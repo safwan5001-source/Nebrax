@@ -10269,7 +10269,8 @@
         "branch": "Routed to branch",
         "status": "Ingress point status",
         "version": "Signing key version",
-        "created": "Created"
+        "created": "Created",
+        "actions": "Actions"
       },
       "status": {
         "configured": "Configured",
@@ -10284,8 +10285,10 @@
       "unknownDate": "—",
       "statusNote": "An ingress point's status (configured or disabled) concerns AWJ only. It is not platform readiness or the native integration status shown above.",
       "branchNote": "An ingress point may be routed to an AWJ branch. That does not map the platform's store to a branch.",
-      "scopeNote": "Points are shown within the scope of your branches only. This panel is read-only.",
-      "retry": "Try again"
+      "scopeNote": "Points are shown within the scope of your branches only.",
+      "retry": "Try again",
+      "readOnlyNote": "Read-only: you do not have permission to manage ingress points.",
+      "manageNote": "Rotating and disabling change the ingress point inside AWJ only. They do not affect the merchant account or the platform's settings."
     },
     "ingressManagement": {
       "errors": {
@@ -10304,7 +10307,47 @@
         "conflict": "This conflicts with a newer state. Refresh the list.",
         "outcomeUnknown": "We did not receive the result and the operation may have completed. Refresh the list; if the point appears and you did not save the secret, rotate it again. Do not repeat the request.",
         "serverError": "The action could not be completed right now. You can try again.",
-        "unknown": "The action could not be completed."
+        "unknown": "The action could not be completed.",
+        "demoUnavailable": "Managing ingress points is not available in preview mode.",
+        "disableOutcomeUnknown": "We did not receive the result of the disable, and it may have completed. We re-read the current state; repeat it only if the point still shows as configured and you still want it disabled."
+      },
+      "common": {
+        "cancel": "Cancel"
+      },
+      "actions": {
+        "rotate": "Rotate secret",
+        "disable": "Disable",
+        "rotateFor": "Rotate the secret of ingress point {storeId}",
+        "disableFor": "Disable ingress point {storeId}"
+      },
+      "rotate": {
+        "title": "Rotate signing secret",
+        "message": "The current secret of this point stops working immediately, and any event signed with it is rejected until the sender is updated with the new secret. The new secret is shown only once.",
+        "confirm": "Rotate secret",
+        "busy": "Rotating…"
+      },
+      "disable": {
+        "title": "Disable ingress point",
+        "message": "This point will stop accepting any signed event, and the disable cannot be undone from this interface.",
+        "typedLabel": "To confirm, type the store ID shown below exactly as it appears",
+        "confirm": "Disable ingress point",
+        "busy": "Disabling…"
+      },
+      "secret": {
+        "title": "New ingress point secret",
+        "description": "Ingress point ⁨{storeId}⁩: put it in the signing setup of the party that sends the events. The previous secret no longer works.",
+        "warning": "This is the new secret and it will not be shown again once this window is closed. Copy it and store it somewhere safe now.",
+        "copied": "Copied",
+        "confirm": "I have saved the secret",
+        "confirmHint": "Confirm that you saved the secret first; it cannot be recovered after closing.",
+        "reveal": "Show secret",
+        "hide": "Hide secret",
+        "copy": "Copy secret"
+      },
+      "notices": {
+        "rotated": "The secret of ingress point {storeId} was rotated. The previous secret no longer works.",
+        "disabled": "Ingress point {storeId} was disabled.",
+        "dismiss": "Dismiss"
       }
     }
   }

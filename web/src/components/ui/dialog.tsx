@@ -13,6 +13,11 @@ interface DialogProps {
   className?: string;
   /** تسمية زر الإغلاق؛ الافتراضي من `common.close` بلغة الواجهة الحالية. */
   closeLabel?: string;
+  /**
+   * يُخفي زرّ الإغلاق العلوي. للحوار الذي لا يجوز إغلاقه الآن (طلب جارٍ، أو سرّ لم يُؤكَّد حفظه): زرٌّ ظاهر لا يفعل شيئاً
+   * يوهم المستخدم بعطل. Escape والخلفية يبقيان على `onClose` ليقرّر المستدعي. الافتراضي `false` = السلوك القائم حرفياً.
+   */
+  hideClose?: boolean;
 }
 
 const FOCUSABLE = [
@@ -49,7 +54,7 @@ function topDialog(): HTMLElement | undefined {
  * ويمنع تمرير الصفحة خلفه. السلوك وحده تغيّر — لا خاصيات جديدة ولا تغيير في
  * أي استدعاء قائم.
  */
-export function Dialog({ open, onClose, title, children, className, closeLabel }: DialogProps) {
+export function Dialog({ open, onClose, title, children, className, closeLabel, hideClose = false }: DialogProps) {
   const defaultCloseLabel = useCommonLabel('close', { ar: 'إغلاق', en: 'Close' });
   const panelRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -137,9 +142,11 @@ export function Dialog({ open, onClose, title, children, className, closeLabel }
       >
         <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
           <h2 className="min-w-0 truncate text-base font-semibold text-text">{title}</h2>
-          <button type="button" onClick={onClose} className="-m-1 shrink-0 rounded p-1 text-muted hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label={closeLabel ?? defaultCloseLabel}>
-            <X className="h-4 w-4" strokeWidth={1.7} />
-          </button>
+          {hideClose ? null : (
+            <button type="button" onClick={onClose} className="-m-1 shrink-0 rounded p-1 text-muted hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label={closeLabel ?? defaultCloseLabel}>
+              <X className="h-4 w-4" strokeWidth={1.7} />
+            </button>
+          )}
         </div>
         <div ref={bodyRef} className="min-w-0 overflow-y-auto overflow-x-hidden p-4 [&_pre]:max-w-full [&_pre]:whitespace-pre-wrap [&_pre]:break-all">{children}</div>
       </div>
