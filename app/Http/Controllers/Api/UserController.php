@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\AuthRecoveryService;
 use App\Support\PlanGate;
+use App\Support\Rbac;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -72,6 +73,74 @@ class UserController extends ApiController
     }
 
     /**
+     * هل يستطيع هذا الفاعل منح الدور `$slug`؟ (AC-UX-00A — سقف المنح)
+     *
+     * - الفاعل ذو `*` يمنح أي دور (حارس المالك `guardOwnerRole` يبقى منفصلاً).
+     * - غيره يمنح دوراً فقط إن لم يكن الدور ذا `*` وكانت كل صلاحياته ⊆ صلاحيات
+     *   الفاعل نفسه — فلا يرقّي نفسه (أو غيره) فوق ما يملك.
+     */
+    private function canGrantRole(User $actor, string $slug): bool
+    {
+        $mine = Rbac::permissionsForRole($actor->role);
+        if (in_array('*', $mine, true)) {
+            return true;
+        }
+
+        $wanted = Rbac::permissionsForRole($slug);
+
+        return ! in_array('*', $wanted, true) && array_diff($wanted, $mine) === [];
+    }
+
+    /**
+     * حدود المنح لإدارة المستخدمين (AC-UX-00A): لا يُدار بـ`users.manage` ما يتجاوز
+     * سلطة الفاعل نفسه.
+     *
+     *  1. **الدور:** يُمنح دورٌ جديد فقط إن استطاع الفاعل منحه (`canGrantRole`).
+     *  2. **الهدف:** مستخدمٌ آخر دوره الحالي فوق سقف الفاعل لا يُعدَّل ولا يُحذف —
+     *     وإلا كان إعادة تعيين كلمة مرور `admin` ترقيةً بالمقايضة.
+     *  3. **النطاق:** فاعلٌ مقيَّد بفروع/مستودعات لا يُسند إلا ما هو ضمن نطاقه ولا
+     *     يمسح التقييد (`[]` تعني «غير مقيَّد») ولا يُنشئ مستخدماً بلا نطاق.
+     *
+     * الفاعل غير المقيَّد (دلالة الفراغ = الكلّ) وذو `*` لا يتأثر سلوكه.
+     */
+    private function guardGrantBoundary(Request $request, array $data, ?User $target = null): void
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+
+        if ($target && $target->id !== $actor->id && ! $this->canGrantRole($actor, $target->role)) {
+            abort(403, 'لا يمكنك إدارة مستخدمٍ دوره يتجاوز صلاحياتك.');
+        }
+
+        $newRole = $data['role'] ?? null;
+        if ($newRole !== null && $newRole !== $target?->role && ! $this->canGrantRole($actor, $newRole)) {
+            abort(403, 'لا يمكنك منح دورٍ يتجاوز صلاحياتك.');
+        }
+
+        $creating = $target === null;
+        foreach (['branch_ids' => $actor->allowedBranchIds(), 'warehouse_ids' => $actor->allowedWarehouseIds()] as $key => $allowed) {
+            if ($allowed === null) {
+                continue; // الفاعل غير مقيَّد في هذا البُعد.
+            }
+
+            if (! array_key_exists($key, $data)) {
+                if ($creating) {
+                    abort(403, 'حدّد نطاق الوصول للمستخدم الجديد ضمن نطاقك.');
+                }
+                continue; // الغياب = بلا تغيير.
+            }
+
+            $requested = array_values(array_unique($data[$key] ?? []));
+            if ($requested === []) {
+                abort(403, 'لا يمكنك إلغاء قيد نطاق الوصول؛ حدّد ما ضمن نطاقك.');
+            }
+            if (array_diff($requested, $allowed) !== []) {
+                abort(403, 'لا يمكنك إسناد فروع أو مستودعات خارج نطاقك.');
+            }
+        }
+    }
+
+    /**
      * تحقّق ربط الموظف بالمستخدم (`User ⊃ Employee`). لا فعل إن كان `null`
      * (غير مرسَل أو فكّ ربط). وإلا: الموظف يجب أن يخصّ المستأجر وألّا يكون
      * مرتبطاً بمستخدم آخر — فحسابُ دخولٍ واحد لكل موظف على الأكثر.
@@ -118,6 +187,7 @@ class UserController extends ApiController
     {
         $data = $request->validated();
         $this->guardOwnerRole($request, null, $data['role'] ?? null);
+        $this->guardGrantBoundary($request, $data);
         $tenantId = $this->tenantId();
 
         // فرض حدّ الخطة لعدد المستخدمين
@@ -186,6 +256,7 @@ class UserController extends ApiController
         $user = User::where('tenant_id', $this->tenantId())->findOrFail($id);
         $data = $request->validated();
         $this->guardOwnerRole($request, $user, $data['role'] ?? null);
+        $this->guardGrantBoundary($request, $data, $user);
 
         if (empty($data['password'])) {
             unset($data['password']);
@@ -221,6 +292,7 @@ class UserController extends ApiController
 
         $user = User::where('tenant_id', $this->tenantId())->findOrFail($id);
         $this->guardOwnerRole($request, $user);
+        $this->guardGrantBoundary($request, [], $user);
 
         // REM-08 / SEC-04: الحذف ناعم (`SoftDeletes`) وجدول التوكنات polymorphic بلا
         // FK متتالٍ، فلا يسقط التوكن تبعاً للمستخدم — يُسحب صراحةً قبل الحذف.
