@@ -172,4 +172,19 @@ describe('ApplicationsPage operational actions', () => {
     expect(within(group).getByRole('button', { name: 'Enable' })).toBeTruthy();
     expect(within(group).getByRole('button', { name: 'Disable' })).toBeTruthy();
   });
+
+  it('keeps unbuilt applications and the selected status tab at full text contrast (ERP-UX-011)', async () => {
+    api.mockResolvedValue({ data: {
+      fuel_trial: app('fuel_trial', 'trial'),
+      fuel_soon: app('fuel_soon', 'included', { maturity: 'coming_soon' }),
+    } });
+    const { container } = render(<ApplicationsPage />);
+    await screen.findByRole('heading', { name: 'Fuel trial' });
+
+    expect(container.querySelectorAll('article').length).toBe(2);
+    for (const row of container.querySelectorAll('article')) expect(row.className).not.toMatch(/opacity-/);
+    const pressed = container.querySelector('button[aria-pressed="true"] > span');
+    expect(pressed?.className).toContain('text-text');
+    expect(pressed?.className).not.toContain('text-muted');
+  });
 });

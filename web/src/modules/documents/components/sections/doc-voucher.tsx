@@ -46,11 +46,11 @@ export function DocVoucher({
         style={{ borderColor: 'var(--doc-brand)', background: 'var(--doc-brand-soft)' }}
       >
         <div>
-          <div className="text-[11px] text-gray-500">{phrase}</div>
+          <div className="text-[11px] text-gray-600">{phrase}</div>
           <div className="text-base font-bold text-black">{party}</div>
         </div>
         <div className="text-end">
-          <div className="text-[11px] text-gray-500">{voucherLabel('amount')}</div>
+          <div className="text-[11px] text-gray-600">{voucherLabel('amount')}</div>
           <div className="num text-2xl font-bold" style={{ color: 'var(--doc-brand)' }}>
             {formatMoney(v.amount)}
           </div>
@@ -60,12 +60,12 @@ export function DocVoucher({
       {/* الطريقة والمرجع. */}
       <div className="grid grid-cols-2 gap-3 text-[12px]">
         <div className="flex justify-between border-b border-gray-100 pb-1">
-          <span className="text-gray-500">{voucherLabel('method')}</span>
+          <span className="text-gray-600">{voucherLabel('method')}</span>
           <span className="font-medium text-black">{v.method}</span>
         </div>
         {v.reference && (
           <div className="flex justify-between border-b border-gray-100 pb-1">
-            <span className="text-gray-500">{voucherLabel('reference')}</span>
+            <span className="text-gray-600">{voucherLabel('reference')}</span>
             <span className="num font-medium text-black">{v.reference}</span>
           </div>
         )}
@@ -74,7 +74,7 @@ export function DocVoucher({
       {/* التخصيصات — ما غطّاه السند من فواتير/مشتريات. */}
       {v.allocations && v.allocations.length > 0 && (
         <div className={cn('overflow-hidden border border-gray-200', style.cardRadius)}>
-          <div className="bg-gray-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+          <div className="bg-gray-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-600">
             {voucherLabel('applied_to')}
           </div>
           <table className="w-full text-[12px]">

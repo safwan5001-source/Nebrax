@@ -152,7 +152,7 @@ export default function InventorySettingsPage() {
           </div>
 
           {/* آلية التحقق عند البيع: معطّلة — لا مفهوم «محجوز» في النظام بعد. */}
-          <div className="rounded border border-border p-3 opacity-60">
+          <div className="rounded border border-dashed border-border p-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-medium text-muted">{t('total_in_stock')}</span>
               <Badge tone="muted">{t('soon')}</Badge>
