@@ -862,7 +862,8 @@
     "no": "No",
     "all": "All",
     "themeToggle": "Toggle color mode",
-    "languageToggle": "Switch language"
+    "languageToggle": "Switch language",
+    "close": "Close"
   },
   "contacts": {
     "title": "Contact list",
