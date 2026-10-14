@@ -27,6 +27,7 @@
                         "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
                         "fit": "cover"
                     },
+                    "fallbackIcon": "gift",
                     "shape": "arch",
                     "size": "lg",
                     "showLabel": true
@@ -717,6 +718,48 @@
                     "icon": null,
                     "iconColor": null,
                     "background": null,
+                    "fallback": null,
+                    "fit": "system",
+                    "shape": "system",
+                    "size": "system",
+                    "showLabel": "system"
+                }
+            }
+        },
+        {
+            "name": "an image carries its fallback icon and that icon's colour",
+            "facet": {
+                "defaults": {
+                    "icon": "cake",
+                    "iconColor": "#9d2449",
+                    "background": "#fdf2f4"
+                }
+            },
+            "value": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                }
+            },
+            "context": {},
+            "expected": {
+                "visual": {
+                    "content": "image",
+                    "image": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "fit": "cover"
+                    },
+                    "fallbackIcon": "cake",
+                    "iconColor": "#9d2449",
+                    "background": "#fdf2f4",
+                    "shape": "circle",
+                    "size": "md",
+                    "showLabel": true
+                },
+                "sources": {
+                    "content": "implicit",
+                    "icon": "facet",
+                    "iconColor": "facet",
+                    "background": "facet",
                     "fallback": null,
                     "fit": "system",
                     "shape": "system",

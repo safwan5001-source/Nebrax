@@ -6,7 +6,7 @@ STATUS: TAX-ZATCA HORIZON ACTIVE UPON MERGE OF ACTIVATION PR #1324 — use `docs
 
 ## Parallel Horizon — AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 (launched by owner 2026-10-14)
 - **G0 CLOSED** (owner, 2026-10-14): D-01..D-17 approved. H1-0 merged as `d5dfa16` (POST_MERGE_REVIEW: PASS).
-- VD-1a (pure contract: normalizer/resolver/registries/icons, no DB/API) in review. VD-1b/VD-1c (migration + API) **need a separate explicit owner approval** before starting.
+- VD-1a (pure contract: normalizer/resolver/registries/icons, no DB/API) merged as `8801af9`. VD-2 (shape engine, `FacetVisualTile`, `IconPicker`, no DB/API) in review. VD-1b/VD-1c (migration + API) **need a separate explicit owner approval** before starting.
 - Plan / queue / decisions: `docs/plans/store/visual-dimensions/`. Per-PR owner merge approval; no deploy. Does not touch TAX-ZATCA files.
 
 ## Paused Horizon handoff — Delivery Platforms & Settlement

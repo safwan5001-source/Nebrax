@@ -96,8 +96,17 @@ Evidence: `AWJ-VD-H1-0-EVIDENCE-AND-ARCHITECTURE.md` (sections referenced as §n
 - **Status:** APPROVED (G0, 2026-10-14)
 
 ### D-14 — Merge policy
-- **Decision:** every PR requires explicit owner approval. No stacked PRs.
-- **Status:** OWNER-SET
+- **Decision (amended by the owner, 2026-10-14, this horizon only):**
+  - **Low-risk PRs are auto-merged** (VD-2 included) once every CI check is green, the reviews have passed, there is no conflict, and no substantive finding is open.
+    - Method: **Squash merge**. The merge SHA is recorded in the task queue and the slice report, followed by `POST_MERGE_REVIEW`.
+    - Then the horizon continues automatically to the next **authorized** slice.
+  - **Explicit owner approval before implementation and before merge** for any change that touches:
+    - the database, an API, permissions, security, tenant isolation, accounting or inventory.
+    - In this horizon that covers VD-1b, VD-1c and VD-4a, and any slice that consumes them before they are approved.
+  - **No production deploy** without explicit owner approval.
+  - No stacked PRs.
+- **Original decision (superseded):** every PR requires explicit owner approval.
+- **Status:** OWNER-SET (amended)
 
 ### D-15 — Caching and leakage
 - **Decision:**
