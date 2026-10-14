@@ -76,12 +76,16 @@ const world = (over: Partial<World> = {}): World => ({
 });
 const writes = (w: World) => w.requests.filter((r) => !r.startsWith('GET '));
 const visible = (page: Page, testId: string) => page.locator(`[data-testid="${testId}"]:visible`);
+/** صفّ (جدول) أو بطاقة (جوال) نقطة المتجر المحدّدة — النقطة المعطّلة تعرض مشغّلها أيضاً، فلا يصحّ الاعتماد على «الظاهر الوحيد». */
+const rowOf = (page: Page, storeId: string) => page.locator('[data-testid="signed-ingress-row"]:visible', { hasText: storeId });
+const operatorOf = (page: Page, storeId: string) => rowOf(page, storeId).getByTestId('signed-ingress-operator');
+const STORE = 'KTA-RIYADH-0042';
 async function shot(page: Page, name: string) {
   if (shots) await page.screenshot({ path: `${shots}/${name}.png`, fullPage: false });
 }
 async function openDialog(page: Page) {
-  await expect(visible(page, 'signed-ingress-operator')).toHaveText('نورة السالم');
-  await visible(page, 'ingress-reassign').click();
+  await expect(operatorOf(page, STORE)).toHaveText('نورة السالم');
+  await rowOf(page, STORE).getByTestId('ingress-reassign').click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
   await expect(dialog.getByTestId('reassign-select')).toBeVisible();
@@ -100,7 +104,7 @@ for (const [locale, dir] of [['ar', 'rtl'], ['en', 'ltr']] as const) {
         expect(await page.evaluate(() => document.documentElement.dir)).toBe(dir);
         const tag = `${locale}-${theme}-${info.project.name}`;
 
-        await expect(visible(page, 'signed-ingress-operator')).toHaveText(self);
+        await expect(operatorOf(page, STORE)).toHaveText(self);
         await expect(visible(page, 'ingress-reassign')).toHaveCount(1); // نقطة مهيّأة واحدة فقط
         await shot(page, `panel-${tag}`);
 
@@ -121,7 +125,7 @@ for (const [locale, dir] of [['ar', 'rtl'], ['en', 'ltr']] as const) {
 
         await expect(page.getByRole('dialog')).toHaveCount(0);
         await expect(page.getByTestId('ingress-management-notice')).toContainText(amal);
-        await expect(visible(page, 'signed-ingress-operator')).toHaveText(amal);
+        await expect(operatorOf(page, STORE)).toHaveText(amal);
         expect(writes(w)).toEqual(['POST /delivery-connectors/ing-1/reassign']);
         expect(w.bodies).toEqual([{ user_id: 'u-amal' }]);
         expect(w.rows[0]).toMatchObject({ status: 'configured', secret_version: 3, branch_id: null, external_store_id: 'KTA-RIYADH-0042' });
