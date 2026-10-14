@@ -12,7 +12,9 @@ import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
-import { type CashBankAccount, type CashBankType, PERMISSION_SCOPES, type PermissionScope } from '@/lib/cash-bank';
+import { type CashBankAccount, type CashBankType, type PermissionScope } from '@/lib/cash-bank';
+import { AccessRuleField, useAccessLookups, type AccessRuleValue } from '@/components/treasury/access-rules';
+import { payloadSubject, subjectMissing } from '@/modules/treasury/access';
 
 const todayType = (value: string | null): CashBankType => value === 'bank' ? 'bank' : 'cash';
 
@@ -32,6 +34,13 @@ export default function CashBankFormPage() {
     withdraw_scope: 'all' as PermissionScope, withdraw_scope_subject: '',
   });
 
+  // القيمة المحفوظة عند الفتح: نطاقها يبقى متاحاً حتى بلا صلاحية عرض قائمته (انظر AccessRuleField).
+  const [initialAccess, setInitialAccess] = useState<Record<'deposit' | 'withdraw', AccessRuleValue>>({
+    deposit: { scope: 'all', subject: '' },
+    withdraw: { scope: 'all', subject: '' },
+  });
+  const lookups = useAccessLookups(true);
+
   const load = useCallback(() => {
     if (!editId) return;
     setLoading(true);
@@ -44,6 +53,10 @@ export default function CashBankFormPage() {
           deposit_scope: data.deposit_scope, deposit_scope_subject: data.deposit_scope_subject ?? '',
           withdraw_scope: data.withdraw_scope, withdraw_scope_subject: data.withdraw_scope_subject ?? '',
         });
+        setInitialAccess({
+          deposit: { scope: data.deposit_scope, subject: data.deposit_scope_subject ?? '' },
+          withdraw: { scope: data.withdraw_scope, subject: data.withdraw_scope_subject ?? '' },
+        });
       })
       .catch((err) => toastError(err instanceof ApiError ? err.message : t('load_failed')))
       .finally(() => setLoading(false));
@@ -52,13 +65,16 @@ export default function CashBankFormPage() {
   useEffect(() => load(), [load]);
   const set = (key: keyof typeof form, value: string | boolean) => setForm((current) => ({ ...current, [key]: value }));
 
+  const accessIncomplete = subjectMissing(form.deposit_scope, form.deposit_scope_subject) || subjectMissing(form.withdraw_scope, form.withdraw_scope_subject);
+
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (accessIncomplete) return;
     setSaving(true);
     const payload = {
       type, ...form,
-      deposit_scope_subject: form.deposit_scope === 'all' ? null : form.deposit_scope_subject || null,
-      withdraw_scope_subject: form.withdraw_scope === 'all' ? null : form.withdraw_scope_subject || null,
+      deposit_scope_subject: payloadSubject(form.deposit_scope, form.deposit_scope_subject),
+      withdraw_scope_subject: payloadSubject(form.withdraw_scope, form.withdraw_scope_subject),
     };
     try {
       const response = await api<{ data: CashBankAccount }>(editId ? `/cash-bank-accounts/${editId}` : '/cash-bank-accounts', {
@@ -76,7 +92,7 @@ export default function CashBankFormPage() {
   return <form onSubmit={submit} className="mx-auto max-w-3xl space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-3"><Button asChild type="button" variant="ghost" size="icon" aria-label={t('back')}><Link href="/cash-and-bank"><ArrowRight className="h-4 w-4" strokeWidth={1.7} /></Link></Button><div><h1 className="text-xl font-semibold text-text">{editId ? t('edit_title', { name: form.name }) : t(type === 'bank' ? 'new_bank' : 'new_cash')}</h1><p className="mt-1 text-sm text-muted">{t('subtitle')}</p></div></div>
-      <Button disabled={saving}><Save className="h-4 w-4" strokeWidth={1.7} />{t('save')}</Button>
+      <Button disabled={saving || accessIncomplete}><Save className="h-4 w-4" strokeWidth={1.7} />{t('save')}</Button>
     </div>
 
     <Card><CardHeader><CardTitle className="flex items-center gap-2"><Icon className="h-4 w-4 text-primary" strokeWidth={1.7} />{t('account_info')}</CardTitle></CardHeader><CardContent className="space-y-5">
@@ -86,11 +102,20 @@ export default function CashBankFormPage() {
       <label className="flex items-center gap-2 text-sm text-text"><input type="checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} className="h-4 w-4 rounded border-border accent-primary focus-visible:ring-2 focus-visible:ring-primary/40" />{t('active')}</label>
     </CardContent></Card>
 
-    <Card><CardHeader><CardTitle>{t('permissions')}</CardTitle></CardHeader><CardContent className="grid gap-5 sm:grid-cols-2">
-      {(['deposit', 'withdraw'] as const).map((action) => {
-        const scopeKey = `${action}_scope` as const; const subjectKey = `${action}_scope_subject` as const;
-        return <div key={action} className="space-y-3 rounded-md border border-border p-4"><p className="text-sm font-medium text-text">{t(action)}</p><label className="block space-y-2 text-sm text-muted"><span>{t('scope')}</span><Select value={form[scopeKey]} onChange={(e) => set(scopeKey, e.target.value as PermissionScope)}>{PERMISSION_SCOPES.map((scope) => <option key={scope} value={scope}>{t(scope)}</option>)}</Select></label>{form[scopeKey] !== 'all' && <label className="block space-y-2 text-sm text-muted"><span>{t('scope_subject')}</span><Input required value={form[subjectKey]} onChange={(e) => set(subjectKey, e.target.value)} /></label>}</div>;
-      })}
+    <Card><CardHeader><CardTitle>{t('permissions')}</CardTitle></CardHeader><CardContent className="space-y-4">
+      <p className="text-sm leading-relaxed text-muted">{t('permissions_intro')}</p>
+      <div className="grid gap-5 sm:grid-cols-2">
+        {(['deposit', 'withdraw'] as const).map((action) => (
+          <AccessRuleField
+            key={action}
+            action={action}
+            lookups={lookups}
+            initial={initialAccess[action]}
+            value={{ scope: form[`${action}_scope`], subject: form[`${action}_scope_subject`] }}
+            onChange={(next) => setForm((current) => ({ ...current, [`${action}_scope`]: next.scope, [`${action}_scope_subject`]: next.subject }))}
+          />
+        ))}
+      </div>
     </CardContent></Card>
   </form>;
 }
