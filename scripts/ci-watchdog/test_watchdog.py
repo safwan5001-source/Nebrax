@@ -423,7 +423,11 @@ class StepExitCode(unittest.TestCase):
             "trap awj_watchdog_stop EXIT\n"
             f"awj_watchdog_start --out-dir {out} --paratest-tmp-dir {self.base}/paratest --stall-seconds 60 --poll-seconds 0.2\n"
             "echo \"WDPID=$AWJ_WATCHDOG_PID\"\n"
-            f"for i in $(seq 1 100); do [ -s {out}/watchdog.log ] && break; sleep 0.1; done\n"
+            # until the watchdog is ready (handlers installed, first log line) or already gone
+            "for i in $(seq 1 100); do\n"
+            f"  [ -n \"$AWJ_WATCHDOG_PID\" ] && kill -0 \"$AWJ_WATCHDOG_PID\" 2>/dev/null && [ ! -s {out}/watchdog.log ] || break\n"
+            "  sleep 0.1\n"
+            "done\n"
             f"(echo running tests; exit {test_exit}) | tee {self.base}/test-output.txt\n"
             "echo not-reached-on-failure\n")
         env = dict(os.environ)
@@ -473,7 +477,9 @@ class StepExitCode(unittest.TestCase):
 
     def test_watchdog_ignoring_sigterm_is_killed_and_result_kept(self):
         stubborn = self.base / "stubborn.py"
-        stubborn.write_text("import signal, time\nsignal.signal(signal.SIGTERM, signal.SIG_IGN)\ntime.sleep(120)\n")
+        stubborn.write_text("import signal, sys, time\nsignal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+                            "out = sys.argv[sys.argv.index('--out-dir') + 1]\n"
+                            "open(out + '/watchdog.log', 'w').write('ready\\n')\ntime.sleep(120)\n")
         rc, out, pid = self.step(0, watchdog=str(stubborn))
         self.assertEqual(rc, 0, out)
         self.assertIn("did not stop within 10s", out)

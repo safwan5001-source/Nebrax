@@ -89,6 +89,8 @@ CI runs the same suite in ~10–13 min against ~6 min locally, so CPU-bound test
 
 **Confirmed on the GitHub runner** (PR #1488, head `938b60e`, run `38632798597`, `summary.json` from the artifact): 6908 tests in 8:27, **0 stalls**. Per-worker maximum gaps: 55.1 / 55.1 / 20.0 / 15.0 s (sampled every 5 s). Slowest tests: 60.0 s (lock-timeout test), **56.7 s** (`PlatformGlobalApplicationOverrideTest::global_summary_scales…`, 23.8 s locally, so ~2.4× slower on CI), 43.8 s (`ImportJobApplyTest`). 240 s stays ≥ 4× every legitimate value seen on CI.
 
+The second CI run (head `361ed6d`, run `38636170947`, a slower runner: suite 11:18) measured the same test at **75.6 s** and a longest gap of **80.1 s** (`PlatformGlobalApplicationOverrideTest::global_summary_scales…`, 3.2× its local time). 240 s still leaves 3× headroom over the worst value seen on any runner. A false positive would cost one `::warning` and a snapshot, never a failed job (observe only); `summary.json` on every run keeps this margin visible.
+
 A deliberately low threshold (30 s) on the same suite produced **two false stalls** on legitimate tests (the 36 s import test and the 60 s lock-timeout test) — see §5.
 
 **Decision: `--stall-seconds 240`.**
@@ -130,7 +132,7 @@ In order: an `active` session on the worker's `nibras_test_N` waiting on `Lock` 
 | Gate cannot see into `hooks.sh` | `HooksStayInert`: no `exit`, `trap`, `shopt`, `alias`; the only `set` is `set +e` inside the stop hook |
 | Least privilege, real server | `RealPostgres`: the `pg_monitor` role sees another session's `Timeout:PgSleep` (CI: real `postgres:16` container) |
 
-Local: 33/33 green (Python 3.13, local PostgreSQL 16), stable over repeated runs. CI on `938b60e`: 31/31 in 42.8 s on the runner (2 tests were added after review).
+Local: 33/33 green in ~40 s (Python 3.13, local PostgreSQL 16), stable over repeated runs. CI: 31/31 in 42.8 s on `938b60e`; 33/33 on `361ed6d` but in 111 s. Cause: the post-review "wait until the watchdog is ready" loop waited its full 10 s for the substitute watchdogs (crashing / absent / no python3 / SIGTERM-ignoring) that never write a log. Fixed by waiting until the watchdog has logged **or is no longer running** (the SIGTERM-ignoring stub now writes a ready line): back to ~40 s locally.
 
 ### Real ParaTest hang probes (local only; the probe test is never committed)
 A probe test in the real app, run through an exact copy of the CI step (hooks + watchdog + `php artisan test --parallel`):
@@ -185,8 +187,8 @@ No P1. Resolution:
 ## 7. CI time impact
 | Item | Cost |
 |---|---|
-| Watchdog during the suite | ≈ +1 % (342 → 346 s locally; CI pgsql suite 8:27 on `938b60e`) |
-| Self-test step | ≈ 45 s (42.8 s measured on the runner) |
+| Watchdog during the suite | ≈ +1 % (342 → 346 s locally). CI pgsql suite: 8:27 on `938b60e`, 11:18 on `361ed6d` (runner variance; the 1477 merge run took 13:21) |
+| Self-test step | ≈ 40–45 s (42.8 s measured on the runner for the first version; ~40 s locally for the final one) |
 | Role step | < 1 s |
 | Artifact | +~280 KB compressed (`teamcity.log`, `summary.json`, `watchdog.log`) |
 
