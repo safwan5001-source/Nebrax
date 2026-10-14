@@ -10523,7 +10523,9 @@
     "reason_delete_has_users": "Reassign its users before deleting this role.",
     "confirm_delete_title": "Delete role",
     "confirm_delete": "Delete the role \"{name}\"? It has no assigned users. This cannot be undone.",
-    "exact_key": "Permission key"
+    "exact_key": "Permission key",
+    "duplicate": "Duplicate role",
+    "copy_name": "{name} (copy)"
   },
   "roleEditor": {
     "title_new": "New role",
@@ -10564,6 +10566,10 @@
     "discard": "Discard",
     "cancel": "Cancel",
     "save": "Save",
-    "saving": "Saving…"
+    "saving": "Saving…",
+    "title_clone": "Duplicate role",
+    "description_clone": "A new custom role pre-filled from an existing one. The original is not changed.",
+    "cloned_from": "Copied from \"{name}\". Review the permissions before saving.",
+    "clone_skipped": "{n, plural, one {1 permission you cannot grant was left out.} other {{count} permissions you cannot grant were left out.}}"
   }
 }

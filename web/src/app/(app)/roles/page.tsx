@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { Check, Minus, Pencil, Plus, Search, ShieldAlert, Trash2 } from 'lucide-react';
+import { Check, Copy, Minus, Pencil, Plus, Search, ShieldAlert, Trash2 } from 'lucide-react';
 import { PageHeader, type PageAction } from '@/components/nebrax';
 import { EmptyState, ErrorState, LoadingState } from '@/components/nebrax/states';
 import { RoleEditorSheet } from '@/components/roles/role-editor-sheet';
@@ -18,6 +18,7 @@ import { currentUser } from '@/lib/auth';
 import { displayLocale } from '@/lib/formatting';
 import { hasPermission } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
+import { cloneSeed, type CloneSeed } from '@/modules/roles/editor';
 import {
   filterCatalog,
   filterRoles,
@@ -68,7 +69,8 @@ export default function RolesPage() {
   const [roleQuery, setRoleQuery] = useState('');
   const [permQuery, setPermQuery] = useState('');
   const [grantedOnly, setGrantedOnly] = useState(false);
-  const [editor, setEditor] = useState<{ role: RoleRecord | null } | null>(null);
+  // `seed` + `source` = نسخ دورٍ (إنشاء مبذور)؛ `role` = تعديل؛ كلاهما فارغ = إنشاء جديد.
+  const [editor, setEditor] = useState<{ role: RoleRecord | null; seed?: CloneSeed; source?: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const load = useCallback((selectId?: string) => {
@@ -126,6 +128,12 @@ export default function RolesPage() {
     if (role.users_count > 0) return 'delete_has_users';
     return undefined;
   };
+
+  // النسخ على جانب العميل فقط: نقرأ من الدور المصدر ولا نعدّله، والحفظ لاحقاً POST عادي بالاسم والصلاحيات وحدهما.
+  function duplicate(role: RoleRecord) {
+    const seed = cloneSeed(role, catalog, mine, t('copy_name', { name: role.name }));
+    setEditor({ role: null, seed, source: role.name });
+  }
 
   async function remove(role: RoleRecord) {
     const confirmed = await askConfirm({
@@ -274,6 +282,10 @@ export default function RolesPage() {
                       <Pencil className="h-4 w-4" strokeWidth={1.7} />
                       {t('edit')}
                     </Button>
+                    <Button variant="outline" onClick={() => duplicate(selected)}>
+                      <Copy className="h-4 w-4" strokeWidth={1.7} />
+                      {t('duplicate')}
+                    </Button>
                     <Button
                       variant="outline"
                       disabled={Boolean(del) || deleting}
@@ -361,7 +373,7 @@ export default function RolesPage() {
 
       {editor ? (
         <RoleEditorSheet
-          key={editor.role?.id ?? 'new'}
+          key={editor.role?.id ?? (editor.seed ? `clone-${editor.source}` : 'new')}
           open
           onClose={() => setEditor(null)}
           onSaved={(savedId) => load(savedId)}
@@ -369,6 +381,8 @@ export default function RolesPage() {
           catalog={catalog}
           labels={labels}
           actorPermissions={mine}
+          seed={editor.seed}
+          sourceName={editor.source}
         />
       ) : null}
     </div>
