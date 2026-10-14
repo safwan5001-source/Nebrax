@@ -85,7 +85,7 @@ export function CreditNoteForm({ type = 'sales', initialInvoiceId }: { type?: 's
       {!isPurchase && allowStandalone === false && (
         <p className="text-xs leading-relaxed text-muted">
           {tn('standalone_disabled_hint')}{' '}
-          <Link href="/sales-settings/invoices" className="text-primary hover:underline">{tn('standalone_disabled_link')}</Link>
+          <Link href="/sales-settings/invoices" className="text-primary underline underline-offset-2 hover:no-underline">{tn('standalone_disabled_link')}</Link>
         </p>
       )}
 

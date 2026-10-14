@@ -128,7 +128,7 @@ export function ThermalReceipt({
 
       {model.qr?.value && (
         <div className="mt-3 flex justify-center">
-          <QRCodeSVG value={model.qr.value} size={88} level="M" />
+          <QRCodeSVG value={model.qr.value} size={88} level="M" title={t('qr_title')} />
         </div>
       )}
 

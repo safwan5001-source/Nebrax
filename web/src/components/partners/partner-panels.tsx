@@ -29,7 +29,7 @@ export function KeyValue({
       <span className="text-muted">{label}</span>
       <span className={cn('font-medium text-text', mono && 'num')}>
         {href ? (
-          <Link href={href} className="text-primary hover:underline">
+          <Link href={href} className="inline-flex min-h-6 min-w-6 items-center justify-end text-primary hover:underline">
             {value}
           </Link>
         ) : (
@@ -103,7 +103,7 @@ export function DocTable({
         {rows.map((r) => (
           <TR key={r.id}>
             <TD>
-              <Link href={href(r.id)} className="num font-medium text-primary hover:underline">
+              <Link href={href(r.id)} className="num inline-flex min-h-6 items-center font-medium text-primary hover:underline">
                 {r.number}
               </Link>
             </TD>

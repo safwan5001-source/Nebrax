@@ -544,6 +544,7 @@ export function Sidebar({
       {open && <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={onDismiss} aria-hidden />}
 
       <aside
+        aria-label={t('sidebarLabel')}
         aria-hidden={drawerHiddenOnMobile || undefined}
         inert={drawerHiddenOnMobile}
         data-awj-shell="sidebar"

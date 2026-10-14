@@ -152,7 +152,7 @@ export default function PosAuditPage() {
 
   if (!user) return null;
   return (
-    <main className="space-y-5 p-4 lg:p-6">
+    <div className="space-y-5 p-4 lg:p-6">
       <header className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
         <div><h1 className="text-xl font-semibold tracking-tight text-text">{t('title')}</h1><p className="mt-1 max-w-3xl text-sm text-muted">{t('subtitle')}</p></div>
         <div className="flex gap-2"><Button variant="outline" onClick={() => void loadCore()} disabled={loading}><RefreshCw className="h-4 w-4" strokeWidth={1.6} />{tc('refresh')}</Button>{can('pos.audit.export') && <Button variant="outline" onClick={exportCsv}><Download className="h-4 w-4" strokeWidth={1.6} />{t('export')}</Button>}</div>
@@ -242,6 +242,6 @@ export default function PosAuditPage() {
           </div>
         )}
       </Dialog>
-    </main>
+    </div>
   );
 }

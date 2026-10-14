@@ -842,6 +842,11 @@
     "search": "Search branches…",
     "empty": "No branches"
   },
+  "notFound": {
+    "title": "Page not found",
+    "body": "The link may be out of date or incomplete, or this module is not available yet.",
+    "back": "Back to the dashboard"
+  },
   "common": {
     "refresh": "Refresh",
     "active": "Active",
@@ -2277,6 +2282,7 @@
     "relations_unavailable": "Some protected relations could not be loaded. This does not affect the invoice data."
   },
   "invoiceDoc": {
+    "qr_title": "QR code",
     "title": "Tax Invoice",
     "title_en": "فاتورة ضريبية",
     "bill_to": "Bill to",
@@ -2748,6 +2754,7 @@
     }
   },
   "nav": {
+    "sidebarLabel": "Sidebar",
     "dashboard": "Dashboard",
     "soon": "Soon",
     "close": "Close menu",
