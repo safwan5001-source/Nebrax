@@ -1,6 +1,6 @@
 # AWJ-ERP-UX-H1-0 — Crawl evidence (generated)
 
-Page loads recorded: **1871**
+Page loads recorded: **1869**
 
 Gate check: loads whose `data-awj-ui` attribute disagreed with the requested mode (excluding gate-excluded routes): **7** /icon.ico
 
@@ -11,8 +11,8 @@ Gate check: loads whose `data-awj-ui` attribute disagreed with the requested mod
 | 3 | ar-light-320 | 207 |
 | 3 | ar-light-390 | 208 |
 | 3 | ar-light-768 | 208 |
-| 3 | en-dark-1440 | 208 |
-| 3 | en-light-390 | 208 |
+| 3 | en-dark-1440 | 207 |
+| 3 | en-light-390 | 207 |
 | legacy | ar-light-1440 | 208 |
 | legacy | ar-light-390 | 208 |
 
@@ -20,8 +20,8 @@ Gate check: loads whose `data-awj-ui` attribute disagreed with the requested mod
 
 | Rule | Impact | UI | Page loads affected | Distinct routes | Example route | Example node |
 |---|---|---|---|---|---|---|
-| `aria-hidden-focus` | serious | 3 | 674 | 168 | `/accounting-settings` | `.max-h-\[calc\(100dvh-1\.5rem\)\]` |
-| `heading-order` | moderate | 3 | 372 | 92 | `/accounting-settings/account-routing` | `.border.bg-surface[data-awj-card="true"]:nth-child(2) > .pb-2.p-4 > h3[data-awj-card-title` |
+| `aria-hidden-focus` | serious | 3 | 672 | 168 | `/accounting-settings` | `.max-h-\[calc\(100dvh-1\.5rem\)\]` |
+| `heading-order` | moderate | 3 | 370 | 92 | `/accounting-settings/account-routing` | `.border.bg-surface[data-awj-card="true"]:nth-child(2) > .pb-2.p-4 > h3[data-awj-card-title` |
 | `aria-hidden-focus` | serious | legacy | 337 | 168 | `/accounting-settings` | `.max-h-\[calc\(100dvh-1\.5rem\)\]` |
 | `heading-order` | moderate | legacy | 188 | 93 | `/accounting-settings/account-routing` | `.border.bg-surface[data-awj-card="true"]:nth-child(2) > .pb-2.p-4 > h3[data-awj-card-title` |
 | `select-name` | critical | 3 | 60 | 15 | `/accounting-settings/account-routing` | `.border.bg-surface[data-awj-card="true"]:nth-child(2) > .pt-2.p-4 > .divide-y.divide-borde` |
@@ -266,7 +266,7 @@ Gate check: loads whose `data-awj-ui` attribute disagreed with the requested mod
 | `/reports/general/balance-sheet` | ar-light-320 | 3 | 12 |
 | `/reports/general/account-ledger` | ar-light-320 | 3 | 12 |
 
-Total overflowing loads: 175 of 1871
+Total overflowing loads: 175 of 1869
 
 ## API responses >= 400 during page load
 
@@ -331,28 +331,11 @@ Total overflowing loads: 175 of 1871
 
 | Route | Config | Count | Samples |
 |---|---|---|---|
-| `/reports/general/balance-sheet` | en-dark-1440 | 55 | لوحة التحكم; المبيعات; نقطة البيع; التجارة الإلكترونية; العملاء |
-| `/suppliers/:id/ledger` | en-dark-1440 | 52 | لوحة التحكم; المبيعات; نقطة البيع; التجارة الإلكترونية; العملاء |
-| `/suppliers/:id/statement` | en-dark-1440 | 51 | لوحة التحكم; المبيعات; نقطة البيع; التجارة الإلكترونية; العملاء |
-| `/reports/customers/aging` | en-dark-1440 | 50 | لوحة التحكم; المبيعات; نقطة البيع; التجارة الإلكترونية; العملاء |
-| `/reports/general/income-statement` | en-dark-1440 | 49 | لوحة التحكم; المبيعات; نقطة البيع; التجارة الإلكترونية; العملاء |
-| `/reports/general/account-ledger` | en-dark-1440 | 41 | لوحة التحكم; المبيعات; نقطة البيع; التجارة الإلكترونية; العملاء |
-| `/warehouses/:id` | en-light-390 | 40 | لوحة التحكم; المبيعات; نقطة البيع; التجارة الإلكترونية; العملاء |
-| `/warehouses/new` | en-light-390 | 40 | لوحة التحكم; المبيعات; نقطة البيع; التجارة الإلكترونية; العملاء |
-| `/suppliers` | en-dark-1440 | 40 | لوحة التحكم; المبيعات; نقطة البيع; التجارة الإلكترونية; العملاء |
-| `/stock-permits/new` | en-light-390 | 39 | لوحة التحكم; المبيعات; نقطة البيع; التجارة الإلكترونية; العملاء |
-| `/stocktaking/new` | en-light-390 | 36 | لوحة التحكم; المبيعات; نقطة البيع; التجارة الإلكترونية; العملاء |
-| `/supplier-payments` | en-light-390 | 36 | لوحة التحكم; المبيعات; نقطة البيع; التجارة الإلكترونية; العملاء |
-| `/supplier-refunds` | en-light-390 | 36 | لوحة التحكم; المبيعات; نقطة البيع; التجارة الإلكترونية; العملاء |
-| `/warehouses` | en-dark-1440 | 35 | لوحة التحكم; المبيعات; نقطة البيع; التجارة الإلكترونية; العملاء |
-| `/tax-settings` | en-light-390 | 32 | لوحة التحكم; المبيعات; نقطة البيع; التجارة الإلكترونية; العملاء |
-| `/stock-permits` | en-light-390 | 30 | لوحة التحكم; المبيعات; نقطة البيع; التجارة الإلكترونية; العملاء |
-| `/stocktaking` | en-light-390 | 30 | لوحة التحكم; المبيعات; نقطة البيع; التجارة الإلكترونية; العملاء |
-| `/warehouses/:id/stock` | en-light-390 | 30 | لوحة التحكم; المبيعات; نقطة البيع; التجارة الإلكترونية; العملاء |
-| `/whats-new` | en-light-390 | 23 | لوحة التحكم; المبيعات; نقطة البيع; التجارة الإلكترونية; العملاء |
 | `/payment-methods` | en-light-390 | 6 | ع; ممالك الاختبارالفرع الرئيسي; بطاقة ائتمان; تحويل بنكي; شيك |
+| `/reports/general/balance-sheet` | en-dark-1440 | 6 | ع; ممالك الاختبارالفرع الرئيسي; 1130العملاء (المدينون); 1150ضريبة القيمة المضافة - مدخ; 2110الموردون (الدائنون) |
 | `/cash-and-bank/transfer` | en-dark-1440 | 4 | ع; ممالك الاختبارالفرع الرئيسي; Source—الحساب البنكي الافتراضي; Destination—الحساب البنكي الاف |
 | `/delivery-notes/new` | en-dark-1440 | 4 | ع; ممالك الاختبارالفرع الرئيسي; عميل اختبار 27; المخزن الرئيسي |
+| `/reports/general/income-statement` | en-dark-1440 | 4 | ع; ممالك الاختبارالفرع الرئيسي; 4110إيرادات المبيعات; 5150مصروفات عامة |
 | `/invoices/:id/edit` | en-light-390 | 3 | ع; ممالك الاختبارالفرع الرئيسي; خدمة صيانة دورية |
 | `/invoices/new` | en-light-390 | 3 | ع; ممالك الاختبارالفرع الرئيسي; عميل اختبار 27 |
 | `/partners/:id` | en-light-390 | 3 | ع; ممالك الاختبارالفرع الرئيسي; مؤسسة الطموح للتجارة |
@@ -477,6 +460,7 @@ Total overflowing loads: 175 of 1871
 | `/reports/sales` | en-light-390 | 2 | ع; ممالك الاختبارالفرع الرئيسي |
 | `/reports/classification-analytics` | en-light-390 | 2 | ع; ممالك الاختبارالفرع الرئيسي |
 | `/reports/customers/balances` | en-light-390 | 2 | ع; ممالك الاختبارالفرع الرئيسي |
+| `/reports/customers/aging` | en-light-390 | 2 | ع; ممالك الاختبارالفرع الرئيسي |
 | `/reports/general/trial-balance` | en-light-390 | 2 | ع; ممالك الاختبارالفرع الرئيسي |
 | `/reports/inventory/value` | en-light-390 | 2 | ع; ممالك الاختبارالفرع الرئيسي |
 | `/reports/purchases/balances` | en-light-390 | 2 | ع; ممالك الاختبارالفرع الرئيسي |
@@ -498,6 +482,22 @@ Total overflowing loads: 175 of 1871
 | `/sales-settings/sources` | en-light-390 | 2 | ع; ممالك الاختبارالفرع الرئيسي |
 | `/sales-settings/statuses` | en-light-390 | 2 | ع; ممالك الاختبارالفرع الرئيسي |
 | `/settings` | en-light-390 | 2 | ع; ممالك الاختبارالفرع الرئيسي |
+| `/stock-permits` | en-dark-1440 | 2 | ع; ممالك الاختبارالفرع الرئيسي |
+| `/stock-permits/new` | en-dark-1440 | 2 | ع; ممالك الاختبارالفرع الرئيسي |
+| `/stocktaking` | en-dark-1440 | 2 | ع; ممالك الاختبارالفرع الرئيسي |
+| `/stocktaking/new` | en-dark-1440 | 2 | ع; ممالك الاختبارالفرع الرئيسي |
+| `/supplier-payments` | en-dark-1440 | 2 | ع; ممالك الاختبارالفرع الرئيسي |
+| `/supplier-refunds` | en-dark-1440 | 2 | ع; ممالك الاختبارالفرع الرئيسي |
+| `/suppliers` | en-dark-1440 | 2 | ع; ممالك الاختبارالفرع الرئيسي |
+| `/suppliers/:id/ledger` | en-dark-1440 | 2 | ع; ممالك الاختبارالفرع الرئيسي |
+| `/suppliers/:id/statement` | en-dark-1440 | 2 | ع; ممالك الاختبارالفرع الرئيسي |
+| `/tax-settings` | en-dark-1440 | 2 | ع; ممالك الاختبارالفرع الرئيسي |
+| `/warehouses` | en-dark-1440 | 2 | ع; ممالك الاختبارالفرع الرئيسي |
+| `/warehouses/:id` | en-dark-1440 | 2 | ع; ممالك الاختبارالفرع الرئيسي |
+| `/warehouses/:id/stock` | en-dark-1440 | 2 | ع; ممالك الاختبارالفرع الرئيسي |
+| `/warehouses/new` | en-dark-1440 | 2 | ع; ممالك الاختبارالفرع الرئيسي |
+| `/whats-new` | en-dark-1440 | 2 | ع; ممالك الاختبارالفرع الرئيسي |
+| `/reports/general/account-ledger` | en-dark-1440 | 2 | ع; ممالك الاختبارالفرع الرئيسي |
 | `/` | en-dark-1440 | 1 | ع |
 | `/app-builder` | en-dark-1440 | 1 | ع |
 | `/app-builder/new` | en-dark-1440 | 1 | ع |
@@ -530,7 +530,7 @@ Total overflowing loads: 175 of 1871
 | `/me` | en-light-390 | 1 | ع |
 | `/register` | en-light-390 | 1 | ع |
 | `/reset-password` | en-light-390 | 1 | ع |
-| `/verify-email` | en-light-390 | 1 | تأكيد البريد الإلكتروني |
+| `/verify-email` | en-dark-1440 | 1 | ع |
 
 Routes with Arabic chrome in EN: 200
 

@@ -19,7 +19,7 @@ Columns: **Loads** = page loads across v3/legacy × locale × theme × width; **
 | Fuel stations (separate workspace) | 13 |
 | Auth / self-service / dev | 12 |
 | Other | 1 |
-| **Total** | **207** URLs (= 204 of 231 manifest entries; `/reports/general/*` URLs share one dynamic entry) |
+| **Total** | **207** |
 
 
 ## Sales

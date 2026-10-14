@@ -8,11 +8,12 @@ Executor: Claude Code (sole executor for this horizon, per owner direction of 20
 
 ## الملخص التنفيذي (عربي)
 
-- جُرد **231 مساراً** في بناء الواجهة خارج `/platform`، وفُحص منها فعلياً **207 عنوان URL تغطي 204 مدخلاً من 231** (203 صفحات + أيقونة الموقع) في متصفح Chromium حقيقي مقابل Laravel حقيقي على بيانات اختبار معزولة، عبر **1,871 تحميل صفحة** إضافةً إلى فحوص تفاعل لوحة المفاتيح: v3 وlegacy، عربي وإنجليزي، فاتح وداكن، وعروض 320 و360 و390 و768 و1440.
+- جُرد **231 مساراً** في بناء الواجهة خارج `/platform`، وفُحص منها فعلياً **207 عنوان URL تغطي 204 مدخلاً من 231** (203 صفحات + أيقونة الموقع) في متصفح Chromium حقيقي مقابل Laravel حقيقي على بيانات اختبار معزولة، عبر **1,869 تحميل صفحة** إضافةً إلى فحوص تفاعل لوحة المفاتيح: v3 وlegacy، عربي وإنجليزي، فاتح وداكن، وعروض 320 و360 و390 و768 و1440.
 - **لا يوجد خلل P0.** لم يُرصد أي خطر على البيانات أو المحاسبة أو العزل أو الصلاحيات من جهة الواجهة.
 - **P1 واحد مثبت:** حوار `Dialog` المشترك (123 استخداماً) لا ينقل التركيز إليه، ولا يحبسه، ولا يعيده عند الإغلاق — قارئ الشاشة قد لا يصل إلى الحوار أصلاً.
 - أهم P2 مشتركة: القوائم المغلقة قابلة للتركيز وهي مخفية (`aria-hidden-focus`)، تجاوز أفقي **في كل صفحات ERP عند 320px** سببه الشريط العلوي، منطقة التنبيهات (Toast) تخرج عن الشاشة على الجوال، عناصر «قريباً» في الشريط الجانبي روابط إلى صفحات 404، زر إغلاق الحوار يُقرأ «إغلاق» بالعربية في الواجهة الإنجليزية، وحالة «لا صلاحية» تُعرض مع حالة «فارغ» وزر إنشاء في آن واحد، وصفحة تعديل المنتج تتمرر أفقياً 264px حتى على 1440، ومبلغ صافي الدخل في لوحة التحكم يخرج عن بطاقته على عرض 360 ويُقص عند 320.
-- كتالوجا الترجمة متطابقان تماماً (9,437 مفتاحاً لكل لغة)، والواجهة الإنجليزية نظيفة عموماً؛ النقص الفعلي 5 تسميات في إعدادات الترقيم.
+- كتالوجا الترجمة متطابقان تماماً (9,437 مفتاحاً لكل لغة)، لكن **نحو 150 نصاً عربياً مكتوباً مباشرة في الكود** (12 ملفاً، منها قائمة الفواتير والمنتجات والإشعارات الدائنة/المدينة والموردين) يظهر في الواجهة الإنجليزية، وتنقص 5 تسميات في إعدادات الترقيم.
+- **خلل مثبت في اللغة:** بعد التبديل إلى الإنجليزية من الشريط العلوي، مجرد فتح صفحة الإعدادات يعيد الواجهة إلى العربية دون طلب المستخدم.
 - **قرار مالك واحد مطلوب** (غير حاجب): أسماء الحسابات الإنجليزية في التقارير تتطلب حقلاً إضافياً في API التقارير — خارج نطاق مهام UX.
 - الخطة: 10 شرائح صغيرة مرتبة بالاعتماديات (H1-1 → H1-8)، تبدأ بالمكونات المشتركة لأنها تصلح أكبر عدد من الصفحات بأقل تغيير.
 
@@ -133,7 +134,11 @@ Each item: reproduction → expected → actual → evidence. Severity per the c
 
 **P3 items (verified):** ERP-UX-014 heading order — card titles render `h3` directly under the page `h1` on 92 routes (forms and settings built from `Card`). ERP-UX-015 empty `<th>` for row-action columns on 8 list pages (`/invoices`, `/partners`, `/products`, `/purchases`, `/suppliers`, `/warehouses`, `/branches`, `/cash-and-bank`). ERP-UX-023 landmarks: `/pos/audit` renders a second `main` inside the layout `main`; `/fuel-stations/settings` has no `h1`; `landmark-unique` on 8 routes (duplicate unnamed `aside`/`nav`). ERP-UX-016 bidi — Latin names in RTL cells move trailing punctuation to the wrong side (`Al Khobar Trading Est.` renders `.Al Khobar Trading Est` on `/invoices`, 1440 and 390). ERP-UX-017 native `window.confirm` (36 sites). ERP-UX-018 Mono on Arabic placeholders. ERP-UX-019 isolated axe items: `scrollable-region-focusable` (`/developer`, `/developer/security`), `aria-valid-attr-value` (`/commerce/published-products` tab), `svg-img-alt` (`/document-qa`), `link-in-text-block` (`/credit-notes/new`), `landmark-unique` (`/developer/docs`). ERP-UX-020 console errors: invalid SVG `path d` on `/commerce/appearance`. ERP-UX-021 mobile menu trigger without `aria-expanded`/`aria-controls`.
 
-**Not defects (checked and cleared):** EN UI chrome — Arabic text seen in EN mode was tenant data (customer/product/account names, system-seeded payment-method names) and the intentional `ع` language toggle. 403 responses on Fuel/Document Center/Delivery notes are the commercial-entitlement gate working as designed for the test plan. `422 POST /api/email/verify` on `/verify-email` without a code is expected. No page-level overflow at 360/390/768/1440 other than `/products/:id/edit` (ERP-UX-022). The 404s on `/dev/*` QA pages are expected in a production build (dev-only routes). `/icon.ico` appears in the route manifest but is the favicon, not a page.
+**ERP-UX-025 · P2 · Hard-coded Arabic UI strings appear in the English interface.** Message catalogs are at parity, but ~150 Arabic literals bypass them in 12 ERP files (static scan, [`tools/arabic-literals.py`](./h1-0-evidence/tools/arabic-literals.py), excluding dev pages, digit tables, punctuation and brand name): `pos/settings/shifts` (20), `invoices` list (17 — sort options, search placeholder, the `المتبقي` column header and mobile-card label), `products` list (17 sort options), `reports/report-saved-views` (16), `credit-notes` and `debit-notes` lists (16 each, date-filter labels), `suppliers` (13), `inventory` (11), `inventory-settings/categories` (10), POS dialog close label and walk-in customer name, plus 5 in Commerce/App Builder. Verified visually on `/invoices` in EN ([screenshot](./h1-0-evidence/screenshots/v3-en-dark-1440-invoices-arabic-literals.png)). The crawler's visible-chrome detector undercounts this class (closed `<select>` options, mobile cards), so the static scan is the measure.
+
+**ERP-UX-026 · P2 · The language chosen in the top bar reverts after opening Settings.** Reproduction (real UI login, account preference = Arabic): toggle to English → `/invoices` is English → open `/settings` → next page is Arabic again; the `locale` cookie is back to `ar` ([`tools/probe-locale.cjs`](./h1-0-evidence/tools/probe-locale.cjs)). Root cause: `/settings` (and the security card) refresh the user from `/me` and call `persistUser()`, which re-applies the account's stored locale and theme to the device. The top-bar toggles only change the device. Fix belongs to the shell slice (refreshes must not re-apply display preferences; only sign-in and an explicit save in Settings do). This also contaminated 20 EN loads per EN configuration in the first crawl pass (every route visited after `/settings`); those 40 loads were discarded and re-crawled with the locale re-asserted before each load.
+
+**Not defects (checked and cleared):** apart from ERP-UX-025, Arabic text seen in EN mode was tenant data (customer/product/account names, system-seeded payment-method names) and the intentional `ع` language toggle. 403 responses on Fuel/Document Center/Delivery notes are the commercial-entitlement gate working as designed for the test plan. `422 POST /api/email/verify` on `/verify-email` without a code is expected. No page-level overflow at 360/390/768/1440 other than `/products/:id/edit` (ERP-UX-022). The 404s on `/dev/*` QA pages are expected in a production build (dev-only routes). `/icon.ico` appears in the route manifest but is the favicon, not a page.
 
 ## 5. Master UI/UX backlog
 
@@ -159,6 +164,8 @@ Effort: S ≤ ½ day, M ≤ 1½ days. "Accept" = acceptance test that must pass 
 | ERP-UX-011 | P2 | `/applications` | opacity on text | muted token instead of opacity for row text | H1-6A | S | axe `color-contrast` = 0 light+dark |
 | ERP-UX-012 | P2 | Commerce/Fuel workspace shells | unnamed logo link | `aria-label` | H1-6A | S | axe `link-name` = 0 |
 | ERP-UX-008 | P2 | `/numbering-settings` | missing keys | add 5 AR/EN labels | H1-7A | S | no raw keys |
+| ERP-UX-025 | P2 | 12 ERP files (~150 strings) | literals bypass catalogs | move to `messages/{ar,en}.json`, one PR per module group | H1-7C… | M | static scan = 0 in converted files; EN screenshot |
+| ERP-UX-026 | P2 | shell / `/settings` | `persistUser` on refresh re-applies stored locale/theme | refresh keeps device display preferences; sign-in and explicit save still apply them | H1-3C | S | toggle → `/settings` → next page keeps the chosen language |
 | ERP-UX-014 | P3 | 23 routes | card title level | page-local heading level where verified | H1-7B | S–M | axe `heading-order` reduced; no new skips |
 | ERP-UX-019 | P3 | developer, commerce tabs, document-qa, credit-notes/new | misc ARIA | per-item fixes | H1-7B | S | listed axe rules = 0 |
 | ERP-UX-018 | P3 | numeric inputs | Mono on Arabic placeholder | placeholder in Sans | H1-7B | S | visual check |
@@ -223,10 +230,12 @@ Effort: S ≤ ½ day, M ≤ 1½ days. "Accept" = acceptance test that must pass 
 | 5 | H1-2C | Toast region/live region/label | H1-0 | `web/src/components/ui/toast.tsx` (+test) |
 | 6 | H1-3A | Skip link, 320 header, menu button ARIA | H1-2B (shell dropdowns) | `app/(app)/layout.tsx`, `components/layout/topbar.tsx` |
 | 7 | H1-3B | Non-navigable "soon" sidebar items | H1-0 | `components/layout/sidebar.tsx` |
+| 7b | H1-3C | Display preferences kept on refresh (ERP-UX-026) | H1-0 | `lib/auth.ts` (`persistUser` option), `app/(app)/settings/page.tsx`, `components/settings/account-security-card.tsx` |
 | 8 | H1-4A / H1-4B | Bidi-safe names + action header labels; product-edit overflow | H1-0 | list pages verified in §4; `product-media-section.tsx`, payment forms |
 | 9 | H1-5A / H1-5B / H1-5C | Forbidden state; unnamed controls; dashboard KPI at phone widths | H1-2A (5A only) | affected pages only |
 | 10 | H1-6A / H1-6B | contrast + workspace link name; native confirm → dialog (finance/HR) | H1-2A | affected pages only |
 | 11 | H1-7A / H1-7B | i18n labels; heading order + misc P3 | — | affected pages + messages |
+| 11b | H1-7C… | Hard-coded Arabic UI strings → catalogs (ERP-UX-025), one PR per module group | — | affected pages + messages |
 | 12 | H1-8 | regression crawl, role matrix, closure | all merged | `docs/plans/erp/**` |
 
 Critical path: H1-0 → H1-2A → H1-6B. Independent slices (2B, 2C, 3B, 4A, 7A) can proceed in any order from fresh `main`. No slice changes API, database, permissions, accounting, tax, inventory or money formatting.

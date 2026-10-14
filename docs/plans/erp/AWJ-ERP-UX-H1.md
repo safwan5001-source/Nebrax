@@ -24,6 +24,7 @@ Charter: [AWJ-ERP-UX-H1-CHARTER.md](./AWJ-ERP-UX-H1-CHARTER.md) · H1-0 audit: [
 | H1-2C | Toast region, live region, label (ERP-UX-004) | — | queued | — |
 | H1-3A | Skip link, 320 px header, menu ARIA (ERP-UX-005/006/021) | — | queued | — |
 | H1-3B | Non-navigable "soon" sidebar items (ERP-UX-007) | — | queued | — |
+| H1-3C | Display preferences not re-applied on refresh (ERP-UX-026) | — | queued | — |
 | H1-4A | Bidi-safe names, action header labels (ERP-UX-015/016) | — | queued | — |
 | H1-4B | Product-edit sideways scroll from mis-hidden file input (ERP-UX-022) | — | queued | — |
 | H1-5A | Localized forbidden state (ERP-UX-009) | — | queued | — |
@@ -32,6 +33,7 @@ Charter: [AWJ-ERP-UX-H1-CHARTER.md](./AWJ-ERP-UX-H1-CHARTER.md) · H1-0 audit: [
 | H1-6A | Contrast on `/applications`, workspace link name (ERP-UX-011/012) | — | queued | — |
 | H1-6B | Native confirm → in-app dialog, finance/HR (ERP-UX-017) | — | queued | — |
 | H1-7A | Missing numbering labels (ERP-UX-008) | — | queued | — |
+| H1-7C… | Hard-coded Arabic UI strings → catalogs, per module group (ERP-UX-025) | — | queued | — |
 | H1-7B | Heading order + misc P3 (ERP-UX-014/018/019/020/023) | — | queued | — |
 | H1-8 | Regression crawl, role matrix, closure report | — | queued | — |
 

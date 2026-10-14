@@ -110,6 +110,8 @@ async function measure(page, mobile) {
       const onResp = (r) => { const u = r.url(); if (u.includes('/api/') && r.status() >= 400) failed.push(`${r.status()} ${r.request().method()} ${normUrl(u)}`); };
       const onPageErr = (e) => consoleErrors.push('pageerror: ' + String(e.message).slice(0, 200));
       page.on('console', onConsole); page.on('response', onResp); page.on('pageerror', onPageErr);
+      // A page (e.g. /settings) may re-apply the account's server-side locale to the cookie; re-assert the run's locale before every load.
+      await ctx.addCookies([{ name: 'locale', value: cfg.locale, url: BASE }]);
       const t0 = Date.now(); let status = null; let navErr = null;
       try {
         const resp = await page.goto(BASE + route, { waitUntil: 'domcontentloaded', timeout: 30000 });
