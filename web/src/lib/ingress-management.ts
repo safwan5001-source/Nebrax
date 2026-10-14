@@ -84,6 +84,7 @@ export type IngressErrorKey =
   | 'serverError'
   | 'disableOutcomeUnknown'
   | 'createBlocked'
+  | 'reassignOutcomeUnknown'
   | 'demoUnavailable'
   | 'unknown';
 

@@ -15,7 +15,9 @@ import { useIngressPermissions } from './use-ingress-permissions';
 export function IngressRowActions({ point, management }: { point: IngressPoint; management: IngressManagement }) {
   const t = useTranslations('integrationCenter.ingressManagement');
   const allowed = useIngressPermissions(point);
-  if (isDemo() || (!allowed.rotate && !allowed.disable)) return null;
+  // إعادة الإسناد للنقطة المهيّأة فقط (نقطة معطّلة لا تستقبل أحداثاً فلا معنى لإدارة مشغّلها)، وبلا Demo.
+  const reassign = allowed.reassign && point.status === 'configured';
+  if (isDemo() || (!allowed.rotate && !allowed.disable && !reassign)) return null;
 
   return (
     <div className="flex flex-wrap items-center gap-2" data-testid="ingress-row-actions">
@@ -30,6 +32,19 @@ export function IngressRowActions({ point, management }: { point: IngressPoint; 
           data-testid="ingress-rotate"
         >
           {t('actions.rotate')}
+        </Button>
+      ) : null}
+      {reassign ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="min-h-11 md:min-h-8"
+          aria-label={t('actions.reassignFor', { storeId: point.storeId })}
+          onClick={() => management.openReassign(point)}
+          data-testid="ingress-reassign"
+        >
+          {t('actions.reassign')}
         </Button>
       ) : null}
       {allowed.disable ? (
@@ -59,4 +74,10 @@ export function useCanManageIngress(): boolean {
 export function useCanCreateIngress(): boolean {
   const allowed = useIngressPermissions(null);
   return !isDemo() && allowed.create;
+}
+
+/** هل يرى المستخدم إجراء إعادة الإسناد (reassign + users.view معاً، وبلا Demo)؟ يحدّد عمود المشغّل وقراءة الدليل. */
+export function useCanReassignIngress(): boolean {
+  const allowed = useIngressPermissions({ status: 'configured' });
+  return !isDemo() && allowed.reassign;
 }

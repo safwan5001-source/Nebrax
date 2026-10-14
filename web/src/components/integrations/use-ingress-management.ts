@@ -5,15 +5,18 @@ import { currentUser } from '@/lib/auth';
 import { checkStoreId } from '@/lib/ingress-create';
 import { clearUnconfirmedCreate, createGuardScope, findUnconfirmedCreate, listUnconfirmedCreates, recordUnconfirmedCreate } from '@/lib/ingress-create-guard';
 import { classifyIngressFailure, type IngressErrorKey } from '@/lib/ingress-management';
-import { IngressRequestInvalid, IngressUnavailableInDemo, createIngressPoint, disableIngress, rotateIngressSecret } from '@/lib/ingress-operations';
+import { eligibleOperators, operatorName, type OperatorEntry } from '@/lib/ingress-operators';
+import { IngressRequestInvalid, IngressUnavailableInDemo, createIngressPoint, disableIngress, reassignIngressOperator, rotateIngressSecret } from '@/lib/ingress-operations';
 import type { IngressPoint } from '@/lib/signed-ingress';
-import type { SignedIngressState } from './use-signed-ingress';
+import type { OperatorDirectoryState, SignedIngressState } from './use-signed-ingress';
 
 export type IngressDialogState = { kind: 'rotate' | 'disable'; point: IngressPoint } | null;
 
 export type IngressNotice =
   | { kind: 'error'; messageKey: IngressErrorKey }
-  | { kind: 'rotated' | 'disabled' | 'created' | 'createLost' | 'createUnconfirmed'; storeId: string };
+  | { kind: 'rotated' | 'disabled' | 'created' | 'createLost' | 'createUnconfirmed'; storeId: string }
+  /** `operatorName`: اسم المشغّل الجديد فقط (لا بريد ولا معرّف). */
+  | { kind: 'reassigned'; storeId: string; operatorName: string };
 
 /** السرّ الجديد: يعيش هنا بين نجاح الإنشاء/التدوير وإغلاق حوار الكشف فقط، ثم يصير `null`. */
 export interface IngressReveal {
@@ -37,6 +40,20 @@ export interface IngressManagement {
   blockedStoreIds: string[];
   /** هل المعرّف المكتوب (بعد القصّ) محظور؟ */
   isCreateBlocked: (storeId: string) => boolean;
+  /** دليل المشغّلين (reassign + users.view فقط) وإعادة قراءته. */
+  operators: OperatorDirectoryState;
+  retryOperators: () => void;
+  /** المرشّحون المؤهلون لنقطة (نشطون، يشمل نطاقهم فرعها، دون المشغّل الحالي) — فارغة إن لم يجهز الدليل. */
+  eligibleFor: (point: IngressPoint) => OperatorEntry[];
+  /** اسم المشغّل الحالي لنقطة، أو `null` إن لم يُعرف. */
+  currentOperatorName: (point: IngressPoint) => string | null;
+  /** نقطة حوار إعادة الإسناد المفتوح، وآخر رفض صريح (يبقى الحوار مفتوحاً للتصحيح). */
+  reassignPoint: IngressPoint | null;
+  reassignError: IngressErrorKey | null;
+  openReassign: (point: IngressPoint) => void;
+  cancelReassign: () => void;
+  /** يُنفَّذ مرة واحدة؛ لا إعادة محاولة تلقائية. `userId` يجب أن يكون من المرشّحين المؤهلين. */
+  confirmReassign: (userId: string) => void;
   /** حوار الإنشاء مفتوح؟ وآخر رفض صريح من الخادم (يبقى الحوار مفتوحاً للتصحيح). */
   createOpen: boolean;
   createError: IngressErrorKey | null;
@@ -65,7 +82,19 @@ export interface IngressManagement {
  *   القائمة فوراً؛ تختفي أزرار الصفوف أثناء إعادة الجلب (حالة تحميل) وتعود بالحالة الحقيقية فقط، فلا محاولة جديدة قبل رؤيتها.
  * - **السرّ:** لا يُكتب إلى أي تخزين ولا سجلّ، ويُمسح عند إغلاق حوار الكشف أو إلغاء تركيب الحوار الأم.
  */
-export function useIngressManagement(reload: () => void, profileId: string | null = null, platformKey = ''): IngressManagement {
+export function useIngressManagement(
+  reload: () => void,
+  profileId: string | null = null,
+  platformKey = '',
+  operators: OperatorDirectoryState = { status: 'idle' },
+  retryOperators: () => void = () => {},
+): IngressManagement {
+  const [reassignPoint, setReassignPoint] = useState<IngressPoint | null>(null);
+  const [reassignError, setReassignError] = useState<IngressErrorKey | null>(null);
+  const operatorsRef = useRef(operators);
+  operatorsRef.current = operators;
+  const retryOperatorsRef = useRef(retryOperators);
+  retryOperatorsRef.current = retryOperators;
   const [guardTick, setGuardTick] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
   const [createError, setCreateError] = useState<IngressErrorKey | null>(null);
@@ -188,6 +217,81 @@ export function useIngressManagement(reload: () => void, profileId: string | nul
     [platformKey, guardTick],
   );
 
+  const eligibleFor = useCallback(
+    (point: IngressPoint) => (operators.status === 'ready' ? eligibleOperators(operators.entries, point, point.operatedBy) : []),
+    [operators],
+  );
+  const currentOperatorName = useCallback(
+    (point: IngressPoint) => (operators.status === 'ready' ? operatorName(operators.entries, point.operatedBy) : null),
+    [operators],
+  );
+
+  const openReassign = useCallback((point: IngressPoint) => {
+    if (lock.current) return;
+    setNotice(null);
+    setReassignError(null);
+    setReassignPoint(point);
+  }, []);
+
+  const cancelReassign = useCallback(() => {
+    if (lock.current) return;
+    setReassignPoint(null);
+    setReassignError(null);
+  }, []);
+
+  const confirmReassign = useCallback((userId: string) => {
+    if (lock.current || reassignPoint === null) return;
+    const point = reassignPoint;
+    // المرشّح يجب أن يكون من المؤهلين المعروضين (الدليل جاهز): معرّف خارجهم لا يُرسل أبداً. الخادم يبقى المرجع النهائي.
+    const current = operatorsRef.current;
+    const candidate = current.status === 'ready' ? eligibleOperators(current.entries, point, point.operatedBy).find((entry) => entry.id === userId) : undefined;
+    if (candidate === undefined) return;
+    lock.current = true;
+    setBusy(true);
+    setReassignError(null);
+    (async () => {
+      try {
+        await reassignIngressOperator(point.id, candidate.id);
+        if (!mounted.current) return;
+        setReassignPoint(null);
+        setNotice({ kind: 'reassigned', storeId: point.storeId, operatorName: candidate.name });
+        reloadRef.current();
+      } catch (error) {
+        if (!mounted.current) return;
+        if (error instanceof IngressUnavailableInDemo) {
+          setReassignPoint(null);
+          setNotice({ kind: 'error', messageKey: 'demoUnavailable' });
+          return;
+        }
+        if (error instanceof IngressRequestInvalid) {
+          setReassignError('validation');
+          return;
+        }
+        const failure = classifyIngressFailure(error, 'reassign');
+        if (failure.outcomeUnknown) {
+          // لا إعادة محاولة تلقائية: تُعاد قراءة القائمة ويقرّر المستخدم من المشغّل المعروض.
+          setReassignPoint(null);
+          setNotice({ kind: 'error', messageKey: 'reassignOutcomeUnknown' });
+          reloadRef.current();
+          return;
+        }
+        if (failure.messageKey === 'forbidden' || failure.messageKey === 'notFound' || failure.messageKey === 'connectorUnavailable') {
+          // الصلاحية/النقطة تغيّرت: لا جدوى من إبقاء الحوار.
+          setReassignPoint(null);
+          setNotice({ kind: 'error', messageKey: failure.messageKey });
+          reloadRef.current();
+          return;
+        }
+        // رفض صريح (غير مؤهل/تحقق/تعارض): يبقى الحوار للتصحيح، ويُحدَّث دليل المشغّلين لأن الأهلية قد تغيّرت.
+        setReassignError(failure.messageKey);
+        if (failure.messageKey === 'operatorIneligible') retryOperatorsRef.current();
+      } finally {
+        lock.current = false;
+        if (mounted.current) setBusy(false);
+      }
+    })();
+  }, [reassignPoint]);
+
   const openCreate = useCallback(() => {
     if (lock.current) return;
     setNotice(null);
@@ -297,7 +401,7 @@ export function useIngressManagement(reload: () => void, profileId: string | nul
   const dismissNotice = useCallback(() => setNotice(null), []);
 
   return {
-    dialog, busy, reveal, notice, blockedStoreIds, isCreateBlocked, createOpen, createError, openCreate, cancelCreate, confirmCreate, observe,
+    dialog, busy, reveal, notice, operators, retryOperators, eligibleFor, currentOperatorName, reassignPoint, reassignError, openReassign, cancelReassign, confirmReassign, blockedStoreIds, isCreateBlocked, createOpen, createError, openCreate, cancelCreate, confirmCreate, observe,
     openRotate, openDisable, cancel, confirmRotate, confirmDisable, closeReveal, dismissNotice,
   };
 }

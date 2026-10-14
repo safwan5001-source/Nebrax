@@ -5,7 +5,8 @@
  * القارئ هنا **قائمة سماح** صريحة: يقرأ أربعة أنواع من الحقول فقط، وما عداها لا يدخل أي حالة ولا DOM.
  * الحقول التي يُرجعها الخادم ولا تُقرأ عمداً:
  *  - `secret_prefix`: جزء من سرّ التوقيع. قرار المالك (DP-C) ألّا يُعرض أبداً.
- *  - `configured_by` / `operated_by`: معرّفات مستخدمين، ولا مصدر معتمد لأسمائها في هذه الشريحة.
+ *  - `configured_by`: معرّف مستخدم، ولا يُقرأ. `operated_by`: يُقرأ **فقط** بخيار `operators` لمن يملك reassign + `users.view` (INT-UX-5d)
+ *    ويُعرض اسماً فقط؛ لغيرهم لا يدخل الحالة.
  *  - `id`: يُستعمل مفتاحاً للقائمة فقط ولا يُعرض (جزء من عنوان نقطة الاستقبال).
  *  - `delivery_platform_profile_id`: غير لازم للعرض.
  * وقيمة السرّ الكاملة لا يعيدها هذا المسار أصلاً (تُعاد عند الإنشاء والتدوير فقط).
@@ -28,6 +29,11 @@ export interface IngressPoint {
   secretVersion: number;
   createdAt: string | null;
   disabledAt: string | null;
+  /**
+   * معرّف المشغّل الحالي (INT-UX-5d). **يُقرأ فقط** لمن يملك `delivery_connector.reassign` و`users.view` معاً (قرار D2/D3) ويُحوَّل إلى
+   * اسم للعرض؛ لا يُعرض المعرّف نفسه أبداً. غائب (`undefined`) لغيرهم: لا يدخل حالة الواجهة أصلاً.
+   */
+  operatedBy?: string | null;
 }
 
 const KEY_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
@@ -59,7 +65,7 @@ function optionalDate(value: unknown): string | null {
  * كائنات بمفتاح منصة نصّي؛ وصف المنصة المعروضة يجب أن يكون سليماً كاملاً وإلا فالقراءة كلها `null`
  * (لا يُعرض نصف سليم من حمولة منحرفة العقد). تكرار المعرّف مرفوض.
  */
-export function readIngressPoints(payload: unknown, platformKey: string): IngressPoint[] | null {
+export function readIngressPoints(payload: unknown, platformKey: string, options: { operators?: boolean } = {}): IngressPoint[] | null {
   const rows = objectRows(payload);
   if (rows === null) return null;
 
@@ -92,6 +98,8 @@ export function readIngressPoints(payload: unknown, platformKey: string): Ingres
       secretVersion: version,
       createdAt: optionalDate(row.created_at),
       disabledAt: optionalDate(row.disabled_at),
+      // معرّف مشوّه يُهمل (`null`) ولا يُفشل القراءة: وصف المشغّل ثانوي لعرض النقطة.
+      ...(options.operators ? { operatedBy: typeof row.operated_by === 'string' && KEY_PATTERN.test(row.operated_by) ? row.operated_by : null } : {}),
     });
   }
   return points;
