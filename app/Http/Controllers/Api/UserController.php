@@ -8,6 +8,7 @@ use App\Http\Resources\UserResource;
 use App\Mail\AuthActionMail;
 use App\Models\Branch;
 use App\Models\Employee;
+use App\Models\Role;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Models\Warehouse;
@@ -81,6 +82,10 @@ class UserController extends ApiController
      */
     private function canGrantRole(User $actor, string $slug): bool
     {
+        // يُقفل صفّ الدور المفحوص (داخل معاملة الكتابة) ليتسلسل مع `RoleController::update`
+        // الذي يقفله أيضاً — فلا يتّسع الدور بين الفحص والكتابة.
+        Role::where('slug', $slug)->lockForUpdate()->first();
+
         return Rbac::covers(Rbac::permissionsForRole($actor->role), Rbac::permissionsForRole($slug));
     }
 
