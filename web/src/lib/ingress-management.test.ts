@@ -106,7 +106,7 @@ describe('classifyIngressFailure (safe dictionary, no server text, no blind retr
 describe('the error dictionary is complete in both locales and says no forbidden thing', () => {
   const keys = [
     'mappingAmbiguous', 'profileUnavailable', 'branchUnavailable', 'branchInactive', 'branchRequired', 'invalidStore', 'operatorIneligible',
-    'connectorUnavailable', 'tenantRequired', 'forbidden', 'notFound', 'validation', 'conflict', 'outcomeUnknown', 'serverError', 'unknown',
+    'connectorUnavailable', 'tenantRequired', 'forbidden', 'notFound', 'validation', 'conflict', 'outcomeUnknown', 'serverError', 'disableOutcomeUnknown', 'demoUnavailable', 'unknown',
   ];
 
   it.each([['ar', ar], ['en', en]] as const)('%s has every key, non-empty', (_locale, messages) => {

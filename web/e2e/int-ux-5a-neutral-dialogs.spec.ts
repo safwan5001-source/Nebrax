@@ -86,7 +86,7 @@ for (const [locale, dir] of [['ar', 'rtl'], ['en', 'ltr']] as const) {
   }
 }
 
-test('the integration center detail page has no management action yet (5a adds none)', async ({ page }) => {
+test('a viewer without delivery_connector.manage gets a read-only integration page (no action, no write)', async ({ page }) => {
   await page.context().addCookies([{ name: 'locale', value: 'en', url: baseUrl }]);
   const writes: string[] = [];
   await page.route('**/api/**', async (route) => {
@@ -98,7 +98,7 @@ test('the integration center detail page has no management action yet (5a adds n
     if (path === '/delivery-connectors') return json({ data: [{ id: 'a', platform_key: 'keeta', external_store_id: 'S-1', branch_id: null, status: 'configured', secret_version: 1, created_at: '2026-10-01T08:00:00Z', disabled_at: null }] });
     return json({ data: [] });
   });
-  const user = { id: 'u1', name: 'O', email: 'o@test', tenant_id: 't1', role: 'owner', permissions: ['*'] };
+  const user = { id: 'u1', name: 'O', email: 'o@test', tenant_id: 't1', role: 'custom', permissions: ['invoices.view', 'delivery_connector.view'] };
   await page.addInitScript((u) => { localStorage.setItem('token', 't'); localStorage.setItem('user', u); }, JSON.stringify(user));
   await page.goto(`${baseUrl}/integrations/delivery-platforms/keeta`, { waitUntil: 'domcontentloaded' });
   const panel = page.getByTestId('signed-ingress-panel');

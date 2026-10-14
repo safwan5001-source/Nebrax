@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 
@@ -23,6 +24,9 @@ export function ConfirmDialog({
   busyLabel,
   danger = true,
   busy = false,
+  children,
+  confirmDisabled = false,
+  hideClose = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -36,15 +40,22 @@ export function ConfirmDialog({
   busyLabel: string;
   danger?: boolean;
   busy?: boolean;
+  /** محتوى إضافي بين الرسالة والأزرار (مثل حقل كتابة تأكيد). غيابه = الحوار القديم حرفياً. */
+  children?: ReactNode;
+  /** يعطّل زرّ التأكيد وحده (شرط لم يتحقق بعد). الافتراضي `false`. */
+  confirmDisabled?: boolean;
+  /** يُخفي زرّ الإغلاق العلوي (مثلاً أثناء التنفيذ). الافتراضي `false`. */
+  hideClose?: boolean;
 }) {
   return (
-    <Dialog open={open} onClose={onClose} title={title} className="max-w-md">
+    <Dialog open={open} onClose={onClose} title={title} className="max-w-md" hideClose={hideClose}>
       <div className="space-y-4">
         <p className="text-sm leading-relaxed text-text">{message}</p>
         {detail ? <p dir="ltr" className="rounded border border-border bg-background px-3 py-2 font-mono text-xs text-muted [unicode-bidi:plaintext]">{detail}</p> : null}
+        {children}
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={onClose} disabled={busy}>{cancelLabel}</Button>
-          <Button type="button" variant={danger ? 'danger' : 'primary'} onClick={onConfirm} disabled={busy}>
+          <Button type="button" variant={danger ? 'danger' : 'primary'} onClick={onConfirm} disabled={busy || confirmDisabled}>
             {busy ? busyLabel : confirmLabel}
           </Button>
         </div>

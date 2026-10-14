@@ -53,8 +53,8 @@ beforeEach(() => { api.mockReset(); currentUser.mockReset(); });
 afterEach(cleanup);
 
 describe('SignedIngressPanel on the platform detail screen', () => {
-  it.each(TEST_LOCALES)('lists the platform ingress points read-only with authorized branch names (%s)', async (locale) => {
-    asOwner();
+  it.each(TEST_LOCALES)('lists the platform ingress points read-only (viewer without manage) with authorized branch names (%s)', async (locale) => {
+    asUser(['invoices.view', 'delivery_connector.view', 'branches.view']);
     backend({ connectors: { data: [account(), account({ id: 'a2', branch_id: 'br-2', external_store_id: 'store-200', status: 'disabled', disabled_at: '2026-10-05T00:00:00Z' }), account({ id: 'a3', platform_key: 'jahez', external_store_id: 'other-platform' })] } });
     renderIntl(<DeliveryPlatformDetailScreen platformKey="keeta" />, locale);
     const m = TEST_MESSAGES[locale].integrationCenter.ingressPanel;
@@ -75,8 +75,10 @@ describe('SignedIngressPanel on the platform detail screen', () => {
     expect(panel.textContent).toContain(m.columns.version);
     expect(panel.textContent).toContain(m.branchNote);
     expect(panel.textContent).toContain(m.statusNote);
-    // لوحة قراءة فقط: لا أزرار إطلاقاً (لا «إعادة المحاولة» أيضاً في حالة النجاح).
+    // من لا يملك delivery_connector.manage: لوحة قراءة فقط، لا أزرار إطلاقاً (الإجراء غائب لا معطّل).
     expect(screen.queryAllByRole('button')).toHaveLength(0);
+    expect(screen.getByTestId('signed-ingress-readonly-note').textContent).toBe(m.readOnlyNote);
+    expect(screen.queryByTestId('signed-ingress-manage-note')).toBeNull();
   });
 
   it('never puts a secret, prefix, key, token, operator id, profile id or ingress id into the DOM', async () => {

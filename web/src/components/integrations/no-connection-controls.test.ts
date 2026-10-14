@@ -39,6 +39,9 @@ describe('integration center module sources', () => {
       'components/integrations/use-signed-ingress.ts',
       'lib/ingress-management.ts',
       'components/integrations/use-ingress-permissions.ts',
+      'components/integrations/use-ingress-management.ts',
+      'components/integrations/ingress-row-actions.tsx',
+      'components/integrations/ingress-management-layer.tsx',
       'components/integrations/integration-center-landing.tsx',
       'components/integrations/delivery-platform-catalog.tsx',
       'components/integrations/delivery-platform-detail.tsx',
@@ -58,12 +61,23 @@ describe('integration center module sources', () => {
     }
   });
 
-  it('uses the shared Button component only for the retry action', () => {
+  it('uses the shared Button component only for the retry action, plus the two INT-UX-5b row actions and the notice dismissal', () => {
+    // INT-UX-5b: ثلاثة مواضع استثنائية معلنة بأسمائها، لكلٍّ معالج واحد معروف. أي زر آخر (إنشاء، إعادة إسناد، إعادة تفعيل…) يفشل هنا.
+    const allowed: Record<string, RegExp[]> = {
+      'components/integrations/ingress-row-actions.tsx': [/onClick=\{\(\) => management\.openRotate\(point\)\}/, /onClick=\{\(\) => management\.openDisable\(point\)\}/],
+      'components/integrations/ingress-management-layer.tsx': [/onClick=\{management\.dismissNotice\}/],
+    };
     for (const { path, code } of files) {
       const uses = code.match(/<Button\b/g)?.length ?? 0;
       if (uses === 0) continue;
-      // كل استعمال لـButton يجب أن يكون زر «إعادة المحاولة» (onClick={onRetry} + t('retry')).
       const blocks = code.split(/<Button\b/).slice(1).map((chunk) => chunk.slice(0, chunk.indexOf('</Button>')));
+      const exceptions = allowed[path];
+      if (exceptions) {
+        expect(blocks, `${path}: exactly the declared buttons`).toHaveLength(exceptions.length);
+        blocks.forEach((block, index) => expect(block, path).toMatch(exceptions[index]));
+        continue;
+      }
+      // كل استعمال لـButton في غيرها يجب أن يكون زر «إعادة المحاولة» (onClick={onRetry} + t('retry')).
       for (const block of blocks) {
         expect(block, `${path}: only the retry button is allowed`).toMatch(/onClick=\{onRetry\}/);
         expect(block, path).toMatch(/t\('retry'\)/);
@@ -106,18 +120,40 @@ describe('integration center module sources', () => {
     }
   });
 
-  it('INT-UX-5a foundations make no request and activate no management action', () => {
-    // الأساس (صلاحيات + قاموس أخطاء + هيكل hook) نقيّ: لا `api(` ولا `fetch` ولا أي مسار كتابة، ولا يستورده أي مكوّن عرض بعد.
+  it('the ingress-management foundations stay pure and are consumed only by the declared INT-UX-5b files', () => {
+    // الأساس (صلاحيات + قاموس أخطاء + هيكل hook) نقيّ: لا `api(` ولا `fetch` ولا أي مسار كتابة.
     const foundations = files.filter((f) => ['lib/ingress-management.ts', 'components/integrations/use-ingress-permissions.ts'].includes(f.path));
     expect(foundations).toHaveLength(2);
     for (const { path, code } of foundations) {
       const live = code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
       expect(live, path).not.toMatch(/\bapi\s*[<(]|\bfetch\s*\(|XMLHttpRequest|\/delivery-connectors|rotate-secret|\/disable|\/reassign/);
     }
-    for (const { path, code } of files) {
-      if (path === 'components/integrations/use-ingress-permissions.ts' || path === 'lib/ingress-management.ts') continue;
-      expect(code, `${path} must not consume the 5a foundations before 5b`).not.toMatch(/ingress-management|use-ingress-permissions/);
-    }
+    const consumers = (pattern: RegExp) => files.filter((f) => pattern.test(f.code)).map((f) => f.path).filter((p) => p !== 'lib/ingress-management.ts' && p !== 'components/integrations/use-ingress-permissions.ts').sort();
+    expect(consumers(/use-ingress-permissions/)).toEqual(['components/integrations/ingress-row-actions.tsx']);
+    expect(consumers(/@\/lib\/ingress-management/)).toEqual(['components/integrations/use-ingress-management.ts']);
+  });
+
+  it('INT-UX-5b: the only code that talks to the rotate/disable routes is lib/ingress-operations.ts, and only the management hook calls it', () => {
+    const everything = walk(SRC).filter((path) => !isTest(path) && /\.(ts|tsx)$/.test(path));
+    const writers = everything
+      .filter((path) => /delivery-connectors\/\$\{|delivery-connectors[^\n]*rotate-secret/.test(readFileSync(path, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')))
+      .map((path) => relative(SRC, path));
+    expect(writers).toEqual(['lib/ingress-operations.ts']);
+
+    const callers = everything
+      .filter((path) => /rotateIngressSecret|disableIngress/.test(readFileSync(path, 'utf8')))
+      .map((path) => relative(SRC, path))
+      .sort();
+    expect(callers).toEqual(['components/integrations/use-ingress-management.ts', 'lib/ingress-operations.ts']);
+  });
+
+  it('INT-UX-5b: ingress-operations has exactly two POST routes (rotate, disable), no create/reassign, and never stores, logs or tracks', () => {
+    const code = readFileSync(join(SRC, 'lib/ingress-operations.ts'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    expect(code.match(/method\s*:\s*'POST'/g)).toHaveLength(2);
+    expect(code.match(/target\(id, '([a-z-]+)'\)/g)).toEqual(["target(id, 'rotate-secret')", "target(id, 'disable')"]);
+    expect(code).not.toMatch(/reassign|oauth|authoriz|credential|\/connect\b|\/sync\b|method\s*:\s*'(PUT|PATCH|DELETE)'/i);
+    expect(code).not.toMatch(/console\.|localStorage|sessionStorage|indexedDB|document\.cookie|navigator\.|window\.|location|history\.|analytics|track|fetch\s*\(|XMLHttpRequest|sendBeacon/i);
+    expect(code).not.toMatch(/delivery-connectors['"`](\s*[,)])/);
   });
 
   it('links only to allow-listed destinations', () => {
