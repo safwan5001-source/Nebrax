@@ -1,6 +1,6 @@
 # AWJ-BACKEND-CI-02b — Implementation Report
 
-STATUS: review (PR-ready; merge gated on final-head CI + pre-merge review)
+STATUS: closed (merged, post-merge CI green, POST_MERGE_REVIEW: PASS)
 DATE: 2026-10-14
 
 ## Outcome
@@ -113,15 +113,28 @@ Not changed:
 - `setup.sh` (CI-03).
 
 ## CI
-Recorded in the PR and in the PRE_MERGE_REVIEW comment (a file cannot carry its own head SHA).
+On the final head `ed6ab16` (run `38594657316`, gate `38594657067`):
+
+| Job | Result |
+|---|---|
+| pgsql (4 workers) | ✅ 6858 tests, 51970 assertions, 0 failures, 3 skipped (14:12). The legacy probe's expected `NOWAIT` refusal on `tenant_reference_number_sequences` is in the server log |
+| sqlite | ✅ |
+| CI Gate | ✅ |
 
 ## Pre-merge review
 - PRE_MERGE_REVIEW: PR comment on the final head.
 - Codex / Reviewer: recorded on the PR.
 
 ## Merge
-- Merge status: not merged
-- Merge SHA: — (POST_MERGE_REVIEW comment)
+- Merge status: **merged** (squash), PR [#1470](https://github.com/safwan5001-source/Nebrax/pull/1470). Codex: no findings. PRE_MERGE_REVIEW: PASS.
+- Base SHA: `51851c0` · Head SHA: `ed6ab16` · **Merge SHA: `115b6304b531d6af01b5d0f180213f89b49b449d`**
+
+## Post-merge review
+**POST_MERGE_REVIEW: PASS** (PR comment). `main` run `38597615511` on `115b630`:
+- pgsql ✅ 6858 tests, 51970 assertions, 0 failures, 3 skipped (16:12); `TestTeardownCleanupTest` ran.
+- sqlite ✅.
+
+The next `main` merge (`a8a9505`, REM-05) was also green with this change in place. No production deploy.
 
 ## Self-review
 
