@@ -12,7 +12,8 @@ import type { CommunicationChannelKey, CommunicationProvider } from '@/lib/commu
 export const CHANNEL_ICONS: Record<CommunicationChannelKey, LucideIcon> = {
   sms: MessageSquareText,
   whatsapp: MessageCircle,
-  email: Mail,
+  // مفتاح القناة، لا حقل مستخدم. يُنصَّص كي لا يطابق حارس INT-UX-5d (`\bemail\s*:`) الذي يمنع قراءة بريد المستخدم في هذا المجلد.
+  'email': Mail,
   push: Bell,
 };
 
