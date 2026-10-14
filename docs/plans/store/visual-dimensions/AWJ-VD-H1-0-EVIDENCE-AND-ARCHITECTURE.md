@@ -488,17 +488,22 @@ HORIZON: AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 (Master Plan: `AWJ-VD-H1-MASTER-PLAN.
 
 **ب) المتجر العام.** على `storefront.v1` فقط (القرار D-05)، على نمط صورة التصنيف (`StorefrontCategoryResource.php:60-62`). يبقى `commerce/v1` المغلق في OpenAPI بلا تغيير.
 
-- **`meta.facets[]`** يضاف إليه `visual` (هوية البُعد المحلولة) أو `null`.
-- **`meta.facets[].values[]`** يضاف إليه `visual` بهذا الشكل:
+> **قرار المالك D1 (VD-1c، 2026-10-14) يستبدل الصيغة «المحلولة» السابقة.** تُرسَل وثائق الهوية **بعد تطبيعها لا بعد حلّها**، ويحلّ المتجر الوراثة والأولويات بمحلّل VD-1a. السبب: سلسلة D-08 فيها مستويان من سياق القسم (VD-4a) لا يعرفهما الخادم، هما «القسم الصريح» فوق القيمة و«قالب القسم» تحت افتراضات البُعد.
+
+- **`meta.facets[]`** يضاف إليه `visual`: وثيقة البُعد المطبَّعة `{self?, defaults?}`، أو `null`.
+- **`meta.facets[].values[]`** يضاف إليه `visual`: وثيقة القيمة المطبَّعة وحدها (مفاتيحها هي فقط، بلا وراثة)، أو `null`:
   ```jsonc
-  { "content": "image"|"icon"|"none",
-    "image": { "sources": [{"width":160,"format":"webp","src":"/store/v1/media/facet-visuals/{visualId}/{mediaId}/thumb-160.webp" /* مسار المصدر — يُعاد كتابته في storefront، انظر أدناه */}, …],
-               "alt": "…", "fit": "cover", "focal": {"x":50,"y":40}, "zoom": 1.2 },
-    "icon": "cake", "iconColor": "#9d2449", "background": "#fdf2f4",
-    "shape": "arch", "size": "md", "showLabel": true }
+  { "image": { "mediaId": "…", "focal": {"x":50,"y":40}, "zoom": 1.2, "fit": "cover", "alt": {…},
+               "sources": [{"width":160,"format":"webp","src":"/store/v1/media/facet-visuals/{visualId}/{mediaId}/thumb-160.webp" /* مسار المصدر — يُعاد كتابته في storefront، انظر أدناه */}, …] },
+    "shape": "arch" }
   ```
+- **`sources`** تُضاف إلى كل مرجع صورة (`image` للقيمة، و`self.image` للبُعد): الملفات المولّدة فعلاً من القائمة `thumb-160|thumb-320|480w|768w` × `webp|jpg`، و`width` هو العرض الفعلي للنسخة.
+- **صورة وسيطُها غير نشط أو غير جاهز تُحذف من الوثيقة**، فيسقط المتجر إلى الأيقونة ثم النص دون طلب رابط سيعيد 404. إن فرغت الوثيقة بعد الحذف يصبح `visual` = `null`. شاهد الحذف (`{}`) وغياب الصف كلاهما يعطي `null`.
+- **لا يظهر أبداً:** رابط الأصل، ولا رابط المعاينة الموقّع الخاص بالإدارة (`visual_preview`)، ولا `visual_version`.
+- **قرار المالك D2:** المسارات القديمة `{tenantSlug}` بلا سياق متجر، فلا يمكن فيها إثبات الرؤية على القناة. تعيد `visual: null` لكل بُعد وقيمة، ولا يُسجَّل مسار الصور فيها.
+- **التنفيذ:** `StorefrontFacetVisualProjector`، يستدعيه `StorefrontProductController::index()` وحده. `CatalogFacetFilter::meta()` المشترك مع `commerce/v1` لا يتغيّر ناتجه؛ أضيف إليه فقط `activeFacetModels()` للقراءة.
 - يُحمَّل باستعلامين محدودين لكل رد: صفوف الهويات للأبعاد النشطة، ثم صفوف الوسائط المشار إليها. لا N+1.
-- الحمل محدود سلفاً بحدّي 30 بُعداً و200 قيمة.
+- الحمل محدود سلفاً بحدّي 30 بُعداً و200 قيمة. ولا يُقرأ من الهويات إلا صفوف الأبعاد الظاهرة وقيمها الظاهرة في `meta`.
 
 **ج) تقديم صور الأبعاد** (القراران D-03 وD-15). مسار جديد محروس:
 
@@ -526,12 +531,13 @@ HORIZON: AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 (Master Plan: `AWJ-VD-H1-MASTER-PLAN.
 **عند أي إخفاق:**
 - **404 موحّد** بجسم ثابت، بلا تمييز يكشف السبب أو وجود الصف (non-revealing).
 - `Cache-Control: no-store`.
+- **قرار المالك D4:** تبنيه دالة `notFound()` واحدة داخل المتحكّم الجديد. معالج أخطاء الـAPI العام لا يتغيّر. قيود المسار متساهلة عمداً، والتحقق كله داخل المتحكّم، ومسار احتياطي (`media/facet-visuals/{rest?}`) يعطي الرد نفسه لأي شكل آخر تحت البادئة، بدل 404 الإطار الخالي من `no-store`.
 
 **عند النجاح:**
 - `Cache-Control: private, no-store` + `ETag` + `X-Content-Type-Options: nosniff` + `Content-Type` من القائمة البيضاء.
 - بروكسي `storefront/src/app/api/storefront/media/facet-visuals/[visualId]/[mediaId]/[file]/route.ts`:
-  - يحتفظ بالرد الناجح فقط، مدة أقصاها **300 ثانية** (نمط AMEND-16).
-  - **لا يخزّن أي رد غير 200.**
+  - **قرار المالك D3:** يأخذ ردّا 200 و304 فقط `public, max-age=300, must-revalidate` (نمط AMEND-16). الـ304 لا يصل إلا بعد أن يعيد المصدر فحص كل البوابات، فهو إعادة تفويض للبايتات نفسها.
+  - **لا يخزّن أي رد آخر:** 404 و5xx وأي حالة غير متوقعة تأخذ `no-store`، ولا يمرّر إلا `image/webp` و`image/jpeg`.
   - يمرّر `nosniff`.
   - يرفض المعاملات خارج القائمة قبل الاتصال بالمصدر.
 
@@ -542,7 +548,7 @@ HORIZON: AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 (Master Plan: `AWJ-VD-H1-MASTER-PLAN.
 - **أي شكل آخر يعيد `null`، لا الرابط الخام.** يتلقاه `listing-facets.ts` فيُسقط المصدر، فيعمل تسلسل السقوط (أيقونة، ثم نص). **لا رابط خام إلى المصدر يصل إلى `<img>` أبداً.**
 - **اختبارات (VD-1c):**
   - vitest للمحوّل: مسار صالح، و`file` غير مسموح، وuuid مشوّه، وأجزاء زائدة، وترميز `..`، وأن الفرع يسبق النمط العام.
-  - اختبار يثبت أن كل `src` يخرج من `normalizeListingFacets` يبدأ بـ`/api/storefront/media/facet-visuals/`.
+  - اختبار يثبت أن كل `src` يخرج من `parseListingFacets` يبدأ بـ`/api/storefront/media/facet-visuals/`.
   - في VD-5: تحميل فعلي للصورة في المتصفح عبر المتجر المحلي، والتحقق بالرد 200 والعرض.
 
 **نافذة التعطيل الموثّقة:**

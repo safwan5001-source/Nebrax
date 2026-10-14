@@ -1,6 +1,8 @@
 # REM-04 / SEC-02 — Follow-up Report: single-attempt posting + scoped 503 contract
 
-STATUS: **DRAFT PR — NOT MERGED — NOT DEPLOYED** (CI on the final head is recorded in the PR comment)
+STATUS: **MERGED** (PR #1461, merge `51851c04ae11ac90c14e223bc44456765d0dc535`) · **CI verified** · **Production deployment NOT VERIFIED**
+
+> **Status correction (2026-10-14, post-merge).** This report was authored while the change was a Draft PR ("NOT MERGED"). Current verified state: PR #1461 merged, merge SHA `51851c04ae11ac90c14e223bc44456765d0dc535`, post-merge `CI` run #9515 success; **production deployment NOT VERIFIED**. The body below is otherwise unchanged and still describes the state at authoring; where it says "Draft" or "not merged" this note supersedes it. Cross-horizon status: `TAX-ZATCA-RECONCILIATION-AUDIT.md`.
 DATE: 2026-10-14
 HORIZON: TAX-ZATCA — follow-up to REM-04 (#1450) after the owner's post-merge review
 ZONE: C — financial posting path / API contract (no accounting change, no schema change)

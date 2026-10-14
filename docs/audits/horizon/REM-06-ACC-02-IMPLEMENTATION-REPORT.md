@@ -1,6 +1,8 @@
 # REM-06 / ACC-02 — Implementation Report: semantic VAT account routing
 
-STATUS: **IN REVIEW (Draft PR #1473). NOT MERGED. NOT DEPLOYED.** Closes only after approved merge and verification.
+STATUS: **MERGED** (PR #1473, merge `76b05f69a32fb7d2c5d741708661261dfc01d6cf`) · **CI verified** · **Production deployment NOT VERIFIED**
+
+> **Status correction (2026-10-14, post-merge).** This report was authored while the change was a Draft PR ("NOT MERGED"). Current verified state: PR #1473 merged, merge SHA `76b05f69a32fb7d2c5d741708661261dfc01d6cf`, post-merge `CI` run #9596 (sqlite + pgsql) success; **production deployment NOT VERIFIED**. On the PR head `cb3779a` the first pgsql attempt hit the 60-minute job timeout (cause undetermined) and passed on re-run. The Fiscal Close VAT line follow-up (§9 item 1) remains open. The body below is otherwise unchanged and still describes the state at authoring; where it says "Draft" or "not merged" this note supersedes it. Cross-horizon status: `TAX-ZATCA-RECONCILIATION-AUDIT.md`.
 DATE: 2026-10-14 · ZONE: C — tax / accounting
 Contract & decisions: `REM-06-ACC-02-ACCOUNTING-DECISION-REPORT.md` (R6-1/R6-2 = Option A approved; R6-3 not applicable).
 
@@ -97,6 +99,7 @@ Resulting balances / reconciliation (invoice → remap → full return): `2120` 
 | `da92e24` (expense/asset only) | see PR checks | see PR checks | see PR checks | superseded |
 | `b09559c` (returns + notes) | ❌ | ❌ | ❌ | one REM-05 test asserted the old hard-coded `2120` (§6) |
 | `7032340` (test updated) | pending at the time of writing | pending | pending | final results are recorded on the PR |
+| `cb3779a` (final PR head, report-only on top of `7032340`) | ✅ attempt 1 | ✅ attempt 2 (attempt 1 hit the 60-minute job timeout and was cancelled; cause undetermined — not a lock wait, not a code regression; test hang vs runner stall unknown) | ✅ re-run (the first Gate run failed only because of the cancelled pgsql job) | recorded 2026-10-14 from the GitHub Actions API; post-merge `CI` run #9596 on `76b05f6` also ✅ (sqlite + pgsql) |
 
 Web CI: not applicable (no `web/` change). The final head is re-verified on the PR; see the closing PR comment.
 

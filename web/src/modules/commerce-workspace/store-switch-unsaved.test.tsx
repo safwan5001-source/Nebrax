@@ -34,6 +34,8 @@ function Screen({ dirty }: { dirty: boolean }) {
 
 async function open(dirty: boolean) {
   apiMock.mockResolvedValue({ data: { stores: [store('s1', 'الأول'), store('s2', 'الثاني')] } });
+  // AWJ-STORE-CTX-2: متجران بلا سياق = اختيار صريح مطلوب؛ هنا التبويب اختار «s1» سابقاً.
+  window.sessionStorage.setItem('awj-commerce-active-store', 's1');
   render(<CommerceStoreProvider><Screen dirty={dirty} /></CommerceStoreProvider>);
   await waitFor(() => expect(screen.getByTestId('selected').textContent).toBe('s1'));
 }

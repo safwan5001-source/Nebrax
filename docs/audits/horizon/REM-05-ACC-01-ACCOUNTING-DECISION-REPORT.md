@@ -1,6 +1,8 @@
 # REM-05 / ACC-01 — Accounting Decision Report: VAT account roles & tax-report accuracy
 
-STATUS: **PHASE 1 DECISION REPORT — D-1…D-6 APPROVED BY THE OWNER (see §11). PHASE 2 IMPLEMENTED IN A SEPARATE DRAFT PR — see `REM-05-ACC-01-IMPLEMENTATION-REPORT.md`. NOT MERGED. NOT DEPLOYED.**
+STATUS: **PHASE 1 DECISION REPORT — D-1…D-6 APPROVED BY THE OWNER (see §11). PHASE 2 IMPLEMENTED AND MERGED (PR #1457, merge `a8a950508d533805530c324d51595fe46cdaa682`) — see `REM-05-ACC-01-IMPLEMENTATION-REPORT.md`. Production deployment NOT VERIFIED.**
+
+> **Status correction (2026-10-14, post-merge).** This report was authored while the change was a Draft PR ("NOT MERGED"). Current verified state: PR #1457 merged, merge SHA `a8a950508d533805530c324d51595fe46cdaa682`, post-merge `CI` run #9532 success; **production deployment NOT VERIFIED**. The body below is otherwise unchanged and still describes the state at authoring; where it says "Draft" or "not merged" this note supersedes it. Cross-horizon status: `TAX-ZATCA-RECONCILIATION-AUDIT.md`.
 DATE: 2026-10-14
 HORIZON: TAX-ZATCA (origin: AWJ-TAX-ZATCA-AUDIT-1 ACC-01 → backlog REM-05)
 ZONE: C — tax / accounting
