@@ -115,6 +115,8 @@ Observation (not investigated, out of scope): in a test that switches branch con
 
 `tests/Feature/VatSemanticRoutingTest.php` (11, SQLite + PostgreSQL): default-mapping journals byte-identical (exact debit/credit table); remapped `tax_input` used; four sequential remaps incl. reset, each document on the role in force, earlier entries unchanged, REM-05 report 600.00 verified; rounding (333.33 × 15 % ⇒ 50.00) and zero-rate (no VAT line) unchanged; inactive mapped account ⇒ fail closed, no entry, draft kept, nothing on 1150; unmapped role ⇒ fail closed; zero-rate needs no mapping; asset acquisition default + remapped with exact amounts; invalid mapping blocks asset atomically; cross-tenant isolation; Fiscal Close disclosure now limited to pre-remap VAT. Existing suites `Expense*`, `Asset*`, `BranchAssetHrIsolationTest`, `DocumentExpenseDraftBuilderTest`, `CostCenterReportTest`: 94 passed, unchanged.
 
+Local full `php artisan test` (SQLite) on `dfec09d`: 6,785 passed · 93 skipped · 26 failed — all 26 in the 6 Fuel test classes that need PHP `bcmath`, absent in this sandbox (CI installs it); identical to `main`. PostgreSQL (focused: routing, REM-05, Expense, Asset, cost-centre): 66 passed. CI on the PR head is authoritative.
+
 Pending the decision: return / credit-note tests (default, remapped, multiple remaps, source-linked and standalone, POS exchange return leg, reversal inheritance, REM-05 compatibility, PostgreSQL concurrency of a remap racing a return post).
 
 ## 7. Risks
