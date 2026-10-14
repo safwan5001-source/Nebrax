@@ -1,6 +1,6 @@
 # AWJ-VD-2 — Implementation Report (Shape engine, FacetVisualTile, IconPicker)
 
-STATUS: **PR #1482 — in review.** Low-risk under the amended D-14 (no DB, API, permissions, security, tenant, accounting or inventory change): it auto-merges by squash once CI is green, the review has passed and nothing substantive is open.
+STATUS: **MERGED** — PR #1482 squash-merged as `d568bf681c2615e36fb6cd43ce2ac8390ab30320` under the owner's amended D-14 (low risk: no DB, API, permissions, security, tenant, accounting or inventory change). POST_MERGE_REVIEW: PENDING (post-merge CI running).
 DATE: 2026-10-14
 HORIZON: AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 · slice VD-2 (H1-2)
 AUTHORITY: G0 closed by the owner (D-01..D-17 approved). VD-1a merged as `8801af9` (post-merge CI green). VD-2 has no DB or API change, so it continues the horizon without the separate DB/API approval that VD-1b, VD-1c and VD-4a still need.
@@ -188,11 +188,20 @@ No endpoints. The picker's `disabled` state is the hook for VD-3's "no `commerce
 - Storefront dark mode remains out of scope (D-13).
 - The `fallbackIcon` refinement is a small contract addition beyond the VD-1a text. It is surfaced here for the owner rather than applied silently.
 
+## CI and merge
+
+- **PRE_MERGE_REVIEW: PASS** on the final head `6309f34`:
+  - **CI:** 9/9 checks green — PHP sqlite + pgsql, CI Gate, storefront (lint + typecheck + test) ×2, web build ×2, merchant preview visual QA, published footer visual QA.
+  - **Mergeability:** `clean`.
+  - **Review:** no open review threads; all independent-review findings fixed.
+- **Merge:** squash, `d568bf681c2615e36fb6cd43ce2ac8390ab30320`.
+- **POST_MERGE_REVIEW: PENDING (post-merge CI running)** (CI, Web CI and Storefront CI on `main` at `d568bf6`).
+
 ## Git state
 
-- Branch: `feat/vd-2-facet-shape-engine`
-- Base: `8801af9` (VD-1a), with `origin/main` merged at `f1bcc67`
-- PR: #1482. Head SHA: recorded on the PR.
+- Branch: `feat/vd-2-facet-shape-engine` (merged)
+- PR: #1482
+- Merge SHA: `d568bf6`
 
 ## Recommended next dependency-ready task
 
