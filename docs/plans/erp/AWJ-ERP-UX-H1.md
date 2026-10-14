@@ -1,6 +1,6 @@
 # AWJ-ERP-UX-H1 — ERP UI / UX / Accessibility Horizon (state file)
 
-Status: **IN EXECUTION** — H1-0 merged (`276ebef`); implementation slices in review (see table)
+Status: **CLOSED** — all slices merged on `main` (H1-8 closure: [AWJ-ERP-UX-H1-8-CLOSURE.md](./AWJ-ERP-UX-H1-8-CLOSURE.md)). Merged ≠ Deployed ≠ Production verified: nothing in this horizon was deployed.
 Owner: Safwan · Executor: **Claude Code** (sole executor) · Started: 2026-10-14
 Repository: `safwan5001-source/Nebrax` · Protocol: [AWJ Horizon System](../../autonomous-engineering/AWJ-HORIZON-SYSTEM.md), [Execution Protocol](../../engineering/AWJ_HORIZON_EXECUTION_PROTOCOL.md)
 Charter: [AWJ-ERP-UX-H1-CHARTER.md](./AWJ-ERP-UX-H1-CHARTER.md) · H1-0 audit: [AWJ-ERP-UX-H1-0-AUDIT.md](./AWJ-ERP-UX-H1-0-AUDIT.md)
@@ -15,32 +15,36 @@ Charter: [AWJ-ERP-UX-H1-CHARTER.md](./AWJ-ERP-UX-H1-CHARTER.md) · H1-0 audit: [
 
 ## Slice status
 
-| Slice | Content | Branch / PR | Status | Merge SHA |
+| Slice | Content | PR | Status | Merge SHA |
 |---|---|---|---|---|
-| H1-0 | Evidence audit, backlog, queue (docs) | `docs/erp-ux-h1-0-audit` / #1418 | **merged** — PRE/POST_MERGE_REVIEW PASS | `276ebef` |
-| H1-1 | ERP UI contract + acceptance rubric (docs) | `docs/erp-ux-h1-1-ui-contract` | in review | — |
-| H1-2A | Dialog focus management + localized close (ERP-UX-001/002) | — | queued | — |
-| H1-2B | Dropdown inert when closed (ERP-UX-003) | — | queued | — |
-| H1-2C | Toast region, live region, label (ERP-UX-004) | — | queued | — |
-| H1-3A | Skip link, 320 px header, menu ARIA (ERP-UX-005/006/021) | — | queued | — |
-| H1-3B | Non-navigable "soon" sidebar items (ERP-UX-007) | — | queued | — |
-| H1-3C | Display preferences not re-applied on refresh (ERP-UX-026) | — | queued | — |
-| H1-4A | Bidi-safe names, action header labels (ERP-UX-015/016) | — | queued | — |
-| H1-4B | Product-edit sideways scroll from mis-hidden file input (ERP-UX-022) | — | queued | — |
-| H1-4C | Minus sign left of negative amounts in RTL (ERP-UX-027) | — | queued | — |
-| H1-5A | Localized forbidden state (ERP-UX-009) | — | queued | — |
-| H1-5B | Accessible names for unnamed controls (ERP-UX-010) | — | queued | — |
-| H1-5C | Dashboard KPI amount spill at ≤360 px (ERP-UX-024) | — | queued | — |
-| H1-6A | Contrast on `/applications`, workspace link name (ERP-UX-011/012) | — | queued | — |
-| H1-6B | Native confirm → in-app dialog, finance/HR (ERP-UX-017) | — | queued | — |
-| H1-7A | Missing numbering labels (ERP-UX-008) | — | queued | — |
-| H1-7C… | Hard-coded Arabic UI strings → catalogs, per module group (ERP-UX-025) | — | queued | — |
-| H1-7B | Heading order + misc P3 (ERP-UX-014/018/019/020/023) | — | queued | — |
-| H1-8 | Regression crawl, role matrix, closure report | — | queued | — |
+| H1-0 | Evidence audit, backlog, queue (docs) | #1418 | merged — PRE/POST_MERGE_REVIEW PASS | `276ebef` |
+| H1-1 | ERP UI contract + acceptance rubric (docs) | #1420 | merged — PASS / PASS | `69e9ffe` |
+| H1-2A | Dialog focus management + localized close (ERP-UX-001/002) | #1421 | merged — PASS / PASS | `6581e58` |
+| H1-2B | Closed menus inert (ERP-UX-003) | #1422 | merged — PASS / PASS | `0902fd0` |
+| H1-2C | Toast region, assertive errors, label (ERP-UX-004) | #1433 | merged — PASS / PASS | `9c50ead` |
+| H1-3A | Skip link, 320 px header, menu ARIA (ERP-UX-005/006/021) | #1423 | merged — PASS / PASS | `d9dbeaf` |
+| H1-3B | Non-navigable "soon" sidebar items (ERP-UX-007) | #1424 | merged — PASS / PASS | `a90b3f9` |
+| H1-3C | Display preferences kept on refresh (ERP-UX-026) | #1425 | merged — PASS / PASS | `ca652ff` |
+| H1-4A | Row-action headers, bidi-safe names (ERP-UX-015/016) | #1426 | merged — PASS / PASS | `45092a9` |
+| H1-4B | Product-edit sideways scroll (ERP-UX-022) | #1427 | merged — PASS / PASS | `fa3166f` |
+| H1-4C | Minus sign left of negative amounts in RTL (ERP-UX-027) | #1428 | merged — PASS / PASS | `b222da8` |
+| H1-5A | Localized forbidden state (ERP-UX-009) | #1429 | merged — PASS / PASS | `42c8b1c` |
+| H1-5B | Every flagged control named (ERP-UX-010) | #1435 | merged — PASS / PASS | `b8f3453` |
+| H1-5C | Dashboard KPI fit at ≤360 px (ERP-UX-024) | #1430 | merged — PASS / PASS | `c6ca972` |
+| (fix) | KPI test after 4C+5C interaction (test only) | #1436 | merged — PASS / PASS | `ccf0be2` |
+| H1-6A | Contrast, dark-mode document paper, workspace link names (ERP-UX-011/012) | #1434 | merged — PASS / PASS | `4ca1ece` |
+| H1-6B | In-app confirm, finance/accounting/HR (ERP-UX-017) | #1437 | merged — PASS / PASS | `317d04d` |
+| H1-7A | Numbering labels (ERP-UX-008) | #1431 | merged — PASS / PASS | `29a2316` |
+| H1-7B | Heading order (ERP-UX-014) | #1438 | merged — PASS / PASS | `3093e10` |
+| H1-7C1 | English UI on main lists (ERP-UX-025) | #1432 | merged — PASS / PASS | `cc490d6` |
+| H1-7D | Landmarks, links, 404, fuel settings, labels (ERP-UX-019/023, rest of 025) | #1439 | merged — PASS / PASS | `7888cdf` |
+| H1-7E | Sans placeholders, Customizer chevron (ERP-UX-018/020) | #1440 | merged — PASS / PASS | `622783e` |
+| H1-7F | Residuals from the closure crawl incl. restricted role (ERP-UX-014/019/023) | #1441 | merged — PASS / PASS | `ea7c0c3` |
+| H1-8 | Regression matrix, role matrix, closure report (docs) | this PR | see closure report | — |
 
 Open owner decision (non-blocking): **D-ERP-UX-01** — additive `name_en` on report account rows (ERP-UX-013).
 
-Per-slice PR numbers, head/merge SHAs and review records live on each PR and in `reports/AWJ-ERP-UX-H1-*-REPORT.md`; this table is refreshed at closure (H1-8) to avoid every slice PR editing the same file.
+Per-slice review records (exact-head CI, full Vitest, PRE/POST_MERGE_REVIEW) live on each PR; implementation reports in `reports/AWJ-ERP-UX-H1-*-REPORT.md`.
 
 ## Definition of done (from the owner direction, §6)
 
