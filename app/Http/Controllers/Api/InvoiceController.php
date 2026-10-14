@@ -228,7 +228,9 @@ class InvoiceController extends ApiController
     /** ينشئ ملاحظة داخلية وملفات خاصة مرتبطة بها، من دون تعديل حالة الفاتورة أو قيدها. */
     public function storeNote(StoreInvoiceNoteRequest $request, string $id): JsonResponse
     {
-        $invoice = $this->visibleInvoice($request, $id);
+        // REM-03b: كتابة ملاحظة/مرفقات = عملية تغييرية ⇒ الفرع النشط فقط، قبل توليد
+        // معرّف المورد وقبل تخزين أي ملف أو صف (القراءة `notes()` تبقى على سياسة القراءة).
+        $invoice = $this->targetInvoice($id);
         $data = $request->validated();
 
         // ذرّية الطلب (Q12): الملفات أولاً خارج المعاملة، ثم الملاحظة وصفوف مرفقاتها معاً.
@@ -317,7 +319,8 @@ class InvoiceController extends ApiController
     /** ينشئ مسودة مستقلة من فاتورة مرئية، بلا أثر ترحيل أو سداد من المصدر. */
     public function duplicate(Request $request, string $id): JsonResponse
     {
-        $invoice = $this->visibleInvoice($request, $id);
+        // REM-03b: المصدر يُحلّ بالفرع النشط فقط (لا يوسّعه `?branch=all`) قبل أي مسودة/سطر/رقم.
+        $invoice = $this->targetInvoice($id);
         $copy = $this->domain(fn () => $this->invoices->duplicate($invoice, $request->user()?->id));
 
         return (new InvoiceResource($copy->load('priceList', 'lines.product', 'lines.costCenterAllocations.costCenter')))
@@ -394,7 +397,8 @@ class InvoiceController extends ApiController
     }
 
     /**
-     * REM-03 / SEC-01: فاتورة هدف عملية **تغييرية** (تعديل/تصنيف/حذف/ترحيل) —
+     * REM-03 / SEC-01 (+ REM-03b): فاتورة هدف عملية **تغييرية** (تعديل/تصنيف/حذف/ترحيل،
+     * ونسخ الفاتورة وإضافة ملاحظة) —
      * الفرع النشط فقط. لا يوسّعها `?branch=all` (على عكس `visibleInvoice()` الخاصة
      * بالقراءة). انظر `ApiController::scopeToCurrentBranchOnly()`.
      */
