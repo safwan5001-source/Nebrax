@@ -190,13 +190,17 @@ for (const [locale, dir] of [['ar', 'rtl'], ['en', 'ltr']] as const) {
   }
 }
 
-test('a viewer without manage, or only with reassign, sees no management action and sends no write', async ({ page }) => {
-  for (const permissions of [['invoices.view', 'delivery_connector.view'], ['invoices.view', 'delivery_connector.view', 'delivery_connector.reassign', 'users.view']]) {
-    const w = world();
-    await open(page, { locale: 'en', theme: 'light', permissions, role: 'custom' }, w);
-    await expect(page.getByTestId('signed-ingress-panel').getByRole('button')).toHaveCount(0);
-    await expect(page.getByTestId('signed-ingress-readonly-note')).toBeVisible();
-    expect(writes(w)).toEqual([]);
-    await page.unrouteAll({ behavior: 'ignoreErrors' });
-  }
+test('a viewer without manage sees no management action and sends no write; with reassign + users.view (5d) only reassign appears, never rotate/disable', async ({ page }) => {
+  const viewer = world();
+  await open(page, { locale: 'en', theme: 'light', permissions: ['invoices.view', 'delivery_connector.view'], role: 'custom' }, viewer);
+  await expect(page.getByTestId('signed-ingress-panel').getByRole('button')).toHaveCount(0);
+  await expect(page.getByTestId('signed-ingress-readonly-note')).toBeVisible();
+  expect(writes(viewer)).toEqual([]);
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+
+  const operator = world();
+  await open(page, { locale: 'en', theme: 'light', permissions: ['invoices.view', 'delivery_connector.view', 'delivery_connector.reassign', 'users.view'], role: 'custom' }, operator);
+  const ids = await page.getByTestId('signed-ingress-panel').getByRole('button').evaluateAll((els) => els.map((el) => el.getAttribute('data-testid')));
+  expect([...new Set(ids)]).toEqual(['ingress-reassign']);
+  expect(writes(operator)).toEqual([]);
 });

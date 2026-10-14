@@ -1,10 +1,12 @@
 'use client';
 
+import { useCallback, useRef, useState } from 'react';
 import { DeliveryPlatformDetail } from './delivery-platform-detail';
 import { useDeliveryIntegrationData } from './use-delivery-integration-data';
 import type { IngressProfileSupport } from './ingress-create-entry';
 import { useIngressManagement } from './use-ingress-management';
-import { useSignedIngress } from './use-signed-ingress';
+import { useCanReassignIngress } from './ingress-row-actions';
+import { useOperatorDirectory, useSignedIngress } from './use-signed-ingress';
 import { deliveryLadder } from '@/lib/integration-center';
 
 /**
@@ -18,7 +20,16 @@ export function DeliveryPlatformDetailScreen({ platformKey }: { platformKey: str
 
   // تدوير السر والتعطيل (INT-UX-5b): بعد أي نتيجة (أو نتيجة مجهولة) تُعاد قراءة قائمة النقاط.
   const profileId = data.profileIds?.get(platformKey) ?? null;
-  const management = useIngressManagement(ingress.retry, profileId, platformKey);
+  // دليل المشغّلين (INT-UX-5d): يُقرأ فقط لمن يملك reassign + users.view، وبعد جاهزية القائمة وبوجود نقطة مهيّأة.
+  const canReassign = useCanReassignIngress();
+  const [operatorsAttempt, setOperatorsAttempt] = useState(0);
+  const retryOperators = useCallback(() => setOperatorsAttempt((value) => value + 1), []);
+  const hasConfiguredPoint = ingress.state.status === 'ready' && ingress.state.points.some((point) => point.status === 'configured');
+  // «لاصق»: بعد أن تصير القراءة مطلوبة لا تُلغى مع إعادة قراءة القائمة العابرة (تحميل) فلا يُعاد جلب الدليل ولا تومض الأسماء.
+  const wantOperators = useRef(false);
+  if (canReassign && hasConfiguredPoint) wantOperators.current = true;
+  const operators = useOperatorDirectory(wantOperators.current, operatorsAttempt);
+  const management = useIngressManagement(ingress.retry, profileId, platformKey, operators, retryOperators);
   const manualState = data.manual?.get(platformKey);
   const ingressProfile: IngressProfileSupport = {
     state: data.manualFailed || data.profileIds === null ? 'unreadable' : profileId !== null ? 'ready' : manualState === 'disabled' ? 'disabled' : 'missing',

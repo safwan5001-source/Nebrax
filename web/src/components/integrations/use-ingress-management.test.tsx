@@ -6,15 +6,15 @@ import { resetUnconfirmedCreatesForTests } from '@/lib/ingress-create-guard';
 import type { IngressPoint } from '@/lib/signed-ingress';
 import type { SignedIngressState } from './use-signed-ingress';
 
-const { rotateIngressSecret, disableIngress, createIngressPoint } = vi.hoisted(() => ({ rotateIngressSecret: vi.fn(), disableIngress: vi.fn(), createIngressPoint: vi.fn() }));
+const { rotateIngressSecret, disableIngress, createIngressPoint, reassignIngressOperator } = vi.hoisted(() => ({ rotateIngressSecret: vi.fn(), disableIngress: vi.fn(), createIngressPoint: vi.fn(), reassignIngressOperator: vi.fn() }));
 vi.mock('@/lib/ingress-operations', async () => {
   const actual = await vi.importActual<typeof import('@/lib/ingress-operations')>('@/lib/ingress-operations');
-  return { ...actual, rotateIngressSecret, disableIngress, createIngressPoint };
+  return { ...actual, rotateIngressSecret, disableIngress, createIngressPoint, reassignIngressOperator };
 });
 
 const point: IngressPoint = { id: 'ing-1', storeId: 'Store-100', branchId: null, status: 'configured', secretVersion: 1, createdAt: null, disabledAt: null };
 
-beforeEach(() => { resetUnconfirmedCreatesForTests(); rotateIngressSecret.mockReset(); disableIngress.mockReset(); createIngressPoint.mockReset(); });
+beforeEach(() => { resetUnconfirmedCreatesForTests(); rotateIngressSecret.mockReset(); disableIngress.mockReset(); createIngressPoint.mockReset(); reassignIngressOperator.mockReset(); });
 
 describe('useIngressManagement', () => {
   it('confirmDisable ignores anything but the exact store ID (a hook-level guard, independent of the dialog)', async () => {
@@ -197,6 +197,142 @@ describe('useIngressManagement', () => {
       act(() => result.current.observe(ready([point, born])));
       expect(result.current.blockedStoreIds).toEqual([]);
       expect(result.current.notice).toEqual({ kind: 'createUnconfirmed', storeId: 'Store-NEW' });
+    });
+  });
+});
+
+describe('useIngressManagement — reassign (5d)', () => {
+  const operatorsReady = {
+    status: 'ready' as const,
+    entries: [
+      { id: 'u-old', name: 'Old', active: true, branchIds: [] },
+      { id: 'u-new', name: 'New', active: true, branchIds: [] },
+      { id: 'u-off', name: 'Off', active: false, branchIds: [] },
+      { id: 'u-br', name: 'Branch2', active: true, branchIds: ['br-2'] },
+    ],
+  };
+  const operated: IngressPoint = { ...point, operatedBy: 'u-old' };
+  const mountReady = (reload = () => {}, retry = () => {}) => renderHook(() => useIngressManagement(reload, null, 'keeta', operatorsReady, retry));
+
+  it('two confirms in the same tick send one request (the lock is raised before the first await)', async () => {
+    let release: (v?: unknown) => void = () => {};
+    reassignIngressOperator.mockImplementation(() => new Promise((resolve) => { release = resolve; }));
+    const { result } = mountReady();
+    act(() => result.current.openReassign(operated));
+    act(() => { result.current.confirmReassign('u-new'); result.current.confirmReassign('u-new'); });
+    expect(reassignIngressOperator).toHaveBeenCalledTimes(1);
+    expect(reassignIngressOperator).toHaveBeenCalledWith('ing-1', 'u-new');
+    expect(result.current.busy).toBe(true);
+    // مشغولاً: لا إغلاق ولا فتح جديد.
+    act(() => { result.current.cancelReassign(); result.current.openReassign({ ...operated, id: 'ing-2' }); });
+    expect(result.current.reassignPoint?.id).toBe('ing-1');
+    await act(async () => { release({}); });
+    expect(result.current.reassignPoint).toBeNull();
+    expect(result.current.busy).toBe(false);
+  });
+
+  it.each([['an inactive user', 'u-off'], ['the current operator', 'u-old'], ['a user outside the point scope', 'u-br'], ['an unknown id', 'u-ghost'], ['an empty id', ''], ['a path-like id', '../x']])('never sends for %s', (_name, id) => {
+    const { result } = mountReady();
+    act(() => result.current.openReassign(operated));
+    act(() => result.current.confirmReassign(id));
+    expect(reassignIngressOperator).not.toHaveBeenCalled();
+    expect(result.current.busy).toBe(false);
+  });
+
+  it('never sends while the operator directory is not ready', () => {
+    const { result } = renderHook(() => useIngressManagement(() => {}, null, 'keeta', { status: 'loading' }));
+    act(() => result.current.openReassign(operated));
+    act(() => result.current.confirmReassign('u-new'));
+    expect(reassignIngressOperator).not.toHaveBeenCalled();
+  });
+
+  it('success closes the dialog, records the new operator NAME only, and re-reads the list once', async () => {
+    reassignIngressOperator.mockResolvedValue(undefined);
+    const reload = vi.fn();
+    const { result } = mountReady(reload);
+    act(() => result.current.openReassign(operated));
+    await act(async () => result.current.confirmReassign('u-new'));
+    expect(result.current.notice).toEqual({ kind: 'reassigned', storeId: 'Store-100', operatorName: 'New' });
+    expect(JSON.stringify(result.current.notice)).not.toContain('u-new');
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('a known 422 keeps the dialog open, exposes the safe key and refreshes the directory; no automatic retry', async () => {
+    reassignIngressOperator.mockRejectedValue(Object.assign(new Error('x'), { status: 422, body: { error_code: 'operator_ineligible' } }));
+    const retry = vi.fn();
+    const { result } = mountReady(() => {}, retry);
+    act(() => result.current.openReassign(operated));
+    await act(async () => result.current.confirmReassign('u-new'));
+    expect(result.current.reassignError).toBe('operatorIneligible');
+    expect(result.current.reassignPoint).not.toBeNull();
+    expect(retry).toHaveBeenCalledTimes(1);
+    expect(reassignIngressOperator).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([[403, 'forbidden'], [404, 'notFound']])('%s closes the dialog with a notice and re-reads', async (status, key) => {
+    reassignIngressOperator.mockRejectedValue(Object.assign(new Error('x'), { status }));
+    const reload = vi.fn();
+    const { result } = mountReady(reload);
+    act(() => result.current.openReassign(operated));
+    await act(async () => result.current.confirmReassign('u-new'));
+    expect(result.current.notice).toEqual({ kind: 'error', messageKey: key });
+    expect(result.current.reassignPoint).toBeNull();
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('a lost response (network) is an unknown outcome: dialog closed, neutral notice, list re-read, one request', async () => {
+    reassignIngressOperator.mockRejectedValue(new TypeError('Failed to fetch'));
+    const reload = vi.fn();
+    const { result } = mountReady(reload);
+    act(() => result.current.openReassign(operated));
+    await act(async () => result.current.confirmReassign('u-new'));
+    expect(result.current.notice).toEqual({ kind: 'error', messageKey: 'reassignOutcomeUnknown' });
+    expect(result.current.reassignPoint).toBeNull();
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(reassignIngressOperator).toHaveBeenCalledTimes(1);
+  });
+
+  it('eligibleFor mirrors the scope rule and currentOperatorName resolves a name or null', () => {
+    const { result } = mountReady();
+    expect(result.current.eligibleFor(operated).map((e) => e.id)).toEqual(['u-new']);
+    expect(result.current.eligibleFor({ ...operated, branchId: 'br-2' }).map((e) => e.id)).toEqual(['u-br', 'u-new']);
+    expect(result.current.currentOperatorName(operated)).toBe('Old');
+    expect(result.current.currentOperatorName({ ...operated, operatedBy: 'u-ghost' })).toBeNull();
+    expect(result.current.currentOperatorName({ ...operated, operatedBy: null })).toBeNull();
+  });
+
+  describe('same-name candidates (excluded together; enforced in the hook, not only in the UI)', () => {
+    const entries = [
+      { id: 'u-old', name: 'Old', active: true, branchIds: [] as string[] },
+      { id: 'u-sam1', name: 'Sam', active: true, branchIds: [] as string[] },
+      { id: 'u-sam2', name: 'sam', active: true, branchIds: [] as string[] },
+      { id: 'u-uniq', name: 'Unique', active: true, branchIds: [] as string[] },
+    ];
+    const mountNamed = () => renderHook(() => useIngressManagement(() => {}, null, 'keeta', { status: 'ready' as const, entries }, () => {}));
+
+    it.each(['u-sam1', 'u-sam2'])('calling confirmReassign directly with the excluded id %s sends nothing', (id) => {
+      const { result } = mountNamed();
+      act(() => result.current.openReassign(operated));
+      act(() => result.current.confirmReassign(id));
+      expect(reassignIngressOperator).not.toHaveBeenCalled();
+      expect(result.current.busy).toBe(false);
+    });
+
+    it('lists only the unique name, reports the ambiguous name, and still sends the unique one', async () => {
+      reassignIngressOperator.mockResolvedValue(undefined);
+      const { result } = mountNamed();
+      expect(result.current.eligibleFor(operated).map((e) => e.id)).toEqual(['u-uniq']);
+      expect(result.current.ambiguousFor(operated).map((n) => n.toLowerCase())).toEqual(['sam']); // الاسم يُذكر مرة واحدة
+      expect(JSON.stringify(result.current.ambiguousFor(operated))).not.toContain('u-sam');
+      act(() => result.current.openReassign(operated));
+      await act(async () => result.current.confirmReassign('u-uniq'));
+      expect(reassignIngressOperator).toHaveBeenCalledWith('ing-1', 'u-uniq');
+    });
+
+    it('distinct names: nothing excluded, nothing reported', () => {
+      const { result } = mountReady();
+      expect(result.current.ambiguousFor(operated)).toEqual([]);
+      expect(result.current.eligibleFor(operated).map((e) => e.id)).toEqual(['u-new']);
     });
   });
 });

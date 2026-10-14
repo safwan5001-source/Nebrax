@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { IngressRequestInvalid, IngressResponseUnreadable, IngressUnavailableInDemo, createIngressPoint, disableIngress, rotateIngressSecret } from './ingress-operations';
+import { IngressRequestInvalid, IngressResponseUnreadable, IngressUnavailableInDemo, createIngressPoint, disableIngress, reassignIngressOperator, rotateIngressSecret } from './ingress-operations';
 
 const { api } = vi.hoisted(() => ({ api: vi.fn() }));
 vi.mock('@/lib/api', () => ({ api }));
@@ -119,5 +119,44 @@ describe('disableIngress', () => {
   ])('treats a 2xx that is %s as an unknown outcome', async (_name, payload) => {
     api.mockResolvedValue(payload);
     await expect(disableIngress('ing-1')).rejects.toBeInstanceOf(IngressResponseUnreadable);
+  });
+});
+
+describe('reassignIngressOperator', () => {
+  it('POSTs the existing reassign route once with exactly { user_id } and resolves on a data object', async () => {
+    api.mockResolvedValue({ data: { id: 'ing-1', status: 'configured', operated_by: 'u-9' } });
+    await expect(reassignIngressOperator('ing-1', 'u-9')).resolves.toBeUndefined();
+    expect(api).toHaveBeenCalledTimes(1);
+    expect(api).toHaveBeenCalledWith('/delivery-connectors/ing-1/reassign', { method: 'POST', body: { user_id: 'u-9' } });
+  });
+
+  it.each([
+    ['no data', {}], ['null payload', null], ['data null', { data: null }], ['data list', { data: [] }], ['data string', { data: 'ok' }],
+  ])('treats %s as an unreadable success (no status ⇒ unknown outcome)', async (_name, payload) => {
+    api.mockResolvedValue(payload);
+    const error = await reassignIngressOperator('ing-1', 'u-9').catch((e) => e);
+    expect(error).toBeInstanceOf(IngressResponseUnreadable);
+    expect((error as { status?: unknown }).status).toBeUndefined();
+  });
+
+  it('rejects ids that are not plain identifiers before any request (client check; the server is final)', async () => {
+    for (const bad of ['', '../x', 'a/b', 'a?b=1', 'a b', 'x'.repeat(65)]) {
+      await expect(reassignIngressOperator(bad, 'u-9')).rejects.toBeInstanceOf(IngressRequestInvalid);
+      await expect(reassignIngressOperator('ing-1', bad)).rejects.toBeInstanceOf(IngressRequestInvalid);
+    }
+    expect(api).not.toHaveBeenCalled();
+  });
+
+  it('rethrows HTTP and transport errors unchanged and never repeats the request', async () => {
+    const failure = Object.assign(new Error('boom'), { status: 422, body: { error_code: 'operator_ineligible' } });
+    api.mockRejectedValue(failure);
+    await expect(reassignIngressOperator('ing-1', 'u-9')).rejects.toBe(failure);
+    expect(api).toHaveBeenCalledTimes(1);
+  });
+
+  it('in demo mode sends nothing', async () => {
+    localStorage.setItem('demo', 'true');
+    await expect(reassignIngressOperator('ing-1', 'u-9')).rejects.toBeInstanceOf(IngressUnavailableInDemo);
+    expect(api).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,6 @@
 /**
- * عمليات إدارة نقطة الاستقبال الموقّعة المسموح بها: **الإنشاء** (INT-UX-5c) و**تدوير السر** و**التعطيل** (INT-UX-5b)، عبر
- * المسارات القائمة `POST /delivery-connectors` و`…/{id}/rotate-secret` و`…/{id}/disable`. لا إعادة إسناد (5d) ولا مسار آخر.
+ * عمليات إدارة نقطة الاستقبال الموقّعة المسموح بها: **الإنشاء** (INT-UX-5c) و**تدوير السر** و**التعطيل** (INT-UX-5b) و**إعادة إسناد المشغّل**
+ * (INT-UX-5d)، عبر المسارات القائمة `POST /delivery-connectors` و`…/{id}/rotate-secret` و`…/{id}/disable` و`…/{id}/reassign`. لا مسار آخر.
  *
  * هذا الملف هو **المكان الوحيد** في الواجهة الذي يقرأ حقل السرّ من استجابة الإنشاء أو التدوير. القواعد:
  *  - السرّ قيمة تُعاد من الدالة ولا يُخزَّن هنا ولا في أي وحدة؛ لا `console` ولا تخزين متصفح ولا عنوان URL ولا تحليلات.
@@ -96,4 +96,18 @@ export async function disableIngress(id: string): Promise<void> {
   const payload = await api<unknown>(target(id, 'disable'), { method: 'POST' });
   const status = (payload as { data?: { status?: unknown } } | null)?.data?.status;
   if (status !== 'disabled') throw new IngressResponseUnreadable();
+}
+
+/**
+ * يعيد إسناد المشغّل المسؤول عن النقطة (`POST …/reassign` بحقل `user_id` وحده). لا يغيّر فرعاً ولا حالة ولا سرّاً ولا معرّف متجر.
+ * **القابلية للتكرار وفق عقد الخادم الفعلي** (`DeliveryConnectorAccountService::reassign`): الطلب لمشغّل هو الحالي أصلاً يعيد 200 دون تغيير
+ * ودون حدث تدقيق جديد، فتكرار الطلب نفسه آمن؛ مع ذلك لا يُكرَّر تلقائياً أبداً (النتيجة المجهولة تُعاد قراءتها ويقرّر المستخدم).
+ * النجاح = 2xx بحمولة `data` كائناً؛ غير ذلك يُعامل نتيجةً مجهولة.
+ */
+export async function reassignIngressOperator(id: string, userId: string): Promise<void> {
+  if (isDemo()) throw new IngressUnavailableInDemo();
+  if (!ID_PATTERN.test(id) || !ID_PATTERN.test(userId)) throw new IngressRequestInvalid();
+  const payload = await api<unknown>(`/delivery-connectors/${id}/reassign`, { method: 'POST', body: { user_id: userId } });
+  const data = (payload as { data?: unknown } | null)?.data;
+  if (data === null || typeof data !== 'object' || Array.isArray(data)) throw new IngressResponseUnreadable();
 }

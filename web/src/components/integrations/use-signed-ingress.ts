@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
+import { isDemo } from '@/lib/demo';
 import { readBranchOptions, type BranchOption } from '@/lib/ingress-create';
+import { INGRESS_REASSIGN_PERMISSION, USERS_VIEW_PERMISSION } from '@/lib/ingress-management';
+import { readOperatorDirectory, type OperatorEntry } from '@/lib/ingress-operators';
 import { hasPermission } from '@/lib/permissions';
 import {
   BRANCHES_VIEW_PERMISSION,
@@ -48,13 +51,15 @@ export function useSignedIngress(platformKey: string, enabled: boolean, reloadKe
       return;
     }
     const canViewBranches = hasPermission(user?.permissions, user?.role, BRANCHES_VIEW_PERMISSION);
+    // معرّف المشغّل الحالي لا يدخل الحالة إلا لمن يملك reassign + users.view (D2/D3)، وبلا Demo.
+    const operators = !isDemo() && hasPermission(user?.permissions, user?.role, INGRESS_REASSIGN_PERMISSION) && hasPermission(user?.permissions, user?.role, USERS_VIEW_PERMISSION);
 
     let cancelled = false;
     setState({ status: 'loading' });
     (async () => {
       let points: IngressPoint[] | null;
       try {
-        points = readIngressPoints(await api<unknown>('/delivery-connectors'), platformKey);
+        points = readIngressPoints(await api<unknown>('/delivery-connectors'), platformKey, { operators });
       } catch (error) {
         if (cancelled) return;
         setState({ status: (error as { status?: unknown } | null)?.status === 403 ? 'forbidden' : 'error' });
@@ -115,6 +120,51 @@ export function useBranchOptions(enabled: boolean, reloadKey = 0): BranchOptions
         if (cancelled) return;
         const options = readBranchOptions(payload);
         setState(options === null ? { status: 'error' } : { status: 'ready', options });
+      },
+      () => {
+        if (!cancelled) setState({ status: 'error' });
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled, reloadKey]);
+
+  return state;
+}
+
+export type OperatorDirectoryState =
+  /** لا صلاحية (reassign + users.view) أو لا حاجة بعد: لا قراءة ولا بيانات. */
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'ready'; entries: OperatorEntry[] }
+  /** تعذّرت القراءة: ليس «لا مشغّلين». */
+  | { status: 'error' };
+
+/**
+ * دليل المشغّلين (INT-UX-5d): قراءة `GET /users` **بـ`delivery_connector.reassign` و`users.view` معاً فقط** وخارج Demo. القارئ قائمة سماح
+ * (id، اسم، نشاط، فروع) — البريد وغيره لا يدخل الحالة. `reloadKey` يعيد القراءة (زرّ إعادة المحاولة: قراءة لا كتابة).
+ */
+export function useOperatorDirectory(enabled: boolean, reloadKey = 0): OperatorDirectoryState {
+  const [state, setState] = useState<OperatorDirectoryState>({ status: 'idle' });
+
+  useEffect(() => {
+    if (!enabled || isDemo()) {
+      setState({ status: 'idle' });
+      return;
+    }
+    const user = currentUser();
+    if (!hasPermission(user?.permissions, user?.role, INGRESS_REASSIGN_PERMISSION) || !hasPermission(user?.permissions, user?.role, USERS_VIEW_PERMISSION)) {
+      setState({ status: 'idle' });
+      return;
+    }
+    let cancelled = false;
+    setState({ status: 'loading' });
+    api<unknown>('/users').then(
+      (payload) => {
+        if (cancelled) return;
+        const entries = readOperatorDirectory(payload);
+        setState(entries === null ? { status: 'error' } : { status: 'ready', entries });
       },
       () => {
         if (!cancelled) setState({ status: 'error' });

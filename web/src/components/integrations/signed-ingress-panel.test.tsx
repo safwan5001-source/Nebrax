@@ -40,6 +40,7 @@ function backend(opts: { connectors?: Reply; branches?: Reply; navState?: unknow
     if (path === '/delivery-platforms/readiness') return Promise.resolve({ data: READINESS });
     if (path === '/delivery-connectors') return reply(opts.connectors ?? { data: [account()] });
     if (path === '/branches') return reply(opts.branches ?? { data: [{ id: 'br-1', name: 'Dammam Branch' }, { id: 'br-2', name: 'Khobar Branch' }] });
+    if (path === '/users') return Promise.resolve({ data: [] });
     return Promise.reject(new Error(`unexpected ${path}`));
   });
 }
@@ -98,7 +99,8 @@ describe('SignedIngressPanel on the platform detail screen', () => {
     backend();
     renderIntl(<DeliveryPlatformDetailScreen platformKey="keeta" />, 'en');
     await waitFor(() => expect(screen.getByTestId('signed-ingress-panel').getAttribute('data-state')).toBe('ready'));
-    expect(paths().sort()).toEqual(['/applications/nav-state', '/branches', '/delivery-connectors', '/delivery-platforms', '/delivery-platforms/readiness']);
+    // المالك يملك reassign + users.view فيُقرأ دليل المشغّلين (INT-UX-5d) بـGET بلا خيارات أيضاً.
+    expect(paths().sort()).toEqual(['/applications/nav-state', '/branches', '/delivery-connectors', '/delivery-platforms', '/delivery-platforms/readiness', '/users']);
     for (const call of api.mock.calls) expect(call, String(call[0])).toHaveLength(1);
   });
 
