@@ -26,7 +26,10 @@ export function CommerceWorkspaceShell({ children }: { children: React.ReactNode
   const { catalog, selectedStoreId, setSelectedStoreId, viewStoreUrl, storeContextStatus } = useCommerceStoreContext();
   // لا متجر محسوم: رابط/جلسة لمتجر غير متاح، أو (AWJ-STORE-CTX-2) أكثر من متجر بلا اختيار في هذا التبويب.
   const storeContextInvalid = storeContextStatus === 'invalid' || storeContextStatus === 'needs_selection';
-  const blockStoreScopedPage = storeContextInvalid && !isStoreAgnosticCommercePath(pathname);
+  // AWJ-STORE-CTX-3 (QA D-1) — ولا تُركَّب صفحة مرتبطة بمتجر قبل أن تُحسم القائمة نفسها: أثناء التحميل أو عند فشلها
+  // تُعرض حالة الشاشة (تحميل / خطأ مع إعادة محاولة) بدل صفحةٍ بلا متجر. «لا متاجر» (`empty`) تبقى كما كانت.
+  const catalogUnresolved = catalog.status === 'loading' || catalog.status === 'error' || catalog.status === 'unavailable';
+  const blockStoreScopedPage = (storeContextInvalid || catalogUnresolved) && !isStoreAgnosticCommercePath(pathname);
   const [navigationOpen, setNavigationOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarPreferenceLoaded, setSidebarPreferenceLoaded] = useState(false);

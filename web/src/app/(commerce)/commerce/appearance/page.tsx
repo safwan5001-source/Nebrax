@@ -55,7 +55,13 @@ export default function CommerceAppearancePage() {
     });
   }
 
-  if (storeContextStatus === 'invalid' || storeContextStatus === 'needs_selection') {
+  // AWJ-STORE-CTX-3 (QA D-1) — قائمة متاجر فاشلة/غير متاحة لا تُركِّب البنّاء محلياً بلا متجر؛ الشاشة تعرض الخطأ وإعادة المحاولة.
+  if (
+    storeContextStatus === 'invalid' ||
+    storeContextStatus === 'needs_selection' ||
+    catalog.status === 'error' ||
+    catalog.status === 'unavailable'
+  ) {
     return (
       <div className="grid h-full min-h-0 place-items-center overflow-y-auto p-4">
         <div className="w-full max-w-xl"><StoreSelectionScreen /></div>

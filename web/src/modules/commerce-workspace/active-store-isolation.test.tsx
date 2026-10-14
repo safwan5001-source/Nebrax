@@ -518,4 +518,44 @@ describe('explicit store selection for multi-store tenants (AWJ-STORE-CTX-2)', (
     expect(screen.getByTestId('builder').getAttribute('data-version')).toBe(`published-of-${TAIBA}`);
     expect(builderProps.mock.calls.every(([props]) => props.storefrontId === TAIBA)).toBe(true);
   });
+
+  it('QA D-1: a failed store list never renders a store-scoped page — error + retry instead, then recovery', async () => {
+    apiMock.mockReset();
+    let storeListCalls = 0;
+    apiMock.mockImplementation(async (path: string) => {
+      if (path !== '/commerce/workspace/storefronts') return { data: {} };
+      storeListCalls += 1;
+      if (storeListCalls === 1) throw new Error('down');
+      return storesPayload;
+    });
+    hardLoad('/commerce/themes');
+    renderShell(<CommerceThemesPage />);
+    await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
+    expect(document.querySelector('[data-theme-card]')).toBeNull();
+    expect(listVersionsMock).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'retry' }));
+    await needsSelection();
+    expect(document.querySelector('[data-store-selection-screen]')).toBeTruthy();
+  });
+
+  it('QA D-1: the builder is not mounted (not even local-only) while the store list failed', async () => {
+    apiMock.mockReset();
+    apiMock.mockRejectedValue(new Error('down'));
+    hardLoad('/commerce/appearance');
+    renderWorkspace(<CommerceAppearancePage />);
+    await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
+    expect(screen.queryByTestId('builder')).toBeNull();
+    expect(builderProps).not.toHaveBeenCalled();
+  });
+
+  it('QA D-1: while the store list is loading, the store-scoped page body is withheld', async () => {
+    apiMock.mockReset();
+    apiMock.mockImplementation(() => new Promise(() => {}));
+    hardLoad('/commerce/themes');
+    renderShell(<CommerceThemesPage />);
+    await waitFor(() => expect(screen.getByTestId('active-status').textContent).toBe('pending'));
+    expect(document.querySelector('[data-theme-card]')).toBeNull();
+    expect(listVersionsMock).not.toHaveBeenCalled();
+  });
 });
+
