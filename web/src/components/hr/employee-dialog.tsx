@@ -153,8 +153,12 @@ export function EmployeeDialog({
   initialAllowAccess?: boolean;
   /** إظهار قسم الدخول أصلاً — يقتصر على مالك/مدير يديران المستخدمين والأدوار. */
   canManageUsers?: boolean;
-  /** نطاق المشاهد المخزَّن (من صفّه في قائمة المستخدمين): فراغٌ في بُعدٍ = غير مقيَّد. غيابه = غير معروف فيُترك الحسم للخادم. */
-  actorScope?: { branches: string[]; warehouses: string[] };
+  /**
+   * نطاق المشاهد المخزَّن (من صفّه في قائمة المستخدمين): فراغٌ في بُعدٍ = غير مقيَّد.
+   * `undefined` = ما زال يُحمَّل ⇒ يُمنع منح الدخول مؤقتاً (الموظف يُحفظ قبل طلب المستخدم، فلا نترك نافذةً يُرسَل فيها «الكل» لمقيَّد)؛
+   * `null` = انتهى البحث ولم يُعرف النطاق (فشل الطلب أو لا صفّ) ⇒ يُترك الحسم للخادم فلا يُحجَب الإنشاء أبداً.
+   */
+  actorScope?: { branches: string[]; warehouses: string[] } | null;
 }) {
   const t = useTranslations('hr');
   const tu = useTranslations('users');
@@ -301,7 +305,8 @@ export function EmployeeDialog({
   const scopeIssuesNow = accessActive
     ? scopeIssues(initialScope, scope, scopeCaps, actorRestricted, Boolean(linkedUser))
     : { branches: null, warehouses: null };
-  const scopeBlocked = Boolean(scopeIssuesNow.branches || scopeIssuesNow.warehouses);
+  const scopeLoading = accessActive && actorScope === undefined;
+  const scopeBlocked = Boolean(scopeIssuesNow.branches || scopeIssuesNow.warehouses) || scopeLoading;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -489,6 +494,7 @@ export function EmployeeDialog({
                     ))}
                   </Select>
                 </div>
+                {scopeLoading ? <p role="status" className="text-xs text-muted">{tu('actor_scope_loading')}</p> : null}
                 <AccessScopeEditor
                   value={scope}
                   onChange={setScope}

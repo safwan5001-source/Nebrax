@@ -6827,7 +6827,8 @@
     "keep_editing": "متابعة التعديل",
     "discard": "تجاهل",
     "no_changes": "لا تغييرات بعد",
-    "saving": "جارٍ الحفظ…"
+    "saving": "جارٍ الحفظ…",
+    "actor_scope_loading": "جارٍ التحقق من نطاق وصولك قبل منح صلاحية الدخول…"
   },
   "voucherDoc": {
     "received_from": "استلمنا من",

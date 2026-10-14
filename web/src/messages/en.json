@@ -6827,7 +6827,8 @@
     "keep_editing": "Keep editing",
     "discard": "Discard",
     "no_changes": "No changes yet",
-    "saving": "Saving…"
+    "saving": "Saving…",
+    "actor_scope_loading": "Checking your own access scope before login access can be granted…"
   },
   "voucherDoc": {
     "received_from": "Received from",

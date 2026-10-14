@@ -90,20 +90,23 @@ export default function HrPage() {
 
 
   const [team, setTeam] = useState<TeamUser[]>([]);
+  const [teamLoaded, setTeamLoaded] = useState(false);
 
   const loadTeam = useCallback(() => {
     if (!canManageRoles) return;
-    api<{ data: TeamUser[] }>('/users').then((r) => setTeam(r.data)).catch(() => {});
+    api<{ data: TeamUser[] }>('/users').then((r) => setTeam(r.data)).catch(() => {}).finally(() => setTeamLoaded(true));
   }, [canManageRoles]);
 
   useEffect(() => { if (canManageRoles) loadTeam(); }, [canManageRoles, loadTeam]);
 
   // نطاق المشاهد المخزَّن من صفّه في قائمة المستخدمين (لا نقطة نهاية للنطاق الفعلي): فراغ = غير مقيَّد.
+  // `undefined` = ما زالت القائمة تُحمَّل؛ `null` = انتهت ولم يوجد صفّه/فشلت (يحسم الخادم).
   const actorScope = useMemo(() => {
+    if (!teamLoaded) return undefined;
     const meId = currentUser()?.id;
     const own = meId ? team.find((u) => u.id === meId) : undefined;
-    return own ? { branches: own.branch_ids ?? [], warehouses: own.warehouse_ids ?? [] } : undefined;
-  }, [team]);
+    return own ? { branches: own.branch_ids ?? [], warehouses: own.warehouse_ids ?? [] } : null;
+  }, [team, teamLoaded]);
 
   const toLinkedUser = (u: TeamUser): LinkedUser => ({
     id: u.id, name: u.name, email: u.email, role: u.role, is_active: u.is_active,

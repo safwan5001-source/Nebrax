@@ -99,7 +99,7 @@ export default function EmployeeProfilePage() {
   const [leaveBalances, setLeaveBalances] = useState<LeaveBalance[]>([]);
   const [employeeRequests, setEmployeeRequests] = useState<EmployeeRequest[]>([]);
   const [linkedUser, setLinkedUser] = useState<LinkedUser | null>(null);
-  const [actorScope, setActorScope] = useState<{ branches: string[]; warehouses: string[] } | undefined>(undefined);
+  const [actorScope, setActorScope] = useState<{ branches: string[]; warehouses: string[] } | null | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [section, setSection] = useState<SectionId>('details');
   const [editOpen, setEditOpen] = useState(false);
@@ -285,9 +285,9 @@ export default function EmployeeProfilePage() {
         // نطاق المشاهد المخزَّن من صفّه (فراغ = غير مقيَّد) — يلزم نموذج الموظف ليعرف إن كان «الكل» متاحاً له.
         const meId = currentUser()?.id;
         const own = meId ? r.data.find((u) => u.id === meId) : undefined;
-        setActorScope(own ? { branches: own.branch_ids ?? [], warehouses: own.warehouse_ids ?? [] } : undefined);
+        setActorScope(own ? { branches: own.branch_ids ?? [], warehouses: own.warehouse_ids ?? [] } : null);
       })
-      .catch(() => {});
+      .catch(() => setActorScope(null));
   }, [canManageUsers, id]);
 
   const fmtHours = (m: number) => `${Math.floor(m / 60)} ${t('hours_short')} ${m % 60} ${t('minutes_short')}`;

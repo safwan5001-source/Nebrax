@@ -39,7 +39,7 @@ function respond() {
 const writes = () => api.mock.calls.filter((c) => (c[1] as { method?: string } | undefined)?.method) as [string, { method: string; body: Record<string, unknown> }][];
 
 type LinkedArg = { id: string; name: string; email: string; role: string; branch_ids?: string[]; warehouse_ids?: string[] };
-type ScopeArg = { branches: string[]; warehouses: string[] };
+type ScopeArg = { branches: string[]; warehouses: string[] } | null;
 
 const tree = (linkedUser?: LinkedArg, actorScope?: ScopeArg) => (
   <NextIntlClientProvider locale="en" messages={messages as never}>
@@ -47,7 +47,8 @@ const tree = (linkedUser?: LinkedArg, actorScope?: ScopeArg) => (
   </NextIntlClientProvider>
 );
 
-function open(linkedUser?: LinkedArg, actorScope?: ScopeArg) {
+// الافتراضي `null` = انتهى تحميل نطاق الفاعل ولم يُعرف (يحسم الخادم)؛ `undefined` الصريح = ما زال يُحمَّل.
+function open(linkedUser?: LinkedArg, actorScope: ScopeArg = null) {
   return render(tree(linkedUser, actorScope));
 }
 
@@ -146,7 +147,7 @@ describe('EmployeeDialog access scope for a scope-limited actor', () => {
 
 describe('EmployeeDialog: the actor scope arrives after the dialog opened', () => {
   it('reseeds the untouched scope so a limited actor cannot submit "All" in the gap', async () => {
-    const view = open(undefined, undefined); // قائمة المستخدمين لم تصل بعد
+    const view = render(tree(undefined, undefined)); // قائمة المستخدمين لم تصل بعد
     expect(((await screen.findByRole('radio', { name: /All branches/ })) as HTMLInputElement).disabled).toBe(false);
 
     view.rerender(tree(undefined, { branches: ['b1'], warehouses: [] }));
@@ -159,12 +160,42 @@ describe('EmployeeDialog: the actor scope arrives after the dialog opened', () =
   });
 
   it('keeps a dimension the user already changed when the scope arrives', async () => {
-    const view = open(undefined, undefined);
+    const view = render(tree(undefined, undefined));
     await userEvent.click(await screen.findByRole('radio', { name: /Selected branches only/ }));
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Khobar' }));
 
     view.rerender(tree(undefined, { branches: ['b1', 'b2'], warehouses: [] }));
     await waitFor(() => expect((screen.getByRole('radio', { name: /All branches/ }) as HTMLInputElement).disabled).toBe(true));
     expect((screen.getByRole('checkbox', { name: 'Khobar' }) as HTMLInputElement).checked).toBe(true);
+  });
+});
+
+describe('EmployeeDialog: login access is blocked until the actor scope is known', () => {
+  it('while the scope is loading, Save is disabled with a reason and nothing is written; it unblocks when the scope arrives', async () => {
+    const view = render(tree(undefined, undefined));
+    await fillNewUser();
+    expect(await screen.findByText('Checking your own access scope before login access can be granted…')).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(writes()).toEqual([]);
+
+    view.rerender(tree(undefined, { branches: [], warehouses: [] }));
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(false));
+    expect(screen.queryByText(/Checking your own access scope/)).toBeNull();
+  });
+
+  it('a lookup that finished without a usable scope (null) never blocks creation — the server decides', async () => {
+    open(undefined, null);
+    await fillNewUser();
+    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('does not block an employee save that grants no login access', async () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages as never}>
+        <EmployeeDialog open onClose={() => {}} onSaved={() => {}} canManageUsers actorScope={undefined} />
+      </NextIntlClientProvider>,
+    );
+    await userEvent.type(screen.getByLabelText('Name'), 'Hind');
+    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(false);
   });
 });
