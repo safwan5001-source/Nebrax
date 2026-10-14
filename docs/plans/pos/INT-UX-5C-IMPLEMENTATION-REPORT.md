@@ -63,12 +63,14 @@ No backend, API, database, permission, accounting, POS or ZATCA change.
 - It does **not** survive a **hard reload or closing the tab** — page memory is gone. This is a documented-limit test in Vitest and Playwright, not a hidden gap.
 - It is per browser tab: another tab or device is unprotected.
 
-**Reload protection — not implemented; options for the owner** (each needs a decision the brief reserved: a retention policy or a backend contract):
+**Owner decision (2026-10-14): option C is the final solution — backend idempotency on create — as an independent follow-up.** Options A and B are **not** added: **no `sessionStorage`/`localStorage` in this PR**, and this PR's scope stays page-memory only with **no backend/API contract change**. Refresh / tab-close protection is therefore **deferred**, and the gap below is a **known, temporary gap** (documented here, in the Horizon INT-UX-5c acceptance criterion, in the guard's source header, and pinned by tests). The options considered were:
+
+**Reload protection — options (for the record)** (each needs a decision the brief reserved: a retention policy or a backend contract):
 - **A. Tab-lifetime storage (`sessionStorage`)**: survives reload, dies with the tab; no secrets. Needs a retention decision: what is stored (store ID in clear vs. a hash), maximum age, clearing on sign-out, lift rule. Still per tab.
 - **B. Persistent storage (`localStorage` with an expiry)**: also survives tab close and covers other tabs of the browser. Needs the same decisions plus an expiry and a manual "I verified this" override, otherwise a user can be locked out of a store ID that was truly never created.
 - **C. Backend idempotency key on create** (a `request_id` that makes the repeated request return the same result or the existing point): the only option that is correct across reloads, tabs and devices and could even re-deliver the outcome. It is a backend/API contract change.
-- **D. Accept the in-memory limit** and rely on the server's 409 plus the notice (current state).
-- *Recommendation:* C as the real fix; A as an interim stopgap only if the owner approves its retention policy.
+- **D. Accept the in-memory limit (this is what 5c does until C ships)** and rely on the server's 409 plus the notice (current state).
+- *Outcome:* **C chosen** (follow-up, separate PR and approval — not started here); A/B rejected for this PR.
 
 ### Merge state of PR #1463
 - **What GitHub showed:** after `main` advanced (9 new commits, `51851c04`) the PR's `mergeable_state` was `unknown` — GitHub had not yet recomputed it and still listed the old base `5ff31353`. `unknown` is what the API returns while it recomputes; it is not a conflict verdict.
@@ -119,7 +121,7 @@ Vitest: guard unit tests (scope, trimmed exact match, per-platform, clear/list, 
 - **The store ID is globally unique per platform** (`platform_key + external_store_id`, no tenant in the key), so a 409 may mean another tenant holds it; the fixed message does not reveal which (DP-A context, unchanged).
 - **Reconciliation never infers failure from absence.** The list is branch-scoped, so a point outside the user's visible scope is simply not shown; the UI says "could not be confirmed, do not retry until verified or an administrator is contacted" and cannot tell the two cases apart. The user must verify out of band (or ask an administrator); there is no UI to confirm it yet (that would need the audit reader, INT-UX-6).
 - **Unchanged and out of scope:** the server still allows rotating a disabled point (UI never offers it); no re-enable; rotate/disable from 5b untouched. Pre-existing unrelated: the INT-UX-1 mobile flake `summary error keeps the card usable`, and TypeScript errors in unrelated test files (none in files touched here).
-- **Reload / other tabs / other devices are not protected from re-creating after an unknown outcome** (§2b). The server still answers 409 to a repeated create and never re-sends the secret, so a duplicate cannot leak or replace a secret, but the user can be misled by the unconfirmed state. Options A–D are in §2b; waiting for the owner's decision (retention policy or a backend idempotency contract).
+- **Reload / tab close / other tabs / other devices are not protected from re-creating after an unknown outcome — a known, temporary, documented gap, deliberately not handled in this PR** (§2b; the fix is the independent backend-idempotency follow-up, option C). The server still answers 409 to a repeated create and never re-sends the secret, so a duplicate cannot leak or replace a secret, but the user can be misled by the unconfirmed state. Options A–D and the owner's choice (C) are in §2b.
 - **Remaining in INT-UX-5:** 5d reassign operator. INT-UX-6 and INT-MAP-1 are not started.
 
 ## 7. Git state
