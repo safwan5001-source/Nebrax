@@ -1,6 +1,6 @@
 # AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 — Horizon Master Plan
 
-STATUS: **H1-0 — owner accepted the architecture in principle (2026-10-14); amendments to D-04/D-08/D-15 + D-16 applied; awaiting the owner's final confirmation to close G0.** No migration, API, or deploy without explicit approval.
+STATUS: **G0 CLOSED (2026-10-14) — D-01..D-17 approved by the owner. H1-0 merged (`d5dfa16`). Execution in progress: VD-1a in review.** DB/API slices need a separate explicit approval. No deploy.
 DATE: 2026-10-14
 OWNER: Safwan
 EXECUTION SYSTEM: AWJ Horizon (`docs/autonomous-engineering/AWJ-HORIZON-SYSTEM.md`)
@@ -17,6 +17,7 @@ BASE: `origin/main` @ `f147fb6063d36952971724609250f9ba1baf42f5`
 | `AWJ-VD-H1-TASK-QUEUE.md` | الشرائح والاعتماديات والحالة |
 | `AWJ-VD-H1-VD3-EDITOR-UX-REQUIREMENTS.md` | متطلبات محرر VD-3 المبنية على صور الواجهة الحالية والنموذج |
 | `AWJ-VD-H1-0-IMPLEMENTATION-REPORT.md` | تقرير شريحة H1-0 |
+| `AWJ-VD-1A-IMPLEMENTATION-REPORT.md` | تقرير شريحة VD-1a |
 
 ## الهدف
 
@@ -63,7 +64,8 @@ BASE: `origin/main` @ `f147fb6063d36952971724609250f9ba1baf42f5`
 
 | البوابة | الشرط | الحالة |
 |---|---|---|
-| **G0 — اعتماد المعمارية** | موافقة صريحة على D-01..D-17 | **مقبول مبدئياً مع تعديلات (2026-10-14). التعديلات مطبّقة، وبانتظار تأكيد الإغلاق** |
+| **G0 — اعتماد المعمارية** | موافقة صريحة على D-01..D-17 | **CLOSED** — اعتمدها المالك صراحةً (2026-10-14) |
+| **G-DB/API** | موافقة منفصلة صريحة قبل VD-1b وVD-1c (تغيير قاعدة البيانات وعقود API) | OPEN |
 | G-merge | موافقة المالك على دمج كل PR (D-14) | لكل PR |
 | G-deploy | خارج هذا الأفق | — |
 

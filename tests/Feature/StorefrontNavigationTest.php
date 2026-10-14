@@ -66,9 +66,10 @@ class StorefrontNavigationTest extends TestCase
     }
 
     /** @test */
-    public function the_icon_registry_is_the_pinned_twenty_four(): void
+    public function the_icon_registry_is_the_pinned_append_only_list(): void
     {
-        $this->assertCount(24, IconRegistry::KEYS);
+        // 24 مفتاحاً أصلياً (V7d-1) + 28 ملحقة لهويات الأبعاد (AWJ-VD-H1 / VD-1a، D-10).
+        $this->assertCount(52, IconRegistry::KEYS);
         $this->assertSame(IconRegistry::KEYS, array_values(array_unique(IconRegistry::KEYS)));
     }
 }

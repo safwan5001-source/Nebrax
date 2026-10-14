@@ -1,0 +1,527 @@
+{
+    "value": [
+        {
+            "name": "empty object inherits everything",
+            "input": {},
+            "expected": {}
+        },
+        {
+            "name": "non-object string",
+            "input": "circle",
+            "expected": {}
+        },
+        {
+            "name": "list instead of object",
+            "input": [
+                {
+                    "shape": "circle"
+                }
+            ],
+            "expected": {}
+        },
+        {
+            "name": "null",
+            "input": null,
+            "expected": {}
+        },
+        {
+            "name": "full value in canonical key order (hex lowercased, alt trimmed, id lowercased)",
+            "input": {
+                "showLabel": false,
+                "size": "lg",
+                "shape": "arch",
+                "background": "#FDF2F4",
+                "iconColor": "#9D2449",
+                "icon": "cake",
+                "image": {
+                    "decorative": true,
+                    "alt": {
+                        "ar": "  عيد ميلاد  ",
+                        "en": "Birthday"
+                    },
+                    "zoom": 1.5,
+                    "focal": {
+                        "x": 30,
+                        "y": 70
+                    },
+                    "fit": "cover",
+                    "mediaId": "  0B8F6C2E-3D3A-4A53-9C7E-8F1A2B3C4D5E "
+                },
+                "content": "image"
+            },
+            "expected": {
+                "content": "image",
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                    "fit": "cover",
+                    "focal": {
+                        "x": 30,
+                        "y": 70
+                    },
+                    "zoom": 1.5,
+                    "alt": {
+                        "ar": "عيد ميلاد",
+                        "en": "Birthday"
+                    },
+                    "decorative": true
+                },
+                "icon": "cake",
+                "iconColor": "#9d2449",
+                "background": "#fdf2f4",
+                "shape": "arch",
+                "size": "lg",
+                "showLabel": false
+            }
+        },
+        {
+            "name": "unknown keys never survive (no html, css, urls)",
+            "input": {
+                "html": "<b>x</b>",
+                "style": "color:red",
+                "className": "x",
+                "url": "https://x",
+                "shape": "circle"
+            },
+            "expected": {
+                "shape": "circle"
+            }
+        },
+        {
+            "name": "each invalid field drops on its own",
+            "input": {
+                "content": "video",
+                "shape": "blob",
+                "size": "xl",
+                "icon": "<svg onload=x>",
+                "showLabel": "yes",
+                "iconColor": "red",
+                "background": "#fff",
+                "fit": "contain"
+            },
+            "expected": {}
+        },
+        {
+            "name": "null means inherit",
+            "input": {
+                "content": null,
+                "image": null,
+                "icon": null,
+                "shape": null,
+                "showLabel": null
+            },
+            "expected": {}
+        },
+        {
+            "name": "showLabel false is kept (explicit override)",
+            "input": {
+                "showLabel": false
+            },
+            "expected": {
+                "showLabel": false
+            }
+        },
+        {
+            "name": "new D-10 icon keys are accepted",
+            "input": {
+                "icon": "graduation-cap"
+            },
+            "expected": {
+                "icon": "graduation-cap"
+            }
+        },
+        {
+            "name": "an icon outside the registry is dropped",
+            "input": {
+                "icon": "balloon",
+                "shape": "heart"
+            },
+            "expected": {
+                "shape": "heart"
+            }
+        },
+        {
+            "name": "crop and rotate never survive, crop.zoom is ignored",
+            "input": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                    "crop": {
+                        "x": 0,
+                        "y": 0,
+                        "w": 1,
+                        "h": 1,
+                        "aspect": "1:1",
+                        "zoom": 2
+                    },
+                    "rotate": 90
+                }
+            },
+            "expected": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                }
+            }
+        },
+        {
+            "name": "an invalid media id drops the image only",
+            "input": {
+                "image": {
+                    "mediaId": "not-a-uuid",
+                    "fit": "contain"
+                },
+                "shape": "star"
+            },
+            "expected": {
+                "shape": "star"
+            }
+        },
+        {
+            "name": "an image without an id drops",
+            "input": {
+                "image": {
+                    "fit": "contain"
+                }
+            },
+            "expected": {}
+        },
+        {
+            "name": "image urls, paths and dimensions never survive",
+            "input": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                    "url": "https://evil.example/x.png",
+                    "src": "/a",
+                    "path": "p",
+                    "width": 10,
+                    "height": 5
+                }
+            },
+            "expected": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                }
+            }
+        },
+        {
+            "name": "fit cover is stored explicitly (absence means inherit)",
+            "input": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                    "fit": "cover"
+                }
+            },
+            "expected": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                    "fit": "cover"
+                }
+            }
+        },
+        {
+            "name": "invalid fit drops",
+            "input": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                    "fit": "fill"
+                }
+            },
+            "expected": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                }
+            }
+        },
+        {
+            "name": "centred focal is the default and is not stored",
+            "input": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                    "focal": {
+                        "x": 50,
+                        "y": 50
+                    }
+                }
+            },
+            "expected": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                }
+            }
+        },
+        {
+            "name": "focal is rounded to integers",
+            "input": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                    "focal": {
+                        "x": 12.5,
+                        "y": 87.4
+                    }
+                }
+            },
+            "expected": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                    "focal": {
+                        "x": 13,
+                        "y": 87
+                    }
+                }
+            }
+        },
+        {
+            "name": "an out-of-range focal drops alone",
+            "input": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                    "focal": {
+                        "x": 120,
+                        "y": 10
+                    },
+                    "fit": "contain"
+                }
+            },
+            "expected": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                    "fit": "contain"
+                }
+            }
+        },
+        {
+            "name": "zoom above 3 is clamped",
+            "input": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                    "zoom": 5
+                }
+            },
+            "expected": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                    "zoom": 3
+                }
+            }
+        },
+        {
+            "name": "zoom below 1 clamps to the default and is not stored",
+            "input": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                    "zoom": 0.5
+                }
+            },
+            "expected": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                }
+            }
+        },
+        {
+            "name": "zoom 1 is the default and is not stored",
+            "input": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                    "zoom": 1
+                }
+            },
+            "expected": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                }
+            }
+        },
+        {
+            "name": "zoom rounds half away from zero to 2 dp",
+            "input": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                    "zoom": 1.005
+                }
+            },
+            "expected": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                    "zoom": 1.01
+                }
+            }
+        },
+        {
+            "name": "a non-numeric zoom drops",
+            "input": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                    "zoom": "2"
+                }
+            },
+            "expected": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                }
+            }
+        },
+        {
+            "name": "decorative must be literally true",
+            "input": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                    "decorative": "true"
+                }
+            },
+            "expected": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                }
+            }
+        },
+        {
+            "name": "short hex and named colours drop",
+            "input": {
+                "iconColor": "#abc",
+                "background": "white"
+            },
+            "expected": {}
+        },
+        {
+            "name": "hex with surrounding spaces drops (no trimming)",
+            "input": {
+                "background": " #ffffff"
+            },
+            "expected": {}
+        },
+        {
+            "name": "fit outside an image is not a value key",
+            "input": {
+                "fit": "contain",
+                "size": "sm"
+            },
+            "expected": {
+                "size": "sm"
+            }
+        }
+    ],
+    "facet": [
+        {
+            "name": "empty facet",
+            "input": {},
+            "expected": {}
+        },
+        {
+            "name": "non-object",
+            "input": "x",
+            "expected": {}
+        },
+        {
+            "name": "self and defaults kept in canonical order",
+            "input": {
+                "defaults": {
+                    "showLabel": false,
+                    "fit": "contain",
+                    "size": "lg",
+                    "shape": "arch",
+                    "icon": "gift",
+                    "content": "icon"
+                },
+                "self": {
+                    "shape": "hexagon",
+                    "content": "image",
+                    "image": {
+                        "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                    }
+                }
+            },
+            "expected": {
+                "self": {
+                    "content": "image",
+                    "image": {
+                        "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                    },
+                    "shape": "hexagon"
+                },
+                "defaults": {
+                    "content": "icon",
+                    "icon": "gift",
+                    "shape": "arch",
+                    "size": "lg",
+                    "fit": "contain",
+                    "showLabel": false
+                }
+            }
+        },
+        {
+            "name": "images are never part of defaults (not inherited)",
+            "input": {
+                "defaults": {
+                    "image": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                    },
+                    "shape": "star"
+                }
+            },
+            "expected": {
+                "defaults": {
+                    "shape": "star"
+                }
+            }
+        },
+        {
+            "name": "self carries its own shape, size and label",
+            "input": {
+                "self": {
+                    "shape": "portrait",
+                    "size": "sm",
+                    "showLabel": false
+                }
+            },
+            "expected": {
+                "self": {
+                    "shape": "portrait",
+                    "size": "sm",
+                    "showLabel": false
+                }
+            }
+        },
+        {
+            "name": "fit is a defaults key but not a self key",
+            "input": {
+                "self": {
+                    "fit": "contain"
+                },
+                "defaults": {
+                    "fit": "contain"
+                }
+            },
+            "expected": {
+                "defaults": {
+                    "fit": "contain"
+                }
+            }
+        },
+        {
+            "name": "empty parts are omitted",
+            "input": {
+                "self": {
+                    "shape": "blob"
+                },
+                "defaults": {}
+            },
+            "expected": {}
+        },
+        {
+            "name": "unknown top-level keys and non-object parts drop",
+            "input": {
+                "self": "circle",
+                "defaults": {
+                    "size": "md"
+                },
+                "extra": {
+                    "shape": "star"
+                }
+            },
+            "expected": {
+                "defaults": {
+                    "size": "md"
+                }
+            }
+        }
+    ]
+}
