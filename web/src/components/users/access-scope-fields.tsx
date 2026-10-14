@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
+import { displayLocale } from '@/lib/formatting';
 import { hasPermission } from '@/lib/permissions';
 
 interface Option {
@@ -54,6 +55,7 @@ export function AccessScopeFields({
   availability?: ScopeAvailability;
 }) {
   const t = useTranslations('users');
+  const locale = useLocale();
   const [branches, setBranches] = useState<Option[] | null>(null);
   const [warehouses, setWarehouses] = useState<Option[] | null>(null);
   const canBranches = availability?.branches ?? true;
@@ -83,7 +85,7 @@ export function AccessScopeFields({
       <Label>{label}</Label>
       {!editable ? (
         <p className="rounded border border-border px-3 py-2 text-sm text-muted">
-          {value[key].length === 0 ? t(key === 'branch_ids' ? 'scope_all_branches' : 'scope_all_warehouses') : t('scope_read_only_count', { count: value[key].length })}
+          {value[key].length === 0 ? t(key === 'branch_ids' ? 'scope_all_branches' : 'scope_all_warehouses') : t('scope_read_only_count', { count: value[key].length.toLocaleString(displayLocale(locale)) })}
           {' — '}
           {t(key === 'branch_ids' ? 'scope_needs_branches_view' : 'scope_needs_warehouses_view')}
         </p>
