@@ -207,7 +207,7 @@ export default function CashAndBankPage() {
         <Button asChild size="icon" variant="ghost" aria-label={t('edit')}>
           <Link href={`/cash-and-bank/new?edit=${item.id}`}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Link>
         </Button>
-        <Dropdown align="end" menuLabel={t('actions')} triggerClassName="h-9 w-9 justify-center rounded border border-border bg-surface text-text hover:bg-primary-soft" trigger={<MoreHorizontal className="h-4 w-4" strokeWidth={1.7} />}>
+        <Dropdown align="end" menuLabel={t('actions')} triggerLabel={`${t('actions')}: ${item.name}`} triggerClassName="h-9 w-9 justify-center rounded border border-border bg-surface text-text hover:bg-primary-soft" trigger={<MoreHorizontal className="h-4 w-4" strokeWidth={1.7} />}>
           <DropdownItem icon={Building2} href={`/cash-and-bank/transfer?source=${item.id}`}>{t('transfer')}</DropdownItem>
           {!item.is_main && item.is_active && <DropdownItem icon={Building2} onClick={() => makeMain(item)}>{t('make_main')}</DropdownItem>}
           {item.is_active && <DropdownItem icon={Building2} onClick={() => deactivate(item)} disabled={busy}>{t('deactivate')}</DropdownItem>}

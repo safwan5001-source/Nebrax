@@ -238,14 +238,14 @@ function StandaloneForm({ type }: { type: 'sales' | 'purchase' }) {
             const lx = Math.round((lt * rateOf(l)) / 100);
             return (
               <div key={l.key} className="grid grid-cols-2 items-center gap-2 rounded border border-border p-2 md:grid-cols-12 md:border-0 md:p-0">
-                <Select className="col-span-2 md:col-span-3" value={l.productId ?? ''} onChange={(e) => pickProduct(l.key, e.target.value)}>
+                <Select aria-label={tf('product')} className="col-span-2 md:col-span-3" value={l.productId ?? ''} onChange={(e) => pickProduct(l.key, e.target.value)}>
                   <option value="">{tf('manual')}</option>
                   {products.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
                 </Select>
-                <Input className="col-span-2 md:col-span-3" placeholder={tf('description')} value={l.description} onChange={(e) => setLine(l.key, { description: e.target.value, productId: null })} />
-                <Input className="num text-end md:col-span-1" type="number" min={1} value={l.qty} onChange={(e) => setLine(l.key, { qty: e.target.value })} />
-                <Input className="num text-end md:col-span-2" inputMode="decimal" placeholder={tf('price')} value={l.price} onChange={(e) => setLine(l.key, { price: e.target.value })} />
-                <Input className="num text-end md:col-span-1" type="number" min={0} max={100} value={l.tax} placeholder={defaultRate} onChange={(e) => setLine(l.key, { tax: e.target.value })} />
+                <Input aria-label={tf('description')} className="col-span-2 md:col-span-3" placeholder={tf('description')} value={l.description} onChange={(e) => setLine(l.key, { description: e.target.value, productId: null })} />
+                <Input aria-label={tf('qty')} className="num text-end md:col-span-1" type="number" min={1} value={l.qty} onChange={(e) => setLine(l.key, { qty: e.target.value })} />
+                <Input aria-label={tf('price')} className="num text-end md:col-span-2" inputMode="decimal" placeholder={tf('price')} value={l.price} onChange={(e) => setLine(l.key, { price: e.target.value })} />
+                <Input aria-label={tf('tax')} className="num text-end md:col-span-1" type="number" min={0} max={100} value={l.tax} placeholder={defaultRate} onChange={(e) => setLine(l.key, { tax: e.target.value })} />
                 <div className="num col-span-1 text-end text-sm md:col-span-1">{formatRiyal((lt + lx) / 100)}</div>
                 <Button type="button" variant="ghost" size="icon" className="col-span-1 ms-auto md:col-span-1" aria-label={tf('remove_line')} onClick={() => removeLine(l.key)}>
                   <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />

@@ -144,6 +144,11 @@ describe.each(TEST_LOCALES)('DataTable default labels (%s)', (locale) => {
     expect(screen.getByTitle(nebraxText(locale, 'exportCsv'))).toBeTruthy();
   });
 
+  it('names the toolbar search even when the page passes no placeholder (ERP-UX-H1-5B)', () => {
+    renderIntl(<DataTable columns={columns} data={rows} />, locale);
+    expect(screen.getByRole('textbox', { name: nebraxText(locale, 'search') })).toBeTruthy();
+  });
+
   it('offers a translated retry on a load failure', () => {
     renderIntl(<DataTable columns={columns} data={[]} error="x" onRetry={() => {}} showToolbar={false} />, locale);
     expect(screen.getByRole('button', { name: nebraxText(locale, 'retry') })).toBeTruthy();

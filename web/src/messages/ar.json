@@ -4751,6 +4751,7 @@
     "min_sale_price": "أقل سعر بيع",
     "profit_margin": "هامش الربح %",
     "discount": "الخصم",
+    "discount_type": "نوع الخصم",
     "tags": "الوسوم",
     "tags_hint": "افصل بين الوسوم بفاصلة",
     "internal_notes": "ملاحظات داخلية",
