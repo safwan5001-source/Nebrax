@@ -40,11 +40,14 @@ Charter: [AWJ-ERP-UX-H1-CHARTER.md](./AWJ-ERP-UX-H1-CHARTER.md) · H1-0 audit: [
 | H1-7D | Landmarks, links, 404, fuel settings, labels (ERP-UX-019/023, rest of 025) | #1439 | merged — PASS / PASS | `7888cdf` |
 | H1-7E | Sans placeholders, Customizer chevron (ERP-UX-018/020) | #1440 | merged — PASS / PASS | `622783e` |
 | H1-7F | Residuals from the closure crawl incl. restricted role (ERP-UX-014/019/023) | #1441 | merged — PASS / PASS | `ea7c0c3` |
-| H1-8 | Regression matrix, role matrix, closure report (docs) | this PR | see closure report | — |
+| H1-8 | Regression matrix, role matrix, closure report (docs) | #1443 | merged — PASS / PASS (see H1-8b note) | `f8e7ab8` |
+| H1-8b | Late review findings on #1438, #1439 and #1443; re-crawl of the actual final tree | this PR | see [report](./reports/AWJ-ERP-UX-H1-8B-REPORT.md) | — |
 
 Open owner decision (non-blocking): **D-ERP-UX-01** — additive `name_en` on report account rows (ERP-UX-013).
 
 Per-slice review records (exact-head CI, full Vitest, PRE/POST_MERGE_REVIEW) live on each PR; implementation reports in `reports/AWJ-ERP-UX-H1-*-REPORT.md`.
+
+**H1-8b note:** the `PRE_MERGE_REVIEW` records of #1438, #1439 and #1443 state "no open review threads", but automated (Codex) review threads had been posted on each before it merged — one, one and three respectively. They were found after closure and are answered and fixed in H1-8b; see its report.
 
 ## Definition of done (from the owner direction, §6)
 

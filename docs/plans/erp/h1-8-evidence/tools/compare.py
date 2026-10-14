@@ -3,13 +3,18 @@
 import json, sys, os, collections, re
 base = sys.argv[1]
 def load(dirs, ui):
+    # A missing or empty crawl must abort: zero rows would read as a clean result.
     rows = []
     for d in dirs:
         p = os.path.join(base, d, 'results.jsonl')
-        if not os.path.exists(p): continue
+        if not os.path.isfile(p):
+            sys.exit(f'compare.py: required crawl result missing: {p}')
+        found = 0
         for l in open(p, encoding='utf8'):
             if l.strip():
-                r = json.loads(l); r['_ui'] = ui; rows.append(r)
+                r = json.loads(l); r['_ui'] = ui; rows.append(r); found += 1
+        if not found:
+            sys.exit(f'compare.py: required crawl result has no records: {p}')
     return rows
 def norm(route): return re.sub(r'[0-9a-f]{8}-[0-9a-f-]{27}', ':id', route)
 before = load(['v3a', 'v3b', 'v3c'], '3') + load(['legacy'], 'legacy')
@@ -42,7 +47,7 @@ out.append('| Metric (routes affected) | ' + ' | '.join(f'{("v3" if u=="3" else 
 out.append('|---|' + '---|' * len(CFGS))
 for k in ['loads', 'overflow', 'h1!=1', 'headingSkips', 'consoleErr', 'missingMsg', 'rawKeys']:
     out.append(f'| {k} | ' + ' | '.join(f"{data[x][0][0][k]} → **{data[x][1][0][k]}**" for x in CFGS) + ' |')
-for rule in sorted(allrules, key=lambda r: -sum(data[x][0][1][r] for x in CFGS)):
+for rule in sorted(allrules, key=lambda r: (-sum(data[x][0][1][r] for x in CFGS), r)):  # name breaks ties: stable output
     out.append(f'| axe `{rule}` | ' + ' | '.join(f"{data[x][0][1][rule]} → **{data[x][1][1][rule]}**" for x in CFGS) + ' |')
 print('\n'.join(out))
 # residual detail on final
@@ -50,7 +55,7 @@ print('\n### Residual axe findings on final main (route list)\n')
 res = collections.defaultdict(set)
 for r in after:
     for a in r.get('axe') or []: res[a['id']].add(f"{norm(r['route'])} ({'v3' if r['_ui']=='3' else 'legacy'} {r['cfg']})")
-for k, v in sorted(res.items(), key=lambda x: -len(x[1])):
+for k, v in sorted(res.items(), key=lambda x: (-len(x[1]), x[0])):
     print(f'- `{k}` ({len(v)}): ' + ', '.join(sorted(v)[:12]) + (' …' if len(v) > 12 else ''))
 if staff:
     s = summary(staff, 'staff', 'ar-light-1440')[0]

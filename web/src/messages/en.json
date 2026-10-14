@@ -845,7 +845,8 @@
   "notFound": {
     "title": "Page not found",
     "body": "The link may be out of date or incomplete, or this module is not available yet.",
-    "back": "Back to the dashboard"
+    "back": "Back to the dashboard",
+    "backPlatform": "Back to the platform console"
   },
   "common": {
     "refresh": "Refresh",

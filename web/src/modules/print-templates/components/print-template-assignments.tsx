@@ -190,7 +190,7 @@ export function PrintTemplateAssignments({
 
         <form onSubmit={saveAssignment} className="space-y-4 border-t border-border pt-4">
           <div>
-            <h3 className="text-sm font-medium text-text">{t('form_title')}</h3>
+            <h4 className="text-sm font-medium text-text">{t('form_title')}</h4>
             <p className="mt-1 text-xs leading-relaxed text-muted">{t('form_description')}</p>
           </div>
 
@@ -235,7 +235,7 @@ export function PrintTemplateAssignments({
 
               <section aria-live="polite" className="space-y-3 rounded border border-border bg-surface p-3">
                 <div>
-                  <h4 className="text-sm font-medium text-text">{t('resolution_title')}</h4>
+                  <h5 className="text-sm font-medium text-text">{t('resolution_title')}</h5>
                   <p className="mt-1 text-xs leading-relaxed text-muted">{t('resolution_description')}</p>
                 </div>
 

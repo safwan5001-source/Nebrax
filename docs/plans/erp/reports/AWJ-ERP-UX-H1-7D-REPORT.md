@@ -13,7 +13,7 @@ Backlog: ERP-UX-019, ERP-UX-023 (P3) and the remaining hard-coded label of ERP-U
 | `aria-controls` pointing at no element (`aria-valid-attr-value`) | `/commerce/published-products` tabs | active section wrapped in the shared `TabPanel` (id/labelledby) |
 | QR `svg role="img"` without a name (`svg-img-alt`) | document QR (A4 + thermal) | `title` «رمز QR» / "QR code" (`invoiceDoc.qr_title`); QR value unchanged |
 | **No `h1`, endless skeleton** (`page-has-heading-one`) | `/fuel-stations/settings` | when the first load fails, the page kept skeletons forever (no title, no reason). It now shows the title and either the localized forbidden state (403, via H1-5A `describeLoadFailure`, no futile retry) or the error with Refresh |
-| 404 without `main`, English-only (`landmark-one-main`, `region`) | any unknown URL | `app/not-found.tsx`: `main`, localized `h1`/text, "Back to the dashboard" |
+| 404 without `main`, English-only (`landmark-one-main`, `region`) | any unknown URL | `app/not-found.tsx`: `main`, localized `h1`/text, "Back to the dashboard" (unknown `/platform` URLs link to the platform console since [H1-8b](./AWJ-ERP-UX-H1-8B-REPORT.md)) |
 | Small link targets (`target-size`) | partner detail summary/document links | `inline-flex min-h-6` (24 px) |
 | Hard-coded Arabic close label | POS dialog | `useCommonLabel('close')` |
 

@@ -12,6 +12,7 @@ interface TemplateRevisionVisualComparisonProps {
   after: RevisionVisualPreviewSource;
 }
 
+/** يقع داخل بطاقة سجل المراجعات (`h3` في تبويب الحوكمة)، فتبدأ عناوينه من `h4`. */
 export function TemplateRevisionVisualComparison({ before, after }: TemplateRevisionVisualComparisonProps) {
   const t = useTranslations('printTemplateStudio');
   const beforePreview = useMemo(() => getRevisionVisualPreview(before), [before]);
@@ -26,7 +27,7 @@ export function TemplateRevisionVisualComparison({ before, after }: TemplateRevi
       <div className="flex items-start gap-2">
         <Eye className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
         <div>
-          <h3 id="revision-visual-comparison-title" className="text-sm font-medium text-text">{t('revision_visual_comparison')}</h3>
+          <h4 id="revision-visual-comparison-title" className="text-sm font-medium text-text">{t('revision_visual_comparison')}</h4>
           <p className="mt-1 text-xs text-muted">{t('revision_visual_comparison_hint')}</p>
         </div>
       </div>
@@ -34,9 +35,9 @@ export function TemplateRevisionVisualComparison({ before, after }: TemplateRevi
         {panes.map(({ revision, preview, label }) => (
           <section key={revision.id} className="min-w-0 overflow-hidden rounded border border-border bg-background" aria-labelledby={`revision-visual-${revision.id}`}>
             <header className="border-b border-border bg-surface px-3 py-2">
-              <h4 id={`revision-visual-${revision.id}`} className="text-xs font-medium text-text">
+              <h5 id={`revision-visual-${revision.id}`} className="text-xs font-medium text-text">
                 {label} · {t('revision', { version: revision.version })}
-              </h4>
+              </h5>
             </header>
             <div className="p-2">
               <DocumentScaler>
