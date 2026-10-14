@@ -1,12 +1,12 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { Dialog } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { ConfirmDialog as NeutralConfirmDialog } from '@/components/shared/confirm-dialog';
 
 /**
- * حوار تأكيد موحّد للإجراءات الحسّاسة (إبطال مفتاح، تعطيل عميل، حذف Webhook، تدوير سرّ).
- * يذكر الأثر بدقّة (§42/§9)، والزرّ الهدّام يحمل نبرة `danger` للإجراء الهدّام وحده.
+ * حوار تأكيد موحّد للإجراءات الحسّاسة في شاشات المطوّر (إبطال مفتاح، تعطيل عميل، حذف Webhook، تدوير سرّ).
+ * غلافٌ رقيق على المكوّن المحايد `components/shared/confirm-dialog` يربطه بترجمات `developer.common`
+ * (INT-UX-5a): الاسم والمسار والخاصيات والمظهر كما كانت، فلا يتغيّر أي مستدعٍ.
  */
 export function ConfirmDialog({
   open,
@@ -31,17 +31,18 @@ export function ConfirmDialog({
 }) {
   const tc = useTranslations('developer.common');
   return (
-    <Dialog open={open} onClose={onClose} title={title} className="max-w-md">
-      <div className="space-y-4">
-        <p className="text-sm leading-relaxed text-text">{message}</p>
-        {detail ? <p dir="ltr" className="rounded border border-border bg-background px-3 py-2 font-mono text-xs text-muted [unicode-bidi:plaintext]">{detail}</p> : null}
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onClose} disabled={busy}>{tc('cancel')}</Button>
-          <Button type="button" variant={danger ? 'danger' : 'primary'} onClick={onConfirm} disabled={busy}>
-            {busy ? tc('saving') : confirmLabel}
-          </Button>
-        </div>
-      </div>
-    </Dialog>
+    <NeutralConfirmDialog
+      open={open}
+      onClose={onClose}
+      onConfirm={onConfirm}
+      title={title}
+      message={message}
+      detail={detail}
+      confirmLabel={confirmLabel}
+      cancelLabel={tc('cancel')}
+      busyLabel={tc('saving')}
+      danger={danger}
+      busy={busy}
+    />
   );
 }

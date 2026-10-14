@@ -10286,6 +10286,26 @@
       "branchNote": "An ingress point may be routed to an AWJ branch. That does not map the platform's store to a branch.",
       "scopeNote": "Points are shown within the scope of your branches only. This panel is read-only.",
       "retry": "Try again"
+    },
+    "ingressManagement": {
+      "errors": {
+        "mappingAmbiguous": "This store ID is already mapped and cannot be reused. If it is your store, contact support.",
+        "profileUnavailable": "There is no active manual attribution profile for this platform. Set it up first in the attribution settings.",
+        "branchUnavailable": "The selected branch is not available to you.",
+        "branchInactive": "The selected branch is not active.",
+        "branchRequired": "Choose a branch: your account is limited to specific branches.",
+        "invalidStore": "Enter the store ID (up to 191 characters).",
+        "operatorIneligible": "The selected user is not eligible for this ingress point or its branch.",
+        "connectorUnavailable": "This ingress point is no longer available. Refresh the list.",
+        "tenantRequired": "The organization could not be determined. Sign in again.",
+        "forbidden": "You do not have permission for this action.",
+        "notFound": "This item is no longer available. Refresh the list.",
+        "validation": "The values entered are not valid. Check them and try again.",
+        "conflict": "This conflicts with a newer state. Refresh the list.",
+        "outcomeUnknown": "We did not receive the result and the operation may have completed. Refresh the list; if the point appears and you did not save the secret, rotate it again. Do not repeat the request.",
+        "serverError": "The action could not be completed right now. You can try again.",
+        "unknown": "The action could not be completed."
+      }
     }
   }
 }
