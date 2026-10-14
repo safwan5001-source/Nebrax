@@ -18,7 +18,7 @@ On 91 ERP routes (forms, settings, reports, details) the outline jumped from the
 - `card.tsx` became a client module (`'use client'`); every importer was already a client component (checked).
 
 ## Reviewed for over-flattening
-14 ERP files render their own `h2`. All are item titles in lists/cards (payment methods, settlement types, fuel stations/permits/orders/alerts, supplier ledger, accounts children, dashboard quick actions, report presentation panels) or a print-template section; card titles become their siblings, which matches the visual hierarchy. No card is visually nested inside one of those `h2` sections.
+14 ERP files render their own `h2`. All are item titles in lists/cards (payment methods, settlement types, fuel stations/permits/orders/alerts, supplier ledger, accounts children, dashboard quick actions, report presentation panels) or a print-template section; card titles become their siblings, which matches the visual hierarchy. No card is visually nested inside one of those `h2` sections. **Correction (H1-8b):** this missed two pages whose own `h2` sections contain cards — the print template center (family cards) and the template governance tab. Found by automated review after merge and fixed in [H1-8b](./AWJ-ERP-UX-H1-8B-REPORT.md): those cards are `h3`.
 
 ## Changed files
 `web/src/components/ui/card.tsx`, `web/src/app/(app)/layout.tsx`, `web/src/app/(fuel)/layout.tsx`, `web/src/app/me/page.tsx`, `web/src/app/(commerce)/app-builder/new/page.tsx`, `web/src/app/(app)/inventory-settings/page.tsx`, `web/src/components/developer/docs/docs-explorer.tsx`; test `web/src/components/ui/__tests__/card-title-level.test.tsx` (new).
