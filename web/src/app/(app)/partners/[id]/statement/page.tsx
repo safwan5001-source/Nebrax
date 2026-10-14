@@ -31,6 +31,7 @@ import { useCompany } from '@/lib/company';
 import { formatRiyal } from '@/lib/money';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { ReportMetricGrid, ReportMobileRows, ReportScreenHeader } from '@/components/reports/report-workspace-ui';
+import { LtrNumber } from '@/components/ui/ltr-number';
 
 interface Partner {
   id: string;
@@ -254,7 +255,7 @@ export default function PartnerStatementPage() {
           <ReportMobileRows columns={statementColumns} rows={statementRows} emptyText={t('empty')} primaryIndex={2} secondaryIndex={0} />
           <Table className="hidden md:table">
             <THead><TR>{statementColumns.map((column) => <TH key={column.label} className={column.align === 'end' ? 'text-end' : undefined}>{column.label}</TH>)}</TR></THead>
-            <TBody>{statementRows.map((row, rowIndex) => <TR key={`${row[1]}-${rowIndex}`}>{row.map((cell, index) => <TD key={index} className={statementColumns[index]?.align === 'end' ? 'num text-end' : undefined}>{cell}</TD>)}</TR>)}</TBody>
+            <TBody>{statementRows.map((row, rowIndex) => <TR key={`${row[1]}-${rowIndex}`}>{row.map((cell, index) => <TD key={index} className={statementColumns[index]?.align === 'end' ? 'num text-end' : undefined}>{statementColumns[index]?.align === 'end' ? <LtrNumber>{cell}</LtrNumber> : cell}</TD>)}</TR>)}</TBody>
           </Table>
         </CardContent>
       </Card>
