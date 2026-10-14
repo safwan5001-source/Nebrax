@@ -374,6 +374,24 @@ class FlatHostBackfillTest extends TestCase
     }
 
     /** @test */
+    public function a_tenant_slug_collision_is_not_hidden_behind_an_already_present_target(): void
+    {
+        $this->prodShape();
+        $this->backfill(true);
+        $this->tenant('dominah-h'); // سلاج مستأجر يطابق شريحة هدفٍ مُدرَج سابقاً (بيانات قديمة/سباق)
+
+        foreach ([false, true] as $execute) {
+            try {
+                $this->backfill($execute);
+                $this->fail('expected conflict');
+            } catch (FlatHostBackfillException $e) {
+                $this->assertSame('target_is_tenant_slug', $e->reason);
+            }
+        }
+        $this->assertSame(4, DB::table('storefront_domains')->count());
+    }
+
+    /** @test */
     public function ambiguous_dash_concatenation_between_two_legacy_hosts_aborts(): void
     {
         $a = $this->tenant('a');

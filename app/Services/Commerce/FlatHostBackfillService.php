@@ -88,6 +88,19 @@ final class FlatHostBackfillService
                 StorefrontDomain::withoutGlobalScope(TenantScope::class)
                     ->whereKey($s['domain']->id)->lockForUpdate()->first();
             }
+            // كل صف يدخل في اشتقاق «النشط» يُقفل أيضاً (المتجر والقناة): تفعيل/تعطيل متجر متزامن
+            // (CommerceWorkspaceStorefrontsService::setActiveForCurrentTenant يقفل صف المتجر) يتسلسل
+            // معنا بدل أن يُشتقّ الهدف من حالة قديمة. ترتيب ثابت: مستأجر ← نطاق ← متجر ← قناة.
+            $storefrontIds = array_values(array_unique(array_map(fn ($s) => $s['storefront']->id, $sources)));
+            sort($storefrontIds);
+            foreach ($storefrontIds as $id) {
+                Storefront::withoutGlobalScope(TenantScope::class)->withTrashed()->whereKey($id)->lockForUpdate()->first();
+            }
+            $channelIds = array_values(array_unique(array_map(fn ($s) => $s['channel']->id, $sources)));
+            sort($channelIds);
+            foreach ($channelIds as $id) {
+                SalesChannel::withoutGlobalScope(TenantScope::class)->withTrashed()->whereKey($id)->lockForUpdate()->first();
+            }
             // إعادة تحميل بعد القفل: لا قرار على قراءة قديمة.
             foreach ($legacyHosts as $host) {
                 $sources[$host] = $this->loadLegacy($host, $base);
@@ -112,6 +125,12 @@ final class FlatHostBackfillService
 
             $desiredActive = $this->desiredActive($s);
 
+            // الحجز لسلاج مستأجر يُفحص دائماً — حتى لو كان الهدف موجوداً (إعادة تشغيل)، فتعارضٌ سابق
+            // لا يُخفى خلف already_present.
+            if (Tenant::withTrashed()->where('slug', ManagedStorefrontHostname::labelOf($target, $base))->exists()) {
+                throw new FlatHostBackfillException('target_is_tenant_slug', "الهدف {$target} محجوز لسلاج مستأجر.");
+            }
+
             // القفل في التنفيذ فقط: dry-run قراءة محضة (جلسات PostgreSQL للقراءة فقط ترفض FOR UPDATE).
             $existingQuery = StorefrontDomain::withoutGlobalScope(TenantScope::class)->where('hostname', $target);
             $existing = ($execute ? $existingQuery->lockForUpdate() : $existingQuery)->first();
@@ -135,10 +154,6 @@ final class FlatHostBackfillService
                 $results[] = $this->result($host, $target, 'already_present', $desiredActive, $s, $drift ? 'drift' : null);
 
                 continue;
-            }
-
-            if (Tenant::withTrashed()->where('slug', ManagedStorefrontHostname::labelOf($target, $base))->exists()) {
-                throw new FlatHostBackfillException('target_is_tenant_slug', "الهدف {$target} محجوز لسلاج مستأجر.");
             }
 
             if ($execute) {
