@@ -11,7 +11,7 @@
 ## 1. Posture
 
 - **Backend authorization is authoritative.** UI hiding is never the security boundary. No slice weakens, widens, or reinterprets any server check.
-- **No rebuild.** Access Control V2 backend is complete; this horizon is UI/UX over existing contracts.
+- **No rebuild.** Access Control V2 backend is complete; this horizon is UI/UX over existing contracts. The single owner-mandated exception is **AC-UX-00A** (§6), a minimal grant-boundary fix in `UserController`.
 - **Priority order:** Tenant Isolation → Security → Accounting invariants → Backward compatibility → Existing API contracts → Data integrity → UX → density → consistency → polish.
 - **Design system:** AWJ Design System **v3** (semantic tokens only, no new tokens, no parallel system, v3/legacy gate untouched). Authority: code+tests → v3 → `DESIGN_SYSTEM.md` → older plans → `CLAUDE.md` invariants override visuals.
 - **MERGE ≠ DEPLOY.** No deploy, Railway, production config, or production migration.
@@ -36,6 +36,7 @@ One PR per slice, always branched from fresh `origin/main`, never stacked on an 
 | Slice | Scope (summary) | Branch | Backend change? |
 |---|---|---|---|
 | **AC-UX-00** | Baseline inspection, UX contract, three execution docs, small doc corrections | `feat/access-control/ac-ux-00-baseline` | none |
+| **AC-UX-00A** | **User Administration Grant Boundaries** — backend authorization fix for F-1/F-2 (owner decision D-A = Option 2, High). **Blocking prerequisite for AC-UX-01.** See §6. | `fix/access-control/ac-ux-00a-user-grant-boundaries` | **Yes — `UserController` only; no schema migration, no RBAC redesign** |
 | **AC-UX-01** | Users workspace V2: dense DataTable, filters, status semantics, lifecycle actions with confirmations, mobile records, real error states | `feat/access-control/ac-ux-01-users-workspace` | none |
 | **AC-UX-02** | User editor (Sheet), identity/status/role/scope sections, effective-access summary before save | `feat/access-control/ac-ux-02-user-scope-editor` | none |
 | **AC-UX-03A** | Roles workspace shell: master/detail, role rail, permission catalogue (grouped, searchable, read) | `feat/access-control/ac-ux-03a-role-workspace-shell` | none |
@@ -129,7 +130,7 @@ Applies to every Access Control screen. A slice's checklist is the relevant subs
 
 | ID | Question | Default adopted (no owner action needed unless disagreed) | Escalation |
 |---|---|---|---|
-| D-A | F-1: branch-restricted `users.manage` actor can clear/widen scope (and F-2: role escalation to `admin`) | **Not fixed in this horizon.** UI performs no client-side attempt to compensate. | **Owner decision packet — see §6.** |
+| D-A | F-1/F-2: branch-restricted `users.manage` actor can clear/widen scope; role escalation to `admin`; takeover of a more-privileged user | **DECIDED by owner 2026-10-14: Option 2, classified High.** Fixed in **AC-UX-00A**, which blocks AC-UX-01. | none further |
 | D-B | Where does permission label/risk/group metadata live? | Frontend presentation map keyed by exact canonical key (display-only), with a drift test against `Rbac::PERMISSIONS` so an unclassified/unknown key degrades to a neutral standard row, never to a hidden or mis-submitted one. | Additive backend field (`meta.permission_meta`) only on owner request. |
 | D-C | IA | §3 | Reversible; recorded in AC-UX-01. |
 | D-D | Users list scale | No server pagination/search exists and enterprise / `users: null` tenants are **unbounded**. AC-UX-01 stays on the existing API but mitigates: render with the existing DataTable (client-side search/filter), keep rows lightweight (no per-row fetches), apply a visible row-count and degrade gracefully (no eager rendering of hidden detail; windowed/"show more" rendering if the list exceeds a threshold chosen in 01 and measured). The accepted residual risk is the unbounded payload itself. | Server pagination/search = API change → owner decision; recommended if a tenant exceeds a few hundred users. |
@@ -140,23 +141,22 @@ Applies to every Access Control screen. A slice's checklist is the relevant subs
 
 ---
 
-## 6. Decision packet — D-A (needs Safwan; not blocking slices 00–10)
+## 6. Decision D-A — owner chose **Option 2** (2026-10-14); AC-UX-00A
 
-**Evidence (current `main`, probe not committed):** a custom role `{users.view, users.manage, branches.view}` assigned to a user scoped to branch A can, via `PUT /api/users/{self}`: `{branch_ids: []}` → 200 and becomes unrestricted; `{branch_ids:[A,B]}` → 200 and gains branch B. `guardOwnerRole` blocks only the `owner` role (so such an actor can also self-assign `admin` = `*`). Owner/admin users are normally unrestricted, which is why this has not surfaced; it needs a non-owner/admin `users.manage` holder that is itself scope-restricted.
+**Classification:** High authorization / privilege-escalation finding (F-1, F-2). **AC-UX-00A is a blocking prerequisite for AC-UX-01.**
 
-**Why the horizon cannot fix it:** any server-side containment (actor ⊆ target scope; restricted actors cannot clear scope; role-assignment ceiling) is **new backend authority** — STOP condition #11, and it touches the empty=unrestricted contract (#2-adjacent).
+**Evidence (probe on `main` @ `5ff3135`, not committed):** a custom role `{users.view, users.manage, branches.view}` held by a user scoped to branch A can, via `PUT /api/users/{self}`: `{branch_ids: []}` → 200 and becomes unrestricted; `{branch_ids:[A,B]}` → 200 and gains branch B. `guardOwnerRole` blocks only the `owner` role, so such an actor can also self-assign `admin` (`*`) and reset the password of an `admin` user.
 
-**Options**
+**Options considered:** (1) document-only — rejected by owner; **(2) small backend PR: scope-restricted actors may only assign scopes ⊆ their own, cannot clear their own, cannot grant roles outside their own authority — CHOSEN**; (3) option 2 plus forbidding `users.manage` on scope-restricted roles — not chosen.
 
-| | Option | Trade-off |
-|---|---|---|
-| 1 | **Document-only; treat `users.manage`/`roles.manage` as root-equivalent** and show them with top risk treatment ("security administration") + warn when assigning them to a scope-restricted role. | Zero backend risk; relies on administrators; matches current product assumption ("owner/admin only"). **Recommended for this horizon.** |
-| 2 | Small separate backend PR: a scope-restricted actor may only assign scopes ⊆ own scope, cannot clear their own, and cannot assign a role with permissions outside their own. | Closes F-1/F-2; needs tests on sqlite+pgsql and a backward-compat review (owner/admin unaffected). Requires explicit approval. |
-| 3 | Option 2 plus forbidding `users.manage` on any scope-restricted role at the role-assignment level. | Strongest; changes existing assignment semantics — highest compat risk. |
+### AC-UX-00A scope (minimal; `UserController` + tests; no migration, no RBAC redesign, no financial/TAX change)
 
-Until the owner chooses, AC-UX-01…10 proceed on Option 1 behaviour.
-
----
+1. **Scope ceiling (restricted actors only).** If `actor->allowedBranchIds()` is non-null, any submitted `branch_ids` must be **non-empty** and ⊆ the actor's allowed branches; `[]` (clear) is refused; on **create**, an omitted/empty `branch_ids` is refused (it would mint an unrestricted user). Same rule independently for `warehouse_ids` vs `allowedWarehouseIds()`. Absent key on update = unchanged (existing contract). Unrestricted actors: behaviour unchanged.
+2. **Role grant ceiling (all non-owner actors).** A role may be granted (create, or update where it **changes**) only if the actor could hold it: an actor with `*` may grant any role except `owner` (existing `guardOwnerRole`); an actor without `*` may grant a role only if it has no `*` and every permission of the role ⊆ the actor's own permissions. Self-promotion to `admin`/`owner`/any wildcard role is therefore refused.
+3. **Target ceiling.** A non-self target whose **current** role the actor could not grant (e.g. an `admin` managed by a custom-role actor) cannot be modified or deleted by that actor — otherwise a password reset would be an equivalent escalation. Self-edits of non-grant fields stay allowed.
+4. **Preserved:** empty stored assignment = unrestricted; owner/admin (unrestricted, `*`) behaviour; `guardOwnerRole`; Tenant Isolation (manual `tenant_id` filtering, cross-tenant id ⇒ 404 / ignored); REM-08 token revocation; no schema change.
+5. **Executable negative tests** (sqlite + pgsql in CI): self-unrestriction (`[]`), out-of-scope branch assignment (self and other), create without scope by a restricted actor, self-admin escalation (and owner / any `*` role), target-ceiling (custom actor vs admin), cross-tenant mutation, warehouse parity, and legitimate owner/admin controls still working.
+6. **Residual, documented, not changed here:** a scope-restricted actor can still edit non-grant fields of a lower-role user whose scope is broader than the actor's, and can narrow that user's scope within the actor's own ceiling. Not an escalation; revisit under AC-UX-FUTURE (record-scope semantics) if the owner wants it closed.
 
 ## 7. STOP register (restated for execution)
 

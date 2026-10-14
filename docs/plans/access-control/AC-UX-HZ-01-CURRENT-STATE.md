@@ -19,7 +19,8 @@ A slice is marked **Merged** only after tests + exact-head CI + merge. "Post-mer
 | Slice | Status | PR | Merge SHA |
 |---|---|---|---|
 | AC-UX-00 baseline & UX contract | In review (this PR) | — | — |
-| AC-UX-01 Users workspace | Not started | — | — |
+| **AC-UX-00A User administration grant boundaries** (backend, owner-mandated, **blocks AC-UX-01**) | Not started | — | — |
+| AC-UX-01 Users workspace (blocked by 00A) | Not started | — | — |
 | AC-UX-02 User editor & access scope | Not started | — | — |
 | AC-UX-03 Roles & Permissions workspace (03A shell/catalogue · 03B editing/risk) | Not started | — | — |
 | AC-UX-04 Role creation & safe cloning | Not started | — | — |
@@ -70,12 +71,12 @@ There is **no dedicated Access Control area today**. Users and Roles are two tab
 | P-1 | `permission_modules` i18n coverage is partial: **19 of 36** modules have no label → **101 of 134** keys render under a raw key such as `fuel`, `pos`, `documents`. 3 terminal actions (`operate`, `reassign`, `publish`) have no label in either locale. | `messages/{ar,en}.json` `hr.perm_modules/perm_actions` | Med | 03 |
 | P-2 | Stale session permissions: `currentUser().permissions` is written at login and refreshed only by a few screens that call `/me`. After a role edit, affected users keep stale nav until re-login. Backend remains authoritative, so this is a UX/staleness issue, not a bypass. | `lib/auth.ts` | Low-Med | 07 |
 
-### Backend/security findings surfaced by the inspection (not UI defects)
+### Backend/security findings surfaced by the inspection (not UI defects) — F-1/F-2 owner-classified **High**, fixed by AC-UX-00A
 
 | # | Finding | Evidence | Severity | Disposition |
 |---|---|---|---|---|
-| **F-1** | A **branch-restricted** actor who holds `users.manage` can (a) clear their own `branch_ids` (`[]` ⇒ unrestricted) and (b) assign any tenant branch/warehouse — including outside their own scope — to themselves or others. `UserController::syncAccessScope` and the Store/Update requests apply **no actor-scope check**. | **[probe]** custom role `{users.view, users.manage, branches.view}`, user scoped to branch A: `PUT /users/{self}` `{branch_ids: []}` → **200**, `allowedBranchIds() === null`; `{branch_ids:[A,B]}` → **200**, now holds B. **[code]** `UserController.php:syncAccessScope`, no guard in `guardOwnerRole`. | **Medium** (needs a non-owner/admin `users.manage` holder that is itself scope-restricted; owner/admin are normally unrestricted) | **STOP-condition #11 / #2-adjacent** — new backend authority. Not fixed here. Decision packet in MASTER-PLAN §6 (D-A). UI must not rely on it either way. |
-| **F-2** | `users.manage` lets the holder assign **any tenant role except `owner`**, including `admin` (`*`). `guardOwnerRole` blocks only `owner`. So `users.manage` is effectively privilege-escalating. By design today (owner/admin are expected to be the only holders), but it must be **presented** as such. | **[code]** `UserController::guardOwnerRole`; `UpdateUserRequest.role` rule accepts any tenant role slug. | Info/Low | Not changed. Drives the risk class "security administration" for `users.manage`/`roles.manage` in AC-UX-03 and a copy warning in AC-UX-02. |
+| **F-1** | A **branch-restricted** actor who holds `users.manage` can (a) clear their own `branch_ids` (`[]` ⇒ unrestricted) and (b) assign any tenant branch/warehouse — including outside their own scope — to themselves or others; (c) omitting `branch_ids` on create yields an unrestricted user. `UserController::syncAccessScope` and the Store/Update requests apply **no actor-scope check**. | **[probe]** custom role `{users.view, users.manage, branches.view}`, user scoped to branch A: `PUT /users/{self}` `{branch_ids: []}` → **200**, `allowedBranchIds() === null`; `{branch_ids:[A,B]}` → **200**, now holds B. **[code]** `UserController.php:syncAccessScope`, no guard in `guardOwnerRole`. | **High** (owner classification, 2026-10-14): authorization / privilege escalation. | **Owner decision: Option 2.** Fixed by **AC-UX-00A** (blocks AC-UX-01). |
+| **F-2** | `users.manage` lets the holder assign **any tenant role except `owner`**, including `admin` (`*`), to themselves or others, and modify/reset the password of any non-owner user including an `admin`. `guardOwnerRole` blocks only the `owner` role. | **[code]** `UserController::guardOwnerRole`; `UpdateUserRequest.role` accepts any tenant role slug; update accepts `password` for any non-owner target. | **High** (same classification). | **Owner decision: Option 2.** Fixed by **AC-UX-00A**: a role grant/target-management ceiling. `users.manage`/`roles.manage` are still presented as the highest-risk class in AC-UX-03. |
 | F-3 | `GET /branches` and `GET /warehouses` return only the **caller's** allowed rows. A restricted administrator therefore sees an incomplete checklist in the scope editor (target's out-of-view assignments are invisible but preserved in form state). | **[code]** `BranchController::index`, `WarehouseController::index`. | Low | Editor must tell the admin the list is limited to what they can see (AC-UX-05); no API change. |
 
 ---
@@ -129,7 +130,7 @@ Guards to reflect in UI: owner role grant/modify/delete = owner only (403 otherw
 
 Backend: `RoleTest`, `UserManagementTest`, `UserAccessScopeTest`, `UserEmployeeLinkTest`, `UserInvitationTest`, `UserRequestIdempotencyTest`, `Rem08DeactivatedUserAccessTest`, `ApiRbacTest`, `Rem37ZatcaSubmitPermissionTest`, `ReportEffectiveScopeTest`, `LegacyInventoryWarehouseScopeTest`.
 Web: `components/hr/role-dialog.test.tsx` (8 tests, multi-segment key integrity), `lib/permissions.test.ts`. Playwright: **no** e2e spec covers Users/Roles today.
-Gap: no backend test exercises a **scope-restricted actor** calling `/users` (F-1).
+Gap: no backend test exercises a **scope-restricted actor** calling `/users` (F-1) — closed by AC-UX-00A.
 
 ---
 

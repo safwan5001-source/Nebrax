@@ -7,7 +7,8 @@ Legend: ☐ not started · ◐ in progress / in review · ☑ merged (with Merge
 | # | Slice | Depends on | Status | PR | Base SHA | Merge SHA |
 |---|---|---|---|---|---|---|
 | 00 | Baseline inspection + execution docs + doc corrections | — | ◐ | — | `5ff3135` | — |
-| 01 | Users workspace V2 (route `/users`, permission-gated nav, **own manage gating: view-only viewers get a read-only table**, D-H role-name fallback, D-D scale mitigation, filters, status, lifecycle confirmations, mobile cards, error states, `/hr?tab=users` redirect) | 00 | ☐ | | | |
+| 00A | **User Administration Grant Boundaries** — backend fix for F-1/F-2 (High, owner decision Option 2): scope ceiling, role grant ceiling, target ceiling + negative tests. **Blocks 01.** | 00 | ☐ | | | |
+| 01 | Users workspace V2 (route `/users`, permission-gated nav, **own manage gating: view-only viewers get a read-only table**, D-H role-name fallback, D-D scale mitigation, filters, status, lifecycle confirmations, mobile cards, error states, `/hr?tab=users` redirect) | 00, **00A** | ☐ | | | |
 | 02 | User editor Sheet (identity · status · role · branch/warehouse scope · pre-save access summary; owner-user select fix) | 01 | ☐ | | | |
 | 03A | Roles workspace shell + catalogue (route `/roles`, **`roles.manage` gating of create/edit/delete from the first slice**, master/detail, grouped read-only catalogue, i18n coverage for all 36 modules / 40 actions, `/hr?tab=roles` redirect) | 00 | ☐ | | | |
 | 03B | Role editing (**editors only for `roles.manage`; view-only viewers see the read-only catalogue**; selection model, group select/deselect, search, counts, risk map + drift test, dirty state, unsaved guard, system/owner messaging, "applies to N users") | 03A | ☐ | | | |
@@ -23,11 +24,11 @@ Legend: ☐ not started · ◐ in progress / in review · ☑ merged (with Merge
 
 | ID | Item | Owner needed? | Notes |
 |---|---|---|---|
-| D-A | F-1 / F-2 backend containment (restricted `users.manage` actor can clear/widen scope; role escalation to `admin`) | **Yes — decision packet, MASTER-PLAN §6** | Does not block slices. Default behaviour = Option 1 (document + risk treatment). |
+| D-A | F-1 / F-2 backend containment | **Decided: Option 2 (owner, 2026-10-14), High** | Implemented by slice 00A, which blocks slice 01. |
 | D-B | Permission metadata location | No (default adopted) | Revisit only if owner prefers an additive backend field. |
 | D-D | Server-side pagination/search for `/users` | If an enterprise / `users: null` tenant grows large | API change; 01 ships client-side mitigation only. |
 | D-H | Role display name for `users.view`-without-`roles.view` viewers | Only if the UI fallback proves inadequate | Additive `role_name` on `UserResource` would be non-breaking. |
-| T-1 | Backend test for a scope-restricted actor calling `/users` (characterises F-1) | Only with D-A Option 2/3 | Not added in this horizon without approval (would pin current behaviour). |
+| T-1 | Backend test for a scope-restricted actor calling `/users` (characterises F-1) | — | Delivered inside AC-UX-00A as negative tests of the new boundary (not as a test pinning the old behaviour). |
 
 ## Per-slice checklist (copy into each PR)
 
