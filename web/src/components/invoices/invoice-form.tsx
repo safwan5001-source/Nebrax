@@ -18,6 +18,9 @@ import { LifecycleRail } from '@/components/workspace/lifecycle-rail';
 import { SALES_INVOICE_LIFECYCLE } from '@/components/workspace/lifecycle';
 import type { PageAction } from '@/components/nebrax/action-group';
 import { useAwjUi3 } from '@/lib/use-awj-ui3';
+import { useApplicationVisible } from '@/lib/use-application-visible';
+import { useCurrentUser } from '@/lib/use-can';
+import { DELIVERY_NOTE_PERMISSIONS, hasPermission } from '@/lib/delivery-notes';
 import { InvoiceTemplateSelector } from '@/components/invoices/invoice-template-selector';
 import { DocumentLanguageSelector } from '@/components/documents/document-language-selector';
 import { Input } from '@/components/ui/input';
@@ -144,6 +147,13 @@ export function InvoiceForm({ editId }: { editId?: string }) {
   const ts = useTranslations('status');
   const router = useRouter();
   const { success } = useToast();
+  // «مسودة فاتورة من سندات التسليم» تقود إلى مسارٍ يحرسه RBAC والاستحقاق التجاري لـ`sales.invoicing`
+  // معاً (AWJ-BACKEND-NAV-01)؛ فلا يظهر الإجراء إلا حين يُفتح المسار فعلاً، بعقد الشريط الجانبي نفسه.
+  const viewer = useCurrentUser();
+  const deliveryNotesVisible = useApplicationVisible('sales.invoicing');
+  const showDeliveryDraft = !editId
+    && deliveryNotesVisible === true
+    && hasPermission(viewer?.permissions, viewer?.role, DELIVERY_NOTE_PERMISSIONS.invoice);
 
   const [partners, setPartners] = useState<Partner[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -959,7 +969,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
   if (v3) {
     const wsActions: PageAction[] = [
       { key: 'cancel', label: t('cancel'), href: '/invoices', variant: 'ghost', emphasis: 'secondary' },
-      ...(!editId ? [{ key: 'delivery-draft', label: td('invoiceDraftAction'), icon: FileText, href: '/delivery-notes/invoice-draft', variant: 'outline' as const, emphasis: 'secondary' as const }] : []),
+      ...(showDeliveryDraft ? [{ key: 'delivery-draft', label: td('invoiceDraftAction'), icon: FileText, href: '/delivery-notes/invoice-draft', variant: 'outline' as const, emphasis: 'secondary' as const }] : []),
       { key: 'save-draft', label: t('save_draft'), onClick: () => submit(false), disabled: !canSave, variant: 'outline', emphasis: 'primary' },
       { key: 'save-post', label: t('save_post'), onClick: () => submit(true), disabled: !canSave, variant: 'primary', emphasis: 'primary' },
     ];
@@ -1076,7 +1086,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
     >
       {dialogs}
 
-      {!editId && <section className="flex flex-col gap-3 rounded border border-primary/25 bg-primary-soft/40 p-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-medium text-text">{td('invoiceDraftAction')}</h2><p className="mt-1 text-sm text-muted">{td('invoiceDraftBoundaryHint')}</p></div><Button asChild variant="outline" className="shrink-0"><Link href="/delivery-notes/invoice-draft"><FileText className="h-4 w-4" strokeWidth={1.7} />{td('invoiceDraftAction')}</Link></Button></section>}
+      {showDeliveryDraft && <section className="flex flex-col gap-3 rounded border border-primary/25 bg-primary-soft/40 p-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-medium text-text">{td('invoiceDraftAction')}</h2><p className="mt-1 text-sm text-muted">{td('invoiceDraftBoundaryHint')}</p></div><Button asChild variant="outline" className="shrink-0"><Link href="/delivery-notes/invoice-draft"><FileText className="h-4 w-4" strokeWidth={1.7} />{td('invoiceDraftAction')}</Link></Button></section>}
 
       <div className="grid gap-3 lg:grid-cols-[1fr_320px]">
         <InvoiceTemplateSelector

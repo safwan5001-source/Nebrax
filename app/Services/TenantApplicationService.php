@@ -167,6 +167,12 @@ class TenantApplicationService
      * تحرسها `EnsureCommercialApplicationAccess`، فبقاء الرابط بلا منحة كان يجعل
      * الواجهة أوسع من الخادم. القدرات التشغيلية تبقى على حالة التطبيق وحدها.
      *
+     * القدرة **الإلزامية** تغيب عن العقد (الواجهة تقرأ الغياب «ظاهرة دائماً») —
+     * إلا إن أُعلنت `ACCESS_COMMERCIAL`: إلزاميتها تخص حالة التطبيق وحدها (مفعّلة
+     * دائماً، كما في `statusFor()`)، أما مساراتها فيحرسها الاستحقاق. غيابها كان
+     * يُبقي رابط سندات التسليم (`sales.invoicing`) ظاهراً لمستأجر بلا استحقاق
+     * فيردّ مساره 403 (AWJ-BACKEND-NAV-01).
+     *
      * @return array<string, bool>
      */
     public function navVisibility(): array
@@ -176,8 +182,8 @@ class TenantApplicationService
 
         $navigable = array_filter(
             ApplicationCatalog::all(),
-            fn (array $application) => ! $application['mandatory']
-                && $application['maturity'] === ApplicationCatalog::MATURITY_BUILT,
+            fn (array $application) => $application['maturity'] === ApplicationCatalog::MATURITY_BUILT
+                && (! $application['mandatory'] || $application['access'] === ApplicationCatalog::ACCESS_COMMERCIAL),
         );
 
         $commercialKeys = array_keys(array_filter(
@@ -188,7 +194,9 @@ class TenantApplicationService
 
         $result = [];
         foreach ($navigable as $key => $application) {
-            $status = $rows->get($key)?->status ?? ($grandfathered ? 'enabled' : 'disabled');
+            $status = $application['mandatory']
+                ? 'enabled'
+                : ($rows->get($key)?->status ?? ($grandfathered ? 'enabled' : 'disabled'));
             $enabled = $status !== 'disabled';
 
             $entitled = $application['access'] !== ApplicationCatalog::ACCESS_COMMERCIAL
