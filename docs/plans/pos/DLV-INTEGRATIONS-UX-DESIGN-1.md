@@ -958,7 +958,7 @@ Two tracks. **Track U** (UX/catalog) is safe to build now and never touches prov
 - **Excludes.** Configuration-change log (needs INT-AUDIT-1).
 
 #### INT-AUDIT-1 — Connection-lifecycle audit *(DP-F approved 2026-10-14; implemented — pending review/merge)*
-- **Scope.** Append-only audit table and writers for ingress create/rotate/disable; reader for the activity tab's second log.
+- **Scope.** Append-only audit table and writers for ingress create/rotate/disable; reader for the activity tab's second log. **Delivered 2026-10-14: table + writers. The reader was deferred by owner decision D4 and has no owning slice yet** — INT-UX-6 explicitly excludes the configuration-change log (it waits on this reader), so the owner must assign one (not decided here).
 - **Depends on.** DP-F.
 - **Acceptance.** No secrets/payloads recorded; model rejects update/delete; existing operator events remain valid.
 - **Security.** Uuid user columns without FKs; tenant scoped.
