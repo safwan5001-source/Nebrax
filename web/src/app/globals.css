@@ -1029,6 +1029,12 @@ html[data-awj-ui="3"] [data-awj-card-title] {
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
   }
+
+  /* ERP-UX-018: a numeric field's placeholder is often Arabic hint text («اختياري»);
+     in Mono it renders letter-spaced and broken. Values stay Mono; hints use Sans. */
+  .num::placeholder {
+    font-family: var(--font-sans);
+  }
 }
 
 /* فتح مجموعة الشريط الجانبي — حركة على الـ compositor فقط (opacity/transform)
