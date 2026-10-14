@@ -111,6 +111,23 @@ describe('Users workspace (AC-UX-01)', () => {
     expect(screen.getAllByText('Main store').length).toBeGreaterThan(0);
   });
 
+  it('active filter chips show option labels, never a raw role slug or stored value', async () => {
+    world([OWNER, user({ id: 'u1', role: 'role-ab12cd34' })]);
+    renderPage();
+    await screen.findAllByText('Hind Alharbi');
+
+    await userEvent.selectOptions(screen.getByLabelText('Role'), 'role-ab12cd34');
+    await userEvent.selectOptions(screen.getByLabelText('Status'), 'inactive');
+    await userEvent.selectOptions(screen.getByLabelText('Access scope'), 'restricted');
+
+    const chips = screen.getByLabelText('Active filters');
+    expect(chips.textContent).toContain('Role: Branch manager');
+    expect(chips.textContent).toContain('Status: Inactive');
+    expect(chips.textContent).toContain('Access scope: Restricted scope');
+    expect(chips.textContent).not.toContain('role-ab12cd34');
+    expect(chips.textContent).not.toContain('restricted:');
+  });
+
   it('marks the signed-in account', async () => {
     world([OWNER]);
     renderPage();

@@ -214,6 +214,17 @@ export default function UsersPage() {
     [definitions, explorer.filters],
   );
 
+  // شريحة الفلتر تعرض اسم الخيار لا قيمته المخزَّنة (slug الدور مثلاً لا يُكشف اسماً أبداً).
+  const formatFilter = useCallback(
+    (filter: ActiveFilter) => {
+      const definition = definitions.find((candidate) => candidate.key === filter.key);
+      const raw = Array.isArray(filter.value) ? filter.value.map(String) : [String(filter.value)];
+      const shown = raw.map((value) => definition?.options?.find((option) => option.value === value)?.label ?? value);
+      return `${definition?.label ?? filter.label ?? filter.key}: ${shown.join('، ')}`;
+    },
+    [definitions],
+  );
+
   const query: UserListQuery = {
     search: explorer.search,
     status: filterValue(explorer.filters, 'status') as UserStatusFilter,
@@ -489,6 +500,7 @@ export default function UsersPage() {
         onFilterChange={updateFilter}
         onRemoveFilter={(key) => setExplorer((current) => ({ ...current, page: 1, filters: removeFilter(current.filters, key) }))}
         onClearFilters={() => setExplorer((current) => ({ ...current, page: 1, filters: [] }))}
+        formatFilter={formatFilter}
         sort={{
           value: explorer.sort ?? 'newest',
           onChange: (value) => setExplorer((current) => ({ ...current, page: 1, sort: value })),
