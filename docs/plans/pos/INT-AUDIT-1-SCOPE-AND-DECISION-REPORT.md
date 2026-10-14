@@ -93,7 +93,7 @@ Smallest change that satisfies DP-F and the Horizon acceptance, mirroring `Deliv
 
 ## 7. Changed files, tests, build, git
 
-- **Changed files:** this report only (`docs/plans/pos/INT-AUDIT-1-SCOPE-AND-DECISION-REPORT.md`). No code, migration, API, RBAC or test change.
+- **Changed files (current head):** three documentation files — this report; `DLV-INTEGRATIONS-UX-DESIGN-1.md` (assigns the audit reader to INT-UX-6, deferred until the DP-E read permission; wording of the populated vs future events); and `INT-AUDIT-1-IMPLEMENTATION-REPORT.md` (aligned with that decision). The first version of this PR changed this report only. No code, migration, API, RBAC or test change.
 - **Tests / build:** none run — nothing to verify (documentation only). CI on the docs PR is not claimed here.
 - **Branch:** `docs/int-audit-1-scope-gate` · **Base:** `main` @ `176965d086dd60dbd98208d4f4580da91b9a07b0` · **PR / head SHA:** reported in the final message (a document cannot embed the hash of its own commit).
 - **Status (at the time): BLOCKED — awaiting D1–D6; since resolved (§7a).** Nothing merged, nothing deployed.
@@ -109,7 +109,7 @@ Smallest change that satisfies DP-F and the Horizon acceptance, mirroring `Deliv
 | D5 | No IP / Request ID | **Approved** |
 | D6 | Branch re-route out of scope | **Approved** |
 
-Handling of this PR: it stays **documentation-only** and is kept as the scope-gate record; the code lives in the separate implementation PR so neither duplicates nor conflicts with the other (different files; this PR touches only this document).
+Handling of this PR: it stays **documentation-only** and is kept as the scope-gate record; the code lived in the separate implementation PR #1411 (merged, `af82fcb0`). The two PRs did not conflict: #1411 was merged first and this branch then merged `main` (a merge commit) before editing the shared Horizon document and the implementation report, which #1411 had introduced or changed.
 
 ## 8. Next step
 
