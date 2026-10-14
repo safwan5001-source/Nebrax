@@ -146,7 +146,7 @@ A second surface had the same defect: `invoice-form.tsx` always offered "create 
 |---|---|---|
 | 1 | The "every commercial key" test only covers uniform grants; the dependency gap is hidden | Renamed to `…_under_uniform_grants` and the docblock now states the limit. The gap stays a separate task (Remaining work) |
 | 2 | Two web "hidden" tests could pass in the loading state (`null` also hides) | **Fixed:** the tests now wait for the nav-state read to resolve (`navStateSettled`). Mutation check: a hook that ignores `false` now fails the unentitled test |
-| 3 | The invoice form used the role-lenient `hasPermission` from `lib/delivery-notes` | **Fixed:** it now uses `@/lib/permissions`, which mirrors `Rbac::allows` like the sidebar |
+| 3 | The invoice form used the role-lenient `hasPermission` from `lib/delivery-notes` | **Fixed:** it now uses `useCan().can(...)` from `@/lib/use-can`, the single capabilities source (mirrors `Rbac::allows`). A first attempt imported `@/lib/permissions` directly. The repo's AC-UX-07 ratchet (`capabilities.guard.test.ts`) failed it in Web CI on `80fd657`; corrected, and the full web suite (618 files, 6882 tests) passes locally |
 | 4 | One extra nav-state request per invoice-form mount; the banner appears after it resolves | Accepted: one small GET, no hydration mismatch. A shared nav-state cache would be a separate refactor |
 | 5 | Direct visits to `/delivery-notes*` rely on the page's 403 handling | Already handled by the pages (H1-5A: forbidden state, Retry and actions hidden on 403) |
 

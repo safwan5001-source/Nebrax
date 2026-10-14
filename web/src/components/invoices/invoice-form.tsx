@@ -19,9 +19,8 @@ import { SALES_INVOICE_LIFECYCLE } from '@/components/workspace/lifecycle';
 import type { PageAction } from '@/components/nebrax/action-group';
 import { useAwjUi3 } from '@/lib/use-awj-ui3';
 import { useApplicationVisible } from '@/lib/use-application-visible';
-import { useCurrentUser } from '@/lib/use-can';
+import { useCan } from '@/lib/use-can';
 import { DELIVERY_NOTE_PERMISSIONS } from '@/lib/delivery-notes';
-import { hasPermission } from '@/lib/permissions';
 import { InvoiceTemplateSelector } from '@/components/invoices/invoice-template-selector';
 import { DocumentLanguageSelector } from '@/components/documents/document-language-selector';
 import { Input } from '@/components/ui/input';
@@ -150,11 +149,9 @@ export function InvoiceForm({ editId }: { editId?: string }) {
   const { success } = useToast();
   // «مسودة فاتورة من سندات التسليم» تقود إلى مسارٍ يحرسه RBAC والاستحقاق التجاري لـ`sales.invoicing`
   // معاً (AWJ-BACKEND-NAV-01)؛ فلا يظهر الإجراء إلا حين يُفتح المسار فعلاً، بعقد الشريط الجانبي نفسه.
-  const viewer = useCurrentUser();
+  const { can } = useCan();
   const deliveryNotesVisible = useApplicationVisible('sales.invoicing');
-  const showDeliveryDraft = !editId
-    && deliveryNotesVisible === true
-    && hasPermission(viewer?.permissions, viewer?.role, DELIVERY_NOTE_PERMISSIONS.invoice);
+  const showDeliveryDraft = !editId && deliveryNotesVisible === true && can(DELIVERY_NOTE_PERMISSIONS.invoice);
 
   const [partners, setPartners] = useState<Partner[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
