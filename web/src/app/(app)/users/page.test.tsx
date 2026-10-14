@@ -9,7 +9,7 @@ import arMessages from '@/messages/ar.json';
 import { ConfirmProvider } from '@/components/ui/confirm-dialog';
 import UsersPage from './page';
 
-const { api, toast, auth, FakeApiError } = vi.hoisted(() => {
+const { api, toast, auth, nav, FakeApiError } = vi.hoisted(() => {
   class FakeApiError extends Error {
     status: number;
     constructor(message: string, status = 422) {
@@ -21,6 +21,7 @@ const { api, toast, auth, FakeApiError } = vi.hoisted(() => {
     api: vi.fn(),
     toast: { success: vi.fn(), error: vi.fn() },
     auth: { current: null as null | { id: string; role: string; permissions?: string[] } },
+    nav: { search: '' },
     FakeApiError,
   };
 });
@@ -30,7 +31,7 @@ vi.mock('@/lib/auth', () => ({ currentUser: () => auth.current }));
 vi.mock('@/components/ui/toast', () => ({ useToast: () => toast }));
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(nav.search),
 }));
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => <a href={href} {...rest}>{children}</a>,
@@ -81,6 +82,7 @@ function renderPage(locale: 'en' | 'ar' = 'en') {
 const paths = () => api.mock.calls.map((call) => String(call[0]));
 
 beforeEach(() => {
+  nav.search = '';
   auth.current = { id: 'me', role: 'owner', permissions: ['*'] };
 });
 afterEach(() => {
@@ -126,6 +128,18 @@ describe('Users workspace (AC-UX-01)', () => {
     expect(chips.textContent).toContain('Access scope: Restricted scope');
     expect(chips.textContent).not.toContain('role-ab12cd34');
     expect(chips.textContent).not.toContain('restricted:');
+  });
+
+  it('a bookmarked role filter never shows the raw slug, with or without roles.view', async () => {
+    nav.search = 'f.role=eq:role-ab12cd34';
+    auth.current = { id: 'v', role: 'role-x', permissions: ['users.view'] };
+    world([user({ id: 'u1', role: 'role-ab12cd34' })]);
+    renderPage();
+    await screen.findAllByText('Hind Alharbi');
+
+    const chips = screen.getByLabelText('Active filters');
+    expect(chips.textContent).toContain('Role: Custom role');
+    expect(chips.textContent).not.toContain('role-ab12cd34');
   });
 
   it('marks the signed-in account', async () => {

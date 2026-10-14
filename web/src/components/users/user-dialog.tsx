@@ -77,6 +77,7 @@ export function UserDialog({
   // كل قائمة مرجعية خلف صلاحيتها المستقلة (D-J). بلا صلاحيتها لا نطلبها (فلا 403 معروف سلفاً)
   // ولا نُرسل حقلها: غياب المفتاح = «بلا تغيير» في الخادم، فلا يُمحى شيءٌ بالسهو.
   const me = currentUser();
+  const isSelf = Boolean(user && me?.id && me.id === user.id);
   const canListRoles = hasPermission(me?.permissions, me?.role, 'roles.view');
   const canListEmployees = hasPermission(me?.permissions, me?.role, 'hr.view');
   const scopeAvailability = useScopeAvailability();
@@ -206,10 +207,18 @@ export function UserDialog({
         {user && (
           <div className="space-y-1.5">
             <Label htmlFor="ustatus">{t('status_label')}</Label>
-            <Select id="ustatus" value={form.is_active ? '1' : '0'} onChange={(e) => set('is_active', e.target.value === '1')}>
+            <Select
+              id="ustatus"
+              value={form.is_active ? '1' : '0'}
+              onChange={(e) => set('is_active', e.target.value === '1')}
+              disabled={isSelf}
+              aria-describedby={isSelf ? 'ustatus-note' : undefined}
+            >
               <option value="1">{t('active')}</option>
               <option value="0">{t('inactive')}</option>
             </Select>
+            {/* التعطيل الذاتي يقفل صاحبه (وقد يقفل المؤسسة إن كان المالك الوحيد): لا يمرّ من هنا — عرضٌ لا أمان. */}
+            {isSelf ? <p id="ustatus-note" className="text-xs text-muted">{t('reason_self_deactivate')}</p> : null}
           </div>
         )}
 

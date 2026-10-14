@@ -108,4 +108,17 @@ describe('UserDialog — independently gated inputs (D-J)', () => {
     await waitFor(() => expect(Array.from(select.options).map((o) => o.value)).toContain('owner'));
     expect(select.value).toBe('owner');
   });
+
+  it("cannot deactivate your own account through the editor, but can for someone else", async () => {
+    auth.current = { id: 'u1', role: 'admin', permissions: ['*'] };
+    const { unmount } = open(existing); // المحرَّر هو المستخدم نفسه
+    const own = (await screen.findByLabelText('Status')) as HTMLSelectElement;
+    expect(own.disabled).toBe(true);
+    expect(screen.getByText("You can't deactivate your own account from here.")).toBeTruthy();
+    unmount();
+
+    auth.current = { id: 'someone-else', role: 'admin', permissions: ['*'] };
+    open(existing);
+    expect(((await screen.findByLabelText('Status')) as HTMLSelectElement).disabled).toBe(false);
+  });
 });
