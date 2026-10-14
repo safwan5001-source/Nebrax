@@ -694,8 +694,8 @@ export function InvoiceForm({ editId }: { editId?: string }) {
                 searchPlaceholder={t('search_partner')}
                 emptyText={t('no_partner_found')}
               />
-              <Button type="button" variant="outline" className="shrink-0" onClick={() => setNewPartner(true)}>
-                <Plus className="h-4 w-4" strokeWidth={1.7} />
+              <Button type="button" variant="outline" className="shrink-0" aria-label={t('new_partner_title')} onClick={() => setNewPartner(true)}>
+                <Plus className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
                 <span className="hidden sm:inline">{t('new_partner')}</span>
               </Button>
             </div>

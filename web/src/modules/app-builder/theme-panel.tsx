@@ -188,6 +188,7 @@ export function ThemePanel({
             <span className="absolute inset-0" style={{ background: primaryColor }} />
             <input
               type="color"
+              aria-label={t('primaryColor')}
               value={primaryColor}
               onChange={(event) => {
                 const hex = event.target.value;
@@ -197,6 +198,7 @@ export function ThemePanel({
             />
           </label>
           <Input
+            aria-label={t('primaryColor')}
             className="h-9 font-mono text-xs uppercase"
             dir="ltr"
             value={primaryColor}

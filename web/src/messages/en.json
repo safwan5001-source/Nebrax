@@ -4752,6 +4752,7 @@
     "min_sale_price": "Min. sale price",
     "profit_margin": "Profit margin %",
     "discount": "Discount",
+    "discount_type": "Discount type",
     "tags": "Tags",
     "tags_hint": "Separate tags with commas",
     "internal_notes": "Internal notes",

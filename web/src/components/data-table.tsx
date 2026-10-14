@@ -259,7 +259,7 @@ export function DataTable<T>({
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
             placeholder={searchPlaceholder}
-            aria-label={searchLabel ?? searchPlaceholder}
+            aria-label={searchLabel || searchPlaceholder || t('search')}
             data-awj-grid-search=""
             className="h-8 w-full max-w-xs bg-transparent text-sm text-text placeholder:text-muted focus:outline-none"
           />

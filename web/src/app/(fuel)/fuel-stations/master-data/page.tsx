@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useId } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { ArrowRight, ChevronDown, CircleAlert, Fuel, Loader2, Pencil, Plus, Power, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -330,15 +330,18 @@ function AdvancedFields({ title, hint, children }: { title: string; hint?: strin
 }
 
 function FieldInput({ label, value, onChange, type = 'text', required, min, step, dir }: { label: string; value: string; onChange: (value: string) => void; type?: string; required?: boolean; min?: string; step?: string; dir?: 'ltr' | 'rtl' }) {
-  return <div className="space-y-1.5"><Label>{label}</Label><Input value={value} type={type} min={min} step={step} required={required} dir={dir} inputMode={type === 'number' ? 'decimal' : undefined} onChange={(event) => onChange(event.target.value)} /></div>;
+  const fieldId = useId();
+  return <div className="space-y-1.5"><Label htmlFor={fieldId}>{label}</Label><Input id={fieldId} value={value} type={type} min={min} step={step} required={required} dir={dir} inputMode={type === 'number' ? 'decimal' : undefined} onChange={(event) => onChange(event.target.value)} /></div>;
 }
 
 function LiterField({ label, value, onChange, required }: { label: string; value: string; onChange: (value: string) => void; required?: boolean }) {
-  return <div className="space-y-1.5"><Label>{label}</Label><div className="relative"><Input value={value} type="number" min="0" step="0.001" required={required} inputMode="decimal" className="pe-12" onChange={(event) => onChange(event.target.value)} /><span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-xs text-muted">L</span></div></div>;
+  const fieldId = useId();
+  return <div className="space-y-1.5"><Label htmlFor={fieldId}>{label}</Label><div className="relative"><Input id={fieldId} value={value} type="number" min="0" step="0.001" required={required} inputMode="decimal" className="pe-12" onChange={(event) => onChange(event.target.value)} /><span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-xs text-muted">L</span></div></div>;
 }
 
 function FieldSelect({ label, value, onChange, options, required, disabled, hint }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }>; required?: boolean; disabled?: boolean; hint?: string }) {
-  return <div className="space-y-1.5"><Label>{label}</Label><Select value={value} required={required} disabled={disabled} onChange={(event) => onChange(event.target.value)}><option value="">—</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</Select>{hint && <p className="text-xs leading-relaxed text-muted">{hint}</p>}</div>;
+  const fieldId = useId();
+  return <div className="space-y-1.5"><Label htmlFor={fieldId}>{label}</Label><Select id={fieldId} value={value} required={required} disabled={disabled} onChange={(event) => onChange(event.target.value)}><option value="">—</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</Select>{hint && <p className="text-xs leading-relaxed text-muted">{hint}</p>}</div>;
 }
 
 function ReadOnlyField({ label, value }: { label: string; value: string }) { return <div className="space-y-1.5"><Label>{label}</Label><p className="flex min-h-10 items-center rounded-md border border-border bg-muted/40 px-3 text-sm text-text">{value}</p></div>; }

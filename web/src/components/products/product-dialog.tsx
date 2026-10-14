@@ -451,7 +451,7 @@ export function ProductDialog({
             <Label htmlFor="disc">{t('discount')}</Label>
             <div className="flex gap-1.5">
               <Input id="disc" className="num text-end" type="number" min={0} value={form.discount} onChange={(e) => set('discount', e.target.value)} />
-              <Select className="w-16" value={form.discount_type} onChange={(e) => set('discount_type', e.target.value)}>
+              <Select aria-label={t('discount_type')} className="w-16" value={form.discount_type} onChange={(e) => set('discount_type', e.target.value)}>
                 <option value="percent">%</option>
                 <option value="amount">﷼</option>
               </Select>

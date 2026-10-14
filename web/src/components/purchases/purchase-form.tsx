@@ -888,16 +888,16 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
           <p className="mt-1 text-xs leading-relaxed text-muted">{t('s_attachments_hint')}</p>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Input
+          {/* يُفتح برمجياً من زرّ الاختيار الظاهر فقط؛ `hidden` يُخرجه من ترتيب Tab ومن
+              شجرة الوصول، فلا يبقى حقلٌ بلا اسم ولا عرضٌ يتجاوز الصفحة (H1-1 §2.7). */}
+          <input
             ref={attachmentInputRef}
             id="purchase-attachments"
             type="file"
             multiple
             accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.jpg,.jpeg,.png,.gif,.zip"
             onChange={selectAttachments}
-            // `sr-only` وحدها لا تغلب `w-full` الآتية من `Input`، فيتمدّد الحقل المخفيّ
-            // بعرض الصفحة ويتجاوز حافّتها لأنه مطلق الموضع. `size-px` تحسم قياسه.
-            className="sr-only size-px"
+            hidden
           />
 
           {pendingAttachments.length === 0 && storedAttachments.length === 0 ? (
@@ -970,6 +970,7 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
         </CardHeader>
         <CardContent>
           <textarea
+            aria-label={t('notes_section')}
             rows={3} value={notes} onChange={(e) => setNotes(e.target.value)}
             className="w-full resize-y rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus:border-primary"
           />

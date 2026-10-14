@@ -536,12 +536,14 @@ function ThemePanel({
             />
             <input
               type="color"
+              aria-label={t("primaryColor")}
               value={config.primaryColor}
               onChange={(event) => applyColor(event.target.value)}
               className="absolute inset-0 cursor-pointer opacity-0"
             />
           </label>
           <input
+            aria-label={t("primaryColor")}
             className={`${inputClass} font-mono uppercase tracking-wide`}
             value={config.primaryColor}
             onChange={(event) => applyColor(event.target.value)}
