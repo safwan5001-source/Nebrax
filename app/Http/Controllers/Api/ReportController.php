@@ -207,6 +207,13 @@ class ReportController extends ApiController
             // إضافي (REM-05): توثيق الإجمالي وتحذيراته ونطاق الحسابات المجموعة.
             'verification' => $report['verification'],
             'warnings'   => $report['warnings'],
+            // فرق سطر الإقفال المالي (REM-06): المبالغ بالريال كباقي الاستجابة.
+            'disclosures' => array_map(fn (array $d) => [
+                ...$d,
+                'current_balance' => Money::toRiyal($d['current_balance']),
+                'set_balance'     => Money::toRiyal($d['set_balance']),
+                'difference'      => Money::toRiyal($d['difference']),
+            ], $report['disclosures']),
             'accounts'   => $report['accounts'],
         ]);
     }

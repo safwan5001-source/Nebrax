@@ -475,9 +475,10 @@ class ReportService
      * وتبقى القيود المرمَّزة يدوياً بـ1150/2120 (REM-06) داخل النطاق. المدخلات = مدين − دائن على مجموعة
      * المدخلات، والمخرجات = دائن − مدين على مجموعة المخرجات. صافي موجب = مستحق للهيئة، وسالب = قابل للاسترداد.
      *
-     * الحقول الأربعة الأصلية بلا تغيير. إضافياً: `verification` (موثَّق/غير موثَّق) و`warnings` (تداخل أدوار،
-     * حسابات ملوّثة أو بلا أثر تدقيق، حركات من مصادر غير ضريبية) و`accounts` (الحسابات المجموعة ومصدر كل منها).
-     * مستأجر بتعيينات افتراضية نظيفة: الأرقام نفسها و`verified = true`.
+     * الحقول الأربعة الأصلية بلا تغيير. إضافياً: `verification` (verified | verified_with_notices | unverified،
+     * مع الفحوص المُنفَّذة وما لم يُفحص)، و`warnings` (تداخل أدوار، حسابات ملوّثة أو بلا أثر تدقيق، حركات من
+     * مصادر غير ضريبية — لكلٍّ `affects_totals` بحسب حركة الحساب في النطاق)، و`disclosures` (فرق سطر الإقفال المالي)،
+     * و`accounts` (الحسابات المجموعة ومصدر كل منها). مستأجر بتعيينات افتراضية نظيفة: الأرقام نفسها و`verified = true`.
      */
     public function taxReport(array $filters = []): array
     {
@@ -493,17 +494,17 @@ class ReportService
         $input = $net($scope['input_ids']);        // مدين − دائن
         $output = -$net($scope['output_ids']);     // دائن − مدين
 
+        // التحذير يُصنَّف بأثره على أرقام هذا النطاق (فترة + فروع): حسابٌ بلا حركة فيه ⇒ ملاحظة لا تلويث.
+        $classified = app(VatRoleIntegrityService::class)->verification($scope['warnings'], $movements->keys()->all());
+
         return [
             'input_vat'  => $input,
             'output_vat' => $output,
             'net_vat'    => $output - $input,
             'status'     => $output - $input >= 0 ? 'payable' : 'recoverable',
-            'verification' => [
-                'verified' => $scope['warnings'] === [],
-                'status'   => $scope['warnings'] === [] ? 'verified' : 'unverified',
-                'issues'   => count($scope['warnings']),
-            ],
-            'warnings'   => $scope['warnings'],
+            'verification' => $classified['verification'],
+            'warnings'   => $classified['warnings'],
+            'disclosures' => $scope['disclosures'],
             'accounts'   => $scope['accounts'],
         ];
     }

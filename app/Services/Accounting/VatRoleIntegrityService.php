@@ -54,6 +54,18 @@ class VatRoleIntegrityService
         Stocktake::class, InventoryOpening::class, CashBankTransfer::class,
     ];
 
+    /** كواشف سلامة تقرير الضريبة بترتيب ثابت (لقائمة `verification.checks`). */
+    private const DETECTORS = [
+        'vat_role_accounts_overlap', 'vat_account_type_mismatch', 'vat_account_cash_bank',
+        'vat_account_mapped_to_other_role', 'vat_account_pre_mapping_activity',
+        'vat_account_unaudited_history', 'vat_account_non_vat_source',
+    ];
+
+    /** ما لا يغطّيه «التوثيق» عمداً — يُعلن في كل استجابة كي لا يُقرأ كإقرار أو مطابقة. */
+    private const NOT_CHECKED = [
+        'invoice_to_ledger_reconciliation', 'manual_journal_content', 'zatca_clearance', 'vat_return_filing',
+    ];
+
     /** @return list<string> */
     public static function vatRoleKeys(): array
     {
@@ -171,7 +183,113 @@ class VatRoleIntegrityService
                 'output' => $describe($outputIds, 'tax_output'),
             ],
             'warnings' => $warnings,
+            'disclosures' => $this->fiscalCloseDisclosures($s, $inputIds, $outputIds),
         ];
+    }
+
+    /**
+     * يصنّف التحذيرات بحسب أثرها على **الأرقام المعروضة** ويبني كتلة `verification`.
+     *
+     * تحذيرٌ على حسابٍ لا حركة له ضمن الفترة/الفروع المطلوبة لا يلوّث إجمالي هذه الفترة، لكنه لا يُحذف:
+     * يبقى ظاهراً بـ`affects_totals:false` والحالة `verified_with_notices`. أما حسابٌ له حركة في النطاق
+     * فيجعل الحالة `unverified`. `verified` منطقي محافظ: `true` فقط حين لا يوجد أي تحذير إطلاقاً.
+     * «موثَّق» هنا يعني اجتياز فحوص سلامة حسابات الدور المعلنة في `checks` فقط؛ لا مطابقة للفواتير
+     * ولا إقرار ولا ZATCA (انظر `not_checked`).
+     *
+     * @param  list<array<string,mixed>>  $warnings
+     * @param  list<string>  $movedAccountIds  حسابات لها سطور ضمن نطاق التقرير (فترة + فروع)
+     * @return array{warnings: list<array<string,mixed>>, verification: array<string,mixed>}
+     */
+    public function verification(array $warnings, array $movedAccountIds): array
+    {
+        $moved = array_flip($movedAccountIds);
+        $annotated = array_map(fn (array $w) => [...$w, 'affects_totals' => isset($moved[$w['account_id']])], $warnings);
+
+        $issues = count(array_filter($annotated, fn (array $w) => $w['affects_totals']));
+        $notices = count($annotated) - $issues;
+        $status = $issues > 0 ? 'unverified' : ($notices > 0 ? 'verified_with_notices' : 'verified');
+
+        $checks = array_map(function (string $code) use ($annotated) {
+            $forCode = array_filter($annotated, fn (array $w) => $w['code'] === $code);
+            $result = $forCode === [] ? 'passed'
+                : (array_filter($forCode, fn (array $w) => $w['affects_totals']) !== [] ? 'failed' : 'notice');
+
+            return ['code' => $code, 'result' => $result];
+        }, self::DETECTORS);
+
+        return [
+            'warnings' => $annotated,
+            'verification' => [
+                'verified' => $status === 'verified',
+                'status' => $status,
+                'issues' => $issues,
+                'notices' => $notices,
+                'basis' => 'role_account_integrity',
+                'checks' => $checks,
+                'not_checked' => self::NOT_CHECKED,
+            ],
+        ];
+    }
+
+    /**
+     * إفصاحٌ عن فرق سطر «ضريبة القيمة المضافة» في جاهزية الإقفال المالي: `FiscalCloseService::roleBalance`
+     * يقرأ **الحساب الحالي للدور وحده** (كل الزمن، كل الفروع)، بينما هذا التقرير يجمع مجموعة الحسابات.
+     * بعد إعادة تعيين (أو بحساب نظامي مكتوب بالكود — REM-06) يختلف الرقمان. هنا يُحسب الفرق ويُعلن
+     * بنفس تعريف الإقفال (كل الزمن، بلا مرشّح فروع) كي يُقارن الرقمان بلا لبس؛ لا يغيّر التوثيق ولا الإقفال.
+     *
+     * @param  list<string>  $inputIds
+     * @param  list<string>  $outputIds
+     * @return list<array<string,mixed>>
+     */
+    private function fiscalCloseDisclosures(array $s, array $inputIds, array $outputIds): array
+    {
+        $roleIds = ['tax_output' => $outputIds, 'tax_input' => $inputIds];
+        $currentIds = [];
+        foreach ($roleIds as $roleKey => $ids) {
+            $account = isset($s['mappings'][$roleKey]) ? ($s['accounts'][$s['mappings'][$roleKey]] ?? null) : null;
+            if ($account !== null && $account->is_active && ! $account->is_group) {
+                $currentIds[$roleKey] = $account->id; // نفس شرط الحلّ عند الإقفال؛ غير ذلك يتجاهله الإقفال.
+            }
+        }
+        if ($currentIds === []) {
+            return [];
+        }
+
+        $nets = JournalLine::query()
+            ->join('journal_entries as e', 'e.id', '=', 'journal_lines.journal_entry_id')
+            ->whereIn('journal_lines.account_id', array_values(array_unique([...$currentIds, ...$inputIds, ...$outputIds])))
+            ->whereIn('e.status', ['posted', 'reversed'])
+            ->selectRaw('journal_lines.account_id as account_id, SUM(journal_lines.debit) as d, SUM(journal_lines.credit) as c')
+            ->groupBy('journal_lines.account_id')
+            ->get()
+            ->mapWithKeys(fn ($row) => [(string) $row->account_id => (int) $row->d - (int) $row->c])
+            ->all();
+        $net = fn (array $ids): int => (int) array_sum(array_map(fn (string $id) => $nets[$id] ?? 0, $ids));
+
+        $disclosures = [];
+        foreach ($currentIds as $roleKey => $currentId) {
+            $account = $s['accounts'][$currentId];
+            $currentNet = $nets[$currentId] ?? 0;
+            $current = $account->normal_balance === 'debit' ? $currentNet : -$currentNet;   // كما في roleBalance
+            $set = $roleKey === 'tax_input' ? $net($roleIds[$roleKey]) : -$net($roleIds[$roleKey]);
+            if ($set === $current) {
+                continue;
+            }
+            $fmt = fn (int $h) => number_format($h / 100, 2);
+            $disclosures[] = [
+                'code' => 'fiscal_close_vat_control_differs',
+                'role_key' => $roleKey,
+                'current_account_code' => $account->code,
+                'current_balance' => $current,
+                'set_balance' => $set,
+                'difference' => $set - $current,
+                'message' => 'سطر ضريبة القيمة المضافة في جاهزية الإقفال المالي لدور «'.AccountingRoles::find($roleKey)['label_ar']
+                    .'» يقرأ الحساب الحالي '.$account->code.' وحده ('.$fmt($current).') بينما مجموع حسابات الدور في هذا التقرير (كل الزمن) '
+                    .$fmt($set).' — الفرق '.$fmt($set - $current).' في حسابات سابقة أو نظامية لا يشملها سطر الإقفال (REM-06).',
+            ];
+        }
+
+        return $disclosures;
     }
 
     // ── قواعد الأهلية ────────────────────────────────────────────────────────

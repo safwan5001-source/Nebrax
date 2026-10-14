@@ -48,9 +48,11 @@ interface CashSection { inflows: string; outflows: string; net: string; entries:
 interface CashFlow { operating: CashSection; investing: CashSection; financing: CashSection; net_cash_flow: string }
 interface TaxReport {
   input_vat: string; output_vat: string; net_vat: string; status: 'payable' | 'recoverable';
-  /** REM-05 (إضافي): توثيق الإجمالي وتحذيرات التداخل/التلوّث. */
-  verification?: { verified: boolean; status: 'verified' | 'unverified'; issues: number };
-  warnings?: { code: string; account_code: string | null; message: string }[];
+  /** REM-05 (إضافي): توثيق سلامة حسابات الدور — ليس مطابقة فواتير ولا إقراراً. */
+  verification?: { verified: boolean; status: 'verified' | 'verified_with_notices' | 'unverified'; issues: number; notices?: number };
+  warnings?: { code: string; account_code: string | null; message: string; affects_totals?: boolean }[];
+  /** فرق سطر الإقفال المالي عن مجموع حسابات الدور (REM-06). */
+  disclosures?: { code: string; role_key: string; message: string }[];
 }
 interface ReportDoc { title: string; columns: ReportColumn[]; rows: string[][]; totalRow?: string[]; exportName: string }
 
@@ -525,7 +527,11 @@ export function CashFlowTable({ cashFlow, comparisonCashFlow, loading, g, t, emp
 
 export function TaxCard({ tax, loading, g }: { tax: TaxReport | null; loading: boolean; g: ReturnType<typeof useTranslations> }) {
   const payable = tax?.status === 'payable';
-  const unverified = tax?.verification?.verified === false;
+  // خوادم أقدم بلا `status` تُرسل `verified` وحده: false ⇒ غير موثَّق.
+  const verificationStatus = tax?.verification?.status ?? (tax?.verification?.verified === false ? 'unverified' : 'verified');
+  const unverified = verificationStatus === 'unverified';
+  const withNotices = verificationStatus === 'verified_with_notices';
+  const disclosures = tax?.disclosures ?? [];
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -533,6 +539,7 @@ export function TaxCard({ tax, loading, g }: { tax: TaxReport | null; loading: b
         {tax && (
           <div className="flex items-center gap-2">
             {unverified && <Badge tone="negative">{g('taxUnverified')}</Badge>}
+            {withNotices && <Badge tone="warning">{g('taxVerifiedWithNotices')}</Badge>}
             <Badge tone={payable ? 'warning' : 'positive'}>{payable ? g('taxPayable') : g('taxRecoverable')}</Badge>
           </div>
         )}
@@ -544,7 +551,23 @@ export function TaxCard({ tax, loading, g }: { tax: TaxReport | null; loading: b
               <div role="alert" className="mb-3 rounded border border-negative/40 bg-negative/5 p-3 text-sm text-negative">
                 <p className="font-medium">{g('taxUnverifiedHint')}</p>
                 <ul className="mt-1 list-disc space-y-0.5 ps-5">
-                  {(tax.warnings ?? []).map((warning, index) => <li key={`${warning.code}-${warning.account_code ?? ''}-${index}`}>{warning.message}</li>)}
+                  {(tax.warnings ?? []).filter((warning) => warning.affects_totals !== false).map((warning, index) => <li key={`${warning.code}-${warning.account_code ?? ''}-${index}`}>{warning.message}</li>)}
+                </ul>
+              </div>
+            )}
+            {(unverified || withNotices) && (tax.warnings ?? []).some((warning) => warning.affects_totals === false) && (
+              <div role="status" className="mb-3 rounded border border-border bg-background p-3 text-sm text-muted">
+                <p className="font-medium">{g('taxNoticesHint')}</p>
+                <ul className="mt-1 list-disc space-y-0.5 ps-5">
+                  {(tax.warnings ?? []).filter((warning) => warning.affects_totals === false).map((warning, index) => <li key={`${warning.code}-${warning.account_code ?? ''}-${index}`}>{warning.message}</li>)}
+                </ul>
+              </div>
+            )}
+            {disclosures.length > 0 && (
+              <div data-testid="fiscal-close-disclosure" className="mb-3 rounded border border-border bg-background p-3 text-sm text-muted">
+                <p className="font-medium">{g('taxFiscalCloseDisclosure')}</p>
+                <ul className="mt-1 list-disc space-y-0.5 ps-5">
+                  {disclosures.map((disclosure) => <li key={`${disclosure.code}-${disclosure.role_key}`}>{disclosure.message}</li>)}
                 </ul>
               </div>
             )}

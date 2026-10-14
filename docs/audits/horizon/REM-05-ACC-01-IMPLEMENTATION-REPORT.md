@@ -66,7 +66,7 @@ First failing rule wins (order above). `DELETE` (reset) runs the same checks wit
   "accounts": { "input": [{"account_id","code","name","sources":["current","system_default","history"]}], "output": [...] } } // new
 ```
 
-Warning codes (any one ⇒ `verified: false`): `vat_role_accounts_overlap`, `vat_account_type_mismatch`, `vat_account_cash_bank`, `vat_account_mapped_to_other_role`, `vat_account_pre_mapping_activity`, `vat_account_unaudited_history`, `vat_account_non_vat_source` (period/branch-scoped; sources that never carry VAT: payments, payroll, stock movements/permits/counts, inventory openings, cash/bank transfers — a **deny**-list, so an unlisted legitimate source is never a false alarm).
+Warning codes (any warning ⇒ `verified: false`; the **status** distinguishes whether it touches the reported figures — see §12): `vat_role_accounts_overlap`, `vat_account_type_mismatch`, `vat_account_cash_bank`, `vat_account_mapped_to_other_role`, `vat_account_pre_mapping_activity`, `vat_account_unaudited_history`, `vat_account_non_vat_source` (period/branch-scoped; sources that never carry VAT: payments, payroll, stock movements/permits/counts, inventory openings, cash/bank transfers — a **deny**-list, so an unlisted legitimate source is never a false alarm).
 
 `GET /api/accounting-settings/account-routing` → each `roles[].mapping` gains `violations: [{code, message}]` (`[]` when compliant). `state` keeps its meaning (see decision report §11, deviation 1).
 
@@ -109,8 +109,8 @@ Effects: trial balance, balance sheet, ledger and every account balance are **un
 ## 7. Remaining risks — REM-06 and Fiscal Close
 
 1. **Hard-coded VAT posters (REM-06).** `CreditNoteService`, `ReturnService` (sales side), `ExpenseService`, `AssetService`, `PosExchangeService` still post to `2120`/`1150` regardless of mapping. After a remap the **report is complete** (system accounts are in the set), but **GL-by-account is split** across the old and new account. Tested.
-2. **Fiscal Close.** `FiscalCloseService::roleBalance` reads **only the current role account**, so the close readiness `vat_balances` line shows 150.00 where the report shows 300.00 after a remap (test `fiscal_close_reads_only_the_current_role_account…`). Informational line only (not a blocker); **not modified** per scope; unify under REM-06.
-3. **Contaminated history is sticky.** Warnings persist after the tenant remaps away from a contaminated account; clearing needs an attestation mechanism (schema + decision) — deferred.
+2. **Fiscal Close.** `FiscalCloseService::roleBalance` reads **only the current role account**, so the close readiness `vat_balances` line shows 150.00 where the report shows 300.00 after a remap (test `fiscal_close_reads_only_the_current_role_account…`). Informational line only (not a blocker); **not modified** per scope; unify under REM-06. Since review round 1 the **tax report discloses** the difference (§12); the Fiscal Close screen itself does not (that needs a change in `FiscalCloseService` — owner approval required).
+3. **Contaminated history stays visible.** Warnings persist after the tenant remaps away from a contaminated account. Since review round 1 they only turn a period `unverified` when the account actually moved in that period (§12); a durable *clean* verdict still needs an attestation mechanism (schema + decision) — deferred.
 4. **Unknown blast radius.** No production visibility; the read-only operator audit is specified (decision report §5.3) but **not shipped or run**. Enforcement only affects future writes; the report change is identical for non-remapped tenants.
 5. **P4 strictness.** A tenant with an already-used custom VAT account must move to a clean account (ordinary journal entry) — by design (D-3).
 6. **Other roles** (AR/AP/revenue…) still lack *type* validation; only the VAT-reserved rule applies to them. Recommend a follow-up slice.
@@ -142,6 +142,30 @@ On code head `3a5951e` (PR #1457): `php artisan test (L11, sqlite)` ✅ · `php 
 | Base | `main` @ `a9f4acfc7a8b4fbc4353dccb04705184c1f5d10c` |
 | Code head (verified by CI) | `3a5951e3f5156f8e96bddbba6b8a718c673d2f5b` |
 | Final head | the head of PR #1457; it adds only this report's §8–§10 on top of the verified code head (docs-only, no code change) |
+
+## 12. Review round 1 — verification semantics, historical overlap, Fiscal Close disclosure
+
+Scope: report layer only (`VatRoleIntegrityService`, `ReportService::taxReport`, `ReportController`, web `TaxCard`). **No** change to posting, `FiscalCloseService`, REM-06 posters, schema, routes or permissions. The PR carried no recorded review comments; the three items were taken from the owner's titles and interpreted as below — please correct the interpretation if it differs.
+
+| # | Review item | Change |
+|---|---|---|
+| 1 | VAT report verification semantics | `verified` used to read as "the VAT is correct". It now means only *passed the listed role-account integrity checks*. `verification` gains `basis: role_account_integrity`, `checks[]` (each detector: `passed` / `notice` / `failed`) and `not_checked[]` (`invoice_to_ledger_reconciliation`, `manual_journal_content`, `zatca_clearance`, `vat_return_filing`) so the response states what was **not** verified. Status is tri-state: `verified` · `verified_with_notices` · `unverified`; `verified` (boolean) stays conservative — `true` only when there is no warning at all. `issues` now counts warnings that affect the reported totals, `notices` the rest. |
+| 2 | Historical overlap / unverified warnings | Every warning carries `affects_totals`: true when its account has movement inside the requested scope (period **and** branch filter), false otherwise. A historical overlap or a contaminated old account therefore makes only the periods where it moved `unverified`; other periods are `verified_with_notices` and the warning remains listed (never hidden). Overlap attribution by account type is unchanged. |
+| 3 | Fiscal Close discrepancy disclosure | New additive `disclosures[]` on the tax report: per VAT role, `fiscal_close_vat_control_differs` with `current_account_code`, `current_balance` (exactly what Fiscal Close readiness shows: current role account, all time, all branches), `set_balance` (the report's role-account set on the same basis), `difference` and an Arabic message. Independent of the selected period, and it does **not** change the verification state. A test asserts the disclosed `current_balance` equals the number `FiscalCloseService::readiness` returns. |
+
+Web: `TaxCard` shows a red alert only for `unverified`, a neutral notice (with the unaffected warnings) for `verified_with_notices`, and a separate "Difference from the Fiscal Close line" block; older APIs without `status` keep working.
+
+Accounting example (default chart; sale 1,000.00 + 15 % on 2026-01-10 credited to a legacy revenue-typed `tax_output` account `4999`, remap to liability `2125` before the 2026-02-10 sale):
+
+| Request | output VAT | status | note |
+|---|---:|---|---|
+| January | 150.00 | `unverified` | `4999` moved (type mismatch affects totals) |
+| February | 150.00 | `verified_with_notices` (`verified:false`) | `4999` has no February movement ⇒ `affects_totals:false` |
+| All time | 300.00 | `unverified` | |
+
+Journal impact: none (read-only). Tests added (4, SQLite + PostgreSQL): `verification_declares_what_was_checked_and_what_was_not`, `a_contaminated_historical_account_only_taints_the_periods_it_moved_in`, `a_historical_role_overlap_is_a_notice_without_movement_and_a_failure_with_movement`, `the_report_discloses_the_fiscal_close_vat_line_difference_with_the_same_numbers_the_close_shows`; web: 3 new `TaxCard` tests.
+
+**Decision requested (not implemented):** showing the same disclosure on the Fiscal Close readiness screen requires an additive info item in `FiscalCloseService`, which the Phase-2 scope excluded. Approve or leave it to REM-06.
 
 ## 11. Next recommended step
 

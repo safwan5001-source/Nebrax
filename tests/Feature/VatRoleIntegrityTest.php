@@ -335,8 +335,11 @@ class VatRoleIntegrityTest extends TestCase
         $this->assertSame(7500, $report['input_vat']);
         $this->assertSame(7500, $report['net_vat']);
         $this->assertSame('payable', $report['status']);
-        $this->assertSame(['verified' => true, 'status' => 'verified', 'issues' => 0], $report['verification']);
+        $this->assertTrue($report['verification']['verified']);
+        $this->assertSame('verified', $report['verification']['status']);
+        $this->assertSame([0, 0], [$report['verification']['issues'], $report['verification']['notices']]);
         $this->assertSame([], $report['warnings']);
+        $this->assertSame([], $report['disclosures']);
         $this->assertSame(['2120'], collect($report['accounts']['output'])->pluck('code')->all());
         $this->assertSame(['1150'], collect($report['accounts']['input'])->pluck('code')->all());
     }
@@ -603,6 +606,122 @@ class VatRoleIntegrityTest extends TestCase
         app(TenantContext::class)->set($this->tenantId);
         $this->assertSame(15000, $this->tax()['output_vat']);
         $this->assertSame(2, AccountRoleMappingEvent::where('role_key', 'tax_output')->count() + AccountRoleMappingEvent::where('role_key', 'tax_input')->count());
+    }
+
+    // ───────────── 3b. دلالات التوثيق: ما فُحص، وما لم يُفحص، وأثر النطاق ─────────────
+
+    /** @test */
+    public function verification_declares_what_was_checked_and_what_was_not(): void
+    {
+        $this->invoice('2026-01-10');
+        $v = $this->tax()['verification'];
+
+        $this->assertSame('role_account_integrity', $v['basis']);
+        $this->assertSame(
+            ['vat_role_accounts_overlap', 'vat_account_type_mismatch', 'vat_account_cash_bank', 'vat_account_mapped_to_other_role',
+                'vat_account_pre_mapping_activity', 'vat_account_unaudited_history', 'vat_account_non_vat_source'],
+            array_column($v['checks'], 'code')
+        );
+        $this->assertSame(['passed'], array_values(array_unique(array_column($v['checks'], 'result'))));
+        // «موثَّق» لا يعني مطابقة الفواتير ولا الإقرار ولا ZATCA — يُعلن صراحةً.
+        foreach (['invoice_to_ledger_reconciliation', 'zatca_clearance', 'vat_return_filing'] as $notChecked) {
+            $this->assertContains($notChecked, $v['not_checked']);
+        }
+    }
+
+    /** @test */
+    public function a_contaminated_historical_account_only_taints_the_periods_it_moved_in(): void
+    {
+        $legacy = $this->account('4999', 'revenue');
+        $this->legacyMap('tax_output', $legacy);            // تعيين قديم مخالف
+        $this->invoice('2026-01-10');                       // VAT 150.00 على الحساب المخالف
+        $valid = $this->account('2125', 'liability');
+        $this->map('tax_output', $valid);                   // التصحيح بحساب صالح
+        $this->invoice('2026-02-10');                       // VAT 150.00 على الحساب الصالح
+
+        $jan = $this->tax(['from' => '2026-01-01', 'to' => '2026-01-31']);
+        $this->assertSame('unverified', $jan['verification']['status']);
+        $this->assertFalse($jan['verification']['verified']);
+        $this->assertGreaterThan(0, $jan['verification']['issues']);
+        $this->assertTrue(collect($jan['warnings'])->firstWhere('code', 'vat_account_type_mismatch')['affects_totals']);
+
+        // شباط: الحساب المخالف بلا حركة ⇒ أرقام الفترة غير ملوّثة، لكن التحذير لا يُخفى ولا يُقدَّم «موثَّقاً» نظيفاً.
+        $feb = $this->tax(['from' => '2026-02-01', 'to' => '2026-02-28']);
+        $this->assertSame(15000, $feb['output_vat']);
+        $this->assertSame('verified_with_notices', $feb['verification']['status']);
+        $this->assertFalse($feb['verification']['verified']);                 // المنطقي محافظ: true لا يكون إلا بلا أي تحذير
+        $this->assertSame(0, $feb['verification']['issues']);
+        $this->assertGreaterThan(0, $feb['verification']['notices']);
+        $mismatch = collect($feb['warnings'])->firstWhere('code', 'vat_account_type_mismatch');
+        $this->assertNotNull($mismatch);
+        $this->assertFalse($mismatch['affects_totals']);
+        $this->assertSame('notice', collect($feb['verification']['checks'])->firstWhere('code', 'vat_account_type_mismatch')['result']);
+
+        // كل الزمن يشمل حركة الحساب المخالف ⇒ غير موثَّق.
+        $all = $this->tax();
+        $this->assertSame(30000, $all['output_vat']);
+        $this->assertSame('unverified', $all['verification']['status']);
+    }
+
+    /** @test */
+    public function a_historical_role_overlap_is_a_notice_without_movement_and_a_failure_with_movement(): void
+    {
+        $shared = $this->account('2125', 'liability');
+        $this->legacyMap('tax_input', $shared);                                   // دخل تاريخ المدخلات
+        AccountRoleMapping::where('role_key', 'tax_input')->update(['account_id' => $this->byCode('1150')->id]);
+        $this->legacyMap('tax_output', $shared);                                  // ويُعيَّن الآن للمخرجات ⇒ تداخل تاريخي
+        $this->invoice('2026-02-10');                                             // VAT على الحساب المشترك
+
+        $jan = $this->tax(['from' => '2026-01-01', 'to' => '2026-01-31']);
+        $this->assertContains('vat_role_accounts_overlap', $this->codes($jan));
+        $this->assertSame('verified_with_notices', $jan['verification']['status']);
+        $this->assertFalse(collect($jan['warnings'])->firstWhere('code', 'vat_role_accounts_overlap')['affects_totals']);
+
+        $feb = $this->tax(['from' => '2026-02-01', 'to' => '2026-02-28']);
+        $this->assertSame('unverified', $feb['verification']['status']);
+        $this->assertTrue(collect($feb['warnings'])->firstWhere('code', 'vat_role_accounts_overlap')['affects_totals']);
+        $this->assertSame(15000, $feb['output_vat']);                             // يُنسب بنوعه (التزام ⇒ مخرجات)، لا ازدواج
+        $this->assertSame(0, $feb['input_vat']);
+    }
+
+    // ───────────── 3c. إفصاح فرق سطر الإقفال المالي ─────────────
+
+    /** @test */
+    public function the_report_discloses_the_fiscal_close_vat_line_difference_with_the_same_numbers_the_close_shows(): void
+    {
+        $this->assertSame([], $this->tax()['disclosures']);                       // مستأجر افتراضي: لا فرق
+
+        $out = $this->account('2125', 'liability');
+        $in = $this->account('1158', 'asset');
+        $this->invoice('2026-01-10'); $this->purchase('2026-01-11', 50000);       // 2120: 150.00 · 1150: 75.00
+        $this->map('tax_output', $out); $this->map('tax_input', $in);
+        $this->invoice('2026-02-10'); $this->purchase('2026-02-11', 50000);       // 2125: 150.00 · 1158: 75.00
+
+        // التقرير في فترة لا تحوي الحركات لا يغيّر الإفصاح: يُقاس كما يقيس الإقفال (كل الزمن).
+        $disclosures = collect($this->tax(['from' => '2026-03-01', 'to' => '2026-03-31'])['disclosures'])->keyBy('role_key');
+        $this->assertSame(['tax_input', 'tax_output'], $disclosures->keys()->sort()->values()->all());
+        $o = $disclosures['tax_output'];
+        $this->assertSame('fiscal_close_vat_control_differs', $o['code']);
+        $this->assertSame('2125', $o['current_account_code']);
+        $this->assertSame([15000, 30000, 15000], [$o['current_balance'], $o['set_balance'], $o['difference']]);
+        $this->assertSame([7500, 15000, 7500], [$disclosures['tax_input']['current_balance'], $disclosures['tax_input']['set_balance'], $disclosures['tax_input']['difference']]);
+
+        // نفس رقم الإقفال حرفياً (FiscalCloseService غير معدَّل).
+        $year = FiscalYear::findOrFail(app(FiscalYearService::class)->create(
+            ['name' => '2026', 'start_date' => '2026-01-01', 'end_date' => '2026-12-31'], null
+        )['id']);
+        $vat = collect(app(FiscalCloseService::class)->readiness($year)['info'])->firstWhere('code', 'vat_balances');
+        $this->assertSame($vat['details']['tax_output'], $o['current_balance']);
+        $this->assertSame($vat['details']['tax_input'], $disclosures['tax_input']['current_balance']);
+
+        // العقد عبر الـAPI: مبالغ بالريال، وتوثيق الأرقام يبقى مستقلاً عن الإفصاح.
+        $res = $this->withToken($this->token)->getJson('/api/reports/tax-report')->assertOk();
+        $res->assertJsonPath('output_vat', '300.00')
+            ->assertJsonPath('verification.status', 'verified')
+            ->assertJsonPath('disclosures.0.code', 'fiscal_close_vat_control_differs');
+        $apiOut = collect($res->json('disclosures'))->firstWhere('role_key', 'tax_output');
+        $this->assertSame(['150.00', '300.00', '150.00'], [$apiOut['current_balance'], $apiOut['set_balance'], $apiOut['difference']]);
+        $this->balanced();
     }
 
     // ───────────── 6. REM-06 / الإقفال المالي: الاعتماد الموثَّق ─────────────

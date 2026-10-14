@@ -96,6 +96,7 @@ describe('TaxCard', () => {
   const labels: Record<string, string> = {
     taxReport: 'VAT report', outputVat: 'Output VAT', inputVat: 'Input VAT', netVat: 'Net VAT', taxPayable: 'Payable',
     taxRecoverable: 'Recoverable', taxUnverified: 'Unverified', taxUnverifiedHint: 'Figures may include non-VAT movements',
+    taxVerifiedWithNotices: 'Verified with notices', taxNoticesHint: 'History notices, no movement in this period', taxFiscalCloseDisclosure: 'Difference from the Fiscal Close line',
   };
   const gTax = ((key: string) => labels[key] ?? key) as ReturnType<typeof useTranslations>;
 
@@ -124,5 +125,60 @@ describe('TaxCard', () => {
     const alert = screen.getByRole('alert');
     expect(within(alert).getByText('Figures may include non-VAT movements')).not.toBeNull();
     expect(within(alert).getByText('Account 2120 overlaps both VAT roles')).not.toBeNull();
+  });
+
+  it('treats a notices-only report as not clean but not contaminated, and keeps the notices visible', () => {
+    render(
+      <TaxCard
+        tax={{
+          ...tax,
+          verification: { verified: false, status: 'verified_with_notices', issues: 0, notices: 1 },
+          warnings: [{ code: 'vat_account_type_mismatch', account_code: '4999', message: 'Account 4999 has the wrong type', affects_totals: false }],
+        }}
+        loading={false}
+        g={gTax}
+      />
+    );
+    expect(screen.getByText('Verified with notices')).not.toBeNull();
+    expect(screen.queryByText('Unverified')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(within(screen.getByRole('status')).getByText('Account 4999 has the wrong type')).not.toBeNull();
+  });
+
+  it('separates affecting warnings from period notices when the report is unverified', () => {
+    render(
+      <TaxCard
+        tax={{
+          ...tax,
+          verification: { verified: false, status: 'unverified', issues: 1, notices: 1 },
+          warnings: [
+            { code: 'vat_role_accounts_overlap', account_code: '2125', message: 'Overlap on 2125', affects_totals: true },
+            { code: 'vat_account_type_mismatch', account_code: '4999', message: 'Wrong type on 4999', affects_totals: false },
+          ],
+        }}
+        loading={false}
+        g={gTax}
+      />
+    );
+    expect(within(screen.getByRole('alert')).getByText('Overlap on 2125')).not.toBeNull();
+    expect(within(screen.getByRole('alert')).queryByText('Wrong type on 4999')).toBeNull();
+    expect(within(screen.getByRole('status')).getByText('Wrong type on 4999')).not.toBeNull();
+  });
+
+  it('discloses the Fiscal Close difference without changing the verification state', () => {
+    render(
+      <TaxCard
+        tax={{
+          ...tax,
+          verification: { verified: true, status: 'verified', issues: 0, notices: 0 },
+          warnings: [],
+          disclosures: [{ code: 'fiscal_close_vat_control_differs', role_key: 'tax_output', message: 'Close shows 150.00, report 300.00' }],
+        }}
+        loading={false}
+        g={gTax}
+      />
+    );
+    expect(screen.queryByText('Unverified')).toBeNull();
+    expect(within(screen.getByTestId('fiscal-close-disclosure')).getByText('Close shows 150.00, report 300.00')).not.toBeNull();
   });
 });
