@@ -238,11 +238,36 @@ class FlatHostBackfillTest extends TestCase
         DB::table('storefront_domains')->where('hostname', 'dominah-h.store.awjdev.xyz')->update(['is_active' => true]);
         $snap = DB::table('storefront_domains')->orderBy('hostname')->get()->toJson();
 
-        $out = $this->backfill(true);
-
-        $this->assertTrue($out['has_drift']);
+        $this->assertTrue($this->backfill(false)['has_drift']);   // dry-run يُبلّغ
+        try {
+            $this->backfill(true);                                // execute يرفض
+            $this->fail('expected drift abort');
+        } catch (FlatHostBackfillException $e) {
+            $this->assertSame('drift', $e->reason);
+        }
         $this->assertSame($snap, DB::table('storefront_domains')->orderBy('hostname')->get()->toJson(), 'no correction');
         $this->artisan('storefront:flat-host-backfill', ['--host' => [self::H], '--execute' => true])->assertFailed();
+    }
+
+    /** @test */
+    public function drift_on_a_later_host_rolls_back_inserts_for_earlier_hosts(): void
+    {
+        $d = $this->tenant('dominah');
+        $this->legacy($d, 'aaa');                      // يُعالَج أولاً: لا هدف له بعد
+        $this->legacy($d, 'zzz');
+        $this->backfill(true, ['zzz.dominah.store.awjdev.xyz']);
+        DB::table('storefront_domains')->where('hostname', 'dominah-zzz.store.awjdev.xyz')->update(['is_active' => false]); // drift
+        $count = DB::table('storefront_domains')->count();
+
+        try {
+            $this->backfill(true, ['aaa.dominah.store.awjdev.xyz', 'zzz.dominah.store.awjdev.xyz']);
+            $this->fail('expected drift abort');
+        } catch (FlatHostBackfillException $e) {
+            $this->assertSame('drift', $e->reason);
+        }
+
+        $this->assertSame($count, DB::table('storefront_domains')->count());
+        $this->assertNull($this->newRow('dominah-aaa.store.awjdev.xyz'), 'earlier insert must be rolled back');
     }
 
     /** @test */
@@ -253,7 +278,7 @@ class FlatHostBackfillTest extends TestCase
         DB::table('storefront_domains')->where('hostname', 'dominah-zhor-tyb.store.awjdev.xyz')->update(['verification_status' => 'pending']);
         $snap = DB::table('storefront_domains')->orderBy('hostname')->get()->toJson();
 
-        $out = $this->backfill(true);
+        $out = $this->backfill(false);
 
         $this->assertTrue($out['has_drift']);
         $this->assertSame('drift', collect($out['results'])->firstWhere('legacy_host', self::Z)['flag']);

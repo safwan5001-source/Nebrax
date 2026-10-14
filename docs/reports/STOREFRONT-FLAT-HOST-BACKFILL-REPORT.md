@@ -20,7 +20,7 @@ Same `tenant_id`, `storefront_id` (hence the same sales channel) as the legacy r
 2. **Insert-only.** No UPDATE/DELETE of any existing row, no other table touched. Legacy rows, storefronts, channels and tenants are asserted byte-identical before/after.
 3. **One DB transaction per execute, all-or-nothing.** Tenant rows locked (`FOR UPDATE`, sorted ids — the same anchor `CreateStorefrontForCurrentTenant`/`StorefrontProvisioningService` use) plus the legacy domain rows; sources re-read after locking; `UNIQUE(hostname)` is the last line. Any conflict rolls back every host.
 4. **Dry-run:** no transaction, no locks, no write; prints `would_insert`.
-5. **Idempotent.** Existing target with the same tenant+storefront+`awj_subdomain` → `already_present`, no write. If its `is_active` **or `verification_status`** differs from the desired state → reported as `drift`, **not corrected**, command exits non-zero (e.g. someone activated `dominah-h`).
+5. **Idempotent.** Existing target with the same tenant+storefront+`awj_subdomain` → `already_present`, no write. If its `is_active` **or `verification_status`** differs from the desired state → `--dry-run` reports `drift` (exit non-zero); `--execute` **aborts and rolls back the whole transaction** (no partial inserts for other hosts) with reason `drift`. The drifted row is never corrected (e.g. someone activated `dominah-h`).
 6. **No inactive→active.** New row is active only if domain, verification, storefront (not deleted) and sales channel (not deleted) are all active/verified; otherwise inactive. The original `h` storefront/domain stay inactive (asserted).
 7. **Tenant isolation.** Tenant/storefront/channel come from the legacy row and must agree three ways (`tenant_mismatch` otherwise); a same-named store under another tenant is neither read nor created for (asserted); no cross-tenant target is accepted (`target_taken`).
 8. **Global uniqueness / reserved labels.** Target taken by any other row → `target_taken`; label equal to any tenant slug (incl. soft-deleted) → `target_is_tenant_slug`; two legacy hosts mapping to one target (`a`+`b-c` vs `a-b`+`c`) → `duplicate_target`.
@@ -34,7 +34,7 @@ Same `tenant_id`, `storefront_id` (hence the same sales channel) as the legacy r
 | `app/Services/Commerce/FlatHostBackfillService.php` | new — logic above |
 | `app/Services/Commerce/FlatHostBackfillException.php` | new — typed fail-closed reasons |
 | `app/Console/Commands/StorefrontFlatHostBackfillCommand.php` | new — Artisan command |
-| `tests/Feature/FlatHostBackfillTest.php` | new — 20 tests |
+| `tests/Feature/FlatHostBackfillTest.php` | new — 22 tests |
 | `docs/reports/STOREFRONT-FLAT-HOST-BACKFILL-REPORT.md` | new — this report |
 
 No migration, no schema change, no API/route change, no change to resolution or financial code.
@@ -43,7 +43,7 @@ No migration, no schema change, no API/route change, no change to resolution or 
 
 | Run | Result |
 |---|---|
-| `php artisan test --filter=FlatHostBackfillTest` (local SQLite) | **20 passed** |
+| `php artisan test --filter=FlatHostBackfillTest` (local SQLite) | **22 passed** |
 | Related: `FlatHostBackfillTest\|FlatStorefrontHostTest\|MultiStore\|StorefrontProvisioning\|StorefrontDomain\|StorefrontGateway\|ApplicationCatalog` | **166 passed, 1 skipped, 0 failed** |
 | Mutation check | flipping `is_primary` to `true` made 8 tests fail (partial unique index + tests bite); reverted |
 | PostgreSQL | not available locally — **runs in CI's pgsql leg** (same `RefreshDatabase` tests; this is where `FOR UPDATE` and the partial index are really exercised) |
