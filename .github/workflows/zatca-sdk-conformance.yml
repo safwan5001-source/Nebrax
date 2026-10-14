@@ -1,0 +1,115 @@
+name: ZATCA SDK conformance (advisory)
+
+# REM-11 / D-03 — مشغّل مطابقة لمدقّق ZATCA الرسمي (SDK) يعمل دون اتصال.
+#
+# استشاري بالكامل: ملف workflow مستقل لا يستدعيه ولا يعدّله أي workflow آخر،
+# وغير مُدرج في .github/ci-gate/required-checks.json (البوابة تتجاهل الـworkflows
+# غير المعلنة؛ والفحص غير المصنَّف يُنتج تحذيراً فقط). لا يغيّر أي إعداد في GitHub.
+#
+# مبادئ غير قابلة للتفاوض (يحرسها scripts/zatca-sdk/tests):
+#   * الـSDK يُنزَّل من المصدر الرسمي المثبَّت ويُتحقَّق من الحجم وSHA-256 قبل فكّ الضغط؛
+#     لا تخزين مؤقت ولا مرآة ولا رفع artifacts ولا نسخ في المستودع. الفشل = فشل مغلق.
+#   * التحقق يجري داخل network namespace مثبَّت العزل (لا واجهات سوى lo + رفض اتصالات).
+#   * لا أسرار، لا credentials، لا OTP/CSID، لا بيانات مكلّف، لا حركة نحو ZATCA.
+#   * الأوامر المسموحة للـSDK: -validate فقط.
+# القرار والمبررات: docs/engineering/ZATCA-SDK-CONFORMANCE.md
+
+on:
+  pull_request:
+    branches: ['**']
+    paths:
+      - 'app/Services/Accounting/Zatca*'
+      - 'app/Support/Zatca*'
+      - 'tests/Fixtures/zatca-sdk/**'
+      - 'tests/Feature/ZatcaSdkFixtureDriftTest.php'
+      - 'scripts/zatca-sdk/**'
+      - '.github/workflows/zatca-sdk-conformance.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'app/Services/Accounting/Zatca*'
+      - 'app/Support/Zatca*'
+      - 'tests/Fixtures/zatca-sdk/**'
+      - 'tests/Feature/ZatcaSdkFixtureDriftTest.php'
+      - 'scripts/zatca-sdk/**'
+      - '.github/workflows/zatca-sdk-conformance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zatca-sdk-conformance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  harness-selftest:
+    name: ZATCA SDK harness self-test (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Harness unit tests (no network, no SDK, no Java)
+        run: python3 -I -m unittest discover -s scripts/zatca-sdk/tests -t scripts/zatca-sdk -v
+
+  sdk-conformance:
+    name: ZATCA SDK conformance (advisory)
+    needs: harness-selftest
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Setup JDK 11 (SDK 238-R3.4.8 requires 11 <= JDK < 15; JDK 21 cannot verify secp256k1)
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      - name: Runner evidence (isolation prerequisites)
+        run: |
+          set +e
+          uname -a
+          java -version 2>&1 | head -3
+          python3 --version
+          echo "apparmor_restrict_unprivileged_userns=$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>&1)"
+          echo "user=$(id -un) uid=$(id -u)"; sudo -n true && echo "sudo: passwordless" || echo "sudo: unavailable"
+          echo "--- host interfaces (outside namespace):"; cut -d: -f1 /proc/net/dev | tail -n +3 | tr -d ' ' | paste -sd, -
+          exit 0
+
+      - name: Fetch official SDK (GET only, size + SHA-256 verified before extraction)
+        run: python3 -I scripts/zatca-sdk/fetch_sdk.py --pin scripts/zatca-sdk/sdk-pin.json --dest "$RUNNER_TEMP/zatca-sdk"
+
+      - name: Isolation positive control (reachable outside, unreachable inside the namespace)
+        run: |
+          set +e
+          out=$(curl -sS -m 15 -o /dev/null -w '%{http_code}' https://api.github.com/zen 2>&1); echo "outside namespace: $out"
+          for prefix in "unshare -n" "unshare -rn" "sudo -n unshare -n"; do
+            in=$($prefix curl -sS -m 8 -o /dev/null -w '%{http_code}' https://api.github.com/zen 2>&1); rc=$?
+            echo "[$prefix] curl rc=$rc: $in"
+          done
+          exit 0
+
+      - name: Validate fixtures offline (official samples, AWJ baseline, mutation liveness)
+        run: |
+          python3 -I scripts/zatca-sdk/conformance.py run \
+            --sdk-root "$RUNNER_TEMP/zatca-sdk" \
+            --pin scripts/zatca-sdk/sdk-pin.json \
+            --fixtures tests/Fixtures/zatca-sdk \
+            --java "$JAVA_HOME/bin/java" \
+            --summary "$GITHUB_STEP_SUMMARY" \
+            --result-json "$RUNNER_TEMP/zatca-sdk-result.json"
+
+      - name: AWJ-owned result metadata
+        if: always()
+        run: |
+          echo "::group::zatca-sdk-result.json"
+          cat "$RUNNER_TEMP/zatca-sdk-result.json" 2>/dev/null || echo "(no result file)"
+          echo "::endgroup::"

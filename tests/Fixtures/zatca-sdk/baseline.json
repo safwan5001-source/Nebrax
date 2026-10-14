@@ -1,0 +1,303 @@
+{
+  "schema": 1,
+  "sdk_version": "238-R3.4.8",
+  "_comment": "AWJ expected-failure baseline (ratchet). Regenerate only locally via `python3 -I scripts/zatca-sdk/conformance.py update-baseline ...`; review the diff. A fixture that now PASSES a stage or loses an error code must shrink this file.",
+  "official": {
+    "expected_count": 19,
+    "allowed_warning_codes": [
+      "BR-KSA-98"
+    ],
+    "samples": {
+      "Simplified/Credit/Simplified_Credit_Note.xml": {
+        "stages": [
+          "XSD",
+          "EN",
+          "KSA",
+          "QR",
+          "SIGNATURE",
+          "PIH"
+        ]
+      },
+      "Simplified/Debit/Simplified_Debit_Note.xml": {
+        "stages": [
+          "XSD",
+          "EN",
+          "KSA",
+          "QR",
+          "SIGNATURE",
+          "PIH"
+        ]
+      },
+      "Simplified/Invoice/Nominal supply invoice.xml": {
+        "stages": [
+          "XSD",
+          "EN",
+          "KSA",
+          "QR",
+          "SIGNATURE",
+          "PIH"
+        ]
+      },
+      "Simplified/Invoice/Simplified Tax Invoice with Zero Rated Item.xml": {
+        "stages": [
+          "XSD",
+          "EN",
+          "KSA",
+          "QR",
+          "SIGNATURE",
+          "PIH"
+        ]
+      },
+      "Simplified/Invoice/Simplified_Invoice.xml": {
+        "stages": [
+          "XSD",
+          "EN",
+          "KSA",
+          "QR",
+          "SIGNATURE",
+          "PIH"
+        ]
+      },
+      "Standard/Credit/Standard_Credit_Note.xml": {
+        "stages": [
+          "XSD",
+          "EN",
+          "KSA",
+          "PIH"
+        ]
+      },
+      "Standard/Debit/Standard_Debit_Note.xml": {
+        "stages": [
+          "XSD",
+          "EN",
+          "KSA",
+          "PIH"
+        ]
+      },
+      "Standard/Invoice/Advance Payment adjustments with foreign currency invoice.xml": {
+        "stages": [
+          "XSD",
+          "EN",
+          "KSA",
+          "PIH"
+        ]
+      },
+      "Standard/Invoice/Advance Payment adjustments with rate change scenarios.xml": {
+        "stages": [
+          "XSD",
+          "EN",
+          "KSA",
+          "PIH"
+        ]
+      },
+      "Standard/Invoice/Advance Payment adjustments.xml": {
+        "stages": [
+          "XSD",
+          "EN",
+          "KSA",
+          "PIH"
+        ]
+      },
+      "Standard/Invoice/Exempt Tax Invoice.xml": {
+        "stages": [
+          "XSD",
+          "EN",
+          "KSA",
+          "PIH"
+        ]
+      },
+      "Standard/Invoice/Export invoice.xml": {
+        "stages": [
+          "XSD",
+          "EN",
+          "KSA",
+          "PIH"
+        ]
+      },
+      "Standard/Invoice/Out of Scope Standard Tax Invoice.xml": {
+        "stages": [
+          "XSD",
+          "EN",
+          "KSA",
+          "PIH"
+        ]
+      },
+      "Standard/Invoice/Self-billing invoice.xml": {
+        "stages": [
+          "XSD",
+          "EN",
+          "KSA",
+          "PIH"
+        ]
+      },
+      "Standard/Invoice/Standard Invoice with Document Level Charge.xml": {
+        "stages": [
+          "XSD",
+          "EN",
+          "KSA",
+          "PIH"
+        ]
+      },
+      "Standard/Invoice/Standard Invoice with Payable Rounding Adjustment.xml": {
+        "stages": [
+          "XSD",
+          "EN",
+          "KSA",
+          "PIH"
+        ]
+      },
+      "Standard/Invoice/Standard_Invoice.xml": {
+        "stages": [
+          "XSD",
+          "EN",
+          "KSA",
+          "PIH"
+        ]
+      },
+      "Standard/Invoice/Summary Invoice.xml": {
+        "stages": [
+          "XSD",
+          "EN",
+          "KSA",
+          "PIH"
+        ]
+      },
+      "Standard/Invoice/Third party billing.xml": {
+        "stages": [
+          "XSD",
+          "EN",
+          "KSA",
+          "PIH"
+        ]
+      }
+    }
+  },
+  "awj": {
+    "awj-simplified-single-line.xml": {
+      "global": "FAILED",
+      "stages": {
+        "XSD": {
+          "status": "FAILED",
+          "errors": [
+            "SAXParseException"
+          ]
+        },
+        "EN": {
+          "status": "FAILED",
+          "errors": [
+            "BR-CO-04",
+            "BR-CO-15",
+            "BR-CO-18"
+          ]
+        },
+        "KSA": {
+          "status": "FAILED",
+          "errors": [
+            "BR-KSA-28",
+            "BR-KSA-39",
+            "BR-KSA-68"
+          ]
+        },
+        "QR": {
+          "status": "FAILED",
+          "errors": [
+            "QRCODE_INVALID"
+          ]
+        },
+        "SIGNATURE": {
+          "status": "FAILED",
+          "errors": [
+            "NullPointerException",
+            "certificate"
+          ]
+        },
+        "PIH": {
+          "status": "FAILED",
+          "errors": [
+            "KSA-13"
+          ]
+        }
+      }
+    },
+    "awj-simplified-two-lines.xml": {
+      "global": "FAILED",
+      "stages": {
+        "XSD": {
+          "status": "FAILED",
+          "errors": [
+            "SAXParseException"
+          ]
+        },
+        "EN": {
+          "status": "FAILED",
+          "errors": [
+            "BR-CO-04",
+            "BR-CO-15",
+            "BR-CO-18"
+          ]
+        },
+        "KSA": {
+          "status": "FAILED",
+          "errors": [
+            "BR-KSA-28",
+            "BR-KSA-39",
+            "BR-KSA-68"
+          ]
+        },
+        "QR": {
+          "status": "FAILED",
+          "errors": [
+            "QRCODE_INVALID"
+          ]
+        },
+        "SIGNATURE": {
+          "status": "FAILED",
+          "errors": [
+            "NullPointerException",
+            "certificate"
+          ]
+        },
+        "PIH": {
+          "status": "FAILED",
+          "errors": [
+            "KSA-13"
+          ]
+        }
+      }
+    },
+    "awj-standard-single-line.xml": {
+      "global": "FAILED",
+      "stages": {
+        "XSD": {
+          "status": "FAILED",
+          "errors": [
+            "SAXParseException"
+          ]
+        },
+        "EN": {
+          "status": "FAILED",
+          "errors": [
+            "BR-CO-04",
+            "BR-CO-15",
+            "BR-CO-18"
+          ]
+        },
+        "KSA": {
+          "status": "FAILED",
+          "errors": [
+            "BR-KSA-39",
+            "BR-KSA-52",
+            "BR-KSA-53",
+            "BR-KSA-68"
+          ]
+        },
+        "PIH": {
+          "status": "FAILED",
+          "errors": [
+            "KSA-13"
+          ]
+        }
+      }
+    }
+  }
+}
