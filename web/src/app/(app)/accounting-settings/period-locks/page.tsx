@@ -15,9 +15,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { EmptyState, LoadingState } from '@/components/nebrax';
 import { api, ApiError } from '@/lib/api';
-import { currentUser } from '@/lib/auth';
 import { formatDateTime } from '@/lib/formatting';
-import { hasPermission } from '@/lib/permissions';
+import { useCan } from '@/lib/use-can';
 
 /**
  * ACC-6: أقفال الفترات المحاسبية — نطاق تاريخ مغلق الطرفين يمنع **ترحيل**
@@ -55,11 +54,11 @@ function useAccess(): { mounted: boolean; canView: boolean; canManage: boolean }
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  const user = currentUser();
+  const { can } = useCan();
   return {
     mounted,
-    canView: hasPermission(user?.permissions, user?.role, 'accounting_period_locks.view'),
-    canManage: hasPermission(user?.permissions, user?.role, 'accounting_period_locks.manage'),
+    canView: can('accounting_period_locks.view'),
+    canManage: can('accounting_period_locks.manage'),
   };
 }
 

@@ -37,7 +37,7 @@ async function open(page: Page, w: World, opts: { locale?: 'ar' | 'en'; theme?: 
       if (w.putStatus === 403) return json(route, { message: 'You cannot grant permissions beyond your own.' }, 403);
       return json(route, { data: ROLES[1] });
     }
-    if (path === '/me') return json(route, { user: { id: 'me', name: 'Safwan', role: 'owner', permissions: ['*'] }, company: { name: 'Acme' } });
+    if (path === '/me') return json(route, { user, company: { name: 'Acme' } });
     return json(route, { data: [] });
   });
 

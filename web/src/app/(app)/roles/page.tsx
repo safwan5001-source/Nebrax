@@ -14,9 +14,8 @@ import { Select } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
-import { currentUser } from '@/lib/auth';
 import { displayLocale } from '@/lib/formatting';
-import { hasPermission } from '@/lib/permissions';
+import { useCan } from '@/lib/use-can';
 import { cn } from '@/lib/utils';
 import { cloneSeed, type CloneSeed } from '@/modules/roles/editor';
 import {
@@ -32,11 +31,6 @@ import {
 } from '@/modules/roles/catalog';
 import { coversPermissions, effectivePermissions } from '@/modules/users/model';
 
-interface Actor {
-  role: string | null;
-  permissions: string[] | undefined;
-}
-
 type RoleReason = 'owner_protected' | 'role_above_you' | 'delete_system' | 'delete_has_users';
 
 export default function RolesPage() {
@@ -48,15 +42,7 @@ export default function RolesPage() {
   const { success, error: toastError } = useToast();
   const num = (n: number) => n.toLocaleString(locale);
 
-  const [actor, setActor] = useState<Actor | null | undefined>(undefined);
-  useEffect(() => {
-    const me = currentUser();
-    setActor(me ? { role: me.role ?? null, permissions: me.permissions } : null);
-  }, []);
-  const can = useCallback(
-    (permission: string) => Boolean(actor) && hasPermission(actor!.permissions, actor!.role ?? undefined, permission),
-    [actor],
-  );
+  const { viewer: actor, can, hydrated } = useCan();
   const canView = can('roles.view');
   const canManage = can('roles.manage');
   const mine = useMemo(() => effectivePermissions(actor?.permissions, actor?.role), [actor]);
@@ -88,9 +74,9 @@ export default function RolesPage() {
   }, [tc]);
 
   useEffect(() => {
-    if (actor === undefined || !canView) return;
+    if (!hydrated || !canView) return;
     load();
-  }, [actor, canView, load]);
+  }, [hydrated, canView, load]);
 
   // التحديد يبقى على الدور نفسه بعد إعادة التحميل؛ وإن اختفى (حُذف) أو لم يُحدَّد شيء فأول دور.
   useEffect(() => {
@@ -156,7 +142,7 @@ export default function RolesPage() {
     }
   }
 
-  if (actor === undefined) return null;
+  if (!hydrated) return null;
 
   if (!canView) {
     return (

@@ -4,8 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api';
-import { currentUser } from '@/lib/auth';
-import { hasPermission } from '@/lib/permissions';
+import { useCan } from '@/lib/use-can';
 import type { ScopeCaps, ScopeForm, ScopeIssues } from '@/modules/users/editor';
 import { ScopePicker, type PickerOption } from './scope-picker';
 
@@ -24,11 +23,10 @@ interface WarehouseOption extends BranchOption {
  * ذلك البُعد: يُعرض للقراءة فقط ولا يُرسَل مفتاحه.
  */
 export function useScopeCaps(): ScopeCaps {
-  const me = currentUser();
-  return {
-    branches: hasPermission(me?.permissions, me?.role, 'branches.view'),
-    warehouses: hasPermission(me?.permissions, me?.role, 'products.view'),
-  };
+  const { can } = useCan();
+  const branches = can('branches.view');
+  const warehouses = can('products.view');
+  return useMemo(() => ({ branches, warehouses }), [branches, warehouses]);
 }
 
 /** قوائم الفروع والمستودعات (مستودعٌ مع فرعه الأم سياقاً)، تُحمَّل عند `enabled` ولمن يملك صلاحيتها فقط. */
@@ -40,8 +38,7 @@ export function useScopeLookups(enabled: boolean, caps: ScopeCaps) {
     if (!enabled) return;
     if (caps.branches) api<{ data: BranchOption[] }>('/branches').then((r) => setBranches(r.data)).catch(() => setBranches([]));
     if (caps.warehouses) api<{ data: WarehouseOption[] }>('/warehouses').then((r) => setWarehouses(r.data)).catch(() => setWarehouses([]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- تُحمَّل عند التفعيل فقط
-  }, [enabled]);
+  }, [enabled, caps.branches, caps.warehouses]);
 
   const branchName = useMemo(() => new Map((branches ?? []).map((b) => [b.id, b.name])), [branches]);
   const warehouseOptions: PickerOption[] | null = useMemo(

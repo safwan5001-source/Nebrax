@@ -5,8 +5,7 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { CalendarClock, ChevronLeft, Lock, Network, Route, type LucideIcon } from 'lucide-react';
 import { EmptyState, LoadingState } from '@/components/nebrax';
-import { currentUser } from '@/lib/auth';
-import { hasPermission } from '@/lib/permissions';
+import { useCan } from '@/lib/use-can';
 
 /**
  * ACC-1: مركز إعدادات المحاسبة — واجهة تعريفية فقط، بلا أي أثر محاسبي أو
@@ -43,7 +42,7 @@ const ITEMS: AccountingSettingItem[] = [
 /**
  * بوابة صلاحية على مستوى الصفحة كاملة — نفس نمط `DeveloperGate`: إخفاء
  * الشريط الجانبي وحده ليس تفويضاً؛ الوصول المباشر بالرابط يُفحص هنا أيضاً
- * بمرآة `Rbac::allows` نفسها (`hasPermission`). الربط بـ`mounted` يمنع
+ * بمرآة `Rbac::allows` نفسها (`useCan`). الربط بـ`mounted` يمنع
  * وميض «ممنوع» قبل تركيب جلسة `localStorage` في هذه الصفحات `use client`.
  *
  * `canShow(permission)` يفحص صلاحية عنصر بعينه فوق بوابة الصفحة — لا يستبدلها.
@@ -52,11 +51,11 @@ function useAccountingSettingsAccess(): { mounted: boolean; canView: boolean; ca
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  const user = currentUser();
+  const { can } = useCan();
   return {
     mounted,
-    canView: hasPermission(user?.permissions, user?.role, 'accounting_settings.view'),
-    canShow: (permission) => permission === undefined || hasPermission(user?.permissions, user?.role, permission),
+    canView: can('accounting_settings.view'),
+    canShow: (permission) => permission === undefined || can(permission),
   };
 }
 

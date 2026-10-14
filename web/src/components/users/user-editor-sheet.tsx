@@ -10,9 +10,8 @@ import { Select } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
-import { currentUser } from '@/lib/auth';
 import { displayLocale } from '@/lib/formatting';
-import { hasPermission } from '@/lib/permissions';
+import { useCan } from '@/lib/use-can';
 import { coversPermissions, effectivePermissions, resolveRoleLabel, type RoleSummary } from '@/modules/users/model';
 import {
   accessSummary,
@@ -95,9 +94,8 @@ export function UserEditorSheet({
   const locale = displayLocale(useLocale());
   const { success } = useToast();
 
-  const me = currentUser();
+  const { viewer: me, can } = useCan();
   const isSelf = Boolean(user && me?.id && me.id === user.id);
-  const can = (permission: string) => hasPermission(me?.permissions, me?.role, permission);
   const caps: EditorCapabilities = {
     role: can('roles.view'),
     employee: can('hr.view'),

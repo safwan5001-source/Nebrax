@@ -21,7 +21,7 @@ import { RequestsManager } from '@/components/hr/requests-manager';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
-import { hasPermission } from '@/lib/permissions';
+import { useCan } from '@/lib/use-can';
 import { formatRiyal } from '@/lib/money';
 import { cn } from '@/lib/utils';
 import { useConfirm } from '@/components/ui/confirm-dialog';
@@ -80,27 +80,25 @@ export default function HrPage() {
 
   // الأدوار والمستخدمون: تبويبان حسّاسان يظهران لأصحاب الإدارة فقط (owner/admin).
   // يُقرآن بعد التركيب لتفادي اختلاف الترطيب (localStorage غائب أثناء العرض على الخادم).
-  const [role, setRole] = useState<string | null>(null);
-  const [meId, setMeId] = useState<string | null>(null);
-  const [canReadUsers, setCanReadUsers] = useState(false);
-  useEffect(() => {
-    const me = currentUser();
-    setRole(me?.role ?? null);
-    setMeId(me?.id ?? null);
-    setCanReadUsers(hasPermission(me?.permissions, me?.role, 'users.view'));
-  }, []);
-  const canManageRoles = role === 'owner' || role === 'admin';
+  const { viewer: me, can } = useCan();
+  const role = me?.role ?? null;
+  const meId = me?.id ?? null;
+  const canReadUsers = can('users.view');
+  // إدارة الدخول تتبع صلاحيات الخادم لا اسم الدور: القراءة (`users.view`) لعرض حالة الدخول، والكتابة (`users.manage`) لإنشائه.
+  const canManageUsers = canReadUsers && can('users.manage');
+  // تبويب الهيكل التنظيمي بقي لـowner/admin عمداً (المحاسب يملك `hr.manage` افتراضياً ولم يكن يراه) — قرار منتج لا تقني.
+  const canManageOrg = role === 'owner' || role === 'admin';
 
 
   const [team, setTeam] = useState<TeamUser[]>([]);
   const [teamLoaded, setTeamLoaded] = useState(false);
 
   const loadTeam = useCallback(() => {
-    if (!canManageRoles) return;
+    if (!canManageUsers) return;
     api<{ data: TeamUser[] }>('/users').then((r) => setTeam(r.data)).catch(() => {}).finally(() => setTeamLoaded(true));
-  }, [canManageRoles]);
+  }, [canManageUsers]);
 
-  useEffect(() => { if (canManageRoles) loadTeam(); }, [canManageRoles, loadTeam]);
+  useEffect(() => { if (canManageUsers) loadTeam(); }, [canManageUsers, loadTeam]);
 
   // نطاق المشاهد المخزَّن من صفّه في قائمة المستخدمين (لا نقطة نهاية للنطاق الفعلي): فراغ = غير مقيَّد.
   // `undefined` = ما زالت القائمة تُحمَّل؛ `null` = انتهت ولم يوجد صفّه/فشلت (يحسم الخادم).
@@ -312,7 +310,7 @@ export default function HrPage() {
       </div>
 
       <div className="flex gap-1 border-b border-border">
-        {(['employees', 'shifts', 'attendance', 'runs', 'leave', 'requests', ...(canManageRoles ? ['org_structure'] : [])] as Tab[]).map((key) => (
+        {(['employees', 'shifts', 'attendance', 'runs', 'leave', 'requests', ...(canManageOrg ? ['org_structure'] : [])] as Tab[]).map((key) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -340,16 +338,16 @@ export default function HrPage() {
       )}
       {tab === 'leave' && <LeaveManager />}
       {tab === 'requests' && <RequestsManager />}
-      {tab === 'org_structure' && canManageRoles && <OrgStructureManager />}
+      {tab === 'org_structure' && canManageOrg && <OrgStructureManager />}
 
       <EmployeeDialog
         open={empDialog}
         onClose={() => setEmpDialog(false)}
-        onSaved={() => { load(); if (canManageRoles) loadTeam(); }}
+        onSaved={() => { load(); if (canManageUsers) loadTeam(); }}
         employee={editing}
         linkedUser={empLinkedUser}
         initialAllowAccess={empInitialAccess}
-        canManageUsers={canManageRoles}
+        canManageUsers={canManageUsers}
         actorScope={actorScope}
         canReadActorScope={canReadUsers}
       />
