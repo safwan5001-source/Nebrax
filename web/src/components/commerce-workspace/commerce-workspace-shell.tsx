@@ -13,7 +13,7 @@ import { useCompany } from '@/lib/company';
 import { commerceWorkspaceMessage } from '@/modules/commerce-workspace/messages';
 import { isStoreAgnosticCommercePath, withStoreParam } from '@/modules/commerce-workspace/active-store';
 import { useCommerceStoreContext } from '@/modules/commerce-workspace/store-context';
-import { StoreContextInvalidNotice } from '@/modules/commerce-workspace/store-context-invalid';
+import { StoreSelectionScreen } from '@/modules/commerce-workspace/store-selection-screen';
 import { installUnsavedNavigationGuard } from '@/modules/commerce-workspace/unsaved-registry';
 import { CommerceWorkspaceNav } from './commerce-workspace-nav';
 
@@ -252,7 +252,7 @@ export function CommerceWorkspaceShell({ children }: { children: React.ReactNode
           ) : (
             <div className="mx-auto w-full max-w-7xl p-4 sm:p-6">
               {/* لا متجر نشط ⇒ لا تُعرض الصفحة أصلاً: لا قراءة ولا حفظ على متجرٍ لم يُختر صراحةً. */}
-              {blockStoreScopedPage ? <StoreContextInvalidNotice /> : children}
+              {blockStoreScopedPage ? <StoreSelectionScreen /> : children}
             </div>
           )}
         </main>

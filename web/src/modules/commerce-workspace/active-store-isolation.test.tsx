@@ -7,7 +7,7 @@
  * («الرشد» قبل «طيبة»). كل اختبار هنا كان سيفشل على السلوك القديم ما لم يُذكر خلاف ذلك.
  */
 import * as React from 'react';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const apiMock = vi.fn();
@@ -55,6 +55,9 @@ import {
   withStoreParam,
 } from './active-store';
 import { CommerceStoreProvider, useCommerceStoreContext } from './store-context';
+import { COMMERCE_WORKSPACE_MESSAGES } from './messages';
+import { StoreSelectionScreen } from './store-selection-screen';
+import userEvent from '@testing-library/user-event';
 import type { CommerceStoreCatalog } from './stores';
 
 const RASHD = '11111111-1111-4111-8111-111111111111';
@@ -103,6 +106,13 @@ function renderWorkspace(page: React.ReactNode = null) {
       {page}
     </CommerceStoreProvider>,
   );
+}
+
+/** الاختيار الصريح من شاشة اختيار المتجر: زرّ راديو ثم «اختيار المتجر». */
+function chooseStore(name: string) {
+  const selection = document.querySelector('[data-store-selection-screen]') as HTMLElement;
+  fireEvent.click(within(selection).getByRole('radio', { name }));
+  fireEvent.click(within(selection).getByRole('button', { name: 'اختيار المتجر' }));
 }
 
 async function needsSelection(label = 'active') {
@@ -295,7 +305,7 @@ describe('active store across Commerce navigation (زهور طيبة / زهور 
     expect(window.sessionStorage.getItem(ACTIVE_STORE_SESSION_KEY)).toBe(TAIBA);
 
     // الخروج باختيار صريح فقط — ونسخة المتجر الأجنبي لا تُفتح تحت المتجر المختار.
-    fireEvent.change(screen.getByRole('combobox', { name: 'اختر متجراً' }), { target: { value: TAIBA } });
+    chooseStore('زهور طيبة');
     await waitFor(() => expect(screen.getByTestId('builder').getAttribute('data-store')).toBe(TAIBA));
     expect(screen.getByTestId('builder').getAttribute('data-version')).toBe('');
   });
@@ -326,7 +336,7 @@ describe('active store across Commerce navigation (زهور طيبة / زهور 
     await waitFor(() => expect(document.querySelector('[data-store-context-invalid]')).toBeTruthy());
     expect(screen.queryByTestId('page-body')).toBeNull();
 
-    fireEvent.change(screen.getAllByRole('combobox', { name: 'اختر متجراً' })[0], { target: { value: TAIBA } });
+    chooseStore('زهور طيبة');
     await waitFor(() => expect(screen.getByTestId('page-body')).toBeTruthy());
     const themesLinks = Array.from(document.querySelectorAll('a[href^="/commerce/themes"]'));
     expect(themesLinks.length).toBeGreaterThan(0);
@@ -375,7 +385,7 @@ describe('explicit store selection for multi-store tenants (AWJ-STORE-CTX-2)', (
     hardLoad('/commerce/themes');
     renderShell(<CommerceThemesPage />);
     await needsSelection();
-    fireEvent.change(screen.getAllByRole('combobox', { name: 'اختر متجراً' })[0], { target: { value: TAIBA } });
+    chooseStore('زهور طيبة');
     await activeIs(TAIBA);
     await waitFor(() => expect(listVersionsMock).toHaveBeenCalledWith(TAIBA));
     expect(listVersionsMock).not.toHaveBeenCalledWith(RASHD);
@@ -413,5 +423,99 @@ describe('explicit store selection for multi-store tenants (AWJ-STORE-CTX-2)', (
     await activeIs(TAIBA);
     await waitFor(() => expect(listVersionsMock).toHaveBeenCalledWith(TAIBA));
     expect(document.querySelector('[data-store-selection-required]')).toBeNull();
+  });
+
+  it('zero stores: no selection screen — the existing empty/creation experience renders unchanged', async () => {
+    apiMock.mockImplementation(async (path: string) => (path === '/commerce/workspace/storefronts' ? { data: { stores: [] } } : { data: {} }));
+    hardLoad('/commerce/stores');
+    renderShell(<div data-testid="stores-page">create your first store</div>);
+    await waitFor(() => expect(screen.getByTestId('stores-page')).toBeTruthy());
+    expect(document.querySelector('[data-store-selection-screen]')).toBeNull();
+    expect(screen.getByTestId('active').textContent).toBe('');
+  });
+
+  it('lists exactly the stores the server returned for this tenant, and requires the explicit action', async () => {
+    hardLoad('/commerce/themes');
+    renderShell(<CommerceThemesPage />);
+    await needsSelection();
+    const selection = document.querySelector('[data-store-selection-screen]') as HTMLElement;
+    expect(within(selection).getAllByRole('radio').map((radio) => (radio as HTMLInputElement).value)).toEqual([RASHD, TAIBA]);
+    expect(selection.textContent).not.toContain(FOREIGN);
+    const action = within(selection).getByRole('button', { name: 'اختيار المتجر' });
+    expect(action.hasAttribute('disabled')).toBe(true);
+    // تحديد خيار وحده لا يفتح متجراً.
+    fireEvent.click(within(selection).getByRole('radio', { name: 'زهور طيبة' }));
+    expect(screen.getByTestId('active-status').textContent).toBe('needs_selection');
+    expect(listVersionsMock).not.toHaveBeenCalled();
+    fireEvent.click(action);
+    await activeIs(TAIBA);
+  });
+
+  it('is fully keyboard operable (Tab to the store, Space to pick, Tab + Enter to confirm)', async () => {
+    hardLoad('/commerce/themes');
+    render(<CommerceStoreProvider><Probe /><StoreSelectionScreen /></CommerceStoreProvider>);
+    await needsSelection();
+    const user = userEvent.setup();
+    await user.tab(); // زرّا Probe أولاً في ترتيب التنقّل
+    await user.tab();
+    await user.tab();
+    expect((document.activeElement as HTMLInputElement).type).toBe('radio');
+    await user.keyboard(' ');
+    expect((document.activeElement as HTMLInputElement).checked).toBe(true);
+    const picked = (document.activeElement as HTMLInputElement).value;
+    await user.tab();
+    expect(document.activeElement?.textContent).toBe('اختيار المتجر');
+    await user.keyboard('{Enter}');
+    await activeIs(picked);
+  });
+
+  it('handles the catalog loading, error (with retry) and empty states itself', async () => {
+    let resolve: (value: unknown) => void = () => {};
+    apiMock.mockImplementationOnce(() => new Promise((r) => { resolve = r; }));
+    const view = render(<CommerceStoreProvider><StoreSelectionScreen /></CommerceStoreProvider>);
+    expect(document.querySelector('[aria-busy="true"], [role="status"]')).toBeTruthy();
+    await act(async () => resolve({ data: { stores: [] } }));
+    await waitFor(() => expect(screen.getByText(COMMERCE_WORKSPACE_MESSAGES.ar.noStoreYetTitle)).toBeTruthy());
+    view.unmount();
+
+    apiMock.mockReset();
+    apiMock.mockRejectedValueOnce(new Error('down')).mockResolvedValueOnce(storesPayload);
+    render(<CommerceStoreProvider><Probe /><StoreSelectionScreen /></CommerceStoreProvider>);
+    await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: 'retry' }));
+    await waitFor(() => expect(document.querySelector('[data-store-selection-screen]')).toBeTruthy());
+  });
+
+  it('two tabs: choosing in one tab never resolves the other, which still asks for its own choice', async () => {
+    render(
+      <>
+        <CommerceStoreProvider><Probe label="tabA" /></CommerceStoreProvider>
+        <CommerceStoreProvider><Probe label="tabB" /></CommerceStoreProvider>
+      </>,
+    );
+    await needsSelection('tabA');
+    await needsSelection('tabB');
+    fireEvent.click(screen.getByText('tabA-taiba'));
+    await waitFor(() => expect(screen.getByTestId('tabA').textContent).toBe(TAIBA));
+    expect(screen.getByTestId('tabB-status').textContent).toBe('needs_selection');
+    expect(screen.getByTestId('tabB').textContent).toBe('');
+  });
+
+  it('after an explicit choice, Theme Gallery → builder stays on that store with its own version only', async () => {
+    hardLoad('/commerce/themes');
+    renderShell(<CommerceThemesPage />);
+    await needsSelection();
+    chooseStore('زهور طيبة');
+    await waitFor(() => expect(document.querySelector('[data-theme-preview-link="awj-market"]')).toBeTruthy());
+    const href = document.querySelector('[data-theme-preview-link="awj-market"]')!.getAttribute('href')!;
+    expect(href).toContain(`store=${TAIBA}`);
+    expect(href).toContain(`version=published-of-${TAIBA}`);
+
+    // فتح رابط المعاينة (تحميل كامل) في التبويب نفسه.
+    hardLoad(href);
+    renderWorkspace(<CommerceAppearancePage />);
+    await waitFor(() => expect(screen.getByTestId('builder').getAttribute('data-store')).toBe(TAIBA));
+    expect(screen.getByTestId('builder').getAttribute('data-version')).toBe(`published-of-${TAIBA}`);
+    expect(builderProps.mock.calls.every(([props]) => props.storefrontId === TAIBA)).toBe(true);
   });
 });

@@ -36,7 +36,9 @@ describe('StoreGate', () => {
     renderGate([store('s1', 'Rose House'), store('s2', 'Gift Corner')]);
     expect(await screen.findByText('Choose the store to work on')).toBeTruthy();
     expect(screen.queryByTestId('child')).toBeNull();
-    await userEvent.selectOptions(screen.getByLabelText('Choose a store'), 's2');
+    expect(screen.queryByRole('button', { name: 'Select store' })?.hasAttribute('disabled')).toBe(true);
+    await userEvent.click(screen.getByRole('radio', { name: 'Gift Corner' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Select store' }));
     expect((await screen.findByTestId('child')).textContent).toBe('child for s2');
   });
 

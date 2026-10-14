@@ -16,6 +16,7 @@ export const COMMERCE_WORKSPACE_MESSAGES = {
     storeSelectorEmpty: 'لا يوجد متجر يمكن اختياره',
     storeSelectorLoading: 'جارٍ تحميل المتاجر',
     storeSelectorChoose: 'اختر متجراً',
+    storeSelectAction: 'اختيار المتجر',
     storeSelectionRequiredTitle: 'اختر المتجر الذي تعمل عليه',
     storeSelectionRequiredDescription:
       'لديك أكثر من متجر. اختر المتجر الذي تريد إدارته؛ يبقى اختيارك ثابتاً في هذا التبويب حتى تغيّره بنفسك.',
@@ -367,6 +368,7 @@ export const COMMERCE_WORKSPACE_MESSAGES = {
     storeSelectorEmpty: 'No store is available to select',
     storeSelectorLoading: 'Loading stores',
     storeSelectorChoose: 'Choose a store',
+    storeSelectAction: 'Select store',
     storeSelectionRequiredTitle: 'Choose the store to work on',
     storeSelectionRequiredDescription:
       'You have more than one store. Choose the store you want to manage; your choice stays fixed in this tab until you change it.',

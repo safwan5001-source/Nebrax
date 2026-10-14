@@ -5,7 +5,7 @@ import { useLocale } from 'next-intl';
 import { ExperienceBuilder } from '@/modules/store-experience-builder/ExperienceBuilder';
 import { readStoreParam } from '@/modules/commerce-workspace/active-store';
 import { useCommerceStoreContext } from '@/modules/commerce-workspace/store-context';
-import { StoreContextInvalidNotice } from '@/modules/commerce-workspace/store-context-invalid';
+import { StoreSelectionScreen } from '@/modules/commerce-workspace/store-selection-screen';
 import { useCompany } from '@/lib/company';
 import { commerceWorkspaceMessage } from '@/modules/commerce-workspace/messages';
 import { loadFacets } from '@/modules/commerce-workspace/merchandising/client';
@@ -58,7 +58,7 @@ export default function CommerceAppearancePage() {
   if (storeContextStatus === 'invalid' || storeContextStatus === 'needs_selection') {
     return (
       <div className="grid h-full min-h-0 place-items-center overflow-y-auto p-4">
-        <div className="w-full max-w-xl"><StoreContextInvalidNotice /></div>
+        <div className="w-full max-w-xl"><StoreSelectionScreen /></div>
       </div>
     );
   }
