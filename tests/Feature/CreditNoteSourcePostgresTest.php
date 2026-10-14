@@ -14,6 +14,7 @@ use App\Services\Accounting\InvoiceService;
 use App\Services\Accounting\ReturnService;
 use App\Tenancy\TenantContext;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -230,9 +231,9 @@ class CreditNoteSourcePostgresTest extends TestCase
         ));
     }
 
-    private function deleteRule(): ?string
+    private function deleteRule(?string $connection = null): ?string
     {
-        $row = DB::selectOne(
+        $row = DB::connection($connection)->selectOne(
             "SELECT rc.delete_rule AS rule
                FROM information_schema.referential_constraints rc
                JOIN information_schema.key_column_usage kcu
@@ -269,20 +270,73 @@ class CreditNoteSourcePostgresTest extends TestCase
         $this->assertSame($invoice->id, DB::table('credit_notes')->where('id', $note->id)->value('original_invoice_id'));
     }
 
-    /** @test */
+    /**
+     * التراجع والإعادة بأمرَي المشغّل الحقيقيين (`migrate:rollback --path` ثم `migrate --path`)
+     * على قاعدة خاصة مُهاجَرة بالسلسلة كاملة — لا على القاعدة المشتركة.
+     *
+     * AWJ-BACKEND-CI-01: صفوف هذا الصنف تُرحَّل فعلاً (الأبناء المتشعّبون يجب أن يروها) فلا
+     * يستعمل RefreshDatabase، ولذلك لا يحوّله ParaTest إلى قاعدة العامل `nibras_test_N`: كل
+     * العمّال يتشاركون القاعدة الأساسية. وتعديل القيد يأخذ AccessExclusiveLock على
+     * credit_notes ثم invoices، بينما `DELETE FROM tenants` في تنظيف عاملٍ آخر يأخذ
+     * RowExclusiveLock على الجدولين بالترتيب المعاكس عبر قيود tenant_id المتتالية — دورة
+     * أقفال يكسرها PostgreSQL بـ 40P01 (رُصدت في CI على #1433 و#1441). قاعدةٌ لا يتصل بها
+     * غير هذا الاختبار تزيل الدورة من أصلها بلا إعادة محاولة ولا استثناء من التشغيل المتوازي.
+     *
+     * @test
+     */
     public function the_restrict_rule_rolls_back_to_set_null_and_forward_again(): void
     {
-        $migration = require base_path('database/migrations/2026_11_04_020000_restrict_credit_note_original_invoice_delete.php');
+        $path = base_path('database/migrations/2026_11_04_020000_restrict_credit_note_original_invoice_delete.php');
+        $name = '2026_11_04_020000_restrict_credit_note_original_invoice_delete';
+
+        $this->onPrivateMigratedDatabase(function (string $connection) use ($path, $name) {
+            $applied = fn () => DB::connection($connection)->table('migrations')->where('migration', $name)->value('batch');
+
+            $this->assertSame('RESTRICT', $this->deleteRule($connection), 'السلسلة الكاملة تنتهي بالتقييد.');
+            $this->assertNotNull($applied());
+
+            $this->artisan('migrate:rollback', ['--database' => $connection, '--path' => $path, '--realpath' => true, '--force' => true])
+                ->assertExitCode(0)
+                ->run();
+            $this->assertSame('SET NULL', $this->deleteRule($connection));
+            $this->assertNull($applied(), 'التراجع أزال سجلّ هذه الهجرة وحدها.');
+
+            $this->artisan('migrate', ['--database' => $connection, '--path' => $path, '--realpath' => true, '--force' => true])
+                ->assertExitCode(0)
+                ->run();
+            $this->assertSame('RESTRICT', $this->deleteRule($connection));
+            $this->assertNotNull($applied(), 'الإعادة سجّلت الهجرة من جديد.');
+        });
+
+        $this->assertSame('RESTRICT', $this->deleteRule(), 'القاعدة المشتركة لم تُمسّ.');
+    }
+
+    /**
+     * ينشئ قاعدة PostgreSQL مؤقتة باسمٍ فريد، يهاجرها بالسلسلة الحقيقية كاملة، يمرّر اسم
+     * اتصالها، ثم يسقطها مهما كانت النتيجة.
+     *
+     * @param  callable(string): void  $test
+     */
+    private function onPrivateMigratedDatabase(callable $test): void
+    {
+        $base = config('database.default');
+        $connection = 'rem02_private_ddl';
+        // اللاحقة تُحفظ كاملة (حدّ PostgreSQL للمعرّف 63 بايتاً): يُقتطع من اسم القاعدة الأساسية لا منها.
+        $suffix = '_ddl_'.getmypid().'_'.bin2hex(random_bytes(4));
+        $database = substr((string) config("database.connections.{$base}.database"), 0, 63 - strlen($suffix)).$suffix;
+
+        config(["database.connections.{$connection}" => array_merge(config("database.connections.{$base}"), ['database' => $database])]);
+        DB::statement("CREATE DATABASE \"{$database}\"");
 
         try {
-            $migration->down();
-            $this->assertSame('SET NULL', $this->deleteRule());
-            $migration->up();
-            $this->assertSame('RESTRICT', $this->deleteRule());
+            $exit = Artisan::call('migrate', ['--database' => $connection, '--force' => true]);
+            $this->assertSame(0, $exit, Artisan::output());
+
+            $test($connection);
         } finally {
-            if ($this->deleteRule() !== 'RESTRICT') {
-                $migration->up();
-            }
+            DB::purge($connection);
+            DB::statement("DROP DATABASE IF EXISTS \"{$database}\" WITH (FORCE)");
+            config(["database.connections.{$connection}" => null]);
         }
     }
 
