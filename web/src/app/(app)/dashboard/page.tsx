@@ -325,7 +325,7 @@ export default function DashboardPage() {
                 onClick={() => setMobileTab(k)}
                 className={cn(
                   'flex-1 rounded-[9px] py-2 text-center text-[12.5px] font-semibold transition-colors',
-                  mobileTab === k ? 'bg-primary text-white' : 'bg-background text-muted'
+                  mobileTab === k ? 'bg-primary text-primary-foreground' : 'bg-background text-muted'
                 )}
               >
                 {t(k === 'activity' ? 'activity' : 'recent_invoices')}

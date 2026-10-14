@@ -66,18 +66,6 @@ const payTone: Record<string, 'positive' | 'warning' | 'muted'> = {
 
 const INVOICE_SORT_COLUMNS = ['number', 'invoice_date', 'total', 'remaining'];
 
-const sortOptions: SortOption[] = [
-  { value: '-invoice_date', label: 'الأحدث أولًا' },
-  { value: 'invoice_date', label: 'الأقدم أولًا' },
-  { value: '-due_date', label: 'الاستحقاق الأبعد' },
-  { value: 'due_date', label: 'الاستحقاق الأقرب' },
-  { value: '-total', label: 'الإجمالي: الأعلى' },
-  { value: 'total', label: 'الإجمالي: الأقل' },
-  { value: '-remaining', label: 'المتبقي: الأعلى' },
-  { value: 'remaining', label: 'المتبقي: الأقل' },
-  { value: 'number', label: 'رقم الفاتورة' },
-];
-
 function isEmptyFilter(filter: ActiveFilter): boolean {
   return Array.isArray(filter.value)
     ? filter.value.every((value) => String(value).trim() === '')
@@ -100,6 +88,19 @@ function appendMoneyFilter(params: URLSearchParams, key: 'total' | 'remaining', 
 export default function InvoicesPage() {
   const t = useTranslations('invoices');
   const ts = useTranslations('status');
+  const tl = useTranslations('listUi');
+  // خيارات الترتيب من الكتالوج: كانت نصوصاً عربية ثابتة تظهر في الواجهة الإنجليزية (ERP-UX-025).
+  const sortOptions: SortOption[] = useMemo(() => [
+    { value: '-invoice_date', label: tl('newestFirst') },
+    { value: 'invoice_date', label: tl('oldestFirst') },
+    { value: '-due_date', label: tl('dueLatest') },
+    { value: 'due_date', label: tl('dueEarliest') },
+    { value: '-total', label: tl('totalHighest') },
+    { value: 'total', label: tl('totalLowest') },
+    { value: '-remaining', label: tl('remainingHighest') },
+    { value: 'remaining', label: tl('remainingLowest') },
+    { value: 'number', label: tl('invoiceNumber') },
+  ], [tl]);
   const router = useRouter();
   const searchParams = useSearchParams();
   const { success, error: errorToast } = useToast();
@@ -149,8 +150,8 @@ export default function InvoicesPage() {
     },
     {
       key: 'partner_id', label: t('partner'), kind: 'entity', quick: true,
-      searchPlaceholder: 'ابحث بالاسم، الهاتف أو الرقم التعريفي',
-      emptyText: 'لا يوجد عميل مطابق',
+      searchPlaceholder: tl('searchCustomersPlaceholder'),
+      emptyText: tl('noMatchingCustomer'),
       options: partners.map((partner) => ({
         value: partner.id,
         label: partner.name,
@@ -159,10 +160,10 @@ export default function InvoicesPage() {
       })),
     },
     { key: 'invoice_date', label: t('date'), kind: 'dateRange' },
-    { key: 'due_date', label: 'تاريخ الاستحقاق', kind: 'dateRange' },
+    { key: 'due_date', label: tl('dueDate'), kind: 'dateRange' },
     { key: 'total', label: t('total'), kind: 'money', operators: ['gte', 'lte', 'eq'] },
-    { key: 'remaining', label: 'المتبقي', kind: 'money', operators: ['gte', 'lte', 'eq'] },
-  ], [partners, t, ts]);
+    { key: 'remaining', label: tl('remaining'), kind: 'money', operators: ['gte', 'lte', 'eq'] },
+  ], [partners, t, ts, tl]);
 
   const labelledFilters = useMemo(
     () => explorer.filters.map((filter) => ({
@@ -302,7 +303,7 @@ export default function InvoicesPage() {
       // النص كاملٌ في الـ DOM (فيقرأه القارئ الصوتي) وفي `title` عند التحويم.
       cell: ({ row }) => {
         const name = partnerNames[row.original.partner_id] ?? '—';
-        return <span className="block max-w-64 truncate" title={name}>{name}</span>;
+        return <span className="block max-w-64 truncate" title={name}><bdi>{name}</bdi></span>;
       },
     },
     {
@@ -314,7 +315,7 @@ export default function InvoicesPage() {
       cell: ({ row }) => <div className="whitespace-nowrap text-end"><Money value={row.original.total} /></div>,
     },
     {
-      accessorKey: 'remaining', header: 'المتبقي',
+      accessorKey: 'remaining', header: tl('remaining'),
       cell: ({ row }) => <div className="whitespace-nowrap text-end"><Money value={row.original.remaining} /></div>,
     },
     {
@@ -329,7 +330,7 @@ export default function InvoicesPage() {
       id: 'actions', header: '', enableSorting: false,
       cell: ({ row }) => <div data-awj-row-actions="" className="flex items-center justify-end gap-0.5">{rowActions(row.original)}</div>,
     },
-  ], [partnerNames, rowActions, t, ts]);
+  ], [partnerNames, rowActions, t, ts, tl]);
 
   const headerActions: PageAction[] = [
     { key: 'create', label: t('create'), icon: Plus, href: '/invoices/new', variant: 'primary' },
@@ -351,7 +352,7 @@ export default function InvoicesPage() {
       <ListToolbar
         search={searchInput}
         onSearchChange={setSearchInput}
-        searchPlaceholder="ابحث برقم الفاتورة، العميل أو مرجع الدفع"
+        searchPlaceholder={tl('searchInvoicesPlaceholder')}
         searchLabel={t('title')}
         definitions={definitions}
         filters={labelledFilters}
@@ -394,7 +395,7 @@ export default function InvoicesPage() {
           subtitle: partnerNames[invoice.partner_id] ?? '—',
           amountLabel: t('total'),
           amount: formatRiyal(invoice.total),
-          secondary: { label: 'المتبقي', value: formatRiyal(invoice.remaining) },
+          secondary: { label: tl('remaining'), value: formatRiyal(invoice.remaining) },
           status: (
             <>
               <Badge tone={statusTone[invoice.status] ?? 'muted'}>{ts(invoice.status)}</Badge>
@@ -425,7 +426,7 @@ export default function InvoicesPage() {
       />
 
       <Dialog open={!!toDelete} onClose={() => (deleting ? null : setToDelete(null))} title={t('delete_title')}>
-        <p className="text-sm text-text">{t('delete_confirm')} <span className="num font-medium">{toDelete?.number}</span>؟</p>
+        <p className="text-sm text-text">{t('delete_confirm')} <span className="num font-medium">{toDelete?.number}</span>{tl('questionMark')}</p>
         <div className="mt-4 flex justify-end gap-2">
           <Button variant="outline" onClick={() => setToDelete(null)} disabled={deleting}>{t('retry_cancel')}</Button>
           <Button variant="danger" onClick={confirmDelete} disabled={deleting}>{deleting ? t('generating_delete') : t('delete')}</Button>

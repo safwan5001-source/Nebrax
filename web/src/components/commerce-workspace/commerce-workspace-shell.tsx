@@ -167,9 +167,10 @@ export function CommerceWorkspaceShell({ children }: { children: React.ReactNode
               href={viewStoreUrl}
               target="_blank"
               rel="noreferrer"
+              aria-label={t('viewStore')}
               className="inline-flex min-h-11 items-center gap-2 rounded px-2.5 text-sm font-medium text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
             >
-              <ExternalLink className="h-4 w-4" strokeWidth={1.7} />
+              <ExternalLink aria-hidden="true" className="h-4 w-4" strokeWidth={1.7} />
               <span className="hidden sm:inline">{t('viewStore')}</span>
             </a>
           ) : (
@@ -184,6 +185,7 @@ export function CommerceWorkspaceShell({ children }: { children: React.ReactNode
           )}
           <Link
             href="/dashboard"
+            aria-label={t('backToAwj')}
             className="inline-flex min-h-11 items-center gap-2 rounded px-2.5 text-sm font-medium text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           >
             <ArrowRight aria-hidden="true" className="h-4 w-4 rtl:rotate-180" strokeWidth={1.7} />

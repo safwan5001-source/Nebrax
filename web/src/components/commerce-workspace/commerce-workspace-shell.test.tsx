@@ -74,6 +74,15 @@ describe('Commerce workspace shell header', () => {
     expect(apiMock).toHaveBeenCalledWith('/commerce/workspace/storefronts');
   });
 
+  it('names the back-to-dashboard link independently of its visible text (ERP-UX-012)', async () => {
+    apiMock.mockResolvedValue({ data: { stores: [] } });
+    renderShell();
+
+    const back = await screen.findByRole('link', { name: 'Back to AWJ' });
+    expect(back.getAttribute('href')).toBe('/dashboard');
+    expect(back.getAttribute('aria-label')).toBe('Back to AWJ');
+  });
+
   it('renders Arabic workspace chrome', async () => {
     apiMock.mockResolvedValue({ data: { stores: [] } });
     locale.current = 'ar';
@@ -103,6 +112,8 @@ describe('Commerce workspace shell header', () => {
     await waitFor(() => expect(screen.getByText('Downtown')).toBeTruthy());
     const viewStore = screen.getByRole('link', { name: 'View store' });
     expect(viewStore).toHaveProperty('href', 'https://downtown.example/');
+    // ERP-UX-012: below `sm` the text span is hidden, so the name must not depend on it.
+    expect(viewStore.getAttribute('aria-label')).toBe('View store');
     expect(screen.queryByText('Store list is not available yet')).toBeNull();
   });
 

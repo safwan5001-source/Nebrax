@@ -38,3 +38,15 @@ describe('MobileRecordItem caption', () => {
     expect(container.querySelectorAll('.min-w-0.flex-1 > div').length).toBe(2);
   });
 });
+
+describe('MobileRecordItem bidi isolation (ERP-UX-016)', () => {
+  it('isolates free-text title and subtitle so punctuation stays with a Latin name', () => {
+    render(<MobileRecordItem record={{ title: 'INV-1', subtitle: 'Al Khobar Trading Est.' }} />);
+    expect(screen.getByText('Al Khobar Trading Est.').tagName).toBe('BDI');
+  });
+
+  it('passes non-text nodes through unchanged', () => {
+    render(<MobileRecordItem record={{ title: <a href="/x">INV-2</a> }} />);
+    expect(screen.getByRole('link', { name: 'INV-2' }).parentElement?.tagName).toBe('DIV');
+  });
+});

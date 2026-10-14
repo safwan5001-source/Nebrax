@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import type { ReportDataColumn, ReportRowAction } from '@/components/reports/report-data-table';
+import { LtrNumber } from '@/components/ui/ltr-number';
 
 export interface ReportAction {
   id: string;
@@ -136,7 +137,7 @@ export function ReportMetricGrid({ metrics }: { metrics: ReportMetric[] }) {
               metric.tone === 'warning' && 'text-warning'
             )}
           >
-            {metric.value}
+            <LtrNumber>{metric.value}</LtrNumber>
           </p>
         </div>
       ))}
@@ -168,14 +169,14 @@ export function ReportMobileRows({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-text">{row[primaryIndex] || '—'}</p>
-          {secondaryIndex !== undefined && row[secondaryIndex] && <p className="num mt-1 text-xs text-muted">{row[secondaryIndex]}</p>}
+          {secondaryIndex !== undefined && row[secondaryIndex] && <p className="num mt-1 text-xs text-muted"><LtrNumber>{row[secondaryIndex]}</LtrNumber></p>}
         </div>
       </div>
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
         {valueIndexes.map((index) => (
           <div key={`${key}-${columns[index]?.label}`} className={cn(index === valueIndexes.length - 1 && valueIndexes.length % 2 === 1 && 'col-span-2')}>
             <dt className="text-[11px] font-medium text-muted">{columns[index]?.label}</dt>
-            <dd className="num mt-1 text-sm font-medium text-text">{row[index] || '—'}</dd>
+            <dd className="num mt-1 text-sm font-medium text-text"><LtrNumber>{row[index] || '—'}</LtrNumber></dd>
           </div>
         ))}
       </dl>

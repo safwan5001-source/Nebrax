@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CircleAlert, FileSearch, RefreshCw, RotateCw, ShieldCheck } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { api, ApiError } from '@/lib/api';
+import { describeLoadFailure } from '@/lib/load-failure';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -38,18 +39,21 @@ export default function DocumentOperationsPage() {
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // 403 (صلاحية/استحقاق): رسالة من الكتالوج وبلا إعادة محاولة (ERP-UX-009).
+  const [forbidden, setForbidden] = useState(false);
+  const tCommon = useTranslations('common');
   const [notice, setNotice] = useState<string | null>(null);
   const [retrying, setRetrying] = useState<string | null>(null);
   const [page, setPage] = useState(1);
 
   const path = useMemo(() => `/document-operations?per_page=20&page=${page}`, [page]);
   const load = useCallback(async () => {
-    setLoading(true); setError(null);
+    setLoading(true); setError(null); setForbidden(false);
     try {
       const response = await api<{ data: Data }>(path);
       setData(response.data);
     } catch (exception) {
-      setError(exception instanceof ApiError ? exception.message : t('loadFailed'));
+      { const failure = describeLoadFailure(exception, { forbidden: tCommon('capabilityUnavailable'), fallback: t('loadFailed') }); setError(failure.message); setForbidden(failure.forbidden); }
     } finally { setLoading(false); }
   }, [path, t]);
 
@@ -83,7 +87,7 @@ export default function DocumentOperationsPage() {
 
       {notice && <div role="status" className="rounded border border-primary/20 bg-primary-soft px-3 py-2 text-sm text-text">{notice}</div>}
       {loading ? <Card><CardContent className="py-10 text-sm text-muted">{t('loading')}</CardContent></Card> : error ? (
-        <Card><CardContent className="flex flex-wrap items-center gap-3 py-10 text-sm text-muted"><CircleAlert className="h-5 w-5" aria-hidden="true" />{error}<Button variant="outline" onClick={() => void load()}>{t('retry')}</Button></CardContent></Card>
+        <Card><CardContent className="flex flex-wrap items-center gap-3 py-10 text-sm text-muted"><CircleAlert className="h-5 w-5" aria-hidden="true" />{error}{!forbidden && (<Button variant="outline" onClick={() => void load()}>{t('retry')}</Button>)}</CardContent></Card>
       ) : data ? <>
         <section aria-label={t('title')} className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {stats.map(([label, value]) => <Card key={label}><CardContent className="py-4"><p className="text-xs text-muted">{t(label)}</p><p className="mt-1 text-2xl font-semibold tabular-nums text-text">{value}</p></CardContent></Card>)}

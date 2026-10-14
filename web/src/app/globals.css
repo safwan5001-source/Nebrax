@@ -59,6 +59,31 @@
   color: var(--danger-fg);
 }
 
+/* ERP-UX-H1-6A: the document preview is white paper in every app mode. Its sections read the
+   app tokens (--text, --muted, --border…), which in dark mode became light-on-white (1.1:1).
+   Pin the light palette on the paper root in dark mode only; light mode is untouched. */
+.dark [data-doc-paper] {
+  color-scheme: light;
+  --background: #f6f7f9;
+  --surface: #ffffff;
+  --text: #15181d;
+  --muted: #6b7280;
+  --border: #eceef1;
+  --primary: #1e40af;
+  --primary-soft: #eef2ff;
+  --positive: #166534;
+  --negative: #b91c1c;
+  --warning: #92400e;
+}
+
+html[data-awj-ui="3"].dark [data-doc-paper] {
+  --background: #e9e8e4;
+  --text: #15181d;
+  --muted: #586172;
+  --border: #dce0e8;
+  --primary-soft: #eaf0fe;
+}
+
 /*
  * AWJ v3 — design tokens (Horizon 1: Core Visual System).
  *
