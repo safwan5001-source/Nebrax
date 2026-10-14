@@ -10,7 +10,7 @@ import { formatDate } from '@/lib/formatting';
 import { branchLabel, type IngressPoint } from '@/lib/signed-ingress';
 import { IngressManagementLayer } from './ingress-management-layer';
 import { IngressCreateEntry, type IngressProfileSupport } from './ingress-create-entry';
-import { IngressRowActions, useCanCreateIngress, useCanManageIngress } from './ingress-row-actions';
+import { IngressRowActions, useCanCreateIngress, useCanManageIngress, useCanReassignIngress } from './ingress-row-actions';
 import type { IngressManagement } from './use-ingress-management';
 import type { SignedIngressState } from './use-signed-ingress';
 
@@ -42,7 +42,10 @@ export function SignedIngressPanel({
 }) {
   const t = useTranslations('integrationCenter.ingressPanel');
   const canManage = useCanManageIngress() && management !== undefined;
+  const canReassign = useCanReassignIngress() && management !== undefined;
+  const canSeeActions = canManage || canReassign;
   const canCreate = useCanCreateIngress() && management !== undefined && profile !== undefined;
+
   const observe = management?.observe;
   // اللوحة تُبلّغ الإدارة بكل حالة قراءة: تحفظ المعروف، وتُسوّي إنشاءً مجهولاً بعد إعادة القراءة.
   useEffect(() => {
@@ -84,14 +87,14 @@ export function SignedIngressPanel({
           <p className="text-sm leading-relaxed text-muted">{t('empty.body')}</p>
         </div>
       ) : (
-        <IngressRows points={state.points} canViewBranches={state.canViewBranches} branchNames={state.branchNames} management={canManage ? management : undefined} />
+        <IngressRows points={state.points} canViewBranches={state.canViewBranches} branchNames={state.branchNames} management={canSeeActions ? management : undefined} showOperator={canReassign} />
       )}
 
       <div className="space-y-1 text-xs leading-relaxed text-muted" data-testid="signed-ingress-notes">
         <p>{t('statusNote')}</p>
         <p>{t('branchNote')}</p>
         <p>{t('scopeNote')}</p>
-        <p data-testid={canManage ? 'signed-ingress-manage-note' : 'signed-ingress-readonly-note'}>{canManage ? t('manageNote') : t('readOnlyNote')}</p>
+        <p data-testid={canManage ? 'signed-ingress-manage-note' : canReassign ? 'signed-ingress-reassign-note' : 'signed-ingress-readonly-note'}>{canManage ? t('manageNote') : canReassign ? t('reassignNote') : t('readOnlyNote')}</p>
       </div>
     </section>
   );
@@ -102,14 +105,22 @@ function IngressRows({
   canViewBranches,
   branchNames,
   management,
+  showOperator = false,
 }: {
   points: IngressPoint[];
   canViewBranches: boolean;
   branchNames: Map<string, string> | null;
   management?: IngressManagement;
+  /** عمود/سطر «المشغّل المسؤول» لمن يملك reassign + users.view فقط (اسم لا معرّف). */
+  showOperator?: boolean;
 }) {
   const t = useTranslations('integrationCenter.ingressPanel');
   const locale = useLocale();
+  const operatorText = (point: IngressPoint): string => {
+    const name = management?.currentOperatorName(point);
+    if (name) return name;
+    return management?.operators.status === 'loading' ? t('operator.loading') : t('operator.unknown');
+  };
 
   const branchText = (point: IngressPoint): string => {
     const label = branchLabel(point, canViewBranches, branchNames);
@@ -135,6 +146,7 @@ function IngressRows({
                 <TH scope="col">{t('columns.branch')}</TH>
                 <TH scope="col">{t('columns.status')}</TH>
                 <TH scope="col">{t('columns.version')}</TH>
+                {showOperator ? <TH scope="col">{t('columns.operator')}</TH> : null}
                 <TH scope="col">{t('columns.created')}</TH>
                 {management ? <TH scope="col"><span className="sr-only">{t('columns.actions')}</span></TH> : null}
               </TR>
@@ -151,6 +163,7 @@ function IngressRows({
                     </div>
                   </TD>
                   <TD><span className="num">{point.secretVersion}</span></TD>
+                  {showOperator ? <TD data-testid="signed-ingress-operator">{operatorText(point)}</TD> : null}
                   <TD>{created(point)}</TD>
                   {management ? <TD className="text-end"><IngressRowActions point={point} management={management} /></TD> : null}
                 </TR>
@@ -176,6 +189,12 @@ function IngressRows({
                 <dt className="text-muted">{t('columns.version')}</dt>
                 <dd className="num text-text">{point.secretVersion}</dd>
               </div>
+              {showOperator ? (
+                <div className="flex items-start justify-between gap-3 py-1.5">
+                  <dt className="text-muted">{t('columns.operator')}</dt>
+                  <dd className="min-w-0 text-end text-text" data-testid="signed-ingress-operator">{operatorText(point)}</dd>
+                </div>
+              ) : null}
               <div className="flex items-start justify-between gap-3 py-1.5">
                 <dt className="text-muted">{t('columns.created')}</dt>
                 <dd className="text-end text-text">{created(point)}</dd>

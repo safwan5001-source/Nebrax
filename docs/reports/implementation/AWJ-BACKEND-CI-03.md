@@ -1,6 +1,6 @@
 # AWJ-BACKEND-CI-03 — Implementation Report
 
-STATUS: review (PR-ready; merge gated on final-head CI + pre-merge review)
+STATUS: closed (merged, post-merge CI green, POST_MERGE_REVIEW: PASS)
 DATE: 2026-10-14
 
 ## Outcome
@@ -80,7 +80,17 @@ A first draft of the guard matched its own regex line in `ci.yml` and read `[^` 
 - **One intermediate run** showed a 27th failure: the CI-02b guard. The branch had been cut before #1470 merged, and the stale app directory still held the new guard test. Rebasing onto the latest `main` removed it.
 
 ## CI
-Recorded in the PR and the PRE_MERGE_REVIEW comment.
+On the final head `dd700c8` (run `38604322458`, gate `38604322424`):
+
+| Job | Result |
+|---|---|
+| pgsql (4 workers) | ✅ 6896 tests, 52297 assertions, 0 failures, 3 skipped (09:58) |
+| sqlite | ✅ |
+| CI Gate | ✅ |
+
+The new guard ran in CI and printed both ✔ lines.
+
+Pre-merge check: `main` had advanced to `d5dfa16` (web/docs only). A local merge re-ran the guard from the merged `ci.yml`: exit 0.
 
 ## Review findings and resolution
 **Codex was unavailable on this PR** (the account hit its usage limit; bot comment on #1474). An **independent reviewer agent** reviewed the diff instead. It extracted the guard from `ci.yml`, executed it against both `setup.sh` versions, and restored the tree. It found **no blocking defects**, and 3 non-blocking findings:
@@ -94,8 +104,17 @@ Recorded in the PR and the PRE_MERGE_REVIEW comment.
 Both fixes were re-verified locally: branch → exit 0; `main`'s `setup.sh` → exit 1 with 4 errors; version mutant → exit 1.
 
 ## Pre-merge review / Merge / Post-merge review
-- PRE_MERGE_REVIEW and POST_MERGE_REVIEW: PR comments.
-- Merge status: not merged. Merge SHA: —.
+- **PRE_MERGE_REVIEW: PASS** (PR comment): reviewer findings closed, AWJ Guardian review passed on the final diff.
+- Merge status: **merged** (squash), PR [#1474](https://github.com/safwan5001-source/Nebrax/pull/1474).
+- Base SHA: `c9f8bc5` · Head SHA: `dd700c8` · **Merge SHA: `cf58c965153ba33db3899c07969625d251ca33ba`**
+- **POST_MERGE_REVIEW: PASS** (PR comment). `main` run `38606942609` on `cf58c96`:
+
+| Job | Result |
+|---|---|
+| pgsql | ✅ 6896 tests, 52298 assertions, 0 failures, 3 skipped (10:06). The guard printed both ✔ lines |
+| sqlite | ✅ 6801 passed, 95 skipped, 0 failed (51622 assertions) |
+
+No findings. No production deploy.
 
 ## Self-review
 
@@ -121,5 +140,27 @@ None. No secrets: the AWS SDK is installed but no credentials are configured (te
 - **PHP version:** CI uses 8.4, local images often 8.3. Not addressable from `setup.sh`.
 - **Optional follow-up:** apply the same parity guard to `deploy/assemble.sh` (it matches today).
 
-## Next task
-None queued from this Horizon. CI-01 → CI-02 → CI-02b → CI-03 close the PostgreSQL test hang chain end to end.
+## Horizon closure — PostgreSQL test hang chain (CI-01 → CI-03)
+
+**Objective:** a PostgreSQL test failure must never hang a CI worker, and local runs must reproduce CI's results.
+
+| Slice | Outcome | PR | Merge SHA | Post-merge CI |
+|---|---|---|---|---|
+| CI-01 | REM-02 DDL test moved to a private migrated database; removes the `credit_notes` / `tenants` deadlock between workers | #1451 | `5ff3135` | ✅ |
+| CI-02 | `PGOPTIONS="-c lock_timeout=60s"` in the CI pgsql step: an abandoned lock now fails with `55P03` instead of an unbounded hang; `PostgresTestLockTimeoutTest` | #1464 | `410465e` | ✅ 6828 / 0 failures |
+| CI-02b | Root cause removed: 26 classes no longer close Mockery before the DB rollback; `TestTeardownCleanupTest` (guard + PostgreSQL probe) | #1470 | `115b630` | ✅ 6858 / 0 failures |
+| CI-03 | `setup.sh` at CI parity (AWS SDK, predis, `app/Mail`, `resources/views`, extension warning) + CI parity guard | #1474 | `cf58c96` | ✅ 6896 / 0 failures |
+
+**Measured effect (local, same machine):**
+- Leaked-lock victims went from 3 per full parallel run (each waiting the cap) to 0. The full parallel run took 373 s before and 326 s after.
+- Local-only false failures dropped from ~150 to 26 (`bcmath` only).
+- An abandoned transaction now produces a named failure within 60 s, where before it hung until the 60-minute job timeout.
+
+**Unchanged throughout:** production code, configuration and deploy; migrations; API; tenant isolation; accounting (no journal entries); CI Gate test-step rules. Nothing was deployed.
+
+**Remaining (outside this Horizon, owner decisions):**
+- `bcmath` in the cloud environment image: 26 Fuel tests stay red locally only.
+- Optionally apply the parity guard to `deploy/assemble.sh` (it matches today).
+- Fork-based PostgreSQL classes still purge shared-base tenants; no defect observed (CI-01 backlog).
+
+**Horizon status: complete.**

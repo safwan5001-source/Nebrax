@@ -152,9 +152,9 @@ for (const [locale, dir] of LOCALES) {
 
         const html = await page.content();
         for (const sentinel of SENTINELS) expect(html, sentinel).not.toContain(sentinel);
-        // INT-UX-5b: المالك يرى الإنشاء (ملف إسناد مفعّل) وتدوير السر والتعطيل لنقطة مهيّأة فقط (لا إعادة إسناد ولا غيره)؛ لا طلب كتابة قبل أي نقرة.
+        // INT-UX-5b/5d: المالك يرى الإنشاء (ملف إسناد مفعّل) وتدوير السر وإعادة الإسناد والتعطيل لنقطة مهيّأة فقط؛ لا طلب كتابة قبل أي نقرة.
         const buttonIds = await panel.getByRole('button').evaluateAll((els) => els.map((el) => el.getAttribute('data-testid')));
-        expect([...new Set(buttonIds)].sort()).toEqual(['ingress-create-open', 'ingress-disable', 'ingress-rotate']);
+        expect([...new Set(buttonIds)].sort()).toEqual(['ingress-create-open', 'ingress-disable', 'ingress-reassign', 'ingress-rotate']);
         expect(requests.filter((r) => !r.startsWith('GET '))).toEqual([]);
         // مع branches.view تُقرأ أسماء الفروع بعد قراءة النقاط (طلب اللوحة، لا طلب الغلاف).
         expect(requests.slice(requests.indexOf('GET /delivery-connectors') + 1)).toContain('GET /branches');

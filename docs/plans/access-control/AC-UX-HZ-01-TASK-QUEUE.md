@@ -15,8 +15,8 @@ Legend: ☐ not started · ◐ in progress / in review · ☑ merged (with Merge
 | 04 | Role create + safe client-side clone (+ tests: source unchanged, only `name`+`permissions` sent) | 03B, **00A** | ☑ | #1469 | `db93a70` | `f147fb6` |
 | 05 | Shared scope editor + summary language (All/Selected, counts, search, warehouse↔branch context, limited-view notice) adopted in Users | 02 | ☑ | #1471 | `f147fb6` | `7e8af03` |
 | 06 | Treasury deposit/withdraw access legibility on existing account form | 00 | ☑ | #1475 | `7e8af03` | `beaa6bf` |
-| 07 | Consolidate the capability helper (`useCan`-style over `lib/permissions.ts`, replacing the per-screen `hasPermission` calls from 01/03), extend to the rest of the ERP: hidden/read-only/disabled/allowed states on nav, create/edit/delete, posting, exports, reports, approvals, treasury, ZATCA, settings; `/me` refresh on shell mount/focus | 01, 03B | ◐ | | `beaa6bf` | |
-| 08 | Per-user access summary (source assignments only) | 02, 05 | ☐ | | | |
+| 07 | Consolidate the capability helper (`useCan`-style over `lib/permissions.ts`, replacing the per-screen `hasPermission` calls from 01/03), extend to the rest of the ERP: hidden/read-only/disabled/allowed states on nav, create/edit/delete, posting, exports, reports, approvals, treasury, ZATCA, settings; `/me` refresh on shell mount/focus | 01, 03B | ☑ | #1480 | `beaa6bf` | `f1bcc67` |
+| 08 | Per-user access summary (source assignments only) | 02, 05 | ◐ | | `f1bcc67` | |
 | 09 | Keyboard / RTL / responsive (1440·1280·768·390) / dark+Ink / state QA with existing Playwright; add e2e for Users & Roles | 01–08 | ☐ | | | |
 | 10 | Closure: backend regression matrix, frontend verification, final report | 09 | ☐ | | | |
 

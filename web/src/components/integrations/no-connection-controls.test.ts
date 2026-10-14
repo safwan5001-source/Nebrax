@@ -69,9 +69,11 @@ describe('integration center module sources', () => {
   it('uses the shared Button component only for the retry action and the declared INT-UX-5b/5c actions', () => {
     // INT-UX-5b: ثلاثة مواضع استثنائية معلنة بأسمائها، لكلٍّ معالج واحد معروف. أي زر آخر (إنشاء، إعادة إسناد، إعادة تفعيل…) يفشل هنا.
     const allowed: Record<string, RegExp[]> = {
-      'components/integrations/ingress-row-actions.tsx': [/onClick=\{\(\) => management\.openRotate\(point\)\}/, /onClick=\{\(\) => management\.openDisable\(point\)\}/],
+      'components/integrations/ingress-row-actions.tsx': [/onClick=\{\(\) => management\.openRotate\(point\)\}/, /onClick=\{\(\) => management\.openReassign\(point\)\}/, /onClick=\{\(\) => management\.openDisable\(point\)\}/],
       'components/integrations/ingress-management-layer.tsx': [/onClick=\{management\.dismissNotice\}/],
       // INT-UX-5c: مدخل الإنشاء زرّ واحد، ونموذج الإنشاء ثلاثة (إعادة قراءة الفروع، إلغاء، إرسال).
+      // INT-UX-5d: حوار إعادة الإسناد فيه زرّ واحد غير التأكيد/الإلغاء (يأتيان من ConfirmDialog): إعادة قراءة دليل المشغّلين.
+      'components/integrations/ingress-reassign-dialog.tsx': [/onClick=\{management\.retryOperators\}/],
       'components/integrations/ingress-create-entry.tsx': [/onClick=\{management\.openCreate\}/],
       'components/integrations/ingress-create-dialog.tsx': [/onClick=\{\(\) => setBranchAttempt\(\(value\) => value \+ 1\)\}/, /onClick=\{onCancel\}/, /onClick=\{submit\}/],
     };
@@ -103,7 +105,7 @@ describe('integration center module sources', () => {
     }
   });
 
-  it('only reads the four existing endpoints, all by GET with no options argument', () => {
+  it('only reads the existing endpoints (plus /users for the INT-UX-5d operator directory), all by GET with no options argument', () => {
     const called = new Set<string>();
     for (const { path, code } of files) {
       for (const match of code.matchAll(/api(?:<[^>]*>)?\(\s*(['"`])([^'"`]+)\1\s*([,)])/g)) {
@@ -111,12 +113,12 @@ describe('integration center module sources', () => {
         expect(match[3], `${path}: ${match[2]} must be a plain GET (no options)`).toBe(')');
       }
     }
-    expect([...called].sort()).toEqual(['/applications/nav-state', '/branches', '/delivery-connectors', '/delivery-platforms', '/delivery-platforms/readiness']);
+    expect([...called].sort()).toEqual(['/applications/nav-state', '/branches', '/delivery-connectors', '/delivery-platforms', '/delivery-platforms/readiness', '/users']);
   });
 
-  it('reads delivery-connectors and branches only from the signed ingress hook', () => {
+  it('reads delivery-connectors, branches and users only from the signed ingress hook', () => {
     for (const { path, code } of files) {
-      const touches = /['"`]\/(delivery-connectors|branches)['"`]/.test(code);
+      const touches = /['"`]\/(delivery-connectors|branches|users)['"`]/.test(code);
       expect(touches, path).toBe(path === 'components/integrations/use-signed-ingress.ts');
     }
   });
@@ -139,7 +141,7 @@ describe('integration center module sources', () => {
     const consumers = (pattern: RegExp) => files.filter((f) => pattern.test(f.code)).map((f) => f.path).filter((p) => p !== 'lib/ingress-management.ts' && p !== 'components/integrations/use-ingress-permissions.ts').sort();
     expect(consumers(/use-ingress-permissions/)).toEqual(['components/integrations/ingress-row-actions.tsx']);
     // `ingress-create-dialog` يستورد النوع `IngressErrorKey` وحده (لا منطق).
-    expect(consumers(/@\/lib\/ingress-management/)).toEqual(['components/integrations/ingress-create-dialog.tsx', 'components/integrations/use-ingress-management.ts']);
+    expect(consumers(/@\/lib\/ingress-management/)).toEqual(['components/integrations/ingress-create-dialog.tsx', 'components/integrations/use-ingress-management.ts', 'components/integrations/use-signed-ingress.ts']);
   });
 
   it('INT-UX-5b: the only code that talks to the rotate/disable routes is lib/ingress-operations.ts, and only the management hook calls it', () => {
@@ -156,15 +158,18 @@ describe('integration center module sources', () => {
     expect(callers).toEqual(['components/integrations/use-ingress-management.ts', 'lib/ingress-operations.ts']);
   });
 
-  it('INT-UX-5b/5c: ingress-operations has exactly three POST routes (create, rotate, disable), no reassign, and never stores, logs or tracks', () => {
+  it('INT-UX-5b/5c/5d: ingress-operations has exactly four POST routes (create, rotate, disable, reassign), and never stores, logs or tracks', () => {
     const code = readFileSync(join(SRC, 'lib/ingress-operations.ts'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-    expect(code.match(/method\s*:\s*'POST'/g)).toHaveLength(3);
+    expect(code.match(/method\s*:\s*'POST'/g)).toHaveLength(4);
     expect(code.match(/target\(id, '([a-z-]+)'\)/g)).toEqual(["target(id, 'rotate-secret')", "target(id, 'disable')"]);
-    expect(code).not.toMatch(/reassign|oauth|authoriz|credential|\/connect\b|\/sync\b|method\s*:\s*'(PUT|PATCH|DELETE)'/i);
+    expect(code).not.toMatch(/oauth|authoriz|credential|\/connect\b|\/sync\b|method\s*:\s*'(PUT|PATCH|DELETE)'/i);
     expect(code).not.toMatch(/console\.|localStorage|sessionStorage|indexedDB|document\.cookie|navigator\.|window\.|location|history\.|analytics|track|fetch\s*\(|XMLHttpRequest|sendBeacon/i);
     // مسار الإنشاء الحرفي مرة واحدة فقط، وجسمه الحقول الثلاثة التي يقبلها الخادم وحدها.
     expect(code.match(/api<unknown>\('\/delivery-connectors', \{ method: 'POST', body \}\)/g)).toHaveLength(1);
     expect(code.match(/delivery_platform_profile_id|external_store_id|branch_id/g)?.sort()).toEqual(['branch_id', 'delivery_platform_profile_id', 'external_store_id']);
+    // إعادة الإسناد: مسار `…/reassign` الحرفي مرة واحدة وجسمه `user_id` وحده؛ لا فرع ولا سرّ ولا حالة ولا معرّف متجر.
+    expect(code.match(/\/delivery-connectors\/\$\{id\}\/reassign`, \{ method: 'POST', body: \{ user_id: userId \} \}/g)).toHaveLength(1);
+    expect(code.match(/user_id/g)).toHaveLength(1);
   });
 
   it('links only to allow-listed destinations', () => {
@@ -177,6 +182,16 @@ describe('integration center module sources', () => {
         const href = (match[1] ?? match[2] ?? match[3]).replace(/\$\{[^}]+\}/g, 'x');
         expect(allowed.some((re) => re.test(href)), `${path}: ${href}`).toBe(true);
       }
+    }
+  });
+
+  it('INT-UX-5d: the operator reader is an allow-list that never touches email, role or any other user field, and no component reads them', () => {
+    const reader = readFileSync(join(SRC, 'lib/ingress-operators.ts'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    expect(reader).not.toMatch(/email|\brole\b|employee|warehouse|phone|password|token|secret/i);
+    expect(reader).not.toMatch(/localStorage|sessionStorage|fetch\s*\(|\bapi\s*[<(]|console\./);
+    for (const { path, code } of files) {
+      const live = code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+      expect(live, path).not.toMatch(/\.email\b|\bemail\s*:/i);
     }
   });
 });

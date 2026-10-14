@@ -6868,7 +6868,26 @@
     "no_changes": "No changes yet",
     "saving": "Saving…",
     "actor_scope_loading": "Checking your own access scope before login access can be granted…",
-    "actor_scope_unavailable": "We couldn't verify your own access scope, so login access can't be granted from here. Reload the page and try again."
+    "actor_scope_unavailable": "We couldn't verify your own access scope, so login access can't be granted from here. Reload the page and try again.",
+    "access_summary_open": "Access summary",
+    "access_summary_title": "Access summary",
+    "access_summary_signin": "Sign-in",
+    "access_summary_signin_allowed": "Can sign in.",
+    "access_summary_signin_blocked": "Cannot sign in. Deactivating revokes active sessions and API access.",
+    "access_summary_role_owner": "Owner role",
+    "access_summary_sensitive": "{n, plural, one {1 of them is sensitive} other {{count} of them are sensitive}}",
+    "access_summary_role_needs_view": "Role permission details need access to view roles.",
+    "access_summary_open_roles": "Open roles",
+    "access_summary_branches_all": "All branches — not limited to specific branches.",
+    "access_summary_warehouses_all": "All warehouses — not limited to specific warehouses.",
+    "access_summary_branches_limited_count": "{n, plural, one {Limited to 1 branch} other {Limited to {count} branches}}",
+    "access_summary_warehouses_limited_count": "{n, plural, one {Limited to 1 warehouse} other {Limited to {count} warehouses}}",
+    "access_summary_branches_names_need_list": "Branch names need access to view branches.",
+    "access_summary_warehouses_names_need_list": "Warehouse names need access to view products.",
+    "access_summary_scope_hidden": "{n, plural, one {and 1 more you cannot see} other {and {count} more you cannot see}}",
+    "access_summary_employee": "Linked employee",
+    "access_summary_no_employee": "Not linked to an employee.",
+    "access_summary_note": "This summarizes only what is assigned to the user. Actual access is also decided by the server on each action — for example treasury account rules — which is not calculated here."
   },
   "voucherDoc": {
     "received_from": "Received from",
@@ -10484,7 +10503,8 @@
         "status": "Ingress point status",
         "version": "Signing key version",
         "created": "Created",
-        "actions": "Actions"
+        "actions": "Actions",
+        "operator": "Responsible operator"
       },
       "status": {
         "configured": "Configured",
@@ -10502,7 +10522,12 @@
       "scopeNote": "Points are shown within the scope of your branches only.",
       "retry": "Try again",
       "readOnlyNote": "Read-only: you do not have permission to manage ingress points.",
-      "manageNote": "Rotating and disabling change the ingress point inside AWJ only. They do not affect the merchant account or the platform's settings."
+      "manageNote": "Rotating and disabling change the ingress point inside AWJ only. They do not affect the merchant account or the platform's settings.",
+      "operator": {
+        "unknown": "Unknown",
+        "loading": "…"
+      },
+      "reassignNote": "Reassigning changes the responsible operator of the ingress point inside AWJ only. It does not change its branch, status or secret."
     },
     "ingressManagement": {
       "errors": {
@@ -10524,7 +10549,8 @@
         "unknown": "The action could not be completed.",
         "demoUnavailable": "Managing ingress points is not available in preview mode.",
         "disableOutcomeUnknown": "We did not receive the result of the disable, and it may have completed. We re-read the current state; repeat it only if the point still shows as configured and you still want it disabled.",
-        "createBlocked": "The result of an earlier attempt to create this store ID was never confirmed, so it cannot be sent again now. Verify the ingress point or contact an administrator before trying again."
+        "createBlocked": "The result of an earlier attempt to create this store ID was never confirmed, so it cannot be sent again now. Verify the ingress point or contact an administrator before trying again.",
+        "reassignOutcomeUnknown": "We did not receive the result of the reassignment, and it may have completed. We re-read the current state; check the operator shown before trying again."
       },
       "common": {
         "cancel": "Cancel"
@@ -10533,7 +10559,9 @@
         "rotate": "Rotate secret",
         "disable": "Disable",
         "rotateFor": "Rotate the secret of ingress point {storeId}",
-        "disableFor": "Disable ingress point {storeId}"
+        "disableFor": "Disable ingress point {storeId}",
+        "reassign": "Reassign operator",
+        "reassignFor": "Reassign the operator of ingress point {storeId}"
       },
       "rotate": {
         "title": "Rotate signing secret",
@@ -10566,7 +10594,8 @@
         "dismiss": "Dismiss",
         "created": "Ingress point {storeId} was created. Hand the secret to the party that will send the events.",
         "createLost": "Ingress point {storeId} appears to have been created, but its secret did not reach you. Use \"Rotate secret\" on its row in the list to get a new one.",
-        "createUnconfirmed": "The creation result could not be confirmed. Do not retry until the ingress point has been verified or an administrator has been contacted."
+        "createUnconfirmed": "The creation result could not be confirmed. Do not retry until the ingress point has been verified or an administrator has been contacted.",
+        "reassigned": "Ingress point {storeId} was reassigned to {operator}. The secret was not changed. If the previous operator may still hold it, rotate it separately."
       },
       "create": {
         "open": "Create ingress point",
@@ -10602,6 +10631,25 @@
           "needsPermission": "Setting up the attribution profile needs the company-management permission; ask your account administrator."
         },
         "blockedNote": "An earlier creation result was never confirmed for these store IDs, and they cannot be created again until verified:"
+      },
+      "reassign": {
+        "title": "Reassign operator",
+        "message": "Only the responsible operator of this point changes. The branch, status, store ID and secret are not changed. If the previous operator may still hold the secret, rotate it separately.",
+        "current": "Current operator: {operator}",
+        "select": {
+          "label": "New operator",
+          "placeholder": "Choose an operator",
+          "hint": "Only active users eligible for this point's branch are listed. The system verifies eligibility when you save."
+        },
+        "summary": "Responsibility will move from {from} to {to}.",
+        "confirm": "Reassign",
+        "busy": "Reassigning…",
+        "loading": "Loading operators…",
+        "directoryError": "The operator list could not be loaded. This does not mean there are no operators.",
+        "retry": "Try again",
+        "empty": "No operator is eligible for this point: it needs an active user whose scope includes its branch (or an unrestricted user if the point is not routed to a branch).",
+        "unknownOperator": "Unknown",
+        "ambiguous": "Some names are not listed because more than one eligible operator has the same name and they cannot be told apart safely here: {names}. To assign one of them, ask an administrator to tell the accounts apart."
       }
     }
   },

@@ -1,6 +1,6 @@
 # AWJ-BACKEND-CI-02 — Implementation Report
 
-STATUS: review (PR-ready; merge gated on final-head CI + pre-merge review)
+STATUS: closed (merged, post-merge CI green, POST_MERGE_REVIEW: PASS)
 DATE: 2026-10-14
 
 ## Outcome
@@ -136,11 +136,27 @@ Authoritative results are on the PR head (see PR description and the PRE_MERGE_R
 - Codex / Reviewer findings and resolution: recorded on the PR.
 
 ## Merge
-- Merge status: not merged
-- Merge SHA: —
+- Merge status: **merged** (squash), PR [#1464](https://github.com/safwan5001-source/Nebrax/pull/1464)
+- Base SHA: `5ff3135` · Head SHA: `18e42c3` · **Merge SHA: `410465ecb4ed64f93d1c9c975550e2ed1c8e43e4`**
+
+### CI on the final head `18e42c3`
+| Job | Run / job | Result |
+|---|---|---|
+| pgsql (4 workers) | `38560272335` / `115839335891` | ✅ 6828 tests, 51162 assertions, 0 failures, 3 skipped (13:38). `PostgresTestLockTimeoutTest` ran (+21 assertions) |
+| sqlite | `38560272335` / `115839335456` | ✅ |
+| CI Gate | `38560272495` | ✅ |
+
+Codex review on `18e42c3`: no findings. PRE_MERGE_REVIEW: PASS (PR comment).
 
 ## Post-merge review
-- POST_MERGE_REVIEW: recorded as a PR comment with the Merge SHA.
+**POST_MERGE_REVIEW: PASS** (PR comment). `main` run `38562668450` on `410465e`:
+
+| Job | Result |
+|---|---|
+| pgsql | ✅ 6828 tests, 51162 assertions, 0 failures, 3 skipped (11:09); `PGOPTIONS="-c lock_timeout=60s"` exported |
+| sqlite | ✅ |
+
+No findings. No production deploy.
 
 ## Self-review
 
@@ -190,7 +206,7 @@ Full. No runtime, API, schema or migration change.
 ## Git state
 - Branch: `fix/backend-ci-02-pg-lock-timeout`
 - Base SHA: `5ff3135` (`origin/main`, merge of #1451)
-- Head SHA: recorded in the PR description
+- Head SHA: `18e42c3` · Merge SHA: `410465e`
 
 ## Recommended next task
 **AWJ-BACKEND-CI-03**: local test-environment parity (`setup.sh`), including `PGOPTIONS` so this guard runs the same way locally.

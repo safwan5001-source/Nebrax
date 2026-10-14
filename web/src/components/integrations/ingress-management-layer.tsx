@@ -7,6 +7,7 @@ import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { SecretRevealDialog } from '@/components/shared/secret-reveal-dialog';
 import { TypedConfirmationField } from '@/components/shared/typed-confirmation-field';
 import { IngressCreateDialog } from './ingress-create-dialog';
+import { IngressReassignDialog } from './ingress-reassign-dialog';
 import type { IngressManagement } from './use-ingress-management';
 
 /**
@@ -41,11 +42,13 @@ export function IngressManagementLayer({ management, platformName }: { managemen
           data-kind={notice.kind}
         >
           <span>
-            {notice.kind === 'error' ? t(`errors.${notice.messageKey}`) : t(`notices.${notice.kind}`, { storeId: notice.storeId })}
+            {notice.kind === 'error' ? t(`errors.${notice.messageKey}`) : notice.kind === 'reassigned' ? t('notices.reassigned', { storeId: notice.storeId, operator: notice.operatorName }) : t(`notices.${notice.kind}`, { storeId: notice.storeId })}
           </span>
           <Button type="button" variant="ghost" size="sm" onClick={management.dismissNotice}>{t('notices.dismiss')}</Button>
         </div>
       ) : null}
+
+      {management.reassignPoint ? <IngressReassignDialog key={management.reassignPoint.id} management={management} /> : null}
 
       {management.createOpen ? (
         <IngressCreateDialog
