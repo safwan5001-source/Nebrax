@@ -65,5 +65,5 @@ invalid-`PORT` exit, Android-only, both-configured and nothing-configured contai
 
 - iOS deferred · Apple route fail-closed (503) until `APPLE_TEAM_ID` exists.
 - Remaining operational inputs for Android: set the fingerprint variable on `awj-preview-host`, deploy, attach `preview.awjdev.xyz`, DNS, TLS — each requires separate owner authorization, **none performed**.
-- The three placeholder hosts in `mobile/` still need their own reviewed PR (10B Phase 2).
+- Preview-host wiring in `mobile/` is **already complete** (MP-10B-1): `AndroidManifest.xml`, `Runner.entitlements` and `preview_deep_link.dart` all point at `preview.awjdev.xyz`. Nothing remains to change there. The separate production deep-link host `awj-runtime-proof.example` is a placeholder **by design** and is out of scope for this task.
 - **Criterion #10: OPEN.**
