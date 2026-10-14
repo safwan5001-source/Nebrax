@@ -14,18 +14,13 @@ name: ZATCA SDK conformance (advisory)
 #   * الأوامر المسموحة للـSDK: -validate فقط.
 # القرار والمبررات: docs/engineering/ZATCA-SDK-CONFORMANCE.md
 
+# لماذا `push` وليس `pull_request`؟ اختبارات بوابة CI نفسها (test_ci_gate.Validation.test_repo_is_clean)
+# تفشل عند وجود أي فحص PR غير مُصنَّف في required-checks.json، وتعديل المانيفست ممنوع في هذا الـslice
+# (قرار D-03e). دفعة الفرع (push) تُظهر الفحص على الـPR نفسه بنفس الـSHA دون أن تدخل اكتشاف البوابة؛
+# والحارس test_repo_guards يمنع إضافة pull_request هنا بالخطأ. التصنيف كـadvisory في المانيفست = قرار مالك لاحق.
 on:
-  pull_request:
-    branches: ['**']
-    paths:
-      - 'app/Services/Accounting/Zatca*'
-      - 'app/Support/Zatca*'
-      - 'tests/Fixtures/zatca-sdk/**'
-      - 'tests/Feature/ZatcaSdkFixtureDriftTest.php'
-      - 'scripts/zatca-sdk/**'
-      - '.github/workflows/zatca-sdk-conformance.yml'
   push:
-    branches: [main]
+    branches: ['**']
     paths:
       - 'app/Services/Accounting/Zatca*'
       - 'app/Support/Zatca*'

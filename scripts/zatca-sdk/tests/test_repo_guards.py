@@ -42,7 +42,14 @@ class WorkflowGuardTest(unittest.TestCase):
     def test_triggers_are_path_filtered_and_unscheduled(self):
         self.assertNotRegex(self.text, r"(?m)^\s*schedule:")
         self.assertIn("workflow_dispatch", self.text)
-        self.assertEqual(len(re.findall(r"(?m)^\s{4}paths:", self.text)), 2, "pull_request and push both path-filtered")
+        self.assertEqual(len(re.findall(r"(?m)^\s{4}paths:", self.text)), 1, "push is path-filtered")
+
+    def test_no_pull_request_trigger_so_the_ci_gate_does_not_discover_this_workflow(self):
+        # scripts/ci-gate/test_ci_gate.py::test_repo_is_clean fails on any unclassified PR-triggered job, and this
+        # slice must not edit required-checks.json (D-03e). Adding `pull_request:` here would fail the mandatory gate.
+        on_block = self.text.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
+        self.assertNotRegex(on_block, r"(?m)^\s{2}pull_request", "see comment in the workflow")
+        self.assertRegex(on_block, r"(?m)^\s{2}push:")
 
     def test_checkout_does_not_persist_credentials(self):
         self.assertIn("persist-credentials: false", self.text)

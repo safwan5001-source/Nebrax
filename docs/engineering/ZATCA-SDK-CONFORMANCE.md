@@ -2,6 +2,13 @@
 
 > **Advisory.** This harness is a development oracle, not a ZATCA compliance statement.
 > It is not a required check and is not registered in the CI Gate manifest.
+>
+> **Trigger design.** The workflow triggers on `push` (all branches, path-filtered) and `workflow_dispatch` — *not* on
+> `pull_request`. Reason: the CI Gate's own self-test (`scripts/ci-gate/test_ci_gate.py::Validation::test_repo_is_clean`)
+> fails on any PR-triggered job that is not classified in `.github/ci-gate/required-checks.json`, and this slice may
+> not edit that manifest (D-03e). A branch push shows the same checks on the PR's head SHA without entering the
+> gate's discovery. Classifying the jobs as `advisory` in the manifest (a two-entry change) is the alternative and
+> needs the owner's approval; if made, `pull_request` + `paths` can be restored.
 
 ## What it does
 
