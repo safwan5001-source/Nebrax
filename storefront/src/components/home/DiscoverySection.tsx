@@ -5,9 +5,13 @@ import {
   discoveryListingParams,
   fetchDiscoveryValues,
 } from "@/lib/commerce/data-sections";
+import {
+  buildDiscoveryItems,
+  visibleDiscoveryOptions,
+} from "@/lib/presentation/discovery-items";
+import { resolveDiscoveryDisplay } from "@/lib/presentation/discovery-templates";
 import type { DiscoveryContent } from "@/lib/presentation/section-content";
-
-const MAX_OPTIONS = 12;
+import { DiscoveryItems } from "./DiscoveryItems";
 
 /**
  * FLOWERS-H9b / ADR-21 — the published "discovery" section ("Shop by occasion /
@@ -18,6 +22,10 @@ const MAX_OPTIONS = 12;
  * product list meta, so a merchant renaming a value or a value running out of
  * products is reflected immediately. A dimension with no visible value — or a
  * failed read — leaves no section.
+ *
+ * AWJ-VD-H1 / VD-4b: a document that chose a `layout` (or a `template`, which carries one) renders the visual
+ * layouts in `DiscoveryItems`, each value's real visual resolved by the VD-1a chain. A document with neither is a
+ * legacy one and keeps the `display` tiles / chips markup below exactly as before.
  */
 export async function DiscoverySection({
   content,
@@ -52,7 +60,9 @@ export async function DiscoverySection({
     (selector.axis === "brand"
       ? t("shopByBrand")
       : `${t("discoverBy")} ${values.name}`.trim());
-  const options = values.options.slice(0, MAX_OPTIONS);
+  const display = resolveDiscoveryDisplay(content);
+  // `valueSort` and `maxItems` default to the legacy behaviour (the API's order, 12): a legacy document is unchanged.
+  const options = visibleDiscoveryOptions(values.options, display);
 
   const href = (value: string) => {
     const query = new URLSearchParams(
@@ -60,6 +70,30 @@ export async function DiscoverySection({
     ).toString();
     return `${basePath}/products?${query}`;
   };
+
+  if (display.layout !== null) {
+    const layoutDisplay = { ...display, layout: display.layout };
+    const numbers = new Intl.NumberFormat(locale);
+    return (
+      <section aria-labelledby={headingId}>
+        <h2
+          id={headingId}
+          className="text-base font-extrabold text-store-foreground md:text-lg"
+        >
+          {title}
+        </h2>
+        <DiscoveryItems
+          layout={display.layout}
+          display={layoutDisplay}
+          items={buildDiscoveryItems(values, layoutDisplay)}
+          hrefOf={href}
+          idPrefix={headingId}
+          formatCount={(count) => numbers.format(count)}
+          describeCount={(count) => t("discoveryProductCount", { count })}
+        />
+      </section>
+    );
+  }
 
   return (
     <section aria-labelledby={headingId}>

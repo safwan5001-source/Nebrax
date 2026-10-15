@@ -153,6 +153,7 @@
     "shopSelection": "Shop the selection",
     "discoverBy": "Shop by",
     "shopByBrand": "Shop by brand",
+    "discoveryProductCount": "{count, plural, one {# product} other {# products}}",
     "earliestDelivery": "Earliest delivery",
     "deliveryToday": "Today",
     "deliveryTomorrow": "Tomorrow",

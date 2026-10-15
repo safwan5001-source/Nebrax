@@ -120,6 +120,9 @@
   --color-store-footer-muted: var(--store-footer-muted);
   --color-store-footer-link: var(--store-footer-link);
   --color-store-footer-border: var(--store-footer-border);
+  /* AWJ-VD-H1 / VD-4b — caption scrim over a facet-visual image (discovery `textPosition: overlay`). */
+  --color-store-scrim: var(--store-scrim);
+  --color-store-scrim-foreground: var(--store-scrim-foreground);
 
   /* Shell metrics. Kept as theme values so shell components never hard-code
      a header/nav height that a sibling component has to guess again. */
@@ -381,6 +384,14 @@ input[type="search"]::-webkit-search-cancel-button {
   --store-footer-link: #d1d5db;
   --store-footer-border: #1f2937;
   /* CUST-HV V5c — originals, restored on nested surfaces inside a recoloured section. */
+  /*
+   * AWJ-VD-H1 / VD-4b — the caption scrim of a discovery tile with `textPosition: overlay`. Fixed on purpose (not a
+   * merchant colour): a caption sits on an arbitrary merchant photo, so the pair is chosen for the worst case. White
+   * on 72% black over a pure-white photo composites to #474747, which is 9.3:1 (>= 4.5:1, test-enforced).
+   */
+  --store-scrim: rgb(0 0 0 / 0.72);
+  --store-scrim-foreground: #ffffff;
+
   --store-primary-foreground-base: var(--store-primary-foreground);
   --store-footer-foreground-base: var(--store-footer-foreground);
   --store-footer-muted-base: var(--store-footer-muted);

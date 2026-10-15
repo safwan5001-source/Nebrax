@@ -153,6 +153,7 @@
     "shopSelection": "تسوّق المختارات",
     "discoverBy": "تسوّق حسب",
     "shopByBrand": "تسوّق حسب العلامة التجارية",
+    "discoveryProductCount": "{count, plural, zero {لا منتجات} one {منتج واحد} two {منتجان} few {# منتجات} many {# منتجاً} other {# منتج}}",
     "earliestDelivery": "أقرب موعد توصيل",
     "deliveryToday": "اليوم",
     "deliveryTomorrow": "غداً",

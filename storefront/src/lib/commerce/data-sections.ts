@@ -1,6 +1,14 @@
 import { getLocale } from "next-intl/server";
+import type {
+  FacetValueVisual,
+  FacetVisualDefaults,
+} from "@/lib/presentation/facet-visual";
 import type { ShelfSource } from "@/lib/presentation/section-content";
 import { storefrontFetch } from "./config";
+import {
+  type ListingFacetImageSource,
+  parseListingFacets,
+} from "./listing-facets";
 import { mapAwjProductToViewModel } from "./mappers";
 import type {
   AwjListResponse,
@@ -71,6 +79,13 @@ export interface DiscoveryOption {
   value: string;
   name: string;
   count: number;
+  /**
+   * AWJ-VD-H1 / VD-4b — the value's own visual document (normalized, not resolved; absent = none), exactly as
+   * `parseListingFacets` returns it. Its `image`, if any, has `imageSources`: same-origin proxy paths only. Brands
+   * carry neither (the brand axis has no visual identity).
+   */
+  visual?: FacetValueVisual;
+  imageSources?: ListingFacetImageSource[];
 }
 
 /** Which values to read: a merchant facet by key, or the built-in brands. */
@@ -82,28 +97,18 @@ export interface DiscoveryValues {
   /** The facet's display name; empty for brands (the caller supplies a title). */
   name: string;
   options: DiscoveryOption[];
+  /** The facet-level defaults its values inherit (VD-1a chain). Absent for brands and for a facet without any. */
+  defaults?: FacetVisualDefaults;
 }
-
-type AwjFacetMeta = {
-  key: string;
-  name: string;
-  name_en?: string | null;
-  values: {
-    slug: string;
-    name: string;
-    name_en?: string | null;
-    count: number;
-  }[];
-};
 
 type AwjBrandMeta = { id: string; name: string; count: number };
 
 /**
  * An option is only offered when the listing can honour its link: the same
- * token shapes `parseListingContext` accepts. Otherwise the tile would open an
+ * token shapes `parseListingContext` accepts (facet values are checked by
+ * `parseListingFacets`, brands here). Otherwise the tile would open an
  * unfiltered list under a misleading label.
  */
-const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function pickName(
@@ -153,35 +158,32 @@ export async function fetchDiscoveryValues(
     return options.length === 0 ? null : { name: "", options };
   }
 
-  const facets = Array.isArray(response.meta.facets)
-    ? (response.meta.facets as unknown[])
-    : [];
-  const facet = facets
+  // One facet row through the shared listing parser (re-normalized documents, canonical proxy sources only, the
+  // `count > 0` visibility rule). Selecting the row by key first keeps the parser's group cap from hiding the
+  // chosen dimension; the first row with the key wins, as before.
+  const row = (Array.isArray(response.meta.facets) ? response.meta.facets : [])
     .filter(isRecord)
-    .map((row) => row as unknown as AwjFacetMeta)
-    .find((row) => row.key === selector.dimension);
-  if (!facet || !Array.isArray(facet.values)) return null;
+    .find((candidate) => candidate.key === selector.dimension);
+  if (!row) return null;
+  const group = parseListingFacets({ facets: [row] }, locale).groups[0];
+  if (!group) return null;
 
-  const options = facet.values
-    .filter(
-      (value) =>
-        isRecord(value) &&
-        typeof value.slug === "string" &&
-        SLUG.test(value.slug) &&
-        typeof value.name === "string" &&
-        value.name.trim() !== "" &&
-        typeof value.count === "number" &&
-        value.count > 0,
-    )
-    .map((value) => ({
-      value: value.slug,
-      name: pickName(value.name, value.name_en, locale),
-      count: value.count,
-    }));
+  const options = group.values
+    .filter((value) => value.count > 0)
+    .map(
+      (value): DiscoveryOption => ({
+        value: value.slug,
+        name: value.name,
+        count: value.count,
+        ...(value.visual ? { visual: value.visual } : {}),
+        ...(value.imageSources ? { imageSources: value.imageSources } : {}),
+      }),
+    );
   if (options.length === 0) return null;
   return {
-    name: pickName(facet.name, facet.name_en, locale),
+    name: group.name,
     options,
+    ...(group.visual?.defaults ? { defaults: group.visual.defaults } : {}),
   };
 }
 
