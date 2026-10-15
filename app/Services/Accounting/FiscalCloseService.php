@@ -108,7 +108,8 @@ class FiscalCloseService
             $drafts = $this->countDocuments($document, $year, 'draft');
             if ($drafts > 0) {
                 $items[] = $this->item(self::SEVERITY_WARNING, "drafts.{$key}", sprintf(
-                    'توجد %d مسودة في %s داخل السنة المالية. المسودات ليست في الدفتر ولا تدخل حساب الإقفال.',
+                    'توجد %d مسودة في %s داخل السنة المالية. المسودات ليست في الدفتر ولا تدخل حساب الإقفال، '
+                    . 'وبعد الإقفال يُرفض ترحيل أي مستند مؤرَّخ داخل السنة ما لم تُفتح السنة رسمياً.',
                     $drafts,
                     $document['label'],
                 ), ['count' => $drafts]);
@@ -139,10 +140,22 @@ class FiscalCloseService
             ), ['account_id' => $retained->id, 'code' => $retained->code, 'name' => $retained->name]);
         }
 
+        // FC-3: الإقفال يمنع كل ترحيل/عكس مؤرَّخ داخل السنة حتى تُفتح رسمياً — يُقال قبل التأكيد لا بعده.
+        // وسنةٌ لم ينقضِ آخر يومها بعد: إقفالها يوقف ترحيل اليوم نفسه (نقطة البيع والمستندات بتاريخ اليوم)
+        // حتى نهايتها — يُذكر صراحةً بلا تغيير شدّة ولا منع.
+        $yearNotEnded = Carbon::today()->lte($year->end_date);
         $items[] = $this->item(self::SEVERITY_INFO, 'close_date', sprintf(
-            'تاريخ قيد الإقفال: %s (نهاية السنة المالية).',
+            'تاريخ قيد الإقفال: %s (نهاية السنة المالية). بعد الإقفال يُرفض كل ترحيل أو عكس مؤرَّخ من %s إلى %s '
+            . 'ما لم تُفتح السنة رسمياً؛ والتصحيحات بتاريخ فترة مفتوحة لا تتأثر.%s',
             $year->end_date->toDateString(),
-        ), ['close_date' => $year->end_date->toDateString()]);
+            $year->start_date->toDateString(),
+            $year->end_date->toDateString(),
+            $yearNotEnded ? ' السنة لم تنتهِ بعد: إقفالها الآن يرفض أيضاً ترحيل العمليات بتاريخ اليوم حتى نهايتها.' : '',
+        ), [
+            'close_date' => $year->end_date->toDateString(),
+            'posting_blocked_after_close' => true,
+            'year_not_ended' => $yearNotEnded,
+        ]);
 
         $posted = [];
         foreach (self::DOCUMENTS as $key => $document) {

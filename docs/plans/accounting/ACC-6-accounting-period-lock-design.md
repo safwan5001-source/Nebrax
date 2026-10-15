@@ -34,7 +34,7 @@ Draft creation/edit/duplicate/delete is allowed even if intended date is locked 
 Posted journals remain immutable. Locking introduces no edit/delete path.
 
 ## Reversal — DECIDED
-Reversal is a new accounting event and must use an open reversal date. The original locked date does not prohibit a correction posted into an open date. Never silently backdate reversal into a lock. LedgerService::reverse continues copying original concrete accounts and dimensions.
+*(FC-3 note, 2026-10-15: `AccountingDateGuard` now also treats a date inside a `closed` fiscal year as not open — `FiscalYearClosedException` extends `AccountingPeriodLockedException`. Period-lock behaviour itself is unchanged and independent.)* Reversal is a new accounting event and must use an open reversal date. The original locked date does not prohibit a correction posted into an open date. Never silently backdate reversal into a lock. LedgerService::reverse continues copying original concrete accounts and dimensions.
 
 ## Override — DECIDED: none per transaction in V1
 No administrator bypass flag on an individual post/reversal. To intentionally post into a locked range, an authorized user must explicitly release/change the lock with reason/audit, perform the operation, then re-lock if appropriate. A future exception workflow needs separate design approval.

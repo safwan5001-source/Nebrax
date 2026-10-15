@@ -127,10 +127,17 @@ REM-03 and REM-08 touch disjoint controllers (`Invoice/Return/Quote/DocumentRevi
 
 ### ACC-02-FC — status update (2026-10-15)
 
-> **ACC-02-FC — IN REVIEW (Draft PR), not closed**; closes only after approved merge and verification. Report: `ACC-02-FC-IMPLEMENTATION-REPORT.md`. Resolves the REM-05/06 residual "Fiscal Close VAT line reads only the current role account".
+> **ACC-02-FC — MERGED: PR #1501, merge `90b854f53e4cdd35b8d9118873474387847cefe2`; production deployment NOT VERIFIED.** (Wording at authoring was "IN REVIEW (Draft PR), not closed".) Report: `ACC-02-FC-IMPLEMENTATION-REPORT.md`. Resolves the REM-05/06 residual "Fiscal Close VAT line reads only the current role account".
 > **Owner decisions:** FC-1 Option C · FC-1a warning when unverified (no block) · FC-1b retire `fiscal_close_vat_control_differs` after proven consistency · FC-1c keep `details.tax_output/tax_input` names, changed semantics, add `basis` · FC-1d show unresolved roles with a warning · FC-2 as of `fiscal_years.end_date`.
 > **Implemented:** `VatRoleIntegrityService::balancesAsOf()` (REM-05 role-account set, cumulative `entry_date <= end_date`, posted + reversed, company-wide); `FiscalCloseService::vat_balances` item (info / warning); AR/AP calculation unchanged and labelled `all_time_current_account`. Read-only: no posting, schema or ZATCA change.
 > **Remaining:** FC-3 (no stored close snapshot — live recompute; backdating into a closed year changes the figure absent a period lock) and FC-4 (AR/AP basis). VAT return liability and filing readiness remain REM-28. Production NOT VERIFIED.
+
+### FC-3 — status update (2026-10-15)
+
+> **FC-3 — IN REVIEW (Draft PR), not closed**; closes only after approved merge and verification. Report: `FC-3-IMPLEMENTATION-REPORT.md`. Resolves the ACC-02-FC residual "backdating into a closed year changes the figure absent a period lock".
+> **Owner decisions:** FC3-1 Option C1 (enforce centrally in `AccountingDateGuard`) · FC3-2 mandatory, no tenant bypass toggle · FC3-3 keep `AccountingPeriodLock` independent + superseding notes in FISCAL-1 / FISCAL-2 / ACC-6 docs · FC3-4 readiness wording.
+> **Implemented:** `FiscalYearClosedException` (extends `AccountingPeriodLockedException`, HTTP 422); `AccountingDateGuard::assertOpen` rejects post/reverse dated inside a `closed` year (inclusive bounds, company-wide); readiness `close_date` / `drafts` wording. No amount, journal, VAT, ZATCA, permission or schema change.
+> **Remaining:** stored close snapshot (still live recompute — now stable because a closed year accepts no new entries); FC-4 (AR/AP basis); REM-28. Production NOT VERIFIED.
 
 ### REM-03 — card (ready for owner approval to start)
 
