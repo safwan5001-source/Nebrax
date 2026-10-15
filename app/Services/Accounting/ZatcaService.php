@@ -7,6 +7,8 @@ use App\Models\Invoice;
 use App\Models\Tenant;
 use App\Models\ZatcaCredential;
 use App\Support\ZatcaIcvScope;
+use App\Support\ZatcaIssueTimestamp;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -37,6 +39,10 @@ class ZatcaService
      */
     public function buildFor(Invoice $invoice): array
     {
+        // REM-13a: لحظة الإصدار تُلتقط في InvoiceService::post() قبل هذا النداء وتُحمَل على النموذج.
+        // غيابها فشل مغلق — لا رجوع صامت إلى created_at (وقت المسودة) ولا إلى الساعة الحالية.
+        $issuedAt = $this->issuedAtOf($invoice);
+
         $invoice->loadMissing('lines', 'partner');
         $tenant = Tenant::find($invoice->tenant_id);
 
@@ -87,13 +93,14 @@ class ZatcaService
         // الصامت إلى XML غير موقّع بسبب اختيار بيئة بلا اعتماد أو سياسة ناقصة؛
         // finalizer يفشل مغلقاً، ومعاملة InvoiceService تتراجع بكامل أثرها.
         if (ZatcaCredential::query()->exists()) {
-            $issueTime = $invoice->created_at ?? now();
+            // وقت الإصدار (للوسم 3 في QR المرحلة الثانية) هو لحظة الإصدار المخزَّنة؛ ووقت التوقيع
+            // `now('UTC')` لحظة مستقلة عنها بالتصميم (ADR-0001 قرار 4) — لا يُفترض تطابقهما قانونياً.
             $final = $this->signedInvoiceFinalizer->finalize(
                 $xml,
                 $qr,
                 $tenant?->name ?? '',
                 $tenant?->vat_number ?? '',
-                $issueTime,
+                $issuedAt,
                 now('UTC'),
                 $this->formatAmount($invoice->total),
                 $this->formatAmount($invoice->tax_amount),
@@ -105,6 +112,20 @@ class ZatcaService
         }
 
         return compact('uuid', 'icv', 'prev', 'xml', 'hash', 'qr');
+    }
+
+    /**
+     * لحظة الإصدار المخزَّنة على الفاتورة (UTC). فشل مغلق إن غابت: الفاتورة المرحَّلة قبل REM-13a تبقى
+     * `issued_at = NULL` ولا يُعاد توليد أي من مخرجاتها، فلا يصل إلى هنا إلا ترحيل جديد.
+     */
+    private function issuedAtOf(Invoice $invoice): CarbonImmutable
+    {
+        $issuedAt = $invoice->issued_at;
+        if ($issuedAt === null) {
+            throw new RuntimeException('لحظة إصدار الفاتورة (issued_at) غير محدّدة؛ لا تُولَّد مخرجات ZATCA بلا لحظة إصدار مثبّتة.');
+        }
+
+        return $issuedAt;
     }
 
     /**
@@ -160,7 +181,7 @@ class ZatcaService
         $payload =
             $this->tlv(1, $tenant?->name ?? '') .
             $this->tlv(2, $tenant?->vat_number ?? '') .
-            $this->tlv(3, ($invoice->created_at ?? now())->toIso8601String()) .
+            $this->tlv(3, ZatcaIssueTimestamp::phase1QrText($this->issuedAtOf($invoice))) .
             $this->tlv(4, $this->formatAmount($invoice->total)) .
             $this->tlv(5, $this->formatAmount($invoice->tax_amount));
 
@@ -250,7 +271,10 @@ class ZatcaService
 LINE;
         }
 
-        $issue = ($invoice->created_at ?? now());
+        // REM-13a / BR-KSA-70: توقيت السعودية (AST) بلا Z، مشتق من لحظة الإصدار المخزَّنة.
+        $issuedAt = $this->issuedAtOf($invoice);
+        $issueDate = ZatcaIssueTimestamp::xmlDate($issuedAt);
+        $issueTime = ZatcaIssueTimestamp::xmlTime($issuedAt);
         $transactionCode = $invoice->zatca_document_type === 'standard' ? '0100000' : '0200000';
 
         return <<<XML
@@ -267,8 +291,8 @@ LINE;
   <cbc:ProfileID>reporting:1.0</cbc:ProfileID>
   <cbc:ID>{$e($invoice->number)}</cbc:ID>
   <cbc:UUID>{$e($uuid)}</cbc:UUID>
-  <cbc:IssueDate>{$e($issue->format('Y-m-d'))}</cbc:IssueDate>
-  <cbc:IssueTime>{$e($issue->format('H:i:s'))}</cbc:IssueTime>
+  <cbc:IssueDate>{$e($issueDate)}</cbc:IssueDate>
+  <cbc:IssueTime>{$e($issueTime)}</cbc:IssueTime>
   <cbc:InvoiceTypeCode name="{$transactionCode}">388</cbc:InvoiceTypeCode>
   <cbc:DocumentCurrencyCode>SAR</cbc:DocumentCurrencyCode>
   <cac:AdditionalDocumentReference>

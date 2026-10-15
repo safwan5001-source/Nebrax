@@ -45,6 +45,8 @@ class InvoiceResource extends JsonResource
             'payment_reference' => $this->payment_reference,
             'cash_account_id'   => $this->cash_account_id,
             'invoice_date'   => optional($this->invoice_date)->toDateString(),
+            // REM-13a: لحظة الإصدار القانونية (UTC)، `null` للفواتير المرحَّلة قبلها أو المسودات. للقراءة فقط.
+            'issued_at'      => $this->issued_at?->utc()->format('Y-m-d\TH:i:s\Z'),
             'due_date'       => optional($this->due_date)->toDateString(),
             'notes'          => $this->notes,
             'cost_center_id' => $this->cost_center_id,

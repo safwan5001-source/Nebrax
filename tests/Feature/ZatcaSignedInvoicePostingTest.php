@@ -101,6 +101,62 @@ class ZatcaSignedInvoicePostingTest extends TestCase
             ->where('source_id', $invoice->id)->count());
     }
 
+    /** @test */
+    public function phase_two_qr_tag_three_and_xml_use_the_stored_issue_instant_while_signing_time_stays_independent(): void
+    {
+        $this->configureCredential('developer');
+        config()->set('zatca.signature_policy.identifier', 'https://zatca.gov.sa/security-policy.pdf');
+        config()->set('zatca.signature_policy.digest', base64_encode(hash('sha256', 'pinned-policy', true)));
+
+        // REM-13a: لحظة الإصدار المخزَّنة 07:30:00Z، بينما التوقيع يجري "الآن" 08:45:10Z — لحظتان مختلفتان قانونياً.
+        $invoice = $this->draft();
+        $invoice->forceFill([
+            'zatca_document_type' => 'simplified',
+            'issued_at' => \Carbon\CarbonImmutable::parse('2026-01-15 07:30:00', 'UTC'),
+        ]);
+        $this->travelTo(\Carbon\CarbonImmutable::parse('2026-01-15 08:45:10', 'UTC'));
+
+        $built = app(\App\Services\Accounting\ZatcaService::class)->buildFor($invoice);
+
+        // XML: توقيت السعودية بلا Z (07:30Z = 10:30 AST).
+        $this->assertStringContainsString('<cbc:IssueDate>2026-01-15</cbc:IssueDate>', $built['xml']);
+        $this->assertStringContainsString('<cbc:IssueTime>10:30:00</cbc:IssueTime>', $built['xml']);
+        // QR المرحلة الثانية: وسم 3 بصيغته الحرفية القائمة (UTC بـZ) من اللحظة المخزَّنة لا من لحظة التوقيع.
+        $qr = $this->decodeQr($built['qr']);
+        $this->assertSame('2026-01-15T07:30:00Z', $qr[3]);
+        // التوقيع: لحظة مستقلة ('الآن' عند التوقيع)، ليست لحظة الإصدار.
+        $this->assertSame(1, preg_match('#<xades:SigningTime>([^<]+)</xades:SigningTime>#', $built['xml'], $m));
+        $this->assertSame('2026-01-15T08:45:10Z', $m[1]);
+        $this->assertNotSame($qr[3], $m[1]);
+        // اللحظة نفسها في XML (AST) وQR (UTC).
+        $this->assertTrue(
+            \Carbon\CarbonImmutable::parse('2026-01-15 10:30:00', 'Asia/Riyadh')
+                ->equalTo(\Carbon\CarbonImmutable::parse($qr[3]))
+        );
+    }
+
+    /** @test */
+    public function a_signed_posting_stores_the_instant_and_signs_after_it_without_changing_the_journal(): void
+    {
+        $this->configureCredential('developer');
+        config()->set('zatca.signature_policy.identifier', 'https://zatca.gov.sa/security-policy.pdf');
+        config()->set('zatca.signature_policy.digest', base64_encode(hash('sha256', 'pinned-policy', true)));
+
+        $draft = $this->draft();
+        $this->travelTo(\Carbon\CarbonImmutable::parse('2026-10-15 21:30:00', 'UTC'));
+        $posted = app(InvoiceService::class)->post($draft);
+
+        $this->assertSame('2026-10-15 21:30:00', \Illuminate\Support\Facades\DB::table('invoices')->where('id', $posted->id)->value('issued_at'));
+        $this->assertStringContainsString('<cbc:IssueDate>2026-10-16</cbc:IssueDate>', $posted->zatca_xml);
+        $this->assertStringContainsString('<cbc:IssueTime>00:30:00</cbc:IssueTime>', $posted->zatca_xml);
+        $this->assertSame('2026-10-15T21:30:00Z', $this->decodeQr($posted->zatca_qr)[3]);
+        $this->assertSame(1, preg_match('#<xades:SigningTime>([^<]+)</xades:SigningTime>#', $posted->zatca_xml, $m));
+        $this->assertGreaterThanOrEqual('2026-10-15T21:30:00Z', $m[1]);
+        // الهاش المخزَّن = هاش XML الموقَّع المخزَّن (لا إعادة توليد).
+        $this->assertSame(app(ZatcaInvoiceHasher::class)->hash($posted->zatca_xml), $posted->zatca_hash);
+        $this->assertSame(1, JournalEntry::where('source_type', Invoice::class)->where('source_id', $posted->id)->count());
+    }
+
     private function draft(): Invoice
     {
         return app(InvoiceService::class)->create(
