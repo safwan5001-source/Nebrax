@@ -8,11 +8,11 @@ Plan: [AWJ-ERP-UI-H2-START-PLAN.md](../AWJ-ERP-UI-H2-START-PLAN.md) (merged #151
 | Artifact | Content |
 |---|---|
 | [`h2-a-evidence/ROUTE-INVENTORY-H2.md`](../h2-a-evidence/ROUTE-INVENTORY-H2.md) | Every `web/src/app/**/page.tsx` (239) classified: module, workspace posture, v3-gate scope, H1 coverage, and its baseline crawl result |
-| [`h2-a-evidence/BASELINE-CRAWL-H2.md`](../h2-a-evidence/BASELINE-CRAWL-H2.md) | Baseline matrix: 233 URLs × 6 configurations = **1,398 real-browser loads** (v3 AR 1440 / 390 / 320, v3 EN dark 1440, legacy AR 1440 / 390), axe-core 4.10.2 + measurements |
+| [`h2-a-evidence/BASELINE-CRAWL-H2.md`](../h2-a-evidence/BASELINE-CRAWL-H2.md) | Baseline matrix: 235 URLs × 6 configurations = **1,410 real-browser loads** (v3 AR 1440 / 390 / 320, v3 EN dark 1440, legacy AR 1440 / 390), axe-core 4.10.2 + measurements |
 | [`h2-a-evidence/KIT-ADOPTION-H2.md`](../h2-a-evidence/KIT-ADOPTION-H2.md) | Static adoption of the shared UI kit per page (input to A2/A4) |
 | [`h2-a-evidence/tools/`](../h2-a-evidence/tools/README.md) | Repeatable local fixture, inventory classifier, crawl summariser, state probe, kit scan |
 
-Screenshots (1,398) stay outside git (size). The curated subset and the screen atlas are delivered with A2.
+Screenshots (1,410) stay outside git (size). The curated subset and the screen atlas are delivered with A2.
 
 ## 2. Environment and fixture
 
@@ -37,7 +37,7 @@ Production build of `web/` (`next build` + `next start`) against Laravel built b
 | Excluded with reason | 11 (7 `platform/` → AWJ-PLATFORM-UX; 4 `dev/`/`document-qa` harnesses) |
 | Not covered by H1 | 30 (mostly detail pages H1 did not load; plus `/users`, `/roles`). 8 more templates H1 covered only through concrete paths (`/reports/**/:id`, `/help/:id`, `/integrations/delivery-platforms/:id`) |
 | Outside the v3 gate's route scope | 21 in scope (13 Fuel, 8 auth/self-service), audited on their current surface |
-| Detail templates not loaded in A1 | 29 (no seed record). Covered in A2, whose workflows create these records through the UI. `/journal-entries/:id` was added after review (H1 covered it; the fixture has JE-2026-00002): clean in all 6 configurations (one h1, no axe finding, no overflow), so the 3 axe rules H1 recorded there stay fixed |
+| Detail templates not loaded in A1 | 27 (no seed record). Covered in A2, whose workflows create these records through the UI. `/journal-entries/:id` was added after review (H1 covered it; the fixture has JE-2026-00002): clean in all 6 configurations (one h1, no axe finding, no overflow), so the 3 axe rules H1 recorded there stay fixed. `/help/:id` and `/integrations/delivery-platforms/:id` were added the same way, with H1's concrete paths (`/help/create-sales-invoice`, `…/jahez`): clean in all 6 configurations |
 
 By posture: Ledger (most modules, including the App Builder list/new/versions pages), **Floor** (POS, 13), **Studio** (`/app-builder/:id/builder` and the Store Customizer `/commerce/appearance`), Fuel = **O-14 (deferred to A2)**.
 
@@ -70,7 +70,7 @@ The H1 gains **held** on every audited route (v3 and legacy):
 
 **Expected, not defects:** `/dev/*` returns 404 in a production build (excluded routes). One axe scan failed (`/document-qa`, v3 AR 1440: browser context closed); that route is an excluded dev/QA harness, so no audited result depends on it. The summary reports such failures as «axe scan failed» rather than as zero violations. `/verify-email` returns 422 without a token. `/me` gets 403 on `/api/me/{profile,contract,attendances,payroll-items}` for an owner with no linked employee. A2 judges how that state is *shown*.
 
-**English mode:** after excluding the language switch («ع») and the exact fixture user and branch names in the topbar (`المالك a`, `الفرع الرئيسي`: tenant data), **11 pages** still show Arabic in EN chrome positions (including the journal-entry detail: account names). They are data, not catalog strings, but several are actionable and go to A2:
+**English mode:** after excluding the language switch («ع») and the exact fixture user and branch names in the topbar (`المالك a`, `الفرع الرئيسي`: tenant data), **13 pages** still show Arabic in EN chrome positions (including the journal-entry detail: account names; on the two help/delivery-platform pages crawled after review, only branch names in the branch switcher, i.e. branches created during the A2 workflows). They are data, not catalog strings, but several are actionable and go to A2:
 
 | What is shown in Arabic | Pages | Classification |
 |---|---|---|
@@ -104,7 +104,7 @@ This is the measurable core of the consistency gap H2 targets. A2 confirms it on
 
 ## 6. Not verified in A1
 
-- **Not run:** 29 dynamic detail templates (no seed record; covered by A2 workflows).
+- **Not run:** 27 dynamic detail templates (no seed record; covered by A2 workflows).
 - **Not run:** Firefox and WebKit (Q1), real screen readers, physical devices.
 - **Not run:** Fuel sale, receiving and reconciliation paths are not exercisable locally because PHP `bcmath` is missing; they are green in CI.
 - **Not run:** Performance numbers are not reported, because the local load times are not comparable to H1's (different host load).

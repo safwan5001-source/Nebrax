@@ -95,7 +95,9 @@ async function read(page) {
     ...JSON.parse(process.env.PAGE_SHELL_OVERRIDES || '{}'),
   };
   let current = '';
-  const isPageApi = (u) => u.includes('/api/') && (!shell.has(apiPath(u)) || (OVERRIDES[current] || []).includes(apiPath(u)));
+  // An override key covers the route and its children (`/warehouses` → `/warehouses/new`, `/warehouses/<id>`, …).
+  const overridesFor = (route) => Object.entries(OVERRIDES).filter(([k]) => route === k || route.startsWith(k + '/')).flatMap(([, v]) => v);
+  const isPageApi = (u) => u.includes('/api/') && (!shell.has(apiPath(u)) || overridesFor(current).includes(apiPath(u)));
 
   for (const state of statesCsv.split(',')) {
     const who = state === 'empty' ? 'empty' : state === 'forbidden' ? 'staff' : 'owner';
