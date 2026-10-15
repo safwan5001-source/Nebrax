@@ -18,7 +18,9 @@ use App\Models\TenantApplicationEvent;
 use App\Models\TenantApplicationState;
 use App\Models\User;
 use App\Models\ZatcaCredential;
+use App\Support\ApplicationAccessLevel;
 use App\Support\ApplicationCatalog;
+use App\Support\ApplicationOperationClass;
 use App\Support\TenantApplicationEntitlementDecision;
 use App\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
@@ -202,10 +204,34 @@ class TenantApplicationService
             $entitled = $application['access'] !== ApplicationCatalog::ACCESS_COMMERCIAL
                 || ($entitlements[$key] ?? TenantApplicationEntitlementDecision::DENIED) !== TenantApplicationEntitlementDecision::DENIED;
 
-            $result[$key] = $enabled && $entitled;
+            $result[$key] = $enabled && $entitled && $this->dependenciesAllowRead($key, $application);
         }
 
         return $result;
+    }
+
+    /**
+     * اعتماديات قدرة تجارية تسمح بالقراءة؟ نفس قرار الحارس (`ApplicationAccessDecision` لعملية
+     * القراءة بلا RBAC) — حلٌّ كسول لأن القرار يعتمد على هذه الخدمة نفسها. من غير المفاتيح
+     * التجارية ذات الاعتماديات تعود `true` فلا تُمَسّ.
+     *
+     * @param  array{access:string,dependencies:list<string>}  $application
+     */
+    private function dependenciesAllowRead(string $key, array $application): bool
+    {
+        if ($application['access'] !== ApplicationCatalog::ACCESS_COMMERCIAL || $application['dependencies'] === []) {
+            return true;
+        }
+
+        $tenantId = app(TenantContext::class)->id();
+        $tenant = $tenantId === null ? null : Tenant::find($tenantId);
+        if ($tenant === null) {
+            return false; // الحارس نفسه fail-closed (`findOrFail`)
+        }
+
+        return app(ApplicationAccessDecision::class)
+            ->decide($tenant, $key, ApplicationOperationClass::READ)
+            ->level !== ApplicationAccessLevel::DENIED;
     }
 
     /**

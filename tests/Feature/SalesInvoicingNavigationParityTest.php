@@ -180,8 +180,8 @@ class SalesInvoicingNavigationParityTest extends TestCase
     {
         // حارس شامل: لكل قدرة محروسة تجارياً، «ظاهرة في الشريط» ⇔ «قرار القراءة ليس DENIED»،
         // في ثلاث حالات استحقاق **متجانسة** (المنحة نفسها لكل القدرات). لا يغطّي المنح المختلطة
-        // عبر الاعتماديات: `navVisibility()` لا تقيّم الاعتماديات والحارس يقيّمها — فجوةٌ سابقة
-        // لا تمسّ `sales.invoicing` (بلا اعتماديات)، موثّقة في تقرير NAV-01 كمهمة مستقلة.
+        // عبر الاعتماديات — أُغلقت فجوتها في AWJ-BACKEND-NAV-02 وحارسها
+        // `ApplicationDependencyNavigationParityTest`.
         $commercial = array_keys(array_filter(
             ApplicationCatalog::all(),
             fn (array $application) => $application['access'] === ApplicationCatalog::ACCESS_COMMERCIAL,
