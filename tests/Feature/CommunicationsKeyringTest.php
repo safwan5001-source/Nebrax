@@ -119,4 +119,29 @@ class CommunicationsKeyringTest extends TestCase
         $this->assertSame([], $shipped['hmac']['keys']);
         $this->assertNull($shipped['hmac']['active_version']);
     }
+
+    #[Test]
+    public function every_supported_key_version_is_discovered_not_just_the_first_sixteen(): void
+    {
+        $names = ['COMMUNICATIONS_HMAC_KEY_17', 'COMMUNICATIONS_HMAC_KEY_20000', 'COMMUNICATIONS_HMAC_KEY_32767',
+            'COMMUNICATIONS_HMAC_KEY_32768', 'COMMUNICATIONS_HMAC_KEY_0', 'COMMUNICATIONS_HMAC_KEY_017'];
+        $key = base64_encode(random_bytes(32));
+        foreach ($names as $name) {
+            $_ENV[$name] = $_SERVER[$name] = $key;
+        }
+
+        try {
+            $shipped = require base_path('config/communications.php');
+        } finally {
+            foreach ($names as $name) {
+                unset($_ENV[$name], $_SERVER[$name]);
+            }
+        }
+
+        $this->assertSame([17, 20000, 32767], array_keys($shipped['hmac']['keys']), 'only 1..32767 without leading zeros');
+
+        $keyring = new HmacKeyring($shipped['hmac']['keys'], 20000);
+        $this->assertSame(20000, $keyring->activeVersion());
+        $this->assertSame(64, strlen($keyring->fingerprint('t', 20000, 'x')));
+    }
 }

@@ -540,6 +540,56 @@ class CommunicationOutboxEnqueueTest extends TestCase
         })->once();
     }
 
+    /**
+     * قاعدة غير متاحة باستمرار: يمرّ المسار السريع (إن طُلب) ثم تفشل كل استعلامات الجدول، بما فيها استعلام الاسترداد.
+     * الاستثناء يُرمى قبل غلاف الاتصال فيصل المعالج QueryException خاماً كما في انقطاع حقيقي.
+     */
+    private function failTableQueriesAfter(int $allowedSelects): void
+    {
+        $seen = 0;
+        DB::beforeExecuting(function (string $sql) use (&$seen, $allowedSelects) {
+            if (stripos($sql, 'communication_messages') === false) {
+                return;
+            }
+            if (stripos(ltrim($sql), 'select') === 0 && ++$seen <= $allowedSelects) {
+                return;
+            }
+
+            throw new QueryException('testing', $sql, [self::ADDRESS], new \PDOException('connection lost '.self::ADDRESS));
+        });
+    }
+
+    #[Test]
+    public function a_persistent_outage_during_the_recovery_lookup_is_still_a_storage_error(): void
+    {
+        $tenant = $this->commTenant();
+        $outbox = $this->as($tenant->id);
+        Log::spy();
+        $this->failTableQueriesAfter(1);
+
+        try {
+            $outbox->enqueue($this->commIntent($tenant->id));
+            $this->fail('a persistent outage must surface as a storage error');
+        } catch (CommunicationsStorageException $e) {
+            $this->assertNull($e->getPrevious());
+            $this->assertStringNotContainsString(self::ADDRESS, $e->getMessage());
+        }
+
+        Log::shouldHaveReceived('error')->withArgs(fn (string $m, array $c) => $m === 'communications.enqueue.storage_failure'
+            && array_keys($c) === ['tenant_id', 'sqlstate'] && ! str_contains(json_encode($c), self::ADDRESS))->once();
+    }
+
+    #[Test]
+    public function an_outage_during_the_fast_path_lookup_is_a_storage_error_too(): void
+    {
+        $tenant = $this->commTenant();
+        $outbox = $this->as($tenant->id);
+        $this->failTableQueriesAfter(0);
+
+        $this->expectException(CommunicationsStorageException::class);
+        $outbox->enqueue($this->commIntent($tenant->id));
+    }
+
     #[Test]
     public function a_legacy_row_without_a_fingerprint_is_unverifiable_never_a_match(): void
     {

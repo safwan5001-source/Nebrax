@@ -60,7 +60,11 @@ final class CommunicationOutbox
         $hash = $intent->idempotencyHash();
 
         // مسار سريع للتكرار المعتاد (تحسين فقط؛ التزامن يحسمه القيد الفريد أدناه).
-        $existing = $this->findByHash($tenantId, $hash);
+        try {
+            $existing = $this->findByHash($tenantId, $hash);
+        } catch (QueryException $e) {
+            throw $this->storageFailure($tenantId, $e);
+        }
         if ($existing !== null) {
             return $this->replay($existing, $intent);
         }
@@ -92,17 +96,29 @@ final class CommunicationOutbox
             $message = DB::transaction(static fn () => CommunicationMessage::create($attributes));
         } catch (QueryException $e) {
             // تعارض تفرّد ⇒ الصف موجود (سباق): نقارنه. أي فشل آخر ⇒ لا صف ⇒ خطأ تخزين لا تعارض.
-            $existing = $this->findByHash($tenantId, $hash);
-            if ($existing === null) {
-                Log::error('communications.enqueue.storage_failure', ['tenant_id' => $tenantId, 'sqlstate' => (string) $e->getCode()]);
+            // فشل البحث نفسه (قاعدة غير متاحة باستمرار) يُعامَل خطأ تخزين أيضاً فلا يتسرّب QueryException خاماً.
+            try {
+                $existing = $this->findByHash($tenantId, $hash);
+            } catch (QueryException) {
+                throw $this->storageFailure($tenantId, $e);
+            }
 
-                throw new CommunicationsStorageException('Communication message storage failed.');
+            if ($existing === null) {
+                throw $this->storageFailure($tenantId, $e);
             }
 
             return $this->replay($existing, $intent);
         }
 
         return new EnqueueResult($message->id, EnqueueOutcome::Created, DeliveryStatus::from($message->status));
+    }
+
+    /** سجلّ مُعقَّم (مستأجر + SQLSTATE فقط) واستثناء ثابت بلا سلسلة سابقة: لا حمولة ولا عنوان ولا bindings. */
+    private function storageFailure(string $tenantId, QueryException $e): CommunicationsStorageException
+    {
+        Log::error('communications.enqueue.storage_failure', ['tenant_id' => $tenantId, 'sqlstate' => (string) $e->getCode()]);
+
+        return new CommunicationsStorageException('Communication message storage failed.');
     }
 
     private function trustedTenantId(MessageIntent $intent): string

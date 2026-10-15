@@ -14,13 +14,20 @@
  * التدوير: أضف المفتاح الجديد وحوّل الإصدار النشط؛ تبقى المفاتيح القديمة مضبوطة حتى لا يبقى صفّ بإصدارها
  * (لا إعادة تجزئة للقديم: لا نملك العنوان الخام). **لا يُنشأ أي مفتاح هنا.**
  */
+// كل إصدار مدعوم (1..32767، كما في Schema والـKeyring) يُكتشف من أسماء متغيرات البيئة، لا من نطاق ثابت.
 $hmacKeys = [];
-foreach (range(1, 16) as $version) {
-    $key = env("COMMUNICATIONS_HMAC_KEY_{$version}");
-    if (is_string($key) && $key !== '') {
-        $hmacKeys[$version] = $key;
+foreach ([getenv(), $_ENV, $_SERVER] as $source) {
+    foreach (is_array($source) ? $source : [] as $name => $value) {
+        if (is_string($name) && preg_match('/^COMMUNICATIONS_HMAC_KEY_([1-9][0-9]{0,4})\z/', $name, $m) === 1
+            && (int) $m[1] <= 32767 && ! isset($hmacKeys[(int) $m[1]])) {
+            $key = env($name);
+            if (is_string($key) && $key !== '') {
+                $hmacKeys[(int) $m[1]] = $key;
+            }
+        }
     }
 }
+ksort($hmacKeys);
 
 return [
     'hmac' => [
