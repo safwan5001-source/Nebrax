@@ -1,0 +1,146 @@
+[
+ {
+  "name": "core-light-ar-desktop-dashboard",
+  "theme": "core",
+  "ui": "3",
+  "dark": false,
+  "sidebarBg": "rgb(30, 64, 175)",
+  "topbarBg": "rgb(30, 64, 175)",
+  "overflowX": 0
+ },
+ {
+  "name": "core-light-ar-desktop-invoices",
+  "theme": "core",
+  "ui": "3",
+  "dark": false,
+  "sidebarBg": "rgb(30, 64, 175)",
+  "topbarBg": "rgb(30, 64, 175)",
+  "overflowX": 0
+ },
+ {
+  "name": "core-light-ar-mobile-dashboard",
+  "theme": "core",
+  "ui": "3",
+  "dark": false,
+  "sidebarBg": "rgb(30, 64, 175)",
+  "topbarBg": "rgb(30, 64, 175)",
+  "overflowX": 0
+ },
+ {
+  "name": "core-light-ar-mobile-invoices",
+  "theme": "core",
+  "ui": "3",
+  "dark": false,
+  "sidebarBg": "rgb(30, 64, 175)",
+  "topbarBg": "rgb(30, 64, 175)",
+  "overflowX": 0
+ },
+ {
+  "name": "core-light-en-desktop-dashboard",
+  "theme": "core",
+  "ui": "3",
+  "dark": false,
+  "sidebarBg": "rgb(30, 64, 175)",
+  "topbarBg": "rgb(30, 64, 175)",
+  "overflowX": 0
+ },
+ {
+  "name": "core-light-en-desktop-invoices",
+  "theme": "core",
+  "ui": "3",
+  "dark": false,
+  "sidebarBg": "rgb(30, 64, 175)",
+  "topbarBg": "rgb(30, 64, 175)",
+  "overflowX": 0
+ },
+ {
+  "name": "core-light-en-mobile-dashboard",
+  "theme": "core",
+  "ui": "3",
+  "dark": false,
+  "sidebarBg": "rgb(30, 64, 175)",
+  "topbarBg": "rgb(30, 64, 175)",
+  "overflowX": 0
+ },
+ {
+  "name": "core-light-en-mobile-invoices",
+  "theme": "core",
+  "ui": "3",
+  "dark": false,
+  "sidebarBg": "rgb(30, 64, 175)",
+  "topbarBg": "rgb(30, 64, 175)",
+  "overflowX": 0
+ },
+ {
+  "name": "core-dark-ar-desktop-dashboard",
+  "theme": "core",
+  "ui": "3",
+  "dark": true,
+  "sidebarBg": "rgb(79, 140, 255)",
+  "topbarBg": "rgb(79, 140, 255)",
+  "overflowX": 0
+ },
+ {
+  "name": "core-dark-ar-desktop-invoices",
+  "theme": "core",
+  "ui": "3",
+  "dark": true,
+  "sidebarBg": "rgb(79, 140, 255)",
+  "topbarBg": "rgb(79, 140, 255)",
+  "overflowX": 0
+ },
+ {
+  "name": "core-dark-ar-mobile-dashboard",
+  "theme": "core",
+  "ui": "3",
+  "dark": true,
+  "sidebarBg": "rgb(79, 140, 255)",
+  "topbarBg": "rgb(79, 140, 255)",
+  "overflowX": 0
+ },
+ {
+  "name": "core-dark-ar-mobile-invoices",
+  "theme": "core",
+  "ui": "3",
+  "dark": true,
+  "sidebarBg": "rgb(79, 140, 255)",
+  "topbarBg": "rgb(79, 140, 255)",
+  "overflowX": 0
+ },
+ {
+  "name": "core-dark-en-desktop-dashboard",
+  "theme": "core",
+  "ui": "3",
+  "dark": true,
+  "sidebarBg": "rgb(79, 140, 255)",
+  "topbarBg": "rgb(79, 140, 255)",
+  "overflowX": 0
+ },
+ {
+  "name": "core-dark-en-desktop-invoices",
+  "theme": "core",
+  "ui": "3",
+  "dark": true,
+  "sidebarBg": "rgb(79, 140, 255)",
+  "topbarBg": "rgb(79, 140, 255)",
+  "overflowX": 0
+ },
+ {
+  "name": "core-dark-en-mobile-dashboard",
+  "theme": "core",
+  "ui": "3",
+  "dark": true,
+  "sidebarBg": "rgb(79, 140, 255)",
+  "topbarBg": "rgb(79, 140, 255)",
+  "overflowX": 0
+ },
+ {
+  "name": "core-dark-en-mobile-invoices",
+  "theme": "core",
+  "ui": "3",
+  "dark": true,
+  "sidebarBg": "rgb(79, 140, 255)",
+  "topbarBg": "rgb(79, 140, 255)",
+  "overflowX": 0
+ }
+]

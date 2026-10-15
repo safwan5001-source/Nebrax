@@ -72,6 +72,7 @@ export function MobileBottomNav({ basePath }: MobileBottomNavProps) {
   return (
     <nav
       aria-label={t("primaryNavigation")}
+      data-store-bottom-nav=""
       className="fixed inset-x-0 bottom-0 z-40 border-t border-store-border bg-store-surface pb-[env(safe-area-inset-bottom)] md:hidden"
     >
       <ul className="grid grid-cols-4">

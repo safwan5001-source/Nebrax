@@ -692,6 +692,22 @@ input[type="search"]::-webkit-search-cancel-button {
   html {
     @apply font-sans;
   }
+  /*
+   * WCAG 2.2 SC 2.4.11 (Focus Not Obscured). `MobileBottomNav` is `fixed` over the
+   * bottom of the viewport below `md`; without a matching scroll padding the browser
+   * scrolls a keyboard-focused link only until it is merely *visible*, which leaves
+   * it under the bar. The padding is the bar's own height (token + safe area) plus
+   * 0.25rem for its 1px top border and the 2px focus ring + 2px offset. `:has()` on
+   * the bar's marker scopes it to layouts that actually render the bar (the checkout
+   * group has none), and the query is the bar's own `md:hidden` boundary.
+   */
+  @media (width < 48rem) {
+    html:has([data-store-bottom-nav]) {
+      scroll-padding-bottom: calc(
+        var(--store-bottom-nav-height) + env(safe-area-inset-bottom) + 0.25rem
+      );
+    }
+  }
 }
 
 

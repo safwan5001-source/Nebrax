@@ -16,6 +16,7 @@ import type {
   DiscoveryLayout,
 } from "@/lib/presentation/section-content";
 import { cn } from "@/lib/utils";
+import { CarouselRail } from "./CarouselRail";
 
 /**
  * AWJ-VD-H1 / VD-4b — the five discovery layouts (`image-grid`, `image-cards`, `carousel`, `icon-grid`, `text-list`).
@@ -54,10 +55,11 @@ const GRID =
   "relative mt-4 grid grid-cols-[repeat(var(--disc-cols-m),minmax(0,1fr))] sm:grid-cols-[repeat(var(--disc-cols-t),minmax(0,1fr))] lg:grid-cols-[repeat(var(--disc-cols-d),minmax(0,1fr))]";
 
 /**
- * Carousel: a native scroll-snap row (no script), so keyboard, touch, trackpad and the scrollbar all work and RTL is
+ * Carousel: a native scroll-snap row (no scroll script), so keyboard, touch, trackpad and the scrollbar all work and RTL is
  * the browser's own (the inline-start edge is where it begins). `rows` stacks 1–2 rows on small screens only (§3.7);
  * from `md` up it is one row. Smooth scrolling only when motion is allowed. The padding keeps a focus ring from being
- * clipped by the scroller.
+ * clipped by the scroller. Chromium does not scroll a *partly* visible focused tile into view, so the scroller is
+ * `CarouselRail`, which reveals it on focus (D-S-2).
  *
  * Both lists are `relative`: the `sr-only` labels and counts are absolutely positioned, and without a positioned
  * ancestor inside the scroller they would escape its clipping and widen the whole page (found in the harness).
@@ -135,8 +137,11 @@ export function DiscoveryItems({
       : discoveryColumnVars(display.columns)
   ) as CSSProperties;
 
+  // The carousel scroller reveals a partly clipped focused tile (D-S-2); every other layout stays a plain `<ul>`.
+  const List = carousel ? CarouselRail : "ul";
+
   return (
-    <ul
+    <List
       className={cn(carousel ? CAROUSEL : GRID, GAP[display.gap])}
       style={style}
       data-discovery-layout={layout}
@@ -212,6 +217,6 @@ export function DiscoveryItems({
           </li>
         );
       })}
-    </ul>
+    </List>
   );
 }

@@ -71,6 +71,11 @@ class Rbac
         // DLV-CONNECTOR-OWNERSHIP-1: إعادة الإسناد مستقلة عن العرض والإدارة.
         // لا تُمنح للمحاسب ولا للموظف ولا للخدمة الذاتية.
         'delivery_connector.view', 'delivery_connector.manage', 'delivery_connector.reassign',
+        // INT-UX-6 / PR-6a (DP-E، D1): قراءة سجل تدقيق إعدادات نقاط الاستقبال **فقط**. مستقلة عن
+        // `.view` و`.manage` و`.reassign` (لا ترثها ولا تمنحها) ولا تفتح أي مسار قائم. owner/admin عبر
+        // `*` فقط؛ لا تُضاف إلى `MATRIX` ولا تُمنح لأي دور مخزَّن بهجرة (لا منح ضمني). أساس خامل: لا
+        // مسار ولا قارئ يستعملها بعد (PR-6b).
+        'delivery_connector.audit.view',
         'payments.view', 'payments.manage',
         'purchases.view', 'purchases.manage',
         'returns.view', 'returns.manage',

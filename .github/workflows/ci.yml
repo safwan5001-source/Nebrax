@@ -75,7 +75,7 @@ jobs:
       - name: حارس قائمة النسخ
         run: |
           ALLOWED="app/Contracts app/Mail app/Jobs/Accounting app/Jobs/DocumentCenter app/Models app/Models/Concerns app/Services app/Services/Accounting app/Services/Commerce app/Services/Commerce/Edge app/Services/Commerce/Otp app/Services/DocumentCenter app/Services/AppBuilder app/Services/DeliveryHub app/Services/Pos app/Services/Pos/Hardware \
-                   app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory app/Support/Dns app/Support/Commerce app/Support/Communications app/Tenancy \
+                   app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory app/Support/Dns app/Support/Commerce app/Services/Communications app/Support/Communications app/Tenancy \
                    app/Http/Middleware app/Http/Controllers/Api \
                    app/Http/Requests app/Http/Resources app/Providers \
                    app/Console/Commands"
@@ -152,7 +152,7 @@ jobs:
         run: |
           CORE="$GITHUB_WORKSPACE"
           cd "$APP_DIR"
-          mkdir -p app/Contracts app/Mail app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Commerce app/Services/Commerce/Edge app/Services/Commerce/Otp app/Services/DocumentCenter app/Services/AppBuilder app/Services/DeliveryHub app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory app/Support/Dns app/Support/Commerce app/Support/Communications \
+          mkdir -p app/Contracts app/Mail app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Commerce app/Services/Commerce/Edge app/Services/Commerce/Otp app/Services/DocumentCenter app/Services/AppBuilder app/Services/DeliveryHub app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory app/Support/Dns app/Support/Commerce app/Services/Communications app/Support/Communications \
                    app/Tenancy app/Http/Middleware app/Http/Controllers/Api \
                    app/Http/Requests app/Http/Resources app/Console/Commands \
                    app/Models/Concerns tests/Feature tests/Fixtures/presentation routes config docs/openapi contracts/app-builder contracts/flowers-journey contracts/flowers-admin-journey/responses
@@ -179,6 +179,7 @@ jobs:
           cp -r "$CORE/app/Support/Inventory/"*.php       app/Support/Inventory/
           cp -r "$CORE/app/Support/Dns/"*.php             app/Support/Dns/
           cp -r "$CORE/app/Support/Commerce/"*.php        app/Support/Commerce/
+          cp -r "$CORE/app/Services/Communications/"*.php app/Services/Communications/
           cp -r "$CORE/app/Support/Communications/"*.php  app/Support/Communications/
           cp -r "$CORE/app/Tenancy/"*.php                 app/Tenancy/
           cp -r "$CORE/app/Http/Middleware/"*.php         app/Http/Middleware/

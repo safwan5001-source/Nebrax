@@ -83,6 +83,10 @@ export function buildTokens(tokens) {
 
   const themeDefault = resolveThemeBlock(tokens, tokens.theme.default);
   const themeInk = resolveThemeBlock(tokens, tokens.theme.ink);
+  // AWJ Core: the only theme with an independent Dark shell (THEMES.md §6), so it carries
+  // a light and a dark value set; Default/Ink stay a single set (Ink-Dark = Default-Dark).
+  const themeCoreLight = resolveThemeBlock(tokens, tokens.theme.core.light);
+  const themeCoreDark = resolveThemeBlock(tokens, tokens.theme.core.dark);
   const darkBase = buildDarkBase(tokens);
 
   // Mode-independent tokens: valid in light AND dark under the gate. Outcome is
@@ -94,7 +98,7 @@ export function buildTokens(tokens) {
     ...densityVars(tokens, 'standard'),
   };
 
-  return { base, themeDefault, themeInk, darkBase, modeless };
+  return { base, themeDefault, themeInk, themeCoreLight, themeCoreDark, darkBase, modeless };
 }
 
 function indentBlock(block, pad) {
@@ -164,6 +168,7 @@ function densityVars(tokens, tier) {
 function resolveThemeBlock(tokens, themeNode) {
   const out = {};
   for (const [key, raw] of Object.entries(themeNode)) {
+    if (key.startsWith('$')) continue;
     out[`--awj-${key}`] = resolveRef(raw, tokens);
   }
   return out;
@@ -201,7 +206,7 @@ export const SHELL_SCOPE_MAP = {
 };
 
 export function buildCss(tokens) {
-  const { base, themeDefault, themeInk, darkBase, modeless } = buildTokens(tokens);
+  const { base, themeDefault, themeInk, themeCoreLight, themeCoreDark, darkBase, modeless } = buildTokens(tokens);
 
   const blocks = [];
   blocks.push(cssBlock('html[data-awj-ui="3"]', modeless));
@@ -229,6 +234,11 @@ export function buildCss(tokens) {
   blocks.push(
     cssBlock('html[data-awj-ui="3"][data-awj-theme="ink"]:not(.dark)', themeInk)
   );
+  // AWJ Core · Light: the shell takes the brand blue itself (#1E40AF). Same 13 tokens as every
+  // theme — only their values differ; no component or layout rule keys off the theme.
+  blocks.push(
+    cssBlock('html[data-awj-ui="3"][data-awj-theme="core"]:not(.dark)', themeCoreLight)
+  );
   blocks.push(
     `@media (max-height: 740px) {\n${cssBlock('html[data-awj-ui="3"]', densityVars(tokens, 'compact'), '    ')
       .split('\n')
@@ -243,6 +253,12 @@ export function buildCss(tokens) {
   // present — no shell values are duplicated or redefined, just reused.
   blocks.push(
     cssBlock('html[data-awj-ui="3"].dark', { ...darkBase, ...themeInk })
+  );
+  // AWJ Core · Dark is the one exception to D-12: Core owns an independent Dark shell (the lighter
+  // brand blue #4F8CFF with dark foregrounds). Higher specificity than the unconditional dark block
+  // above, so it overrides only the 13 shell tokens — and only when Core is the chosen theme.
+  blocks.push(
+    cssBlock('html[data-awj-ui="3"][data-awj-theme="core"].dark', themeCoreDark)
   );
 
   // Postures (H4): variables only, scoped to the workspace root that opts in with

@@ -49,6 +49,8 @@ export const PERMISSION_RISK: Readonly<Record<string, RiskKind>> = {
   'pos.audit.export': 'data',
   'pos.investigations.export': 'data',
   'documents.center.audit_export': 'data',
+  // INT-UX-6 / PR-6a (D6): سجل تدقيق إعدادات التكامل يكشف من فعل ماذا ومتى (وأسماء الأشخاص).
+  'delivery_connector.audit.view': 'data',
 };
 
 export function riskOf(key: string): RiskKind | null {
