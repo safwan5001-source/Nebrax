@@ -355,7 +355,7 @@ export function FocalGrid({
               >
                 <span
                   aria-hidden="true"
-                  className={cn('block size-2.5 rounded-full', selected ? 'bg-primary' : 'bg-border')}
+                  className={cn('block size-2.5 rounded-full', selected ? 'bg-primary' : 'bg-muted/50')}
                 />
               </button>
             );

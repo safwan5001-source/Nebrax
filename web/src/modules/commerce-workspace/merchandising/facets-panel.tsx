@@ -17,6 +17,7 @@ import {
   type ResolvedFacetVisual,
 } from '@/modules/store-experience-builder/presentation/facet-visual';
 import { FACET_SHAPE_GEOMETRY } from '@/modules/store-experience-builder/presentation/facet-visual-style';
+import '@/modules/store-experience-builder/store-preview.css';
 import {
   createFacet,
   createFacetValue,
@@ -73,11 +74,13 @@ function writeCollapsed(ids: Set<string>): void {
 function Thumbnail({ visual, label, image }: { visual: ResolvedFacetVisual; label: string; image: FacetVisualTileImage | null }) {
   if (visual.content === 'none') return null;
   const tall = FACET_SHAPE_GEOMETRY[visual.shape]?.aspect === '3 / 4';
+  // `awj-store-preview` supplies the store's tokens (the tile's frame and icon colours), so the thumbnail looks as it
+  // does to shoppers; its page background is dropped so only the shape is drawn on the row.
   return (
     <span
       aria-hidden="true"
       data-row-thumb=""
-      className="flex h-8 w-8 shrink-0 items-center justify-center [&>span]:w-full [&>span>span:last-child]:sr-only"
+      className="awj-store-preview flex h-8 w-8 shrink-0 items-center justify-center !bg-transparent [&_[data-facet-content]>span:last-child]:sr-only"
     >
       <span className={cn('block', tall ? 'w-6' : 'w-8')}>
         <FacetVisualTile visual={{ ...visual, showLabel: false }} label={label} image={image} className="w-full" />
@@ -229,7 +232,7 @@ export function FacetsPanel({
                       aria-label={`${isCollapsed ? vt('expandValues') : vt('collapseValues')} — ${displayName(facet.name, facet.nameEn)}`}
                       onClick={() => toggleCollapsed(facet.id)}
                     >
-                      {isCollapsed ? <ChevronDown className="h-4 w-4" aria-hidden="true" /> : <ChevronUp className="h-4 w-4" aria-hidden="true" />}
+                      {isCollapsed ? <ChevronDown className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" /> : <ChevronUp className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />}
                     </Button>
                     <Thumbnail visual={facetVisual} label={facet.name} image={previewImage(facet.visualPreview)} />
                     <div className="min-w-0 flex-1 space-y-0.5">
@@ -240,15 +243,6 @@ export function FacetsPanel({
                         {facet.systemKey ? <Badge tone="neutral">{t('merchCoreBadge')}</Badge> : null}
                         {!facet.isActive ? <Badge tone="muted">{t('merchInactive')}</Badge> : null}
                       </div>
-                      {canManage && facetBlocked ? (
-                        <p
-                          id={`blocked-${facet.id}`}
-                          data-delete-blocked={facet.id}
-                          className={cn('text-xs text-muted', revealedBlock !== facet.id && 'md:hidden')}
-                        >
-                          {t('merchDeleteBlocked')}
-                        </p>
-                      ) : null}
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -269,7 +263,7 @@ export function FacetsPanel({
                       aria-label={`${canManage ? t('merchEdit') : vt('viewAction')} ${facet.name}`}
                       onClick={() => openEditor(facet.id)}
                     >
-                      {canManage ? <Pencil className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+                      {canManage ? <Pencil className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />}
                     </Button>
                     {canManage ? (
                       <Button
@@ -292,6 +286,15 @@ export function FacetsPanel({
                       </Button>
                     ) : null}
                   </div>
+                  {canManage && facetBlocked ? (
+                    <p
+                      id={`blocked-${facet.id}`}
+                      data-delete-blocked={facet.id}
+                      className={cn('basis-full text-xs text-muted', revealedBlock !== facet.id && 'md:hidden')}
+                    >
+                      {t('merchDeleteBlocked')}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div id={`values-${facet.id}`} className={cn(isCollapsed && 'max-md:hidden')}>
@@ -311,15 +314,6 @@ export function FacetsPanel({
                                   {value.productCount} {t('merchProductsSuffix')}
                                 </span>
                               </div>
-                              {canManage && blocked ? (
-                                <p
-                                  id={`blocked-${value.id}`}
-                                  data-delete-blocked={value.id}
-                                  className={cn('text-xs text-muted', revealedBlock !== value.id && 'md:hidden')}
-                                >
-                                  {t('merchDeleteBlocked')}
-                                </p>
-                              ) : null}
                             </div>
                           </div>
                           <div className="flex items-center gap-1.5">
@@ -340,7 +334,7 @@ export function FacetsPanel({
                               aria-label={`${canManage ? t('merchEdit') : vt('viewAction')} ${value.name}`}
                               onClick={() => openEditor(facet.id, value.id)}
                             >
-                              {canManage ? <Pencil className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+                              {canManage ? <Pencil className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />}
                             </Button>
                             {canManage ? (
                               <Button
@@ -363,6 +357,15 @@ export function FacetsPanel({
                               </Button>
                             ) : null}
                           </div>
+                          {canManage && blocked ? (
+                            <p
+                              id={`blocked-${value.id}`}
+                              data-delete-blocked={value.id}
+                              className={cn('basis-full text-xs text-muted', revealedBlock !== value.id && 'md:hidden')}
+                            >
+                              {t('merchDeleteBlocked')}
+                            </p>
+                          ) : null}
                         </li>
                       );
                     })}
@@ -456,7 +459,10 @@ export function FacetsPanel({
           canManageData={canManage}
           canManageIdentity={canManageIdentity}
           initialTab={dialog.tab}
-          onClose={() => setDialog(null)}
+          onClose={(changed) => {
+            setDialog(null);
+            if (changed) void load();
+          }}
           onSaved={async () => {
             setDialog(null);
             await load();

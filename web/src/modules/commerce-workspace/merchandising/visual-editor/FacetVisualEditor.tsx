@@ -68,7 +68,8 @@ export interface FacetVisualEditorProps {
   /** `commerce.manage` — may write the visual identity and use the media library. */
   canManageIdentity: boolean;
   initialTab?: EditorTab;
-  onClose: () => void;
+  /** The editor was closed without finishing; `changed` says a part had already been saved, so the list is stale. */
+  onClose: (changed: boolean) => void;
   /** Everything was saved: the parent refreshes its list, shows the confirmation and closes the editor. */
   onSaved: () => void | Promise<void>;
   /** The user chose to reload after a version conflict: the parent reopens the editor, on this tab, on fresh data. */
@@ -151,6 +152,8 @@ function EditorBody({
   const [tab, setTab] = useState<EditorTab>(initialTab ?? 'data');
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
+  // A part saved before a later part failed: closing afterwards must still refresh the list behind the editor.
+  const savedAnyRef = useRef(false);
   const [dataResult, setDataResult] = useState<PartStatus>(IDLE);
   const [visualResult, setVisualResult] = useState<PartStatus>(IDLE);
   const [visualErrors, setVisualErrors] = useState<IndexedErrors>(NO_ERRORS);
@@ -246,7 +249,7 @@ function EditorBody({
   const requestClose = useCallback(() => {
     if (savingRef.current) return;
     if (dirty) setConfirmDiscard(true);
-    else onClose();
+    else onClose(savedAnyRef.current);
   }, [dirty, onClose]);
 
   // ── saving ────────────────────────────────────────────────────────────────────
@@ -272,6 +275,7 @@ function EditorBody({
             ? await updateFacet(target.facet.id, patch)
             : await updateFacetValue(target.facet.id, target.value.id, patch);
         if (result.ok) {
+          savedAnyRef.current = true;
           setBaseline((b) => ({ ...b, data: { ...data } }));
           setDataResult({ status: 'saved' });
         } else {
@@ -287,6 +291,7 @@ function EditorBody({
             ? await saveFacetVisual(target.facet.id, payload as FacetVisual | null, baseline.version)
             : await saveFacetValueVisual(target.facet.id, target.value.id, payload as NonNullable<FacetValue['visual']> | null, baseline.version);
         if (result.ok) {
+          savedAnyRef.current = true;
           setBaseline((b) => ({ ...b, draft: structuredCloneDraft(draft), version: result.version }));
           setVisualResult({ status: 'saved' });
         } else {
@@ -379,6 +384,7 @@ function EditorBody({
       dragEnabled={dragEnabled && !saving}
       onFocal={(focal) => update((d) => setFraming(d, { focal }))}
       dir={dir}
+      showTitle={desktop}
     />
   );
 
@@ -451,13 +457,13 @@ function EditorBody({
                 className="flex min-h-11 w-full items-center justify-between gap-3 px-4 text-sm font-medium text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
               >
                 <span className="flex min-w-0 items-center gap-3">
-                  <span aria-hidden="true" className="awj-store-preview flex size-9 shrink-0 items-center justify-center rounded" dir={dir}>
-                    {editedItem ? (
-                      <span className="block w-8 [&>span]:w-full [&>span>span:last-child]:sr-only">
-                        <FacetVisualTile visual={{ ...editedItem.visual, showLabel: false }} label={editedItem.label} image={editedItem.image} />
+                  {editedItem && editedItem.visual.content !== 'none' ? (
+                    <span aria-hidden="true" className="awj-store-preview flex size-9 shrink-0 items-center justify-center rounded !bg-transparent" dir={dir}>
+                      <span className="block w-8 [&_[data-facet-content]>span:last-child]:sr-only">
+                        <FacetVisualTile visual={{ ...editedItem.visual, showLabel: false }} label={editedItem.label} image={editedItem.image} className="w-full" />
                       </span>
-                    ) : null}
-                  </span>
+                    </span>
+                  ) : null}
                   {vt('previewStrip')}
                 </span>
                 {previewOpen ? <ChevronUp className="size-4" strokeWidth={1.7} aria-hidden="true" /> : <ChevronDown className="size-4" strokeWidth={1.7} aria-hidden="true" />}
@@ -544,7 +550,7 @@ function EditorBody({
             onClose={() => setConfirmDiscard(false)}
             onConfirm={async () => {
               setConfirmDiscard(false);
-              onClose();
+              onClose(savedAnyRef.current);
               return null;
             }}
           />

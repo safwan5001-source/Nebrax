@@ -723,6 +723,30 @@ describe('closing with unsaved changes', () => {
     const { onClose } = mount({});
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledWith(false);
+  });
+
+  it('Escape on an edited editor asks instead of closing', async () => {
+    const { onClose } = mount({});
+    await userEvent.type(screen.getByLabelText('Arabic name'), 'x');
+    await userEvent.keyboard('{Escape}');
+    expect(await screen.findByRole('dialog', { name: 'Unsaved changes' })).toBeTruthy();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('after a partly saved attempt, discarding still tells the parent the list is stale', async () => {
+    apiMock
+      .mockResolvedValueOnce({ data: { value: { id: 'v2', slug: 'birthday', name: 'Birthday 2' } } })
+      .mockRejectedValueOnce(new ApiError(422, 'bad', { code: 'visual_invalid', errors: { 'visual.shape': ['unknown_shape'] } }));
+    const { onClose } = mount({});
+    await userEvent.type(screen.getByLabelText('Arabic name'), ' 2');
+    await openTab('Appearance');
+    await userEvent.click(screen.getByRole('button', { name: 'Square' }));
+    await save();
+    await screen.findByText(/Some appearance settings are invalid/);
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Discard changes' }));
+    expect(onClose).toHaveBeenCalledWith(true);
   });
 
   it('asks before discarding edits, and keeps the editor open when the user keeps editing', async () => {
@@ -752,6 +776,7 @@ describe('closing with unsaved changes', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Restore inheritance — Shape' }));
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledWith(false);
   });
 });
 

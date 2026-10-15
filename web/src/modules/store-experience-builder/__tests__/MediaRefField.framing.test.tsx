@@ -27,7 +27,7 @@ vi.mock("@/modules/commerce-workspace/storefront-media", async (original) => ({
 
 const t = (key: Parameters<typeof customizerMessage>[1]) => customizerMessage("en", key);
 
-function field(framing?: boolean) {
+function field(framing?: boolean, extra: { altRequired?: boolean } = {}) {
   return render(
     <MediaRefField
       slot="facet"
@@ -37,6 +37,7 @@ function field(framing?: boolean) {
       locale="en"
       onChange={() => undefined}
       {...(framing === undefined ? {} : { framing })}
+      {...extra}
     />,
   );
 }
@@ -82,5 +83,22 @@ describe("MediaRefField framing prop (VD-3)", () => {
     await screen.findByText("storefront-hero.jpg");
     expect(screen.getByRole("button", { name: t("mediaEditImage") })).toBeTruthy();
     expect(framingEditor).toHaveBeenCalled();
+  });
+
+  it("altRequired={false} shows a missing alt as a neutral note; the default keeps the red «required» error", async () => {
+    const { unmount } = field(false, { altRequired: false });
+    await screen.findByText("storefront-hero.jpg");
+    const optional = document.querySelector('[data-alt-coverage="missing"]') as HTMLElement;
+    expect(optional.textContent).toBe(t("mediaAltMissing"));
+    expect(optional.className).toContain("text-muted");
+    expect(optional.className).not.toContain("text-negative");
+    expect(document.querySelector('[data-media-alt="ar"]')?.getAttribute("aria-invalid")).toBeNull();
+    unmount();
+
+    field(false);
+    await screen.findByText("storefront-hero.jpg");
+    const required = document.querySelector('[data-alt-coverage="missing"]') as HTMLElement;
+    expect(required.className).toContain("text-negative");
+    expect(document.querySelector('[data-media-alt="ar"]')?.getAttribute("aria-invalid")).toBe("true");
   });
 });

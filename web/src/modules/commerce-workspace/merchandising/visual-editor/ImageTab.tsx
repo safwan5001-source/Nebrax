@@ -80,7 +80,8 @@ function IdentityBlock({
   const choice = choiceOf(doc, mode);
   const err = (group: Parameters<typeof errorKey>[1]) => errors.byField[errorKey(scope, group)];
   const contentState = propState(kind, facetVisual, draft, scope, 'content');
-  const gated = media === 'gated';
+  // The explanation is for someone who could have used the library; a read-only role has its own banner instead.
+  const gated = media === 'gated' && !readOnly;
   const hasImageChoice = mode !== 'defaults';
 
   const options: SegmentOption<ContentChoice>[] = [
@@ -153,7 +154,10 @@ function ImageSection({ scope, ...props }: IdentityTabProps & { scope: Scope }) 
   const note = imageNoteKey(imageSource.state);
 
   return (
-    <div className="space-y-2" data-section="image">
+    <div
+      className="space-y-2 [&_button]:min-h-11 [&_input:not([type=checkbox])]:h-11 [&_label.cursor-pointer]:min-h-11"
+      data-section="image"
+    >
       {readOnly ? (
         <ReadOnlyImage {...props} />
       ) : (

@@ -24,7 +24,6 @@ export const VISUAL_EDITOR_MESSAGES = {
     tabImage: 'الصورة والأيقونة',
     tabAppearance: 'المظهر',
     tabHasError: 'يحتوي هذا التبويب على خطأ',
-    editorTabs: 'أقسام المحرر',
 
     // Data tab (C7: the same labels for a dimension and a value)
     nameAr: 'الاسم بالعربية',
@@ -34,13 +33,11 @@ export const VISUAL_EDITOR_MESSAGES = {
     statusInactive: 'معطّل',
     slugLabel: 'المعرّف (slug)',
     keyLabel: 'المفتاح',
-    readOnlyField: 'للقراءة فقط',
     productCountLabel: 'عدد المنتجات',
 
     // Banners
     identityReadOnly:
       'تعديل الصورة والأيقونة والمظهر يتطلب صلاحية إدارة المتجر الإلكتروني. اطلب من مالك المؤسسة أو المسؤول منحك إياها.',
-    allReadOnly: 'لا تملك صلاحية تعديل التسويق — العرض فقط.',
 
     // Content type
     contentTitle: 'نوع المحتوى',
@@ -77,7 +74,6 @@ export const VISUAL_EDITOR_MESSAGES = {
     selfSectionHelp: 'كيف يظهر البُعد نفسه، كغلافه أو بطاقته.',
     defaultsSection: 'افتراضات القيم',
     defaultsSectionHelp: 'ما ترثه قيم هذا البُعد ما لم تُخصَّص قيمة بعينها. لا تشمل الصورة، فهي لكل قيمة على حدة.',
-    valueSection: 'هذه القيمة',
 
     // Appearance
     shapeTitle: 'الشكل',
@@ -125,7 +121,6 @@ export const VISUAL_EDITOR_MESSAGES = {
     layoutRail: 'شريط',
     layoutIcons: 'أيقونات',
     layoutList: 'قائمة',
-    previewEditing: 'قيد التعديل',
     previewFacetSelf: 'البُعد نفسه',
     previewFacetValues: 'قيم البُعد',
     previewDragHint: 'اسحب على الصورة لتحديد نقطة التركيز.',
@@ -141,7 +136,6 @@ export const VISUAL_EDITOR_MESSAGES = {
     partData: 'البيانات',
     partVisual: 'الصورة والمظهر',
     partSaved: 'تم الحفظ',
-    partFailed: 'لم يُحفظ',
     versionConflict: 'تغيّرت الهوية من مستخدم آخر. أعد التحميل لترى آخر نسخة.',
     reload: 'إعادة التحميل',
     reloadHint: 'تعيد إعادة التحميل فتح المحرر بآخر نسخة محفوظة، وتُفقد تعديلات الصورة والمظهر التي لم تُحفظ.',
@@ -170,7 +164,6 @@ export const VISUAL_EDITOR_MESSAGES = {
     // List
     collapseValues: 'طيّ القيم',
     expandValues: 'عرض القيم',
-    valuesCount: '{count} قيمة',
   },
   en: {
     titleFacet: 'Edit dimension',
@@ -187,7 +180,6 @@ export const VISUAL_EDITOR_MESSAGES = {
     tabImage: 'Image & icon',
     tabAppearance: 'Appearance',
     tabHasError: 'This tab has an error',
-    editorTabs: 'Editor sections',
 
     nameAr: 'Arabic name',
     nameEn: 'English name (optional)',
@@ -196,12 +188,10 @@ export const VISUAL_EDITOR_MESSAGES = {
     statusInactive: 'Inactive',
     slugLabel: 'Identifier (slug)',
     keyLabel: 'Key',
-    readOnlyField: 'Read only',
     productCountLabel: 'Products',
 
     identityReadOnly:
       'Editing the image, icon and appearance requires the e-commerce management permission. Ask the account owner or an administrator to grant it.',
-    allReadOnly: 'You do not have permission to edit merchandising — view only.',
 
     contentTitle: 'Content type',
     contentInherit: 'Inherit from dimension',
@@ -236,7 +226,6 @@ export const VISUAL_EDITOR_MESSAGES = {
     selfSectionHelp: 'How the dimension itself appears, such as its cover or card.',
     defaultsSection: 'Value defaults',
     defaultsSectionHelp: 'What this dimension’s values inherit unless a value sets its own. Images are not included: each value has its own.',
-    valueSection: 'This value',
 
     shapeTitle: 'Shape',
     sizeTitle: 'Size',
@@ -281,7 +270,6 @@ export const VISUAL_EDITOR_MESSAGES = {
     layoutRail: 'Rail',
     layoutIcons: 'Icons',
     layoutList: 'List',
-    previewEditing: 'Being edited',
     previewFacetSelf: 'The dimension',
     previewFacetValues: 'Dimension values',
     previewDragHint: 'Drag on the image to set the focal point.',
@@ -296,7 +284,6 @@ export const VISUAL_EDITOR_MESSAGES = {
     partData: 'Data',
     partVisual: 'Image and appearance',
     partSaved: 'Saved',
-    partFailed: 'Not saved',
     versionConflict: 'The identity was changed by another user. Reload to see the latest version.',
     reload: 'Reload',
     reloadHint: 'Reloading reopens the editor on the latest saved version, and unsaved image and appearance edits are lost.',
@@ -322,7 +309,6 @@ export const VISUAL_EDITOR_MESSAGES = {
 
     collapseValues: 'Collapse values',
     expandValues: 'Show values',
-    valuesCount: '{count} values',
   },
 } as const;
 

@@ -66,6 +66,7 @@ export function PreviewPanel({
   dragEnabled,
   onFocal,
   dir,
+  showTitle = true,
   className,
 }: {
   t: VT;
@@ -75,6 +76,8 @@ export function PreviewPanel({
   dragEnabled: boolean;
   onFocal?: (point: { x: number; y: number }) => void;
   dir: 'ltr' | 'rtl';
+  /** The mobile strip already carries its own header, so it hides this one. */
+  showTitle?: boolean;
   className?: string;
 }) {
   const [layout, setLayout] = useState<PreviewLayout>('grid');
@@ -98,7 +101,8 @@ export function PreviewPanel({
       layout === 'list' ? (
         <span className="text-sm text-store-foreground">{item.label}</span>
       ) : (
-        <FacetVisualTile visual={visual} label={item.label} image={item.image} />
+        // `w-full`: the tile's frame is capped at its size but shrinks (max-width 100%) to the cell, as in a store column.
+        <FacetVisualTile visual={visual} label={item.label} image={item.image} className="w-full" />
       );
     const edited = item.edited === true;
     return (
@@ -143,6 +147,7 @@ export function PreviewPanel({
 
   return (
     <div className={cn('space-y-3', className)} data-preview-panel="">
+      {showTitle ? <h3 className="text-sm font-semibold text-text">{t('previewTitle')}</h3> : null}
       <div className="space-y-1.5">
         <span className="block text-xs font-medium text-muted">{t('previewLayoutGroup')}</span>
         <div role="group" aria-label={t('previewLayoutGroup')} className="grid grid-cols-5 gap-1">
