@@ -26,6 +26,8 @@ export default function CommerceMerchandisingPage() {
 
   const user = currentUser();
   const canManage = hasPermission(user?.permissions, user?.role, 'products.manage');
+  // AWJ-VD-H1 / VD-3 — the visual identity is written under `commerce.manage` (D-04); this only mirrors the server's guard.
+  const canManageIdentity = hasPermission(user?.permissions, user?.role, 'commerce.manage');
 
   return (
     <div className="space-y-5">
@@ -45,7 +47,7 @@ export default function CommerceMerchandisingPage() {
 
       {tab === 'facets' ? (
         <TabPanel id="facets">
-          <FacetsPanel t={t} canManage={canManage} />
+          <FacetsPanel t={t} locale={locale.startsWith('en') ? 'en' : 'ar'} canManage={canManage} canManageIdentity={canManageIdentity} />
         </TabPanel>
       ) : null}
       {tab === 'collections' ? (
