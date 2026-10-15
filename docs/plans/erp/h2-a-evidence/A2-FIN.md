@@ -4,7 +4,7 @@
 
 > Saved by the coordinator verbatim from the auditor's hand-back (the auditor's harness refused report files). P0s re-verified by the coordinator in code: `web/src/components/hr/run-detail-dialog.tsx:74` posts `/payroll-runs/{id}/{post|pay…}` with no `useConfirm`; `web/src/app/(app)/cash-and-bank/transfer/page.tsx:49` POSTs `/cash-bank-transfers` with no confirmation.
 
-Run: v3 surface (`awj:ui-version=3`), production build :3001, local API :8000 (shared, single-threaded), 2026-10-15. Users: tenant A owner (workflows); `staff` (15 view permissions) and branch-scoped staff («فرع الخبر») for permissions/scope; tenant-B canary searched. Records tagged `H2-A2-FIN`. Repository untouched. Paths relative to `a2/fin/`: [`a2/fin/NN-*.jpg`](a2/fin/) (15), `shots/{ar1440,ar390,en1440,staff1440}__<route>.png` (atlas, 288 loads of 72 static routes), `shots/detail-{loading,error,notfound,staff,m390}__*.png`, `wf/<workflow>/NN-*.png` + `log.json`, `$S/out-states/shots/{empty,loading,error,forbidden}__<route>.png`.
+Run: v3 surface (`awj:ui-version=3`), production build :3001, local API :8000 (shared, single-threaded), 2026-10-15. Users: tenant A owner (workflows); `staff` (15 view permissions) and branch-scoped staff («فرع الخبر») for permissions/scope; tenant-B canary searched. Records tagged `H2-A2-FIN`. Repository untouched. Paths relative to this directory: [`a2/fin/NN-*.jpg`](a2/fin/) (15), `shots/{ar1440,ar390,en1440,staff1440}__<route>.png` (atlas, 288 loads of 72 static routes), `shots/detail-{loading,error,notfound,staff,m390}__*.png`, `wf/<workflow>/NN-*.png` + `log.json`, `$S/out-states/shots/{empty,loading,error,forbidden}__<route>.png`.
 
 **Counts: 35 findings — P0 2 · P1 5 · P2 21 · P3 7.**
 

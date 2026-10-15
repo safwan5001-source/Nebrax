@@ -70,17 +70,17 @@ Priority = highest source finding. **Rule** = the A4 contract rule that fixes it
 | ERP-UI-H2-005 | Partner statement drops refunds (backend) | OPS-03 | P0 | — | **Backend task** |
 | ERP-UI-H2-006 | Error, 403 or loading shown as "no records", `0 ⃁` or a blank page | SAL-06, SAL-07, PLT-05, PLT-12, FIN-04, FIN-05, OPS-12, PLT-24 | P1 | R-STATE-1, 2, 4, 6 | **B4** (one state component) + B2 |
 | ERP-UI-H2-007 | Actions not aware of permissions (full forms, then 403 after submit) | FIN-09, SAL-10, PLT-15, PLT-16, PLT-24 | P1 | R-PERM-1..2 | B1 + each wave (UI hides by `permissions`; RBAC unchanged) |
-| ERP-UI-H2-008 | Validation: 6 patterns, English server text, native bubbles, errors far from fields, halalas in a message | PLT-09, PLT-10, PLT-11, PLT-13, FIN-08, FIN-14, SAL-15, SAL-20, SAL-22, OPS-16, OPS-27 | P1 | R-VALID-1..6 | **B3** |
+| ERP-UI-H2-008 | Validation: 6 patterns, English server text, native bubbles, errors far from fields | PLT-09, PLT-10, PLT-11, PLT-13, FIN-08, FIN-14, SAL-15, SAL-20, SAL-22, OPS-16, OPS-27 | P1 | R-VALID-1..6 | **B3** |
 | ERP-UI-H2-009 | Not-found and out-of-scope detail pages: raw `No query results for model…`, pointless retry, blank edit form, no h1 | PLT-08, FIN-08, SAL-21, OPS-33 | P2 | R-STATE-5 | B4 |
 | ERP-UI-H2-010 | Money format drift: old ﷼, «SAR», short format, halalas, minus side, red/green without financial meaning | PLT-04, SAL-17, OPS-19, OPS-18, FIN-06, FIN-12, SAL-30 | P1 | R-MONEY-1, 3, 4, 5 | B2 (cells) + C waves |
 | ERP-UI-H2-011 | POS Floor: scan double-add, amount due invisible below 1024 px, variant barcode price, session close shortage, walk-in customer, payment layout at 720/900 px, out-of-stock tile, `/pos/start` dead end, long logs | OPS-04, 05, 06, 10, 11, 22, 23, 24, 25, 27, 31, 34, 35 | P1 | P-FLOOR | **C2** (no change to sale, payment or stock logic) |
 | ERP-UI-H2-012 | Accessibility: unnamed inputs/buttons, focus lost after Combobox, tiny variant controls, tile names start with company name, Arabic `aria-label` on every date field | OPS-08, SAL-12, OPS-30, OPS-31, PLT-30, FIN-25 | P1 | R-A11Y-1, 4, 5; R-CONFIRM-3; R-TEXT-3 | B3 (shared Combobox, date input) + C2/C3 |
 | ERP-UI-H2-013 | Sales documents: «إلغاء» labelled «إعادة المحاولة», recurring schedule cannot be stopped (API `DELETE` exists), UTC default date, preselected customer, no link to the created document, DN→invoice resubmittable | SAL-04, SAL-09 (stop via the existing `DELETE`, with confirmation), SAL-11, SAL-18, SAL-19, SAL-29, SAL-31, SAL-32, SAL-28 | P1 | P-DOC, R-CONFIRM-3, R-DATE-1, R-NAV-2 | C1 |
-| ERP-UI-H2-014 | Raw codes and keys in Arabic UI: statuses, event codes, class names, permission keys, `posAudit.eventLabels.*`, `fields.*` | PLT-19, OPS-20, FIN-11, FIN-20, FIN-32, PLT-37, A1 raw keys (`/documents/governance`, `/roles`) | P2 | R-TEXT-1, 3 | Each wave (catalog strings only; `name_en` stays separate) |
+| ERP-UI-H2-014 | Raw codes and keys in Arabic UI: statuses, event codes, class names, permission keys, `posAudit.eventLabels.*`, `fields.*` | PLT-19, OPS-20, FIN-11, FIN-20, FIN-32, PLT-37, A1 raw keys (`/documents/governance`, `/roles`) | P2 | R-TEXT-1, 3, 4 | Each wave (catalog strings only; `name_en` stays separate) |
 | ERP-UI-H2-015 | Typography and tone: monospace on Arabic words, invisible «مسودة» badge (1.00:1), two sidebar items highlighted | OPS-17, PLT-35, FIN-29, FIN-17, SAL-16, PLT-33, FIN-30, SAL-33 | P2 | R-TEXT-5, R-A11Y-3, R-NAV-1 | B1 (shell, badge tone) |
 | ERP-UI-H2-016 | List pattern drift: three sort controls, missing status column, `/supplier-refunds` off-pattern, native selects for long lists, HR tabs, pager on empty lists, plurals | SAL-25, SAL-26, SAL-34, OPS-29, FIN-27, FIN-28, PLT-36 | P2 | P-LIST | **B2** (+ O-06 density) |
 | ERP-UI-H2-017 | Form scaffold drift and copied labels («اختر العميل» on supplier fields, «إضافة منتج» for an option value, quantity buttons named "return") | FIN-15, SAL-24, OPS-21, OPS-26, PLT-13, SAL-31 | P2 | P-FORM | B3 + C1/C3/C4 |
-| ERP-UI-H2-018 | Accounting traceability: posted documents do not link their journal entry or reversal; transfers and payroll expose no JE | FIN-10, SAL-08 (owner/ADR dependency, §8) | P2 | R-LINK-1 | C5 (display only; links only where the API returns them) |
+| ERP-UI-H2-018 | Accounting traceability: posted documents do not link their journal entry or reversal; transfers and payroll expose no JE | FIN-10; SAL-08 counted as a dependency (§8), not a source, so the item stays at FIN-10's priority | P2 | R-LINK-1 | C5 (display only; links only where the API returns them) |
 | ERP-UI-H2-019 | Commerce Admin, App Builder, Store Customizer: placeholder home, sample store shown without a store, "edited in another session" on a fresh session, developer terms, publish enabled on an empty app | PLT-18, PLT-22, PLT-23, PLT-31, PLT-32 | P2 | P-STUDIO | C9 (UI only; persistence untouched) |
 | ERP-UI-H2-020 | Document Center: raw statuses, rejected file kept in upload dialog, forbidden message hidden | PLT-19, PLT-20, PLT-21 | P2 | R-STATE-6, R-VALID-2, R-TEXT-1 | C11 |
 | ERP-UI-H2-021 | Fuel: create buttons and `0` counts on forbidden/error screens, errors out of view, technical terms, 390 targets | PLT-24, PLT-25, PLT-26, PLT-29 | P2 | P-LIST/P-FORM (Ledger) | C10 (O-14, §7) |
@@ -113,12 +113,12 @@ Derived from the per-route matrices in each group report §2 with one rule: ✓ 
 | Module | Empty | Loading | Error | Forbidden | Validation | Many rows | Key workflows (result) |
 |---|---|---|---|---|---|---|---|
 | Sales | ✓ | ◐ | ✗ | ✗ | ✗ | ◐ (22 extra invoices; drafts counted as unpaid) | Invoice → post → pay → print ✓ · Return ✗ (posts on create) · CN ✓ (no confirm) · Recurring ◐ (cannot stop) |
-| Customers | ✓ | ✓ | ✗ | ✗ | ✗ | ◐ | Partner summary ✗ (SAL-03) |
+| Customers | ✓ | ◐ | ✗ | ✗ | ✗ | ◐ | Partner summary ✗ (SAL-03) |
 | POS | ◐ | ✓ | ◐ | ✓ | ✗ | ◐ | Sale ✗ for default products (OPS-01) · Sale with unit template ✓ · Close ◐ (hidden shortage) |
-| Inventory | ✓ | ✓ | ◐ | ✓ | ◐ | NV | Opening ✓ / ✗ for variants · Transfer ✓ · Stocktake ✓ (no confirm) |
+| Inventory | ✓ | ✓ | ◐ | ✓ (OPS-32 is an owner decision, not counted) | ◐ | NV | Opening ✓ / ✗ for variants · Transfer ✓ · Stocktake ✓ (no confirm) |
 | Purchases | ✓ | ✓ | ✗ | ◐ | ◐ | NV | PR → RFQ ✗ (dead end) · PQ → PO → bill → pay ✓ · Return ✗ (posts on create) · DN/refund ✓ (no confirm) |
-| Accounting | ✓ | ◐ | ◐ | ✗ | ◐ | NV | Manual journal → post → reverse ✓ (no confirm) |
-| Finance | ✓ | ◐ | ✗ | ✗ | ◐ | NV | Expense ✓ · Receipt ✓ · Transfer ✗ (no confirm) · Custody ✓ |
+| Accounting | ✓ | ◐ | ✗ | ✗ | ◐ | NV | Manual journal → post → reverse ✓ (no confirm) |
+| Finance | ✓ | ◐ | ◐ | ✗ | ◐ | NV | Expense ✓ · Receipt ✓ · Transfer ✗ (no confirm) · Custody ✓ |
 | Reports | ✓ | ◐ | ◐ | ✓ | ✗ (inverted range) | NV | Trial balance parity ✓ · Aging ✗ (period ignored) |
 | HR | ✓ | ◐ | ◐ | ◐ | ◐ | NV | Payroll → accrue → pay ✗ (no confirm) |
 | Settings & admin | ✗ | ◐ | ✗ | ◐ | ◐ | NV | Tax settings ✗ (PLT-01) · Branch ✓ · Applications ◐ (PLT-07) |
