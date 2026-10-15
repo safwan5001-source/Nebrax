@@ -80,7 +80,7 @@
 | `/assets/new` | Accounting | Ledger | yes | `(app)/assets/new/page.tsx` | HTTP 200 · axe 0 |
 | `/cost-centers` | Accounting | Ledger | yes | `(app)/cost-centers/page.tsx` | HTTP 200 · axe 0 |
 | `/journal-entries` | Accounting | Ledger | yes | `(app)/journal-entries/page.tsx` | HTTP 200 · axe 0 |
-| `/journal-entries/:id` | Accounting | Ledger | yes | `(app)/journal-entries/[id]/page.tsx` | NOT LOADED (no fixture) |
+| `/journal-entries/:id` | Accounting | Ledger | yes | `(app)/journal-entries/[id]/page.tsx` | HTTP 200 · axe 0 |
 | `/manual-journals` | Accounting | Ledger | yes | `(app)/manual-journals/page.tsx` | HTTP 200 · axe 0 |
 | `/manual-journals/:id` | Accounting | Ledger | yes | `(app)/manual-journals/[id]/page.tsx` | NOT LOADED (no fixture) |
 | `/manual-journals/new` | Accounting | Ledger | yes | `(app)/manual-journals/new/page.tsx` | HTTP 200 · axe 0 |

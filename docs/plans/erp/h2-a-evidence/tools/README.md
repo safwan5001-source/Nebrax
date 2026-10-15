@@ -33,7 +33,7 @@ Local, isolated audit environment only. Never point any of this at production or
   loading shows a spinner, error shows «تعذّر تحميل التحديثات» with retry.
 - `kit_usage.py` — static adoption of the shared UI kit (`components/nebrax/*`, `DataTable`, states, confirm) per page;
   a lower bound (2 import levels).
-- `routes.template.json` + `make_routes.py` — the 232-URL manifest the baseline crawl loaded, with record ids as placeholders
-  (`{C1}`, `{I1}`, `{MAIN_BRANCH}`…). Every fresh fixture has new UUIDs, so build the list for the current run first:
-  `python3 make_routes.py routes.template.json routes.json @seed-output.txt MAIN_BRANCH=<id> MAIN_WAREHOUSE=<id>`.
-  It refuses to write while any placeholder is unresolved. Filled with this run's ids it reproduces the original manifest exactly.
+- `routes.template.json` + `make_routes.py` — the 233-URL manifest the baseline crawl loaded, with record ids as placeholders
+  (`{C1}`, `{I1}`, `{JE1}`, `{MAIN_BRANCH}`…). Every fresh fixture has new UUIDs, so build the list for the current run first:
+  `python3 make_routes.py routes.template.json routes.json @seed-output.txt MAIN_BRANCH=<id> MAIN_WAREHOUSE=<id> JE1=<id>`.
+  It refuses to write while any placeholder is unresolved. Filled with this run's ids it reproduces the manifest the baseline loaded exactly (232 URLs in the first pass, plus `/journal-entries/:id` added after review).
