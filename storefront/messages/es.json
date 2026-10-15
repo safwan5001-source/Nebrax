@@ -153,6 +153,7 @@
     "shopSelection": "Ver la selección",
     "discoverBy": "Comprar por",
     "shopByBrand": "Comprar por marca",
+    "discoveryProductCount": "{count, plural, one {# producto} other {# productos}}",
     "earliestDelivery": "Entrega más próxima",
     "deliveryToday": "Hoy",
     "deliveryTomorrow": "Mañana",

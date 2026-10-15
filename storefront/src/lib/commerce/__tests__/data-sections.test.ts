@@ -225,6 +225,202 @@ describe("commerce/data-sections — FLOWERS-H9b", () => {
       expect(await fetchDiscoveryValues({ axis: "brand" })).toBeNull();
     });
 
+    describe("VD-4b — visuals carried through the listing parser", () => {
+      const MEDIA = "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e";
+      const VISUAL = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa";
+      const origin = (file: string) =>
+        `/store/v1/media/facet-visuals/${VISUAL}/${MEDIA}/${file}`;
+      const proxy = (file: string) =>
+        `/api/storefront/media/facet-visuals/${VISUAL}/${MEDIA}/${file}`;
+      const facetMeta = (values: unknown[], visual: unknown = null) => ({
+        pagination,
+        facets: [
+          {
+            key: "occasion",
+            name: "المناسبة",
+            name_en: "Occasion",
+            values,
+            visual,
+          },
+        ],
+      });
+
+      it("returns each value's visual, its proxied sources and the facet defaults", async () => {
+        fetchMock.mockResolvedValue(
+          jsonResponse({
+            data: [],
+            meta: facetMeta(
+              [
+                {
+                  slug: "eid",
+                  name: "العيد",
+                  count: 4,
+                  selected: false,
+                  visual: {
+                    shape: "heart",
+                    image: {
+                      mediaId: MEDIA,
+                      fit: "cover",
+                      sources: [
+                        {
+                          width: 160,
+                          format: "webp",
+                          src: origin("thumb-160.webp"),
+                        },
+                        {
+                          width: 320,
+                          format: "jpg",
+                          src: origin("thumb-320.jpg"),
+                        },
+                      ],
+                    },
+                  },
+                },
+                {
+                  slug: "plain",
+                  name: "عادي",
+                  count: 2,
+                  selected: false,
+                  visual: null,
+                },
+              ],
+              { defaults: { icon: "gift", shape: "arch" } },
+            ),
+          }),
+        );
+        const axis = await fetchDiscoveryValues({
+          axis: "facet",
+          dimension: "occasion",
+        });
+        expect(axis?.defaults).toEqual({ icon: "gift", shape: "arch" });
+        expect(axis?.options[0]).toEqual({
+          value: "eid",
+          name: "العيد",
+          count: 4,
+          visual: { image: { mediaId: MEDIA, fit: "cover" }, shape: "heart" },
+          imageSources: [
+            { width: 160, format: "webp", src: proxy("thumb-160.webp") },
+            { width: 320, format: "jpg", src: proxy("thumb-320.jpg") },
+          ],
+        });
+        // a value without a visual carries no visual keys at all
+        expect(axis?.options[1]).toEqual({
+          value: "plain",
+          name: "عادي",
+          count: 2,
+        });
+        expect(Object.keys(axis?.options[1] ?? {})).toEqual([
+          "value",
+          "name",
+          "count",
+        ]);
+      });
+
+      it("never offers a value at count 0, even one the API lists because it is selected", async () => {
+        fetchMock.mockResolvedValue(
+          jsonResponse({
+            data: [],
+            meta: facetMeta([
+              { slug: "eid", name: "العيد", count: 4, selected: false },
+              {
+                slug: "gone",
+                name: "انتهى",
+                count: 0,
+                selected: true,
+                visual: { shape: "star" },
+              },
+            ]),
+          }),
+        );
+        const axis = await fetchDiscoveryValues({
+          axis: "facet",
+          dimension: "occasion",
+        });
+        expect(axis?.options.map((o) => o.value)).toEqual(["eid"]);
+      });
+
+      it("drops an image whose sources are not the canonical proxy files (so the resolver falls back)", async () => {
+        fetchMock.mockResolvedValue(
+          jsonResponse({
+            data: [],
+            meta: facetMeta([
+              {
+                slug: "eid",
+                name: "العيد",
+                count: 4,
+                selected: false,
+                visual: {
+                  icon: "gift",
+                  image: {
+                    mediaId: MEDIA,
+                    sources: [
+                      {
+                        width: 160,
+                        format: "webp",
+                        src: "https://evil.test/x.webp",
+                      },
+                    ],
+                  },
+                },
+              },
+            ]),
+          }),
+        );
+        const axis = await fetchDiscoveryValues({
+          axis: "facet",
+          dimension: "occasion",
+        });
+        expect(axis?.options[0].visual).toEqual({ icon: "gift" });
+        expect(axis?.options[0].imageSources).toBeUndefined();
+      });
+
+      it("finds the dimension even when it is not among the first eight facets the listing shows", async () => {
+        const filler = Array.from({ length: 9 }, (_, i) => ({
+          key: `f${i}`,
+          name: `ف${i}`,
+          values: [{ slug: "a", name: "أ", count: 1, selected: false }],
+        }));
+        fetchMock.mockResolvedValue(
+          jsonResponse({
+            data: [],
+            meta: {
+              pagination,
+              facets: [
+                ...filler,
+                {
+                  key: "occasion",
+                  name: "المناسبة",
+                  values: [
+                    { slug: "eid", name: "العيد", count: 4, selected: false },
+                  ],
+                },
+              ],
+            },
+          }),
+        );
+        const axis = await fetchDiscoveryValues({
+          axis: "facet",
+          dimension: "occasion",
+        });
+        expect(axis?.options.map((o) => o.value)).toEqual(["eid"]);
+      });
+
+      it("the brand axis carries no visuals, and a failed read still rejects", async () => {
+        fetchMock.mockResolvedValue(jsonResponse({ data: [], meta }));
+        const brands = await fetchDiscoveryValues({ axis: "brand" });
+        expect(brands?.defaults).toBeUndefined();
+        expect(
+          brands?.options.every(
+            (o) => o.visual === undefined && o.imageSources === undefined,
+          ),
+        ).toBe(true);
+        fetchMock.mockResolvedValue(jsonResponse({}, false, 500));
+        await expect(
+          fetchDiscoveryValues({ axis: "facet", dimension: "occasion" }),
+        ).rejects.toThrow();
+      });
+    });
+
     it("maps an option to its listing deep link", () => {
       expect(
         discoveryListingParams({ axis: "facet", dimension: "occasion" }, "eid"),

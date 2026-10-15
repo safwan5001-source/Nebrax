@@ -79,7 +79,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Bounds a hostile `sources` list; the origin sends at most eight. */
 export const MAX_IMAGE_SOURCES = 8;
-const MAX_SOURCE_WIDTH = 4096;
+export const MAX_SOURCE_WIDTH = 4096;
 
 /** Built-in dimensions are shown first, in this order. */
 const SYSTEM_ORDER = ["occasion", "recipient"] as const;
