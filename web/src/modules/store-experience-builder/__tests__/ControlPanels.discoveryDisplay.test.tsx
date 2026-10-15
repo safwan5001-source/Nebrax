@@ -162,7 +162,7 @@ describe("Store Builder — discovery display controls (VD-4c)", () => {
   it("the preview uses the merchant's real facet values for the chosen dimension", async () => {
     renderPanel(withDiscovery({ ...LEGACY, layout: "image-grid" }));
     await waitFor(() =>
-      expect(document.querySelector("[data-discovery-preview]")?.textContent).toContain("Value names from your catalog"),
+      expect(document.querySelector("[data-discovery-preview]")?.textContent).toContain("Your catalog's values and pictures"),
     );
     const preview = document.querySelector("[data-preview-layout]") as HTMLElement;
     expect(within(preview).getByText("Birthday")).toBeTruthy();

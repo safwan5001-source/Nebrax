@@ -538,6 +538,7 @@ export function DiscoveryFields({
         t={t}
         facets={facets.state === "ready" ? facets.data : null}
         storeVars={storeVars}
+        onReloadFacets={retryFacets}
       />
 
       {!complete ? <Incomplete message={t("discoveryIncomplete")} /> : null}

@@ -85,7 +85,7 @@ describe("messages", () => {
     const sources = ["DiscoveryDisplayFields.tsx", "DiscoveryPanelPreview.tsx"]
       .map((file) => readFileSync(resolve(__dirname, "..", file), "utf8"))
       .join("\n");
-    const dynamic = /^dd(Template(Name|Desc)|Layout|Device|Gap|Size|TextPosition|CardStyle|ValueSort|ContentSequence|Align)_/;
+    const dynamic = /^dd(Template(Name|Desc)|Layout|Device|Gap|Size|TextPosition|CardStyle|ValueSort|ContentSequence|Align|Sample|Note)_/;
     for (const key of Object.keys(DISCOVERY_DISPLAY_MESSAGES.en)) {
       if (dynamic.test(key)) continue;
       expect(sources, key).toContain(key);
@@ -661,6 +661,7 @@ describe("panel preview", () => {
     render(<Harness locale="en" />);
     expect(preview().getAttribute("dir")).toBe("ltr");
     expect(document.querySelector("[data-discovery-preview]")?.textContent).toContain("Sample values");
+    expect(document.querySelector("[data-discovery-preview]")?.textContent).toContain("Sample preview");
   });
 
   it("paints with the store's own tokens (the .awj-store-preview frame), not admin colours", () => {
@@ -713,7 +714,7 @@ describe("preview model", () => {
     expect(previewSelection(values, "merchant", 24).shown).toHaveLength(12);
   });
 
-  it("real names drive the rendered preview and the caption says so", () => {
+  it("real names drive the rendered preview and the status line says it is the catalog's", () => {
     render(
       <DiscoveryDisplayFields
         base={BASE}
@@ -725,6 +726,6 @@ describe("preview model", () => {
       />,
     );
     expect(screen.getAllByText("B").length).toBeGreaterThan(0);
-    expect(document.querySelector("[data-discovery-preview]")?.textContent).toContain("Value names from your catalog");
+    expect(document.querySelector("[data-discovery-preview]")?.textContent).toContain("Your catalog's values and pictures");
   });
 });
