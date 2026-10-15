@@ -72,7 +72,7 @@ export function MobileNavItem({
   }
 
   return (
-    <div data-mobile-nav-group="">
+    <div data-mobile-nav-group="" className="shrink-0">
       <div className="flex items-center">
         {anchor(item, `${rowClass} flex-1`, { "data-mobile-extra-nav": "" })}
         <button
@@ -83,7 +83,7 @@ export function MobileNavItem({
             label: item.label,
           })}
           onClick={() => setOpen((value) => !value)}
-          className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-50 hover:text-gray-900"
+          className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-store-muted-foreground hover:bg-store-surface-muted hover:text-store-foreground"
         >
           <ChevronDown
             aria-hidden="true"
@@ -94,7 +94,7 @@ export function MobileNavItem({
       <ul
         id={panelId}
         hidden={!open}
-        className="ms-3 border-s border-gray-200 ps-2"
+        className="ms-3 border-s border-store-border ps-2"
       >
         {item.children?.map((child) => (
           <li key={child.id}>

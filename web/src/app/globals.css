@@ -246,6 +246,22 @@ html[data-awj-ui="3"][data-awj-theme="ink"]:not(.dark) {
   --awj-shell-brandmark-bg: #2D5BDB;
 }
 
+html[data-awj-ui="3"][data-awj-theme="core"]:not(.dark) {
+  --awj-shell-bg: #1E40AF;
+  --awj-shell-fg: #FFFFFF;
+  --awj-shell-fg-muted: #CBD9FB;
+  --awj-shell-line: #5573D2;
+  --awj-shell-hover: #2A4DBF;
+  --awj-shell-active-bg: #3558C8;
+  --awj-shell-active-fg: #FFFFFF;
+  --awj-shell-active-shadow: inset 0 0 0 1px #6F8BE0;
+  --awj-shell-apex: #FFFFFF;
+  --awj-shell-field-bg: #18368F;
+  --awj-shell-field-line: #9DB4EE;
+  --awj-shell-focus-ring: #FFFFFF;
+  --awj-shell-brandmark-bg: #FFFFFF;
+}
+
 @media (max-height: 740px) {
   html[data-awj-ui="3"] {
       --awj-grid-row-1l: 32px;
@@ -321,6 +337,22 @@ html[data-awj-ui="3"].dark {
   --awj-shell-field-line: #5A74A8;
   --awj-shell-focus-ring: #7FA8FF;
   --awj-shell-brandmark-bg: #2D5BDB;
+}
+
+html[data-awj-ui="3"][data-awj-theme="core"].dark {
+  --awj-shell-bg: #4F8CFF;
+  --awj-shell-fg: #06101F;
+  --awj-shell-fg-muted: #0F2247;
+  --awj-shell-line: #2D63CC;
+  --awj-shell-hover: #6CA0FF;
+  --awj-shell-active-bg: #EAF0FE;
+  --awj-shell-active-fg: #0E1A31;
+  --awj-shell-active-shadow: 0 1px 2px rgba(6,16,31,.28), 0 0 0 1px rgba(6,16,31,.10);
+  --awj-shell-apex: #0E1A31;
+  --awj-shell-field-bg: #8FB4FF;
+  --awj-shell-field-line: #0E1A31;
+  --awj-shell-focus-ring: #0E1A31;
+  --awj-shell-brandmark-bg: #0E1A31;
 }
 
 html[data-awj-ui="3"] [data-posture="floor"] {
@@ -547,6 +579,17 @@ html[data-awj-ui="3"] [data-awj-shell-field]:focus-within {
 html[data-awj-ui="3"] [data-awj-super-group-label] {
   color: var(--awj-shell-fg-muted);
   opacity: 1;
+}
+
+/* AWJ Core shell focus (THEMES.md §6A). The unified ring above is `--awj-state-focus-ring`
+   (brand-600 in Light), which is invisible on Core's brand-blue shell, and a light ring cannot
+   sit on the bright #4F8CFF Dark shell. Inside the Core chrome the ring takes the shell's own
+   token (white on Light, ink on Dark — each ≥ 3:1 on the shell and on the search field; see the
+   `theme.core.*.shell-focus-ring` contrast checks). Scoped to Core so Default and Ink focus
+   rendering is unchanged, and popovers inside the chrome (which sit on Paper again, see the
+   re-bridge above) keep the workspace ring. */
+html[data-awj-ui="3"][data-awj-theme="core"] [data-awj-shell] :is(a[href], button, input, select, textarea, summary, [tabindex]):focus-visible:not(:is([role="menu"], [role="dialog"], [role="listbox"], [role="tooltip"]) *) {
+  outline-color: var(--awj-shell-focus-ring);
 }
 
 /* Elevation on existing portal-free surfaces (FOUNDATIONS.md §9). These selectors

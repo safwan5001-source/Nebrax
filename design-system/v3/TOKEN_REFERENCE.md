@@ -99,23 +99,23 @@
 
 ## 4. Theme tokens (القشرة فقط)
 
-**القائمة مغلقة: 13 توكناً.** السمة لا تُضيف ولا تُبدّل غيرها. (ومعها ثابتان لا يتبدّلان: `surface-outcome` و`status-*`.)
+**القائمة مغلقة: 13 توكناً.** السمة لا تُضيف ولا تُبدّل غيرها. Core تحمل مجموعتي قيم (Light/Dark: `theme.core.light|dark`)؛ Default وInk مجموعة واحدة (Ink-Dark = Default-Dark). أسباب قيم Core: [`THEMES.md`](./THEMES.md) §6A. (ومعها ثابتان لا يتبدّلان: `surface-outcome` و`status-*`.)
 
-| التوكن | **Default** (Tinted Neutral) | **Ink** | الدور |
-|---|---|---|---|
-| `shell-bg` | `#D5DFF0` | `#0E1A31` | خلفية القشرة |
-| `shell-fg` | `#12203B` | `#E8EEF9` | نص/أيقونة نشطة |
-| `shell-fg-muted` | `#3F4F6C` | `#9FB0CC` | نص عنصر عادي |
-| `shell-line` | `#BFCCE3` | `#22345A` | فواصل القشرة |
-| `shell-hover` | `#C6D3EA` | `#15244A` | hover |
-| `shell-active-bg` | `#FFFFFF` | `#1A2A4A` | العنصر النشط |
-| `shell-active-fg` | `#12203B` | `#FFFFFF` | نص العنصر النشط |
-| `shell-active-shadow` | `0 1px 2px rgba(15,27,51,.14), 0 0 0 1px rgba(15,27,51,.04)` | `inset 0 0 0 1px #2C4170` | بروز النشط |
-| `shell-apex` | `#1E40AF` | `#7FA8FF` | Apex داخل القشرة |
-| `shell-field-bg` | `#E9EFF9` | `#15244A` | حقل البحث |
-| `shell-field-line` | `#6F82A6` | `#5A74A8` | حدّ حقل ≥ 3:1 |
-| `shell-focus-ring` | `#1E40AF` | `#7FA8FF` | تركيز داخل القشرة |
-| `shell-brandmark-bg` | `#1E40AF` | `#2D5BDB` | خلفية علامة المؤسسة الافتراضية |
+| التوكن | **Default** (Tinted Neutral) | **Ink** | **Core · Light** | **Core · Dark** | الدور |
+|---|---|---|---|---|---|
+| `shell-bg` | `#D5DFF0` | `#0E1A31` | `#1E40AF` | `#4F8CFF` | خلفية القشرة |
+| `shell-fg` | `#12203B` | `#E8EEF9` | `#FFFFFF` | `#06101F` | نص/أيقونة نشطة |
+| `shell-fg-muted` | `#3F4F6C` | `#9FB0CC` | `#CBD9FB` | `#0F2247` | نص عنصر عادي |
+| `shell-line` | `#BFCCE3` | `#22345A` | `#5573D2` | `#2D63CC` | فواصل القشرة |
+| `shell-hover` | `#C6D3EA` | `#15244A` | `#2A4DBF` | `#6CA0FF` | hover |
+| `shell-active-bg` | `#FFFFFF` | `#1A2A4A` | `#3558C8` | `#EAF0FE` | العنصر النشط |
+| `shell-active-fg` | `#12203B` | `#FFFFFF` | `#FFFFFF` | `#0E1A31` | نص العنصر النشط |
+| `shell-active-shadow` | `0 1px 2px rgba(15,27,51,.14), 0 0 0 1px rgba(15,27,51,.04)` | `inset 0 0 0 1px #2C4170` | `inset 0 0 0 1px #6F8BE0` | `0 1px 2px rgba(6,16,31,.28), 0 0 0 1px rgba(6,16,31,.10)` | بروز النشط |
+| `shell-apex` | `#1E40AF` | `#7FA8FF` | `#FFFFFF` | `#0E1A31` | Apex داخل القشرة |
+| `shell-field-bg` | `#E9EFF9` | `#15244A` | `#18368F` | `#8FB4FF` | حقل البحث |
+| `shell-field-line` | `#6F82A6` | `#5A74A8` | `#9DB4EE` | `#0E1A31` | حدّ حقل ≥ 3:1 |
+| `shell-focus-ring` | `#1E40AF` | `#7FA8FF` | `#FFFFFF` | `#0E1A31` | تركيز داخل القشرة |
+| `shell-brandmark-bg` | `#1E40AF` | `#2D5BDB` | `#FFFFFF` | `#0E1A31` | خلفية علامة المؤسسة الافتراضية |
 
 ## 5. Posture tokens
 
@@ -202,9 +202,10 @@
 > يستبدل خط الأساس v2.0 أدناه بالكامل تحت البوابة. `--awj-*` تحت `.dark` قيمٌ دلالية حقيقية
 > من `design-system/tokens/awj.tokens.json` (`dark.*`)، وليست أسماء مستعارة لـ`.dark` v2.0.
 > `--awj-surface-outcome` و`--awj-outcome-*` **ثابتة عبر الوضعين** (D-13) فلا تتكرّر هنا.
-> القشرة في الداكن **لا تملك مصفوفة ثانية**: `Ink-Dark = Default-Dark` (D-12) يُنفَّذ حرفياً
+> القشرة في الداكن **لا تملك مصفوفة ثانية** لـDefault/Ink: `Ink-Dark = Default-Dark` (D-12) يُنفَّذ حرفياً
 > بإعادة استعمال `theme.ink.shell-*` المحسوبة في كتلة `.dark` نفسها، أياً كانت قيمة
-> `data-awj-theme` المختارة.
+> `data-awj-theme` المختارة. **الاستثناء الوحيد `core`:** كتلة `[data-awj-theme="core"].dark`
+> (خصوصية أعلى) تُبدّل التوكنز الـ13 وحدها إلى `theme.core.dark` (§4، D-41).
 
 | التوكن | القيمة | من |
 |---|---|---|
@@ -229,9 +230,9 @@
 | `status-warning-fg` | `#D97706` | مطابقة |
 | `state-focus-ring` | `#7FA8FF` | primitive.brand.300 — نفس قيمة `focus-ring-on-ink` |
 | `outcome-edge` *(جديد)* | `#22345A` (ink-600) | يفصل `surface-outcome` عن `surface-desk` القريبين لوناً في الداكن (THEMES.md §6.3) |
-| `shell-*` (13 توكناً) | = `theme.ink.shell-*` | معاد استعمالها حرفياً، لا قيم جديدة |
+| `shell-*` (13 توكناً) | = `theme.ink.shell-*` (إلا عند `core`: `theme.core.dark`) | معاد استعمالها حرفياً لـDefault/Ink؛ Core مستقلة |
 
-### مصفوفة التباين (محسوبة، 28 زوجاً، كلها ناجحة)
+### مصفوفة التباين (محسوبة، 28 زوجاً، كلها ناجحة؛ وCore: 26 زوجاً مسجَّلاً في `contrastChecks` كلها ناجحة)
 
 | الزوج | النسبة | الحدّ |
 |---|---|---|
@@ -290,6 +291,17 @@
 | shell Ink: `fg` / `muted` / `muted على hover` | 14.89 · 7.89 · 6.91 | 4.5 | ✓ |
 | shell Ink: Apex / ink · active | 7.39 · 6.07 | 3.0 | ✓ |
 | shell Ink: field-line / field-bg | 3.25 | 3.0 | ✓ |
+| shell Core Light (`#1E40AF`): `fg` / `muted` / `muted على hover` | 8.72 · 6.17 · 5.10 | 4.5 | ✓ |
+| shell Core Light: Apex نصاً على القشرة · على hover | 8.72 · 7.21 | 4.5 | ✓ |
+| shell Core Light: نص النشط / لوح النشط · Apex شريطاً على لوح النشط | 6.21 · 6.21 | 4.5 · 3.0 | ✓ |
+| shell Core Light: `fg` · `muted` على حقل البحث · field-line / field-bg | 10.70 · 7.57 · 5.19 | 4.5 · 4.5 · 3.0 | ✓ |
+| shell Core Light: حلقة التركيز / القشرة · / الحقل · brandmark / القشرة | 8.72 · 10.70 · 8.72 | 3.0 | ✓ |
+| shell Core Dark (`#4F8CFF`): `fg` / `muted` / `muted على hover` | 5.93 · 4.87 · 6.05 | 4.5 | ✓ |
+| shell Core Dark: Apex نصاً على القشرة · على hover | 5.39 · 6.70 | 4.5 | ✓ |
+| shell Core Dark: نص النشط / لوح النشط · Apex شريطاً على لوح النشط | 15.19 · 15.19 | 4.5 · 3.0 | ✓ |
+| shell Core Dark: `fg` · `muted` على حقل البحث · field-line / field-bg | 9.20 · 7.57 · 8.38 | 4.5 · 4.5 · 3.0 | ✓ |
+| shell Core Dark: حلقة التركيز / القشرة · / الحقل · brandmark / القشرة | 5.39 · 8.38 · 5.39 | 3.0 | ✓ |
+| الأبيض على `#4F8CFF` (مرجع: لماذا نص Dark داكن) | 3.22 | 4.5 | **✗ — لذلك `shell-fg` داكن في Core Dark** |
 | `action-primary` (600) / ink | 1.97 | — | **✗ — لذلك Apex/تركيز على الحبر `brand-300`** |
 | Outcome: fg · label · decimals · rule · green | 16.0 · 11.28 · 8.66 · 7.39 · 9.52 | 4.5 / 3.0 | ✓ |
 
