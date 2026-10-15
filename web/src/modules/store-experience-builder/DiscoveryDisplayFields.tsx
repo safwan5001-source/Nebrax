@@ -440,6 +440,7 @@ export function DiscoveryDisplayFields({
   t,
   facets,
   storeVars,
+  onReloadFacets,
 }: {
   /** The four keys the host panel edits; used for the preview and for resolving the effective display. */
   base: Pick<DiscoveryContent, "title" | "axis" | "dimension" | "display">;
@@ -451,6 +452,8 @@ export function DiscoveryDisplayFields({
   t: T;
   facets: readonly Facet[] | null;
   storeVars?: CSSProperties;
+  /** Loads the dimension list again (fresh signed preview links); the preview offers it when a picture fails to load. */
+  onReloadFacets?: () => void;
 }) {
   const uid = useId();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -619,6 +622,7 @@ export function DiscoveryDisplayFields({
         t={t}
         facets={facets}
         storeVars={storeVars}
+        onReload={onReloadFacets}
       />
 
       {/* ── Layout ─────────────────────────────────────────────── */}
@@ -716,10 +720,21 @@ export function DiscoveryDisplayFields({
             onSelect={(id) => set(setDiscoveryOption(options, "layout", id))}
             columns={2}
             leading={{
+              // «Follows the template» is a STATE of this one property (VD-4a D-08), not a second template picker:
+              // the hint below names the template whose layout is followed; pressing it clears the explicit choice.
               label: template ? t("ddLayoutFromTemplate") : t("ddLayoutLegacy"),
               onSelect: () => set(resetDiscoveryOption(options, "layout")),
             }}
           />
+          {template ? (
+            <span className="block text-[11px] leading-4 text-muted" data-layout-hint={has("layout") ? "override" : "follow"}>
+              {has("layout")
+                ? t("ddLayoutOverridesHint")
+                : t("ddLayoutFollowHint")
+                    .replace("{template}", templateName ?? "")
+                    .replace("{layout}", display.layout ? labelOf(`ddLayout_${display.layout}`) : t("ddLayoutLegacy"))}
+            </span>
+          ) : null}
         </div>
 
         <fieldset className="space-y-1.5" data-dd-control="columns">
