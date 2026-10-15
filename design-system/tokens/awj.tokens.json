@@ -122,6 +122,38 @@
       "shell-field-line": "{primitive.ink.500}",
       "shell-focus-ring": "{primitive.brand.300}",
       "shell-brandmark-bg": "#2D5BDB"
+    },
+    "core": {
+      "light": {
+        "shell-bg": "{primitive.brand.600}",
+        "shell-fg": "#FFFFFF",
+        "shell-fg-muted": "#CBD9FB",
+        "shell-line": "#5573D2",
+        "shell-hover": "#2A4DBF",
+        "shell-active-bg": "#3558C8",
+        "shell-active-fg": "#FFFFFF",
+        "shell-active-shadow": "inset 0 0 0 1px #6F8BE0",
+        "shell-apex": "#FFFFFF",
+        "shell-field-bg": "#18368F",
+        "shell-field-line": "#9DB4EE",
+        "shell-focus-ring": "#FFFFFF",
+        "shell-brandmark-bg": "#FFFFFF"
+      },
+      "dark": {
+        "shell-bg": "{primitive.brand.500}",
+        "shell-fg": "#06101F",
+        "shell-fg-muted": "#0F2247",
+        "shell-line": "#2D63CC",
+        "shell-hover": "#6CA0FF",
+        "shell-active-bg": "{primitive.brand.50}",
+        "shell-active-fg": "{primitive.ink.900}",
+        "shell-active-shadow": "0 1px 2px rgba(6,16,31,.28), 0 0 0 1px rgba(6,16,31,.10)",
+        "shell-apex": "{primitive.ink.900}",
+        "shell-field-bg": "#8FB4FF",
+        "shell-field-line": "{primitive.ink.900}",
+        "shell-focus-ring": "{primitive.ink.900}",
+        "shell-brandmark-bg": "{primitive.ink.900}"
+      }
     }
   },
   "dark": {
@@ -351,6 +383,32 @@
     { "name": "editor warning/warning-bg", "fg": "{editor.warning}", "bg": "{editor.warning-bg}", "min": 4.5 },
     { "name": "editor selection/white canvas", "fg": "{posture.studio.selection-overlay.standard}", "bg": "#FFFFFF", "min": 3.0 },
     { "name": "editor chrome/workspace (structural)", "fg": "{editor.workspace}", "bg": "{editor.chrome}", "min": 1.1 },
-    { "name": "dark shell(ink) apex/bg", "fg": "{theme.ink.shell-apex}", "bg": "{theme.ink.shell-bg}", "min": 3.0 }
+    { "name": "dark shell(ink) apex/bg", "fg": "{theme.ink.shell-apex}", "bg": "{theme.ink.shell-bg}", "min": 3.0 },
+    { "name": "theme.core.light.shell-fg/shell-bg", "fg": "{theme.core.light.shell-fg}", "bg": "{theme.core.light.shell-bg}", "min": 4.5 },
+    { "name": "theme.core.light.shell-fg-muted/shell-bg", "fg": "{theme.core.light.shell-fg-muted}", "bg": "{theme.core.light.shell-bg}", "min": 4.5 },
+    { "name": "theme.core.light.shell-fg-muted/shell-hover", "fg": "{theme.core.light.shell-fg-muted}", "bg": "{theme.core.light.shell-hover}", "min": 4.5 },
+    { "name": "theme.core.light.shell-apex/shell-bg (leaf text)", "fg": "{theme.core.light.shell-apex}", "bg": "{theme.core.light.shell-bg}", "min": 4.5 },
+    { "name": "theme.core.light.shell-apex/shell-hover (hover text)", "fg": "{theme.core.light.shell-apex}", "bg": "{theme.core.light.shell-hover}", "min": 4.5 },
+    { "name": "theme.core.light.shell-active-fg/shell-active-bg", "fg": "{theme.core.light.shell-active-fg}", "bg": "{theme.core.light.shell-active-bg}", "min": 4.5 },
+    { "name": "theme.core.light.shell-apex/shell-active-bg (rail)", "fg": "{theme.core.light.shell-apex}", "bg": "{theme.core.light.shell-active-bg}", "min": 3.0 },
+    { "name": "theme.core.light.shell-fg/shell-field-bg", "fg": "{theme.core.light.shell-fg}", "bg": "{theme.core.light.shell-field-bg}", "min": 4.5 },
+    { "name": "theme.core.light.shell-fg-muted/shell-field-bg", "fg": "{theme.core.light.shell-fg-muted}", "bg": "{theme.core.light.shell-field-bg}", "min": 4.5 },
+    { "name": "theme.core.light.shell-field-line/shell-field-bg", "fg": "{theme.core.light.shell-field-line}", "bg": "{theme.core.light.shell-field-bg}", "min": 3.0 },
+    { "name": "theme.core.light.shell-focus-ring/shell-bg", "fg": "{theme.core.light.shell-focus-ring}", "bg": "{theme.core.light.shell-bg}", "min": 3.0 },
+    { "name": "theme.core.light.shell-focus-ring/shell-field-bg", "fg": "{theme.core.light.shell-focus-ring}", "bg": "{theme.core.light.shell-field-bg}", "min": 3.0 },
+    { "name": "theme.core.light.shell-brandmark-bg/shell-bg", "fg": "{theme.core.light.shell-brandmark-bg}", "bg": "{theme.core.light.shell-bg}", "min": 3.0 },
+    { "name": "theme.core.dark.shell-fg/shell-bg", "fg": "{theme.core.dark.shell-fg}", "bg": "{theme.core.dark.shell-bg}", "min": 4.5 },
+    { "name": "theme.core.dark.shell-fg-muted/shell-bg", "fg": "{theme.core.dark.shell-fg-muted}", "bg": "{theme.core.dark.shell-bg}", "min": 4.5 },
+    { "name": "theme.core.dark.shell-fg-muted/shell-hover", "fg": "{theme.core.dark.shell-fg-muted}", "bg": "{theme.core.dark.shell-hover}", "min": 4.5 },
+    { "name": "theme.core.dark.shell-apex/shell-bg (leaf text)", "fg": "{theme.core.dark.shell-apex}", "bg": "{theme.core.dark.shell-bg}", "min": 4.5 },
+    { "name": "theme.core.dark.shell-apex/shell-hover (hover text)", "fg": "{theme.core.dark.shell-apex}", "bg": "{theme.core.dark.shell-hover}", "min": 4.5 },
+    { "name": "theme.core.dark.shell-active-fg/shell-active-bg", "fg": "{theme.core.dark.shell-active-fg}", "bg": "{theme.core.dark.shell-active-bg}", "min": 4.5 },
+    { "name": "theme.core.dark.shell-apex/shell-active-bg (rail)", "fg": "{theme.core.dark.shell-apex}", "bg": "{theme.core.dark.shell-active-bg}", "min": 3.0 },
+    { "name": "theme.core.dark.shell-fg/shell-field-bg", "fg": "{theme.core.dark.shell-fg}", "bg": "{theme.core.dark.shell-field-bg}", "min": 4.5 },
+    { "name": "theme.core.dark.shell-fg-muted/shell-field-bg", "fg": "{theme.core.dark.shell-fg-muted}", "bg": "{theme.core.dark.shell-field-bg}", "min": 4.5 },
+    { "name": "theme.core.dark.shell-field-line/shell-field-bg", "fg": "{theme.core.dark.shell-field-line}", "bg": "{theme.core.dark.shell-field-bg}", "min": 3.0 },
+    { "name": "theme.core.dark.shell-focus-ring/shell-bg", "fg": "{theme.core.dark.shell-focus-ring}", "bg": "{theme.core.dark.shell-bg}", "min": 3.0 },
+    { "name": "theme.core.dark.shell-focus-ring/shell-field-bg", "fg": "{theme.core.dark.shell-focus-ring}", "bg": "{theme.core.dark.shell-field-bg}", "min": 3.0 },
+    { "name": "theme.core.dark.shell-brandmark-bg/shell-bg", "fg": "{theme.core.dark.shell-brandmark-bg}", "bg": "{theme.core.dark.shell-bg}", "min": 3.0 }
   ]
 }

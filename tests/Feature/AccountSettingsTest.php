@@ -68,6 +68,62 @@ class AccountSettingsTest extends TestCase
     }
 
     /** @test */
+    public function app_theme_core_is_saved_restored_and_survives_a_preferences_only_save(): void
+    {
+        $auth = $this->registerTenant();
+        $other = $this->registerTenant('globex', 'owner@globex.test');
+
+        // AWJ Core (الثيم الثالث): يُحفظ ويُسترجع عبر /me كما Ink تماماً.
+        $this->withToken($auth['token'])->putJson('/api/account/preferences', [
+            'locale'   => 'ar',
+            'theme'    => 'dark',
+            'appTheme' => 'core',
+        ])->assertOk()
+            ->assertJsonPath('user.preferences.appTheme', 'core')
+            ->assertJsonPath('user.preferences.theme', 'dark');
+
+        $this->withToken($auth['token'])->getJson('/api/me')
+            ->assertOk()
+            ->assertJsonPath('user.preferences.appTheme', 'core');
+
+        // عميل قديم لا يرسل appTheme لا يمسح الاختيار.
+        $this->withToken($auth['token'])->putJson('/api/account/preferences', [
+            'locale' => 'en',
+            'theme'  => 'light',
+        ])->assertOk()
+            ->assertJsonPath('user.preferences.appTheme', 'core');
+
+        // التفضيل شخصي: مستخدم مؤسسة أخرى لا يتأثر.
+        $this->withToken($other['token'])->getJson('/api/me')
+            ->assertOk()
+            ->assertJsonPath('user.preferences.appTheme', 'default');
+
+        // القيم القديمة ما زالت مقبولة، والانتقال بين الثلاثة حرّ.
+        foreach (['ink', 'default', 'core', 'ink'] as $value) {
+            $this->withToken($auth['token'])->putJson('/api/account/preferences', [
+                'locale'   => 'ar',
+                'theme'    => 'system',
+                'appTheme' => $value,
+            ])->assertOk()
+                ->assertJsonPath('user.preferences.appTheme', $value);
+        }
+
+        // القائمة مغلقة: لا حساسية حالة ولا قيم مجاورة.
+        foreach (['Core', 'CORE', 'cores', 'neon', 'dark'] as $invalid) {
+            $this->withToken($auth['token'])->putJson('/api/account/preferences', [
+                'locale'   => 'ar',
+                'theme'    => 'system',
+                'appTheme' => $invalid,
+            ])->assertStatus(422);
+        }
+
+        // الفشل لا يغيّر المخزَّن.
+        $this->withToken($auth['token'])->getJson('/api/me')
+            ->assertOk()
+            ->assertJsonPath('user.preferences.appTheme', 'ink');
+    }
+
+    /** @test */
     public function user_must_confirm_current_password_to_change_email_and_global_email_stays_unique(): void
     {
         $auth = $this->registerTenant('account-email', 'account-email@example.test');

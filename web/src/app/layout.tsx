@@ -38,8 +38,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang={locale} dir={dir} className={`${sans.variable} ${mono.variable}`} suppressHydrationWarning>
       <head>
-        {/* AWJ v3 theme pre-paint (Horizon 3): sets data-awj-theme="ink" before first
-            paint when that is the stored preference, so Ink never flashes to Default
+        {/* AWJ v3 theme pre-paint (Horizon 3): sets data-awj-theme="ink"|"core" before first
+            paint when that is the stored preference, so Ink/Core never flash to Default
             first. Separate from next-themes' own injected script (Light/Dark), and
             never touches data-awj-ui — see src/lib/awj-theme.ts. suppressHydrationWarning
             above covers the attribute this adds outside React's own render. */}
