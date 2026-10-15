@@ -62,7 +62,7 @@ describe("Canvas — data-backed sections (ADR-21)", () => {
     );
     const el = section(container, "d-1");
     expect(el.querySelector("h2")?.textContent?.length).toBeGreaterThan(0);
-    expect(el.textContent).toContain("Live catalog values appear here");
+    expect(el.textContent).toContain("appear on the published store");
   });
 
   it("flags a productShelf or discovery section with no stored content as incomplete", () => {
