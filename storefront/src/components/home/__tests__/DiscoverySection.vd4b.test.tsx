@@ -766,6 +766,88 @@ describe("carousel", () => {
     expect(list.querySelector("[tabindex]")).toBeNull();
   });
 
+  describe("focus reveal (VD-5 / D-S-2)", () => {
+    // jsdom has no layout and no scrollIntoView: the geometry is stubbed per element, the scroll call is observed.
+    // The Chromium behaviour behind it (a partly visible focused tile is never scrolled into view) was proven in a real
+    // browser; here the unit contract is "a partly clipped focused tile is aligned to the rail's inline-start edge".
+    const rect = (left: number, right: number) =>
+      ({
+        left,
+        right,
+        top: 0,
+        bottom: 100,
+        width: right - left,
+        height: 100,
+      }) as DOMRect;
+    const scrollIntoView = vi.fn();
+
+    async function renderRail(
+      rails: { left: number; right: number },
+      tiles: Array<[number, number]>,
+    ) {
+      render(
+        (await renderSection(visualFacet, {
+          layout: "carousel",
+        })) as React.JSX.Element,
+      );
+      const list = document.querySelector(
+        "[data-discovery-layout=carousel]",
+      ) as HTMLElement;
+      vi.spyOn(list, "getBoundingClientRect").mockReturnValue(
+        rect(rails.left, rails.right),
+      );
+      const items = [...list.querySelectorAll("li")];
+      items.forEach((li, index) => {
+        const [left, right] = tiles[index] ?? [0, 0];
+        vi.spyOn(li, "getBoundingClientRect").mockReturnValue(
+          rect(left, right),
+        );
+        li.scrollIntoView = scrollIntoView;
+      });
+      return { list, items };
+    }
+
+    beforeEach(() => scrollIntoView.mockClear());
+
+    it("reveals a focused tile that is only partly inside the rail (aligned to the snap-start edge)", async () => {
+      const { items } = await renderRail({ left: 8, right: 382 }, [
+        [270, 374],
+        [-78, 26],
+      ]);
+      fireEvent.focus(items[1].querySelector("a") as HTMLElement);
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      expect(scrollIntoView).toHaveBeenCalledWith({
+        block: "nearest",
+        inline: "start",
+      });
+      expect(scrollIntoView.mock.contexts[0]).toBe(items[1]);
+    });
+
+    it("also reveals a tile clipped on the other edge (Shift+Tab back)", async () => {
+      const { items } = await renderRail({ left: 8, right: 382 }, [[300, 404]]);
+      fireEvent.focus(items[0].querySelector("a") as HTMLElement);
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves a fully visible tile alone: ordinary Tab never makes the rail jump", async () => {
+      const { items } = await renderRail({ left: 8, right: 382 }, [
+        [270, 374],
+        [154, 258],
+      ]);
+      fireEvent.focus(items[0].querySelector("a") as HTMLElement);
+      fireEvent.focus(items[1].querySelector("a") as HTMLElement);
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    });
+
+    it("adds no element, role, tab stop or attribute: the scroller is still the server's plain <ul>", async () => {
+      const { list } = await renderRail({ left: 0, right: 100 }, []);
+      expect(list.tagName).toBe("UL");
+      expect(list.getAttribute("tabindex")).toBeNull();
+      expect(list.getAttribute("role")).toBeNull();
+      expect(list.querySelector("[tabindex]")).toBeNull();
+    });
+  });
+
   it("rows: 1 by default, 2 from the swipe-rail template or an explicit value; clamped; one row from md", async () => {
     render(
       (await renderSection(visualFacet, {
