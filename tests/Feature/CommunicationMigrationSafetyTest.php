@@ -3,14 +3,19 @@
 namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
 use Tests\TestCase;
 
 /**
  * AWJ-COMMS-FOUNDATION-02-A — سلامة الترحيل: إنشاء/إسقاط/إعادة إنشاء، ومنع التراجع المدمّر عند وجود بيانات.
+ *
+ * السياسة: `down()` يرفض حذف الجدولين متى وُجد أي صف في أيٍّ منهما، في **كل** البيئات (production/staging/
+ * local/testing) وبلا أي علم أو إعداد تجاوز. لا توجد آلية اختبار مأهولة: من يريد تراجعاً يُفرغ الجدولين أولاً.
  *
  * DDL معاملاتي في المحرّكين، فتُنفَّذ هذه الاختبارات داخل معاملة `RefreshDatabase` وتُستعاد بعدها.
  */
@@ -20,6 +25,17 @@ class CommunicationMigrationSafetyTest extends TestCase
     use RefreshDatabase;
 
     private const MIGRATION = '2026_11_10_010000_create_communication_messages_tables.php';
+
+    /** @return array<string, array{0: string}> */
+    public static function everyEnvironment(): array
+    {
+        return [
+            'production' => ['production'],
+            'staging' => ['staging'],
+            'local' => ['local'],
+            'testing' => ['testing'],
+        ];
+    }
 
     private function migration(): object
     {
@@ -39,10 +55,34 @@ class CommunicationMigrationSafetyTest extends TestCase
             : [];
     }
 
+    private function assertRollbackRefused(): void
+    {
+        try {
+            $this->migration()->down();
+            $this->fail('rollback of populated communications tables must be refused');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('Rollback refused', $e->getMessage());
+        }
+    }
+
+    /** كل الكائنات سليمة بعد الرفض: جداول، صفوف، Triggers، فهارس، (دوال PG). */
+    private function assertEverythingIntact(int $messages, int $attempts): void
+    {
+        $this->assertTrue($this->tablesExist());
+        $this->assertSame($messages, DB::table('communication_messages')->count());
+        $this->assertSame($attempts, DB::table('communication_message_attempts')->count());
+        $this->assertNotSame([], $this->commTriggerNames());
+        $this->assertTrue($this->commIndexExists('comm_attempt_one_inflight'));
+        if ($this->commDriver() === 'pgsql') {
+            $this->assertCount(2, $this->communicationFunctions());
+        }
+    }
+
     #[Test]
     public function rollback_of_empty_tables_removes_every_object_and_reapplication_restores_them(): void
     {
         $this->assertTrue($this->tablesExist());
+        $this->assertSame(0, DB::table('communication_messages')->count());
 
         $this->migration()->down();
 
@@ -67,6 +107,27 @@ class CommunicationMigrationSafetyTest extends TestCase
     }
 
     #[Test]
+    #[DataProvider('everyEnvironment')]
+    public function empty_tables_can_be_rolled_back_in_every_environment(string $environment): void
+    {
+        $this->app['env'] = $environment;
+
+        $this->migration()->down();
+
+        $this->assertFalse(Schema::hasTable('communication_messages'));
+        $this->assertFalse(Schema::hasTable('communication_message_attempts'));
+    }
+
+    #[Test]
+    public function rolling_back_when_the_tables_are_already_absent_is_a_noop(): void
+    {
+        $this->migration()->down();
+        $this->migration()->down();
+
+        $this->assertFalse(Schema::hasTable('communication_messages'));
+    }
+
+    #[Test]
     public function reapplication_succeeds_after_tables_were_wiped_but_functions_remained(): void
     {
         if ($this->commDriver() !== 'pgsql') {
@@ -85,51 +146,69 @@ class CommunicationMigrationSafetyTest extends TestCase
     }
 
     #[Test]
-    public function rollback_with_rows_is_refused_in_production_and_nothing_is_dropped(): void
+    #[DataProvider('everyEnvironment')]
+    public function rollback_with_rows_is_refused_in_every_environment_and_nothing_is_dropped(string $environment): void
     {
         $tenant = $this->commTenant();
         $message = $this->insertCommMessage($tenant->id);
         $this->insertCommAttempt($tenant->id, $message);
+        $this->app['env'] = $environment;
 
-        foreach (['production', 'staging'] as $environment) {
-            $this->app['env'] = $environment;
-            try {
-                $this->migration()->down();
-                $this->fail("rollback must be refused in {$environment}");
-            } catch (RuntimeException $e) {
-                $this->assertStringContainsString('Rollback refused', $e->getMessage());
-                // الرسالة لا تحوي قيماً من الصفوف.
-                $this->assertStringNotContainsString($tenant->id, $e->getMessage());
-            }
-
-            $this->assertTrue($this->tablesExist());
-            $this->assertSame(1, DB::table('communication_messages')->count());
-            $this->assertSame(1, DB::table('communication_message_attempts')->count());
-            $this->assertNotSame([], $this->commTriggerNames());
+        try {
+            $this->migration()->down();
+            $this->fail("rollback must be refused in {$environment}");
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('Rollback refused', $e->getMessage());
+            // الرسالة لا تحوي قيماً من الصفوف.
+            $this->assertStringNotContainsString($tenant->id, $e->getMessage());
+            $this->assertStringNotContainsString($message, $e->getMessage());
         }
+
+        $this->assertEverythingIntact(messages: 1, attempts: 1);
     }
 
     #[Test]
-    public function an_environment_flag_alone_cannot_override_the_production_protection(): void
+    public function a_single_message_without_attempts_is_enough_to_refuse_the_rollback(): void
     {
         $tenant = $this->commTenant();
         $this->insertCommMessage($tenant->id);
-        $this->app['env'] = 'production';
 
-        foreach (['COMMUNICATIONS_ALLOW_DESTRUCTIVE_ROLLBACK', 'ALLOW_DESTRUCTIVE_ROLLBACK', 'FORCE'] as $flag) {
+        $this->assertRollbackRefused();
+        $this->assertEverythingIntact(messages: 1, attempts: 0);
+    }
+
+    #[Test]
+    public function rollback_is_refused_even_when_the_attempts_table_was_removed_by_hand(): void
+    {
+        $tenant = $this->commTenant();
+        $this->insertCommMessage($tenant->id);
+        Schema::dropIfExists('communication_message_attempts');
+
+        $this->assertRollbackRefused();
+        $this->assertTrue(Schema::hasTable('communication_messages'));
+        $this->assertSame(1, DB::table('communication_messages')->count());
+    }
+
+    #[Test]
+    #[DataProvider('everyEnvironment')]
+    public function no_flag_or_config_can_override_the_protection_in_any_environment(string $environment): void
+    {
+        $tenant = $this->commTenant();
+        $this->insertCommMessage($tenant->id);
+        $this->app['env'] = $environment;
+
+        $flags = ['COMMUNICATIONS_ALLOW_DESTRUCTIVE_ROLLBACK', 'ALLOW_DESTRUCTIVE_ROLLBACK', 'FORCE'];
+        foreach ($flags as $flag) {
             putenv("{$flag}=true");
             $_ENV[$flag] = 'true';
         }
         config(['communications.allow_destructive_rollback' => true]);
 
         try {
-            $this->migration()->down();
-            $this->fail('no flag may override the production rollback protection');
-        } catch (RuntimeException) {
-            $this->assertTrue($this->tablesExist());
-            $this->assertSame(1, DB::table('communication_messages')->count());
+            $this->assertRollbackRefused();
+            $this->assertEverythingIntact(messages: 1, attempts: 0);
         } finally {
-            foreach (['COMMUNICATIONS_ALLOW_DESTRUCTIVE_ROLLBACK', 'ALLOW_DESTRUCTIVE_ROLLBACK', 'FORCE'] as $flag) {
+            foreach ($flags as $flag) {
                 putenv($flag);
                 unset($_ENV[$flag]);
             }
@@ -137,14 +216,39 @@ class CommunicationMigrationSafetyTest extends TestCase
     }
 
     #[Test]
-    public function a_populated_rollback_is_only_possible_in_local_or_testing_environments(): void
+    public function the_artisan_rollback_command_is_blocked_for_a_populated_table_and_keeps_the_migration_recorded(): void
     {
         $tenant = $this->commTenant();
         $this->insertCommMessage($tenant->id);
+        $name = pathinfo(self::MIGRATION, PATHINFO_FILENAME);
+        $this->assertTrue(DB::table('migrations')->where('migration', $name)->exists());
 
-        $this->app['env'] = 'local';
+        try {
+            Artisan::call('migrate:rollback', ['--path' => 'database/migrations/'.self::MIGRATION, '--force' => true]);
+            $this->fail('migrate:rollback must not drop populated communications tables');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('Rollback refused', $e->getMessage());
+        }
+
+        $this->assertTrue(DB::table('migrations')->where('migration', $name)->exists());
+        $this->assertEverythingIntact(messages: 1, attempts: 0);
+    }
+
+    #[Test]
+    public function the_only_way_to_roll_back_is_to_empty_the_tables_explicitly_first(): void
+    {
+        $tenant = $this->commTenant();
+        $message = $this->insertCommMessage($tenant->id);
+        $this->insertCommAttempt($tenant->id, $message);
+        $this->assertRollbackRefused();
+
+        // تفريغ صريح (قرار واعٍ من المنفِّذ، لا من الـmigration): المحاولات تُحذف بالتتالي مع الرسالة.
+        DB::table('communication_messages')->delete();
+        $this->assertSame(0, DB::table('communication_message_attempts')->count());
+
         $this->migration()->down();
 
         $this->assertFalse(Schema::hasTable('communication_messages'));
+        $this->assertFalse(Schema::hasTable('communication_message_attempts'));
     }
 }

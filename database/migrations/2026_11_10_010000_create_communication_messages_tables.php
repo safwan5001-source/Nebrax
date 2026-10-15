@@ -31,8 +31,9 @@ use Illuminate\Support\Facades\Schema;
  * لا `recipient_hash` ولا `hash_key_version` ولا `request_fingerprint` (مؤجَّلة لشريحة المفاتيح)،
  * ولا فهارس أدائية جزئية (تُضاف مع الاستعلامات التي تستعملها).
  *
- * **التراجع:** آمن حين يكون الجدولان فارغين. وجود أي صف يمنع الحذف خارج بيئتَي local/testing —
- * لا علم بيئة ولا تجاوز. بعد ظهور بيانات إنتاجية تكون التغييرات إلى الأمام فقط (expand-then-contract).
+ * **التراجع:** آمن حين يكون الجدولان فارغين فقط. وجود أي صف في أي منهما يمنع الحذف في **كل** البيئات
+ * (production/staging/local/testing) — لا علم بيئة ولا تجاوز ولا استثناء اختبار. من يحتاج تراجعاً يُفرغ
+ * الجدولين صراحةً أولاً. بعد ظهور بيانات إنتاجية تكون التغييرات إلى الأمام فقط (expand-then-contract).
  */
 return new class extends Migration
 {
@@ -109,10 +110,12 @@ return new class extends Migration
 
     public function down(): void
     {
-        if ($this->hasRows() && ! app()->environment(['local', 'testing'])) {
+        // لا استثناء لأي بيئة (production/staging/local/testing) ولا علم تجاوز: السجل المأهول لا يُحذف
+        // بالتراجع. من يحتاج تراجعاً (اختبار/تطوير) يُفرغ الجدولين صراحةً أولاً فيصبح التراجع آمناً.
+        if ($this->hasRows()) {
             throw new RuntimeException(
                 'Rollback refused: communication_messages / communication_message_attempts contain rows. '
-                .'Destructive rollback of populated communications tables is not permitted outside local/testing; '
+                .'Populated communications tables are never dropped by rollback in any environment; '
                 .'use a forward-only migration instead.'
             );
         }
