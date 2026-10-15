@@ -92,7 +92,7 @@ No web change: the sidebar and the fuel workspace nav already hide on an explici
 |---|---|
 | New class on **unfixed** `origin/main` service | **5 of 10 fail** (regression proof); with the fix 10/10 pass, 107 assertions |
 | Related backend (`ApplicationNavState*`, `ApplicationEnforcement*`, `SalesInvoicingNavigationParity`, `PlatformApplicationOverride*`, `PlatformGlobalApplicationOverride*`, `ApplicationAccess*`, `ApplicationCatalog*`, `TenantApplication*`, `FuelStationsCommercial*`, `FuelStationsFoundation*`, `DeliveryNote*`, `Entitlement*`) | 232 passed, 2144 assertions |
-| Full PHP suite | see Closure |
+| Full PHP suite, sqlite, serial | 6956 passed, 99 skipped, 26 failed (653 s). All 26 are in `FuelAviRfidService`, `FuelReconciliation`, `FuelSaleApi`, `FuelSaleService`, `FuelSupplyReceiving*` and need `bcmath`, absent locally (`bcmul` etc.): the same set recorded as the baseline in NAV-01, green in CI. No navigation, application, entitlement or delivery-note test fails |
 
 ## Security / tenant isolation / backward compatibility
 - **Entitlements and RBAC:** no rule changed, nothing granted. `decide()` is called without an RBAC verdict, the same as the guard's first stage; RBAC stays its own middleware.
