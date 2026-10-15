@@ -31,6 +31,14 @@ describe("MobileBottomNav", () => {
     itemCount = 0;
   });
 
+  it("carries the marker the root scroll-padding rule keys on (D-S-3)", () => {
+    render(<MobileBottomNav basePath="/us/en" />);
+
+    expect(
+      screen.getByRole("navigation", { name: "Primary navigation" }),
+    ).toHaveAttribute("data-store-bottom-nav");
+  });
+
   it("offers only destinations the storefront actually routes to", () => {
     render(<MobileBottomNav basePath="/us/en" />);
 
