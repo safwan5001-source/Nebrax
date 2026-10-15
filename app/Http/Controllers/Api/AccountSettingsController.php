@@ -48,7 +48,7 @@ class AccountSettingsController extends ApiController
     {
         $user = $request->user();
         $data = $request->validated();
-        // AWJ v3 theme (Default/Ink): `preferences` column is replaced wholesale (not
+        // AWJ v3 theme (Default/Ink/Core): `preferences` column is replaced wholesale (not
         // merged) by this endpoint, so a client that doesn't yet send `appTheme` would
         // otherwise silently drop whatever was stored. Keep the previous value, or the
         // documented default, instead of losing it on every locale/mode-only save.

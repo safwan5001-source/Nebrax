@@ -1,7 +1,7 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
-import { type AwjTheme, AWJ_THEME_ATTRIBUTE } from './awj-theme';
+import { type AwjTheme, AWJ_THEME_ATTRIBUTE, readAwjThemeAttribute } from './awj-theme';
 
 // Reactive read of the current AWJ theme (`html[data-awj-theme]`), mirroring
 // use-awj-ui3.ts's pattern: the pre-paint script and the Settings selector both
@@ -14,7 +14,7 @@ function subscribe(onChange: () => void): () => void {
 }
 
 function getSnapshot(): AwjTheme {
-  return document.documentElement.getAttribute(AWJ_THEME_ATTRIBUTE) === 'ink' ? 'ink' : 'default';
+  return readAwjThemeAttribute();
 }
 
 // Server snapshot is always 'default': the pre-paint script runs before hydration on
