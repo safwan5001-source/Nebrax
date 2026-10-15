@@ -2,7 +2,7 @@
 
 import { AnnouncementsPanel } from "./AnnouncementsPanel";
 import { DEFAULT_TENANT_TIMEZONE } from "@/lib/timezone";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import {
   canAddSectionType,
@@ -42,6 +42,7 @@ import { HeaderDesignPanel } from "./HeaderDesignPanel";
 import { FooterEditor } from "./FooterEditor";
 import { NavigationPanel } from "./NavigationPanel";
 import { emptyMainMenu, migrateLegacyLinks, withMainMenu } from "./navigation-edit";
+import { presentationCssVars } from "./presentation/tokens";
 import { mainMenu } from "./presentation/navigation";
 import { SectionLibraryContent, SectionLibraryDialog } from "./SectionLibrary";
 import { buildWhatsAppUrl, sanitizeExternalUrl } from "./presentation/urls";
@@ -1508,6 +1509,9 @@ function HomepagePanel({
                 content={discoveryContentOf(selected)}
                 locale={locale}
                 t={t}
+                storeVars={
+                  presentationCssVars(config.primaryColor, config.radius, config.accentColor) as CSSProperties
+                }
                 onChange={(content) =>
                   updateSection(selectedIndex, { ...selected, content })
                 }

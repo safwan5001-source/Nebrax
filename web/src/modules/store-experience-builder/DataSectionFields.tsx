@@ -17,7 +17,7 @@
  * `undefined` content until the choice is complete, with an explicit warning.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react";
 import {
   type Collection,
   type Facet,
@@ -25,6 +25,11 @@ import {
   loadFacets,
 } from "@/modules/commerce-workspace/merchandising/client";
 import { Field, Toggle, inputClass, selectClass } from "./ControlPanels";
+import { DiscoveryDisplayFields } from "./DiscoveryDisplayFields";
+import {
+  type DiscoveryDisplayOptions,
+  discoveryDisplayOptionsOf,
+} from "./discovery-display-edit";
 import type { CustomizerLocale, CustomizerMessageKey } from "./messages";
 import {
   type DeliveryPromiseContent,
@@ -386,35 +391,35 @@ export function ProductShelfFields({
 
 // ── discovery ───────────────────────────────────────────────────────────
 
-/** VD-4a — everything in a discovery content except the four keys the panel edits. */
-function discoveryDisplayOptionsOf(content: DiscoveryContent): Partial<DiscoveryContent> {
-  const { title: _title, axis: _axis, dimension: _dimension, display: _display, ...options } = content;
-  return options;
-}
-
 export function DiscoveryFields({
   content,
   locale,
   t,
   onChange,
+  storeVars,
 }: {
   content: DiscoveryContent;
   locale: CustomizerLocale;
   t: T;
   onChange: (content: DiscoveryContent | undefined) => void;
+  /** The store theme variables the live preview paints with (primary, radius …). */
+  storeVars?: CSSProperties;
 }) {
   const [title, setTitle] = useState(content.title);
   const [axis, setAxis] = useState(content.axis);
   const [dimension, setDimension] = useState(content.dimension ?? "");
   const [display, setDisplay] = useState<DiscoveryDisplay>(content.display);
   const [facets, retryFacets] = useRemote(loadFacets);
-  // AWJ-VD-H1 / VD-4a — the display settings this panel does not edit (layout, template, columns, …). Kept from the
-  // last real content, so an edit that briefly empties the section (facet axis with no dimension yet) does not lose
-  // them; refreshed whenever real content arrives (undo/redo, another editor).
+  // AWJ-VD-H1 / VD-4a + VD-4c — the optional display settings (layout, template, columns, …). Kept from the last real
+  // content, so an edit that briefly empties the section (facet axis with no dimension yet) does not lose them;
+  // refreshed whenever real content arrives (undo/redo, another editor). The ref is the synchronous source for
+  // `commit`; the state mirrors it so the display controls re-render.
   const displayOptions = useRef(discoveryDisplayOptionsOf(content));
+  const [options, setOptions] = useState<DiscoveryDisplayOptions>(displayOptions.current);
   useEffect(() => {
     if (content.axis === "brand" || content.dimension) {
       displayOptions.current = discoveryDisplayOptionsOf(content);
+      setOptions(displayOptions.current);
     }
   }, [content]);
 
@@ -423,7 +428,12 @@ export function DiscoveryFields({
     axis?: DiscoveryContent["axis"];
     dimension?: string;
     display?: DiscoveryDisplay;
+    options?: DiscoveryDisplayOptions;
   }) => {
+    if (next.options !== undefined) {
+      displayOptions.current = next.options;
+      setOptions(next.options);
+    }
     const nextAxis = next.axis ?? axis;
     const nextDimension = next.dimension ?? dimension;
     const nextTitle = next.title ?? title;
@@ -514,6 +524,21 @@ export function DiscoveryFields({
           ))}
         </select>
       </Field>
+
+      <DiscoveryDisplayFields
+        base={{
+          title,
+          axis,
+          ...(axis === "facet" ? { dimension } : {}),
+          display,
+        }}
+        options={options}
+        onOptionsChange={(next) => commit({ options: next })}
+        locale={locale}
+        t={t}
+        facets={facets.state === "ready" ? facets.data : null}
+        storeVars={storeVars}
+      />
 
       {!complete ? <Incomplete message={t("discoveryIncomplete")} /> : null}
     </div>
