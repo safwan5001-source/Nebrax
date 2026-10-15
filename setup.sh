@@ -49,7 +49,7 @@ cp -r "$CORE_DIR/app/Models/"*.php        app/Models/
 # السمات في مجلد فرعي لا يلتقطها glob النماذج أعلاه؛ يجب أن تطابق CI والإنتاج.
 # قائمة المجلدات هنا يدوية ويجب أن تبقى مطابقة لقائمة .github/workflows/ci.yml
 # (كلاهما ينسخ من نفس النواة بمنطق مستقل) — نسيان مجلد هنا لا يظهر في CI فيمر بصمت.
-mkdir -p app/Contracts app/Mail app/Models/Concerns app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Commerce app/Services/Commerce/Edge app/Services/Commerce/Otp app/Services/DocumentCenter app/Services/AppBuilder app/Services/DeliveryHub app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory app/Support/Dns app/Support/Commerce app/Support/Communications \
+mkdir -p app/Contracts app/Mail app/Models/Concerns app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Commerce app/Services/Commerce/Edge app/Services/Commerce/Otp app/Services/DocumentCenter app/Services/AppBuilder app/Services/DeliveryHub app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory app/Support/Dns app/Support/Commerce app/Services/Communications app/Support/Communications \
          app/Tenancy app/Http/Middleware app/Http/Controllers/Api config \
          app/Http/Requests app/Http/Resources app/Console/Commands tests/Feature tests/Fixtures/presentation routes docs/openapi contracts/app-builder contracts/flowers-journey contracts/flowers-admin-journey/responses
 cp -r "$CORE_DIR/app/Contracts/"*.php app/Contracts/
@@ -73,6 +73,7 @@ cp -r "$CORE_DIR/app/Support/"*.php              app/Support/
 cp -r "$CORE_DIR/app/Support/Inventory/"*.php    app/Support/Inventory/
 cp -r "$CORE_DIR/app/Support/Dns/"*.php          app/Support/Dns/
 cp -r "$CORE_DIR/app/Support/Commerce/"*.php     app/Support/Commerce/
+cp -r "$CORE_DIR/app/Services/Communications/"*.php app/Services/Communications/
 cp -r "$CORE_DIR/app/Support/Communications/"*.php app/Support/Communications/
 cp -r "$CORE_DIR/app/Tenancy/"*.php              app/Tenancy/
 cp -r "$CORE_DIR/app/Http/Middleware/"*.php      app/Http/Middleware/

@@ -57,6 +57,8 @@ mkdir -p app/Support/Dns
 cp -r "$CORE_DIR/app/Support/Dns/"*.php          app/Support/Dns/
 mkdir -p app/Support/Commerce
 cp -r "$CORE_DIR/app/Support/Commerce/"*.php     app/Support/Commerce/
+mkdir -p app/Services/Communications
+cp -r "$CORE_DIR/app/Services/Communications/"*.php app/Services/Communications/
 mkdir -p app/Support/Communications
 cp -r "$CORE_DIR/app/Support/Communications/"*.php app/Support/Communications/
 cp -r "$CORE_DIR/app/Tenancy/"*.php              app/Tenancy/
