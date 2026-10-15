@@ -52,6 +52,8 @@ Before launching autonomous execution, the owner must decide whether TAX-ZATCA b
 ## Execution phases
 **0 — Evidence + policy:** REM-00A, REM-00B; verify actual production/data residency, deployment, current findings, open ADRs, and all already merged REM-01/02 code. No use of real customer data without authority.
 
+> *Status note 2026-10-15:* REM-00B is partially recorded — ADR-A/I/B direction is in `docs/decisions/ADR-0001…0003` (documentation only; regulatory gates and tax-adviser sign-off open; no code, schema or accounting-policy change authorised). See `TAX-ZATCA-RECONCILIATION-AUDIT.md` §7.
+
 **1 — Core financial and isolation safety:** prioritize REM-03, REM-04, REM-05, REM-08, REM-09 and other dependency-ready Tier 1 tasks based on fresh evidence; REM-06 requires REM-05, REM-10 requires REM-09. The separate POS partial-rounding convention and saved print layouts are tracked as follow-ups, not silently assumed solved.
 
 **2 — Compliance oracle / invoice content:** REM-11 independent SDK validator harness early; REM-12 and REM-13 may be explored in bounded independent slices after evidence; REM-14 depends on 13; REM-16 depends on 11/12/13/14; REM-17 depends on 11/13; REM-18 depends on 16/02.

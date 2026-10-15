@@ -44,7 +44,7 @@ Classifications: COMPLETE · PARTIAL · NOT IMPLEMENTED · BLOCKED · NEEDS VERI
 | Task | Status | Evidence | Missing | Dependencies / decisions | SDK |
 |---|---|---|---|---|---|
 | REM-00A Production evidence + residency | **BLOCKED** | `render.yaml` shows intent only (frankfurt, local disk, retention 365); no `ZATCA_*` in `render.yaml`/`Dockerfile`/`deploy/` | Evidence items 1–6, ADR-H | D-08, D-10, production access | No |
-| REM-00B ADR package A–J | **NOT IMPLEMENTED** | No `ADR-A…J` file; ADR-E decision exists only in the REM-02 PR/report; `ADR-E2` PROPOSED | All ADRs + tax-adviser sign-off | D-05 | No |
+| REM-00B ADR package A–J | **PARTIAL (documentation only, 2026-10-15)** | ADR-A/I/B direction recorded as `docs/decisions/ADR-0001/0002/0003` (direction approved; **regulatory gates and tax-adviser sign-off open**). Still no file for C, D, F, G, H, J; ADR-E decision exists only in the REM-02 PR/report; `ADR-E2` PROPOSED | C, D, E (formal), F, G, H, J; all open gates of A/I/B; tax-adviser sign-off | D-05 | No |
 
 ### Tier 1 — financial and security
 
@@ -59,18 +59,18 @@ Classifications: COMPLETE · PARTIAL · NOT IMPLEMENTED · BLOCKED · NEEDS VERI
 | REM-07 Immutability of posted docs/journals | **NOT IMPLEMENTED** | `Invoice` `$fillable` includes `status` and `zatca_*`; `JournalEntry`/`JournalLine` have no model guards | Writer inventory, guards, verify command. No unmet dependency (ready) | No |
 | REM-08 Deactivated users lose access | **COMPLETE** | #1415 · `6670a9a7e5df063d8d42ad6872a0b5599ae8bb11` (CI #9359 ✅) | Reactivation requires a fresh login by design | No |
 | REM-09 64-bit overflow guards | **PARTIAL** | Guarded: `ReturnSourceAllocator::mulDiv`, `DeliveryNote…::checkedMultiply`. Unguarded: `InvoiceService.php:1248`, `PurchaseService.php:245` (`intdiv($taxGross * $net, …)`) | Shared helper, documented maximum, boundary tests. Start: maximum amount = policy | No |
-| REM-10 VAT arithmetic consistency | **BLOCKED** | `?? 15` defaults (`ReturnService:165`, `ExpenseService:59,100`, `AssetService:72`, `RecurringInvoiceService:60`); client `tax_inclusive` accepted (`StorePosSaleRequest:25`) | 10a–10f. Blocked by REM-09, ADR-B | No |
+| REM-10 VAT arithmetic consistency | **BLOCKED** | `?? 15` defaults (`ReturnService:165`, `ExpenseService:59,100`, `AssetService:72`, `RecurringInvoiceService:60`); client `tax_inclusive` accepted (`StorePosSaleRequest:25`) | 10a–10f. Blocked by REM-09, ADR-B (direction recorded in `ADR-0003`; **no calculation change approved; gates G-B1…G-B8 open**) | No |
 
 ### Tier 2 — ZATCA document blockers
 
 | Task | Status | Evidence | Missing | Blocked by | SDK |
 |---|---|---|---|---|---|
 | REM-11 SDK conformance harness | **COMPLETE (advisory)** | #1416 · `cb87e17d7583d8b24eab76e87ae5dad1d78484b3` (CI #9365 ✅); `tests/Fixtures/zatca-sdk/baseline.json`; 19/19 official samples pass | Promotion to a blocking check; signed path not covered; **D-03a** legal/portal terms open | D-03a | It *is* the oracle |
-| REM-12 VAT category / VATEX | **BLOCKED** | No category/VATEX in `ZatcaService` | Everything | ADR-I | Yes |
-| REM-13 Issue time frozen at posting | **BLOCKED** | `ZatcaService.php:90,163,253` use `created_at`; no `invoices.issued_at` (only `print_issued_at`) | Everything | ADR-A | Yes |
+| REM-12 VAT category / VATEX | **BLOCKED** | No category/VATEX in `ZatcaService` | Everything | ADR-I (direction recorded in `ADR-0002`; **gates G-I1…G-I7 open; no schema change authorised**) | Yes |
+| REM-13 Issue time frozen at posting | **BLOCKED** | `ZatcaService.php:90,163,253` use `created_at`; no `invoices.issued_at` (only `print_issued_at`) | Everything | ADR-A (direction recorded in `ADR-0001`; **gates G-A1…G-A6 open; migration adding `issued_at` NOT YET AUTHORIZED**; first slice proposed as REM-13a) | Yes |
 | REM-14 Party validation + snapshots | **BLOCKED** | No snapshot columns | Everything | REM-13 | Yes |
 | REM-15 Classification as precondition | **BLOCKED** | Classification + type snapshot exist (#505); no preconditions, no buyer block | Preconditions, buyer block | REM-14 | Yes |
-| REM-16 UBL 2.1 KSA body | **BLOCKED** | `buildXml` skeleton (`ZatcaService.php:272`: always `388`); SDK XSD/EN/KSA fail (REM-11 baseline) | 16a–d | REM-11 ✅, 12, 13, 14, ADR-B | Yes |
+| REM-16 UBL 2.1 KSA body | **BLOCKED** | `buildXml` skeleton (`ZatcaService.php:272`: always `388`); SDK XSD/EN/KSA fail (REM-11 baseline) | 16a–d | REM-11 ✅, 12, 13, 14, ADR-B (`ADR-0003`, gates open) | Yes |
 | REM-17 Stamp & QR conformance | **BLOCKED** | Signing infrastructure and Phase 2 QR exist; genesis `base64(sha256_raw("0"))` (`ZatcaService.php:175`); Phase 1 `tlv()` unguarded (`:181-184`) | 17a–c | REM-13, D-06 | Yes |
 | REM-18 Credit/debit notes 381/383 | **BLOCKED** | `buildFor` has a single caller (`InvoiceService.php:1032`) | Everything | REM-16, ADR-E | Yes |
 | REM-19 Onboarding CSR → CSID | **BLOCKED** | No CSR/OTP/CSID code for ZATCA (OTP hits are customer commerce OTP); credentials pasted manually | Everything | REM-17, ADR-C, D-07, D-09; separate approval before any ZATCA contact | Yes |
@@ -203,7 +203,7 @@ Merge SHAs for the October PRs are full SHAs verified against `origin/main` hist
 
 | ID | Decision | Unblocks |
 |---|---|---|
-| D-05 | ADR-A (issue time), **ADR-I** (categories), **ADR-B** (rounding), C, D, E (formal), F, G, H, J + tax-adviser sign-off | REM-12/13/10/16 and all downstream |
+| D-05 | ADR-A (issue time), **ADR-I** (categories), **ADR-B** (rounding), C, D, E (formal), F, G, H, J + tax-adviser sign-off. **Status 2026-10-15: PARTIALLY RECORDED — not resolved.** A/I/B direction recorded (`docs/decisions/ADR-0001…0003`); regulatory gates, tax-adviser sign-off and owner approvals listed in each ADR remain open; C, D, E, F, G, H, J not started | REM-12/13/10/16 and all downstream |
 | D-06 / D-07 | ZATCA clarification request; Swagger/OpenAPI capture | REM-17/19/21b/25 |
 | D-03a | SDK licence / portal terms (open since REM-11) | Making REM-11 blocking |
 | D-04 / D-10 | "KSA tenant" definition + default-on semantics; real taxpayer data and wave | REM-20, TAX-N05, prioritisation vs 1 Feb 2027 |
@@ -279,6 +279,8 @@ After REM-12 / 07 / 13: REM-28 (ADR-G) → REM-29/30/31/32 ; REM-33 ; REM-34 →
 | 5 | **REM-38 — hygiene bundle** | P3 security | Owner confirmation (CORS boot-fail) | S–M | DOCTYPE/entity cleared XML rejected; production CORS without `*`; 1/3 quantity rejected; both databases green |
 
 In parallel (not code): a D-05 decision packet for ADR-A, ADR-I, ADR-B — the largest single unblock for the compliance critical path.
+
+> **Update 2026-10-15 (documentation only).** The D-05 decision review for ADR-A/I/B has been recorded as `docs/decisions/ADR-0001-invoice-issue-timestamp.md`, `docs/decisions/ADR-0002-vat-categories-and-exemptions.md` and `docs/decisions/ADR-0003-monetary-rounding-and-tax-totals.md` (index: `docs/decisions/README.md`). These record *approved architectural direction* only. They do **not** close D-05: unresolved regulatory/tax interpretations are listed as decision gates in each ADR (G-A1…G-A6, G-I1…G-I7, G-B1…G-B8); tax-adviser sign-off and ZATCA clarification (D-06/TAX-E01) are not obtained; no schema, calculation, posting or API change is authorised. Proposed next slice **REM-13a** is documented in ADR-0001 and is **not authorised** (a database migration adding `issued_at` is NOT YET AUTHORIZED).
 
 ---
 
