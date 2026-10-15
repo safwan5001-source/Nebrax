@@ -41,6 +41,15 @@ Precedence proposal:
 - Fulfillment warehouse cannot be silently optional for stock-tracked products; treating missing warehouse as Always would violate ADR-02.
 - Decide how scheduled delivery slots interact with lead time; prohibit false «يوصل اليوم» for made-to-order.
 
+## Clarifications from review (pending final architecture sign-off)
+- **Precedence resolved at requirements level:** Auto always wins and preserves legacy behavior; product overrides are effective only under Custom mode. Do not imply otherwise in API or UI.
+- **Three distinct states:** catalog-orderable, order accepted/committed, and ready for physical fulfillment. MTO must record its nature and preparation promise as an immutable order snapshot; accepting an MTO order does not authorize automatic stock issue.
+- **Non-stock vs tracked:** Always is V1-eligible only for a truly non-stock item identified by an authoritative core classification after source-code audit. The existence of a `track_inventory` property elsewhere is not proof that all Commerce endpoints honor it. No automatic conversion of tracked products.
+- **MTO physical goods:** require a separate approved design for assembly/materials, allocation, shipment, invoice/COGS recognition, refunds/cancellation, replay and cross-channel impacts before checkout activation. Do not invent a substitute for inventory reservation or negative quantity.
+- **Lead time:** server authority must validate timezone, cutoff, business/calendar days, minimum eligible date, selected slot and capacity. A missing duration cannot be assumed zero and must produce a merchant configuration error.
+- **Per-store identity:** overrides must be keyed to the trusted storefront/channel and product (variant-specific resolution where needed). Data of another tenant must fail closed.
+- **Compatibility:** explicitly inventory all API readers (web storefront/mobile/commerce endpoints), active carts, retries, current orders, analytics/SEO/schema.org before evolving `in_stock` or introducing new enum values. Preserve established nullable legacy semantics.
+
 ## Approval gates
 Gate A (this PR): docs only, review and resolve explicit open decisions.
 Gate B: read-only architecture/contract inventory of cart, checkout, order, inventory, accounting and product classification.
