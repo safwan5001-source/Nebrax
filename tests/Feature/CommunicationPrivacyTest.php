@@ -143,6 +143,7 @@ class CommunicationPrivacyTest extends TestCase
             'recipient_masked' => '+•••12', 'max_attempts' => 3, 'expires_at' => now()->addHour(),
             'payload_encrypted' => ['address' => self::SENTINEL_ADDRESS, 'variables' => []],
             'status' => 'queued', 'next_attempt_at' => now(),
+            'request_fingerprint' => hash('sha256', 'fp-base'), 'hash_key_version' => 1,
         ];
 
         $invalid = [
@@ -185,6 +186,7 @@ class CommunicationPrivacyTest extends TestCase
         $message = CommunicationMessage::create([
             'channel' => 'sms', 'classification' => 'transactional', 'template_key' => 'invoice.issued', 'source' => 'invoicing',
             'idempotency_hash' => hash('sha256', 'enc'), 'recipient_masked' => '+•••56', 'max_attempts' => 3,
+            'request_fingerprint' => hash('sha256', 'fp-enc'), 'hash_key_version' => 1,
             'expires_at' => now()->addHour(), 'next_attempt_at' => now(),
             'payload_encrypted' => ['address' => self::SENTINEL_ADDRESS, 'variables' => ['code' => self::SENTINEL_CODE]],
         ]);
@@ -214,6 +216,7 @@ class CommunicationPrivacyTest extends TestCase
         $message = CommunicationMessage::create([
             'channel' => 'sms', 'classification' => 'transactional', 'template_key' => 't', 'source' => 's',
             'idempotency_hash' => hash('sha256', 'atomic'), 'recipient_masked' => '+•••56', 'max_attempts' => 3,
+            'request_fingerprint' => hash('sha256', 'fp-atomic'), 'hash_key_version' => 1,
             'expires_at' => now()->addHour(), 'next_attempt_at' => now(),
             'payload_encrypted' => ['address' => self::SENTINEL_ADDRESS, 'variables' => []],
         ]);
@@ -254,7 +257,8 @@ class CommunicationPrivacyTest extends TestCase
     public function no_column_can_hold_a_raw_address_code_secret_or_provider_text(): void
     {
         $forbidden = '/(^|_)(address|phone|email|code|otp|secret|password|body|text|message|response|request|token)($|_)/';
-        $allowed = ['payload_encrypted', 'provider_message_id', 'lease_token', 'last_error_code', 'error_code', 'message_id', 'recipient_masked'];
+        // request_fingerprint = بصمة HMAC مفتاحية (02-B1) لا جسم طلب؛ تُستثنى بالاسم صراحةً.
+        $allowed = ['payload_encrypted', 'provider_message_id', 'lease_token', 'last_error_code', 'error_code', 'message_id', 'recipient_masked', 'request_fingerprint'];
 
         foreach (['communication_messages', 'communication_message_attempts'] as $table) {
             foreach (Schema::getColumnListing($table) as $column) {

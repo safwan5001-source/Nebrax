@@ -40,6 +40,8 @@ class CommunicationIdentityProtectionTest extends TestCase
             'max_attempts' => ['max_attempts', 9],
             'expires_at' => ['expires_at', '2099-01-01 00:00:00'],
             'created_at' => ['created_at', '2099-01-01 00:00:00'],
+            'request_fingerprint' => ['request_fingerprint', 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'],
+            'hash_key_version' => ['hash_key_version', 2],
         ];
     }
 
@@ -223,11 +225,14 @@ class CommunicationIdentityProtectionTest extends TestCase
     public function the_identity_triggers_exist_on_this_engine(): void
     {
         if ($this->commDriver() === 'pgsql') {
-            $this->assertSame(['comm_attempt_guard', 'comm_msg_identity_immutable'], $this->commTriggerNames());
+            $this->assertSame(['comm_attempt_guard', 'comm_msg_fingerprint_required', 'comm_msg_identity_immutable'], $this->commTriggerNames());
             $this->assertSame(2, DB::table('pg_proc')->whereIn('proname', ['communication_messages_guard_identity', 'communication_message_attempts_guard'])->count());
         } else {
             $this->assertSame(
-                ['comm_attempt_guard', 'comm_msg_identity_immutable', 'comm_msg_privacy_insert', 'comm_msg_privacy_update'],
+                [
+                    'comm_attempt_guard', 'comm_msg_fingerprint_insert', 'comm_msg_fingerprint_update',
+                    'comm_msg_identity_immutable', 'comm_msg_privacy_insert', 'comm_msg_privacy_update',
+                ],
                 $this->commTriggerNames()
             );
         }

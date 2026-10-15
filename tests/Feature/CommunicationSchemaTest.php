@@ -30,6 +30,7 @@ class CommunicationSchemaTest extends TestCase
         'recipient_masked', 'payload_encrypted', 'status', 'attempt_count', 'max_attempts',
         'next_attempt_at', 'expires_at', 'lease_token', 'lease_until', 'last_error_code', 'accepted_at',
         'receipt_deadline_at', 'settled_at', 'settled_reason', 'created_at', 'updated_at',
+        'request_fingerprint', 'hash_key_version',
     ];
 
     private const ATTEMPT_COLUMNS = [
@@ -48,7 +49,7 @@ class CommunicationSchemaTest extends TestCase
     public function deferred_hmac_and_receipt_columns_are_absent(): void
     {
         $deferred = [
-            'recipient_hash', 'hash_key_version', 'request_fingerprint', 'status_changed_at',
+            'recipient_hash', 'status_changed_at',
             'provider_key', 'provider_message_id', 'delivered_at', 'read_at',
         ];
         foreach ($deferred as $column) {
@@ -69,7 +70,7 @@ class CommunicationSchemaTest extends TestCase
             $this->assertFalse($messages[$column]['nullable'], "{$column} must be NOT NULL");
         }
         $nullable = ['payload_encrypted', 'next_attempt_at', 'lease_token', 'lease_until', 'last_error_code',
-            'accepted_at', 'receipt_deadline_at', 'settled_at', 'settled_reason'];
+            'accepted_at', 'receipt_deadline_at', 'settled_at', 'settled_reason', 'request_fingerprint', 'hash_key_version'];
         foreach ($nullable as $column) {
             $this->assertTrue($messages[$column]['nullable'], "{$column} must be nullable");
         }
