@@ -28,7 +28,7 @@
 |---|---|
 | المستودع / الفرع | `safwan5001-source/Nebrax` · `claude/new-session-fii71l` |
 | **Base SHA** (`origin/main` عند التنفيذ) | `17e91e86a7861069431667e1300588a6a8a6d951` (دُمج `main` في الفرع قبل الالتقاط؛ لا إعادة كتابة تاريخ) |
-| **Head SHA** | `__HEAD_SHA__` |
+| **Head SHA** | `0db5e7000a7cac46faaaca05fcc70e8ec0186033` (commit الأدلة؛ رأس الـPR النهائي = commit تعبئة المراجع الذي يليه) |
 | PR | [#1535](https://github.com/safwan5001-source/Nebrax/pull/1535) — **مفتوح وغير مدموج** |
 | الملفات المتغيّرة | `docs/reports/**` فقط. **صفر** تغيير في `web/` و`app/` و`design-system/` و`tests/` (تحقّقتُ: `git diff origin/main HEAD -- . ':!docs/reports'` = 0 سطر) |
 
