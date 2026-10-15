@@ -119,7 +119,8 @@ async function read(page) {
   if (process.env.DERIVE_OVERRIDES !== '0') {
     for (const route of routes) {
       const n = await countRequests(route);
-      const extra = [...shell].filter((k) => k !== '/api/me' && (n[k] || 0) > (shellCount[k] || 0));
+      // Never derived: /api/me (failing it ends the session) and the browser-tab icon (not page content; some pages refetch it).
+      const extra = [...shell].filter((k) => !['/api/me', '/api/company-browser-icon'].includes(k) && (n[k] || 0) > (shellCount[k] || 0));
       if (extra.length) derived[route] = extra;
     }
     fs.writeFileSync(path.join(outDir, 'derived-overrides.json'), JSON.stringify(derived, null, 1));
