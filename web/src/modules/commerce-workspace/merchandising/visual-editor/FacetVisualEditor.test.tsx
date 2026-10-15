@@ -32,6 +32,7 @@ import * as library from '@/modules/commerce-workspace/storefront-media';
 import { asset, page, usage } from '@/modules/store-experience-builder/__tests__/media-fixtures';
 import { commerceWorkspaceMessage } from '@/modules/commerce-workspace/messages';
 import { FacetVisualEditor, type FacetVisualEditorProps } from './FacetVisualEditor';
+import { FACET_VISUAL_SIZE_PX } from '@/modules/store-experience-builder/presentation/facet-visual-style';
 import { MEDIA_A, MEDIA_B, PREVIEW_A, facetOf, rawFacet, rawValue } from './test-fixtures';
 
 const listMedia = vi.mocked(library.listStorefrontMedia);
@@ -407,6 +408,44 @@ describe('live preview', () => {
     await userEvent.type(screen.getByLabelText('English name (optional)'), 'Anniversary');
     expect(preview().querySelector('[data-preview-edited]')?.textContent).toContain('Anniversary');
     expect(apiMock).not.toHaveBeenCalled();
+  });
+
+  // D-W-1: the tile frame is capped at its cell (`max-width: 100%`), and the cells used to be ~76 px wide, so Medium
+  // (80 px) and Large (112 px) both collapsed to the same ~64.7 px. jsdom cannot measure layout, so this pins the two
+  // decisions that produce the real sizes: the frame's nominal width, and a cell that is wide enough to hold it. The
+  // measured sizes in a real browser are in the VD-5 report.
+  it.each([
+    ['Grid', 12],
+    ['Cards', 22],
+    ['Rail', 12],
+    ['Icons', 12],
+  ])('%s layout: every size step keeps its true frame size and a cell wide enough for it', async (layoutName, chrome) => {
+    mount({ initialTab: 'appearance' });
+    await userEvent.click(within(preview()).getByRole('button', { name: layoutName }));
+    const frame = () =>
+      document.querySelector('[data-preview-edited] [data-facet-content] > span[aria-hidden="true"]') as HTMLElement;
+    const cell = () => document.querySelector('[data-preview-edited]') as HTMLElement;
+    const cells = () => document.querySelector('[data-preview-cells]') as HTMLElement;
+    // The edited value needs something to draw (a text-only value has no frame).
+    await openTab('Image & icon');
+    await userEvent.click(screen.getByRole('button', { name: 'Icon' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Gift' }));
+    await openTab('Appearance');
+
+    const seen: Record<string, number> = {};
+    for (const [label, size] of [['Small', 'sm'], ['Medium', 'md'], ['Large', 'lg']] as const) {
+      await userEvent.click(screen.getByRole('button', { name: label }));
+      const width = parseFloat(frame().style.width);
+      expect(width).toBe(FACET_VISUAL_SIZE_PX[size]);
+      seen[size] = width;
+      // The room each cell gives the frame: the column minimum (grid-like layouts) or the item's own minimum (rail).
+      const room =
+        layoutName === 'Rail'
+          ? parseFloat(cell().style.minWidth)
+          : parseFloat(/minmax\((\d+(?:\.\d+)?)px/.exec(cells().getAttribute('style') ?? '')?.[1] ?? 'NaN');
+      expect(room).toBeGreaterThanOrEqual(width + chrome);
+    }
+    expect(new Set(Object.values(seen)).size).toBe(3);
   });
 
   it('switches the layout for the preview only, never saving it', async () => {

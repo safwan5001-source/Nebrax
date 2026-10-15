@@ -536,7 +536,7 @@ function EditorBody({
             </div>
           ) : null}
 
-          <div className={cn('p-4', desktop && 'grid grid-cols-[minmax(0,1fr)_17rem] items-start gap-6')}>
+          <div className={cn('p-4', desktop && 'grid grid-cols-[minmax(0,1fr)_19rem] items-start gap-6')}>
             <div className="min-w-0 space-y-4">
               {permissionBanner}
               {identityBanner}

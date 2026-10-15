@@ -13,10 +13,11 @@
  * - A drag on the edited item's picture sets the focal point (pointer enhancement; the 3 × 3 grid is the keyboard path).
  */
 
-import { type PointerEvent, useRef, useState } from 'react';
+import { type CSSProperties, type PointerEvent, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { FacetVisualTile, type FacetVisualTileImage } from '@/modules/store-experience-builder/FacetVisualTile';
 import type { ResolvedFacetVisual } from '@/modules/store-experience-builder/presentation/facet-visual';
+import { FACET_VISUAL_SIZE_PX } from '@/modules/store-experience-builder/presentation/facet-visual-style';
 import '@/modules/store-experience-builder/store-preview.css';
 import { optionClass } from './controls';
 import type { VT, VisualEditorMessageKey } from './messages';
@@ -53,6 +54,18 @@ function iconFirst(visual: ResolvedFacetVisual): ResolvedFacetVisual {
     return { ...rest, content: 'icon', icon: visual.fallbackIcon };
   }
   return visual;
+}
+
+/**
+ * Horizontal room a cell takes besides the tile frame, in px (the cell's own padding, plus the border of a card). The
+ * tile frame is capped at its cell (`max-width: 100%`, as in a store column), so a cell narrower than the frame plus
+ * this would silently shrink the frame and make two size steps look alike (D-W-1).
+ */
+const CELL_CHROME_PX: Record<PreviewLayout, number> = { grid: 12, cards: 22, rail: 12, icons: 12, list: 0 };
+
+/** The frame width the tile will draw for `visual`, in px; 0 when no frame is drawn (text by choice). */
+function frameWidth(visual: ResolvedFacetVisual): number {
+  return visual.content === 'none' ? 0 : (FACET_VISUAL_SIZE_PX[visual.size] ?? FACET_VISUAL_SIZE_PX.md);
 }
 
 function clampPercent(value: number): number {
@@ -123,11 +136,12 @@ export function PreviewPanel({
         onPointerMove={edited && draggable ? (event) => dragging.current && focalFrom(event) : undefined}
         onPointerUp={edited && draggable ? () => (dragging.current = false) : undefined}
         onPointerCancel={edited && draggable ? () => (dragging.current = false) : undefined}
+        style={layout === 'rail' ? { minWidth: `${Math.max(96, frameWidth(visual) + CELL_CHROME_PX.rail)}px` } : undefined}
         className={cn(
           'min-w-0 rounded-store p-1.5',
           layout === 'list' ? 'flex items-center' : 'flex justify-center',
           layout === 'cards' && 'border border-store-border bg-store-surface p-2.5',
-          layout === 'rail' && 'w-24 shrink-0 snap-start',
+          layout === 'rail' && 'shrink-0 snap-start',
           edited && 'outline outline-2 outline-offset-2 outline-primary',
           edited && draggable && 'cursor-crosshair touch-none',
         )}
@@ -138,12 +152,22 @@ export function PreviewPanel({
   };
 
   const container = cn(
-    layout === 'grid' && 'grid grid-cols-3 gap-2',
-    layout === 'cards' && 'grid grid-cols-2 gap-2',
+    (layout === 'grid' || layout === 'cards' || layout === 'icons') && 'grid gap-2',
     layout === 'rail' && 'flex snap-x gap-2 overflow-x-auto pb-1',
-    layout === 'icons' && 'grid grid-cols-4 gap-2',
     layout === 'list' && 'flex flex-col gap-1',
   );
+
+  // Every cell is at least as wide as the biggest frame on show, so each size step draws at its true nominal width
+  // (the editor previews exactly the sizes the store renders, UX requirements §3.6). The column count follows from that
+  // and the panel's width: more columns while the sizes are small, fewer for large frames. Nothing is scaled.
+  const containerStyle = (items: PreviewItem[]): CSSProperties | undefined => {
+    if (layout === 'list' || layout === 'rail') return undefined;
+    const widest = Math.max(
+      0,
+      ...items.map((item) => frameWidth(layout === 'icons' ? iconFirst(item.visual) : item.visual)),
+    );
+    return { gridTemplateColumns: `repeat(auto-fill, minmax(${widest + CELL_CHROME_PX[layout]}px, 1fr))` };
+  };
 
   return (
     <div className={cn('space-y-3', className)} data-preview-panel="">
@@ -170,7 +194,9 @@ export function PreviewPanel({
         {groups.map((group) => (
           <div key={group.id} className="space-y-1.5">
             {group.title ? <p className="text-xs font-medium text-store-muted-foreground">{group.title}</p> : null}
-            <div className={container}>{group.items.map(renderItem)}</div>
+            <div className={container} style={containerStyle(group.items)} data-preview-cells="">
+              {group.items.map(renderItem)}
+            </div>
           </div>
         ))}
       </div>
