@@ -99,8 +99,9 @@ final class CommunicationOutbox
             // فشل البحث نفسه (قاعدة غير متاحة باستمرار) يُعامَل خطأ تخزين أيضاً فلا يتسرّب QueryException خاماً.
             try {
                 $existing = $this->findByHash($tenantId, $hash);
-            } catch (QueryException) {
-                throw $this->storageFailure($tenantId, $e);
+            } catch (QueryException $lookupFailure) {
+                // يُسجَّل SQLSTATE الاستعلام الذي أفشل الاسترداد (قد يكون انقطاعاً) لا تعارض التفرّد الأصلي.
+                throw $this->storageFailure($tenantId, $lookupFailure);
             }
 
             if ($existing === null) {
@@ -157,8 +158,13 @@ final class CommunicationOutbox
             || ($intent->channel()->usesPhoneAddress() && str_contains($key, ltrim($address, '+')));
 
         if (! $embeds && $intent->classification === MessageClassification::Otp) {
+            // الرمز يُستخرج من تجزئة بلا مفتاح بتعداد فضائه الصغير: نرفض أي قيمة متغير تظهر في المفتاح — كجزءٍ كامل بين
+            // الفواصل (أي طول: رمز من 3 خانات مثلاً) أو كسلسلة فرعية من 3 محارف فأكثر. قيمة بحرف/حرفين لا تُرفض
+            // كسلسلة فرعية (تطابقٌ عرضيّ يرفض كل مفتاح)، لكنها تُرفض إن كانت جزءاً كاملاً.
+            $segments = preg_split('/[._:-]/', $key) ?: [];
             foreach ($intent->variables as $value) {
-                if (strlen($value) >= 4 && str_contains($key, strtolower($value))) {
+                $needle = strtolower($value);
+                if ($needle !== '' && (in_array($needle, $segments, true) || (strlen($needle) >= 3 && str_contains($key, $needle)))) {
                     $embeds = true;
                     break;
                 }

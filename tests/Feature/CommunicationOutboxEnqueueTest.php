@@ -385,6 +385,11 @@ class CommunicationOutboxEnqueueTest extends TestCase
         foreach ([
             ['key' => 'otp:'.self::CODE, 'variables' => ['code' => self::CODE]],
             ['key' => 'otp:966555123456', 'address' => self::ADDRESS, 'variables' => ['code' => '111111']],
+            // رمز قصير (3 خانات) كجزء كامل أو كسلسلة فرعية، وكلمة بأحرف مختلفة.
+            ['key' => 'otp:login:123:1', 'variables' => ['code' => '123']],
+            ['key' => 'otp:x742y', 'variables' => ['code' => '742']],
+            ['key' => 'otp:AbC9', 'variables' => ['code' => 'abc9']],
+            ['key' => 'otp:login:7', 'variables' => ['code' => '7']],
         ] as $case) {
             try {
                 $outbox->enqueue($this->commIntent($tenant->id, $base + $case));
@@ -544,18 +549,35 @@ class CommunicationOutboxEnqueueTest extends TestCase
      * قاعدة غير متاحة باستمرار: يمرّ المسار السريع (إن طُلب) ثم تفشل كل استعلامات الجدول، بما فيها استعلام الاسترداد.
      * الاستثناء يُرمى قبل غلاف الاتصال فيصل المعالج QueryException خاماً كما في انقطاع حقيقي.
      */
-    private function failTableQueriesAfter(int $allowedSelects): void
+    private function failTableQueriesAfter(int $allowedSelects, string $insertSqlState = 'HY000', string $lookupSqlState = 'HY000'): void
     {
         $seen = 0;
-        DB::beforeExecuting(function (string $sql) use (&$seen, $allowedSelects) {
+        $failure = static function (string $sql, string $sqlState): QueryException {
+            // QueryException يقرأ SQLSTATE من الاستثناء السابق.
+            $pdo = new class($sqlState, 'connection lost '.self::ADDRESS) extends \PDOException {
+                public function __construct(string $sqlState, string $message)
+                {
+                    parent::__construct($message);
+                    $this->code = $sqlState;
+                }
+            };
+
+            return new QueryException('testing', $sql, [self::ADDRESS], $pdo);
+        };
+
+        DB::beforeExecuting(function (string $sql) use (&$seen, $allowedSelects, $insertSqlState, $lookupSqlState, $failure) {
             if (stripos($sql, 'communication_messages') === false) {
                 return;
             }
-            if (stripos(ltrim($sql), 'select') === 0 && ++$seen <= $allowedSelects) {
-                return;
+            if (stripos(ltrim($sql), 'select') === 0) {
+                if (++$seen <= $allowedSelects) {
+                    return;
+                }
+
+                throw $failure($sql, $lookupSqlState);
             }
 
-            throw new QueryException('testing', $sql, [self::ADDRESS], new \PDOException('connection lost '.self::ADDRESS));
+            throw $failure($sql, $insertSqlState);
         });
     }
 
@@ -577,6 +599,24 @@ class CommunicationOutboxEnqueueTest extends TestCase
 
         Log::shouldHaveReceived('error')->withArgs(fn (string $m, array $c) => $m === 'communications.enqueue.storage_failure'
             && array_keys($c) === ['tenant_id', 'sqlstate'] && ! str_contains(json_encode($c), self::ADDRESS))->once();
+    }
+
+    #[Test]
+    public function the_logged_sqlstate_is_the_one_of_the_lookup_that_failed_not_the_original_insert_conflict(): void
+    {
+        $tenant = $this->commTenant();
+        $outbox = $this->as($tenant->id);
+        Log::spy();
+        // الإدراج يفشل بـ23505 ثم يفشل البحث بـ08006 (انقطاع اتصال).
+        $this->failTableQueriesAfter(1, insertSqlState: '23505', lookupSqlState: '08006');
+
+        try {
+            $outbox->enqueue($this->commIntent($tenant->id));
+            $this->fail('a failed recovery lookup must surface as a storage error');
+        } catch (CommunicationsStorageException) {
+        }
+
+        Log::shouldHaveReceived('error')->withArgs(fn (string $m, array $c) => $c['sqlstate'] === '08006')->once();
     }
 
     #[Test]
