@@ -3,12 +3,12 @@ import { seedDemoSession } from './helpers/demo-session';
 import { scanContrast } from './helpers/contrast-scan';
 
 // AWJ Core — the third V3 theme (THEMES.md §6A). Demo Mode, real components.
-// Owner-approved contract: Light shell (sidebar + topbar) = #1E40AF, Dark shell = #4F8CFF;
+// Owner-approved contract: Light shell (sidebar + topbar) = #1E40AF, Dark shell = #1E3A8A (design M, D-42);
 // layout, components and the workspace are Default's, untouched. Presentation only.
 
 const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:3001';
 const CORE_LIGHT = 'rgb(30, 64, 175)'; // #1E40AF
-const CORE_DARK = 'rgb(79, 140, 255)'; // #4F8CFF
+const CORE_DARK = 'rgb(30, 58, 138)'; // #1E3A8A
 
 async function open(page: Page, route: string, opts: { locale?: 'ar' | 'en'; mode?: 'light' | 'dark'; theme?: 'core' | 'ink' | 'default'; gate?: boolean } = {}) {
   const { locale = 'ar', mode = 'light', theme = 'core', gate = true } = opts;
@@ -34,7 +34,7 @@ test.describe('Core — shell colors (owner-approved contract)', () => {
       expect(await overflowX(page)).toBe(0);
     });
 
-    test(`Dark ${locale}: sidebar and topbar are both #4F8CFF (not navy, not an accent)`, async ({ page }) => {
+    test(`Dark ${locale}: sidebar and topbar are both #1E3A8A (brand-700, not the old bright #4F8CFF)`, async ({ page }) => {
       await open(page, '/dashboard', { locale, mode: 'dark' });
       await expect(page.locator('html')).toHaveClass(/dark/);
       expect(await bgOf(page, '[data-awj-shell="sidebar"]')).toBe(CORE_DARK);
@@ -79,14 +79,14 @@ test.describe('Core — Default and Ink are unchanged', () => {
     expect(await bgOf(page, '[data-awj-shell="sidebar"]')).toBe('rgb(14, 26, 49)'); // #0E1A31
   });
 
-  test('Ink-Dark = Default-Dark still holds; only Core-Dark differs (#0E1A31 vs #4F8CFF)', async ({ page }) => {
+  test('Ink-Dark = Default-Dark still holds; only Core-Dark differs (#0E1A31 vs #1E3A8A)', async ({ page }) => {
     const shellBg = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--awj-shell-bg').trim().toUpperCase());
     await open(page, '/dashboard', { mode: 'dark', theme: 'ink' });
     expect(await shellBg()).toBe('#0E1A31');
     await page.evaluate(() => document.documentElement.removeAttribute('data-awj-theme'));
     expect(await shellBg()).toBe('#0E1A31');
     await page.evaluate(() => document.documentElement.setAttribute('data-awj-theme', 'core'));
-    expect(await shellBg()).toBe('#4F8CFF');
+    expect(await shellBg()).toBe('#1E3A8A');
   });
 
   test('gate OFF: a stored Core preference stays inert and renders legacy', async ({ page }) => {
@@ -170,6 +170,31 @@ test.describe('Core — contrast, hover, active and keyboard focus (live)', () =
       expect(measured!.width).toBe('2px');
     });
   }
+
+  test('dark: Shell → Hover → Active are visibly separated (≥1.2 · ≥1.3 · ≥1.6) and the ring is white', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile', 'hover is a desktop pointer state');
+    await open(page, '/invoices', { mode: 'dark', locale: 'en' });
+    const grp = page.locator('[data-awj-shell="sidebar"] nav button:not([data-awj-shell-active])').nth(1);
+    await grp.hover();
+    await page.waitForTimeout(300);
+    const m = await page.evaluate(() => {
+      const rgb = (v: string) => (v.match(/\d+(\.\d+)?/g) ?? []).slice(0, 3).map(Number);
+      const lin = (c: number) => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };
+      const lum = (c: number[]) => 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]);
+      const ratio = (a: number[], b: number[]) => { const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05); };
+      const hovered = document.querySelector('[data-awj-shell="sidebar"] nav button:not([data-awj-shell-active]):hover') as HTMLElement | null;
+      const active = document.querySelector('[data-awj-shell="sidebar"] nav [data-awj-shell-active]') as HTMLElement | null;
+      const shell = rgb(getComputedStyle(document.querySelector('[data-awj-shell="sidebar"]') as HTMLElement).backgroundColor);
+      if (!hovered || !active) return null;
+      const h = rgb(getComputedStyle(hovered).backgroundColor);
+      const a = rgb(getComputedStyle(active).backgroundColor);
+      return { shellHover: ratio(shell, h), hoverActive: ratio(h, a), shellActive: ratio(shell, a), h, a };
+    });
+    expect(m, 'hovered or active shell item not found').not.toBeNull();
+    expect(m!.shellHover, JSON.stringify(m)).toBeGreaterThanOrEqual(1.2);
+    expect(m!.hoverActive, JSON.stringify(m)).toBeGreaterThanOrEqual(1.3);
+    expect(m!.shellActive, JSON.stringify(m)).toBeGreaterThanOrEqual(1.6);
+  });
 
   test('a menu opened from the Core topbar sits on Paper and stays legible', async ({ page }) => {
     await open(page, '/dashboard', { mode: 'light', locale: 'en' });
