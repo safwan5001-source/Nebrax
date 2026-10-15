@@ -47,6 +47,8 @@ export function MediaRefField({
   locale,
   decorativeOnly = false,
   coverOnly = decorativeOnly,
+  framing = true,
+  altRequired = true,
 }: {
   label: string;
   hint?: string;
@@ -66,6 +68,19 @@ export function MediaRefField({
    * surface the picture's luminance evidence does not cover) while the alt text stays. Defaults to `decorativeOnly`.
    */
   coverOnly?: boolean;
+  /**
+   * AWJ-VD-H1 / VD-3 — `false` makes the field **pick-only**: no «Edit image» action and no `MediaFramingEditor`
+   * (which emits `crop` / `rotate` and keeps its zoom in `crop.zoom`). A facet-visual identity forbids both and carries
+   * its framing (`fit` / `focal` / `zoom`) in its own appearance controls. Selecting, replacing, removing, the alt
+   * text and the decorative choice are unchanged. Defaults to `true`, so every Customizer use behaves exactly as before.
+   */
+  framing?: boolean;
+  /**
+   * AWJ-VD-H1 / VD-3 — `false` for a usage whose alt text is optional (a facet identity: the link in the store already
+   * carries the name). A language with no alt then reads as a neutral note, not as the red «required before publish»
+   * error. Defaults to `true`, so the Customizer is unchanged.
+   */
+  altRequired?: boolean;
 }) {
   const [picking, setPicking] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -165,16 +180,18 @@ export function MediaRefField({
           </div>
 
           <div className="flex flex-wrap gap-1.5">
-            <button
-              type="button"
-              className={mediaBtnClass}
-              disabled={!asset || asset.variantsState !== "ready"}
-              onClick={() => setEditing(true)}
-              data-media-edit={slot}
-            >
-              <Pencil aria-hidden="true" className="size-3.5" />
-              {t("mediaEditImage")}
-            </button>
+            {framing ? (
+              <button
+                type="button"
+                className={mediaBtnClass}
+                disabled={!asset || asset.variantsState !== "ready"}
+                onClick={() => setEditing(true)}
+                data-media-edit={slot}
+              >
+                <Pencil aria-hidden="true" className="size-3.5" />
+                {t("mediaEditImage")}
+              </button>
+            ) : null}
             <button type="button" className={mediaBtnClass} onClick={() => setPicking(true)}>
               <Replace aria-hidden="true" className="size-3.5" />
               {t("mediaReplace")}
@@ -213,6 +230,7 @@ export function MediaRefField({
                   label={locale === "ar" ? t("mediaAltAr") : t("mediaAltEn")}
                   value={value.alt?.[locale] ?? ""}
                   coverage={resolveAltCoverage(value, asset, locale)}
+                  required={altRequired}
                   onChange={(text) => setAlt(locale, text)}
                   t={t}
                 />
@@ -225,7 +243,7 @@ export function MediaRefField({
       {hint ? <p className="text-[12px] leading-5 text-muted">{hint}</p> : null}
 
       <MediaPicker open={picking} onClose={() => setPicking(false)} onSelect={select} t={t} locale={locale} />
-      {value && asset ? (
+      {framing && value && asset ? (
         <MediaFramingEditor
           // A fresh editor per opening: it seeds its draft framing from `value`.
           key={editing ? "open" : "closed"}
@@ -252,6 +270,7 @@ function AltField({
   label,
   value,
   coverage,
+  required,
   onChange,
   t,
 }: {
@@ -260,10 +279,12 @@ function AltField({
   label: string;
   value: string;
   coverage: AltCoverage;
+  required: boolean;
   onChange: (text: string) => void;
   t: T;
 }) {
-  const missing = coverage.kind === "missing";
+  const absent = coverage.kind === "missing";
+  const missing = absent && required;
   return (
     <div className="space-y-1">
       <label htmlFor={id} className="block text-[12px] font-medium text-muted">
@@ -294,7 +315,7 @@ function AltField({
             </span>
           </>
         ) : null}
-        {missing ? t("mediaAltMissing") : null}
+        {absent ? t("mediaAltMissing") : null}
       </p>
     </div>
   );

@@ -8,6 +8,10 @@ export interface TabDef {
   label: string;
   /** عدّاد اختياري يظهر بجانب العنوان (بخط الأرقام). */
   count?: number;
+  /** نقطة تنبيه بجانب العنوان (مثلاً تبويب فيه خطأ لم يُحلّ). غيابها يترك التبويب كما كان حرفياً. */
+  alert?: boolean;
+  /** نصّ النقطة لقارئ الشاشة؛ النقطة وحدها زخرفية. */
+  alertLabel?: string;
 }
 
 /**
@@ -92,6 +96,12 @@ export function Tabs({
           >
             {t.label}
             {t.count !== undefined && <span className="num ms-1.5 text-xs">{t.count}</span>}
+            {t.alert ? (
+              <>
+                <span aria-hidden="true" className="ms-1.5 inline-block size-2 rounded-full bg-negative align-middle" data-tab-alert="" />
+                {t.alertLabel ? <span className="sr-only">{t.alertLabel}</span> : null}
+              </>
+            ) : null}
           </button>
         );
       })}

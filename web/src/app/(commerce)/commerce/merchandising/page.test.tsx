@@ -46,10 +46,11 @@ describe('Merchandising — dimensions tab', () => {
 
     expect(await screen.findByText('Birthday')).toBeTruthy();
     expect(screen.getByText('2 products')).toBeTruthy();
-    expect((screen.getByRole('button', { name: 'Delete Birthday' }) as HTMLButtonElement).disabled).toBe(true);
+    // VD-3 (C4): blocked deletes are `aria-disabled` (still focusable and pressable) so the reason can be shown as text.
+    expect(screen.getByRole('button', { name: 'Delete Birthday' }).getAttribute('aria-disabled')).toBe('true');
     // البُعد كله لا يُحذف ما دامت قيمة منه مُسنَدة (الخادم يرفضه 409)
-    expect((screen.getByRole('button', { name: 'Delete Occasion' }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole('button', { name: 'Delete Wedding' }) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.getByRole('button', { name: 'Delete Occasion' }).getAttribute('aria-disabled')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Delete Wedding' }).getAttribute('aria-disabled')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Add “Occasion”' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Add “Recipient”' })).toBeTruthy();
   });
@@ -70,6 +71,9 @@ describe('Merchandising — dimensions tab', () => {
       body: { key: 'recipient', name: 'Recipient', name_en: 'Recipient', system_key: 'recipient' },
     });
     expect(await screen.findByRole('heading', { name: 'Recipient' })).toBeTruthy();
+    // VD-3: after a quick add the editor offers «Customize appearance» (never writes an identity before the row exists).
+    expect(screen.getByRole('button', { name: 'Customize appearance' })).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Later' }));
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
@@ -80,7 +84,7 @@ describe('Merchandising — dimensions tab', () => {
     renderPage();
 
     await userEvent.click(await screen.findByRole('button', { name: 'Add value' }));
-    await userEvent.type(screen.getByLabelText('Value name'), 'Birthday');
+    await userEvent.type(screen.getByLabelText('Arabic name'), 'Birthday');
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     // خطأ غير HTTP ⇒ العبارة العامة (لا نص خادم مُختلَق)
@@ -203,7 +207,7 @@ describe('Merchandising — collections for read-only users and pending writes',
     apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } });
     renderPage();
     await userEvent.click(await screen.findByRole('button', { name: 'Add value' }));
-    await userEvent.type(screen.getByLabelText('Value name'), 'Anniversary');
+    await userEvent.type(screen.getByLabelText('Arabic name'), 'Anniversary');
 
     let finish: (value: unknown) => void = () => undefined;
     apiMock.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
@@ -214,7 +218,9 @@ describe('Merchandising — collections for read-only users and pending writes',
 
     apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } });
     finish({ data: { value: { id: 'v9', slug: 'anniversary', name: 'Anniversary' } } });
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    // The form closes only once the server confirmed; the follow-up offers the appearance editor (VD-3).
+    await waitFor(() => expect(screen.queryByLabelText('Arabic name')).toBeNull());
+    expect(screen.getByRole('button', { name: 'Customize appearance' })).toBeTruthy();
   });
 });
 

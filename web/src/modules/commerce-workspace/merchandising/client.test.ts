@@ -21,6 +21,8 @@ import {
   productFacetsPath,
   replaceCollectionMembers,
   replaceProductFacetValueIds,
+  saveFacetValueVisual,
+  saveFacetVisual,
   suggestFacetKey,
 } from './client';
 
@@ -119,5 +121,116 @@ describe('merchandising requests', () => {
     expect(await loadFacets()).toBeNull();
     apiMock.mockResolvedValue({ data: {} });
     expect(await loadCollectionMembers('c1')).toBeNull();
+  });
+});
+
+// ── AWJ-VD-H1 / VD-3: the visual identity fields and the two PUT endpoints (VD-1b) ──────────────────────────
+
+describe('facet visual fields on GET facets', () => {
+  const raw = {
+    id: 'f1', key: 'occasion', name: 'المناسبة', visual_version: 3,
+    visual: { self: { shape: 'arch' }, defaults: { size: 'lg', bogus: 1 } },
+    visual_preview: { thumb_160: 'https://s/a-160.webp', thumb_320: 'https://s/a-320.webp' },
+    values: [
+      { id: 'v1', slug: 'a', name: 'أ', visual: { shape: 'star', image: { mediaId: '0b9d6a3e-1f5c-4a8e-9a47-2c1d3e4f5a6b', crop: { x: 0 } } }, visual_version: 1, visual_preview: null },
+      { id: 'v2', slug: 'b', name: 'ب', visual: null, visual_version: 4, visual_preview: null },
+      { id: 'v3', slug: 'c', name: 'ج' },
+    ],
+  };
+
+  it('maps the normalised document, the integer token and the signed previews', () => {
+    const facet = mapFacet(raw);
+    expect(facet?.visual).toEqual({ self: { shape: 'arch' }, defaults: { size: 'lg' } });
+    expect(facet?.visualVersion).toBe(3);
+    expect(facet?.visualPreview).toEqual({ thumb160: 'https://s/a-160.webp', thumb320: 'https://s/a-320.webp' });
+    expect(facet?.values[0].visual).toEqual({ shape: 'star', image: { mediaId: '0b9d6a3e-1f5c-4a8e-9a47-2c1d3e4f5a6b' } });
+  });
+
+  it('a tombstone keeps its token with no document, and a legacy row has neither', () => {
+    const facet = mapFacet(raw);
+    expect(facet?.values[1]).toMatchObject({ visual: null, visualVersion: 4 });
+    expect(facet?.values[2]).toMatchObject({ visual: null, visualVersion: null, visualPreview: null });
+  });
+
+  it('refuses a token that is not a positive integer', () => {
+    expect(mapFacet({ ...raw, visual_version: '3' })?.visualVersion).toBeNull();
+    expect(mapFacet({ ...raw, visual_version: 1.5 })?.visualVersion).toBeNull();
+    expect(mapFacet({ ...raw, visual_version: 0 })?.visualVersion).toBeNull();
+  });
+});
+
+describe('facet visual writes', () => {
+  it('PUTs a dimension’s document with the exact body {visual, expected_version}', async () => {
+    apiMock.mockResolvedValue({ data: { visual: { self: { shape: 'arch' } }, version: 4 } });
+    const result = await saveFacetVisual('f1', { self: { shape: 'arch' } }, 3);
+
+    expect(apiMock).toHaveBeenCalledWith(`${FACETS_PATH}/f1/visual`, {
+      method: 'PUT',
+      body: { visual: { self: { shape: 'arch' } }, expected_version: 3 },
+    });
+    expect(result).toEqual({ ok: true, visual: { self: { shape: 'arch' } }, version: 4 });
+  });
+
+  it('PUTs a value’s document on the value path', async () => {
+    apiMock.mockResolvedValue({ data: { visual: { shape: 'star' }, version: 1 } });
+    await saveFacetValueVisual('f1', 'v1', { shape: 'star' }, null);
+
+    expect(apiMock).toHaveBeenCalledWith(`${FACETS_PATH}/f1/values/v1/visual`, {
+      method: 'PUT',
+      body: { visual: { shape: 'star' }, expected_version: null },
+    });
+  });
+
+  it('sends the null tombstone as `visual: null`, keeping the token', async () => {
+    apiMock.mockResolvedValue({ data: { visual: null, version: 5 } });
+    const result = await saveFacetValueVisual('f1', 'v1', null, 4);
+
+    expect(apiMock).toHaveBeenCalledWith(`${FACETS_PATH}/f1/values/v1/visual`, {
+      method: 'PUT',
+      body: { visual: null, expected_version: 4 },
+    });
+    expect(result).toEqual({ ok: true, visual: null, version: 5 });
+  });
+
+  it('the token is a JSON integer or null: anything else is refused before any request', async () => {
+    for (const bad of [0, -1, 1.5, Number.NaN, '3', true]) {
+      const result = await saveFacetValueVisual('f1', 'v1', { shape: 'star' }, bad as unknown as number);
+      expect(result).toMatchObject({ ok: false, code: 'invalid_expected_version', status: null });
+    }
+    expect(apiMock).not.toHaveBeenCalled();
+    // an integer-valued number serialises as a JSON integer
+    apiMock.mockResolvedValue({ data: { visual: null, version: 2 } });
+    await saveFacetVisual('f1', null, 1);
+    expect(JSON.stringify(apiMock.mock.calls[0][1].body)).toBe('{"visual":null,"expected_version":1}');
+  });
+
+  it('surfaces 409 with the current version, 428 and a 422 with field errors instead of throwing', async () => {
+    apiMock.mockRejectedValueOnce(new ApiError(409, 'تغيّرت', { code: 'visual_version_conflict', current_version: 7 }));
+    expect(await saveFacetVisual('f1', null, 3)).toEqual({
+      ok: false, status: 409, code: 'visual_version_conflict', message: 'تغيّرت', currentVersion: 7, errors: {},
+    });
+
+    apiMock.mockRejectedValueOnce(new ApiError(428, 'مطلوب', { code: 'visual_precondition_required' }));
+    expect(await saveFacetVisual('f1', null, null)).toMatchObject({ ok: false, status: 428, code: 'visual_precondition_required', currentVersion: null });
+
+    apiMock.mockRejectedValueOnce(
+      new ApiError(422, 'غير صالحة', { code: 'visual_invalid', errors: { 'visual.image.mediaId': ['media_not_ready'], 'visual.shape': ['unknown_shape', 5] } }),
+    );
+    expect(await saveFacetValueVisual('f1', 'v1', { shape: 'star' }, 2)).toMatchObject({
+      ok: false, status: 422, code: 'visual_invalid',
+      errors: { 'visual.image.mediaId': ['media_not_ready'], 'visual.shape': ['unknown_shape'] },
+    });
+  });
+
+  it('a non-HTTP failure has a null status and no codes', async () => {
+    apiMock.mockRejectedValue(new TypeError('network'));
+    expect(await saveFacetVisual('f1', null, null)).toEqual({
+      ok: false, status: null, code: null, message: null, currentVersion: null, errors: {},
+    });
+  });
+
+  it('a success without a usable token is not reported as saved', async () => {
+    apiMock.mockResolvedValue({ data: { visual: null } });
+    expect(await saveFacetVisual('f1', null, null)).toMatchObject({ ok: false });
   });
 });
