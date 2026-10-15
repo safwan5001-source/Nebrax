@@ -124,15 +124,20 @@ function pickName(
  * list `meta` — the single source the public API exposes for them. One
  * `per_page=1` request carries the whole meta; the products themselves are
  * ignored. Returns null when the dimension has no visible value.
+ *
+ * `locale` is the page's own locale (the `/{country}/{locale}` segment the section was rendered for). Callers that
+ * have it must pass it: the next-intl request locale (`getLocale()`) is not published from the URL in this storefront
+ * and always resolves to the default, so on `/sa/en` it would pick the Arabic names. Omitted, it falls back to that.
  */
 export async function fetchDiscoveryValues(
   selector: DiscoverySelector,
+  locale?: string,
 ): Promise<DiscoveryValues | null> {
   const response = await storefrontFetch<{
     data: unknown[];
     meta: { pagination: AwjPagination; facets?: unknown; brands?: unknown };
   }>("products", { per_page: 1 });
-  const locale = await getLocale();
+  const pageLocale = locale ?? (await getLocale());
 
   if (selector.axis === "brand") {
     const brands = Array.isArray(response.meta.brands)
@@ -165,7 +170,7 @@ export async function fetchDiscoveryValues(
     .filter(isRecord)
     .find((candidate) => candidate.key === selector.dimension);
   if (!row) return null;
-  const group = parseListingFacets({ facets: [row] }, locale).groups[0];
+  const group = parseListingFacets({ facets: [row] }, pageLocale).groups[0];
   if (!group) return null;
 
   const options = group.values

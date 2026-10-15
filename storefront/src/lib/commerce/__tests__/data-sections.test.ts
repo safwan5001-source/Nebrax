@@ -203,6 +203,19 @@ describe("commerce/data-sections — FLOWERS-H9b", () => {
       expect(axis?.options[0].name).toBe("Eid");
     });
 
+    it("localizes by the page locale it is given, not by the request locale (AWJ-VD-H1 D-S-1)", async () => {
+      // On `/sa/en` the next-intl request locale still resolves to the default ("ar"): nothing in the storefront
+      // proxy or layout publishes the URL locale to `getLocale()`. The home section knows the page locale.
+      mocks.getLocale.mockResolvedValue("ar");
+      fetchMock.mockResolvedValue(jsonResponse({ data: [], meta }));
+      const axis = await fetchDiscoveryValues(
+        { axis: "facet", dimension: "occasion" },
+        "en",
+      );
+      expect(axis?.name).toBe("Occasion");
+      expect(axis?.options[0].name).toBe("Eid");
+    });
+
     it("reads the brand axis and drops brands with no products", async () => {
       fetchMock.mockResolvedValue(jsonResponse({ data: [], meta }));
       expect(await fetchDiscoveryValues({ axis: "brand" })).toEqual({
