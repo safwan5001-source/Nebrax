@@ -45,7 +45,7 @@ export async function DiscoverySection({
         ? { axis: "facet", dimension: content.dimension }
         : null;
   if (!selector) return null;
-  const values = await fetchDiscoveryValues(selector).catch((error) => {
+  const values = await fetchDiscoveryValues(selector, locale).catch((error) => {
     console.error("DiscoverySection: failed to load discovery values", error);
     return null;
   });
