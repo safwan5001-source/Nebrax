@@ -188,6 +188,11 @@ export function FacetsPanel({
   if (facets === 'error') return <ErrorState message={t('merchLoadFailed')} onRetry={() => void load()} />;
 
   const hasSystem = (key: SystemFacetKey) => facets.some((f) => f.systemKey === key);
+  // «Customize appearance» opens the editor on the row just created, which exists only once the reload that follows the
+  // creation has landed. Before that the editor would find no target and close itself with the whole flow (D-W-2).
+  const createdRowReady =
+    dialog?.kind === 'created' &&
+    facets.some((f) => f.id === dialog.facetId && (!dialog.valueId || f.values.some((v) => v.id === dialog.valueId)));
   const displayName = (name: string, nameEn: string | null) => (locale === 'en' && nameEn ? nameEn : name);
 
   return (
@@ -458,7 +463,7 @@ export function FacetsPanel({
               <Button type="button" variant="outline" className="min-h-11" onClick={() => setDialog(null)}>
                 {vt('later')}
               </Button>
-              <Button type="button" className="min-h-11" onClick={() => openEditor(dialog.facetId, dialog.valueId, 'image')}>
+              <Button type="button" className="min-h-11" disabled={!createdRowReady} onClick={() => openEditor(dialog.facetId, dialog.valueId, 'image')}>
                 {vt('customizeAppearance')}
               </Button>
             </div>
