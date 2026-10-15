@@ -2,6 +2,7 @@
 // لأن التحويل من الهللات يتم في طبقة موارد الـ backend. لا يُستخدم أي float في حساب مالي حقيقي هنا.
 
 import { DEMO_USER } from './demo';
+import { isAwjTheme } from './awj-theme';
 import { handleDocumentReviewDemo } from './document-review-demo';
 import { handleDocumentOperationsDemo } from './document-operations-demo';
 import { handleStorefrontMediaDemo } from './storefront-media-demo';
@@ -3300,7 +3301,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
         ? requested.theme : mockAccountPreferences.theme;
       // الخادم الحقيقي يستبدل العمود كاملاً إن لم يُرسَل appTheme إلا أنه يحافظ على
       // القيمة القائمة (AccountSettingsController::updatePreferences) — نطابق ذلك هنا.
-      const appTheme = requested?.appTheme === 'ink' || requested?.appTheme === 'default'
+      const appTheme = isAwjTheme(requested?.appTheme)
         ? requested.appTheme : (mockAccountPreferences.appTheme ?? 'default');
       mockAccountPreferences = { locale, theme, appTheme };
       return resolve({ user: { ...DEMO_USER, preferences: mockAccountPreferences } });

@@ -37,9 +37,21 @@ describe('useAwjTheme', () => {
     expect(screen.getByTestId('theme').textContent).toBe('ink');
 
     await act(async () => {
+      applyAwjTheme('core');
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId('theme').textContent).toBe('core');
+
+    await act(async () => {
       applyAwjTheme('default');
       await Promise.resolve();
     });
+    expect(screen.getByTestId('theme').textContent).toBe('default');
+  });
+
+  it('treats an unrecognized attribute value as default', async () => {
+    document.documentElement.setAttribute(AWJ_THEME_ATTRIBUTE, 'neon');
+    render(<Probe />);
     expect(screen.getByTestId('theme').textContent).toBe('default');
   });
 });
