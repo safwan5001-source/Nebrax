@@ -383,7 +383,7 @@ input[type="search"]::-webkit-search-cancel-button {
   --store-footer-muted: #9ca3af;
   --store-footer-link: #d1d5db;
   --store-footer-border: #1f2937;
-  /* CUST-HV V5c — originals, restored on nested surfaces inside a recoloured section. */
+
   /*
    * AWJ-VD-H1 / VD-4b — the caption scrim of a discovery tile with `textPosition: overlay`. Fixed on purpose (not a
    * merchant colour): a caption sits on an arbitrary merchant photo, so the pair is chosen for the worst case. White
@@ -392,6 +392,7 @@ input[type="search"]::-webkit-search-cancel-button {
   --store-scrim: rgb(0 0 0 / 0.72);
   --store-scrim-foreground: #ffffff;
 
+  /* CUST-HV V5c — originals, restored on nested surfaces inside a recoloured section. */
   --store-primary-foreground-base: var(--store-primary-foreground);
   --store-footer-foreground-base: var(--store-footer-foreground);
   --store-footer-muted-base: var(--store-footer-muted);

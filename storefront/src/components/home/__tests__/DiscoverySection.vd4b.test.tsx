@@ -873,6 +873,224 @@ describe("RTL / LTR and tokens", () => {
   });
 });
 
+// ───────────────────────────── review fixes ─────────────────────────────
+
+describe("hidden name follows the tile's own rule (showLabel || !drawsMedia)", () => {
+  const withNoVisual: DiscoveryValues = {
+    name: "x",
+    options: [
+      { value: "plain", name: "بلا هوية", count: 3 },
+      { value: "t", name: "نص فقط", count: 5, visual: { content: "none" } },
+      {
+        value: "birthday",
+        name: "عيد ميلاد",
+        count: 9,
+        visual: { icon: "gift" },
+      },
+    ],
+  };
+
+  it.each([
+    "image-grid",
+    "icon-grid",
+    "carousel",
+  ] as const)("%s: showLabel=false + showCounts, a value with no visual shows its name AND its count, with no redundant title", async (layout) => {
+    render(
+      (await renderSection(withNoVisual, {
+        layout,
+        showLabel: false,
+        showCounts: true,
+      })) as React.JSX.Element,
+    );
+    const plain = screen.getByRole("link", { name: "بلا هوية" });
+    // the tile shows the name (initial-only frame) and the count is visible beside it
+    expect(within(plain).getByText("بلا هوية").className).not.toContain(
+      "sr-only",
+    );
+    expect(within(plain).getByText("3").getAttribute("aria-hidden")).toBe(
+      "true",
+    );
+    expect(plain.getAttribute("title")).toBeNull();
+    // text-by-choice also shows its name and count
+    const text = screen.getByRole("link", { name: "نص فقط" });
+    expect(within(text).getByText("5")).toBeTruthy();
+    expect(text.getAttribute("title")).toBeNull();
+    // an icon IS drawn, so the name is hidden: no visible count, a title, the count still described
+    const icon = screen.getByRole("link", { name: "عيد ميلاد" });
+    expect(within(icon).getByText("عيد ميلاد").className).toContain("sr-only");
+    expect(within(icon).queryByText("9")).toBeNull();
+    expect(icon.getAttribute("title")).toBe("عيد ميلاد");
+    expect(
+      document.getElementById(icon.getAttribute("aria-describedby") as string)
+        ?.textContent,
+    ).toBe("discoveryProductCount|9");
+  });
+
+  it("text-list ignores showLabel: the name and the count are always visible", async () => {
+    render(
+      (await renderSection(withNoVisual, {
+        layout: "text-list",
+        showLabel: false,
+        showCounts: true,
+      })) as React.JSX.Element,
+    );
+    const plain = screen.getByRole("link", { name: "بلا هوية" });
+    expect(within(plain).getByText("3")).toBeTruthy();
+    expect(plain.getAttribute("title")).toBeNull();
+  });
+});
+
+describe("count description is read once", () => {
+  it("the description span is aria-hidden (describedby still resolves it) and sits outside the link", async () => {
+    render(
+      (await renderSection(visualFacet, {
+        layout: "image-grid",
+        showCounts: true,
+      })) as React.JSX.Element,
+    );
+    for (const link of screen.getAllByRole("link")) {
+      const description = document.getElementById(
+        link.getAttribute("aria-describedby") as string,
+      );
+      expect(description).not.toBeNull();
+      expect(description?.getAttribute("aria-hidden")).toBe("true");
+      expect(link.contains(description)).toBe(false);
+    }
+  });
+});
+
+describe("count ids are unique across sections on one page", () => {
+  it("two sections with different headingIds never share an aria-describedby id", async () => {
+    const first = await renderSection(
+      visualFacet,
+      { layout: "image-grid", showCounts: true },
+      { headingId: "discovery-a" },
+    );
+    const second = await renderSection(
+      visualFacet,
+      { layout: "text-list", showCounts: true },
+      { headingId: "discovery-b" },
+    );
+    render(
+      <>
+        {first}
+        {second}
+      </>,
+    );
+    const ids = screen
+      .getAllByRole("link")
+      .map((a) => a.getAttribute("aria-describedby") as string);
+    expect(ids).toHaveLength(8);
+    expect(new Set(ids).size).toBe(8);
+    expect(
+      ids.filter((id) => id.startsWith("discovery-a-count-")),
+    ).toHaveLength(4);
+    expect(
+      ids.filter((id) => id.startsWith("discovery-b-count-")),
+    ).toHaveLength(4);
+    for (const id of ids)
+      expect(document.querySelectorAll(`[id="${id}"]`)).toHaveLength(1);
+  });
+});
+
+describe("image sources are re-validated where they become <img> (defence in depth)", () => {
+  const OTHER_MEDIA = "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d99";
+  const P = `/api/storefront/media/facet-visuals/${V1}/${M1}`;
+  const good = (file: string, width: number, format: "webp" | "jpg") => ({
+    width,
+    format,
+    src: `${P}/${file}`,
+  });
+  const hostile: ListingFacetImageSource[] = [
+    { width: 1e9, format: "webp", src: "https://evil.test/x.webp" },
+    { width: 160, format: "webp", src: "https://evil.test/x.webp" },
+    {
+      width: 160,
+      format: "webp",
+      src: "/not/the/proxy/aaaa/bbbb/thumb-160.webp",
+    },
+    {
+      width: 160,
+      format: "webp",
+      src: `/store/v1/media/facet-visuals/${V1}/${M1}/thumb-160.webp`,
+    },
+    {
+      width: 160,
+      format: "webp",
+      src: `/api/storefront/media/facet-visuals/${V1}/${OTHER_MEDIA}/thumb-160.webp`,
+    },
+    { width: 160, format: "webp", src: `${P}/original.png` },
+    { width: 160, format: "webp", src: `${P}/thumb-160.jpg` },
+    { width: 160, format: "webp", src: `${P}/..%2Fx.webp` },
+    { width: 0, format: "webp", src: `${P}/thumb-160.webp` },
+    { width: 1.5, format: "webp", src: `${P}/thumb-160.webp` },
+    { width: 5000, format: "webp", src: `${P}/thumb-320.webp` },
+    { width: 320, format: "webp", src: `${P}/thumb-320.webp?x=1` },
+    { width: 480, format: "gif" as never, src: `${P}/480w.webp` },
+  ];
+  const values = (
+    imageSources: ListingFacetImageSource[],
+  ): DiscoveryValues => ({
+    name: "x",
+    defaults: { icon: "gift" },
+    options: [
+      {
+        value: "eid",
+        name: "العيد",
+        count: 4,
+        visual: { image: { mediaId: M1, fit: "cover" } },
+        imageSources,
+      },
+    ],
+  });
+
+  it("drops every hostile source: no such URL reaches the markup, and the tile falls back to the icon", async () => {
+    for (const layout of [
+      "image-grid",
+      "image-cards",
+      "carousel",
+      "icon-grid",
+    ] as const) {
+      const el = await renderSection(values(hostile), { layout });
+      const html = renderToStaticMarkup(el as React.JSX.Element);
+      expect(html).not.toContain("<img");
+      for (const text of [
+        "evil.test",
+        "/store/v1/",
+        "/not/the/proxy",
+        OTHER_MEDIA,
+        "original.png",
+        "..%2F",
+        "1000000000",
+        "5000w",
+        "?x=1",
+        ".jpg",
+      ]) {
+        expect(html).not.toContain(text);
+      }
+      expect(html).toContain('data-facet-content="icon"');
+    }
+  });
+
+  it("keeps only the valid sources of a mixed list", async () => {
+    const mixed = [
+      ...hostile,
+      good("thumb-160.webp", 160, "webp"),
+      good("thumb-320.webp", 320, "webp"),
+    ];
+    const { container } = render(
+      (await renderSection(values(mixed), {
+        layout: "image-grid",
+      })) as React.JSX.Element,
+    );
+    const img = container.querySelector("img") as HTMLImageElement;
+    expect(img.getAttribute("srcset")).toBe(
+      `${P}/thumb-160.webp 160w, ${P}/thumb-320.webp 320w`,
+    );
+    expect(img.getAttribute("src")).toBe(`${P}/thumb-160.webp`);
+  });
+});
+
 describe("no section when there is nothing to show", () => {
   it("returns null for a failed or empty read in every layout", async () => {
     for (const layout of ["image-grid", "carousel", "text-list"] as const) {

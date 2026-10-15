@@ -5,6 +5,7 @@ import {
   carouselItemWidthPx,
   type DiscoveryItem,
   discoveryColumnVars,
+  discoveryLabelHidden,
   discoveryRows,
 } from "@/lib/presentation/discovery-items";
 import type { ResolvedDiscoveryDisplay } from "@/lib/presentation/discovery-templates";
@@ -147,7 +148,7 @@ export function DiscoveryItems({
         const countId = `${idPrefix}-count-${index}`;
         // A visible count belongs to a visible caption: with the label hidden it would be an unexplained number.
         // Assistive technology still gets it (aria-describedby below).
-        const hideName = item.visual !== null && !item.visual.showLabel;
+        const hideName = discoveryLabelHidden(item.visual, item.image);
         const count =
           display.showCounts && !hideName ? (
             <span
@@ -202,7 +203,9 @@ export function DiscoveryItems({
               {count}
             </Link>
             {display.showCounts ? (
-              <span id={countId} className="sr-only">
+              // Spoken only through the link's aria-describedby: `aria-hidden` keeps it out of the reading order, so
+              // it is not announced a second time (a described-by reference still resolves a hidden element).
+              <span id={countId} aria-hidden="true" className="sr-only">
                 {describeCount(item.count)}
               </span>
             ) : null}

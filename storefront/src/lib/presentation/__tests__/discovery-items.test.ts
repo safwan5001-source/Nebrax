@@ -5,11 +5,13 @@ import {
   buildDiscoveryItems,
   carouselItemWidthPx,
   discoveryColumnVars,
+  discoveryLabelHidden,
   discoveryMaxItems,
   discoveryRows,
   discoveryTileImage,
   resolveDiscoveryOptionVisual,
   sortDiscoveryOptions,
+  validDiscoverySources,
   visibleDiscoveryOptions,
 } from "../discovery-items";
 import { resolveDiscoveryDisplay } from "../discovery-templates";
@@ -325,6 +327,90 @@ describe("buildDiscoveryItems", () => {
       layoutDisplay("image-grid", { valueSort: "count", maxItems: 4 }),
     );
     expect(items.map((i) => i.value)).toEqual(["v9", "v8", "v7", "v6"]);
+  });
+});
+
+describe("validDiscoverySources / discoveryLabelHidden (review fixes)", () => {
+  const OTHER = "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d99";
+
+  it("keeps only canonical proxy files of this media with a matching extension and a bounded integer width", () => {
+    const bad: ListingFacetImageSource[] = [
+      { width: 1e9, format: "webp", src: path("thumb-160.webp") },
+      { width: 4097, format: "webp", src: path("thumb-160.webp") },
+      { width: 0, format: "webp", src: path("thumb-160.webp") },
+      { width: 160.5, format: "webp", src: path("thumb-160.webp") },
+      { width: 160, format: "webp", src: "https://evil.test/x.webp" },
+      { width: 160, format: "webp", src: path("thumb-160.jpg") },
+      { width: 160, format: "jpg", src: path("original.jpg") },
+      {
+        width: 160,
+        format: "webp",
+        src: `/api/storefront/media/facet-visuals/${V}/${OTHER}/thumb-160.webp`,
+      },
+    ];
+    expect(validDiscoverySources(bad, M1)).toEqual([]);
+    expect(validDiscoverySources([...bad, ...SOURCES], M1)).toEqual(SOURCES);
+    expect(validDiscoverySources(SOURCES, OTHER)).toEqual([]);
+    expect(validDiscoverySources(SOURCES)).toEqual(SOURCES);
+    expect(discoveryTileImage(bad, 80, M1)).toBeNull();
+    expect(validDiscoverySources(undefined)).toEqual([]);
+  });
+
+  it("an image whose sources are all invalid is not usable: the resolver falls back to the icon", () => {
+    const o = option("eid", 5, {
+      visual: { image: { mediaId: M1, fit: "cover" } },
+      imageSources: [
+        { width: 160, format: "webp", src: "https://evil.test/x.webp" },
+      ],
+    });
+    const v = resolveDiscoveryOptionVisual(
+      o,
+      { icon: "gift" },
+      display(),
+      "image-grid",
+    );
+    expect(v).toMatchObject({ content: "icon", icon: "gift" });
+  });
+
+  it("the name is hidden only when something visual is drawn (the tile's rule)", () => {
+    const shape = { shape: "circle", size: "md" } as const;
+    const image = { src: path("thumb-160.webp") };
+    const img = {
+      content: "image",
+      image: { mediaId: M1, fit: "cover" },
+      showLabel: false,
+      ...shape,
+    } as const;
+    expect(discoveryLabelHidden(img, image)).toBe(true);
+    // no renderable file and no fallback icon: initial only => the name shows
+    expect(discoveryLabelHidden(img, null)).toBe(false);
+    expect(discoveryLabelHidden({ ...img, fallbackIcon: "gift" }, null)).toBe(
+      true,
+    );
+    expect(
+      discoveryLabelHidden(
+        { content: "icon", icon: "gift", showLabel: false, ...shape },
+        null,
+      ),
+    ).toBe(true);
+    // an icon-less icon frame (initial) and text-by-choice show their name
+    expect(
+      discoveryLabelHidden(
+        { content: "icon", showLabel: false, ...shape },
+        null,
+      ),
+    ).toBe(false);
+    expect(
+      discoveryLabelHidden(
+        { content: "none", showLabel: false, ...shape },
+        null,
+      ),
+    ).toBe(false);
+    // showLabel true never hides; a text-list item has no visual
+    expect(discoveryLabelHidden({ ...img, showLabel: true }, image)).toBe(
+      false,
+    );
+    expect(discoveryLabelHidden(null, null)).toBe(false);
   });
 });
 

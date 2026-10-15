@@ -72,8 +72,8 @@ A `discovery` section now renders its real visuals, templates and display option
 **New**
 - `storefront/src/lib/presentation/discovery-items.ts`
 - `storefront/src/components/home/DiscoveryItems.tsx`
-- `storefront/src/lib/presentation/__tests__/discovery-items.test.ts` (24 tests)
-- `storefront/src/components/home/__tests__/DiscoverySection.vd4b.test.tsx` (60 tests)
+- `storefront/src/lib/presentation/__tests__/discovery-items.test.ts` (27 tests)
+- `storefront/src/components/home/__tests__/DiscoverySection.vd4b.test.tsx` (68 tests)
 - this report
 
 **Modified**
@@ -88,7 +88,7 @@ A `discovery` section now renders its real visuals, templates and display option
 | Check | Command (from the worktree root) | Result |
 |---|---|---|
 | Focused | `pnpm --dir storefront exec vitest run <3 files above + DataSections.h9b>` | all passed |
-| Storefront full | `pnpm --dir storefront test` | **204 files passed / 15 skipped; 2669 tests passed / 15 skipped** (main before: 200/15 files, 2580 tests) |
+| Storefront full | `pnpm --dir storefront test` | **204 files passed / 15 skipped; 2680 tests passed / 15 skipped** (main before: 200/15 files, 2580 tests) |
 | Biome | `pnpm --dir storefront check` | 0 errors; 2 warnings + 2 infos, all in files this slice does not touch |
 | Locales | `pnpm --dir storefront check:locales` | all six locale files in sync |
 | Types | `pnpm --dir storefront exec tsc --noEmit` | exit 0 |
@@ -181,6 +181,29 @@ Every dataset includes:
 - **Carousel bleed.** The scroller bleeds 8px past the content edge so focus rings are not clipped, so a partial neighbouring item shows 8px inside the page gutter. A full-bleed carousel would need the page gutter value, which the section does not know.
 - **`rows` interpretation.** Two rows apply below `md` only (§3.7: "carousel, on mobile"). VD-4c should offer `rows` only for a carousel.
 - **VD-5.** A real-image load on a deployed storefront (CDN/proxy, cache window) remains VD-5's browser verification.
+
+## Review fixes (independent review of PR #1508: no blocking findings)
+
+Second commit on the same branch; storefront only, no API/DB/permission change. Files touched by the fixes: `discovery-items.ts`, `DiscoveryItems.tsx`, `globals.css`, `listing-facets.ts` (one `export` on the existing width cap) and the three test files.
+
+| # | Finding | Result |
+|---|---|---|
+| 3 | Re-validate image sources where they become `<img src/srcSet>` | **Fixed.** New `validDiscoverySources` in `discovery-items.ts`: a source survives only if it is exactly the canonical proxy path `/api/storefront/media/facet-visuals/{uuid}/{uuid}/{allowed file}`, its extension matches `format`, its media segment is the visual's `mediaId`, and its width is an integer in 1–4096 (the parser's cap, now exported as `MAX_SOURCE_WIDTH`). `discoveryTileImage` uses it, and so does `usableMediaIds`, so a media with no valid source resolves straight to its icon or initial. Tests feed hand-built values with `width: 1e9` + `https://evil.test/x.webp`, a non-proxy path, the origin path, a wrong media id, a bad file, a mismatched extension, `..%2F`, a query, widths 0 / 1.5 / 5000 and an unknown format. No such string reaches the markup in four layouts (the width and URL strings are asserted absent). Valid sources in a mixed list are kept. Unit tests cover the function directly. |
+| 4 | `hideName` must follow the tile's rule | **Fixed.** `discoveryLabelHidden(visual, image)` derives the tile's own `showLabel \|\| !drawsMedia` (usable image, or own/fallback icon). With `showLabel:false` + `showCounts:true`, a value with no visual (initial-only) and a text-only value show their name and their visible count, with no `title`; a value that draws an icon or image still hides both and keeps the `aria-describedby` count. Tested for image-grid, icon-grid and carousel, and for text-list (which ignores `showLabel`). Mutation check: restoring the old expression fails 3 tests. **Residual:** the decision is made for the first paint. An image that later fails in the browser with no fallback icon becomes an initial and the tile then shows its name, while the visible count (withheld on the server) stays available to assistive technology only. The server cannot know a client-side load failure. |
+| 5 | Count description read twice | **Fixed.** The `sr-only` description span is `aria-hidden="true"`; `aria-describedby` still resolves it. Test asserts the attribute, that the id resolves, and that the span is outside the link. |
+| 7 | Scrim block orphaned the V5c comment in `globals.css` | **Fixed.** The block sits above the "CUST-HV V5c — originals, restored…" comment, which again heads the `--*-base` variables. |
+| 8 | Count ids section-unique | **Fixed.** A test renders two sections with different `headingId`s on one page: eight links, eight distinct `aria-describedby` ids, four per prefix, each resolving to exactly one element. Mutation check: dropping `idPrefix` from `countId` fails it. |
+| 1 | `valueSort: "count"` ranks only within the first 40 values | **Accepted, unchanged.** It is the shared `parseListingFacets` cap (`MAX_VALUES_PER_GROUP`). Merchant order is unaffected because `maxItems` is at most 24. Recorded as a limit: VD-5, or a future decision on lifting the cap for discovery, which would change a shared parser. |
+| 2 | Behaviour changes versus the old code for a malformed payload | **Accepted, unchanged.** A blank facet name now yields no section, value names are trimmed, fractional counts are truncated, and a facet key failing `FACET_KEY` is dropped. None can occur with a well-formed API payload, and blank names are rejected at write time. |
+| 6 | Overlay captions on `sm` (56px) frames clamp to two lines | **Accepted, unchanged.** It affects hand-picked combinations only; the shipped overlay template (`editorial-portrait`) uses `lg`. **Added to the VD-5 visual checklist:** check overlay captions on `sm` and `md` frames with long names on a deployed storefront. |
+| 9 | Design notes | No change. |
+
+**Re-verification after the fixes**
+- Focused: the three affected test files plus `lib/commerce` passed (22 files, 311 tests).
+- Full storefront: **204 files passed / 15 skipped; 2680 tests passed / 15 skipped**.
+- Biome: 0 errors (the same 2 warnings and 2 infos in untouched files). Locales in sync. `tsc --noEmit` exit 0.
+- Visual harness still existed and was rebuilt. 280 captures (two new cases: `image-grid` and `text-list` with `showLabel:false` + `showCounts:true`, 390 and 1280, RTL and LTR), 0 automatic problems (no overflow, no small targets, no layout shift, no errors). Looked at the new cases: values with no visual show their initial, name and count; values drawing an image or icon show neither name nor count; the text-list shows every name and count.
+- Screen-reader text is covered by the DOM tests above (accessible names, `aria-describedby` text, `aria-hidden` on the description). It was not run through a real screen reader.
 
 ## Accounting impact
 

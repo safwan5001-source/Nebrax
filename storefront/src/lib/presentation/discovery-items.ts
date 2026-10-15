@@ -12,7 +12,14 @@ import type {
   DiscoveryOption,
   DiscoveryValues,
 } from "@/lib/commerce/data-sections";
-import type { ListingFacetImageSource } from "@/lib/commerce/listing-facets";
+import {
+  AWJ_FACET_VISUAL_MEDIA_PROXY_PATH_PREFIX,
+  facetVisualMediaPath,
+} from "@/lib/commerce/facet-visual-media";
+import {
+  type ListingFacetImageSource,
+  MAX_SOURCE_WIDTH,
+} from "@/lib/commerce/listing-facets";
 import type { ResolvedDiscoveryDisplay } from "./discovery-templates";
 import {
   type FacetVisualResolution,
@@ -20,6 +27,7 @@ import {
   resolveFacetValueVisual,
 } from "./facet-visual";
 import { FACET_VISUAL_SIZE_PX } from "./facet-visual-style";
+import { normalizeIconKey } from "./icon-registry";
 import {
   DISCOVERY_COLUMN_RANGES,
   DISCOVERY_MAX_ITEMS_MAX,
@@ -94,6 +102,44 @@ export function visibleDiscoveryOptions<T extends { count: number }>(
 
 // ───────────────────────────── images ─────────────────────────────
 
+const PROXY_PATH = new RegExp(
+  `^${AWJ_FACET_VISUAL_MEDIA_PROXY_PATH_PREFIX}([^/?#%]+)/([^/?#%]+)/([^/?#%]+)$`,
+);
+
+/**
+ * Defence in depth (the listing parser already filters, but a source is re-checked where it becomes `<img src>` /
+ * `srcset`). A source survives only if it is exactly the canonical same-origin proxy path of an allowed file, its
+ * file extension matches its `format`, it belongs to `mediaId` when one is given, and its width is a bounded
+ * positive integer (the parser's cap). Anything else is dropped, so the tile falls back to the icon or initial.
+ */
+export function validDiscoverySources(
+  sources: readonly ListingFacetImageSource[] | undefined,
+  mediaId?: string,
+): ListingFacetImageSource[] {
+  if (!Array.isArray(sources)) return [];
+  return sources.filter((source) => {
+    if (
+      !source ||
+      typeof source.src !== "string" ||
+      typeof source.width !== "number" ||
+      !Number.isInteger(source.width) ||
+      source.width < 1 ||
+      source.width > MAX_SOURCE_WIDTH ||
+      (source.format !== "webp" && source.format !== "jpg")
+    ) {
+      return false;
+    }
+    const match = source.src.match(PROXY_PATH);
+    if (!match) return false;
+    const [, visualId, media, file] = match;
+    return (
+      facetVisualMediaPath(visualId, media, file) === source.src &&
+      file.endsWith(`.${source.format}`) &&
+      (mediaId === undefined || media === mediaId)
+    );
+  });
+}
+
 /**
  * `src` / `srcSet` for the proxy sources of one image. Width descriptors are the files' real pixel widths (the
  * origin reports them), so the browser picks correctly for the frame and the device pixel ratio. WebP is preferred
@@ -104,10 +150,12 @@ export function visibleDiscoveryOptions<T extends { count: number }>(
 export function discoveryTileImage(
   sources: readonly ListingFacetImageSource[] | undefined,
   framePx: number,
+  mediaId?: string,
 ): DiscoveryTileImage | null {
-  if (!sources || sources.length === 0) return null;
-  const webp = sources.filter((source) => source.format === "webp");
-  const chosen = webp.length > 0 ? webp : sources;
+  const valid = validDiscoverySources(sources, mediaId);
+  if (valid.length === 0) return null;
+  const webp = valid.filter((source) => source.format === "webp");
+  const chosen = webp.length > 0 ? webp : valid;
   const byWidth = new Map<number, ListingFacetImageSource>();
   for (const source of chosen)
     if (!byWidth.has(source.width)) byWidth.set(source.width, source);
@@ -170,15 +218,44 @@ export function resolveDiscoveryOptionVisual(
     {
       section: display.visualSection,
       template: display.visualTemplate,
-      // The parser removed any image left without sources, so an image still present here has files to load.
+      // Usable only if at least one source survives re-validation; otherwise the resolver falls back (icon, text).
       usableMediaIds:
-        option.visual?.image && option.imageSources?.length
+        option.visual?.image &&
+        validDiscoverySources(option.imageSources, option.visual.image.mediaId)
+          .length > 0
           ? [option.visual.image.mediaId]
           : [],
     },
   );
   const visual = keepsFrame(resolution);
   return layout === "icon-grid" ? iconFirst(visual) : visual;
+}
+
+/**
+ * Whether the tile hides the item's name visually. This is `FacetVisualTile`'s own rule, derived the same way:
+ * the label is visible when `showLabel` is set **or** nothing visual is drawn (`showLabel || !drawsMedia`), where
+ * media is a usable image, or the icon the tile would draw (own icon, or the fallback icon of an image that cannot
+ * load). A text-only item and an initial-only frame therefore always show their name, and the visible count and the
+ * `title` follow it instead of being suppressed or duplicated.
+ *
+ * Evaluated for the first paint. An image that later fails in the browser and has no icon falls back to the initial
+ * and the tile then shows its name; the count (already withheld here) stays available to assistive technology.
+ */
+export function discoveryLabelHidden(
+  visual: ResolvedFacetVisual | null,
+  image: DiscoveryTileImage | null,
+): boolean {
+  if (visual === null || visual.showLabel) return false;
+  const imageUsable =
+    visual.content === "image" && visual.image !== undefined && !!image?.src;
+  const iconKey = normalizeIconKey(
+    visual.content === "icon"
+      ? visual.icon
+      : visual.content === "image" && !imageUsable
+        ? visual.fallbackIcon
+        : undefined,
+  );
+  return imageUsable || iconKey !== undefined;
 }
 
 export function buildDiscoveryItems(
@@ -208,10 +285,11 @@ export function buildDiscoveryItems(
       count: option.count,
       visual,
       image:
-        visual.content === "image"
+        visual.content === "image" && visual.image
           ? discoveryTileImage(
               option.imageSources,
               FACET_VISUAL_SIZE_PX[visual.size] ?? FACET_VISUAL_SIZE_PX.md,
+              visual.image.mediaId,
             )
           : null,
     };
