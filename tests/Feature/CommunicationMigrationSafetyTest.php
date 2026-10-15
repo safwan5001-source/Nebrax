@@ -26,6 +26,8 @@ class CommunicationMigrationSafetyTest extends TestCase
 
     private const MIGRATION = '2026_11_10_010000_create_communication_messages_tables.php';
 
+    private const FINGERPRINT_MIGRATION = '2026_11_10_020000_add_request_fingerprint_to_communication_messages.php';
+
     /** @return array<string, array{0: string}> */
     public static function everyEnvironment(): array
     {
@@ -40,6 +42,24 @@ class CommunicationMigrationSafetyTest extends TestCase
     private function migration(): object
     {
         return require database_path('migrations/'.self::MIGRATION);
+    }
+
+    private function fingerprintMigration(): object
+    {
+        return require database_path('migrations/'.self::FINGERPRINT_MIGRATION);
+    }
+
+    /** ترتيب `migrate:rollback` الحقيقي: امتداد 02-B1 أولاً ثم 02-A. */
+    private function rollbackAll(): void
+    {
+        $this->fingerprintMigration()->down();
+        $this->migration()->down();
+    }
+
+    private function reapplyAll(): void
+    {
+        $this->migration()->up();
+        $this->fingerprintMigration()->up();
     }
 
     private function tablesExist(): bool
@@ -74,7 +94,7 @@ class CommunicationMigrationSafetyTest extends TestCase
         $this->assertNotSame([], $this->commTriggerNames());
         $this->assertTrue($this->commIndexExists('comm_attempt_one_inflight'));
         if ($this->commDriver() === 'pgsql') {
-            $this->assertCount(2, $this->communicationFunctions());
+            $this->assertCount(3, $this->communicationFunctions());
         }
     }
 
@@ -84,7 +104,7 @@ class CommunicationMigrationSafetyTest extends TestCase
         $this->assertTrue($this->tablesExist());
         $this->assertSame(0, DB::table('communication_messages')->count());
 
-        $this->migration()->down();
+        $this->rollbackAll();
 
         $this->assertFalse(Schema::hasTable('communication_messages'));
         $this->assertFalse(Schema::hasTable('communication_message_attempts'));
@@ -94,7 +114,7 @@ class CommunicationMigrationSafetyTest extends TestCase
             $this->assertFalse($this->commIndexExists($index), "{$index} must be gone after rollback");
         }
 
-        $this->migration()->up();
+        $this->reapplyAll();
 
         $this->assertTrue($this->tablesExist());
         $this->assertNotSame([], $this->commTriggerNames());
@@ -112,7 +132,7 @@ class CommunicationMigrationSafetyTest extends TestCase
     {
         $this->app['env'] = $environment;
 
-        $this->migration()->down();
+        $this->rollbackAll();
 
         $this->assertFalse(Schema::hasTable('communication_messages'));
         $this->assertFalse(Schema::hasTable('communication_message_attempts'));
@@ -121,8 +141,8 @@ class CommunicationMigrationSafetyTest extends TestCase
     #[Test]
     public function rolling_back_when_the_tables_are_already_absent_is_a_noop(): void
     {
-        $this->migration()->down();
-        $this->migration()->down();
+        $this->rollbackAll();
+        $this->rollbackAll();
 
         $this->assertFalse(Schema::hasTable('communication_messages'));
     }
@@ -139,10 +159,10 @@ class CommunicationMigrationSafetyTest extends TestCase
         Schema::dropIfExists('communication_messages');
         $this->assertNotSame([], $this->communicationFunctions());
 
-        $this->migration()->up();
+        $this->reapplyAll();
 
         $this->assertTrue($this->tablesExist());
-        $this->assertSame(2, count($this->commTriggerNames()));
+        $this->assertSame(3, count($this->commTriggerNames()));
     }
 
     #[Test]
@@ -246,7 +266,7 @@ class CommunicationMigrationSafetyTest extends TestCase
         DB::table('communication_messages')->delete();
         $this->assertSame(0, DB::table('communication_message_attempts')->count());
 
-        $this->migration()->down();
+        $this->rollbackAll();
 
         $this->assertFalse(Schema::hasTable('communication_messages'));
         $this->assertFalse(Schema::hasTable('communication_message_attempts'));
