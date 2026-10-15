@@ -254,8 +254,8 @@ export function buildCss(tokens) {
   blocks.push(
     cssBlock('html[data-awj-ui="3"].dark', { ...darkBase, ...themeInk })
   );
-  // AWJ Core · Dark is the one exception to D-12: Core owns an independent Dark shell (the lighter
-  // brand blue #4F8CFF with dark foregrounds). Higher specificity than the unconditional dark block
+  // AWJ Core · Dark is the one exception to D-12: Core owns an independent Dark shell (brand-700
+  // #1E3A8A with white foregrounds and #A9C4FF Apex — THEMES.md §6A, D-42). Higher specificity than the unconditional dark block
   // above, so it overrides only the 13 shell tokens — and only when Core is the chosen theme.
   blocks.push(
     cssBlock('html[data-awj-ui="3"][data-awj-theme="core"].dark', themeCoreDark)

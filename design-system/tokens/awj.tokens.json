@@ -140,19 +140,19 @@
         "shell-brandmark-bg": "#FFFFFF"
       },
       "dark": {
-        "shell-bg": "{primitive.brand.500}",
-        "shell-fg": "#06101F",
-        "shell-fg-muted": "#0F2247",
-        "shell-line": "#2D63CC",
-        "shell-hover": "#6CA0FF",
-        "shell-active-bg": "{primitive.brand.50}",
-        "shell-active-fg": "{primitive.ink.900}",
-        "shell-active-shadow": "0 1px 2px rgba(6,16,31,.28), 0 0 0 1px rgba(6,16,31,.10)",
-        "shell-apex": "{primitive.ink.900}",
-        "shell-field-bg": "#8FB4FF",
-        "shell-field-line": "{primitive.ink.900}",
-        "shell-focus-ring": "{primitive.ink.900}",
-        "shell-brandmark-bg": "{primitive.ink.900}"
+        "shell-bg": "{primitive.brand.700}",
+        "shell-fg": "#FFFFFF",
+        "shell-fg-muted": "#DCE5FB",
+        "shell-line": "#3D5AA6",
+        "shell-hover": "#2E4A98",
+        "shell-active-bg": "#425FAB",
+        "shell-active-fg": "#FFFFFF",
+        "shell-active-shadow": "inset 0 0 0 1px #8FA9E8",
+        "shell-apex": "#A9C4FF",
+        "shell-field-bg": "#142B6B",
+        "shell-field-line": "#8FA9E0",
+        "shell-focus-ring": "#FFFFFF",
+        "shell-brandmark-bg": "#A9C4FF"
       }
     }
   },
@@ -409,6 +409,13 @@
     { "name": "theme.core.dark.shell-field-line/shell-field-bg", "fg": "{theme.core.dark.shell-field-line}", "bg": "{theme.core.dark.shell-field-bg}", "min": 3.0 },
     { "name": "theme.core.dark.shell-focus-ring/shell-bg", "fg": "{theme.core.dark.shell-focus-ring}", "bg": "{theme.core.dark.shell-bg}", "min": 3.0 },
     { "name": "theme.core.dark.shell-focus-ring/shell-field-bg", "fg": "{theme.core.dark.shell-focus-ring}", "bg": "{theme.core.dark.shell-field-bg}", "min": 3.0 },
-    { "name": "theme.core.dark.shell-brandmark-bg/shell-bg", "fg": "{theme.core.dark.shell-brandmark-bg}", "bg": "{theme.core.dark.shell-bg}", "min": 3.0 }
+    { "name": "theme.core.dark.shell-brandmark-bg/shell-bg", "fg": "{theme.core.dark.shell-brandmark-bg}", "bg": "{theme.core.dark.shell-bg}", "min": 3.0 },
+    { "name": "theme.core.dark.shell-fg/shell-hover", "fg": "{theme.core.dark.shell-fg}", "bg": "{theme.core.dark.shell-hover}", "min": 4.5 },
+    { "name": "theme.core.dark.shell-fg-muted/shell-active-bg", "fg": "{theme.core.dark.shell-fg-muted}", "bg": "{theme.core.dark.shell-active-bg}", "min": 4.5 },
+    { "name": "theme.core.dark.shell-focus-ring/shell-hover", "fg": "{theme.core.dark.shell-focus-ring}", "bg": "{theme.core.dark.shell-hover}", "min": 3.0 },
+    { "name": "theme.core.dark.shell-focus-ring/shell-active-bg", "fg": "{theme.core.dark.shell-focus-ring}", "bg": "{theme.core.dark.shell-active-bg}", "min": 3.0 },
+    { "name": "theme.core.dark.shell-hover/shell-bg (structural)", "fg": "{theme.core.dark.shell-hover}", "bg": "{theme.core.dark.shell-bg}", "min": 1.2 },
+    { "name": "theme.core.dark.shell-active-bg/shell-hover (structural)", "fg": "{theme.core.dark.shell-active-bg}", "bg": "{theme.core.dark.shell-hover}", "min": 1.3 },
+    { "name": "theme.core.dark.shell-active-bg/shell-bg (structural)", "fg": "{theme.core.dark.shell-active-bg}", "bg": "{theme.core.dark.shell-bg}", "min": 1.6 }
   ]
 }

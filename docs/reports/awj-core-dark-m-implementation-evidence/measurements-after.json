@@ -1,0 +1,592 @@
+{
+ "AFTER": {
+  "ar-desktop": {
+   "rows": [
+    {
+     "label": "sidebar text · group (normal, muted)",
+     "fg": "#DCE5FB",
+     "bg": "#1E3A8A",
+     "ratio": 8.21,
+     "min": 4.5,
+     "pass": true
+    },
+    {
+     "label": "sidebar icon · group (normal)",
+     "fg": "#DCE5FB",
+     "bg": "#1E3A8A",
+     "ratio": 8.21,
+     "min": 3,
+     "pass": true
+    },
+    {
+     "label": "sidebar text · group/dashboard (selected)",
+     "fg": "#FFFFFF",
+     "bg": "#425FAB",
+     "ratio": 6.08,
+     "min": 4.5,
+     "pass": true
+    },
+    {
+     "label": "sidebar icon · selected",
+     "fg": "#FFFFFF",
+     "bg": "#425FAB",
+     "ratio": 6.08,
+     "min": 3,
+     "pass": true
+    },
+    {
+     "label": "sidebar text · leaf (normal)",
+     "fg": "#DCE5FB",
+     "bg": "#1E3A8A",
+     "ratio": 8.21,
+     "min": 4.5,
+     "pass": true
+    },
+    {
+     "label": "sidebar text · leaf (active — Apex used as text)",
+     "fg": "#A9C4FF",
+     "bg": "#1E3A8A",
+     "ratio": 5.93,
+     "min": 4.5,
+     "pass": true
+    },
+    {
+     "label": "sidebar text · section label",
+     "fg": "#DCE5FB",
+     "bg": "#1E3A8A",
+     "ratio": 8.21,
+     "min": 4.5,
+     "pass": true
+    },
+    {
+     "label": "sidebar text · company name",
+     "fg": "#FFFFFF",
+     "bg": "#1E3A8A",
+     "ratio": 10.36,
+     "min": 4.5,
+     "pass": true
+    },
+    {
+     "label": "sidebar wordmark (Apex as text)",
+     "fg": "#A9C4FF",
+     "bg": "#1E3A8A",
+     "ratio": 5.93,
+     "min": 3,
+     "pass": true
+    },
+    {
+     "label": "topbar text · search input",
+     "fg": "#FFFFFF",
+     "bg": "#142B6B",
+     "ratio": 13.23,
+     "min": 4.5,
+     "pass": true
+    },
+    {
+     "label": "topbar icon · buttons",
+     "fg": "#FFFFFF",
+     "bg": "#1E3A8A",
+     "ratio": 10.36,
+     "min": 3,
+     "pass": true
+    },
+    {
+     "label": "topbar text · user name",
+     "fg": "#FFFFFF",
+     "bg": "#1E3A8A",
+     "ratio": 10.36,
+     "min": 4.5,
+     "pass": true
+    },
+    {
+     "label": "topbar text · user sub-label (branch)",
+     "fg": "#DCE5FB",
+     "bg": "#1E3A8A",
+     "ratio": 8.21,
+     "min": 4.5,
+     "pass": true
+    },
+    {
+     "label": "topbar text · notification count badge",
+     "fg": "#0E1A31",
+     "bg": "#F87171",
+     "ratio": 6.27,
+     "min": 4.5,
+     "pass": true
+    },
+    {
+     "label": "topbar text · search placeholder",
+     "fg": "#DCE5FB",
+     "bg": "#142B6B",
+     "ratio": 10.48,
+     "min": 4.5,
+     "pass": true
+    },
+    {
+     "label": "topbar search · field border vs field",
+     "fg": "#8FA9E0",
+     "bg": "#142B6B",
+     "ratio": 5.62,
+     "min": 3,
+     "pass": true
+    },
+    {
+     "label": "sidebar Apex rail (active leaf) vs shell",
+     "fg": "#A9C4FF",
+     "bg": "#1E3A8A",
+     "ratio": 5.93,
+     "min": 3,
+     "pass": true
+    }
+   ],
+   "geometry": {
+    "sidebarBg": "rgb(30, 58, 138)",
+    "topbarBg": "rgb(30, 58, 138)",
+    "deskBg": "rgb(7, 9, 12)",
+    "activePlateBg": "rgb(66, 95, 171)",
+    "activePlate_vs_shell": 1.7,
+    "shell_vs_desk": 1.92,
+    "overflowX": 0
+   },
+   "hover": {
+    "color": "rgb(169, 196, 255)",
+    "bg": "rgb(46, 74, 152)"
+   },
+   "focusSidebar": {
+    "tag": "BUTTON",
+    "text": "المبيعات",
+    "outline": "rgb(255, 255, 255)",
+    "width": "2px",
+    "offset": "2px",
+    "style": "solid"
+   },
+   "focusSearch": {
+    "tag": "INPUT",
+    "outline": "rgb(255, 255, 255)",
+    "width": "2px",
+    "fieldBorder": "rgb(255, 255, 255)"
+   },
+   "scanSide": [],
+   "scanTop": []
+  },
+  "ar-mobile": {
+   "geometry": {
+    "sidebarBg": "rgb(30, 58, 138)",
+    "topbarBg": "rgb(30, 58, 138)",
+    "deskBg": "rgb(7, 9, 12)",
+    "activePlateBg": "rgb(66, 95, 171)",
+    "activePlate_vs_shell": 1.7,
+    "shell_vs_desk": 1.92,
+    "overflowX": 0
+   },
+   "scanDrawer": []
+  },
+  "en-desktop": {
+   "rows": [
+    {
+     "label": "sidebar text · group (normal, muted)",
+     "fg": "#DCE5FB",
+     "bg": "#1E3A8A",
+     "ratio": 8.21,
+     "min": 4.5,
+     "pass": true
+    },
+    {
+     "label": "sidebar icon · group (normal)",
+     "fg": "#DCE5FB",
+     "bg": "#1E3A8A",
+     "ratio": 8.21,
+     "min": 3,
+     "pass": true
+    },
+    {
+     "label": "sidebar text · group/dashboard (selected)",
+     "fg": "#FFFFFF",
+     "bg": "#425FAB",
+     "ratio": 6.08,
+     "min": 4.5,
+     "pass": true
+    },
+    {
+     "label": "sidebar icon · selected",
+     "fg": "#FFFFFF",
+     "bg": "#425FAB",
+     "ratio": 6.08,
+     "min": 3,
+     "pass": true
+    },
+    {
+     "label": "sidebar text · leaf (normal)",
+     "fg": "#DCE5FB",
+     "bg": "#1E3A8A",
+     "ratio": 8.21,
+     "min": 4.5,
+     "pass": true
+    },
+    {
+     "label": "sidebar text · leaf (active — Apex used as text)",
+     "fg": "#A9C4FF",
+     "bg": "#1E3A8A",
+     "ratio": 5.93,
+     "min": 4.5,
+     "pass": true
+    },
+    {
+     "label": "sidebar text · section label",
+     "fg": "#DCE5FB",
+     "bg": "#1E3A8A",
+     "ratio": 8.21,
+     "min": 4.5,
+     "pass": true
+    },
+    {
+     "label": "sidebar text · company name",
+     "fg": "#FFFFFF",
+     "bg": "#1E3A8A",
+     "ratio": 10.36,
+     "min": 4.5,
+     "pass": true
+    },
+    {
+     "label": "sidebar wordmark (Apex as text)",
+     "fg": "#A9C4FF",
+     "bg": "#1E3A8A",
+     "ratio": 5.93,
+     "min": 3,
+     "pass": true
+    },
+    {
+     "label": "topbar text · search input",
+     "fg": "#FFFFFF",
+     "bg": "#142B6B",
+     "ratio": 13.23,
+     "min": 4.5,
+     "pass": true
+    },
+    {
+     "label": "topbar icon · buttons",
+     "fg": "#FFFFFF",
+     "bg": "#1E3A8A",
+     "ratio": 10.36,
+     "min": 3,
+     "pass": true
+    },
+    {
+     "label": "topbar text · user name",
+     "fg": "#FFFFFF",
+     "bg": "#1E3A8A",
+     "ratio": 10.36,
+     "min": 4.5,
+     "pass": true
+    },
+    {
+     "label": "topbar text · user sub-label (branch)",
+     "fg": "#DCE5FB",
+     "bg": "#1E3A8A",
+     "ratio": 8.21,
+     "min": 4.5,
+     "pass": true
+    },
+    {
+     "label": "topbar text · notification count badge",
+     "fg": "#0E1A31",
+     "bg": "#F87171",
+     "ratio": 6.27,
+     "min": 4.5,
+     "pass": true
+    },
+    {
+     "label": "topbar text · search placeholder",
+     "fg": "#DCE5FB",
+     "bg": "#142B6B",
+     "ratio": 10.48,
+     "min": 4.5,
+     "pass": true
+    },
+    {
+     "label": "topbar search · field border vs field",
+     "fg": "#8FA9E0",
+     "bg": "#142B6B",
+     "ratio": 5.62,
+     "min": 3,
+     "pass": true
+    },
+    {
+     "label": "sidebar Apex rail (active leaf) vs shell",
+     "fg": "#A9C4FF",
+     "bg": "#1E3A8A",
+     "ratio": 5.93,
+     "min": 3,
+     "pass": true
+    }
+   ],
+   "geometry": {
+    "sidebarBg": "rgb(30, 58, 138)",
+    "topbarBg": "rgb(30, 58, 138)",
+    "deskBg": "rgb(7, 9, 12)",
+    "activePlateBg": "rgb(66, 95, 171)",
+    "activePlate_vs_shell": 1.7,
+    "shell_vs_desk": 1.92,
+    "overflowX": 0
+   },
+   "hover": {
+    "color": "rgb(169, 196, 255)",
+    "bg": "rgb(46, 74, 152)"
+   },
+   "focusSidebar": {
+    "tag": "BUTTON",
+    "text": "Sales",
+    "outline": "rgb(255, 255, 255)",
+    "width": "2px",
+    "offset": "2px",
+    "style": "solid"
+   },
+   "focusSearch": {
+    "tag": "INPUT",
+    "outline": "rgb(255, 255, 255)",
+    "width": "2px",
+    "fieldBorder": "rgb(255, 255, 255)"
+   },
+   "scanSide": [],
+   "scanTop": []
+  },
+  "en-mobile": {
+   "geometry": {
+    "sidebarBg": "rgb(30, 58, 138)",
+    "topbarBg": "rgb(30, 58, 138)",
+    "deskBg": "rgb(7, 9, 12)",
+    "activePlateBg": "rgb(66, 95, 171)",
+    "activePlate_vs_shell": 1.7,
+    "shell_vs_desk": 1.92,
+    "overflowX": 0
+   },
+   "scanDrawer": []
+  },
+  "overflow": [
+   {
+    "locale": "ar",
+    "w": 320,
+    "h": 568,
+    "route": "/dashboard",
+    "overflowX": 0
+   },
+   {
+    "locale": "ar",
+    "w": 320,
+    "h": 568,
+    "route": "/invoices",
+    "overflowX": 0
+   },
+   {
+    "locale": "ar",
+    "w": 360,
+    "h": 740,
+    "route": "/dashboard",
+    "overflowX": 0
+   },
+   {
+    "locale": "ar",
+    "w": 360,
+    "h": 740,
+    "route": "/invoices",
+    "overflowX": 0
+   },
+   {
+    "locale": "ar",
+    "w": 390,
+    "h": 844,
+    "route": "/dashboard",
+    "overflowX": 0
+   },
+   {
+    "locale": "ar",
+    "w": 390,
+    "h": 844,
+    "route": "/invoices",
+    "overflowX": 0
+   },
+   {
+    "locale": "ar",
+    "w": 412,
+    "h": 915,
+    "route": "/dashboard",
+    "overflowX": 0
+   },
+   {
+    "locale": "ar",
+    "w": 412,
+    "h": 915,
+    "route": "/invoices",
+    "overflowX": 0
+   },
+   {
+    "locale": "ar",
+    "w": 768,
+    "h": 1024,
+    "route": "/dashboard",
+    "overflowX": 0
+   },
+   {
+    "locale": "ar",
+    "w": 768,
+    "h": 1024,
+    "route": "/invoices",
+    "overflowX": 0
+   },
+   {
+    "locale": "ar",
+    "w": 720,
+    "h": 450,
+    "route": "/dashboard",
+    "overflowX": 25
+   },
+   {
+    "locale": "ar",
+    "w": 720,
+    "h": 450,
+    "route": "/invoices",
+    "overflowX": 25
+   },
+   {
+    "locale": "ar",
+    "w": 640,
+    "h": 400,
+    "route": "/dashboard",
+    "overflowX": 105
+   },
+   {
+    "locale": "ar",
+    "w": 640,
+    "h": 400,
+    "route": "/invoices",
+    "overflowX": 105
+   },
+   {
+    "locale": "ar",
+    "w": 360,
+    "h": 225,
+    "route": "/dashboard",
+    "overflowX": 0
+   },
+   {
+    "locale": "ar",
+    "w": 360,
+    "h": 225,
+    "route": "/invoices",
+    "overflowX": 0
+   },
+   {
+    "locale": "en",
+    "w": 320,
+    "h": 568,
+    "route": "/dashboard",
+    "overflowX": 0
+   },
+   {
+    "locale": "en",
+    "w": 320,
+    "h": 568,
+    "route": "/invoices",
+    "overflowX": 0
+   },
+   {
+    "locale": "en",
+    "w": 360,
+    "h": 740,
+    "route": "/dashboard",
+    "overflowX": 0
+   },
+   {
+    "locale": "en",
+    "w": 360,
+    "h": 740,
+    "route": "/invoices",
+    "overflowX": 0
+   },
+   {
+    "locale": "en",
+    "w": 390,
+    "h": 844,
+    "route": "/dashboard",
+    "overflowX": 0
+   },
+   {
+    "locale": "en",
+    "w": 390,
+    "h": 844,
+    "route": "/invoices",
+    "overflowX": 0
+   },
+   {
+    "locale": "en",
+    "w": 412,
+    "h": 915,
+    "route": "/dashboard",
+    "overflowX": 0
+   },
+   {
+    "locale": "en",
+    "w": 412,
+    "h": 915,
+    "route": "/invoices",
+    "overflowX": 0
+   },
+   {
+    "locale": "en",
+    "w": 768,
+    "h": 1024,
+    "route": "/dashboard",
+    "overflowX": 4
+   },
+   {
+    "locale": "en",
+    "w": 768,
+    "h": 1024,
+    "route": "/invoices",
+    "overflowX": 4
+   },
+   {
+    "locale": "en",
+    "w": 720,
+    "h": 450,
+    "route": "/dashboard",
+    "overflowX": 52
+   },
+   {
+    "locale": "en",
+    "w": 720,
+    "h": 450,
+    "route": "/invoices",
+    "overflowX": 52
+   },
+   {
+    "locale": "en",
+    "w": 640,
+    "h": 400,
+    "route": "/dashboard",
+    "overflowX": 132
+   },
+   {
+    "locale": "en",
+    "w": 640,
+    "h": 400,
+    "route": "/invoices",
+    "overflowX": 132
+   },
+   {
+    "locale": "en",
+    "w": 360,
+    "h": 225,
+    "route": "/dashboard",
+    "overflowX": 0
+   },
+   {
+    "locale": "en",
+    "w": 360,
+    "h": 225,
+    "route": "/invoices",
+    "overflowX": 0
+   }
+  ]
+ }
+}

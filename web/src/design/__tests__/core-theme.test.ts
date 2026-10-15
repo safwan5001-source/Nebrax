@@ -5,7 +5,8 @@ import path from 'node:path';
 import { buildCss, buildTokens, checkContrasts, contrastRatio } from '../../../scripts/generate-awj-tokens.mjs';
 
 // AWJ Core (third V3 theme) — THEMES.md §6A. The owner-approved contract:
-//   Light shell (sidebar + topbar) = #1E40AF · Dark shell = #4F8CFF · everything else unchanged.
+//   Light shell (sidebar + topbar) = #1E40AF · Dark shell = #1E3A8A (design M, PR #1535 · D-42) ·
+//   everything else unchanged.
 // These tests pin the colors, the "shell tokens only" boundary, the Default/Ink invariants and
 // the contrast of every foreground / state role against each Core background.
 
@@ -35,16 +36,57 @@ describe('AWJ Core — owner-approved shell colors', () => {
     expect(block(CORE_LIGHT)).toContain('--awj-shell-bg: #1E40AF;');
   });
 
-  it('Dark shell background is exactly #4F8CFF (AWJ approved lighter blue) — not navy, not an accent', () => {
-    expect(resolved.themeCoreDark['--awj-shell-bg'].toUpperCase()).toBe('#4F8CFF');
-    expect(block(CORE_DARK)).toContain('--awj-shell-bg: #4F8CFF;');
+  it('Dark shell background is exactly #1E3A8A (owner-approved design M = primitive.brand.700)', () => {
+    expect(resolved.themeCoreDark['--awj-shell-bg'].toUpperCase()).toBe('#1E3A8A');
+    expect(block(CORE_DARK)).toContain('--awj-shell-bg: #1E3A8A;');
+    expect(tokens.theme.core.dark['shell-bg']).toBe('{primitive.brand.700}');
   });
 
-  it('Dark foregrounds are dark: white on #4F8CFF cannot reach 4.5:1, so the shell text must not be white', () => {
-    expect(contrastRatio('#FFFFFF', '#4F8CFF')).toBeLessThan(4.5);
+  it('Dark foregrounds are light again (white on #1E3A8A passes 4.5:1) and Apex is the approved #A9C4FF', () => {
     const dark = resolved.themeCoreDark;
+    expect(dark['--awj-shell-fg'].toUpperCase()).toBe('#FFFFFF');
+    expect(dark['--awj-shell-apex'].toUpperCase()).toBe('#A9C4FF');
     expect(contrastRatio(dark['--awj-shell-fg'], dark['--awj-shell-bg'])).toBeGreaterThanOrEqual(4.5);
-    expect(contrastRatio('#FFFFFF', dark['--awj-shell-fg'])).toBeGreaterThan(contrastRatio('#FFFFFF', dark['--awj-shell-bg']));
+    expect(contrastRatio(dark['--awj-shell-apex'], dark['--awj-shell-bg'])).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('Core Light is pinned: the 13 Light shell values are unchanged by the Dark work', () => {
+    const light = resolved.themeCoreLight;
+    expect(Object.fromEntries(Object.entries(light).map(([k, v]) => [k, v.toUpperCase()]))).toEqual({
+      '--awj-shell-bg': '#1E40AF', '--awj-shell-fg': '#FFFFFF', '--awj-shell-fg-muted': '#CBD9FB',
+      '--awj-shell-line': '#5573D2', '--awj-shell-hover': '#2A4DBF', '--awj-shell-active-bg': '#3558C8',
+      '--awj-shell-active-fg': '#FFFFFF', '--awj-shell-active-shadow': 'INSET 0 0 0 1PX #6F8BE0',
+      '--awj-shell-apex': '#FFFFFF', '--awj-shell-field-bg': '#18368F', '--awj-shell-field-line': '#9DB4EE',
+      '--awj-shell-focus-ring': '#FFFFFF', '--awj-shell-brandmark-bg': '#FFFFFF',
+    });
+  });
+});
+
+describe('AWJ Core-Dark — Active / Hover / Shell separation and identity (design M)', () => {
+  const d = resolved.themeCoreDark;
+  const shell = d['--awj-shell-bg'];
+  const hover = d['--awj-shell-hover'];
+  const active = d['--awj-shell-active-bg'];
+
+  it('Shell → Hover ≥ 1.2, Hover → Active ≥ 1.3, Shell → Active ≥ 1.6 (selected state is not a whisper)', () => {
+    expect(contrastRatio(shell, hover)).toBeGreaterThanOrEqual(1.2);
+    expect(contrastRatio(hover, active)).toBeGreaterThanOrEqual(1.3);
+    expect(contrastRatio(shell, active)).toBeGreaterThanOrEqual(1.6);
+  });
+
+  it('is distinct from Ink-Dark (≥ 1.5:1 against #0E1A31) …', () => {
+    expect(contrastRatio(shell, resolved.themeInk['--awj-shell-bg'])).toBeGreaterThanOrEqual(1.5);
+  });
+
+  it('… and does not return to the bright #4F8CFF slab (< 3:1 against the dark Desk; it was 6.2:1)', () => {
+    expect(contrastRatio(shell, tokens.primitive.night.desk)).toBeLessThan(3);
+  });
+
+  it('focus ring clears 3:1 on every shell surface it can touch (shell, hover, active plate, search field)', () => {
+    const ring = d['--awj-shell-focus-ring'];
+    for (const surface of [shell, hover, active, d['--awj-shell-field-bg']]) {
+      expect(contrastRatio(ring, surface), `${ring} on ${surface}`).toBeGreaterThanOrEqual(3);
+    }
   });
 });
 
@@ -123,8 +165,28 @@ describe('AWJ Core — contrast of every shell role against its background', () 
     }
   );
 
-  it('text roles require 4.5:1, non-text indicators 3:1', () => {
+  // Core-Dark only: the Active/Hover/Focus roles added with design M (D-42).
+  const DARK_EXTRA_ROLES = [
+    'shell-fg/shell-hover',
+    'shell-fg-muted/shell-active-bg',
+    'shell-focus-ring/shell-hover',
+    'shell-focus-ring/shell-active-bg',
+    'shell-hover/shell-bg (structural)',
+    'shell-active-bg/shell-hover (structural)',
+    'shell-active-bg/shell-bg (structural)',
+  ];
+  it.each(DARK_EXTRA_ROLES)('core.dark %s is registered and passes', (role) => {
+    const hit = results.find((r) => r.name === `theme.core.dark.${role}`);
+    expect(hit, `contrast check theme.core.dark.${role} is not registered`).toBeTruthy();
+    expect(hit!.pass, `${hit!.name}: ${hit!.ratio.toFixed(2)} < ${hit!.min}`).toBe(true);
+  });
+
+  it('text roles require 4.5:1, non-text indicators 3:1, structural separations their own floor', () => {
     for (const r of results.filter((x) => x.name.startsWith('theme.core.'))) {
+      if (r.name.includes('(structural)')) {
+        expect(r.min, r.name).toBeGreaterThanOrEqual(1.2);
+        continue;
+      }
       const textual = /(shell-fg|leaf text|hover text|shell-active-fg)/.test(r.name);
       expect(r.min, r.name).toBe(textual ? 4.5 : 3.0);
     }

@@ -103,19 +103,19 @@
 
 | التوكن | **Default** (Tinted Neutral) | **Ink** | **Core · Light** | **Core · Dark** | الدور |
 |---|---|---|---|---|---|
-| `shell-bg` | `#D5DFF0` | `#0E1A31` | `#1E40AF` | `#4F8CFF` | خلفية القشرة |
-| `shell-fg` | `#12203B` | `#E8EEF9` | `#FFFFFF` | `#06101F` | نص/أيقونة نشطة |
-| `shell-fg-muted` | `#3F4F6C` | `#9FB0CC` | `#CBD9FB` | `#0F2247` | نص عنصر عادي |
-| `shell-line` | `#BFCCE3` | `#22345A` | `#5573D2` | `#2D63CC` | فواصل القشرة |
-| `shell-hover` | `#C6D3EA` | `#15244A` | `#2A4DBF` | `#6CA0FF` | hover |
-| `shell-active-bg` | `#FFFFFF` | `#1A2A4A` | `#3558C8` | `#EAF0FE` | العنصر النشط |
-| `shell-active-fg` | `#12203B` | `#FFFFFF` | `#FFFFFF` | `#0E1A31` | نص العنصر النشط |
-| `shell-active-shadow` | `0 1px 2px rgba(15,27,51,.14), 0 0 0 1px rgba(15,27,51,.04)` | `inset 0 0 0 1px #2C4170` | `inset 0 0 0 1px #6F8BE0` | `0 1px 2px rgba(6,16,31,.28), 0 0 0 1px rgba(6,16,31,.10)` | بروز النشط |
-| `shell-apex` | `#1E40AF` | `#7FA8FF` | `#FFFFFF` | `#0E1A31` | Apex داخل القشرة |
-| `shell-field-bg` | `#E9EFF9` | `#15244A` | `#18368F` | `#8FB4FF` | حقل البحث |
-| `shell-field-line` | `#6F82A6` | `#5A74A8` | `#9DB4EE` | `#0E1A31` | حدّ حقل ≥ 3:1 |
-| `shell-focus-ring` | `#1E40AF` | `#7FA8FF` | `#FFFFFF` | `#0E1A31` | تركيز داخل القشرة |
-| `shell-brandmark-bg` | `#1E40AF` | `#2D5BDB` | `#FFFFFF` | `#0E1A31` | خلفية علامة المؤسسة الافتراضية |
+| `shell-bg` | `#D5DFF0` | `#0E1A31` | `#1E40AF` | `#1E3A8A` | خلفية القشرة |
+| `shell-fg` | `#12203B` | `#E8EEF9` | `#FFFFFF` | `#FFFFFF` | نص/أيقونة نشطة |
+| `shell-fg-muted` | `#3F4F6C` | `#9FB0CC` | `#CBD9FB` | `#DCE5FB` | نص عنصر عادي |
+| `shell-line` | `#BFCCE3` | `#22345A` | `#5573D2` | `#3D5AA6` | فواصل القشرة |
+| `shell-hover` | `#C6D3EA` | `#15244A` | `#2A4DBF` | `#2E4A98` | hover |
+| `shell-active-bg` | `#FFFFFF` | `#1A2A4A` | `#3558C8` | `#425FAB` | العنصر النشط |
+| `shell-active-fg` | `#12203B` | `#FFFFFF` | `#FFFFFF` | `#FFFFFF` | نص العنصر النشط |
+| `shell-active-shadow` | `0 1px 2px rgba(15,27,51,.14), 0 0 0 1px rgba(15,27,51,.04)` | `inset 0 0 0 1px #2C4170` | `inset 0 0 0 1px #6F8BE0` | `inset 0 0 0 1px #8FA9E8` | بروز النشط |
+| `shell-apex` | `#1E40AF` | `#7FA8FF` | `#FFFFFF` | `#A9C4FF` | Apex داخل القشرة |
+| `shell-field-bg` | `#E9EFF9` | `#15244A` | `#18368F` | `#142B6B` | حقل البحث |
+| `shell-field-line` | `#6F82A6` | `#5A74A8` | `#9DB4EE` | `#8FA9E0` | حدّ حقل ≥ 3:1 |
+| `shell-focus-ring` | `#1E40AF` | `#7FA8FF` | `#FFFFFF` | `#FFFFFF` | تركيز داخل القشرة |
+| `shell-brandmark-bg` | `#1E40AF` | `#2D5BDB` | `#FFFFFF` | `#A9C4FF` | خلفية علامة المؤسسة الافتراضية |
 
 ## 5. Posture tokens
 
@@ -205,7 +205,7 @@
 > القشرة في الداكن **لا تملك مصفوفة ثانية** لـDefault/Ink: `Ink-Dark = Default-Dark` (D-12) يُنفَّذ حرفياً
 > بإعادة استعمال `theme.ink.shell-*` المحسوبة في كتلة `.dark` نفسها، أياً كانت قيمة
 > `data-awj-theme` المختارة. **الاستثناء الوحيد `core`:** كتلة `[data-awj-theme="core"].dark`
-> (خصوصية أعلى) تُبدّل التوكنز الـ13 وحدها إلى `theme.core.dark` (§4، D-41).
+> (خصوصية أعلى) تُبدّل التوكنز الـ13 وحدها إلى `theme.core.dark` (§4، D-41/D-42).
 
 | التوكن | القيمة | من |
 |---|---|---|
@@ -232,7 +232,7 @@
 | `outcome-edge` *(جديد)* | `#22345A` (ink-600) | يفصل `surface-outcome` عن `surface-desk` القريبين لوناً في الداكن (THEMES.md §6.3) |
 | `shell-*` (13 توكناً) | = `theme.ink.shell-*` (إلا عند `core`: `theme.core.dark`) | معاد استعمالها حرفياً لـDefault/Ink؛ Core مستقلة |
 
-### مصفوفة التباين (محسوبة، 28 زوجاً، كلها ناجحة؛ وCore: 26 زوجاً مسجَّلاً في `contrastChecks` كلها ناجحة)
+### مصفوفة التباين (محسوبة، 28 زوجاً، كلها ناجحة؛ وCore: 33 زوجاً مسجَّلاً في `contrastChecks` كلها ناجحة (13 Light + 20 Dark بما فيها 3 فصولات بنيوية Shell/Hover/Active))
 
 | الزوج | النسبة | الحدّ |
 |---|---|---|
@@ -296,12 +296,16 @@
 | shell Core Light: نص النشط / لوح النشط · Apex شريطاً على لوح النشط | 6.21 · 6.21 | 4.5 · 3.0 | ✓ |
 | shell Core Light: `fg` · `muted` على حقل البحث · field-line / field-bg | 10.70 · 7.57 · 5.19 | 4.5 · 4.5 · 3.0 | ✓ |
 | shell Core Light: حلقة التركيز / القشرة · / الحقل · brandmark / القشرة | 8.72 · 10.70 · 8.72 | 3.0 | ✓ |
-| shell Core Dark (`#4F8CFF`): `fg` / `muted` / `muted على hover` | 5.93 · 4.87 · 6.05 | 4.5 | ✓ |
-| shell Core Dark: Apex نصاً على القشرة · على hover | 5.39 · 6.70 | 4.5 | ✓ |
-| shell Core Dark: نص النشط / لوح النشط · Apex شريطاً على لوح النشط | 15.19 · 15.19 | 4.5 · 3.0 | ✓ |
-| shell Core Dark: `fg` · `muted` على حقل البحث · field-line / field-bg | 9.20 · 7.57 · 8.38 | 4.5 · 4.5 · 3.0 | ✓ |
-| shell Core Dark: حلقة التركيز / القشرة · / الحقل · brandmark / القشرة | 5.39 · 8.38 · 5.39 | 3.0 | ✓ |
-| الأبيض على `#4F8CFF` (مرجع: لماذا نص Dark داكن) | 3.22 | 4.5 | **✗ — لذلك `shell-fg` داكن في Core Dark** |
+| shell Core Dark (`#1E3A8A`): `fg` / `muted` / `muted على hover` / `muted على لوح النشط` | 10.36 · 8.21 · 6.53 · 4.82 | 4.5 | ✓ |
+| shell Core Dark: `fg` على hover · نص النشط على لوحه (`#425FAB`) | 8.24 · 6.08 | 4.5 | ✓ |
+| shell Core Dark: Apex `#A9C4FF` نصاً على القشرة · على hover | 5.93 · 4.72 | 4.5 | ✓ |
+| shell Core Dark: Apex شريطاً على لوح النشط · على القشرة | 3.48 · 5.93 | 3.0 | ✓ |
+| shell Core Dark: `fg` · `muted` على حقل البحث · field-line / field-bg | 13.23 · 10.48 · 5.62 | 4.5 · 4.5 · 3.0 | ✓ |
+| shell Core Dark: حلقة التركيز (أبيض) على القشرة · hover · لوح النشط · الحقل | 10.36 · 8.24 · 6.08 · 13.23 | 3.0 | ✓ |
+| shell Core Dark: لوحة الشعار / القشرة | 5.93 | 3.0 | ✓ |
+| shell Core Dark — **فصول بنيوية** Shell→Hover · Hover→Active · Shell→Active | 1.26 · 1.36 · 1.70 | 1.2 · 1.3 · 1.6 | ✓ |
+| shell Core Dark ÷ Ink-Dark `#0E1A31` · ÷ Desk `#07090C` · ÷ قشرة Core-Light | 1.67 · 1.92 · 1.19 | تمايز ≥ 1.5 · وهج < 3 | ✓ (اختبار وحدة) |
+| الأبيض على `#4F8CFF` (مرجع تاريخي D-41: سبب النص الداكن آنذاك) | 3.22 | 4.5 | ✗ — سبب استبدال `#4F8CFF` بـ`#1E3A8A` (D-42) |
 | `action-primary` (600) / ink | 1.97 | — | **✗ — لذلك Apex/تركيز على الحبر `brand-300`** |
 | Outcome: fg · label · decimals · rule · green | 16.0 · 11.28 · 8.66 · 7.39 · 9.52 | 4.5 / 3.0 | ✓ |
 
