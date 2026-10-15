@@ -1,6 +1,6 @@
 # FC-4 — Implementation report: Fiscal Close AR/AP balance as of fiscal year-end
 
-STATUS: **IN REVIEW (Draft PR). NOT MERGED. NOT DEPLOYED.** Closes only after approved merge and verification. Production deployment and production data: NOT VERIFIED.
+STATUS: **MERGED — PR #1515, merge `c7bff59c37a6ed557c972ee3a4d4d8769f828946` (2026-10-15).** NOT DEPLOYED. Production deployment and production data: NOT VERIFIED. (Wording at authoring was "IN REVIEW (Draft PR). NOT MERGED. NOT DEPLOYED.") Post-merge CI: see §9.
 DATE: 2026-10-15 · ZONE: C — accounting integrity (read-only) · Horizon: TAX-ZATCA
 Contract: owner decisions "Option C" with S1–S8, taken after the FC-4 accounting policy review. Predecessors: ACC-02-FC (`90b854f`, VAT line), FC-3 (`99d1c4b`, closed-year posting protection).
 
@@ -134,7 +134,7 @@ Local results (SQLite and PostgreSQL 16, this environment lacks `bcmath`, so the
 | Same focused set — PostgreSQL | 310 passed |
 | Full SQLite suite | 7085 passed, 132 skipped, 26 failed — all 26 are the known Fuel tests needing `bcmath` (`bcmul`), absent locally and installed in CI |
 | Full PostgreSQL suite | 7213 passed, 3 skipped, 27 failed — the same 26 Fuel/`bcmath` tests plus `StorefrontMediaApiTest › the library lists newest first with cursor pagination…` (`PDOException HY093` in a media query). That test fails identically with FC-4 removed (checked locally against `origin/main` code) and passes in CI on `main` (run #9658 on `99d1c4b`), so it is a local-environment difference unrelated to this change |
-| CI (sqlite, pgsql) and CI Gate on the final head | recorded in the PR (see §9) |
+| CI (sqlite, pgsql) and CI Gate on the final PR head `64dbfa5` | all three success (see §9) |
 
 ## 7. Existing test updated, with justification
 
@@ -152,9 +152,20 @@ Local results (SQLite and PostgreSQL 16, this environment lacks `bcmath`, so the
 ## 9. Branch / PR / SHAs
 
 - Branch: `feat/fc4-ar-ap-year-end-control-balance`
-- Base SHA: `99d1c4b722eff5cc50f959c721dd5781b7cb0bc9` (`main`, FC-3 merge)
-- PR / Head SHA / full-suite and CI Gate results: recorded in the PR.
+- PR: #1515 — merged 2026-10-15 (squash)
+- Base SHA when branched: `99d1c4b722eff5cc50f959c721dd5781b7cb0bc9` (`main`, FC-3 merge); `main` had moved to `ee36573f46e11bc4568f943f989d68ffcd3f5c90` by the time the PR was opened (no overlap with FC-4 files)
+- Final PR Head SHA: `64dbfa5855d55c7706330540a89acee05c19d004`
+- Merge SHA on `main`: `c7bff59c37a6ed557c972ee3a4d4d8769f828946` (parent `f792a51876ec1f9c6969a38341fb8263278bef5f`)
+
+**CI evidence — kept separate:**
+
+| Evidence | Commit | Result |
+|---|---|---|
+| PR CI (run `38767642458` / `38767642404`) | final PR head `64dbfa5` | `php artisan test (L11, sqlite)` success · `php artisan test (L11, pgsql)` success · `CI Gate` success (all completed 2026-10-15 16:30–16:32 UTC) |
+| Post-merge `CI` push run #9673 (run `38771455004`) | merge commit `c7bff59` | `php artisan test (L11, sqlite)` success (completed 16:54 UTC) · `php artisan test (L11, pgsql)` success (completed 17:00 UTC) · run conclusion **success**. The push run has no separate `CI Gate` job; `CI Gate` is a PR check and was green only on the PR head. |
+
+The PR CI result is for the pre-merge head and is not evidence about the merge commit; the post-merge row is the only evidence about `c7bff59`.
 
 ## 10. Recommended next step
 
-Owner review of the Draft PR. Then, as separate tasks: S7 (route the hard-coded paths through the role resolver) before S6, then the subledger / open-document reconciliation scoping.
+Merged. Remaining work stays as separate tasks, unchanged: **S7** (route the hard-coded `1130` / `2110` paths through the role resolver) before **S6** (AR/AP mapping-write validation), then the subledger / open-document reconciliation scoping. Neither S6 nor S7 was implemented by FC-4.
