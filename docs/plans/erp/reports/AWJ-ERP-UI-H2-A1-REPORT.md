@@ -26,7 +26,7 @@ Production build of `web/` (`next build` + `next start`) against Laravel built b
 | `staff` (unscoped) | RBAC-restricted only; sees the whole tenant by design |
 | `staff` (scoped) | Restricted to the branch «فرع الخبر». API check (`GET /api/invoices`): 0 invoices visible, against 5 for the unscoped user at A1 time (3 from `seed.sh`, `INV-2026-00004/5` created through the UI before the check; raw output not kept). Re-run after the A2 workflows: **0 against 30**, all 30 in the main branch |
 
-`nav-state` of tenant A reported every capability it lists (16) as `true`, through the normal path (`GET /api/applications/nav-state`; reproduce with the tenant-A token). The 232-URL manifest the crawl loaded is committed as [`tools/routes.template.json`](../h2-a-evidence/tools/routes.template.json) (record ids as placeholders; `make_routes.py` fills them from the current fixture).
+`nav-state` of tenant A reported every capability it lists (16) as `true`, through the normal path (`GET /api/applications/nav-state`; reproduce with the tenant-A token). The 235-URL manifest the crawl loaded (232 in the first pass plus 3 detail pages added after review, §3) is committed as [`tools/routes.template.json`](../h2-a-evidence/tools/routes.template.json) (record ids as placeholders; `make_routes.py` fills them from the current fixture).
 
 ## 3. Inventory (generated)
 
