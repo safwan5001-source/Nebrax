@@ -809,12 +809,21 @@ describe("carousel", () => {
 
     beforeEach(() => scrollIntoView.mockClear());
 
+    const focusVisible = (link: HTMLElement, visible: boolean | "throws") =>
+      vi.spyOn(link, "matches").mockImplementation((selector: string) => {
+        if (selector !== ":focus-visible") return false;
+        if (visible === "throws") throw new SyntaxError("unsupported");
+        return visible;
+      });
+
     it("reveals a focused tile that is only partly inside the rail (aligned to the snap-start edge)", async () => {
       const { items } = await renderRail({ left: 8, right: 382 }, [
         [270, 374],
         [-78, 26],
       ]);
-      fireEvent.focus(items[1].querySelector("a") as HTMLElement);
+      const link = items[1].querySelector("a") as HTMLElement;
+      focusVisible(link, true);
+      fireEvent.focus(link);
       expect(scrollIntoView).toHaveBeenCalledTimes(1);
       expect(scrollIntoView).toHaveBeenCalledWith({
         block: "nearest",
@@ -823,10 +832,44 @@ describe("carousel", () => {
       expect(scrollIntoView.mock.contexts[0]).toBe(items[1]);
     });
 
-    it("also reveals a tile clipped on the other edge (Shift+Tab back)", async () => {
+    it("also reveals a tile clipped on the opposite edge", async () => {
       const { items } = await renderRail({ left: 8, right: 382 }, [[300, 404]]);
-      fireEvent.focus(items[0].querySelector("a") as HTMLElement);
+      const link = items[0].querySelector("a") as HTMLElement;
+      focusVisible(link, true);
+      fireEvent.focus(link);
       expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    });
+
+    it("does NOT scroll on pointer-initiated focus (not :focus-visible): a click must not move under the pointer", async () => {
+      const { items } = await renderRail({ left: 8, right: 382 }, [
+        [270, 374],
+        [-78, 26],
+      ]);
+      const link = items[1].querySelector("a") as HTMLElement;
+      focusVisible(link, false);
+      fireEvent.focus(link);
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    });
+
+    it("treats an engine that cannot evaluate :focus-visible as keyboard (the fix is never lost)", async () => {
+      const { items } = await renderRail({ left: 8, right: 382 }, [
+        [270, 374],
+        [-78, 26],
+      ]);
+      const link = items[1].querySelector("a") as HTMLElement;
+      focusVisible(link, "throws");
+      fireEvent.focus(link);
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    });
+
+    it("ignores sub-pixel overhang (0.5px) of a fully visible tile", async () => {
+      const { items } = await renderRail({ left: 8, right: 382 }, [
+        [7.6, 111.6],
+      ]);
+      const link = items[0].querySelector("a") as HTMLElement;
+      focusVisible(link, true);
+      fireEvent.focus(link);
+      expect(scrollIntoView).not.toHaveBeenCalled();
     });
 
     it("leaves a fully visible tile alone: ordinary Tab never makes the rail jump", async () => {
@@ -834,8 +877,11 @@ describe("carousel", () => {
         [270, 374],
         [154, 258],
       ]);
-      fireEvent.focus(items[0].querySelector("a") as HTMLElement);
-      fireEvent.focus(items[1].querySelector("a") as HTMLElement);
+      for (const li of items.slice(0, 2)) {
+        const link = li.querySelector("a") as HTMLElement;
+        focusVisible(link, true);
+        fireEvent.focus(link);
+      }
       expect(scrollIntoView).not.toHaveBeenCalled();
     });
 

@@ -12,6 +12,9 @@ import type { ComponentPropsWithoutRef, FocusEvent } from "react";
  *
  * The behaviour is deliberately narrow:
  *  - nothing happens while the focused tile is fully inside the rail, so ordinary Tab/Shift+Tab never jumps;
+ *  - only keyboard-initiated focus (`:focus-visible`) reveals. A mouse/touch press focuses the link on `mousedown`; an
+ *    animated scroll then would move the tile from under the pointer before `mouseup` and could swallow the click.
+ *    Where `:focus-visible` cannot be evaluated the focus is treated as keyboard, so the keyboard fix is never lost;
  *  - otherwise the tile is aligned to the rail's inline-start edge. That is exactly the `snap-start` position of the
  *    `<li>`s (with the rail's `scroll-padding`), so the mandatory snap has nothing left to correct, and the browser
  *    clamps at either end. The edge is logical, so RTL/LTR are the browser's own;
@@ -20,13 +23,27 @@ import type { ComponentPropsWithoutRef, FocusEvent } from "react";
  * It adds no element, attribute, tab stop or role: the markup is the same `<ul>` the server rendered, and without
  * JavaScript the rail simply behaves as before.
  */
+/** Sub-pixel layout rounding must not count as "clipped". */
+const EPSILON = 0.5;
+
+function isKeyboardFocus(target: Element): boolean {
+  try {
+    return target.matches(":focus-visible");
+  } catch {
+    return true;
+  }
+}
+
 export function revealFocusedTile(event: FocusEvent<HTMLElement>): void {
   const rail = event.currentTarget;
   const tile = (event.target as Element).closest("li");
   if (!tile || !rail.contains(tile)) return;
+  if (!isKeyboardFocus(event.target as Element)) return;
   const frame = rail.getBoundingClientRect();
   const box = tile.getBoundingClientRect();
-  if (box.left >= frame.left && box.right <= frame.right) return;
+  if (box.left >= frame.left - EPSILON && box.right <= frame.right + EPSILON) {
+    return;
+  }
   tile.scrollIntoView({ block: "nearest", inline: "start" });
 }
 
