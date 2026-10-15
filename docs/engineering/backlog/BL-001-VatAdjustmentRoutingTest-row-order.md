@@ -21,6 +21,10 @@ The amounts were identical. Only the **order of the array keys** differed:
 
 The next run, on head `23e72f4` of the same PR, passed on both SQLite and pgsql, with no change to that test.
 
+## Second occurrence (2026-10-15)
+
+The same flake hit a **different test of the same class** on PR #1508 (head `e8fabcf`): `VatAdjustmentRoutingTest::a_sales_return_with_default_mappings_is_byte_identical_to_before` (assertion at `tests/Feature/VatAdjustmentRoutingTest.php:254`; `2120` and `4110` swapped, same amounts). The failed job passed on its single re-run. This confirms the cause is the shared `journal()` helper, not one test, and that any PR can meet it on pgsql. Impact so far: one re-run each time, no product defect.
+
 ## Cause
 
 The test's `journal()` helper (`tests/Feature/VatAdjustmentRoutingTest.php:213`) loads `JournalEntry::with('lines.account')` and iterates `$entry->lines` with **no `ORDER BY`**, then builds an array keyed by account code. The assertions use `assertSame`, which compares key order as well as values. SQL does not guarantee row order without `ORDER BY`, and PostgreSQL returns rows in physical order, which can differ between runs. SQLite usually returns insertion order, so the test passes there.

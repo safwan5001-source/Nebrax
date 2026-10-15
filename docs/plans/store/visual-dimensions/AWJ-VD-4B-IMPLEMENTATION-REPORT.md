@@ -1,6 +1,6 @@
 # AWJ-VD-4B — Implementation Report (Storefront visual renderer for `discovery`)
 
-STATUS: **PR pending** — branch pushed, PR not opened, nothing merged or deployed.
+STATUS: **MERGED** — PR #1508 merged under the owner's 2026-10-15 authorization as `f1e309e26ad02bed242e17ea537536cb912183c4`. POST_MERGE_REVIEW: PASS — CI (sqlite + pgsql) and Storefront CI green on main (runs 38670309241, 38670309191). Production deployment still needs the owner's explicit approval.
 DATE: 2026-10-15
 HORIZON: AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 · slice VD-4b (H1-4)
 AUTHORITY: the owner authorized this slice on 2026-10-15 as **storefront/UI only**: no API, DB, migration, permission, security or tenant-isolation change, and no change to the merged contracts (VD-1c `meta.facets[].visual` + `sources`, the guarded image route and proxy, VD-4a display keys, VD-1a resolver). No Decision-Gate item was hit.
