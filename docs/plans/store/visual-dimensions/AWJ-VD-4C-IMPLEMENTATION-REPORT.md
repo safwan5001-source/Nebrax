@@ -1,6 +1,6 @@
 # AWJ-VD-4C — Implementation Report (Storefront Builder controls for the discovery section)
 
-STATUS: **MERGED** — PR #1507 merged under the owner's 2026-10-15 authorization as `2b7774721beab742dbb31b5b8233da08b802ca45`. POST_MERGE_REVIEW: __PMR__. Production deployment still needs the owner's explicit approval.
+STATUS: **MERGED** — PR #1507 merged under the owner's 2026-10-15 authorization as `2b7774721beab742dbb31b5b8233da08b802ca45`. POST_MERGE_REVIEW: PASS — CI (sqlite + pgsql) and Web CI green on main (runs 38667361465, 38667361473). Production deployment still needs the owner's explicit approval.
 DATE: 2026-10-15
 HORIZON: AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 · slice VD-4c (H1-4)
 AUTHORITY: the owner authorized this slice on 2026-10-15 as **web/UI only**. No API, database, migration, permission, security or tenant-isolation change was made or is needed.

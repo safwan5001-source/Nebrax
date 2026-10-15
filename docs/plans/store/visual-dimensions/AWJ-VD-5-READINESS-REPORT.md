@@ -17,7 +17,7 @@ AUTHORITY: the owner asked on 2026-10-15 for this report after VD-3, VD-4b and V
 | VD-1c | Public `meta.facets` visual, guarded image route, proxy, N1–N19 | #1499 | `b1b7988` | PASS |
 | VD-4c | Builder controls for the discovery section | #1507 | `2b77747` | PASS |
 | VD-4b | Storefront discovery renderer (5 layouts) | #1508 | `f1e309e` | PASS |
-| VD-3 | Admin visual editor | #1509 | `d628288` | __PMR__ |
+| VD-3 | Admin visual editor | #1509 | `d628288` | PASS |
 
 Every slice was reviewed by a separate reviewer before merge. The three UI slices (VD-3, VD-4b, VD-4c) changed no API, database, permission, security or tenant behaviour. BL-001 (a known pgsql row-order flake in `VatAdjustmentRoutingTest`) is recorded outside the horizon; it failed once on #1499's first head (the next commit passed) and once on #1508 (the job passed on its single re-run), with no product defect.
 
@@ -78,7 +78,7 @@ Every slice was reviewed by a separate reviewer before merge. The three UI slice
 | Criterion | State |
 |---|---|
 | VD-3, VD-4b, VD-4c merged on `main` | Yes |
-| Post-merge CI on `main` (PHP sqlite + pgsql, Web CI, Storefront CI) | __PMR_DETAIL__ |
+| Post-merge CI on `main` (PHP sqlite + pgsql, Web CI, Storefront CI) Yes — on `d628288` (which contains VD-4c and VD-4b): CI (sqlite + pgsql) and Web CI green; Storefront CI green on `f1e309e` (VD-4b) |
 | No open review thread or blocking finding on any slice | Yes |
 | Environment can run Laravel, Next and Chromium | Yes, as in CTX-3 |
 | Any API, database, permission or security change needed | None known; if VD-5 finds one it stops at a Decision Gate |
