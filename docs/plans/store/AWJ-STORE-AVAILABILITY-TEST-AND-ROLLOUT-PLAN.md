@@ -13,11 +13,11 @@
 | Custom / By stock: stock in another warehouse only | Unavailable from selected warehouse |
 | Custom / By stock: active reservations exhaust balance | Unavailable; release/expiry restores availability correctly |
 | Custom / Always + verified non-stock product | Orderable without stock reservation/issue; checkout still validates prices/fulfillment/payment |
-| Custom / Always + inventory-tracked product | Reject unsafe policy or show explicit ineligible reason; no bypass/negative issue |
-| Custom / Made to order + eligible product | Explicit MTO copy/lead time, order lifecycle consistent with approved fulfillment contract |
+| Custom / Always + inventory-tracked product | Reject unsafe policy or show explicit ineligible reason; direct merchant to MTO if applicable; no bypass/negative issue |
+| Custom / Made to order + eligible product | Explicit MTO copy/validated lead time; separate accepted-order and ready-to-fulfill states; no stock issue until approved fulfillment contract |
 | Custom / MTO + incomplete lead time/workflow | Cannot activate without safe explicit server validation |
 | Product override + Store Custom | Product takes precedence only in same storefront/channel |
-| Product override + Store Auto | Legacy Auto remains effective (proposed pending approval) |
+| Product override + Store Auto | Legacy Auto remains effective; override dormant and explained in merchant UI |
 | Missing/unavailable delivery slots | Order delivery not promised even when product orderable |
 | Multiple variants | Availability/eligibility resolved at selected variant; no sibling-stock leakage |
 | Duplicate checkout/payment retry | Idempotent; no duplicate reservations, movements or orders |
@@ -50,3 +50,14 @@
 - [ ] Confirm default Auto + rollback
 - [ ] Verify no production mutation in analysis/docs stage
 - [ ] Approve implementation slices individually
+
+## Additional must-pass scenarios
+- Product override saved under Auto is *dormant*; switching to Custom applies it only if eligible; switching back restores historical behavior with no inventory mutations.
+- Checkout cannot accept an MTO order without a server-approved lifecycle and truthful lead-time/delivery commitment; neither product cards nor payment confirmation can imply ready-to-ship.
+- Lead-time absent, zero, invalid, cutoff crossed, timezone boundary, nonworking day and slot before minimum date: explicit safe rejection.
+- Cancellation before/after preparation, payment failure/refund, partial fulfillment and retries: accounting and reservation outcomes must be proven per dedicated ADR; no invented stock issue/negative physical stock.
+- Same product published on stores A/B with different policies: no cross-store configuration leak; trusted host resolves the correct channel, tenant enforced.
+- Public API `in_stock: null` and legacy consumers, SEO structured data, current carts and existing orders preserve backward compatibility and snapshot correctness.
+
+## Review disposition
+P1/P2 issues from PR review are **addressed at requirements level** but not all resolved technically. Do not mark the ADR Accepted or implement Always/MTO until authoritative non-stock classification and MTO lifecycle evidence is collected and explicitly approved.
