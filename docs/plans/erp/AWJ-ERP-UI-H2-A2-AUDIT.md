@@ -161,6 +161,17 @@ From [A2-PLT §7](h2-a-evidence/A2-PLT.md): 11 of the 13 Fuel screens are back-o
 5. **A4 contract:** approve [AWJ-ERP-UI-H2-1-UI-CONTRACT.md](AWJ-ERP-UI-H2-1-UI-CONTRACT.md) as the H2 rulebook.
 6. **Launch B then C** in the plan order, with B5 widened to all irreversible actions (ERP-UI-H2-002) and B4 first among B (largest spread).
 
-## 10. Not verified (all groups)
+## 10. Coordination with parallel work
+
+- **Third theme for Design System v3 (owner notice, 2026-10-15):** a separate, independent task is adding a third theme to the v3 design system. It is still in development and its branch is **not merged into `main`**. H2 phase A is unaffected (docs and evidence only), and H2's scope is unchanged.
+- **Before any shared change in phase B:** check the status of that branch first (merged or not, and which tokens and components it touches). Shared changes here means tokens, `components/nebrax/*`, `components/ui/*`, `data-table.tsx`, the shell, and the theme/`data-awj-ui` gate. Rebase B slices on it when it merges, so the two efforts do not conflict. In particular:
+  - B1 (shell, badge tone).
+  - B2 (list cells, money cell).
+  - B4 (state component).
+  - Contract rules that depend on colour and contrast: R-A11Y-3, R-MONEY-4, and the Floor amount-due contrast.
+
+  Each must be verified on the new theme as well as the existing ones once it exists.
+
+## 11. Not verified (all groups)
 
 Legacy surface for most workflows; 200% zoom and the Ink theme; Firefox/WebKit (Q1); real screen readers and devices; real login (shared rate limit); Fuel sale/receiving/reconciliation (`bcmath` missing locally, green in CI); Studio publish; document extraction (no worker); POS returns/exchange, cash drawer, offline, printing; many-row states outside Sales (seed too small); exported/printed file contents. Each group report §6/§7 lists its own.
