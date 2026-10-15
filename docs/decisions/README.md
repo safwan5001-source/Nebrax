@@ -6,7 +6,7 @@ Records follow `docs/autonomous-engineering/ADR-CONVENTION.md`. An accepted reco
 
 | ADR | Plan label | Subject | Status | Open gates |
 |---|---|---|---|---|
-| [ADR-0001](ADR-0001-invoice-issue-timestamp.md) | ADR-A | Immutable `issued_at`; one issuance instant, several output representations | Accepted — **direction only** | G-A1 … G-A6 |
+| [ADR-0001](ADR-0001-invoice-issue-timestamp.md) | ADR-A | Immutable `issued_at`; one issuance instant, several output representations | Accepted — **direction only**; **REM-13a implemented in a Draft PR** (not merged) | G-A1 (QR tag 3 = Q1) … G-A6; Q1/Q2 recorded for D-06 |
 | [ADR-0002](ADR-0002-vat-categories-and-exemptions.md) | ADR-I | Explicit VAT categories S/Z/E/O, validated reason codes, no guessing of legacy 0% | Accepted — **direction only** | G-I1 … G-I7 |
 | [ADR-0003](ADR-0003-monetary-rounding-and-tax-totals.md) | ADR-B | One verified monetary contract; **no calculation change approved** | Accepted — **direction only** | G-B1 … G-B8 |
 
@@ -14,6 +14,6 @@ Records follow `docs/autonomous-engineering/ADR-CONVENTION.md`. An accepted reco
 
 **D-05 is not resolved.** Tax-adviser sign-off has not been obtained, ZATCA clarification has not been sent (D-06/TAX-E01), and ADR-C, D, E (formal), F, G, H, J are not written. These records make no statement that AWJ complies with ZATCA Phase 1 or Phase 2.
 
-**Nothing here authorises implementation.** In particular, the database migration adding `invoices.issued_at` is **NOT YET AUTHORIZED**; the proposed next slice REM-13a is described in ADR-0001 and is not started.
+**Implementation authorisation is per task.** ADR-0002 and ADR-0003 authorise no code. ADR-0001's slice REM-13a (the `invoices.issued_at` migration included) was authorised by the owner on 2026-10-15 and is implemented in a Draft PR — see `docs/audits/horizon/REM-13a-IMPLEMENTATION-REPORT.md`; it remains unmerged and undeployed until the owner decides.
 
 Tracking: `docs/audits/horizon/TAX-ZATCA-RECONCILIATION-AUDIT.md` §7 · `TAX-HZ-00-REMEDIATION-BACKLOG.md` · `AWJ-TAX-ZATCA-HORIZON-TASK-QUEUE.md` · evidence: `docs/audits/horizon/TAX-HZ-00-EXTERNAL-EVIDENCE-REGISTER.md`.

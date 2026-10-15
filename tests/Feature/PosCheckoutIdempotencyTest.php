@@ -100,6 +100,39 @@ class PosCheckoutIdempotencyTest extends TestCase
     }
 
     /** @test */
+    public function a_replayed_checkout_keeps_the_original_issue_instant_and_artifacts(): void
+    {
+        // REM-13a: إعادة الطلب بالمفتاح نفسه تُعيد الفاتورة الفائزة — لا ترحيل ثانٍ ولا لحظة إصدار جديدة.
+        $auth = $this->registerTenant('pos-idem-issued', 'owner@pos-idem-issued.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $sessionId = $this->openSession($auth);
+        $partnerId = $this->withToken($auth['token'])->postJson('/api/partners', [
+            'name' => 'عميل لحظة', 'type' => 'customer',
+        ])->assertCreated()['data']['id'];
+        $cash = $this->cashMethod($auth);
+        $key = (string) Str::uuid();
+        $cart = $this->withToken($auth['token'])->postJson('/api/pos/carts', [
+            'pos_session_id' => $sessionId,
+        ])->assertCreated()['data']['cart_id'];
+
+        $first = $this->withToken($auth['token'])->postJson('/api/pos/checkout', $this->payload($partnerId, $sessionId, $key, $cash, $cart))
+            ->assertCreated();
+        $invoiceId = $first['data']['id'];
+        $row = fn () => \Illuminate\Support\Facades\DB::table('invoices')->where('id', $invoiceId)
+            ->first(['issued_at', 'zatca_xml', 'zatca_hash', 'zatca_qr', 'zatca_icv']);
+        $before = $row();
+        $this->assertNotNull($before->issued_at);
+
+        $this->travelTo(now()->addHours(2));
+        $this->withToken($auth['token'])->postJson('/api/pos/checkout', $this->payload($partnerId, $sessionId, $key, $cash, $cart))
+            ->assertOk()->assertJsonPath('idempotent_replay', true)->assertJsonPath('data.id', $invoiceId);
+
+        $this->assertEquals($before, $row());
+        $this->assertSame(1, Invoice::count());
+        $this->travelBack();
+    }
+
+    /** @test */
     public function a_different_payload_with_the_same_key_conflicts(): void
     {
         $auth = $this->registerTenant('pos-idem-conflict', 'owner@pos-idem-conflict.test');

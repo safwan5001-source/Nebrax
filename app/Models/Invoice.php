@@ -4,11 +4,13 @@ namespace App\Models;
 
 use App\Support\GeneratesDocumentNumbers;
 use App\Support\RecordsRevisions;
+use App\Support\UtcSecondInstant;
 use App\Tenancy\BelongsToBranch;
 use App\Tenancy\ResolvesBranchReferences;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use LogicException;
 
 /**
  * فاتورة مبيعات. تُنشأ بحالة draft ثم تُرحَّل عبر InvoiceService::post
@@ -48,6 +50,8 @@ class Invoice extends BaseModel
         'tax_inclusive' => 'boolean',
         'paid_amount'  => 'integer',
         'is_paid'      => 'boolean',
+        // REM-13a: لحظة الإصدار القانونية (UTC، ثانية). ليست في $fillable عمداً — تُكتب مرة واحدة في post() فقط.
+        'issued_at'    => UtcSecondInstant::class,
     ];
 
     protected $attributes = [
@@ -170,6 +174,21 @@ class Invoice extends BaseModel
     public function pdfTemplateOverrideRevision(): BelongsTo
     {
         return $this->belongsTo(PrintTemplateRevision::class, 'pdf_template_override_revision_id');
+    }
+
+    /**
+     * REM-13a / ADR-0001 — `issued_at` يُكتب مرة واحدة (من null) داخل معاملة الترحيل ولا يتغيّر بعدها.
+     * الحارس يقارن القيمة الخام المخزَّنة، فيرفض التعديل والمسح معاً. التعديل الجماعي عبر Builder خارج
+     * متناول أحداث النموذج؛ الحماية هناك أنّ العمود ليس في $fillable ولا في أي FormRequest.
+     */
+    protected static function booted(): void
+    {
+        static::updating(function (self $invoice): void {
+            $original = $invoice->getRawOriginal('issued_at');
+            if ($original !== null && ($invoice->getAttributes()['issued_at'] ?? null) !== $original) {
+                throw new LogicException('لحظة إصدار الفاتورة (issued_at) ثابتة بعد الترحيل ولا يجوز تعديلها.');
+            }
+        });
     }
 
     public function isDraft(): bool

@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Support\DocumentLineVariantResolver;
 use App\Support\PrintTemplateContract;
 use App\Support\Settings;
+use App\Support\ZatcaIssueTimestamp;
 use App\Services\PrintTemplates\PrintTemplateService;
 use App\Services\ClassificationService;
 use App\Tenancy\BranchContext;
@@ -1029,6 +1030,11 @@ class InvoiceService
             $invoice->subtotal   = $subtotal;
             $invoice->tax_amount = $taxAmount;
             $invoice->total      = $total;
+
+            // REM-13a / ADR-0001: لحظة الإصدار القانونية تُلتقط **هنا فقط** — داخل معاملة الترحيل، بعد قفل
+            // الفاتورة وقفل مِرساة المستأجر (LedgerService) وقبل توليد أي مخرج ZATCA — فيتّفق ترتيبها مع ترتيب ICV،
+            // وتتراجع مع المعاملة، ولا تُقرأ الساعة مرة ثانية لأي مخرج. تُحفَظ ضمن update() أدناه.
+            $invoice->forceFill(['issued_at' => ZatcaIssueTimestamp::capture()]);
             $zatca = $this->zatca->buildFor($invoice);
 
             // تُحل المراجعة داخل معاملة الترحيل وتُخزَّن لقطةً؛ لا تغيّر

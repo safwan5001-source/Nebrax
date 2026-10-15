@@ -395,6 +395,13 @@ php artisan serve
 `/inventory-openings/[id]` (مراجعة وترحيل — والمرحَّل لا يُعدَّل ولا يُحذف). العقد في
 `web/src/modules/inventory-openings/contract.ts`.
 
+## وقت إصدار الفاتورة (`invoices.issued_at`) — REM-13a
+
+لحظة الإصدار القانونية للفاتورة تُلتقط **مرة واحدة** في `InvoiceService::post()` (داخل معاملة الترحيل بعد القفلين وقبل `ZatcaService::buildFor`)، وتُخزَّن UTC بدقة ثانية، **ثابتة** (حارس `Invoice::booted`)، ولا تدخل `$fillable`.
+- **ممنوع** استعمال `created_at` (وقت المسودة) أو `now()` لأي مخرج ZATCA؛ `ZatcaService` يفشل مغلقاً إن غابت اللحظة. الصفوف المرحَّلة قبل REM-13a تبقى `NULL` — **لا backfill ولا إعادة توليد** لـXML/QR/الهاش/PIH القديمة.
+- XML: `IssueDate`/`IssueTime` بتوقيت السعودية (AST) **بلا `Z`** (BR-KSA-70) عبر `App\Support\ZatcaIssueTimestamp`. وسم QR 3 للمرحلتين يُشتق من اللحظة نفسها **بصيغتيه الحرفيتين القائمتين** — صيغة الوسم 3 (Q1) ومنطقة BR-KSA-04 (Q2) **غير محسومتين** (D-06/TAX-E01) فلا تُغيَّرا ولا تُستنتجا من قبول SDK (لا يفحص الوسم 3).
+- `SigningTime` ووقت الإرسال لحظتان مستقلتان بالتصميم. المرجع: `docs/decisions/ADR-0001-invoice-issue-timestamp.md` و`docs/audits/horizon/REM-13a-IMPLEMENTATION-REPORT.md`.
+
 ## الترقيم التسلسلي
 
 كل أرقام المستندات تُولَّد من مصدر واحد: `App\Support\GeneratesDocumentNumbers` (trait على النموذج).

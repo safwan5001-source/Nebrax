@@ -53,9 +53,9 @@ class ZatcaSdkFixtureDriftTest extends TestCase
 
     /** SHA-256 لمخرجات المولِّد لكل fixture. تُحدَّث مع الملفات وbaseline في الـPR نفسه. */
     private const DIGESTS = [
-        'awj-simplified-single-line' => '415a6fb0817cbb534409f3dee2764b8a5ab28cbaefd321da82052f71c88cf2c7',
-        'awj-simplified-two-lines' => '8ed9765afbe7d4e66bb6240549c9ec95e342dd0a0b50118f72ccab5afe2245c3',
-        'awj-standard-single-line' => 'e3fe8fbfbf890d9ce8355f66952380c9269002e97a22dd02cb975d7090d5e6e3',
+        'awj-simplified-single-line' => '62504f51c45f9f70d2883e0ebaccf904ba45a9316ef0ff8e3d6565041f179ad2',
+        'awj-simplified-two-lines' => '4ddd2b0241d8067ef2d9c7e5ec8dfd0abb4627b20053d869863b112765d66c10',
+        'awj-standard-single-line' => '544c4b48b9bdb225bbfdba0f52bee963b63cd6f83767b34397df321a487ead5e',
     ];
 
     #[DataProvider('fixtureProvider')]
@@ -111,7 +111,9 @@ class ZatcaSdkFixtureDriftTest extends TestCase
             'tax_amount'          => $spec['tax'],
             'total'               => $spec['total'],
         ]);
-        $invoice->setAttribute('created_at', CarbonImmutable::parse('2026-01-15 10:30:00', 'UTC'));
+        // REM-13a: لحظة الإصدار المخزَّنة (UTC) تُمثَّل في XML بتوقيت السعودية (AST) بلا Z — 07:30:00Z = 10:30:00 AST،
+        // فيبقى IssueTime في الـfixtures كما كان؛ يتغيّر فقط نصّ الوسم 3 في QR (صيغة المرحلة الأولى من لحظة UTC).
+        $invoice->setAttribute('issued_at', CarbonImmutable::parse('2026-01-15 07:30:00', 'UTC'));
 
         $lines = [];
         foreach ($spec['lines'] as $row) {
