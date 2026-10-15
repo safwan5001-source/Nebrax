@@ -1,6 +1,6 @@
 # AWJ-BACKEND-NAV-01 — `sales.invoicing` Navigation / Entitlement Parity
 
-STATUS: in review
+STATUS: closed (merged; post-merge CI green)
 DATE: 2026-10-14
 
 ## Outcome
@@ -158,4 +158,38 @@ A second surface had the same defect: `invoice-form.tsx` always offered "create 
 - **Production:** no deploy.
 
 ## CI / merge
-_Filled after CI._
+
+| Item | Value |
+|---|---|
+| Branch | `claude/postgresql-ci-hang-watchdog-cc1nw1` |
+| PR | #1500 (merged) |
+| Base SHA | `ebdfdae` |
+| Head SHA | `e41c319e5a4b7130d0207f33720110af6e434449` |
+| Merge SHA | `c96c7272f689bc9c92e191a8f8da96474f81d2a5` |
+
+### Pre-merge CI (head `e41c319`)
+| Check | Job | Result |
+|---|---|---|
+| CI · pgsql | 116158334656 | ✅ Tests 7023 · Assertions 53702 · Skipped 3 · 0 failures · watchdog stalls 0 |
+| CI · sqlite | 116158335097 | ✅ success |
+| Web CI · Vitest + build | ×2 | ✅ success |
+| CI Gate | — | ✅ success |
+
+PRE_MERGE_REVIEW: **PASS**
+
+### Post-merge CI (`main` @ `c96c727`)
+| Check | Run / Job | Result |
+|---|---|---|
+| CI · pgsql | 38655643886 / 116164630420 | ✅ Tests 7048 · Assertions 54368 · Skipped 3 · 0 failures (9:36) |
+| CI · sqlite | 38655643886 / 116164630665 | ✅ success |
+| Web CI · Vitest + build | 38655644203 / 116164631043 | ✅ success |
+| Watchdog (CI-04) | pgsql job | stalls 0 · longest gap 65.1s (threshold 240s) |
+
+The test count differs between pre- and post-merge because `main` had moved on when #1500 merged.
+
+POST_MERGE_REVIEW: **PASS** (posted on #1500).
+
+**Production:** no deploy and no release. That still needs the owner's explicit approval.
+
+## Next recommended task
+**AWJ-BACKEND-NAV-02: dependency parity in `navVisibility()`.** Navigation should evaluate catalog dependencies the same way `ApplicationAccessDecision` does. For example, `fuel_stations.avi` without `fuel_stations.core` should be hidden, because its route guard denies it. This changes visibility for non-mandatory keys, so it needs its own PR with parity tests under mixed grants.
