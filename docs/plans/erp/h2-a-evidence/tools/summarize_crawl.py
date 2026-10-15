@@ -55,7 +55,8 @@ with open(out, 'w', encoding='utf-8') as f:
     for rid in sorted(rules, key=lambda k: -sum(len(v) for v in rules[k].values())):
         f.write(f'| axe `{rid}` | ' + ' | '.join(str(len(rules[rid].get(c, ()))) for c in cols) + ' |\n')
     f.write('\n## Routes per finding (every column with a count above 0)\n\n')
-    main = ('v3a', 'ar-light-1440')
+    # the v3 desktop column: first non-legacy ar-light-1440 column, whatever its label
+    main = next((c for c in cols if c[1] == 'ar-light-1440' and not c[0].startswith('legacy')), None)
     for name, pred in METRICS.items():
         if name == 'loads': continue
         for c in cols:

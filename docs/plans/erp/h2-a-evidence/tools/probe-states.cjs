@@ -16,6 +16,14 @@ const BASE = process.env.BASE ?? 'http://127.0.0.1:3001';
 const DELAY_MS = Number(process.env.DELAY_MS ?? 2500);
 const SHELL_ROUTES = (process.env.SHELL_ROUTES ?? '/whats-new,/help').split(',');
 const ID = { owner: [process.env.TOKEN, process.env.USER_JSON], empty: [process.env.TOKEN_EMPTY, process.env.USER_EMPTY], staff: [process.env.TOKEN_STAFF, process.env.USER_STAFF] };
+// Fail fast on a missing or malformed identity: a bad token would record the login page as state evidence.
+const needed = new Set(['owner', ...statesCsv.split(',').map((s) => (s === 'empty' ? 'empty' : s === 'forbidden' ? 'staff' : 'owner'))]);
+for (const who of needed) {
+  const [token, user] = ID[who];
+  let ok = Boolean(token);
+  try { ok = ok && Boolean(JSON.parse(user || '').id); } catch { ok = false; }
+  if (!ok) { console.error(`probe-states: missing or invalid token/user JSON for "${who}"`); process.exit(1); }
+}
 const routes = JSON.parse(fs.readFileSync(routesFile, 'utf8'));
 fs.mkdirSync(path.join(outDir, 'shots'), { recursive: true });
 const outFile = path.join(outDir, 'states.jsonl');
