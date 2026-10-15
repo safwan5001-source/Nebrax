@@ -79,7 +79,7 @@ The H1 gains **held** on every audited route (v3 and legacy):
 | Product and partner names | Several | The seed product and partner **have `name_en`** yet their Arabic name is shown in EN |
 | Default treasury and bank names | Several | System-created defaults stored in Arabic |
 
-**Heuristic metric, not a finding by itself:** "targets < 24 px" counts any interactive element smaller than 24×24. It excludes inline links and checkboxes/radios (`crawl.cjs`), but not WCAG's spacing or equivalent-target exceptions (203 routes). axe `target-size`, which applies the exceptions, flags only the routes above. A2 judges the dense controls by screenshot and Floor/POS against 44 px.
+**Heuristic metric, not a finding by itself:** "targets < 24 px" counts any interactive element smaller than 24×24. It excludes inline links and checkboxes/radios (`crawl.cjs`), but not WCAG's spacing or equivalent-target exceptions (205 routes, from the generated matrix). axe `target-size`, which applies the exceptions, flags only the routes above. A2 judges the dense controls by screenshot and Floor/POS against 44 px.
 
 ## 5. Shared-kit adoption (static lower bound, 228 pages traced)
 
