@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """AWJ-ERP-UI-H2 A1 — summarize crawl.cjs JSONL into the H2 baseline matrix (evidence tooling).
 Usage: python3 summarize_crawl.py <out.md> <label=results.jsonl> ...   (label e.g. v3a, v3b, legacy)"""
-import json, sys
+import json, re, sys
 from collections import defaultdict
 out, pairs = sys.argv[1], sys.argv[2:]
 recs = []
@@ -13,6 +13,11 @@ for p in pairs:
 cols = sorted({(r['_ui'], r['cfg']) for r in recs}, key=lambda c: (c[0].startswith('legacy'), c[1]))
 by = defaultdict(list)
 for r in recs: by[(r['_ui'], r['cfg'])].append(r)
+FIXTURE_NAMES = ('المالك a', 'الفرع الرئيسي')
+def arabic_left(t):
+    if t == 'ع': return False
+    for n in FIXTURE_NAMES: t = t.replace(n, '')
+    return bool(re.search('[\u0600-\u06FF]{2,}', t))
 def routes(rs, pred): return sorted({r['route'] for r in rs if pred(r)})
 METRICS = {
   'loads': lambda r: True,
@@ -30,8 +35,9 @@ METRICS = {
   'unnamed buttons/links': lambda r: (r.get('unnamed') or 0) > 0,
   'targets < 24px': lambda r: (r.get('small') or 0) > 0,
   'content leaving viewport': lambda r: (r.get('offscreen') or 0) > 0,
-  # Excludes the language switch («ع», Arabic by design) and topbar user/branch names (tenant data, not chrome).
-  'Arabic chrome while EN': lambda r: r['cfg'].startswith('en') and any(t for t in (r.get('arabicChrome') or []) if t != 'ع' and not t.startswith('ا') and 'الفرع' not in t),
+  # Excludes the language switch («ع», Arabic by design) and the exact fixture user/branch names shown in the topbar
+  # (tenant data, not chrome); what remains must still hold two consecutive Arabic letters (drops the avatar initial).
+  'Arabic chrome while EN': lambda r: r['cfg'].startswith('en') and any(arabic_left(t) for t in (r.get('arabicChrome') or [])),
 }
 rules = defaultdict(lambda: defaultdict(set))
 for c, rs in by.items():
@@ -48,12 +54,13 @@ with open(out, 'w', encoding='utf-8') as f:
         f.write(f'| {name} | ' + ' | '.join(str(len(routes(by[c], pred))) for c in cols) + ' |\n')
     for rid in sorted(rules, key=lambda k: -sum(len(v) for v in rules[k].values())):
         f.write(f'| axe `{rid}` | ' + ' | '.join(str(len(rules[rid].get(c, ()))) for c in cols) + ' |\n')
-    f.write('\n## Routes per finding (v3 ar-light-1440 unless stated)\n\n')
+    f.write('\n## Routes per finding (every column with a count above 0)\n\n')
     main = ('v3a', 'ar-light-1440')
     for name, pred in METRICS.items():
         if name == 'loads': continue
-        rs = routes(by.get(main, []), pred)
-        if rs: f.write(f'- **{name}** ({len(rs)}): ' + ', '.join(f'`{x}`' for x in rs[:40]) + (' …' if len(rs) > 40 else '') + '\n')
+        for c in cols:
+            rs = routes(by[c], pred)
+            if rs: f.write(f'- **{name}** · {c[0]} {c[1]} ({len(rs)}): ' + ', '.join(f'`{x}`' for x in rs[:40]) + (' …' if len(rs) > 40 else '') + '\n')
     for rid in sorted(rules):
         for c in cols:
             rs = sorted(rules[rid].get(c, ()))

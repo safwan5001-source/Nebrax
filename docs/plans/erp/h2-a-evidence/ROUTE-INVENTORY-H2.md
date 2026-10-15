@@ -1,13 +1,13 @@
 # AWJ-ERP-UI-H2 A1 — Route inventory (generated)
 
-`page.tsx` files: **239** · in H2 scope: **228** · excluded with reason: **11** · not in the H1 inventory: **38**
+`page.tsx` files: **239** · in H2 scope: **228** · excluded with reason: **11** · not covered by H1: **30** · templates H1 covered via concrete paths: **8**
 
 | Module | Pages | v3-gated | Posture |
 |---|---|---|---|
 | Accounting | 14 | 14 | Ledger |
-| App Builder | 5 | 5 | Studio |
+| App Builder | 5 | 5 | Ledger, Studio |
 | Auth / self-service | 8 | 0 | gate-excluded |
-| Commerce Admin | 11 | 11 | Ledger |
+| Commerce Admin | 11 | 11 | Ledger, Studio |
 | Customers | 9 | 9 | Ledger |
 | Dashboard | 1 | 1 | Ledger |
 | Documents | 7 | 7 | Ledger |
@@ -23,7 +23,7 @@
 | Sales | 40 | 40 | Ledger |
 | Settings & admin | 20 | 20 | Ledger |
 
-## Routes not present in the H1 inventory
+## Routes not covered by the H1 inventory
 
 - `/manual-journals/:id` (Accounting)
 - `/app-builder/:id` (App Builder)
@@ -47,12 +47,6 @@
 - `/purchase-requests/:id` (Purchases)
 - `/rfq/:id` (Purchases)
 - `/supplier-refunds/:id` (Purchases)
-- `/reports/:id` (Reports)
-- `/reports/customers/:id` (Reports)
-- `/reports/general/:id` (Reports)
-- `/reports/inventory/:id` (Reports)
-- `/reports/purchases/:id` (Reports)
-- `/reports/sales/:id` (Reports)
 - `/credit-notes/:id` (Sales)
 - `/customer-refunds/:id` (Sales)
 - `/delivery-notes/:id` (Sales)
@@ -60,8 +54,17 @@
 - `/quotes/:id` (Sales)
 - `/recurring-invoices/:id` (Sales)
 - `/returns/:id` (Sales)
-- `/help/:id` (Settings & admin)
 - `/integrations/communications` (Settings & admin)
+
+## Templates H1 covered through concrete paths
+
+- `/reports/:id` (Reports)
+- `/reports/customers/:id` (Reports)
+- `/reports/general/:id` (Reports)
+- `/reports/inventory/:id` (Reports)
+- `/reports/purchases/:id` (Reports)
+- `/reports/sales/:id` (Reports)
+- `/help/:id` (Settings & admin)
 - `/integrations/delivery-platforms/:id` (Settings & admin)
 
 ## Every page
@@ -82,11 +85,11 @@
 | `/manual-journals/:id` | Accounting | Ledger | yes | `(app)/manual-journals/[id]/page.tsx` | NOT LOADED (no fixture) |
 | `/manual-journals/new` | Accounting | Ledger | yes | `(app)/manual-journals/new/page.tsx` | HTTP 200 · axe 0 |
 | `/numbering-settings` | Accounting | Ledger | yes | `(app)/numbering-settings/page.tsx` | HTTP 200 · axe 0 |
-| `/app-builder` | App Builder | Studio | yes | `(commerce)/app-builder/page.tsx` | HTTP 200 · axe 0 |
-| `/app-builder/:id` | App Builder | Studio | yes | `(commerce)/app-builder/[id]/page.tsx` | NOT LOADED (no fixture) |
+| `/app-builder` | App Builder | Ledger | yes | `(commerce)/app-builder/page.tsx` | HTTP 200 · axe 0 |
+| `/app-builder/:id` | App Builder | Ledger | yes | `(commerce)/app-builder/[id]/page.tsx` | NOT LOADED (no fixture) |
 | `/app-builder/:id/builder` | App Builder | Studio | yes | `(commerce)/app-builder/[id]/builder/page.tsx` | NOT LOADED (no fixture) |
-| `/app-builder/:id/versions` | App Builder | Studio | yes | `(commerce)/app-builder/[id]/versions/page.tsx` | NOT LOADED (no fixture) |
-| `/app-builder/new` | App Builder | Studio | yes | `(commerce)/app-builder/new/page.tsx` | HTTP 200 · axe 0 |
+| `/app-builder/:id/versions` | App Builder | Ledger | yes | `(commerce)/app-builder/[id]/versions/page.tsx` | NOT LOADED (no fixture) |
+| `/app-builder/new` | App Builder | Ledger | yes | `(commerce)/app-builder/new/page.tsx` | HTTP 200 · axe 0 |
 | `/` | Auth / self-service | gate-excluded | no | `/page.tsx` | HTTP 200 · axe 0 · gate n/a |
 | `/auth/handoff` | Auth / self-service | gate-excluded | no | `auth/handoff/page.tsx` | HTTP 200 · axe 0 · gate n/a |
 | `/forgot-password` | Auth / self-service | gate-excluded | no | `forgot-password/page.tsx` | HTTP 200 · axe 0 · gate n/a |
@@ -96,7 +99,7 @@
 | `/reset-password` | Auth / self-service | gate-excluded | no | `reset-password/page.tsx` | HTTP 200 · axe 0 · gate n/a |
 | `/verify-email` | Auth / self-service | gate-excluded | no | `verify-email/page.tsx` | HTTP 200 · axe 0 · gate n/a |
 | `/commerce` | Commerce Admin | Ledger | yes | `(commerce)/commerce/page.tsx` | HTTP 200 · axe 0 |
-| `/commerce/appearance` | Commerce Admin | Ledger | yes | `(commerce)/commerce/appearance/page.tsx` | HTTP 200 · axe 0 |
+| `/commerce/appearance` | Commerce Admin | Studio | yes | `(commerce)/commerce/appearance/page.tsx` | HTTP 200 · axe 0 |
 | `/commerce/delivery` | Commerce Admin | Ledger | yes | `(commerce)/commerce/delivery/page.tsx` | HTTP 200 · axe 0 |
 | `/commerce/domains` | Commerce Admin | Ledger | yes | `(commerce)/commerce/domains/page.tsx` | HTTP 200 · axe 0 |
 | `/commerce/gifting` | Commerce Admin | Ledger | yes | `(commerce)/commerce/gifting/page.tsx` | HTTP 200 · axe 0 |
@@ -127,13 +130,13 @@
 | `/dev/customizer-visual` | EXCLUDED: internal dev/QA harness | - | no | `dev/customizer-visual/page.tsx` | HTTP 404 · axe 0 · gate n/a |
 | `/dev/trust-visual` | EXCLUDED: internal dev/QA harness | - | no | `dev/trust-visual/page.tsx` | HTTP 404 · axe 0 · gate n/a |
 | `/document-qa` | EXCLUDED: internal dev/QA harness | - | no | `document-qa/page.tsx` | HTTP 200 · axe 1 · gate n/a |
-| `/platform/(console)` | EXCLUDED: platform (AWJ-PLATFORM-UX) | - | no | `platform/(console)/page.tsx` | NOT LOADED (no fixture) |
-| `/platform/(console)/document-operations` | EXCLUDED: platform (AWJ-PLATFORM-UX) | - | no | `platform/(console)/document-operations/page.tsx` | NOT LOADED (no fixture) |
-| `/platform/(console)/integrations` | EXCLUDED: platform (AWJ-PLATFORM-UX) | - | no | `platform/(console)/integrations/page.tsx` | NOT LOADED (no fixture) |
-| `/platform/(console)/prices` | EXCLUDED: platform (AWJ-PLATFORM-UX) | - | no | `platform/(console)/prices/page.tsx` | NOT LOADED (no fixture) |
-| `/platform/(console)/tenants` | EXCLUDED: platform (AWJ-PLATFORM-UX) | - | no | `platform/(console)/tenants/page.tsx` | NOT LOADED (no fixture) |
-| `/platform/(console)/tenants/:id` | EXCLUDED: platform (AWJ-PLATFORM-UX) | - | no | `platform/(console)/tenants/[id]/page.tsx` | NOT LOADED (no fixture) |
+| `/platform` | EXCLUDED: platform (AWJ-PLATFORM-UX) | - | no | `platform/(console)/page.tsx` | NOT LOADED (no fixture) |
+| `/platform/document-operations` | EXCLUDED: platform (AWJ-PLATFORM-UX) | - | no | `platform/(console)/document-operations/page.tsx` | NOT LOADED (no fixture) |
+| `/platform/integrations` | EXCLUDED: platform (AWJ-PLATFORM-UX) | - | no | `platform/(console)/integrations/page.tsx` | NOT LOADED (no fixture) |
 | `/platform/login` | EXCLUDED: platform (AWJ-PLATFORM-UX) | - | no | `platform/login/page.tsx` | NOT LOADED (no fixture) |
+| `/platform/prices` | EXCLUDED: platform (AWJ-PLATFORM-UX) | - | no | `platform/(console)/prices/page.tsx` | NOT LOADED (no fixture) |
+| `/platform/tenants` | EXCLUDED: platform (AWJ-PLATFORM-UX) | - | no | `platform/(console)/tenants/page.tsx` | NOT LOADED (no fixture) |
+| `/platform/tenants/:id` | EXCLUDED: platform (AWJ-PLATFORM-UX) | - | no | `platform/(console)/tenants/[id]/page.tsx` | NOT LOADED (no fixture) |
 | `/cash-and-bank` | Finance | Ledger | yes | `(app)/cash-and-bank/page.tsx` | HTTP 200 · axe 0 |
 | `/cash-and-bank/:id` | Finance | Ledger | yes | `(app)/cash-and-bank/[id]/page.tsx` | NOT LOADED (no fixture) |
 | `/cash-and-bank/new` | Finance | Ledger | yes | `(app)/cash-and-bank/new/page.tsx` | HTTP 200 · axe 0 |

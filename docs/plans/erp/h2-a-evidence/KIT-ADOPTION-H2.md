@@ -1,28 +1,28 @@
-# AWJ-ERP-UI-H2 A2 — Shared UI kit adoption per page (static, generated)
+# AWJ-ERP-UI-H2 A1 — Shared UI kit adoption per page (static, generated)
 
-Pages traced: **221** (each `page.tsx` + its local imports, 2 levels; shared kit files themselves excluded). Excludes `platform/`, `dev/`, `document-qa`.
+Pages traced: **228** (each `page.tsx` + its local imports, 2 levels; shared kit files themselves excluded). Excludes `platform/`, `dev/`, `document-qa`.
 
 | Pattern | Pages using it |
 |---|---|
-| `PageHeader` | 51 |
+| `PageHeader` | 56 |
 | `ListToolbar` | 35 |
-| `DataTable` | 49 |
+| `DataTable` | 52 |
 | `raw<table>` | 58 |
 | `ui/Table` | 24 |
-| `Pagination` | 35 |
-| `EmptyState` | 22 |
-| `ErrorState` | 22 |
-| `LoadingState` | 28 |
-| `Skeleton` | 85 |
+| `Pagination` | 36 |
+| `EmptyState` | 27 |
+| `ErrorState` | 23 |
+| `LoadingState` | 33 |
+| `Skeleton` | 86 |
 | `FormPage` | 8 |
 | `FormSection` | 8 |
 | `DetailPage` | 5 |
-| `ConfirmDialog` | 2 |
-| `window.confirm` | 16 |
+| `ConfirmDialog` | 4 |
+| `window.confirm` | 17 |
 | `MobileRecord` | 0 |
 | `DocumentWorkspace` | 4 |
-| `rawHex` | 10 |
-| `text<12px` | 55 |
+| `rawHex` | 12 |
+| `text<12px` | 59 |
 
 | Page | PageHeader | ListToolbar | DataTable | raw<table> | ui/Table | Pagination | EmptyState | ErrorState | LoadingState | Skeleton | FormPage | FormSection | DetailPage | ConfirmDialog | window.confirm | MobileRecord | DocumentWorkspace | rawHex | text<12px |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -62,6 +62,11 @@ Pages traced: **221** (each `page.tsx` + its local imports, 2 levels; shared kit
 | `(app)/delivery-notes/invoice-draft` |  |  |  | 1 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
 | `(app)/delivery-notes/new` |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
 | `(app)/delivery-platforms` |  |  |  | 1 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+| `(app)/developer` | 1 |  |  |  |  |  | 2 |  | 1 |  |  |  |  |  |  |  |  |  | 1 |
+| `(app)/developer/docs` | 1 |  |  |  |  |  | 2 |  | 1 |  |  |  |  |  |  |  |  |  | 8 |
+| `(app)/developer/keys` | 1 |  |  |  |  |  | 3 | 1 | 2 |  |  |  |  | 2 |  |  |  |  | 2 |
+| `(app)/developer/security` | 1 |  |  |  |  |  | 2 |  | 1 |  |  |  |  |  |  |  |  |  |  |
+| `(app)/developer/webhooks` | 1 |  | 2 |  |  | 1 | 2 |  | 1 |  |  |  |  | 2 |  |  |  |  | 1 |
 | `(app)/document-design` |  |  |  | 2 |  |  |  |  |  | 6 |  |  |  |  |  |  |  | 19 | 3 |
 | `(app)/documents` |  |  |  | 1 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
 | `(app)/documents/[id]` |  |  |  | 1 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
@@ -126,6 +131,7 @@ Pages traced: **221** (each `page.tsx` + its local imports, 2 levels; shared kit
 | `(app)/pos/settings` |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 1 |
 | `(app)/pos/settings/cash-drawer` |  |  |  |  |  |  |  |  |  | 1 |  |  |  |  |  |  |  |  |  |
 | `(app)/pos/settings/configuration` |  |  |  |  |  |  |  |  |  | 1 |  | 7 |  |  |  |  |  |  |  |
+| `(app)/pos/settings/devices` |  |  | 1 |  |  |  |  |  |  |  |  |  |  |  | 1 |  |  |  |  |
 | `(app)/pos/settings/printing` |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
 | `(app)/pos/settings/shifts` |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
 | `(app)/pos/settings/sound-feedback` |  |  |  |  |  |  |  |  |  | 1 |  |  |  |  |  |  |  |  |  |
@@ -216,7 +222,7 @@ Pages traced: **221** (each `page.tsx` + its local imports, 2 levels; shared kit
 | `(commerce)/app-builder/[id]/versions` |  |  |  |  |  |  |  | 1 | 1 |  |  |  |  |  |  |  |  |  |  |
 | `(commerce)/app-builder/new` |  |  |  |  |  |  |  |  |  |  | 1 | 3 |  |  |  |  |  |  |  |
 | `(commerce)/commerce` | 2 |  |  |  |  |  | 3 | 3 | 4 |  |  |  |  |  | 1 |  |  |  |  |
-| `(commerce)/commerce/appearance` |  |  |  |  |  |  | 1 | 1 | 1 |  |  |  |  |  | 6 |  |  |  | 8 |
+| `(commerce)/commerce/appearance` |  |  |  |  |  |  | 1 | 1 | 1 |  |  |  |  |  | 6 |  |  | 36 | 47 |
 | `(commerce)/commerce/delivery` | 1 |  |  |  |  |  | 7 | 4 | 5 |  |  |  |  | 2 | 1 |  |  |  |  |
 | `(commerce)/commerce/domains` | 1 |  |  |  | 1 |  | 2 | 2 | 2 |  |  |  |  |  | 1 |  |  |  | 1 |
 | `(commerce)/commerce/gifting` | 1 |  |  |  |  |  | 4 | 3 | 4 |  |  |  |  |  |  |  |  |  |  |
@@ -225,11 +231,12 @@ Pages traced: **221** (each `page.tsx` + its local imports, 2 levels; shared kit
 | `(commerce)/commerce/onboarding` | 1 |  |  |  |  |  | 4 | 5 | 5 |  |  |  |  |  | 1 |  |  |  |  |
 | `(commerce)/commerce/published-products` | 1 |  |  |  | 1 | 1 | 1 | 1 | 1 |  |  |  |  |  | 1 |  |  |  |  |
 | `(commerce)/commerce/stores` | 1 |  |  |  | 1 |  | 1 | 1 | 1 |  |  |  |  |  | 1 |  |  |  |  |
-| `(commerce)/commerce/themes` | 1 |  |  |  |  |  |  |  |  |  |  |  |  |  | 1 |  |  |  |  |
+| `(commerce)/commerce/themes` | 1 |  |  |  |  |  |  |  |  |  |  |  |  |  | 1 |  |  | 6 |  |
 | `(fuel)/fuel-stations` | 1 |  |  |  |  |  | 1 | 1 | 1 | 1 |  |  |  |  |  |  |  |  |  |
 | `(fuel)/fuel-stations/alerts` |  |  |  |  |  |  |  |  |  | 3 |  |  |  |  |  |  |  |  |  |
 | `(fuel)/fuel-stations/avi-rfid` |  |  | 2 |  |  |  |  |  |  | 2 |  |  |  |  |  |  |  |  |  |
 | `(fuel)/fuel-stations/corporate-contracts` |  |  | 1 |  |  |  |  |  |  | 2 |  |  |  |  |  |  |  |  |  |
+| `(fuel)/fuel-stations/devices` |  |  | 2 |  |  |  |  |  |  | 2 |  |  |  |  |  |  |  |  |  |
 | `(fuel)/fuel-stations/maintenance` |  |  |  | 1 |  |  |  |  |  | 3 |  |  |  |  |  |  |  |  |  |
 | `(fuel)/fuel-stations/master-data` |  |  |  | 1 |  |  |  |  | 1 | 1 |  | 6 |  |  | 1 |  |  |  |  |
 | `(fuel)/fuel-stations/readiness` |  |  |  |  |  |  |  |  |  | 3 |  |  |  |  |  |  |  |  |  |

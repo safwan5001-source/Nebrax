@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AWJ-ERP-UI-H2 A2 — static adoption of the shared UI kit per page (evidence tooling).
+"""AWJ-ERP-UI-H2 A1 — static adoption of the shared UI kit per page (evidence tooling).
 Traces each app/**/page.tsx and its local imports (2 levels) and records which shared patterns appear.
 Usage: python3 kit_usage.py <web/src> <out.md>"""
 import os, re, sys, json
@@ -7,13 +7,13 @@ from collections import defaultdict
 SRC, OUT = sys.argv[1], sys.argv[2]
 PAT = {
   'PageHeader': r'<PageHeader\b', 'ListToolbar': r'<ListToolbar\b', 'DataTable': r'<DataTable\b',
-  'raw<table>': r'<table\b', 'ui/Table': r"from '@/components/ui/table'", 'Pagination': r'<Pagination\b',
+  'raw<table>': r'<table\b', 'ui/Table': r"from ['\"]@/components/ui/table['\"]", 'Pagination': r'<Pagination\b',
   'EmptyState': r'<EmptyState\b', 'ErrorState': r'<ErrorState\b', 'LoadingState': r'<LoadingState\b',
   'Skeleton': r'<Skeleton\b', 'FormPage': r'<FormPage\b', 'FormSection': r'<FormSection\b', 'DetailPage': r'<DetailPage\b',
   'ConfirmDialog': r'<ConfirmDialog\b', 'window.confirm': r'window\.confirm\(', 'MobileRecord': r'<MobileRecord\b',
   'DocumentWorkspace': r'DocumentWorkspace|data-awj-docws', 'rawHex': r'#[0-9a-fA-F]{6}\b', 'text<12px': r'text-\[(?:[0-9]|1[01])(?:\.\d+)?px\]',
 }
-IMP = re.compile(r"from\s+'(@/[^']+|\.{1,2}/[^']+)'")
+IMP = re.compile(r"""from\s+['"](@/[^'"]+|\.{1,2}/[^'"]+)['"]""")
 def resolve(base, spec):
     p = os.path.join(SRC, spec[2:]) if spec.startswith('@/') else os.path.normpath(os.path.join(os.path.dirname(base), spec))
     for c in (p, p + '.tsx', p + '.ts', os.path.join(p, 'index.tsx'), os.path.join(p, 'index.ts')):
@@ -32,7 +32,8 @@ def trace(page, depth=2):
 rows = []
 app = os.path.join(SRC, 'app')
 for root, _, files in os.walk(app):
-    if 'page.tsx' not in files or '/platform' in root or '/dev' in root or 'document-qa' in root: continue
+    top = os.path.relpath(root, app).split(os.sep)[0]
+    if 'page.tsx' not in files or top in ('platform', 'dev', 'document-qa'): continue
     files_ = trace(os.path.join(root, 'page.tsx'))
     text = '\n'.join(open(f, encoding='utf-8').read() for f in files_)
     rel = os.path.relpath(root, app)
@@ -42,7 +43,7 @@ tot = defaultdict(int)
 for _, c in rows:
     for k, v in c.items(): tot[k] += 1 if v else 0
 with open(OUT, 'w', encoding='utf-8') as f:
-    f.write('# AWJ-ERP-UI-H2 A2 — Shared UI kit adoption per page (static, generated)\n\n')
+    f.write('# AWJ-ERP-UI-H2 A1 — Shared UI kit adoption per page (static, generated)\n\n')
     f.write(f'Pages traced: **{len(rows)}** (each `page.tsx` + its local imports, 2 levels; shared kit files themselves excluded). Excludes `platform/`, `dev/`, `document-qa`.\n\n')
     f.write('| Pattern | Pages using it |\n|---|---|\n')
     for k in PAT: f.write(f'| `{k}` | {tot[k]} |\n')

@@ -4,14 +4,18 @@ Local, isolated audit environment only. Never point any of this at production or
 
 ## Fixture (repeatable)
 1. Backend: `setup.sh`, then a **separate** SQLite file so the test DB is untouched:
-   `touch database/h2-audit.sqlite && DB_DATABASE=$PWD/database/h2-audit.sqlite php artisan migrate --force`
-   and `PHP_CLI_SERVER_WORKERS=6 DB_DATABASE=… QUEUE_CONNECTION=sync php artisan serve --port=8000`.
+   `touch database/h2-audit.sqlite && APP_ENV=local DB_CONNECTION=sqlite DB_DATABASE=$PWD/database/h2-audit.sqlite php artisan migrate` (no `--force`: a non-local env must stop at Laravel's prompt)
+   and `PHP_CLI_SERVER_WORKERS=6 APP_ENV=local DB_CONNECTION=sqlite DB_DATABASE=$PWD/database/h2-audit.sqlite QUEUE_CONNECTION=sync php artisan serve --host=127.0.0.1 --port=8000`.
+   Every backend command below carries the same `APP_ENV=local DB_CONNECTION=sqlite DB_DATABASE=$PWD/database/h2-audit.sqlite` prefix.
 2. Web: `cd web && NEXT_PUBLIC_API_URL=http://127.0.0.1:8000/api npm run build && npx next start -p 3001`.
 3. Tenants through `POST /api/register`: **A** (audited), **B** (isolation canary: one partner named
    `ISOLATION-CANARY مستأجر ب`), **C** (empty, for empty states).
 4. Tenant A and C — local fixture only: `created_at` before the enforcement cut-over, plan `enterprise`, and every built
    commercial capability granted FULL through the official `EntitlementGrantService`:
-   `TENANT_ID=<id> DB_DATABASE=… php artisan tinker --execute="require 'grant-entitlements.php';"`.
+   `TENANT_ID=<id> APP_ENV=local DB_CONNECTION=sqlite DB_DATABASE=$PWD/database/h2-audit.sqlite php artisan tinker --execute="require '<repo>/docs/plans/erp/h2-a-evidence/tools/grant-entitlements.php';"`
+   (absolute path: tinker runs from the Laravel root). The script refuses to run unless the env is `local`, the connection is
+   `sqlite` and the file is `h2-audit.sqlite`. It is the one direct write of the fixture: it backdates `tenants.created_at` and sets
+   `plan` (fixture only); the grants themselves go through `EntitlementGrantService`.
 5. Seed tenant A through the public API: `../../h1-0-evidence/tools/seed.sh <token-A>`.
 6. Actors in tenant A: an unscoped `staff` user (RBAC only — sees the whole tenant by design,
    `UserAccessScopeTest`), and a **branch-scoped** `staff` user created through `POST /api/users` with
@@ -26,3 +30,4 @@ Local, isolated audit environment only. Never point any of this at production or
   shell endpoints learnt from a minimal page) and forbidden (staff), with screenshots and DOM readings.
 - `kit_usage.py` — static adoption of the shared UI kit (`components/nebrax/*`, `DataTable`, states, confirm) per page;
   a lower bound (2 import levels).
+- `routes.json` — the 232-URL manifest the baseline crawl loaded (concrete paths, fixture ids).
