@@ -3,6 +3,7 @@
  */
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { flushSync } from 'react-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const apiMock = vi.fn();
@@ -68,6 +69,28 @@ function mount(opts: Opts = {}) {
     />,
   );
   return { ...view, ...handlers, facet };
+}
+
+
+/**
+ * Escape the way a browser delivers it. A real key event is dispatched with an empty JS stack, so React flushes the
+ * update a document listener queued (and the passive effects of that render) before the NEXT listener of the same
+ * dispatch runs. `fireEvent` / `userEvent` wrap the dispatch in `act`, which defers all of that until the dispatch is
+ * over, so they cannot see anything that happens "during the same keydown" (D-W-4). This helper dispatches natively
+ * and flushes React between the dialog layers' listeners, as the browser's microtask checkpoint does.
+ */
+function pressEscapeLikeABrowser(target: Element = document.activeElement ?? document.body) {
+  const flush = () => flushSync(() => undefined);
+  document.addEventListener('keydown', flush, true); // registered after Radix's capture listener => runs right after it
+  const reactEnv = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
+  const previous = reactEnv.IS_REACT_ACT_ENVIRONMENT;
+  reactEnv.IS_REACT_ACT_ENVIRONMENT = false;
+  try {
+    target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true, cancelable: true }));
+  } finally {
+    document.removeEventListener('keydown', flush, true);
+    reactEnv.IS_REACT_ACT_ENVIRONMENT = previous;
+  }
 }
 
 const tab = (name: RegExp | string) => screen.getByRole('tab', { name });
@@ -732,6 +755,38 @@ describe('closing with unsaved changes', () => {
     await userEvent.keyboard('{Escape}');
     expect(await screen.findByRole('dialog', { name: 'Unsaved changes' })).toBeTruthy();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('a real Escape on an edited editor opens the confirmation and it stays open (D-W-4)', async () => {
+    const { onClose } = mount({});
+    await userEvent.type(screen.getByLabelText('Arabic name'), 'x');
+    pressEscapeLikeABrowser();
+    // the dialog registered during the very keydown that opened it must not treat that keydown as its own Escape
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.getByRole('dialog', { name: 'Unsaved changes' })).toBeTruthy();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('a second Escape returns to the editor with the edits intact and focus inside it (D-W-4)', async () => {
+    const { onClose } = mount({});
+    await userEvent.type(screen.getByLabelText('Arabic name'), 'x');
+    pressEscapeLikeABrowser();
+    await screen.findByRole('dialog', { name: 'Unsaved changes' });
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Unsaved changes' })).toBeNull());
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Edit value — Birthday EN' })).toBeTruthy();
+    expect((screen.getByLabelText('Arabic name') as HTMLInputElement).value).toBe('Birthdayx');
+    expect(screen.getByRole('dialog', { name: 'Edit value — Birthday EN' }).contains(document.activeElement)).toBe(true);
+  });
+
+  it('a real Escape on a clean editor closes it without asking (D-W-4)', async () => {
+    const { onClose } = mount({});
+    pressEscapeLikeABrowser();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledWith(false);
+    expect(screen.queryByRole('dialog', { name: 'Unsaved changes' })).toBeNull();
   });
 
   it('after a partly saved attempt, discarding still tells the parent the list is stale', async () => {

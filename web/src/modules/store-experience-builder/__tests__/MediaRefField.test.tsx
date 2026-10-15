@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -169,5 +169,21 @@ describe("MediaRefField (CUST-HV V4b)", () => {
       await userEvent.click(screen.getByRole("button", { name: t("mediaUsageRetry") }));
       expect(await screen.findByText(t("mediaUsageReady"))).toBeTruthy();
     });
+  });
+  it("returns focus to the control that opened the picker after Escape and after Close (D-W-8)", async () => {
+    list.mockResolvedValue(page([asset()]));
+    render(<Harness initial={null} />);
+    const opener = () => screen.getByRole("button", { name: t("mediaPick") });
+
+    await userEvent.click(opener());
+    await screen.findByRole("dialog");
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(opener()));
+
+    await userEvent.click(opener());
+    await userEvent.click(within(await screen.findByRole("dialog")).getAllByRole("button", { name: t("mediaCancel") })[0]);
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(opener()));
   });
 });
