@@ -172,6 +172,19 @@ the ACC-2 contract exactly:
 
 ## 9. Period Lock integration (ACC-6) — no bypass
 
+> **Superseded in part by FC-3 (2026-10-15) — posting into a closed fiscal year.** As shipped here, a
+> `closed` fiscal year did **not** itself block posting: only an active Accounting Period Lock did, so a
+> journal dated inside a closed year could still be posted and would silently fall outside the active close
+> generation. FC-3 (owner decisions FC3-1…FC3-4) makes `AccountingDateGuard::assertOpen` reject any
+> `LedgerService::post/reverse` whose accounting date falls inside a `closed` year's inclusive
+> `start_date..end_date` (`FiscalYearClosedException`, a subclass of `AccountingPeriodLockedException` →
+> HTTP 422). Mandatory, no tenant setting, no bypass argument; the correction path is the formal reopen
+> or an open-period date. The close journal and the reopen reversal are unaffected (the year is
+> `closing` / `reopening` — never `closed` — inside its own transaction). The period lock **stays an
+> independent authority** (its own permission, audit and range, which may cover dates in an open year);
+> the "two independent authorities" paragraph below remains true for *locking*, but no longer describes
+> the posting rule for closed years. Report: `docs/audits/horizon/FC-3-IMPLEMENTATION-REPORT.md`.
+
 `LedgerService` is unchanged. No `force`, no `skipLock`, no `disableGuard`, no privileged close path.
 
 The close journal is posted through `post()` and therefore guarded by `AccountingDateGuard` like any

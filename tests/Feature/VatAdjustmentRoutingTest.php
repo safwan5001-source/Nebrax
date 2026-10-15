@@ -224,7 +224,21 @@ class VatAdjustmentRoutingTest extends TestCase
             $out[$code] = [($out[$code][0] ?? 0) + (int) $l->debit, ($out[$code][1] ?? 0) + (int) $l->credit];
         }
 
-        return $out;
+        return $this->canonical($out);
+    }
+
+    /**
+     * ترتيبٌ قانونيّ بالرمز: علاقة `lines` بلا ORDER BY، فترتيب السطور غير مضمون على PostgreSQL،
+     * و`assertSame` يقارن ترتيب المفاتيح. القيم (مدين/دائن لكل حساب) تبقى مقارَنةً حرفياً.
+     *
+     * @param  array<string, array{0: int, 1: int}>  $journal
+     * @return array<string, array{0: int, 1: int}>
+     */
+    private function canonical(array $journal): array
+    {
+        ksort($journal, SORT_STRING);
+
+        return $journal;
     }
 
     private function balanceOf(string $code): int
@@ -252,7 +266,7 @@ class VatAdjustmentRoutingTest extends TestCase
         $return = $this->salesReturn($this->sale());
 
         $this->assertSame(
-            ['4110' => [100000, 0], '2120' => [15000, 0], '1130' => [0, 115000]],
+            $this->canonical(['4110' => [100000, 0], '2120' => [15000, 0], '1130' => [0, 115000]]),
             $this->journal(ReturnDocument::class, $return->id)
         );
         $this->assertSame([15000, 115000], [(int) $return->fresh()->tax_amount, (int) $return->fresh()->total]);
@@ -271,7 +285,7 @@ class VatAdjustmentRoutingTest extends TestCase
         $return = $this->salesReturn($invoice);
 
         $this->assertSame(
-            ['4110' => [100000, 0], '2125' => [15000, 0], '1130' => [0, 115000]],
+            $this->canonical(['4110' => [100000, 0], '2125' => [15000, 0], '1130' => [0, 115000]]),
             $this->journal(ReturnDocument::class, $return->id)
         );
         $this->assertSame($invoiceJournalBefore, $this->journal(Invoice::class, $invoice->id));   // لم يُمَسّ
@@ -336,14 +350,14 @@ class VatAdjustmentRoutingTest extends TestCase
         $return = $this->salesReturn($invoice);
 
         $this->assertSame(
-            ['4110' => [33333, 0], '2125' => [5000, 0], '1130' => [0, 38333]],
+            $this->canonical(['4110' => [33333, 0], '2125' => [5000, 0], '1130' => [0, 38333]]),
             $this->journal(ReturnDocument::class, $return->id)
         );
 
         // معدل صفري: لا سطر ضريبة، ولا حاجة لدور مُعيَّن.
         AccountRoleMapping::where('role_key', 'tax_output')->delete();
         $zero = $this->salesReturn($this->sale(rate: 0), '2026-02-20');
-        $this->assertSame(['4110' => [100000, 0], '1130' => [0, 100000]], $this->journal(ReturnDocument::class, $zero->id));
+        $this->assertSame($this->canonical(['4110' => [100000, 0], '1130' => [0, 100000]]), $this->journal(ReturnDocument::class, $zero->id));
     }
 
     // ───────────────── 2) الإشعارات الدائنة والمدينة ─────────────────
@@ -354,7 +368,7 @@ class VatAdjustmentRoutingTest extends TestCase
         $invoice = $this->sale();
         $default = $this->salesNote($invoice, date: '2026-02-01');
         $this->assertSame(
-            ['4110' => [100000, 0], '2120' => [15000, 0], '1130' => [0, 115000]],
+            $this->canonical(['4110' => [100000, 0], '2120' => [15000, 0], '1130' => [0, 115000]]),
             $this->journal(CreditNote::class, $default->id)
         );
 
@@ -362,7 +376,7 @@ class VatAdjustmentRoutingTest extends TestCase
         $invoice2 = $this->sale(date: '2026-03-01');
         $remapped = $this->salesNote($invoice2);
         $this->assertSame(
-            ['4110' => [100000, 0], '2125' => [15000, 0], '1130' => [0, 115000]],
+            $this->canonical(['4110' => [100000, 0], '2125' => [15000, 0], '1130' => [0, 115000]]),
             $this->journal(CreditNote::class, $remapped->id)
         );
         $this->assertSame([15000, 115000], [(int) $remapped->fresh()->tax_amount, (int) $remapped->fresh()->total]);
@@ -377,7 +391,7 @@ class VatAdjustmentRoutingTest extends TestCase
         $note = $this->standaloneSalesNote();
 
         $this->assertSame(
-            ['4110' => [100000, 0], '2125' => [15000, 0], '1130' => [0, 115000]],
+            $this->canonical(['4110' => [100000, 0], '2125' => [15000, 0], '1130' => [0, 115000]]),
             $this->journal(CreditNote::class, $note->id)
         );
     }
@@ -388,7 +402,7 @@ class VatAdjustmentRoutingTest extends TestCase
         $purchase = $this->purchaseDoc();                            // VAT 150.00 مدين 1150
         $default = $this->purchaseNote($purchase);
         $this->assertSame(
-            ['2110' => [115000, 0], '5115' => [0, 100000], '1150' => [0, 15000]],
+            $this->canonical(['2110' => [115000, 0], '5115' => [0, 100000], '1150' => [0, 15000]]),
             $this->journal(CreditNote::class, $default->id)
         );
 
@@ -396,7 +410,7 @@ class VatAdjustmentRoutingTest extends TestCase
         $purchase2 = $this->purchaseDoc(date: '2026-03-01');
         $remapped = $this->purchaseNote($purchase2);
         $this->assertSame(
-            ['2110' => [115000, 0], '5115' => [0, 100000], '1158' => [0, 15000]],
+            $this->canonical(['2110' => [115000, 0], '5115' => [0, 100000], '1158' => [0, 15000]]),
             $this->journal(CreditNote::class, $remapped->id)
         );
         $this->assertBooksBalanced();
@@ -542,7 +556,7 @@ class VatAdjustmentRoutingTest extends TestCase
         $returnB = $this->salesReturn($invoiceB);
         $journalB = $this->journal(ReturnDocument::class, $returnB->id);
 
-        $this->assertSame(['4110' => [100000, 0], '2120' => [15000, 0], '1130' => [0, 115000]], $journalB);   // الافتراضي، لا 2125 لمستأجر أ
+        $this->assertSame($this->canonical(['4110' => [100000, 0], '2120' => [15000, 0], '1130' => [0, 115000]]), $journalB);   // الافتراضي، لا 2125 لمستأجر أ
         $this->assertSame(0, Account::where('code', '2125')->count());                                          // حساب أ غير مرئي لـ ب
         $this->assertSame(0, $this->tax()['output_vat']);
 

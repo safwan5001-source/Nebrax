@@ -68,7 +68,7 @@ Readiness returns `BLOCKER`, `WARNING`, and `INFO`. Only BLOCKER prevents close.
 ### INFO
 1. Fiscal-year revenue, expense and calculated profit/loss.
 2. Retained Earnings destination account.
-3. Closing date and resulting Accounting Period Lock range.
+3. Closing date and resulting Accounting Period Lock range. *(FC-3, 2026-10-15: implemented not as a generated Period Lock but as a direct `AccountingDateGuard` rule — a `closed` fiscal year rejects posting/reversal dated inside it; the period lock remains a separate, independent authority. See `docs/audits/horizon/FC-3-IMPLEMENTATION-REPORT.md`.)*
 4. Counts of posted invoices/purchases/payments/returns/notes/journals.
 5. Open AR/AP totals.
 6. VAT output/input balances and known local tax-period status, clearly labeled as accounting/local status rather than ZATCA portal truth unless integration proves otherwise.
