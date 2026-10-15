@@ -33,6 +33,8 @@ The visual builder does not promise arbitrary Webflow-style DOM editing in V1. D
 - **Availability:** timeouts, resource budgets and graceful static fallback if sandbox or animation cannot load. A CSP/iframe boundary mitigates risk but does not guarantee complete isolation against all browser threats.
 - **No arbitrary merchant JS in published host HTML**, even when entered through an HTML editor.
 
+**V1 follow-up specification:** [AWJ Animated Hero V1 Spec](AWJ_ANIMATED_HERO_V1_SPEC.md) documents candidate schema, validation, parity, performance gates and phased delivery. Its proposed defaults supersede this ADR's illustrative example until contract discovery locks the final schema.
+
 ## 4. V1: Animated Hero Builder — proposed contract
 
 Use existing presentation-section architecture and lifecycle rather than adding parallel store or page tables. This is a *candidate contract*; exact naming/location must be aligned with the authoritative PHP normalizer and both TypeScript twins before approval:
