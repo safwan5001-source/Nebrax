@@ -58,6 +58,7 @@ class CommunicationTenantIsolationTest extends TestCase
         $message = CommunicationMessage::create([
             'channel' => 'sms', 'classification' => 'transactional', 'template_key' => 't', 'source' => 's',
             'idempotency_hash' => hash('sha256', 'ctx'), 'recipient_masked' => '+•••12', 'max_attempts' => 3,
+            'request_fingerprint' => hash('sha256', 'fp-ctx'), 'hash_key_version' => 1,
             'expires_at' => now()->addHour(), 'next_attempt_at' => now(),
             'payload_encrypted' => ['address' => '+966500000001', 'variables' => []],
         ]);

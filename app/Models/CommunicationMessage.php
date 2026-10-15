@@ -31,7 +31,14 @@ class CommunicationMessage extends BaseModel implements CompanyWide
     public const IDENTITY_COLUMNS = [
         'id', 'tenant_id', 'channel', 'classification', 'template_key', 'source',
         'idempotency_hash', 'recipient_masked', 'max_attempts', 'expires_at', 'created_at',
+        'request_fingerprint', 'hash_key_version',
     ];
+
+    /** صيغة بصمة الطلب: SHA-256/HMAC بحروف hex صغيرة (64). */
+    public const FINGERPRINT_PATTERN = '/^[0-9a-f]{64}\z/';
+
+    /** أقصى إصدار مفتاح (smallint). */
+    public const MAX_HASH_KEY_VERSION = 32767;
 
     public const SETTLED_FINAL_STATUS = 'final_status';
 
@@ -49,6 +56,7 @@ class CommunicationMessage extends BaseModel implements CompanyWide
         'recipient_masked', 'payload_encrypted', 'status', 'attempt_count', 'max_attempts',
         'next_attempt_at', 'expires_at', 'lease_token', 'lease_until', 'last_error_code',
         'accepted_at', 'receipt_deadline_at', 'settled_at', 'settled_reason',
+        'request_fingerprint', 'hash_key_version',
     ];
 
     /** @var array<string, mixed> */
@@ -57,7 +65,7 @@ class CommunicationMessage extends BaseModel implements CompanyWide
         'attempt_count' => 0,
     ];
 
-    protected $hidden = ['payload_encrypted'];
+    protected $hidden = ['payload_encrypted', 'request_fingerprint'];
 
     protected function casts(): array
     {
@@ -65,6 +73,7 @@ class CommunicationMessage extends BaseModel implements CompanyWide
             'payload_encrypted' => 'encrypted:array',
             'attempt_count' => 'integer',
             'max_attempts' => 'integer',
+            'hash_key_version' => 'integer',
             'next_attempt_at' => 'datetime',
             'expires_at' => 'datetime',
             'lease_until' => 'datetime',
@@ -106,6 +115,8 @@ class CommunicationMessage extends BaseModel implements CompanyWide
         $classification = MessageClassification::tryFrom((string) $this->classification)
             ?? throw new LogicException('Communication message classification is not supported.');
 
+        $this->assertFingerprintMetadata();
+
         $this->ensure($this->settled_reason === null || in_array($this->settled_reason, self::SETTLED_REASONS, true), 'settled_reason');
 
         $hasPayload = $this->getRawOriginalOrAttribute('payload_encrypted') !== null;
@@ -135,6 +146,21 @@ class CommunicationMessage extends BaseModel implements CompanyWide
             && (($this->settled_at === null) === ($this->settled_reason === null)),
             'settlement'
         );
+    }
+
+    /**
+     * بصمة الطلب وإصدار المفتاح (02-B1): معاً أو لا شيء، بصيغة صالحة. الصف **الجديد** يجب أن يحملهما (يعكس
+     * Trigger الإدراج)، أما الصف القديم المحمَّل (NULL/NULL) فيبقى قابلاً للتحديث. لا يُحسب HMAC هنا.
+     */
+    private function assertFingerprintMetadata(): void
+    {
+        $fingerprint = $this->attributes['request_fingerprint'] ?? null;
+        $version = $this->attributes['hash_key_version'] ?? null;
+
+        $this->ensure(($fingerprint === null) === ($version === null), 'fingerprint pair');
+        $this->ensure($this->exists || $fingerprint !== null, 'fingerprint required for new rows');
+        $this->ensure($fingerprint === null || (is_string($fingerprint) && preg_match(self::FINGERPRINT_PATTERN, $fingerprint) === 1), 'fingerprint format');
+        $this->ensure($version === null || (is_numeric($version) && (int) $version == $version && (int) $version >= 1 && (int) $version <= self::MAX_HASH_KEY_VERSION), 'hash key version');
     }
 
     private function getRawOriginalOrAttribute(string $key): mixed

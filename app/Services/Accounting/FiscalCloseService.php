@@ -82,6 +82,7 @@ class FiscalCloseService
         private AccountingDateGuard $dateGuard,
         private FiscalYearService $years,
         private VatRoleIntegrityService $vatIntegrity,
+        private ArApControlBalanceService $arAp,
     ) {}
 
     // ───────────────────────────── الجاهزية ─────────────────────────────
@@ -175,21 +176,11 @@ class FiscalCloseService
             );
         }
 
-        // أرصدة العملاء والموردين **ليست مانعاً ولا تنبيهاً**: أرصدة ميزانية
-        // مشروعة تنتقل للسنة التالية بطبيعتها، وتحويلها إلى تنبيه يوحي بعملٍ
-        // مطلوب لا وجود له.
-        $receivable = $this->roleBalance('accounts_receivable');
-        $payable    = $this->roleBalance('accounts_payable');
-        if ($receivable !== null || $payable !== null) {
-            // ACC-02-FC: أساس هذين الرقمين **تراكمي حتى اليوم لحساب الدور الحالي وحده** — لا «كما في نهاية السنة».
-            // يُعلَن صراحةً لئلا يُقارَن بسطر الضريبة أدناه (حتى نهاية السنة) على أنهما أساسٌ واحد. توحيد الأساس
-            // قرارٌ محاسبي منفصل (FC-4) ولم يُتَّخذ.
-            $items[] = $this->item(self::SEVERITY_INFO, 'open_ar_ap', sprintf(
-                'أرصدة قائمة تنتقل للسنة التالية — العملاء: %s، الموردون: %s. أرصدة ميزانية طبيعية لا تمنع الإقفال. '
-                . 'هذه الأرصدة تراكمية حتى اليوم للحساب الحالي للدور وحده، وليست كما في نهاية السنة المالية.',
-                $this->money($receivable ?? 0),
-                $this->money($payable ?? 0),
-            ), ['receivable' => $receivable, 'payable' => $payable, 'basis' => 'all_time_current_account']);
+        // أرصدة العملاء والموردين (FC-4): رصيد حسابات الأستاذ للدورين كما في نهاية السنة. معلومة طبيعية لا تمنع
+        // الإقفال ولا تغيّر `can_close`؛ وتصير **تنبيهاً** (إقرارٌ في الواجهة لا مانع) إن لم تثبت سلامة حسابات الدور
+        // أو تعذّر حلّ أحد الدورين — بالمنطق نفسه لسطر الضريبة.
+        foreach ($this->arApItems($year) as $item) {
+            $items[] = $item;
         }
 
         // الضريبة: أرصدة **محاسبية محلية** لا حالة إقرار لدى الهيئة. لا تُقفل
@@ -680,24 +671,104 @@ class FiscalCloseService
         ])];
     }
 
-    /** صافي رصيد الحساب المعيَّن لدور، بطبيعته. `null` إن كان الدور غير قابل للحل. */
-    private function roleBalance(string $roleKey): ?int
+    /**
+     * FC-4 — سطر `open_ar_ap`: رصيد **حسابات الأستاذ** للعملاء والموردين كما في `end_date` (تراكمي، كل الفروع، على
+     * كل حسابات الدور: الحالي ∪ النظامي ∪ سجلّ التعيينات). ليس رصيد دفاتر الأطراف ولا المستندات غير المسدَّدة
+     * ولا مركز ذمم مطابَقاً — يُعلَن ذلك في الرسالة وفي `not_checked`. المفتاحان `receivable`/`payable` باقيان
+     * (هللات) ودلالتهما تغيّرت من «الحساب الحالي كل الزمن» إلى «مجموعة الدور حتى نهاية السنة».
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function arApItems(FiscalYear $year): array
     {
-        try {
-            $account = $this->accountRoles->resolve($roleKey);
-        } catch (RuntimeException) {
-            return null;
+        $asOf = $year->end_date->toDateString();
+        $data = $this->arAp->balancesAsOf($asOf, $year);
+        $roles = $data['roles'];
+        $receivable = $roles[ArApControlBalanceService::ROLE_RECEIVABLE];
+        $payable = $roles[ArApControlBalanceService::ROLE_PAYABLE];
+
+        // مستأجرٌ بلا أي حساب في مجموعتَي الدورين (لا تعيين ولا حساب نظامي): لا شيء يُعرض — كما كان.
+        if ($receivable['accounts'] === [] && $payable['accounts'] === []) {
+            return [];
         }
 
-        $totals = JournalLine::query()
-            ->selectRaw('SUM(debit) as total_debit, SUM(credit) as total_credit')
-            ->where('account_id', $account->id)
-            ->whereHas('entry', fn ($q) => $q->whereIn('status', ['posted', 'reversed']))
-            ->first();
+        $verification = $data['verification'];
+        $unresolved = array_keys(array_filter($roles, fn (array $r) => $r['mapping_state'] !== 'resolved'));
+        $unverified = $verification['status'] === 'unverified';
 
-        $net = (int) ($totals->total_debit ?? 0) - (int) ($totals->total_credit ?? 0);
+        $message = sprintf(
+            'أرصدة قائمة تنتقل للسنة التالية — حسابات الأستاذ كما في %s (تراكمية، كل الفروع، على كل حسابات الدور) — '
+            . 'العملاء: %s، الموردون: %s. أرصدة ميزانية طبيعية لا تمنع الإقفال. '
+            . 'هذه أرصدة حسابات الأستاذ للدور وليست رصيد دفاتر العملاء والموردين ولا الفواتير والمشتريات غير المسدَّدة، '
+            . 'ولم تُطابَق بأيٍّ منها؛ ومطابقتها بالميزانية فحص اتساق دفتري داخلي لا يجعلها مركز ذمم مطابَقاً. ',
+            $asOf,
+            $this->money($receivable['balance']),
+            $this->money($payable['balance']),
+        );
+        $message .= match ($verification['status']) {
+            'unverified' => 'تحذير: سلامة حسابات الدور غير مثبتة — الرصيد قد يضمّ مبالغ ليست ذمماً أو يكون ترجيحاً لا قراءة قطعية؛ راجع التحذيرات قبل الاعتماد عليه.',
+            'verified_with_notices' => 'سلامة حسابات الدور: ملاحظات لا تمسّ أرقام هذا التاريخ.',
+            default => 'سلامة حسابات الدور: مجتازة لفحوص الهيكل المعلنة فقط (لا مطابقة لدفاتر الأطراف ولا للمستندات ولا لمحتوى القيود اليدوية).',
+        };
+        foreach ($unresolved as $roleKey) {
+            $message .= sprintf(
+                ' الدور «%s» غير قابل للحلّ (%s): الرصيد المعروض تاريخيّ، وترحيل جديد على هذا الدور سيفشل حتى يُعالَج التعيين.',
+                AccountingRoles::find($roleKey)['label_ar'],
+                $roles[$roleKey]['mapping_state'],
+            );
+        }
 
-        return $account->normal_balance === 'debit' ? $net : -$net;
+        $opposite = [
+            'receivable' => $receivable['opposite_sign'],
+            'payable' => $payable['opposite_sign'],
+        ];
+        $oppositeCount = array_sum(array_map(fn (array $o) => count($o['accounts']) + $o['partners']['count'], $opposite));
+        if ($oppositeCount > 0) {
+            $message .= sprintf(
+                ' إفصاح: توجد أرصدة بعكس طبيعة الدور (عملاء دائنون: %s، موردون مدينون: %s) — تُعرض كما هي بلا إعادة تصنيف.',
+                $this->money($opposite['receivable']['partners']['amount']),
+                $this->money($opposite['payable']['partners']['amount']),
+            );
+        }
+
+        $untaggedLines = $receivable['untagged']['lines'] + $payable['untagged']['lines'];
+        if ($untaggedLines > 0) {
+            $message .= sprintf(
+                ' إفصاح: %d سطر على حسابات الدور بلا معرّف طرف (قيود يدوية أو تسويات مثلاً) — ليست بالضرورة خطأً ولا تغيّر حالة التوثيق.',
+                $untaggedLines,
+            );
+        }
+
+        $history = $data['history'];
+        if ($history !== null && $history['balances_can_still_change']) {
+            $names = implode('، ', array_map(fn (array $y) => $y['name'], $history['prior_open_years']));
+            $message .= $history['prior_open_years'] !== []
+                ? sprintf(' إفصاح: سنوات سابقة غير مقفلة (%s) — الأرصدة تراكمية، فقيدٌ جديد مؤرَّخ داخلها لا يزال يغيّر رقم نهاية هذه السنة حتى بعد إقفالها.', $names)
+                : ' إفصاح: توجد حركة على حسابات الدور مؤرَّخة قبل هذه السنة في تواريخ لا تحميها سنة مقفلة — الأرصدة تراكمية وقد يتغيّر رقم نهاية هذه السنة.';
+        }
+
+        $severity = ($unverified || $unresolved !== []) ? self::SEVERITY_WARNING : self::SEVERITY_INFO;
+        $short = fn (string $key) => [
+            'receivable' => $roles[ArApControlBalanceService::ROLE_RECEIVABLE][$key],
+            'payable' => $roles[ArApControlBalanceService::ROLE_PAYABLE][$key],
+        ];
+
+        return [$this->item($severity, 'open_ar_ap', $message, [
+            // مفتاحان قائمان: القيمة الآن رصيد مجموعة حسابات الدور كما في نهاية السنة (هللات).
+            'receivable' => $receivable['balance'],
+            'payable' => $payable['balance'],
+            'basis' => 'role_account_set_as_of_end_date',
+            'as_of' => $asOf,
+            'accounts' => $short('accounts'),
+            'current_account' => $short('current_account'),
+            'mapping_state' => $short('mapping_state'),
+            'verification' => $verification,
+            'warnings' => $data['warnings'],
+            'untagged' => $short('untagged'),
+            'opposite_sign' => $opposite,
+            'history' => $history,
+            'not_checked' => $verification['not_checked'],
+        ])];
     }
 
     private function money(int $halalas): string

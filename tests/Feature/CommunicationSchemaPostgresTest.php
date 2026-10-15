@@ -114,6 +114,7 @@ class CommunicationSchemaPostgresTest extends TestCase
             'comm_msg_enums_chk', 'comm_msg_otp_privacy_chk', 'comm_msg_payload_lifecycle_chk', 'comm_msg_deferred_payload_chk',
             'comm_msg_attempts_chk', 'comm_msg_lease_chk', 'comm_msg_due_chk', 'comm_msg_receipt_chk', 'comm_msg_settled_chk',
             'comm_attempt_outcome_chk', 'comm_attempt_message_fk', 'comm_msg_tenant_id_unique', 'comm_msg_idem_unique', 'comm_attempt_no_unique',
+            'comm_msg_fingerprint_pair_chk', 'comm_msg_fingerprint_format_chk', 'comm_msg_hash_key_version_chk',
         ] as $expected) {
             $this->assertContains($expected, $names);
         }

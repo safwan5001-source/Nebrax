@@ -18,7 +18,7 @@ The Fiscal Close readiness line `vat_balances` used to read **only the account c
 | FC-1c | `details.tax_output` / `details.tax_input` keep their names and integer-halala type; their **value changes** (set balance as of year-end). Added: `basis`, `accounts`, `current_account`, `mapping_state`, `verification`, `warnings`, `not_checked`. |
 | FC-1d | Unmapped / inactive / group / missing role ⇒ the historical set balance is **still shown**, `mapping_state` names the problem, the item is a **warning**, and the message states that new VAT postings fail closed (REM-06). |
 | FC-2 | Cut-off `journal_entries.entry_date <= fiscal_years.end_date`, cumulative (no lower bound), `posted` + `reversed`, company-wide (no branch filter), tenant-scoped. Output = credit − debit; input = debit − credit. |
-| AR/AP | Calculation **unchanged**. The item gains `details.basis = "all_time_current_account"` and a message saying the figures are cumulative to date for the current account, not as of year-end. FC-4 owns any change. |
+| AR/AP | Calculation **unchanged**. The item gains `details.basis = "all_time_current_account"` and a message saying the figures are cumulative to date for the current account, not as of year-end. FC-4 owns any change. *(Superseded 2026-10-15 by FC-4: `open_ar_ap` now uses the year-end role-account-set basis — see `FC-4-IMPLEMENTATION-REPORT.md`.)* |
 
 Not changed: financial posting, journals, schema/migrations, VAT rates, ZATCA XML/QR/signature/submission, `close()`/`reopen()`/P&L/`criticalIssues()`, permissions, routes, `web/`.
 

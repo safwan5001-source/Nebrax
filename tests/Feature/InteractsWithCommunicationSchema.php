@@ -61,6 +61,9 @@ trait InteractsWithCommunicationSchema
             'source' => 'invoicing.issue',
             'idempotency_hash' => hash('sha256', $tenantId."\n".Str::random(16)),
             'recipient_masked' => '+•••12',
+            // 02-B1: الصف الجديد يحمل بصمة صالحة (قيمة اختبار ثابتة الشكل، لا حساب HMAC حقيقي).
+            'request_fingerprint' => hash('sha256', 'fp:'.Str::uuid()),
+            'hash_key_version' => 1,
             'payload_encrypted' => 'ciphertext-placeholder',
             'status' => 'queued',
             'attempt_count' => 0,
@@ -77,6 +80,20 @@ trait InteractsWithCommunicationSchema
             'created_at' => $now,
             'updated_at' => $now,
         ], $overrides);
+    }
+
+    /**
+     * صف «قديم» (قبل 02-B1): بلا بصمة ولا إصدار. لا يُدرَج إلا على Schema سبقت الامتداد (انظر اختبار الترحيل).
+     *
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    private function legacyCommMessageRow(string $tenantId, array $overrides = []): array
+    {
+        $row = $this->commMessageRow($tenantId, $overrides);
+        unset($row['request_fingerprint'], $row['hash_key_version']);
+
+        return $row;
     }
 
     /** @param  array<string, mixed>  $overrides */
@@ -162,7 +179,7 @@ trait InteractsWithCommunicationSchema
         if ($this->commDriver() === 'pgsql') {
             return DB::table('pg_trigger')
                 ->where('tgisinternal', false)
-                ->whereIn('tgname', ['comm_msg_identity_immutable', 'comm_attempt_guard'])
+                ->whereIn('tgname', ['comm_msg_identity_immutable', 'comm_attempt_guard', 'comm_msg_fingerprint_required'])
                 ->pluck('tgname')->sort()->values()->all();
         }
 
