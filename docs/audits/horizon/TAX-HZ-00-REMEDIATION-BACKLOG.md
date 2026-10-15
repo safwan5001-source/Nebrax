@@ -134,10 +134,17 @@ REM-03 and REM-08 touch disjoint controllers (`Invoice/Return/Quote/DocumentRevi
 
 ### FC-3 — status update (2026-10-15)
 
-> **FC-3 — IN REVIEW (Draft PR), not closed**; closes only after approved merge and verification. Report: `FC-3-IMPLEMENTATION-REPORT.md`. Resolves the ACC-02-FC residual "backdating into a closed year changes the figure absent a period lock".
+> **FC-3 — MERGED: PR #1505, merge `99d1c4b722eff5cc50f959c721dd5781b7cb0bc9`; production deployment NOT VERIFIED.** (Wording at authoring was "IN REVIEW (Draft PR), not closed".) Report: `FC-3-IMPLEMENTATION-REPORT.md`. Resolves the ACC-02-FC residual "backdating into a closed year changes the figure absent a period lock".
 > **Owner decisions:** FC3-1 Option C1 (enforce centrally in `AccountingDateGuard`) · FC3-2 mandatory, no tenant bypass toggle · FC3-3 keep `AccountingPeriodLock` independent + superseding notes in FISCAL-1 / FISCAL-2 / ACC-6 docs · FC3-4 readiness wording.
 > **Implemented:** `FiscalYearClosedException` (extends `AccountingPeriodLockedException`, HTTP 422); `AccountingDateGuard::assertOpen` rejects post/reverse dated inside a `closed` year (inclusive bounds, company-wide); readiness `close_date` / `drafts` wording. No amount, journal, VAT, ZATCA, permission or schema change.
 > **Remaining:** stored close snapshot (still live recompute — now stable because a closed year accepts no new entries); FC-4 (AR/AP basis); REM-28. Production NOT VERIFIED.
+
+### FC-4 — status update (2026-10-15)
+
+> **FC-4 — IN REVIEW (Draft PR), not closed**; closes only after approved merge and verification. Report: `FC-4-IMPLEMENTATION-REPORT.md`. Resolves the ACC-02-FC residual "AR/AP stay all-time and current-account-only".
+> **Owner decisions:** Option C with S1–S8 (unverified ⇒ warning, no block · overlap attributed by type but always unverified · opposite-sign disclosed · untagged lines disclosed separately · cash/bank, type and other-role contamination warned · S6 mapping-write validation and S7 hard-coded 1130/2110 routing are **separate follow-ups** · prior open years disclosed).
+> **Implemented:** `ArApControlBalanceService` (read-only); `open_ar_ap` re-based to the year-end role-account set (`basis: role_account_set_as_of_end_date`) with additive fields; severity moves to warning when unverified or a mapping is unresolved. No posting, settlement, schema, route, permission, VAT or ZATCA change.
+> **Remaining (separate tasks):** S6 AR/AP mapping-write validation (type, clean target, uniqueness) · S7 route the hard-coded `1130`/`2110` posting paths (`ReturnService` sales, `CreditNoteService`, `PosExchangeService`, `PartnerService` opening balances, `ExpenseService`, `AssetService`, `InventoryService`, `FuelSupplyReceivingService`, `CorporateFuelAuthorizationService`) through `AccountRoleResolver` · partner-subledger and open-document reconciliation (②/③/④) · aging "as of" · REM-28. Production NOT VERIFIED.
 
 ### REM-03 — card (ready for owner approval to start)
 

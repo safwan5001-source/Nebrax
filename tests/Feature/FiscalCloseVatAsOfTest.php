@@ -679,28 +679,38 @@ class FiscalCloseVatAsOfTest extends TestCase
         $this->assertSame(20000, (int) collect($sheet['assets'])->firstWhere('account_id', $wrong->id)['amount']);
     }
 
-    // ───────────── T20. الذمم المدينة/الدائنة: لم تُعدَّل، وأساسها يُعلَن ─────────────
+    // ───────────── T20. الذمم المدينة/الدائنة: أساسها صار «كما في نهاية السنة» (FC-4) ─────────────
 
-    /** @test */
-    public function t20_receivables_and_payables_keep_the_all_time_current_account_basis_and_say_so(): void
+    /**
+     * FC-4 (تعليل التعديل): كان هذا الاختبار يثبّت الأساس القديم `all_time_current_account` — تراكمي حتى اليوم لحساب
+     * الدور الحالي وحده، فيشمل قيود 2027 ويُسقط الحسابات السابقة. القرار المعتمد (FC-4، الخيار C) غيّر دلالة المفتاحين
+     * `receivable`/`payable` إلى رصيد مجموعة حسابات الدور **كما في `end_date`** مع بقاء الاسمين والنوع. فصار الاختبار يثبّت
+     * الأساس الجديد: قيود 2027 خارج رقم 2026، والأساس `role_account_set_as_of_end_date`، والرسالة تعلن أنه رصيد أستاذ.
+     * التغطية التفصيلية لـFC-4 في `FiscalCloseArApAsOfTest`.
+     *
+     * @test
+     */
+    public function t20_receivables_and_payables_use_the_year_end_role_account_set_basis_and_say_so(): void
     {
         $this->entry('2026-03-01', [['1130', 100000, 0], ['4110', 0, 100000]]);
         $this->entry('2026-04-01', [['5130', 40000, 0], ['2110', 0, 40000]]);
-        $this->entry('2027-03-01', [['1130', 7000, 0], ['4110', 0, 7000]]);                 // بعد نهاية 2026: يدخل AR/AP ولا يدخل الضريبة
+        $this->entry('2027-03-01', [['1130', 7000, 0], ['4110', 0, 7000]]);                 // بعد نهاية 2026: لم يعد يدخل رقم السنة
         $this->out('2120', 15000, '2026-05-01');
         $this->out('2120', 9000, '2027-03-02');
 
         $readiness = app(FiscalCloseService::class)->readiness($this->y26->fresh());
         $arAp = collect($readiness['info'])->firstWhere('code', 'open_ar_ap');
 
-        $this->assertSame(107000 + 15000 + 9000, $arAp['details']['receivable']);          // 1130 كل الزمن (يشمل 2027 وقيود الضريبة المقابلة)
+        $this->assertSame(100000 + 15000, $arAp['details']['receivable']);                 // 1130 حتى 2026-12-31 فقط
         $this->assertSame(40000, $arAp['details']['payable']);
-        $this->assertSame('all_time_current_account', $arAp['details']['basis']);
-        $this->assertStringContainsString('ليست كما في نهاية السنة المالية', $arAp['message']);
+        $this->assertSame('role_account_set_as_of_end_date', $arAp['details']['basis']);
+        $this->assertSame('2026-12-31', $arAp['details']['as_of']);
+        $this->assertStringContainsString('حسابات الأستاذ كما في 2026-12-31', $arAp['message']);
+        $this->assertStringNotContainsString('ليست كما في نهاية السنة المالية', $arAp['message']);
         $this->assertNotContains('open_ar_ap', array_column($readiness['warnings'], 'code'));
         $this->assertNotContains('open_ar_ap', array_column($readiness['blockers'], 'code'));
 
-        // بينما الضريبة في الجاهزية نفسها حتى نهاية السنة فقط.
+        // وصار أساس الذمم والضريبة في الجاهزية نفسها واحداً: حتى نهاية السنة.
         $this->assertSame(15000, collect($readiness['info'])->firstWhere('code', 'vat_balances')['details']['tax_output']);
     }
 
