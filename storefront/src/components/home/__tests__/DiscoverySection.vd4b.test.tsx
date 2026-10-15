@@ -1173,6 +1173,16 @@ describe("image sources are re-validated where they become <img> (defence in dep
   });
 });
 
+describe("page locale (AWJ-VD-H1 D-S-1)", () => {
+  it("reads the values for the locale the section was rendered for", async () => {
+    await renderSection(plainFacet, {}, { basePath: "/sa/en", locale: "en" });
+    expect(mocks.fetchDiscoveryValues).toHaveBeenCalledWith(
+      { axis: "facet", dimension: "occasion" },
+      "en",
+    );
+  });
+});
+
 describe("no section when there is nothing to show", () => {
   it("returns null for a failed or empty read in every layout", async () => {
     for (const layout of ["image-grid", "carousel", "text-list"] as const) {

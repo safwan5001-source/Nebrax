@@ -175,10 +175,10 @@ describe("DiscoverySection", () => {
         },
       })) as React.JSX.Element,
     );
-    expect(mocks.fetchDiscoveryValues).toHaveBeenCalledWith({
-      axis: "facet",
-      dimension: "occasion",
-    });
+    expect(mocks.fetchDiscoveryValues).toHaveBeenCalledWith(
+      { axis: "facet", dimension: "occasion" },
+      "ar",
+    );
     const link = screen.getByRole("link", { name: "العيد" });
     const url = new URL(link.getAttribute("href") as string, "https://x.test");
     expect(url.pathname).toBe("/sa/ar/products");
@@ -257,10 +257,10 @@ describe("DiscoverySection", () => {
         },
       })) as React.JSX.Element,
     );
-    expect(mocks.fetchDiscoveryValues).toHaveBeenCalledWith({
-      axis: "facet",
-      dimension: "brand",
-    });
+    expect(mocks.fetchDiscoveryValues).toHaveBeenCalledWith(
+      { axis: "facet", dimension: "brand" },
+      "ar",
+    );
     const url = new URL(
       screen
         .getByRole("link", { name: "غوتشي" })
