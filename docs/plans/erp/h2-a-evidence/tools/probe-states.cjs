@@ -30,7 +30,9 @@ const outFile = path.join(outDir, 'states.jsonl');
 // Resume only the SAME run: the fingerprint covers the fixture identities (user and tenant ids, not tokens), the base URL
 // and the probe options. A recreated fixture or other options must use a fresh outDir, so runs never mix.
 const ident = (u) => { try { const j = JSON.parse(u || '{}'); return `${j.id}@${j.tenant_id}`; } catch { return '?'; } };
-const fingerprint = JSON.stringify({ base: BASE, delay: DELAY_MS, shell: SHELL_ROUTES, derive: process.env.DERIVE_OVERRIDES !== '0', owner: ident(ID.owner[1]), empty: ident(ID.empty[1]), staff: ident(ID.staff[1]) });
+// Interception rules are part of the run: the extra overrides and the derive flag change which requests are probed.
+// The route list is not: a resumed run may append routes, and each (state, route) record stands on its own.
+const fingerprint = JSON.stringify({ base: BASE, delay: DELAY_MS, shell: SHELL_ROUTES, derive: process.env.DERIVE_OVERRIDES !== '0', extraOverrides: process.env.PAGE_SHELL_OVERRIDES || '', owner: ident(ID.owner[1]), empty: ident(ID.empty[1]), staff: ident(ID.staff[1]) });
 const runFile = path.join(outDir, 'run.json');
 if (fs.existsSync(outFile)) {
   const prev = fs.existsSync(runFile) ? fs.readFileSync(runFile, 'utf8') : null;
