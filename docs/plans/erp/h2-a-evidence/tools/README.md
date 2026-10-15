@@ -28,7 +28,9 @@ Local, isolated audit environment only. Never point any of this at production or
 - `h2_inventory.py` — classifies every `web/src/app/**/page.tsx` (module, posture, v3 gate scope, H1 coverage) and joins crawl results.
 - `../../h1-0-evidence/tools/crawl.cjs` — H1 real-browser crawler (axe-core 4.10.2, measurements, screenshots), reused unchanged.
 - `probe-states.cjs` — renders each route as empty (tenant C), loading (delayed page APIs), server error (500 on page APIs;
-  shell endpoints learnt from a minimal page) and forbidden (staff), with screenshots and DOM readings.
+  shell endpoints = the intersection of what two minimal pages request, `SHELL_ROUTES=/whats-new,/help`, so neither page's own
+  API is mistaken for shell) and forbidden (staff), with screenshots and DOM readings. `/whats-new` was re-probed after this fix:
+  loading shows a spinner, error shows «تعذّر تحميل التحديثات» with retry.
 - `kit_usage.py` — static adoption of the shared UI kit (`components/nebrax/*`, `DataTable`, states, confirm) per page;
   a lower bound (2 import levels).
 - `routes.json` — the 232-URL manifest the baseline crawl loaded (concrete paths, fixture ids).

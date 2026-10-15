@@ -4,7 +4,8 @@
 //   loading   — every page-specific /api GET delayed by DELAY_MS; screenshot taken mid-flight
 //   error     — every page-specific /api GET answered 500 (shell endpoints keep working)
 //   forbidden — a restricted user (TOKEN_STAFF / USER_STAFF)
-// "Shell endpoints" = the /api paths a minimal page (SHELL_ROUTE) requests; everything else on a route is page-specific.
+// "Shell endpoints" = the /api paths requested by EVERY one of two minimal pages (SHELL_ROUTES, intersection), so a
+// request one of them makes for itself (e.g. /whats-new -> /api/system-updates) stays page-specific and gets probed.
 // Usage: node probe-states.cjs <routes.json> <outDir> [states csv=empty,loading,error,forbidden]
 const fs = require('fs');
 const path = require('path');
@@ -13,7 +14,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const [, , routesFile, outDir, statesCsv = 'empty,loading,error,forbidden'] = process.argv;
 const BASE = process.env.BASE ?? 'http://127.0.0.1:3001';
 const DELAY_MS = Number(process.env.DELAY_MS ?? 2500);
-const SHELL_ROUTE = process.env.SHELL_ROUTE ?? '/whats-new';
+const SHELL_ROUTES = (process.env.SHELL_ROUTES ?? '/whats-new,/help').split(',');
 const ID = { owner: [process.env.TOKEN, process.env.USER_JSON], empty: [process.env.TOKEN_EMPTY, process.env.USER_EMPTY], staff: [process.env.TOKEN_STAFF, process.env.USER_STAFF] };
 const routes = JSON.parse(fs.readFileSync(routesFile, 'utf8'));
 fs.mkdirSync(path.join(outDir, 'shots'), { recursive: true });
@@ -64,12 +65,16 @@ async function read(page) {
 
 (async () => {
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ['--no-sandbox'] });
-  // Learn the shell endpoints once.
-  const shell = new Set();
-  { const ctx = await context(browser, 'owner'); const p = await ctx.newPage();
-    p.on('request', (r) => { if (r.url().includes('/api/')) shell.add(apiPath(r.url())); });
-    await p.goto(BASE + SHELL_ROUTE, { waitUntil: 'domcontentloaded' }); await p.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
-    await ctx.close(); }
+  // Learn the shell endpoints once: the intersection of what each minimal page requests.
+  let shell = null;
+  for (const route of SHELL_ROUTES) {
+    const seen = new Set();
+    const ctx = await context(browser, 'owner'); const p = await ctx.newPage();
+    p.on('request', (r) => { if (r.url().includes('/api/')) seen.add(apiPath(r.url())); });
+    await p.goto(BASE + route, { waitUntil: 'domcontentloaded' }); await p.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
+    await ctx.close();
+    shell = shell === null ? seen : new Set([...shell].filter((x) => seen.has(x)));
+  }
   fs.writeFileSync(path.join(outDir, 'shell-endpoints.json'), JSON.stringify([...shell].sort(), null, 1));
   const isPageApi = (u) => u.includes('/api/') && !shell.has(apiPath(u));
 
