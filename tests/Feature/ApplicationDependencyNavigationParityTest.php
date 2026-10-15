@@ -146,6 +146,66 @@ class ApplicationDependencyNavigationParityTest extends TestCase
     }
 
     #[Test]
+    public function an_expired_dependency_grant_hides_the_link(): void
+    {
+        $auth = $this->registerTenant('nav02-core-expired');
+        $this->grant($auth['tenant_id'], self::CORE);
+        $this->grant($auth['tenant_id'], self::AVI);
+        $this->assertTrue($this->navState($auth['token'])[self::AVI]);
+
+        TenantApplicationEntitlement::query()
+            ->where('tenant_id', $auth['tenant_id'])
+            ->where('capability_key', self::CORE)
+            ->update(['ends_at' => CarbonImmutable::now('UTC')->subSecond()]);
+
+        $this->assertFalse($this->navState($auth['token'])[self::AVI]);
+        $this->withToken($auth['token'])->getJson(self::AVI_ROUTE)->assertForbidden();
+    }
+
+    #[Test]
+    public function a_suspended_dependency_keeps_the_link_for_reads_and_refuses_writes(): void
+    {
+        $auth = $this->registerTenant('nav02-core-suspended');
+        $this->grant($auth['tenant_id'], self::CORE);
+        $this->grant($auth['tenant_id'], self::AVI);
+        app(TenantContext::class)->set($auth['tenant_id']);
+        TenantApplicationState::query()->where('application_key', self::CORE)->update(['status' => 'suspended']);
+
+        $this->assertTrue($this->navState($auth['token'])[self::AVI]);
+        $this->withToken($auth['token'])->getJson(self::AVI_ROUTE)->assertOk();
+        $this->withToken($auth['token'])->postJson(self::AVI_ROUTE, [])->assertForbidden();
+    }
+
+    #[Test]
+    public function a_legacy_grandfathered_tenant_follows_the_same_dependency_rule(): void
+    {
+        // مستأجر مسجَّل قبل ENFORCEMENT_CUTOVER_AT بلا أي صفوف حالة: القدرات «مفعّلة» ضمنياً.
+        $auth = $this->registerTenant('nav02-legacy', 'owner@nav02-legacy.test', autoEnableApplications: false);
+        DB::table('tenants')->where('id', $auth['tenant_id'])->update(['created_at' => '2026-01-01 00:00:00']);
+        $this->grant($auth['tenant_id'], self::AVI);
+
+        $this->assertFalse($this->navState($auth['token'])[self::AVI], 'AVI بلا core مرفوض حتى للقديم.');
+        $this->withToken($auth['token'])->getJson(self::AVI_ROUTE)->assertForbidden();
+
+        $this->grant($auth['tenant_id'], self::CORE);
+
+        $this->assertTrue($this->navState($auth['token'])[self::AVI]);
+        $this->withToken($auth['token'])->getJson(self::AVI_ROUTE)->assertOk();
+    }
+
+    #[Test]
+    public function the_strongest_of_two_grants_on_the_dependency_wins_like_the_guard(): void
+    {
+        $auth = $this->registerTenant('nav02-two-grants');
+        $this->grant($auth['tenant_id'], self::CORE, EntitlementAccessMode::READ_ONLY);
+        $this->grant($auth['tenant_id'], self::CORE, EntitlementAccessMode::FULL);
+        $this->grant($auth['tenant_id'], self::AVI);
+
+        $this->assertTrue($this->navState($auth['token'])[self::AVI]);
+        $this->withToken($auth['token'])->getJson(self::AVI_ROUTE)->assertOk();
+    }
+
+    #[Test]
     public function dependency_state_never_leaks_across_tenants(): void
     {
         $a = $this->registerTenant('nav02-tenant-a', 'owner@nav02-a.test');

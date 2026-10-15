@@ -226,7 +226,7 @@ class TenantApplicationService
         $tenantId = app(TenantContext::class)->id();
         $tenant = $tenantId === null ? null : Tenant::find($tenantId);
         if ($tenant === null) {
-            return true;
+            return false; // الحارس نفسه fail-closed (`findOrFail`)
         }
 
         return app(ApplicationAccessDecision::class)

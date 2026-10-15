@@ -50,7 +50,7 @@ Why delegate instead of walking `ApplicationCatalog::dependenciesFor()` here: th
 | Commercial without dependencies (`sales.invoicing`, `fuel_stations.core`, `document_center.core`) | Unchanged (batched resolver path from NAV-01) |
 | Operational keys with dependencies (`sales.pos`, `hr.payroll`, …) | **Unchanged.** Their guard `EnsureApplicationActive` checks the key's own status only and never evaluates dependencies; hiding them for a dependency would make the UI narrower than the server |
 
-Cost: three extra decision evaluations per nav-state call, only for the three dependent commercial keys.
+Cost (measured): `GET /applications/nav-state` for a tenant entitled to all four fuel keys went from **10 to 25 queries** (+15). Tenants whose own entitlement is already denied short-circuit (`enabled && entitled && deps`) and pay nothing. Sharing one memo or reusing the batched resolver result would cut this, but would re-copy decision logic; not adopted.
 
 ### Not adopted
 | Option | Why not |
@@ -65,7 +65,7 @@ Cost: three extra decision evaluations per nav-state call, only for the three de
 | File | Change |
 |---|---|
 | `app/Services/TenantApplicationService.php` | Dependency-aware visibility for dependent commercial keys |
-| `tests/Feature/ApplicationDependencyNavigationParityTest.php` | New, 10 tests |
+| `tests/Feature/ApplicationDependencyNavigationParityTest.php` | New, 14 tests |
 | `tests/Feature/SalesInvoicingNavigationParityTest.php` | Comment only: the "uniform grants" docblock now points at the new guard |
 | `CLAUDE.md` | One contract line |
 | `docs/reports/implementation/AWJ-BACKEND-NAV-02.md` | This report |
@@ -81,6 +81,10 @@ No web change: the sidebar and the fuel workspace nav already hide on an explici
 | core alone | `core=true`, `avi=false`, route → 403 |
 | read-only dependency | `avi=true`; GET → 200; POST → 403 (writes refused) |
 | revoked dependency | Visible, then hidden after revoking `core`; route → 403 |
+| expired dependency grant | `ends_at` in the past → hidden; route → 403 |
+| suspended dependency app | Visible for reads (GET 200), POST → 403 |
+| legacy (pre-cutover) tenant, no state rows | AVI without `core` hidden/403; with `core` visible/200 |
+| two grants on the dependency | READ_ONLY + FULL → FULL wins; visible/200 |
 | disabled dependency application | AVI enabled and entitled, `core` entitled but its app is disabled: hidden, route → 403. Isolates the dependency path (the key alone would pass) |
 | cross-tenant | A (both) `true`/200; B (avi only) `false`/403. No leak |
 | RBAC | Owner and `viewer` get identical nav-state; the viewer is still refused by RBAC on the route (separate gate, not widened) |
@@ -90,7 +94,7 @@ No web change: the sidebar and the fuel workspace nav already hide on an explici
 ### Results
 | Run | Result |
 |---|---|
-| New class on **unfixed** `origin/main` service | **5 of 10 fail** (regression proof); with the fix 10/10 pass, 107 assertions |
+| New class on **unfixed** `origin/main` service | **5 of the first 10 fail** (regression proof; the other tests are guards for unchanged behavior); with the fix 14/14 pass, 129 assertions |
 | Related backend (`ApplicationNavState*`, `ApplicationEnforcement*`, `SalesInvoicingNavigationParity`, `PlatformApplicationOverride*`, `PlatformGlobalApplicationOverride*`, `ApplicationAccess*`, `ApplicationCatalog*`, `TenantApplication*`, `FuelStationsCommercial*`, `FuelStationsFoundation*`, `DeliveryNote*`, `Entitlement*`) | 232 passed, 2144 assertions |
 | Full PHP suite, sqlite, serial | 6956 passed, 99 skipped, 26 failed (653 s). All 26 are in `FuelAviRfidService`, `FuelReconciliation`, `FuelSaleApi`, `FuelSaleService`, `FuelSupplyReceiving*` and need `bcmath`, absent locally (`bcmul` etc.): the same set recorded as the baseline in NAV-01, green in CI. No navigation, application, entitlement or delivery-note test fails |
 
@@ -105,8 +109,21 @@ No web change: the sidebar and the fuel workspace nav already hide on an explici
 - Web fail-open on a failed nav-state read is unchanged; the server still refuses with 403.
 
 ## Remaining work (not in scope)
+- **Operational keys for Cohort-enrolled tenants** (found by the independent review, pre-existing): `EnsureApplicationActive` also runs `EntitlementCohortEnforcer`, which, when the rollout is authoritative for the tenant, evaluates the full decision including dependencies and entitlement. Example: a cohort tenant with `sales.pos` enabled but `sales.invoicing` unentitled sees POS while its routes return 403. Non-cohort tenants match. Separate task (it needs the cohort verdict in nav-state; changes behavior of non-commercial keys).
 - Operational keys with dependencies: aligning them would need `EnsureApplicationActive` to evaluate dependencies first. Not proposed; there is no observed disagreement today.
 - `name_en` on report account rows (D-ERP-UX-01) stays a separate owner decision.
 
-## Reviews and closure
-Filled in on the PR (Reviewer, AWJ Guardian, CI, PRE_MERGE_REVIEW, POST_MERGE_REVIEW).
+## Reviews
+
+### Independent Reviewer + AWJ Guardian (separate agent, given the diff, not my conclusions)
+**No P1, no P2.** Confirmed: nav == guard across FULL/READ_ONLY/none/revoked/expired, suspended/disabled dependency, grandfathered vs new tenants, transitive chains and cycles; no circular DI (lazy `app()`, no recursion into `navVisibility`); tenant resolved identically to the middleware; no RBAC widening (`rbacAllowed = null`); no accounting touched.
+
+| # | Finding | Resolution |
+|---|---|---|
+| P3-1 | Extra queries per nav-state call | **Measured** (+15, fuel tenants only) and documented; not optimized to avoid copying decision logic |
+| P3-2 | `tenant === null` branch returned `true` (dead today, fail-open style) | **Fixed**: returns `false`, matching the guard's `findOrFail` |
+| P3-3 | Test gaps: expired grant, suspended dependency, legacy tenant, two grants | **Fixed**: 4 tests added (14 total) |
+| Pre-existing | Cohort-enrolled tenants: operational keys can still disagree | Recorded under Remaining work; CLAUDE.md wording made precise |
+
+## Closure
+CI, PRE_MERGE_REVIEW, merge and POST_MERGE_REVIEW are recorded below once complete.
