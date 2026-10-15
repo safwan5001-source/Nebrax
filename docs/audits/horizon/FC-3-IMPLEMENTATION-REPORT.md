@@ -26,6 +26,7 @@ FC-3 makes a closed year **closed for posting**, centrally, in the one place eve
 | `app/Services/Accounting/FiscalCloseService.php` | readiness wording only (`close_date`, `drafts`); `close()` / `reopen()` / P&L / blockers untouched |
 | `tests/Feature/FiscalYearClosedPostingTest.php` (new, 13 tests) | functional matrix (SQLite + PostgreSQL) |
 | `tests/Feature/FiscalYearClosedPostingPostgresTest.php` (new, 2 tests) | forked-process PostgreSQL races (skipped on SQLite) |
+| `tests/Feature/VatAdjustmentRoutingTest.php` | CI robustness only: `journal()` and its expected literals are compared in canonical account-code order (`lines` has no ORDER BY, so PostgreSQL returned the same three lines in a different order on the first CI run). Values and debit/credit direction remain compared strictly; no assertion removed |
 | `docs/plans/accounting/FISCAL-1-fiscal-period-close-design.md`, `docs/plans/accounting/reports/FISCAL-2-implementation-report.md`, `docs/plans/accounting/ACC-6-accounting-period-lock-design.md` | explicit superseding notes (FC3-3) |
 | `CLAUDE.md`, `docs/audits/horizon/TAX-HZ-00-REMEDIATION-BACKLOG.md`, this report | documentation / status (ACC-02-FC recorded as merged #1501) |
 
