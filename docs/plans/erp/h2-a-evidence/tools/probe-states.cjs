@@ -84,7 +84,18 @@ async function read(page) {
     shell = shell === null ? seen : new Set([...shell].filter((x) => seen.has(x)));
   }
   fs.writeFileSync(path.join(outDir, 'shell-endpoints.json'), JSON.stringify([...shell].sort(), null, 1));
-  const isPageApi = (u) => u.includes('/api/') && !shell.has(apiPath(u));
+  // Pages that also load a shell endpoint for their own content: for these routes that endpoint is page API too,
+  // so loading/error probes reach it. `/api/me` is never overridden: failing it ends the session by design (layout).
+  // Extra pairs via PAGE_SHELL_OVERRIDES='{"/route":["/api/x"]}'.
+  const OVERRIDES = {
+    '/sales-settings': ['/api/applications/nav-state'], '/sales-settings/einvoice': ['/api/applications/nav-state'],
+    '/integrations': ['/api/applications/nav-state'], '/delivery-platforms': ['/api/applications/nav-state', '/api/branches'],
+    '/branches': ['/api/branches'], '/branches/settings': ['/api/branches'], '/warehouses': ['/api/branches'],
+    '/inventory': ['/api/branches'], '/users': ['/api/branches'], '/fuel-stations/master-data': ['/api/branches'],
+    ...JSON.parse(process.env.PAGE_SHELL_OVERRIDES || '{}'),
+  };
+  let current = '';
+  const isPageApi = (u) => u.includes('/api/') && (!shell.has(apiPath(u)) || (OVERRIDES[current] || []).includes(apiPath(u)));
 
   for (const state of statesCsv.split(',')) {
     const who = state === 'empty' ? 'empty' : state === 'forbidden' ? 'staff' : 'owner';
@@ -94,6 +105,7 @@ async function read(page) {
     if (state === 'error') await page.route('**/api/**', async (r) => { if (r.request().method() === 'GET' && isPageApi(r.request().url())) return r.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'Server Error' }) }); await r.continue().catch(() => {}); });
     for (const route of routes) {
       if (done.has(state + ' ' + route)) continue;
+      current = route;
       const api = []; const errs = [];
       const onResp = (r) => { if (r.url().includes('/api/') && isPageApi(r.url())) api.push(`${r.status()} ${r.request().method()} ${apiPath(r.url())}`); };
       const onErr = (e) => errs.push(String(e.message).slice(0, 160));
