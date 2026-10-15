@@ -23,6 +23,8 @@ METRICS = {
   'loads': lambda r: True,
   'v3 gate NOT applied on the page': lambda r: not r['_ui'].startswith('legacy') and r.get('ui') != '3',
   'navigation error': lambda r: bool(r.get('navErr')),
+  # a failed axe run is not "zero violations": surface it so the route/config is re-run, never read as clean
+  'axe scan failed': lambda r: any(v.get('id') == 'axe-error' for v in r.get('axe') or []),
   'HTTP ≥ 400 (document)': lambda r: (r.get('status') or 0) >= 400,
   'page overflow-x > 0': lambda r: (r.get('overflowX') or 0) > 0,
   'h1 count ≠ 1': lambda r: r.get('h1', 1) != 1,

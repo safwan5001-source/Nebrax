@@ -68,7 +68,7 @@ The H1 gains **held** on every audited route (v3 and legacy):
 | legacy AR 1440 | `/warehouses/:id` has no `h1` (axe `page-has-heading-one`, a **regression** against H1 final, where that rule hit only `/icon.ico`); `/roles` axe `color-contrast` | Legacy surface |
 | `/invoices/new` | axe `target-size` on the "Already paid" checkbox | **Accepted** in H1 (WCAG 2.5.8 equivalent-target exception) |
 
-**Expected, not defects:** `/dev/*` returns 404 in a production build (excluded routes). `/verify-email` returns 422 without a token. `/me` gets 403 on `/api/me/{profile,contract,attendances,payroll-items}` for an owner with no linked employee. A2 judges how that state is *shown*.
+**Expected, not defects:** `/dev/*` returns 404 in a production build (excluded routes). One axe scan failed (`/document-qa`, v3 AR 1440: browser context closed); that route is an excluded dev/QA harness, so no audited result depends on it. The summary reports such failures as «axe scan failed» rather than as zero violations. `/verify-email` returns 422 without a token. `/me` gets 403 on `/api/me/{profile,contract,attendances,payroll-items}` for an owner with no linked employee. A2 judges how that state is *shown*.
 
 **English mode:** after excluding the language switch («ع») and the exact fixture user and branch names in the topbar (`المالك a`, `الفرع الرئيسي`: tenant data), **11 pages** still show Arabic in EN chrome positions (including the journal-entry detail: account names). They are data, not catalog strings, but several are actionable and go to A2:
 
