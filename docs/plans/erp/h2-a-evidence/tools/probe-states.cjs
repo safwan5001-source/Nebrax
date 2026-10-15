@@ -30,7 +30,7 @@ const outFile = path.join(outDir, 'states.jsonl');
 // Resume only the SAME run: the fingerprint covers the fixture identities (user and tenant ids, not tokens), the base URL
 // and the probe options. A recreated fixture or other options must use a fresh outDir, so runs never mix.
 const ident = (u) => { try { const j = JSON.parse(u || '{}'); return `${j.id}@${j.tenant_id}`; } catch { return '?'; } };
-const fingerprint = JSON.stringify({ base: BASE, delay: DELAY_MS, shell: SHELL_ROUTES, owner: ident(ID.owner[1]), empty: ident(ID.empty[1]), staff: ident(ID.staff[1]) });
+const fingerprint = JSON.stringify({ base: BASE, delay: DELAY_MS, shell: SHELL_ROUTES, derive: process.env.DERIVE_OVERRIDES !== '0', owner: ident(ID.owner[1]), empty: ident(ID.empty[1]), staff: ident(ID.staff[1]) });
 const runFile = path.join(outDir, 'run.json');
 if (fs.existsSync(outFile)) {
   const prev = fs.existsSync(runFile) ? fs.readFileSync(runFile, 'utf8') : null;
@@ -83,15 +83,21 @@ async function read(page) {
 
 (async () => {
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ['--no-sandbox'] });
-  // Learn the shell endpoints once: the intersection of what each minimal page requests.
-  let shell = null;
-  for (const route of SHELL_ROUTES) {
-    const seen = new Set();
+  // Learn the shell endpoints once: the intersection of what each minimal page requests, with the
+  // smallest number of times each is requested there (a shell endpoint may legitimately be called twice).
+  let shell = null; const shellCount = {};
+  const countRequests = async (route) => {
+    const n = {};
     const ctx = await context(browser, 'owner'); const p = await ctx.newPage();
-    p.on('request', (r) => { if (r.url().includes('/api/')) seen.add(apiPath(r.url())); });
-    await p.goto(BASE + route, { waitUntil: 'domcontentloaded' }); await p.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
+    p.on('request', (r) => { if (r.url().includes('/api/') && r.method() === 'GET') { const k = apiPath(r.url()); n[k] = (n[k] || 0) + 1; } });
+    await p.goto(BASE + route, { waitUntil: 'domcontentloaded' }).catch(() => {}); await p.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
     await ctx.close();
-    shell = shell === null ? seen : new Set([...shell].filter((x) => seen.has(x)));
+    return n;
+  };
+  for (const route of SHELL_ROUTES) {
+    const n = await countRequests(route);
+    shell = shell === null ? new Set(Object.keys(n)) : new Set([...shell].filter((x) => x in n));
+    for (const [k, v] of Object.entries(n)) shellCount[k] = Math.min(shellCount[k] ?? v, v);
   }
   fs.writeFileSync(path.join(outDir, 'shell-endpoints.json'), JSON.stringify([...shell].sort(), null, 1));
   // Pages that also load a shell endpoint for their own content: for these routes that endpoint is page API too,
@@ -104,9 +110,22 @@ async function read(page) {
     '/inventory': ['/api/branches'], '/users': ['/api/branches'], '/fuel-stations/master-data': ['/api/branches'],
     ...JSON.parse(process.env.PAGE_SHELL_OVERRIDES || '{}'),
   };
+  // Derived overrides (the root fix): load each route once normally; a shell endpoint it requests MORE often than the
+  // bare shell does is also the page's own (e.g. report filters loading /branches), so that route probes it too.
+  // `/api/me` is excluded for the reason above. Set DERIVE_OVERRIDES=0 to skip the discovery pass.
+  const derived = {};
+  if (process.env.DERIVE_OVERRIDES !== '0') {
+    for (const route of routes) {
+      const n = await countRequests(route);
+      const extra = [...shell].filter((k) => k !== '/api/me' && (n[k] || 0) > (shellCount[k] || 0));
+      if (extra.length) derived[route] = extra;
+    }
+    fs.writeFileSync(path.join(outDir, 'derived-overrides.json'), JSON.stringify(derived, null, 1));
+    if (process.env.DISCOVER_ONLY === '1') { await browser.close(); return; }
+  }
   let current = '';
   // An override key covers the route and its children (`/warehouses` → `/warehouses/new`, `/warehouses/<id>`, …).
-  const overridesFor = (route) => Object.entries(OVERRIDES).filter(([k]) => route === k || route.startsWith(k + '/')).flatMap(([, v]) => v);
+  const overridesFor = (route) => [...Object.entries(OVERRIDES).filter(([k]) => route === k || route.startsWith(k + '/')).flatMap(([, v]) => v), ...(derived[route] || [])];
   const isPageApi = (u) => u.includes('/api/') && (!shell.has(apiPath(u)) || overridesFor(current).includes(apiPath(u)));
 
   for (const state of statesCsv.split(',')) {
