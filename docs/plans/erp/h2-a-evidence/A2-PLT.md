@@ -4,7 +4,7 @@
 
 > Saved by the coordinator verbatim from the auditor's hand-back (the auditor's harness refused file writes). Evidence files referenced below exist in this directory. P0 (PLT-01) re-verified by the coordinator in code: `web/src/components/settings/tax-settings-card.tsx:32` `.catch(() => setRows([]))` + `:52` PUT of the whole list; `app/Http/Controllers/Api/SalesConfigController.php` `update()` accepts `data: present|array` (empty allowed) and stores it.
 
-Environment: local only (web 127.0.0.1:3001, API 127.0.0.1:8000), v3 surface. Viewports: AR 1440 light (primary), AR 390 (mobile), EN dark 1440 (from `out-v3b`). Records tagged `H2-A2-PLT`. Evidence paths relative to this directory: `shots/` (all screenshots), `capture-{d,m}.jsonl`, `wf1..wf8.jsonl`, `states.jsonl` (raw), `*.cjs` (scripts), `sheet_*.jpg` (contact sheets), [`E01`](a2/plt/E01_tax_load_error_empty_list_save.jpg)..E15`.
+Environment: local only (web 127.0.0.1:3001, API 127.0.0.1:8000), v3 surface. Viewports: AR 1440 light (primary), AR 390 (mobile), EN dark 1440 (from `out-v3b`). Records tagged `H2-A2-PLT`. Evidence paths relative to this directory: `shots/` (all screenshots), `capture-{d,m}.jsonl`, `wf1..wf8.jsonl`, `states.jsonl` (raw), `*.cjs` (scripts), `sheet_*.jpg` (contact sheets), and the curated `E01`…`E15` images, committed under [`a2/plt/`](a2/plt/).
 
 Severity: **P0 1 · P1 6 · P2 22 · P3 8** (37 distinct findings).
 

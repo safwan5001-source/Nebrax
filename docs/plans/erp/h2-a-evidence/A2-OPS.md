@@ -4,7 +4,7 @@
 
 - **Run:** 2026-10-15, local isolated environment (web on :3001, production build; API on :8000).
 - **Surface:** v3, Arabic, 1440 light, unless noted.
-- **Paths:** evidence images are relative to `ops/` (for example `evidence/01-….jpg`). `shots/` holds all screenshots; `run.log` is the step log.
+- **Paths:** curated evidence images are committed under [`a2/ops/`](a2/ops/) (for example [`01`](a2/ops/01-pos-checkout-422-no-visible-error.jpg)). `shots/` holds all screenshots and `run.log` is the step log (local run, outside git).
 - **Tag:** every record I created is tagged `H2-A2-OPS`.
 - **Format:** each finding gives Observed (fact) separately from Direction (suggestion only).
 
@@ -163,13 +163,13 @@ The POS cart total is calculated in the browser (`page.tsx:1166`) and matched th
 
 **H2-OPS-04 · P1 · A barcode scan while a tile has focus adds two items**
 - **Observed:** I tapped «ديزل 91 لتر» and then scanned `FLT-1`. The cart now held Filter ×1 and diesel ×2: the Enter at the end of the scan also activated the focused tile.
-- **Evidence:** `evidence/02-…`
+- **Evidence:** [`02`](a2/ops/02-pos-scan-with-tile-focused-double-add.jpg)
 - **Why it matters:** the cart silently gains an item, so the customer is overcharged.
 - **Direction:** have the scanner consume its final Enter, or move focus off the tile after a tap.
 
 **H2-OPS-05 · P1 · The amount due is invisible on the payment screen below 1024 px**
 - **Observed:** the 36 px total is drawn in `rgb(242,246,253)` on a white card in the mobile summary. The dark "outcome" surface is applied to a hidden 0×0 element instead.
-- **Evidence:** `evidence/03-…`
+- **Evidence:** [`03`](a2/ops/03-pos-390-amount-due-invisible.jpg)
 - **Why it matters:** fails WCAG 1.4.3 contrast; cashiers on phones or portrait tablets cannot read what is owed.
 - **Direction:** give the visible summary the dark background, or use normal text color on the white card.
 
@@ -184,7 +184,7 @@ The POS cart total is calculated in the browser (`page.tsx:1166`) and matched th
 
 **H2-OPS-07 · P1 · The RFQ is a dead end**
 - **Observed:** «تسجيل عرض مورّد» returns 422 «هذا المستند يلزمه مورّد محدَّد.», but the RFQ has no supplier field (neither on `/rfq/new` nor on the detail page) and no edit action.
-- **Evidence:** `evidence/12-…`
+- **Evidence:** [`12`](a2/ops/12-rfq-dead-end-supplier-required.jpg)
 - **Why it matters:** the purchase request → RFQ → quote path cannot be completed.
 - **Direction:** collect the supplier on the RFQ, or when recording the quote.
 

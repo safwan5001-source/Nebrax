@@ -20,7 +20,7 @@ DATE: 2026-10-15 · Plan: [AWJ-ERP-UI-H2-START-PLAN.md](./AWJ-ERP-UI-H2-START-PL
 
 Order of authority (unchanged): **code + tests → design-system/v3 → DESIGN_SYSTEM.md → H1-1 contract → this document**. This contract does not restate tokens, colour, type, spacing, grid, Document Workspace or Totals Dock (v3 `FOUNDATIONS`, `DATA_GRID`, `DOCUMENT_WORKSPACE`, `TOTALS_DOCK`, `WORKSPACE_POSTURES`). It keeps every H1-1 rule (dialog D1–D7, menus M1–M3, toasts T1–T4, shell S1–S5, §2.5–2.8) and adds page patterns plus cross-cutting rules that A2 showed are missing.
 
-**Numbers alignment (closes A3 open question 1):** amounts, quantities and percentages align to the **logical end** (`text-end`: physically left in RTL, right in LTR), mono with tabular figures (v3 FOUNDATIONS §5.3, DATA_GRID §7). The phrase «الأرقام يمين» in `DESIGN_SYSTEM.md` §مبادئ التخطيط is v2 wording; a docs-sync item (not a behaviour change) is listed in §6.
+**Numbers alignment (settles the number-alignment caution in A3 §1 «Not adopted / caution» and its RTL observations):** amounts, quantities and percentages align to the **logical end** (`text-end`: physically left in RTL, right in LTR), mono with tabular figures (v3 FOUNDATIONS §5 rule 3, DATA_GRID §7). The phrase «الأرقام يمين» in `DESIGN_SYSTEM.md` §مبادئ التخطيط is v2 wording; a docs-sync item (not a behaviour change) is listed in §6.
 
 Each rule has an id (`R-…`), a level (MUST / SHOULD), the A2 evidence that motivates it, and how it is verified.
 
@@ -90,7 +90,7 @@ Tiers (A3 §8, adapted):
 |---|---|---|
 | R-TEXT-1 | No raw server text, exception, model name or internal code in the UI («No query results for model…», «Server Error», `safety_check_pending`, `CashBankTransfer`, permission keys, `fields.*`). Map to catalog strings; unknown codes fall back to a localized generic message. | PLT-19, FIN-08/11/32, SAL-21, OPS-20 |
 | R-TEXT-2 | No developer jargon in user copy («layout», «ListView», «float», «append-only», «token أو secret»). Domain terms (COGS, GRNI) appear only where the role uses them, with a plain label. | PLT-23/25 |
-| R-TEXT-3 | English mode: every chrome string comes from the catalog, including `aria-label`s (e.g. the date-picker label `input.tsx:179`). Fixed system values (system role names, default treasury names) display through the catalog. | FIN-25/32, A1 §4 |
+| R-TEXT-3 | English mode: every chrome string comes from the catalog, including `aria-label`s (e.g. the date-picker label `input.tsx:179`). System roles (`is_system`) display their name through the catalog, keyed by `slug` (`app/Models/Role.php`). User-editable records (treasury, account, product, partner names) are tenant data and stay as stored: that is D-ERP-UX-01 / `name_en`, outside H2. | FIN-25/32, A1 §4 |
 | R-TEXT-4 | Two screens never share one title. | FIN-20 |
 | R-TEXT-5 | The mono numeric face applies to digits only; Arabic words and labels never render in it (letters lose their joining). | OPS-17, PLT-35, FIN-29 |
 
@@ -100,7 +100,7 @@ Tiers (A3 §8, adapted):
 | R-NAV-1 | Exactly one sidebar item is active per route. | PLT-33, FIN-30, SAL-33 |
 | R-NAV-2 | After create, land on the created record's detail (or stay with a toast linking to it); never silently on the list. | SAL-29/31, PLT-13 |
 | R-LINK-1 | A posted document shows its journal entry number as a link, and links to related documents (credit notes, returns, payments, reversal) where the API returns them. Where it does not, record a backend dependency; do not compute links. | FIN-10, SAL-08 |
-| R-DATE-1 | Default dates are the user's local calendar date, never the UTC date from `toISOString()`. | SAL-11 |
+| R-DATE-1 | Default document dates are today's date in the **tenant timezone** (`company.timezone`, `web/src/lib/timezone.ts`), never the UTC date from `toISOString()` and never the browser's zone. | SAL-11 |
 | R-DATE-2 | One display format per surface: inputs and tables use the same convention per locale (decided in B1). | FIN §4.7 |
 
 ### R-A11Y (additions to H1)
@@ -190,9 +190,10 @@ Each pattern names the shared components to use (existing, `components/nebrax/*`
   - A checkout error is shown inside the payment pane, never only in code or under a toast that covers the total (OPS-01 UI part, OPS-22).
   - Opening payment moves focus into it; the default method comes from configuration, not alphabetical order (OPS-24).
   - A rule that blocks confirm (a registered customer is required) is visible before confirm (OPS-11).
-  - An out-of-stock tile is disabled with its reason (OPS-25).
-  - Closing a session shows the live over/short amount, confirms (T2) when it is not zero, and lands on the session's Z report (OPS-10).
-  - The cart shows subtotal, discount and tax before payment (OPS-35).
+  - An out-of-stock tile is disabled with its reason **only when `inventory.allow_negative_stock` is off**; otherwise it stays enabled with the out-of-stock marker (OPS-25).
+  - Closing a session shows the live over/short amount **unless blind cash count is enabled** (`pos.blind_cash_count_enabled`, where the server withholds the expected amount); it confirms (T2) when the amount is not zero, or always in blind mode, and lands on the session's Z report (OPS-10).
+  - The cart shows subtotal, discount and tax before payment (OPS-35), **reusing the cart computation the payment pane already shows** (`pos/page.tsx`); the server stays authoritative at checkout, and no new tax or pricing rule is added.
+- **A posture rule never overrides a tenant setting.** Where a configurable policy exists (`Settings`, `PosSettings`, `BranchSettings`), the UI follows the setting; the rule describes the default presentation only (CLAUDE.md rule 6).
 - No change to sale, payment or inventory logic.
 
 ### P-STUDIO — Store Customizer and App Builder
@@ -225,16 +226,18 @@ The plan §8 criteria 1–11 apply, plus, for each slice:
   - **Client-computed balances:** they conflict with R-MONEY-2.
   - **A snapshot regression gate:** D5.
   - **Typed confirmation for every delete:** excessive. T3 only.
+  - **From A3 «Not adopted / caution»:** collapsed (icon-only) search on lists; row actions visible on hover only (unreachable by touch and keyboard); floating labels on desktop forms; auto-save on financial documents (explicit Save and Post stay); a recycle bin for posted documents (conflicts with immutability; drafts delete with T1).
 
 ## 6. Backend and owner dependencies surfaced by A2 (outside H2, listed for routing)
 
 | Item | Why it is not UI |
 |---|---|
 | `/applications` shows «مفعّلة 0» for tenants registered before 2026-08-21 while enforcement treats capabilities as enabled (PLT-07) | `TenantApplicationService::stateFor()` intentionally shows stored state; aligning it is a backend/owner decision |
-| Invoice «المتبقي» ignores posted credit notes and returns (SAL-08); customer amount due (SAL-03) depends on it | Settlement semantics: ADR needed |
+| Invoice «المتبقي» ignores posted credit notes and returns (SAL-08) | Settlement semantics: ADR needed. The SAL-03 hotfix uses the ledger balance the partner page already fetches (statement `closing_balance`); only a per-invoice due view depends on SAL-08 |
 | Credit note vs return rounding differs by 0.01–0.02 (SAL-14) | Backend tax/rounding: accounting decision |
 | Branch-scoped user sees tenant-wide cash and receivables (SAL-13) | Record-scope policy for account balances: owner decision |
-| Company field cannot be cleared (PLT-03); aging API ignores dates (FIN-03); recurring stop/pause (SAL-09) partly exists in the API | Backend fixes or contract |
+| Company field cannot be cleared (PLT-03); aging API ignores dates (FIN-03); recurring **pause/edit** (SAL-09: only `DELETE recurring-invoices/{id}` exists, used for «stop» in C1) | Backend fixes or contract |
+| Server values R-MONEY-2 needs but no endpoint provides: dashboard KPIs except `dashboard/sales-breakdown` (PLT-06); group account balances return `"0.00"` (FIN-24); treasury movements (FIN-22, no endpoint); provisional stocktake value and stock-permit draft cost (OPS-13, OPS-14) | Backend: until each exists, the slice keeps today's display and adds no new browser aggregation |
 | Configured payment methods ignored by receipt/expense/custody (FIN-21) | Product decision on where methods apply |
 | `name_en` on report rows (D-ERP-UX-01) and on partners/products display in EN | Separate owner decision (unchanged) |
 | **POS checkout 422 for every product without a unit template (OPS-01, P0)** | `InvoiceService` resolves the POS base-unit name through `UnitConversion::resolve`, which throws without a template; delivery notes map the base unit to `null`. Backend fix |

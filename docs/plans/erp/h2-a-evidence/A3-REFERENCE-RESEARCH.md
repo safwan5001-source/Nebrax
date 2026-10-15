@@ -4,11 +4,11 @@ AWJ ERP (أَوْج) UI/UX horizon, phase A3. Captured 2026-10-15.
 
 **What this is.** Evidence that was observed directly: pages opened in headless Chromium (Playwright, 1440x900 desktop and 390x844 mobile), screenshots taken, page text extracted. Every fact below comes from a screenshot in [`a3/`](a3/) or from the visible text of the cited page. Where something was not observed, the text says so.
 
-**What this is not.** It is not a decision record. Every item under "Implications for AWJ" is a **candidate** for the AWJ team to accept, change or reject. Items under "Not adopted / caution" mark places where a reference practice conflicts with AWJ's governing principles: a daily accounting tool, RTL Arabic first, dense, one brand colour, financial numbers in Mono, no decoration, double-entry immutability.
+**What this is not.** It is not a decision record. Every item under "Implications for AWJ" is a **candidate** for the AWJ team to accept, change or reject. **AWJ Decision:** recorded in the A4 contract ([AWJ-ERP-UI-H2-1-UI-CONTRACT.md](../AWJ-ERP-UI-H2-1-UI-CONTRACT.md) §2–§5), not here; each section below points to it. Items under "Not adopted / caution" mark places where a reference practice conflicts with AWJ's governing principles: a daily accounting tool, RTL Arabic first, dense, one brand colour, financial numbers in Mono, no decoration, double-entry immutability.
 
 ## How to read the evidence
 
-- Screenshots are in [`a3/`](a3/), named `<source>-<pattern>-<width>.png`.
+- Screenshots are in [`a3/`](a3/), named `<source>-<pattern>-<width>.jpg` (converted from the original PNG captures, ≤1000 px).
 - The width suffix is the viewport the page was loaded at. Many captures are **element crops** of an image embedded in a docs page (Carbon, Primer, Zoho, BC, Shopify POS). So a `-1440` file can be narrower than 1440 px. A few (`zoho-settings-orgprofile`, `zoho-detail-splitview`, `bc-report-analysis-*`, `shopify-pos-*`, `daftra-*`) were re-rendered from the original image URL at 1440 px (Daftra POS totals at 800 px) so they stay legible.
 - The kind of evidence differs, and it is noted per source:
   - **Real product screenshot (help docs):** Zoho Books, Microsoft Dynamics 365 Business Central (BC).
@@ -114,6 +114,8 @@ AWJ ERP (أَوْج) UI/UX horizon, phase A3. Captured 2026-10-15.
 
 ---
 
+> **AWJ Decision:** see A4 §2–§5 (rules, patterns, and «Not adopted»).
+
 ## 2. Forms (النماذج)
 
 ### External Evidence
@@ -181,6 +183,8 @@ AWJ ERP (أَوْج) UI/UX horizon, phase A3. Captured 2026-10-15.
 - **Auto-save** (Primer imperative controls, BC page model) is not appropriate for financial documents. Totals and postings must be explicit (AWJ rule: posting is explicit and immutable).
 
 ---
+
+> **AWJ Decision:** see A4 §2–§5 (rules, patterns, and «Not adopted»).
 
 ## 3. Document detail: invoice / bill (تفاصيل المستند)
 
@@ -253,6 +257,8 @@ AWJ ERP (أَوْج) UI/UX horizon, phase A3. Captured 2026-10-15.
 
 ---
 
+> **AWJ Decision:** see A4 §2–§5 (rules, patterns, and «Not adopted»).
+
 ## 4. Empty / loading / error / permission-denied states (الحالات)
 
 ### External Evidence
@@ -303,6 +309,8 @@ AWJ ERP (أَوْج) UI/UX horizon, phase A3. Captured 2026-10-15.
 - **"View log" links to raw logs** suit an IBM ops audience, not accountants. Show a reference ID instead.
 
 ---
+
+> **AWJ Decision:** see A4 §2–§5 (rules, patterns, and «Not adopted»).
 
 ## 5. Settings pages: sectioned settings centre (مركز الإعدادات)
 
@@ -361,6 +369,8 @@ AWJ ERP (أَوْج) UI/UX horizon, phase A3. Captured 2026-10-15.
 
 ---
 
+> **AWJ Decision:** see A4 §2–§5 (rules, patterns, and «Not adopted»).
+
 ## 6. Reports: analysis-first (التقارير)
 
 ### External Evidence
@@ -413,6 +423,8 @@ AWJ ERP (أَوْج) UI/UX horizon, phase A3. Captured 2026-10-15.
 - **Charts** (Zoho chart view, Foodics KPI sparklines) are optional, not the default report body.
 
 ---
+
+> **AWJ Decision:** see A4 §2–§5 (rules, patterns, and «Not adopted»).
 
 ## 7. POS (نقطة البيع)
 
@@ -470,6 +482,8 @@ AWJ ERP (أَوْج) UI/UX horizon, phase A3. Captured 2026-10-15.
 - **Free price editing at POS** must be permission-gated and policy-controlled (configurable-policies rule). Daftra documents restricting it as an FAQ.
 
 ---
+
+> **AWJ Decision:** see A4 §2–§5 (rules, patterns, and «Not adopted»).
 
 ## 8. Destructive confirmations (تأكيد الإجراءات الهدّامة)
 
@@ -553,6 +567,8 @@ AWJ ERP (أَوْج) UI/UX horizon, phase A3. Captured 2026-10-15.
 - **Red text-only "Delete" buttons** (Primer demo, Shopify header) must keep the explicit verb label, because colour cannot be the only signal (AWJ principle 4).
 
 ---
+
+> **AWJ Decision:** see A4 §2–§5 (rules, patterns, and «Not adopted»).
 
 ## Cross-cutting RTL observations (ملاحظات RTL)
 
