@@ -8,8 +8,8 @@
 |---|---|
 | الفرع | `claude/core-dark-m-implementation` |
 | **Base SHA** (`origin/main`) | `a79b1576abe3d4aba9ad241f477d09b5bebdd72a` |
-| **Head SHA** | `__HEAD_SHA__` |
-| PR | __PR__ |
+| **Head SHA** | `d59444edc22b8ca2f3082043f24600b5648df126` (commit التنفيذ؛ رأس الـPR النهائي = commit تعبئة المراجع الذي يليه) |
+| PR | [#1539](https://github.com/safwan5001-source/Nebrax/pull/1539) — **مفتوح وغير مدموج** |
 | مرجع التصميم | PR #1535 (مفتوح)، قرار المالك: **M** |
 | الثيمات المتأثرة | **Core · Dark فقط** (`theme.core.dark`) |
 
