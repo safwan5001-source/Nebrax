@@ -6,7 +6,7 @@ Plan: [AWJ-ERP-UI-H2-START-PLAN.md](AWJ-ERP-UI-H2-START-PLAN.md) §5.1 and §7 �
 ## الملخص (للمالك)
 
 - دُقّقت **كل وحدات ERP الموجودة** في أربع مجموعات متوازية، بالحالات (فارغ/تحميل/خطأ/ممنوع/قراءة فقط/تحقق/نص طويل/بيانات كثيرة) و**مسارات عمل حقيقية** من البداية للنهاية في متصفح فعلي، لا لقطات فقط: فاتورة ← ترحيل ← تحصيل، مرتجع، إشعار دائن، بيع POS كامل وإقفال جلسة، رصيد افتتاحي، تحويل مخزني، جرد، دورة مشتريات كاملة، قيد يدوي ← عكس، مسيّر رواتب ← صرف، تحويل خزينة، إعدادات الضرائب، والمزيد.
-- **147 ملاحظة**: ‏**9 P0** · 29 P1 · 86 P2 · 23 P3، مُجمَّعة في **28 بنداً موحّداً** (`ERP-UI-H2-001..028`) مربوطة بقواعد عقد A4 وبشرائح B/C.
+- **149 ملاحظة**: ‏**9 P0** · 30 P1 · 87 P2 · 23 P3، مُجمَّعة في **28 بنداً موحّداً** (`ERP-UI-H2-001..028`) مربوطة بقواعد عقد A4 وبشرائح B/C.
 - **الأرقام المالية مطابقة للـAPI** في كل ما فُحص، **إلا ثلاثة**: مستحق العميل في صفحة الطرف يُحسب في المتصفح ويخطئ (SAL-03)، وكشف المورّد يُسقط استرداد المورّد (OPS-03، خلل خادمي)، ولوحة التحكم تعدّ المسودة غير مدفوعة وتجمع النقد في المتصفح (PLT-06).
 - **العزل سليم:** مستأجر ب لم يظهر في أي قائمة أو منتقٍ. المستخدم المقيّد بفرع لا يرى مستندات الفرع الرئيسي؛ لكنه يرى أرصدة المؤسسة في لوحة التحكم ومخزون المخازن المؤسسية (قراران للمالك: SAL-13، OPS-32).
 - **أخطر نمطين متكررين:** (١) إجراء لا يُعكس (ترحيل/صرف/حذف/إقفال) بنقرة واحدة بلا تأكيد في **أكثر من 15 موضعاً**؛ (٢) خطأ تحميل يتحوّل إلى «لا توجد بيانات» أو «0 ⃁» — وفي الإعدادات إلى **نموذج فارغ قابل للحفظ يمحو الإعداد الحقيقي**.
@@ -35,7 +35,8 @@ Plan: [AWJ-ERP-UI-H2-START-PLAN.md](AWJ-ERP-UI-H2-START-PLAN.md) §5.1 and §7 �
 | FIN | 2 | 5 | 21 | 7 | 35 |
 | SAL | 3 | 11 | 18 | 7 | 39 |
 | OPS | 3 | 7 | 25 | 1 (bundle of 9) | 36 |
-| **All** | **9** | **29** | **86** | **23** | **147** |
+| Probe re-run (§3a) | 0 | 1 | 1 | 0 | 2 |
+| **All** | **9** | **30** | **87** | **23** | **149** |
 
 **Financial-number parity.** Every checked document, list, statement, report and POS figure equals the API value formatted by `formatRiyal`, except SAL-03, OPS-03 and PLT-06 (§3). Format deviations (old ﷼ sign, «SAR», dropped trailing zeros, halalas in an error) are ERP-UI-H2-010.
 
@@ -57,18 +58,27 @@ Plan: [AWJ-ERP-UI-H2-START-PLAN.md](AWJ-ERP-UI-H2-START-PLAN.md) §5.1 and §7 �
 
 Items 1–7 are UI-only, small and independent. They are outside D3 (no code before the gate), so they need the owner's explicit go (§9, decision 1). Items 8–9 are backend defects in financial paths; under the plan (§4.2) they leave H2 and need their own task.
 
+### 3a. Found by the probe re-run after review
+
+The state probe originally exempted any endpoint the shell also calls; after review it probes those endpoints on the pages that use them, including child routes ([tools/README](h2-a-evidence/tools/README.md)). Re-probing the affected routes changed no earlier verdict and added two findings:
+
+| ID | P | Finding | Rule | Evidence |
+|---|---|---|---|---|
+| PROBE-01 | P1 | Warehouse and branch **edit** pages (`/warehouses/:id`, `/branches/:id`) render the full form blank and editable after their GET fails, with only a small «تعذّر التحميل» beside Save. Typing a name enables Save, which would overwrite code, branch, city, address and notes with blanks. Same class as PLT-01 for records | R-STATE-3 | [`PROBE-01`](h2-a-evidence/a2/probe/PROBE-01-warehouse-edit-blank-after-load-error.jpg) |
+| PROBE-02 | P2 | `/warehouses/new`: when `/api/branches` fails the branch selector silently offers only «مخزن مركزي (بلا فرع)», with no error, so a branch warehouse can be created as central by mistake | R-STATE-2 | [`PROBE-02`](h2-a-evidence/a2/probe/PROBE-02-warehouse-new-branch-list-silently-empty.jpg) |
+
 ## 4. Consolidated backlog
 
 Priority = highest source finding. **Rule** = the A4 contract rule that fixes it. **Slice** = where it lands. Layer **UI** unless stated.
 
 | ID | Theme | Source findings | P | Rule (A4) | Slice |
 |---|---|---|---|---|---|
-| ERP-UI-H2-001 | Load failure becomes a savable empty settings form | PLT-01, SAL-01, PLT-14 | P0 | R-STATE-3 | Hotfix → B4 |
+| ERP-UI-H2-001 | Load failure becomes a savable empty settings or record form | PLT-01, SAL-01, PLT-14, PROBE-01 | P0 | R-STATE-3 | Hotfix → B4 |
 | ERP-UI-H2-002 | Irreversible action without confirmation (post, pay, delete, close session, status change, company-wide toggle) | FIN-01, FIN-02, FIN-07, SAL-02, SAL-05, OPS-02, OPS-10, OPS-28, FIN-16, PLT-02 | P0 | R-CONFIRM-1..4 | Hotfix (P0 subset) → **B5 widened** beyond `window.confirm` |
 | ERP-UI-H2-003 | Financial totals computed in the browser | SAL-03, PLT-06, SAL-27, FIN-24, SAL-30 | P0 | R-MONEY-2 | Hotfix (SAL-03: statement `closing_balance`) → C1; PLT-06/FIN-24 need server values (§8) |
 | ERP-UI-H2-004 | POS checkout unit name (backend) and invisible checkout error | OPS-01 | P0 | P-FLOOR | **Backend task** + C2 |
 | ERP-UI-H2-005 | Partner statement drops refunds (backend) | OPS-03 | P0 | — | **Backend task** |
-| ERP-UI-H2-006 | Error, 403 or loading shown as "no records", `0 ⃁` or a blank page | SAL-06, SAL-07, PLT-05, PLT-12, FIN-04, FIN-05, OPS-12, PLT-24 | P1 | R-STATE-1, 2, 4, 6 | **B4** (one state component) + B2 |
+| ERP-UI-H2-006 | Error, 403 or loading shown as "no records", `0 ⃁` or a blank page | SAL-06, SAL-07, PLT-05, PLT-12, FIN-04, FIN-05, OPS-12, PLT-24, PROBE-02 | P1 | R-STATE-1, 2, 4, 6 | **B4** (one state component) + B2 |
 | ERP-UI-H2-007 | Actions not aware of permissions (full forms, then 403 after submit) | FIN-09, SAL-10, PLT-15, PLT-16, PLT-24 | P1 | R-PERM-1..2 | B1 + each wave (UI hides by `permissions`; RBAC unchanged) |
 | ERP-UI-H2-008 | Validation: 6 patterns, English server text, native bubbles, errors far from fields | PLT-09, PLT-10, PLT-11, PLT-13, FIN-08, FIN-14, SAL-15, SAL-20, SAL-22, OPS-16, OPS-27 | P1 | R-VALID-1..6 | **B3** |
 | ERP-UI-H2-009 | Not-found and out-of-scope detail pages: raw `No query results for model…`, pointless retry, blank edit form, no h1 | PLT-08, FIN-08, SAL-21, OPS-33 | P2 | R-STATE-5 | B4 |

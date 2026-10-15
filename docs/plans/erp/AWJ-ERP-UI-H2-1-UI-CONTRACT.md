@@ -30,8 +30,8 @@ Each rule has an id (`R-…`), a level (MUST / SHOULD), the A2 evidence that mot
 | # | Rule | Evidence |
 |---|---|---|
 | R-STATE-1 | MUST follow H1-1 §2.5 precedence: loading → forbidden → error → empty → data. | H1-1 |
-| R-STATE-2 | **A failed load is never shown as empty data.** No «لا توجد…», blank card, `0`, `0.00` or «لم يُعثر» when the request failed: show the localized error state with retry. | FIN-04/05, SAL-06/07, PLT-05/12, OPS-12 |
-| R-STATE-3 | **An editor whose data did not load is not editable.** Settings and edit forms render no inputs and no Save until the GET succeeds; on failure they show the error state. Saving defaults over real data must be impossible from the UI. | **PLT-01, SAL-01 (P0)** |
+| R-STATE-2 | **A failed load is never shown as empty data.** No «لا توجد…», blank card, `0`, `0.00` or «لم يُعثر» when the request failed: show the localized error state with retry. | FIN-04/05, SAL-06/07, PLT-05/12, OPS-12, PROBE-02 |
+| R-STATE-3 | **An editor whose data did not load is not editable.** Settings and edit forms render no inputs and no Save until the GET succeeds; on failure they show the error state. Saving defaults over real data must be impossible from the UI. | **PLT-01, SAL-01 (P0)**; PROBE-01 (record edit forms) |
 | R-STATE-4 | Loading shows a skeleton shaped like the content (`LoadingState` variants), never the empty text, and never an endless skeleton: a request that ends in error leaves the skeleton. | FIN-04/05 |
 | R-STATE-5 | Not-found (404) is a localized page state with a link back to the list. It never shows the exception text and never offers «إعادة المحاولة». The same applies to a record outside the user's branch scope (a localized «غير متاح لك» state, not a retry). | PLT-08, FIN-08, SAL-21, OPS-33 |
 | R-STATE-6 | Forbidden (403) uses the shared localized state. It shows no create/manage actions, no counts and no empty-state CTA (extends H1-1 §2.5). | PLT-21/24, SAL-06, OPS-12 |
