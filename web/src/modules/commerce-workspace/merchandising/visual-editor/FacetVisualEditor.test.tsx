@@ -3,6 +3,7 @@
  */
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { flushSync } from 'react-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const apiMock = vi.fn();
@@ -32,6 +33,8 @@ import * as library from '@/modules/commerce-workspace/storefront-media';
 import { asset, page, usage } from '@/modules/store-experience-builder/__tests__/media-fixtures';
 import { commerceWorkspaceMessage } from '@/modules/commerce-workspace/messages';
 import { FacetVisualEditor, type FacetVisualEditorProps } from './FacetVisualEditor';
+import { PREVIEW_CELL_CHROME_PX, PREVIEW_MIN_FRAME_PX } from './PreviewPanel';
+import { FACET_VISUAL_SIZE_PX } from '@/modules/store-experience-builder/presentation/facet-visual-style';
 import { MEDIA_A, MEDIA_B, PREVIEW_A, facetOf, rawFacet, rawValue } from './test-fixtures';
 
 const listMedia = vi.mocked(library.listStorefrontMedia);
@@ -68,6 +71,28 @@ function mount(opts: Opts = {}) {
     />,
   );
   return { ...view, ...handlers, facet };
+}
+
+
+/**
+ * Escape the way a browser delivers it. A real key event is dispatched with an empty JS stack, so React flushes the
+ * update a document listener queued (and the passive effects of that render) before the NEXT listener of the same
+ * dispatch runs. `fireEvent` / `userEvent` wrap the dispatch in `act`, which defers all of that until the dispatch is
+ * over, so they cannot see anything that happens "during the same keydown" (D-W-4). This helper dispatches natively
+ * and flushes React between the dialog layers' listeners, as the browser's microtask checkpoint does.
+ */
+function pressEscapeLikeABrowser(target: Element = document.activeElement ?? document.body) {
+  const flush = () => flushSync(() => undefined);
+  document.addEventListener('keydown', flush, true); // registered after Radix's capture listener => runs right after it
+  const reactEnv = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
+  const previous = reactEnv.IS_REACT_ACT_ENVIRONMENT;
+  reactEnv.IS_REACT_ACT_ENVIRONMENT = false;
+  try {
+    target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true, cancelable: true }));
+  } finally {
+    document.removeEventListener('keydown', flush, true);
+    reactEnv.IS_REACT_ACT_ENVIRONMENT = previous;
+  }
 }
 
 const tab = (name: RegExp | string) => screen.getByRole('tab', { name });
@@ -409,6 +434,66 @@ describe('live preview', () => {
     expect(apiMock).not.toHaveBeenCalled();
   });
 
+  // D-W-1: the tile frame is capped at its cell (`max-width: 100%`), and the cells used to be ~76 px wide, so Medium
+  // (80 px) and Large (112 px) both collapsed to the same ~64.7 px. jsdom cannot measure layout, so these pin the
+  // decisions that produce the real sizes: a cell wide enough for the frame, a floor for groups with no frame, and a
+  // bounded rail slot. The measured sizes in a real browser are in the VD-5 report.
+  const GRID_LIKE = ['Grid', 'Cards', 'Icons'] as const;
+  const LAYOUT_ID = { Grid: 'grid', Cards: 'cards', Icons: 'icons', Rail: 'rail' } as const;
+  const pickLayout = (name: keyof typeof LAYOUT_ID) =>
+    userEvent.click(within(preview()).getByRole('button', { name }));
+  const columnMin = () =>
+    parseFloat(/minmax\((\d+(?:\.\d+)?)px/.exec(document.querySelector('[data-preview-cells]')?.getAttribute('style') ?? '')?.[1] ?? 'NaN');
+  const giveItAGift = async () => {
+    await openTab('Image & icon');
+    await userEvent.click(screen.getByRole('button', { name: 'Icon' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Gift' }));
+    await openTab('Appearance');
+  };
+
+  it.each(GRID_LIKE)('%s layout: each size step gets a cell wide enough for its nominal frame, and a bigger one for a bigger step', async (name) => {
+    mount({ initialTab: 'appearance' });
+    await pickLayout(name);
+    await giveItAGift();
+    const frame = () =>
+      document.querySelector('[data-preview-edited] [data-facet-content] > span[aria-hidden="true"]') as HTMLElement;
+    const chrome = PREVIEW_CELL_CHROME_PX[LAYOUT_ID[name]];
+    const room: Record<string, number> = {};
+    for (const [label, size] of [['Small', 'sm'], ['Medium', 'md'], ['Large', 'lg']] as const) {
+      await userEvent.click(screen.getByRole('button', { name: label }));
+      expect(parseFloat(frame().style.width)).toBe(FACET_VISUAL_SIZE_PX[size]);
+      room[size] = columnMin();
+      expect(room[size]).toBeGreaterThanOrEqual(FACET_VISUAL_SIZE_PX[size] + chrome);
+    }
+    // Large must get strictly more room than Medium: a cell that fits only the smaller step would cap the frame.
+    expect(room.lg).toBeGreaterThan(room.md);
+  });
+
+  it.each(GRID_LIKE)('%s layout: a group with no frame at all (every value text-only) keeps readable columns', async (name) => {
+    mount({ initialTab: 'appearance' });
+    await pickLayout(name);
+    expect(document.querySelector('[data-preview-edited] [data-facet-content]')?.getAttribute('data-facet-content')).toBe('none');
+    // never ~12 px columns that wrap a label one character per line
+    expect(columnMin()).toBeGreaterThanOrEqual(PREVIEW_MIN_FRAME_PX[LAYOUT_ID[name]] + PREVIEW_CELL_CHROME_PX[LAYOUT_ID[name]]);
+    expect(columnMin()).toBeGreaterThanOrEqual(50);
+  });
+
+  it('Rail layout: an item is a bounded slot that holds its frame, however long its label is', async () => {
+    mount({ initialTab: 'data' });
+    await userEvent.clear(screen.getByLabelText('English name (optional)'));
+    await userEvent.type(screen.getByLabelText('English name (optional)'), 'x'.repeat(60));
+    await giveItAGift();
+    await pickLayout('Rail');
+    const slot = () => parseFloat((document.querySelector('[data-preview-edited]') as HTMLElement).style.width);
+    for (const [label, size] of [['Small', 'sm'], ['Medium', 'md'], ['Large', 'lg']] as const) {
+      await userEvent.click(screen.getByRole('button', { name: label }));
+      // a fixed width (not min-width): the 60-character label cannot widen the slot
+      expect(slot()).toBeGreaterThanOrEqual(FACET_VISUAL_SIZE_PX[size] + PREVIEW_CELL_CHROME_PX.rail);
+      expect(slot()).toBeLessThanOrEqual(FACET_VISUAL_SIZE_PX[size] + 48);
+      expect((document.querySelector('[data-preview-edited]') as HTMLElement).style.minWidth).toBe('');
+    }
+  });
+
   it('switches the layout for the preview only, never saving it', async () => {
     mount();
     expect(screen.getByRole('button', { name: 'Grid' }).getAttribute('aria-pressed')).toBe('true');
@@ -732,6 +817,38 @@ describe('closing with unsaved changes', () => {
     await userEvent.keyboard('{Escape}');
     expect(await screen.findByRole('dialog', { name: 'Unsaved changes' })).toBeTruthy();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('a real Escape on an edited editor opens the confirmation and it stays open (D-W-4)', async () => {
+    const { onClose } = mount({});
+    await userEvent.type(screen.getByLabelText('Arabic name'), 'x');
+    pressEscapeLikeABrowser();
+    // the dialog registered during the very keydown that opened it must not treat that keydown as its own Escape
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.getByRole('dialog', { name: 'Unsaved changes' })).toBeTruthy();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('a second Escape returns to the editor with the edits intact and focus inside it (D-W-4)', async () => {
+    const { onClose } = mount({});
+    await userEvent.type(screen.getByLabelText('Arabic name'), 'x');
+    pressEscapeLikeABrowser();
+    await screen.findByRole('dialog', { name: 'Unsaved changes' });
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Unsaved changes' })).toBeNull());
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Edit value — Birthday EN' })).toBeTruthy();
+    expect((screen.getByLabelText('Arabic name') as HTMLInputElement).value).toBe('Birthdayx');
+    expect(screen.getByRole('dialog', { name: 'Edit value — Birthday EN' }).contains(document.activeElement)).toBe(true);
+  });
+
+  it('a real Escape on a clean editor closes it without asking (D-W-4)', async () => {
+    const { onClose } = mount({});
+    pressEscapeLikeABrowser();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledWith(false);
+    expect(screen.queryByRole('dialog', { name: 'Unsaved changes' })).toBeNull();
   });
 
   it('after a partly saved attempt, discarding still tells the parent the list is stale', async () => {

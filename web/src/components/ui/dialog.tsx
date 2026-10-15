@@ -37,6 +37,15 @@ function focusableIn(root: HTMLElement): HTMLElement[] {
 }
 
 /**
+ * آخر مفتاح بدأ توزيعه (طور الالتقاط يسبق كل مستمعي الفقاعة). يُسجَّل على مستوى الوحدة لأن أول حوار يُركَّب أثناء
+ * المفتاح نفسه لا يستطيع التقاطه بعد فوات الأوان. كائن الحدث فريد لكل ضغطة، فمطابقته لاحقاً لا تصيب إلا الضغطة ذاتها.
+ */
+let keydownInFlight: KeyboardEvent | undefined;
+if (typeof document !== 'undefined') {
+  document.addEventListener('keydown', (event) => { keydownInFlight = event; }, true);
+}
+
+/**
  * الحوارات المفتوحة بترتيب فتحها. الأعلى وحده يستجيب لـEscape ويحبس Tab،
  * فلا يُغلق حوارٌ أبٌ مع ابنه ولا يتنازعان التركيز (ERP-UX-001).
  */
@@ -84,7 +93,13 @@ export function Dialog({ open, onClose, title, children, className, closeLabel, 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
+    // مفتاحٌ فتح هذا الحوار نفسه (Escape على حوارٍ أبٍ يطلب تأكيداً): المتصفح يُفرّغ تحديث React وتأثيراته قبل المستمع
+    // التالي من الحدث ذاته، فيُسجَّل مستمعنا والحدث لا يزال في طريقه ويصله في طور الفقاعة. من غير هذا الحارس يعدّه
+    // الحوار الجديد Escape موجّهاً إليه ويُغلق نفسه في اللحظة ذاتها (D-W-4). ما بعده من الأحداث كائناتٌ أخرى فلا يتأثر.
+    const openingEvent = keydownInFlight;
+
     const onKey = (event: KeyboardEvent) => {
+      if (event === openingEvent) return;
       if (topDialog() !== panel) return;
       if (event.key === 'Escape') {
         event.stopPropagation();

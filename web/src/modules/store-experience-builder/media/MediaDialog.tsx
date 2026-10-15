@@ -7,7 +7,7 @@
  */
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useRef } from "react";
 
 export function MediaDialog({
   open,
@@ -31,6 +31,9 @@ export function MediaDialog({
   /** The builder's locale — the dialog is portalled out of the builder shell, so it carries its own direction. */
   locale: "ar" | "en";
 }) {
+  // The picker is opened by a plain button, not a Radix Trigger, so Radix has nowhere to return focus to and drops it
+  // on <body> (D-W-8). The opener is whatever holds focus when the content is about to take it.
+  const opener = useRef<HTMLElement | null>(null);
   return (
     <DialogPrimitive.Root
       open={open}
@@ -42,6 +45,18 @@ export function MediaDialog({
         <DialogPrimitive.Overlay className="fixed inset-0 z-[70] bg-text opacity-40" />
         <DialogPrimitive.Content
           data-media-dialog=""
+          onOpenAutoFocus={() => {
+            const active = document.activeElement;
+            opener.current = active instanceof HTMLElement && active !== document.body ? active : null;
+          }}
+          onCloseAutoFocus={(event) => {
+            const target = opener.current;
+            opener.current = null;
+            if (target?.isConnected) {
+              event.preventDefault();
+              target.focus();
+            }
+          }}
           dir={locale === "ar" ? "rtl" : "ltr"}
           lang={locale}
           className={`fixed inset-0 z-[70] flex flex-col border-border bg-surface outline-none md:inset-auto md:left-1/2 md:top-1/2 md:max-h-[calc(100dvh-4rem)] md:w-[calc(100vw-4rem)] md:-translate-x-1/2 md:-translate-y-1/2 md:border ${
