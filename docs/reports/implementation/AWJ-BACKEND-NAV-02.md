@@ -1,6 +1,6 @@
 # AWJ-BACKEND-NAV-02 — Commercial Dependency Navigation Parity
 
-STATUS: in review (PR open; see "Reviews" and "Closure" below)
+STATUS: closed (merged; post-merge CI green)
 DATE: 2026-10-15
 BASE: `origin/main` @ `0bfa84d`
 
@@ -126,4 +126,18 @@ No web change: the sidebar and the fuel workspace nav already hide on an explici
 | Pre-existing | Cohort-enrolled tenants: operational keys can still disagree | Recorded under Remaining work; CLAUDE.md wording made precise |
 
 ## Closure
-CI, PRE_MERGE_REVIEW, merge and POST_MERGE_REVIEW are recorded below once complete.
+
+| Item | Result |
+|---|---|
+| PR | #1510, squash-merged to `main` as `d9d13a1` (2026-10-15) |
+| CI on the PR head `5acabe3` | `php artisan test` sqlite ✅ · pgsql ✅ · CI Gate ✅ |
+| Codex review | Did not run: usage limit reached (same as NAV-01). The independent agent review above stands in |
+| PRE_MERGE_REVIEW | Recorded on the PR: scope, entitlements/RBAC unchanged, tenant isolation, backward compatibility, regression proof, CI, merge state, no open threads |
+| Merge authority | Horizon merge authorization. No deploy, no production action |
+| Post-merge CI (`main` @ `d9d13a1`, run 38669281222) | ✅ success |
+| POST_MERGE_REVIEW | `main` contains `dependenciesAllowRead` and the 14-test guard; CI green on the merge commit; no follow-up regression found. The only open item is the Cohort divergence under Remaining work |
+
+## Hand-off
+- **AWJ-ERP-UI-H2:** the navigation/entitlement blockers raised in UX-H1-8 §6 are closed (NAV-01: `sales.invoicing`; NAV-02: dependent commercial keys). Nothing in this change blocks starting H2.
+- **`name_en` (D-ERP-UX-01)** remains a separate owner decision: an additive API field on report account rows, not part of NAV-02 and not required to start H2.
+- **Carry into H2 as a known limitation:** operational keys for Cohort-enrolled tenants can still show a link whose route returns 403 (Remaining work). It affects only tenants enrolled in the entitlement-enforcement rollout.
