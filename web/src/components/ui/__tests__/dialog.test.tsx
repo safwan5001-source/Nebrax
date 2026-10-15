@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, screen } from '@testing-library/react';
+import { flushSync } from 'react-dom';
 import { Dialog } from '../dialog';
 import { renderIntl } from '@/test-utils/intl';
 
@@ -78,6 +79,36 @@ describe('Dialog (ERP-UX-001/002)', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(document.activeElement).toBe(opener);
+  });
+
+  it('does not close on the very keydown that opened it, but does on the next one (D-W-4)', () => {
+    const onClose = vi.fn();
+    function Parent() {
+      const [open, setOpen] = useState(false);
+      // a layer below the dialog that answers Escape by opening it (the facet editor's discard confirmation)
+      useEffect(() => {
+        const onEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(true); };
+        document.addEventListener('keydown', onEscape, true);
+        return () => document.removeEventListener('keydown', onEscape, true);
+      }, []);
+      return <Dialog open={open} onClose={() => { onClose(); setOpen(false); }} title="confirm"><p>sure?</p></Dialog>;
+    }
+    renderIntl(<Parent />, 'en');
+    // a browser flushes React (and its passive effects) between listeners of one dispatch; `fireEvent`'s act defers it
+    const flush = () => flushSync(() => undefined);
+    document.addEventListener('keydown', flush, true);
+    const env = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
+    env.IS_REACT_ACT_ENVIRONMENT = false;
+    try {
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    } finally {
+      document.removeEventListener('keydown', flush, true);
+      env.IS_REACT_ACT_ENVIRONMENT = true;
+    }
+    expect(screen.getByRole('dialog', { name: 'confirm' })).toBeTruthy();
+    expect(onClose).not.toHaveBeenCalled();
+    act(() => { fireEvent.keyDown(document.body, { key: 'Escape' }); });
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('locks page scroll while open and restores it after close', () => {

@@ -283,6 +283,33 @@ describe('quick add, then «Customize appearance» (§3.2)', () => {
     expect(apiMock.mock.calls.some(([path]) => String(path).endsWith('/visual'))).toBe(false);
   });
 
+  it('does not close everything when «Customize appearance» is pressed before the list reload has landed (D-W-2)', async () => {
+    const withNew = rawFacet({
+      values: [rawValue({ id: 'v1', name: 'Wedding', slug: 'wedding', product_count: 0 }), rawValue({ id: 'v9', name: 'Anniversary', name_en: null, slug: 'anniversary', product_count: 0 })],
+    });
+    let landReload: (value: unknown) => void = () => undefined;
+    apiMock
+      .mockResolvedValueOnce(facets(rawFacet()))
+      .mockResolvedValueOnce({ data: { value: { id: 'v9', slug: 'anniversary', name: 'Anniversary' } } })
+      .mockReturnValueOnce(new Promise((resolve) => (landReload = resolve)));
+    panel();
+    await userEvent.click((await screen.findAllByRole('button', { name: 'Add value' }))[0]);
+    await userEvent.type(screen.getByLabelText('Arabic name'), 'Anniversary');
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Save' }));
+
+    const customize = await screen.findByRole('button', { name: 'Customize appearance' });
+    // the row is not in the list yet: pressing the button now must neither open a target-less editor nor dismiss the offer
+    await userEvent.click(customize);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.getByRole('button', { name: 'Customize appearance' })).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Customize appearance' }) as HTMLButtonElement).disabled).toBe(true);
+
+    landReload(facets(withNew));
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Customize appearance' }) as HTMLButtonElement).disabled).toBe(false));
+    await userEvent.click(screen.getByRole('button', { name: 'Customize appearance' }));
+    expect(await screen.findByRole('dialog', { name: 'Edit value — Anniversary' })).toBeTruthy();
+  });
+
   it('can be dismissed with «Later»', async () => {
     apiMock
       .mockResolvedValueOnce(facets(rawFacet()))
