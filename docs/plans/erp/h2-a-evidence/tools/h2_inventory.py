@@ -62,8 +62,9 @@ def main():
     for c in crawls:
         for line in open(c, encoding='utf-8'):
             if line.strip():
-                r = json.loads(line); results[r['route']][r['cfg']] = r
+                r = json.loads(line); results[re.sub(r'[0-9a-f]{8}-[0-9a-f-]{27}', ':id', r['route'])][r['cfg']] = r
     rows = sorted((classify(p) + (p,) for p in pages), key=lambda r: (r[1], r[0]))
+    static_urls = {r[0] for r in rows if ':id' not in r[0]}
     by_mod = defaultdict(list)
     for r in rows: by_mod[r[1]].append(r)
     new = [r for r in rows if r[0] not in h1 and not r[1].startswith('EXCLUDED')]
@@ -79,7 +80,11 @@ def main():
         f.write('\n## Every page\n\n| Route | Module | Posture | v3 gate | Source | Crawl (v3 ar-1440) |\n|---|---|---|---|---|---|\n')
         for url, mod, posture, gated, src in rows:
             c = results.get(url, {}).get('ar-light-1440')
-            cell = '—' if not c else f"HTTP {c.get('status')}" + (f" · axe {len(c.get('axe') or [])}" if c.get('axe') is not None else '')
+            if not c and ':id' in url:  # template crawled through concrete paths (e.g. /reports/general/trial-balance)
+                pat = re.compile('^' + re.escape(url).replace(':id', '[^/]+') + '$')
+                hits = [k for k in results if pat.match(k) and k != url and k not in static_urls]
+                if hits: c = dict(results[hits[0]].get('ar-light-1440') or {}); c['_n'] = len(hits)
+            cell = 'NOT LOADED (no fixture)' if not c else f"HTTP {c.get('status')}" + (f" · axe {len(c.get('axe') or [])}" if c.get('axe') is not None else '') + ('' if c.get('ui') == '3' else ' · gate n/a') + (f" · via {c['_n']} concrete path(s)" if c.get('_n') else '')
             f.write(f'| `{url}` | {mod} | {posture} | {"yes" if gated else "no"} | `{src}/page.tsx` | {cell} |\n')
 
 if __name__ == '__main__':
