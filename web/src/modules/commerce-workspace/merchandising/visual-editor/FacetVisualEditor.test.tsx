@@ -189,7 +189,7 @@ describe('content type (Image & icon)', () => {
     cleanup();
     mount({ initialTab: 'image', value: { visual: { content: 'icon', icon: 'gift', iconColor: '#000000', background: '#ffffff' }, visual_version: 1 } });
     expect(screen.queryByText(/below 3:1/)).toBeNull();
-    expect(screen.getByText(/contrast is 21\.0:1/)).toBeTruthy();
+    expect(screen.getByText(/contrast is 21\.00:1/)).toBeTruthy();
   });
 
   it('a newly picked image is decorative by default and goes through the pick-only field', async () => {
@@ -615,8 +615,8 @@ describe('saving', () => {
     const results = document.querySelector('[data-save-results]') as HTMLElement;
     expect(within(results).getByText(/Data:/).parentElement?.textContent).toContain('Saved');
     // the failing part sits beside its tab, on the control, and the data tab shows no alert
-    expect(within(tab(/Image & icon/)).queryByText('This tab has an error')).toBeTruthy();
-    expect(within(tab('Data')).queryByText('This tab has an error')).toBeNull();
+    expect(within(tab(/Image & icon/)).queryByText(/This tab has an error/)).toBeTruthy();
+    expect(within(tab('Data')).queryByText(/This tab has an error/)).toBeNull();
     expect(screen.getByText('The image is still processing. Wait for it to finish, then save.')).toBeTruthy();
 
     await save();
@@ -637,7 +637,7 @@ describe('saving', () => {
     await save();
 
     expect(await screen.findByText('الاسم مكرر')).toBeTruthy();
-    expect(within(tab(/Data/)).queryByText('This tab has an error')).toBeTruthy();
+    expect(within(tab(/Data/)).queryByText(/This tab has an error/)).toBeTruthy();
     expect(onSaved).not.toHaveBeenCalled();
     expect(visualCalls()).toHaveLength(1);
   });
@@ -669,9 +669,9 @@ describe('saving', () => {
 
     const shapeRow = (await waitFor(() => document.querySelector('[data-prop="shape"]'))) as HTMLElement;
     await waitFor(() => expect(within(shapeRow).getByText('Unknown shape.')).toBeTruthy());
-    expect(within(tab(/Appearance/)).queryByText('This tab has an error')).toBeTruthy();
-    expect(within(tab(/Image & icon/)).queryByText('This tab has an error')).toBeTruthy();
-    expect(within(tab('Data')).queryByText('This tab has an error')).toBeNull();
+    expect(within(tab(/Appearance/)).queryByText(/This tab has an error/)).toBeTruthy();
+    expect(within(tab(/Image & icon/)).queryByText(/This tab has an error/)).toBeTruthy();
+    expect(within(tab('Data')).queryByText(/This tab has an error/)).toBeNull();
     // an error on a control that is not on screen (no icon section for a text-only value) is still listed
     expect(document.querySelector('[data-visual-error="own:iconColor"]')?.textContent).toBe('Icon colour: Invalid colour; use the #RRGGBB format.');
     expect(document.querySelector('[data-visual-error="own:shape"]')?.textContent).toBe('Shape: Unknown shape.');

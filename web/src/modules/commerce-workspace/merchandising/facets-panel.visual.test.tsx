@@ -25,6 +25,7 @@ import { ToastProvider } from '@/components/ui/toast';
 import { commerceWorkspaceMessage } from '@/modules/commerce-workspace/messages';
 import { FacetsPanel } from './facets-panel';
 import { PREVIEW_A, MEDIA_A, rawFacet, rawValue } from './visual-editor/test-fixtures';
+import { touchTargetViolations } from './visual-editor/test-touch-targets';
 
 const tEn = (key: Parameters<typeof commerceWorkspaceMessage>[1]) => commerceWorkspaceMessage('en', key);
 const tAr = (key: Parameters<typeof commerceWorkspaceMessage>[1]) => commerceWorkspaceMessage('ar', key);
@@ -100,6 +101,23 @@ describe('list thumbnails (§3.1)', () => {
     await screen.findByText('Birthday EN');
     const img = document.querySelector('[data-value-row="v2"] [data-row-thumb] img') as HTMLImageElement;
     expect(img.getAttribute('src')).toBe(PREVIEW_A.thumb_320);
+  });
+});
+
+describe('list touch targets (F3)', () => {
+  it('every icon button in the rows is a 44 px target at every breakpoint', async () => {
+    apiMock.mockResolvedValueOnce(facets(rawFacet()));
+    panel();
+    await screen.findByText('Birthday EN');
+    // the row switches are reached through a 44 px label, and the text actions are min-h-11 too
+    expect(touchTargetViolations(document.body)).toEqual([]);
+  });
+
+  it('a view-only user’s «View» buttons are 44 px too', async () => {
+    apiMock.mockResolvedValueOnce(facets(rawFacet()));
+    panel({ canManage: false, canManageIdentity: false });
+    await screen.findByText('Birthday EN');
+    expect(touchTargetViolations(document.body)).toEqual([]);
   });
 });
 

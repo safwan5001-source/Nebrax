@@ -17,7 +17,7 @@
 import { useEffect, useState } from 'react';
 import { fetchStorefrontMediaAsset } from '@/modules/commerce-workspace/storefront-media';
 import type { FacetVisualTileImage } from '@/modules/store-experience-builder/FacetVisualTile';
-import type { FacetVisualPreview } from '../client';
+import { type FacetVisualPreview, safePreviewUrl } from '../client';
 
 export type ImageState = 'none' | 'loading' | 'ready' | 'not_ready' | 'deleted' | 'failed' | 'unavailable';
 
@@ -29,12 +29,12 @@ export interface ImageSource {
 /** Tile image of a stored preview (the 160 and 320 px variants as a `srcset`). */
 export function previewImage(preview: FacetVisualPreview | null | undefined): FacetVisualTileImage | null {
   if (!preview) return null;
-  const src = preview.thumb320 ?? preview.thumb160;
+  // Re-checked here as well: this is where the URL becomes an image source.
+  const thumb160 = safePreviewUrl(preview.thumb160);
+  const thumb320 = safePreviewUrl(preview.thumb320);
+  const src = thumb320 ?? thumb160;
   if (!src) return null;
-  const set = [
-    preview.thumb160 ? `${preview.thumb160} 160w` : null,
-    preview.thumb320 ? `${preview.thumb320} 320w` : null,
-  ].filter(Boolean);
+  const set = [thumb160 ? `${thumb160} 160w` : null, thumb320 ? `${thumb320} 320w` : null].filter(Boolean);
   return { src, ...(set.length > 1 ? { srcSet: set.join(', ') } : {}) };
 }
 

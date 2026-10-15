@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyChoice,
+  changedGroups,
+  pruneErrors,
   choiceOf,
   draftFromStored,
   documentOf,
@@ -202,5 +204,30 @@ describe('wording', () => {
       expect(fieldErrorMessage(t, code)).not.toBe(t('err_generic'));
     }
     expect(fieldErrorMessage(t, 'something_new')).toBe(t('err_generic'));
+  });
+});
+
+describe('clearing a field error when its control changes', () => {
+  const draft: VisualDraft = { own: { shape: 'arch', image: { mediaId: MEDIA_A, zoom: 1.4 } }, defaults: {} };
+
+  it('names only the controls whose value changed', () => {
+    expect([...changedGroups(draft, setProp(draft, 'own', 'size', 'lg'))]).toEqual(['own:size']);
+    expect([...changedGroups(draft, setFraming(draft, { zoom: 2 }))]).toEqual(['own:zoom']);
+    expect([...changedGroups(draft, setImage(draft, null))].sort()).toEqual(['own:image', 'own:zoom']);
+    expect([...changedGroups(draft, setProp(draft, 'defaults', 'shape', 'star'))]).toEqual(['defaults:shape']);
+    expect(changedGroups(draft, draft).size).toBe(0);
+  });
+
+  it('a framing edit is not an edit of the image control (and vice versa)', () => {
+    expect(changedGroups(draft, setFraming(draft, { fit: 'contain' })).has('own:image')).toBe(false);
+    const alt = setImage(draft, { mediaId: MEDIA_A, zoom: 1.4, alt: { en: 'x' } });
+    expect([...changedGroups(draft, alt)]).toEqual(['own:image']);
+  });
+
+  it('drops exactly the errors of the changed controls', () => {
+    const indexed = indexVisualErrors('value', { 'visual.shape': ['unknown_shape'], 'visual.size': ['invalid_value'] });
+    const pruned = pruneErrors(indexed, new Set(['own:shape']));
+    expect(Object.keys(pruned.byField)).toEqual(['own:size']);
+    expect(pruneErrors(indexed, new Set(['own:icon']))).toBe(indexed);
   });
 });

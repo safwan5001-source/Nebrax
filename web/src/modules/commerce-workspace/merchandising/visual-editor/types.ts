@@ -25,6 +25,8 @@ export interface IdentityTabProps {
   facetVisual: FacetVisual | null;
   /** The identity tabs are read-only (no `commerce.manage`, or no edit right at all). */
   readOnly: boolean;
+  /** A save is in flight: every control is disabled, but nothing unmounts (so no state or fetch is lost). */
+  busy: boolean;
   errors: IndexedErrors;
   media: MediaAvailability;
   /** Where the preview of the edited identity's own image comes from, and whether it is usable. */

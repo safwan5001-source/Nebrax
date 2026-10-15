@@ -99,7 +99,7 @@ export function Tabs({
             {t.alert ? (
               <>
                 <span aria-hidden="true" className="ms-1.5 inline-block size-2 rounded-full bg-negative align-middle" data-tab-alert="" />
-                {t.alertLabel ? <span className="sr-only">{t.alertLabel}</span> : null}
+                {t.alertLabel ? <span className="sr-only">, {t.alertLabel}</span> : null}
               </>
             ) : null}
           </button>

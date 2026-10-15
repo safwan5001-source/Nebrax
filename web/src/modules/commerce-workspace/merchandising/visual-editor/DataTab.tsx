@@ -82,10 +82,11 @@ export function DataTab({
         />
       </div>
 
-      <div className="flex min-h-11 items-center justify-between gap-3">
-        <Label htmlFor="ve-active">{t('status')}</Label>
+      {/* The whole row is the label of the switch: the clickable area is the row (≥ 44 px), not the 24 px switch. */}
+      <label htmlFor="ve-active" className="flex min-h-11 cursor-pointer items-center justify-between gap-3 text-sm font-medium text-text">
+        {t('status')}
         <span className="flex items-center gap-2">
-          <span className="text-sm text-muted">{data.isActive ? t('statusActive') : t('statusInactive')}</span>
+          <span className="font-normal text-muted">{data.isActive ? t('statusActive') : t('statusInactive')}</span>
           <Switch
             id="ve-active"
             checked={data.isActive}
@@ -94,7 +95,7 @@ export function DataTab({
             aria-label={t('status')}
           />
         </span>
-      </div>
+      </label>
 
       <dl className="space-y-2 border-t border-border pt-4 text-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">

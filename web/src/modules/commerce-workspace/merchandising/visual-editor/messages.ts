@@ -140,6 +140,10 @@ export const VISUAL_EDITOR_MESSAGES = {
     reload: 'إعادة التحميل',
     reloadHint: 'تعيد إعادة التحميل فتح المحرر بآخر نسخة محفوظة، وتُفقد تعديلات الصورة والمظهر التي لم تُحفظ.',
     visualInvalid: 'بعض إعدادات المظهر غير صالحة. راجع الحقول المعلَّمة في التبويبات.',
+    visualNotFound: 'هذا البُعد أو هذه القيمة لم يعد موجوداً، فقد يكون حُذف من مستخدم آخر. أعد التحميل.',
+    visualTooMany: 'طلبات كثيرة في وقت قصير. انتظر لحظة ثم اضغط «حفظ» مرة أخرى.',
+    visualServerError: 'تعذّر الحفظ بسبب خطأ في الخادم. لم يتغيّر شيء؛ حاول مرة أخرى بعد قليل.',
+    visualNetworkError: 'تعذّر الاتصال بالخادم. تحقق من اتصالك ثم حاول مرة أخرى.',
     saved: 'تم حفظ التعديلات.',
 
     // Field error codes (422)
@@ -288,6 +292,10 @@ export const VISUAL_EDITOR_MESSAGES = {
     reload: 'Reload',
     reloadHint: 'Reloading reopens the editor on the latest saved version, and unsaved image and appearance edits are lost.',
     visualInvalid: 'Some appearance settings are invalid. Check the fields marked in the tabs.',
+    visualNotFound: 'This dimension or value no longer exists; another user may have deleted it. Reload.',
+    visualTooMany: 'Too many requests in a short time. Wait a moment, then press Save again.',
+    visualServerError: 'Saving failed because of a server error. Nothing changed; try again in a moment.',
+    visualNetworkError: 'Could not reach the server. Check your connection and try again.',
     saved: 'Changes saved.',
 
     err_media_not_found: 'This image is no longer in the library. Choose another image.',

@@ -17,7 +17,7 @@
  */
 
 import { RotateCcw } from 'lucide-react';
-import { type KeyboardEvent, type ReactNode, useId, useRef, useState } from 'react';
+import { type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import {
@@ -68,6 +68,7 @@ export function PropertyRow({
   t,
   onRestore,
   readOnly,
+  busy = false,
   errors,
   children,
   hideState = false,
@@ -83,6 +84,8 @@ export function PropertyRow({
   t: VT;
   onRestore: () => void;
   readOnly: boolean;
+  /** A save is in flight: the restore button is disabled. */
+  busy?: boolean;
   errors?: readonly string[];
   children: ReactNode;
   /** The caller shows its own state (e.g. the content-type group, where «inherit» is itself an option). */
@@ -96,6 +99,18 @@ export function PropertyRow({
   const labelId = useId();
   const value = valueText ?? describeValue(propKey as InheritableKey, state.value, locale, t);
   const overridden = state.source === 'own';
+  // «Restore» removes its own button, which is the focused element: put focus on the control that was just restored so
+  // a keyboard user is not dropped onto the dialog container.
+  const controlRef = useRef<HTMLDivElement>(null);
+  const [restoredCount, setRestoredCount] = useState(0);
+  useEffect(() => {
+    if (restoredCount === 0) return;
+    const root = controlRef.current;
+    const target =
+      root?.querySelector<HTMLElement>('[aria-pressed="true"]:not(:disabled)') ??
+      root?.querySelector<HTMLElement>('button:not(:disabled), input:not(:disabled), [role="switch"]:not(:disabled)');
+    target?.focus();
+  }, [restoredCount]);
   const labelClass = hideLabel ? 'sr-only' : 'text-sm font-medium text-text';
   return (
     <div className="space-y-2" data-prop={propKey} data-prop-source={state.source}>
@@ -125,9 +140,13 @@ export function PropertyRow({
             {overridden && !readOnly ? (
               <button
                 type="button"
-                onClick={onRestore}
+                disabled={busy}
+                onClick={() => {
+                  onRestore();
+                  setRestoredCount((n) => n + 1);
+                }}
                 aria-label={`${parent === 'facet' ? t('restoreInheritance') : t('restoreDefault')} — ${label}`}
-                className="inline-flex min-h-11 items-center gap-1 rounded px-2 text-xs font-medium text-primary hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                className="inline-flex min-h-11 items-center gap-1 rounded px-2 text-xs disabled:opacity-50 font-medium text-primary hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 data-restore={propKey}
               >
                 <RotateCcw className="size-3.5" strokeWidth={1.7} aria-hidden="true" />
@@ -137,7 +156,9 @@ export function PropertyRow({
           </span>
         )}
       </div>
-      {children}
+      <div ref={controlRef} className="space-y-2">
+        {children}
+      </div>
       <FieldErrors codes={errors} t={t} />
     </div>
   );

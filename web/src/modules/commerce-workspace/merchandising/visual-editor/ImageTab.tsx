@@ -28,7 +28,7 @@ import { fromFacetImage, toFacetImage } from '@/modules/store-experience-builder
 import { MediaRefField } from '@/modules/store-experience-builder/media/MediaRefField';
 import { customizerMessage } from '@/modules/store-experience-builder/messages';
 import type { IconKey } from '@/modules/store-experience-builder/presentation/icon-registry';
-import { contrastRatio } from '@/modules/store-experience-builder/presentation/facet-visual-style';
+import { contrastRatio, FACET_ICON_MIN_CONTRAST } from '@/modules/store-experience-builder/presentation/facet-visual-style';
 import { COLOUR_FIELD_CONTEXT } from './constants';
 import { FieldErrors, PropertyRow, SectionHeading, Segmented, type SegmentOption } from './controls';
 import {
@@ -45,6 +45,11 @@ import {
 } from './document';
 import { describeValue, imageNoteKey } from './labels';
 import type { IdentityTabProps } from './types';
+
+/** Two decimals, truncated: 2.996 reads «2.99», never «3.00» next to a «below 3:1» warning. */
+function shownRatio(ratio: number): string {
+  return (Math.floor(ratio * 100) / 100).toFixed(2);
+}
 
 export function ImageTab(props: IdentityTabProps) {
   const { kind, t } = props;
@@ -74,7 +79,7 @@ function IdentityBlock({
   mode,
   ...props
 }: IdentityTabProps & { scope: Scope; mode: ContentMode }) {
-  const { kind, locale, t, draft, baseline, update, facetVisual, readOnly, errors, media, imageSource } = props;
+  const { kind, locale, t, draft, baseline, update, facetVisual, readOnly, busy, errors, media } = props;
   const gatedId = useId();
   const doc = draft[scope];
   const choice = choiceOf(doc, mode);
@@ -109,7 +114,7 @@ function IdentityBlock({
           label={t('contentTitle')}
           value={choice}
           options={options}
-          disabled={readOnly}
+          disabled={readOnly || busy}
           onChange={(next) => update((d) => applyChoice(d, scope, next))}
           className={options.length === 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}
         />
@@ -141,7 +146,7 @@ function IdentityBlock({
 // ───────────────────────────── image ─────────────────────────────
 
 function ImageSection({ scope, ...props }: IdentityTabProps & { scope: Scope }) {
-  const { locale, t, draft, update, readOnly, errors, media, imageSource } = props;
+  const { locale, t, draft, update, readOnly, busy, errors, media, imageSource } = props;
   const image = draft.own.image;
   const mediaT = useMemo(
     () =>
@@ -157,6 +162,8 @@ function ImageSection({ scope, ...props }: IdentityTabProps & { scope: Scope }) 
     <div
       className="space-y-2 [&_button]:min-h-11 [&_input:not([type=checkbox])]:h-11 [&_label.cursor-pointer]:min-h-11"
       data-section="image"
+      // While a save is in flight the field stays mounted (so it does not refetch its asset) but cannot be used.
+      {...(busy ? ({ inert: '' } as Record<string, string>) : {})}
     >
       {readOnly ? (
         <ReadOnlyImage {...props} />
@@ -236,7 +243,7 @@ function IconSection({
   fallback,
   ...props
 }: IdentityTabProps & { scope: Scope; mode: ContentMode; fallback: boolean }) {
-  const { kind, locale, t, draft, update, facetVisual, readOnly, errors } = props;
+  const { kind, locale, t, draft, update, facetVisual, readOnly, busy, errors } = props;
   const err = (group: Parameters<typeof errorKey>[1]) => errors.byField[errorKey(scope, group)];
   const parent = kind === 'value' ? 'facet' : 'none';
   const icon = propState(kind, facetVisual, draft, scope, 'icon');
@@ -252,9 +259,9 @@ function IconSection({
   const status =
     ratio === null
       ? null
-      : ratio < 3
-        ? { tone: 'bad' as const, text: t('contrastLow', { ratio: ratio.toFixed(1) }) }
-        : { tone: 'ok' as const, text: t('contrastGood', { ratio: ratio.toFixed(1) }) };
+      : ratio < FACET_ICON_MIN_CONTRAST
+        ? { tone: 'bad' as const, text: t('contrastLow', { ratio: shownRatio(ratio) }) }
+        : { tone: 'ok' as const, text: t('contrastGood', { ratio: shownRatio(ratio) }) };
 
   const colourRow = (key: 'iconColor' | 'background', label: string, state: typeof iconColour, hex: string | undefined) => (
     <PropertyRow
@@ -265,6 +272,7 @@ function IconSection({
       locale={locale}
       t={t}
       readOnly={readOnly}
+      busy={busy}
       hideLabel
       errors={err(key)}
       onRestore={() => update((d) => setProp(d, scope, key, undefined))}
@@ -277,7 +285,7 @@ function IconSection({
         t={customizerT}
         hexOnly
         clearable={false}
-        disabled={readOnly}
+        disabled={readOnly || busy}
         dataName={`${scope}-${key}`}
         status={key === 'iconColor' ? status : null}
       />
@@ -285,7 +293,10 @@ function IconSection({
   );
 
   return (
-    <div className="space-y-5" data-section="icon">
+    <div
+      className="space-y-5 [&_button]:min-h-11 [&_button]:min-w-11 [&_input]:h-11 [&_input[type=color]]:w-11"
+      data-section="icon"
+    >
       <div className="space-y-2">
         <SectionHeading title={fallback ? t('iconFallbackTitle') : t('iconTitle')} help={fallback ? t('iconFallbackHelp') : undefined} />
         <PropertyRow
@@ -296,6 +307,7 @@ function IconSection({
           locale={locale}
           t={t}
           readOnly={readOnly}
+          busy={busy}
           hideLabel
           errors={err('icon')}
           onRestore={() => update((d) => setProp(d, scope, 'icon', undefined))}
@@ -304,7 +316,7 @@ function IconSection({
             value={typeof icon.value === 'string' ? (icon.value as IconKey) : undefined}
             onChange={(next) => update((d) => setProp(d, scope, 'icon', next))}
             locale={locale}
-            disabled={readOnly}
+            disabled={readOnly || busy}
             labels={{
               group: t('iconGroup'),
               search: t('iconSearch'),

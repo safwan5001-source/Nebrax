@@ -26,6 +26,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { TabPanel, Tabs } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import { useRestoreFocus } from '@/lib/use-restore-focus';
 import { FacetVisualTile } from '@/modules/store-experience-builder/FacetVisualTile';
 import { type MediaCapability, useMediaCapability } from '@/modules/store-experience-builder/media/use-media-capability';
 import {
@@ -39,6 +40,7 @@ import { ConfirmDialog, type T, writeFailureMessage } from '../common';
 import { AppearanceTab } from './AppearanceTab';
 import { DataTab, type DataDraft, dataFromTarget, sameData } from './DataTab';
 import {
+  changedGroups,
   choiceOf,
   documentOf,
   draftFromStored,
@@ -46,6 +48,7 @@ import {
   type IndexedErrors,
   indexVisualErrors,
   payloadOf,
+  pruneErrors,
   sameVisual,
   setFraming,
   tabsWithErrors,
@@ -74,12 +77,17 @@ export interface FacetVisualEditorProps {
   onSaved: () => void | Promise<void>;
   /** The user chose to reload after a version conflict: the parent reopens the editor, on this tab, on fresh data. */
   onReload: (tab: EditorTab) => void;
+  /**
+   * Where focus goes on close when the element that opened the editor is gone (a quick-add follow-up button that was
+   * replaced by the editor): the list row's own edit button.
+   */
+  returnFocusTo?: () => HTMLElement | null;
 }
 
 type PartStatus =
   | { status: 'idle' }
   | { status: 'saved' }
-  | { status: 'failed'; message: string; conflict?: boolean };
+  | { status: 'failed'; message: string; conflict?: boolean; reload?: boolean; fields?: boolean };
 
 const IDLE: PartStatus = { status: 'idle' };
 const NO_ERRORS: IndexedErrors = { byField: {}, unmapped: [] };
@@ -134,6 +142,7 @@ function EditorBody({
   onClose,
   onSaved,
   onReload,
+  returnFocusTo,
   identityEditable,
   media,
 }: FacetVisualEditorProps & { identityEditable: boolean; media: MediaAvailability }) {
@@ -161,7 +170,44 @@ function EditorBody({
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
 
-  const update = useCallback((change: (current: VisualDraft) => VisualDraft) => setDraft((current) => change(current)), []);
+  // The ref is the draft's source of truth between renders, so two changes in one event never overwrite each other and a
+  // field error is cleared exactly when the value of the control it belongs to changes.
+  const draftRef = useRef(draft);
+  const update = useCallback((change: (current: VisualDraft) => VisualDraft) => {
+    const before = draftRef.current;
+    const after = change(before);
+    if (after === before) return;
+    draftRef.current = after;
+    setDraft(after);
+    setVisualErrors((errors) => pruneErrors(errors, changedGroups(before, after)));
+  }, []);
+
+  // Once the last field error is corrected the «some settings are invalid» line has nothing left to point at.
+  useEffect(() => {
+    if (
+      visualResult.status === 'failed' &&
+      visualResult.fields &&
+      Object.keys(visualErrors.byField).length === 0 &&
+      visualErrors.unmapped.length === 0
+    ) {
+      setVisualResult(IDLE);
+    }
+  }, [visualErrors, visualResult]);
+
+  // Focus returns to whatever opened the editor (the sheet has no Trigger for Radix to return it to).
+  const restoreOpener = useRestoreFocus();
+  const onCloseAutoFocus = useCallback(
+    (event: Event) => {
+      restoreOpener(event);
+      if (event.defaultPrevented) return;
+      const fallback = returnFocusTo?.();
+      if (fallback?.isConnected) {
+        event.preventDefault();
+        fallback.focus();
+      }
+    },
+    [restoreOpener, returnFocusTo],
+  );
 
   const dataDirty = canManageData && !sameData(data, baseline.data);
   const visualDirty = identityEditable && !sameVisual(kind, draft, baseline.draft);
@@ -296,14 +342,24 @@ function EditorBody({
           setVisualResult({ status: 'saved' });
         } else {
           allSaved = false;
-          if (result.status === 409 || result.status === 428) {
-            setVisualResult({ status: 'failed', message: vt('versionConflict'), conflict: true });
-          } else if (result.status === 422) {
+          // Each refusal has its own words; none is retried automatically.
+          const status = result.status;
+          if (status === 409 || status === 428) {
+            setVisualResult({ status: 'failed', message: vt('versionConflict'), conflict: true, reload: true });
+          } else if (status === 404) {
+            setVisualResult({ status: 'failed', message: vt('visualNotFound'), reload: true });
+          } else if (status === 422) {
             const indexed = indexVisualErrors(kind, result.errors);
             setVisualErrors(indexed);
-            setVisualResult({ status: 'failed', message: vt('visualInvalid') });
-          } else if (result.status === 403) {
+            setVisualResult({ status: 'failed', message: vt('visualInvalid'), fields: true });
+          } else if (status === 403) {
             setVisualResult({ status: 'failed', message: vt('identityReadOnly') });
+          } else if (status === 429) {
+            setVisualResult({ status: 'failed', message: vt('visualTooMany') });
+          } else if (status !== null && status >= 500) {
+            setVisualResult({ status: 'failed', message: vt('visualServerError') });
+          } else if (status === null) {
+            setVisualResult({ status: 'failed', message: vt('visualNetworkError') });
           } else {
             setVisualResult({ status: 'failed', message: t('merchSaveFailed') });
           }
@@ -320,8 +376,10 @@ function EditorBody({
   // ── tab alerts ────────────────────────────────────────────────────────────────
   const visualFailed = visualResult.status === 'failed';
   const mappedTabs = tabsWithErrors(visualErrors);
+  // A failure with field errors flags the tabs that still hold one; any other failure flags both identity tabs.
+  const fieldFailure = visualResult.status === 'failed' && visualResult.fields === true;
   const identityAlert = (which: 'image' | 'appearance') =>
-    visualFailed && (mappedTabs.size === 0 || mappedTabs.has(which));
+    visualFailed && (fieldFailure ? mappedTabs.has(which) : true);
   const alerts: Record<EditorTab, boolean> = {
     data: dataResult.status === 'failed' || nameError !== null,
     image: identityAlert('image'),
@@ -336,7 +394,8 @@ function EditorBody({
     baseline: baseline.draft,
     update,
     facetVisual,
-    readOnly: !identityEditable || saving,
+    readOnly: !identityEditable,
+    busy: saving,
     errors: visualErrors,
     media,
     imageSource,
@@ -420,7 +479,8 @@ function EditorBody({
       <SheetContent
         closeLabel={t('merchClose')}
         dir={dir}
-        className="sm:max-w-full md:max-w-3xl"
+        className="sm:max-w-full md:max-w-3xl [&>button:last-child]:size-11"
+        onCloseAutoFocus={onCloseAutoFocus}
         data-facet-visual-editor={kind}
       >
         <div className="shrink-0 space-y-1 border-b border-border px-4 pb-3 pt-4 pe-14">
@@ -497,7 +557,7 @@ function EditorBody({
                       <span role="alert" className="min-w-0 break-words text-negative">
                         <span className="font-medium">{label}:</span> {status.message}
                       </span>
-                      {status.conflict ? (
+                      {status.reload ? (
                         <Button type="button" size="sm" variant="outline" className="min-h-11" onClick={() => onReload(tab)}>
                           {vt('reload')}
                         </Button>
@@ -514,7 +574,8 @@ function EditorBody({
                 <li className="text-xs text-muted">{vt('reloadHint')}</li>
               ) : null}
               {errorLines.map((line) => (
-                <li key={line.key} className="break-words text-xs text-negative" data-visual-error={line.key}>
+                // Visual only: the control itself announces its error, so a screen reader hears it once.
+                <li key={line.key} aria-hidden="true" className="break-words text-xs text-negative" data-visual-error={line.key}>
                   {line.text}
                 </li>
               ))}

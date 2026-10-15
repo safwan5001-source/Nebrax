@@ -72,9 +72,9 @@ The list gives a view-only user an «عرض» button instead of the pencil.
 
 | Suite | Command | Result |
 |---|---|---|
-| Focused | `npx vitest run src/modules/commerce-workspace/merchandising src/modules/store-experience-builder/__tests__/MediaRefField "src/app/(commerce)/commerce/merchandising"` | **7 files / 161 tests passed** |
-| Web full | `cd web && npm run test` (includes the drift ratchet) | **623 files / 7017 tests passed** |
-| Web build | `cd web && npm run build` | **Compiled successfully; 190/190 static pages** |
+| Focused | `npx vitest run src/modules/commerce-workspace/merchandising "src/app/(commerce)/commerce/merchandising"` | **6 files / 177 tests passed** (after the review fixes) |
+| Web full | `cd web && npm run test` (includes the drift ratchet) | **624 files / 7050 tests passed** (after the review fixes) |
+| Web build | `cd web && npm run build` | **Compiled successfully; 190/190 static pages** (after the review fixes) |
 | Types | `npx tsc --noEmit` | **48 errors, all in pre-existing test files; none added** (same count as `origin/main`) |
 
 `npm run lint` is not configured in this repo.
@@ -113,6 +113,33 @@ A throwaway page (not committed; kept only in the scratchpad) mounted the real `
 - `ConfirmDialog` / `Dialog` are not portalled, so inside the sheet they are positioned relative to the sheet (checked visually: they read as a modal over it). If a global portal is ever introduced for them this stays correct.
 - The facet's `visual_preview` covers only its own `self.image`; a dimension's defaults carry no image, so nothing is missing.
 - Two pre-existing Next dev messages (`next-intl` dotted-key warnings in `en`/`ar` message JSON) appear in the dev console; they are not from this slice.
+
+## Review fixes (independent review of PR #1509, head `051e48d`)
+
+No blocking finding. The accessibility and error-handling findings were binding and are fixed in a new commit.
+
+| # | Finding | Result |
+|---|---|---|
+| F1 | Closing dropped focus to `<body>` (the sheet has no Trigger) | **Fixed.** `useRestoreFocus()` + `onCloseAutoFocus` as in `role-editor-sheet.tsx`. When the opener no longer exists (the quick-add «Customize appearance» button the editor replaced), focus goes to that row's own edit button (`data-open-editor`, passed as `returnFocusTo`). Tests: focus returns to the opener after Esc, Cancel, a successful save, a discard confirmation, and the «Customize appearance» origin. |
+| F2 | «Restore inheritance» unmounted the focused button | **Fixed.** After a restore, focus moves to the restored control (the pressed option, else the first control) inside the row. Tests assert `document.activeElement` is a control of that row, not `<body>` or the dialog (shape, size, label switch). |
+| F3 | Touch targets under 44 px | **Fixed.** Image & icon tab: the icon section carries `[&_button]:min-h-11 [&_button]:min-w-11 [&_input]:h-11 [&_input[type=color]]:w-11` (colour and hex inputs, recent swatches, icon search) without editing `ColourField`. Data «Status» and Appearance «Show the name» are now whole-row `<label>`s, so the clickable area is the row, not the 24 px switch (`ui/switch.tsx` untouched). List: edit/view/delete/collapse buttons are `size-11` at every breakpoint (no `max-md:` shrink), the row switches sit in a 44 px label, and the text actions («New dimension», presets, «Add value») are `min-h-11`. The sheet's close button is 44 px through `[&>button:last-child]:size-11` on the content. A new class-based test (`test-touch-targets.ts`) rejects any interactive element that is not ≥ 44 px **or** carries a `md:` / `sm:` / `max-md:` height or size class below 44 px, for all three tabs, a dimension editor, the media field and the list. Verified in the real layout too: with Playwright every interactive element in the editor and the list was measured (button, input, switch via its label) at 390 and 1280, ar and en, light and dark — none under 44 px. Not covered by the check by design: the tab strip (46 px by padding, shared component). |
+| F4 | The double-submit test clicked a `disabled` button | **Fixed.** A new test fires two clicks on the **enabled** Save button inside one `act` (no re-render between) and asserts one request per part. **Confirmed it fails when the guard is removed** (`savingRef.current ||` deleted: the test fails; restored). |
+| F5 | Gaps in error handling | **Fixed.** The identity write now has a message of its own (Arabic and English) for **403** (needs the e-commerce permission), **404** (no longer exists, with «Reload»; the panel also closes an editor whose row disappeared), **409/428** (changed by another user, with «Reload»), **422** (field errors), **429** (wait and press Save again; no reload, no retry), **5xx** (server error, nothing changed) and a **network failure** (could not reach the server), plus the generic fallback for any other status. Tests cover every one, including the previously missing 403, that none is retried automatically, and an Arabic message. |
+| F6a | `visual_preview` URLs | **Fixed.** `safePreviewUrl()` accepts only `http(s)` links and same-origin paths (`/…`, not `//…`); `javascript:`, `data:`, `vbscript:`, protocol-relative and relative-without-slash values are dropped, in the mapper and again where the URL becomes an image source. Tested. |
+| F6b | Tab alert name | **Fixed.** The hidden text now starts with «, » so the tab reads «Image & icon, This tab has an error». Only the editor passes `alert`, so no other `Tabs` consumer changes. Tested. |
+| F6c | Contrast message | **Fixed.** Compared with `FACET_ICON_MIN_CONTRAST` and shown with two truncated decimals (2.995 reads «2.99», never «3.00:1 is low»). Tested. |
+| F6d | Field errors announced twice | **Fixed.** The control keeps its `role="alert"`; the footer copy is `aria-hidden` (still visible). Tested. |
+| F6e | `MediaRefField` remounted while saving | **Fixed.** `readOnly` no longer flips during a save; a separate `busy` flag disables the controls and makes the media field `inert` while it stays mounted. Tested: same element before, during and after a failed save, and no extra asset fetch. |
+| F6f | A server field error stayed after the user fixed the field | **Fixed.** Editing a control clears its own error (and, when it was the last one, the tab dot and the «some settings are invalid» line). A framing edit is not an edit of the image control. Unit and component tests. |
+
+### Accepted (residual risks, no change)
+- **«Inherit» has no per-choice undo.** It shows the explicit warning line and Cancel / Esc discards the draft; keeping the removed image in memory so that re-selecting «Image» restores it was left out.
+- The `#000000` in `constants.ts` is a never-drawn placeholder required by the `ColourField` type (it lives in a `.ts` file so the drift ratchet does not see it).
+- The signed `visual_preview` link lives 20 minutes, as before.
+- The tab strip's 46 px height depends on the shared `Tabs` padding and is not asserted by the class-based test.
+
+### Visual re-check
+After the fixes: 48 captures (list, Image & icon colours, restore focus, close focus, dimension Image tab, value Image tab × 390 / 1280 × ar RTL / en LTR × light / dark), plus the earlier 304. The measured-size check reported no target under 44 px. The focus ring is visible on the restored shape button (keyboard path) and on the row's edit button after Esc; the colour fields and recent swatches are 44 px; the list rows are denser by 8 px at most and nothing wraps or overflows.
 
 ## Accounting impact
 **None.** No journal, no ledger service, no financial figure.

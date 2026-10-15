@@ -159,6 +159,29 @@ describe('facet visual fields on GET facets', () => {
   });
 });
 
+describe('visual_preview URLs', () => {
+  const row = (preview: unknown) => mapFacet({ id: 'f1', key: 'k', name: 'n', visual_preview: preview });
+
+  it('keeps http(s) links and same-origin paths', () => {
+    expect(row({ thumb_160: 'https://s.example/a.webp?sig=1', thumb_320: '/api/x/b.webp' })?.visualPreview).toEqual({
+      thumb160: 'https://s.example/a.webp?sig=1',
+      thumb320: '/api/x/b.webp',
+    });
+    expect(row({ thumb_160: 'HTTP://s.example/a.webp' })?.visualPreview?.thumb160).toBe('HTTP://s.example/a.webp');
+  });
+
+  it('drops javascript:, data:, protocol-relative and relative-without-slash values', () => {
+    for (const bad of ['javascript:alert(1)', ' javascript:alert(1)', 'data:image/svg+xml,<svg/>', '//evil.example/a.webp', 'vbscript:x', 'a.webp', '']) {
+      expect(row({ thumb_160: bad, thumb_320: bad })?.visualPreview).toBeNull();
+    }
+    // one bad link does not take the good one with it
+    expect(row({ thumb_160: 'javascript:alert(1)', thumb_320: 'https://s.example/b.webp' })?.visualPreview).toEqual({
+      thumb160: null,
+      thumb320: 'https://s.example/b.webp',
+    });
+  });
+});
+
 describe('facet visual writes', () => {
   it('PUTs a dimension’s document with the exact body {visual, expected_version}', async () => {
     apiMock.mockResolvedValue({ data: { visual: { self: { shape: 'arch' } }, version: 4 } });

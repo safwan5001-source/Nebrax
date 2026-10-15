@@ -56,7 +56,8 @@ export function AppearanceTab(props: IdentityTabProps) {
 }
 
 function AppearanceBlock({ scope, ...props }: IdentityTabProps & { scope: Scope }) {
-  const { kind, locale, t, draft, update, facetVisual, readOnly, errors, imageSource } = props;
+  const { kind, locale, t, draft, update, facetVisual, readOnly, busy, errors, imageSource } = props;
+  const locked = readOnly || busy;
   const parent = kind === 'value' ? 'facet' : 'none';
   const err = (group: Parameters<typeof errorKey>[1]) => errors.byField[errorKey(scope, group)];
   const state = (key: Parameters<typeof propState>[4]) => propState(kind, facetVisual, draft, scope, key);
@@ -70,6 +71,7 @@ function AppearanceBlock({ scope, ...props }: IdentityTabProps & { scope: Scope 
       locale={locale}
       t={t}
       readOnly={readOnly}
+      busy={busy}
       errors={err(key as Parameters<typeof errorKey>[1])}
       onRestore={onRestore ?? (() => restore(key as Parameters<typeof setProp>[2]))}
     >
@@ -100,7 +102,7 @@ function AppearanceBlock({ scope, ...props }: IdentityTabProps & { scope: Scope 
         <ShapeGrid
           value={shape.value as FacetVisualShape}
           onChange={(next) => update((d) => setProp(d, scope, 'shape', next))}
-          disabled={readOnly}
+          disabled={locked}
           label={t('shapeTitle')}
           locale={locale}
         />,
@@ -112,7 +114,7 @@ function AppearanceBlock({ scope, ...props }: IdentityTabProps & { scope: Scope 
         <Segmented
           label={t('sizeTitle')}
           value={size.value as FacetVisualSize}
-          disabled={readOnly}
+          disabled={locked}
           onChange={(next) => update((d) => setProp(d, scope, 'size', next))}
           options={FACET_VISUAL_SIZES.map((value) => ({ value, label: sizeLabel(value, t) }))}
           className="grid-cols-3"
@@ -122,22 +124,24 @@ function AppearanceBlock({ scope, ...props }: IdentityTabProps & { scope: Scope 
       {row(
         'showLabel',
         t('showLabelTitle'),
-        <div className="flex min-h-11 items-center gap-3">
+        // The row is the switch's label: the clickable area is the whole row (≥ 44 px), not the 24 px switch.
+        <label htmlFor={`ve-show-label-${scope}`} className="flex min-h-11 cursor-pointer items-center gap-3">
           <Switch
+            id={`ve-show-label-${scope}`}
             checked={showLabel.value !== false}
             onCheckedChange={(next) => update((d) => setProp(d, scope, 'showLabel', next))}
-            disabled={readOnly}
+            disabled={locked}
             aria-label={t('showLabelTitle')}
           />
           <span className="text-xs leading-5 text-muted">{t('showLabelHelp')}</span>
-        </div>,
+        </label>,
       )}
 
       {scope === 'defaults' ? (
         row(
           'fit',
           t('fitTitle'),
-          <FitGroup value={fit.value as FacetVisualFit} disabled={readOnly} t={t} onChange={(next) => update((d) => setProp(d, 'defaults', 'fit', next))} />,
+          <FitGroup value={fit.value as FacetVisualFit} disabled={locked} t={t} onChange={(next) => update((d) => setProp(d, 'defaults', 'fit', next))} />,
         )
       ) : showsImage && image ? (
         <>
@@ -146,7 +150,7 @@ function AppearanceBlock({ scope, ...props }: IdentityTabProps & { scope: Scope 
             t('fitTitle'),
             <FitGroup
               value={fit.value as FacetVisualFit}
-              disabled={readOnly}
+              disabled={locked}
               t={t}
               onChange={(next) => update((d) => setFraming(d, { fit: next }))}
             />,
@@ -161,6 +165,7 @@ function AppearanceBlock({ scope, ...props }: IdentityTabProps & { scope: Scope 
             locale={locale}
             t={t}
             readOnly={readOnly}
+            busy={busy}
             valueText={t('focalCenter')}
             errors={errors.byField[errorKey(scope, 'focal')]}
             onRestore={() => update((d) => setFraming(d, { focal: null }))}
@@ -169,7 +174,7 @@ function AppearanceBlock({ scope, ...props }: IdentityTabProps & { scope: Scope 
             <FocalGrid
               value={focal}
               onChange={(next) => update((d) => setFraming(d, { focal: next }))}
-              disabled={readOnly || !imageUsable}
+              disabled={locked || !imageUsable}
               label={t('focalTitle')}
               t={t}
             />
@@ -188,6 +193,7 @@ function AppearanceBlock({ scope, ...props }: IdentityTabProps & { scope: Scope 
             locale={locale}
             t={t}
             readOnly={readOnly}
+            busy={busy}
             valueText={t('valueNoZoom')}
             errors={errors.byField[errorKey(scope, 'zoom')]}
             onRestore={() => update((d) => setFraming(d, { zoom: null }))}
@@ -195,7 +201,7 @@ function AppearanceBlock({ scope, ...props }: IdentityTabProps & { scope: Scope 
             <ZoomSlider
               value={zoom}
               onChange={(next) => update((d) => setFraming(d, { zoom: next }))}
-              disabled={readOnly}
+              disabled={locked}
               label={t('zoomTitle')}
             />
           </PropertyRow>

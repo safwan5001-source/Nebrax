@@ -177,6 +177,13 @@ export function FacetsPanel({
     return value ? { kind: 'value', facet, value } : null;
   }, [dialog, facets]);
 
+  // The row the editor was opened on is gone (deleted elsewhere, found out after a reload): close it rather than leave an
+  // invisible editor state behind.
+  const editorMissing = dialog?.kind === 'editor' && Array.isArray(facets) && editorTarget === null;
+  useEffect(() => {
+    if (editorMissing) setDialog(null);
+  }, [editorMissing]);
+
   if (facets === null) return <LoadingState variant="cards" rows={2} label={t('merchLoading')} />;
   if (facets === 'error') return <ErrorState message={t('merchLoadFailed')} onRetry={() => void load()} />;
 
@@ -190,16 +197,16 @@ export function FacetsPanel({
         {canManage ? (
           <div className="flex flex-wrap gap-2">
             {!hasSystem('occasion') ? (
-              <Button type="button" disabled={busyId !== null} variant="outline" size="sm" onClick={() => setDialog({ kind: 'create-facet', preset: 'occasion' })}>
+              <Button type="button" disabled={busyId !== null} variant="outline" size="sm" className="min-h-11" onClick={() => setDialog({ kind: 'create-facet', preset: 'occasion' })}>
                 {t('merchPresetOccasion')}
               </Button>
             ) : null}
             {!hasSystem('recipient') ? (
-              <Button type="button" disabled={busyId !== null} variant="outline" size="sm" onClick={() => setDialog({ kind: 'create-facet', preset: 'recipient' })}>
+              <Button type="button" disabled={busyId !== null} variant="outline" size="sm" className="min-h-11" onClick={() => setDialog({ kind: 'create-facet', preset: 'recipient' })}>
                 {t('merchPresetRecipient')}
               </Button>
             ) : null}
-            <Button type="button" disabled={busyId !== null} size="sm" onClick={() => setDialog({ kind: 'create-facet' })}>
+            <Button type="button" disabled={busyId !== null} size="sm" className="min-h-11" onClick={() => setDialog({ kind: 'create-facet' })}>
               <Plus className="h-4 w-4" aria-hidden="true" /> {t('merchFacetCreate')}
             </Button>
           </div>
@@ -247,20 +254,25 @@ export function FacetsPanel({
                   </div>
                   <div className="flex items-center gap-1.5">
                     {canManage ? (
+                      // the label gives the 24 px switch a 44 px clickable area without touching the shared control
+                      <label htmlFor={`active-${facet.id}`} className="flex size-11 cursor-pointer items-center justify-center">
                       <Switch
+                        id={`active-${facet.id}`}
                         checked={facet.isActive}
                         disabled={busyId !== null}
                         onCheckedChange={() => void toggleFacet(facet)}
                         aria-label={`${facet.isActive ? t('merchDisable') : t('merchEnable')} ${facet.name}`}
                       />
+                      </label>
                     ) : null}
                     <Button
                       type="button"
                       disabled={busyId !== null}
                       variant="ghost"
                       size="icon"
-                      className="max-md:size-11"
+                      className="size-11"
                       aria-label={`${canManage ? t('merchEdit') : vt('viewAction')} ${facet.name}`}
+                      data-open-editor={facet.id}
                       onClick={() => openEditor(facet.id)}
                     >
                       {canManage ? <Pencil className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />}
@@ -270,7 +282,7 @@ export function FacetsPanel({
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className={cn('max-md:size-11', facetBlocked && 'opacity-50')}
+                        className={cn('size-11', facetBlocked && 'opacity-50')}
                         aria-label={`${t('merchDelete')} ${facet.name}`}
                         aria-disabled={facetBlocked || undefined}
                         aria-describedby={facetBlocked ? `blocked-${facet.id}` : undefined}
@@ -318,20 +330,24 @@ export function FacetsPanel({
                           </div>
                           <div className="flex items-center gap-1.5">
                             {canManage ? (
+                              <label htmlFor={`active-${value.id}`} className="flex size-11 cursor-pointer items-center justify-center">
                               <Switch
+                                id={`active-${value.id}`}
                                 checked={value.isActive}
                                 disabled={busyId !== null}
                                 onCheckedChange={() => void toggleValue(facet, value)}
                                 aria-label={`${value.isActive ? t('merchDisable') : t('merchEnable')} ${value.name}`}
                               />
+                              </label>
                             ) : null}
                             <Button
                               type="button"
                               disabled={busyId !== null}
                               variant="ghost"
                               size="icon"
-                              className="max-md:size-11"
+                              className="size-11"
                               aria-label={`${canManage ? t('merchEdit') : vt('viewAction')} ${value.name}`}
+                              data-open-editor={value.id}
                               onClick={() => openEditor(facet.id, value.id)}
                             >
                               {canManage ? <Pencil className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />}
@@ -342,7 +358,7 @@ export function FacetsPanel({
                                 variant="ghost"
                                 size="icon"
                                 disabled={busyId !== null}
-                                className={cn('max-md:size-11', blocked && 'opacity-50')}
+                                className={cn('size-11', blocked && 'opacity-50')}
                                 title={blocked ? t('merchDeleteBlocked') : undefined}
                                 aria-label={`${t('merchDelete')} ${value.name}`}
                                 aria-disabled={blocked || undefined}
@@ -373,7 +389,7 @@ export function FacetsPanel({
 
                   {canManage ? (
                     <div className="border-t border-border px-3 py-2">
-                      <Button type="button" disabled={busyId !== null} variant="ghost" size="sm" onClick={() => setDialog({ kind: 'add-value', facet })}>
+                      <Button type="button" disabled={busyId !== null} variant="ghost" size="sm" className="min-h-11" onClick={() => setDialog({ kind: 'add-value', facet })}>
                         <Plus className="h-4 w-4" aria-hidden="true" /> {t('merchValueAdd')}
                       </Button>
                     </div>
@@ -459,6 +475,9 @@ export function FacetsPanel({
           canManageData={canManage}
           canManageIdentity={canManageIdentity}
           initialTab={dialog.tab}
+          returnFocusTo={() =>
+            document.querySelector<HTMLElement>(`[data-open-editor="${dialog.valueId ?? dialog.facetId}"]`)
+          }
           onClose={(changed) => {
             setDialog(null);
             if (changed) void load();

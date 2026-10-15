@@ -94,10 +94,21 @@ function mapVersion(value: unknown): number | null {
   return typeof value === 'number' && Number.isInteger(value) && value >= 1 ? value : null;
 }
 
+/**
+ * A preview URL is put in an `<img src>`: only `http(s)` links and same-origin paths are accepted. Anything else
+ * (`javascript:`, `data:`, a protocol-relative `//host`) is dropped, so a hostile value can never become a source.
+ */
+export function safePreviewUrl(value: unknown): string | null {
+  const url = str(value)?.trim();
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url)) return url;
+  return url.startsWith('/') && !url.startsWith('//') ? url : null;
+}
+
 function mapPreview(raw: unknown): FacetVisualPreview | null {
   const row = obj(raw);
   if (!row) return null;
-  const preview = { thumb160: str(row.thumb_160), thumb320: str(row.thumb_320) };
+  const preview = { thumb160: safePreviewUrl(row.thumb_160), thumb320: safePreviewUrl(row.thumb_320) };
   return preview.thumb160 || preview.thumb320 ? preview : null;
 }
 

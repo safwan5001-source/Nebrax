@@ -312,3 +312,46 @@ export function tabsWithErrors(indexed: IndexedErrors): Set<EditorTab> {
   }
   return tabs;
 }
+
+// ───────────────────── clearing a field error once its control is edited ─────────────────────
+
+const GROUP_PICKERS: Record<FieldGroup, (doc: Record<string, unknown>) => unknown> = {
+  content: (d) => d.content,
+  // the image control owns the picture, its alt text and the decorative choice — not the framing
+  image: (d) => {
+    const image = d.image as FacetVisualImage | undefined;
+    return image ? { mediaId: image.mediaId, alt: image.alt, decorative: image.decorative } : undefined;
+  },
+  icon: (d) => d.icon,
+  iconColor: (d) => d.iconColor,
+  background: (d) => d.background,
+  shape: (d) => d.shape,
+  size: (d) => d.size,
+  showLabel: (d) => d.showLabel,
+  fit: (d) => (d.image as FacetVisualImage | undefined)?.fit ?? d.fit,
+  focal: (d) => (d.image as FacetVisualImage | undefined)?.focal,
+  zoom: (d) => (d.image as FacetVisualImage | undefined)?.zoom,
+};
+
+/** The `${scope}:${group}` keys whose control's value differs between two drafts. */
+export function changedGroups(before: VisualDraft, after: VisualDraft): Set<string> {
+  const changed = new Set<string>();
+  for (const scope of ['own', 'defaults'] as const) {
+    for (const group of GROUPS) {
+      const pick = GROUP_PICKERS[group];
+      const a = JSON.stringify(pick(before[scope] as Record<string, unknown>) ?? null);
+      const b = JSON.stringify(pick(after[scope] as Record<string, unknown>) ?? null);
+      if (a !== b) changed.add(errorKey(scope, group));
+    }
+  }
+  return changed;
+}
+
+/** Drops the field errors of the controls in `changed`; returns the same object when nothing was dropped. */
+export function pruneErrors(indexed: IndexedErrors, changed: ReadonlySet<string>): IndexedErrors {
+  const keys = Object.keys(indexed.byField).filter((key) => changed.has(key));
+  if (keys.length === 0) return indexed;
+  const byField = { ...indexed.byField };
+  for (const key of keys) delete byField[key];
+  return { byField, unmapped: indexed.unmapped };
+}
