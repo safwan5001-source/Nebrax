@@ -36,6 +36,13 @@ Local, isolated audit environment only. Never point any of this at production or
   warehouses, inventory, users, fuel master data; extend with `PAGE_SHELL_OVERRIDES`). `/api/me` is never failed: the
   app layout ends the session on it by design. Re-probing those 10 routes changed no A2 verdict: `/branches` shows
   «لا توجد فروع» on error (already PLT-12); the sales-settings hub keeps its cards when `nav-state` fails (server still guards).
+  **Derived overrides (root fix):** before probing, the script loads every route once and treats a shell endpoint the
+  route requests more often than the bare shell as that route's own (`derived-overrides.json`; `DISCOVER_ONLY=1` stops
+  there). On this fixture: 103 routes (72 load `/api/branches` through list/report branch filters, 33 load `nav-state`
+  through the Commerce/Fuel/App Builder workspace navs). Re-probing all 103 in loading and error (206 runs) changed 18
+  verdicts: 14 routes newly covered and 4 better than before (all show their loading/error state); the only worse result is
+  `/branches` on error («لا توجد فروع», already PLT-12). Limitation: a shared endpoint is failed together with the page's
+  own data, not on its own (e.g. a branch filter failing while the list loads is not isolated).
 - **One output directory per fixture run.** `probe-states.cjs` records a run fingerprint (`run.json`: fixture user/tenant ids, base URL, options) and refuses to resume into a directory from another run. `crawl.cjs` (H1, unchanged) also resumes from `results.jsonl`, so give it a fresh `outDir` after recreating the fixture.
 - `kit_usage.py` — static adoption of the shared UI kit (`components/nebrax/*`, `DataTable`, states, confirm) per page;
   a lower bound (2 import levels).
