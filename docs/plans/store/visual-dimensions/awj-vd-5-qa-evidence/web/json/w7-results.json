@@ -1,0 +1,369 @@
+{
+  "tag": "w7l66b",
+  "versionId": "a2fd35bf-27d2-48ca-8f6a-32dadcc032f6",
+  "aId": "section-4d3a5741-ea53-4bf4-8fdb-9c9edf3de0c9",
+  "bId": "section-86e46a31-70c6-4ac4-9205-d6cce93e8f53",
+  "cId": "section-044c18aa-62d6-460b-bb57-70168d6a801b",
+  "results": [
+    {
+      "id": "W-7.1a section A stored document holds exactly the keys set for A",
+      "ok": true,
+      "detail": {
+        "got": {
+          "title": "QA-W A w7l66b",
+          "axis": "facet",
+          "dimension": "qa-w-par2",
+          "display": "tiles",
+          "layout": "image-grid",
+          "template": "gift-circles",
+          "columns": {
+            "mobile": 2,
+            "desktop": 5
+          },
+          "gap": "loose",
+          "textPosition": "overlay",
+          "contentSequence": "label-first",
+          "shape": "hexagon",
+          "size": "lg",
+          "showCounts": true
+        },
+        "want": {
+          "title": "QA-W A w7l66b",
+          "axis": "facet",
+          "dimension": "qa-w-par2",
+          "display": "tiles",
+          "template": "gift-circles",
+          "layout": "image-grid",
+          "columns": {
+            "mobile": 2,
+            "desktop": 5
+          },
+          "gap": "loose",
+          "textPosition": "overlay",
+          "contentSequence": "label-first",
+          "shape": "hexagon",
+          "size": "lg",
+          "showCounts": true
+        }
+      }
+    },
+    {
+      "id": "W-7.1b section B (same dimension) holds exactly its own different keys",
+      "ok": true,
+      "detail": {
+        "got": {
+          "title": "QA-W B w7l66b",
+          "axis": "facet",
+          "dimension": "qa-w-par2",
+          "display": "tiles",
+          "layout": "carousel",
+          "template": "swipe-rail",
+          "rows": 1,
+          "valueSort": "count",
+          "shape": "heart",
+          "size": "sm",
+          "cardStyle": "outlined",
+          "maxItems": 6
+        },
+        "want": {
+          "title": "QA-W B w7l66b",
+          "axis": "facet",
+          "dimension": "qa-w-par2",
+          "display": "tiles",
+          "template": "swipe-rail",
+          "layout": "carousel",
+          "rows": 1,
+          "shape": "heart",
+          "size": "sm",
+          "maxItems": 6,
+          "valueSort": "count",
+          "cardStyle": "outlined"
+        }
+      }
+    },
+    {
+      "id": "W-7.1c no display key of one section leaked into the other (A has none of B's rows/maxItems/valueSort/cardStyle; B none of A's columns/gap/textPosition/contentSequence/showCounts)",
+      "ok": true,
+      "detail": {
+        "A": [
+          "title",
+          "axis",
+          "dimension",
+          "display",
+          "layout",
+          "template",
+          "columns",
+          "gap",
+          "textPosition",
+          "contentSequence",
+          "shape",
+          "size",
+          "showCounts"
+        ],
+        "B": [
+          "title",
+          "axis",
+          "dimension",
+          "display",
+          "layout",
+          "template",
+          "rows",
+          "valueSort",
+          "shape",
+          "size",
+          "cardStyle",
+          "maxItems"
+        ]
+      }
+    },
+    {
+      "id": "W-7.1d legacy section C (dimension only) stores no display keys",
+      "ok": true,
+      "detail": {
+        "title": "QA-W C w7l66b",
+        "axis": "facet",
+        "dimension": "qa-w-par2",
+        "display": "tiles"
+      }
+    },
+    {
+      "id": "W-7.1e same dimension in two sections: both reference qa-w-par2 and keep distinct designs",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "id": "W-7.2 legacy C is byte-identical in the stored document after unrelated edits to A and B (JSON string compared)",
+      "ok": true,
+      "detail": {
+        "before": "{\"title\":\"QA-W C w7l66b\",\"axis\":\"facet\",\"dimension\":\"qa-w-par2\",\"display\":\"tiles\"}",
+        "after": "{\"title\":\"QA-W C w7l66b\",\"axis\":\"facet\",\"dimension\":\"qa-w-par2\",\"display\":\"tiles\"}"
+      }
+    },
+    {
+      "id": "W-7.2b the unrelated edits landed on the right sections only (A.size=md, B.gap=tight, A.gap and B.size unchanged)",
+      "ok": true,
+      "detail": {
+        "A": {
+          "title": "QA-W A w7l66b",
+          "axis": "facet",
+          "dimension": "qa-w-par2",
+          "display": "tiles",
+          "layout": "image-grid",
+          "template": "gift-circles",
+          "columns": {
+            "mobile": 2,
+            "desktop": 5
+          },
+          "gap": "loose",
+          "textPosition": "overlay",
+          "contentSequence": "label-first",
+          "shape": "hexagon",
+          "size": "md",
+          "showCounts": true
+        },
+        "B": {
+          "title": "QA-W B w7l66b",
+          "axis": "facet",
+          "dimension": "qa-w-par2",
+          "display": "tiles",
+          "layout": "carousel",
+          "template": "swipe-rail",
+          "rows": 1,
+          "gap": "tight",
+          "valueSort": "count",
+          "shape": "heart",
+          "size": "sm",
+          "cardStyle": "outlined",
+          "maxItems": 6
+        }
+      }
+    },
+    {
+      "id": "W-7.3 publish: the published document carries the three sections with the stored keys",
+      "ok": true,
+      "detail": {
+        "head": [
+          "storefront_id",
+          "schema_version",
+          "draft",
+          "draft_revision",
+          "published",
+          "published_revision",
+          "published_at"
+        ]
+      }
+    },
+    {
+      "id": "W-7.4a storefront renders all three sections of the same dimension",
+      "ok": true,
+      "detail": {
+        "a": true,
+        "b": true,
+        "c": true
+      }
+    },
+    {
+      "id": "W-7.4b A (desktop): image-grid, 5 columns, hexagon frames, label under... overlay, counts shown, medium size",
+      "ok": true,
+      "detail": {
+        "layout": "image-grid",
+        "columns": 5,
+        "position": "overlay",
+        "frames": [
+          {
+            "nominalW": "80px",
+            "renderedW": 80,
+            "aspect": "1/1",
+            "radius": "0px",
+            "clip": "polygon",
+            "mask": "none"
+          },
+          {
+            "nominalW": "80px",
+            "renderedW": 80,
+            "aspect": "1/1",
+            "radius": "0px",
+            "clip": "polygon",
+            "mask": "none"
+          }
+        ]
+      }
+    },
+    {
+      "id": "W-7.4c B (desktop): carousel, heart (mask) frames at small size (56px), 6 items max, most-products order (red 5, blue 4, cake 3, long 3, heart 2, none 2), tight gap (8px)",
+      "ok": true,
+      "detail": {
+        "layout": "carousel",
+        "n": 6,
+        "names": [
+          "ورد أحمر",
+          "ورد أزرق",
+          "أيقونة كعكة",
+          "اسم عربي طويل جداً يتجاوز أربعين حرفاً لفحص الالتفاف",
+          "أيقونة قلب",
+          "بلا هوية"
+        ],
+        "frames": [
+          {
+            "nominalW": "56px",
+            "renderedW": 56,
+            "aspect": "1/1",
+            "radius": "0px",
+            "clip": "none",
+            "mask": "mask"
+          },
+          {
+            "nominalW": "56px",
+            "renderedW": 56,
+            "aspect": "1/1",
+            "radius": "0px",
+            "clip": "none",
+            "mask": "mask"
+          }
+        ],
+        "gap": 8
+      }
+    },
+    {
+      "id": "W-7.4d C is the legacy look (no data-discovery-layout list) and A/B designs differ from it",
+      "ok": true,
+      "detail": {
+        "cLayout": "legacy"
+      }
+    },
+    {
+      "id": "W-7.4e each section shows its own design: A shapes (polygon) differ from B shapes (mask); item counts differ (A all visible values, B capped at 6)",
+      "ok": true,
+      "detail": {
+        "a": 7,
+        "b": 6
+      }
+    },
+    {
+      "id": "W-7.4f mobile 390 (en): A uses its mobile columns (2), B the carousel",
+      "ok": true,
+      "detail": {
+        "a": 2,
+        "b": "carousel"
+      }
+    },
+    {
+      "id": "W-7.4g no horizontal page overflow on the storefront (desktop / mobile)",
+      "ok": true,
+      "detail": {
+        "d": 0,
+        "m": 0
+      }
+    },
+    {
+      "id": "W-7.4h facet-visual images through the storefront proxy answered 200 only",
+      "ok": true,
+      "detail": [
+        200
+      ]
+    },
+    {
+      "id": "W-7.5a resetting ONE control deletes exactly that key (shape) and no other",
+      "ok": true,
+      "detail": {
+        "title": "QA-W B w7l66b",
+        "axis": "facet",
+        "dimension": "qa-w-par2",
+        "display": "tiles",
+        "layout": "carousel",
+        "template": "swipe-rail",
+        "rows": 1,
+        "gap": "tight",
+        "valueSort": "count",
+        "size": "sm",
+        "cardStyle": "outlined",
+        "maxItems": 6
+      }
+    },
+    {
+      "id": "W-7.5b «Reset all» leaves only title / axis / dimension / display (every optional key deleted, no placeholders)",
+      "ok": true,
+      "detail": {
+        "title": "QA-W B w7l66b",
+        "axis": "facet",
+        "dimension": "qa-w-par2",
+        "display": "tiles"
+      }
+    },
+    {
+      "id": "W-7.5c section A is untouched by B's resets",
+      "ok": true,
+      "detail": {
+        "title": "QA-W A w7l66b",
+        "axis": "facet",
+        "dimension": "qa-w-par2",
+        "display": "tiles",
+        "layout": "image-grid",
+        "template": "gift-circles",
+        "columns": {
+          "mobile": 2,
+          "desktop": 5
+        },
+        "gap": "loose",
+        "textPosition": "overlay",
+        "contentSequence": "label-first",
+        "shape": "hexagon",
+        "size": "md",
+        "showCounts": true
+      }
+    },
+    {
+      "id": "W-7.5d legacy C is still byte-identical after the resets",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "id": "W-7.5e after the reset and a new publish the storefront shows B in the legacy look again, and A unchanged",
+      "ok": true,
+      "detail": {
+        "bLegacy": true,
+        "aLayout": "image-grid"
+      }
+    }
+  ]
+}

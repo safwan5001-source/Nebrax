@@ -1,0 +1,102 @@
+[
+  {
+    "id": "S-5.alone-a",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-5.alone-b",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-5.alone-c",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-5.alone-d",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-5.together-a-byte-identical-to-alone",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-5.together-b-byte-identical-to-alone",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-5.together-c-byte-identical-to-alone",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-5.together-d-byte-identical-to-alone",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-5.designs-differ",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-5.no-duplicate-ids-in-document",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-5.A grid: layout/cols/count",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-5.A keeps value shapes (B's explicit square/sm does not leak)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-5.B carousel: layout, explicit square/sm applied to every media tile",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-5.B overlay position, no counts (A/C showCounts does not leak)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-5.B sorted by count desc",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-5.C text list: no media, counts, start aligned, 4 items",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-5.D legacy tiles untouched by neighbours",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-5.count ids are section-unique (A and C both show counts)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-5.same value links consistent across sections",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-5.console clean (excl. dev HMR/font noise)",
+    "ok": true,
+    "detail": ""
+  }
+]

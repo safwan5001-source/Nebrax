@@ -1,0 +1,426 @@
+{
+  "results": [
+    {
+      "id": "W-6.en.1 keyboard reaches the row's edit button with a visible focus ring",
+      "ok": true,
+      "detail": [
+        {
+          "n": "button:Edit قيمة لوحة المفاتيح",
+          "inDialog": false,
+          "dlgLabel": null,
+          "ring": true,
+          "fv": true
+        }
+      ]
+    },
+    {
+      "id": "W-6.en.2 on open, focus is moved into the dialog",
+      "ok": true,
+      "detail": {
+        "n": "button[tab]:Data",
+        "inDialog": true,
+        "dlgLabel": "value",
+        "ring": true,
+        "fv": true
+      }
+    },
+    {
+      "id": "W-6.en.3 Tab order inside the Data tab stays in the dialog (14 stops), focus ring visible on each",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "id": "W-6.en.4 focus trap: 80 further Tab presses never leave the dialog",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "id": "W-6.en.5 focus trap backwards: 80 Shift+Tab presses never leave the dialog",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "id": "W-6.en.6 tabs: ArrowRight moves to the next tab, ArrowLeft back (visual direction follows RTL); selection sequence [\"Data\",\"Image & icon\",\"Appearance\",\"Image & icon\"]",
+      "ok": true,
+      "detail": {
+        "seq": [
+          "Data",
+          "Image & icon",
+          "Appearance",
+          "Image & icon"
+        ],
+        "afterFocus": {
+          "n": "button[tab]:Image & icon",
+          "inDialog": true,
+          "dlgLabel": "value",
+          "ring": true,
+          "fv": true
+        }
+      }
+    },
+    {
+      "id": "W-6.en.7 INFO: Home/End on the tablist select first/last tab -> Home=\"Data\" End=\"Appearance\"",
+      "ok": true,
+      "detail": {
+        "info": {
+          "homeSel": "Data",
+          "endSel": "Appearance"
+        }
+      }
+    },
+    {
+      "id": "W-6.en.8 shape grid: arrow keys move focus (button:Circle > button:Square > button:Rounded square > button:Star); Space selects -> star",
+      "ok": true,
+      "detail": {
+        "grid": [
+          "button:Circle",
+          "button:Square",
+          "button:Rounded square",
+          "button:Star"
+        ],
+        "pressed": "star"
+      }
+    },
+    {
+      "id": "W-6.en.9 after «restore inheritance» by keyboard focus lands on a control of that row (not <body>)",
+      "ok": true,
+      "detail": {
+        "n": "button:Circle",
+        "inDialog": true,
+        "dlgLabel": "value",
+        "ring": true,
+        "fv": true
+      }
+    },
+    {
+      "id": "W-6.en.10 focal grid selectable by Enter and zoom slider by arrows (zoom=1.3)",
+      "ok": true,
+      "detail": {
+        "focalOn": "true",
+        "zoom": "1.3"
+      }
+    },
+    {
+      "id": "W-6.en.11 Escape with unsaved changes opens the discard confirmation (documented behaviour)",
+      "ok": false,
+      "detail": {
+        "confirmShown": 0,
+        "editorStillOpen": 1
+      }
+    },
+    {
+      "id": "W-6.en.11b the confirmation (opened by Cancel) takes focus inside itself",
+      "ok": true,
+      "detail": {
+        "n": "button:Cancel",
+        "inDialog": true,
+        "dlgLabel": "other-dialog",
+        "ring": true,
+        "fv": true
+      }
+    },
+    {
+      "id": "W-6.en.12 Escape on the confirmation closes only the confirmation (editor and edits kept); focus returns inside the editor",
+      "ok": true,
+      "detail": {
+        "stillEditor": 1,
+        "afterEsc2": {
+          "n": "button:Cancel",
+          "inDialog": true,
+          "dlgLabel": "value",
+          "ring": true,
+          "fv": true
+        }
+      }
+    },
+    {
+      "id": "W-6.en.13 after Discard (keyboard) the editor closes and focus returns to the row's edit button",
+      "ok": true,
+      "detail": {
+        "back2": {
+          "n": "button:Edit قيمة لوحة المفاتيح",
+          "inDialog": false,
+          "dlgLabel": null,
+          "ring": true,
+          "fv": true
+        },
+        "openerFocused": true
+      }
+    },
+    {
+      "id": "W-6.en.14 Save by keyboard closes the editor and returns focus to the row's edit button",
+      "ok": true,
+      "detail": {
+        "openerAfterSave": true
+      }
+    },
+    {
+      "id": "W-6.en.15 Escape without changes closes at once and returns focus to the edit button",
+      "ok": true,
+      "detail": {
+        "openerAfterEsc": true
+      }
+    },
+    {
+      "id": "W-6.en.16 media picker: focus enters the picker, 25 Tabs stay inside it; Escape closes only the picker and focus returns inside the editor",
+      "ok": false,
+      "detail": {
+        "inPicker": {
+          "n": "button:Cancel",
+          "inDialog": true,
+          "dlgLabel": "other-dialog",
+          "ring": true,
+          "fv": true
+        },
+        "outside": [],
+        "afterPicker": {
+          "n": "BODY",
+          "inDialog": false
+        }
+      }
+    },
+    {
+      "id": "W-6.ar.1 keyboard reaches the row's edit button with a visible focus ring",
+      "ok": true,
+      "detail": [
+        {
+          "n": "button:تعديل قيمة لوحة المفاتيح",
+          "inDialog": false,
+          "dlgLabel": null,
+          "ring": true,
+          "fv": true
+        }
+      ]
+    },
+    {
+      "id": "W-6.ar.2 on open, focus is moved into the dialog",
+      "ok": true,
+      "detail": {
+        "n": "button[tab]:البيانات",
+        "inDialog": true,
+        "dlgLabel": "value",
+        "ring": true,
+        "fv": true
+      }
+    },
+    {
+      "id": "W-6.ar.3 Tab order inside the Data tab stays in the dialog (14 stops), focus ring visible on each",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "id": "W-6.ar.4 focus trap: 80 further Tab presses never leave the dialog",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "id": "W-6.ar.5 focus trap backwards: 80 Shift+Tab presses never leave the dialog",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "id": "W-6.ar.6 tabs: ArrowLeft moves to the next tab, ArrowRight back (visual direction follows RTL); selection sequence [\"البيانات\",\"الصورة والأيقونة\",\"المظهر\",\"الصورة والأيقونة\"]",
+      "ok": true,
+      "detail": {
+        "seq": [
+          "البيانات",
+          "الصورة والأيقونة",
+          "المظهر",
+          "الصورة والأيقونة"
+        ],
+        "afterFocus": {
+          "n": "button[tab]:الصورة والأيقونة",
+          "inDialog": true,
+          "dlgLabel": "value",
+          "ring": true,
+          "fv": true
+        }
+      }
+    },
+    {
+      "id": "W-6.ar.7 INFO: Home/End on the tablist select first/last tab -> Home=\"البيانات\" End=\"المظهر\"",
+      "ok": true,
+      "detail": {
+        "info": {
+          "homeSel": "البيانات",
+          "endSel": "المظهر"
+        }
+      }
+    },
+    {
+      "id": "W-6.ar.8 shape grid: arrow keys move focus (button:دائري > button:دائري > button:دائري > button:مستطيل رأسي); Space selects -> portrait",
+      "ok": true,
+      "detail": {
+        "grid": [
+          "button:دائري",
+          "button:دائري",
+          "button:دائري",
+          "button:مستطيل رأسي"
+        ],
+        "pressed": "portrait"
+      }
+    },
+    {
+      "id": "W-6.ar.9 after «restore inheritance» by keyboard focus lands on a control of that row (not <body>)",
+      "ok": true,
+      "detail": {
+        "n": "button:دائري",
+        "inDialog": true,
+        "dlgLabel": "value",
+        "ring": true,
+        "fv": true
+      }
+    },
+    {
+      "id": "W-6.ar.10 focal grid selectable by Enter and zoom slider by arrows (zoom=1.3)",
+      "ok": true,
+      "detail": {
+        "focalOn": "true",
+        "zoom": "1.3"
+      }
+    },
+    {
+      "id": "W-6.ar.11 Escape with unsaved changes opens the discard confirmation (documented behaviour)",
+      "ok": false,
+      "detail": {
+        "confirmShown": 0,
+        "editorStillOpen": 1
+      }
+    },
+    {
+      "id": "W-6.ar.11b the confirmation (opened by Cancel) takes focus inside itself",
+      "ok": true,
+      "detail": {
+        "n": "button:إلغاء",
+        "inDialog": true,
+        "dlgLabel": "other-dialog",
+        "ring": true,
+        "fv": true
+      }
+    },
+    {
+      "id": "W-6.ar.12 Escape on the confirmation closes only the confirmation (editor and edits kept); focus returns inside the editor",
+      "ok": true,
+      "detail": {
+        "stillEditor": 1,
+        "afterEsc2": {
+          "n": "button:إلغاء",
+          "inDialog": true,
+          "dlgLabel": "value",
+          "ring": true,
+          "fv": true
+        }
+      }
+    },
+    {
+      "id": "W-6.ar.13 after Discard (keyboard) the editor closes and focus returns to the row's edit button",
+      "ok": true,
+      "detail": {
+        "back2": {
+          "n": "button:تعديل قيمة لوحة المفاتيح",
+          "inDialog": false,
+          "dlgLabel": null,
+          "ring": true,
+          "fv": true
+        },
+        "openerFocused": true
+      }
+    },
+    {
+      "id": "W-6.ar.14 Save by keyboard closes the editor and returns focus to the row's edit button",
+      "ok": true,
+      "detail": {
+        "openerAfterSave": true
+      }
+    },
+    {
+      "id": "W-6.ar.15 Escape without changes closes at once and returns focus to the edit button",
+      "ok": true,
+      "detail": {
+        "openerAfterEsc": true
+      }
+    },
+    {
+      "id": "W-6.ar.16 media picker: focus enters the picker, 25 Tabs stay inside it; Escape closes only the picker and focus returns inside the editor",
+      "ok": false,
+      "detail": {
+        "inPicker": {
+          "n": "button:إلغاء",
+          "inDialog": true,
+          "dlgLabel": "other-dialog",
+          "ring": true,
+          "fv": true
+        },
+        "outside": [],
+        "afterPicker": {
+          "n": "BODY",
+          "inDialog": false
+        }
+      }
+    }
+  ],
+  "orders": {
+    "en-data-open": [
+      "button[tab]:Data",
+      "div[tabpanel]:Arabic name English name (optional) ",
+      "input:ve-name-ar",
+      "input:ve-name-en",
+      "button[switch]:Status",
+      "button:Grid",
+      "button:Cards",
+      "button:Rail",
+      "button:Icons",
+      "button:List",
+      "button:Cancel",
+      "button:Close",
+      "button[tab]:Data",
+      "div[tabpanel]:Arabic name English name (optional) ",
+      "input:ve-name-ar"
+    ],
+    "en-shape-grid": [
+      "button:Circle",
+      "button:Square",
+      "button:Rounded square",
+      "button:Star"
+    ],
+    "en-picker-first": [
+      "button[tab]:Library",
+      "button[tab]:Upload",
+      "input:Search by name or alt text",
+      "input:",
+      "button:Use: qa-s-e2e-b-mv9so9ys.png",
+      "button:Use: qa-s-e2e-b-mv9snwhu.png"
+    ],
+    "ar-data-open": [
+      "button[tab]:البيانات",
+      "div[tabpanel]:الاسم بالعربية الاسم بالإنجليزية (اخ",
+      "input:ve-name-ar",
+      "input:ve-name-en",
+      "button[switch]:الحالة",
+      "button:شبكة",
+      "button:بطاقات",
+      "button:شريط",
+      "button:أيقونات",
+      "button:قائمة",
+      "button:إلغاء",
+      "button:إغلاق",
+      "button[tab]:البيانات",
+      "div[tabpanel]:الاسم بالعربية الاسم بالإنجليزية (اخ",
+      "input:ve-name-ar"
+    ],
+    "ar-shape-grid": [
+      "button:دائري",
+      "button:دائري",
+      "button:دائري",
+      "button:مستطيل رأسي"
+    ],
+    "ar-picker-first": [
+      "button[tab]:المكتبة",
+      "button[tab]:رفع",
+      "input:ابحث بالاسم أو النص البديل",
+      "input:",
+      "button:استخدام: qa-s-e2e-b-mv9so9ys.png",
+      "button:استخدام: qa-s-e2e-b-mv9snwhu.png"
+    ]
+  }
+}

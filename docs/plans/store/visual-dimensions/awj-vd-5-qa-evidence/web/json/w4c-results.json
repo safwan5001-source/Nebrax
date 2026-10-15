@@ -1,0 +1,133 @@
+[
+  {
+    "id": "W-4.11 long Arabic/English name (85 chars) ar 1440: no overflow in list, editor, preview",
+    "ok": true,
+    "detail": {
+      "listM": {
+        "rowW": 1134,
+        "rowH": 61,
+        "overflowingChildren": 0,
+        "docOverflow": 0
+      },
+      "titleClamp": {
+        "text": "تعديل القيمة — مناسبة اختبار ب",
+        "title": 99,
+        "clientH": 24,
+        "scrollH": 24
+      },
+      "m1": {
+        "clipped": [],
+        "sheetOverflowX": 0
+      },
+      "m2": {
+        "clipped": []
+      },
+      "tileBox": {
+        "tileW": 77,
+        "frameW": 272,
+        "inside": true
+      }
+    }
+  },
+  {
+    "id": "W-4.11 long Arabic/English name (85 chars) ar 390: no overflow in list, editor, preview",
+    "ok": true,
+    "detail": {
+      "listM": {
+        "rowW": 356,
+        "rowH": 181,
+        "overflowingChildren": 0,
+        "docOverflow": 0
+      },
+      "titleClamp": {
+        "text": "تعديل القيمة — مناسبة اختبار ب",
+        "title": 99,
+        "clientH": 48,
+        "scrollH": 72
+      },
+      "m1": {
+        "clipped": [],
+        "sheetOverflowX": 0
+      },
+      "m2": {
+        "clipped": []
+      },
+      "tileBox": {
+        "tileW": 105,
+        "frameW": 357,
+        "inside": true
+      }
+    }
+  },
+  {
+    "id": "W-4.11 long Arabic/English name (85 chars) en 1440: no overflow in list, editor, preview",
+    "ok": true,
+    "detail": {
+      "listM": {
+        "rowW": 1134,
+        "rowH": 61,
+        "overflowingChildren": 0,
+        "docOverflow": 0
+      },
+      "titleClamp": {
+        "text": "Edit value — A very long Engli",
+        "title": 104,
+        "clientH": 48,
+        "scrollH": 48
+      },
+      "m1": {
+        "clipped": [],
+        "sheetOverflowX": 0
+      },
+      "m2": {
+        "clipped": []
+      },
+      "tileBox": {
+        "tileW": 77,
+        "frameW": 272,
+        "inside": true
+      }
+    }
+  },
+  {
+    "id": "W-4.11 long Arabic/English name (85 chars) en 390: no overflow in list, editor, preview",
+    "ok": true,
+    "detail": {
+      "listM": {
+        "rowW": 356,
+        "rowH": 181,
+        "overflowingChildren": 0,
+        "docOverflow": 0
+      },
+      "titleClamp": {
+        "text": "Edit value — A very long Engli",
+        "title": 104,
+        "clientH": 48,
+        "scrollH": 72
+      },
+      "m1": {
+        "clipped": [],
+        "sheetOverflowX": 0
+      },
+      "m2": {
+        "clipped": []
+      },
+      "tileBox": {
+        "tileW": 105,
+        "frameW": 357,
+        "inside": true
+      }
+    }
+  },
+  {
+    "id": "W-4.12 data-part server rejection (name 400 chars): the editor stays open with a visible failure message on the Data part",
+    "ok": true,
+    "detail": [
+      {
+        "part": "data",
+        "status": "failed",
+        "text": "Data: The name field must not be greater than 120 characters."
+      }
+    ]
+  }
+]

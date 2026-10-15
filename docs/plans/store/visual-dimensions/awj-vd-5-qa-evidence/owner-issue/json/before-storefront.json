@@ -1,0 +1,96 @@
+{
+ "ar-1440": {
+  "titles": [
+   "F2 carousel",
+   "تسوّق حسب اللون",
+   "تسوّق حسب المناسبة",
+   "الأشكال الاثنا عشر",
+   "أحدث المنتجات",
+   "معلومات المنشأة"
+  ],
+  "facetImages": [
+   {
+    "url": "81d5ec1e/f431ff08-c369-411f-a262-966baf28ed8c/thumb-160.webp",
+    "status": 200,
+    "type": "image/webp"
+   },
+   {
+    "url": "6db145e4/8f391f5e-ddec-4336-af36-1d2acbcb07bb/thumb-160.webp",
+    "status": 200,
+    "type": "image/webp"
+   },
+   {
+    "url": "268a5a7c/ac24d91b-e934-4fea-a134-cc11517de7db/thumb-160.webp",
+    "status": 200,
+    "type": "image/webp"
+   },
+   {
+    "url": "18eaa4e2/bde563ae-4138-48ca-9683-faf1e12be37b/thumb-160.webp",
+    "status": 200,
+    "type": "image/webp"
+   },
+   {
+    "url": "c80e815e/8f391f5e-ddec-4336-af36-1d2acbcb07bb/thumb-160.webp",
+    "status": 200,
+    "type": "image/webp"
+   },
+   {
+    "url": "d38f7635/bde563ae-4138-48ca-9683-faf1e12be37b/thumb-160.webp",
+    "status": 200,
+    "type": "image/webp"
+   },
+   {
+    "url": "235ba097/ac24d91b-e934-4fea-a134-cc11517de7db/thumb-160.webp",
+    "status": 200,
+    "type": "image/webp"
+   },
+   {
+    "url": "dceeed77/f431ff08-c369-411f-a262-966baf28ed8c/thumb-160.webp",
+    "status": 200,
+    "type": "image/webp"
+   }
+  ]
+ },
+ "ar-390": {
+  "titles": [
+   "أحدث المنتجات"
+  ],
+  "facetImages": [
+   {
+    "url": "81d5ec1e/f431ff08-c369-411f-a262-966baf28ed8c/thumb-160.webp",
+    "status": 200,
+    "type": "image/webp"
+   },
+   {
+    "url": "6db145e4/8f391f5e-ddec-4336-af36-1d2acbcb07bb/thumb-160.webp",
+    "status": 200,
+    "type": "image/webp"
+   },
+   {
+    "url": "268a5a7c/ac24d91b-e934-4fea-a134-cc11517de7db/thumb-160.webp",
+    "status": 200,
+    "type": "image/webp"
+   },
+   {
+    "url": "18eaa4e2/bde563ae-4138-48ca-9683-faf1e12be37b/thumb-160.webp",
+    "status": 502
+   },
+   {
+    "url": "c80e815e/8f391f5e-ddec-4336-af36-1d2acbcb07bb/thumb-160.webp",
+    "status": 502
+   },
+   {
+    "url": "dceeed77/f431ff08-c369-411f-a262-966baf28ed8c/thumb-160.webp",
+    "status": 502
+   },
+   {
+    "url": "d38f7635/bde563ae-4138-48ca-9683-faf1e12be37b/thumb-160.webp",
+    "status": 502
+   },
+   {
+    "url": "235ba097/ac24d91b-e934-4fea-a134-cc11517de7db/thumb-160.webp",
+    "status": 502
+   }
+  ]
+ }
+}

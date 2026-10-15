@@ -1,0 +1,108 @@
+[
+ {
+  "id": "W-9.1 request census",
+  "ok": true,
+  "detail": {
+   "files": 24,
+   "requests": 1258,
+   "byTenant": {
+    "vd5-a": 614,
+    "no-auth": 644
+   },
+   "unknownAuthPrefixes": []
+  }
+ },
+ {
+  "id": "W-9.2 every API request used a tenant-A (vd5-a) bearer token, except <img> loads of signed media variants, all of which carry tenant=vd5-a and a signature",
+  "ok": true,
+  "detail": {
+   "byTenant": {
+    "vd5-a": 614,
+    "no-auth": 644
+   },
+   "anonymous": 644,
+   "signedVariantsOfTenantA": 644
+  }
+ },
+ {
+  "id": "W-9.3 no request path/query/body contains a tenant-B id (stores, sales channel, media, facets, values, products, tenant)",
+  "ok": true,
+  "detail": {
+   "leaks": [],
+   "checkedIds": 7
+  }
+ },
+ {
+  "id": "W-9.4 store ids addressed by the builder journeys are only vd5-a store S2 (none of S1, SB)",
+  "ok": true,
+  "detail": {
+   "storeIds": [
+    "a2fd1cdb-a4fe-4501-8db0-5150eb7a37ea"
+   ]
+  }
+ },
+ {
+  "id": "W-9.4b storefront (S2) browser requests: host is only the S2 managed hostname; image proxy answered 200 only; no tenant-B id",
+  "ok": true,
+  "detail": {
+   "hosts": [
+    "vd5-a-s2-mtgr-alhdaya.store.vd5.test:3103"
+   ],
+   "requests": 32,
+   "images": 16,
+   "leaks": 0
+  }
+ },
+ {
+  "id": "W-9.5 every endpoint called belongs to the expected families (me, applications, commerce/workspace, ...); anything else listed",
+  "ok": true,
+  "detail": {
+   "odd": []
+  }
+ },
+ {
+  "id": "W-9.6 INFO third-party/foreign hosts contacted during a merchandising journey (fonts, analytics...)",
+  "ok": true,
+  "detail": {
+   "info": {
+    "foreign": [
+     "localhost:3101"
+    ],
+    "sample": [
+     {
+      "ctx": "w9-journey",
+      "method": "GET",
+      "host": "localhost:3101",
+      "path": "/icon.ico"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "id": "W-9.7 logout: POST /logout sent, token and user cleared from storage, redirected to login",
+  "ok": true,
+  "detail": {
+   "url": "/login",
+   "requests": [
+    "POST /logout 200 auth=yes"
+   ],
+   "stored": {
+    "token": null,
+    "user": null
+   }
+  }
+ },
+ {
+  "id": "W-9.8 no authenticated API request after the logout request (8 s observation)",
+  "ok": true,
+  "detail": []
+ },
+ {
+  "id": "W-9.9 the logged-out (private) token is revoked server-side (GET /me answers 401)",
+  "ok": true,
+  "detail": {
+   "status": 401
+  }
+ }
+]

@@ -1,0 +1,4613 @@
+{
+  "results": [
+    {
+      "id": "value-data-ar-light-390",
+      "kind": "value",
+      "tab": "data",
+      "locale": "ar",
+      "theme": "light",
+      "width": 390,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 390,
+        "h": 844
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "button:صورة قوس المعاينة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px inset, rgb(30, 64, 175) 0",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "div:الاسم بالعربية الاسم بالإنجليزية (اختيار",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(229, 151, 0)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-image-ar-light-390",
+      "kind": "value",
+      "tab": "image",
+      "locale": "ar",
+      "theme": "light",
+      "width": 390,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 390,
+        "h": 844
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "button:صورة قوس المعاينة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px inset, rgb(30, 64, 175) 0",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "div:نوع المحتوى ورِّث من البُعد صورة أيقونة ",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(229, 151, 0)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:ورِّث من البُعد",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-appearance-ar-light-390",
+      "kind": "value",
+      "tab": "appearance",
+      "locale": "ar",
+      "theme": "light",
+      "width": 390,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 390,
+        "h": 844
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "button:صورة قوس المعاينة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px inset, rgb(30, 64, 175) 0",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "div:الشكل مخصَّص لهذه القيمة استرجاع الوراثة",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(229, 151, 0)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:استرجاع الوراثة — الشكل",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-data-ar-light-390",
+      "kind": "facet",
+      "tab": "data",
+      "locale": "ar",
+      "theme": "light",
+      "width": 390,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 390,
+        "h": 844
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "button:المعاينة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px inset, rgb(30, 64, 175) 0",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "div:الاسم بالعربية الاسم بالإنجليزية (اختيار",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(229, 151, 0)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-image-ar-light-390",
+      "kind": "facet",
+      "tab": "image",
+      "locale": "ar",
+      "theme": "light",
+      "width": 390,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 390,
+        "h": 844
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "button:المعاينة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px inset, rgb(30, 64, 175) 0",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "div:هوية البُعد نفسه كيف يظهر البُعد نفسه، ك",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(229, 151, 0)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:صورة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-appearance-ar-light-390",
+      "kind": "facet",
+      "tab": "appearance",
+      "locale": "ar",
+      "theme": "light",
+      "width": 390,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 390,
+        "h": 844
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "button:المعاينة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px inset, rgb(30, 64, 175) 0",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "div:هوية البُعد نفسه كيف يظهر البُعد نفسه، ك",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(229, 151, 0)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:دائري",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-data-ar-light-768",
+      "kind": "value",
+      "tab": "data",
+      "locale": "ar",
+      "theme": "light",
+      "width": 768,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:الاسم بالعربية الاسم بالإنجليزية (اختيار",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-en",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-image-ar-light-768",
+      "kind": "value",
+      "tab": "image",
+      "locale": "ar",
+      "theme": "light",
+      "width": 768,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:نوع المحتوى ورِّث من البُعد صورة أيقونة ",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:ورِّث من البُعد",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:صورة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-appearance-ar-light-768",
+      "kind": "value",
+      "tab": "appearance",
+      "locale": "ar",
+      "theme": "light",
+      "width": 768,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:الشكل مخصَّص لهذه القيمة استرجاع الوراثة",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:استرجاع الوراثة — الشكل",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:قوس إسلامي",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-data-ar-light-768",
+      "kind": "facet",
+      "tab": "data",
+      "locale": "ar",
+      "theme": "light",
+      "width": 768,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:الاسم بالعربية الاسم بالإنجليزية (اختيار",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-en",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-image-ar-light-768",
+      "kind": "facet",
+      "tab": "image",
+      "locale": "ar",
+      "theme": "light",
+      "width": 768,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:هوية البُعد نفسه كيف يظهر البُعد نفسه، ك",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:صورة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:أيقونة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-appearance-ar-light-768",
+      "kind": "facet",
+      "tab": "appearance",
+      "locale": "ar",
+      "theme": "light",
+      "width": 768,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:هوية البُعد نفسه كيف يظهر البُعد نفسه، ك",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:دائري",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:صغير",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-data-ar-light-1280",
+      "kind": "value",
+      "tab": "data",
+      "locale": "ar",
+      "theme": "light",
+      "width": 1280,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:الاسم بالعربية الاسم بالإنجليزية (اختيار",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-en",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-image-ar-light-1280",
+      "kind": "value",
+      "tab": "image",
+      "locale": "ar",
+      "theme": "light",
+      "width": 1280,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:نوع المحتوى ورِّث من البُعد صورة أيقونة ",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:ورِّث من البُعد",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:صورة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-appearance-ar-light-1280",
+      "kind": "value",
+      "tab": "appearance",
+      "locale": "ar",
+      "theme": "light",
+      "width": 1280,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:الشكل مخصَّص لهذه القيمة استرجاع الوراثة",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:استرجاع الوراثة — الشكل",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:قوس إسلامي",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-data-ar-light-1280",
+      "kind": "facet",
+      "tab": "data",
+      "locale": "ar",
+      "theme": "light",
+      "width": 1280,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:الاسم بالعربية الاسم بالإنجليزية (اختيار",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-en",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-image-ar-light-1280",
+      "kind": "facet",
+      "tab": "image",
+      "locale": "ar",
+      "theme": "light",
+      "width": 1280,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:هوية البُعد نفسه كيف يظهر البُعد نفسه، ك",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:صورة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:أيقونة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-appearance-ar-light-1280",
+      "kind": "facet",
+      "tab": "appearance",
+      "locale": "ar",
+      "theme": "light",
+      "width": 1280,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:هوية البُعد نفسه كيف يظهر البُعد نفسه، ك",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:دائري",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:صغير",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-data-ar-light-1440",
+      "kind": "value",
+      "tab": "data",
+      "locale": "ar",
+      "theme": "light",
+      "width": 1440,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:الاسم بالعربية الاسم بالإنجليزية (اختيار",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-en",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-image-ar-light-1440",
+      "kind": "value",
+      "tab": "image",
+      "locale": "ar",
+      "theme": "light",
+      "width": 1440,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:نوع المحتوى ورِّث من البُعد صورة أيقونة ",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:ورِّث من البُعد",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:صورة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-appearance-ar-light-1440",
+      "kind": "value",
+      "tab": "appearance",
+      "locale": "ar",
+      "theme": "light",
+      "width": 1440,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:الشكل مخصَّص لهذه القيمة استرجاع الوراثة",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:استرجاع الوراثة — الشكل",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:قوس إسلامي",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-data-ar-light-1440",
+      "kind": "facet",
+      "tab": "data",
+      "locale": "ar",
+      "theme": "light",
+      "width": 1440,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:الاسم بالعربية الاسم بالإنجليزية (اختيار",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-en",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-image-ar-light-1440",
+      "kind": "facet",
+      "tab": "image",
+      "locale": "ar",
+      "theme": "light",
+      "width": 1440,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:هوية البُعد نفسه كيف يظهر البُعد نفسه، ك",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:صورة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:أيقونة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-appearance-ar-light-1440",
+      "kind": "facet",
+      "tab": "appearance",
+      "locale": "ar",
+      "theme": "light",
+      "width": 1440,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:هوية البُعد نفسه كيف يظهر البُعد نفسه، ك",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:دائري",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:صغير",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-data-ar-dark-390",
+      "kind": "value",
+      "tab": "data",
+      "locale": "ar",
+      "theme": "dark",
+      "width": 390,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 390,
+        "h": 844
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "button:صورة قوس المعاينة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px inset, rgb(79, 140, 255) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "div:الاسم بالعربية الاسم بالإنجليزية (اختيار",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(229, 151, 0)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-image-ar-dark-390",
+      "kind": "value",
+      "tab": "image",
+      "locale": "ar",
+      "theme": "dark",
+      "width": 390,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 390,
+        "h": 844
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "button:صورة قوس المعاينة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px inset, rgb(79, 140, 255) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "div:نوع المحتوى ورِّث من البُعد صورة أيقونة ",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(229, 151, 0)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:ورِّث من البُعد",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-appearance-ar-dark-390",
+      "kind": "value",
+      "tab": "appearance",
+      "locale": "ar",
+      "theme": "dark",
+      "width": 390,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 390,
+        "h": 844
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "button:صورة قوس المعاينة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px inset, rgb(79, 140, 255) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "div:الشكل مخصَّص لهذه القيمة استرجاع الوراثة",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(229, 151, 0)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:استرجاع الوراثة — الشكل",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-data-ar-dark-390",
+      "kind": "facet",
+      "tab": "data",
+      "locale": "ar",
+      "theme": "dark",
+      "width": 390,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 390,
+        "h": 844
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "button:المعاينة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px inset, rgb(79, 140, 255) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "div:الاسم بالعربية الاسم بالإنجليزية (اختيار",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(229, 151, 0)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-image-ar-dark-390",
+      "kind": "facet",
+      "tab": "image",
+      "locale": "ar",
+      "theme": "dark",
+      "width": 390,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 390,
+        "h": 844
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "button:المعاينة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px inset, rgb(79, 140, 255) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "div:هوية البُعد نفسه كيف يظهر البُعد نفسه، ك",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(229, 151, 0)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:صورة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-appearance-ar-dark-390",
+      "kind": "facet",
+      "tab": "appearance",
+      "locale": "ar",
+      "theme": "dark",
+      "width": 390,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 390,
+        "h": 844
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "button:المعاينة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px inset, rgb(79, 140, 255) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "div:هوية البُعد نفسه كيف يظهر البُعد نفسه، ك",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(229, 151, 0)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:دائري",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-data-ar-dark-768",
+      "kind": "value",
+      "tab": "data",
+      "locale": "ar",
+      "theme": "dark",
+      "width": 768,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:الاسم بالعربية الاسم بالإنجليزية (اختيار",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-en",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-image-ar-dark-768",
+      "kind": "value",
+      "tab": "image",
+      "locale": "ar",
+      "theme": "dark",
+      "width": 768,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:نوع المحتوى ورِّث من البُعد صورة أيقونة ",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:ورِّث من البُعد",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:صورة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-appearance-ar-dark-768",
+      "kind": "value",
+      "tab": "appearance",
+      "locale": "ar",
+      "theme": "dark",
+      "width": 768,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:الشكل مخصَّص لهذه القيمة استرجاع الوراثة",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:استرجاع الوراثة — الشكل",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:قوس إسلامي",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-data-ar-dark-768",
+      "kind": "facet",
+      "tab": "data",
+      "locale": "ar",
+      "theme": "dark",
+      "width": 768,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:الاسم بالعربية الاسم بالإنجليزية (اختيار",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-en",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-image-ar-dark-768",
+      "kind": "facet",
+      "tab": "image",
+      "locale": "ar",
+      "theme": "dark",
+      "width": 768,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:هوية البُعد نفسه كيف يظهر البُعد نفسه، ك",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:صورة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:أيقونة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-appearance-ar-dark-768",
+      "kind": "facet",
+      "tab": "appearance",
+      "locale": "ar",
+      "theme": "dark",
+      "width": 768,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:هوية البُعد نفسه كيف يظهر البُعد نفسه، ك",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:دائري",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:صغير",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-data-ar-dark-1280",
+      "kind": "value",
+      "tab": "data",
+      "locale": "ar",
+      "theme": "dark",
+      "width": 1280,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:الاسم بالعربية الاسم بالإنجليزية (اختيار",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-en",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-image-ar-dark-1280",
+      "kind": "value",
+      "tab": "image",
+      "locale": "ar",
+      "theme": "dark",
+      "width": 1280,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:نوع المحتوى ورِّث من البُعد صورة أيقونة ",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:ورِّث من البُعد",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:صورة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-appearance-ar-dark-1280",
+      "kind": "value",
+      "tab": "appearance",
+      "locale": "ar",
+      "theme": "dark",
+      "width": 1280,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:الشكل مخصَّص لهذه القيمة استرجاع الوراثة",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:استرجاع الوراثة — الشكل",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:قوس إسلامي",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-data-ar-dark-1280",
+      "kind": "facet",
+      "tab": "data",
+      "locale": "ar",
+      "theme": "dark",
+      "width": 1280,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:الاسم بالعربية الاسم بالإنجليزية (اختيار",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-en",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-image-ar-dark-1280",
+      "kind": "facet",
+      "tab": "image",
+      "locale": "ar",
+      "theme": "dark",
+      "width": 1280,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:هوية البُعد نفسه كيف يظهر البُعد نفسه، ك",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:صورة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:أيقونة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-appearance-ar-dark-1280",
+      "kind": "facet",
+      "tab": "appearance",
+      "locale": "ar",
+      "theme": "dark",
+      "width": 1280,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:هوية البُعد نفسه كيف يظهر البُعد نفسه، ك",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:دائري",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:صغير",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-data-ar-dark-1440",
+      "kind": "value",
+      "tab": "data",
+      "locale": "ar",
+      "theme": "dark",
+      "width": 1440,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:الاسم بالعربية الاسم بالإنجليزية (اختيار",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-en",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-image-ar-dark-1440",
+      "kind": "value",
+      "tab": "image",
+      "locale": "ar",
+      "theme": "dark",
+      "width": 1440,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:نوع المحتوى ورِّث من البُعد صورة أيقونة ",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:ورِّث من البُعد",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:صورة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-appearance-ar-dark-1440",
+      "kind": "value",
+      "tab": "appearance",
+      "locale": "ar",
+      "theme": "dark",
+      "width": 1440,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:الشكل مخصَّص لهذه القيمة استرجاع الوراثة",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:استرجاع الوراثة — الشكل",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:قوس إسلامي",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-data-ar-dark-1440",
+      "kind": "facet",
+      "tab": "data",
+      "locale": "ar",
+      "theme": "dark",
+      "width": 1440,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:الاسم بالعربية الاسم بالإنجليزية (اختيار",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-en",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-image-ar-dark-1440",
+      "kind": "facet",
+      "tab": "image",
+      "locale": "ar",
+      "theme": "dark",
+      "width": 1440,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:هوية البُعد نفسه كيف يظهر البُعد نفسه، ك",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:صورة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:أيقونة",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-appearance-ar-dark-1440",
+      "kind": "facet",
+      "tab": "appearance",
+      "locale": "ar",
+      "theme": "dark",
+      "width": 1440,
+      "htmlDir": "rtl",
+      "htmlLang": "ar",
+      "edDir": "rtl",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:هوية البُعد نفسه كيف يظهر البُعد نفسه، ك",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:دائري",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:صغير",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-data-en-light-390",
+      "kind": "value",
+      "tab": "data",
+      "locale": "en",
+      "theme": "light",
+      "width": 390,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 390,
+        "h": 844
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "button:Arch image Preview",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px inset, rgb(30, 64, 175) 0",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "div:Arabic name English name (optional) Stat",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(229, 151, 0)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-image-en-light-390",
+      "kind": "value",
+      "tab": "image",
+      "locale": "en",
+      "theme": "light",
+      "width": 390,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 390,
+        "h": 844
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "button:Arch image Preview",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px inset, rgb(30, 64, 175) 0",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "div:Content type Inherit from dimension Imag",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(229, 151, 0)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Inherit from dimension",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-appearance-en-light-390",
+      "kind": "value",
+      "tab": "appearance",
+      "locale": "en",
+      "theme": "light",
+      "width": 390,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 390,
+        "h": 844
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "button:Arch image Preview",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px inset, rgb(30, 64, 175) 0",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "div:Shape Customized for this value Restore ",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(229, 151, 0)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Restore inheritance — Shape",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-data-en-light-390",
+      "kind": "facet",
+      "tab": "data",
+      "locale": "en",
+      "theme": "light",
+      "width": 390,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 390,
+        "h": 844
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "button:Preview",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px inset, rgb(30, 64, 175) 0",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "div:Arabic name English name (optional) Stat",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(229, 151, 0)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-image-en-light-390",
+      "kind": "facet",
+      "tab": "image",
+      "locale": "en",
+      "theme": "light",
+      "width": 390,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 390,
+        "h": 844
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "button:Preview",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px inset, rgb(30, 64, 175) 0",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "div:The dimension itself How the dimension i",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(229, 151, 0)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Image",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-appearance-en-light-390",
+      "kind": "facet",
+      "tab": "appearance",
+      "locale": "en",
+      "theme": "light",
+      "width": 390,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 390,
+        "h": 844
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "button:Preview",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px inset, rgb(30, 64, 175) 0",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "div:The dimension itself How the dimension i",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(229, 151, 0)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Circle",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-data-en-light-768",
+      "kind": "value",
+      "tab": "data",
+      "locale": "en",
+      "theme": "light",
+      "width": 768,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:Arabic name English name (optional) Stat",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-en",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-image-en-light-768",
+      "kind": "value",
+      "tab": "image",
+      "locale": "en",
+      "theme": "light",
+      "width": 768,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:Content type Inherit from dimension Imag",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Inherit from dimension",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Image",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-appearance-en-light-768",
+      "kind": "value",
+      "tab": "appearance",
+      "locale": "en",
+      "theme": "light",
+      "width": 768,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:Shape Customized for this value Restore ",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Restore inheritance — Shape",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Islamic arch",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-data-en-light-768",
+      "kind": "facet",
+      "tab": "data",
+      "locale": "en",
+      "theme": "light",
+      "width": 768,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:Arabic name English name (optional) Stat",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-en",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-image-en-light-768",
+      "kind": "facet",
+      "tab": "image",
+      "locale": "en",
+      "theme": "light",
+      "width": 768,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:The dimension itself How the dimension i",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Image",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Icon",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-appearance-en-light-768",
+      "kind": "facet",
+      "tab": "appearance",
+      "locale": "en",
+      "theme": "light",
+      "width": 768,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:The dimension itself How the dimension i",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Circle",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Small",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-data-en-light-1280",
+      "kind": "value",
+      "tab": "data",
+      "locale": "en",
+      "theme": "light",
+      "width": 1280,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 512,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:Arabic name English name (optional) Stat",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-en",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-image-en-light-1280",
+      "kind": "value",
+      "tab": "image",
+      "locale": "en",
+      "theme": "light",
+      "width": 1280,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 512,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:Content type Inherit from dimension Imag",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Inherit from dimension",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Image",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-appearance-en-light-1280",
+      "kind": "value",
+      "tab": "appearance",
+      "locale": "en",
+      "theme": "light",
+      "width": 1280,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 512,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:Shape Customized for this value Restore ",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Restore inheritance — Shape",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Islamic arch",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-data-en-light-1280",
+      "kind": "facet",
+      "tab": "data",
+      "locale": "en",
+      "theme": "light",
+      "width": 1280,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 512,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:Arabic name English name (optional) Stat",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-en",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-image-en-light-1280",
+      "kind": "facet",
+      "tab": "image",
+      "locale": "en",
+      "theme": "light",
+      "width": 1280,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 512,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:The dimension itself How the dimension i",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Image",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Icon",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-appearance-en-light-1280",
+      "kind": "facet",
+      "tab": "appearance",
+      "locale": "en",
+      "theme": "light",
+      "width": 1280,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 512,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:The dimension itself How the dimension i",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Circle",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Small",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-data-en-light-1440",
+      "kind": "value",
+      "tab": "data",
+      "locale": "en",
+      "theme": "light",
+      "width": 1440,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 672,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:Arabic name English name (optional) Stat",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-en",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-image-en-light-1440",
+      "kind": "value",
+      "tab": "image",
+      "locale": "en",
+      "theme": "light",
+      "width": 1440,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 672,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:Content type Inherit from dimension Imag",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Inherit from dimension",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Image",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-appearance-en-light-1440",
+      "kind": "value",
+      "tab": "appearance",
+      "locale": "en",
+      "theme": "light",
+      "width": 1440,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 672,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:Shape Customized for this value Restore ",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Restore inheritance — Shape",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Islamic arch",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-data-en-light-1440",
+      "kind": "facet",
+      "tab": "data",
+      "locale": "en",
+      "theme": "light",
+      "width": 1440,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 672,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:Arabic name English name (optional) Stat",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-en",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-image-en-light-1440",
+      "kind": "facet",
+      "tab": "image",
+      "locale": "en",
+      "theme": "light",
+      "width": 1440,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 672,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:The dimension itself How the dimension i",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Image",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Icon",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-appearance-en-light-1440",
+      "kind": "facet",
+      "tab": "appearance",
+      "locale": "en",
+      "theme": "light",
+      "width": 1440,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 672,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": false,
+      "focusStops": [
+        {
+          "name": "div:The dimension itself How the dimension i",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Circle",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Small",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(30, 64, 175) 0px 0px",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-data-en-dark-390",
+      "kind": "value",
+      "tab": "data",
+      "locale": "en",
+      "theme": "dark",
+      "width": 390,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 390,
+        "h": 844
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "button:Arch image Preview",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px inset, rgb(79, 140, 255) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "div:Arabic name English name (optional) Stat",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(229, 151, 0)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-image-en-dark-390",
+      "kind": "value",
+      "tab": "image",
+      "locale": "en",
+      "theme": "dark",
+      "width": 390,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 390,
+        "h": 844
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "button:Arch image Preview",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px inset, rgb(79, 140, 255) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "div:Content type Inherit from dimension Imag",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(229, 151, 0)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Inherit from dimension",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-appearance-en-dark-390",
+      "kind": "value",
+      "tab": "appearance",
+      "locale": "en",
+      "theme": "dark",
+      "width": 390,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 390,
+        "h": 844
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "button:Arch image Preview",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px inset, rgb(79, 140, 255) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "div:Shape Customized for this value Restore ",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(229, 151, 0)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Restore inheritance — Shape",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-data-en-dark-390",
+      "kind": "facet",
+      "tab": "data",
+      "locale": "en",
+      "theme": "dark",
+      "width": 390,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 390,
+        "h": 844
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "button:Preview",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px inset, rgb(79, 140, 255) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "div:Arabic name English name (optional) Stat",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(229, 151, 0)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-image-en-dark-390",
+      "kind": "facet",
+      "tab": "image",
+      "locale": "en",
+      "theme": "dark",
+      "width": 390,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 390,
+        "h": 844
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "button:Preview",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px inset, rgb(79, 140, 255) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "div:The dimension itself How the dimension i",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(229, 151, 0)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Image",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-appearance-en-dark-390",
+      "kind": "facet",
+      "tab": "appearance",
+      "locale": "en",
+      "theme": "dark",
+      "width": 390,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 390,
+        "h": 844
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "button:Preview",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px inset, rgb(79, 140, 255) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "div:The dimension itself How the dimension i",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(229, 151, 0)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Circle",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-data-en-dark-768",
+      "kind": "value",
+      "tab": "data",
+      "locale": "en",
+      "theme": "dark",
+      "width": 768,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:Arabic name English name (optional) Stat",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-en",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-image-en-dark-768",
+      "kind": "value",
+      "tab": "image",
+      "locale": "en",
+      "theme": "dark",
+      "width": 768,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:Content type Inherit from dimension Imag",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Inherit from dimension",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Image",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-appearance-en-dark-768",
+      "kind": "value",
+      "tab": "appearance",
+      "locale": "en",
+      "theme": "dark",
+      "width": 768,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:Shape Customized for this value Restore ",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Restore inheritance — Shape",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Islamic arch",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-data-en-dark-768",
+      "kind": "facet",
+      "tab": "data",
+      "locale": "en",
+      "theme": "dark",
+      "width": 768,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:Arabic name English name (optional) Stat",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-en",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-image-en-dark-768",
+      "kind": "facet",
+      "tab": "image",
+      "locale": "en",
+      "theme": "dark",
+      "width": 768,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:The dimension itself How the dimension i",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Image",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Icon",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-appearance-en-dark-768",
+      "kind": "facet",
+      "tab": "appearance",
+      "locale": "en",
+      "theme": "dark",
+      "width": 768,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 0,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:The dimension itself How the dimension i",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Circle",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Small",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-data-en-dark-1280",
+      "kind": "value",
+      "tab": "data",
+      "locale": "en",
+      "theme": "dark",
+      "width": 1280,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 512,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:Arabic name English name (optional) Stat",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-en",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-image-en-dark-1280",
+      "kind": "value",
+      "tab": "image",
+      "locale": "en",
+      "theme": "dark",
+      "width": 1280,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 512,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:Content type Inherit from dimension Imag",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Inherit from dimension",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Image",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-appearance-en-dark-1280",
+      "kind": "value",
+      "tab": "appearance",
+      "locale": "en",
+      "theme": "dark",
+      "width": 1280,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 512,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:Shape Customized for this value Restore ",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Restore inheritance — Shape",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Islamic arch",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-data-en-dark-1280",
+      "kind": "facet",
+      "tab": "data",
+      "locale": "en",
+      "theme": "dark",
+      "width": 1280,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 512,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:Arabic name English name (optional) Stat",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-en",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-image-en-dark-1280",
+      "kind": "facet",
+      "tab": "image",
+      "locale": "en",
+      "theme": "dark",
+      "width": 1280,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 512,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:The dimension itself How the dimension i",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Image",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Icon",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-appearance-en-dark-1280",
+      "kind": "facet",
+      "tab": "appearance",
+      "locale": "en",
+      "theme": "dark",
+      "width": 1280,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 512,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:The dimension itself How the dimension i",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Circle",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Small",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-data-en-dark-1440",
+      "kind": "value",
+      "tab": "data",
+      "locale": "en",
+      "theme": "dark",
+      "width": 1440,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 672,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:Arabic name English name (optional) Stat",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-en",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-image-en-dark-1440",
+      "kind": "value",
+      "tab": "image",
+      "locale": "en",
+      "theme": "dark",
+      "width": 1440,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 672,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:Content type Inherit from dimension Imag",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Inherit from dimension",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Image",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "value-appearance-en-dark-1440",
+      "kind": "value",
+      "tab": "appearance",
+      "locale": "en",
+      "theme": "dark",
+      "width": 1440,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 672,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:Shape Customized for this value Restore ",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Restore inheritance — Shape",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Islamic arch",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-data-en-dark-1440",
+      "kind": "facet",
+      "tab": "data",
+      "locale": "en",
+      "theme": "dark",
+      "width": 1440,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 672,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:Arabic name English name (optional) Stat",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-ar",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "input:ve-name-en",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgba(59, 130, 246, 0.5) ",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-image-en-dark-1440",
+      "kind": "facet",
+      "tab": "image",
+      "locale": "en",
+      "theme": "dark",
+      "width": 1440,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 672,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:The dimension itself How the dimension i",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Image",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Icon",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    },
+    {
+      "id": "facet-appearance-en-dark-1440",
+      "kind": "facet",
+      "tab": "appearance",
+      "locale": "en",
+      "theme": "dark",
+      "width": 1440,
+      "htmlDir": "ltr",
+      "htmlLang": "en",
+      "edDir": "ltr",
+      "docOverflowX": 0,
+      "sheetOverflowX": 0,
+      "scrollerOverflowX": 0,
+      "sheet": {
+        "x": 672,
+        "w": 768,
+        "h": 900
+      },
+      "clipped": [],
+      "smallTargets": [],
+      "dark": true,
+      "focusStops": [
+        {
+          "name": "div:The dimension itself How the dimension i",
+          "role": "tabpanel",
+          "visible": true,
+          "outline": "1px auto rgb(16, 16, 16)",
+          "shadow": null,
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Circle",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        },
+        {
+          "name": "button:Small",
+          "role": null,
+          "visible": true,
+          "outline": "2px solid rgba(0, 0, 0, 0)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(79, 140, 255) 0px 0p",
+          "matchesFocusVisible": true
+        }
+      ]
+    }
+  ],
+  "console": []
+}

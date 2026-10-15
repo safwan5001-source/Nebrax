@@ -1,0 +1,136 @@
+[
+  {
+    "id": "S-11.dpr1",
+    "ok": true,
+    "info": true,
+    "detail": "home HTML ttfb 561ms (dev mode), load 1359ms, doc 248KB decoded; discovery image requests 8 (tiles with img {\"discovery-vd5-discovery-color\":4,\"discovery-vd5-discovery-occasion\":0,\"discovery-vd5-discovery-shapes\":4}), total 5.8KB, largest 0.8KB, files thumb-160.webp"
+  },
+  {
+    "id": "S-11.dpr1 every discovery image request is 200 with the documented policy and only image/webp|jpeg",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-11.dpr1 no original or oversized file served (only the 8-file list; max < 100KB for a 80-112px tile)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-11.dpr1 srcset picks the smallest file that covers frame x DPR (no waste beyond one step)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-11.dpr1 lazy + async decoding, no fetchpriority (section sits below the hero)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-11.dpr2",
+    "ok": true,
+    "info": true,
+    "detail": "home HTML ttfb 644ms (dev mode), load 1414ms, doc 248KB decoded; discovery image requests 8 (tiles with img {\"discovery-vd5-discovery-color\":4,\"discovery-vd5-discovery-occasion\":0,\"discovery-vd5-discovery-shapes\":4}), total 5.8KB, largest 0.8KB, files thumb-160.webp"
+  },
+  {
+    "id": "S-11.dpr2 every discovery image request is 200 with the documented policy and only image/webp|jpeg",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-11.dpr2 no original or oversized file served (only the 8-file list; max < 100KB for a 80-112px tile)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-11.dpr2 srcset picks the smallest file that covers frame x DPR (no waste beyond one step)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-11.dpr2 lazy + async decoding, no fetchpriority (section sits below the hero)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-11.dpr3",
+    "ok": true,
+    "info": true,
+    "detail": "home HTML ttfb 1236ms (dev mode), load 2297ms, doc 248KB decoded; discovery image requests 8 (tiles with img {\"discovery-vd5-discovery-color\":4,\"discovery-vd5-discovery-occasion\":0,\"discovery-vd5-discovery-shapes\":4}), total 12.9KB, largest 1.8KB, files thumb-320.webp"
+  },
+  {
+    "id": "S-11.dpr3 every discovery image request is 200 with the documented policy and only image/webp|jpeg",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-11.dpr3 no original or oversized file served (only the 8-file list; max < 100KB for a 80-112px tile)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-11.dpr3 srcset picks the smallest file that covers frame x DPR (no waste beyond one step)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-11.dpr3 lazy + async decoding, no fetchpriority (section sits below the hero)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-11.laravel meta call (per_page=1) wall ms x5",
+    "ok": true,
+    "info": true,
+    "detail": "121,104,70,128,76"
+  },
+  {
+    "id": "S-11.T1 exhaust sequence tail",
+    "ok": true,
+    "info": true,
+    "detail": "[200,200,429,\"retry-after=58\"]"
+  },
+  {
+    "id": "S-11.T1 user-visible result of a page load while the 30/min bucket is empty",
+    "ok": true,
+    "info": true,
+    "detail": "HTTP 200; discovery sections rendered: [false,false,false]; body starts: \"تخطي إلى المحتوى AR SAR المتجر بحث السلة جميع المنتجات المتجر تسوّق الآن أحدث المنتجات عرض الكل لا توجد منتجات تصفّح مجموعتنا الكاملة المتجر المتجر جميع المنتجات الحساب حسابي سجل الطلبات السلة السياسات سياسة الشحن سياسة الخصوصية سياسة الإرجاع شروط الخدمة © 2026 المتجر\"; console: [{\"type\":\"error\",\"text\":\"%c%s%c CategoriesSection: failed to load categories background: #e6e6e6;background: light-dark(rgba(0,0,0,0.1), rgba(255,255,255,0.25));color: #000000;color: light-dark(#000000, #ffffff);border-radius: 2px  Server   StorefrontApiError: تجاوزت حدّ معدّل الطلبات المسموح؛ أعد المحاولة لاحقًا.\\n    at raiseForErrorResponse (about://React/Server/file://<local path>%5Broot-of-the-server%5D__204uq3v._.js?99:8938:11)\\n    at storefrontFetch (about://React/Server/file://<local path>%5Broot-of-the-server%5D__204uq3v.\",\"loc\":\"http://localhost:3310/_next/static/chunks/10fh_next_dist_0bnhnl_._.js\"},{\"type\":\"error\",\"text\":\"%c%s%c StorefrontLayout: failed to load categories background: #e6e6e6;background: light-dark(rgba(0,0,0,0.1), rgba(255,255,255,0.25));color: #000000;color: light-dark(#000000, #ffffff);border-radius: 2px  Server   StorefrontApiError: تجاوزت حدّ معدّل الطلبات المسموح؛ أعد المحاولة لاحقًا.\\n    at raiseForErrorResponse (about://React/Server/file://<local path>%5Broot-of-the-server%5D__204uq3v._.js?99:8938:11)\\n    at storefrontFetch (about://React/Server/file://<local path>%5Broot-of-the-server%5D__204uq3v._\",\"loc\":\"http://localhost:3310/_next/static/chunks/10fh_next_dist_0bnhnl_._.js\"}]"
+  },
+  {
+    "id": "S-11.T1 a throttled SSR degrades without an error page (status 200 and the page chrome renders)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-11.T2 exhaust sequence tail",
+    "ok": true,
+    "info": true,
+    "detail": "[200,429,\"retry-after=55\"]"
+  },
+  {
+    "id": "S-11.T2 tile content kinds (shapes + color sections) when every image request is answered 502 by the throttle",
+    "ok": true,
+    "info": true,
+    "detail": "[\"icon\",\"initial\",\"none\",\"icon\",\"initial\",\"none\",\"icon\",\"initial\",\"none\",\"icon\",\"initial\",\"none\",\"initial\",\"initial\",\"initial\",\"initial\"]"
+  },
+  {
+    "id": "S-11.T2 throttled image requests (proxy 502 no-store): no tile keeps a broken image; image tiles fall back to icon/initial keeping the shape",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-11.T2 raw proxy answer while throttled",
+    "ok": true,
+    "info": true,
+    "detail": "502 cache-control=no-store"
+  },
+  {
+    "id": "S-11.T2 proxy answers a throttled request 502 + no-store (never cached)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-11.T2 after the bucket refills the same URL serves normally (the failure was not cached)",
+    "ok": true,
+    "detail": ""
+  }
+]

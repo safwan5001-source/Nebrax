@@ -1,0 +1,90 @@
+[
+  {
+    "id": "W-5.1 409: stale identity write -> one request, message + Reload + hint that unsaved edits are lost",
+    "ok": true,
+    "detail": {
+      "st": [
+        409
+      ],
+      "text": "Image and appearance: The identity was changed by another user. Reload to see the latest version. Reload"
+    }
+  },
+  {
+    "id": "W-5.2 no lost update: the winner's document is intact, the loser's edit was not applied",
+    "ok": true,
+    "detail": {
+      "content": "icon",
+      "icon": "gift",
+      "shape": "star",
+      "size": "md"
+    }
+  },
+  {
+    "id": "W-5.3 the reload hint explains that unsaved edits will be lost",
+    "ok": true,
+    "detail": null
+  },
+  {
+    "id": "W-5.4 Reload reopens the editor on the same tab with the winner's data (star, medium), no stale banner",
+    "ok": true,
+    "detail": {
+      "sel": "true",
+      "star": "true",
+      "size": "true"
+    }
+  },
+  {
+    "id": "W-5.5 after Reload the loser can save on top: both users' changes present (star + large), version 3",
+    "ok": true,
+    "detail": {
+      "content": "icon",
+      "icon": "gift",
+      "shape": "star",
+      "size": "lg"
+    }
+  },
+  {
+    "id": "W-5.6 first-write race: loser gets the same conflict message (status 428)",
+    "ok": true,
+    "detail": {
+      "st": [
+        428
+      ]
+    }
+  },
+  {
+    "id": "W-5.7 no lost update on the first write: stored document is the winner's",
+    "ok": true,
+    "detail": {
+      "shape": "diamond"
+    }
+  },
+  {
+    "id": "W-5.8 Reload shows the winner's diamond",
+    "ok": true,
+    "detail": null
+  },
+  {
+    "id": "W-5.9 simultaneous Save: exactly one request wins (200), the other is a 409/428; stored state equals the winner (no merge, no corruption)",
+    "ok": true,
+    "detail": {
+      "sa": [
+        200
+      ],
+      "sb": [
+        409
+      ],
+      "shape": "square",
+      "ver": 2
+    }
+  },
+  {
+    "id": "W-5.10 INFO: the Data tab (names / active) has no version check: last writer wins silently (B's name was overwritten by A with no warning)",
+    "ok": true,
+    "detail": {
+      "info": {
+        "name_en": "Name from A"
+      }
+    }
+  }
+]

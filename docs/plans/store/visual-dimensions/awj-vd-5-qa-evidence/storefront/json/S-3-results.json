@@ -1,0 +1,77 @@
+[
+  {
+    "check": "ssr-200",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "byte-identical:qa-s-leg-tiles",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "no-visual-markup:qa-s-leg-tiles",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "byte-identical:qa-s-leg-chips",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "no-visual-markup:qa-s-leg-chips",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "byte-identical:qa-s-leg-novis",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "no-visual-markup:qa-s-leg-novis",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "byte-identical:qa-s-leg-novis-chips",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "no-visual-markup:qa-s-leg-novis-chips",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "byte-identical:qa-s-leg-sorted",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "no-visual-markup:qa-s-leg-sorted",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "byte-identical-en-structure:qa-s-leg-tiles",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "byte-identical-en-structure:qa-s-leg-chips",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "layout-key-switches-to-visual-markup",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "check": "rollback-removes-layout-returns-legacy-bytes",
+    "ok": true,
+    "detail": ""
+  }
+]

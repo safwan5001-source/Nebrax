@@ -1,0 +1,134 @@
+{
+ "sample-ar-1440": {
+  "mode": "sample",
+  "reason": "no_dimension",
+  "text": "معاينة نموذجية: الأسماء والصور ليست من متجرك. اختر بُعداً لمعاينة قيمه وصوره الحقيقية.",
+  "badge": "نموذجي"
+ },
+ "failed-ar-1440": {
+  "notes": [
+   "image_failed: تعذّر تحميل معاينة الصورة (تنتهي صلاحية رابط المعاينة بعد نحو ٢٠ دقيقة): أمي، أبي، صديقة، ",
+   "no_look: بلا صورة ولا أيقونة، فتظهر بحرفها الأول: طفل",
+   "no_products: لا منتجات مسندة لها، فلا يعرضها المتجر: صديقة",
+   "inactive: قيم معطّلة لا تظهر هنا ولا في المتجر (1)",
+   "store_rule: يعرض المتجر المنشور القيمة فقط إن كان لها منتج منشور في هذا المتجر. الأعداد هنا تشمل المنت"
+  ],
+  "reload": true,
+  "contents": [
+   "initial",
+   "initial",
+   "initial",
+   "initial",
+   "initial"
+  ]
+ },
+ "reloaded-ar-1440": {
+  "notes": [
+   "no_look",
+   "no_products",
+   "inactive",
+   "store_rule"
+  ],
+  "contents": [
+   "image",
+   "image",
+   "image",
+   "image",
+   "initial"
+  ],
+  "loaded": [
+   true,
+   true,
+   true,
+   true
+  ]
+ },
+ "sample-en-1440": {
+  "mode": "sample",
+  "reason": "no_dimension",
+  "text": "Sample preview: the names and pictures are not from your store. Choose a dimension to preview its real values and pictures.",
+  "badge": "Sample"
+ },
+ "failed-en-1440": {
+  "notes": [
+   "image_failed: The picture preview could not be loaded (preview links expire after about 20 minutes): Mom",
+   "no_look: No picture and no icon; drawn as its first letter: Kid",
+   "no_products: No products assigned, so the store does not list it: Friend",
+   "inactive: Inactive values are not shown here or in the store (1)",
+   "store_rule: The published store lists a value only if a published product of this store carries it. Co"
+  ],
+  "reload": true,
+  "contents": [
+   "initial",
+   "initial",
+   "initial",
+   "initial",
+   "initial"
+  ]
+ },
+ "reloaded-en-1440": {
+  "notes": [
+   "no_look",
+   "no_products",
+   "inactive",
+   "store_rule"
+  ],
+  "contents": [
+   "image",
+   "image",
+   "image",
+   "image",
+   "initial"
+  ],
+  "loaded": [
+   true,
+   true,
+   true,
+   true
+  ]
+ },
+ "sample-ar-390": {
+  "mode": "sample",
+  "reason": "no_dimension",
+  "text": "معاينة نموذجية: الأسماء والصور ليست من متجرك. اختر بُعداً لمعاينة قيمه وصوره الحقيقية.",
+  "badge": "نموذجي"
+ },
+ "failed-ar-390": {
+  "notes": [
+   "image_failed: تعذّر تحميل معاينة الصورة (تنتهي صلاحية رابط المعاينة بعد نحو ٢٠ دقيقة): أمي، أبي، صديقة، ",
+   "no_look: بلا صورة ولا أيقونة، فتظهر بحرفها الأول: طفل",
+   "no_products: لا منتجات مسندة لها، فلا يعرضها المتجر: صديقة",
+   "inactive: قيم معطّلة لا تظهر هنا ولا في المتجر (1)",
+   "store_rule: يعرض المتجر المنشور القيمة فقط إن كان لها منتج منشور في هذا المتجر. الأعداد هنا تشمل المنت"
+  ],
+  "reload": true,
+  "contents": [
+   "initial",
+   "initial",
+   "initial",
+   "initial",
+   "initial"
+  ]
+ },
+ "reloaded-ar-390": {
+  "notes": [
+   "no_look",
+   "no_products",
+   "inactive",
+   "store_rule"
+  ],
+  "contents": [
+   "image",
+   "image",
+   "image",
+   "image",
+   "initial"
+  ],
+  "loaded": [
+   true,
+   true,
+   true,
+   true
+  ]
+ }
+}

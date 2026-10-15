@@ -1,0 +1,272 @@
+
+> nibras-web@0.1.0 build
+> next build
+
+   ▲ Next.js 15.5.19
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 68s
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/190) ...
+   Generating static pages (47/190) 
+   Generating static pages (94/190) 
+   Generating static pages (142/190) 
+ ✓ Generating static pages (190/190)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                            Size  First Load JS
+┌ ƒ /                                               8.49 kB         144 kB
+├ ƒ /_not-found                                       142 B         104 kB
+├ ƒ /accounting-settings                            5.51 kB         199 kB
+├ ƒ /accounting-settings/account-routing            8.84 kB         202 kB
+├ ƒ /accounting-settings/fiscal-years               9.92 kB         204 kB
+├ ƒ /accounting-settings/period-locks               9.33 kB         203 kB
+├ ƒ /accounts                                       14.1 kB         198 kB
+├ ƒ /api/company-browser-icon                         142 B         104 kB
+├ ƒ /app-builder                                    5.36 kB         199 kB
+├ ƒ /app-builder/[id]                               5.95 kB         210 kB
+├ ƒ /app-builder/[id]/builder                       23.1 kB         274 kB
+├ ƒ /app-builder/[id]/versions                      6.97 kB         201 kB
+├ ƒ /app-builder/new                                4.54 kB         198 kB
+├ ƒ /applications                                   9.35 kB         203 kB
+├ ƒ /appointments                                   5.64 kB         240 kB
+├ ƒ /assets                                         5.03 kB         239 kB
+├ ƒ /assets/new                                     5.84 kB         190 kB
+├ ƒ /auth/handoff                                    5.3 kB         185 kB
+├ ƒ /branches                                       2.99 kB         237 kB
+├ ƒ /branches/[id]                                    300 B         191 kB
+├ ƒ /branches/new                                     266 B         191 kB
+├ ƒ /branches/settings                              4.42 kB         181 kB
+├ ƒ /cash-and-bank                                  6.59 kB         241 kB
+├ ƒ /cash-and-bank/[id]                             6.38 kB         194 kB
+├ ƒ /cash-and-bank/new                               2.6 kB         195 kB
+├ ƒ /cash-and-bank/transfer                         5.65 kB         190 kB
+├ ƒ /commerce                                       1.14 kB         235 kB
+├ ƒ /commerce/appearance                            4.03 kB         451 kB
+├ ƒ /commerce/delivery                              16.5 kB         249 kB
+├ ƒ /commerce/domains                                 10 kB         218 kB
+├ ƒ /commerce/gifting                               7.77 kB         231 kB
+├ ƒ /commerce/integrations                           2.7 kB         158 kB
+├ ƒ /commerce/merchandising                         33.3 kB         334 kB
+├ ƒ /commerce/onboarding                            2.53 kB         236 kB
+├ ƒ /commerce/published-products                     7.9 kB         216 kB
+├ ƒ /commerce/stores                                9.56 kB         218 kB
+├ ƒ /commerce/themes                                4.35 kB         250 kB
+├ ƒ /contacts                                       4.75 kB         239 kB
+├ ƒ /cost-centers                                   5.14 kB         239 kB
+├ ƒ /credit-notes                                    5.1 kB         235 kB
+├ ƒ /credit-notes/[id]                              8.37 kB         217 kB
+├ ƒ /credit-notes/new                                 360 B         194 kB
+├ ƒ /crm                                            5.36 kB         240 kB
+├ ƒ /customer-refunds                               7.07 kB         237 kB
+├ ƒ /customer-refunds/[id]                          5.92 kB         200 kB
+├ ƒ /customer-settings                              4.07 kB         185 kB
+├ ƒ /dashboard                                      13.6 kB         202 kB
+├ ƒ /debit-notes                                    5.11 kB         235 kB
+├ ƒ /debit-notes/new                                  274 B         194 kB
+├ ƒ /delivery-hub                                   8.67 kB         185 kB
+├ ƒ /delivery-notes                                  7.7 kB         192 kB
+├ ƒ /delivery-notes/[id]                             9.6 kB         189 kB
+├ ƒ /delivery-notes/[id]/edit                         141 B         192 kB
+├ ƒ /delivery-notes/invoice-draft                   9.03 kB         193 kB
+├ ƒ /delivery-notes/new                               141 B         192 kB
+├ ƒ /delivery-platforms                             7.96 kB         189 kB
+├ ƒ /dev/customizer-versions                        6.93 kB         410 kB
+├ ƒ /dev/customizer-visual                          7.83 kB         281 kB
+├ ƒ /dev/trust-visual                               5.14 kB         279 kB
+├ ƒ /developer                                      3.67 kB         206 kB
+├ ƒ /developer/docs                                 5.78 kB         208 kB
+├ ƒ /developer/keys                                 8.99 kB         212 kB
+├ ƒ /developer/security                             4.03 kB         200 kB
+├ ƒ /developer/webhooks                             9.33 kB         248 kB
+├ ƒ /document-design                                25.1 kB         247 kB
+├ ƒ /document-qa                                    8.12 kB         160 kB
+├ ƒ /documents                                      10.3 kB         193 kB
+├ ƒ /documents/[id]                                 11.5 kB         199 kB
+├ ƒ /documents/[id]/diagnostics                     3.53 kB         183 kB
+├ ƒ /documents/governance                           4.65 kB         184 kB
+├ ƒ /documents/operations                           4.94 kB         185 kB
+├ ƒ /documents/settings                             5.84 kB         186 kB
+├ ƒ /documents/usage                                4.44 kB         184 kB
+├ ƒ /employee-custodies                             7.76 kB         242 kB
+├ ƒ /employee-custodies/[id]                        9.82 kB         194 kB
+├ ƒ /employee-custodies/new                          6.2 kB         190 kB
+├ ƒ /expenses                                        7.8 kB         242 kB
+├ ƒ /expenses/[id]                                   8.7 kB         202 kB
+├ ƒ /expenses/categories                            6.62 kB         191 kB
+├ ƒ /expenses/new                                   10.3 kB         204 kB
+├ ƒ /finance-settings                               2.29 kB         126 kB
+├ ƒ /finance-settings/financial-alerts              4.86 kB         189 kB
+├ ƒ /finance-settings/settlement-types              6.88 kB         191 kB
+├ ƒ /financial-alerts                               6.21 kB         240 kB
+├ ƒ /forgot-password                                4.41 kB         188 kB
+├ ƒ /fuel-stations                                  6.98 kB         201 kB
+├ ƒ /fuel-stations/alerts                           3.11 kB         189 kB
+├ ƒ /fuel-stations/avi-rfid                         10.7 kB         231 kB
+├ ƒ /fuel-stations/corporate-contracts              8.96 kB         229 kB
+├ ƒ /fuel-stations/devices                          9.77 kB         230 kB
+├ ƒ /fuel-stations/maintenance                      6.76 kB         193 kB
+├ ƒ /fuel-stations/master-data                      10.6 kB         195 kB
+├ ƒ /fuel-stations/readiness                        4.71 kB         184 kB
+├ ƒ /fuel-stations/receiving                        7.13 kB         191 kB
+├ ƒ /fuel-stations/safety                            8.8 kB         189 kB
+├ ƒ /fuel-stations/sales                            4.47 kB         232 kB
+├ ƒ /fuel-stations/settings                         13.2 kB         194 kB
+├ ƒ /fuel-stations/shifts                              5 kB         232 kB
+├ ƒ /help                                            4.9 kB         161 kB
+├ ƒ /help/[slug]                                    3.14 kB         145 kB
+├ ƒ /hr                                               11 kB         262 kB
+├ ƒ /hr/employees/[id]                              9.89 kB         227 kB
+├ ○ /icon.ico                                           0 B            0 B
+├ ƒ /integrations                                   6.39 kB         190 kB
+├ ƒ /integrations/communications                    4.89 kB         189 kB
+├ ƒ /integrations/delivery-platforms                4.05 kB         192 kB
+├ ƒ /integrations/delivery-platforms/[platformKey]  4.93 kB         209 kB
+├ ƒ /inventory                                      8.05 kB         242 kB
+├ ƒ /inventory-openings                             3.34 kB         233 kB
+├ ƒ /inventory-openings/[id]                        6.39 kB         200 kB
+├ ƒ /inventory-openings/import                       6.6 kB         207 kB
+├ ƒ /inventory-settings                             2.23 kB         126 kB
+├ ƒ /inventory-settings/brands                      2.11 kB         189 kB
+├ ƒ /inventory-settings/categories                  6.15 kB         193 kB
+├ ƒ /inventory-settings/products                     2.5 kB         185 kB
+├ ƒ /inventory-settings/units                       2.69 kB         190 kB
+├ ƒ /invoices                                       7.32 kB         242 kB
+├ ƒ /invoices/[id]                                  12.4 kB         251 kB
+├ ƒ /invoices/[id]/edit                               326 B         270 kB
+├ ƒ /invoices/[id]/payments/new                       300 B         192 kB
+├ ƒ /invoices/new                                     295 B         270 kB
+├ ƒ /journal-entries                                6.49 kB         241 kB
+├ ƒ /journal-entries/[id]                           5.27 kB         199 kB
+├ ƒ /login                                           3.3 kB         213 kB
+├ ƒ /manual-journals                                 6.4 kB         241 kB
+├ ƒ /manual-journals/[id]                           8.77 kB         202 kB
+├ ƒ /manual-journals/new                            7.29 kB         201 kB
+├ ƒ /me                                             6.58 kB         183 kB
+├ ƒ /notifications                                  5.52 kB         236 kB
+├ ƒ /numbering-settings                             6.15 kB         190 kB
+├ ƒ /partners                                       5.24 kB         239 kB
+├ ƒ /partners/[id]                                  10.7 kB         212 kB
+├ ƒ /partners/[id]/edit                             1.17 kB         192 kB
+├ ƒ /partners/[id]/statement                        2.69 kB         206 kB
+├ ƒ /partners/new                                     909 B         191 kB
+├ ƒ /payment-methods                                7.98 kB         189 kB
+├ ƒ /payments                                       4.77 kB         239 kB
+├ ƒ /payments/[id]                                  11.7 kB         221 kB
+├ ƒ /payments/new                                   8.79 kB         193 kB
+├ ƒ /platform                                       6.76 kB         183 kB
+├ ƒ /platform/document-operations                   8.92 kB         185 kB
+├ ƒ /platform/integrations                          12.4 kB         197 kB
+├ ƒ /platform/login                                 3.71 kB         213 kB
+├ ƒ /platform/prices                                 7.8 kB         188 kB
+├ ƒ /platform/tenants                               12.3 kB         233 kB
+├ ƒ /platform/tenants/[id]                          15.1 kB         203 kB
+├ ƒ /pos                                            51.6 kB         269 kB
+├ ƒ /pos/audit                                      27.2 kB         257 kB
+├ ƒ /pos/report                                     8.97 kB         189 kB
+├ ƒ /pos/sessions                                   12.9 kB         233 kB
+├ ƒ /pos/sessions/[id]                              11.2 kB         191 kB
+├ ƒ /pos/settings                                   2.14 kB         126 kB
+├ ƒ /pos/settings/cash-drawer                          7 kB         191 kB
+├ ƒ /pos/settings/configuration                     11.6 kB         196 kB
+├ ƒ /pos/settings/devices                           8.24 kB         229 kB
+├ ƒ /pos/settings/printing                            142 B         104 kB
+├ ƒ /pos/settings/shifts                             6.4 kB         187 kB
+├ ƒ /pos/settings/sound-feedback                    6.16 kB         190 kB
+├ ƒ /pos/start                                       4.7 kB         189 kB
+├ ƒ /products                                       8.23 kB         242 kB
+├ ƒ /products/[id]                                    220 B         314 kB
+├ ƒ /products/[id]/edit                               307 B         314 kB
+├ ƒ /products/import                                6.15 kB         206 kB
+├ ƒ /products/new                                   5.33 kB         262 kB
+├ ƒ /products/workbook-import                       3.45 kB         204 kB
+├ ƒ /purchase-orders                                  296 B         240 kB
+├ ƒ /purchase-orders/[id]                             284 B         220 kB
+├ ƒ /purchase-orders/new                              275 B         191 kB
+├ ƒ /purchase-quotes                                  298 B         240 kB
+├ ƒ /purchase-quotes/[id]                             286 B         220 kB
+├ ƒ /purchase-quotes/new                              278 B         191 kB
+├ ƒ /purchase-requests                                295 B         240 kB
+├ ƒ /purchase-requests/[id]                           286 B         220 kB
+├ ƒ /purchase-requests/new                            276 B         191 kB
+├ ƒ /purchase-returns                               5.98 kB         245 kB
+├ ƒ /purchase-settings                              4.32 kB         188 kB
+├ ƒ /purchases                                      7.14 kB         241 kB
+├ ƒ /purchases/[id]                                   11 kB         250 kB
+├ ƒ /purchases/[id]/edit                              312 B         225 kB
+├ ƒ /purchases/[id]/payments/new                      299 B         192 kB
+├ ƒ /purchases/new                                    281 B         225 kB
+├ ƒ /quotes                                         5.17 kB         239 kB
+├ ƒ /quotes/[id]                                    3.67 kB         218 kB
+├ ƒ /quotes/new                                     6.31 kB         210 kB
+├ ƒ /receipt-vouchers                               7.48 kB         242 kB
+├ ƒ /receipt-vouchers/[id]                          8.44 kB         202 kB
+├ ƒ /receipt-vouchers/new                           6.54 kB         200 kB
+├ ƒ /recurring-invoices                              3.9 kB         238 kB
+├ ƒ /recurring-invoices/[id]                        5.57 kB         185 kB
+├ ƒ /recurring-invoices/new                         6.16 kB         190 kB
+├ ƒ /register                                       4.69 kB         214 kB
+├ ƒ /reports                                          176 B         136 kB
+├ ƒ /reports/[category]                               176 B         136 kB
+├ ƒ /reports/classification-analytics               6.82 kB         195 kB
+├ ƒ /reports/customers/[report]                     4.77 kB         252 kB
+├ ƒ /reports/customers/aging                          397 B         253 kB
+├ ƒ /reports/general/[report]                       6.77 kB         259 kB
+├ ƒ /reports/inventory/[report]                     6.04 kB         253 kB
+├ ƒ /reports/purchases/[report]                        5 kB         252 kB
+├ ƒ /reports/purchases/aging                          397 B         253 kB
+├ ƒ /reports/sales/[report]                         5.24 kB         252 kB
+├ ƒ /reports/sales/delivery-channel                 6.82 kB         239 kB
+├ ƒ /reports/settings/classifications               5.01 kB         185 kB
+├ ƒ /reset-password                                 4.48 kB         189 kB
+├ ƒ /returns                                        5.93 kB         244 kB
+├ ƒ /returns/[id]                                   7.13 kB         191 kB
+├ ƒ /rfq                                              295 B         240 kB
+├ ƒ /rfq/[id]                                         284 B         220 kB
+├ ƒ /rfq/new                                          274 B         191 kB
+├ ƒ /roles                                          12.4 kB         222 kB
+├ ƒ /sales-settings                                 2.78 kB         176 kB
+├ ƒ /sales-settings/designs                           142 B         104 kB
+├ ƒ /sales-settings/einvoice                         8.1 kB         192 kB
+├ ƒ /sales-settings/fields                            419 B         189 kB
+├ ƒ /sales-settings/invoices                        4.84 kB         189 kB
+├ ƒ /sales-settings/orders                          4.37 kB         188 kB
+├ ƒ /sales-settings/pricelists                      8.17 kB         192 kB
+├ ƒ /sales-settings/quotes                           3.9 kB         188 kB
+├ ƒ /sales-settings/shipping                          386 B         189 kB
+├ ƒ /sales-settings/sources                           369 B         189 kB
+├ ƒ /sales-settings/statuses                          384 B         189 kB
+├ ƒ /settings                                         15 kB         196 kB
+├ ƒ /stock-permits                                  5.14 kB         239 kB
+├ ƒ /stock-permits/[id]                             5.35 kB         185 kB
+├ ƒ /stock-permits/new                              6.47 kB         191 kB
+├ ƒ /stocktaking                                    4.91 kB         239 kB
+├ ƒ /stocktaking/[id]                               5.64 kB         190 kB
+├ ƒ /stocktaking/new                                4.48 kB         189 kB
+├ ƒ /supplier-payments                               7.9 kB         242 kB
+├ ƒ /supplier-refunds                               7.06 kB         237 kB
+├ ƒ /supplier-refunds/[id]                          5.88 kB         200 kB
+├ ƒ /suppliers                                      5.65 kB         236 kB
+├ ƒ /suppliers/[id]/ledger                          4.77 kB         206 kB
+├ ƒ /suppliers/[id]/statement                        2.8 kB         206 kB
+├ ƒ /tax-settings                                   5.29 kB         186 kB
+├ ƒ /users                                          8.05 kB         263 kB
+├ ƒ /verify-email                                   4.46 kB         184 kB
+├ ƒ /warehouses                                     3.58 kB         238 kB
+├ ƒ /warehouses/[id]                                  300 B         189 kB
+├ ƒ /warehouses/[id]/stock                          4.31 kB         220 kB
+├ ƒ /warehouses/new                                   264 B         189 kB
+└ ƒ /whats-new                                      2.83 kB         196 kB
++ First Load JS shared by all                        104 kB
+  ├ chunks/857d196c-4ba4998b7a401c94.js             54.2 kB
+  ├ chunks/9019-ccf8e56f1d8e9266.js                 46.9 kB
+  └ other shared chunks (total)                     2.75 kB
+
+
+ƒ Middleware                                        37.5 kB
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

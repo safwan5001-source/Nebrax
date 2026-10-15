@@ -1,0 +1,58 @@
+[
+  {
+    "url": "8f391f5e-ddec-4336-af36-1d2acbcb07bb/thumb-160.webp",
+    "status": 200,
+    "bytes": 750,
+    "cc": "public, max-age=300, must-revalidate",
+    "ct": "image/webp"
+  },
+  {
+    "url": "f431ff08-c369-411f-a262-966baf28ed8c/thumb-160.webp",
+    "status": 200,
+    "bytes": 818,
+    "cc": "public, max-age=300, must-revalidate",
+    "ct": "image/webp"
+  },
+  {
+    "url": "bde563ae-4138-48ca-9683-faf1e12be37b/thumb-160.webp",
+    "status": 200,
+    "bytes": 700,
+    "cc": "public, max-age=300, must-revalidate",
+    "ct": "image/webp"
+  },
+  {
+    "url": "ac24d91b-e934-4fea-a134-cc11517de7db/thumb-160.webp",
+    "status": 200,
+    "bytes": 722,
+    "cc": "public, max-age=300, must-revalidate",
+    "ct": "image/webp"
+  },
+  {
+    "url": "f431ff08-c369-411f-a262-966baf28ed8c/thumb-160.webp",
+    "status": 200,
+    "bytes": 818,
+    "cc": "public, max-age=300, must-revalidate",
+    "ct": "image/webp"
+  },
+  {
+    "url": "8f391f5e-ddec-4336-af36-1d2acbcb07bb/thumb-160.webp",
+    "status": 200,
+    "bytes": 750,
+    "cc": "public, max-age=300, must-revalidate",
+    "ct": "image/webp"
+  },
+  {
+    "url": "ac24d91b-e934-4fea-a134-cc11517de7db/thumb-160.webp",
+    "status": 200,
+    "bytes": 722,
+    "cc": "public, max-age=300, must-revalidate",
+    "ct": "image/webp"
+  },
+  {
+    "url": "bde563ae-4138-48ca-9683-faf1e12be37b/thumb-160.webp",
+    "status": 200,
+    "bytes": 700,
+    "cc": "public, max-age=300, must-revalidate",
+    "ct": "image/webp"
+  }
+]

@@ -1,0 +1,200 @@
+[
+  {
+    "id": "S-9.1280.tab order inside the sections equals DOM order, each link once",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.1280.no extra tab stops inside the sections (scroller, sr-only text)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.1280.focus ring visible on every item (:focus-visible, >=2px, solid)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.1280.focus ring contrast vs page background >= 3:1 (12.41)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.1280.focused item never hidden behind the sticky header / bottom bar (WCAG 2.2 2.4.11)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.1280.focused item is scrolled fully into the viewport",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.1280.carousel: focusing the last item scrolls it into the scroller's visible area",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.1280.carousel scroll-behavior (no-preference)",
+    "ok": true,
+    "info": true,
+    "detail": "smooth"
+  },
+  {
+    "id": "S-9.Enter activates the link (navigates to the facet filter URL)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.390.tab order inside the sections equals DOM order, each link once",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.390.no extra tab stops inside the sections (scroller, sr-only text)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.390.focus ring visible on every item (:focus-visible, >=2px, solid)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.390.focus ring contrast vs page background >= 3:1 (12.41)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.390.focused item never hidden behind the sticky header / bottom bar (WCAG 2.2 2.4.11)",
+    "ok": false,
+    "detail": "[{\"tag\":\"A\",\"href\":\"/sa/ar/products?facet%5Bqa-s-kinds%5D=k-img-circle\",\"sec\":\"discovery-qa-s-k9-icons\",\"inView\":true,\"covered\":true,\"outline\":\"solid 2px rgb(18, 55, 42)\",\"matchesFV\":true,\"text\":\"صورة دائرية\",\"tabindex\":null,\"cls\":\"group flex min-h-11 w-full min\"},{\"tag\":\"A\",\"href\":\"/sa/ar/products?facet%5Bqa-s-kinds%5D=k-img-arch\",\"sec\":\"discovery-qa-s-k9-icons\",\"inView\":false,\"covered\":true,\"outline\":\"solid 2px rgb(18, 55, 42)\",\"matchesFV\":true,\"text\":\"صورة قوس\",\"tabindex\":null,\"cls\":\"group flex min-h-11 w-full min\"},{\"tag\":\"A\",\"href\":\"/sa/ar/products?facet%5Bqa-s-kinds%5D=k-img-white\",\"sec\":\"discovery-qa-s-k9-icons\",\"inView\":false,\"covered\":true,\"outline\":\"solid 2px rgb(18, 55, 42)\",\"matc"
+  },
+  {
+    "id": "S-9.390.focused item is scrolled fully into the viewport",
+    "ok": false,
+    "detail": "[{\"tag\":\"A\",\"href\":\"/sa/ar/products?facet%5Bqa-s-kinds%5D=k-img-icon\",\"sec\":\"discovery-qa-s-k9-car\",\"inView\":false,\"covered\":false,\"outline\":\"solid 2px rgb(18, 55, 42)\",\"matchesFV\":true,\"text\":\"صورة مع أيقونة بديلة1\",\"tabindex\":null,\"cls\":\"group flex min-h-11 w-full min\"},{\"tag\":\"A\",\"href\":\"/sa/ar/products?facet%5Bqa-s-kinds%5D=k-img-noicon\",\"sec\":\"discovery-qa-s-k9-car\",\"inView\":false,\"covered\":false,\"outline\":\"solid 2px rgb(18, 55, 42)\",\"matchesFV\":true,\"text\":\"نجمة بلا أيقونة بديلة1\",\"tabindex\":null,\"cls\":\"group flex min-h-11 w-full min\"},{\"tag\":\"A\",\"href\":\"/sa/ar/products?facet%5Bqa-s-kinds%5D=k-img-arch\",\"sec\":\"discovery-qa-s-k9-icons\",\"inView\":false,\"covered\":true,\"outline\":\"solid 2px "
+  },
+  {
+    "id": "S-9.390.carousel: focusing the last item scrolls it into the scroller's visible area",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.390.carousel scroll-behavior (no-preference)",
+    "ok": true,
+    "info": true,
+    "detail": "smooth"
+  },
+  {
+    "id": "S-9.1280.tab order inside the sections equals DOM order, each link once",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.1280.no extra tab stops inside the sections (scroller, sr-only text)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.1280.focus ring visible on every item (:focus-visible, >=2px, solid)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.1280.focus ring contrast vs page background >= 3:1 (14.96)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.1280.focused item never hidden behind the sticky header / bottom bar (WCAG 2.2 2.4.11)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.1280.focused item is scrolled fully into the viewport",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.1280.carousel: focusing the last item scrolls it into the scroller's visible area",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.1280.carousel scroll-behavior (reduce)",
+    "ok": true,
+    "info": true,
+    "detail": "auto"
+  },
+  {
+    "id": "S-9.reduced-motion: carousel scroll-behavior is auto",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.a11y grid: accessible link names are exactly the value names (counts/media never leak into the name)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.a11y car: accessible link names are exactly the value names (counts/media never leak into the name)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.a11y icons: accessible link names are exactly the value names (counts/media never leak into the name)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.a11y list: accessible link names are exactly the value names (counts/media never leak into the name)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.a11y: decorative media exposes no image role / alt text in the tree",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.a11y: each section is a labelled region by its h2 (heading level 2 present)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.a11y: count described once (describedby -> aria-hidden description outside the link); images alt=\"\"; icons inside aria-hidden frames",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.contrast grid label rgb(17, 24, 39) on rgb(248, 249, 250) = 16.83:1 (14px)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.contrast grid count rgb(99, 106, 120) on rgb(248, 249, 250) = 5.16:1 (12px)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.contrast car label rgb(17, 24, 39) on rgb(248, 249, 250) = 16.83:1 (14px)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.contrast car count rgb(99, 106, 120) on rgb(248, 249, 250) = 5.16:1 (12px)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.contrast list label rgb(17, 24, 39) on rgb(255, 255, 255) = 17.74:1 (16px)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-9.contrast list count rgb(99, 106, 120) on rgb(255, 255, 255) = 5.44:1 (12px)",
+    "ok": true,
+    "detail": ""
+  }
+]

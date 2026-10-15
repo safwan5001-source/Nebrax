@@ -1,0 +1,359 @@
+{
+ "rows": [
+  {
+   "slug": "p-img-arch",
+   "storefront": {
+    "content": "image",
+    "nominalW": "112px",
+    "aspect": "3/4",
+    "radius": "0px",
+    "clip": "none",
+    "mask": "M0 100 V42 C0 22 22 8 50 0 C78 8 100 22 ",
+    "bg": "rgb(255, 237, 213)",
+    "img": {
+     "fit": "cover",
+     "pos": "50% 50%",
+     "transform": "none",
+     "origin": "56px 74.6641px"
+    },
+    "iconColor": null,
+    "iconBoxW": null,
+    "labelHidden": false,
+    "labelText": "صورة قوس"
+   },
+   "editor": {
+    "content": "image",
+    "nominalW": "112px",
+    "aspect": "3/4",
+    "radius": "0px",
+    "clip": "none",
+    "mask": "M0 100 V42 C0 22 22 8 50 0 C78 8 100 22 ",
+    "bg": "rgb(255, 237, 213)",
+    "img": {
+     "fit": "cover",
+     "pos": "50% 50%",
+     "transform": "none",
+     "origin": "32.3359px 43.1094px"
+    },
+    "iconColor": null,
+    "iconBoxW": null,
+    "labelHidden": false,
+    "labelText": "Arch image"
+   }
+  },
+  {
+   "slug": "p-img-circle",
+   "storefront": {
+    "content": "image",
+    "nominalW": "80px",
+    "aspect": "1/1",
+    "radius": "50%",
+    "clip": "none",
+    "mask": "none",
+    "bg": "rgb(255, 237, 213)",
+    "img": {
+     "fit": "cover",
+     "pos": "50% 50%",
+     "transform": "none",
+     "origin": "40px 40px"
+    },
+    "iconColor": null,
+    "iconBoxW": null,
+    "labelHidden": false,
+    "labelText": "صورة دائرة"
+   },
+   "editor": {
+    "content": "image",
+    "nominalW": "80px",
+    "aspect": "1/1",
+    "radius": "50%",
+    "clip": "none",
+    "mask": "none",
+    "bg": "rgb(255, 237, 213)",
+    "img": {
+     "fit": "cover",
+     "pos": "50% 50%",
+     "transform": "none",
+     "origin": "32.3359px 32.3359px"
+    },
+    "iconColor": null,
+    "iconBoxW": null,
+    "labelHidden": false,
+    "labelText": "Circle image"
+   }
+  },
+  {
+   "slug": "p-icon-hex",
+   "storefront": {
+    "content": "icon",
+    "nominalW": "56px",
+    "aspect": "1/1",
+    "radius": "0px",
+    "clip": "polygon(25% 0%, 75% 0%, 100% 50%, 75% 10",
+    "mask": "none",
+    "bg": "rgb(252, 231, 243)",
+    "img": null,
+    "iconColor": "rgb(157, 23, 77)",
+    "iconBoxW": "46%",
+    "labelHidden": false,
+    "labelText": "أيقونة سداسية"
+   },
+   "editor": {
+    "content": "icon",
+    "nominalW": "56px",
+    "aspect": "1/1",
+    "radius": "0px",
+    "clip": "polygon(25% 0%, 75% 0%, 100% 50%, 75% 10",
+    "mask": "none",
+    "bg": "rgb(252, 231, 243)",
+    "img": null,
+    "iconColor": "rgb(157, 23, 77)",
+    "iconBoxW": "46%",
+    "labelHidden": false,
+    "labelText": "Hex icon"
+   }
+  },
+  {
+   "slug": "p-text",
+   "storefront": {
+    "content": "icon",
+    "nominalW": "80px",
+    "aspect": "1/1",
+    "radius": "50%",
+    "clip": "none",
+    "mask": "none",
+    "bg": "rgb(255, 237, 213)",
+    "img": null,
+    "iconColor": "rgb(124, 45, 18)",
+    "iconBoxW": "46%",
+    "labelHidden": false,
+    "labelText": "نص فقط"
+   },
+   "editor": {
+    "content": "icon",
+    "nominalW": "80px",
+    "aspect": "1/1",
+    "radius": "50%",
+    "clip": "none",
+    "mask": "none",
+    "bg": "rgb(255, 237, 213)",
+    "img": null,
+    "iconColor": "rgb(124, 45, 18)",
+    "iconBoxW": "46%",
+    "labelHidden": false,
+    "labelText": "Text only"
+   }
+  },
+  {
+   "slug": "p-inherit",
+   "storefront": {
+    "content": "icon",
+    "nominalW": "80px",
+    "aspect": "1/1",
+    "radius": "18%",
+    "clip": "none",
+    "mask": "none",
+    "bg": "rgb(255, 237, 213)",
+    "img": null,
+    "iconColor": "rgb(124, 45, 18)",
+    "iconBoxW": "46%",
+    "labelHidden": false,
+    "labelText": "وراثة كاملة"
+   },
+   "editor": {
+    "content": "icon",
+    "nominalW": "80px",
+    "aspect": "1/1",
+    "radius": "18%",
+    "clip": "none",
+    "mask": "none",
+    "bg": "rgb(255, 237, 213)",
+    "img": null,
+    "iconColor": "rgb(124, 45, 18)",
+    "iconBoxW": "46%",
+    "labelHidden": false,
+    "labelText": "Full inherit"
+   }
+  },
+  {
+   "slug": "p-long",
+   "storefront": {
+    "content": "icon",
+    "nominalW": "80px",
+    "aspect": "4/3",
+    "radius": "50%",
+    "clip": "none",
+    "mask": "none",
+    "bg": "rgb(255, 237, 213)",
+    "img": null,
+    "iconColor": "rgb(124, 45, 18)",
+    "iconBoxW": "46%",
+    "labelHidden": false,
+    "labelText": "مناسبة اختبار باسم عربي طويل جداً يتجاوز أربعين حرفاً لفحص القص والالتفاف في كل مكان"
+   },
+   "editor": {
+    "content": "icon",
+    "nominalW": "80px",
+    "aspect": "4/3",
+    "radius": "50%",
+    "clip": "none",
+    "mask": "none",
+    "bg": "rgb(255, 237, 213)",
+    "img": null,
+    "iconColor": "rgb(124, 45, 18)",
+    "iconBoxW": "46%",
+    "labelHidden": false,
+    "labelText": "A very long English name to test clipping and wrapping in grids and cards"
+   }
+  },
+  {
+   "slug": "p-img-icon",
+   "storefront": {
+    "content": "image",
+    "nominalW": "80px",
+    "aspect": "1/1",
+    "radius": "0px",
+    "clip": "none",
+    "mask": "M50 92 C20 72 2 54 2 32 C2 15 15 4 29 4 ",
+    "bg": "rgb(255, 237, 213)",
+    "img": {
+     "fit": "cover",
+     "pos": "50% 50%",
+     "transform": "none",
+     "origin": "40px 40px"
+    },
+    "iconColor": null,
+    "iconBoxW": null,
+    "labelHidden": true,
+    "labelText": "صورة وأيقونة"
+   },
+   "editor": {
+    "content": "image",
+    "nominalW": "80px",
+    "aspect": "1/1",
+    "radius": "0px",
+    "clip": "none",
+    "mask": "M50 92 C20 72 2 54 2 32 C2 15 15 4 29 4 ",
+    "bg": "rgb(255, 237, 213)",
+    "img": {
+     "fit": "cover",
+     "pos": "50% 50%",
+     "transform": "none",
+     "origin": "32.3359px 32.3359px"
+    },
+    "iconColor": null,
+    "iconBoxW": null,
+    "labelHidden": true,
+    "labelText": "Image and fallback icon"
+   }
+  },
+  {
+   "slug": "p-img-star",
+   "storefront": {
+    "content": "image",
+    "nominalW": "80px",
+    "aspect": "1/1",
+    "radius": "0px",
+    "clip": "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57",
+    "mask": "none",
+    "bg": "rgb(255, 237, 213)",
+    "img": {
+     "fit": "contain",
+     "pos": "0% 100%",
+     "transform": "matrix(1.3, 0, 0, 1.3, 0, 0)",
+     "origin": "0px 80px"
+    },
+    "iconColor": null,
+    "iconBoxW": null,
+    "labelHidden": false,
+    "labelText": "صورة نجمة"
+   },
+   "editor": {
+    "content": "image",
+    "nominalW": "80px",
+    "aspect": "1/1",
+    "radius": "0px",
+    "clip": "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57",
+    "mask": "none",
+    "bg": "rgb(255, 237, 213)",
+    "img": {
+     "fit": "contain",
+     "pos": "0% 100%",
+     "transform": "matrix(1.3, 0, 0, 1.3, 0, 0)",
+     "origin": "0px 64.6719px"
+    },
+    "iconColor": null,
+    "iconBoxW": null,
+    "labelHidden": false,
+    "labelText": "Star image"
+   }
+  }
+ ],
+ "divergences": [
+  {
+   "slug": "p-img-arch",
+   "prop": "img style",
+   "storefront": {
+    "fit": "cover",
+    "pos": "50% 50%",
+    "transform": "none",
+    "origin": "56px 74.6641px"
+   },
+   "editor": {
+    "fit": "cover",
+    "pos": "50% 50%",
+    "transform": "none",
+    "origin": "32.3359px 43.1094px"
+   }
+  },
+  {
+   "slug": "p-img-circle",
+   "prop": "img style",
+   "storefront": {
+    "fit": "cover",
+    "pos": "50% 50%",
+    "transform": "none",
+    "origin": "40px 40px"
+   },
+   "editor": {
+    "fit": "cover",
+    "pos": "50% 50%",
+    "transform": "none",
+    "origin": "32.3359px 32.3359px"
+   }
+  },
+  {
+   "slug": "p-img-icon",
+   "prop": "img style",
+   "storefront": {
+    "fit": "cover",
+    "pos": "50% 50%",
+    "transform": "none",
+    "origin": "40px 40px"
+   },
+   "editor": {
+    "fit": "cover",
+    "pos": "50% 50%",
+    "transform": "none",
+    "origin": "32.3359px 32.3359px"
+   }
+  },
+  {
+   "slug": "p-img-star",
+   "prop": "img style",
+   "storefront": {
+    "fit": "contain",
+    "pos": "0% 100%",
+    "transform": "matrix(1.3, 0, 0, 1.3, 0, 0)",
+    "origin": "0px 80px"
+   },
+   "editor": {
+    "fit": "contain",
+    "pos": "0% 100%",
+    "transform": "matrix(1.3, 0, 0, 1.3, 0, 0)",
+    "origin": "0px 64.6719px"
+   }
+  }
+ ],
+ "editorPreviewNote": "edited tile in the editor preview vs the same value on the real storefront section"
+}

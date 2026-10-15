@@ -1,0 +1,46 @@
+[
+ {
+  "id": "W-4.13 (D-W-2) «Customize appearance» clicked while the list reload is still in flight: the editor opens",
+  "ok": false,
+  "detail": {
+   "editorOpen": 0,
+   "valueCreated": true
+  }
+ },
+ {
+  "id": "W-4.14 (D-W-3) library search in the media picker returns results (or an empty state), not an error",
+  "ok": false,
+  "detail": {
+   "before": 24,
+   "state": {
+    "cards": 0,
+    "error": 1,
+    "errText": "Couldn't reach the media library.\nRetry"
+   },
+   "searchRequests": [
+    "GET ?q=qa 500"
+   ]
+  }
+ },
+ {
+  "id": "W-1.m (D-W-6) media picker dialog on a phone: every interactive element >= 44px",
+  "ok": false,
+  "detail": {
+   "small": [
+    "input:Search by name or al 250x40",
+    "input: 16x16",
+    "button:Use 155x36",
+    "button:Use 155x36",
+    "button:Use 155x36",
+    "button:Use 155x36",
+    "button:Use 155x36",
+    "button:Use 155x36",
+    "button:Use 155x36",
+    "button:Use 155x36",
+    "button:Use 155x36",
+    "button:Use 155x36"
+   ],
+   "total": 27
+  }
+ }
+]

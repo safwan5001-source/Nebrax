@@ -1,0 +1,114 @@
+{
+ "GET /commerce/workspace/storefront-media/:id/variants/thumb-160.webp": {
+  "n": 550,
+  "statuses": {
+   "200": 550
+  }
+ },
+ "GET /commerce/workspace/facets": {
+  "n": 181,
+  "statuses": {
+   "200": 181
+  }
+ },
+ "GET /applications/nav-state": {
+  "n": 168,
+  "statuses": {
+   "200": 168
+  }
+ },
+ "GET /commerce/workspace/storefront-media/:id/variants/thumb-320.webp": {
+  "n": 94,
+  "statuses": {
+   "200": 94
+  }
+ },
+ "GET /commerce/workspace/storefronts": {
+  "n": 90,
+  "statuses": {
+   "200": 90
+  }
+ },
+ "GET /me": {
+  "n": 45,
+  "statuses": {
+   "200": 45
+  }
+ },
+ "GET /commerce/workspace/storefront-media/:id": {
+  "n": 44,
+  "statuses": {
+   "200": 22,
+   "none": 22
+  }
+ },
+ "GET /commerce/workspace/storefront-media": {
+  "n": 43,
+  "statuses": {
+   "200": 43
+  }
+ },
+ "PUT /commerce/workspace/facets/:id/values/:id/visual": {
+  "n": 12,
+  "statuses": {
+   "200": 9,
+   "409": 2,
+   "428": 1
+  }
+ },
+ "GET /commerce/workspace/storefronts/:id/presentation/versions": {
+  "n": 8,
+  "statuses": {
+   "200": 8
+  }
+ },
+ "PUT /commerce/workspace/facets/:id/values/:id": {
+  "n": 4,
+  "statuses": {
+   "200": 3,
+   "422": 1
+  }
+ },
+ "POST /commerce/workspace/storefronts/:id/presentation/versions": {
+  "n": 4,
+  "statuses": {
+   "201": 4
+  }
+ },
+ "PUT /commerce/workspace/storefronts/:id/presentation/versions/:id": {
+  "n": 4,
+  "statuses": {
+   "200": 4
+  }
+ },
+ "GET /commerce/workspace/storefronts/:id/categories": {
+  "n": 3,
+  "statuses": {
+   "200": 3
+  }
+ },
+ "GET /commerce/workspace/storefronts/:id/products": {
+  "n": 3,
+  "statuses": {
+   "200": 3
+  }
+ },
+ "PUT /commerce/workspace/facets/:id/visual": {
+  "n": 2,
+  "statuses": {
+   "200": 2
+  }
+ },
+ "POST /commerce/workspace/storefronts/:id/presentation/versions/:id/publish": {
+  "n": 2,
+  "statuses": {
+   "200": 2
+  }
+ },
+ "PUT /commerce/workspace/facets/:id": {
+  "n": 1,
+  "statuses": {
+   "200": 1
+  }
+ }
+}

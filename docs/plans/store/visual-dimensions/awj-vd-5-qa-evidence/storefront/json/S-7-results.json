@@ -1,0 +1,92 @@
+[
+  {
+    "id": "S-7.0 open page shows the original name, circle shape and old image",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-7.1 public meta reflects the new name, shape and image at once (no delay)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-7.2 replacing the image changes the URL (mediaId in the path); visualId is unchanged",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-7.2 old image URL: origin 404 no-store, proxy 404 no-store",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-7.3 OPEN page is a snapshot: still the old name/shape/image until reloaded (documented, no live push)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-7.4 next load (reload of the same tab): new name, diamond clip, new image URL, loaded",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-7.5 INFO soft navigation then Back after an admin change: tile names [\"ف سليم ثالث1من\",\"ف بلا منتجات1م\",\"ف معطلة1منتج و\",\"ف منتج غير منش\",\"ف متجر ثانٍ1من\",\"ف تبديل1منتج و\"]",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-7.5 Back shows FRESH (server re-render) data",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-7.6 proxy 200: public,max-age=300,must-revalidate + ETag",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-7.6 proxy conditional (exact ETag) -> 304",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-7.6 proxy conditional (list with the ETag) -> 304",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-7.6 proxy conditional (*) -> 304",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-7.6 proxy conditional (stale/other ETag) -> 200",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-7.6 origin conditional -> 304 `private, no-store` (shared-cacheable only at the proxy)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-7.6 a validator never revives a withdrawn URL (404, not 304)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-7.6 ETag differs per file",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-7.7 consecutive loads: every load that rendered the section produced identical bytes; first two loads always do",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-7.7 INFO ok,ok,ok,ok,ok,ok",
+    "ok": true,
+    "detail": ""
+  }
+]
