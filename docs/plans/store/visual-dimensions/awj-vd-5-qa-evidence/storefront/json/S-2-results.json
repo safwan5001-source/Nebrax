@@ -1,0 +1,3334 @@
+[
+  {
+    "shape": "*",
+    "variant": "normal/image",
+    "check": "twelve-tiles",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "normal/image",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "normal/image",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "normal/image",
+    "check": "img-loaded",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "normal/image",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "normal/image",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "normal/image",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "normal/image",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "normal/image",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "normal/image",
+    "check": "img-loaded",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "normal/image",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "normal/image",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "normal/image",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "normal/image",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "normal/image",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "normal/image",
+    "check": "img-loaded",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "normal/image",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "normal/image",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "normal/image",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "normal/image",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "normal/image",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "normal/image",
+    "check": "img-loaded",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "normal/image",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "normal/image",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "normal/image",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "normal/image",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "normal/image",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "normal/image",
+    "check": "img-loaded",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "normal/image",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "normal/image",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "normal/image",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "normal/image",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "normal/image",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "normal/image",
+    "check": "img-loaded",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "normal/image",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "normal/image",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "normal/image",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "normal/image",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "normal/image",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "normal/image",
+    "check": "img-loaded",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "normal/image",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "normal/image",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "normal/image",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "normal/image",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "normal/image",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "normal/image",
+    "check": "img-loaded",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "normal/image",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "normal/image",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "normal/image",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "normal/image",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "normal/image",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "normal/image",
+    "check": "img-loaded",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "normal/image",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "normal/image",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "normal/image",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "normal/image",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "normal/image",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "normal/image",
+    "check": "img-loaded",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "normal/image",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "normal/image",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "normal/image",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "normal/image",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "normal/image",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "normal/image",
+    "check": "img-loaded",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "normal/image",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "normal/image",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "normal/image",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "normal/image",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "normal/image",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "normal/image",
+    "check": "img-loaded",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "normal/image",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "normal/image",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "normal/image",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "*",
+    "variant": "normal/icon",
+    "check": "twelve-tiles",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "normal/icon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "normal/icon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "normal/icon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "normal/icon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "normal/icon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "normal/icon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "normal/icon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "normal/icon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "normal/icon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "normal/icon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "normal/icon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "normal/icon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "normal/icon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "normal/icon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "normal/icon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "normal/icon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "normal/icon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "normal/icon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "normal/icon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "normal/icon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "normal/icon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "normal/icon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "normal/icon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "normal/icon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "normal/icon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "normal/icon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "normal/icon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "normal/icon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "normal/icon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "normal/icon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "normal/icon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "normal/icon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "normal/icon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "normal/icon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "normal/icon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "normal/icon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "normal/icon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "normal/icon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "normal/icon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "normal/icon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "normal/icon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "normal/icon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "normal/icon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "normal/icon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "normal/icon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "normal/icon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "normal/icon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "normal/icon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "normal/icon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "normal/icon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "normal/icon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "normal/icon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "normal/icon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "normal/icon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "normal/icon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "normal/icon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "normal/icon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "normal/icon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "normal/icon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "normal/icon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "*",
+    "variant": "normal/text",
+    "check": "twelve-tiles",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "normal/text",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "normal/text",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "normal/text",
+    "check": "text-by-choice-has-no-frame",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "normal/text",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "normal/text",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "normal/text",
+    "check": "text-by-choice-has-no-frame",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "normal/text",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "normal/text",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "normal/text",
+    "check": "text-by-choice-has-no-frame",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "normal/text",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "normal/text",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "normal/text",
+    "check": "text-by-choice-has-no-frame",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "normal/text",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "normal/text",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "normal/text",
+    "check": "text-by-choice-has-no-frame",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "normal/text",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "normal/text",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "normal/text",
+    "check": "text-by-choice-has-no-frame",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "normal/text",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "normal/text",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "normal/text",
+    "check": "text-by-choice-has-no-frame",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "normal/text",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "normal/text",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "normal/text",
+    "check": "text-by-choice-has-no-frame",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "normal/text",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "normal/text",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "normal/text",
+    "check": "text-by-choice-has-no-frame",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "normal/text",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "normal/text",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "normal/text",
+    "check": "text-by-choice-has-no-frame",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "normal/text",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "normal/text",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "normal/text",
+    "check": "text-by-choice-has-no-frame",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "normal/text",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "normal/text",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "normal/text",
+    "check": "text-by-choice-has-no-frame",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "*",
+    "variant": "normal/imgicon",
+    "check": "twelve-tiles",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "normal/imgicon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "normal/imgicon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "normal/imgicon",
+    "check": "img-loaded",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "normal/imgicon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "normal/imgicon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "normal/imgicon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "normal/imgicon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "normal/imgicon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "normal/imgicon",
+    "check": "img-loaded",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "normal/imgicon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "normal/imgicon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "normal/imgicon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "normal/imgicon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "normal/imgicon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "normal/imgicon",
+    "check": "img-loaded",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "normal/imgicon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "normal/imgicon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "normal/imgicon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "normal/imgicon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "normal/imgicon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "normal/imgicon",
+    "check": "img-loaded",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "normal/imgicon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "normal/imgicon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "normal/imgicon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "normal/imgicon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "normal/imgicon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "normal/imgicon",
+    "check": "img-loaded",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "normal/imgicon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "normal/imgicon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "normal/imgicon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "normal/imgicon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "normal/imgicon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "normal/imgicon",
+    "check": "img-loaded",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "normal/imgicon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "normal/imgicon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "normal/imgicon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "normal/imgicon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "normal/imgicon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "normal/imgicon",
+    "check": "img-loaded",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "normal/imgicon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "normal/imgicon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "normal/imgicon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "normal/imgicon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "normal/imgicon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "normal/imgicon",
+    "check": "img-loaded",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "normal/imgicon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "normal/imgicon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "normal/imgicon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "normal/imgicon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "normal/imgicon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "normal/imgicon",
+    "check": "img-loaded",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "normal/imgicon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "normal/imgicon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "normal/imgicon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "normal/imgicon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "normal/imgicon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "normal/imgicon",
+    "check": "img-loaded",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "normal/imgicon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "normal/imgicon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "normal/imgicon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "normal/imgicon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "normal/imgicon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "normal/imgicon",
+    "check": "img-loaded",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "normal/imgicon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "normal/imgicon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "normal/imgicon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "normal/imgicon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "normal/imgicon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "normal/imgicon",
+    "check": "img-loaded",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "normal/imgicon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "normal/imgicon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "normal/imgicon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "*",
+    "variant": "abort-images/image",
+    "check": "twelve-tiles",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "abort-images/image",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "abort-images/image",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "abort-images/image",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "abort-images/image",
+    "check": "initial-char",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "abort-images/image",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "abort-images/image",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "abort-images/image",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "abort-images/image",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "abort-images/image",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "abort-images/image",
+    "check": "initial-char",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "abort-images/image",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "abort-images/image",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "abort-images/image",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "abort-images/image",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "abort-images/image",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "abort-images/image",
+    "check": "initial-char",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "abort-images/image",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "abort-images/image",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "abort-images/image",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "abort-images/image",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "abort-images/image",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "abort-images/image",
+    "check": "initial-char",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "abort-images/image",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "abort-images/image",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "abort-images/image",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "abort-images/image",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "abort-images/image",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "abort-images/image",
+    "check": "initial-char",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "abort-images/image",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "abort-images/image",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "abort-images/image",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "abort-images/image",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "abort-images/image",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "abort-images/image",
+    "check": "initial-char",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "abort-images/image",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "abort-images/image",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "abort-images/image",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "abort-images/image",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "abort-images/image",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "abort-images/image",
+    "check": "initial-char",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "abort-images/image",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "abort-images/image",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "abort-images/image",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "abort-images/image",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "abort-images/image",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "abort-images/image",
+    "check": "initial-char",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "abort-images/image",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "abort-images/image",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "abort-images/image",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "abort-images/image",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "abort-images/image",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "abort-images/image",
+    "check": "initial-char",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "abort-images/image",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "abort-images/image",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "abort-images/image",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "abort-images/image",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "abort-images/image",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "abort-images/image",
+    "check": "initial-char",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "abort-images/image",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "abort-images/image",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "abort-images/image",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "abort-images/image",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "abort-images/image",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "abort-images/image",
+    "check": "initial-char",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "abort-images/image",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "abort-images/image",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "abort-images/image",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "abort-images/image",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "abort-images/image",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "abort-images/image",
+    "check": "initial-char",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "abort-images/image",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "abort-images/image",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "*",
+    "variant": "abort-images/icon",
+    "check": "twelve-tiles",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "abort-images/icon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "abort-images/icon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "abort-images/icon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "abort-images/icon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "abort-images/icon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "abort-images/icon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "abort-images/icon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "abort-images/icon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "abort-images/icon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "abort-images/icon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "abort-images/icon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "abort-images/icon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "abort-images/icon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "abort-images/icon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "abort-images/icon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "abort-images/icon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "abort-images/icon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "abort-images/icon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "abort-images/icon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "abort-images/icon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "abort-images/icon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "abort-images/icon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "abort-images/icon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "abort-images/icon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "abort-images/icon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "abort-images/icon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "abort-images/icon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "abort-images/icon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "abort-images/icon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "abort-images/icon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "abort-images/icon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "abort-images/icon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "abort-images/icon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "abort-images/icon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "abort-images/icon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "abort-images/icon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "abort-images/icon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "abort-images/icon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "abort-images/icon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "abort-images/icon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "abort-images/icon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "abort-images/icon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "abort-images/icon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "abort-images/icon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "abort-images/icon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "abort-images/icon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "abort-images/icon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "abort-images/icon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "abort-images/icon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "abort-images/icon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "abort-images/icon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "abort-images/icon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "abort-images/icon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "abort-images/icon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "abort-images/icon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "abort-images/icon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "abort-images/icon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "abort-images/icon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "abort-images/icon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "abort-images/icon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "*",
+    "variant": "abort-images/text",
+    "check": "twelve-tiles",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "abort-images/text",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "abort-images/text",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "abort-images/text",
+    "check": "text-by-choice-has-no-frame",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "abort-images/text",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "abort-images/text",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "abort-images/text",
+    "check": "text-by-choice-has-no-frame",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "abort-images/text",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "abort-images/text",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "abort-images/text",
+    "check": "text-by-choice-has-no-frame",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "abort-images/text",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "abort-images/text",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "abort-images/text",
+    "check": "text-by-choice-has-no-frame",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "abort-images/text",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "abort-images/text",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "abort-images/text",
+    "check": "text-by-choice-has-no-frame",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "abort-images/text",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "abort-images/text",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "abort-images/text",
+    "check": "text-by-choice-has-no-frame",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "abort-images/text",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "abort-images/text",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "abort-images/text",
+    "check": "text-by-choice-has-no-frame",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "abort-images/text",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "abort-images/text",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "abort-images/text",
+    "check": "text-by-choice-has-no-frame",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "abort-images/text",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "abort-images/text",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "abort-images/text",
+    "check": "text-by-choice-has-no-frame",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "abort-images/text",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "abort-images/text",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "abort-images/text",
+    "check": "text-by-choice-has-no-frame",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "abort-images/text",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "abort-images/text",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "abort-images/text",
+    "check": "text-by-choice-has-no-frame",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "abort-images/text",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "abort-images/text",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "abort-images/text",
+    "check": "text-by-choice-has-no-frame",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "*",
+    "variant": "abort-images/imgicon",
+    "check": "twelve-tiles",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "abort-images/imgicon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "abort-images/imgicon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "abort-images/imgicon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "abort-images/imgicon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "circle",
+    "variant": "abort-images/imgicon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "abort-images/imgicon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "abort-images/imgicon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "abort-images/imgicon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "abort-images/imgicon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "square",
+    "variant": "abort-images/imgicon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "abort-images/imgicon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "abort-images/imgicon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "abort-images/imgicon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "abort-images/imgicon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "rounded",
+    "variant": "abort-images/imgicon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "abort-images/imgicon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "abort-images/imgicon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "abort-images/imgicon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "abort-images/imgicon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "landscape",
+    "variant": "abort-images/imgicon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "abort-images/imgicon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "abort-images/imgicon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "abort-images/imgicon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "abort-images/imgicon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "portrait",
+    "variant": "abort-images/imgicon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "abort-images/imgicon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "abort-images/imgicon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "abort-images/imgicon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "abort-images/imgicon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "oval",
+    "variant": "abort-images/imgicon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "abort-images/imgicon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "abort-images/imgicon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "abort-images/imgicon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "abort-images/imgicon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "star",
+    "variant": "abort-images/imgicon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "abort-images/imgicon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "abort-images/imgicon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "abort-images/imgicon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "abort-images/imgicon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "heart",
+    "variant": "abort-images/imgicon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "abort-images/imgicon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "abort-images/imgicon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "abort-images/imgicon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "abort-images/imgicon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "diamond",
+    "variant": "abort-images/imgicon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "abort-images/imgicon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "abort-images/imgicon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "abort-images/imgicon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "abort-images/imgicon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "hexagon",
+    "variant": "abort-images/imgicon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "abort-images/imgicon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "abort-images/imgicon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "abort-images/imgicon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "abort-images/imgicon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "vase",
+    "variant": "abort-images/imgicon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "abort-images/imgicon",
+    "check": "content-kind",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "abort-images/imgicon",
+    "check": "name-and-link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "abort-images/imgicon",
+    "check": "aspect",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "abort-images/imgicon",
+    "check": "painted-vs-expected-mask-IoU",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "shape": "arch",
+    "variant": "abort-images/imgicon",
+    "check": "iou-value",
+    "ok": true,
+    "detail": ""
+  }
+]

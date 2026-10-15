@@ -1,0 +1,166 @@
+[
+  {
+    "id": "W-3a.1 untouched value shows every property as inherited from the dimension",
+    "ok": true,
+    "detail": {
+      "shape:0": {
+        "source": "facet",
+        "badge": "Inherited from the dimension: Hexagon"
+      },
+      "size:1": {
+        "source": "facet",
+        "badge": "Inherited from the dimension: Small"
+      },
+      "showLabel:2": {
+        "source": "facet",
+        "badge": "Inherited from the dimension: Shown"
+      }
+    }
+  },
+  {
+    "id": "W-3a.2 API document equals every edited property",
+    "ok": true,
+    "detail": {
+      "got": {
+        "content": "icon",
+        "icon": "trophy",
+        "iconColor": "#112233",
+        "background": "#aabbcc",
+        "shape": "diamond",
+        "size": "lg",
+        "showLabel": false
+      },
+      "name_en": "Value A edited"
+    }
+  },
+  {
+    "id": "W-3a.3 UI state after hard reload identical to the state before saving (3 tabs)",
+    "ok": true,
+    "detail": []
+  },
+  {
+    "id": "W-3a.4 restoring each property shows its inherited badge with the dimension value",
+    "ok": true,
+    "detail": {
+      "shapeBadge": {
+        "source": "facet",
+        "badge": "Inherited from the dimension: Hexagon"
+      },
+      "restore": []
+    }
+  },
+  {
+    "id": "W-3a.5 after restore only content stays in the document (inheritance deleted keys, nothing materialised)",
+    "ok": true,
+    "detail": {
+      "content": "icon"
+    }
+  },
+  {
+    "id": "W-3a.6 choosing «inherit» removes the identity entirely (document is null)",
+    "ok": true,
+    "detail": null
+  },
+  {
+    "id": "W-3d.1 choosing «inherit» warns that the image/icon set for the value will be removed on save",
+    "ok": true,
+    "detail": "Edit value — Value D\n\nvalue-d\nDim qa-w-poh6t d\n\nData\nImage & icon\nAppearance\nContent type\nInherit from dimension\nImage\nIcon\nText only\n\nCurrently: Icon\n\nOn save, the image and icon you set for this val"
+  },
+  {
+    "id": "W-3d.2 Cancel + Discard leaves the stored document untouched",
+    "ok": true,
+    "detail": {
+      "content": "icon",
+      "icon": "trophy",
+      "shape": "diamond"
+    }
+  },
+  {
+    "id": "W-3d.3 INFO: after inherit then icon again, the earlier icon choice is not restored (no per-choice undo, documented residual risk)",
+    "ok": true,
+    "detail": {
+      "trophyPressed": "false"
+    }
+  },
+  {
+    "id": "W-3b.1 dimension defaults saved (API)",
+    "ok": true,
+    "detail": {
+      "defaults": {
+        "content": "icon",
+        "icon": "gift",
+        "iconColor": "#7c2d12",
+        "background": "#ffedd5",
+        "shape": "star",
+        "size": "md",
+        "showLabel": true
+      }
+    }
+  },
+  {
+    "id": "W-3b.2 an inheriting value follows the new defaults (Star / Medium shown as inherited)",
+    "ok": true,
+    "detail": {
+      "shape": {
+        "source": "facet",
+        "badge": "Inherited from the dimension: Star"
+      },
+      "size": {
+        "source": "facet",
+        "badge": "Inherited from the dimension: Medium"
+      }
+    }
+  },
+  {
+    "id": "W-3b.3 a value with its own shape keeps it; its other properties follow the defaults",
+    "ok": true,
+    "detail": {
+      "shape": {
+        "source": "own",
+        "badge": "Customized for this value"
+      },
+      "size": {
+        "source": "facet",
+        "badge": "Inherited from the dimension: Medium"
+      }
+    }
+  },
+  {
+    "id": "W-3b.4 the inheriting value document is still null (defaults were never copied into it)",
+    "ok": true,
+    "detail": null
+  },
+  {
+    "id": "W-3c.1 dimension document (self + defaults) equals every edited property; name_en and is_active persisted",
+    "ok": true,
+    "detail": {
+      "visual": {
+        "self": {
+          "content": "icon",
+          "icon": "crown",
+          "iconColor": "#0a3d62",
+          "background": "#dff3ff",
+          "shape": "oval",
+          "size": "lg"
+        },
+        "defaults": {
+          "content": "icon",
+          "icon": "leaf",
+          "iconColor": "#14532d",
+          "background": "#dcfce7",
+          "shape": "vase",
+          "size": "sm",
+          "fit": "contain",
+          "showLabel": false
+        }
+      },
+      "name_en": "Dimension C edited",
+      "active": false
+    }
+  },
+  {
+    "id": "W-3c.2 UI state after hard reload identical to before saving (dimension, 3 tabs)",
+    "ok": true,
+    "detail": []
+  }
+]

@@ -1,0 +1,222 @@
+{
+ "s0_explicitImageGrid": {
+  "layoutSource": "Explicit",
+  "layoutButtons": [
+   {
+    "text": "Legacy (tiles/chips)",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "Image grid",
+    "pressed": "true",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "Image cards",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "Carousel",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "Icon grid",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "Text list",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   }
+  ],
+  "reset": true,
+  "templateSource": "System default",
+  "templateButtons": [
+   "No template:true",
+   "Gift circles Round pictures in a tidy gr:false",
+   "Boutique arches Tall Islamic-arch cards :false"
+  ],
+  "overridden": null
+ },
+ "s1_templateChosen": {
+  "layoutSource": "Explicit",
+  "layoutButtons": [
+   {
+    "text": "Follow template",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "Image grid",
+    "pressed": "true",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "Image cards",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "Carousel",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "Icon grid",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "Text list",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   }
+  ],
+  "reset": true,
+  "templateSource": "Explicit",
+  "templateButtons": [
+   "No template:false",
+   "Gift circles Round pictures in a tidy gr:true",
+   "Boutique arches Tall Islamic-arch cards :false"
+  ],
+  "overridden": "Explicit settings override this template: 1"
+ },
+ "s2_followTemplate": {
+  "layoutSource": "From template: Gift circles",
+  "layoutButtons": [
+   {
+    "text": "Follow template",
+    "pressed": "true",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "Image grid",
+    "pressed": "false",
+    "disabled": false,
+    "effective": "inherited",
+    "label": "Image grid (inherited)"
+   },
+   {
+    "text": "Image cards",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "Carousel",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "Icon grid",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "Text list",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   }
+  ],
+  "reset": false,
+  "templateSource": "Explicit",
+  "templateButtons": [
+   "No template:false",
+   "Gift circles Round pictures in a tidy gr:true",
+   "Boutique arches Tall Islamic-arch cards :false"
+  ],
+  "overridden": null
+ },
+ "s3_clickAgain": {
+  "layoutSource": "From template: Gift circles",
+  "layoutButtons": [
+   {
+    "text": "Follow template",
+    "pressed": "true",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "Image grid",
+    "pressed": "false",
+    "disabled": false,
+    "effective": "inherited",
+    "label": "Image grid (inherited)"
+   },
+   {
+    "text": "Image cards",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "Carousel",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "Icon grid",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "Text list",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   }
+  ],
+  "reset": false,
+  "templateSource": "Explicit",
+  "templateButtons": [
+   "No template:false",
+   "Gift circles Round pictures in a tidy gr:true",
+   "Boutique arches Tall Islamic-arch cards :false"
+  ],
+  "overridden": null
+ }
+}

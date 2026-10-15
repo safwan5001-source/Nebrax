@@ -1,0 +1,572 @@
+[
+  {
+    "id": "S-6.setup",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.a control A own: origin(vd5-a.store.vd5.test) -> 200",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.a control A own: proxy(vd5-a.store.vd5.test) -> 200",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.a control B own: origin(vd5-b.store.vd5.test) -> 200",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.a control B own: proxy(vd5-b.store.vd5.test) -> 200",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.a B host + A visual/media: origin(vd5-b.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.a B host + A visual/media: proxy(vd5-b.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.a A host + B visual/media: origin(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.a A host + B visual/media: proxy(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.a B host + A visual, B media: origin(vd5-b.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.a B host + A visual, B media: proxy(vd5-b.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.a B host + B visual, A media (foreign mediaId injection): origin(vd5-b.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.a B host + B visual, A media (foreign mediaId injection): proxy(vd5-b.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.a A host + A visual, B media: origin(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.a A host + A visual, B media: proxy(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.a A host + B visual, A media: origin(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.a A host + B visual, A media: proxy(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.a canary meta: A red mediaId != B red mediaId",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.a canary: tenant A public JSON never contains B ids",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.a browser S1 color/red tile uses A's media, never B's",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.b setup: S2-only value image path known on S2 and S1-only on S1",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.b S2 control (S2 host): origin(vd5-a-s2-mtgr-alhdaya.store.vd5.test) -> 200",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.b S2 control (S2 host): proxy(vd5-a-s2-mtgr-alhdaya.store.vd5.test) -> 200",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.b S2-only image through S1 host: origin(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.b S2-only image through S1 host: proxy(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.b S1-only image through S2 host: origin(vd5-a-s2-mtgr-alhdaya.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.b S1-only image through S2 host: proxy(vd5-a-s2-mtgr-alhdaya.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.b S1 meta does not list the S2-only value",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.b unknown host: origin(nonexistent-store.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.b unknown host: proxy(nonexistent-store.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.b foreign domain: origin(evil.example.com) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.b foreign domain: proxy(evil.example.com) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c traversal ../: origin(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c traversal ../: proxy(vd5-a.store.vd5.test) -> 404 [framework 404 outside the route: no-cache, must-revalidate]",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c traversal %2e%2e: origin(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c traversal %2e%2e: proxy(vd5-a.store.vd5.test) -> 404 [framework 404 outside the route: no-cache, must-revalidate]",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c traversal double-encoded: origin(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c traversal double-encoded: proxy(vd5-a.store.vd5.test) -> 404 [framework 404 outside the route: no-cache, must-revalidate]",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c encoded slash in file: origin(vd5-a.store.vd5.test) -> 404 [collapses to the canonical authorized image: same bytes]",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c encoded slash in file: proxy(vd5-a.store.vd5.test) -> 404 [framework 404 outside the route: no-cache, must-revalidate]",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c encoded slash (visual%2Fmedia): origin(vd5-a.store.vd5.test) -> 404 [collapses to the canonical authorized image: same bytes]",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c encoded slash (visual%2Fmedia): proxy(vd5-a.store.vd5.test) -> 404 [framework 404 outside the route: no-cache, must-revalidate]",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c backslash %5C: origin(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c backslash %5C: proxy(vd5-a.store.vd5.test) -> 404 [framework 404 outside the route: no-cache, must-revalidate]",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c uppercase visualId: origin(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c uppercase visualId: proxy(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c uppercase mediaId: origin(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c uppercase mediaId: proxy(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c extra segment: origin(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c extra segment: proxy(vd5-a.store.vd5.test) -> 404 [framework 404 outside the route: no-cache, must-revalidate]",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c missing segment: origin(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c missing segment: proxy(vd5-a.store.vd5.test) -> 404 [framework 404 outside the route: no-cache, must-revalidate]",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c file: original: origin(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c file: original: proxy(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c file: original.png: origin(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c file: original.png: proxy(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c file: 1200w.webp: origin(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c file: 1200w.webp: proxy(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c file: thumb-160.png: origin(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c file: thumb-160.png: proxy(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c file: THUMB-160.WEBP: origin(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c file: THUMB-160.WEBP: proxy(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c file: thumb-160.webp.php: origin(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c file: thumb-160.webp.php: proxy(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c file: null byte %00: origin(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c file: null byte %00: proxy(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c file: trailing slash: origin(vd5-a.store.vd5.test) -> 404 [collapses to the canonical authorized image: same bytes]",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c file: trailing slash: proxy(vd5-a.store.vd5.test) -> 404 [308 -> /api/storefront/media/facet-visuals/a2fd1ce6-d1d4-4fc6-8671-eea6c80e815e/8f391f5e-ddec-4336-af36-1d2acbcb07bb/thumb-160.webp]",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c double slash: origin(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c double slash: proxy(vd5-a.store.vd5.test) -> 404 [308 -> /api/storefront/media/facet-visuals/a2fd1ce6-d1d4-4fc6-8671-eea6c80e815e/8f391f5e-ddec-4336-af36-1d2acbcb07bb/thumb-160.webp]",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c file: 320w.webp (not in list): origin(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c file: 320w.webp (not in list): proxy(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c non-uuid ids: origin(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c non-uuid ids: proxy(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c sql-ish id: origin(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c sql-ish id: proxy(vd5-a.store.vd5.test) -> 404",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c INFO query string on a valid path is ignored (origin 200, proxy 200)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c allowed file thumb-160.webp: origin(vd5-a.store.vd5.test) -> 200",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c allowed file thumb-160.webp: proxy(vd5-a.store.vd5.test) -> 200",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c allowed file thumb-160.jpg: origin(vd5-a.store.vd5.test) -> 200",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c allowed file thumb-160.jpg: proxy(vd5-a.store.vd5.test) -> 200",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c allowed file thumb-320.webp: origin(vd5-a.store.vd5.test) -> 200",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c allowed file thumb-320.webp: proxy(vd5-a.store.vd5.test) -> 200",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c allowed file thumb-320.jpg: origin(vd5-a.store.vd5.test) -> 200",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c allowed file thumb-320.jpg: proxy(vd5-a.store.vd5.test) -> 200",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c allowed file 480w.webp: origin(vd5-a.store.vd5.test) -> 200",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c allowed file 480w.webp: proxy(vd5-a.store.vd5.test) -> 200",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c allowed file 480w.jpg: origin(vd5-a.store.vd5.test) -> 200",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c allowed file 480w.jpg: proxy(vd5-a.store.vd5.test) -> 200",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c allowed file 768w.webp: origin(vd5-a.store.vd5.test) -> 200",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c allowed file 768w.webp: proxy(vd5-a.store.vd5.test) -> 200",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c allowed file 768w.jpg: origin(vd5-a.store.vd5.test) -> 200",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c allowed file 768w.jpg: proxy(vd5-a.store.vd5.test) -> 200",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c POST on the image route serves no image (status 405, body 310 B)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c PUT on the image route serves no image (status 405, body 309 B)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c DELETE on the image route serves no image (status 405, body 312 B)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c OPTIONS on the image route serves no image (status 200, body 0 B)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.c proxy content-type + nosniff",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.d no raw /store/v1 path in any <img> (src/srcset) of the SSR HTML",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.d no /store/v1/media/ anywhere in the HTML or RSC payload",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.d HTML/RSC does not contain tenant A id",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.d HTML/RSC does not contain tenant B id",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.d HTML/RSC does not contain store S1 id",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.d HTML/RSC does not contain store S2 id",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.d HTML/RSC does not contain S1 sales_channel id",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.d HTML/RSC does not contain B media id",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.d HTML/RSC does not contain B visual id",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.d HTML has no storage-origin hints (r2 / s3 / signed url)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.d public meta JSON does not contain tenant id",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.d public meta JSON does not contain store id",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.d public meta JSON does not contain sales channel id",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.d public meta JSON carries none of the internal keys",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.d SB public JSON contains no tenant-A id/media/visual",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "S-6.a admin: tenant B cannot reference tenant A's media in a visual (status 422)",
+    "ok": true,
+    "detail": ""
+  }
+]

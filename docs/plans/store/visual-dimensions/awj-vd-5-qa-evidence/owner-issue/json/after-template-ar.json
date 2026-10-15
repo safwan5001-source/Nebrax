@@ -1,0 +1,222 @@
+{
+ "s0_explicitImageGrid": {
+  "layoutSource": "قيمة صريحة",
+  "layoutButtons": [
+   {
+    "text": "قديم (بطاقات/أزرار)",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "شبكة صور",
+    "pressed": "true",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "بطاقات صور",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "شريط متحرك",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "شبكة أيقونات",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "قائمة نصية",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   }
+  ],
+  "reset": true,
+  "templateSource": "افتراضي النظام",
+  "templateButtons": [
+   "بدون قالب:true",
+   "دوائر الهدايا صور دائرية في شبكة مرتبة و:false",
+   "أقواس البوتيك بطاقات طويلة بقوس إسلامي ب:false"
+  ],
+  "overridden": null
+ },
+ "s1_templateChosen": {
+  "layoutSource": "قيمة صريحة",
+  "layoutButtons": [
+   {
+    "text": "يتبع القالب",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "شبكة صور",
+    "pressed": "true",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "بطاقات صور",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "شريط متحرك",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "شبكة أيقونات",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "قائمة نصية",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   }
+  ],
+  "reset": true,
+  "templateSource": "قيمة صريحة",
+  "templateButtons": [
+   "بدون قالب:false",
+   "دوائر الهدايا صور دائرية في شبكة مرتبة و:true",
+   "أقواس البوتيك بطاقات طويلة بقوس إسلامي ب:false"
+  ],
+  "overridden": "إعدادات صريحة تتقدّم على القالب: 1"
+ },
+ "s2_followTemplate": {
+  "layoutSource": "من القالب: دوائر الهدايا",
+  "layoutButtons": [
+   {
+    "text": "يتبع القالب",
+    "pressed": "true",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "شبكة صور",
+    "pressed": "false",
+    "disabled": false,
+    "effective": "inherited",
+    "label": "شبكة صور (موروث)"
+   },
+   {
+    "text": "بطاقات صور",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "شريط متحرك",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "شبكة أيقونات",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "قائمة نصية",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   }
+  ],
+  "reset": false,
+  "templateSource": "قيمة صريحة",
+  "templateButtons": [
+   "بدون قالب:false",
+   "دوائر الهدايا صور دائرية في شبكة مرتبة و:true",
+   "أقواس البوتيك بطاقات طويلة بقوس إسلامي ب:false"
+  ],
+  "overridden": null
+ },
+ "s3_clickAgain": {
+  "layoutSource": "من القالب: دوائر الهدايا",
+  "layoutButtons": [
+   {
+    "text": "يتبع القالب",
+    "pressed": "true",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "شبكة صور",
+    "pressed": "false",
+    "disabled": false,
+    "effective": "inherited",
+    "label": "شبكة صور (موروث)"
+   },
+   {
+    "text": "بطاقات صور",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "شريط متحرك",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "شبكة أيقونات",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   },
+   {
+    "text": "قائمة نصية",
+    "pressed": "false",
+    "disabled": false,
+    "effective": null,
+    "label": null
+   }
+  ],
+  "reset": false,
+  "templateSource": "قيمة صريحة",
+  "templateButtons": [
+   "بدون قالب:false",
+   "دوائر الهدايا صور دائرية في شبكة مرتبة و:true",
+   "أقواس البوتيك بطاقات طويلة بقوس إسلامي ب:false"
+  ],
+  "overridden": null
+ }
+}

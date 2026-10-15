@@ -1,0 +1,38 @@
+   × real values are drawn from their stored look > the picture of a value with an image is its signed thumbnail, never a placeholder 154ms
+     → expected [ …(2) ] to deeply equal [ …(2) ]
+   × real values are drawn from their stored look > keeps each value's own shape (heart vs circle) and never leaks the placeholder media ids or pictures 61ms
+     → expected 'aspect-ratio: 1 / 1; overflow: hidden…' to not deeply equal 'aspect-ratio: 1 / 1; overflow: hidden…'
+   × a value that cannot be drawn as its picture says why > a stored image with no preview link falls back like the store and is named as unavailable 36ms
+     → expected 'image' not to be 'image' // Object.is equality
+   × a value that cannot be drawn as its picture says why > a value with no look at all is said to have none; a value with no products is said not to be listed 45ms
+     → the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string
+   × a value that cannot be drawn as its picture says why > inactive values are not drawn and their number is said; the store rule about unpublished products is always said 44ms
+     → the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string
+   × a value that cannot be drawn as its picture says why > text-list and the legacy look draw names only, so only the products note applies 62ms
+     → the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string
+   × a value that cannot be drawn as its picture says why > a thumbnail that fails to load falls back, is reported with the reload action, and the reload hook is called 61ms
+     → the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string
+   × a value that cannot be drawn as its picture says why > a fresh signed link (after a reload) is tried again: the failure is remembered per link 32ms
+     → expected [] to have a length of 1 but got +0
+   × a value that cannot be drawn as its picture says why > the notices are announced (status region) and sit outside the hidden picture frame 22ms
+     → Cannot read properties of null (reading 'getAttribute')
+   × samples are labelled as samples, with the reason > no dimension chosen: placeholders, a visible badge in the frame and a status line saying they are not yours 18ms
+     → Cannot read properties of null (reading 'getAttribute')
+   × samples are labelled as samples, with the reason > dimension list not loaded: samples, reason loading 21ms
+     → Cannot read properties of null (reading 'getAttribute')
+   × samples are labelled as samples, with the reason > brand axis and a dimension with no active values: samples, with their own reasons 19ms
+     → Cannot read properties of null (reading 'getAttribute')
+   × samples are labelled as samples, with the reason > a real dimension is labelled as the merchant's own and carries no sample badge 20ms
+     → Cannot read properties of null (reading 'getAttribute')
+   × samples are labelled as samples, with the reason > the Arabic copy is real Arabic (no English leaks into the notices) 27ms
+     → .toMatch() expects to receive a string, but got undefined
+   × model > previewSource reports why it is a sample, and keeps the stored look of real values 1ms
+     → expected undefined to be 'loading' // Object.is equality
+   × model > previewNotes: picture + link = none; picture without link = unavailable; nothing set = no_look; zero products = no_products 0ms
+     → previewNotes is not a function
+   × «follows the template» is a named state, not a second template picker > is a pressed, never-disabled state whose hint names the template and the layout it brings 269ms
+     → expected 'Template\'s layout' to be 'Follow template' // Object.is equality
+   × «follows the template» is a named state, not a second template picker > choosing a layout overrides the template (and says so); pressing «follow template» returns to it and deletes the key 140ms
+     → Cannot read properties of null (reading 'getAttribute')
+⎯⎯⎯⎯⎯⎯ Failed Tests 18 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  18 failed | 3 passed (21)

@@ -1,0 +1,177 @@
+[
+ {
+  "status": "PASS",
+  "id": "W-4.1a",
+  "text": "422 maps each server code to its own control/message (shape, icon, colour, image, zoom) "
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.1b",
+  "text": "tabs carrying an error get the alert (Image & icon and Appearance), Data does not "
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.1c",
+  "text": "editor stays open, exactly one PUT, Save usable again "
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.1d",
+  "text": "changing the field with the error clears that error (and only that) "
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.2a",
+  "text": "owner/admin: all tabs editable, media library probed, Save enabled only when dirty "
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.2b",
+  "text": "accountant (products.manage, no commerce.manage): Data editable, identity tabs read-only with banner, no library read, no pick buttons "
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.2c",
+  "text": "viewer (products.view only): whole editor read-only (view button), Save disabled, no writes, no library read "
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.2d",
+  "text": "self_service: no list, no editor; what the user sees {\"url\":\"/me\",\"text\":\"Hello, — You haven't checked in today yet Check in Overview Attendance Payroll Job details Employee no. — Hire date — Mobile — Personal email — Salary (active contract) No active contract\",\"reqs\":[\"GET /me 200\",\"GET /me/profile 403\",\"GET /me/contract 403\",\"GET /me/attendances 40"
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.2e",
+  "text": "no role sent any write during the read-only sessions (accountant/viewer/self_service) "
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.3a",
+  "text": "deleted value: both parts report a clear failure (data: generic save failure; identity: «no longer exists» + Reload) "
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.3b",
+  "text": "Reload on a vanished row closes the editor without a ghost state; the row is gone from the list "
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.4a",
+  "text": "429: «wait and press Save again», one attempt, no auto-retry, Save usable, nothing stored "
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.4a",
+  "text": "429: «wait and press Save again», one attempt, no auto-retry, Save usable, nothing stored-retry "
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.5a",
+  "text": "500: server error message, nothing changed, one attempt "
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.5b",
+  "text": "502 with an HTML gateway body: same server-error message (no raw HTML shown) "
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.5c",
+  "text": "503 maintenance: server-error message "
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.6a",
+  "text": "offline (request aborted): «could not reach the server», nothing stored "
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.6b",
+  "text": "403 (permission revoked mid-session): identity read-only message, no retry "
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.6c",
+  "text": "request that never completes then fails: UI does not hang forever in «saving» after abort "
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.6d",
+  "text": "list load offline shows an error state with a Retry, and Retry recovers "
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.6e",
+  "text": "INFO: media-library probe fails (429) -> «Image» option disabled; message shown: [\"The media library is not enabled for this account, so the image option is unavailable. Icon and text-only still work.\"] {\"imgDisabled\":true,\"gatedMsg\":[\"The media library is not enabled for this account, so the image option is unavailable. Icon and text-only still work.\"]}"
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.6e",
+  "text": "INFO: media-library probe fails (500) -> «Image» option disabled; message shown: [\"The media library is not enabled for this account, so the image option is unavailable. Icon and text-only still work.\"] {\"imgDisabled\":true,\"gatedMsg\":[\"The media library is not enabled for this account, so the image option is unavailable. Icon and text-only still work.\"]}"
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.6e",
+  "text": "INFO: media-library probe fails (offline) -> «Image» option disabled; message shown: [\"The media library is not enabled for this account, so the image option is unavailable. Icon and text-only still work.\"] {\"imgDisabled\":true,\"gatedMsg\":[\"The media library is not enabled for this account, so the image option is unavailable. Icon and text-only still work.\"]}"
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.7a",
+  "text": "signed preview URL rejected (403): editor says «could not be loaded» + falls back (no broken <img> in the preview) "
+ },
+ {
+  "status": "FAIL",
+  "id": "W-4.7b",
+  "text": "list thumbnail with a failing signed URL falls back without leaving a broken image {\"listBroken\":[{\"ok\":false,\"w\":32}]}"
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.8a",
+  "text": "picked image still processing: editor says so (not_ready), fallback preview, focal grid disabled "
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.8b",
+  "text": "server 422 media_not_ready is shown on the image control with its own wording "
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.9",
+  "text": "triple-click on Save sends exactly one data PUT and one identity PUT "
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.10a",
+  "text": "non-image / corrupt / >5MB uploads are rejected with a per-file message, nothing enters the library, field stays empty "
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.10b",
+  "text": "INFO upload rejection wording per type {\"txt\":\"qa-w-bad.txt File rejected — الصيغة غير مدعومة. المسموح: JPG وPNG وWebP.\",\"svg\":\"qa-w-bad.svg File rejected — الصيغة غير مدعومة. المسموح: JPG وPNG وWebP.\",\"pdf\":\"qa-w-bad.pdf File rejected — الصيغة غير مدعومة. المسموح: JPG وPNG وWebP.\",\"corrupt-png\":\"qa-w-bad-corrupt.png File rejected — الصي"
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.11",
+  "text": "long Arabic/English name (85 chars) ar 1440: no overflow in list, editor, preview "
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.11",
+  "text": "long Arabic/English name (85 chars) ar 390: no overflow in list, editor, preview "
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.11",
+  "text": "long Arabic/English name (85 chars) en 1440: no overflow in list, editor, preview "
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.11",
+  "text": "long Arabic/English name (85 chars) en 390: no overflow in list, editor, preview "
+ },
+ {
+  "status": "PASS",
+  "id": "W-4.12",
+  "text": "data-part server rejection (name 400 chars): the editor stays open with a visible failure message on the Data part "
+ }
+]

@@ -1,0 +1,238 @@
+{
+ "admin_facets_list": [
+  {
+   "key": "qa-o-recipient",
+   "values": [
+    {
+     "slug": "mom",
+     "active": true,
+     "product_count": 1,
+     "has_visual": true,
+     "visual_preview_keys": [
+      "thumb_160",
+      "thumb_320"
+     ],
+     "thumb_host": "http://127.0.0.1:8000/api/commerce/workspace/storefront-medi"
+    },
+    {
+     "slug": "dad",
+     "active": true,
+     "product_count": 1,
+     "has_visual": true,
+     "visual_preview_keys": [
+      "thumb_160",
+      "thumb_320"
+     ],
+     "thumb_host": "http://127.0.0.1:8000/api/commerce/workspace/storefront-medi"
+    },
+    {
+     "slug": "friend",
+     "active": true,
+     "product_count": 0,
+     "has_visual": true,
+     "visual_preview_keys": [
+      "thumb_160",
+      "thumb_320"
+     ],
+     "thumb_host": "http://127.0.0.1:8000/api/commerce/workspace/storefront-medi"
+    },
+    {
+     "slug": "boss",
+     "active": true,
+     "product_count": 1,
+     "has_visual": true,
+     "visual_preview_keys": [
+      "thumb_160",
+      "thumb_320"
+     ],
+     "thumb_host": "http://127.0.0.1:8000/api/commerce/workspace/storefront-medi"
+    },
+    {
+     "slug": "kid",
+     "active": true,
+     "product_count": 1,
+     "has_visual": false,
+     "visual_preview_keys": null
+    },
+    {
+     "slug": "retired",
+     "active": false,
+     "product_count": 1,
+     "has_visual": true,
+     "visual_preview_keys": [
+      "thumb_160",
+      "thumb_320"
+     ],
+     "thumb_host": "http://127.0.0.1:8000/api/commerce/workspace/storefront-medi"
+    }
+   ]
+  },
+  {
+   "key": "qa-o-occasion",
+   "values": [
+    {
+     "slug": "birthday",
+     "active": true,
+     "product_count": 1,
+     "has_visual": true,
+     "visual_preview_keys": [
+      "thumb_160",
+      "thumb_320"
+     ],
+     "thumb_host": "http://127.0.0.1:8000/api/commerce/workspace/storefront-medi"
+    },
+    {
+     "slug": "wedding",
+     "active": true,
+     "product_count": 1,
+     "has_visual": true,
+     "visual_preview_keys": [
+      "thumb_160",
+      "thumb_320"
+     ],
+     "thumb_host": "http://127.0.0.1:8000/api/commerce/workspace/storefront-medi"
+    },
+    {
+     "slug": "eid",
+     "active": true,
+     "product_count": 0,
+     "has_visual": true,
+     "visual_preview_keys": [
+      "thumb_160",
+      "thumb_320"
+     ],
+     "thumb_host": "http://127.0.0.1:8000/api/commerce/workspace/storefront-medi"
+    },
+    {
+     "slug": "graduation",
+     "active": true,
+     "product_count": 1,
+     "has_visual": true,
+     "visual_preview_keys": null
+    },
+    {
+     "slug": "thanks",
+     "active": true,
+     "product_count": 1,
+     "has_visual": false,
+     "visual_preview_keys": null
+    }
+   ]
+  }
+ ],
+ "public_store_meta_facets": [
+  {
+   "key": "qa-o-recipient",
+   "values": [
+    {
+     "slug": "mom",
+     "count": 1,
+     "visual": {
+      "content": "image",
+      "shape": "heart",
+      "image": {
+       "mediaId": "91702ee9-0a3b-412f-8502-6ac8343834fe",
+       "sources": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+       ]
+      }
+     }
+    },
+    {
+     "slug": "dad",
+     "count": 1,
+     "visual": {
+      "content": "image",
+      "shape": "circle",
+      "image": {
+       "mediaId": "f71d3f1c-6a47-4eaf-9c7d-79a6ac2983ef",
+       "sources": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+       ]
+      }
+     }
+    },
+    {
+     "slug": "kid",
+     "count": 1,
+     "visual": null
+    }
+   ]
+  },
+  {
+   "key": "qa-o-occasion",
+   "values": [
+    {
+     "slug": "birthday",
+     "count": 1,
+     "visual": {
+      "content": "image",
+      "shape": "circle",
+      "image": {
+       "mediaId": "f15045ea-8b09-4525-8e72-78c6957a9be3",
+       "sources": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+       ]
+      }
+     }
+    },
+    {
+     "slug": "wedding",
+     "count": 1,
+     "visual": {
+      "content": "image",
+      "shape": "heart",
+      "image": {
+       "mediaId": "9cd69f6e-fca0-441a-82c9-41ac59cf35d9",
+       "sources": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+       ]
+      }
+     }
+    },
+    {
+     "slug": "graduation",
+     "count": 1,
+     "visual": {
+      "content": "icon",
+      "shape": "circle",
+      "image": null
+     }
+    },
+    {
+     "slug": "thanks",
+     "count": 1,
+     "visual": null
+    }
+   ]
+  }
+ ]
+}

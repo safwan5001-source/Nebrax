@@ -1,0 +1,426 @@
+{
+ "ar-1440-recipient": {
+  "caption": "الأعمدة: 2 · أسماء القيم من الكتالوج والصور نموذجية للتوضيح. يتبع قواعد تخطيط المتجر نفسها، والمتجر المنشور هو المرجع.",
+  "notice": [],
+  "items": [
+   {
+    "name": "أمي",
+    "content": "image",
+    "src": "data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20vie",
+    "naturalW": 150,
+    "tileNote": null
+   },
+   {
+    "name": "أبي",
+    "content": "image",
+    "src": "data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20vie",
+    "naturalW": 150,
+    "tileNote": null
+   },
+   {
+    "name": "صديقة",
+    "content": "icon",
+    "src": null,
+    "naturalW": null,
+    "tileNote": null
+   },
+   {
+    "name": "المدير",
+    "content": "image",
+    "src": "data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20vie",
+    "naturalW": 150,
+    "tileNote": null
+   },
+   {
+    "name": "طفل",
+    "content": "icon",
+    "src": null,
+    "naturalW": null,
+    "tileNote": null
+   }
+  ]
+ },
+ "ar-1440-occasion": {
+  "caption": "الأعمدة: 2 · أسماء القيم من الكتالوج والصور نموذجية للتوضيح. يتبع قواعد تخطيط المتجر نفسها، والمتجر المنشور هو المرجع.",
+  "notice": [],
+  "items": [
+   {
+    "name": "ميلاد",
+    "content": "image",
+    "src": "data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20vie",
+    "naturalW": 150,
+    "tileNote": null
+   },
+   {
+    "name": "زفاف",
+    "content": "image",
+    "src": "data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20vie",
+    "naturalW": 150,
+    "tileNote": null
+   },
+   {
+    "name": "عيد",
+    "content": "icon",
+    "src": null,
+    "naturalW": null,
+    "tileNote": null
+   },
+   {
+    "name": "تخرّج",
+    "content": "image",
+    "src": "data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20vie",
+    "naturalW": 150,
+    "tileNote": null
+   },
+   {
+    "name": "شكر",
+    "content": "icon",
+    "src": null,
+    "naturalW": null,
+    "tileNote": null
+   }
+  ]
+ },
+ "net-ar-1440": {
+  "api": [
+   "GET /me 200",
+   "GET /commerce/workspace/storefronts 200",
+   "GET /commerce/workspace/storefronts 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions/a2fd7b15-1871-4b26-a63d-f026a71ac074 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/categories 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/products 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200"
+  ],
+  "images": [],
+  "dataImages": 0
+ },
+ "ar-390-recipient": {
+  "caption": "الأعمدة: 2 · أسماء القيم من الكتالوج والصور نموذجية للتوضيح. يتبع قواعد تخطيط المتجر نفسها، والمتجر المنشور هو المرجع.",
+  "notice": [],
+  "items": [
+   {
+    "name": "أمي",
+    "content": "image",
+    "src": "data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20vie",
+    "naturalW": 150,
+    "tileNote": null
+   },
+   {
+    "name": "أبي",
+    "content": "image",
+    "src": "data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20vie",
+    "naturalW": 150,
+    "tileNote": null
+   },
+   {
+    "name": "صديقة",
+    "content": "icon",
+    "src": null,
+    "naturalW": null,
+    "tileNote": null
+   },
+   {
+    "name": "المدير",
+    "content": "image",
+    "src": "data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20vie",
+    "naturalW": 150,
+    "tileNote": null
+   },
+   {
+    "name": "طفل",
+    "content": "icon",
+    "src": null,
+    "naturalW": null,
+    "tileNote": null
+   }
+  ]
+ },
+ "ar-390-occasion": {
+  "caption": "الأعمدة: 2 · أسماء القيم من الكتالوج والصور نموذجية للتوضيح. يتبع قواعد تخطيط المتجر نفسها، والمتجر المنشور هو المرجع.",
+  "notice": [],
+  "items": [
+   {
+    "name": "ميلاد",
+    "content": "image",
+    "src": "data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20vie",
+    "naturalW": 150,
+    "tileNote": null
+   },
+   {
+    "name": "زفاف",
+    "content": "image",
+    "src": "data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20vie",
+    "naturalW": 150,
+    "tileNote": null
+   },
+   {
+    "name": "عيد",
+    "content": "icon",
+    "src": null,
+    "naturalW": null,
+    "tileNote": null
+   },
+   {
+    "name": "تخرّج",
+    "content": "image",
+    "src": "data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20vie",
+    "naturalW": 150,
+    "tileNote": null
+   },
+   {
+    "name": "شكر",
+    "content": "icon",
+    "src": null,
+    "naturalW": null,
+    "tileNote": null
+   }
+  ]
+ },
+ "net-ar-390": {
+  "api": [
+   "GET /me 200",
+   "GET /commerce/workspace/storefronts 200",
+   "GET /commerce/workspace/storefronts 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions/a2fd7b15-1871-4b26-a63d-f026a71ac074 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/categories 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/products 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /me 200",
+   "GET /commerce/workspace/storefronts 200",
+   "GET /commerce/workspace/storefronts 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions/a2fd7b15-1871-4b26-a63d-f026a71ac074 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/categories 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/products 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200"
+  ],
+  "images": [],
+  "dataImages": 0
+ },
+ "en-1440-recipient": {
+  "caption": "Columns: 2 · Value names from your catalog; pictures are samples for illustration. Follows the store's layout rules; the published store is the reference.",
+  "notice": [],
+  "items": [
+   {
+    "name": "Mom",
+    "content": "image",
+    "src": "data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20vie",
+    "naturalW": 150,
+    "tileNote": null
+   },
+   {
+    "name": "Dad",
+    "content": "image",
+    "src": "data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20vie",
+    "naturalW": 150,
+    "tileNote": null
+   },
+   {
+    "name": "Friend",
+    "content": "icon",
+    "src": null,
+    "naturalW": null,
+    "tileNote": null
+   },
+   {
+    "name": "Boss",
+    "content": "image",
+    "src": "data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20vie",
+    "naturalW": 150,
+    "tileNote": null
+   },
+   {
+    "name": "Kid",
+    "content": "icon",
+    "src": null,
+    "naturalW": null,
+    "tileNote": null
+   }
+  ]
+ },
+ "en-1440-occasion": {
+  "caption": "Columns: 2 · Value names from your catalog; pictures are samples for illustration. Follows the store's layout rules; the published store is the reference.",
+  "notice": [],
+  "items": [
+   {
+    "name": "Birthday",
+    "content": "image",
+    "src": "data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20vie",
+    "naturalW": 150,
+    "tileNote": null
+   },
+   {
+    "name": "Wedding",
+    "content": "image",
+    "src": "data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20vie",
+    "naturalW": 150,
+    "tileNote": null
+   },
+   {
+    "name": "Eid",
+    "content": "icon",
+    "src": null,
+    "naturalW": null,
+    "tileNote": null
+   },
+   {
+    "name": "Graduation",
+    "content": "image",
+    "src": "data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20vie",
+    "naturalW": 150,
+    "tileNote": null
+   },
+   {
+    "name": "Thanks",
+    "content": "icon",
+    "src": null,
+    "naturalW": null,
+    "tileNote": null
+   }
+  ]
+ },
+ "net-en-1440": {
+  "api": [
+   "GET /me 200",
+   "GET /commerce/workspace/storefronts 200",
+   "GET /commerce/workspace/storefronts 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions/a2fd7b15-1871-4b26-a63d-f026a71ac074 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/categories 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/products 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200"
+  ],
+  "images": [],
+  "dataImages": 0
+ },
+ "en-390-recipient": {
+  "caption": "Columns: 2 · Value names from your catalog; pictures are samples for illustration. Follows the store's layout rules; the published store is the reference.",
+  "notice": [],
+  "items": [
+   {
+    "name": "Mom",
+    "content": "image",
+    "src": "data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20vie",
+    "naturalW": 150,
+    "tileNote": null
+   },
+   {
+    "name": "Dad",
+    "content": "image",
+    "src": "data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20vie",
+    "naturalW": 150,
+    "tileNote": null
+   },
+   {
+    "name": "Friend",
+    "content": "icon",
+    "src": null,
+    "naturalW": null,
+    "tileNote": null
+   },
+   {
+    "name": "Boss",
+    "content": "image",
+    "src": "data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20vie",
+    "naturalW": 150,
+    "tileNote": null
+   },
+   {
+    "name": "Kid",
+    "content": "icon",
+    "src": null,
+    "naturalW": null,
+    "tileNote": null
+   }
+  ]
+ },
+ "en-390-occasion": {
+  "caption": "Columns: 2 · Value names from your catalog; pictures are samples for illustration. Follows the store's layout rules; the published store is the reference.",
+  "notice": [],
+  "items": [
+   {
+    "name": "Birthday",
+    "content": "image",
+    "src": "data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20vie",
+    "naturalW": 150,
+    "tileNote": null
+   },
+   {
+    "name": "Wedding",
+    "content": "image",
+    "src": "data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20vie",
+    "naturalW": 150,
+    "tileNote": null
+   },
+   {
+    "name": "Eid",
+    "content": "icon",
+    "src": null,
+    "naturalW": null,
+    "tileNote": null
+   },
+   {
+    "name": "Graduation",
+    "content": "image",
+    "src": "data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20vie",
+    "naturalW": 150,
+    "tileNote": null
+   },
+   {
+    "name": "Thanks",
+    "content": "icon",
+    "src": null,
+    "naturalW": null,
+    "tileNote": null
+   }
+  ]
+ },
+ "net-en-390": {
+  "api": [
+   "GET /me 200",
+   "GET /commerce/workspace/storefronts 200",
+   "GET /commerce/workspace/storefronts 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions/a2fd7b15-1871-4b26-a63d-f026a71ac074 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/categories 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/products 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /me 200",
+   "GET /commerce/workspace/storefronts 200",
+   "GET /commerce/workspace/storefronts 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions/a2fd7b15-1871-4b26-a63d-f026a71ac074 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/categories 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/products 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200"
+  ],
+  "images": [],
+  "dataImages": 0
+ }
+}

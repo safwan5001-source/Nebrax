@@ -1,0 +1,172 @@
+[
+  {
+    "role": "owner",
+    "listRows": 19,
+    "url": "/commerce/merchandising",
+    "openButton": "Edit صورة سلبية",
+    "title": "Edit value — Neg image",
+    "tab_Data": {
+      "banner": [],
+      "enabledControls": 3,
+      "disabledControls": 0,
+      "pickButtons": 0
+    },
+    "tab_Image & icon": {
+      "banner": [],
+      "enabledControls": 67,
+      "disabledControls": 0,
+      "pickButtons": 1
+    },
+    "tab_Appearance": {
+      "banner": [],
+      "enabledControls": 30,
+      "disabledControls": 0,
+      "pickButtons": 0
+    },
+    "saveDisabled": true,
+    "requests": [
+      "GET /me 200",
+      "GET /applications/nav-state 200",
+      "GET /commerce/workspace/facets 200",
+      "GET /commerce/workspace/storefronts 200",
+      "GET /commerce/workspace/storefront-media/:id/variants/thumb-160.webp 200",
+      "GET /commerce/workspace/storefront-media 200",
+      "GET /commerce/workspace/storefront-media/:id/variants/thumb-320.webp 200",
+      "GET /commerce/workspace/storefront-media/:id undefined",
+      "GET /commerce/workspace/storefront-media/:id 200"
+    ],
+    "writes": []
+  },
+  {
+    "role": "admin",
+    "listRows": 19,
+    "url": "/commerce/merchandising",
+    "openButton": "Edit صورة سلبية",
+    "title": "Edit value — Neg image",
+    "tab_Data": {
+      "banner": [],
+      "enabledControls": 3,
+      "disabledControls": 0,
+      "pickButtons": 0
+    },
+    "tab_Image & icon": {
+      "banner": [],
+      "enabledControls": 67,
+      "disabledControls": 0,
+      "pickButtons": 1
+    },
+    "tab_Appearance": {
+      "banner": [],
+      "enabledControls": 30,
+      "disabledControls": 0,
+      "pickButtons": 0
+    },
+    "saveDisabled": true,
+    "requests": [
+      "GET /me 200",
+      "GET /applications/nav-state 200",
+      "GET /commerce/workspace/facets 200",
+      "GET /commerce/workspace/storefronts 200",
+      "GET /commerce/workspace/storefront-media/:id/variants/thumb-160.webp 200",
+      "GET /commerce/workspace/storefront-media 200",
+      "GET /commerce/workspace/storefront-media/:id/variants/thumb-320.webp 200",
+      "GET /commerce/workspace/storefront-media/:id undefined",
+      "GET /commerce/workspace/storefront-media/:id 200"
+    ],
+    "writes": []
+  },
+  {
+    "role": "accountant",
+    "listRows": 19,
+    "url": "/commerce/merchandising",
+    "openButton": "Edit صورة سلبية",
+    "title": "Edit value — Neg image",
+    "tab_Data": {
+      "banner": [],
+      "enabledControls": 3,
+      "disabledControls": 0,
+      "pickButtons": 0
+    },
+    "tab_Image & icon": {
+      "banner": [
+        "Editing the image, icon and appearance requires the e-commerce management permis"
+      ],
+      "enabledControls": 0,
+      "disabledControls": 63,
+      "pickButtons": 0
+    },
+    "tab_Appearance": {
+      "banner": [
+        "Editing the image, icon and appearance requires the e-commerce management permis"
+      ],
+      "enabledControls": 0,
+      "disabledControls": 28,
+      "pickButtons": 0
+    },
+    "saveDisabled": true,
+    "requests": [
+      "GET /me 200",
+      "GET /applications/nav-state 200",
+      "GET /commerce/workspace/facets 200",
+      "GET /commerce/workspace/storefronts 200",
+      "GET /commerce/workspace/storefront-media/:id/variants/thumb-160.webp 200",
+      "GET /commerce/workspace/storefront-media/:id/variants/thumb-320.webp 200"
+    ],
+    "writes": []
+  },
+  {
+    "role": "viewer",
+    "listRows": 19,
+    "url": "/commerce/merchandising",
+    "openButton": "View صورة سلبية",
+    "title": "View value — Neg image",
+    "tab_Data": {
+      "banner": [
+        "You do not have permission to edit merchandising — view only."
+      ],
+      "enabledControls": 0,
+      "disabledControls": 3,
+      "pickButtons": 0
+    },
+    "tab_Image & icon": {
+      "banner": [
+        "You do not have permission to edit merchandising — view only."
+      ],
+      "enabledControls": 0,
+      "disabledControls": 63,
+      "pickButtons": 0
+    },
+    "tab_Appearance": {
+      "banner": [
+        "You do not have permission to edit merchandising — view only."
+      ],
+      "enabledControls": 0,
+      "disabledControls": 28,
+      "pickButtons": 0
+    },
+    "saveDisabled": true,
+    "requests": [
+      "GET /me 200",
+      "GET /applications/nav-state 200",
+      "GET /commerce/workspace/facets 200",
+      "GET /commerce/workspace/storefronts 200",
+      "GET /commerce/workspace/storefront-media/:id/variants/thumb-160.webp 200",
+      "GET /commerce/workspace/storefront-media/:id/variants/thumb-320.webp 200"
+    ],
+    "writes": []
+  },
+  {
+    "role": "self_service",
+    "listRows": 0,
+    "mainText": "Hello, — You haven't checked in today yet Check in Overview Attendance Payroll Job details Employee no. — Hire date — Mobile — Personal email — Salary (active contract) No active contract",
+    "url": "/me",
+    "requests": [
+      "GET /me 200",
+      "GET /me/profile 403",
+      "GET /me/contract 403",
+      "GET /me/attendances 403",
+      "GET /me/payroll-items 403"
+    ],
+    "writes": []
+  }
+]

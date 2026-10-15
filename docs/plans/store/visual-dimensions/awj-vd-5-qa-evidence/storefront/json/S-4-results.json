@@ -1,0 +1,316 @@
+{
+  "results": [
+    {
+      "id": "S-4.0",
+      "check": "baseline meta lists the 5 S1 values (all but... s2 is published on S1 too at this point)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.0",
+      "check": "baseline: 6 tiles, all images loaded",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.H1",
+      "check": "meta: value with no products has no entry/visual (count>0 rule)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.H1",
+      "check": "tile hidden",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.H1",
+      "check": "noprod origin 404",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.H1",
+      "check": "noprod proxy 404",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.H2",
+      "check": "deactivated value hidden",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.H2",
+      "check": "inactive origin 404",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.H2",
+      "check": "inactive proxy 404",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.H3",
+      "check": "value of an unpublished product hidden",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.H3",
+      "check": "unpub origin 404",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.H3",
+      "check": "unpub proxy 404",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.H4",
+      "check": "S2-only value hidden on S1",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.H4",
+      "check": "s2 origin 404",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.H4",
+      "check": "s2 proxy 404",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.H4-S2",
+      "check": "s2 origin 200",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.H4-S2",
+      "check": "s2 proxy 200",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.H4",
+      "check": "S2 meta shows the value with its visual",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.H4",
+      "check": "S2 meta must not show S1-only values (ok/toggle are S1 only)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.H",
+      "check": "remaining tiles = ok + toggle",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.F1",
+      "check": "F1 network abort: tile falls back to the icon (image -> icon), shape (circle radius) kept, label visible, no <img> left",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.F1",
+      "check": "sibling tile unaffected (image loaded)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.F1",
+      "check": "no broken image left in DOM",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.F2",
+      "check": "F2 origin-style 404: tile falls back to the icon (image -> icon), shape (circle radius) kept, label visible, no <img> left",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.F2",
+      "check": "sibling tile unaffected (image loaded)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.F2",
+      "check": "no broken image left in DOM",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.F3",
+      "check": "F3 502 (throttle / origin down): tile falls back to the icon (image -> icon), shape (circle radius) kept, label visible, no <img> left",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.F3",
+      "check": "sibling tile unaffected (image loaded)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.F3",
+      "check": "no broken image left in DOM",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.F4",
+      "check": "F4 200 with undecodable bytes: tile falls back to the icon (image -> icon), shape (circle radius) kept, label visible, no <img> left",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.F4",
+      "check": "sibling tile unaffected (image loaded)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.F4",
+      "check": "no broken image left in DOM",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.F5",
+      "check": "slow image: frame has its size before the bytes arrive (no layout shift from the section)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.H5",
+      "check": "meta: inactive dimension is gone",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.H5",
+      "check": "section renders nothing (no heading either)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.H5",
+      "check": "ok origin 404",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.H5",
+      "check": "ok proxy 404",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.H5",
+      "check": "toggle origin 404",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.H5",
+      "check": "toggle proxy 404",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.R",
+      "check": "meta lists all 6 values again with visuals",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.R",
+      "check": "re-shown values keep their image URLs (same visualId/mediaId, content-derived)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.R",
+      "check": "all 6 tiles back, images loaded",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.R",
+      "check": "ok origin 200",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.R",
+      "check": "ok proxy 200",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.R",
+      "check": "inactive origin 200",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.R",
+      "check": "inactive proxy 200",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.T",
+      "check": "toggle: hidden after the product is unpublished",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S-4.T",
+      "check": "toggle: shown again after re-publish",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "paths": {
+    "ok": "/store/v1/media/facet-visuals/a2fd2e50-73ff-4bd4-a9af-e022ac2877da/2ae88a53-5881-45ac-bbfe-9942e11ff01f/thumb-160.webp",
+    "noprod": "/store/v1/media/facet-visuals/a2fd2e51-6bf4-4a60-9a7a-fcc9da49a543/7d242816-0417-4b36-b96c-603526f774d1/thumb-160.webp",
+    "inactive": "/store/v1/media/facet-visuals/a2fd2e51-b2ce-48bd-9838-44bf07077d5f/440b9b1f-b53a-43b9-93a7-1049f29be6de/thumb-160.webp",
+    "unpub": "/store/v1/media/facet-visuals/a2fd2e52-0556-40eb-b842-51355a69a771/e98465cf-4a85-4980-9257-bef25c20f07a/thumb-160.webp",
+    "toggle": "/store/v1/media/facet-visuals/a2fd2e54-0bb9-46e0-8933-d720c3692787/06723dc4-35c6-47c6-9f2f-6b9e5b534fb8/thumb-160.webp",
+    "s2": "/store/v1/media/facet-visuals/a2fd2e53-2c0a-4634-a558-fae376cb3e4e/b5cd2185-fd76-4f19-abcb-fcd6144f89fc/thumb-160.webp"
+  },
+  "media": {
+    "ok": "2ae88a53-5881-45ac-bbfe-9942e11ff01f",
+    "noprod": "7d242816-0417-4b36-b96c-603526f774d1",
+    "inactive": "440b9b1f-b53a-43b9-93a7-1049f29be6de",
+    "unpub": "e98465cf-4a85-4980-9257-bef25c20f07a",
+    "s2": "b5cd2185-fd76-4f19-abcb-fcd6144f89fc",
+    "toggle": "06723dc4-35c6-47c6-9f2f-6b9e5b534fb8"
+  },
+  "values": {
+    "ok": "a2fd2e4f-d474-4a76-b3a4-83a0f5e2a501",
+    "noprod": "a2fd2e50-e89f-4c03-828f-f2c3f177ab08",
+    "inactive": "a2fd2e51-8f4a-4968-82b7-54cc4d0c63bb",
+    "unpub": "a2fd2e51-dabb-418f-be1c-61f702c6746d",
+    "s2": "a2fd2e52-491d-46cf-af39-7b2463c7a4bb",
+    "toggle": "a2fd2e53-d931-4c6c-acf9-151d9b2313ae"
+  }
+}

@@ -1,0 +1,594 @@
+{
+ "ar-1440-recipient": {
+  "caption": "قيم الكتالوج وصورها كما حُفظت",
+  "notice": [
+   "قيم الكتالوج وصورها كما حُفظت",
+   "بلا صورة ولا أيقونة، فتظهر بحرفها الأول: طفل\n\nلا منتجات مسندة لها، فلا يعرضها المتجر: صديقة\n\nقيم معطّلة لا تظهر هنا ولا في المتجر (1)\n\nيعرض المتجر المنشور القيمة فقط إن كان لها منتج منشور في هذا المتجر. الأعداد هنا تشمل المنتجات غير المنشورة."
+  ],
+  "items": [
+   {
+    "name": "أمي",
+    "content": "image",
+    "src": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/91702ee9-0a3b-412f",
+    "naturalW": 80,
+    "tileNote": null
+   },
+   {
+    "name": "أبي",
+    "content": "image",
+    "src": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/f71d3f1c-6a47-4eaf",
+    "naturalW": 80,
+    "tileNote": null
+   },
+   {
+    "name": "صديقة",
+    "content": "image",
+    "src": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/904210e0-cd68-4853",
+    "naturalW": 80,
+    "tileNote": null
+   },
+   {
+    "name": "المدير",
+    "content": "image",
+    "src": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/e6979d20-30d7-480e",
+    "naturalW": 80,
+    "tileNote": null
+   },
+   {
+    "name": "ط طفل",
+    "content": "initial",
+    "src": null,
+    "naturalW": null,
+    "tileNote": null
+   }
+  ]
+ },
+ "ar-1440-occasion": {
+  "caption": "قيم الكتالوج وصورها كما حُفظت",
+  "notice": [
+   "قيم الكتالوج وصورها كما حُفظت",
+   "بلا صورة ولا أيقونة، فتظهر بحرفها الأول: شكر\n\nلا منتجات مسندة لها، فلا يعرضها المتجر: عيد\n\nيعرض المتجر المنشور القيمة فقط إن كان لها منتج منشور في هذا المتجر. الأعداد هنا تشمل المنتجات غير المنشورة."
+  ],
+  "items": [
+   {
+    "name": "ميلاد",
+    "content": "image",
+    "src": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/f15045ea-8b09-4525",
+    "naturalW": 80,
+    "tileNote": null
+   },
+   {
+    "name": "زفاف",
+    "content": "image",
+    "src": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/9cd69f6e-fca0-441a",
+    "naturalW": 80,
+    "tileNote": null
+   },
+   {
+    "name": "عيد",
+    "content": "image",
+    "src": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/0538add3-4172-41ab",
+    "naturalW": 80,
+    "tileNote": null
+   },
+   {
+    "name": "تخرّج",
+    "content": "icon",
+    "src": null,
+    "naturalW": null,
+    "tileNote": null
+   },
+   {
+    "name": "ش شكر",
+    "content": "initial",
+    "src": null,
+    "naturalW": null,
+    "tileNote": null
+   }
+  ]
+ },
+ "net-ar-1440": {
+  "api": [
+   "GET /me 200",
+   "GET /commerce/workspace/storefronts 200",
+   "GET /commerce/workspace/storefronts 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions/a2fd7b15-1871-4b26-a63d-f026a71ac074 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/categories 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/products 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/storefront-media/91702ee9-0a3b-412f-8502-6ac8343834fe/variants/thumb-160.webp 200",
+   "GET /commerce/workspace/storefront-media/f71d3f1c-6a47-4eaf-9c7d-79a6ac2983ef/variants/thumb-160.webp 200",
+   "GET /commerce/workspace/storefront-media/904210e0-cd68-4853-9320-ef5cc409e224/variants/thumb-160.webp 200",
+   "GET /commerce/workspace/storefront-media/e6979d20-30d7-480e-912b-503caf00943e/variants/thumb-160.webp 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/storefront-media/f15045ea-8b09-4525-8e72-78c6957a9be3/variants/thumb-160.webp 200",
+   "GET /commerce/workspace/storefront-media/9cd69f6e-fca0-441a-82c9-41ac59cf35d9/variants/thumb-160.webp 200",
+   "GET /commerce/workspace/storefront-media/0538add3-4172-41ab-839c-de8b01c2f51e/variants/thumb-160.webp 200"
+  ],
+  "images": [
+   {
+    "url": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/91702ee9-0a3b-412f-8502-6ac8343834fe/variants/thumb-160.webp?expires=179209879",
+    "type": "image"
+   },
+   {
+    "url": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/f71d3f1c-6a47-4eaf-9c7d-79a6ac2983ef/variants/thumb-160.webp?expires=179209879",
+    "type": "image"
+   },
+   {
+    "url": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/904210e0-cd68-4853-9320-ef5cc409e224/variants/thumb-160.webp?expires=179209879",
+    "type": "image"
+   },
+   {
+    "url": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/e6979d20-30d7-480e-912b-503caf00943e/variants/thumb-160.webp?expires=179209879",
+    "type": "image"
+   },
+   {
+    "url": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/f15045ea-8b09-4525-8e72-78c6957a9be3/variants/thumb-160.webp?expires=179209879",
+    "type": "image"
+   },
+   {
+    "url": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/9cd69f6e-fca0-441a-82c9-41ac59cf35d9/variants/thumb-160.webp?expires=179209879",
+    "type": "image"
+   },
+   {
+    "url": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/0538add3-4172-41ab-839c-de8b01c2f51e/variants/thumb-160.webp?expires=179209879",
+    "type": "image"
+   }
+  ],
+  "dataImages": 0
+ },
+ "ar-390-recipient": {
+  "caption": "قيم الكتالوج وصورها كما حُفظت",
+  "notice": [
+   "قيم الكتالوج وصورها كما حُفظت",
+   "بلا صورة ولا أيقونة، فتظهر بحرفها الأول: طفل\n\nلا منتجات مسندة لها، فلا يعرضها المتجر: صديقة\n\nقيم معطّلة لا تظهر هنا ولا في المتجر (1)\n\nيعرض المتجر المنشور القيمة فقط إن كان لها منتج منشور في هذا المتجر. الأعداد هنا تشمل المنتجات غير المنشورة."
+  ],
+  "items": [
+   {
+    "name": "أمي",
+    "content": "image",
+    "src": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/91702ee9-0a3b-412f",
+    "naturalW": 80,
+    "tileNote": null
+   },
+   {
+    "name": "أبي",
+    "content": "image",
+    "src": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/f71d3f1c-6a47-4eaf",
+    "naturalW": 80,
+    "tileNote": null
+   },
+   {
+    "name": "صديقة",
+    "content": "image",
+    "src": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/904210e0-cd68-4853",
+    "naturalW": 80,
+    "tileNote": null
+   },
+   {
+    "name": "المدير",
+    "content": "image",
+    "src": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/e6979d20-30d7-480e",
+    "naturalW": 80,
+    "tileNote": null
+   },
+   {
+    "name": "ط طفل",
+    "content": "initial",
+    "src": null,
+    "naturalW": null,
+    "tileNote": null
+   }
+  ]
+ },
+ "ar-390-occasion": {
+  "caption": "قيم الكتالوج وصورها كما حُفظت",
+  "notice": [
+   "قيم الكتالوج وصورها كما حُفظت",
+   "بلا صورة ولا أيقونة، فتظهر بحرفها الأول: شكر\n\nلا منتجات مسندة لها، فلا يعرضها المتجر: عيد\n\nيعرض المتجر المنشور القيمة فقط إن كان لها منتج منشور في هذا المتجر. الأعداد هنا تشمل المنتجات غير المنشورة."
+  ],
+  "items": [
+   {
+    "name": "ميلاد",
+    "content": "image",
+    "src": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/f15045ea-8b09-4525",
+    "naturalW": 80,
+    "tileNote": null
+   },
+   {
+    "name": "زفاف",
+    "content": "image",
+    "src": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/9cd69f6e-fca0-441a",
+    "naturalW": 80,
+    "tileNote": null
+   },
+   {
+    "name": "عيد",
+    "content": "image",
+    "src": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/0538add3-4172-41ab",
+    "naturalW": 80,
+    "tileNote": null
+   },
+   {
+    "name": "تخرّج",
+    "content": "icon",
+    "src": null,
+    "naturalW": null,
+    "tileNote": null
+   },
+   {
+    "name": "ش شكر",
+    "content": "initial",
+    "src": null,
+    "naturalW": null,
+    "tileNote": null
+   }
+  ]
+ },
+ "net-ar-390": {
+  "api": [
+   "GET /me 200",
+   "GET /commerce/workspace/storefronts 200",
+   "GET /commerce/workspace/storefronts 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions/a2fd7b15-1871-4b26-a63d-f026a71ac074 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/categories 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/products 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/storefront-media/91702ee9-0a3b-412f-8502-6ac8343834fe/variants/thumb-160.webp 200",
+   "GET /commerce/workspace/storefront-media/f71d3f1c-6a47-4eaf-9c7d-79a6ac2983ef/variants/thumb-160.webp 200",
+   "GET /commerce/workspace/storefront-media/904210e0-cd68-4853-9320-ef5cc409e224/variants/thumb-160.webp 200",
+   "GET /commerce/workspace/storefront-media/e6979d20-30d7-480e-912b-503caf00943e/variants/thumb-160.webp 200",
+   "GET /me 200",
+   "GET /commerce/workspace/storefronts 200",
+   "GET /commerce/workspace/storefronts 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions/a2fd7b15-1871-4b26-a63d-f026a71ac074 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/categories 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/products 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/storefront-media/f15045ea-8b09-4525-8e72-78c6957a9be3/variants/thumb-160.webp 200",
+   "GET /commerce/workspace/storefront-media/9cd69f6e-fca0-441a-82c9-41ac59cf35d9/variants/thumb-160.webp 200",
+   "GET /commerce/workspace/storefront-media/0538add3-4172-41ab-839c-de8b01c2f51e/variants/thumb-160.webp 200"
+  ],
+  "images": [
+   {
+    "url": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/91702ee9-0a3b-412f-8502-6ac8343834fe/variants/thumb-160.webp?expires=179209880",
+    "type": "image"
+   },
+   {
+    "url": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/f71d3f1c-6a47-4eaf-9c7d-79a6ac2983ef/variants/thumb-160.webp?expires=179209880",
+    "type": "image"
+   },
+   {
+    "url": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/904210e0-cd68-4853-9320-ef5cc409e224/variants/thumb-160.webp?expires=179209880",
+    "type": "image"
+   },
+   {
+    "url": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/e6979d20-30d7-480e-912b-503caf00943e/variants/thumb-160.webp?expires=179209880",
+    "type": "image"
+   },
+   {
+    "url": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/f15045ea-8b09-4525-8e72-78c6957a9be3/variants/thumb-160.webp?expires=179209881",
+    "type": "image"
+   },
+   {
+    "url": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/9cd69f6e-fca0-441a-82c9-41ac59cf35d9/variants/thumb-160.webp?expires=179209881",
+    "type": "image"
+   },
+   {
+    "url": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/0538add3-4172-41ab-839c-de8b01c2f51e/variants/thumb-160.webp?expires=179209881",
+    "type": "image"
+   }
+  ],
+  "dataImages": 0
+ },
+ "en-1440-recipient": {
+  "caption": "Your catalog's values and pictures, as saved",
+  "notice": [
+   "Your catalog's values and pictures, as saved",
+   "No picture and no icon; drawn as its first letter: Kid\n\nNo products assigned, so the store does not list it: Friend\n\nInactive values are not shown here or in the store (1)\n\nThe published store lists a value only if a published product of this store carries it. Counts here include unpublished products."
+  ],
+  "items": [
+   {
+    "name": "Mom",
+    "content": "image",
+    "src": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/91702ee9-0a3b-412f",
+    "naturalW": 80,
+    "tileNote": null
+   },
+   {
+    "name": "Dad",
+    "content": "image",
+    "src": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/f71d3f1c-6a47-4eaf",
+    "naturalW": 80,
+    "tileNote": null
+   },
+   {
+    "name": "Friend",
+    "content": "image",
+    "src": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/904210e0-cd68-4853",
+    "naturalW": 80,
+    "tileNote": null
+   },
+   {
+    "name": "Boss",
+    "content": "image",
+    "src": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/e6979d20-30d7-480e",
+    "naturalW": 80,
+    "tileNote": null
+   },
+   {
+    "name": "K Kid",
+    "content": "initial",
+    "src": null,
+    "naturalW": null,
+    "tileNote": null
+   }
+  ]
+ },
+ "en-1440-occasion": {
+  "caption": "Your catalog's values and pictures, as saved",
+  "notice": [
+   "Your catalog's values and pictures, as saved",
+   "No picture and no icon; drawn as its first letter: Thanks\n\nNo products assigned, so the store does not list it: Eid\n\nThe published store lists a value only if a published product of this store carries it. Counts here include unpublished products."
+  ],
+  "items": [
+   {
+    "name": "Birthday",
+    "content": "image",
+    "src": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/f15045ea-8b09-4525",
+    "naturalW": 80,
+    "tileNote": null
+   },
+   {
+    "name": "Wedding",
+    "content": "image",
+    "src": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/9cd69f6e-fca0-441a",
+    "naturalW": 80,
+    "tileNote": null
+   },
+   {
+    "name": "Eid",
+    "content": "image",
+    "src": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/0538add3-4172-41ab",
+    "naturalW": 80,
+    "tileNote": null
+   },
+   {
+    "name": "Graduation",
+    "content": "icon",
+    "src": null,
+    "naturalW": null,
+    "tileNote": null
+   },
+   {
+    "name": "T Thanks",
+    "content": "initial",
+    "src": null,
+    "naturalW": null,
+    "tileNote": null
+   }
+  ]
+ },
+ "net-en-1440": {
+  "api": [
+   "GET /me 200",
+   "GET /commerce/workspace/storefronts 200",
+   "GET /commerce/workspace/storefronts 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions/a2fd7b15-1871-4b26-a63d-f026a71ac074 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/categories 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/products 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/storefront-media/91702ee9-0a3b-412f-8502-6ac8343834fe/variants/thumb-160.webp 200",
+   "GET /commerce/workspace/storefront-media/f71d3f1c-6a47-4eaf-9c7d-79a6ac2983ef/variants/thumb-160.webp 200",
+   "GET /commerce/workspace/storefront-media/904210e0-cd68-4853-9320-ef5cc409e224/variants/thumb-160.webp 200",
+   "GET /commerce/workspace/storefront-media/e6979d20-30d7-480e-912b-503caf00943e/variants/thumb-160.webp 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/storefront-media/f15045ea-8b09-4525-8e72-78c6957a9be3/variants/thumb-160.webp 200",
+   "GET /commerce/workspace/storefront-media/9cd69f6e-fca0-441a-82c9-41ac59cf35d9/variants/thumb-160.webp 200",
+   "GET /commerce/workspace/storefront-media/0538add3-4172-41ab-839c-de8b01c2f51e/variants/thumb-160.webp 200"
+  ],
+  "images": [
+   {
+    "url": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/91702ee9-0a3b-412f-8502-6ac8343834fe/variants/thumb-160.webp?expires=179209882",
+    "type": "image"
+   },
+   {
+    "url": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/f71d3f1c-6a47-4eaf-9c7d-79a6ac2983ef/variants/thumb-160.webp?expires=179209882",
+    "type": "image"
+   },
+   {
+    "url": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/904210e0-cd68-4853-9320-ef5cc409e224/variants/thumb-160.webp?expires=179209882",
+    "type": "image"
+   },
+   {
+    "url": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/e6979d20-30d7-480e-912b-503caf00943e/variants/thumb-160.webp?expires=179209882",
+    "type": "image"
+   },
+   {
+    "url": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/f15045ea-8b09-4525-8e72-78c6957a9be3/variants/thumb-160.webp?expires=179209883",
+    "type": "image"
+   },
+   {
+    "url": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/9cd69f6e-fca0-441a-82c9-41ac59cf35d9/variants/thumb-160.webp?expires=179209883",
+    "type": "image"
+   },
+   {
+    "url": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/0538add3-4172-41ab-839c-de8b01c2f51e/variants/thumb-160.webp?expires=179209883",
+    "type": "image"
+   }
+  ],
+  "dataImages": 0
+ },
+ "en-390-recipient": {
+  "caption": "Your catalog's values and pictures, as saved",
+  "notice": [
+   "Your catalog's values and pictures, as saved",
+   "No picture and no icon; drawn as its first letter: Kid\n\nNo products assigned, so the store does not list it: Friend\n\nInactive values are not shown here or in the store (1)\n\nThe published store lists a value only if a published product of this store carries it. Counts here include unpublished products."
+  ],
+  "items": [
+   {
+    "name": "Mom",
+    "content": "image",
+    "src": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/91702ee9-0a3b-412f",
+    "naturalW": 80,
+    "tileNote": null
+   },
+   {
+    "name": "Dad",
+    "content": "image",
+    "src": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/f71d3f1c-6a47-4eaf",
+    "naturalW": 80,
+    "tileNote": null
+   },
+   {
+    "name": "Friend",
+    "content": "image",
+    "src": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/904210e0-cd68-4853",
+    "naturalW": 80,
+    "tileNote": null
+   },
+   {
+    "name": "Boss",
+    "content": "image",
+    "src": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/e6979d20-30d7-480e",
+    "naturalW": 80,
+    "tileNote": null
+   },
+   {
+    "name": "K Kid",
+    "content": "initial",
+    "src": null,
+    "naturalW": null,
+    "tileNote": null
+   }
+  ]
+ },
+ "en-390-occasion": {
+  "caption": "Your catalog's values and pictures, as saved",
+  "notice": [
+   "Your catalog's values and pictures, as saved",
+   "No picture and no icon; drawn as its first letter: Thanks\n\nNo products assigned, so the store does not list it: Eid\n\nThe published store lists a value only if a published product of this store carries it. Counts here include unpublished products."
+  ],
+  "items": [
+   {
+    "name": "Birthday",
+    "content": "image",
+    "src": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/f15045ea-8b09-4525",
+    "naturalW": 80,
+    "tileNote": null
+   },
+   {
+    "name": "Wedding",
+    "content": "image",
+    "src": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/9cd69f6e-fca0-441a",
+    "naturalW": 80,
+    "tileNote": null
+   },
+   {
+    "name": "Eid",
+    "content": "image",
+    "src": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/0538add3-4172-41ab",
+    "naturalW": 80,
+    "tileNote": null
+   },
+   {
+    "name": "Graduation",
+    "content": "icon",
+    "src": null,
+    "naturalW": null,
+    "tileNote": null
+   },
+   {
+    "name": "T Thanks",
+    "content": "initial",
+    "src": null,
+    "naturalW": null,
+    "tileNote": null
+   }
+  ]
+ },
+ "net-en-390": {
+  "api": [
+   "GET /me 200",
+   "GET /commerce/workspace/storefronts 200",
+   "GET /commerce/workspace/storefronts 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions/a2fd7b15-1871-4b26-a63d-f026a71ac074 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/categories 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/products 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/storefront-media/91702ee9-0a3b-412f-8502-6ac8343834fe/variants/thumb-160.webp 200",
+   "GET /commerce/workspace/storefront-media/f71d3f1c-6a47-4eaf-9c7d-79a6ac2983ef/variants/thumb-160.webp 200",
+   "GET /commerce/workspace/storefront-media/904210e0-cd68-4853-9320-ef5cc409e224/variants/thumb-160.webp 200",
+   "GET /commerce/workspace/storefront-media/e6979d20-30d7-480e-912b-503caf00943e/variants/thumb-160.webp 200",
+   "GET /me 200",
+   "GET /commerce/workspace/storefronts 200",
+   "GET /commerce/workspace/storefronts 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/presentation/versions/a2fd7b15-1871-4b26-a63d-f026a71ac074 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/categories 200",
+   "GET /commerce/workspace/storefronts/a2fd1cdb-7a87-471d-8583-7c4d5eeca332/products 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/facets 200",
+   "GET /commerce/workspace/storefront-media/f15045ea-8b09-4525-8e72-78c6957a9be3/variants/thumb-160.webp 200",
+   "GET /commerce/workspace/storefront-media/9cd69f6e-fca0-441a-82c9-41ac59cf35d9/variants/thumb-160.webp 200",
+   "GET /commerce/workspace/storefront-media/0538add3-4172-41ab-839c-de8b01c2f51e/variants/thumb-160.webp 200"
+  ],
+  "images": [
+   {
+    "url": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/91702ee9-0a3b-412f-8502-6ac8343834fe/variants/thumb-160.webp?expires=179209883",
+    "type": "image"
+   },
+   {
+    "url": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/f71d3f1c-6a47-4eaf-9c7d-79a6ac2983ef/variants/thumb-160.webp?expires=179209883",
+    "type": "image"
+   },
+   {
+    "url": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/904210e0-cd68-4853-9320-ef5cc409e224/variants/thumb-160.webp?expires=179209883",
+    "type": "image"
+   },
+   {
+    "url": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/e6979d20-30d7-480e-912b-503caf00943e/variants/thumb-160.webp?expires=179209883",
+    "type": "image"
+   },
+   {
+    "url": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/f15045ea-8b09-4525-8e72-78c6957a9be3/variants/thumb-160.webp?expires=179209885",
+    "type": "image"
+   },
+   {
+    "url": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/9cd69f6e-fca0-441a-82c9-41ac59cf35d9/variants/thumb-160.webp?expires=179209885",
+    "type": "image"
+   },
+   {
+    "url": "http://127.0.0.1:8000/api/commerce/workspace/storefront-media/0538add3-4172-41ab-839c-de8b01c2f51e/variants/thumb-160.webp?expires=179209885",
+    "type": "image"
+   }
+  ],
+  "dataImages": 0
+ }
+}

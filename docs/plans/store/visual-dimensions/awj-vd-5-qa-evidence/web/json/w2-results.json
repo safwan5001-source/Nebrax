@@ -1,0 +1,942 @@
+{
+  "list": [
+    {
+      "kind": "image",
+      "shape": "circle",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "1 / 1",
+        "radius": "50%",
+        "clip": "none",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 32,
+        "h": 32
+      },
+      "problems": []
+    },
+    {
+      "kind": "image",
+      "shape": "square",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "1 / 1",
+        "radius": "0px",
+        "clip": "none",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 32,
+        "h": 32
+      },
+      "problems": []
+    },
+    {
+      "kind": "image",
+      "shape": "rounded",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "1 / 1",
+        "radius": "18%",
+        "clip": "none",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 32,
+        "h": 32
+      },
+      "problems": []
+    },
+    {
+      "kind": "image",
+      "shape": "landscape",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "4 / 3",
+        "radius": "8%",
+        "clip": "none",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 32,
+        "h": 24
+      },
+      "problems": []
+    },
+    {
+      "kind": "image",
+      "shape": "portrait",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "3 / 4",
+        "radius": "8%",
+        "clip": "none",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 24,
+        "h": 32
+      },
+      "problems": []
+    },
+    {
+      "kind": "image",
+      "shape": "oval",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "4 / 3",
+        "radius": "50%",
+        "clip": "none",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 32,
+        "h": 24
+      },
+      "problems": []
+    },
+    {
+      "kind": "image",
+      "shape": "star",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "1 / 1",
+        "radius": "0px",
+        "clip": "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 95%, 50% 73%, 21% 95%, 32% 57%, 2% 35%, 39% 35%)",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 32,
+        "h": 32
+      },
+      "problems": []
+    },
+    {
+      "kind": "image",
+      "shape": "heart",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "1 / 1",
+        "radius": "0px",
+        "clip": "none",
+        "mask": "url(\"data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w",
+        "overflow": "hidden",
+        "w": 32,
+        "h": 32
+      },
+      "problems": []
+    },
+    {
+      "kind": "image",
+      "shape": "diamond",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "1 / 1",
+        "radius": "0px",
+        "clip": "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 32,
+        "h": 32
+      },
+      "problems": []
+    },
+    {
+      "kind": "image",
+      "shape": "hexagon",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "1 / 1",
+        "radius": "0px",
+        "clip": "polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 32,
+        "h": 32
+      },
+      "problems": []
+    },
+    {
+      "kind": "image",
+      "shape": "vase",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "3 / 4",
+        "radius": "0px",
+        "clip": "none",
+        "mask": "url(\"data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w",
+        "overflow": "hidden",
+        "w": 24,
+        "h": 32
+      },
+      "problems": []
+    },
+    {
+      "kind": "image",
+      "shape": "arch",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "3 / 4",
+        "radius": "0px",
+        "clip": "none",
+        "mask": "url(\"data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w",
+        "overflow": "hidden",
+        "w": 24,
+        "h": 32
+      },
+      "problems": []
+    },
+    {
+      "kind": "icon",
+      "shape": "circle",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "1 / 1",
+        "radius": "50%",
+        "clip": "none",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 32,
+        "h": 32
+      },
+      "problems": []
+    },
+    {
+      "kind": "icon",
+      "shape": "square",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "1 / 1",
+        "radius": "0px",
+        "clip": "none",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 32,
+        "h": 32
+      },
+      "problems": []
+    },
+    {
+      "kind": "icon",
+      "shape": "rounded",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "1 / 1",
+        "radius": "18%",
+        "clip": "none",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 32,
+        "h": 32
+      },
+      "problems": []
+    },
+    {
+      "kind": "icon",
+      "shape": "landscape",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "4 / 3",
+        "radius": "8%",
+        "clip": "none",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 32,
+        "h": 24
+      },
+      "problems": []
+    },
+    {
+      "kind": "icon",
+      "shape": "portrait",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "3 / 4",
+        "radius": "8%",
+        "clip": "none",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 24,
+        "h": 32
+      },
+      "problems": []
+    },
+    {
+      "kind": "icon",
+      "shape": "oval",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "4 / 3",
+        "radius": "50%",
+        "clip": "none",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 32,
+        "h": 24
+      },
+      "problems": []
+    },
+    {
+      "kind": "icon",
+      "shape": "star",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "1 / 1",
+        "radius": "0px",
+        "clip": "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 95%, 50% 73%, 21% 95%, 32% 57%, 2% 35%, 39% 35%)",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 32,
+        "h": 32
+      },
+      "problems": []
+    },
+    {
+      "kind": "icon",
+      "shape": "heart",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "1 / 1",
+        "radius": "0px",
+        "clip": "none",
+        "mask": "url(\"data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w",
+        "overflow": "hidden",
+        "w": 32,
+        "h": 32
+      },
+      "problems": []
+    },
+    {
+      "kind": "icon",
+      "shape": "diamond",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "1 / 1",
+        "radius": "0px",
+        "clip": "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 32,
+        "h": 32
+      },
+      "problems": []
+    },
+    {
+      "kind": "icon",
+      "shape": "hexagon",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "1 / 1",
+        "radius": "0px",
+        "clip": "polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 32,
+        "h": 32
+      },
+      "problems": []
+    },
+    {
+      "kind": "icon",
+      "shape": "vase",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "3 / 4",
+        "radius": "0px",
+        "clip": "none",
+        "mask": "url(\"data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w",
+        "overflow": "hidden",
+        "w": 24,
+        "h": 32
+      },
+      "problems": []
+    },
+    {
+      "kind": "icon",
+      "shape": "arch",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "3 / 4",
+        "radius": "0px",
+        "clip": "none",
+        "mask": "url(\"data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w",
+        "overflow": "hidden",
+        "w": 24,
+        "h": 32
+      },
+      "problems": []
+    },
+    {
+      "kind": "text",
+      "shape": "circle",
+      "drawn": false,
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "text",
+      "shape": "square",
+      "drawn": false,
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "text",
+      "shape": "rounded",
+      "drawn": false,
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "text",
+      "shape": "landscape",
+      "drawn": false,
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "text",
+      "shape": "portrait",
+      "drawn": false,
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "text",
+      "shape": "oval",
+      "drawn": false,
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "text",
+      "shape": "star",
+      "drawn": false,
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "text",
+      "shape": "heart",
+      "drawn": false,
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "text",
+      "shape": "diamond",
+      "drawn": false,
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "text",
+      "shape": "hexagon",
+      "drawn": false,
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "text",
+      "shape": "vase",
+      "drawn": false,
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "text",
+      "shape": "arch",
+      "drawn": false,
+      "ok": true,
+      "problems": []
+    }
+  ],
+  "editor": [
+    {
+      "kind": "image",
+      "shape": "circle",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "1 / 1",
+        "radius": "50%",
+        "clip": "none",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 64.7,
+        "h": 64.7
+      },
+      "problems": []
+    },
+    {
+      "kind": "image",
+      "shape": "square",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "1 / 1",
+        "radius": "0px",
+        "clip": "none",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 64.7,
+        "h": 64.7
+      },
+      "problems": []
+    },
+    {
+      "kind": "image",
+      "shape": "rounded",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "1 / 1",
+        "radius": "18%",
+        "clip": "none",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 64.7,
+        "h": 64.7
+      },
+      "problems": []
+    },
+    {
+      "kind": "image",
+      "shape": "landscape",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "4 / 3",
+        "radius": "8%",
+        "clip": "none",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 64.7,
+        "h": 48.5
+      },
+      "problems": []
+    },
+    {
+      "kind": "image",
+      "shape": "portrait",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "3 / 4",
+        "radius": "8%",
+        "clip": "none",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 64.7,
+        "h": 86.2
+      },
+      "problems": []
+    },
+    {
+      "kind": "image",
+      "shape": "oval",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "4 / 3",
+        "radius": "50%",
+        "clip": "none",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 64.7,
+        "h": 48.5
+      },
+      "problems": []
+    },
+    {
+      "kind": "image",
+      "shape": "star",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "1 / 1",
+        "radius": "0px",
+        "clip": "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 95%, 50% 73%, 21% 95%, 32% 57%, 2% 35%, 39% 35%)",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 64.7,
+        "h": 64.7
+      },
+      "problems": []
+    },
+    {
+      "kind": "image",
+      "shape": "heart",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "1 / 1",
+        "radius": "0px",
+        "clip": "none",
+        "mask": "url(\"data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w",
+        "overflow": "hidden",
+        "w": 64.7,
+        "h": 64.7
+      },
+      "problems": []
+    },
+    {
+      "kind": "image",
+      "shape": "diamond",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "1 / 1",
+        "radius": "0px",
+        "clip": "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 64.7,
+        "h": 64.7
+      },
+      "problems": []
+    },
+    {
+      "kind": "image",
+      "shape": "hexagon",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "1 / 1",
+        "radius": "0px",
+        "clip": "polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 64.7,
+        "h": 64.7
+      },
+      "problems": []
+    },
+    {
+      "kind": "image",
+      "shape": "vase",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "3 / 4",
+        "radius": "0px",
+        "clip": "none",
+        "mask": "url(\"data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w",
+        "overflow": "hidden",
+        "w": 64.7,
+        "h": 86.2
+      },
+      "problems": []
+    },
+    {
+      "kind": "image",
+      "shape": "arch",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "3 / 4",
+        "radius": "0px",
+        "clip": "none",
+        "mask": "url(\"data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w",
+        "overflow": "hidden",
+        "w": 64.7,
+        "h": 86.2
+      },
+      "problems": []
+    },
+    {
+      "kind": "icon",
+      "shape": "circle",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "1 / 1",
+        "radius": "50%",
+        "clip": "none",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 64.7,
+        "h": 64.7
+      },
+      "problems": []
+    },
+    {
+      "kind": "icon",
+      "shape": "square",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "1 / 1",
+        "radius": "0px",
+        "clip": "none",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 64.7,
+        "h": 64.7
+      },
+      "problems": []
+    },
+    {
+      "kind": "icon",
+      "shape": "rounded",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "1 / 1",
+        "radius": "18%",
+        "clip": "none",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 64.7,
+        "h": 64.7
+      },
+      "problems": []
+    },
+    {
+      "kind": "icon",
+      "shape": "landscape",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "4 / 3",
+        "radius": "8%",
+        "clip": "none",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 64.7,
+        "h": 48.5
+      },
+      "problems": []
+    },
+    {
+      "kind": "icon",
+      "shape": "portrait",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "3 / 4",
+        "radius": "8%",
+        "clip": "none",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 64.7,
+        "h": 86.2
+      },
+      "problems": []
+    },
+    {
+      "kind": "icon",
+      "shape": "oval",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "4 / 3",
+        "radius": "50%",
+        "clip": "none",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 64.7,
+        "h": 48.5
+      },
+      "problems": []
+    },
+    {
+      "kind": "icon",
+      "shape": "star",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "1 / 1",
+        "radius": "0px",
+        "clip": "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 95%, 50% 73%, 21% 95%, 32% 57%, 2% 35%, 39% 35%)",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 64.7,
+        "h": 64.7
+      },
+      "problems": []
+    },
+    {
+      "kind": "icon",
+      "shape": "heart",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "1 / 1",
+        "radius": "0px",
+        "clip": "none",
+        "mask": "url(\"data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w",
+        "overflow": "hidden",
+        "w": 64.7,
+        "h": 64.7
+      },
+      "problems": []
+    },
+    {
+      "kind": "icon",
+      "shape": "diamond",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "1 / 1",
+        "radius": "0px",
+        "clip": "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 64.7,
+        "h": 64.7
+      },
+      "problems": []
+    },
+    {
+      "kind": "icon",
+      "shape": "hexagon",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "1 / 1",
+        "radius": "0px",
+        "clip": "polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)",
+        "mask": "none",
+        "overflow": "hidden",
+        "w": 64.7,
+        "h": 64.7
+      },
+      "problems": []
+    },
+    {
+      "kind": "icon",
+      "shape": "vase",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "3 / 4",
+        "radius": "0px",
+        "clip": "none",
+        "mask": "url(\"data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w",
+        "overflow": "hidden",
+        "w": 64.7,
+        "h": 86.2
+      },
+      "problems": []
+    },
+    {
+      "kind": "icon",
+      "shape": "arch",
+      "drawn": true,
+      "ok": true,
+      "probe": {
+        "aspect": "3 / 4",
+        "radius": "0px",
+        "clip": "none",
+        "mask": "url(\"data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w",
+        "overflow": "hidden",
+        "w": 64.7,
+        "h": 86.2
+      },
+      "problems": []
+    },
+    {
+      "kind": "text",
+      "shape": "circle",
+      "drawn": false,
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "text",
+      "shape": "square",
+      "drawn": false,
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "text",
+      "shape": "rounded",
+      "drawn": false,
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "text",
+      "shape": "landscape",
+      "drawn": false,
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "text",
+      "shape": "portrait",
+      "drawn": false,
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "text",
+      "shape": "oval",
+      "drawn": false,
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "text",
+      "shape": "star",
+      "drawn": false,
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "text",
+      "shape": "heart",
+      "drawn": false,
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "text",
+      "shape": "diamond",
+      "drawn": false,
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "text",
+      "shape": "hexagon",
+      "drawn": false,
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "text",
+      "shape": "vase",
+      "drawn": false,
+      "ok": true,
+      "problems": []
+    },
+    {
+      "kind": "text",
+      "shape": "arch",
+      "drawn": false,
+      "ok": true,
+      "problems": []
+    }
+  ]
+}
