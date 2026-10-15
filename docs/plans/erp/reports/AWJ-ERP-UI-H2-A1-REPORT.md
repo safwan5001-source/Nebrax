@@ -60,7 +60,7 @@ The H1 gains **held** on every audited route (v3 and legacy):
 | `/pos/report` | axe `select-name` (390/320) | Unnamed select |
 | `/pos/audit` | axe `target-size` (390/320) | |
 | `/suppliers/:id/ledger`, `/suppliers/:id/statement` | no `h1` (EN dark 1440) | New supplier statement pages |
-| `/commerce/themes` | 36 elements leave the viewport at 320 px; `/commerce/published-products` 1 | Not page-level overflow, so clipped content |
+| `/commerce/themes`, `/commerce/published-products` | content leaves the viewport at 320 px (`offscreen` > 0) | Not page-level overflow, so clipped content |
 | `/documents/governance`, `/roles` | raw i18n keys rendered | |
 | `/partners/:id` | 1 unnamed button | |
 | `/fuel-stations/settings` | axe `color-contrast` (390, 320) | Outside the v3 gate |

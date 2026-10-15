@@ -3,7 +3,8 @@
 Local, isolated audit environment only. Never point any of this at production or a real tenant.
 
 ## Fixture (repeatable)
-1. Backend: `setup.sh`, then a **separate** SQLite file so the test DB is untouched:
+1. Backend: `setup.sh`, then `php artisan config:clear` (the env overrides below have no effect on a cached config), then a
+   **separate** SQLite file so the test DB is untouched:
    `touch database/h2-audit.sqlite && APP_ENV=local DB_CONNECTION=sqlite DB_DATABASE=$PWD/database/h2-audit.sqlite php artisan migrate` (no `--force`: a non-local env must stop at Laravel's prompt)
    and `PHP_CLI_SERVER_WORKERS=6 APP_ENV=local DB_CONNECTION=sqlite DB_DATABASE=$PWD/database/h2-audit.sqlite QUEUE_CONNECTION=sync php artisan serve --host=127.0.0.1 --port=8000`.
    Every backend command below carries the same `APP_ENV=local DB_CONNECTION=sqlite DB_DATABASE=$PWD/database/h2-audit.sqlite` prefix.
