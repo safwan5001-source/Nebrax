@@ -4,6 +4,7 @@
 The template holds placeholders instead of record ids, because every fresh audit database gets new UUIDs:
   {C1} {S1} {P2} {B1} {I1} {PAY}   ids printed by `h1-0-evidence/tools/seed.sh` (customer, supplier, product, purchase, invoice, payment)
   {MAIN_BRANCH} {MAIN_WAREHOUSE}    main branch / main warehouse of tenant A (`GET /api/branches`, `GET /api/warehouses`)
+  {JE1}                            journal entry of the posted invoice I1 (`GET /api/journal-entries`, source = I1)
 Usage: python3 make_routes.py routes.template.json routes.json KEY=uuid ... (or @file with KEY=uuid tokens, e.g. seed.sh output)
 Fails if any placeholder is left unresolved, so stale ids can never be crawled silently."""
 import json, re, sys
