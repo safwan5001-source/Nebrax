@@ -1,6 +1,6 @@
 # AWJ-VD-1B — Implementation Report (Facet visual storage and admin API)
 
-STATUS: **PR — in review, not merged.** DB + API slice: merging needs the owner's explicit approval, and VD-1c does not start until the owner has reviewed VD-1b's results.
+STATUS: **MERGED** — PR #1491 merged by the owner as `5a10930fb16bb902e619e46b13930f0274a3ed85`. POST_MERGE_REVIEW: PASS — CI (sqlite + pgsql) green on main; Web CI and Storefront CI not triggered (no web/ or storefront/ changes).
 DATE: 2026-10-14
 HORIZON: AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 · slice VD-1b (H1-1)
 AUTHORITY:

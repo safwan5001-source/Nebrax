@@ -1,6 +1,6 @@
 # AWJ-VD-1C — Implementation Report (Public facet visuals and guarded image delivery)
 
-STATUS: **PR #1499 — in review, not merged.** Public API slice: merging and production deployment need the owner's explicit approval.
+STATUS: **MERGED** — PR #1499 merged by the owner as `b1b7988b907bc2f437cb2ef6d31ff34c70ece606`. POST_MERGE_REVIEW: PASS — CI (sqlite + pgsql) and Storefront CI green on main. Production deployment still needs the owner's explicit approval.
 DATE: 2026-10-14
 HORIZON: AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 · slice VD-1c (H1-1)
 AUTHORITY:
@@ -137,7 +137,7 @@ Confirmed clean: tenant scopes on every model and on the raw pivot query, guard 
 - First head `68f7412`: pgsql failed on one test, `VatAdjustmentRoutingTest::a_purchase_debit_note_credits_the_current_tax_input_role`.
   - The values are identical; only the key **order** differs. The test's `journal()` helper loads `lines` without `ORDER BY`, and `assertSame` compares order, so PostgreSQL row order made it fail.
   - VD-1c does not touch that test or accounting. The details and a proposed one-line patch are on the PR rather than widening this slice into an accounting test.
-- The final head's CI is recorded on the PR.
+- Final head `23e72f4`: **7/7 green** (php sqlite, php pgsql, CI Gate, storefront ×2, visual QA ×2), with the accounting test above passing.
 
 ## Accounting impact
 
