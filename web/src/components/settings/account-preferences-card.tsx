@@ -105,6 +105,7 @@ export function AccountPreferencesCard({ user, onSaved }: { user: AuthUser | nul
             >
               <option value="default">{t('app_theme_default')}</option>
               <option value="ink">{t('app_theme_ink')}</option>
+              <option value="core">{t('app_theme_core')}</option>
             </select>
           </label>
         </div>

@@ -2,7 +2,7 @@
 
 import { api, setToken, clearToken, getToken } from './api';
 import { isDemo } from './demo';
-import { applyAwjTheme, isAwjTheme, writeAwjThemePreference } from './awj-theme';
+import { applyAwjTheme, isAwjTheme, writeAwjThemePreference, type AwjTheme } from './awj-theme';
 import { AUTH_SESSION_CHANGED_EVENT, USER_CHANGED_EVENT } from './user-events';
 
 export { AUTH_SESSION_CHANGED_EVENT };
@@ -25,7 +25,7 @@ export interface AuthUser {
    */
   branch_ids?: string[];
   warehouse_ids?: string[];
-  preferences?: { locale: 'ar' | 'en'; theme: 'system' | 'light' | 'dark'; appTheme?: 'default' | 'ink' };
+  preferences?: { locale: 'ar' | 'en'; theme: 'system' | 'light' | 'dark'; appTheme?: AwjTheme };
 }
 
 /**
@@ -136,7 +136,7 @@ export function persistUser(user: AuthUser, options: { applyDisplayPreferences?:
   if (locale) document.cookie = `locale=${locale}; path=/; max-age=31536000; samesite=lax`;
   const theme = user.preferences?.theme;
   if (theme) localStorage.setItem('theme', theme);
-  // AWJ v3 theme (Default/Ink, Horizon 3) — same sync-on-login pattern as Light/Dark
+  // AWJ v3 theme (Default/Ink/Core, Horizon 3) — same sync-on-login pattern as Light/Dark
   // above: seeds localStorage from the server preference so the NEXT pre-paint picks
   // it up, and applies it to the current page immediately (it is a separate axis from
   // data-awj-ui, so this never enables the v3 gate — see src/lib/awj-theme.ts).

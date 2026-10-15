@@ -19,7 +19,7 @@
 | D-09 | `border.control` ≥ 3:1 للحقول؛ الحقول الهادئة للعرض فقط | **DECIDED — اكتُشف أثناء التوثيق** | حدّ الحقل اليوم 1.16:1 (والـPrototype 1.61:1): دون WCAG 1.4.11 | FOUNDATIONS §8 |
 | D-10 | عقد تركيز واحد (2px/2px) + عدم الحجب + `forced-colors` | DECIDED | ثلاثة أنماط في الكود؛ WCAG 2.2 | FOUNDATIONS §11 |
 | D-11 | الكثافة: تشريح صف + 3 درجات + طبقة ارتفاع قصير تلقائية؛ لا `comfortable` للمستخدم | DECIDED | يمنع مضاعفة الاختبار؛ يطابق الإنتاج 36 | FOUNDATIONS §14 |
-| D-12 | سمتان (Default/Ink)؛ السمة = 13 توكناً؛ Theme × Mode محوران؛ Ink-Dark = Default-Dark | APPROVED (السمتان) / DECIDED (المصفوفة) | الداكن موجود اليوم؛ تباين Ink يتلاشى فيه | THEMES |
+| D-12 | سمتان (Default/Ink) — **صار ثلاثاً بإضافة Core (D-41)**؛ السمة = 13 توكناً؛ Theme × Mode محوران؛ Ink-Dark = Default-Dark (Core-Dark مستقل) | APPROVED (السمتان) / DECIDED (المصفوفة) | الداكن موجود اليوم؛ تباين Ink يتلاشى فيه | THEMES |
 | D-13 | **Outcome Surface** دلالي (الحبر = النتيجة) بسقف صارم | DECIDED | تعميم ضيّق لمبدأ مفيد؛ ليس سمة ولا Default-fixed | SIGNATURE §2 |
 | D-14 | Apex Marker: خمسة مواضع مغلقة، داخل الحافة، بديل `forced-colors` | APPROVED (الهوية) / DECIDED (القيود) | | SIGNATURE §1 |
 | D-15 | دورة المستند ≠ الدفع؛ المسار من حالات مخزَّنة فقط؛ «صادرة» تُحذَف | APPROVED (البعدان) / **DECIDED (التصحيح)** | لا حالة `issued` في الكود | LIFECYCLE |
@@ -45,6 +45,7 @@
 | D-38 | H5: حدّ الحقول `border-control` بقاعدة واحدة على المكوّنات المشتركة والعناصر الأصلية ذات `border-border` | **DECIDED** | WCAG 1.4.11 (كان ≈1.3:1) | FOUNDATIONS §11 |
 | D-39 | H5: مفتاح الإطلاق `NEXT_PUBLIC_AWJ_UI_DEFAULT` **معطَّل**؛ البوابة والمسار القديم **يبقيان** | **DECIDED** | التراجع الفوري + ~370 صنفاً ثابتاً في الطباعة/المحرّر؛ قرار التفعيل للمالك | MIGRATION §5–6 |
 | D-40 | H5: اختبارات e2e القديمة تُصلح بـ`seedDemoSession` (لا يُعاد زر الدخول التجريبي) | **DECIDED** | الزر أُزيل عمداً؛ الحل واضح وآمن | MIGRATION §7 |
+| D-41 | **AWJ Core**: ثيم ثالث بقشرة Light `#1E40AF` / Dark `#4F8CFF` (اختيار المالك الصريح)؛ Dark مستقل — **استثناء مقصود من D-12**؛ 13 توكناً فقط؛ حلقة تركيز قشرة محصورة بـCore؛ مصفوفة 3 سمات × وضعين | **APPROVED** (الألوان) / **DECIDED** (التفاصيل) | الأبيض على `#4F8CFF` = 3.22:1 فلزم نص داكن؛ Apex لا يجتاز 4.5:1 على `#1E40AF` وعلى الأبيض معاً فلا لوح أبيض نشط؛ حلقة brand-600 تختفي على القشرة الزرقاء؛ قبول backend لـ`appTheme=core` تغيير تحقق محدود موافَق عليه | THEMES §6A |
 | D-28 | WCAG 2.2 AA هدفاً (من 2.1 AA) | DECIDED | | FOUNDATIONS §13 |
 | D-29 | لا اختصار أحادي للترحيل | DECIDED | فعل لا رجعة فيه | DOCUMENT_WORKSPACE §4 |
 | D-30 | شريط الأوامر لاصق، رأس الصفحة غير لاصق | DECIDED | يوفّر ارتفاعاً | DOCUMENT_WORKSPACE §3 |
