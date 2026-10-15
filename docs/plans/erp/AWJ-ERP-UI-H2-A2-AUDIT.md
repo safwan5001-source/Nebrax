@@ -60,7 +60,7 @@ Items 1–7 are UI-only, small and independent. They are outside D3 (no code bef
 
 ### 3a. Found by the probe re-run after review
 
-The state probe originally exempted any endpoint the shell also calls; after review it probes those endpoints on the pages that use them, including child routes ([tools/README](h2-a-evidence/tools/README.md)). Re-probing the affected routes changed no earlier verdict and added two findings:
+The state probe originally exempted any endpoint the shell also calls; after review it probes those endpoints on the pages that use them, including child routes ([tools/README](h2-a-evidence/tools/README.md)). Re-probing the affected routes added two findings below. A later full pass with overrides derived automatically for every route (103 routes, 206 loading/error runs) changed no other verdict: 14 routes were newly covered and showed their states, 4 improved, and the one worse result is `/branches` (PLT-12):
 
 | ID | P | Finding | Rule | Evidence |
 |---|---|---|---|---|
