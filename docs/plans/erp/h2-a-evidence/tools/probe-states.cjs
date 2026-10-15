@@ -27,6 +27,16 @@ for (const who of needed) {
 const routes = JSON.parse(fs.readFileSync(routesFile, 'utf8'));
 fs.mkdirSync(path.join(outDir, 'shots'), { recursive: true });
 const outFile = path.join(outDir, 'states.jsonl');
+// Resume only the SAME run: the fingerprint covers the fixture identities (user and tenant ids, not tokens), the base URL
+// and the probe options. A recreated fixture or other options must use a fresh outDir, so runs never mix.
+const ident = (u) => { try { const j = JSON.parse(u || '{}'); return `${j.id}@${j.tenant_id}`; } catch { return '?'; } };
+const fingerprint = JSON.stringify({ base: BASE, delay: DELAY_MS, shell: SHELL_ROUTES, owner: ident(ID.owner[1]), empty: ident(ID.empty[1]), staff: ident(ID.staff[1]) });
+const runFile = path.join(outDir, 'run.json');
+if (fs.existsSync(outFile)) {
+  const prev = fs.existsSync(runFile) ? fs.readFileSync(runFile, 'utf8') : null;
+  if (prev !== fingerprint) { console.error(`probe-states: ${outDir} holds another run (fixture or options differ); use a fresh outDir`); process.exit(1); }
+}
+fs.writeFileSync(runFile, fingerprint);
 const done = new Set();
 try { for (const l of fs.readFileSync(outFile, 'utf8').split('\n')) if (l.trim()) { const r = JSON.parse(l); done.add(r.state + ' ' + r.route); } } catch {}
 
