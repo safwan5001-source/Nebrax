@@ -1,6 +1,6 @@
 # BL-001 — `VatAdjustmentRoutingTest` depends on database row order
 
-STATUS: **OPEN — backlog, outside any horizon.** Not scheduled. No fix is proposed for approval yet.
+STATUS: **OPEN — root-cause analysis DELIVERED (2026-10-15), awaiting a separate owner approval before any change.** See `BL-001-ROOT-CAUSE-ANALYSIS.md`: journal-line order is NOT an accounting requirement; the flake is test-side only. No test or accounting logic has been changed. Note: `VatAdjustmentRoutingTest` was already given a test-only canonicalisation by #1505; the same unfixed pattern remains in `VatSemanticRoutingTest::journal()`.
 OPENED: 2026-10-15
 AREA: tests · accounting (test code only; no accounting logic is affected)
 SEVERITY: low (test flake on PostgreSQL; no product behaviour is wrong)
