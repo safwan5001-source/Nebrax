@@ -4,6 +4,8 @@
  * AWJ-VD-H1 / VD-4c — the discovery display controls and their live panel preview.
  */
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { DiscoveryDisplayFields } from "../DiscoveryDisplayFields";
@@ -79,6 +81,19 @@ describe("messages", () => {
     }
   });
 
+  it("carries no unused keys (every key is read by a component)", () => {
+    const sources = ["DiscoveryDisplayFields.tsx", "DiscoveryPanelPreview.tsx"]
+      .map((file) => readFileSync(resolve(__dirname, "..", file), "utf8"))
+      .join("\n");
+    const dynamic = /^dd(Template(Name|Desc)|Layout|Device|Gap|Size|TextPosition|CardStyle|ValueSort|ContentSequence|Align)_/;
+    for (const key of Object.keys(DISCOVERY_DISPLAY_MESSAGES.en)) {
+      if (dynamic.test(key)) continue;
+      expect(sources, key).toContain(key);
+    }
+    expect(Object.keys(DISCOVERY_DISPLAY_MESSAGES.en)).not.toContain("ddEffective");
+    expect(Object.keys(DISCOVERY_DISPLAY_MESSAGES.en)).not.toContain("ddPreviewFallbackLegend");
+  });
+
   it("is merged into the module catalog for both locales", () => {
     expect(CUSTOMIZER_MESSAGES.ar.ddReset).toBe(DISCOVERY_DISPLAY_MESSAGES.ar.ddReset);
     expect(CUSTOMIZER_MESSAGES.en.ddReset).toBe(DISCOVERY_DISPLAY_MESSAGES.en.ddReset);
@@ -139,9 +154,12 @@ describe("controls — inheritance semantics", () => {
 
   it("the inherited option is marked without being pressed", () => {
     render(<Harness initial={{ template: "gift-circles" }} />);
-    const grid = within(control("layout")).getByRole("button", { name: "Image grid" });
+    const grid = within(control("layout")).getByRole("button", { name: "Image grid (inherited)" });
     expect(grid.getAttribute("aria-pressed")).toBe("false");
     expect(grid.getAttribute("data-effective")).toBe("inherited");
+    // The dashed outline is visual only: the state is also spoken, in the accessible name (which keeps the label).
+    expect(grid.getAttribute("aria-label")).toBe("Image grid (inherited)");
+    expect(within(control("layout")).getByRole("button", { name: "Carousel" }).hasAttribute("aria-label")).toBe(false);
   });
 
   it("the layout list offers the five layouts plus the legacy option (no layout key)", () => {
@@ -263,6 +281,8 @@ describe("shape / size / label overrides", () => {
     expect(within(shape).getByRole("option", { name: "Don't force" })).toBeTruthy();
     expect(control("shape").textContent).toContain("Not forced");
     // What a value without a look of its own falls back to, and where that comes from.
+    // §3.6: the dimension's own default sits above the section template, so the line must not claim the template wins.
+    expect(control("shape").querySelector("[data-visual-fallback]")?.textContent).toContain("Unless the dimension sets its own default");
     expect(control("shape").querySelector("[data-visual-fallback]")?.textContent).toContain("Circle");
     expect(control("shape").querySelector("[data-visual-fallback]")?.textContent).toContain("Gift circles");
   });
@@ -297,6 +317,16 @@ describe("shape / size / label overrides", () => {
   });
 });
 
+describe("Arabic accessibility strings", () => {
+  it("speaks the inherited state and the badge meaning in Arabic", () => {
+    render(<Harness locale="ar" initial={{ template: "gift-circles", gap: "tight" }} />);
+    expect(within(control("layout")).getByRole("button", { name: "شبكة صور (موروث)" })).toBeTruthy();
+    const badge = screen.getByRole("button", { name: /^متقدّم/ }).querySelector("[title]") as HTMLElement;
+    expect(badge.querySelector(".sr-only")?.textContent).toBe("إعدادات محدّدة هنا: 1");
+    expect(DISCOVERY_DISPLAY_MESSAGES.ar.ddVisualFallback).toContain("ما لم يضبط البُعد");
+  });
+});
+
 describe("groups, reset all, counts", () => {
   it("has four collapsible groups, keyboard-operable buttons with aria-expanded", () => {
     render(<Harness />);
@@ -325,18 +355,46 @@ describe("groups, reset all, counts", () => {
     const seen: DiscoveryDisplayOptions[] = [];
     render(<Harness initial={{ template: "swipe-rail", gap: "tight" }} onOptions={(o) => seen.push(o)} />);
     open("Advanced");
-    fireEvent.click(screen.getByRole("button", { name: "Reset all display settings" }));
+    const button = screen.getByRole("button", { name: "Reset all display settings" });
+    button.focus();
+    fireEvent.click(button);
     expect(seen.at(-1)).toEqual({});
-    expect((screen.getByRole("button", { name: "Reset all display settings" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    // Not natively disabled: it keeps keyboard focus (WCAG 2.4.3) and a further press is a no-op.
+    expect(document.activeElement).toBe(button);
+    seen.length = 0;
+    fireEvent.click(button);
+    expect(seen).toEqual([]);
   });
 
-  it("every control button and select meets the 44px touch target at phone width (classes)", () => {
-    render(<Harness initial={{ template: "swipe-rail", gap: "tight" }} />);
-    open("Look");
-    for (const button of screen.getAllByRole("button")) {
-      // 44px on touch widths: either an explicit h/min-h/size-11 class, or a sm: override of a smaller one.
-      expect(button.className, button.textContent ?? "").toMatch(/(min-h-11|size-11|h-11)/);
+  it("every interactive control keeps a >=44px target at every breakpoint (no sm:/md:/lg: class shrinks it)", () => {
+    render(<Harness initial={{ template: "swipe-rail", gap: "tight", shape: "heart" }} />);
+    for (const group of ["Look", "Content", "Advanced"]) open(group);
+    const controls = [
+      ...screen.getAllByRole("button"),
+      ...screen.getAllByRole("combobox"),
+    ] as HTMLElement[];
+    expect(controls.length).toBeGreaterThan(30);
+    const size = /^(?:(?<variant>[a-z0-9-]+):)?(?<kind>size|h|min-h)-(?<n>\d+(?:\.\d+)?)$/;
+    for (const el of controls) {
+      const name = `${el.tagName} ${el.getAttribute("aria-label") ?? el.textContent ?? ""}`;
+      const classes = el.className.split(/\s+/);
+      // The unprefixed class that sets the target (11 = 44px) …
+      const base = classes.map((c) => size.exec(c)?.groups).filter((g) => g && !g.variant && g.n);
+      expect(base.some((g) => Number(g?.n) >= 11), `${name}: base target`).toBe(true);
+      // … and no responsive class (sm:, md:, lg: …) that sets a smaller height / size.
+      for (const c of classes) {
+        const g = size.exec(c)?.groups;
+        if (g?.variant) expect(Number(g.n), `${name}: ${c}`).toBeGreaterThanOrEqual(11);
+      }
     }
+  });
+
+  it("the 44px guard itself rejects a shrinking responsive class", () => {
+    const size = /^(?:(?<variant>[a-z0-9-]+):)?(?<kind>size|h|min-h)-(?<n>\d+(?:\.\d+)?)$/;
+    expect(size.exec("sm:size-9")?.groups?.n).toBe("9");
+    expect(size.exec("md:min-h-10")?.groups?.variant).toBe("md");
+    expect(size.exec("size-11")?.groups?.variant).toBeUndefined();
   });
 
   it("uses no fixed palette or raw hex in class names", () => {
@@ -344,6 +402,66 @@ describe("groups, reset all, counts", () => {
     const html = container.innerHTML;
     expect(html).not.toMatch(/\b(?:bg|text|border|ring)-(?:white|black|neutral|slate|gray|red|green|amber)\b/);
     expect(html).not.toMatch(/class="[^"]*#[0-9a-fA-F]{6}/);
+  });
+});
+
+describe("keyboard focus after a reset (WCAG 2.4.3)", () => {
+  it("a per-control reset keeps focus inside the control, never on <body>", () => {
+    render(<Harness initial={{ layout: "carousel", template: "gift-circles" }} />);
+    const reset = within(control("layout")).getByRole("button", { name: /Reset to inherited/ });
+    reset.focus();
+    expect(document.activeElement).toBe(reset);
+    fireEvent.click(reset);
+    // The reset button unmounted with the explicit value; focus moved to the control's first remaining button.
+    expect(document.activeElement).not.toBe(document.body);
+    expect(control("layout").contains(document.activeElement)).toBe(true);
+  });
+
+  it("works for the template, a select, an enum control and a group whose control is disabled", () => {
+    render(<Harness initial={{ template: "gift-circles", maxItems: 8, gap: "tight", rows: 2, shape: "heart" }} />);
+    for (const group of ["Look", "Content", "Advanced"]) open(group);
+    for (const name of ["template", "maxItems", "gap", "shape", "rows"]) {
+      const reset = within(control(name)).getByRole("button", { name: /Reset to inherited/ });
+      reset.focus();
+      fireEvent.click(reset);
+      expect(document.activeElement, name).not.toBe(document.body);
+      // Rows is disabled for a non-carousel layout: focus falls back to the group header, still inside the panel.
+      expect(document.querySelector("[data-discovery-display]")?.contains(document.activeElement), name).toBe(true);
+    }
+  });
+
+  it("'Reset all' leaves focus on the button", () => {
+    render(<Harness initial={{ template: "swipe-rail", gap: "tight" }} />);
+    open("Advanced");
+    const button = screen.getByRole("button", { name: "Reset all display settings" });
+    button.focus();
+    fireEvent.click(button);
+    expect(document.activeElement).toBe(button);
+    expect(document.activeElement).not.toBe(document.body);
+  });
+});
+
+describe("template override count", () => {
+  it("counts settings that override the template, not the template and not a stored inactive rows", () => {
+    // gift-circles is not a carousel: the stored `rows` is inactive and must not be counted.
+    render(<Harness initial={{ template: "gift-circles", rows: 2, gap: "tight" }} />);
+    expect(document.querySelector("[data-template-overridden]")?.textContent).toContain(": 1");
+    cleanup();
+    render(<Harness initial={{ template: "gift-circles", rows: 2 }} />);
+    expect(document.querySelector("[data-template-overridden]")).toBeNull();
+    cleanup();
+    render(<Harness initial={{ template: "swipe-rail", rows: 1, gap: "tight" }} />);
+    expect(document.querySelector("[data-template-overridden]")?.textContent).toContain(": 2");
+  });
+});
+
+describe("group badge", () => {
+  it("exposes its meaning as text, not a bare aria-label", () => {
+    render(<Harness initial={{ gap: "tight" }} />);
+    const badge = screen.getByRole("button", { name: /^Advanced/ }).querySelector("[title]") as HTMLElement;
+    expect(badge.hasAttribute("aria-label")).toBe(false);
+    expect(badge.querySelector(".sr-only")?.textContent).toBe("Settings set here: 1");
+    expect(badge.querySelector("[aria-hidden='true']")?.textContent).toBe("1");
   });
 });
 
@@ -364,12 +482,93 @@ describe("panel preview", () => {
     });
   }
 
-  it("a carousel renders a keyboard-reachable rail with the resolved rows", () => {
+  it("a carousel renders a rail with the resolved rows (mobile) and no focus stop inside the hidden preview", () => {
     render(<Harness initial={{ layout: "carousel", rows: 2 }} />);
     const rail = document.querySelector("[data-preview-rail]") as HTMLElement;
-    expect(rail.getAttribute("tabindex")).toBe("0");
-    expect(rail.getAttribute("aria-label")).toBe("Carousel");
+    expect(rail.hasAttribute("tabindex")).toBe(false);
     expect(rail.style.gridTemplateRows).toBe("repeat(2, auto)");
+    expect(preview().getAttribute("data-preview-rows")).toBe("2");
+  });
+
+  it("VD-4b: a second carousel row exists on mobile only", () => {
+    render(<Harness initial={{ template: "swipe-rail" }} />);
+    const device = screen.getByRole("group", { name: "Preview device" });
+    expect(preview().getAttribute("data-preview-rows")).toBe("2");
+    for (const name of ["Tablet", "Desktop"]) {
+      fireEvent.click(within(device).getByRole("button", { name }));
+      expect(preview().getAttribute("data-preview-rows")).toBe("1");
+      expect((document.querySelector("[data-preview-rail]") as HTMLElement).style.gridTemplateRows).toBe("repeat(1, auto)");
+      expect(document.querySelector("[data-preview-summary]")?.textContent).toContain("two rows on mobile only");
+    }
+    fireEvent.click(within(device).getByRole("button", { name: "Mobile" }));
+    expect(document.querySelector("[data-preview-summary]")?.textContent).not.toContain("mobile only");
+  });
+
+  it("VD-4b: the carousel ignores `columns` and sizes items from the frame (widest frame + 24px, min 88px)", () => {
+    const { unmount } = render(<Harness initial={{ layout: "carousel", columns: { mobile: 4 }, size: "lg" }} />);
+    const rail = document.querySelector("[data-preview-rail]") as HTMLElement;
+    expect(rail.style.gridAutoColumns).toBe("136px"); // lg 112 + 24
+    expect(preview().getAttribute("data-preview-columns")).toBe("");
+    expect(document.querySelector("[data-preview-summary]")?.textContent).not.toContain("Columns");
+    unmount();
+    render(<Harness initial={{ layout: "carousel", size: "sm" }} />);
+    expect((document.querySelector("[data-preview-rail]") as HTMLElement).style.gridAutoColumns).toBe("88px"); // 56 + 24 < 88
+  });
+
+  it("the columns control says columns do not apply to a carousel", () => {
+    render(<Harness initial={{ layout: "carousel" }} />);
+    expect(document.querySelector("[data-columns-carousel-note]")?.textContent).toContain("Columns do not apply to the carousel");
+    cleanup();
+    render(<Harness initial={{ layout: "image-grid" }} />);
+    expect(document.querySelector("[data-columns-carousel-note]")).toBeNull();
+  });
+
+  it("VD-4b: icon-grid shows the icon over the picture, and keeps a value with no icon as its initial", () => {
+    render(<Harness initial={{ layout: "icon-grid" }} />);
+    const kinds = Array.from(document.querySelectorAll("[data-facet-content]")).map((el) => el.getAttribute("data-facet-content"));
+    expect(kinds).not.toContain("image");
+    expect(kinds).toContain("icon");
+    expect(kinds).toContain("initial");
+  });
+
+  it("VD-4b: overlay puts the caption on the frame over the scrim, at the top with label-first; beside is a row", () => {
+    render(<Harness initial={{ layout: "image-cards", textPosition: "overlay" }} />);
+    const tile = document.querySelector("[data-preview-item] [data-facet-content]") as HTMLElement;
+    expect(tile.className).toContain("[&>span:last-child:not(.sr-only)]:absolute");
+    expect(tile.className).toContain(":bottom-1.5");
+    cleanup();
+    render(<Harness initial={{ layout: "image-cards", textPosition: "overlay", contentSequence: "label-first" }} />);
+    expect((document.querySelector("[data-preview-item] [data-facet-content]") as HTMLElement).className).toContain(":top-1.5");
+    cleanup();
+    render(<Harness initial={{ layout: "image-grid", textPosition: "beside", contentSequence: "label-first" }} />);
+    const beside = (document.querySelector("[data-preview-item] [data-facet-content]") as HTMLElement).className;
+    expect(beside).toContain("flex-row-reverse");
+    expect(beside).not.toContain("flex-col");
+  });
+
+  it("VD-4b: a count shows only beside a visible name", () => {
+    render(<Harness initial={{ layout: "image-grid", showCounts: true, showLabel: false }} />);
+    expect(within(preview()).queryByText("24")).toBeNull();
+    cleanup();
+    render(<Harness initial={{ layout: "image-grid", showCounts: true }} />);
+    expect(within(preview()).getAllByText("24").length).toBeGreaterThan(0);
+    cleanup();
+    // text-list has no label switch: its count always shows.
+    render(<Harness initial={{ layout: "text-list", showCounts: true, showLabel: false }} />);
+    expect(within(preview()).getAllByText("24").length).toBeGreaterThan(0);
+  });
+
+  it("the preview frame is hidden from assistive technology and holds nothing focusable", () => {
+    render(<Harness initial={{ layout: "carousel", rows: 2, showCounts: true }} />);
+    const frame = preview();
+    expect(frame.getAttribute("aria-hidden")).toBe("true");
+    expect(frame.querySelector("a, button, input, select, textarea, [tabindex], [role]")).toBeNull();
+    // The device switcher and the caption stay outside it, available to everyone.
+    expect(frame.contains(screen.getByRole("group", { name: "Preview device" }))).toBe(false);
+    expect(frame.contains(document.querySelector("[data-preview-summary]"))).toBe(false);
+    // No fake heading or list semantics are exposed.
+    expect(screen.queryAllByRole("heading", { level: 5 })).toHaveLength(0);
+    expect(within(document.querySelector("[data-discovery-preview]") as HTMLElement).queryAllByRole("listitem")).toHaveLength(0);
   });
 
   it("shows the columns of the chosen preview device and the resolved value for it", () => {
@@ -404,10 +603,12 @@ describe("panel preview", () => {
     expect(kinds).toContain("initial");
   });
 
-  it("text-list draws names only (no media frames)", () => {
-    render(<Harness initial={{ layout: "text-list" }} />);
-    const kinds = new Set(Array.from(document.querySelectorAll("[data-facet-content]")).map((el) => el.getAttribute("data-facet-content")));
-    expect([...kinds]).toEqual(["none"]);
+  it("VD-4b: text-list draws plain names — no tile, no media, and neither showLabel nor text position applies", () => {
+    render(<Harness initial={{ layout: "text-list", showLabel: false, textPosition: "overlay", shape: "star" }} />);
+    expect(document.querySelectorAll("[data-facet-content]")).toHaveLength(0);
+    expect(document.querySelector("[data-preview-item] img, [data-preview-item] svg")).toBeNull();
+    expect(screen.getAllByText("Birthday").length).toBeGreaterThan(0);
+    expect(document.querySelector("[data-preview-item] .sr-only")).toBeNull();
   });
 
   it("every preview value keeps an accessible name; hiding the label keeps it for screen readers", () => {
@@ -431,7 +632,7 @@ describe("panel preview", () => {
 
   it("showCounts draws a count beside each value", () => {
     render(<Harness initial={{ layout: "image-grid", showCounts: true }} />);
-    expect(screen.getAllByText("24").length).toBeGreaterThan(0);
+    expect(within(preview()).getAllByText("24").length).toBeGreaterThan(0);
   });
 
   it("the legacy look renders tiles or chips and says so", () => {
@@ -445,7 +646,7 @@ describe("panel preview", () => {
     const title = "تسوّق حسب المناسبة أو المُهدى إليه أو العلامة التجارية المفضلة لديك اليوم";
     expect(title.length).toBeGreaterThanOrEqual(40);
     render(<Harness locale="ar" base={{ ...BASE, title }} initial={{ template: "gift-circles" }} />);
-    const heading = within(preview()).getByRole("heading", { level: 5 });
+    const heading = preview().querySelector("[data-preview-title]") as HTMLElement;
     expect(heading.textContent).toBe(title);
     expect(heading.className).toContain("break-words");
     expect(preview().getAttribute("dir")).toBe("rtl");
@@ -453,7 +654,7 @@ describe("panel preview", () => {
 
   it("falls back to a default title when the section has none", () => {
     render(<Harness base={{ ...BASE, title: "  " }} locale="ar" />);
-    expect(within(preview()).getByRole("heading", { level: 5 }).textContent).toBe("تسوّق حسب");
+    expect((preview().querySelector("[data-preview-title]") as HTMLElement).textContent).toBe("تسوّق حسب");
   });
 
   it("is English LTR in English, and says whether names are real or sample", () => {

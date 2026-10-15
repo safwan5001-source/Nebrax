@@ -26,7 +26,16 @@ import {
   Shapes,
   TriangleAlert,
 } from "lucide-react";
-import { type CSSProperties, type ReactNode, useId, useState } from "react";
+import {
+  type CSSProperties,
+  type ReactNode,
+  createContext,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import { cn } from "@/lib/utils";
 import type { Facet } from "@/modules/commerce-workspace/merchandising/client";
 import { DiscoveryPanelPreview } from "./DiscoveryPanelPreview";
@@ -130,11 +139,13 @@ function Group({
           <span className="truncate">{title}</span>
           {count > 0 ? (
             <span
-              aria-label={`${t("ddGroupExplicit")}: ${count}`}
               title={`${t("ddGroupExplicit")}: ${count}`}
               className="inline-flex min-w-5 items-center justify-center bg-primary-soft px-1.5 text-[11px] font-semibold leading-5 text-primary"
             >
-              {count}
+              <span aria-hidden="true">{count}</span>
+              <span className="sr-only">
+                {t("ddGroupExplicit")}: {count}
+              </span>
             </span>
           ) : null}
         </span>
@@ -183,6 +194,15 @@ function SourceText({
   );
 }
 
+/**
+ * Keyboard focus after a reset (WCAG 2.4.3). A reset button disappears once its control is back to inherited, which
+ * would drop focus to `<body>`; the host moves focus to the control's first remaining control instead.
+ */
+const FocusAfterReset = createContext<(from: Element | null) => void>(() => undefined);
+
+const FOCUSABLE =
+  "button:not([data-dd-reset]):not(:disabled):not([aria-disabled='true']), select:not(:disabled)";
+
 function ResetButton({
   label,
   t,
@@ -194,16 +214,21 @@ function ResetButton({
   visible: boolean;
   onReset: () => void;
 }) {
+  const refocus = useContext(FocusAfterReset);
   if (!visible) return null;
   return (
     <button
       type="button"
-      onClick={onReset}
+      onClick={(event) => {
+        const container = event.currentTarget.closest("[data-dd-control]");
+        onReset();
+        refocus(container);
+      }}
       aria-label={`${label}: ${t("ddReset")}`}
       title={t("ddReset")}
       data-dd-reset=""
       className={cn(
-        "inline-flex size-11 shrink-0 items-center justify-center text-muted hover:bg-primary-soft hover:text-primary sm:size-9",
+        "inline-flex size-11 shrink-0 items-center justify-center text-muted hover:bg-primary-soft hover:text-primary",
         focusRing,
       )}
     >
@@ -263,6 +288,7 @@ function ChoiceButtons<V extends string>({
   disabled = false,
   columns = options.length,
   leading,
+  inheritedText,
 }: {
   labelledBy: string;
   options: ReadonlyArray<ChoiceOption<V>>;
@@ -273,6 +299,8 @@ function ChoiceButtons<V extends string>({
   columns?: number;
   /** An extra first button that means "no explicit value" (pressed while nothing is explicit). */
   leading?: { label: string; onSelect: () => void };
+  /** Spoken marker for the inherited (not pressed) option: the dashed outline is visual only. */
+  inheritedText: string;
 }) {
   return (
     <div
@@ -288,7 +316,7 @@ function ChoiceButtons<V extends string>({
           disabled={disabled}
           onClick={leading.onSelect}
           className={cn(
-            "min-h-11 border px-2 text-[12px] font-medium leading-4 disabled:opacity-50 sm:min-h-10",
+            "min-h-11 border px-2 text-[12px] font-medium leading-4 disabled:opacity-50",
             focusRing,
             explicit === undefined
               ? "border-primary bg-primary text-primary-foreground"
@@ -307,11 +335,13 @@ function ChoiceButtons<V extends string>({
             key={id}
             type="button"
             aria-pressed={pressed}
+            // The dashed outline is visual only: the inherited state is spoken too (the name still contains the label).
+            aria-label={inherited ? `${label} ${inheritedText}` : undefined}
             data-effective={inherited ? "inherited" : undefined}
             disabled={disabled}
             onClick={() => onSelect(id)}
             className={cn(
-              "flex min-h-11 flex-col items-center justify-center gap-1 border px-1.5 py-1 text-[12px] font-medium leading-4 disabled:opacity-50 sm:min-h-10",
+              "flex min-h-11 flex-col items-center justify-center gap-1 border px-1.5 py-1 text-[12px] font-medium leading-4 disabled:opacity-50",
               focusRing,
               pressed
                 ? "border-primary bg-primary text-primary-foreground"
@@ -330,7 +360,7 @@ function ChoiceButtons<V extends string>({
 }
 
 const selectClassName = cn(
-  "h-11 w-full border border-border bg-surface px-2 text-sm text-text disabled:opacity-50 sm:h-10",
+  "h-11 w-full border border-border bg-surface px-2 text-sm text-text disabled:opacity-50",
   focusRing,
 );
 
@@ -423,6 +453,22 @@ export function DiscoveryDisplayFields({
   storeVars?: CSSProperties;
 }) {
   const uid = useId();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [refocus, setRefocus] = useState<{ from: Element | null; n: number } | null>(null);
+  // After a reset the control's reset button is gone: put focus on the control's first remaining button/select,
+  // else on its group header, so it never falls back to <body>.
+  useEffect(() => {
+    if (!refocus) return;
+    const root = rootRef.current;
+    const from = refocus.from;
+    if (root && from && root.contains(from)) {
+      const target =
+        from.querySelector<HTMLElement>(FOCUSABLE) ??
+        from.closest("[data-dd-group]")?.querySelector<HTMLElement>(":scope > button");
+      target?.focus();
+    }
+    setRefocus(null);
+  }, [refocus]);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ layout: true });
   const toggle = (group: string) => setOpenGroups((prev) => ({ ...prev, [group]: !prev[group] }));
 
@@ -454,6 +500,9 @@ export function DiscoveryDisplayFields({
       0,
     );
   const total = explicitDiscoveryOptionCount(options);
+  // Explicit settings that actually override the template: not the template itself, and not a stored `rows` the
+  // resolver ignores while the layout is not a carousel.
+  const overridingTemplate = total - (has("template") ? 1 : 0) - (has("rows") && !rowsApply ? 1 : 0);
 
   /** What a value falls back to when it has no look of its own (template, then system) — shown when not forced. */
   const visualFallbackText = (what: "shape" | "size" | "showLabel") => {
@@ -499,6 +548,7 @@ export function DiscoveryDisplayFields({
           t={t}
         />
         <ChoiceButtons
+            inheritedText={t("ddInheritedSr")}
           labelledBy={id}
           options={list.map((value) => ({ id: value, label: t(labelKey(value)) }))}
           explicit={options[key] as NonNullable<DiscoveryDisplayOptions[K]> | undefined}
@@ -525,6 +575,7 @@ export function DiscoveryDisplayFields({
           t={t}
         />
         <ChoiceButtons
+            inheritedText={t("ddInheritedSr")}
           labelledBy={id}
           options={[
             { id: "show", label: t("ddShow") },
@@ -555,7 +606,8 @@ export function DiscoveryDisplayFields({
   const rowsNoteId = `${uid}-rows-note`;
 
   return (
-    <div className="space-y-3" data-discovery-display="">
+    <FocusAfterReset.Provider value={(from) => setRefocus({ from, n: Date.now() })}>
+    <div ref={rootRef} className="space-y-3" data-discovery-display="">
       <div className="space-y-1">
         <h3 className="text-[12px] font-semibold tracking-wide text-muted">{t("ddSectionTitle")}</h3>
         <p className="text-[12px] leading-5 text-muted">{t("ddIntro")}</p>
@@ -592,7 +644,7 @@ export function DiscoveryDisplayFields({
               aria-pressed={!has("template")}
               onClick={() => set(selectDiscoveryTemplate(options, undefined))}
               className={cn(
-                "min-h-11 border px-2.5 py-1.5 text-start text-[12px] font-medium sm:min-h-10",
+                "min-h-11 border px-2.5 py-1.5 text-start text-[12px] font-medium",
                 focusRing,
                 !has("template")
                   ? "border-primary bg-primary text-primary-foreground"
@@ -611,7 +663,7 @@ export function DiscoveryDisplayFields({
                   data-template={id}
                   onClick={() => set(selectDiscoveryTemplate(options, id))}
                   className={cn(
-                    "min-h-11 border px-2.5 py-1.5 text-start sm:min-h-10",
+                    "min-h-11 border px-2.5 py-1.5 text-start",
                     focusRing,
                     pressed
                       ? "border-primary bg-primary text-primary-foreground"
@@ -634,9 +686,9 @@ export function DiscoveryDisplayFields({
             })}
           </div>
           <span className="block text-[11px] leading-4 text-muted">{t("ddTemplateNote")}</span>
-          {has("template") && total > 1 ? (
+          {has("template") && overridingTemplate > 0 ? (
             <span className="block text-[11px] leading-4 text-muted" data-template-overridden="">
-              {t("ddTemplateOverridden")}: {total - 1}
+              {t("ddTemplateOverridden")}: {overridingTemplate}
             </span>
           ) : null}
         </div>
@@ -652,6 +704,7 @@ export function DiscoveryDisplayFields({
             t={t}
           />
           <ChoiceButtons
+            inheritedText={t("ddInheritedSr")}
             labelledBy={layoutId}
             options={DISCOVERY_LAYOUTS.map((id) => ({
               id,
@@ -671,6 +724,11 @@ export function DiscoveryDisplayFields({
 
         <fieldset className="space-y-1.5" data-dd-control="columns">
           <legend className="text-[12px] font-medium text-text">{t("ddColumns")}</legend>
+          {display.layout === "carousel" ? (
+            <span className="block text-[11px] leading-4 text-muted" data-columns-carousel-note="">
+              {t("ddColumnsCarouselNote")}
+            </span>
+          ) : null}
           <div className="space-y-2">
             {DISCOVERY_DEVICES.map((device) => {
               const [min, max] = DISCOVERY_COLUMN_RANGES[device];
@@ -797,6 +855,7 @@ export function DiscoveryDisplayFields({
             t={t}
           />
           <ChoiceButtons
+            inheritedText={t("ddInheritedSr")}
             labelledBy={sizeId}
             options={FACET_VISUAL_SIZES.map((size) => ({ id: size, label: labelOf(`ddSize_${size}`) }))}
             explicit={options.size}
@@ -869,10 +928,13 @@ export function DiscoveryDisplayFields({
         <div className="space-y-1.5 border-t border-border pt-3" data-dd-reset-all="">
           <button
             type="button"
-            disabled={total === 0}
-            onClick={() => set(resetAllDiscoveryOptions())}
+            aria-disabled={total === 0}
+            onClick={() => {
+              if (total === 0) return;
+              set(resetAllDiscoveryOptions());
+            }}
             className={cn(
-              "inline-flex min-h-11 w-full items-center justify-center gap-2 border border-border px-3 text-[12px] font-medium text-text hover:bg-primary-soft disabled:opacity-50 sm:min-h-10",
+              "inline-flex min-h-11 w-full items-center justify-center gap-2 border border-border px-3 text-[12px] font-medium text-text hover:bg-primary-soft aria-disabled:opacity-50",
               focusRing,
             )}
           >
@@ -885,5 +947,6 @@ export function DiscoveryDisplayFields({
         </div>
       </Group>
     </div>
+    </FocusAfterReset.Provider>
   );
 }

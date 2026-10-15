@@ -139,8 +139,10 @@ export function previewSelection(
  * The value visual (VD-1a shape) a preview value is drawn from. The image id is a placeholder UUID — the tile gets a
  * sample picture (or none, to show the fallback) separately and nothing is requested from the media library.
  */
-export function previewValueVisual(value: PreviewValue, forceIcon: boolean): FacetValueVisual {
-  if (forceIcon) return { content: "icon", icon: value.icon };
+export function previewValueVisual(value: PreviewValue, iconFirst: boolean): FacetValueVisual {
+  // `icon-grid` (VD-4b, §3.6 rule 3): the resolved icon first, then the image, then the text. A value with no icon of
+  // its own to show keeps its image / initial.
+  if (iconFirst && value.media !== "initial") return { content: "icon", icon: value.icon };
   switch (value.media) {
     case "picture":
       return {
@@ -161,4 +163,21 @@ export function previewValueVisual(value: PreviewValue, forceIcon: boolean): Fac
       // A picture with no icon and nothing to draw: the tile falls back to the name's initial.
       return { content: "image", image: { mediaId: "00000000-0000-4000-8000-000000000003" } };
   }
+}
+
+/** Width of a frame per size step, in px (the tile's own table, mirrored here without importing React). */
+const CAROUSEL_ITEM_PADDING_PX = 24;
+const CAROUSEL_ITEM_MIN_PX = 88;
+
+/**
+ * VD-4b: a carousel column is as wide as the widest frame plus padding (never narrower than 88 px). The carousel does
+ * **not** use `columns`; those drive the grid layouts only.
+ */
+export function previewCarouselItemWidth(framePx: readonly number[]): number {
+  return Math.max(CAROUSEL_ITEM_MIN_PX, Math.max(0, ...framePx) + CAROUSEL_ITEM_PADDING_PX);
+}
+
+/** VD-4b: a second carousel row exists only on mobile (below `md`); from tablet up it is one row. */
+export function previewCarouselRows(rows: number, device: "mobile" | "tablet" | "desktop"): number {
+  return device === "mobile" ? rows : 1;
 }
