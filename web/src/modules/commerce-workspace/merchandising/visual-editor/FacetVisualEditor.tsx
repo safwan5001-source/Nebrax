@@ -53,7 +53,7 @@ import {
 } from './document';
 import { ImageTab } from './ImageTab';
 import { imageNoteKey } from './labels';
-import { createVisualEditorT } from './messages';
+import { createVisualEditorT, fieldErrorMessage, type VisualEditorMessageKey } from './messages';
 import { PreviewPanel, type PreviewGroup, type PreviewItem } from './PreviewPanel';
 import type { EditorTarget, IdentityTabProps, MediaAvailability } from './types';
 import { previewImage, useFacetImageSource } from './use-image-source';
@@ -71,8 +71,8 @@ export interface FacetVisualEditorProps {
   onClose: () => void;
   /** Everything was saved: the parent refreshes its list, shows the confirmation and closes the editor. */
   onSaved: () => void | Promise<void>;
-  /** The user chose to reload after a version conflict: the parent reopens the editor on fresh data. */
-  onReload: () => void;
+  /** The user chose to reload after a version conflict: the parent reopens the editor, on this tab, on fresh data. */
+  onReload: (tab: EditorTab) => void;
 }
 
 type PartStatus =
@@ -382,6 +382,27 @@ function EditorBody({
     />
   );
 
+  // Every server field error is also listed here, so one on a control that is not on screen (another tab, a section
+  // that is collapsed away) is never invisible.
+  const GROUP_LABEL: Record<string, VisualEditorMessageKey> = {
+    content: 'contentTitle',
+    image: 'imageTitle',
+    icon: 'iconTitle',
+    iconColor: 'iconColour',
+    background: 'backgroundColour',
+    shape: 'shapeTitle',
+    size: 'sizeTitle',
+    showLabel: 'showLabelTitle',
+    fit: 'fitTitle',
+    focal: 'focalTitle',
+    zoom: 'zoomTitle',
+  };
+  const errorLines = Object.entries(visualErrors.byField).map(([key, codes]) => {
+    const [scope, group] = key.split(':');
+    const prefix = kind === 'facet' ? `${vt(scope === 'defaults' ? 'defaultsSection' : 'selfSection')} — ` : '';
+    return { key, text: `${prefix}${vt(GROUP_LABEL[group])}: ${[...new Set(codes)].map((c) => fieldErrorMessage(vt, c)).join(' ')}` };
+  });
+
   const failedParts: { key: string; label: string; status: PartStatus }[] = [
     { key: 'data', label: vt('partData'), status: dataResult },
     { key: 'visual', label: vt('partVisual'), status: visualResult },
@@ -471,7 +492,7 @@ function EditorBody({
                         <span className="font-medium">{label}:</span> {status.message}
                       </span>
                       {status.conflict ? (
-                        <Button type="button" size="sm" variant="outline" className="min-h-11" onClick={onReload}>
+                        <Button type="button" size="sm" variant="outline" className="min-h-11" onClick={() => onReload(tab)}>
                           {vt('reload')}
                         </Button>
                       ) : null}
@@ -486,8 +507,15 @@ function EditorBody({
               {visualResult.status === 'failed' && visualResult.conflict ? (
                 <li className="text-xs text-muted">{vt('reloadHint')}</li>
               ) : null}
+              {errorLines.map((line) => (
+                <li key={line.key} className="break-words text-xs text-negative" data-visual-error={line.key}>
+                  {line.text}
+                </li>
+              ))}
               {visualErrors.unmapped.length > 0 ? (
-                <li className="text-xs text-negative">{[...new Set(visualErrors.unmapped)].join('، ')}</li>
+                <li className="break-words text-xs text-negative">
+                  {[...new Set(visualErrors.unmapped)].map((code) => fieldErrorMessage(vt, code)).join(' ')}
+                </li>
               ) : null}
             </ul>
           ) : null}

@@ -462,9 +462,11 @@ export function FacetsPanel({
             await load();
             success(vt('saved'));
           }}
-          onReload={() => {
+          onReload={(tab) => {
             // Fresh data first, then a fresh editor on it: nothing is merged over a version the user has not seen.
-            void load().then(() => setDialog((current) => (current?.kind === 'editor' ? { ...current, nonce: Date.now() } : current)));
+            void load().then(() =>
+              setDialog((current) => (current?.kind === 'editor' ? { ...current, tab, nonce: Date.now() } : current)),
+            );
           }}
         />
       ) : null}
