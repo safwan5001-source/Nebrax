@@ -48,7 +48,7 @@ PR: #1520 (open, not merged before the owner's review) · Plan: [AWJ-ERP-UI-H2-S
 | **Evidence integrity** | Fixes to the state probe were re-run, not only described. 10 shell-endpoint routes and 4 child routes were re-probed, then a full pass ran with automatically derived overrides (103 routes, 206 runs). The only additions were PROBE-01 (P1) and PROBE-02 (P2); no other verdict changed |
 | **P0 code verification** | All 9 P0 rows were checked against the cited files and lines on the current tree, by the coordinator and again by the independent reviewer |
 | **Links** | All relative links in the H2 documents resolve (checked by script) |
-| **A1 merge** | #1516 merged as `24528be` after CI was green on the final head (sqlite, pgsql, CI Gate), with PRE_MERGE_REVIEW: PASS. POST_MERGE_REVIEW is recorded on #1516 once `main` CI completes |
+| **A1 merge** | #1516 merged as `24528be` after CI was green on the final head (sqlite, pgsql, CI Gate), with PRE_MERGE_REVIEW: PASS. **POST_MERGE_REVIEW: PASS** recorded on #1516 after `main` CI succeeded on `24528be` (run 9741: sqlite and pgsql) |
 
 ## 4. AWJ Core (third v3 theme)
 
