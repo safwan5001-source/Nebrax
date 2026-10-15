@@ -6,7 +6,7 @@ STATUS: TAX-ZATCA HORIZON ACTIVE UPON MERGE OF ACTIVATION PR #1324 — use `docs
 
 ## Parallel Horizon — AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 (launched by owner 2026-10-14)
 - **G0 CLOSED** (owner, 2026-10-14): D-01..D-17 approved. H1-0 merged as `d5dfa16` (POST_MERGE_REVIEW: PASS).
-- VD-1a merged as `8801af9`, VD-2 as `d568bf6`, VD-4a (discovery display contract) as `c57f4be` and VD-1b (facet visual storage + admin API) as `5a10930`. VD-1c (public projection, guarded image route, N1–N19) merged as `b1b7988` (PR #1499, owner decisions D1–D4). VD-3, VD-4b and VD-4c are ready and wait for the owner's authorization; nothing deploys without explicit approval.
+- VD-1a merged as `8801af9`, VD-2 as `d568bf6`, VD-4a (discovery display contract) as `c57f4be` and VD-1b (facet visual storage + admin API) as `5a10930`. VD-1c (public projection, guarded image route, N1–N19) merged as `b1b7988` (PR #1499, owner decisions D1–D4). VD-4c (builder discovery controls) merged as `2b77747`, VD-4b (storefront discovery renderer) as `f1e309e` and VD-3 (admin visual editor) as `d628288` (PRs #1507, #1508, #1509; owner-authorized, independently reviewed, UI-only). VD-5 (final browser QA) is ready and waits for the readiness report and the owner's go-ahead; nothing deploys without explicit approval.
 - Plan / queue / decisions: `docs/plans/store/visual-dimensions/`. Per-PR owner merge approval; no deploy. Does not touch TAX-ZATCA files.
 
 ## Paused Horizon handoff — Delivery Platforms & Settlement

@@ -1,6 +1,6 @@
 # AWJ-VD-3 — Implementation Report (Admin visual editor for dimensions and values)
 
-STATUS: **PR pending** — branch pushed, PR not opened by this slice. Not merged, not deployed.
+STATUS: **MERGED** — PR #1509 merged under the owner's 2026-10-15 authorization as `d6282888e26636eec698cadda1ad3880ae0eb5bf`. POST_MERGE_REVIEW: __PMR__. Production deployment still needs the owner's explicit approval.
 DATE: 2026-10-15
 HORIZON: AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 · slice VD-3 (H1-3)
 AUTHORITY: owner authorization of 2026-10-15. Web/UI only. The VD-1b endpoints and the VD-2 render layer are consumed as merged; no contract was changed.
