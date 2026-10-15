@@ -210,8 +210,12 @@ final class CommunicationDispatcher
 
         try {
             $intent = $this->intentFor($message);
-        } catch (DecryptException|\InvalidArgumentException|\TypeError) {
-            return DispatchResult::permanentFailure('payload_unreadable'); // لم يُستدعَ المزوّد.
+        } catch (DecryptException) {
+            // قد يكون المفتاح خاطئاً/مُدوَّراً في هذا المضيف فقط: لا نُتلف الحمولة نهائياً. يُحدّها سقف المحاولات، وتبقى
+            // قابلة للقراءة من مضيف سليم. لم يُستدعَ المزوّد.
+            return DispatchResult::retryableFailure('payload_unreadable');
+        } catch (\InvalidArgumentException|\TypeError) {
+            return DispatchResult::permanentFailure('payload_invalid'); // بنية الحمولة نفسها غير صالحة؛ لا فائدة من إعادة المحاولة.
         }
 
         try {
@@ -285,15 +289,17 @@ final class CommunicationDispatcher
             }
 
             // إخفاق قابل لإعادة المحاولة: failed_retryable → (retry_scheduled | expired | failed_permanent).
-            if ((int) $message->attempt_count < (int) $message->max_attempts && $now < $message->expires_at) {
+            // لا نجدول محاولة موعدها بعد انتهاء الصلاحية: لن تُطالَب أبداً (expires_at > الآن شرط المطالبة) وتحتفظ بالحمولة بلا فائدة.
+            $nextAttemptAt = $now->addSeconds($this->policy->backoffAfterAttempt((int) $message->attempt_count));
+            if ((int) $message->attempt_count < (int) $message->max_attempts && $nextAttemptAt < $message->expires_at) {
                 $this->mustTransition($tenantId, $message->id, DeliveryStatus::FailedRetryable, DeliveryStatus::RetryScheduled, [
-                    'next_attempt_at' => $now->addSeconds($this->policy->backoffAfterAttempt((int) $message->attempt_count)),
+                    'next_attempt_at' => $nextAttemptAt,
                 ]);
 
                 return DeliveryStatus::RetryScheduled->value;
             }
 
-            $terminal = $now >= $message->expires_at ? DeliveryStatus::Expired : DeliveryStatus::FailedPermanent;
+            $terminal = (int) $message->attempt_count < (int) $message->max_attempts ? DeliveryStatus::Expired : DeliveryStatus::FailedPermanent;
             $this->mustTransition($tenantId, $message->id, DeliveryStatus::FailedRetryable, $terminal, ['payload_encrypted' => null] + $settled);
 
             return $terminal->value;
@@ -345,7 +351,7 @@ final class CommunicationDispatcher
                 && $provider->capabilities()->providerIdempotency
                 && $row->classification !== MessageClassification::Otp->value
                 && (int) $row->attempt_count < (int) $row->max_attempts
-                && $now < $row->expires_at;
+                && $now->addSeconds($this->policy->backoffAfterAttempt((int) $row->attempt_count)) < $row->expires_at;
 
             // فاصل الإيجار: فقط إن بقي الإيجار نفسه منقضياً (لم ينهِه صاحبه ولم يسترجعه عامل آخر).
             $first = $canRetry ? DeliveryStatus::FailedRetryable : DeliveryStatus::Unknown;

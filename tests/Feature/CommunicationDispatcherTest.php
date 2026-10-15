@@ -284,11 +284,39 @@ class CommunicationDispatcherTest extends TestCase
     }
 
     #[Test]
-    public function an_unreadable_payload_fails_permanently_without_calling_the_provider(): void
+    public function an_undecryptable_payload_is_retried_not_destroyed_and_the_provider_is_never_called(): void
     {
         $tenant = $this->commTenant();
         $id = $this->enqueueMessage($tenant->id);
         DB::table('communication_messages')->where('id', $id)->update(['payload_encrypted' => 'not-a-valid-ciphertext']);
+        $provider = $this->probe();
+        $dispatcher = $this->dispatcherFor($provider);
+
+        $summary = $dispatcher->dispatchDue($tenant->id);
+
+        $this->assertSame(['claimed' => 1, 'retry_scheduled' => 1], $summary->toArray());
+        $this->assertSame([], $provider->received);
+        $row = $this->messageRow($id);
+        $this->assertSame(['retry_scheduled', 'payload_unreadable'], [$row->status, $row->last_error_code]);
+        $this->assertSame('not-a-valid-ciphertext', $row->payload_encrypted, 'a wrong key on this host must not erase the payload');
+        $this->assertSame('retryable_failure', $this->attemptRows($id)[0]->outcome);
+
+        // سقف المحاولات يحدّ الخسارة: بعد استنفادها فقط تُمسح.
+        $this->travel(61)->seconds();
+        $dispatcher->dispatchDue($tenant->id);
+        $this->travel(301)->seconds();
+        $last = $dispatcher->dispatchDue($tenant->id);
+        $this->assertSame(['claimed' => 1, 'failed_permanent' => 1], $last->toArray());
+        $this->assertNull($this->messageRow($id)->payload_encrypted);
+        $this->assertSame([], $provider->received);
+    }
+
+    #[Test]
+    public function a_structurally_invalid_payload_fails_permanently_without_calling_the_provider(): void
+    {
+        $tenant = $this->commTenant();
+        $id = $this->enqueueMessage($tenant->id);
+        DB::table('communication_messages')->where('id', $id)->update(['payload_encrypted' => \Illuminate\Support\Facades\Crypt::encryptString('"just a string"')]);
         $provider = $this->probe();
 
         $summary = $this->dispatcherFor($provider)->dispatchDue($tenant->id);
@@ -296,9 +324,28 @@ class CommunicationDispatcherTest extends TestCase
         $this->assertSame(['claimed' => 1, 'failed_permanent' => 1], $summary->toArray());
         $this->assertSame([], $provider->received);
         $row = $this->messageRow($id);
-        $this->assertSame(['failed_permanent', 'payload_unreadable'], [$row->status, $row->last_error_code]);
+        $this->assertSame(['failed_permanent', 'payload_invalid'], [$row->status, $row->last_error_code]);
         $this->assertNull($row->payload_encrypted);
-        $this->assertSame('permanent_failure', $this->attemptRows($id)[0]->outcome);
+    }
+
+    #[Test]
+    public function a_retry_that_could_only_run_after_expiry_ends_expired_instead_of_being_stranded(): void
+    {
+        $tenant = $this->commTenant();
+        $id = $this->enqueueMessage($tenant->id); // TTL 3600
+        $provider = $this->probe(function () {
+            $this->travel(3600 - 30)->seconds(); // 30ث قبل الانتهاء؛ التراجع 60ث يتجاوزه
+
+            return DispatchResult::retryableFailure('http_503');
+        });
+
+        $summary = $this->dispatcherFor($provider)->dispatchDue($tenant->id);
+
+        $this->assertSame(['claimed' => 1, 'expired' => 1], $summary->toArray());
+        $row = $this->messageRow($id);
+        $this->assertSame('expired', $row->status);
+        $this->assertNull($row->payload_encrypted);
+        $this->assertNull($row->next_attempt_at);
     }
 
     #[Test]
@@ -468,7 +515,7 @@ class CommunicationDispatcherTest extends TestCase
         $orphan = $this->enqueueMessage($tenant->id);
         $this->strandInSending($tenant->id, $orphan, providerKey: 'gone');
 
-        $this->travel(120)->seconds(); // الرسالة القصيرة (60ث) انتهت؛ الإيجارات كلها منقضية أصلاً
+        $this->travel(120)->seconds(); // الرسالة القصيرة (60ث) انتهتا؛ الإيجارات كلها منقضية أصلاً
         $summary = $this->dispatcherFor($idempotent)->recoverExpiredLeases($tenant->id);
 
         $this->assertSame(['recovered_retry_scheduled' => 1, 'recovered_unknown' => 3], $summary->toArray());
@@ -479,6 +526,22 @@ class CommunicationDispatcherTest extends TestCase
             $this->assertSame('unknown', $this->messageRow($id)->status);
             $this->assertNull($this->messageRow($id)->payload_encrypted);
         }
+    }
+
+    #[Test]
+    public function recovery_does_not_reschedule_a_retry_that_could_only_run_after_expiry(): void
+    {
+        $tenant = $this->commTenant();
+        $id = $this->enqueueShortLived($tenant->id); // TTL 60
+        $this->strandInSending($tenant->id, $id);
+        $this->travel(15)->seconds(); // ما زالت حيّة (45ث متبقية) لكن التراجع 60ث يتجاوز الانتهاء
+
+        $summary = $this->dispatcherFor($this->probe(idempotent: true))->recoverExpiredLeases($tenant->id);
+
+        $this->assertSame(['recovered_unknown' => 1], $summary->toArray());
+        $row = $this->messageRow($id);
+        $this->assertSame('unknown', $row->status);
+        $this->assertNull($row->payload_encrypted);
     }
 
     #[Test]
