@@ -301,11 +301,11 @@
 | `/developer/security` | Settings & admin | Ledger | yes | `(app)/developer/security/page.tsx` | HTTP 200 · axe 0 |
 | `/developer/webhooks` | Settings & admin | Ledger | yes | `(app)/developer/webhooks/page.tsx` | HTTP 200 · axe 0 |
 | `/help` | Settings & admin | Ledger | yes | `(app)/help/page.tsx` | HTTP 200 · axe 0 |
-| `/help/:id` | Settings & admin | Ledger | yes | `(app)/help/[slug]/page.tsx` | NOT LOADED (no fixture) |
+| `/help/:id` | Settings & admin | Ledger | yes | `(app)/help/[slug]/page.tsx` | HTTP 200 · axe 0 · via 1 concrete path(s) |
 | `/integrations` | Settings & admin | Ledger | yes | `(app)/integrations/page.tsx` | HTTP 200 · axe 0 |
 | `/integrations/communications` | Settings & admin | Ledger | yes | `(app)/integrations/communications/page.tsx` | HTTP 200 · axe 0 |
 | `/integrations/delivery-platforms` | Settings & admin | Ledger | yes | `(app)/integrations/delivery-platforms/page.tsx` | HTTP 200 · axe 0 |
-| `/integrations/delivery-platforms/:id` | Settings & admin | Ledger | yes | `(app)/integrations/delivery-platforms/[platformKey]/page.tsx` | NOT LOADED (no fixture) |
+| `/integrations/delivery-platforms/:id` | Settings & admin | Ledger | yes | `(app)/integrations/delivery-platforms/[platformKey]/page.tsx` | HTTP 200 · axe 0 · via 1 concrete path(s) |
 | `/notifications` | Settings & admin | Ledger | yes | `(app)/notifications/page.tsx` | HTTP 200 · axe 0 |
 | `/settings` | Settings & admin | Ledger | yes | `(app)/settings/page.tsx` | HTTP 200 · axe 0 |
 | `/tax-settings` | Settings & admin | Ledger | yes | `(app)/tax-settings/page.tsx` | HTTP 200 · axe 0 |
