@@ -173,16 +173,27 @@ From [A2-PLT §7](h2-a-evidence/A2-PLT.md): 11 of the 13 Fuel screens are back-o
 5. **A4 contract:** approve [AWJ-ERP-UI-H2-1-UI-CONTRACT.md](AWJ-ERP-UI-H2-1-UI-CONTRACT.md) as the H2 rulebook.
 6. **Launch B then C** in the plan order, with B5 widened to all irreversible actions (ERP-UI-H2-002) and B4 first among B (largest spread).
 
-## 10. Coordination with parallel work
+## 10. Coordination with parallel work — AWJ Core (third v3 theme)
 
-- **Third theme for Design System v3 (owner notice, 2026-10-15):** a separate, independent task is adding a third theme to the v3 design system. It is still in development and its branch is **not merged into `main`**. H2 phase A is unaffected (docs and evidence only), and H2's scope is unchanged.
-- **Before any shared change in phase B:** check the status of that branch first (merged or not, and which tokens and components it touches). Shared changes here means tokens, `components/nebrax/*`, `components/ui/*`, `data-table.tsx`, the shell, and the theme/`data-awj-ui` gate. Rebase B slices on it when it merges, so the two efforts do not conflict. In particular:
-  - B1 (shell, badge tone).
-  - B2 (list cells, money cell).
-  - B4 (state component).
-  - Contract rules that depend on colour and contrast: R-A11Y-3, R-MONEY-4, and the Floor amount-due contrast.
+**Status in the repository (verified on `main`, 2026-10-15):**
 
-  Each must be verified on the new theme as well as the existing ones once it exists.
+| Fact | Value |
+|---|---|
+| Merged | #1522 → `0d7bded` (`feat(design-system): add AWJ Core theme to v3`), decision **D-41**, spec `design-system/v3/THEMES.md` §6A |
+| What it changes | **13 shell tokens only**: the sidebar and topbar. Light `#1E40AF` with white text; Dark `#4F8CFF` with dark text, because white on `#4F8CFF` is 3.22:1. The active-item plate is a lighter shell tone, not white. There is one focus-ring rule scoped to `[data-awj-theme="core"] [data-awj-shell]` |
+| What it does not change | Workspace, DataTable, Document Workspace, buttons, cards, financial semantics, `surface-outcome`. Default and Ink are pixel-identical to before (53/56 shots identical, 3 differ by ≤11 px of antialiasing) |
+| Scope | **Ledger only.** Floor (POS), Studio and Storefront do not adopt Core, as with Ink. Behind the v3 gate (`html[data-awj-ui="3"]`); v3 is still opt-in |
+| Selection | Settings → Preferences («سمة أَوْج»). Stored in `awj:theme` and `preferences.appTheme='core'`; the server accepts `default\|ink\|core` |
+| Files it owns | `design-system/tokens/awj.tokens.json` (`theme.core.*`), `web/scripts/generate-awj-tokens.mjs`, the generated blocks and the Core focus rule in `web/src/app/globals.css`, `web/src/lib/awj-theme.ts`, `use-awj-theme.ts`, the pre-paint script in `web/src/app/layout.tsx`, `components/settings/account-preferences-card.tsx`, and the theme strings in `messages/{ar,en}.json` |
+| Follow-up (owner notice) | A separate task is **tuning Core's Dark-mode colours** after the merge. No PR or branch for it was visible at the time of writing. **Core Dark values are provisional** until that task closes |
+
+**What this means for H2:**
+
+1. **Phase A evidence was captured on Default.** That covers the A1 baseline (1,410 loads), the A2 atlas and state probes, and the workflow screenshots. All of it predates Core, so none of it shows Core. Core does not change the workspace, so no A2 finding depends on the theme. Every finding about the shell is listed below and must be re-checked on Core in B1: PLT-33/FIN-30/SAL-33 (two active sidebar items), OPS-23 (POS overflow menu) and OPS-35 (avatar initials).
+2. **Visual verification matrix** (plan §5 and §8 #5, updated): Default in every capture. **Core Light** is sampled in every slice that touches the shell or shared components (B1–B5) and in every C wave; Ink is sampled as before. **Core Dark is evidence, not a gate**, until its follow-up closes. Floor and Studio are verified on Default only.
+3. **No conflicting edits.** H2 slices do not modify theme tokens, the generated token blocks, `awj-theme`/`use-awj-theme`, the pre-paint script, the theme selector or the shell focus rule. If a slice needs any of these, the need is raised with the theme task, not patched in H2.
+4. **Before any shared change in phase B,** re-check the theme task's state (open PRs/branches touching the files above) and rebase on it if it has merged. This applies above all to B1 (shell, badge tone, active-item highlight), B2 (list cells, money cell) and B4 (state component).
+5. **Contract rules that depend on colour** (R-A11Y-3 contrast, R-MONEY-4 sign colours, R-NAV-1 single active item, and the Floor amount-due contrast) are checked on Default and Core Light. Core Dark results are recorded but are not pass/fail until the follow-up closes.
 
 ## 11. Not verified (all groups)
 

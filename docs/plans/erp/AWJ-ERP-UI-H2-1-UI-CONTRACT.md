@@ -210,6 +210,11 @@ The plan §8 criteria 1–11 apply, plus, for each slice:
 2. **Surface:** the slice is classified **v3-only** or **all-surfaces** (plan §3). All-surfaces slices are verified on both.
 3. **Scope check:** no new local component when a shared one exists. Shared-component changes come first with a proof screen.
 4. **Prohibited areas untouched:** API, RBAC, accounting, persistence, migrations (diff review).
+5. **Visual verification matrix (themes):**
+   - Default in every capture. Core Light and Ink as samples, as the plan §5 note sets out after AWJ Core was merged (#1522, D-41).
+   - **Core Dark is recorded as evidence only** until its Dark-mode follow-up closes.
+   - Floor and Studio are verified on Default only, because they adopt neither Ink nor Core.
+   - A slice never edits theme tokens, generated token blocks, `awj-theme` or the shell focus rule (A2 §10).
 
 ## 5. Decisions recorded here (AWJ Decision) and not adopted
 - **AWJ Decision:**
