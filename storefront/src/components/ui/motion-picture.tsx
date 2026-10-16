@@ -22,7 +22,10 @@ import {
  *    `<source>`s and the browser re-resolves to the still ladder. A `MotionToggle` elsewhere in the tree
  *    flips the shared per-`id` state — the control and the picture are independent components, so the
  *    control can sit outside an `aria-hidden` decorative layer.
- *  - Without JavaScript the animation plays and has no control; with `prefers-reduced-motion` it never plays.
+ *  - **No-JavaScript visitors never get motion they cannot stop (WCAG 2.2.2).** The server renders only the
+ *    still ladder (the reduced-motion `<source>`s and the `<img>`); the animated `<source>`s are added after
+ *    hydration, together with the pause control. As a side benefit the still paints first (LCP) and the
+ *    animation file is fetched only once the page is interactive.
  */
 
 const paused = new Map<string, boolean>();
@@ -36,6 +39,17 @@ function subscribe(listener: () => void): () => void {
 function setPaused(id: string, value: boolean): void {
   paused.set(id, value);
   for (const listener of listeners) listener();
+}
+
+const noopSubscribe = () => () => undefined;
+
+/** `false` on the server and during hydration, `true` afterwards (never flips back). */
+function useHydrated(): boolean {
+  return useSyncExternalStore(
+    noopSubscribe,
+    () => true,
+    () => false,
+  );
 }
 
 export function useMotionPaused(id: string): boolean {
@@ -61,8 +75,10 @@ export function MotionPicture({
   children: ReactNode;
 } & ComponentPropsWithoutRef<"picture">) {
   const isPaused = useMotionPaused(id);
+  const hydrated = useHydrated();
+  // Animated sources exist only while hydrated and not paused; the stills are always present.
   const live = (list: AnimatedPictureSources["leading"]) =>
-    list.filter((s) => !(isPaused && s.animated));
+    list.filter((s) => !(s.animated && (isPaused || !hydrated)));
   const toSource = (
     s: AnimatedPictureSources["leading"][number],
     key: string,

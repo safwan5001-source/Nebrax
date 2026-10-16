@@ -164,14 +164,30 @@ describe("SectionBackdrop with an animated picture", () => {
     expect(screen.queryByRole("button")).toBeNull();
   });
 
-  it("server markup has no control (no dead button without JavaScript) and still carries the animation", () => {
+  it("server markup (what a no-JavaScript visitor gets) is the still ladder only: no animation, no dead control", () => {
     const html = renderToString(
       withIntl(
         <SectionBackdrop data={{ media: media("d", "gif"), overlay: false }} />,
       ),
     );
     expect(html).not.toContain("<button");
-    expect(html).toContain("animated.gif");
+    expect(html).not.toContain("animated.gif");
+    expect(html).toContain("d800w.jpg"); // the still <img>
+    expect(html).toContain("prefers-reduced-motion"); // stills stay first for reduced motion
+  });
+
+  it("after hydration the animation is added back (and the control appears)", async () => {
+    const { container } = render(
+      withIntl(
+        <SectionBackdrop data={{ media: media("d", "gif"), overlay: false }} />,
+      ),
+    );
+    await screen.findByRole("button", { name: "Pause animation" });
+    expect(
+      sourcesOf(container).some(
+        ([, , set]) => set === `${P}${ID}/animated.gif`,
+      ),
+    ).toBe(true);
   });
 
   it("a static backdrop is byte-for-byte what it was: one picture, no control, no animated sources", async () => {
