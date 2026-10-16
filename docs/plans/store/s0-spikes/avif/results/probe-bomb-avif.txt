@@ -1,0 +1,6 @@
+S0-A decompression-bomb probe: corpus/bomb-8192.avif = 1067 bytes, header declares 8192x8192 (67.1 MP => ~268 MB RGBA)
+image: s0-gd-avif (php 8.3.35, GD with libavif)
+[1] getimagesize only                        : header-dims=8192x8192, PHP mem peak 0.4 MiB (no decode)
+[2] imagecreatefromavif, memory_limit=256M   : PHP Fatal "Allowed memory size of 268435456 bytes exhausted" (request dies; process survives)
+[3] imagecreatefromavif, memory_limit=-1, container --memory=512m : container OOM-killed, exit code 137
+=> a ~1 KB file can kill the worker. A header-dimension check BEFORE decode is mandatory (getimagesizefromstring is safe and cheap).

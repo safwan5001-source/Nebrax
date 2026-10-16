@@ -97,8 +97,10 @@ export default async function AnimatedMediaVisualPage({
 }: {
   searchParams: Promise<{ scenario?: string; locale?: string }>;
 }) {
-  if (process.env.NODE_ENV === "production") notFound();
+  // Read the request first: that makes the route dynamic, so production answers a real 404 per request.
+  // Calling notFound() before touching searchParams lets Next prerender the route as a cached soft-404 (HTTP 200).
   const params = await searchParams;
+  if (process.env.NODE_ENV === "production") notFound();
   const locale = params.locale === "ar" ? "ar" : "en";
   const scenario: Scenario =
     params.scenario === "desktop-webp" ||

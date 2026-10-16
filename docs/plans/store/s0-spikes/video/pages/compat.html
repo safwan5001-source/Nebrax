@@ -35,7 +35,7 @@ async function play(name) {
   const el = document.createElement('video'); el.muted = true; el.defaultMuted = true; el.playsInline = true; el.setAttribute('playsinline', ''); el.setAttribute('muted', ''); el.autoplay = true; el.loop = true; el.preload = 'auto'; el.width = 120; el.style.background = '#222';
   const ev = []; for (const e of ['loadedmetadata', 'canplay', 'playing', 'stalled', 'error', 'suspend', 'waiting']) el.addEventListener(e, () => ev.push(e));
   document.getElementById('stage').appendChild(el); const t0 = performance.now(); el.src = F(name);
-  let playRejected = null; try { await el.play(); } catch (e) { playRejected = e.name; }
+  let playRejected = null; try { await Promise.race([el.play(), wait(6000).then(() => { playRejected = 'play()-promise-still-pending-after-6s'; })]); } catch (e) { playRejected = e.name; }
   await Promise.race([new Promise((r) => el.addEventListener('playing', r, { once: true })), new Promise((r) => el.addEventListener('error', r, { once: true })), wait(6000)]);
   const tPlaying = ev.includes('playing') ? Math.round(performance.now() - t0) : null; const ct0 = el.currentTime; await wait(1500);
   const res = { events: [...new Set(ev)], play_rejected: playRejected, time_to_playing_ms: tPlaying, advanced: el.currentTime > ct0 + 0.3, currentTime: +el.currentTime.toFixed(2), dims: [el.videoWidth, el.videoHeight], duration: isFinite(el.duration) ? +el.duration.toFixed(2) : el.duration, readyState: el.readyState, error: el.error ? { code: el.error.code, msg: (el.error.message || '').slice(0, 80) } : null };
