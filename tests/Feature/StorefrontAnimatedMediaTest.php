@@ -201,6 +201,8 @@ class StorefrontAnimatedMediaTest extends TestCase
             'too heavy (frames × pixels)' => $this->gifWithFrames(300),
             'truncated' => substr($this->animatedGifBytes(), 0, -1),
             'webp partial first frame' => $this->webpWithPartialFirstFrame(),
+            'gif partial first frame' => $this->gifWithPartialFirstFrame(),
+            'gif forged graphic-control terminator' => $this->gifWithBadGceTerminator(),
             'too heavy bytes' => $this->animatedGifBytes().str_repeat("\0", 5 * 1024 * 1024),
             default => $this->fail($case),
         };
@@ -226,8 +228,27 @@ class StorefrontAnimatedMediaTest extends TestCase
             'too heavy (frames × pixels)' => ['too heavy (frames × pixels)', 'animated_too_heavy'],
             'truncated' => ['truncated', 'image_unreadable'],
             'webp partial first frame' => ['webp partial first frame', 'animated_poster_unavailable'],
+            'gif partial first frame' => ['gif partial first frame', 'animated_poster_unavailable'],
+            'gif forged graphic-control terminator' => ['gif forged graphic-control terminator', 'image_unreadable'],
             'too heavy bytes' => ['too heavy bytes', 'file_too_large'],
         ];
+    }
+
+    /** @test */
+    public function the_kill_switch_also_stops_a_retry_from_regenerating_an_animated_file(): void
+    {
+        $this->fakeStorefrontMediaR2();
+        $auth = $this->registerTenant('am-retry-off');
+        $media = $this->createAnimated($auth);
+        StorefrontMedia::query()->whereKey($media['id'])->update(['variants_state' => 'failed', 'variants_error' => 'storage_unavailable']);
+        unset($this->r2Objects[$this->key($auth, $media, 'animated.gif')]);
+
+        config()->set('storefront_media.animated.enabled', false);
+        $retried = $this->withToken($auth['token'])->postJson(self::BASE."/{$media['id']}/retry")->json('data');
+
+        $this->assertSame('failed', $retried['variants_state']);
+        $this->assertSame('animated_not_supported', $retried['variants_error']);
+        $this->assertArrayNotHasKey($this->key($auth, $media, 'animated.gif'), $this->r2Objects, 'no animated file was written while disabled');
     }
 
     /** @test */
@@ -335,6 +356,12 @@ class StorefrontAnimatedMediaTest extends TestCase
         $this->assertStringContainsString('private', (string) $res->headers->get('Cache-Control'));
         $this->assertStringStartsWith('GIF89a', $res->streamedContent());
         $etag = (string) $res->headers->get('ETag');
+        $sha = StorefrontMedia::query()->withoutGlobalScopes()->whereKey($media['id'])->value('sha256');
+        $this->assertSame(
+            '"'.substr(hash('sha256', $sha.':animated.gif:s'.\App\Services\Commerce\StorefrontAnimatedImage::SANITISER_VERSION), 0, 32).'"',
+            $etag,
+            'the validator is bound to the sanitiser version',
+        );
         $this->get($url($a, $media['id'], 'animated.gif'), ['If-None-Match' => $etag])->assertStatus(304);
 
         // الملف الثابت ما زال يعمل (الإطار الأول).

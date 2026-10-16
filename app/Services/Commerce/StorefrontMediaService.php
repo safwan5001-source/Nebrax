@@ -255,9 +255,14 @@ class StorefrontMediaService
             $info = $this->animated->inspect($bytes, $mime); // بنية سليمة وكاملة، وإلا image_unreadable
             if ($info['animated']) {
                 $this->assertAnimatedLimits($info, $size, $animatedOn, $animatedCfg);
-                if ($this->animated->posterBytes($bytes, $mime) === null) {
+                // الإطار الأول يجب أن يكون صورةً ثابتة يفكّها GD بأبعاد اللوحة نفسها، وإلا فالسلّم الثابت (وصورة تقليل
+                // الحركة) ليست الإطار المعروض فعلاً: نرفض عند الرفع بدل أصلٍ `failed` لا تنفع فيه إعادة المحاولة.
+                $poster = $this->animated->posterBytes($bytes, $mime);
+                $posterSize = $poster === null ? false : @getimagesizefromstring($poster);
+                if (! is_array($posterSize) || [$posterSize[0], $posterSize[1]] !== [$info['width'], $info['height']]) {
                     throw new StorefrontMediaException('animated_poster_unavailable', 'تعذّر استخراج الإطار الأول لهذه الصورة المتحركة (إطارها الأول لا يغطي اللوحة كاملة). أعد تصديرها بإطار أول كامل.');
                 }
+                unset($poster);
                 unset($bytes);
 
                 return [
@@ -461,6 +466,10 @@ class StorefrontMediaService
             $animation = null;
 
             if ($media->isAnimated()) {
+                // مفتاح الإيقاف يسري على إعادة المحاولة أيضاً (لا توليد ملف متحرك جديد وهو مُطفأ).
+                if (! (bool) config('storefront_media.animated.enabled', false)) {
+                    throw new StorefrontMediaException('animated_not_supported', 'الصور المتحركة غير مفعّلة حالياً.');
+                }
                 // الأصل المتحرك: السلّم الثابت من الإطار الأول، وملفٌ منقّى واحد للحركة.
                 $bytes = file_get_contents($sourcePath);
                 if ($bytes === false) {

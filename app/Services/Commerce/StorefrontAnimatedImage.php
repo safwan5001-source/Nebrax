@@ -29,11 +29,17 @@ final class StorefrontAnimatedImage
         self::FORMAT_WEBP => 'image/webp',
     ];
 
+    /** يُدمَج في ETag الملف المقدَّم: تغيّر المنقّي يُبطل مُصدّقات العملاء القديمة. */
+    public const SANITISER_VERSION = 2;
+
     /** سقف صلب لمحلِّل البنية مهما كان الإعداد (تحصين ضد ملفات مصمَّمة). */
     private const HARD_FRAME_CEILING = 2000;
 
     /** مدة إطارٍ ≤ 10ms تُعرَض 100ms في المتصفحات؛ نحسبها كذلك (تقدير متحفّظ للمدة). */
     private const MIN_FRAME_MS = 10;
+
+    /** أقصى حجم لملف ألوان ICC يُحتفَظ به في نسخة WebP المنقّاة. */
+    private const MAX_ICC_BYTES = 65536;
 
     public static function formatForMime(string $mime): ?string
     {
@@ -86,7 +92,11 @@ final class StorefrontAnimatedImage
     public function posterBytes(string $bytes, string $mime): ?string
     {
         if ($mime === self::MIME[self::FORMAT_GIF]) {
-            return $bytes; // GD يفكّ الإطار الأول من GIF متحرك.
+            // GD يفكّ الإطار الأول — من النسخة المنقّاة ذاتها التي تُقدَّم (لا ما يختلف عنها)، وبشرط أن يغطي
+            // الإطار الأول اللوحة (GD يحجّم الصورة بحجم الإطار ويتجاهل الإزاحة).
+            $gif = $this->gif($bytes);
+
+            return $gif['poster_ok'] ? $gif['clean'] : null;
         }
         if ($mime === self::MIME[self::FORMAT_WEBP]) {
             return $this->webp($bytes)['poster'];
@@ -98,7 +108,7 @@ final class StorefrontAnimatedImage
     // ───────────────────────────── GIF ─────────────────────────────
 
     /**
-     * @return array{meta:array{format:string,animated:bool,width:int,height:int,frames:int,duration_ms:int,loop:bool}, clean:string}
+     * @return array{meta:array{format:string,animated:bool,width:int,height:int,frames:int,duration_ms:int,loop:bool}, clean:string, poster_ok:bool}
      */
     private function gif(string $b): array
     {
@@ -131,6 +141,8 @@ final class StorefrontAnimatedImage
         $loop = false;
         $pendingDelayMs = 0;
         $closed = false;
+        $netscapeEmitted = false;
+        $firstCovers = false;
 
         while ($pos < $len) {
             $block = ord($b[$pos]);
@@ -148,14 +160,16 @@ final class StorefrontAnimatedImage
                 $label = ord($b[$pos + 1]);
                 $start = $pos;
                 if ($label === 0xF9) { // graphic control: [size=4][packed][delay u16][transp][0]
-                    if ($pos + 8 > $len || ord($b[$pos + 2]) !== 4) {
+                    // [21][F9][04][packed][delay u16][transparent idx][00]: الخاتمة 0x00 إلزامية — بايتٌ آخر يفسّره
+                    // مفكّكٌ مطابق للمواصفة كطول كتلة فرعية فيختلف عدّ الإطارات عمّا فحصناه.
+                    if ($pos + 8 > $len || ord($b[$pos + 2]) !== 4 || ord($b[$pos + 7]) !== 0) {
                         throw $this->unreadable();
                     }
                     $delay = $this->u16($b, $pos + 4) * 10;
                     $pendingDelayMs = $delay <= self::MIN_FRAME_MS ? 100 : $delay;
-                    $end = $pos + 8;
-                    $clean .= substr($b, $start, $end - $start);
-                    $pos = $end;
+                    // يُعاد بناؤه قانونياً بدل النسخ الحرفي.
+                    $clean .= "\x21\xF9\x04".$b[$pos + 3].$b[$pos + 4].$b[$pos + 5].$b[$pos + 6]."\x00";
+                    $pos += 8;
 
                     continue;
                 }
@@ -171,13 +185,15 @@ final class StorefrontAnimatedImage
                 }
                 $subStart = $pos;
                 $pos = $this->skipSubBlocks($b, $pos, $len);
-                if ($label === 0xFF && $app === 'NETSCAPE2.0') {
+                if ($label === 0xFF && $app === 'NETSCAPE2.0' && ! $netscapeEmitted) {
                     $sub = substr($b, $subStart, $pos - $subStart);
-                    // [11]["NETSCAPE2.0"][3][1][loops u16][0]
+                    // [11]["NETSCAPE2.0"][3][1][loops u16][0] — أي كتل فرعية إضافية لا تُنسخ، ولا يُقبل إلا امتدادٌ واحد.
                     if (strlen($sub) >= 17 && ord($sub[12]) === 3 && ord($sub[13]) === 1) {
-                        $loop = ($this->u16($sub, 14) === 0);
+                        $loops = $this->u16($sub, 14);
+                        $loop = ($loops === 0);
+                        $clean .= "\x21\xFF\x0BNETSCAPE2.0\x03\x01".pack('v', $loops)."\x00";
+                        $netscapeEmitted = true;
                     }
-                    $clean .= substr($b, $start, $pos - $start);
                 }
 
                 // التعليقات (0xFE) والنص العادي (0x01) وامتدادات التطبيق الأخرى (XMP…) تُسقَط.
@@ -194,6 +210,10 @@ final class StorefrontAnimatedImage
                 $fh = $this->u16($b, $pos + 7);
                 if ($fw < 1 || $fh < 1 || $left + $fw > $w || $top + $fh > $h) {
                     throw $this->unreadable();
+                }
+                if ($frames === 0) {
+                    // الإطار الأول يغطي اللوحة كاملة؟ وإلا فصورة GD (بحجم الإطار) ليست الإطار الأول المعروض.
+                    $firstCovers = ($left === 0 && $top === 0 && $fw === $w && $fh === $h);
                 }
                 $start = $pos;
                 $local = ord($b[$pos + 9]);
@@ -236,6 +256,7 @@ final class StorefrontAnimatedImage
                 'loop' => $loop,
             ],
             'clean' => $clean."\x3B",
+            'poster_ok' => $firstCovers,
         ];
     }
 
@@ -276,8 +297,12 @@ final class StorefrontAnimatedImage
         $chunks = $this->riffChunks($b, 12, $riffEnd);
         $first = $chunks[0] ?? null;
 
-        // ثابت (VP8 / VP8L بلا VP8X): ليس متحركاً؛ الأبعاد يقرأها GD.
+        // ثابت (VP8 / VP8L بلا VP8X): ليس متحركاً؛ الأبعاد يقرأها GD. أي جزء أول آخر (JUNK/ANIM/ANMF…) تالف.
         if ($first !== null && $first['id'] !== 'VP8X') {
+            if (! in_array($first['id'], ['VP8 ', 'VP8L'], true)) {
+                throw $this->unreadable();
+            }
+
             return [
                 'meta' => ['format' => self::FORMAT_WEBP, 'animated' => false, 'width' => 0, 'height' => 0, 'frames' => 1, 'duration_ms' => 0, 'loop' => false],
                 'clean' => $b,
@@ -313,7 +338,10 @@ final class StorefrontAnimatedImage
                 }
                 $anim = ['loops' => $this->u16($b, $c['data'] + 4)];
             } elseif ($c['id'] === 'ICCP') {
-                $icc = substr($b, $c['hdr'], 8 + $c['size'] + ($c['size'] & 1));
+                // ملف الألوان يُحفَظ إن كان بحجمٍ معقول؛ الأكبر يُسقَط (بايتات اعتباطية) ويُمسح رايته.
+                if ($c['size'] <= self::MAX_ICC_BYTES) {
+                    $icc = substr($b, $c['hdr'], 8 + $c['size'] + ($c['size'] & 1));
+                }
             } elseif ($c['id'] === 'ANMF') {
                 if ($anim === null || $c['size'] < 16 + 8) {
                     throw $this->unreadable();
@@ -331,7 +359,14 @@ final class StorefrontAnimatedImage
                 if (count($bitstream) !== 1) {
                     throw $this->unreadable();
                 }
-                $frames[] = substr($b, $c['hdr'], 8 + $c['size'] + ($c['size'] & 1));
+                // يُعاد بناء الإطار: ترويسة ANMF (16 بايت) + أجزاء البيانات ALPH/VP8/VP8L فقط (لا XMP/مجهول داخله).
+                $kept = '';
+                foreach ($inner as $i) {
+                    if (in_array($i['id'], ['ALPH', 'VP8 ', 'VP8L'], true)) {
+                        $kept .= substr($b, $i['hdr'], 8 + $i['size'] + ($i['size'] & 1));
+                    }
+                }
+                $frames[] = $this->chunk('ANMF', substr($b, $c['data'], 16).$kept);
                 if (count($frames) > self::HARD_FRAME_CEILING) {
                     throw new StorefrontMediaException('animated_too_many_frames', 'عدد إطارات الصورة المتحركة يتجاوز الحد المسموح.');
                 }
@@ -348,8 +383,8 @@ final class StorefrontAnimatedImage
             throw $this->unreadable();
         }
 
-        // VP8X: نُبقي الحركة والألفا وICC ونمسح EXIF/XMP.
-        $vp8x = chr($flags & ~0x0C).substr($b, $first['data'] + 1, 9);
+        // VP8X: نُبقي الحركة والألفا وICC (إن بقي) ونمسح EXIF/XMP.
+        $vp8x = chr(($flags & ~0x0C & ($icc === null ? ~0x20 : 0xFF)) & 0xFF).substr($b, $first['data'] + 1, 9);
         $body = 'WEBP'.$this->chunk('VP8X', $vp8x).($icc ?? '');
         $body .= $this->chunk('ANIM', $this->animBody($b, $chunks));
         $body .= implode('', $frames);
@@ -375,7 +410,7 @@ final class StorefrontAnimatedImage
     {
         foreach ($chunks as $c) {
             if ($c['id'] === 'ANIM') {
-                return substr($b, $c['data'], $c['size']);
+                return substr($b, $c['data'], 6); // رأس ANIM القانوني فقط (لون الخلفية + عدد الحلقات)
             }
         }
 

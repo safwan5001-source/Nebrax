@@ -71,4 +71,68 @@ trait AnimatedMediaFixtures
 
         return substr($b, 0, $o).$w.$h.substr($b, $o + 6);
     }
+
+    /** الإطار الأول 100×100 عند (50,50) داخل لوحة 400×400: GD سيفكّه بحجم الإطار لا اللوحة. */
+    protected function gifWithPartialFirstFrame(): string
+    {
+        $b = $this->animatedGifBytes();
+        $gce = strpos($b, "\x21\xF9");
+        $img = strpos($b, "\x2C", $gce);
+        $this->assertNotFalse($img);
+
+        return substr($b, 0, $img + 1).pack('v4', 50, 50, 100, 100).substr($b, $img + 9);
+    }
+
+    /** خاتمة GCE ≠ 0x00: مفكّكٌ آخر يقرؤها طول كتلة فرعية (اختلاف تفسير). */
+    protected function gifWithBadGceTerminator(): string
+    {
+        $b = $this->animatedGifBytes();
+        $gce = strpos($b, "\x21\xF9");
+        $b[$gce + 7] = "\x05";
+
+        return $b;
+    }
+
+    /** كتلة فرعية إضافية داخل امتداد NETSCAPE تحمل بايتات اعتباطية. */
+    protected function gifWithNetscapeExtraData(): string
+    {
+        $b = $this->animatedGifBytes();
+        $needle = "NETSCAPE2.0\x03\x01\x00\x00\x00";
+        $this->assertNotFalse(strpos($b, $needle));
+
+        return str_replace($needle, "NETSCAPE2.0\x03\x01\x00\x00\x0Csecret-gps-1\x00", $b);
+    }
+
+    /** يضيف جزءاً غير معروف (XMP) داخل ANMF الأول ويصحّح الأحجام. */
+    protected function webpWithInnerMetadata(): string
+    {
+        $b = $this->animatedWebpBytes();
+        $pos = strpos($b, 'ANMF');
+        $size = unpack('V', substr($b, $pos + 4, 4))[1];
+        $this->assertSame(0, $size % 2);
+        $extra = 'XMP '.pack('V', 8).'LEAKLEAK';
+        $b = substr($b, 0, $pos + 4).pack('V', $size + strlen($extra)).substr($b, $pos + 8, $size).$extra.substr($b, $pos + 8 + $size);
+
+        return 'RIFF'.pack('V', strlen($b) - 8).substr($b, 8);
+    }
+
+    /** ANIM أكبر من 6 بايت بذيلٍ اعتباطي. */
+    protected function webpWithOversizeAnim(): string
+    {
+        $b = $this->animatedWebpBytes();
+        $pos = strpos($b, 'ANIM');
+        $this->assertSame(6, unpack('V', substr($b, $pos + 4, 4))[1]);
+        $b = substr($b, 0, $pos + 4).pack('V', 12).substr($b, $pos + 8, 6).'META!!'.substr($b, $pos + 14);
+
+        return 'RIFF'.pack('V', strlen($b) - 8).substr($b, 8);
+    }
+
+    /** جزء JUNK أولاً بدل VP8X/VP8/VP8L. */
+    protected function webpJunkFirst(): string
+    {
+        $b = $this->animatedWebpBytes();
+        $body = 'WEBP'.'JUNK'.pack('V', 4).'abcd'.substr($b, 12);
+
+        return 'RIFF'.pack('V', strlen($body)).$body;
+    }
 }

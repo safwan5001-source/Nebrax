@@ -108,7 +108,10 @@ class StorefrontCustomizerMediaController extends PublicApiController
 
         // المحتوى مشتقٌّ من بصمة الأصل واسم الملف: تتغيّر إن تغيّر الأصل (لا يحدث —
         // الأصل ثابت)، وتبقى مستقرةً عبر إعادة توليد السلّم بالإعدادات نفسها.
-        return [$media, substr(hash('sha256', $media->sha256.':'.$file), 0, 32), fn () => $service->readVariant($media, $file)];
+        // الملف المتحرك المنقّى مشتقٌّ من الأصل بمنقٍّ مُرقَّم: تغيّر المنقّي يغيّر الـETag فلا 304 على بايتات قديمة.
+        $salt = StorefrontAnimatedImage::isValidFileName($file) ? ':s'.StorefrontAnimatedImage::SANITISER_VERSION : '';
+
+        return [$media, substr(hash('sha256', $media->sha256.':'.$file.$salt), 0, 32), fn () => $service->readVariant($media, $file)];
     }
 
     /** @return array{0:StorefrontMedia,1:string,2:\Closure} */

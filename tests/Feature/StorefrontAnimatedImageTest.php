@@ -180,6 +180,91 @@ class StorefrontAnimatedImageTest extends TestCase
         ];
     }
 
+    // ───────── independent security review (findings #1–#4) ─────────
+
+    /** @test */
+    public function a_gif_whose_first_frame_does_not_cover_the_canvas_has_no_safe_poster(): void
+    {
+        $bytes = $this->gifWithPartialFirstFrame();
+
+        $this->assertSame(3, $this->sut()->inspect($bytes, self::GIF)['frames'], 'structurally valid');
+        $this->assertNull($this->sut()->posterBytes($bytes, self::GIF), 'GD would size the poster to the 100×100 frame, not the 400×400 canvas');
+    }
+
+    /** @test */
+    public function the_gif_poster_is_the_sanitised_copy_and_decodes_at_canvas_size(): void
+    {
+        $poster = $this->sut()->posterBytes($this->gifWithMetadata(), self::GIF);
+
+        $this->assertNotNull($poster);
+        $this->assertStringNotContainsString('secret-note', $poster);
+        $this->assertSame([400, 400], array_slice(getimagesizefromstring($poster), 0, 2));
+    }
+
+    /** @test */
+    public function a_graphic_control_block_with_a_non_zero_terminator_is_rejected_not_copied(): void
+    {
+        $this->expectException(StorefrontMediaException::class);
+
+        $this->sut()->inspect($this->gifWithBadGceTerminator(), self::GIF);
+    }
+
+    /** @test */
+    public function the_sanitised_gif_is_rebuilt_canonically_so_a_strict_decoder_and_inspect_agree(): void
+    {
+        $clean = $this->sut()->sanitize($this->animatedGifBytes(), self::GIF);
+
+        // every graphic-control block is the canonical 8 bytes with a 0x00 terminator
+        preg_match_all('/\x21\xF9\x04.{4}\x00/s', $clean, $gce);
+        $this->assertCount(3, $gce[0]);
+        $this->assertNotFalse(@imagecreatefromstring($clean));
+        $this->assertSame(
+            $this->sut()->inspect($this->animatedGifBytes(), self::GIF),
+            $this->sut()->inspect($clean, self::GIF),
+        );
+    }
+
+    /** @test */
+    public function arbitrary_bytes_hidden_in_netscape_anim_or_anmf_do_not_survive_sanitising(): void
+    {
+        $gif = $this->sut()->sanitize($this->gifWithNetscapeExtraData(), self::GIF);
+        $this->assertStringNotContainsString('secret-gps-1', $gif);
+        $this->assertSame(1, substr_count($gif, 'NETSCAPE2.0'));
+        $this->assertStringContainsString("NETSCAPE2.0\x03\x01\x00\x00\x00", $gif, 'canonical 19-byte loop extension');
+        $this->assertTrue($this->sut()->inspect($gif, self::GIF)['loop']);
+
+        $inner = $this->sut()->sanitize($this->webpWithInnerMetadata(), self::WEBP);
+        $this->assertStringNotContainsString('LEAKLEAK', $inner);
+        $this->assertStringNotContainsString('XMP ', $inner);
+        $this->assertSame(3, $this->sut()->inspect($inner, self::WEBP)['frames']);
+
+        $anim = $this->sut()->sanitize($this->webpWithOversizeAnim(), self::WEBP);
+        $this->assertStringNotContainsString('META!!', $anim);
+        $this->assertSame(strlen($anim) - 8, unpack('V', substr($anim, 4, 4))[1], 'RIFF size consistent after rebuilding');
+    }
+
+    /** @test */
+    public function many_netscape_extensions_collapse_to_one(): void
+    {
+        $b = $this->animatedGifBytes();
+        $ns = "\x21\xFF\x0BNETSCAPE2.0\x03\x01\x00\x00\x00";
+        $pos = strpos($b, $ns);
+        $flood = substr($b, 0, $pos).str_repeat($ns, 5000).substr($b, $pos);
+
+        $clean = $this->sut()->sanitize($flood, self::GIF);
+
+        $this->assertSame(1, substr_count($clean, 'NETSCAPE2.0'));
+        $this->assertLessThan(strlen($this->animatedGifBytes()), strlen($clean));
+    }
+
+    /** @test */
+    public function a_webp_that_starts_with_an_unknown_chunk_is_rejected(): void
+    {
+        $this->expectException(StorefrontMediaException::class);
+
+        $this->sut()->inspect($this->webpJunkFirst(), self::WEBP);
+    }
+
     /** @test */
     public function the_frame_ceiling_protects_the_parser_itself(): void
     {

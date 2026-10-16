@@ -4,6 +4,8 @@
 **Delivered:** Phase 1 — animated **GIF** and animated **WebP**. **Not delivered (deliberately):** Phase 2 — animated AVIF, MP4, WebM (reasons in §4).
 **Status:** PR open, **not merged, not deployed.**
 
+> **Update 2026-10-16:** after the owner's review, the no-JavaScript limitation was fixed, real-Chromium validation was added, an independent security review was run (3 sanitiser issues found and fixed), and Phase 2 was designed. See **`AWJ-ANIMATED-MEDIA-PHASE1-ACCEPTANCE-REPORT.md`** (supersedes the corresponding statements below) and `docs/plans/store/AWJ-ANIMATED-MEDIA-PHASE2-ARCHITECTURE-PROPOSAL.md`.
+
 | | |
 |---|---|
 | Branch | `claude/awj-animated-media-support-7kzzga` |
@@ -99,7 +101,7 @@ No accounting, ledger, POS, ZATCA or other ERP module was touched.
 **Behavioural limitations (by design):**
 - Animated media: backgrounds of hero/banner sections and slider slides only; no crop / rotate / focal / fit.
 - Text over motion needs a strong scrim (proven for any frame) — otherwise publish says `contrast_unprovable`.
-- Visitors **without JavaScript** get the animation but no pause control (control is hydration-gated); reduced-motion visitors never get the animation.
+- ~~Visitors without JavaScript get the animation but no pause control~~ **Fixed (2026-10-16):** the server HTML now carries only the still; the animation and its pause control are added together after hydration. Reduced-motion visitors never get the animation.
 - An animated hero is its own LCP element and a 5 MB GIF is heavy; animated WebP is recommended (the admin hint does not yet say so).
 - The editor Canvas preview shows the first frame (play only in the library / field preview).
 
@@ -144,7 +146,7 @@ No accounting, ledger, POS, ZATCA or other ERP module was touched.
 | Risk | Mitigation / next |
 |---|---|
 | LCP / bandwidth for animated heroes | recommend animated WebP; consider a lower default cap or a first-paint poster-then-swap strategy |
-| No pause for no-JS visitors | acceptable per V0 (controls are progressive); could be revisited |
+| ~~No pause for no-JS visitors~~ | fixed — no-JS gets the still only |
 | `MotionToggle` store is module-global per `id` (same animation used twice shares pause) | acceptable; document |
 | Unverified in real browsers / production R2 | run the existing Playwright visual specs + a production browser check before enabling |
 | Animated logo / gallery / content blocks refused | extend renderers (`MediaImage`, gallery, content blocks) in a later slice if wanted |
