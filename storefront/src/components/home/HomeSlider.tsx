@@ -507,6 +507,12 @@ export function HomeSlider({
             ) : null}
           </div>
         </>
+      ) : mounted && hasMotion ? (
+        // WCAG 2.2.2: a lone slide left after unavailable ones were dropped has no arrows or dots, but its animation
+        // still needs the pause control (the same bar the controls case renders).
+        <div data-slider-bar="">
+          <MotionToggle id={`${idBase}-motion`} />
+        </div>
       ) : null}
     </section>
   );

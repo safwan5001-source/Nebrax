@@ -1395,7 +1395,8 @@
 /* two-tone focus ring: visible on a light or a dark picture */
 .awj-store-preview [data-slider-arrow]:focus-visible,
 .awj-store-preview [data-slider-pause]:focus-visible,
-.awj-store-preview [data-slider-dots] button:focus-visible {
+.awj-store-preview [data-slider-dots] button:focus-visible,
+.awj-store-preview [data-motion-toggle]:focus-visible {
   outline: 2px solid #fff;
   outline-offset: 2px;
   box-shadow: 0 0 0 2px #000;

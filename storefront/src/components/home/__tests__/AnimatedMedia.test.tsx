@@ -290,6 +290,48 @@ describe("HomeSlider with animated slides", () => {
     ).toBe(1);
   });
 
+  // WCAG 2.2.2: a slider whose other slides were dropped (unavailable media) still has an animation that must be pausable.
+  const lone = (animated: boolean): SliderView => ({
+    slides: [slide(0, animated ? "gif" : undefined)],
+    behaviour: resolveSliderBehaviour(undefined),
+  });
+
+  it("a lone animated slide (no arrows, no dots) still gets the pause control, and pausing drops the animation", async () => {
+    mount(lone(true));
+    const toggle = await screen.findByRole("button", {
+      name: "Pause animation",
+    });
+    expect(toggle.closest("[data-slider-bar]")).not.toBeNull();
+    expect(document.querySelector("[data-slider-arrow]")).toBeNull();
+    expect(document.querySelector("[data-slider-dots]")).toBeNull();
+    expect(document.querySelectorAll("source[type='image/gif']").length).toBe(
+      1,
+    );
+    fireEvent.click(toggle);
+    expect(screen.getByRole("button", { name: "Play animation" })).toBeTruthy();
+    expect(document.querySelector("source[type='image/gif']")).toBeNull();
+  });
+
+  it("a lone static slide gets no bar at all, and the lone animated slide's server markup has none either (no dead control without JS)", async () => {
+    mount(lone(false));
+    await act(async () => undefined);
+    expect(document.querySelector("[data-slider-bar]")).toBeNull();
+    cleanup();
+    const html = renderToString(
+      withIntl(
+        <HomeSlider
+          view={lone(true)}
+          labels={labels}
+          basePath="/sa/ar"
+          dir="ltr"
+          sectionId="sl"
+        />,
+      ),
+    );
+    expect(html).not.toContain("data-slider-bar");
+    expect(html).not.toContain("data-motion-toggle");
+  });
+
   it("without animated slides there is no motion toggle and no animated source", async () => {
     mount(view(false));
     await act(async () => undefined);

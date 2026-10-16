@@ -21,6 +21,7 @@ import {
   usageStatus,
 } from "@/modules/commerce-workspace/storefront-media";
 import type { MediaRef } from "../presentation/media-ref";
+import { setAnimatedPreview } from "./animated-preview-store";
 import { onUsageGenerated, pickPreviewUrl, usageKey } from "./use-usage-readiness";
 
 const POLL_MS = 2000;
@@ -43,6 +44,8 @@ export function useMediaRefPreview(ref: MediaRef | null): string | null {
         if (!live) return;
         const base = asset?.previewUrl ?? asset?.thumbnailUrl ?? null;
         setUrl(base);
+        // an animated asset: also hand the sanitised animated copy to the Canvas motion preview (no second request)
+        setAnimatedPreview(ref.mediaId, asset?.animation?.url ?? null);
         if (asset && usageNeedsDerivatives(ref)) {
           // A usage another tab/user is generating (`processing`) is followed to completion (bounded);
           // `absent` is picked up by the in-page `onUsageGenerated` signal below.

@@ -416,7 +416,7 @@ export function StorefrontPreviewCanvas({
     if (bg?.kind !== "media") return null;
     const resolved = resolveSectionDesign(section.type, section.design, designContext);
     if (!resolved?.attrs["data-sd"]?.split(" ").includes("mbg")) return null;
-    return <CanvasBackdrop background={bg} viewport={viewport} />;
+    return <CanvasBackdrop background={bg} viewport={viewport} motionLabels={{ pause: t("canvasMotionPause"), play: t("canvasMotionPlay") }} />;
   };
   // CUST-HV V7c-2 — the same decision the published Home makes: opted in, first visible section a proven full-picture
   // hero, picture really rendered (the resolver emitted `mbg`) — else the header stays solid.
@@ -1081,6 +1081,7 @@ export function StorefrontPreviewCanvas({
                     goTo: t("canvasSliderGoTo"),
                     empty: t("canvasSliderEmpty"),
                     autoplayNote: t("canvasSliderAutoplayNote"),
+                    motion: { pause: t("canvasMotionPause"), play: t("canvasMotionPlay") },
                   }}
                 />
               );
@@ -2395,6 +2396,9 @@ function SelectablePreviewSection({
       data-section-selected={selected ? "" : undefined}
       onClick={() => onSelect(sectionId)}
       onKeyDown={(event) => {
+        // only the wrapper's own Enter / Space selects: a keystroke bubbling from a control inside the section (slider arrows and
+        // dots, the motion toggle) must reach that control, not be cancelled here
+        if (event.target !== event.currentTarget) return;
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           onSelect(sectionId);
