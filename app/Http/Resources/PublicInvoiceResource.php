@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Support\InvoicePartySnapshot;
 use App\Support\PublicMoney;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -40,11 +41,20 @@ class PublicInvoiceResource extends JsonResource
             'invoice_date'   => $this->invoice_date?->toDateString(),
             'due_date'       => $this->due_date?->toDateString(),
             'partner_id'     => $this->partner_id,
-            'partner'        => $this->whenLoaded('partner', fn () => $this->partner ? [
-                'id'   => $this->partner->id,
-                'name' => $this->partner->name,
-                'code' => $this->partner->code,
-            ] : null),
+            // REM-14c: اسم العميل في فاتورة مرحَّلة ذات لقطة v1 يأتي من لقطة لحظة الإصدار (الشكل نفسه)؛ المسودة والمرحَّلة
+            // قبل REM-14 على القراءة الحية. `code` مرجع العميل الحالي وليس جزءاً من اللقطة.
+            'partner'        => $this->whenLoaded('partner', function () {
+                if (! $this->partner) {
+                    return null;
+                }
+                $snapshot = $this->status === 'posted' ? InvoicePartySnapshot::parse($this->party_snapshot) : null;
+
+                return [
+                    'id'   => $this->partner->id,
+                    'name' => $snapshot !== null ? ($snapshot['buyer']['name'] ?? null) : $this->partner->name,
+                    'code' => $this->partner->code,
+                ];
+            }),
             'currency'       => PublicMoney::currency($request),
             'subtotal_minor' => PublicMoney::minor($this->subtotal),
             'discount_minor' => PublicMoney::minor($this->discount),

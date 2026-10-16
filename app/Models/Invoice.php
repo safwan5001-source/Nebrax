@@ -52,6 +52,8 @@ class Invoice extends BaseModel
         'is_paid'      => 'boolean',
         // REM-13a: لحظة الإصدار القانونية (UTC، ثانية). ليست في $fillable عمداً — تُكتب مرة واحدة في post() فقط.
         'issued_at'    => UtcSecondInstant::class,
+        // REM-14: لقطة البائع/المشتري لحظة الإصدار (v1). ليست في $fillable عمداً — تُكتب مرة واحدة في post() فقط.
+        'party_snapshot' => 'array',
     ];
 
     protected $attributes = [
@@ -177,18 +179,52 @@ class Invoice extends BaseModel
     }
 
     /**
-     * REM-13a / ADR-0001 — `issued_at` يُكتب مرة واحدة (من null) داخل معاملة الترحيل ولا يتغيّر بعدها.
-     * الحارس يقارن القيمة الخام المخزَّنة، فيرفض التعديل والمسح معاً. التعديل الجماعي عبر Builder خارج
-     * متناول أحداث النموذج؛ الحماية هناك أنّ العمود ليس في $fillable ولا في أي FormRequest.
+     * الأعمدة «تُكتب مرة واحدة» (من null) داخل معاملة الترحيل ثم تثبت: لحظة الإصدار (REM-13a) ولقطة الأطراف (REM-14).
+     *
+     * الحارس يرفض التعديل والمسح معاً، ويقارن القيمة المنطقية (JSON مفكوكاً للقطة) لا النص الخام فلا يختلف
+     * بين SQLite وPostgreSQL. وإن لم يكن العمود محمَّلاً أصلاً في النموذج (select جزئي) يقرأ القيمة المخزَّنة من
+     * الصف نفسه بالمفتاح الأساسي **بلا نطاقات** — كي لا يتيح نموذجٌ جزئي ما يمنعه الكامل.
+     *
+     * حدود Eloquent الموثَّقة (لا يغطيها أي حارس نموذج): `Invoice::query()->update()` والتحديث الجماعي،
+     * `DB::table('invoices')` وSQL الخام، و`saveQuietly`. لا يوجد في التطبيق مسار منها (يحرس ذلك
+     * `InvoicePartySnapshotTest::no_application_code_writes_the_write_once_columns_outside_the_posting_path`)،
+     * ولا العمودان في $fillable ولا في أي FormRequest. ما يبقى نظرياً هو وصول مباشر إلى قاعدة البيانات.
      */
     protected static function booted(): void
     {
         static::updating(function (self $invoice): void {
-            $original = $invoice->getRawOriginal('issued_at');
-            if ($original !== null && ($invoice->getAttributes()['issued_at'] ?? null) !== $original) {
-                throw new LogicException('لحظة إصدار الفاتورة (issued_at) ثابتة بعد الترحيل ولا يجوز تعديلها.');
+            $attributes = $invoice->getAttributes();
+            $rawOriginal = $invoice->getRawOriginal();
+
+            foreach (['issued_at', 'party_snapshot'] as $column) {
+                if (! array_key_exists($column, $attributes)) {
+                    continue; // العمود لم يُحمَّل ولم يُسنَد: لن يُكتب.
+                }
+
+                $stored = array_key_exists($column, $rawOriginal)
+                    ? $rawOriginal[$column]
+                    : $invoice->newQueryWithoutScopes()->whereKey($invoice->getKey())->value($column);
+
+                if ($stored === null) {
+                    continue; // أول كتابة (الترحيل) مسموحة.
+                }
+
+                if (self::normalizeWriteOnce($column, $attributes[$column]) !== self::normalizeWriteOnce($column, $stored)) {
+                    throw new LogicException(
+                        "العمود {$column} في الفاتورة يُكتب مرة واحدة عند الترحيل ثم يثبت؛ لا يجوز تعديله أو مسحه."
+                    );
+                }
             }
         });
+    }
+
+    private static function normalizeWriteOnce(string $column, mixed $value): mixed
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        return $column === 'party_snapshot' && is_string($value) ? json_decode($value, true) : $value;
     }
 
     public function isDraft(): bool

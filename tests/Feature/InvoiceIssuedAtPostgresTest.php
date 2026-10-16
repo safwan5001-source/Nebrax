@@ -204,6 +204,10 @@ class InvoiceIssuedAtPostgresTest extends TestCase
         $row = DB::table('invoices')->where('id', $draft->id)->first();
         $this->assertSame('posted', $row->status);
         $this->assertNotNull($row->issued_at, 'لحظة الإصدار مكتوبة مرة واحدة من الفائز');
+        // REM-14: ولقطة الأطراف كذلك — نسخة واحدة سليمة v1 من الفائز، لا يتنازع عليها الخاسر.
+        $snapshot = json_decode((string) $row->party_snapshot, true);
+        $this->assertSame(1, $snapshot['v']);
+        $this->assertSame('عميل', $snapshot['buyer']['name']);
         $this->assertSame(1, (int) $row->zatca_icv);
         $this->assertSame(1, JournalEntry::where('source_type', Invoice::class)->where('source_id', $draft->id)->count());
     }
@@ -223,6 +227,12 @@ class InvoiceIssuedAtPostgresTest extends TestCase
         $rows = DB::table('invoices')->whereIn('id', array_map(fn ($d) => $d->id, $drafts))
             ->orderBy('zatca_icv')->get(['issued_at', 'zatca_icv', 'zatca_xml', 'zatca_hash', 'zatca_previous_hash']);
 
+        // REM-14: كل فاتورة لها لقطتها الكاملة (v1) — لا لقطة مفقودة ولا مشتركة.
+        foreach ($drafts as $d) {
+            $snap = json_decode((string) DB::table('invoices')->where('id', $d->id)->value('party_snapshot'), true);
+            $this->assertSame(1, $snap['v']);
+            $this->assertSame($this->customer->id, $snap['buyer']['partner_id']);
+        }
         // ICV متصل بلا تكرار أو فجوات.
         $this->assertSame([1, 2, 3, 4], $rows->pluck('zatca_icv')->map(fn ($v) => (int) $v)->all());
         // لحظة الإصدار غير متناقصة مع ICV (تُلتقط داخل القسم المقفول نفسه الذي يُولَّد فيه ICV).
@@ -236,5 +246,35 @@ class InvoiceIssuedAtPostgresTest extends TestCase
         for ($i = 1; $i < $rows->count(); $i++) {
             $this->assertSame($hasher->hash($rows[$i - 1]->zatca_xml), $rows[$i]->zatca_previous_hash);
         }
+    }
+    /** @test */
+    public function a_concurrent_partner_edit_never_produces_a_mixed_snapshot(): void
+    {
+        // الترحيل يقرأ صف العميل مرة واحدة؛ والتعديل المتزامن يعدّل اسمه ورقمه الضريبي في تحديث واحد.
+        // اللقطة يجب أن تكون إحدى الحالتين المتماسكتين كاملتين، لا مزيجاً (اسم قديم + رقم جديد).
+        $this->customer->update(['name' => 'الاسم القديم', 'vat_number' => '300000000000003']);
+        $draft = $this->draft();
+        $tenantId = $this->tenant->id;
+        $customerId = $this->customer->id;
+
+        $editor = function () use ($tenantId, $customerId) {
+            app(TenantContext::class)->set($tenantId);
+            app(BranchContext::class)->forget();
+            Partner::findOrFail($customerId)->update(['name' => 'الاسم الجديد', 'vat_number' => '399999999999993']);
+
+            return ['edited' => true];
+        };
+
+        $results = $this->runConcurrently([$this->poster($draft->id), $editor]);
+
+        foreach ($results as $r) {
+            $this->assertFalse($this->isDeadlock($r), json_encode($r));
+            $this->assertTrue($r['ok'], json_encode($r));
+        }
+        $buyer = json_decode((string) DB::table('invoices')->where('id', $draft->id)->value('party_snapshot'), true)['buyer'];
+        $this->assertContains([$buyer['name'], $buyer['vat_number']], [
+            ['الاسم القديم', '300000000000003'],
+            ['الاسم الجديد', '399999999999993'],
+        ], 'لقطة متماسكة لا مختلطة');
     }
 }
