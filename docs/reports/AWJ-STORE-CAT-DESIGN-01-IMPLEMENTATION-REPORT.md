@@ -7,7 +7,7 @@ Category section design controls for the AWJ Store homepage (`التصنيفات
 | **Status** | Implemented on a feature branch, PR open for review. **Not merged, not deployed.** |
 | **Branch** | `claude/ecstatic-curie-yeo8nd` |
 | **Base SHA** | `a2d2fcb7f83cfaa8cb361eb2744de7fc649393e5` (`origin/main`, "refine AWJ Core-Dark shell (#1539)") |
-| **Head SHA / PR** | See §14 (filled in after push) |
+| **Head SHA / PR** | See §14 — PR #1542 |
 | **Scope owner decisions needed** | 3 — see §12 (extra Canvas media route · px values vs named steps · route allow-list entry) |
 
 ---
@@ -181,4 +181,12 @@ Dev-only fixtures (404 in production, local SVG pictures — no network): storef
 Review §12, then merge-gate on CI (sqlite + pgsql + Web CI + Storefront CI). Afterwards: free-colour controls with a publish-time contrast gate, and the sub-category count as an optional `name` meta line.
 
 ## 14. Final state
-(Filled in at the end of the session: full backend suite result, branch, PR URL/number, Head SHA.)
+
+| | |
+|---|---|
+| Branch | `claude/ecstatic-curie-yeo8nd` |
+| PR | [safwan5001-source/Nebrax#1542](https://github.com/safwan5001-source/Nebrax/pull/1542) — open, ready for review, **not merged** |
+| Base SHA | `a2d2fcb7f83cfaa8cb361eb2744de7fc649393e5` |
+| Head SHA (code) | `c2c651c4a825543e2c6a7263b8bdc90cf50432f4` (a follow-up docs-only commit adds this section) |
+| CI | Not yet observed at the time of writing — check the PR's checks (sqlite + pgsql, Web CI, Storefront CI). |
+| Deployed | No. |
