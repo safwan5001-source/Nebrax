@@ -2396,6 +2396,9 @@ function SelectablePreviewSection({
       data-section-selected={selected ? "" : undefined}
       onClick={() => onSelect(sectionId)}
       onKeyDown={(event) => {
+        // only the wrapper's own Enter / Space selects: a keystroke bubbling from a control inside the section (slider arrows and
+        // dots, the motion toggle) must reach that control, not be cancelled here
+        if (event.target !== event.currentTarget) return;
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           onSelect(sectionId);
