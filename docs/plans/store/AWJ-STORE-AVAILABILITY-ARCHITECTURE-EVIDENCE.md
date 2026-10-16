@@ -28,3 +28,22 @@
 
 ## No claims made
 No tests/CI/build were executed for this read-only source inspection. No production database/query access or live transaction observed. No code, migration, source contract, deployment, or merge changed. Status remains Proposed.
+
+
+## Focused second-pass findings — 2026-10-16
+Source inspection, **not an executed integration test**:
+- `CommerceCartService::purchasable()` (approx. lines 717–778) validates tenant/channel published listing, active product, variant/UOM and price; it **does not check warehouse ATS or `track_inventory`**. Cart add/update can therefore differ from the storefront's out-of-stock display. This is an important UI/contract parity gap, not proof that a live checkout succeeds.
+- `CommerceCheckoutService::revalidateAndPrice()` (approx. 770–808) resolves the fulfillment warehouse and checks ATS **only if `track_inventory` is true**, so non-tracked items bypass this stock gate at checkout.
+- **Critical caveat:** `CommerceOrderReservationService::reserve()` (approx. 116–132) calls `resolveWarehouseFor()` **before iterating the lines and skipping `!track_inventory` products**. Thus a confirmed order containing *only* non-tracked items may still fail its reservation orchestration if the sales channel has no configured warehouse. Do not advertise `no warehouse required` until this path and its callers are tested and an explicit contract approved.
+- `StorefrontProductController::batchAvailability()` (approx. 353–398) calculates ATS for every published product irrespective of `track_inventory`, so non-tracked zero-stock items can receive `in_stock=false` in catalog. The product-detail and variant availability paths also use warehouse ATS without `track_inventory` gating.
+- Physical-product made-to-order remains unresolved; nothing above proves a safe goods-assembly/fulfillment/accounting flow.
+
+### Exact reproducible regression tests for implementation branch
+1. Publish a `track_inventory=false`, active, correctly priced product with zero ProductWarehouseStock; with configured channel warehouse, assert catalog, detail, cart add, checkout complete and confirmed-order reservation all agree on orderability and do not create inventory reservation/stock movement.
+2. Repeat with **no channel fulfillment warehouse**. Distinguish expected customer checkout path from any post-confirmation order reserve failure. Define whether non-stock-only orders should be legitimately allowed to operate warehouse-free, and ensure mixed baskets still require a warehouse for tracked lines.
+3. Verify a `track_inventory=true` variant product with zero ATS is rejected at checkout, including reservation competition.
+4. Tenant A/B, same product published on two channels, channel-specific settings, checkout retries, cancellation and no ledger/COGS changes from availability configuration alone.
+5. No backend feature implementation until proposed new semantics are explicitly approved. Tests above are **not yet executed**.
+
+### Updated review gate
+PR docs should remain **Draft / Proposed**. Requested original capability *without warehouse* is **not confirmed end-to-end** under current code. A minimal focused integration-test PR is the next appropriate verification; do not merge or deploy it without approval.
