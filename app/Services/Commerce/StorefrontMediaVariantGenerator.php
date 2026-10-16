@@ -43,6 +43,12 @@ final class StorefrontMediaVariantGenerator
     /** AWJ-ANIMATED-MEDIA P1 — مدخل الملف المتحرك المنقّى في `variants` (ليس درجة سلّم). */
     public const KIND_ANIM = 'anim';
 
+    /**
+     * AWJ-ANIMATED-MEDIA P2-0 — جودات التخفيف حين يتجاوز الترميز الأول سقف الحجم (`variant_max_bytes`)، تنازلياً.
+     * أدنى جودةٍ 45: دونها تتدهور الصورة بلا فائدةٍ تُذكر في الحجم، فيُفضَّل الرفض بخطأٍ صريح.
+     */
+    private const STEP_DOWN_QUALITY = [65, 55, 45];
+
     private const MIME = [
         self::FORMAT_WEBP => 'image/webp',
         self::FORMAT_JPG => 'image/jpeg',
@@ -106,11 +112,7 @@ final class StorefrontMediaVariantGenerator
             $evidence ??= StorefrontMediaPixelEvidence::scan($image);
 
             foreach ([self::FORMAT_WEBP, self::FORMAT_JPG] as $format) {
-                $quality = (int) config("storefront_media.quality.{$format}", 85);
-                $encoded = $format === self::FORMAT_WEBP
-                    ? $image->encodeUsingMediaType('image/webp', $quality)
-                    : $image->encodeUsingMediaType('image/jpeg', $quality);
-                $bytes = (string) $encoded;
+                $bytes = $this->encodeWithinCeiling($image, $format);
                 $file = self::fileName($kind, $width, $format);
                 $this->foldEncodedEvidence($evidence, $evidenceBroken, $bytes, 'frame');
 
@@ -124,7 +126,7 @@ final class StorefrontMediaVariantGenerator
                     'file' => $file,
                     'bytes' => strlen($bytes),
                 ];
-                unset($encoded, $bytes);
+                unset($bytes);
             }
         }
 
@@ -214,10 +216,7 @@ final class StorefrontMediaVariantGenerator
             foreach ([self::FORMAT_WEBP, self::FORMAT_JPG] as $format) {
                 $cacheKey = $image->width().'.'.$format;
                 if (! isset($encoded[$cacheKey])) {
-                    $quality = (int) config("storefront_media.quality.{$format}", 85);
-                    $encoded[$cacheKey] = (string) ($format === self::FORMAT_WEBP
-                        ? $image->encodeUsingMediaType('image/webp', $quality)
-                        : $image->encodeUsingMediaType('image/jpeg', $quality));
+                    $encoded[$cacheKey] = $this->encodeWithinCeiling($image, $format);
                     $this->foldEncodedEvidence($evidence, $evidenceBroken, $encoded[$cacheKey], 'transform');
                 }
                 $store($nominal, $format, $encoded[$cacheKey], self::MIME[$format], $image->width(), $image->height());
@@ -269,6 +268,45 @@ final class StorefrontMediaVariantGenerator
         }
 
         return [$x0, $y0, $cw, $ch];
+    }
+
+    /**
+     * AWJ-ANIMATED-MEDIA P2-0 (مراجعة) — يرمّز متغيّراً واحداً بحيث لا يتجاوز `storefront_media.variant_max_bytes`.
+     *
+     * السبب: حدّ الرفع (5 م.ب، ≤ 8192px، ≤ 40 ميغابكسل) يقيس الملف **المرفوع** لا المُعاد ترميزه؛ وحجم JPEG/WebP الناتج
+     * يتبع البكسلات × الإنتروبيا (صورة PNG صالحة 3.8 م.ب بعرض 1920 وارتفاع 8192 وضجيج بتّي تُنتج `1920w.jpg` بـ10.27 م.ب)،
+     * والوسيط العام في Next يرفض أي جسمٍ فوق 8 م.ب (502). فنفرض سقفاً أدنى من حدّ الوسيط على كل ملفٍّ مُنتَج.
+     *
+     * - المحاولة الأولى هي **الاستدعاء نفسه حرفياً** الذي كان قبل السقف ⇒ ناتجٌ مطابق بايتاً لكل صورةٍ تتسع (التوافق).
+     *   (الوسيط الموضعي `$quality` يتجاهله مرمِّز Intervention 4 فيعمل بجودته الافتراضية 75؛ تغييره تغييرٌ لبايتات كل
+     *   متغيّر ودليله، فهو خارج هذا الإصلاح ومذكور في تقريره.)
+     * - إن تجاوزت: تُعاد المحاولة بجودةٍ أدنى (اسمية `quality:` فتسري فعلاً) حتى {@see self::STEP_DOWN_QUALITY}.
+     * - إن لم يكفِ ذلك: `variant_too_large` بخطأٍ ثابتٍ قابل للترجمة — لا يُخزَّن شيءٌ فوق السقف أبداً. الأبعاد لا تُغيَّر
+     *   (اسم الملف يحمل العرض، والسلّم عقدٌ مع المتجر).
+     *
+     * @throws StorefrontMediaException
+     */
+    private function encodeWithinCeiling(ImageInterface $image, string $format): string
+    {
+        $ceiling = (int) config('storefront_media.variant_max_bytes', 6 * 1024 * 1024);
+        $mediaType = self::MIME[$format];
+        $quality = (int) config("storefront_media.quality.{$format}", 85);
+
+        $bytes = (string) $image->encodeUsingMediaType($mediaType, $quality);
+        if (strlen($bytes) <= $ceiling) {
+            return $bytes;
+        }
+        foreach (self::STEP_DOWN_QUALITY as $lower) {
+            $bytes = (string) $image->encodeUsingMediaType($mediaType, quality: $lower);
+            if (strlen($bytes) <= $ceiling) {
+                return $bytes;
+            }
+        }
+
+        throw new StorefrontMediaException(
+            'variant_too_large',
+            'تعذّر تجهيز نسخة بحجمٍ مناسبٍ للعرض: الصورة شديدة التفاصيل بالنسبة لأبعادها. صغّر أبعادها أو بسّط محتواها ثم أعد الرفع.',
+        );
     }
 
     private function exifAvailable(): bool

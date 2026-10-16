@@ -15,7 +15,9 @@
  * resolves the storefront from the forwarded host and checks the Published reference) is untouched.
  */
 
-export const DEFAULT_MAX_BODY_BYTES = 8 * 1024 * 1024; // animated limit is 5 MiB; static ladder files are far smaller
+// Laravel caps every generated file at `storefront_media.variant_max_bytes` (6 MiB; pinned by StorefrontMediaVariantByteCeilingTest) and
+// the animated file at 5 MiB, so a published file always fits under this bound. Keep it ABOVE that ceiling.
+export const DEFAULT_MAX_BODY_BYTES = 8 * 1024 * 1024;
 export const DEFAULT_MAX_CONCURRENT = 16;
 export const DEFAULT_MAX_QUEUE = 64;
 export const DEFAULT_QUEUE_WAIT_MS = 4_000;
