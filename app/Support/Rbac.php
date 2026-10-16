@@ -36,6 +36,11 @@ class Rbac
             // REM-37: الإرسال إلى ZATCA سلطة مستقلة عن `zatca.view` (قراءة) وعن
             // `invoices.manage` — فصلُ مهام. المحاسب يحتفظ بقدرته السابقة؛ staff لا.
             'accounts.view', 'reports.view', 'zatca.view', 'zatca.submit',
+            // AWJ Intelligence (AI-01): فتح بوابة المساعد فقط. سلطة مستقلة عن صلاحيات البيانات:
+            // لا تمنح أي قراءة مالية ولا تقارير، وكل أداة مستقبلية تشترط صلاحيتها هي
+            // (`reports.view` وغيرها) وتُفحص عند كل استدعاء. لا أثر ما لم تُفعّل المنصة
+            // والمستأجر المساعد صراحةً. الدور المخزَّن للمستأجرين القائمين لا يتغيّر (بلا هجرة).
+            'ai.assistant.use',
         ],
         'staff' => [
             'partners.view', 'products.view', 'invoices.view', 'delivery_notes.view',

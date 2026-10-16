@@ -113,7 +113,7 @@ class AiAssistantGatewayTest extends TestCase
     /** @return list<string> */
     private function accountantBase(): array
     {
-        return Rbac::MATRIX['accountant'];
+        return array_values(array_diff(Rbac::MATRIX['accountant'], ['ai.assistant.use']));
     }
 
     // ───────────────────── default OFF / kill switch ─────────────────────
@@ -139,6 +139,32 @@ class AiAssistantGatewayTest extends TestCase
         $res->assertJsonPath('error.code', 'platform_disabled');
         $this->assertTrue(Str::isUuid($res->json('request_id')));
         $this->assertArrayNotHasKey('data', $res->json());
+    }
+
+    /**
+     * سلوك موثَّق ومقصود: التحقق من شكل الطلب (422) يسبق مفتاح الإيقاف (503).
+     * لا مشكلة أمنية: الردّ 422 لا يكشف حالة المنصة ولا يعالج أي بيانات، ولا يصل
+     * إلى السياسة أو المزوّد أو التدقيق. الطلب الصالح وحده يبلغ المفتاح فيُرفض بـ503.
+     *
+     * @test
+     */
+    public function shape_validation_runs_before_the_kill_switch_and_leaks_nothing(): void
+    {
+        $auth = $this->readyTenant(platform: false);
+
+        $invalid = $this->withToken($auth['token'])->postJson(self::URL, ['tenant_id' => 'x'])->assertStatus(422);
+        $this->assertSame('invalid_request', $invalid->json('error.code'));
+        $this->assertStringNotContainsString('platform', strtolower($invalid->getContent()));
+        $this->assertStringNotContainsString('disabled', strtolower($invalid->getContent()));
+
+        // نفس الشكل الخاطئ والمنصة مفتوحة يعطي الردّ نفسه — لا فرق يكشف حالة المفتاح.
+        config(['ai_assistant.enabled' => true]);
+        $open = $this->withToken($auth['token'])->postJson(self::URL, ['tenant_id' => 'x'])->assertStatus(422);
+        $this->assertSame($invalid->json('error'), $open->json('error'));
+
+        // الطلب الصالح يبلغ المفتاح.
+        config(['ai_assistant.enabled' => false]);
+        $this->ask($auth['token'])->assertStatus(503)->assertJsonPath('error.code', 'platform_disabled');
     }
 
     /** @test */
@@ -230,24 +256,111 @@ class AiAssistantGatewayTest extends TestCase
     // ───────────────────── actor / RBAC / revocation ─────────────────────
 
     /** @test */
-    public function the_permission_is_registered_and_not_granted_to_restricted_default_roles(): void
+    public function the_permission_is_registered_and_granted_only_to_the_intended_default_roles(): void
     {
         $this->assertContains('ai.assistant.use', Rbac::PERMISSIONS);
-        $this->assertNotContains('ai.assistant.use', Rbac::MATRIX['accountant']);
+
+        // owner/admin عبر `*`، وaccountant صراحةً؛ staff وself_service لا.
+        $this->assertSame(['*'], Rbac::MATRIX['owner']);
+        $this->assertSame(['*'], Rbac::MATRIX['admin']);
+        $this->assertContains('ai.assistant.use', Rbac::MATRIX['accountant']);
         $this->assertNotContains('ai.assistant.use', Rbac::MATRIX['staff']);
         $this->assertNotContains('ai.assistant.use', Rbac::MATRIX['self_service']);
-        $this->assertSame(['*'], Rbac::MATRIX['owner']);
+
+        // المصفوفة الثابتة (السقوط الآمن) تعطي المحاسب الصلاحية خارج أي مستأجر أيضاً.
+        $this->assertTrue(Rbac::allows('accountant', 'ai.assistant.use'));
+        $this->assertFalse(Rbac::allows('staff', 'ai.assistant.use'));
+        $this->assertFalse(Rbac::allows('self_service', 'ai.assistant.use'));
     }
 
     /** @test */
-    public function a_role_without_the_permission_is_denied_even_when_platform_and_tenant_allow(): void
+    public function granting_the_assistant_permission_to_accountant_changes_no_other_accountant_permission(): void
+    {
+        // الفرق الوحيد عن مصفوفة المحاسب السابقة هو الصلاحية الجديدة نفسها.
+        $this->assertSame(
+            [],
+            array_values(array_diff(Rbac::MATRIX['accountant'], $this->accountantBase(), ['ai.assistant.use'])),
+        );
+        $this->assertCount(count($this->accountantBase()) + 1, Rbac::MATRIX['accountant']);
+
+        // صلاحيات البيانات المالية والتقارير مستقلة وباقية كما هي للمحاسب، والصلاحية
+        // الجديدة لا تُضيف شيئاً منها إلى دورٍ لا يملكها (staff/self_service لم يتغيّرا).
+        foreach (['reports.view', 'invoices.view', 'payments.view', 'accounts.view'] as $dataPermission) {
+            $this->assertContains($dataPermission, Rbac::MATRIX['accountant']);
+            $this->assertNotContains($dataPermission, Rbac::MATRIX['self_service'], $dataPermission);
+        }
+        $this->assertNotContains('ai.assistant.use', Rbac::MATRIX['staff']);
+    }
+
+    /** @test */
+    public function a_newly_registered_tenants_default_accountant_can_use_the_assistant_once_enabled(): void
     {
         $auth = $this->readyTenant();
-        $staff = $this->tokenForRole($auth['tenant_id'], 'staff', 'staff@ai.test');
         $accountant = $this->tokenForRole($auth['tenant_id'], 'accountant', 'acc@ai.test');
 
-        $this->ask($staff)->assertForbidden();
-        $this->ask($accountant)->assertForbidden();
+        $this->ask($accountant)->assertOk()->assertJsonPath('data.status', 'ok');
+    }
+
+    /** @test */
+    public function the_default_accountant_is_still_denied_while_the_platform_or_tenant_gate_is_closed(): void
+    {
+        $platformOff = $this->readyTenant('ai-off', platform: false);
+        $this->ask($this->tokenForRole($platformOff['tenant_id'], 'accountant', 'acc@ai-off.test'))
+            ->assertStatus(503)->assertJsonPath('error.code', 'platform_disabled');
+
+        $noOptIn = $this->readyTenant('ai-noopt', tenantOptIn: false);
+        $this->ask($this->tokenForRole($noOptIn['tenant_id'], 'accountant', 'acc@ai-noopt.test'))
+            ->assertForbidden()->assertJsonPath('error.code', 'tenant_not_enabled');
+    }
+
+    /** @test */
+    public function staff_and_self_service_remain_denied_even_when_platform_and_tenant_allow(): void
+    {
+        $auth = $this->readyTenant();
+
+        $this->ask($this->tokenForRole($auth['tenant_id'], 'staff', 'staff@ai.test'))->assertForbidden();
+        $this->ask($this->tokenForRole($auth['tenant_id'], 'self_service', 'ss@ai.test'))->assertForbidden();
+    }
+
+    /** @test */
+    public function a_stored_accountant_role_without_the_permission_is_not_silently_backfilled(): void
+    {
+        // مستأجر قائم دوره المخزَّن سابق للصلاحية: يبقى مرفوضاً حتى يُمنحها صراحةً (لا هجرة).
+        $auth = $this->readyTenant();
+        $token = $this->tokenForRole($auth['tenant_id'], 'accountant', 'acc@ai.test');
+        $this->setRolePermissions($auth['tenant_id'], 'accountant', $this->accountantBase());
+
+        $this->ask($token)->assertForbidden();
+    }
+
+    /** @test */
+    public function the_assistant_permission_alone_grants_no_financial_or_report_access(): void
+    {
+        $auth = $this->readyTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        Role::create(['slug' => 'ai_only', 'name' => 'مساعد فقط', 'permissions' => ['ai.assistant.use'], 'is_system' => false]);
+        $token = $this->tokenForRole($auth['tenant_id'], 'ai_only', 'aionly@ai.test');
+
+        $this->ask($token)->assertOk();
+        foreach (['/api/reports/income-statement', '/api/invoices', '/api/payments', '/api/accounts', '/api/purchases'] as $url) {
+            $this->withToken($token)->getJson($url)->assertForbidden();
+        }
+    }
+
+    /** @test */
+    public function a_tool_permission_is_independent_of_the_assistant_permission(): void
+    {
+        $auth = $this->readyTenant();
+        $token = $this->tokenForRole($auth['tenant_id'], 'accountant', 'acc@ai.test');
+        // المحاسب يملك ai.assistant.use لكنه لا يملك users.manage.
+        $this->assertFalse(Rbac::allows('accountant', 'users.manage'));
+
+        $probe = $this->probeTool(AiAssistantDataCategory::ASSISTANT_MESSAGES, 'users.manage');
+        $this->app->instance(AiAssistantToolRegistry::class, $this->registryWith($probe));
+        $this->app->instance(MockAiAssistantProvider::class, new MockAiAssistantProvider(fn () => [['name' => 'probe.echo', 'arguments' => []]]));
+
+        $this->ask($token)->assertForbidden()->assertJsonPath('error.code', 'tool_permission_denied');
+        $this->assertSame(0, $probe->calls);
     }
 
     /** @test */
