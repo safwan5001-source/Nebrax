@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, LayoutPanelTop, MapPin, Send, Settings2, Trash2 } from 'lucide-react';
+import { ArrowRight, Building2, ChevronLeft, FileSpreadsheet, Info, LayoutPanelTop, MapPin, Send, Settings2, Sparkles, Trash2, Users, type LucideIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
@@ -29,37 +29,69 @@ function Entry({ entry, onOpenCanvas, onNavigate, runIds, demo }: {
   }
   if (entry.role === 'user') {
     return (
-      <div className="rounded bg-primary-soft px-3 py-2 text-sm" data-role="user">
-        <p className="mb-0.5 text-[11px] text-muted">{t('panel.you')}</p>
-        <p dir="auto" className="whitespace-pre-wrap break-words">{entry.text}</p>
+      <div className="awj-intel-rise flex flex-col items-end gap-0.5" data-role="user">
+        <p className="px-1 text-[11px] text-muted">{t('panel.you')}</p>
+        <p dir="auto" className="max-w-[90%] whitespace-pre-wrap break-words rounded-lg rounded-ee-sm bg-primary-soft px-3 py-2 text-sm text-text">{entry.text}</p>
       </div>
     );
   }
   return (
-    <div className="space-y-2" data-role="assistant">
-      <div className="rounded border border-border bg-surface px-3 py-2 text-sm">
-        <div className="mb-0.5 flex items-center gap-2 text-[11px] text-muted">
-          <span>{t('panel.assistant')}</span>
-          {demo ? <Badge tone="warning">{t('demo.badge')}</Badge> : null}
+    <div className="awj-intel-rise flex gap-2" data-role="assistant">
+      <span aria-hidden="true" className="mt-5 flex h-7 w-7 shrink-0 items-center justify-center rounded bg-primary-soft text-primary">
+        <Sparkles className="h-4 w-4" strokeWidth={1.7} />
+      </span>
+      <div className="min-w-0 flex-1 space-y-2">
+        <div>
+          <div className="mb-0.5 flex items-center gap-2 px-1 text-[11px] text-muted">
+            <span>{t('panel.assistant')}</span>
+            {demo ? <Badge tone="warning">{t('demo.badge')}</Badge> : null}
+          </div>
+          <div className="rounded-lg rounded-ss-sm border border-border bg-surface px-3 py-2 text-sm">
+            <p dir="auto" className="whitespace-pre-wrap break-words">{entry.text}</p>
+            {demo ? <p className="mt-1.5 border-t border-border pt-1.5 text-xs text-muted">{t('demo.reply')}</p> : null}
+          </div>
         </div>
-        <p dir="auto" className="whitespace-pre-wrap break-words">{entry.text}</p>
-        {demo ? <p className="mt-1.5 text-xs text-muted">{t('demo.reply')}</p> : null}
+        {entry.toolCalls && entry.toolCalls.length > 0
+          ? entry.toolCalls.map((call, index) => {
+            const runId = entry.runIds?.[index];
+            return (
+              <ResultSummary
+                key={`${entry.id}-${index}`}
+                call={call}
+                canOpenCanvas={Boolean(runId && runIds.has(runId))}
+                onOpenCanvas={() => runId && onOpenCanvas(runId)}
+                onNavigate={onNavigate}
+              />
+            );
+          })
+          : <p className="px-1 text-xs text-muted">{t('panel.no_tool')}</p>}
       </div>
-      {entry.toolCalls && entry.toolCalls.length > 0
-        ? entry.toolCalls.map((call, index) => {
-          const runId = entry.runIds?.[index];
-          return (
-            <ResultSummary
-              key={`${entry.id}-${index}`}
-              call={call}
-              canOpenCanvas={Boolean(runId && runIds.has(runId))}
-              onOpenCanvas={() => runId && onOpenCanvas(runId)}
-              onNavigate={onNavigate}
-            />
-          );
-        })
-        : <p className="text-xs text-muted">{t('panel.no_tool')}</p>}
     </div>
+  );
+}
+
+const TOOL_ORDER: ToolName[] = ['finance.income_statement', 'finance.receivables_aging', 'finance.payables_aging'];
+
+const TOOL_ICON: Record<ToolName, LucideIcon> = {
+  'finance.income_statement': FileSpreadsheet,
+  'finance.receivables_aging': Users,
+  'finance.payables_aging': Building2,
+};
+
+function Suggestion({ tool, onPick, primary }: { tool: ToolName; onPick: (tool: ToolName) => void; primary: boolean }) {
+  const t = useTranslations('intelligence');
+  const Icon = TOOL_ICON[tool];
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      className={`h-11 w-full justify-start gap-3 px-3 sm:h-10 ${primary ? '' : 'text-muted'}`}
+      onClick={() => onPick(tool)}
+    >
+      <Icon className="h-4 w-4 shrink-0 text-primary" strokeWidth={1.7} aria-hidden="true" />
+      <span className="min-w-0 flex-1 truncate text-start">{t(`panel.quick.${toolKey(tool)}`)}</span>
+      <ChevronLeft className="h-4 w-4 shrink-0 text-muted ltr:rotate-180" strokeWidth={1.7} aria-hidden="true" />
+    </Button>
   );
 }
 
@@ -150,8 +182,8 @@ export function AssistantPanel() {
           }
         }}
       >
-        <header className="shrink-0 space-y-2 border-b border-border px-4 pb-3 pt-3 pe-14 max-sm:pe-4">
-          <div className="flex items-center gap-2">
+        <header className="shrink-0 space-y-2.5 border-b border-border px-4 pb-3 pt-3 pe-14 max-sm:pe-4">
+          <div className="flex items-center gap-2.5">
             <Button
               type="button"
               variant="ghost"
@@ -162,12 +194,15 @@ export function AssistantPanel() {
             >
               <ArrowRight className="h-5 w-5 ltr:rotate-180" strokeWidth={1.7} aria-hidden="true" />
             </Button>
+            <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-primary text-primary-foreground">
+              <Sparkles className="h-[18px] w-[18px]" strokeWidth={1.7} />
+            </span>
             <div className="min-w-0 flex-1">
-              <SheetTitle className="flex items-center gap-2 text-base font-semibold text-text">
+              <SheetTitle className="flex items-center gap-2 text-base font-semibold leading-tight text-text">
                 {t('panel.title')}
                 {demo ? <Badge tone="warning">{t('demo.badge')}</Badge> : null}
               </SheetTitle>
-              <SheetDescription className="text-xs text-muted">{t('panel.description')}</SheetDescription>
+              <SheetDescription className="mt-0.5 text-xs leading-snug text-muted">{t('panel.description')}</SheetDescription>
             </div>
             {store.entries.length > 0 ? (
               <Button type="button" variant="ghost" size="icon" className="h-11 w-11 shrink-0 sm:h-9 sm:w-9" aria-label={t('panel.clear')} onClick={store.clearConversation}>
@@ -199,19 +234,30 @@ export function AssistantPanel() {
             <StateNotice notice={gate.notice} compact canManageConsent={canManage} onNavigate={store.closePanel} />
           ) : null}
           {gate.kind === 'ready' && store.entries.length === 0 ? (
-            <div className="space-y-3">
-              <div>
-                <p className="text-sm font-medium text-text">{t('panel.empty_title')}</p>
+            <div className="awj-intel-rise space-y-4">
+              <div className="rounded-lg border border-border bg-surface p-3">
+                <p className="text-sm font-semibold text-text">{t('panel.empty_title')}</p>
                 <p className="mt-1 text-xs leading-relaxed text-muted">{t('panel.empty_body')}</p>
               </div>
-              <div role="group" aria-label={t('panel.suggestions')} className="flex flex-col gap-2">
-                {/* اقتراحات الصفحة أولاً (ترتيب فقط — لا تشغيل تلقائي) */}
+              <div role="group" aria-label={t('panel.suggestions')} className="space-y-2">
+                {/* اقتراحات هذه الشاشة أولاً (ترتيب فقط — لا تشغيل تلقائي)؛ كل اقتراح يُرسل سؤالاً جاهزاً عبر البوابة. */}
+                <p className="px-1 text-xs font-medium text-muted">{context.kind === 'other' || context.kind === 'dashboard' || context.kind === 'reports' || context.kind === 'intelligence' ? t('panel.suggestions') : t('panel.suggestions_for_screen')}</p>
                 {context.suggestedTools.map((tool) => (
-                  <Button key={tool} type="button" variant="outline" className="h-11 justify-start sm:h-9" onClick={() => suggest(tool)}>
-                    {t(`panel.quick.${toolKey(tool)}`)}
-                  </Button>
+                  <Suggestion key={tool} tool={tool} primary onPick={suggest} />
                 ))}
+                {context.suggestedTools.length < 3 ? (
+                  <>
+                    <p className="px-1 pt-1 text-xs font-medium text-muted">{t('panel.more_reports')}</p>
+                    {TOOL_ORDER.filter((tool) => !context.suggestedTools.includes(tool)).map((tool) => (
+                      <Suggestion key={tool} tool={tool} primary={false} onPick={suggest} />
+                    ))}
+                  </>
+                ) : null}
               </div>
+              <p className="flex items-start gap-2 px-1 text-xs leading-relaxed text-muted">
+                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+                {t('panel.not_yet')}
+              </p>
             </div>
           ) : null}
           {store.entries.map((entry) => (
@@ -223,7 +269,7 @@ export function AssistantPanel() {
         </div>
 
         <footer className="shrink-0 space-y-2 border-t border-border bg-surface px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <div className="flex items-end gap-2">
+          <div className="flex items-end gap-2 rounded-lg border border-border bg-background p-1.5 focus-within:ring-2 focus-within:ring-primary/40">
             <textarea
               ref={textareaRef}
               value={draft}
@@ -239,7 +285,7 @@ export function AssistantPanel() {
                   submit();
                 }
               }}
-              className="min-h-[4.25rem] flex-1 resize-none rounded border border-border bg-background px-3 py-2 text-sm text-text placeholder:text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
+              className="min-h-[3.25rem] flex-1 resize-none bg-transparent px-2 py-1.5 text-sm text-text placeholder:text-muted focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             />
             <Button type="button" className="h-11 w-11 shrink-0 px-0 sm:h-9 sm:w-9" aria-label={t('panel.send')} disabled={!canSend} onClick={submit}>
               <Send className="h-4 w-4 rtl:-scale-x-100" strokeWidth={1.7} aria-hidden="true" />

@@ -44,6 +44,19 @@ describe.each(TEST_LOCALES)('financial result (%s)', (locale) => {
     expect(text).not.toContain('w1'); // the user's warehouse id never appears next to figures
   });
 
+  it('leads with the summary: net income first for the income statement, the total first for aging — and never invents percentages or growth', () => {
+    const income = renderIntl(<FinancialResult run={run(incomeResult())} />, locale);
+    const incomeTiles = income.container.querySelector('[role="group"]')!.children;
+    expect(incomeTiles[0].textContent).toContain(`8,345.00 ${SAUDI_RIYAL_SYMBOL}`);
+    expect(income.container.textContent).not.toMatch(/%|\+\d+(\.\d+)?\s?٪/);
+    cleanup();
+    const aging = renderIntl(<FinancialResult run={run(agingResult())} />, locale);
+    const agingTiles = aging.container.querySelector('[role="group"]')!.children;
+    expect(agingTiles).toHaveLength(5);
+    expect(agingTiles[0].textContent).toContain(`350.00 ${SAUDI_RIYAL_SYMBOL}`);
+    expect(aging.container.textContent).not.toContain('%');
+  });
+
   it('links to the original report and exposes the source', () => {
     renderIntl(<FinancialResult run={run(incomeResult())} />, locale);
     const link = screen.getByRole('link', { name: locale === 'ar' ? /فتح التقرير الأصلي/ : /Open original report/ });

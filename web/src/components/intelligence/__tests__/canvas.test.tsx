@@ -55,7 +55,7 @@ describe.each(TEST_LOCALES)('canvas (%s)', (locale) => {
     api.runTool.mockResolvedValue({ request_id: 'r', status: 'ok', tool_calls: [{ tool: 'finance.receivables_aging', result: agingResult() }] });
     mount(locale);
     await runButton(locale);
-    fireEvent.change(screen.getByLabelText(locale === 'ar' ? 'التقرير' : 'Report'), { target: { value: 'finance.receivables_aging' } });
+    await userEvent.click(screen.getByRole('radio', { name: locale === 'ar' ? 'أعمار الذمم المدينة' : 'Receivables aging' }));
     await userEvent.click(await runButton(locale));
     await waitFor(() => expect(api.runTool).toHaveBeenCalledWith({ tool: 'finance.receivables_aging', arguments: { as_of: '2026-10-16' } }));
     await waitFor(() => expect(screen.getByRole('note')).toBeTruthy());
@@ -111,12 +111,12 @@ describe('canvas history', () => {
     mount('en');
     await userEvent.click(await runButton('en'));
     await waitFor(() => expect(document.querySelector('[data-result="income_statement"]')).not.toBeNull());
-    fireEvent.change(screen.getByLabelText('Report'), { target: { value: 'finance.receivables_aging' } });
+    await userEvent.click(screen.getByRole('radio', { name: 'Receivables aging' }));
     await userEvent.click(await runButton('en'));
     await waitFor(() => expect(document.querySelector('[data-result="receivables_aging"]')).not.toBeNull());
-    const history = screen.getByRole('complementary', { name: 'Runs in this session' });
+    const history = screen.getByRole('navigation', { name: 'Runs in this session' });
     await userEvent.click(history.querySelectorAll('button')[1] as HTMLElement);
     await waitFor(() => expect(document.querySelector('[data-result="income_statement"]')).not.toBeNull());
-    expect(history.textContent).toContain('Kept in memory only');
+    expect(history.querySelector('span[title]')?.getAttribute('title')).toContain('Kept in memory only');
   });
 });

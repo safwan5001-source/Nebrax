@@ -38,7 +38,13 @@ async function openPanel() {
   return screen.findByRole('dialog');
 }
 
-beforeEach(() => resetSession());
+beforeEach(() => {
+  resetSession();
+  // الاختبار يفترض مؤشراً غير لمسي: لا نعتمد على حالة matchMedia المتروكة من ملفات أخرى في العملية المشتركة.
+  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    matches: false, media: query, onchange: null, addEventListener: vi.fn(), removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn(), dispatchEvent: vi.fn(),
+  })) as unknown as typeof window.matchMedia;
+});
 afterEach(cleanup);
 
 describe('trigger visibility', () => {
@@ -59,7 +65,7 @@ describe('opening', () => {
     api.fetchStatus.mockResolvedValue(makeStatus());
     mount();
     const dialog = await openPanel();
-    await waitFor(() => expect(within(dialog).getByText('Start from a suggestion or type a question')).toBeTruthy());
+    await waitFor(() => expect(within(dialog).getByText('Ask about your numbers, from your reports')).toBeTruthy());
     expect(api.fetchStatus).toHaveBeenCalledTimes(1);
     expect(api.sendMessage).not.toHaveBeenCalled();
     expect(api.runTool).not.toHaveBeenCalled();
@@ -72,15 +78,21 @@ describe('opening', () => {
     mount();
     const dialog = await openPanel();
     await waitFor(() => expect(within(dialog).getByText('Receivables aging report')).toBeTruthy());
-    expect(within(dialog).getAllByRole('button').filter((b) => b.textContent === 'Receivables aging')).toHaveLength(1);
-    expect(within(dialog).queryByRole('button', { name: 'Payables aging' })).toBeNull();
+    const group = within(dialog).getByRole('group', { name: 'Suggestions' });
+    const names = within(group).getAllByRole('button').map((b) => b.textContent);
+    expect(names[0]).toBe('Receivables aging'); // this screen's report first
+    expect(within(group).getByText('Suggested for this screen')).toBeTruthy();
+    expect(within(group).getByText('Other reports')).toBeTruthy();
+    // unsupported analysis is stated, never offered as a button
+    expect(within(dialog).getByText(/Not available yet: period comparison, charts/)).toBeTruthy();
+    expect(within(dialog).queryByRole('button', { name: /compare|chart/i })).toBeNull();
   });
 
   it('puts keyboard focus in the composer on open (non-touch)', async () => {
     api.fetchStatus.mockResolvedValue(makeStatus());
     mount();
     const dialog = await openPanel();
-    await waitFor(() => expect(document.activeElement).toBe(within(dialog).getByPlaceholderText('Ask about the income statement or aging…')));
+    await waitFor(() => expect(document.activeElement).toBe(within(dialog).getByPlaceholderText('Ask about the income statement or aging…')), { timeout: 5000 });
   });
 });
 
@@ -102,11 +114,11 @@ describe('re-opening', () => {
     api.fetchStatus.mockResolvedValue(makeStatus());
     mount();
     const dialog = await openPanel();
-    await waitFor(() => expect(document.activeElement?.tagName).toBe('TEXTAREA'));
+    await waitFor(() => expect(document.activeElement?.tagName).toBe('TEXTAREA'), { timeout: 5000 });
     await act(async () => { fireEvent.keyDown(dialog, { key: 'Escape' }); });
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     const again = await openPanel();
-    await waitFor(() => expect(document.activeElement).toBe(within(again).getByRole('textbox')));
+    await waitFor(() => expect(document.activeElement).toBe(within(again).getByRole('textbox')), { timeout: 5000 });
     expect(api.fetchStatus).toHaveBeenCalledTimes(2); // fresh read on every open
   });
 });

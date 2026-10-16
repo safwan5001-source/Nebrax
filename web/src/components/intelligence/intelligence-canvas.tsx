@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { MessageSquareText, Play, Settings2 } from 'lucide-react';
 import Link from 'next/link';
@@ -9,7 +9,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { TOOL_NAMES, toolKey, type ToolName } from '@/modules/intelligence/contract';
@@ -40,6 +39,8 @@ export function IntelligenceCanvas() {
   const [to, setTo] = useState('');
   const [asOf, setAsOf] = useState('');
   const [touched, setTouched] = useState(false);
+  const resultRef = useRef<HTMLDivElement>(null);
+  const scrollToResult = useRef(false);
 
   // الحالة تُقرأ طازجةً عند دخول المساحة (صلاحية/موافقة قد تتغيّر بين الزيارات).
   const { refreshStatus, identity } = store;
@@ -65,10 +66,24 @@ export function IntelligenceCanvas() {
     setTouched(true);
     if (invalid || gate.kind !== 'ready') return;
     store.dismissFinancialError();
-    await store.runFinancial({ tool, arguments: isIncome ? { from, to } : { as_of: asOf } });
+    scrollToResult.current = true;
+    const ok = await store.runFinancial({ tool, arguments: isIncome ? { from, to } : { as_of: asOf } });
+    if (!ok) scrollToResult.current = false;
   }
 
   const active = store.activeRun;
+
+  // بعد تشغيل صريح: أظهر النتيجة (على الجوال تكون خلف النموذج). بلا تمرير سلس — يحترم Reduced Motion بطبيعته.
+  const activeId = active?.id;
+  useEffect(() => {
+    if (!activeId || !scrollToResult.current) return;
+    scrollToResult.current = false;
+    const el = resultRef.current;
+    // فقط إن كانت النتيجة تحت نصف الشاشة (الجوال)؛ على الشاشات العريضة تبقى ظاهرة بجوار النموذج فلا نحرّك الصفحة.
+    if (el && typeof el.scrollIntoView === 'function' && el.getBoundingClientRect().top > window.innerHeight * 0.55) {
+      el.scrollIntoView({ block: 'start' });
+    }
+  }, [activeId]);
 
   return (
     <div className="space-y-4">
@@ -102,42 +117,84 @@ export function IntelligenceCanvas() {
       {gate.kind === 'ready' ? (
         <>
           <form
-            className="flex flex-wrap items-end gap-3 rounded border border-border bg-surface p-3"
+            className="space-y-3 rounded border border-border bg-surface p-3"
             aria-label={tc('controls')}
             onSubmit={(event) => { event.preventDefault(); void run(); }}
           >
-            <div className="w-full space-y-1 sm:w-60">
-              <Label htmlFor="ai-tool">{tc('tool')}</Label>
-              <Select id="ai-tool" value={tool} onChange={(event) => setTool(event.target.value as ToolName)}>
-                {allowedTools.map((name) => (<option key={name} value={name}>{tc(`tools.${toolKey(name)}`)}</option>))}
-              </Select>
-            </div>
-            {isIncome ? (
-              <>
-                <div className="space-y-1">
-                  <Label htmlFor="ai-from">{tc('from')}</Label>
-                  <Input id="ai-from" type="date" dir="ltr" value={from} max={today} onChange={(event) => setFrom(event.target.value)} aria-invalid={Boolean(touched && issues.from) || undefined} />
-                  {touched && issues.from ? <p role="alert" className="text-xs text-negative">{issueText(tc, issues.from)}</p> : null}
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="ai-to">{tc('to')}</Label>
-                  <Input id="ai-to" type="date" dir="ltr" value={to} max={today} onChange={(event) => setTo(event.target.value)} aria-invalid={Boolean(touched && (issues.to || issues.range)) || undefined} />
-                  {touched && (issues.to || issues.range) ? <p role="alert" className="text-xs text-negative">{issueText(tc, issues.to ?? issues.range)}</p> : null}
-                </div>
-              </>
-            ) : (
-              <div className="space-y-1">
-                <Label htmlFor="ai-as-of">{tc('as_of')}</Label>
-                <Input id="ai-as-of" type="date" dir="ltr" value={asOf} max={today} onChange={(event) => setAsOf(event.target.value)} aria-invalid={Boolean(touched && issues.asOf) || undefined} />
-                {touched && issues.asOf ? <p role="alert" className="text-xs text-negative">{issueText(tc, issues.asOf)}</p> : null}
+            <fieldset className="min-w-0">
+              <legend className="mb-1 text-xs font-medium text-muted">{tc('tool')}</legend>
+              <div role="radiogroup" aria-label={tc('tool')} className="grid grid-cols-3 gap-1 rounded border border-border bg-background p-0.5 sm:inline-grid sm:grid-cols-[repeat(3,auto)]">
+                {allowedTools.map((name) => (
+                  <label key={name} className="relative cursor-pointer">
+                    <input
+                      type="radio"
+                      name="ai-tool"
+                      value={name}
+                      checked={tool === name}
+                      onChange={() => setTool(name)}
+                      className="peer sr-only"
+                    />
+                    <span className="flex min-h-11 items-center justify-center rounded px-3 text-center text-sm font-medium leading-tight text-muted transition-colors hover:text-text peer-checked:bg-primary peer-checked:text-primary-foreground peer-focus-visible:ring-2 peer-focus-visible:ring-primary/50 sm:min-h-9">
+                      {tc(`tools.${toolKey(name)}`)}
+                    </span>
+                  </label>
+                ))}
               </div>
-            )}
-            <Button type="submit" disabled={store.financialPending} className="h-11 sm:h-9">
-              <Play className="h-4 w-4 rtl:-scale-x-100" strokeWidth={1.7} aria-hidden="true" />
-              {store.financialPending ? tc('running') : tc('run')}
-            </Button>
-            {today ? <p className="w-full text-[11px] text-muted">{tc('today', { date: today })}</p> : null}
+            </fieldset>
+            <div className="flex flex-wrap items-end gap-3">
+              {isIncome ? (
+                <>
+                  <div className="space-y-1">
+                    <Label htmlFor="ai-from">{tc('from')}</Label>
+                    <Input id="ai-from" type="date" dir="ltr" value={from} max={today} onChange={(event) => setFrom(event.target.value)} aria-invalid={Boolean(touched && issues.from) || undefined} />
+                    {touched && issues.from ? <p role="alert" className="text-xs text-negative">{issueText(tc, issues.from)}</p> : null}
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="ai-to">{tc('to')}</Label>
+                    <Input id="ai-to" type="date" dir="ltr" value={to} max={today} onChange={(event) => setTo(event.target.value)} aria-invalid={Boolean(touched && (issues.to || issues.range)) || undefined} />
+                    {touched && (issues.to || issues.range) ? <p role="alert" className="text-xs text-negative">{issueText(tc, issues.to ?? issues.range)}</p> : null}
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-1">
+                  <Label htmlFor="ai-as-of">{tc('as_of')}</Label>
+                  <Input id="ai-as-of" type="date" dir="ltr" value={asOf} max={today} onChange={(event) => setAsOf(event.target.value)} aria-invalid={Boolean(touched && issues.asOf) || undefined} />
+                  {touched && issues.asOf ? <p role="alert" className="text-xs text-negative">{issueText(tc, issues.asOf)}</p> : null}
+                </div>
+              )}
+              <Button type="submit" disabled={store.financialPending} className="h-11 sm:h-9">
+                <Play className="h-4 w-4 rtl:-scale-x-100" strokeWidth={1.7} aria-hidden="true" />
+                {store.financialPending ? tc('running') : tc('run')}
+              </Button>
+              {today ? <p className="w-full text-[11px] text-muted sm:ms-auto sm:w-auto">{tc('today', { date: today })}</p> : null}
+            </div>
           </form>
+
+          {store.runs.length > 0 ? (
+            <nav aria-label={tc('history')} className="flex items-center gap-2">
+              <span className="shrink-0 text-xs text-muted" title={tc('history_note')}>{tc('history')}</span>
+              <ul className="flex min-w-0 gap-1.5 overflow-x-auto pb-1">
+                {store.runs.map((run) => (
+                  <li key={run.id} className="shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => store.setActiveRunId(run.id)}
+                      aria-current={active?.id === run.id || undefined}
+                      className={cn(
+                        'flex min-h-11 flex-col items-start justify-center rounded border border-border px-3 py-1 text-start text-xs hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:min-h-9',
+                        active?.id === run.id && 'border-primary bg-primary-soft',
+                      )}
+                    >
+                      <span className="font-medium">{t(`result.${run.result.report}`)}</span>
+                      <span dir="ltr" className="num text-[11px] text-muted">
+                        {run.result.report === 'income_statement' ? `${run.result.period.from} → ${run.result.period.to}` : run.result.as_of}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          ) : null}
 
           {store.financialError ? (
             <StateNotice
@@ -150,45 +207,16 @@ export function IntelligenceCanvas() {
 
           {store.financialPending && !active ? (
             <div role="status" aria-busy="true" aria-label={tc('loading')} className="space-y-2">
-              <Skeleton className="h-8 w-1/3" /><Skeleton className="h-40 w-full" />
+              <Skeleton className="h-8 w-1/3" /><Skeleton className="h-16 w-full" /><Skeleton className="h-40 w-full" />
             </div>
           ) : null}
 
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_16rem]">
-            <div aria-busy={store.financialPending} className={cn('min-w-0', store.financialPending && active && 'opacity-60')}>
-              {active ? (
-                <FinancialResult run={active} />
-              ) : !store.financialPending ? (
-                <EmptyState title={tc('empty_title')} description={tc('empty_body')} />
-              ) : null}
-            </div>
-            <aside aria-label={tc('history')} className="space-y-2">
-              <h2 className="text-xs font-medium text-muted">{tc('history')}</h2>
-              {store.runs.length === 0 ? <p className="text-xs text-muted">{tc('history_empty')}</p> : (
-                <ul className="space-y-1">
-                  {store.runs.map((run) => (
-                    <li key={run.id}>
-                      <button
-                        type="button"
-                        onClick={() => store.setActiveRunId(run.id)}
-                        aria-current={active?.id === run.id || undefined}
-                        className={cn(
-                          'flex w-full flex-col items-start gap-0.5 rounded border border-border px-3 py-2 text-start text-sm hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
-                          active?.id === run.id && 'border-primary bg-primary-soft',
-                        )}
-                      >
-                        <span className="font-medium">{t(`result.${run.result.report}`)}</span>
-                        <span className="text-[11px] text-muted">
-                          <span dir="ltr" className="num">{run.result.report === 'income_statement' ? `${run.result.period.from} → ${run.result.period.to}` : run.result.as_of}</span>
-                          {' · '}{run.source === 'assistant' ? tc('source_assistant') : tc('source_canvas')}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <p className="text-[11px] leading-relaxed text-muted">{tc('history_note')}</p>
-            </aside>
+          <div ref={resultRef} aria-busy={store.financialPending} className={cn('min-w-0 scroll-mt-2 transition-opacity', store.financialPending && active && 'opacity-60')}>
+            {active ? (
+              <FinancialResult key={active.id} run={active} />
+            ) : !store.financialPending ? (
+              <EmptyState title={tc('empty_title')} description={tc('empty_body')} />
+            ) : null}
           </div>
         </>
       ) : null}

@@ -10,7 +10,7 @@ Scope: a practical, premium accounting workspace on top of the AI-01/AI-02 gatew
 | Draft PR | https://github.com/safwan5001-source/Nebrax/pull/1553 (Draft) |
 | Base | `main` @ `1296e1ce79a339f94336f92c3258ec5fb0d815e6` (already contains AI-01 #1546, AI-02A #1548, AI-02B #1549) |
 | Head | `f77953cbc6cd0404614dc0910e4420a730bcb447` at PR creation (any later commit on the branch is report-text only) |
-| Commits | backend `ffdf5a5` · web `85f9fbe` · tests/visual-QA/UX-fixes + this report (see PR) |
+| Commits | backend `ffdf5a5` · web `85f9fbe` · tests/visual-QA/UX-fixes · round-2 premium refinement (see PR) |
 | Migrations | **none** (consent lives in the existing `tenants.settings` JSON group `ai_assistant`) |
 | Provider | mock only; `AI_ASSISTANT_ENABLED` and tenant flags untouched everywhere |
 
@@ -83,7 +83,7 @@ Defects found by this review and fixed before delivery:
 
 ## 5. Visual QA
 
-Real Playwright screenshots (Chromium, API intercepted with fixtures; **figures are fixture data, not a live tenant**) in `docs/reports/ai-03-visual-qa/` — 95 images: `{desktop|mobile}-{scene}-{ar|en}-{light|dark}.png`.
+Real Playwright screenshots (Chromium, API intercepted with fixtures; **figures are fixture data, not a live tenant**) in `docs/reports/ai-03-visual-qa/` — **`before/`** (round 1, commit `36a5f4c`, 95 images), **`after/`** (round 2 premium refinement, 95 images) and **`compare/`** (8 side-by-side Before/After boards). Names: `{desktop|mobile}-{scene}-{ar|en}-{light|dark}.png`.
 
 | Scene | Files (prefix `desktop-` / `mobile-`) |
 |---|---|
@@ -102,9 +102,9 @@ Observations not caused by this slice: the shared `Dialog` overlay leaves the to
 | Check | Result |
 |---|---|
 | New web unit tests (`modules/intelligence`, `components/intelligence`) | 7 test files, **142 tests**: error→state mapping incl. budget codes; page-context resolver; date rules; gating; store (no request before ready, per blocked state; stale response; tenant switch; logout; no storage writes; status re-read per open); panel (trigger visibility, focus, blocked states ×2 locales, Enter/Shift+Enter, limit, budget refusal, Escape/focus return); canvas; consent (acknowledgement, revoke, platform-off, server refusal, audit visibility); results (warnings, scope wording, source link safety, withheld partners, money) — AR and EN |
-| Full web suite | **645 files / 7574 tests passed** |
+| Full web suite | **645 files / 7576 tests passed** (after round 2) |
 | `next build` | passed; `/intelligence` 6.8 kB, `/intelligence/settings` 5.2 kB |
-| Playwright (`e2e/ai-03-intelligence.spec.ts`) | 41 passed, 3 skipped by design (desktop-only / mobile-only journeys), 0 failed |
+| Playwright (`e2e/ai-03-intelligence.spec.ts`) | 41 passed, 3 skipped by design (desktop-only / mobile-only journeys), 0 failed — re-run after round 2 |
 | PHP focused (AI + RBAC + route/permission suites) | 1330 passed, 27 skipped, 2 failed — both in `FuelCostBasisService` (`bcmath` missing in this sandbox; CI has the extension) |
 | PHP full suite | 7478 passed, 141 skipped, **26 failed** — all in six Fuel* classes (`FuelReconciliationTest`, `FuelSaleServiceTest`, `FuelSupplyReceivingTest`, `FuelAviRfidServiceTest`, `FuelSupplyReceivingApiTest`, …) that call `bcmul/bcadd`; this sandbox lacks `ext-bcmath` (CI has it). Identical set to the pre-AI-03 baseline (26); no AI/RBAC/route test fails. |
 | Backend AI-03 tests | `AiAssistantUiApiTest` 23 tests (status states/abilities/isolation, consent authorization matrix owner/admin vs accountant/staff, tenant A/B, unknown/document category, acknowledgement, disable-revokes-all, platform-off grant refused/revoke allowed, audit-failure rollback, metadata-only audit, Document Center independence, effect on next request, tool-run parity with the message path, no provider/ledger/budget row, AI-01/02 gates preserved) |
@@ -130,7 +130,58 @@ Observations not caused by this slice: the shared `Dialog` overlay leaves the to
 | `Dialog` overlay top band | Shared component; observed, not changed. |
 | Consent screen assumes `ai.consent.manage` is held by owner/admin only | Per-tenant custom roles can grant it explicitly via the role editor (label added). |
 
-## 9. Next step
+## 9. Round 2 — Premium UI/UX refinement (same PR, same architecture)
+
+Direction: the supplied reference image, used as **visual direction only** (no figures taken from it). Store, API contracts, ReportService and RBAC are untouched; this round changes presentation, copy and a few interactions.
+
+### 9.1 What changed (Before → After)
+
+| Surface | Before | After |
+|---|---|---|
+| **Assistant header** | Title + description + chip | AWJ mark tile, title + Demo badge, one-line read-only subtitle, current-screen chip (metadata only) |
+| **Empty state** | Generic "start from a suggestion" + 1–3 buttons | Explains what it can do ("answers only from reports you may read, states period/scope/source, never writes"), **"Suggested for this screen"** first, **"Other reports"** below, icon rows, and an explicit line for what is **not** available (period comparison, charts, trend analysis) — unsupported ideas are never offered as buttons and never return invented results |
+| **Messages** | Stacked boxes | Directional bubbles (user on the logical end, assistant with avatar), Demo note inside the reply, `dir="auto"`, quiet 160 ms rise (disabled under Reduced Motion by the existing global rule) |
+| **Result card in the panel** | Net income only | Period chip, headline figure (green/red by sign), two secondary server figures (revenue/expenses) or the 90+ bucket for aging, warnings count, Open in Canvas / Open original report |
+| **Composer** | Textarea + loose button | Single rounded container with the send button inside, focus ring on the whole control, counter on its own line |
+| **Canvas controls** | `<select>` + dates | Segmented report switch (native radios: arrow keys, 44 px touch on mobile) + dates + Run |
+| **Canvas result** | Tables then evidence below | **Summary first** (Net income emphasised, revenue, expenses KPI tiles), then dense tables with totals rows, with **Evidence & scope as a sticky side column** on wide screens (stacked below on mobile) |
+| **Aging** | Table / cards | **Total first**, then four bucket tiles (0–30, 31–60, 61–90, 90+; overdue dots amber/red only when non-zero), then party table (sm+) / party cards (mobile) |
+| **Run history** | Side list | Compact "Runs in this session" strip above the result |
+| **Mobile flow** | Result below the fold after Run | After an explicit run on a small screen the result scrolls into view (instant, no smooth scroll → Reduced-Motion-safe); not triggered on wide screens |
+| **Evidence rows** | Two-column label/value | Stacked label over value (fits the 18 rem column and phones) |
+
+### 9.2 Deliberately not done (kept honest)
+
+| Reference element | Decision |
+|---|---|
+| Growth percentages (+12%, −3%), "vs previous period", cost-share percentages | **Not built.** No such values exist in the services; the UI never computes them. A test asserts no `%` in income/aging results. |
+| Revenue/expense bar-and-line chart, monthly breakdown | **Deferred.** The tools return period totals only, not a per-month authorized series. A chart needs a new approved read tool (AI-04+ / report contract), not UI arithmetic. |
+| "Compare with previous period", "show chart" quick actions | Shown only as a plain "not available yet" note, never as actionable suggestions. |
+| Attachment button, share/export, fullscreen, tabs "Summary / Details / Analysis" | Not built: no backing capability (uploads need AI-04; export belongs to the reports module). The Canvas keeps Summary → Tables → Evidence as one scroll instead of tabs, to keep dense data visible. |
+| "Narrative summary" paragraph | Not built: it would be model/UI-authored prose about numbers; the KPI tiles carry the server figures verbatim. |
+
+### 9.3 Round-2 files
+
+`components/intelligence/{kpi-tile (new), assistant-panel, result-summary, intelligence-canvas, financial-result, income-statement-view, aging-view, evidence-panel}.tsx`, `messages/{ar,en}.json` (new keys under `intelligence.panel` / `.canvas` / `.result`), `app/globals.css` (one keyframe `awj-intel-rise`), tests (`panel`, `canvas`, `results`), `e2e/ai-03-intelligence.spec.ts` (shots to `after/`, 350 ms settle), screenshots (`before/`, `after/`, `compare/`).
+
+### 9.4 Round-2 verification
+
+| Check | Result |
+|---|---|
+| Intelligence unit tests | 144 passing (modules + components); new: summary-first ordering, no `%`, suggestion order/grouping, unsupported-analysis note, segmented switch, focus return |
+| Full web suite | 645 files / **7576 passed** |
+| `next build` | passed (`/intelligence` 7.6 kB, `/intelligence/settings` 5.2 kB) |
+| Playwright | 41 passed / 3 skipped by design / 0 failed (AR/EN × light/dark × desktop/mobile + Ink/Core + journeys) |
+| Test-isolation fix | Two focus tests failed only in the shared single-fork full run because another file leaves a `matchMedia` stub behind; the tests now pin their own pointer environment (code unchanged). |
+| Accounting / API / RBAC | No change in `app/`, routes or tests of the backend this round |
+
+### 9.5 Round-2 review notes
+
+- Defects found while reviewing the new captures and fixed: panel shots caught mid-animation (settle delay added to the harness); secondary figures wrapped on phones (stacked label/value); the result scrolled away on wide screens after Run (scroll now only when the result sits below 55 % of the viewport).
+- Contrast and touch targets rechecked in dark and Ink/Core captures; segmented options and suggestion rows are ≥ 44 px on mobile.
+- Not verifiable here: real devices/on-screen keyboard, live-tenant data, and Core/Ink on every scene (Ink/Core are captured for the canvas result in AR/light on both viewports).
+
+## 10. Next step
 
 **AI-04** (document-projected text under its own consent category and extraction contract), **not** live-provider activation — that stays blocked on the privacy, residency, billing-owner and numeric-cap gates recorded in AI-02. Do not enable `AI_ASSISTANT_ENABLED` or any tenant consent anywhere.
 

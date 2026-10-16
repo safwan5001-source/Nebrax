@@ -10762,7 +10762,7 @@
     },
     "panel": {
       "title": "AWJ assistant",
-      "description": "Answers financial questions from the reports you are authorized to read. It never writes or posts anything.",
+      "description": "Reference financial answers from your reports — read-only",
       "close": "Close assistant",
       "back": "Back to page",
       "context_label": "Current screen",
@@ -10774,8 +10774,8 @@
       "counter": "{count} / {max}",
       "too_long": "Message is longer than {max} characters.",
       "hint": "Enter to send · Shift+Enter for a new line",
-      "empty_title": "Start from a suggestion or type a question",
-      "empty_body": "Suggestions send a ready question through the assistant gateway. For period control open the Financial Intelligence Canvas.",
+      "empty_title": "Ask about your numbers, from your reports",
+      "empty_body": "I answer only from the reports you are authorized to read, and I state the period, scope and source. I never write or post anything.",
       "suggestions": "Suggestions",
       "you": "You",
       "assistant": "Assistant",
@@ -10798,7 +10798,10 @@
         "income_statement": "Income statement",
         "receivables_aging": "Receivables aging",
         "payables_aging": "Payables aging"
-      }
+      },
+      "suggestions_for_screen": "Suggested for this screen",
+      "more_reports": "Other reports",
+      "not_yet": "Not available yet: period comparison, charts and trend analysis. The assistant shows nothing for what current reports do not support."
     },
     "context": {
       "dashboard": "Dashboard",
@@ -10904,7 +10907,8 @@
       "warning": {
         "as_of_not_historical": "The selected date is not today, but balances are the current balances as of the read time ({balance_as_of}); no historical balance was rebuilt. The date only sets the age reference.",
         "unknown": "Server warning: {code}"
-      }
+      },
+      "summary": "Summary"
     },
     "settings": {
       "title": "Assistant settings",

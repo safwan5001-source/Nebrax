@@ -11,7 +11,7 @@ import type { AssistantStatus } from '../src/modules/intelligence/contract';
  */
 
 const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:3001';
-const shotDir = process.env.AI03_SHOT_DIR ?? '../docs/reports/ai-03-visual-qa';
+const shotDir = process.env.AI03_SHOT_DIR ?? '../docs/reports/ai-03-visual-qa/after';
 mkdirSync(shotDir, { recursive: true });
 
 type Locale = 'ar' | 'en';
@@ -86,8 +86,10 @@ async function open(page: Page, scene: Scene = {}) {
   await page.addStyleTag({ content: 'nextjs-portal{display:none!important}' });
 }
 
-const shot = async (page: Page, name: string, testInfo: { project: { name: string } }) =>
-  page.screenshot({ path: `${shotDir}/${testInfo.project.name}-${name}.png`, fullPage: false });
+const shot = async (page: Page, name: string, testInfo: { project: { name: string } }) => {
+  await page.waitForTimeout(350); // بعد انتهاء حركة الظهور (160ms) كي لا تُلتقط الشاشة وهي شفافة جزئياً
+  return page.screenshot({ path: `${shotDir}/${testInfo.project.name}-${name}.png`, fullPage: false });
+};
 
 async function openAssistant(page: Page, locale: Locale, mobile: boolean) {
   const label = locale === 'ar' ? 'مساعد أَوْج الذكي' : 'AWJ assistant';
@@ -119,7 +121,7 @@ for (const locale of LOCALES) {
         await open(page, { locale, mode, route: '/reports/general/income-statement' });
         await openAssistant(page, locale, mobile);
         const dialog = page.getByRole('dialog').first();
-        await expect(dialog.getByText(locale === 'ar' ? 'ابدأ من اقتراح أو اكتب سؤالك' : 'Start from a suggestion or type a question')).toBeVisible();
+        await expect(dialog.getByText(locale === 'ar' ? 'اسأل عن أرقامك من تقاريرك' : 'Ask about your numbers, from your reports')).toBeVisible();
         expect(calls.some((c) => c.path === '/ai-assistant/tools/run' || c.path === '/ai-assistant/messages')).toBe(false); // nothing financial before a click
         await shot(page, `panel-empty-${tag}`, testInfo);
 
@@ -150,7 +152,7 @@ for (const locale of LOCALES) {
         expect(calls.some((c) => c.path === '/ai-assistant/tools/run')).toBe(false);
         await shot(page, `canvas-empty-${tag}`, testInfo);
 
-        await page.getByLabel(locale === 'ar' ? 'التقرير' : 'Report', { exact: true }).selectOption('finance.receivables_aging');
+        await page.locator('label', { hasText: locale === 'ar' ? 'أعمار الذمم المدينة' : 'Receivables aging' }).first().click();
         await page.getByRole('button', { name: locale === 'ar' ? 'تشغيل التقرير' : 'Run report' }).click();
         await expect(page.locator('[data-result="receivables_aging"]')).toBeVisible();
         await expect(page.getByRole('note')).toBeVisible();
