@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\StorefrontMedia;
+use App\Services\Commerce\StorefrontAnimatedImage;
 use App\Services\Commerce\StorefrontMediaService;
 use App\Services\Commerce\StorefrontMediaVariantGenerator;
 
@@ -46,7 +47,29 @@ final class StorefrontMediaResource
             'preview_url' => self::previewUrl($media, $service),
             'usage_count' => $usageCount,
             'created_at' => $media->created_at?->toIso8601String(),
-        ];
+        ] + self::animatedFields($media, $service);
+    }
+
+    /**
+     * AWJ-ANIMATED-MEDIA P1 — حقول إضافية **للمتحرك فقط**: شكل أصل الصورة الثابتة يبقى كما كان حرفياً
+     * (يحرسه اختبار قائمة السماح). `preview_url` يبقى الإطار الثابت؛ معاينة الحركة تُطلب صراحةً من الواجهة.
+     *
+     * @return array<string,mixed>
+     */
+    private static function animatedFields(StorefrontMedia $media, StorefrontMediaService $service): array
+    {
+        $anim = $media->isAnimated() ? $media->animationVariant() : null;
+        if ($anim === null) {
+            return [];
+        }
+
+        return ['kind' => $media->kind, 'animation' => [
+            'url' => $service->signedUrl($media, StorefrontAnimatedImage::fileName((string) $anim['format'])),
+            'format' => (string) $anim['format'],
+            'frames' => (int) ($anim['frames'] ?? 0),
+            'duration_ms' => (int) ($anim['duration_ms'] ?? 0),
+            'loop' => (bool) ($anim['loop'] ?? false),
+        ]];
     }
 
     /** @param list<string> $files */

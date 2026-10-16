@@ -25,6 +25,9 @@ class StorefrontMedia extends BaseModel implements CompanyWide
 
     public const KIND_IMAGE = 'image';
 
+    /** AWJ-ANIMATED-MEDIA P1 — GIF / WebP متحرك؛ سلّم ثابت من الإطار الأول + ملف `animated.*` منقّى. */
+    public const KIND_ANIMATED = 'animated';
+
     public const STATE_ACTIVE = 'active';
     public const STATE_DELETED = 'deleted';
     public const STATE_PURGED = 'purged';
@@ -67,6 +70,27 @@ class StorefrontMedia extends BaseModel implements CompanyWide
     public function isReady(): bool
     {
         return $this->variants_state === self::VARIANTS_READY;
+    }
+
+    public function isAnimated(): bool
+    {
+        return $this->kind === self::KIND_ANIMATED;
+    }
+
+    /**
+     * مدخل الملف المتحرك المنقّى (`kind = anim`) إن وُجد.
+     *
+     * @return array{kind:string,width:int,height:int,format:string,file:string,bytes:int,frames?:int,duration_ms?:int,loop?:bool}|null
+     */
+    public function animationVariant(): ?array
+    {
+        foreach ($this->variantList() as $variant) {
+            if (($variant['kind'] ?? null) === 'anim') {
+                return $variant;
+            }
+        }
+
+        return null;
     }
 
     /**

@@ -22,8 +22,21 @@ export function commerceStorefrontMediaPath(mediaId: string): string {
 
 export type MediaVariantsState = 'pending' | 'ready' | 'failed';
 
+/** AWJ-ANIMATED-MEDIA P1 — GIF / animated WebP. Absent on static assets (the server omits it). */
+export interface StorefrontMediaAnimation {
+  /** Signed, short-lived, sanitised animated file — editor preview only, played on request. */
+  url: string | null;
+  format: 'gif' | 'webp';
+  frames: number;
+  durationMs: number;
+  loop: boolean;
+}
+
 export interface StorefrontMediaAsset {
   id: string;
+  /** `image` unless the server says `animated`. */
+  kind?: 'image' | 'animated';
+  animation?: StorefrontMediaAnimation | null;
   name: string;
   mime: string;
   size: number;
@@ -63,10 +76,25 @@ function num(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
+function mapAnimation(raw: unknown): StorefrontMediaAnimation | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const a = raw as Record<string, unknown>;
+  return {
+    url: str(a.url),
+    format: a.format === 'webp' ? 'webp' : 'gif',
+    frames: num(a.frames),
+    durationMs: num(a.duration_ms),
+    loop: a.loop === true,
+  };
+}
+
 export function mapStorefrontMediaAsset(raw: RawAsset): StorefrontMediaAsset {
   const state = raw.variants_state;
+  const animation = raw.kind === 'animated' ? mapAnimation(raw.animation) : null;
   return {
     id: String(raw.id ?? ''),
+    kind: animation ? 'animated' : 'image',
+    animation,
     name: str(raw.name) ?? '',
     mime: str(raw.mime) ?? '',
     size: num(raw.size),

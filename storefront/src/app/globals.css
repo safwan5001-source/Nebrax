@@ -1595,6 +1595,7 @@ input[type="search"]::-webkit-search-cancel-button {
 /* controls: translucent dark discs / pill — their glyphs contrast with their OWN fill, whatever the picture */
 [data-slider-arrow],
 [data-slider-pause],
+[data-slider-bar] [data-motion-toggle],
 [data-slider-dots] button {
   appearance: none;
   border: 0;
@@ -1654,13 +1655,19 @@ input[type="search"]::-webkit-search-cancel-button {
   background: rgb(0 0 0 / 0.6);
   border-radius: 9999px;
 }
-[data-slider-pause] {
+[data-slider-pause],
+[data-slider-bar] [data-motion-toggle] {
   display: grid;
   place-items: center;
   inline-size: 2.75rem;
   block-size: 2.75rem;
 }
-[data-slider-pause] svg {
+/* AWJ-ANIMATED-MEDIA P1 — the motion toggle sits in the same pill; the pause button's own look is unchanged. */
+[data-slider-bar] [data-motion-toggle] {
+  background: none;
+}
+[data-slider-pause] svg,
+[data-slider-bar] [data-motion-toggle] svg {
   inline-size: 1.25rem;
   block-size: 1.25rem;
 }

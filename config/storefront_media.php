@@ -25,6 +25,26 @@ return [
     'max_edge' => 8192,
     'max_pixels' => 40_000_000,
 
+    // AWJ-ANIMATED-MEDIA P1 — animated GIF / animated WebP (amends V0 §7.4 "no GIF/animated").
+    // Original bytes are kept; a sanitised copy (`animated.{gif|webp}`) is the only animated file
+    // ever served, and the static ladder is generated from the FIRST FRAME (poster / reduced-motion
+    // fallback). Animated assets store NO pixel evidence (later frames are unmeasured); the contrast
+    // gates instead use worst-case full-range bounds, so text over motion publishes only under a
+    // scrim proven for ANY frame. They accept NO crop/rotate/focal/fit transform.
+    // Bounds are abuse/UX limits: browsers decode every frame, so frames × pixels is budgeted. Enforced at upload only.
+    'animated' => [
+        // Kill switch: false restores the pre-amendment behaviour (animated uploads → `animated_not_supported`).
+        'enabled' => filter_var(env('STOREFRONT_MEDIA_ANIMATED_ENABLED', true), FILTER_VALIDATE_BOOL),
+        'max_bytes' => (int) env('STOREFRONT_MEDIA_ANIMATED_MAX_BYTES', 5 * 1024 * 1024),
+        'max_frames' => 300,
+        'max_duration_ms' => 20_000,
+        'max_edge' => 2560,
+        'max_pixels' => 2_500_000,
+        // 40 M = ≈160 MB of decoded RGBA per image (measured: Chromium decodes ≈ 4 B × W × H × frames; the former 150 M
+        // allowed ≈ 600 MB). Lowered by owner decision after the F3 memory assessment (AWJ-ANIMATED-MEDIA-HARDENING-REPORT.md).
+        'max_total_pixels' => 40_000_000,
+    ],
+
     // Decode-memory guard (N-1 — calibrated on measured RSS, see the V2a report).
     // GD allocates pixel buffers outside PHP's `memory_limit`, so that ini value
     // says nothing about the real cost; the container's RAM does. Measured peak

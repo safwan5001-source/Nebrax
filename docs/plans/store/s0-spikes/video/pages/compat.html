@@ -1,0 +1,71 @@
+<!doctype html>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>S0 compatibility probe</title>
+<body style="font:13px/1.4 system-ui,sans-serif;padding:8px">
+<h3 style="margin:0 0 6px">S0 compatibility probe <small id="st">running…</small></h3>
+<div>Open with <code>?mode=range</code> (default) or <code>?mode=norange</code> to compare origins that ignore Range.</div>
+<pre id="out" style="white-space:pre-wrap"></pre><div id="stage" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+<script>
+const q = new URLSearchParams(location.search), MODE = q.get('mode') || 'range', BASE = location.origin;
+const R = { ua: navigator.userAgent, platform: navigator.platform, mode: MODE, dpr: devicePixelRatio, reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches, tests: {} };
+const out = (s) => (document.getElementById('out').textContent += s + '\n');
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const F = (n) => `${BASE}/files/${n}?mode=${MODE}&nc=${Math.random().toString(36).slice(2)}`;
+const A = (n) => `${BASE}/avif/${n}?mode=${MODE}&nc=${Math.random().toString(36).slice(2)}`;
+const v = document.createElement('video');
+
+// 1) canPlayType
+const types = { 'mp4 h264 baseline': 'video/mp4; codecs="avc1.42E01E"', 'mp4 h264 high': 'video/mp4; codecs="avc1.640028"', 'mp4 h264+aac': 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"',
+  'mp4 hevc': 'video/mp4; codecs="hvc1.1.6.L93.B0"', 'mp4 av1': 'video/mp4; codecs="av01.0.05M.08"', 'webm vp8': 'video/webm; codecs="vp8"', 'webm vp9': 'video/webm; codecs="vp9"',
+  'webm av1': 'video/webm; codecs="av01.0.05M.08"', 'webm vp9+opus': 'video/webm; codecs="vp9, opus"' };
+R.canPlayType = Object.fromEntries(Object.entries(types).map(([k, t]) => [k, v.canPlayType(t) || 'no']));
+
+// 2) MediaCapabilities
+async function caps() {
+  if (!navigator.mediaCapabilities) return 'unavailable';
+  const o = {};
+  for (const [k, ct] of Object.entries({ h264: 'video/mp4; codecs="avc1.640028"', vp9: 'video/webm; codecs="vp09.00.40.08"', av1: 'video/mp4; codecs="av01.0.08M.08"', hevc: 'video/mp4; codecs="hvc1.1.6.L120.B0"' })) {
+    try { const r = await navigator.mediaCapabilities.decodingInfo({ type: 'file', video: { contentType: ct, width: 1920, height: 1080, bitrate: 4e6, framerate: 30 } }); o[k] = { supported: r.supported, smooth: r.smooth, powerEfficient: r.powerEfficient }; } catch (e) { o[k] = 'err:' + e.name; }
+  }
+  return o;
+}
+
+// 3) real playback of each file
+async function play(name) {
+  const el = document.createElement('video'); el.muted = true; el.defaultMuted = true; el.playsInline = true; el.setAttribute('playsinline', ''); el.setAttribute('muted', ''); el.autoplay = true; el.loop = true; el.preload = 'auto'; el.width = 120; el.style.background = '#222';
+  const ev = []; for (const e of ['loadedmetadata', 'canplay', 'playing', 'stalled', 'error', 'suspend', 'waiting']) el.addEventListener(e, () => ev.push(e));
+  document.getElementById('stage').appendChild(el); const t0 = performance.now(); el.src = F(name);
+  let playRejected = null; try { await Promise.race([el.play(), wait(6000).then(() => { playRejected = 'play()-promise-still-pending-after-6s'; })]); } catch (e) { playRejected = e.name; }
+  await Promise.race([new Promise((r) => el.addEventListener('playing', r, { once: true })), new Promise((r) => el.addEventListener('error', r, { once: true })), wait(6000)]);
+  const tPlaying = ev.includes('playing') ? Math.round(performance.now() - t0) : null; const ct0 = el.currentTime; await wait(1500);
+  const res = { events: [...new Set(ev)], play_rejected: playRejected, time_to_playing_ms: tPlaying, advanced: el.currentTime > ct0 + 0.3, currentTime: +el.currentTime.toFixed(2), dims: [el.videoWidth, el.videoHeight], duration: isFinite(el.duration) ? +el.duration.toFixed(2) : el.duration, readyState: el.readyState, error: el.error ? { code: el.error.code, msg: (el.error.message || '').slice(0, 80) } : null };
+  el.pause(); el.removeAttribute('src'); el.load(); el.remove(); return res;
+}
+
+// 4) images: still + animated AVIF/GIF/WebP: decode ok? does animation advance?
+async function img(url, animated) {
+  const im = new Image(); im.style.width = '120px'; const t0 = performance.now(); im.src = url; document.getElementById('stage').appendChild(im);
+  const r = {}; try { await im.decode(); r.decoded = true; r.natural = [im.naturalWidth, im.naturalHeight]; } catch (e) { r.decoded = false; r.err = e.name; im.remove(); return r; }
+  if (animated) {
+    const c = document.createElement('canvas'); c.width = c.height = 1; const x = c.getContext('2d', { willReadFrequently: true }); const seen = new Set(); const t = performance.now();
+    while (performance.now() - t < 1800) { x.drawImage(im, 0, 0, 1, 1); const d = x.getImageData(0, 0, 1, 1).data; seen.add(d[0] + ',' + d[1] + ',' + d[2]); await new Promise((rr) => requestAnimationFrame(rr)); }
+    r.distinct_frame_samples = seen.size; r.animates = seen.size > 1;
+  }
+  im.remove(); return r;
+}
+async function pictureAvif() {
+  const p = document.createElement('picture'); const s = document.createElement('source'); s.type = 'image/avif'; s.srcset = A('anim3.avif'); const i = document.createElement('img'); i.src = `${BASE}/files/../none.gif`; p.append(s, i); document.getElementById('stage').appendChild(p);
+  await wait(1200); const r = { chose_avif_source: /\.avif/.test(i.currentSrc), currentSrc: i.currentSrc.replace(/\?.*/, '') }; p.remove(); return r;
+}
+
+(async () => {
+  R.mediaCapabilities = await caps(); out('canPlayType: ' + JSON.stringify(R.canPlayType));
+  const videos = ['h264-baseline-faststart.mp4', 'h264-high-faststart.mp4', 'h264-nofaststart.mp4', 'h264-aac-audio.mp4', 'h264-fragmented.mp4', 'h264-rotated90.mp4', 'hevc.mp4', 'av1.mp4', 'vp9.webm', 'vp8.webm', 'av1.webm', 'trunc.mp4', 'hostile-boxsize.mp4'];
+  for (const n of videos) { R.tests['video:' + n] = await play(n); out(n + ' → ' + JSON.stringify(R.tests['video:' + n])); }
+  for (const [n, anim] of [['still.avif', false], ['anim3.avif', true], ['anim3-alpha.avif', true], ['anim60-big.avif', true]]) { R.tests['avif:' + n] = await img(A(n), anim); out(n + ' → ' + JSON.stringify(R.tests['avif:' + n])); }
+  for (const [n, u] of [['control.gif', F('control.gif')], ['sanitised animated.gif', F('animated.gif')], ['sanitised animated.webp', F('animated.webp')]]) { R.tests['control:' + n] = await img(u, true); out(n + ' → ' + JSON.stringify(R.tests['control:' + n])); }
+  R.tests['picture-source-avif'] = await pictureAvif();
+  document.getElementById('st').textContent = 'DONE'; R.done = true;
+  try { await fetch('/__result', { method: 'POST', body: JSON.stringify(R) }); } catch (e) { out('post failed ' + e); }
+})();
+</script>

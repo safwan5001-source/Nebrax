@@ -25,6 +25,7 @@ import {
 import type { CustomizerMessageKey } from "../messages";
 import { MEDIA_ALT_MAX, type MediaRef } from "../presentation/media-ref";
 import { MediaFramingEditor } from "./MediaFramingEditor";
+import { MotionBadge, MotionPreviewImage, motionSummary } from "./MotionPreview";
 import { MediaPicker } from "./MediaPicker";
 import { mediaBtnClass, mediaInputClass } from "./ui";
 import { useUsageReadiness } from "./use-usage-readiness";
@@ -145,9 +146,19 @@ export function MediaRefField({
       ) : (
         <div className="space-y-3 border border-border bg-surface p-3">
           <div className="flex items-start gap-3">
-            <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden border border-border bg-background">
+            <div className="relative flex size-16 shrink-0 items-center justify-center overflow-hidden border border-border bg-background">
               {assetState.kind === "loading" ? (
                 <Loader2 aria-hidden="true" className="size-4 animate-spin text-muted" />
+              ) : thumb && asset?.animation ? (
+                <MotionPreviewImage
+                  asset={asset}
+                  poster={thumb}
+                  alt=""
+                  t={t}
+                  imgClassName="size-full object-contain"
+                  controlClassName="absolute bottom-0.5 start-0.5"
+                  compact
+                />
               ) : thumb ? (
                 // eslint-disable-next-line @next/next/no-img-element -- signed, short-lived workspace URL
                 <img src={thumb} alt="" className="size-full object-contain" />
@@ -170,8 +181,15 @@ export function MediaRefField({
                   {asset ? (
                     <p className="text-[11px] tabular-nums text-muted" dir="ltr">
                       {asset.width}×{asset.height}
+                      {motionSummary(asset, t) ? ` · ${motionSummary(asset, t)}` : ""}
                       {asset.usageCount ? ` · ${t("mediaUsedIn")} ${asset.usageCount} ${t("mediaPlaces")}` : ""}
                     </p>
+                  ) : null}
+                  {asset?.animation ? (
+                    <div className="space-y-1 pt-0.5" data-media-motion-note="">
+                      <MotionBadge asset={asset} t={t} />
+                      <p className="text-[11px] leading-4 text-muted">{t("mediaMotionNoFraming")}</p>
+                    </div>
                   ) : null}
                 </>
               )}
@@ -180,7 +198,7 @@ export function MediaRefField({
           </div>
 
           <div className="flex flex-wrap gap-1.5">
-            {framing ? (
+            {framing && !asset?.animation ? (
               <button
                 type="button"
                 className={mediaBtnClass}
@@ -243,7 +261,7 @@ export function MediaRefField({
       {hint ? <p className="text-[12px] leading-5 text-muted">{hint}</p> : null}
 
       <MediaPicker open={picking} onClose={() => setPicking(false)} onSelect={select} t={t} locale={locale} />
-      {framing && value && asset ? (
+      {framing && value && asset && !asset.animation ? (
         <MediaFramingEditor
           // A fresh editor per opening: it seeds its draft framing from `value`.
           key={editing ? "open" : "closed"}

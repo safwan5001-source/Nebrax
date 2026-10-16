@@ -1,0 +1,350 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { type BrowserContext, expect, type Page, test } from "@playwright/test";
+
+/**
+ * AWJ-ANIMATED-MEDIA P1 — the animated-media rendering in a REAL browser (Chromium), against the real
+ * `SectionBackdrop` / `HomeSlider` on `/dev/animated-media-visual`.
+ *
+ * The fixtures are the bytes the PHP pipeline actually produces (`StorefrontAnimatedImage::sanitize()` /
+ * `posterBytes()`), so this proves a browser decodes and animates the SANITISED files, not just the originals.
+ * Every request to the same-origin media proxy path is answered here and logged, so "the animation was never
+ * even fetched" is assertable (reduced motion, no JavaScript, paused).
+ *
+ * Needs no backend. `pnpm exec playwright test -c playwright.animated-media.config.ts`
+ * Not covered here (no WebKit/Firefox in this environment): Safari/iOS — see the report's manual checklist.
+ */
+const FX = join(__dirname, "support", "animated-fixtures");
+const bytes = (name: string) => readFileSync(join(FX, name));
+
+async function serveMedia(target: Page | BrowserContext, log: string[]) {
+  await target.route("**/api/storefront/media/customizer/**", (route) => {
+    const file = new URL(route.request().url()).pathname.split("/").pop() ?? "";
+    log.push(file);
+    const reply = (name: string, type: string) =>
+      route.fulfill({
+        status: 200,
+        body: bytes(name),
+        contentType: type,
+        headers: { "cache-control": "no-store" },
+      });
+    if (file === "control.gif")
+      return reply("control-original.gif", "image/gif");
+    if (file === "animated.gif") return reply("animated.gif", "image/gif");
+    if (file === "animated.webp") return reply("animated.webp", "image/webp");
+    if (file === "first-frame.webp")
+      return reply("webp-first-frame.webp", "image/webp");
+    if (file.endsWith(".webp")) return reply("still.webp", "image/webp");
+    if (file.endsWith(".jpg")) return reply("still.jpg", "image/jpeg");
+    return route.fulfill({ status: 404 });
+  });
+}
+
+const HERO = "[data-sd-backdrop] img";
+const SLIDE = "[data-slider-slide] img";
+const TOGGLE = "[data-motion-toggle]";
+
+const currentSrc = (page: Page, sel: string) =>
+  page.evaluate(
+    (s) =>
+      (document.querySelector(s) as HTMLImageElement | null)?.currentSrc ?? "",
+    sel,
+  );
+
+/** The dominant channel (r/g/b) of the image's current frame, sampled over time. */
+async function frames(page: Page, sel: string, count = 14, gap = 90) {
+  return page.evaluate(
+    async ({ sel, count, gap }) => {
+      const img = document.querySelector(sel) as HTMLImageElement;
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 1;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) throw new Error("no 2d context");
+      const out: string[] = [];
+      for (let i = 0; i < count; i++) {
+        ctx.clearRect(0, 0, 1, 1);
+        ctx.drawImage(img, 0, 0, 1, 1);
+        const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+        out.push(
+          r > g && r > b
+            ? "r"
+            : b > r && b > g
+              ? "b"
+              : g > r && g > b
+                ? "g"
+                : "?",
+        );
+        await new Promise((resolve) => setTimeout(resolve, gap));
+      }
+      return out;
+    },
+    { sel, count, gap },
+  );
+}
+
+/**
+ * Canary: does THIS browser advance animated images at all? Samples an UNTOUCHED, known-good control GIF
+ * (solid red → blue → lime, 200 ms). Some headless/CI Chromium builds paint the first frame forever; asserting
+ * motion there would test the browser, not the product. The playback tests skip (visibly) when it fails.
+ */
+async function browserAnimates(page: Page): Promise<boolean> {
+  return page.evaluate(async () => {
+    const img = new Image();
+    img.src = "/api/storefront/media/customizer/x/control.gif";
+    document.body.appendChild(img);
+    await img.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 1;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return false;
+    const seen = new Set<string>();
+    const t0 = performance.now();
+    while (performance.now() - t0 < 1500) {
+      ctx.drawImage(img, 0, 0, 1, 1);
+      const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+      seen.add(`${r},${g},${b}`);
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+    img.remove();
+    return seen.size > 1;
+  });
+}
+
+function watchErrors(page: Page) {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
+  page.on("console", (m) => {
+    // Only real faults: a hydration mismatch (the gated sources must not cause one) or an uncaught error.
+    // (next-intl's dev-only `timeZone` notice is a known warning on every /dev page.)
+    if (/hydrat|did not match|mismatch/i.test(m.text())) errors.push(m.text());
+  });
+  return errors;
+}
+
+const open = (page: Page, scenario: string, locale = "en") =>
+  page.goto(`/dev/animated-media-visual?scenario=${scenario}&locale=${locale}`);
+
+test.describe("animated media — real Chromium", () => {
+  test("GIF hero: still first, then the animated source after hydration; no hydration errors", async ({
+    page,
+  }) => {
+    const log: string[] = [];
+    const errors = watchErrors(page);
+    await serveMedia(page, log);
+    await open(page, "desktop-gif");
+
+    await page.waitForSelector(TOGGLE);
+    await expect.poll(() => currentSrc(page, HERO)).toMatch(/animated\.gif$/);
+    expect(log).toContain("animated.gif");
+
+    expect(errors, errors.join("\n")).toEqual([]);
+  });
+
+  test("GIF playback: frames really change (skipped where the browser cannot animate a control GIF)", async ({
+    page,
+  }) => {
+    await serveMedia(page, []);
+    await open(page, "desktop-gif");
+    await page.waitForSelector(TOGGLE);
+    await expect.poll(() => currentSrc(page, HERO)).toMatch(/animated\.gif$/);
+    test.skip(
+      !(await browserAnimates(page)),
+      "this Chromium build does not advance animated images (control GIF stayed on frame 0)",
+    );
+    const seen = new Set(await frames(page, HERO));
+    expect(seen.has("r") && seen.has("b") && seen.has("g")).toBe(true); // red → blue → lime
+  });
+
+  test("pause freezes on the still; play resumes the animation", async ({
+    page,
+  }) => {
+    await serveMedia(page, []);
+    await open(page, "desktop-gif");
+    const toggle = page.locator(TOGGLE);
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await expect(toggle).toHaveAccessibleName("Pause animation");
+    await expect.poll(() => currentSrc(page, HERO)).toMatch(/animated\.gif$/);
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    await expect(toggle).toHaveAccessibleName("Play animation");
+    await expect
+      .poll(() => currentSrc(page, HERO))
+      .toMatch(/800w\.(webp|jpg)$/);
+    expect(new Set(await frames(page, HERO, 8))).toEqual(new Set(["r"]));
+
+    await toggle.click();
+    await expect.poll(() => currentSrc(page, HERO)).toMatch(/animated\.gif$/);
+  });
+
+  test("Arabic RTL: control sits at the inline end and is keyboard operable", async ({
+    page,
+  }) => {
+    await serveMedia(page, []);
+    await open(page, "desktop-gif", "ar");
+    const toggle = page.locator(TOGGLE);
+    await toggle.focus();
+    await page.keyboard.press("Enter");
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    const box = await toggle.boundingBox();
+    const hero = await page.locator("[data-testid=hero]").boundingBox();
+    if (!box || !hero) throw new Error("no layout");
+    expect(box.x).toBeLessThan(hero.x + hero.width / 2); // RTL ⇒ inline-end is the left half
+    expect(box.width).toBeGreaterThanOrEqual(40); // 44px-class touch target
+  });
+
+  test("reduced motion: the still is used, the animation is NEVER requested, no control", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ reducedMotion: "reduce" });
+    const page = await context.newPage();
+    const log: string[] = [];
+    await serveMedia(page, log);
+    await open(page, "desktop-gif");
+    await page.waitForLoadState("networkidle");
+    await expect
+      .poll(() => currentSrc(page, HERO))
+      .toMatch(/800w\.(webp|jpg)$/);
+    expect(log.filter((f) => f.startsWith("animated."))).toEqual([]);
+    await expect(page.locator(TOGGLE)).toHaveCount(0);
+    await context.close();
+  });
+
+  test("no JavaScript: the still only — no animation fetched, no motion without a control", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ javaScriptEnabled: false });
+    const page = await context.newPage();
+    const log: string[] = [];
+    await serveMedia(page, log);
+    await open(page, "desktop-gif");
+    await page.waitForLoadState("networkidle");
+    expect(await currentSrc(page, HERO)).toMatch(/800w\.(webp|jpg)$/);
+    expect(log.filter((f) => f.startsWith("animated."))).toEqual([]);
+    expect(
+      await page.evaluate(
+        () =>
+          (document.querySelector("[data-sd-backdrop] img") as HTMLImageElement)
+            .naturalWidth,
+      ),
+    ).toBeGreaterThan(0);
+    await expect(page.locator("button")).toHaveCount(0);
+    await context.close();
+  });
+
+  test("animated WebP: the sanitised file is fetched, decodes and renders in the browser", async ({
+    page,
+  }) => {
+    const log: string[] = [];
+    await serveMedia(page, log);
+    await open(page, "desktop-webp");
+    await page.waitForSelector(TOGGLE);
+    await expect.poll(() => currentSrc(page, HERO)).toMatch(/animated\.webp$/);
+    // decoded and rendered at the right size (a broken/truncated sanitised file would not decode)
+    expect(
+      await page.evaluate(
+        (sel) => (document.querySelector(sel) as HTMLImageElement).naturalWidth,
+        HERO,
+      ),
+    ).toBe(400);
+  });
+
+  test("animated WebP playback: frames really change (skipped where the browser cannot animate)", async ({
+    page,
+  }) => {
+    await serveMedia(page, []);
+    await open(page, "desktop-webp");
+    await page.waitForSelector(TOGGLE);
+    await expect.poll(() => currentSrc(page, HERO)).toMatch(/animated\.webp$/);
+    test.skip(
+      !(await browserAnimates(page)),
+      "this Chromium build does not advance animated images (control GIF stayed on frame 0)",
+    );
+    expect(new Set(await frames(page, HERO)).size).toBeGreaterThanOrEqual(3);
+  });
+
+  test("the still extracted from an animated WebP's first frame decodes as a full-canvas red image", async ({
+    page,
+  }) => {
+    await serveMedia(page, []);
+    await page.goto("/dev/animated-media-visual?scenario=static");
+    const result = await page.evaluate(async () => {
+      const img = new Image();
+      img.src = "/api/storefront/media/customizer/x/first-frame.webp";
+      await img.decode();
+      const c = document.createElement("canvas");
+      c.width = c.height = 1;
+      const ctx = c.getContext("2d", { willReadFrequently: true });
+      if (!ctx) throw new Error("no 2d");
+      ctx.drawImage(img, 0, 0, 1, 1);
+      return {
+        w: img.naturalWidth,
+        h: img.naturalHeight,
+        px: Array.from(ctx.getImageData(0, 0, 1, 1).data),
+      };
+    });
+    expect([result.w, result.h]).toEqual([400, 400]);
+    expect(result.px[0]).toBeGreaterThan(200);
+    expect(result.px[2]).toBeLessThan(60);
+  });
+
+  test("phone art direction: a phone-only animation plays on a phone and not on desktop", async ({
+    browser,
+  }) => {
+    const desktopLog: string[] = [];
+    const desktop = await browser.newContext({
+      viewport: { width: 1280, height: 800 },
+    });
+    const dp = await desktop.newPage();
+    await serveMedia(dp, desktopLog);
+    await open(dp, "phone-gif");
+    await dp.waitForLoadState("networkidle");
+    expect(await currentSrc(dp, HERO)).toMatch(/800w\.(webp|jpg)$/);
+    expect(desktopLog.filter((f) => f.startsWith("animated."))).toEqual([]);
+    await desktop.close();
+
+    const phone = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      isMobile: true,
+      hasTouch: true,
+      deviceScaleFactor: 3,
+    });
+    const pp = await phone.newPage();
+    await serveMedia(pp, []);
+    await open(pp, "phone-gif");
+    await pp.waitForSelector(TOGGLE);
+    await expect.poll(() => currentSrc(pp, HERO)).toMatch(/animated\.gif$/);
+    const box = await pp.locator(TOGGLE).boundingBox();
+    expect(box?.width ?? 0).toBeGreaterThanOrEqual(40);
+    expect(
+      await pp.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true); // no horizontal scroll
+    await phone.close();
+  });
+
+  test("slider: animated slide plays, the toggle lives in the control bar, pausing shows the still", async ({
+    page,
+  }) => {
+    await serveMedia(page, []);
+    await open(page, "slider");
+    const toggle = page.locator(`[data-slider-bar] ${TOGGLE}`);
+    await expect(toggle).toBeVisible();
+    await expect.poll(() => currentSrc(page, SLIDE)).toMatch(/animated\.gif$/);
+    await toggle.click();
+    await expect.poll(() => currentSrc(page, SLIDE)).toMatch(/\.(webp|jpg)$/);
+    expect(await currentSrc(page, SLIDE)).not.toMatch(/animated/);
+  });
+
+  test("static section: byte-for-byte the old behaviour — no animation request, no control", async ({
+    page,
+  }) => {
+    const log: string[] = [];
+    await serveMedia(page, log);
+    await open(page, "static");
+    await page.waitForLoadState("networkidle");
+    expect(log.filter((f) => f.startsWith("animated."))).toEqual([]);
+    await expect(page.locator(TOGGLE)).toHaveCount(0);
+  });
+});

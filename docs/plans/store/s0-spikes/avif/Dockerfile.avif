@@ -1,0 +1,7 @@
+# S0-A spike: identical to Dockerfile.baseline plus libavif (--with-avif). Spike only - production Dockerfile is NOT modified.
+FROM php:8.3-apache
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libfreetype6-dev libjpeg62-turbo-dev libpng-dev libwebp-dev libavif-dev \
+    && rm -rf /var/lib/apt/lists/*
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp --with-avif \
+    && docker-php-ext-install gd

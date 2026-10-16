@@ -395,6 +395,15 @@ php artisan serve
 `/inventory-openings/[id]` (مراجعة وترحيل — والمرحَّل لا يُعدَّل ولا يُحذف). العقد في
 `web/src/modules/inventory-openings/contract.ts`.
 
+## الوسائط المتحركة في مُخصِّص المتجر (AWJ-ANIMATED-MEDIA P1)
+
+مكتبة وسائط المُخصِّص (`storefront_media`) تقبل **GIF متحرك وWebP متحرك** (تعديل AMEND-22 على بند "لا GIF" المجمَّد في §7.4). **ليست مكتبة موازية**: نفس `StorefrontMediaService`/R2/بوابة المرجع المنشور/البروكسي.
+- `App\Services\Commerce\StorefrontAnimatedImage`: محلِّل بنية GIF/WebP بلا تبعية (الإنتاج بلا ffmpeg/Imagick/AVIF) — يقيس الإطارات والمدة والحلقة، ينقّي الملف (بلا تعليقات/XMP/EXIF)، ويستخرج الإطار الأول.
+- السلّم الثابت (WebP+JPEG) يُولَّد من **الإطار الأول** ويبقى `sources` والاحتياط وصورة `prefers-reduced-motion`. الملف المتحرك الوحيد المقدَّم هو `animated.{gif|webp}` المنقّى ويُعرض في حقل `animation` الإضافي.
+- **لا دليل بكسل للحركة**: `StorefrontMediaContrastEvidence` يعيد المدى الكامل `[0..255]` فلا يُنشر نصٌّ فوق حركة إلا تحت طبقة تعتيم كافية لأي إطار. **لا قصّ/تدوير/تأطير** لها. تُنشر فقط في خلفيات الأقسام وشرائح السلايدر (`animated_not_allowed_here` خارجها).
+- حدود قابلة للضبط في `config/storefront_media.php` → `animated`؛ مفتاح الإيقاف `STOREFRONT_MEDIA_ANIMATED_ENABLED=false`.
+- **مؤجَّل صراحةً:** AVIF المتحرك (GD الإنتاج بلا AVIF) وفيديو MP4/WebM (لا Range ولا أدوات مدة/بوستر). التفصيل: `AWJ-ANIMATED-MEDIA-IMPLEMENTATION-REPORT.md`.
+
 ## وقت إصدار الفاتورة (`invoices.issued_at`) — REM-13a
 
 لحظة الإصدار القانونية للفاتورة تُلتقط **مرة واحدة** في `InvoiceService::post()` (داخل معاملة الترحيل بعد القفلين وقبل `ZatcaService::buildFor`)، وتُخزَّن UTC بدقة ثانية، **ثابتة** (حارس `Invoice::booted`)، ولا تدخل `$fillable`.

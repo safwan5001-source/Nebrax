@@ -137,3 +137,50 @@ describe("customizer media proxy (AMEND-1/4/12/16)", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+describe("customizer media proxy — animated file (AWJ-ANIMATED-MEDIA P1)", () => {
+  beforeEach(() => {
+    fetchMock.mockReset();
+    hostHeader.value = "shop.example.com";
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubEnv("AWJ_COMMERCE_API_URL", "https://api.example.com");
+  });
+
+  it("forwards animated.gif / animated.webp for a media id with the same cache contract", async () => {
+    for (const [file, type] of [
+      ["animated.gif", "image/gif"],
+      ["animated.webp", "image/webp"],
+    ] as const) {
+      fetchMock.mockResolvedValueOnce(
+        new Response(new Uint8Array([71, 73, 70]), {
+          status: 200,
+          headers: { "content-type": type, etag: '"e"' },
+        }),
+      );
+      const response = await call(UUID, file);
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toBe(type);
+      expect(response.headers.get("cache-control")).toBe(
+        CUSTOMIZER_MEDIA_CACHE_CONTROL,
+      );
+      expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+      expect(String(fetchMock.mock.calls.at(-1)?.[0])).toContain(
+        `/media/customizer/${UUID}/${file}`,
+      );
+    }
+  });
+
+  it("never forwards the animated file for a transform key, or any other extension", async () => {
+    expect((await call(KEY, "animated.gif")).status).toBe(404);
+    expect((await call(UUID, "animated.png")).status).toBe(404);
+    expect((await call(UUID, "animated.GIF")).status).toBe(404);
+    expect((await call(UUID, "original.gif")).status).toBe(404);
+    expect((await call(UUID, "animated.gif.php")).status).toBe(404);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("passes a gate refusal through as 404 (unpublished / other tenant)", async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 404 }));
+    expect((await call(UUID, "animated.gif")).status).toBe(404);
+  });
+});

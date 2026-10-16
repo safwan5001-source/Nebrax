@@ -1293,6 +1293,7 @@
 /* controls: translucent dark discs / pill — their glyphs contrast with their OWN fill, whatever the picture */
 .awj-store-preview [data-slider-arrow],
 .awj-store-preview [data-slider-pause],
+.awj-store-preview [data-slider-bar] [data-motion-toggle],
 .awj-store-preview [data-slider-dots] button {
   appearance: none;
   border: 0;
@@ -1352,13 +1353,19 @@
   background: rgb(0 0 0 / 0.6);
   border-radius: 9999px;
 }
-.awj-store-preview [data-slider-pause] {
+.awj-store-preview [data-slider-pause],
+.awj-store-preview [data-slider-bar] [data-motion-toggle] {
   display: grid;
   place-items: center;
   inline-size: 2.75rem;
   block-size: 2.75rem;
 }
-.awj-store-preview [data-slider-pause] svg {
+/* AWJ-ANIMATED-MEDIA P1 — the motion toggle sits in the same pill; the pause button's own look is unchanged. */
+.awj-store-preview [data-slider-bar] [data-motion-toggle] {
+  background: none;
+}
+.awj-store-preview [data-slider-pause] svg,
+.awj-store-preview [data-slider-bar] [data-motion-toggle] svg {
   inline-size: 1.25rem;
   block-size: 1.25rem;
 }

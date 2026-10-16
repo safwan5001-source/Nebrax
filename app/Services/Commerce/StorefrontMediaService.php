@@ -31,11 +31,13 @@ class StorefrontMediaService
         'image/jpeg' => 'jpg',
         'image/png' => 'png',
         'image/webp' => 'webp',
+        'image/gif' => 'gif',
     ];
 
     public function __construct(
         private readonly R2StorageService $r2,
         private readonly StorefrontMediaVariantGenerator $variants,
+        private readonly StorefrontAnimatedImage $animated,
         private readonly StorefrontMediaReferenceScanner $references,
         private readonly TenantContext $tenant,
     ) {}
@@ -77,6 +79,7 @@ class StorefrontMediaService
         $this->assertQuota($meta['size']);
 
         $media = new StorefrontMedia([
+            'kind' => $meta['animation'] !== null ? StorefrontMedia::KIND_ANIMATED : StorefrontMedia::KIND_IMAGE,
             'original_name' => $this->safeName($file->getClientOriginalName()),
             'mime' => $meta['mime'],
             'size' => $meta['size'],
@@ -222,27 +225,71 @@ class StorefrontMediaService
     // ───────────────────────────── internals ─────────────────────────────
 
     /**
-     * @return array{mime:string,extension:string,width:int,height:int,size:int}
+     * @return array{mime:string,extension:string,width:int,height:int,size:int,animation:array{format:string,animated:bool,width:int,height:int,frames:int,duration_ms:int,loop:bool}|null}
      *
      * @throws StorefrontMediaException
      */
     private function inspect(string $path, int $size): array
     {
-        if ($size <= 0 || $size > (int) config('storefront_media.max_bytes')) {
+        $animatedCfg = (array) config('storefront_media.animated', []);
+        $animatedOn = (bool) ($animatedCfg['enabled'] ?? false);
+        $staticMax = (int) config('storefront_media.max_bytes');
+        // الحدّ الأعلى قبل معرفة النوع؛ يُشدَّد بعد الفحص للصور الثابتة (ثابتٌ ≤ حدّها دائماً).
+        $hardMax = max($staticMax, $animatedOn ? (int) ($animatedCfg['max_bytes'] ?? 0) : 0);
+        if ($size <= 0 || $size > $hardMax) {
             throw new StorefrontMediaException('file_too_large', 'حجم الصورة يتجاوز الحد المسموح (5 ميغابايت).');
         }
 
         // الامتداد/نوع العميل لا يُعتمد: نسبر البايتات.
         $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($path) ?: '';
         if (! isset(self::ALLOWED[$mime])) {
-            throw new StorefrontMediaException('unsupported_type', 'الصيغة غير مدعومة. المسموح: JPG وPNG وWebP.');
+            throw new StorefrontMediaException('unsupported_type', 'الصيغة غير مدعومة. المسموح: JPG وPNG وWebP وGIF.');
         }
-        if ($this->isAnimated($path, $mime)) {
-            throw new StorefrontMediaException('animated_not_supported', 'الصور المتحركة غير مدعومة.');
+
+        $info = null;
+        if (StorefrontAnimatedImage::formatForMime($mime) !== null) {
+            $bytes = file_get_contents($path);
+            if ($bytes === false) {
+                throw new StorefrontMediaException('image_unreadable', 'تعذّرت قراءة الملف المرفوع.');
+            }
+            $info = $this->animated->inspect($bytes, $mime); // بنية سليمة وكاملة، وإلا image_unreadable
+            if ($info['animated']) {
+                $this->assertAnimatedLimits($info, $size, $animatedOn, $animatedCfg);
+                // الإطار الأول يجب أن يكون صورةً ثابتة يفكّها GD بأبعاد اللوحة نفسها، وإلا فالسلّم الثابت (وصورة تقليل
+                // الحركة) ليست الإطار المعروض فعلاً: نرفض عند الرفع بدل أصلٍ `failed` لا تنفع فيه إعادة المحاولة.
+                $poster = $this->animated->posterBytes($bytes, $mime);
+                $posterSize = $poster === null ? false : @getimagesizefromstring($poster);
+                if (! is_array($posterSize) || [$posterSize[0], $posterSize[1]] !== [$info['width'], $info['height']]) {
+                    throw new StorefrontMediaException('animated_poster_unavailable', 'تعذّر استخراج الإطار الأول لهذه الصورة المتحركة (إطارها الأول لا يغطي اللوحة كاملة). أعد تصديرها بإطار أول كامل.');
+                }
+                // `getimagesizefromstring` قرأ الترويسة فقط؛ فكُّ GD الفعلي يلتقط تياراً تالفاً (F4) قبل أن يُخزَّن شيء.
+                // الكلفة محدودة: الإطار ≤ max_pixels (2.5MP ≈ 10MB RGBA).
+                $probe = @imagecreatefromstring((string) $poster);
+                if ($probe === false) {
+                    throw new StorefrontMediaException('animated_poster_unavailable', 'تعذّر فكّ الإطار الأول لهذه الصورة المتحركة (بياناته تالفة). أعد تصديرها ثم ارفعها.');
+                }
+                unset($probe, $poster, $bytes);
+
+                return [
+                    'mime' => $mime,
+                    'extension' => self::ALLOWED[$mime],
+                    'width' => $info['width'],
+                    'height' => $info['height'],
+                    'size' => $size,
+                    'animation' => $info,
+                ];
+            }
+            unset($bytes);
+        } elseif ($mime === 'image/png' && $this->isAnimatedPng($path)) {
+            throw new StorefrontMediaException('animated_not_supported', 'صور APNG المتحركة غير مدعومة. استخدم GIF أو WebP متحركاً.');
+        }
+
+        if ($size > $staticMax) {
+            throw new StorefrontMediaException('file_too_large', 'حجم الصورة يتجاوز الحد المسموح (5 ميغابايت).');
         }
         // فكّ GD متسامحٌ مع الملف المبتور (يعيد صورةً رماديةً جزئية بلا خطأ):
-        // نرفض ما لا ينتهي بعلامة نهايته بدل نشر صورةٍ نصفها مفقود.
-        if (! $this->hasCompleteTail($path, $mime)) {
+        // نرفض ما لا ينتهي بعلامة نهايته بدل نشر صورةٍ نصفها مفقود. (GIF/WebP تحقّق منهما المحلِّل.)
+        if ($info === null && ! $this->hasCompleteTail($path, $mime)) {
             throw new StorefrontMediaException('image_unreadable', 'الملف ناقص أو تالف (لم يكتمل رفعه). أعد تصديره ثم ارفعه.');
         }
 
@@ -269,7 +316,51 @@ class StorefrontMediaService
             'width' => $width,
             'height' => $height,
             'size' => $size,
+            'animation' => null,
         ];
+    }
+
+    /**
+     * حدود الصور المتحركة (حدود إساءة/تجربة لا حقائق محاسبية): المتصفح يفكّ كل إطار،
+     * فالكلفة ≈ إطارات × بكسلات لا حجم الملف وحده.
+     *
+     * @param  array{width:int,height:int,frames:int,duration_ms:int}  $info
+     * @param  array<string,mixed>  $cfg
+     *
+     * @throws StorefrontMediaException
+     */
+    private function assertAnimatedLimits(array $info, int $size, bool $enabled, array $cfg): void
+    {
+        if (! $enabled) {
+            throw new StorefrontMediaException('animated_not_supported', 'الصور المتحركة غير مدعومة.');
+        }
+        if ($size > (int) ($cfg['max_bytes'] ?? 0)) {
+            throw new StorefrontMediaException('file_too_large', 'حجم الصورة المتحركة يتجاوز الحد المسموح ('.max(1, intdiv((int) ($cfg['max_bytes'] ?? 0), 1048576)).' ميغابايت).');
+        }
+        if ($info['frames'] < 2) {
+            throw new StorefrontMediaException('animated_single_frame', 'الصورة المتحركة تحتاج إطارين على الأقل. ارفعها كصورة ثابتة بدلاً من ذلك.');
+        }
+        if ($info['frames'] > (int) ($cfg['max_frames'] ?? 0)) {
+            throw new StorefrontMediaException('animated_too_many_frames', 'عدد إطارات الصورة المتحركة يتجاوز الحد المسموح ('.(int) ($cfg['max_frames'] ?? 0).' إطار).');
+        }
+        if ($info['duration_ms'] > (int) ($cfg['max_duration_ms'] ?? 0)) {
+            throw new StorefrontMediaException('animated_too_long', 'مدة الصورة المتحركة تتجاوز الحد المسموح ('.intdiv((int) ($cfg['max_duration_ms'] ?? 0), 1000).' ثانية).');
+        }
+
+        [$w, $h] = [$info['width'], $info['height']];
+        if (min($w, $h) < (int) config('storefront_media.min_short_edge')) {
+            throw new StorefrontMediaException('dimension_too_small', 'الصورة صغيرة جداً. الحد الأدنى 320 بكسل على الضلع الأقصر.');
+        }
+        if (max($w, $h) > (int) ($cfg['max_edge'] ?? 0)) {
+            throw new StorefrontMediaException('dimension_too_large', 'الصورة المتحركة كبيرة جداً. الحد الأقصى '.(int) ($cfg['max_edge'] ?? 0).' بكسل لأي ضلع.');
+        }
+        if ($w * $h > (int) ($cfg['max_pixels'] ?? 0)) {
+            throw new StorefrontMediaException('pixel_limit', 'دقة الصورة المتحركة أعلى من المسموح. صغّر أبعادها.');
+        }
+        if ($w * $h * $info['frames'] > (int) ($cfg['max_total_pixels'] ?? 0)) {
+            throw new StorefrontMediaException('animated_too_heavy', 'الصورة المتحركة ثقيلة على المتصفح (أبعاد × إطارات). قلّل الأبعاد أو عدد الإطارات.');
+        }
+        $this->assertDecodable($w, $h, 1);
     }
 
     /**
@@ -320,7 +411,8 @@ class StorefrontMediaService
         }
     }
 
-    private function isAnimated(string $path, string $mime): bool
+    /** APNG: جزء `acTL` قبل أول IDAT. */
+    private function isAnimatedPng(string $path): bool
     {
         $handle = fopen($path, 'rb');
         if ($handle === false) {
@@ -328,30 +420,21 @@ class StorefrontMediaService
         }
 
         try {
-            if ($mime === 'image/webp') {
-                $head = (string) fread($handle, 32);
-
-                // VP8X: بتّ الحركة (0x02) في بايت الرايات.
-                return substr($head, 12, 4) === 'VP8X' && (ord($head[20] ?? "\0") & 0x02) === 0x02;
-            }
-
-            if ($mime === 'image/png') {
-                fseek($handle, 8);
-                while (! feof($handle)) {
-                    $header = (string) fread($handle, 8);
-                    if (strlen($header) < 8) {
-                        return false;
-                    }
-                    $length = unpack('N', substr($header, 0, 4))[1];
-                    $type = substr($header, 4, 4);
-                    if ($type === 'acTL') {
-                        return true;
-                    }
-                    if ($type === 'IDAT' || $type === 'IEND') {
-                        return false;
-                    }
-                    fseek($handle, $length + 4, SEEK_CUR);
+            fseek($handle, 8);
+            while (! feof($handle)) {
+                $header = (string) fread($handle, 8);
+                if (strlen($header) < 8) {
+                    return false;
                 }
+                $length = unpack('N', substr($header, 0, 4))[1];
+                $type = substr($header, 4, 4);
+                if ($type === 'acTL') {
+                    return true;
+                }
+                if ($type === 'IDAT' || $type === 'IEND') {
+                    return false;
+                }
+                fseek($handle, $length + 4, SEEK_CUR);
             }
         } finally {
             fclose($handle);
@@ -381,9 +464,53 @@ class StorefrontMediaService
     private function generateVariants(StorefrontMedia $media, string $sourcePath): void
     {
         $stored = [];
+        $poster = null;
 
         try {
-            $result = $this->variants->generate($sourcePath, function (string $file, string $bytes, string $mime) use ($media, &$stored): void {
+            $ladderSource = $sourcePath;
+            $animation = null;
+
+            if ($media->isAnimated()) {
+                // مفتاح الإيقاف يسري على إعادة المحاولة أيضاً (لا توليد ملف متحرك جديد وهو مُطفأ).
+                if (! (bool) config('storefront_media.animated.enabled', false)) {
+                    throw new StorefrontMediaException('animated_not_supported', 'الصور المتحركة غير مفعّلة حالياً.');
+                }
+                // الأصل المتحرك: السلّم الثابت من الإطار الأول، وملفٌ منقّى واحد للحركة.
+                $bytes = file_get_contents($sourcePath);
+                if ($bytes === false) {
+                    throw new StorefrontMediaException('image_unreadable', 'تعذّرت قراءة الملف المرفوع.');
+                }
+                $info = $this->animated->inspect($bytes, $media->mime);
+                $posterBytes = $this->animated->posterBytes($bytes, $media->mime);
+                if (! $info['animated'] || $posterBytes === null) {
+                    throw new StorefrontMediaException('animated_poster_unavailable', 'تعذّر استخراج الإطار الأول لهذه الصورة المتحركة.');
+                }
+
+                $poster = tempnam(sys_get_temp_dir(), 'sfp');
+                if ($poster === false || file_put_contents($poster, $posterBytes) === false) {
+                    throw StorefrontMediaException::storageUnavailable();
+                }
+                $ladderSource = $poster;
+
+                $clean = $this->animated->sanitize($bytes, $media->mime);
+                $file = StorefrontAnimatedImage::fileName($info['format']);
+                $this->r2->put(StorefrontMedia::R2_DOMAIN, $media->id, $file, $clean, $media->mime);
+                $stored[] = $file;
+                $animation = [
+                    'kind' => StorefrontMediaVariantGenerator::KIND_ANIM,
+                    'width' => $info['width'],
+                    'height' => $info['height'],
+                    'format' => $info['format'],
+                    'file' => $file,
+                    'bytes' => strlen($clean),
+                    'frames' => $info['frames'],
+                    'duration_ms' => $info['duration_ms'],
+                    'loop' => $info['loop'],
+                ];
+                unset($bytes, $posterBytes, $clean);
+            }
+
+            $result = $this->variants->generate($ladderSource, function (string $file, string $bytes, string $mime) use ($media, &$stored): void {
                 $this->r2->put(StorefrontMedia::R2_DOMAIN, $media->id, $file, $bytes, $mime);
                 $stored[] = $file;
             });
@@ -393,8 +520,9 @@ class StorefrontMediaService
                 'height' => $result['height'],
                 'avg_luminance' => $result['avg_luminance'],
                 'dominant_colour' => $result['dominant_colour'],
-                'region_luminance' => $result['region_luminance'],
-                'variants' => $result['variants'],
+                // الحركة: لا دليل تباين أبداً (الإطارات اللاحقة غير مثبتة) ⇒ البوابات تُغلق (`null` = غير مُثبَت).
+                'region_luminance' => $animation !== null ? null : $result['region_luminance'],
+                'variants' => $animation !== null ? [...$result['variants'], $animation] : $result['variants'],
                 'variants_state' => StorefrontMedia::VARIANTS_READY,
                 'variants_error' => null,
             ])->save();
@@ -413,6 +541,10 @@ class StorefrontMediaService
                 'variants_error' => $this->failureCode($e),
             ])->save();
             $this->report($e);
+        } finally {
+            if (is_string($poster)) {
+                @unlink($poster);
+            }
         }
     }
 

@@ -40,6 +40,9 @@ final class StorefrontMediaVariantGenerator
     public const KIND_WIDTH = 'w';
     public const KIND_THUMB = 'thumb';
 
+    /** AWJ-ANIMATED-MEDIA P1 — مدخل الملف المتحرك المنقّى في `variants` (ليس درجة سلّم). */
+    public const KIND_ANIM = 'anim';
+
     private const MIME = [
         self::FORMAT_WEBP => 'image/webp',
         self::FORMAT_JPG => 'image/jpeg',

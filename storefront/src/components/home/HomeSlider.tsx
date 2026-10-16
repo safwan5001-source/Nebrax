@@ -10,7 +10,9 @@ import {
   useRef,
   useState,
 } from "react";
+import { MotionPicture, MotionToggle } from "@/components/ui/motion-picture";
 import { destination } from "@/lib/home/destination";
+import { animatedPictureSources } from "@/lib/presentation/animated-sources";
 import type { ResolvedMedia } from "@/lib/presentation/media-ref";
 import type { SliderView, SlideView } from "@/lib/presentation/slider-resolve";
 
@@ -77,7 +79,15 @@ function srcSet(media: ResolvedMedia, format: "webp" | "jpg"): string {
     .join(", ");
 }
 
-function SlidePicture({ slide, eager }: { slide: SlideView; eager: boolean }) {
+function SlidePicture({
+  slide,
+  eager,
+  motionId,
+}: {
+  slide: SlideView;
+  eager: boolean;
+  motionId: string;
+}) {
   const media = slide.media;
   if (!media) return null;
   const widths = media.sources.filter((s) => s.kind === "w");
@@ -95,8 +105,8 @@ function SlidePicture({ slide, eager }: { slide: SlideView; eager: boolean }) {
   const mobileJpg = slide.mobile ? srcSet(slide.mobile, "jpg") : "";
   const webp = srcSet(media, "webp");
 
-  return (
-    <picture data-slider-picture="" style={style}>
+  const phoneStills = (
+    <>
       {mobileWebp ? (
         <source
           media={PHONE}
@@ -113,7 +123,12 @@ function SlidePicture({ slide, eager }: { slide: SlideView; eager: boolean }) {
           sizes="100vw"
         />
       ) : null}
+    </>
+  );
+  const desktopStills = (
+    <>
       {webp ? <source type="image/webp" srcSet={webp} sizes="100vw" /> : null}
+      {/* biome-ignore lint/performance/noImgElement: the <img> of a <picture> art-direction set (rendered inside it) */}
       <img
         src={fallback.src}
         srcSet={srcSet(media, "jpg") || undefined}
@@ -125,6 +140,30 @@ function SlidePicture({ slide, eager }: { slide: SlideView; eager: boolean }) {
         fetchPriority={eager ? "high" : undefined}
         decoding="async"
       />
+    </>
+  );
+
+  // AWJ-ANIMATED-MEDIA P1 — animated slides play via MotionPicture (still first frame for reduced motion /
+  // paused); a slider with no animation renders exactly the original markup.
+  const motion = animatedPictureSources(media, slide.mobile ?? undefined);
+  if (motion) {
+    return (
+      <MotionPicture
+        id={motionId}
+        sources={motion}
+        phoneStills={phoneStills}
+        data-slider-picture=""
+        style={style}
+      >
+        {desktopStills}
+      </MotionPicture>
+    );
+  }
+
+  return (
+    <picture data-slider-picture="" style={style}>
+      {phoneStills}
+      {desktopStills}
     </picture>
   );
 }
@@ -287,6 +326,9 @@ export function HomeSlider({
 
   const controls = mounted && total > 1;
   const idBase = `slider-${sectionId}`;
+  const hasMotion = slides.some(
+    (slide) => slide.media?.animation || slide.mobile?.animation,
+  );
 
   return (
     <section
@@ -365,7 +407,11 @@ export function HomeSlider({
                 inert={!isActive}
                 style={style}
               >
-                <SlidePicture slide={slide} eager={priority && index === 0} />
+                <SlidePicture
+                  slide={slide}
+                  eager={priority && index === 0}
+                  motionId={`${idBase}-motion`}
+                />
                 {slide.overlay ? <div data-slider-wash="" /> : null}
                 {slide.heading || slide.sub || (slide.cta && href) ? (
                   <div data-slider-copy="">
@@ -415,6 +461,7 @@ export function HomeSlider({
             </>
           ) : null}
           <div data-slider-bar="">
+            {hasMotion ? <MotionToggle id={`${idBase}-motion`} /> : null}
             {autoplay ? (
               <button
                 type="button"

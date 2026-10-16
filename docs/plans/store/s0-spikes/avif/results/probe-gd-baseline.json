@@ -1,0 +1,78 @@
+{
+    "php": "8.3.35",
+    "gd_info": {
+        "GD Version": "bundled (2.1.0 compatible)",
+        "JPEG Support": true,
+        "PNG Support": true,
+        "WebP Support": true,
+        "AVIF Support": false
+    },
+    "has_imagecreatefromavif": false,
+    "has_imageavif": false,
+    "files": {
+        "anim3-alpha.avif": {
+            "size": 2121,
+            "getimagesize": [
+                400,
+                400,
+                "image/avif"
+            ]
+        },
+        "anim3.avif": {
+            "size": 1208,
+            "getimagesize": [
+                400,
+                400,
+                "image/avif"
+            ]
+        },
+        "anim60-big.avif": {
+            "size": 144241,
+            "getimagesize": [
+                1920,
+                600,
+                "image/avif"
+            ]
+        },
+        "hostile-boxsize.avif": {
+            "size": 1208,
+            "getimagesize": [
+                400,
+                400,
+                "image/avif"
+            ]
+        },
+        "still-meta.avif": {
+            "size": 859,
+            "getimagesize": [
+                800,
+                400,
+                "image/avif"
+            ]
+        },
+        "still.avif": {
+            "size": 665,
+            "getimagesize": [
+                800,
+                400,
+                "image/avif"
+            ]
+        },
+        "trunc-400.avif": {
+            "size": 400,
+            "getimagesize": [
+                400,
+                400,
+                "image/avif"
+            ]
+        },
+        "trunc-800.avif": {
+            "size": 800,
+            "getimagesize": [
+                400,
+                400,
+                "image/avif"
+            ]
+        }
+    }
+}

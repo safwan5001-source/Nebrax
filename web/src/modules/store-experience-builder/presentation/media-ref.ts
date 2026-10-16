@@ -192,6 +192,20 @@ export interface ResolvedContrastBounds {
   max: [number, number, number];
 }
 
+/**
+ * AWJ-ANIMATED-MEDIA P1 — the sanitised animated file of a GIF / animated-WebP asset. Additive and optional:
+ * `sources` always stays the still ladder (first frame), so a renderer that ignores `animation` shows a
+ * correct still image. Never present for a transformed (cropped/rotated) usage — those are refused at publish.
+ */
+export interface ResolvedAnimation {
+  /** Same-origin proxy path `/api/storefront/media/customizer/{uuid}/animated.{gif|webp}`. */
+  src: string;
+  format: "gif" | "webp";
+  frames: number;
+  durationMs: number;
+  loop: boolean;
+}
+
 export interface ResolvedMedia {
   width: number;
   height: number;
@@ -199,6 +213,7 @@ export interface ResolvedMedia {
   alt: { ar: string | null; en: string | null };
   sources: ResolvedMediaSource[];
   contrast?: ResolvedContrastBounds;
+  animation?: ResolvedAnimation;
 }
 
 /** Resolved media keyed by the JSON path of the `MediaRef` inside the published document. */

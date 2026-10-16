@@ -24,6 +24,7 @@ import {
 } from "@/modules/commerce-workspace/storefront-media";
 import type { CustomizerMessageKey } from "../messages";
 import { MediaDialog } from "./MediaDialog";
+import { MotionBadge, MotionPreviewImage, motionSummary } from "./MotionPreview";
 import { mediaBtnClass, mediaInputClass, mediaPrimaryBtnClass } from "./ui";
 
 type T = (key: CustomizerMessageKey) => string;
@@ -38,7 +39,23 @@ interface UploadRow {
   asset?: StorefrontMediaAsset;
 }
 
-const ACCEPT = "image/jpeg,image/png,image/webp";
+// AWJ-ANIMATED-MEDIA P1 — GIF and animated WebP (WebP covers both). The server sniffs real bytes; this only filters the OS dialog.
+const ACCEPT = "image/jpeg,image/png,image/webp,image/gif";
+
+// Stable server codes → localized copy (the server text is Arabic-only); unknown codes keep the server text.
+const UPLOAD_ERROR_KEY: Record<string, CustomizerMessageKey> = {
+  animated_too_many_frames: "mediaErr_animated_too_many_frames",
+  animated_too_long: "mediaErr_animated_too_long",
+  animated_too_heavy: "mediaErr_animated_too_heavy",
+  animated_single_frame: "mediaErr_animated_single_frame",
+  animated_poster_unavailable: "mediaErr_animated_poster_unavailable",
+  animated_not_supported: "mediaErr_animated_not_supported",
+};
+
+export function uploadRejectionMessage(code: string, serverMessage: string, t: (key: CustomizerMessageKey) => string): string {
+  const key = UPLOAD_ERROR_KEY[code];
+  return key ? t(key) : serverMessage;
+}
 
 export function MediaPicker({
   open,
@@ -131,7 +148,7 @@ export function MediaPicker({
       try {
         const out = await uploadStorefrontMedia(files[i]);
         if (out.status === "rejected") {
-          patch(row.id, { status: "rejected", message: out.message });
+          patch(row.id, { status: "rejected", message: uploadRejectionMessage(out.code, out.message, t) });
         } else {
           any = true;
           patch(row.id, { status: out.status, asset: out.asset });
@@ -390,7 +407,21 @@ function MediaCard({
   return (
     <li className="flex min-w-0 flex-col border border-border bg-surface" data-media-card={asset.id} data-media-state={asset.variantsState}>
       <div className="relative aspect-[4/3] bg-background">
-        {asset.thumbnailUrl ? (
+        {asset.thumbnailUrl && asset.animation ? (
+          <>
+            <MotionPreviewImage
+              asset={asset}
+              poster={asset.thumbnailUrl}
+              alt={asset.altAr || asset.altEn || ""}
+              t={t}
+              imgClassName="size-full object-contain"
+              compact
+            />
+            <span className="absolute end-1 top-1">
+              <MotionBadge asset={asset} t={t} />
+            </span>
+          </>
+        ) : asset.thumbnailUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- signed, short-lived workspace URL
           <img
             src={asset.thumbnailUrl}
@@ -414,6 +445,7 @@ function MediaCard({
         </p>
         <p className="text-[11px] tabular-nums text-muted" dir="ltr">
           {asset.width}×{asset.height}
+          {motionSummary(asset, t) ? ` · ${motionSummary(asset, t)}` : ""}
           {asset.usageCount ? ` · ${t("mediaUsedIn")} ${asset.usageCount} ${t("mediaPlaces")}` : ""}
         </p>
         {asset.variantsState === "pending" ? (

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Models\StorefrontMedia;
 use App\Models\StorefrontMediaDerivative;
+use App\Services\Commerce\StorefrontAnimatedImage;
 use App\Services\Commerce\StorefrontMediaDerivativeService;
 use App\Services\Commerce\StorefrontMediaException;
 use App\Services\Commerce\StorefrontMediaVariantGenerator;
@@ -44,15 +45,20 @@ class StorefrontCustomizerMediaController extends PublicApiController
         $file = (string) $request->route('file');
 
         $context = app(StorefrontContext::class);
-        if (! $context->hasStorefront() || ! StorefrontMediaVariantGenerator::isValidFileName($file)) {
+        // AWJ-ANIMATED-MEDIA P1 — `animated.{gif|webp}`: الملف المتحرك المنقّى، للوسيط الأساسي فقط (لا مشتقّات).
+        $animatedFile = StorefrontAnimatedImage::isValidFileName($file);
+        if (! $context->hasStorefront() || (! $animatedFile && ! StorefrontMediaVariantGenerator::isValidFileName($file))) {
             $this->notFound();
         }
 
         $format = str_ends_with($file, '.webp')
             ? StorefrontMediaVariantGenerator::FORMAT_WEBP
             : StorefrontMediaVariantGenerator::FORMAT_JPG;
+        $contentType = $animatedFile
+            ? StorefrontAnimatedImage::MIME[substr($file, strlen('animated.'))]
+            : StorefrontMediaVariantGenerator::mimeForFormat($format);
 
-        if (preg_match('/\A[a-f0-9]{32}\z/', $id) === 1) {
+        if (! $animatedFile && preg_match('/\A[a-f0-9]{32}\z/', $id) === 1) {
             [$media, $etag, $read] = $this->derivative($id, $file, $format, $derivatives);
         } else {
             [$media, $etag, $read] = $this->base($id, $file);
@@ -83,7 +89,7 @@ class StorefrontCustomizerMediaController extends PublicApiController
             while (! $body->eof()) {
                 echo $body->read(8192);
             }
-        }, 200, $headers + ['Content-Type' => StorefrontMediaVariantGenerator::mimeForFormat($format)]);
+        }, 200, $headers + ['Content-Type' => $contentType]);
     }
 
     /** @return array{0:StorefrontMedia,1:string,2:\Closure} */
@@ -102,7 +108,10 @@ class StorefrontCustomizerMediaController extends PublicApiController
 
         // المحتوى مشتقٌّ من بصمة الأصل واسم الملف: تتغيّر إن تغيّر الأصل (لا يحدث —
         // الأصل ثابت)، وتبقى مستقرةً عبر إعادة توليد السلّم بالإعدادات نفسها.
-        return [$media, substr(hash('sha256', $media->sha256.':'.$file), 0, 32), fn () => $service->readVariant($media, $file)];
+        // الملف المتحرك المنقّى مشتقٌّ من الأصل بمنقٍّ مُرقَّم: تغيّر المنقّي يغيّر الـETag فلا 304 على بايتات قديمة.
+        $salt = StorefrontAnimatedImage::isValidFileName($file) ? ':s'.StorefrontAnimatedImage::SANITISER_VERSION : '';
+
+        return [$media, substr(hash('sha256', $media->sha256.':'.$file.$salt), 0, 32), fn () => $service->readVariant($media, $file)];
     }
 
     /** @return array{0:StorefrontMedia,1:string,2:\Closure} */

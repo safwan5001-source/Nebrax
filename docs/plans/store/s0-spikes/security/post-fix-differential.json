@@ -1,0 +1,76 @@
+{
+ "method": "harness/fuzz.py, identical seeds and iteration counts before/after the F1/F2/F4/F5 fix; Pillow differential (MORE_in = Pillow counts more frames than inspect() on the ORIGINAL upload)",
+ "runs": [
+  {
+   "format": "gif",
+   "seed": 11,
+   "before": {
+    "inputs": 150017,
+    "accepted": 53096,
+    "MORE_in": 12,
+    "MORE_san": 0,
+    "pillow_rejects_sanitised_animated": 0,
+    "unexpected_throwables": 0
+   },
+   "after": {
+    "inputs": 150017,
+    "accepted": 46889,
+    "MORE_in": 0,
+    "MORE_san": 0,
+    "pillow_rejects_sanitised_animated": 0,
+    "unexpected_throwables": 0
+   },
+   "after_other_invariants_reported": {}
+  },
+  {
+   "format": "webp",
+   "seed": 11,
+   "before": {
+    "inputs": 150018,
+    "accepted": 50446,
+    "MORE_in": 3,
+    "MORE_san": 0,
+    "pillow_rejects_sanitised_animated": 4440,
+    "unexpected_throwables": 0
+   },
+   "after": {
+    "inputs": 150018,
+    "accepted": 51196,
+    "MORE_in": 0,
+    "MORE_san": 0,
+    "pillow_rejects_sanitised_animated": 1220,
+    "unexpected_throwables": 0
+   },
+   "after_other_invariants_reported": {
+    "grammar_icc_flag_mismatch": 167,
+    "grammar_nonzero_pad_inner": 2597,
+    "grammar_nonzero_pad": 4
+   }
+  },
+  {
+   "format": "webp",
+   "seed": 12,
+   "before": {
+    "inputs": 150018,
+    "accepted": 48925,
+    "MORE_in": 292,
+    "MORE_san": 0,
+    "pillow_rejects_sanitised_animated": 4764,
+    "unexpected_throwables": 0
+   },
+   "after": {
+    "inputs": 150018,
+    "accepted": 61038,
+    "MORE_in": 0,
+    "MORE_san": 0,
+    "pillow_rejects_sanitised_animated": 405,
+    "unexpected_throwables": 0
+   },
+   "after_other_invariants_reported": {
+    "grammar_nonzero_pad_inner": 586,
+    "grammar_icc_flag_mismatch": 208,
+    "grammar_nonzero_pad": 4
+   }
+  }
+ ]
+}
