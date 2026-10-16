@@ -5,12 +5,29 @@
 | Scope | Phase 1 only (animated GIF / animated WebP). Phase 2 **not** started. |
 | Merge verified | `a50ce81f3fedcf5c8a700797e19c1275f0df0cea` — *feat(store-builder): support animated GIF and WebP media (#1541)*, squash-merged into `main` (parent `97341a1`, #1542). ✅ ancestor of `origin/main`, which is currently that SHA. |
 | Staging environment | **None exists** (see §2). **No deployment, flag change, migration or infrastructure change was made by this task.** |
-| Overall outcome | **STOPPED AT A DOCUMENTED TEST PLAN** (as instructed when staging is missing) — plus **two urgent findings** (§1). |
-| Recommendation | **NO-GO for production enablement; NO-GO for any limited enablement until §1 is resolved and §4 staging/device checks pass** (§8). |
+| Overall outcome | **STOPPED AT A DOCUMENTED TEST PLAN** (no staging environment) — plus the findings in §1. **Updated after owner-reported production checks — see §0.** |
+| Recommendation | **Superseded by §0/§8:** the owner has since enabled the flag in production and reported a GIF end-to-end check on an iPhone. Treat production as a *limited, owner-supervised canary*; do **not** widen until animated WebP and the remaining checks in §4 pass. |
 
 ---
 
-## 1. Urgent findings (read first)
+## 0. Update — status after owner-reported production checks (supersedes the “now/NO-GO” wording below)
+
+**Evidence classes used in this document:** *Verified here* = I ran it or read it from the repo/Railway (read-only). *Owner-reported* = stated by the owner, **not independently verified in this session**. *Not verified* = nobody has evidence.
+
+| Fact | Class | Detail |
+|---|---|---|
+| Phase 1 is merged: `a50ce81f3fedcf5c8a700797e19c1275f0df0cea` | Verified here | ancestor of `origin/main`. |
+| `STOREFRONT_MEDIA_ANIMATED_ENABLED` now **exists** on production `nibras-api` | Verified here (variable **name only**; value deliberately not read) | It was absent when §1.2 was written. |
+| The flag is **enabled** on Railway | Owner-reported | consistent with the variable now existing. |
+| GIF upload, storefront playback, pause and resume work on a **real iPhone** | Owner-reported | browser/iOS version not stated, so this is *not* recorded as “iPhone Safari” and does not close the multi-version Safari item. |
+| Animated **WebP** has not been manually verified | Owner-reported | open. |
+| Canvas showed no animation or control while the storefront did | Verified here (code) | explained and addressed in `AWJ-ANIMATED-MEDIA-CANVAS-PARITY-REPORT.md`. |
+
+Consequences for this document: §1.1 (auto-deploy) and §1.2 (flag defaulting on, unset) are **historical** — the deployment happened and the flag is now explicitly set. The code default is **still `true`** (§4 #16 stays FAIL as a *default*); that risk now only matters for a new environment (e.g. the future staging) and for any environment where the variable is accidentally unset. Option B in §1.2 (default `false`) remains the durable fix and is **not** done.
+
+---
+
+## 1. Urgent findings (read first) — *historical, see §0*
 
 ### 1.1 `main` is auto-deploying to the only Railway environment — production — right now
 Read-only Railway inspection (`list-services`, `get-service-config`, `list-deployments`, `environment-status`):
@@ -80,11 +97,11 @@ Status key — **PASS** (verified, with evidence) · **FAIL** · **BLOCKED** (ca
 
 | # | Check | Staging result | Local/prior evidence | How to complete on staging |
 |---|---|---|---|---|
-| 1 | Upload an animated **GIF** via the Customizer media library | **BLOCKED** | ✅ PHP feature test (created, original kept, sanitised `animated.gif`, static ladder from frame 1) | In the staging Customizer upload a real GIF (≤5 MB, ≤300 frames, ≤20 s, ≤2560 px, Σpx ≤ 40 M). Expect status `created`, “animated” badge, frames/duration summary. |
-| 2 | Upload an animated **WebP** | **BLOCKED** | ✅ same, WebP | Same with a real animated WebP (e.g. from `img2webp`). |
+| 1 | Upload an animated **GIF** via the Customizer media library | **PASS (owner-reported, production)**; staging **BLOCKED** | ✅ PHP feature test (created, original kept, sanitised `animated.gif`, static ladder from frame 1) | In the staging Customizer upload a real GIF (≤5 MB, ≤300 frames, ≤20 s, ≤2560 px, Σpx ≤ 40 M). Expect status `created`, “animated” badge, frames/duration summary. |
+| 2 | Upload an animated **WebP** | **NOT VERIFIED** (owner: not yet tested) — **next action** | ✅ same, WebP | Same with a real animated WebP (e.g. from `img2webp`). |
 | 3 | Reject malformed/oversized files (truncated, nested ANMF, FF-00 ext, LZW, 251+ frames of 400×400, >5 MB) with stable code and **no** R2 write | **BLOCKED** (R2 real) | ✅ PoC + boundary tests: `rejected`, 0 rows, 0 storage calls | Upload the PoCs from `docs/plans/store/s0-spikes/security/poc/`; confirm the error toast and an **empty** R2 prefix (`aws s3 ls`/dashboard). |
-| 4 | Animation **plays** on the published storefront (hero background, slider slide) | **BLOCKED** | ⚠️ Not demonstrable here: headless Chromium never advances animated images (canary self-skips 2 tests) | Open the published page in headed Chrome/Firefox/Safari; the image visibly moves. |
-| 5 | **Pause / Play** control (WCAG 2.2.2) | **BLOCKED** | ✅ DOM/unit tests + Chromium test for control presence after hydration | Click pause → frame freezes (still shown); play → resumes; keyboard Enter/Space; label AR/EN. |
+| 4 | Animation **plays** on the published storefront (hero background, slider slide) | **GIF: PASS (owner-reported, real iPhone)**; WebP **NOT VERIFIED**; desktop browsers **BLOCKED** | ⚠️ Not demonstrable here: headless Chromium never advances animated images (canary self-skips 2 tests) | Open the published page in headed Chrome/Firefox/Safari; the image visibly moves. |
+| 5 | **Pause / Play** control (WCAG 2.2.2) | **GIF: PASS (owner-reported, real iPhone: pause and resume)**; WebP / keyboard / AR+EN labels on device **NOT VERIFIED** | ✅ DOM/unit tests + Chromium test for control presence after hydration | Click pause → frame freezes (still shown); play → resumes; keyboard Enter/Space; label AR/EN. |
 | 6 | **Static first-frame fallback** (poster / `<picture>` still) | **BLOCKED** | ✅ tests: ladder built from frame 1, poster decodes at canvas size, GD-decoded at upload | With animation request blocked (DevTools) the hero shows the still, correct crop/size. |
 | 7 | **`prefers-reduced-motion`** | **BLOCKED** | ✅ real-Chromium test: still used, no `animated.*` request, no control | OS setting “Reduce motion” on iPhone/macOS → no animated request in Network tab. |
 | 8 | **No JavaScript** | **BLOCKED** | ✅ real-Chromium `javaScriptEnabled:false`: still only, 0 animated requests, 0 buttons | Disable JS (DevTools) → still only, no dead control. |
@@ -92,14 +109,14 @@ Status key — **PASS** (verified, with evidence) · **FAIL** · **BLOCKED** (ca
 | 10 | **Mobile layout** (390 px, DPR 3) | **BLOCKED** (device) | ⚠️ Chromium emulation only | Real iPhone + Android: no layout shift (CLS), phone art-direction still. |
 | 11 | **Tenant isolation** (tenant B cannot read/list/publish tenant A's animated asset; uniform 404) | **BLOCKED** | ✅ `animation is tenant scoped in the workspace api`, `a published animation is served through the gate and never across tenants`, signed-URL tamper test; independent adversarial review | Two staging tenants; request A's `…/customizer/{id}/animated.gif` on B's host and with B's token → 404 identical to a non-existent id. |
 | 12 | **Unpublished-asset access** (only published references are served publicly) | **BLOCKED** | ✅ publication-gate tests (unreferenced/draft asset → 404 on the storefront route; workspace signed URL works only for the owner, expires 20 min) | Upload but do **not** publish; `curl -I` the public proxy URL → 404; publish → 200 `image/gif|webp`, `X-Content-Type-Options: nosniff`, `Cache-Control: private, no-store` on the storefront route (workspace signed route: `private, max-age=600`); unpublish → 404 again. |
-| 13 | **Real Cloudflare R2 delivery** (PUT original + sanitised + ladder; GET through Laravel + same-origin Next proxy; ETag/304; content-type; size) | **BLOCKED** (no R2 test bucket / credentials) | ⚠️ only a faked R2 in tests; never exercised against real R2 | On staging with a test bucket: upload → list objects (expect `original.*`, `animated.*`, ladder `w480…1920`, thumbs); fetch via storefront; compare bytes to the sanitised file; verify no direct R2 URL is exposed. |
-| 14 | **Safari / iPhone** compatibility (playback, pause, Low Power Mode, rotation, reduced motion, WebP animation, GIF) | **BLOCKED** (no devices — **no physical-device claim is made**) | none | Run the device checklist in `AWJ-ANIMATED-MEDIA-PHASE1-ACCEPTANCE-REPORT.md` §3.3 on iPhone (current iOS + one back), Mac Safari, Android Chrome, Firefox. |
+| 13 | **Real Cloudflare R2 delivery** (PUT original + sanitised + ladder; GET through Laravel + same-origin Next proxy; ETag/304; content-type; size) | **PARTIAL — indirect, owner-reported:** a GIF uploaded and played end-to-end in production, which exercises the real R2 write and the proxy read for that asset. Object layout, headers, ETag/304 and the rejection-writes-nothing check are **NOT VERIFIED** | ⚠️ only a faked R2 in tests; never exercised against real R2 | On staging with a test bucket: upload → list objects (expect `original.*`, `animated.*`, ladder `w480…1920`, thumbs); fetch via storefront; compare bytes to the sanitised file; verify no direct R2 URL is exposed. |
+| 14 | **Safari / iPhone** compatibility (playback, pause, Low Power Mode, rotation, reduced motion, WebP animation, GIF) | **PARTIAL — owner-reported only:** GIF playback + pause/resume on one real iPhone (OS/browser not recorded). Not verified: WebP, Low Power Mode, rotation, reduced motion, a second iOS version, Mac Safari, Android, Firefox. I did not test any device. | none | Run the device checklist in `AWJ-ANIMATED-MEDIA-PHASE1-ACCEPTANCE-REPORT.md` §3.3 on iPhone (current iOS + one back), Mac Safari, Android Chrome, Firefox. |
 | 15 | **40 M total-pixel limit enforced** | **BLOCKED** on staging; **PASS** locally | ✅ config `animated.max_total_pixels = 40,000,000` on `a50ce81`; boundary tests (400×400: 249 ✔, 250 ✔, 251 ✘ `animated_too_heavy`, 300 ✘), 0 rows, 0 storage calls; static limits and other animated bounds pinned unchanged | On staging upload a 400×400×251-frame GIF → `animated_too_heavy`; ×250 → accepted. |
-| 16 | **Feature flag defaults to disabled** | **FAIL** | `STOREFRONT_MEDIA_ANIMATED_ENABLED` defaults to **true** in code; unset in production (§1.2). Master gate `STOREFRONT_MEDIA_R2_ENABLED` defaults false | Fix per §1.2 option A/B, then re-verify with `php artisan tinker` → `config('storefront_media.animated.enabled')`. |
+| 16 | **Feature flag defaults to disabled** | **FAIL (default)** — production is now **explicitly enabled** (variable present; owner-reported on) | `STOREFRONT_MEDIA_ANIMATED_ENABLED` still defaults to **true** in code. Master gate `STOREFRONT_MEDIA_R2_ENABLED` defaults false | Fix per §1.2 option A/B, then re-verify with `php artisan tinker` → `config('storefront_media.animated.enabled')`. |
 | 17 | **Rollback** works (flag off → new uploads refused, retries refused, existing assets keep serving) | **BLOCKED** | ✅ tests: kill switch restores `animated_not_supported`; retry cannot regenerate; no serve-time flag check | §6 rollback drill on staging. |
 | 18 | Production runtime parity (GD + libwebp decode of posters, `finfo` mime sniffing, memory) | **BLOCKED** | ✅ CI container has GD/WebP; production Dockerfile (Railpack on Railway) **differs from the repo `Dockerfile`** (build label *Railpack*) — GD/WebP presence on Railway not verified | On staging: upload GIF and WebP; confirm ladder generated; check `php -m` / `gd_info()` in the service shell. |
 
-**Totals:** PASS 0 on staging (no staging) · **FAIL 1** (#16) · **BLOCKED 17** · local PASS evidence for #1–3, 5–9, 11, 12, 15, 17 as listed.
+**Totals (updated):** staging checks: none run (no staging). Production, owner-reported: **#1, #4, #5 PASS for GIF**, #13/#14 partial. **FAIL 1** (#16, default). **Not verified:** #2 and every WebP-specific check. Everything else remains **BLOCKED**. Local PASS evidence for #3, 6–9, 11, 12, 15, 17 is unchanged.
 
 ---
 
@@ -107,8 +124,9 @@ Status key — **PASS** (verified, with evidence) · **FAIL** · **BLOCKED** (ca
 
 | # | Finding | Severity | Status |
 |---|---|---|---|
-| S1 | Phase 1 merged and auto-deployed to production with the flag defaulting **on** and no staging/device acceptance (§1) | **High (process)** | Open — owner decision §1.2 |
-| S2 | No real-R2, no real-device and no Safari evidence exists; headless playback is unobservable | High for go-live | Open — §4 #13–14 |
+| S1 | Phase 1 merged and auto-deployed to production before staging/device acceptance (§1, historical). The owner has since enabled the flag explicitly (§0) | Medium (process) | Mitigated by supervised canary; code default still `true` (option B open) |
+| S2 | Real-R2 and real-device evidence is now **owner-reported for GIF only** (one iPhone); nothing for WebP, other devices, Safari versions, Low Power Mode or reduced motion; headless playback is unobservable here | Medium–High for wide rollout | Open — §4 #2, #13–14 |
+| S2b | Canvas (editor preview) did not mirror animated media or its pause/play control; a lone animated slide on the storefront had no pause control (WCAG 2.2.2) | Medium (parity / a11y) | Fixed in PR #1547 code — see `AWJ-ANIMATED-MEDIA-CANVAS-PARITY-REPORT.md` |
 | S3 | Parser hardening done (F1/F2/F4/F5); 40 M budget caps decoded memory at ≈ 160 MB per image (desktop Chromium measured); re-decode CPU on low-RAM browsers unmeasured | Medium → Low | Closed in PR; device validation open |
 | S4 | Tenant isolation and publication gating covered by tests + an independent review; **not** exercised against real R2 | Medium | Open until #11–13 on staging |
 | S5 | Residual info/low items F6 (bytes inside image-data streams survive), F7, F8 | Low/Info | Documented in the hardening report |
@@ -121,8 +139,8 @@ Status key — **PASS** (verified, with evidence) · **FAIL** · **BLOCKED** (ca
 
 **Gates (both must be true for animated uploads):** `STOREFRONT_MEDIA_R2_ENABLED=true` **and** `STOREFRONT_MEDIA_ANIMATED_ENABLED=true`. Env changes on Railway redeploy the service; `deploy/entrypoint.sh` runs `config:cache`, so *editing the value without a restart has no effect*.
 
-**Before enabling anywhere**
-1. Resolve §1.2 (set `STOREFRONT_MEDIA_ANIMATED_ENABLED=false` explicitly in production, or ship option B).
+**Before enabling anywhere new** (the production flag is already on — §0)
+1. Make the safe default real: set the variable explicitly in every environment, or ship option B (code default `false`).
 2. Complete §4 on a staging environment, including #13 (R2) and #14 (iPhone Safari).
 
 **Enable on staging (approved environment only)**
@@ -148,18 +166,20 @@ Status key — **PASS** (verified, with evidence) · **FAIL** · **BLOCKED** (ca
 | Blocker | Needed | Owner action |
 |---|---|---|
 | No staging environment | Approval to create a Railway `staging` environment (own DB, own R2 test bucket + scoped token, hostname) | Approve infrastructure + provide R2 test bucket credentials |
-| No physical iPhone/Android in this sandbox | A person with devices | Run §4 #4–10, #14 and report results; no simulated result will be called device verification |
+| No physical device in this sandbox | A person with devices | Owner reported GIF on one iPhone (§0). Still needed: animated WebP, a second iOS version, Low Power Mode, rotation, reduced motion, Android/desktop browsers (§4 #2, #4–10, #14). No simulated result will be called device verification |
 | Real R2 behaviour of the upload/serve path | Staging with the test bucket | §4 #13 |
-| Unknown value of `STOREFRONT_MEDIA_R2_ENABLED` in production | Dashboard read by the owner | Check and tell me (or choose §1.2 A) |
+| Unknown value of `STOREFRONT_MEDIA_R2_ENABLED` in production | Dashboard read by the owner | Implied `true` by the owner-reported end-to-end GIF; not read by me |
 | Railway runtime image (GD/WebP) not verified | Shell on the service | §4 #18 |
 
 ---
 
 ## 8. Go / no-go for limited enablement
 
-**NO-GO (now).**
+**Updated:** the owner has already enabled the flag in production and verified GIF on one iPhone, so “limited enablement” is a *fact*, not a proposal. **Recommendation: keep it a supervised canary (internal/owner tenants only); do not announce or widen until animated WebP and the conditions below are met.**
 
-Conditions for a *limited* canary to become GO:
+*Original assessment (before the owner's production checks):* **NO-GO.**
+
+Conditions for widening beyond the canary:
 1. §1.2 resolved so “off by default” is true, and the production value of `STOREFRONT_MEDIA_R2_ENABLED` is known.
 2. A staging environment exists and §4 #1–3, 11–13, 15, 17, 18 pass against **real R2**.
 3. §4 #4–10 and #14 pass on **real devices** (iPhone Safari current + previous iOS, Android Chrome, desktop Chrome/Firefox/Safari) — in particular playback, pause/play, Low Power Mode and reduced motion.
@@ -172,5 +192,5 @@ Nothing found so far contradicts the code-level evidence (tests, fuzz, CI green)
 ## 9. Branch / PR / SHAs
 
 - Phase 1 merge SHA (verified): `a50ce81f3fedcf5c8a700797e19c1275f0df0cea` (PR #1541, merged).
-- This document is the only change. Because #1541 is merged, the designated branch was restarted from `main`: **`claude/awj-animated-media-support-7kzzga`** (Base SHA `a50ce81f3fedcf5c8a700797e19c1275f0df0cea`); Head SHA and the docs-only PR are given in the hand-off message.
-- No merge, deploy, production flag/config change, migration or API change was made; Phase 2 was not started.
+- Because #1541 is merged, the designated branch was restarted from `main`: **`claude/awj-animated-media-support-7kzzga`**, PR **#1547**, Base SHA `a50ce81f3fedcf5c8a700797e19c1275f0df0cea` (later merged with `main` for #1546). The PR first carried this document only; it now also carries the Canvas/storefront parity fix (`AWJ-ANIMATED-MEDIA-CANVAS-PARITY-REPORT.md`). Head SHA: see that report.
+- This task made no merge, deploy, production flag/config change, migration or API change; Phase 2 was not started.

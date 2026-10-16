@@ -1,11 +1,14 @@
 /**
  * @vitest-environment jsdom
  */
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CanvasSlider, type CanvasSliderLabels } from "../CanvasSlider";
 import { setAnimatedPreview } from "../media/animated-preview-store";
 import { CanvasBackdrop } from "../media/CanvasBackdrop";
+import { CANVAS_MOTION_TOGGLE_STYLE } from "../media/CanvasMotion";
 import type { SectionBackground } from "../presentation/section-design";
 import type { DesignContext } from "../presentation/section-design-resolve";
 
@@ -233,5 +236,23 @@ describe("CanvasSlider — animated slides", () => {
     const { motion: _omit, ...legacy } = labels;
     const { container } = mountSlider([slide("a", A), slide("b", B)], { labels: legacy });
     expect(container.querySelector("[data-motion-toggle]")).toBeNull();
+  });
+});
+
+describe("Canvas ↔ storefront mirror guards", () => {
+  const storefront = (rel: string) => readFileSync(resolve(__dirname, "../../../../../storefront/src", rel), "utf8");
+
+  it("the backdrop control's inline look is the storefront's MOTION_TOGGLE_STYLE, value for value", () => {
+    const source = storefront("components/ui/motion-picture.tsx");
+    const block = source.slice(source.indexOf("export const MOTION_TOGGLE_STYLE"));
+    for (const [key, value] of Object.entries(CANVAS_MOTION_TOGGLE_STYLE)) {
+      expect(block, `${key}`).toMatch(new RegExp(`${key}: ${typeof value === "number" ? value : `"${String(value).replace(/[()]/g, "\\$&")}"`}`));
+    }
+  });
+
+  it("the control has a two-tone focus ring in BOTH stylesheets (the global 1px outline vanishes on a dark picture)", () => {
+    const canvas = readFileSync(resolve(__dirname, "../store-preview.css"), "utf8");
+    expect(storefront("app/globals.css")).toMatch(/\[data-motion-toggle\]:focus-visible\s*\{\s*outline: 2px solid #fff;/);
+    expect(canvas).toMatch(/\.awj-store-preview \[data-motion-toggle\]:focus-visible\s*\{\s*outline: 2px solid #fff;/);
   });
 });
