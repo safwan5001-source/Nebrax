@@ -128,7 +128,7 @@ export const LAYOUT_DEFAULTS: Record<DisplayLayout, LayoutDefaults> = {
     padding: 0,
     aspect: "4:3",
     nameAlign: "center",
-    nameSize: 15,
+    nameSize: 16,
     nameWeight: 700,
     thumb: same(48),
   },

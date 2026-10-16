@@ -373,6 +373,197 @@ function NumberControl({
   );
 }
 
+/** Named, easy starting values for a pixel setting. Each writes the plain pixel number — the contract is unchanged. */
+interface Step {
+  id: string;
+  label: string;
+  value: number;
+}
+
+/**
+ * Easy first, exact on demand: a row of named steps (what most merchants want), and an "advanced" disclosure with the
+ * exact bounded pixel control. The advanced part opens by itself when the current value is not one of the steps, so a
+ * custom value is never hidden. Nothing here changes what is stored: always a plain bounded integer.
+ */
+function StepControl({
+  id,
+  label,
+  steps,
+  value,
+  fallback,
+  min,
+  max,
+  onChange,
+  t,
+}: {
+  id: string;
+  label: string;
+  steps: readonly Step[];
+  value: number | undefined;
+  fallback: number;
+  min: number;
+  max: number;
+  onChange: (next: number | undefined) => void;
+  t: T;
+}) {
+  const effective = value ?? fallback;
+  const matches = steps.some((step) => step.value === effective);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const showAdvanced = advancedOpen || !matches;
+  const bodyId = useId();
+  return (
+    <div className="space-y-2" data-catd-steps={id}>
+      <Label id={`${id}-steps`}>{label}</Label>
+      <div role="group" aria-labelledby={`${id}-steps`} className="grid gap-1" style={{ gridTemplateColumns: `repeat(${steps.length > 4 ? 3 : steps.length}, minmax(0, 1fr))` }}>
+        {steps.map((step) => {
+          const selected = effective === step.value;
+          const explicit = value !== undefined;
+          return (
+            <button
+              key={step.id}
+              type="button"
+              aria-pressed={selected && explicit}
+              data-effective={selected && !explicit ? "inherited" : undefined}
+              onClick={() => onChange(step.value)}
+              className={cn(
+                "flex min-h-11 flex-col items-center justify-center border px-1 py-1 text-[12px] font-medium leading-4",
+                focusRing,
+                selected && explicit
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : selected
+                    ? "border-dashed border-primary text-primary hover:bg-primary-soft"
+                    : "border-border text-text hover:bg-primary-soft",
+              )}
+            >
+              <span className="break-words text-center">{step.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      {!matches ? <Hint data-catd-custom-value="">{`${t("catdCustomValue")}: ${effective} ${t("catdUnitPx")}`}</Hint> : null}
+      <button
+        type="button"
+        aria-expanded={showAdvanced}
+        aria-controls={bodyId}
+        data-catd-advanced-toggle={id}
+        onClick={() => setAdvancedOpen((open) => !open)}
+        className={cn("inline-flex min-h-9 items-center gap-1.5 px-1 text-[12px] font-medium text-primary hover:underline", focusRing)}
+      >
+        <ChevronDown aria-hidden="true" strokeWidth={1.6} className={cn("size-3.5 transition-transform", showAdvanced && "rotate-180")} />
+        {t("catdAdvanced")}
+      </button>
+      <div id={bodyId} hidden={!showAdvanced}>
+        <NumberControl
+          id={`${id}-exact`}
+          label={label}
+          value={value}
+          fallback={fallback}
+          min={min}
+          max={max}
+          unit={t("catdUnitPx")}
+          onChange={onChange}
+          resetLabel={t("catdResetDevice")}
+          inheritedText={t("catdInherited")}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** The gap between cards: easy named steps for every device at once, exact per-device pixels under "advanced". */
+function GapControl({
+  idBase,
+  display,
+  defaults,
+  onChange,
+  deviceLabel,
+  t,
+}: {
+  idBase: string;
+  display: CategoryDisplay;
+  defaults: Record<DisplayDevice, number>;
+  onChange: (next: CategoryDisplay | undefined) => void;
+  deviceLabel: (id: string | number) => string;
+  t: T;
+}) {
+  const steps: readonly Step[] = [
+    { id: "tight", label: t("catdStep_gap_tight"), value: 8 },
+    { id: "normal", label: t("catdStep_gap_normal"), value: 12 },
+    { id: "loose", label: t("catdStep_gap_loose"), value: 20 },
+  ];
+  const effective = DISPLAY_DEVICES.map((device) => display.gap?.[device] ?? defaults[device]);
+  const uniform = effective.every((value) => value === effective[0]);
+  const matched = uniform ? steps.find((step) => step.value === effective[0]) : undefined;
+  const explicit = Object.keys(display.gap ?? {}).length > 0;
+  const [open, setOpen] = useState(false);
+  const showAdvanced = open || !matched;
+  const bodyId = useId();
+  const setAll = (value: number): CategoryDisplay | undefined => {
+    let next: CategoryDisplay | undefined = display;
+    for (const device of DISPLAY_DEVICES) next = setDevice(next, "gap", device, value);
+    return next;
+  };
+  return (
+    <div className="space-y-2" data-catd-responsive="gap">
+      <Label id={`${idBase}-gap-steps`}>{t("catdGap")}</Label>
+      <div role="group" aria-labelledby={`${idBase}-gap-steps`} className="grid grid-cols-3 gap-1">
+        {steps.map((step) => {
+          const selected = matched?.id === step.id;
+          return (
+            <button
+              key={step.id}
+              type="button"
+              aria-pressed={selected && explicit}
+              data-effective={selected && !explicit ? "inherited" : undefined}
+              onClick={() => onChange(setAll(step.value))}
+              className={cn(
+                "flex min-h-11 items-center justify-center border px-1 py-1 text-[12px] font-medium leading-4",
+                focusRing,
+                selected && explicit
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : selected
+                    ? "border-dashed border-primary text-primary hover:bg-primary-soft"
+                    : "border-border text-text hover:bg-primary-soft",
+              )}
+            >
+              {step.label}
+            </button>
+          );
+        })}
+      </div>
+      {!matched ? <Hint data-catd-custom-value="">{t("catdCustomValue")}</Hint> : null}
+      <button
+        type="button"
+        aria-expanded={showAdvanced}
+        aria-controls={bodyId}
+        data-catd-advanced-toggle={`${idBase}-gap`}
+        onClick={() => setOpen((value) => !value)}
+        className={cn("inline-flex min-h-9 items-center gap-1.5 px-1 text-[12px] font-medium text-primary hover:underline", focusRing)}
+      >
+        <ChevronDown aria-hidden="true" strokeWidth={1.6} className={cn("size-3.5 transition-transform", showAdvanced && "rotate-180")} />
+        {t("catdAdvancedPerDevice")}
+      </button>
+      <fieldset id={bodyId} hidden={!showAdvanced} className="space-y-3">
+        {DISPLAY_DEVICES.map((device: DisplayDevice) => (
+          <NumberControl
+            key={device}
+            id={`${idBase}-gap-${device}`}
+            label={deviceLabel(device)}
+            value={display.gap?.[device]}
+            fallback={defaults[device]}
+            min={DISPLAY_GAP_RANGE[0]}
+            max={DISPLAY_GAP_RANGE[1]}
+            unit={t("catdUnitPx")}
+            onChange={(next) => onChange(setDevice(display, "gap", device, next))}
+            resetLabel={t("catdResetDevice")}
+            inheritedText={t("catdInherited")}
+          />
+        ))}
+      </fieldset>
+    </div>
+  );
+}
+
 // ── the panel ───────────────────────────────────────────────────────────
 
 export function CategoriesDisplayFields({
@@ -636,29 +827,39 @@ export function CategoriesDisplayFields({
                 />
               </div>
             ) : null}
-            <NumberControl
+            <StepControl
               id={`${idBase}-card-radius`}
               label={t("catdCardRadius")}
+              steps={[
+                { id: "none", label: t("catdStep_radius_none"), value: 0 },
+                { id: "sm", label: t("catdStep_radius_sm"), value: 8 },
+                { id: "md", label: t("catdStep_radius_md"), value: 12 },
+                { id: "lg", label: t("catdStep_radius_lg"), value: 16 },
+                { id: "xl", label: t("catdStep_radius_xl"), value: 24 },
+                { id: "full", label: t("catdStep_radius_full"), value: 32 },
+              ]}
               value={card?.radius}
               fallback={12}
               min={DISPLAY_CARD_RADIUS_RANGE[0]}
               max={DISPLAY_CARD_RADIUS_RANGE[1]}
-              unit={t("catdUnitPx")}
               onChange={(next) => emit(setField(display, "card", "radius", next))}
-              resetLabel={t("catdResetDevice")}
-              inheritedText={t("catdInherited")}
+              t={t}
             />
-            <NumberControl
+            <StepControl
               id={`${idBase}-card-padding`}
               label={t("catdCardPadding")}
+              steps={[
+                { id: "none", label: t("catdStep_pad_none"), value: 0 },
+                { id: "compact", label: t("catdStep_pad_compact"), value: 8 },
+                { id: "normal", label: t("catdStep_pad_normal"), value: 12 },
+                { id: "roomy", label: t("catdStep_pad_roomy"), value: 20 },
+              ]}
               value={card?.padding}
               fallback={defaults.padding}
               min={DISPLAY_CARD_PADDING_RANGE[0]}
               max={DISPLAY_CARD_PADDING_RANGE[1]}
-              unit={t("catdUnitPx")}
               onChange={(next) => emit(setField(display, "card", "padding", next))}
-              resetLabel={t("catdResetDevice")}
-              inheritedText={t("catdInherited")}
+              t={t}
             />
             <div className="space-y-1">
               <Label id={`${idBase}-card-hover`}>{t("catdCardHover")}</Label>
@@ -838,17 +1039,21 @@ export function CategoriesDisplayFields({
                     onSelect={(id) => emit(setField(display, "name", "align", id))}
                   />
                 </div>
-                <NumberControl
+                <StepControl
                   id={`${idBase}-name-size`}
                   label={t("catdNameSize")}
+                  steps={[
+                    { id: "sm", label: t("catdStep_size_sm"), value: 13 },
+                    { id: "md", label: t("catdStep_size_md"), value: 14 },
+                    { id: "lg", label: t("catdStep_size_lg"), value: 16 },
+                    { id: "xl", label: t("catdStep_size_xl"), value: 20 },
+                  ]}
                   value={name?.size}
                   fallback={defaults.nameSize}
                   min={DISPLAY_NAME_SIZE_RANGE[0]}
                   max={DISPLAY_NAME_SIZE_RANGE[1]}
-                  unit={t("catdUnitPx")}
                   onChange={(next) => emit(setField(display, "name", "size", next))}
-                  resetLabel={t("catdResetDevice")}
-                  inheritedText={t("catdInherited")}
+                  t={t}
                 />
                 <div className="space-y-1">
                   <Label id={`${idBase}-name-weight`}>{t("catdNameWeight")}</Label>
@@ -967,24 +1172,14 @@ export function CategoriesDisplayFields({
                 ))}
               </fieldset>
             ) : null}
-            <fieldset className="space-y-3" data-catd-responsive="gap">
-              <legend className="mb-1 text-[12px] font-semibold text-text">{t("catdGap")}</legend>
-              {DISPLAY_DEVICES.map((device: DisplayDevice) => (
-                <NumberControl
-                  key={device}
-                  id={`${idBase}-gap-${device}`}
-                  label={deviceLabel(device)}
-                  value={display.gap?.[device]}
-                  fallback={defaults.gap[device]}
-                  min={DISPLAY_GAP_RANGE[0]}
-                  max={DISPLAY_GAP_RANGE[1]}
-                  unit={t("catdUnitPx")}
-                  onChange={(next) => emit(setDevice(display, "gap", device, next))}
-                  resetLabel={t("catdResetDevice")}
-                  inheritedText={t("catdInherited")}
-                />
-              ))}
-            </fieldset>
+            <GapControl
+              idBase={idBase}
+              display={display}
+              defaults={defaults.gap}
+              onChange={emit}
+              deviceLabel={deviceLabel}
+              t={t}
+            />
             {explicitCount(display, "responsive") > 0 ? (
               <div className="flex flex-wrap gap-1">
                 {(["columns", "gap", "itemWidth"] as const)

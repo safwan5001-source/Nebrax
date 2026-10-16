@@ -59,6 +59,12 @@ const open = (group: string) => {
   if (toggle.getAttribute("aria-expanded") === "false") fireEvent.click(toggle);
   return root;
 };
+/** Exact-pixel inputs live under an "Advanced" disclosure; open it and return the input whose id ends with `suffix`. */
+const exact = (suffix: string) => {
+  const toggle = document.querySelector(`[data-catd-advanced-toggle$="${suffix.replace(/-exact$/, "")}"]`) as HTMLElement | null;
+  if (toggle && toggle.getAttribute("aria-expanded") === "false") fireEvent.click(toggle);
+  return Array.from(document.querySelectorAll<HTMLInputElement>("input[type=number]")).find((b) => b.id.endsWith(suffix)) as HTMLInputElement;
+};
 const layoutButton = (id: string) => document.querySelector(`[data-catd-layout="${id}"]`) as HTMLButtonElement;
 
 describe("the classic look is the starting point", () => {
@@ -179,8 +185,8 @@ describe("presets", () => {
   it("shows a dirty state once a preset is edited, and restores the preset on re-applying it", () => {
     const { section } = mount(baseConfig());
     fireEvent.click(document.querySelector('[data-catd-preset="elegant_cards"]') as HTMLElement);
-    const card = open("card");
-    const radius = within(card).getAllByRole("spinbutton")[1];
+    open("card");
+    const radius = exact("card-radius-exact");
     fireEvent.change(radius, { target: { value: "4" } });
     fireEvent.blur(radius);
     expect(section()?.design?.display?.card?.radius).toBe(4);
@@ -208,12 +214,12 @@ describe("presets", () => {
 describe("card, image and name controls", () => {
   it("card: radius and padding are clamped into 0-32 and written as plain pixels", () => {
     const { section } = mount(baseConfig({ display: { layout: "grid" } }));
-    const card = open("card");
-    const [, radius, padding] = within(card).getAllByRole("spinbutton");
-    // order: border width, radius, padding
+    open("card");
+    const radius = exact("card-radius-exact");
     fireEvent.change(radius, { target: { value: "500" } });
     fireEvent.blur(radius);
     expect(section()?.design?.display?.card?.radius).toBe(32);
+    const padding = exact("card-padding-exact");
     fireEvent.change(padding, { target: { value: "-4" } });
     fireEvent.blur(padding);
     expect(section()?.design?.display?.card?.padding).toBe(0);
@@ -221,8 +227,8 @@ describe("card, image and name controls", () => {
 
   it("card: a typed value is committed on blur, not clamped digit by digit", () => {
     const { section } = mount(baseConfig({ display: { layout: "grid" } }));
-    const card = open("card");
-    const [, radius] = within(card).getAllByRole("spinbutton");
+    open("card");
+    const radius = exact("card-radius-exact");
     fireEvent.change(radius, { target: { value: "1" } });
     expect(section()?.design?.display?.card).toBeUndefined(); // still typing
     fireEvent.change(radius, { target: { value: "16" } });
@@ -307,7 +313,7 @@ describe("card, image and name controls", () => {
   it("name: size is bounded to 12-32 and weight/lines/alignment write plain values", () => {
     const { section } = mount(baseConfig({ display: { layout: "grid" } }));
     const name = open("name");
-    const size = within(name).getAllByRole("spinbutton")[0];
+    const size = exact("name-size-exact");
     fireEvent.change(size, { target: { value: "99" } });
     fireEvent.blur(size);
     expect(section()?.design?.display?.name?.size).toBe(32);
@@ -356,12 +362,100 @@ describe("responsive values", () => {
     expect(within(document.querySelector('[data-catd-responsive="columns"]') as HTMLElement).getAllByRole("button", { name: /Reset to default/ })).toHaveLength(1);
   });
 
-  it("gap is 4-32 px per device", () => {
+  it("gap is 4-32 px per device (under advanced)", () => {
     const { section } = mount(baseConfig({ display: { layout: "grid" } }));
-    const gap = within(open("responsive")).getAllByRole("spinbutton").find((b) => b.id.endsWith("gap-tablet")) as HTMLInputElement;
+    open("responsive");
+    const gap = exact("gap-tablet");
     fireEvent.change(gap, { target: { value: "1" } });
     fireEvent.blur(gap);
     expect(section()?.design?.display?.gap).toEqual({ tablet: 4 });
+  });
+});
+
+describe("easy options first, exact pixels on demand (owner decision 2)", () => {
+  it("named steps write the plain pixel value — the contract stays pixels", () => {
+    const { section } = mount(baseConfig({ display: { layout: "grid" } }));
+    const card = open("card");
+    const radius = within(card).getByRole("group", { name: "Corner radius" });
+    fireEvent.click(within(radius).getByRole("button", { name: "X-large" }));
+    expect(section()?.design?.display?.card?.radius).toBe(24);
+    fireEvent.click(within(within(open("card")).getByRole("group", { name: "Inner padding" })).getByRole("button", { name: "Roomy" }));
+    expect(section()?.design?.display?.card?.padding).toBe(20);
+    const name = open("name");
+    fireEvent.click(within(within(name).getByRole("group", { name: "Font size" })).getByRole("button", { name: "X-large" }));
+    expect(section()?.design?.display?.name?.size).toBe(20);
+  });
+
+  it("the exact control is collapsed while a named step matches, and opens by itself for a custom value", () => {
+    mount(baseConfig({ display: { layout: "grid", card: { radius: 16 } } }));
+    open("card");
+    const toggle = document.querySelector('[data-catd-advanced-toggle$="card-radius"]') as HTMLElement;
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    cleanup();
+    mount(baseConfig({ display: { layout: "grid", card: { radius: 19 } } }));
+    open("card");
+    const open2 = document.querySelector('[data-catd-advanced-toggle$="card-radius"]') as HTMLElement;
+    expect(open2.getAttribute("aria-expanded")).toBe("true");
+    expect(document.querySelector("[data-catd-custom-value]")?.textContent).toContain("19");
+  });
+
+  it("the advanced toggle is a keyboard-operable disclosure wired to its panel", () => {
+    mount(baseConfig({ display: { layout: "grid" } }));
+    open("card");
+    const toggle = document.querySelector('[data-catd-advanced-toggle$="card-radius"]') as HTMLElement;
+    const panel = document.getElementById(toggle.getAttribute("aria-controls") as string) as HTMLElement;
+    expect(panel.hasAttribute("hidden")).toBe(true);
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(panel.hasAttribute("hidden")).toBe(false);
+    expect(toggle.className).toMatch(/focus-visible:ring-2/);
+  });
+
+  it("gap steps set every device at once; per-device pixels stay available and mark the value custom", () => {
+    const { section } = mount(baseConfig({ display: { layout: "grid" } }));
+    const responsive = open("responsive");
+    const gap = document.querySelector('[data-catd-responsive="gap"]') as HTMLElement;
+    fireEvent.click(within(gap).getByRole("button", { name: "Loose" }));
+    expect(section()?.design?.display?.gap).toEqual({ mobile: 20, tablet: 20, desktop: 20 });
+    expect(within(document.querySelector('[data-catd-responsive="gap"]') as HTMLElement).getByRole("button", { name: "Loose" }).getAttribute("aria-pressed")).toBe("true");
+    const tablet = exact("gap-tablet");
+    fireEvent.change(tablet, { target: { value: "9" } });
+    fireEvent.blur(tablet);
+    expect(section()?.design?.display?.gap).toEqual({ mobile: 20, tablet: 9, desktop: 20 });
+    expect(document.querySelector("[data-catd-custom-value]")).not.toBeNull();
+    void responsive;
+  });
+
+  it("a layout's own defaults and the four presets always land on a named step (never a 'custom value' on a fresh start)", () => {
+    for (const layout of ["grid", "horizontal_scroll", "circles", "image_tiles", "compact_list"] as const) {
+      mount(baseConfig({ display: { layout } }));
+      open("card");
+      open("name");
+      const custom = document.querySelectorAll('[data-catd-steps] ~ [data-catd-custom-value], [data-catd-steps] [data-catd-custom-value]');
+      expect(custom.length, layout).toBe(0);
+      cleanup();
+    }
+    for (const id of ["elegant_cards", "circular", "compact", "image_tiles"] as const) {
+      mount(baseConfig({ display: presetById(id).display }));
+      open("card");
+      open("name");
+      expect(document.querySelectorAll('[data-catd-steps] [data-catd-custom-value]').length, id).toBe(0);
+      cleanup();
+    }
+  });
+
+  it("every named step stays inside the contract's own range", () => {
+    const { section } = mount(baseConfig({ display: { layout: "grid" } }));
+    open("card");
+    for (const [group, button, key, max] of [
+      ["Corner radius", "Round", "radius", 32],
+      ["Corner radius", "Square", "radius", 32],
+      ["Inner padding", "None", "padding", 32],
+    ] as const) {
+      fireEvent.click(within(within(open("card")).getByRole("group", { name: group })).getByRole("button", { name: button }));
+      const value = section()?.design?.display?.card?.[key as "radius" | "padding"];
+      expect(value === undefined || (value >= 0 && value <= max)).toBe(true);
+    }
   });
 });
 

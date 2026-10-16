@@ -287,6 +287,131 @@ class CommerceWorkspaceCategoryMediaApiTest extends TestCase
         $this->withToken($b['token'])->getJson($this->categoriesPath($storeA['storefront']->id))->assertNotFound();
     }
 
+    // ── 5b. سلبيات أمنية (قرار المالك: تحقّق من العزل والتوقيع والصلاحية ومنع غير المصرَّح) ─────────
+
+    /** @test */
+    public function minting_signed_urls_needs_commerce_manage_and_a_live_subscription(): void
+    {
+        $auth = $this->registerTenant('cat-media-perm', 'owner@cat-media-perm.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $this->seedCategory($auth['tenant_id'], $seeded['channel'], ['image_path' => 'product-category-media/perm.webp']);
+        $path = $this->categoriesPath($seeded['storefront']->id).'?with_media=true';
+
+        foreach (['self_service', 'staff'] as $role) {
+            $token = $this->tokenForRole($auth['tenant_id'], $role, "{$role}@cat-media-perm.test");
+            $res = $this->flushHeaders()->withToken($token)->getJson($path)->assertForbidden();
+            $this->assertStringNotContainsString('signature', $res->getContent(), "{$role} must never receive a signed URL");
+        }
+
+        \App\Models\Tenant::query()->where('id', $auth['tenant_id'])->update(['trial_ends_at' => now()->subDay()]);
+        $res = $this->flushHeaders()->withToken($auth['token'])->getJson($path)->assertStatus(403);
+        $this->assertStringNotContainsString('signature', $res->getContent());
+    }
+
+    /** @test */
+    public function the_preview_list_never_exposes_a_category_the_storefront_may_not_show_nor_its_picture_url(): void
+    {
+        $a = $this->registerTenant('cat-media-leak-a', 'owner@cat-media-leak-a.test');
+        $b = $this->registerTenant('cat-media-leak-b', 'owner@cat-media-leak-b.test');
+        $web = $this->seedWebStorefront($a['tenant_id'], 'web');
+        $other = $this->seedWebStorefront($a['tenant_id'], 'wholesale');
+        $storeB = $this->seedWebStorefront($b['tenant_id']);
+
+        $visible = $this->seedCategory($a['tenant_id'], $web['channel'], ['name' => 'ظاهر', 'image_path' => 'product-category-media/v.webp']);
+        $this->seedCategory($a['tenant_id'], $web['channel'], ['name' => 'غير منشور', 'image_path' => 'product-category-media/u.webp'], published: false);
+        $this->seedCategory($a['tenant_id'], $web['channel'], ['name' => 'معطّل', 'image_path' => 'product-category-media/i.webp', 'is_active' => false]);
+        $this->seedCategory($a['tenant_id'], $other['channel'], ['name' => 'قناة أخرى', 'image_path' => 'product-category-media/o.webp']);
+        $this->seedCategory($b['tenant_id'], $storeB['channel'], ['name' => 'مستأجر آخر', 'image_path' => 'product-category-media/b.webp']);
+
+        $res = $this->withToken($a['token'])
+            ->getJson($this->categoriesPath($web['storefront']->id).'?with_media=true&per_page=50')
+            ->assertOk();
+
+        $this->assertSame([$visible->id], collect($res->json('data'))->pluck('id')->all());
+        $this->assertSame(1, substr_count(json_encode($res->json('data'), JSON_UNESCAPED_SLASHES), 'category-media/'));
+        foreach (['غير منشور', 'معطّل', 'قناة أخرى', 'مستأجر آخر'] as $hidden) {
+            $this->assertStringNotContainsString($hidden, $res->getContent());
+        }
+    }
+
+    /** @test */
+    public function a_signed_url_cannot_be_repurposed_for_another_storefront_category_or_parameter(): void
+    {
+        $auth = $this->registerTenant('cat-media-repurpose', 'owner@cat-media-repurpose.test');
+        $web = $this->seedWebStorefront($auth['tenant_id'], 'web');
+        $other = $this->seedWebStorefront($auth['tenant_id'], 'wholesale');
+        $category = $this->seedCategory($auth['tenant_id'], $web['channel'], ['image_path' => 'product-category-media/r1.webp']);
+        $sibling = $this->seedCategory($auth['tenant_id'], $web['channel'], ['name' => 'شقيق', 'image_path' => 'product-category-media/r2.webp']);
+
+        $signed = $this->signed($web['storefront']->id, $category->id);
+
+        // another storefront id in the path, same signature
+        $this->flushHeaders()->get(str_replace($web['storefront']->id, $other['storefront']->id, $signed))->assertForbidden();
+        // another category id in the path, same signature
+        $this->flushHeaders()->get(str_replace($category->id, $sibling->id, $signed))->assertForbidden();
+        // an extra query parameter, same signature
+        $this->flushHeaders()->get($signed.'&path=../../etc/passwd')->assertForbidden();
+        $this->flushHeaders()->get($signed.'&disk=local')->assertForbidden();
+        // a longer expiry than was signed
+        $this->flushHeaders()->get(preg_replace('/expires=\d+/', 'expires='.(now()->addDays(30)->timestamp), $signed))->assertForbidden();
+        // the genuine URL still works, and nothing a client sends changes what is read
+        $this->flushHeaders()->get($signed)->assertOk();
+    }
+
+    /** @test */
+    public function a_valid_signature_is_not_a_standing_grant_it_dies_when_the_category_is_unpublished_or_deactivated(): void
+    {
+        $auth = $this->registerTenant('cat-media-revoke', 'owner@cat-media-revoke.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $category = $this->seedCategory($auth['tenant_id'], $seeded['channel'], ['image_path' => 'product-category-media/rv.webp']);
+        $url = $this->signed($seeded['storefront']->id, $category->id);
+
+        $this->flushHeaders()->get($url)->assertOk();
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        CommerceCategoryListing::query()->where('category_id', $category->id)->update(['is_published' => false]);
+        app(TenantContext::class)->forget();
+        $this->flushHeaders()->get($url)->assertNotFound();
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        CommerceCategoryListing::query()->where('category_id', $category->id)->update(['is_published' => true]);
+        ProductCategory::query()->where('id', $category->id)->update(['is_active' => false]);
+        app(TenantContext::class)->forget();
+        $this->flushHeaders()->get($url)->assertNotFound();
+    }
+
+    /** @test */
+    public function only_get_is_accepted_ids_must_be_uuids_and_failures_reveal_nothing_about_existence(): void
+    {
+        $a = $this->registerTenant('cat-media-neg-a', 'owner@cat-media-neg-a.test');
+        $b = $this->registerTenant('cat-media-neg-b', 'owner@cat-media-neg-b.test');
+        $storeA = $this->seedWebStorefront($a['tenant_id']);
+        $storeB = $this->seedWebStorefront($b['tenant_id']);
+        $mine = $this->seedCategory($a['tenant_id'], $storeA['channel'], ['image_path' => 'product-category-media/n1.webp']);
+        $foreign = $this->seedCategory($b['tenant_id'], $storeB['channel'], ['image_path' => 'product-category-media/n2.webp']);
+
+        $signed = $this->signed($storeA['storefront']->id, $mine->id);
+        foreach (['post', 'put', 'patch', 'delete'] as $method) {
+            $this->flushHeaders()->call($method, $signed)->assertStatus(405);
+        }
+
+        // non-UUID ids never reach the controller, even under a valid signature
+        $this->flushHeaders()->get($this->signed($storeA['storefront']->id, '../../etc/passwd'))->assertNotFound();
+        $this->flushHeaders()->get($this->signed('not-a-uuid', $mine->id))->assertNotFound();
+
+        // a foreign category and a non-existent one are indistinguishable
+        $foreignRes = $this->flushHeaders()->get($this->signed($storeA['storefront']->id, $foreign->id));
+        $unknownRes = $this->flushHeaders()->get($this->signed($storeA['storefront']->id, '33333333-3333-4333-8333-333333333333'));
+        $this->assertSame($unknownRes->getStatusCode(), $foreignRes->getStatusCode());
+        // (compare the message, not the body: debug builds append a stack trace that differs by call site)
+        $this->assertSame($unknownRes->json('message'), $foreignRes->json('message'));
+
+        // success carries no cookie and is not shared-cacheable
+        $ok = $this->flushHeaders()->get($signed)->assertOk();
+        $this->assertCount(0, $ok->headers->getCookies());
+        $this->assertStringNotContainsString('public', (string) $ok->headers->get('Cache-Control'));
+    }
+
     // ── 6. R2 ────────────────────────────────────────────────────────────
 
     /** @test */
