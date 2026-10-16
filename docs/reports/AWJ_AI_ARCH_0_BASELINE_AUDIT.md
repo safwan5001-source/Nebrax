@@ -12,9 +12,9 @@
 | Base SHA (`origin/main`) | `5fb6f2331cc82e2d37dce6d79e512658e7cd834c` |
 | Head SHA للكود الذي تمت مراجعته | `5fb6f2331cc82e2d37dce6d79e512658e7cd834c` |
 | PR #1543 Head SHA (الخطة المقترحة فقط) | `d4782f48fdd3abf19e29a256f50f93f75e967239` |
-| Draft PR لهذا التقرير | يُحدّث بعد فتح المسودة |
+| Draft PR لهذا التقرير | [#1544](https://github.com/safwan5001-source/Nebrax/pull/1544) — Open, Draft |
 | الملفات المعدلة | `docs/reports/AWJ_AI_ARCH_0_BASELINE_AUDIT.md` فقط |
-| حالة CI/Build لهذا التقرير | لم تُشغّل بعد؛ تقرير Markdown فقط |
+| حالة CI/Build لهذا التقرير | GitHub CI قيد التنفيذ عند `2026-10-16 02:18:53 UTC`: `CI Gate` وLaravel SQLite/PostgreSQL؛ لا توجد نتيجة نهائية بعد |
 
 تم تثبيت `origin/main` أولاً ثم إنشاء فرع مستقل منه. تمت قراءة خطة AWJ Intelligence من PR #1543 دون دمجها أو تعديل فرعها. الـ Base والـ Head الخاصان **بلقطة كود النظام محل التدقيق** متطابقان؛ أما commit التقرير نفسه فهو تغيير توثيقي فقط، ويظل SHA الحالي له ظاهرًا في Draft PR لتجنب ادعاء أن التقرير جزء من لقطة النظام المدققة.
 
@@ -309,6 +309,7 @@ Laravel AI Gateway (auth + tenant + current actor re-check)
 | استدعاء provider أو `test connection` | **Skipped عمدًا**؛ قد يكون مدفوعًا/ذا أثر |
 | Laravel/Next full suite | **Not run**؛ غير ضروري لتغيير Markdown فقط |
 | فحص تنسيق diff | Pass |
+| GitHub CI التلقائي لـ PR #1544 | **In progress** عند `2026-10-16 02:18:53 UTC`: ثلاثة checks pending، بلا فشل مسجل |
 
 نجاح checks التاريخية الظاهرة في PR #1543 لا يُسجل كاختبارات شغّلها هذا التدقيق.
 
