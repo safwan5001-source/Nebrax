@@ -42,7 +42,7 @@ The Store Builder already had a complete, production-verified media system. **No
   - measures frames, duration (≤10 ms frame delays counted as 100 ms like browsers), loop, canvas size;
   - **sanitises**: drops GIF comments / plain-text / XMP / unknown app extensions (keeps the loop extension) and WebP EXIF / XMP (clears the VP8X flags);
   - extracts the **first frame** as a still (GIF natively; WebP by re-wrapping frame-1 bitstream chunks; a first frame that doesn't cover the canvas → upload refused `animated_poster_unavailable` rather than showing a wrong poster).
-- **Upload branch** in `StorefrontMediaService`: bounded frames (300), duration (20 s), edge (2560), pixels (2.5 MP), frames×pixels (150 M), bytes (5 MB default) — all in `config/storefront_media.php → animated`, kill switch `STOREFRONT_MEDIA_ANIMATED_ENABLED=false` (restores the old `animated_not_supported` refusal). 1-frame GIF = ordinary static image. APNG stays rejected. Dedupe / quota / retry work unchanged.
+- **Upload branch** in `StorefrontMediaService`: bounded frames (300), duration (20 s), edge (2560), pixels (2.5 MP), frames×pixels (**40 M** — lowered from 150 M in the hardening round, see `AWJ-ANIMATED-MEDIA-HARDENING-REPORT.md`), bytes (5 MB default) — all in `config/storefront_media.php → animated`, kill switch `STOREFRONT_MEDIA_ANIMATED_ENABLED=false` (restores the old `animated_not_supported` refusal). 1-frame GIF = ordinary static image. APNG stays rejected. Dedupe / quota / retry work unchanged.
 - **Variants:** static WebP+JPEG ladder + thumbs generated from **frame 1** (poster / reduced-motion fallback / admin thumbnails); original kept byte-for-byte; the **sanitised** `animated.{gif|webp}` is the only animated file ever served (stored as an extra `variants` entry, `kind: anim` — no schema change).
 - **Delivery:** public controller and signed workspace controller accept `animated.gif|webp` (media-id only, never a transform key) behind the *existing* Published-reference gate, tenant checks, uniform 404, `nosniff`, `private, no-store`, ETag.
 - **Resolver:** additive `animation` field `{src, format, width, height, frames, durationMs, loop}`; `sources` is still the static ladder, so any renderer that ignores `animation` shows a correct still image.
@@ -91,7 +91,7 @@ No accounting, ledger, POS, ZATCA or other ERP module was touched.
 | Format | Status | Notes |
 |---|---|---|
 | Static JPEG / PNG / WebP | unchanged | same files, same payload shape |
-| **GIF** (animated) | ✅ supported | ≤5 MB, ≤300 frames, ≤20 s, ≤2560 px edge, ≤2.5 MP, frames×px ≤150 M |
+| **GIF** (animated) | ✅ supported | ≤5 MB, ≤300 frames, ≤20 s, ≤2560 px edge, ≤2.5 MP, frames×px ≤40 M (was 150 M) |
 | **Animated WebP** | ✅ supported | same limits; first frame must cover the full canvas (else refused with a clear code) |
 | GIF with 1 frame | ✅ | treated as a static image |
 | APNG, SVG | ❌ | still rejected |

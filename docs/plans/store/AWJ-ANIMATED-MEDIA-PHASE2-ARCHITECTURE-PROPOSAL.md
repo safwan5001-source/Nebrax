@@ -82,7 +82,7 @@
 Parse ISOBMFF boxes with hard bounds (box size ≤ file, depth ≤ 8, box count cap, no 64-bit size overflow):
 - `ftyp` major/compatible brands: accept `avis` (sequence) / `avif`; **reject** if neither brand is present.
 - Dimensions from `ispe`; frame count and duration from the `moov/trak/mdia` (`mdhd` timescale + `stts`/`stsz`) of the image-sequence track; loop from `elst`/edit list (if present).
-- Same budgets as Phase 1: bytes (5 MB), frames (300), duration (20 s), edge (2560), pixels (2.5 MP), frames×pixels (150 M).
+- Same budgets as Phase 1: bytes (5 MB), frames (300), duration (20 s), edge (2560), pixels (2.5 MP), frames×pixels (40 M; was 150 M when this proposal was written — lowered in the Phase 1 hardening round).
 - **Metadata policy:** rewriting `meta/iloc` to strip Exif/XMP items is fragile (item offsets). **Proposal: reject** an AVIF that declares `Exif`/`mime` (XMP) items (`iinf` item types), with a clear code (`avif_metadata_present`) and a hint to re-export — instead of silently serving private metadata. (Alternative: serve as-is and document the exposure — *not recommended*.)
 - Poster: first frame via GD → feeds the existing WebP+JPEG ladder (identical to Phase 1).
 

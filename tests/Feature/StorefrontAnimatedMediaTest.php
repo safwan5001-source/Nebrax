@@ -212,17 +212,68 @@ class StorefrontAnimatedMediaTest extends TestCase
             'f5 webp alph before vp8l' => $this->webpWithAlphBeforeVp8l(),
             default => $this->fail($case),
         };
-        if ($case === 'too heavy (frames × pixels)') {
-            config()->set('storefront_media.animated.max_total_pixels', 100_000_000); // 400×400×300 = 48M < → shrink the budget
-            config()->set('storefront_media.animated.max_total_pixels', 40_000_000);
-        }
-
         $json = $this->uploadOne($auth, $bytes, 'x.'.(str_contains($case, 'webp') ? 'webp' : 'gif'));
 
         $this->assertSame('rejected', $json['data'][0]['status'], json_encode($json));
         $this->assertSame($code, $json['data'][0]['error']['code']);
         $this->assertSame(0, StorefrontMedia::query()->count());
         $this->assertSame([], $this->r2Calls, 'a rejected file never reaches storage');
+    }
+
+    /** @test */
+    public function the_animated_total_pixel_budget_is_40_million_and_nothing_else_moved(): void
+    {
+        $this->assertSame(40_000_000, config('storefront_media.animated.max_total_pixels'));
+        // the other animated bounds
+        $this->assertSame(300, config('storefront_media.animated.max_frames'));
+        $this->assertSame(20_000, config('storefront_media.animated.max_duration_ms'));
+        $this->assertSame(2560, config('storefront_media.animated.max_edge'));
+        $this->assertSame(2_500_000, config('storefront_media.animated.max_pixels'));
+        $this->assertSame(5 * 1024 * 1024, config('storefront_media.animated.max_bytes'));
+        // the static image limits
+        $this->assertSame(5 * 1024 * 1024, config('storefront_media.max_bytes'));
+        $this->assertSame(320, config('storefront_media.min_short_edge'));
+        $this->assertSame(8192, config('storefront_media.max_edge'));
+        $this->assertSame(40_000_000, config('storefront_media.max_pixels'), 'static per-image pixel cap, unrelated to the animated budget');
+    }
+
+    /**
+     * @test
+     *
+     * 400×400 = 160,000 px per frame → 40,000,000 / 160,000 = 250 frames is exactly the budget.
+     */
+    public function the_total_pixel_budget_accepts_just_below_and_exactly_at_the_limit_and_rejects_above_it_before_storage(): void
+    {
+        $this->fakeStorefrontMediaR2();
+        $auth = $this->registerTenant('am-budget');
+
+        foreach ([249 => 'just below', 250 => 'exactly at'] as $frames => $label) {
+            $json = $this->uploadOne($auth, $this->gifWithFrames($frames), "b{$frames}.gif");
+            $this->assertSame('created', $json['data'][0]['status'], "{$label} the limit ({$frames} frames): ".json_encode($json));
+            $this->assertSame($frames, $json['data'][0]['media']['animation']['frames']);
+        }
+        $stored = StorefrontMedia::query()->count();
+        $this->assertSame(2, $stored);
+        $callsBefore = count($this->r2Calls);
+
+        $json = $this->uploadOne($auth, $this->gifWithFrames(251), 'b251.gif'); // 40,160,000 px
+        $this->assertSame('rejected', $json['data'][0]['status'], json_encode($json));
+        $this->assertSame('animated_too_heavy', $json['data'][0]['error']['code']);
+        $this->assertSame($stored, StorefrontMedia::query()->count(), 'no row for the rejected upload');
+        $this->assertCount($callsBefore, $this->r2Calls, 'the rejected upload never reached storage');
+    }
+
+    /** @test */
+    public function the_old_150_million_budget_no_longer_admits_a_300_frame_banner(): void
+    {
+        $this->fakeStorefrontMediaR2();
+        $auth = $this->registerTenant('am-budget-old');
+
+        $json = $this->uploadOne($auth, $this->gifWithFrames(300), 'b300.gif'); // 48,000,000 px: fine under 150 M, over 40 M
+
+        $this->assertSame('animated_too_heavy', $json['data'][0]['error']['code']);
+        $this->assertSame(0, StorefrontMedia::query()->count());
+        $this->assertSame([], $this->r2Calls);
     }
 
     /** @return array<string, array{string,string}> */

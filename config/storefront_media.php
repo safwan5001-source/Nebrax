@@ -31,7 +31,7 @@ return [
     // fallback). Animated assets store NO pixel evidence (later frames are unmeasured); the contrast
     // gates instead use worst-case full-range bounds, so text over motion publishes only under a
     // scrim proven for ANY frame. They accept NO crop/rotate/focal/fit transform.
-    // Bounds are abuse/UX limits: browsers decode every frame, so frames × pixels is budgeted.
+    // Bounds are abuse/UX limits: browsers decode every frame, so frames × pixels is budgeted. Enforced at upload only.
     'animated' => [
         // Kill switch: false restores the pre-amendment behaviour (animated uploads → `animated_not_supported`).
         'enabled' => filter_var(env('STOREFRONT_MEDIA_ANIMATED_ENABLED', true), FILTER_VALIDATE_BOOL),
@@ -40,7 +40,9 @@ return [
         'max_duration_ms' => 20_000,
         'max_edge' => 2560,
         'max_pixels' => 2_500_000,
-        'max_total_pixels' => 150_000_000,
+        // 40 M = ≈160 MB of decoded RGBA per image (measured: Chromium decodes ≈ 4 B × W × H × frames; the former 150 M
+        // allowed ≈ 600 MB). Lowered by owner decision after the F3 memory assessment (AWJ-ANIMATED-MEDIA-HARDENING-REPORT.md).
+        'max_total_pixels' => 40_000_000,
     ],
 
     // Decode-memory guard (N-1 — calibrated on measured RSS, see the V2a report).
