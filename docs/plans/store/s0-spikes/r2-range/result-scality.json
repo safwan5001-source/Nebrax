@@ -1,0 +1,150 @@
+{
+    "endpoint": "http://127.0.0.1:9102",
+    "sdk": "3.401.2",
+    "object_bytes": 1048576,
+    "put_etag": "125d9830e2ac139681634e18b63773c0",
+    "cases": [
+        {
+            "case": "HEAD",
+            "status": 200,
+            "content_length": 1048576,
+            "accept_ranges": "bytes",
+            "etag": "\"125d9830e2ac139681634e18b63773c0\"",
+            "content_type": "video/mp4"
+        },
+        {
+            "case": "full GET (no Range)",
+            "range": null,
+            "status": 200,
+            "content_range": null,
+            "content_length": 1048576,
+            "accept_ranges": "bytes",
+            "body_len": 1048576,
+            "body_matches_expected_slice": true
+        },
+        {
+            "case": "first byte  bytes=0-0",
+            "range": "bytes=0-0",
+            "status": 206,
+            "content_range": "bytes 0-0/1048576",
+            "content_length": 1,
+            "accept_ranges": "bytes",
+            "body_len": 1,
+            "body_matches_expected_slice": true
+        },
+        {
+            "case": "Safari probe  bytes=0-1",
+            "range": "bytes=0-1",
+            "status": 206,
+            "content_range": "bytes 0-1/1048576",
+            "content_length": 2,
+            "accept_ranges": "bytes",
+            "body_len": 2,
+            "body_matches_expected_slice": true
+        },
+        {
+            "case": "closed  bytes=100-199",
+            "range": "bytes=100-199",
+            "status": 206,
+            "content_range": "bytes 100-199/1048576",
+            "content_length": 100,
+            "accept_ranges": "bytes",
+            "body_len": 100,
+            "body_matches_expected_slice": true
+        },
+        {
+            "case": "open-ended  bytes=1048000-",
+            "range": "bytes=1048000-",
+            "status": 206,
+            "content_range": "bytes 1048000-1048575/1048576",
+            "content_length": 576,
+            "accept_ranges": "bytes",
+            "body_len": 576,
+            "body_matches_expected_slice": true
+        },
+        {
+            "case": "suffix  bytes=-100",
+            "range": "bytes=-100",
+            "status": 206,
+            "content_range": "bytes 1048476-1048575/1048576",
+            "content_length": 100,
+            "accept_ranges": "bytes",
+            "body_len": 100,
+            "body_matches_expected_slice": true
+        },
+        {
+            "case": "end beyond size  bytes=0-99999999",
+            "range": "bytes=0-99999999",
+            "status": 206,
+            "content_range": "bytes 0-1048575/1048576",
+            "content_length": 1048576,
+            "accept_ranges": "bytes",
+            "body_len": 1048576,
+            "body_matches_expected_slice": true
+        },
+        {
+            "case": "start == size  bytes=1048576-1048600 (unsatisfiable)",
+            "range": "bytes=1048576-1048600",
+            "status": 416,
+            "error": "InvalidRange"
+        },
+        {
+            "case": "start > size  bytes=5000000-",
+            "range": "bytes=5000000-",
+            "status": 416,
+            "error": "InvalidRange"
+        },
+        {
+            "case": "multi-range  bytes=0-1,5-6",
+            "range": "bytes=0-1,5-6",
+            "status": 200,
+            "content_range": null,
+            "content_length": 1048576,
+            "accept_ranges": "bytes",
+            "body_len": 1048576
+        },
+        {
+            "case": "malformed  bytes=abc",
+            "range": "bytes=abc",
+            "status": 200,
+            "content_range": null,
+            "content_length": 1048576,
+            "accept_ranges": "bytes",
+            "body_len": 1048576
+        },
+        {
+            "case": "wrong unit  items=0-1",
+            "range": "items=0-1",
+            "status": 200,
+            "content_range": null,
+            "content_length": 1048576,
+            "accept_ranges": "bytes",
+            "body_len": 1048576
+        },
+        {
+            "case": "Range + IfMatch(correct etag)",
+            "range": "bytes=0-9",
+            "status": 206,
+            "content_range": "bytes 0-9/1048576",
+            "content_length": 10,
+            "accept_ranges": "bytes",
+            "body_len": 10,
+            "body_matches_expected_slice": true
+        },
+        {
+            "case": "Range + IfMatch(wrong etag)",
+            "range": "bytes=0-9",
+            "status": 412,
+            "error": "PreconditionFailed"
+        },
+        {
+            "case": "Range + IfNoneMatch(current etag)",
+            "range": "bytes=0-9",
+            "status": 304,
+            "content_range": null,
+            "content_length": -1,
+            "accept_ranges": null,
+            "body_len": 0
+        }
+    ]
+}

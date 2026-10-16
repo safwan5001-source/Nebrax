@@ -1,0 +1,167 @@
+{
+    "php": "8.3.35",
+    "gd_info": {
+        "GD Version": "bundled (2.1.0 compatible)",
+        "JPEG Support": true,
+        "PNG Support": true,
+        "WebP Support": true,
+        "AVIF Support": true
+    },
+    "has_imagecreatefromavif": true,
+    "has_imageavif": true,
+    "files": {
+        "anim3-alpha.avif": {
+            "size": 2121,
+            "getimagesize": [
+                400,
+                400,
+                "image/avif"
+            ],
+            "decode_ms": 4.7,
+            "warning": null,
+            "decoded": true,
+            "dims": [
+                400,
+                400
+            ],
+            "center_rgba": [
+                255,
+                0,
+                0,
+                63
+            ],
+            "truecolor": true,
+            "rss_growth_kib": 4388,
+            "maxrss_kib": 32560
+        },
+        "anim3.avif": {
+            "size": 1208,
+            "getimagesize": [
+                400,
+                400,
+                "image/avif"
+            ],
+            "decode_ms": 1.1,
+            "warning": null,
+            "decoded": true,
+            "dims": [
+                400,
+                400
+            ],
+            "center_rgba": [
+                255,
+                0,
+                0,
+                0
+            ],
+            "truecolor": true,
+            "rss_growth_kib": 84,
+            "maxrss_kib": 32644
+        },
+        "anim60-big.avif": {
+            "size": 144241,
+            "getimagesize": [
+                1920,
+                600,
+                "image/avif"
+            ],
+            "decode_ms": 41.8,
+            "warning": null,
+            "decoded": true,
+            "dims": [
+                1920,
+                600
+            ],
+            "center_rgba": [
+                128,
+                0,
+                127,
+                0
+            ],
+            "truecolor": true,
+            "rss_growth_kib": 15676,
+            "maxrss_kib": 48320
+        },
+        "hostile-boxsize.avif": {
+            "size": 1208,
+            "getimagesize": [
+                400,
+                400,
+                "image/avif"
+            ],
+            "decode_ms": 0.3,
+            "warning": "imagecreatefromavif(): \"corpus/hostile-boxsize.avif\" is not a valid AVIF file",
+            "decoded": false
+        },
+        "still-meta.avif": {
+            "size": 859,
+            "getimagesize": [
+                800,
+                400,
+                "image/avif"
+            ],
+            "decode_ms": 3.1,
+            "warning": null,
+            "decoded": true,
+            "dims": [
+                800,
+                400
+            ],
+            "center_rgba": [
+                127,
+                193,
+                0,
+                0
+            ],
+            "truecolor": true,
+            "rss_growth_kib": 0,
+            "maxrss_kib": 48320
+        },
+        "still.avif": {
+            "size": 665,
+            "getimagesize": [
+                800,
+                400,
+                "image/avif"
+            ],
+            "decode_ms": 2.4,
+            "warning": null,
+            "decoded": true,
+            "dims": [
+                800,
+                400
+            ],
+            "center_rgba": [
+                127,
+                193,
+                0,
+                0
+            ],
+            "truecolor": true,
+            "rss_growth_kib": 0,
+            "maxrss_kib": 48320
+        },
+        "trunc-400.avif": {
+            "size": 400,
+            "getimagesize": [
+                400,
+                400,
+                "image/avif"
+            ],
+            "decode_ms": 0.1,
+            "warning": "imagecreatefromavif(): \"corpus/trunc-400.avif\" is not a valid AVIF file",
+            "decoded": false
+        },
+        "trunc-800.avif": {
+            "size": 800,
+            "getimagesize": [
+                400,
+                400,
+                "image/avif"
+            ],
+            "decode_ms": 0,
+            "warning": "imagecreatefromavif(): \"corpus/trunc-800.avif\" is not a valid AVIF file",
+            "decoded": false
+        }
+    }
+}
