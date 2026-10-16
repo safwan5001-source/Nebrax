@@ -27,6 +27,12 @@ export interface WorkspaceCategorySummary {
   parentId: string | null;
   /** Breadcrumb/disambiguation hint only — never shown as a primary label. */
   parentName: string | null;
+  /**
+   * AWJ-STORE-CAT-DESIGN-01 — present only when the list was requested with `withMedia`: the merchant's category colour
+   * (free text — validated by the renderer) and a short-lived signed URL of the category picture (`null` without one).
+   */
+  color?: string | null;
+  imageUrl?: string | null;
 }
 
 export interface WorkspaceCategoryAncestor {
@@ -77,12 +83,16 @@ function mapSummary(row: unknown): WorkspaceCategorySummary | null {
   const record = row as Record<string, unknown>;
   if (typeof record.id !== 'string' || record.id === '') return null;
   if (typeof record.name !== 'string') return null;
-  return {
+  const summary: WorkspaceCategorySummary = {
     id: record.id,
     name: record.name,
     parentId: typeof record.parent_id === 'string' ? record.parent_id : null,
     parentName: typeof record.parent_name === 'string' ? record.parent_name : null,
   };
+  // Only when the server sent them (`with_media`); absent keys stay absent so the minimal shape is unchanged.
+  if ('color' in record) summary.color = typeof record.color === 'string' ? record.color : null;
+  if ('image_url' in record) summary.imageUrl = typeof record.image_url === 'string' ? record.image_url : null;
+  return summary;
 }
 
 function mapAncestors(raw: unknown): WorkspaceCategoryAncestor[] {
@@ -129,7 +139,7 @@ function mapDetail(payload: unknown): WorkspaceCategoryDetail | null {
 
 export async function listWorkspaceCategories(
   storefrontId: string,
-  params: { search?: string; rootOnly?: boolean; page?: number; perPage?: number } = {},
+  params: { search?: string; rootOnly?: boolean; withMedia?: boolean; page?: number; perPage?: number } = {},
   signal?: AbortSignal,
 ): Promise<WorkspaceCategoryListOutcome> {
   try {
@@ -142,6 +152,9 @@ export async function listWorkspaceCategories(
     // explicitly requested — every other caller (the Category-page preview
     // picker) omits it and keeps today's mixed-depth list unchanged.
     if (params.rootOnly) query.set('root_only', 'true');
+    // AWJ-STORE-CAT-DESIGN-01 — the Home categories preview also wants each category's colour and a signed picture URL
+    // so the Canvas can draw the section the way the storefront does. Opt-in: every other caller keeps the minimal shape.
+    if (params.withMedia) query.set('with_media', 'true');
     if (params.page) query.set('page', String(params.page));
     if (params.perPage) query.set('per_page', String(params.perPage));
     const qs = query.toString();

@@ -1,0 +1,282 @@
+{
+ "horizontal_scroll__ar": {
+  "steps": [
+   {
+    "label": "\u0627\u0644\u0645\u0646\u0632\u0644 \u0648\u0627\u0644\u062d\u062f\u064a\u0642\u0629",
+    "fullyVisible": true,
+    "partlyVisible": true,
+    "scrollLeft": 0,
+    "pageOverflow": 0,
+    "outline": "solid 2px"
+   },
+   {
+    "label": "\u0645\u0644\u0627\u0628\u0633",
+    "fullyVisible": true,
+    "partlyVisible": true,
+    "scrollLeft": -304,
+    "pageOverflow": 0,
+    "outline": "solid 2px"
+   },
+   {
+    "label": "\u0645\u0633\u062a\u0644\u0632\u0645\u0627\u062a \u0627\u0644\u0623\u0637\u0641\u0627\u0644 \u0648",
+    "fullyVisible": true,
+    "partlyVisible": true,
+    "scrollLeft": -304,
+    "pageOverflow": 0,
+    "outline": "solid 2px"
+   },
+   {
+    "label": "\u0631\u064a\u0627\u0636\u0629",
+    "fullyVisible": true,
+    "partlyVisible": true,
+    "scrollLeft": -608,
+    "pageOverflow": 0,
+    "outline": "solid 2px"
+   },
+   {
+    "label": "\u0639\u0646\u0627\u064a\u0629",
+    "fullyVisible": true,
+    "partlyVisible": true,
+    "scrollLeft": -608,
+    "pageOverflow": 0,
+    "outline": "solid 2px"
+   },
+   {
+    "label": "\u0623\u062f\u0648\u0627\u062a \u0645\u0643\u062a\u0628\u064a\u0629",
+    "fullyVisible": true,
+    "partlyVisible": true,
+    "scrollLeft": -846,
+    "pageOverflow": 0,
+    "outline": "solid 2px"
+   },
+   {
+    "label": "\u0633\u064a\u0627\u0631\u0627\u062a",
+    "fullyVisible": true,
+    "partlyVisible": true,
+    "scrollLeft": -846,
+    "pageOverflow": 0,
+    "outline": "solid 2px"
+   }
+  ],
+  "scroll": {
+   "dir": "rtl",
+   "before": -846,
+   "after": -846,
+   "canScroll": true,
+   "pageOverflow": 0,
+   "snapType": "x mandatory",
+   "overscroll": "contain"
+  }
+ },
+ "circles__ar": {
+  "steps": [
+   {
+    "label": "\u0627\u0644\u0645\u0646\u0632\u0644 \u0648\u0627\u0644\u062d\u062f\u064a\u0642\u0629",
+    "fullyVisible": true,
+    "partlyVisible": true,
+    "scrollLeft": 0,
+    "pageOverflow": 0,
+    "outline": "solid 2px"
+   },
+   {
+    "label": "\u0645\u0644\u0627\u0628\u0633",
+    "fullyVisible": true,
+    "partlyVisible": true,
+    "scrollLeft": 0,
+    "pageOverflow": 0,
+    "outline": "solid 2px"
+   },
+   {
+    "label": "\u0645\u0633\u062a\u0644\u0632\u0645\u0627\u062a \u0627\u0644\u0623\u0637\u0641\u0627\u0644 \u0648",
+    "fullyVisible": true,
+    "partlyVisible": true,
+    "scrollLeft": -312,
+    "pageOverflow": 0,
+    "outline": "solid 2px"
+   },
+   {
+    "label": "\u0631\u064a\u0627\u0636\u0629",
+    "fullyVisible": true,
+    "partlyVisible": true,
+    "scrollLeft": -312,
+    "pageOverflow": 0,
+    "outline": "solid 2px"
+   },
+   {
+    "label": "\u0639\u0639\u0646\u0627\u064a\u0629",
+    "fullyVisible": true,
+    "partlyVisible": true,
+    "scrollLeft": -312,
+    "pageOverflow": 0,
+    "outline": "solid 2px"
+   },
+   {
+    "label": "\u0623\u0623\u062f\u0648\u0627\u062a \u0645\u0643\u062a\u0628\u064a\u0629",
+    "fullyVisible": true,
+    "partlyVisible": true,
+    "scrollLeft": -458,
+    "pageOverflow": 0,
+    "outline": "solid 2px"
+   },
+   {
+    "label": "\u0633\u064a\u0627\u0631\u0627\u062a",
+    "fullyVisible": true,
+    "partlyVisible": true,
+    "scrollLeft": -458,
+    "pageOverflow": 0,
+    "outline": "solid 2px"
+   }
+  ],
+  "scroll": {
+   "dir": "rtl",
+   "before": -458,
+   "after": -458,
+   "canScroll": true,
+   "pageOverflow": 0,
+   "snapType": "x mandatory",
+   "overscroll": "contain"
+  }
+ },
+ "horizontal_scroll__en": {
+  "steps": [
+   {
+    "label": "Home & Garden",
+    "fullyVisible": true,
+    "partlyVisible": true,
+    "scrollLeft": 0,
+    "pageOverflow": 0,
+    "outline": "solid 2px"
+   },
+   {
+    "label": "Fashion",
+    "fullyVisible": true,
+    "partlyVisible": true,
+    "scrollLeft": 304,
+    "pageOverflow": 0,
+    "outline": "solid 2px"
+   },
+   {
+    "label": "Baby, kids & moder",
+    "fullyVisible": true,
+    "partlyVisible": true,
+    "scrollLeft": 304,
+    "pageOverflow": 0,
+    "outline": "solid 2px"
+   },
+   {
+    "label": "Sports",
+    "fullyVisible": true,
+    "partlyVisible": true,
+    "scrollLeft": 608,
+    "pageOverflow": 0,
+    "outline": "solid 2px"
+   },
+   {
+    "label": "Care",
+    "fullyVisible": true,
+    "partlyVisible": true,
+    "scrollLeft": 608,
+    "pageOverflow": 0,
+    "outline": "solid 2px"
+   },
+   {
+    "label": "Office",
+    "fullyVisible": true,
+    "partlyVisible": true,
+    "scrollLeft": 846,
+    "pageOverflow": 0,
+    "outline": "solid 2px"
+   },
+   {
+    "label": "Auto",
+    "fullyVisible": true,
+    "partlyVisible": true,
+    "scrollLeft": 846,
+    "pageOverflow": 0,
+    "outline": "solid 2px"
+   }
+  ],
+  "scroll": {
+   "dir": "ltr",
+   "before": 846,
+   "after": 846,
+   "canScroll": true,
+   "pageOverflow": 0,
+   "snapType": "x mandatory",
+   "overscroll": "contain"
+  }
+ },
+ "circles__en": {
+  "steps": [
+   {
+    "label": "Home & Garden",
+    "fullyVisible": true,
+    "partlyVisible": true,
+    "scrollLeft": 0,
+    "pageOverflow": 0,
+    "outline": "solid 2px"
+   },
+   {
+    "label": "Fashion",
+    "fullyVisible": true,
+    "partlyVisible": true,
+    "scrollLeft": 0,
+    "pageOverflow": 0,
+    "outline": "solid 2px"
+   },
+   {
+    "label": "Baby, kids & moder",
+    "fullyVisible": true,
+    "partlyVisible": true,
+    "scrollLeft": 312,
+    "pageOverflow": 0,
+    "outline": "solid 2px"
+   },
+   {
+    "label": "Sports",
+    "fullyVisible": true,
+    "partlyVisible": true,
+    "scrollLeft": 312,
+    "pageOverflow": 0,
+    "outline": "solid 2px"
+   },
+   {
+    "label": "CCare",
+    "fullyVisible": true,
+    "partlyVisible": true,
+    "scrollLeft": 312,
+    "pageOverflow": 0,
+    "outline": "solid 2px"
+   },
+   {
+    "label": "OOffice",
+    "fullyVisible": true,
+    "partlyVisible": true,
+    "scrollLeft": 458,
+    "pageOverflow": 0,
+    "outline": "solid 2px"
+   },
+   {
+    "label": "Auto",
+    "fullyVisible": true,
+    "partlyVisible": true,
+    "scrollLeft": 458,
+    "pageOverflow": 0,
+    "outline": "solid 2px"
+   }
+  ],
+  "scroll": {
+   "dir": "ltr",
+   "before": 458,
+   "after": 458,
+   "canScroll": true,
+   "pageOverflow": 0,
+   "snapType": "x mandatory",
+   "overscroll": "contain"
+  }
+ },
+ "reducedMotion": {
+  "scrollBehavior": "auto",
+  "transition": "0s"
+ }
+}

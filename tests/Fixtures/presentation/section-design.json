@@ -94,6 +94,7 @@
             "spacing": true,
             "border": true,
             "radius": true,
+            "display": true,
             "separator": true
         },
         "slider": {
@@ -3368,6 +3369,535 @@
                     "top": "line"
                 }
             }
+        },
+        {
+            "name": "AWJ-STORE-CAT-DESIGN-01: absent display ⇒ no design (the classic tile)",
+            "type": "categories",
+            "input": {
+                "spacing": {
+                    "top": "md"
+                }
+            },
+            "expected": {
+                "spacing": {
+                    "top": "md"
+                }
+            }
+        },
+        {
+            "name": "display needs a layout: without one the whole group is dropped (no inert metadata)",
+            "type": "categories",
+            "input": {
+                "display": {
+                    "columns": {
+                        "mobile": 2
+                    },
+                    "card": {
+                        "style": "border"
+                    }
+                }
+            },
+            "expected": null
+        },
+        {
+            "name": "display with an unknown layout is dropped entirely",
+            "type": "categories",
+            "input": {
+                "display": {
+                    "layout": "masonry",
+                    "columns": {
+                        "mobile": 2
+                    }
+                }
+            },
+            "expected": null
+        },
+        {
+            "name": "a bare layout is the whole group",
+            "type": "categories",
+            "input": {
+                "display": {
+                    "layout": "circles"
+                }
+            },
+            "expected": {
+                "display": {
+                    "layout": "circles"
+                }
+            }
+        },
+        {
+            "name": "every layout is accepted",
+            "type": "categories",
+            "input": {
+                "display": {
+                    "layout": "horizontal_scroll"
+                }
+            },
+            "expected": {
+                "display": {
+                    "layout": "horizontal_scroll"
+                }
+            }
+        },
+        {
+            "name": "a full display keeps every group in canonical order, whatever the input order",
+            "type": "categories",
+            "input": {
+                "display": {
+                    "name": {
+                        "show": false,
+                        "placement": "overlay",
+                        "align": "center",
+                        "size": 18,
+                        "weight": 700,
+                        "color": "primary",
+                        "lines": 2,
+                        "background": "scrim"
+                    },
+                    "image": {
+                        "show": false,
+                        "shape": "rect",
+                        "aspect": "4:3",
+                        "fit": "contain",
+                        "position": "start",
+                        "height": {
+                            "mobile": 96,
+                            "tablet": 120,
+                            "desktop": 160
+                        }
+                    },
+                    "card": {
+                        "style": "border",
+                        "background": "muted",
+                        "borderColor": "primary",
+                        "borderWidth": 2,
+                        "radius": 16,
+                        "padding": 12,
+                        "hover": "subtle"
+                    },
+                    "itemWidth": {
+                        "mobile": 120,
+                        "tablet": 140,
+                        "desktop": 160
+                    },
+                    "gap": {
+                        "mobile": 8,
+                        "tablet": 12,
+                        "desktop": 16
+                    },
+                    "columns": {
+                        "mobile": 2,
+                        "tablet": 3,
+                        "desktop": 6
+                    },
+                    "layout": "grid"
+                }
+            },
+            "expected": {
+                "display": {
+                    "layout": "grid",
+                    "columns": {
+                        "mobile": 2,
+                        "tablet": 3,
+                        "desktop": 6
+                    },
+                    "gap": {
+                        "mobile": 8,
+                        "tablet": 12,
+                        "desktop": 16
+                    },
+                    "itemWidth": {
+                        "mobile": 120,
+                        "tablet": 140,
+                        "desktop": 160
+                    },
+                    "card": {
+                        "style": "border",
+                        "background": "muted",
+                        "borderColor": "primary",
+                        "borderWidth": 2,
+                        "radius": 16,
+                        "padding": 12,
+                        "hover": "subtle"
+                    },
+                    "image": {
+                        "show": false,
+                        "shape": "rect",
+                        "aspect": "4:3",
+                        "fit": "contain",
+                        "position": "start",
+                        "height": {
+                            "mobile": 96,
+                            "tablet": 120,
+                            "desktop": 160
+                        }
+                    },
+                    "name": {
+                        "show": false,
+                        "placement": "overlay",
+                        "align": "center",
+                        "size": 18,
+                        "weight": 700,
+                        "color": "primary",
+                        "lines": 2,
+                        "background": "scrim"
+                    }
+                }
+            }
+        },
+        {
+            "name": "integers are clamped into their range (columns, gap, itemWidth, radius, padding, borderWidth, size, height)",
+            "type": "categories",
+            "input": {
+                "display": {
+                    "layout": "grid",
+                    "columns": {
+                        "mobile": 9,
+                        "tablet": 1,
+                        "desktop": 99
+                    },
+                    "gap": {
+                        "mobile": 0,
+                        "desktop": 500
+                    },
+                    "itemWidth": {
+                        "tablet": 10
+                    },
+                    "card": {
+                        "radius": 99,
+                        "padding": -5,
+                        "borderWidth": 9
+                    },
+                    "image": {
+                        "height": {
+                            "mobile": 1,
+                            "desktop": 9999
+                        }
+                    },
+                    "name": {
+                        "size": 4
+                    }
+                }
+            },
+            "expected": {
+                "display": {
+                    "layout": "grid",
+                    "columns": {
+                        "mobile": 4,
+                        "tablet": 2,
+                        "desktop": 8
+                    },
+                    "gap": {
+                        "mobile": 4,
+                        "desktop": 32
+                    },
+                    "itemWidth": {
+                        "tablet": 64
+                    },
+                    "card": {
+                        "borderWidth": 4,
+                        "radius": 32,
+                        "padding": 0
+                    },
+                    "image": {
+                        "height": {
+                            "mobile": 48,
+                            "desktop": 400
+                        }
+                    },
+                    "name": {
+                        "size": 12
+                    }
+                }
+            }
+        },
+        {
+            "name": "a fractional, string, boolean or object number drops its own key only",
+            "type": "categories",
+            "input": {
+                "display": {
+                    "layout": "grid",
+                    "columns": {
+                        "mobile": 2.5,
+                        "tablet": "3",
+                        "desktop": true
+                    },
+                    "gap": {
+                        "mobile": [
+                            8
+                        ]
+                    },
+                    "card": {
+                        "radius": "12",
+                        "padding": 8.5,
+                        "borderWidth": 1
+                    },
+                    "name": {
+                        "size": {
+                            "px": 14
+                        },
+                        "weight": 600
+                    }
+                }
+            },
+            "expected": {
+                "display": {
+                    "layout": "grid",
+                    "card": {
+                        "borderWidth": 1
+                    },
+                    "name": {
+                        "weight": 600
+                    }
+                }
+            }
+        },
+        {
+            "name": "an integral float (6.0) is an integer",
+            "type": "categories",
+            "input": {
+                "display": {
+                    "layout": "grid",
+                    "columns": {
+                        "desktop": 6.0
+                    },
+                    "card": {
+                        "radius": 12.0
+                    }
+                }
+            },
+            "expected": {
+                "display": {
+                    "layout": "grid",
+                    "columns": {
+                        "desktop": 6
+                    },
+                    "card": {
+                        "radius": 12
+                    }
+                }
+            }
+        },
+        {
+            "name": "an unknown or mistyped enum drops its own key, the valid siblings survive",
+            "type": "categories",
+            "input": {
+                "display": {
+                    "layout": "grid",
+                    "card": {
+                        "style": "glow",
+                        "background": "red",
+                        "borderColor": "#ff0000",
+                        "hover": "spin"
+                    },
+                    "image": {
+                        "shape": "star",
+                        "aspect": "2:1",
+                        "fit": "fill",
+                        "position": "left"
+                    },
+                    "name": {
+                        "placement": "inside",
+                        "align": "justify",
+                        "color": "#000000",
+                        "lines": 3,
+                        "background": "black",
+                        "weight": 650
+                    }
+                }
+            },
+            "expected": {
+                "display": {
+                    "layout": "grid"
+                }
+            }
+        },
+        {
+            "name": "card colours are theme tokens only: a hex is dropped, the token is kept",
+            "type": "categories",
+            "input": {
+                "display": {
+                    "layout": "grid",
+                    "card": {
+                        "background": "#ffffff",
+                        "borderColor": "strong"
+                    }
+                }
+            },
+            "expected": {
+                "display": {
+                    "layout": "grid",
+                    "card": {
+                        "borderColor": "strong"
+                    }
+                }
+            }
+        },
+        {
+            "name": "image.show and name.show are stored only as false (visible is the default)",
+            "type": "categories",
+            "input": {
+                "display": {
+                    "layout": "grid",
+                    "image": {
+                        "show": true
+                    },
+                    "name": {
+                        "show": false
+                    }
+                }
+            },
+            "expected": {
+                "display": {
+                    "layout": "grid",
+                    "name": {
+                        "show": false
+                    }
+                }
+            }
+        },
+        {
+            "name": "name lines accepts 1, 2 and natural",
+            "type": "categories",
+            "input": {
+                "display": {
+                    "layout": "grid",
+                    "name": {
+                        "lines": "natural"
+                    }
+                }
+            },
+            "expected": {
+                "display": {
+                    "layout": "grid",
+                    "name": {
+                        "lines": "natural"
+                    }
+                }
+            }
+        },
+        {
+            "name": "name lines: the string \"2\" is not the number 2",
+            "type": "categories",
+            "input": {
+                "display": {
+                    "layout": "grid",
+                    "name": {
+                        "lines": "2"
+                    }
+                }
+            },
+            "expected": {
+                "display": {
+                    "layout": "grid"
+                }
+            }
+        },
+        {
+            "name": "empty groups are not stored",
+            "type": "categories",
+            "input": {
+                "display": {
+                    "layout": "grid",
+                    "columns": {},
+                    "gap": {
+                        "mobile": "x"
+                    },
+                    "card": {},
+                    "image": {
+                        "height": {}
+                    },
+                    "name": {
+                        "nope": 1
+                    }
+                }
+            },
+            "expected": {
+                "display": {
+                    "layout": "grid"
+                }
+            }
+        },
+        {
+            "name": "a non-object display is dropped",
+            "type": "categories",
+            "input": {
+                "display": "grid",
+                "spacing": {
+                    "top": "sm"
+                }
+            },
+            "expected": {
+                "spacing": {
+                    "top": "sm"
+                }
+            }
+        },
+        {
+            "name": "display sits between cards/shadow and separator in the canonical order",
+            "type": "categories",
+            "input": {
+                "separator": {
+                    "top": "line"
+                },
+                "display": {
+                    "layout": "circles"
+                },
+                "radius": "md",
+                "spacing": {
+                    "top": "sm"
+                }
+            },
+            "expected": {
+                "spacing": {
+                    "top": "sm"
+                },
+                "radius": "md",
+                "display": {
+                    "layout": "circles"
+                },
+                "separator": {
+                    "top": "line"
+                }
+            }
+        },
+        {
+            "name": "display is categories-only: a shelf drops it",
+            "type": "newArrivals",
+            "input": {
+                "display": {
+                    "layout": "grid"
+                },
+                "spacing": {
+                    "top": "sm"
+                }
+            },
+            "expected": {
+                "spacing": {
+                    "top": "sm"
+                }
+            }
+        },
+        {
+            "name": "display is categories-only: the hero drops it",
+            "type": "hero",
+            "input": {
+                "display": {
+                    "layout": "grid"
+                }
+            },
+            "expected": null
+        },
+        {
+            "name": "display is categories-only: the discovery section drops it",
+            "type": "discovery",
+            "input": {
+                "display": {
+                    "layout": "grid"
+                }
+            },
+            "expected": null
         }
     ]
 }

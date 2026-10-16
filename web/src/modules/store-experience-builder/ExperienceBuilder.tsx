@@ -1249,6 +1249,8 @@ export function ExperienceBuilder({
     setHomeCategoriesState("loading");
     const result = await listWorkspaceCategories(storefrontId, {
       rootOnly: true,
+      // AWJ-STORE-CAT-DESIGN-01 — colour + signed picture URL, so a chosen card display previews with the real pictures.
+      withMedia: true,
       perPage: HOME_CATEGORIES_PREVIEW_LIMIT,
     });
     if (token !== homeCategoriesRequestRef.current || storefrontIdRef.current !== originStorefrontId) return;
@@ -3616,7 +3618,7 @@ export function ExperienceBuilder({
                   categoryGridProducts={categoryGridProducts.map((p) => ({ id: p.id, name: p.name, thumbnailUrl: p.thumbnailUrl }))}
                   categoryGridProductsTotal={categoryGridProductsTotal}
                   homeCategoriesState={homeCategoriesState}
-                  homeCategories={homeCategories.map((c) => ({ id: c.id, name: c.name }))}
+                  homeCategories={homeCategories.map((c) => ({ id: c.id, name: c.name, imageUrl: c.imageUrl ?? null, color: c.color ?? null }))}
                   onRetryHomeCategories={handleRetryHomeCategories}
                   homeNewArrivalsState={homeNewArrivalsState}
                   homeNewArrivals={homeNewArrivals.map((p) => ({ id: p.id, name: p.name, thumbnailUrl: p.thumbnailUrl }))}

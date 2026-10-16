@@ -460,7 +460,9 @@ export function DesignInspector({
               onChange={(event) => {
                 const preset = presets.find((candidate) => candidate.id === event.target.value);
                 if (!preset) return;
-                onChange(commitDesign(type, preset.design));
+                // A structural preset restyles the section's frame; the categories card display is owned by its own
+                // panel (with its own presets), so a frame preset must not silently wipe it.
+                onChange(commitDesign(type, design?.display ? { ...preset.design, display: design.display } : preset.design));
                 setNotice(t("designPresetApplied"));
               }}
               className={`${btnClass} max-w-full`}

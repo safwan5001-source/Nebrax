@@ -48,6 +48,7 @@ import {
 } from "@/lib/presentation/section-content";
 import type {
   BenefitsLayout,
+  CategoryDisplay,
   ShelfColumns,
   ShelfLayout,
 } from "@/lib/presentation/section-design";
@@ -274,11 +275,22 @@ async function pushSectionNode(
               },
             )
           : node;
+    // AWJ-STORE-CAT-DESIGN-01 — the categories section's own card display reaches the page-built node here, like the
+    // shelf's layout above. Absent ⇒ the node is untouched and the classic tiles render.
+    const display =
+      section.type === "categories" ? section.design?.display : undefined;
+    const final =
+      display && isValidElement(rendered)
+        ? cloneElement(
+            rendered as React.ReactElement<{ display?: CategoryDisplay }>,
+            { display },
+          )
+        : rendered;
     nodes.push(
       framed ? (
-        <Fragment key={section.id}>{rendered}</Fragment>
+        <Fragment key={section.id}>{final}</Fragment>
       ) : (
-        <div key={section.id}>{rendered}</div>
+        <div key={section.id}>{final}</div>
       ),
     );
     return;

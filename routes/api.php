@@ -42,6 +42,7 @@ use App\Http\Controllers\Api\CommerceFulfillmentController;
 use App\Http\Controllers\Api\CommerceGiftSettingsController;
 use App\Http\Controllers\Api\CommerceVerticalSetupController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontsController;
+use App\Http\Controllers\Api\CommerceWorkspaceCategoryMediaController;
 use App\Http\Controllers\Api\CommerceWorkspaceMediaController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontMediaController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontMediaDerivativeController;
@@ -235,6 +236,15 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         ->whereUuid('id')->whereUuid('media')
         ->middleware('signed')
         ->name('commerce.workspace.media.show');
+
+    // AWJ-STORE-CAT-DESIGN-01: صورة تصنيفٍ لمعاينة Canvas — نفس نموذج الثقة أعلاه (رابطٌ موقَّعٌ قصير الأجل بلا
+    // `auth:sanctum`؛ التوقيع هو السلطة الوحيدة، يُولَّد فقط داخل سياقٍ مُصادَقٍ بالكامل عبر
+    // `CommerceWorkspaceStorefrontCategoryController::index()`). تصنيفٌ فعّال ومنشورٌ على قناة هذا المتجر ولمستأجره فقط،
+    // وإلا 404 غير كاشف. انظر `CommerceWorkspaceCategoryMediaController`.
+    Route::get('commerce/workspace/storefronts/{id}/category-media/{category}', [CommerceWorkspaceCategoryMediaController::class, 'show'])
+        ->whereUuid('id')->whereUuid('category')
+        ->middleware('signed')
+        ->name('commerce.workspace.category-media.show');
 
     // CUST-HV V2a: متغيّر وسائط المُخصِّص لمعاينة مساحة العمل. نفس نموذج الثقة
     // أعلاه (CUST-H4-8b): **بلا** `auth:sanctum` لأن `<img src>` لا يحمل Bearer،

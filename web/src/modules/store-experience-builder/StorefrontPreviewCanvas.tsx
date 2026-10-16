@@ -101,6 +101,7 @@ import {
   PREVIEW_CATEGORIES,
   PREVIEW_STORE_NAME,
 } from "./preview-fixtures";
+import { CanvasCategoryDisplay } from "./CanvasCategoryDisplay";
 import "./store-preview.css";
 
 const SECTION_TITLE: Record<string, CustomizerMessageKey> = {
@@ -196,7 +197,7 @@ interface StorefrontPreviewCanvasProps {
    * own convention above.
    */
   homeCategoriesState?: "idle" | "loading" | "error" | "ready";
-  homeCategories?: { id: string; name: string }[];
+  homeCategories?: { id: string; name: string; imageUrl?: string | null; color?: string | null }[];
   onRetryHomeCategories?: () => void;
   /**
    * CUST-H4-3 — the Home "newArrivals" section's own real Canvas preview:
@@ -908,6 +909,15 @@ export function StorefrontPreviewCanvas({
                     >
                       {t("homeCategoriesEmpty")}
                     </p>
+                  ) : section.design?.display ? (
+                    // AWJ-STORE-CAT-DESIGN-01 — the merchant chose a card display: the storefront's own resolver, view and
+                    // stylesheet, pinned to the simulated device. Without one the classic preview tiles below are untouched.
+                    <CanvasCategoryDisplay
+                      display={section.design.display}
+                      categories={homeCategories}
+                      viewport={viewport}
+                      dir={locale === "ar" ? "rtl" : "ltr"}
+                    />
                   ) : (
                     <ul className={cn("mt-4 grid", categoriesGap, categoriesColumns)}>
                       {homeCategories.map((category) => (

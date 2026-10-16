@@ -1,0 +1,307 @@
+/*
+ * AWJ-STORE-CAT-DESIGN-01 — the categories section's display layouts (grid · horizontal scroll · circles · image tiles ·
+ * compact list). Plain CSS on purpose (no Tailwind classes): the published storefront (Tailwind 4) and the builder's Canvas
+ * (Tailwind 3) share this file BYTE FOR BYTE, so the preview is the storefront's own stylesheet, not a second mock.
+ *
+ * Everything dynamic arrives as a custom property on the list root (`--cd-*`, set from `resolveCategoryDisplay`: validated
+ * numbers and fixed `--store-*` tokens, never raw merchant text). Responsive values exist three times (`-m` mobile, `-t`
+ * tablet, `-d` desktop) and the effective `--cd-*` is picked below: by media query on the storefront, and by
+ * `data-cd-device` in the Canvas, whose simulated device width is not the host browser's.
+ *
+ * Logical properties only (RTL/LTR are the document's). Motion is limited to a colour/shadow transition that
+ * `prefers-reduced-motion` switches off. Dark mode is out of scope for the storefront (D-13).
+ */
+
+.awj-cd {
+  --cd-cols: var(--cd-cols-m);
+  --cd-gap: var(--cd-gap-m);
+  --cd-iw: var(--cd-iw-m);
+  --cd-thumb: var(--cd-thumb-m);
+  --cd-ar: var(--cd-ar-m);
+  --cd-h: var(--cd-h-m);
+  --cd-w: var(--cd-w-m);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--cd-gap);
+  /* A flex/grid parent must never be widened by a scroller or a long name. */
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+@media (min-width: 640px) {
+  .awj-cd:not([data-cd-device]) {
+    --cd-cols: var(--cd-cols-t);
+    --cd-gap: var(--cd-gap-t);
+    --cd-iw: var(--cd-iw-t);
+    --cd-thumb: var(--cd-thumb-t);
+    --cd-ar: var(--cd-ar-t);
+    --cd-h: var(--cd-h-t);
+    --cd-w: var(--cd-w-t);
+  }
+}
+
+@media (min-width: 1024px) {
+  .awj-cd:not([data-cd-device]) {
+    --cd-cols: var(--cd-cols-d);
+    --cd-gap: var(--cd-gap-d);
+    --cd-iw: var(--cd-iw-d);
+    --cd-thumb: var(--cd-thumb-d);
+    --cd-ar: var(--cd-ar-d);
+    --cd-h: var(--cd-h-d);
+    --cd-w: var(--cd-w-d);
+  }
+}
+
+.awj-cd[data-cd-device="tablet"] {
+  --cd-cols: var(--cd-cols-t);
+  --cd-gap: var(--cd-gap-t);
+  --cd-iw: var(--cd-iw-t);
+  --cd-thumb: var(--cd-thumb-t);
+  --cd-ar: var(--cd-ar-t);
+  --cd-h: var(--cd-h-t);
+  --cd-w: var(--cd-w-t);
+}
+
+.awj-cd[data-cd-device="desktop"] {
+  --cd-cols: var(--cd-cols-d);
+  --cd-gap: var(--cd-gap-d);
+  --cd-iw: var(--cd-iw-d);
+  --cd-thumb: var(--cd-thumb-d);
+  --cd-ar: var(--cd-ar-d);
+  --cd-h: var(--cd-h-d);
+  --cd-w: var(--cd-w-d);
+}
+
+/* Column layouts. */
+.awj-cd[data-cd-layout="grid"],
+.awj-cd[data-cd-layout="image_tiles"],
+.awj-cd[data-cd-layout="compact_list"] {
+  grid-template-columns: repeat(var(--cd-cols), minmax(0, 1fr));
+}
+
+/*
+ * Sideways-scrolling layouts: a native scroll-snap row (no script — keyboard, touch, trackpad and the scrollbar all work,
+ * and RTL is the browser's own: the row starts at the inline-start edge). `overscroll-behavior-x: contain` stops a swipe at
+ * the rail's end from dragging the page, and the rail is its own scroll container, so it can never widen the page. The
+ * inline padding keeps a focus ring from being clipped by the scroller.
+ */
+.awj-cd[data-cd-layout="horizontal_scroll"],
+.awj-cd[data-cd-layout="circles"] {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: var(--cd-iw);
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 4px;
+  scrollbar-width: thin;
+  padding-block: 4px 10px;
+  padding-inline: 4px;
+  margin-inline: -4px;
+  margin-block-end: -6px;
+  max-width: calc(100% + 8px);
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .awj-cd[data-cd-layout="horizontal_scroll"],
+  .awj-cd[data-cd-layout="circles"] {
+    scroll-behavior: smooth;
+  }
+}
+
+.awj-cd__item {
+  min-width: 0;
+  display: block;
+}
+
+.awj-cd[data-cd-layout="horizontal_scroll"] > .awj-cd__item,
+.awj-cd[data-cd-layout="circles"] > .awj-cd__item {
+  scroll-snap-align: start;
+}
+
+/* The card: one link, the whole tile is the target (>= 44 px tall by padding + content, see min-height). */
+.awj-cd__card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  inline-size: 100%;
+  block-size: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: var(--cd-pad);
+  border: var(--cd-bw) solid var(--cd-bc);
+  border-radius: var(--cd-radius);
+  background-color: var(--cd-bg);
+  box-shadow: var(--cd-shadow);
+  color: var(--store-foreground);
+  text-decoration: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.awj-cd__card:focus-visible {
+  outline: 2px solid var(--store-primary);
+  outline-offset: 2px;
+}
+
+/* Subtle hover/focus: a stronger edge and a surface tint — no movement, no scale. */
+.awj-cd[data-cd-hover="subtle"] .awj-cd__card:is(:hover, :focus-visible) {
+  border-color: var(--store-border-strong);
+  background-color: var(--cd-bg-hover);
+  box-shadow: var(--cd-shadow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .awj-cd__card {
+    transition: none;
+  }
+}
+
+/* Alignment of the card's content along the cross axis (logical: start is the inline-start edge). */
+.awj-cd__card[data-cd-align="start"] {
+  align-items: flex-start;
+}
+.awj-cd__card[data-cd-align="center"] {
+  align-items: center;
+}
+.awj-cd__card[data-cd-align="end"] {
+  align-items: flex-end;
+}
+
+/* The image frame: the aspect ratio reserves the space before the picture loads (no layout shift). */
+.awj-cd__media {
+  position: relative;
+  display: block;
+  flex: none;
+  box-sizing: border-box;
+  inline-size: var(--cd-w);
+  max-inline-size: 100%;
+  aspect-ratio: var(--cd-ar);
+  block-size: var(--cd-h);
+  overflow: hidden;
+  border-radius: max(0px, calc(var(--cd-radius) - var(--cd-pad)));
+  background-color: var(--store-surface-muted);
+}
+
+.awj-cd__media[data-cd-shape="circle"] {
+  border-radius: 50%;
+}
+
+/* object-fit / object-position act on the picture itself, not on its wrapper. */
+.awj-cd__img {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: var(--cd-fit);
+  object-position: var(--cd-op);
+}
+
+/* No picture: the merchant's colour (or the neutral surface) in the same frame, so a row stays aligned. */
+.awj-cd__fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: clamp(14px, 2.2vw, 22px);
+  line-height: 1;
+  color: var(--store-muted-foreground);
+  background-color: var(--store-surface-muted);
+}
+
+/* The name. */
+.awj-cd__name {
+  display: block;
+  min-width: 0;
+  max-inline-size: 100%;
+  box-sizing: border-box;
+  font-size: var(--cd-name-size);
+  font-weight: var(--cd-name-weight);
+  line-height: 1.35;
+  text-align: var(--cd-name-align);
+  color: var(--cd-name-color);
+  overflow-wrap: anywhere;
+}
+
+/* The clamp sits on the inner text, never on the padded element: hidden lines would show through its padding. */
+.awj-cd__name-text {
+  display: block;
+  min-width: 0;
+}
+
+.awj-cd__name-text[data-cd-clamp="1"],
+.awj-cd__name-text[data-cd-clamp="2"] {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--cd-lines);
+  line-clamp: var(--cd-lines);
+  overflow: hidden;
+}
+
+.awj-cd__name[data-cd-nbg="scrim"],
+.awj-cd__name[data-cd-nbg="surface"] {
+  background-color: var(--cd-name-bg);
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+/* Name over the picture: a bar across the frame's block-end edge, on the contrast-proven scrim (or a themed surface). */
+.awj-cd__name[data-cd-over] {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 0;
+  border-radius: 0;
+  padding: 8px 10px;
+}
+
+/* Beside: picture and name on one row; the picture yields room to the name in narrow cells. */
+.awj-cd__card[data-cd-placement="beside"] {
+  flex-direction: row;
+  align-items: center;
+}
+.awj-cd__card[data-cd-placement="beside"] > .awj-cd__media {
+  flex: 0 1 38%;
+  max-inline-size: 120px;
+}
+.awj-cd__card[data-cd-placement="beside"] > .awj-cd__name {
+  flex: 1 1 0;
+}
+
+/* Compact list: a small square thumbnail beside the name. */
+.awj-cd[data-cd-layout="compact_list"] .awj-cd__media {
+  flex: none;
+  inline-size: var(--cd-thumb);
+  max-inline-size: none;
+  aspect-ratio: 1 / 1;
+  block-size: auto;
+}
+
+/* Circles: the picture is a disc the width of its slot; the name sits under it. */
+.awj-cd[data-cd-layout="circles"] .awj-cd__media {
+  border-radius: 50%;
+}
+
+/* Image tiles: the picture is the card. */
+.awj-cd[data-cd-layout="image_tiles"] .awj-cd__card {
+  gap: 0;
+}
+
+/* A name that is hidden stays in the accessibility tree via the link's aria-label; nothing else here hides it. */
+.awj-cd__sr {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

@@ -6,10 +6,12 @@ use App\Http\Resources\StorefrontCategoryResource;
 use App\Models\CommerceCategoryListing;
 use App\Models\ProductCategory;
 use App\Models\Storefront;
+use App\Support\EdgeScheme;
 use App\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\URL;
 
 /**
  * CUST-H2-4 — قراءة تصنيفات مساحة عمل Commerce للمعاينة داخل مُخصِّص صفحة
@@ -38,7 +40,7 @@ use Illuminate\Http\Request;
  * تماماً القرار الذي اتّخذه `CommerceWorkspaceStorefrontProductController`
  * لـ`Product` (نفس التصنيف الفرعي بالضبط) — لا حالة جديدة تُخترع هنا.
  *
- * **الحمولة**: القائمة مُصغَّرة (معرّف/اسم/تلميح تسلسل هرمي فقط) — لا حمولة
+ * **الحمولة**: القائمة مُصغَّرة (معرّف/اسم/تلميح تسلسل هرمي فقط؛ و— AWJ-STORE-CAT-DESIGN-01 — `color` ورابط صورةٍ موقَّع قصير الأجل **عند** `with_media=true` لمعاينة Canvas) — لا حمولة
  * تصنيف كاملة لمجرَّد منتقٍ. التفصيل يعيد استخدام `StorefrontCategoryResource`
  * نفسه (نفس مورد الكتالوج العام) — بما أن مسار مساحة العمل هذا لا يحمل اسم
  * مسار `storefront.v1.*`، يُسقِط المورد حقل `image` تلقائياً بمنطقه القائم
@@ -96,6 +98,9 @@ class CommerceWorkspaceStorefrontCategoryController extends ApiController
             // string) — accepting only `1`/`0` here would 422 on the one
             // request shape this fix exists to serve.
             'root_only' => ['sometimes', 'nullable', 'string', 'in:true,false,1,0'],
+            // AWJ-STORE-CAT-DESIGN-01 — إضافيٌّ واختياري: غيابه يُبقي الحمولة المُصغَّرة حرفياً لكل مستدعٍ قائم (المنتقيات)،
+            // فلا تُصدَر روابط موقَّعة لمن لا يحتاجها. معاينة قسم «التصنيفات» وحدها تطلبه.
+            'with_media' => ['sometimes', 'nullable', 'string', 'in:true,false,1,0'],
             'page' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:'.self::PER_PAGE_MAX],
         ]);
@@ -119,12 +124,25 @@ class CommerceWorkspaceStorefrontCategoryController extends ApiController
         $perPage = min((int) ($filters['per_page'] ?? self::PER_PAGE_DEFAULT), self::PER_PAGE_MAX);
         $paginator = $query->paginate($perPage, ['*'], 'page', (int) ($filters['page'] ?? 1));
 
-        $data = $paginator->getCollection()->map(fn (ProductCategory $category) => [
-            'id' => $category->id,
-            'name' => $category->name,
-            'parent_id' => $category->parent_id,
-            'parent_name' => $category->parent?->name,
-        ])->all();
+        $withMedia = $request->boolean('with_media');
+        $data = $paginator->getCollection()->map(function (ProductCategory $category) use ($withMedia, $storefront): array {
+            $row = [
+                'id' => $category->id,
+                'name' => $category->name,
+                'parent_id' => $category->parent_id,
+                'parent_name' => $category->parent?->name,
+            ];
+
+            // AWJ-STORE-CAT-DESIGN-01 — لمعاينة Canvas الأمينة لقسم «التصنيفات» (عند الطلب فقط): لون التاجر (نصٌّ حرّ
+            // يتحقّق منه العميل) ورابطٌ موقَّعٌ قصير الأجل لصورته إن وُجدت. مسار التخزين لا يُكشف أبداً، والرابط يُولَّد هنا
+            // فقط (بعد `ownedStorefront()` + `commerce.manage`) ويخدمه `CommerceWorkspaceCategoryMediaController`.
+            if ($withMedia) {
+                $row['color'] = $category->color;
+                $row['image_url'] = $category->image_path ? $this->signedImageUrl($storefront, $category) : null;
+            }
+
+            return $row;
+        })->all();
 
         return response()->json([
             'data' => $data,
@@ -180,6 +198,16 @@ class CommerceWorkspaceStorefrontCategoryController extends ApiController
         $resource = new StorefrontCategoryResource($categoryModel, 1, array_reverse($ancestors));
 
         return response()->json(['data' => $resource->resolve($request)]);
+    }
+
+    /** رابط صورة التصنيف الموقَّع (20 دقيقة، كوسائط المنتج في CUST-H4-8b)؛ المخطّط يُبدَّل بعد التوقيع فقط (O-1). */
+    private function signedImageUrl(Storefront $storefront, ProductCategory $category): string
+    {
+        return EdgeScheme::forBrowser(URL::temporarySignedRoute(
+            'commerce.workspace.category-media.show',
+            now()->addMinutes(20),
+            ['id' => $storefront->id, 'category' => $category->id],
+        ));
     }
 
     /**
