@@ -4,11 +4,11 @@ Category section design controls for the AWJ Store homepage (`التصنيفات
 
 | | |
 |---|---|
-| **Status** | Implemented on a feature branch, PR open for review. **Not merged, not deployed.** |
+| **Status** | Implemented; owner review round applied; CI green on the code head. PR open. **Not merged, not deployed.** |
 | **Branch** | `claude/ecstatic-curie-yeo8nd` |
-| **Base SHA** | `a2d2fcb7f83cfaa8cb361eb2744de7fc649393e5` (`origin/main`, "refine AWJ Core-Dark shell (#1539)") |
+| **Base SHA** | `5fb6f2331cc82e2d37dce6d79e512658e7cd834c` (`origin/main` at review time — merged into the branch, clean, no conflicts). Original base: `a2d2fcb7f83cfaa8cb361eb2744de7fc649393e5`. |
 | **Head SHA / PR** | See §14 — PR #1542 |
-| **Scope owner decisions needed** | 3 — see §12 (extra Canvas media route · px values vs named steps · route allow-list entry) |
+| **Owner decisions** | Both resolved in the review round (§12): signed picture route approved conditionally; bounded pixel values approved with easy defaults + advanced control. |
 
 ---
 
@@ -97,7 +97,7 @@ The screenshots in the brief were a product brief, so behaviour was verified in 
 
 ---
 
-## 5. Backend addition: signed category picture for the Canvas (needs your eye)
+## 5. Backend addition: signed category picture for the Canvas (approved conditionally — see §15)
 
 The Canvas's workspace categories read returned only `id`+`name`, and the picture route is host-resolved on the storefront domain (unreachable from a merchant `<img>`; the web app authenticates with a Bearer token, not a cookie). A faithful preview of `fit`/`position`/`shape` needs real pictures, so this slice mirrors the **CUST-H4-8b product-media trust model exactly**:
 
@@ -106,7 +106,7 @@ The Canvas's workspace categories read returned only `id`+`name`, and the pictur
 * Bytes come from the same code the public route uses (trait extracted verbatim; its existing tests pass unchanged).
 * The storage path is never serialized.
 
-Tested in `CommerceWorkspaceCategoryMediaApiTest` (10 tests): signed payload shape, minimal default shape, TTL, no-Authorization serving, cross-tenant, sibling channel, unpublished/inactive/no-image/unknown ids, unsigned/tampered/expired, list auth + foreign storefront, R2 under the right tenant, no tenant-context leak.
+Tested in `CommerceWorkspaceCategoryMediaApiTest` (16 tests after the review round; the negatives are listed in §15): signed payload shape, minimal default shape, TTL, no-Authorization serving, cross-tenant, sibling channel, unpublished/inactive/no-image/unknown ids, unsigned/tampered/expired, list auth + foreign storefront, R2 under the right tenant, no tenant-context leak.
 
 ---
 
@@ -116,7 +116,7 @@ Tested in `CommerceWorkspaceCategoryMediaApiTest` (10 tests): signed payload sha
 |---|---|---|
 | Contract, PHP | `php artisan test --filter=StorefrontSectionDesignTest` (via `setup.sh` copy in `nibras-app`) | pass, 180 shared-fixture cases |
 | Contract, document / API / isolation | `--filter=StorefrontCategoryDisplayTest` | 6 passed (classic byte identity, firewall, never-422, draft→reopen→publish→public, no unpublished leak, tenant isolation, unauthenticated write rejected) |
-| Backend media | `--filter=CommerceWorkspaceCategoryMediaApiTest` | 10 passed |
+| Backend media | `--filter=CommerceWorkspaceCategoryMediaApiTest` | 16 passed (10 first round + 6 security negatives) |
 | Existing suites touching the same files | `--filter='StorefrontCategoryMediaTest\|CommerceWorkspaceStorefrontCategory\|CommerceWorkspaceMediaApiTest\|CommerceModuleBoundaryTest'` | all pass (after adding the new route to the allow-list) |
 | Backend broad | `--filter='Storefront\|CommerceWorkspace\|Presentation\|Commerce\|Tenant\|Isolation\|BranchIsolationGuard'` | 2 921 passed, 41 skipped, 3 failed → `CommerceModuleBoundaryTest` (**fixed**, allow-list) + 2 `Fuel*` (pre-existing: `bcmath` not installed in the sandbox) |
 | Backend full | `php artisan test` (sandbox copy built by `setup.sh`) | **7 239 passed, 139 skipped, 26 failed** — all 26 are `Fuel*` tests failing with `Call to undefined function App\Services\bcmul()` (PHP `bcmath` is not installed in the sandbox; the session hook warns about it; CI installs it). No failure outside `Fuel*`. |
@@ -172,21 +172,90 @@ Dev-only fixtures (404 in production, local SVG pictures — no network): storef
 * Pre-existing, not touched: 1 px page overflow in the EN Canvas harness (also in the existing `populated` scenario), three `IntlError INVALID_KEY` console messages from unrelated app-builder keys.
 * Publish-time contrast: not needed for `display` (tokens only) — revisit if free colours are added.
 
-## 12. Decisions for the owner
-1. **Pixel values** (radius 0–32, padding 0–32, gap 4–32, font 12–32, border 0–4, height) follow the task, but V0 §5.2 says global tokens are *named steps only, never a pixel input*. I kept them bounded and clamp-or-drop (the VD-4a rule). Alternative: named steps. Cheap to change (normalizers + one control).
-2. **Canvas picture route** (§5): additive and modelled on H4-8b, but it is a new unauthenticated-by-design signed route. Alternative: ship without pictures in the Canvas (fallback frames only) and drop §5.
-3. **`CommerceModuleBoundaryTest` allow-list** now contains `…/category-media/{category}` — a deliberate governance edit that needs a reviewer's explicit nod.
+## 12. Owner decisions (resolved in the review round)
+
+1. **Signed category-picture route — approved conditionally** (verify tenant isolation, signature, authorization; deny unauthorized access; add negative security tests). Done — see §15.
+2. **Bounded pixel values — approved, with easy defaults and an advanced control, without changing the architectural contract.** Done — see §16. The stored contract is unchanged (plain bounded integers, clamp-or-drop); only the editor changed.
+3. `CommerceModuleBoundaryTest` allow-list entry for `…/category-media/{category}` remains a governance edit for the reviewer to acknowledge (it is the intended, minimal change; the test otherwise fails by design on any new Commerce route).
 
 ## 13. Next recommended action
 Review §12, then merge-gate on CI (sqlite + pgsql + Web CI + Storefront CI). Afterwards: free-colour controls with a publish-time contrast gate, and the sub-category count as an optional `name` meta line.
 
-## 14. Final state
+## 14. Review round (PR #1542) — what was checked and changed
+
+### 14.1 CI on the head SHA
+Head `94d15c730ae97783c1caf2ae602744deaf6d88b0` (the branch merged with the latest `origin/main` `5fb6f23`; the merge was conflict-free):
+
+| Check | Result |
+|---|---|
+| php artisan test (L11, sqlite) | success |
+| php artisan test (L11, pgsql) | success |
+| web build (Next.js) — push and PR runs | success |
+| storefront (lint + typecheck + test) — push and PR runs | success |
+| merchant preview visual QA / published footer visual QA | success |
+| CI Gate | success |
+
+The first run on the earlier head `5e10d42` also had web build, storefront and visual QA green; its PHP jobs were superseded by the new head. **No CI failure occurred on this PR, so no unrelated or related failure needed fixing.** The earlier local-only failures were environmental (sandbox: no `bcmath`, no Google Fonts for `next build`) and do not occur in CI — the web build the sandbox could not run is now proven by CI.
+
+### 14.2 Local verification on the merged tree
+| Scope | Result |
+|---|---|
+| Web `vitest run` (full) | 635 files / **7 404 tests passed**, 0 failed (includes the design-drift ratchet) |
+| Storefront `vitest run` (full) | 208 files / **2 802 tests passed**, 15 skipped (pre-existing skips) |
+| PHP focused (`StorefrontSectionDesign`, `StorefrontCategoryDisplay`, `CommerceWorkspaceCategoryMedia`, `CommerceModuleBoundary`, `StorefrontCategoryMedia`, `CommerceWorkspaceStorefrontCategory`, `StorefrontCommerceFirewall`, `StorefrontPresentation*`) | 372 passed, 1 skipped |
+| Earlier PHP full run (pre-merge) | 7 239 passed; 26 failed, all `Fuel*` / `bcmath` (sandbox only); CI is green for the whole suite |
+| Biome (storefront) | no errors on changed paths |
+
+### 14.3 Existing settings and published stores are unaffected
+* Classic look = absence of `design.display`. Byte-identity goldens (default theme and AWJ Market) rendered from the **pre-change component on `main`** still pass after every change in this round.
+* `StorefrontSectionDesignTest` (180 shared-fixture cases), `StorefrontCategoryDisplayTest` (legacy document byte identity, default document has no `design`), the pre-HV golden, v1 default and unsafe-input fixtures, and the commerce firewall all pass in PHP, web and storefront.
+* A display on any other section type is dropped; a display without a valid `layout` is dropped — a stale or hand-written document cannot switch a live store to a new look.
+* The default workspace categories payload is unchanged (`with_media` is opt-in; the existing shape test passes untouched).
+* The one behaviour change to an existing editor control is intentional and tested: the generic frame presets now **preserve** `design.display` instead of wiping it.
+* Only change to a default value inside the new feature: the Image-tiles name size default 15 → 16 px (so a fresh layout lands on a named step). It affects only documents that already carry a display, i.e. none in production.
+
+### 14.4 Preview data cannot reveal categories the storefront may not show
+The Canvas list is the workspace categories read, already gated by `commerce.manage`, subscription, `ownedStorefront()` and `publishedCategoryIds(storefront.sales_channel_id)`; `with_media` only adds `color` and a signed URL to the rows that already passed those gates. Tests assert that with `with_media` the list returns **only** the published, active, own-tenant, own-channel category — unpublished, inactive, other-channel and other-tenant categories (and their picture URLs) are absent from the body.
+
+## 15. Security: negative tests added for the signed category-picture route
+
+`CommerceWorkspaceCategoryMediaApiTest` now has 16 tests (was 10). New negatives:
+
+| Threat | Test |
+|---|---|
+| Minting URLs without permission | `self_service`, `staff` (no `commerce.manage`) and an expired subscription get 403 and the body contains no `signature` |
+| Leaking unpublished / inactive / other-channel / other-tenant categories through the preview list or their picture URLs | list contains exactly the visible category; hidden names and URLs are absent |
+| Re-using a signature | swapped storefront id, swapped category id, extra query parameters (`path=../../etc/passwd`, `disk=local`) and an extended `expires` all return 403 |
+| A signature as a standing grant | the same valid URL returns 404 as soon as the category is unpublished, or deactivated |
+| Wrong verbs / hostile ids | POST, PUT, PATCH, DELETE → 405; non-UUID ids (including `../../etc/passwd`) → 404 even under a valid signature |
+| Existence oracle | a foreign category and a non-existent one return the same status and message |
+| Cache / cookie hygiene | no `Set-Cookie`; `Cache-Control` is `private`, never `public` |
+
+Already covered in the first round: unsigned, tampered and expired URLs; another tenant's category under a valid signature for this storefront; sibling channel; no-image and unknown ids; unauthenticated and foreign-storefront list calls; R2 read under the storefront's own tenant with no tenant-context leak; the signed URL's 20-minute lifetime.
+
+**Verified properties:** tenant isolation (explicit `tenant_id` match with `TenantScope` bypassed on purpose, because the request is unauthenticated); signature (Laravel `signed`, bound to storefront id, category id, expiry and every query parameter); authorization of minting (`commerce.manage` + subscription + owned storefront); no storage path in any response.
+
+**Residual risks (accepted, documented):** the signed URL appears in the merchant's own browser requests and may be logged by proxies for its 20-minute life; the route has no per-IP throttle (identical to the existing product-media route — a global throttle would be a separate, cross-route decision).
+
+## 16. Pixel values: easy first, exact on demand
+The contract is unchanged (bounded integers, clamp-or-drop; PHP/web/storefront normalizers and fixture untouched in this round). The editor now offers:
+* **Named steps first** — card radius (Square 0 · Small 8 · Medium 12 · Large 16 · X-large 24 · Round 32), inner padding (None 0 · Tight 8 · Normal 12 · Roomy 20), name size (Small 13 · Normal 14 · Large 16 · X-large 20), card gap for all devices at once (Tight 8 · Normal 12 · Loose 20). A step writes the plain pixel number.
+* **Advanced** — a keyboard-operable disclosure (`aria-expanded` / `aria-controls`) with the exact bounded control (slider + typed value committed on blur/Enter, per-value reset); gap offers per-device pixels there. It opens by itself when the current value is not a named step, and says so ("Custom value"), so nothing is ever hidden.
+* Every layout default and every preset lands on a named step; per-device columns, border width and picture height keep their direct controls (their ranges are small).
+* Tests: steps write exact pixels, advanced collapsed/auto-open, disclosure semantics, gap-all-devices + per-device override marks custom, defaults and presets never show "custom". Evidence: `awj-store-cat-design-01-evidence/editor/editor-steps-advanced__{ar,en}__desktop.png`.
+
+## 17. Final state and remaining risks
 
 | | |
 |---|---|
 | Branch | `claude/ecstatic-curie-yeo8nd` |
-| PR | [safwan5001-source/Nebrax#1542](https://github.com/safwan5001-source/Nebrax/pull/1542) — open, ready for review, **not merged** |
-| Base SHA | `a2d2fcb7f83cfaa8cb361eb2744de7fc649393e5` |
-| Head SHA (code) | `c2c651c4a825543e2c6a7263b8bdc90cf50432f4` (a follow-up docs-only commit adds this section) |
-| CI | Not yet observed at the time of writing — check the PR's checks (sqlite + pgsql, Web CI, Storefront CI). |
-| Deployed | No. |
+| PR | [safwan5001-source/Nebrax#1542](https://github.com/safwan5001-source/Nebrax/pull/1542) — open, ready for review, **not merged, not deployed** |
+| Base SHA | `5fb6f2331cc82e2d37dce6d79e512658e7cd834c` (`origin/main`; original base `a2d2fcb`) |
+| Head SHA (CI-verified code) | `94d15c730ae97783c1caf2ae602744deaf6d88b0` — all checks green. A later docs-only commit records these results (no code change; re-run CI is not expected to differ). |
+
+Remaining risks / items for the reviewer:
+1. The signed-URL residual risks in §15 (log exposure for 20 minutes; no throttle on the route).
+2. The route allow-list edit in `CommerceModuleBoundaryTest` needs an explicit acknowledgement.
+3. The classic "N sub-categories" line is not drawn by the new layouts; free colour pickers (needing a contrast gate) and an in-panel mini preview are not implemented.
+4. No screen-reader (assistive technology) pass was possible; keyboard, focus, contrast, RTL and reduced-motion were verified in a real browser.
+5. Web vitest has no dedicated CI job (the web CI job is the Next.js build); the full web suite was run locally (7 404 passed).
