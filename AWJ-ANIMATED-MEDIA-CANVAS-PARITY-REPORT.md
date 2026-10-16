@@ -110,7 +110,7 @@ Code head `810cb73` (two workflow runs — one per push — all at the same code
 
 **Why main looked green:** `web-ci` did not run for #1546 (a backend-only diff), and the later `a50ce81` run predates it, so the web test went red only now that a PR touches `web/` on top of #1546. Any web-touching PR will hit it until it is fixed.
 
-**Proposed fix (not applied — it belongs to the AI-01 change and needs Arabic wording from its owner):** add `ai` to `hr.perm_modules`, `use` to `hr.perm_actions`, `assistant` to `hr.perm_areas` in `web/messages/en.json` and `ar.json`. I did not make it because the task bars unrelated changes; say the word and I will add it to this PR (or a separate one).
+**Resolved:** the labels were added by PR #1550 (merged to `main` as `1b6f51d`) and `main` has been merged into this branch (merge commit; no conflicts, no change to this PR's own files). The failing-run table above is the historical result for code head `810cb73`; the re-run on the updated branch is reported in the PR hand-off.
 
 ## 6. Risks and what is NOT verified
 
