@@ -3,10 +3,10 @@
 | | |
 |---|---|
 | Branch | `claude/awj-ai-permission-labels` |
-| PR | __PR__ (targets `main`; **not merged**) |
+| PR | https://github.com/safwan5001-source/Nebrax/pull/1550 (targets `main`; **not merged**) |
 | Base SHA | `336284170ea6a044ee745fda2f1c844e161215cf` (`origin/main`, #1546 AI-01) |
-| Code head | __CODE__ |
-| Final head | __FINAL__ |
+| Code head | `02ab424de0a628ecaeaf429abf4660f3d61f8a9b` |
+| Final head | the commit adding this CI update (docs-only; shown on the PR) |
 
 ## Problem
 PR #1546 (AI-01 Secure AI Gateway) added the server permission `ai.assistant.use` to `app/Support/Rbac.php`. The web role editor needs a label for every **module**, **action** and **area** of every server permission; `web/src/modules/roles/catalog.test.ts` ("permission label coverage") guards that, in English and Arabic. The labels for `ai` / `use` / `assistant` did not exist, so two tests failed (`en` and `ar`) and the `web build (Next.js)` job and CI Gate went red on any PR touching `web/`. `main` itself had not run the web job since #1546 (backend-only diff), so it went unnoticed.
@@ -37,7 +37,16 @@ Resulting label of `ai.assistant.use`: **AI — Assistant — Use** / **الذك
 | PHP | not applicable — no PHP file changed |
 
 ## CI
-__CI__
+Code head `02ab424` (status as of 06:39 UTC; one poll after the web job finished, not repeated):
+
+| Check | Result |
+|---|---|
+| `web build (Next.js)` — the job that was red | ✅ **success** (both workflow runs; 06:23 / 06:24 UTC) |
+| `php artisan test (L11, sqlite)` | ⏳ in progress at the last check (no PHP file changed) |
+| `php artisan test (L11, pgsql)` | ⏳ in progress at the last check (no PHP file changed) |
+| `CI Gate` | ⏳ waits for the two PHP jobs |
+
+The PHP jobs were still running at the last check, so **the final CI Gate result is not recorded here**; it is visible on the PR.
 
 ## Risks
 - **Very low.** Display-only strings; no behavioural, authorization or data change. The wording ("AI", "Assistant", "Use") is a reasonable default — if the AI-01 owner wants different product terminology, only these three pairs change.
