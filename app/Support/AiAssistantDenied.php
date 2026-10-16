@@ -37,6 +37,7 @@ final class AiAssistantDenied extends RuntimeException
         'duplicate_request'         => [409, 'هذا الطلب نُفّذ سابقاً بنفس مفتاح التكرار.'],
         'request_in_progress'       => [409, 'هذا الطلب قيد التنفيذ بنفس مفتاح التكرار.'],
         'idempotency_key_reuse'     => [422, 'مفتاح التكرار مستخدم مع طلب مختلف.'],
+        'acknowledgement_required'  => [422, 'يلزم إقرارٌ صريح بإشعار الخصوصية قبل منح الموافقة.'],
         'internal_error'            => [500, 'تعذّر إكمال الطلب.'],
     ];
 
