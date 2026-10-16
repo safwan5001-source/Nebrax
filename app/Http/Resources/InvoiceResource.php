@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Support\InvoicePartySnapshot;
 use App\Support\Money;
 use App\Support\PrintTemplateContract;
 use App\Support\Settings;
@@ -10,6 +11,25 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class InvoiceResource extends JsonResource
 {
+    /** REM-14: كتلة `parties` الكاملة تُكشف في قراءة الفاتورة المفردة فقط، لا في القوائم. */
+    private bool $includeParties = false;
+
+    public function withParties(bool $include = true): static
+    {
+        $this->includeParties = $include;
+
+        return $this;
+    }
+
+    /**
+     * لقطة الأطراف المعتمدة للعرض: فاتورة **مرحَّلة** بلقطة v1 سليمة فقط. المسودة تبقى على البيانات الحية،
+     * والمرحَّلة قبل REM-14 (`party_snapshot = NULL`) تبقى على القراءة الحية كتوافق مؤقت لا كضمان تاريخي.
+     */
+    private function partySnapshot(): ?array
+    {
+        return $this->status === 'posted' ? InvoicePartySnapshot::parse($this->party_snapshot) : null;
+    }
+
     public function toArray(Request $request): array
     {
         return [
@@ -27,12 +47,27 @@ class InvoiceResource extends JsonResource
             // R5: لقطة عرض فقط (لا تُستهلك محاسبياً) — تتيح لواجهات مثل إيصال
             // POS الفوري عرض اسم العميل من هذا التمثيل وحده، بلا اعتماد على
             // حالة عميل جانب العميل. تظهر فقط حين تُحمَّل العلاقة صراحة.
-            'partner'        => $this->whenLoaded('partner', fn () => $this->partner ? [
-                'id'         => $this->partner->id,
-                'name'       => $this->partner->name,
-                'vat_number' => $this->partner->vat_number,
-                'city'       => $this->partner->city,
-            ] : null),
+            // REM-14c: للفاتورة المرحَّلة ذات اللقطة تأتي القيم من لقطة لحظة الإصدار لا من العميل الحي (الشكل
+            // نفسه: id/name/vat_number/city). `id` يبقى مرجع العميل الحالي للتنقّل.
+            'partner'        => $this->whenLoaded('partner', function () {
+                if (! $this->partner) {
+                    return null;
+                }
+                $buyer = $this->partySnapshot()['buyer'] ?? null;
+
+                return [
+                    'id'         => $this->partner->id,
+                    'name'       => $buyer !== null ? ($buyer['name'] ?? null) : $this->partner->name,
+                    'vat_number' => $buyer !== null ? ($buyer['vat_number'] ?? null) : $this->partner->vat_number,
+                    'city'       => $buyer !== null ? ($buyer['address']['city'] ?? null) : $this->partner->city,
+                ];
+            }),
+            // REM-14c: لقطة البائع/المشتري الكاملة (قراءة فقط) — `null` للمسودات وللمرحَّلة قبل REM-14.
+            'parties'        => $this->when($this->includeParties, function () {
+                $snapshot = $this->partySnapshot();
+
+                return $snapshot !== null ? InvoicePartySnapshot::forApi($snapshot) : null;
+            }),
             'payment_type'   => $this->payment_type,
             'zatca_document_type' => $this->zatca_document_type,
             'status'         => $this->status,

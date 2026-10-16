@@ -21,6 +21,7 @@ import { Accordion, AccordionItem } from '@/components/ui/accordion';
 import { EmptyState } from '@/components/nebrax';
 import { useToast } from '@/components/ui/toast';
 import { InvoiceDocument, type Company, type Customer } from '@/components/invoices/invoice-document';
+import { resolveInvoiceParties, type InvoiceParties } from '@/modules/documents/builder/invoice-parties';
 import { CreateReturnDialog } from '@/components/returns/create-return-dialog';
 import { InvoiceNoteDialog } from '@/components/invoices/invoice-note-dialog';
 import { api, downloadFile, hasApiStatus } from '@/lib/api';
@@ -101,6 +102,8 @@ interface Invoice {
   paid_amount: string;
   remaining: string;
   notes: string | null;
+  /** REM-14c: لقطة الطرفين لحظة الإصدار (مرحَّلة بلقطة v1 فقط؛ وإلا null). */
+  parties?: InvoiceParties | null;
   zatca_document_type?: string | null;
   cost_center?: { id: string; code: string; name: string } | null;
   lines: Line[];
@@ -291,9 +294,16 @@ export default function InvoiceDetailPage() {
           api<{ data: InvoiceInventoryMovement[] }>(`/invoices/${id}/inventory`),
           api<{ data: AccountingLinks }>(`/invoices/${id}/accounting`),
         ]);
-        if (p.status === 'fulfilled') setCustomer(p.value.data);
+        // REM-14c: المرحَّلة بلقطة طرفين تُعرض منها (لا من العميل/المؤسسة الحيّين)؛ المسودة والقديمة بلا لقطة حيّة.
+        const effective = resolveInvoiceParties({
+          status: r.data.status,
+          parties: r.data.parties,
+          company: m.status === 'fulfilled' ? m.value.company : null,
+          customer: p.status === 'fulfilled' ? p.value.data : null,
+        });
+        setCustomer(effective.customer);
         if (z.status === 'fulfilled') setZatca(z.value);
-        if (m.status === 'fulfilled') setCompany(m.value.company);
+        setCompany(effective.company);
         if (paymentRelations.status === 'fulfilled') setPayments(paymentRelations.value.data);
         if (noteRelations.status === 'fulfilled') setNotesLog(noteRelations.value.data);
         if (inventoryRelations.status === 'fulfilled') setInventoryMovements(inventoryRelations.value.data);

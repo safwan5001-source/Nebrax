@@ -13,6 +13,7 @@ use App\Models\JournalLine;
 use App\Models\Product;
 use App\Models\User;
 use App\Support\DocumentLineVariantResolver;
+use App\Support\InvoicePartySnapshot;
 use App\Support\PrintTemplateContract;
 use App\Support\Settings;
 use App\Support\ZatcaIssueTimestamp;
@@ -1034,7 +1035,12 @@ class InvoiceService
             // REM-13a / ADR-0001: لحظة الإصدار القانونية تُلتقط **هنا فقط** — داخل معاملة الترحيل، بعد قفل
             // الفاتورة وقفل مِرساة المستأجر (LedgerService) وقبل توليد أي مخرج ZATCA — فيتّفق ترتيبها مع ترتيب ICV،
             // وتتراجع مع المعاملة، ولا تُقرأ الساعة مرة ثانية لأي مخرج. تُحفَظ ضمن update() أدناه.
-            $invoice->forceFill(['issued_at' => ZatcaIssueTimestamp::capture()]);
+            $invoice->forceFill([
+                'issued_at' => ZatcaIssueTimestamp::capture(),
+                // REM-14: لقطة البائع/المشتري تُلتقط في الحدّ نفسه (بعد القفلين وقبل أي مخرج ZATCA) وتُحفظ مع
+                // الترحيل في update() أدناه. لا ترفض شيئاً: الحقول الناقصة تُلتقط null ولا تمنع الترحيل.
+                'party_snapshot' => InvoicePartySnapshot::capture($invoice),
+            ]);
             $zatca = $this->zatca->buildFor($invoice);
 
             // تُحل المراجعة داخل معاملة الترحيل وتُخزَّن لقطةً؛ لا تغيّر

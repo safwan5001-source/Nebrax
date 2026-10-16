@@ -119,9 +119,12 @@ class PosCheckoutIdempotencyTest extends TestCase
             ->assertCreated();
         $invoiceId = $first['data']['id'];
         $row = fn () => \Illuminate\Support\Facades\DB::table('invoices')->where('id', $invoiceId)
-            ->first(['issued_at', 'zatca_xml', 'zatca_hash', 'zatca_qr', 'zatca_icv']);
+            ->first(['issued_at', 'party_snapshot', 'zatca_xml', 'zatca_hash', 'zatca_qr', 'zatca_icv']);
         $before = $row();
         $this->assertNotNull($before->issued_at);
+        // REM-14: لقطة الأطراف تُلتقط مع بيع نقطة البيع نفسه، وتبقى كما هي عند إعادة الطلب ولو تغيّر العميل.
+        $this->assertSame('عميل لحظة', json_decode($before->party_snapshot, true)['buyer']['name']);
+        \App\Models\Partner::query()->whereKey($partnerId)->update(['name' => 'اسم تغيّر بعد البيع']);
 
         $this->travelTo(now()->addHours(2));
         $this->withToken($auth['token'])->postJson('/api/pos/checkout', $this->payload($partnerId, $sessionId, $key, $cash, $cart))

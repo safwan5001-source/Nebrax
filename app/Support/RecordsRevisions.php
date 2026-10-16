@@ -27,6 +27,8 @@ trait RecordsRevisions
      */
     private static array $revisionIgnored = [
         'updated_at', 'created_at', 'zatca_xml', 'zatca_qr', 'zatca_previous_hash',
+        // REM-14: لقطة الأطراف ثابتة ومخزَّنة على الصف نفسه؛ نسخها إلى سجل المراجعات تكرار لبيانات شخصية بلا فائدة.
+        'party_snapshot',
     ];
 
     public static function bootRecordsRevisions(): void

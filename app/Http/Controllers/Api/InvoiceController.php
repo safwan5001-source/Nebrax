@@ -157,7 +157,9 @@ class InvoiceController extends ApiController
             'deliveryNoteAllocations.deliveryNote', 'deliveryNoteAllocations.lineLinks',
         ]), $request)->findOrFail($id);
 
-        return (new InvoiceResource($invoice))->response();
+        // REM-14c: القراءة المفردة وحدها تكشف كتلة `parties` (لقطة لحظة الإصدار) — ضمن صلاحية invoices.view
+        // ونطاق الفرع القائمين نفسيهما؛ القوائم لا تحملها.
+        return (new InvoiceResource($invoice))->withParties()->response();
     }
 
     /** مدفوعات الفاتورة للقراءة: مبلغ التخصيص لا مبلغ سند قد يغطي فواتير أخرى. */

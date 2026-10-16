@@ -1,6 +1,7 @@
 import { riyalToMinor } from '@/lib/money';
 import { getCurrency } from '../constants/currencies';
 import type { CurrencyCode, Direction, DocumentLanguage, DocumentModel, DocumentTypeId } from '../types';
+import { resolveInvoiceParties, type InvoiceParties } from './invoice-parties';
 
 /**
  * أشكال المصدر (عقد الـ API للفاتورة) — المبالغ بالريال نصّاً كما يعيدها الـ backend.
@@ -30,6 +31,8 @@ export interface SourceInvoice {
   /** حقول قائمة على عقد الفاتورة؛ اختيارية حتى لا ينكسر مستدعو POS والمعاينة. */
   due_date?: string | null;
   status?: string | null;
+  /** REM-14c: لقطة الطرفين لحظة الإصدار (فاتورة مرحَّلة فقط)؛ تغلب البيانات الحية عند وجودها. */
+  parties?: InvoiceParties | null;
   discount?: string;
   shipping?: string;
   adjustment?: string;
@@ -129,7 +132,14 @@ export function buildInvoiceDocumentModel(input: {
    */
   language?: DocumentLanguage | null;
 }): DocumentModel {
-  const { invoice, company, customer, qr, footerText, logoUrl, logoHeight, terms, bank, stampUrl, signatureUrl } = input;
+  const { invoice, qr, footerText, logoUrl, logoHeight, terms, bank, stampUrl, signatureUrl } = input;
+  // REM-14c: فاتورة مرحَّلة بلقطة طرفين تُعرض من اللقطة لا من البيانات الحية (المسودة والقديمة بلا لقطة: حيّة).
+  const { company, customer } = resolveInvoiceParties({
+    status: invoice.status,
+    parties: invoice.parties,
+    company: input.company,
+    customer: input.customer,
+  });
   const currency = getCurrency(company?.currency).code as CurrencyCode;
   // أولوية الـprop الصريح ثم `language_effective` من عقد الـAPI، فالإسقاط إلى
   // `null` يُبقي سلوك ما قبل PR-LANG-1 حرفياً (استنتاج من UI locale × direction).
