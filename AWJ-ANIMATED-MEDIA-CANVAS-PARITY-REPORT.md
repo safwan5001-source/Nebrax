@@ -5,8 +5,8 @@
 | Branch | `claude/awj-animated-media-support-7kzzga` |
 | PR | https://github.com/safwan5001-source/Nebrax/pull/1547 (open, **not merged**) — now carries the parity fix + the updated acceptance document |
 | Base SHA | `336284170ea6a044ee745fda2f1c844e161215cf` (`origin/main` when this work started: #1541 + #1546; PR #1541 is `a50ce81`) |
-| Code head (verified) | __CODE__ |
-| Final head | the commit that adds this report (docs-only; given in the hand-off message) |
+| Code head (verified) | `810cb73549569cd7b40a0b27ded784a69f8ad68c` (+ docs-only commits after it) |
+| Final head | the commit that adds this CI update (docs-only; given in the hand-off message) |
 | Scope | Web Canvas + two storefront touch-ups. **No** change to media validation, tenant isolation, storage, accounting, migrations or APIs. No merge, no deploy. |
 
 ---
@@ -97,7 +97,20 @@ Visual consistency: the Canvas control reuses the storefront's exact glyphs, siz
 | AR/EN and RTL | covered in unit tests above; **not** exercised in a real browser (see §6) |
 
 ## 5. CI
-__CI__
+Code head `810cb73` (two workflow runs — one per push — all at the same code):
+
+| Check | Result |
+|---|---|
+| `storefront (lint + typecheck + test)` | ✅ success (both runs) |
+| `merchant preview visual QA` · `published footer visual QA` | ✅ success |
+| `php artisan test (L11, sqlite)` | ✅ success (no PHP file changed) |
+| `php artisan test (L11, pgsql)` | ⏳ **still running at the last check (06:04 UTC)** — not yet reported; PHP is untouched by this change, and the same PHP code was green on PostgreSQL on the previous heads |
+| **`web build (Next.js)`** | ❌ **failure — NOT caused by this change.** Web vitest: **7,430 passed, 2 failed** (637/638 files). Both failures are the same assertion in `src/modules/roles/catalog.test.ts:120` (`en` and `ar`): *"every module, action and area has a label"* — the server permission catalogue gained `ai.assistant.use` with **PR #1546 (AI-01 Secure AI Gateway)**, but `hr.perm_modules/perm_actions/perm_areas` in the web messages have no `ai` / `use` / `assistant` labels. I reproduced it locally on a tree containing no change to `src/modules/roles`. All Canvas/animated-media/parity tests in that run passed. |
+| `CI Gate` | ❌ failure — a consequence of the `web build` job above |
+
+**Why main looked green:** `web-ci` did not run for #1546 (a backend-only diff), and the later `a50ce81` run predates it, so the web test went red only now that a PR touches `web/` on top of #1546. Any web-touching PR will hit it until it is fixed.
+
+**Proposed fix (not applied — it belongs to the AI-01 change and needs Arabic wording from its owner):** add `ai` to `hr.perm_modules`, `use` to `hr.perm_actions`, `assistant` to `hr.perm_areas` in `web/messages/en.json` and `ar.json`. I did not make it because the task bars unrelated changes; say the word and I will add it to this PR (or a separate one).
 
 ## 6. Risks and what is NOT verified
 
