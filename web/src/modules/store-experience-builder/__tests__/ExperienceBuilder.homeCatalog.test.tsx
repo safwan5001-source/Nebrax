@@ -181,6 +181,41 @@ describe('ExperienceBuilder — CUST-H4-3 real Home catalog preview', () => {
     expect(categoriesSection()?.querySelectorAll('li').length).toBe(1);
   });
 
+  it('AWJ-STORE-CAT-DESIGN-01: asks for colour + picture, and a chosen display previews the merchant\'s real category pictures', async () => {
+    const config = {
+      ...DEFAULT_PRESENTATION_CONFIG,
+      homepage: {
+        ...DEFAULT_PRESENTATION_CONFIG.homepage,
+        sections: DEFAULT_PRESENTATION_CONFIG.homepage.sections.map((section) =>
+          section.type === 'categories'
+            ? { ...section, design: { display: { layout: 'circles', image: { fit: 'contain' } } } }
+            : section,
+        ),
+      },
+    };
+    showMock.mockResolvedValue({ ok: true, data: versionDetail({ config }) });
+    listCategoriesMock.mockResolvedValue({
+      ok: true,
+      hasMore: false,
+      data: [
+        categoryRow({ imageUrl: 'https://api.example.test/signed/c1?signature=abc', color: '#12372a' }),
+        categoryRow({ id: 'c2', name: 'بلا صورة', imageUrl: null, color: null }),
+      ],
+    });
+
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await waitFor(() => expect(listCategoriesMock).toHaveBeenCalledWith(
+      'store-1',
+      expect.objectContaining({ rootOnly: true, withMedia: true }),
+    ));
+    await waitFor(() => expect(categoriesSection()?.querySelector('ul.awj-cd')).not.toBeNull());
+    const list = categoriesSection()?.querySelector('ul.awj-cd') as HTMLElement;
+    expect(list.getAttribute('data-cd-layout')).toBe('circles');
+    expect(list.querySelector('img')?.getAttribute('src')).toBe('https://api.example.test/signed/c1?signature=abc');
+    expect(list.querySelectorAll('.awj-cd__fallback')).toHaveLength(1);
+    expect(list.getAttribute('style')).toContain('--cd-fit: contain');
+  });
+
   it('renders an honest empty state for real-but-empty catalog data, never fake content', async () => {
     render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
     await waitFor(() => expect(document.querySelector('[data-home-categories-empty]')).not.toBeNull());

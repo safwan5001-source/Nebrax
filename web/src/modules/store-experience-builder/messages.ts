@@ -1,3 +1,4 @@
+import { CATEGORIES_DISPLAY_MESSAGES } from "./categories-display-messages";
 import { DISCOVERY_DISPLAY_MESSAGES } from "./discovery-display-messages";
 
 export type CustomizerLocale = "ar" | "en";
@@ -896,6 +897,7 @@ export const CUSTOMIZER_MESSAGES = {
     discoveryIncomplete: "اختر بُعداً — وإلا لن يظهر القسم في المتجر.",
     // AWJ-VD-H1 / VD-4c — discovery display controls (own catalog file).
     ...DISCOVERY_DISPLAY_MESSAGES.ar,
+    ...CATEGORIES_DISPLAY_MESSAGES.ar,
     deliveryPromiseNote: "الموعد يُحسب تلقائياً من جدول التوصيل ولا يُدخل هنا. النصوص أدناه اختيارية.",
     deliveryPromiseBodyLabel: "نص إضافي",
     canvasShelfLive: "تظهر هنا منتجات المتجر الحيّة",
@@ -2407,6 +2409,7 @@ export const CUSTOMIZER_MESSAGES = {
     discoveryDisplayChips: "Chips",
     discoveryIncomplete: "Choose a dimension — otherwise the section will not appear in the store.",
     ...DISCOVERY_DISPLAY_MESSAGES.en,
+    ...CATEGORIES_DISPLAY_MESSAGES.en,
     deliveryPromiseNote: "The date is computed automatically from your delivery schedule and is not entered here. The text below is optional.",
     deliveryPromiseBodyLabel: "Extra text",
     canvasShelfLive: "Live store products appear here",

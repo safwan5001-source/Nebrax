@@ -82,6 +82,59 @@ final class StorefrontSectionDesignNormalizer
     /** V6b-2 — أنواع الخلفية المتاحة لكل الأقسام؛ `media` للبطل واللافتة وحدهما. */
     public const BACKGROUND_KINDS = ['solid', 'gradient'];
 
+    /**
+     * AWJ-STORE-CAT-DESIGN-01 — `design.display` لقسم `categories` وحده: عرض بطاقات التصنيفات (نمط العرض، البطاقة، الصورة، الاسم،
+     * التجاوب). **الغياب = المظهر الكلاسيكي الحالي حرفياً**؛ و`layout` شرط المجموعة (بدونه تُحذف المجموعة كلّها فلا تبقى بيانات
+     * خاملة). الأعداد الصحيحة تتبع قاعدة `productShelf.limit`/VD-4a: عدد صحيح (`6` أو `6.0`) يُقصّ إلى مداه، وما عداه يُسقط المفتاح
+     * فيرث الافتراضي (الحفظ لا يُرجع 422 على المحتوى أبداً). ألوان البطاقة رموزُ سمة المتجر فقط — لا hex حرّ — فلا تحتاج بوابة تباين.
+     */
+    public const DISPLAY_LAYOUTS = ['grid', 'horizontal_scroll', 'circles', 'image_tiles', 'compact_list'];
+
+    /** @var array<string, array{0: int, 1: int}> device => [min, max] */
+    public const DISPLAY_COLUMN_RANGES = ['mobile' => [1, 4], 'tablet' => [2, 6], 'desktop' => [2, 8]];
+
+    public const DISPLAY_DEVICES = ['mobile', 'tablet', 'desktop'];
+
+    public const DISPLAY_GAP_RANGE = [4, 32];
+
+    public const DISPLAY_ITEM_WIDTH_RANGE = [64, 320];
+
+    public const DISPLAY_CARD_STYLES = ['none', 'border', 'shadow', 'filled'];
+
+    public const DISPLAY_CARD_BACKGROUNDS = ['surface', 'muted', 'transparent'];
+
+    public const DISPLAY_CARD_BORDER_COLORS = ['border', 'strong', 'primary', 'accent'];
+
+    public const DISPLAY_CARD_BORDER_WIDTH_RANGE = [0, 4];
+
+    public const DISPLAY_CARD_RADIUS_RANGE = [0, 32];
+
+    public const DISPLAY_CARD_PADDING_RANGE = [0, 32];
+
+    public const DISPLAY_CARD_HOVERS = ['none', 'subtle'];
+
+    public const DISPLAY_IMAGE_SHAPES = ['rect', 'square', 'circle'];
+
+    public const DISPLAY_IMAGE_ASPECTS = ['1:1', '4:3', '3:2', '16:9'];
+
+    public const DISPLAY_IMAGE_FITS = ['cover', 'contain'];
+
+    public const DISPLAY_IMAGE_POSITIONS = ['center', 'top', 'bottom', 'start', 'end'];
+
+    public const DISPLAY_IMAGE_HEIGHT_RANGE = [48, 400];
+
+    public const DISPLAY_NAME_PLACEMENTS = ['below', 'above', 'overlay', 'beside'];
+
+    public const DISPLAY_NAME_SIZE_RANGE = [12, 32];
+
+    public const DISPLAY_NAME_WEIGHTS = [400, 500, 600, 700, 800];
+
+    public const DISPLAY_NAME_COLORS = ['foreground', 'muted', 'primary'];
+
+    public const DISPLAY_NAME_LINES = [1, 2, 'natural'];
+
+    public const DISPLAY_NAME_BACKGROUNDS = ['none', 'scrim', 'surface'];
+
     /** V6b-2 — تعتيم تراكب الصورة: نسبة مئوية بخطوات 5، حدّها 90 (V0 §8.1) فلا تُخفى الصورة كلياً. */
     public const OVERLAY_ALPHAS = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90];
 
@@ -137,7 +190,7 @@ final class StorefrontSectionDesignNormalizer
         return [
             'hero' => $heroOnly,
             'banner' => $banner,
-            'categories' => ['background' => self::BACKGROUND_KINDS, 'text' => ['heading'], 'typography' => ['headingStyle'], 'width' => true, 'spacing' => true, 'border' => true, 'radius' => true, 'separator' => true],
+            'categories' => ['background' => self::BACKGROUND_KINDS, 'text' => ['heading'], 'typography' => ['headingStyle'], 'width' => true, 'spacing' => true, 'border' => true, 'radius' => true, 'display' => true, 'separator' => true],
             // CUST-HV V8a (V0 §3.4) — الشرائح: خلفية القسم (صلبة/تدرّج) والعرض والتباعد والحدّ والاستدارة والظل والفاصل
             // وارتفاعٌ مُعدّ مسبقاً. لا مجموعة `text`: ألوان النص **لكل شريحة** (محتوى الشريحة) لأنها تقع فوق صورتها. ولا `layout`
             // (`split` يضع النص على سطح القسم لا الصورة — إثبات تباينه شريحةٌ لاحقة). الحركة (`transition`) سلوكٌ في المحتوى.
@@ -248,6 +301,13 @@ final class StorefrontSectionDesignNormalizer
                 $out['cards'] = $cards;
             }
         }
+        if (isset($capability['display'])) {
+            // AWJ-STORE-CAT-DESIGN-01 — عرض بطاقات التصنيفات؛ الترتيب القانوني: … cards، display، separator …
+            $display = self::display($raw['display'] ?? null);
+            if ($display !== null) {
+                $out['display'] = $display;
+            }
+        }
         if (isset($capability['separator'])) {
             $separator = self::separator($raw['separator'] ?? null);
             if ($separator !== null) {
@@ -273,6 +333,194 @@ final class StorefrontSectionDesignNormalizer
             if ($reveal !== null) {
                 $out['motion'] = ['reveal' => $reveal];
             }
+        }
+
+        return $out === [] ? null : $out;
+    }
+
+    /** عدد صحيح JSON (`6` أو `6.0` — PHP يفكّ الثانية float) يُقصّ إلى [min, max]؛ وما عداه null (يُسقط المفتاح). */
+    private static function clampedInt(mixed $value, int $min, int $max): ?int
+    {
+        $integral = is_int($value) || (is_float($value) && is_finite($value) && floor($value) === $value);
+
+        return $integral ? (int) max($min, min($max, $value)) : null;
+    }
+
+    /**
+     * جهاز ← عدد صحيح مقصوص. يعيد null إن لم يبقَ جهاز صالح (المجموعة الفارغة تُحذف).
+     *
+     * @param  array<string, array{0: int, 1: int}>  $ranges
+     * @return array<string, int>|null
+     */
+    private static function perDevice(mixed $raw, array $ranges): ?array
+    {
+        if (! self::isObject($raw)) {
+            return null;
+        }
+        $out = [];
+        foreach ($ranges as $device => [$min, $max]) {
+            $value = self::clampedInt($raw[$device] ?? null, $min, $max);
+            if ($value !== null) {
+                $out[$device] = $value;
+            }
+        }
+
+        return $out === [] ? null : $out;
+    }
+
+    /** @return array<string, array{0: int, 1: int}> */
+    private static function uniformRange(array $range): array
+    {
+        return array_fill_keys(self::DISPLAY_DEVICES, $range);
+    }
+
+    /**
+     * AWJ-STORE-CAT-DESIGN-01 — `design.display` (قسم `categories`). `layout` شرط المجموعة؛ ترتيب المفاتيح القانوني:
+     * layout، columns، gap، itemWidth، card، image، name. `image.show`/`name.show` لا يُخزَّنان إلا `false` (الافتراضي ظاهر).
+     *
+     * @return array<string,mixed>|null
+     */
+    private static function display(mixed $raw): ?array
+    {
+        if (! self::isObject($raw)) {
+            return null;
+        }
+        $layout = self::pick($raw['layout'] ?? null, self::DISPLAY_LAYOUTS);
+        if ($layout === null) {
+            return null; // بلا نمطٍ لا مجموعة: المظهر الكلاسيكي
+        }
+        $out = ['layout' => $layout];
+
+        $columns = self::perDevice($raw['columns'] ?? null, self::DISPLAY_COLUMN_RANGES);
+        if ($columns !== null) {
+            $out['columns'] = $columns;
+        }
+        $gap = self::perDevice($raw['gap'] ?? null, self::uniformRange(self::DISPLAY_GAP_RANGE));
+        if ($gap !== null) {
+            $out['gap'] = $gap;
+        }
+        $itemWidth = self::perDevice($raw['itemWidth'] ?? null, self::uniformRange(self::DISPLAY_ITEM_WIDTH_RANGE));
+        if ($itemWidth !== null) {
+            $out['itemWidth'] = $itemWidth;
+        }
+
+        $card = self::displayCard($raw['card'] ?? null);
+        if ($card !== null) {
+            $out['card'] = $card;
+        }
+        $image = self::displayImage($raw['image'] ?? null);
+        if ($image !== null) {
+            $out['image'] = $image;
+        }
+        $name = self::displayName($raw['name'] ?? null);
+        if ($name !== null) {
+            $out['name'] = $name;
+        }
+
+        return $out;
+    }
+
+    /** @return array<string,mixed>|null */
+    private static function displayCard(mixed $raw): ?array
+    {
+        if (! self::isObject($raw)) {
+            return null;
+        }
+        $out = [];
+        foreach ([
+            'style' => self::DISPLAY_CARD_STYLES,
+            'background' => self::DISPLAY_CARD_BACKGROUNDS,
+            'borderColor' => self::DISPLAY_CARD_BORDER_COLORS,
+        ] as $key => $list) {
+            $value = self::pick($raw[$key] ?? null, $list);
+            if ($value !== null) {
+                $out[$key] = $value;
+            }
+        }
+        foreach ([
+            'borderWidth' => self::DISPLAY_CARD_BORDER_WIDTH_RANGE,
+            'radius' => self::DISPLAY_CARD_RADIUS_RANGE,
+            'padding' => self::DISPLAY_CARD_PADDING_RANGE,
+        ] as $key => [$min, $max]) {
+            $value = self::clampedInt($raw[$key] ?? null, $min, $max);
+            if ($value !== null) {
+                $out[$key] = $value;
+            }
+        }
+        $hover = self::pick($raw['hover'] ?? null, self::DISPLAY_CARD_HOVERS);
+        if ($hover !== null) {
+            $out['hover'] = $hover;
+        }
+
+        return $out === [] ? null : $out;
+    }
+
+    /** @return array<string,mixed>|null */
+    private static function displayImage(mixed $raw): ?array
+    {
+        if (! self::isObject($raw)) {
+            return null;
+        }
+        $out = [];
+        if (($raw['show'] ?? null) === false) {
+            $out['show'] = false;
+        }
+        foreach ([
+            'shape' => self::DISPLAY_IMAGE_SHAPES,
+            'aspect' => self::DISPLAY_IMAGE_ASPECTS,
+            'fit' => self::DISPLAY_IMAGE_FITS,
+            'position' => self::DISPLAY_IMAGE_POSITIONS,
+        ] as $key => $list) {
+            $value = self::pick($raw[$key] ?? null, $list);
+            if ($value !== null) {
+                $out[$key] = $value;
+            }
+        }
+        $height = self::perDevice($raw['height'] ?? null, self::uniformRange(self::DISPLAY_IMAGE_HEIGHT_RANGE));
+        if ($height !== null) {
+            $out['height'] = $height;
+        }
+
+        return $out === [] ? null : $out;
+    }
+
+    /** @return array<string,mixed>|null */
+    private static function displayName(mixed $raw): ?array
+    {
+        if (! self::isObject($raw)) {
+            return null;
+        }
+        $out = [];
+        if (($raw['show'] ?? null) === false) {
+            $out['show'] = false;
+        }
+        $placement = self::pick($raw['placement'] ?? null, self::DISPLAY_NAME_PLACEMENTS);
+        if ($placement !== null) {
+            $out['placement'] = $placement;
+        }
+        $align = self::pick($raw['align'] ?? null, self::ALIGNS);
+        if ($align !== null) {
+            $out['align'] = $align;
+        }
+        $size = self::clampedInt($raw['size'] ?? null, self::DISPLAY_NAME_SIZE_RANGE[0], self::DISPLAY_NAME_SIZE_RANGE[1]);
+        if ($size !== null) {
+            $out['size'] = $size;
+        }
+        $weight = self::pick($raw['weight'] ?? null, self::DISPLAY_NAME_WEIGHTS);
+        if ($weight !== null) {
+            $out['weight'] = $weight;
+        }
+        $color = self::pick($raw['color'] ?? null, self::DISPLAY_NAME_COLORS);
+        if ($color !== null) {
+            $out['color'] = $color;
+        }
+        $lines = self::pick($raw['lines'] ?? null, self::DISPLAY_NAME_LINES);
+        if ($lines !== null) {
+            $out['lines'] = $lines;
+        }
+        $background = self::pick($raw['background'] ?? null, self::DISPLAY_NAME_BACKGROUNDS);
+        if ($background !== null) {
+            $out['background'] = $background;
         }
 
         return $out === [] ? null : $out;

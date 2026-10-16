@@ -34,6 +34,7 @@ use RuntimeException;
  */
 class StorefrontMediaController extends PublicApiController
 {
+    use ServesCategoryImageBytes;
     use ServesProductMediaBytes;
 
     public function __construct(
@@ -116,40 +117,6 @@ class StorefrontMediaController extends PublicApiController
             abort(404, 'الوسائط غير موجودة.');
         }
 
-        $headers = [
-            'Content-Type' => $category->image_mime_type ?: 'application/octet-stream',
-            'Cache-Control' => 'public, max-age=3600',
-            'X-Content-Type-Options' => 'nosniff',
-        ];
-
-        if (ProductCategory::isR2ImagePath($category->image_path)) {
-            try {
-                $body = $this->r2->get(
-                    ProductCategory::R2_DOMAIN,
-                    (string) $category->id,
-                    basename($category->image_path),
-                );
-            } catch (RuntimeException|AwsException) {
-                abort(404, 'الوسائط غير موجودة.');
-            }
-
-            return response()->streamDownload(function () use ($body): void {
-                echo (string) $body;
-            }, $category->image_original_name ?: "category-{$category->id}", $headers, 'inline');
-        }
-
-        try {
-            $stream = $this->documentStorage->readStream(
-                $this->documentStorage->profile(),
-                $category->image_path,
-            );
-        } catch (RuntimeException) {
-            abort(404, 'الوسائط غير موجودة.');
-        }
-
-        return response()->streamDownload(function () use ($stream): void {
-            fpassthru($stream);
-            fclose($stream);
-        }, $category->image_original_name ?: "category-{$category->id}", $headers, 'inline');
+        return $this->streamCategoryImageBytes($category, $this->documentStorage, $this->r2, 'public, max-age=3600');
     }
 }

@@ -89,6 +89,7 @@ import {
   ProductShelfFields,
 } from "./DataSectionFields";
 import { OfferCatalog } from "./OfferCatalog";
+import { CategoriesDisplayFields } from "./CategoriesDisplayFields";
 import { DesignInspector } from "./design/DesignInspector";
 import { ContentBlocksFields } from "./ContentBlocksFields";
 import { BufferedText, stored } from "./BufferedText";
@@ -1299,21 +1300,38 @@ function HomepagePanel({
               />
             ) : null}
             {designTab === "design" ? (
-              <DesignInspector
-                key={selected.id}
-                type={selected.type}
-                design={selected.design}
-                ctx={designContext}
-                t={t}
-                locale={locale === "en" ? "en" : "ar"}
-                bounds={backgroundBounds}
-                onChange={(design) =>
-                  updateSection(selectedIndex, {
-                    ...selected,
-                    design,
-                  })
-                }
-              />
+              <>
+                {selected.type === "categories" ? (
+                  // AWJ-STORE-CAT-DESIGN-01 — the card display of the categories section sits above the generic section
+                  // styling; both edit the same `design`, so reset / copy / paste / presets and undo cover them together.
+                  <CategoriesDisplayFields
+                    key={`${selected.id}-display`}
+                    design={selected.design}
+                    t={t}
+                    onChange={(design) =>
+                      updateSection(selectedIndex, {
+                        ...selected,
+                        design,
+                      })
+                    }
+                  />
+                ) : null}
+                <DesignInspector
+                  key={selected.id}
+                  type={selected.type}
+                  design={selected.design}
+                  ctx={designContext}
+                  t={t}
+                  locale={locale === "en" ? "en" : "ar"}
+                  bounds={backgroundBounds}
+                  onChange={(design) =>
+                    updateSection(selectedIndex, {
+                      ...selected,
+                      design,
+                    })
+                  }
+                />
+              </>
             ) : selected.type === "hero" ? (
               <HeroFields
                 key={selected.id}

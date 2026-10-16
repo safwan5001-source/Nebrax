@@ -101,6 +101,31 @@ describe('workspace-categories client — CUST-H2-4', () => {
     expect(falsePath).not.toContain('root_only');
   });
 
+  it('sends with_media=true only when requested and maps colour + signed picture URL (AWJ-STORE-CAT-DESIGN-01)', async () => {
+    apiMock.mockResolvedValue({
+      data: [
+        summaryRow({ color: '#12372a', image_url: 'https://api.test/x?signature=s' }),
+        summaryRow({ id: 'c2', color: null, image_url: null }),
+      ],
+      meta: { pagination: { has_more: false } },
+    });
+    const result = await listWorkspaceCategories('store-1', { rootOnly: true, withMedia: true });
+    expect(apiMock.mock.calls[0][0]).toBe(
+      '/commerce/workspace/storefronts/store-1/categories?root_only=true&with_media=true',
+    );
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.data[0]).toMatchObject({ color: '#12372a', imageUrl: 'https://api.test/x?signature=s' });
+    expect(result.data[1]).toMatchObject({ color: null, imageUrl: null });
+  });
+
+  it('without with_media the summary keeps its minimal shape (no colour / imageUrl keys at all)', async () => {
+    apiMock.mockResolvedValue({ data: [summaryRow()], meta: { pagination: { has_more: false } } });
+    const result = await listWorkspaceCategories('store-1', { rootOnly: true });
+    expect(apiMock.mock.calls[0][0]).not.toContain('with_media');
+    if (!result.ok) throw new Error('expected ok');
+    expect(Object.keys(result.data[0]).sort()).toEqual(['id', 'name', 'parentId', 'parentName']);
+  });
+
   it('classifies a 404 as not_found without throwing', async () => {
     apiMock.mockRejectedValue(new ApiError(404, 'not found', {}));
     const result = await listWorkspaceCategories('store-1');

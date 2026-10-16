@@ -1,12 +1,14 @@
 "use client";
 
 import { notFound, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
+import { ControlPanels } from "@/modules/store-experience-builder/ControlPanels";
 import { StorefrontPreviewCanvas } from "@/modules/store-experience-builder/StorefrontPreviewCanvas";
 import {
   type StorefrontPresentationConfig,
   normalizePresentationConfig,
 } from "@/modules/store-experience-builder/presentation/config";
+import { fixtureCategories } from "./category-fixtures";
 import { designConfig } from "./design-scenario";
 
 /**
@@ -34,7 +36,9 @@ type Scenario =
   | "overlay"
   | "navigation"
   | "footer"
-  | "slider";
+  | "slider"
+  | "categories-display"
+  | "categories-panel";
 type PreviewViewport = "mobile" | "tablet" | "desktop";
 
 function scenarioOf(value: string | null): Scenario {
@@ -50,7 +54,9 @@ function scenarioOf(value: string | null): Scenario {
     value === "overlay" ||
     value === "navigation" ||
     value === "footer" ||
-    value === "slider"
+    value === "slider" ||
+    value === "categories-display" ||
+    value === "categories-panel"
   ) {
     return value;
   }
@@ -138,7 +144,29 @@ function dataSectionsConfig(locale: "ar" | "en") {
   });
 }
 
-function configFor(locale: "ar" | "en", scenario: Scenario, footerLayout: string | null = null): StorefrontPresentationConfig {
+function configFor(
+  locale: "ar" | "en",
+  scenario: Scenario,
+  footerLayout: string | null = null,
+  display: unknown = undefined,
+): StorefrontPresentationConfig {
+  if (scenario === "categories-display" || scenario === "categories-panel") {
+    // AWJ-STORE-CAT-DESIGN-01 — the categories section alone, with the `design.display` given in `?display=` JSON, normalized
+    // exactly like a saved document (so the harness can never show a value the contract would not keep).
+    return normalizePresentationConfig({
+      version: 2,
+      homepage: {
+        sections: [
+          {
+            id: "categories",
+            type: "categories",
+            visible: true,
+            ...(display ? { design: { display } } : {}),
+          },
+        ],
+      },
+    });
+  }
   if (scenario === "global") {
     // CUST-HV V5e-2a — the populated page wearing every global token at its boldest step.
     const base = configFor(locale, "populated");
@@ -403,20 +431,129 @@ function configFor(locale: "ar" | "en", scenario: Scenario, footerLayout: string
   });
 }
 
+/**
+ * AWJ-STORE-CAT-DESIGN-01 — the builder's categories controls next to the live Canvas, both on one local state: the
+ * real `ControlPanels` (Design tab) edits the config, the real `StorefrontPreviewCanvas` previews it. No backend.
+ */
+function CategoriesPanelHarness({
+  locale,
+  viewport,
+  initial,
+  homeCategories,
+}: {
+  locale: "ar" | "en";
+  viewport: PreviewViewport;
+  initial: StorefrontPresentationConfig;
+  homeCategories: { id: string; name: string; imageUrl: string | null; color: string | null }[];
+}) {
+  const [config, setConfig] = useState(initial);
+  const [device, setDevice] = useState<PreviewViewport>(viewport);
+  return (
+    <main
+      data-visual-root=""
+      data-surface="categories-panel"
+      dir={locale === "ar" ? "rtl" : "ltr"}
+      className="grid min-h-screen gap-4 bg-surface p-4 lg:grid-cols-[360px_1fr]"
+    >
+      <aside data-builder-controls="" className="max-h-[calc(100vh-2rem)] overflow-y-auto border border-border bg-surface p-4">
+        <ControlPanels
+          panel="homepage"
+          config={config}
+          locale={locale}
+          liveStoreName={null}
+          onChange={setConfig}
+          selectedSection="categories"
+        />
+      </aside>
+      <section className="min-w-0">
+        <div role="group" aria-label="device" className="mb-3 flex gap-1">
+          {(["mobile", "tablet", "desktop"] as const).map((id) => (
+            <button
+              key={id}
+              type="button"
+              data-device={id}
+              aria-pressed={device === id}
+              onClick={() => setDevice(id)}
+              className="min-h-11 border border-border bg-surface px-3 text-sm text-text aria-pressed:bg-primary aria-pressed:text-primary-foreground"
+            >
+              {id}
+            </button>
+          ))}
+        </div>
+        <div className="overflow-x-auto" data-preview-wrap="">
+          <StorefrontPreviewCanvas
+            config={config}
+            locale={locale}
+            viewport={device}
+            liveStoreName={locale === "ar" ? "متجر النور" : "Al Noor"}
+            homeCategoriesState="ready"
+            homeCategories={homeCategories}
+            selectedSection="categories"
+            onSelectSection={() => {}}
+            onSelectChrome={() => {}}
+          />
+        </div>
+      </section>
+    </main>
+  );
+}
+
 function Fixture() {
   const params = useSearchParams();
   const locale = params.get("locale") === "en" ? "en" : "ar";
   const scenario = scenarioOf(params.get("scenario"));
   const viewport = viewportOf(params.get("viewport"));
-  const config = configFor(locale, scenario, params.get("layout"));
+  let display: unknown;
+  try {
+    const raw = params.get("display");
+    display = raw ? JSON.parse(raw) : undefined;
+  } catch {
+    display = undefined;
+  }
+  const config = configFor(locale, scenario, params.get("layout"), display);
+  const categoryCount = Math.max(0, Math.min(8, Number(params.get("count") ?? 8) || 0));
+  const noImage = (params.get("noimage") ?? "5,6")
+    .split(",")
+    .map((n) => Number.parseInt(n, 10))
+    .filter((n) => Number.isInteger(n));
+  const homeCategories =
+    scenario === "categories-display" || scenario === "categories-panel"
+      ? fixtureCategories(locale, categoryCount, noImage).map((c) => ({
+          id: c.id,
+          name: c.name,
+          imageUrl: c.image?.url ?? null,
+          color: c.color,
+        }))
+      : undefined;
+
+  if (scenario === "categories-panel") {
+    return (
+      <CategoriesPanelHarness
+        locale={locale}
+        viewport={viewport}
+        initial={config}
+        homeCategories={homeCategories ?? []}
+      />
+    );
+  }
+
+  // The builder mounts the Canvas inside a device-width frame; the categories-display scenario does the same so the
+  // simulated device and the real width agree (media queries are never used by the pinned preview, but pixels are judged).
+  const frameWidth = scenario === "categories-display" ? { mobile: 390, tablet: 768, desktop: 1280 }[viewport] : undefined;
 
   return (
-    <main data-visual-root="" data-surface="merchant-preview" data-scenario={scenario}>
+    <main
+      data-visual-root=""
+      data-surface="merchant-preview"
+      data-scenario={scenario}
+      style={frameWidth ? { width: frameWidth, marginInline: "auto" } : undefined}
+    >
       <StorefrontPreviewCanvas
         config={config}
         locale={locale}
         viewport={viewport}
         liveStoreName={locale === "ar" ? "متجر النور" : "Al Noor"}
+        {...(homeCategories ? { homeCategoriesState: "ready" as const, homeCategories } : {})}
         onSelectSection={() => {}}
         onSelectChrome={() => {}}
       />

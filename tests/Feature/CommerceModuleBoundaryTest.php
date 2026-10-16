@@ -110,6 +110,9 @@ class CommerceModuleBoundaryTest extends TestCase
         // في مُخصِّص صفحة التصنيف. قراءة فقط، أهليتها مقيَّدة بقناة هذا المتجر تحديداً.
         'api/commerce/workspace/storefronts/{id}/categories',
         'api/commerce/workspace/storefronts/{id}/categories/{category}',
+        // AWJ-STORE-CAT-DESIGN-01 — صورة تصنيفٍ موقَّعة لمعاينة Canvas (بلا auth:sanctum — التوقيع هو السلطة، نموذج
+        // CUST-H4-8b نفسه؛ انظر CommerceWorkspaceCategoryMediaController).
+        'api/commerce/workspace/storefronts/{id}/category-media/{category}',
         'api/commerce/workspace/storefronts/{id}/deactivate',
         // FLOWERS-H7a / ADR-19 — سياسة جدولة التسليم.
         'api/commerce/workspace/storefronts/{id}/delivery-schedule',
