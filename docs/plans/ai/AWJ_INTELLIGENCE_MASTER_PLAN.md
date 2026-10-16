@@ -83,3 +83,23 @@ Create one permission-aware, Arabic/English AI assistant accessible contextually
 No runtime code changes, migrations, credentials, activation of provider network, production data transfer, PR merge or deployment. Future execution requires a reviewed baseline and separate approval.
 
 **References:** `config/document_center.php`; `docs/reports/AWJ_DOCUMENT_CENTER_STATUS_WIRING_REPORT.md`; `docs/plans/help-center/AWJ_HELP_CENTER_V2_MASTER_PLAN.md`; `app/Tenancy/TenantContext.php`; `web/src/components/document-center/document-upload-dialog.tsx`.
+
+## 11. Platform Administration AI Integration — existing capability (verified 2026-10-16)
+
+**Important correction to the implementation plan:** Platform Administration already has multi-provider Document AI integration settings. Do **not** build a second secrets/settings management interface for the new assistant without proving a distinct configuration need.
+
+Current repository evidence:
+- `web/src/app/platform/(console)/integrations/payload.ts` defines `document_ai`, three provider keys `openai`, `anthropic`, `google_gemini`, primary/fallback routing, sync/async, per-provider API key/model/enablement, `allow_document_sending`, monthly operations/pages limits, data region and retention policy.
+- `app/Services/PlatformIntegrationService.php` persists platform integration configuration, requires platform administrator password for updates, tests individual providers and audits configuration/test events.
+- `app/Services/DocumentCenter/AnthropicDocumentExtractionProvider.php` demonstrates an existing Anthropic document extraction adapter. **Do not confuse it with a general-purpose financial conversational AI implementation.**
+- Existing platform settings appear to be a shared/platform-level configuration; this review has **not established per-tenant provider credentials or billing ownership**. Investigate tenant policies/entitlements separately; never assume keys are owned by individual companies.
+
+Required architecture changes/gates:
+1. AI-ARCH-0 must inventory Platform Administration integrations, provider registry, integration secret handling, tenant document intelligence policies, administrator vs tenant access rights, and cost/usage tracking before proposing any new schemas or settings.
+2. Keep **platform controls** (providers, network readiness, secret rotation, supported models, global budgets, audit) distinct from **tenant controls** (opt-in, feature access, allowed data categories, per-tenant quotas) and **user controls** (RBAC, branch/warehouse scope). Confirm actual ownership and precedence from code, not assumptions.
+3. Reuse existing Anthropic/OpenAI/Gemini connections only where their security, policy, capability and cost contracts fit; document-extraction credentials must not silently authorize broader finance/HR data sharing or cross-company access.
+4. Provider selection for the AI assistant can be proposed as an **extension of existing platform integration governance**, with distinct feature-specific permissions/policy and metering. Avoid separate unrestricted provider registry, duplicate storage of keys or shadow admin console.
+5. Test company A/B isolation with one shared platform API key and different tenant opt-in/limits; absence of an individual tenant key must **not** relax isolation. Verify platform budget vs per-tenant metering and failure modes.
+6. Promotional Anthropic API credits belong to the provider billing organization, **not** intrinsically to AWJ tenants. Never expose an owner's personal API key or presume that the credit funds multi-tenant production.
+
+**Scope note:** This section documents code evidence and design consequences; it does not claim existing AI assistant functionality or validated production integration readiness.
