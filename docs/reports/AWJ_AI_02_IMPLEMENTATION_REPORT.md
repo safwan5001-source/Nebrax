@@ -134,8 +134,11 @@ AI-02 is delivered as **two stacked Draft PRs**, because one PR would mix a migr
 | `AiAuditTest` | **16 passed** |
 | `AiAssistantGatewayTest` (AI-01 regression, unchanged) | **39 passed** |
 | Nearby guard and RBAC suites (`BranchIsolationGuardTest`, `ApiTenantIsolationTest`, `ApiUnauthenticatedResponseTest`, `ApplicationAccessGateGuardTest`, `RoleGrantBoundaryTest`, `UserGrantBoundaryTest`, `MeActorScopeTest`, `PublicApiWriteSurfaceTest`) | **98 passed** |
+| Full local suite (`php artisan test`, SQLite) | **7415 passed, 140 skipped, 26 failed** (59,104 assertions, 679 s) |
 | Real concurrency check (see below) | pass |
 | `git diff --check` | clean |
+
+The 26 failures are the same environmental set as in AI-01: six fuel test classes (`FuelAviRfidServiceTest`, `FuelReconciliationTest`, `FuelSaleApiTest`, `FuelSaleServiceTest`, `FuelSupplyReceivingApiTest`, `FuelSupplyReceivingTest`) failing with `undefined function bcmul()`, because this sandbox PHP lacks `bcmath`. CI installs it and passed these on the AI-01 merge. The 140 skips are pre-existing.
 
 Commands: `php artisan test --filter=AiMeteringTest`, `--filter=AiAuditTest`, `--filter=AiAssistantGatewayTest`.
 
