@@ -12,6 +12,22 @@ trait AnimatedMediaFixtures
 
     private const FIXTURE_WEBP_B64 = 'UklGRtgAAABXRUJQVlA4WAoAAAACAAAAjwEAjwEAQU5JTQYAAAD/////AABBTk1GNAAAAAAAAAAAAI8BAI8BAMgAAAJWUDhMGwAAAC+PwWMABxD9j/4HABTp/3+K6H/qf//73/8iAgBBTk1GNAAAAAAAAAAAAI8BAI8BAMgAAABWUDhMGwAAAC+PwWMABxDR//4HABTp/3+K6H/qf//73/8iAgBBTk1GNAAAAAAAAAAAAI8BAI8BAMgAAABWUDhMGwAAAC+PwWMAB9D/iP4HABTp/3+K6H/qf//73/8iAgA=';
 
+    // ── Security PoCs (S0 fuzz + differential review; originals in docs/plans/store/s0-spikes/security/poc/) ──
+    // F2: GIF `21 FF 00 …` hides a 3rd frame from inspect() but not from giflib/Pillow/gifsicle.
+    private const POC_GIF_EXT_FF_ZERO_B64 = 'R0lGODlhQAAwAPAAAP8AAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQACgAAACwAAAAAQAAwAAACOYSPqcvtD6OctNqLs968+w+G4kiW5omm6sq27gvH8kzX9o3n+s73/g8MCofEovGITCqXzKbzCY0mCwAh+QQACgAAACwAAAAAQAAwAIAAAP8AAAACOYSPqcvtD6OctNqLs968+w+G4kiW5omm6sq27gvH8kzX9o3n+s73/g8MCofEovGITCqXzKbzCY0mCwAh/wA7RkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkYAIfkEAAoAAAAsAAAAAEAAMACAAIAAAAAAAjmEj6nL7Q+jnLTai7PevPsPhuJIluaJpurKtu4Lx/JM1/aN5/rO9/4PDAqHxKLxiEwql8ym8wmNJgsAOw==';
+
+    // F1: WebP ANMF carrying three nested ANMF — inspect() counts 2 frames, libwebp/Chromium/Pillow play 5.
+    private const POC_WEBP_NESTED_ANMF_B64 = 'UklGRlABAABXRUJQVlA4WAoAAAACAAAAjwEAjwEAQU5JTQYAAAD/////AABBTk1GNAAAAAAAAAAAAI8BAI8BAMgAAAJWUDhMGwAAAC+PwWMABxD9j/4HABTp/3+K6H/qf//73/8iAgBBTk1G6AAAAAAAAAAAAI8BAI8BAMgAAAJWUDhMGwAAAC+PwWMABxD9j/4HABTp/3+K6H/qf//73/8iAgBBTk1GNAAAAAAAAAAAAI8BAI8BAMgAAAJWUDhMGwAAAC+PwWMABxD9j/4HABTp/3+K6H/qf//73/8iAgBBTk1GNAAAAAAAAAAAAI8BAI8BAMgAAAJWUDhMGwAAAC+PwWMABxD9j/4HABTp/3+K6H/qf//73/8iAgBBTk1GNAAAAAAAAAAAAI8BAI8BAMgAAAJWUDhMGwAAAC+PwWMABxD9j/4HABTp/3+K6H/qf//73/8iAgA=';
+
+    // F4: GIF with LZW minimum code size 0xFF — passes the dimension check, GD cannot decode the poster.
+    private const POC_GIF_LZW_SIZE_B64 = 'R0lGODlhQAAwAPAAAP8AAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQACgAAACH/C0ltYWdlTWFnaWNrDmdhbW1hPTAuNDU0NTQ1ACwAAAAAQAAwAAD/OYSPqcvtD6OctNqLs968+w+G4kiW5omm6sq27gvH8kzX9o3n+s73/g8MCofEovGITCqXzKbzCY0mCwAh+QQACgAAACH/C0ltYWdlTWFnaWNrDmdhbW1hPTAuNDU0NTQ1ACwAAAAAQAAwAIAAAP8AAAACOYSPqcvtD6OctNqLs968+w+G4kiW5omm6sq27gvH8kzX9o3n+s73/g8MCofEovGITCqXzKbzCY0mCwAh+QQACgAAACH/C0ltYWdlTWFnaWNrDmdhbW1hPTAuNDU0NTQ1ACwAAAAAQAAwAIAAgAAAAAACOYSPqcvtD6OctNqLs968+w+G4kiW5omm6sq27gvH8kzX9o3n+s73/g8MCofEovGITCqXzKbzCY0mCwA7';
+
+    // F4/F5: WebP whose VP8L bitstream header disagrees with its ANMF/canvas dimensions.
+    private const POC_WEBP_DIMS_MISMATCH_B64 = 'UklGRtgAAABXRUJQVlA4WAoAAAACAAAAkAEAjwEAQU5JTQYAAAD/////AABBTk1GNAAAAAAAAAAAAJABAI8BAMgAAAJWUDhMGwAAAC+PwWMABxD9j/4HABTp/3+K6H/qf//73/8iAgBBTk1GNAAAAAAAAAAAAJABAI8BAMgAAABWUDhMGwAAAC+PwWMABxDR//4HABTp/3+K6H/qf//73/8iAgBBTk1GNAAAAAAAAAAAAJABAI8BAMgAAABWUDhMGwAAAC+PwWMAB9D/iP4HABTp/3+K6H/qf//73/8iAgA=';
+
+    // F5: VP8L header claims 16383×16383 inside a 400×400 frame.
+    private const POC_WEBP_VP8L_HDR_B64 = 'UklGRtgAAABXRUJQVlA4WAoAAAACAAAAjwEAjwEAQU5JTQYAAAD/////AABBTk1GNAAAAAAAAAAAAI8BAI8BAMgAAAJWUDhMGwAAAC////8PBxD9j/4HABTp/3+K6H/qf//73/8iAgBBTk1GNAAAAAAAAAAAAI8BAI8BAMgAAABWUDhMGwAAAC////8PBxDR//4HABTp/3+K6H/qf//73/8iAgBBTk1GNAAAAAAAAAAAAI8BAI8BAMgAAABWUDhMGwAAAC////8PB9D/iP4HABTp/3+K6H/qf//73/8iAgA=';
+
     protected function animatedGifBytes(): string
     {
         return (string) base64_decode(self::FIXTURE_GIF_B64, true);
@@ -68,8 +84,15 @@ trait AnimatedMediaFixtures
         $o = $pos + 8 + 6; // بعد X,Y
         $w = substr(pack('V', 99), 0, 3);
         $h = substr(pack('V', 99), 0, 3);
+        $b = substr($b, 0, $o).$w.$h.substr($b, $o + 6);
 
-        return substr($b, 0, $o).$w.$h.substr($b, $o + 6);
+        // the VP8L header must agree with the declared frame size (F5), so declare 100×100 there too
+        $vp8l = strpos($b, 'VP8L', $pos);
+        $this->assertNotFalse($vp8l);
+        $bits = unpack('V', substr($b, $vp8l + 9, 4))[1];
+        $bits = ($bits & ~0xFFFFFFF) | 99 | (99 << 14);
+
+        return substr($b, 0, $vp8l + 9).pack('V', $bits).substr($b, $vp8l + 13);
     }
 
     /** الإطار الأول 100×100 عند (50,50) داخل لوحة 400×400: GD سيفكّه بحجم الإطار لا اللوحة. */
@@ -134,5 +157,114 @@ trait AnimatedMediaFixtures
         $body = 'WEBP'.'JUNK'.pack('V', 4).'abcd'.substr($b, 12);
 
         return 'RIFF'.pack('V', strlen($body)).$body;
+    }
+    protected function pocGifExtFfZero(): string
+    {
+        return (string) base64_decode(self::POC_GIF_EXT_FF_ZERO_B64, true);
+    }
+
+    protected function pocWebpNestedAnmf(): string
+    {
+        return (string) base64_decode(self::POC_WEBP_NESTED_ANMF_B64, true);
+    }
+
+    protected function pocGifLzwSize(): string
+    {
+        return (string) base64_decode(self::POC_GIF_LZW_SIZE_B64, true);
+    }
+
+    protected function pocWebpDimsMismatch(): string
+    {
+        return (string) base64_decode(self::POC_WEBP_DIMS_MISMATCH_B64, true);
+    }
+
+    protected function pocWebpVp8lHeader(): string
+    {
+        return (string) base64_decode(self::POC_WEBP_VP8L_HDR_B64, true);
+    }
+
+    /**
+     * يعيد كتابة أبناء ANMF الأول (بعد ترويسته 16 بايت) عبر $edit(string $children): string ويصحّح الأحجام.
+     */
+    protected function webpWithFirstFrameChildren(\Closure $edit): string
+    {
+        $b = $this->animatedWebpBytes();
+        $pos = strpos($b, 'ANMF');
+        $this->assertNotFalse($pos);
+        $size = unpack('V', substr($b, $pos + 4, 4))[1];
+        $payload = substr($b, $pos + 8, $size);
+        $new = substr($payload, 0, 16).$edit(substr($payload, 16));
+        if (strlen($new) & 1) {
+            $new .= "\0";
+        }
+        $b = substr($b, 0, $pos + 4).pack('V', strlen($new)).$new.substr($b, $pos + 8 + $size);
+
+        return 'RIFF'.pack('V', strlen($b) - 8).substr($b, 8);
+    }
+
+    protected static function riffChunk(string $id, string $data): string
+    {
+        return $id.pack('V', strlen($data)).$data.(strlen($data) & 1 ? "\0" : '');
+    }
+
+    /** ANMF الأول يحمل جزءاً غير معروف/ANMF متداخلاً بعد بيانات الصورة. */
+    protected function webpWithTrailingChunkInFirstFrame(string $id = 'ANMF'): string
+    {
+        return $this->webpWithFirstFrameChildren(fn (string $kids): string => $kids.self::riffChunk($id, str_repeat("\0", 16)));
+    }
+
+    /** ALPH أمام VP8L (تركيبة يرفضها libwebp). */
+    protected function webpWithAlphBeforeVp8l(): string
+    {
+        return $this->webpWithFirstFrameChildren(fn (string $kids): string => self::riffChunk('ALPH', "\0\0\0\0").$kids);
+    }
+
+    /** تيارا بيانات في إطار واحد. */
+    protected function webpWithTwoBitstreamsInFirstFrame(): string
+    {
+        return $this->webpWithFirstFrameChildren(fn (string $kids): string => $kids.$kids);
+    }
+
+    /** ترويسة VP8L تعلن أبعاداً غير أبعاد الإطار. */
+    protected function webpWithVp8lHeaderOfAnotherSize(): string
+    {
+        return $this->webpWithFirstFrameChildren(function (string $kids): string {
+            $this->assertSame('VP8L', substr($kids, 0, 4));
+            $this->assertSame(0x2F, ord($kids[8]));
+            $bits = unpack('V', substr($kids, 9, 4))[1];
+            $bits = ($bits & ~0x3FFF) | 199; // العرض 200 بدل 400
+
+            return substr($kids, 0, 9).pack('V', $bits).substr($kids, 13);
+        });
+    }
+
+    /** GIF: امتداد نص عادي (0x01) بطول كتلة أولى ≠ 12. */
+    protected function gifWithPlainTextExtensionOfWrongSize(): string
+    {
+        $b = $this->animatedGifBytes();
+        $gce = strpos($b, "\x21\xF9");
+
+        return substr($b, 0, $gce)."\x21\x01\x05abcde\x00".substr($b, $gce);
+    }
+
+    /** GIF: امتدادات تطبيق بحجم كتلة أولى غير 11. */
+    protected function gifWithApplicationExtensionOfWrongSize(int $size): string
+    {
+        $b = $this->animatedGifBytes();
+        $gce = strpos($b, "\x21\xF9");
+
+        return substr($b, 0, $gce)."\x21\xFF".chr($size).str_repeat('A', $size)."\x00".substr($b, $gce);
+    }
+
+    /** GIF: حجم رمز LZW الأدنى للإطار الأول. */
+    protected function gifWithLzwMinimumCodeSize(int $size): string
+    {
+        $b = $this->animatedGifBytes();
+        $img = strpos($b, "\x2C", strpos($b, "\x21\xF9"));
+        $local = ord($b[$img + 9]);
+        $off = $img + 10 + (($local & 0x80) ? 3 * (1 << (($local & 7) + 1)) : 0);
+        $b[$off] = chr($size);
+
+        return $b;
     }
 }

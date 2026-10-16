@@ -183,6 +183,16 @@ final class StorefrontAnimatedImage
                     $size = ord($b[$pos]);
                     $app = substr($b, $pos + 1, $size);
                 }
+                // F2: بعد التسمية يأتي طول الكتلة الأولى، وهو ثابتٌ بالمواصفة لتطبيق (11) ونص (12). صفرٌ هنا يُفسَّر
+                // «منهياً» عندنا وكتلةً فارغة تتبعها كتلٌ فرعية عند مفكّكاتٍ أخرى (فيظهر إطارٌ لا نعدّه). التعليق 0xFE وحده
+                // قد يكون فارغاً بلا التباس.
+                if ($pos >= $len) {
+                    throw $this->unreadable();
+                }
+                $firstBlock = ord($b[$pos]);
+                if (($label === 0xFF && $firstBlock !== 11) || ($label === 0x01 && $firstBlock !== 12) || ($firstBlock === 0 && $label !== 0xFE)) {
+                    throw $this->unreadable();
+                }
                 $subStart = $pos;
                 $pos = $this->skipSubBlocks($b, $pos, $len);
                 if ($label === 0xFF && $app === 'NETSCAPE2.0' && ! $netscapeEmitted) {
@@ -224,7 +234,12 @@ final class StorefrontAnimatedImage
                 if ($pos + 1 > $len) {
                     throw $this->unreadable();
                 }
-                $pos++; // LZW minimum code size
+                // حجم رمز LZW الأدنى 2..8 بالمواصفة؛ خارجها لا يفكّه GD فيمرّ الملف الفحص ويفشل الإطار الثابت لاحقاً (F4).
+                $lzw = ord($b[$pos]);
+                if ($lzw < 2 || $lzw > 8) {
+                    throw $this->unreadable();
+                }
+                $pos++;
                 $pos = $this->skipSubBlocks($b, $pos, $len);
 
                 $frames++;
@@ -355,16 +370,11 @@ final class StorefrontAnimatedImage
                     throw $this->unreadable();
                 }
                 $inner = $this->riffChunks($b, $c['data'] + 16, $c['data'] + $c['size']);
-                $bitstream = array_values(array_filter($inner, static fn (array $i): bool => in_array($i['id'], ['VP8 ', 'VP8L'], true)));
-                if (count($bitstream) !== 1) {
-                    throw $this->unreadable();
-                }
-                // يُعاد بناء الإطار: ترويسة ANMF (16 بايت) + أجزاء البيانات ALPH/VP8/VP8L فقط (لا XMP/مجهول داخله).
+                $this->assertFrameData($b, $inner, $fw, $fh);
+                // الأبناء بعد التحقق هم تماماً [ALPH؟] + VP8/VP8L: يُنسخون كما هم.
                 $kept = '';
                 foreach ($inner as $i) {
-                    if (in_array($i['id'], ['ALPH', 'VP8 ', 'VP8L'], true)) {
-                        $kept .= substr($b, $i['hdr'], 8 + $i['size'] + ($i['size'] & 1));
-                    }
+                    $kept .= substr($b, $i['hdr'], 8 + $i['size'] + ($i['size'] & 1));
                 }
                 $frames[] = $this->chunk('ANMF', substr($b, $c['data'], 16).$kept);
                 if (count($frames) > self::HARD_FRAME_CEILING) {
@@ -403,6 +413,44 @@ final class StorefrontAnimatedImage
             'clean' => $clean,
             'poster' => $poster,
         ];
+    }
+
+    /**
+     * بيانات إطار ANMF يجب أن تكون تماماً `[ALPH؟] + (VP8 | VP8L)` وبأبعاد الإطار المعلنة (F1/F5).
+     *
+     * libwebp يتوقف عند أول جزء بيانات داخل ANMF ويقرأ ما بعده أجزاءً علوية، فجزءٌ ANMF متداخل أو أي جزء بعد
+     * البيانات كان يُظهر إطاراتٍ لا نعدّها (يتجاوز حدّ الإطارات/المدة في الأصل المحفوظ). وALPH لا يصحّ إلا قبل VP8
+     * (VP8L يحمل ألفاه)، وترويسة التيار (VP8/VP8L) يجب أن تطابق أبعاد ANMF وإلا رفضه المفكّك أو فشل الإطار الثابت.
+     *
+     * @param  list<array{id:string,size:int,hdr:int,data:int}>  $inner
+     */
+    private function assertFrameData(string $b, array $inner, int $fw, int $fh): void
+    {
+        $ids = array_column($inner, 'id');
+        if ($ids !== ['VP8 '] && $ids !== ['VP8L'] && $ids !== ['ALPH', 'VP8 ']) {
+            throw $this->unreadable();
+        }
+        $stream = $inner[count($inner) - 1];
+        $d = $stream['data'];
+        if ($stream['id'] === 'VP8 ') {
+            // [frame tag 3B: bit0 = 0 → إطار مفتاحي][9d 01 2a][w u16 & 0x3fff][h u16 & 0x3fff]
+            if ($stream['size'] < 10 || (ord($b[$d]) & 1) !== 0 || substr($b, $d + 3, 3) !== "\x9D\x01\x2A"
+                || ($this->u16($b, $d + 6) & 0x3FFF) !== $fw || ($this->u16($b, $d + 8) & 0x3FFF) !== $fh) {
+                throw $this->unreadable();
+            }
+        } else {
+            // [0x2F][w-1: 14 bit][h-1: 14 bit][alpha: 1 bit][version: 3 bit = 0]
+            if ($stream['size'] < 5 || ord($b[$d]) !== 0x2F) {
+                throw $this->unreadable();
+            }
+            $bits = $this->u32($b, $d + 1);
+            if ((($bits & 0x3FFF) + 1) !== $fw || (((($bits >> 14) & 0x3FFF)) + 1) !== $fh || (($bits >> 29) & 0x7) !== 0) {
+                throw $this->unreadable();
+            }
+        }
+        if ($ids[0] === 'ALPH' && $inner[0]['size'] < 1) {
+            throw $this->unreadable();
+        }
     }
 
     /** @param list<array{id:string,size:int,hdr:int,data:int}> $chunks */

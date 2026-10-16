@@ -204,6 +204,12 @@ class StorefrontAnimatedMediaTest extends TestCase
             'gif partial first frame' => $this->gifWithPartialFirstFrame(),
             'gif forged graphic-control terminator' => $this->gifWithBadGceTerminator(),
             'too heavy bytes' => $this->animatedGifBytes().str_repeat("\0", 5 * 1024 * 1024),
+            'poc f1 webp nested anmf' => $this->pocWebpNestedAnmf(),
+            'poc f2 gif ext ff 00' => $this->pocGifExtFfZero(),
+            'poc f4 gif lzw size' => $this->pocGifLzwSize(),
+            'poc f4 webp dims mismatch' => $this->pocWebpDimsMismatch(),
+            'poc f5 webp vp8l header' => $this->pocWebpVp8lHeader(),
+            'f5 webp alph before vp8l' => $this->webpWithAlphBeforeVp8l(),
             default => $this->fail($case),
         };
         if ($case === 'too heavy (frames × pixels)') {
@@ -211,7 +217,7 @@ class StorefrontAnimatedMediaTest extends TestCase
             config()->set('storefront_media.animated.max_total_pixels', 40_000_000);
         }
 
-        $json = $this->uploadOne($auth, $bytes, 'x.'.($case === 'webp partial first frame' ? 'webp' : 'gif'));
+        $json = $this->uploadOne($auth, $bytes, 'x.'.(str_contains($case, 'webp') ? 'webp' : 'gif'));
 
         $this->assertSame('rejected', $json['data'][0]['status'], json_encode($json));
         $this->assertSame($code, $json['data'][0]['error']['code']);
@@ -231,6 +237,12 @@ class StorefrontAnimatedMediaTest extends TestCase
             'gif partial first frame' => ['gif partial first frame', 'animated_poster_unavailable'],
             'gif forged graphic-control terminator' => ['gif forged graphic-control terminator', 'image_unreadable'],
             'too heavy bytes' => ['too heavy bytes', 'file_too_large'],
+            'poc f1 webp nested anmf' => ['poc f1 webp nested anmf', 'image_unreadable'],
+            'poc f2 gif ext ff 00' => ['poc f2 gif ext ff 00', 'image_unreadable'],
+            'poc f4 gif lzw size' => ['poc f4 gif lzw size', 'image_unreadable'],
+            'poc f4 webp dims mismatch' => ['poc f4 webp dims mismatch', 'image_unreadable'],
+            'poc f5 webp vp8l header' => ['poc f5 webp vp8l header', 'image_unreadable'],
+            'f5 webp alph before vp8l' => ['f5 webp alph before vp8l', 'image_unreadable'],
         ];
     }
 

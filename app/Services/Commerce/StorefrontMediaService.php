@@ -262,8 +262,13 @@ class StorefrontMediaService
                 if (! is_array($posterSize) || [$posterSize[0], $posterSize[1]] !== [$info['width'], $info['height']]) {
                     throw new StorefrontMediaException('animated_poster_unavailable', 'تعذّر استخراج الإطار الأول لهذه الصورة المتحركة (إطارها الأول لا يغطي اللوحة كاملة). أعد تصديرها بإطار أول كامل.');
                 }
-                unset($poster);
-                unset($bytes);
+                // `getimagesizefromstring` قرأ الترويسة فقط؛ فكُّ GD الفعلي يلتقط تياراً تالفاً (F4) قبل أن يُخزَّن شيء.
+                // الكلفة محدودة: الإطار ≤ max_pixels (2.5MP ≈ 10MB RGBA).
+                $probe = @imagecreatefromstring((string) $poster);
+                if ($probe === false) {
+                    throw new StorefrontMediaException('animated_poster_unavailable', 'تعذّر فكّ الإطار الأول لهذه الصورة المتحركة (بياناته تالفة). أعد تصديرها ثم ارفعها.');
+                }
+                unset($probe, $poster, $bytes);
 
                 return [
                     'mime' => $mime,

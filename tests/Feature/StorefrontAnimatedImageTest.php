@@ -233,11 +233,6 @@ class StorefrontAnimatedImageTest extends TestCase
         $this->assertStringContainsString("NETSCAPE2.0\x03\x01\x00\x00\x00", $gif, 'canonical 19-byte loop extension');
         $this->assertTrue($this->sut()->inspect($gif, self::GIF)['loop']);
 
-        $inner = $this->sut()->sanitize($this->webpWithInnerMetadata(), self::WEBP);
-        $this->assertStringNotContainsString('LEAKLEAK', $inner);
-        $this->assertStringNotContainsString('XMP ', $inner);
-        $this->assertSame(3, $this->sut()->inspect($inner, self::WEBP)['frames']);
-
         $anim = $this->sut()->sanitize($this->webpWithOversizeAnim(), self::WEBP);
         $this->assertStringNotContainsString('META!!', $anim);
         $this->assertSame(strlen($anim) - 8, unpack('V', substr($anim, 4, 4))[1], 'RIFF size consistent after rebuilding');
@@ -282,5 +277,103 @@ class StorefrontAnimatedImageTest extends TestCase
         foreach (['animated.png', 'animated.GIF', '../animated.gif', 'animated.gif/x', 'original.gif', 'animated.gif ', "animated.gif\n", '480w.webp'] as $bad) {
             $this->assertFalse(StorefrontAnimatedImage::isValidFileName($bad), $bad);
         }
+    }
+
+    // ───────── hardening after the S0 fuzz + differential review (F1, F2, F4, F5) ─────────
+
+    private function assertUnreadable(string $bytes, string $mime, string $why): void
+    {
+        try {
+            $this->sut()->inspect($bytes, $mime);
+            $this->fail("accepted: {$why}");
+        } catch (StorefrontMediaException $e) {
+            $this->assertSame('image_unreadable', $e->errorCode, $why);
+        }
+    }
+
+    /** @test */
+    public function f1_a_webp_with_nested_anmf_frames_is_rejected_instead_of_hiding_frames_from_the_count(): void
+    {
+        // PoC: inspect() used to say 2 frames while libwebp / Chromium / Pillow play 5.
+        $this->assertUnreadable($this->pocWebpNestedAnmf(), self::WEBP, 'nested ANMF PoC');
+        $this->assertUnreadable($this->webpWithTrailingChunkInFirstFrame('ANMF'), self::WEBP, 'ANMF after the bitstream');
+    }
+
+    /** @test */
+    public function f1_anmf_children_must_be_exactly_alph_optional_plus_one_bitstream(): void
+    {
+        $this->assertUnreadable($this->webpWithTrailingChunkInFirstFrame('XMP '), self::WEBP, 'unknown chunk after the bitstream (libwebp reads it as top-level)');
+        $this->assertUnreadable($this->webpWithInnerMetadata(), self::WEBP, 'XMP inside ANMF');
+        $this->assertUnreadable($this->webpWithTwoBitstreamsInFirstFrame(), self::WEBP, 'two bitstreams');
+        $this->assertUnreadable($this->webpWithFirstFrameChildren(fn (): string => ''), self::WEBP, 'no bitstream');
+    }
+
+    /** @test */
+    public function f5_alph_is_only_valid_before_a_lossy_vp8_stream(): void
+    {
+        $this->assertUnreadable($this->webpWithAlphBeforeVp8l(), self::WEBP, 'ALPH + VP8L is rejected by libwebp');
+    }
+
+    /** @test */
+    public function f5_f4_the_bitstream_header_must_match_the_frame_dimensions(): void
+    {
+        $this->assertUnreadable($this->pocWebpDimsMismatch(), self::WEBP, 'dims mismatch PoC');
+        $this->assertUnreadable($this->pocWebpVp8lHeader(), self::WEBP, '16383² VP8L header in a 400² frame');
+        $this->assertUnreadable($this->webpWithVp8lHeaderOfAnotherSize(), self::WEBP, 'VP8L header 200 wide in a 400 wide frame');
+    }
+
+    /** @test */
+    public function f2_a_gif_application_extension_with_a_zero_first_block_is_rejected(): void
+    {
+        // PoC: `21 FF 00 3B <59 bytes> 00 <frame> 3B` — giflib/Pillow/gifsicle see 3 frames, inspect() saw 2.
+        $this->assertUnreadable($this->pocGifExtFfZero(), self::GIF, 'FF 00 PoC');
+        $this->assertUnreadable($this->gifWithApplicationExtensionOfWrongSize(0), self::GIF, 'application ext size 0');
+        $this->assertUnreadable($this->gifWithApplicationExtensionOfWrongSize(5), self::GIF, 'application ext size != 11');
+        $this->assertUnreadable($this->gifWithPlainTextExtensionOfWrongSize(), self::GIF, 'plain-text ext size != 12');
+    }
+
+    /** @test */
+    public function f2_ordinary_extensions_are_still_accepted_and_still_stripped(): void
+    {
+        // ImageMagick `ImageMagick` ext (size 11), XMP `XMP DataXMP` (size 11), NETSCAPE (11), comments: all unchanged.
+        $m = $this->sut()->inspect($this->gifWithMetadata(), self::GIF);
+        $this->assertSame(3, $m['frames']);
+        $this->assertStringNotContainsString('secret-note', $this->sut()->sanitize($this->gifWithMetadata(), self::GIF));
+        // an empty comment is the one legitimate zero-length first block
+        $b = $this->animatedGifBytes();
+        $p = strpos($b, "\x21\xF9");
+        $this->assertSame(3, $this->sut()->inspect(substr($b, 0, $p)."\x21\xFE\x00".substr($b, $p), self::GIF)['frames']);
+    }
+
+    /** @test */
+    public function f4_a_gif_lzw_minimum_code_size_outside_2_to_8_is_rejected_so_no_undecodable_poster_exists(): void
+    {
+        $this->assertUnreadable($this->pocGifLzwSize(), self::GIF, 'LZW 0xFF PoC');
+        foreach ([0, 1, 9, 12, 255] as $bad) {
+            $this->assertUnreadable($this->gifWithLzwMinimumCodeSize($bad), self::GIF, "LZW {$bad}");
+        }
+        $this->assertSame(3, $this->sut()->inspect($this->animatedGifBytes(), self::GIF)['frames'], 'the fixture itself is valid');
+    }
+
+    /** @test */
+    public function every_accepted_animated_file_yields_a_poster_gd_can_actually_decode_at_canvas_size(): void
+    {
+        foreach ([[$this->animatedGifBytes(), self::GIF], [$this->animatedWebpBytes(), self::WEBP], [$this->gifWithMetadata(), self::GIF], [$this->webpWithMetadata(), self::WEBP]] as [$bytes, $mime]) {
+            $poster = $this->sut()->posterBytes($bytes, $mime);
+            $this->assertNotNull($poster, $mime);
+            $im = @imagecreatefromstring($poster);
+            $this->assertNotFalse($im, "{$mime}: GD must decode the poster");
+            $this->assertSame([400, 400], [imagesx($im), imagesy($im)]);
+        }
+    }
+
+    /** @test */
+    public function the_sanitised_webp_keeps_exactly_the_validated_frame_children(): void
+    {
+        $clean = $this->sut()->sanitize($this->animatedWebpBytes(), self::WEBP);
+
+        $this->assertSame($this->sut()->inspect($this->animatedWebpBytes(), self::WEBP), $this->sut()->inspect($clean, self::WEBP));
+        $this->assertSame(3, substr_count($clean, 'ANMF'));
+        $this->assertSame(3, substr_count($clean, 'VP8L'));
     }
 }
