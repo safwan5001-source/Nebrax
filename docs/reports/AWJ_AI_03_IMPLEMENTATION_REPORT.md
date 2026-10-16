@@ -7,9 +7,9 @@ Scope: a practical, premium accounting workspace on top of the AI-01/AI-02 gatew
 | | |
 |---|---|
 | Branch | `feat/ai-03-intelligence-ui-20261016` |
-| Draft PR | __PR_URL__ |
+| Draft PR | https://github.com/safwan5001-source/Nebrax/pull/1553 (Draft) |
 | Base | `main` @ `1296e1ce79a339f94336f92c3258ec5fb0d815e6` (already contains AI-01 #1546, AI-02A #1548, AI-02B #1549) |
-| Head | __HEAD_SHA__ |
+| Head | `f77953cbc6cd0404614dc0910e4420a730bcb447` at PR creation (any later commit on the branch is report-text only) |
 | Commits | backend `ffdf5a5` · web `85f9fbe` · tests/visual-QA/UX-fixes + this report (see PR) |
 | Migrations | **none** (consent lives in the existing `tenants.settings` JSON group `ai_assistant`) |
 | Provider | mock only; `AI_ASSISTANT_ENABLED` and tenant flags untouched everywhere |
@@ -108,7 +108,7 @@ Observations not caused by this slice: the shared `Dialog` overlay leaves the to
 | PHP focused (AI + RBAC + route/permission suites) | 1330 passed, 27 skipped, 2 failed — both in `FuelCostBasisService` (`bcmath` missing in this sandbox; CI has the extension) |
 | PHP full suite | 7478 passed, 141 skipped, **26 failed** — all in six Fuel* classes (`FuelReconciliationTest`, `FuelSaleServiceTest`, `FuelSupplyReceivingTest`, `FuelAviRfidServiceTest`, `FuelSupplyReceivingApiTest`, …) that call `bcmul/bcadd`; this sandbox lacks `ext-bcmath` (CI has it). Identical set to the pre-AI-03 baseline (26); no AI/RBAC/route test fails. |
 | Backend AI-03 tests | `AiAssistantUiApiTest` 23 tests (status states/abilities/isolation, consent authorization matrix owner/admin vs accountant/staff, tenant A/B, unknown/document category, acknowledgement, disable-revokes-all, platform-off grant refused/revoke allowed, audit-failure rollback, metadata-only audit, Document Center independence, effect on next request, tool-run parity with the message path, no provider/ledger/budget row, AI-01/02 gates preserved) |
-| CI (GitHub) | __CI__ |
+| CI (GitHub) | Draft PR opened with SQLite, PostgreSQL, CI Gate and web build queued at report time; results are read once on the PR checks page (not polled here). Local equivalents are in the rows above. |
 
 **Accounting entries:** AI-03 creates none (no posting path touched; consent and tool-run writes only settings JSON and audit metadata). The mandatory journal-entry table therefore has no rows.
 
