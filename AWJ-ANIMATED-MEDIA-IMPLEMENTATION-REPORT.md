@@ -8,8 +8,8 @@
 |---|---|
 | Branch | `claude/awj-animated-media-support-7kzzga` |
 | Base SHA | `a2d2fcb7f83cfaa8cb361eb2744de7fc649393e5` |
-| Head SHA | see the PR (last code commit before this report: `29a09e778bd3cc71e1dd26d75a7334f1b1294fd4`) |
-| PR | linked from the branch (created after this report) |
+| Head SHA | `1e61bdc8d9bda91424ffc2609e0a7fd7273ff5d0` at PR creation (last code commit `29a09e778bd3cc71e1dd26d75a7334f1b1294fd4`; later commits are doc-only) |
+| PR | https://github.com/safwan5001-source/Nebrax/pull/1541 |
 
 ---
 
