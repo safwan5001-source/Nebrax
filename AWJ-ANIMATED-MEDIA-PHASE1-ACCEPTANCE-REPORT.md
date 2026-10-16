@@ -30,13 +30,16 @@
 |---|---|---|
 | `29a09e7` (Phase 1 code) | feature + CSS parity fix | ✅ **7/7 green**: `php artisan test (L11, pgsql)` ✓ (17 min), `(sqlite)` ✓, `CI Gate` ✓, `web build (Next.js)` ✓, `storefront (lint + typecheck + test)` ✓, `merchant preview visual QA` ✓, `published footer visual QA` ✓ |
 | `e14f0f8` | hydration-gated animation, dev page + Playwright spec | storefront ✓, web build ✓, both visual-QA ✓ (PHP jobs superseded by the next push) |
-| `d10cd36` (**final**) | sanitiser hardening after security review | **re-running** — storefront ✓ at time of writing; PHP pgsql/sqlite, web build, visual QA in progress. Final status: see the "Final CI" line below. |
+| `d10cd36` (**last code change**) | sanitiser hardening after security review | storefront ✓, Store Brand QA (both jobs) ✓, web CI ✓; the PHP run (sqlite + pgsql) was **superseded** by the next docs-only push (the repo's `ci.yml` cancels in-progress runs) |
+| `23b3e51` and later (**docs only**, same code as `d10cd36`) | reports | full CI re-run **pending/in progress at time of writing**. Because every push restarts the ~17-minute PHP jobs, I stopped pushing after this edit. **The authoritative final result is the PR's Checks tab; I will also post it as a PR comment** (comments do not restart CI). |
+
+**Observed transient failure (disclosed):** on commit `1e61bdc` the workflow *Store Brand QA → merchant preview visual QA* failed once (32 passed, 1 failed: a Playwright `page.goto('/dev/trust-visual…')` navigation error in `web/e2e/store-brand-qa.spec.ts`, a footer/trust page unrelated to media). The same job **passed on three later runs with identical product code** (`da94e4b`, `e14f0f8`, `d10cd36`). I believe it is a cold-start flake but have not proven the root cause. Likewise, the first push (`9cda0ab`) failed *Web CI* — that was a genuine regression from my storefront CSS change (Canvas-preview parity test); it was fixed in `29a09e7`.
 
 **Local full-suite note (unchanged):** the sandbox lacks `bcmath`, so 26 `Fuel*` tests fail locally with `bcmul()` undefined. **CI (which installs bcmath) passes them**, confirming the failures are environmental and unrelated.
 
 **Automated Codex review:** *did not run* ("usage limits reached") — so there has been **no automated third-party review** of the PR. The independent review in §4 was performed by a separate fresh-context reviewer instead. A human code review is still recommended.
 
-**Final CI:** _(updated below when the run completes)_
+**Final CI:** see the PR Checks tab / PR comment (not repeated here to avoid restarting CI with another docs push).
 
 ---
 
@@ -164,7 +167,7 @@ Delivered: `docs/plans/store/AWJ-ANIMATED-MEDIA-PHASE2-ARCHITECTURE-PROPOSAL.md`
 | WebP later-frame dimensions unvalidated (#5) | Low | Accepted; browsers reject mismatches |
 | `MotionToggle` pause state shared per animation id | Low | By design |
 | Dev page + e2e spec added to the repo (dev-only, 404 in production) | Low | Remove if you prefer not to carry them |
-| Final CI on `d10cd36` | — | see §1 |
+| Final CI on the last head (docs-only commits after `d10cd36`) | — | see §1 — verify PHP sqlite + pgsql green on the PR before merging |
 
 ---
 
