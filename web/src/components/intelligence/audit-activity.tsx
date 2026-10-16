@@ -26,17 +26,21 @@ export function AuditActivity({ events, failed }: { events: AuditEvent[] | null;
             <TR>
               <TH scope="col">{t('audit_event')}</TH>
               <TH scope="col">{t('audit_outcome')}</TH>
-              <TH scope="col">{t('audit_reason')}</TH>
-              <TH scope="col">{t('audit_time')}</TH>
+              <TH scope="col" className="hidden sm:table-cell">{t('audit_reason')}</TH>
+              <TH scope="col" className="hidden sm:table-cell">{t('audit_time')}</TH>
             </TR>
           </THead>
           <TBody>
             {events.map((event) => (
               <TR key={event.id}>
-                <TD><span dir="ltr" className="font-mono text-xs">{event.event}{event.tool ? ` · ${event.tool}` : ''}</span></TD>
+                <TD>
+                  <span dir="ltr" className="block font-mono text-xs">{event.event}{event.tool ? ` · ${event.tool}` : ''}</span>
+                  {/* على الجوال يُطوى الوقت والسبب تحت الحدث بدل أعمدة تتجاوز العرض. */}
+                  <span dir="ltr" className="num mt-0.5 block text-[11px] text-muted sm:hidden">{event.occurred_at} · {event.reason}</span>
+                </TD>
                 <TD><Badge tone={TONES[event.outcome] ?? 'muted'}>{t(`outcome.${event.outcome}`)}</Badge></TD>
-                <TD><span dir="ltr" className="font-mono text-xs text-muted">{event.reason}</span></TD>
-                <TD><span dir="ltr" className="num text-xs">{event.occurred_at}</span></TD>
+                <TD className="hidden sm:table-cell"><span dir="ltr" className="font-mono text-xs text-muted">{event.reason}</span></TD>
+                <TD className="hidden sm:table-cell"><span dir="ltr" className="num text-xs">{event.occurred_at}</span></TD>
               </TR>
             ))}
           </TBody>

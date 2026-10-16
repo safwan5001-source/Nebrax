@@ -77,7 +77,7 @@ export function IntelligenceCanvas() {
         description={t('canvas.description')}
         actionsSlot={
           <div className="flex flex-wrap items-center gap-2">
-            {store.status?.provider_mode === 'mock' ? <Badge tone="warning">{t('demo.badge')}</Badge> : null}
+            <Badge tone="muted">{tc('read_only')}</Badge>
             <Button type="button" variant="outline" onClick={store.openPanel}>
               <MessageSquareText className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
               {t('canvas.ask_assistant')}

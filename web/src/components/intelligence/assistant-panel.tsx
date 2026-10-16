@@ -31,7 +31,7 @@ function Entry({ entry, onOpenCanvas, onNavigate, runIds, demo }: {
     return (
       <div className="rounded bg-primary-soft px-3 py-2 text-sm" data-role="user">
         <p className="mb-0.5 text-[11px] text-muted">{t('panel.you')}</p>
-        <p className="whitespace-pre-wrap break-words">{entry.text}</p>
+        <p dir="auto" className="whitespace-pre-wrap break-words">{entry.text}</p>
       </div>
     );
   }
@@ -42,7 +42,7 @@ function Entry({ entry, onOpenCanvas, onNavigate, runIds, demo }: {
           <span>{t('panel.assistant')}</span>
           {demo ? <Badge tone="warning">{t('demo.badge')}</Badge> : null}
         </div>
-        <p className="whitespace-pre-wrap break-words">{entry.text}</p>
+        <p dir="auto" className="whitespace-pre-wrap break-words">{entry.text}</p>
         {demo ? <p className="mt-1.5 text-xs text-muted">{t('demo.reply')}</p> : null}
       </div>
       {entry.toolCalls && entry.toolCalls.length > 0
@@ -76,6 +76,8 @@ export function AssistantPanel() {
   const [draft, setDraft] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
+  // العنصر الذي فتح اللوحة: يستعيد الإغلاقُ التركيزَ إليه (الـSheet مضبوط الحالة بلا Trigger فلا يفعلها Radix وحده).
+  const openerRef = useRef<HTMLElement | null>(null);
 
   const context = useMemo(() => resolveAssistantContext(pathname), [pathname]);
   const gate = gateFor(store, 'chat');
@@ -128,6 +130,7 @@ export function AssistantPanel() {
         className="max-sm:[&>button]:hidden sm:max-w-md"
         data-awj-assistant-panel=""
         onOpenAutoFocus={(event) => {
+          openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
           // الحالة معروفة مسبقاً (فتحٌ ثانٍ): ركّز مربع الكتابة مباشرة. وإلا يتولّى التأثير أعلاه ذلك حين تصير جاهزة.
           const coarse = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
           const box = textareaRef.current;
@@ -135,6 +138,15 @@ export function AssistantPanel() {
             event.preventDefault();
             box.focus();
             focusPending.current = false;
+          }
+        }}
+        onCloseAutoFocus={(event) => {
+          const opener = openerRef.current;
+          openerRef.current = null;
+          // يتجاهل عنصراً لم يعد مرئياً (قائمة الحساب على الجوال أُغلقت) فيعمل الافتراضي.
+          if (opener && opener.isConnected && !opener.closest('[aria-hidden="true"], [hidden]')) {
+            event.preventDefault();
+            opener.focus();
           }
         }}
       >
@@ -236,9 +248,8 @@ export function AssistantPanel() {
           <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted">
             <span className={tooLong ? 'text-negative' : undefined}>
               {tooLong ? t('panel.too_long', { max: MESSAGE_MAX_CHARS }) : t('panel.hint')}
-              {' · '}
-              <span dir="ltr" className="num">{t('panel.counter', { count: draft.length, max: MESSAGE_MAX_CHARS })}</span>
             </span>
+            <span dir="ltr" className="num shrink-0">{t('panel.counter', { count: draft.length, max: MESSAGE_MAX_CHARS })}</span>
             <span className="flex items-center gap-1">
               <Button type="button" variant="ghost" size="sm" className="h-8 px-2" onClick={() => openCanvas()}>
                 <LayoutPanelTop className="h-3.5 w-3.5 rtl:-scale-x-100" strokeWidth={1.7} aria-hidden="true" />

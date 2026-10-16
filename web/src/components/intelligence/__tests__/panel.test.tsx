@@ -84,6 +84,19 @@ describe('opening', () => {
   });
 });
 
+describe('focus return', () => {
+  it('returns focus to the element that opened the panel', async () => {
+    api.fetchStatus.mockResolvedValue(makeStatus());
+    mount();
+    const opener = screen.getByRole('button', { name: 'open-panel' });
+    await userEvent.click(opener);
+    const dialog = await screen.findByRole('dialog');
+    await act(async () => { fireEvent.keyDown(dialog, { key: 'Escape' }); });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(opener));
+  });
+});
+
 describe('re-opening', () => {
   it('focuses the composer again on a second open when the status is already known', async () => {
     api.fetchStatus.mockResolvedValue(makeStatus());

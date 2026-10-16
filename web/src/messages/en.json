@@ -10846,7 +10846,8 @@
       "source_canvas": "Explicit run",
       "checking": "Checking permissions…",
       "status_error": "Could not read assistant status",
-      "controls": "Report controls"
+      "controls": "Report controls",
+      "read_only": "Read-only"
     },
     "result": {
       "income_statement": "Income statement",
@@ -10961,7 +10962,8 @@
       "loading": "Loading settings…",
       "status_error": "Could not read settings",
       "retry": "Retry",
-      "mock_note": "Current provider mode: simulated — no external connection."
+      "mock_note": "Current provider mode: simulated — no external connection.",
+      "confirm_enable_only": "You are turning the assistant on for your organization. No data category is granted until you grant each one separately."
     },
     "notice": {
       "action_settings": "Open assistant settings",

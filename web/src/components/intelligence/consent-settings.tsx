@@ -190,11 +190,9 @@ export function ConsentSettings() {
             {needsAck ? (
               <>
                 <p className="text-sm">
-                  {t('confirm_enable', {
-                    categories: pending.kind === 'grant'
-                      ? t(`category.${pending.category}`)
-                      : [...consented].map((c) => t(`category.${c}`)).join('، ') || t('master'),
-                  })}
+                  {pending.kind === 'grant'
+                    ? t('confirm_enable', { categories: t(`category.${pending.category}`) })
+                    : t('confirm_enable_only')}
                 </p>
                 <div className="rounded border border-border bg-background p-3">
                   <p className="mb-1 flex items-center gap-1.5 text-xs font-medium"><ShieldCheck className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />{t('privacy_title')}</p>
