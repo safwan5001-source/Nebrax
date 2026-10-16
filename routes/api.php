@@ -163,6 +163,7 @@ use App\Http\Controllers\Api\ZatcaSubmissionController;
 use App\Http\Middleware\EnforcePlanLimit;
 use App\Http\Middleware\EnforceUserIdempotency;
 use App\Http\Controllers\Api\AiAssistantController;
+use App\Http\Controllers\Api\AiAuditController;
 use App\Http\Middleware\EnsureActiveSubscription;
 use App\Http\Middleware\EnsureApplicationActive;
 use App\Http\Middleware\EnsureApplicationOperationActive;
@@ -406,6 +407,9 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // تجريبية فقط، بلا أي اتصال خارجي. التفويض الكامل داخل AiAssistantGateway.
         Route::post('ai-assistant/messages', [AiAssistantController::class, 'store'])
             ->middleware([$perm('ai.assistant.use'), 'throttle:20,1']);
+        // سجل تدقيق المساعد (وصفي، للمستأجر نفسه) — صلاحية مستقلة عن الاستعمال.
+        Route::get('ai-assistant/audit-events', [AiAuditController::class, 'index'])
+            ->middleware([$perm('ai.audit.view'), 'throttle:60,1']);
 
         // مركز المستندات — PR-2: استقبال يدوي خاص فقط، بلا OCR أو Queue أو إنشاء معاملات.
         Route::post('document-batches', [DocumentIntakeController::class, 'storeBatch'])

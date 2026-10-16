@@ -30,5 +30,39 @@ return [
         'scope_max_ids' => 10,
         // Upper bound on tool invocations the provider may plan for one turn.
         'max_tool_calls' => 3,
+        // Hard ceiling on completion tokens per provider call; also the reservation size (output side).
+        'max_output_tokens' => 1024,
+    ],
+
+    /*
+    | Spend control (AI-02A). Caps live in `ai_budgets` and are explicit: a billable request with no
+    | global AND tenant budget row for the current UTC month is refused. There is no unlimited default.
+    | Units: tokens, and micro-USD (1 USD = 1,000,000).
+    */
+    'budget' => [
+        // A reservation older than this is treated as an abandoned request and settled by the reaper.
+        'reservation_ttl_seconds' => 600,
+        // What a failed / abandoned attempt costs when the provider reported no usage:
+        //   reserved = the whole reservation (conservative; the call may have been billed)
+        //   none     = nothing
+        'failure_charge' => 'reserved',
+    ],
+
+    /*
+    | Price table, micro-USD per 1,000 tokens, per provider and model. A provider/model with no entry
+    | is refused (`pricing_unknown`) — never treated as free. `billable=false` is honoured for the
+    | in-process `mock` provider ONLY; every other provider is always billable. No real provider is
+    | resolvable in this phase, so no real prices are listed.
+    */
+    'pricing' => [
+        'mock' => [
+            'mock-1' => ['billable' => false, 'input_micro_usd_per_1k' => 0, 'output_micro_usd_per_1k' => 0],
+        ],
+    ],
+
+    // Retention for durable audit events and request records (days). The prune command enforces a floor
+    // of 30 days; shortening below it requires a code change, not configuration.
+    'audit' => [
+        'retention_days' => 400,
     ],
 ];

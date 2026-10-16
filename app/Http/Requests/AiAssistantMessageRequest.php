@@ -58,6 +58,11 @@ class AiAssistantMessageRequest extends FormRequest
                 $validator->errors()->add((string) $field, 'unsupported_field');
             }
 
+            $key = $this->header('Idempotency-Key');
+            if ($key !== null && preg_match('/^[A-Za-z0-9._:-]{8,64}$/', $key) !== 1) {
+                $validator->errors()->add('Idempotency-Key', 'invalid_idempotency_key');
+            }
+
             $scope = $this->input('scope');
             if (is_array($scope)) {
                 foreach (array_diff(array_keys($scope), self::SCOPE_KEYS) as $field) {

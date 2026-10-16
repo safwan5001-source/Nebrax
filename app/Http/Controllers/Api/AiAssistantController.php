@@ -16,7 +16,7 @@ class AiAssistantController extends ApiController
     public function store(AiAssistantMessageRequest $request, AiAssistantGateway $gateway): JsonResponse
     {
         try {
-            $data = $gateway->handle($request->user(), $request->validated());
+            $data = $gateway->handle($request->user(), $request->validated(), $request->header('Idempotency-Key'));
         } catch (AiAssistantDenied $denied) {
             return response()->json([
                 'error' => ['code' => $denied->reason, 'message' => $denied->getMessage()],
