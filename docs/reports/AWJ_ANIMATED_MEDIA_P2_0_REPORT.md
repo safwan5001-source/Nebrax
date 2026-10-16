@@ -156,6 +156,13 @@ Intervention 4's `encodeUsingMediaType($type, $quality)` ignores a **positional*
 - If an operator lowers `STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES` below 6 MiB, large-but-valid variants will be refused; operators must keep that env at or above `variant_max_bytes` (6 MiB); it is not enforced in code.
 
 ## 10. Identifiers
-Branch `claude/awj-p2-0-media-proxy-hardening` · PR [#1552](https://github.com/safwan5001-source/Nebrax/pull/1552) · Base `1296e1ce79a339f94336f92c3258ec5fb0d815e6` · Code head `d38d7ea9a86bffd6aa4a84fc1e870b6244b18cd6` · Final head this docs-only commit (see PR head) · CI: on code head `d38d7ea9a`: storefront lint+typecheck+test ✅, merchant preview visual QA ✅, published footer visual QA ✅, php sqlite ✅ (11m49s), php pgsql ✅ (17m27s); CI Gate was still finishing at the last check (it only aggregates the jobs above)
+Branch `claude/awj-p2-0-media-proxy-hardening` · PR [#1552](https://github.com/safwan5001-source/Nebrax/pull/1552) · Base `1296e1ce79a339f94336f92c3258ec5fb0d815e6`
+
+| Head | Content | CI |
+|---|---|---|
+| `d38d7ea9a86bffd6aa4a84fc1e870b6244b18cd6` | P2-0 proxy hardening | all green (storefront, both visual QAs, php sqlite 11m49s, php pgsql 17m27s) |
+| `abd9a3eefb45f78521455cb8656cd9fa3132a563` | review fix: variant ceiling | php sqlite/pgsql **failed**: my own pin test read `storefront/…/media-proxy-guard.ts`, which CI does not copy into the Laravel app (the generator tests themselves passed: 7,485 passed, 1 failed) |
+| `84d600a118224cf3a0d0493e4a6c6fffda9960bf` | pin moved to the storefront test | **all green**: storefront ✅, merchant preview QA ✅, published footer QA ✅, php sqlite ✅ (17m), php pgsql ✅ (12m), CI Gate ✅ |
+| final head | this docs-only commit (see PR head) | docs only; reruns the same workflows |
 
 No merge, deployment, migration, API change, R2 or infrastructure change was made.
