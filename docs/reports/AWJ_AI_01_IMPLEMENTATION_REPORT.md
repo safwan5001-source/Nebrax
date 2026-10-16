@@ -5,9 +5,18 @@
 | Branch | `feat/ai-01-secure-gateway-20261016` |
 | Draft PR | see PR description (Draft, not merged) |
 | Base SHA (`origin/main`) | `97341a197a47024dda60c2ea541761aac0b1f355` |
-| Code Head SHA (all runtime code + tests) | `5ebcbb5db93c667e6af4ff1e2ff5874af1f74cb6` |
-| Report commit | the commit following the code head; final Head SHA is shown on the PR |
+| Draft PR | [#1546](https://github.com/safwan5001-source/Nebrax/pull/1546) (Draft, not merged) |
+| Code Head SHA (all runtime code + tests, CI-verified) | `49f857b49854e969f478f608d5bd850e4b4afe88` |
+| Earlier commits | `5ebcbb5` (initial implementation), `ecf3861` (initial report) |
+| Final Head SHA | the report-update commit that follows `49f857b` is docs-only; the exact SHA is the PR head |
 | Scope | AI-01 only. Mock provider, default OFF, zero egress, no schema change |
+
+## 0. Review round (owner decisions applied)
+
+1. **Audit:** log-based audit is accepted **temporarily, for the Mock phase only**. Durable audit and atomic spend limits are **mandatory in AI-02, before any paid provider connection**.
+2. **`ai.assistant.use` added to the default `accountant` role.** Data and report permissions stay independent (see §2 and §5).
+3. **422 before the kill switch is kept** and now documented and tested (see §6.1). No security issue was found.
+4. **CI:** all jobs green on `49f857b` (see §5).
 
 ## 1. References (not merged, not dependencies)
 
@@ -55,7 +64,12 @@ Note: the RBAC route middleware (`EnsurePermission`) and the auth middleware kee
   - `assistant_messages` is the only available category.
   - `financial_summary` and `document_projected_text` are **reserved/unavailable**. They cannot be used even if stored in settings. No financial data is transmitted in AI-01.
 - There is no write path for the `ai_assistant` group yet (no settings controller or UI), so it cannot be changed through the generic settings API. Consent management belongs to AI-03.
-- New permission `ai.assistant.use` was added to `Rbac::PERMISSIONS`. owner/admin hold it via `*`; it is **not** added to the accountant, staff or self_service matrices. Custom roles may be granted it.
+- New permission `ai.assistant.use` in `Rbac::PERMISSIONS`.
+  - **owner/admin:** hold it via `*`.
+  - **accountant (default role):** granted explicitly. The accountant matrix gained exactly this one string and nothing else.
+  - **staff and self_service:** not granted. Custom roles may be granted it.
+  - **Independent of data access:** it only opens the gateway and grants no read of any record, report or financial data. Every future tool declares its own permission (for example `reports.view`), re-checked on each invocation with a freshly loaded actor.
+  - **Existing tenants:** their stored `roles` rows are unchanged because no migration was added. Their accountants stay denied until granted. This is safe, since the feature is off platform-wide and no tenant has opted in. New tenants get the permission through `Rbac::systemRoles()`. A backfill migration is a decision for AI-02 or a later step.
 
 ### Provider secrets
 
@@ -83,12 +97,12 @@ Note: the RBAC route middleware (`EnsurePermission`) and the auth middleware kee
 | `app/Services/AiAssistantScopeGuard.php` | new: explicit scope rejection |
 | `app/Services/AiAssistantToolRegistry.php` | new: closed, empty registry |
 | `app/Services/MockAiAssistantProvider.php` | new: deterministic mock |
-| `app/Http/Requests/AiAssistantMessageRequest.php` | new: bounded schema |
+| `app/Http/Requests/AiAssistantMessageRequest.php` | new: bounded schema; documents validation-before-kill-switch order |
 | `app/Http/Controllers/Api/AiAssistantController.php` | new |
-| `app/Support/Rbac.php` | +1 permission string (`ai.assistant.use`) |
+| `app/Support/Rbac.php` | `ai.assistant.use` added to `PERMISSIONS` and to `MATRIX['accountant']` |
 | `app/Support/Settings.php` | +`ai_assistant` defaults group |
 | `routes/api.php` | +1 route and import |
-| `tests/Feature/AiAssistantGatewayTest.php` | new: 32 tests |
+| `tests/Feature/AiAssistantGatewayTest.php` | new: 39 tests |
 | `docs/reports/AWJ_AI_01_IMPLEMENTATION_REPORT.md` | this report |
 
 - No migrations, no CI or assembly script changes (all new files sit in directories already copied by `setup.sh`, `ci.yml` and `deploy/assemble.sh`).
@@ -107,46 +121,66 @@ Note: the RBAC route middleware (`EnsurePermission`) and the auth middleware kee
 
 ## 5. Tests and verification
 
-Run on SQLite against the assembled app, using the repo's own assembly (`setup.sh` layout).
+Local runs used SQLite on the assembled app (`setup.sh` layout). CI runs SQLite and PostgreSQL.
 
 | Check | Result |
 |---|---|
-| `AiAssistantGatewayTest` (focused) | **32 passed, 513 assertions, 0 failed, 0 skipped** |
-| Mutation sanity (kill switch ignored; scope widened instead of rejected) | 4 of the new tests failed as expected, then code restored |
-| Full suite `php artisan test` | **7296 passed, 140 skipped, 26 failed** (58,055 assertions, 677 s) |
+| `AiAssistantGatewayTest` (focused, after review changes) | **39 passed, 567 assertions, 0 failed, 0 skipped** |
+| Adjacent RBAC, grant-boundary, scope and route-guard suites | **194 passed, 2480 assertions, 0 failed** |
+| Initial full local suite (`ecf3861`, before the review round) | 7296 passed, 140 skipped, 26 failed (environmental, see below) |
 | `git diff --check` | clean |
 
-### The 26 failures
+Adjacent suites run: `UserGrantBoundaryTest`, `RoleGrantBoundaryTest`, `MeActorScopeTest`, `Rem37Zatca*`, `DeliveryConnectorCoreTest`, `DeliveryConnectorAuditPermissionTest`, `DeliveryHubProjectionTest`, `ReportEffectiveScopeTest`, `UserAccessScopeTest`, `ApiUnauthenticatedResponseTest`, `ApplicationAccessGateGuardTest`. These were chosen because they assert on the role matrix, grant ceilings or route guards that this change touches.
 
-- All 26 are in 6 fuel test classes: `FuelAviRfidServiceTest`, `FuelReconciliationTest`, `FuelSaleApiTest`, `FuelSaleServiceTest`, `FuelSupplyReceivingApiTest`, `FuelSupplyReceivingTest`.
-- Cause: `Call to undefined function App\Services\bcmul()`. The sandbox PHP lacks the `bcmath` extension; the session bootstrap warned about this beforehand.
-- CI installs `bcmath`. I re-ran two of the classes and reproduced the identical error.
-- None of them touch the changed files. I did not compare against a baseline run on `main`, so treat this as environmental until CI confirms.
-- The 140 skips are pre-existing skips in other suites, not changed by this PR.
+The full local suite was **not re-run** after the review round, as requested. The change is one permission string, test code and comments. CI is the full-suite authority for the final head.
 
-### Coverage of the required scenarios
+### CI
 
-- Default OFF: shipped config defaults, and kill switch OFF blocks a fully opted-in tenant.
-- No consent, enabled without consent, consent without enabled; Document Center consent does not authorize the assistant.
-- Permission denied (staff, accountant), and permission revoked between requests and between planning and tool execution.
-- Cross-tenant: actor id, branch id, warehouse id, and per-tenant consent isolation.
-- Forbidden branch and warehouse scope for restricted users (rejected, not widened), plus unrestricted semantics preserved.
-- Malformed and bounded input: 14 invalid shapes, boundary values at exactly 2000 chars (including multi-byte Arabic), and every smuggled field.
-- Mock behavior: deterministic, does not echo the prompt, locale-aware.
-- Closed registry: unregistered tool, over-limit tool calls, reserved data category on a tool, tool scope re-resolution.
-- No external calls: `Http::preventStrayRequests()` plus `Http::assertNothingSent()` run in every test. Non-mock providers fail closed even with a live Anthropic connection configured in the platform. A static scan checks the new sources for network and provider-client code.
-- No secrets in responses or logs: a canary API key in platform settings and a canary prompt never appear in responses or in captured log contexts.
+| Run | Commit | SQLite | PostgreSQL | CI Gate |
+|---|---|---|---|---|
+| Initial implementation | `ecf3861` | success | superseded by the new push before finishing | superseded |
+| Review round | `49f857b` | **success** (13 min) | **success** (17 min) | **success** |
+
+- No job failed, so there were no failure logs to inspect.
+- The 26 local failures were not reproduced in CI. They were all `undefined function bcmul()` in 6 fuel test classes, because the sandbox PHP lacks `bcmath`. SQLite and PostgreSQL CI both pass the full suite, confirming the failures were environmental.
+- The report-only commit that follows `49f857b` changes no code. CI may re-run on it.
+
+### New RBAC tests (review round)
+
+- Default matrix: owner/admin hold `*`, accountant holds the permission, staff and self_service do not. The `Rbac::allows` fallback agrees.
+- The accountant matrix differs from the previous one by exactly `ai.assistant.use`. Data and report permissions are unchanged, and `self_service` still lacks them.
+- A newly registered tenant's default accountant gets 200 once platform and tenant gates are open.
+- The same accountant is still denied while the platform is off (503 `platform_disabled`) or the tenant has not opted in (403 `tenant_not_enabled`).
+- staff and self_service are denied even when platform and tenant allow.
+- A stored accountant role without the permission is **not** backfilled (denied until granted).
+- A custom role holding only `ai.assistant.use` can call the gateway but gets 403 on income statement, invoices, payments, accounts and purchases.
+- A tool requiring `users.manage` is denied (`tool_permission_denied`) for an accountant who holds `ai.assistant.use`, so tool permissions are independent.
+- Revoking the permission between requests, and between planning and tool execution, takes effect immediately (from the initial suite).
+- Validation order: a malformed request returns 422 with an identical body whether the platform is on or off, and leaks no platform state. A valid request then hits the kill switch (503).
+
+### Initial-suite scenario coverage (unchanged)
+
+- Default OFF, no consent, Document Center consent not authorizing the assistant, and reserved categories unusable.
+- Cross-tenant ids; forbidden branch and warehouse scope rejected (not widened); unrestricted semantics preserved.
+- Malformed and bounded input, and every smuggled field rejected.
+- Deterministic mock; closed registry; per-invocation re-authorization.
+- Zero egress: `Http::preventStrayRequests()` plus `assertNothingSent()` in every test, and non-mock providers fail closed.
+- No secrets or prompts in responses or logs.
+- Mutation checks: breaking the kill switch or the scope rejection fails the tests.
 
 ## 6. Risks and limitations
 
-1. **Validation precedes the kill switch.** A malformed request to a disabled platform returns `422`, not `503`. No data is processed and nothing sensitive is exposed, but the disabled response is not the very first thing evaluated.
-2. **Audit is log-only.** Logs are not an immutable store. Durable, immutable audit and budget settlement are AI-02 prerequisites before any live provider call.
+1. **422 precedes the kill switch (kept, documented, tested).** A malformed request to a disabled platform returns `422 invalid_request`, not `503`. No security issue was found, for these reasons:
+   - The 422 body is identical whether the platform is on or off, so it reveals nothing about the switch.
+   - No policy read, provider call or audit entry happens before validation.
+   - A well-formed request is always gated by the switch first.
+   - Rationale and test: comment in `AiAssistantMessageRequest` and `shape_validation_runs_before_the_kill_switch_and_leaks_nothing`.
+2. **Audit is log-only, accepted temporarily for the Mock phase only.** Logs are not an immutable store. **Durable audit and atomic global and tenant spend limits are mandatory in AI-02, before any paid provider connection.** No live provider may be enabled without them.
 3. **No consent write path or UI** in this PR. Opt-in can only be set by code or data until AI-03.
-4. **Accountants do not get the permission by default.** Contract §1 names owners, managers and accountants as the audience. Accountants need a custom-role grant or a deliberate matrix change.
-5. **Existing tenants' stored roles** are unaffected. owner/admin hold the permission through `*`; nothing is migrated.
-6. **Tool contract is a design stub.** The re-authorization path is tested with a test-only tool, but no production tool exists. AI-02 must add its own financial parity tests.
-7. **Gateway-level `permission_denied`** is reachable only through the tool re-authorization path. The route middleware answers first on the request path.
-8. `tenant_id` appears in log lines. This is operational metadata, not a secret.
+4. **Existing tenants' stored accountant role is not backfilled** (no migration). They stay denied until granted, which is safe while the feature is off. A backfill is a separate decision.
+5. **Tool contract is a design stub.** The re-authorization path is tested with a test-only tool, but no production tool exists. AI-02 must add its own financial parity tests.
+6. **Gateway-level `permission_denied`** is reachable only through the tool re-authorization path. The route middleware answers first on the request path.
+7. `tenant_id` appears in log lines. This is operational metadata, not a secret.
 
 ## 7. Remaining work and next step
 
@@ -155,4 +189,4 @@ Run on SQLite against the assembled app, using the repo's own assembly (`setup.s
 - AI-04: Document Center integration with a separate consent.
 - Before any live provider: privacy, retention and residency approval, billing owner and caps. These open gates are unchanged from contract §5.
 
-**Next step:** review this Draft PR and CI results. If the owner accepts the log-only audit, proceed to AI-02. No merge or deploy was performed.
+**Next step:** owner review of Draft PR #1546 (CI is green). AI-02 follows, with durable audit and atomic budgets as hard prerequisites for any paid call. No merge or deploy was performed.
