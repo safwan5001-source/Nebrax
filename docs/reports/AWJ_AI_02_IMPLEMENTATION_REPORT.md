@@ -132,6 +132,7 @@ AI-02 is delivered as **two stacked Draft PRs**, because one PR would mix a migr
 |---|---|
 | `AiMeteringTest` | **28 passed** |
 | `AiAuditTest` | **16 passed** |
+| `AiMeteringMigrationTest` (final review) | **3 passed, 1 skipped on SQLite; 4 passed on PostgreSQL** |
 | `AiAssistantGatewayTest` (AI-01 regression, unchanged) | **39 passed** |
 | Nearby guard and RBAC suites (`BranchIsolationGuardTest`, `ApiTenantIsolationTest`, `ApiUnauthenticatedResponseTest`, `ApplicationAccessGateGuardTest`, `RoleGrantBoundaryTest`, `UserGrantBoundaryTest`, `MeActorScopeTest`, `PublicApiWriteSurfaceTest`) | **98 passed** |
 | Full local suite (`php artisan test`, SQLite) | **7415 passed, 140 skipped, 26 failed** (59,104 assertions, 679 s) |
@@ -147,7 +148,7 @@ Commands: `php artisan test --filter=AiMeteringTest`, `--filter=AiAuditTest`, `-
 PHPUnit runs inside a transaction, so it cannot show true parallelism. I ran **12 parallel PHP processes** against the real SQLite database file. Each reserved 400 tokens against a 1,000-token cap on both the global row and a tenant row.
 - **Result:** exactly 2 succeeded and 10 were refused (`platform_budget_exceeded`). The final reserved total was 800, never above the cap.
 - **Cleanup:** the temporary rows were deleted afterwards.
-- **Limit of this evidence:** this ran on SQLite only. PostgreSQL uses row locks for the same single statement and is covered by CI for correctness, but I did not run a parallel race on PostgreSQL.
+- **PostgreSQL:** the same race was run again during the final review, see A8.
 
 ### Coverage
 
@@ -166,7 +167,7 @@ CI results for the PR head are recorded in the PR description.
 
 ## A6. Risks and open issues
 
-1. **Single-statement atomicity is exercised for real only on SQLite.** On PostgreSQL it relies on the same statement's row lock, and CI runs the functional tests, but no parallel race was run there.
+1. ~~Single-statement atomicity only exercised on SQLite~~ — **closed in the final review (A8):** the same race was repeated on a local PostgreSQL 16 (16 processes: 2 granted, 14 refused, reserved total 800 of a 1,000 cap).
 2. **Audit is database-level append-only only through the model.** Raw SQL or DBA access can alter it. The retention command deletes by design. Stronger tamper evidence (hash chaining or database triggers) is a possible later step and was not added.
 3. **Budget rows must be provisioned by an operator.** Until a UI or command exists, there is no way to set caps outside code. The failure mode is safe: no row means no paid call.
 4. **The reaper charges abandoned reservations in full by default.** This is conservative: a crash can consume budget without a real charge. The failure policy is configurable.
@@ -177,3 +178,29 @@ CI results for the PR head are recorded in the PR description.
 ## A7. Recommended next action
 
 Review and merge AI-02A first (with CI green), then AI-02B. Before any real provider adapter, create the global and tenant caps through a reviewed operator path.
+
+## A8. Final review — migration date and ordering
+
+**Decision: the migration keeps its name, `2026_11_13_010000_create_ai_metering_and_audit_tables.php`. No rename.**
+
+| Question | Finding |
+|---|---|
+| Is it ordered correctly? | Yes. It is the last file in `database/migrations` (previous: `2026_11_12_010000_add_party_snapshot_to_invoices`), and sorts after `2025_01_01_000001_create_tenants_and_users`, the only table it depends on (foreign keys to `tenants`). It depends on no later migration, and nothing depends on it. |
+| Is the "future" date a problem? | No. The calendar date today is 2026-10-16, but `main` already holds 21 migrations dated `2026_11_*`, including `2026_11_12_010000`, committed on 2026-10-16. The repository uses a rolling sequence that runs ahead of wall-clock time, and `2026_11_13` continues it. A date earlier than `2026_11_12` would be the anomaly: it would sort before migrations that are already applied. |
+| Execution-order risk? | Laravel runs pending migrations in filename order and skips applied ones, so a deployed database applies this one after everything already applied. The only hazard would be a future branch adding a migration that sorts *before* this one; it would still be independent of these three new tables, so there is no ordering conflict. |
+| Is a rename necessary or safe? | Not necessary. Renaming after the file has run anywhere would make Laravel treat it as a new migration and try to recreate the tables. Before merge it would only churn the stacked PR. |
+
+### Verification run (local, in addition to CI)
+
+| Check | SQLite | PostgreSQL 16.15 (local) |
+|---|---|---|
+| `migrate:fresh` (all migrations including this one) | pass | pass |
+| `migrate:rollback --step=1` removes only this migration's three tables | pass | pass (no `ai_*` table remains) |
+| `migrate` re-applies it incrementally | pass | pass |
+| Non-negative `CHECK` constraints present and enforced | not applicable (SQLite cannot add them after creation) | pass: a negative cap is rejected |
+| New `AiMeteringMigrationTest` (4 tests) | 3 passed, 1 skipped (PostgreSQL-only CHECK) | 4 passed |
+| All AI suites (`AiAssistantGatewayTest`, `AiMeteringTest`, `AiAuditTest`, `AiFinanceToolsTest`) | passed in earlier runs | **109 passed (1,433 assertions)** |
+| Parallel processes reserving 400 tokens against a 1,000-token cap on a global row and a tenant row | 12 processes: 2 granted, 10 refused | **16 processes: 2 granted, 14 refused, reserved total 800** |
+
+- `AiMeteringMigrationTest` belongs to this PR (#1548). It guards the ordering relative to the migration's dependency, the `down()` and `up()` round trip (only its own tables are dropped), the database-level uniqueness, and the PostgreSQL `CHECK`.
+- The local PostgreSQL was started only for this verification, on a throwaway database. No existing migration or data was changed.
