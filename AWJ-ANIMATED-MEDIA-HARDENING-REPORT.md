@@ -5,14 +5,15 @@
 | PR | https://github.com/safwan5001-source/Nebrax/pull/1541 — **open, not merged** |
 | Branch | `claude/awj-animated-media-support-7kzzga` |
 | Base SHA | `a2d2fcb7f83cfaa8cb361eb2744de7fc649393e5` (PR base; `main` has since advanced to `5fb6f23`, PR reports *mergeable: clean*) |
-| Code head (verified) | `f3a46a84df8055356fea1e8f1dd51cddb6a798dc` |
-| Final head | the commit that adds this report (shown on the PR; no code, test or config change after `f3a46a8`) |
-| Scope | F1, F2, F4, F5 fixes · F3 assessment (no limit change) · limited cleanup · verification |
+| Round-1 code head (verified) | `f3a46a84df8055356fea1e8f1dd51cddb6a798dc` |
+| Round-2 code head (verified) | `a95839fbb99e27446721655f348b07186077172e` — F3 limit change (§10) |
+| Final head | the commit that adds this report update (docs-only; the exact SHA is the PR head and is given in the hand-off message) — this report only (docs-only on top of the round-2 code head) |
+| Scope | Round 1: F1, F2, F4, F5 fixes · F3 assessment · limited cleanup. **Round 2 (§10): F3 limit 150 M → 40 M, reviewability assessment of `s0-spikes/`, final verification** |
 | Not done (by instruction) | Phase 2 · migrations · API/contract changes · merge · deploy · production config |
 
 ## Recommendation: **READY FOR REVIEW**
 
-All four approved findings (F1, F2, F4, F5) are fixed with PoC-based regression tests, 7/7 CI checks (incl. PostgreSQL) are green on the code head, and nothing was merged or deployed. **Condition for merge:** the owner decides F3 (§2, §9) — it is a documented medium risk with a kill switch, not a code defect, so it does not block *review*; it should be settled (or knowingly accepted) before merge.
+F1, F2, F4, F5 are fixed with PoC-based regression tests; the F3 limit is now **40,000,000** (animated media only) with boundary tests; CI is green on the code heads including SQLite and PostgreSQL (§6, §10.5); nothing was merged or deployed. No open blocker. Remaining risks are listed in §7/§10.6 (mainly: no physical-device validation). The optional evidence split is analysed in §10.3 and is **not** executed.
 
 ---
 
@@ -47,7 +48,7 @@ Same harness (`security/harness/fuzz.py`), same seeds and iteration counts as th
 
 ---
 
-## 2. F3 — decoded browser memory (assessment only; `max_total_pixels` is still 150,000,000)
+## 2. F3 — decoded browser memory (round-1 assessment; the limit was **then** 150,000,000 — lowered to 40,000,000 in round 2, §10.1)
 
 ### Method
 - Real **Chromium 141** (Playwright build) on a 16 GB / 4-vCPU Linux host, loading GIF/WebP through the same `<img>` + same-origin route a storefront uses; renderer RSS summed over `--type=renderer` processes, baseline = `about:blank` (≈ 155 MB), sampled every 1 s. Memory climbs at roughly real-time pace (≈ frames × 100 ms; e.g. 60 frames ≈ 6 s to plateau), consistent with frames being decoded as the animation advances, so it keeps rising for one **full loop** (playback itself is inferred from this growth — a 1×1-canvas colour canary never observed a change, so it is not independently proven). Windows were therefore ≥ loop length (60-frame fixtures 8–12 s, 300-frame fixtures 45 s; an earlier 8-s run of a 300-frame fixture under-measured and was discarded and redone).
@@ -123,7 +124,7 @@ What drives the size: **production code is 23 % of added lines**; the rest is te
 | **Retained** | AVIF/R2/video/streaming spike scripts and result JSON | Meaningful evidence behind the S0 go/no-go decisions; owner asked to preserve reproducibility. `result-seaweedfs.json` and `result-scality.json` are near-identical in shape but are two independent S3 implementations — kept as separate evidence. |
 | **Retained** | `AWJ-ANIMATED-MEDIA-{IMPLEMENTATION,PHASE1-ACCEPTANCE,S0-FEASIBILITY,HARDENING}-REPORT.md`, Phase 2 proposal | Each answers a different gate (build / acceptance / feasibility / hardening). Overlap exists (CI history, risk lists) but merging them would lose the audit trail of owner approvals; flagged below as a candidate if the owner wants one consolidated document. |
 | **Not touched** | PHP/Vitest/Playwright tests, `web/` ↔ `storefront/` mirrored contracts and `store-preview.css`, production files > 400 lines | No defect found in the mirrored contracts; no demonstrated maintenance problem justifies splitting `StorefrontAnimatedImage.php` (≈ 540 lines, one cohesive parser, 90+ tests). |
-| **Reported, not done** | Moving `docs/plans/store/s0-spikes/` (≈ 60 files) into its own docs-only PR | It would cut this PR's file count roughly in half and make code review easier, but it deletes evidence from the branch the owner asked to be preserved, and rewrites history references in the S0 report. Low technical risk; **needs an owner decision**. |
+| **Reported, not done** (round 2 analysis: §10.3) | Moving `docs/plans/store/s0-spikes/` (≈ 60 files) into its own docs-only PR | It would cut this PR's file count roughly in half and make code review easier, but it deletes evidence from the branch the owner asked to be preserved, and rewrites history references in the S0 report. Low technical risk; **needs an owner decision**. |
 
 ## 5. Tests and results
 
@@ -154,11 +155,11 @@ What drives the size: **production code is 23 % of added lines**; the rest is te
 
 | Risk | Level | Note |
 |---|---|---|
-| **F3 browser memory / mobile re-decode CPU** | **Medium** | Limit unchanged at 150 M ⇒ up to ≈ 600 MB decoded per image on cache-everything browsers; low-RAM browsers re-decode (CPU/battery). Requires owner decision (§2). Mitigated for now by: placement restriction (backgrounds and slider slides only), `prefers-reduced-motion` still, pause/play control, kill switch `STOREFRONT_MEDIA_ANIMATED_ENABLED`, feature unmerged. |
+| **F3 browser memory / mobile re-decode CPU** | **Medium → Low-Medium** | *Round 1 text:* limit was 150 M ⇒ up to ≈ 600 MB decoded per image. *Now (§10.1):* 40 M ⇒ ≈ 160 MB per image; low-RAM browsers still re-decode (CPU/battery, unmeasured). Superseded context: Requires owner decision (§2). Mitigated for now by: placement restriction (backgrounds and slider slides only), `prefers-reduced-motion` still, pause/play control, kill switch `STOREFRONT_MEDIA_ANIMATED_ENABLED`, feature unmerged. |
 | Real-device/Safari/Firefox behaviour | Medium (unknown) | Nothing here was run on physical devices; headless desktop Chromium only. |
 | F6/F7/F8 | Low/Info | Arbitrary bytes inside image-data streams survive sanitising; ICCP/padding; delay clamping untested in Safari/Firefox. |
 | Stricter WebP/GIF acceptance | Low | A hand-crafted but spec-valid WebP with trailing unknown chunks inside an `ANMF`, or a GIF with a non-standard-size application extension, is now rejected with the "re-export" message. Encoders exercised in the review are unaffected (all 35 encoder-made seeds still accepted); other encoders were not tested. |
-| PR size / reviewability | Low | 130+ files, ≈ 1/3 non-production spike material (see §4 for the split option). |
+| PR size / reviewability | Low | ~130 files, ≈ 1/3 of added lines are non-production spike evidence; split analysed in §10.3 (not executed). |
 | `main` has advanced (`5fb6f23`) | Low | GitHub reports the PR *mergeable: clean*; re-check CI after any rebase/merge. |
 | PR description is from the first revision | Info | Still correct in substance (GIF/WebP only, no migration); the acceptance, S0 and this report supersede its "not verified" list. |
 
@@ -166,14 +167,119 @@ What drives the size: **production code is 23 % of added lines**; the rest is te
 
 - Branch: `claude/awj-animated-media-support-7kzzga`
 - Base SHA: `a2d2fcb7f83cfaa8cb361eb2744de7fc649393e5`
-- Code head SHA: `f3a46a84df8055356fea1e8f1dd51cddb6a798dc`
-- Final head SHA: the commit adding this report (see the PR; docs-only on top of `f3a46a8`)
+- Round-1 code head: `f3a46a84df8055356fea1e8f1dd51cddb6a798dc`
+- Round-2 code head: `a95839fbb99e27446721655f348b07186077172e`
+- Final head SHA: the commit that adds this report update (docs-only; the exact SHA is the PR head and is given in the hand-off message) (docs-only on top of the round-2 code head)
 - PR: https://github.com/safwan5001-source/Nebrax/pull/1541
 
 ## 9. Owner decisions requested
 
-1. **F3:** approve lowering `animated.max_total_pixels` (recommended **40 M**; **75 M** at most) — or keep 150 M knowingly.
-2. Optionally split `s0-spikes/` into a docs-only PR (§4).
+1. ~~F3 limit~~ — **decided and applied in round 2: 40 M** (§10.1).
+2. Optional evidence split — see §10.3 (procedure proposed, awaiting a go/no-go; **not executed**).
 3. Real-device memory/CPU validation (iOS Safari, Android Chrome) before relying on any limit.
 
 No merge, deploy, migration, production configuration change or Phase 2 work was performed.
+
+---
+
+## 10. Round 2 — final F3 gate & reviewability
+
+### 10.1 F3: `animated.max_total_pixels` 150,000,000 → **40,000,000** (owner-approved)
+
+**Change (3 lines of config, no logic change):** `config/storefront_media.php → animated.max_total_pixels`. The only consumer is `StorefrontMediaService::assertAnimatedLimits()` (`W × H × frames > max_total_pixels` ⇒ `animated_too_heavy`), executed during `inspect()` — i.e. **before any storage write** (verified by tests below).
+
+Untouched (asserted by `the_animated_total_pixel_budget_is_40_million_and_nothing_else_moved`):
+
+| Limit | Value | |
+|---|---|---|
+| animated frames / duration / edge / pixels per frame / bytes | 300 / 20 s / 2560 px / 2.5 MP / 5 MB | unchanged |
+| static images: bytes / short edge / max edge / max pixels | 5 MB / 320 / 8192 / 40,000,000 | unchanged (the static 40 M cap is a separate key and merely happens to have the same value) |
+| API error code / localized messages | `animated_too_heavy`, "الصورة المتحركة ثقيلة على المتصفح (أبعاد × إطارات). قلّل الأبعاد أو عدد الإطارات." and the AR/EN `mediaErr_animated_too_heavy` strings | unchanged (messages carry no number, so none needed updating) |
+
+**Boundary tests** (`StorefrontAnimatedMediaTest`; 400×400 = 160,000 px/frame ⇒ the budget is exactly **250 frames**):
+
+| Case | Σ pixels | Expected | Result |
+|---|---|---|---|
+| 249 frames — just below | 39,840,000 | `created`, 249 frames recorded | ✅ |
+| 250 frames — exactly at | 40,000,000 | `created` (limit is `>`) | ✅ |
+| 251 frames — just above | 40,160,000 | `rejected` / `animated_too_heavy`, **no row, no new storage call** | ✅ |
+| 300 frames (fine under the old 150 M) | 48,000,000 | `rejected` / `animated_too_heavy`, 0 rows, **0 storage calls** | ✅ |
+| existing `too heavy (frames × pixels)` provider case | 48,000,000 | now runs on the **default** config (the test no longer overrides the limit) | ✅ |
+
+**Documentation updated:** `config/storefront_media.php` (comment with the measured rationale), `AWJ-ANIMATED-MEDIA-IMPLEMENTATION-REPORT.md` (2 places), `docs/plans/store/AWJ-ANIMATED-MEDIA-PHASE2-ARCHITECTURE-PROPOSAL.md`. `CLAUDE.md` and the V0 contract state no numeric value, so they needed no change. Historic evidence documents (S0 report, round-1 sections above) keep "150 M" deliberately, labelled as the then-current value.
+
+**Compatibility:** enforced at upload only. PR #1541 is unmerged/undeployed so no stored production animation exists; anything uploaded under a higher limit would keep serving. Users uploading banners between 40 M and 150 M Σpixels (e.g. 1920×1080×48) now get `animated_too_heavy` with the existing "reduce dimensions or frames" guidance.
+
+### 10.2 Verification of this change
+
+| Check | Result |
+|---|---|
+| Focused: `StorefrontAnimatedImageTest` + `StorefrontAnimatedMediaTest` | **68 passed / 480 assertions** (65 → 68: +2 new budget tests, +1 limit-guard test; the provider case was reworked, not removed) |
+| Related regression sweep: `StorefrontMedia*`, `StorefrontCustomizer*`, `*Contrast*`, `*MediaRef*`, `StorefrontPublished*`, `StorefrontBuilder*`, `ProductMedia*`, `CategoryMedia*` | **363 passed, 1 skipped, 0 failed** (3,724 assertions) — static media backward compatibility, derivatives, delivery, publish gates, contrast |
+| Tenant isolation & publication gating (inside the focused run) | `animation is tenant scoped in the workspace api`, `a published animation is served through the gate and never across tenants`, `the signed workspace url … tampered…`, `an animation is publishable only where the storefront renders it`, `text over an animated background publishes only under a scrim…`, `crop rotate and framing on an animation are refused…` — all ✅ unchanged |
+| Full local suite | **Not re-run** (as instructed; the change is one config value + tests). Round-1 full run: 7,287 passed / 26 `Fuel*` failures from missing `bcmath` in this sandbox. Full SQLite + PostgreSQL suites run in CI (§10.5). |
+
+### 10.3 Would moving `docs/plans/store/s0-spikes/` into a separate PR materially simplify #1541?
+
+**Facts**
+- `s0-spikes/` is **69 of 129 files (53 %) but only 2,601 of 7,621 added lines (34 %)**, and **0 executable product lines**. Without it, #1541 would be **60 files / ≈ +5,020 lines**, all production code, tests and the four gate reports.
+- No runtime or CI dependency: nothing in `app/`, `config/`, `web/`, `storefront/` or the workflows reads it; the four PoCs used by tests are embedded as base64 in `AnimatedMediaFixtures.php` (a comment there names the folder). Only three documents reference it: the S0 report, this report and that fixture comment.
+- CI jobs for docs-only paths still run the full PHP matrix, so a separate PR costs ≈ 18 minutes of CI but no extra risk.
+
+**Assessment:** the split is **feasible, low-risk and mechanical, with moderate benefit**. It would halve the file count a reviewer scrolls, but the spike files are one path prefix that reviewers can already collapse/filter (`-docs/plans/store/s0-spikes/**`), contain no code that ships, and the security-relevant diff (parser + tests) is the same either way. The cost is coordination: two PRs, link updates in two reports, and the evidence travelling with a different merge decision than the code it justifies. **My recommendation: do the split only if the reviewer asks for it; otherwise leave #1541 intact** (this is a preference, not a blocker — it does not make the PR safer).
+
+**Proposed exact safe procedure (NOT executed; needs your explicit go):**
+
+1. `git fetch origin main && git switch -c claude/awj-animated-media-s0-evidence origin/main` (new branch; nothing existing is touched).
+2. `git checkout claude/awj-animated-media-support-7kzzga -- docs/plans/store/s0-spikes AWJ-ANIMATED-MEDIA-S0-FEASIBILITY-REPORT.md` → one commit "docs(animated-media): S0 feasibility evidence (spikes, PoCs, harnesses, reports)". Tree contents are byte-identical to the PR branch; history is **not** rewritten.
+3. Push, open a **docs-only PR** (ready for review, not merged). Verify `git diff --stat origin/main` lists only those paths and that `git ls-tree -r` file hashes equal the PR branch's (`git diff --stat claude/awj-animated-media-support-7kzzga -- docs/plans/store/s0-spikes` is empty).
+4. Only after step 3 is reviewed/accepted by you: on the #1541 branch, a normal forward commit `git rm -r docs/plans/store/s0-spikes AWJ-ANIMATED-MEDIA-S0-FEASIBILITY-REPORT.md` plus link edits in this report and the Phase-1 acceptance report ("evidence: PR #<new>"). No force-push, no rebase.
+5. Re-run the 68 focused tests (no dependency expected), push once, check CI once (SQLite + PostgreSQL).
+6. Rollback at any point: `git revert` the step-4 commit; the evidence PR is independent.
+7. Merge order is unconstrained; recommended: evidence PR first so the report links resolve.
+
+**Risks of the split:** dangling links if the PRs merge out of order; PoC provenance for F1/F2/F4/F5 would live in a different PR than the fix (mitigated: the four PoCs stay embedded in tests); the `security/` and `memory/` harness folders are the evidence for the hardening claims, so the hardening report would have to cite the other PR.
+
+### 10.4 PR statistics — before and after round 2
+
+`git diff --numstat a2d2fcb…<head>`; *Start of round 2* = `ffbd367`; *Round-2 code head* = `a95839f`; *Final* = with this report update.
+
+| Category | Files (start of round 2) | +/− | Files (code head) | +/− | Files (final) | +/− |
+|---|---|---|---|---|---|---|
+| Production code | 37 | +1,748 / −93 | 37 | +1,750 / −93 | 37 | +1,750 / −93 |
+| Tests & fixtures | 16 | +2,245 / −2 | 16 | +2,296 / −2 | 16 | +2,296 / −2 |
+| Documentation / reports | 7 | +1,027 / −1 | 7 | +1,027 / −1 | 7 | +1,115 / −1 |
+| S0 spike evidence (`s0-spikes/`) | 69 | +2,601 / −0 | 69 | +2,601 / −0 | 69 | +2,601 / −0 |
+| **Total** | **129** | **+7,621 / −96** | **129** | **+7,674 / −96** | **129** | **+7,762 / −96** |
+
+*Binary PoC images count as 0 lines. Round 2 changed 2 production lines (config), +51 test lines, +88 report lines; file count is unchanged (129). Since the start of the hardening task (`519312a`: 125 files, +6,941 / −96) the PR is +4 files / +821 lines — see §3.*
+
+Round 2 added no files outside tests/config/docs, and no spike files. The numbers are **not** reduced: the split (§10.3) is the only change that would shrink the PR materially, and it was not executed.
+
+### 10.5 GitHub CI
+
+| Check — head `a95839f` (round-2 code head) | Result |
+|---|---|
+| `php artisan test (L11, sqlite)` | ✅ success (16 m 37 s) |
+| `php artisan test (L11, pgsql)` — **PostgreSQL** | ✅ success (17 m 06 s) |
+| `CI Gate` | ✅ success |
+| `web build (Next.js)` | ✅ success |
+| `storefront (lint + typecheck + test)` | ✅ success |
+| `merchant preview visual QA` | ✅ success |
+| `published footer visual QA` | ✅ success |
+
+7/7 green on the round-2 code head, including SQLite and PostgreSQL (one poll after the expected run time, not repeated polling). The final head differs from `a95839f` only by this Markdown report, so its CI result is not re-awaited; it is visible on the PR. Previous heads: `f3a46a8` 7/7 green, `ffbd367` 7/7 green (docs-only).
+
+### 10.6 Remaining risks (after round 2)
+
+| Risk | Level | Note |
+|---|---|---|
+| No physical-device validation (iOS Safari, Android, Firefox, WebView) of memory/CPU | Medium (unknown) | The 40 M budget is justified on desktop Chromium + Chromium low-RAM-mode measurements only. Re-decode CPU/battery of capped browsers was never measured. |
+| Tighter budget rejects some previously-planned banners (40–150 M Σpixels) | Low | Intentional; clear existing error code/message; limit is a single config key; kill switch `STOREFRONT_MEDIA_ANIMATED_ENABLED` unchanged. |
+| F6/F7/F8 (info/low) | Low | Unchanged from §7. |
+| Evidence split not executed | Info | Optional; procedure ready (§10.3). |
+| `main` advanced since the PR base | Low | PR reported *mergeable: clean*; re-run CI after any rebase/merge. |
+
+### 10.7 Final recommendation: **READY FOR REVIEW**
+
+No code defect or failing check is open. No merge, deployment, migration, API-breaking change, Phase 2 work or production configuration change was made. Stopping here.
