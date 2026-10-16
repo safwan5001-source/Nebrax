@@ -180,6 +180,9 @@ class AiAssistantGateway
             'locale' => $locale,
             'message' => ['role' => 'assistant', 'content' => $reply['content']],
             'data_categories' => $categories,
+            // نطاق **التفويض** المحلول لهذا الفاعل — ليس ما طُبّق على البيانات. ما طبّقته كل أداة فعلاً (ومنه أن
+            // التقارير المالية بلا بُعد مخزن) في `tool_calls[].result.scope` وهو المرجع الوحيد لتفسير الأرقام.
+            'scope_kind' => 'authorization',
             'scope' => $scope,
             'usage' => ['input_tokens' => $usage['input_tokens'], 'output_tokens' => $usage['output_tokens']],
             'tool_calls' => $executed,

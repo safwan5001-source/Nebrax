@@ -804,6 +804,59 @@ class AiFinanceToolsTest extends TestCase
         $this->assertLessThan($owner['totals']['total_revenue']['minor'], $both['totals']['total_revenue']['minor']);
     }
 
+    /**
+     * مراجعة الجاهزية للدمج: لا تُوصَف أرقام مالية لمستخدم مقيَّد بمخازن بأنها خاصة بمخازنه، في أي موضع من
+     * الردّ — نتيجة الأداة أو غلاف البوابة.
+     *
+     * @test
+     */
+    public function financial_figures_are_never_described_as_warehouse_specific_for_a_warehouse_restricted_user(): void
+    {
+        $auth = $this->financeTenant();
+        $actors = $this->actorMatrix($auth);
+        $mine = $actors['ids']['whMine'];
+
+        $calls = [
+            ['finance.income_statement', ['from' => '2026-10-01', 'to' => '2026-10-20']],
+            ['finance.receivables_aging', ['as_of' => self::TODAY]],
+            ['finance.payables_aging', ['as_of' => '2026-09-01']],
+        ];
+        foreach ($calls as [$tool, $args]) {
+            $res = $this->runTool($actors['warehouse'], $tool, $args)->assertOk();
+            $result = $res->json('data.tool_calls.0.result');
+
+            // ١) في نتيجة الأداة: كلمة «warehouse» لا تظهر إلا داخل `scope.warehouse` الذي ينفي التطبيق صراحةً.
+            $paths = [];
+            $walk = function (array $node, string $path) use (&$walk, &$paths) {
+                foreach ($node as $key => $value) {
+                    $here = $path === '' ? (string) $key : $path . '.' . $key;
+                    if (stripos((string) $key, 'warehouse') !== false || (is_string($value) && stripos($value, 'warehouse') !== false)) {
+                        $paths[] = $here;
+                    }
+                    if (is_array($value)) {
+                        $walk($value, $here);
+                    }
+                }
+            };
+            $walk($result, '');
+            $this->assertNotEmpty($paths, "{$tool}: the result must state the warehouse position explicitly");
+            foreach ($paths as $path) {
+                $this->assertStringStartsWith('scope.warehouse', $path, "{$tool}: `{$path}` must not live outside scope.warehouse");
+            }
+            $this->assertSame(
+                ['mode' => 'not_applicable', 'ids' => [], 'reason' => 'financial_reports_have_no_warehouse_dimension', 'user_restriction_applied' => false],
+                $result['scope']['warehouse'],
+                $tool,
+            );
+            // ٢) معرّف مخزنه لا يظهر في الأرقام ولا في أي حقل من النتيجة.
+            $this->assertStringNotContainsString($mine, json_encode($result), $tool);
+
+            // ٣) غلاف البوابة يُعرِّف نفسه نطاقَ تفويضٍ لا مرشِّح بيانات، فلا يُقرأ `assigned` على أنه تصفية.
+            $this->assertSame('authorization', $res->json('data.scope_kind'), $tool);
+            $this->assertSame(['mode' => 'assigned', 'ids' => [$mine]], $res->json('data.scope.warehouse'), $tool);
+        }
+    }
+
     /** @test */
     public function naming_warehouses_is_always_explicit_never_silently_ignored_or_widened(): void
     {
