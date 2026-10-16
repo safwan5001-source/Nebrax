@@ -2002,7 +2002,8 @@
       "pos": "Point of sale",
       "sales": "Sales",
       "self_service": "Employee self-service",
-      "supplier_refunds": "Supplier refunds"
+      "supplier_refunds": "Supplier refunds",
+      "ai": "AI"
     },
     "perm_actions": {
       "view": "View",
@@ -2044,7 +2045,8 @@
       "submit": "Submit",
       "operate": "Operate",
       "publish": "Publish",
-      "reassign": "Reassign"
+      "reassign": "Reassign",
+      "use": "Use"
     },
     "weekdays": [
       "Sunday",
@@ -2143,7 +2145,8 @@
       "session": "Sessions",
       "settings": "Settings",
       "shift": "Shifts",
-      "variance": "Variances"
+      "variance": "Variances",
+      "assistant": "Assistant"
     }
   },
   "inventory": {

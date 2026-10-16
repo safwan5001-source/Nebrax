@@ -2002,7 +2002,8 @@
       "pos": "نقطة البيع",
       "sales": "المبيعات",
       "self_service": "الخدمة الذاتية للموظفين",
-      "supplier_refunds": "استردادات الموردين"
+      "supplier_refunds": "استردادات الموردين",
+      "ai": "الذكاء الاصطناعي"
     },
     "perm_actions": {
       "view": "عرض",
@@ -2044,7 +2045,8 @@
       "submit": "إرسال",
       "operate": "تشغيل",
       "publish": "نشر",
-      "reassign": "إعادة إسناد"
+      "reassign": "إعادة إسناد",
+      "use": "استخدام"
     },
     "weekdays": [
       "الأحد",
@@ -2143,7 +2145,8 @@
       "session": "الجلسات",
       "settings": "الإعدادات",
       "shift": "الورديات",
-      "variance": "الفروقات"
+      "variance": "الفروقات",
+      "assistant": "المساعد"
     }
   },
   "inventory": {
