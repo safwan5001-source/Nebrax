@@ -70,8 +70,8 @@ return [
 
     // AWJ-ANIMATED-MEDIA P2-0 — ceiling on ONE encoded variant file (ladder, thumbnail, transform derivative). The upload
     // limits (5 MiB, 8192 px, 40 MP) bound the SOURCE, not the re-encoded size, and the Next media proxy refuses any body
-    // above its 8 MiB bound (`storefront/src/lib/commerce/media-proxy-guard.ts` → DEFAULT_MAX_BODY_BYTES; pinned by
-    // StorefrontMediaVariantByteCeilingTest). Keep this BELOW that bound and AT OR ABOVE `animated.max_bytes`. A variant that
+    // above its 8 MiB bound (`storefront/src/lib/commerce/media-proxy-guard.ts` → DEFAULT_MAX_BODY_BYTES; pinned from both
+    // sides by StorefrontMediaVariantByteCeilingTest and storefront media-proxy-guard.test.ts). Keep this BELOW that bound and AT OR ABOVE `animated.max_bytes`. A variant that
     // cannot fit even at the lowest step-down quality fails generation with `variant_too_large`; nothing above it is stored.
     'variant_max_bytes' => 6 * 1024 * 1024,
 

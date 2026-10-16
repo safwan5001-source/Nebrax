@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   BodyTooLargeError,
@@ -270,5 +272,36 @@ describe("createConcurrencyGate", () => {
     expect(gate.stats()).toEqual({ active: 0, queued: 0 });
     const fresh = await gate.acquire("after");
     fresh();
+  });
+});
+
+describe("contract with the Laravel variant ceiling", () => {
+  // Laravel never stores a generated file above `storefront_media.variant_max_bytes` (and the animated file is capped at its
+  // own limit), so every published file must fit under this proxy bound. The PHP side is pinned by
+  // StorefrontMediaVariantByteCeilingTest; this is the other half (the PHP test cannot read this file in CI).
+  const config = readFileSync(
+    resolve(process.cwd(), "../config/storefront_media.php"),
+    "utf-8",
+  );
+  const mib = (expr: string) => {
+    const m = expr.match(/(\d+)\s*\*\s*1024\s*\*\s*1024/);
+    return m ? Number(m[1]) * 1024 * 1024 : Number.NaN;
+  };
+
+  it("keeps the default body bound above the generated-variant ceiling", () => {
+    const ceiling = config.match(/'variant_max_bytes'\s*=>\s*([^,]+),/);
+    expect(
+      ceiling,
+      "variant_max_bytes not found in config/storefront_media.php",
+    ).not.toBeNull();
+    expect(mib(ceiling?.[1] ?? "")).toBeLessThan(DEFAULT_MAX_BODY_BYTES);
+  });
+
+  it("keeps the default body bound above the animated upload limit", () => {
+    const animated = config.match(
+      /'max_bytes'\s*=>\s*\(int\) env\('STOREFRONT_MEDIA_ANIMATED_MAX_BYTES',\s*([^)]+)\)/,
+    );
+    expect(animated, "animated.max_bytes not found").not.toBeNull();
+    expect(mib(animated?.[1] ?? "")).toBeLessThan(DEFAULT_MAX_BODY_BYTES);
   });
 });

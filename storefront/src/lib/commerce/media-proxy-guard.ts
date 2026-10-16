@@ -15,7 +15,7 @@
  * resolves the storefront from the forwarded host and checks the Published reference) is untouched.
  */
 
-// Laravel caps every generated file at `storefront_media.variant_max_bytes` (6 MiB; pinned by StorefrontMediaVariantByteCeilingTest) and
+// Laravel caps every generated file at `storefront_media.variant_max_bytes` (6 MiB; pinned by media-proxy-guard.test.ts and StorefrontMediaVariantByteCeilingTest) and
 // the animated file at 5 MiB, so a published file always fits under this bound. Keep it ABOVE that ceiling.
 export const DEFAULT_MAX_BODY_BYTES = 8 * 1024 * 1024;
 export const DEFAULT_MAX_CONCURRENT = 16;

@@ -96,16 +96,18 @@ class StorefrontMediaVariantByteCeilingTest extends TestCase
         return $largest;
     }
 
-    /** @test */
+    /**
+     * The proxy's bound lives in TypeScript (`DEFAULT_MAX_BODY_BYTES` = 8 MiB). CI copies only selected directories into the
+     * Laravel app, so this test cannot read that file; the cross-language pin is `media-proxy-guard.test.ts`, which reads
+     * `config/storefront_media.php` and asserts ceiling < bound. This test pins the Laravel side of the same contract.
+     *
+     * @test
+     */
     public function the_ceiling_is_configured_below_the_proxy_bound_and_above_the_animated_limit(): void
     {
-        $ts = (string) file_get_contents(base_path('storefront/src/lib/commerce/media-proxy-guard.ts'));
-        $this->assertSame(1, preg_match('/DEFAULT_MAX_BODY_BYTES\s*=\s*(\d+)\s*\*\s*1024\s*\*\s*1024/', $ts, $m), 'proxy bound constant not found');
-        $proxyBound = (int) $m[1] * 1024 * 1024;
-
         $ceiling = config('storefront_media.variant_max_bytes');
         $this->assertIsInt($ceiling, 'storefront_media.variant_max_bytes must exist');
-        $this->assertLessThan($proxyBound, $ceiling, 'a variant at the ceiling must still be accepted by the proxy');
+        $this->assertLessThan(8 * 1024 * 1024, $ceiling, 'a variant at the ceiling must still be accepted by the proxy (8 MiB)');
         $this->assertGreaterThanOrEqual((int) config('storefront_media.animated.max_bytes'), $ceiling, 'the sanitised animated file (≤ its own upload limit) must fit');
     }
 

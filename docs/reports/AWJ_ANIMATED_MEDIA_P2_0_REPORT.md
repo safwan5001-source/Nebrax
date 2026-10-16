@@ -131,6 +131,7 @@ The mismatch needs a tall, high-entropy image (the 1920 rung of a 1920×8192 sou
   1. First attempt = the **exact call used before** ⇒ byte-identical output for every image that already fits (verified by a hash-equality test).
   2. Over the ceiling ⇒ re-encode at named `quality:` 65 → 55 → 45 (floor).
   3. Still over ⇒ `StorefrontMediaException('variant_too_large')` with a clear Arabic message. The existing failure handling stores `variants_state=failed` + `variants_error=variant_too_large` (assets) or `error_code` (derivatives) and removes any files already stored. Dimensions are never changed (file names carry the width).
+- Cross-language pin: `media-proxy-guard.test.ts` reads `config/storefront_media.php` and asserts ceiling and animated limit < the proxy bound (mutation-checked: a 9 MiB ceiling fails it); the PHP test pins the Laravel side. (A first version of the PHP test read the TS file directly and failed in CI, because CI copies only selected directories into the Laravel app — fixed in the follow-up commit.)
 - Nothing above the ceiling is ever handed to R2, so every newly generated file is servable by the proxy.
 - `media-proxy-guard.ts`: only the explanatory comment changed (the claim “ladder files are far smaller” was false).
 
