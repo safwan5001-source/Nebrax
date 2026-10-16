@@ -5,10 +5,10 @@
 |---|---|
 | Slice | **P2-0** of `docs/reports/AWJ_ANIMATED_MEDIA_PHASE2_READINESS.md` (that report lives on PR #1551; its status update recording the approvals below is committed there) |
 | Branch | `claude/awj-p2-0-media-proxy-hardening` |
-| PR | __PR__ (targets `main`; **not merged, not deployed**) |
+| PR | [#1552](https://github.com/safwan5001-source/Nebrax/pull/1552) (targets `main`; **not merged, not deployed**) |
 | Base SHA | `1296e1ce79a339f94336f92c3258ec5fb0d815e6` (`origin/main`) |
-| Code head | __CODE__ |
-| Final head | __FINAL__ |
+| Code head | `d38d7ea9a86bffd6aa4a84fc1e870b6244b18cd6` |
+| Final head | this docs-only commit (see PR head) |
 | Scope guard | No video, AVIF or WebM. No migration, API-contract change, R2 credential change or infrastructure. Laravel-served image bytes are **still buffered, never streamed**. |
 
 ## 1. Owner decisions recorded (readiness report, PR #1551)
@@ -112,6 +112,6 @@ Measured with `proxy-bounded-memory.mjs` (100 slow visitors, 250 KiB/s, same mac
 | V1–V7 video slices | **NO-GO until V0 passes** | Per readiness report §5/§6 |
 
 ## 9. Identifiers
-Branch `claude/awj-p2-0-media-proxy-hardening` · PR __PR__ · Base `1296e1ce79a339f94336f92c3258ec5fb0d815e6` · Code head __CODE__ · Final head __FINAL__ · CI: __CI__
+Branch `claude/awj-p2-0-media-proxy-hardening` · PR [#1552](https://github.com/safwan5001-source/Nebrax/pull/1552) · Base `1296e1ce79a339f94336f92c3258ec5fb0d815e6` · Code head `d38d7ea9a86bffd6aa4a84fc1e870b6244b18cd6` · Final head this docs-only commit (see PR head) · CI: on code head `d38d7ea9a`: storefront lint+typecheck+test ✅, merchant preview visual QA ✅, published footer visual QA ✅, php sqlite ✅ (11m49s), php pgsql ✅ (17m27s); CI Gate was still finishing at the last check (it only aggregates the jobs above)
 
 No merge, deployment, migration, API change, R2 or infrastructure change was made.
