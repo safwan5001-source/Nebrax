@@ -402,6 +402,13 @@ php artisan serve
 - XML: `IssueDate`/`IssueTime` بتوقيت السعودية (AST) **بلا `Z`** (BR-KSA-70) عبر `App\Support\ZatcaIssueTimestamp`. وسم QR 3 للمرحلتين يُشتق من اللحظة نفسها **بصيغتيه الحرفيتين القائمتين** — صيغة الوسم 3 (Q1) ومنطقة BR-KSA-04 (Q2) **غير محسومتين** (D-06/TAX-E01) فلا تُغيَّرا ولا تُستنتجا من قبول SDK (لا يفحص الوسم 3).
 - `SigningTime` ووقت الإرسال لحظتان مستقلتان بالتصميم. المرجع: `docs/decisions/ADR-0001-invoice-issue-timestamp.md` و`docs/audits/horizon/REM-13a-IMPLEMENTATION-REPORT.md`.
 
+## لقطة البائع والمشتري (`invoices.party_snapshot`) — REM-14
+
+تُلتقط **مرة واحدة** في `InvoiceService::post()` بحدّ `issued_at` نفسه (بعد القفلين وقبل `ZatcaService::buildFor`) عبر `App\Support\InvoicePartySnapshot` (v1: `seller` و`buyer` ببيانات موجودة أصلاً فقط)، وتثبت بعدها (حارس `Invoice::booted` يغطي `issued_at` و`party_snapshot`، ولا يدخلان `$fillable`).
+- **العرض:** فاتورة مرحَّلة بلقطة v1 تُعرض منها (`parties` في قراءة الفاتورة المفردة، وكتلة `partner`، وPublic API، ومحوّل المستندات `invoice-parties.ts`). المسودة والمرحَّلة القديمة (`NULL`) تقرأ البيانات الحية — **توافق لا ضمان تاريخي**. لا Backfill.
+- **ممنوع** كتابة هذا العمود أو `issued_at` عبر Builder/`DB::table`/SQL خام/`saveQuietly`؛ يحرس ذلك `InvoicePartySnapshotTest` ساكناً.
+- **لم يتغيّر XML/QR/الهاش**: كتل البائع/المشتري داخل XML تبقى مهمة REM-15/16 (تُبنى من هذه اللقطة). نمذجة هوية البائع/المشتري (P1–P6) غير محسومة. المرجع: `docs/audits/horizon/REM-14-IMPLEMENTATION-REPORT.md`.
+
 ## الترقيم التسلسلي
 
 كل أرقام المستندات تُولَّد من مصدر واحد: `App\Support\GeneratesDocumentNumbers` (trait على النموذج).
