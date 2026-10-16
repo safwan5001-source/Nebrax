@@ -27,6 +27,13 @@ final class AiAssistantDenied extends RuntimeException
         'tool_not_registered'       => [403, 'الأداة المطلوبة غير مسجّلة.'],
         'tool_permission_denied'    => [403, 'ليس لديك صلاحية استخدام هذه الأداة.'],
         'too_many_tool_calls'       => [422, 'عدد استدعاءات الأدوات يتجاوز الحدّ المسموح.'],
+        'pricing_unknown'           => [503, 'تسعير المزوّد أو النموذج غير معرّف.'],
+        'budget_not_configured'     => [503, 'لا توجد ميزانية معرّفة لهذه الفترة.'],
+        'budget_exceeded'           => [429, 'تجاوزت المؤسسة سقف استهلاك المساعد الذكي لهذه الفترة.'],
+        'platform_budget_exceeded'  => [503, 'استُنفد سقف المنصة لاستهلاك المساعد الذكي لهذه الفترة.'],
+        'duplicate_request'         => [409, 'هذا الطلب نُفّذ سابقاً بنفس مفتاح التكرار.'],
+        'request_in_progress'       => [409, 'هذا الطلب قيد التنفيذ بنفس مفتاح التكرار.'],
+        'idempotency_key_reuse'     => [422, 'مفتاح التكرار مستخدم مع طلب مختلف.'],
         'internal_error'            => [500, 'تعذّر إكمال الطلب.'],
     ];
 

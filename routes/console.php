@@ -86,3 +86,9 @@ Schedule::command('documents:sweep-scans')
     ->withoutOverlapping()
     ->onOneServer()
     ->sendOutputTo('/proc/1/fd/1');
+
+// AI-02A: سياسة احتفاظ سجلات المساعد الذكي (تدقيق + طلبات منتهية). حذف مجمّع بسيط، آمن للتكرار.
+Schedule::command('ai:prune-records')
+    ->dailyAt('03:40')
+    ->withoutOverlapping()
+    ->onOneServer();
