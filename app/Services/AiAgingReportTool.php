@@ -74,6 +74,10 @@ class AiAgingReportTool extends AiFinanceReportTool
                 'method' => 'document_remaining_balance',
                 'documents' => $this->type === 'payable' ? 'posted_purchases_not_fully_paid' : 'posted_invoices_not_fully_paid',
                 'balance_semantics' => 'current_outstanding_balance',
+                // `as_of` يغيّر مرجع حساب العمر فقط؛ الرصيد حاليٌّ وقت التوليد ولا يُعاد بناؤه لذلك التاريخ.
+                'as_of_role' => 'age_reference_only',
+                'historical_balance_rebuilt' => false,
+                'balance_as_of' => 'generation_time',
                 'age_reference' => 'due_date_else_document_date',
                 'reconciled_to_control_ledger' => false,
             ],
@@ -83,7 +87,11 @@ class AiAgingReportTool extends AiFinanceReportTool
             'rows' => $withPartners
                 ? array_map(fn (array $r): array => ['partner_id' => $r['partner_id'], 'name' => $r['name']] + $buckets($r), $aging['rows'])
                 : [],
-            'warnings' => $isToday ? [] : [['code' => 'as_of_not_historical']],
+            'warnings' => $isToday ? [] : [[
+                'code' => 'as_of_not_historical',
+                'as_of' => $arguments['as_of'],
+                'balance_as_of' => 'generation_time',
+            ]],
         ];
 
         $result['sources'] = [[

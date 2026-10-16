@@ -21,8 +21,10 @@ use InvalidArgumentException;
  *  - **SAR فقط** في المرحلة التجريبية: مستأجر بعملة أخرى يُرفض قبل أي قراءة (`currency_unsupported`).
  *  - الصلاحية `reports.view` (فوق `ai.assistant.use`) يفحصها الحارس عند كل استدعاء بفاعل طازج.
  *  - النطاق: الفروع المحلولة والمصرَّح بها فقط تُمرَّر صراحةً (لا اتساع). التقارير المالية بلا بُعد مخزن،
- *    فيُرفض طلبٌ يحدد مخازن صراحةً (`scope_not_supported`) بدل تجاهله بصمت — ويطابق ذلك سلوك مسارات
- *    `/api/reports/*` الحالية التي تفرض نطاق الفرع وحده.
+ *    فيُرفض طلبٌ يحدد مخازن صراحةً (`scope_not_supported`) بدل تجاهله بصمت. أما المستخدم المقيَّد بمخازن
+ *    ولا يحدد شيئاً فتُعاد له الأرقام كما تعيدها مساراتُ `/api/reports/*` له حرفياً (نطاق الفرع وحده)، مع
+ *    إعلان `warehouse.user_restriction_applied = false`. تقييد المخزن في هذا النظام يحكم قراءات المخزون
+ *    (`ReportWarehouseScope`) لا الأستاذ؛ والمساعد لا يتجاوز ما يراه المستخدم بواجهته ولا يضيّق عنه.
  *  - التواريخ بتوقيت المستأجر، بصيغة `Y-m-d` صارمة، ولا تاريخ مستقبلي.
  */
 abstract class AiFinanceReportTool implements AiAssistantTool
@@ -95,8 +97,15 @@ abstract class AiFinanceReportTool implements AiAssistantTool
             'currency_assumption' => 'sar_only_pilot_tenant_currency_verified',
             'scope' => [
                 'branch' => $branchScope,
-                // التقارير المالية بلا بُعد مخزن؛ لا تُصفّى بمخزن.
-                'warehouse' => ['mode' => 'not_applicable', 'ids' => []],
+                // التقارير المالية بلا بُعد مخزن، فلا تُصفّى به ولا يُقيّدها تقييد المستخدم بمخازن — تمامًا
+                // كمسارات `/api/reports/*` (تفرض نطاق الفرع وحده). تُعلَن صراحةً كي لا يُفهم من «assigned»
+                // في نطاق البوابة أن الأرقام محصورة بمخازنه.
+                'warehouse' => [
+                    'mode' => 'not_applicable',
+                    'ids' => [],
+                    'reason' => 'financial_reports_have_no_warehouse_dimension',
+                    'user_restriction_applied' => false,
+                ],
             ],
             'timezone' => $timezone,
             'generated_at' => CarbonImmutable::now('UTC')->toIso8601String(),

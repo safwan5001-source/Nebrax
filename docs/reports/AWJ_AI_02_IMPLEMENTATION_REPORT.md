@@ -277,7 +277,7 @@ No accounting rule, report calculation, Document Center, Store, UI or Help Cente
 | `app/Services/MockAiAssistantProvider.php`, `app/Contracts/AiAssistantProvider.php` | keyword planner; `today` and `timezone` inputs |
 | `app/Support/AiAssistantDataCategory.php` | `financial_summary` becomes available (still needs consent) |
 | `app/Support/AiAssistantDenied.php` | `invalid_tool_arguments`, `scope_not_supported`, `currency_unsupported` |
-| `tests/Feature/AiFinanceToolsTest.php` | new, 26 tests |
+| `tests/Feature/AiFinanceToolsTest.php` | new, 32 tests (26 initial + 6 from the final review, see B8) |
 | `tests/Feature/AiAssistantGatewayTest.php` | AI-01 tests updated for the new contract (registry now has three tools, financial category now consent-gated, probe tool implements the new methods, fresh-actor assertion) |
 
 ## B3. Compatibility
@@ -291,7 +291,7 @@ No accounting rule, report calculation, Document Center, Store, UI or Help Cente
 
 | Check | Result |
 |---|---|
-| `AiFinanceToolsTest` | **26 passed** |
+| `AiFinanceToolsTest` | **32 passed** (26 initial + 6 added in the final review) |
 | `AiAssistantGatewayTest` (AI-01, updated) | **39 passed** |
 | `AiMeteringTest` + `AiAuditTest` (AI-02A) | **44 passed** |
 | Nearby accounting, report and isolation suites (`ReportStatementsTest`, `ApiReportsTest`, `FinancialStatementsTest`, `ReportEffectiveScopeTest`, `BranchPartnerIsolationTest`, `BranchIsolationGuardTest`, `ApiUnauthenticatedResponseTest`, `ApplicationAccessGateGuardTest`) with the above | **188 passed in total** |
@@ -319,8 +319,8 @@ Recorded in the PR description for the head commit.
 
 ## B6. Risks and open issues (AI-02B)
 
-1. **Aging `as_of` is not historical.** This is existing `ReportService` behavior, now labeled with a machine-readable warning. If the product needs true historical aging, that is an accounting change in a separate task. A model that ignores the warning could narrate a current balance as a past one.
-2. **Warehouse-restricted users see company-wide financials**, matching the existing report endpoints. If warehouse restriction must also limit financial visibility, that is a policy decision (a candidate for a configurable setting) and was not changed here.
+1. **Aging `as_of` is not historical.** This is existing `ReportService` behavior, labeled with a machine-readable warning and explicit basis fields (B8). If the product needs true historical aging, that is an accounting change in a separate task. A model that ignores the warning could narrate a current balance as a past one.
+2. ~~Warehouse-restricted users see company-wide financials~~ — **decided and tested in the final review (B8).** The behavior mirrors the existing report API exactly, is stated in every result, and is guarded by an API-parity test. Whether warehouse restriction *should* also limit financial visibility remains an owner policy decision.
 3. **Mock keyword planning is a demo.** A real model will choose tools and arguments, so its argument validation (already closed-schema) is the control. Real prompt-injection testing belongs to the adapter phase.
 4. **Financial data is not sent to any provider yet.** Before it can be, the real adapter needs the privacy, retention and residency approvals and a decision on whether tool results may be forwarded to the model.
 5. **No drill-down.** Row-level source links (documents, ledger) are intentionally absent; only report-level `api_path` and `ui_path` are returned.
@@ -331,3 +331,62 @@ Recorded in the PR description for the head commit.
 1. Review and merge AI-02A (#1548) first, then retarget and review AI-02B.
 2. Provision budget caps through a reviewed operator path before any real adapter.
 3. Next phase: the AI-03 UI (consent management and states). The real provider adapter stays blocked on the open gates (privacy, residency, billing owner and numeric caps).
+
+## B8. Final review — warehouse scope and aging semantics
+
+### 1. Warehouse-restricted users
+
+**What the existing policy does.**
+- `ReportService::incomeStatement` and `::aging` take no warehouse parameter. Their only scope is `branchIds()`.
+- `GET /api/reports/income-statement` and `GET /api/reports/aging/{type}` are gated by `reports.view` alone. They apply the branch scope and nothing else.
+- Warehouse restriction (`User::allowedWarehouseIds()`, `ReportWarehouseScope`) is applied only to inventory reads: the inventory reports, product warehouse balances, stocktakes, transfers, return and class handlers, and commerce fulfillment.
+- So a warehouse-restricted user already sees company-wide financial statements through the application. I did not assume "restricted warehouse" means "no financial reports".
+
+**Decision: mirror the approved access policy exactly. Do not block, do not widen.**
+- A warehouse-restricted user who names no warehouse gets the financial tools. The numbers equal what the report API returns to the same user.
+- A user restricted by **branch** (with or without a warehouse restriction) stays pinned to those branches. Having a warehouse restriction never weakens the branch restriction.
+- A request that **names** warehouses is always rejected, never ignored:
+  - the user's own warehouse → `422 scope_not_supported`, because the report has no warehouse dimension, so the assistant will not claim to have filtered by it;
+  - a warehouse outside the user's scope, or another tenant's → `403 warehouse_scope_forbidden` (rejected by the gateway before the tool runs).
+- **Stated in every result** (not just in this report): `scope.warehouse` now reads `{mode: not_applicable, ids: [], reason: financial_reports_have_no_warehouse_dimension, user_restriction_applied: false}`. This prevents a model from telling a warehouse-restricted user that the figures are limited to their warehouses. The gateway's own `data.scope.warehouse` keeps showing the authorization scope (`assigned`); the tool block is the authority for what was applied.
+- The same rule is documented in the `AiFinanceReportTool` docblock.
+- No new setting and no accounting change. Making warehouse restriction also govern financial visibility would be a policy decision with more than one defensible answer (CLAUDE.md rule 6), so it is left to the owner. It would need to change the report API too, so the assistant stays consistent with it.
+
+**Tests added** (all in `AiFinanceToolsTest`):
+- `for_every_actor_kind_the_tools_return_exactly_what_the_report_api_returns_to_that_user`: owner, accountant, branch-restricted, warehouse-restricted and both-restricted users. For each, the income statement (totals and revenue rows) and both aging reports (every bucket and the partner ids) equal the HTTP responses of `/api/reports/*` for the same user. This is the "never more, never less than the application shows" guard.
+- `a_warehouse_restriction_neither_blocks_nor_widens_the_financial_tools`: the warehouse-restricted user equals the owner's figures; the user restricted by both is still pinned to the branch and sees strictly less; the result carries the explicit note.
+- `naming_warehouses_is_always_explicit_never_silently_ignored_or_widened`: own warehouse, foreign warehouse, and an unrestricted owner naming a valid one, across all three tools.
+- `where_the_report_api_denies_the_user_the_tools_deny_too`: a user without `reports.view` gets 403 from the API and `tool_permission_denied` from all three tools, with no data.
+- `restricted_users_never_see_another_tenants_data_even_when_naming_its_ids`: restricted users never see a canary from another tenant, and another tenant's branch and warehouse ids are rejected.
+- Mutation checks: widening the branch filter, or silently ignoring named warehouses, makes tests fail.
+
+### 2. Aging and `as_of`
+
+- **Unchanged:** `ReportService::aging` and every accounting rule. The tool still shows exactly the numbers the service returns.
+- **Clarified in the result** (both aging tools):
+  - `basis.as_of_role = age_reference_only`
+  - `basis.historical_balance_rebuilt = false`
+  - `basis.balance_semantics = current_outstanding_balance`
+  - `basis.balance_as_of = generation_time`
+  - `warnings: [{code: as_of_not_historical, as_of, balance_as_of: generation_time}]` whenever `as_of` is not today in the tenant timezone. The warning is absent for today. The `basis` block is identical in both cases, because the balance is always current.
+- **Test** (`a_past_as_of_only_moves_the_age_reference_and_is_flagged_as_not_historical`): an invoice due 2026-05-01 is paid in full today, so it was open on 2026-08-01. For `as_of = 2026-08-01` it is **absent** (the balance is not rebuilt), while a second open invoice moves from the 90+ bucket (today) to the 61–90 bucket (at 2026-08-01). That proves `as_of` changes only the age reference. The numbers equal `ReportService`. A second test checks the warning on both receivables and payables and its absence for today.
+
+### 3. Verification
+
+| Check | Result |
+|---|---|
+| `AiFinanceToolsTest` | **32 passed** on SQLite and on local PostgreSQL 16 |
+| Focused set: all AI suites (`AiAssistantGatewayTest`, `AiMeteringTest`, `AiMeteringMigrationTest`, `AiAuditTest`, `AiFinanceToolsTest`) plus nearby report, scope, isolation and RBAC suites | **219 passed, 1 skipped** on SQLite; **165 passed** on PostgreSQL 16 (the PostgreSQL run covers a subset of the nearby suites) |
+| Mutation checks | 3 tests fail when the branch filter is widened or named warehouses are ignored; restored afterwards |
+| Full suite | Not re-run: the final-review change touches the output shape of two classes and tests only, no accounting code. The earlier full run was 7441 passed, 26 failed (the environmental `bcmath` set). CI runs the full suite on SQLite and PostgreSQL for this head. |
+
+### 4. CI for the final review
+
+See the PR description for the CI result on the final head of each PR.
+
+### 5. Residual risks after the final review
+
+1. **Policy question left open, by instruction:** a warehouse-restricted user sees company-wide financials, as they do in the application today. If the owner decides otherwise, it must change the report API and the assistant together.
+2. **A model must read `warnings` and `basis`.** The labels are machine-readable and explicit, but only a prompt-level instruction or the UI (AI-03) makes sure a narration respects `as_of_not_historical`.
+3. **Audit tamper-resistance** is still model-level only (Part A, risk 2).
+4. **Provider and cap provisioning** gates are unchanged (Part A, risk 3, and Part B, risk 4).

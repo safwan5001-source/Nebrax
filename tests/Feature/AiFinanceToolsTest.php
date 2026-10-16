@@ -284,7 +284,7 @@ class AiFinanceToolsTest extends TestCase
         $this->assertSame('/api/reports/income-statement?from=2026-10-01&to=2026-10-20', $result['sources'][0]['api_path']);
         $this->assertSame('/reports/general/income-statement', $result['sources'][0]['ui_path']);
         $this->assertSame(Carbon::now('UTC')->toIso8601String(), $result['generated_at']);
-        $this->assertSame(['mode' => 'not_applicable', 'ids' => []], $result['scope']['warehouse']);
+        $this->assertSame(['mode' => 'not_applicable', 'ids' => [], 'reason' => 'financial_reports_have_no_warehouse_dimension', 'user_restriction_applied' => false], $result['scope']['warehouse']);
     }
 
     // ───────────────────────── أعمار الديون: المطابقة والأساس ─────────────────────────
@@ -338,6 +338,9 @@ class AiFinanceToolsTest extends TestCase
             'method' => 'document_remaining_balance',
             'documents' => 'posted_purchases_not_fully_paid',
             'balance_semantics' => 'current_outstanding_balance',
+            'as_of_role' => 'age_reference_only',
+            'historical_balance_rebuilt' => false,
+            'balance_as_of' => 'generation_time',
             'age_reference' => 'due_date_else_document_date',
             'reconciled_to_control_ledger' => false,
         ], $result['basis']);
@@ -347,18 +350,65 @@ class AiFinanceToolsTest extends TestCase
     }
 
     /** @test */
-    public function a_past_as_of_is_flagged_as_not_historical_because_balances_are_current(): void
+    public function a_past_as_of_only_moves_the_age_reference_and_is_flagged_as_not_historical(): void
     {
         $auth = $this->financeTenant();
         $tid = $auth['tenant_id'];
-        $this->invoice($tid, $this->mainBranch($tid), $this->partner($tid, 'customer', 'عميل'), '2026-05-01', 100000);
+        $customer = $this->partner($tid, 'customer', 'عميل');
+        // فاتورة مستحقة في 2026-05-01 وسُدّدت بالكامل «اليوم» (2026-10-20): في 2026-08-01 كانت مفتوحة فعلاً.
+        $paid = $this->invoice($tid, $this->mainBranch($tid), $customer, '2026-05-01', 100000, 1, '2026-05-01');
+        $this->inTenant($tid, null, function () use ($customer, $paid) {
+            $payments = app(\App\Services\Accounting\PaymentService::class);
+            $payments->post($payments->create(['partner_id' => $customer, 'invoice_id' => $paid, 'amount' => 115000]));
+        });
+        // وفاتورة أخرى ما زالت مفتوحة، مرجع عمرها يتغيّر مع as_of.
+        $this->invoice($tid, $this->mainBranch($tid), $customer, '2026-06-01', 200000, 1, '2026-06-01');
 
-        $result = $this->toolResult($this->runTool($auth['token'], 'finance.receivables_aging', ['as_of' => '2026-08-01']));
+        $past = $this->toolResult($this->runTool($auth['token'], 'finance.receivables_aging', ['as_of' => '2026-08-01']));
+        $today = $this->toolResult($this->runTool($auth['token'], 'finance.receivables_aging', ['as_of' => self::TODAY]));
 
-        $this->assertSame([['code' => 'as_of_not_historical']], $result['warnings']);
-        $this->assertSame('current_outstanding_balance', $result['basis']['balance_semantics']);
+        // الرصيد حاليّ في الحالتين: المسدَّدة غائبة حتى عند as_of ماضٍ (لا يُعاد بناء رصيد 2026-08-01).
+        $this->assertSame(230000, $past['totals']['total']['minor']);
+        $this->assertSame($past['totals']['total'], $today['totals']['total']);
+        // لكن مرجع العمر تحرّك: 2026-06-01 → 61 يوماً عند 2026-08-01 مقابل 141 عند اليوم.
+        $this->assertSame(230000, $past['totals']['b61_90']['minor']);
+        $this->assertSame(230000, $today['totals']['b90_plus']['minor']);
+        $this->assertSame(0, $past['totals']['b90_plus']['minor']);
+
+        // المطابقة مع ReportService نفسه.
         $expected = $this->direct($tid, $this->ownerId($tid), fn (ReportService $r) => $r->aging('receivable', ['as_of' => '2026-08-01']));
-        $this->assertSame($expected['totals']['total'], $result['totals']['total']['minor']);
+        $this->assertSame($expected['totals']['b61_90'], $past['totals']['b61_90']['minor']);
+
+        // الوسم صريح وقابل للقراءة آلياً.
+        $this->assertSame('2026-08-01', $past['as_of']);
+        $this->assertSame('age_reference_only', $past['basis']['as_of_role']);
+        $this->assertFalse($past['basis']['historical_balance_rebuilt']);
+        $this->assertSame('current_outstanding_balance', $past['basis']['balance_semantics']);
+        $this->assertSame('generation_time', $past['basis']['balance_as_of']);
+        $this->assertSame(
+            [['code' => 'as_of_not_historical', 'as_of' => '2026-08-01', 'balance_as_of' => 'generation_time']],
+            $past['warnings'],
+        );
+        // اليوم المحلي: لا تحذير، ويبقى الوصف نفسه لأن الرصيد دائماً حاليّ.
+        $this->assertSame([], $today['warnings']);
+        $this->assertSame($past['basis'], $today['basis']);
+    }
+
+    /** @test */
+    public function the_not_historical_warning_applies_to_both_aging_tools(): void
+    {
+        $auth = $this->financeTenant();
+        $tid = $auth['tenant_id'];
+        $this->purchase($tid, $this->mainBranch($tid), $this->partner($tid, 'supplier', 'مورد'), '2026-05-01', 4000, 10);
+
+        foreach (['finance.receivables_aging', 'finance.payables_aging'] as $tool) {
+            $past = $this->toolResult($this->runTool($auth['token'], $tool, ['as_of' => '2026-09-30']));
+            $this->assertSame('as_of_not_historical', $past['warnings'][0]['code'], $tool);
+            $this->assertSame('age_reference_only', $past['basis']['as_of_role'], $tool);
+
+            $today = $this->toolResult($this->runTool($auth['token'], $tool, ['as_of' => self::TODAY]));
+            $this->assertSame([], $today['warnings'], $tool);
+        }
     }
 
     // ───────────────────────── تواريخ ومنطقة زمنية وحدود ─────────────────────────
@@ -655,8 +705,169 @@ class AiFinanceToolsTest extends TestCase
 
         $result = $this->toolResult($res);
         $this->assertSame(100000, $result['totals']['total_revenue']['minor']);
-        $this->assertSame(['mode' => 'not_applicable', 'ids' => []], $result['scope']['warehouse']);
+        $this->assertSame(['mode' => 'not_applicable', 'ids' => [], 'reason' => 'financial_reports_have_no_warehouse_dimension', 'user_restriction_applied' => false], $result['scope']['warehouse']);
         $this->assertSame('assigned', $res->json('data.scope.warehouse.mode'));
+    }
+
+    // ───────────────────────── مراجعة نهائية: مطابقة مسارات /api/reports/* وتقييد المخازن ─────────────────────────
+
+    /** @return array{owner:string, accountant:string, branch:string, warehouse:string, both:string, ids:array<string,string>} */
+    private function actorMatrix(array $auth): array
+    {
+        $tid = $auth['tenant_id'];
+        $main = $this->mainBranch($tid);
+        $other = $this->newBranch($auth['token']);
+        $whMine = $this->withToken($auth['token'])->getJson('/api/warehouses')['data'][0]['id'];
+        $whOther = $this->withToken($auth['token'])->postJson('/api/warehouses', ['name' => 'مخزن آخر'])->assertCreated()['data']['id'];
+        $customer = $this->partner($tid, 'customer', 'عميل');
+        $supplier = $this->partner($tid, 'supplier', 'مورد');
+        $this->invoice($tid, $main, $customer, '2026-10-05', 100000, 1, '2026-09-01');
+        $this->invoice($tid, $other, $customer, '2026-10-06', 300000, 1, '2026-06-01');
+        $this->purchase($tid, $main, $supplier, '2026-10-02', 4000, 10);
+        $this->purchase($tid, $other, $supplier, '2026-06-02', 5000, 4);
+        $this->expense($tid, '2026-10-07', 4000);
+
+        // مباشرةً لا عبر /api/users: خطة التجربة تحدّ عدد المستخدمين، وما يُختبر هنا هو النطاق لا إدارة المستخدمين.
+        $make = function (string $email, array $scope) use ($tid) {
+            return $this->inTenant($tid, null, function () use ($email, $scope, $tid) {
+                $user = User::create(['tenant_id' => $tid, 'name' => $email, 'email' => $email, 'password' => 'password123', 'role' => 'admin']);
+                $user->branches()->sync($scope['branch_ids'] ?? []);
+                $user->warehouses()->sync($scope['warehouse_ids'] ?? []);
+
+                return $user->createToken('api')->plainTextToken;
+            });
+        };
+
+        return [
+            'owner' => $auth['token'],
+            'accountant' => $this->tokenForRole($tid, 'accountant', 'acc@fin.test'),
+            'branch' => $make('b@fin.test', ['branch_ids' => [$other]]),
+            'warehouse' => $make('w@fin.test', ['warehouse_ids' => [$whMine]]),
+            'both' => $make('bw@fin.test', ['branch_ids' => [$main], 'warehouse_ids' => [$whMine]]),
+            'ids' => ['main' => $main, 'other' => $other, 'whMine' => $whMine, 'whOther' => $whOther],
+        ];
+    }
+
+    /** @test */
+    public function for_every_actor_kind_the_tools_return_exactly_what_the_report_api_returns_to_that_user(): void
+    {
+        $auth = $this->financeTenant();
+        $actors = $this->actorMatrix($auth);
+
+        foreach (['owner', 'accountant', 'branch', 'warehouse', 'both'] as $kind) {
+            $token = $actors[$kind];
+
+            // قائمة الدخل
+            $api = $this->withToken($token)->getJson('/api/reports/income-statement?from=2026-10-01&to=2026-10-20')->assertOk();
+            $tool = $this->toolResult($this->runTool($token, 'finance.income_statement', ['from' => '2026-10-01', 'to' => '2026-10-20']));
+            foreach (['total_revenue', 'total_expense', 'net_income'] as $key) {
+                $this->assertSame($api->json($key), $tool['totals'][$key]['decimal'], "{$kind} income {$key}");
+            }
+            $this->assertSame(
+                array_map(fn ($r) => [$r['code'], $r['amount']], $api->json('revenues')),
+                array_map(fn ($r) => [$r['code'], $r['amount']['decimal']], $tool['revenues']),
+                "{$kind} revenue rows",
+            );
+
+            // أعمار الذمم (مدينة ودائنة)
+            foreach (['receivable' => 'finance.receivables_aging', 'payable' => 'finance.payables_aging'] as $type => $name) {
+                $api = $this->withToken($token)->getJson("/api/reports/aging/{$type}?as_of=" . self::TODAY)->assertOk();
+                $tool = $this->toolResult($this->runTool($token, $name, ['as_of' => self::TODAY]));
+                foreach (['b0_30', 'b31_60', 'b61_90', 'b90_plus', 'total'] as $bucket) {
+                    $this->assertSame($api->json("totals.{$bucket}"), $tool['totals'][$bucket]['decimal'], "{$kind} {$type} {$bucket}");
+                }
+                $this->assertSame($api->json('rows.*.partner_id'), array_column($tool['rows'], 'partner_id'), "{$kind} {$type} partners");
+            }
+        }
+    }
+
+    /** @test */
+    public function a_warehouse_restriction_neither_blocks_nor_widens_the_financial_tools(): void
+    {
+        $auth = $this->financeTenant();
+        $actors = $this->actorMatrix($auth);
+
+        // المقيَّد بمخزن (بلا تقييد فرع) يرى كل الفروع كالمالك، تماماً كمساره في الـAPI.
+        $owner = $this->toolResult($this->runTool($actors['owner'], 'finance.income_statement', ['from' => '2026-10-01', 'to' => '2026-10-20']));
+        $res = $this->runTool($actors['warehouse'], 'finance.income_statement', ['from' => '2026-10-01', 'to' => '2026-10-20']);
+        $wh = $this->toolResult($res);
+        $this->assertSame($owner['totals'], $wh['totals']);
+        $this->assertSame('not_applicable', $wh['scope']['warehouse']['mode']);
+        $this->assertFalse($wh['scope']['warehouse']['user_restriction_applied']);
+        $this->assertSame('financial_reports_have_no_warehouse_dimension', $wh['scope']['warehouse']['reason']);
+        $this->assertSame('all', $wh['scope']['branch']['mode'], 'a warehouse restriction implies no branch restriction');
+
+        // أما تقييد الفرع فيبقى سارياً حتى مع تقييد المخزن (لا يُضعفه وجود تقييد مخزن).
+        $both = $this->toolResult($this->runTool($actors['both'], 'finance.income_statement', ['from' => '2026-10-01', 'to' => '2026-10-20']));
+        $this->assertSame(['mode' => 'assigned', 'ids' => [$actors['ids']['main']]], $both['scope']['branch']);
+        $this->assertSame(100000, $both['totals']['total_revenue']['minor']);
+        $this->assertLessThan($owner['totals']['total_revenue']['minor'], $both['totals']['total_revenue']['minor']);
+    }
+
+    /** @test */
+    public function naming_warehouses_is_always_explicit_never_silently_ignored_or_widened(): void
+    {
+        $auth = $this->financeTenant();
+        $actors = $this->actorMatrix($auth);
+        $args = ['from' => '2026-10-01', 'to' => '2026-10-20'];
+
+        // مخزنه هو: لا يملك التقرير بُعد مخزن فلا يُدّعى أنه صُفّي به.
+        $this->runTool($actors['warehouse'], 'finance.income_statement', $args, ['scope' => ['warehouse_ids' => [$actors['ids']['whMine']]]])
+            ->assertStatus(422)->assertJsonPath('error.code', 'scope_not_supported');
+        // مخزن ليس له: رفض نطاق صريح (لا يصل إلى فحص الأداة).
+        $this->runTool($actors['warehouse'], 'finance.income_statement', $args, ['scope' => ['warehouse_ids' => [$actors['ids']['whOther']]]])
+            ->assertForbidden()->assertJsonPath('error.code', 'warehouse_scope_forbidden');
+        // المالك غير المقيَّد: اختيار مخزن صالح يُرفض بالأداة نفسها بدل تجاهله.
+        foreach (['finance.receivables_aging' => ['as_of' => self::TODAY], 'finance.payables_aging' => ['as_of' => self::TODAY]] as $tool => $toolArgs) {
+            $this->runTool($actors['owner'], $tool, $toolArgs, ['scope' => ['warehouse_ids' => [$actors['ids']['whMine']]]])
+                ->assertStatus(422)->assertJsonPath('error.code', 'scope_not_supported');
+        }
+    }
+
+    /** @test */
+    public function where_the_report_api_denies_the_user_the_tools_deny_too(): void
+    {
+        $auth = $this->financeTenant();
+        $tid = $auth['tenant_id'];
+        $noReports = $this->customRoleToken($tid, 'no_reports', ['ai.assistant.use', 'invoices.view'], 'nr@fin.test');
+
+        $this->withToken($noReports)->getJson('/api/reports/income-statement?from=2026-10-01&to=2026-10-20')->assertForbidden();
+        $this->withToken($noReports)->getJson('/api/reports/aging/receivable')->assertForbidden();
+        foreach ([
+            ['finance.income_statement', ['from' => '2026-10-01', 'to' => '2026-10-20']],
+            ['finance.receivables_aging', ['as_of' => self::TODAY]],
+            ['finance.payables_aging', ['as_of' => self::TODAY]],
+        ] as [$tool, $args]) {
+            $res = $this->runTool($noReports, $tool, $args);
+            $res->assertForbidden()->assertJsonPath('error.code', 'tool_permission_denied');
+            $this->assertArrayNotHasKey('data', $res->json());
+        }
+    }
+
+    /** @test */
+    public function restricted_users_never_see_another_tenants_data_even_when_naming_its_ids(): void
+    {
+        $a = $this->financeTenant('fin-a');
+        $b = $this->financeTenant('fin-b');
+        $actorsA = $this->actorMatrix($a);
+        $bBranch = $this->mainBranch($b['tenant_id']);
+        $bWarehouse = $this->withToken($b['token'])->getJson('/api/warehouses')['data'][0]['id'];
+        $this->invoice($b['tenant_id'], $bBranch, $this->partner($b['tenant_id'], 'customer', self::SECRET_NAME), '2026-10-05', 99999900, 1, '2026-01-01');
+
+        foreach (['warehouse', 'branch', 'both'] as $kind) {
+            $income = $this->runTool($actorsA[$kind], 'finance.income_statement', ['from' => '2026-10-01', 'to' => '2026-10-20']);
+            $aging = $this->runTool($actorsA[$kind], 'finance.receivables_aging', ['as_of' => self::TODAY]);
+            foreach ([$income, $aging] as $res) {
+                $res->assertOk();
+                $this->assertStringNotContainsString(self::SECRET_NAME, $res->getContent(), $kind);
+                $this->assertStringNotContainsString('99999900', $res->getContent(), $kind);
+            }
+
+            $this->runTool($actorsA[$kind], 'finance.income_statement', ['from' => '2026-10-01', 'to' => '2026-10-20'], ['scope' => ['branch_ids' => [$bBranch]]])
+                ->assertForbidden()->assertJsonPath('error.code', 'branch_scope_forbidden');
+            $this->runTool($actorsA[$kind], 'finance.income_statement', ['from' => '2026-10-01', 'to' => '2026-10-20'], ['scope' => ['warehouse_ids' => [$bWarehouse]]])
+                ->assertForbidden()->assertJsonPath('error.code', 'warehouse_scope_forbidden');
+        }
     }
 
     // ───────────────────────── المخطِّط الحتمي والتدقيق ─────────────────────────
