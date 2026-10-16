@@ -137,7 +137,7 @@ Tested in `CommerceWorkspaceCategoryMediaApiTest` (16 tests after the review rou
 Dev-only fixtures (404 in production, local SVG pictures — no network): storefront `/dev/categories-display-visual` mounts the storefront's real `CategoriesDisplayBlock`; web `/dev/customizer-visual?scenario=categories-display|categories-panel` mounts the real Canvas and the real `ControlPanels`.
 
 * **45 cases × (storefront + Canvas)**: grid/scroll/circles/tiles/list at **390 / 768 / 1280**, Arabic RTL and English LTR, plus names hidden, overlay (scrim and surface), circular pictures, `contain`+`top`+3 px border, no-frame/name-above, custom per-device height, big names, picture hidden.
-* **Parity**: column count, row count, item count identical in all 45; computed styles of card, frame, image, name and fallback identical except `img{color}` (`next/image` inlines `transparent`, irrelevant). See `parity-and-metrics.json`.
+* **Parity**: column count, row count, item count identical in all 45; computed styles of card, frame, image, name and fallback identical except `img{color}` (`next/image` inlines `transparent`, irrelevant). See `parity-and-metrics.json` (condensed, §18).
 * **No page-level horizontal overflow** on the storefront in any case; scrolling layouts scroll natively (RTL `scrollLeft` goes negative, snap `x mandatory`, `overscroll-behavior-x: contain`).
 * **Keyboard**: Tab through a 390 px rail in AR and EN — every focused tile ends fully visible (measured after smooth-scroll settles), solid focus outline. `prefers-reduced-motion`: `scroll-behavior: auto`, transition `0s`.
 * **Bug found by the screenshots and fixed**: `line-clamp` on an element with vertical padding let a hidden third line peek through the scrim bar (image tiles, 390 px). The clamp now lives on an inner span; regression test added.
@@ -259,3 +259,13 @@ Remaining risks / items for the reviewer:
 3. The classic "N sub-categories" line is not drawn by the new layouts; free colour pickers (needing a contrast gate) and an in-panel mini preview are not implemented.
 4. No screen-reader (assistive technology) pass was possible; keyboard, focus, contrast, RTL and reduced-motion were verified in a real browser.
 5. Web vitest has no dedicated CI job (the web CI job is the Next.js build); the full web suite was run locally (7 404 passed).
+
+## 18. PR size review (before merge)
+
+**Evidence file.** `parity-and-metrics.json` was a raw dump of 45 cases × 5 elements × 21 computed-style properties for both renderers: **10 675 lines / 271 KB — 53 % of the PR's added lines**. It was condensed to **92 lines / 10.6 KB**, keeping what proves Canvas ↔ storefront parity: per case, item/column/row counts and page overflow for both renderers, the first item's size, and the list of computed-style differences (only `img.color`, 43 cases — `next/image` inlines `transparent`); plus a summary of which elements and properties were compared. The raw dump is regenerable from the two dev fixtures and was not referenced by any test or doc.
+
+**`CategoriesDisplayFields.tsx` (1 216 lines) — not split.** It is one panel: generic controls (`Group`, `Choice`, `Switch`, `NumberControl`, `StepControl`, `GapControl`) followed by the panel body. No duplicated logic, no mixed responsibilities, no state shared across files, and its size is in line with its sibling `DiscoveryDisplayFields.tsx` (967 lines). A split now would only add imports and risk the tested behaviour; revisit if a second panel needs the primitives.
+
+**Twin drift is already guarded and the guards work.** `web/…/__tests__/categories-display.test.ts` asserts byte identity of `section-design.ts`, `categories-display.ts` and `categories-display.css`, and identity of `CategoryDisplayList.tsx` from its first declaration down plus an import-path-normalized header. Mutation check performed for this review: appending a line to each of the four storefront twins makes exactly that test fail (1 failed / 24 passed each time); the files were restored. The contract itself is pinned across PHP, web and storefront by `tests/Fixtures/presentation/section-design.json`.
+
+**Not touched in this round:** behaviour, API, database, visual design, tests, source code.
