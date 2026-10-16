@@ -274,10 +274,12 @@ class StorefrontMediaApiTest extends TestCase
     {
         return [
             'svg' => ['svg', 'unsupported_type'],
-            'gif' => ['gif', 'unsupported_type'],
+            // AWJ-ANIMATED-MEDIA P1 (amends V0 §7.4): GIF is now a supported type; a 1×1 GIF is rejected on size, not type.
+            'gif (tiny)' => ['gif', 'dimension_too_small'],
             'php disguised as jpg' => ['php', 'unsupported_type'],
             'pdf' => ['pdf', 'unsupported_type'],
-            'animated webp' => ['animated-webp', 'animated_not_supported'],
+            // رأس WebP متحرك بلا إطارات (VP8X فقط): بنية تالفة لا «غير مدعوم» — الحركة الحقيقية مدعومة الآن.
+            'animated webp (header only, no frames)' => ['animated-webp', 'image_unreadable'],
             'apng' => ['apng', 'animated_not_supported'],
             'garbage claiming to be a jpeg' => ['corrupt', 'unsupported_type'],
             'truncated jpeg' => ['truncated', 'image_unreadable'],

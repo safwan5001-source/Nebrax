@@ -75,6 +75,14 @@ class StorefrontMediaContrastEvidence
             return null;
         }
 
+        // AWJ-ANIMATED-MEDIA P1 — الحركة: الإطارات اللاحقة غير مقيسة (لا دليل بكسل لها، ولا نخمّنه من الإطار الأول).
+        // الأسوأ حالةً هو الإثبات الوحيد الصادق: أي بكسلٍ في أي إطار قد يكون أي لون ⇒ المدى الكامل [0..255] لكل قناة.
+        // الخوارزمية القائمة ذاتها (لا مسار ثانٍ) تُثبت النص إذن فقط إن بلغ تباينه الحدّ أمام الأسود والأبيض معاً —
+        // أي بوجود طبقة تعتيم/تلوين كافية فعلاً — فلا نص مقروء بالحظ فوق إطارٍ لاحق. وبلا طبقة كافية: «غير مُثبَت».
+        if ($asset->isAnimated()) {
+            return ['min' => [0, 0, 0], 'max' => [255, 255, 255]];
+        }
+
         if ($transform->isDefault()) {
             return StorefrontMediaPixelEvidence::bounds(is_array($asset->region_luminance) ? $asset->region_luminance : []);
         }

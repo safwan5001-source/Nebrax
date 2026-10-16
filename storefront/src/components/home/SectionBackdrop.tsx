@@ -1,4 +1,10 @@
 import type { CSSProperties } from "react";
+import {
+  MOTION_TOGGLE_STYLE,
+  MotionPicture,
+  MotionToggle,
+} from "@/components/ui/motion-picture";
+import { animatedPictureSources } from "@/lib/presentation/animated-sources";
 import type { SectionBackdropData } from "@/lib/presentation/background-media";
 import type { ResolvedMedia } from "@/lib/presentation/media-ref";
 
@@ -47,39 +53,71 @@ export function SectionBackdrop({
   const mobileJpg = mobile ? srcSet(mobile, "jpg") : "";
   const webp = srcSet(media, "webp");
 
-  return (
-    <div data-sd-backdrop="" aria-hidden="true" style={style}>
-      <picture>
-        {mobileWebp ? (
-          <source
-            media={PHONE}
-            type="image/webp"
-            srcSet={mobileWebp}
-            sizes="100vw"
-          />
-        ) : null}
-        {mobileJpg ? (
-          <source
-            media={PHONE}
-            type="image/jpeg"
-            srcSet={mobileJpg}
-            sizes="100vw"
-          />
-        ) : null}
-        {webp ? <source type="image/webp" srcSet={webp} sizes="100vw" /> : null}
-        <img
-          src={fallback.src}
-          srcSet={srcSet(media, "jpg") || undefined}
+  const phoneStills = (
+    <>
+      {mobileWebp ? (
+        <source
+          media={PHONE}
+          type="image/webp"
+          srcSet={mobileWebp}
           sizes="100vw"
-          width={media.width}
-          height={media.height}
-          alt=""
-          loading={priority ? "eager" : "lazy"}
-          fetchPriority={priority ? "high" : undefined}
-          decoding="async"
         />
-      </picture>
-      {data.overlay ? <div data-sd-overlay="" /> : null}
-    </div>
+      ) : null}
+      {mobileJpg ? (
+        <source
+          media={PHONE}
+          type="image/jpeg"
+          srcSet={mobileJpg}
+          sizes="100vw"
+        />
+      ) : null}
+    </>
+  );
+  const desktopStills = (
+    <>
+      {webp ? <source type="image/webp" srcSet={webp} sizes="100vw" /> : null}
+      {/* biome-ignore lint/performance/noImgElement: the <img> of a <picture> art-direction set (rendered inside it) */}
+      <img
+        src={fallback.src}
+        srcSet={srcSet(media, "jpg") || undefined}
+        sizes="100vw"
+        width={media.width}
+        height={media.height}
+        alt=""
+        loading={priority ? "eager" : "lazy"}
+        fetchPriority={priority ? "high" : undefined}
+        decoding="async"
+      />
+    </>
+  );
+
+  // AWJ-ANIMATED-MEDIA P1 — an animated GIF/WebP plays here; the still ladder stays the default for
+  // reduced motion, paused and unsupported browsers. With no animation the markup is exactly the original.
+  const motion = animatedPictureSources(media, mobile);
+  const motionId = media.animation?.src ?? mobile?.animation?.src ?? "";
+
+  return (
+    <>
+      <div data-sd-backdrop="" aria-hidden="true" style={style}>
+        {motion ? (
+          <MotionPicture
+            id={motionId}
+            sources={motion}
+            phoneStills={phoneStills}
+          >
+            {desktopStills}
+          </MotionPicture>
+        ) : (
+          <picture>
+            {phoneStills}
+            {desktopStills}
+          </picture>
+        )}
+        {data.overlay ? <div data-sd-overlay="" /> : null}
+      </div>
+      {motion ? (
+        <MotionToggle id={motionId} style={MOTION_TOGGLE_STYLE} />
+      ) : null}
+    </>
   );
 }

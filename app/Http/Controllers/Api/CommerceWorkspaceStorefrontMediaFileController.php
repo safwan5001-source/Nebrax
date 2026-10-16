@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\StorefrontMedia;
+use App\Services\Commerce\StorefrontAnimatedImage;
 use App\Services\Commerce\StorefrontMediaException;
 use App\Services\Commerce\StorefrontMediaService;
 use App\Services\Commerce\StorefrontMediaVariantGenerator;
@@ -31,7 +32,8 @@ class CommerceWorkspaceStorefrontMediaFileController extends PublicApiController
     {
         $tenantId = (string) $request->query('tenant', '');
 
-        if ($tenantId === '' || ! StorefrontMediaVariantGenerator::isValidFileName($file)) {
+        $animatedFile = StorefrontAnimatedImage::isValidFileName($file);
+        if ($tenantId === '' || (! $animatedFile && ! StorefrontMediaVariantGenerator::isValidFileName($file))) {
             abort(404, 'الوسيط غير موجود.');
         }
 
@@ -65,7 +67,9 @@ class CommerceWorkspaceStorefrontMediaFileController extends PublicApiController
                 echo $body->read(8192);
             }
         }, 200, [
-            'Content-Type' => StorefrontMediaVariantGenerator::mimeForFormat($format),
+            'Content-Type' => $animatedFile
+                ? StorefrontAnimatedImage::MIME[substr($file, strlen('animated.'))]
+                : StorefrontMediaVariantGenerator::mimeForFormat($format),
             'Cache-Control' => 'private, max-age=600',
             'X-Content-Type-Options' => 'nosniff',
         ]);

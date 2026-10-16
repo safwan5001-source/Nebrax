@@ -184,6 +184,10 @@
       "note": "Hinweis",
       "success": "Erfolg",
       "warning": "Warnung"
+    },
+    "motion": {
+      "pause": "Animation anhalten",
+      "play": "Animation abspielen"
     }
   },
   "cart": {

@@ -47,6 +47,7 @@ class StorefrontMediaEvidenceBackfiller
             $assetQuery = StorefrontMedia::query()
                 ->where('state', StorefrontMedia::STATE_ACTIVE)
                 ->where('variants_state', StorefrontMedia::VARIANTS_READY)
+                ->where('kind', '!=', StorefrontMedia::KIND_ANIMATED) // الحركة بلا دليل تباين عمداً
                 ->whereNull('region_luminance');
             $this->eachCandidate($assetQuery, $limit, $after['assets'] ?? null, $stats, 'assets', function (StorefrontMedia $media) use ($dryRun): bool {
                 $evidence = $this->assetEvidence($media);

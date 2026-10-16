@@ -148,7 +148,31 @@ final class StorefrontPublishedMediaResolver
                 'en' => $this->firstText($alt['en'] ?? null, $asset->alt_en),
             ],
             'sources' => $sources,
-        ];
+        ] + $this->animation($asset, $transform);
+    }
+
+    /**
+     * AWJ-ANIMATED-MEDIA P1 — الملف المتحرك المنقّى، لإطار غير محوَّل فقط (البوابة ترفض المحوَّل).
+     * حقلٌ إضافي: مُصيِّرٌ لا يعرفه يبقى على الإطار الأول الثابت (`sources`) فلا ينكسر.
+     *
+     * @return array{animation?: array{src:string,format:string,width:int,height:int,frames:int,durationMs:int,loop:bool}}
+     */
+    private function animation(StorefrontMedia $asset, StorefrontMediaTransform $transform): array
+    {
+        $anim = $asset->isAnimated() && $transform->isDefault() ? $asset->animationVariant() : null;
+        if ($anim === null) {
+            return [];
+        }
+
+        return ['animation' => [
+            'src' => self::PROXY_PREFIX.$asset->id.'/'.$anim['file'],
+            'format' => (string) $anim['format'],
+            'width' => (int) $anim['width'],
+            'height' => (int) $anim['height'],
+            'frames' => (int) ($anim['frames'] ?? 0),
+            'durationMs' => (int) ($anim['duration_ms'] ?? 0),
+            'loop' => (bool) ($anim['loop'] ?? false),
+        ]];
     }
 
     /** @return list<array{kind:string,width:int,height:int,format:string,src:string}> */
@@ -156,6 +180,10 @@ final class StorefrontPublishedMediaResolver
     {
         $sources = [];
         foreach ($asset->variantList() as $variant) {
+            // مدخل الحركة ليس درجة سلّم ثابتة: يخرج في حقل `animation` المستقل، فيبقى `sources` ثابتاً كما كان.
+            if (($variant['kind'] ?? null) === StorefrontMediaVariantGenerator::KIND_ANIM) {
+                continue;
+            }
             $sources[] = [
                 'kind' => (string) $variant['kind'],
                 'width' => (int) $variant['width'],

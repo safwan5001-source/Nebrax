@@ -8,7 +8,8 @@
  *   {id}   a media id (UUID → base ladder) or a transformKey (32 hex →
  *          transform derivative, which carries its own source media)
  *   {file} `{width}w.{webp|jpg}` or `thumb-{160|320}.{webp|jpg}`
- *          (format is an explicit path segment — no Accept/Vary negotiation)
+ *          (format is an explicit path segment — no Accept/Vary negotiation),
+ *          or `animated.{gif|webp}` for an animated asset (UUID only)
  */
 export const AWJ_CUSTOMIZER_MEDIA_PROXY_PATH_PREFIX =
   "/api/storefront/media/customizer/";
@@ -17,6 +18,8 @@ const MEDIA_ID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TRANSFORM_KEY = /^[a-f0-9]{32}$/;
 const FILE = /^(?:\d{2,4}w|thumb-(?:160|320))\.(?:webp|jpg)$/;
+// AWJ-ANIMATED-MEDIA P1 — the sanitised animated file; media-id (UUID) only, never a transform key.
+const ANIMATED_FILE = /^animated\.(?:gif|webp)$/;
 
 export function isCustomizerMediaId(value: string): boolean {
   return MEDIA_ID.test(value) || TRANSFORM_KEY.test(value);
@@ -26,9 +29,27 @@ export function isCustomizerMediaFile(value: string): boolean {
   return FILE.test(value);
 }
 
+/** A ladder file OR the animated file — what the same-origin proxy route is allowed to forward. */
+export function isCustomizerProxyFile(value: string): boolean {
+  return FILE.test(value) || ANIMATED_FILE.test(value);
+}
+
+export function isCustomizerAnimatedFile(value: string): boolean {
+  return ANIMATED_FILE.test(value);
+}
+
 /** `null` when either segment is outside the contract — callers drop the image rather than guess. */
 export function customizerMediaPath(id: string, file: string): string | null {
   if (!isCustomizerMediaId(id) || !isCustomizerMediaFile(file)) return null;
+  return `${AWJ_CUSTOMIZER_MEDIA_PROXY_PATH_PREFIX}${id}/${file}`;
+}
+
+/** `animated.{gif|webp}` path for an asset id (UUID), or `null` outside the contract. */
+export function customizerAnimatedPath(
+  id: string,
+  file: string,
+): string | null {
+  if (!MEDIA_ID.test(id) || !isCustomizerAnimatedFile(file)) return null;
   return `${AWJ_CUSTOMIZER_MEDIA_PROXY_PATH_PREFIX}${id}/${file}`;
 }
 

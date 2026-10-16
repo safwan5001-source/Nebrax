@@ -5,8 +5,9 @@ import {
   GATEWAY_SECRET_HEADER,
 } from "@/lib/commerce/config";
 import {
-  isCustomizerMediaFile,
+  isCustomizerAnimatedFile,
   isCustomizerMediaId,
+  isCustomizerProxyFile,
 } from "@/lib/commerce/customizer-media";
 
 /**
@@ -34,7 +35,11 @@ export async function GET(
   context: { params: Promise<{ id: string; file: string }> },
 ): Promise<Response> {
   const { id, file } = await context.params;
-  if (!isCustomizerMediaId(id) || !isCustomizerMediaFile(file)) {
+  if (!isCustomizerMediaId(id) || !isCustomizerProxyFile(file)) {
+    return new Response(null, { status: 404 });
+  }
+  // The animated file belongs to a media id, never to a transform key.
+  if (isCustomizerAnimatedFile(file) && id.length !== 36) {
     return new Response(null, { status: 404 });
   }
 

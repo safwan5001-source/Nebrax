@@ -48,6 +48,8 @@ const MEDIA_ISSUE_KEY: Record<string, CustomizerMessageKey> = {
   transform_invalid: "mediaIssue_transform_invalid",
   derivative_not_ready: "mediaIssue_derivative_not_ready",
   derivative_failed: "mediaIssue_derivative_failed",
+  animated_transform_unsupported: "mediaIssue_animated_transform_unsupported",
+  animated_not_allowed_here: "mediaIssue_animated_not_allowed_here",
 };
 
 /** Which identity slot a `branding.*Media…` path belongs to. */

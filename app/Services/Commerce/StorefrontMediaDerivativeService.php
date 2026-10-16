@@ -83,6 +83,9 @@ class StorefrontMediaDerivativeService
         if (! $media->isReady()) {
             throw new StorefrontMediaException('media_not_ready', 'لم تكتمل معالجة الصورة بعد. انتظر ثم أعد المحاولة.', 409);
         }
+        if ($media->isAnimated()) {
+            throw new StorefrontMediaException('animated_transform_unsupported', 'لا يمكن قصّ أو تدوير أو إعادة تأطير صورة متحركة.');
+        }
         if ($transform->isDefault()) {
             throw new StorefrontMediaException(
                 'transform_is_default',

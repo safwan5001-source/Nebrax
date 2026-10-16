@@ -11,6 +11,7 @@
  */
 import {
   AWJ_CUSTOMIZER_MEDIA_PROXY_PATH_PREFIX,
+  customizerAnimatedPath,
   customizerMediaPath,
   isCustomizerMediaFile,
   isCustomizerMediaId,
@@ -18,6 +19,7 @@ import {
 import type { StorefrontPresentationConfig } from "./config";
 import type {
   MediaRef,
+  ResolvedAnimation,
   ResolvedContrastBounds,
   ResolvedMedia,
   ResolvedMediaMap,
@@ -71,6 +73,35 @@ function readSource(raw: unknown): ResolvedMediaSource | null {
   };
 }
 
+/**
+ * AWJ-ANIMATED-MEDIA P1 — the optional animated file. Dropped (the still ladder remains) unless the
+ * path is exactly `{proxy}/{uuid}/animated.{format}` and the declared format matches the file name.
+ */
+function readAnimation(raw: unknown): ResolvedAnimation | undefined {
+  if (!isRecord(raw)) return undefined;
+  if (raw.format !== "gif" && raw.format !== "webp") return undefined;
+  if (typeof raw.src !== "string") return undefined;
+  if (!raw.src.startsWith(AWJ_CUSTOMIZER_MEDIA_PROXY_PATH_PREFIX))
+    return undefined;
+  const [id, file, ...rest] = raw.src
+    .slice(AWJ_CUSTOMIZER_MEDIA_PROXY_PATH_PREFIX.length)
+    .split("/");
+  if (rest.length > 0 || !id || !file) return undefined;
+  if (file !== `animated.${raw.format}`) return undefined;
+  const src = customizerAnimatedPath(id, file);
+  if (src === null) return undefined;
+  const frames = positiveInt(raw.frames);
+  const durationMs = positiveInt(raw.durationMs);
+  if (frames === null || frames < 2 || durationMs === null) return undefined;
+  return {
+    src,
+    format: raw.format,
+    frames,
+    durationMs,
+    loop: raw.loop === true,
+  };
+}
+
 function channelTriple(raw: unknown): [number, number, number] | null {
   if (!Array.isArray(raw) || raw.length !== 3) return null;
   const out: number[] = [];
@@ -115,6 +146,7 @@ export function readResolvedMedia(raw: unknown): ResolvedMediaMap {
 
     const alt = isRecord(value.alt) ? value.alt : {};
     const contrast = readContrast(value.contrast);
+    const animation = readAnimation(value.animation);
     out[path] = {
       width,
       height,
@@ -122,6 +154,7 @@ export function readResolvedMedia(raw: unknown): ResolvedMediaMap {
       alt: { ar: nullableText(alt.ar), en: nullableText(alt.en) },
       sources,
       ...(contrast ? { contrast } : {}),
+      ...(animation ? { animation } : {}),
     };
   }
   return out;

@@ -28,6 +28,13 @@ class StorefrontMediaPublishGate
 {
     private const LOCALES = ['ar', 'en'];
 
+    /**
+     * AWJ-ANIMATED-MEDIA P1 — المواضع التي يُصيِّر المتجر فيها الحركة فعلاً: خلفية قسم (hero/banner) وصور شرائح
+     * السلايدر. في أي موضعٍ آخر (شعار، معرض، كتل محتوى…) ستظهر صورةً ثابتة بصمت، فنرفضها عند النشر برمزٍ صريح
+     * بدل خداع التاجر. (المسارات كما يفتاحها الماسح: `homepage.sections.N.…`).
+     */
+    private const ANIMATED_ALLOWED_PATH = '/\Ahomepage\.sections\.\d+\.(?:design\.background\.(?:media|mobile)|content\.slides\.\d+\.(?:media|mobile))\z/';
+
     public function __construct(
         private readonly StorefrontMediaReferenceScanner $scanner,
         private readonly StorefrontMediaDerivativeService $derivatives,
@@ -63,6 +70,12 @@ class StorefrontMediaPublishGate
             }
             if (! $asset->isReady()) {
                 $errors["{$path}.mediaId"] = ['code' => 'media_not_ready', 'message' => 'لم تكتمل معالجة هذه الصورة بعد، أو فشلت. أعد المحاولة من مكتبة الوسائط.'];
+
+                continue;
+            }
+
+            if ($asset->isAnimated() && preg_match(self::ANIMATED_ALLOWED_PATH, $path) !== 1) {
+                $errors["{$path}.mediaId"] = ['code' => 'animated_not_allowed_here', 'message' => 'الصور المتحركة تُعرض في خلفيات الأقسام وشرائح السلايدر فقط. اختر صورة ثابتة لهذا الموضع.'];
 
                 continue;
             }
@@ -127,6 +140,13 @@ class StorefrontMediaPublishGate
 
         if ($transform->isDefault()) {
             return; // يخدمه السلّم الأساسي (جاهزٌ أعلاه).
+        }
+
+        // AWJ-ANIMATED-MEDIA P1 — لا قصّ/تدوير/تركيز/ملاءمة لصورة متحركة: البكسلات المتحركة لا تُعاد صياغتها.
+        if ($asset->isAnimated()) {
+            $errors["{$path}.crop"] = ['code' => 'animated_transform_unsupported', 'message' => 'لا يمكن قصّ أو تدوير أو إعادة تأطير صورة متحركة. أزل إعدادات الإطار أو استخدم صورة ثابتة.'];
+
+            return;
         }
 
         $status = $this->derivatives->status($asset, $transform);
