@@ -20,7 +20,7 @@ interface AiAssistantProvider
      * يخطّط ردّاً على رسالة. لا يملك المزوّد أي وصول للبيانات: يعيد نصّاً واستهلاكاً مُبلَّغاً به
      * ومقترحات استدعاء أدوات (اسم + معطيات) تفحصها البوابة قبل أي تنفيذ.
      *
-     * @param  array{message:string, locale:string, max_output_tokens:int}  $input
+     * @param  array{message:string, locale:string, max_output_tokens:int, today:string, timezone:string}  $input  `today`/`timezone`: تاريخ اليوم بتوقيت المستأجر (Y-m-d) واسم المنطقة — غير حساسَين.
      * @return array{
      *     content:string,
      *     tool_calls:list<array{name:string, arguments:array<string,mixed>}>,

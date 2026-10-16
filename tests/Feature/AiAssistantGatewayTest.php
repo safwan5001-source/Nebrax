@@ -221,23 +221,26 @@ class AiAssistantGatewayTest extends TestCase
     }
 
     /** @test */
-    public function reserved_financial_and_document_categories_cannot_be_used_even_if_stored(): void
+    public function the_reserved_document_category_cannot_be_used_even_if_stored_while_financial_needs_its_own_consent(): void
     {
         $auth = $this->readyTenant(tenantOptIn: false);
         $this->optIn($auth['tenant_id'], [
             AiAssistantDataCategory::ASSISTANT_MESSAGES,
-            AiAssistantDataCategory::FINANCIAL_SUMMARY,
             AiAssistantDataCategory::DOCUMENT_PROJECTED_TEXT,
         ]);
 
-        foreach ([AiAssistantDataCategory::FINANCIAL_SUMMARY, AiAssistantDataCategory::DOCUMENT_PROJECTED_TEXT] as $category) {
-            $this->ask($auth['token'], ['data_categories' => [$category]])
-                ->assertForbidden()->assertJsonPath('error.code', 'data_category_unavailable');
-        }
-
-        // ولا تُمرَّر فئة محجوزة بجانب المتاحة.
-        $this->ask($auth['token'], ['data_categories' => [AiAssistantDataCategory::ASSISTANT_MESSAGES, AiAssistantDataCategory::FINANCIAL_SUMMARY]])
+        // الفئة المحجوزة (مستندات) غير قابلة للاستعمال مهما خُزِّنت.
+        $this->ask($auth['token'], ['data_categories' => [AiAssistantDataCategory::DOCUMENT_PROJECTED_TEXT]])
             ->assertForbidden()->assertJsonPath('error.code', 'data_category_unavailable');
+        $this->ask($auth['token'], ['data_categories' => [AiAssistantDataCategory::ASSISTANT_MESSAGES, AiAssistantDataCategory::DOCUMENT_PROJECTED_TEXT]])
+            ->assertForbidden()->assertJsonPath('error.code', 'data_category_unavailable');
+
+        // الفئة المالية متاحة كقدرة، لكنها لا تعمل بلا موافقة صريحة عليها (موافقة الرسائل لا تشملها).
+        $this->ask($auth['token'], ['data_categories' => [AiAssistantDataCategory::FINANCIAL_SUMMARY]])
+            ->assertForbidden()->assertJsonPath('error.code', 'consent_required');
+
+        $this->optIn($auth['tenant_id'], [AiAssistantDataCategory::ASSISTANT_MESSAGES, AiAssistantDataCategory::FINANCIAL_SUMMARY]);
+        $this->ask($auth['token'], ['data_categories' => [AiAssistantDataCategory::FINANCIAL_SUMMARY]])->assertOk();
 
         // والفئة المتاحة تبقى تعمل.
         $this->ask($auth['token'], ['data_categories' => [AiAssistantDataCategory::ASSISTANT_MESSAGES]])->assertOk();
@@ -580,13 +583,17 @@ class AiAssistantGatewayTest extends TestCase
     // ───────────────────── closed tool registry / per-invocation reauth ─────────────────────
 
     /** @test */
-    public function the_shipped_tool_registry_is_closed_and_empty(): void
+    public function the_shipped_tool_registry_is_closed_to_exactly_the_three_finance_tools(): void
     {
         $registry = app(AiAssistantToolRegistry::class);
 
-        $this->assertSame([], $registry->names());
-        $this->assertNull($registry->find('finance.getIncomeStatement'));
-        $this->assertNull($registry->find('sql'));
+        $this->assertEqualsCanonicalizing(
+            ['finance.income_statement', 'finance.receivables_aging', 'finance.payables_aging'],
+            $registry->names(),
+        );
+        foreach (['sql', 'finance.getIncomeStatement', 'finance.journal_entries', 'finance.account_ledger', 'documents.read', ''] as $unknown) {
+            $this->assertNull($registry->find($unknown), $unknown);
+        }
     }
 
     /** @test */
@@ -629,6 +636,7 @@ class AiAssistantGatewayTest extends TestCase
         $this->assertSame('probe.echo', $res->json('data.tool_calls.0.tool'));
         $this->assertSame(1, $probe->calls);
         $this->assertSame('acc@ai.test', $probe->lastActor->email);
+        $this->assertSame($probe->lastActor, $probe->authUser, 'the fresh actor is the authenticated user while a tool runs');
         $this->assertSame(['mode' => 'all', 'ids' => []], $probe->lastBranchScope);
 
         // ٢) سُحبت صلاحية الأداة بعد التخطيط وقبل التنفيذ → لا تنفيذ.
@@ -666,8 +674,8 @@ class AiAssistantGatewayTest extends TestCase
     public function a_tool_that_carries_a_reserved_data_category_is_refused(): void
     {
         $auth = $this->readyTenant();
-        $this->optIn($auth['tenant_id'], [AiAssistantDataCategory::ASSISTANT_MESSAGES, AiAssistantDataCategory::FINANCIAL_SUMMARY]);
-        $probe = $this->probeTool(AiAssistantDataCategory::FINANCIAL_SUMMARY, 'reports.view');
+        $this->optIn($auth['tenant_id'], [AiAssistantDataCategory::ASSISTANT_MESSAGES, AiAssistantDataCategory::DOCUMENT_PROJECTED_TEXT]);
+        $probe = $this->probeTool(AiAssistantDataCategory::DOCUMENT_PROJECTED_TEXT, 'reports.view');
         $this->app->instance(AiAssistantToolRegistry::class, $this->registryWith($probe));
         $this->app->instance(MockAiAssistantProvider::class, new MockAiAssistantProvider(fn () => [['name' => 'probe.echo', 'arguments' => []]]));
 
@@ -844,6 +852,7 @@ class AiAssistantGatewayTest extends TestCase
         return new class($category, $permission) implements AiAssistantTool {
             public int $calls = 0;
             public ?User $lastActor = null;
+            public mixed $authUser = null;
             public array $lastBranchScope = [];
 
             public function __construct(private readonly string $category, private readonly string $permission) {}
@@ -863,10 +872,26 @@ class AiAssistantGatewayTest extends TestCase
                 return $this->category;
             }
 
+            public function supportsWarehouseScope(): bool
+            {
+                return true;
+            }
+
+            public function validate(array $arguments): array
+            {
+                return $arguments;
+            }
+
+            public function auditMeta(array $result): array
+            {
+                return [];
+            }
+
             public function execute(User $actor, array $arguments, array $branchScope, array $warehouseScope): array
             {
                 $this->calls++;
                 $this->lastActor = $actor;
+                $this->authUser = \Illuminate\Support\Facades\Auth::guard()->user();
                 $this->lastBranchScope = $branchScope;
 
                 return ['ok' => true];

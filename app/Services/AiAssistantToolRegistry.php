@@ -3,11 +3,13 @@
 namespace App\Services;
 
 use App\Contracts\AiAssistantTool;
+use App\Services\Reporting\ReportService;
+use App\Tenancy\TenantContext;
 
 /**
- * سجلّ الأدوات **المغلق**. يُعلَن هنا فقط ما يُسمح للمساعد باستدعائه؛ لا اكتشاف
- * ديناميكي ولا اسم أداة من النموذج يُحلّ خارج هذه القائمة. في AI-01 القائمة فارغة
- * عمداً (لا أدوات مالية ولا مستندات) — أدوات AI-02 تُضاف هنا وحدها.
+ * سجلّ الأدوات **المغلق**. يُعلَن هنا فقط ما يُسمح للمساعد باستدعائه؛ لا اكتشاف ديناميكي ولا اسم أداة
+ * من النموذج يُحلّ خارج هذه القائمة. AI-01: فارغ. AI-02B: ثلاث أدوات قراءة مالية حتمية فقط (قائمة
+ * الدخل، أعمار الذمم المدينة، أعمار الذمم الدائنة). أي أداة جديدة قرارٌ مراجَع يُضاف هنا وحده.
  */
 class AiAssistantToolRegistry
 {
@@ -17,7 +19,14 @@ class AiAssistantToolRegistry
     /** @return list<AiAssistantTool> */
     protected function definitions(): array
     {
-        return [];
+        $tenant = app(TenantContext::class);
+        $reports = app(ReportService::class);
+
+        return [
+            new AiIncomeStatementTool($tenant, $reports),
+            new AiAgingReportTool($tenant, $reports, 'receivable'),
+            new AiAgingReportTool($tenant, $reports, 'payable'),
+        ];
     }
 
     public function find(string $name): ?AiAssistantTool

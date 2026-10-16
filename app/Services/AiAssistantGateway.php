@@ -4,13 +4,16 @@ namespace App\Services;
 
 use App\Contracts\AiAssistantProvider;
 use App\Models\AiRequest;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Support\AiAssistantDataCategory;
 use App\Support\AiAssistantDenied;
 use App\Support\AiAssistantPricing;
 use App\Support\AiProviderException;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use Throwable;
 
 /**
@@ -119,7 +122,8 @@ class AiAssistantGateway
                 throw AiAssistantDenied::for('internal_error');
             }
 
-            $reply = $this->callProvider($provider, $profile, $request, $message, $locale, $maxOutput, $tenantId, $actorId, $extra, $finalAudited, $settled);
+            [$timezone, $today] = $this->tenantClock($tenantId);
+            $reply = $this->callProvider($provider, $profile, $request, ['message' => $message, 'locale' => $locale, 'max_output_tokens' => $maxOutput, 'today' => $today, 'timezone' => $timezone], $tenantId, $actorId, $extra, $finalAudited, $settled);
 
             $usage = $this->usage($profile, $reply['usage']);
             $overrun = $profile['billable'] && (
@@ -196,6 +200,7 @@ class AiAssistantGateway
 
     /**
      * @param  array{billable:bool, input_micro_usd_per_1k:int, output_micro_usd_per_1k:int}  $profile
+     * @param  array{message:string, locale:string, max_output_tokens:int, today:string, timezone:string}  $input
      * @param  array<string,mixed>  $extra
      * @return array{content:string, tool_calls:list<array{name:string, arguments:array<string,mixed>}>, usage:array{input_tokens:int, output_tokens:int}}
      * @throws AiAssistantDenied
@@ -204,9 +209,7 @@ class AiAssistantGateway
         AiAssistantProvider $provider,
         array $profile,
         AiRequest $request,
-        string $message,
-        string $locale,
-        int $maxOutput,
+        array $input,
         string $tenantId,
         string $actorId,
         array $extra,
@@ -214,7 +217,7 @@ class AiAssistantGateway
         bool &$settled,
     ): array {
         try {
-            return $provider->respond(['message' => $message, 'locale' => $locale, 'max_output_tokens' => $maxOutput]);
+            return $provider->respond($input);
         } catch (Throwable $e) {
             report($e);
 
@@ -270,14 +273,36 @@ class AiAssistantGateway
             $fresh = $this->policy->authorize($actorId, [$tool->dataCategory()], $tool->requiredPermission());
             $scope = $this->scopeGuard->resolve($fresh, $branchIds, $warehouseIds);
 
+            // أداة بلا بُعد مخزن لا تتجاهل مخازن طُلبت صراحةً بصمت.
+            if (! $tool->supportsWarehouseScope() && $scope['warehouse']['mode'] === 'selected') {
+                throw AiAssistantDenied::for('scope_not_supported');
+            }
+
+            // التحقق من المعطيات بعد التفويض (لا يعرف غير المخوَّل مخطط الأداة).
             try {
-                $result = $tool->execute($fresh, (array) ($call['arguments'] ?? []), $scope['branch'], $scope['warehouse']);
+                $arguments = $tool->validate((array) ($call['arguments'] ?? []));
+            } catch (InvalidArgumentException) {
+                throw AiAssistantDenied::for('invalid_tool_arguments');
+            }
+
+            // الفاعل الطازج هو «المستخدم المصادَق» طوال التنفيذ: خدمات التقارير تقرأ نطاق الفروع من
+            // `auth()->user()`، فلا يجوز أن ترى نسخة قديمة منه.
+            $guard = Auth::guard();
+            $previous = $guard->user();
+            $guard->setUser($fresh);
+
+            try {
+                $result = $tool->execute($fresh, $arguments, $scope['branch'], $scope['warehouse']);
             } catch (AiAssistantDenied $denied) {
                 throw $denied;
             } catch (Throwable $e) {
                 report($e);
 
                 throw AiAssistantDenied::for('internal_error');
+            } finally {
+                if ($previous !== null) {
+                    $guard->setUser($previous);
+                }
             }
         } catch (AiAssistantDenied $denied) {
             // اسم الأداة المقترح من المزوّد لا يُسجَّل إلا إن كان رمزاً صالحاً (يفرضه المسجّل).
@@ -286,9 +311,20 @@ class AiAssistantGateway
             throw $denied;
         }
 
-        $this->audit->record($requestId, $tenantId, $actorId, 'tool.invoked', 'allowed', 'ok', ['tool' => $tool->name()] + $extra);
+        $this->audit->record($requestId, $tenantId, $actorId, 'tool.invoked', 'allowed', 'ok', ['tool' => $tool->name(), 'meta' => $tool->auditMeta($result)] + $extra);
 
         return ['tool' => $tool->name(), 'result' => $result];
+    }
+
+    /** @return array{0:string, 1:string} [المنطقة الزمنية للمستأجر، تاريخ اليوم Y-m-d بتوقيته]. */
+    private function tenantClock(string $tenantId): array
+    {
+        $zone = (string) (Tenant::query()->whereKey($tenantId)->value('timezone') ?: 'Asia/Riyadh');
+        if (! in_array($zone, timezone_identifiers_list(), true)) {
+            $zone = 'Asia/Riyadh';
+        }
+
+        return [$zone, now($zone)->format('Y-m-d')];
     }
 
     /** بصمة الطلب لكشف إعادة استعمال مفتاح التكرار مع طلب مختلف — HMAC لا نصّ. */
