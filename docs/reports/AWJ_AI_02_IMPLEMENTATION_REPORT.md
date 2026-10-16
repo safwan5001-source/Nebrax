@@ -6,8 +6,8 @@ AI-02 is delivered as **two stacked Draft PRs**, because one PR would mix a migr
 
 | PR | Scope | Depends on |
 |---|---|---|
-| **AI-02A** (this report, Part A) | Budget and usage metering, durable audit, retention, idempotency | `main` (AI-01 merged at `336284170ea6a044ee745fda2f1c844e161215cf`) |
-| **AI-02B** (Part B, added by that PR) | Three read-only finance tools over `ReportService` | AI-02A |
+| **AI-02A** (Part A) | Budget and usage metering, durable audit, retention, idempotency | `main` (AI-01 merged at `336284170ea6a044ee745fda2f1c844e161215cf`) |
+| **AI-02B** (Part B, this branch) | Three read-only finance tools over `ReportService` | AI-02A (PR #1548) |
 
 - Neither PR makes a live call, activates a provider, or turns on any platform or tenant switch.
 - AI-02B is stacked on the AI-02A branch. Its base is retargeted to `main` once AI-02A merges.
@@ -177,3 +177,130 @@ CI results for the PR head are recorded in the PR description.
 ## A7. Recommended next action
 
 Review and merge AI-02A first (with CI green), then AI-02B. Before any real provider adapter, create the global and tenant caps through a reviewed operator path.
+
+---
+
+# Part B — AI-02B: Read-only finance tools
+
+| Item | Value |
+|---|---|
+| Branch | `feat/ai-02b-finance-tools-20261016` (stacked on `feat/ai-02-financial-intelligence-20261016`) |
+| Base | AI-02A head `db9fc57dd82bf928754d845c53be2d5eef6f0595` (PR #1548); `main` is `336284170ea6a044ee745fda2f1c844e161215cf` |
+| Head SHA | stated on the PR (the report commit is the last commit) |
+| Draft PR | see PR description; its base is the AI-02A branch and is retargeted to `main` after #1548 merges |
+
+## B1. Work completed
+
+### Three allowlisted tools (the registry is closed to exactly these)
+
+| Tool | Source | Arguments (closed schema) |
+|---|---|---|
+| `finance.income_statement` | `ReportService::incomeStatement` | `from`, `to` (`Y-m-d`) |
+| `finance.receivables_aging` | `ReportService::aging('receivable')` | `as_of` (`Y-m-d`) |
+| `finance.payables_aging` | `ReportService::aging('payable')` | `as_of` (`Y-m-d`) |
+
+- **No recalculation and no generated SQL.**
+  - Each tool calls the existing `ReportService` method and only reshapes its integer output.
+  - A test greps the tool sources for `DB::`, raw SQL, `JournalLine`, `Invoice::`, `round(`, float casts and network code.
+  - A second test asserts the tools issue no write statements against accounting tables.
+  - Financial figures are never produced by the model.
+- **Typed, validated input.**
+  - Unknown keys are rejected, not ignored.
+  - Dates must be strict `Y-m-d`, a real calendar date, year 2000 or later, and **not in the future** in the tenant's timezone.
+  - Income statement: `from` must not be after `to`; the period is capped at **366 days** inclusive (366 passes, 367 is rejected).
+  - Validation runs after authorization, so an unauthorized caller never learns the schema.
+- **Typed output.** Every amount is `{minor: int, decimal: "1150.00"}` with the currency and `minor_unit: 2` stated once. A test walks the whole result and asserts no floats. Each result carries the period or `as_of`, the timezone, `generated_at` (UTC), the effective branch scope, the explicit basis, and a `sources` entry with the API path (including the filters used) and the UI path.
+- **SAR-only pilot, explicit.** The tenant currency is verified as `SAR` before any read; otherwise the call is refused with `currency_unsupported` and no report query runs. The result states `currency_assumption: sar_only_pilot_tenant_currency_verified`.
+- **Timezone.** "Today" and the future-date check use the tenant timezone, not UTC. A test at 22:30 UTC (which is 01:30 the next day in Riyadh) accepts the local date and rejects the day after.
+- **Basis labels (what `ReportService` actually does, stated rather than changed).**
+  - Income statement: accrual ledger, `posted` and `reversed` entries, by `entry_date`, inclusive, excluding fiscal-year closing entries. When filtered by branch, `unallocated` (entries with no branch) is returned explicitly.
+  - Aging: remaining balance of posted, not-fully-paid documents; age reference is due date, else document date. Buckets are `<=30` days past due (this includes not-yet-due), `31-60`, `61-90`, `>90`. It is **not reconciled to the control ledger** (stated in the result).
+  - **Important limitation, labeled in the result:** aging balances are the **current** outstanding balances. `as_of` only moves the age reference and does not reconstruct history. When `as_of` is not today (tenant time), the result carries the warning `as_of_not_historical`. I did not change the report logic.
+
+### Authorization (re-checked on every invocation with a freshly loaded actor)
+
+- **Permissions.** `ai.assistant.use` (gateway) plus `reports.view` (tool). `reports.view` alone is not enough, and the assistant permission alone is not enough.
+- **Consent.** The tenant must have consented to the `financial_summary` category. Message consent does not cover it. `financial_summary` is now an *available* category, but it stays default-deny and no tenant is opted in.
+- **Restricted field.** Partner detail (id and name) in aging requires `partners.view` on top of `reports.view`. Without it the totals and buckets are returned unchanged, `rows` is empty and `partner_detail` is `withheld`. A test confirms a partner-name canary never appears in that response.
+- **Scope.**
+  - Only the resolved, authorized branch ids are passed to `ReportService`, so there is no widening. The existing report helper widens a forbidden request to the user's full scope; the gateway rejects it with `403` before the tool runs.
+  - Forbidden branch or warehouse ids, and ids from another tenant, are rejected.
+  - Revoking a branch or `reports.view` between planning and execution is enforced.
+  - The fresh actor is installed as the authenticated user while the tool runs, because `ReportService` reads branch scope from `auth()->user()`. A test fails if this is removed.
+- **Warehouse.** The financial reports have no warehouse dimension. A request that names warehouses is rejected (`scope_not_supported`) instead of silently ignoring them. A user restricted to warehouses but naming none gets company-wide financials, the same as the existing `/api/reports/*` behavior, and the result states `warehouse: not_applicable`.
+
+### Data flow
+
+- Tool results are returned only to the authenticated caller. In AI-02B they are **not forwarded to any provider**. Forwarding financial data to a real model needs the real adapter, the privacy approval and a separate review.
+- The deterministic mock provider can plan a tool from a few Arabic and English keywords (for example "income statement", "قائمة الدخل", "receivables aging", "أعمار الذمم الدائنة") with default arguments. This is for demonstration and tests; a custom planner overrides it.
+- Audit: `tool.invoked` and `tool.denied` carry the tool name and counts only (row count, period days, branch mode and count, `partner_detail`). A test confirms no amount or partner name reaches the audit table.
+
+### Unchanged
+No accounting rule, report calculation, Document Center, Store, UI or Help Center change. No real provider, network call or credential. No migration in AI-02B.
+
+## B2. Changed files (AI-02B only)
+
+| File | Change |
+|---|---|
+| `app/Services/AiFinanceReportTool.php` | new: shared base (SAR gate, dates, scope, money, envelope) |
+| `app/Services/AiIncomeStatementTool.php`, `AiAgingReportTool.php` | new |
+| `app/Services/AiAssistantToolRegistry.php` | registers exactly the three tools |
+| `app/Contracts/AiAssistantTool.php` | adds `validate`, `supportsWarehouseScope`, `auditMeta` |
+| `app/Services/AiAssistantGateway.php` | validates arguments after authorization, rejects unsupported warehouse scope, installs the fresh actor, passes tenant clock to the provider, audits tool metadata |
+| `app/Services/MockAiAssistantProvider.php`, `app/Contracts/AiAssistantProvider.php` | keyword planner; `today` and `timezone` inputs |
+| `app/Support/AiAssistantDataCategory.php` | `financial_summary` becomes available (still needs consent) |
+| `app/Support/AiAssistantDenied.php` | `invalid_tool_arguments`, `scope_not_supported`, `currency_unsupported` |
+| `tests/Feature/AiFinanceToolsTest.php` | new, 26 tests |
+| `tests/Feature/AiAssistantGatewayTest.php` | AI-01 tests updated for the new contract (registry now has three tools, financial category now consent-gated, probe tool implements the new methods, fresh-actor assertion) |
+
+## B3. Compatibility
+
+- **No migration and no schema change** in AI-02B.
+- **AI-01 test changes:** they follow deliberate behavior changes (registry no longer empty; `financial_summary` no longer reserved). The 39 AI-01 gateway tests still pass.
+- **Default behavior is unchanged:** the feature is off platform-wide, no tenant is opted in, and `financial_summary` consent is empty for every tenant.
+- **Tool contract:** `AiAssistantTool` gained three methods. The only implementers are the three new tools and the test double.
+
+## B4. Tests
+
+| Check | Result |
+|---|---|
+| `AiFinanceToolsTest` | **26 passed** |
+| `AiAssistantGatewayTest` (AI-01, updated) | **39 passed** |
+| `AiMeteringTest` + `AiAuditTest` (AI-02A) | **44 passed** |
+| Nearby accounting, report and isolation suites (`ReportStatementsTest`, `ApiReportsTest`, `FinancialStatementsTest`, `ReportEffectiveScopeTest`, `BranchPartnerIsolationTest`, `BranchIsolationGuardTest`, `ApiUnauthenticatedResponseTest`, `ApplicationAccessGateGuardTest`) with the above | **188 passed in total** |
+| Full local suite (SQLite) | **7441 passed, 140 skipped, 26 failed** (59,476 assertions, 693 s) |
+| Mutation checks | Downgrading the tool permission, ignoring the branch filter, or dropping the fresh-actor installation each makes tests fail, then the code was restored |
+| `git diff --check` | clean |
+
+The 26 failures are the same environmental set: six fuel classes failing with `undefined function bcmul()`, because the sandbox PHP lacks `bcmath`. CI installs it.
+
+### Coverage
+
+- **Financial parity vs `ReportService`:**
+  - Income statement with inclusive boundaries (day before, first day, last day and the day after excluded), a three-line rounding case, negative values, and expenses.
+  - Aging at every bucket boundary: due today, 30, 31, 60, 61, 90, 91 days late and not yet due, plus payables.
+  - Parity is asserted on totals, rows and the decimal strings.
+- **Isolation:** another tenant's documents never appear; cross-tenant branch and warehouse ids are rejected.
+- **Scope:** branch filtering with `unallocated`; a restricted user pinned to their branches; an explicitly forbidden branch rejected, not widened; a branch revoked mid-request; a warehouse selection rejected; a warehouse-restricted user.
+- **Authorization:** missing `reports.view`; `reports.view` revoked between planning and execution (no report query runs); missing consent; withheld partner detail.
+- **Dates and limits:** timezone boundaries, 15 malformed or out-of-bound argument cases (no report query runs), the 366-day limit, and the non-SAR tenant.
+- **Audit and safety:** redaction, no write statements, no generated SQL, the closed registry.
+
+## B5. CI
+
+Recorded in the PR description for the head commit.
+
+## B6. Risks and open issues (AI-02B)
+
+1. **Aging `as_of` is not historical.** This is existing `ReportService` behavior, now labeled with a machine-readable warning. If the product needs true historical aging, that is an accounting change in a separate task. A model that ignores the warning could narrate a current balance as a past one.
+2. **Warehouse-restricted users see company-wide financials**, matching the existing report endpoints. If warehouse restriction must also limit financial visibility, that is a policy decision (a candidate for a configurable setting) and was not changed here.
+3. **Mock keyword planning is a demo.** A real model will choose tools and arguments, so its argument validation (already closed-schema) is the control. Real prompt-injection testing belongs to the adapter phase.
+4. **Financial data is not sent to any provider yet.** Before it can be, the real adapter needs the privacy, retention and residency approvals and a decision on whether tool results may be forwarded to the model.
+5. **No drill-down.** Row-level source links (documents, ledger) are intentionally absent; only report-level `api_path` and `ui_path` are returned.
+6. **Account-level sensitivity.** Revenue and expense lines are visible to any role holding `reports.view`, as in the existing API. A field-level policy registry (for example for cost accounts) is not part of this PR.
+
+## B7. Recommended next action
+
+1. Review and merge AI-02A (#1548) first, then retarget and review AI-02B.
+2. Provision budget caps through a reviewed operator path before any real adapter.
+3. Next phase: the AI-03 UI (consent management and states). The real provider adapter stays blocked on the open gates (privacy, residency, billing owner and numeric caps).
