@@ -8,6 +8,18 @@
 | Read-only external checks | Railway build log of `nibras-api` (how production is built); Cloudflare R2 docs (presigned URLs, `GetObject` params); MDN (AVIF support); php.net (`imagecreatefromavif`) |
 | Evidence tags | **[Repo]** read in code · **[S0]** measured in the S0 spikes (not repeated) · **[Ext]** primary external doc · **[Prod]** read from Railway (read-only) · **[Unverified]** nobody has evidence |
 
+## Status update — owner decisions and evidence (recorded after this review)
+
+| Item | Status | Evidence class |
+|---|---|---|
+| **Architecture B2** (Laravel authorises; Next.js streams video bytes from R2 using server-side signed URLs) | **Approved architecturally by the owner** | Owner decision |
+| **Poster design P2** (the poster belongs to the video asset itself; **no** `poster_media_id` migration) | **Approved by the owner** — supersedes option P1 in §5 #4 | Owner decision |
+| **Animated WebP** | **Manually tested successfully by the owner on a real iPhone, in the Canvas and on the published storefront** | Owner-reported (not independently verified in this repository); closes the "WebP unverified" gap for that one device |
+| Every other real-device and security acceptance test (second iOS version, Low Power Mode, reduced motion on device, Android, Safari desktop, Firefox, animated AVIF, MP4/WebM playback, real-R2 Range/presigned behaviour, Railway edge streaming) | **Remain unverified** unless independently evidenced | — |
+| **These approvals do NOT authorise video rollout.** | They fix the *design direction* only. No video code, upload route, authorise endpoint, flag, canary or production change is authorised; the gates in §4.6 and §6 still apply, and approvals #1, #5, #6, #10, #11, #12 in §5 are still required before their slices. The AMEND-1 clarification (#7) is covered in principle by the B2 approval but its ADR text is still to be written (slice V0). | — |
+
+**First slice from this review:** `P2-0` (proxy safety for the existing buffered image path) — see `AWJ_ANIMATED_MEDIA_P2_0_REPORT.md`.
+
 ## 0. Verdict at a glance
 
 | Item | Recommendation |
@@ -152,7 +164,7 @@ Option A (Next proxy → **Laravel `video` route** → R2 `GetObject` with `Rang
 | 1 | **Dockerfile:** `libavif-dev`, `gd --with-avif`, pinned base tag, AVIF smoke assertion | AVIF | No (image change) | **REQUIRED** |
 | 2 | New closed file name `animated.avif` (PHP regex, proxy regex, TS twin), `animation.format` enum += `avif`, accept `image/avif` uploads, env flag `STOREFRONT_MEDIA_AVIF_ENABLED` (default **false**) | AVIF | Additive (old storefront ignores unknown format → still) | Informational |
 | 3 | `kind='video'`, `mime video/mp4`, `variants` JSON entry — **no schema change** | video | No | None |
-| 4 | **Poster ownership.** *Option P1:* nullable `storefront_media.poster_media_id` (additive migration; deletion/reference checks extended) — your earlier "preferred" design. *Option P2 (new, recommended to evaluate):* **the poster is part of the video asset** — uploaded in the same request, processed by the existing static pipeline into the asset's own ladder (exactly how animated assets already own a first-frame ladder). **Zero migration, no cross-asset reference, no deletion-protection problem**; trade-off: a poster is not reusable elsewhere and the upload takes two files | video | P1: schema change · P2: none | **REQUIRED** (choose P1 vs P2; P2 changes the design you approved) |
+| 4 | **Poster ownership — RESOLVED: P2 approved (see Status update).** *(Original options kept for the record.)* *Option P1:* nullable `storefront_media.poster_media_id` (additive migration; deletion/reference checks extended) — your earlier "preferred" design. *Option P2 (new, recommended to evaluate):* **the poster is part of the video asset** — uploaded in the same request, processed by the existing static pipeline into the asset's own ladder (exactly how animated assets already own a first-frame ladder). **Zero migration, no cross-asset reference, no deletion-protection problem**; trade-off: a poster is not reusable elsewhere and the upload takes two files | video | P1: schema change · P2: none | **REQUIRED** (choose P1 vs P2; P2 changes the design you approved) |
 | 5 | **Video upload endpoint** (multipart `video` + `poster`) or extension of the existing `files[]` contract | video | Additive | **REQUIRED** (new API surface) |
 | 6 | **Internal authorise endpoint** (gateway-secret protected, forwarded-host scoped) returning a presigned R2 URL | video | Additive, internal | **REQUIRED** (new API + security design) |
 | 7 | ADR clarifying AMEND-1: *server-to-server signed R2 fetch by the storefront proxy is not "direct R2 exposure"* | video | Contract interpretation | **REQUIRED** |
