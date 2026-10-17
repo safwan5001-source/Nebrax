@@ -40,10 +40,6 @@ async function openPanel() {
 
 beforeEach(() => {
   resetSession();
-  // الاختبار يفترض مؤشراً غير لمسي: لا نعتمد على حالة matchMedia المتروكة من ملفات أخرى في العملية المشتركة.
-  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-    matches: false, media: query, onchange: null, addEventListener: vi.fn(), removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn(), dispatchEvent: vi.fn(),
-  })) as unknown as typeof window.matchMedia;
 });
 afterEach(cleanup);
 
@@ -145,7 +141,7 @@ describe.each(TEST_LOCALES)('blocked states (%s)', (locale) => {
     const dialog = await openPanel();
     await waitFor(() => expect(within(dialog).getByRole('link').getAttribute('href')).toBe('/intelligence/settings'));
     cleanup();
-    api.fetchStatus.mockResolvedValue(blockedStatus('consent_required', { abilities: { use: true, manage_consent: false, view_audit: false, partner_detail: false } }));
+    api.fetchStatus.mockResolvedValue(blockedStatus('consent_required', { abilities: { use: true, manage_consent: false, view_audit: false, partner_detail: false, document_read: false } }));
     mount(locale);
     const second = await openPanel();
     await waitFor(() => expect(within(second).getByRole('status').getAttribute('data-notice')).toBe('consent_required'));

@@ -12,6 +12,7 @@ export type AssistantContextKind =
   | 'dashboard'
   | 'invoices'
   | 'invoice_detail'
+  | 'document_review'
   | 'payments'
   | 'purchases'
   | 'partners'
@@ -42,6 +43,12 @@ export function resolveAssistantContext(pathname: string | null | undefined): As
   const id = (value: string | undefined): string | null => (value !== undefined && UUID.test(value) ? value.toLowerCase() : null);
 
   if (path === '/dashboard') return { kind: 'dashboard', entityId: null, suggestedTools: ALL_TOOLS };
+  // شاشة مراجعة مستند في مركز المستندات: `/documents/<uuid>` فقط (الشاشات الأخرى — operations/governance/usage/settings — ليست UUID).
+  if (first === 'documents') {
+    const entityId = id(second);
+    if (entityId && segments.length === 2) return { kind: 'document_review', entityId, suggestedTools: [] };
+    return { kind: 'other', entityId: null, suggestedTools: ALL_TOOLS };
+  }
   if (first === 'invoices') {
     const entityId = id(second);
     return { kind: entityId ? 'invoice_detail' : 'invoices', entityId, suggestedTools: ['finance.receivables_aging'] };

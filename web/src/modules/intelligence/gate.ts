@@ -13,7 +13,7 @@ export type Gate =
 
 export function gateFor(
   input: { statusPhase: 'idle' | 'loading' | 'ready' | 'error'; status: AssistantStatus | null; statusError: ClassifiedError | null },
-  capability: 'chat' | 'financial',
+  capability: 'chat' | 'financial' | 'document',
 ): Gate {
   if (input.status) {
     const state = input.status[capability];

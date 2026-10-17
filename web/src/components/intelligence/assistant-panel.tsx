@@ -13,6 +13,7 @@ import { MESSAGE_MAX_CHARS, toolKey, type ToolName } from '@/modules/intelligenc
 import { resolveAssistantContext } from '@/modules/intelligence/context';
 import { gateFor } from '@/modules/intelligence/gate';
 import { useIntelligence, type ChatEntry } from '@/modules/intelligence/store';
+import { DocumentSection } from './document-section';
 import { ResultSummary } from './result-summary';
 import { StateNotice } from './state-notice';
 
@@ -221,6 +222,9 @@ export function AssistantPanel() {
         </header>
 
         <div ref={logRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3" role="log" aria-live="polite" aria-label={t('panel.title')}>
+          {context.kind === 'document_review' && context.entityId ? (
+            <DocumentSection documentId={context.entityId} onNavigate={store.closePanel} />
+          ) : null}
           {gate.kind === 'loading' ? (
             <div role="status" aria-busy="true" aria-label={t('panel.loading_status')} className="space-y-2">
               <Skeleton className="h-10 w-full" />
@@ -241,7 +245,7 @@ export function AssistantPanel() {
               </div>
               <div role="group" aria-label={t('panel.suggestions')} className="space-y-2">
                 {/* اقتراحات هذه الشاشة أولاً (ترتيب فقط — لا تشغيل تلقائي)؛ كل اقتراح يُرسل سؤالاً جاهزاً عبر البوابة. */}
-                <p className="px-1 text-xs font-medium text-muted">{context.kind === 'other' || context.kind === 'dashboard' || context.kind === 'reports' || context.kind === 'intelligence' ? t('panel.suggestions') : t('panel.suggestions_for_screen')}</p>
+                {context.suggestedTools.length > 0 ? <p className="px-1 text-xs font-medium text-muted">{context.kind === 'other' || context.kind === 'dashboard' || context.kind === 'reports' || context.kind === 'intelligence' ? t('panel.suggestions') : t('panel.suggestions_for_screen')}</p> : null}
                 {context.suggestedTools.map((tool) => (
                   <Suggestion key={tool} tool={tool} primary onPick={suggest} />
                 ))}

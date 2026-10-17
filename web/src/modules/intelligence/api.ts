@@ -2,6 +2,7 @@ import { api } from '@/lib/api';
 import type {
   AssistantStatus,
   AuditEvent,
+  DocumentToolRunResponse,
   MessageResponse,
   SettingsPayload,
   ToolName,
@@ -53,5 +54,17 @@ export async function saveSettings(payload: SettingsPayload): Promise<AssistantS
 
 export async function fetchAuditEvents(perPage = 10): Promise<AuditEvent[]> {
   const res = await api<{ data: AuditEvent[] }>(`/ai-assistant/audit-events?per_page=${perPage}`);
+  return res.data;
+}
+
+/**
+ * قراءة صريحة لمستند واحد (AI-04). المعرّف يأتي من شاشة المستند التي يقف عليها المستخدم (مسار معروف + UUID)،
+ * لا من نصّ يكتبه ولا من أي محتوى مستند. الخادم يعيد التفويض كاملاً؛ لا مفتاح مزوّد هنا ولا نداء خارجي.
+ */
+export async function readDocument(documentId: string): Promise<DocumentToolRunResponse> {
+  const res = await api<{ data: DocumentToolRunResponse }>('/ai-assistant/tools/run', {
+    method: 'POST',
+    body: { tool: 'documents.projected_read', arguments: { document_id: documentId } },
+  });
   return res.data;
 }

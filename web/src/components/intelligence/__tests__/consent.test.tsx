@@ -40,7 +40,7 @@ const sw = (name: RegExp | string) => screen.findByRole('switch', { name });
 
 describe('access', () => {
   it('shows a denial (no controls) to someone without consent management', async () => {
-    api.fetchStatus.mockResolvedValue(makeStatus({ abilities: { use: true, manage_consent: false, view_audit: false, partner_detail: false } }));
+    api.fetchStatus.mockResolvedValue(makeStatus({ abilities: { use: true, manage_consent: false, view_audit: false, partner_detail: false, document_read: false } }));
     mount();
     await screen.findByText('This page is for the organization owner or admin');
     expect(screen.queryByRole('switch')).toBeNull();
@@ -100,8 +100,8 @@ describe.each(TEST_LOCALES)('granting consent (%s)', (locale) => {
     mount(locale);
     const doc = (await sw(ar ? /^نص المستندات المستخرج/ : /^Extracted document text/)) as HTMLButtonElement;
     expect(doc.disabled).toBe(true);
-    expect(screen.getByText(ar ? 'غير متاحة بعد' : 'Not available yet')).toBeTruthy();
-    expect(screen.getByText(ar ? /موافقة مركز المستندات/ : /Document Center consent/)).toBeTruthy();
+    expect(screen.getByText(ar ? 'غير مفعّلة على المنصة' : 'Not enabled on the platform')).toBeTruthy();
+    expect(screen.getAllByText(ar ? /موافقة مركز المستندات/ : /Document Center consent/).length).toBeGreaterThan(0);
   });
 });
 
@@ -147,7 +147,7 @@ describe('revoking and failures', () => {
   });
 
   it('shows the audit log only to someone with audit access, and never message text', async () => {
-    api.fetchStatus.mockResolvedValue(makeStatus({ abilities: { use: true, manage_consent: true, view_audit: true, partner_detail: true } }));
+    api.fetchStatus.mockResolvedValue(makeStatus({ abilities: { use: true, manage_consent: true, view_audit: true, partner_detail: true, document_read: true } }));
     api.fetchAuditEvents.mockResolvedValue([
       { id: 'e1', request_id: 'r1', actor_id: 'u1', event: 'consent.updated', tool: null, outcome: 'allowed', reason: 'ok', occurred_at: '2026-10-16 09:00:00' },
     ]);

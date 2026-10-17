@@ -166,7 +166,7 @@ for (const locale of LOCALES) {
         await expect(page.getByRole('button', { name: locale === 'ar' ? 'تشغيل التقرير' : 'Run report' })).toHaveCount(0);
         await shot(page, `state-consent-admin-${tag}`, testInfo);
 
-        await open(page, { locale, mode, route: '/intelligence', status: blockedStatus('consent_required', { abilities: { use: true, manage_consent: false, view_audit: false, partner_detail: false } }), permissions: ['ai.assistant.use', 'reports.view'] });
+        await open(page, { locale, mode, route: '/intelligence', status: blockedStatus('consent_required', { abilities: { use: true, manage_consent: false, view_audit: false, partner_detail: false, document_read: false } }), permissions: ['ai.assistant.use', 'reports.view'] });
         await expect(page.locator('[data-notice="consent_required"]')).toBeVisible();
         await expect(page.getByRole('link', { name: locale === 'ar' ? 'فتح إعدادات المساعد' : 'Open assistant settings' })).toHaveCount(0);
         await shot(page, `state-consent-member-${tag}`, testInfo);
@@ -186,7 +186,7 @@ for (const locale of LOCALES) {
       });
 
       test('settings: consent controls, acknowledgement dialog, audit log', async ({ page }, testInfo) => {
-        await open(page, { locale, mode, route: '/intelligence/settings', status: makeStatus({ abilities: { use: true, manage_consent: true, view_audit: true, partner_detail: true } }) });
+        await open(page, { locale, mode, route: '/intelligence/settings', status: makeStatus({ abilities: { use: true, manage_consent: true, view_audit: true, partner_detail: true, document_read: true } }) });
         await expect(page.getByRole('switch').first()).toBeVisible();
         await expect(page.getByText('consent.updated')).toBeVisible();
         await noHorizontalOverflow(page);

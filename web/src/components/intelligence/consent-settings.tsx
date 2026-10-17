@@ -194,11 +194,14 @@ export function ConsentSettings() {
                     ? t('confirm_enable', { categories: t(`category.${pending.category}`) })
                     : t('confirm_enable_only')}
                 </p>
-                <div className="rounded border border-border bg-background p-3">
-                  <p className="mb-1 flex items-center gap-1.5 text-xs font-medium"><ShieldCheck className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />{t('privacy_title')}</p>
+                <div className="rounded border border-border bg-background p-3" data-privacy={pending.kind === 'grant' && pending.category === 'document_projected_text' ? 'document' : 'general'}>
+                  <p className="mb-1 flex items-center gap-1.5 text-xs font-medium"><ShieldCheck className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />{pending.kind === 'grant' && pending.category === 'document_projected_text' ? t('document_privacy_title') : t('privacy_title')}</p>
                   <ul className="list-disc space-y-1 ps-5 text-xs text-muted">
-                    {(['p1', 'p2', 'p3', 'p4'] as const).map((key) => (<li key={key}>{t(`privacy_points.${key}`)}</li>))}
+                    {pending.kind === 'grant' && pending.category === 'document_projected_text'
+                      ? (['d1', 'd2', 'd3', 'd4'] as const).map((key) => (<li key={key}>{t(`document_privacy_points.${key}`)}</li>))
+                      : (['p1', 'p2', 'p3', 'p4'] as const).map((key) => (<li key={key}>{t(`privacy_points.${key}`)}</li>))}
                   </ul>
+                  {pending.kind === 'grant' && pending.category === 'document_projected_text' ? <p className="mt-2 text-xs font-medium text-text">{t('document_separate')}</p> : null}
                 </div>
                 <label className="flex min-h-11 cursor-pointer items-start gap-2 text-sm">
                   <input type="checkbox" className="mt-1 h-4 w-4 accent-primary" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />

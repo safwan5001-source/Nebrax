@@ -8,6 +8,7 @@ const api = vi.hoisted(() => ({
   fetchStatus: vi.fn(),
   sendMessage: vi.fn(),
   runTool: vi.fn(),
+  readDocument: vi.fn(),
   saveSettings: vi.fn(),
   fetchAuditEvents: vi.fn(),
 }));

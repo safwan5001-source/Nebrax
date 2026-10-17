@@ -24,6 +24,15 @@ describe('resolveAssistantContext (approved metadata only)', () => {
     expect(resolveAssistantContext('/invoices?customer=secret&q=ahmad')).toMatchObject({ kind: 'invoices', entityId: null });
   });
 
+  it('recognises a Document Center review screen by its UUID only (AI-04)', () => {
+    expect(resolveAssistantContext(`/documents/${UUID}`)).toMatchObject({ kind: 'document_review', entityId: UUID, suggestedTools: [] });
+    expect(resolveAssistantContext(`/documents/${UUID.toUpperCase()}/`)).toMatchObject({ kind: 'document_review', entityId: UUID });
+    expect(resolveAssistantContext('/documents/operations').kind).toBe('other');
+    expect(resolveAssistantContext('/documents/not-a-uuid').kind).toBe('other');
+    expect(resolveAssistantContext(`/documents/${UUID}/diagnostics`).kind).toBe('other');
+    expect(resolveAssistantContext('/documents').kind).toBe('other');
+  });
+
   it('exposes nothing but kind, entityId and suggestions', () => {
     expect(Object.keys(resolveAssistantContext(`/invoices/${UUID}`)).sort()).toEqual(['entityId', 'kind', 'suggestedTools']);
   });
