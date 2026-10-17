@@ -15,7 +15,7 @@ use Illuminate\Validation\Rule;
  */
 class AiAssistantSettingsRequest extends FormRequest
 {
-    private const ALLOWED = ['enabled', 'consented_categories', 'acknowledge_privacy'];
+    private const ALLOWED = ['enabled', 'consented_categories', 'acknowledge_privacy', 'acknowledge_external_provider'];
 
     public function authorize(): bool
     {
@@ -30,6 +30,7 @@ class AiAssistantSettingsRequest extends FormRequest
             'consented_categories' => ['present', 'array', 'max:' . count(AiAssistantDataCategory::ALL)],
             'consented_categories.*' => ['string', 'distinct', Rule::in(AiAssistantDataCategory::ALL)],
             'acknowledge_privacy' => ['sometimes', 'boolean'],
+            'acknowledge_external_provider' => ['sometimes', 'boolean'],
         ];
     }
 

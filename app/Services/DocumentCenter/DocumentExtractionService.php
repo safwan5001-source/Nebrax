@@ -10,6 +10,7 @@ use App\Models\DocumentProcessingRun;
 use App\Models\DocumentProviderAttempt;
 use App\Models\DocumentProviderUsageEvent;
 use App\Services\PlatformIntegrationResolver;
+use App\Support\AiAssistantDenied;
 use App\Support\DocumentProcessingStatus;
 use App\Support\DocumentScanStatus;
 use App\Support\DocumentWorkflowStatus;
@@ -28,6 +29,7 @@ class DocumentExtractionService
         private readonly DocumentProcessingService $processing,
         private readonly DocumentWorkflowService $workflow,
         private readonly DocumentFileScanAdmissionService $scanAdmission,
+        private readonly DocumentExtractionMeter $meter,
     ) {
     }
 
@@ -164,6 +166,14 @@ class DocumentExtractionService
                 ? $configuredAttempts
                 : max(1, min($configuredAttempts, $maxProviderAttemptsThisInvocation));
             for ($attemptNumber = 1; $attemptNumber <= $attemptBudget; $attemptNumber++) {
+                // AI-07 (سياسة اختيارية): حجز في ميزانية الذكاء الاصطناعي قبل أي اتصال؛ رفضه ⇒ لا يُرسَل المستند.
+                try {
+                    $metered = $this->meter->reserve((string) $run->tenant_id, $run->batch->created_by, $providerKey, $configuration->model, (int) $file->page_count);
+                } catch (AiAssistantDenied $denied) {
+                    $this->recordSkippedAttempt($run, $file, ++$sequence, $configuration, 'ai_budget_' . $denied->reason, 'منعت ميزانية الذكاء الاصطناعي أو التسعير هذه المحاولة قبل إرسال المستند.');
+                    break;
+                }
+
                 $attempt = DocumentProviderAttempt::create([
                     'document_batch_id' => $run->document_batch_id,
                     'document_file_id' => $file->id,
@@ -187,6 +197,7 @@ class DocumentExtractionService
                         (string) $run->batch->document_type,
                         $policy->defaultLanguage(),
                     ));
+                    $this->meter->settle($metered, $providerKey, $configuration->model, $result->inputTokens, $result->outputTokens);
                     $finishedAt = now('UTC');
                     $attempt->fill([
                         'status' => 'succeeded',
@@ -201,6 +212,7 @@ class DocumentExtractionService
 
                     return;
                 } catch (DocumentProviderException $exception) {
+                    $this->meter->fail($metered, $exception->safeCode);
                     $attempt->fill([
                         'status' => 'failed',
                         'error_code' => $exception->safeCode,
@@ -211,6 +223,7 @@ class DocumentExtractionService
                         break;
                     }
                 } catch (Throwable) {
+                    $this->meter->fail($metered, null);
                     $attempt->fill([
                         'status' => 'failed',
                         'error_code' => 'provider_unavailable',

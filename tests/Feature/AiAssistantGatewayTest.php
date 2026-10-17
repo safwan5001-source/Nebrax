@@ -737,7 +737,7 @@ class AiAssistantGatewayTest extends TestCase
         $forbidden = [
             'Http::', 'Illuminate\\Support\\Facades\\Http', 'GuzzleHttp', 'curl_', 'fsockopen', 'stream_socket',
             'file_get_contents', 'PlatformIntegration', 'api_key', 'Crypt::', 'DB::raw', 'DB::select', 'DB::statement',
-            'anthropic', 'openai', 'gemini',
+            'openai', 'gemini',
         ];
 
         foreach ($files as $file) {
@@ -752,7 +752,26 @@ class AiAssistantGatewayTest extends TestCase
             foreach ($forbidden as $needle) {
                 $this->assertStringNotContainsStringIgnoringCase($needle, $code, "{$file} must not contain `{$needle}`");
             }
+            // AI-07: only the gateway and the config may NAME the one allowed external provider; nothing else in the list may.
+            if (! in_array($file, ['app/Services/AiAssistantGateway.php', 'config/ai_assistant.php'], true)) {
+                $this->assertStringNotContainsStringIgnoringCase('anthropic', $code, "{$file} must not name a provider");
+            }
         }
+    }
+
+    /** @test */
+    public function the_external_provider_class_has_no_network_secret_or_logging_code_of_its_own(): void
+    {
+        $code = implode("\n", array_map(
+            fn ($token) => is_array($token) && in_array($token[0], [T_COMMENT, T_DOC_COMMENT], true) ? '' : (is_array($token) ? $token[1] : $token),
+            token_get_all((string) file_get_contents(base_path('app/Services/AnthropicAssistantProvider.php'))),
+        ));
+        // It must reuse the platform integration + the existing client: no HTTP of its own, no key handling, no logging.
+        foreach (['Http::', 'GuzzleHttp', 'curl_', 'fsockopen', 'stream_socket', 'file_get_contents', 'Crypt::', 'Log::', 'error_log', 'api_key', 'x-api-key', 'dd(', 'dump(', 'var_dump', 'print_r', 'openai', 'gemini'] as $needle) {
+            $this->assertStringNotContainsStringIgnoringCase($needle, $code, "AnthropicAssistantProvider must not contain `{$needle}`");
+        }
+        $this->assertStringContainsString('converse', $code, 'it must go through the existing Anthropic client');
+        $this->assertStringContainsString('aiProviderConfiguration', $code, 'it must read the existing platform integration');
     }
 
     // ───────────────────── secrets / audit ─────────────────────
@@ -861,6 +880,16 @@ class AiAssistantGatewayTest extends TestCase
             public function name(): string
             {
                 return 'probe.echo';
+            }
+
+            public function description(): string
+            {
+                return 'probe';
+            }
+
+            public function inputSchema(): array
+            {
+                return ['type' => 'object', 'properties' => new \stdClass, 'additionalProperties' => false];
             }
 
             public function requiredPermission(): string

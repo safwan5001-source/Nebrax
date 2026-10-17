@@ -14,6 +14,20 @@ interface AiAssistantTool
 {
     public function name(): string;
 
+    /**
+     * وصف قصير بالإنجليزية يقرؤه النموذج لاختيار الأداة (لا بيانات ولا أسرار). AI-07: مصدر تعريف الأداة للمزوّد الخارجي
+     * هو الأداة نفسها، فلا يوجد مخطط ثانٍ يُصان بجانب `validate()`.
+     */
+    public function description(): string;
+
+    /**
+     * JSON Schema **مغلق** لمعطيات الأداة (`additionalProperties:false`) يطابق `validate()`. للمزوّد الخارجي فقط؛
+     * التحقق الفعلي والملزِم يبقى في `validate()` بعد التفويض.
+     *
+     * @return array<string,mixed>
+     */
+    public function inputSchema(): array;
+
     /** صلاحية RBAC الإضافية اللازمة لهذه الأداة (فوق `ai.assistant.use`). */
     public function requiredPermission(): string;
 

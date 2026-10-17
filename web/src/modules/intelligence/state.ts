@@ -69,6 +69,7 @@ const CODE_TO_NOTICE: Record<string, NoticeKey> = {
   document_on_hold: 'document_on_hold',
   document_retention_ended: 'document_retention_ended',
   document_projection_unavailable: 'document_projection_unavailable',
+  external_provider_not_acknowledged: 'external_provider_not_acknowledged',
 };
 
 export interface ClassifiedError {
@@ -84,6 +85,7 @@ export interface ClassifiedError {
 const STATE_CHANGING: ReadonlySet<NoticeKey> = new Set([
   'permission_denied', 'platform_disabled', 'tenant_disabled', 'consent_required', 'tool_permission_denied',
   'provider_unavailable', 'currency_unsupported', 'data_category_unavailable', 'category_unavailable', 'document_center_unavailable',
+  'external_provider_not_acknowledged',
 ]);
 
 export function errorCode(body: unknown): string | null {

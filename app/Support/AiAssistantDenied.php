@@ -48,6 +48,7 @@ final class AiAssistantDenied extends RuntimeException
         'document_on_hold'          => [409, 'المستند تحت حجز احتفاظ نشط ولا يُتاح للمساعد حالياً.'],
         'document_retention_ended'  => [409, 'انتهت مدة احتفاظ المستند أو حُذف محتواه أو أُرشف.'],
         'document_projection_unavailable' => [409, 'تعذّر إنتاج إسقاط آمن حالي لهذا المستند.'],
+        'external_provider_not_acknowledged' => [403, 'لم يُقرّ مالك المؤسسة بإرسال بيانات المساعد إلى مزوّد ذكاء اصطناعي خارجي.'],
         'internal_error'            => [500, 'تعذّر إكمال الطلب.'],
     ];
 

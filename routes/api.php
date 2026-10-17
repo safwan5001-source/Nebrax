@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\PlatformCommercialAssignmentController;
 use App\Http\Controllers\Api\PlatformCommercialCatalogController;
 use App\Http\Controllers\Api\PlatformDashboardController;
 use App\Http\Controllers\Api\PlatformDocumentOperationsController;
+use App\Http\Controllers\Api\PlatformAiBudgetController;
 use App\Http\Controllers\Api\PlatformIntegrationController;
 use App\Http\Controllers\Api\PlatformDocumentFileScanExceptionController;
 use App\Http\Controllers\Api\PlatformSubscriptionController;
@@ -301,6 +302,7 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('me', [PlatformAuthController::class, 'me']);
         Route::get('overview', [PlatformDashboardController::class, 'overview']);
         Route::get('integrations', [PlatformIntegrationController::class, 'index']);
+        Route::get('ai-budgets', [PlatformAiBudgetController::class, 'index']);
         Route::get('tenants', [PlatformTenantController::class, 'index']);
         Route::get('tenants/{tenant}', [PlatformTenantController::class, 'show']);
         Route::get('document-operations', [PlatformDocumentOperationsController::class, 'overview']);
@@ -321,6 +323,7 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
             Route::post('system-updates/{id}/publish', [PlatformSystemUpdateController::class, 'publish'])->whereUuid('id');
             Route::delete('system-updates/{id}', [PlatformSystemUpdateController::class, 'destroy'])->whereUuid('id');
             Route::put('integrations/{integration}', [PlatformIntegrationController::class, 'update']);
+            Route::put('ai-budgets', [PlatformAiBudgetController::class, 'update']);
             Route::post('integrations/{integration}/test', [PlatformIntegrationController::class, 'test']);
             Route::post('document-file-scan-exceptions', [PlatformDocumentFileScanExceptionController::class, 'store']);
             Route::post('document-file-scan-exceptions/{exception}/revoke', [PlatformDocumentFileScanExceptionController::class, 'revoke'])->whereUuid('exception');

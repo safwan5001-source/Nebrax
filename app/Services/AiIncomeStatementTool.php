@@ -26,6 +26,25 @@ class AiIncomeStatementTool extends AiFinanceReportTool
         return 'finance.income_statement';
     }
 
+    public function description(): string
+    {
+        return 'Income statement (revenue, expenses, net income) in SAR for an inclusive date range, from the accounting ledger. '
+            . 'Use for profit/loss, revenue, expense questions. Dates are YYYY-MM-DD in the company timezone; period max 366 days.';
+    }
+
+    public function inputSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'from' => ['type' => 'string', 'description' => 'Start date YYYY-MM-DD (inclusive).'],
+                'to' => ['type' => 'string', 'description' => 'End date YYYY-MM-DD (inclusive), not in the future.'],
+            ],
+            'required' => ['from', 'to'],
+            'additionalProperties' => false,
+        ];
+    }
+
     public function validate(array $arguments): array
     {
         $this->assertClosedSchema($arguments, ['from', 'to']);

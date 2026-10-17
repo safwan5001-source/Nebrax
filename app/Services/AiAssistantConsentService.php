@@ -37,7 +37,7 @@ class AiAssistantConsentService
      * @return array<string,mixed> الحالة الجديدة كما تعيدها `AiAssistantStatusService`.
      * @throws AiAssistantDenied
      */
-    public function update(User $actor, bool $enabled, array $categories, bool $acknowledged): array
+    public function update(User $actor, bool $enabled, array $categories, bool $acknowledged, ?bool $externalAcknowledged = null): array
     {
         $requested = $enabled ? array_values(array_unique($categories)) : [];
         foreach ($requested as $category) {
@@ -46,7 +46,12 @@ class AiAssistantConsentService
             }
         }
 
-        DB::transaction(function () use ($actor, $enabled, $requested, $acknowledged): void {
+        // AI-07: الإقرار بإرسال البيانات لمزوّد خارجي لا يُمنح إلا والمزوّد الفعلي خارجي، وبإقرار الخصوصية، ويُسحب بتعطيل المساعد.
+        if ($externalAcknowledged === true && ! $this->status->externalProviderConfigured()) {
+            throw AiAssistantDenied::for('provider_unavailable');
+        }
+
+        DB::transaction(function () use ($actor, $enabled, $requested, $acknowledged, $externalAcknowledged): void {
             $tenant = Tenant::query()->whereKey($actor->tenant_id)->lockForUpdate()->firstOrFail();
             $current = Settings::group('ai_assistant', $tenant);
             $wasEnabled = ($current['enabled'] ?? false) === true;
@@ -54,11 +59,13 @@ class AiAssistantConsentService
 
             $granted = array_values(array_diff($requested, $before));
             $revoked = array_values(array_diff($before, $requested));
-            if ($wasEnabled === $enabled && $granted === [] && $revoked === []) {
+            $ackBefore = (Settings::group('ai_assistant_external', $tenant)['acknowledged'] ?? false) === true;
+            $ackAfter = ! $enabled ? false : ($externalAcknowledged ?? $ackBefore);
+            if ($wasEnabled === $enabled && $granted === [] && $revoked === [] && $ackBefore === $ackAfter) {
                 return; // لا تغيير فعلي: لا كتابة ولا تدقيق.
             }
 
-            if ((! $wasEnabled && $enabled) || $granted !== []) {
+            if ((! $wasEnabled && $enabled) || $granted !== [] || ($ackAfter && ! $ackBefore)) {
                 if (! $this->policy->platformEnabled()) {
                     throw AiAssistantDenied::for('platform_disabled');
                 }
@@ -68,6 +75,9 @@ class AiAssistantConsentService
             }
 
             Settings::put('ai_assistant', ['enabled' => $enabled, 'consented_categories' => $requested], $tenant);
+            if ($ackAfter !== $ackBefore) {
+                Settings::put('ai_assistant_external', ['acknowledged' => $ackAfter], $tenant);
+            }
 
             $this->audit->record(
                 (string) Str::uuid(),
@@ -76,7 +86,7 @@ class AiAssistantConsentService
                 'consent.updated',
                 'allowed',
                 'ok',
-                ['meta' => ['consent_enabled' => $enabled, 'categories_granted' => $granted, 'categories_revoked' => $revoked]],
+                ['meta' => ['consent_enabled' => $enabled, 'categories_granted' => $granted, 'categories_revoked' => $revoked] + ($this->status->externalProviderConfigured() ? ['external_ack' => $ackAfter] : [])],
                 required: true,
             );
         });
