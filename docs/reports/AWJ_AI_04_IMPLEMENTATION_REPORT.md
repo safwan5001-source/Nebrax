@@ -9,9 +9,9 @@ Scope: let AWJ Intelligence read an explicitly authorized, **human-reviewed, red
 | **Blocker for a safe integration?** | **No.** A safe read model already exists in Document Center (`ReviewedDocumentProjector` + `DocumentRedactionProjector` over the encrypted `DocumentExtractionResult`). Nothing was bypassed or invented. |
 | **Owner-visible caveats** | Four, all documented in §9 (retention does not purge the extraction payload; conservative hold/scan decisions; two platform flags default off; tax numbers deliberately excluded). None needs a schema change. |
 | Branch | `feat/ai-04-document-read-20261017` |
-| Draft PR | __PR_URL__ |
+| Draft PR | https://github.com/safwan5001-source/Nebrax/pull/1554 (Draft) |
 | Base | `main` @ `1f94e18480e78fea1839b0493073f21b486f6f07` (AI-01 #1546, AI-02A #1548, AI-02B #1549, AI-03 #1553 merged) |
-| Head | __HEAD__ |
+| Head | `443bb69df0e77a4b851310a178b94252b1846423` at PR creation (any later commit on the branch changes this report only) |
 | Migrations / new tables | **none** |
 | Provider / network | mock only; **zero egress** (asserted in every backend test and in Playwright) |
 
@@ -114,7 +114,7 @@ Tests cover each row; every denial writes a metadata-only `tool.denied` audit ev
 | `next build` | passed |
 | Playwright `ai-04-documents.spec.ts` | **31 passed, 1 skipped by design** (desktop keyboard journey is desktop-only); asserts a single read request carrying only the URL id, no non-local host, no document content in `localStorage`/`sessionStorage` |
 | Playwright AI-03 spec (regression) | 41 passed / 3 skipped by design, re-run on this branch — AI-03 UI untouched apart from the document surface |
-| CI (GitHub) | __CI__ |
+| CI (GitHub) | Draft PR opened with SQLite, PostgreSQL, CI Gate and web build running; result recorded in the PR checks and summarised in the hand-off message (not polled here). |
 
 **No-egress proof:** every backend test runs `Http::preventStrayRequests()` and asserts `Http::assertNothingSent()` in `tearDown`; the tool run path calls no provider; the provider path cannot reach the tool; Playwright records every request host and asserts only the app origin and the (intercepted) API origin occur.
 
