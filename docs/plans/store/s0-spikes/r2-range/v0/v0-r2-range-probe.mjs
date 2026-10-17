@@ -16,27 +16,15 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { allowedUpstream, guardedFetch, UpstreamRefused } from './v0-upstream-guard.mjs';
 import { classifyLocation, cleanupGate, etagGate, leakGate, redactText, redirectGate, safeSerialize, scanHeaderValues, scanText, sensitiveTokens } from './v0-gates.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const arg = (n, d) => (process.argv.find((a) => a.startsWith(`--${n}=`)) ?? `--${n}=${d}`).split('=').slice(1).join('=');
 const flag = (n) => process.argv.includes(`--${n}`);
 
-// ───────────────────────────── the proxy-side SSRF guard (reference implementation for V2) ─────────────────────────────
-/** A signed URL may be fetched only if it is https (or http for the loopback self-test), carries no userinfo/port tricks, and its host is exactly the configured endpoint
- *  host or `<bucket>.<endpoint host>`. Anything else is refused BEFORE a request is made. */
-export function allowedUpstream(rawUrl, { endpoint, bucket, allowInsecureLoopback = false }) {
-  let u; let e;
-  try { u = new URL(rawUrl); e = new URL(endpoint); } catch { return false; }
-  if (u.username || u.password) return false;
-  const loopback = allowInsecureLoopback && (e.hostname === '127.0.0.1' || e.hostname === 'localhost');
-  if (!(u.protocol === 'https:' || (loopback && u.protocol === 'http:'))) return false;
-  if (u.protocol !== e.protocol) return false;
-  if ((u.port || '') !== (e.port || '')) return false;
-  const host = u.hostname.toLowerCase();
-  const base = e.hostname.toLowerCase();
-  return host === base || host === `${bucket.toLowerCase()}.${base}`;
-}
+// the proxy-side SSRF guard (allowedUpstream) and the only outgoing-request path (guardedFetch) live in v0-upstream-guard.mjs
+export { allowedUpstream };
 
 const HOSTLIST_CASES = [
   ['exact endpoint host', 'https://acct.r2.cloudflarestorage.com/b/k?X-Amz-Signature=x', true],
@@ -144,10 +132,15 @@ const sign = (method, key, ttl = 120, query) => { const r = signer({ op: 'presig
 const KEEP = ['status', 'content-length', 'content-range', 'accept-ranges', 'etag', 'content-type', 'content-encoding', 'last-modified', 'location', 'content-disposition', 'cache-control', 'x-amz-request-id', 'cf-cache-status', 'server', 'x-amz-id-2', 'www-authenticate'];
 const sensitiveUrls = new Set();
 const tokens = () => sensitiveTokens({ secrets, urls: [...sensitiveUrls] });
-async function hit(url, { method = 'GET', headers = {}, body, read = true, keepBody = false } = {}) {
+const upstreamPolicy = { endpoint: cfg.endpoint, bucket: process.env.S3_BUCKET, allowInsecureLoopback: cfg.loopback };
+let upstreamAllowed = 0; const upstreamRefused = [];
+async function hit(url, { method = 'GET', headers = {}, body, read = true, keepBody = false, plainHttpProbe = false } = {}) {
   sensitiveUrls.add(url); // every URL we ever send (signed, derived or tampered) is something the provider must never echo back
   const h = { 'accept-encoding': 'identity', ...headers };
-  const res = await fetch(url, { method, headers: h, redirect: 'manual', body });
+  // The allow-list is enforced BEFORE any connection: a disallowed host never receives a request (and so never sees the signature). A refusal is recorded (reason only) and fails the run.
+  let res;
+  try { res = await guardedFetch(url, { method, headers: h, body, plainHttpProbe }, upstreamPolicy); } catch (e) { if (e instanceof UpstreamRefused) upstreamRefused.push(e.reason); throw e; }
+  upstreamAllowed += 1;
   const tk = tokens();
   const seen = {}; const allNames = []; const rawEntries = [];
   // every retained VALUE and every NAME is redacted against the token set before it can reach `seen` / `headerNames` (and from there the JSON report)
@@ -301,7 +294,7 @@ try {
   // On a loopback look-alike (plain http only) the probe is skipped unless the self-test hook V0_SELFTEST_PLAIN_HTTP_HOOK=1 asks it to send an `x-v0-plain` marker that the fault injector answers with a 301.
   if (!cfg.loopback || process.env.V0_SELFTEST_PLAIN_HTTP_HOOK === '1') {
     const plainUrl = cfg.loopback ? getUrl : getUrl.replace(/^https:/, 'http:');
-    let obs; try { const r = track(await hit(plainUrl, { headers: cfg.loopback ? { 'x-v0-plain': '1' } : {} }), 'informational', 'I10'); obs = { ...brief(r), redirectsTo: r.locationClass }; } catch (e) { obs = { refused: true, error: scrub(e.cause?.code ?? e.message) }; }
+    let obs; try { const r = track(await hit(plainUrl, { headers: cfg.loopback ? { 'x-v0-plain': '1' } : {}, plainHttpProbe: !cfg.loopback }), 'informational', 'I10'); obs = { ...brief(r), redirectsTo: r.locationClass }; } catch (e) { obs = { refused: true, error: scrub(e.cause?.code ?? e.message) }; }
     rec('I10', 'I', PLAN[31][2], null, obs, 'Real endpoints should refuse or redirect plain http; a redirect to https is acceptable and is NOT counted by R13. The proxy refuses any non-https URL before connecting (R19).');
   } else rec('I10', 'I', PLAN[31][2], null, { skipped: 'loopback look-alike' });
 
@@ -331,7 +324,7 @@ try {
   rec('I14', 'I', PLAN[36][2], null, { bodyLeakKinds: [...bodyLeakKinds].sort() }, 'Informational: some S3 implementations echo the access key id or string-to-sign in error documents. The proxy never forwards upstream bodies (empty uniform failures), so this is a log-hygiene note.');
   const hl = runHostlist();
   rec('R19', 'R', PLAN[22][2], hl.every((r) => r.pass), { cases: hl.length, failed: hl.filter((r) => !r.pass).map((r) => r.name) });
-  rec('R20', 'R', PLAN[23][2] && 'Every URL the signer produced passes the host allow-list', producedUrls.every((x) => allowedUpstream(x, { endpoint: cfg.endpoint, bucket: process.env.S3_BUCKET, allowInsecureLoopback: cfg.loopback })), { urls: producedUrls.length });
+  rec('R20', 'R', PLAN[23][2] && 'Every URL the signer produced passes the host allow-list', producedUrls.every((x) => allowedUpstream(x, upstreamPolicy)), { urls: producedUrls.length });
 } catch (e) {
   // A thrown matrix still produces a (redacted) report and a nonzero exit; the raw error is never printed — a library error can carry a URL.
   fatal = scrub(e?.cause?.code ?? e?.message ?? e);
@@ -353,6 +346,7 @@ const report = {
   label: cfg.label, generatedAt: new Date().toISOString(), provider: cfg.loopback ? 'LOCAL LOOK-ALIKE (not R2)' : 'remote S3 API',
   endpointHost: cfg.loopback ? new URL(cfg.endpoint).host : '<account>.' + new URL(cfg.endpoint).hostname.split('.').slice(1).join('.'),
   addressingStyle: cfg.style, objectBytes: N, ttlSeconds: cfg.ttl, runId: RUN, cleanedUp: cleaned, cleanup,
+  upstreamGuard: { enforced: 'before every outgoing request (guardedFetch)', requestsAllowed: upstreamAllowed, requestsRefused: upstreamRefused.length, refusedReasons: [...new Set(upstreamRefused)] },
   ...(fatal ? { fatal } : {}),
   summary: { required: required.length, requiredPassed: required.length - failed.length, requiredFailed: failed.map((r) => r.id), info: results.filter((r) => r.group === 'I').length },
   results,
@@ -366,5 +360,5 @@ else console.error(`REPORT NOT WRITTEN: sensitive material (${serial.sweepKinds.
 if (serial.sweepKinds.length) console.error(`REDACTION SWEEP removed [${serial.sweepKinds.join(', ')}] from the report — a value bypassed scrub(); fix the call site`);
 console.log(`label=${cfg.label} provider=${report.provider} style=${cfg.style} size=${cfg.sizeMiB}MiB ttl=${cfg.ttl}s cleanedUp=${cleaned}`);
 for (const r of results) console.log(`${r.id.padEnd(5)} ${r.group === 'R' ? (r.pass ? 'PASS' : 'FAIL') : 'INFO'}  ${r.description.slice(0, 96)}`);
-console.log(`required ${report.summary.requiredPassed}/${report.summary.required}  failed: ${failed.map((r) => r.id).join(', ') || 'none'}  cleanup: ${cleanup.pass ? 'verified' : 'NOT VERIFIED (exit 1)'}${fatal ? '  FATAL: matrix aborted (exit 1)' : ''}\n${serial.clean ? `wrote ${outPath.replace(process.cwd() + '/', '')}` : 'no result file written'}`);
-process.exit(failed.length || !cleanup.pass || fatal || serial.sweepKinds.length ? 1 : 0);
+console.log(`required ${report.summary.requiredPassed}/${report.summary.required}  failed: ${failed.map((r) => r.id).join(', ') || 'none'}  cleanup: ${cleanup.pass ? 'verified' : 'NOT VERIFIED (exit 1)'}${fatal ? '  FATAL: matrix aborted (exit 1)' : ''}${upstreamRefused.length ? `  UPSTREAM ALLOW-LIST REFUSED ${upstreamRefused.length} request(s) (exit 1)` : ''}\n${serial.clean ? `wrote ${outPath.replace(process.cwd() + '/', '')}` : 'no result file written'}`);
+process.exit(failed.length || !cleanup.pass || fatal || serial.sweepKinds.length || upstreamRefused.length ? 1 : 0);

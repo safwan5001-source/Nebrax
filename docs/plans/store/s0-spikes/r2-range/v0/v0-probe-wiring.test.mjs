@@ -11,8 +11,11 @@ const here = dirname(fileURLToPath(import.meta.url));
 const src = readFileSync(process.env.V0_PROBE ?? join(here, 'v0-r2-range-probe.mjs'), 'utf8');
 const lines = src.split('\n');
 
-test('every request goes through hit(): there is exactly one fetch() call in the probe (an untracked fetch hides a response from R11/R13/R18)', () => {
-  assert.equal((src.match(/\bfetch\(/g) ?? []).length, 1);
+test('every request goes through hit() AND the upstream allow-list: no raw fetch() in the probe, exactly one guardedFetch() call (inside hit())', () => {
+  assert.equal((src.match(/(?<![A-Za-z])fetch\(/g) ?? []).length, 0, 'a raw fetch() would bypass the allow-list');
+  assert.equal((src.match(/\bguardedFetch\(/g) ?? []).length, 1);
+  const i = src.indexOf('async function hit('); const j = src.indexOf('guardedFetch(');
+  assert.ok(i > 0 && j > i, 'guardedFetch is called inside hit()');
 });
 test('every hit() call site feeds track() (the 8 parallel ranges are tracked right after Promise.all)', () => {
   const sites = lines.filter((l) => /\bhit\(/.test(l) && !/^\s*async function hit\(/.test(l) && !/^\s*\/\//.test(l));

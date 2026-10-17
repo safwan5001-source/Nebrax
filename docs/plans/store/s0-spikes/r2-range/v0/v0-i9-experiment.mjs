@@ -14,6 +14,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { cleanupGate, safeSerialize, sensitiveTokens } from './v0-gates.mjs';
+import { guardedFetch, UpstreamRefused } from './v0-upstream-guard.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const arg = (n, d) => (process.argv.find((a) => a.startsWith(`--${n}=`)) ?? `--${n}=${d}`).split('=').slice(1).join('=');
@@ -25,6 +26,8 @@ const tmp = mkdtempSync(join(tmpdir(), 'v0i9-'));
 let attempted = false; let aborted = null; let cleanup;
 const rows = [];
 const sensitiveUrls = [];
+// the same allow-list as the probe, enforced before the request is made (a signed URL for any other host is never fetched)
+const policy = { endpoint: process.env.S3_ENDPOINT, bucket: process.env.S3_BUCKET, allowInsecureLoopback: /^https?:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(process.env.S3_ENDPOINT) };
 const secrets = [process.env.S3_KEY, process.env.S3_SECRET].filter(Boolean);
 try {
   writeFileSync(join(tmp, 'p.bin'), randomBytes(N));
@@ -38,9 +41,9 @@ try {
     sensitiveUrls.push(url);
     const t0 = Date.now(); let got = 0; let err = null; let status = null;
     try {
-      const res = await fetch(url, { headers: { 'accept-encoding': 'identity' }, redirect: 'manual' }); status = res.status;
+      const res = await guardedFetch(url, { headers: { 'accept-encoding': 'identity' } }, policy); status = res.status;
       for await (const c of res.body) { got += c.length; await sleep((c.length / (mibps * 1048576)) * 1000); }
-    } catch (e) { err = e.cause?.code ?? e.name; }
+    } catch (e) { if (e instanceof UpstreamRefused) { aborted = `download URL refused by the upstream allow-list (${e.reason})`; break; } err = e.cause?.code ?? e.name; }
     rows.push({ url: name, ttlSeconds: ttl, status, readRateMiBps: mibps, receivedBytes: got, of: N, complete: got === N, error: err, endedAfterMs: Date.now() - t0 });
   }
 } finally {
