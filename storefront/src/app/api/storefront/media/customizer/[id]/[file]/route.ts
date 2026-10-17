@@ -14,6 +14,7 @@ import {
   mediaProxyLimits,
   readBodyBounded,
   sharedMediaProxyGate,
+  warnIfLimitsConstrained,
 } from "@/lib/commerce/media-proxy-guard";
 
 /**
@@ -78,6 +79,7 @@ export async function GET(
   }
 
   const limits = mediaProxyLimits();
+  warnIfLimitsConstrained(limits);
   const gate = sharedMediaProxyGate(limits);
   let release: () => void;
   try {

@@ -21,13 +21,30 @@ export const DEFAULT_MAX_BODY_BYTES = 8 * 1024 * 1024;
 export const DEFAULT_MAX_CONCURRENT = 16;
 export const DEFAULT_MAX_QUEUE = 64;
 export const DEFAULT_QUEUE_WAIT_MS = 4_000;
+const MIB = 1024 * 1024;
+
+// Aggregate read-phase memory budget. Reading a body holds the received chunks AND, for an instant, the assembled copy, so one
+// in-flight read costs up to `body bound × READ_COPY_FACTOR`. Concurrency and body bound are only safe TOGETHER:
+//   maxConcurrent × maxBodyBytes × READ_COPY_FACTOR  ≤  maxBufferedBytes  ≤  HARD_MAX_BUFFERED_BYTES.
+// The defaults (16 × 8 MiB × 2) are exactly the default budget, so default behaviour is unchanged. An operator can raise the budget
+// (to HARD_MAX_BUFFERED_BYTES at most) but can never configure past it: `mediaProxyLimits` lowers the concurrency — never the body
+// bound that keeps published files servable — until the product fits. (Memory of the DELIVERY phase, after the read, is a separate
+// matter and is not covered by this budget.)
+export const READ_COPY_FACTOR = 2;
+export const DEFAULT_MAX_BUFFERED_BYTES = 256 * MIB;
+export const MIN_MAX_BUFFERED_BYTES = 32 * MIB;
+export const HARD_MAX_BUFFERED_BYTES = 512 * MIB;
 export const DEFAULT_TIMEOUT_MS = 15_000;
 
 export interface MediaProxyLimits {
-  /** Largest origin body held in memory. */
+  /** Largest origin body held in memory (after the budget has been applied). */
   maxBodyBytes: number;
-  /** Simultaneous origin round-trips for the whole instance. */
+  /** Simultaneous origin round-trips for the whole instance (after the budget has been applied). */
   maxConcurrent: number;
+  /** The read-phase memory budget the two limits above were fitted into: maxConcurrent × maxBodyBytes × READ_COPY_FACTOR ≤ this. */
+  maxBufferedBytes: number;
+  /** What the operator asked for before the budget was applied; present only when the budget lowered a value. */
+  constrained?: { requestedConcurrent: number; requestedBodyBytes: number };
   /** …of which one visitor host may hold at most this many (noisy-neighbour protection between storefronts). */
   maxConcurrentPerHost: number;
   /** Requests allowed to wait for a slot. */
@@ -49,24 +66,53 @@ function integerEnv(
   return Math.min(max, Math.max(min, value));
 }
 
-/** Environment overrides are optional and clamped; an absent or malformed value keeps the safe default. */
+/**
+ * Environment overrides are optional and clamped; an absent or malformed value keeps the safe default. The clamped values are then
+ * fitted into the aggregate read budget (see READ_COPY_FACTOR): the body bound is capped at half the budget (so a single read always
+ * fits) and the concurrency is lowered until `maxConcurrent × maxBodyBytes × READ_COPY_FACTOR ≤ maxBufferedBytes`.
+ */
 export function mediaProxyLimits(
   env: Record<string, string | undefined> = process.env,
 ): MediaProxyLimits {
-  const maxConcurrent = integerEnv(
+  const maxBufferedBytes = integerEnv(
+    env.STOREFRONT_MEDIA_PROXY_MAX_BUFFERED_BYTES,
+    DEFAULT_MAX_BUFFERED_BYTES,
+    MIN_MAX_BUFFERED_BYTES,
+    HARD_MAX_BUFFERED_BYTES,
+  );
+  const requestedBodyBytes = integerEnv(
+    env.STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES,
+    DEFAULT_MAX_BODY_BYTES,
+    64 * 1024,
+    32 * MIB,
+  );
+  const requestedConcurrent = integerEnv(
     env.STOREFRONT_MEDIA_PROXY_MAX_CONCURRENT,
     DEFAULT_MAX_CONCURRENT,
     1,
     256,
   );
-  return {
-    maxBodyBytes: integerEnv(
-      env.STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES,
-      DEFAULT_MAX_BODY_BYTES,
-      64 * 1024,
-      32 * 1024 * 1024,
+  const maxBodyBytes = Math.min(
+    requestedBodyBytes,
+    Math.floor(maxBufferedBytes / READ_COPY_FACTOR),
+  );
+  const maxConcurrent = Math.max(
+    1,
+    Math.min(
+      requestedConcurrent,
+      Math.floor(maxBufferedBytes / (maxBodyBytes * READ_COPY_FACTOR)),
     ),
+  );
+  const constrained =
+    maxConcurrent !== requestedConcurrent ||
+    maxBodyBytes !== requestedBodyBytes;
+  return {
+    maxBodyBytes,
     maxConcurrent,
+    maxBufferedBytes,
+    ...(constrained && {
+      constrained: { requestedConcurrent, requestedBodyBytes },
+    }),
     maxConcurrentPerHost: Math.max(1, Math.ceil(maxConcurrent / 2)),
     maxQueue: integerEnv(
       env.STOREFRONT_MEDIA_PROXY_MAX_QUEUE,
@@ -82,6 +128,28 @@ export function mediaProxyLimits(
       120_000,
     ),
   };
+}
+
+let warnedConstrained = false;
+/** Logs once per process (never per request) that the budget lowered what the operator asked for. No secrets or hosts involved. */
+export function warnIfLimitsConstrained(limits: MediaProxyLimits): void {
+  if (!limits.constrained || warnedConstrained) return;
+  warnedConstrained = true;
+  console.warn(
+    "[media-proxy] configured limits exceed the read-memory budget; lowered to fit",
+    {
+      requestedConcurrent: limits.constrained.requestedConcurrent,
+      requestedBodyBytes: limits.constrained.requestedBodyBytes,
+      maxConcurrent: limits.maxConcurrent,
+      maxBodyBytes: limits.maxBodyBytes,
+      maxBufferedBytes: limits.maxBufferedBytes,
+    },
+  );
+}
+
+/** Test hook. */
+export function resetConstrainedWarning(): void {
+  warnedConstrained = false;
 }
 
 // ───────────────────────────── bounded body ─────────────────────────────

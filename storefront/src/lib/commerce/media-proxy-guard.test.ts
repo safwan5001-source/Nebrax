@@ -5,10 +5,13 @@ import {
   BodyTooLargeError,
   createConcurrencyGate,
   DEFAULT_MAX_BODY_BYTES,
+  DEFAULT_MAX_BUFFERED_BYTES,
   DEFAULT_MAX_CONCURRENT,
   declaredLength,
   GateBusyError,
+  HARD_MAX_BUFFERED_BYTES,
   mediaProxyLimits,
+  READ_COPY_FACTOR,
   readBodyBounded,
 } from "./media-proxy-guard";
 
@@ -303,5 +306,181 @@ describe("contract with the Laravel variant ceiling", () => {
     );
     expect(animated, "animated.max_bytes not found").not.toBeNull();
     expect(mib(animated?.[1] ?? "")).toBeLessThan(DEFAULT_MAX_BODY_BYTES);
+  });
+});
+
+// ───────────────────────────── aggregate read budget (P2-0 review, P1) ─────────────────────────────
+// Worst-case memory of the READ phase is concurrent × body bound × READ_COPY_FACTOR (the received chunks and the assembled copy
+// coexist for an instant). The limits are only safe together, so `mediaProxyLimits` derives them from one budget.
+const MiB = 1024 * 1024;
+const env = (o: Record<string, string>) => ({
+  ...(o.C !== undefined && { STOREFRONT_MEDIA_PROXY_MAX_CONCURRENT: o.C }),
+  ...(o.L !== undefined && { STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES: o.L }),
+  ...(o.B !== undefined && { STOREFRONT_MEDIA_PROXY_MAX_BUFFERED_BYTES: o.B }),
+});
+const worstCase = (l: ReturnType<typeof mediaProxyLimits>) =>
+  l.maxConcurrent * l.maxBodyBytes * READ_COPY_FACTOR;
+
+describe("aggregate read budget", () => {
+  it("defaults are unchanged and exactly fit the default budget", () => {
+    const l = mediaProxyLimits({});
+    expect(l).toMatchObject({
+      maxConcurrent: 16,
+      maxConcurrentPerHost: 8,
+      maxBodyBytes: 8 * MiB,
+      maxQueue: 64,
+      maxBufferedBytes: 256 * MiB,
+    });
+    expect(DEFAULT_MAX_BUFFERED_BYTES).toBe(256 * MiB);
+    expect(worstCase(l)).toBeLessThanOrEqual(l.maxBufferedBytes);
+  });
+
+  it("raising concurrency alone cannot exceed the budget: it is reduced, never the body bound", () => {
+    const l = mediaProxyLimits(env({ C: "256" }));
+    expect(l.maxBodyBytes).toBe(8 * MiB); // the bound that keeps published files servable is untouched
+    expect(l.maxConcurrent).toBe(16);
+    expect(l.maxConcurrentPerHost).toBe(8);
+    expect(worstCase(l)).toBeLessThanOrEqual(l.maxBufferedBytes);
+  });
+
+  it("raising the body bound alone reduces concurrency to stay inside the budget", () => {
+    const l = mediaProxyLimits(env({ L: String(32 * MiB) }));
+    expect(l.maxBodyBytes).toBe(32 * MiB);
+    expect(l.maxConcurrent).toBe(4); // 256 MiB / (2 × 32 MiB)
+    expect(l.maxConcurrentPerHost).toBe(2);
+    expect(worstCase(l)).toBeLessThanOrEqual(l.maxBufferedBytes);
+  });
+
+  it("a larger budget is an explicit opt-in and is itself hard-capped", () => {
+    const opted = mediaProxyLimits(env({ C: "64", B: String(512 * MiB) }));
+    expect(opted.maxConcurrent).toBe(32);
+    expect(worstCase(opted)).toBeLessThanOrEqual(512 * MiB);
+
+    const huge = mediaProxyLimits(
+      env({ C: "256", L: String(32 * MiB), B: String(100 * 1024 * MiB) }),
+    );
+    expect(HARD_MAX_BUFFERED_BYTES).toBe(512 * MiB);
+    expect(huge.maxBufferedBytes).toBe(HARD_MAX_BUFFERED_BYTES);
+    expect(huge.maxConcurrent).toBe(8); // 512 MiB / (2 × 32 MiB)
+    expect(worstCase(huge)).toBeLessThanOrEqual(HARD_MAX_BUFFERED_BYTES);
+  });
+
+  it("maximum overrides of every variable together stay under the hard ceiling", () => {
+    const l = mediaProxyLimits({
+      ...env({ C: "256", L: String(32 * MiB), B: String(512 * MiB) }),
+      STOREFRONT_MEDIA_PROXY_MAX_QUEUE: "1024",
+      STOREFRONT_MEDIA_PROXY_TIMEOUT_MS: "120000",
+    });
+    expect(l).toMatchObject({
+      maxConcurrent: 8,
+      maxBodyBytes: 32 * MiB,
+      maxQueue: 1024,
+      timeoutMs: 120_000,
+    });
+    expect(worstCase(l)).toBeLessThanOrEqual(HARD_MAX_BUFFERED_BYTES);
+  });
+
+  it("a body bound larger than half the budget is itself lowered, so one request always fits", () => {
+    const l = mediaProxyLimits(
+      env({ L: String(32 * MiB), B: String(32 * MiB) }),
+    ); // 32 MiB budget ⇒ at most 16 MiB per body
+    expect(l.maxBufferedBytes).toBe(32 * MiB);
+    expect(l.maxBodyBytes).toBe(16 * MiB);
+    expect(l.maxConcurrent).toBe(1);
+    expect(worstCase(l)).toBeLessThanOrEqual(32 * MiB);
+  });
+
+  it("holds for every combination, valid or not (grid), and never starves the proxy", () => {
+    const values = [
+      "",
+      "abc",
+      "1.5",
+      "-5",
+      "0",
+      "1",
+      "64",
+      "100000",
+      "1e9",
+      "NaN",
+      " ",
+      String(2 ** 53),
+      "8388608",
+      String(33 * MiB),
+    ];
+    for (const C of values) {
+      for (const L of values) {
+        for (const B of values) {
+          const l = mediaProxyLimits(env({ C, L, B }));
+          expect(worstCase(l), `C=${C} L=${L} B=${B}`).toBeLessThanOrEqual(
+            Math.min(l.maxBufferedBytes, HARD_MAX_BUFFERED_BYTES),
+          );
+          expect(l.maxConcurrent).toBeGreaterThanOrEqual(1);
+          expect(l.maxConcurrentPerHost).toBeGreaterThanOrEqual(1);
+          expect(l.maxConcurrentPerHost).toBeLessThanOrEqual(l.maxConcurrent);
+          expect(l.maxBodyBytes).toBeGreaterThanOrEqual(64 * 1024);
+        }
+      }
+    }
+  });
+
+  it("invalid values fall back to the defaults (non-integers) or clamp (out-of-range) — for the budget variable too", () => {
+    for (const bad of ["abc", "1.5", "", " ", "NaN"]) {
+      expect(mediaProxyLimits(env({ B: bad })), bad).toMatchObject({
+        maxBufferedBytes: 256 * MiB,
+        maxConcurrent: 16,
+      });
+      expect(mediaProxyLimits(env({ C: bad })), bad).toMatchObject({
+        maxConcurrent: 16,
+      });
+      expect(mediaProxyLimits(env({ L: bad })), bad).toMatchObject({
+        maxBodyBytes: 8 * MiB,
+      });
+    }
+    expect(mediaProxyLimits(env({ B: "1" })).maxBufferedBytes).toBe(32 * MiB);
+    expect(mediaProxyLimits(env({ B: "-1" })).maxBufferedBytes).toBe(32 * MiB);
+    // numeric spellings that ARE integers (existing semantics) clamp like any other number — never past the hard ceiling
+    expect(mediaProxyLimits(env({ B: "1e9" })).maxBufferedBytes).toBe(
+      HARD_MAX_BUFFERED_BYTES,
+    );
+    expect(mediaProxyLimits(env({ B: "0x10" })).maxBufferedBytes).toBe(
+      32 * MiB,
+    );
+  });
+
+  it("the gate built from the constrained limits still queues, sheds and fully recovers", async () => {
+    const l = mediaProxyLimits({
+      ...env({ C: "64", L: String(32 * MiB) }),
+      STOREFRONT_MEDIA_PROXY_MAX_QUEUE: "1",
+    });
+    expect(l.maxConcurrent).toBe(4);
+    const gate = createConcurrencyGate({ ...l, queueWaitMs: 50 });
+    // four different hosts fill the instance (per-host cap is 2)
+    const held = await Promise.all(
+      ["a", "b", "c", "d"].map((h) => gate.acquire(h)),
+    );
+    expect(gate.stats()).toEqual({ active: 4, queued: 0 });
+    const queued = gate.acquire("e");
+    await expect(gate.acquire("f")).rejects.toBeInstanceOf(GateBusyError); // queue (1) is full ⇒ shed
+    held[0]();
+    (await queued)();
+    for (const r of held) r();
+    held[1](); // idempotent
+    expect(gate.stats()).toEqual({ active: 0, queued: 0 });
+    // after the burst the full constrained capacity is available again
+    const again = await Promise.all(
+      ["a", "b", "c", "d"].map((h) => gate.acquire(h)),
+    );
+    expect(gate.stats().active).toBe(4);
+    for (const r of again) r();
+    expect(gate.stats().active).toBe(0);
+  });
+
+  it("measured: the budget covers the instant the received chunks and the assembled copy coexist", async () => {
+    // Structural check on the factor: assembling a received body needs `received` bytes of chunks AND `received` bytes of output.
+    const { response, state } = chunked([MiB, MiB, MiB]);
+    const out = await readBodyBounded(response, 8 * MiB);
+    expect(out.byteLength).toBe(3 * MiB);
+    expect(state.sent).toBe(3 * MiB);
+    expect(READ_COPY_FACTOR).toBe(2);
   });
 });

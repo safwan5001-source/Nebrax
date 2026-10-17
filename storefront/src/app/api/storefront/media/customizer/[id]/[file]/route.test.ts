@@ -189,7 +189,10 @@ describe("customizer media proxy — animated file (AWJ-ANIMATED-MEDIA P1)", () 
 // The buffered image path is now bounded and guarded; nothing about its contract (headers, cache, auth boundaries) changed.
 
 import { afterEach } from "vitest";
-import { resetSharedMediaProxyGate } from "@/lib/commerce/media-proxy-guard";
+import {
+  resetConstrainedWarning,
+  resetSharedMediaProxyGate,
+} from "@/lib/commerce/media-proxy-guard";
 
 const BOUND = 65_536; // the smallest bound the environment may set
 
@@ -410,6 +413,47 @@ describe("customizer media proxy — P2-0 concurrency", () => {
     fetchMock.mockReset();
     fetchMock.mockResolvedValue(ok());
     expect((await call(UUID, "1920w.webp")).status).toBe(200);
+  });
+
+  it("an over-budget configuration is fitted (64 requested × 32 MiB ⇒ 1 slot × 16 MiB) and still queues, sheds and recovers", async () => {
+    resetConstrainedWarning();
+    vi.stubEnv("STOREFRONT_MEDIA_PROXY_MAX_CONCURRENT", "64");
+    vi.stubEnv(
+      "STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES",
+      String(32 * 1024 * 1024),
+    );
+    vi.stubEnv(
+      "STOREFRONT_MEDIA_PROXY_MAX_BUFFERED_BYTES",
+      String(32 * 1024 * 1024),
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const pending = deferredFetch();
+    const first = call(UUID, "480w.webp");
+    await flush();
+    const queued = call(UUID, "768w.webp");
+    await flush();
+    const shed = await call(UUID, "1280w.webp");
+    expect(shed.status).toBe(503);
+    expect(fetchMock).toHaveBeenCalledTimes(1); // one slot, not 64: the budget lowered the concurrency
+
+    pending[0].settle(ok());
+    expect((await first).status).toBe(200);
+    await flush();
+    pending[1].settle(ok());
+    expect((await queued).status).toBe(200);
+
+    // recovered: a fresh request is served at once, and the constraint was reported once (not per request), without host/secret
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue(ok());
+    expect((await call(UUID, "1920w.webp")).status).toBe(200);
+    const constrained = warn.mock.calls.filter((c) =>
+      String(c[0]).includes("exceed the read-memory budget"),
+    );
+    expect(constrained).toHaveLength(1);
+    expect(JSON.stringify(constrained[0])).not.toMatch(
+      /gw-secret|shop\.example\.com|api\.example\.com/,
+    );
   });
 
   it("a visitor who disconnects frees the slot and cancels the origin request", async () => {

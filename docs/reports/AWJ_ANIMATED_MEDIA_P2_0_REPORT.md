@@ -37,7 +37,8 @@ Validated id/file against the contract, forwarded `Host` + gateway secret to the
 | Setting | Default | Env | Why |
 |---|---|---|---|
 | Max buffered body | **8 MiB** (floor 64 KiB, ceiling 32 MiB) | `STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES` | Largest legitimate body is the Laravel-side ceiling for a generated file, `storefront_media.variant_max_bytes` = 6 MiB (§10 — the original wording “ladder files are far smaller” was wrong), or the sanitised animation ≤ 5 MiB (`animated.max_bytes`). 8 MiB leaves headroom above both. |
-| Concurrent origin round-trips | **16** (1–256); one host ≤ half | `STOREFRONT_MEDIA_PROXY_MAX_CONCURRENT` | Bounds Laravel workers used by this proxy per instance and peak read memory (16 × 8 MiB = 128 MiB worst case). |
+| Concurrent origin round-trips | **16** (1–256); one host ≤ half | `STOREFRONT_MEDIA_PROXY_MAX_CONCURRENT` | Bounds Laravel workers used by this proxy per instance. **Fitted into the read-memory budget below** — a request above what the budget allows is lowered, never honoured (§10). The earlier note “16 × 8 MiB = 128 MiB worst case” understated the read phase: the received chunks and the assembled copy coexist, so the bound is **× 2 = 256 MiB** (measured +224–297 MiB RSS over baseline at the defaults). |
+| Read-memory budget | **256 MiB** (32 MiB – 512 MiB hard ceiling) | `STOREFRONT_MEDIA_PROXY_MAX_BUFFERED_BYTES` | Invariant `maxConcurrent × maxBodyBytes × 2 ≤ budget ≤ 512 MiB`. Defaults (16 × 8 MiB × 2) equal the default budget, so default behaviour is unchanged. |
 | Queue / wait | 64 waiters (0–1024), 4 s | `STOREFRONT_MEDIA_PROXY_MAX_QUEUE` | Smooths a page-load burst, then sheds with `503` + `Retry-After: 2`, `no-store`. |
 | Round-trip deadline | **15 s** (1–120 s) | `STOREFRONT_MEDIA_PROXY_TIMEOUT_MS` | A stuck origin can never hold a slot. |
 
@@ -94,7 +95,8 @@ Measured with `proxy-bounded-memory.mjs` (100 slow visitors, 250 KiB/s, same mac
 ## 7. Risks and remaining work
 | Risk | Level | Note |
 |---|---|---|
-| Delivery-phase memory not aggregated-bounded (finding 5) | Medium | Same as today; follow-up P2-0b |
+| Delivery-phase memory not aggregated-bounded (finding 5) | Medium | Same as today; follow-up P2-0b. The §10 budget covers the **read** phase only |
+| Operator raises the read budget (≤ 512 MiB hard ceiling) | Low | Explicit opt-in; RSS ≈ 1.2× budget measured; the Railway plan memory is not known to this repo — keep the default unless it is |
 | 503 shedding under legitimate bursts | Low–Medium | Tunable by env; observe after deploy |
 | New code on the public image path | Low | 38 tests, A/B header identity, real-runtime smoke; kill-switch is reverting the PR (no data/config involved) |
 | Merging redeploys the storefront from `main` (Railway auto-deploy) | Process | Merge deliberately; effects are limited to image delivery behaviour described above |
@@ -137,14 +139,27 @@ The mismatch needs a tall, high-entropy image (the 1920 rung of a 1920×8192 sou
 
 ### Compatibility of previously generated assets
 - **New uploads / retries:** capped as above. Behaviour for anything that fit is unchanged.
-- **Already-generated assets:** the code cannot know whether any exist above 8 MiB. They are only possible for the extreme tall/high-entropy class in the table above; `bytes` is recorded for every file, so this is checkable read-only (no production access was used here — **owner action before deploying #1552**):
+- **Already-generated assets:** the code cannot know whether any exist above 8 MiB. They are only possible for the extreme tall/high-entropy class in the table above; `bytes` is recorded for every file, so this is checkable read-only (no production access was used here — **owner action before deploying #1552**). The statements were reviewed and corrected in the second review round (§10) and are executed by `StorefrontMediaOversizeAuditSqlTest` on PostgreSQL:
 ```sql
--- ladder (storefront_media.variants is json)
-SELECT m.tenant_id, m.id, v->>'file' AS file, (v->>'bytes')::bigint AS bytes
-FROM storefront_media m, json_array_elements(m.variants) v
-WHERE m.variants_state = 'ready' AND (v->>'bytes')::bigint > 6291456;
--- transform derivatives
-SELECT tenant_id, media_id, storage_key, bytes FROM storefront_media_derivatives WHERE state = 'ready' AND bytes > 6291456;
+-- A. ladder + animated files (storefront_media.variants is a json array of {file, bytes, …})
+SELECT m.tenant_id, m.id AS media_id, v.item->>'file' AS file, (v.item->>'bytes')::bigint AS bytes
+FROM storefront_media AS m
+CROSS JOIN LATERAL json_array_elements(
+    CASE WHEN json_typeof(m.variants) = 'array' THEN m.variants ELSE '[]'::json END
+) AS v(item)
+WHERE m.state = 'active'
+  AND m.variants_state = 'ready'
+  AND CASE WHEN (v.item->>'bytes') ~ '^[0-9]{1,15}$' THEN (v.item->>'bytes')::bigint END > 8388608
+ORDER BY bytes DESC, m.tenant_id, m.id, file;
+
+-- B. per-usage transform derivatives
+SELECT d.tenant_id, d.media_id, d.transform_key, d.width, d.format, d.bytes
+FROM storefront_media_derivatives AS d
+JOIN storefront_media AS m ON m.id = d.media_id
+WHERE d.state = 'ready'
+  AND m.state = 'active'
+  AND d.bytes > 8388608
+ORDER BY d.bytes DESC, d.tenant_id, d.media_id, d.transform_key;
 ```
   Zero rows ⇒ no compatibility handling is needed. Rows ⇒ those specific files would answer 502 through the proxy once #1552 is deployed (only the oversized file fails; other rungs of the same asset are served — browser `srcset` fallback behaviour was not tested). Remediation, only for those rows and only with owner approval: re-upload the image smaller, or regenerate the asset through the capped path (it fails closed with `variant_too_large` rather than serving an unservable file). I did **not** raise the proxy bound to cover them (it would reopen the memory exposure P2-0 closes).
 
@@ -155,7 +170,44 @@ Intervention 4's `encodeUsingMediaType($type, $quality)` ignores a **positional*
 - The UI has no localized EN/AR key for `variant_too_large` yet; unknown codes already fall back to the server's Arabic text (`MediaPicker.tsx`). A translation key is a trivial follow-up.
 - If an operator lowers `STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES` below 6 MiB, large-but-valid variants will be refused; operators must keep that env at or above `variant_max_bytes` (6 MiB); it is not enforced in code.
 
-## 10. Identifiers
+## 10. Second review round — aggregate read budget (P1), audit SQL, mergeability
+### 10.1 P1 finding: concurrency × body size (confirmed, fixed)
+*Finding.* `STOREFRONT_MEDIA_PROXY_MAX_CONCURRENT` (≤ 256) and `STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES` (≤ 32 MiB) were clamped **independently**, so a typo or an intentional override could permit 256 × 32 MiB = 8 GiB of buffered chunks — and `readBodyBounded` briefly holds a second, assembled copy of each body. (The earlier note “16 × 8 MiB = 128 MiB worst case” also ignored that copy.)
+
+*Reproduced* (`docs/plans/store/s0-spikes/streaming/proxy-aggregate-budget.mjs`, results in `results/proxy-aggregate-budget.txt`; origin in a child process, all C reads held at ~the full bound, then finished together; Node 22):
+| Configuration (before) | C × L | Peak RSS over baseline |
+|---|---|---|
+| defaults 16 × 8 MiB | 128 MiB | +224 MiB |
+| C=64, L=8 MiB | 512 MiB | +669 MiB |
+| C=16, L=32 MiB | 512 MiB | +640 MiB |
+| C=64, L=32 MiB | 2048 MiB | **+2,204 MiB** |
+
+*Fix* (`storefront/src/lib/commerce/media-proxy-guard.ts`, `mediaProxyLimits`): one invariant for every configuration —
+`maxConcurrent × maxBodyBytes × READ_COPY_FACTOR(2) ≤ maxBufferedBytes ≤ HARD_MAX_BUFFERED_BYTES (512 MiB)`.
+- Budget `STOREFRONT_MEDIA_PROXY_MAX_BUFFERED_BYTES`: default **256 MiB**, clamped to 32 MiB – 512 MiB, malformed ⇒ default. The defaults (16 × 8 MiB × 2) fill exactly the default budget, so **default behaviour is unchanged**.
+- The body bound is capped at half the budget (one read always fits). Concurrency is then **lowered** until the product fits — never the body bound, because that bound is what keeps published files (≤ 6 MiB ceiling) servable (§9). Per-host cap follows the effective concurrency.
+- Operators can opt in to a larger budget but never past 512 MiB; the hard ceiling is a constant, not configuration.
+- When the budget lowers a requested value the proxy logs **one** server-side warning per process (requested vs. effective values only; no host, URL or secret). `maxQueue` waiters hold no bytes and are unaffected.
+- Nothing else changed: gate semantics, deadlines, uniform failures, headers and tenant/publication behaviour are untouched.
+
+*After* (same script): defaults +237 MiB; C=64 ⇒ effective C=16 (+297 MiB); L=32 MiB ⇒ C=4 (+247 MiB); C=64 & L=32 MiB ⇒ C=4 (+227 MiB); budget 512 MiB with C=256 & L=32 MiB ⇒ C=8 (+343 MiB). **Honest reading:** the budget bounds the *live buffer bytes*; measured RSS ran up to ≈ 1.2× the 256 MiB budget (allocator overhead and GC lag), i.e. ≈ 0.6–0.7 GiB at the 512 MiB hard ceiling. The default exposure is the one that already existed, now provably the maximum rather than one of many reachable values.
+
+*Tests* (fail on the previous code, pass now; mutation-checked — removing the concurrency fit fails 8 tests): `media-proxy-guard.test.ts` “aggregate read budget” (10 tests: defaults, raised concurrency, raised body bound, opt-in/hard-capped budget, all maximum overrides together, body > half budget, a 14³-combination grid of valid/invalid values proving the invariant and `maxConcurrent ≥ 1`, invalid values ⇒ default or clamp for all three variables, gate recovery under constrained limits) and `route.test.ts` (an over-budget configuration queues, sheds, recovers, and warns once without leaking host/secret).
+
+### 10.2 Audit SQL for already-generated variants above 8 MiB — reviewed, corrected, executed
+Problems found in the first version: (1) threshold 6 MiB mixed *servable* files into the “broken” list — the proxy refuses only **> 8 MiB (8388608)**; (2) it ignored derivatives' parent state and audited deleted/failed assets that 404 anyway; (3) `json_array_elements` raises on a JSON `null`/object `variants` and the `::bigint` cast raises on a non-numeric `bytes`, aborting the whole audit; (4) filtering on `state` was missing. The corrected statements are in §9 (A: ladder + animated entries; B: derivatives); both are `SELECT`s only.
+
+*Validation.* `StorefrontMediaOversizeAuditSqlTest` seeds: an asset with 10.27/9.2 MiB files, a file of **exactly** 8388608 (accepted ⇒ must not appear), 8388609 (must appear), a 7 MB file (above the new ceiling, still served ⇒ must not appear), deleted/failed assets, SQL-NULL / JSON-null / object / missing / non-numeric `variants`, and derivatives at/over the bound, failed, and under a deleted parent. It was run on **PostgreSQL 16** locally and runs in the pgsql CI job; a SQLite twin runs in the sqlite job.
+
+*Expected result.* **0 rows from A and 0 rows from B ⇒ nothing to remediate.** Each row = one file that answers 502 through the proxy after #1552 deploys (columns identify tenant, media id, file/transform key and bytes). To see what the *new* ceiling would have refused, replace `8388608` with `6291456` (informational; those files still work). The audit was **not run against production** (no data access); I did not modify any data.
+
+### 10.3 Mergeability
+`mergeable_state: clean`. `git merge-tree` of the head against current `origin/main` (`1f94e1848`, #1553) is conflict-free, so no merge/rebase was performed and the base SHA is unchanged (`1296e1ce7`).
+
+### 10.4 Out of scope (unchanged)
+Image quality defaults (the positional-quality finding in §9 stays reported-only), P2-0b (delivery-phase memory), AVIF/video, migrations, API contracts.
+
+## 11. Identifiers
 Branch `claude/awj-p2-0-media-proxy-hardening` · PR [#1552](https://github.com/safwan5001-source/Nebrax/pull/1552) · Base `1296e1ce79a339f94336f92c3258ec5fb0d815e6`
 
 | Head | Content | CI |
