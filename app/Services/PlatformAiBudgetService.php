@@ -102,7 +102,8 @@ class PlatformAiBudgetService
                 if (! Tenant::query()->whereKey($tenantId)->exists()) {
                     throw ValidationException::withMessages(['tenant_id' => 'المؤسسة غير موجودة.']);
                 }
-                $global = AiBudget::query()->where('budget_key', 'global')->where('period', $period)->first();
+                // قفل صفّ السقف العالمي حتى نهاية المعاملة: فحص «سقف المؤسسة ≤ العالمي» وكتابته لا يفصل بينهما تعديلٌ متزامن للعالمي.
+                $global = AiBudget::query()->where('budget_key', 'global')->where('period', $period)->lockForUpdate()->first();
                 if ($global !== null && ($tokens > $global->cap_tokens || $cost > $global->cap_cost_micro_usd)) {
                     throw ValidationException::withMessages(['cap_tokens' => 'سقف المؤسسة لا يتجاوز السقف العالمي للفترة.']);
                 }

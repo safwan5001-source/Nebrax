@@ -176,7 +176,14 @@ class AiAssistantGateway
                     );
                 } catch (Throwable $e) {
                     report($e);
-                    $reported = $e instanceof AiProviderException && $e->usage !== null ? $this->usage($profile, $e->usage) : $usage;
+                    // النداء الأول استُهلك فعلاً ($usage). النداء الثاني فشل بلا استهلاك مُبلَّغ: يُطبَّق عليه `failure_charge` (قد يكون
+                    // فُوتِر) — حصّته من الحجز تُحتسب مرة واحدة مع المقيس الفعلي، لا يُفقد ولا يُحتسب مرتين.
+                    $reported = $this->usage($profile, ['input_tokens' => $usage['input_tokens'], 'output_tokens' => $usage['output_tokens']]);
+                    if (config('ai_assistant.budget.failure_charge', 'reserved') !== 'none') {
+                        [$secondIn, $secondOut] = $provider->secondCallReservation($estimatedInput, $maxOutput);
+                        $reported['unmetered_tokens'] = $secondIn + $secondOut;
+                        $reported['cost_micro_usd'] += AiAssistantPricing::costMicroUsd($profile, $secondIn, $secondOut);
+                    }
                     $this->ledger->fail($request, $reported, 'provider_error');
                     $settled = true;
                     $this->audit->record($requestId, $tenantId, $actorId, 'request.failed', 'error', 'provider_error', $extra + $reported);

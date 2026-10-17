@@ -496,7 +496,7 @@ class AiAnthropicProviderTest extends TestCase
     }
 
     /** @test */
-    public function a_failure_of_the_second_call_charges_only_what_the_first_call_reported(): void
+    public function a_failure_of_the_second_call_charges_the_first_actual_plus_the_second_calls_reserved_share_once(): void
     {
         $auth = $this->externalTenant('ext-k');
         $this->seedBooks($auth['tenant_id']);
@@ -506,7 +506,9 @@ class AiAnthropicProviderTest extends TestCase
 
         $this->aiAsk($auth['token'], ['message' => 'income statement'])->assertStatus(500);
 
-        $this->assertSame(160, $this->budgetRow($auth['tenant_id'])->used_tokens);
+        // الأول فعلي (120+40) + حصة الثاني المحجوزة (قد يكون فُوتر): لا فقد ولا ازدواج.
+        [$secondIn, $secondOut] = app(\App\Services\AnthropicAssistantProvider::class)->secondCallReservation(\App\Support\AiAssistantPricing::estimateInputTokens('income statement'), (int) config('ai_assistant.limits.max_output_tokens'));
+        $this->assertSame(160 + $secondIn + $secondOut, $this->budgetRow($auth['tenant_id'])->used_tokens);
         $this->assertSame(0, $this->budgetRow($auth['tenant_id'])->reserved_tokens);
     }
 

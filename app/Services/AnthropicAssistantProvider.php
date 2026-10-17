@@ -59,12 +59,17 @@ class AnthropicAssistantProvider implements AiExternalAssistantProvider
 
     public function reservationEstimate(int $estimatedInput, int $maxOutputTokens): array
     {
-        $toolBudget = (int) config('ai_assistant.limits.tool_result_max_tokens', 3000);
-        $first = $estimatedInput + self::OVERHEAD_TOKENS;
-        // النداء الثاني يعيد رسالة المستخدم وكتل الأدوات ونتائجها المقصوصة.
-        $second = $first + $toolBudget + 300;
+        [$secondIn, $secondOut] = $this->secondCallReservation($estimatedInput, $maxOutputTokens);
 
-        return [$first + $second, 2 * $maxOutputTokens];
+        return [$estimatedInput + self::OVERHEAD_TOKENS + $secondIn, $maxOutputTokens + $secondOut];
+    }
+
+    public function secondCallReservation(int $estimatedInput, int $maxOutputTokens): array
+    {
+        $toolBudget = (int) config('ai_assistant.limits.tool_result_max_tokens', 3000);
+
+        // النداء الثاني يعيد رسالة المستخدم وكتل الأدوات ونتائجها المقصوصة.
+        return [$estimatedInput + self::OVERHEAD_TOKENS + $toolBudget + 300, $maxOutputTokens];
     }
 
     public function respond(array $input): array

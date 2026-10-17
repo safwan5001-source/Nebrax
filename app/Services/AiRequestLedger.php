@@ -127,7 +127,7 @@ class AiRequestLedger
         return $this->budgets->finalize($request->id, AiRequest::STATUS_SETTLED, $usage, null);
     }
 
-    /** @param array{input_tokens:int, output_tokens:int, cost_micro_usd:int}|null $usage ما أبلغ به المزوّد إن وُجد. */
+    /** @param array{input_tokens:int, output_tokens:int, cost_micro_usd:int, unmetered_tokens?:int}|null $usage ما أبلغ به المزوّد إن وُجد (+ جزء مقدَّر اختياري). */
     public function fail(AiRequest $request, ?array $usage, string $errorCode): bool
     {
         return $this->budgets->finalize($request->id, AiRequest::STATUS_FAILED, $usage, $errorCode);

@@ -23,6 +23,13 @@ interface AiExternalAssistantProvider extends AiAssistantProvider
     public function reservationEstimate(int $estimatedInput, int $maxOutputTokens): array;
 
     /**
+     * حصّة النداء الثاني (الصياغة) من الحجز [إدخال، إخراج] — تُحتسب إن فشل بعد نجاح الأول ولم يُعرف استهلاكه (سياسة الفشل).
+     *
+     * @return array{0:int, 1:int}
+     */
+    public function secondCallReservation(int $estimatedInput, int $maxOutputTokens): array;
+
+    /**
      * المرحلة الثانية: صياغة الجواب النهائي من ملخّصات نتائج الأدوات **المحجوبة** (بلا هويات ولا أسماء أطراف).
      *
      * @param  array{message:string, locale:string, max_output_tokens:int, today:string, timezone:string}  $input
