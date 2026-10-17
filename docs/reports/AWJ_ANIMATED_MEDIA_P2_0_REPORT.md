@@ -278,6 +278,8 @@ Branch `claude/awj-p2-0-media-proxy-hardening` · PR [#1552](https://github.com/
 | `84d600a118224cf3a0d0493e4a6c6fffda9960bf` | pin moved to the storefront test | **all green**: storefront ✅, merchant preview QA ✅, published footer QA ✅, php sqlite ✅ (17m), php pgsql ✅ (12m), CI Gate ✅ |
 | `17b253f40756430628b18a41989017e3d55cde2a` | round 2: read-memory budget (P1), audit-SQL test, spike | storefront ✅, merchant preview QA ✅, published footer QA ✅, php sqlite ✅ (16m), php pgsql ✅ (18m, includes the audit SQL on PostgreSQL); CI Gate (aggregator) was still finishing at the last check |
 | `c85ee1f8b0e1647266b43d5fea9cbf60b5531820` | round 3: body-override floor (P2) | **all green**: storefront ✅ (×2), merchant preview QA ✅, published footer QA ✅, php sqlite ✅ (14m), php pgsql ✅ (12m), CI Gate ✅ |
+| `e94c6951f3bcaa0db20e01f07220f4136768ee2c` | round 3 docs (CI results) | docs only |
+| `d191e9b2496c162372ff893b312e53fe6f201dab` | P2-0b: delivery memory safety (P1) | **all green**: storefront ✅ (×2), merchant preview QA ✅, published footer QA ✅, php sqlite ✅ (18m), php pgsql ✅ (17m), CI Gate ✅ |
 | final head | this docs-only commit (see PR head) | docs only; reruns the same workflows |
 
 No merge, deployment, migration, API change, R2 or infrastructure change was made.
