@@ -139,9 +139,9 @@ export function AiBudgetsCard(): JSX.Element {
         ) : (
           <>
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              <Badge tone={overview.policy.meter_document_extraction ? 'positive' : 'muted'}>{overview.policy.meter_document_extraction ? t('aiBudgetMeterOn') : t('aiBudgetMeterOff')}</Badge>
-              <Badge tone={overview.policy.assistant_provider === 'mock' ? 'muted' : 'warning'}>{t('aiBudgetProvider', { provider: overview.policy.assistant_provider })}</Badge>
-              <Badge tone={overview.policy.assistant_external_network_enabled ? 'warning' : 'muted'}>{overview.policy.assistant_external_network_enabled ? t('aiBudgetNetworkOn') : t('aiBudgetNetworkOff')}</Badge>
+              <Badge wrap tone={overview.policy.meter_document_extraction ? 'positive' : 'muted'}>{overview.policy.meter_document_extraction ? t('aiBudgetMeterOn') : t('aiBudgetMeterOff')}</Badge>
+              <Badge wrap tone={overview.policy.assistant_provider === 'mock' ? 'muted' : 'warning'}>{t('aiBudgetProvider', { provider: overview.policy.assistant_provider })}</Badge>
+              <Badge wrap tone={overview.policy.assistant_external_network_enabled ? 'warning' : 'muted'}>{overview.policy.assistant_external_network_enabled ? t('aiBudgetNetworkOn') : t('aiBudgetNetworkOff')}</Badge>
               <span className="text-muted" dir="ltr">{overview.period}</span>
             </div>
             {overview.over_allocated ? <p role="status" className="text-sm text-warning">{t('aiBudgetOverAllocated')}</p> : null}
