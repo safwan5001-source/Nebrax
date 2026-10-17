@@ -215,6 +215,7 @@ Branch `claude/awj-p2-0-media-proxy-hardening` · PR [#1552](https://github.com/
 | `d38d7ea9a86bffd6aa4a84fc1e870b6244b18cd6` | P2-0 proxy hardening | all green (storefront, both visual QAs, php sqlite 11m49s, php pgsql 17m27s) |
 | `abd9a3eefb45f78521455cb8656cd9fa3132a563` | review fix: variant ceiling | php sqlite/pgsql **failed**: my own pin test read `storefront/…/media-proxy-guard.ts`, which CI does not copy into the Laravel app (the generator tests themselves passed: 7,485 passed, 1 failed) |
 | `84d600a118224cf3a0d0493e4a6c6fffda9960bf` | pin moved to the storefront test | **all green**: storefront ✅, merchant preview QA ✅, published footer QA ✅, php sqlite ✅ (17m), php pgsql ✅ (12m), CI Gate ✅ |
+| `17b253f40756430628b18a41989017e3d55cde2a` | round 2: read-memory budget (P1), audit-SQL test, spike | storefront ✅, merchant preview QA ✅, published footer QA ✅, php sqlite ✅ (16m), php pgsql ✅ (18m, includes the audit SQL on PostgreSQL); CI Gate (aggregator) was still finishing at the last check |
 | final head | this docs-only commit (see PR head) | docs only; reruns the same workflows |
 
 No merge, deployment, migration, API change, R2 or infrastructure change was made.
