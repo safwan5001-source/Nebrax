@@ -10,12 +10,14 @@ use App\Models\DocumentExtractionResult;
 use App\Models\DocumentFile;
 use App\Models\DocumentProcessingRun;
 use App\Models\DocumentProviderAttempt;
+use App\Models\DocumentReviewAction;
 use App\Models\DocumentReviewChange;
 use App\Models\Role;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\AiAuditRecorder;
 use App\Services\DocumentCenter\DocumentGovernanceService;
+use App\Services\DocumentCenter\DocumentReviewService;
 use App\Services\DocumentCenter\DocumentWorkflowService;
 use App\Services\EntitlementGrantService;
 use App\Services\MockAiAssistantProvider;
@@ -150,7 +152,7 @@ class AiDocumentProjectionTest extends TestCase
      * @param  array<string,mixed>  $file
      * @return array{batch:DocumentBatch, file:DocumentFile, result:DocumentExtractionResult}
      */
-    private function document(array $auth, DocumentWorkflowStatus $status = DocumentWorkflowStatus::READY_FOR_DRAFT, array $payload = [], array $file = [], ?string $branchId = null, bool $withResult = true): array
+    private function document(array $auth, DocumentWorkflowStatus $status = DocumentWorkflowStatus::READY_FOR_DRAFT, array $payload = [], array $file = [], ?string $branchId = null, bool $withResult = true, string $review = 'human'): array
     {
         $context = app(TenantContext::class);
         $context->set($auth['tenant_id']);
@@ -164,10 +166,22 @@ class AiDocumentProjectionTest extends TestCase
             DocumentWorkflowStatus::ARCHIVED => [DocumentWorkflowStatus::RECEIVING, DocumentWorkflowStatus::RECEIVED, DocumentWorkflowStatus::ARCHIVED],
             DocumentWorkflowStatus::NEEDS_REVIEW => [DocumentWorkflowStatus::RECEIVING, DocumentWorkflowStatus::RECEIVED, DocumentWorkflowStatus::NEEDS_REVIEW],
             DocumentWorkflowStatus::REVIEWED => [DocumentWorkflowStatus::RECEIVING, DocumentWorkflowStatus::RECEIVED, DocumentWorkflowStatus::NEEDS_REVIEW, DocumentWorkflowStatus::REVIEWED],
+            DocumentWorkflowStatus::CREATING_DRAFT => [DocumentWorkflowStatus::RECEIVING, DocumentWorkflowStatus::RECEIVED, DocumentWorkflowStatus::NEEDS_REVIEW, DocumentWorkflowStatus::READY_FOR_DRAFT, DocumentWorkflowStatus::CREATING_DRAFT],
+            DocumentWorkflowStatus::DRAFT_CREATED => [DocumentWorkflowStatus::RECEIVING, DocumentWorkflowStatus::RECEIVED, DocumentWorkflowStatus::NEEDS_REVIEW, DocumentWorkflowStatus::READY_FOR_DRAFT, DocumentWorkflowStatus::CREATING_DRAFT, DocumentWorkflowStatus::DRAFT_CREATED],
             default => [DocumentWorkflowStatus::RECEIVING, DocumentWorkflowStatus::RECEIVED, DocumentWorkflowStatus::NEEDS_REVIEW, DocumentWorkflowStatus::READY_FOR_DRAFT],
         };
+        // المسار المباشر الذي تسمح به الخريطة بلا مراجع: processing → ready_for_draft (لا إكمال مراجعة).
+        if ($review === 'direct') {
+            $path = [DocumentWorkflowStatus::RECEIVING, DocumentWorkflowStatus::RECEIVED, DocumentWorkflowStatus::QUEUED, DocumentWorkflowStatus::PROCESSING, DocumentWorkflowStatus::READY_FOR_DRAFT];
+        }
+        $completionVersion = null;
         foreach ($path as $step) {
-            $batch = $workflow->transition($batch->fresh(), $step, 'ai04_test', 'user', $actor->id);
+            $completing = in_array($step, [DocumentWorkflowStatus::REVIEWED, DocumentWorkflowStatus::READY_FOR_DRAFT], true) && in_array($review, ['human', 'system'], true);
+            $batch = $workflow->transition(
+                $batch->fresh(), $step, $completing ? 'review_completed' : 'ai04_test',
+                $completing && $review === 'system' ? 'system' : 'user', $completing && $review === 'system' ? null : $actor->id,
+            );
+            $completionVersion = $completing ? $batch->version : $completionVersion;
         }
 
         $stored = DocumentFile::create(array_merge([
@@ -202,6 +216,19 @@ class AiDocumentProjectionTest extends TestCase
                 'provider_key' => 'test_fixture', 'model' => 'local', 'schema_version' => 1,
                 'detected_document_type' => 'purchase_invoice', 'detected_language' => 'ar', 'confidence_basis_points' => 9400,
                 'normalized_payload' => $this->payload($payload), 'extracted_at' => now('UTC'),
+            ]);
+        }
+
+        // دليل الإكمال البشري كما يكتبه `DocumentReviewService::complete()` (إجراء append-only بإصدار ما بعد الانتقال).
+        if ($result !== null && in_array($review, ['human', 'system'], true)
+            && in_array($status, [DocumentWorkflowStatus::REVIEWED, DocumentWorkflowStatus::READY_FOR_DRAFT, DocumentWorkflowStatus::CREATING_DRAFT, DocumentWorkflowStatus::DRAFT_CREATED], true)) {
+            DocumentReviewAction::create([
+                'document_batch_id' => $batch->id, 'document_extraction_result_id' => $result->id,
+                'subject_type' => 'batch', 'subject_id' => $batch->id, 'action' => 'review_completed',
+                'before' => ['status' => 'needs_review'], 'after' => ['status' => 'ready_for_draft'],
+                'actor_id' => $review === 'system' ? null : $actor->id, 'reason' => 'ai04-test',
+                'review_version' => $completionVersion,
+                'occurred_at' => now('UTC'),
             ]);
         }
 
@@ -625,6 +652,212 @@ class AiDocumentProjectionTest extends TestCase
         $this->assertSame($reason, $denied->reason);
         $this->assertSame(self::TOOL, $denied->tool);
         $this->assertNull($denied->meta);
+    }
+
+    // ───────────────────────── human-review evidence (not status alone) ─────────────────────────
+
+    /** @return array<string,array{0:DocumentWorkflowStatus}> */
+    public static function reviewedStatuses(): array
+    {
+        return [
+            'reviewed' => [DocumentWorkflowStatus::REVIEWED],
+            'ready_for_draft' => [DocumentWorkflowStatus::READY_FOR_DRAFT],
+            'creating_draft' => [DocumentWorkflowStatus::CREATING_DRAFT],
+            'draft_created' => [DocumentWorkflowStatus::DRAFT_CREATED],
+        ];
+    }
+
+    private function assertDeniedForReview($res, string $reason, array $doc, array $auth): void
+    {
+        $res->assertStatus(409)->assertJsonPath('error.code', $reason);
+        $this->assertStringNotContainsString('PI-2026-0042', $res->getContent());
+        $denied = $this->audit($auth['tenant_id'])->where('event', 'tool.denied')->last();
+        $this->assertNotNull($denied);
+        $this->assertSame($reason, $denied->reason);
+        $this->assertNull($denied->meta);
+    }
+
+    /**
+     * @test
+     * @dataProvider reviewedStatuses
+     */
+    public function a_document_with_genuine_current_review_evidence_is_read_in_every_reviewed_status(DocumentWorkflowStatus $status): void
+    {
+        $auth = $this->docTenant('doc-evid-ok-' . str_replace('_', '-', $status->value));
+        $doc = $this->document($auth, $status);
+
+        $this->read($auth['token'], $doc['batch']->id)->assertOk()
+            ->assertJsonPath('data.tool_calls.0.result.document.status', $status->value)
+            ->assertJsonPath('data.tool_calls.0.result.basis.values', 'human_reviewed_values');
+    }
+
+    /**
+     * @test
+     * @dataProvider reviewedStatuses
+     */
+    public function a_reviewed_status_without_review_completion_evidence_is_refused(DocumentWorkflowStatus $status): void
+    {
+        $auth = $this->docTenant('doc-evid-none-' . str_replace('_', '-', $status->value));
+        $doc = $this->document($auth, $status, review: 'none');
+
+        $this->assertDeniedForReview($this->read($auth['token'], $doc['batch']->id), 'document_not_reviewed', $doc, $auth);
+    }
+
+    /** @test */
+    public function the_direct_processing_to_ready_for_draft_path_has_no_review_and_is_refused(): void
+    {
+        $auth = $this->docTenant('doc-evid-direct');
+        $doc = $this->document($auth, review: 'direct');
+
+        $this->assertSame(DocumentWorkflowStatus::READY_FOR_DRAFT, $doc['batch']->fresh()->status);
+        $this->assertDeniedForReview($this->read($auth['token'], $doc['batch']->id), 'document_not_reviewed', $doc, $auth);
+    }
+
+    /** @test */
+    public function a_completion_not_attributable_to_a_human_user_is_refused(): void
+    {
+        $auth = $this->docTenant('doc-evid-system');
+        $doc = $this->document($auth, review: 'system');
+
+        $this->assertDeniedForReview($this->read($auth['token'], $doc['batch']->id), 'document_not_reviewed', $doc, $auth);
+    }
+
+    /** @test */
+    public function a_review_action_alone_without_the_matching_workflow_completion_is_refused(): void
+    {
+        $auth = $this->docTenant('doc-evid-forged');
+        $doc = $this->document($auth, review: 'direct');
+        // إجراء مراجعة بلا انتقال سير العمل المقابل لا يكفي (الدليلان يتطابقان أو يُرفض).
+        $this->inTenant($auth, fn () => DocumentReviewAction::create([
+            'document_batch_id' => $doc['batch']->id, 'document_extraction_result_id' => $doc['result']->id,
+            'subject_type' => 'batch', 'subject_id' => $doc['batch']->id, 'action' => 'review_completed',
+            'actor_id' => User::query()->where('tenant_id', $auth['tenant_id'])->value('id'),
+            'review_version' => 99, 'occurred_at' => now('UTC'),
+        ]));
+
+        $this->assertDeniedForReview($this->read($auth['token'], $doc['batch']->id), 'document_not_reviewed', $doc, $auth);
+    }
+
+    /** @test */
+    public function a_newer_extraction_result_makes_an_earlier_review_stale(): void
+    {
+        $auth = $this->docTenant('doc-evid-newer');
+        $doc = $this->document($auth);
+        $this->read($auth['token'], $doc['batch']->id)->assertOk();
+
+        $this->inTenant($auth, function () use ($doc): void {
+            // ملف ثانٍ في الحزمة بنسخة استخراج أحدث (قيد فريد لكل ملف/مرحلة).
+            $second = DocumentFile::create([
+                'document_batch_id' => $doc['batch']->id, 'storage_profile' => 'platform', 'object_key' => "private/{$doc['batch']->id}/second.pdf",
+                'original_name' => 'second.pdf', 'declared_mime' => 'application/pdf', 'detected_mime' => 'application/pdf',
+                'size_bytes' => 64, 'page_count' => 1, 'sha256' => hash('sha256', (string) Str::uuid()),
+                'scan_status' => DocumentScanStatus::CLEAN, 'scanned_at' => now('UTC'),
+            ]);
+            $run = DocumentProcessingRun::create([
+                'document_batch_id' => $doc['batch']->id, 'document_file_id' => $second->id, 'stage' => 'extraction',
+                'status' => DocumentProcessingStatus::SUCCEEDED, 'attempt_count' => 1,
+                'queued_at' => now('UTC'), 'started_at' => now('UTC'), 'finished_at' => now('UTC'),
+            ]);
+            $attempt = DocumentProviderAttempt::create([
+                'document_batch_id' => $doc['batch']->id, 'document_file_id' => $second->id, 'document_processing_run_id' => $run->id,
+                'sequence' => 1, 'provider_key' => 'test_fixture', 'model' => 'local', 'status' => 'succeeded',
+                'page_count' => 1, 'started_at' => now('UTC'), 'finished_at' => now('UTC'),
+            ]);
+            DocumentExtractionResult::create([
+                'document_batch_id' => $doc['batch']->id, 'document_file_id' => $second->id,
+                'document_processing_run_id' => $run->id, 'document_provider_attempt_id' => $attempt->id,
+                'provider_key' => 'test_fixture', 'model' => 'local', 'schema_version' => 1,
+                'detected_document_type' => 'purchase_invoice', 'detected_language' => 'ar', 'confidence_basis_points' => 9100,
+                'normalized_payload' => $this->payload(['fields' => ['document_number' => 'PI-NEWER-UNREVIEWED']]),
+                'extracted_at' => now('UTC')->addMinute(),
+            ]);
+        });
+
+        $res = $this->read($auth['token'], $doc['batch']->id);
+        $this->assertDeniedForReview($res, 'document_review_stale', $doc, $auth);
+        $this->assertStringNotContainsString('PI-NEWER-UNREVIEWED', $res->getContent());
+    }
+
+    /** @test */
+    public function a_review_edit_made_after_completion_makes_the_review_stale(): void
+    {
+        $auth = $this->docTenant('doc-evid-edit');
+        $doc = $this->document($auth);
+        $this->read($auth['token'], $doc['batch']->id)->assertOk();
+
+        $this->inTenant($auth, fn () => DocumentReviewChange::create([
+            'document_batch_id' => $doc['batch']->id, 'document_extraction_result_id' => $doc['result']->id,
+            'target_type' => 'field', 'target_key' => 'fields.document_number',
+            'before_value' => ['value' => 'PI-2026-0042'], 'after_value' => ['value' => 'PI-EDITED-AFTER'], 'value_type' => 'string',
+            'reason' => 'ai04-test', 'actor_id' => null, 'review_version' => $doc['batch']->fresh()->version + 1,
+        ]));
+
+        $res = $this->read($auth['token'], $doc['batch']->id);
+        $this->assertDeniedForReview($res, 'document_review_stale', $doc, $auth);
+        $this->assertStringNotContainsString('PI-EDITED-AFTER', $res->getContent());
+    }
+
+    /** @test */
+    public function reopening_a_reviewed_document_withdraws_the_evidence_until_it_is_completed_again(): void
+    {
+        $auth = $this->docTenant('doc-evid-reopen');
+        $doc = $this->document($auth);
+        $this->read($auth['token'], $doc['batch']->id)->assertOk();
+
+        $this->inTenant($auth, fn () => app(DocumentWorkflowService::class)->transition(
+            $doc['batch']->fresh(), DocumentWorkflowStatus::NEEDS_REVIEW, 'ai04_test_reopen', 'user',
+            User::query()->where('tenant_id', $auth['tenant_id'])->value('id'),
+        ));
+
+        $this->assertDeniedForReview($this->read($auth['token'], $doc['batch']->id), 'document_not_reviewed', $doc, $auth);
+    }
+
+    /** @test */
+    public function evidence_written_by_the_real_review_service_is_accepted_and_a_later_edit_invalidates_it(): void
+    {
+        $auth = $this->docTenant('doc-evid-real');
+        $doc = $this->document($auth, DocumentWorkflowStatus::NEEDS_REVIEW);
+        $actorId = User::query()->where('tenant_id', $auth['tenant_id'])->value('id');
+        // سياسة جاهزية مذكرة التسليم لا تشترط مطابقات منتجات، فيمرّ الإكمال الحقيقي بلا تجهيز إضافي (الحالة الناتجة reviewed).
+        $this->inTenant($auth, fn () => DocumentBatch::withoutGlobalScopes()->where('id', $doc['batch']->id)->update(['document_type' => 'delivery_note']));
+
+        // قبل الإكمال: مرفوض (needs_review).
+        $this->assertDeniedForReview($this->read($auth['token'], $doc['batch']->id), 'document_not_reviewed', $doc, $auth);
+
+        // إكمال حقيقي عبر خدمة المراجعة نفسها (لا إدخال يدوي للدليل).
+        $this->inTenant($auth, fn () => app(DocumentReviewService::class)->change(
+            $doc['batch']->fresh(), $doc['result'], $doc['batch']->fresh()->version, 'fields.document_number', 'PI-REAL-REVIEWED', 'ai04-test', $actorId,
+        ));
+        $this->inTenant($auth, fn () => app(DocumentReviewService::class)->complete(
+            $doc['batch']->fresh(), $doc['result'], $doc['batch']->fresh()->version, 'ai04-test', $actorId,
+        ));
+
+        $res = $this->read($auth['token'], $doc['batch']->id)->assertOk();
+        $this->assertStringContainsString('PI-REAL-REVIEWED', $res->getContent());
+
+        // إعادة فتح حقيقية (workflow) ثم تعديل ثم إكمال جديد: الأحدث وحده يُعتدّ به.
+        $this->inTenant($auth, fn () => app(DocumentWorkflowService::class)->transition(
+            $doc['batch']->fresh(), DocumentWorkflowStatus::NEEDS_REVIEW, 'ai04_test_reopen', 'user', $actorId,
+        ));
+        $this->inTenant($auth, fn () => app(DocumentReviewService::class)->change(
+            $doc['batch']->fresh(), $doc['result'], $doc['batch']->fresh()->version, 'fields.document_number', 'PI-REAL-REVIEWED-2', 'ai04-test', $actorId,
+        ));
+        $this->assertDeniedForReview($this->read($auth['token'], $doc['batch']->id), 'document_not_reviewed', $doc, $auth);
+        $this->inTenant($auth, fn () => app(DocumentReviewService::class)->complete(
+            $doc['batch']->fresh(), $doc['result'], $doc['batch']->fresh()->version, 'ai04-test', $actorId,
+        ));
+        $this->assertStringContainsString('PI-REAL-REVIEWED-2', $this->read($auth['token'], $doc['batch']->id)->assertOk()->getContent());
+    }
+
+    /** @test */
+    public function evidence_is_isolated_per_document_and_never_borrowed_from_another(): void
+    {
+        $auth = $this->docTenant('doc-evid-iso');
+        $reviewed = $this->document($auth);
+        $direct = $this->document($auth, review: 'direct');
+
+        $this->read($auth['token'], $reviewed['batch']->id)->assertOk();
+        $this->assertDeniedForReview($this->read($auth['token'], $direct['batch']->id), 'document_not_reviewed', $direct, $auth);
     }
 
     /** @test */

@@ -7,11 +7,12 @@ Scope: let AWJ Intelligence read an explicitly authorized, **human-reviewed, red
 | | |
 |---|---|
 | **Blocker for a safe integration?** | **No.** A safe read model already exists in Document Center (`ReviewedDocumentProjector` + `DocumentRedactionProjector` over the encrypted `DocumentExtractionResult`). Nothing was bypassed or invented. |
-| **Owner-visible caveats** | Four, all documented in §9 (retention does not purge the extraction payload; conservative hold/scan decisions; two platform flags default off; tax numbers deliberately excluded). None needs a schema change. |
+| **Owner-visible caveats** | Documented in §9 (retention does not purge the extraction payload; conservative hold/scan decisions; two platform flags default off; tax numbers deliberately excluded). None needs a schema change. |
+| **Owner decisions applied (final hardening)** | (1) retention-ended ⇒ refuse, Document Center purge policy untouched; (2) active hold ⇒ refuse, general hold policy untouched; (3) **status alone is no longer proof of human review** — see §5.1. |
 | Branch | `feat/ai-04-document-read-20261017` |
 | Draft PR | https://github.com/safwan5001-source/Nebrax/pull/1554 (Draft) |
 | Base | `main` @ `1f94e18480e78fea1839b0493073f21b486f6f07` (AI-01 #1546, AI-02A #1548, AI-02B #1549, AI-03 #1553 merged) |
-| Head | `443bb69df0e77a4b851310a178b94252b1846423` at PR creation (any later commit on the branch changes this report only) |
+| Head | `@@HEAD@@` (final hardening commit; earlier heads: `443bb69` at PR creation, `aa47087` before hardening) |
 | Migrations / new tables | **none** |
 | Provider / network | mock only; **zero egress** (asserted in every backend test and in Playwright) |
 
@@ -94,7 +95,29 @@ Checked **after** tenant/branch/permission scope passes (so these reasons never 
 | Status not in {reviewed, ready_for_draft, creating_draft, draft_created} (needs_review, received, queued, processing, failed, cancelled, duplicate…) | `document_not_reviewed` | 409 |
 | No extraction result / result not tied to the batch's files / stale review reference / decryption failure | `document_projection_unavailable` | 409 |
 
+Then, **even for those statuses**, the human-review evidence gate of §5.1 runs after the latest extraction result is resolved:
+
+| State | Reason code | HTTP |
+|---|---|---|
+| No `review_completed` evidence / evidence without a human actor / workflow completion event missing (e.g. the direct `processing → ready_for_draft` path) | `document_not_reviewed` | 409 |
+| Evidence belongs to a non-latest extraction result, or a review change/action happened after the completion | `document_review_stale` (new) | 409 |
+
 Tests cover each row; every denial writes a metadata-only `tool.denied` audit event and returns no value.
+
+### 5.1 Human-review evidence (final hardening)
+
+**Finding:** the status is *not* proof of review — `DocumentWorkflowService::TRANSITIONS` permits `processing → ready_for_draft` (no caller today) and nothing ties a status to a person. **A reliable mechanism does exist** in Document Center, so no workflow/schema change and no invented evidence was needed:
+
+`DocumentReviewService::complete()` is the only writer of `review_completed`. In one transaction it (a) transitions the batch with workflow event `review_completed` (actor type `user`, actor id), and (b) appends an immutable `DocumentReviewAction` (`action=review_completed`, `subject_type=batch`, `document_extraction_result_id`, `actor_id`, `review_version = batch version after the transition`). Review edits (`DocumentReviewChange`, `review_version = expected+1`) and every other review action are only possible while `needs_review`, always with a lower version than the completion that follows them.
+
+`AiDocumentProjectionReader::assertHumanReviewEvidence()` (read-only) requires **all** of:
+
+1. A latest `review_completed` review action for the batch with a non-null `actor_id` that is an existing user of the tenant.
+2. The matching workflow event `review_completed` with `actor_type=user` and the same actor, entering `reviewed`/`ready_for_draft` (a lone action row without the transition, or a system completion, is refused).
+3. `document_extraction_result_id` equals the **latest** extraction result of the batch (a newer extraction ⇒ `document_review_stale`).
+4. No `DocumentReviewChange` and no non-draft review action with `review_version ≥` the completion's (an edit after completion ⇒ `document_review_stale`; a reopen to `needs_review` fails the status gate first, and a re-completion writes a new, higher-versioned action).
+
+Nothing else changed: tenant/branch scope, RBAC, consent, retention/hold/scan/quarantine gates, redaction, allow-list output, DB schema, REST API. The UI only gained the new notice key `document_review_stale` (ar/en).
 
 ## 6. UI (AI-03 identity preserved; small focused surface)
 
@@ -107,10 +130,10 @@ Tests cover each row; every denial writes a metadata-only `tool.denied` audit ev
 
 | Check | Result |
 |---|---|
-| `AiDocumentProjectionTest` (new) | **36 tests** — happy path & bounds, review override, redaction, delivery-note disclosure, consent (absent/revoked/Document-Center-sending independence/platform switches), RBAC (no doc view, no AI permission), cross-tenant indistinguishability, other-branch, restricted-branch, warehouse scope, closed schema, 10 lifecycle states, hold + release, stale review, entitlement, prompt-injection/zero egress, provider cannot plan the tool, metadata-only audit/logs, no copies/state change |
+| `AiDocumentProjectionTest` (new) | **52 tests** (final hardening added review-evidence cases: valid for reviewed/ready_for_draft/creating_draft/draft_created; missing evidence for each of those statuses; direct `processing → ready_for_draft`; system-actor completion; lone action without workflow completion; newer extraction result; edit after completion; reopen; per-document isolation; and a case driving the **real** `DocumentReviewService::change/complete` incl. reopen + re-completion) — originally 36 covering happy path & bounds, review override, redaction, delivery-note disclosure, consent (absent/revoked/Document-Center-sending independence/platform switches), RBAC (no doc view, no AI permission), cross-tenant indistinguishability, other-branch, restricted-branch, warehouse scope, closed schema, 10 lifecycle states, hold + release, stale review, entitlement, prompt-injection/zero egress, provider cannot plan the tool, metadata-only audit/logs, no copies/state change |
 | AI + Document Center regression | all AI suites (AI-01/02/03) and the whole Document Center set (`--filter=Document`: 623 passed) green |
-| PHP full suite | 7514 passed, 141 skipped, **26 failed** — all in six Fuel* classes (`FuelAviRfidServiceTest`, `FuelReconciliationTest`, `FuelSaleApiTest`, `FuelSaleServiceTest`, `FuelSupplyReceivingApiTest`, `FuelSupplyReceivingTest`) that call `bcmul/bcadd`; this sandbox lacks `ext-bcmath` (CI has it). Identical set to the pre-AI-04 baseline; no AI, Document Center or RBAC test fails. |
-| Web unit | **647 files / 7633 tests passed** (new: store gating/isolation tests, document projection/panel/consent component tests, state/context additions) |
+| PHP full suite (after final hardening) | 7530 passed, 141 skipped, **26 failed** — all in six Fuel* classes (`FuelAviRfidServiceTest`, `FuelReconciliationTest`, `FuelSaleApiTest`, `FuelSaleServiceTest`, `FuelSupplyReceivingApiTest`, `FuelSupplyReceivingTest`) that call `bcmul/bcadd`; this sandbox lacks `ext-bcmath` (CI has it). Identical set to the pre-AI-04 baseline; no AI, Document Center or RBAC test fails. |
+| Web unit | **647 files / 7635 tests passed** (new: store gating/isolation tests, document projection/panel/consent component tests, state/context additions) |
 | `next build` | passed |
 | Playwright `ai-04-documents.spec.ts` | **31 passed, 1 skipped by design** (desktop keyboard journey is desktop-only); asserts a single read request carrying only the URL id, no non-local host, no document content in `localStorage`/`sessionStorage` |
 | Playwright AI-03 spec (regression) | 41 passed / 3 skipped by design, re-run on this branch — AI-03 UI untouched apart from the document surface |
@@ -141,7 +164,7 @@ Reviewed for alignment, clipping, overflow (asserted: no horizontal overflow), t
 | 2 | Redaction overlays cover 10 fixed field paths only | The AI projection adds its own closed allow-list (tax numbers and barcodes excluded) so nothing beyond the reviewed header/line set is ever returned. Extending `DocumentRedactionProjector::FIELD_PATHS` stays a Document Center change. |
 | 3 | **Holds**: Document Center treats a hold as "blocks purge" only | AI-04 is stricter (refuses while a hold is active). Owner may relax once a hold-vs-disclosure policy exists. |
 | 4 | Scan-exception admissions stay `pending` by design | They are refused (`document_scan_incomplete`) — conservative. |
-| 5 | Workflow map allows `processing → ready_for_draft` with no caller today | If a future path used it **without** human review, AI-04 would treat the document as reviewed (it trusts status). Recommend an explicit review-completed marker if that path is ever wired. |
+| 5 | ~~Workflow map allows `processing → ready_for_draft` with no caller today~~ **Resolved** | AI-04 no longer trusts status: it requires the immutable `review_completed` evidence of §5.1, so even if that transition is wired without a reviewer the document stays unreadable (`document_not_reviewed`). No workflow change was made. |
 | 6 | No storage-object existence check | The projection is DB-resident; reading never touches storage (no I/O, no egress). An object deleted out-of-band is not modelled in the state machine. |
 | 7 | Two platform flags, both default **off** | `AI_ASSISTANT_ENABLED` and `AI_ASSISTANT_DOCUMENTS_ENABLED`. Nothing was enabled in any environment, tenant or CI file. Tenant consent stays per-tenant and default-off; existing tenants are unaffected and stored consents never gain the category. |
 | 8 | Real provider + documents | Still blocked. Sending reviewed document values to a model is a **separate egress gate** (privacy, residency, billing, caps) and is not part of this PR; today the values are only returned to the authorized user. |
@@ -150,13 +173,13 @@ Reviewed for alignment, clipping, overflow (asserted: no horizontal overflow), t
 
 ## 10. Changed files
 
-- **Backend:** `config/ai_assistant.php` (documents block), `app/Support/AiAssistantDataCategory.php`, `app/Support/AiAssistantDenied.php` (7 codes), `app/Contracts/AiExplicitInvocationOnly.php` (new), `app/Services/AiDocumentProjectionReader.php` (new), `app/Services/AiDocumentProjectionTool.php` (new), `app/Services/AiAssistantToolRegistry.php`, `app/Services/AiAssistantGateway.php` (explicit-only), `app/Services/AiAssistantStatusService.php`, `app/Services/AiAuditRecorder.php` (+`uuid` meta type), `app/Http/Requests/AiAssistantToolRunRequest.php` (arg length), tests: `AiDocumentProjectionTest` (new) and three deliberate pin updates.
-- **Web:** `modules/intelligence/{contract,api,state,context,gate,store}`, `components/intelligence/{document-result,document-section (new), assistant-panel, consent-settings}`, `messages/{ar,en}.json`, tests (`document`, `document-store` new; fixtures/harness/panel/consent/state/pure updated), `e2e/ai-04-documents.spec.ts` (new), `e2e/ai-03-intelligence.spec.ts` (type fixture only).
+- **Backend:** `config/ai_assistant.php` (documents block), `app/Support/AiAssistantDataCategory.php`, `app/Support/AiAssistantDenied.php` (8 codes), `app/Contracts/AiExplicitInvocationOnly.php` (new), `app/Services/AiDocumentProjectionReader.php` (new), `app/Services/AiDocumentProjectionTool.php` (new), `app/Services/AiAssistantToolRegistry.php`, `app/Services/AiAssistantGateway.php` (explicit-only), `app/Services/AiAssistantStatusService.php`, `app/Services/AiAuditRecorder.php` (+`uuid` meta type), `app/Http/Requests/AiAssistantToolRunRequest.php` (arg length), tests: `AiDocumentProjectionTest` (new) and three deliberate pin updates.
+- **Web:** `modules/intelligence/{contract,api,state (+`document_review_stale`),context,gate,store}`, `components/intelligence/{document-result,document-section (new), assistant-panel, consent-settings}`, `messages/{ar,en}.json`, tests (`document`, `document-store` new; fixtures/harness/panel/consent/state/pure updated), `e2e/ai-04-documents.spec.ts` (new), `e2e/ai-03-intelligence.spec.ts` (type fixture only).
 - **QA/docs:** `docs/reports/ai-04-visual-qa/*`, this report.
 
 ## 11. Next recommended step
 
-1. Owner decisions on §9 items 1, 3 and 5 (no code needed to proceed).
+1. §9 items 1, 3 and 5 are decided/resolved (retention and hold kept as refusals; review evidence enforced). Nothing blocks the owner's merge decision.
 2. Staging dry run with `AI_ASSISTANT_ENABLED` and `AI_ASSISTANT_DOCUMENTS_ENABLED` on a single internal tenant, mock provider, to validate reviewed/redacted projections on real documents.
 3. Only after the privacy/residency/billing/caps gates: a **separate** slice for real-provider document grounding (egress design, per-document purpose limitation, redaction-before-send), not enabled by AI-04.
 

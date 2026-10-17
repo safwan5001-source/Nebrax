@@ -11091,6 +11091,10 @@
         "title": "The document has not been reviewed yet",
         "body": "The assistant only reads documents a person has finished reviewing. Complete the review in Document Center, then try again."
       },
+      "document_review_stale": {
+        "title": "The document review changed after approval",
+        "body": "A newer extraction or a value edit appeared after the last human approval. Re-approve the review in Document Center, then try again."
+      },
       "document_quarantined": {
         "title": "The document is quarantined",
         "body": "A quarantined document is never read. A Document Center administrator handles it."

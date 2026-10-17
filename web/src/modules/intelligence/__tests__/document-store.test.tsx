@@ -86,7 +86,7 @@ describe('document reads — results, errors and isolation', () => {
     expect(result.current.documentRun?.projection.document.status).toBe('ready_for_draft');
   });
 
-  it.each(['document_on_hold', 'document_not_reviewed', 'document_quarantined', 'document_retention_ended', 'document_scan_incomplete', 'document_projection_unavailable'] as const)(
+  it.each(['document_on_hold', 'document_not_reviewed', 'document_review_stale', 'document_quarantined', 'document_retention_ended', 'document_scan_incomplete', 'document_projection_unavailable'] as const)(
     'turns the server refusal %s into a state with no data left on screen',
     async (reason) => {
       api.fetchStatus.mockResolvedValue(docReadyStatus());

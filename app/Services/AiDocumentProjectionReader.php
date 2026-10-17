@@ -6,6 +6,9 @@ use App\Models\DocumentBatch;
 use App\Models\DocumentExtractionResult;
 use App\Models\DocumentFile;
 use App\Models\DocumentRetentionHold;
+use App\Models\DocumentReviewAction;
+use App\Models\DocumentReviewChange;
+use App\Models\DocumentWorkflowEvent;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\DocumentCenter\DocumentRedactionProjector;
@@ -105,6 +108,9 @@ class AiDocumentProjectionReader
             throw AiAssistantDenied::for('document_projection_unavailable');
         }
 
+        // الحالة وحدها ليست دليلاً على مراجعة بشرية (الخريطة تسمح بـ processing → ready_for_draft بلا مراجع).
+        $this->assertHumanReviewEvidence($batch, $result);
+
         try {
             $projection = $this->redactions->apply($result, $this->reviewed->project($result));
         } catch (Throwable) {
@@ -153,6 +159,61 @@ class AiDocumentProjectionReader
 
         if (! in_array($batch->status, self::REVIEWED_STATUSES, true)) {
             throw AiAssistantDenied::for('document_not_reviewed');
+        }
+    }
+
+    /**
+     * دليل المراجعة البشرية الموثوق: ما يكتبه `DocumentReviewService::complete()` وحده، ولا يُنشأ بأي مسار آخر —
+     * `DocumentReviewAction` بالفعل `review_completed` (append-only) + حدث سير العمل `review_completed` بفاعل مستخدم.
+     * يُرفض الإفصاح ما لم يتحقق كلٌّ مما يلي (بصرف النظر عن الحالة، حتى `ready_for_draft`/`draft_created`):
+     *  1. وجود الإكمال البشري (فاعل مستخدم موجود في المستأجر) وحدث سير العمل المقابل له.
+     *  2. أنه يخص **أحدث** نسخة استخراج لهذا المستند (`document_extraction_result_id`)؛ نسخة أحدث بعده تُبطله.
+     *  3. أنه لم يُسبَق بتعديل لاحق: لا `DocumentReviewChange` ولا إجراء مراجعة (غير إنشاء المسودة) بإصدار أحدث منه
+     *     (إعادة الفتح تُرفع الإصدار، فكل تعديل بعدها يتجاوز إصدار الإكمال).
+     *
+     * @throws AiAssistantDenied
+     */
+    private function assertHumanReviewEvidence(DocumentBatch $batch, DocumentExtractionResult $result): void
+    {
+        $completion = DocumentReviewAction::query()
+            ->where('document_batch_id', $batch->id)
+            ->where('subject_type', 'batch')
+            ->where('action', 'review_completed')
+            ->orderByDesc('review_version')
+            ->orderByDesc('occurred_at')
+            ->first();
+        if ($completion === null || $completion->actor_id === null) {
+            throw AiAssistantDenied::for('document_not_reviewed');
+        }
+
+        $humanActor = User::query()->where('tenant_id', $batch->tenant_id)->whereKey($completion->actor_id)->exists();
+        $workflowCompletion = DocumentWorkflowEvent::query()
+            ->where('document_batch_id', $batch->id)
+            ->where('event', 'review_completed')
+            ->where('actor_type', 'user')
+            ->where('actor_id', $completion->actor_id)
+            ->whereIn('to_status', [DocumentWorkflowStatus::REVIEWED->value, DocumentWorkflowStatus::READY_FOR_DRAFT->value])
+            ->exists();
+        if (! $humanActor || ! $workflowCompletion) {
+            throw AiAssistantDenied::for('document_not_reviewed');
+        }
+
+        if ($completion->document_extraction_result_id !== $result->id) {
+            throw AiAssistantDenied::for('document_review_stale');
+        }
+
+        $changedAfter = DocumentReviewChange::query()
+            ->where('document_batch_id', $batch->id)
+            ->where('review_version', '>=', $completion->review_version)
+            ->exists();
+        $actedAfter = DocumentReviewAction::query()
+            ->where('document_batch_id', $batch->id)
+            ->where('subject_type', '!=', 'transaction_link')
+            ->where('action', '!=', 'review_completed')
+            ->where('review_version', '>=', $completion->review_version)
+            ->exists();
+        if ($changedAfter || $actedAfter) {
+            throw AiAssistantDenied::for('document_review_stale');
         }
     }
 

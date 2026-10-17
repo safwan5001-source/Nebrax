@@ -22,6 +22,7 @@ export type NoticeKey =
   | 'duplicate_request'
   | 'document_unavailable'
   | 'document_not_reviewed'
+  | 'document_review_stale'
   | 'document_quarantined'
   | 'document_scan_incomplete'
   | 'document_on_hold'
@@ -62,6 +63,7 @@ const CODE_TO_NOTICE: Record<string, NoticeKey> = {
   internal_error: 'server_error',
   document_unavailable: 'document_unavailable',
   document_not_reviewed: 'document_not_reviewed',
+  document_review_stale: 'document_review_stale',
   document_quarantined: 'document_quarantined',
   document_scan_incomplete: 'document_scan_incomplete',
   document_on_hold: 'document_on_hold',
