@@ -1,6 +1,61 @@
 # AWJ Infrastructure Safety — Staging & Production Deployment Gate (Review)
 
-**Status: DESIGN + REPOSITORY CHANGES READY. LIVE PRODUCTION PROTECTION IS *NOT* ENABLED.** Nothing in Railway or GitHub settings was changed; no service was created; no AI flag was touched; no merge or deploy was performed. Production was inspected read-only (service/deployment/config metadata, variable **names** only, one deploy-log line). No secret or variable value was read, printed or stored.
+**Status: DESIGN + REPOSITORY CHANGES READY; A0–A1 EXECUTED, A2–A3 BLOCKED (§0). LIVE PRODUCTION PROTECTION IS *NOT* ENABLED.** The only live change so far is the creation of the inert `production` git branch. Nothing in Railway or GitHub settings was changed; no service was created; no AI flag was touched; no merge or deploy was performed. Production was inspected read-only (service/deployment/config metadata, variable **names** only, one deploy-log line). No secret or variable value was read, printed or stored.
+
+## 0. Execution log — owner-approved steps A0–A3 (2026-10-17)
+
+Owner approved the promotion-branch design in principle and authorised **A0–A3 only**. Result: **A0 done · A1 done · A2 blocked (no tool, nothing created) · A3 partially done (local dry-run only; Actions dry-run blocked)**. No Railway setting, no GitHub setting, no deploy, no migration, no staging resource was touched. PR #1556 is unmerged.
+
+| Step | Result | Evidence |
+|---|---|---|
+| **A0 — AI flags** | **VERIFIED OFF (by absence) on both PHP runtime services**; no value was read or shown | Railway `get-service-config` (variable *names* only) re-run today: `nibras-api` 36 names and `awj-scheduler` 13 names — neither contains `AI_ASSISTANT_ENABLED` nor `AI_ASSISTANT_DOCUMENTS_ENABLED`; shared variables: none; repo has no `.env`/Dockerfile setting for them; code defaults are `false`. `Nebrax`, `storefront`, `awj-preview-host` are Node services that never read the flags. Residual limit unchanged: absence of the variable, not a runtime readback. |
+| **A1 — `production` branch** | **CREATED**, exactly at `6258840b7fef68fbc533f78176006c0cd7b1ad9d` (= `main` HEAD = the commit all five Railway services run) | Pre-checks: all 5 services' source branch is `main`, none tracks `production`; no GitHub workflow deploys; `ci.yml` pushes only on `main`. Post-checks: `git ls-remote` → `refs/heads/main` and `refs/heads/production` both `6258840b…`; **0 workflow runs on `production`**; latest Railway `nibras-api` deployment still created 08:40:51 UTC (no new deployment). Creating it did not and cannot deploy. |
+| **A2 — Environment `production` + required reviewer, branch rules** | **NOT DONE — BLOCKER (tooling)** | The only sanctioned GitHub interface in this session (MCP tools) has no environment, deployment-protection or ruleset capability, and I did not bypass it with raw API calls. Existence/configuration of the environment, reviewers and rulesets remains **UNVERIFIED**. Exact owner steps in §0.1. |
+| **A3 — dry-run** | **Local dry-run PASSED; Actions dry-run BLOCKED** | See §0.2. |
+
+### 0.1 A2 blocker and exact owner steps (public repo → all features available at no cost)
+
+**Why it matters:** a job that names `environment: production` auto-creates an **unprotected** environment if it does not exist, and then runs with no review. Because I cannot create it, I closed this hole in code instead (below), so a missing/misconfigured environment now fails closed.
+
+Owner steps (GitHub UI; ~3 minutes; none of them deploys anything):
+1. Settings → **Environments** → *New environment* → `production`.
+2. *Required reviewers*: add `safwan5001-source`. *Prevent self-review*: **off** (single owner). *Deployment branches and tags*: *Selected* → add `main`.
+3. Settings → **Rules → Rulesets** → *New branch ruleset* → name `production-release-branch`, enforcement *Active*, target branch `production`, rules: **Restrict deletions** and **Block force pushes**. (Deliberately *not* "Restrict updates": that would also block the workflow's own fast-forward push.)
+
+Optional equivalent via `gh` (not executed by me; no secrets involved):
+```
+gh api -X PUT repos/safwan5001-source/Nebrax/environments/production --input - <<'JSON'
+{"prevent_self_review":false,"reviewers":[{"type":"User","id":225775880}],
+ "deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}
+JSON
+gh api -X POST repos/safwan5001-source/Nebrax/environments/production/deployment-branch-policies -f name=main
+```
+Residual (unchanged): the sole admin can still push to `production` directly or use Railway UI redeploy — the gate stops mistakes and other contributors, not the owner acting deliberately.
+
+### 0.2 A3 — what was and was not tested
+
+| Test | Result |
+|---|---|
+| Dispatch *Promote to Production* from the PR branch (`dry_run=true`) | **404** — GitHub only dispatches `workflow_dispatch` workflows that exist on the default branch. The workflow cannot run before it is merged to `main`; the `verify` job additionally requires `ref == main`. |
+| Verifier on **real** `main` HEAD, real `production` (equal) | `NOT RELEASABLE — production is already at this commit`; both `php artisan test` checks **PASS** on `6258840` (read from the live GitHub API) |
+| Verifier, **simulated** local-only ref `production = 1f94e18` (AI-03), candidate `6258840`; **nothing pushed**, local ref restored afterwards | **RELEASABLE**, migrations carried: 0 |
+| Candidate not on `main` (PR #1556 head) | `NOT RELEASABLE — not on main` (even though its checks pass) |
+| Approval guard on a real run without a protected environment (run 39018270846) | `BLOCK — no recorded approval`, exit 1 (endpoint reachable; fail-closed confirmed) |
+| Unit tests | `python3 -m unittest discover -s scripts/release` → **12 OK** (3 new: no approval record blocks; only `approved` for this environment counts; malformed records do not crash) |
+
+**New code in this PR (hardening found while preparing A2):** `release_gate.py require-approval` + a `promote`-job step that reads `GET /actions/runs/{id}/approvals` and refuses to push unless a reviewer actually approved for `production`.
+
+### 0.3 The ordering catch-22 and the safe order
+
+The workflow lives only in PR #1556, and merging anything to `main` currently **redeploys all five production services** (no gate yet). So the Actions dry-run (A3) and approval test need either a benign redeploy or Railway cutover first. Recommended order — **repoint Railway before merging #1556**:
+
+1. Owner completes A2 steps (§0.1) — inert.
+2. Owner does **A4** (Railway: five services → branch `production`, Wait for CI on). Same SHA, so at most one redeploy of identical code; from here merges to `main` deploy nothing.
+3. Verify with runbook §9 (I can run the read-only check).
+4. Owner merges #1556 → zero production effect (nothing tracks `main`). 
+5. Run the Actions dry-run, then the approval rehearsal (`dry_run=false` on a releasable SHA → must pause at *Review deployments* → **Reject**).
+
+Alternative (not recommended): merge #1556 first and accept one redeploy of the same code (no migrations: workflow/scripts/docs only).
 
 ## 1. Bottom line
 
@@ -10,7 +65,7 @@
 | Is there a staging environment? | **No.** One Railway environment (`production`). |
 | Are the AI flags on in production? | **VERIFIED OFF by absence** on both PHP runtime services (variable not defined; code default `false`). No value readback was done (§4). |
 | What is ready now? | A promotion workflow + release-gate script (tested), a deployment runbook, and this design — all inert until the owner performs the Railway/GitHub steps in §7. |
-| What actually protects production? | **Nothing yet.** Protection exists only after owner steps A1–A4 (§7). Until then every merge to `main` still deploys to production immediately. |
+| What actually protects production? | **Nothing yet.** `production` branch exists (A1 done) but no Railway service tracks it. Protection starts only after A2 (owner, GitHub UI) and A4 (owner, Railway). Until then every merge to `main` still deploys to production immediately. |
 | Recommended staging cost | ≈ **$10/month** (core) · ≈ **$18/month** with ClamAV, from measured production usage (§6). Needs your approval; nothing was provisioned. |
 
 ## 2. Verified current topology (evidence)
@@ -152,10 +207,10 @@ Nothing below has been done. Each is a live change that needs your explicit go-a
 
 | # | Where | Action | Prerequisite / note |
 |---|---|---|---|
-| A0 | Railway dashboard | Confirm `AI_ASSISTANT_ENABLED` / `AI_ASSISTANT_DOCUMENTS_ENABLED` are not set on `nibras-api` and `awj-scheduler` | removes the last doubt in §3 |
-| A1 | Git | Create branch `production` at the commit currently deployed (today `6258840b…`) | the workflow refuses to run without it |
-| A2 | GitHub → Settings → Environments | Create `production`: required reviewer = you; **Prevent self-review OFF** (sole owner); deployment branches = `main` only | public repo → available at no cost |
-| A3 | GitHub → Actions | Run *Promote to Production* with `dry_run=false` on a harmless SHA **once, to confirm it pauses for review**; reject it | proves approval is real before cutover |
+| A0 | Railway dashboard | **DONE by names-only check (§0)** — optional owner runtime confirmation that the assistant shows as unavailable | residual: absence ≠ readback |
+| A1 | Git | **DONE** — `production` = `6258840b7fef68fbc533f78176006c0cd7b1ad9d` | the workflow refuses to run without it |
+| A2 | **BLOCKED for Claude → owner (§0.1)** GitHub → Settings → Environments | Create `production`: required reviewer = you; **Prevent self-review OFF** (sole owner); deployment branches = `main` only | public repo → available at no cost |
+| A3 | **Local dry-run done; Actions dry-run needs the workflow on `main` (§0.3)** GitHub → Actions | Run *Promote to Production* with `dry_run=false` on a harmless SHA **once, to confirm it pauses for review**; reject it | proves approval is real before cutover |
 | A4 | Railway → each of 5 services → Settings | Source branch `main` → `production`; enable **Wait for CI** | order: `awj-scheduler` last; expect at most one redeploy of the same SHA |
 | A5 | GitHub → Rules | (optional hardening) ruleset on `production`: block force-push/deletion | direct-push restriction needs Option B (new secret) |
 | A6 | Railway | Approve and create `staging` per §4.2 and its cost | §6 |
@@ -187,8 +242,8 @@ Nothing below has been done. Each is a live change that needs your explicit go-a
 
 | Item | Value |
 |---|---|
-| Files added | `.github/workflows/promote-production.yml` · `scripts/release/release_gate.py` · `scripts/release/test_release_gate.py` · `docs/runbooks/AWJ_DEPLOYMENT_RUNBOOK.md` · this report. No existing file modified. |
-| Focused tests | `python3 -m unittest discover -s scripts/release` → **9 tests OK** (green commit; missing/running/failed required check; failed path check blocks but advisory does not; re-run supersedes failure; foreign-app check cannot satisfy the gate; running unclassified job blocks; migration detection). |
+| Files | added: `.github/workflows/promote-production.yml` · `scripts/release/release_gate.py` · `scripts/release/test_release_gate.py` · `docs/runbooks/AWJ_DEPLOYMENT_RUNBOOK.md` · this report. Updated in the A0–A3 round: the workflow (approval-record guard step), the script (+`require-approval`), its tests, the runbook, this report. No pre-existing repository file modified. |
+| Focused tests | `python3 -m unittest discover -s scripts/release` → **12 tests OK** (originally 9; +3 approval-guard) (green commit; missing/running/failed required check; failed path check blocks but advisory does not; re-run supersedes failure; foreign-app check cannot satisfy the gate; running unclassified job blocks; migration detection). |
 | Live smoke | `release_gate.py verify` against the real `main` HEAD `6258840`: both `php artisan test` checks → PASS; reports "`production` branch does not exist yet" (expected before A1). |
 | Existing gate impact | `python3 scripts/ci-gate/ci_gate.py validate` → **OK** (the new workflow is `workflow_dispatch`-only, so it is not a PR check and changes no required-check manifest). |
 | Build / CI | CI results for the Draft PR are recorded in the PR checks (not claimed here). No application code touched; no PHP/web build impact. |
@@ -209,4 +264,4 @@ Nothing below has been done. Each is a live change that needs your explicit go-a
 
 ## 12. Next smallest action
 
-Owner: do **A0** (confirm flags) and decide yes/no on the promotion-branch design. If yes, the smallest safe live step is **A1 + A2** (create the `production` branch and the GitHub Environment) — both are inert (no production effect) and let us run the A3 dry approval test before touching Railway.
+Owner: do **A2** in the GitHub UI (§0.1: environment `production` with you as required reviewer, deployment branch `main`, and the delete/force-push ruleset on `production`) — inert, no production effect. Then tell me; the next step is the Railway cutover **A4** (separate approval), followed by merging #1556 and the Actions dry-run + approval rehearsal (§0.3).

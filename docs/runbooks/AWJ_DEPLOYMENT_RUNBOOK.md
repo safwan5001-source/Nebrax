@@ -9,9 +9,10 @@ Companion to `docs/reports/AWJ_INFRA_STAGING_PRODUCTION_GATE_REVIEW.md` (design 
 ## 2. One-time cutover (owner; each step is a live change)
 
 1. **Confirm flags (A0):** `AI_ASSISTANT_ENABLED` and `AI_ASSISTANT_DOCUMENTS_ENABLED` are not set on `nibras-api` / `awj-scheduler`.
-2. **Create `production`** at the commit that is deployed now (Railway → `nibras-api` → latest deployment → commit): `git push origin <deployed-sha>:refs/heads/production`.
+2. **Create `production`** at the commit that is deployed now (Railway → `nibras-api` → latest deployment → commit): `git push origin <deployed-sha>:refs/heads/production`. *(Done 2026-10-17 at `6258840b7fef68fbc533f78176006c0cd7b1ad9d`.)*
 3. **GitHub → Settings → Environments → New → `production`:** required reviewers = owner; *Prevent self-review* off (single owner); *Deployment branches* = selected → `main`.
-4. **Dry approval test:** Actions → *Promote to Production* → Run on `main`, `dry_run=false`, `sha` = a commit that is already releasable. Confirm the `promote` job **stops at "Waiting for review"**, then **Reject**. If it did not wait, stop: the environment is misconfigured.
+4. **Order matters:** the workflow only exists on `main` after PR #1556 is merged, and until step 5 (Railway repoint) every merge to `main` still deploys production. So do step 5 **before** merging the workflow. Then:
+   **Dry approval test:** Actions → *Promote to Production* → Run on `main`, `dry_run=false`, `sha` = a commit that is already releasable. Confirm the `promote` job **stops at "Waiting for review"**, then **Reject**. If it did not wait, stop: the environment is misconfigured. (Even then the job fails closed at *Require a recorded owner approval* — GitHub auto-creates an unprotected environment if none exists, so never rely on the environment alone.)
 5. **Railway, per service** (`nibras-api`, `Nebrax`, `storefront`, `awj-preview-host`, then `awj-scheduler`): Settings → Source → branch `production`; enable **Wait for CI** (if the toggle is missing, note it and rely on the workflow gate). A redeploy of the same SHA is expected once.
 6. **Verify (§9).**
 

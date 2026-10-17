@@ -75,6 +75,19 @@ def migrations_in(changed_files: list[str]) -> list[str]:
     return sorted(f for f in changed_files if f.startswith(MIGRATIONS_DIR) and f.endswith(".php"))
 
 
+def approvers(approvals: list[dict], environment: str) -> list[str]:
+    """Logins that APPROVED this run for `environment`.
+
+    GitHub auto-creates an unprotected environment the first time a job names one that does not exist, and
+    such a job runs without any review. A recorded approval is the only evidence that a reviewer really gated it,
+    so the promote job requires at least one (fail-closed)."""
+    return sorted({
+        (a.get("user") or {}).get("login", "?")
+        for a in approvals
+        if a.get("state") == "approved" and any(e.get("name") == environment for e in a.get("environments") or [])
+    })
+
+
 def git(*args: str) -> str:
     return subprocess.run(["git", *args], check=True, capture_output=True, text=True).stdout.strip()
 
@@ -148,6 +161,21 @@ def verify(args: argparse.Namespace) -> int:
     return 0 if not problems else 1
 
 
+def require_approval(args: argparse.Namespace) -> int:
+    try:
+        approvals = api_get(args.repo, args.token, f"actions/runs/{args.run_id}/approvals")
+    except (urllib.error.URLError, ValueError) as exc:  # fail closed
+        print(f"BLOCK: cannot read approvals ({type(exc).__name__})")
+        return 1
+    who = approvers(approvals if isinstance(approvals, list) else [], args.environment)
+    if not who:
+        print(f"BLOCK: no recorded approval for environment `{args.environment}` on this run. "
+              "The Environment is missing or has no required reviewers; nothing was pushed.")
+        return 1
+    print(f"Approved for `{args.environment}` by: {', '.join(who)}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -157,6 +185,12 @@ def main(argv: list[str] | None = None) -> int:
     v.add_argument("--token", default=os.environ.get("GITHUB_TOKEN", ""))
     v.add_argument("--acknowledge-migrations", action="store_true")
     v.set_defaults(fn=verify)
+    a = sub.add_parser("require-approval")
+    a.add_argument("--repo", required=True)
+    a.add_argument("--run-id", required=True)
+    a.add_argument("--environment", default="production")
+    a.add_argument("--token", default=os.environ.get("GITHUB_TOKEN", ""))
+    a.set_defaults(fn=require_approval)
     args = parser.parse_args(argv)
     return args.fn(args)
 

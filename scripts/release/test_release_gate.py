@@ -54,5 +54,22 @@ class MigrationsTest(unittest.TestCase):
         self.assertEqual(g.migrations_in(files), ["database/migrations/2026_01_01_000001_x.php"])
 
 
+def approval(state="approved", env="production", login="owner"):
+    return {"state": state, "user": {"login": login}, "environments": [{"name": env}]}
+
+
+class ApprovalTest(unittest.TestCase):
+    def test_no_approval_record_blocks(self):
+        # e.g. the environment was auto-created without reviewers: the run proceeds but nobody approved
+        self.assertEqual(g.approvers([], "production"), [])
+
+    def test_only_approved_state_for_this_environment_counts(self):
+        records = [approval("rejected"), approval("pending"), approval(env="staging"), approval(login="owner")]
+        self.assertEqual(g.approvers(records, "production"), ["owner"])
+
+    def test_missing_fields_do_not_crash(self):
+        self.assertEqual(g.approvers([{"state": "approved"}, {"state": "approved", "environments": None}], "production"), [])
+
+
 if __name__ == "__main__":
     unittest.main()

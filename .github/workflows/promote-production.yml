@@ -99,6 +99,13 @@ jobs:
           [ "$ACK" = "true" ] && flags+=(--acknowledge-migrations)
           python3 scripts/release/release_gate.py verify --repo "$GITHUB_REPOSITORY" --sha "$SHA" "${flags[@]}"
 
+      # GitHub auto-creates an UNPROTECTED environment when a job names one that does not exist, and that job
+      # runs with no review. Require the recorded approval itself; fail closed if there is none.
+      - name: Require a recorded owner approval
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/release/release_gate.py require-approval --repo "$GITHUB_REPOSITORY" --run-id "$GITHUB_RUN_ID" --environment production
+
       # Plain (non-force) push: git rejects anything that is not a fast-forward of production.
       # The push is what Railway's GitHub trigger reacts to (production services deploy from this branch).
       - name: Fast-forward production
