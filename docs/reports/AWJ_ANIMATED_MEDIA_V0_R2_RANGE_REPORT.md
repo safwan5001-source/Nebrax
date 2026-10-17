@@ -15,7 +15,7 @@
 | Branch | `claude/awj-v0-r2-range-feasibility` |
 | PR | [#1558](https://github.com/safwan5001-source/Nebrax/pull/1558) (docs + throwaway spike only; **not merged**) |
 | Base SHA | `3cf914235f2044c0a7b7a0357b240d6edc1b3086` (`origin/main`, includes merged #1552) |
-| Head SHA | this docs-only commit (see PR head); the code/harness content (incl. the round-1, round-2 and round-3 review fixes) is at `143c4f478dff1f59b76ebf446d97f647f41276e4` — CI on that commit: php sqlite ✅, php pgsql ✅, CI Gate ✅ (the PR changes no application code; the repository CI runs only the PHP and storefront suites; the V0 `node --test` suites are local evidence, not CI) |
+| Head SHA | this docs-only commit (see PR head); the code/harness content (incl. the round-1 to round-4 review fixes) is at `c531ad437ffca79371fb3fe88737cb3d0f74f7e0` — CI results for the final head are recorded on the PR (the PR changes no application code; the repository CI runs only the PHP and storefront suites; the V0 `node --test` suites are local evidence, not CI) |
 
 ## 1. Scope and constraints honoured
 Read-only inspection of the repo; a throwaway spike under `docs/plans/store/s0-spikes/r2-range/v0/`; this report. **Not done, by instruction:** no bucket created, no Railway
