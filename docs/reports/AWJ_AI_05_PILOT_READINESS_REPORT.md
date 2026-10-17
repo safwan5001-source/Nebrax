@@ -16,7 +16,7 @@ Scope: evidence-based GO / NO-GO for the merged AI-01 → AI-04 foundation. **Ve
 |---|---|
 | Base (`main`, verified live, had not advanced) | `6258840b7fef68fbc533f78176006c0cd7b1ad9d` (AI-04, PR #1554) |
 | Branch / PR | `docs/ai-05-pilot-readiness-20261017` — docs-only Draft PR (this report only) |
-| Head | see PR (report-only commit on top of Base) |
+| Head | `7a1992dd24ce8fda338781f92287165617ec02f2` (report commit on top of Base; any later commit changes this report only) |
 | `main` CI for Base | run 39018270846 — **success** (completed 08:58 UTC) |
 | Test envs used | PHP 8.3 / SQLite in-memory via the assembled Laravel app (`/home/user/nibras-app`); Vitest (jsdom); Playwright Chromium with **intercepted API** (fixture data). PostgreSQL and `bcmath`-dependent Fuel tests run only in CI (sandbox lacks `ext-bcmath`). |
 | Not tested | physical devices, Safari/Firefox, Android Back, real keyboards on hardware, any real provider, real production data, load/soak. |
@@ -158,6 +158,6 @@ No Critical findings. No defect requiring a code change was found, so **no code 
 
 - **Files changed:** `docs/reports/AWJ_AI_05_PILOT_READINESS_REPORT.md` only. No code, schema, config, tenant setting or environment variable was changed anywhere.
 - **Branch / PR:** `docs/ai-05-pilot-readiness-20261017` → Draft PR (docs-only). **Do not merge automatically.** Note: merging to `main` triggers a production redeploy (F1) even for a docs-only change.
-- **Base:** `6258840b7fef68fbc533f78176006c0cd7b1ad9d` · **Head:** see PR.
+- **Base:** `6258840b7fef68fbc533f78176006c0cd7b1ad9d` · **Head:** `7a1992dd24ce8fda338781f92287165617ec02f2` (report-only; later commits touch this file only).
 - **Remaining risks:** F1–F8 above; production flag values unknown (F2); physical-device UX untested; real-provider billing/egress and live-provider privacy/residency entirely unverified.
 - **Next action:** owner review of this report; decide #1 and #2 in §6.
