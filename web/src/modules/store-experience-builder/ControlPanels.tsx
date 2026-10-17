@@ -106,9 +106,11 @@ import type { DesignContext } from "./presentation/section-design-resolve";
 import { OfferSummary, OfferThumb } from "./OfferParts";
 import { offerDisplayName } from "./offers-display";
 import type { OfferManagement } from "./offers-management";
+import { DesignLibraryPanel } from "./DesignLibraryPanel";
 
 export type CustomizerPanel =
   | "theme"
+  | "designLibrary"
   | "branding"
   | "header"
   | "homepage"
@@ -129,6 +131,7 @@ export const CUSTOMIZER_NAV_GROUPS: Array<{
   {
     items: [
       { id: "theme", label: "theme" },
+      { id: "designLibrary", label: "designLibraryNav" },
       { id: "branding", label: "branding" },
     ],
   },
@@ -273,6 +276,16 @@ export function ControlPanels({
   switch (panel) {
     case "theme":
       return <ThemePanel config={config} t={t} patch={patch} locale={locale} />;
+    case "designLibrary":
+      return (
+        <DesignLibraryPanel
+          config={config}
+          locale={locale}
+          selectedSection={selectedSection}
+          onChange={onChange}
+          onSelectSection={onSelectSection}
+        />
+      );
     case "branding":
       return (
         <BrandingPanel
