@@ -1,0 +1,136 @@
+{
+  "label": "fault-leak-then-abort",
+  "generatedAt": "2026-10-17T12:58:43.275Z",
+  "provider": "LOCAL LOOK-ALIKE (not R2)",
+  "endpointHost": "127.0.0.1:8001",
+  "addressingStyle": "path",
+  "objectBytes": 4194304,
+  "ttlSeconds": 3,
+  "runId": "cb4986f1bc4f",
+  "cleanedUp": true,
+  "cleanup": {
+    "pass": true,
+    "verified": true,
+    "objects": 3,
+    "remaining": [],
+    "unverified": [],
+    "deleteFailed": []
+  },
+  "fatal": "UND_ERR_SOCKET",
+  "summary": {
+    "required": 5,
+    "requiredPassed": 5,
+    "requiredFailed": [],
+    "info": 0
+  },
+  "results": [
+    {
+      "id": "R1",
+      "group": "R",
+      "description": "Full GET with a presigned URL → 200, Content-Length = size, Accept-Ranges: bytes, ETag, Content-Type, body sha256 matches",
+      "pass": true,
+      "observed": {
+        "status": 200,
+        "headers": {
+          "accept-ranges": "bytes",
+          "content-length": "4194304",
+          "content-type": "video/mp4",
+          "etag": "\"26bf6b10041e03a6d38664a13d240ee9\"",
+          "last-modified": "Sat, 17 Oct 2026 12:58:42 GMT",
+          "server": "S3 Server",
+          "x-amz-id-2": "55e8a935c848b5187eb2",
+          "x-amz-request-id": "55e8a935c848b5187eb2"
+        },
+        "bodyLen": 4194304
+      }
+    },
+    {
+      "id": "R2",
+      "group": "R",
+      "description": "Range bytes=100-199 → 206, Content-Range \"bytes 100-199/N\", 100 bytes, body matches",
+      "pass": true,
+      "observed": {
+        "range": "bytes=100-199",
+        "status": 206,
+        "headers": {
+          "accept-ranges": "bytes",
+          "content-length": "100",
+          "content-range": "bytes 100-199/4194304",
+          "content-type": "video/mp4",
+          "etag": "\"<redacted:signature>\"",
+          "last-modified": "Sat, 17 Oct 2026 12:58:42 GMT",
+          "server": "S3 Server",
+          "x-amz-id-2": "8781bcae144188d635c1",
+          "x-amz-request-id": "8781bcae144188d635c1"
+        },
+        "bodyLen": 100
+      }
+    },
+    {
+      "id": "R3",
+      "group": "R",
+      "description": "Range bytes=0-0 → 206, 1 byte",
+      "pass": true,
+      "observed": {
+        "range": "bytes=0-0",
+        "status": 206,
+        "headers": {
+          "accept-ranges": "bytes",
+          "content-length": "1",
+          "content-range": "bytes 0-0/4194304",
+          "content-type": "video/mp4",
+          "etag": "\"<redacted:signature>\"",
+          "last-modified": "Sat, 17 Oct 2026 12:58:42 GMT",
+          "server": "S3 Server",
+          "x-amz-id-2": "de94ed6c564bbc071869",
+          "x-amz-request-id": "de94ed6c564bbc071869"
+        },
+        "bodyLen": 1
+      }
+    },
+    {
+      "id": "R4",
+      "group": "R",
+      "description": "Safari probe bytes=0-1 → 206, 2 bytes",
+      "pass": true,
+      "observed": {
+        "range": "bytes=0-1",
+        "status": 206,
+        "headers": {
+          "accept-ranges": "bytes",
+          "content-length": "2",
+          "content-range": "bytes 0-1/4194304",
+          "content-type": "video/mp4",
+          "etag": "\"<redacted:signature>\"",
+          "last-modified": "Sat, 17 Oct 2026 12:58:42 GMT",
+          "server": "S3 Server",
+          "x-amz-id-2": "1f523adc5c4b98dce14b",
+          "x-amz-request-id": "1f523adc5c4b98dce14b"
+        },
+        "bodyLen": 2
+      }
+    },
+    {
+      "id": "R5",
+      "group": "R",
+      "description": "Open-ended bytes=<N-500>- → 206 to the last byte",
+      "pass": true,
+      "observed": {
+        "range": "bytes=4193804-",
+        "status": 206,
+        "headers": {
+          "accept-ranges": "bytes",
+          "content-length": "500",
+          "content-range": "bytes 4193804-4194303/4194304",
+          "content-type": "video/mp4",
+          "etag": "\"<redacted:signature>\"",
+          "last-modified": "Sat, 17 Oct 2026 12:58:42 GMT",
+          "server": "S3 Server",
+          "x-amz-id-2": "890d7776d442894d767b",
+          "x-amz-request-id": "890d7776d442894d767b"
+        },
+        "bodyLen": 500
+      }
+    }
+  ]
+}
