@@ -1,0 +1,145 @@
+# AWJ Animated Media — V0: Cloudflare R2 presigned GET + HTTP Range feasibility
+
+## Verdict (read this first)
+
+| Question | Answer |
+|---|---|
+| Was real Cloudflare R2 tested? | **No. BLOCKED.** This environment has no R2 test bucket, no scoped token and no R2 endpoint. **No claim of real-R2 validation is made anywhere in this report.** |
+| Is architecture B2 feasible on R2? | **Not yet proven. Not disproven.** The documented capabilities and the app's own SDK are compatible with B2 (§3), but every R2-specific behaviour (§5) is **unverified**. |
+| What was delivered instead | A complete, reproducible, credential-safe V0 test harness, validated end-to-end against a SigV4-validating **local look-alike** (24/24 required cases) and proven to detect failures by a negative control — **neither is R2 evidence**. |
+| Video implementation | **NO-GO** until the harness passes on real R2 (V-G1). No video endpoint, DB change, UI, bucket or Railway change was made. |
+| What unblocks it | Owner action in §6 (an isolated R2 test bucket + a bucket-scoped token as environment variables, and network egress to the R2 host). About 15 minutes of owner time, then one command. |
+
+| | |
+|---|---|
+| Branch | `claude/awj-v0-r2-range-feasibility` |
+| PR | __PR__ (docs + throwaway spike only; **not merged**) |
+| Base SHA | `3cf914235f2044c0a7b7a0357b240d6edc1b3086` (`origin/main`, includes merged #1552) |
+| Head SHA | __HEAD__ |
+
+## 1. Scope and constraints honoured
+Read-only inspection of the repo; a throwaway spike under `docs/plans/store/s0-spikes/r2-range/v0/`; this report. **Not done, by instruction:** no bucket created, no Railway
+variable read or changed, no credential printed/logged/committed, no signed URL printed or stored, no production media or customer data, no video endpoint, no migration, no UI,
+no merge/deploy. The sandbox exposes `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` variables that are **not documented as R2 credentials for this task**; they were deliberately
+**not used and not printed** (using unrelated credentials against an object store is outside this brief).
+
+## 2. Inputs reused
+* Phase 2 readiness review (`AWJ_ANIMATED_MEDIA_PHASE2_READINESS.md`, PR #1551, still open): §4 architecture B2, gate **V-G1** ("presigned GET + `Range` — single, suffix, open-ended, past-EOF → 416, `If-Range`, HEAD — on a test bucket with a scoped token"), approvals **#7** (AMEND-1 clarification ADR) and **#11** (R2 test bucket + token).
+* `docs/plans/store/s0-spikes/r2-range/range-probe.php` (S0-B) — extended, not replaced: it exercised the SDK's `GetObject` only on two S3 look-alikes. V0 adds what B2 actually needs: **presigned URLs fetched over plain HTTP by a different process**, expiry, tamper/method confusion, redirects, header hygiene and the SSRF guard.
+
+## 3. Inspection of the current R2 integration (no credentials touched)
+| Finding | Evidence | Consequence for B2 |
+|---|---|---|
+| `R2StorageService` exposes only `put / get / exists / delete / key`; **no `Range`, no URL signing**, `get()` returns the whole body. | `app/Services/R2StorageService.php` | V1 must add a signing method (additive). Laravel never streams video: it will only sign. |
+| Key layout `tenant/{tenantId}/{domain}/{resourceId}/{filename}`; every segment validated (`[A-Za-z0-9][A-Za-z0-9._-]*`, no `..`). Tenant comes only from `TenantContext`. | same | The authorise endpoint derives the key server-side from the resolved tenant + media id — the browser cannot influence the key (tenant isolation preserved). |
+| Client: `region = auto` (default), endpoint from `R2_ENDPOINT`, **`use_path_style_endpoint` defaults to `false`** (virtual-hosted). Settings come from `config('filesystems.disks.r2')` ← env names `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_REGION`, `R2_BUCKET`, `R2_ENDPOINT`, `R2_USE_PATH_STYLE_ENDPOINT` (names read from code; Railway was **not** queried — its API returns values). | `config/filesystems.php` | The probe uses different names (`S3_*`) so a test run can never pick up production settings. It must be run in **both** addressing styles; the app's current style is virtual-hosted. |
+| The repo's own SDK (`aws-sdk-php 3.401.2`) presigns offline with the production client options. For `region=auto` and an `*.r2.cloudflarestorage.com` endpoint it produced, in virtual-hosted mode, `https://<bucket>.<account>.r2.cloudflarestorage.com/<key>` and, in path style, `https://<account>.r2.cloudflarestorage.com/<bucket>/<key>`; both `AWS4-HMAC-SHA256`, scope region `auto`, **`X-Amz-SignedHeaders=host` only**. | executed offline with dummy credentials (nothing sent) | (a) Both host shapes must be allow-listed by the proxy; (b) because only `host` is signed, **`Range`, `If-Range` and conditional headers are not part of the signature**, so one signed URL can serve any range the proxy decides to send; (c) the signer needs no R2 round trip. |
+| Existing private-file stance: no presigned/302/CDN to browsers. | readiness report | B2 keeps URLs server-to-server (the browser never sees an R2 host). |
+
+## 4. What the harness does
+`v0-signer.php` (Laravel's side: app SDK signs and uploads/deletes the disposable objects) + `v0-r2-range-probe.mjs` (the Node proxy's side: `fetch` with `redirect:"manual"`, the browser's `Range`
+headers, no automatic decompression). It runs the plan in §5 against an 8 MiB random object, a 1 KiB second object, and an empty object under `v0-range-probe/<run>/` of the test bucket only, deletes them
+and verifies deletion. Safety by construction: URLs live only in memory (signer → probe over a pipe); provider headers are reduced to an allow-list; error bodies to the S3 `<Code>`; every string is
+scrubbed of credentials, signature parameters and the account id; the result files contain no URL. `README.md` in the spike folder has the exact commands.
+
+## 5. Test matrix
+**R** = required for B2 (a failure is a blocker or needs a proxy-side shim) · **I** = informational (behaviour recorded, shim chosen from it). Columns: *Real R2* — **NOT RUN** for every row;
+*Look-alike* = Scality CloudServer on loopback, SigV4-validating (`result-selftest-scality.json`) — proves the harness works, says **nothing** about R2; *Neg. control* = same store behind a forwarder that drops `Range`.
+
+| ID | Case | Grp | Real R2 | Look-alike | Neg. control | Note / B2 handling |
+|---|---|---|---|---|---|---|
+| R1 | Full GET: 200, `Content-Length`, `Accept-Ranges: bytes`, `ETag`, `Content-Type`, sha256 of body | R | NOT RUN | PASS | PASS | |
+| R2 | `bytes=100-199` → 206, `Content-Range`, 100 B, bytes match | R | NOT RUN | PASS | FAIL | |
+| R3 | `bytes=0-0` → 206, 1 B | R | NOT RUN | PASS | FAIL | |
+| R4 | Safari probe `bytes=0-1` → 206, 2 B | R | NOT RUN | PASS | FAIL | |
+| R5 | Open-ended `bytes=N-500-` → 206 to EOF | R | NOT RUN | PASS | FAIL | |
+| R6 | Suffix `bytes=-500` → 206, last 500 B | R | NOT RUN | PASS | FAIL | |
+| R7 | End beyond EOF → 206 clamped | R | NOT RUN | PASS | FAIL | |
+| R8 | Start == size → 416 | R | NOT RUN | PASS | FAIL | Look-alike answers 416 **without** `Content-Range`; criterion relaxed (see below): proxy synthesises `bytes */N` |
+| R9 | Start > size → 416 | R | NOT RUN | PASS | FAIL | |
+| R10 | Last byte `bytes=N-1-` → 206, 1 B | R | NOT RUN | PASS | FAIL | |
+| R11 | Identical strong, quoted `ETag` on 200 / every 206 / HEAD | R | NOT RUN | PASS | PASS | Treat ETag as opaque (multipart uploads are not MD5) |
+| R12 | `Accept-Encoding: identity` → no `Content-Encoding` on 200/206 (video/mp4) | R | NOT RUN | PASS | PASS | Proxy must send `identity` (Node's default is gzip) |
+| R13 | No 3xx on any correctly signed request (`redirect: manual`) | R | NOT RUN | PASS | PASS | Proxy treats **any** 3xx as failure |
+| R14 | Expired URL → 403, nothing served | R | NOT RUN | PASS | FAIL¹ | TTL 4 s in the harness; production TTL 60–120 s |
+| R15a | Tampered signature → 403 | R | NOT RUN | PASS | PASS | |
+| R15b | Signed for key A, used for key B → 403 | R | NOT RUN | PASS | PASS | Tenant/key isolation at the storage layer |
+| R15c | `X-Amz-Expires` extended after signing → 403 | R | NOT RUN | PASS | PASS | |
+| R15d | Signature removed → 403/400 | R | NOT RUN | PASS | PASS | |
+| R16a | `PUT` with a GET-signed URL → 403, object unchanged | R | NOT RUN | PASS | FAIL¹ | |
+| R16b | `DELETE` with a GET-signed URL → 403, object present | R | NOT RUN | PASS | FAIL¹ | |
+| R17 | Unsigned GET → 403 (bucket private) | R | NOT RUN | PASS | PASS | Needs the owner to keep the test bucket private (no public access, no custom domain) |
+| R18 | No provider response header exposes a credential/signature/URL | R | NOT RUN | PASS | PASS | Proxy forwards a **whitelist** only (`content-type/-length/-range`, `accept-ranges`, `etag`, `last-modified`) |
+| R19 | Offline SSRF host allow-list, 15 cases | R | **PASS (offline)** | **PASS (offline)** | PASS | The only check that needs neither R2 nor credentials; it proves the guard logic, not R2 |
+| R20 | Every signer URL passes the allow-list | R | NOT RUN | PASS | PASS | Virtual-hosted and path-style hosts both pass |
+| I1 | HEAD with a HEAD-signed URL | I | NOT RUN | 200, same metadata | – | B2 does not need HEAD (size/ETag come from the authorise response) |
+| I2 | HEAD with a GET-signed URL | I | NOT RUN | 403 | – | Method is part of the signature |
+| I3 | Multi-range `bytes=0-1,5-6` | I | NOT RUN | 200 full body (Range ignored) | – | Proxy refuses multi-range itself |
+| I4 | Malformed ranges (`abc`, `5-2`, `items=0-1`, `-0`, `--5`, `0-9,`, `Bytes=0-1`, `bytes = 0-1`) | I | NOT RUN | 200 full body for all except `-0` → 416 | – | **Proxy validates `Range` and never forwards anything but one closed/open/suffix range**; otherwise a hostile client could trigger full-object transfers |
+| I5 | Suffix larger than the object | I | NOT RUN | 206 whole object | – | |
+| I6 | `If-Range` (matching / mismatching / date) | I | NOT RUN | **ignored: 206 even for a mismatching ETag** | – | Look-alike ignores `If-Range`; R2's docs do not list it either → **proxy implements `If-Range` itself** against the authorised ETag (keys are immutable) |
+| I7 | `If-Match` wrong / `If-None-Match` current | I | NOT RUN | 412 / 304 | – | |
+| I8 | `Accept-Encoding: gzip` on video/mp4 | I | NOT RUN | no `Content-Encoding` | – | |
+| I9 | Slow download that outlives the URL's expiry | I | NOT RUN | completes (8 MiB read slowly over ≈ 8 s with a 4 s TTL) | – | Signature is checked at request start; the proxy sets its own total deadline anyway |
+| I10 | Plain `http://` to the real endpoint | I | NOT RUN | skipped (loopback) | – | Proxy refuses non-https before connecting (R19) |
+| I11 | 8 parallel ranges | I | NOT RUN | PASS | – | |
+| I12 | Empty object: full GET 200 / `bytes=0-0` | I | NOT RUN | 200 len 0 / 416 | – | |
+| I13 | 8 KiB `Range` header | I | NOT RUN | 200 (ignored) | – | Proxy caps header length |
+
+¹ Fails on the negative control only because the check reads the object back with a `Range` request, which that forwarder drops — a consequence, not a separate defect.
+
+**Criterion change, disclosed:** R8 originally required the provider to send `Content-Range: bytes */N`. The look-alike's `416 InvalidRange` carries no such header, and the proxy knows `N` from the
+authorise response, so the criterion was relaxed to "416" (provider behaviour is recorded in `providerSendsContentRangeStar`). The change was made after seeing the look-alike, **before any R2 run**.
+
+**Look-alike result: 24/24 required pass; negative control: 12/24 fail as designed** (all of R2–R10 plus the Range-dependent R14/R16a/R16b) — the probe detects a store that ignores `Range`.
+
+## 6. Blockers requiring owner action
+| # | Action | Why | Constraint |
+|---|---|---|---|
+| 1 | **Create an isolated, private, empty R2 bucket** (e.g. `awj-v0-range-test`), no public access, no custom domain | Source of truth for V-G1; the harness refuses to need anything else | I may not create buckets (instruction). Approval **#11** in the readiness report |
+| 2 | **Create an R2 API token scoped to that bucket only** — *Object Read & Write*, no account-wide scope, short expiry (days) | The harness uploads/deletes only `v0-range-probe/…` | Never paste it into chat |
+| 3 | Put these in the **sandbox environment** as variables (Environment settings → Network secrets / environment variables): `S3_ENDPOINT` (`https://<account>.r2.cloudflarestorage.com`), `S3_KEY`, `S3_SECRET`, `S3_BUCKET`, `S3_REGION=auto` | Names differ from the app's `R2_*` on purpose. A new session picks them up | — |
+| 4 | **Allow outbound HTTPS to `*.r2.cloudflarestorage.com`** (and the `<bucket>.<account>.r2.cloudflarestorage.com` host) | Egress to this host family is **unverified**: general internet works through the sandbox proxy, but a probe of a made-up account host failed at TLS and that does not prove or disprove policy | Network access is an environment setting |
+| 5 | Alternative to 3–4: **run the harness yourself** (`README.md`) and send back only `result-r2-*.json` | The output is credential-free and URL-free by construction | Preferred if you do not want secrets in the sandbox |
+| 6 | Afterwards: **revoke the token and delete the bucket** | Hygiene | — |
+| 7 | Separate, later: approval **#7** (AMEND-1 ADR: server-to-server signed fetch is not "direct R2 exposure") and **#6** (internal authorise endpoint) | Needed before V1/V2, not for V0 | Not part of this deliverable |
+
+## 7. Decision rules for when real R2 results exist
+| Outcome | Meaning |
+|---|---|
+| All R pass in both addressing styles | **B2 feasible** → V1 (authorise endpoint + presign, flag off) may be scheduled |
+| R8 without `Content-Range` / `If-Range` ignored / multi-range or malformed ranges not rejected by R2 | **Not blockers** — handled by proxy-side shims already designed (synthesise 416 header, own `If-Range`, own `Range` validator) |
+| Any of R2–R7, R9, R10 wrong (206 / `Content-Range` / clamping) or R11 unstable ETag | Blocker unless a safe shim exists → **B2 NO-GO**; do **not** fall back to Laravel streaming |
+| R13 (any 3xx), R14 (expiry not enforced), R15–R17 (acceptance of tampered/unsigned/wrong-method requests) or R18 | **Security blocker** → NO-GO until understood |
+| Different results between path-style and virtual-hosted | Pick one style for the signer and pin it in V1 |
+
+## 8. Unresolved risks
+* **Everything R2-specific is unverified** (Range/416/suffix/clamping, `If-Range`, multi-range, conditional requests, expiry enforcement, header set, `Content-Encoding`, redirects, plain-http behaviour, the ETag format of multipart-uploaded video).
+* Cloudflare's documented facts (from the readiness review, not re-fetched here): presigned URLs work **only on the S3 API domain** (not custom domains); GET/HEAD/PUT/DELETE; expiry 1 s–7 d; they are bearer tokens; `GetObject` supports `Range`, `If-Match`, `If-None-Match`; `If-Range` is **not listed**.
+* The harness runs from this sandbox's network. Latency/throughput from the Railway edge to R2 is **not** measured by V0 (that belongs to V-G3/V-G7 with the S0-E rig).
+* The look-alike is Scality CloudServer; its `If-Range` and malformed-range behaviour are not a model of R2 or AWS S3.
+* Real browsers (Safari/iOS range sequences) are unverified — V0 only covers the HTTP contract.
+* Cost/abuse: each playback authorisation is a cheap signing call, but a client rotating ranges can generate many R2 Class-B operations; throttling and the authorisation cache are V1/V2 design items.
+
+## 9. Reproduce
+```
+node docs/plans/store/s0-spikes/r2-range/v0/v0-r2-range-probe.mjs --plan
+node docs/plans/store/s0-spikes/r2-range/v0/v0-r2-range-probe.mjs --hostlist          # 15/15 pass, offline
+# self-test on a local look-alike (not R2):  docker run zenko/cloudserver (S3BACKEND=mem) then see README.md
+# real R2 (after §6):  S3_PATH_STYLE=1 …probe.mjs --label=r2-pathstyle --autoload=…/vendor/autoload.php ; then S3_PATH_STYLE=0 … --label=r2-virtualhosted
+```
+
+## 10. Files
+`docs/plans/store/s0-spikes/r2-range/v0/{README.md, v0-signer.php, v0-r2-range-probe.mjs, negative-control-proxy.mjs, result-selftest-scality.json, result-negative-control-no-range.json}` and this report. No application code changed.
+
+## 11. GO / NO-GO
+| Item | Recommendation |
+|---|---|
+| Run V0 on real R2 | **GO as soon as §6 items 1–4 (or 5) are done** — harness ready, one command per addressing style |
+| Architecture B2 | **UNPROVEN** — remains the recommended design; nothing observed contradicts it |
+| V1 (authorise endpoint + presign) | **NO-GO until V0 passes on real R2** (and approvals #6/#7) |
+| Any video endpoint, DB change, UI, rollout | **NO-GO** |
+| Laravel streaming fallback | **Never** (S0-E) |
+
+## 12. Required approvals
+Owner action only (§6): R2 test bucket + scoped token (#11), network egress to the R2 host, token revocation afterwards. No code, DB, API or production approval is requested by this report.
