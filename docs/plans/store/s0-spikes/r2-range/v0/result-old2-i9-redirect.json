@@ -1,0 +1,838 @@
+{
+  "label": "old2-i9-redirect",
+  "generatedAt": "2026-10-17T12:16:03.265Z",
+  "provider": "LOCAL LOOK-ALIKE (not R2)",
+  "endpointHost": "127.0.0.1:8001",
+  "addressingStyle": "path",
+  "objectBytes": 4194304,
+  "ttlSeconds": 3,
+  "runId": "be7d2ae27b20",
+  "cleanedUp": true,
+  "summary": {
+    "required": 24,
+    "requiredPassed": 24,
+    "requiredFailed": [],
+    "info": 14
+  },
+  "results": [
+    {
+      "id": "R1",
+      "group": "R",
+      "description": "Full GET with a presigned URL → 200, Content-Length = size, Accept-Ranges: bytes, ETag, Content-Type, body sha256 matches",
+      "pass": true,
+      "observed": {
+        "status": 200,
+        "headers": {
+          "accept-ranges": "bytes",
+          "content-length": "4194304",
+          "content-type": "video/mp4",
+          "etag": "\"18299f1f455a070230687507625fbc12\"",
+          "last-modified": "Sat, 17 Oct 2026 12:15:56 GMT",
+          "server": "S3 Server",
+          "x-amz-id-2": "7d4f6777dd4eb6b6808a",
+          "x-amz-request-id": "7d4f6777dd4eb6b6808a"
+        },
+        "bodyLen": 4194304
+      }
+    },
+    {
+      "id": "R2",
+      "group": "R",
+      "description": "Range bytes=100-199 → 206, Content-Range \"bytes 100-199/N\", 100 bytes, body matches",
+      "pass": true,
+      "observed": {
+        "range": "bytes=100-199",
+        "status": 206,
+        "headers": {
+          "accept-ranges": "bytes",
+          "content-length": "100",
+          "content-range": "bytes 100-199/4194304",
+          "content-type": "video/mp4",
+          "etag": "\"18299f1f455a070230687507625fbc12\"",
+          "last-modified": "Sat, 17 Oct 2026 12:15:56 GMT",
+          "server": "S3 Server",
+          "x-amz-id-2": "21f8b1b0204db2812a6b",
+          "x-amz-request-id": "21f8b1b0204db2812a6b"
+        },
+        "bodyLen": 100
+      }
+    },
+    {
+      "id": "R3",
+      "group": "R",
+      "description": "Range bytes=0-0 → 206, 1 byte",
+      "pass": true,
+      "observed": {
+        "range": "bytes=0-0",
+        "status": 206,
+        "headers": {
+          "accept-ranges": "bytes",
+          "content-length": "1",
+          "content-range": "bytes 0-0/4194304",
+          "content-type": "video/mp4",
+          "etag": "\"18299f1f455a070230687507625fbc12\"",
+          "last-modified": "Sat, 17 Oct 2026 12:15:56 GMT",
+          "server": "S3 Server",
+          "x-amz-id-2": "899e9abf3347ac7a889d",
+          "x-amz-request-id": "899e9abf3347ac7a889d"
+        },
+        "bodyLen": 1
+      }
+    },
+    {
+      "id": "R4",
+      "group": "R",
+      "description": "Safari probe bytes=0-1 → 206, 2 bytes",
+      "pass": true,
+      "observed": {
+        "range": "bytes=0-1",
+        "status": 206,
+        "headers": {
+          "accept-ranges": "bytes",
+          "content-length": "2",
+          "content-range": "bytes 0-1/4194304",
+          "content-type": "video/mp4",
+          "etag": "\"18299f1f455a070230687507625fbc12\"",
+          "last-modified": "Sat, 17 Oct 2026 12:15:56 GMT",
+          "server": "S3 Server",
+          "x-amz-id-2": "cd93a429b34c805397c9",
+          "x-amz-request-id": "cd93a429b34c805397c9"
+        },
+        "bodyLen": 2
+      }
+    },
+    {
+      "id": "R5",
+      "group": "R",
+      "description": "Open-ended bytes=<N-500>- → 206 to the last byte",
+      "pass": true,
+      "observed": {
+        "range": "bytes=4193804-",
+        "status": 206,
+        "headers": {
+          "accept-ranges": "bytes",
+          "content-length": "500",
+          "content-range": "bytes 4193804-4194303/4194304",
+          "content-type": "video/mp4",
+          "etag": "\"18299f1f455a070230687507625fbc12\"",
+          "last-modified": "Sat, 17 Oct 2026 12:15:56 GMT",
+          "server": "S3 Server",
+          "x-amz-id-2": "ac4c9db3214fb5dd7feb",
+          "x-amz-request-id": "ac4c9db3214fb5dd7feb"
+        },
+        "bodyLen": 500
+      }
+    },
+    {
+      "id": "R6",
+      "group": "R",
+      "description": "Suffix bytes=-500 → 206, last 500 bytes",
+      "pass": true,
+      "observed": {
+        "range": "bytes=-500",
+        "status": 206,
+        "headers": {
+          "accept-ranges": "bytes",
+          "content-length": "500",
+          "content-range": "bytes 4193804-4194303/4194304",
+          "content-type": "video/mp4",
+          "etag": "\"18299f1f455a070230687507625fbc12\"",
+          "last-modified": "Sat, 17 Oct 2026 12:15:56 GMT",
+          "server": "S3 Server",
+          "x-amz-id-2": "1b15ba08a54ca8d09c5b",
+          "x-amz-request-id": "1b15ba08a54ca8d09c5b"
+        },
+        "bodyLen": 500
+      }
+    },
+    {
+      "id": "R7",
+      "group": "R",
+      "description": "End beyond EOF bytes=0-<2N> → 206 clamped to N-1",
+      "pass": true,
+      "observed": {
+        "range": "bytes=0-8388608",
+        "status": 206,
+        "headers": {
+          "accept-ranges": "bytes",
+          "content-length": "4194304",
+          "content-range": "bytes 0-4194303/4194304",
+          "content-type": "video/mp4",
+          "etag": "\"18299f1f455a070230687507625fbc12\"",
+          "last-modified": "Sat, 17 Oct 2026 12:15:56 GMT",
+          "server": "S3 Server",
+          "x-amz-id-2": "447b68a4334e9f7fd026",
+          "x-amz-request-id": "447b68a4334e9f7fd026"
+        },
+        "bodyLen": 4194304
+      }
+    },
+    {
+      "id": "R8",
+      "group": "R",
+      "description": "Start == size → 416 (a Content-Range \"bytes */N\" from the provider is recorded, not required: the proxy knows N from the authorise response and always synthesises it)",
+      "pass": true,
+      "observed": {
+        "range": "bytes=4194304-4194314",
+        "providerSendsContentRangeStar": false,
+        "status": 416,
+        "errorCode": "InvalidRange",
+        "headers": {
+          "content-length": "201",
+          "content-type": "application/xml",
+          "server": "S3 Server",
+          "x-amz-id-2": "a411d608264ab3fd87f8",
+          "x-amz-request-id": "a411d608264ab3fd87f8"
+        },
+        "bodyLen": 201
+      },
+      "note": "Criterion relaxed after the local self-test: S3-compatible servers answer 416 with an XML InvalidRange error and no Content-Range; the proxy builds the header itself."
+    },
+    {
+      "id": "R9",
+      "group": "R",
+      "description": "Start > size → 416",
+      "pass": true,
+      "observed": {
+        "range": "bytes=4199304-",
+        "status": 416,
+        "errorCode": "InvalidRange",
+        "headers": {
+          "content-length": "201",
+          "content-type": "application/xml",
+          "server": "S3 Server",
+          "x-amz-id-2": "e85a36511b419feed561",
+          "x-amz-request-id": "e85a36511b419feed561"
+        },
+        "bodyLen": 201
+      }
+    },
+    {
+      "id": "R10",
+      "group": "R",
+      "description": "Last byte bytes=<N-1>- → 206, 1 byte",
+      "pass": true,
+      "observed": {
+        "range": "bytes=4194303-",
+        "status": 206,
+        "headers": {
+          "accept-ranges": "bytes",
+          "content-length": "1",
+          "content-range": "bytes 4194303-4194303/4194304",
+          "content-type": "video/mp4",
+          "etag": "\"18299f1f455a070230687507625fbc12\"",
+          "last-modified": "Sat, 17 Oct 2026 12:15:56 GMT",
+          "server": "S3 Server",
+          "x-amz-id-2": "acff58bcbe4e9a408512",
+          "x-amz-request-id": "acff58bcbe4e9a408512"
+        },
+        "bodyLen": 1
+      }
+    },
+    {
+      "id": "I1",
+      "group": "I",
+      "description": "HEAD with a HEAD-signed URL → 200 with the same metadata",
+      "pass": true,
+      "observed": {
+        "status": 200,
+        "headers": {
+          "accept-ranges": "bytes",
+          "content-length": "4194304",
+          "content-type": "video/mp4",
+          "etag": "\"18299f1f455a070230687507625fbc12\"",
+          "last-modified": "Sat, 17 Oct 2026 12:15:56 GMT",
+          "server": "S3 Server",
+          "x-amz-id-2": "8d36a071ff40ae93147d",
+          "x-amz-request-id": "8d36a071ff40ae93147d"
+        },
+        "bodyLen": 0
+      }
+    },
+    {
+      "id": "R12",
+      "group": "R",
+      "description": "With Accept-Encoding: identity the 200 and 206 carry no Content-Encoding (video/mp4)",
+      "pass": true,
+      "observed": {
+        "full": null,
+        "range": null
+      }
+    },
+    {
+      "id": "R17",
+      "group": "R",
+      "description": "Unsigned GET of the same object → 403 (bucket is private)",
+      "pass": true,
+      "observed": {
+        "status": 403,
+        "errorCode": "AccessDenied",
+        "headers": {
+          "content-length": "174",
+          "content-type": "application/xml",
+          "server": "S3 Server",
+          "x-amz-id-2": "3890ab8f0e40b3c2d64c",
+          "x-amz-request-id": "3890ab8f0e40b3c2d64c"
+        },
+        "bodyLen": 174
+      }
+    },
+    {
+      "id": "R15a",
+      "group": "R",
+      "description": "Tampered signature → 403",
+      "pass": true,
+      "observed": {
+        "status": 403,
+        "errorCode": "SignatureDoesNotMatch",
+        "headers": {
+          "content-length": "248",
+          "content-type": "application/xml",
+          "server": "S3 Server",
+          "x-amz-id-2": "63cf9c956041bae6fe7b",
+          "x-amz-request-id": "63cf9c956041bae6fe7b"
+        },
+        "bodyLen": 248
+      }
+    },
+    {
+      "id": "R15b",
+      "group": "R",
+      "description": "Signed for key A, used for key B → 403",
+      "pass": true,
+      "observed": {
+        "status": 403,
+        "errorCode": "SignatureDoesNotMatch",
+        "headers": {
+          "content-length": "248",
+          "content-type": "application/xml",
+          "server": "S3 Server",
+          "x-amz-id-2": "ecfc72f8c544a6e02e94",
+          "x-amz-request-id": "ecfc72f8c544a6e02e94"
+        },
+        "bodyLen": 248
+      }
+    },
+    {
+      "id": "R15c",
+      "group": "R",
+      "description": "X-Amz-Expires extended after signing → 403",
+      "pass": true,
+      "observed": {
+        "status": 403,
+        "errorCode": "SignatureDoesNotMatch",
+        "headers": {
+          "content-length": "248",
+          "content-type": "application/xml",
+          "server": "S3 Server",
+          "x-amz-id-2": "06d396e61a4abb27667a",
+          "x-amz-request-id": "06d396e61a4abb27667a"
+        },
+        "bodyLen": 248
+      }
+    },
+    {
+      "id": "R15d",
+      "group": "R",
+      "description": "Signature removed → 403/400",
+      "pass": true,
+      "observed": {
+        "status": 400,
+        "errorCode": "InvalidArgument",
+        "headers": {
+          "content-length": "180",
+          "content-type": "application/xml",
+          "server": "S3 Server",
+          "x-amz-id-2": "994d3eeb42428ab2b82b",
+          "x-amz-request-id": "994d3eeb42428ab2b82b"
+        },
+        "bodyLen": 180
+      }
+    },
+    {
+      "id": "R16a",
+      "group": "R",
+      "description": "PUT with a GET-signed URL → 403, object unchanged",
+      "pass": true,
+      "observed": {
+        "put": {
+          "status": 403,
+          "errorCode": "SignatureDoesNotMatch",
+          "headers": {
+            "content-length": "248",
+            "content-type": "application/xml",
+            "server": "S3 Server",
+            "x-amz-id-2": "5474db2df641af6d7fc5",
+            "x-amz-request-id": "5474db2df641af6d7fc5"
+          },
+          "bodyLen": 248
+        },
+        "objectUnchanged": true
+      }
+    },
+    {
+      "id": "R16b",
+      "group": "R",
+      "description": "DELETE with a GET-signed URL → 403, object still present",
+      "pass": true,
+      "observed": {
+        "delete": {
+          "status": 403,
+          "errorCode": "SignatureDoesNotMatch",
+          "headers": {
+            "content-length": "248",
+            "content-type": "application/xml",
+            "server": "S3 Server",
+            "x-amz-id-2": "3be7af0b2443bb1f4d2e",
+            "x-amz-request-id": "3be7af0b2443bb1f4d2e"
+          },
+          "bodyLen": 248
+        },
+        "stillPresent": true
+      }
+    },
+    {
+      "id": "I2",
+      "group": "I",
+      "description": "HEAD with a GET-signed URL (record)",
+      "pass": null,
+      "observed": {
+        "status": 403,
+        "headers": {
+          "content-length": "248",
+          "content-type": "application/xml",
+          "server": "S3 Server",
+          "x-amz-id-2": "bef7ab9bec45b64678b0",
+          "x-amz-request-id": "bef7ab9bec45b64678b0"
+        },
+        "bodyLen": 0
+      },
+      "note": "S3 signs the HTTP method; a GET-signed URL is expected to be refused for HEAD. B2 needs no HEAD at the proxy (size/ETag come from the authorise response)."
+    },
+    {
+      "id": "I3",
+      "group": "I",
+      "description": "Multi-range bytes=0-1,5-6 (record; B2 proxy will refuse multi-range)",
+      "pass": null,
+      "observed": {
+        "status": 200,
+        "headers": {
+          "accept-ranges": "bytes",
+          "content-length": "4194304",
+          "content-type": "video/mp4",
+          "etag": "\"18299f1f455a070230687507625fbc12\"",
+          "last-modified": "Sat, 17 Oct 2026 12:15:56 GMT",
+          "server": "S3 Server",
+          "x-amz-id-2": "0650bbe40c41b5d5e138",
+          "x-amz-request-id": "0650bbe40c41b5d5e138"
+        },
+        "bodyLen": 4194304,
+        "singleRangeServed": false
+      }
+    },
+    {
+      "id": "I4",
+      "group": "I",
+      "description": "Malformed ranges: bytes=abc, bytes=5-2, items=0-1, bytes=-0, bytes=--5, bytes=0-9, , Bytes=0-1 (record)",
+      "pass": null,
+      "observed": [
+        {
+          "range": "bytes=abc",
+          "status": 200,
+          "contentRange": null,
+          "bodyLen": 4194304
+        },
+        {
+          "range": "bytes=5-2",
+          "status": 200,
+          "contentRange": null,
+          "bodyLen": 4194304
+        },
+        {
+          "range": "items=0-1",
+          "status": 200,
+          "contentRange": null,
+          "bodyLen": 4194304
+        },
+        {
+          "range": "bytes=-0",
+          "status": 416,
+          "contentRange": null,
+          "bodyLen": 201,
+          "errorCode": "InvalidRange"
+        },
+        {
+          "range": "bytes=--5",
+          "status": 200,
+          "contentRange": null,
+          "bodyLen": 4194304
+        },
+        {
+          "range": "bytes=0-9,",
+          "status": 200,
+          "contentRange": null,
+          "bodyLen": 4194304
+        },
+        {
+          "range": "Bytes=0-1",
+          "status": 200,
+          "contentRange": null,
+          "bodyLen": 4194304
+        },
+        {
+          "range": "bytes = 0-1",
+          "status": 200,
+          "contentRange": null,
+          "bodyLen": 4194304
+        }
+      ],
+      "note": "B2: the proxy validates Range itself (single closed/open/suffix range only) and never forwards anything else."
+    },
+    {
+      "id": "I5",
+      "group": "I",
+      "description": "Suffix larger than the object bytes=-<N+10> (record)",
+      "pass": null,
+      "observed": {
+        "status": 206,
+        "headers": {
+          "accept-ranges": "bytes",
+          "content-length": "4194304",
+          "content-range": "bytes 0-4194303/4194304",
+          "content-type": "video/mp4",
+          "etag": "\"18299f1f455a070230687507625fbc12\"",
+          "last-modified": "Sat, 17 Oct 2026 12:15:56 GMT",
+          "server": "S3 Server",
+          "x-amz-id-2": "487591c52c49942ecf64",
+          "x-amz-request-id": "487591c52c49942ecf64"
+        },
+        "bodyLen": 4194304
+      }
+    },
+    {
+      "id": "I6",
+      "group": "I",
+      "description": "If-Range: matching ETag → 206 ; mismatching ETag → 200 (RFC) or ignored ; HTTP-date (record)",
+      "pass": null,
+      "observed": {
+        "matching": {
+          "status": 206,
+          "headers": {
+            "accept-ranges": "bytes",
+            "content-length": "10",
+            "content-range": "bytes 0-9/4194304",
+            "content-type": "video/mp4",
+            "etag": "\"18299f1f455a070230687507625fbc12\"",
+            "last-modified": "Sat, 17 Oct 2026 12:15:56 GMT",
+            "server": "S3 Server",
+            "x-amz-id-2": "0f31630dca4a800fd5e2",
+            "x-amz-request-id": "0f31630dca4a800fd5e2"
+          },
+          "bodyLen": 10
+        },
+        "mismatching": {
+          "status": 206,
+          "headers": {
+            "accept-ranges": "bytes",
+            "content-length": "10",
+            "content-range": "bytes 0-9/4194304",
+            "content-type": "video/mp4",
+            "etag": "\"18299f1f455a070230687507625fbc12\"",
+            "last-modified": "Sat, 17 Oct 2026 12:15:56 GMT",
+            "server": "S3 Server",
+            "x-amz-id-2": "46729e8e7148ba089518",
+            "x-amz-request-id": "46729e8e7148ba089518"
+          },
+          "bodyLen": 10
+        },
+        "httpDate": {
+          "status": 206,
+          "headers": {
+            "accept-ranges": "bytes",
+            "content-length": "10",
+            "content-range": "bytes 0-9/4194304",
+            "content-type": "video/mp4",
+            "etag": "\"18299f1f455a070230687507625fbc12\"",
+            "last-modified": "Sat, 17 Oct 2026 12:15:56 GMT",
+            "server": "S3 Server",
+            "x-amz-id-2": "a22bee71b6489700e90b",
+            "x-amz-request-id": "a22bee71b6489700e90b"
+          },
+          "bodyLen": 10
+        },
+        "ifRangeHonoured": false
+      },
+      "note": "If the mismatching ETag still yields 206, R2 ignores If-Range → the proxy must implement If-Range itself against the authorised ETag (immutable keys make this cheap)."
+    },
+    {
+      "id": "I7",
+      "group": "I",
+      "description": "If-Match wrong → 412 ; If-None-Match current (with Range) → 304 (record)",
+      "pass": null,
+      "observed": {
+        "ifMatchWrong": {
+          "status": 412,
+          "errorCode": "PreconditionFailed",
+          "headers": {
+            "content-length": "228",
+            "content-type": "application/xml",
+            "server": "S3 Server",
+            "x-amz-id-2": "87f6e8e4554fb345e500",
+            "x-amz-request-id": "87f6e8e4554fb345e500"
+          },
+          "bodyLen": 228
+        },
+        "ifNoneMatchCurrent": {
+          "status": 304,
+          "headers": {
+            "server": "S3 Server",
+            "x-amz-id-2": "709cc67e4847a603c6ec",
+            "x-amz-request-id": "709cc67e4847a603c6ec"
+          },
+          "bodyLen": 0
+        }
+      }
+    },
+    {
+      "id": "I8",
+      "group": "I",
+      "description": "Accept-Encoding: gzip on video/mp4 → Content-Encoding? (record)",
+      "pass": null,
+      "observed": {
+        "status": 206,
+        "headers": {
+          "accept-ranges": "bytes",
+          "content-length": "100",
+          "content-range": "bytes 0-99/4194304",
+          "content-type": "video/mp4",
+          "etag": "\"18299f1f455a070230687507625fbc12\"",
+          "last-modified": "Sat, 17 Oct 2026 12:15:56 GMT",
+          "server": "S3 Server",
+          "x-amz-id-2": "278f69ad7b4d9243dbf9",
+          "x-amz-request-id": "278f69ad7b4d9243dbf9"
+        },
+        "bodyLen": 100,
+        "contentEncoding": null
+      }
+    },
+    {
+      "id": "I11",
+      "group": "I",
+      "description": "8 parallel ranges all correct",
+      "pass": true,
+      "observed": {
+        "statuses": [
+          206,
+          206,
+          206,
+          206,
+          206,
+          206,
+          206,
+          206
+        ]
+      }
+    },
+    {
+      "id": "I12",
+      "group": "I",
+      "description": "Empty object: full GET 200 len 0 ; bytes=0-0 → 416 (record)",
+      "pass": null,
+      "observed": {
+        "full": {
+          "status": 200,
+          "headers": {
+            "accept-ranges": "bytes",
+            "content-length": "0",
+            "content-type": "video/mp4",
+            "etag": "\"d41d8cd98f00b204e9800998ecf8427e\"",
+            "last-modified": "Sat, 17 Oct 2026 12:15:56 GMT",
+            "server": "S3 Server",
+            "x-amz-id-2": "a27703a84449bdcf01ec",
+            "x-amz-request-id": "a27703a84449bdcf01ec"
+          },
+          "bodyLen": 0
+        },
+        "range0": {
+          "status": 416,
+          "errorCode": "InvalidRange",
+          "headers": {
+            "content-length": "201",
+            "content-type": "application/xml",
+            "server": "S3 Server",
+            "x-amz-id-2": "e73744959843ba26a0fa",
+            "x-amz-request-id": "e73744959843ba26a0fa"
+          },
+          "bodyLen": 201
+        }
+      }
+    },
+    {
+      "id": "I13",
+      "group": "I",
+      "description": "Oversized Range header (8 KiB) (record)",
+      "pass": null,
+      "observed": {
+        "status": 200,
+        "headers": {
+          "accept-ranges": "bytes",
+          "content-length": "4194304",
+          "content-type": "video/mp4",
+          "etag": "\"18299f1f455a070230687507625fbc12\"",
+          "last-modified": "Sat, 17 Oct 2026 12:15:56 GMT",
+          "server": "S3 Server",
+          "x-amz-id-2": "bd82ae9cae49937403bd",
+          "x-amz-request-id": "bd82ae9cae49937403bd"
+        },
+        "bodyLen": 4194304
+      }
+    },
+    {
+      "id": "I10",
+      "group": "I",
+      "description": "Plain http:// to the real https endpoint (record: refused / redirected to https is ACCEPTABLE and does not affect R13) — remote endpoints only",
+      "pass": null,
+      "observed": {
+        "skipped": "loopback look-alike"
+      }
+    },
+    {
+      "id": "R14",
+      "group": "R",
+      "description": "Expired URL (TTL elapsed) → 403, nothing served",
+      "pass": true,
+      "observed": {
+        "before": {
+          "status": 206,
+          "headers": {
+            "accept-ranges": "bytes",
+            "content-length": "10",
+            "content-range": "bytes 0-9/4194304",
+            "content-type": "video/mp4",
+            "etag": "\"18299f1f455a070230687507625fbc12\"",
+            "last-modified": "Sat, 17 Oct 2026 12:15:56 GMT",
+            "server": "S3 Server",
+            "x-amz-id-2": "21a67443e340927e7536",
+            "x-amz-request-id": "21a67443e340927e7536"
+          },
+          "bodyLen": 10
+        },
+        "afterTtl": {
+          "status": 403,
+          "errorCode": "RequestTimeTooSkewed",
+          "headers": {
+            "content-length": "244",
+            "content-type": "application/xml",
+            "server": "S3 Server",
+            "x-amz-id-2": "4d3f37cf104681ec7a51",
+            "x-amz-request-id": "4d3f37cf104681ec7a51"
+          },
+          "bodyLen": 244
+        },
+        "ttlSeconds": 3
+      }
+    },
+    {
+      "id": "I9",
+      "group": "I",
+      "description": "Download started before expiry and still running after it (record whether it completes)",
+      "pass": null,
+      "observed": {
+        "status": 302,
+        "startedBeforeExpiry": true,
+        "ranPastTtlMs": 5012,
+        "receivedBytes": 0,
+        "completed": false,
+        "error": null
+      },
+      "note": "S3/R2 validate the signature when the request starts; whether an in-flight body survives expiry is recorded here. The proxy sets its own total deadline anyway."
+    },
+    {
+      "id": "R13",
+      "group": "R",
+      "description": "No 3xx on any correctly signed HTTPS request (redirect: manual). Negative controls and the informational I10 probe never feed this gate",
+      "pass": true,
+      "observed": {
+        "pass": true,
+        "signedRequests": 41,
+        "signed3xx": [],
+        "negativeRedirects": 0,
+        "informationalRedirects": []
+      }
+    },
+    {
+      "id": "R11",
+      "group": "R",
+      "description": "One strong, quoted ETag on EVERY successful response for the object: the 200, every 206 (closed, open-ended, suffix, EOF-clamped, If-Range, parallel…) and the HEAD",
+      "pass": true,
+      "observed": {
+        "pass": true,
+        "judged": 34,
+        "distinctEtags": [
+          "\"18299f1f455a070230687507625fbc12\""
+        ],
+        "missing": [],
+        "noEtag": [],
+        "different": [],
+        "weak": [],
+        "putEtag": "18299f1f455a070230687507625fbc12"
+      }
+    },
+    {
+      "id": "R18",
+      "group": "R",
+      "description": "No provider response header NAME or VALUE exposes a credential, a signature, SigV4 material or the signed URL (every header of every response is scanned)",
+      "pass": true,
+      "observed": {
+        "providerHeaderNames": [
+          "accept-ranges",
+          "connection",
+          "content-length",
+          "content-range",
+          "content-type",
+          "date",
+          "etag",
+          "keep-alive",
+          "last-modified",
+          "location",
+          "server",
+          "transfer-encoding",
+          "x-amz-id-2",
+          "x-amz-request-id"
+        ],
+        "suspiciousNames": [],
+        "valueLeaks": [],
+        "responsesScanned": 50
+      }
+    },
+    {
+      "id": "I14",
+      "group": "I",
+      "description": "Provider ERROR BODIES that echo credential or signature material (kinds only; the proxy must never forward upstream bodies)",
+      "pass": null,
+      "observed": {
+        "bodyLeakKinds": []
+      },
+      "note": "Informational: some S3 implementations echo the access key id or string-to-sign in error documents. The proxy never forwards upstream bodies (empty uniform failures), so this is a log-hygiene note."
+    },
+    {
+      "id": "R19",
+      "group": "R",
+      "description": "Host allow-list (offline, 15 cases) accepts only the endpoint or <bucket>.<endpoint>, https, no userinfo/port tricks",
+      "pass": true,
+      "observed": {
+        "cases": 15,
+        "failed": []
+      }
+    },
+    {
+      "id": "R20",
+      "group": "R",
+      "description": "Every URL the signer produced passes the host allow-list",
+      "pass": true,
+      "observed": {
+        "urls": 4
+      }
+    }
+  ]
+}

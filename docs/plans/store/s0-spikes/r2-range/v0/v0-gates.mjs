@@ -120,3 +120,16 @@ export function classifyLocation(location, endpointHost) {
     return u.protocol === 'https:' ? 'other-host-https' : `non-https(${u.protocol.replace(':', '')})`;
   } catch { return 'unparseable'; }
 }
+
+/**
+ * Cleanup verification: every disposable test object must be DELETED and then CONFIRMED gone (HEAD → 404). A delete that errored, an object that is still
+ * there, or a verification that could not be completed (HEAD answered anything but 404 — e.g. 403/500/network) all leave the owner's bucket in an unknown
+ * state, so the run must exit nonzero even when every protocol gate passed. Labels only; never a key.
+ * @param {{label: string, deleteOk: boolean, headStatus: number|null}[]} entries  an empty list (nothing was created) is a clean state
+ */
+export function cleanupGate(entries) {
+  const remaining = entries.filter((e) => e.headStatus === 200).map((e) => e.label);
+  const unverified = entries.filter((e) => e.headStatus !== 200 && e.headStatus !== 404).map((e) => e.label);
+  const deleteFailed = entries.filter((e) => !e.deleteOk).map((e) => e.label);
+  return { pass: remaining.length === 0 && unverified.length === 0, verified: remaining.length === 0 && unverified.length === 0, objects: entries.length, remaining, unverified, deleteFailed };
+}

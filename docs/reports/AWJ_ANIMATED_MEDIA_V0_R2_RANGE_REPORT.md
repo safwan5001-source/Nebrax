@@ -58,9 +58,9 @@ scrubbed of credentials, signature parameters and the account id; the result fil
 | R8 | Start == size → 416 | R | NOT RUN | PASS | FAIL | Look-alike answers 416 **without** `Content-Range`; criterion relaxed (see below): proxy synthesises `bytes */N` |
 | R9 | Start > size → 416 | R | NOT RUN | PASS | FAIL | |
 | R10 | Last byte `bytes=N-1-` → 206, 1 B | R | NOT RUN | PASS | FAIL | |
-| R11 | One strong, quoted `ETag` on **every** successful response: the 200, every 206 (closed, open-ended, suffix, EOF-clamped, If-Range, parallel…) and the HEAD; a missing required observation fails | R | NOT RUN | PASS (34 responses, 1 ETag) | PASS | Treat ETag as opaque (multipart uploads are not MD5). *Fixed after review — see §5a* |
+| R11 | One strong, quoted `ETag` on **every** successful response: the 200, every 206 (closed, open-ended, suffix, EOF-clamped, If-Range, parallel…) and the HEAD; a missing required observation fails | R | NOT RUN | PASS (35 responses incl. I9, 1 ETag) | PASS | Treat ETag as opaque (multipart uploads are not MD5). *Fixed after review — see §5a* |
 | R12 | `Accept-Encoding: identity` → no `Content-Encoding` on 200/206 (video/mp4) | R | NOT RUN | PASS | PASS | Proxy must send `identity` (Node's default is gzip) |
-| R13 | No 3xx on any correctly signed **HTTPS** request (`redirect: manual`); negative controls and the informational I10 plain-http probe never feed this gate | R | NOT RUN | PASS (41 signed requests) | PASS | Proxy treats **any** 3xx as failure. *Fixed after review — see §5a* |
+| R13 | No 3xx on any correctly signed **HTTPS** request (`redirect: manual`); negative controls and the informational I10 plain-http probe never feed this gate | R | NOT RUN | PASS (42 signed requests incl. I9) | PASS | Proxy treats **any** 3xx as failure. *Fixed after review — see §5a* |
 | R14 | Expired URL → 403, nothing served | R | NOT RUN | PASS | FAIL¹ | TTL 4 s in the harness; production TTL 60–120 s |
 | R15a | Tampered signature → 403 | R | NOT RUN | PASS | PASS | |
 | R15b | Signed for key A, used for key B → 403 | R | NOT RUN | PASS | PASS | Tenant/key isolation at the storage layer |
@@ -80,7 +80,7 @@ scrubbed of credentials, signature parameters and the account id; the result fil
 | I6 | `If-Range` (matching / mismatching / date) | I | NOT RUN | **ignored: 206 even for a mismatching ETag** | – | Look-alike ignores `If-Range`; R2's docs do not list it either → **proxy implements `If-Range` itself** against the authorised ETag (keys are immutable) |
 | I7 | `If-Match` wrong / `If-None-Match` current | I | NOT RUN | 412 / 304 | – | |
 | I8 | `Accept-Encoding: gzip` on video/mp4 | I | NOT RUN | no `Content-Encoding` | – | |
-| I9 | Slow download that outlives the URL's expiry | I | NOT RUN | completes (8 MiB read slowly over ≈ 8 s with a 4 s TTL) | – | Signature is checked at request start; the proxy sets its own total deadline anyway |
+| I9 | Download started before expiry and still running after it | I | NOT RUN | **Not established** — full body received in 8 of 10 probe runs, 2 runs 64 KiB short; every probe run ended with `UND_ERR_SOCKET`; isolated experiment (§5b): full body in 3/3, trailing socket error on either URL | – | Signature is validated at request start on the look-alike (consistent with S3 semantics) but the end-of-stream is not reliable there; informational only. The proxy sets its own total deadline anyway. **Tracked like every signed request (status → R13, ETag → R11, header values → R18)** — see §5a round 2 |
 | I10 | Plain `http://` to the real endpoint | I | NOT RUN | skipped (loopback) | – | Proxy refuses non-https before connecting (R19) |
 | I11 | 8 parallel ranges | I | NOT RUN | PASS | – | |
 | I12 | Empty object: full GET 200 / `bytes=0-0` | I | NOT RUN | 200 len 0 / 416 | – | |
@@ -116,9 +116,40 @@ Three review findings were confirmed in `v0-r2-range-probe.mjs`; each is fixed, 
 
 **Unit regression tests** (`node --test v0-gates.test.mjs`): **22 pass** on the fix; the same file run against the pre-fix logic (`V0_GATES=./regression/legacy-gates.mjs`) → **15 fail, 7 pass** (the 7 are the baseline/"preserved" cases that were already right). They cover: 301/302/307/308 on I10 not failing R13; negative-control redirects ignored; a redirect on a signed request still failing; 304 not a redirect; URL/signature/credential-scope/access-key/secret in header values, percent-encoded and query-string copies, unknown presigned parameters, error bodies; **no finding ever contains a value** (asserted on the serialised report); no false positives on an ordinary header set; suspicious header names still failing; ETag drift on R5, R6, R7 and on the other ranged cases, missing observations, missing ETag, weak ETags, a different ETag on the 200.
 
-**Other gates re-verified after the change:** full harness on the look-alike **24/24 required pass** (8 MiB, TTL 4 s, 50 responses scanned, 0 value leaks, 41 signed requests, 0 signed redirects); offline SSRF allow-list **15/15**; every `result-*.json` was grepped for the test credentials and for `X-Amz-Signature=<hex>` — no match.
+#### Round 2 (three further findings, same PR)
+| # | Finding | Defect (reproduced against the pre-fix probe `0bbfb0053`) | Fix |
+|---|---|---|---|
+| P1 | **I9 bypassed tracking** | The short-TTL streaming request used a bare `fetch()`, so its status never reached R13 and its ETag never reached R11 (only its header values were scanned). With the fault injector answering that request with `302` the old probe still reported **R13 PASS**; with a different ETag, **R11 PASS** — false passes. | I9 now goes through `hit(…, { keepBody: true })` + `track(…, 'signed', 'I9')`: the response is described and judged like every other signed request while its streaming body stays unread for the slow reader. A structural test pins that the probe contains exactly one `fetch()` and that every `hit()` result is tracked, so an untracked request cannot be reintroduced. |
+| P2 | **Cleanup failure did not fail the run** | `cleanedUp` was reported in the JSON but the exit status depended only on the required cases. With the DELETE refused (`block-delete`) all three disposable objects stayed in the bucket and the probe exited **0**; with the verification HEAD answered `500` (`unverifiable-head`) it also exited **0**. | `cleanupGate`: each object must be deleted **and** confirmed gone (`HEAD` → 404). An object still present, or a verification that could not be completed (403/500/no answer), fails the run (**exit 1**) and prints the prefix to remove by hand. Cleanup runs in a `finally`, so it is attempted even if the matrix throws. The 24-case matrix is unchanged; cleanup is a separate exit condition (`summary`/`cleanup` in the JSON). |
+| P2 | **Report contradicted the I9 evidence** | The matrix said the 8 MiB I9 download "completes"; the checked-in JSON showed `completed: false`, 8,323,072 bytes, `UND_ERR_SOCKET`. | Rerun and documented honestly — §5b. The earlier sentence is replaced; the claim is downgraded from "completes" to "not established". |
 
-The gate tests are local spike evidence (`node --test`); they are not wired into the repository CI, which only runs the PHP and storefront suites.
+**Reproduction → fix (local look-alike, NOT R2; exit status shown):**
+| Fault injected | Pre-fix probe | Fixed probe |
+|---|---|---|
+| `i9-redirect` — the I9 signed GET answered `302` | exit 0, R13 **PASS** (false) | exit **1**, R13 **FAIL** |
+| `i9-etag-drift` — I9 gets another ETag | exit 0, R11 **PASS** (false) | exit **1**, R11 **FAIL** |
+| `block-delete` — cleanup DELETE refused | exit 0, `cleanedUp=false` ignored | exit **1**, cleanup `remaining: [probe, other, empty]` |
+| `unverifiable-head` — cleanup HEAD answers 500 | exit 0 | exit **1**, cleanup `unverified: [probe, other, empty]` |
+| *(re-run of every earlier fault)* `leak-url-header`, `leak-signature-header`, `etag-drift`, `redirect-signed`, `drop-range` | – | exit 1 with the same failures as before (R18, R18, R11, R13, 12 cases); `redirect-http` → exit **0** (R13 PASS, I10 `301 → same-host-https`) |
+| clean look-alike run | – | **exit 0**, 24/24 required, cleanup verified, 35 ETag observations, 42 signed requests |
+
+**Tests (all local):** `node --test v0-gates.test.mjs v0-probe-wiring.test.mjs` → **35 pass** (29 gate + 6 wiring). Against the pre-fix logic: `V0_GATES=./regression/legacy-gates.mjs` → **20 of 29 gate tests fail**; the pre-fix probe against the wiring tests (`V0_PROBE=<0bbfb0053 probe>`) → **4 of 6 fail**. New cases: I9 redirect fails R13; I9 missing/different ETag fails R11; cleanup — all 404 passes, nothing created passes, a remaining object fails, a failed delete with the object present fails, **unverified (403/500/503/no answer) fails**, a failed delete with the object confirmed gone is clean (recorded under `deleteFailed`).
+
+**Other gates re-verified after the change:** full harness on the look-alike **24/24 required pass** (8 MiB, TTL 4 s, 0 value leaks, 42 signed requests, 0 signed redirects, 35 ETag observations, cleanup verified); offline SSRF allow-list **15/15**; every `result-*.json` was grepped for the test credentials and for `X-Amz-Signature=<hex>` — no match.
+
+The gate and wiring tests are local spike evidence (`node --test`); they are not wired into the repository CI, which only runs the PHP and storefront suites.
+
+### 5b. I9 (in-flight download vs URL expiry) — what the evidence actually says
+Local look-alike only (**not R2**). The probe reads the 8 MiB object at ≈ 1 MiB/s (≈ 8 s) on a URL with a 4 s TTL. Observed over 10 probe runs (3 earlier runs, 6 dedicated samples of the same probe, and the final baseline run): the full 8,388,608 bytes arrived in **8 of 10** runs; **2 of 10** ended **64 KiB short** (8,323,072 bytes) — one of them is the run the review quoted from the checked-in JSON — and **all 10 reported `UND_ERR_SOCKET`** at ≈ 8.0 s. The earlier sentence "completes" in this report was therefore wrong for that evidence file. Because the read lasted exactly as long as the suspicious ≈ 8 s mark, the run could not separate *expiry* from a *transport* limit, so `v0-i9-experiment.mjs` reads the same object at **0.5 MiB/s (≈ 16 s)** on two URLs, one that **expires mid-download** (TTL 2 s) and one that **does not**:
+
+| Run | URL expiring at 2 s | URL valid for 120 s |
+|---|---|---|
+| 1 | 8,388,608 B, `UND_ERR_SOCKET` at the end | 8,388,608 B, no error |
+| 2 | 8,388,608 B, no error | 8,388,608 B, `UND_ERR_SOCKET` at the end |
+| 3 | 8,388,608 B, no error | 8,388,608 B, `UND_ERR_SOCKET` at the end |
+
+Conclusions, limited to this simulator: (1) the signature is validated at request start — a download that began before expiry continued for ≈ 14 s after it and delivered every byte in **3 of 3** runs; (2) the trailing `UND_ERR_SOCKET` occurs on expiring *and* non-expiring URLs alike (1/3 vs 2/3), so it is a **transport artefact of the look-alike's connection handling, not an expiry effect**, and the occasional 64 KiB-short run (2 of 10) is the same artefact. I9 therefore stays **informational** and **unproven for R2**; the probe now records `socketErrorAfterAllBytes` so a clean tail is distinguishable from a truncated one. The B2 proxy does not rely on this behaviour (its own total deadline and URL TTL are independent).
+
 
 ## 6. Blockers requiring owner action
 | # | Action | Why | Constraint |
@@ -157,7 +188,7 @@ node docs/plans/store/s0-spikes/r2-range/v0/v0-r2-range-probe.mjs --hostlist    
 ```
 
 ## 10. Files
-`docs/plans/store/s0-spikes/r2-range/v0/`: `README.md`, `v0-signer.php`, `v0-r2-range-probe.mjs`, `v0-gates.mjs`, `v0-gates.test.mjs`, `regression/legacy-gates.mjs`, `fault-injector.mjs`, `result-selftest-scality.json`, `result-fault-{drop-range,leak-url-header,leak-signature-header,etag-drift,redirect-http,redirect-signed}.json`, `result-old-{leak-url-header,etag-drift,redirect-http}.json` (pre-fix probe under the same faults), and this report. No application code changed.
+`docs/plans/store/s0-spikes/r2-range/v0/`: `README.md`, `v0-signer.php`, `v0-r2-range-probe.mjs`, `v0-gates.mjs`, `v0-gates.test.mjs`, `v0-probe-wiring.test.mjs`, `v0-i9-experiment.mjs`, `regression/legacy-gates.mjs`, `fault-injector.mjs`, `result-selftest-scality.json`, `result-fault-*.json` (ten fault modes), `result-old-*.json` / `result-old2-*.json` (pre-fix probes under the same faults), and this report. No application code changed.
 
 ## 11. GO / NO-GO
 | Item | Recommendation |

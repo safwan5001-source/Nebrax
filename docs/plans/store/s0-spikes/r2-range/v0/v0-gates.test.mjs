@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 const gates = await import(process.env.V0_GATES ?? './v0-gates.mjs');
-const { sensitiveTokens, scanHeaderValues, scanText, leakGate, redirectGate, etagGate, classifyLocation } = gates;
+const { sensitiveTokens, scanHeaderValues, scanText, leakGate, redirectGate, etagGate, cleanupGate, classifyLocation } = gates;
 
 const KEY_ID = 'AKIAEXAMPLEKEYID0001';
 const SECRET = 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY';
@@ -125,4 +125,46 @@ test('R11 regression: a successful ranged response with NO ETag fails', () => {
 test('R11 preserved: weak ETags fail, and a 200 with a different ETag still fails', () => {
   assert.equal(etagGate(goodLog().map((o) => ({ ...o, etag: o.etag ? 'W/"x"' : o.etag })), REQUIRED).pass, false);
   assert.equal(etagGate(goodLog().map((o) => (o.id === 'R1' ? { ...o, etag: '"other"' } : o)), REQUIRED).pass, false);
+});
+
+// ───────────── I9 — the short-TTL streaming request must be judged by R11 and R13 like every other signed request ─────────────
+test('I9 regression: a redirect on the I9 signed request fails R13', () => {
+  const r = redirectGate([...signed(), { id: 'I9', kind: 'signed', status: 302 }]);
+  assert.equal(r.pass, false);
+  assert.deepEqual(r.signed3xx, [{ id: 'I9', status: 302 }]);
+});
+test('I9 regression: a missing or different ETag on the I9 response fails R11', () => {
+  const withI9 = (etag) => [...goodLog(), { id: 'I9', status: 200, etag }];
+  assert.equal(etagGate(withI9(E), REQUIRED).pass, true);
+  assert.equal(etagGate(withI9('"drifted-i9"'), REQUIRED).pass, false);
+  assert.equal(etagGate(withI9(null), REQUIRED).pass, false);
+});
+
+// ───────────── cleanup — failed or unverified cleanup must fail the run ─────────────
+const objs = (...heads) => heads.map((h, i) => ({ label: ['probe', 'other', 'empty'][i], deleteOk: true, headStatus: h }));
+test('cleanup regression: every object deleted and confirmed 404 passes; nothing created passes', () => {
+  assert.equal(cleanupGate(objs(404, 404, 404)).pass, true);
+  assert.equal(cleanupGate([]).pass, true);
+});
+test('cleanup regression: an object that is still present fails and is named by label only', () => {
+  const r = cleanupGate(objs(404, 200, 404));
+  assert.equal(r.pass, false);
+  assert.deepEqual(r.remaining, ['other']);
+});
+test('cleanup regression: a failed delete whose object is still there fails', () => {
+  const r = cleanupGate([{ label: 'probe', deleteOk: false, headStatus: 200 }, ...objs(404, 404).map((o, i) => ({ ...o, label: ['other', 'empty'][i] }))]);
+  assert.equal(r.pass, false);
+  assert.deepEqual(r.deleteFailed, ['probe']);
+});
+test('cleanup regression: an UNVERIFIED cleanup (HEAD 403 / 500 / no answer) fails — absence of proof is not a clean bucket', () => {
+  for (const unknown of [403, 500, 503, null]) {
+    const r = cleanupGate(objs(404, unknown, 404));
+    assert.equal(r.pass, false, String(unknown));
+    assert.deepEqual(r.unverified, ['other']);
+  }
+});
+test('cleanup: a delete call that errored but whose object is confirmed gone is clean (recorded, not failed)', () => {
+  const r = cleanupGate([{ label: 'probe', deleteOk: false, headStatus: 404 }]);
+  assert.equal(r.pass, true);
+  assert.deepEqual(r.deleteFailed, ['probe']);
 });

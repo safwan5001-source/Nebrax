@@ -16,7 +16,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { classifyLocation, etagGate, leakGate, redirectGate, scanHeaderValues, scanText, sensitiveTokens } from './v0-gates.mjs';
+import { classifyLocation, cleanupGate, etagGate, leakGate, redirectGate, scanHeaderValues, scanText, sensitiveTokens } from './v0-gates.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const arg = (n, d) => (process.argv.find((a) => a.startsWith(`--${n}=`)) ?? `--${n}=${d}`).split('=').slice(1).join('=');
@@ -140,14 +140,14 @@ const sign = (method, key, ttl = 120, query) => { const r = signer({ op: 'presig
 const KEEP = ['status', 'content-length', 'content-range', 'accept-ranges', 'etag', 'content-type', 'content-encoding', 'last-modified', 'location', 'content-disposition', 'cache-control', 'x-amz-request-id', 'cf-cache-status', 'server', 'x-amz-id-2', 'www-authenticate'];
 const sensitiveUrls = new Set();
 const tokens = () => sensitiveTokens({ secrets, urls: [...sensitiveUrls] });
-async function hit(url, { method = 'GET', headers = {}, body, read = true } = {}) {
+async function hit(url, { method = 'GET', headers = {}, body, read = true, keepBody = false } = {}) {
   sensitiveUrls.add(url); // every URL we ever send (signed, derived or tampered) is something the provider must never echo back
   const h = { 'accept-encoding': 'identity', ...headers };
   const res = await fetch(url, { method, headers: h, redirect: 'manual', body });
   const seen = {}; const allNames = []; const rawEntries = [];
   res.headers.forEach((v, k) => { allNames.push(k); rawEntries.push([k, v]); if (KEEP.includes(k)) seen[k] = scrub(v); });
   let len = 0; let sha = null; let errorCode = null; let bodyLeaks = [];
-  if (read && method !== 'HEAD') {
+  if (keepBody) { /* streaming body left untouched for the caller (I9) */ } else if (read && method !== 'HEAD') {
     const hash = createHash('sha256'); const chunks = [];
     for await (const c of res.body ?? []) { len += c.length; hash.update(c); if (len <= 4096) chunks.push(c); }
     sha = hash.digest('hex');
@@ -155,7 +155,7 @@ async function hit(url, { method = 'GET', headers = {}, body, read = true } = {}
   } else { await res.body?.cancel().catch(() => undefined); }
   // header VALUES are scanned here, in memory, against the unscrubbed tokens; only {header, kind} survives
   const valueFindings = scanHeaderValues(rawEntries, tokens());
-  return { status: res.status, headers: seen, headerNames: allNames, valueFindings, bodyLeaks, bodyLen: len, sha, errorCode, locationClass: res.headers.get('location') ? classifyLocation(res.headers.get('location'), new URL(cfg.endpoint).hostname) : null };
+  return { ...(keepBody ? { res } : {}), status: res.status, headers: seen, headerNames: allNames, valueFindings, bodyLeaks, bodyLen: len, sha, errorCode, locationClass: res.headers.get('location') ? classifyLocation(res.headers.get('location'), new URL(cfg.endpoint).hostname) : null };
 }
 
 const data = randomBytes(N);
@@ -179,6 +179,7 @@ const track = (r, kind = 'signed', label = null) => {
 const brief = (r) => ({ status: r.status, ...(r.errorCode ? { errorCode: r.errorCode } : {}), headers: r.headers, bodyLen: r.bodyLen });
 
 const tmp = mkdtempSync(join(tmpdir(), 'v0-'));
+let cleanupEntries = [];
 let etag = null; let started = false;
 try {
   if (process.env.S3_CREATE_BUCKET === '1') signer({ op: 'create-bucket' });
@@ -303,15 +304,16 @@ try {
   const okBefore = track(await hit(shortUrl, { headers: { range: 'bytes=0-9' } }), 'signed', 'R14-before');
   // I9: start a slow full download now; it will outlive the TTL
   const slowStart = Date.now();
-  const slowRes = await fetch(shortUrl, { headers: { 'accept-encoding': 'identity' }, redirect: 'manual' });
-  sensitiveUrls.add(shortUrl); scanHeaderValues([...slowRes.headers], tokens()).forEach((f) => valueFindings.push({ id: 'I9', ...f })); [...slowRes.headers.keys()].forEach((n) => allHeaderNames.add(n));
+  // routed through hit()/track() like every other request (status → R13, ETag → R11, header values → R18) WITHOUT consuming its streaming body
+  const slow = track(await hit(shortUrl, { keepBody: true }), 'signed', 'I9');
+  const slowRes = slow.res;
   let slowBytes = 0; let slowErr = null;
   const slowRead = (async () => { try { for await (const c of slowRes.body) { slowBytes += c.length; await sleep(Math.ceil((c.length / (1024 * 1024)) * 1000)); } } catch (e) { slowErr = scrub(e.cause?.code ?? e.message); } })();
   await sleep((cfg.ttl + 2) * 1000);
   const expired = track(await hit(shortUrl, { headers: { range: 'bytes=0-9' } }), 'negative');
   rec('R14', 'R', PLAN[13][2], okBefore.status === 206 && expired.status === 403, { before: brief(okBefore), afterTtl: brief(expired), ttlSeconds: cfg.ttl });
   await slowRead;
-  rec('I9', 'I', PLAN[38 - 1 + 0 > 0 ? 36 : 36][2] ?? '', null, { status: slowRes.status, startedBeforeExpiry: true, ranPastTtlMs: Date.now() - slowStart, receivedBytes: slowBytes, completed: slowBytes === N, error: slowErr }, 'S3/R2 validate the signature when the request starts; whether an in-flight body survives expiry is recorded here. The proxy sets its own total deadline anyway.');
+  rec('I9', 'I', PLAN[38 - 1 + 0 > 0 ? 36 : 36][2] ?? '', null, { status: slowRes.status, startedBeforeExpiry: true, ranPastTtlMs: Date.now() - slowStart, receivedBytes: slowBytes, completed: slowBytes === N, error: slowErr, socketErrorAfterAllBytes: !!slowErr && slowBytes === N }, 'S3/R2 validate the signature when the request starts; whether an in-flight body survives expiry is recorded here. The proxy sets its own total deadline anyway.');
 
   // R13 / R18 / R20 / R19
   const redirects = redirectGate(redirectLog);
@@ -325,18 +327,22 @@ try {
   rec('R19', 'R', PLAN[22][2], hl.every((r) => r.pass), { cases: hl.length, failed: hl.filter((r) => !r.pass).map((r) => r.name) });
   rec('R20', 'R', PLAN[23][2] && 'Every URL the signer produced passes the host allow-list', producedUrls.every((x) => allowedUpstream(x, { endpoint: cfg.endpoint, bucket: process.env.S3_BUCKET, allowInsecureLoopback: cfg.loopback })), { urls: producedUrls.length });
 } finally {
-  if (started) for (const k of [KEY, KEY_B, KEY_EMPTY]) signer({ op: 'delete', key: k });
+  // Cleanup is verified, not assumed: delete each disposable object, then require HEAD → 404 for it. Runs even when the matrix threw.
+  cleanupEntries = started ? [['probe', KEY], ['other', KEY_B], ['empty', KEY_EMPTY]].map(([label, key]) => {
+    const del = signer({ op: 'delete', key }); const head = signer({ op: 'head', key });
+    return { label, deleteOk: !del.error, headStatus: head.error === 'aws' ? head.status : (head.ok ? 200 : null) };
+  }) : [];
   rmSync(tmp, { recursive: true, force: true });
 }
-
-// cleanup verification
-const cleaned = [KEY, KEY_B, KEY_EMPTY].every((k) => { const r = signer({ op: 'head', key: k }); return r.error === 'aws' && (r.status === 404 || r.code === 'NotFound'); });
+const cleanup = cleanupGate(cleanupEntries);
+const cleaned = cleanup.pass;
+if (!cleanup.pass) console.error(`CLEANUP NOT VERIFIED — remaining: [${cleanup.remaining}] unverified: [${cleanup.unverified}] deleteFailed: [${cleanup.deleteFailed}]. Remove the prefix v0-range-probe/${RUN}/ from the test bucket by hand.`);
 const required = results.filter((r) => r.group === 'R');
 const failed = required.filter((r) => r.pass !== true);
 const report = {
   label: cfg.label, generatedAt: new Date().toISOString(), provider: cfg.loopback ? 'LOCAL LOOK-ALIKE (not R2)' : 'remote S3 API',
   endpointHost: cfg.loopback ? new URL(cfg.endpoint).host : '<account>.' + new URL(cfg.endpoint).hostname.split('.').slice(1).join('.'),
-  addressingStyle: cfg.style, objectBytes: N, ttlSeconds: cfg.ttl, runId: RUN, cleanedUp: cleaned,
+  addressingStyle: cfg.style, objectBytes: N, ttlSeconds: cfg.ttl, runId: RUN, cleanedUp: cleaned, cleanup,
   summary: { required: required.length, requiredPassed: required.length - failed.length, requiredFailed: failed.map((r) => r.id), info: results.filter((r) => r.group === 'I').length },
   results,
 };
@@ -344,5 +350,5 @@ const outPath = join(here, `result-${cfg.label}.json`);
 writeFileSync(outPath, JSON.stringify(report, null, 2) + '\n');
 console.log(`label=${cfg.label} provider=${report.provider} style=${cfg.style} size=${cfg.sizeMiB}MiB ttl=${cfg.ttl}s cleanedUp=${cleaned}`);
 for (const r of results) console.log(`${r.id.padEnd(5)} ${r.group === 'R' ? (r.pass ? 'PASS' : 'FAIL') : 'INFO'}  ${r.description.slice(0, 96)}`);
-console.log(`required ${report.summary.requiredPassed}/${report.summary.required}  failed: ${failed.map((r) => r.id).join(', ') || 'none'}\nwrote ${outPath.replace(process.cwd() + '/', '')}`);
-process.exit(failed.length ? 1 : 0);
+console.log(`required ${report.summary.requiredPassed}/${report.summary.required}  failed: ${failed.map((r) => r.id).join(', ') || 'none'}  cleanup: ${cleanup.pass ? 'verified' : 'NOT VERIFIED (exit 1)'}\nwrote ${outPath.replace(process.cwd() + '/', '')}`);
+process.exit(failed.length || !cleanup.pass ? 1 : 0);

@@ -8,9 +8,11 @@ server-to-server with the browser's `Range`*. Laravel never streams the bytes. S
 | `v0-signer.php` | the "Laravel side": signs with the app's own AWS SDK (`aws/aws-sdk-php`), uploads/deletes the disposable test objects |
 | `v0-r2-range-probe.mjs` | the "Node proxy side": runs the matrix with `fetch(..., {redirect: 'manual'})`, includes the reference SSRF host allow-list |
 | `v0-gates.mjs` | the pass/fail LOGIC of R11 (ETag), R13 (redirects) and R18 (header-value leaks), free of I/O so it is unit-testable |
-| `v0-gates.test.mjs` | regression tests for those three gates (`node --test v0-gates.test.mjs`) |
+| `v0-gates.test.mjs` | regression tests for those gates and for cleanup verification (`node --test v0-gates.test.mjs`) |
+| `v0-probe-wiring.test.mjs` | structural tests on the probe source: one `fetch()` (inside `hit()`), every `hit()` result tracked, I9 tracked without consuming its stream, cleanup in the exit status, nothing secret printed |
+| `v0-i9-experiment.mjs` | isolates case I9 (does an in-flight download survive URL expiry?) from transport artefacts of the look-alike |
 | `regression/legacy-gates.mjs` | the gate logic as it was BEFORE the review fixes — `V0_GATES=./regression/legacy-gates.mjs node --test v0-gates.test.mjs` must show the regression tests failing |
-| `fault-injector.mjs` | loopback forwarder that misbehaves in one chosen way (`drop-range`, `leak-url-header`, `leak-signature-header`, `etag-drift`, `redirect-http`, `redirect-signed`) so the probe can be shown to detect — or correctly ignore — each fault |
+| `fault-injector.mjs` | loopback forwarder that misbehaves in one chosen way (`drop-range`, `leak-url-header`, `leak-signature-header`, `etag-drift`, `redirect-http`, `redirect-signed`, `i9-redirect`, `i9-etag-drift`, `block-delete`, `unverifiable-head`) so the probe can be shown to detect — or correctly ignore — each fault |
 | `result-selftest-scality.json` | **local look-alike** self-test (Scality CloudServer) — validates the harness, **NOT R2** |
 | `result-fault-*.json`, `result-old-*.json` | fault-injection runs of the fixed probe and of the pre-fix probe (db1ac4c5b) under the same faults — **NOT R2** |
 
@@ -18,8 +20,10 @@ server-to-server with the browser's `Range`*. Laravel never streams the bytes. S
 ```
 node v0-r2-range-probe.mjs --plan
 node v0-r2-range-probe.mjs --hostlist      # offline SSRF allow-list checks (15 cases)
-node --test v0-gates.test.mjs              # gate regression tests (22)
-V0_GATES=./regression/legacy-gates.mjs node --test v0-gates.test.mjs   # same tests on the pre-fix logic: 15 must FAIL
+node --test v0-gates.test.mjs v0-probe-wiring.test.mjs     # 29 gate tests + 6 wiring tests
+V0_GATES=./regression/legacy-gates.mjs node --test v0-gates.test.mjs   # the same gate tests on the pre-fix logic: 20 must FAIL
+git show 0bbfb0053:docs/plans/store/s0-spikes/r2-range/v0/v0-r2-range-probe.mjs > /tmp/prefix-probe.mjs
+V0_PROBE=/tmp/prefix-probe.mjs node --test v0-probe-wiring.test.mjs     # the pre-fix probe: 4 of the 6 wiring tests must FAIL
 ```
 
 ## Run against real R2 (owner-provisioned TEST bucket only)
@@ -43,4 +47,6 @@ S3_PATH_STYLE=0   node v0-r2-range-probe.mjs --label=r2-virtualhosted  --autoloa
 * Gate scopes (review fixes): **R13** judges only correctly signed HTTPS requests — negative controls and the informational plain-http probe **I10** (where a redirect to https is acceptable) never feed it;
   **R18** scans every header NAME and VALUE of every response (and error bodies, informationally) for credentials, signatures, SigV4 material and the signed URLs, reporting only header name + kind;
   **R11** requires one strong ETag across the 200, every 206 (closed, open-ended, suffix, EOF-clamped, If-Range, parallel…) and the HEAD, and fails if a required observation is missing.
+* **Exit status** is nonzero when any required case fails **or when cleanup is not verified**: every disposable object must be deleted *and* confirmed gone (`HEAD` → 404); a delete that errored with the object still present, or a verification that could not be completed (403/500/no answer), fails the run and prints the prefix to remove by hand. Cleanup runs in a `finally`, so it is attempted even if the matrix throws.
+* **I9** (a download that outlives the URL's expiry) goes through the same tracking as every request — its status feeds R13, its ETag R11, its header values R18 — without consuming its streaming body.
 * `V0_SELFTEST_PLAIN_HTTP_HOOK=1` (self-test only) lets I10 run against a loopback look-alike by sending an `x-v0-plain` marker that `fault-injector.mjs --mode=redirect-http` answers with a 301.

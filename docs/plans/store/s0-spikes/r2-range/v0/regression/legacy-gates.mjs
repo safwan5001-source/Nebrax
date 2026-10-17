@@ -22,3 +22,7 @@ export function etagGate(log) {                      // R11 before: only the 200
   const etags = subset.map((o) => o.etag);
   return { pass: etags.every((e) => e && e === etags[0] && /^"[^"]+"$/.test(e)), judged: subset.length, distinctEtags: [...new Set(etags)], missing: [], noEtag: [], different: [], weak: [] };
 }
+
+export function cleanupGate() {                      // cleanup before: reported in the JSON but never part of the exit status
+  return { pass: true, verified: true, objects: 0, remaining: [], unverified: [], deleteFailed: [] };
+}
