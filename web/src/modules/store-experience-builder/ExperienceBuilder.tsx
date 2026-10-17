@@ -2549,6 +2549,9 @@ export function ExperienceBuilder({
     id: string | null,
     origin: "sidebar" | "preview",
   ) {
+    if (id !== null && currentPage !== "home") {
+      handleSelectPage("home");
+    }
     setSelectedSection(id);
     setSelectedChrome(null);
     if (id === null) return;

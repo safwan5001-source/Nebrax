@@ -81,4 +81,3 @@ describe("AWJ Store Design Library Phase 1 contract", () => {
     expect(sectionVariants.every((variant) => Object.keys(variant.design).length > 0)).toBe(true);
   });
 });
-

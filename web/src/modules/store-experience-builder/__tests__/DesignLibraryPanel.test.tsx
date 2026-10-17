@@ -93,6 +93,32 @@ describe("AWJ Store Design Library panel", () => {
     expect(onSelectSection).toHaveBeenCalledWith(category?.id);
   });
 
+  it("preserves an existing hidden section's visibility when applying a variant", () => {
+    const config = clonePresentationConfig(DEFAULT_PRESENTATION_CONFIG);
+    const category = config.homepage.sections.find(
+      (section) => section.type === "categories",
+    );
+    expect(category).toBeTruthy();
+    if (category) category.visible = false;
+
+    const expected = designLibraryVariant("categories-showcase");
+    const { onChange } = mount(config);
+    fireEvent.click(
+      within(variant("categories-showcase")).getByRole("button", {
+        name: "Apply variant",
+      }),
+    );
+
+    const next = onChange.mock.calls.at(-1)![0] as StorefrontPresentationConfig;
+    const updated = next.homepage.sections.find(
+      (section) => section.id === category?.id,
+    );
+    expect(updated?.visible).toBe(false);
+    expect(updated?.design).toEqual(
+      expected?.scope === "section" ? expected.design : undefined,
+    );
+  });
+
   it("adds a missing gallery as a normal homepage section for existing reorder controls", () => {
     const config = clonePresentationConfig(DEFAULT_PRESENTATION_CONFIG);
     expect(config.homepage.sections.some((section) => section.type === "gallery")).toBe(false);
@@ -173,4 +199,3 @@ describe("AWJ Store Design Library panel", () => {
     expect(screen.getByText("No variants match your search.")).toBeTruthy();
   });
 });
-

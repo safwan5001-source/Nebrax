@@ -112,7 +112,7 @@ export function DesignLibraryPanel({
           ...config.homepage,
           sections: config.homepage.sections.map((section) =>
             section.id === target.id
-              ? { ...section, visible: true, design: { ...variant.design } }
+              ? { ...section, design: { ...variant.design } }
               : section,
           ),
         },
@@ -337,7 +337,7 @@ function FilterChip({
 }
 
 function VariantPreview({ id }: { id: string }) {
-  const shared = "rounded-sm bg-white/90 shadow-sm";
+  const shared = "rounded-sm bg-surface/90 shadow-sm";
   return (
     <div
       data-design-variant-preview={id}
@@ -358,7 +358,7 @@ function VariantPreview({ id }: { id: string }) {
         <div className="flex h-full items-center justify-center gap-3">
           {[0, 1, 2, 3].map((item) => (
             <span key={item} className="flex flex-col items-center gap-2">
-              <span className="size-11 rounded-full border-4 border-white bg-primary/25 shadow-sm" />
+              <span className="size-11 rounded-full border-4 border-surface bg-primary/25 shadow-sm" />
               <span className="h-1 w-8 rounded bg-text/30" />
             </span>
           ))}
@@ -367,8 +367,8 @@ function VariantPreview({ id }: { id: string }) {
         <div className="grid h-full grid-cols-2 gap-2">
           {[0, 1, 2, 3].map((item) => (
             <span key={item} className="relative overflow-hidden rounded-md bg-primary/25">
-              <span className="absolute inset-x-0 bottom-0 h-7 bg-gradient-to-t from-black/50 to-transparent" />
-              <span className="absolute bottom-2 start-2 h-1.5 w-10 rounded bg-white/90" />
+              <span className="absolute inset-x-0 bottom-0 h-7 bg-gradient-to-t from-text/50 to-text/0" />
+              <span className="absolute bottom-2 start-2 h-1.5 w-10 rounded bg-surface/90" />
             </span>
           ))}
         </div>
@@ -396,7 +396,7 @@ function VariantPreview({ id }: { id: string }) {
           {["w-2/3", "w-1/2", "w-2/3"].map((width, item) => (
             <span
               key={item}
-              className={`${width} shrink-0 rounded-lg border-4 border-white bg-primary/20 shadow-sm`}
+              className={`${width} shrink-0 rounded-lg border-4 border-surface bg-primary/20 shadow-sm`}
             />
           ))}
         </div>
@@ -404,4 +404,3 @@ function VariantPreview({ id }: { id: string }) {
     </div>
   );
 }
-

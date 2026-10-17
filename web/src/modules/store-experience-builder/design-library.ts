@@ -204,4 +204,3 @@ export function designLibraryVariant(
 ): DesignLibraryVariant | undefined {
   return DESIGN_LIBRARY_VARIANTS.find((variant) => variant.id === id);
 }
-

@@ -236,6 +236,42 @@ describe('ExperienceBuilder — CUST-H2-2 Page Navigator', () => {
     expect(screen.getByRole('button', { name: 'Homepage' })).toBeTruthy();
   });
 
+  it.each([
+    { pageName: 'Product page', page: 'product' },
+    { pageName: 'Category page', page: 'category' },
+  ])(
+    'returns from $page to Home and selects the matching inspector when a homepage design is applied',
+    async ({ pageName, page }) => {
+      listMock.mockResolvedValue({ ok: true, data: [summary()] });
+      showMock.mockResolvedValue({ ok: true, data: detail() });
+      const user = userEvent.setup();
+      render(<ExperienceBuilder storefrontId="store-1" initialLocale="en" />);
+      await waitFor(() => expect(showMock).toHaveBeenCalledTimes(1));
+
+      await openPageNavigator(user);
+      await user.click(screen.getByRole('button', { name: pageName }));
+      expect(builderRoot().getAttribute('data-current-page')).toBe(page);
+
+      await user.click(screen.getByRole('button', { name: 'Design library' }));
+      const variantCard = document.querySelector(
+        '[data-design-library-variant="categories-showcase"]',
+      ) as HTMLElement;
+      await user.click(
+        within(variantCard).getByRole('button', { name: 'Apply variant' }),
+      );
+
+      expect(builderRoot().getAttribute('data-current-page')).toBe('home');
+      expect(canvas().getAttribute('data-preview-page')).toBe('home');
+      expect(builderRoot().getAttribute('data-panel')).toBe('homepage');
+      expect(builderRoot().getAttribute('data-selected-section')).not.toBe('');
+      expect(
+        document
+          .querySelector('[data-selected-section-settings]')
+          ?.getAttribute('data-selected-section-settings'),
+      ).toBe('categories');
+    },
+  );
+
   it('preserves the Product page context across a Version switch', async () => {
     listMock.mockResolvedValue({
       ok: true,
