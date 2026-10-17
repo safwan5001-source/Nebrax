@@ -116,14 +116,16 @@ class CommunicationSchemaTest extends TestCase
     }
 
     #[Test]
-    public function deferred_performance_and_receipt_indexes_are_not_created(): void
+    public function only_the_dispatch_indexes_exist_and_the_later_slice_indexes_are_still_deferred(): void
     {
         $names = collect(['communication_messages', 'communication_message_attempts'])
             ->flatMap(fn (string $table) => collect(Schema::getIndexes($table))->reject(fn (array $i) => $i['primary'])->pluck('name'))
             ->all();
 
+        // 03-A أضافت الثلاثة المخطَّطة لها؛ نافذة الإيصال والتقليم (03-B) ومطابقة الإيصال (08) وفهارس القوائم لم تُنشأ بعد.
         $this->assertEqualsCanonicalizing([
             'comm_msg_tenant_id_unique', 'comm_msg_idem_unique', 'comm_attempt_no_unique', 'comm_attempt_one_inflight',
+            'comm_msg_due_idx', 'comm_msg_expiry_idx', 'comm_msg_lease_idx',
         ], $names);
     }
 
