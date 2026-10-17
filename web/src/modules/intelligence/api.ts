@@ -19,12 +19,13 @@ export async function fetchStatus(): Promise<AssistantStatus> {
   return res.data;
 }
 
-export async function sendMessage(input: { message: string; locale: 'ar' | 'en'; branchIds?: string[] }): Promise<MessageResponse> {
+export async function sendMessage(input: { message: string; locale: 'ar' | 'en'; branchIds?: string[]; documentId?: string }): Promise<MessageResponse> {
   const res = await api<{ data: MessageResponse }>('/ai-assistant/messages', {
     method: 'POST',
     body: {
       message: input.message,
       locale: input.locale,
+      ...(input.documentId ? { document_id: input.documentId } : {}),
       ...(input.branchIds && input.branchIds.length > 0 ? { scope: { branch_ids: input.branchIds } } : {}),
     },
   });

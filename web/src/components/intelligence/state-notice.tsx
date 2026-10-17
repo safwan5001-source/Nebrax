@@ -18,6 +18,8 @@ const ICONS: Partial<Record<NoticeKey, LucideIcon>> = {
   tool_permission_denied: Lock,
   provider_unavailable: PlugZap,
   external_provider_not_acknowledged: KeyRound,
+  external_documents_not_acknowledged: KeyRound,
+  external_documents_unavailable: PlugZap,
   currency_unsupported: Coins,
   branch_scope_forbidden: ShieldOff,
   warehouse_scope_forbidden: ShieldOff,
@@ -38,7 +40,7 @@ const ICONS: Partial<Record<NoticeKey, LucideIcon>> = {
 };
 
 /** حالات يملك فيها مالك المؤسسة/مديرها إجراءً مباشراً (إعدادات الموافقة). */
-const ADMIN_FIXABLE: ReadonlySet<NoticeKey> = new Set(['tenant_disabled', 'consent_required', 'external_provider_not_acknowledged']);
+const ADMIN_FIXABLE: ReadonlySet<NoticeKey> = new Set(['tenant_disabled', 'consent_required', 'external_provider_not_acknowledged', 'external_documents_not_acknowledged']);
 const ERROR_TONE: ReadonlySet<NoticeKey> = new Set(['network_error', 'server_error', 'unknown_error', 'invalid_request', 'invalid_tool_arguments']);
 
 /**

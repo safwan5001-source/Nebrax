@@ -39,4 +39,22 @@ interface AiExternalAssistantProvider extends AiAssistantProvider
      * @throws AiProviderException يحمل استهلاك المرحلة الأولى إن عُرف.
      */
     public function compose(array $input, array $continuation, array $results): array;
+
+    /**
+     * ما يُحجز لطلب **مستند** (نداء واحد بلا أدوات).
+     *
+     * @return array{0:int, 1:int} [input_tokens, output_tokens]
+     */
+    public function documentReservationEstimate(int $estimatedInput, int $digestTokens, int $maxOutputTokens): array;
+
+    /**
+     * الإجابة عن سؤال حول **مستند واحد مراجَع ومنقَّح** (AI-07ب): نداء واحد **بلا أدوات**، والملخّص المحجوب بيانات
+     * غير موثوقة داخل كتلة مهرَّبة. لا يملك النموذج هنا أي قدرة فعل إن تأثّر بنصّ المستند.
+     *
+     * @param  array{message:string, locale:string, max_output_tokens:int, today:string, timezone:string}  $input
+     * @param  array<string,mixed>  $digest  كما يبنيه `AiDocumentDigest`.
+     * @return array{content:string, usage:array{input_tokens:int, output_tokens:int}}
+     * @throws AiProviderException
+     */
+    public function answerDocument(array $input, array $digest): array;
 }

@@ -42,7 +42,9 @@ class AiAssistantStatusService
             default => 'unavailable',
         };
         $providerAvailable = $providerMode !== 'unavailable';
-        $externalAck = ! $external || (Settings::group('ai_assistant_external', $tenant)['acknowledged'] ?? false) === true;
+        $externalSettings = Settings::group('ai_assistant_external', $tenant);
+        $externalAck = ! $external || ($externalSettings['acknowledged'] ?? false) === true;
+        $documentsAck = ($externalSettings['documents_acknowledged'] ?? false) === true;
 
         $can = fn (string $permission): bool => Rbac::allows((string) $user->role, $permission);
         $use = $can(AiAssistantPolicy::PERMISSION);
@@ -79,6 +81,16 @@ class AiAssistantStatusService
             default => 'ready',
         };
 
+        // AI-07ب: «اسأل عن هذا المستند» عبر المزوّد الخارجي — حالة مستقلة عن القراءة المحلية الصريحة (`document`) التي لا تُرسل شيئاً.
+        $documentAsk = match (true) {
+            $document !== 'ready' => $document,
+            $providerMode !== 'external' => 'provider_unavailable',
+            config('ai_assistant.documents.external_send_enabled') !== true => 'external_documents_unavailable',
+            ! $externalAck => 'external_provider_not_acknowledged',
+            ! $documentsAck => 'external_documents_not_acknowledged',
+            default => 'ready',
+        };
+
         return [
             'platform_enabled' => $platform,
             // `mock`: ردود تجريبية حتمية بلا اتصال. `external` (AI-07): يُسمّى المزوّد للمستخدم لأن الموافقة المستنيرة تتطلب ذلك.
@@ -87,7 +99,7 @@ class AiAssistantStatusService
             'tenant' => [
                 'enabled' => $tenantEnabled,
                 'consented_categories' => $consented,
-            ] + ($external ? ['external_acknowledged' => $externalAck] : []),
+            ] + ($external ? ['external_acknowledged' => $externalAck, 'external_documents_acknowledged' => $documentsAck && $externalAck] : []),
             'categories' => array_map(static fn (string $key): array => [
                 'key' => $key,
                 'available' => AiAssistantDataCategory::isAvailable($key),
@@ -104,6 +116,7 @@ class AiAssistantStatusService
             'financial' => $financial,
             'financial_tools' => ['finance.income_statement', 'finance.receivables_aging', 'finance.payables_aging'],
             'document' => $document,
+            'document_ask' => $documentAsk,
             'document_tools' => [AiDocumentProjectionTool::NAME],
             // «اليوم» بتوقيت المؤسسة: الواجهة لا تخمّن منطقتها الزمنية فتقترح تاريخاً مستقبلياً يرفضه الخادم.
             'clock' => $this->clock($tenant),

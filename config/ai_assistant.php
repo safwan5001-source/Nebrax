@@ -52,6 +52,11 @@ return [
     */
     'documents' => [
         'enabled' => filter_var(env('AI_ASSISTANT_DOCUMENTS_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+        // AI-07ب: مفتاح منصة **ثالث ومستقل** لإرسال القيم المراجَعة والمنقَّحة إلى المزوّد الخارجي (الإجابة عن أسئلة مستند).
+        // تفعيل القراءة المحلية أعلاه لا يفتح هذا المسار؛ كلاهما مغلق افتراضياً.
+        'external_send_enabled' => filter_var(env('AI_ASSISTANT_DOCUMENTS_EXTERNAL_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+        // سقف رموز ملخّص المستند المرسَل للنموذج (يُقصّ قبل الإرسال؛ ويحدد حجم الحجز).
+        'external_max_tokens' => 4000,
         'max_fields' => 24,
         'max_lines' => 50,
         'max_warnings' => 10,

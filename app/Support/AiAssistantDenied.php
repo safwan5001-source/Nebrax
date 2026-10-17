@@ -49,6 +49,9 @@ final class AiAssistantDenied extends RuntimeException
         'document_retention_ended'  => [409, 'انتهت مدة احتفاظ المستند أو حُذف محتواه أو أُرشف.'],
         'document_projection_unavailable' => [409, 'تعذّر إنتاج إسقاط آمن حالي لهذا المستند.'],
         'external_provider_not_acknowledged' => [403, 'لم يُقرّ مالك المؤسسة بإرسال بيانات المساعد إلى مزوّد ذكاء اصطناعي خارجي.'],
+        'external_documents_not_acknowledged' => [403, 'لم يُقرّ مالك المؤسسة بإرسال القيم المراجَعة للمستندات إلى مزوّد ذكاء اصطناعي خارجي.'],
+        'document_too_large' => [422, 'محتوى المستند أكبر من الحد المسموح لإرساله إلى المزوّد الخارجي؛ لم يُرسَل شيء.'],
+        'external_documents_unavailable' => [503, 'إرسال المستندات إلى مزوّد خارجي غير مفعّل على المنصة.'],
         'internal_error'            => [500, 'تعذّر إكمال الطلب.'],
     ];
 

@@ -16,6 +16,8 @@ describe('classifyError', () => {
     ['tool_permission_denied', 403, 'tool_permission_denied'],
     ['provider_unavailable', 503, 'provider_unavailable'],
     ['external_provider_not_acknowledged', 403, 'external_provider_not_acknowledged'],
+    ['external_documents_not_acknowledged', 403, 'external_documents_not_acknowledged'],
+    ['external_documents_unavailable', 503, 'external_documents_unavailable'],
     ['currency_unsupported', 422, 'currency_unsupported'],
     ['budget_not_configured', 402, 'budget_not_configured'],
     ['budget_exceeded', 429, 'budget_exceeded'],
@@ -34,6 +36,7 @@ describe('classifyError', () => {
     ['document_on_hold', 409, 'document_on_hold'],
     ['document_retention_ended', 409, 'document_retention_ended'],
     ['document_projection_unavailable', 409, 'document_projection_unavailable'],
+    ['document_too_large', 422, 'document_too_large'],
   ] as [string, number, NoticeKey][])('maps server code %s to %s', (code, status, notice) => {
     const result = classifyError(err(status, code));
     expect(result.notice).toBe(notice);
@@ -62,6 +65,7 @@ describe('classifyError', () => {
     expect(classifyError(err(403, 'consent_required')).refreshStatus).toBe(true);
     expect(classifyError(err(403, 'permission_denied')).refreshStatus).toBe(true);
     expect(classifyError(err(403, 'external_provider_not_acknowledged')).refreshStatus).toBe(true);
+    expect(classifyError(err(403, 'external_documents_not_acknowledged')).refreshStatus).toBe(true);
     expect(classifyError(err(422, 'invalid_tool_arguments')).refreshStatus).toBe(false);
     expect(classifyError(err(500)).refreshStatus).toBe(false);
   });
@@ -76,11 +80,11 @@ describe('classifyError', () => {
 describe('notice copy', () => {
   const KEYS: NoticeKey[] = [
     'platform_disabled', 'tenant_disabled', 'consent_required', 'permission_denied', 'tool_permission_denied', 'provider_unavailable',
-    'external_provider_not_acknowledged', 'currency_unsupported', 'branch_scope_forbidden', 'warehouse_scope_forbidden', 'scope_not_supported', 'invalid_tool_arguments',
+    'external_provider_not_acknowledged', 'external_documents_not_acknowledged', 'external_documents_unavailable', 'currency_unsupported', 'branch_scope_forbidden', 'warehouse_scope_forbidden', 'scope_not_supported', 'invalid_tool_arguments',
     'invalid_request', 'budget_not_configured', 'budget_exceeded', 'platform_budget_exceeded', 'pricing_unknown',
     'acknowledgement_required', 'data_category_unavailable', 'duplicate_request', 'rate_limited', 'network_error', 'server_error', 'unknown_error',
     'category_unavailable', 'document_center_unavailable', 'document_unavailable', 'document_not_reviewed', 'document_review_stale', 'document_quarantined',
-    'document_scan_incomplete', 'document_on_hold', 'document_retention_ended', 'document_projection_unavailable',
+    'document_scan_incomplete', 'document_on_hold', 'document_retention_ended', 'document_projection_unavailable', 'document_too_large',
   ];
   it.each([['ar', arMessages], ['en', enMessages]] as const)('has a title and body for every state in %s', (_locale, messages) => {
     const notice = (messages as unknown as { intelligence: { notice: Record<string, { title?: string; body?: string }> } }).intelligence.notice;

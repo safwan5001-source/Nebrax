@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Support\AiAssistantDataCategory;
 use App\Support\AiAssistantDenied;
 use App\Support\AiAnswerGuard;
+use App\Support\AiDocumentDigest;
 use App\Support\AiAssistantPricing;
 use App\Support\AiToolResultDigest;
 use App\Support\Settings;
@@ -58,6 +59,11 @@ class AiAssistantGateway
         $tenantId = (string) $requester->tenant_id;
         $actorId = (string) $requester->getKey();
         $categories = $input['data_categories'] ?? [AiAssistantDataCategory::ASSISTANT_MESSAGES];
+        // AI-07ب: مستند واحد يحدّده المستخدم صراحةً (UUID من شاشته). وجوده يضيف فئة نص المستند وصلاحية المركز إلى التفويض.
+        $documentId = isset($input['document_id']) ? strtolower((string) $input['document_id']) : null;
+        if ($documentId !== null) {
+            $categories = array_values(array_unique([...$categories, AiAssistantDataCategory::ASSISTANT_MESSAGES, AiAssistantDataCategory::DOCUMENT_PROJECTED_TEXT]));
+        }
         $branchIds = $input['scope']['branch_ids'] ?? [];
         $warehouseIds = $input['scope']['warehouse_ids'] ?? [];
         $locale = ($input['locale'] ?? 'ar') === 'en' ? 'en' : 'ar';
@@ -81,9 +87,10 @@ class AiAssistantGateway
         $finalAudited = false;
         $usage = ['input_tokens' => 0, 'output_tokens' => 0, 'cost_micro_usd' => 0];
         $extra = [];
+        $documentContext = null;
 
         try {
-            $actor = $this->policy->authorize($actorId, $categories);
+            $actor = $this->policy->authorize($actorId, $categories, $documentId !== null ? 'documents.center.view' : null);
             $scope = $this->scopeGuard->resolve($actor, $branchIds, $warehouseIds);
             $provider = $this->provider();
             $external = $provider instanceof AiExternalAssistantProvider;
@@ -95,13 +102,31 @@ class AiAssistantGateway
                 throw AiAssistantDenied::for('external_provider_not_acknowledged');
             }
 
+            if ($documentId !== null) {
+                // لا مستند لمزوّد تجريبي (لا نموذج حقيقي يجيب)، ولا بلا مفتاح المنصة الثالث، ولا بلا إقرار المؤسسة المستقل.
+                if (! $external) {
+                    throw AiAssistantDenied::for('provider_unavailable');
+                }
+                if (config('ai_assistant.documents.external_send_enabled') !== true) {
+                    throw AiAssistantDenied::for('external_documents_unavailable');
+                }
+                if ((Settings::group('ai_assistant_external', Tenant::query()->findOrFail($tenantId))['documents_acknowledged'] ?? false) !== true) {
+                    throw AiAssistantDenied::for('external_documents_not_acknowledged');
+                }
+            }
+
             $profile = AiAssistantPricing::profile($provider->name(), $provider->model())
                 ?? throw AiAssistantDenied::for('pricing_unknown');
 
             $maxOutput = (int) config('ai_assistant.limits.max_output_tokens', 1024);
             $estimatedInput = AiAssistantPricing::estimateInputTokens($message);
             // الخارجي نداءان كحدّ أقصى: يُحجز لهما معاً قبل أول استدعاء.
-            [$reserveIn, $reserveOut] = $external ? $provider->reservationEstimate($estimatedInput, $maxOutput) : [$estimatedInput, $maxOutput];
+            $documentMaxTokens = (int) config('ai_assistant.documents.external_max_tokens', 4000);
+            [$reserveIn, $reserveOut] = match (true) {
+                $documentId !== null => $provider->documentReservationEstimate($estimatedInput, $documentMaxTokens, $maxOutput),
+                $external => $provider->reservationEstimate($estimatedInput, $maxOutput),
+                default => [$estimatedInput, $maxOutput],
+            };
 
             $request = $this->ledger->open(
                 $tenantId,
@@ -112,7 +137,8 @@ class AiAssistantGateway
                 $reserveIn + $reserveOut,
                 AiAssistantPricing::costMicroUsd($profile, $reserveIn, $reserveOut),
                 $idempotencyKey,
-                $this->fingerprint($message, $locale, $categories, $branchIds, $warehouseIds),
+                $this->fingerprint($message, $locale, $categories, $branchIds, $warehouseIds, $documentId),
+                $documentId !== null ? 'assistant_document' : 'assistant',
             );
             $requestId = $log['request_id'] = $request->id;
             $extra['attempt'] = $request->attempt;
@@ -121,7 +147,7 @@ class AiAssistantGateway
                 'branch_mode' => $scope['branch']['mode'], 'branch_count' => count($scope['branch']['ids']),
                 'warehouse_mode' => $scope['warehouse']['mode'], 'warehouse_count' => count($scope['warehouse']['ids']),
                 'billable' => $profile['billable'],
-            ] + ($external ? ['external_ack' => true] : []);
+            ] + ($external ? ['external_ack' => true] : []) + ($documentId !== null ? ['document_external' => true, 'document_ack' => true] : []);
 
             // دائم وإلزامي قبل أي استدعاء: إن تعذّر يُحرَّر الحجز ويُمنع الاستدعاء.
             try {
@@ -135,91 +161,143 @@ class AiAssistantGateway
             }
 
             [$timezone, $today] = $this->tenantClock($tenantId);
-            $reply = $this->callProvider($provider, $profile, $request, ['message' => $message, 'locale' => $locale, 'max_output_tokens' => $maxOutput, 'today' => $today, 'timezone' => $timezone], $tenantId, $actorId, $extra, $finalAudited, $settled);
-
-            $usage = $this->usage($profile, $reply['usage']);
-            $plannedCalls = $reply['tool_calls'];
-            $log['tool_calls_planned'] = $meta['tool_calls_planned'] = count($plannedCalls);
-            $tooMany = count($plannedCalls) > (int) config('ai_assistant.limits.max_tool_calls', 3);
-            $executed = [];
-
-            if ($external && $plannedCalls !== [] && ! $tooMany) {
-                // مزوّد خارجي اقترح أدوات: التنفيذ بتفويض طازج لكل أداة أولاً، ثم صياغة الجواب من ملخّصات محجوبة.
-                // التسوية تتأخر إلى ما بعد النداء الثاني؛ أي إخفاق قبله يُسوّي ما استُهلك فعلاً (النداء الأول).
+            if ($documentId !== null) {
+                // قراءة محلية بتفويض طازج (الحارس نفسه للقراءة الصريحة): مراجعة بشرية + تنقيح + نطاق مستأجر/فرع + حالة المستند.
                 try {
-                    foreach ($plannedCalls as $call) {
-                        $executed[] = $this->invokeTool($actorId, $call, $branchIds, $warehouseIds, $requestId, $tenantId, $extra, explicit: false);
-                        $log['tool_calls_executed'] = $meta['tool_calls_executed'] = count($executed);
-                    }
+                    $read = $this->invokeTool($actorId, ['name' => AiDocumentProjectionTool::NAME, 'arguments' => ['document_id' => $documentId]], $branchIds, $warehouseIds, $requestId, $tenantId, $extra, explicit: true);
                 } catch (Throwable $e) {
-                    $this->settle($request, $profile, $usage, $settled, $extra, $meta);
+                    // لم يُرسَل شيء إلى المزوّد: تُحرَّر المحجوزات بلا أي رسوم.
+                    $this->ledger->fail($request, ['input_tokens' => 0, 'output_tokens' => 0, 'cost_micro_usd' => 0], $e instanceof AiAssistantDenied ? $e->reason : 'internal_error');
+                    $settled = true;
 
                     throw $e;
                 }
+                $executed = [];
+                $built = AiDocumentDigest::build($read['result'], $documentMaxTokens);
+                if (! $built['fits']) {
+                    // الأساس لا يتّسع في الحد الصارم: رفض آمن **قبل أي اتصال** وتُحرَّر المحجوزات بلا أي رسوم.
+                    $this->ledger->fail($request, ['input_tokens' => 0, 'output_tokens' => 0, 'cost_micro_usd' => 0], 'document_too_large');
+                    $settled = true;
 
-                $digests = [];
-                $names = [];
-                $maxResultTokens = (int) config('ai_assistant.limits.tool_result_max_tokens', 3000);
-                foreach ($executed as $result) {
-                    $built = AiToolResultDigest::build($result['result'], intdiv($maxResultTokens, max(1, count($executed))));
-                    $digests[] = ['tool' => $result['tool'], 'digest' => $built['digest']];
-                    $names += $built['names'];
+                    throw AiAssistantDenied::for('document_too_large');
                 }
-                $meta['composed'] = true;
-                $meta['results_digested'] = count($digests);
+                $meta['document_fields_sent'] = $built['fields'];
+                $meta['document_lines_sent'] = $built['lines'];
 
                 try {
-                    $composed = $provider->compose(
-                        ['message' => $message, 'locale' => $locale, 'max_output_tokens' => $maxOutput, 'today' => $today, 'timezone' => $timezone],
-                        (array) ($reply['continuation'] ?? []),
-                        $digests,
-                    );
+                    $answered = $provider->answerDocument(['message' => $message, 'locale' => $locale, 'max_output_tokens' => $maxOutput, 'today' => $today, 'timezone' => $timezone], $built['digest']);
                 } catch (Throwable $e) {
                     report($e);
-                    // النداء الأول استُهلك فعلاً ($usage). النداء الثاني فشل بلا استهلاك مُبلَّغ: يُطبَّق عليه `failure_charge` (قد يكون
-                    // فُوتِر) — حصّته من الحجز تُحتسب مرة واحدة مع المقيس الفعلي، لا يُفقد ولا يُحتسب مرتين.
-                    $reported = $this->usage($profile, ['input_tokens' => $usage['input_tokens'], 'output_tokens' => $usage['output_tokens']]);
-                    if (config('ai_assistant.budget.failure_charge', 'reserved') !== 'none') {
-                        [$secondIn, $secondOut] = $provider->secondCallReservation($estimatedInput, $maxOutput);
-                        $reported['unmetered_tokens'] = $secondIn + $secondOut;
-                        $reported['cost_micro_usd'] += AiAssistantPricing::costMicroUsd($profile, $secondIn, $secondOut);
-                    }
+                    $reported = $e instanceof AiProviderException && $e->usage !== null ? $this->usage($profile, $e->usage) : null;
                     $this->ledger->fail($request, $reported, 'provider_error');
                     $settled = true;
-                    $this->audit->record($requestId, $tenantId, $actorId, 'request.failed', 'error', 'provider_error', $extra + $reported);
+                    $this->audit->record($requestId, $tenantId, $actorId, 'request.failed', 'error', 'provider_error', $extra + ($reported ?? []));
                     $finalAudited = true;
 
                     throw AiAssistantDenied::for('internal_error');
                 }
 
-                $usage = $this->usage($profile, $composed['usage']);
+                $usage = $this->usage($profile, $answered['usage']);
                 $this->settle($request, $profile, $usage, $settled, $extra, $meta);
-
-                $max = (int) config('ai_assistant.limits.answer_max_chars', 4000);
-                $answer = AiAnswerGuard::sanitize((string) $composed['content'], $max);
-                $meta['grounded'] = $answer !== '' && AiAnswerGuard::isGrounded($answer, array_column($digests, 'digest'));
-                $reply['content'] = $meta['grounded']
-                    ? AiAnswerGuard::restoreNames($answer, $names)
-                    : ($locale === 'en'
-                        ? 'I could not verify the figures in my written answer, so it was withheld. The approved report figures are shown below.'
-                        : 'تعذّر التحقق من الأرقام الواردة في صياغتي للجواب فحُجب. الأرقام المعتمدة معروضة في بطاقات النتائج أدناه.');
+                $answer = AiAnswerGuard::sanitize((string) $answered['content'], (int) config('ai_assistant.limits.answer_max_chars', 4000));
+                // تأريض: كل رقم في الجواب يجب أن يكون من القيم المرسلة. ما لا يمكن التحقق منه يُحجب لا يُصلَح بصمت.
+                $meta['grounded'] = $answer !== '' && AiAnswerGuard::isGrounded($answer, [$built['digest']]);
+                $reply = [
+                    'content' => $meta['grounded']
+                        ? AiAnswerGuard::restoreNames($answer, $built['names'])
+                        : ($locale === 'en'
+                            ? 'I could not verify the figures in my written answer against the document values, so it was withheld. The document values are shown on the page.'
+                            : 'تعذّر التحقق من الأرقام في صياغتي للجواب مقابل قيم المستند فحُجب. قيم المستند معروضة في الصفحة.'),
+                ];
+                $documentContext = ['ref' => $documentId, 'fields_sent' => $built['fields'], 'lines_sent' => $built['lines'], 'redacted' => $built['redacted']];
             } else {
-                $this->settle($request, $profile, $usage, $settled, $extra, $meta);
-                if ($tooMany) {
-                    throw AiAssistantDenied::for('too_many_tool_calls');
+                $reply = $this->callProvider($provider, $profile, $request, ['message' => $message, 'locale' => $locale, 'max_output_tokens' => $maxOutput, 'today' => $today, 'timezone' => $timezone], $tenantId, $actorId, $extra, $finalAudited, $settled);
+
+                $usage = $this->usage($profile, $reply['usage']);
+                $plannedCalls = $reply['tool_calls'];
+                $log['tool_calls_planned'] = $meta['tool_calls_planned'] = count($plannedCalls);
+                $tooMany = count($plannedCalls) > (int) config('ai_assistant.limits.max_tool_calls', 3);
+                $executed = [];
+
+                if ($external && $plannedCalls !== [] && ! $tooMany) {
+                    // مزوّد خارجي اقترح أدوات: التنفيذ بتفويض طازج لكل أداة أولاً، ثم صياغة الجواب من ملخّصات محجوبة.
+                    // التسوية تتأخر إلى ما بعد النداء الثاني؛ أي إخفاق قبله يُسوّي ما استُهلك فعلاً (النداء الأول).
+                    try {
+                        foreach ($plannedCalls as $call) {
+                            $executed[] = $this->invokeTool($actorId, $call, $branchIds, $warehouseIds, $requestId, $tenantId, $extra, explicit: false);
+                            $log['tool_calls_executed'] = $meta['tool_calls_executed'] = count($executed);
+                        }
+                    } catch (Throwable $e) {
+                        $this->settle($request, $profile, $usage, $settled, $extra, $meta);
+
+                        throw $e;
+                    }
+
+                    $digests = [];
+                    $names = [];
+                    $maxResultTokens = (int) config('ai_assistant.limits.tool_result_max_tokens', 3000);
+                    foreach ($executed as $result) {
+                        $built = AiToolResultDigest::build($result['result'], intdiv($maxResultTokens, max(1, count($executed))));
+                        $digests[] = ['tool' => $result['tool'], 'digest' => $built['digest']];
+                        $names += $built['names'];
+                    }
+                    $meta['composed'] = true;
+                    $meta['results_digested'] = count($digests);
+
+                    try {
+                        $composed = $provider->compose(
+                            ['message' => $message, 'locale' => $locale, 'max_output_tokens' => $maxOutput, 'today' => $today, 'timezone' => $timezone],
+                            (array) ($reply['continuation'] ?? []),
+                            $digests,
+                        );
+                    } catch (Throwable $e) {
+                        report($e);
+                        // النداء الأول استُهلك فعلاً ($usage). النداء الثاني فشل بلا استهلاك مُبلَّغ: يُطبَّق عليه `failure_charge` (قد يكون
+                        // فُوتِر) — حصّته من الحجز تُحتسب مرة واحدة مع المقيس الفعلي، لا يُفقد ولا يُحتسب مرتين.
+                        $reported = $this->usage($profile, ['input_tokens' => $usage['input_tokens'], 'output_tokens' => $usage['output_tokens']]);
+                        if (config('ai_assistant.budget.failure_charge', 'reserved') !== 'none') {
+                            [$secondIn, $secondOut] = $provider->secondCallReservation($estimatedInput, $maxOutput);
+                            $reported['unmetered_tokens'] = $secondIn + $secondOut;
+                            $reported['cost_micro_usd'] += AiAssistantPricing::costMicroUsd($profile, $secondIn, $secondOut);
+                        }
+                        $this->ledger->fail($request, $reported, 'provider_error');
+                        $settled = true;
+                        $this->audit->record($requestId, $tenantId, $actorId, 'request.failed', 'error', 'provider_error', $extra + $reported);
+                        $finalAudited = true;
+
+                        throw AiAssistantDenied::for('internal_error');
+                    }
+
+                    $usage = $this->usage($profile, $composed['usage']);
+                    $this->settle($request, $profile, $usage, $settled, $extra, $meta);
+
+                    $max = (int) config('ai_assistant.limits.answer_max_chars', 4000);
+                    $answer = AiAnswerGuard::sanitize((string) $composed['content'], $max);
+                    $meta['grounded'] = $answer !== '' && AiAnswerGuard::isGrounded($answer, array_column($digests, 'digest'));
+                    $reply['content'] = $meta['grounded']
+                        ? AiAnswerGuard::restoreNames($answer, $names)
+                        : ($locale === 'en'
+                            ? 'I could not verify the figures in my written answer, so it was withheld. The approved report figures are shown below.'
+                            : 'تعذّر التحقق من الأرقام الواردة في صياغتي للجواب فحُجب. الأرقام المعتمدة معروضة في بطاقات النتائج أدناه.');
+                } else {
+                    $this->settle($request, $profile, $usage, $settled, $extra, $meta);
+                    if ($tooMany) {
+                        throw AiAssistantDenied::for('too_many_tool_calls');
+                    }
+                    foreach ($plannedCalls as $call) {
+                        $executed[] = $this->invokeTool($actorId, $call, $branchIds, $warehouseIds, $requestId, $tenantId, $extra, explicit: false);
+                        $log['tool_calls_executed'] = $meta['tool_calls_executed'] = count($executed);
+                    }
+                    if ($external) {
+                        // الجواب المباشر من النموذج (بلا أدوات): نصّ بلا أرقام معتمدة، يُنظَّف فقط وتُرفض فيه أي أرقام مالية.
+                        $answer = AiAnswerGuard::sanitize((string) $reply['content'], (int) config('ai_assistant.limits.answer_max_chars', 4000));
+                        $meta['grounded'] = $answer !== '' && AiAnswerGuard::isGrounded($answer, []);
+                        $reply['content'] = $meta['grounded'] ? $answer : ($locale === 'en'
+                            ? 'I can only answer from the approved reports (income statement, receivables aging, payables aging). Please ask about one of them.'
+                            : 'أستطيع الإجابة من التقارير المعتمدة فقط (قائمة الدخل، أعمار الذمم المدينة، أعمار الذمم الدائنة). اسأل عن أحدها.');
+                    }
                 }
-                foreach ($plannedCalls as $call) {
-                    $executed[] = $this->invokeTool($actorId, $call, $branchIds, $warehouseIds, $requestId, $tenantId, $extra, explicit: false);
-                    $log['tool_calls_executed'] = $meta['tool_calls_executed'] = count($executed);
-                }
-                if ($external) {
-                    // الجواب المباشر من النموذج (بلا أدوات): نصّ بلا أرقام معتمدة، يُنظَّف فقط وتُرفض فيه أي أرقام مالية.
-                    $answer = AiAnswerGuard::sanitize((string) $reply['content'], (int) config('ai_assistant.limits.answer_max_chars', 4000));
-                    $meta['grounded'] = $answer !== '' && AiAnswerGuard::isGrounded($answer, []);
-                    $reply['content'] = $meta['grounded'] ? $answer : ($locale === 'en'
-                        ? 'I can only answer from the approved reports (income statement, receivables aging, payables aging). Please ask about one of them.'
-                        : 'أستطيع الإجابة من التقارير المعتمدة فقط (قائمة الدخل، أعمار الذمم المدينة، أعمار الذمم الدائنة). اسأل عن أحدها.');
-                }
+
             }
 
             $this->audit->record($requestId, $tenantId, $actorId, 'request.completed', 'allowed', 'ok', $extra + ['meta' => $meta]);
@@ -261,7 +339,7 @@ class AiAssistantGateway
             'scope' => $scope,
             'usage' => ['input_tokens' => $usage['input_tokens'], 'output_tokens' => $usage['output_tokens']],
             'tool_calls' => $executed,
-        ];
+        ] + ($documentContext === null ? [] : ['document' => $documentContext]);
     }
 
     /**
@@ -473,13 +551,13 @@ class AiAssistantGateway
     }
 
     /** بصمة الطلب لكشف إعادة استعمال مفتاح التكرار مع طلب مختلف — HMAC لا نصّ. */
-    private function fingerprint(string $message, string $locale, array $categories, array $branchIds, array $warehouseIds): string
+    private function fingerprint(string $message, string $locale, array $categories, array $branchIds, array $warehouseIds, ?string $documentId = null): string
     {
         sort($categories);
         sort($branchIds);
         sort($warehouseIds);
 
-        return $this->ledger->hmac(json_encode([$message, $locale, $categories, $branchIds, $warehouseIds], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+        return $this->ledger->hmac(json_encode([$message, $locale, $categories, $branchIds, $warehouseIds] + ($documentId === null ? [] : [5 => $documentId]), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
     }
 
     /** @param array<string,mixed> $context */

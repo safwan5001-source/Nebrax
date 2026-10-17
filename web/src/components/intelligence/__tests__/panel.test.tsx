@@ -181,6 +181,58 @@ describe('external provider (AI-07)', () => {
   });
 });
 
+describe('asking about a document (AI-07ب)', () => {
+  const DOC = '11111111-2222-4333-8444-555555555555';
+  const ready = () => makeStatus({ provider_mode: 'external', provider_label: 'anthropic', document_ask: 'ready', tenant: { enabled: true, consented_categories: ['assistant_messages', 'financial_summary', 'document_projected_text'], external_acknowledged: true, external_documents_acknowledged: true } });
+
+  it('offers the toggle only on a document screen when the server says it is ready, and sends the path id (never typed text)', async () => {
+    session.pathname = `/documents/${DOC}`;
+    api.fetchStatus.mockResolvedValue(ready());
+    api.sendMessage.mockResolvedValueOnce(messageResponse([]));
+    api.sendMessage.mockResolvedValueOnce({ ...messageResponse([]), document: { ref: DOC, fields_sent: 9, lines_sent: 2, redacted: 1 } });
+    mount('en');
+    const dialog = await openPanel();
+    const toggle = await within(dialog).findByRole('checkbox', { name: /Answer from this document/ });
+    await userEvent.type(within(dialog).getByRole('textbox'), 'What is the total?');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }));
+    // بلا تفعيل الخيار: سؤال عادي بلا مستند.
+    await waitFor(() => expect(api.sendMessage).toHaveBeenCalledWith({ message: 'What is the total?', locale: 'en' }));
+
+    await userEvent.click(toggle);
+    await userEvent.type(within(dialog).getByRole('textbox'), 'Summarize it');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(api.sendMessage).toHaveBeenLastCalledWith({ message: 'Summarize it', locale: 'en', documentId: DOC }));
+    expect((await within(dialog).findByText(/Based on this document: 9 fields, 2 lines sent; 1 hidden/)).closest('[data-document-basis]')).toBeTruthy();
+  });
+
+  it('shows no toggle off the document screen or when the server says it is not ready, and explains an admin-fixable block', async () => {
+    api.fetchStatus.mockResolvedValue(ready());
+    mount('en');
+    let dialog = await openPanel();
+    await within(dialog).findByText('Ask about your numbers, from your reports');
+    expect(within(dialog).queryByRole('checkbox', { name: /Answer from this document/ })).toBeNull();
+    cleanup();
+
+    session.pathname = `/documents/${DOC}`;
+    api.fetchStatus.mockResolvedValue({ ...ready(), document: 'ready', document_ask: 'external_documents_not_acknowledged' });
+    mount('en');
+    dialog = await openPanel();
+    await waitFor(() => expect(within(dialog).getByRole('status', { name: '' }).getAttribute('data-notice')).toBeTruthy());
+    expect(within(dialog).queryByRole('checkbox', { name: /Answer from this document/ })).toBeNull();
+    expect(within(dialog).getByText('Acknowledge document sending first')).toBeTruthy();
+  });
+
+  it('never sends a document question when the freshly read state is not ready', async () => {
+    session.pathname = `/documents/${DOC}`;
+    api.fetchStatus.mockResolvedValue({ ...ready(), document_ask: 'provider_unavailable' });
+    mount('en');
+    const dialog = await openPanel();
+    await within(dialog).findByRole('textbox');
+    expect(within(dialog).queryByRole('checkbox', { name: /Answer from this document/ })).toBeNull();
+    expect(api.sendMessage).not.toHaveBeenCalled();
+  });
+});
+
 describe('conversation', () => {
   it('sends a suggestion through the gateway, labels the reply as demo and links to the canvas and report', async () => {
     session.pathname = '/reports/general/income-statement';
