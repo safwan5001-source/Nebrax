@@ -13,6 +13,7 @@ PR #1560 كان مبنيًا على تاريخ يحتوي commits الخاصة �
 - Base SHA: `0bb86f720443a65b95f865600f4d16987847a99d`
 - Previous PR HEAD protected before rewrite: `bb1bca66796ba224eab9a8e27cd11be028acb19e`
 - Pre-#1560 comparison base: `9db5e3b63cb9d1533ea07792fbbb885cf6406400`
+- Rebased PR HEAD: `5e25cc0439cd09c9198d39f809b3e21cb7686bed`
 
 ## Files Conflicting in a Direct Full-History Merge
 
@@ -63,12 +64,13 @@ These are historical overlap conflicts with the squashed #1559 content, not evid
 
 Local PHP/Docker execution is unavailable in the Sandbox, so local Laravel/PostgreSQL execution cannot be claimed.
 
-Before conflict resolution, PR #1560 had passed PostgreSQL, SQLite, Web CI, and CI Gate on its old base. After pushing the rebased branch, GitHub CI must be rerun and verified for:
+Before conflict resolution, PR #1560 had passed PostgreSQL, SQLite, Web CI, and CI Gate on its old base. After pushing the rebased branch, the new GitHub CI completed successfully:
 
-- PostgreSQL Laravel test suite
-- SQLite Laravel test suite
-- Web CI
-- CI Gate
+- PostgreSQL Laravel test suite: **PASS**
+- SQLite Laravel test suite: **PASS**
+- Web CI pull request check: **PASS**
+- Web CI push check: **PASS**
+- CI Gate: **PASS**
 
 No real Anthropic API call was made.
 
@@ -78,8 +80,8 @@ The reconstructed tree contains 32 changed files relative to `main`; the exact s
 
 ## Remaining Risks
 
-The only remaining risk before delivery is CI verification on the rewritten branch. The rewrite uses `--force-with-lease` against the protected old head and must be aborted if the remote branch changed unexpectedly.
+The rewrite used `--force-with-lease` against the protected old head. The PR is now reported as mergeable and all required checks are green. The remaining risk is limited to normal post-CI review; no merge or deployment was performed.
 
 ## Next Action
 
-Push the reconstructed `main`-based branch to PR #1560 with an explicit `--force-with-lease`, then verify the new CI and mergeability. Do not merge or deploy.
+The reconstructed `main`-based branch was pushed to PR #1560 with an explicit `--force-with-lease`; mergeability and CI were verified. Do not merge or deploy without separate approval.
