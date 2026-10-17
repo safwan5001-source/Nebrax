@@ -6,7 +6,7 @@
 |---|---|
 | Was real Cloudflare R2 tested? | **No. BLOCKED.** This environment has no R2 test bucket, no scoped token and no R2 endpoint. **No claim of real-R2 validation is made anywhere in this report.** |
 | Is architecture B2 feasible on R2? | **Not yet proven. Not disproven.** The documented capabilities and the app's own SDK are compatible with B2 (§3), but every R2-specific behaviour (§5) is **unverified**. |
-| What was delivered instead | A complete, reproducible, credential-safe V0 test harness, validated end-to-end against a SigV4-validating **local look-alike** (24/24 required cases) and proven to detect failures by a negative control — **neither is R2 evidence**. |
+| What was delivered instead | A complete, reproducible, credential-safe V0 test harness, validated end-to-end against a SigV4-validating **local look-alike** (24/24 required cases) and proven to detect (or correctly ignore) injected faults — including the three gate defects found in review (§5a) — **none of it is R2 evidence**. |
 | Video implementation | **NO-GO** until the harness passes on real R2 (V-G1). No video endpoint, DB change, UI, bucket or Railway change was made. |
 | What unblocks it | Owner action in §6 (an isolated R2 test bucket + a bucket-scoped token as environment variables, and network egress to the R2 host). About 15 minutes of owner time, then one command. |
 
@@ -44,7 +44,7 @@ scrubbed of credentials, signature parameters and the account id; the result fil
 
 ## 5. Test matrix
 **R** = required for B2 (a failure is a blocker or needs a proxy-side shim) · **I** = informational (behaviour recorded, shim chosen from it). Columns: *Real R2* — **NOT RUN** for every row;
-*Look-alike* = Scality CloudServer on loopback, SigV4-validating (`result-selftest-scality.json`) — proves the harness works, says **nothing** about R2; *Neg. control* = same store behind a forwarder that drops `Range`.
+*Look-alike* = Scality CloudServer on loopback, SigV4-validating (`result-selftest-scality.json`) — proves the harness works, says **nothing** about R2; *Neg. control* = same store behind `fault-injector.mjs --mode=drop-range` (drops `Range`).
 
 | ID | Case | Grp | Real R2 | Look-alike | Neg. control | Note / B2 handling |
 |---|---|---|---|---|---|---|
@@ -58,9 +58,9 @@ scrubbed of credentials, signature parameters and the account id; the result fil
 | R8 | Start == size → 416 | R | NOT RUN | PASS | FAIL | Look-alike answers 416 **without** `Content-Range`; criterion relaxed (see below): proxy synthesises `bytes */N` |
 | R9 | Start > size → 416 | R | NOT RUN | PASS | FAIL | |
 | R10 | Last byte `bytes=N-1-` → 206, 1 B | R | NOT RUN | PASS | FAIL | |
-| R11 | Identical strong, quoted `ETag` on 200 / every 206 / HEAD | R | NOT RUN | PASS | PASS | Treat ETag as opaque (multipart uploads are not MD5) |
+| R11 | One strong, quoted `ETag` on **every** successful response: the 200, every 206 (closed, open-ended, suffix, EOF-clamped, If-Range, parallel…) and the HEAD; a missing required observation fails | R | NOT RUN | PASS (34 responses, 1 ETag) | PASS | Treat ETag as opaque (multipart uploads are not MD5). *Fixed after review — see §5a* |
 | R12 | `Accept-Encoding: identity` → no `Content-Encoding` on 200/206 (video/mp4) | R | NOT RUN | PASS | PASS | Proxy must send `identity` (Node's default is gzip) |
-| R13 | No 3xx on any correctly signed request (`redirect: manual`) | R | NOT RUN | PASS | PASS | Proxy treats **any** 3xx as failure |
+| R13 | No 3xx on any correctly signed **HTTPS** request (`redirect: manual`); negative controls and the informational I10 plain-http probe never feed this gate | R | NOT RUN | PASS (41 signed requests) | PASS | Proxy treats **any** 3xx as failure. *Fixed after review — see §5a* |
 | R14 | Expired URL → 403, nothing served | R | NOT RUN | PASS | FAIL¹ | TTL 4 s in the harness; production TTL 60–120 s |
 | R15a | Tampered signature → 403 | R | NOT RUN | PASS | PASS | |
 | R15b | Signed for key A, used for key B → 403 | R | NOT RUN | PASS | PASS | Tenant/key isolation at the storage layer |
@@ -69,7 +69,7 @@ scrubbed of credentials, signature parameters and the account id; the result fil
 | R16a | `PUT` with a GET-signed URL → 403, object unchanged | R | NOT RUN | PASS | FAIL¹ | |
 | R16b | `DELETE` with a GET-signed URL → 403, object present | R | NOT RUN | PASS | FAIL¹ | |
 | R17 | Unsigned GET → 403 (bucket private) | R | NOT RUN | PASS | PASS | Needs the owner to keep the test bucket private (no public access, no custom domain) |
-| R18 | No provider response header exposes a credential/signature/URL | R | NOT RUN | PASS | PASS | Proxy forwards a **whitelist** only (`content-type/-length/-range`, `accept-ranges`, `etag`, `last-modified`) |
+| R18 | No provider response header **name or value** exposes a credential, signature, SigV4 material or the signed URL (all headers of all 50 responses scanned) | R | NOT RUN | PASS | PASS | *Fixed after review — see §5a.* Proxy forwards a **whitelist** only (`content-type/-length/-range`, `accept-ranges`, `etag`, `last-modified`) |
 | R19 | Offline SSRF host allow-list, 15 cases | R | **PASS (offline)** | **PASS (offline)** | PASS | The only check that needs neither R2 nor credentials; it proves the guard logic, not R2 |
 | R20 | Every signer URL passes the allow-list | R | NOT RUN | PASS | PASS | Virtual-hosted and path-style hosts both pass |
 | I1 | HEAD with a HEAD-signed URL | I | NOT RUN | 200, same metadata | – | B2 does not need HEAD (size/ETag come from the authorise response) |
@@ -85,13 +85,40 @@ scrubbed of credentials, signature parameters and the account id; the result fil
 | I11 | 8 parallel ranges | I | NOT RUN | PASS | – | |
 | I12 | Empty object: full GET 200 / `bytes=0-0` | I | NOT RUN | 200 len 0 / 416 | – | |
 | I13 | 8 KiB `Range` header | I | NOT RUN | 200 (ignored) | – | Proxy caps header length |
+| I14 | Provider error bodies echoing credential/signature material (kinds only) | I | NOT RUN | none | – | Proxy never forwards upstream bodies; log-hygiene note |
 
 ¹ Fails on the negative control only because the check reads the object back with a `Range` request, which that forwarder drops — a consequence, not a separate defect.
 
 **Criterion change, disclosed:** R8 originally required the provider to send `Content-Range: bytes */N`. The look-alike's `416 InvalidRange` carries no such header, and the proxy knows `N` from the
 authorise response, so the criterion was relaxed to "416" (provider behaviour is recorded in `providerSendsContentRangeStar`). The change was made after seeing the look-alike, **before any R2 run**.
 
-**Look-alike result: 24/24 required pass; negative control: 12/24 fail as designed** (all of R2–R10 plus the Range-dependent R14/R16a/R16b) — the probe detects a store that ignores `Range`.
+**Look-alike result: 24/24 required pass; negative control (`drop-range`): 12/24 fail as designed** (all of R2–R10 plus the Range-dependent R14/R16a/R16b) — the probe detects a store that ignores `Range`.
+
+### 5a. Review fixes (PR #1558, before any real-R2 run)
+Three review findings were confirmed in `v0-r2-range-probe.mjs`; each is fixed, covered by a regression test that fails on the pre-fix behaviour, and demonstrated end-to-end with a fault injector against the local look-alike. The gate logic now lives in the I/O-free `v0-gates.mjs`.
+
+| # | Finding | Defect (reproduced) | Fix |
+|---|---|---|---|
+| P1 | **R13** counted the informational I10 plain-http probe | A real endpoint that redirects `http://` → `https://` — an outcome I10 explicitly accepts — set the global `saw3xx` flag, so R13 reported a **false security failure** (and §7 would classify the run NO-GO). The same flag was also fed by tampered/unsigned/expired controls. | Observations carry a kind: `signed` (correctly signed HTTPS) · `negative` · `informational`. **Only `signed` feeds R13**; I10 and negative controls are recorded (`informationalRedirects`, `negativeRedirects`) but cannot fail it. A 3xx on any correctly signed request still fails, 304 is not a redirect. I10 reports where a redirect points only as a class (`same-host-https` …), never a URL. |
+| P1 | **R18** looked at header *names* only | A provider that echoes the signed URL, the signature, the credential scope or the access key in the *value* of an ordinary header (e.g. `Location`, a debug header) **passed** R18 — a **false security pass** (the value was scrubbed from the output, so it was also invisible). | Every header of every response is scanned **by value**, in memory, against the secrets, every URL the probe sent (signed, derived, tampered), their query strings, signature, credential-scope and token values (raw, percent-encoded and decoded), plus generic markers (`X-Amz-Signature=`, `X-Amz-Credential=`, `AWS4-HMAC-SHA256`). Findings carry **only header name + kind + count** — never a value. Error bodies get the same scan as informational **I14**. Name-based detection is kept. |
+| P2 | **R11** compared only R1–R4, R10 and HEAD | An ETag that changes on an open-ended (R5), suffix (R6) or EOF-clamped (R7) response — or on If-Range/parallel/suffix-larger responses — **passed**. | Every 200/206 for the test object is logged with a label; R11 requires one strong, quoted ETag across **all** of them (34 on the look-alike) **and** the presence of R1–R7, R10 and I1 (a silently skipped case cannot pass). |
+
+**Reproduction → fix (all on the local look-alike, NOT R2).** Pre-fix probe = `db1ac4c5b` (with only the self-test hook added so I10 can run on loopback); fixed probe = this PR. Faults from `fault-injector.mjs`:
+
+| Fault injected | Pre-fix probe | Fixed probe | Correct? |
+|---|---|---|---|
+| `leak-url-header` — full signed URL in `x-debug-origin` | R18 **PASS** (false pass) | R18 **FAIL** — `x-debug-origin`: credential, signed-url, signed-url-query, credential-scope, signature, signed-url-parameter, sigv4-material (counts only) | ✔ |
+| `leak-signature-header` — signature value in `x-trace` | R18 PASS (false pass; not run pre-fix, same blind spot) | R18 **FAIL** — `x-trace`: signature | ✔ |
+| `etag-drift` — new ETag only on open-ended (≥100 B), suffix and EOF-clamped ranges | R11 **PASS** (false pass) | R11 **FAIL** — different: R5, R6, I5 | ✔ |
+| `redirect-http` — plain-http probe answered `301 → https` | R13 **FAIL** (false failure; `failed=['R13']`) | R13 **PASS**, I10 records `301 → same-host-https`; 0 required failures | ✔ |
+| `redirect-signed` — a correctly signed GET answered `302` | – | R13 **FAIL** (signed3xx: R3 and one more) — the security gate still bites | ✔ |
+| `drop-range` — store ignores `Range` (negative control) | FAIL ×12 | FAIL ×12 (R2–R10, R14, R16a, R16b) | ✔ |
+
+**Unit regression tests** (`node --test v0-gates.test.mjs`): **22 pass** on the fix; the same file run against the pre-fix logic (`V0_GATES=./regression/legacy-gates.mjs`) → **15 fail, 7 pass** (the 7 are the baseline/"preserved" cases that were already right). They cover: 301/302/307/308 on I10 not failing R13; negative-control redirects ignored; a redirect on a signed request still failing; 304 not a redirect; URL/signature/credential-scope/access-key/secret in header values, percent-encoded and query-string copies, unknown presigned parameters, error bodies; **no finding ever contains a value** (asserted on the serialised report); no false positives on an ordinary header set; suspicious header names still failing; ETag drift on R5, R6, R7 and on the other ranged cases, missing observations, missing ETag, weak ETags, a different ETag on the 200.
+
+**Other gates re-verified after the change:** full harness on the look-alike **24/24 required pass** (8 MiB, TTL 4 s, 50 responses scanned, 0 value leaks, 41 signed requests, 0 signed redirects); offline SSRF allow-list **15/15**; every `result-*.json` was grepped for the test credentials and for `X-Amz-Signature=<hex>` — no match.
+
+The gate tests are local spike evidence (`node --test`); they are not wired into the repository CI, which only runs the PHP and storefront suites.
 
 ## 6. Blockers requiring owner action
 | # | Action | Why | Constraint |
@@ -130,7 +157,7 @@ node docs/plans/store/s0-spikes/r2-range/v0/v0-r2-range-probe.mjs --hostlist    
 ```
 
 ## 10. Files
-`docs/plans/store/s0-spikes/r2-range/v0/{README.md, v0-signer.php, v0-r2-range-probe.mjs, negative-control-proxy.mjs, result-selftest-scality.json, result-negative-control-no-range.json}` and this report. No application code changed.
+`docs/plans/store/s0-spikes/r2-range/v0/`: `README.md`, `v0-signer.php`, `v0-r2-range-probe.mjs`, `v0-gates.mjs`, `v0-gates.test.mjs`, `regression/legacy-gates.mjs`, `fault-injector.mjs`, `result-selftest-scality.json`, `result-fault-{drop-range,leak-url-header,leak-signature-header,etag-drift,redirect-http,redirect-signed}.json`, `result-old-{leak-url-header,etag-drift,redirect-http}.json` (pre-fix probe under the same faults), and this report. No application code changed.
 
 ## 11. GO / NO-GO
 | Item | Recommendation |

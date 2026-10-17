@@ -16,6 +16,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { classifyLocation, etagGate, leakGate, redirectGate, scanHeaderValues, scanText, sensitiveTokens } from './v0-gates.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const arg = (n, d) => (process.argv.find((a) => a.startsWith(`--${n}=`)) ?? `--${n}=${d}`).split('=').slice(1).join('=');
@@ -72,9 +73,9 @@ const PLAN = [
   ['R8', 'R', 'Start == size → 416 (a Content-Range "bytes */N" from the provider is recorded, not required: the proxy knows N from the authorise response and always synthesises it)'],
   ['R9', 'R', 'Start > size → 416'],
   ['R10', 'R', 'Last byte bytes=<N-1>- → 206, 1 byte'],
-  ['R11', 'R', 'ETag identical on the 200, every 206 and the HEAD (strong, quoted)'],
+  ['R11', 'R', 'One strong, quoted ETag on EVERY successful response for the object: the 200, every 206 (closed, open-ended, suffix, EOF-clamped, If-Range, parallel…) and the HEAD'],
   ['R12', 'R', 'With Accept-Encoding: identity the 200 and 206 carry no Content-Encoding (video/mp4)'],
-  ['R13', 'R', 'No 3xx on any correctly signed request (redirect: manual)'],
+  ['R13', 'R', 'No 3xx on any correctly signed HTTPS request (redirect: manual). Negative controls and the informational I10 probe never feed this gate'],
   ['R14', 'R', 'Expired URL (TTL elapsed) → 403, nothing served'],
   ['R15a', 'R', 'Tampered signature → 403'],
   ['R15b', 'R', 'Signed for key A, used for key B → 403'],
@@ -83,7 +84,7 @@ const PLAN = [
   ['R16a', 'R', 'PUT with a GET-signed URL → 403, object unchanged'],
   ['R16b', 'R', 'DELETE with a GET-signed URL → 403, object still present'],
   ['R17', 'R', 'Unsigned GET of the same object → 403 (bucket is private)'],
-  ['R18', 'R', 'No provider response header exposes a credential, signature or the signed URL'],
+  ['R18', 'R', 'No provider response header NAME or VALUE exposes a credential, a signature, SigV4 material or the signed URL (every header of every response is scanned)'],
   ['R19', 'R', 'Host allow-list (offline, 15 cases) accepts only the endpoint or <bucket>.<endpoint>, https, no userinfo/port tricks'],
   ['R20', 'R', 'Every URL the signer produced passes the host allow-list'],
   ['I1', 'I', 'HEAD with a HEAD-signed URL → 200 with the same metadata'],
@@ -95,10 +96,11 @@ const PLAN = [
   ['I7', 'I', 'If-Match wrong → 412 ; If-None-Match current (with Range) → 304 (record)'],
   ['I8', 'I', 'Accept-Encoding: gzip on video/mp4 → Content-Encoding? (record)'],
   ['I9', 'I', 'Download started before expiry and still running after it (record whether it completes)'],
-  ['I10', 'I', 'Plain http:// to the real https endpoint (record: refused / redirected) — remote endpoints only'],
+  ['I10', 'I', 'Plain http:// to the real https endpoint (record: refused / redirected to https is ACCEPTABLE and does not affect R13) — remote endpoints only'],
   ['I11', 'I', '8 parallel ranges all correct'],
   ['I12', 'I', 'Empty object: full GET 200 len 0 ; bytes=0-0 → 416 (record)'],
   ['I13', 'I', 'Oversized Range header (8 KiB) (record)'],
+  ['I14', 'I', 'Provider ERROR BODIES that echo credential or signature material (kinds only; the proxy must never forward upstream bodies)'],
 ];
 
 if (flag('plan')) {
@@ -136,28 +138,44 @@ const KEY_EMPTY = `v0-range-probe/${RUN}/empty.bin`;
 const sign = (method, key, ttl = 120, query) => { const r = signer({ op: 'presign', method, key, ttl, query }); if (!r.url) throw new Error(`signer failed: ${scrub(JSON.stringify(r))}`); return r.url; };
 
 const KEEP = ['status', 'content-length', 'content-range', 'accept-ranges', 'etag', 'content-type', 'content-encoding', 'last-modified', 'location', 'content-disposition', 'cache-control', 'x-amz-request-id', 'cf-cache-status', 'server', 'x-amz-id-2', 'www-authenticate'];
+const sensitiveUrls = new Set();
+const tokens = () => sensitiveTokens({ secrets, urls: [...sensitiveUrls] });
 async function hit(url, { method = 'GET', headers = {}, body, read = true } = {}) {
+  sensitiveUrls.add(url); // every URL we ever send (signed, derived or tampered) is something the provider must never echo back
   const h = { 'accept-encoding': 'identity', ...headers };
   const res = await fetch(url, { method, headers: h, redirect: 'manual', body });
-  const seen = {}; const allNames = [];
-  res.headers.forEach((v, k) => { allNames.push(k); if (KEEP.includes(k)) seen[k] = scrub(v); });
-  let len = 0; let sha = null; let errorCode = null; let text = null;
+  const seen = {}; const allNames = []; const rawEntries = [];
+  res.headers.forEach((v, k) => { allNames.push(k); rawEntries.push([k, v]); if (KEEP.includes(k)) seen[k] = scrub(v); });
+  let len = 0; let sha = null; let errorCode = null; let bodyLeaks = [];
   if (read && method !== 'HEAD') {
     const hash = createHash('sha256'); const chunks = [];
     for await (const c of res.body ?? []) { len += c.length; hash.update(c); if (len <= 4096) chunks.push(c); }
     sha = hash.digest('hex');
-    if (res.status >= 400) { text = Buffer.concat(chunks).toString('utf8'); errorCode = (text.match(/<Code>([^<]+)<\/Code>/) ?? [])[1] ?? null; }
+    if (res.status >= 400) { const text = Buffer.concat(chunks).toString('utf8'); errorCode = (text.match(/<Code>([^<]+)<\/Code>/) ?? [])[1] ?? null; bodyLeaks = scanText(text, tokens()); }
   } else { await res.body?.cancel().catch(() => undefined); }
-  return { status: res.status, headers: seen, headerNames: allNames, bodyLen: len, sha, errorCode };
+  // header VALUES are scanned here, in memory, against the unscrubbed tokens; only {header, kind} survives
+  const valueFindings = scanHeaderValues(rawEntries, tokens());
+  return { status: res.status, headers: seen, headerNames: allNames, valueFindings, bodyLeaks, bodyLen: len, sha, errorCode, locationClass: res.headers.get('location') ? classifyLocation(res.headers.get('location'), new URL(cfg.endpoint).hostname) : null };
 }
 
 const data = randomBytes(N);
 const sha = (b) => createHash('sha256').update(b).digest('hex');
 const slice = (s, e) => data.subarray(s, e + 1);
-const results = []; const allHeaderNames = new Set(); let saw3xx = false; const producedUrls = [];
+const results = []; const allHeaderNames = new Set(); const producedUrls = [];
+const redirectLog = []; const etagLog = []; const valueFindings = []; const bodyLeakKinds = new Set();
 const D = Object.fromEntries(PLAN.map(([id, , d]) => [id, d]));
 const rec = (id, group, _ignored, pass, observed, note) => { results.push({ id, group, description: D[id], pass, observed, ...(note ? { note } : {}) }); };
-const track = (r) => { r.headerNames.forEach((n) => allHeaderNames.add(n)); if (r.status >= 300 && r.status < 400 && r.status !== 304) saw3xx = true; return r; };
+// kind: 'signed' = a correctly signed HTTPS request (feeds R13) · 'negative' = tampered/unsigned/expired/wrong-method control · 'informational' = I10 (a redirect to https is fine).
+// label: identifies a response for the ETag gate (R11) — every successful response for the test object must carry one.
+const track = (r, kind = 'signed', label = null) => {
+  const id = label ?? `${kind}#${redirectLog.length}`;
+  r.headerNames.forEach((n) => allHeaderNames.add(n));
+  redirectLog.push({ id, kind, status: r.status });
+  r.valueFindings.forEach((f) => valueFindings.push({ id, ...f }));
+  r.bodyLeaks.forEach((k) => bodyLeakKinds.add(k));
+  if (label) etagLog.push({ id: label, status: r.status, etag: r.headers.etag ?? null });
+  return r;
+};
 const brief = (r) => ({ status: r.status, ...(r.errorCode ? { errorCode: r.errorCode } : {}), headers: r.headers, bodyLen: r.bodyLen });
 
 const tmp = mkdtempSync(join(tmpdir(), 'v0-'));
@@ -173,13 +191,13 @@ try {
   if (signer({ op: 'put', key: KEY_EMPTY, file: join(tmp, 'empty.bin'), contentType: 'video/mp4' }).error) throw new Error('empty test object upload failed');
 
   const getUrl = sign('GET', KEY); producedUrls.push(getUrl);
-  const R = async (v, extra) => track(await hit(getUrl, { headers: { range: v, ...extra } }));
+  const R = async (v, extra, label) => track(await hit(getUrl, { headers: { range: v, ...extra } }), 'signed', label ?? `range ${v}${extra ? ` +${Object.keys(extra).join(',')}` : ''}`);
 
   // R1
-  const full = track(await hit(getUrl));
+  const full = track(await hit(getUrl), 'signed', 'R1');
   rec('R1', 'R', PLAN[0][2], full.status === 200 && full.headers['content-length'] === String(N) && full.headers['accept-ranges'] === 'bytes' && !!full.headers.etag && full.headers['content-type'] === 'video/mp4' && full.sha === sha(data), brief(full));
   const ranged = async (id, desc, v, s, e, expectStatus = 206) => {
-    const r = await R(v); const want = `bytes ${s}-${e}/${N}`;
+    const r = await R(v, undefined, id); const want = `bytes ${s}-${e}/${N}`;
     rec(id, 'R', desc, r.status === expectStatus && r.headers['content-range'] === want && r.bodyLen === e - s + 1 && r.sha === sha(slice(s, e)) && r.headers['content-length'] === String(e - s + 1), { range: v, ...brief(r) });
     return r;
   };
@@ -189,114 +207,120 @@ try {
   await ranged('R5', PLAN[4][2], `bytes=${N - 500}-`, N - 500, N - 1);
   await ranged('R6', PLAN[5][2], 'bytes=-500', N - 500, N - 1);
   await ranged('R7', PLAN[6][2], `bytes=0-${N * 2}`, 0, N - 1);
-  const r8 = await R(`bytes=${N}-${N + 10}`);
+  const r8 = await R(`bytes=${N}-${N + 10}`, undefined, 'R8');
   rec('R8', 'R', PLAN[7][2], r8.status === 416, { range: `bytes=${N}-${N + 10}`, providerSendsContentRangeStar: r8.headers['content-range'] === `bytes */${N}`, ...brief(r8) }, 'Criterion relaxed after the local self-test: S3-compatible servers answer 416 with an XML InvalidRange error and no Content-Range; the proxy builds the header itself.');
-  const r9 = await R(`bytes=${N + 5000}-`);
+  const r9 = await R(`bytes=${N + 5000}-`, undefined, 'R9');
   rec('R9', 'R', PLAN[8][2], r9.status === 416, { range: `bytes=${N + 5000}-`, ...brief(r9) });
   const r10 = await ranged('R10', PLAN[9][2], `bytes=${N - 1}-`, N - 1, N - 1);
 
   // HEAD (I1) with a HEAD-signed URL, needed for R11
   const headUrl = sign('HEAD', KEY); producedUrls.push(headUrl);
-  const head = track(await hit(headUrl, { method: 'HEAD' }));
+  const head = track(await hit(headUrl, { method: 'HEAD' }), 'signed', 'I1');
   rec('I1', 'I', PLAN[23][2], head.status === 200 && head.headers['content-length'] === String(N) && head.headers['accept-ranges'] === 'bytes', brief(head));
-  const etags = [full, r2, r3, r4, r10, head].map((r) => r.headers.etag);
-  rec('R11', 'R', PLAN[10][2], etags.every((e) => e && e === etags[0] && /^"[^"]+"$/.test(e)), { etags: [...new Set(etags)], putEtag: etag });
+  // R11 is judged at the END over every successful response for the test object (see etagGate); placeholder removed here
 
   rec('R12', 'R', PLAN[11][2], !full.headers['content-encoding'] && !r2.headers['content-encoding'], { full: full.headers['content-encoding'] ?? null, range: r2.headers['content-encoding'] ?? null });
 
   // R17 unsigned
   const bare = getUrl.split('?')[0];
-  const unsigned = track(await hit(bare));
+  const unsigned = track(await hit(bare), 'negative');
   rec('R17', 'R', PLAN[20][2], unsigned.status === 403, brief(unsigned));
 
   // R15 tamper
   const u = new URL(getUrl);
   const sigParam = [...u.searchParams.keys()].find((k) => k.toLowerCase() === 'x-amz-signature');
   const tamperSig = new URL(getUrl); const sig = tamperSig.searchParams.get(sigParam); tamperSig.searchParams.set(sigParam, (sig[0] === 'a' ? 'b' : 'a') + sig.slice(1));
-  const t1 = track(await hit(tamperSig.toString()));
+  const t1 = track(await hit(tamperSig.toString()), 'negative');
   rec('R15a', 'R', PLAN[14][2], t1.status === 403, brief(t1));
   // sign for A, use for B: swap the object key segment in the path
   const swapped = getUrl.replace(KEY, KEY_B);
-  const t2 = track(await hit(swapped));
+  const t2 = track(await hit(swapped), 'negative');
   rec('R15b', 'R', PLAN[15][2], swapped !== getUrl && t2.status === 403, brief(t2));
   const expParam = [...u.searchParams.keys()].find((k) => k.toLowerCase() === 'x-amz-expires');
   const longer = new URL(getUrl); longer.searchParams.set(expParam, String(+longer.searchParams.get(expParam) + 3600));
-  const t3 = track(await hit(longer.toString()));
+  const t3 = track(await hit(longer.toString()), 'negative');
   rec('R15c', 'R', PLAN[16][2], t3.status === 403, brief(t3));
   const nosig = new URL(getUrl); nosig.searchParams.delete(sigParam);
-  const t4 = track(await hit(nosig.toString()));
+  const t4 = track(await hit(nosig.toString()), 'negative');
   rec('R15d', 'R', PLAN[17][2], t4.status === 403 || t4.status === 400, brief(t4));
 
   // R16 method confusion (destructive attempts are only ever made against the disposable TEST objects)
-  const put16 = track(await hit(getUrl, { method: 'PUT', body: Buffer.from('tampered') }));
-  const afterPut = track(await hit(getUrl, { headers: { range: 'bytes=0-15' } }));
+  const put16 = track(await hit(getUrl, { method: 'PUT', body: Buffer.from('tampered') }), 'negative');
+  const afterPut = track(await hit(getUrl, { headers: { range: 'bytes=0-15' } }), 'signed', 'R16a-after');
   rec('R16a', 'R', PLAN[18][2], put16.status === 403 && afterPut.sha === sha(slice(0, 15)), { put: brief(put16), objectUnchanged: afterPut.sha === sha(slice(0, 15)) });
-  const del16 = track(await hit(getUrl, { method: 'DELETE' }));
-  const afterDel = track(await hit(getUrl, { headers: { range: 'bytes=0-15' } }));
+  const del16 = track(await hit(getUrl, { method: 'DELETE' }), 'negative');
+  const afterDel = track(await hit(getUrl, { headers: { range: 'bytes=0-15' } }), 'signed', 'R16b-after');
   rec('R16b', 'R', PLAN[19][2], del16.status === 403 && afterDel.status === 206, { delete: brief(del16), stillPresent: afterDel.status === 206 });
 
   // I2 HEAD with a GET-signed URL
-  const headWithGet = track(await hit(getUrl, { method: 'HEAD' }));
+  const headWithGet = track(await hit(getUrl, { method: 'HEAD' }), 'negative');
   rec('I2', 'I', PLAN[24][2], null, brief(headWithGet), 'S3 signs the HTTP method; a GET-signed URL is expected to be refused for HEAD. B2 needs no HEAD at the proxy (size/ETag come from the authorise response).');
 
   // I3 multi-range
-  const mr = await R('bytes=0-1,5-6');
+  const mr = await R('bytes=0-1,5-6', undefined, 'I3');
   rec('I3', 'I', PLAN[25][2], null, { ...brief(mr), singleRangeServed: mr.bodyLen === 2 });
   // I4 malformed
   const malformed = [];
-  for (const v of ['bytes=abc', 'bytes=5-2', 'items=0-1', 'bytes=-0', 'bytes=--5', 'bytes=0-9,', 'Bytes=0-1', 'bytes = 0-1']) { const r = await R(v); malformed.push({ range: v, status: r.status, contentRange: r.headers['content-range'] ?? null, bodyLen: r.bodyLen, ...(r.errorCode ? { errorCode: r.errorCode } : {}) }); }
+  for (const v of ['bytes=abc', 'bytes=5-2', 'items=0-1', 'bytes=-0', 'bytes=--5', 'bytes=0-9,', 'Bytes=0-1', 'bytes = 0-1']) { const r = await R(v, undefined, `I4 ${v}`); malformed.push({ range: v, status: r.status, contentRange: r.headers['content-range'] ?? null, bodyLen: r.bodyLen, ...(r.errorCode ? { errorCode: r.errorCode } : {}) }); }
   rec('I4', 'I', PLAN[26][2], null, malformed, 'B2: the proxy validates Range itself (single closed/open/suffix range only) and never forwards anything else.');
   // I5 suffix larger
-  const sl = await R(`bytes=-${N + 10}`);
+  const sl = await R(`bytes=-${N + 10}`, undefined, 'I5');
   rec('I5', 'I', PLAN[27][2], null, brief(sl));
   // I6 If-Range
-  const ifOk = await R('bytes=0-9', { 'if-range': etag ? `"${etag}"` : full.headers.etag });
-  const ifBad = await R('bytes=0-9', { 'if-range': '"00000000000000000000000000000000"' });
-  const ifDate = await R('bytes=0-9', { 'if-range': full.headers['last-modified'] ?? 'Mon, 01 Jan 2001 00:00:00 GMT' });
+  const ifOk = await R('bytes=0-9', { 'if-range': etag ? `"${etag}"` : full.headers.etag }, 'I6-matching');
+  const ifBad = await R('bytes=0-9', { 'if-range': '"00000000000000000000000000000000"' }, 'I6-mismatching');
+  const ifDate = await R('bytes=0-9', { 'if-range': full.headers['last-modified'] ?? 'Mon, 01 Jan 2001 00:00:00 GMT' }, 'I6-date');
   rec('I6', 'I', PLAN[28][2], null, { matching: brief(ifOk), mismatching: brief(ifBad), httpDate: brief(ifDate), ifRangeHonoured: ifOk.status === 206 && ifBad.status === 200 }, 'If the mismatching ETag still yields 206, R2 ignores If-Range → the proxy must implement If-Range itself against the authorised ETag (immutable keys make this cheap).');
   // I7 conditionals
-  const im = await R('bytes=0-9', { 'if-match': '"00000000000000000000000000000000"' });
-  const inm = await R('bytes=0-9', { 'if-none-match': full.headers.etag });
+  const im = await R('bytes=0-9', { 'if-match': '"00000000000000000000000000000000"' }, 'I7-if-match');
+  const inm = await R('bytes=0-9', { 'if-none-match': full.headers.etag }, 'I7-if-none-match');
   rec('I7', 'I', PLAN[29][2], null, { ifMatchWrong: brief(im), ifNoneMatchCurrent: brief(inm) });
   // I8 gzip
-  const gz = track(await hit(getUrl, { headers: { 'accept-encoding': 'gzip', range: 'bytes=0-99' } }));
+  const gz = track(await hit(getUrl, { headers: { 'accept-encoding': 'gzip', range: 'bytes=0-99' } }), 'signed', 'I8');
   rec('I8', 'I', PLAN[30][2], null, { ...brief(gz), contentEncoding: gz.headers['content-encoding'] ?? null });
   // I11 parallel
   const par = await Promise.all(Array.from({ length: 8 }, (_, i) => hit(getUrl, { headers: { range: `bytes=${i * 1000}-${i * 1000 + 999}` } })));
-  par.forEach(track);
+  par.forEach((r, i) => track(r, 'signed', `I11-${i}`));
   rec('I11', 'I', PLAN[32][2], par.every((r, i) => r.status === 206 && r.sha === sha(slice(i * 1000, i * 1000 + 999))), { statuses: par.map((r) => r.status) });
   // I12 empty object
   const emptyUrl = sign('GET', KEY_EMPTY); producedUrls.push(emptyUrl);
-  const e1 = track(await hit(emptyUrl)); const e2 = track(await hit(emptyUrl, { headers: { range: 'bytes=0-0' } }));
+  const e1 = track(await hit(emptyUrl), 'signed'); const e2 = track(await hit(emptyUrl, { headers: { range: 'bytes=0-0' } }), 'signed');
   rec('I12', 'I', PLAN[33][2], null, { full: brief(e1), range0: brief(e2) });
   // I13 oversized header
-  let big; try { big = await R(`bytes=0-1,${'1-2,'.repeat(2000)}`); big = brief(big); } catch (e) { big = { error: scrub(e.message) }; }
+  let big; try { big = await R(`bytes=0-1,${'1-2,'.repeat(2000)}`, undefined, 'I13'); big = brief(big); } catch (e) { big = { error: scrub(e.message) }; }
   rec('I13', 'I', PLAN[34][2], null, big);
 
-  // I10 plain http to a remote endpoint
-  if (!cfg.loopback) {
-    let obs; try { obs = brief(track(await hit(getUrl.replace(/^https:/, 'http:')))); } catch (e) { obs = { refused: true, error: scrub(e.cause?.code ?? e.message) }; }
-    rec('I10', 'I', PLAN[31][2], null, obs, 'Real endpoints should refuse or redirect plain http; the proxy refuses any non-https URL before connecting (R19).');
+  // I10 plain http. INFORMATIONAL: a refusal or a redirect to https are both acceptable outcomes and never feed the R13 gate (which is about correctly signed HTTPS requests).
+  // On a loopback look-alike (plain http only) the probe is skipped unless the self-test hook V0_SELFTEST_PLAIN_HTTP_HOOK=1 asks it to send an `x-v0-plain` marker that the fault injector answers with a 301.
+  if (!cfg.loopback || process.env.V0_SELFTEST_PLAIN_HTTP_HOOK === '1') {
+    const plainUrl = cfg.loopback ? getUrl : getUrl.replace(/^https:/, 'http:');
+    let obs; try { const r = track(await hit(plainUrl, { headers: cfg.loopback ? { 'x-v0-plain': '1' } : {} }), 'informational', 'I10'); obs = { ...brief(r), redirectsTo: r.locationClass }; } catch (e) { obs = { refused: true, error: scrub(e.cause?.code ?? e.message) }; }
+    rec('I10', 'I', PLAN[31][2], null, obs, 'Real endpoints should refuse or redirect plain http; a redirect to https is acceptable and is NOT counted by R13. The proxy refuses any non-https URL before connecting (R19).');
   } else rec('I10', 'I', PLAN[31][2], null, { skipped: 'loopback look-alike' });
 
   // R14 expiry + I9 mid-stream expiry (they overlap in time to save wall-clock)
   const shortUrl = sign('GET', KEY, cfg.ttl); producedUrls.push(shortUrl);
-  const okBefore = track(await hit(shortUrl, { headers: { range: 'bytes=0-9' } }));
+  const okBefore = track(await hit(shortUrl, { headers: { range: 'bytes=0-9' } }), 'signed', 'R14-before');
   // I9: start a slow full download now; it will outlive the TTL
   const slowStart = Date.now();
   const slowRes = await fetch(shortUrl, { headers: { 'accept-encoding': 'identity' }, redirect: 'manual' });
+  sensitiveUrls.add(shortUrl); scanHeaderValues([...slowRes.headers], tokens()).forEach((f) => valueFindings.push({ id: 'I9', ...f })); [...slowRes.headers.keys()].forEach((n) => allHeaderNames.add(n));
   let slowBytes = 0; let slowErr = null;
   const slowRead = (async () => { try { for await (const c of slowRes.body) { slowBytes += c.length; await sleep(Math.ceil((c.length / (1024 * 1024)) * 1000)); } } catch (e) { slowErr = scrub(e.cause?.code ?? e.message); } })();
   await sleep((cfg.ttl + 2) * 1000);
-  const expired = track(await hit(shortUrl, { headers: { range: 'bytes=0-9' } }));
+  const expired = track(await hit(shortUrl, { headers: { range: 'bytes=0-9' } }), 'negative');
   rec('R14', 'R', PLAN[13][2], okBefore.status === 206 && expired.status === 403, { before: brief(okBefore), afterTtl: brief(expired), ttlSeconds: cfg.ttl });
   await slowRead;
   rec('I9', 'I', PLAN[38 - 1 + 0 > 0 ? 36 : 36][2] ?? '', null, { status: slowRes.status, startedBeforeExpiry: true, ranPastTtlMs: Date.now() - slowStart, receivedBytes: slowBytes, completed: slowBytes === N, error: slowErr }, 'S3/R2 validate the signature when the request starts; whether an in-flight body survives expiry is recorded here. The proxy sets its own total deadline anyway.');
 
   // R13 / R18 / R20 / R19
-  rec('R13', 'R', PLAN[12][2], !saw3xx, { saw3xx });
-  const leak = [...allHeaderNames].filter((n) => /key|secret|token|signature|credential|authorization/i.test(n));
-  rec('R18', 'R', PLAN[21][2], leak.length === 0, { providerHeaderNames: [...allHeaderNames].sort(), suspicious: leak });
+  const redirects = redirectGate(redirectLog);
+  rec('R13', 'R', PLAN[12][2], redirects.pass, redirects);
+  const etagResult = etagGate(etagLog, ['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R10', 'I1']);
+  rec('R11', 'R', PLAN[10][2], etagResult.pass, { ...etagResult, putEtag: etag });
+  const leaks = leakGate({ headerNames: [...allHeaderNames], valueFindings });
+  rec('R18', 'R', PLAN[21][2], leaks.pass, { providerHeaderNames: [...allHeaderNames].sort(), suspiciousNames: leaks.suspiciousNames, valueLeaks: leaks.valueLeaks, responsesScanned: redirectLog.length });
+  rec('I14', 'I', PLAN[36][2], null, { bodyLeakKinds: [...bodyLeakKinds].sort() }, 'Informational: some S3 implementations echo the access key id or string-to-sign in error documents. The proxy never forwards upstream bodies (empty uniform failures), so this is a log-hygiene note.');
   const hl = runHostlist();
   rec('R19', 'R', PLAN[22][2], hl.every((r) => r.pass), { cases: hl.length, failed: hl.filter((r) => !r.pass).map((r) => r.name) });
   rec('R20', 'R', PLAN[23][2] && 'Every URL the signer produced passes the host allow-list', producedUrls.every((x) => allowedUpstream(x, { endpoint: cfg.endpoint, bucket: process.env.S3_BUCKET, allowInsecureLoopback: cfg.loopback })), { urls: producedUrls.length });
