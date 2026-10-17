@@ -13,10 +13,11 @@ export type Gate =
 
 export function gateFor(
   input: { statusPhase: 'idle' | 'loading' | 'ready' | 'error'; status: AssistantStatus | null; statusError: ClassifiedError | null },
-  capability: 'chat' | 'financial' | 'document',
+  capability: 'chat' | 'financial' | 'document' | 'document_ask',
 ): Gate {
   if (input.status) {
-    const state = input.status[capability];
+    // `document_ask` غائبة من خادم أقدم = غير جاهزة (لا نفترض).
+    const state = input.status[capability] ?? 'provider_unavailable';
     return state === 'ready' ? { kind: 'ready' } : { kind: 'blocked', notice: state };
   }
   if (input.statusPhase === 'error' && input.statusError) return { kind: 'error', error: input.statusError };

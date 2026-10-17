@@ -30,7 +30,11 @@ export type CapabilityState =
   /** AI-04: قدرة مركز المستندات غير مستحقة لهذه المؤسسة. */
   | 'document_center_unavailable'
   /** AI-07: المزوّد خارجي ولم يُقرّ مالك المؤسسة بإرسال بيانات المساعد إليه. */
-  | 'external_provider_not_acknowledged';
+  | 'external_provider_not_acknowledged'
+  /** AI-07ب: لم يُقرّ مالك المؤسسة بإرسال القيم المراجَعة للمستندات إلى المزوّد الخارجي. */
+  | 'external_documents_not_acknowledged'
+  /** AI-07ب: مفتاح المنصة لإرسال المستندات إلى مزوّد خارجي مغلق. */
+  | 'external_documents_unavailable';
 
 export type DataCategoryKey = 'assistant_messages' | 'financial_summary' | 'document_projected_text';
 
@@ -40,7 +44,7 @@ export interface AssistantStatus {
   provider_mode: 'mock' | 'external' | 'unavailable';
   provider_label?: 'anthropic' | null;
   /** `external_acknowledged` يظهر فقط حين يكون المزوّد المضبوط خارجياً. */
-  tenant: { enabled: boolean; consented_categories: DataCategoryKey[]; external_acknowledged?: boolean };
+  tenant: { enabled: boolean; consented_categories: DataCategoryKey[]; external_acknowledged?: boolean; external_documents_acknowledged?: boolean };
   categories: { key: DataCategoryKey; available: boolean; consented: boolean }[];
   abilities: { use: boolean; manage_consent: boolean; view_audit: boolean; partner_detail: boolean; document_read: boolean };
   chat: CapabilityState;
@@ -48,6 +52,8 @@ export interface AssistantStatus {
   financial_tools: ToolName[];
   /** AI-04: قراءة مستند مُسقَط — حالة محسوبة في الخادم (لا تخمين من العميل). */
   document: CapabilityState;
+  /** AI-07ب: «اسأل عن هذا المستند» عبر المزوّد الخارجي — منفصلة عن القراءة المحلية `document`. */
+  document_ask?: CapabilityState;
   document_tools: string[];
   clock: { timezone: string; today: string };
 }
@@ -166,6 +172,8 @@ export interface MessageResponse {
   scope: { branch: ScopeBlock['branch']; warehouse: { mode: string; ids: string[] } };
   usage: { input_tokens: number; output_tokens: number };
   tool_calls: ToolCall[];
+  /** AI-07ب: حاضر فقط حين أُجيب السؤال من مستند؛ أعداد فقط — لا قيمة ولا اسم. */
+  document?: { ref: string; fields_sent: number; lines_sent: number; redacted: number };
 }
 
 export interface AuditEvent {
@@ -185,6 +193,8 @@ export interface SettingsPayload {
   acknowledge_privacy?: boolean;
   /** AI-07: إقرار بإرسال الرسائل وملخّصات الأرقام إلى مزوّد خارجي (يُسحب بالتعطيل أو بقيمة `false`). */
   acknowledge_external_provider?: boolean;
+  /** AI-07ب: إقرار مستقل بإرسال القيم المراجَعة والمنقَّحة للمستندات إلى المزوّد الخارجي. */
+  acknowledge_external_documents?: boolean;
 }
 
 export const MESSAGE_MAX_CHARS = 2000;

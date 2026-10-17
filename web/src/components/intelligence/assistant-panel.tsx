@@ -53,6 +53,11 @@ function Entry({ entry, onOpenCanvas, onNavigate, runIds, demo, external }: {
             <p dir="auto" className="whitespace-pre-wrap break-words">{entry.text}</p>
             {demo ? <p className="mt-1.5 border-t border-border pt-1.5 text-xs text-muted">{t('demo.reply')}</p> : null}
             {external ? <p className="mt-1.5 border-t border-border pt-1.5 text-xs text-muted">{t('external.reply')}</p> : null}
+            {entry.basedOnDocument ? (
+              <p data-document-basis="" className="mt-1.5 text-xs text-muted">
+                {t('external.document_basis', { fields: entry.basedOnDocument.fields_sent, lines: entry.basedOnDocument.lines_sent, redacted: entry.basedOnDocument.redacted })}
+              </p>
+            ) : null}
           </div>
         </div>
         {entry.toolCalls && entry.toolCalls.length > 0
@@ -141,11 +146,17 @@ export function AssistantPanel() {
     if (log) log.scrollTop = log.scrollHeight;
   }, [store.entries.length, store.chatPending]);
 
+  // AI-07ب: «اسأل عن هذا المستند» — فقط على شاشة مراجعة مستند والحالة المقروءة للتوّ جاهزة؛ والمعرّف يأتي من المسار لا من النص.
+  const documentId = context.kind === 'document_review' && context.entityId ? context.entityId : null;
+  const askReady = documentId !== null && store.status?.document_ask === 'ready';
+  const [askDocument, setAskDocument] = useState(false);
+  const asking = askReady && askDocument;
+
   function submit() {
     if (!canSend) return;
     const text = draft;
     setDraft('');
-    void store.send(text);
+    void store.send(text, asking && documentId ? { documentId } : undefined);
   }
 
   function suggest(tool: ToolName) {
@@ -277,6 +288,17 @@ export function AssistantPanel() {
         </div>
 
         <footer className="shrink-0 space-y-2 border-t border-border bg-surface px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          {askReady ? (
+            <label className="flex min-h-11 cursor-pointer items-start gap-2 text-xs text-text sm:min-h-0">
+              <input type="checkbox" className="mt-0.5 h-4 w-4 accent-primary" checked={askDocument} onChange={(event) => setAskDocument(event.target.checked)} />
+              <span>
+                <span className="font-medium">{t('external.document_toggle')}</span>
+                <span className="block text-muted">{t('external.document_toggle_hint')}</span>
+              </span>
+            </label>
+          ) : documentId !== null && store.status && external && store.status.document === 'ready' && store.status.document_ask && store.status.document_ask !== 'ready' ? (
+            <StateNotice notice={store.status.document_ask} compact canManageConsent={canManage} onNavigate={store.closePanel} />
+          ) : null}
           <div className="flex items-end gap-2 rounded-lg border border-border bg-background p-1.5 focus-within:ring-2 focus-within:ring-primary/40">
             <textarea
               ref={textareaRef}

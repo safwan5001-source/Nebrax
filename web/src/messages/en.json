@@ -11025,7 +11025,22 @@
         "e3": "Written answers are checked against the report figures; an answer containing a number that is not in the report is withheld.",
         "e4": "Acknowledgement is withdrawn automatically when the assistant is turned off, and can be withdrawn here at any time."
       },
-      "external_acknowledge": "I acknowledge, on behalf of the organization, that questions and figure summaries are sent to Anthropic."
+      "external_acknowledge": "I acknowledge, on behalf of the organization, that questions and figure summaries are sent to Anthropic.",
+      "external_documents_title": "Sending reviewed documents to an external AI provider",
+      "external_documents_help": "When you ask about a document, its human-reviewed and redacted values are sent to Anthropic. Original files, hidden values and other documents are never sent.",
+      "external_documents_requires": "Requires: the assistant on, the external sending acknowledgement, and consent to extracted document text.",
+      "external_documents_platform_off": "The platform has not enabled sending documents to an external provider.",
+      "external_documents_cta": "Review and acknowledge document sending",
+      "external_documents_revoke": "Withdraw acknowledgement",
+      "external_documents_confirm": "Acknowledge that reviewed document values are sent to an external AI provider when someone asks about a document.",
+      "external_documents_privacy_title": "Document sending notice",
+      "external_documents_acknowledge": "I acknowledge, on behalf of the organization, that reviewed document values are sent to Anthropic when a user asks about a document.",
+      "external_documents_privacy_points": {
+        "x1": "What is sent: the question you type and the human-reviewed values of ONE document you chose (amounts as decimals, dates, document numbers, line descriptions).",
+        "x2": "What is never sent: the original file, scan, file name, storage location, hidden (redacted) values, tax numbers, document or company identifiers, and any other document.",
+        "x3": "The issuer and recipient names are replaced by labels (Party-1, Party-2) before sending and restored here in the answer.",
+        "x4": "Answers are checked against the document values; an answer with a figure that is not in the document is withheld. Withdrawing the acknowledgement stops this immediately."
+      }
     },
     "notice": {
       "action_settings": "Open assistant settings",
@@ -11167,6 +11182,18 @@
       "external_provider_not_acknowledged": {
         "title": "Acknowledge external sending first",
         "body": "The assistant uses an external AI provider. An owner or admin must acknowledge the sending notice in assistant settings. No request was made."
+      },
+      "external_documents_not_acknowledged": {
+        "title": "Acknowledge document sending first",
+        "body": "Asking about a document sends its reviewed values to an external AI provider. An owner or admin must acknowledge this in assistant settings. No request was made."
+      },
+      "external_documents_unavailable": {
+        "title": "Document questions are not enabled",
+        "body": "The platform has not enabled sending documents to an external AI provider. Nothing was sent."
+      },
+      "document_too_large": {
+        "title": "Document too large to send",
+        "body": "The document content exceeds the limit for sending to the external AI provider. Nothing was sent and nothing was charged."
       }
     },
     "document": {
@@ -11234,7 +11261,10 @@
     },
     "external": {
       "badge": "Anthropic",
-      "reply": "Written by an external AI model from your report figures. The figures in the cards are read directly from AWJ reports."
+      "reply": "Written by an external AI model from your report figures. The figures in the cards are read directly from AWJ reports.",
+      "document_toggle": "Answer from this document",
+      "document_toggle_hint": "Sends this document's reviewed values (with hidden fields excluded) to Anthropic to answer your question. No file is sent.",
+      "document_basis": "Based on this document: {fields} fields, {lines} lines sent; {redacted} hidden values were not sent."
     }
   }
 }

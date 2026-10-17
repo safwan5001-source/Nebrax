@@ -493,7 +493,15 @@ class AiDocumentProjectionTest extends TestCase
             'consented_categories' => [AiAssistantDataCategory::ASSISTANT_MESSAGES, AiAssistantDataCategory::DOCUMENT_PROJECTED_TEXT],
             'acknowledge_privacy' => true,
         ])->assertOk();
-        $event = AiAuditEvent::withoutGlobalScopes()->where('tenant_id', $auth['tenant_id'])->where('event', 'consent.updated')->latest('occurred_at')->first();
+        $event = AiAuditEvent::withoutGlobalScopes()
+            ->where('tenant_id', $auth['tenant_id'])
+            ->where('event', 'consent.updated')
+            ->get()
+            ->first(fn (AiAuditEvent $audit): bool => in_array(
+                AiAssistantDataCategory::DOCUMENT_PROJECTED_TEXT,
+                $audit->meta['categories_granted'] ?? [],
+                true,
+            ));
         $this->assertContains(AiAssistantDataCategory::DOCUMENT_PROJECTED_TEXT, $event->meta['categories_granted']);
     }
 

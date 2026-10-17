@@ -32,6 +32,8 @@ export interface ChatEntry {
   text?: string;
   error?: ClassifiedError;
   toolCalls?: ToolCall[];
+  /** AI-07ب: الجواب مبنيّ على مستند (أعداد فقط). */
+  basedOnDocument?: { ref: string; fields_sent: number; lines_sent: number; redacted: number };
   /** معرّفات التشغيلات المقابلة لـ`toolCalls` بالترتيب (للانتقال إلى المساحة). */
   runIds?: string[];
 }
@@ -68,7 +70,7 @@ export interface IntelligenceStore {
   closePanel: () => void;
   entries: ChatEntry[];
   chatPending: boolean;
-  send: (text: string) => Promise<void>;
+  send: (text: string, options?: { documentId?: string }) => Promise<void>;
   clearConversation: () => void;
   runs: FinancialRun[];
   activeRun: FinancialRun | null;
@@ -197,24 +199,27 @@ export function IntelligenceProvider({ children, locale = 'ar' }: { children: Re
     return created.map((run) => run.id);
   }, []);
 
-  const send = useCallback(async (raw: string) => {
+  const send = useCallback(async (raw: string, options?: { documentId?: string }) => {
     const text = raw.trim();
     if (!text || text.length > MESSAGE_MAX_CHARS) return;
     if (!identity || chatPending) return;
     // لا طلب محادثة إلا والحالة المقروءة جاهزة: لا نُجرّب ثم نكتشف الرفض.
     if (statusRef.current?.chat !== 'ready') return;
+    // سؤال عن مستند: لا يُرسَل إلا والحالة المقروءة للتوّ `document_ask: ready` ومعرّف UUID صالح.
+    const documentId = options?.documentId;
+    if (documentId && (statusRef.current?.document_ask !== 'ready' || !UUID.test(documentId))) return;
 
     const myEpoch = epoch.current;
     const mySeq = ++chatSeq.current;
     setEntries((previous) => [...previous, { id: nextId('u'), role: 'user' as const, text }].slice(-MAX_ENTRIES));
     setChatPending(true);
     try {
-      const data = await sendMessage({ message: text, locale });
+      const data = await sendMessage({ message: text, locale, ...(documentId ? { documentId: documentId.toLowerCase() } : {}) });
       if (myEpoch !== epoch.current || mySeq !== chatSeq.current) return;
       const runIds = registerRuns(data.tool_calls, 'assistant', data.request_id, data.scope);
       setEntries((previous) => [
         ...previous,
-        { id: nextId('a'), role: 'assistant' as const, text: data.message.content, toolCalls: data.tool_calls, runIds },
+        { id: nextId('a'), role: 'assistant' as const, text: data.message.content, toolCalls: data.tool_calls, runIds, ...(data.document ? { basedOnDocument: data.document } : {}) },
       ].slice(-MAX_ENTRIES));
       if (runIds[0]) setActiveRunId(runIds[0]);
     } catch (error) {

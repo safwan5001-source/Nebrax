@@ -22,7 +22,7 @@ use Illuminate\Validation\Rule;
  */
 class AiAssistantMessageRequest extends FormRequest
 {
-    private const TOP_LEVEL = ['message', 'locale', 'data_categories', 'scope'];
+    private const TOP_LEVEL = ['message', 'locale', 'data_categories', 'scope', 'document_id'];
 
     private const SCOPE_KEYS = ['branch_ids', 'warehouse_ids'];
 
@@ -42,6 +42,8 @@ class AiAssistantMessageRequest extends FormRequest
             'locale' => ['sometimes', 'string', Rule::in(['ar', 'en'])],
             'data_categories' => ['sometimes', 'array', 'min:1', 'max:' . count(AiAssistantDataCategory::ALL)],
             'data_categories.*' => ['string', 'distinct', Rule::in(AiAssistantDataCategory::ALL)],
+            // AI-07ب: مستند واحد يحدّده المستخدم صراحةً من شاشته (UUID). لا مسار ولا رابط ولا نصّ؛ والتفويض يُعاد عند التنفيذ.
+            'document_id' => ['sometimes', 'string', 'uuid'],
             'scope' => ['sometimes', 'array'],
             'scope.branch_ids' => ['sometimes', 'array', 'max:' . $maxIds],
             'scope.branch_ids.*' => ['string', 'uuid', 'distinct'],

@@ -148,6 +148,75 @@ describe('external provider acknowledgement (AI-07)', () => {
   });
 });
 
+describe('document sending acknowledgement (AI-07ب)', () => {
+  const docs = (overrides: Record<string, unknown> = {}, ack = false) => makeStatus({
+    provider_mode: 'external', provider_label: 'anthropic', document_ask: ack ? 'ready' : 'external_documents_not_acknowledged',
+    tenant: { enabled: true, consented_categories: ['assistant_messages', 'financial_summary', 'document_projected_text'], external_acknowledged: true, external_documents_acknowledged: ack },
+    categories: [
+      { key: 'assistant_messages', available: true, consented: true },
+      { key: 'financial_summary', available: true, consented: true },
+      { key: 'document_projected_text', available: true, consented: true },
+    ],
+    ...overrides,
+  });
+
+  it('has its own acknowledgement, separate from the first one, and sends only the documents flag', async () => {
+    api.fetchStatus.mockResolvedValue(docs());
+    api.saveSettings.mockResolvedValue(docs({}, true));
+    mount();
+    await userEvent.click(await screen.findByRole('button', { name: 'Review and acknowledge document sending' }));
+    const dialog = await screen.findByRole('dialog');
+    const confirm = within(dialog).getByRole('button', { name: 'Grant consent' }) as HTMLButtonElement;
+    expect(within(dialog).getByText('Document sending notice')).toBeTruthy();
+    const boxes = within(dialog).getAllByRole('checkbox');
+    expect(boxes).toHaveLength(2); // الخصوصية العامة + إقرار المستندات (لا إقرار المزوّد الأول)
+    await userEvent.click(boxes[0]);
+    expect(confirm.disabled).toBe(true);
+    await userEvent.click(boxes[1]);
+    expect(confirm.disabled).toBe(false);
+    await userEvent.click(confirm);
+    await waitFor(() => expect(api.saveSettings).toHaveBeenCalledWith({
+      enabled: true, consented_categories: ['assistant_messages', 'financial_summary', 'document_projected_text'], acknowledge_privacy: true, acknowledge_external_documents: true,
+    }));
+  });
+
+  it('is not grantable until its premises hold, and says what is missing', async () => {
+    api.fetchStatus.mockResolvedValue(docs({
+      tenant: { enabled: true, consented_categories: ['assistant_messages'], external_acknowledged: true, external_documents_acknowledged: false },
+    }));
+    mount();
+    const cta = (await screen.findByRole('button', { name: 'Review and acknowledge document sending' })) as HTMLButtonElement;
+    expect(cta.disabled).toBe(true);
+    expect(screen.getByText(/Requires: the assistant on/)).toBeTruthy();
+  });
+
+  it('says so when the platform has not enabled document sending', async () => {
+    api.fetchStatus.mockResolvedValue(docs({ document_ask: 'external_documents_unavailable' }));
+    mount();
+    expect(await screen.findByText('The platform has not enabled sending documents to an external provider.')).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Review and acknowledge document sending' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('withdraws the acknowledgement immediately without a dialog', async () => {
+    api.fetchStatus.mockResolvedValue(docs({}, true));
+    api.saveSettings.mockResolvedValue(docs());
+    mount();
+    const section = (await screen.findByText('Sending reviewed documents to an external AI provider')).closest('section') as HTMLElement;
+    await userEvent.click(within(section).getByRole('button', { name: 'Withdraw acknowledgement' }));
+    await waitFor(() => expect(api.saveSettings).toHaveBeenCalledWith({
+      enabled: true, consented_categories: ['assistant_messages', 'financial_summary', 'document_projected_text'], acknowledge_external_documents: false,
+    }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('shows no document-sending section for the mock provider', async () => {
+    api.fetchStatus.mockResolvedValue(makeStatus());
+    mount();
+    await sw('Enable the assistant for my organization');
+    expect(screen.queryByText('Sending reviewed documents to an external AI provider')).toBeNull();
+  });
+});
+
 describe('revoking and failures', () => {
   it('revokes a category immediately without an acknowledgement', async () => {
     api.fetchStatus.mockResolvedValue(makeStatus());
