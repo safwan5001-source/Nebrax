@@ -18,7 +18,7 @@ No defect requiring a code fix was found. The only code added is a pilot-journey
 |---|---|
 | Base (`main`, verified live, not advanced) | `6258840b7fef68fbc533f78176006c0cd7b1ad9d` (AI-04, #1554) |
 | Branch | `feat/ai-06-internal-mock-pilot-20261017` (Draft PR) |
-| Head | `@@HEAD@@` |
+| Head | `d9ef656991090d4a389767d79432125885664889` (test + report; later commits change this report only) |
 | Environment tested | PHP 8.3 / SQLite via the assembled Laravel app; Vitest; Playwright Chromium (intercepted API). PostgreSQL and bcmath-dependent suites run in CI only. |
 | Not tested | physical devices, real keyboard/Android Back, real provider, production data, load. |
 
@@ -135,7 +135,7 @@ Vitest `modules/intelligence` + `components/intelligence`: **203/203**. Playwrig
 | Vitest AI | 203 passed |
 | Playwright AI-03 + AI-04 | 72 passed, 4 skipped, 0 failed |
 | Full PHP suite | not re-run (no production code changed); AI-04 full run and green CI on `6258840` relied on |
-| CI on this PR | `@@CI@@` |
+| CI on this PR | PR #1557 checks (SQLite, PostgreSQL, CI Gate, web build) — result recorded in the PR, not claimed here |
 
 ## 9. Remaining work and risks
 
