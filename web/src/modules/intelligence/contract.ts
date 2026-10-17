@@ -28,14 +28,19 @@ export type CapabilityState =
   /** AI-04: فئة نصّ المستند غير متاحة على المنصة (مفتاح المنصة المستقل مغلق). */
   | 'category_unavailable'
   /** AI-04: قدرة مركز المستندات غير مستحقة لهذه المؤسسة. */
-  | 'document_center_unavailable';
+  | 'document_center_unavailable'
+  /** AI-07: المزوّد خارجي ولم يُقرّ مالك المؤسسة بإرسال بيانات المساعد إليه. */
+  | 'external_provider_not_acknowledged';
 
 export type DataCategoryKey = 'assistant_messages' | 'financial_summary' | 'document_projected_text';
 
 export interface AssistantStatus {
   platform_enabled: boolean;
-  provider_mode: 'mock' | 'unavailable';
-  tenant: { enabled: boolean; consented_categories: DataCategoryKey[] };
+  /** `external` (AI-07): مزوّد خارجي جاهز؛ يُسمّى في `provider_label`. */
+  provider_mode: 'mock' | 'external' | 'unavailable';
+  provider_label?: 'anthropic' | null;
+  /** `external_acknowledged` يظهر فقط حين يكون المزوّد المضبوط خارجياً. */
+  tenant: { enabled: boolean; consented_categories: DataCategoryKey[]; external_acknowledged?: boolean };
   categories: { key: DataCategoryKey; available: boolean; consented: boolean }[];
   abilities: { use: boolean; manage_consent: boolean; view_audit: boolean; partner_detail: boolean; document_read: boolean };
   chat: CapabilityState;
@@ -178,6 +183,8 @@ export interface SettingsPayload {
   enabled: boolean;
   consented_categories: DataCategoryKey[];
   acknowledge_privacy?: boolean;
+  /** AI-07: إقرار بإرسال الرسائل وملخّصات الأرقام إلى مزوّد خارجي (يُسحب بالتعطيل أو بقيمة `false`). */
+  acknowledge_external_provider?: boolean;
 }
 
 export const MESSAGE_MAX_CHARS = 2000;

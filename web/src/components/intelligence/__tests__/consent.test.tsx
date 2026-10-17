@@ -105,6 +105,49 @@ describe.each(TEST_LOCALES)('granting consent (%s)', (locale) => {
   });
 });
 
+describe('external provider acknowledgement (AI-07)', () => {
+  const external = (ack: boolean) => makeStatus({
+    provider_mode: 'external', provider_label: 'anthropic',
+    tenant: { enabled: true, consented_categories: ['assistant_messages', 'financial_summary'], external_acknowledged: ack },
+  });
+
+  it('shows no external section for the mock provider', async () => {
+    api.fetchStatus.mockResolvedValue(makeStatus());
+    mount();
+    await sw('Enable the assistant for my organization');
+    expect(screen.queryByText('Sending to an external AI provider')).toBeNull();
+  });
+
+  it('needs a second, separate acknowledgement before the external send is granted, and sends it', async () => {
+    api.fetchStatus.mockResolvedValue(external(false));
+    api.saveSettings.mockResolvedValue(external(true));
+    mount();
+    await userEvent.click(await screen.findByRole('button', { name: 'Review and acknowledge' }));
+    const dialog = await screen.findByRole('dialog');
+    const confirm = within(dialog).getByRole('button', { name: 'Grant consent' }) as HTMLButtonElement;
+    const [privacy, extra] = within(dialog).getAllByRole('checkbox');
+    await userEvent.click(privacy);
+    expect(confirm.disabled).toBe(true);
+    await userEvent.click(extra);
+    expect(confirm.disabled).toBe(false);
+    await userEvent.click(confirm);
+    await waitFor(() => expect(api.saveSettings).toHaveBeenCalledWith({
+      enabled: true, consented_categories: ['assistant_messages', 'financial_summary'], acknowledge_privacy: true, acknowledge_external_provider: true,
+    }));
+  });
+
+  it('withdraws the acknowledgement immediately without a dialog', async () => {
+    api.fetchStatus.mockResolvedValue(external(true));
+    api.saveSettings.mockResolvedValue(external(false));
+    mount();
+    await userEvent.click(await screen.findByRole('button', { name: 'Withdraw acknowledgement' }));
+    await waitFor(() => expect(api.saveSettings).toHaveBeenCalledWith({
+      enabled: true, consented_categories: ['assistant_messages', 'financial_summary'], acknowledge_external_provider: false,
+    }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});
+
 describe('revoking and failures', () => {
   it('revokes a category immediately without an acknowledgement', async () => {
     api.fetchStatus.mockResolvedValue(makeStatus());

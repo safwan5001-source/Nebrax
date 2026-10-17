@@ -3,12 +3,16 @@
 namespace App\Services;
 
 use App\Contracts\AiAssistantProvider;
+use App\Contracts\AiExternalAssistantProvider;
 use App\Models\AiRequest;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Support\AiAssistantDataCategory;
 use App\Support\AiAssistantDenied;
+use App\Support\AiAnswerGuard;
 use App\Support\AiAssistantPricing;
+use App\Support\AiToolResultDigest;
+use App\Support\Settings;
 use App\Support\AiProviderException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -82,14 +86,22 @@ class AiAssistantGateway
             $actor = $this->policy->authorize($actorId, $categories);
             $scope = $this->scopeGuard->resolve($actor, $branchIds, $warehouseIds);
             $provider = $this->provider();
+            $external = $provider instanceof AiExternalAssistantProvider;
             $log['provider'] = $extra['provider'] = $provider->name();
             $extra['model'] = $provider->model();
+
+            // مزوّد خارجي: لا إرسال بلا إقرار صريح من مالك المؤسسة بذلك (موافقات المرحلة التجريبية لا تنقلب إليه ضمنياً).
+            if ($external && (Settings::group('ai_assistant_external', Tenant::query()->findOrFail($tenantId))['acknowledged'] ?? false) !== true) {
+                throw AiAssistantDenied::for('external_provider_not_acknowledged');
+            }
 
             $profile = AiAssistantPricing::profile($provider->name(), $provider->model())
                 ?? throw AiAssistantDenied::for('pricing_unknown');
 
             $maxOutput = (int) config('ai_assistant.limits.max_output_tokens', 1024);
             $estimatedInput = AiAssistantPricing::estimateInputTokens($message);
+            // الخارجي نداءان كحدّ أقصى: يُحجز لهما معاً قبل أول استدعاء.
+            [$reserveIn, $reserveOut] = $external ? $provider->reservationEstimate($estimatedInput, $maxOutput) : [$estimatedInput, $maxOutput];
 
             $request = $this->ledger->open(
                 $tenantId,
@@ -97,8 +109,8 @@ class AiAssistantGateway
                 $provider->name(),
                 $provider->model(),
                 $profile,
-                $estimatedInput + $maxOutput,
-                AiAssistantPricing::costMicroUsd($profile, $estimatedInput, $maxOutput),
+                $reserveIn + $reserveOut,
+                AiAssistantPricing::costMicroUsd($profile, $reserveIn, $reserveOut),
                 $idempotencyKey,
                 $this->fingerprint($message, $locale, $categories, $branchIds, $warehouseIds),
             );
@@ -109,7 +121,7 @@ class AiAssistantGateway
                 'branch_mode' => $scope['branch']['mode'], 'branch_count' => count($scope['branch']['ids']),
                 'warehouse_mode' => $scope['warehouse']['mode'], 'warehouse_count' => count($scope['warehouse']['ids']),
                 'billable' => $profile['billable'],
-            ];
+            ] + ($external ? ['external_ack' => true] : []);
 
             // دائم وإلزامي قبل أي استدعاء: إن تعذّر يُحرَّر الحجز ويُمنع الاستدعاء.
             try {
@@ -126,25 +138,81 @@ class AiAssistantGateway
             $reply = $this->callProvider($provider, $profile, $request, ['message' => $message, 'locale' => $locale, 'max_output_tokens' => $maxOutput, 'today' => $today, 'timezone' => $timezone], $tenantId, $actorId, $extra, $finalAudited, $settled);
 
             $usage = $this->usage($profile, $reply['usage']);
-            $overrun = $profile['billable'] && (
-                $usage['input_tokens'] + $usage['output_tokens'] > $request->reserved_tokens
-                || $usage['cost_micro_usd'] > $request->reserved_cost_micro_usd
-            );
-            $this->ledger->complete($request, $usage);
-            $settled = true;
-            $extra += $usage;
-            $meta['overrun'] = $overrun;
-
             $plannedCalls = $reply['tool_calls'];
             $log['tool_calls_planned'] = $meta['tool_calls_planned'] = count($plannedCalls);
-            if (count($plannedCalls) > (int) config('ai_assistant.limits.max_tool_calls', 3)) {
-                throw AiAssistantDenied::for('too_many_tool_calls');
-            }
-
+            $tooMany = count($plannedCalls) > (int) config('ai_assistant.limits.max_tool_calls', 3);
             $executed = [];
-            foreach ($plannedCalls as $call) {
-                $executed[] = $this->invokeTool($actorId, $call, $branchIds, $warehouseIds, $requestId, $tenantId, $extra, explicit: false);
-                $log['tool_calls_executed'] = $meta['tool_calls_executed'] = count($executed);
+
+            if ($external && $plannedCalls !== [] && ! $tooMany) {
+                // مزوّد خارجي اقترح أدوات: التنفيذ بتفويض طازج لكل أداة أولاً، ثم صياغة الجواب من ملخّصات محجوبة.
+                // التسوية تتأخر إلى ما بعد النداء الثاني؛ أي إخفاق قبله يُسوّي ما استُهلك فعلاً (النداء الأول).
+                try {
+                    foreach ($plannedCalls as $call) {
+                        $executed[] = $this->invokeTool($actorId, $call, $branchIds, $warehouseIds, $requestId, $tenantId, $extra, explicit: false);
+                        $log['tool_calls_executed'] = $meta['tool_calls_executed'] = count($executed);
+                    }
+                } catch (Throwable $e) {
+                    $this->settle($request, $profile, $usage, $settled, $extra, $meta);
+
+                    throw $e;
+                }
+
+                $digests = [];
+                $names = [];
+                $maxResultTokens = (int) config('ai_assistant.limits.tool_result_max_tokens', 3000);
+                foreach ($executed as $result) {
+                    $built = AiToolResultDigest::build($result['result'], intdiv($maxResultTokens, max(1, count($executed))));
+                    $digests[] = ['tool' => $result['tool'], 'digest' => $built['digest']];
+                    $names += $built['names'];
+                }
+                $meta['composed'] = true;
+                $meta['results_digested'] = count($digests);
+
+                try {
+                    $composed = $provider->compose(
+                        ['message' => $message, 'locale' => $locale, 'max_output_tokens' => $maxOutput, 'today' => $today, 'timezone' => $timezone],
+                        (array) ($reply['continuation'] ?? []),
+                        $digests,
+                    );
+                } catch (Throwable $e) {
+                    report($e);
+                    $reported = $e instanceof AiProviderException && $e->usage !== null ? $this->usage($profile, $e->usage) : $usage;
+                    $this->ledger->fail($request, $reported, 'provider_error');
+                    $settled = true;
+                    $this->audit->record($requestId, $tenantId, $actorId, 'request.failed', 'error', 'provider_error', $extra + $reported);
+                    $finalAudited = true;
+
+                    throw AiAssistantDenied::for('internal_error');
+                }
+
+                $usage = $this->usage($profile, $composed['usage']);
+                $this->settle($request, $profile, $usage, $settled, $extra, $meta);
+
+                $max = (int) config('ai_assistant.limits.answer_max_chars', 4000);
+                $answer = AiAnswerGuard::sanitize((string) $composed['content'], $max);
+                $meta['grounded'] = $answer !== '' && AiAnswerGuard::isGrounded($answer, array_column($digests, 'digest'));
+                $reply['content'] = $meta['grounded']
+                    ? AiAnswerGuard::restoreNames($answer, $names)
+                    : ($locale === 'en'
+                        ? 'I could not verify the figures in my written answer, so it was withheld. The approved report figures are shown below.'
+                        : 'تعذّر التحقق من الأرقام الواردة في صياغتي للجواب فحُجب. الأرقام المعتمدة معروضة في بطاقات النتائج أدناه.');
+            } else {
+                $this->settle($request, $profile, $usage, $settled, $extra, $meta);
+                if ($tooMany) {
+                    throw AiAssistantDenied::for('too_many_tool_calls');
+                }
+                foreach ($plannedCalls as $call) {
+                    $executed[] = $this->invokeTool($actorId, $call, $branchIds, $warehouseIds, $requestId, $tenantId, $extra, explicit: false);
+                    $log['tool_calls_executed'] = $meta['tool_calls_executed'] = count($executed);
+                }
+                if ($external) {
+                    // الجواب المباشر من النموذج (بلا أدوات): نصّ بلا أرقام معتمدة، يُنظَّف فقط وتُرفض فيه أي أرقام مالية.
+                    $answer = AiAnswerGuard::sanitize((string) $reply['content'], (int) config('ai_assistant.limits.answer_max_chars', 4000));
+                    $meta['grounded'] = $answer !== '' && AiAnswerGuard::isGrounded($answer, []);
+                    $reply['content'] = $meta['grounded'] ? $answer : ($locale === 'en'
+                        ? 'I can only answer from the approved reports (income statement, receivables aging, payables aging). Please ask about one of them.'
+                        : 'أستطيع الإجابة من التقارير المعتمدة فقط (قائمة الدخل، أعمار الذمم المدينة، أعمار الذمم الدائنة). اسأل عن أحدها.');
+                }
             }
 
             $this->audit->record($requestId, $tenantId, $actorId, 'request.completed', 'allowed', 'ok', $extra + ['meta' => $meta]);
@@ -236,13 +304,32 @@ class AiAssistantGateway
     /** @throws AiAssistantDenied */
     private function provider(): AiAssistantProvider
     {
-        // لا يُحلّ إلا `mock`. أي قيمة أخرى (حتى اسم مزوّد حقيقي مهيّأ في المنصة) تفشل مغلقةً: لا اتصال
-        // شبكي ولا قراءة لأسرار المنصة في هذه المرحلة.
-        if (config('ai_assistant.provider') !== 'mock') {
-            throw AiAssistantDenied::for('provider_unavailable');
-        }
+        // `mock` (الافتراضي) أو `anthropic` (AI-07، عبر تكامل المنصة القائم وبوابة الشبكة وكل ضوابطها). أي قيمة أخرى
+        // تفشل مغلقةً: لا اتصال شبكي ولا قراءة لأسرار المنصة.
+        return match (config('ai_assistant.provider')) {
+            'mock' => $this->mockProvider,
+            'anthropic' => tap(app(AnthropicAssistantProvider::class), static fn (AnthropicAssistantProvider $p) => $p->assertReady()),
+            default => throw AiAssistantDenied::for('provider_unavailable'),
+        };
+    }
 
-        return $this->mockProvider;
+    /**
+     * تسوية الطلب بالاستهلاك الفعلي (مرة واحدة). `overrun` = تجاوز الاستهلاك ما حُجز لطلب قابل للفوترة.
+     *
+     * @param  array{billable:bool}  $profile
+     * @param  array{input_tokens:int, output_tokens:int, cost_micro_usd:int}  $usage
+     * @param  array<string,mixed>  $extra
+     * @param  array<string,mixed>  $meta
+     */
+    private function settle(AiRequest $request, array $profile, array $usage, bool &$settled, array &$extra, array &$meta): void
+    {
+        $meta['overrun'] = $profile['billable'] && (
+            $usage['input_tokens'] + $usage['output_tokens'] > $request->reserved_tokens
+            || $usage['cost_micro_usd'] > $request->reserved_cost_micro_usd
+        );
+        $this->ledger->complete($request, $usage);
+        $settled = true;
+        $extra += $usage;
     }
 
     /**

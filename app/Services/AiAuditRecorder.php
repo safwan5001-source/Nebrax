@@ -27,6 +27,8 @@ class AiAuditRecorder
         // قراءة مستند مُسقَط (AI-04): مرجع المستند (UUID) ونوعه وحالته وأعداد فقط — لا قيمة ولا نص ولا اسم ملف.
         'document_ref' => 'uuid', 'document_type' => 'string', 'document_status' => 'string',
         'fields_returned' => 'int', 'lines_returned' => 'int', 'redactions_applied' => 'int',
+        // مزوّد خارجي (AI-07): أعلام فقط — لا نص رسالة ولا جواب ولا رقم.
+        'external_ack' => 'bool', 'composed' => 'bool', 'grounded' => 'bool', 'results_digested' => 'int',
     ];
 
     private const CODE = '/^[a-z][a-z0-9_.]{0,79}$/';

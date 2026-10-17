@@ -60,6 +60,7 @@ class AiAssistantController extends ApiController
                 $request->boolean('enabled'),
                 (array) $request->input('consented_categories', []),
                 $request->boolean('acknowledge_privacy'),
+                $request->has('acknowledge_external_provider') ? $request->boolean('acknowledge_external_provider') : null,
             );
         } catch (AiAssistantDenied $denied) {
             return response()->json([

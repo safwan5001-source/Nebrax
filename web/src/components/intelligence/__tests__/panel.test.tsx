@@ -159,6 +159,28 @@ describe.each(TEST_LOCALES)('blocked states (%s)', (locale) => {
   });
 });
 
+describe('external provider (AI-07)', () => {
+  it('labels replies as external instead of demo, and shows the dedicated state when not acknowledged', async () => {
+    api.fetchStatus.mockResolvedValue(makeStatus({ provider_mode: 'external', provider_label: 'anthropic' }));
+    api.sendMessage.mockResolvedValue(messageResponse());
+    mount('en');
+    const dialog = await openPanel();
+    await userEvent.click(await within(dialog).findByRole('button', { name: 'Income statement this month' }));
+    await within(dialog).findByText(/Written by an external AI model/);
+    expect(within(dialog).queryByText('Demo')).toBeNull();
+    expect(within(dialog).getAllByText('Anthropic').length).toBeGreaterThan(0);
+  });
+
+  it('blocks the composer with its own notice while the tenant has not acknowledged', async () => {
+    api.fetchStatus.mockResolvedValue(makeStatus({ provider_mode: 'external', chat: 'external_provider_not_acknowledged', financial: 'external_provider_not_acknowledged' }));
+    mount('en');
+    const dialog = await openPanel();
+    await waitFor(() => expect(within(dialog).getByRole('status').getAttribute('data-notice')).toBe('external_provider_not_acknowledged'));
+    expect((within(dialog).getByRole('textbox') as HTMLTextAreaElement).disabled).toBe(true);
+    expect(api.sendMessage).not.toHaveBeenCalled();
+  });
+});
+
 describe('conversation', () => {
   it('sends a suggestion through the gateway, labels the reply as demo and links to the canvas and report', async () => {
     session.pathname = '/reports/general/income-statement';

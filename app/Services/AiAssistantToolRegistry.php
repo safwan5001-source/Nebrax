@@ -40,6 +40,20 @@ class AiAssistantToolRegistry
         return $this->index[$name] ?? null;
     }
 
+    /**
+     * الأدوات التي يجوز عرضها على **نموذج خارجي** (AI-07): كلّ المسجَّل عدا الصريحة الاستدعاء (قراءة المستند).
+     * فلا يرى النموذج وجودها أصلاً، ولو اقترح اسمها لرفضتها البوابة كـ`tool_not_registered`.
+     *
+     * @return list<AiAssistantTool>
+     */
+    public function offeredToModel(): array
+    {
+        return array_values(array_filter(
+            $this->definitions(),
+            static fn (AiAssistantTool $tool): bool => ! $tool instanceof \App\Contracts\AiExplicitInvocationOnly,
+        ));
+    }
+
     /** @return list<string> */
     public function names(): array
     {

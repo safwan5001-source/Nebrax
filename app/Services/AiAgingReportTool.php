@@ -41,6 +41,24 @@ class AiAgingReportTool extends AiFinanceReportTool
         return $this->type === 'payable' ? 'finance.payables_aging' : 'finance.receivables_aging';
     }
 
+    public function description(): string
+    {
+        return ($this->type === 'payable'
+            ? 'Payables (suppliers) aging: current outstanding balances owed to suppliers, bucketed by days past due, in SAR.'
+            : 'Receivables (customers) aging: current outstanding customer balances, bucketed by days past due, in SAR.')
+            . ' as_of (YYYY-MM-DD, not in the future) only moves the age reference; balances are always the current ones.';
+    }
+
+    public function inputSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => ['as_of' => ['type' => 'string', 'description' => 'Age reference date YYYY-MM-DD (usually today).']],
+            'required' => ['as_of'],
+            'additionalProperties' => false,
+        ];
+    }
+
     public function validate(array $arguments): array
     {
         $this->assertClosedSchema($arguments, ['as_of']);

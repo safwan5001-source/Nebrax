@@ -389,6 +389,27 @@ class PlatformIntegrationService
         ];
     }
 
+    /**
+     * إعداد مزوّد ذكاء اصطناعي كما حفظه مدير المنصة (مفتاح مشفَّر `encrypted:array` + النموذج + المهلات) — **قراءة فقط**.
+     *
+     * يستعمله المساعد الذكي (AI-07) لإعادة استعمال التكامل نفسه بدل نظام مفاتيح ثانٍ. يُعاد إعداداً فارغاً
+     * (`enabled=false`) إن لم يُحفظ شيء. السرّ لا يغادر هذا الكائن إلى أي سجل أو استجابة.
+     */
+    public function aiProviderConfiguration(string $provider): DocumentProviderConfiguration
+    {
+        if (! in_array($provider, self::AI_PROVIDER_KEYS, true)) {
+            throw new \InvalidArgumentException('Unknown AI provider.');
+        }
+
+        $setting = PlatformIntegrationSetting::query()->where('integration_key', 'document_ai')->first();
+        $configuration = is_array($setting?->configuration) ? $this->upgradeLegacyAiConfiguration($setting->configuration) : [];
+
+        return DocumentProviderConfiguration::fromArray(
+            $provider,
+            is_array($configuration['providers'][$provider] ?? null) ? $configuration['providers'][$provider] : [],
+        );
+    }
+
     public function documentWorkerOnline(): bool
     {
         $lastSeen = PlatformRuntimeHeartbeat::query()

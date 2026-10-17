@@ -41,6 +41,22 @@ class AiDocumentProjectionTool implements AiAssistantTool, AiExplicitInvocationO
         return false;
     }
 
+    /** صريحة الاستدعاء من المستخدم فقط: لا يعرضها أي مزوّد للنموذج (AI-07 يستثنيها بنوع `AiExplicitInvocationOnly`). */
+    public function description(): string
+    {
+        return 'Explicit user-initiated read of one reviewed, redacted Document Center projection. Never offered to a model.';
+    }
+
+    public function inputSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => ['document_id' => ['type' => 'string']],
+            'required' => ['document_id'],
+            'additionalProperties' => false,
+        ];
+    }
+
     public function validate(array $arguments): array
     {
         if (array_diff(array_keys($arguments), ['document_id']) !== []) {

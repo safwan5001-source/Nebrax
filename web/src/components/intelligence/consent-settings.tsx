@@ -19,6 +19,7 @@ import { StateNotice } from './state-notice';
 type Pending =
   | { kind: 'enable' }
   | { kind: 'grant'; category: DataCategoryKey }
+  | { kind: 'external' }
   | { kind: 'disable' };
 
 /**
@@ -33,6 +34,7 @@ export function ConsentSettings() {
 
   const [pending, setPending] = useState<Pending | null>(null);
   const [acknowledged, setAcknowledged] = useState(false);
+  const [externalAcknowledged, setExternalAcknowledged] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<ClassifiedError | null>(null);
   const [saved, setSaved] = useState(false);
@@ -59,7 +61,7 @@ export function ConsentSettings() {
     if (identity && canAudit) void loadAudit(identity);
   }, [identity, canAudit]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function commit(payload: { enabled: boolean; categories: DataCategoryKey[]; acknowledge?: boolean }) {
+  async function commit(payload: { enabled: boolean; categories: DataCategoryKey[]; acknowledge?: boolean; externalAck?: boolean }) {
     if (!status || saving) return;
     const forIdentity = identity;
     setSaving(true);
@@ -70,12 +72,14 @@ export function ConsentSettings() {
         enabled: payload.enabled,
         consented_categories: payload.categories,
         ...(payload.acknowledge ? { acknowledge_privacy: true } : {}),
+        ...(payload.externalAck !== undefined ? { acknowledge_external_provider: payload.externalAck } : {}),
       });
       if (identityRef.current !== forIdentity) return;
       applyStatus(next);
       setSaved(true);
       setPending(null);
       setAcknowledged(false);
+      setExternalAcknowledged(false);
       if (next.abilities.view_audit) void loadAudit(forIdentity);
     } catch (caught) {
       if (identityRef.current !== forIdentity) return;
@@ -83,6 +87,7 @@ export function ConsentSettings() {
       setError(classified);
       setPending(null);
       setAcknowledged(false);
+      setExternalAcknowledged(false);
       if (classified.refreshStatus) void refreshStatus();
     } finally {
       if (identityRef.current === forIdentity) setSaving(false);
@@ -103,6 +108,9 @@ export function ConsentSettings() {
   const consented = new Set(status.tenant.consented_categories);
   const enabled = status.tenant.enabled;
   const platformOn = status.platform_enabled;
+  // AI-07: حين يكون المزوّد المضبوط خارجياً يلزم إقرار مستقل صريح بأن الرسائل وملخّصات الأرقام تُرسَل إليه.
+  const external = status.tenant.external_acknowledged !== undefined;
+  const externalAck = status.tenant.external_acknowledged === true;
 
   const onMaster = (next: boolean) => setPending(next ? { kind: 'enable' } : { kind: 'disable' });
   const onCategory = (key: DataCategoryKey, next: boolean) => {
@@ -114,10 +122,11 @@ export function ConsentSettings() {
     if (!pending) return;
     if (pending.kind === 'disable') return void commit({ enabled: false, categories: [] });
     const categories = pending.kind === 'grant' ? [...consented, pending.category] : [...consented];
-    void commit({ enabled: true, categories, acknowledge: true });
+    void commit({ enabled: true, categories, acknowledge: true, ...(external ? { externalAck: true } : {}) });
   }
 
   const needsAck = pending !== null && pending.kind !== 'disable';
+  const needsExternalAck = needsAck && external;
 
   return (
     <div className="space-y-4">
@@ -174,14 +183,33 @@ export function ConsentSettings() {
         </div>
       </section>
 
+      {external ? (
+        <section className="rounded border border-border bg-surface p-4" aria-label={t('external_title')} data-external-ack={externalAck ? 'granted' : 'missing'}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                {t('external_title')}
+                <Badge tone={externalAck ? 'positive' : 'muted'}>{externalAck ? t('granted') : t('not_granted')}</Badge>
+              </p>
+              <p className="mt-0.5 text-xs text-muted">{t('external_help')}</p>
+            </div>
+            {enabled && platformOn ? (
+              externalAck
+                ? <Button type="button" variant="outline" disabled={saving} onClick={() => void commit({ enabled: true, categories: [...consented], externalAck: false })}>{t('external_revoke')}</Button>
+                : <Button type="button" variant="primary" disabled={saving} onClick={() => setPending({ kind: 'external' })}>{t('external_acknowledge_cta')}</Button>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
       {status.provider_mode === 'mock' ? <p className="text-xs text-muted">{t('mock_note')}</p> : null}
+      {status.provider_mode === 'external' ? <p className="text-xs text-muted">{t('external_note')}</p> : null}
       {saving ? <p role="status" className="text-xs text-muted">{t('saving')}</p> : null}
 
       {canAudit ? <AuditActivity events={events} failed={auditFailed} /> : null}
 
       <Dialog
         open={pending !== null}
-        onClose={() => { if (!saving) { setPending(null); setAcknowledged(false); } }}
+        onClose={() => { if (!saving) { setPending(null); setAcknowledged(false); setExternalAcknowledged(false); } }}
         title={pending?.kind === 'disable' ? t('revoke_confirm') : t('confirm_title')}
         closeLabel={t('cancel')}
       >
@@ -192,28 +220,43 @@ export function ConsentSettings() {
                 <p className="text-sm">
                   {pending.kind === 'grant'
                     ? t('confirm_enable', { categories: t(`category.${pending.category}`) })
-                    : t('confirm_enable_only')}
+                    : pending.kind === 'external' ? t('external_confirm') : t('confirm_enable_only')}
                 </p>
                 <div className="rounded border border-border bg-background p-3" data-privacy={pending.kind === 'grant' && pending.category === 'document_projected_text' ? 'document' : 'general'}>
                   <p className="mb-1 flex items-center gap-1.5 text-xs font-medium"><ShieldCheck className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />{pending.kind === 'grant' && pending.category === 'document_projected_text' ? t('document_privacy_title') : t('privacy_title')}</p>
                   <ul className="list-disc space-y-1 ps-5 text-xs text-muted">
                     {pending.kind === 'grant' && pending.category === 'document_projected_text'
                       ? (['d1', 'd2', 'd3', 'd4'] as const).map((key) => (<li key={key}>{t(`document_privacy_points.${key}`)}</li>))
-                      : (['p1', 'p2', 'p3', 'p4'] as const).map((key) => (<li key={key}>{t(`privacy_points.${key}`)}</li>))}
+                      // p1 تقول «لا شيء يُرسَل لطرف خارجي»: تُستبدل بنقاط الإرسال الخارجي حين يكون المزوّد خارجياً.
+                      : (external ? (['p2', 'p3', 'p4'] as const) : (['p1', 'p2', 'p3', 'p4'] as const)).map((key) => (<li key={key}>{t(`privacy_points.${key}`)}</li>))}
                   </ul>
                   {pending.kind === 'grant' && pending.category === 'document_projected_text' ? <p className="mt-2 text-xs font-medium text-text">{t('document_separate')}</p> : null}
                 </div>
+                {needsExternalAck ? (
+                  <div className="rounded border border-warning/50 bg-background p-3" data-privacy="external">
+                    <p className="mb-1 flex items-center gap-1.5 text-xs font-medium"><ShieldCheck className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />{t('external_privacy_title')}</p>
+                    <ul className="list-disc space-y-1 ps-5 text-xs text-muted">
+                      {(['e1', 'e2', 'e3', 'e4'] as const).map((key) => (<li key={key}>{t(`external_privacy_points.${key}`)}</li>))}
+                    </ul>
+                  </div>
+                ) : null}
                 <label className="flex min-h-11 cursor-pointer items-start gap-2 text-sm">
                   <input type="checkbox" className="mt-1 h-4 w-4 accent-primary" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />
                   <span>{t('acknowledge')}</span>
                 </label>
+                {needsExternalAck ? (
+                  <label className="flex min-h-11 cursor-pointer items-start gap-2 text-sm">
+                    <input type="checkbox" className="mt-1 h-4 w-4 accent-primary" checked={externalAcknowledged} onChange={(event) => setExternalAcknowledged(event.target.checked)} />
+                    <span>{t('external_acknowledge')}</span>
+                  </label>
+                ) : null}
               </>
             ) : (
               <p className="text-sm">{t('master_help')}</p>
             )}
             <div className="flex flex-wrap justify-end gap-2">
-              <Button type="button" variant="outline" disabled={saving} onClick={() => { setPending(null); setAcknowledged(false); }}>{t('cancel')}</Button>
-              <Button type="button" variant={pending.kind === 'disable' ? 'danger' : 'primary'} disabled={saving || (needsAck && !acknowledged)} onClick={confirm}>
+              <Button type="button" variant="outline" disabled={saving} onClick={() => { setPending(null); setAcknowledged(false); setExternalAcknowledged(false); }}>{t('cancel')}</Button>
+              <Button type="button" variant={pending.kind === 'disable' ? 'danger' : 'primary'} disabled={saving || (needsAck && !acknowledged) || (needsExternalAck && !externalAcknowledged)} onClick={confirm}>
                 {pending.kind === 'disable' ? t('revoke_confirm') : t('confirm')}
               </Button>
             </div>

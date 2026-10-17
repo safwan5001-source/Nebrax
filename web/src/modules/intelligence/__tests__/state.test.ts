@@ -15,6 +15,7 @@ describe('classifyError', () => {
     ['permission_denied', 403, 'permission_denied'],
     ['tool_permission_denied', 403, 'tool_permission_denied'],
     ['provider_unavailable', 503, 'provider_unavailable'],
+    ['external_provider_not_acknowledged', 403, 'external_provider_not_acknowledged'],
     ['currency_unsupported', 422, 'currency_unsupported'],
     ['budget_not_configured', 402, 'budget_not_configured'],
     ['budget_exceeded', 429, 'budget_exceeded'],
@@ -60,6 +61,7 @@ describe('classifyError', () => {
   it('asks for a status re-read only when permission/consent/enablement may have changed', () => {
     expect(classifyError(err(403, 'consent_required')).refreshStatus).toBe(true);
     expect(classifyError(err(403, 'permission_denied')).refreshStatus).toBe(true);
+    expect(classifyError(err(403, 'external_provider_not_acknowledged')).refreshStatus).toBe(true);
     expect(classifyError(err(422, 'invalid_tool_arguments')).refreshStatus).toBe(false);
     expect(classifyError(err(500)).refreshStatus).toBe(false);
   });
@@ -74,7 +76,7 @@ describe('classifyError', () => {
 describe('notice copy', () => {
   const KEYS: NoticeKey[] = [
     'platform_disabled', 'tenant_disabled', 'consent_required', 'permission_denied', 'tool_permission_denied', 'provider_unavailable',
-    'currency_unsupported', 'branch_scope_forbidden', 'warehouse_scope_forbidden', 'scope_not_supported', 'invalid_tool_arguments',
+    'external_provider_not_acknowledged', 'currency_unsupported', 'branch_scope_forbidden', 'warehouse_scope_forbidden', 'scope_not_supported', 'invalid_tool_arguments',
     'invalid_request', 'budget_not_configured', 'budget_exceeded', 'platform_budget_exceeded', 'pricing_unknown',
     'acknowledgement_required', 'data_category_unavailable', 'duplicate_request', 'rate_limited', 'network_error', 'server_error', 'unknown_error',
     'category_unavailable', 'document_center_unavailable', 'document_unavailable', 'document_not_reviewed', 'document_review_stale', 'document_quarantined',

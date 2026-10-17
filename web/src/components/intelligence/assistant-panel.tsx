@@ -17,12 +17,13 @@ import { DocumentSection } from './document-section';
 import { ResultSummary } from './result-summary';
 import { StateNotice } from './state-notice';
 
-function Entry({ entry, onOpenCanvas, onNavigate, runIds, demo }: {
+function Entry({ entry, onOpenCanvas, onNavigate, runIds, demo, external }: {
   entry: ChatEntry;
   onOpenCanvas: (runId: string) => void;
   onNavigate: () => void;
   runIds: Set<string>;
   demo: boolean;
+  external: boolean;
 }) {
   const t = useTranslations('intelligence');
   if (entry.role === 'notice' && entry.error) {
@@ -46,10 +47,12 @@ function Entry({ entry, onOpenCanvas, onNavigate, runIds, demo }: {
           <div className="mb-0.5 flex items-center gap-2 px-1 text-[11px] text-muted">
             <span>{t('panel.assistant')}</span>
             {demo ? <Badge tone="warning">{t('demo.badge')}</Badge> : null}
+            {external ? <Badge tone="muted">{t('external.badge')}</Badge> : null}
           </div>
           <div className="rounded-lg rounded-ss-sm border border-border bg-surface px-3 py-2 text-sm">
             <p dir="auto" className="whitespace-pre-wrap break-words">{entry.text}</p>
             {demo ? <p className="mt-1.5 border-t border-border pt-1.5 text-xs text-muted">{t('demo.reply')}</p> : null}
+            {external ? <p className="mt-1.5 border-t border-border pt-1.5 text-xs text-muted">{t('external.reply')}</p> : null}
           </div>
         </div>
         {entry.toolCalls && entry.toolCalls.length > 0
@@ -116,6 +119,7 @@ export function AssistantPanel() {
   const gate = gateFor(store, 'chat');
   const canManage = store.status?.abilities.manage_consent === true;
   const demo = store.status?.provider_mode === 'mock';
+  const external = store.status?.provider_mode === 'external';
   const runIds = useMemo(() => new Set(store.runs.map((run) => run.id)), [store.runs]);
   const tooLong = draft.length > MESSAGE_MAX_CHARS;
   const canSend = gate.kind === 'ready' && !store.chatPending && draft.trim().length > 0 && !tooLong;
@@ -265,7 +269,7 @@ export function AssistantPanel() {
             </div>
           ) : null}
           {store.entries.map((entry) => (
-            <Entry key={entry.id} entry={entry} runIds={runIds} demo={demo} onOpenCanvas={openCanvas} onNavigate={store.closePanel} />
+            <Entry key={entry.id} entry={entry} runIds={runIds} demo={demo} external={external} onOpenCanvas={openCanvas} onNavigate={store.closePanel} />
           ))}
           {store.chatPending ? (
             <p role="status" className="text-xs text-muted">{t('panel.pending')}</p>

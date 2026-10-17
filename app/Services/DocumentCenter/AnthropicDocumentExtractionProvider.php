@@ -102,6 +102,35 @@ final class AnthropicDocumentExtractionProvider implements DocumentExtractionPro
         }
     }
 
+    /**
+     * استدعاء Messages API عام لمستهلك آخر (المساعد الذكي — AI-07) عبر **العميل نفسه**: الترويسات والمهلات وبوابة الشبكة
+     * وتحويل الأخطاء كلها من هذا الصنف، فلا عميل ثانٍ ولا إدارة مفاتيح ثانية. يعيد الاستجابة المفكوكة فقط؛ لا يسجّل شيئاً.
+     *
+     * @param  array<string, mixed>  $payload  جسم الطلب (model/max_tokens/system/messages/tools…).
+     * @return array<string, mixed>
+     * @throws DocumentProviderException
+     */
+    public function converse(DocumentProviderConfiguration $configuration, array $payload): array
+    {
+        $validation = $this->validateConfiguration($configuration);
+        if (! $validation->valid) {
+            throw new DocumentProviderException('provider_not_configured', $validation->errors[0], false);
+        }
+        DocumentProviderNetworkGate::assertAllowed();
+
+        try {
+            $response = $this->client($configuration)->post(self::ENDPOINT, ['model' => $configuration->model] + $payload);
+            $this->assertSuccessful($response);
+            $data = $response->json();
+
+            return is_array($data) ? $data : [];
+        } catch (DocumentProviderException $exception) {
+            throw $exception;
+        } catch (Throwable) {
+            throw new DocumentProviderException('provider_unavailable', 'تعذر الوصول إلى Anthropic Claude.', true);
+        }
+    }
+
     /** @return array<string, mixed> */
     private function documentPart(DocumentExtractionRequest $request): array
     {

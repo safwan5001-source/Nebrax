@@ -10976,7 +10976,21 @@
         "d3": "Values are not sent to any outside provider; they are shown to the authorized user only, and audit records keep a document reference and counts only — no values or text.",
         "d4": "Reading needs Document Center view permission and an allowed branch, and unreviewed, quarantined, held or expired documents are refused. You can withdraw consent any time and it applies from the next request."
       },
-      "document_separate": "This consent is independent of “sending documents” in Document Center settings."
+      "document_separate": "This consent is independent of “sending documents” in Document Center settings.",
+      "external_title": "Sending to an external AI provider",
+      "external_help": "Your questions and a summary of the report figures are sent to Anthropic to write the answer. Party names, ids and documents are never sent.",
+      "external_acknowledge_cta": "Review and acknowledge",
+      "external_revoke": "Withdraw acknowledgement",
+      "external_confirm": "Acknowledge that the assistant sends data to an external AI provider.",
+      "external_note": "Current provider mode: external (Anthropic).",
+      "external_privacy_title": "External provider notice",
+      "external_privacy_points": {
+        "e1": "What is sent: the text of each question you ask, and a de-identified summary of the report figures the assistant used (amounts and dates).",
+        "e2": "What is never sent: customer or supplier names, ids, branch identifiers, tenant or user identity, and any Document Center content.",
+        "e3": "Written answers are checked against the report figures; an answer containing a number that is not in the report is withheld.",
+        "e4": "Acknowledgement is withdrawn automatically when the assistant is turned off, and can be withdrawn here at any time."
+      },
+      "external_acknowledge": "I acknowledge, on behalf of the organization, that questions and figure summaries are sent to Anthropic."
     },
     "notice": {
       "action_settings": "Open assistant settings",
@@ -11114,6 +11128,10 @@
       "document_projection_unavailable": {
         "title": "No current safe projection is available",
         "body": "There is no up-to-date projection that can be shown safely for this document. Review it again or try later."
+      },
+      "external_provider_not_acknowledged": {
+        "title": "Acknowledge external sending first",
+        "body": "The assistant uses an external AI provider. An owner or admin must acknowledge the sending notice in assistant settings. No request was made."
       }
     },
     "document": {
@@ -11178,6 +11196,10 @@
         "unit_price_minor": "Unit price",
         "total_minor": "Line total"
       }
+    },
+    "external": {
+      "badge": "Anthropic",
+      "reply": "Written by an external AI model from your report figures. The figures in the cards are read directly from AWJ reports."
     }
   }
 }

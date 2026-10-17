@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Support\ApplicationAccessLevel;
 use App\Support\ApplicationOperationClass;
 use App\Support\AiAssistantDataCategory;
+use App\Support\AiAssistantPricing;
 use App\Support\Rbac;
 use App\Support\Settings;
 
@@ -33,7 +34,15 @@ class AiAssistantStatusService
         $consented = AiAssistantDataCategory::sanitize($settings['consented_categories'] ?? []);
         $tenantEnabled = ($settings['enabled'] ?? false) === true;
         $platform = $this->policy->platformEnabled();
-        $providerAvailable = config('ai_assistant.provider') === 'mock';
+        $external = $this->externalProviderConfigured();
+        // `mock` | `external` (AI-07) | `unavailable`. الخارجي «متاح» فقط إن اجتاز المزوّد كل شروط المنصة وكان سعره معرَّفاً.
+        $providerMode = match (true) {
+            config('ai_assistant.provider') === 'mock' => 'mock',
+            $external && $this->externalReady() => 'external',
+            default => 'unavailable',
+        };
+        $providerAvailable = $providerMode !== 'unavailable';
+        $externalAck = ! $external || (Settings::group('ai_assistant_external', $tenant)['acknowledged'] ?? false) === true;
 
         $can = fn (string $permission): bool => Rbac::allows((string) $user->role, $permission);
         $use = $can(AiAssistantPolicy::PERMISSION);
@@ -48,6 +57,7 @@ class AiAssistantStatusService
         $chat = $common ?? match (true) {
             ! $providerAvailable => 'provider_unavailable',
             ! in_array(AiAssistantDataCategory::ASSISTANT_MESSAGES, $consented, true) => 'consent_required',
+            ! $externalAck => 'external_provider_not_acknowledged',
             default => 'ready',
         };
 
@@ -71,12 +81,13 @@ class AiAssistantStatusService
 
         return [
             'platform_enabled' => $platform,
-            // الاستجابات في هذه المرحلة تجريبية حتمية دائماً؛ لا مزوّد حقيقي يُسمّى للواجهة.
-            'provider_mode' => $providerAvailable ? 'mock' : 'unavailable',
+            // `mock`: ردود تجريبية حتمية بلا اتصال. `external` (AI-07): يُسمّى المزوّد للمستخدم لأن الموافقة المستنيرة تتطلب ذلك.
+            'provider_mode' => $providerMode,
+            'provider_label' => $providerMode === 'external' ? 'anthropic' : null,
             'tenant' => [
                 'enabled' => $tenantEnabled,
                 'consented_categories' => $consented,
-            ],
+            ] + ($external ? ['external_acknowledged' => $externalAck] : []),
             'categories' => array_map(static fn (string $key): array => [
                 'key' => $key,
                 'available' => AiAssistantDataCategory::isAvailable($key),
@@ -97,6 +108,24 @@ class AiAssistantStatusService
             // «اليوم» بتوقيت المؤسسة: الواجهة لا تخمّن منطقتها الزمنية فتقترح تاريخاً مستقبلياً يرفضه الخادم.
             'clock' => $this->clock($tenant),
         ];
+    }
+
+    /** هل المزوّد المضبوط على المنصة خارجي (يتطلب إقراراً وجاهزية)؟ لا يكشف أي إعداد. */
+    public function externalProviderConfigured(): bool
+    {
+        return config('ai_assistant.provider') === 'anthropic';
+    }
+
+    private function externalReady(): bool
+    {
+        try {
+            $provider = app(AnthropicAssistantProvider::class);
+            $provider->assertReady();
+
+            return AiAssistantPricing::profile($provider->name(), $provider->model()) !== null;
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     private function documentCenterDenied(Tenant $tenant, bool $rbac): bool

@@ -686,7 +686,7 @@ class AiMeteringTest extends TestCase
             'app/Models/AiBudget.php', 'app/Models/AiRequest.php', 'app/Models/AiAuditEvent.php',
             'app/Http/Controllers/Api/AiAuditController.php', 'app/Console/Commands/PruneAiRecords.php',
         ];
-        $forbidden = ['Http::', 'GuzzleHttp', 'curl_', 'fsockopen', 'stream_socket', 'file_get_contents', 'PlatformIntegration', 'api_key', 'Crypt::', 'anthropic', 'openai', 'gemini'];
+        $forbidden = ['Http::', 'GuzzleHttp', 'curl_', 'fsockopen', 'stream_socket', 'file_get_contents', 'PlatformIntegration', 'api_key', 'Crypt::', 'openai', 'gemini'];
 
         foreach ($files as $file) {
             $path = base_path($file);
@@ -697,6 +697,10 @@ class AiMeteringTest extends TestCase
             ));
             foreach ($forbidden as $needle) {
                 $this->assertStringNotContainsStringIgnoringCase($needle, $code, "{$file} must not contain `{$needle}`");
+            }
+            // AI-07: the gateway alone names the allowed external provider (to resolve it); budget/ledger/audit code never does.
+            if ($file !== 'app/Services/AiAssistantGateway.php') {
+                $this->assertStringNotContainsStringIgnoringCase('anthropic', $code, "{$file} must not name a provider");
             }
         }
     }
