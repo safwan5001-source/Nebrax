@@ -583,15 +583,16 @@ class AiAssistantGatewayTest extends TestCase
     // ───────────────────── closed tool registry / per-invocation reauth ─────────────────────
 
     /** @test */
-    public function the_shipped_tool_registry_is_closed_to_exactly_the_three_finance_tools(): void
+    public function the_shipped_tool_registry_is_closed_to_exactly_the_reviewed_tools(): void
     {
         $registry = app(AiAssistantToolRegistry::class);
 
         $this->assertEqualsCanonicalizing(
-            ['finance.income_statement', 'finance.receivables_aging', 'finance.payables_aging'],
+            // AI-04 يضيف أداة واحدة صريحة الاستدعاء فقط (قراءة مستند مُسقَط)؛ ما عداها مغلق.
+            ['finance.income_statement', 'finance.receivables_aging', 'finance.payables_aging', 'documents.projected_read'],
             $registry->names(),
         );
-        foreach (['sql', 'finance.getIncomeStatement', 'finance.journal_entries', 'finance.account_ledger', 'documents.read', ''] as $unknown) {
+        foreach (['sql', 'finance.getIncomeStatement', 'finance.journal_entries', 'finance.account_ledger', 'documents.read', 'documents.search', 'documents.download', ''] as $unknown) {
             $this->assertNull($registry->find($unknown), $unknown);
         }
     }

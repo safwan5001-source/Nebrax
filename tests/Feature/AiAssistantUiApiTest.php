@@ -168,7 +168,7 @@ class AiAssistantUiApiTest extends TestCase
         $this->grant($auth['token'], [AiAssistantDataCategory::ASSISTANT_MESSAGES, AiAssistantDataCategory::FINANCIAL_SUMMARY])->assertOk();
 
         $accountant = $this->withToken($this->tokenForRole($tid, 'accountant', 'acc@ui.test'))->getJson(self::STATUS)->assertOk();
-        $this->assertSame(['use' => true, 'manage_consent' => false, 'view_audit' => false, 'partner_detail' => true], $accountant->json('data.abilities'));
+        $this->assertSame(['use' => true, 'manage_consent' => false, 'view_audit' => false, 'partner_detail' => true, 'document_read' => false], $accountant->json('data.abilities'));
         $this->assertSame(['ready', 'ready'], [$accountant->json('data.chat'), $accountant->json('data.financial')]);
 
         // يستعمل المساعد لكنه بلا reports.view: المحادثة جاهزة والمالية مرفوضة

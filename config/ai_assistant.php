@@ -35,6 +35,20 @@ return [
     ],
 
     /*
+    | Document projections (AI-04). A SECOND platform switch, independent of `enabled`: the category
+    | `document_projected_text` is unavailable (cannot be granted, cannot be read) unless this is an explicit
+    | `true`. Tenant consent stays per-tenant and default-off; this flag never grants anything by itself.
+    | The bounds apply to the projection returned to the authorized user (it is never sent to a provider).
+    */
+    'documents' => [
+        'enabled' => filter_var(env('AI_ASSISTANT_DOCUMENTS_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+        'max_fields' => 24,
+        'max_lines' => 50,
+        'max_warnings' => 10,
+        'max_text_chars' => 200,
+    ],
+
+    /*
     | Spend control (AI-02A). Caps live in `ai_budgets` and are explicit: a billable request with no
     | global AND tenant budget row for the current UTC month is refused. There is no unlimited default.
     | Units: tokens, and micro-USD (1 USD = 1,000,000).

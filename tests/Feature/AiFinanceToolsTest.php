@@ -1039,7 +1039,7 @@ class AiFinanceToolsTest extends TestCase
     public function the_registry_still_exposes_no_unreviewed_tools(): void
     {
         $this->assertEqualsCanonicalizing(
-            ['finance.income_statement', 'finance.receivables_aging', 'finance.payables_aging'],
+            ['finance.income_statement', 'finance.receivables_aging', 'finance.payables_aging', 'documents.projected_read'],
             app(AiAssistantToolRegistry::class)->names(),
         );
     }
