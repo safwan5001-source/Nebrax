@@ -13,9 +13,9 @@
 | | |
 |---|---|
 | Branch | `claude/awj-v0-r2-range-feasibility` |
-| PR | __PR__ (docs + throwaway spike only; **not merged**) |
+| PR | [#1558](https://github.com/safwan5001-source/Nebrax/pull/1558) (docs + throwaway spike only; **not merged**) |
 | Base SHA | `3cf914235f2044c0a7b7a0357b240d6edc1b3086` (`origin/main`, includes merged #1552) |
-| Head SHA | __HEAD__ |
+| Head SHA | this docs-only commit (see PR head); the harness/report content is at `2503f7d6fac870ec521761124bcf338db8113603` |
 
 ## 1. Scope and constraints honoured
 Read-only inspection of the repo; a throwaway spike under `docs/plans/store/s0-spikes/r2-range/v0/`; this report. **Not done, by instruction:** no bucket created, no Railway
