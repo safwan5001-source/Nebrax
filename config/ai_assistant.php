@@ -24,6 +24,10 @@ return [
     // consent, a known price and budgets. Anything else fails closed with `provider_unavailable`.
     'provider' => env('AI_ASSISTANT_PROVIDER', 'mock'),
 
+    // AI-07: مفتاح الاتصال الخارجي للمساعد — **مستقل** عن `DOCUMENT_AI_PROVIDER_NETWORK_ENABLED` (استخراج المستندات).
+    // كلاهما مغلق افتراضياً ولا يفتح أحدهما الآخر؛ يمكن تشغيلهما معاً بمفتاحين صريحين.
+    'external_network_enabled' => filter_var(env('AI_ASSISTANT_EXTERNAL_NETWORK_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+
     'limits' => [
         // Bounded request contract (characters, not bytes).
         'message_max_chars' => 2000,
@@ -66,6 +70,17 @@ return [
         //   reserved = the whole reservation (conservative; the call may have been billed)
         //   none     = nothing
         'failure_charge' => 'reserved',
+        // AI-07: هل يدخل استخراج المستندات (Document Center) في **ميزانية الذكاء الاصطناعي نفسها**؟ سياسة تُضبط:
+        // مطفأ افتراضياً (سلوك المؤسسات القائمة لا يتغيّر؛ الاستخراج يبقى محكوماً بحدود العمليات/الصفحات الشهرية).
+        // عند التشغيل: حجز قبل كل استدعاء، وبلا سعر/ميزانية لا يُرسَل المستند. يُوصى بتشغيله عند تفعيل Anthropic.
+        'meter_document_extraction' => filter_var(env('AI_ASSISTANT_METER_DOCUMENT_EXTRACTION', false), FILTER_VALIDATE_BOOLEAN),
+    ],
+
+    // تقدير الحجز لاستخراج مستند (متحفظ عمداً؛ التسوية بالاستهلاك الفعلي). المخرجات = max_tokens في عميل الاستخراج.
+    'document_extraction' => [
+        'input_tokens_per_page' => 6000,
+        'overhead_tokens' => 3000,
+        'max_output_tokens' => 4096,
     ],
 
     /*

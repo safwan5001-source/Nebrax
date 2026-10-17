@@ -72,7 +72,9 @@ class AiAnthropicProviderTest extends TestCase
         config([
             'ai_assistant.enabled' => true,
             'ai_assistant.provider' => 'anthropic',
-            'document_center.ai.provider_network_enabled' => ! in_array('network', $without, true),
+            // AI-07: مفتاحان مستقلان. المساعد لا يعتمد على مفتاح Document AI (مطفأ هنا)، وإيقاف مفتاحه وحده يغلقه ولو فُتح الآخر.
+            'ai_assistant.external_network_enabled' => ! in_array('network', $without, true),
+            'document_center.ai.provider_network_enabled' => in_array('network', $without, true),
             'ai_assistant.pricing.anthropic' => in_array('pricing', $without, true) ? [] : [self::MODEL => ['input_micro_usd_per_1k' => 3000, 'output_micro_usd_per_1k' => 15000]],
         ]);
 
@@ -380,7 +382,7 @@ class AiAnthropicProviderTest extends TestCase
             'provider disabled by the platform admin' => [['provider_disabled'], 503, 'provider_unavailable'],
             'no api key saved' => [['api_key'], 503, 'provider_unavailable'],
             'no model chosen' => [['model'], 503, 'provider_unavailable'],
-            'global provider-network switch off' => [['network'], 503, 'provider_unavailable'],
+            'assistant network switch off (even with the Document AI switch on)' => [['network'], 503, 'provider_unavailable'],
             'no price for the chosen model' => [['pricing'], 503, 'pricing_unknown'],
             'no budget configured' => [['budget'], 503, 'budget_not_configured'],
             'tenant did not acknowledge external sending' => [['ack'], 403, 'external_provider_not_acknowledged'],
@@ -402,6 +404,49 @@ class AiAnthropicProviderTest extends TestCase
 
         $this->assertCount(0, $this->anthropicCalls());
         $this->assertStringNotContainsString(self::KEY, $this->everythingWritten());
+    }
+
+    /** @test */
+    public function the_assistant_and_document_ai_have_independent_network_switches_and_can_run_together(): void
+    {
+        $auth = $this->externalTenant('ext-ind');
+        $this->fakeAnthropic([$this->text('Hello — no tools needed.'), $this->text('Hello again.'), $this->text('Still here.')]);
+
+        // (١) المساعد وحده: مفتاح Document AI مطفأ ويعمل.
+        $this->assertFalse((bool) config('document_center.ai.provider_network_enabled'));
+        $this->aiAsk($auth['token'], ['message' => 'hello', 'locale' => 'en'])->assertOk();
+        $this->assertCount(1, $this->anthropicCalls());
+
+        // (٢) تشغيلهما معاً: لا يتعارضان.
+        config(['document_center.ai.provider_network_enabled' => true]);
+        $this->aiAsk($auth['token'], ['message' => 'hello again', 'locale' => 'en'])->assertOk();
+        $this->assertCount(2, $this->anthropicCalls());
+
+        // (٣) مفتاح Document AI وحده لا يفتح المساعد.
+        config(['ai_assistant.external_network_enabled' => false]);
+        $this->aiAsk($auth['token'], ['message' => 'third'])->assertStatus(503)->assertJsonPath('error.code', 'provider_unavailable');
+        $this->assertCount(2, $this->anthropicCalls(), 'no new call');
+
+        // (٤) والعكس: إطفاء مفتاح Document AI لا يمسّ المساعد.
+        config(['ai_assistant.external_network_enabled' => true, 'document_center.ai.provider_network_enabled' => false]);
+        $this->aiAsk($auth['token'], ['message' => 'fourth', 'locale' => 'en'])->assertOk();
+        $this->assertCount(3, $this->anthropicCalls());
+    }
+
+    /** @test */
+    public function the_shared_client_refuses_at_the_lowest_layer_when_only_the_document_ai_switch_is_on(): void
+    {
+        config(['ai_assistant.external_network_enabled' => false, 'document_center.ai.provider_network_enabled' => true]);
+        Http::fake([self::ENDPOINT => Http::response($this->text('never'), 200)]);
+        $configuration = \App\Services\DocumentCenter\DocumentProviderConfiguration::fromArray('anthropic', ['enabled' => true, 'api_key' => self::KEY, 'model' => self::MODEL]);
+
+        try {
+            app(\App\Services\DocumentCenter\AnthropicDocumentExtractionProvider::class)->converse($configuration, ['max_tokens' => 1, 'messages' => []]);
+            $this->fail('expected the assistant gate to refuse');
+        } catch (\App\Services\DocumentCenter\DocumentProviderException $e) {
+            $this->assertSame('provider_network_disabled', $e->safeCode);
+        }
+        $this->assertCount(0, $this->anthropicCalls());
     }
 
     /** @test */
@@ -574,7 +619,7 @@ class AiAnthropicProviderTest extends TestCase
             $this->assertStringNotContainsString($secret, $res->getContent());
         }
         // أي شرط ناقص ⇒ «غير متاح» بصدق، لا «جاهز».
-        config(['document_center.ai.provider_network_enabled' => false]);
+        config(['ai_assistant.external_network_enabled' => false]);
         $this->withToken($auth['token'])->getJson('/api/ai-assistant/status')->assertJsonPath('data.provider_mode', 'unavailable')->assertJsonPath('data.chat', 'provider_unavailable');
     }
 

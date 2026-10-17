@@ -3,6 +3,7 @@
 namespace App\Services\DocumentCenter;
 
 use App\Contracts\DocumentExtractionProvider;
+use App\Services\AssistantNetworkGate;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Throwable;
@@ -103,8 +104,9 @@ final class AnthropicDocumentExtractionProvider implements DocumentExtractionPro
     }
 
     /**
-     * استدعاء Messages API عام لمستهلك آخر (المساعد الذكي — AI-07) عبر **العميل نفسه**: الترويسات والمهلات وبوابة الشبكة
-     * وتحويل الأخطاء كلها من هذا الصنف، فلا عميل ثانٍ ولا إدارة مفاتيح ثانية. يعيد الاستجابة المفكوكة فقط؛ لا يسجّل شيئاً.
+     * استدعاء Messages API عام لمستهلك آخر (المساعد الذكي — AI-07) عبر **العميل نفسه**: الترويسات والمهلات
+     * وتحويل الأخطاء من هذا الصنف، فلا عميل ثانٍ ولا إدارة مفاتيح ثانية. يعيد الاستجابة المفكوكة فقط؛ لا يسجّل شيئاً.
+     * بوابته `AssistantNetworkGate` **لا** `DocumentProviderNetworkGate`: مفتاحا الاتصال مستقلان (يُفحص هنا أدنى طبقة).
      *
      * @param  array<string, mixed>  $payload  جسم الطلب (model/max_tokens/system/messages/tools…).
      * @return array<string, mixed>
@@ -116,7 +118,7 @@ final class AnthropicDocumentExtractionProvider implements DocumentExtractionPro
         if (! $validation->valid) {
             throw new DocumentProviderException('provider_not_configured', $validation->errors[0], false);
         }
-        DocumentProviderNetworkGate::assertAllowed();
+        AssistantNetworkGate::assertAllowed();
 
         try {
             $response = $this->client($configuration)->post(self::ENDPOINT, ['model' => $configuration->model] + $payload);

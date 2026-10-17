@@ -6,7 +6,6 @@ use App\Contracts\AiExternalAssistantProvider;
 use App\Services\DocumentCenter\AnthropicDocumentExtractionProvider;
 use App\Services\DocumentCenter\DocumentProviderConfiguration;
 use App\Services\DocumentCenter\DocumentProviderException;
-use App\Services\DocumentCenter\DocumentProviderNetworkGate;
 use App\Support\AiAssistantDenied;
 use App\Support\AiProviderException;
 
@@ -16,7 +15,7 @@ use App\Support\AiProviderException;
  * - **المفتاح والنموذج:** من `PlatformIntegrationService::aiProviderConfiguration('anthropic')` (صف `document_ai`،
  *   `encrypted:array`). السرّ لا يُسجَّل ولا يصل لأي استجابة؛ كل استثناء يُلفّ بلا `previous` كي لا تتسرّب رسالة نقل.
  * - **العميل:** `AnthropicDocumentExtractionProvider::converse()` (الترويسات، المهلات، تحويل أخطاء 401/429/5xx).
- * - **بوابة الشبكة:** `DocumentProviderNetworkGate` نفسها (مفتاح المنصة العام لكل اتصالات الذكاء الاصطناعي) — شرطٌ إضافي
+ * - **بوابة الشبكة:** `AssistantNetworkGate` (مفتاح مستقل `AI_ASSISTANT_EXTERNAL_NETWORK_ENABLED`، لا علاقة له بمفتاح Document AI) — شرطٌ إضافي
  *   فوق `AI_ASSISTANT_PROVIDER=anthropic` وفوق إعداد المنصة. أيّ شرط ناقص ⇒ `provider_unavailable` بلا اتصال.
  * - **ما يُعرَض للنموذج:** أدوات التقارير المالية المسجَّلة فقط (أسماؤها بلا نقطة)، وتبقى قراءة المستندات صريحة الاستدعاء
  *   وخارج الأدوات المعروضة نهائياً. النموذج **يقترح فقط**؛ كل اقتراح يمرّ بتفويض كامل طازج في البوابة قبل التنفيذ.
@@ -53,7 +52,7 @@ class AnthropicAssistantProvider implements AiExternalAssistantProvider
     public function assertReady(): void
     {
         $c = $this->configuration();
-        if (! $c->enabled || $c->apiKey === '' || $c->model === '' || ! DocumentProviderNetworkGate::allowsExternalRequests()) {
+        if (! $c->enabled || $c->apiKey === '' || $c->model === '' || ! AssistantNetworkGate::allowsExternalRequests()) {
             throw AiAssistantDenied::for('provider_unavailable');
         }
     }

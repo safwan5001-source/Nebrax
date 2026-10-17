@@ -69,6 +69,11 @@ const exceptions = () => [
 ];
 
 let current = overview();
+const aiBudgets = () => ({
+  period: '2026-10', current_period: '2026-10', global: null, tenants: [], over_allocated: false, by_feature: [],
+  policy: { meter_document_extraction: false, failure_charge: 'reserved', assistant_provider: 'mock', assistant_external_network_enabled: false },
+  limits: { max_tokens: 1_000_000_000_000, max_cost_micro_usd: 100_000_000_000 },
+});
 const writes = () => platformApi.mock.calls.filter(([, o]) => o?.method && o.method !== 'GET');
 const deferred = <T,>() => {
   let resolve!: (value: T) => void;
@@ -85,6 +90,7 @@ beforeEach(() => {
     const method = init?.method ?? 'GET';
     if (path === '/platform/integrations' && method === 'GET') return { data: current };
     if (path === '/platform/document-file-scan-exceptions' && method === 'GET') return { data: exceptions() };
+    if (path.startsWith('/platform/ai-budgets') && method === 'GET') return { data: aiBudgets() };
     if (path.startsWith('/platform/tenants') && method === 'GET') return { data: { data: [{ id: 't1', name: 'Alpha Co' }, { id: 't2', name: 'Beta Co' }] } };
     throw new Error(`unexpected ${method} ${path}`);
   });
@@ -264,6 +270,7 @@ describe('notices, errors and refresh', () => {
       platformApi.mockImplementation(async (path: string, init?: { method?: string }) => {
         if (path === '/platform/integrations' && (init?.method ?? 'GET') === 'GET') return { data: current };
         if (path === '/platform/document-file-scan-exceptions') return { data: exceptions() };
+        if (path.startsWith('/platform/ai-budgets')) return { data: aiBudgets() };
         if (path.startsWith('/platform/tenants')) return { data: { data: [] } };
         return { data: { ok: false, message: 'x', target: 'saved_provider', operational_storage: 'local' } };
       });
@@ -318,6 +325,7 @@ describe('notices, errors and refresh', () => {
         return { data: current };
       }
       if (path === '/platform/document-file-scan-exceptions') return { data: exceptions() };
+      if (path.startsWith('/platform/ai-budgets')) return { data: aiBudgets() };
       if (path.startsWith('/platform/tenants')) return { data: { data: [] } };
       throw new Error(`unexpected ${init?.method} ${path}`);
     });
@@ -388,6 +396,7 @@ describe('file scan exceptions', () => {
     platformApi.mockImplementation(async (path: string) => {
       if (path === '/platform/integrations') return { data: current };
       if (path === '/platform/document-file-scan-exceptions') return { data: [] };
+      if (path.startsWith('/platform/ai-budgets')) return { data: aiBudgets() };
       return { data: { data: [{ id: 't1', name: 'Alpha Co' }] } };
     });
     render(<PlatformIntegrationsPage />);

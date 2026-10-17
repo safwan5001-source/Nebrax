@@ -35,17 +35,18 @@ class AiRequestLedger
         int $reserveCostMicroUsd,
         ?string $idempotencyKey,
         string $fingerprint,
+        string $feature = 'assistant',
     ): AiRequest {
         // تجاوز السقف قد يكون سببه حجز مهجور: يُسوّى **خارج** معاملة الحجز (كي لا يُتراجَع عنه عند
         // الرفض النهائي) ثم تُعاد المحاولة مرة واحدة فقط.
         try {
-            return $this->openOnce($tenantId, $actorId, $provider, $model, $profile, $reserveTokens, $reserveCostMicroUsd, $idempotencyKey, $fingerprint);
+            return $this->openOnce($tenantId, $actorId, $provider, $model, $profile, $reserveTokens, $reserveCostMicroUsd, $idempotencyKey, $fingerprint, $feature);
         } catch (AiAssistantDenied $denied) {
             if (! AiBudgetService::isExceeded($denied) || $this->budgets->reapStale() === 0) {
                 throw $denied;
             }
 
-            return $this->openOnce($tenantId, $actorId, $provider, $model, $profile, $reserveTokens, $reserveCostMicroUsd, $idempotencyKey, $fingerprint);
+            return $this->openOnce($tenantId, $actorId, $provider, $model, $profile, $reserveTokens, $reserveCostMicroUsd, $idempotencyKey, $fingerprint, $feature);
         }
     }
 
@@ -60,13 +61,14 @@ class AiRequestLedger
         int $reserveCostMicroUsd,
         ?string $idempotencyKey,
         string $fingerprint,
+        string $feature,
     ): AiRequest {
         $hash = $idempotencyKey === null ? null : $this->hmac($tenantId . "\n" . $idempotencyKey);
         $period = $this->budgets->period();
         $billable = $profile['billable'];
 
         try {
-            return DB::transaction(function () use ($tenantId, $actorId, $provider, $model, $billable, $hash, $fingerprint, $period, $reserveTokens, $reserveCostMicroUsd): AiRequest {
+            return DB::transaction(function () use ($tenantId, $actorId, $provider, $model, $billable, $hash, $fingerprint, $period, $reserveTokens, $reserveCostMicroUsd, $feature): AiRequest {
                 $existing = $hash === null ? null : AiRequest::query()->where('idempotency_hash', $hash)->lockForUpdate()->first();
 
                 if ($existing !== null) {
@@ -107,7 +109,7 @@ class AiRequestLedger
                 return AiRequest::query()->create($attributes + [
                     'tenant_id' => $tenantId,
                     'actor_id' => $actorId,
-                    'feature' => 'assistant',
+                    'feature' => $feature,
                     'idempotency_hash' => $hash,
                     'request_fingerprint' => $fingerprint,
                     'attempt' => 1,
