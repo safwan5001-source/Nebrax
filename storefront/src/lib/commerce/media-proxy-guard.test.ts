@@ -10,6 +10,8 @@ import {
   declaredLength,
   GateBusyError,
   HARD_MAX_BUFFERED_BYTES,
+  MIN_MAX_BODY_BYTES,
+  MIN_MAX_BUFFERED_BYTES,
   mediaProxyLimits,
   READ_COPY_FACTOR,
   readBodyBounded,
@@ -56,8 +58,9 @@ describe("mediaProxyLimits", () => {
       STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES: "1",
       STOREFRONT_MEDIA_PROXY_TIMEOUT_MS: "1",
     });
-    expect(l.maxConcurrent).toBe(256);
-    expect(l.maxBodyBytes).toBe(64 * 1024);
+    // 100000 concurrent is clamped to 256, then fitted into the 256 MiB budget at the 6 MiB floor: ⌊256 / (2 × 6)⌋ = 21
+    expect(l.maxConcurrent).toBe(21);
+    expect(l.maxBodyBytes).toBe(MIN_MAX_BODY_BYTES);
     expect(l.timeoutMs).toBe(1_000);
     expect(
       mediaProxyLimits({ STOREFRONT_MEDIA_PROXY_MAX_CONCURRENT: "0" })
@@ -417,7 +420,7 @@ describe("aggregate read budget", () => {
           expect(l.maxConcurrent).toBeGreaterThanOrEqual(1);
           expect(l.maxConcurrentPerHost).toBeGreaterThanOrEqual(1);
           expect(l.maxConcurrentPerHost).toBeLessThanOrEqual(l.maxConcurrent);
-          expect(l.maxBodyBytes).toBeGreaterThanOrEqual(64 * 1024);
+          expect(l.maxBodyBytes).toBeGreaterThanOrEqual(MIN_MAX_BODY_BYTES);
         }
       }
     }
@@ -482,5 +485,112 @@ describe("aggregate read budget", () => {
     expect(out.byteLength).toBe(3 * MiB);
     expect(state.sent).toBe(3 * MiB);
     expect(READ_COPY_FACTOR).toBe(2);
+  });
+});
+
+// ───────────────────────────── body override floor (P2 review) ─────────────────────────────
+// The proxy refuses any body above `maxBodyBytes`. Laravel publishes variants up to `storefront_media.variant_max_bytes` (6 MiB) and
+// animations up to `animated.max_bytes` (5 MiB), so no configuration may set the bound below the largest valid published file.
+describe("body override floor (producer ceilings)", () => {
+  const config = readFileSync(
+    resolve(process.cwd(), "../config/storefront_media.php"),
+    "utf-8",
+  );
+  const mibOf = (expr: string | undefined) => {
+    const m = (expr ?? "").match(/(\d+)\s*\*\s*1024\s*\*\s*1024/);
+    return m ? Number(m[1]) * 1024 * 1024 : Number.NaN;
+  };
+  const variantCeiling = mibOf(
+    config.match(/'variant_max_bytes'\s*=>\s*([^,]+),/)?.[1],
+  );
+  const animatedCeiling = mibOf(
+    config.match(
+      /'max_bytes'\s*=>\s*\(int\) env\('STOREFRONT_MEDIA_ANIMATED_MAX_BYTES',\s*([^)]+)\)/,
+    )?.[1],
+  );
+
+  it("the floor is not below the largest file Laravel can publish (config-pinned, both producers)", () => {
+    expect(variantCeiling).toBe(6 * MiB);
+    expect(animatedCeiling).toBe(5 * MiB);
+    expect(MIN_MAX_BODY_BYTES).toBeGreaterThanOrEqual(variantCeiling);
+    expect(MIN_MAX_BODY_BYTES).toBeGreaterThanOrEqual(animatedCeiling);
+    expect(DEFAULT_MAX_BODY_BYTES).toBeGreaterThan(MIN_MAX_BODY_BYTES); // default keeps its headroom
+  });
+
+  it("the smallest budget still fits one floor-sized body with its copy (the invariant is satisfiable)", () => {
+    expect(2 * MIN_MAX_BODY_BYTES).toBeLessThanOrEqual(MIN_MAX_BUFFERED_BYTES);
+  });
+
+  it("too-small, zero, negative and typo values are RAISED to the floor — never honoured", () => {
+    for (const small of [
+      "1",
+      "0",
+      "-5",
+      "1024",
+      "65536",
+      String(MIN_MAX_BODY_BYTES - 1),
+      " 7 ",
+    ]) {
+      expect(mediaProxyLimits(env({ L: small })).maxBodyBytes, small).toBe(
+        MIN_MAX_BODY_BYTES,
+      );
+    }
+    expect(mediaProxyLimits(env({ L: "1" })).bodyRaisedToFloor).toBe(true);
+  });
+
+  it("values at or above the floor are untouched (up to the 32 MiB cap and the budget); the default is unchanged", () => {
+    expect(
+      mediaProxyLimits(env({ L: String(MIN_MAX_BODY_BYTES) })).maxBodyBytes,
+    ).toBe(MIN_MAX_BODY_BYTES);
+    expect(
+      mediaProxyLimits(env({ L: String(MIN_MAX_BODY_BYTES) }))
+        .bodyRaisedToFloor,
+    ).toBeUndefined();
+    expect(mediaProxyLimits(env({ L: String(10 * MiB) })).maxBodyBytes).toBe(
+      10 * MiB,
+    );
+    expect(mediaProxyLimits(env({ L: String(1000 * MiB) })).maxBodyBytes).toBe(
+      32 * MiB,
+    );
+    expect(mediaProxyLimits({}).maxBodyBytes).toBe(DEFAULT_MAX_BODY_BYTES);
+    expect(mediaProxyLimits({}).bodyRaisedToFloor).toBeUndefined();
+  });
+
+  it("non-numeric / non-integer values still fall back to the default (8 MiB), not to the floor", () => {
+    for (const bad of ["abc", "1.5", "", " ", "NaN"]) {
+      expect(mediaProxyLimits(env({ L: bad })).maxBodyBytes, bad).toBe(
+        DEFAULT_MAX_BODY_BYTES,
+      );
+    }
+  });
+
+  it("the floor does not weaken the aggregate budget: raising to the floor still satisfies concurrent × body × 2 ≤ budget", () => {
+    for (const B of [
+      "",
+      "1",
+      String(32 * MiB),
+      String(100 * MiB),
+      String(512 * MiB),
+    ]) {
+      for (const C of ["", "1", "16", "256"]) {
+        const l = mediaProxyLimits(env({ L: "1", C, B }));
+        expect(l.maxBodyBytes, `B=${B} C=${C}`).toBe(MIN_MAX_BODY_BYTES);
+        expect(worstCase(l), `B=${B} C=${C}`).toBeLessThanOrEqual(
+          l.maxBufferedBytes,
+        );
+        expect(l.maxConcurrent).toBeGreaterThanOrEqual(1);
+      }
+    }
+  });
+
+  it("readBodyBounded at the floor accepts the largest valid files and still refuses one byte more", async () => {
+    const floor = mediaProxyLimits(env({ L: "1" })).maxBodyBytes;
+    for (const size of [5 * MiB, 6 * MiB]) {
+      const { response } = chunked([size]);
+      expect((await readBodyBounded(response, floor)).byteLength).toBe(size);
+    }
+    await expect(
+      readBodyBounded(chunked([6 * MiB + 1]).response, floor),
+    ).rejects.toBeInstanceOf(BodyTooLargeError);
   });
 });

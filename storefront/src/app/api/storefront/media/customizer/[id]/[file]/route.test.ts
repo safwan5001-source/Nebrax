@@ -194,7 +194,8 @@ import {
   resetSharedMediaProxyGate,
 } from "@/lib/commerce/media-proxy-guard";
 
-const BOUND = 65_536; // the smallest bound the environment may set
+// The smallest bound the environment may set: the producer ceiling (storefront_media.variant_max_bytes = 6 MiB; animated ≤ 5 MiB).
+const BOUND = 6 * 1024 * 1024;
 
 function bodyOf(size: number, fill = 9) {
   return new Uint8Array(size).fill(fill);
@@ -327,10 +328,10 @@ describe("customizer media proxy — P2-0 bounded buffering", () => {
 
   it("bounds a body with NO Content-Length (chunked) by the bytes actually received", async () => {
     fetchMock.mockResolvedValue(
-      new Response(streamOf(new Array(50).fill(10_000)), {
+      new Response(streamOf(new Array(70).fill(100_000)), {
         headers: { "content-type": "image/webp" },
       }),
-    );
+    ); // 7,000,000 bytes received in chunks > the 6 MiB floor
     await expectUniformFailure(await call(UUID, "480w.webp"));
   });
 
@@ -351,6 +352,132 @@ describe("customizer media proxy — P2-0 bounded buffering", () => {
     });
     fetchMock.mockResolvedValue(new Response(body));
     await expectUniformFailure(await call(UUID, "480w.webp"));
+  });
+});
+
+describe("customizer media proxy — body override can never fall below the producer ceilings (P2 review)", () => {
+  beforeEach(() => {
+    fetchMock.mockReset();
+    resetSharedMediaProxyGate();
+    resetConstrainedWarning();
+    hostHeader.value = "shop.example.com";
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubEnv("STOREFRONT_GATEWAY_SECRET", "gw-secret");
+    vi.stubEnv("AWJ_COMMERCE_API_URL", "https://api.example.com");
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  // The largest files Laravel can publish: a ladder/derivative variant at the 6 MiB ceiling, a sanitised animation at 5 MiB.
+  const producers: Array<[string, string, number, string]> = [
+    [
+      "largest generated JPEG variant (6 MiB)",
+      "1920w.jpg",
+      6 * 1024 * 1024,
+      "image/jpeg",
+    ],
+    [
+      "largest generated WebP variant (6 MiB)",
+      "1920w.webp",
+      6 * 1024 * 1024,
+      "image/webp",
+    ],
+    [
+      "largest animated GIF (5 MiB)",
+      "animated.gif",
+      5 * 1024 * 1024,
+      "image/gif",
+    ],
+    [
+      "largest animated WebP (5 MiB)",
+      "animated.webp",
+      5 * 1024 * 1024,
+      "image/webp",
+    ],
+  ];
+
+  for (const override of ["1", "0", "-5", "1024", "65536", "6291455"]) {
+    it(`STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES=${override} still serves every valid generated asset byte-for-byte`, async () => {
+      vi.stubEnv("STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES", override);
+      vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      for (const [, file, size, type] of producers) {
+        fetchMock.mockResolvedValueOnce(
+          new Response(bodyOf(size), { headers: { "content-type": type } }),
+        );
+        const response = await call(UUID, file);
+        expect(response.status, file).toBe(200);
+        expect((await response.arrayBuffer()).byteLength, file).toBe(size);
+      }
+    });
+  }
+
+  it("a too-small override is raised to the floor, not honoured, and stays fail-closed above it", async () => {
+    vi.stubEnv("STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES", "1");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    fetchMock.mockResolvedValueOnce(
+      new Response(bodyOf(6 * 1024 * 1024 + 1), {
+        headers: { "content-type": "image/jpeg" },
+      }),
+    );
+    const refused = await call(UUID, "1920w.jpg");
+    expect(refused.status).toBe(502);
+    expect(refused.headers.get("cache-control")).toBe("no-store");
+    expect(await refused.text()).toBe("");
+
+    // the raised override is reported once, server-side, with no host/URL/secret
+    const raised = warn.mock.calls.filter((c) =>
+      String(c[0]).includes("below the producer ceiling"),
+    );
+    expect(raised).toHaveLength(1);
+    expect(JSON.stringify(raised[0])).not.toMatch(
+      /gw-secret|shop\.example\.com|api\.example\.com/,
+    );
+  });
+
+  it("a Content-Length above the floor is refused without draining the body, whatever the override", async () => {
+    vi.stubEnv("STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES", "1");
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    let cancelled = false;
+    let consumed = 0;
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        new ReadableStream<Uint8Array>({
+          pull(c) {
+            consumed += 1; // the stream machinery may prefetch one chunk; nothing is drained
+            c.enqueue(new Uint8Array(10));
+          },
+          cancel() {
+            cancelled = true;
+          },
+        }),
+        {
+          headers: {
+            "content-length": String(7 * 1024 * 1024),
+            "content-type": "image/jpeg",
+          },
+        },
+      ),
+    );
+    expect((await call(UUID, "1920w.jpg")).status).toBe(502);
+    expect(cancelled).toBe(true);
+    expect(consumed).toBeLessThanOrEqual(2);
+  });
+
+  it("tenant isolation is unchanged by the floor: the visitor host and gateway secret are still forwarded verbatim", async () => {
+    vi.stubEnv("STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES", "1");
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    fetchMock.mockResolvedValueOnce(
+      new Response(bodyOf(10), { headers: { "content-type": "image/webp" } }),
+    );
+    expect((await call(UUID, "480w.webp")).status).toBe(200);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain(
+      `/store/v1/media/customizer/${UUID}/480w.webp`,
+    );
+    expect(JSON.stringify(init.headers)).toContain("shop.example.com");
+    expect(JSON.stringify(init.headers)).toContain("gw-secret");
   });
 });
 

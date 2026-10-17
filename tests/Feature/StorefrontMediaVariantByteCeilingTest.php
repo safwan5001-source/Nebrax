@@ -108,6 +108,10 @@ class StorefrontMediaVariantByteCeilingTest extends TestCase
         $ceiling = config('storefront_media.variant_max_bytes');
         $this->assertIsInt($ceiling, 'storefront_media.variant_max_bytes must exist');
         $this->assertLessThan(8 * 1024 * 1024, $ceiling, 'a variant at the ceiling must still be accepted by the proxy (8 MiB)');
+        // The proxy never lets its body bound go below MIN_MAX_BODY_BYTES (6 MiB; media-proxy-guard.ts, pinned against this config by
+        // media-proxy-guard.test.ts). Every file Laravel can publish must fit under that floor, whatever the proxy env says.
+        $this->assertLessThanOrEqual(6 * 1024 * 1024, $ceiling, 'variant ceiling above the proxy floor: raise MIN_MAX_BODY_BYTES first');
+        $this->assertLessThanOrEqual(6 * 1024 * 1024, (int) config('storefront_media.animated.max_bytes'), 'animated limit above the proxy floor');
         $this->assertGreaterThanOrEqual((int) config('storefront_media.animated.max_bytes'), $ceiling, 'the sanitised animated file (≤ its own upload limit) must fit');
     }
 

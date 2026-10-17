@@ -36,7 +36,7 @@ Validated id/file against the contract, forwarded `Host` + gateway secret to the
 ### Defaults (all overridable by optional env vars, clamped; absent/malformed ⇒ default)
 | Setting | Default | Env | Why |
 |---|---|---|---|
-| Max buffered body | **8 MiB** (floor 64 KiB, ceiling 32 MiB) | `STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES` | Largest legitimate body is the Laravel-side ceiling for a generated file, `storefront_media.variant_max_bytes` = 6 MiB (§10 — the original wording “ladder files are far smaller” was wrong), or the sanitised animation ≤ 5 MiB (`animated.max_bytes`). 8 MiB leaves headroom above both. |
+| Max buffered body | **8 MiB** (**floor 6 MiB** = the producer ceiling, §10.4; ceiling 32 MiB) | `STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES` | Largest legitimate body is the Laravel-side ceiling for a generated file, `storefront_media.variant_max_bytes` = 6 MiB (§10 — the original wording “ladder files are far smaller” was wrong), or the sanitised animation ≤ 5 MiB (`animated.max_bytes`). 8 MiB leaves headroom above both. |
 | Concurrent origin round-trips | **16** (1–256); one host ≤ half | `STOREFRONT_MEDIA_PROXY_MAX_CONCURRENT` | Bounds Laravel workers used by this proxy per instance. **Fitted into the read-memory budget below** — a request above what the budget allows is lowered, never honoured (§10). The earlier note “16 × 8 MiB = 128 MiB worst case” understated the read phase: the received chunks and the assembled copy coexist, so the bound is **× 2 = 256 MiB** (measured +224–297 MiB RSS over baseline at the defaults). |
 | Read-memory budget | **256 MiB** (32 MiB – 512 MiB hard ceiling) | `STOREFRONT_MEDIA_PROXY_MAX_BUFFERED_BYTES` | Invariant `maxConcurrent × maxBodyBytes × 2 ≤ budget ≤ 512 MiB`. Defaults (16 × 8 MiB × 2) equal the default budget, so default behaviour is unchanged. |
 | Queue / wait | 64 waiters (0–1024), 4 s | `STOREFRONT_MEDIA_PROXY_MAX_QUEUE` | Smooths a page-load burst, then sheds with `503` + `Retry-After: 2`, `no-store`. |
@@ -168,7 +168,7 @@ Intervention 4's `encodeUsingMediaType($type, $quality)` ignores a **positional*
 
 ### Known gaps
 - The UI has no localized EN/AR key for `variant_too_large` yet; unknown codes already fall back to the server's Arabic text (`MediaPicker.tsx`). A translation key is a trivial follow-up.
-- If an operator lowers `STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES` below 6 MiB, large-but-valid variants will be refused; operators must keep that env at or above `variant_max_bytes` (6 MiB); it is not enforced in code.
+- ~~If an operator lowers `STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES` below 6 MiB, large-but-valid variants will be refused; it is not enforced in code.~~ **Closed in §10.4:** the proxy now raises any smaller override to a 6 MiB floor.
 
 ## 10. Second review round — aggregate read budget (P1), audit SQL, mergeability
 ### 10.1 P1 finding: concurrency × body size (confirmed, fixed)
@@ -204,7 +204,23 @@ Problems found in the first version: (1) threshold 6 MiB mixed *servable* files 
 ### 10.3 Mergeability
 `mergeable_state: clean`. `git merge-tree` of the head against current `origin/main` (`1f94e1848`, #1553) is conflict-free, so no merge/rebase was performed and the base SHA is unchanged (`1296e1ce7`).
 
-### 10.4 Out of scope (unchanged)
+### 10.4 Third review round — P2: body override below the producer ceilings (confirmed, fixed)
+*Finding.* `STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES` was clamped only to ≥ 64 KiB. A typo such as `"1"` (clamped to 64 KiB) or any value under 6 MiB made the proxy refuse variants Laravel is allowed to publish (`storefront_media.variant_max_bytes` = 6 MiB; animations ≤ 5 MiB) → 502 for valid published media. The previous round had listed this only as an unenforced operator rule (§9 “Known gaps”); the reviewer is right that a typo must not be able to do that.
+
+*Reproduced* (tests written first, run on the previous code): 17 new/adjusted tests failed — with `"1"`, `"0"`, `"-5"`, `"1024"`, `"65536"` and `"6291455"` the proxy answered 502 for a 6 MiB JPEG/WebP variant and a 5 MiB animated GIF/WebP, and `mediaProxyLimits` returned `maxBodyBytes` = 65,536.
+
+*Fix* (`media-proxy-guard.ts`, proxy only): new `MIN_MAX_BODY_BYTES = 6 MiB` replaces 64 KiB as the minimum of the body override.
+- An integer override **below** the floor is **raised** to it (not honoured, not “fall back to default”): `"1"`, `"0"`, negatives and anything under 6 MiB become 6 MiB; the default (8 MiB) and non-numeric/non-integer values (`abc`, `1.5`, empty) still resolve to the 8 MiB default; values ≥ 6 MiB are untouched up to the existing 32 MiB cap and the budget.
+- Raising is logged **once per process** (no host/URL/secret) via `limits.bodyRaisedToFloor`.
+- **Aggregate budget preserved:** the floor is applied *before* the budget fit, so `maxConcurrent × maxBodyBytes × 2 ≤ maxBufferedBytes ≤ 512 MiB` still holds for every input (grid test over budget × concurrency with `"1"`); the smallest budget (32 MiB) still fits a floor-sized body with its copy (pinned). A floor-sized configuration admits 21 slots (⌊256/12⌋) at the default budget, 16 at the default concurrency. Defaults are unchanged.
+- **Fail-closed unchanged:** one byte above the effective bound is still refused (uniform body-less `no-store` 502), a `Content-Length` above it is refused without draining the body, and the origin stream is cancelled. Tenant isolation, publication gating, headers and ETag/304 behaviour are untouched; the visitor host and gateway secret are still forwarded verbatim (route test).
+- **Pinned to the producers:** `media-proxy-guard.test.ts` reads `config/storefront_media.php` and asserts `variant_max_bytes` = 6 MiB and the animated default = 5 MiB are both ≤ the floor (and the floor < the 8 MiB default); `StorefrontMediaVariantByteCeilingTest` asserts the same two producer limits are ≤ 6 MiB from the PHP side — so raising either producer ceiling without raising the floor fails CI in both suites.
+
+*Tests.* New “body override floor” suite (7 tests) in `media-proxy-guard.test.ts`; route tests: six too-small overrides each serve **every** valid generated asset byte-for-byte (6 MiB JPEG, 6 MiB WebP, 5 MiB GIF, 5 MiB animated WebP), a too-small override stays fail-closed one byte above the floor and warns once without leaking host/secret, an oversize `Content-Length` is refused undrained, and host/secret forwarding is unchanged. The existing bounded-buffering route tests now use the floor (6 MiB) as their bound instead of 64 KiB, which the environment can no longer set. Evidence: `results/proxy-aggregate-budget.txt` — `"1"` ⇒ 16 × 6 MiB (+178 MiB RSS); `"1"` with 256 requested ⇒ 21 × 6 MiB (+215 MiB), both inside the 256 MiB budget.
+
+*Residual.* `animated.max_bytes` is itself env-configurable on the Laravel side (`STOREFRONT_MEDIA_ANIMATED_MAX_BYTES`); raising it above 6 MiB would exceed the floor. Not changed here (out of scope); the pin tests above cover the **defaults** only, so an operator override of that Laravel variable is the one remaining way to exceed the proxy bound.
+
+### 10.5 Out of scope (unchanged)
 Image quality defaults (the positional-quality finding in §9 stays reported-only), P2-0b (delivery-phase memory), AVIF/video, migrations, API contracts.
 
 ## 11. Identifiers

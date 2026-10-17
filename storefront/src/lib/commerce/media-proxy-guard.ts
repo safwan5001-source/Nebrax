@@ -31,6 +31,12 @@ const MIB = 1024 * 1024;
 // bound that keeps published files servable — until the product fits. (Memory of the DELIVERY phase, after the read, is a separate
 // matter and is not covered by this budget.)
 export const READ_COPY_FACTOR = 2;
+// Floor for the body bound. The proxy refuses any body above `maxBodyBytes`, and Laravel publishes variants up to
+// `storefront_media.variant_max_bytes` (6 MiB) and animations up to `animated.max_bytes` (5 MiB). A smaller override — a typo such as
+// "1" included — would turn valid published media into 502s, so overrides below this are RAISED to it, never honoured. Keep it at or
+// above both producer ceilings (pinned against config/storefront_media.php by media-proxy-guard.test.ts); 2 × it must fit the
+// smallest budget (also pinned).
+export const MIN_MAX_BODY_BYTES = 6 * MIB;
 export const DEFAULT_MAX_BUFFERED_BYTES = 256 * MIB;
 export const MIN_MAX_BUFFERED_BYTES = 32 * MIB;
 export const HARD_MAX_BUFFERED_BYTES = 512 * MIB;
@@ -43,6 +49,8 @@ export interface MediaProxyLimits {
   maxConcurrent: number;
   /** The read-phase memory budget the two limits above were fitted into: maxConcurrent × maxBodyBytes × READ_COPY_FACTOR ≤ this. */
   maxBufferedBytes: number;
+  /** `true` only when a `STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES` integer below {@link MIN_MAX_BODY_BYTES} was raised to it. */
+  bodyRaisedToFloor?: true;
   /** What the operator asked for before the budget was applied; present only when the budget lowered a value. */
   constrained?: { requestedConcurrent: number; requestedBodyBytes: number };
   /** …of which one visitor host may hold at most this many (noisy-neighbour protection between storefronts). */
@@ -83,9 +91,15 @@ export function mediaProxyLimits(
   const requestedBodyBytes = integerEnv(
     env.STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES,
     DEFAULT_MAX_BODY_BYTES,
-    64 * 1024,
+    MIN_MAX_BODY_BYTES,
     32 * MIB,
   );
+  const rawBody = env.STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES;
+  const bodyRaisedToFloor =
+    rawBody !== undefined &&
+    rawBody.trim() !== "" &&
+    Number.isInteger(Number(rawBody)) &&
+    Number(rawBody) < MIN_MAX_BODY_BYTES;
   const requestedConcurrent = integerEnv(
     env.STOREFRONT_MEDIA_PROXY_MAX_CONCURRENT,
     DEFAULT_MAX_CONCURRENT,
@@ -110,6 +124,7 @@ export function mediaProxyLimits(
     maxBodyBytes,
     maxConcurrent,
     maxBufferedBytes,
+    ...(bodyRaisedToFloor && { bodyRaisedToFloor: true as const }),
     ...(constrained && {
       constrained: { requestedConcurrent, requestedBodyBytes },
     }),
@@ -131,25 +146,38 @@ export function mediaProxyLimits(
 }
 
 let warnedConstrained = false;
-/** Logs once per process (never per request) that the budget lowered what the operator asked for. No secrets or hosts involved. */
+let warnedRaised = false;
+/** Logs once per process (never per request) when an override was changed to stay safe. No secrets, hosts or URLs involved. */
 export function warnIfLimitsConstrained(limits: MediaProxyLimits): void {
-  if (!limits.constrained || warnedConstrained) return;
-  warnedConstrained = true;
-  console.warn(
-    "[media-proxy] configured limits exceed the read-memory budget; lowered to fit",
-    {
-      requestedConcurrent: limits.constrained.requestedConcurrent,
-      requestedBodyBytes: limits.constrained.requestedBodyBytes,
-      maxConcurrent: limits.maxConcurrent,
-      maxBodyBytes: limits.maxBodyBytes,
-      maxBufferedBytes: limits.maxBufferedBytes,
-    },
-  );
+  if (limits.constrained && !warnedConstrained) {
+    warnedConstrained = true;
+    console.warn(
+      "[media-proxy] configured limits exceed the read-memory budget; lowered to fit",
+      {
+        requestedConcurrent: limits.constrained.requestedConcurrent,
+        requestedBodyBytes: limits.constrained.requestedBodyBytes,
+        maxConcurrent: limits.maxConcurrent,
+        maxBodyBytes: limits.maxBodyBytes,
+        maxBufferedBytes: limits.maxBufferedBytes,
+      },
+    );
+  }
+  if (limits.bodyRaisedToFloor && !warnedRaised) {
+    warnedRaised = true;
+    console.warn(
+      "[media-proxy] STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES is below the producer ceiling; raised to the floor",
+      {
+        maxBodyBytes: limits.maxBodyBytes,
+        floorBytes: MIN_MAX_BODY_BYTES,
+      },
+    );
+  }
 }
 
 /** Test hook. */
 export function resetConstrainedWarning(): void {
   warnedConstrained = false;
+  warnedRaised = false;
 }
 
 // ───────────────────────────── bounded body ─────────────────────────────
