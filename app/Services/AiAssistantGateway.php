@@ -143,7 +143,7 @@ class AiAssistantGateway
 
             $executed = [];
             foreach ($plannedCalls as $call) {
-                $executed[] = $this->invokeTool($actorId, $call, $branchIds, $warehouseIds, $requestId, $tenantId, $extra);
+                $executed[] = $this->invokeTool($actorId, $call, $branchIds, $warehouseIds, $requestId, $tenantId, $extra, explicit: false);
                 $log['tool_calls_executed'] = $meta['tool_calls_executed'] = count($executed);
             }
 
@@ -215,7 +215,7 @@ class AiAssistantGateway
         ];
 
         try {
-            $executed = $this->invokeTool($actorId, ['name' => $toolName, 'arguments' => $arguments], $branchIds, $warehouseIds, $requestId, $tenantId, ['provider' => 'none']);
+            $executed = $this->invokeTool($actorId, ['name' => $toolName, 'arguments' => $arguments], $branchIds, $warehouseIds, $requestId, $tenantId, ['provider' => 'none'], explicit: true);
         } catch (AiAssistantDenied $denied) {
             Log::info('ai_assistant.tool_run', $log + ['outcome' => 'denied', 'reason' => $denied->reason]);
             $denied->requestId ??= $requestId;
@@ -305,7 +305,7 @@ class AiAssistantGateway
      * @return array{tool:string, result:array<string,mixed>}
      * @throws AiAssistantDenied
      */
-    private function invokeTool(string $actorId, array $call, array $branchIds, array $warehouseIds, string $requestId, string $tenantId, array $extra): array
+    private function invokeTool(string $actorId, array $call, array $branchIds, array $warehouseIds, string $requestId, string $tenantId, array $extra, bool $explicit): array
     {
         $name = (string) ($call['name'] ?? '');
         // اسم مقترح من المزوّد لا يدخل التدقيق إلا إن كان رمزاً صالحاً.
@@ -314,6 +314,10 @@ class AiAssistantGateway
         try {
             $tool = $this->tools->find($name);
             if ($tool === null) {
+                throw AiAssistantDenied::for('tool_not_registered');
+            }
+            // أداة صريحة الاستدعاء (AI-04) لا يخطّط لها المزوّد ولا يختار وسائطها: تُعامَل كغير مسجَّلة هنا.
+            if (! $explicit && $tool instanceof \App\Contracts\AiExplicitInvocationOnly) {
                 throw AiAssistantDenied::for('tool_not_registered');
             }
 

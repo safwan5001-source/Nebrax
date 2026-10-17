@@ -32,7 +32,7 @@ class AiAssistantToolRunRequest extends FormRequest
         return [
             'tool' => ['required', 'string', Rule::in(app(AiAssistantToolRegistry::class)->names())],
             'arguments' => ['required', 'array', 'max:5'],
-            'arguments.*' => ['nullable', 'string', 'max:32'],
+            'arguments.*' => ['nullable', 'string', 'max:40'],
             'scope' => ['sometimes', 'array'],
             'scope.branch_ids' => ['sometimes', 'array', 'max:' . $maxIds],
             'scope.branch_ids.*' => ['string', 'uuid', 'distinct'],

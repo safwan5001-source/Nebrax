@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Tenant;
 use App\Models\User;
+use App\Support\ApplicationAccessLevel;
+use App\Support\ApplicationOperationClass;
 use App\Support\AiAssistantDataCategory;
 use App\Support\Rbac;
 use App\Support\Settings;
@@ -57,6 +59,16 @@ class AiAssistantStatusService
             default => 'ready',
         };
 
+        // AI-04: قراءة مستند مُسقَط. حالات إضافية صادقة: الفئة غير متاحة على المنصة، أو قدرة مركز المستندات غير مستحقة.
+        $document = match (true) {
+            $common !== null => $common,
+            ! $can('documents.center.view') => 'permission_denied',
+            ! AiAssistantDataCategory::isAvailable(AiAssistantDataCategory::DOCUMENT_PROJECTED_TEXT) => 'category_unavailable',
+            $this->documentCenterDenied($tenant, $can('documents.center.view')) => 'document_center_unavailable',
+            ! in_array(AiAssistantDataCategory::DOCUMENT_PROJECTED_TEXT, $consented, true) => 'consent_required',
+            default => 'ready',
+        };
+
         return [
             'platform_enabled' => $platform,
             // الاستجابات في هذه المرحلة تجريبية حتمية دائماً؛ لا مزوّد حقيقي يُسمّى للواجهة.
@@ -75,13 +87,23 @@ class AiAssistantStatusService
                 'manage_consent' => $can('ai.consent.manage'),
                 'view_audit' => $can('ai.audit.view'),
                 'partner_detail' => $can('partners.view'),
+                'document_read' => $can('documents.center.view'),
             ],
             'chat' => $chat,
             'financial' => $financial,
             'financial_tools' => ['finance.income_statement', 'finance.receivables_aging', 'finance.payables_aging'],
+            'document' => $document,
+            'document_tools' => [AiDocumentProjectionTool::NAME],
             // «اليوم» بتوقيت المؤسسة: الواجهة لا تخمّن منطقتها الزمنية فتقترح تاريخاً مستقبلياً يرفضه الخادم.
             'clock' => $this->clock($tenant),
         ];
+    }
+
+    private function documentCenterDenied(Tenant $tenant, bool $rbac): bool
+    {
+        return app(ApplicationAccessDecision::class)
+            ->decide($tenant, 'document_center.core', ApplicationOperationClass::READ, $rbac)
+            ->level === ApplicationAccessLevel::DENIED;
     }
 
     /** @return array{timezone:string, today:string} */

@@ -24,6 +24,9 @@ class AiAuditRecorder
         'overrun' => 'bool', 'row_count' => 'int', 'period_days' => 'int', 'partner_detail' => 'string',
         // تغيير موافقة المؤسسة (AI-03): أعلام وأسماء فئات معروفة فقط — لا نص حرّ.
         'consent_enabled' => 'bool', 'categories_granted' => 'categories', 'categories_revoked' => 'categories',
+        // قراءة مستند مُسقَط (AI-04): مرجع المستند (UUID) ونوعه وحالته وأعداد فقط — لا قيمة ولا نص ولا اسم ملف.
+        'document_ref' => 'uuid', 'document_type' => 'string', 'document_status' => 'string',
+        'fields_returned' => 'int', 'lines_returned' => 'int', 'redactions_applied' => 'int',
     ];
 
     private const CODE = '/^[a-z][a-z0-9_.]{0,79}$/';
@@ -114,6 +117,7 @@ class AiAuditRecorder
                 'categories' => is_array($value)
                     ? array_values(array_intersect(array_map('strval', $value), \App\Support\AiAssistantDataCategory::ALL))
                     : null,
+                'uuid' => preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/', (string) $value) === 1 ? (string) $value : null,
                 default => preg_match('/^[a-z_]{1,24}$/', (string) $value) === 1 ? (string) $value : null,
             };
             if ($clean[$key] === null || ($type === 'categories' && $clean[$key] === [])) {

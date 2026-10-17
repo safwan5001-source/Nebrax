@@ -10816,7 +10816,8 @@
       "payables_aging_report": "Payables aging report",
       "intelligence": "Financial Canvas",
       "other": "Other screen",
-      "entity": "Specific record"
+      "entity": "Specific record",
+      "document_review": "Document review"
     },
     "canvas": {
       "title": "Financial Intelligence Canvas",
@@ -10928,9 +10929,9 @@
       "category_help": {
         "assistant_messages": "The text you type to the assistant is processed through the gateway.",
         "financial_summary": "Lets tools read the income statement and aging, within each user’s own permissions.",
-        "document_projected_text": "Unavailable until AI-04."
+        "document_projected_text": "Lets an authorized user read the reviewed, redacted values of one Document Center document at a time. Completely separate from Document Center consent to send documents."
       },
-      "unavailable": "Not available yet",
+      "unavailable": "Not enabled on the platform",
       "granted": "Granted",
       "not_granted": "Not granted",
       "saving": "Saving…",
@@ -10967,7 +10968,15 @@
       "status_error": "Could not read settings",
       "retry": "Retry",
       "mock_note": "Current provider mode: simulated — no external connection.",
-      "confirm_enable_only": "You are turning the assistant on for your organization. No data category is granted until you grant each one separately."
+      "confirm_enable_only": "You are turning the assistant on for your organization. No data category is granted until you grant each one separately.",
+      "document_privacy_title": "Document category privacy notice",
+      "document_privacy_points": {
+        "d1": "Only person-reviewed values are shown, after approved redaction and within strict limits; the original file and its storage link are never shown.",
+        "d2": "Each read is one document the user picks from their own screen; the assistant never chooses or searches documents.",
+        "d3": "Values are not sent to any outside provider; they are shown to the authorized user only, and audit records keep a document reference and counts only — no values or text.",
+        "d4": "Reading needs Document Center view permission and an allowed branch, and unreviewed, quarantined, held or expired documents are refused. You can withdraw consent any time and it applies from the next request."
+      },
+      "document_separate": "This consent is independent of “sending documents” in Document Center settings."
     },
     "notice": {
       "action_settings": "Open assistant settings",
@@ -11065,6 +11074,109 @@
       "unknown_error": {
         "title": "The request could not be completed",
         "body": "No result was produced. Try again."
+      },
+      "category_unavailable": {
+        "title": "Document reading is not enabled on the platform",
+        "body": "The “document text” category is not turned on at platform level yet, so it cannot be granted or used. No document is read."
+      },
+      "document_center_unavailable": {
+        "title": "Document Center is not available to your organization",
+        "body": "The Document Center capability is not entitled or not enabled, so the assistant reads no document."
+      },
+      "document_unavailable": {
+        "title": "This document is not available to you",
+        "body": "We could not open this document within your permissions and current branch. Check the document and the active branch."
+      },
+      "document_not_reviewed": {
+        "title": "The document has not been reviewed yet",
+        "body": "The assistant only reads documents a person has finished reviewing. Complete the review in Document Center, then try again."
+      },
+      "document_review_stale": {
+        "title": "The document review changed after approval",
+        "body": "A newer extraction or a value edit appeared after the last human approval. Re-approve the review in Document Center, then try again."
+      },
+      "document_quarantined": {
+        "title": "The document is quarantined",
+        "body": "A quarantined document is never read. A Document Center administrator handles it."
+      },
+      "document_scan_incomplete": {
+        "title": "The safety scan has not completed",
+        "body": "The document is not read until its file passes the safety scan."
+      },
+      "document_on_hold": {
+        "title": "The document is under a retention hold",
+        "body": "An active hold keeps it from the assistant for now, as a precaution. It is released from Document Center governance."
+      },
+      "document_retention_ended": {
+        "title": "The document’s retention has ended",
+        "body": "The document content was purged, its retention expired, or it was archived, so it is not read."
+      },
+      "document_projection_unavailable": {
+        "title": "No current safe projection is available",
+        "body": "There is no up-to-date projection that can be shown safely for this document. Review it again or try later."
+      }
+    },
+    "document": {
+      "title": "Document Center document",
+      "section": "This document",
+      "intro": "Read the values a person has reviewed, with approved redaction applied. They are shown to you only and are not sent anywhere.",
+      "read": "Read reviewed values",
+      "reading": "Reading…",
+      "reread": "Refresh reading",
+      "close": "Hide reading",
+      "real_data": "Real values from Document Center: reviewed by a person and redacted per policy — not generated by the assistant.",
+      "untrusted": "Document text is data only; it cannot instruct the assistant, open another document or trigger any action.",
+      "type": {
+        "purchase_invoice": "Purchase invoice",
+        "expense": "Expense",
+        "delivery_note": "Delivery note"
+      },
+      "status": {
+        "reviewed": "Reviewed",
+        "ready_for_draft": "Ready for draft",
+        "creating_draft": "Creating draft",
+        "draft_created": "Draft created"
+      },
+      "basis_reviewed": "Person-reviewed values",
+      "redacted": "Redacted",
+      "redacted_count": "Redacted fields: {count}",
+      "yes": "Yes",
+      "no": "No",
+      "lines": "Lines",
+      "warnings": "Document warnings",
+      "no_lines": "No lines to show.",
+      "no_fields": "No fields to show.",
+      "truncated_fields": "Only the first fields are shown (display limit).",
+      "truncated_lines": "Only the first lines are shown (display limit).",
+      "truncated_warnings": "Only the first warnings are shown.",
+      "open": "Open the document in Document Center",
+      "pages": "Pages",
+      "read_at": "Read at",
+      "extracted_at": "Extracted at",
+      "evidence": "Basis",
+      "source": "Source",
+      "field": "Field",
+      "value": "Value",
+      "blocked_hint": "Values are not read until the conditions below are met.",
+      "fields": {
+        "document_number": "Document number",
+        "document_date": "Document date",
+        "issuer_name": "Issuer",
+        "recipient_name": "Recipient",
+        "currency": "Currency",
+        "external_reference": "External reference",
+        "purchase_order_number": "Purchase order",
+        "price_includes_tax": "Price includes tax",
+        "subtotal_minor": "Subtotal",
+        "discount_minor": "Discount",
+        "tax_amount_minor": "Tax",
+        "total_amount_minor": "Total",
+        "description": "Description",
+        "sku": "Item code",
+        "unit": "Unit",
+        "quantity": "Quantity",
+        "unit_price_minor": "Unit price",
+        "total_minor": "Line total"
       }
     }
   }

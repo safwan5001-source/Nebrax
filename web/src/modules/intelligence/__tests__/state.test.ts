@@ -25,6 +25,14 @@ describe('classifyError', () => {
     ['warehouse_scope_forbidden', 403, 'warehouse_scope_forbidden'],
     ['acknowledgement_required', 422, 'acknowledgement_required'],
     ['request_in_progress', 409, 'duplicate_request'],
+    ['document_unavailable', 404, 'document_unavailable'],
+    ['document_not_reviewed', 409, 'document_not_reviewed'],
+    ['document_review_stale', 409, 'document_review_stale'],
+    ['document_quarantined', 409, 'document_quarantined'],
+    ['document_scan_incomplete', 409, 'document_scan_incomplete'],
+    ['document_on_hold', 409, 'document_on_hold'],
+    ['document_retention_ended', 409, 'document_retention_ended'],
+    ['document_projection_unavailable', 409, 'document_projection_unavailable'],
   ] as [string, number, NoticeKey][])('maps server code %s to %s', (code, status, notice) => {
     const result = classifyError(err(status, code));
     expect(result.notice).toBe(notice);
@@ -69,6 +77,8 @@ describe('notice copy', () => {
     'currency_unsupported', 'branch_scope_forbidden', 'warehouse_scope_forbidden', 'scope_not_supported', 'invalid_tool_arguments',
     'invalid_request', 'budget_not_configured', 'budget_exceeded', 'platform_budget_exceeded', 'pricing_unknown',
     'acknowledgement_required', 'data_category_unavailable', 'duplicate_request', 'rate_limited', 'network_error', 'server_error', 'unknown_error',
+    'category_unavailable', 'document_center_unavailable', 'document_unavailable', 'document_not_reviewed', 'document_review_stale', 'document_quarantined',
+    'document_scan_incomplete', 'document_on_hold', 'document_retention_ended', 'document_projection_unavailable',
   ];
   it.each([['ar', arMessages], ['en', enMessages]] as const)('has a title and body for every state in %s', (_locale, messages) => {
     const notice = (messages as unknown as { intelligence: { notice: Record<string, { title?: string; body?: string }> } }).intelligence.notice;

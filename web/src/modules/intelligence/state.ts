@@ -20,6 +20,14 @@ export type NoticeKey =
   | 'acknowledgement_required'
   | 'data_category_unavailable'
   | 'duplicate_request'
+  | 'document_unavailable'
+  | 'document_not_reviewed'
+  | 'document_review_stale'
+  | 'document_quarantined'
+  | 'document_scan_incomplete'
+  | 'document_on_hold'
+  | 'document_retention_ended'
+  | 'document_projection_unavailable'
   | 'rate_limited'
   | 'network_error'
   | 'server_error'
@@ -53,6 +61,14 @@ const CODE_TO_NOTICE: Record<string, NoticeKey> = {
   idempotency_key_reuse: 'invalid_request',
   too_many_tool_calls: 'invalid_request',
   internal_error: 'server_error',
+  document_unavailable: 'document_unavailable',
+  document_not_reviewed: 'document_not_reviewed',
+  document_review_stale: 'document_review_stale',
+  document_quarantined: 'document_quarantined',
+  document_scan_incomplete: 'document_scan_incomplete',
+  document_on_hold: 'document_on_hold',
+  document_retention_ended: 'document_retention_ended',
+  document_projection_unavailable: 'document_projection_unavailable',
 };
 
 export interface ClassifiedError {
@@ -67,7 +83,7 @@ export interface ClassifiedError {
 
 const STATE_CHANGING: ReadonlySet<NoticeKey> = new Set([
   'permission_denied', 'platform_disabled', 'tenant_disabled', 'consent_required', 'tool_permission_denied',
-  'provider_unavailable', 'currency_unsupported', 'data_category_unavailable',
+  'provider_unavailable', 'currency_unsupported', 'data_category_unavailable', 'category_unavailable', 'document_center_unavailable',
 ]);
 
 export function errorCode(body: unknown): string | null {

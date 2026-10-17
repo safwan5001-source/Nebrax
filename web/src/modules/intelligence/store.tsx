@@ -2,10 +2,11 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useCurrentUser } from '@/lib/use-can';
-import { fetchStatus, runTool, sendMessage } from './api';
+import { fetchStatus, readDocument, runTool, sendMessage } from './api';
 import { classifyError, type ClassifiedError } from './state';
 import type {
   AssistantStatus,
+  DocumentProjection,
   FinancialResult,
   MessageResponse,
   ToolCall,
@@ -45,6 +46,15 @@ export interface FinancialRun {
   authorizationScope?: MessageResponse['scope'];
 }
 
+/** نتيجة قراءة مستند (AI-04) — في الذاكرة فقط، وتُمحى بتبدّل الهوية أو بإغلاق التبويب. */
+export interface DocumentRun {
+  requestId: string;
+  documentId: string;
+  projection: DocumentProjection;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export interface IntelligenceStore {
   identity: string;
   statusPhase: StatusPhase;
@@ -67,6 +77,14 @@ export interface IntelligenceStore {
   financialError: ClassifiedError | null;
   dismissFinancialError: () => void;
   runFinancial: (input: { tool: ToolName; arguments: Record<string, string>; branchIds?: string[] }) => Promise<boolean>;
+  /** AI-04: آخر مستند قُرئ (مستند واحد في الذاكرة)، وحالة طلبه وخطؤه. */
+  documentRun: DocumentRun | null;
+  documentPending: boolean;
+  documentError: ClassifiedError | null;
+  dismissDocumentError: () => void;
+  /** قراءة صريحة لمستند واحد بمعرّفه من الشاشة؛ لا طلب إلا والحالة المقروءة للتوّ `document: ready`. */
+  readDocument: (documentId: string) => Promise<boolean>;
+  clearDocument: () => void;
 }
 
 const Context = createContext<IntelligenceStore | null>(null);
@@ -85,6 +103,7 @@ export function IntelligenceProvider({ children, locale = 'ar' }: { children: Re
   const statusSeq = useRef(0);
   const chatSeq = useRef(0);
   const financialSeq = useRef(0);
+  const documentSeq = useRef(0);
   const statusRef = useRef<AssistantStatus | null>(null);
 
   const [statusPhase, setStatusPhase] = useState<StatusPhase>('idle');
@@ -97,6 +116,9 @@ export function IntelligenceProvider({ children, locale = 'ar' }: { children: Re
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [financialPending, setFinancialPending] = useState(false);
   const [financialError, setFinancialError] = useState<ClassifiedError | null>(null);
+  const [documentRun, setDocumentRun] = useState<DocumentRun | null>(null);
+  const [documentPending, setDocumentPending] = useState(false);
+  const [documentError, setDocumentError] = useState<ClassifiedError | null>(null);
 
   // تغيّرت الهوية: صفّر كل شيء وأبطل ما في الطيران.
   const lastIdentity = useRef(identity);
@@ -107,6 +129,7 @@ export function IntelligenceProvider({ children, locale = 'ar' }: { children: Re
     statusSeq.current += 1;
     chatSeq.current += 1;
     financialSeq.current += 1;
+    documentSeq.current += 1;
     statusRef.current = null;
     setStatusPhase('idle');
     setStatus(null);
@@ -118,6 +141,9 @@ export function IntelligenceProvider({ children, locale = 'ar' }: { children: Re
     setActiveRunId(null);
     setFinancialPending(false);
     setFinancialError(null);
+    setDocumentRun(null);
+    setDocumentPending(false);
+    setDocumentError(null);
   }, [identity]);
 
   const refreshStatus = useCallback(async (): Promise<AssistantStatus | null> => {
@@ -227,6 +253,35 @@ export function IntelligenceProvider({ children, locale = 'ar' }: { children: Re
     }
   }, [identity, registerRuns, refreshStatus]);
 
+  const readDocumentRun = useCallback(async (documentId: string): Promise<boolean> => {
+    if (!identity || !UUID.test(documentId)) return false;
+    // «لا طلب غير مصرَّح»: الحالة المقروءة للتوّ يجب أن تكون جاهزة قبل أي نداء، ولا يُرسَل نصّ مستخدم أصلاً.
+    if (statusRef.current?.document !== 'ready') return false;
+
+    const myEpoch = epoch.current;
+    const mySeq = ++documentSeq.current;
+    setDocumentPending(true);
+    setDocumentError(null);
+    try {
+      const data = await readDocument(documentId.toLowerCase());
+      if (myEpoch !== epoch.current || mySeq !== documentSeq.current) return false;
+      const call = data.tool_calls[0];
+      if (!call) return false;
+      setDocumentRun({ requestId: data.request_id, documentId: documentId.toLowerCase(), projection: call.result });
+      return true;
+    } catch (error) {
+      if (myEpoch !== epoch.current || mySeq !== documentSeq.current) return false;
+      // لا نُبقي نتيجة سابقة لمستند آخر ظاهرةً بجوار خطأ هذا الطلب.
+      setDocumentRun(null);
+      const classified = classifyError(error);
+      setDocumentError(classified);
+      if (classified.refreshStatus) void refreshStatus();
+      return false;
+    } finally {
+      if (myEpoch === epoch.current && mySeq === documentSeq.current) setDocumentPending(false);
+    }
+  }, [identity, refreshStatus]);
+
   const value = useMemo<IntelligenceStore>(() => ({
     identity,
     statusPhase,
@@ -248,7 +303,13 @@ export function IntelligenceProvider({ children, locale = 'ar' }: { children: Re
     financialError,
     dismissFinancialError: () => setFinancialError(null),
     runFinancial,
-  }), [identity, statusPhase, status, statusError, refreshStatus, applyStatus, panelOpen, openPanel, closePanel, entries, chatPending, send, runs, activeRunId, financialPending, financialError, runFinancial]);
+    documentRun,
+    documentPending,
+    documentError,
+    dismissDocumentError: () => setDocumentError(null),
+    readDocument: readDocumentRun,
+    clearDocument: () => { documentSeq.current += 1; setDocumentRun(null); setDocumentError(null); setDocumentPending(false); },
+  }), [identity, statusPhase, status, statusError, refreshStatus, applyStatus, panelOpen, openPanel, closePanel, entries, chatPending, send, runs, activeRunId, financialPending, financialError, runFinancial, documentRun, documentPending, documentError, readDocumentRun]);
 
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

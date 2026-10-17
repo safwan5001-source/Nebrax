@@ -24,7 +24,11 @@ export type CapabilityState =
   | 'tenant_disabled'
   | 'consent_required'
   | 'provider_unavailable'
-  | 'currency_unsupported';
+  | 'currency_unsupported'
+  /** AI-04: فئة نصّ المستند غير متاحة على المنصة (مفتاح المنصة المستقل مغلق). */
+  | 'category_unavailable'
+  /** AI-04: قدرة مركز المستندات غير مستحقة لهذه المؤسسة. */
+  | 'document_center_unavailable';
 
 export type DataCategoryKey = 'assistant_messages' | 'financial_summary' | 'document_projected_text';
 
@@ -33,10 +37,13 @@ export interface AssistantStatus {
   provider_mode: 'mock' | 'unavailable';
   tenant: { enabled: boolean; consented_categories: DataCategoryKey[] };
   categories: { key: DataCategoryKey; available: boolean; consented: boolean }[];
-  abilities: { use: boolean; manage_consent: boolean; view_audit: boolean; partner_detail: boolean };
+  abilities: { use: boolean; manage_consent: boolean; view_audit: boolean; partner_detail: boolean; document_read: boolean };
   chat: CapabilityState;
   financial: CapabilityState;
   financial_tools: ToolName[];
+  /** AI-04: قراءة مستند مُسقَط — حالة محسوبة في الخادم (لا تخمين من العميل). */
+  document: CapabilityState;
+  document_tools: string[];
   clock: { timezone: string; today: string };
 }
 
@@ -179,4 +186,53 @@ export const MAX_PERIOD_DAYS = 366;
 /** مفتاح الرسائل لاسم أداة (`finance.income_statement` → `income_statement`) — النقطة محظورة في مفاتيح next-intl. */
 export function toolKey(tool: ToolName): 'income_statement' | 'receivables_aging' | 'payables_aging' {
   return tool.slice('finance.'.length) as 'income_statement' | 'receivables_aging' | 'payables_aging';
+}
+
+/* ───────────────────────── AI-04: قراءة مستند مُسقَط ───────────────────────── */
+
+export const DOCUMENT_TOOL = 'documents.projected_read';
+
+export type DocumentFieldType = 'text' | 'money' | 'flag';
+
+export interface DocumentEntry {
+  key: string;
+  type: DocumentFieldType;
+  /** `null` حين يكون الحقل منقَّحاً (`redacted`). النصّ بيانات غير موثوقة: يُعرض نصاً خاماً فقط. */
+  value: string | number | boolean | null;
+  /** للمبالغ: القيمة بالريال كما أرسلها الخادم — لا حساب في الواجهة. */
+  decimal?: string;
+  redacted: boolean;
+}
+
+export interface DocumentProjection {
+  report: 'document_projection';
+  schema_version: number;
+  document: {
+    ref: string;
+    document_type: string;
+    status: string;
+    language: string | null;
+    extracted_at: string | null;
+    page_count: number;
+  };
+  basis: {
+    values: string;
+    redaction: string;
+    content_trust: string;
+    generated_by_model: boolean;
+    redacted_values: number;
+  };
+  fields: DocumentEntry[];
+  lines: { index: number; fields: DocumentEntry[] }[];
+  warnings: string[];
+  truncated: { fields: boolean; lines: boolean; warnings: boolean };
+  timezone: string;
+  generated_at: string;
+  sources: { type: string; service: string; ui_path: string }[];
+}
+
+export interface DocumentToolRunResponse {
+  request_id: string;
+  status: 'ok';
+  tool_calls: { tool: typeof DOCUMENT_TOOL; result: DocumentProjection }[];
 }
