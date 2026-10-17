@@ -2549,6 +2549,9 @@ export function ExperienceBuilder({
     id: string | null,
     origin: "sidebar" | "preview",
   ) {
+    if (id !== null && currentPage !== "home") {
+      handleSelectPage("home");
+    }
     setSelectedSection(id);
     setSelectedChrome(null);
     if (id === null) return;
@@ -4187,6 +4190,14 @@ function NavIcon({ panel }: { panel: CustomizerPanel }) {
         <circle cx="6" cy="6" r="2.25" />
         <circle cx="11" cy="5.5" r="1.75" />
         <circle cx="9.5" cy="11" r="2" />
+      </svg>
+    ),
+    designLibrary: (
+      <svg {...common}>
+        <rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1" />
+        <rect x="9" y="2.5" width="4.5" height="4.5" rx="1" />
+        <rect x="2.5" y="9" width="4.5" height="4.5" rx="1" />
+        <path d="M9 11.25h4.5M11.25 9v4.5" strokeLinecap="round" />
       </svg>
     ),
     announcements: (

@@ -38,7 +38,8 @@ type Scenario =
   | "footer"
   | "slider"
   | "categories-display"
-  | "categories-panel";
+  | "categories-panel"
+  | "design-library";
 type PreviewViewport = "mobile" | "tablet" | "desktop";
 
 function scenarioOf(value: string | null): Scenario {
@@ -56,7 +57,8 @@ function scenarioOf(value: string | null): Scenario {
     value === "footer" ||
     value === "slider" ||
     value === "categories-display" ||
-    value === "categories-panel"
+    value === "categories-panel" ||
+    value === "design-library"
   ) {
     return value;
   }
@@ -498,6 +500,56 @@ function CategoriesPanelHarness({
   );
 }
 
+/** Phase 1 Design Library visual QA: real catalogue + real Canvas, no API. */
+function DesignLibraryHarness({
+  locale,
+  viewport,
+  initial,
+  homeCategories,
+}: {
+  locale: "ar" | "en";
+  viewport: PreviewViewport;
+  initial: StorefrontPresentationConfig;
+  homeCategories: { id: string; name: string; imageUrl: string | null; color: string | null }[];
+}) {
+  const [config, setConfig] = useState(initial);
+  return (
+    <main
+      data-visual-root=""
+      data-surface="design-library"
+      dir={locale === "ar" ? "rtl" : "ltr"}
+      className="grid min-h-screen gap-4 bg-surface p-4 lg:grid-cols-[420px_1fr]"
+    >
+      <aside
+        data-builder-controls=""
+        className="max-h-[calc(100vh-2rem)] overflow-y-auto border border-border bg-surface p-4"
+      >
+        <ControlPanels
+          panel="designLibrary"
+          config={config}
+          locale={locale}
+          liveStoreName={null}
+          onChange={setConfig}
+          selectedSection="categories"
+        />
+      </aside>
+      <section className="min-w-0 overflow-x-auto">
+        <StorefrontPreviewCanvas
+          config={config}
+          locale={locale}
+          viewport={viewport}
+          liveStoreName={locale === "ar" ? "متجر النور" : "Al Noor"}
+          homeCategoriesState="ready"
+          homeCategories={homeCategories}
+          selectedSection="categories"
+          onSelectSection={() => {}}
+          onSelectChrome={() => {}}
+        />
+      </section>
+    </main>
+  );
+}
+
 function Fixture() {
   const params = useSearchParams();
   const locale = params.get("locale") === "en" ? "en" : "ar";
@@ -517,7 +569,7 @@ function Fixture() {
     .map((n) => Number.parseInt(n, 10))
     .filter((n) => Number.isInteger(n));
   const homeCategories =
-    scenario === "categories-display" || scenario === "categories-panel"
+    scenario === "categories-display" || scenario === "categories-panel" || scenario === "design-library"
       ? fixtureCategories(locale, categoryCount, noImage).map((c) => ({
           id: c.id,
           name: c.name,
@@ -529,6 +581,17 @@ function Fixture() {
   if (scenario === "categories-panel") {
     return (
       <CategoriesPanelHarness
+        locale={locale}
+        viewport={viewport}
+        initial={config}
+        homeCategories={homeCategories ?? []}
+      />
+    );
+  }
+
+  if (scenario === "design-library") {
+    return (
+      <DesignLibraryHarness
         locale={locale}
         viewport={viewport}
         initial={config}
