@@ -12,7 +12,7 @@ Scope: let AWJ Intelligence read an explicitly authorized, **human-reviewed, red
 | Branch | `feat/ai-04-document-read-20261017` |
 | Draft PR | https://github.com/safwan5001-source/Nebrax/pull/1554 (Draft) |
 | Base | `main` @ `1f94e18480e78fea1839b0493073f21b486f6f07` (AI-01 #1546, AI-02A #1548, AI-02B #1549, AI-03 #1553 merged) |
-| Head | `@@HEAD@@` (final hardening commit; earlier heads: `443bb69` at PR creation, `aa47087` before hardening) |
+| Head | `51ef008031b99076cb3fc25f46dc192c41b8de30` (final hardening code commit; any later commit changes this report only; earlier heads: `443bb69` at PR creation, `aa47087` before hardening) |
 | Migrations / new tables | **none** |
 | Provider / network | mock only; **zero egress** (asserted in every backend test and in Playwright) |
 
