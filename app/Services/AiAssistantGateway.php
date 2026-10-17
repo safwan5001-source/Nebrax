@@ -189,6 +189,50 @@ class AiAssistantGateway
         ];
     }
 
+    /**
+     * تشغيل **صريح** من المستخدم لأداة قراءة من السجل المغلق (AI-03) — بلا مزوّد ولا نموذج ولا إنفاق.
+     *
+     * يمرّ بالمسار الأمني نفسه لاستدعاء الأداة من المساعد حرفياً (`invokeTool`): المنصة ∩ المستأجر ∩ موافقة فئة
+     * الأداة ∩ `ai.assistant.use` ∩ صلاحية الأداة (`reports.view`) بفاعل طازج، ثم رفض صريح للنطاق الممنوع،
+     * ثم التحقق من المعطيات بمخطط الأداة المغلق، ثم التنفيذ بالفاعل الطازج مستخدِماً مصادَقاً، ثم تدقيق
+     * وصفي. لا يتخطى شيئاً ليبدو «يعمل». الأرقام من `ReportService` كما هي، والنتيجة تعود للمستخدم وحده.
+     *
+     * @param  array<string,mixed>  $arguments
+     * @param  array{scope?:array{branch_ids?:list<string>, warehouse_ids?:list<string>}}  $input
+     * @return array<string,mixed>
+     * @throws AiAssistantDenied
+     */
+    public function runTool(User $requester, string $toolName, array $arguments, array $input = []): array
+    {
+        $requestId = (string) Str::uuid();
+        $tenantId = (string) $requester->tenant_id;
+        $actorId = (string) $requester->getKey();
+        $branchIds = $input['scope']['branch_ids'] ?? [];
+        $warehouseIds = $input['scope']['warehouse_ids'] ?? [];
+        $log = [
+            'request_id' => $requestId, 'tenant_id' => $tenantId, 'actor_id' => $actorId, 'tool' => $toolName,
+            'branch_ids_requested' => count($branchIds), 'warehouse_ids_requested' => count($warehouseIds),
+        ];
+
+        try {
+            $executed = $this->invokeTool($actorId, ['name' => $toolName, 'arguments' => $arguments], $branchIds, $warehouseIds, $requestId, $tenantId, ['provider' => 'none']);
+        } catch (AiAssistantDenied $denied) {
+            Log::info('ai_assistant.tool_run', $log + ['outcome' => 'denied', 'reason' => $denied->reason]);
+            $denied->requestId ??= $requestId;
+
+            throw $denied;
+        }
+
+        Log::info('ai_assistant.tool_run', $log + ['outcome' => 'allowed', 'reason' => 'ok']);
+
+        return [
+            'request_id' => $requestId,
+            'status' => 'ok',
+            // لا نطاق تفويض هنا: ما طُبّق فعلاً داخل `tool_calls[].result.scope` وهو المرجع الوحيد.
+            'tool_calls' => [$executed],
+        ];
+    }
+
     /** @throws AiAssistantDenied */
     private function provider(): AiAssistantProvider
     {

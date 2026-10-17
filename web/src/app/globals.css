@@ -1095,6 +1095,14 @@ html[data-awj-ui="3"] [data-awj-card-title] {
 .sidebar-group-in {
   animation: sidebar-group-in 160ms ease-out;
 }
+/* AWJ Intelligence: ظهور هادئ لنتيجة/رسالة جديدة (opacity + transform فقط، 160ms). يُعطَّل بقاعدة reduced-motion أدناه. */
+@keyframes awj-intel-rise {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.awj-intel-rise {
+  animation: awj-intel-rise 160ms ease-out;
+}
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

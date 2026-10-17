@@ -22,6 +22,8 @@ class AiAuditRecorder
         'branch_mode' => 'string', 'branch_count' => 'int', 'warehouse_mode' => 'string', 'warehouse_count' => 'int',
         'message_chars' => 'int', 'tool_calls_planned' => 'int', 'tool_calls_executed' => 'int', 'billable' => 'bool',
         'overrun' => 'bool', 'row_count' => 'int', 'period_days' => 'int', 'partner_detail' => 'string',
+        // تغيير موافقة المؤسسة (AI-03): أعلام وأسماء فئات معروفة فقط — لا نص حرّ.
+        'consent_enabled' => 'bool', 'categories_granted' => 'categories', 'categories_revoked' => 'categories',
     ];
 
     private const CODE = '/^[a-z][a-z0-9_.]{0,79}$/';
@@ -108,9 +110,13 @@ class AiAuditRecorder
             $clean[$key] = match ($type) {
                 'int' => (int) $value,
                 'bool' => (bool) $value,
+                // قائمة أسماء فئات من الكتالوج المعتمد فقط؛ أي اسم آخر يسقط.
+                'categories' => is_array($value)
+                    ? array_values(array_intersect(array_map('strval', $value), \App\Support\AiAssistantDataCategory::ALL))
+                    : null,
                 default => preg_match('/^[a-z_]{1,24}$/', (string) $value) === 1 ? (string) $value : null,
             };
-            if ($clean[$key] === null) {
+            if ($clean[$key] === null || ($type === 'categories' && $clean[$key] === [])) {
                 unset($clean[$key]);
             }
         }

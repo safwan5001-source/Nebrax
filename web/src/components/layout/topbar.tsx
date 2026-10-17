@@ -15,6 +15,7 @@ import { useCompany } from '@/lib/company';
 import { currentUser, logout } from '@/lib/auth';
 import { useBranches } from '@/lib/branch';
 import { ContextualHelpTrigger } from '@/components/help-center/contextual-help-trigger';
+import { AssistantMenuItem, AssistantTrigger } from '@/components/intelligence/assistant-trigger';
 
 export function Topbar({
   onMenuClick,
@@ -90,6 +91,7 @@ export function Topbar({
           <DropdownItem icon={UserPlus} href="/partners/new">{t('new_customer')}</DropdownItem>
         </Dropdown>
 
+        <AssistantTrigger />
         <ContextualHelpTrigger placement="topbar" />
 
         <NotificationBell />
@@ -145,6 +147,7 @@ export function Topbar({
             </>
           )}
 
+          <AssistantMenuItem />
           <ContextualHelpTrigger placement="menu" restoreFocusRef={userMenuButtonRef} />
           <div className="sm:hidden">
             <DropdownItem icon={Languages} onClick={() => switchLocale(locale, () => router.refresh())}>

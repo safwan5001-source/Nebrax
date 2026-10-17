@@ -410,6 +410,14 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // سجل تدقيق المساعد (وصفي، للمستأجر نفسه) — صلاحية مستقلة عن الاستعمال.
         Route::get('ai-assistant/audit-events', [AiAuditController::class, 'index'])
             ->middleware([$perm('ai.audit.view'), 'throttle:60,1']);
+        // AWJ Intelligence (AI-03): حالة المساعد للواجهة، وتحديث موافقة المؤسسة، وتشغيل أداة قراءة مالية صريحة.
+        // الثلاثة تعيد التفويض كاملاً بفاعل طازج؛ الإخفاء في الواجهة ليس حدّاً أمنياً.
+        Route::get('ai-assistant/status', [AiAssistantController::class, 'status'])
+            ->middleware('throttle:60,1');
+        Route::put('ai-assistant/settings', [AiAssistantController::class, 'updateSettings'])
+            ->middleware([$perm('ai.consent.manage'), 'throttle:20,1']);
+        Route::post('ai-assistant/tools/run', [AiAssistantController::class, 'runTool'])
+            ->middleware([$perm('ai.assistant.use'), 'throttle:30,1']);
 
         // مركز المستندات — PR-2: استقبال يدوي خاص فقط، بلا OCR أو Queue أو إنشاء معاملات.
         Route::post('document-batches', [DocumentIntakeController::class, 'storeBatch'])
