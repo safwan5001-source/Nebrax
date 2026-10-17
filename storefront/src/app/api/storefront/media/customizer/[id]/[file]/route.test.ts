@@ -190,8 +190,10 @@ describe("customizer media proxy — animated file (AWJ-ANIMATED-MEDIA P1)", () 
 
 import { afterEach } from "vitest";
 import {
+  mediaProxyLimits,
   resetConstrainedWarning,
   resetSharedMediaProxyGate,
+  sharedMediaProxyGate,
 } from "@/lib/commerce/media-proxy-guard";
 
 // The smallest bound the environment may set: the producer ceiling (storefront_media.variant_max_bytes = 6 MiB; animated ≤ 5 MiB).
@@ -481,6 +483,175 @@ describe("customizer media proxy — body override can never fall below the prod
   });
 });
 
+describe("customizer media proxy — P2-0b outstanding response delivery counts against the memory budget", () => {
+  const MiB = 1024 * 1024;
+  beforeEach(() => {
+    fetchMock.mockReset();
+    resetSharedMediaProxyGate();
+    resetConstrainedWarning();
+    hostHeader.value = "shop.example.com";
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubEnv("STOREFRONT_GATEWAY_SECRET", "gw-secret");
+    vi.stubEnv("AWJ_COMMERCE_API_URL", "https://api.example.com");
+    // smallest budget: a read reserves 2 × 6 MiB = 12 MiB and a finished-but-undelivered response keeps its 6 MiB ⇒ 4 deliveries fit
+    vi.stubEnv("STOREFRONT_MEDIA_PROXY_MAX_BUFFERED_BYTES", String(32 * MiB));
+    vi.stubEnv("STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES", String(6 * MiB));
+    vi.stubEnv("STOREFRONT_MEDIA_PROXY_MAX_QUEUE", "0"); // shed at once instead of waiting 4 s in a test
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  const big = () =>
+    new Response(bodyOf(6 * MiB), {
+      headers: { "content-type": "image/jpeg", etag: '"e"' },
+    });
+  const gate = () => sharedMediaProxyGate(mediaProxyLimits());
+
+  /** Starts `n` requests whose responses the "slow visitor" never consumes; returns the Response objects. */
+  async function startSlow(n: number, file = "1920w.jpg", spreadHosts = true) {
+    const out: Response[] = [];
+    for (let i = 0; i < n; i++) {
+      if (spreadHosts) hostHeader.value = `h${i}.example.com`; // a host may use at most half the budget; spread so only the TOTAL binds
+      fetchMock.mockResolvedValueOnce(big());
+      out.push(await call(UUID, file));
+    }
+    hostHeader.value = "shop.example.com";
+    return out;
+  }
+
+  it("REGRESSION: responses still being delivered keep their share of the budget, so a burst of slow downloads is shed instead of accumulating", async () => {
+    const slow = await startSlow(4);
+    expect(slow.map((r) => r.status)).toEqual([200, 200, 200, 200]);
+
+    // the four buffered 6 MiB bodies are still held downstream: a fifth request must NOT be admitted
+    fetchMock.mockResolvedValueOnce(big());
+    const fifth = await call(UUID, "1920w.jpg");
+    expect(fifth.status).toBe(503);
+    expect(fifth.headers.get("retry-after")).toBe("2");
+    expect(fifth.headers.get("cache-control")).toBe("no-store");
+    expect(await fifth.text()).toBe("");
+    expect(fetchMock).toHaveBeenCalledTimes(4); // the shed request never reached Laravel
+    expect(gate().stats().bytes).toBe(24 * MiB); // 4 × 6 MiB retained
+    expect(gate().stats().active).toBe(0); // origin slots are free: only memory is the constraint
+  });
+
+  it("finishing delivery returns the budget exactly once; the next request is served", async () => {
+    const slow = await startSlow(4);
+    // a visitor that reads everything
+    const received = await slow[0].arrayBuffer();
+    expect(received.byteLength).toBe(6 * MiB);
+    expect(gate().stats().bytes).toBe(18 * MiB);
+
+    fetchMock.mockResolvedValueOnce(big());
+    const next = await call(UUID, "1920w.jpg");
+    expect(next.status).toBe(200);
+    await next.body?.cancel();
+    for (const r of slow.slice(1)) await r.body?.cancel();
+    expect(gate().stats()).toEqual({ active: 0, queued: 0, bytes: 0 });
+  });
+
+  it("a visitor that disconnects (stream cancelled) frees its share; cancelling twice or after completion changes nothing", async () => {
+    const slow = await startSlow(4);
+    await slow[1].body?.cancel();
+    await slow[1].body?.cancel().catch(() => undefined);
+    expect(gate().stats().bytes).toBe(18 * MiB);
+    await slow[0].arrayBuffer();
+    expect(gate().stats().bytes).toBe(12 * MiB);
+    for (const r of slow.slice(2)) await r.body?.cancel();
+    expect(gate().stats().bytes).toBe(0);
+    expect(gate().stats().bytes).toBeGreaterThanOrEqual(0);
+  });
+
+  it("a request abort signal (client left before the body was pulled) frees the share", async () => {
+    const controller = new AbortController();
+    fetchMock.mockResolvedValueOnce(big());
+    const response = await call(UUID, "1920w.jpg", {
+      signal: controller.signal,
+    });
+    expect(response.status).toBe(200);
+    expect(gate().stats().bytes).toBe(6 * MiB);
+    controller.abort();
+    await flush();
+    expect(gate().stats().bytes).toBe(0);
+    await response.body?.cancel().catch(() => undefined); // late cancel is a no-op
+    expect(gate().stats().bytes).toBe(0);
+  });
+
+  it("delivers the buffered bytes unchanged with the unchanged headers", async () => {
+    const payload = bodyOf(3 * MiB + 17, 5);
+    fetchMock.mockResolvedValueOnce(
+      new Response(payload, {
+        headers: {
+          "content-type": "image/webp",
+          etag: '"abc"',
+          "cache-control": "private, no-store",
+        },
+      }),
+    );
+    const response = await call(UUID, "1280w.webp");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe(
+      CUSTOMIZER_MEDIA_CACHE_CONTROL,
+    );
+    expect(response.headers.get("etag")).toBe('"abc"');
+    expect(response.headers.get("content-type")).toBe("image/webp");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    expect(bytes.byteLength).toBe(payload.byteLength);
+    expect(bytes.every((b) => b === 5)).toBe(true);
+    expect(gate().stats().bytes).toBe(0);
+  });
+
+  it("304, 404 and failures hold nothing after the handler returns", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(null, { status: 304, headers: { etag: '"e"' } }),
+    );
+    expect(
+      (await call(UUID, "480w.webp", { headers: { "if-none-match": '"e"' } }))
+        .status,
+    ).toBe(304);
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 404 }));
+    expect((await call(UUID, "480w.webp")).status).toBe(404);
+    fetchMock.mockResolvedValueOnce(new Response("boom", { status: 500 }));
+    expect((await call(UUID, "480w.webp")).status).toBe(502);
+    fetchMock.mockRejectedValueOnce(new Error("ECONNRESET"));
+    expect((await call(UUID, "480w.webp")).status).toBe(502);
+    fetchMock.mockResolvedValueOnce(new Response(bodyOf(7 * MiB))); // over the bound
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    expect((await call(UUID, "480w.webp")).status).toBe(502);
+    expect(gate().stats()).toEqual({ active: 0, queued: 0, bytes: 0 });
+  });
+
+  it("one storefront's slow visitors cannot take the whole budget: another host is still served (fairness)", async () => {
+    hostHeader.value = "slow.example.com";
+    const slow = await startSlow(1, "1920w.jpg", false); // 6 MiB retained for host A
+    expect(slow.map((r) => r.status)).toEqual([200]);
+    hostHeader.value = "slow.example.com";
+    fetchMock.mockResolvedValueOnce(big());
+    expect((await call(UUID, "1920w.jpg")).status).toBe(503); // 6 retained + 12 for a second read = 18 > host A's share (16 MiB = half of 32)
+
+    hostHeader.value = "other.example.com";
+    fetchMock.mockResolvedValueOnce(big());
+    const other = await call(UUID, "1920w.jpg");
+    expect(other.status).toBe(200);
+    await other.body?.cancel();
+    for (const r of slow) await r.body?.cancel();
+    expect(gate().stats().bytes).toBe(0);
+  });
+
+  it("recovers after a mass disconnect: a full burst of slow visitors leaves, the whole budget is available again", async () => {
+    const slow = await startSlow(4);
+    for (const r of slow) await r.body?.cancel();
+    expect(gate().stats()).toEqual({ active: 0, queued: 0, bytes: 0 });
+    const again = await startSlow(4);
+    expect(again.map((r) => r.status)).toEqual([200, 200, 200, 200]);
+    for (const r of again) await r.body?.cancel();
+    expect(gate().stats().bytes).toBe(0);
+  });
+});
+
 describe("customizer media proxy — P2-0 concurrency", () => {
   beforeEach(() => {
     fetchMock.mockReset();
@@ -565,10 +736,17 @@ describe("customizer media proxy — P2-0 concurrency", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1); // one slot, not 64: the budget lowered the concurrency
 
     pending[0].settle(ok());
-    expect((await first).status).toBe(200);
+    const firstResponse = await first;
+    expect(firstResponse.status).toBe(200);
+    // P2-0b: the queued request needs the whole (32 MiB) budget, so it waits until the first response has been DELIVERED
+    await flush();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await firstResponse.arrayBuffer();
     await flush();
     pending[1].settle(ok());
-    expect((await queued).status).toBe(200);
+    const queuedResponse = await queued;
+    expect(queuedResponse.status).toBe(200);
+    await queuedResponse.arrayBuffer();
 
     // recovered: a fresh request is served at once, and the constraint was reported once (not per request), without host/secret
     fetchMock.mockReset();

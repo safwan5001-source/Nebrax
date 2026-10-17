@@ -39,6 +39,7 @@ Validated id/file against the contract, forwarded `Host` + gateway secret to the
 | Max buffered body | **8 MiB** (**floor 6 MiB** = the producer ceiling, §10.4; ceiling 32 MiB) | `STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES` | Largest legitimate body is the Laravel-side ceiling for a generated file, `storefront_media.variant_max_bytes` = 6 MiB (§10 — the original wording “ladder files are far smaller” was wrong), or the sanitised animation ≤ 5 MiB (`animated.max_bytes`). 8 MiB leaves headroom above both. |
 | Concurrent origin round-trips | **16** (1–256); one host ≤ half | `STOREFRONT_MEDIA_PROXY_MAX_CONCURRENT` | Bounds Laravel workers used by this proxy per instance. **Fitted into the read-memory budget below** — a request above what the budget allows is lowered, never honoured (§10). The earlier note “16 × 8 MiB = 128 MiB worst case” understated the read phase: the received chunks and the assembled copy coexist, so the bound is **× 2 = 256 MiB** (measured +224–297 MiB RSS over baseline at the defaults). |
 | Read-memory budget | **256 MiB** (32 MiB – 512 MiB hard ceiling) | `STOREFRONT_MEDIA_PROXY_MAX_BUFFERED_BYTES` | Invariant `maxConcurrent × maxBodyBytes × 2 ≤ budget ≤ 512 MiB`. Defaults (16 × 8 MiB × 2) equal the default budget, so default behaviour is unchanged. |
+| Delivery deadline | **120 s** (10–600 s) | `STOREFRONT_MEDIA_PROXY_DELIVERY_TIMEOUT_MS` | P2-0b: longest a finished, buffered response may stay outstanding before it is cut off and its budget share freed (§10.5). |
 | Queue / wait | 64 waiters (0–1024), 4 s | `STOREFRONT_MEDIA_PROXY_MAX_QUEUE` | Smooths a page-load burst, then sheds with `503` + `Retry-After: 2`, `no-store`. |
 | Round-trip deadline | **15 s** (1–120 s) | `STOREFRONT_MEDIA_PROXY_TIMEOUT_MS` | A stuck origin can never hold a slot. |
 
@@ -86,7 +87,7 @@ Measured with `proxy-bounded-memory.mjs` (100 slow visitors, 250 KiB/s, same mac
 2. **Fixed — unbounded origin fan-out**: ≤ 16 simultaneous Laravel requests per storefront instance (≤ 8 per host), with queueing and shedding. This is the part that protects the shared Apache pool the ERP API runs on.
 3. **Fixed — hung origin / vanished visitor** now free their slot (deadline + abort), so the gate cannot leak slots.
 4. **Fixed — information leakage**: every failure is the same empty, uncached response; the only diagnostic is a server-side warning with media id, file and limit (no host, URL or secret).
-5. **Not fixed (honest limitation) — delivery-phase memory.** The gate covers the *origin round-trip*, not the time a finished buffer waits for a slow visitor to drain it. 100 slow visitors on 5 MB bodies still hold ≈ 500–600 MiB, as before (543 vs 600 MiB above). Bounding that needs an in-flight-bytes budget released on response completion, which means wrapping the buffer in a stream and re-checking Next's framing/`Content-Length` — a behaviour change the P2-0 brief excludes. Worst case is now at least capped per body (8 MiB), but not in aggregate. **Recommended follow-up (P2-0b, optional):** in-flight byte budget + `Content-Length` on the wrapped response, with a slow-loris test, before enabling any large asset on this path. Until then, watch the storefront service memory in Railway.
+5. **Fixed in P2-0b (§10.5) — delivery-phase memory.** This was a confirmed P1 (the gate released when the handler returned, before a slow visitor had drained the buffered body). The same memory budget now also covers outstanding response delivery, with measurements on the real built server. The original paragraph said this needed a behaviour change; Next's framing was re-checked on the built server and is byte-identical (see §10.5).
 6. **Limits are per Node instance** (the storefront runs 1 replica); with more replicas the effective global limit multiplies.
 7. **The per-host cap is fairness, not a security boundary**: the key is the visitor-supplied `Host`, so an attacker rotating Host values avoids the per-host cap but is still held by the global cap and queue.
 8. **Defaults are reasoned, not tuned on production traffic.** Under a real traffic spike a legitimate visitor can now see `503` where before the request would have queued inside Laravel; the browser shows a broken image until reload. If monitoring shows shedding at normal load, raise `…MAX_CONCURRENT` (an env change, owner decision).
@@ -95,7 +96,7 @@ Measured with `proxy-bounded-memory.mjs` (100 slow visitors, 250 KiB/s, same mac
 ## 7. Risks and remaining work
 | Risk | Level | Note |
 |---|---|---|
-| Delivery-phase memory not aggregated-bounded (finding 5) | Medium | Same as today; follow-up P2-0b. The §10 budget covers the **read** phase only |
+| Delivery-phase memory (finding 5) | Low (was Medium) | Bounded by the budget since P2-0b (§10.5); residual: allocator overhead ≈ 1.2×, kernel socket buffers, and availability under a coordinated slow-client attack (503 until the 120 s deadline) |
 | Operator raises the read budget (≤ 512 MiB hard ceiling) | Low | Explicit opt-in; RSS ≈ 1.2× budget measured; the Railway plan memory is not known to this repo — keep the default unless it is |
 | 503 shedding under legitimate bursts | Low–Medium | Tunable by env; observe after deploy |
 | New code on the public image path | Low | 38 tests, A/B header identity, real-runtime smoke; kill-switch is reverting the PR (no data/config involved) |
@@ -110,7 +111,7 @@ Measured with `proxy-bounded-memory.mjs` (100 slow visitors, 250 KiB/s, same mac
 |---|---|---|
 | **V0** delivery spike (R2 presigned + Range, authorise endpoint cost) | **GO** to prepare | R2 test bucket + scoped token; AMEND-1 clarification ADR |
 | **A0** AVIF image change | **GO** to prepare, flag-off | Owner approval of the Dockerfile change |
-| **P2-0b** delivery-phase memory budget | Optional, **GO if** you want aggregate bounds before bigger files | Brief that allows changing the response framing |
+| **P2-0b** delivery-phase memory budget | **Done in this PR (§10.5)** | — |
 | V1–V7 video slices | **NO-GO until V0 passes** | Per readiness report §5/§6 |
 
 ## 9. Review fix — generated variants could exceed the proxy bound
@@ -220,8 +221,52 @@ Problems found in the first version: (1) threshold 6 MiB mixed *servable* files 
 
 *Residual.* `animated.max_bytes` is itself env-configurable on the Laravel side (`STOREFRONT_MEDIA_ANIMATED_MAX_BYTES`); raising it above 6 MiB would exceed the floor. Not changed here (out of scope); the pin tests above cover the **defaults** only, so an operator override of that Laravel variable is the one remaining way to exceed the proxy bound.
 
-### 10.5 Out of scope (unchanged)
-Image quality defaults (the positional-quality finding in §9 stays reported-only), P2-0b (delivery-phase memory), AVIF/video, migrations, API contracts.
+### 10.5 P2-0b — delivery memory safety (P1 confirmed, fixed)
+*Finding (thread `PRRT_kwDOS52FT86teUxg`).* The route released the concurrency gate in `finally` as soon as it had **constructed** the `Response`. A buffered 6–8 MiB body then stays in memory until the visitor has drained it, while new requests keep acquiring the same slots — so a burst of slow downloads is not bounded by the §10.1 budget.
+
+*Reproduced* — (1) failing regression test: with the smallest budget, four unconsumed 6 MiB responses were followed by a fifth request that returned **200** (expected 503); (2) on the **real built Next standalone server** (`proxy-delivery-memory.mjs`, fake Laravel origin, raw-socket visitors reading 16 KiB/s, baseline 146 MiB):
+
+| Visitors × hosts (6 MiB bodies) | Accepted | Shed (503) | Peak RSS |
+|---|---|---|---|
+| 16 × 1 | 16 | 0 | 296 MiB |
+| 48 × 1 | 48 | 0 | 492 MiB |
+| 96 × 1 | 59 (37 had no response yet) | 0 | **803 MiB** |
+| 48 × 8 | 48 | 0 | 500 MiB |
+| 96 × 8 | 96 | 0 | **795 MiB** |
+
+*Lifecycle traced* (route → Next → socket): the origin round-trip ends at `readBodyBounded`; `new Response(body)` returns and the handler's `finally` ran (the bug); Next then consumes the body lazily — on the real server a visitor reading 16 KiB/s keeps its response outstanding for the whole hold (no `slowCompleted`), so delivery is paced by the visitor. A visitor that **disconnects** ends the delivery: after all slow visitors dropped, the share was available again within 3 s, far below the 120 s deadline (whether Next does this by cancelling the body, by aborting `request.signal`, or both was not isolated — the release handles either). A visitor that **stays connected but never reads** produces neither event: with the default 120 s deadline its share is still held at 14 s, with a 10 s deadline it is cut off. A failure before the Response exists never reaches delivery. Every exit now ends in the same single, idempotent release.
+
+*Mechanism (smallest safe).* One resource model for both phases, in the existing gate:
+- `acquire(host, signal, bytes)` takes a **slot and `maxBodyBytes × 2` bytes** of the budget atomically (same FIFO queue, same 4 s wait, same `503` + `Retry-After: 2`, same per-host fairness — now also a **per-host byte share** of half the budget).
+- After the origin read, `permit.endRound(max(bodyBytes, 64 KiB))` frees the **slot at once** (Laravel's workers and the 16 slots are never held by a slow visitor) and **shrinks** the reservation to the buffered body's own size.
+- The body is delivered by `deliverBuffered()`: a **pull-based** stream (`highWaterMark: 0`, 64 KiB views of the one buffer, no copies, nothing handed over ahead of the consumer). It is **not** origin streaming — Laravel's bytes are fully read first and never reach the visitor while the origin socket is open.
+- The permit is released **exactly once** (idempotent) when: the consumer asks for more after the last chunk (all chunks consumed), the consumer **cancels** (disconnect), `request.signal` **aborts**, or the **delivery deadline** (120 s, 10–600 s via `STOREFRONT_MEDIA_PROXY_DELIVERY_TIMEOUT_MS`) passes — the last two also error the stream so a stalled connection is torn down rather than left half-open. A response that never gets a consumer is therefore still bounded in time. 304/404/502/oversize paths release in `finally`.
+- Each outstanding delivery is charged at least 64 KiB, so tiny images cannot be held open in unbounded numbers (≤ 4,096 outstanding at the default budget).
+
+*What did not change* (A/B on the real built server, `status`/headers/bytes/sha256 identical for 200, conditional 304 and 404): `Cache-Control`, ETag/304, `X-Content-Type-Options`, content-type, chunked framing (no `Content-Length` before or after), tenant/storefront resolution (host + gateway secret still forwarded verbatim), publication gating, the 6 MiB producer floor, the 8 MiB default, all AR/EN-facing behaviour (no user-visible strings in this path). No migration, API contract, Laravel or accounting change.
+
+*After* (same harness, same machine, built from this branch):
+| Visitors × hosts | Accepted | Shed (503) | Peak RSS (VmHWM) | Probe from an unrelated host while they download |
+|---|---|---|---|---|
+| 16 × 1 | 16 | 0 | 286 MiB | 200 in 90 ms |
+| 48 × 1 | 19 | 29 | 305 MiB | 200 in 102 ms |
+| 96 × 1 | 19 | 77 | **300 MiB** (was 803) | 200 in 151 ms |
+| 48 × 8 | 41 | 7 | 453 MiB | 503 after 4.0 s, `Retry-After: 2` (global budget full) |
+| 96 × 8 | 41 | 55 | **419 MiB** (was 795) | 503 after 4.0 s, `Retry-After: 2` |
+
+- *Fairness:* one storefront's slow visitors are capped at its half-share (≈ 19 × 6 MiB); an unrelated storefront is still served (200).
+- *Overload:* when the whole budget is outstanding, new requests wait ≤ 4 s then get `503` + `Retry-After: 2`, never an unbounded queue.
+- *Recovery after disconnect:* after every slow visitor dropped, 6 of 6 follow-up requests returned 200 with the full body; RSS fell back to 175–204 MiB. Stalled visitors that never read: with the default 120 s deadline they keep their share (probe → 503); with `…DELIVERY_TIMEOUT_MS=10000` they are cut off and the probe returns 200 in 45 ms.
+- *Throughput (6 MiB, loopback):* sequential median 33 ms → 20 ms, 16 parallel 1,159 ms → 608 ms (noise-level; no regression).
+
+*Measured upper bound.* The budget bounds **live buffer bytes** (reads reserve 2 × body bound; deliveries keep their own size): ≤ 256 MiB at the defaults (≤ 512 MiB hard ceiling). Peak RSS in the eight-host runs was **baseline 146 MiB + 273–307 MiB**, i.e. ≈ **1.07–1.2 × the budget** above baseline (allocator/GC overhead, plus ≤ 64 KiB per connection still in Node's write buffer after the share is released). Kernel socket buffers are outside RSS. Plan for **baseline + 1.2 × maxBufferedBytes** (≈ 450 MiB at the defaults), not baseline + budget.
+
+*Tests* (fail first, then pass): route — the REGRESSION above, delivery completes → share returned exactly once, cancel (twice, and after completion) , request-abort, bytes/headers unchanged, 304/404/502/oversize hold nothing, per-host fairness, mass-disconnect recovery; guard — byte-aware gate (reserve/endRound/idempotent release, queue on bytes, deadline shed, abort-while-queued, per-host share, no-budget compatibility), `deliverBuffered` (exact bytes and order, pull-based, empty body, cancel, abort, already-aborted, **deadline with fake timers**, timer cleared on completion, throwing `onSettled`), and the new limits (delivery timeout default/clamp, per-host share).
+
+*Remaining limitations / unverified.* (1) Budget is per instance (one replica today). (2) A coordinated slow-client attack can exhaust the budget so legitimate visitors see `503` until the 120 s deadline cuts the attackers off — an availability trade-off chosen over OOM; an attacker rotating `Host` defeats only the fairness share, not the global budget. (3) Visitors slower than ≈ size/120 s (≈ 50 KiB/s for a 6 MiB file) are cut off mid-body — a truncated chunked response, which browsers report as a failed load; **not verified on real devices or behind the Railway edge/CDN**. (4) Behaviour of intermediaries on early cancel, HTTP/2, and Range/HEAD (unsupported on this route) are untested. (5) The harness drives raw TCP clients on loopback, not real browsers or mobile networks.
+
+### 10.6 Out of scope (unchanged)
+Image quality defaults (the positional-quality finding in §9 stays reported-only), AVIF/video, migrations, API contracts, accounting/ERP logic.
 
 ## 11. Identifiers
 Branch `claude/awj-p2-0-media-proxy-hardening` · PR [#1552](https://github.com/safwan5001-source/Nebrax/pull/1552) · Base `1296e1ce79a339f94336f92c3258ec5fb0d815e6`

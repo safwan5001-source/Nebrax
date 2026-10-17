@@ -11,7 +11,11 @@ import {
 } from "@/lib/commerce/customizer-media";
 import {
   BodyTooLargeError,
+  deliverBuffered,
+  MIN_DELIVERY_CHARGE_BYTES,
   mediaProxyLimits,
+  type Permit,
+  READ_COPY_FACTOR,
   readBodyBounded,
   sharedMediaProxyGate,
   warnIfLimitsConstrained,
@@ -42,6 +46,12 @@ import {
  * round-trip has a deadline and follows the visitor's disconnect, and every
  * failure is a uniform, uncached, body-less response — nothing about the origin
  * (URL, status text, secret, stack) reaches the client. See media-proxy-guard.ts.
+ *
+ * P2-0b — the memory budget also covers the response DELIVERY: the origin slot is
+ * freed as soon as the origin read ends (a slow visitor never holds a Laravel
+ * worker), but the buffered body keeps its share of the budget until it has been
+ * handed to the visitor, or the visitor left, or the delivery deadline passed.
+ * The permit is released exactly once on every path (it is idempotent).
  */
 export const CUSTOMIZER_MEDIA_CACHE_CONTROL =
   "public, max-age=300, must-revalidate";
@@ -81,9 +91,14 @@ export async function GET(
   const limits = mediaProxyLimits();
   warnIfLimitsConstrained(limits);
   const gate = sharedMediaProxyGate(limits);
-  let release: () => void;
+  let permit: Permit;
   try {
-    release = await gate.acquire(visitorHost.toLowerCase(), request.signal);
+    // a slot AND the worst-case read memory (received chunks + assembled copy) from the shared budget
+    permit = await gate.acquire(
+      visitorHost.toLowerCase(),
+      request.signal,
+      limits.maxBodyBytes * READ_COPY_FACTOR,
+    );
   } catch {
     // at capacity (or the visitor already left): shed load instead of queueing without bound
     return new Response(null, {
@@ -92,6 +107,7 @@ export async function GET(
     });
   }
 
+  let handedOver = false;
   try {
     const upstream = await fetch(
       buildStorefrontUrl(
@@ -130,7 +146,18 @@ export async function GET(
     responseHeaders["Content-Type"] =
       upstream.headers.get("content-type") ?? "application/octet-stream";
     const body = await readBodyBounded(upstream, limits.maxBodyBytes);
-    return new Response(body, { status: 200, headers: responseHeaders });
+    // The origin round-trip is over (slot freed); the buffered body now keeps only its own size in the budget until delivered.
+    permit.endRound(Math.max(body.byteLength, MIN_DELIVERY_CHARGE_BYTES));
+    const response = new Response(
+      deliverBuffered(body, {
+        onSettled: permit,
+        deadlineMs: limits.deliveryTimeoutMs,
+        signal: request.signal,
+      }),
+      { status: 200, headers: responseHeaders },
+    );
+    handedOver = true;
+    return response;
   } catch (error) {
     if (error instanceof BodyTooLargeError) {
       // server-side only; the visitor just sees a uniform failure
@@ -142,7 +169,8 @@ export async function GET(
     }
     return failure(502);
   } finally {
-    release();
+    // Every path that did not hand the buffered body to a delivery releases here; the delivery releases its own share.
+    if (!handedOver) permit();
   }
 }
 

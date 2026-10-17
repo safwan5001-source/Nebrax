@@ -4,12 +4,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   BodyTooLargeError,
   createConcurrencyGate,
+  DEFAULT_DELIVERY_TIMEOUT_MS,
   DEFAULT_MAX_BODY_BYTES,
   DEFAULT_MAX_BUFFERED_BYTES,
   DEFAULT_MAX_CONCURRENT,
+  DELIVERY_CHUNK_BYTES,
+  DeliveryDeadlineError,
   declaredLength,
+  deliverBuffered,
   GateBusyError,
   HARD_MAX_BUFFERED_BYTES,
+  MIN_DELIVERY_CHARGE_BYTES,
   MIN_MAX_BODY_BYTES,
   MIN_MAX_BUFFERED_BYTES,
   mediaProxyLimits,
@@ -178,10 +183,10 @@ describe("createConcurrencyGate", () => {
     const gate = createConcurrencyGate(limits);
     const a = await gate.acquire("a");
     const b = await gate.acquire("b");
-    expect(gate.stats()).toEqual({ active: 2, queued: 0 });
+    expect(gate.stats()).toEqual({ active: 2, queued: 0, bytes: 0 });
     a();
     b();
-    expect(gate.stats()).toEqual({ active: 0, queued: 0 });
+    expect(gate.stats()).toEqual({ active: 0, queued: 0, bytes: 0 });
   });
 
   it("queues beyond the limit and hands the freed slot to the waiter; release is idempotent", async () => {
@@ -189,11 +194,11 @@ describe("createConcurrencyGate", () => {
     const a = await gate.acquire("a");
     await gate.acquire("b");
     const waiting = gate.acquire("c");
-    expect(gate.stats()).toEqual({ active: 2, queued: 1 });
+    expect(gate.stats()).toEqual({ active: 2, queued: 1, bytes: 0 });
     a();
     a(); // second call must not free a second slot
     const c = await waiting;
-    expect(gate.stats()).toEqual({ active: 2, queued: 0 });
+    expect(gate.stats()).toEqual({ active: 2, queued: 0, bytes: 0 });
     c();
   });
 
@@ -231,7 +236,7 @@ describe("createConcurrencyGate", () => {
     const waiting = gate.acquire("c", controller.signal);
     controller.abort();
     await expect(waiting).rejects.toBeInstanceOf(GateBusyError);
-    expect(gate.stats()).toEqual({ active: 2, queued: 0 });
+    expect(gate.stats()).toEqual({ active: 2, queued: 0, bytes: 0 });
     a();
     expect(gate.stats().active).toBe(1);
     await expect(gate.acquire("x", AbortSignal.abort())).rejects.toBeInstanceOf(
@@ -249,12 +254,12 @@ describe("createConcurrencyGate", () => {
     const first = await gate.acquire("noisy");
     await gate.acquire("noisy");
     const third = gate.acquire("noisy"); // queued: noisy is at its cap although 2 slots are free
-    expect(gate.stats()).toEqual({ active: 2, queued: 1 });
+    expect(gate.stats()).toEqual({ active: 2, queued: 1, bytes: 0 });
     const other = await gate.acquire("quiet"); // not blocked behind the noisy host
     expect(gate.stats().active).toBe(3);
     first();
     const granted = await third; // freed noisy slot goes to the noisy waiter
-    expect(gate.stats()).toEqual({ active: 3, queued: 0 });
+    expect(gate.stats()).toEqual({ active: 3, queued: 0, bytes: 0 });
     other();
     granted();
   });
@@ -275,7 +280,7 @@ describe("createConcurrencyGate", () => {
     });
     const outcomes = await Promise.all(runs);
     expect(outcomes.filter((o) => o === "shed").length).toBeLessThanOrEqual(2);
-    expect(gate.stats()).toEqual({ active: 0, queued: 0 });
+    expect(gate.stats()).toEqual({ active: 0, queued: 0, bytes: 0 });
     const fresh = await gate.acquire("after");
     fresh();
   });
@@ -461,14 +466,14 @@ describe("aggregate read budget", () => {
     const held = await Promise.all(
       ["a", "b", "c", "d"].map((h) => gate.acquire(h)),
     );
-    expect(gate.stats()).toEqual({ active: 4, queued: 0 });
+    expect(gate.stats()).toEqual({ active: 4, queued: 0, bytes: 0 });
     const queued = gate.acquire("e");
     await expect(gate.acquire("f")).rejects.toBeInstanceOf(GateBusyError); // queue (1) is full ⇒ shed
     held[0]();
     (await queued)();
     for (const r of held) r();
     held[1](); // idempotent
-    expect(gate.stats()).toEqual({ active: 0, queued: 0 });
+    expect(gate.stats()).toEqual({ active: 0, queued: 0, bytes: 0 });
     // after the burst the full constrained capacity is available again
     const again = await Promise.all(
       ["a", "b", "c", "d"].map((h) => gate.acquire(h)),
@@ -592,5 +597,300 @@ describe("body override floor (producer ceilings)", () => {
     await expect(
       readBodyBounded(chunked([6 * MiB + 1]).response, floor),
     ).rejects.toBeInstanceOf(BodyTooLargeError);
+  });
+});
+
+// ───────────────────────────── delivery memory (P2-0b) ─────────────────────────────
+
+describe("byte-aware gate", () => {
+  const limits = {
+    maxConcurrent: 8,
+    maxConcurrentPerHost: 8,
+    maxBufferedBytes: 100,
+    maxBytesPerHost: 60,
+    maxQueue: 1,
+    queueWaitMs: 40,
+  };
+
+  it("reserves bytes with the slot; endRound frees the slot but keeps the retained share until the permit is released", async () => {
+    const gate = createConcurrencyGate(limits);
+    const permit = await gate.acquire("a", undefined, 50);
+    expect(gate.stats()).toEqual({ active: 1, queued: 0, bytes: 50 });
+    permit.endRound(20);
+    expect(gate.stats()).toEqual({ active: 0, queued: 0, bytes: 20 });
+    permit.endRound(5); // a second endRound neither frees the slot twice nor GROWS the share back, and may only shrink it
+    expect(gate.stats()).toEqual({ active: 0, queued: 0, bytes: 5 });
+    permit.endRound(500); // can never grow beyond what is held
+    expect(gate.stats().bytes).toBe(5);
+    permit();
+    permit(); // idempotent
+    expect(gate.stats()).toEqual({ active: 0, queued: 0, bytes: 0 });
+  });
+
+  it("a release without endRound frees slot and bytes together, exactly once", async () => {
+    const gate = createConcurrencyGate(limits);
+    const permit = await gate.acquire("a", undefined, 40);
+    permit();
+    permit();
+    permit.endRound(10); // after a full release nothing comes back
+    expect(gate.stats()).toEqual({ active: 0, queued: 0, bytes: 0 });
+  });
+
+  it("queues when the BYTES do not fit (slots free), grants in order as bytes return, and sheds beyond the queue", async () => {
+    const gate = createConcurrencyGate(limits);
+    const a = await gate.acquire("a", undefined, 60);
+    a.endRound(60); // slot free, bytes retained
+    const b = await gate.acquire("b", undefined, 40); // 100 used: full
+    const waiter = gate.acquire("c", undefined, 40); // does not fit: queued
+    await expect(gate.acquire("d", undefined, 40)).rejects.toBeInstanceOf(
+      GateBusyError,
+    ); // queue (1) full
+    expect(gate.stats()).toEqual({ active: 1, queued: 1, bytes: 100 });
+    a(); // delivery finished: 60 bytes back → the waiter runs
+    const c = await waiter;
+    expect(gate.stats()).toEqual({ active: 2, queued: 0, bytes: 80 });
+    b();
+    c();
+    expect(gate.stats()).toEqual({ active: 0, queued: 0, bytes: 0 });
+  });
+
+  it("a waiter that never fits is shed after the wait deadline, leaves the queue, and the gate recovers", async () => {
+    const gate = createConcurrencyGate(limits);
+    const hold = await gate.acquire("a", undefined, 60);
+    hold.endRound(60);
+    const hold2 = await gate.acquire("b", undefined, 40);
+    await expect(gate.acquire("c", undefined, 40)).rejects.toBeInstanceOf(
+      GateBusyError,
+    ); // waits 40 ms, then shed
+    expect(gate.stats().queued).toBe(0);
+    hold();
+    hold2();
+    expect(
+      (await gate.acquire("c", undefined, 40)).endRound(0),
+    ).toBeUndefined();
+    expect(gate.stats().bytes).toBe(0);
+  });
+
+  it("a waiter whose visitor leaves is removed without ever taking bytes", async () => {
+    const gate = createConcurrencyGate({ ...limits, queueWaitMs: 5000 });
+    const hold = await gate.acquire("a", undefined, 60);
+    const hold2 = await gate.acquire("b", undefined, 40);
+    const controller = new AbortController();
+    const waiter = gate.acquire("c", controller.signal, 10);
+    expect(gate.stats().queued).toBe(1);
+    controller.abort();
+    await expect(waiter).rejects.toBeInstanceOf(GateBusyError);
+    expect(gate.stats()).toEqual({ active: 2, queued: 0, bytes: 100 });
+    hold();
+    hold2();
+    expect(gate.stats()).toEqual({ active: 0, queued: 0, bytes: 0 });
+  });
+
+  it("one host cannot take more than its byte share; another host still gets through (fairness)", async () => {
+    const gate = createConcurrencyGate({ ...limits, maxQueue: 0 });
+    const a1 = await gate.acquire("a", undefined, 30);
+    a1.endRound(30);
+    const a2 = await gate.acquire("a", undefined, 30); // host a: 60 = its cap
+    await expect(gate.acquire("a", undefined, 1)).rejects.toBeInstanceOf(
+      GateBusyError,
+    );
+    const b = await gate.acquire("b", undefined, 30); // another host is unaffected
+    expect(gate.stats().bytes).toBe(90);
+    a1();
+    a2();
+    b();
+    expect(gate.stats().bytes).toBe(0);
+  });
+
+  it("without a byte budget the gate behaves exactly as before (bytes ignored)", async () => {
+    const gate = createConcurrencyGate({
+      maxConcurrent: 1,
+      maxConcurrentPerHost: 1,
+      maxQueue: 0,
+      queueWaitMs: 10,
+    });
+    const p = await gate.acquire("a", undefined, 1_000_000_000);
+    await expect(gate.acquire("b")).rejects.toBeInstanceOf(GateBusyError);
+    p();
+    expect(gate.stats().active).toBe(0);
+  });
+});
+
+describe("deliverBuffered", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+  const bytes = (n: number) =>
+    Uint8Array.from({ length: n }, (_, i) => i % 251);
+  const opts = (
+    onSettled: () => void,
+    extra: Partial<Parameters<typeof deliverBuffered>[1]> = {},
+  ) => ({
+    onSettled,
+    deadlineMs: 60_000,
+    chunkBytes: 1000,
+    ...extra,
+  });
+
+  it("delivers exactly the buffered bytes, in order, one chunk per read, and settles only after the consumer is done with the last chunk", async () => {
+    const body = bytes(2500);
+    const settled = vi.fn();
+    const reader = deliverBuffered(body, opts(settled)).getReader();
+    const parts: Uint8Array[] = [];
+    for (let i = 0; i < 3; i++) {
+      const { value, done } = await reader.read();
+      expect(done).toBe(false);
+      parts.push(value as Uint8Array);
+      expect(settled).not.toHaveBeenCalled(); // still outstanding while chunks remain — and right after the last chunk was handed over
+    }
+    expect(parts.map((p) => p.byteLength)).toEqual([1000, 1000, 500]);
+    expect(Uint8Array.from(parts.flatMap((p) => [...p]))).toEqual(body);
+    expect((await reader.read()).done).toBe(true);
+    expect(settled).toHaveBeenCalledTimes(1);
+  });
+
+  it("is pull-based: nothing is handed over until the consumer reads, and a stalled consumer holds the delivery open", async () => {
+    const settled = vi.fn();
+    const body = bytes(5000);
+    const spy = vi.spyOn(body, "subarray");
+    const stream = deliverBuffered(body, opts(settled));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(spy).not.toHaveBeenCalled();
+    const reader = stream.getReader();
+    await reader.read();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(spy).toHaveBeenCalledTimes(1); // one chunk per read, no read-ahead
+    expect(settled).not.toHaveBeenCalled();
+    await reader.cancel();
+    expect(settled).toHaveBeenCalledTimes(1);
+  });
+
+  it("an empty body completes on the first read", async () => {
+    const settled = vi.fn();
+    const reader = deliverBuffered(
+      new Uint8Array(0),
+      opts(settled),
+    ).getReader();
+    expect((await reader.read()).done).toBe(true);
+    expect(settled).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancel (visitor disconnect) settles once; repeated cancels and later reads change nothing", async () => {
+    const settled = vi.fn();
+    const stream = deliverBuffered(bytes(5000), opts(settled));
+    const reader = stream.getReader();
+    await reader.cancel();
+    await reader.cancel().catch(() => undefined);
+    expect(settled).toHaveBeenCalledTimes(1);
+  });
+
+  it("the request signal aborting settles once and errors the stream (the connection is torn down, not left half-open)", async () => {
+    const settled = vi.fn();
+    const controller = new AbortController();
+    const reader = deliverBuffered(
+      bytes(5000),
+      opts(settled, { signal: controller.signal }),
+    ).getReader();
+    await reader.read();
+    controller.abort();
+    await expect(reader.read()).rejects.toBeInstanceOf(DeliveryDeadlineError);
+    expect(settled).toHaveBeenCalledTimes(1);
+    controller.abort();
+    expect(settled).toHaveBeenCalledTimes(1);
+  });
+
+  it("an already-aborted signal settles immediately", async () => {
+    const settled = vi.fn();
+    const controller = new AbortController();
+    controller.abort();
+    deliverBuffered(bytes(10), opts(settled, { signal: controller.signal }));
+    expect(settled).toHaveBeenCalledTimes(1);
+  });
+
+  it("the deadline cuts off a consumer that never reads (slow-loris) and frees the share exactly once", async () => {
+    vi.useFakeTimers();
+    const settled = vi.fn();
+    const stream = deliverBuffered(
+      bytes(5000),
+      opts(settled, { deadlineMs: 10_000 }),
+    );
+    vi.advanceTimersByTime(9_999);
+    expect(settled).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(2);
+    expect(settled).toHaveBeenCalledTimes(1);
+    await expect(stream.getReader().read()).rejects.toBeInstanceOf(
+      DeliveryDeadlineError,
+    );
+    vi.advanceTimersByTime(60_000);
+    expect(settled).toHaveBeenCalledTimes(1);
+  });
+
+  it("a delivery that completes cancels its timer: no late release, no leaked timer", async () => {
+    vi.useFakeTimers();
+    const settled = vi.fn();
+    const reader = deliverBuffered(
+      new Uint8Array(10),
+      opts(settled, { deadlineMs: 10_000 }),
+    ).getReader();
+    await reader.read();
+    await reader.read();
+    expect(settled).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("a throwing onSettled cannot break the delivery or double-fire", async () => {
+    const settled = vi.fn(() => {
+      throw new Error("boom");
+    });
+    const reader = deliverBuffered(
+      new Uint8Array(10),
+      opts(settled),
+    ).getReader();
+    await reader.read();
+    await expect(reader.read()).resolves.toBeDefined();
+    expect(settled).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("delivery limits", () => {
+  it("defaults and clamps: 120 s, 10 s – 600 s, malformed ⇒ default; per-host byte share ≥ one read, ≤ the budget", () => {
+    expect(mediaProxyLimits({}).deliveryTimeoutMs).toBe(
+      DEFAULT_DELIVERY_TIMEOUT_MS,
+    );
+    expect(DEFAULT_DELIVERY_TIMEOUT_MS).toBe(120_000);
+    expect(
+      mediaProxyLimits({ STOREFRONT_MEDIA_PROXY_DELIVERY_TIMEOUT_MS: "1" })
+        .deliveryTimeoutMs,
+    ).toBe(10_000);
+    expect(
+      mediaProxyLimits({
+        STOREFRONT_MEDIA_PROXY_DELIVERY_TIMEOUT_MS: "99999999",
+      }).deliveryTimeoutMs,
+    ).toBe(600_000);
+    for (const bad of ["abc", "1.5", "", " "]) {
+      expect(
+        mediaProxyLimits({ STOREFRONT_MEDIA_PROXY_DELIVERY_TIMEOUT_MS: bad })
+          .deliveryTimeoutMs,
+        bad,
+      ).toBe(120_000);
+    }
+    for (const B of ["", String(32 * MiB), String(512 * MiB)]) {
+      for (const L of ["", "1", String(32 * MiB)]) {
+        const l = mediaProxyLimits(env({ B, L }));
+        expect(l.maxBytesPerHost, `B=${B} L=${L}`).toBeGreaterThanOrEqual(
+          l.maxBodyBytes * READ_COPY_FACTOR,
+        );
+        expect(l.maxBytesPerHost).toBeLessThanOrEqual(l.maxBufferedBytes);
+      }
+    }
+    expect(mediaProxyLimits({}).maxBytesPerHost).toBe(128 * MiB);
+  });
+
+  it("every request is charged at least a floor, so tiny images cannot be held open in unbounded numbers", () => {
+    expect(MIN_DELIVERY_CHARGE_BYTES).toBe(64 * 1024);
+    expect(DELIVERY_CHUNK_BYTES).toBe(64 * 1024);
+    expect(
+      mediaProxyLimits({}).maxBufferedBytes / MIN_DELIVERY_CHARGE_BYTES,
+    ).toBe(4096); // ≤ 4096 outstanding deliveries at the default budget
   });
 });
