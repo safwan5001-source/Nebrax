@@ -1,0 +1,31 @@
+{
+  "label": "fault-block-put",
+  "generatedAt": "2026-10-17T12:58:45.003Z",
+  "provider": "LOCAL LOOK-ALIKE (not R2)",
+  "endpointHost": "127.0.0.1:8001",
+  "addressingStyle": "path",
+  "objectBytes": 4194304,
+  "ttlSeconds": 3,
+  "runId": "161845f26b83",
+  "cleanedUp": true,
+  "cleanup": {
+    "pass": true,
+    "verified": true,
+    "objects": 3,
+    "remaining": [],
+    "unverified": [],
+    "deleteFailed": [
+      "probe",
+      "other",
+      "empty"
+    ]
+  },
+  "fatal": "test object upload failed: {\"error\":\"aws\",\"code\":\"AccessDenied\",\"status\":403}",
+  "summary": {
+    "required": 0,
+    "requiredPassed": 0,
+    "requiredFailed": [],
+    "info": 0
+  },
+  "results": []
+}

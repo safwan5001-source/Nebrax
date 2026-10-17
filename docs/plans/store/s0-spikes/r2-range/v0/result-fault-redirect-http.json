@@ -1,12 +1,12 @@
 {
   "label": "fault-redirect-http",
-  "generatedAt": "2026-10-17T12:17:41.571Z",
+  "generatedAt": "2026-10-17T12:59:17.589Z",
   "provider": "LOCAL LOOK-ALIKE (not R2)",
   "endpointHost": "127.0.0.1:8001",
   "addressingStyle": "path",
   "objectBytes": 4194304,
   "ttlSeconds": 3,
-  "runId": "5b7ac4a9e71d",
+  "runId": "4766f5dbbbf4",
   "cleanedUp": true,
   "cleanup": {
     "pass": true,
@@ -34,11 +34,11 @@
           "accept-ranges": "bytes",
           "content-length": "4194304",
           "content-type": "video/mp4",
-          "etag": "\"c83be73e3adf7aeef5ede88538f28698\"",
-          "last-modified": "Sat, 17 Oct 2026 12:17:35 GMT",
+          "etag": "\"d80a5401b664adeb91e8122a6835dd49\"",
+          "last-modified": "Sat, 17 Oct 2026 12:59:10 GMT",
           "server": "S3 Server",
-          "x-amz-id-2": "19024edf5847bb9388ae",
-          "x-amz-request-id": "19024edf5847bb9388ae"
+          "x-amz-id-2": "0581a7a0014db3fe81d9",
+          "x-amz-request-id": "0581a7a0014db3fe81d9"
         },
         "bodyLen": 4194304
       }
@@ -56,11 +56,11 @@
           "content-length": "100",
           "content-range": "bytes 100-199/4194304",
           "content-type": "video/mp4",
-          "etag": "\"c83be73e3adf7aeef5ede88538f28698\"",
-          "last-modified": "Sat, 17 Oct 2026 12:17:35 GMT",
+          "etag": "\"d80a5401b664adeb91e8122a6835dd49\"",
+          "last-modified": "Sat, 17 Oct 2026 12:59:10 GMT",
           "server": "S3 Server",
-          "x-amz-id-2": "fb1434c6ae4ea962e4d8",
-          "x-amz-request-id": "fb1434c6ae4ea962e4d8"
+          "x-amz-id-2": "395701775242909482aa",
+          "x-amz-request-id": "395701775242909482aa"
         },
         "bodyLen": 100
       }
@@ -78,11 +78,11 @@
           "content-length": "1",
           "content-range": "bytes 0-0/4194304",
           "content-type": "video/mp4",
-          "etag": "\"c83be73e3adf7aeef5ede88538f28698\"",
-          "last-modified": "Sat, 17 Oct 2026 12:17:35 GMT",
+          "etag": "\"d80a5401b664adeb91e8122a6835dd49\"",
+          "last-modified": "Sat, 17 Oct 2026 12:59:10 GMT",
           "server": "S3 Server",
-          "x-amz-id-2": "e67b600a4d40acad33eb",
-          "x-amz-request-id": "e67b600a4d40acad33eb"
+          "x-amz-id-2": "38ac726903458524573d",
+          "x-amz-request-id": "38ac726903458524573d"
         },
         "bodyLen": 1
       }
@@ -100,11 +100,11 @@
           "content-length": "2",
           "content-range": "bytes 0-1/4194304",
           "content-type": "video/mp4",
-          "etag": "\"c83be73e3adf7aeef5ede88538f28698\"",
-          "last-modified": "Sat, 17 Oct 2026 12:17:35 GMT",
+          "etag": "\"d80a5401b664adeb91e8122a6835dd49\"",
+          "last-modified": "Sat, 17 Oct 2026 12:59:10 GMT",
           "server": "S3 Server",
-          "x-amz-id-2": "5fee819c484493b6c7e1",
-          "x-amz-request-id": "5fee819c484493b6c7e1"
+          "x-amz-id-2": "e2640a29c14cbd4f6877",
+          "x-amz-request-id": "e2640a29c14cbd4f6877"
         },
         "bodyLen": 2
       }
@@ -122,11 +122,11 @@
           "content-length": "500",
           "content-range": "bytes 4193804-4194303/4194304",
           "content-type": "video/mp4",
-          "etag": "\"c83be73e3adf7aeef5ede88538f28698\"",
-          "last-modified": "Sat, 17 Oct 2026 12:17:35 GMT",
+          "etag": "\"d80a5401b664adeb91e8122a6835dd49\"",
+          "last-modified": "Sat, 17 Oct 2026 12:59:10 GMT",
           "server": "S3 Server",
-          "x-amz-id-2": "7b8b9f4eaa45b574a1bc",
-          "x-amz-request-id": "7b8b9f4eaa45b574a1bc"
+          "x-amz-id-2": "471386033d4fb7e4bdca",
+          "x-amz-request-id": "471386033d4fb7e4bdca"
         },
         "bodyLen": 500
       }
@@ -144,11 +144,11 @@
           "content-length": "500",
           "content-range": "bytes 4193804-4194303/4194304",
           "content-type": "video/mp4",
-          "etag": "\"c83be73e3adf7aeef5ede88538f28698\"",
-          "last-modified": "Sat, 17 Oct 2026 12:17:35 GMT",
+          "etag": "\"d80a5401b664adeb91e8122a6835dd49\"",
+          "last-modified": "Sat, 17 Oct 2026 12:59:10 GMT",
           "server": "S3 Server",
-          "x-amz-id-2": "c9d76d5d9249b83e3bef",
-          "x-amz-request-id": "c9d76d5d9249b83e3bef"
+          "x-amz-id-2": "c4b2fe24054388a3aefc",
+          "x-amz-request-id": "c4b2fe24054388a3aefc"
         },
         "bodyLen": 500
       }
@@ -166,11 +166,11 @@
           "content-length": "4194304",
           "content-range": "bytes 0-4194303/4194304",
           "content-type": "video/mp4",
-          "etag": "\"c83be73e3adf7aeef5ede88538f28698\"",
-          "last-modified": "Sat, 17 Oct 2026 12:17:35 GMT",
+          "etag": "\"d80a5401b664adeb91e8122a6835dd49\"",
+          "last-modified": "Sat, 17 Oct 2026 12:59:10 GMT",
           "server": "S3 Server",
-          "x-amz-id-2": "c453b95bb443b791d15a",
-          "x-amz-request-id": "c453b95bb443b791d15a"
+          "x-amz-id-2": "6455ce4dfa42a30e01e8",
+          "x-amz-request-id": "6455ce4dfa42a30e01e8"
         },
         "bodyLen": 4194304
       }
@@ -189,8 +189,8 @@
           "content-length": "201",
           "content-type": "application/xml",
           "server": "S3 Server",
-          "x-amz-id-2": "421d72c351429576f993",
-          "x-amz-request-id": "421d72c351429576f993"
+          "x-amz-id-2": "330e89184446827699a5",
+          "x-amz-request-id": "330e89184446827699a5"
         },
         "bodyLen": 201
       },
@@ -209,8 +209,8 @@
           "content-length": "201",
           "content-type": "application/xml",
           "server": "S3 Server",
-          "x-amz-id-2": "6e0c67503c4992930412",
-          "x-amz-request-id": "6e0c67503c4992930412"
+          "x-amz-id-2": "08a709e33d469c950e99",
+          "x-amz-request-id": "08a709e33d469c950e99"
         },
         "bodyLen": 201
       }
@@ -228,11 +228,11 @@
           "content-length": "1",
           "content-range": "bytes 4194303-4194303/4194304",
           "content-type": "video/mp4",
-          "etag": "\"c83be73e3adf7aeef5ede88538f28698\"",
-          "last-modified": "Sat, 17 Oct 2026 12:17:35 GMT",
+          "etag": "\"d80a5401b664adeb91e8122a6835dd49\"",
+          "last-modified": "Sat, 17 Oct 2026 12:59:10 GMT",
           "server": "S3 Server",
-          "x-amz-id-2": "ddb2b2cab6428b607c52",
-          "x-amz-request-id": "ddb2b2cab6428b607c52"
+          "x-amz-id-2": "6d4702c11f4484386f7a",
+          "x-amz-request-id": "6d4702c11f4484386f7a"
         },
         "bodyLen": 1
       }
@@ -248,11 +248,11 @@
           "accept-ranges": "bytes",
           "content-length": "4194304",
           "content-type": "video/mp4",
-          "etag": "\"c83be73e3adf7aeef5ede88538f28698\"",
-          "last-modified": "Sat, 17 Oct 2026 12:17:35 GMT",
+          "etag": "\"d80a5401b664adeb91e8122a6835dd49\"",
+          "last-modified": "Sat, 17 Oct 2026 12:59:10 GMT",
           "server": "S3 Server",
-          "x-amz-id-2": "6e63ffec8e4fa6a21417",
-          "x-amz-request-id": "6e63ffec8e4fa6a21417"
+          "x-amz-id-2": "9865cd418f4aacba3fcc",
+          "x-amz-request-id": "9865cd418f4aacba3fcc"
         },
         "bodyLen": 0
       }
@@ -279,8 +279,8 @@
           "content-length": "174",
           "content-type": "application/xml",
           "server": "S3 Server",
-          "x-amz-id-2": "f0a286e3634d9721842e",
-          "x-amz-request-id": "f0a286e3634d9721842e"
+          "x-amz-id-2": "68069deb214b8522c378",
+          "x-amz-request-id": "68069deb214b8522c378"
         },
         "bodyLen": 174
       }
@@ -297,8 +297,8 @@
           "content-length": "248",
           "content-type": "application/xml",
           "server": "S3 Server",
-          "x-amz-id-2": "49ec1eb7874598517559",
-          "x-amz-request-id": "49ec1eb7874598517559"
+          "x-amz-id-2": "0335b9d32b4e908035da",
+          "x-amz-request-id": "0335b9d32b4e908035da"
         },
         "bodyLen": 248
       }
@@ -315,8 +315,8 @@
           "content-length": "248",
           "content-type": "application/xml",
           "server": "S3 Server",
-          "x-amz-id-2": "ac4f9570e5409dfd932f",
-          "x-amz-request-id": "ac4f9570e5409dfd932f"
+          "x-amz-id-2": "849b9eea1d44a38c773e",
+          "x-amz-request-id": "849b9eea1d44a38c773e"
         },
         "bodyLen": 248
       }
@@ -333,8 +333,8 @@
           "content-length": "248",
           "content-type": "application/xml",
           "server": "S3 Server",
-          "x-amz-id-2": "3243ec533d419c0eaee8",
-          "x-amz-request-id": "3243ec533d419c0eaee8"
+          "x-amz-id-2": "60210373794cadb262b3",
+          "x-amz-request-id": "60210373794cadb262b3"
         },
         "bodyLen": 248
       }
@@ -351,8 +351,8 @@
           "content-length": "180",
           "content-type": "application/xml",
           "server": "S3 Server",
-          "x-amz-id-2": "6b28595b5b42a7c69c52",
-          "x-amz-request-id": "6b28595b5b42a7c69c52"
+          "x-amz-id-2": "fec9cbedd74b80c64924",
+          "x-amz-request-id": "fec9cbedd74b80c64924"
         },
         "bodyLen": 180
       }
@@ -370,8 +370,8 @@
             "content-length": "248",
             "content-type": "application/xml",
             "server": "S3 Server",
-            "x-amz-id-2": "b7e19a2c73409b386aca",
-            "x-amz-request-id": "b7e19a2c73409b386aca"
+            "x-amz-id-2": "488fc85cca49a4eb95f8",
+            "x-amz-request-id": "488fc85cca49a4eb95f8"
           },
           "bodyLen": 248
         },
@@ -391,8 +391,8 @@
             "content-length": "248",
             "content-type": "application/xml",
             "server": "S3 Server",
-            "x-amz-id-2": "baa3d35a214b8226d31a",
-            "x-amz-request-id": "baa3d35a214b8226d31a"
+            "x-amz-id-2": "2ddd125d8a4088d79fcc",
+            "x-amz-request-id": "2ddd125d8a4088d79fcc"
           },
           "bodyLen": 248
         },
@@ -410,8 +410,8 @@
           "content-length": "248",
           "content-type": "application/xml",
           "server": "S3 Server",
-          "x-amz-id-2": "160294a6b14bab3b522f",
-          "x-amz-request-id": "160294a6b14bab3b522f"
+          "x-amz-id-2": "9cc68a498a41904f6260",
+          "x-amz-request-id": "9cc68a498a41904f6260"
         },
         "bodyLen": 0
       },
@@ -428,11 +428,11 @@
           "accept-ranges": "bytes",
           "content-length": "4194304",
           "content-type": "video/mp4",
-          "etag": "\"c83be73e3adf7aeef5ede88538f28698\"",
-          "last-modified": "Sat, 17 Oct 2026 12:17:35 GMT",
+          "etag": "\"d80a5401b664adeb91e8122a6835dd49\"",
+          "last-modified": "Sat, 17 Oct 2026 12:59:10 GMT",
           "server": "S3 Server",
-          "x-amz-id-2": "950177c6d54c906f8624",
-          "x-amz-request-id": "950177c6d54c906f8624"
+          "x-amz-id-2": "6eedadf86143815f787e",
+          "x-amz-request-id": "6eedadf86143815f787e"
         },
         "bodyLen": 4194304,
         "singleRangeServed": false
@@ -508,11 +508,11 @@
           "content-length": "4194304",
           "content-range": "bytes 0-4194303/4194304",
           "content-type": "video/mp4",
-          "etag": "\"c83be73e3adf7aeef5ede88538f28698\"",
-          "last-modified": "Sat, 17 Oct 2026 12:17:35 GMT",
+          "etag": "\"d80a5401b664adeb91e8122a6835dd49\"",
+          "last-modified": "Sat, 17 Oct 2026 12:59:10 GMT",
           "server": "S3 Server",
-          "x-amz-id-2": "0a3c25a783459af287e6",
-          "x-amz-request-id": "0a3c25a783459af287e6"
+          "x-amz-id-2": "48105e1db8469365c473",
+          "x-amz-request-id": "48105e1db8469365c473"
         },
         "bodyLen": 4194304
       }
@@ -530,11 +530,11 @@
             "content-length": "10",
             "content-range": "bytes 0-9/4194304",
             "content-type": "video/mp4",
-            "etag": "\"c83be73e3adf7aeef5ede88538f28698\"",
-            "last-modified": "Sat, 17 Oct 2026 12:17:35 GMT",
+            "etag": "\"d80a5401b664adeb91e8122a6835dd49\"",
+            "last-modified": "Sat, 17 Oct 2026 12:59:10 GMT",
             "server": "S3 Server",
-            "x-amz-id-2": "4920d4e9c241a220f3e2",
-            "x-amz-request-id": "4920d4e9c241a220f3e2"
+            "x-amz-id-2": "455b5203a04a8ac59994",
+            "x-amz-request-id": "455b5203a04a8ac59994"
           },
           "bodyLen": 10
         },
@@ -545,11 +545,11 @@
             "content-length": "10",
             "content-range": "bytes 0-9/4194304",
             "content-type": "video/mp4",
-            "etag": "\"c83be73e3adf7aeef5ede88538f28698\"",
-            "last-modified": "Sat, 17 Oct 2026 12:17:35 GMT",
+            "etag": "\"d80a5401b664adeb91e8122a6835dd49\"",
+            "last-modified": "Sat, 17 Oct 2026 12:59:10 GMT",
             "server": "S3 Server",
-            "x-amz-id-2": "c72e1b85bb4f9810c02c",
-            "x-amz-request-id": "c72e1b85bb4f9810c02c"
+            "x-amz-id-2": "f734e680b24e9fd53c1b",
+            "x-amz-request-id": "f734e680b24e9fd53c1b"
           },
           "bodyLen": 10
         },
@@ -560,11 +560,11 @@
             "content-length": "10",
             "content-range": "bytes 0-9/4194304",
             "content-type": "video/mp4",
-            "etag": "\"c83be73e3adf7aeef5ede88538f28698\"",
-            "last-modified": "Sat, 17 Oct 2026 12:17:35 GMT",
+            "etag": "\"d80a5401b664adeb91e8122a6835dd49\"",
+            "last-modified": "Sat, 17 Oct 2026 12:59:10 GMT",
             "server": "S3 Server",
-            "x-amz-id-2": "5d0a75f888478cc82176",
-            "x-amz-request-id": "5d0a75f888478cc82176"
+            "x-amz-id-2": "3c28577b6143b124bfbf",
+            "x-amz-request-id": "3c28577b6143b124bfbf"
           },
           "bodyLen": 10
         },
@@ -585,8 +585,8 @@
             "content-length": "228",
             "content-type": "application/xml",
             "server": "S3 Server",
-            "x-amz-id-2": "4960d28fd143bc209f8f",
-            "x-amz-request-id": "4960d28fd143bc209f8f"
+            "x-amz-id-2": "1d3657cb9e459862faf6",
+            "x-amz-request-id": "1d3657cb9e459862faf6"
           },
           "bodyLen": 228
         },
@@ -594,8 +594,8 @@
           "status": 304,
           "headers": {
             "server": "S3 Server",
-            "x-amz-id-2": "a6a4cb167942a2248135",
-            "x-amz-request-id": "a6a4cb167942a2248135"
+            "x-amz-id-2": "22aec247ac498ae72210",
+            "x-amz-request-id": "22aec247ac498ae72210"
           },
           "bodyLen": 0
         }
@@ -613,11 +613,11 @@
           "content-length": "100",
           "content-range": "bytes 0-99/4194304",
           "content-type": "video/mp4",
-          "etag": "\"c83be73e3adf7aeef5ede88538f28698\"",
-          "last-modified": "Sat, 17 Oct 2026 12:17:35 GMT",
+          "etag": "\"d80a5401b664adeb91e8122a6835dd49\"",
+          "last-modified": "Sat, 17 Oct 2026 12:59:10 GMT",
           "server": "S3 Server",
-          "x-amz-id-2": "ddee49d7064ead640c0f",
-          "x-amz-request-id": "ddee49d7064ead640c0f"
+          "x-amz-id-2": "b34a12eda548865c85c4",
+          "x-amz-request-id": "b34a12eda548865c85c4"
         },
         "bodyLen": 100,
         "contentEncoding": null
@@ -654,10 +654,10 @@
             "content-length": "0",
             "content-type": "video/mp4",
             "etag": "\"d41d8cd98f00b204e9800998ecf8427e\"",
-            "last-modified": "Sat, 17 Oct 2026 12:17:35 GMT",
+            "last-modified": "Sat, 17 Oct 2026 12:59:10 GMT",
             "server": "S3 Server",
-            "x-amz-id-2": "8ca73b4fc94aaba18fe3",
-            "x-amz-request-id": "8ca73b4fc94aaba18fe3"
+            "x-amz-id-2": "32f03ba79145b7b489ac",
+            "x-amz-request-id": "32f03ba79145b7b489ac"
           },
           "bodyLen": 0
         },
@@ -668,8 +668,8 @@
             "content-length": "201",
             "content-type": "application/xml",
             "server": "S3 Server",
-            "x-amz-id-2": "b25ce82be248924e5c6e",
-            "x-amz-request-id": "b25ce82be248924e5c6e"
+            "x-amz-id-2": "fe1ae175654f9e26fd59",
+            "x-amz-request-id": "fe1ae175654f9e26fd59"
           },
           "bodyLen": 201
         }
@@ -686,11 +686,11 @@
           "accept-ranges": "bytes",
           "content-length": "4194304",
           "content-type": "video/mp4",
-          "etag": "\"c83be73e3adf7aeef5ede88538f28698\"",
-          "last-modified": "Sat, 17 Oct 2026 12:17:35 GMT",
+          "etag": "\"d80a5401b664adeb91e8122a6835dd49\"",
+          "last-modified": "Sat, 17 Oct 2026 12:59:10 GMT",
           "server": "S3 Server",
-          "x-amz-id-2": "e9a6d2c8f94bb364a0f0",
-          "x-amz-request-id": "e9a6d2c8f94bb364a0f0"
+          "x-amz-id-2": "909cc9e086408c4dfaaf",
+          "x-amz-request-id": "909cc9e086408c4dfaaf"
         },
         "bodyLen": 4194304
       }
@@ -701,8 +701,14 @@
       "description": "Plain http:// to the real https endpoint (record: refused / redirected to https is ACCEPTABLE and does not affect R13) — remote endpoints only",
       "pass": null,
       "observed": {
-        "skipped": "loopback look-alike"
-      }
+        "status": 301,
+        "headers": {
+          "location": "https://127.0.0.1:8001/v0-f3-fault-redirect-http/v0-range-probe/4766f5dbbbf4/probe.bin"
+        },
+        "bodyLen": 0,
+        "redirectsTo": "same-host-https"
+      },
+      "note": "Real endpoints should refuse or redirect plain http; a redirect to https is acceptable and is NOT counted by R13. The proxy refuses any non-https URL before connecting (R19)."
     },
     {
       "id": "R14",
@@ -717,11 +723,11 @@
             "content-length": "10",
             "content-range": "bytes 0-9/4194304",
             "content-type": "video/mp4",
-            "etag": "\"c83be73e3adf7aeef5ede88538f28698\"",
-            "last-modified": "Sat, 17 Oct 2026 12:17:35 GMT",
+            "etag": "\"d80a5401b664adeb91e8122a6835dd49\"",
+            "last-modified": "Sat, 17 Oct 2026 12:59:10 GMT",
             "server": "S3 Server",
-            "x-amz-id-2": "eb835ece8b4097d3b4db",
-            "x-amz-request-id": "eb835ece8b4097d3b4db"
+            "x-amz-id-2": "5fccd7ae8849bde4ec87",
+            "x-amz-request-id": "5fccd7ae8849bde4ec87"
           },
           "bodyLen": 10
         },
@@ -732,8 +738,8 @@
             "content-length": "244",
             "content-type": "application/xml",
             "server": "S3 Server",
-            "x-amz-id-2": "869db9711c46b9595d88",
-            "x-amz-request-id": "869db9711c46b9595d88"
+            "x-amz-id-2": "1acf273cc3409857aee9",
+            "x-amz-request-id": "1acf273cc3409857aee9"
           },
           "bodyLen": 244
         },
@@ -748,7 +754,7 @@
       "observed": {
         "status": 200,
         "startedBeforeExpiry": true,
-        "ranPastTtlMs": 5011,
+        "ranPastTtlMs": 5016,
         "receivedBytes": 4194304,
         "completed": true,
         "error": null,
@@ -766,7 +772,12 @@
         "signedRequests": 42,
         "signed3xx": [],
         "negativeRedirects": 0,
-        "informationalRedirects": []
+        "informationalRedirects": [
+          {
+            "id": "I10",
+            "status": 301
+          }
+        ]
       }
     },
     {
@@ -778,13 +789,13 @@
         "pass": true,
         "judged": 35,
         "distinctEtags": [
-          "\"c83be73e3adf7aeef5ede88538f28698\""
+          "\"d80a5401b664adeb91e8122a6835dd49\""
         ],
         "missing": [],
         "noEtag": [],
         "different": [],
         "weak": [],
-        "putEtag": "c83be73e3adf7aeef5ede88538f28698"
+        "putEtag": "d80a5401b664adeb91e8122a6835dd49"
       }
     },
     {
@@ -803,13 +814,15 @@
           "etag",
           "keep-alive",
           "last-modified",
+          "location",
           "server",
+          "transfer-encoding",
           "x-amz-id-2",
           "x-amz-request-id"
         ],
         "suspiciousNames": [],
         "valueLeaks": [],
-        "responsesScanned": 51
+        "responsesScanned": 52
       }
     },
     {

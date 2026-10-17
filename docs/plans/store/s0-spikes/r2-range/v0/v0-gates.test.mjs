@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 const gates = await import(process.env.V0_GATES ?? './v0-gates.mjs');
-const { sensitiveTokens, scanHeaderValues, scanText, leakGate, redirectGate, etagGate, cleanupGate, classifyLocation } = gates;
+const { sensitiveTokens, scanHeaderValues, scanText, leakGate, redirectGate, etagGate, cleanupGate, classifyLocation, redactText, redactDeep, safeSerialize } = gates;
 
 const KEY_ID = 'AKIAEXAMPLEKEYID0001';
 const SECRET = 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY';
@@ -167,4 +167,80 @@ test('cleanup: a delete call that errored but whose object is confirmed gone is 
   const r = cleanupGate([{ label: 'probe', deleteOk: false, headStatus: 404 }]);
   assert.equal(r.pass, true);
   assert.deepEqual(r.deleteFailed, ['probe']);
+});
+
+// ───────────── redaction (review round 3) — nothing sensitive may reach a serialized result, retained headers and failure cases included ─────────────
+const SIG_ENC = encodeURIComponent(SECRET);
+// what a hostile / misconfigured endpoint can put into the headers the probe RETAINS in its JSON
+const HOSTILE = {
+  etag: `"${SIG}"`,
+  location: URL_,
+  'content-disposition': `attachment; filename="${URL_}"`,
+  'cache-control': `private; ${KEY_ID}`,
+  server: SECRET.toUpperCase(),
+  'x-amz-id-2': SIG_ENC,
+  'www-authenticate': `AWS4-HMAC-SHA256 Credential=SOMEOTHERKEY/20261017/auto/s3/aws4_request, Signature=0123456789abcdef`,
+  'content-type': 'video/mp4?X-Amz-Signature=feedfacefeedface',
+};
+const SENSITIVE = [SIG, KEY_ID, SECRET, SIG_ENC, URL_, 'SOMEOTHERKEY', '0123456789abcdef', 'feedfacefeedface'];
+const retain = (headers) => Object.fromEntries(Object.entries(headers).map(([k, v]) => [k, redactText(v, tokens()).text]));
+const hasAnySensitive = (text) => SENSITIVE.filter((x) => String(text).toLowerCase().includes(x.toLowerCase()));
+
+test('redaction regression: no token survives in ANY retained header value (etag, location, content-disposition, … — not just a name allow-list)', () => {
+  const kept = retain(HOSTILE);
+  assert.deepEqual(hasAnySensitive(JSON.stringify(kept)), []);
+  assert.deepEqual(scanText(JSON.stringify(kept), tokens()), []);
+});
+test('redaction regression: a signature echoed as a "strong" ETag is replaced, not merely flagged (the pre-fix probe wrote it to the report)', () => {
+  const r = redactText(`"${SIG}"`, tokens());
+  assert.ok(!r.text.includes(SIG));
+  assert.ok(/^"<redacted:[a-z-]+>"$/.test(r.text), r.text);
+  assert.ok(r.kinds.includes('signature'));
+});
+test('redaction regression: unknown SigV4 material (a token the probe never requested) is still removed by the generic markers', () => {
+  const r = redactText('AWS4-HMAC-SHA256 Credential=OTHER/20261017/auto/s3/aws4_request, Signature=abc123def456', tokens());
+  assert.ok(!/OTHER|abc123def456/.test(r.text));
+  const q = redactText('https://h/k?X-Amz-Signature=abc123def456&X-Amz-Expires=60', tokens());
+  assert.ok(!q.text.includes('abc123def456'));
+});
+test('redaction: percent-encoded, decoded and upper-/lower-case variants of a credential or signature are all removed', () => {
+  for (const v of [SECRET, SIG_ENC, SECRET.toUpperCase(), SECRET.toLowerCase(), SIG.toUpperCase()]) assert.deepEqual(hasAnySensitive(redactText(`x ${v} y`, tokens()).text), [], v);
+});
+test('redaction: ordinary provider headers are left byte-for-byte unchanged (the report stays useful)', () => {
+  for (const [n, v] of CLEAN) assert.equal(redactText(v, tokens()).text, v, n);
+});
+test('redaction: header NAMES are redacted too (a hostile endpoint can name a header after a token)', () => {
+  const r = redactDeep({ providerHeaderNames: ['etag', SIG, `x-${KEY_ID}`] }, tokens());
+  assert.deepEqual(hasAnySensitive(JSON.stringify(r.value)), []);
+});
+test('redaction (failure case): a fatal error message that embeds the signed URL or a credential is redacted before it is serialised', () => {
+  const report = { label: 'x', fatal: `fetch failed for ${URL_} (key ${KEY_ID}, secret ${SECRET})`, results: [{ id: 'R2', observed: { error: `bad ${SIG}` } }] };
+  const s = safeSerialize(report, tokens());
+  assert.equal(s.clean, true);
+  assert.deepEqual(hasAnySensitive(s.text), []);
+  assert.deepEqual(scanText(s.text, tokens()), []);
+});
+test('redaction: the sweep reports KINDS only — a finding never contains the value it removed', () => {
+  const s = safeSerialize({ a: { b: [SIG, URL_, SECRET] } }, tokens());
+  assert.ok(s.sweepKinds.length > 0);
+  assert.deepEqual(hasAnySensitive(JSON.stringify(s.sweepKinds)), []);
+});
+test('redaction: a clean report passes the sweep untouched (no false positives, no sweep hits)', () => {
+  const s = safeSerialize({ results: CLEAN.map(([n, v]) => ({ n, v })) }, tokens());
+  assert.deepEqual(s.sweepKinds, []);
+  assert.equal(s.clean, true);
+});
+test('redaction FAILS CLOSED: if the serialised text still contains a token after redaction, no text is returned (the caller must not write a file)', () => {
+  // pathological: a credential whose own text appears in the redaction label — the replacement re-creates the token
+  const s = safeSerialize({ v: 'xx redacted yy' }, sensitiveTokens({ secrets: ['redacted'] }));
+  assert.equal(s.clean, false);
+  assert.equal(s.text, null);
+});
+test('redaction: an echoed URL whose access key id was substituted FIRST is no longer matched as a whole — token redaction must come before substitutions', () => {
+  // documents the ordering defect found while verifying round 3 (`location` kept host + path after the credential had been replaced inside it)
+  const mutated = URL_.split(KEY_ID).join('<secret>');
+  const r = redactText(mutated, tokens());
+  assert.ok(r.text.includes('bucket.acct.r2.cloudflarestorage.com'), 'the mutated URL escapes whole-URL redaction (this is why scrub() must not substitute first)');
+  const whole = redactText(URL_, tokens());
+  assert.equal(whole.text, '<redacted:signed-url>');
 });

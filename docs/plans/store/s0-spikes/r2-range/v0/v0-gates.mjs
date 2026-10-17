@@ -133,3 +133,53 @@ export function cleanupGate(entries) {
   const deleteFailed = entries.filter((e) => !e.deleteOk).map((e) => e.label);
   return { pass: remaining.length === 0 && unverified.length === 0, verified: remaining.length === 0 && unverified.length === 0, objects: entries.length, remaining, unverified, deleteFailed };
 }
+
+// ───────────────────────────── redaction (review round 3: nothing sensitive may reach a serialized result) ─────────────────────────────
+// Provider response headers that the probe RETAINS in its JSON (etag, location, content-disposition, …) are provider-controlled strings. A misbehaving or
+// compromised endpoint can echo a signature, a credential or the whole signed URL into any of them, so a retention allow-list of header NAMES is not a
+// redaction. Every retained string — and, as a last line of defence, every string in the finished report — is redacted against the same token set the R18 gate
+// scans for. Findings and labels carry kinds only: a redacted value is replaced by `<redacted:kind>`, never partially masked.
+
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Replaces every occurrence of a known token (case-insensitive, every encoding variant `sensitiveTokens` knows) and of the generic SigV4/presign markers.
+ * @returns {{text: string, kinds: string[]}} kinds of what was removed (no values)
+ */
+export function redactText(text, tokens = []) {
+  let out = String(text ?? ''); const kinds = new Set();
+  // longest first: a whole URL is replaced before the query / signature pieces it contains
+  for (const t of [...tokens].sort((a, b) => b.value.length - a.value.length)) {
+    const re = new RegExp(escapeRe(t.value), 'gi');
+    if (re.test(out)) { kinds.add(t.kind); out = out.replace(new RegExp(escapeRe(t.value), 'gi'), `<redacted:${t.kind}>`); }
+  }
+  if (/aws4-hmac-sha256/i.test(out)) { kinds.add('sigv4-material'); out = out.replace(/aws4-hmac-sha256[^\n]*/gi, '<redacted:sigv4-material>'); }
+  if (/x-amz-(signature|credential|security-token)=/i.test(out)) { kinds.add('signed-url-parameter'); }
+  out = out.replace(/X-Amz-[A-Za-z-]+=[^&\s"']+/gi, 'X-Amz-…=<redacted>');
+  return { text: out, kinds: [...kinds].sort() };
+}
+
+/** Redacts every string value AND every object key of a JSON-able structure. @returns {{value: any, kinds: string[]}} */
+export function redactDeep(value, tokens = []) {
+  const kinds = new Set();
+  const walk = (v) => {
+    if (typeof v === 'string') { const r = redactText(v, tokens); r.kinds.forEach((k) => kinds.add(k)); return r.text; }
+    if (Array.isArray(v)) return v.map(walk);
+    if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [walk(k), walk(x)]));
+    return v;
+  };
+  return { value: walk(value), kinds: [...kinds].sort() };
+}
+
+/**
+ * The only way a result is turned into text for a file or stdout: redact, serialise, then SCAN THE SERIALISED TEXT against the same tokens. If anything is
+ * still there, `text` is null and `clean` false — the caller must not write it. `sweepKinds` = what the sweep had to remove (a non-empty list means an
+ * un-redacted path existed upstream, which is itself a defect to report, by kind only).
+ * @returns {{text: string|null, sweepKinds: string[], clean: boolean}}
+ */
+export function safeSerialize(value, tokens = [], space = 2) {
+  const { value: safe, kinds } = redactDeep(value, tokens);
+  const text = JSON.stringify(safe, null, space);
+  const remaining = scanText(text, tokens);
+  return remaining.length ? { text: null, sweepKinds: [...new Set([...kinds, ...remaining])].sort(), clean: false } : { text, sweepKinds: kinds, clean: true };
+}

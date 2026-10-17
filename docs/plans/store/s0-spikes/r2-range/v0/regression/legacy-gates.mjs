@@ -26,3 +26,8 @@ export function etagGate(log) {                      // R11 before: only the 200
 export function cleanupGate() {                      // cleanup before: reported in the JSON but never part of the exit status
   return { pass: true, verified: true, objects: 0, remaining: [], unverified: [], deleteFailed: [] };
 }
+
+// Round 3 (retained-header redaction). Before the fix the probe's only redaction of a provider header was a `X-Amz-…=` regex, and nothing swept the finished report.
+export const redactText = (text) => ({ text: String(text ?? '').replace(/X-Amz-[A-Za-z-]+=[^&\s"']+/g, 'X-Amz-…=<redacted>'), kinds: [] });
+export const redactDeep = (value) => ({ value, kinds: [] });
+export const safeSerialize = (value, _tokens, space = 2) => ({ text: JSON.stringify(value, null, space), sweepKinds: [], clean: true });

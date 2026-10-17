@@ -25,7 +25,7 @@ test('I9 is a signed, labelled observation that keeps its streaming body (R11 + 
   assert.ok(/track\(await hit\(shortUrl, \{ keepBody: true \}\), 'signed', 'I9'\)/.test(src));
 });
 test('the exit status includes cleanup verification', () => {
-  assert.ok(/process\.exit\(failed\.length \|\| !cleanup\.pass \? 1 : 0\)/.test(src));
+  assert.ok(/process\.exit\([^\n]*failed\.length[^\n]*!cleanup\.pass[^\n]*\? 1 : 0\)/.test(src));
   assert.ok(/cleanupGate\(cleanupEntries\)/.test(src));
 });
 test('cleanup runs in a finally block, so a thrown matrix still attempts it', () => {
@@ -35,4 +35,41 @@ test('cleanup runs in a finally block, so a thrown matrix still attempts it', ()
 test('no credential, signature or URL is ever printed: the probe has no console output that interpolates a url/signature/secret variable', () => {
   const printing = lines.filter((l) => /console\.(log|error|warn)\(/.test(l)).join('\n');
   assert.ok(!/\b(getUrl|headUrl|shortUrl|emptyUrl|tamperSig|secrets|process\.env\.S3_(KEY|SECRET))\b/.test(printing));
+});
+
+// ───────────── review round 3: redaction of everything that is retained or serialised ─────────────
+test('scrub() is token-aware (credentials + every requested URL), not a regex over X-Amz-* alone', () => {
+  const def = lines.find((l) => /^const scrub = /.test(l)) ?? '';
+  assert.ok(/redactText\(/.test(def) && /tokens\(\)|tk/.test(def), def.slice(0, 160));
+});
+test('every retained provider header (value AND name) goes through scrub(): no raw `seen[k] = v`', () => {
+  const assigns = lines.filter((l) => /\bseen\[[^\]]+\]\s*=/.test(l));
+  assert.ok(assigns.length >= 1);
+  for (const l of assigns) assert.ok(/seen\[[^\]]+\]\s*=\s*scrub\(/.test(l), l.trim());
+  const names = lines.filter((l) => /allNames\.push\(/.test(l));
+  assert.ok(names.length >= 1);
+  for (const l of names) assert.ok(/allNames\.push\(scrub\(/.test(l), l.trim());
+});
+test('the result file is written ONLY from safeSerialize() output, after the sweep, and never from a bare JSON.stringify(report)', () => {
+  assert.ok(!/JSON\.stringify\(report/.test(src));
+  const writes = lines.map((l, i) => [l, i]).filter(([l]) => /writeFileSync\(outPath/.test(l));
+  assert.equal(writes.length, 1);
+  assert.ok(/serial\.text/.test(writes[0][0]) && /serial\.clean/.test(writes[0][0]));
+  assert.ok(src.indexOf('safeSerialize(report') > 0 && src.indexOf('safeSerialize(report') < src.indexOf('writeFileSync(outPath'));
+});
+test('a thrown matrix still yields a redacted report and a nonzero exit (failure cases are serialised through the same path)', () => {
+  const t = src.indexOf('try {\n  if (process.env.S3_CREATE_BUCKET'); const c = src.indexOf('} catch (e) {', t); const f = src.indexOf('} finally {', t);
+  assert.ok(t > 0 && c > t && f > c, 'catch between try and finally');
+  assert.ok(/fatal = scrub\(/.test(src.slice(c, f)));
+  assert.ok(/\.\.\.\(fatal \? \{ fatal \} : \{\}\)/.test(src));
+  assert.ok(/process\.exit\([^\n]*fatal[^\n]*serial\.sweepKinds/.test(src));
+});
+test('error text is never printed raw: every console.error in the probe goes through scrub()/fixed text or reports kinds only', () => {
+  const errs = lines.filter((l) => /console\.error\(/.test(l));
+  for (const l of errs) assert.ok(!/\be\.(message|stack)\b|\$\{e\}|\be\)/.test(l.replace(/scrub\([^)]*\)/g, '')), l.trim());
+});
+test('scrub() redacts tokens BEFORE the credential / account substitutions (replacing the access key id first mutates an echoed URL so the whole-URL token stops matching)', () => {
+  const def = lines.find((l) => /^const scrub = /.test(l)) ?? '';
+  const iTok = def.indexOf('redactText('); const iSecret = def.indexOf('secrets');
+  assert.ok(iTok > 0 && iSecret > iTok, def.slice(0, 200));
 });

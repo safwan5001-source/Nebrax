@@ -16,7 +16,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { classifyLocation, cleanupGate, etagGate, leakGate, redirectGate, scanHeaderValues, scanText, sensitiveTokens } from './v0-gates.mjs';
+import { classifyLocation, cleanupGate, etagGate, leakGate, redactText, redirectGate, safeSerialize, scanHeaderValues, scanText, sensitiveTokens } from './v0-gates.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const arg = (n, d) => (process.argv.find((a) => a.startsWith(`--${n}=`)) ?? `--${n}=${d}`).split('=').slice(1).join('=');
@@ -125,7 +125,11 @@ for (const k of ['S3_ENDPOINT', 'S3_KEY', 'S3_SECRET', 'S3_BUCKET']) if (!proces
 const N = Math.round(cfg.sizeMiB * 1048576);
 const secrets = [process.env.S3_KEY, process.env.S3_SECRET].filter(Boolean);
 const accountLike = (() => { try { return new URL(cfg.endpoint).hostname.split('.')[0]; } catch { return ''; } })();
-const scrub = (s) => { let t = String(s); for (const v of secrets) t = t.split(v).join('<secret>'); if (accountLike && !cfg.loopback) t = t.split(accountLike).join('<account>'); return t.replace(/X-Amz-[A-Za-z-]+=[^&\s"']+/g, 'X-Amz-…=<redacted>'); };
+// The ONE redaction path for anything that is kept or printed. Token-aware (credentials, every URL ever requested and its signature / credential / token parts, in every
+// encoding) on top of the generic presign markers; a regex over `X-Amz-*=` alone is not enough (review round 3). `tk` lets hit() compute the token set once per response.
+const scrub = (s, tk = tokens()) => { let t = redactText(String(s), tk).text; for (const v of secrets) t = t.split(v).join('<secret>'); if (accountLike && !cfg.loopback) t = t.split(accountLike).join('<account>'); return t; };
+// ORDER MATTERS: token redaction runs FIRST. Replacing the access key id (a substring of every signed URL's X-Amz-Credential) before it would mutate an echoed URL so that the
+// whole-URL token no longer matched, leaving the host/path and key prefix in the report.
 
 function signer(request) {
   const r = spawnSync('php', [join(here, 'v0-signer.php'), cfg.autoload], { input: JSON.stringify(request), encoding: 'utf8', env: process.env, maxBuffer: 1 << 20 });
@@ -144,17 +148,19 @@ async function hit(url, { method = 'GET', headers = {}, body, read = true, keepB
   sensitiveUrls.add(url); // every URL we ever send (signed, derived or tampered) is something the provider must never echo back
   const h = { 'accept-encoding': 'identity', ...headers };
   const res = await fetch(url, { method, headers: h, redirect: 'manual', body });
+  const tk = tokens();
   const seen = {}; const allNames = []; const rawEntries = [];
-  res.headers.forEach((v, k) => { allNames.push(k); rawEntries.push([k, v]); if (KEEP.includes(k)) seen[k] = scrub(v); });
+  // every retained VALUE and every NAME is redacted against the token set before it can reach `seen` / `headerNames` (and from there the JSON report)
+  res.headers.forEach((v, k) => { allNames.push(scrub(k, tk)); rawEntries.push([k, v]); if (KEEP.includes(k)) seen[k] = scrub(v, tk); });
   let len = 0; let sha = null; let errorCode = null; let bodyLeaks = [];
   if (keepBody) { /* streaming body left untouched for the caller (I9) */ } else if (read && method !== 'HEAD') {
     const hash = createHash('sha256'); const chunks = [];
     for await (const c of res.body ?? []) { len += c.length; hash.update(c); if (len <= 4096) chunks.push(c); }
     sha = hash.digest('hex');
-    if (res.status >= 400) { const text = Buffer.concat(chunks).toString('utf8'); errorCode = (text.match(/<Code>([^<]+)<\/Code>/) ?? [])[1] ?? null; bodyLeaks = scanText(text, tokens()); }
+    if (res.status >= 400) { const text = Buffer.concat(chunks).toString('utf8'); errorCode = scrub((text.match(/<Code>([^<]+)<\/Code>/) ?? [])[1] ?? '', tk) || null; bodyLeaks = scanText(text, tk); }
   } else { await res.body?.cancel().catch(() => undefined); }
   // header VALUES are scanned here, in memory, against the unscrubbed tokens; only {header, kind} survives
-  const valueFindings = scanHeaderValues(rawEntries, tokens());
+  const valueFindings = [...scanHeaderValues(rawEntries, tk), ...scanHeaderValues(rawEntries.map(([k]) => ['<header-name>', k]), tk)];
   return { ...(keepBody ? { res } : {}), status: res.status, headers: seen, headerNames: allNames, valueFindings, bodyLeaks, bodyLen: len, sha, errorCode, locationClass: res.headers.get('location') ? classifyLocation(res.headers.get('location'), new URL(cfg.endpoint).hostname) : null };
 }
 
@@ -180,7 +186,7 @@ const brief = (r) => ({ status: r.status, ...(r.errorCode ? { errorCode: r.error
 
 const tmp = mkdtempSync(join(tmpdir(), 'v0-'));
 let cleanupEntries = [];
-let etag = null; let started = false;
+let etag = null; let started = false; let fatal = null;
 try {
   if (process.env.S3_CREATE_BUCKET === '1') signer({ op: 'create-bucket' });
   writeFileSync(join(tmp, 'probe.bin'), data); writeFileSync(join(tmp, 'other.bin'), randomBytes(1024)); writeFileSync(join(tmp, 'empty.bin'), Buffer.alloc(0));
@@ -319,13 +325,17 @@ try {
   const redirects = redirectGate(redirectLog);
   rec('R13', 'R', PLAN[12][2], redirects.pass, redirects);
   const etagResult = etagGate(etagLog, ['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R10', 'I1']);
-  rec('R11', 'R', PLAN[10][2], etagResult.pass, { ...etagResult, putEtag: etag });
+  rec('R11', 'R', PLAN[10][2], etagResult.pass, { ...etagResult, putEtag: etag == null ? null : scrub(etag) });
   const leaks = leakGate({ headerNames: [...allHeaderNames], valueFindings });
   rec('R18', 'R', PLAN[21][2], leaks.pass, { providerHeaderNames: [...allHeaderNames].sort(), suspiciousNames: leaks.suspiciousNames, valueLeaks: leaks.valueLeaks, responsesScanned: redirectLog.length });
   rec('I14', 'I', PLAN[36][2], null, { bodyLeakKinds: [...bodyLeakKinds].sort() }, 'Informational: some S3 implementations echo the access key id or string-to-sign in error documents. The proxy never forwards upstream bodies (empty uniform failures), so this is a log-hygiene note.');
   const hl = runHostlist();
   rec('R19', 'R', PLAN[22][2], hl.every((r) => r.pass), { cases: hl.length, failed: hl.filter((r) => !r.pass).map((r) => r.name) });
   rec('R20', 'R', PLAN[23][2] && 'Every URL the signer produced passes the host allow-list', producedUrls.every((x) => allowedUpstream(x, { endpoint: cfg.endpoint, bucket: process.env.S3_BUCKET, allowInsecureLoopback: cfg.loopback })), { urls: producedUrls.length });
+} catch (e) {
+  // A thrown matrix still produces a (redacted) report and a nonzero exit; the raw error is never printed — a library error can carry a URL.
+  fatal = scrub(e?.cause?.code ?? e?.message ?? e);
+  console.error(`FATAL: matrix aborted: ${fatal}`);
 } finally {
   // Cleanup is verified, not assumed: delete each disposable object, then require HEAD → 404 for it. Runs even when the matrix threw.
   cleanupEntries = started ? [['probe', KEY], ['other', KEY_B], ['empty', KEY_EMPTY]].map(([label, key]) => {
@@ -343,12 +353,18 @@ const report = {
   label: cfg.label, generatedAt: new Date().toISOString(), provider: cfg.loopback ? 'LOCAL LOOK-ALIKE (not R2)' : 'remote S3 API',
   endpointHost: cfg.loopback ? new URL(cfg.endpoint).host : '<account>.' + new URL(cfg.endpoint).hostname.split('.').slice(1).join('.'),
   addressingStyle: cfg.style, objectBytes: N, ttlSeconds: cfg.ttl, runId: RUN, cleanedUp: cleaned, cleanup,
+  ...(fatal ? { fatal } : {}),
   summary: { required: required.length, requiredPassed: required.length - failed.length, requiredFailed: failed.map((r) => r.id), info: results.filter((r) => r.group === 'I').length },
   results,
 };
+// Last line of defence: the finished report is redacted and the SERIALISED text is scanned again before anything touches the disk. If a sensitive value is still present
+// the file is NOT written (exit 1, kinds only). A non-empty sweep also fails the run: it means a value reached the report without passing scrub() upstream.
+const serial = safeSerialize(report, tokens());
 const outPath = join(here, `result-${cfg.label}.json`);
-writeFileSync(outPath, JSON.stringify(report, null, 2) + '\n');
+if (serial.clean) writeFileSync(outPath, serial.text + '\n');
+else console.error(`REPORT NOT WRITTEN: sensitive material (${serial.sweepKinds.join(', ')}) survived redaction`);
+if (serial.sweepKinds.length) console.error(`REDACTION SWEEP removed [${serial.sweepKinds.join(', ')}] from the report — a value bypassed scrub(); fix the call site`);
 console.log(`label=${cfg.label} provider=${report.provider} style=${cfg.style} size=${cfg.sizeMiB}MiB ttl=${cfg.ttl}s cleanedUp=${cleaned}`);
 for (const r of results) console.log(`${r.id.padEnd(5)} ${r.group === 'R' ? (r.pass ? 'PASS' : 'FAIL') : 'INFO'}  ${r.description.slice(0, 96)}`);
-console.log(`required ${report.summary.requiredPassed}/${report.summary.required}  failed: ${failed.map((r) => r.id).join(', ') || 'none'}  cleanup: ${cleanup.pass ? 'verified' : 'NOT VERIFIED (exit 1)'}\nwrote ${outPath.replace(process.cwd() + '/', '')}`);
-process.exit(failed.length || !cleanup.pass ? 1 : 0);
+console.log(`required ${report.summary.requiredPassed}/${report.summary.required}  failed: ${failed.map((r) => r.id).join(', ') || 'none'}  cleanup: ${cleanup.pass ? 'verified' : 'NOT VERIFIED (exit 1)'}${fatal ? '  FATAL: matrix aborted (exit 1)' : ''}\n${serial.clean ? `wrote ${outPath.replace(process.cwd() + '/', '')}` : 'no result file written'}`);
+process.exit(failed.length || !cleanup.pass || fatal || serial.sweepKinds.length ? 1 : 0);
