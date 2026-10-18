@@ -111,6 +111,8 @@ export interface StorefrontPresentationConfig {
   version: typeof PRESENTATION_CONFIG_VERSION;
   themePreset: ThemePresetId;
   primaryColor: string;
+  /** Independent solid page background; legacy documents fall back to AWJ Modern neutral. */
+  backgroundColor?: string;
   accentColor: string | null;
   fontPreset: FontPresetId;
   density: DensityId;
@@ -254,6 +256,7 @@ export const DEFAULT_PRESENTATION_CONFIG: StorefrontPresentationConfig = {
   version: PRESENTATION_CONFIG_VERSION,
   themePreset: "awj-modern",
   primaryColor: "#12372a",
+  backgroundColor: "#f8f9fa",
   accentColor: null,
   fontPreset: "cairo-geist",
   density: "comfortable",
@@ -557,6 +560,10 @@ export function normalizePresentationConfig(
   const primaryColor = isSafeHexColor(asString(raw.primaryColor))
     ? asString(raw.primaryColor).trim()
     : presetPrimary(themePreset);
+  const backgroundRaw = asString(raw.backgroundColor).trim();
+  const backgroundColor = isSafeHexColor(backgroundRaw)
+    ? backgroundRaw
+    : "#f8f9fa";
   const accentRaw = asString(raw.accentColor).trim();
   const accentColor = isSafeHexColor(accentRaw) ? accentRaw : null;
 
@@ -574,6 +581,7 @@ export function normalizePresentationConfig(
     version: PRESENTATION_CONFIG_VERSION,
     themePreset,
     primaryColor,
+    backgroundColor,
     accentColor,
     fontPreset: inList(
       raw.fontPreset,

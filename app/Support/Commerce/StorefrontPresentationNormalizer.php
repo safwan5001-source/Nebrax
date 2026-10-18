@@ -327,6 +327,7 @@ final class StorefrontPresentationNormalizer
             'version' => self::VERSION,
             'themePreset' => 'awj-modern',
             'primaryColor' => '#12372a',
+            'backgroundColor' => '#f8f9fa',
             'accentColor' => null,
             'fontPreset' => 'cairo-geist',
             'density' => 'comfortable',
@@ -449,6 +450,8 @@ final class StorefrontPresentationNormalizer
         $primaryColor = $this->isSafeHexColor($primaryRaw)
             ? trim($primaryRaw)
             : self::THEME_PRESETS[$themePreset];
+        $backgroundRaw = trim($this->asString($input['backgroundColor'] ?? null));
+        $backgroundColor = $this->isSafeHexColor($backgroundRaw) ? $backgroundRaw : '#f8f9fa';
         $accentRaw = trim($this->asString($input['accentColor'] ?? null));
         $accentColor = $this->isSafeHexColor($accentRaw) ? $accentRaw : null;
 
@@ -468,6 +471,7 @@ final class StorefrontPresentationNormalizer
             'version' => self::VERSION,
             'themePreset' => $themePreset,
             'primaryColor' => $primaryColor,
+            'backgroundColor' => $backgroundColor,
             'accentColor' => $accentColor,
             'fontPreset' => $this->inList($input['fontPreset'] ?? null, self::FONT_PRESETS, 'cairo-geist'),
             'density' => $this->inList($input['density'] ?? null, self::DENSITY_PRESETS, 'comfortable'),

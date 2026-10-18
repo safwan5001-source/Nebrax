@@ -64,6 +64,19 @@ describe("section design publish contrast — shared fixture with the PHP gate (
     expect(text.judged).not.toBeNull();
   });
 
+  it("uses the configured store background for text-only sections", () => {
+    const text = effectiveText(
+      { text: { body: { hex: "#ffffff" } } },
+      { primaryColor: "#12372a", accentColor: null, pageBackground: "#111827", dir: "ltr" },
+      "benefits",
+    );
+    expect(text.judged).not.toBeNull();
+    expect(sectionContrastIssues(
+      { text: { body: { hex: "#ffffff" } } },
+      { primaryColor: "#12372a", accentColor: null, pageBackground: "#111827", dir: "ltr" },
+      "benefits",
+    )).toEqual([]);
+  });
   it("has nothing to judge for a design that sets no colour", () => {
     const text = effectiveText(
       { spacing: { top: "md" } },
