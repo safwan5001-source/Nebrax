@@ -215,7 +215,9 @@ export function presentationCssVars(
 ): Record<string, string> {
   const color = isSafeHexColor(primary) ? primary.trim() : "#12372a";
   const foreground = primaryForeground(color);
-  const pageBackground = isSafeHexColor(background ?? "") ? background!.trim() : "#f8f9fa";
+  const pageBackground = isSafeHexColor(background ?? "")
+    ? background!.trim()
+    : "#f8f9fa";
   // CUST-HV V5d-3 (DEF-2) — the accent role is live only when the merchant set one;
   // otherwise no `--store-accent*` is emitted and every utility that reads it falls
   // back to today's token, so a legacy `accentColor: null` document renders unchanged.

@@ -27,10 +27,12 @@ describe("normalizePresentationConfig", () => {
   it("normalizes the independent store background and keeps legacy documents neutral", () => {
     expect(normalizePresentationConfig({}).backgroundColor).toBe("#f8f9fa");
     expect(
-      normalizePresentationConfig({ backgroundColor: "#112233" }).backgroundColor,
+      normalizePresentationConfig({ backgroundColor: "#112233" })
+        .backgroundColor,
     ).toBe("#112233");
     expect(
-      normalizePresentationConfig({ backgroundColor: "rgb(1,2,3)" }).backgroundColor,
+      normalizePresentationConfig({ backgroundColor: "rgb(1,2,3)" })
+        .backgroundColor,
     ).toBe("#f8f9fa");
   });
   it("accepts awj-market and derives its own default primary color", () => {
