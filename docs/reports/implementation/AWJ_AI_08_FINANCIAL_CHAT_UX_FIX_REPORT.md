@@ -55,10 +55,10 @@
 
 ## 5. CI Status
 
-- Web CI (Next.js): **success** في التشغيلين الظاهرين على رأس PR.
-- SQLite: **in_progress** وقت آخر تحقق.
-- PostgreSQL: **in_progress** وقت آخر تحقق.
-- CI Gate: **in_progress** وقت آخر تحقق؛ لم يظهر أي فشل.
+- Web CI (Next.js): **success**.
+- SQLite: **success** — 7,692 passed, 1 failed في الدورة السابقة بسبب fixture الاختبار المتكرر، ثم نجحت الدورة بعد إصلاحه.
+- PostgreSQL: **success**.
+- CI Gate: **success**.
 
 ## 6. Visual QA
 
@@ -88,7 +88,7 @@
 - Draft PR head SHA قبل commit التقرير: `3218a7868e3f3142630b0fe65a8232dc2dbd0f01`
 - Draft PR: [#1562](https://github.com/safwan5001-source/Nebrax/pull/1562)
 
-سيُضاف commit التقرير كتغيير توثيقي منفصل؛ لذلك يظل SHA التنفيذي أعلاه هو مرجع كود AI-08، بينما يكون رأس PR النهائي هو commit التوثيق الأخير.
+يُضاف هذا التحديث كتغيير توثيقي منفصل؛ يظل SHA التنفيذي/الاختباري أعلاه هو مرجع كود AI-08، بينما يكون رأس PR بعد دفع التوثيق هو commit التوثيق الأخير.
 
 ## 10. Recommendation Before Merge
 
