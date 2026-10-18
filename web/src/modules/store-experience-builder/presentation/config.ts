@@ -114,10 +114,14 @@ export interface PresentationContentPage {
   enabled: boolean;
 }
 
+export const DEFAULT_STORE_BACKGROUND_COLOR = "#f8f9fa";
+
 export interface StorefrontPresentationConfig {
   version: typeof PRESENTATION_CONFIG_VERSION;
   themePreset: ThemePresetId;
   primaryColor: string;
+  /** Independent solid page background; legacy documents fall back to AWJ Modern neutral. */
+  backgroundColor?: string;
   accentColor: string | null;
   fontPreset: FontPresetId;
   density: DensityId;
@@ -256,6 +260,7 @@ export const DEFAULT_PRESENTATION_CONFIG: StorefrontPresentationConfig = {
   version: PRESENTATION_CONFIG_VERSION,
   themePreset: "awj-modern",
   primaryColor: "#12372a",
+  backgroundColor: "#f8f9fa",
   accentColor: null,
   fontPreset: "cairo-geist",
   density: "comfortable",
@@ -537,6 +542,11 @@ export function normalizePresentationConfig(
   const primaryColor = isSafeHexColor(asString(raw.primaryColor))
     ? asString(raw.primaryColor).trim()
     : presetPrimary(themePreset);
+  const hasBackgroundColor = Object.hasOwn(raw, "backgroundColor");
+  const backgroundRaw = asString(raw.backgroundColor).trim();
+  const backgroundColor = isSafeHexColor(backgroundRaw)
+    ? backgroundRaw
+    : DEFAULT_STORE_BACKGROUND_COLOR;
   const accentRaw = asString(raw.accentColor).trim();
   const accentColor = isSafeHexColor(accentRaw) ? accentRaw : null;
 
@@ -554,6 +564,7 @@ export function normalizePresentationConfig(
     version: PRESENTATION_CONFIG_VERSION,
     themePreset,
     primaryColor,
+    ...(hasBackgroundColor ? { backgroundColor } : {}),
     accentColor,
     fontPreset: inList(raw.fontPreset, FONT_PRESETS.map((p) => p.id), "cairo-geist"),
     density: inList(raw.density, DENSITY_PRESETS, "comfortable"),

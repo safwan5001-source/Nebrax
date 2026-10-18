@@ -70,6 +70,7 @@ export function publishedThemeStyle(
       presentation.primaryColor,
       presentation.radius,
       presentation.accentColor,
+      presentation.backgroundColor,
     ),
     // CUST-HV V5e-2a — document-level global tokens (absent ⇒ nothing is added).
     ...(resolveGlobalTokens(presentation, presentation)?.style ?? {}),

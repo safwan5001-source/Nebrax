@@ -352,7 +352,7 @@ export function StorefrontPreviewCanvas({
   // theme wrapper uses (absent ⇒ nothing is added).
   const globalTokens = resolveGlobalTokens(config, config);
   const vars = {
-    ...presentationCssVars(config.primaryColor, config.radius, config.accentColor),
+    ...presentationCssVars(config.primaryColor, config.radius, config.accentColor, config.backgroundColor),
     ...(globalTokens?.style ?? {}),
   } as CSSProperties;
   // The published Header only ties `header.style === "compact"` to two things:
@@ -402,6 +402,7 @@ export function StorefrontPreviewCanvas({
   const designContext: DesignContext = {
     primaryColor: config.primaryColor,
     accentColor: config.accentColor,
+    pageBackground: config.backgroundColor,
     palette: config.palette,
     dir: locale === "ar" ? "rtl" : "ltr",
     mediaBounds: backgroundBounds.lookup,

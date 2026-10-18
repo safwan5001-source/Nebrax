@@ -17,7 +17,7 @@ namespace App\Support\Commerce;
  */
 final class SectionDesignContrast
 {
-    /** لون خلفية الصفحة اليوم (`--store-background`) — ما خلف قسمٍ بلا خلفية. */
+    /** لون خلفية الصفحة الافتراضي (`--store-background`) — ما خلف قسمٍ بلا خلفية. */
     public const PAGE_BACKGROUND = '#f8f9fa';
 
     /** أقسامٌ فاتحة ترسم سطحاً خاصاً بها: أين يقع نصٌّ بلا خلفية في التصميم (توأم `LEGACY_SURFACE_HEX`). */
@@ -185,7 +185,8 @@ final class SectionDesignContrast
         $heading = $explicitHeading ?? $body;
 
         // خلف النص الصريح في قسمٍ بلا خلفية: خلفية الصفحة.
-        $page = ContrastEngine::parseHex(self::LEGACY_SURFACE[$type ?? ''] ?? self::PAGE_BACKGROUND);
+        $pageHex = self::LEGACY_SURFACE[$type ?? ''] ?? (is_string($config['backgroundColor'] ?? null) ? $config['backgroundColor'] : self::PAGE_BACKGROUND);
+        $page = ContrastEngine::parseHex($pageHex) ?? ContrastEngine::parseHex(self::PAGE_BACKGROUND);
         $judged = $background ?? (($explicitBody ?? $explicitHeading ?? $explicitLink) !== null && $page !== null
             ? ContrastEngine::solidInterval($page)
             : null);
@@ -252,6 +253,7 @@ final class SectionDesignContrast
         $config = [
             'primaryColor' => $normalized['primaryColor'] ?? '#12372a',
             'accentColor' => $normalized['accentColor'] ?? null,
+            'backgroundColor' => $normalized['backgroundColor'] ?? self::PAGE_BACKGROUND,
             'palette' => $normalized['palette'] ?? [],
         ];
         $errors = [];

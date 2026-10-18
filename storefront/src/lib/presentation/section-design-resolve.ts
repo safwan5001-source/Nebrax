@@ -41,6 +41,8 @@ import type {
 export interface DesignContext {
   primaryColor: string;
   accentColor: string | null;
+  /** Solid page background used when a section has no own surface. */
+  pageBackground?: string;
   palette?: PresentationPalette;
   /** Page direction: logical gradient directions mirror under RTL. */
   dir: "ltr" | "rtl";
@@ -329,7 +331,9 @@ export function effectiveText(
     background ??
     ((explicitBody ?? explicitHeading ?? explicitLink) !== null
       ? backgroundInterval(
-          (type !== undefined && LEGACY_SURFACE_HEX[type]) || PAGE_BACKGROUND,
+          (type !== undefined && LEGACY_SURFACE_HEX[type]) ||
+            ctx.pageBackground ||
+            PAGE_BACKGROUND,
           null,
         )
       : null);

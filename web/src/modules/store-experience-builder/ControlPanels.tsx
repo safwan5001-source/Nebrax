@@ -6,10 +6,12 @@ import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import {
   canAddSectionType,
+  DEFAULT_STORE_BACKGROUND_COLOR,
   canDuplicateSection,
   canDeleteSection,
   type CONTENT_PAGE_SLUGS,
   contrastRatio,
+  isSafeHexColor,
   DENSITY_PRESETS,
   FONT_PRESETS,
   type FontPresetId,
@@ -485,6 +487,9 @@ function ThemePanel({
   locale?: CustomizerLocale;
 }) {
   const contrast = contrastRatio(config.primaryColor, "#ffffff");
+  const backgroundColor = isSafeHexColor(config.backgroundColor)
+    ? config.backgroundColor
+    : DEFAULT_STORE_BACKGROUND_COLOR;
   // Typing a hex that happens to equal a bundled preset's exact swatch (e.g.
   // Market's #0f766e) is the same *transition* as clicking that preset's
   // button — it must carry the same starting bundle, or the merchant ends up
@@ -563,6 +568,34 @@ function ThemePanel({
             value={config.primaryColor}
             onChange={(event) => applyColor(event.target.value)}
           />
+        </div>
+      </Field>
+      <Field label={t("storeBackground")} hint={t("storeBackgroundHint")}>
+        <div className="flex items-stretch gap-2">
+          <label className="relative size-10 shrink-0 cursor-pointer overflow-hidden border border-neutral-300">
+            <span className="absolute inset-0" style={{ background: backgroundColor }} />
+            <input
+              type="color"
+              aria-label={t("storeBackground")}
+              value={backgroundColor}
+              onChange={(event) => patch({ backgroundColor: event.target.value })}
+              className="absolute inset-0 cursor-pointer opacity-0"
+            />
+          </label>
+          <input
+            aria-label={t("storeBackground")}
+            className={`${inputClass} font-mono uppercase tracking-wide`}
+            value={config.backgroundColor ?? DEFAULT_STORE_BACKGROUND_COLOR}
+            onChange={(event) => patch({ backgroundColor: event.target.value })}
+          />
+          <button
+            type="button"
+            className={btnClass}
+            onClick={() => patch({ backgroundColor: DEFAULT_STORE_BACKGROUND_COLOR })}
+            disabled={backgroundColor === DEFAULT_STORE_BACKGROUND_COLOR}
+          >
+            {t("storeBackgroundReset")}
+          </button>
         </div>
       </Field>
       <div className="space-y-5">
@@ -1541,7 +1574,7 @@ function HomepagePanel({
                 locale={locale}
                 t={t}
                 storeVars={
-                  presentationCssVars(config.primaryColor, config.radius, config.accentColor) as CSSProperties
+                  presentationCssVars(config.primaryColor, config.radius, config.accentColor, config.backgroundColor) as CSSProperties
                 }
                 onChange={(content) =>
                   updateSection(selectedIndex, { ...selected, content })

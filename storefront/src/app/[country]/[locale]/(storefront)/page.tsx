@@ -93,6 +93,7 @@ export default async function HomePage({ params }: HomePageProps) {
     ? {
         primaryColor: presentation.primaryColor,
         accentColor: presentation.accentColor,
+        pageBackground: presentation.backgroundColor,
         palette: presentation.palette,
         dir: localeDirection(locale),
       }
