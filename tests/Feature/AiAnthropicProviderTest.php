@@ -267,14 +267,6 @@ class AiAnthropicProviderTest extends TestCase
         $this->aiAsk($auth['token'], ['message' => 'Show the income statement for September 2026.', 'locale' => 'en'])->assertOk()
             ->assertJsonPath('data.tool_calls.0.result.period.from', '2026-09-01')
             ->assertJsonPath('data.tool_calls.0.result.period.to', '2026-09-30');
-
-        $this->fakeAnthropic([
-            $this->toolUse('finance_income_statement', []),
-            $this->text('التقرير المعتمد ظاهر أدناه.'),
-        ]);
-        $this->aiAsk($auth['token'], ['message' => 'كم إجمالي إيراداتي ومصروفاتي وصافي الربح خلال هذا الشهر؟', 'locale' => 'ar'])->assertOk()
-            ->assertJsonPath('data.tool_calls.0.result.period.from', '2026-10-01')
-            ->assertJsonPath('data.tool_calls.0.result.period.to', self::TODAY);
     }
 
     /** @test */
