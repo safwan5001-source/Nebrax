@@ -55,8 +55,10 @@
 
 ## 5. CI Status
 
-- الحالة عند إعداد هذا التقرير: **Pending — بانتظار تشغيل CI على رأس Draft PR**.
-- سيتم تحديث هذا القسم بعد إنشاء PR وظهور حالات GitHub Actions.
+- Web CI (Next.js): **success** في التشغيلين الظاهرين على رأس PR.
+- SQLite: **in_progress** وقت آخر تحقق.
+- PostgreSQL: **in_progress** وقت آخر تحقق.
+- CI Gate: **in_progress** وقت آخر تحقق؛ لم يظهر أي فشل.
 
 ## 6. Visual QA
 
@@ -82,8 +84,11 @@
 - Base branch: `main`
 - Base SHA: `4d8b02fd6bdd7de0bc89273f5bb4e4c542b00b2f`
 - Head branch: `fix/ai-08-financial-chat-ux`
-- Head SHA: سيتم تحديثه بعد الالتزام والدفع.
-- Draft PR: سيتم تحديث الرابط بعد إنشائه.
+- Implementation commit SHA: `3218a7868e3f3142630b0fe65a8232dc2dbd0f01`
+- Draft PR head SHA قبل commit التقرير: `3218a7868e3f3142630b0fe65a8232dc2dbd0f01`
+- Draft PR: [#1562](https://github.com/safwan5001-source/Nebrax/pull/1562)
+
+سيُضاف commit التقرير كتغيير توثيقي منفصل؛ لذلك يظل SHA التنفيذي أعلاه هو مرجع كود AI-08، بينما يكون رأس PR النهائي هو commit التوثيق الأخير.
 
 ## 10. Recommendation Before Merge
 
