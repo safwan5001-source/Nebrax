@@ -59,15 +59,17 @@ final class AiAnswerGuard
     private static function numbers(string $text): array
     {
         $text = strtr($text, self::DIGITS);
-        preg_match_all('/\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?/u', $text, $m);
-
+        // الإشارة جزء من الهوية المحاسبية: 2,075 و-2,075 ليسا رقماً واحداً.
+        $text = str_replace(['−', '﹣', '－'], '-', $text);
+        preg_match_all('/(?<![\d.])-?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?/u', $text, $m);
         return array_values(array_unique(array_map(static function (string $n): string {
+            $negative = str_starts_with($n, '-');
+            $n = ltrim($n, '-');
             $n = str_replace(',', '', $n);
             if (str_contains($n, '.')) {
                 $n = rtrim(rtrim($n, '0'), '.');
             }
-
-            return $n === '' ? '0' : $n;
+            return ($negative ? '-' : '') . ($n === '' ? '0' : $n);
         }, $m[0])));
     }
 }

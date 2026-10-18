@@ -10,13 +10,16 @@ use PHPUnit\Framework\TestCase;
 /** AI-07 — pure guards around the external model: number grounding, sanitising, name restoration, result digest. */
 class AiAnswerGuardTest extends TestCase
 {
-    private const DIGEST = ['totals' => ['total' => '1150.00', 'b0_30' => '1000.50'], 'period' => ['from' => '2026-10-01', 'to' => '2026-10-20']];
+    private const DIGEST = ['totals' => ['total' => '1150.00', 'b0_30' => '1000.50'], 'period' => ['from' => '2026-10-01', 'to' => '2026-10-20'], 'expense' => '-2075.00'];
 
     /** @return array<string,array{0:string,1:bool}> */
     public static function answers(): array
     {
         return [
             'exact figure' => ['Total outstanding is 1150.00 SAR.', true],
+            'negative accounting figure keeps its sign' => ['Expenses: -2,075.00 SAR.', true],
+            'positive absolute value cannot replace a negative expense' => ['Expenses: 2,075.00 SAR.', false],
+            'arabic negative accounting figure keeps its sign' => ['المصروفات: −٢٬٠٧٥٫٠٠ ريال.', true],
             'thousands separator and dropped zeros' => ['Outstanding: 1,150 SAR and 1000.5 in the first bucket.', true],
             'arabic-indic digits' => ['الإجمالي ١١٥٠٫٠٠ ريال', true],
             'dates and small counts' => ['From 2026-10-01 to 2026-10-20 there are 3 parties over 30 days.', true],
@@ -67,6 +70,23 @@ class AiAnswerGuardTest extends TestCase
     private function row(string $id, string $name, int $total): array
     {
         return ['partner_id' => $id, 'name' => $name, 'b0_30' => $this->money($total), 'b31_60' => $this->money(0), 'b61_90' => $this->money(0), 'b90_plus' => $this->money(0), 'total' => $this->money($total)];
+    }
+
+    public function test_income_digest_preserves_negative_expense_sign(): void
+    {
+        $built = AiToolResultDigest::build([
+            'report' => 'income_statement', 'currency' => 'SAR', 'timezone' => 'Asia/Riyadh',
+            'period' => ['from' => '2026-10-01', 'to' => '2026-10-18'],
+            'totals' => [
+                'total_revenue' => $this->money(4622600),
+                'total_expense' => $this->money(-207500),
+                'net_income' => $this->money(4830100),
+            ],
+            'revenues' => [], 'expenses' => [],
+        ], 3000);
+        $this->assertSame('-2075.00', $built['digest']['totals']['total_expense']);
+        $this->assertTrue(AiAnswerGuard::isGrounded('Expenses are -2,075.00 SAR.', [$built['digest']]));
+        $this->assertFalse(AiAnswerGuard::isGrounded('Expenses are 2,075.00 SAR.', [$built['digest']]));
     }
 
     public function test_digest_drops_identities_and_pseudonymises_parties_largest_first(): void

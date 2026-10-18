@@ -252,6 +252,20 @@ describe('conversation', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 
+  it('renders only the supported bold markdown safely and wraps long assistant text', async () => {
+    api.fetchStatus.mockResolvedValue(makeStatus());
+    api.sendMessage.mockResolvedValue({ ...messageResponse([]), message: { role: 'assistant', content: '**Revenue**: -2,075.00 SAR\nA long unbroken value 12345678901234567890.' } });
+    mount('en');
+    const dialog = await openPanel();
+    const box = await within(dialog).findByRole('textbox');
+    await userEvent.type(box, 'show income');
+    fireEvent.keyDown(box, { key: 'Enter' });
+    await waitFor(() => expect(within(dialog).getByText('Revenue')).toBeTruthy());
+    expect(within(dialog).getByText('Revenue').tagName).toBe('STRONG');
+    expect(within(dialog).queryByText('**Revenue**')).toBeNull();
+    expect(within(dialog).getByText(/12345678901234567890/)).toBeTruthy();
+  });
+
   it('Enter sends, Shift+Enter does not; the counter and limit are enforced', async () => {
     api.fetchStatus.mockResolvedValue(makeStatus());
     api.sendMessage.mockResolvedValue(messageResponse([]));
