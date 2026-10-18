@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo, useState } from "react";
 import {
   canAddSectionType,
@@ -21,6 +22,76 @@ import {
 } from "./messages";
 
 type CategoryFilter = DesignLibraryCategory | "all";
+type PreviewLanguage = "ar" | "en";
+
+const PREVIEW_COPY = {
+  en: {
+    products: [
+      {
+        name: "Woven carryall",
+        price: "SAR 129",
+        image: "/store-design-library/woven-tote.svg",
+      },
+      {
+        name: "Amber serum",
+        price: "SAR 89",
+        image: "/store-design-library/amber-serum.svg",
+      },
+      {
+        name: "Studio mug",
+        price: "SAR 54",
+        image: "/store-design-library/studio-mug.svg",
+      },
+    ],
+    categories: [
+      { name: "Fashion", image: "/store-design-library/woven-tote.svg" },
+      { name: "Beauty", image: "/store-design-library/amber-serum.svg" },
+      { name: "Home", image: "/store-design-library/soft-living.svg" },
+      { name: "Tech", image: "/store-design-library/sand-headphones.svg" },
+    ],
+    promotion: {
+      eyebrow: "SUMMER EDIT",
+      title: "Fresh looks, lighter days",
+      offer: "Up to 30% off",
+      action: "Shop now",
+    },
+    featured: { title: "Editor’s picks", action: "View all" },
+    gallery: { eyebrow: "THE HOME EDIT", title: "Made for slow mornings" },
+  },
+  ar: {
+    products: [
+      {
+        name: "حقيبة منسوجة",
+        price: "129 ر.س",
+        image: "/store-design-library/woven-tote.svg",
+      },
+      {
+        name: "سيروم العنبر",
+        price: "89 ر.س",
+        image: "/store-design-library/amber-serum.svg",
+      },
+      {
+        name: "كوب الاستوديو",
+        price: "54 ر.س",
+        image: "/store-design-library/studio-mug.svg",
+      },
+    ],
+    categories: [
+      { name: "الأزياء", image: "/store-design-library/woven-tote.svg" },
+      { name: "الجمال", image: "/store-design-library/amber-serum.svg" },
+      { name: "المنزل", image: "/store-design-library/soft-living.svg" },
+      { name: "التقنية", image: "/store-design-library/sand-headphones.svg" },
+    ],
+    promotion: {
+      eyebrow: "تشكيلة الصيف",
+      title: "إطلالات جديدة لأيام أخف",
+      offer: "خصم حتى 30٪",
+      action: "تسوّق الآن",
+    },
+    featured: { title: "مختارات المحررين", action: "عرض الكل" },
+    gallery: { eyebrow: "مجموعة المنزل", title: "مصممة لصباح هادئ" },
+  },
+} as const;
 
 function sameValue(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
@@ -192,7 +263,7 @@ export function DesignLibraryPanel({
           {t("designLibraryEmpty")}
         </p>
       ) : (
-        <ul className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-3">
           {variants.map((variant) => {
             const target =
               variant.scope === "section"
@@ -232,7 +303,7 @@ export function DesignLibraryPanel({
                   active ? "border-primary ring-1 ring-primary" : "border-border"
                 }`}
               >
-                <VariantPreview id={variant.id} />
+                <VariantPreview id={variant.id} language={language} />
                 <div className="space-y-3 p-3">
                   <div>
                     <div className="flex items-start justify-between gap-2">
@@ -336,69 +407,193 @@ function FilterChip({
   );
 }
 
-function VariantPreview({ id }: { id: string }) {
-  const shared = "rounded-sm bg-surface/90 shadow-sm";
+function DemoImage({ src, className }: { src: string; className: string }) {
+  return (
+    <Image
+      src={src}
+      alt=""
+      width={320}
+      height={240}
+      sizes="160px"
+      className={className}
+      draggable={false}
+      unoptimized
+    />
+  );
+}
+
+function VariantPreview({
+  id,
+  language,
+}: {
+  id: string;
+  language: PreviewLanguage;
+}) {
+  const copy = PREVIEW_COPY[language];
   return (
     <div
       data-design-variant-preview={id}
-      className="h-28 overflow-hidden bg-gradient-to-br from-primary/15 via-surface-muted to-accent/15 p-3"
+      data-preview-direction={language === "ar" ? "rtl" : "ltr"}
+      dir={language === "ar" ? "rtl" : "ltr"}
+      className="h-40 overflow-hidden border-b border-border bg-surface-muted p-3 text-text"
       aria-hidden="true"
     >
       {id === "product-editorial" ? (
-        <div className="mx-auto grid h-full max-w-[210px] grid-cols-3 gap-2">
-          {[0, 1, 2].map((item) => (
-            <span key={item} className={`${shared} flex flex-col p-1.5`}>
-              <span className="min-h-0 flex-1 rounded-sm bg-primary/20" />
-              <span className="mx-auto mt-1 h-1 w-8 rounded bg-text/30" />
-              <span className="mx-auto mt-1 h-1 w-5 rounded bg-primary/50" />
-            </span>
+        <div
+          data-preview-layout="editorial-products"
+          className="grid h-full grid-cols-3 gap-2"
+        >
+          {copy.products.map((product) => (
+            <article
+              key={product.name}
+              className="min-w-0 overflow-hidden rounded-md border border-border bg-surface shadow-sm"
+            >
+              <DemoImage
+                src={product.image}
+                className="h-[86px] w-full object-cover"
+              />
+              <div className="px-1.5 py-1.5 text-center">
+                <p className="truncate text-[9px] font-semibold leading-3 text-text">
+                  {product.name}
+                </p>
+                <p className="mt-0.5 text-[9px] font-extrabold leading-3 text-primary">
+                  {product.price}
+                </p>
+              </div>
+            </article>
           ))}
         </div>
       ) : id === "categories-orbit" ? (
-        <div className="flex h-full items-center justify-center gap-3">
-          {[0, 1, 2, 3].map((item) => (
-            <span key={item} className="flex flex-col items-center gap-2">
-              <span className="size-11 rounded-full border-4 border-surface bg-primary/25 shadow-sm" />
-              <span className="h-1 w-8 rounded bg-text/30" />
-            </span>
-          ))}
+        <div
+          data-preview-layout="category-circles"
+          className="flex h-full flex-col justify-center rounded-lg border border-border bg-surface px-2 py-3 shadow-sm"
+        >
+          <p className="mb-3 text-center text-[10px] font-bold text-text">
+            {language === "ar" ? "تسوّق حسب التصنيف" : "Shop by category"}
+          </p>
+          <div className="grid grid-cols-4 gap-1.5">
+            {copy.categories.map((category) => (
+              <div key={category.name} className="min-w-0 text-center">
+                <DemoImage
+                  src={category.image}
+                  className="mx-auto aspect-square w-full max-w-12 rounded-full border-2 border-surface object-cover shadow-md ring-1 ring-border"
+                />
+                <p className="mt-2 truncate text-[9px] font-semibold text-text">
+                  {category.name}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       ) : id === "categories-showcase" ? (
-        <div className="grid h-full grid-cols-2 gap-2">
-          {[0, 1, 2, 3].map((item) => (
-            <span key={item} className="relative overflow-hidden rounded-md bg-primary/25">
-              <span className="absolute inset-x-0 bottom-0 h-7 bg-gradient-to-t from-text/50 to-text/0" />
-              <span className="absolute bottom-2 start-2 h-1.5 w-10 rounded bg-surface/90" />
-            </span>
+        <div
+          data-preview-layout="category-showcase"
+          className="grid h-full grid-cols-[1.35fr_1fr] grid-rows-2 gap-2"
+        >
+          {copy.categories.slice(0, 3).map((category, index) => (
+            <div
+              key={category.name}
+              className={`relative min-w-0 overflow-hidden rounded-lg border border-border shadow-sm ${
+                index === 0 ? "row-span-2" : ""
+              }`}
+            >
+              <DemoImage
+                src={category.image}
+                className="h-full w-full object-cover"
+              />
+              <div className="absolute inset-x-0 bottom-0 bg-text/80 px-2 py-1.5 text-surface">
+                <p className="truncate text-[9px] font-bold">
+                  {category.name}
+                </p>
+              </div>
+            </div>
           ))}
         </div>
       ) : id === "banner-split" ? (
-        <div className={`${shared} grid h-full grid-cols-2 overflow-hidden rounded-lg`}>
-          <span className="flex flex-col justify-center gap-2 p-3">
-            <span className="h-2 w-16 rounded bg-text/40" />
-            <span className="h-1.5 w-full rounded bg-text/20" />
-            <span className="h-5 w-14 rounded bg-primary/70" />
-          </span>
-          <span className="bg-primary/25" />
+        <div
+          data-preview-layout="split-promotion"
+          className="grid h-full grid-cols-[1.12fr_.88fr] overflow-hidden rounded-lg border border-border bg-surface shadow-sm"
+        >
+          <div className="flex min-w-0 flex-col items-start justify-center p-3">
+            <span className="rounded-full bg-primary-soft px-2 py-0.5 text-[8px] font-extrabold tracking-wide text-primary">
+              {copy.promotion.eyebrow}
+            </span>
+            <p className="mt-2 max-w-32 text-[13px] font-extrabold leading-4 text-text">
+              {copy.promotion.title}
+            </p>
+            <p className="mt-1 text-[9px] font-semibold text-muted">
+              {copy.promotion.offer}
+            </p>
+            <span className="mt-2 rounded-md bg-primary px-2.5 py-1 text-[9px] font-bold text-primary-foreground">
+              {copy.promotion.action}
+            </span>
+          </div>
+          <DemoImage
+            src="/store-design-library/summer-edit.svg"
+            className="h-full w-full object-cover"
+          />
         </div>
       ) : id === "featured-rail" ? (
-        <div className="flex h-full gap-2 overflow-hidden ps-4">
-          {[0, 1, 2, 3].map((item) => (
-            <span key={item} className={`${shared} flex w-20 shrink-0 flex-col p-1.5`}>
-              <span className="min-h-0 flex-1 rounded-sm bg-primary/20" />
-              <span className="mt-1 h-1 w-10 rounded bg-text/30" />
-              <span className="mt-1 h-1 w-6 rounded bg-primary/50" />
+        <div data-preview-layout="featured-rail" className="h-full">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <p className="text-[11px] font-extrabold text-text underline decoration-primary decoration-2 underline-offset-4">
+              {copy.featured.title}
+            </p>
+            <span className="text-[8px] font-bold text-primary">
+              {copy.featured.action}
             </span>
-          ))}
+          </div>
+          <div className="grid h-[112px] grid-cols-3 gap-2 overflow-hidden">
+            {[copy.products[1], copy.products[2], copy.products[0]].map(
+              (product) => (
+                <article
+                  key={product.name}
+                  className="min-w-0 overflow-hidden rounded-md border border-border bg-surface shadow-sm"
+                >
+                  <DemoImage
+                    src={product.image}
+                    className="h-[72px] w-full object-cover"
+                  />
+                  <div className="px-1.5 py-1">
+                    <p className="truncate text-[8px] font-semibold text-text">
+                      {product.name}
+                    </p>
+                    <p className="mt-0.5 text-[8px] font-extrabold text-primary">
+                      {product.price}
+                    </p>
+                  </div>
+                </article>
+              ),
+            )}
+          </div>
         </div>
       ) : (
-        <div className="flex h-full gap-2 overflow-hidden">
-          {["w-2/3", "w-1/2", "w-2/3"].map((width, item) => (
-            <span
-              key={item}
-              className={`${width} shrink-0 rounded-lg border-4 border-surface bg-primary/20 shadow-sm`}
+        <div
+          data-preview-layout="story-gallery"
+          className="grid h-full grid-cols-[1.55fr_.8fr] grid-rows-2 gap-2"
+        >
+          <div className="relative row-span-2 overflow-hidden rounded-lg border border-border shadow-sm">
+            <DemoImage
+              src="/store-design-library/soft-living.svg"
+              className="h-full w-full object-cover"
             />
-          ))}
+            <div className="absolute inset-x-2 bottom-2 rounded-md bg-surface/90 p-2 shadow-sm">
+              <p className="text-[8px] font-extrabold tracking-wide text-primary">
+                {copy.gallery.eyebrow}
+              </p>
+              <p className="mt-0.5 text-[10px] font-bold leading-3 text-text">
+                {copy.gallery.title}
+              </p>
+            </div>
+          </div>
+          <DemoImage
+            src="/store-design-library/studio-mug.svg"
+            className="h-full min-h-0 w-full rounded-lg border border-border object-cover shadow-sm"
+          />
+          <DemoImage
+            src="/store-design-library/woven-tote.svg"
+            className="h-full min-h-0 w-full rounded-lg border border-border object-cover shadow-sm"
+          />
         </div>
       )}
     </div>
