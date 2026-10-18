@@ -107,6 +107,8 @@ export interface PresentationContentPage {
   enabled: boolean;
 }
 
+export const DEFAULT_STORE_BACKGROUND_COLOR = "#f8f9fa";
+
 export interface StorefrontPresentationConfig {
   version: typeof PRESENTATION_CONFIG_VERSION;
   themePreset: ThemePresetId;
@@ -560,10 +562,11 @@ export function normalizePresentationConfig(
   const primaryColor = isSafeHexColor(asString(raw.primaryColor))
     ? asString(raw.primaryColor).trim()
     : presetPrimary(themePreset);
+  const hasBackgroundColor = Object.hasOwn(raw, "backgroundColor");
   const backgroundRaw = asString(raw.backgroundColor).trim();
   const backgroundColor = isSafeHexColor(backgroundRaw)
     ? backgroundRaw
-    : "#f8f9fa";
+    : DEFAULT_STORE_BACKGROUND_COLOR;
   const accentRaw = asString(raw.accentColor).trim();
   const accentColor = isSafeHexColor(accentRaw) ? accentRaw : null;
 
@@ -581,7 +584,7 @@ export function normalizePresentationConfig(
     version: PRESENTATION_CONFIG_VERSION,
     themePreset,
     primaryColor,
-    backgroundColor,
+    ...(hasBackgroundColor ? { backgroundColor } : {}),
     accentColor,
     fontPreset: inList(
       raw.fontPreset,

@@ -6,6 +6,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import {
   canAddSectionType,
+  DEFAULT_STORE_BACKGROUND_COLOR,
   canDuplicateSection,
   canDeleteSection,
   type CONTENT_PAGE_SLUGS,
@@ -488,7 +489,7 @@ function ThemePanel({
   const contrast = contrastRatio(config.primaryColor, "#ffffff");
   const backgroundColor = isSafeHexColor(config.backgroundColor)
     ? config.backgroundColor
-    : "#f8f9fa";
+    : DEFAULT_STORE_BACKGROUND_COLOR;
   // Typing a hex that happens to equal a bundled preset's exact swatch (e.g.
   // Market's #0f766e) is the same *transition* as clicking that preset's
   // button — it must carry the same starting bundle, or the merchant ends up
@@ -584,14 +585,14 @@ function ThemePanel({
           <input
             aria-label={t("storeBackground")}
             className={`${inputClass} font-mono uppercase tracking-wide`}
-            value={config.backgroundColor ?? "#f8f9fa"}
+            value={config.backgroundColor ?? DEFAULT_STORE_BACKGROUND_COLOR}
             onChange={(event) => patch({ backgroundColor: event.target.value })}
           />
           <button
             type="button"
             className={btnClass}
-            onClick={() => patch({ backgroundColor: "#f8f9fa" })}
-            disabled={backgroundColor === "#f8f9fa"}
+            onClick={() => patch({ backgroundColor: DEFAULT_STORE_BACKGROUND_COLOR })}
+            disabled={backgroundColor === DEFAULT_STORE_BACKGROUND_COLOR}
           >
             {t("storeBackgroundReset")}
           </button>

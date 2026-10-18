@@ -25,7 +25,9 @@ describe("normalizePresentationConfig", () => {
   });
 
   it("normalizes the independent store background and keeps legacy documents neutral", () => {
-    expect(normalizePresentationConfig({}).backgroundColor).toBe("#f8f9fa");
+    expect(normalizePresentationConfig({})).not.toHaveProperty(
+      "backgroundColor",
+    );
     expect(
       normalizePresentationConfig({ backgroundColor: "#112233" })
         .backgroundColor,
