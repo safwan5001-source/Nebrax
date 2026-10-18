@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240" viewBox="0 0 320 240" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="24" y1="12" x2="292" y2="232" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8D8C2"/>
+      <stop offset="1" stop-color="#C96E45"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="132" y1="86" x2="196" y2="205" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A84D25"/>
+      <stop offset="1" stop-color="#5B2516"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="240" rx="24" fill="url(#bg)"/>
+  <circle cx="58" cy="48" r="28" fill="#FFF4E8" fill-opacity=".72"/>
+  <path d="M0 188C75 150 142 168 203 145C246 129 278 101 320 92V240H0V188Z" fill="#F6B993" fill-opacity=".72"/>
+  <ellipse cx="164" cy="207" rx="70" ry="13" fill="#5B2516" fill-opacity=".2"/>
+  <rect x="144" y="51" width="40" height="31" rx="7" fill="#E9C7A0"/>
+  <rect x="153" y="28" width="22" height="28" rx="5" fill="#3A2822"/>
+  <path d="M135 87C135 78.716 141.716 72 150 72H178C186.284 72 193 78.716 193 87V190C193 198.284 186.284 205 178 205H150C141.716 205 135 198.284 135 190V87Z" fill="url(#glass)"/>
+  <rect x="142" y="123" width="44" height="43" rx="4" fill="#F8E8D4"/>
+  <circle cx="164" cy="139" r="8" stroke="#A84D25" stroke-width="2"/>
+  <path d="M153 155H175" stroke="#A84D25" stroke-width="3" stroke-linecap="round"/>
+</svg>

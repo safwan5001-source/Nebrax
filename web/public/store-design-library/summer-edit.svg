@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240" viewBox="0 0 320 240" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="18" y1="18" x2="302" y2="224" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F6D9BC"/>
+      <stop offset="1" stop-color="#D87F67"/>
+    </linearGradient>
+    <linearGradient id="fabric" x1="178" y1="51" x2="239" y2="201" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF7E8"/>
+      <stop offset="1" stop-color="#E6C8A1"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="240" rx="24" fill="url(#bg)"/>
+  <circle cx="54" cy="51" r="30" fill="#FFF4E5" fill-opacity=".68"/>
+  <path d="M0 191C67 163 132 178 193 148C248 121 281 123 320 102V240H0V191Z" fill="#F1B895" fill-opacity=".65"/>
+  <ellipse cx="187" cy="211" rx="100" ry="13" fill="#713C31" fill-opacity=".17"/>
+  <path d="M178 58L211 45L246 69L228 91L224 201H157L153 91L132 70L166 45L178 58Z" fill="url(#fabric)"/>
+  <path d="M166 45C174 65 204 65 211 45" stroke="#D7A978" stroke-width="6"/>
+  <path d="M157 109H225M156 143H225" stroke="#D7A978" stroke-width="5" stroke-opacity=".6"/>
+  <path d="M101 109C101 94 113 82 128 82H144V199H91L101 109Z" fill="#A76345"/>
+  <path d="M104 82C106 64 117 54 130 54C143 54 151 64 153 82" stroke="#713C31" stroke-width="9" stroke-linecap="round"/>
+  <circle cx="117" cy="160" r="7" fill="#F1B895"/>
+</svg>

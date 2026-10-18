@@ -50,6 +50,57 @@ describe("AWJ Store Design Library panel", () => {
     expect(screen.getByText("بطاقات تحريرية")).toBeTruthy();
   });
 
+  it("renders a distinct, content-rich representation for every existing variant", () => {
+    mount();
+    const expectedImages: Record<string, number> = {
+      "product-editorial": 3,
+      "categories-orbit": 4,
+      "categories-showcase": 3,
+      "banner-split": 1,
+      "featured-rail": 3,
+      "gallery-story": 3,
+    };
+
+    const layouts = new Set<string>();
+    for (const [id, imageCount] of Object.entries(expectedImages)) {
+      const preview = document.querySelector(
+        `[data-design-variant-preview="${id}"]`,
+      ) as HTMLElement;
+      const layout = preview.querySelector("[data-preview-layout]");
+      expect(preview.getAttribute("aria-hidden")).toBe("true");
+      expect(layout).toBeTruthy();
+      layouts.add(layout?.getAttribute("data-preview-layout") ?? "");
+      expect(preview.querySelectorAll("img")).toHaveLength(imageCount);
+      preview.querySelectorAll("img").forEach((image) => {
+        expect(image.getAttribute("src")).toContain("/store-design-library/");
+        expect(image.getAttribute("width")).toBe("320");
+        expect(image.getAttribute("height")).toBe("240");
+        expect(image.getAttribute("alt")).toBe("");
+      });
+    }
+
+    expect(layouts.size).toBe(6);
+  });
+
+  it("localizes preview content and sets an explicit LTR or RTL direction", () => {
+    mount();
+    const english = document.querySelector(
+      '[data-design-variant-preview="product-editorial"]',
+    ) as HTMLElement;
+    expect(english.getAttribute("data-preview-direction")).toBe("ltr");
+    expect(english.textContent).toContain("Woven carryall");
+    expect(english.textContent).toContain("SAR 129");
+    cleanup();
+
+    mount(clonePresentationConfig(DEFAULT_PRESENTATION_CONFIG), "ar");
+    const arabic = document.querySelector(
+      '[data-design-variant-preview="product-editorial"]',
+    ) as HTMLElement;
+    expect(arabic.getAttribute("data-preview-direction")).toBe("rtl");
+    expect(arabic.textContent).toContain("حقيبة منسوجة");
+    expect(arabic.textContent).toContain("129 ر.س");
+  });
+
   it("applies a product-card variant without touching commerce or page content", () => {
     const config = clonePresentationConfig(DEFAULT_PRESENTATION_CONFIG);
     const { onChange } = mount(config);
