@@ -17,6 +17,16 @@ import { DocumentSection } from './document-section';
 import { ResultSummary } from './result-summary';
 import { StateNotice } from './state-notice';
 
+
+function AssistantText({ text }: { text: string }) {
+  return <p dir="auto" className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+    {text.split(/(\*\*[^*]+\*\*)/g).map((part, index) => {
+      const bold = part.startsWith('**') && part.endsWith('**') && part.length > 4;
+      return bold ? <strong key={index}>{part.slice(2, -2)}</strong> : <span key={index}>{part}</span>;
+    })}
+  </p>;
+}
+
 function Entry({ entry, onOpenCanvas, onNavigate, runIds, demo, external }: {
   entry: ChatEntry;
   onOpenCanvas: (runId: string) => void;
@@ -50,7 +60,7 @@ function Entry({ entry, onOpenCanvas, onNavigate, runIds, demo, external }: {
             {external ? <Badge tone="muted">{t('external.badge')}</Badge> : null}
           </div>
           <div className="rounded-lg rounded-ss-sm border border-border bg-surface px-3 py-2 text-sm">
-            <p dir="auto" className="whitespace-pre-wrap break-words">{entry.text}</p>
+            <AssistantText text={String(entry.text ?? '')} />
             {demo ? <p className="mt-1.5 border-t border-border pt-1.5 text-xs text-muted">{t('demo.reply')}</p> : null}
             {external ? <p className="mt-1.5 border-t border-border pt-1.5 text-xs text-muted">{t('external.reply')}</p> : null}
             {entry.basedOnDocument ? (
@@ -236,7 +246,7 @@ export function AssistantPanel() {
           </div>
         </header>
 
-        <div ref={logRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3" role="log" aria-live="polite" aria-label={t('panel.title')}>
+        <div ref={logRef} className="min-h-0 min-w-0 flex-1 space-y-3 overflow-x-hidden overflow-y-auto px-4 py-3" role="log" aria-live="polite" aria-label={t('panel.title')}>
           {context.kind === 'document_review' && context.entityId ? (
             <DocumentSection documentId={context.entityId} onNavigate={store.closePanel} />
           ) : null}
@@ -322,7 +332,7 @@ export function AssistantPanel() {
             </Button>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted">
-            <span className={tooLong ? 'text-negative' : undefined}>
+            <span data-keyboard-hint="" className={`[@media(pointer:coarse)]:hidden ${tooLong ? 'text-negative' : ''}`}>
               {tooLong ? t('panel.too_long', { max: MESSAGE_MAX_CHARS }) : t('panel.hint')}
             </span>
             <span dir="ltr" className="num shrink-0">{t('panel.counter', { count: draft.length, max: MESSAGE_MAX_CHARS })}</span>

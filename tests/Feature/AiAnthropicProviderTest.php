@@ -205,7 +205,7 @@ class AiAnthropicProviderTest extends TestCase
         $this->assertGreaterThan(0, $expected['total_revenue']);
 
         $this->fakeAnthropic([
-            $this->toolUse('finance_income_statement', ['from' => '2026-10-01', 'to' => self::TODAY]),
+            $this->toolUse('finance_income_statement', []),
             $this->text("إجمالي الإيرادات من 2026-10-01 إلى 2026-10-20 هو {$revenue} ريال."),
         ]);
 
@@ -254,6 +254,19 @@ class AiAnthropicProviderTest extends TestCase
         $this->assertTrue($completed->meta['grounded']);
         $this->assertTrue($completed->meta['external_ack']);
         $this->assertSame(['anthropic', self::MODEL], [$completed->provider, $completed->model]);
+    }
+
+    /** @test */
+    public function natural_named_months_are_normalized_in_the_tenant_timezone_without_touching_explicit_dates(): void
+    {
+        $auth = $this->externalTenant('ext-natural-months');
+        $this->fakeAnthropic([
+            $this->toolUse('finance_income_statement', []),
+            $this->text('The approved report is shown below.'),
+        ]);
+        $this->aiAsk($auth['token'], ['message' => 'Show the income statement for September 2026.', 'locale' => 'en'])->assertOk()
+            ->assertJsonPath('data.tool_calls.0.result.period.from', '2026-09-01')
+            ->assertJsonPath('data.tool_calls.0.result.period.to', '2026-09-30');
     }
 
     /** @test */
