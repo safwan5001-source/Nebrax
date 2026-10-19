@@ -6,7 +6,7 @@ import {
   announcementBarVisible,
 } from "./AnnouncementPreview";
 import { Eye, Home, LayoutGrid, Search, ShoppingBag, User } from "lucide-react";
-import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { OfficialStoreBadge } from "./OfficialStoreBadge";
 import { ContactDetail, contactDetailText } from "./ContactDetail";
 import { IdentityDetail } from "./IdentityDetail";
@@ -74,6 +74,25 @@ import {
   sanitizeExternalUrl,
 } from "./presentation/urls";
 import { cn } from "@/lib/utils";
+
+/** Signed preview media must fail closed when a URL expires or is revoked. */
+function PreviewMediaImage({
+  src,
+  alt = "",
+  className,
+}: {
+  src: string;
+  alt?: string;
+  className?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [src]);
+  if (failed) return null;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- signed tenant media URL
+    <img src={src} alt={alt} className={className} loading="lazy" decoding="async" onError={() => setFailed(true)} />
+  );
+}
 import { SbcSeal } from "./SbcSeal";
 import {
   customizerMessage,
@@ -1015,8 +1034,7 @@ export function StorefrontPreviewCanvas({
                             )}
                           >
                             {product.thumbnailUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element -- tenant media URL, not a static asset
-                              <img
+                              <PreviewMediaImage
                                 src={product.thumbnailUrl}
                                 alt=""
                                 className="size-full object-cover"
@@ -1410,8 +1428,7 @@ export function StorefrontPreviewCanvas({
                           >
                             <div data-card-image="" className={cn(cardImageHeight, "bg-store-surface-muted")}>
                               {product.thumbnailUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element -- tenant media URL, not a static asset
-                                <img
+                                <PreviewMediaImage
                                   src={product.thumbnailUrl}
                                   alt=""
                                   className="size-full object-cover"
@@ -1516,8 +1533,7 @@ export function StorefrontPreviewCanvas({
                         >
                           <div data-card-image="" className={cn(cardImageHeight, "relative bg-store-surface-muted")}>
                             {offer.product.thumbnailUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element -- tenant media URL, not a static asset
-                              <img
+                              <PreviewMediaImage
                                 src={offer.product.thumbnailUrl}
                                 alt=""
                                 className="size-full object-cover"
@@ -1916,14 +1932,12 @@ function ProductPagePreview({
                 {product.media.length > 0 ? (
                   <div className="grid gap-2">
                     <div className="aspect-square overflow-hidden rounded-store bg-store-surface-muted">
-                      {/* eslint-disable-next-line @next/next/no-img-element -- tenant media URL, not a static asset */}
-                      <img src={product.media[0].url} alt={product.media[0].alt ?? ""} className="size-full object-cover" />
+                      <PreviewMediaImage src={product.media[0].url} alt={product.media[0].alt ?? ""} className="size-full object-cover" />
                     </div>
                     {product.media.length > 1 && (
                       <div className="flex gap-2 overflow-x-auto">
                         {product.media.slice(1, 5).map((m) => (
-                          // eslint-disable-next-line @next/next/no-img-element -- tenant media URL, not a static asset
-                          <img key={m.id} src={m.url} alt={m.alt ?? ""} className="size-14 shrink-0 rounded-store object-cover" />
+                          <PreviewMediaImage key={m.id} src={m.url} alt={m.alt ?? ""} className="size-14 shrink-0 rounded-store object-cover" />
                         ))}
                       </div>
                     )}
@@ -2295,8 +2309,7 @@ function CategoryPagePreview({
                     <div key={product.id} className="overflow-hidden rounded-store bg-store-surface-muted">
                       <div className="aspect-square">
                         {product.thumbnailUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element -- tenant media URL, not a static asset
-                          <img src={product.thumbnailUrl} alt="" className="size-full object-cover" />
+                          <PreviewMediaImage src={product.thumbnailUrl} alt="" className="size-full object-cover" />
                         ) : null}
                       </div>
                       <p

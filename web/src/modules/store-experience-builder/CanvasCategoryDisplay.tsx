@@ -24,7 +24,7 @@ function CanvasTile({ href: _href, children, ...rest }: CategoryDisplayLinkProps
 function CanvasImg({ src, className, sizes }: CategoryDisplayImgProps) {
   // The preview draws the picture exactly as the storefront does, minus `next/image`; the URL is a signed same-origin-API URL.
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt="" className={className} sizes={sizes} loading="lazy" decoding="async" />;
+  return <img src={src} alt="" className={className} sizes={sizes} loading="lazy" decoding="async" onError={(event) => { event.currentTarget.style.display = "none"; }} />;
 }
 
 /**
