@@ -64,6 +64,8 @@ class ApplyImportJobRequest extends FormRequest
             'opening_date' => ['sometimes', 'date_format:Y-m-d'],
             'allow_zero_cost' => ['sometimes', 'boolean'],
             'notes' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'apply_product_images' => ['sometimes', 'boolean'],
+            'approve_existing_media_updates' => ['sometimes', 'boolean'],
         ];
     }
 
@@ -114,6 +116,12 @@ class ApplyImportJobRequest extends FormRequest
         }
         if ($this->has('notes')) {
             $options['notes'] = $this->input('notes');
+        }
+        if ($this->has('apply_product_images')) {
+            $options['apply_product_images'] = $this->boolean('apply_product_images');
+        }
+        if ($this->has('approve_existing_media_updates')) {
+            $options['approve_existing_media_updates'] = $this->boolean('approve_existing_media_updates');
         }
 
         return $options;

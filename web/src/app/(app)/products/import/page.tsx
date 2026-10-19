@@ -61,10 +61,14 @@ export default function ProductImportPage() {
   const locale = useLocale();
   const { success, toast } = useToast();
   const fileInput = useRef<HTMLInputElement | null>(null);
+  const mediaArchiveInput = useRef<HTMLInputElement | null>(null);
   const { setParam } = useImportJobUrlParam();
 
   const [step, setStep] = useState(0);
   const [file, setFile] = useState<File | null>(null);
+  const [mediaArchive, setMediaArchive] = useState<File | null>(null);
+  const [applyProductImages, setApplyProductImages] = useState(false);
+  const [approveExistingMediaUpdates, setApproveExistingMediaUpdates] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [inspection, setInspection] = useState<InspectResult | null>(null);
   const [mapping, setMapping] = useState<ColumnMapping>({});
@@ -107,6 +111,9 @@ export default function ProductImportPage() {
   function reset() {
     setStep(0);
     setFile(null);
+    setMediaArchive(null);
+    setApplyProductImages(false);
+    setApproveExistingMediaUpdates(false);
     setInspection(null);
     setMapping({});
     setPreview(null);
@@ -115,6 +122,7 @@ export default function ProductImportPage() {
     setParam(null);
     engine.reset();
     if (fileInput.current) fileInput.current.value = '';
+    if (mediaArchiveInput.current) mediaArchiveInput.current.value = '';
   }
 
   async function acceptFile(next: File | null) {
@@ -164,7 +172,10 @@ export default function ProductImportPage() {
     try {
       const response = await api<{ data: ImportPreview }>('/products/import/preview', {
         method: 'POST',
-        body: importFormData(file, { mode, blankPolicy, masterDataPolicy, mapping, forDurable: true }),
+        body: importFormData(file, {
+          mode, blankPolicy, masterDataPolicy, mapping, forDurable: true,
+          mediaArchive, approveExistingMediaUpdates,
+        }),
       });
       setPreview(response.data);
       setStep(1);
@@ -184,6 +195,8 @@ export default function ProductImportPage() {
       // ملفٌ استُؤنف بلا نسخةٍ محلية منه لا يملك مطابقةً مُختارة — تُترَك
       // فارغة فيطابق الخادم الأعمدة تلقائياً بالاسم (سلوك V1 الافتراضي نفسه).
       ...(file ? { mapping } : {}),
+      apply_product_images: applyProductImages,
+      approve_existing_media_updates: approveExistingMediaUpdates,
     };
   }
 
@@ -192,7 +205,7 @@ export default function ProductImportPage() {
     setError(null);
     if (!engine.job) {
       if (!file) return; // مستأنفٌ بلا ملف يجب أن يملك تشغيلة أصلاً
-      const job = await engine.upload(file);
+      const job = await engine.upload(file, undefined, mediaArchive);
       if (!job) return;
       await engine.applyLoop(job.id, applyOptionsPayload());
       return;
@@ -353,6 +366,29 @@ export default function ProductImportPage() {
                     ) : null}
                   </div>
                 ) : null}
+
+                <div className="space-y-2 rounded-md border border-border bg-background p-3">
+                  <Label htmlFor="product-images-archive">{t('import_images_archive')}</Label>
+                  <Input
+                    id="product-images-archive"
+                    ref={mediaArchiveInput}
+                    type="file"
+                    accept=".zip,application/zip"
+                    onChange={(event) => {
+                      const next = event.target.files?.[0] ?? null;
+                      if (next && next.size > 50 * 1024 * 1024) {
+                        setError(t('import_images_archive_too_large'));
+                        event.target.value = '';
+                        setMediaArchive(null);
+                        return;
+                      }
+                      setMediaArchive(next);
+                      setApplyProductImages(Boolean(next));
+                      setPreview(null);
+                    }}
+                  />
+                  <p className="text-xs leading-relaxed text-muted">{t('import_images_archive_hint')}</p>
+                </div>
               </CardContent>
             </Card>
 
@@ -543,6 +579,79 @@ export default function ProductImportPage() {
               </p>
             ) : null}
 
+            {preview.media && (
+              preview.media.source_count > 0
+              || preview.media.unmatched_archive.length > 0
+              || preview.media.missing_rows.length > 0
+              || preview.media.error_rows > 0
+              || preview.media.needs_approval_rows > 0
+            ) ? (
+              <div className="space-y-3 rounded-md border border-border bg-background p-3">
+                <p className="text-sm font-medium text-text">
+                  {t('import_images_preview', {
+                    ready: preview.media.ready_rows,
+                    review: preview.media.needs_approval_rows,
+                    errors: preview.media.error_rows,
+                  })}
+                </p>
+                {preview.media.unmatched_archive.length > 0 ? (
+                  <p className="text-xs text-warning">
+                    {t('import_images_unmatched', { count: preview.media.unmatched_archive.length })}
+                  </p>
+                ) : null}
+                {preview.media.missing_rows.length > 0 ? (
+                  <p className="text-xs text-muted">
+                    {t('import_images_missing', { count: preview.media.missing_rows.length })}
+                  </p>
+                ) : null}
+                {preview.media.rows.length > 0 ? (
+                  <div className="max-h-56 space-y-2 overflow-y-auto" aria-label={t('import_images_matches')}>
+                    {preview.media.rows.slice(0, 20).map((row) => (
+                      <div key={row.row} className="rounded border border-border px-2.5 py-2 text-xs">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="num font-medium text-text">{t('import_row')} {row.row}</span>
+                          <Badge tone={row.status === 'ready' ? 'positive' : row.status === 'error' ? 'negative' : 'warning'}>
+                            {row.status}
+                          </Badge>
+                          <span className="text-muted" dir="ltr">{row.sku || row.barcode || '—'}</span>
+                        </div>
+                        {row.sources.length > 0 ? (
+                          <p className="mt-1 break-all text-muted" dir="ltr">
+                            {row.sources.map((source) => `${source.role}: ${source.name}`).join(' · ')}
+                          </p>
+                        ) : null}
+                        {row.messages.length > 0 ? <p className="mt-1 text-negative">{row.messages.join(' · ')}</p> : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                <label className="flex items-start gap-2 text-sm text-text">
+                  <input
+                    type="checkbox"
+                    checked={applyProductImages}
+                    onChange={(event) => setApplyProductImages(event.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-border"
+                  />
+                  <span>{t('import_images_apply_confirm')}</span>
+                </label>
+                {preview.media.needs_approval_rows > 0 ? (
+                  <label className="flex items-start gap-2 text-sm text-warning">
+                    <input
+                      type="checkbox"
+                      checked={approveExistingMediaUpdates}
+                      onChange={(event) => {
+                        setApproveExistingMediaUpdates(event.target.checked);
+                        setPreview(null);
+                        setStep(0);
+                      }}
+                      className="mt-0.5 h-4 w-4 rounded border-border"
+                    />
+                    <span>{t('import_images_existing_confirm')}</span>
+                  </label>
+                ) : null}
+              </div>
+            ) : null}
+
             {preview.total_rows === 0 ? (
               <p className="text-sm text-muted">{t('import_no_rows')}</p>
             ) : (
@@ -564,7 +673,10 @@ export default function ProductImportPage() {
                 </Button>
               }
               primary={
-                <Button disabled={!canApplyPreview} onClick={() => void confirmAndApply()}>
+                <Button
+                  disabled={!canApplyPreview || Boolean(applyProductImages && preview.media && (preview.media.error_rows > 0 || preview.media.needs_approval_rows > 0))}
+                  onClick={() => void confirmAndApply()}
+                >
                   <Upload className="h-4 w-4" strokeWidth={1.7} />
                   {t('import_apply')}
                 </Button>

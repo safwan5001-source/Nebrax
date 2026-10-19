@@ -38,6 +38,7 @@ export interface ImportJob {
   extension: string;
   byte_size: number;
   content_sha256: string;
+  media_archive: { original_filename: string; byte_size: number; content_sha256: string } | null;
   row_count: number | null;
   column_count: number | null;
   processed_rows: number;
@@ -57,11 +58,13 @@ export type ApplyOptions = Record<string, string | number | boolean | Record<num
 export async function createImportJob(
   domain: ImportJobDomain,
   file: File,
-  idempotencyKey?: string
+  idempotencyKey?: string,
+  mediaArchive?: File | null
 ): Promise<ImportJob> {
   const form = new FormData();
   form.append('domain', domain);
   form.append('file', file);
+  if (mediaArchive) form.append('media_archive', mediaArchive);
   if (idempotencyKey) form.append('idempotency_key', idempotencyKey);
 
   const response = await api<{ data: ImportJob }>('/import-jobs', { method: 'POST', body: form });

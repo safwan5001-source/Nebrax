@@ -48,7 +48,10 @@ class ImportJobService
     /** الأعمدة لم تتغيّر لأي مجال — سقفٌ واحد (٢٠٠) يبقى كافياً وموحَّداً. */
     private const MAX_COLUMNS = ProductImportService::MAX_COLUMNS;
 
-    public function __construct(private readonly ImportJobFileStorage $storage) {}
+    public function __construct(
+        private readonly ImportJobFileStorage $storage,
+        private readonly ProductImageArchiveService $imageArchives,
+    ) {}
 
     /**
      * إنشاءٌ آمنٌ تحت التزامن: القيد الفريد `(tenant_id, idempotency_key)` في
@@ -57,23 +60,50 @@ class ImportJobService
      * بالقيد فيُنظِّف ملفه اليتيم ويعيد تشغيلة الفائز — بعد التحقق من تطابق
      * الطلب (المجال + بصمة SHA-256)، لا إعادة سجلٍّ لا يخصّه أبداً.
      */
-    public function create(UploadedFile $file, string $domain, ?string $idempotencyKey, ?string $userId): ImportJob
+    public function create(
+        UploadedFile $file,
+        string $domain,
+        ?string $idempotencyKey,
+        ?string $userId,
+        ?UploadedFile $mediaArchive = null,
+    ): ImportJob
     {
         $idempotencyKey = $idempotencyKey !== null && trim($idempotencyKey) !== '' ? trim($idempotencyKey) : null;
         $sha256 = hash_file('sha256', $file->getRealPath());
         if ($sha256 === false) {
             throw new RuntimeException('تعذّر حساب بصمة الملف.');
         }
+        $archiveSha256 = null;
+        if ($mediaArchive !== null) {
+            if ($domain !== ImportJobDomain::PRODUCT_CATALOG) {
+                throw new RuntimeException('أرشيف صور المنتجات متاح لاستيراد كتالوج المنتجات فقط.');
+            }
+            // فحصٌ كامل قبل التخزين: بنية ZIP، المسارات، التشفير، الأحجام،
+            // نسبة الضغط، ثم MIME/محتوى كل صورة لا امتدادها وحده.
+            $this->imageArchives->manifest($mediaArchive);
+            $archiveSha256 = hash_file('sha256', $mediaArchive->getRealPath());
+            if ($archiveSha256 === false) {
+                throw new RuntimeException('تعذّر حساب بصمة أرشيف الصور.');
+            }
+        }
 
         if ($idempotencyKey !== null) {
             $existing = ImportJob::query()->where('idempotency_key', $idempotencyKey)->first();
             if ($existing) {
-                return $this->assertSameRequestOrFail($existing, $domain, $sha256);
+                return $this->assertSameRequestOrFail($existing, $domain, $sha256, $archiveSha256);
             }
         }
 
         $id = (string) Str::uuid();
         $stored = $this->storage->store((string) app(TenantContext::class)->id(), $id, $file, $sha256);
+        try {
+            $storedArchive = $mediaArchive === null
+                ? null
+                : $this->storage->storeMediaArchive((string) app(TenantContext::class)->id(), $id, $mediaArchive);
+        } catch (Throwable $exception) {
+            $this->storage->delete($stored['path']);
+            throw $exception;
+        }
 
         try {
             // معاملة صريحة: عند تعارض القيد الفريد، يجب أن تعود القاعدة إلى
@@ -93,6 +123,11 @@ class ImportJobService
                 'storage_disk' => $stored['disk'],
                 'storage_path' => $stored['path'],
                 'content_sha256' => $sha256,
+                'media_archive_original_filename' => $mediaArchive?->getClientOriginalName(),
+                'media_archive_mime_type' => $storedArchive['mime_type'] ?? null,
+                'media_archive_byte_size' => $storedArchive['byte_size'] ?? null,
+                'media_archive_storage_path' => $storedArchive['path'] ?? null,
+                'media_archive_content_sha256' => $archiveSha256,
                 'created_by' => $userId,
                 'purge_after' => now()->addDays((int) config('imports.retention_days', 14)),
             ]));
@@ -101,6 +136,9 @@ class ImportJobService
             // بين فحصنا المسبق وإدراجنا. الملف الذي خزّناه للتوّ يتيمٌ الآن —
             // يُحذف فوراً؛ لا نسخة ثانية تبقى بلا سجل يشير إليها.
             $this->storage->delete($stored['path']);
+            if ($storedArchive !== null) {
+                $this->storage->delete($storedArchive['path']);
+            }
 
             if ($idempotencyKey === null) {
                 // لا قيد فريد يمكن أن يصطدم به مفتاحٌ غائب أصلاً — دفاعي فقط.
@@ -112,7 +150,7 @@ class ImportJobService
                 throw $e;
             }
 
-            return $this->assertSameRequestOrFail($existing, $domain, $sha256);
+            return $this->assertSameRequestOrFail($existing, $domain, $sha256, $archiveSha256);
         }
 
         return $this->inspect($job);
@@ -125,9 +163,13 @@ class ImportJobService
      * آخر) يُرفض صراحةً (422 عبر `ApiController::domain()`)؛ لا يُعاد أبداً
      * سجلٌّ لا يخصّ هذا الطلب تحت ستار «نفس المفتاح».
      */
-    private function assertSameRequestOrFail(ImportJob $existing, string $domain, string $sha256): ImportJob
+    private function assertSameRequestOrFail(ImportJob $existing, string $domain, string $sha256, ?string $archiveSha256): ImportJob
     {
-        if ($existing->domain !== $domain || $existing->content_sha256 !== $sha256) {
+        if (
+            $existing->domain !== $domain
+            || $existing->content_sha256 !== $sha256
+            || $existing->media_archive_content_sha256 !== $archiveSha256
+        ) {
             throw new RuntimeException(
                 'مفتاح idempotency هذا مستخدَم بالفعل لملف أو مجال مختلف. استخدم مفتاحاً جديداً لهذا الطلب.'
             );
@@ -166,9 +208,13 @@ class ImportJobService
             return $job;
         } catch (Throwable $e) {
             $this->storage->delete($job->storage_path);
+            if ($job->media_archive_storage_path !== null) {
+                $this->storage->delete($job->media_archive_storage_path);
+            }
             $job->update([
                 'status' => ImportJobStatus::FAILED,
                 'storage_path' => null,
+                'media_archive_storage_path' => null,
                 'error_message' => $e->getMessage(),
             ]);
 
@@ -312,7 +358,11 @@ class ImportJobService
             $frozenOptions = $firstChunk ? $options : (array) ($locked->apply_options ?? []);
 
             $tmpPath = $this->materializeLocalCopy((string) $locked->storage_path);
+            $archiveTmpPath = null;
             try {
+                if ($locked->media_archive_storage_path !== null) {
+                    $archiveTmpPath = $this->materializeLocalCopy((string) $locked->media_archive_storage_path);
+                }
                 if ($firstChunk) {
                     $fill = [
                         'status' => ImportJobStatus::PROCESSING,
@@ -341,7 +391,7 @@ class ImportJobService
                 );
 
                 try {
-                    $chunk = $this->runChunk($locked, $tmpPath, $frozenOptions, $offset, $batchSize, $userId, $costAuthorized);
+                    $chunk = $this->runChunk($locked, $tmpPath, $archiveTmpPath, $frozenOptions, $offset, $batchSize, $userId, $costAuthorized);
                 } catch (Throwable $e) {
                     $locked->forceFill([
                         'status' => ImportJobStatus::FAILED,
@@ -367,6 +417,9 @@ class ImportJobService
                 if (is_file($tmpPath)) {
                     @unlink($tmpPath);
                 }
+                if ($archiveTmpPath !== null && is_file($archiveTmpPath)) {
+                    @unlink($archiveTmpPath);
+                }
             }
         });
 
@@ -386,12 +439,12 @@ class ImportJobService
      * @param  array<string, mixed>  $options
      * @return array{processed_in_chunk: int, result: array<string, mixed>}
      */
-    private function runChunk(ImportJob $job, string $tmpPath, array $options, int $offset, int $batchSize, ?string $userId, bool $costAuthorized): array
+    private function runChunk(ImportJob $job, string $tmpPath, ?string $archiveTmpPath, array $options, int $offset, int $batchSize, ?string $userId, bool $costAuthorized): array
     {
         $file = new UploadedFile($tmpPath, (string) $job->original_filename, $job->mime_type, null, true);
 
         return match ($job->domain) {
-            ImportJobDomain::PRODUCT_CATALOG => $this->runProductCatalogChunk($file, $options, $offset, $batchSize, $userId, $costAuthorized),
+            ImportJobDomain::PRODUCT_CATALOG => $this->runProductCatalogChunk($file, $archiveTmpPath, $job, $options, $offset, $batchSize, $userId, $costAuthorized),
             ImportJobDomain::PRODUCT_WORKBOOK => $this->runProductWorkbookChunk($file, $options, (int) $job->row_count, $userId, $costAuthorized),
             ImportJobDomain::INVENTORY_OPENING => $this->runInventoryOpeningChunk($file, $options, (int) $job->row_count, $userId),
             default => throw new RuntimeException('لا يوجد محرّك ترحيل مجزّأ لهذا المجال بعد.'),
@@ -399,14 +452,44 @@ class ImportJobService
     }
 
     /** @param array<string, mixed> $options @return array{processed_in_chunk: int, result: array<string, mixed>} */
-    private function runProductCatalogChunk(UploadedFile $file, array $options, int $offset, int $batchSize, ?string $userId, bool $costAuthorized): array
+    private function runProductCatalogChunk(UploadedFile $file, ?string $archiveTmpPath, ImportJob $job, array $options, int $offset, int $batchSize, ?string $userId, bool $costAuthorized): array
     {
         $chunkOptions = array_merge($options, [
             'batch_offset' => $offset,
             'batch_size' => $batchSize,
         ]);
 
+        $archive = $archiveTmpPath === null ? null : new UploadedFile(
+            $archiveTmpPath,
+            (string) $job->media_archive_original_filename,
+            $job->media_archive_mime_type,
+            null,
+            true,
+        );
+        $approveExisting = (bool) ($chunkOptions['approve_existing_media_updates'] ?? false);
+        $media = app(ProductImportMediaService::class)->preview(
+            $file,
+            $chunkOptions,
+            $archive,
+            ProductImportService::DURABLE_MAX_ROWS,
+            $approveExisting,
+        );
+        if (($chunkOptions['apply_product_images'] ?? false) && ($media['error_rows'] > 0 || $media['needs_approval_rows'] > 0)) {
+            throw new RuntimeException('معاينة صور المنتجات تحتوي أخطاء أو تحديثات قائمة لم تُعتمد صراحةً.');
+        }
+
         $result = app(ProductImportService::class)->apply($file, $chunkOptions, $userId, $costAuthorized, ProductImportService::DURABLE_MAX_ROWS);
+        $result['media'] = ($chunkOptions['apply_product_images'] ?? false) && $userId !== null
+            ? app(ProductImportMediaService::class)->apply(
+                $file,
+                $chunkOptions,
+                $result['results'],
+                $archive,
+                $userId,
+                ProductImportService::DURABLE_MAX_ROWS,
+                $approveExisting,
+            )
+            : $media;
 
         return [
             'processed_in_chunk' => $result['created'] + $result['updated'] + $result['skipped'],
@@ -514,10 +597,14 @@ class ImportJobService
         if ($job->storage_path !== null) {
             $this->storage->delete($job->storage_path);
         }
+        if ($job->media_archive_storage_path !== null) {
+            $this->storage->delete($job->media_archive_storage_path);
+        }
 
         $job->update([
             'status' => ImportJobStatus::CANCELLED,
             'storage_path' => null,
+            'media_archive_storage_path' => null,
             'cancelled_by' => $userId,
             'cancelled_at' => now(),
         ]);

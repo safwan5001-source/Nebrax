@@ -78,12 +78,12 @@ export function useImportJobEngine(domain: ImportJobDomain) {
     }
   }, [setJob]);
 
-  const upload = useCallback(async (file: File, idempotencyKey?: string) => {
+  const upload = useCallback(async (file: File, idempotencyKey?: string, mediaArchive?: File | null) => {
     if (inFlight.current) return;
     inFlight.current = true;
     setState({ job: null, busy: 'uploading', error: null, networkUncertain: false });
     try {
-      const job = await createImportJob(domain, file, idempotencyKey);
+      const job = await createImportJob(domain, file, idempotencyKey, mediaArchive);
       setJob(job);
       return job;
     } catch (err) {

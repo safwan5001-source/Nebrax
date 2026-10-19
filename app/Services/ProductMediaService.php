@@ -10,6 +10,7 @@ use App\Services\DocumentCenter\DocumentStorageService;
 use Aws\Exception\AwsException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -38,6 +39,7 @@ class ProductMediaService
         private readonly DocumentStorageService $documentStorage,
         private readonly R2StorageService $r2,
         private readonly ProductMediaDerivativeService $derivatives,
+        private readonly ProductImageInspector $inspector,
     ) {}
 
     /** AWJ-R2-4A: يبقى false افتراضياً — تراجعٌ فوريٌّ بمتغيّر بيئة بلا نشر كود. */
@@ -97,17 +99,32 @@ class ProductMediaService
             throw new RuntimeException('الحد الأقصى للوسائط في هذا النطاق هو '.self::MAX_PER_SCOPE.' صور. احذف صورة قبل الرفع.');
         }
 
+        // افحص الدفعة كاملة قبل أول كتابة تخزين: ملف ثانٍ خبيث أو مكرر لا
+        // يترك الصورة الأولى محفوظة وحدها في معرض جزئي.
+        $inspectedFiles = [];
+        $seenHashes = [];
+        foreach (array_values($files) as $file) {
+            $inspected = $this->inspector->inspect($file);
+            if (isset($seenHashes[$inspected->sha256])
+                || ProductMedia::query()->where('product_id', $product->id)->where('content_sha256', $inspected->sha256)->exists()) {
+                throw new RuntimeException('هذه الصورة مرفقة بالمنتج بالفعل.');
+            }
+            $seenHashes[$inspected->sha256] = true;
+            $inspectedFiles[] = [$file, $inspected];
+        }
+
         $start = (int) ($countQuery()->max('sort_order') ?? -1) + 1;
         $created = [];
 
-        foreach (array_values($files) as $offset => $file) {
-            $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: 'bin');
+        foreach ($inspectedFiles as $offset => [$file, $inspected]) {
+            $extension = $inspected->extension;
             $filename = Str::uuid().".{$extension}";
             $media = new ProductMedia(array_merge([
                 'product_id' => $product->id,
                 'original_name' => $file->getClientOriginalName(),
-                'mime_type' => $file->getMimeType(),
-                'size' => $file->getSize(),
+                'mime_type' => $inspected->mimeType,
+                'size' => $inspected->size,
+                'content_sha256' => $inspected->sha256,
                 'sort_order' => $start + $offset,
                 'uploaded_by' => $uploadedBy,
             ], $scope));
@@ -141,6 +158,9 @@ class ProductMediaService
                     report($cleanupException);
                 }
 
+                if ($exception instanceof UniqueConstraintViolationException) {
+                    throw new RuntimeException('هذه الصورة مرفقة بالمنتج بالفعل.', previous: $exception);
+                }
                 throw $exception;
             }
             $created[] = $media;

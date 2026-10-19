@@ -17,6 +17,11 @@ class ImportJobResource extends JsonResource
             'extension' => $this->extension,
             'byte_size' => (int) $this->byte_size,
             'content_sha256' => $this->content_sha256,
+            'media_archive' => $this->media_archive_original_filename === null ? null : [
+                'original_filename' => $this->media_archive_original_filename,
+                'byte_size' => (int) $this->media_archive_byte_size,
+                'content_sha256' => $this->media_archive_content_sha256,
+            ],
             'row_count' => $this->row_count === null ? null : (int) $this->row_count,
             'column_count' => $this->column_count === null ? null : (int) $this->column_count,
             'processed_rows' => (int) $this->processed_rows,

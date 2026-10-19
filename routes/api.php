@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\FiscalYearController;
 use App\Http\Controllers\Api\AccountRoutingController;
 use App\Http\Controllers\Api\AccountSettingsController;
 use App\Http\Controllers\Api\AppointmentController;
+use App\Http\Controllers\Api\AiActionController;
 use App\Http\Controllers\Api\AssetController;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuthController;
@@ -421,6 +422,17 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
             ->middleware([$perm('ai.consent.manage'), 'throttle:20,1']);
         Route::post('ai-assistant/tools/run', [AiAssistantController::class, 'runTool'])
             ->middleware([$perm('ai.assistant.use'), 'throttle:30,1']);
+
+        // AI-ACTIONS-01: persisted/versioned drafts only. There is deliberately
+        // no approve/execute/repair endpoint in this foundation slice.
+        Route::post('ai-actions', [AiActionController::class, 'store'])
+            ->middleware([$perm('ai.actions.use'), EnforceUserIdempotency::class, 'throttle:20,1']);
+        Route::get('ai-actions/{action}', [AiActionController::class, 'show'])
+            ->middleware([$perm('ai.actions.use'), 'throttle:60,1']);
+        Route::post('ai-actions/{action}/versions', [AiActionController::class, 'storeVersion'])
+            ->middleware([$perm('ai.actions.use'), EnforceUserIdempotency::class, 'throttle:30,1']);
+        Route::post('ai-actions/{action}/cancel', [AiActionController::class, 'cancel'])
+            ->middleware([$perm('ai.actions.use'), EnforceUserIdempotency::class, 'throttle:20,1']);
 
         // مركز المستندات — PR-2: استقبال يدوي خاص فقط، بلا OCR أو Queue أو إنشاء معاملات.
         Route::post('document-batches', [DocumentIntakeController::class, 'storeBatch'])

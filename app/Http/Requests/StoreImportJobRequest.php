@@ -28,6 +28,11 @@ class StoreImportJobRequest extends FormRequest
                 }
             }],
             'domain' => ['required', Rule::in(ImportJobDomain::values())],
+            'media_archive' => ['sometimes', 'nullable', 'file', 'mimes:zip', 'max:51200', function ($attribute, $value, $fail) {
+                if ((string) $this->input('domain') !== ImportJobDomain::PRODUCT_CATALOG) {
+                    $fail('أرشيف صور المنتجات متاح لاستيراد كتالوج المنتجات فقط.');
+                }
+            }],
             'idempotency_key' => ['sometimes', 'nullable', 'string', 'max:191'],
         ];
     }
@@ -40,6 +45,8 @@ class StoreImportJobRequest extends FormRequest
             'file.max' => 'حجم ملف الاستيراد يجب ألا يتجاوز 5 ميغابايت.',
             'domain.required' => 'حدّد مجال الاستيراد.',
             'domain.in' => 'مجال الاستيراد غير مدعوم.',
+            'media_archive.mimes' => 'أرشيف الصور يجب أن يكون ملف ZIP صالحاً.',
+            'media_archive.max' => 'حجم أرشيف الصور يجب ألا يتجاوز 50 ميغابايت.',
         ];
     }
 }

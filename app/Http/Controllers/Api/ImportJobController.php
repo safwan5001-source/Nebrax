@@ -53,6 +53,7 @@ class ImportJobController extends ApiController
             (string) $request->input('domain'),
             $request->input('idempotency_key'),
             $request->user()?->id,
+            $request->file('media_archive'),
         ));
 
         // `wasRecentlyCreated` هي علامة Eloquent الجاهزة (تُضبط `true` وحصراً
