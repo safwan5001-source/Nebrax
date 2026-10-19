@@ -187,6 +187,11 @@ describe('web presentation contract', () => {
     expect(vars).not.toHaveProperty('--store-font-arabic');
   });
 
+  it('keeps the editor background token aligned with the published presentation contract', () => {
+    const vars = presentationCssVars('#12372a', 'subtle', null, '#f4b6c2');
+    expect(vars['--store-background']).toBe('#f4b6c2');
+  });
+
   it('CUST-H3-3: pageContainerPaddingClass maps density deterministically, matching the Published resolver (public-rhythm.ts)', () => {
     expect(pageContainerPaddingClass('comfortable')).toBe('py-5 md:py-6');
     expect(pageContainerPaddingClass('compact')).toBe('py-3');

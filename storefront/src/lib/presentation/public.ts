@@ -72,6 +72,10 @@ export function publishedThemeStyle(
       presentation.accentColor,
       presentation.backgroundColor,
     ),
+    // `--store-background` is declared on this descendant wrapper, while the
+    // document/body fallback is resolved above it. Paint the wrapper directly
+    // so the published page cannot remain on the root neutral background.
+    backgroundColor: "var(--store-background)",
     // CUST-HV V5e-2a — document-level global tokens (absent ⇒ nothing is added).
     ...(resolveGlobalTokens(presentation, presentation)?.style ?? {}),
     // CUST-HV V7b — header colour custom properties (absent ⇒ nothing is added).
