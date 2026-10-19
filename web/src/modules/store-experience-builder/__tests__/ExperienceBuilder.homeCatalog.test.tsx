@@ -10,7 +10,7 @@
  * tenant/storefront-scoped workspace data renders instead, and the
  * loading/empty/error/stale-response contract the task requires holds.
  */
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const listMock = vi.fn();
@@ -214,6 +214,33 @@ describe('ExperienceBuilder — CUST-H4-3 real Home catalog preview', () => {
       'store-1',
       expect.objectContaining({ rootOnly: true, page: 2, perPage: 50 }),
     );
+  });
+
+  it('exposes a retry for a failed global category request when the Home section is unavailable', async () => {
+    showMock.mockResolvedValue({
+      ok: true,
+      data: versionDetail({
+        config: {
+          ...DEFAULT_PRESENTATION_CONFIG,
+          homepage: {
+            ...DEFAULT_PRESENTATION_CONFIG.homepage,
+            sections: DEFAULT_PRESENTATION_CONFIG.homepage.sections.map((section) =>
+              section.type === 'categories' ? { ...section, visible: false } : section,
+            ),
+          },
+        },
+      }),
+    });
+    listCategoriesMock
+      .mockResolvedValueOnce({ ok: false, reason: 'error', message: 'temporary failure' })
+      .mockResolvedValueOnce({ ok: true, data: [categoryRow({ name: 'بعد إعادة المحاولة' })], hasMore: false });
+
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    const retry = await screen.findByRole('button', { name: 'إعادة المحاولة' });
+    expect(document.querySelector('[data-home-categories-global-error]')).not.toBeNull();
+    fireEvent.click(retry);
+    await waitFor(() => expect(document.body.textContent).toContain('بعد إعادة المحاولة'));
+    expect(listCategoriesMock).toHaveBeenCalledTimes(2);
   });
 
   it('AWJ-STORE-CAT-DESIGN-01: asks for colour + picture, and a chosen display previews the merchant\'s real category pictures', async () => {

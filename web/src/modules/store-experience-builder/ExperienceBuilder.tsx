@@ -1277,6 +1277,17 @@ export function ExperienceBuilder({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storefrontId, busy, homeCategoriesState]);
 
+  useEffect(() => {
+    // Signed category image URLs expire after 20 minutes. Refresh the
+    // catalogue before that window closes, even when Home is not the current
+    // page, so a later navigation never starts with stale media references.
+    if (!storefrontId || homeCategoriesState !== "ready") return;
+    const timer = window.setTimeout(() => {
+      setHomeCategoriesState("idle");
+    }, 18 * 60 * 1000);
+    return () => window.clearTimeout(timer);
+  }, [storefrontId, homeCategoriesState]);
+
   function handleRetryHomeCategories() {
     void loadHomeCategories();
   }
@@ -3578,6 +3589,22 @@ export function ExperienceBuilder({
               // `Dropdown` component or `StorefrontPreviewCanvas`.
               className="relative z-0 h-full min-h-0 overflow-y-auto overscroll-contain p-3 md:overflow-y-scroll md:p-5 xl:p-8"
             >
+              {homeCategoriesState === "error" && (
+                <div
+                  data-home-categories-global-error=""
+                  role="alert"
+                  className="mx-auto mb-3 flex max-w-5xl items-center justify-between gap-3 rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-sm text-text"
+                >
+                  <span>{t("homeCategoriesLoadFailed")}</span>
+                  <button
+                    type="button"
+                    onClick={handleRetryHomeCategories}
+                    className="min-h-10 rounded-md border border-border px-3 font-medium hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                  >
+                    {t("retry")}
+                  </button>
+                </div>
+              )}
               <div
                 data-preview-frame=""
                 className="mx-auto overflow-hidden border border-neutral-300 bg-white"
