@@ -100,7 +100,13 @@ class VatSemanticRoutingTest extends TestCase
         $entry = JournalEntry::with('lines.account')->where('source_type', $sourceType)->where('source_id', $sourceId)->sole();
         $this->assertSame((int) $entry->lines->sum('debit'), (int) $entry->lines->sum('credit'), 'قيد غير متوازن');
 
-        return $entry->lines->mapWithKeys(fn (JournalLine $l) => [$l->account->code => [(int) $l->debit, (int) $l->credit]])->all();
+        // لا يوجد ترتيب تعاقدي لسطور القيد: علاقة `JournalEntry::lines()` لا
+        // تفرض `orderBy`، والمحاسبة هنا تتحقق من الحساب والمدين/الدائن لا من
+        // ترتيب الاسترجاع بين SQLite وPostgreSQL.
+        return $entry->lines
+            ->mapWithKeys(fn (JournalLine $l) => [$l->account->code => [(int) $l->debit, (int) $l->credit]])
+            ->sortKeys()
+            ->all();
     }
 
     // ───────────────────────────── المصروفات ─────────────────────────────
