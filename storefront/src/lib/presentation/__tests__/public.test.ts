@@ -92,6 +92,16 @@ describe("published presentation runtime helpers", () => {
     ).toBe("#12372a");
   });
 
+  it("paints the published wrapper from the same background token as the preview", () => {
+    const style = publishedThemeStyle({
+      ...DEFAULT_PRESENTATION_CONFIG,
+      backgroundColor: "#f4b6c2",
+    });
+
+    expect(style?.["--store-background"]).toBe("#f4b6c2");
+    expect(style?.backgroundColor).toBe("var(--store-background)");
+  });
+
   it("CUST-H3-2-FIX-1: sets fontFamily directly on the same style object as the color vars, so the wrapper that consumes it actually owns it", () => {
     // `(storefront)/layout.tsx` applies this entire object as one inline
     // `style` on its theme wrapper div. A CSS custom property (like
