@@ -27,6 +27,7 @@ import {
 import { publishedFooterGroups } from "@/lib/presentation/public-footer";
 import { publishedMainNav } from "@/lib/presentation/public-navigation";
 import { publishedLogoMedia } from "@/lib/presentation/resolved-media";
+import { resolveStorefrontBackgroundStyle } from "@/lib/presentation/storefront-background-render";
 import {
   isSafeAppStoreUrl,
   isSafePlayStoreUrl,
@@ -186,6 +187,9 @@ export default async function StorefrontLayout({
     footerMessages("shop"),
   );
   const themeStyle = publishedThemeStyle(presentation);
+  const backgroundStyle = presentation
+    ? resolveStorefrontBackgroundStyle(presentation, locale === "ar" ? "rtl" : "ltr")
+    : undefined;
   const themeAttrs = publishedThemeAttrs(presentation);
   const compact = presentation ? headerIsCompact(presentation.header) : false;
   const logoUrl = publishedLogoUrl(presentation, compact);
@@ -366,7 +370,7 @@ export default async function StorefrontLayout({
       data-published-theme=""
       {...themeAttrs}
       className="flex min-h-screen flex-1 flex-col"
-      style={themeStyle}
+      style={{ ...themeStyle, ...backgroundStyle }}
     >
       {chrome}
     </div>

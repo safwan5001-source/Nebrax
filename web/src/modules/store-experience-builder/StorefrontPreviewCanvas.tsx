@@ -27,6 +27,7 @@ import { CanvasFooter } from "./CanvasFooter";
 import { CanvasNavItem, canvasNavItems } from "./CanvasNav";
 import { mainMenu } from "./presentation/navigation";
 import type { PresentationHomeSection } from "./presentation/config";
+import { resolveStorefrontBackgroundStyle } from "./presentation/storefront-background-render";
 import { canDeleteSection, canDuplicateSection } from "./presentation/section-capabilities";
 import { sectionIsAuthored } from "./presentation/section-ops";
 import { overlayMarker, resolveHeaderOverlay } from "./presentation/header-overlay";
@@ -353,6 +354,7 @@ export function StorefrontPreviewCanvas({
   const globalTokens = resolveGlobalTokens(config, config);
   const vars = {
     ...presentationCssVars(config.primaryColor, config.radius, config.accentColor, config.backgroundColor),
+    ...resolveStorefrontBackgroundStyle(config, locale === "ar" ? "rtl" : "ltr"),
     ...(globalTokens?.style ?? {}),
   } as CSSProperties;
   // The published Header only ties `header.style === "compact"` to two things:
