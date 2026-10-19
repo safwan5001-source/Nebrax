@@ -27,9 +27,12 @@ class ProductImportMediaSecurityTest extends TestCase
 
     private function png(string $name = 'SKU-1.png'): UploadedFile
     {
-        $bytes = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);
+        return UploadedFile::fake()->createWithContent($name, $this->pngBytes());
+    }
 
-        return UploadedFile::fake()->createWithContent($name, $bytes);
+    private function pngBytes(): string
+    {
+        return base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true) ?: '';
     }
 
     /** @param array<string,string> $entries */
@@ -71,7 +74,7 @@ class ProductImportMediaSecurityTest extends TestCase
     /** @test */
     public function archive_rejects_zip_slip_and_duplicate_basenames(): void
     {
-        $bytes = file_get_contents($this->png()->getRealPath());
+        $bytes = $this->pngBytes();
 
         try {
             app(ProductImageArchiveService::class)->manifest($this->zip(['../SKU-1.png' => $bytes]));
@@ -91,7 +94,7 @@ class ProductImportMediaSecurityTest extends TestCase
     public function durable_job_persists_archive_identity_and_idempotency_includes_its_hash(): void
     {
         $auth = $this->registerTenant();
-        $bytes = file_get_contents($this->png()->getRealPath());
+        $bytes = $this->pngBytes();
         $csv = fn () => UploadedFile::fake()->createWithContent('catalog.csv', "sku,name,type,sale_price\nSKU-1,منتج,good,100\n");
 
         $first = $this->withToken($auth['token'])->post('/api/import-jobs', [
@@ -137,7 +140,7 @@ class ProductImportMediaSecurityTest extends TestCase
             'document_center.storage.disk' => 'local',
         ]);
         $auth = $this->registerTenant();
-        $bytes = file_get_contents($this->png()->getRealPath());
+        $bytes = $this->pngBytes();
         $createCsv = UploadedFile::fake()->createWithContent(
             'catalog.csv',
             "sku,name,type,sale_price\nIMAGE-SKU-1,منتج بصورة,good,100\n",
