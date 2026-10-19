@@ -26,9 +26,21 @@
         "kind": "media",
         "media": {
           "mediaId": "0B8F6C2E-3D3A-4A53-9C7E-8F1A2B3C4D5E",
-          "url": "https://evil.example/background.jpg"
+          "url": "https://evil.example/background.jpg",
+          "src": "https://evil.example/also-evil.jpg",
+          "path": "/etc/passwd",
+          "style": "background-image: url(https://evil.example)",
+          "animation": "spin",
+          "video": "https://evil.example/video.mp4",
+          "autoplay": true,
+          "nested": { "javascript": "alert(1)" }
         },
-        "overlay": { "alpha": 40 }
+        "overlay": { "alpha": 40, "style": "opacity: 1" },
+        "src": "https://evil.example/top-level.jpg",
+        "path": "/tmp/evil",
+        "style": "color: red",
+        "animation": { "name": "spin" },
+        "video": { "autoplay": true }
       },
       "expected": {
         "kind": "media",

@@ -59,4 +59,31 @@ describe("StorefrontBackground contract (P3-A-02)", () => {
     expect(result).not.toHaveProperty("background");
     expect(result.backgroundColor).toBe("#ffffff");
   });
+
+  it("never carries URL, CSS, animation, or video fields into the canonical media ref", () => {
+    const result = normalizePresentationConfig({
+      background: {
+        kind: "media",
+        media: {
+          mediaId: "0B8F6C2E-3D3A-4A53-9C7E-8F1A2B3C4D5E",
+          url: "https://evil.example/background.jpg",
+          style: "background-image: url(https://evil.example)",
+          animation: "spin",
+          video: "https://evil.example/video.mp4",
+          autoplay: true,
+        },
+      },
+    });
+
+    expect(result.background).toEqual({
+      kind: "media",
+      media: {
+        mediaId: "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+        decorative: true,
+      },
+    });
+    expect(JSON.stringify(result.background)).not.toMatch(
+      /url|style|animation|video|autoplay/i,
+    );
+  });
 });

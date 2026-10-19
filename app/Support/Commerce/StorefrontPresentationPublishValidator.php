@@ -76,7 +76,31 @@ final class StorefrontPresentationPublishValidator
             + ButtonTokensContrast::errors($normalized)
             + HeaderDesignContrast::errors($normalized)
             + FooterDesignContrast::errors($normalized)
+            + $this->globalBackgroundErrors($normalized)
             + $this->mediaErrors($normalized);
+    }
+
+    /**
+     * P3-A-02 temporary safety gate — global media backgrounds stay draft-only
+     * until their dedicated ownership/readiness/contrast gates land in P3-A-03
+     * and P3-A-06. Section media backgrounds deliberately do not use this gate.
+     *
+     * @param  array<string, mixed>  $normalized
+     * @return array<string, array{code: string, message: string}>
+     */
+    private function globalBackgroundErrors(array $normalized): array
+    {
+        $background = $normalized['background'] ?? null;
+        if (! is_array($background) || ($background['kind'] ?? null) !== 'media') {
+            return [];
+        }
+
+        return [
+            'background' => [
+                'code' => 'global_media_background_not_ready',
+                'message' => 'خلفية الوسائط العامة متاحة في المسودة فقط حتى تكتمل بوابات الملكية والجاهزية والتباين.',
+            ],
+        ];
     }
 
     /**
