@@ -383,7 +383,9 @@ export default function ProductImportPage() {
                         return;
                       }
                       setMediaArchive(next);
-                      setApplyProductImages(Boolean(next));
+                      // اختيار الأرشيف ليس موافقةً على الحفظ؛ التأكيد مستقل
+                      // ويظهر بعد المعاينة كي يرى المستخدم المطابقة أولاً.
+                      setApplyProductImages(false);
                       setPreview(null);
                     }}
                   />
