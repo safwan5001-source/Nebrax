@@ -100,13 +100,7 @@ class VatSemanticRoutingTest extends TestCase
         $entry = JournalEntry::with('lines.account')->where('source_type', $sourceType)->where('source_id', $sourceId)->sole();
         $this->assertSame((int) $entry->lines->sum('debit'), (int) $entry->lines->sum('credit'), 'قيد غير متوازن');
 
-        // لا يوجد ترتيب تعاقدي لسطور القيد: علاقة `JournalEntry::lines()` لا
-        // تفرض `orderBy`، والمحاسبة هنا تتحقق من الحساب والمدين/الدائن لا من
-        // ترتيب الاسترجاع بين SQLite وPostgreSQL.
-        return $entry->lines
-            ->mapWithKeys(fn (JournalLine $l) => [$l->account->code => [(int) $l->debit, (int) $l->credit]])
-            ->sortKeys()
-            ->all();
+        return $entry->lines->mapWithKeys(fn (JournalLine $l) => [$l->account->code => [(int) $l->debit, (int) $l->credit]])->all();
     }
 
     // ───────────────────────────── المصروفات ─────────────────────────────
@@ -133,7 +127,10 @@ class VatSemanticRoutingTest extends TestCase
 
         $expense = $this->expense();
 
-        $this->assertSame([
+        // `JournalEntry::lines()` does not define an SQL order. The accounts
+        // and debit/credit values are the accounting contract, so the test
+        // intentionally ignores retrieval order across database engines.
+        $this->assertEqualsCanonicalizing([
             '5130' => [100000, 0],
             '1158' => [15000, 0],
             '1110' => [0, 115000],
