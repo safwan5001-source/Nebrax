@@ -6,8 +6,8 @@
 - Base branch: `main`
 - Base SHA: `aa6a389fb929179652e2a2652192c30913c52de5`
 - Working branch: `feat/ai-actions-01-product-images`
-- Head SHA: recorded in the Draft PR after commit
-- PR: recorded after the Draft PR is opened
+- Implementation head SHA: `ace7950470c69eee572e092cad759210db1f1a51`
+- Draft PR: https://github.com/safwan5001-source/Nebrax/pull/1567
 - Merge/deploy/Railway changes: none
 
 ## Baseline reused
@@ -51,14 +51,14 @@ Repository services reused instead of creating parallel engines:
 - Actual bytes, not client MIME alone, are checked with `finfo`, supported MIME/extension agreement, `getimagesize`, a 5 MiB bound, a 40-megapixel bound, and SHA-256.
 - ZIP handling never calls `extractTo`/`extractAll`; it rejects absolute/traversal paths, drive paths, NUL, encrypted entries, unsupported members, duplicate basenames, excessive entry/count/uncompressed size, zero-size anomalies, and unsafe compression ratios.
 - Remote images require HTTPS, no embedded credentials, public DNS/IP results, no redirect, bounded connect/total time, streaming size enforcement, and content inspection. Remote fetching ships disabled (`PRODUCT_IMPORT_REMOTE_IMAGES_ENABLED=false`) until operations explicitly enables it.
-- `product_media.content_sha256` plus a tenant/product uniqueness constraint and preflight checks protect against duplicate content and concurrent duplicate attachment. Storage files are removed when a media-row insert loses the uniqueness race.
+- Import-only `product_media.content_sha256` values plus a tenant/product uniqueness constraint and preflight checks protect against duplicate content and concurrent duplicate attachment. Storage files are removed when a media-row insert loses the uniqueness race; historical direct gallery uploads retain their existing duplicate-permitted behavior.
 
 ## Data changes
 
 Three additive migrations are included:
 
 1. AI action/action-version/action-event foundation tables.
-2. Nullable `product_media.content_sha256` and uniqueness constraint. Existing rows remain valid with `NULL`; new uploads/imports are hashed.
+2. Nullable `product_media.content_sha256` and uniqueness constraint. Existing rows and direct gallery uploads remain valid with `NULL`; imported images are hashed.
 3. Nullable image-archive identity/storage columns on `import_jobs`.
 
 No migration mutates existing product, inventory, tax, price, or accounting values.
