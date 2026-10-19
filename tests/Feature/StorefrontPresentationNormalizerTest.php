@@ -837,6 +837,53 @@ class StorefrontPresentationNormalizerTest extends TestCase
         $this->assertSame($once['pagePresentation'], $twice['pagePresentation']);
     }
 
+    /** @test */
+    public function storefront_background_fixture_matches_the_php_contract(): void
+    {
+        foreach ($this->fixture('storefront-background.json')['cases'] as $case) {
+            $this->assertSame(
+                $case['expected'],
+                \App\Support\Commerce\StorefrontBackgroundNormalizer::normalize($case['input']),
+                $case['name'],
+            );
+        }
+    }
+
+    /** @test */
+    public function storefront_background_is_additive_and_wins_over_legacy_background_color(): void
+    {
+        $normalized = $this->normalizer->normalize([
+            'backgroundColor' => '#ffffff',
+            'background' => ['kind' => 'solid', 'color' => ['hex' => '#123456']],
+        ]);
+
+        $this->assertSame(['kind' => 'solid', 'color' => ['hex' => '#123456']], $normalized['background']);
+        $this->assertSame('#ffffff', $normalized['backgroundColor']);
+        $this->assertSame(3, StorefrontPresentationNormalizer::VERSION);
+    }
+
+    /** @test */
+    public function legacy_documents_do_not_receive_a_new_background_key(): void
+    {
+        $normalized = $this->normalizer->normalize(['backgroundColor' => '#ffffff']);
+
+        $this->assertArrayNotHasKey('background', $normalized);
+        $this->assertSame('#ffffff', $normalized['backgroundColor']);
+    }
+
+    /** @test */
+    public function invalid_authored_background_is_not_silently_stored(): void
+    {
+        $raw = ['backgroundColor' => '#ffffff', 'background' => ['kind' => 'solid', 'color' => ['hex' => 'red']]];
+
+        $this->assertSame(
+            ['presentation.background.color'],
+            \App\Support\Commerce\StorefrontBackgroundNormalizer::errors($raw['background']),
+        );
+        $this->assertArrayNotHasKey('background', $this->normalizer->normalize($raw));
+        $this->assertSame('#ffffff', $this->normalizer->normalize($raw)['backgroundColor']);
+    }
+
     /** @return array<string, mixed> */
     private function fixture(string $name): array
     {

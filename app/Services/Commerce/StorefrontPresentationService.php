@@ -116,6 +116,7 @@ final class StorefrontPresentationService
         // الحالي — يطبّعه بصمت. يجب رفضه صراحةً هنا هو نفسه فحص
         // `assertIncomingConfigNotForward` في مسار حفظ النسخة الدقيقة.
         $this->assertIncomingConfigNotForward($config);
+        $this->publishValidator->assertIncomingBackground($config);
 
         $normalized = $this->normalizer->normalize($config);
         $this->assertStoredSize($normalized);
@@ -185,6 +186,7 @@ final class StorefrontPresentationService
             // مذكور صراحةً ضمن مسارات "immediate Publish" المشمولة بقاعدة
             // الفشل الآمن.
             $this->assertSupportedLegacySchema($row);
+            $this->publishValidator->assertIncomingBackground((array) ($row->draft_config ?? []));
 
             // CUST-H1-1: نسخة العمل المتوافقة قد تكون انفصلت عن النسخة
             // النشطة (تشويك سابق عبر legacy PUT)، أو لم تُنشأ بعد أصلاً (رأسٌ

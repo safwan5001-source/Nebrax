@@ -162,6 +162,7 @@ final class StorefrontPresentationVersionService
 
             $this->assertSupportedSchema((int) $version->schema_version);
             $this->assertIncomingConfigNotForward($config);
+            $this->publishValidator->assertIncomingBackground($config);
 
             // يُطبَّع دائماً تحت الإصدار الحالي — لا يُمرَّر وسم النسخة
             // القديم هنا مطلقاً كي لا تُستحضَر دلالات غياب v1 (تراجع
@@ -430,6 +431,7 @@ final class StorefrontPresentationVersionService
 
             // فشل آمن قبل أي تطبيع — راجع نظائرها في save/rename/create أعلاه.
             $this->assertSupportedSchema((int) $version->schema_version);
+            $this->publishValidator->assertIncomingBackground((array) $version->config);
 
             $normalized = $this->normalizer->normalize($version->config, (int) $version->schema_version);
             $this->assertStoredSize($normalized);
@@ -568,6 +570,7 @@ final class StorefrontPresentationVersionService
             // تحقّق وقت الجدولة (CUST-HV V3): لا تُجدوَل وثيقةٌ سيرفضها النشر لاحقاً
             // — يعرف التاجر الآن لا بعد منتصف الليل. (المخطط الأحدث يُترك لفحصه عند التنفيذ.)
             if ((int) $version->schema_version <= StorefrontPresentationNormalizer::VERSION) {
+                $this->publishValidator->assertIncomingBackground((array) $version->config);
                 $this->publishValidator->assertPublishable(
                     $this->normalizer->normalize($version->config, (int) $version->schema_version),
                 );
@@ -712,6 +715,12 @@ final class StorefrontPresentationVersionService
                 // للتشخيص/إعادة المحاولة حتى يُنشَر مخطّطٌ يدعمها (§ Forward Schema).
                 if ((int) $version->schema_version > StorefrontPresentationNormalizer::VERSION) {
                     return self::OUTCOME_FORWARD_SCHEMA_REJECTED;
+                }
+
+                try {
+                    $this->publishValidator->assertIncomingBackground((array) $version->config);
+                } catch (PresentationPublishValidationException) {
+                    return self::OUTCOME_VALIDATION_REJECTED;
                 }
 
                 $normalized = $this->normalizer->normalize($version->config, (int) $version->schema_version);

@@ -216,6 +216,50 @@ class StorefrontPresentationPublishApiTest extends TestCase
     }
 
     /** @test */
+    public function global_media_background_is_saved_as_draft_but_blocked_from_publish(): void
+    {
+        $auth = $this->registerTenant('pres-pub-global-media', 'owner@pres-pub-global-media.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+        $mediaId = '0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e';
+
+        $token->putJson($this->path($seeded['storefront']->id), [
+            'config' => [
+                'background' => [
+                    'kind' => 'media',
+                    'media' => [
+                        'mediaId' => strtoupper($mediaId),
+                        'url' => 'https://evil.example/background.jpg',
+                        'style' => 'background-image: url(https://evil.example)',
+                        'animation' => 'spin',
+                        'video' => 'https://evil.example/video.mp4',
+                        'autoplay' => true,
+                    ],
+                ],
+            ],
+            'draft_revision' => 0,
+        ])->assertOk();
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $saved = StorefrontPresentation::query()->where('storefront_id', $seeded['storefront']->id)->firstOrFail();
+        $this->assertSame([
+            'kind' => 'media',
+            'media' => ['mediaId' => $mediaId, 'decorative' => true],
+        ], $saved->draft_config['background']);
+        $this->assertNull($saved->published_config);
+        app(TenantContext::class)->forget();
+
+        $rejected = $token->postJson($this->path($seeded['storefront']->id).'/publish', ['draft_revision' => 1])
+            ->assertStatus(422);
+        $this->assertContains('global_media_background_not_ready', $rejected->json('error_codes'));
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $after = StorefrontPresentation::query()->where('storefront_id', $seeded['storefront']->id)->firstOrFail();
+        $this->assertNull($after->published_config, 'Global media must not reach the published snapshot.');
+        app(TenantContext::class)->forget();
+    }
+
+    /** @test */
     public function unknown_publish_envelope_keys_are_rejected(): void
     {
         $auth = $this->registerTenant('pres-pub-env', 'owner@pres-pub-env.test');

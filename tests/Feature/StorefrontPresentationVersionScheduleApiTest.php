@@ -126,6 +126,35 @@ class StorefrontPresentationVersionScheduleApiTest extends TestCase
     }
 
     /** @test */
+    public function global_media_background_cannot_be_scheduled_for_publish(): void
+    {
+        $auth = $this->registerTenant('sched-global-media', 'owner@sched-global-media.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+
+        $draft = $this->createDraft($token, $seeded['storefront']->id);
+        $saved = $token->putJson($this->itemPath($seeded['storefront']->id, $draft['id']), [
+            'config' => [
+                'background' => [
+                    'kind' => 'media',
+                    'media' => ['mediaId' => '0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e'],
+                ],
+            ],
+            'revision' => $draft['revision'],
+        ])->assertOk();
+
+        $token->putJson($this->schedulePath($seeded['storefront']->id, $draft['id']), [
+            'revision' => $saved->json('data.revision'),
+            'scheduled_for' => $this->futureIso(),
+            'expected_schedule_token' => $saved->json('data.schedule_token'),
+        ])->assertStatus(422);
+
+        $head = $this->presentationHead($seeded['storefront']->id);
+        $this->assertNull($head->scheduled_version_id);
+        $this->assertSame(0, (int) $head->schedule_epoch);
+    }
+
+    /** @test */
     public function returned_token_changes_on_every_successful_schedule_mutation(): void
     {
         $auth = $this->registerTenant('sched-token-change', 'owner@sched-token-change.test');

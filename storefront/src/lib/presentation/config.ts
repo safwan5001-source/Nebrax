@@ -15,6 +15,10 @@ import {
 } from "./section-content";
 import { normalizeSectionDesign, type SectionDesign } from "./section-design";
 import {
+  normalizeStorefrontBackground,
+  type StorefrontBackground,
+} from "./storefront-background";
+import {
   CONTENT_PAGE_SLUGS,
   type ContentPageSlug,
   DENSITY_PRESETS,
@@ -115,6 +119,8 @@ export interface StorefrontPresentationConfig {
   primaryColor: string;
   /** Independent solid page background; legacy documents fall back to AWJ Modern neutral. */
   backgroundColor?: string;
+  /** Additive document-level background; valid values take precedence at runtime. */
+  background?: StorefrontBackground;
   accentColor: string | null;
   fontPreset: FontPresetId;
   density: DensityId;
@@ -567,6 +573,7 @@ export function normalizePresentationConfig(
   const backgroundColor = isSafeHexColor(backgroundRaw)
     ? backgroundRaw
     : DEFAULT_STORE_BACKGROUND_COLOR;
+  const background = normalizeStorefrontBackground(raw.background);
   const accentRaw = asString(raw.accentColor).trim();
   const accentColor = isSafeHexColor(accentRaw) ? accentRaw : null;
 
@@ -585,6 +592,7 @@ export function normalizePresentationConfig(
     themePreset,
     primaryColor,
     ...(hasBackgroundColor ? { backgroundColor } : {}),
+    ...(background !== null ? { background } : {}),
     accentColor,
     fontPreset: inList(
       raw.fontPreset,

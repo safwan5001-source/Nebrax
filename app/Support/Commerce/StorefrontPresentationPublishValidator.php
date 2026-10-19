@@ -40,6 +40,28 @@ final class StorefrontPresentationPublishValidator
     }
 
     /**
+     * P3-A-02 — validate authored document-level background before the lenient
+     * normalizer can drop it. Null explicitly clears the new field.
+     *
+     * @param array<string, mixed> $raw
+     */
+    public function assertIncomingBackground(array $raw): void
+    {
+        $errors = [];
+        if (array_key_exists('background', $raw)) {
+            foreach (StorefrontBackgroundNormalizer::errors($raw['background']) as $path) {
+                $errors[$path] = [
+                    'code' => 'storefront_background_invalid',
+                    'message' => 'خلفية المتجر الجديدة غير صالحة؛ صحّحها أو امسحها قبل الحفظ/النشر.',
+                ];
+            }
+        }
+        if ($errors !== []) {
+            throw new PresentationPublishValidationException($errors);
+        }
+    }
+
+    /**
      * @param  array<string, mixed>  $normalized
      * @return array<string, array{code: string, message: string}>
      */
@@ -54,7 +76,31 @@ final class StorefrontPresentationPublishValidator
             + ButtonTokensContrast::errors($normalized)
             + HeaderDesignContrast::errors($normalized)
             + FooterDesignContrast::errors($normalized)
+            + $this->globalBackgroundErrors($normalized)
             + $this->mediaErrors($normalized);
+    }
+
+    /**
+     * P3-A-02 temporary safety gate — global media backgrounds stay draft-only
+     * until their dedicated ownership/readiness/contrast gates land in P3-A-03
+     * and P3-A-06. Section media backgrounds deliberately do not use this gate.
+     *
+     * @param  array<string, mixed>  $normalized
+     * @return array<string, array{code: string, message: string}>
+     */
+    private function globalBackgroundErrors(array $normalized): array
+    {
+        $background = $normalized['background'] ?? null;
+        if (! is_array($background) || ($background['kind'] ?? null) !== 'media') {
+            return [];
+        }
+
+        return [
+            'background' => [
+                'code' => 'global_media_background_not_ready',
+                'message' => 'خلفية الوسائط العامة متاحة في المسودة فقط حتى تكتمل بوابات الملكية والجاهزية والتباين.',
+            ],
+        ];
     }
 
     /**
