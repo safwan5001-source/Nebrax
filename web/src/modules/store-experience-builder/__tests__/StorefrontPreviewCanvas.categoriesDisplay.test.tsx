@@ -149,3 +149,31 @@ describe("Canvas: data states keep their own messages under a display", () => {
     expect(empty.querySelector(".awj-cd")).toBeNull();
   });
 });
+
+describe("Canvas: public homepage category limits", () => {
+  const many = Array.from({ length: 19 }, (_, index) => ({
+    id: `c-${index}`,
+    name: `Category ${index + 1}`,
+    imageUrl: null,
+    color: null,
+  }));
+
+  it("matches the standard storefront's 12-category homepage limit", () => {
+    const container = canvas({ layout: "grid" }, { homeCategories: many });
+    expect(container.querySelectorAll(".awj-cd li")).toHaveLength(12);
+  });
+
+  it("matches AWJ Market's 18-category homepage limit", () => {
+    const config = { ...configWith({ layout: "grid" }), themePreset: "awj-market" as const };
+    const container = render(
+      <StorefrontPreviewCanvas
+        config={config}
+        locale="en"
+        viewport="desktop"
+        homeCategoriesState="ready"
+        homeCategories={many}
+      />,
+    ).container;
+    expect(container.querySelectorAll(".awj-cd li")).toHaveLength(18);
+  });
+});

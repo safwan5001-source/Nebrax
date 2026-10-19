@@ -7,6 +7,7 @@ use App\Models\ProductCategory;
 use App\Models\SalesChannel;
 use App\Models\Storefront;
 use App\Models\Tenant;
+use App\Support\BranchSettings;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -80,6 +81,16 @@ class CommerceWorkspaceStorefrontCategoryApiTest extends TestCase
         return $category->fresh();
     }
 
+    private function mainBranch(string $token): string
+    {
+        return $this->withToken($token)->getJson('/api/branches')->json('data.0.id');
+    }
+
+    private function createBranch(string $token, string $name): string
+    {
+        return $this->withToken($token)->postJson('/api/branches', ['name' => $name])->assertCreated()->json('data.id');
+    }
+
     // ───────────────────────── 1. Tenant isolation — list ─────────────────────────
 
     /** @test */
@@ -100,6 +111,35 @@ class CommerceWorkspaceStorefrontCategoryApiTest extends TestCase
 
         $names = array_column($res->json('data'), 'name');
         $this->assertSame(['تصنيف أ'], $names);
+    }
+
+    /** @test */
+    public function a_published_category_from_another_operational_branch_is_visible_to_the_storefront_preview(): void
+    {
+        $auth = $this->registerTenant('cat-preview-branch', 'owner@cat-preview-branch.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $main = $this->mainBranch($auth['token']);
+        $other = $this->createBranch($auth['token'], 'فرع الكتالوج');
+
+        $category = $this->seedCategory($auth['tenant_id'], $seeded['channel'], [
+            'name' => 'تصنيف منشور في فرع آخر',
+            'branch_id' => $other,
+        ]);
+        app(TenantContext::class)->set($auth['tenant_id']);
+        BranchSettings::merge(['share_products' => false]);
+        app(TenantContext::class)->forget();
+
+        $list = $this->withToken($auth['token'])
+            ->withHeaders(['X-Branch-Id' => $main])
+            ->getJson($this->listPath($seeded['storefront']->id).'?root_only=true')
+            ->assertOk();
+        $this->assertSame([$category->id], array_column($list->json('data'), 'id'));
+
+        $this->withToken($auth['token'])
+            ->withHeaders(['X-Branch-Id' => $main])
+            ->getJson($this->itemPath($seeded['storefront']->id, $category->id))
+            ->assertOk()
+            ->assertJsonPath('data.id', $category->id);
     }
 
     // ───────────────────────── 2/3. Foreign storefront/category → 404 ─────────────────────────

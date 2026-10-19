@@ -138,11 +138,10 @@ export const PREVIEW_WIDTHS = {
   desktop: 1280,
 } as const;
 
-// CUST-H4-3 — bounds on the Home "categories"/"newArrivals" Canvas preview
-// fetches, matching Published's own homepage defaults (`CategoriesSection.tsx`'s
-// `HOME_CATEGORY_LIMIT`, `NewArrivals.tsx`'s `limit = 8`) rather than an
-// arbitrary editor-only number.
-const HOME_CATEGORIES_PREVIEW_LIMIT = 12;
+// The public category navigation and default footer are both backed by the
+// complete root catalogue. Fetch pages of that same ordered result here; the
+// Canvas performs the public homepage's 12/18-item presentation limit itself.
+const ROOT_CATEGORIES_PAGE_SIZE = 50;
 const HOME_NEW_ARRIVALS_PREVIEW_LIMIT = 8;
 
 export const STORE_BUILDER_SIDEBAR_STORAGE_KEY =
@@ -323,13 +322,13 @@ export function ExperienceBuilder({
     "idle" | "loading" | "error" | "ready"
   >("idle");
   const categoryGridRequestRef = useRef(0);
-  // CUST-H4-3 — real catalog data for the Home "categories"/"newArrivals"
-  // sections' own Canvas preview. Deliberately **not** the same state as
+  // Real root catalogue data feeds the Header, default Footer and Home
+  // categories section. It is deliberately **not** the same state as
   // `categoryList`/`productList` above: those back the Product/Category
   // *preview pickers*, scoped to the merchant's own live search term —
   // incompatible filter semantics to reuse for a home section that must
-  // always show the storefront's real root categories / real newest
-  // products, never whatever the picker's search box currently holds.
+  // always show the storefront's real root categories / real newest products,
+  // never whatever the picker's search box currently holds.
   // `"ready"` with an empty array *is* the honest empty state (no separate
   // `"empty"` value), mirroring `categoryGridProductsState` above exactly.
   const [homeCategories, setHomeCategories] = useState<WorkspaceCategorySummary[]>([]);
@@ -1232,60 +1231,62 @@ export function ExperienceBuilder({
   }
 
   // CUST-H4-3 — real data for the Home "categories" section's own Canvas
-  // preview (`StorefrontPreviewCanvas`'s `categories` branch), replacing the
-  // static `PREVIEW_CATEGORIES` fixture. `rootOnly: true` (CUST-H4-3 parity
-  // fix) asks the backend to apply `whereNull('parent_id')` *before*
-  // pagination, matching Published's own `depth_eq: 0` semantics
-  // (`CategoriesSection.tsx`) exactly — this request fetches only the
-  // bounded number of root categories this section actually shows, never a
-  // larger mixed-depth page filtered down afterwards on the client (that
-  // approach could silently lose real root categories behind enough
-  // alphabetically-earlier children on a single page; the server-side
-  // filter can't, since it runs before the page is cut).
+  // preview (`StorefrontPreviewCanvas`'s categories branch), header and
+  // footer. `rootOnly: true` asks the backend to apply `whereNull('parent_id')`
+  // before pagination, matching Published exactly. We page through the whole
+  // root result because Header/CategoryNav are not homepage-limited.
   async function loadHomeCategories() {
     if (!storefrontId) return;
     const token = ++homeCategoriesRequestRef.current;
     const originStorefrontId = storefrontId;
     setHomeCategoriesState("loading");
-    const result = await listWorkspaceCategories(storefrontId, {
-      rootOnly: true,
-      // AWJ-STORE-CAT-DESIGN-01 — colour + signed picture URL, so a chosen card display previews with the real pictures.
-      withMedia: true,
-      perPage: HOME_CATEGORIES_PREVIEW_LIMIT,
-    });
-    if (token !== homeCategoriesRequestRef.current || storefrontIdRef.current !== originStorefrontId) return;
-    if (!result.ok) {
-      setHomeCategoriesState("error");
-      setHomeCategories([]);
-      return;
+    const rows: WorkspaceCategorySummary[] = [];
+    let page = 1;
+    let hasMore = true;
+    while (hasMore) {
+      const result = await listWorkspaceCategories(storefrontId, {
+        rootOnly: true,
+        // The same records drive category cards, so retain the real image and
+        // colour projection rather than introducing a chrome-only fixture.
+        withMedia: true,
+        perPage: ROOT_CATEGORIES_PAGE_SIZE,
+        page,
+      });
+      if (token !== homeCategoriesRequestRef.current || storefrontIdRef.current !== originStorefrontId) return;
+      if (!result.ok) {
+        setHomeCategoriesState("error");
+        setHomeCategories([]);
+        return;
+      }
+      rows.push(...result.data);
+      hasMore = result.hasMore;
+      page += 1;
     }
+    if (token !== homeCategoriesRequestRef.current || storefrontIdRef.current !== originStorefrontId) return;
     setHomeCategoriesState("ready");
-    setHomeCategories(result.data);
+    setHomeCategories(rows);
   }
 
-  const categoriesSectionVisible = homeSectionsShown.some(
-    (section) => section.type === "categories" && section.visible,
-  );
-
   useEffect(() => {
-    // `busy === "loading"` means `draft` is still the transient default
-    // config this component seeds itself with before the real, persisted
-    // Version config has loaded (see the `[storefrontId, versionId]` reset
-    // effect above) — evaluating `categoriesSectionVisible` against that
-    // placeholder, rather than waiting for the real one, could fire a fetch
-    // for a section the merchant's actual saved homepage doesn't even show.
-    if (
-      currentPage !== "home" ||
-      !storefrontId ||
-      busy === "loading" ||
-      !categoriesSectionVisible ||
-      homeCategoriesState !== "idle"
-    ) {
+    // Header/footer are global chrome and need the same catalogue on every
+    // previewed page, even if the Home categories section is hidden.
+    if (!storefrontId || busy === "loading" || homeCategoriesState !== "idle") {
       return;
     }
     void loadHomeCategories();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, storefrontId, busy, categoriesSectionVisible, homeCategoriesState]);
+  }, [storefrontId, busy, homeCategoriesState]);
+
+  useEffect(() => {
+    // Signed category image URLs expire after 20 minutes. Refresh the
+    // catalogue before that window closes, even when Home is not the current
+    // page, so a later navigation never starts with stale media references.
+    if (!storefrontId || homeCategoriesState !== "ready") return;
+    const timer = window.setTimeout(() => {
+      setHomeCategoriesState("idle");
+    }, 18 * 60 * 1000);
+    return () => window.clearTimeout(timer);
+  }, [storefrontId, homeCategoriesState]);
 
   function handleRetryHomeCategories() {
     void loadHomeCategories();
@@ -3588,6 +3589,22 @@ export function ExperienceBuilder({
               // `Dropdown` component or `StorefrontPreviewCanvas`.
               className="relative z-0 h-full min-h-0 overflow-y-auto overscroll-contain p-3 md:overflow-y-scroll md:p-5 xl:p-8"
             >
+              {homeCategoriesState === "error" && (
+                <div
+                  data-home-categories-global-error=""
+                  aria-live="polite"
+                  className="mx-auto mb-3 flex max-w-5xl items-center justify-between gap-3 rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-sm text-text"
+                >
+                  <span>{t("homeCategoriesLoadFailed")}</span>
+                  <button
+                    type="button"
+                    onClick={handleRetryHomeCategories}
+                    className="min-h-10 rounded-md border border-border px-3 font-medium hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                  >
+                    {t("retry")}
+                  </button>
+                </div>
+              )}
               <div
                 data-preview-frame=""
                 className="mx-auto overflow-hidden border border-neutral-300 bg-white"
