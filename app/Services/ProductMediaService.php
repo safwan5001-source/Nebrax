@@ -55,12 +55,12 @@ class ProductMediaService
      *
      * @param  list<UploadedFile>  $files
      */
-    public function attachToProduct(Product $product, array $files, ?string $uploadedBy): array
+    public function attachToProduct(Product $product, array $files, ?string $uploadedBy, bool $preventDuplicates = false): array
     {
         return $this->store($product, $files, $uploadedBy, [
             'countQuery' => fn () => ProductMedia::where('product_id', $product->id)
                 ->whereNull('product_option_value_id')->whereNull('product_variant_id'),
-        ]);
+        ], $preventDuplicates);
     }
 
     /** @param  list<UploadedFile>  $files */
@@ -90,7 +90,7 @@ class ProductMediaService
     }
 
     /** @param  list<UploadedFile>  $files */
-    private function store(Product $product, array $files, ?string $uploadedBy, array $scope): array
+    private function store(Product $product, array $files, ?string $uploadedBy, array $scope, bool $preventDuplicates = false): array
     {
         $countQuery = $scope['countQuery'];
         unset($scope['countQuery']);
@@ -105,8 +105,8 @@ class ProductMediaService
         $seenHashes = [];
         foreach (array_values($files) as $file) {
             $inspected = $this->inspector->inspect($file);
-            if (isset($seenHashes[$inspected->sha256])
-                || ProductMedia::query()->where('product_id', $product->id)->where('content_sha256', $inspected->sha256)->exists()) {
+            if ($preventDuplicates && (isset($seenHashes[$inspected->sha256])
+                || ProductMedia::query()->where('product_id', $product->id)->where('content_sha256', $inspected->sha256)->exists())) {
                 throw new RuntimeException('هذه الصورة مرفقة بالمنتج بالفعل.');
             }
             $seenHashes[$inspected->sha256] = true;
@@ -124,7 +124,10 @@ class ProductMediaService
                 'original_name' => $file->getClientOriginalName(),
                 'mime_type' => $inspected->mimeType,
                 'size' => $inspected->size,
-                'content_sha256' => $inspected->sha256,
+                // Historical direct gallery uploads allow identical image bytes.
+                // Import uses the explicit opt-in guard below, where the hash also
+                // provides idempotent de-duplication across a retry.
+                'content_sha256' => $preventDuplicates ? $inspected->sha256 : null,
                 'sort_order' => $start + $offset,
                 'uploaded_by' => $uploadedBy,
             ], $scope));

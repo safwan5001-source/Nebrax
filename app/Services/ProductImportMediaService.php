@@ -82,7 +82,7 @@ final class ProductImportMediaService
                     $file = $source['kind'] === 'archive'
                         ? $this->archives->materialize($archive, (int) $source['index'], (string) $source['name'])
                         : $this->remote->fetch((string) $source['value']);
-                    $this->media->attachToProduct($product, [$file], $userId);
+                    $this->media->attachToProduct($product, [$file], $userId, true);
                     $attached++;
                 } catch (\Throwable $exception) {
                     $failed++;
@@ -128,6 +128,18 @@ final class ProductImportMediaService
         $expectsMedia = $archive !== null
             || in_array('primary_image_url', $mapping, true)
             || in_array('additional_image_urls', $mapping, true);
+        // The normal import path must remain entirely unchanged for legacy
+        // files: do not resolve products or inspect galleries when no media
+        // column/archive was supplied. Besides preserving behaviour, this
+        // prevents an N+1 query pattern during ordinary catalog previews.
+        if (! $expectsMedia) {
+            return [
+                'rows' => [],
+                'source_count' => 0,
+                'unmatched_archive' => [],
+                'missing_rows' => [],
+            ];
+        }
         $usedArchive = [];
         $rows = [];
         $missingRows = [];
