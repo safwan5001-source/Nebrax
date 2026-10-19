@@ -200,7 +200,7 @@ interface StorefrontPreviewCanvasProps {
    * filtered by `category_id` — never invented client-side.
    */
   categoryGridProductsState?: "idle" | "loading" | "error" | "ready";
-  categoryGridProducts?: { id: string; name: string; thumbnailUrl: string | null; priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null }[];
+  categoryGridProducts?: { id: string; name: string; thumbnailUrl: string | null; priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null; isVariantManaged?: boolean }[];
   categoryGridProductsTotal?: number;
   /**
    * CUST-H4-3 — the Home "categories" section's own real Canvas preview:
@@ -223,7 +223,7 @@ interface StorefrontPreviewCanvasProps {
    * `PREVIEW_PRODUCTS` fixture this branch used before.
    */
   homeNewArrivalsState?: "idle" | "loading" | "error" | "ready";
-  homeNewArrivals?: { id: string; name: string; thumbnailUrl: string | null; priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null }[];
+  homeNewArrivals?: { id: string; name: string; thumbnailUrl: string | null; priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null; isVariantManaged?: boolean }[];
   onRetryHomeNewArrivals?: () => void;
   /**
    * CUST-H4-5 — the Home "featured" section's own real Canvas preview.
@@ -234,7 +234,7 @@ interface StorefrontPreviewCanvasProps {
    * the picker's own "selected products" chips show — replacing the bare
    * id-text-chip list this branch rendered before.
    */
-  featuredResolved?: Record<string, { id: string; name: string; thumbnailUrl: string | null; priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null }[]>;
+  featuredResolved?: Record<string, { id: string; name: string; thumbnailUrl: string | null; priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null; isVariantManaged?: boolean }[]>;
   featuredResolvedState?: Record<string, "idle" | "loading" | "error" | "ready">;
   onRetryFeatured?: (sectionId: string) => void;
   /**
@@ -1820,24 +1820,36 @@ function PreviewProductMeta({
   product,
   locale,
 }: {
-  product: { priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null };
+  product: { priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null; isVariantManaged?: boolean };
   locale: CustomizerLocale;
 }) {
   return (
     <div className="mt-2 space-y-1">
-      {typeof product.priceAmountMinor === "number" && product.priceAmountMinor > 0 && (
+      {product.isVariantManaged ? (
+        <p className="text-xs font-medium text-store-muted-foreground">{locale === "ar" ? "السعر حسب الخيار" : "Priced by option"}</p>
+      ) : typeof product.priceAmountMinor === "number" && product.priceAmountMinor >= 0 ? (
         <p className="text-sm font-bold text-store-primary">
           <bdi>{formatMinorAmount(product.priceAmountMinor, product.currency ?? "SAR", locale)}</bdi>
         </p>
-      )}
+      ) : null}
       {typeof product.inStock === "boolean" && (
         <p className={cn("text-[11px] font-medium", product.inStock ? "text-store-success" : "text-store-destructive")}>
           {product.inStock ? (locale === "ar" ? "متوفر" : "In stock") : locale === "ar" ? "غير متوفر" : "Out of stock"}
         </p>
       )}
-      <button type="button" disabled aria-disabled="true" className="w-full rounded-store border border-store-border px-2 py-1 text-xs font-semibold text-store-muted-foreground">
-        {locale === "ar" ? "إضافة للسلة" : "Add to cart"}
-      </button>
+      {product.inStock === false ? (
+        <span className="block w-full rounded-store border border-store-border px-2 py-1 text-center text-xs font-semibold text-store-muted-foreground">
+          {locale === "ar" ? "غير متوفر" : "Out of stock"}
+        </span>
+      ) : product.isVariantManaged ? (
+        <span className="block w-full rounded-store border border-store-primary px-2 py-1 text-center text-xs font-bold text-store-primary">
+          {locale === "ar" ? "اختيار الخيارات" : "Select options"}
+        </span>
+      ) : (
+        <button type="button" disabled aria-disabled="true" className="w-full rounded-store bg-store-primary px-2 py-1 text-xs font-semibold text-store-primary-foreground">
+          {locale === "ar" ? "إضافة للسلة" : "Add to cart"}
+        </button>
+      )}
     </div>
   );
 }
