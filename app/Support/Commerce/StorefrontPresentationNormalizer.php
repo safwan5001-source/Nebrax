@@ -452,6 +452,8 @@ final class StorefrontPresentationNormalizer
         $backgroundRaw = trim($this->asString($input['backgroundColor'] ?? null));
         $hasBackgroundColor = array_key_exists('backgroundColor', $input);
         $backgroundColor = $this->isSafeHexColor($backgroundRaw) ? $backgroundRaw : '#f8f9fa';
+        $hasBackground = array_key_exists('background', $input);
+        $background = StorefrontBackgroundNormalizer::normalize($input['background'] ?? null);
         $accentRaw = trim($this->asString($input['accentColor'] ?? null));
         $accentColor = $this->isSafeHexColor($accentRaw) ? $accentRaw : null;
 
@@ -549,6 +551,9 @@ final class StorefrontPresentationNormalizer
 
         if ($hasBackgroundColor) {
             $config['backgroundColor'] = $backgroundColor;
+        }
+        if ($hasBackground && $background !== null) {
+            $config['background'] = $background;
         }
         if ($pagePresentation !== null) {
             $config['pagePresentation'] = $pagePresentation;

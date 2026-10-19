@@ -40,6 +40,28 @@ final class StorefrontPresentationPublishValidator
     }
 
     /**
+     * P3-A-02 — validate authored document-level background before the lenient
+     * normalizer can drop it. Null explicitly clears the new field.
+     *
+     * @param array<string, mixed> $raw
+     */
+    public function assertIncomingBackground(array $raw): void
+    {
+        $errors = [];
+        if (array_key_exists('background', $raw)) {
+            foreach (StorefrontBackgroundNormalizer::errors($raw['background']) as $path) {
+                $errors[$path] = [
+                    'code' => 'storefront_background_invalid',
+                    'message' => 'خلفية المتجر الجديدة غير صالحة؛ صحّحها أو امسحها قبل الحفظ/النشر.',
+                ];
+            }
+        }
+        if ($errors !== []) {
+            throw new PresentationPublishValidationException($errors);
+        }
+    }
+
+    /**
      * @param  array<string, mixed>  $normalized
      * @return array<string, array{code: string, message: string}>
      */

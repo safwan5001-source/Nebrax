@@ -1,0 +1,58 @@
+{
+  "cases": [
+    {
+      "name": "solid role",
+      "input": { "kind": "solid", "color": { "role": "surfaceAlt" } },
+      "expected": { "kind": "solid", "color": { "role": "surfaceAlt" } }
+    },
+    {
+      "name": "gradient lowercases hex and keeps direction",
+      "input": {
+        "kind": "gradient",
+        "from": { "hex": "#ABCDEF" },
+        "to": { "hex": "#123456" },
+        "direction": "to-bottom"
+      },
+      "expected": {
+        "kind": "gradient",
+        "from": { "hex": "#abcdef" },
+        "to": { "hex": "#123456" },
+        "direction": "to-bottom"
+      }
+    },
+    {
+      "name": "media forces decorative and keeps still ref contract",
+      "input": {
+        "kind": "media",
+        "media": {
+          "mediaId": "0B8F6C2E-3D3A-4A53-9C7E-8F1A2B3C4D5E",
+          "url": "https://evil.example/background.jpg"
+        },
+        "overlay": { "alpha": 40 }
+      },
+      "expected": {
+        "kind": "media",
+        "media": {
+          "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+          "decorative": true
+        },
+        "overlay": { "color": { "role": "overlay" }, "alpha": 40 }
+      }
+    },
+    {
+      "name": "null explicitly clears the new field",
+      "input": null,
+      "expected": null
+    },
+    {
+      "name": "unknown kind is invalid",
+      "input": { "kind": "video", "src": "https://evil.example/video.mp4" },
+      "expected": null
+    },
+    {
+      "name": "invalid solid color is invalid",
+      "input": { "kind": "solid", "color": { "hex": "red" } },
+      "expected": null
+    }
+  ]
+}

@@ -45,6 +45,10 @@ import {
   type SectionContent,
 } from "./section-content";
 import { normalizePagePresentation, type PagePresentation } from "./page-regions";
+import {
+  normalizeStorefrontBackground,
+  type StorefrontBackground,
+} from "./storefront-background";
 
 export type NavLinkKind = "home" | "category" | "product" | "content" | "external";
 export type WhatsAppPlacement = "floating" | "footer" | "both";
@@ -122,6 +126,8 @@ export interface StorefrontPresentationConfig {
   primaryColor: string;
   /** Independent solid page background; legacy documents fall back to AWJ Modern neutral. */
   backgroundColor?: string;
+  /** Additive document-level background; valid values take precedence at runtime. */
+  background?: StorefrontBackground;
   accentColor: string | null;
   fontPreset: FontPresetId;
   density: DensityId;
@@ -547,6 +553,7 @@ export function normalizePresentationConfig(
   const backgroundColor = isSafeHexColor(backgroundRaw)
     ? backgroundRaw
     : DEFAULT_STORE_BACKGROUND_COLOR;
+  const background = normalizeStorefrontBackground(raw.background);
   const accentRaw = asString(raw.accentColor).trim();
   const accentColor = isSafeHexColor(accentRaw) ? accentRaw : null;
 
@@ -565,6 +572,7 @@ export function normalizePresentationConfig(
     themePreset,
     primaryColor,
     ...(hasBackgroundColor ? { backgroundColor } : {}),
+    ...(background !== null ? { background } : {}),
     accentColor,
     fontPreset: inList(raw.fontPreset, FONT_PRESETS.map((p) => p.id), "cairo-geist"),
     density: inList(raw.density, DENSITY_PRESETS, "comfortable"),
