@@ -342,7 +342,7 @@ class CommerceWorkspaceStorefrontProductApiTest extends TestCase
         }
 
         $row = $res->json('data.0');
-        $this->assertEqualsCanonicalizing(['id', 'name', 'name_en', 'thumbnail_url', 'is_variant_managed'], array_keys($row));
+        $this->assertEqualsCanonicalizing(['id', 'name', 'name_en', 'thumbnail_url', 'is_variant_managed', 'price', 'in_stock'], array_keys($row));
     }
 
     /** @test */

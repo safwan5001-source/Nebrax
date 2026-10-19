@@ -200,7 +200,7 @@ interface StorefrontPreviewCanvasProps {
    * filtered by `category_id` — never invented client-side.
    */
   categoryGridProductsState?: "idle" | "loading" | "error" | "ready";
-  categoryGridProducts?: { id: string; name: string; thumbnailUrl: string | null }[];
+  categoryGridProducts?: { id: string; name: string; thumbnailUrl: string | null; priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null }[];
   categoryGridProductsTotal?: number;
   /**
    * CUST-H4-3 — the Home "categories" section's own real Canvas preview:
@@ -223,7 +223,7 @@ interface StorefrontPreviewCanvasProps {
    * `PREVIEW_PRODUCTS` fixture this branch used before.
    */
   homeNewArrivalsState?: "idle" | "loading" | "error" | "ready";
-  homeNewArrivals?: { id: string; name: string; thumbnailUrl: string | null }[];
+  homeNewArrivals?: { id: string; name: string; thumbnailUrl: string | null; priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null }[];
   onRetryHomeNewArrivals?: () => void;
   /**
    * CUST-H4-5 — the Home "featured" section's own real Canvas preview.
@@ -234,7 +234,7 @@ interface StorefrontPreviewCanvasProps {
    * the picker's own "selected products" chips show — replacing the bare
    * id-text-chip list this branch rendered before.
    */
-  featuredResolved?: Record<string, { id: string; name: string; thumbnailUrl: string | null }[]>;
+  featuredResolved?: Record<string, { id: string; name: string; thumbnailUrl: string | null; priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null }[]>;
   featuredResolvedState?: Record<string, "idle" | "loading" | "error" | "ready">;
   onRetryFeatured?: (sectionId: string) => void;
   /**
@@ -1056,6 +1056,7 @@ export function StorefrontPreviewCanvas({
                             <p className="line-clamp-2 text-sm font-semibold text-store-foreground">
                               <bdi>{product.name}</bdi>
                             </p>
+                            <PreviewProductMeta product={product} locale={locale} />
                           </div>
                         </li>
                       ))}
@@ -1439,6 +1440,7 @@ export function StorefrontPreviewCanvas({
                               <p className="line-clamp-2 text-sm font-semibold text-store-foreground">
                                 <bdi>{product.name}</bdi>
                               </p>
+                            <PreviewProductMeta product={product} locale={locale} />
                             </div>
                           </li>
                         ))}
@@ -1812,6 +1814,32 @@ function formatMinorAmount(amountMinor: number, currency: string, locale: Custom
   } catch {
     return `${(amountMinor / 100).toFixed(2)} ${currency}`;
   }
+}
+
+function PreviewProductMeta({
+  product,
+  locale,
+}: {
+  product: { priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null };
+  locale: CustomizerLocale;
+}) {
+  return (
+    <div className="mt-2 space-y-1">
+      {typeof product.priceAmountMinor === "number" && product.priceAmountMinor > 0 && (
+        <p className="text-sm font-bold text-store-primary">
+          <bdi>{formatMinorAmount(product.priceAmountMinor, product.currency ?? "SAR", locale)}</bdi>
+        </p>
+      )}
+      {typeof product.inStock === "boolean" && (
+        <p className={cn("text-[11px] font-medium", product.inStock ? "text-store-success" : "text-store-destructive")}>
+          {product.inStock ? (locale === "ar" ? "متوفر" : "In stock") : locale === "ar" ? "غير متوفر" : "Out of stock"}
+        </p>
+      )}
+      <button type="button" disabled aria-disabled="true" className="w-full rounded-store border border-store-border px-2 py-1 text-xs font-semibold text-store-muted-foreground">
+        {locale === "ar" ? "إضافة للسلة" : "Add to cart"}
+      </button>
+    </div>
+  );
 }
 
 /**
@@ -2320,6 +2348,9 @@ function CategoryPagePreview({
                       >
                         <bdi>{product.name}</bdi>
                       </p>
+                      <div className={cn(productCard === "compact" ? "px-1.5 pb-1" : "px-2 pb-1.5")}>
+                        <PreviewProductMeta product={product} locale={locale} />
+                      </div>
                     </div>
                   ))}
                 </div>
