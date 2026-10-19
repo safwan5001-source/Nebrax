@@ -6,13 +6,22 @@ import { normalizeStorefrontBackground } from "../storefront-background";
 import { PRESENTATION_CONFIG_VERSION } from "../tokens";
 
 const fixture = JSON.parse(
-  readFileSync(resolve(process.cwd(), "..", "tests/Fixtures/presentation/storefront-background.json"), "utf8"),
+  readFileSync(
+    resolve(
+      process.cwd(),
+      "..",
+      "tests/Fixtures/presentation/storefront-background.json",
+    ),
+    "utf8",
+  ),
 ) as { cases: Array<{ name: string; input: unknown; expected: unknown }> };
 
 describe("StorefrontBackground contract (P3-A-02)", () => {
   for (const testCase of fixture.cases) {
     it(testCase.name, () => {
-      expect(normalizeStorefrontBackground(testCase.input)).toEqual(testCase.expected);
+      expect(normalizeStorefrontBackground(testCase.input)).toEqual(
+        testCase.expected,
+      );
     });
   }
 
@@ -29,7 +38,10 @@ describe("StorefrontBackground contract (P3-A-02)", () => {
         color: { hex: "#123456" },
       },
     });
-    expect(result.background).toEqual({ kind: "solid", color: { hex: "#123456" } });
+    expect(result.background).toEqual({
+      kind: "solid",
+      color: { hex: "#123456" },
+    });
     expect(result.backgroundColor).toBe("#ffffff");
   });
 

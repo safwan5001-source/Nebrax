@@ -1,6 +1,6 @@
-import { type MediaOverlay, type ColorRef } from "./section-design";
 import { type MediaRef, normalizeMediaRef } from "./media-ref";
 import { PALETTE_ROLES, type PaletteRole } from "./palette";
+import type { ColorRef, MediaOverlay } from "./section-design";
 import { isSafeHexColor } from "./tokens";
 
 export const STOREFRONT_BACKGROUND_DIRECTIONS = [
@@ -13,7 +13,8 @@ export const STOREFRONT_BACKGROUND_DIRECTIONS = [
   "to-top-end",
   "to-top-start",
 ] as const;
-export type StorefrontBackgroundDirection = (typeof STOREFRONT_BACKGROUND_DIRECTIONS)[number];
+export type StorefrontBackgroundDirection =
+  (typeof STOREFRONT_BACKGROUND_DIRECTIONS)[number];
 
 const OVERLAY_ALPHAS = [
   5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90,
@@ -22,8 +23,18 @@ const ROLES: readonly PaletteRole[] = ["brand", "accent", ...PALETTE_ROLES];
 
 export type StorefrontBackground =
   | { kind: "solid"; color: ColorRef }
-  | { kind: "gradient"; from: ColorRef; to: ColorRef; direction: StorefrontBackgroundDirection }
-  | { kind: "media"; media: MediaRef; mobile?: MediaRef; overlay?: MediaOverlay };
+  | {
+      kind: "gradient";
+      from: ColorRef;
+      to: ColorRef;
+      direction: StorefrontBackgroundDirection;
+    }
+  | {
+      kind: "media";
+      media: MediaRef;
+      mobile?: MediaRef;
+      overlay?: MediaOverlay;
+    };
 
 function record(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -45,13 +56,19 @@ function color(value: unknown): ColorRef | null {
 
 function overlay(value: unknown): MediaOverlay | null {
   const raw = record(value);
-  if (!raw || !OVERLAY_ALPHAS.includes(raw.alpha as (typeof OVERLAY_ALPHAS)[number])) return null;
+  if (
+    !raw ||
+    !OVERLAY_ALPHAS.includes(raw.alpha as (typeof OVERLAY_ALPHAS)[number])
+  )
+    return null;
   const colour = color(raw.color) ?? { role: "overlay" as const };
   return { color: colour, alpha: raw.alpha as (typeof OVERLAY_ALPHAS)[number] };
 }
 
 /** P3-A-02: additive document-level contract; invalid objects normalize to absence. */
-export function normalizeStorefrontBackground(raw: unknown): StorefrontBackground | null {
+export function normalizeStorefrontBackground(
+  raw: unknown,
+): StorefrontBackground | null {
   if (raw === null || raw === undefined) return null;
   const value = record(raw);
   if (!value || typeof value.kind !== "string") return null;
@@ -67,7 +84,9 @@ export function normalizeStorefrontBackground(raw: unknown): StorefrontBackgroun
     )
       ? (value.direction as StorefrontBackgroundDirection)
       : undefined;
-    return from && to && direction ? { kind: "gradient", from, to, direction } : null;
+    return from && to && direction
+      ? { kind: "gradient", from, to, direction }
+      : null;
   }
   if (value.kind === "media") {
     const media = normalizeMediaRef(value.media);
