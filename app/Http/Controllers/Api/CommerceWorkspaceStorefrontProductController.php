@@ -13,6 +13,7 @@ use App\Services\Commerce\CommercePriceResolver;
 use App\Services\Commerce\FulfillmentPolicyNotConfiguredException;
 use App\Services\Commerce\FulfillmentPolicyService;
 use App\Services\ProductMediaGalleryService;
+use App\Tenancy\BranchScope;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -104,6 +105,12 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
         ]);
 
         $query = Product::query()
+            // The storefront catalogue is company-wide: publication belongs to
+            // this storefront's sales channel, not to whichever operational
+            // branch the merchant currently has selected in the back office.
+            // TenantScope remains active, and ownedStorefront() + the channel
+            // publication subquery below are the two explicit authority gates.
+            ->withoutGlobalScope(BranchScope::class)
             ->where('is_active', true)
             ->whereIn('id', CommerceListing::query()
                 ->where('sales_channel_id', $storefront->sales_channel_id)
@@ -203,8 +210,11 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
         }
 
         $productModel = Product::query()
+            ->withoutGlobalScope(BranchScope::class)
             ->where('is_active', true)
-            ->with(['productCategory:id,name'])
+            ->with(['productCategory' => fn ($q) => $q
+                ->withoutGlobalScope(BranchScope::class)
+                ->select(['id', 'name'])])
             ->find($product);
 
         if ($productModel === null) {

@@ -11,7 +11,6 @@ import { OfficialSocialMark, officialSocialLinkClassName } from "./OfficialSocia
 import { OfficialStoreBadge } from "./OfficialStoreBadge";
 import { type FooterColourContext, type FooterLayout, resolveFooterDesign } from "./presentation/footer-design";
 import type { StorefrontPresentationConfig } from "./presentation/config";
-import { PREVIEW_CATEGORIES } from "./preview-fixtures";
 import { SbcSeal } from "./SbcSeal";
 import { StoreBrand, storeContainerClassName } from "./StoreBrand";
 
@@ -33,6 +32,8 @@ export interface CanvasFooterProps {
   social: Array<{ id: string; network: string; href: string; label: string }>;
   identity: { legalName: string | null; crNumber: string | null; vatNumber: string | null; has: boolean };
   apps: { ios: string | null; android: string | null; has: boolean };
+  /** Published root categories, already storefront-scoped and ordered. */
+  categories: Array<{ id: string; name: string }>;
   colourContext: FooterColourContext;
 }
 
@@ -95,7 +96,7 @@ function Group({
  */
 export function CanvasFooter(props: CanvasFooterProps) {
   const { config, t, locale, viewport, storeName, logo, onSelectChrome, selectedChrome } = props;
-  const { contact, footerWhatsapp, social, identity, apps, pageTitles } = props;
+  const { contact, footerWhatsapp, social, identity, apps, pageTitles, categories } = props;
   const footer = config.footer;
   const layout: FooterLayout | undefined = footer.layout;
   const groups = canvasFooterGroups(footer, config.navigation?.menus ?? []);
@@ -276,8 +277,8 @@ export function CanvasFooter(props: CanvasFooterProps) {
     <>
       <FooterCol title={t("shop")}>
         <span>{t("allProducts")}</span>
-        {PREVIEW_CATEGORIES.slice(0, 4).map((category) => (
-          <span key={category.id}>{category.name[locale]}</span>
+        {categories.slice(0, 6).map((category) => (
+          <span key={category.id}>{category.name}</span>
         ))}
       </FooterCol>
       <FooterCol title={t("account")}>
@@ -317,8 +318,8 @@ export function CanvasFooter(props: CanvasFooterProps) {
             {group.id === "shop" ? (
               <>
                 <span>{t("allProducts")}</span>
-                {PREVIEW_CATEGORIES.slice(0, 4).map((category) => (
-                  <span key={category.id}>{category.name[locale]}</span>
+                {categories.slice(0, 6).map((category) => (
+                  <span key={category.id}>{category.name}</span>
                 ))}
               </>
             ) : group.id === "account" ? (

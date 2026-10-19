@@ -146,7 +146,7 @@ describe('ExperienceBuilder — CUST-H4-3 real Home catalog preview', () => {
     expect(img?.getAttribute('src')).toBe('https://cdn.example.test/p1.jpg');
   });
 
-  it('uses the tenant/storefront-scoped workspace reads with the right params: no search, sort=newest for products, rootOnly=true for categories', async () => {
+  it('uses the tenant/storefront-scoped workspace reads with the right params: no search, sort=newest for products, and paged root categories', async () => {
     render(<ExperienceBuilder storefrontId="store-42" initialLocale="ar" />);
     await waitFor(() => expect(listCategoriesMock).toHaveBeenCalled());
     await waitFor(() => expect(listProductsMock).toHaveBeenCalledWith(
@@ -156,7 +156,10 @@ describe('ExperienceBuilder — CUST-H4-3 real Home catalog preview', () => {
     // CUST-H4-3 (parity fix) — root-category scoping is a real,
     // server-side filter requested via `rootOnly: true`, not a client-side
     // `.filter()` over a larger fetched page.
-    expect(listCategoriesMock).toHaveBeenCalledWith('store-42', expect.objectContaining({ rootOnly: true, perPage: 12 }));
+    expect(listCategoriesMock).toHaveBeenCalledWith(
+      'store-42',
+      expect.objectContaining({ rootOnly: true, withMedia: true, perPage: 50, page: 1 }),
+    );
   });
 
   it('relies on the server-side root-only filter rather than filtering a mixed-depth page on the client', async () => {
@@ -179,6 +182,38 @@ describe('ExperienceBuilder — CUST-H4-3 real Home catalog preview', () => {
     // Canvas renders exactly what the (mocked) server returned — it never
     // re-derives root-ness itself from a `parentId` field.
     expect(categoriesSection()?.querySelectorAll('li').length).toBe(1);
+  });
+
+  it('uses the complete real root catalogue for header and default footer chrome', async () => {
+    listCategoriesMock.mockResolvedValue({
+      ok: true,
+      hasMore: false,
+      data: [
+        categoryRow({ id: 'c1', name: 'تصنيف حقيقي واحد' }),
+        categoryRow({ id: 'c2', name: 'تصنيف حقيقي اثنان' }),
+      ],
+    });
+
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await waitFor(() => expect(document.body.textContent).toContain('تصنيف حقيقي واحد'));
+    expect(document.body.textContent).toContain('تصنيف حقيقي اثنان');
+    for (const fake of FIXTURE_CATEGORY_NAMES) {
+      expect(document.body.textContent ?? '').not.toContain(fake);
+    }
+  });
+
+  it('loads every root-category page so global chrome is not capped at the homepage limit', async () => {
+    listCategoriesMock
+      .mockResolvedValueOnce({ ok: true, hasMore: true, data: [categoryRow({ id: 'c1', name: 'الصفحة الأولى' })] })
+      .mockResolvedValueOnce({ ok: true, hasMore: false, data: [categoryRow({ id: 'c2', name: 'الصفحة الثانية' })] });
+
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await waitFor(() => expect(document.body.textContent).toContain('الصفحة الثانية'));
+    expect(listCategoriesMock).toHaveBeenNthCalledWith(
+      2,
+      'store-1',
+      expect.objectContaining({ rootOnly: true, page: 2, perPage: 50 }),
+    );
   });
 
   it('AWJ-STORE-CAT-DESIGN-01: asks for colour + picture, and a chosen display previews the merchant\'s real category pictures', async () => {
@@ -292,7 +327,7 @@ describe('ExperienceBuilder — CUST-H4-3 real Home catalog preview', () => {
     expect(categoriesSection()?.textContent ?? '').not.toContain('متجر قديم يجب ألا يظهر');
   });
 
-  it('does not fetch the Home catalog preview when the corresponding section has been removed from the homepage', async () => {
+  it('keeps loading real root categories for global chrome when the Home section is hidden, without fetching new arrivals', async () => {
     const configWithoutCatalogSections = {
       ...DEFAULT_PRESENTATION_CONFIG,
       homepage: {
@@ -311,7 +346,10 @@ describe('ExperienceBuilder — CUST-H4-3 real Home catalog preview', () => {
     await waitFor(() => expect(showMock).toHaveBeenCalledTimes(1));
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(listCategoriesMock).not.toHaveBeenCalled();
+    expect(listCategoriesMock).toHaveBeenCalledWith(
+      'store-1',
+      expect.objectContaining({ rootOnly: true, withMedia: true }),
+    );
     expect(listProductsMock).not.toHaveBeenCalled();
   });
 });

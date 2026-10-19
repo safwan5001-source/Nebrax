@@ -97,10 +97,7 @@ import type { BenefitsLayout, SectionDesign } from "./presentation/section-desig
 import { resolveSectionDesign } from "./presentation/section-design-resolve";
 import { SectionDesignFrame } from "./SectionDesignFrame";
 import type { DesignContext } from "./presentation/section-design-resolve";
-import {
-  PREVIEW_CATEGORIES,
-  PREVIEW_STORE_NAME,
-} from "./preview-fixtures";
+import { PREVIEW_STORE_NAME } from "./preview-fixtures";
 import { CanvasCategoryDisplay } from "./CanvasCategoryDisplay";
 import "./store-preview.css";
 
@@ -449,6 +446,7 @@ export function StorefrontPreviewCanvas({
   const density = config.density === "compact" ? "compact" : "comfortable";
   const cardPad = config.productCard === "compact" ? "p-2.5" : "p-3";
   const isMarket = config.themePreset === "awj-market";
+  const shownHomeCategories = homeCategories.slice(0, isMarket ? 18 : 12);
   // The exact fixed heights ProductCard.tsx itself resolves to at each
   // breakpoint — not the `sm:`/`md:` classes themselves. This preview frame
   // is a plain, width-constrained div rendered inside the real Customizer
@@ -736,9 +734,9 @@ export function StorefrontPreviewCanvas({
                   <span className="rounded-md bg-store-surface px-2 py-1 font-medium text-store-foreground">
                     {t("allProducts")}
                   </span>
-                  {PREVIEW_CATEGORIES.map((category) => (
+                  {homeCategories.map((category) => (
                     <span key={category.id} className="text-store-muted-foreground">
-                      {category.name[locale]}
+                      {category.name}
                     </span>
                   ))}
                 </>
@@ -866,7 +864,10 @@ export function StorefrontPreviewCanvas({
             if (section.type === "categories") {
               return (
                 <section key="categories" aria-labelledby="preview-categories">
-                  <SectionRule title={t("browseCategories")} action={t("viewAll")} />
+                  <SectionRule
+                    title={t("browseCategories")}
+                    action={homeCategories.length > shownHomeCategories.length ? t("viewAll") : undefined}
+                  />
                   {/* "idle" (no fetch triggered yet — e.g. no storefrontId,
                       or a direct render with no `ExperienceBuilder` data
                       wired up) renders identically to "loading": unknown
@@ -915,13 +916,13 @@ export function StorefrontPreviewCanvas({
                     // stylesheet, pinned to the simulated device. Without one the classic preview tiles below are untouched.
                     <CanvasCategoryDisplay
                       display={section.design.display}
-                      categories={homeCategories}
+                      categories={shownHomeCategories}
                       viewport={viewport}
                       dir={locale === "ar" ? "rtl" : "ltr"}
                     />
                   ) : (
                     <ul className={cn("mt-4 grid", categoriesGap, categoriesColumns)}>
-                      {homeCategories.map((category) => (
+                      {shownHomeCategories.map((category) => (
                         <li key={category.id}>
                           <div
                             className={cn(
@@ -1726,6 +1727,7 @@ export function StorefrontPreviewCanvas({
         social={enabledSocial.map((item) => ({ id: item.id, network: item.network, href: item.href, label: socialLabel(t, item.network) }))}
         identity={{ legalName, crNumber, vatNumber, has: hasBusinessIdentity }}
         apps={{ ios, android, has: hasApps }}
+        categories={homeCategories}
         colourContext={{ primaryColor: config.primaryColor, accentColor: config.accentColor, palette: config.palette }}
       />
 
@@ -2431,7 +2433,7 @@ function SectionRule({
   hideTitle = false,
 }: {
   title: string;
-  action: string;
+  action?: string;
   /** CUST-HV V9d-3 — the merchant chose not to show the shelf title: it stays as the accessible name, only the action remains visible. */
   hideTitle?: boolean;
 }) {
@@ -2441,7 +2443,7 @@ function SectionRule({
         <h2 className="sr-only">
           {title}
         </h2>
-        <span data-section-action="" className="text-xs font-bold text-store-primary md:text-sm">{action}</span>
+        {action ? <span data-section-action="" className="text-xs font-bold text-store-primary md:text-sm">{action}</span> : null}
       </div>
     );
   }
@@ -2457,7 +2459,7 @@ function SectionRule({
           {title}
         </h2>
       </div>
-      <span data-section-action="" className="text-xs font-bold text-store-primary md:text-sm">{action}</span>
+      {action ? <span data-section-action="" className="text-xs font-bold text-store-primary md:text-sm">{action}</span> : null}
     </div>
   );
 }
