@@ -50,7 +50,12 @@
 
 ## بيانات PR
 
-سيتم تعبئة اسم الفرع والرابط وBase/Head SHA بعد إنشاء PR. أساس العمل هو `main` عند SHA `8c74051b5e6d0c917babf97902954c1dc9b16ee2`.
+- Branch: `p3-a-04-global-background-renderer`
+- PR: https://github.com/safwan5001-source/Nebrax/pull/1570 (Draft)
+- Base: `main` — SHA `8c74051b5e6d0c917babf97902954c1dc9b16ee2`
+- Head (initial implementation commit): `eb224df58a3507a3d5d8b3c9a7122efc6508a7ae`
+
+هذا PR مسودة جزئية فقط، وليس جاهزًا للدمج حتى استكمال وسائط الخلفية والاختبارات/التحقق المبين أعلاه.
 
 ## المرحلة التالية الموصى بها
 
