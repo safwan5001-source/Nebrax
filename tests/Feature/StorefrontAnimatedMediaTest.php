@@ -547,7 +547,14 @@ class StorefrontAnimatedMediaTest extends TestCase
 
         // مسموح: خلفية قسم (سطح مكتب/جوال) وشريحة سلايدر (سطح مكتب/جوال).
         $this->assertSame([], $codes(['homepage' => ['sections' => [['design' => ['background' => ['media' => $ref, 'mobile' => $ref]]]]]]));
-        $this->assertSame([], $codes(['homepage' => ['sections' => [['content' => ['slides' => [['media' => $ref, 'mobile' => $ref]]]]]]]));
+        $sliderDoc = ['homepage' => ['sections' => [[
+            'content' => ['slides' => [['media' => $ref, 'mobile' => $ref]]],
+        ]]]];
+        $this->assertSame([], $codes($sliderDoc));
+
+        // الخلفية العامة مستهلك still-only: جاهزية سلّم الإطار الأول تكفي،
+        // ولا يُسمح لمسار الحركة بالخروج من بوابة الجاهزية.
+        $this->assertSame([], $codes(['background' => ['kind' => 'media', 'media' => $ref, 'mobile' => $ref]]));
 
         // مرفوض بوضوح: شعار، معرض، كتلة محتوى — سيظهر ثابتاً بصمت.
         $denied = 'animated_not_allowed_here';
