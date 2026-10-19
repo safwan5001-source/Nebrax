@@ -3592,7 +3592,7 @@ export function ExperienceBuilder({
               {homeCategoriesState === "error" && (
                 <div
                   data-home-categories-global-error=""
-                  role="alert"
+                  aria-live="polite"
                   className="mx-auto mb-3 flex max-w-5xl items-center justify-between gap-3 rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-sm text-text"
                 >
                   <span>{t("homeCategoriesLoadFailed")}</span>
