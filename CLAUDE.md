@@ -460,6 +460,19 @@ php artisan serve
 - يمرّ في خط توقيع REM-17 **بلا تعديل**. fixtures الإشعارات `awj-note-*` تُولَّد ببصمات في `ZatcaCreditNoteFixtureDriftTest`، وقيمها مثبتة بأنها ما تكتبه الخدمات الحقيقية (`ZatcaCreditNoteRealServiceParityTest`).
 - **خارج النطاق:** 383، إشعارات المشتريات (تُرفض صراحةً)، POS/مرتجعات المبيعات، ICV/PIH المشتركة، الإرسال. المرجع: `docs/audits/horizon/REM-18a-IMPLEMENTATION-REPORT.md`.
 
+## سلسلة ZATCA المشتركة (ICV/PIH) — أساس المخطط (REM-18b-1، مخطط فقط)
+
+جدولا `zatca_chains` (رأس السلسلة) و`zatca_chain_entries` (مدخل غير قابل للتعديل لكل مستند إلكتروني صدر: فاتورة 388 أو إشعار دائن 381)
+وأعمدة ZATCA **nullable** على `credit_notes`. **لا يقرؤها ولا يكتبها أي مسار قائم** (يحرسه `ZatcaChainSchemaTest`): لا مخصِّص ICV
+(REM-18b-2)، لا سياجا F1/F2، لا ربط بـ`CreditNoteService::post` (REM-18b-3)، ولا API. لا Backfill ولا مَسّ لأي صف في `invoices`/`credit_notes`.
+- **الحراس في القاعدة** (PostgreSQL وSQLite): UPDATE على المدخل مرفوض، DELETE مرفوض ما دام المستأجر موجوداً (حتى المحذوف حذفاً ناعماً)،
+  TRUNCATE مرفوض (PostgreSQL)، إدراج المدخل يُقدّم الرأس ذرّياً (`icv = last_icv + 1` وإلا رُفض)، الرأس لا يتقدّم إلا +1 بمدخل مقابل،
+  والبذرة لا تُقبل إلا = أكبر `invoices.zatca_icv` للمستأجر (أو 0)، ومدخلٌ لمستند/سلسلة مستأجر آخر مرفوض. نموذجا `ZatcaChain`/`ZatcaChainEntry` `CompanyWide`.
+- **حذف المستأجر لم يتغيّر:** `tenant_id` → `tenants` CASCADE كبقية الجداول، وحذف مستند له مدخل منفرداً مرفوض. حذف المستأجر النهائي ما زال يزيل
+  فواتيره وسلسلته معاً — **خطر احتفاظ غير محسوم** (IR المادة 66(1): ≥ 6 سنوات) يُقرَّر في REM-36، لا هنا.
+- **التراجع** يرفض متى وُجد أي صف في الجدولين أو أي قيمة ZATCA في `credit_notes` (كل البيئات، بلا علم تجاوز).
+- المرجع: `docs/audits/horizon/REM-18b-SHARED-CHAIN-DESIGN.md` و`REM-18b-1-IMPLEMENTATION-REPORT.md`.
+
 ## الترقيم التسلسلي
 
 كل أرقام المستندات تُولَّد من مصدر واحد: `App\Support\GeneratesDocumentNumbers` (trait على النموذج).

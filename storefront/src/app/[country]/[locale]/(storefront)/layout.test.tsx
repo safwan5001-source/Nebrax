@@ -41,6 +41,7 @@ vi.mock("@/components/layout/StoreWhatsApp", () => ({
 }));
 
 import { Footer } from "@/components/layout/Footer";
+import { GlobalBackgroundLayer } from "@/components/layout/GlobalBackgroundLayer";
 import { Header } from "@/components/layout/Header";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { PublishedCardStyleProvider } from "@/components/layout/PublishedCardStyle";
@@ -54,6 +55,7 @@ interface LayoutElementProps {
   mobileNavigation?: ReactElement<{ fallback: ReactNode }>;
   categoryNavigation?: ReactElement<{ fallback: ReactNode }>;
   categoryLinks?: ReactElement<{ fallback: ReactNode }>;
+  background?: unknown;
   fallback?: ReactNode;
   id?: string;
   businessIdentity?: unknown;
@@ -67,9 +69,11 @@ async function renderLayout(content: ReactNode) {
 
   expect(layout.type).toBe(Fragment);
 
-  return Children.toArray(
+  const elements = Children.toArray(
     layout.props.children,
   ) as ReactElement<LayoutElementProps>[];
+  expect(elements[0]?.type).toBe(GlobalBackgroundLayer);
+  return elements.filter((element) => element.type !== GlobalBackgroundLayer);
 }
 
 describe("StorefrontLayout", () => {
@@ -131,12 +135,25 @@ describe("StorefrontLayout", () => {
   // this one layout. This proves that invariant directly against a
   // populated (non-default) config, instead of assuming it from the
   // null-presentation cases above.
-  it("resolves identical identity/theme/appearance for Home, Product and Category — no page-specific identity authority", async () => {
+  it("resolves identical identity/theme/appearance for Home, Product, Category and Content — shared background and identity authority", async () => {
     const populatedPresentation = {
       ...DEFAULT_PRESENTATION_CONFIG,
       primaryColor: "#7a2e8f",
       fontPreset: "tajawal-geist" as const,
       radius: "sharp" as const,
+      background: {
+        kind: "media" as const,
+        media: {
+          mediaId: "00000000-0000-4000-8000-000000000101",
+          decorative: true as const,
+          focal: { x: 32, y: 58 },
+        },
+        mobile: {
+          mediaId: "00000000-0000-4000-8000-000000000102",
+          decorative: true as const,
+          focal: { x: 70, y: 30 },
+        },
+      },
       productCard: "compact" as const,
       branding: {
         displayName: "ديوان الهدايا",
@@ -180,6 +197,16 @@ describe("StorefrontLayout", () => {
           vat_number: null,
         },
         presentation: populatedPresentation,
+      })
+      .mockResolvedValueOnce({
+        name: "متجر الاختبار",
+        default_locale: "ar",
+        business_identity: {
+          legal_name: "شركة الاختبار",
+          cr_number: "7050247977",
+          vat_number: null,
+        },
+        presentation: populatedPresentation,
       });
 
     const pages = [
@@ -192,6 +219,9 @@ describe("StorefrontLayout", () => {
       <section key="category" data-fixture="category">
         Category
       </section>,
+      <article key="content" data-fixture="content">
+        Content
+      </article>,
     ];
 
     interface ThemeWrapperProps {
@@ -234,6 +264,12 @@ describe("StorefrontLayout", () => {
       const chrome = Children.toArray(
         chromeFragment.props.children,
       ) as ReactElement<LayoutElementProps>[];
+      const globalBackground = chrome.find(
+        (el) => el.type === GlobalBackgroundLayer,
+      );
+      expect(globalBackground?.props.background).toBe(
+        populatedPresentation.background,
+      );
       const header = chrome.find((el) => el.type === Header) as ReactElement<{
         storeName: string;
         logoUrl: string | null;

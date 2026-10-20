@@ -47,7 +47,8 @@ type Scenario =
   | "vat-only"
   | "apps-one"
   | "apps-google"
-  | "whatsapp-floating";
+  | "whatsapp-floating"
+  | "global-background";
 
 function scenarioOf(value: string | null): Scenario {
   if (
@@ -62,7 +63,8 @@ function scenarioOf(value: string | null): Scenario {
     value === "vat-only" ||
     value === "apps-one" ||
     value === "apps-google" ||
-    value === "whatsapp-floating"
+    value === "whatsapp-floating" ||
+    value === "global-background"
   ) {
     return value;
   }
@@ -181,6 +183,12 @@ function trustConfig(locale: "ar" | "en", scenario: Scenario) {
     businessIdentity,
     config: normalizePresentationConfig({
       version: 2,
+      background: scenario === "global-background" ? {
+        kind: "media",
+        media: { mediaId: "00000000-0000-4000-8000-000000000101", decorative: true, focal: { x: 32, y: 58 } },
+        mobile: { mediaId: "00000000-0000-4000-8000-000000000102", decorative: true, focal: { x: 70, y: 30 } },
+        overlay: { color: { role: "brand" }, alpha: 35 },
+      } : undefined,
       branding: { displayName: storeName },
       footer: {
         tagline: long ? LONG : scenario === "empty" ? "" : "Eastern Province",

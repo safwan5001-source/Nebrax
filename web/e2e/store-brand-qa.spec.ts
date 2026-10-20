@@ -162,6 +162,52 @@ for (const locale of locales) {
   }
 }
 
+test('global media background is still-only and matches desktop/mobile focal points', async ({ page }) => {
+  const ids = ['00000000-0000-4000-8000-000000000101', '00000000-0000-4000-8000-000000000102'];
+  const previewUrls = {
+    [ids[0]]: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Crect width='32' height='32' fill='%234f46e5'/%3E%3C/svg%3E",
+    [ids[1]]: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Crect width='32' height='32' fill='%23f97316'/%3E%3C/svg%3E",
+  };
+  const mediaRequests: string[] = [];
+  await page.route((url) => url.pathname.includes('/commerce/workspace/storefront-media/'), async (route) => {
+    const requestUrl = route.request().url();
+    const headers = { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET, OPTIONS', 'access-control-allow-headers': '*' };
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
+    if (new URL(requestUrl).pathname.endsWith('/derivatives/status')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', headers, body: JSON.stringify({ data: [{ state: 'absent', files: [] }] }) });
+    }
+    if (route.request().method() === 'GET') mediaRequests.push(requestUrl);
+    const id = new URL(requestUrl).pathname.split('/').at(-1) ?? '';
+    if (!ids.includes(id)) return route.fulfill({ status: 404, headers, body: '{}' });
+    const previewUrl = previewUrls[id as keyof typeof previewUrls];
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers,
+      body: JSON.stringify({ data: { id, name: 'QA still', mime: 'image/svg+xml', size: 128, width: 32, height: 32, alt_ar: null, alt_en: null, variants_state: 'ready', variants_error: null, thumbnail_url: previewUrl, preview_url: previewUrl, usage_count: 1 } }),
+    });
+  });
+  for (const view of [
+    { width: 1440, name: 'desktop', id: ids[0], focal: '32% 58%' },
+    { width: 390, name: 'mobile', id: ids[1], focal: '70% 30%' },
+  ]) {
+    await page.setViewportSize({ width: view.width, height: 1000 });
+    await page.goto(`/dev/trust-visual?locale=en&scenario=global-background&viewport=${view.name}`);
+    await expect.poll(() => mediaRequests.length).toBeGreaterThan(0);
+    const layer = page.locator('[data-global-background-layer]');
+    await expect(layer).toBeVisible();
+    await expect(page.locator('header')).toBeVisible();
+    await expect(page.locator('footer')).toBeVisible();
+    const image = layer.locator('img[data-global-background-image]');
+    await expect(image).toHaveAttribute('src', previewUrls[view.id as keyof typeof previewUrls]);
+    await expect(image).toHaveCSS('object-position', view.focal);
+    await expect(image).toHaveAttribute('loading', 'lazy');
+    await expect(layer.locator('[data-global-background-overlay]')).toHaveCSS('opacity', '0.35');
+    await expect(layer.locator('video')).toHaveCount(0);
+    await page.screenshot({ path: path.join(evidenceDir, `global-background-${view.name}.png`), fullPage: true });
+  }
+});
+
 const stateCases = [
   ['empty', { phone: 0, email: 0, address: 0, hours: 0, instagram: 0, whatsapp: 0, apple: 0, google: 0 }],
   ['partial', { phone: 1, email: 0, address: 0, hours: 0, instagram: 1, whatsapp: 1, apple: 0, google: 0 }],
