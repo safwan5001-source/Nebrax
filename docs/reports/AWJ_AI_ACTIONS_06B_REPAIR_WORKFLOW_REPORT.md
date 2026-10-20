@@ -41,7 +41,16 @@ Anthropic, Railway. No journal entry is produced by a repair beyond what the pro
 
 ## Tests
 
-__TESTS__
+| Check | Result |
+|---|---|
+| `AiActionProductRepairTest` (new, 11): repair holds only failed rows and leaves the original untouched; one open repair per execution; field lock + value provenance; own preview/approval and no repeat of successes; transient failure → retry first, repair after approval expiry; domain-rule rejection scope; permission / tenant / branch / not-finished; cost visibility; immutability; chained repair; image repair (append-only, product not rewritten) | **11 passed on SQLite and PostgreSQL** |
+| `AiAction*` + `ProductImport*` + `ProductMedia*` + `ProductReferenceClassificationGuard` + `BranchIsolationGuard` | **102 passed on PostgreSQL**, 87 `AiAction*` on SQLite |
+| Full PHP suite, SQLite (local, 8,083 tests) | 7,912 passed, 145 skipped, **26 failed — all `Fuel*`** (`bcmul()` undefined: `bcmath` missing locally, CI installs it) |
+| Web `vitest` AI Actions + ai-import (+ the store-experience-builder test that CI flagged) | **69 passed** (new: 7 repair-UI tests — proposes repair only for non-retryable failures, explicit confirmation, idempotency key, no creation on cancel, double-click guard, open repair is resumed, retry-first hint, English; page test — opens a repair from the link, shows the reason, unlocks only the affected fields, no bulk field edit) |
+| `npm run build` | passes |
+
+CI note (inherited from 06A): the shared single-process vitest run was leaking a stubbed `crypto.randomUUID` from the AI panel tests into a later,
+unrelated test; the AI test files now unstub globals after each test (fixed in 06A `a814ae0`, merged here).
 
 ## Risks and what remains
 1. A repair is a new import, so it needs its own approval (by design). If a reviewer prefers re-approving the *same* preview after a transient failure,
