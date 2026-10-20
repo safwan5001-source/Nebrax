@@ -185,6 +185,31 @@ export function formatTime(
   });
 }
 
+/** Storefront-compatible delivery day labels from an authoritative timezone. */
+export function formatDeliveryDay(input: {
+  date: string;
+  timezone: string;
+  locale: string;
+  todayLabel: string;
+  tomorrowLabel: string;
+  now?: Date;
+}): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) return null;
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: input.timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(input.now ?? new Date());
+  const [year, month, day] = today.split("-").map(Number);
+  const tomorrow = new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
+  if (input.date === today) return input.todayLabel;
+  if (input.date === tomorrow) return input.tomorrowLabel;
+  return formatLongDate(input.date, input.locale);
+}
+
+/** Storefront-compatible locale-aware delivery window. */
+export function formatDeliveryWindow(start: string, end: string, locale: string): string | null {
+  const valid = (value: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+  if (!valid(start) || !valid(end)) return null;
+  return `${formatTime(`1970-01-01T${start}:00Z`, locale)} – ${formatTime(`1970-01-01T${end}:00Z`, locale)}`;
+}
+
 export type FormatDateTimeOptions = {
   fallback?: string;
   dateStyle?: 'short' | 'medium' | 'long';
