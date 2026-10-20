@@ -439,6 +439,10 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
             ->middleware([$perm('ai.actions.use'), EnforceUserIdempotency::class, 'throttle:10,1']);
         Route::get('ai-actions/{action}/files/{file}/extraction', [AiActionController::class, 'showExtraction'])
             ->middleware([$perm('ai.actions.use'), 'throttle:60,1']);
+        Route::get('ai-actions/{action}/review', [AiActionController::class, 'review'])
+            ->middleware([$perm('ai.actions.use'), 'throttle:60,1']);
+        Route::post('ai-actions/{action}/review/versions', [AiActionController::class, 'storeReview'])
+            ->middleware([$perm('ai.actions.use'), EnforceUserIdempotency::class, 'throttle:30,1']);
 
         // مركز المستندات — PR-2: استقبال يدوي خاص فقط، بلا OCR أو Queue أو إنشاء معاملات.
         Route::post('document-batches', [DocumentIntakeController::class, 'storeBatch'])
