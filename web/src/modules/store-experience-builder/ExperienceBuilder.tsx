@@ -361,6 +361,7 @@ export function ExperienceBuilder({
   const [homeSectionDelivery, setHomeSectionDelivery] = useState<Record<string, WorkspaceDeliveryEarliest | null>>({});
   const [homeSectionDeliveryState, setHomeSectionDeliveryState] = useState<Record<string, "idle" | "loading" | "error" | "ready">>({});
   const homeSectionRequestRef = useRef<Record<string, number>>({});
+  const homeSectionDataKeyRef = useRef<Record<string, string>>({});
   // CUST-H4-5 — real batched resolution for "featured" sections' own Canvas
   // preview. Unlike `homeCategories`/`homeNewArrivals` above, "featured" is
   // **not** a singleton section type (`canDuplicate: true` — a merchant may
@@ -1034,6 +1035,7 @@ export function ExperienceBuilder({
     setOffersMax(null);
     setOffersState("idle");
     homeSectionRequestRef.current = {};
+    homeSectionDataKeyRef.current = {};
     setHomeSectionProducts({});
     setHomeSectionProductsState({});
     setHomeSectionDiscovery({});
@@ -1551,10 +1553,14 @@ export function ExperienceBuilder({
         : section.type === "discovery"
           ? homeSectionDiscoveryState[section.id]
           : homeSectionDeliveryState[section.id];
-      if (state === undefined || state === "idle") void loadHomeDataSection(section);
+      const dataKey = `${section.type}:${JSON.stringify(section.content ?? null)}`;
+      if (homeSectionDataKeyRef.current[section.id] !== dataKey || state === undefined || state === "idle") {
+        homeSectionDataKeyRef.current[section.id] = dataKey;
+        void loadHomeDataSection(section);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, storefrontId, busy, homeSectionsShown]);
+  }, [currentPage, storefrontId, busy, homeSectionsShown, homeSectionProductsState, homeSectionDiscoveryState, homeSectionDeliveryState]);
 
   // Workspace media URLs are signed and bounded. Refresh the section data
   // before the same expiry window used by the category/header preview so a

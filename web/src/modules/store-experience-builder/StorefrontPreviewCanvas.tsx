@@ -115,6 +115,7 @@ import type { HeadingBlock, ParagraphBlock } from "./presentation/content-blocks
 import { StoreIcon } from "./StoreIcon";
 import type { BenefitsLayout, SectionDesign } from "./presentation/section-design";
 import { resolveSectionDesign } from "./presentation/section-design-resolve";
+import { resolveDiscoveryDisplay } from "./presentation/discovery-templates";
 import { SectionDesignFrame } from "./SectionDesignFrame";
 import type { DesignContext } from "./presentation/section-design-resolve";
 import { PREVIEW_STORE_NAME } from "./preview-fixtures";
@@ -321,6 +322,15 @@ function shelfAttrs(design: SectionDesign | undefined, viewport: "desktop" | "ta
     "data-vp": viewport,
     ...(design.columns ? { "data-cols": String(design.columns) } : {}),
   };
+}
+
+function discoveryOptionImage(visual: Record<string, unknown> | null): string | null {
+  const image = visual?.image;
+  if (!image || typeof image !== "object" || Array.isArray(image)) return null;
+  const sources = (image as Record<string, unknown>).sources;
+  if (!Array.isArray(sources)) return null;
+  const source = sources.find((item) => item && typeof item === "object" && typeof (item as Record<string, unknown>).src === "string");
+  return source && typeof (source) === "object" ? (source as Record<string, string>).src ?? null : null;
 }
 
 export function StorefrontPreviewCanvas({
@@ -1672,11 +1682,15 @@ export function StorefrontPreviewCanvas({
                 const content = discoveryContentOf(section);
                 const discovery = homeSectionDiscovery[section.id];
                 const headingId = `preview-discovery-${section.id}`;
-                const options = discovery?.options ?? [];
+                const display = resolveDiscoveryDisplay(content);
+                const orderedOptions = [...(discovery?.options ?? [])].sort((a, b) => display.valueSort === "count" ? b.count - a.count : 0);
+                const options = orderedOptions.slice(0, display.maxItems);
+                const columns = viewport === "mobile" ? display.columns.mobile : viewport === "tablet" ? display.columns.tablet : display.columns.desktop;
+                const layout = display.layout;
                 return (
                   <section key={section.id} aria-labelledby={headingId} data-home-data-section="discovery" data-incomplete={incomplete ? "" : undefined}>
                     <SectionRule title={title || t("sectionDiscovery")} />
-                    {incomplete ? <p className="mt-2 text-xs text-store-muted-foreground">{t("canvasDataSectionIncomplete")}</p> : state === "loading" || state === "idle" ? <div aria-hidden="true" className="mt-4 h-20 animate-pulse rounded-store bg-store-surface-muted" /> : state === "error" ? <div data-home-section-error="discovery" className="mt-4 flex flex-col items-center gap-2 rounded-store border border-dashed border-store-border px-4 py-8 text-center"><p className="text-sm text-store-muted-foreground">{t("homeNewArrivalsLoadFailed")}</p><button type="button" onClick={() => onRetryHomeDataSection?.(section.id)} className="rounded-store border border-store-border px-3 py-1.5 text-xs font-medium text-store-foreground">{t("retry")}</button></div> : options.length === 0 ? <p data-home-section-empty="discovery" className="mt-4 rounded-store border border-dashed border-store-border px-4 py-8 text-center text-sm text-store-muted-foreground">{t("homeNewArrivalsEmpty")}</p> : content.display === "chips" ? <ul className="mt-4 flex flex-wrap gap-2">{options.map((option) => <li key={option.value}><span className="inline-flex min-h-10 items-center rounded-full border border-store-border bg-store-surface px-4 text-sm font-bold text-store-foreground"><bdi>{locale === "en" && option.nameEn ? option.nameEn : option.name}</bdi><span className="ms-1 text-xs text-store-muted-foreground">({option.count})</span></span></li>)}</ul> : <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 md:gap-4">{options.slice(0, content.maxItems ?? 24).map((option) => <li key={option.value}><span className="flex min-h-20 flex-col items-center justify-center rounded-store border border-store-border bg-store-surface px-3 py-4 text-center text-sm font-bold text-store-foreground"><bdi>{locale === "en" && option.nameEn ? option.nameEn : option.name}</bdi><span className="mt-1 text-xs font-normal text-store-muted-foreground">{option.count}</span></span></li>)}</ul>}
+                    {incomplete ? <p className="mt-2 text-xs text-store-muted-foreground">{t("canvasDataSectionIncomplete")}</p> : state === "loading" || state === "idle" ? <div aria-hidden="true" className="mt-4 h-20 animate-pulse rounded-store bg-store-surface-muted" /> : state === "error" ? <div data-home-section-error="discovery" className="mt-4 flex flex-col items-center gap-2 rounded-store border border-dashed border-store-border px-4 py-8 text-center"><p className="text-sm text-store-muted-foreground">{t("homeNewArrivalsLoadFailed")}</p><button type="button" onClick={() => onRetryHomeDataSection?.(section.id)} className="rounded-store border border-dashed border-store-border px-3 py-1.5 text-xs font-medium text-store-foreground">{t("retry")}</button></div> : options.length === 0 ? <p data-home-section-empty="discovery" className="mt-4 rounded-store border border-dashed border-store-border px-4 py-8 text-center text-sm text-store-muted-foreground">{t("homeNewArrivalsEmpty")}</p> : content.display === "chips" && layout === null ? <ul data-discovery-layout="chips" data-discovery-show-counts={display.showCounts ? "true" : "false"} className="mt-4 flex flex-wrap gap-2">{options.map((option) => <li key={option.value}><span className="inline-flex min-h-10 items-center rounded-full border border-store-border bg-store-surface px-4 text-sm font-bold text-store-foreground"><bdi>{locale === "en" && option.nameEn ? option.nameEn : option.name}</bdi>{display.showCounts ? <span className="ms-1 text-xs text-store-muted-foreground">({option.count})</span> : null}</span></li>)}</ul> : <ul data-discovery-layout={layout ?? "tiles"} data-discovery-value-sort={display.valueSort} data-discovery-show-counts={display.showCounts ? "true" : "false"} className={cn("mt-4 grid gap-3 md:gap-4", layout === "text-list" ? "grid-cols-1" : layout === "carousel" ? "grid-flow-col auto-cols-[minmax(9rem,1fr)] overflow-x-auto" : `grid-cols-${Math.max(1, columns)}`)}>{options.map((option) => { const image = discoveryOptionImage(option.visual); return <li key={option.value} className="min-w-0"><span className={cn("flex min-h-20 flex-col items-center justify-center rounded-store border border-store-border bg-store-surface px-3 py-4 text-center text-sm font-bold text-store-foreground", layout === "text-list" && "items-start text-start", layout === "image-cards" && "overflow-hidden p-0")}>{image ? <PreviewMediaImage src={image} alt="" className="mb-2 h-16 w-full object-cover" /> : null}<bdi>{locale === "en" && option.nameEn ? option.nameEn : option.name}</bdi>{display.showCounts ? <span className="mt-1 text-xs font-normal text-store-muted-foreground">{option.count}</span> : null}</span></li>; })}</ul>}
                   </section>
                 );
               }
