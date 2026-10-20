@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Money } from '@/components/ui/money';
 import { Tabs } from '@/components/ui/tabs';
+import { ProductExecutionPanel } from './product-execution-panel';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { formatDateTime } from '@/lib/formatting';
@@ -31,6 +32,7 @@ import {
   minorToRiyal,
   shortHash,
 } from './product-preview';
+import { isExecutionLocked } from './product-execution';
 
 const PAGE_SIZE = 50;
 
@@ -109,7 +111,7 @@ function Images({ row }: { row: PreviewRow }) {
     <div className="space-y-1 text-xs">
       <p className="flex items-center gap-1"><ImageIcon className="h-3.5 w-3.5" aria-hidden /> {images.count} {images.count === 1 ? 'صورة' : 'صور'}</p>
       {first && <p className="max-w-48 truncate text-muted" dir="ltr" title={first}>{first}</p>}
-      <p className="text-muted">{images.will_apply ? 'مقترحة — لم تُنزَّل بعد' : 'لن تُطبَّق على المنتج الموجود'}</p>
+      <p className="text-muted">{images.status === 'deferred' ? 'مؤجَّلة — لا تُنزَّل ولا تُرفق في هذه المرحلة' : 'لن تُطبَّق'}</p>
     </div>
   );
 }
@@ -162,6 +164,8 @@ export function ProductPreviewPanel({ actionId, version, dirty, onEdit, onStatus
   const [page, setPage] = useState(1);
   const [acknowledged, setAcknowledged] = useState(false);
   const [stale, setStale] = useState<string | null>(null);
+  // بعد بدء التنفيذ لا يُسمح بالعودة إلى التعديل ولا بمعاينة جديدة (الخادم يرفضهما أيضاً).
+  const [executionLocked, setExecutionLocked] = useState(false);
   const started = useRef(false);
 
   const generate = useCallback(async () => {
@@ -280,7 +284,7 @@ export function ProductPreviewPanel({ actionId, version, dirty, onEdit, onStatus
               : preview.status === 'invalidated' ? <Badge tone="negative">معاينة مُبطلة</Badge>
               : preview.status === 'expired' ? <Badge tone="warning">منتهية الصلاحية</Badge>
               : preview.approvable ? <Badge tone="neutral">جاهزة للموافقة</Badge> : <Badge tone="negative">بها أخطاء تمنع التنفيذ</Badge>}
-            <Button variant="outline" size="sm" onClick={() => void generate()} disabled={loading}><RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} aria-hidden /> معاينة جديدة</Button>
+            <Button variant="outline" size="sm" onClick={() => void generate()} disabled={loading || executionLocked}><RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} aria-hidden /> معاينة جديدة</Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -400,9 +404,18 @@ export function ProductPreviewPanel({ actionId, version, dirty, onEdit, onStatus
               </div>
             </>
           )}
-          {approved && <Button variant="outline" onClick={onEdit}>تعديل البيانات (يُبطل الموافقة)</Button>}
+          {approved && !executionLocked && <Button variant="outline" onClick={onEdit}>تعديل البيانات (يُبطل الموافقة)</Button>}
         </CardContent>
       </Card>
+
+      {approved && preview.approval && (
+        <ProductExecutionPanel
+          actionId={actionId}
+          version={version}
+          totals={{ create: totals.create, update: totals.update, skip: totals.skip }}
+          onStatus={(status) => { setExecutionLocked(isExecutionLocked(status)); onStatus(status); }}
+        />
+      )}
     </div>
   );
 }

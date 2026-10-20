@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/toast';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { ProductPreviewPanel } from '@/modules/ai-actions/product-preview-panel';
 import { DECISION_LABEL, FIELD_LABEL, type RowDecision, apiErrorMessage } from '@/modules/ai-actions/product-preview';
+import { isExecutionLocked } from '@/modules/ai-actions/product-execution';
 
 type Field = { value: string | number | boolean | null; origin: 'extracted' | 'user' | 'ai_suggested' | 'erp_existing' | 'missing'; confidence: number | null };
 type Row = { row_id: string; source_row: number; decision: RowDecision; fields: Record<string, Field>; violations: { field: string | null; severity: string; message: string }[]; media: unknown };
@@ -38,6 +39,8 @@ export default function AiProductImportReviewPage() {
   const dirty = Object.keys(pending).length > 0;
   // بلا `products.view_cost` يحجب الخادم سعر الشراء ويرفض تعديله؛ الواجهة تعكس ذلك ولا تعرض حقلاً قابلاً للكتابة.
   const costHidden = review?.action.cost_hidden === true;
+  // بعد بدء التنفيذ تُقفل المراجعة: أي تعديل يرفضه الخادم، فلا نعرض له طريقاً.
+  const locked = isExecutionLocked(review?.action.status);
   const visibleFields = fields.filter((field) => !(costHidden && field === 'purchase_price'));
 
   const rows = useMemo(() => (review?.proposal.rows ?? []).filter((row) => {
@@ -70,7 +73,7 @@ export default function AiProductImportReviewPage() {
 
   /** يحفظ التعديلات المعلّقة كإصدار جديد؛ يعيد `true` إن لم يبق شيء غير محفوظ. */
   async function save(): Promise<boolean> {
-    if (!review) return false;
+    if (!review || locked) return false;
     if (!dirty) return true;
     if (['ready_for_approval', 'approved'].includes(review.action.status)) {
       const ok = await confirm({ message: review.action.status === 'approved' ? 'سيؤدي الحفظ إلى إبطال الموافقة والمعاينة الحاليتين، وستحتاج معاينة وموافقة جديدتين.' : 'سيؤدي الحفظ إلى إبطال المعاينة الحالية وستحتاج معاينة جديدة.', confirmLabel: 'حفظ وإبطال' });
@@ -97,7 +100,7 @@ export default function AiProductImportReviewPage() {
     <header className="flex items-center gap-3"><Button asChild variant="ghost" size="icon" aria-label="العودة"><Link href="/products"><ArrowRight className="h-4 w-4 rtl:rotate-0 ltr:rotate-180" /></Link></Button><div><h1 className="text-xl font-semibold">استيراد عبر مساعد أَوْج</h1><p className="text-sm text-muted">{stage === 'review' ? 'استخراج ومراجعة — ثم معاينة نهائية وموافقة. لا تُنشأ منتجات أو تُحدّث في هذه المرحلة.' : 'المعاينة النهائية والموافقة — لا تُنشأ منتجات أو تُحدّث في هذه المرحلة.'}</p></div></header>
     {!review ? <Card><CardHeader><CardTitle>ارفع CSV أو Excel</CardTitle></CardHeader><CardContent><label className="flex min-h-36 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-6 text-center"><FileSpreadsheet className="h-8 w-8 text-primary" /><span>{file?.name ?? 'اختر ملف المنتجات'}</span><Input className="sr-only" type="file" accept=".csv,.xlsx" onChange={upload} disabled={saving} /></label>{saving && <p className="mt-3 flex items-center gap-2 text-sm"><Loader2 className="h-4 w-4 animate-spin" /> جارٍ الاستخراج الآمن…</p>}</CardContent></Card> : <>
       <ol className="flex flex-wrap items-center gap-2 text-sm" aria-label="مراحل الاستيراد">
-        <li><Button variant={stage === 'review' ? 'primary' : 'outline'} size="sm" aria-current={stage === 'review' ? 'step' : undefined} onClick={() => setStage('review')}>١ · مراجعة البيانات</Button></li>
+        <li><Button variant={stage === 'review' ? 'primary' : 'outline'} size="sm" aria-current={stage === 'review' ? 'step' : undefined} onClick={() => setStage('review')} disabled={locked}>١ · مراجعة البيانات</Button></li>
         <li><Button variant={stage === 'preview' ? 'primary' : 'outline'} size="sm" aria-current={stage === 'preview' ? 'step' : undefined} onClick={() => void toPreview()} disabled={saving}>٢ · المعاينة والموافقة</Button></li>
       </ol>
       {stage === 'preview' ? <ProductPreviewPanel actionId={review.action.id} version={review.action.version} dirty={dirty} onEdit={() => setStage('review')} onStatus={setStatus} /> : <>

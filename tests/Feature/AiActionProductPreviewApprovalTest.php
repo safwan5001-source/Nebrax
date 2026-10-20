@@ -140,7 +140,9 @@ class AiActionProductPreviewApprovalTest extends TestCase
         $this->assertSame(1050, $rows['new']['prices']['sale_price']['after']);
         $this->assertSame(500, $rows['new']['prices']['purchase_price']['after']);
         $this->assertSame(3, $rows['new']['images']['count']);
-        $this->assertTrue($rows['new']['images']['will_apply']);
+        $this->assertFalse($rows['new']['images']['will_apply']);
+        $this->assertSame('deferred', $rows['new']['images']['status']);
+        $this->assertContains('media_deferred', $this->codes($rows['new']));
         $this->assertFalse($rows['new']['images']['fetched']);
 
         $this->assertSame('update', $rows['upd']['operation']);

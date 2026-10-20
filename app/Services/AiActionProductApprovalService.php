@@ -236,7 +236,7 @@ final class AiActionProductApprovalService
     }
 
     /** @return array{0:array<string,mixed>,1:string,2:?string,3:?string} */
-    private function compute(AiAction $locked): array
+    public function compute(AiAction $locked): array
     {
         $effective = $this->review->effective($locked);
         $rows = $effective['proposal']['rows'] ?? [];

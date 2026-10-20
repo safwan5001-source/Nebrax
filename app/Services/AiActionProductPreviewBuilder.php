@@ -133,7 +133,7 @@ final class AiActionProductPreviewBuilder
         $products = [];
         $load = function (string $column, array $values) use (&$products): void {
             foreach (array_chunk($values, self::CHUNK) as $chunk) {
-                foreach (Product::query()->with('unitTemplate:id,name')->whereIn($column, $chunk)->get() as $product) {
+                foreach (Product::query()->with(['unitTemplate:id,name', 'productCategory:id,name', 'productBrand:id,name'])->whereIn($column, $chunk)->get() as $product) {
                     $products[(string) $product->id] = $product;
                 }
             }
@@ -295,14 +295,15 @@ final class AiActionProductPreviewBuilder
                 $issues[] = $this->issue('trusted_identifier_missing', null, 'error', 'يلزم رمز صنف (SKU) أو باركود لإنشاء منتج جديد؛ لن يُولَّد واحد تلقائياً.');
             }
             foreach ($values as $key => $value) {
-                if ($key !== 'nebrax_id' && ! in_array($key, ProductImportFields::mediaKeys(), true)) $changes[] = ['field' => $key, 'before' => null, 'after' => $value];
+                // `unit_template` is not applied in this phase (see the warning below), so it is not a change.
+                if (! in_array($key, ['nebrax_id', 'unit_template'], true) && ! in_array($key, ProductImportFields::mediaKeys(), true)) $changes[] = ['field' => $key, 'before' => null, 'after' => $value];
             }
         } else { // update
             if ($target === null) {
                 $issues[] = $this->issue('update_target_missing', null, 'error', 'لا يوجد منتج مطابق بمعرّف موثوق (معرّف نبراكس أو SKU أو باركود)؛ لا يمكن التحديث.');
             } else {
                 foreach (ProductImportFields::writableKeys() as $key) {
-                    if (in_array($key, ProductImportFields::mediaKeys(), true) || ! array_key_exists($key, $values)) continue;
+                    if (in_array($key, ProductImportFields::mediaKeys(), true) || $key === 'unit_template' || ! array_key_exists($key, $values)) continue;
                     $before = $this->existing($target, $key);
                     $after = $values[$key];
                     if (in_array($key, self::LOCKED, true)) {
@@ -329,19 +330,25 @@ final class AiActionProductPreviewBuilder
         }
 
         foreach (self::REFERENCES as $key => $label) {
-            if (isset($values[$key])) {
-                $known = $references[$key][mb_strtolower(trim((string) $values[$key]), 'UTF-8')] ?? null;
-                if ($known !== true) {
-                    $issues[] = $this->issue('reference_unmanaged', $key, 'warning', "«{$label}» بالقيمة «{$values[$key]}» غير موجود (أو غامض) في بيانات المؤسسة ولن يُنشأ تلقائياً.");
-                }
+            if (! isset($values[$key])) continue;
+            if ($key === 'unit_template') {
+                // A template overrides the base unit and multiplies incoming stock quantities: never applied silently.
+                $issues[] = $this->issue('unit_template_deferred', $key, 'warning', "«{$label}» لا يُطبَّق في هذه المرحلة؛ تبقى الوحدة المحدَّدة في الصف كما هي.");
+                continue;
+            }
+            $known = $references[$key][mb_strtolower(trim((string) $values[$key]), 'UTF-8')] ?? null;
+            if ($known !== true) {
+                $issues[] = $this->issue('reference_unmanaged', $key, 'warning', "«{$label}» بالقيمة «{$values[$key]}» غير موجود (أو غامض) في بيانات المؤسسة؛ سيُحفظ نصّاً حرّاً ولن يُنشأ تلقائياً.");
             }
         }
 
         [$images, $imageIssues] = $this->images($fields);
         $issues = array_merge($issues, $imageIssues);
-        if ($decision === 'update' && $images['count'] > 0) {
-            $images['will_apply'] = false;
-            $issues[] = $this->issue('media_update_not_approved', 'primary_image_url', 'warning', 'لم تُعتمد صور المنتج الموجود؛ لن تُطبَّق صور هذا الصف.');
+        if ($images['count'] > 0) {
+            // Image import is deferred (nothing is fetched, attached or replaced); say so instead of implying success.
+            $issues[] = $decision === 'update'
+                ? $this->issue('media_update_not_approved', 'primary_image_url', 'warning', 'لم تُعتمد صور المنتج الموجود؛ لن تُطبَّق صور هذا الصف.')
+                : $this->issue('media_deferred', 'primary_image_url', 'warning', 'استيراد الصور مؤجَّل؛ لن تُنزَّل روابط الصور ولن تُرفق بالمنتج في هذه المرحلة.');
         }
 
         $hasError = count(array_filter($issues, static fn (array $i): bool => $i['severity'] === 'error')) > 0;
@@ -403,7 +410,7 @@ final class AiActionProductPreviewBuilder
         }
 
         // URLs are shown as proposed; nothing is fetched or attached at preview time.
-        return [$good + ['count' => $count, 'will_apply' => $count > 0, 'fetched' => false], $issues];
+        return [$good + ['count' => $count, 'will_apply' => false, 'status' => $count > 0 ? 'deferred' : 'none', 'fetched' => false], $issues];
     }
 
     private function existing(Product $product, string $key): mixed
@@ -414,6 +421,8 @@ final class AiActionProductPreviewBuilder
             'tax_rate' => (int) $product->tax_rate,
             'reorder_level' => $product->reorder_level === null ? null : (int) $product->reorder_level,
             'track_inventory', 'is_active' => (bool) $product->{$key},
+            'category' => $product->category_id !== null ? $product->productCategory?->name : ($product->category === null ? null : (string) $product->category),
+            'brand' => $product->brand_id !== null ? $product->productBrand?->name : ($product->brand === null ? null : (string) $product->brand),
             'unit_template' => $product->unit_template_id === null ? null : ($product->unitTemplate?->name),
             default => $product->{$key} === null ? null : (string) $product->{$key},
         };
