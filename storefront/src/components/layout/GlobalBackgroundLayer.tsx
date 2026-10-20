@@ -112,7 +112,6 @@ export function GlobalBackgroundLayer({
         {desktopWebp ? (
           <source type="image/webp" srcSet={desktopWebp} sizes="100vw" />
         ) : null}
-        {/* biome-ignore lint/performance/noImgElement: still-only responsive art direction inside a picture */}
         <img
           data-global-background-image=""
           src={desktopFallback.src}
