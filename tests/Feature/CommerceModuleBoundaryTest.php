@@ -150,6 +150,8 @@ class CommerceModuleBoundaryTest extends TestCase
         // مُخصِّص صفحة المنتج. قراءة فقط، أهليتها مقيَّدة بقناة هذا المتجر تحديداً.
         'api/commerce/workspace/storefronts/{id}/products',
         'api/commerce/workspace/storefronts/{id}/products/{product}',
+        // FLOWERS-H9c / ADR-21 — bounded editor section-data projection.
+        'api/commerce/workspace/storefronts/{id}/section-data',
         // FLOWERS-H14 / ADR-25 — قائمة تهيئة ملف الهدايا والقيم المبدئية.
         'api/commerce/workspace/storefronts/{id}/vertical-setup',
         'api/commerce/workspace/storefronts/{id}/vertical-setup/starters',

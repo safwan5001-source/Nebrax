@@ -1,9 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * FLOWERS-H9c / ADR-21 — the Canvas never fabricates data for the data-backed
- * sections: it shows only the merchant-authored title and an honest "live
- * data appears here" note, and flags a section the storefront would omit.
+ * FLOWERS-H9c / ADR-21 — the Canvas renders the approved live section-data
+ * projection when present and keeps loading/empty/error states honest.
  */
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -35,7 +34,7 @@ function section(container: HTMLElement, id: string): HTMLElement {
 describe("Canvas — data-backed sections (ADR-21)", () => {
   afterEach(() => cleanup());
 
-  it("productShelf shows the authored title, the deliver-today badge and a live-data note — no products", () => {
+  it("productShelf shows authored content and the deliver-today badge while data is loading", () => {
     const { container } = renderCanvas(
       withSections([
         {
@@ -49,7 +48,7 @@ describe("Canvas — data-backed sections (ADR-21)", () => {
     const el = section(container, "shelf-1");
     expect(el.textContent).toContain("Roses for today");
     expect(el.textContent).toContain("Deliver today");
-    expect(el.textContent).toContain("Live store products appear here");
+    expect(el.querySelector("[aria-hidden=\"true\"]")).not.toBeNull();
     expect(el.hasAttribute("data-incomplete")).toBe(false);
     expect(el.querySelector("img")).toBeNull();
   });
@@ -62,7 +61,7 @@ describe("Canvas — data-backed sections (ADR-21)", () => {
     );
     const el = section(container, "d-1");
     expect(el.querySelector("h2")?.textContent?.length).toBeGreaterThan(0);
-    expect(el.textContent).toContain("appear on the published store");
+    expect(el.querySelector("[aria-hidden=\"true\"]")).not.toBeNull();
   });
 
   it("flags a productShelf or discovery section with no stored content as incomplete", () => {
@@ -85,7 +84,7 @@ describe("Canvas — data-backed sections (ADR-21)", () => {
     );
     const el = section(container, "p-1");
     expect(el.hasAttribute("data-incomplete")).toBe(false);
-    expect(el.textContent).toContain("The earliest delivery window appears here, live");
+    expect(el.querySelector("[aria-hidden=\"true\"]")).not.toBeNull();
     expect(el.textContent).not.toMatch(/\d{4}-\d{2}-\d{2}/);
   });
 
@@ -101,6 +100,27 @@ describe("Canvas — data-backed sections (ADR-21)", () => {
       withSections([{ id: "p-1", type: "deliveryPromise", visible: true }]),
       "ar",
     );
-    expect(section(container, "p-1").textContent).toContain("أقرب موعد توصيل يظهر هنا حيّاً");
+    expect(section(container, "p-1").querySelector("[aria-hidden=\"true\"]")).not.toBeNull();
+  });
+
+  it("renders server-projected product cards and discovery values instead of a placeholder", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={withSections([
+          { id: "shelf-1", type: "productShelf", visible: true, content: { title: "Shelf", deliverToday: false, limit: 2 } },
+          { id: "d-1", type: "discovery", visible: true, content: { title: "Shop by", axis: "brand", display: "tiles" } },
+        ])}
+        locale="en"
+        viewport="desktop"
+        homeSectionProducts={{ "shelf-1": [{ id: "p1", name: "Rose", thumbnailUrl: "/rose.jpg", priceAmountMinor: 2500, currency: "SAR", inStock: true }] }}
+        homeSectionProductsState={{ "shelf-1": "ready" }}
+        homeSectionDiscovery={{ "d-1": { axis: "brand", name: "", nameEn: null, visual: null, options: [{ value: "b1", name: "Brand", nameEn: "Brand", count: 3, visual: null }] } }}
+        homeSectionDiscoveryState={{ "d-1": "ready" }}
+        onSelectSection={() => {}}
+      />,
+    );
+    expect(container.querySelector('[data-home-data-section="productShelf"] [data-card]')).not.toBeNull();
+    expect(container.querySelector('[data-home-data-section="productShelf"]')?.textContent).toContain("SAR");
+    expect(container.querySelector('[data-home-data-section="discovery"]')?.textContent).toContain("Brand");
   });
 });

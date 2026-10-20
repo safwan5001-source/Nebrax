@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\CommerceCategoryListing;
+use App\Models\CommerceCollection;
+use App\Models\CommerceCollectionProduct;
 use App\Models\CommerceListing;
 use App\Models\Product;
 use App\Models\ProductCategory;
@@ -36,6 +38,11 @@ class CommerceWorkspaceStorefrontProductApiTest extends TestCase
     private function itemPath(string $id, string $productId): string
     {
         return $this->listPath($id).'/'.$productId;
+    }
+
+    private function sectionPath(string $id): string
+    {
+        return '/api/commerce/workspace/storefronts/'.$id.'/section-data';
     }
 
     /** @return array{channel: SalesChannel, storefront: Storefront} */
@@ -155,6 +162,46 @@ class CommerceWorkspaceStorefrontProductApiTest extends TestCase
             ->getJson($this->itemPath($seeded['storefront']->id, $product->id))
             ->assertOk()
             ->assertJsonPath('data.id', $product->id);
+    }
+
+    /** @test */
+    public function section_data_uses_the_owned_storefront_channel_and_collection_order(): void
+    {
+        $auth = $this->registerTenant('section-shelf', 'owner@section-shelf.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $first = $this->seedProduct($seeded['channel'], ['name' => 'أول رف']);
+        $second = $this->seedProduct($seeded['channel'], ['name' => 'ثاني رف']);
+        $hidden = $this->seedProduct($seeded['channel'], ['name' => 'غير منشور'], published: false);
+        $collection = CommerceCollection::create([
+            'slug' => 'section-collection',
+            'title' => 'Section collection',
+            'status' => CommerceCollection::STATUS_ACTIVE,
+        ]);
+        CommerceCollectionProduct::create(['commerce_collection_id' => $collection->id, 'product_id' => $second->id, 'position' => 0]);
+        CommerceCollectionProduct::create(['commerce_collection_id' => $collection->id, 'product_id' => $first->id, 'position' => 1]);
+        app(TenantContext::class)->forget();
+
+        $response = $this->withToken($auth['token'])
+            ->getJson($this->sectionPath($seeded['storefront']->id).'?section=product_shelf&source_kind=collection&source_slug=section-collection&limit=2')
+            ->assertOk();
+
+        $this->assertSame([$second->id, $first->id], array_column($response->json('data'), 'id'));
+        $this->assertNotContains($hidden->id, array_column($response->json('data'), 'id'));
+        $this->assertArrayNotHasKey('avg_cost', $response->json('data.0'));
+    }
+
+    /** @test */
+    public function section_data_rejects_a_foreign_storefront_without_disclosing_it(): void
+    {
+        $a = $this->registerTenant('section-foreign-a', 'owner@section-foreign-a.test');
+        $b = $this->registerTenant('section-foreign-b', 'owner@section-foreign-b.test');
+        $foreign = $this->seedWebStorefront($b['tenant_id']);
+
+        $this->withToken($a['token'])
+            ->getJson($this->sectionPath($foreign['storefront']->id).'?section=delivery_promise')
+            ->assertNotFound();
     }
 
     // ───────────────────────── 2/3. Foreign storefront/product → 404 ─────────────────────────

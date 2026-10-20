@@ -28,7 +28,12 @@ import {
   presentationConfigsEqual,
   type StorefrontPresentationConfig,
 } from "./presentation";
-import { featuredContentOf } from "./presentation/section-content";
+import {
+  deliveryPromiseContentOf,
+  discoveryContentOf,
+  featuredContentOf,
+  productShelfContentOf,
+} from "./presentation/section-content";
 import {
   THEME_AREAS,
   THEME_KEPT,
@@ -53,6 +58,11 @@ import {
   type WorkspaceProductDetail,
   type WorkspaceProductSummary,
 } from "@/modules/commerce-workspace/workspace-products";
+import {
+  fetchWorkspaceSectionData,
+  type WorkspaceDeliveryEarliest,
+  type WorkspaceDiscoveryData,
+} from "@/modules/commerce-workspace/workspace-section-data";
 import {
   createWorkspaceOffer,
   deleteWorkspaceOffer,
@@ -341,6 +351,16 @@ export function ExperienceBuilder({
     "idle" | "loading" | "error" | "ready"
   >("idle");
   const homeNewArrivalsRequestRef = useRef(0);
+  // FLOWERS-H9c / ADR-21 — live data for each authored data-backed home
+  // section. Keys are section instance ids so duplicate shelves/discovery
+  // bands never share or overwrite one another's channel-scoped response.
+  const [homeSectionProducts, setHomeSectionProducts] = useState<Record<string, WorkspaceProductSummary[]>>({});
+  const [homeSectionProductsState, setHomeSectionProductsState] = useState<Record<string, "idle" | "loading" | "error" | "ready">>({});
+  const [homeSectionDiscovery, setHomeSectionDiscovery] = useState<Record<string, WorkspaceDiscoveryData | null>>({});
+  const [homeSectionDiscoveryState, setHomeSectionDiscoveryState] = useState<Record<string, "idle" | "loading" | "error" | "ready">>({});
+  const [homeSectionDelivery, setHomeSectionDelivery] = useState<Record<string, WorkspaceDeliveryEarliest | null>>({});
+  const [homeSectionDeliveryState, setHomeSectionDeliveryState] = useState<Record<string, "idle" | "loading" | "error" | "ready">>({});
+  const homeSectionRequestRef = useRef<Record<string, number>>({});
   // CUST-H4-5 — real batched resolution for "featured" sections' own Canvas
   // preview. Unlike `homeCategories`/`homeNewArrivals` above, "featured" is
   // **not** a singleton section type (`canDuplicate: true` — a merchant may
@@ -1013,6 +1033,13 @@ export function ExperienceBuilder({
     setOffersRows([]);
     setOffersMax(null);
     setOffersState("idle");
+    homeSectionRequestRef.current = {};
+    setHomeSectionProducts({});
+    setHomeSectionProductsState({});
+    setHomeSectionDiscovery({});
+    setHomeSectionDiscoveryState({});
+    setHomeSectionDelivery({});
+    setHomeSectionDeliveryState({});
 
     if (!storefrontId) {
       setBusy(null);
@@ -1455,6 +1482,100 @@ export function ExperienceBuilder({
 
   function handleRetryFeaturedPickerList() {
     void loadFeaturedPickerList(featuredPickerSearch);
+  }
+
+  async function loadHomeDataSection(section: PresentationHomeSection) {
+    if (!storefrontId || !["productShelf", "discovery", "deliveryPromise"].includes(section.type)) return;
+    const sectionId = section.id;
+    const originStorefrontId = storefrontId;
+    const token = (homeSectionRequestRef.current[sectionId] ?? 0) + 1;
+    homeSectionRequestRef.current[sectionId] = token;
+    if (section.type === "productShelf") setHomeSectionProductsState((prev) => ({ ...prev, [sectionId]: "loading" }));
+    if (section.type === "discovery") setHomeSectionDiscoveryState((prev) => ({ ...prev, [sectionId]: "loading" }));
+    if (section.type === "deliveryPromise") setHomeSectionDeliveryState((prev) => ({ ...prev, [sectionId]: "loading" }));
+
+    const params: Record<string, string | number | boolean | undefined> = {
+      section: section.type === "productShelf" ? "product_shelf" : section.type === "discovery" ? "discovery" : "delivery_promise",
+    };
+    if (section.type === "productShelf") {
+      const content = productShelfContentOf(section);
+      params.limit = content.limit;
+      params.deliver_today = content.deliverToday;
+      if (content.source?.kind === "collection") {
+        params.source_kind = "collection";
+        params.source_slug = content.source.slug;
+      } else if (content.source?.kind === "facet") {
+        params.source_kind = "facet";
+        params.source_key = content.source.key;
+        params.source_value = content.source.value;
+      }
+    } else if (section.type === "discovery") {
+      const content = discoveryContentOf(section);
+      params.axis = content.axis;
+      params.dimension = content.dimension;
+    }
+
+    const result = await fetchWorkspaceSectionData(storefrontId, params);
+    if (homeSectionRequestRef.current[sectionId] !== token || storefrontIdRef.current !== originStorefrontId) return;
+    if (!result.ok) {
+      if (section.type === "productShelf") {
+        setHomeSectionProductsState((prev) => ({ ...prev, [sectionId]: "error" }));
+        setHomeSectionProducts((prev) => ({ ...prev, [sectionId]: [] }));
+      } else if (section.type === "discovery") {
+        setHomeSectionDiscoveryState((prev) => ({ ...prev, [sectionId]: "error" }));
+        setHomeSectionDiscovery((prev) => ({ ...prev, [sectionId]: null }));
+      } else {
+        setHomeSectionDeliveryState((prev) => ({ ...prev, [sectionId]: "error" }));
+        setHomeSectionDelivery((prev) => ({ ...prev, [sectionId]: null }));
+      }
+      return;
+    }
+    if (result.section === "product_shelf") {
+      setHomeSectionProductsState((prev) => ({ ...prev, [sectionId]: "ready" }));
+      setHomeSectionProducts((prev) => ({ ...prev, [sectionId]: result.products }));
+    } else if (result.section === "discovery") {
+      setHomeSectionDiscoveryState((prev) => ({ ...prev, [sectionId]: "ready" }));
+      setHomeSectionDiscovery((prev) => ({ ...prev, [sectionId]: result.discovery }));
+    } else {
+      setHomeSectionDeliveryState((prev) => ({ ...prev, [sectionId]: "ready" }));
+      setHomeSectionDelivery((prev) => ({ ...prev, [sectionId]: result.earliest }));
+    }
+  }
+
+  useEffect(() => {
+    if (currentPage !== "home" || !storefrontId || busy === "loading") return;
+    for (const section of homeSectionsShown) {
+      if (!section.visible || !["productShelf", "discovery", "deliveryPromise"].includes(section.type)) continue;
+      const state = section.type === "productShelf"
+        ? homeSectionProductsState[section.id]
+        : section.type === "discovery"
+          ? homeSectionDiscoveryState[section.id]
+          : homeSectionDeliveryState[section.id];
+      if (state === undefined || state === "idle") void loadHomeDataSection(section);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, storefrontId, busy, homeSectionsShown]);
+
+  // Workspace media URLs are signed and bounded. Refresh the section data
+  // before the same expiry window used by the category/header preview so a
+  // later canvas interaction cannot keep rendering stale thumbnails.
+  useEffect(() => {
+    if (!storefrontId) return;
+    const hasReady = Object.values(homeSectionProductsState).some((state) => state === "ready")
+      || Object.values(homeSectionDiscoveryState).some((state) => state === "ready")
+      || Object.values(homeSectionDeliveryState).some((state) => state === "ready");
+    if (!hasReady) return;
+    const timer = window.setTimeout(() => {
+      setHomeSectionProductsState((prev) => Object.fromEntries(Object.keys(prev).map((key) => [key, "idle"])));
+      setHomeSectionDiscoveryState((prev) => Object.fromEntries(Object.keys(prev).map((key) => [key, "idle"])));
+      setHomeSectionDeliveryState((prev) => Object.fromEntries(Object.keys(prev).map((key) => [key, "idle"])));
+    }, 18 * 60 * 1000);
+    return () => window.clearTimeout(timer);
+  }, [storefrontId, homeSectionProductsState, homeSectionDiscoveryState, homeSectionDeliveryState]);
+
+  function handleRetryHomeDataSection(sectionId: string) {
+    const section = homeSectionsShown.find((item) => item.id === sectionId);
+    if (section) void loadHomeDataSection(section);
   }
 
   // CUST-H4-7 — the single workspace Offers read (see `offersRows`). Aborts a
@@ -3655,6 +3776,13 @@ export function ExperienceBuilder({
                   homeNewArrivalsState={homeNewArrivalsState}
                   homeNewArrivals={homeNewArrivals}
                   onRetryHomeNewArrivals={handleRetryHomeNewArrivals}
+                  homeSectionProducts={homeSectionProducts}
+                  homeSectionProductsState={homeSectionProductsState}
+                  homeSectionDiscovery={homeSectionDiscovery}
+                  homeSectionDiscoveryState={homeSectionDiscoveryState}
+                  homeSectionDelivery={homeSectionDelivery}
+                  homeSectionDeliveryState={homeSectionDeliveryState}
+                  onRetryHomeDataSection={handleRetryHomeDataSection}
                   featuredResolved={featuredResolved}
                   featuredResolvedState={featuredResolvedState}
                   onRetryFeatured={handleRetryFeaturedResolution}

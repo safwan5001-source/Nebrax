@@ -36,6 +36,7 @@ import type { WorkspaceProductDetail } from "@/modules/commerce-workspace/worksp
 import type { WorkspaceCategoryDetail } from "@/modules/commerce-workspace/workspace-categories";
 import { displayLocale } from "@/lib/formatting";
 import type { WorkspaceOffer } from "@/modules/commerce-workspace/workspace-offers";
+import type { WorkspaceDeliveryEarliest, WorkspaceDiscoveryData } from "@/modules/commerce-workspace/workspace-section-data";
 import {
   formatOfferMoney,
   isDiscountBadgeVisible,
@@ -252,6 +253,14 @@ interface StorefrontPreviewCanvasProps {
    */
   sectionActions?: CanvasSectionActions;
   onRetryOffers?: () => void;
+  /** FLOWERS-H9c — authoritative live data for the three data-backed home sections. */
+  homeSectionProducts?: Record<string, { id: string; name: string; thumbnailUrl: string | null; priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null; isVariantManaged?: boolean }[]>;
+  homeSectionProductsState?: Record<string, "idle" | "loading" | "error" | "ready">;
+  homeSectionDiscovery?: Record<string, WorkspaceDiscoveryData | null>;
+  homeSectionDiscoveryState?: Record<string, "idle" | "loading" | "error" | "ready">;
+  homeSectionDelivery?: Record<string, WorkspaceDeliveryEarliest | null>;
+  homeSectionDeliveryState?: Record<string, "idle" | "loading" | "error" | "ready">;
+  onRetryHomeDataSection?: (sectionId: string) => void;
 }
 
 export interface StorefrontBusinessIdentity {
@@ -353,6 +362,13 @@ export function StorefrontPreviewCanvas({
   offersState = "idle",
   sectionActions,
   onRetryOffers,
+  homeSectionProducts = {},
+  homeSectionProductsState = {},
+  homeSectionDiscovery = {},
+  homeSectionDiscoveryState = {},
+  homeSectionDelivery = {},
+  homeSectionDeliveryState = {},
+  onRetryHomeDataSection,
 }: StorefrontPreviewCanvasProps) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
   const storeName = previewStoreName(
@@ -1618,58 +1634,62 @@ export function StorefrontPreviewCanvas({
               section.type === "discovery" ||
               section.type === "deliveryPromise"
             ) {
-              // FLOWERS-H9c / ADR-21 — data-backed sections read live store data
-              // on the published storefront. The builder never fabricates
-              // products, counts or delivery windows: this is an honest
-              // placeholder that shows only what the merchant authored. An
-              // incomplete section (no stored content) is flagged because the
-              // storefront omits it.
+              // FLOWERS-H9c / ADR-21 — the editor receives the same bounded,
+              // tenant/storefront/channel-scoped projections as the published
+              // sections. It never computes commercial fields and keeps
+              // controls decorative/inactive inside the preview frame.
               const incomplete =
                 section.type !== "deliveryPromise" && section.content === undefined;
-              let title = "";
-              let note: CustomizerMessageKey = "canvasShelfLive";
-              let badge: string | null = null;
-              let hideShelfTitle = false;
+              const state = section.type === "productShelf"
+                ? (homeSectionProductsState[section.id] ?? "idle")
+                : section.type === "discovery"
+                  ? (homeSectionDiscoveryState[section.id] ?? "idle")
+                  : (homeSectionDeliveryState[section.id] ?? "idle");
+              const title = section.type === "productShelf"
+                ? productShelfContentOf(section).title.trim()
+                : section.type === "discovery"
+                  ? discoveryContentOf(section).title.trim()
+                  : deliveryPromiseContentOf(section).title.trim();
               if (section.type === "productShelf") {
                 const shelf = productShelfContentOf(section);
-                hideShelfTitle = shelf.showTitle === false;
-                title = shelf.title.trim();
-                note = "canvasShelfLive";
-                badge = shelf.deliverToday ? t("canvasShelfDeliverToday") : null;
-              } else if (section.type === "discovery") {
-                title = discoveryContentOf(section).title.trim();
-                note = "canvasDiscoveryLive";
-              } else {
-                const promise = deliveryPromiseContentOf(section);
-                title = promise.title.trim();
-                note = "canvasDeliveryPromiseLive";
+                const products = homeSectionProducts[section.id] ?? [];
+                return (
+                  <section key={section.id} data-home-data-section="productShelf" data-incomplete={incomplete ? "" : undefined}>
+                    <div className="flex items-center justify-between gap-3"><SectionRule title={title || t("sectionProductShelf")} hideTitle={shelf.showTitle === false} action={t("viewAll")} />{shelf.deliverToday ? <span className="text-[11px] font-medium text-store-muted-foreground">{t("canvasShelfDeliverToday")}</span> : null}</div>
+                    {incomplete ? <p className="mt-2 text-xs text-store-muted-foreground">{t("canvasDataSectionIncomplete")}</p> : state === "loading" || state === "idle" ? (
+                      <ul aria-hidden="true" className={cn("mt-4 grid gap-3", newArrivalsColumns)}>{Array.from({ length: Math.min(shelf.limit, 4) }).map((_, index) => <li key={index} className="overflow-hidden rounded-store border border-store-border bg-store-surface"><div className={cn(cardImageHeight, "animate-pulse bg-store-surface-muted")} /><div className={cardPad}><div className="h-3 w-3/4 animate-pulse rounded-store bg-store-surface-muted" /></div></li>)}</ul>
+                    ) : state === "error" ? (
+                      <div data-home-section-error="productShelf" className="mt-4 flex flex-col items-center gap-2 rounded-store border border-dashed border-store-border px-4 py-8 text-center"><p className="text-sm text-store-muted-foreground">{t("homeNewArrivalsLoadFailed")}</p><button type="button" onClick={() => onRetryHomeDataSection?.(section.id)} className="rounded-store border border-store-border px-3 py-1.5 text-xs font-medium text-store-foreground">{t("retry")}</button></div>
+                    ) : products.length === 0 ? (
+                      <p data-home-section-empty="productShelf" className="mt-4 rounded-store border border-dashed border-store-border px-4 py-8 text-center text-sm text-store-muted-foreground">{t("homeNewArrivalsEmpty")}</p>
+                    ) : (
+                      <ul className={cn("mt-4 grid gap-3", newArrivalsColumns)} {...shelfAttrs(section.design, viewport)}>{products.map((product) => <li key={product.id} data-card="" className="overflow-hidden rounded-store border border-store-border bg-store-surface"><div data-card-image="" className={cn(cardImageHeight, "relative bg-store-surface-muted")}>{product.thumbnailUrl ? <PreviewMediaImage src={product.thumbnailUrl} alt="" className="size-full object-cover" /> : null}</div><div data-card-body="" className={cardPad}><p className="line-clamp-2 text-sm font-semibold text-store-foreground"><bdi>{product.name}</bdi></p><PreviewProductMeta product={product} locale={locale} /></div></li>)}</ul>
+                    )}
+                  </section>
+                );
               }
-              const headingId = `preview-data-${section.id}`;
+              if (section.type === "discovery") {
+                const content = discoveryContentOf(section);
+                const discovery = homeSectionDiscovery[section.id];
+                const headingId = `preview-discovery-${section.id}`;
+                const options = discovery?.options ?? [];
+                return (
+                  <section key={section.id} aria-labelledby={headingId} data-home-data-section="discovery" data-incomplete={incomplete ? "" : undefined}>
+                    <SectionRule title={title || t("sectionDiscovery")} />
+                    {incomplete ? <p className="mt-2 text-xs text-store-muted-foreground">{t("canvasDataSectionIncomplete")}</p> : state === "loading" || state === "idle" ? <div aria-hidden="true" className="mt-4 h-20 animate-pulse rounded-store bg-store-surface-muted" /> : state === "error" ? <div data-home-section-error="discovery" className="mt-4 flex flex-col items-center gap-2 rounded-store border border-dashed border-store-border px-4 py-8 text-center"><p className="text-sm text-store-muted-foreground">{t("homeNewArrivalsLoadFailed")}</p><button type="button" onClick={() => onRetryHomeDataSection?.(section.id)} className="rounded-store border border-store-border px-3 py-1.5 text-xs font-medium text-store-foreground">{t("retry")}</button></div> : options.length === 0 ? <p data-home-section-empty="discovery" className="mt-4 rounded-store border border-dashed border-store-border px-4 py-8 text-center text-sm text-store-muted-foreground">{t("homeNewArrivalsEmpty")}</p> : content.display === "chips" ? <ul className="mt-4 flex flex-wrap gap-2">{options.map((option) => <li key={option.value}><span className="inline-flex min-h-10 items-center rounded-full border border-store-border bg-store-surface px-4 text-sm font-bold text-store-foreground"><bdi>{locale === "en" && option.nameEn ? option.nameEn : option.name}</bdi><span className="ms-1 text-xs text-store-muted-foreground">({option.count})</span></span></li>)}</ul> : <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 md:gap-4">{options.slice(0, content.maxItems ?? 24).map((option) => <li key={option.value}><span className="flex min-h-20 flex-col items-center justify-center rounded-store border border-store-border bg-store-surface px-3 py-4 text-center text-sm font-bold text-store-foreground"><bdi>{locale === "en" && option.nameEn ? option.nameEn : option.name}</bdi><span className="mt-1 text-xs font-normal text-store-muted-foreground">{option.count}</span></span></li>)}</ul>}
+                  </section>
+                );
+              }
+              const promise = deliveryPromiseContentOf(section);
+              const earliest = homeSectionDelivery[section.id];
+              const headingId = `preview-delivery-${section.id}`;
               return (
-                <section
-                  key={section.id}
-                  aria-labelledby={headingId}
-                  data-home-data-section={section.type}
-                  data-incomplete={incomplete ? "" : undefined}
-                  className="rounded-store border border-dashed border-store-border-strong bg-store-surface px-4 py-5"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <h2
-                      id={headingId}
-                      className={cn("text-sm font-bold text-store-foreground", hideShelfTitle && "sr-only")}
-                    >
-                      {title || t(SECTION_TITLE[section.type] ?? "sectionCustomContent")}
-                    </h2>
-                    {badge ? (
-                      <span className="text-[11px] font-medium text-store-muted-foreground">{badge}</span>
-                    ) : null}
-                  </div>
-                  <p className="mt-1 text-xs text-store-muted-foreground">
-                    {incomplete ? t("canvasDataSectionIncomplete") : t(note)}
-                  </p>
+                <section key={section.id} aria-labelledby={headingId} data-home-data-section="deliveryPromise" className="rounded-store border border-store-border bg-store-surface px-4 py-4 md:px-6 md:py-5">
+                  <h2 id={headingId} className="text-base font-extrabold text-store-foreground md:text-lg">{title || t("sectionDeliveryPromise")}</h2>
+                  {state === "loading" || state === "idle" ? <div aria-hidden="true" className="mt-2 h-5 w-2/3 animate-pulse rounded-store bg-store-surface-muted" /> : state === "error" ? <div data-home-section-error="deliveryPromise" className="mt-3 flex items-center gap-2 text-xs text-store-muted-foreground"><span>{t("homeNewArrivalsLoadFailed")}</span><button type="button" onClick={() => onRetryHomeDataSection?.(section.id)} className="underline">{t("retry")}</button></div> : earliest ? <><p className="mt-1 text-sm font-bold text-store-primary md:text-base"><bdi>{locale === "en" && earliest.labelEn ? earliest.labelEn : earliest.label}</bdi> · {earliest.date} · {earliest.startTime}–{earliest.endTime}</p>{promise.body ? <p className="mt-1 text-xs text-store-muted-foreground md:text-sm">{promise.body}</p> : null}</> : <p data-home-section-empty="deliveryPromise" className="mt-2 text-sm text-store-muted-foreground">{t("canvasDeliveryPromiseLive")}</p>}
                 </section>
               );
-            }
+              }
 
             return (
               <section
