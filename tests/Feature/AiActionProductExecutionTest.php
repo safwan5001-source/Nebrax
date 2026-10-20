@@ -7,6 +7,7 @@ use App\Models\AiActionApproval;
 use App\Models\AiActionEvent;
 use App\Models\AiActionExecution;
 use App\Models\AiActionExecutionRow;
+use App\Models\Brand;
 use App\Models\Invoice;
 use App\Models\JournalEntry;
 use App\Models\Product;
@@ -87,8 +88,9 @@ class AiActionProductExecutionTest extends TestCase
         $auth = $this->registerTenant();
         $existing = $this->product($auth['token'], ['name' => 'قائم', 'sku' => 'EX-1', 'sale_price' => 1000, 'purchase_price' => 500, 'description' => 'قديم']);
         $category = ProductCategory::create(['name' => 'قهوة']);
+        $brand = Brand::create(['name' => 'علامة']);
         [$id, $preview] = $this->approved($auth, [
-            $this->good('new', 2, 'NEW-1', ['category' => 'قهوة', 'brand' => 'علامة حرة', 'primary_image_url' => 'https://img.example/a.jpg', 'unit_template' => 'قالب']),
+            $this->good('new', 2, 'NEW-1', ['category' => 'قهوة', 'brand' => 'علامة', 'primary_image_url' => 'https://img.example/a.jpg', 'unit_template' => 'قالب']),
             $this->row('bar', 3, ['barcode' => '9000000000001', 'name' => 'باركود فقط', 'type' => 'service', 'sale_price' => '0', 'purchase_price' => '0', 'tax_rate' => '0', 'unit' => 'ساعة']),
             $this->row('upd', 4, ['sku' => 'EX-1', 'sale_price' => '12.25', 'description' => 'جديد'], 'update'),
             $this->row('skp', 5, ['sku' => 'SKP-1', 'name' => 'متخطّى'], 'skip'),
@@ -111,7 +113,11 @@ class AiActionProductExecutionTest extends TestCase
         $this->assertSame([1050, 500, 15, 'قطعة', 'good'], [(int) $new->sale_price, (int) $new->purchase_price, (int) $new->tax_rate, $new->unit, $new->type]);
         $this->assertSame($category->id, $new->category_id);
         $this->assertNull($new->category);
-        $this->assertSame('علامة حرة', $new->brand);
+        $this->assertSame($brand->id, $new->brand_id);
+        $this->assertNull($new->brand);
+        // The ids the user approved are exactly the ids that were written.
+        $approvedRefs = $this->rows($preview)['new']['references'];
+        $this->assertSame([$category->id, $brand->id], [$approvedRefs['category']['id'], $approvedRefs['brand']['id']]);
         $this->assertNull($new->unit_template_id);
 
         // Explicit zeros stay zero (no silent default tax/price), and a barcode-only row gets no invented SKU.
@@ -439,5 +445,165 @@ class AiActionProductExecutionTest extends TestCase
         // The product is soft-deleted; the log keeps its reference and its recorded result.
         $this->assertSame($productId, $row->product_id);
         $this->assertNotNull(Product::withoutGlobalScopes()->withTrashed()->find($productId)->deleted_at);
+    }
+
+    /** Approves a one-row import using a category (and optionally a brand); returns the action id. */
+    private function approvedWithReferences(array $auth, string $sku, array $refs, string $key): string
+    {
+        return $this->approved($auth, [$this->good('a', 2, $sku, $refs)], $key)[0];
+    }
+
+    /** @test */
+    public function an_unknown_or_ambiguous_category_or_brand_blocks_the_preview_and_is_never_saved_as_free_text(): void
+    {
+        $auth = $this->registerTenant();
+        ProductCategory::create(['name' => 'Dup']);
+        ProductCategory::create(['name' => 'dup']);
+        Brand::create(['name' => 'علامة معروفة']);
+        $id = $this->makeAction($auth, [
+            $this->good('unknown', 2, 'R-1', ['category' => 'غير موجود']),
+            $this->good('ambiguous', 3, 'R-2', ['category' => 'DUP']),
+            $this->good('badbrand', 4, 'R-3', ['brand' => 'علامة أخرى']),
+            $this->good('ok', 5, 'R-4', ['brand' => 'علامة معروفة']),
+        ]);
+        $preview = $this->preview($auth['token'], $id)->assertCreated()->json('data');
+        $rows = $this->rows($preview);
+
+        $this->assertFalse($preview['approvable']);
+        $this->assertContains('reference_unresolved', $this->codes($rows['unknown']));
+        $this->assertContains('reference_ambiguous', $this->codes($rows['ambiguous']));
+        $this->assertContains('reference_unresolved', $this->codes($rows['badbrand']));
+        $this->assertSame('create', $rows['ok']['operation']);
+        $this->assertSame('علامة معروفة', $rows['ok']['references']['brand']['name']);
+        $this->approve($auth['token'], $id, $preview)->assertStatus(422)->assertJsonPath('error.code', 'preview_blocked');
+        $this->execute($auth['token'], $id)->assertConflict();
+        $this->assertSame(0, Product::withoutGlobalScopes()->count());
+    }
+
+    /** @test */
+    public function a_category_or_brand_changed_after_approval_blocks_execution_before_any_write(): void
+    {
+        $auth = $this->registerTenant();
+        // Each scenario receives the records that were approved in that round.
+        $scenarios = [
+            'category deleted' => fn ($category, $brand) => $category->delete(),
+            'brand deleted' => fn ($category, $brand) => $brand->delete(),
+            'category renamed' => fn ($category, $brand) => $category->update(['name' => 'شاي']),
+            'category duplicated' => fn ($category, $brand) => ProductCategory::create(['name' => 'قهوة']),
+            'brand replaced by another record of the same name' => function ($category, $brand) {
+                $brand->delete();
+                Brand::create(['name' => 'علامة']);
+            },
+        ];
+        $n = 0;
+        foreach ($scenarios as $label => $change) {
+            $n++;
+            \Illuminate\Support\Facades\Cache::flush(); // each scenario is a fresh user session: reset the route throttles
+            // A fresh record set for each scenario.
+            ProductCategory::withoutGlobalScopes()->withTrashed()->where('name', 'قهوة')->get()->each->forceDelete();
+            Brand::withoutGlobalScopes()->withTrashed()->where('name', 'علامة')->get()->each->forceDelete();
+            $category = ProductCategory::create(['name' => 'قهوة']);
+            $brand = Brand::create(['name' => 'علامة']);
+            $id = $this->approvedWithReferences($auth, "STALE-{$n}", ['category' => 'قهوة', 'brand' => 'علامة'], "pe-ref-{$n}");
+
+            $this->travel(2)->seconds();
+            $change($category, $brand);
+            $snapshot = [ProductCategory::withoutGlobalScopes()->withTrashed()->count(), Brand::withoutGlobalScopes()->withTrashed()->count()];
+
+            $this->execute($auth['token'], $id, 1, "pe-ref-exec-{$n}")->assertConflict()->assertJsonPath('error.code', 'approval_stale');
+            $this->assertSame(0, Product::withoutGlobalScopes()->count(), $label);
+            $this->assertSame(0, AiActionExecution::withoutGlobalScopes()->where('ai_action_id', $id)->count(), $label);
+            $this->assertNotNull(AiActionApproval::withoutGlobalScopes()->where('ai_action_id', $id)->firstOrFail()->revoked_at, $label);
+            $this->assertSame('editing', AiAction::findOrFail($id)->status, $label);
+            // Nothing was substituted, created or turned into text.
+            $this->assertSame($snapshot, [ProductCategory::withoutGlobalScopes()->withTrashed()->count(), Brand::withoutGlobalScopes()->withTrashed()->count()], $label);
+        }
+    }
+
+    /** @test */
+    public function a_reference_changed_between_batches_fails_only_that_row_without_substitution(): void
+    {
+        config(['ai_actions.execution_batch_rows' => 1]);
+        $auth = $this->registerTenant();
+        $category = ProductCategory::create(['name' => 'قهوة']);
+        [$id] = $this->approved($auth, [$this->good('a', 2, 'BT-1'), $this->good('b', 3, 'BT-2', ['category' => 'قهوة']), $this->good('c', 4, 'BT-3')]);
+
+        $first = $this->execute($auth['token'], $id)->assertCreated()->json('data');
+        $this->assertSame('running', $first['status']);
+        $category->update(['name' => 'شاي']); // renamed after approval, between batches
+        $this->execute($auth['token'], $id, 1, 'pe-exec-bt2')->assertOk();
+        $final = $this->execute($auth['token'], $id, 1, 'pe-exec-bt3')->assertOk()->json('data');
+        $rows = $this->byRow($final);
+
+        $this->assertSame('partially_failed', $final['status']);
+        $this->assertSame(['a' => 'success', 'b' => 'failed', 'c' => 'success'], array_map(fn ($r) => $r['status'], $rows));
+        $this->assertSame('reference_changed', $rows['b']['error_code']);
+        $this->assertFalse($rows['b']['retryable']);
+        $this->assertNull(Product::withoutGlobalScopes()->where('sku', 'BT-2')->first());
+        $this->assertEqualsCanonicalizing(['BT-1', 'BT-3'], Product::withoutGlobalScopes()->pluck('sku')->all());
+        $this->assertSame('شاي', $category->fresh()->name);
+        $this->retry($auth['token'], $id, $final['id'])->assertConflict()->assertJsonPath('error.code', 'nothing_to_retry');
+    }
+
+    /** @test */
+    public function references_resolve_inside_the_tenant_and_branch_only(): void
+    {
+        $auth = $this->registerTenant();
+        $other = $this->registerTenant('beta', 'owner@beta.test');
+        $foreign = null;
+        app(TenantContext::class)->set($other['tenant_id']);
+        $foreign = ProductCategory::create(['name' => 'قهوة']);
+        app(TenantContext::class)->set($auth['tenant_id']);
+
+        // Another tenant's category of the same name never resolves for this tenant.
+        $id = $this->makeAction($auth, [$this->good('a', 2, 'ISO-R1', ['category' => 'قهوة'])]);
+        $preview = $this->preview($auth['token'], $id)->assertCreated()->json('data');
+        $this->assertContains('reference_unresolved', $this->codes($this->rows($preview)['a']));
+
+        // Once the tenant has its own, the approval binds that id — and the other tenant's later changes are irrelevant.
+        $own = ProductCategory::create(['name' => 'قهوة']);
+        $second = $this->makeAction($auth, [$this->good('a', 2, 'ISO-R2', ['category' => 'قهوة'])], 'pa-action-0002');
+        $preview2 = $this->preview($auth['token'], $second, 1, 'pa-preview-0002')->assertCreated()->json('data');
+        $this->assertSame($own->id, $this->rows($preview2)['a']['references']['category']['id']);
+        $this->assertNotSame($foreign->id, $this->rows($preview2)['a']['references']['category']['id']);
+        $this->approve($auth['token'], $second, $preview2, 1, 'pa-approve-0002')->assertCreated();
+        app(TenantContext::class)->set($other['tenant_id']);
+        $foreign->delete();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->execute($auth['token'], $second, 1, 'pe-exec-iso')->assertCreated()->assertJsonPath('data.status', 'completed');
+        $this->assertSame($own->id, Product::withoutGlobalScopes()->where('sku', 'ISO-R2')->value('category_id'));
+    }
+
+    /** @test */
+    public function a_category_in_another_branch_does_not_resolve_when_catalogues_are_isolated(): void
+    {
+        $auth = $this->registerTenant();
+        $this->enable($auth['tenant_id']);
+        $branch = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'فرع الخبر'])->assertCreated()['data']['id'];
+        \App\Support\BranchSettings::merge(['share_products' => false]);
+        $context = app(\App\Tenancy\BranchContext::class);
+        $context->set($branch);
+        ProductCategory::create(['name' => 'خاص بالخبر']);
+        $context->forget();
+
+        $this->withoutHeader('X-Branch-Id');
+        $id = $this->makeAction($auth, [$this->good('a', 2, 'BRR-1', ['category' => 'خاص بالخبر'])]);
+        $preview = $this->preview($auth['token'], $id)->assertCreated()->json('data');
+        $this->assertContains('reference_unresolved', $this->codes($this->rows($preview)['a']));
+        $this->assertFalse($preview['approvable']);
+    }
+
+    /** @test */
+    public function an_expired_approval_writes_nothing_even_when_references_are_involved(): void
+    {
+        $auth = $this->registerTenant();
+        $category = ProductCategory::create(['name' => 'قهوة']);
+        $id = $this->approvedWithReferences($auth, 'EXPR-1', ['category' => 'قهوة'], 'pe-exp-ref');
+
+        $this->travel((int) config('ai_actions.approval_ttl_minutes') + 1)->minutes();
+        $this->execute($auth['token'], $id, 1, 'pe-exec-exp')->assertConflict();
+        $this->assertSame(0, Product::withoutGlobalScopes()->count());
+        $this->assertSame(0, AiActionExecution::withoutGlobalScopes()->count());
+        $this->assertSame('قهوة', $category->fresh()->name);
     }
 }

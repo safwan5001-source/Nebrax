@@ -42,9 +42,7 @@ final class AiActionProductExecutionService
         'tax_rate', 'track_inventory', 'reorder_level', 'tags', 'description', 'internal_notes', 'is_active',
     ];
     private const DEFERRED_FIELDS = ['images', 'unit_template'];
-
-    /** @var array<string,array<string,?string>> memoised managed-reference lookups (name ⇒ id | null when ambiguous) */
-    private array $managed = [];
+    private const MANAGED = ['category' => 'التصنيف', 'brand' => 'العلامة التجارية'];
 
     public function __construct(
         private readonly AiActionGateway $gateway,
@@ -291,7 +289,7 @@ final class AiActionProductExecutionService
                 if ($previewRow === null || ! in_array($previewRow['operation'] ?? null, ['create', 'update'], true)) {
                     throw new AiActionRowFailure('preview_row_missing', 'صف المعاينة المعتمد غير متاح.', false);
                 }
-                [$attributes, $changed] = $this->attributes($previewRow['changes'] ?? []);
+                [$attributes, $changed] = $this->attributes($previewRow);
                 $product = $previewRow['operation'] === 'create'
                     ? $this->createProduct($actor, $attributes)
                     : $this->updateProduct($actor, $previewRow, $attributes);
@@ -359,25 +357,29 @@ final class AiActionProductExecutionService
     }
 
     /**
-     * Preview changes ⇒ product attributes. Values are the approved, typed ones; a managed category or brand
-     * becomes its id, anything else is stored as free text (the traditional importer's default policy).
+     * Preview changes ⇒ product attributes. Values are the approved, typed ones. A category or brand is the
+     * exact id the user approved (`references`), re-verified against the live record just before the write —
+     * it is never re-resolved by name, never replaced by another record and never degraded to free text.
      *
-     * @param  array<int,array<string,mixed>>  $changes
+     * @param  array<string,mixed>  $previewRow
      * @return array{0:array<string,mixed>,1:list<string>}
      */
-    private function attributes(array $changes): array
+    private function attributes(array $previewRow): array
     {
         $attributes = [];
         $changed = [];
-        foreach ($changes as $change) {
+        foreach ($previewRow['changes'] ?? [] as $change) {
             $field = (string) ($change['field'] ?? '');
-            $value = $change['after'] ?? null;
             if (in_array($field, self::SCALAR_FIELDS, true)) {
-                $attributes[$field] = $value;
-            } elseif (in_array($field, ['category', 'brand'], true)) {
-                $id = $this->managedId($field, (string) $value);
-                $attributes["{$field}_id"] = $id;
-                $attributes[$field] = $id === null ? (string) $value : null;
+                $attributes[$field] = $change['after'] ?? null;
+            } elseif (isset(self::MANAGED[$field])) {
+                $reference = $previewRow['references'][$field] ?? null;
+                if (! is_array($reference) || ! is_string($reference['id'] ?? null)) {
+                    throw new AiActionRowFailure('reference_missing', 'مرجع '.self::MANAGED[$field].' المعتمد غير متاح في المعاينة؛ لم يُنفَّذ الصف.', false);
+                }
+                $this->assertReferenceUnchanged($field, $reference);
+                $attributes["{$field}_id"] = $reference['id'];
+                $attributes[$field] = null; // the id is the source of truth; no parallel free-text copy
             } else {
                 continue; // unknown or deferred field: never applied
             }
@@ -387,18 +389,24 @@ final class AiActionProductExecutionService
         return [$attributes, $changed];
     }
 
-    private function managedId(string $field, string $name): ?string
+    /**
+     * The record must still be the one that was approved: same id, tenant/branch-visible, same name, and the
+     * name must still be unambiguous. Anything else fails this row before it writes.
+     *
+     * @param  array{id:string,name?:string}  $reference
+     */
+    private function assertReferenceUnchanged(string $field, array $reference): void
     {
-        if (! isset($this->managed[$field])) {
-            $index = [];
-            foreach (($field === 'category' ? ProductCategory::query() : Brand::query())->get(['id', 'name']) as $item) {
-                $needle = mb_strtolower(trim((string) $item->name), 'UTF-8');
-                $index[$needle] = array_key_exists($needle, $index) ? null : (string) $item->id; // ambiguous names never match
-            }
-            $this->managed[$field] = $index;
+        $label = self::MANAGED[$field];
+        $model = $field === 'category' ? ProductCategory::class : Brand::class;
+        $record = $model::query()->whereKey($reference['id'])->first(['id', 'name']);
+        $needle = mb_strtolower(trim((string) ($reference['name'] ?? '')), 'UTF-8');
+        if ($record === null || mb_strtolower(trim((string) $record->name), 'UTF-8') !== $needle) {
+            throw new AiActionRowFailure('reference_changed', "«{$label}» المعتمد حُذف أو أُعيدت تسميته منذ الموافقة؛ لم يُنفَّذ الصف ولم يُستبدل بغيره.", false);
         }
-
-        return $this->managed[$field][mb_strtolower(trim($name), 'UTF-8')] ?? null;
+        if ($model::query()->get(['id', 'name'])->filter(fn ($item) => mb_strtolower(trim((string) $item->name), 'UTF-8') === $needle)->count() !== 1) {
+            throw new AiActionRowFailure('reference_changed', "«{$label}» صار الاسم المعتمد غامضاً (سجلّات متعدّدة)؛ لم يُنفَّذ الصف.", false);
+        }
     }
 
     /** @param array<string,mixed> $previewRow @return list<string> */

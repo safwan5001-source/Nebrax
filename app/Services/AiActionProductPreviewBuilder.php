@@ -6,7 +6,6 @@ use App\Models\BarcodeRegistryEntry;
 use App\Models\Brand;
 use App\Models\Product;
 use App\Models\ProductCategory;
-use App\Models\UnitTemplate;
 use App\Support\ProductImportFields;
 use App\Support\ProductImportValueNormalizer as Normalizer;
 use Illuminate\Support\Str;
@@ -25,7 +24,8 @@ final class AiActionProductPreviewBuilder
     /** Locked fields never change on an existing product; a difference is an error. */
     private const LOCKED = ['type', 'track_inventory'];
     private const MONEY = ['sale_price', 'purchase_price', 'min_sale_price'];
-    private const REFERENCES = ['category' => 'التصنيف', 'brand' => 'العلامة التجارية', 'unit_template' => 'قالب الوحدات'];
+    /** Managed references resolved to ids in the preview; the approval binds those exact ids. */
+    private const MANAGED = ['category' => 'التصنيف', 'brand' => 'العلامة التجارية'];
     private const ISSUE_MESSAGES = [
         'unknown_field' => 'حقل غير معروف.',
         'invalid_format' => 'قيمة الحقل لا تطابق الصيغة المتوقعة.',
@@ -150,30 +150,32 @@ final class AiActionProductPreviewBuilder
         return ['by_id' => $products, 'by_sku' => $bySku, 'owner' => $owner, 'products' => $products];
     }
 
-    /** @param list<array<string,mixed>> $parsed @return array<string,array<string,bool>> name => true (managed) | false (ambiguous) */
+    /**
+     * Managed category / brand lookup by normalised name. `Model::query()` carries the tenant and branch
+     * scopes, so another tenant's (or an invisible branch's) record can never resolve. A name that matches
+     * more than one record maps to `false` (ambiguous) — it is never guessed.
+     *
+     * @param  list<array<string,mixed>>  $parsed
+     * @return array<string,array<string,array{id:string,name:string}|false>>
+     */
     private function referenceIndex(array $parsed): array
     {
-        $needed = array_fill_keys(array_keys(self::REFERENCES), false);
-        foreach ($parsed as $row) {
-            foreach (array_keys($needed) as $key) {
-                $needed[$key] = $needed[$key] || isset($row['values'][$key]);
+        $index = ['category' => [], 'brand' => []];
+        foreach (['category' => ProductCategory::class, 'brand' => Brand::class] as $key => $model) {
+            $needed = false;
+            foreach ($parsed as $row) {
+                $needed = $needed || isset($row['values'][$key]);
+            }
+            if (! $needed) {
+                continue;
+            }
+            foreach ($model::query()->get(['id', 'name']) as $item) {
+                $needle = mb_strtolower(trim((string) $item->name), 'UTF-8');
+                $index[$key][$needle] = array_key_exists($needle, $index[$key]) ? false : ['id' => (string) $item->id, 'name' => (string) $item->name];
             }
         }
-        $build = static function (iterable $rows): array {
-            $names = [];
-            foreach ($rows as $item) {
-                $needle = mb_strtolower(trim((string) $item->name), 'UTF-8');
-                $names[$needle] = ! isset($names[$needle]);
-            }
 
-            return $names;
-        };
-
-        return [
-            'category' => $needed['category'] ? $build(ProductCategory::query()->get(['id', 'name'])) : [],
-            'brand' => $needed['brand'] ? $build(Brand::query()->get(['id', 'name'])) : [],
-            'unit_template' => $needed['unit_template'] ? $build(UnitTemplate::query()->get(['id', 'name'])) : [],
-        ];
+        return $index;
     }
 
     /**
@@ -195,7 +197,7 @@ final class AiActionProductPreviewBuilder
         $base = ['row_id' => (string) $row['row_id'], 'source_row' => (int) $row['source_row'], 'decision' => $p['decision'], 'display' => $display];
 
         if ($p['decision'] === 'skip') {
-            return $base + ['operation' => 'skip', 'skip_reason' => 'user_skip', 'match' => $this->matchInfo('none', null, null), 'changes' => [], 'prices' => null, 'images' => null, 'issues' => []];
+            return $base + ['operation' => 'skip', 'skip_reason' => 'user_skip', 'match' => $this->matchInfo('none', null, null), 'changes' => [], 'references' => [], 'prices' => null, 'images' => null, 'issues' => []];
         }
 
         $issues = [];
@@ -265,6 +267,25 @@ final class AiActionProductPreviewBuilder
             }
         }
 
+        // — Managed references: resolved here, to ids, so the approval binds exactly what execution will use.
+        //   An unknown or ambiguous name is an error; it is never turned into free text or guessed. —
+        $refs = [];
+        if (in_array($p['decision'], ['create', 'update'], true)) {
+            foreach (self::MANAGED as $key => $label) {
+                if (! isset($values[$key])) {
+                    continue;
+                }
+                $found = $references[$key][mb_strtolower(trim((string) $values[$key]), 'UTF-8')] ?? null;
+                if ($found === null) {
+                    $issues[] = $this->issue('reference_unresolved', $key, 'error', "«{$label}» بالقيمة «{$values[$key]}» غير موجود في بيانات المؤسسة؛ أنشئه أولاً أو صحّح القيمة (لا يُحفظ نصّاً حرّاً).");
+                } elseif ($found === false) {
+                    $issues[] = $this->issue('reference_ambiguous', $key, 'error', "«{$label}» بالقيمة «{$values[$key]}» يطابق أكثر من سجل؛ صحّح الأسماء المكرّرة أو القيمة.");
+                } else {
+                    $refs[$key] = $found;
+                }
+            }
+        }
+
         // — Decision-specific verdicts. —
         $changes = [];
         $decision = $p['decision'];
@@ -296,7 +317,7 @@ final class AiActionProductPreviewBuilder
             }
             foreach ($values as $key => $value) {
                 // `unit_template` is not applied in this phase (see the warning below), so it is not a change.
-                if (! in_array($key, ['nebrax_id', 'unit_template'], true) && ! in_array($key, ProductImportFields::mediaKeys(), true)) $changes[] = ['field' => $key, 'before' => null, 'after' => $value];
+                if (! in_array($key, ['nebrax_id', 'unit_template'], true) && ! in_array($key, ProductImportFields::mediaKeys(), true)) $changes[] = ['field' => $key, 'before' => null, 'after' => $refs[$key]['name'] ?? $value];
             }
         } else { // update
             if ($target === null) {
@@ -304,6 +325,13 @@ final class AiActionProductPreviewBuilder
             } else {
                 foreach (ProductImportFields::writableKeys() as $key) {
                     if (in_array($key, ProductImportFields::mediaKeys(), true) || $key === 'unit_template' || ! array_key_exists($key, $values)) continue;
+                    if (isset(self::MANAGED[$key])) {
+                        // Compared by id: the product either already points at the approved record or it changes.
+                        if (isset($refs[$key]) && (string) $target->{$key.'_id'} !== $refs[$key]['id']) {
+                            $changes[] = ['field' => $key, 'before' => $this->existing($target, $key), 'after' => $refs[$key]['name']];
+                        }
+                        continue;
+                    }
                     $before = $this->existing($target, $key);
                     $after = $values[$key];
                     if (in_array($key, self::LOCKED, true)) {
@@ -329,17 +357,9 @@ final class AiActionProductPreviewBuilder
             }
         }
 
-        foreach (self::REFERENCES as $key => $label) {
-            if (! isset($values[$key])) continue;
-            if ($key === 'unit_template') {
-                // A template overrides the base unit and multiplies incoming stock quantities: never applied silently.
-                $issues[] = $this->issue('unit_template_deferred', $key, 'warning', "«{$label}» لا يُطبَّق في هذه المرحلة؛ تبقى الوحدة المحدَّدة في الصف كما هي.");
-                continue;
-            }
-            $known = $references[$key][mb_strtolower(trim((string) $values[$key]), 'UTF-8')] ?? null;
-            if ($known !== true) {
-                $issues[] = $this->issue('reference_unmanaged', $key, 'warning', "«{$label}» بالقيمة «{$values[$key]}» غير موجود (أو غامض) في بيانات المؤسسة؛ سيُحفظ نصّاً حرّاً ولن يُنشأ تلقائياً.");
-            }
+        if (isset($values['unit_template'])) {
+            // A template overrides the base unit and multiplies incoming stock quantities: never applied silently.
+            $issues[] = $this->issue('unit_template_deferred', 'unit_template', 'warning', '«قالب الوحدات» لا يُطبَّق في هذه المرحلة؛ تبقى الوحدة المحدَّدة في الصف كما هي.');
         }
 
         [$images, $imageIssues] = $this->images($fields);
@@ -359,6 +379,7 @@ final class AiActionProductPreviewBuilder
             'skip_reason' => $operation === 'skip' ? 'no_changes' : null,
             'match' => $match,
             'changes' => $changes,
+            'references' => $refs,
             'prices' => $this->prices($decision, $values, $target),
             'images' => $images,
             'issues' => $issues,

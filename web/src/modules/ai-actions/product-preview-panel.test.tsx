@@ -44,7 +44,7 @@ function previewFixture(overrides: Partial<ProductPreview> = {}): ProductPreview
         changes: [{ field: 'name', before: null, after: 'قهوة جديدة' }, { field: 'sale_price', before: null, after: 1050 }],
         prices: { sale_price: { before: null, after: 1050 }, purchase_price: { before: null, after: 500 }, tax_rate: { before: null, after: 15 } },
         images: { primary: 'https://img.example/a.jpg', additional: [], count: 1, will_apply: false, status: 'deferred', fetched: false },
-        issues: [{ code: 'reference_unmanaged', field: 'category', severity: 'warning', message: '«التصنيف» بالقيمة «قهوة» غير موجود ولن يُنشأ تلقائياً.' }],
+        issues: [{ code: 'unit_template_deferred', field: 'unit_template', severity: 'warning', message: '«قالب الوحدات» لا يُطبَّق في هذه المرحلة.' }],
       },
       {
         row_id: 'r2', source_row: 3, decision: 'update', display: { name: 'قهوة قائمة', sku: 'EX-1', barcode: null },
@@ -112,7 +112,7 @@ describe('المعاينة النهائية والموافقة', () => {
     expect(screen.getAllByText('وصف جديد').length).toBeGreaterThan(0);
     expect(screen.getAllByText(/مؤجَّلة — لا تُنزَّل ولا تُرفق/).length).toBeGreaterThan(0);
     expect(screen.getAllByText('تخطٍّ بقرارك').length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/غير موجود ولن يُنشأ تلقائياً/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/لا يُطبَّق في هذه المرحلة/).length).toBeGreaterThan(0);
     expect(onStatus).toHaveBeenCalledWith('ready_for_approval');
     expect(screen.getByText(/لا تُنشأ منتجات ولا تُحدَّث/)).toBeTruthy();
   });
