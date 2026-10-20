@@ -1832,9 +1832,9 @@ function PreviewProductMeta({
           <bdi>{formatMinorAmount(product.priceAmountMinor, product.currency ?? "SAR", locale)}</bdi>
         </p>
       ) : null}
-      {typeof product.inStock === "boolean" && (
-        <p className={cn("text-[11px] font-medium", product.inStock ? "text-store-success" : "text-store-destructive")}>
-          {product.inStock ? (locale === "ar" ? "متوفر" : "In stock") : locale === "ar" ? "غير متوفر" : "Out of stock"}
+      {product.inStock === true && (
+        <p className="text-[11px] font-medium text-store-success">
+          {locale === "ar" ? "متوفر" : "In stock"}
         </p>
       )}
       {product.inStock === false ? (
@@ -2204,7 +2204,7 @@ function CategoryPagePreview({
   selectedRegionId?: string | null;
   onSelectRegion?: (id: string) => void;
   gridProductsState?: "idle" | "loading" | "error" | "ready";
-  gridProducts?: { id: string; name: string; thumbnailUrl: string | null }[];
+  gridProducts?: { id: string; name: string; thumbnailUrl: string | null; priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null; isVariantManaged?: boolean }[];
   gridProductsTotal?: number;
 }) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);

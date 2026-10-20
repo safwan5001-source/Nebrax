@@ -345,5 +345,14 @@ describe("Canvas — storefront price and variant parity", () => {
     expect(container.textContent).toContain("Select options");
     expect(container.textContent).not.toContain("Add to cart");
   });
+
+  it("renders one out-of-stock label, matching the published card action line", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas config={config} locale="en" viewport="desktop" onSelectSection={() => {}}
+        homeNewArrivalsState="ready"
+        homeNewArrivals={[{ id: "p-oos", name: "Unavailable", thumbnailUrl: null, priceAmountMinor: 100, currency: "SAR", inStock: false }]} />,
+    );
+    expect((container.textContent?.match(/Out of stock/g) ?? [])).toHaveLength(1);
+  });
 });
 
