@@ -428,6 +428,16 @@ php artisan serve
 - **خارج النطاق (REM-15b/16):** رفض الترحيل عند نقص بيانات المشتري، POS، `entity_type`، حدّ 1,000 ريال، رقم إضافي للمشتري، تعدّد السجلات التجارية/هوية الفرع.
 - **الحارس:** `baseline.json` يحمل `awj_forbidden_warning_codes` (قواعد الأطراف إنذاراتٌ في SDK فلا يلتقطها مسطرة الأخطاء)؛ نجاح XSD/غياب الإنذارات استرشادي وليس إقرار امتثال. المرجع: `docs/audits/horizon/REM-15a-IMPLEMENTATION-REPORT.md`.
 
+## المبالغ وسطور الفاتورة في UBL (`ZatcaMonetaryXml`) — REM-16 (شريحة XML فقط)
+
+`App\Support\ZatcaMonetaryXml` (دالة نقيّة) يعرض **المبالغ المخزَّنة كما هي** (`invoices.*`/`invoice_lines.*` كما كتبها `InvoiceService::post()`) في عناصر UBL الصحيحة: `TaxCurrencyCode`، `LegalMonetaryTotal` (BT-106…BT-115)، `TaxTotal`×2، سطور بـ`TaxTotal` (KSA-11/12) و`LineExtensionAmount = line_subtotal − line_discount` و`AllowanceCharge` للخصم و`PriceAmount` (غير الشامل `unit_price`، والشامل `unit_price_before_tax` المخزَّن). **لا إعادة حساب** لضريبة أو تقريب أو توزيع، ولا إصلاح تناقض قائم في XML؛ التناقضات تبقى ظاهرة في SDK والاختبارات.
+- **التصنيف:** `S` فقط لسطر معدّله **15** (`STANDARD_RATE`، BR-KSA-84، وهو معدل الشحن الثابت). الصفر و5٪ وغيرهما **بلا `ClassifiedTaxCategory`** (لا استنتاج Z/E/O — ADR-0002) = فجوة مطابقة صريحة (BR-CO-04) حتى REM-12.
+- **`TaxSubtotal`** يُكتب فقط حين **كل** الأسطر S/15 (فئة واحدة). خصم المستند يحمل فئة S فقط في هذه الحالة؛ وفي الفئات المختلطة/غير المصنَّفة يُكتب بلا فئة ولا يُوزَّع.
+- **`adjustment` لا يُعيَّن إلى `PayableRoundingAmount`** (G-B5): `TaxInclusiveAmount = BT-109 + BT-110` و`PayableAmount = total` المخزَّن، والفرق ظاهر (BR-CO-16).
+- **الشحن:** `AllowanceCharge(true)` بنص بلا رمز سبب، لأن لا رمز في UNCL 7161 يطابق «رسوم الشحن» حرفياً (SAA «شحن ومناولة»، DL «توصيل»، FC «خدمة شحن بضائع») — BR-KSA-19 فجوة صريحة. فئته S/15 لأن ضريبة الشحن المخزَّنة 15٪.
+- **خارج النطاق:** `unitCode` (نصّ حرّ)، تاريخ التوريد (REM-29)، `PaymentMeans`، PIH/QR/التوقيع (REM-17)، طريقة التقريب وتوزيع الخصم (ADR-B).
+- **الحارس:** `baseline.json` يحمل `awj_forbidden_warning_codes` (تشمل BR-S-09 وBR-CO-17) و`awj_known_gap_warnings` لثلاث ثغرات موثَّقة فقط (تسوية، شحن، معدل صفري). نجاح مراحل SDK استرشادي وليس إقرار امتثال. المرجع: `docs/audits/horizon/REM-16-IMPLEMENTATION-REPORT.md`.
+
 ## الترقيم التسلسلي
 
 كل أرقام المستندات تُولَّد من مصدر واحد: `App\Support\GeneratesDocumentNumbers` (trait على النموذج).

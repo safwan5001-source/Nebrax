@@ -255,12 +255,21 @@ def forbidden_warnings(res: SdkResult, forbidden: list[str]) -> list[str]:
     return sorted(w for w in res.warnings if any(fnmatch.fnmatchcase(w, pattern) for pattern in forbidden))
 
 
-def compare_awj(res: SdkResult, expect: dict, forbidden: list[str] | None = None) -> tuple[str, list[str]]:
-    """Ratchet comparison. Returns (verdict, details); verdict in OK|REGRESSION|STALE_BASELINE."""
+def compare_awj(res: SdkResult, expect: dict, forbidden: list[str] | None = None,
+                known_gaps: list[str] | None = None) -> tuple[str, list[str]]:
+    """Ratchet comparison. Returns (verdict, details); verdict in OK|REGRESSION|STALE_BASELINE.
+
+    `known_gaps`: forbidden warning codes this fixture is *documented* to trigger (REM-16: a deliberately
+    unsupported shape such as a zero-rate line, an arbitrary adjustment or a shipping charge without a verified
+    reason code). They are tolerated for that fixture only; a gap that stops firing demands removal (stale)."""
     regress, improve = [], []
-    bad_warnings = forbidden_warnings(res, forbidden or [])
+    known = set(known_gaps or [])
+    bad_warnings = [w for w in forbidden_warnings(res, forbidden or []) if w not in known]
     if bad_warnings:
         regress.append(f"forbidden warning codes {bad_warnings}")
+    stale_gaps = sorted(known - set(res.warnings))
+    if stale_gaps:
+        improve.append(f"known-gap warning codes no longer reported {stale_gaps}")
     exp_stages = expect["stages"]
     for stage in sorted(set(exp_stages) | set(res.stages)):
         want = exp_stages.get(stage)
@@ -374,7 +383,8 @@ def evaluate(official: dict, awj: dict, baseline: dict) -> tuple[list[dict], boo
             rows.append({"kind": "awj", "name": name, "verdict": "UNEXPECTED_FIXTURE", "details": ["fixture without baseline entry"]})
             ok = False
         else:
-            verdict, details = compare_awj(awj[name], awj_base[name], baseline.get("awj_forbidden_warning_codes", []))
+            verdict, details = compare_awj(awj[name], awj_base[name], baseline.get("awj_forbidden_warning_codes", []),
+                                         baseline.get("awj_known_gap_warnings", {}).get(name[:-4] if name.endswith(".xml") else name, []))
             rows.append({"kind": "awj", "name": name, "verdict": verdict, "details": details, "result": awj[name]})
             ok &= verdict == "OK"
     return rows, ok
@@ -388,7 +398,12 @@ def ratchet_controls(official: dict, awj: dict, baseline: dict) -> list[str]:
     problems: list[str] = []
     if not awj:
         return ["ratchet controls: no AWJ fixtures found"]
-    name = sorted(awj)[0]
+    # الضوابط السلبية تحتاج fixture ومرحلة **فاشلتين فعلاً** (وإلا صار التعديل بلا أثر): اختر أول مرحلة فاشلة بأخطاء.
+    name, first_stage = next(
+        ((n, st) for n in sorted(awj) for st in sorted(awj[n].stages)
+         if awj[n].stages[st] == "FAILED" and awj[n].errors.get(st)),
+        (sorted(awj)[0], sorted(awj[sorted(awj)[0]].stages)[0]),
+    )
 
     def expect_rejected(label: str, mutate) -> None:
         variant = copy.deepcopy(baseline)
@@ -398,7 +413,6 @@ def ratchet_controls(official: dict, awj: dict, baseline: dict) -> list[str]:
             problems.append(f"ratchet control '{label}' was NOT rejected")
 
     entry = lambda b: b["awj"][name]["stages"]  # noqa: E731
-    first_stage = sorted(awj[name].stages)[0]
     expect_rejected("baseline claims a failing stage passes",
                     lambda b: entry(b)[first_stage].update(status="PASSED", errors=[]))
     expect_rejected("baseline lists an error code the SDK no longer reports",
@@ -409,7 +423,9 @@ def ratchet_controls(official: dict, awj: dict, baseline: dict) -> list[str]:
     expect_rejected("baseline expects a fixture that is missing",
                     lambda b: b["awj"].update({"awj-ghost.xml": copy.deepcopy(b["awj"][name])}))
     expect_rejected("official sample count drifts", lambda b: b["official"].update(expected_count=999))
-    reported = sorted({w for r in awj.values() for w in r.warnings})
+    gaps = baseline.get("awj_known_gap_warnings", {})
+    reported = sorted({w for n, r in awj.items() for w in r.warnings
+                       if w not in gaps.get(n[:-4] if n.endswith(".xml") else n, [])})
     if reported:
         expect_rejected("a reported warning code is declared forbidden",
                         lambda b: b.update(awj_forbidden_warning_codes=[reported[0]]))
@@ -525,6 +541,7 @@ def cmd_update_baseline(args) -> int:
             "samples": {n: {"stages": sorted(r.stages, key=KNOWN_STAGES.index)} for n, r in sorted(official.items())},
         },
         "awj_forbidden_warning_codes": previous.get("awj_forbidden_warning_codes", []),
+        "awj_known_gap_warnings": previous.get("awj_known_gap_warnings", {}),
         "awj": {n: baseline_entry(r) for n, r in sorted(awj.items())},
     }
     with open(path, "w", encoding="utf-8") as fh:

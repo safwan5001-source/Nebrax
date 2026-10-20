@@ -8,6 +8,7 @@ use App\Models\Tenant;
 use App\Models\ZatcaCredential;
 use App\Support\ZatcaIcvScope;
 use App\Support\ZatcaIssueTimestamp;
+use App\Support\ZatcaMonetaryXml;
 use App\Support\ZatcaPartyXml;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
@@ -257,28 +258,21 @@ class ZatcaService
 
     /**
      * بناء مستند UBL 2.1 مبسّط للفاتورة (تمثيل بنيوي — غير مُتحقَّق مقابل XSD ZATCA).
-     * كتلتا الطرفين (REM-15a) من لقطة party_snapshot عبر ZatcaPartyXml؛ بقية الهيكل (الإجماليات/الأسطر) ضمن REM-16.
+     * كتلتا الطرفين (REM-15a) من لقطة party_snapshot عبر ZatcaPartyXml؛ والمبالغ/الأسطر (REM-16) تُعرض كما خُزّنت عبر
+     * ZatcaMonetaryXml بلا أي إعادة حساب. الترويسة والتوقيع/QR/PIH خارج هذه الدالة.
      *
      * @param array{seller: array<string, mixed>, buyer: array<string, mixed>} $parties
      */
     protected function buildXml(Invoice $invoice, array $parties, string $uuid, int $icv, string $prev): string
     {
         $e = fn ($v) => htmlspecialchars((string) $v, ENT_XML1 | ENT_QUOTES, 'UTF-8');
-        $amt = fn (int $m) => $this->formatAmount($m);
 
+        // REM-16: المبالغ والأسطر تُعرض كما خُزّنت (ZatcaMonetaryXml) — لا إعادة حساب هنا.
         $linesXml = '';
         foreach ($invoice->lines as $i => $line) {
-            $linesXml .= <<<LINE
-  <cac:InvoiceLine>
-    <cbc:ID>{$e($i + 1)}</cbc:ID>
-    <cbc:InvoicedQuantity>{$e($this->lineQuantity($line))}</cbc:InvoicedQuantity>
-    <cbc:LineExtensionAmount currencyID="SAR">{$e($amt($line->line_subtotal))}</cbc:LineExtensionAmount>
-    <cac:Item><cbc:Name>{$e($line->description ?? '-')}</cbc:Name></cac:Item>
-    <cac:Price><cbc:PriceAmount currencyID="SAR">{$e($amt($line->unit_price))}</cbc:PriceAmount></cac:Price>
-  </cac:InvoiceLine>
-
-LINE;
+            $linesXml .= ZatcaMonetaryXml::line($invoice, $line, $i + 1, $this->lineQuantity($line));
         }
+        $monetaryXml = ZatcaMonetaryXml::documentBlock($invoice);
 
         // REM-13a / BR-KSA-70: توقيت السعودية (AST) بلا Z، مشتق من لحظة الإصدار المخزَّنة.
         $issuedAt = $this->issuedAtOf($invoice);
@@ -308,6 +302,7 @@ LINE;
   <cbc:IssueTime>{$e($issueTime)}</cbc:IssueTime>
   <cbc:InvoiceTypeCode name="{$transactionCode}">388</cbc:InvoiceTypeCode>
   <cbc:DocumentCurrencyCode>SAR</cbc:DocumentCurrencyCode>
+  <cbc:TaxCurrencyCode>SAR</cbc:TaxCurrencyCode>
   <cac:AdditionalDocumentReference>
     <cbc:ID>ICV</cbc:ID>
     <cbc:UUID>{$e($icv)}</cbc:UUID>
@@ -329,15 +324,7 @@ LINE;
     <cbc:SignatureMethod>urn:oasis:names:specification:ubl:dsig:enveloped:xades</cbc:SignatureMethod>
   </cac:Signature>
 {$partiesXml}
-  <cac:TaxTotal>
-    <cbc:TaxAmount currencyID="SAR">{$e($amt($invoice->tax_amount))}</cbc:TaxAmount>
-  </cac:TaxTotal>
-  <cac:LegalMonetaryTotal>
-    <cbc:TaxExclusiveAmount currencyID="SAR">{$e($amt($invoice->subtotal))}</cbc:TaxExclusiveAmount>
-    <cbc:TaxInclusiveAmount currencyID="SAR">{$e($amt($invoice->total))}</cbc:TaxInclusiveAmount>
-    <cbc:PayableAmount currencyID="SAR">{$e($amt($invoice->total))}</cbc:PayableAmount>
-  </cac:LegalMonetaryTotal>
-{$linesXml}</Invoice>
+{$monetaryXml}{$linesXml}</Invoice>
 XML;
     }
 }

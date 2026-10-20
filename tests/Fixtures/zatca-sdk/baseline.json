@@ -182,9 +182,73 @@
     "BR-KSA-66",
     "BR-KSA-67",
     "BR-KSA-81",
-    "BR-KSA-F-06-*"
+    "BR-KSA-F-06-*",
+    "BR-CO-10",
+    "BR-CO-13",
+    "BR-CO-16",
+    "BR-CO-17",
+    "BR-S-01",
+    "BR-S-08",
+    "BR-S-09",
+    "BR-KSA-18",
+    "BR-KSA-19",
+    "BR-KSA-21",
+    "BR-KSA-51",
+    "BR-KSA-EN16931-08",
+    "BR-KSA-EN16931-09",
+    "BR-KSA-EN16931-11"
   ],
+  "awj_known_gap_warnings": {
+    "awj-standard-adjustment": [
+      "BR-CO-16"
+    ],
+    "awj-standard-shipping": [
+      "BR-KSA-19"
+    ],
+    "awj-standard-zero-rate": [
+      "BR-KSA-EN16931-08",
+      "BR-KSA-EN16931-09"
+    ]
+  },
   "awj": {
+    "awj-simplified-document-discount.xml": {
+      "global": "FAILED",
+      "stages": {
+        "XSD": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "EN": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "KSA": {
+          "status": "FAILED",
+          "errors": [
+            "BR-KSA-28"
+          ]
+        },
+        "QR": {
+          "status": "FAILED",
+          "errors": [
+            "QRCODE_INVALID"
+          ]
+        },
+        "SIGNATURE": {
+          "status": "FAILED",
+          "errors": [
+            "NullPointerException",
+            "certificate"
+          ]
+        },
+        "PIH": {
+          "status": "FAILED",
+          "errors": [
+            "KSA-13"
+          ]
+        }
+      }
+    },
     "awj-simplified-single-line.xml": {
       "global": "FAILED",
       "stages": {
@@ -193,18 +257,13 @@
           "errors": []
         },
         "EN": {
-          "status": "FAILED",
-          "errors": [
-            "BR-CO-04",
-            "BR-CO-15",
-            "BR-CO-18"
-          ]
+          "status": "PASSED",
+          "errors": []
         },
         "KSA": {
           "status": "FAILED",
           "errors": [
-            "BR-KSA-28",
-            "BR-KSA-68"
+            "BR-KSA-28"
           ]
         },
         "QR": {
@@ -236,18 +295,13 @@
           "errors": []
         },
         "EN": {
-          "status": "FAILED",
-          "errors": [
-            "BR-CO-04",
-            "BR-CO-15",
-            "BR-CO-18"
-          ]
+          "status": "PASSED",
+          "errors": []
         },
         "KSA": {
           "status": "FAILED",
           "errors": [
-            "BR-KSA-28",
-            "BR-KSA-68"
+            "BR-KSA-28"
           ]
         },
         "QR": {
@@ -271,6 +325,29 @@
         }
       }
     },
+    "awj-standard-adjustment.xml": {
+      "global": "FAILED",
+      "stages": {
+        "XSD": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "EN": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "KSA": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "PIH": {
+          "status": "FAILED",
+          "errors": [
+            "KSA-13"
+          ]
+        }
+      }
+    },
     "awj-standard-buyer-crn.xml": {
       "global": "FAILED",
       "stages": {
@@ -279,20 +356,127 @@
           "errors": []
         },
         "EN": {
-          "status": "FAILED",
-          "errors": [
-            "BR-CO-04",
-            "BR-CO-15",
-            "BR-CO-18"
-          ]
+          "status": "PASSED",
+          "errors": []
         },
         "KSA": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "PIH": {
           "status": "FAILED",
           "errors": [
-            "BR-KSA-52",
-            "BR-KSA-53",
-            "BR-KSA-68"
+            "KSA-13"
           ]
+        }
+      }
+    },
+    "awj-standard-document-discount.xml": {
+      "global": "FAILED",
+      "stages": {
+        "XSD": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "EN": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "KSA": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "PIH": {
+          "status": "FAILED",
+          "errors": [
+            "KSA-13"
+          ]
+        }
+      }
+    },
+    "awj-standard-fractional-quantity.xml": {
+      "global": "FAILED",
+      "stages": {
+        "XSD": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "EN": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "KSA": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "PIH": {
+          "status": "FAILED",
+          "errors": [
+            "KSA-13"
+          ]
+        }
+      }
+    },
+    "awj-standard-line-discount.xml": {
+      "global": "FAILED",
+      "stages": {
+        "XSD": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "EN": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "KSA": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "PIH": {
+          "status": "FAILED",
+          "errors": [
+            "KSA-13"
+          ]
+        }
+      }
+    },
+    "awj-standard-multi-line.xml": {
+      "global": "FAILED",
+      "stages": {
+        "XSD": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "EN": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "KSA": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "PIH": {
+          "status": "FAILED",
+          "errors": [
+            "KSA-13"
+          ]
+        }
+      }
+    },
+    "awj-standard-shipping.xml": {
+      "global": "FAILED",
+      "stages": {
+        "XSD": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "EN": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "KSA": {
+          "status": "PASSED",
+          "errors": []
         },
         "PIH": {
           "status": "FAILED",
@@ -310,20 +494,84 @@
           "errors": []
         },
         "EN": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "KSA": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "PIH": {
+          "status": "FAILED",
+          "errors": [
+            "KSA-13"
+          ]
+        }
+      }
+    },
+    "awj-standard-small-lines.xml": {
+      "global": "FAILED",
+      "stages": {
+        "XSD": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "EN": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "KSA": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "PIH": {
+          "status": "FAILED",
+          "errors": [
+            "KSA-13"
+          ]
+        }
+      }
+    },
+    "awj-standard-tax-inclusive.xml": {
+      "global": "FAILED",
+      "stages": {
+        "XSD": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "EN": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "KSA": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "PIH": {
+          "status": "FAILED",
+          "errors": [
+            "KSA-13"
+          ]
+        }
+      }
+    },
+    "awj-standard-zero-rate.xml": {
+      "global": "FAILED",
+      "stages": {
+        "XSD": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "EN": {
           "status": "FAILED",
           "errors": [
             "BR-CO-04",
-            "BR-CO-15",
             "BR-CO-18"
           ]
         },
         "KSA": {
-          "status": "FAILED",
-          "errors": [
-            "BR-KSA-52",
-            "BR-KSA-53",
-            "BR-KSA-68"
-          ]
+          "status": "PASSED",
+          "errors": []
         },
         "PIH": {
           "status": "FAILED",
