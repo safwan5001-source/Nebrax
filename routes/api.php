@@ -451,6 +451,14 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
             ->middleware([$perm('ai.actions.use'), 'throttle:60,1']);
         Route::post('ai-actions/{action}/approvals', [AiActionController::class, 'approve'])
             ->middleware([$perm('ai.actions.approve'), EnforceUserIdempotency::class, 'throttle:20,1']);
+        // AI-ACTIONS-06: product images. Staging only — validated bytes go to private storage; nothing here
+        // touches a product (that happens, per image, inside the approved execution).
+        Route::post('ai-actions/{action}/image-archives', [AiActionController::class, 'storeImageArchive'])
+            ->middleware([$perm('ai.actions.use'), EnforceUserIdempotency::class, 'throttle:10,1']);
+        Route::get('ai-actions/{action}/images', [AiActionController::class, 'listImages'])
+            ->middleware([$perm('ai.actions.use'), 'throttle:60,1']);
+        Route::get('ai-actions/{action}/images/{image}/thumbnail', [AiActionController::class, 'showImageThumbnail'])
+            ->middleware([$perm('ai.actions.use'), 'throttle:600,1']);
         // AI-ACTIONS-05: applies the approved preview to the catalogue. Gated by
         // `ai_actions.execution_enabled` (off by default); the approver alone may execute their approval.
         Route::post('ai-actions/{action}/executions', [AiActionController::class, 'execute'])

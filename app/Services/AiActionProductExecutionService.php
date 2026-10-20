@@ -6,12 +6,15 @@ use App\Models\AiAction;
 use App\Models\AiActionApproval;
 use App\Models\AiActionEvent;
 use App\Models\AiActionExecution;
+use App\Models\AiActionExecutionImage;
 use App\Models\AiActionExecutionRow;
+use App\Models\AiActionImage;
 use App\Models\AiActionPreview;
 use App\Models\BarcodeRegistryEntry;
 use App\Models\Brand;
 use App\Models\Product;
 use App\Models\ProductCategory;
+use App\Models\ProductMedia;
 use App\Models\User;
 use App\Support\AiActionCanonicalJson;
 use App\Support\AiActionCostVisibility;
@@ -50,6 +53,9 @@ final class AiActionProductExecutionService
         private readonly AiActionApprovalLedger $ledger,
         private readonly ProductService $products,
         private readonly ProductLifecycleService $lifecycle,
+        private readonly AiActionProductImageStager $stager,
+        private readonly ProductMediaService $media,
+        private readonly ProductImageInspector $inspector,
         private readonly TenantContext $tenantContext,
         private readonly BranchContext $branchContext,
     ) {}
@@ -106,12 +112,24 @@ final class AiActionProductExecutionService
                     continue;
                 }
                 $skipped = $row['operation'] === 'skip';
-                AiActionExecutionRow::create([
+                $created = AiActionExecutionRow::create([
                     'ai_action_execution_id' => $execution->id, 'ai_action_id' => $locked->id, 'row_id' => (string) $row['row_id'],
                     'source_row' => (int) $row['source_row'], 'operation' => $row['operation'],
                     'status' => $skipped ? AiActionExecutionRow::STATUS_SKIPPED : AiActionExecutionRow::STATUS_PENDING,
                     'finished_at' => $skipped ? now('UTC') : null,
                 ]);
+                // One result record per approved image — separate from the product's own row.
+                foreach ($skipped ? [] : ($row['images']['items'] ?? []) as $item) {
+                    if (($item['status'] ?? null) !== 'ready' || ! is_array($item['image'] ?? null)) {
+                        continue;
+                    }
+                    AiActionExecutionImage::create([
+                        'ai_action_execution_id' => $execution->id, 'ai_action_execution_row_id' => $created->id, 'ai_action_id' => $locked->id,
+                        'item_key' => (string) $item['key'], 'ai_action_image_id' => (string) $item['image']['id'],
+                        'content_sha256' => (string) $item['image']['sha256'], 'role' => (string) $item['role'],
+                        'position' => (int) $item['position'], 'status' => AiActionExecutionImage::STATUS_PENDING,
+                    ]);
+                }
                 $total++;
             }
             $locked->forceFill(['status' => AiAction::STATUS_EXECUTING])->save();
@@ -155,6 +173,10 @@ final class AiActionProductExecutionService
             $reset = AiActionExecutionRow::query()->where('ai_action_execution_id', $fresh->id)
                 ->where('status', AiActionExecutionRow::STATUS_FAILED)->where('retryable', true)
                 ->update(['status' => AiActionExecutionRow::STATUS_PENDING, 'updated_at' => now('UTC')]);
+            // A failed image of an already-saved product is retried alone: the product is never touched again.
+            $reset += AiActionExecutionImage::query()->where('ai_action_execution_id', $fresh->id)
+                ->where('status', AiActionExecutionImage::STATUS_FAILED)->where('retryable', true)
+                ->update(['status' => AiActionExecutionImage::STATUS_PENDING, 'updated_at' => now('UTC')]);
             if ($reset === 0) {
                 throw new AiActionException('nothing_to_retry', 'كل الصفوف الفاشلة غير قابلة لإعادة المحاولة؛ راجع رسالة كل صف.', 409);
             }
@@ -196,15 +218,26 @@ final class AiActionProductExecutionService
             ->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
         $retryable = AiActionExecutionRow::query()->where('ai_action_execution_id', $execution->id)
             ->where('status', AiActionExecutionRow::STATUS_FAILED)->where('retryable', true)->count();
+        $retryableImages = AiActionExecutionImage::query()->where('ai_action_execution_id', $execution->id)
+            ->where('status', AiActionExecutionImage::STATUS_FAILED)->where('retryable', true)->count();
+        $imageCounts = AiActionExecutionImage::query()->where('ai_action_execution_id', $execution->id)
+            ->whereIn('ai_action_execution_row_id', $this->savedRowIds($execution))
+            ->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
+        $waitingImages = AiActionExecutionImage::query()->where('ai_action_execution_id', $execution->id)
+            ->whereNotIn('ai_action_execution_row_id', $this->savedRowIds($execution))->count();
         $status = in_array($query['status'] ?? null, ['pending', 'success', 'failed', 'skipped'], true) ? $query['status'] : null;
         $perPage = min(500, max(1, (int) ($query['per_page'] ?? config('ai_actions.preview_page_size', 100))));
         $page = max(1, (int) ($query['page'] ?? 1));
         $rowsQuery = AiActionExecutionRow::query()->where('ai_action_execution_id', $execution->id)->when($status, fn ($q) => $q->where('status', $status));
         $total = (clone $rowsQuery)->count();
         $display = [];
+        $planned = [];
         foreach (AiActionPreview::query()->whereKey($execution->ai_action_preview_id)->value('preview')['rows'] ?? [] as $row) {
             $display[(string) $row['row_id']] = $row['display'] ?? null;
+            $planned[(string) $row['row_id']] = $row['images']['items'] ?? [];
         }
+        $pageRows = $rowsQuery->orderBy('source_row')->forPage($page, $perPage)->get();
+        $results = AiActionExecutionImage::query()->whereIn('ai_action_execution_row_id', $pageRows->pluck('id')->all())->get()->groupBy('ai_action_execution_row_id');
         $count = static fn (string $key): int => (int) ($counts[$key] ?? 0);
         $approval = AiActionApproval::query()->whereKey($execution->ai_action_approval_id)->first();
 
@@ -222,23 +255,62 @@ final class AiActionProductExecutionService
                 'total' => array_sum($counts->all()), 'pending' => $count('pending'), 'success' => $count('success'),
                 'failed' => $count('failed'), 'skipped' => $count('skipped'),
             ],
+            'images' => [
+                'total' => array_sum($imageCounts->all()), 'pending' => (int) ($imageCounts['pending'] ?? 0), 'success' => (int) ($imageCounts['success'] ?? 0),
+                'failed' => (int) ($imageCounts['failed'] ?? 0), 'skipped' => (int) ($imageCounts['skipped'] ?? 0), 'waiting_for_product' => $waitingImages,
+            ],
             // Deferred by design: reported, never claimed as imported.
-            'deferred' => ['images' => 'deferred', 'unit_template' => 'deferred'],
-            'rows' => $rowsQuery->orderBy('source_row')->forPage($page, $perPage)->get()->map(fn (AiActionExecutionRow $row): array => [
+            'deferred' => ['unit_template' => 'deferred'],
+            'rows' => $pageRows->map(fn (AiActionExecutionRow $row): array => [
                 'row_id' => $row->row_id, 'source_row' => (int) $row->source_row, 'operation' => $row->operation, 'status' => $row->status,
                 'product_id' => $row->product_id, 'error_code' => $row->error_code, 'error_message' => $row->error_message,
                 'retryable' => (bool) $row->retryable, 'attempts' => (int) $row->attempts,
                 'changed_fields' => $row->changed_fields ?? [], 'deferred' => $row->deferred ?? [],
                 'display' => $display[$row->row_id] ?? null,
+                'images' => $this->presentImages($planned[$row->row_id] ?? [], $results->get($row->id, collect())->keyBy('item_key'), $row->status),
             ])->all(),
             'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $total, 'last_page' => max(1, (int) ceil($total / $perPage)), 'status' => $status],
             'permissions' => [
                 'can_continue' => $execution->status === AiActionExecution::STATUS_RUNNING && $execution->started_by === $actor->id,
                 'can_retry' => in_array($execution->status, [AiActionExecution::STATUS_PARTIALLY_FAILED, AiActionExecution::STATUS_FAILED], true)
-                    && $retryable > 0 && $execution->started_by === $actor->id && $approval?->isActive() === true,
+                    && ($retryable + $retryableImages) > 0 && $execution->started_by === $actor->id && $approval?->isActive() === true,
                 'retryable_rows' => $retryable,
+                'retryable_images' => $retryableImages,
             ],
         ];
+    }
+
+    /**
+     * Every image the approved preview named for a row — applied or not — with the outcome of each: an image the
+     * preview never intended to apply (duplicate, unavailable, no decision) is shown with its reason, not hidden.
+     *
+     * @param  list<array<string,mixed>>  $items
+     * @param  \Illuminate\Support\Collection<string,AiActionExecutionImage>  $results
+     * @return list<array<string,mixed>>
+     */
+    private function presentImages(array $items, $results, string $rowStatus): array
+    {
+        $out = [];
+        foreach ($items as $item) {
+            $result = $results->get($item['key']);
+            // An image waits for its product: if the product failed, say so instead of showing a perpetual "pending".
+            $orphaned = $rowStatus === AiActionExecutionRow::STATUS_FAILED && ($result === null || $result->status === AiActionExecutionImage::STATUS_PENDING) && ($item['status'] ?? null) === 'ready';
+            $out[] = $orphaned ? [
+                'key' => $item['key'], 'role' => $item['role'], 'position' => (int) $item['position'], 'source' => $item['source'], 'image_id' => $item['image']['id'] ?? null,
+                'status' => 'skipped', 'error_code' => 'product_not_saved', 'error_message' => 'لم تُعالَج الصورة لأن المنتج لم يُحفظ.',
+                'retryable' => false, 'attempts' => 0, 'product_media_id' => null,
+            ] : [
+                'key' => $item['key'], 'role' => $item['role'], 'position' => (int) $item['position'],
+                'source' => $item['source'], 'image_id' => $item['image']['id'] ?? null,
+                'status' => $result?->status ?? (($item['status'] ?? null) === 'ready' ? 'pending' : $item['status']),
+                'error_code' => $result?->error_code ?? ($result === null ? ($item['code'] ?? null) : null),
+                'error_message' => $result?->error_message ?? ($result === null ? ($item['message'] ?? null) : null),
+                'retryable' => (bool) ($result?->retryable ?? false), 'attempts' => (int) ($result?->attempts ?? 0),
+                'product_media_id' => $result?->product_media_id,
+            ];
+        }
+
+        return $out;
     }
 
     /** Applies one batch of pending rows under an exclusive lease, then finalises when none are left. */
@@ -268,6 +340,18 @@ final class AiActionProductExecutionService
             $done = ['success' => 0, 'failed' => 0];
             foreach ($batch as $result) {
                 $done[$this->executeRow($actor, $result, $rows[$result->row_id] ?? null) ? 'success' : 'failed']++;
+            }
+            // Images follow their (already saved) product, each with its own result — a failed image never
+            // changes the product row, and a saved product is never written again for the sake of an image.
+            $pendingImages = AiActionExecutionImage::query()->where('ai_action_execution_id', $execution->id)
+                ->where('status', AiActionExecutionImage::STATUS_PENDING)
+                ->whereIn('ai_action_execution_row_id', $this->savedRowIds($execution))
+                ->orderBy('ai_action_execution_row_id')->orderBy('position')
+                ->limit(max(1, (int) config('ai_actions.execution_batch_images', 50)))->get();
+            $execRows = AiActionExecutionRow::query()->whereIn('id', $pendingImages->pluck('ai_action_execution_row_id')->unique()->all())->get()->keyBy('id');
+            foreach ($pendingImages as $image) {
+                $execRow = $execRows[$image->ai_action_execution_row_id] ?? null;
+                $this->applyImage($actor, $image, $execRow, $execRow === null ? null : ($rows[$execRow->row_id] ?? null));
             }
             $this->finish($actor, $execution, $done);
         } finally {
@@ -353,6 +437,11 @@ final class AiActionProductExecutionService
             throw new AiActionRowFailure('conflict_existing_product', 'الباركود الجديد مستخدم لمنتج آخر.', false);
         }
 
+        // An image-only update leaves the product record alone: its images are attached by their own results.
+        if ($attributes === []) {
+            return $product;
+        }
+
         return $this->lifecycle->update($product, $attributes, $actor->id);
     }
 
@@ -413,8 +502,12 @@ final class AiActionProductExecutionService
     private function deferred(array $previewRow): array
     {
         $deferred = [];
-        if (($previewRow['images']['count'] ?? 0) > 0) {
-            $deferred[] = 'images';
+        // Images are applied now; only a source the platform cannot fetch is reported as not applied.
+        foreach ($previewRow['images']['items'] ?? [] as $item) {
+            if (($item['status'] ?? null) === 'unavailable') {
+                $deferred[] = 'images';
+                break;
+            }
         }
         foreach ($previewRow['issues'] ?? [] as $issue) {
             if (($issue['code'] ?? null) === 'unit_template_deferred') {
@@ -423,6 +516,119 @@ final class AiActionProductExecutionService
         }
 
         return array_values(array_intersect(self::DEFERRED_FIELDS, $deferred));
+    }
+
+    /** Sub-query: ids of this execution's rows whose product is already saved. */
+    private function savedRowIds(AiActionExecution $execution): \Illuminate\Database\Eloquent\Builder
+    {
+        return AiActionExecutionRow::query()->where('ai_action_execution_id', $execution->id)
+            ->where('status', AiActionExecutionRow::STATUS_SUCCESS)->select('id');
+    }
+
+    /**
+     * Attaches ONE approved image to the product its row saved. Every guard that protects the product write
+     * protects this one too: the bytes must still hash to the approved identity, the gallery is append-only
+     * (never replaced or reordered), and a duplicate or full gallery is reported, not forced. The outcome is recorded
+     * on the image's own record; the product row is never touched.
+     *
+     * @param  array<string,mixed>|null  $previewRow
+     */
+    private function applyImage(User $actor, AiActionExecutionImage $result, ?AiActionExecutionRow $execRow, ?array $previewRow): void
+    {
+        $file = null;
+        // Counted before any side effect: a crash after the attach leaves a visible attempt behind, which is how the
+        // next run recognises its own image instead of reporting a duplicate.
+        $attempt = $this->beginImage($result);
+        try {
+            if ($execRow === null || $execRow->product_id === null || $previewRow === null) {
+                throw new AiActionRowFailure('preview_row_missing', 'صف المعاينة المعتمد لهذه الصورة غير متاح.', false);
+            }
+            $item = collect($previewRow['images']['items'] ?? [])->firstWhere('key', $result->item_key);
+            if (! is_array($item) || ($item['status'] ?? null) !== 'ready' || ($item['image']['sha256'] ?? null) !== $result->content_sha256) {
+                throw new AiActionRowFailure('preview_image_missing', 'الصورة غير موجودة ضمن المعاينة المعتمدة؛ لم تُرفق.', false);
+            }
+            $product = Product::query()->find($execRow->product_id);
+            if ($product === null) {
+                throw new AiActionRowFailure('product_unavailable', 'المنتج لم يعد متاحاً في نطاقك؛ لم تُرفق الصورة.', false);
+            }
+            $staged = $result->ai_action_image_id === null ? null : AiActionImage::query()->where('ai_action_id', $result->ai_action_id)->find($result->ai_action_image_id);
+            if ($staged === null || $staged->content_sha256 !== $result->content_sha256) {
+                throw new AiActionRowFailure('image_missing', 'الصورة المعتمدة لم تعد متاحة في التخزين الخاص؛ لم تُرفق.', false);
+            }
+
+            // A crash between "attached" and "recorded" must not attach twice: the hash is the idempotency key.
+            $present = ProductMedia::query()->where('product_id', $product->id)->where('content_sha256', $result->content_sha256)->first();
+            if ($present !== null) {
+                $own = $attempt > 1;
+                $this->finishImage($result, $own ? AiActionExecutionImage::STATUS_SUCCESS : AiActionExecutionImage::STATUS_SKIPPED, $own ? null : 'already_attached',
+                    $own ? null : 'الصورة موجودة بالفعل ضمن صور المنتج؛ لم تُكرَّر.', false, $present->id);
+
+                return;
+            }
+            $count = ProductMedia::query()->where('product_id', $product->id)->whereNull('product_option_value_id')->whereNull('product_variant_id')->count();
+            if ($count >= 8) {
+                throw new AiActionRowFailure('gallery_full', 'معرض المنتج بلغ حده الأقصى (8 صور)؛ لم تُرفق الصورة ولم تُستبدل صورة موجودة.', false);
+            }
+
+            $file = $this->stager->materialize($staged);
+            try {
+                $inspected = $this->inspector->inspect($file);
+            } catch (Throwable) {
+                throw new AiActionRowFailure('image_changed', 'لم يعد محتوى الصورة صالحاً؛ لم تُرفق.', false);
+            }
+            if ($inspected->sha256 !== $result->content_sha256) {
+                throw new AiActionRowFailure('image_changed', 'تغيّر محتوى الصورة منذ الموافقة؛ لم تُرفق.', false);
+            }
+
+            try {
+                $created = $this->media->attachToProduct($product, [$file], $actor->id, true);
+            } catch (Throwable $e) {
+                if ($e->getPrevious() instanceof \Illuminate\Database\UniqueConstraintViolationException) {
+                    $this->finishImage($result, AiActionExecutionImage::STATUS_SKIPPED, 'already_attached', 'الصورة موجودة بالفعل ضمن صور المنتج؛ لم تُكرَّر.', false, null);
+
+                    return;
+                }
+                if (str_contains($e->getMessage(), 'تعذّر حفظ الصورة')) {
+                    throw new AiActionRowFailure('image_storage_failed', 'تعذّر حفظ الصورة في التخزين؛ يمكن إعادة المحاولة.', true);
+                }
+                throw $e;
+            }
+            $this->finishImage($result, AiActionExecutionImage::STATUS_SUCCESS, null, null, false, $created[0]->id ?? null);
+        } catch (Throwable $e) {
+            [$code, $message, $retryable] = $this->classify($e);
+            $this->finishImage($result, AiActionExecutionImage::STATUS_FAILED, $code, $message, $retryable, null);
+        } finally {
+            if ($file instanceof \Illuminate\Http\UploadedFile && is_file((string) $file->getRealPath())) {
+                @unlink((string) $file->getRealPath());
+            }
+        }
+    }
+
+    private function beginImage(AiActionExecutionImage $result): int
+    {
+        return DB::transaction(function () use ($result): int {
+            $row = AiActionExecutionImage::query()->whereKey($result->id)->lockForUpdate()->firstOrFail();
+            if ($row->status !== AiActionExecutionImage::STATUS_PENDING) {
+                return (int) $row->attempts;
+            }
+            $row->forceFill(['attempts' => $row->attempts + 1, 'started_at' => $row->started_at ?? now('UTC')])->save();
+
+            return (int) $row->attempts;
+        });
+    }
+
+    private function finishImage(AiActionExecutionImage $result, string $status, ?string $code, ?string $message, bool $retryable, ?string $mediaId): void
+    {
+        DB::transaction(function () use ($result, $status, $code, $message, $retryable, $mediaId): void {
+            $row = AiActionExecutionImage::query()->whereKey($result->id)->lockForUpdate()->firstOrFail();
+            if ($row->status !== AiActionExecutionImage::STATUS_PENDING) {
+                return; // finished by an earlier attempt: never rewritten
+            }
+            $row->forceFill([
+                'status' => $status, 'error_code' => $code, 'error_message' => $message === null ? null : mb_substr($message, 0, 500),
+                'retryable' => $retryable, 'product_media_id' => $mediaId, 'finished_at' => now('UTC'),
+            ])->save();
+        });
     }
 
     /** @return array{0:string,1:string,2:bool} [code, safe message, retryable] */
@@ -449,7 +655,12 @@ final class AiActionProductExecutionService
             $locked = AiAction::query()->whereKey($execution->ai_action_id)->lockForUpdate()->firstOrFail();
             $counts = AiActionExecutionRow::query()->where('ai_action_execution_id', $execution->id)
                 ->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
-            $pending = (int) ($counts['pending'] ?? 0);
+            $imageCounts = AiActionExecutionImage::query()->where('ai_action_execution_id', $execution->id)
+                ->whereIn('ai_action_execution_row_id', $this->savedRowIds($execution))
+                ->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
+            // Images of a product that has not been saved yet wait for it and do not hold the run open.
+            $pending = (int) ($counts['pending'] ?? 0) + (int) ($imageCounts['pending'] ?? 0);
+            $failedImages = (int) ($imageCounts['failed'] ?? 0);
             $failed = (int) ($counts['failed'] ?? 0);
             $success = (int) ($counts['success'] ?? 0);
             $this->event($locked, 'execution_batch_processed', $locked->status, $locked->status, $actor, [
@@ -459,7 +670,8 @@ final class AiActionProductExecutionService
                 return;
             }
             [$executionStatus, $actionStatus] = match (true) {
-                $failed === 0 => [AiActionExecution::STATUS_COMPLETED, AiAction::STATUS_EXECUTED],
+                $failed === 0 && $failedImages === 0 => [AiActionExecution::STATUS_COMPLETED, AiAction::STATUS_EXECUTED],
+                $failed === 0 => [AiActionExecution::STATUS_PARTIALLY_FAILED, AiAction::STATUS_PARTIALLY_FAILED],
                 $success > 0 => [AiActionExecution::STATUS_PARTIALLY_FAILED, AiAction::STATUS_PARTIALLY_FAILED],
                 default => [AiActionExecution::STATUS_FAILED, AiAction::STATUS_FAILED],
             };
@@ -468,6 +680,7 @@ final class AiActionProductExecutionService
             $locked->forceFill(['status' => $actionStatus])->save();
             $this->event($locked, 'execution_'.$executionStatus, $from, $actionStatus, $actor, [
                 'execution_id' => $execution->id, 'success' => $success, 'failed' => $failed, 'skipped' => (int) ($counts['skipped'] ?? 0),
+                'images_success' => (int) ($imageCounts['success'] ?? 0), 'images_failed' => $failedImages, 'images_skipped' => (int) ($imageCounts['skipped'] ?? 0),
             ]);
         }, 3);
     }

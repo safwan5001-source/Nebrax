@@ -64,8 +64,11 @@ final class AiActionProductReviewService
             $rowId = (string) ($edit['row_id'] ?? '');
             $decision = $edit['decision'] ?? null;
             $hasFields = is_array($edit['fields'] ?? null) && $edit['fields'] !== [];
-            if (! isset($byId[$rowId]) || (! $hasFields && $decision === null) || (isset($edit['fields']) && ! is_array($edit['fields']))
-                || ($decision !== null && ! in_array($decision, self::DECISIONS, true))) {
+            // AI-ACTIONS-06: the explicit, per-row decision to append images to an EXISTING product's gallery.
+            $mediaDecision = array_key_exists('media_update_approved', $edit) ? filter_var($edit['media_update_approved'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) : null;
+            if (! isset($byId[$rowId]) || (! $hasFields && $decision === null && $mediaDecision === null) || (isset($edit['fields']) && ! is_array($edit['fields']))
+                || ($decision !== null && ! in_array($decision, self::DECISIONS, true))
+                || (array_key_exists('media_update_approved', $edit) && $mediaDecision === null)) {
                 throw new AiActionException('review_edit_invalid', 'صف أو تعديل مراجعة غير صالح.', 422);
             }
             $index = $byId[$rowId];
@@ -79,8 +82,16 @@ final class AiActionProductReviewService
                 $rows[$index]['fields'][$field] = ['value' => $value, 'origin' => $value === null ? 'missing' : 'user', 'confidence' => null];
             }
             if ($hasFields) {
-                $rows[$index]['media'] = $this->media($rows[$index]['fields']);
+                // Changing an image source voids an earlier "add images" decision: it was about other images.
+                if (array_intersect(array_keys($edit['fields']), ['primary_image_url', 'additional_image_urls']) !== []) {
+                    $rows[$index]['media'] = $this->media($rows[$index]['fields']);
+                }
                 $rows[$index]['violations'] = array_values(array_filter($rows[$index]['violations'] ?? [], fn (array $v) => ! in_array($v['field'] ?? null, array_keys($edit['fields']), true)));
+            }
+            if ($mediaDecision !== null) {
+                $media = $rows[$index]['media'] ?? ['primary' => null, 'additional' => [], 'existing_update_approved' => false];
+                $media['existing_update_approved'] = $mediaDecision;
+                $rows[$index]['media'] = $media;
             }
             // An explicit user decision wins; otherwise a deliberate update/skip survives a field edit.
             $rows[$index]['decision'] = $decision ?? (in_array($rows[$index]['decision'] ?? null, ['update', 'skip'], true)

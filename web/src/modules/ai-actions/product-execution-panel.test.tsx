@@ -23,26 +23,27 @@ const { api, ApiErrorMock, toast } = vi.hoisted(() => {
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => <a href={href} {...rest}>{children}</a>,
 }));
-vi.mock('@/lib/api', () => ({ api, ApiError: ApiErrorMock }));
+vi.mock('@/lib/api', () => ({ api, ApiError: ApiErrorMock, fetchImageUrl: vi.fn(async () => null) }));
 vi.mock('@/components/ui/toast', () => ({ useToast: () => toast }));
 
 const row = (over: Partial<ExecutionRow> & Pick<ExecutionRow, 'row_id' | 'status'>): ExecutionRow => ({
   source_row: 2, operation: 'create', product_id: null, error_code: null, error_message: null, retryable: false, attempts: 1,
-  changed_fields: [], deferred: [], display: { name: 'منتج', sku: 'SKU-1', barcode: null }, ...over,
+  changed_fields: [], deferred: [], display: { name: 'منتج', sku: 'SKU-1', barcode: null }, images: [], ...over,
 });
 
 function execution(over: Partial<Execution> = {}): Execution {
   return {
     id: 'exec-1', action_id: 'action-1', status: 'completed', started_at: null, finished_at: null, retry_count: 0,
     progress: { total: 3, pending: 0, success: 2, failed: 0, skipped: 1 },
-    deferred: { images: 'deferred', unit_template: 'deferred' },
+    images: { total: 0, pending: 0, success: 0, failed: 0, skipped: 0, waiting_for_product: 0 },
+    deferred: { unit_template: 'deferred' },
     rows: [
       row({ row_id: 'a', status: 'success', product_id: 'p-1', changed_fields: ['name', 'sale_price'], deferred: ['images'] }),
       row({ row_id: 'b', status: 'success', operation: 'update', product_id: 'p-2', source_row: 3 }),
       row({ row_id: 'c', status: 'skipped', operation: 'skip', source_row: 4 }),
     ],
     pagination: { page: 1, per_page: 50, total: 3, last_page: 1, status: null },
-    permissions: { can_continue: false, can_retry: false, retryable_rows: 0 },
+    permissions: { can_continue: false, can_retry: false, retryable_rows: 0, retryable_images: 0 },
     ...over,
   };
 }
@@ -69,7 +70,7 @@ beforeEach(() => {
   vi.stubGlobal('crypto', { randomUUID: () => '00000000-0000-4000-8000-000000000000' });
   vi.spyOn(window, 'confirm').mockReturnValue(true);
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); document.documentElement.lang = ''; });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); document.documentElement.lang = ''; vi.unstubAllGlobals(); });
 
 describe('pure helpers', () => {
   it('computes progress and lock states', () => {
@@ -86,7 +87,7 @@ describe('تنفيذ الاستيراد', () => {
     setup((path, options) => (options?.method === 'POST' ? { data: execution() } : undefined));
     const user = userEvent.setup();
 
-    expect(await screen.findByText(/صور المنتجات وقوالب الوحدات لا تُستورد/)).toBeTruthy();
+    expect(await screen.findByText(/قوالب الوحدات لا تُطبَّق ولن تُعدّ ناجحة/)).toBeTruthy();
     expect(posts()).toHaveLength(0);
 
     await user.click(screen.getByRole('button', { name: 'تنفيذ الاستيراد' }));
@@ -128,7 +129,7 @@ describe('تنفيذ الاستيراد', () => {
   });
 
   it('يقود الدفعات حتى الاكتمال ويعرض التقدم ونتيجة كل صف ورابط المنتج والمؤجَّل', async () => {
-    const running = execution({ status: 'running', progress: { total: 3, pending: 2, success: 1, failed: 0, skipped: 0 }, rows: [row({ row_id: 'a', status: 'success', product_id: 'p-1', deferred: ['images'] })], permissions: { can_continue: true, can_retry: false, retryable_rows: 0 } });
+    const running = execution({ status: 'running', progress: { total: 3, pending: 2, success: 1, failed: 0, skipped: 0 }, rows: [row({ row_id: 'a', status: 'success', product_id: 'p-1', deferred: ['images'] })], permissions: { can_continue: true, can_retry: false, retryable_rows: 0, retryable_images: 0 } });
     const responses = [running, execution()];
     const { onStatus } = setup((_path, options) => (options?.method === 'POST' ? { data: responses.shift() } : undefined));
     const user = userEvent.setup();
@@ -150,7 +151,7 @@ describe('تنفيذ الاستيراد', () => {
     const partial = execution({
       status: 'partially_failed', progress: { total: 3, pending: 0, success: 2, failed: 1, skipped: 0 },
       rows: [row({ row_id: 'a', status: 'success', product_id: 'p-1' }), row({ row_id: 'b', status: 'failed', source_row: 3, error_code: 'internal_error', error_message: 'تعذر تنفيذ الصف بسبب خطأ غير متوقع؛ يمكن إعادة المحاولة.', retryable: true })],
-      permissions: { can_continue: false, can_retry: true, retryable_rows: 1 },
+      permissions: { can_continue: false, can_retry: true, retryable_rows: 1, retryable_images: 0 },
     });
     const retried = execution({ status: 'completed', retry_count: 1, progress: { total: 3, pending: 0, success: 3, failed: 0, skipped: 0 } });
     // The panel is opened on an execution that already exists (e.g. after a reload).
@@ -161,7 +162,7 @@ describe('تنفيذ الاستيراد', () => {
     });
     const user = userEvent.setup();
 
-    expect(await screen.findByText(/نُفِّذ جزء من الصفوف وفشل بعضها/)).toBeTruthy();
+    expect(await screen.findByText(/نُفِّذ جزء من الصفوف أو الصور وفشل بعضها/)).toBeTruthy();
     expect(screen.getAllByText(/يمكن إعادة المحاولة/).length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: 'تنفيذ الاستيراد' })).toBeNull();
 
@@ -176,7 +177,7 @@ describe('تنفيذ الاستيراد', () => {
     const stuck = execution({
       status: 'partially_failed', progress: { total: 2, pending: 0, success: 1, failed: 1, skipped: 0 },
       rows: [row({ row_id: 'b', status: 'failed', error_code: 'target_changed', error_message: 'تغيّر المنتج منذ المعاينة؛ لم يُحدَّث.', retryable: false })],
-      permissions: { can_continue: false, can_retry: false, retryable_rows: 0 },
+      permissions: { can_continue: false, can_retry: false, retryable_rows: 0, retryable_images: 0 },
     });
     setup((path) => (path.includes('/executions/latest') ? { data: stuck } : undefined));
 
@@ -197,12 +198,36 @@ describe('تنفيذ الاستيراد', () => {
 
   it('يدعم الإنجليزية عند ضبط لغة الصفحة', async () => {
     document.documentElement.lang = 'en';
-    const partial = execution({ status: 'partially_failed', progress: { total: 3, pending: 0, success: 2, failed: 1, skipped: 0 }, rows: [row({ row_id: 'a', status: 'success', product_id: 'p-1', deferred: ['images'] })], permissions: { can_continue: false, can_retry: true, retryable_rows: 1 } });
+    const partial = execution({ status: 'partially_failed', progress: { total: 3, pending: 0, success: 2, failed: 1, skipped: 0 }, rows: [row({ row_id: 'a', status: 'success', product_id: 'p-1', deferred: ['images'] })], permissions: { can_continue: false, can_retry: true, retryable_rows: 1, retryable_images: 0 } });
     setup((path) => (path.includes('/executions/latest') ? { data: partial } : undefined));
 
-    expect(await screen.findByText(/Some rows were applied and some failed/)).toBeTruthy();
+    expect(await screen.findByText(/Some rows or images were applied and some failed/)).toBeTruthy();
     expect(screen.getByRole('button', { name: /Retry failed rows/ })).toBeTruthy();
     expect(screen.getAllByText(/Deferred: Images/).length).toBeGreaterThan(0);
     expect(screen.getAllByText('Succeeded').length).toBeGreaterThan(0);
+  });
+
+  it('يعرض عدّاد الصور ونتيجة كل صورة مستقلة عن المنتج ويشرح إعادة المحاولة للصور وحدها', async () => {
+    const failedImage = { key: 'k2', role: 'additional' as const, position: 1, source: { kind: 'archive' as const, label: 'SKU-1__2.jpg' }, image_id: 'img-2', status: 'failed' as const, error_code: 'image_storage_failed', error_message: 'تعذّر حفظ الصورة في التخزين؛ يمكن إعادة المحاولة.', retryable: true, attempts: 1, product_media_id: null };
+    const okImage = { ...failedImage, key: 'k1', role: 'primary' as const, position: 0, source: { kind: 'archive' as const, label: 'SKU-1.png' }, image_id: 'img-1', status: 'success' as const, error_code: null, error_message: null, retryable: false, product_media_id: 'm-1' };
+    const partial = execution({
+      status: 'partially_failed', progress: { total: 1, pending: 0, success: 1, failed: 0, skipped: 0 },
+      images: { total: 2, pending: 0, success: 1, failed: 1, skipped: 0, waiting_for_product: 0 },
+      rows: [row({ row_id: 'a', status: 'success', product_id: 'p-1', images: [okImage, failedImage] })],
+      permissions: { can_continue: false, can_retry: true, retryable_rows: 0, retryable_images: 1 },
+    });
+    setup((path) => (path.includes('/executions/latest') ? { data: partial } : undefined));
+
+    expect(await screen.findByTestId('image-counts')).toBeTruthy();
+    expect(screen.getByTestId('image-counts').textContent).toBe('الصور: أُرفقت 1 · فشلت 1 · لم تُرفق 0');
+    // The table (desktop) and the card list (mobile) both render; either one carries the same results.
+    const list = screen.getAllByTestId('execution-images')[0];
+    expect(within(list).getByText('أُرفقت')).toBeTruthy();
+    expect(within(list).getByText('فشلت')).toBeTruthy();
+    expect(within(list).getByText(/يمكن إعادة المحاولة/)).toBeTruthy();
+    // The product row itself stays a success; only the image failed.
+    expect(screen.getAllByText('ناجح').length).toBeGreaterThan(0);
+    expect(screen.getByText(/0 صفاً و1 صورة قابلة لإعادة المحاولة/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: /إعادة محاولة الصفوف الفاشلة/ })).toBeTruthy();
   });
 });

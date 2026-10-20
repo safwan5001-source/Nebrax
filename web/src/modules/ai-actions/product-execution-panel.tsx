@@ -11,6 +11,7 @@ import { Tabs } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { apiErrorMessage, errorCode, fieldLabel } from './product-preview';
+import { ExecutionImagesList } from './product-images-ui';
 import {
   type Execution,
   type ExecutionRow,
@@ -185,6 +186,7 @@ export function ProductExecutionPanel({ actionId, version, totals, onStatus }: P
                 <li key={status}><Badge tone={ROW_TONE[status]}>{statusLabel(lang, status)} · <span className="num">{progress[status]}</span></Badge></li>
               ))}
             </ul>
+            {execution.images.total > 0 && <p className="text-xs text-muted" data-testid="image-counts">{text.imageCounts(execution.images)}</p>}
             {notice && <p role="status" className="text-sm text-warning">{notice}</p>}
             {execution.status === 'completed' && <p role="status" className="flex items-center gap-2 rounded border border-positive/40 bg-positive/10 p-3 text-sm"><CheckCircle2 className="h-4 w-4 text-positive" aria-hidden /> {text.completed}</p>}
             {execution.status === 'partially_failed' && <p role="alert" className="flex items-center gap-2 rounded border border-warning/40 bg-warning/10 p-3 text-sm"><AlertTriangle className="h-4 w-4 text-warning" aria-hidden /> {text.partially}</p>}
@@ -198,13 +200,13 @@ export function ProductExecutionPanel({ actionId, version, totals, onStatus }: P
             {execution.permissions.can_retry && (
               <div className="space-y-1">
                 <Button variant="outline" onClick={() => void retry()} disabled={busy}><RefreshCw className="h-4 w-4" aria-hidden /> {text.retry}</Button>
-                <p className="text-xs text-muted">{text.retryHint(execution.permissions.retryable_rows)}</p>
+                <p className="text-xs text-muted">{text.retryHint(execution.permissions.retryable_rows, execution.permissions.retryable_images)}</p>
               </div>
             )}
-            {isFinished(execution.status) && progress.failed > 0 && !execution.permissions.can_retry && <p className="text-xs text-muted">{text.notRetryable}</p>}
+            {isFinished(execution.status) && (progress.failed > 0 || execution.images.failed > 0) && !execution.permissions.can_retry && <p className="text-xs text-muted">{text.notRetryable}</p>}
 
             <Tabs tabs={tabs} value={filter} onChange={(id) => void changeFilter(id)} />
-            <ResultRows rows={execution.rows} lang={lang} />
+            <ResultRows rows={execution.rows} lang={lang} actionId={actionId} />
           </div>
         )}
       </CardContent>
@@ -212,7 +214,7 @@ export function ProductExecutionPanel({ actionId, version, totals, onStatus }: P
   );
 }
 
-function ResultRows({ rows, lang }: { rows: ExecutionRow[]; lang: 'ar' | 'en' }) {
+function ResultRows({ rows, lang, actionId }: { rows: ExecutionRow[]; lang: 'ar' | 'en'; actionId: string }) {
   const text = execText(lang);
   return (
     <>
@@ -226,7 +228,7 @@ function ResultRows({ rows, lang }: { rows: ExecutionRow[]; lang: 'ar' | 'en' })
                 <td className="p-2"><RowName row={row} /></td>
                 <td className="p-2">{text.operations[row.operation]}</td>
                 <td className="p-2"><Badge tone={ROW_TONE[row.status]}>{statusLabel(lang, row.status)}</Badge></td>
-                <td className="p-2"><RowDetails row={row} lang={lang} /></td>
+                <td className="p-2"><RowDetails row={row} lang={lang} actionId={actionId} /></td>
               </tr>
             ))}
           </tbody>
@@ -237,7 +239,7 @@ function ResultRows({ rows, lang }: { rows: ExecutionRow[]; lang: 'ar' | 'en' })
           <li key={row.row_id} className="space-y-2 rounded border border-border bg-surface p-3 text-sm">
             <div className="flex items-start justify-between gap-2"><RowName row={row} /><Badge tone={ROW_TONE[row.status]}>{statusLabel(lang, row.status)}</Badge></div>
             <p className="text-xs text-muted">{text.operations[row.operation]} · <span className="num">{row.source_row}</span></p>
-            <RowDetails row={row} lang={lang} />
+            <RowDetails row={row} lang={lang} actionId={actionId} />
           </li>
         ))}
       </ul>
@@ -254,7 +256,7 @@ function RowName({ row }: { row: ExecutionRow }) {
   );
 }
 
-function RowDetails({ row, lang }: { row: ExecutionRow; lang: 'ar' | 'en' }) {
+function RowDetails({ row, lang, actionId }: { row: ExecutionRow; lang: 'ar' | 'en'; actionId: string }) {
   const text = execText(lang);
   return (
     <div className="space-y-1 text-xs">
@@ -271,6 +273,7 @@ function RowDetails({ row, lang }: { row: ExecutionRow; lang: 'ar' | 'en' }) {
         <p className="text-warning">{text.deferredRow}: {row.deferred.map((item) => text.deferredFields[item] ?? item).join(lang === 'ar' ? '، ' : ', ')}</p>
       )}
       {row.attempts > 1 && <p className="text-muted"><span className="num">{row.attempts}</span> {text.attempts}</p>}
+      <ExecutionImagesList actionId={actionId} images={row.images ?? []} />
     </div>
   );
 }
