@@ -100,6 +100,7 @@ describe('ExperienceBuilder — Theme Preview (V10b)', () => {
 
   it('shows the preview bar with the Apply summary and what is kept; editing is inert; nothing is written', async () => {
     await ready();
+    expect(document.querySelector('[data-experience-builder]')?.getAttribute('data-preview-mode')).toBe('theme');
     const bar = document.querySelector('[data-theme-preview-bar]') as HTMLElement;
     expect(within(bar).getByText('AWJ Market')).toBeTruthy();
     expect(bar.querySelectorAll('[data-theme-area]')).toHaveLength(10);

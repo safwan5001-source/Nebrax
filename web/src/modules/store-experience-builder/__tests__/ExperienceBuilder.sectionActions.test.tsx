@@ -68,6 +68,7 @@ describe('Canvas section action bar (V10d)', () => {
   it('is a labelled toolbar inside each section wrapper; edges disable their move', async () => {
     mountBuilder();
     await ready();
+    expect(document.querySelector('[data-experience-builder]')?.getAttribute('data-preview-mode')).toBe('draft');
     expect(bar('hero')?.getAttribute('role')).toBe('toolbar');
     expect(bar('hero')?.parentElement?.getAttribute('data-preview-section-id')).toBe('hero');
     expect(action('hero', 'up').hasAttribute('disabled')).toBe(true);
@@ -132,12 +133,14 @@ describe('Canvas section action bar (V10d)', () => {
     mountBuilder('published');
     await waitFor(() => expect(showMock).toHaveBeenCalled());
     await waitFor(() => expect(document.querySelector('[data-preview-section-id]')).not.toBeNull());
+    expect(document.querySelector('[data-experience-builder]')?.getAttribute('data-preview-mode')).toBe('published');
     expect(document.querySelector('[data-section-actions]')).toBeNull();
     cleanup();
 
     mountBuilder('draft', { previewThemeId: 'awj-market' });
     await waitFor(() => expect(document.querySelector('[data-theme-preview-bar]')).not.toBeNull());
     await waitFor(() => expect(document.querySelector('[data-preview-section-id]')).not.toBeNull());
+    expect(document.querySelector('[data-experience-builder]')?.getAttribute('data-preview-mode')).toBe('theme');
     expect(document.querySelector('[data-section-actions]')).toBeNull();
   });
 });
