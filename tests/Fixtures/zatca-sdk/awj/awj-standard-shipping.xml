@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+         xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2"
+         xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+         xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"
+         xmlns:sig="urn:oasis:names:specification:ubl:schema:xsd:CommonSignatureComponents-2"
+         xmlns:sac="urn:oasis:names:specification:ubl:schema:xsd:SignatureAggregateComponents-2"
+         xmlns:sbc="urn:oasis:names:specification:ubl:schema:xsd:SignatureBasicComponents-2"
+         xmlns:ds="http://www.w3.org/2000/09/xmldsig#"
+         xmlns:xades="http://uri.etsi.org/01903/v1.3.2#">
+  <cbc:ProfileID>reporting:1.0</cbc:ProfileID>
+  <cbc:ID>INV-000008</cbc:ID>
+  <cbc:UUID>7751f797-57da-5c79-86e2-571f807ec44d</cbc:UUID>
+  <cbc:IssueDate>2026-01-15</cbc:IssueDate>
+  <cbc:IssueTime>10:30:00</cbc:IssueTime>
+  <cbc:InvoiceTypeCode name="0100000">388</cbc:InvoiceTypeCode>
+  <cbc:DocumentCurrencyCode>SAR</cbc:DocumentCurrencyCode>
+  <cbc:TaxCurrencyCode>SAR</cbc:TaxCurrencyCode>
+  <cac:AdditionalDocumentReference>
+    <cbc:ID>ICV</cbc:ID>
+    <cbc:UUID>8</cbc:UUID>
+  </cac:AdditionalDocumentReference>
+  <cac:AdditionalDocumentReference>
+    <cbc:ID>PIH</cbc:ID>
+    <cac:Attachment>
+      <cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI0NjcyOWQ3M2EyN2ZiNTdlOQ==</cbc:EmbeddedDocumentBinaryObject>
+    </cac:Attachment>
+  </cac:AdditionalDocumentReference>
+  <cac:AdditionalDocumentReference>
+    <cbc:ID>QR</cbc:ID>
+    <cac:Attachment>
+      <cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">ARNTeW50aGV0aWMgU2VsbGVyIENvAg8zMDAwMDAwMDAwMDAwMDMDGTIwMjYtMDEtMTVUMDc6MzA6MDArMDA6MDAEBjU5OC4wMAUFNzguMDA=</cbc:EmbeddedDocumentBinaryObject>
+    </cac:Attachment>
+  </cac:AdditionalDocumentReference>
+  <cac:Signature>
+    <cbc:ID>urn:oasis:names:specification:ubl:signature:Invoice</cbc:ID>
+    <cbc:SignatureMethod>urn:oasis:names:specification:ubl:dsig:enveloped:xades</cbc:SignatureMethod>
+  </cac:Signature>
+  <cac:AccountingSupplierParty>
+    <cac:Party>
+      <cac:PartyIdentification><cbc:ID schemeID="CRN">2050000001</cbc:ID></cac:PartyIdentification>
+      <cac:PostalAddress>
+        <cbc:StreetName>Synthetic Street</cbc:StreetName>
+        <cbc:BuildingNumber>2322</cbc:BuildingNumber>
+        <cbc:PlotIdentification>1234</cbc:PlotIdentification>
+        <cbc:CitySubdivisionName>Synthetic District</cbc:CitySubdivisionName>
+        <cbc:CityName>Dammam</cbc:CityName>
+        <cbc:PostalZone>32241</cbc:PostalZone>
+        <cac:Country><cbc:IdentificationCode>SA</cbc:IdentificationCode></cac:Country>
+      </cac:PostalAddress>
+      <cac:PartyTaxScheme><cbc:CompanyID>300000000000003</cbc:CompanyID><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:PartyTaxScheme>
+      <cac:PartyLegalEntity><cbc:RegistrationName>Synthetic Seller Co</cbc:RegistrationName></cac:PartyLegalEntity>
+    </cac:Party>
+  </cac:AccountingSupplierParty>
+  <cac:AccountingCustomerParty>
+    <cac:Party>
+      <cac:PostalAddress>
+        <cbc:StreetName>Synthetic Buyer Street</cbc:StreetName>
+        <cbc:BuildingNumber>1111</cbc:BuildingNumber>
+        <cbc:CitySubdivisionName>Synthetic Quarter</cbc:CitySubdivisionName>
+        <cbc:CityName>Riyadh</cbc:CityName>
+        <cbc:PostalZone>12222</cbc:PostalZone>
+        <cac:Country><cbc:IdentificationCode>SA</cbc:IdentificationCode></cac:Country>
+      </cac:PostalAddress>
+      <cac:PartyTaxScheme><cbc:CompanyID>300000000000113</cbc:CompanyID><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:PartyTaxScheme>
+      <cac:PartyLegalEntity><cbc:RegistrationName>Synthetic Buyer</cbc:RegistrationName></cac:PartyLegalEntity>
+    </cac:Party>
+  </cac:AccountingCustomerParty>
+  <cac:AllowanceCharge>
+    <cbc:ChargeIndicator>true</cbc:ChargeIndicator>
+    <cbc:AllowanceChargeReason>رسوم الشحن | Shipping</cbc:AllowanceChargeReason>
+    <cbc:Amount currencyID="SAR">20.00</cbc:Amount>
+    <cac:TaxCategory>
+      <cbc:ID>S</cbc:ID>
+      <cbc:Percent>15.00</cbc:Percent>
+      <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
+    </cac:TaxCategory>
+  </cac:AllowanceCharge>
+  <cac:TaxTotal>
+    <cbc:TaxAmount currencyID="SAR">78.00</cbc:TaxAmount>
+  </cac:TaxTotal>
+  <cac:TaxTotal>
+    <cbc:TaxAmount currencyID="SAR">78.00</cbc:TaxAmount>
+    <cac:TaxSubtotal>
+      <cbc:TaxableAmount currencyID="SAR">520.00</cbc:TaxableAmount>
+      <cbc:TaxAmount currencyID="SAR">78.00</cbc:TaxAmount>
+      <cac:TaxCategory>
+        <cbc:ID>S</cbc:ID>
+        <cbc:Percent>15.00</cbc:Percent>
+        <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
+      </cac:TaxCategory>
+    </cac:TaxSubtotal>
+  </cac:TaxTotal>
+  <cac:LegalMonetaryTotal>
+    <cbc:LineExtensionAmount currencyID="SAR">500.00</cbc:LineExtensionAmount>
+    <cbc:TaxExclusiveAmount currencyID="SAR">520.00</cbc:TaxExclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="SAR">598.00</cbc:TaxInclusiveAmount>
+    <cbc:AllowanceTotalAmount currencyID="SAR">0.00</cbc:AllowanceTotalAmount>
+    <cbc:ChargeTotalAmount currencyID="SAR">20.00</cbc:ChargeTotalAmount>
+    <cbc:PrepaidAmount currencyID="SAR">0.00</cbc:PrepaidAmount>
+    <cbc:PayableAmount currencyID="SAR">598.00</cbc:PayableAmount>
+  </cac:LegalMonetaryTotal>
+  <cac:InvoiceLine>
+    <cbc:ID>1</cbc:ID>
+    <cbc:InvoicedQuantity>1</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="SAR">500.00</cbc:LineExtensionAmount>
+    <cac:TaxTotal>
+      <cbc:TaxAmount currencyID="SAR">75.00</cbc:TaxAmount>
+      <cbc:RoundingAmount currencyID="SAR">575.00</cbc:RoundingAmount>
+    </cac:TaxTotal>
+    <cac:Item>
+      <cbc:Name>Item A</cbc:Name>
+      <cac:ClassifiedTaxCategory>
+        <cbc:ID>S</cbc:ID>
+        <cbc:Percent>15.00</cbc:Percent>
+        <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
+      </cac:ClassifiedTaxCategory>
+    </cac:Item>
+    <cac:Price><cbc:PriceAmount currencyID="SAR">500.00</cbc:PriceAmount></cac:Price>
+  </cac:InvoiceLine>
+</Invoice>

@@ -43,7 +43,7 @@ class ProductMedia extends BaseModel implements CompanyWide
 
     protected $fillable = [
         'tenant_id', 'product_id', 'product_option_value_id', 'product_variant_id',
-        'disk', 'path', 'original_name', 'mime_type', 'size', 'sort_order', 'uploaded_by',
+        'disk', 'path', 'original_name', 'mime_type', 'size', 'content_sha256', 'sort_order', 'uploaded_by',
     ];
 
     protected $casts = [

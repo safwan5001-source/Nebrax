@@ -4,10 +4,19 @@ namespace App\Services\Accounting;
 
 use InvalidArgumentException;
 
-/** يستخرج من شهادة CSID البايتات اللازمة لوسمي QR رقم 8 و9 فقط. */
+/**
+ * يستخرج من شهادة CSID البايتات اللازمة لوسمي QR رقم 8 و9 فقط.
+ *
+ * الوسم 8 = بنية SubjectPublicKeyInfo بترميز DER كما في الشهادة (مثال الدليل الفني: `30 56 30 10 06 07 2A…` بطول 88)،
+ * لا نقطة SEC1 الخام — REM-17. الوسم 9 = توقيع CA على الشهادة بترميز DER (بلا تغيير).
+ */
 final class ZatcaQrCertificateMaterialExtractor
 {
     private const EC_COMPONENT_BYTES = 32;
+
+    public function __construct(
+        private readonly ZatcaCertificateFields $certificateFields = new ZatcaCertificateFields(),
+    ) {}
 
     /** @return array{public_key:string, certificate_signature:string} */
     public function extract(string $certificateBase64Der): array
@@ -41,10 +50,7 @@ final class ZatcaQrCertificateMaterialExtractor
         }
 
         return [
-            // تمثيل SEC1 غير المضغوط: 0x04 ثم X ثم Y.
-            'public_key' => "\x04"
-                .str_pad($x, self::EC_COMPONENT_BYTES, "\x00", STR_PAD_LEFT)
-                .str_pad($y, self::EC_COMPONENT_BYTES, "\x00", STR_PAD_LEFT),
+            'public_key' => $this->certificateFields->subjectPublicKeyInfo($der),
             // X.509 يخزن توقيع CA بصيغة DER داخل BIT STRING بلا بايت unused-bits.
             'certificate_signature' => $this->certificateSignature($der),
         ];

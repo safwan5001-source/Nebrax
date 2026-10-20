@@ -416,7 +416,49 @@ php artisan serve
 تُلتقط **مرة واحدة** في `InvoiceService::post()` بحدّ `issued_at` نفسه (بعد القفلين وقبل `ZatcaService::buildFor`) عبر `App\Support\InvoicePartySnapshot` (v1: `seller` و`buyer` ببيانات موجودة أصلاً فقط)، وتثبت بعدها (حارس `Invoice::booted` يغطي `issued_at` و`party_snapshot`، ولا يدخلان `$fillable`).
 - **العرض:** فاتورة مرحَّلة بلقطة v1 تُعرض منها (`parties` في قراءة الفاتورة المفردة، وكتلة `partner`، وPublic API، ومحوّل المستندات `invoice-parties.ts`). المسودة والمرحَّلة القديمة (`NULL`) تقرأ البيانات الحية — **توافق لا ضمان تاريخي**. لا Backfill.
 - **ممنوع** كتابة هذا العمود أو `issued_at` عبر Builder/`DB::table`/SQL خام/`saveQuietly`؛ يحرس ذلك `InvoicePartySnapshotTest` ساكناً.
-- **لم يتغيّر XML/QR/الهاش**: كتل البائع/المشتري داخل XML تبقى مهمة REM-15/16 (تُبنى من هذه اللقطة). نمذجة هوية البائع/المشتري (P1–P6) غير محسومة. المرجع: `docs/audits/horizon/REM-14-IMPLEMENTATION-REPORT.md`.
+- كتلتا البائع/المشتري في XML تُبنيان من هذه اللقطة منذ **REM-15a** (القسم التالي). نمذجة هوية البائع/المشتري (P1–P6) ما زالت غير محسومة جزئياً. المرجع: `docs/audits/horizon/REM-14-IMPLEMENTATION-REPORT.md`.
+
+## كتلتا البائع والمشتري في UBL (`ZatcaPartyXml`) — REM-15a
+
+`App\Support\ZatcaPartyXml` (دالة نقيّة) يبني `AccountingSupplierParty`/`AccountingCustomerParty` **من `invoices.party_snapshot` v1 وحده** لا من `Tenant`/`Partner`/إعدادات الشركة الحيّة؛ وكذلك وسما QR 1–2 (`ZatcaService::qrFor`) فيتّفقان مع XML حرفياً. لقطة غائبة أو تالفة (`requireSnapshot`) ⇒ فشل مغلق قبل أي قفل أو استهلاك ICV؛ ومحرف لا يصحّ في XML ⇒ يفشل الهاشر والمعاملة تتراجع (لا تنظيف صامت).
+- **لا اختلاق ولا إعادة كتابة:** عنصر بلا قيمة لا يُكتب (لا عناصر فارغة)؛ الرقم الضريبي (بائعاً/مشترياً) يُكتب كما التُقط (المشوَّه يظهر BR-KSA-40/44 ولا يُحذف)؛ الاسم بلا ترجمة؛ لا يُكتب `tenant_id`/`branch_id`/`partner_id`.
+- **السجل التجاري** `schemeID="CRN"` فقط حين يكون أحرفاً وأرقاماً (BR-KSA-08/14)؛ وللمشتري فقط حين لا رقم ضريبي له (BT-46). لا مخطّط آخر (MOM/MLS/700/SAG/OTH) — مؤجَّل لحين وجود حقل مخطّط.
+- **البلد** رمز ISO 3166-1 alpha-2 معروف (٢٤٩، مشتقة من BR-CL-14 في SDK بحذف `1A`/`XI`)؛ لا ترجمة لأسماء الدول ولا افتراض `SA`.
+- **المشتري:** الضريبية ⇒ كل ما وُجد من العنوان؛ **المبسّطة** ⇒ العنوان يُكتب مكتملاً فقط (SA: شارع/مبنى/حي/مدينة/رمز بريدي ٥ أرقام؛ أجنبي معروف: شارع/مدينة). حاوية `AccountingCustomerParty` تبقى (فارغة إن لزم) لأن XSD لدى ZATCA يشترطها.
+- **خارج النطاق (REM-15b/16):** رفض الترحيل عند نقص بيانات المشتري، POS، `entity_type`، حدّ 1,000 ريال، رقم إضافي للمشتري، تعدّد السجلات التجارية/هوية الفرع.
+- **الحارس:** `baseline.json` يحمل `awj_forbidden_warning_codes` (قواعد الأطراف إنذاراتٌ في SDK فلا يلتقطها مسطرة الأخطاء)؛ نجاح XSD/غياب الإنذارات استرشادي وليس إقرار امتثال. المرجع: `docs/audits/horizon/REM-15a-IMPLEMENTATION-REPORT.md`.
+
+## المبالغ وسطور الفاتورة في UBL (`ZatcaMonetaryXml`) — REM-16 (شريحة XML فقط)
+
+`App\Support\ZatcaMonetaryXml` (دالة نقيّة) يعرض **المبالغ المخزَّنة كما هي** (`invoices.*`/`invoice_lines.*` كما كتبها `InvoiceService::post()`) في عناصر UBL الصحيحة: `TaxCurrencyCode`، `LegalMonetaryTotal` (BT-106…BT-115)، `TaxTotal`×2، سطور بـ`TaxTotal` (KSA-11/12) و`LineExtensionAmount = line_subtotal − line_discount` و`AllowanceCharge` للخصم و`PriceAmount` (غير الشامل `unit_price`، والشامل `unit_price_before_tax` المخزَّن). **لا إعادة حساب** لضريبة أو تقريب أو توزيع، ولا إصلاح تناقض قائم في XML؛ التناقضات تبقى ظاهرة في SDK والاختبارات.
+- **التصنيف:** `S` فقط لسطر معدّله **15** (`STANDARD_RATE`، BR-KSA-84، وهو معدل الشحن الثابت). الصفر و5٪ وغيرهما **بلا `ClassifiedTaxCategory`** (لا استنتاج Z/E/O — ADR-0002) = فجوة مطابقة صريحة (BR-CO-04) حتى REM-12.
+- **`TaxSubtotal`** يُكتب فقط حين **كل** الأسطر S/15 (فئة واحدة). خصم المستند يحمل فئة S فقط في هذه الحالة؛ وفي الفئات المختلطة/غير المصنَّفة يُكتب بلا فئة ولا يُوزَّع.
+- **`adjustment` لا يُعيَّن إلى `PayableRoundingAmount`** (G-B5): `TaxInclusiveAmount = BT-109 + BT-110` و`PayableAmount = total` المخزَّن، والفرق ظاهر (BR-CO-16).
+- **الشحن:** `AllowanceCharge(true)` بنص بلا رمز سبب، لأن لا رمز في UNCL 7161 يطابق «رسوم الشحن» حرفياً (SAA «شحن ومناولة»، DL «توصيل»، FC «خدمة شحن بضائع») — BR-KSA-19 فجوة صريحة. فئته S/15 لأن ضريبة الشحن المخزَّنة 15٪.
+- **خارج النطاق:** `unitCode` (نصّ حرّ)، تاريخ التوريد (REM-29)، `PaymentMeans`، PIH/QR/التوقيع (REM-17)، طريقة التقريب وتوزيع الخصم (ADR-B).
+- **الحارس:** `baseline.json` يحمل `awj_forbidden_warning_codes` (تشمل BR-S-09 وBR-CO-17) و`awj_known_gap_warnings` لثلاث ثغرات موثَّقة فقط (تسوية، شحن، معدل صفري). نجاح مراحل SDK استرشادي وليس إقرار امتثال. المرجع: `docs/audits/horizon/REM-16-IMPLEMENTATION-REPORT.md`.
+
+## التوقيع وQR المرحلة 2 وPIH — REM-17
+
+كل ترميز هنا **متحقَّق منه** في Phase A: نصّ رسمي (الدليل الفني التفصيلي، معيار ميزات الأمان v1.2، معيار تنفيذ XML) + إعادة إنتاج مستقلة بـ OpenSSL على عيّنات SDK الرسمية الـ19. لا يُغيَّر شيء منها بلا دليل جديد بالمستوى نفسه.
+- **التوقيع:** ECDSA secp256k1 (DER) على **بايتات هاش الفاتورة الخام (32)** — لا على SignedInfo المعياري (`ZatcaXmlEcdsaSigner`). SignedInfo غير موقَّع في مخطط ZATCA؛ يحمل البصمتين فقط. مطابقة المفتاح للشهادة وفحص secp256k1 باقيان.
+- **SignedProperties** (`ZatcaXadesSignedPropertiesBuilder`): `SigningCertificate` **v1** (XSD في SDK يرفض V2) بعنصر `Cert` لكل شهادة في السلسلة، وكلٌّ بـ `CertDigest` = Base64(hex(SHA-256(نص Base64 للشهادة))) و`IssuerSerial` (اسم المُصدِر بصيغة Java في SDK والرقم عشرياً — `ZatcaCertificateFields`، فشل مغلق لأي سمة/قيمة لا تُمثَّل بلا لبس). **`SignaturePolicyIdentifier` و`DataObjectFormat` باقيان** (معيار الأمان §2.3.3؛ بصمة SDK تغطيهما) — **حارس السياسة المغلق لم يُخفَّف**.
+- **بصمة SignedProperties** = Base64(hex(SHA-256(T))): T هي نصّ العنصر المضمَّن **بمسافاته** مع `xmlns:xades` على الجذر و`xmlns:ds` على كل عنصر ds — ليست C14N، ولذلك مرجعها في SignedInfo بلا Transforms. **حسّاسة للمسافات:** يُدرج الامتداد نصاً بعد وسم الجذر بلا إعادة تسلسل ولا مسافة مضافة (المسافات خارج الغلاف تدخل هاش الفاتورة). مثال الخطوة 5 في الدليل بصيغة البايتات الخام يخالف العيّنات والمدقّق؛ المدقّق يرفضه فنتبع العيّنات.
+- **QR المرحلة 2** (`ZatcaPhaseTwoQrEncoder`): 6 = نصّ Base64 لـ DigestValue (44)، 7 = نصّ Base64 لـ SignatureValue، 8 = SPKI بترميز DER من الشهادة (88)، 9 = توقيع CA (DER) بلا تغيير. **الوسم 3 بلا تغيير** (Q1 غير محسومة). المرحلة 1: `ZatcaService::tlv` ترفض قيمة > 255 بايت ولا تقتطع أبداً.
+- **PIH:** أول فاتورة في سلسلة **جديدة** فقط = حرفية BR-KSA-26 `NWZlY2Vi…OQ==` (Base64 لنص SHA-256("0") الست عشري). السلسلة القائمة تستمر من XML السابق المحفوظ. سلاسل بدأت بالقيمة القديمة (`ZatcaService::LEGACY_GENESIS_HASH`) **لا تُصلَح ولا تُعاد** — قرارها في REM-25. لا إعادة توليد لأي XML/QR/توقيع/هاش تاريخي، ولا تصفير عدّادات.
+- **الأدلة في CI:** `scripts/zatca-sdk/sign_fixtures.php` يختم الـfixtures بأصناف الإنتاج واعتماد اصطناعي مؤقت لكل تشغيل (لا مفتاح في المستودع)، وتحقق مستقل بـ OpenSSL CLI في `conformance.py`. GLOBAL PASSED هنا مطابقة SDK لا قبول ZATCA فعلي. المرجع: `docs/audits/horizon/REM-17-IMPLEMENTATION-REPORT.md`.
+
+## أساس XML إشعار الدائن (`ZatcaCreditNoteXml`) — REM-18a (شريحة XML فقط، غير مربوطة بالترحيل)
+
+`App\Support\ZatcaCreditNoteXml` (دالة نقيّة) يبني XML إشعار دائن مبيعات (نوع **381**) من `ZatcaCreditNoteInput` المتحقَّق منه وحده؛ `ZatcaCreditNoteInputFactory` يحوّل إشعاراً **مرحَّلاً** وفاتورته الأصلية إلى المدخل (قراءة فقط: صفر استعلام/كتابة). **لا يُستدعى من `CreditNoteService::post` ولا من أي مسار** (يحرسه `ZatcaCreditNoteXmlTest`)، ولا migration. الدمج والتخزين والسلسلة المشتركة = REM-18b.
+- **الجذر `Invoice` لا `CreditNote`:** المدقّق وكل عيّنات ZATCA الرسمية؛ جذر `CreditNote-2` يسقط في XSD وEN. تناقض المعيار نفسه مسجَّل (U1) وسلوك المنصة الحيّة لم يُختبر.
+- **المرجع (BT-25 / BR-KSA-56) والسبب (KSA-10 / BR-KSA-17) إلزاميان في AWJ:** SDK يعامل غياب المرجع **تحذيراً** فقط، فيفحصه `conformance.py` بنيوياً مع ضوابط تعطيل (حذف العنصر يجب أن يظهر في SDK وفي الفحص)، والرمزان في `awj_forbidden_warning_codes` فلا يُسجَّلان ثغرة معروفة.
+- **السبب من `ZatcaNoteReason` (خمسة أسباب القاموس)** برمز AWJ ثابت؛ حصرها قرار محافظ لا قاعدة ZATCA مثبتة (U2). لا نص حر ولا ربط تلقائي.
+- **`PaymentMeansCode` = `10` للنقد فقط.** الإشعار «credit» (تخفيض ذمة) بلا رمز موثَّق ⇒ **يُرفض** ولا يُخترع رمز (D4 مفتوح). SDK لا يتحقق من قيمة الرمز.
+- **الطرفان من `party_snapshot` للفاتورة الأصلية** (نسخ لا التقاط جديد)؛ غيابها ⇒ فشل مغلق. التصنيف standard/simplified من الفاتورة الأصلية المخزَّنة لا من الإشعار.
+- **المبالغ كما خُزِّنت** (موجبة كما في عيّنات ZATCA)، تُتحقق ولا تُعاد حساباً؛ فئة `S` لسطر 15 % فقط (REM-12 مفتوح). لا `Delivery` ولا خصم/شحن مستند.
+- يمرّ في خط توقيع REM-17 **بلا تعديل**. fixtures الإشعارات `awj-note-*` تُولَّد ببصمات في `ZatcaCreditNoteFixtureDriftTest`، وقيمها مثبتة بأنها ما تكتبه الخدمات الحقيقية (`ZatcaCreditNoteRealServiceParityTest`).
+- **خارج النطاق:** 383، إشعارات المشتريات (تُرفض صراحةً)، POS/مرتجعات المبيعات، ICV/PIH المشتركة، الإرسال. المرجع: `docs/audits/horizon/REM-18a-IMPLEMENTATION-REPORT.md`.
 
 ## الترقيم التسلسلي
 

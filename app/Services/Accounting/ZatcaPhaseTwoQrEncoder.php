@@ -8,11 +8,23 @@ use DateTimeZone;
 use InvalidArgumentException;
 use RuntimeException;
 
-/** يبني حمولة QR للمرحلة الثانية من قيم نصية وبايتات تشفير صريحة. */
+/**
+ * يبني حمولة QR للمرحلة الثانية — ترميزات الوسوم 6–9 متحقَّقة في REM-17 (الدليل الفني التفصيلي §6.2 ومثاله المفكوك،
+ * وعيّنات SDK الرسمية):
+ *  • 6: نصّ Base64 لهاش الفاتورة (DigestValue) — 44 بايت.
+ *  • 7: نصّ Base64 لتوقيع ECDSA بترميز DER (SignatureValue) — نصّ `MEUC…`.
+ *  • 8: بنية SubjectPublicKeyInfo بترميز DER (secp256k1؛ 88 بايت للمفتاح غير المضغوط).
+ *  • 9 (المبسّطة وإشعاراتها فقط): توقيع CA على الشهادة بترميز DER — بلا تغيير.
+ * صيغة الوسم 3 **لم تتغيّر** في REM-17 (Q1 غير محسومة).
+ */
 final class ZatcaPhaseTwoQrEncoder
 {
     private const MAX_VALUE_BYTES = 255;
     private const MAX_BASE64_LENGTH = 700;
+
+    /** رأس SPKI لمفتاح EC على secp256k1: غير مضغوط (65 بايت للنقطة) ومضغوط (33). */
+    private const SPKI_UNCOMPRESSED_PREFIX = "\x30\x56\x30\x10\x06\x07\x2A\x86\x48\xCE\x3D\x02\x01\x06\x05\x2B\x81\x04\x00\x0A\x03\x42\x00\x04";
+    private const SPKI_COMPRESSED_PREFIX = "\x30\x36\x30\x10\x06\x07\x2A\x86\x48\xCE\x3D\x02\x01\x06\x05\x2B\x81\x04\x00\x0A\x03\x22\x00";
 
     public function encode(
         string $sellerName,
@@ -20,8 +32,8 @@ final class ZatcaPhaseTwoQrEncoder
         DateTimeInterface $invoiceTime,
         string $invoiceTotal,
         string $vatTotal,
-        string $invoiceHash,
-        string $ecdsaSignature,
+        string $invoiceDigest,
+        string $signatureValue,
         string $publicKey,
         string $documentType,
         ?string $certificateSignature = null,
@@ -37,14 +49,21 @@ final class ZatcaPhaseTwoQrEncoder
                 throw new InvalidArgumentException('مبالغ QR يجب أن تكون أعداداً عشرية بمنزلتين.');
             }
         }
-        if (strlen($invoiceHash) !== 32) {
-            throw new InvalidArgumentException('هاش فاتورة ZATCA في QR يجب أن يكون 32 بايت خاماً.');
+        $hash = base64_decode($invoiceDigest, true);
+        if (! is_string($hash) || strlen($hash) !== 32 || base64_encode($hash) !== $invoiceDigest) {
+            throw new InvalidArgumentException('وسم QR 6 يجب أن يكون نصّ Base64 قياسياً لهاش SHA-256 (44 محرفاً).');
         }
-        if (strlen($ecdsaSignature) !== 64) {
-            throw new InvalidArgumentException('توقيع ECDSA في QR يجب أن يكون 64 بايت خاماً.');
+        $signature = base64_decode($signatureValue, true);
+        if (! is_string($signature) || base64_encode($signature) !== $signatureValue
+            || strlen($signature) < 8 || strlen($signature) > 72 || $signature[0] !== "\x30"
+        ) {
+            throw new InvalidArgumentException('وسم QR 7 يجب أن يكون نصّ Base64 لتوقيع ECDSA بترميز DER.');
         }
-        if ($publicKey === '' || str_contains($publicKey, '-----BEGIN') || str_contains($publicKey, 'PUBLIC KEY')) {
-            throw new InvalidArgumentException('المفتاح العام في QR يجب أن يكون بايتات خاماً لا نص PEM.');
+        $uncompressed = strlen($publicKey) === 88 && str_starts_with($publicKey, self::SPKI_UNCOMPRESSED_PREFIX);
+        $compressed = strlen($publicKey) === 56 && str_starts_with($publicKey, self::SPKI_COMPRESSED_PREFIX)
+            && ($publicKey[23] === "\x02" || $publicKey[23] === "\x03");
+        if (! $uncompressed && ! $compressed) {
+            throw new InvalidArgumentException('وسم QR 8 يجب أن يكون SubjectPublicKeyInfo بترميز DER لمفتاح secp256k1.');
         }
         if ($documentType === 'simplified' && ($certificateSignature === null || $certificateSignature === '')) {
             throw new InvalidArgumentException('توقيع شهادة الختم مطلوب لـQR الفاتورة المبسطة.');
@@ -62,8 +81,8 @@ final class ZatcaPhaseTwoQrEncoder
             3 => $timestamp,
             4 => $invoiceTotal,
             5 => $vatTotal,
-            6 => $invoiceHash,
-            7 => $ecdsaSignature,
+            6 => $invoiceDigest,
+            7 => $signatureValue,
             8 => $publicKey,
         ];
         if ($documentType === 'simplified') {

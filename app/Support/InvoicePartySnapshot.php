@@ -25,8 +25,8 @@ use App\Models\Tenant;
  *  buyer.address.{street,building_no,district,city,postal_code,country} ← `partners`
  *
  * `cr_number` يُلتقط كما هو بلا مخطط تعريف (scheme) — نمذجة معرّفات البائع/المشتري الأخرى (CRN/MOM/MLS/700/NAT…)
- * مسألة تنظيمية غير محسومة (P1) ولا تُحسم هنا. هذه اللقطة **لا** تغيّر XML/QR/التوقيع/الهاش؛ كتل البائع/المشتري
- * داخل XML تُبنى لاحقاً (REM-15/16) من هذه اللقطة نفسها.
+ * مسألة تنظيمية غير محسومة (P1) ولا تُحسم هنا. اللقطة نفسها لا تغيّر التوقيع/الهاش؛ وكتلتا البائع/المشتري داخل XML
+ * ووسما QR 1–2 تُبنى منها (REM-15a: `ZatcaPartyXml`).
  */
 final class InvoicePartySnapshot
 {

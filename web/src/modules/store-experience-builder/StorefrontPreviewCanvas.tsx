@@ -6,7 +6,7 @@ import {
   announcementBarVisible,
 } from "./AnnouncementPreview";
 import { Eye, Home, LayoutGrid, Search, ShoppingBag, User } from "lucide-react";
-import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { OfficialStoreBadge } from "./OfficialStoreBadge";
 import { ContactDetail, contactDetailText } from "./ContactDetail";
 import { IdentityDetail } from "./IdentityDetail";
@@ -75,6 +75,25 @@ import {
   sanitizeExternalUrl,
 } from "./presentation/urls";
 import { cn } from "@/lib/utils";
+
+/** Signed preview media must fail closed when a URL expires or is revoked. */
+function PreviewMediaImage({
+  src,
+  alt = "",
+  className,
+}: {
+  src: string;
+  alt?: string;
+  className?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [src]);
+  if (failed) return null;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- signed tenant media URL
+    <img src={src} alt={alt} className={className} loading="lazy" decoding="async" onError={() => setFailed(true)} />
+  );
+}
 import { SbcSeal } from "./SbcSeal";
 import {
   customizerMessage,
@@ -99,10 +118,7 @@ import type { BenefitsLayout, SectionDesign } from "./presentation/section-desig
 import { resolveSectionDesign } from "./presentation/section-design-resolve";
 import { SectionDesignFrame } from "./SectionDesignFrame";
 import type { DesignContext } from "./presentation/section-design-resolve";
-import {
-  PREVIEW_CATEGORIES,
-  PREVIEW_STORE_NAME,
-} from "./preview-fixtures";
+import { PREVIEW_STORE_NAME } from "./preview-fixtures";
 import { CanvasCategoryDisplay } from "./CanvasCategoryDisplay";
 import "./store-preview.css";
 
@@ -186,7 +202,7 @@ interface StorefrontPreviewCanvasProps {
    * filtered by `category_id` — never invented client-side.
    */
   categoryGridProductsState?: "idle" | "loading" | "error" | "ready";
-  categoryGridProducts?: { id: string; name: string; thumbnailUrl: string | null }[];
+  categoryGridProducts?: { id: string; name: string; thumbnailUrl: string | null; priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null; isVariantManaged?: boolean }[];
   categoryGridProductsTotal?: number;
   /**
    * CUST-H4-3 — the Home "categories" section's own real Canvas preview:
@@ -209,7 +225,7 @@ interface StorefrontPreviewCanvasProps {
    * `PREVIEW_PRODUCTS` fixture this branch used before.
    */
   homeNewArrivalsState?: "idle" | "loading" | "error" | "ready";
-  homeNewArrivals?: { id: string; name: string; thumbnailUrl: string | null }[];
+  homeNewArrivals?: { id: string; name: string; thumbnailUrl: string | null; priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null; isVariantManaged?: boolean }[];
   onRetryHomeNewArrivals?: () => void;
   /**
    * CUST-H4-5 — the Home "featured" section's own real Canvas preview.
@@ -220,7 +236,7 @@ interface StorefrontPreviewCanvasProps {
    * the picker's own "selected products" chips show — replacing the bare
    * id-text-chip list this branch rendered before.
    */
-  featuredResolved?: Record<string, { id: string; name: string; thumbnailUrl: string | null }[]>;
+  featuredResolved?: Record<string, { id: string; name: string; thumbnailUrl: string | null; priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null; isVariantManaged?: boolean }[]>;
   featuredResolvedState?: Record<string, "idle" | "loading" | "error" | "ready">;
   onRetryFeatured?: (sectionId: string) => void;
   /**
@@ -452,6 +468,7 @@ export function StorefrontPreviewCanvas({
   const density = config.density === "compact" ? "compact" : "comfortable";
   const cardPad = config.productCard === "compact" ? "p-2.5" : "p-3";
   const isMarket = config.themePreset === "awj-market";
+  const shownHomeCategories = homeCategories.slice(0, isMarket ? 18 : 12);
   // The exact fixed heights ProductCard.tsx itself resolves to at each
   // breakpoint — not the `sm:`/`md:` classes themselves. This preview frame
   // is a plain, width-constrained div rendered inside the real Customizer
@@ -740,9 +757,9 @@ export function StorefrontPreviewCanvas({
                   <span className="rounded-md bg-store-surface px-2 py-1 font-medium text-store-foreground">
                     {t("allProducts")}
                   </span>
-                  {PREVIEW_CATEGORIES.map((category) => (
+                  {homeCategories.map((category) => (
                     <span key={category.id} className="text-store-muted-foreground">
-                      {category.name[locale]}
+                      {category.name}
                     </span>
                   ))}
                 </>
@@ -870,7 +887,10 @@ export function StorefrontPreviewCanvas({
             if (section.type === "categories") {
               return (
                 <section key="categories" aria-labelledby="preview-categories">
-                  <SectionRule title={t("browseCategories")} action={t("viewAll")} />
+                  <SectionRule
+                    title={t("browseCategories")}
+                    action={homeCategories.length > shownHomeCategories.length ? t("viewAll") : undefined}
+                  />
                   {/* "idle" (no fetch triggered yet — e.g. no storefrontId,
                       or a direct render with no `ExperienceBuilder` data
                       wired up) renders identically to "loading": unknown
@@ -919,13 +939,13 @@ export function StorefrontPreviewCanvas({
                     // stylesheet, pinned to the simulated device. Without one the classic preview tiles below are untouched.
                     <CanvasCategoryDisplay
                       display={section.design.display}
-                      categories={homeCategories}
+                      categories={shownHomeCategories}
                       viewport={viewport}
                       dir={locale === "ar" ? "rtl" : "ltr"}
                     />
                   ) : (
                     <ul className={cn("mt-4 grid", categoriesGap, categoriesColumns)}>
-                      {homeCategories.map((category) => (
+                      {shownHomeCategories.map((category) => (
                         <li key={category.id}>
                           <div
                             className={cn(
@@ -1018,8 +1038,7 @@ export function StorefrontPreviewCanvas({
                             )}
                           >
                             {product.thumbnailUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element -- tenant media URL, not a static asset
-                              <img
+                              <PreviewMediaImage
                                 src={product.thumbnailUrl}
                                 alt=""
                                 className="size-full object-cover"
@@ -1041,6 +1060,7 @@ export function StorefrontPreviewCanvas({
                             <p className="line-clamp-2 text-sm font-semibold text-store-foreground">
                               <bdi>{product.name}</bdi>
                             </p>
+                            <PreviewProductMeta product={product} locale={locale} />
                           </div>
                         </li>
                       ))}
@@ -1413,8 +1433,7 @@ export function StorefrontPreviewCanvas({
                           >
                             <div data-card-image="" className={cn(cardImageHeight, "bg-store-surface-muted")}>
                               {product.thumbnailUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element -- tenant media URL, not a static asset
-                                <img
+                                <PreviewMediaImage
                                   src={product.thumbnailUrl}
                                   alt=""
                                   className="size-full object-cover"
@@ -1425,6 +1444,7 @@ export function StorefrontPreviewCanvas({
                               <p className="line-clamp-2 text-sm font-semibold text-store-foreground">
                                 <bdi>{product.name}</bdi>
                               </p>
+                            <PreviewProductMeta product={product} locale={locale} />
                             </div>
                           </li>
                         ))}
@@ -1519,8 +1539,7 @@ export function StorefrontPreviewCanvas({
                         >
                           <div data-card-image="" className={cn(cardImageHeight, "relative bg-store-surface-muted")}>
                             {offer.product.thumbnailUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element -- tenant media URL, not a static asset
-                              <img
+                              <PreviewMediaImage
                                 src={offer.product.thumbnailUrl}
                                 alt=""
                                 className="size-full object-cover"
@@ -1730,6 +1749,7 @@ export function StorefrontPreviewCanvas({
         social={enabledSocial.map((item) => ({ id: item.id, network: item.network, href: item.href, label: socialLabel(t, item.network) }))}
         identity={{ legalName, crNumber, vatNumber, has: hasBusinessIdentity }}
         apps={{ ios, android, has: hasApps }}
+        categories={homeCategories}
         colourContext={{ primaryColor: config.primaryColor, accentColor: config.accentColor, palette: config.palette }}
       />
 
@@ -1798,6 +1818,44 @@ function formatMinorAmount(amountMinor: number, currency: string, locale: Custom
   } catch {
     return `${(amountMinor / 100).toFixed(2)} ${currency}`;
   }
+}
+
+function PreviewProductMeta({
+  product,
+  locale,
+}: {
+  product: { priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null; isVariantManaged?: boolean };
+  locale: CustomizerLocale;
+}) {
+  return (
+    <div className="mt-2 space-y-1">
+      {product.isVariantManaged ? (
+        <p className="text-xs font-medium text-store-muted-foreground">{locale === "ar" ? "السعر حسب الخيار" : "Priced by option"}</p>
+      ) : typeof product.priceAmountMinor === "number" && product.priceAmountMinor >= 0 ? (
+        <p className="text-sm font-bold text-store-primary">
+          <bdi>{formatMinorAmount(product.priceAmountMinor, product.currency ?? "SAR", locale)}</bdi>
+        </p>
+      ) : null}
+      {product.inStock === true && (
+        <p className="text-[11px] font-medium text-store-success">
+          {locale === "ar" ? "متوفر" : "In stock"}
+        </p>
+      )}
+      {product.inStock === false ? (
+        <span className="block w-full rounded-store border border-store-border px-2 py-1 text-center text-xs font-semibold text-store-muted-foreground">
+          {locale === "ar" ? "غير متوفر" : "Out of stock"}
+        </span>
+      ) : product.isVariantManaged ? (
+        <span className="block w-full rounded-store border border-store-primary px-2 py-1 text-center text-xs font-bold text-store-primary">
+          {locale === "ar" ? "اختيار الخيارات" : "Select options"}
+        </span>
+      ) : (
+        <button type="button" disabled aria-disabled="true" className="w-full rounded-store bg-store-primary px-2 py-1 text-xs font-semibold text-store-primary-foreground">
+          {locale === "ar" ? "إضافة للسلة" : "Add to cart"}
+        </button>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -1918,14 +1976,12 @@ function ProductPagePreview({
                 {product.media.length > 0 ? (
                   <div className="grid gap-2">
                     <div className="aspect-square overflow-hidden rounded-store bg-store-surface-muted">
-                      {/* eslint-disable-next-line @next/next/no-img-element -- tenant media URL, not a static asset */}
-                      <img src={product.media[0].url} alt={product.media[0].alt ?? ""} className="size-full object-cover" />
+                      <PreviewMediaImage src={product.media[0].url} alt={product.media[0].alt ?? ""} className="size-full object-cover" />
                     </div>
                     {product.media.length > 1 && (
                       <div className="flex gap-2 overflow-x-auto">
                         {product.media.slice(1, 5).map((m) => (
-                          // eslint-disable-next-line @next/next/no-img-element -- tenant media URL, not a static asset
-                          <img key={m.id} src={m.url} alt={m.alt ?? ""} className="size-14 shrink-0 rounded-store object-cover" />
+                          <PreviewMediaImage key={m.id} src={m.url} alt={m.alt ?? ""} className="size-14 shrink-0 rounded-store object-cover" />
                         ))}
                       </div>
                     )}
@@ -2152,7 +2208,7 @@ function CategoryPagePreview({
   selectedRegionId?: string | null;
   onSelectRegion?: (id: string) => void;
   gridProductsState?: "idle" | "loading" | "error" | "ready";
-  gridProducts?: { id: string; name: string; thumbnailUrl: string | null }[];
+  gridProducts?: { id: string; name: string; thumbnailUrl: string | null; priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null; isVariantManaged?: boolean }[];
   gridProductsTotal?: number;
 }) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
@@ -2297,8 +2353,7 @@ function CategoryPagePreview({
                     <div key={product.id} className="overflow-hidden rounded-store bg-store-surface-muted">
                       <div className="aspect-square">
                         {product.thumbnailUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element -- tenant media URL, not a static asset
-                          <img src={product.thumbnailUrl} alt="" className="size-full object-cover" />
+                          <PreviewMediaImage src={product.thumbnailUrl} alt="" className="size-full object-cover" />
                         ) : null}
                       </div>
                       <p
@@ -2309,6 +2364,9 @@ function CategoryPagePreview({
                       >
                         <bdi>{product.name}</bdi>
                       </p>
+                      <div className={cn(productCard === "compact" ? "px-1.5 pb-1" : "px-2 pb-1.5")}>
+                        <PreviewProductMeta product={product} locale={locale} />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -2435,7 +2493,7 @@ function SectionRule({
   hideTitle = false,
 }: {
   title: string;
-  action: string;
+  action?: string;
   /** CUST-HV V9d-3 — the merchant chose not to show the shelf title: it stays as the accessible name, only the action remains visible. */
   hideTitle?: boolean;
 }) {
@@ -2445,7 +2503,7 @@ function SectionRule({
         <h2 className="sr-only">
           {title}
         </h2>
-        <span data-section-action="" className="text-xs font-bold text-store-primary md:text-sm">{action}</span>
+        {action ? <span data-section-action="" className="text-xs font-bold text-store-primary md:text-sm">{action}</span> : null}
       </div>
     );
   }
@@ -2461,7 +2519,7 @@ function SectionRule({
           {title}
         </h2>
       </div>
-      <span data-section-action="" className="text-xs font-bold text-store-primary md:text-sm">{action}</span>
+      {action ? <span data-section-action="" className="text-xs font-bold text-store-primary md:text-sm">{action}</span> : null}
     </div>
   );
 }

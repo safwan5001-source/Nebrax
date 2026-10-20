@@ -26,6 +26,8 @@ function summaryRow(overrides: Record<string, unknown> = {}) {
     name_en: 'Sample Product',
     thumbnail_url: 'https://cdn.example.test/p1.jpg',
     is_variant_managed: false,
+    price: { amount_minor: 12500, currency: 'SAR' },
+    in_stock: true,
     ...overrides,
   };
 }
@@ -78,6 +80,9 @@ describe('workspace-products client — CUST-H2-3', () => {
           nameEn: 'Sample Product',
           thumbnailUrl: 'https://cdn.example.test/p1.jpg',
           isVariantManaged: false,
+          priceAmountMinor: 12500,
+          currency: 'SAR',
+          inStock: true,
         },
         {
           id: 'p2',
@@ -85,6 +90,9 @@ describe('workspace-products client — CUST-H2-3', () => {
           nameEn: 'Sample Product',
           thumbnailUrl: 'https://cdn.example.test/p1.jpg',
           isVariantManaged: false,
+          priceAmountMinor: 12500,
+          currency: 'SAR',
+          inStock: true,
         },
       ],
     });

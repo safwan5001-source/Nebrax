@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\FiscalYearController;
 use App\Http\Controllers\Api\AccountRoutingController;
 use App\Http\Controllers\Api\AccountSettingsController;
 use App\Http\Controllers\Api\AppointmentController;
+use App\Http\Controllers\Api\AiActionController;
 use App\Http\Controllers\Api\AssetController;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuthController;
@@ -421,6 +422,43 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
             ->middleware([$perm('ai.consent.manage'), 'throttle:20,1']);
         Route::post('ai-assistant/tools/run', [AiAssistantController::class, 'runTool'])
             ->middleware([$perm('ai.assistant.use'), 'throttle:30,1']);
+
+        // AI-ACTIONS-01: persisted/versioned drafts only. There is deliberately
+        // no approve/execute/repair endpoint in this foundation slice.
+        Route::post('ai-actions', [AiActionController::class, 'store'])
+            ->middleware([$perm('ai.actions.use'), EnforceUserIdempotency::class, 'throttle:20,1']);
+        Route::get('ai-actions/{action}', [AiActionController::class, 'show'])
+            ->middleware([$perm('ai.actions.use'), 'throttle:60,1']);
+        Route::post('ai-actions/{action}/versions', [AiActionController::class, 'storeVersion'])
+            ->middleware([$perm('ai.actions.use'), EnforceUserIdempotency::class, 'throttle:30,1']);
+        Route::post('ai-actions/{action}/cancel', [AiActionController::class, 'cancel'])
+            ->middleware([$perm('ai.actions.use'), EnforceUserIdempotency::class, 'throttle:20,1']);
+        // AI-ACTIONS-02: private intake and deterministic extraction only;
+        // there is still no product-writing, approval, or execution route.
+        Route::post('ai-actions/{action}/files', [AiActionController::class, 'storeFile'])
+            ->middleware([$perm('ai.actions.use'), EnforceUserIdempotency::class, 'throttle:10,1']);
+        Route::get('ai-actions/{action}/files/{file}/extraction', [AiActionController::class, 'showExtraction'])
+            ->middleware([$perm('ai.actions.use'), 'throttle:60,1']);
+        Route::get('ai-actions/{action}/review', [AiActionController::class, 'review'])
+            ->middleware([$perm('ai.actions.use'), 'throttle:60,1']);
+        Route::post('ai-actions/{action}/review/versions', [AiActionController::class, 'storeReview'])
+            ->middleware([$perm('ai.actions.use'), EnforceUserIdempotency::class, 'throttle:30,1']);
+        // AI-ACTIONS-04: read-only preview and an explicit, expiring approval record.
+        // Approval needs its own permission; nothing here writes products or ledger rows.
+        Route::post('ai-actions/{action}/previews', [AiActionController::class, 'storePreview'])
+            ->middleware([$perm('ai.actions.use'), EnforceUserIdempotency::class, 'throttle:10,1']);
+        Route::get('ai-actions/{action}/previews/{preview}', [AiActionController::class, 'showPreview'])
+            ->middleware([$perm('ai.actions.use'), 'throttle:60,1']);
+        Route::post('ai-actions/{action}/approvals', [AiActionController::class, 'approve'])
+            ->middleware([$perm('ai.actions.approve'), EnforceUserIdempotency::class, 'throttle:20,1']);
+        // AI-ACTIONS-05: applies the approved preview to the catalogue. Gated by
+        // `ai_actions.execution_enabled` (off by default); the approver alone may execute their approval.
+        Route::post('ai-actions/{action}/executions', [AiActionController::class, 'execute'])
+            ->middleware([$perm('ai.actions.approve'), EnforceUserIdempotency::class, 'throttle:60,1']);
+        Route::get('ai-actions/{action}/executions/{execution}', [AiActionController::class, 'showExecution'])
+            ->middleware([$perm('ai.actions.use'), 'throttle:120,1']);
+        Route::post('ai-actions/{action}/executions/{execution}/retry', [AiActionController::class, 'retryExecution'])
+            ->middleware([$perm('ai.actions.approve'), EnforceUserIdempotency::class, 'throttle:20,1']);
 
         // مركز المستندات — PR-2: استقبال يدوي خاص فقط، بلا OCR أو Queue أو إنشاء معاملات.
         Route::post('document-batches', [DocumentIntakeController::class, 'storeBatch'])
