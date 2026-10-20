@@ -84,7 +84,16 @@ Web: `modules/ai-actions/product-images.ts`, `product-images-ui.tsx` (new), `pro
 
 ## Tests
 
-__TESTS__
+| Check | Result |
+|---|---|
+| `AiActionProductImagesTest` (new, 18: valid/invalid images, SSRF incl. internal/metadata/loopback/plain-http/credentials/redirect/non-image/oversize, remote dark by default + fetch bound, Zip Slip + hostile archives, existing-gallery decision/append-only/duplicate/full gallery, archive ambiguity, image changed after approval, new archive withdraws approval, image failure after product success, retry of one image alone, expired approval + revoked permission, tenant/branch isolation, idempotency, immutability) | **18 passed on SQLite and PostgreSQL** (PG run twice) |
+| All `AiAction*` + `ProductImport*` + `ProductMedia*` + `ProductReferenceClassificationGuard` + `BranchIsolationGuard` | **205 passed on PostgreSQL**, 58+ on SQLite |
+| Full PHP suite, SQLite (local, 8,072 tests) | 7,901 passed, 145 skipped, **26 failed — all in `Fuel*` classes** (`bcmul()` undefined: `bcmath` is not installed in this environment; CI installs it). Nothing else failed. |
+| Web `vitest` AI Actions + ai-import | **48 passed** (new: 12 image-component tests — authenticated thumbnails, per-image status/reason, append-only note, ZIP upload with idempotency key + version, server rejection, disabled while unsaved/locked, double-click guard, English; 2 page tests — upload then review reload, explicit media decision only for *update* rows) |
+| `npm run build` (Next.js) | passes |
+| `tsc --noEmit` | no errors in changed files |
+
+Two existing assertions changed meaning (images are no longer "deferred"): `AiActionProductPreviewApprovalTest` (remote-off URLs are `unavailable` with a warning) and `AiActionProductExecutionTest` (per-image `unavailable`, `deferred = {unit_template}`).
 
 ## Risks and what remains
 1. **Remote fetching is code-complete but dark.** Application-level SSRF checks narrow the exposure; they do not replace a network egress policy
