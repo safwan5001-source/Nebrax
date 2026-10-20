@@ -6,12 +6,14 @@ use App\Http\Requests\CancelAiActionRequest;
 use App\Http\Requests\StoreAiActionRequest;
 use App\Http\Requests\StoreAiActionFileRequest;
 use App\Http\Requests\StoreAiActionVersionRequest;
+use App\Http\Requests\StoreAiActionReviewRequest;
 use App\Http\Resources\AiActionExtractionResource;
 use App\Http\Resources\AiActionResource;
 use App\Models\AiAction;
 use App\Models\AiActionFile;
 use App\Services\AiActionGateway;
 use App\Services\AiActionProductFileIntakeService;
+use App\Services\AiActionProductReviewService;
 use App\Support\AiActionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -90,6 +92,29 @@ class AiActionController extends ApiController
         }
 
         return (new AiActionExtractionResource($extraction))->response();
+    }
+
+    public function review(Request $request, AiAction $action, AiActionProductReviewService $review): JsonResponse
+    {
+        try {
+            $data = $review->show($request->user(), $action);
+        } catch (AiActionException $exception) {
+            return $this->error($exception);
+        }
+        return response()->json(['data' => [
+            'action' => (new AiActionResource($data['action']))->resolve(),
+            'proposal' => $data['proposal'], 'manifest_hash' => $data['manifest_hash'],
+        ]]);
+    }
+
+    public function storeReview(StoreAiActionReviewRequest $request, AiAction $action, AiActionProductReviewService $review): JsonResponse
+    {
+        try {
+            $action = $review->edit($request->user(), $action, (int) $request->input('expected_version'), (array) $request->input('edits'));
+        } catch (AiActionException $exception) {
+            return $this->error($exception);
+        }
+        return (new AiActionResource($action))->response()->setStatusCode(201);
     }
 
     private function error(AiActionException $exception): JsonResponse
