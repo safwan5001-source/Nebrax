@@ -72,4 +72,10 @@ AI-ACTIONS-05/06: idempotent execution through `ProductLifecycleService` that re
 
 ## 8. Git / CI
 
-Branch/PR/Base SHA/Head SHA are filled in on the PR description and below once CI starts.
+| Item | Value |
+|---|---|
+| Branch | `ai-actions-04-secure-preview-approval` |
+| Draft PR | https://github.com/safwan5001-source/Nebrax/pull/1580 |
+| Base | `main` @ `e885d776ff893c37775d1242a9cab69603c291c6` |
+| Head (code + report at time of PR) | `a5e1c56626ebdc4cfb648863b101d15821016df5` (later commits only update this table) |
+| CI | PHP matrix (SQLite + PostgreSQL) and Web CI run on the PR; results are tracked on the PR page. Not merged, not deployed. |
