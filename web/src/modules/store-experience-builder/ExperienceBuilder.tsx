@@ -524,6 +524,17 @@ export function ExperienceBuilder({
   );
   const activePanel = CUSTOMIZER_PANELS.find((item) => item.id === panel);
   const isPublishedReadOnly = selectedVersion?.state === "published";
+  // Keep the source of the canvas explicit for accessibility/QA and for the
+  // comparison affordances: a published version is still editable only after
+  // the existing "create draft" flow, while theme/history previews are
+  // intentionally read-only overlays.
+  const previewMode: "draft" | "published" | "theme" | "history" = historyPreview
+    ? "history"
+    : previewTheme
+      ? "theme"
+      : isPublishedReadOnly
+        ? "published"
+        : "draft";
   const candidateVersions = versions.filter((v) => v.state !== "published");
   // بلا `storefrontId` لا يوجد شيء يُحمَّل أو يُحفَظ (سلوك سابق للتحرير المحلي
   // البحت عبر `initialConfig` — يبقى كما هو حرفياً)، فبوابات النسخ لا تنطبق.
@@ -2913,6 +2924,7 @@ export function ExperienceBuilder({
       data-selected-version-id={selectedVersion?.id ?? ""}
       data-selected-version-state={selectedVersion?.state ?? ""}
       data-selected-version-revision={selectedVersion?.revision ?? ""}
+      data-preview-mode={previewMode}
       onInputCapture={(event) => {
         if (isContinuousInputTarget(event.target)) continuousInput.mark(performance.now());
       }}
