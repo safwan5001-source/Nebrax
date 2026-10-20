@@ -73,4 +73,10 @@ AI-ACTIONS-06: controlled product-image import (reuse the dark, egress-reviewed 
 
 ## 7. Git / CI
 
-GIT_PLACEHOLDER
+| Item | Value |
+|---|---|
+| Branch | `ai-actions-05-safe-product-import-execution` |
+| Draft PR | https://github.com/safwan5001-source/Nebrax/pull/1582 |
+| Base | `main` @ `a2a740f9aea6bf73a9b3a707394387c2feb3381c` |
+| Head (code + tests) | `d9e079b904576364176b881e0e4679fee4226eed` (later commits only update this table) |
+| CI | PHP matrix (SQLite + PostgreSQL) and Web CI run on the PR; results are on the PR page. Not merged, not deployed. |
