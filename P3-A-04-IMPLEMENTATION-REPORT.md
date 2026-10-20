@@ -62,7 +62,7 @@
 
 ## CI عن بُعد
 
-فحوص GitHub الظاهرة قبل رفع هذا التحديث كانت تخص head القديم `4bb6a06037c561c9a5e33e264368d164c5df4952`؛ كان بينها فشلا CI Gate وStorefront CI، بينما نجح Web build وStore Brand QA واختبارات PHP. بعد رفع commit التنفيذ الجديد ستُعاد فحوص PR على head الجديد؛ لا تُنسب نتائج head القديم إلى النسخة الجديدة. ستُثبت نتيجة الفحوص الجديدة في PR بعد اكتمالها.
+اكتملت جميع فحوص GitHub على head النهائي `851e01469e5c3c4d9226d844b56766704e40eb94`: **9 ناجحة، صفر فاشلة أو pending**. شملت CI Gate، فحوص Storefront، Web builds، Merchant Preview Visual QA، Published Footer Visual QA، واختبارات PHP على SQLite وPostgreSQL. لا تُنسب حالات الفشل السابقة على head القديم إلى هذه النسخة.
 
 ## المخاطر والمتبقي
 
@@ -78,6 +78,6 @@
 - Branch: `p3-a-04-global-background-renderer`
 - Base (`main`): `8c74051b5e6d0c917babf97902954c1dc9b16ee2`
 - Implementation commit: `22ed521d91a86f198e7353bc29844955e603b48c`
-- سيُذكر PR head النهائي بعد إضافة هذا التقرير في تحديث PR/الرسالة الختامية؛ commit التقرير توثيقي ولا يغيّر كود التنفيذ.
+- Final Head (يتضمن التقرير): `851e01469e5c3c4d9226d844b56766704e40eb94`
 
 **القرار:** جاهز لمراجعة PR ونتائج CI الجديدة؛ لا Merge ولا Deploy قبل موافقتك.
