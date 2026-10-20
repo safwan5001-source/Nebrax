@@ -34,6 +34,16 @@ class AiAction extends BaseModel implements CompanyWide
         return $this->hasMany(AiActionEvent::class);
     }
 
+    public function files(): HasMany
+    {
+        return $this->hasMany(AiActionFile::class);
+    }
+
+    public function extractions(): HasMany
+    {
+        return $this->hasMany(AiActionExtraction::class);
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
