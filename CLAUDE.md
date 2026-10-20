@@ -448,6 +448,18 @@ php artisan serve
 - **PIH:** أول فاتورة في سلسلة **جديدة** فقط = حرفية BR-KSA-26 `NWZlY2Vi…OQ==` (Base64 لنص SHA-256("0") الست عشري). السلسلة القائمة تستمر من XML السابق المحفوظ. سلاسل بدأت بالقيمة القديمة (`ZatcaService::LEGACY_GENESIS_HASH`) **لا تُصلَح ولا تُعاد** — قرارها في REM-25. لا إعادة توليد لأي XML/QR/توقيع/هاش تاريخي، ولا تصفير عدّادات.
 - **الأدلة في CI:** `scripts/zatca-sdk/sign_fixtures.php` يختم الـfixtures بأصناف الإنتاج واعتماد اصطناعي مؤقت لكل تشغيل (لا مفتاح في المستودع)، وتحقق مستقل بـ OpenSSL CLI في `conformance.py`. GLOBAL PASSED هنا مطابقة SDK لا قبول ZATCA فعلي. المرجع: `docs/audits/horizon/REM-17-IMPLEMENTATION-REPORT.md`.
 
+## أساس XML إشعار الدائن (`ZatcaCreditNoteXml`) — REM-18a (شريحة XML فقط، غير مربوطة بالترحيل)
+
+`App\Support\ZatcaCreditNoteXml` (دالة نقيّة) يبني XML إشعار دائن مبيعات (نوع **381**) من `ZatcaCreditNoteInput` المتحقَّق منه وحده؛ `ZatcaCreditNoteInputFactory` يحوّل إشعاراً **مرحَّلاً** وفاتورته الأصلية إلى المدخل (قراءة فقط: صفر استعلام/كتابة). **لا يُستدعى من `CreditNoteService::post` ولا من أي مسار** (يحرسه `ZatcaCreditNoteXmlTest`)، ولا migration. الدمج والتخزين والسلسلة المشتركة = REM-18b.
+- **الجذر `Invoice` لا `CreditNote`:** المدقّق وكل عيّنات ZATCA الرسمية؛ جذر `CreditNote-2` يسقط في XSD وEN. تناقض المعيار نفسه مسجَّل (U1) وسلوك المنصة الحيّة لم يُختبر.
+- **المرجع (BT-25 / BR-KSA-56) والسبب (KSA-10 / BR-KSA-17) إلزاميان في AWJ:** SDK يعامل غياب المرجع **تحذيراً** فقط، فيفحصه `conformance.py` بنيوياً مع ضوابط تعطيل (حذف العنصر يجب أن يظهر في SDK وفي الفحص)، والرمزان في `awj_forbidden_warning_codes` فلا يُسجَّلان ثغرة معروفة.
+- **السبب من `ZatcaNoteReason` (خمسة أسباب القاموس)** برمز AWJ ثابت؛ حصرها قرار محافظ لا قاعدة ZATCA مثبتة (U2). لا نص حر ولا ربط تلقائي.
+- **`PaymentMeansCode` = `10` للنقد فقط.** الإشعار «credit» (تخفيض ذمة) بلا رمز موثَّق ⇒ **يُرفض** ولا يُخترع رمز (D4 مفتوح). SDK لا يتحقق من قيمة الرمز.
+- **الطرفان من `party_snapshot` للفاتورة الأصلية** (نسخ لا التقاط جديد)؛ غيابها ⇒ فشل مغلق. التصنيف standard/simplified من الفاتورة الأصلية المخزَّنة لا من الإشعار.
+- **المبالغ كما خُزِّنت** (موجبة كما في عيّنات ZATCA)، تُتحقق ولا تُعاد حساباً؛ فئة `S` لسطر 15 % فقط (REM-12 مفتوح). لا `Delivery` ولا خصم/شحن مستند.
+- يمرّ في خط توقيع REM-17 **بلا تعديل**. fixtures الإشعارات `awj-note-*` تُولَّد ببصمات في `ZatcaCreditNoteFixtureDriftTest`، وقيمها مثبتة بأنها ما تكتبه الخدمات الحقيقية (`ZatcaCreditNoteRealServiceParityTest`).
+- **خارج النطاق:** 383، إشعارات المشتريات (تُرفض صراحةً)، POS/مرتجعات المبيعات، ICV/PIH المشتركة، الإرسال. المرجع: `docs/audits/horizon/REM-18a-IMPLEMENTATION-REPORT.md`.
+
 ## الترقيم التسلسلي
 
 كل أرقام المستندات تُولَّد من مصدر واحد: `App\Support\GeneratesDocumentNumbers` (trait على النموذج).

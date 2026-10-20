@@ -40,7 +40,13 @@ final class ZatcaMonetaryXml
     /** سطر مصنَّف S/15؟ (المعدل وحده لا يكفي لغير 15، ولا يُستنتج شيء من الصفر.) */
     public static function isStandardRated(InvoiceLine $line): bool
     {
-        return (int) $line->tax_rate === self::STANDARD_RATE;
+        return self::isStandardRate((int) $line->tax_rate);
+    }
+
+    /** المعدل المعتمد 15 فقط — لا استنتاج لـ Z/E/O من أي معدل آخر (REM-16، ADR-0002). */
+    public static function isStandardRate(int $rate): bool
+    {
+        return $rate === self::STANDARD_RATE;
     }
 
     /** كل الأسطر S/15 (فئة واحدة معروفة) — شرط ملخّص الضريبة وفئة خصم المستند. */
@@ -58,16 +64,34 @@ final class ZatcaMonetaryXml
     public static function documentBlock(Invoice $invoice): string
     {
         // قيم post() المشتقة: الخصم والشحن لا يقلّان عن صفر، والتسوية كما هي.
-        $subtotal = (int) $invoice->subtotal;
-        $discount = max(0, (int) $invoice->discount);
-        $shipping = max(0, (int) $invoice->shipping);
-        $tax = (int) $invoice->tax_amount;
-        $total = (int) $invoice->total;
+        return self::documentBlockFromAmounts(
+            (int) $invoice->subtotal,
+            max(0, (int) $invoice->discount),
+            max(0, (int) $invoice->shipping),
+            (int) $invoice->tax_amount,
+            (int) $invoice->total,
+            self::allStandardRated($invoice),
+        );
+    }
 
+    /**
+     * النواة المشتركة لكتلة المبالغ — REM-18a: تستعملها فاتورة المبيعات (`documentBlock`) وإشعار الدائن
+     * (`ZatcaCreditNoteXml`) بالدلالة نفسها حرفياً: تعرض المبالغ المخزَّنة كما هي بلا أي إعادة حساب. ناتج الفاتورة
+     * لم يتغيّر بايتاً (يحرسه ZatcaMonetaryXmlTest وبصمات ZatcaSdkFixtureDriftTest).
+     *
+     * @param bool $standard كل الأسطر S/15 (شرط `TaxSubtotal` وفئة خصم المستند)
+     */
+    public static function documentBlockFromAmounts(
+        int $subtotal,
+        int $discount,
+        int $shipping,
+        int $tax,
+        int $total,
+        bool $standard,
+    ): string {
         $taxExclusive = $subtotal - $discount + $shipping;     // BT-109
         $taxInclusive = $taxExclusive + $tax;                  // BT-112 = BT-109 + BT-110
 
-        $standard = self::allStandardRated($invoice);
         $out = '';
 
         if ($discount > 0) {
@@ -107,11 +131,34 @@ final class ZatcaMonetaryXml
      */
     public static function line(Invoice $invoice, InvoiceLine $line, int $position, string $quantity): string
     {
-        $net = (int) $line->line_subtotal - (int) $line->line_discount;       // BT-131
-        $discount = (int) $line->line_discount;
-        $tax = (int) $line->line_tax;                                          // KSA-11
-        $withVat = (int) $line->line_total;                                    // KSA-12 (= BT-131 + KSA-11 كما خزّنه post)
+        return self::lineFromAmounts(
+            $position,
+            $quantity,
+            $line->description,
+            (int) $line->line_subtotal - (int) $line->line_discount,          // BT-131
+            (int) $line->line_discount,
+            (int) $line->line_tax,                                             // KSA-11
+            (int) $line->line_total,                                           // KSA-12 (= BT-131 + KSA-11 كما خزّنه post)
+            self::isStandardRated($line),
+            self::unitPrice($invoice, $line),
+        );
+    }
 
+    /**
+     * النواة المشتركة لسطر المبالغ — REM-18a (انظر `documentBlockFromAmounts`). `$price` null ⇒ بلا `Price` (فجوة ظاهرة،
+     * لا اختلاق). ناتج سطر الفاتورة لم يتغيّر بايتاً.
+     */
+    public static function lineFromAmounts(
+        int $position,
+        string $quantity,
+        ?string $description,
+        int $net,
+        int $discount,
+        int $tax,
+        int $withVat,
+        bool $standardRated,
+        ?int $price,
+    ): string {
         $xml = "  <cac:InvoiceLine>\n"
             . '    <cbc:ID>' . self::e((string) $position) . "</cbc:ID>\n"
             . '    <cbc:InvoicedQuantity>' . self::e($quantity) . "</cbc:InvoicedQuantity>\n"
@@ -130,14 +177,13 @@ final class ZatcaMonetaryXml
             . '      <cbc:RoundingAmount currencyID="SAR">' . Money::toRiyal($withVat) . "</cbc:RoundingAmount>\n"
             . "    </cac:TaxTotal>\n"
             . "    <cac:Item>\n"
-            . '      <cbc:Name>' . self::e($line->description ?? '-') . "</cbc:Name>\n";
+            . '      <cbc:Name>' . self::e($description ?? '-') . "</cbc:Name>\n";
 
-        if (self::isStandardRated($line)) {
+        if ($standardRated) {
             $xml .= '      ' . self::taxCategory('ClassifiedTaxCategory', 6) . "\n";
         }
         $xml .= "    </cac:Item>\n";
 
-        $price = self::unitPrice($invoice, $line);
         if ($price !== null) {
             $xml .= '    <cac:Price><cbc:PriceAmount currencyID="SAR">' . Money::toRiyal($price) . "</cbc:PriceAmount></cac:Price>\n";
         }

@@ -73,7 +73,18 @@ CODES;
      */
     public static function requireSnapshot(Invoice $invoice): array
     {
-        $snapshot = InvoicePartySnapshot::parse($invoice->party_snapshot);
+        return self::requireSnapshotArray($invoice->party_snapshot);
+    }
+
+    /**
+     * نفس التحقق على لقطة v1 مُمرَّرة صراحةً (REM-18a: إشعار الدائن يأخذ لقطة الفاتورة الأصلية ولا يلمسها).
+     * فشل مغلق بالرسالة نفسها؛ لا رجوع صامت إلى بيانات حيّة.
+     *
+     * @return array{seller: array<string, mixed>, buyer: array<string, mixed>}
+     */
+    public static function requireSnapshotArray(mixed $rawSnapshot): array
+    {
+        $snapshot = InvoicePartySnapshot::parse($rawSnapshot);
         if ($snapshot === null) {
             throw new RuntimeException('لقطة طرفَي الفاتورة (party_snapshot v1) غير موجودة أو غير صالحة؛ لا يُولَّد XML لـ ZATCA بلا لقطة مثبّتة.');
         }

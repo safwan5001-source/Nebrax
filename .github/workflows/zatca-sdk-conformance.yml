@@ -26,6 +26,7 @@ on:
       - 'app/Support/Zatca*'
       - 'tests/Fixtures/zatca-sdk/**'
       - 'tests/Feature/ZatcaSdkFixtureDriftTest.php'
+      - 'tests/Feature/ZatcaCreditNote*.php'
       - 'scripts/zatca-sdk/**'
       - '.github/workflows/zatca-sdk-conformance.yml'
   workflow_dispatch:

@@ -64,10 +64,15 @@ class FixtureDigestTest(unittest.TestCase):
 
     def test_committed_fixtures_match_the_digests_in_the_php_drift_test(self):
         import hashlib
-        php = read(os.path.join(REPO, "tests", "Feature", "ZatcaSdkFixtureDriftTest.php"))
-        block = php.split("private const DIGESTS = [", 1)[1].split("];", 1)[0]
-        digests = dict(re.findall(r"'([a-z0-9-]+)'\s*=>\s*'([0-9a-f]{64})'", block))
-        self.assertTrue(digests)
+        digests = {}
+        # REM-18a: invoice fixtures and credit-note fixtures each have their own drift test and digest table.
+        for drift in ("ZatcaSdkFixtureDriftTest.php", "ZatcaCreditNoteFixtureDriftTest.php"):
+            php = read(os.path.join(REPO, "tests", "Feature", drift))
+            block = php.split("private const DIGESTS = [", 1)[1].split("];", 1)[0]
+            found = dict(re.findall(r"'([a-z0-9-]+)'\s*=>\s*'([0-9a-f]{64})'", block))
+            self.assertTrue(found, drift)
+            self.assertFalse(set(found) & set(digests), "a fixture belongs to exactly one drift test")
+            digests.update(found)
         files = sorted(glob.glob(os.path.join(FIXTURES, "awj", "*.xml")))
         self.assertEqual(sorted(digests), [os.path.basename(f)[:-4] for f in files],
                          "fixture files and DIGESTS must list the same fixtures")
