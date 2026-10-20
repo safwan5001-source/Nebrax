@@ -75,6 +75,7 @@ export function describePublishIssues(
   const lines: string[] = [];
   const bannerLines: string[] = [];
   const mediaLines: string[] = [];
+  let backgroundBlocked = false;
   for (const [path, code] of Object.entries(issues)) {
     if (path.startsWith("announcements")) {
       const key = ISSUE_KEY[code];
@@ -90,6 +91,12 @@ export function describePublishIssues(
       bannerLines.push(
         `${t("bannerLabel")}${index === undefined ? "" : ` ${Number(index) + 1}`}: ${key ? t(key) : t("bannerPublishBlocked")}`,
       );
+      continue;
+    }
+    // P3-A-05 — the temporary server gate on global image backgrounds (until P3-A-06): say what to do,
+    // not a generic "publish failed". The gate itself stays server-side; this only explains it.
+    if (path === "background" && code === "global_media_background_not_ready") {
+      backgroundBlocked = true;
       continue;
     }
     const mediaKey = MEDIA_ISSUE_KEY[code];
@@ -115,5 +122,6 @@ export function describePublishIssues(
     const more = mediaLines.length - MAX_LISTED_ISSUES;
     parts.push(`${t("mediaPublishBlocked")}. ${shown}${more > 0 ? ` (+${more})` : ""}`);
   }
+  if (backgroundBlocked) parts.push(t("storeBackgroundPublishBlocked"));
   return parts.length === 0 ? null : parts.join(" ");
 }

@@ -250,6 +250,21 @@ export const CUSTOMIZER_MESSAGES = {
     storeBackground: "خلفية المتجر",
     storeBackgroundHint: "لون خلفية الصفحات العامة. لا يغيّر خلفيات الأقسام المخصصة.",
     storeBackgroundReset: "استعادة الافتراضي",
+    storeBackgroundType: "نوع الخلفية",
+    storeBackgroundSolid: "لون ثابت",
+    storeBackgroundGradient: "تدرج لوني",
+    storeBackgroundImage: "صورة خلفية",
+    storeBackgroundGradientPreview: "معاينة التدرج",
+    storeBackgroundHexInvalid: "أدخل لوناً بصيغة HEX مثل #f8f9fa.",
+    storeBackgroundImagePending: "اختر صورة لتفعيل خلفية الصورة. حتى ذلك الحين تبقى الخلفية الحالية.",
+    storeBackgroundFocalDesktop: "نقطة تركيز الصورة الأساسية",
+    storeBackgroundFocalPhone: "نقطة تركيز صورة الجوال",
+    storeBackgroundDraftOnly:
+      "خلفية الصورة متاحة في المسودة والمعاينة فقط. نشرها غير مفعّل بعد، وسيُرفض النشر ما دامت هذه الخلفية قائمة. اختر لوناً أو تدرجاً للنشر.",
+    storeBackgroundResetHint:
+      "تبديل النوع يستبدل الخلفية الحالية ويمكن التراجع عنه. «استعادة الافتراضي» تحذف أي تدرج أو صورة وتعيد اللون الافتراضي.",
+    storeBackgroundPublishBlocked:
+      "تعذّر النشر: خلفية الصورة غير متاحة للنشر بعد. استبدلها بلون ثابت أو تدرج، أو أبقِ هذه النسخة مسودة.",
     accentColor: "لون ثانوي",
     font: "الخط",
     fontCairoGeist: "Cairo + Geist",
@@ -1806,6 +1821,21 @@ export const CUSTOMIZER_MESSAGES = {
     storeBackground: "Store background",
     storeBackgroundHint: "The page background colour. It does not change custom section backgrounds.",
     storeBackgroundReset: "Restore default",
+    storeBackgroundType: "Background type",
+    storeBackgroundSolid: "Solid colour",
+    storeBackgroundGradient: "Gradient",
+    storeBackgroundImage: "Background image",
+    storeBackgroundGradientPreview: "Gradient preview",
+    storeBackgroundHexInvalid: "Enter a HEX colour such as #f8f9fa.",
+    storeBackgroundImagePending: "Pick an image to turn on the image background. Until then the current background stays.",
+    storeBackgroundFocalDesktop: "Main image focal point",
+    storeBackgroundFocalPhone: "Phone image focal point",
+    storeBackgroundDraftOnly:
+      "An image background is available in drafts and the preview only. Publishing it is not enabled yet, and publishing is rejected while it is set. Choose a colour or gradient to publish.",
+    storeBackgroundResetHint:
+      "Switching type replaces the current background and can be undone. “Restore default” removes any gradient or image and returns the default colour.",
+    storeBackgroundPublishBlocked:
+      "Publishing was blocked: an image background cannot be published yet. Replace it with a solid colour or gradient, or keep this version as a draft.",
     accentColor: "Accent color",
     font: "Typography",
     fontCairoGeist: "Cairo + Geist",

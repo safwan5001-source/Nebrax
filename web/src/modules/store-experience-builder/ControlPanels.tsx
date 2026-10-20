@@ -6,12 +6,10 @@ import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import {
   canAddSectionType,
-  DEFAULT_STORE_BACKGROUND_COLOR,
   canDuplicateSection,
   canDeleteSection,
   type CONTENT_PAGE_SLUGS,
   contrastRatio,
-  isSafeHexColor,
   DENSITY_PRESETS,
   FONT_PRESETS,
   type FontPresetId,
@@ -42,6 +40,7 @@ import {
 } from "./presentation";
 import { HeaderDesignPanel } from "./HeaderDesignPanel";
 import { FooterEditor } from "./FooterEditor";
+import { GlobalBackgroundField } from "./GlobalBackgroundField";
 import { NavigationPanel } from "./NavigationPanel";
 import { emptyMainMenu, migrateLegacyLinks, withMainMenu } from "./navigation-edit";
 import { presentationCssVars } from "./presentation/tokens";
@@ -277,7 +276,7 @@ export function ControlPanels({
 
   switch (panel) {
     case "theme":
-      return <ThemePanel config={config} t={t} patch={patch} locale={locale} />;
+      return <ThemePanel config={config} t={t} patch={patch} replace={onChange} locale={locale} />;
     case "designLibrary":
       return (
         <DesignLibraryPanel
@@ -479,17 +478,17 @@ function ThemePanel({
   config,
   t,
   patch,
+  replace,
   locale = "ar",
 }: {
   config: StorefrontPresentationConfig;
   t: (key: CustomizerMessageKey) => string;
   patch: (partial: Partial<StorefrontPresentationConfig>) => void;
+  /** Whole-config write: the global background must be able to *remove* its `background` object. */
+  replace: (next: StorefrontPresentationConfig) => void;
   locale?: CustomizerLocale;
 }) {
   const contrast = contrastRatio(config.primaryColor, "#ffffff");
-  const backgroundColor = isSafeHexColor(config.backgroundColor)
-    ? config.backgroundColor
-    : DEFAULT_STORE_BACKGROUND_COLOR;
   // Typing a hex that happens to equal a bundled preset's exact swatch (e.g.
   // Market's #0f766e) is the same *transition* as clicking that preset's
   // button — it must carry the same starting bundle, or the merchant ends up
@@ -570,34 +569,7 @@ function ThemePanel({
           />
         </div>
       </Field>
-      <Field label={t("storeBackground")} hint={t("storeBackgroundHint")}>
-        <div className="flex items-stretch gap-2">
-          <label className="relative size-10 shrink-0 cursor-pointer overflow-hidden border border-neutral-300">
-            <span className="absolute inset-0" style={{ background: backgroundColor }} />
-            <input
-              type="color"
-              aria-label={t("storeBackground")}
-              value={backgroundColor}
-              onChange={(event) => patch({ backgroundColor: event.target.value })}
-              className="absolute inset-0 cursor-pointer opacity-0"
-            />
-          </label>
-          <input
-            aria-label={t("storeBackground")}
-            className={`${inputClass} font-mono uppercase tracking-wide`}
-            value={config.backgroundColor ?? DEFAULT_STORE_BACKGROUND_COLOR}
-            onChange={(event) => patch({ backgroundColor: event.target.value })}
-          />
-          <button
-            type="button"
-            className={btnClass}
-            onClick={() => patch({ backgroundColor: DEFAULT_STORE_BACKGROUND_COLOR })}
-            disabled={backgroundColor === DEFAULT_STORE_BACKGROUND_COLOR}
-          >
-            {t("storeBackgroundReset")}
-          </button>
-        </div>
-      </Field>
+      <GlobalBackgroundField config={config} onReplace={replace} t={t} locale={locale === "en" ? "en" : "ar"} />
       <div className="space-y-5">
         <Field label={t("font")}>
           <select

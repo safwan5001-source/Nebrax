@@ -259,6 +259,96 @@ class StorefrontPresentationPublishApiTest extends TestCase
         app(TenantContext::class)->forget();
     }
 
+    /**
+     * P3-A-05 — the full document the Appearance editor can now author (desktop + phone image, a focal
+     * point for each, an overlay) is kept in the draft yet cannot be published. Removing the object — what
+     * switching to Solid or "Restore default" does in the editor — is what unblocks publishing, because the
+     * document is replaced as a whole and the legacy `backgroundColor` alone is a complete background.
+     *
+     * @test
+     */
+    public function editor_authored_image_background_stays_unpublishable_until_the_object_is_removed(): void
+    {
+        $auth = $this->registerTenant('pres-pub-bg-editor', 'owner@pres-pub-bg-editor.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+        $desktop = '0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e';
+        $phone = '7c1d3e4f-5a6b-4c8d-9e0f-1a2b3c4d5e6f';
+
+        $token->putJson($this->path($seeded['storefront']->id), [
+            'config' => [
+                'backgroundColor' => '#ffeedd',
+                'background' => [
+                    'kind' => 'media',
+                    'media' => ['mediaId' => $desktop, 'decorative' => true, 'focal' => ['x' => 100, 'y' => 0]],
+                    'mobile' => ['mediaId' => $phone, 'decorative' => true, 'focal' => ['x' => 0, 'y' => 100]],
+                    'overlay' => ['color' => ['role' => 'overlay'], 'alpha' => 35],
+                ],
+            ],
+            'draft_revision' => 0,
+        ])->assertOk();
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $saved = StorefrontPresentation::query()->where('storefront_id', $seeded['storefront']->id)->firstOrFail();
+        // Key order is not part of the contract (the normaliser writes `focal` before `decorative`).
+        $this->assertEquals([
+            'kind' => 'media',
+            'media' => ['mediaId' => $desktop, 'decorative' => true, 'focal' => ['x' => 100, 'y' => 0]],
+            'mobile' => ['mediaId' => $phone, 'decorative' => true, 'focal' => ['x' => 0, 'y' => 100]],
+            'overlay' => ['color' => ['role' => 'overlay'], 'alpha' => 35],
+        ], $saved->draft_config['background']);
+        app(TenantContext::class)->forget();
+
+        $rejected = $token->postJson($this->path($seeded['storefront']->id).'/publish', ['draft_revision' => 1])
+            ->assertStatus(422);
+        $this->assertSame('global_media_background_not_ready', $rejected->json('error_codes.background'));
+
+        // The merchant switches to Solid / restores the default: the document no longer carries `background`.
+        $token->putJson($this->path($seeded['storefront']->id), [
+            'config' => ['backgroundColor' => '#ffeedd'],
+            'draft_revision' => 1,
+        ])->assertOk();
+        $token->postJson($this->path($seeded['storefront']->id).'/publish', ['draft_revision' => 2])->assertOk();
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $after = StorefrontPresentation::query()->where('storefront_id', $seeded['storefront']->id)->firstOrFail();
+        $this->assertArrayNotHasKey('background', $after->draft_config);
+        $this->assertArrayNotHasKey('background', $after->published_config);
+        $this->assertSame('#ffeedd', $after->published_config['backgroundColor']);
+        app(TenantContext::class)->forget();
+    }
+
+    /**
+     * P3-A-05 — the supported safe backgrounds keep publishing normally: a gradient (colours as hex or palette
+     * role, an approved logical direction) reaches the published snapshot unchanged.
+     *
+     * @test
+     */
+    public function editor_authored_gradient_background_publishes_normally(): void
+    {
+        $auth = $this->registerTenant('pres-pub-bg-gradient', 'owner@pres-pub-bg-gradient.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+        $gradient = [
+            'kind' => 'gradient',
+            'from' => ['hex' => '#112233'],
+            'to' => ['role' => 'surfaceAlt'],
+            'direction' => 'to-bottom-end',
+        ];
+
+        $token->putJson($this->path($seeded['storefront']->id), [
+            'config' => ['backgroundColor' => '#ffeedd', 'background' => $gradient],
+            'draft_revision' => 0,
+        ])->assertOk();
+        $token->postJson($this->path($seeded['storefront']->id).'/publish', ['draft_revision' => 1])->assertOk();
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $published = StorefrontPresentation::query()->where('storefront_id', $seeded['storefront']->id)->firstOrFail()->published_config;
+        $this->assertSame($gradient, $published['background']);
+        $this->assertSame('#ffeedd', $published['backgroundColor']);
+        app(TenantContext::class)->forget();
+    }
+
     /** @test */
     public function unknown_publish_envelope_keys_are_rejected(): void
     {
