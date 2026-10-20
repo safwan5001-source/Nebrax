@@ -92,7 +92,11 @@ beforeEach(() => {
   toast.error.mockReset();
   vi.stubGlobal('crypto', { randomUUID: () => '00000000-0000-4000-8000-000000000000' });
 });
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  // One process runs every test file: never leave the fake `crypto` behind for the next file.
+  vi.unstubAllGlobals();
+});
 
 describe('المعاينة النهائية والموافقة', () => {
   it('تنشئ المعاينة عند الفتح وتعرض الإنشاء والتحديث والتخطي والأسعار والصور', async () => {
