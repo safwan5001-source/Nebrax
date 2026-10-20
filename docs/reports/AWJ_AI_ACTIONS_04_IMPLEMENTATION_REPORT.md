@@ -42,7 +42,18 @@ Errors: `preview_blocked` 422 · `preview_hash_mismatch` / `preview_stale` / `pr
 
 ## 5. Tests
 
-RESULTS_PLACEHOLDER
+| Suite | Result |
+|---|---|
+| `AiActionProductPreviewApprovalTest` (21 tests: classification, required/invalid values, forged proposal, duplicates/conflicts, name-never-matches, hash binding + replay, edit/cancel invalidation, live-state drift, target edited after preview, preview/approval expiry, approve permission + cost visibility, live permission re-check, tenant + branch isolation, gating/no execute route, decisions, paging, immutability, hash sensitivity, money typing) | **SQLite 21/21 · PostgreSQL 21/21** |
+| Existing AI Actions suites (`AiActionsFoundationTest`, `AiActionProductFileIntakeTest`, `AiActionProductReviewTest`) — legacy approval/permission/tenant behaviour | **pass on SQLite and PostgreSQL** (31/31 incl. new) |
+| Full PHP suite, SQLite (local, 7,962 tests) | 7,176 passed on first pass; 642 failures were environmental (assembled local app had no `APP_KEY` ⇒ `MissingAppKeyException`; CI sets one). The 86 affected classes were rerun with a key: **1,044 passed**, 26 failed — all in `Fuel*` tests with `Call to undefined function bcmul()` (the `bcmath` extension is not installed locally; `setup.sh` warns about it, CI installs it). No failure relates to AI Actions, products, import, branches or tenancy. |
+| Branch classification guard (new models are `CompanyWide`) | pass (`BranchIsolationGuardTest` in the full run) |
+| Web (`npm run test`, Vitest) | **655 files / 7,747 tests passed**, including 9 + 8 + 4 new AI-ACTIONS-04 tests and the unchanged `/products`, `/products/import`, `/products/workbook-import` suites |
+| Web type check (`tsc --noEmit`) | no errors in changed files (the repository's pre-existing unrelated type errors are unchanged) |
+
+Web component tests cover: preview rendering (create/update/skip, SAR prices from minor units, images, warnings), approval gating (explicit checkbox, errors, unsaved edits, no permission, expired/invalidated), payload sent to `/approvals` (version, preview id, full hash, `acknowledged`), stale-preview recovery, cost redaction, server-side filtering, and the page flow (decision saved as a new version *before* the preview is requested; bulk decision applies to visible rows only; no approval request is ever sent automatically).
+
+Not run locally: `next build` (CI `Web CI` runs it) and Playwright/visual QA. CI results are linked from the PR.
 
 ## 6. Risks and decisions for the owner
 
