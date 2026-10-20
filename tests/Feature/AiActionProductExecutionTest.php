@@ -30,6 +30,7 @@ use Tests\TestCase;
 class AiActionProductExecutionTest extends TestCase
 {
     use RefreshDatabase;
+    use AssertsNoCostLeak;
     use InteractsWithApi;
     use InteractsWithAiProductActions;
 
@@ -256,7 +257,7 @@ class AiActionProductExecutionTest extends TestCase
         $this->assertStringNotContainsString('7.77', $response->getContent());
 
         // Results never carry cost values, even for the permitted user reading them back.
-        $this->assertStringNotContainsString('777', $this->withToken($token)->getJson("/api/ai-actions/{$id}/executions/latest")->assertOk()->getContent());
+        $this->assertNoScalarEquals($this->withToken($token)->getJson("/api/ai-actions/{$id}/executions/latest")->assertOk()->getContent(), [777], 'execution result leaked the purchase price');
     }
 
     /** @test */

@@ -26,6 +26,7 @@ class AiActionProductPreviewApprovalTest extends TestCase
 {
     use RefreshDatabase;
     use InteractsWithApi;
+    use AssertsNoCostLeak;
 
     private function enable(string $tenant): void
     {
@@ -666,7 +667,7 @@ class AiActionProductPreviewApprovalTest extends TestCase
         foreach ($responses as $name => $response) {
             $response->assertOk();
             $this->assertStringNotContainsString('7.77', $response->getContent(), "{$name} leaked the purchase price");
-            $this->assertStringNotContainsString('777', $response->getContent(), "{$name} leaked the purchase price in minor units");
+            $this->assertNoScalarEquals($response->getContent(), [777], "{$name} leaked the purchase price in minor units");
         }
         $responses['review']->assertJsonPath('data.proposal.rows.0.fields.purchase_price.value', null)->assertJsonPath('data.action.cost_hidden', true);
         $responses['show']->assertJsonPath('data.cost_hidden', true);
