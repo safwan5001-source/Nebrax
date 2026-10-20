@@ -7,7 +7,9 @@ use App\Http\Requests\StoreAiActionRequest;
 use App\Http\Requests\StoreAiActionFileRequest;
 use App\Http\Requests\StoreAiActionVersionRequest;
 use App\Http\Requests\StoreAiActionReviewRequest;
+use App\Http\Requests\RetryAiActionExecutionRequest;
 use App\Http\Requests\StoreAiActionApprovalRequest;
+use App\Http\Requests\StoreAiActionExecutionRequest;
 use App\Http\Requests\StoreAiActionPreviewRequest;
 use App\Http\Resources\AiActionExtractionResource;
 use App\Http\Resources\AiActionResource;
@@ -16,6 +18,7 @@ use App\Models\AiActionFile;
 use App\Services\AiActionGateway;
 use App\Services\AiActionProductFileIntakeService;
 use App\Services\AiActionProductApprovalService;
+use App\Services\AiActionProductExecutionService;
 use App\Services\AiActionProductReviewService;
 use App\Support\AiActionCostVisibility;
 use App\Support\AiActionException;
@@ -162,6 +165,44 @@ class AiActionController extends ApiController
         if ($result['replayed']) $response->headers->set('AI-Action-Approval-Replayed', 'true');
 
         return $response;
+    }
+
+    public function execute(StoreAiActionExecutionRequest $request, AiAction $action, AiActionProductExecutionService $executions): JsonResponse
+    {
+        try {
+            $result = $executions->run($request->user(), $action, (int) $request->input('expected_version'));
+            $data = $executions->present($result['execution'], $request->user(), $request->query());
+        } catch (AiActionException $exception) {
+            return $this->error($exception);
+        }
+        $response = response()->json(['data' => $data], $result['replayed'] ? 200 : 201);
+        if ($result['replayed']) $response->headers->set('AI-Action-Execution-Replayed', 'true');
+
+        return $response;
+    }
+
+    public function retryExecution(RetryAiActionExecutionRequest $request, AiAction $action, string $execution, AiActionProductExecutionService $executions): JsonResponse
+    {
+        try {
+            $model = $executions->retry($request->user(), $action, $execution);
+            $data = $executions->present($model, $request->user(), $request->query());
+        } catch (AiActionException $exception) {
+            return $this->error($exception);
+        }
+
+        return response()->json(['data' => $data]);
+    }
+
+    public function showExecution(Request $request, AiAction $action, string $execution, AiActionProductExecutionService $executions): JsonResponse
+    {
+        try {
+            $model = $executions->show($request->user(), $action, $execution === 'latest' ? null : $execution);
+            $data = $executions->present($model, $request->user(), $request->query());
+        } catch (AiActionException $exception) {
+            return $this->error($exception);
+        }
+
+        return response()->json(['data' => $data]);
     }
 
     private function error(AiActionException $exception): JsonResponse

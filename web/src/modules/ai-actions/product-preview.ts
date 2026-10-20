@@ -44,7 +44,7 @@ export interface PreviewRow {
   };
   changes: PreviewChange[];
   prices: Partial<Record<'sale_price' | 'purchase_price' | 'min_sale_price' | 'tax_rate', PreviewPrice>> | null;
-  images: { primary: string | null; additional: string[]; count: number; will_apply: boolean; fetched: boolean } | null;
+  images: { primary: string | null; additional: string[]; count: number; will_apply: boolean; status?: 'deferred' | 'none'; fetched: boolean } | null;
   issues: PreviewIssue[];
 }
 
@@ -256,8 +256,11 @@ export const ISSUE_TITLE: Record<string, string> = {
   tax_rate_missing: 'نسبة الضريبة مطلوبة للإنشاء',
   unit_missing: 'الوحدة مطلوبة للإنشاء',
   trusted_identifier_missing: 'يلزم SKU أو باركود',
-  reference_unmanaged: 'قيمة غير مُدارة',
+  reference_unresolved: 'تصنيف/علامة غير موجودة',
+  reference_ambiguous: 'اسم تصنيف/علامة مكرَّر',
   media_update_not_approved: 'صور المنتج الموجود غير معتمدة',
+  media_deferred: 'استيراد الصور مؤجَّل',
+  unit_template_deferred: 'قالب الوحدات مؤجَّل',
 };
 
 /** رسالة الخطأ العربية من جسم `{error:{message}}` (الـ API لا يضعها في الجذر كبقية النقاط). */

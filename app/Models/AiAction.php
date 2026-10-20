@@ -13,6 +13,10 @@ class AiAction extends BaseModel implements CompanyWide
     public const STATUS_READY_FOR_APPROVAL = 'ready_for_approval';
     public const STATUS_APPROVED = 'approved';
     public const STATUS_EXPIRED = 'expired';
+    public const STATUS_EXECUTING = 'executing';
+    public const STATUS_EXECUTED = 'executed';
+    public const STATUS_PARTIALLY_FAILED = 'partially_failed';
+    public const STATUS_FAILED = 'failed';
     public const STATUS_CANCELLED = 'cancelled';
 
     /** States in which a draft can still change (any change invalidates previews and approvals). */
@@ -61,6 +65,11 @@ class AiAction extends BaseModel implements CompanyWide
     public function approvals(): HasMany
     {
         return $this->hasMany(AiActionApproval::class);
+    }
+
+    public function executions(): HasMany
+    {
+        return $this->hasMany(AiActionExecution::class);
     }
 
     public function creator(): BelongsTo

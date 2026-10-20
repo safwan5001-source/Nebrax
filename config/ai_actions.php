@@ -14,6 +14,12 @@ return [
     // is a short-lived authority — a later execution step must start inside it.
     'preview_ttl_minutes' => (int) env('AI_ACTIONS_PREVIEW_TTL_MINUTES', 30),
     'approval_ttl_minutes' => (int) env('AI_ACTIONS_APPROVAL_TTL_MINUTES', 60),
+    // AI-ACTIONS-05: applying an approved preview writes products. It ships dark and is
+    // independent of `enabled`, so the review/approval surface can be on while writes are off.
+    'execution_enabled' => filter_var(env('AI_ACTIONS_EXECUTION_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+    // Rows applied per request (each in its own transaction) and how long a worker holds the lease.
+    'execution_batch_rows' => (int) env('AI_ACTIONS_EXECUTION_BATCH_ROWS', 200),
+    'execution_lease_seconds' => (int) env('AI_ACTIONS_EXECUTION_LEASE_SECONDS', 120),
     'preview_page_size' => (int) env('AI_ACTIONS_PREVIEW_PAGE_SIZE', 100),
     'draft_retention_days' => (int) env('AI_ACTIONS_DRAFT_RETENTION_DAYS', 30),
 ];

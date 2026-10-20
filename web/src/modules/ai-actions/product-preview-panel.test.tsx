@@ -43,8 +43,8 @@ function previewFixture(overrides: Partial<ProductPreview> = {}): ProductPreview
         match: { kind: 'none', value: null, target_product_id: null, target_version: null, target_name: null, target_sku: null },
         changes: [{ field: 'name', before: null, after: 'قهوة جديدة' }, { field: 'sale_price', before: null, after: 1050 }],
         prices: { sale_price: { before: null, after: 1050 }, purchase_price: { before: null, after: 500 }, tax_rate: { before: null, after: 15 } },
-        images: { primary: 'https://img.example/a.jpg', additional: [], count: 1, will_apply: true, fetched: false },
-        issues: [{ code: 'reference_unmanaged', field: 'category', severity: 'warning', message: '«التصنيف» بالقيمة «قهوة» غير موجود ولن يُنشأ تلقائياً.' }],
+        images: { primary: 'https://img.example/a.jpg', additional: [], count: 1, will_apply: false, status: 'deferred', fetched: false },
+        issues: [{ code: 'unit_template_deferred', field: 'unit_template', severity: 'warning', message: '«قالب الوحدات» لا يُطبَّق في هذه المرحلة.' }],
       },
       {
         row_id: 'r2', source_row: 3, decision: 'update', display: { name: 'قهوة قائمة', sku: 'EX-1', barcode: null },
@@ -110,9 +110,9 @@ describe('المعاينة النهائية والموافقة', () => {
     expect(text).toMatch(/12\.00/);
     expect(text).toMatch(/10\.00/);
     expect(screen.getAllByText('وصف جديد').length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/لم تُنزَّل بعد/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/مؤجَّلة — لا تُنزَّل ولا تُرفق/).length).toBeGreaterThan(0);
     expect(screen.getAllByText('تخطٍّ بقرارك').length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/غير موجود ولن يُنشأ تلقائياً/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/لا يُطبَّق في هذه المرحلة/).length).toBeGreaterThan(0);
     expect(onStatus).toHaveBeenCalledWith('ready_for_approval');
     expect(screen.getByText(/لا تُنشأ منتجات ولا تُحدَّث/)).toBeTruthy();
   });
@@ -143,6 +143,10 @@ describe('المعاينة النهائية والموافقة', () => {
     expect(await screen.findByText(/وُوفق على هذه المعاينة بعينها/)).toBeTruthy();
     expect(screen.getByText(/لم يُنشأ أو يُحدَّث أي منتج/)).toBeTruthy();
     expect(onStatus).toHaveBeenLastCalledWith('approved');
+    // The approval opens the execution box but never runs it by itself.
+    expect(await screen.findByTestId('execution-box')).toBeTruthy();
+    expect(api.mock.calls.some(([path, options]) => String(path).includes('/executions') && options?.method === 'POST')).toBe(false);
+    expect(screen.getByRole('button', { name: 'تنفيذ الاستيراد' })).toBeTruthy();
   });
 
   it('لا تسمح بالموافقة عند وجود أخطاء تمنع التنفيذ وتشرح السبب', async () => {

@@ -27,10 +27,11 @@ class ProductService
     /**
      * @param  array<string, mixed>  $data
      */
-    public function create(array $data, ?string $userId = null): Product
+    public function create(array $data, ?string $userId = null, bool $generateSku = true): Product
     {
-        return DB::transaction(function () use ($data, $userId) {
-            if (blank($data['sku'] ?? null)) {
+        return DB::transaction(function () use ($data, $userId, $generateSku) {
+            // `$generateSku = false` is for callers that must never invent an identifier (AI Actions).
+            if ($generateSku && blank($data['sku'] ?? null)) {
                 $prefix = (string) Settings::get('numbering', 'product_prefix');
                 $data['sku'] = Product::nextDocumentNumber($prefix !== '' ? $prefix : 'SKU');
             }
