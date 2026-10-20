@@ -253,6 +253,11 @@ export function ExperienceBuilder({
   const canvasConfig = historyPreview ? historyPreview.config : themed?.ok ? themed.config : draft;
   // أقسام الصفحة الرئيسية التي تعرضها المعاينة الآن: لقطة السجل إن فُتحت، وإلا المسودة. محمِّلات البيانات (التصنيفات/وصل حديثاً/المميّز/العروض) تقرأ منها لا من المسودة وحدها.
   const homeSectionsShown = historyPreview ? historyPreview.config.homepage.sections : draft.homepage.sections;
+  // Data-backed sections must follow the exact configuration rendered by the
+  // canvas. Theme packs can add sections that are absent from the authored
+  // draft, so the section-data loader/retry path uses this list instead of
+  // the editor-only authored list above.
+  const renderedHomeSections = canvasConfig.homepage.sections;
   // React 18 renders `inert` only as a string attribute: while a theme is previewed the editing UI is not operable or focusable.
   const inertWhenThemePreview = readOnlyPreview ? ({ inert: "" } as Record<string, string>) : {};
   const [panel, setPanel] = useState<CustomizerPanel>("theme");
@@ -1546,7 +1551,7 @@ export function ExperienceBuilder({
 
   useEffect(() => {
     if (currentPage !== "home" || !storefrontId || busy === "loading") return;
-    for (const section of homeSectionsShown) {
+    for (const section of renderedHomeSections) {
       if (!section.visible || !["productShelf", "discovery", "deliveryPromise"].includes(section.type)) continue;
       const state = section.type === "productShelf"
         ? homeSectionProductsState[section.id]
@@ -1560,7 +1565,7 @@ export function ExperienceBuilder({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, storefrontId, busy, homeSectionsShown, homeSectionProductsState, homeSectionDiscoveryState, homeSectionDeliveryState]);
+  }, [currentPage, storefrontId, busy, renderedHomeSections, homeSectionProductsState, homeSectionDiscoveryState, homeSectionDeliveryState]);
 
   // Workspace media URLs are signed and bounded. Refresh the section data
   // before the same expiry window used by the category/header preview so a
@@ -1580,7 +1585,7 @@ export function ExperienceBuilder({
   }, [storefrontId, homeSectionProductsState, homeSectionDiscoveryState, homeSectionDeliveryState]);
 
   function handleRetryHomeDataSection(sectionId: string) {
-    const section = homeSectionsShown.find((item) => item.id === sectionId);
+    const section = renderedHomeSections.find((item) => item.id === sectionId);
     if (section) void loadHomeDataSection(section);
   }
 
