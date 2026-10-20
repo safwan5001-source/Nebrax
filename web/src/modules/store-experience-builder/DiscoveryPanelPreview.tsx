@@ -52,11 +52,8 @@ import {
 } from "./discovery-preview-model";
 import type { CustomizerLocale, CustomizerMessageKey } from "./messages";
 import { resolveDiscoveryDisplay } from "./presentation/discovery-templates";
-import {
-  facetLabelHidden,
-  type ResolvedFacetVisual,
-  resolveFacetValueVisual,
-} from "./presentation/facet-visual";
+import { type ResolvedFacetVisual, resolveFacetValueVisual } from "./presentation/facet-visual";
+import { facetLabelHidden } from "./discovery-label-visibility";
 import { FACET_VISUAL_SIZE_PX } from "./presentation/facet-visual-style";
 import type { DiscoveryContent, DiscoveryGap } from "./presentation/section-content";
 import "./store-preview.css";

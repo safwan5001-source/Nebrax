@@ -6,7 +6,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { FacetVisualTile } from '../FacetVisualTile';
-import { facetLabelHidden, type ResolvedFacetVisual } from '../presentation/facet-visual';
+import type { ResolvedFacetVisual } from '../presentation/facet-visual';
+import { facetLabelHidden } from '../discovery-label-visibility';
 
 const repo = (path: string) => readFileSync(resolve(process.cwd(), '..', path), 'utf8');
 

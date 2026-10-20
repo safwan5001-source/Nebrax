@@ -18,7 +18,7 @@
  * Data only (no React). Shape geometry is not here: documents carry the shape **key** only.
  */
 
-import { ICON_KEYS, normalizeIconKey, type IconKey } from "./icon-registry";
+import { ICON_KEYS, type IconKey } from "./icon-registry";
 import { type LocalizedAlt, normalizeMediaRef } from "./media-ref";
 
 export const FACET_VISUAL_CONTENTS = ["image", "icon", "none"] as const;
@@ -283,23 +283,6 @@ export interface ResolvedFacetVisual {
   shape: FacetVisualShape;
   size: FacetVisualSize;
   showLabel: boolean;
-}
-
-/** Matches the storefront tile's visible-name rule for count placement. */
-export function facetLabelHidden(
-  visual: ResolvedFacetVisual | null,
-  image: { src?: string } | null,
-): boolean {
-  if (visual === null || visual.showLabel) return false;
-  const imageUsable = visual.content === "image" && visual.image !== undefined && !!image?.src;
-  const iconKey = normalizeIconKey(
-    visual.content === "icon"
-      ? visual.icon
-      : visual.content === "image" && !imageUsable
-        ? visual.fallbackIcon
-        : undefined,
-  );
-  return imageUsable || iconKey !== undefined;
 }
 
 export type FacetVisualSource =
