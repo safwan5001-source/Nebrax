@@ -63,7 +63,10 @@ git diff tests/Fixtures/zatca-sdk      # review: the baseline diff IS the confor
 * `scripts/zatca-sdk/sign_fixtures.php` stamps the committed AWJ fixtures with **AWJ's own production signing classes**
   (no Laravel bootstrap) and a synthetic CA + leaf + secp256k1 key **generated in memory for that run**. The key and
   certificate are written only to `$RUNNER_TEMP` in the SDK's file format; they are never committed, printed, reused
-  or uploaded, and are not a ZATCA credential. The signature-policy values are synthetic placeholders (the SDK does
+  or uploaded, and are not a ZATCA credential. Key hygiene: the script reduces every warning/exception to class +
+  message, and the workflow runs it with `-d xdebug.mode=off -d zend.exception_ignore_args=1`, so no stack trace can
+  echo the in-memory key (guarded by `test_stamping_cannot_echo_the_ephemeral_key_into_ci_logs`). The runner needs
+  `xmllint` (libxml2-utils) because AWJ's C14N 1.1 hasher shells out to it. The signature-policy values are synthetic placeholders (the SDK does
   not check them); production keeps failing closed until the official policy is configured.
 * `run --stamped-fixtures DIR --stamp-cert-dir DIR` validates them with a **second SDK config** whose `certPath` is
   that synthetic leaf (the SDK compares XAdES `IssuerSerial` with the certificate its config points at). The baseline

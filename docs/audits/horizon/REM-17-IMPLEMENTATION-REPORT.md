@@ -128,6 +128,11 @@ evidence. Unrelated gates are unchanged (forbidden-warning lists, known gaps, ra
 * **Whitespace sensitivity:** any future re-serialisation of signed XML (pretty print, CRLF, DOM `saveXML()` of the
   whole document) would break the SignedProperties digest; the extractor detects it and the tests pin it.
 * **Legacy artefacts:** old-genesis chains and pre-REM-17 signatures remain as stored (→ REM-25).
+* **CI log incident (first push, fixed):** the first advisory SDK run failed because `xmllint` was missing on that
+  runner, and the PHP/xdebug fatal-error trace printed the arguments of the call — including that run's **ephemeral
+  synthetic** private key (generated in memory, used for nothing, never a ZATCA credential, discarded with the
+  runner). Fixed in the follow-up commit: `libxml2-utils` installed, errors reduced to class + message, xdebug off
+  and exception arguments ignored, and a guard test. The owner may delete the logs of that one workflow run.
 
 ## 9. Recommended next step
 

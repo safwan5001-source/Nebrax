@@ -15,7 +15,17 @@ declare(strict_types=1);
  * still fails closed until the official policy is configured.
  *
  * No Laravel bootstrap: the signing classes are plain PHP and are loaded straight from app/.
+ *
+ * Key hygiene: every PHP warning and exception is reduced to its class and message before it is printed — a stack
+ * trace with arguments (PHP or xdebug) would otherwise echo the in-memory private key into the CI log. Run with
+ * `-d xdebug.mode=off -d zend.exception_ignore_args=1` as a second layer.
  */
+
+ini_set('display_errors', 'stderr');
+ini_set('zend.exception_ignore_args', '1');
+set_error_handler(static function (int $severity, string $message): bool {
+    throw new ErrorException($message, 0, $severity);
+});
 
 spl_autoload_register(static function (string $class): void {
     $prefix = 'App\\Services\\Accounting\\';
@@ -84,84 +94,89 @@ function text(DOMXPath $xpath, string $query): string
     return trim((string) $nodes->item(0)?->textContent);
 }
 
-[$script, $fixturesDir, $outDir] = $argv + [null, null, null];
-if (! is_string($fixturesDir) || ! is_dir($fixturesDir) || ! is_string($outDir)) {
-    fail("usage: php {$script} <fixtures-awj-dir> <out-dir>");
-}
-foreach (['signed', 'certificate'] as $sub) {
-    if (! is_dir("{$outDir}/{$sub}") && ! mkdir("{$outDir}/{$sub}", 0700, true)) {
-        fail("cannot create {$outDir}/{$sub}");
+try {
+    [$script, $fixturesDir, $outDir] = $argv + [null, null, null];
+    if (! is_string($fixturesDir) || ! is_dir($fixturesDir) || ! is_string($outDir)) {
+        fail("usage: php {$script} <fixtures-awj-dir> <out-dir>");
     }
-}
-
-[$caKey, $caCertificate] = syntheticCertificate('AWJ-SYNTHETIC-EPHEMERAL-CA', null, null, true);
-[$leafKey, $leafCertificate] = syntheticCertificate('AWJ-SYNTHETIC-EPHEMERAL-EGS', $caCertificate, $caKey, false);
-openssl_x509_export($leafCertificate, $leafPem);
-openssl_x509_export($caCertificate, $caPem);
-openssl_pkey_export($leafKey, $leafKeyPem);
-$chain = [body($leafPem), body($caPem)];
-
-// The SDK compares IssuerSerial with the certificate its config points at: the synthetic leaf.
-file_put_contents("{$outDir}/certificate/cert.pem", $chain[0]);
-file_put_contents("{$outDir}/certificate/ec-secp256k1-priv-key.pem", body($leafKeyPem));
-chmod("{$outDir}/certificate/ec-secp256k1-priv-key.pem", 0600);
-
-$hasher = new ZatcaInvoiceHasher(new ZatcaXmlCanonicalizer());
-$signer = new ZatcaXmlEcdsaSigner();
-$signedProperties = new ZatcaXadesSignedPropertiesBuilder();
-$assembler = new ZatcaXadesSignatureAssembler($hasher, $signedProperties, new ZatcaXmlDsigSignedInfoBuilder(), $signer);
-$extractor = new ZatcaSignedInvoiceQrMaterialExtractor($hasher, $signer, $signedProperties, new ZatcaCertificateFields());
-$certificateMaterial = (new ZatcaQrCertificateMaterialExtractor())->extract($chain[0]);
-$encoder = new ZatcaPhaseTwoQrEncoder();
-$policyDigest = base64_encode(hash('sha256', SYNTHETIC_POLICY_IDENTIFIER, true));
-
-$files = glob(rtrim($fixturesDir, '/').'/*.xml') ?: [];
-if ($files === []) {
-    fail("no fixtures in {$fixturesDir}");
-}
-foreach ($files as $file) {
-    $xml = (string) file_get_contents($file);
-    $document = new DOMDocument();
-    if (! $document->loadXML($xml, LIBXML_NONET)) {
-        fail(basename($file).': not well-formed');
-    }
-    $xpath = new DOMXPath($document);
-    $xpath->registerNamespace('inv', 'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2');
-    $xpath->registerNamespace('cac', 'urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2');
-    $xpath->registerNamespace('cbc', 'urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2');
-
-    $typeName = (string) $xpath->evaluate('string(/inv:Invoice/cbc:InvoiceTypeCode/@name)');
-    $documentType = str_starts_with($typeName, '02') ? 'simplified' : 'standard';
-    $issuedAt = new DateTimeImmutable(
-        text($xpath, '/inv:Invoice/cbc:IssueDate').' '.text($xpath, '/inv:Invoice/cbc:IssueTime'),
-        new DateTimeZone('Asia/Riyadh'),
-    );
-    $currentQr = text($xpath, "/inv:Invoice/cac:AdditionalDocumentReference[cbc:ID='QR']/cac:Attachment/cbc:EmbeddedDocumentBinaryObject");
-
-    $signed = $assembler->assemble($xml, $chain, $leafKeyPem, new DateTimeImmutable('now', new DateTimeZone('UTC')), SYNTHETIC_POLICY_IDENTIFIER, $policyDigest);
-    $material = $extractor->extract($signed);
-    $qr = $encoder->encode(
-        text($xpath, '/inv:Invoice/cac:AccountingSupplierParty/cac:Party/cac:PartyLegalEntity/cbc:RegistrationName'),
-        text($xpath, '/inv:Invoice/cac:AccountingSupplierParty/cac:Party/cac:PartyTaxScheme/cbc:CompanyID'),
-        $issuedAt,
-        text($xpath, '/inv:Invoice/cac:LegalMonetaryTotal/cbc:PayableAmount'),
-        text($xpath, '/inv:Invoice/cac:TaxTotal[1]/cbc:TaxAmount'),
-        $material['invoice_digest'],
-        $material['signature_value'],
-        $certificateMaterial['public_key'],
-        $documentType,
-        $documentType === 'simplified' ? $certificateMaterial['certificate_signature'] : null,
-    );
-
-    $needle = '<cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">'.htmlspecialchars($currentQr, ENT_XML1 | ENT_QUOTES, 'UTF-8').'</cbc:EmbeddedDocumentBinaryObject>';
-    if (substr_count($signed, $needle) !== 1) {
-        fail(basename($file).': QR placeholder not found exactly once');
-    }
-    $final = str_replace($needle, '<cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">'.$qr.'</cbc:EmbeddedDocumentBinaryObject>', $signed);
-    if (! hash_equals($material['signature_value'], $extractor->extract($final)['signature_value'])) {
-        fail(basename($file).': QR replacement changed the signed material');
+    foreach (['signed', 'certificate'] as $sub) {
+        if (! is_dir("{$outDir}/{$sub}") && ! mkdir("{$outDir}/{$sub}", 0700, true)) {
+            fail("cannot create {$outDir}/{$sub}");
+        }
     }
 
-    file_put_contents("{$outDir}/signed/".basename($file), $final);
-    echo 'signed '.basename($file)." ({$documentType})\n";
+    [$caKey, $caCertificate] = syntheticCertificate('AWJ-SYNTHETIC-EPHEMERAL-CA', null, null, true);
+    [$leafKey, $leafCertificate] = syntheticCertificate('AWJ-SYNTHETIC-EPHEMERAL-EGS', $caCertificate, $caKey, false);
+    openssl_x509_export($leafCertificate, $leafPem);
+    openssl_x509_export($caCertificate, $caPem);
+    openssl_pkey_export($leafKey, $leafKeyPem);
+    $chain = [body($leafPem), body($caPem)];
+
+    // The SDK compares IssuerSerial with the certificate its config points at: the synthetic leaf.
+    file_put_contents("{$outDir}/certificate/cert.pem", $chain[0]);
+    file_put_contents("{$outDir}/certificate/ec-secp256k1-priv-key.pem", body($leafKeyPem));
+    chmod("{$outDir}/certificate/ec-secp256k1-priv-key.pem", 0600);
+
+    $hasher = new ZatcaInvoiceHasher(new ZatcaXmlCanonicalizer());
+    $signer = new ZatcaXmlEcdsaSigner();
+    $signedProperties = new ZatcaXadesSignedPropertiesBuilder();
+    $assembler = new ZatcaXadesSignatureAssembler($hasher, $signedProperties, new ZatcaXmlDsigSignedInfoBuilder(), $signer);
+    $extractor = new ZatcaSignedInvoiceQrMaterialExtractor($hasher, $signer, $signedProperties, new ZatcaCertificateFields());
+    $certificateMaterial = (new ZatcaQrCertificateMaterialExtractor())->extract($chain[0]);
+    $encoder = new ZatcaPhaseTwoQrEncoder();
+    $policyDigest = base64_encode(hash('sha256', SYNTHETIC_POLICY_IDENTIFIER, true));
+
+    $files = glob(rtrim($fixturesDir, '/').'/*.xml') ?: [];
+    if ($files === []) {
+        fail("no fixtures in {$fixturesDir}");
+    }
+    foreach ($files as $file) {
+        $xml = (string) file_get_contents($file);
+        $document = new DOMDocument();
+        if (! $document->loadXML($xml, LIBXML_NONET)) {
+            fail(basename($file).': not well-formed');
+        }
+        $xpath = new DOMXPath($document);
+        $xpath->registerNamespace('inv', 'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2');
+        $xpath->registerNamespace('cac', 'urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2');
+        $xpath->registerNamespace('cbc', 'urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2');
+
+        $typeName = (string) $xpath->evaluate('string(/inv:Invoice/cbc:InvoiceTypeCode/@name)');
+        $documentType = str_starts_with($typeName, '02') ? 'simplified' : 'standard';
+        $issuedAt = new DateTimeImmutable(
+            text($xpath, '/inv:Invoice/cbc:IssueDate').' '.text($xpath, '/inv:Invoice/cbc:IssueTime'),
+            new DateTimeZone('Asia/Riyadh'),
+        );
+        $currentQr = text($xpath, "/inv:Invoice/cac:AdditionalDocumentReference[cbc:ID='QR']/cac:Attachment/cbc:EmbeddedDocumentBinaryObject");
+
+        $signed = $assembler->assemble($xml, $chain, $leafKeyPem, new DateTimeImmutable('now', new DateTimeZone('UTC')), SYNTHETIC_POLICY_IDENTIFIER, $policyDigest);
+        $material = $extractor->extract($signed);
+        $qr = $encoder->encode(
+            text($xpath, '/inv:Invoice/cac:AccountingSupplierParty/cac:Party/cac:PartyLegalEntity/cbc:RegistrationName'),
+            text($xpath, '/inv:Invoice/cac:AccountingSupplierParty/cac:Party/cac:PartyTaxScheme/cbc:CompanyID'),
+            $issuedAt,
+            text($xpath, '/inv:Invoice/cac:LegalMonetaryTotal/cbc:PayableAmount'),
+            text($xpath, '/inv:Invoice/cac:TaxTotal[1]/cbc:TaxAmount'),
+            $material['invoice_digest'],
+            $material['signature_value'],
+            $certificateMaterial['public_key'],
+            $documentType,
+            $documentType === 'simplified' ? $certificateMaterial['certificate_signature'] : null,
+        );
+
+        $needle = '<cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">'.htmlspecialchars($currentQr, ENT_XML1 | ENT_QUOTES, 'UTF-8').'</cbc:EmbeddedDocumentBinaryObject>';
+        if (substr_count($signed, $needle) !== 1) {
+            fail(basename($file).': QR placeholder not found exactly once');
+        }
+        $final = str_replace($needle, '<cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">'.$qr.'</cbc:EmbeddedDocumentBinaryObject>', $signed);
+        if (! hash_equals($material['signature_value'], $extractor->extract($final)['signature_value'])) {
+            fail(basename($file).': QR replacement changed the signed material');
+        }
+
+        file_put_contents("{$outDir}/signed/".basename($file), $final);
+        echo 'signed '.basename($file)." ({$documentType})\n";
+    }
+} catch (Throwable $exception) {
+    // Message only: no trace, no arguments (they may carry the ephemeral key).
+    fail(get_class($exception).': '.$exception->getMessage());
 }

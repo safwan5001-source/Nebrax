@@ -109,6 +109,17 @@ class SignedRunTest(unittest.TestCase):
         body = "<xades:SigPolicyHash>\n<ds:DigestMethod/>\n<ds:DigestValue>Abc=</ds:DigestValue>"
         self.assertEqual(c.SIGNED_MUTATION_PATTERN.search(body).group(2), "Abc=")
 
+    def test_stamping_cannot_echo_the_ephemeral_key_into_ci_logs(self):
+        repo = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+        with open(os.path.join(repo, ".github", "workflows", "zatca-sdk-conformance.yml"), encoding="utf-8") as fh:
+            workflow = fh.read()
+        with open(os.path.join(repo, "scripts", "zatca-sdk", "sign_fixtures.php"), encoding="utf-8") as fh:
+            script = fh.read()
+        self.assertIn("-d xdebug.mode=off -d zend.exception_ignore_args=1", workflow)
+        self.assertIn("libxml2-utils", workflow, "the AWJ hasher needs xmllint on the runner")
+        for guard in ("set_error_handler(", "catch (Throwable $exception)", "ini_set('zend.exception_ignore_args', '1')"):
+            self.assertIn(guard, script)
+
     def test_genesis_literal_is_base64_of_the_hex_sha256_of_zero(self):
         self.assertEqual(c.GENESIS_PIH, base64.b64encode(hashlib.sha256(b"0").hexdigest().encode()).decode())
 
