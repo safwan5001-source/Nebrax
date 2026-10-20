@@ -2046,7 +2046,8 @@
       "operate": "Operate",
       "publish": "Publish",
       "reassign": "Reassign",
-      "use": "Use"
+      "use": "Use",
+      "repair": "Repair executed action"
     },
     "weekdays": [
       "Sunday",
@@ -2121,6 +2122,7 @@
     "cancel": "Cancel",
     "close": "Close",
     "perm_areas": {
+      "actions": "Executable actions",
       "alerts": "Alerts",
       "audit": "Audit",
       "avi": "Vehicle ID (AVI)",
@@ -5025,6 +5027,15 @@
     "import_drop_hint": "Drag the file here, or pick one from your device.",
     "import_file_too_large": "The file exceeds {limit} MB. Split it into smaller batches.",
     "import_file_size": "{size} KB",
+    "import_images_archive": "Product image archive (optional)",
+    "import_images_archive_hint": "A safe ZIP: name images with the barcode or SKU and use __2, __3 for additional images. Nothing is stored before confirmation.",
+    "import_images_archive_too_large": "The image archive exceeds 50 MB.",
+    "import_images_preview": "Image preview: {ready} ready, {review} need approval, {errors} have errors.",
+    "import_images_unmatched": "{count} image file(s) did not match any row.",
+    "import_images_missing": "No image matched {count} row(s); images will not be invented or replaced automatically.",
+    "import_images_matches": "Product image matching details",
+    "import_images_apply_confirm": "I approve storing the matched safe images when the import runs.",
+    "import_images_existing_confirm": "I explicitly approve adding the shown images to existing products (without deleting their current images).",
     "import_inspecting": "Reading the file columns…",
     "import_mode_upsert": "Upsert (update existing, create new)",
     "import_mode_upsert_hint": "Matches by ID or SKU; creates the product when no match is found.",

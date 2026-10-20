@@ -2046,7 +2046,8 @@
       "operate": "تشغيل",
       "publish": "نشر",
       "reassign": "إعادة إسناد",
-      "use": "استخدام"
+      "use": "استخدام",
+      "repair": "تصحيح عملية منفّذة"
     },
     "weekdays": [
       "الأحد",
@@ -2121,6 +2122,7 @@
     "cancel": "إلغاء",
     "close": "إغلاق",
     "perm_areas": {
+      "actions": "الإجراءات التنفيذية",
       "alerts": "التنبيهات",
       "audit": "التدقيق",
       "avi": "التعريف الآلي للمركبات (AVI)",
@@ -5025,6 +5027,15 @@
     "import_drop_hint": "اسحب الملف هنا أو اختره من جهازك.",
     "import_file_too_large": "حجم الملف يتجاوز {limit} ميغابايت. قسّمه إلى دفعات أصغر.",
     "import_file_size": "{size} كيلوبايت",
+    "import_images_archive": "أرشيف صور المنتجات (اختياري)",
+    "import_images_archive_hint": "ملف ZIP آمن؛ سمِّ الصورة بالباركود أو SKU، واستخدم ‎__2 و‎__3 للصور الإضافية. لن تُحفظ أي صورة قبل تأكيدك.",
+    "import_images_archive_too_large": "حجم أرشيف الصور يتجاوز 50 ميغابايت.",
+    "import_images_preview": "معاينة الصور: {ready} جاهز، {review} يحتاج موافقة، {errors} به أخطاء.",
+    "import_images_unmatched": "يوجد {count} ملف صورة لم يطابق أي صف.",
+    "import_images_missing": "لم تُطابق صورة في {count} صف/صفوف؛ لن تُخترع أو تُستبدل صور تلقائياً.",
+    "import_images_matches": "تفاصيل مطابقة صور المنتجات",
+    "import_images_apply_confirm": "أوافق على حفظ الصور الآمنة المطابقة عند تنفيذ الاستيراد.",
+    "import_images_existing_confirm": "أوافق صراحةً على إضافة الصور المعروضة إلى المنتجات الموجودة (من دون حذف صورها الحالية).",
     "import_inspecting": "جارٍ قراءة أعمدة الملف…",
     "import_mode_upsert": "دمج (تحديث الموجود وإنشاء الجديد)",
     "import_mode_upsert_hint": "يطابق المنتج بالمعرّف أو الرمز؛ فإن لم يجده أنشأه.",

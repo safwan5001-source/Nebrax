@@ -30,6 +30,7 @@ class ProductImportFields
     public const TYPE_ENUM = 'enum';
     public const TYPE_REFERENCE = 'reference';
     public const TYPE_IDENTIFIER = 'identifier';
+    public const TYPE_MEDIA = 'media';
 
     /**
      * ترتيب الحقول هو ترتيب أعمدة القالب والتصدير — من الهوية إلى التفاصيل.
@@ -158,6 +159,18 @@ class ProductImportFields
                 'label_ar' => 'ملاحظات داخلية', 'label_en' => 'Internal notes',
                 'aliases' => ['internalnotes', 'privatenotes', 'ملاحظاتداخلية', 'ملاحظات'],
             ],
+            'primary_image_url' => [
+                'type' => self::TYPE_MEDIA, 'required' => false, 'clearable' => false,
+                'update_locked' => false, 'writable' => true, 'media_only' => true, 'max' => 2048,
+                'label_ar' => 'رابط الصورة الرئيسية', 'label_en' => 'Primary image URL',
+                'aliases' => ['primaryimageurl', 'mainimageurl', 'imageurl', 'coverurl', 'رابطالصورةالرئيسية', 'رابطالصورة'],
+            ],
+            'additional_image_urls' => [
+                'type' => self::TYPE_MEDIA, 'required' => false, 'clearable' => false,
+                'update_locked' => false, 'writable' => true, 'media_only' => true, 'max' => 6000,
+                'label_ar' => 'روابط الصور الإضافية', 'label_en' => 'Additional image URLs',
+                'aliases' => ['additionalimageurls', 'galleryurls', 'imageurls', 'روابطالصورالاضافية', 'روابطالصور'],
+            ],
             'is_active' => [
                 'type' => self::TYPE_BOOLEAN, 'required' => false, 'clearable' => false,
                 'update_locked' => false, 'writable' => true, 'default' => true,
@@ -177,6 +190,12 @@ class ProductImportFields
     public static function writableKeys(): array
     {
         return array_keys(array_filter(self::all(), static fn (array $field): bool => (bool) $field['writable']));
+    }
+
+    /** حقول صورٍ تخطيطية لا تُمرَّر مطلقاً إلى `Product::fill()`. @return list<string> */
+    public static function mediaKeys(): array
+    {
+        return array_keys(array_filter(self::all(), static fn (array $field): bool => (bool) ($field['media_only'] ?? false)));
     }
 
     /** @return array<string, mixed>|null */

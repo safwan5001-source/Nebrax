@@ -114,6 +114,15 @@ describe('importFormData', () => {
     expect(form.get('mapping[1]')).toBe('ignore');
   });
 
+  it('يرسل أرشيف الصور وموافقة تحديث صور المنتجات الموجودة صراحةً', () => {
+    const file = new File([''], 'products.csv');
+    const archive = new File(['zip'], 'images.zip', { type: 'application/zip' });
+    const form = importFormData(file, { mediaArchive: archive, approveExistingMediaUpdates: true });
+
+    expect((form.get('media_archive') as File).name).toBe('images.zip');
+    expect(form.get('approve_existing_media_updates')).toBe('1');
+  });
+
   it('لا يرسل مفاتيح لم تُطلب', () => {
     const form = importFormData(new File([''], 'p.csv'));
 

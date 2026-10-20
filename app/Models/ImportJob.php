@@ -18,6 +18,8 @@ class ImportJob extends BaseModel implements CompanyWide
         'tenant_id', 'domain', 'status', 'idempotency_key',
         'original_filename', 'extension', 'mime_type', 'byte_size',
         'storage_disk', 'storage_path', 'content_sha256',
+        'media_archive_original_filename', 'media_archive_mime_type',
+        'media_archive_byte_size', 'media_archive_storage_path', 'media_archive_content_sha256',
         'row_count', 'column_count', 'error_message',
         'processed_rows', 'apply_options', 'apply_result',
         'created_by', 'cancelled_by',
@@ -28,6 +30,7 @@ class ImportJob extends BaseModel implements CompanyWide
     {
         return [
             'byte_size' => 'integer',
+            'media_archive_byte_size' => 'integer',
             'row_count' => 'integer',
             'column_count' => 'integer',
             'processed_rows' => 'integer',

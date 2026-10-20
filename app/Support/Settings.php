@@ -44,6 +44,11 @@ class Settings
             // والإجابة عنها. لا يتبع الإقرار الأول ولا موافقة فئة `document_projected_text`؛ يُسحب بسحب أيٍّ منهما أو بتعطيل المساعد.
             'documents_acknowledged' => false,
         ],
+        // AI-ACTIONS-01: tenant opt-in for persisted action drafts. This is
+        // independent from assistant/provider consent and enables no ERP execution.
+        'ai_actions' => [
+            'enabled' => false,
+        ],
         /**
          * هوية الشركة. `logo` صورة (data URL) تُعرَض في **قشرة التطبيق**
          * (الشريط العلوي والجانبي) وفي رؤوس المستندات.

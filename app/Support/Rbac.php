@@ -219,6 +219,9 @@ class Rbac
             // إدارة موافقة المؤسسة على المساعد الذكي (تفعيل/تعطيل + فئات البيانات) — سلطة مستقلة عن
             // استعماله وعن قراءة تدقيقه. owner/admin عبر `*` فقط؛ لا تُمنح للمحاسب ولا غيره تلقائياً.
             'ai.consent.manage',
+            // AI Actions are mutation-adjacent and therefore never inherit
+            // `ai.assistant.use`. Approval and repair remain independently assignable.
+            'ai.actions.use', 'ai.actions.approve', 'ai.actions.repair',
     ];
 
     /**

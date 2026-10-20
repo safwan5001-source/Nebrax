@@ -30,6 +30,7 @@ use App\Services\Accounting\InventoryService;
 use App\Services\DocumentCenter\DocumentStorageService;
 use App\Services\ProductExportService;
 use App\Services\ProductImportService;
+use App\Services\ProductImportMediaService;
 use App\Services\ProductLifecycleService;
 use App\Services\ProductMediaService;
 use App\Services\ProductPricingService;
@@ -51,6 +52,7 @@ class ProductController extends ApiController
         protected DocumentStorageService $documentStorage,
         protected R2StorageService $r2,
         protected ProductImportService $imports,
+        protected ProductImportMediaService $importMedia,
         protected ProductExportService $exports,
         protected ProductLifecycleService $lifecycle,
         protected ProductMediaService $media,
@@ -163,28 +165,58 @@ class ProductController extends ApiController
     /** معاينة غير مغيرة للبيانات؛ لا تكتب شيئاً في الكتالوج. */
     public function importPreview(ImportProductsRequest $request): JsonResponse
     {
+        $options = $request->importOptions();
+        $mediaOptions = $request->mediaOptions();
+
         return response()->json([
-            'data' => $this->domain(fn () => $this->imports->preview(
-                $request->file('file'),
-                $request->importOptions(),
-                SensitiveCostPolicy::authorized($request->user()),
-                $request->maxRows(),
-            )),
+            'data' => $this->domain(function () use ($request, $options, $mediaOptions): array {
+                $preview = $this->imports->preview(
+                    $request->file('file'), $options,
+                    SensitiveCostPolicy::authorized($request->user()), $request->maxRows(),
+                );
+                $preview['media'] = $this->importMedia->preview(
+                    $request->file('file'), $options, $request->file('media_archive'),
+                    $request->maxRows(), $mediaOptions['approve_existing_updates'],
+                );
+
+                return $preview;
+            }),
         ]);
     }
 
     /** يكرر التحقق ثم ينشئ أو يحدّث الكتالوج في معاملة واحدة. */
     public function importApply(ImportProductsRequest $request): JsonResponse
     {
+        $options = $request->importOptions();
+        $mediaOptions = $request->mediaOptions();
+
         return response()->json([
-            'data' => $this->domain(fn () => $this->imports->apply(
-                $request->file('file'),
-                $request->importOptions(),
-                $request->user()?->id,
-                // PR-INV-1: لا تثق بصلاحية جلسة المعاينة — يُعاد فحصها هنا حيّةً،
-                // فرخصةٌ سُحبت بين المعاينة والتطبيق تُرفض عند التطبيق حتماً.
-                SensitiveCostPolicy::authorized($request->user()),
-            )),
+            'data' => $this->domain(function () use ($request, $options, $mediaOptions): array {
+                // Preflight is deliberately before catalog mutation: an unsafe ZIP,
+                // blocked URL or missing explicit approval cannot leave products written.
+                $mediaPreview = $this->importMedia->preview(
+                    $request->file('file'), $options, $request->file('media_archive'),
+                    ProductImportService::MAX_ROWS, $mediaOptions['approve_existing_updates'],
+                );
+                if ($mediaOptions['apply'] && ($mediaPreview['error_rows'] > 0 || $mediaPreview['needs_approval_rows'] > 0)) {
+                    throw new RuntimeException('لا يمكن حفظ صور المنتجات قبل معالجة أخطاء المعاينة والموافقات المطلوبة.');
+                }
+
+                $result = $this->imports->apply(
+                    $request->file('file'), $options, $request->user()?->id,
+                    // PR-INV-1: لا تثق بصلاحية جلسة معاينة قديمة.
+                    SensitiveCostPolicy::authorized($request->user()),
+                );
+                $result['media'] = $mediaOptions['apply']
+                    ? $this->importMedia->apply(
+                        $request->file('file'), $options, $result['results'],
+                        $request->file('media_archive'), (string) $request->user()?->id,
+                        ProductImportService::MAX_ROWS, $mediaOptions['approve_existing_updates'],
+                    )
+                    : $mediaPreview;
+
+                return $result;
+            }),
         ]);
     }
 

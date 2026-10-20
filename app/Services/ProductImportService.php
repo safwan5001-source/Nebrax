@@ -642,6 +642,9 @@ class ProductImportService
             if (! $field['writable']) {
                 continue;
             }
+            if (($field['media_only'] ?? false) === true) {
+                continue;
+            }
             $present = in_array($key, $mapped, true);
             $raw = $cells[$key] ?? '';
             $blank = trim($raw) === '';
@@ -1201,6 +1204,9 @@ class ProductImportService
             if (! $field['writable']) {
                 continue;
             }
+            if (($field['media_only'] ?? false) === true) {
+                continue;
+            }
             $cell = $normalized[$key];
 
             if ($cell['blank']) {
@@ -1242,6 +1248,9 @@ class ProductImportService
 
         foreach (ProductImportFields::all() as $key => $field) {
             if (! $field['writable']) {
+                continue;
+            }
+            if (($field['media_only'] ?? false) === true) {
                 continue;
             }
             $cell = $normalized[$key];
