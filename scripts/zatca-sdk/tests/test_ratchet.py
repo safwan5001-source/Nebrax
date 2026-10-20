@@ -239,8 +239,16 @@ class PolicyTest(unittest.TestCase):
     def test_result_metadata_has_only_awj_detail(self):
         rows, ok = c.evaluate({"a.xml": OK_OFFICIAL, "b.xml": OK_OFFICIAL}, {"f1.xml": SAME}, BASELINE)
         meta = c.result_metadata(rows, [], "proof", ok)
-        self.assertEqual(sorted(meta), ["awj", "isolation_proof", "mutation_problems", "official", "ok"])
+        self.assertEqual(sorted(meta), ["awj", "awj_signed", "crypto", "isolation_proof", "mutation_problems", "official", "ok"])
         self.assertEqual(meta["official"], {"samples": 2, "ok": 2})
+        self.assertNotIn("a.xml", str(meta))
+
+    def test_result_metadata_aggregates_official_crypto_reference_cases(self):
+        rows = [{"kind": "crypto", "name": "official/Simplified/a.xml", "verdict": "REGRESSION", "details": ["x"]},
+                {"kind": "crypto", "name": "official/Simplified/b.xml", "verdict": "OK", "details": []},
+                {"kind": "crypto", "name": "awj-signed/f1.xml", "verdict": "OK", "details": []}]
+        meta = c.result_metadata(rows, [], "proof", False)
+        self.assertEqual(meta["crypto"], {"official_reference": {"checked": 2, "ok": 1}, "awj_signed": {"f1.xml": []}})
         self.assertNotIn("a.xml", str(meta))
 
 

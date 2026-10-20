@@ -16,7 +16,8 @@ class ZatcaXmlDsigSignedInfoBuilderTest extends TestCase
     public function it_builds_the_two_required_zatca_references_without_detached_canonicalization(): void
     {
         $invoiceDigest = base64_encode(hash('sha256', 'invoice', true));
-        $propertiesDigest = base64_encode(hash('sha256', 'properties', true));
+        // REM-17: بصمة SignedProperties بصيغة SDK = Base64 لنص SHA-256 الست عشري.
+        $propertiesDigest = base64_encode(hash('sha256', 'properties'));
         $builder = app(ZatcaXmlDsigSignedInfoBuilder::class);
 
         $xml = $builder->build(
@@ -81,10 +82,12 @@ class ZatcaXmlDsigSignedInfoBuilderTest extends TestCase
             2,
             $xpath->query('//ds:DigestMethod[@Algorithm="'.ZatcaXmlDsigSignedInfoBuilder::SHA256_ALGORITHM.'"]')?->length
         );
+        // C14N يُعلَن لمرجع الفاتورة وحده؛ مرجع SignedProperties بلا Transforms كما في العيّنات الرسمية.
         $this->assertSame(
-            2,
+            1,
             $xpath->query('//ds:Transform[@Algorithm="'.ZatcaXmlCanonicalizer::ALGORITHM.'"]')?->length
         );
+        $this->assertSame(0, $xpath->query('/ds:SignedInfo/ds:Reference[2]/ds:Transforms')?->length);
     }
 
     /** @test */
@@ -92,13 +95,15 @@ class ZatcaXmlDsigSignedInfoBuilderTest extends TestCase
     {
         $builder = app(ZatcaXmlDsigSignedInfoBuilder::class);
         $digest = base64_encode(str_repeat('x', 32));
+        $hexDigest = base64_encode(hash('sha256', 'properties'));
         $invalid = [
-            [base64_encode(str_repeat('x', 31)), $digest, 'invoice', 'properties'],
-            ['not-base64!', $digest, 'invoice', 'properties'],
-            [$digest, base64_encode(str_repeat('x', 33)), 'invoice', 'properties'],
-            [$digest, $digest, '1 invoice', 'properties'],
-            [$digest, $digest, 'invoice', '1 properties'],
-            [$digest, $digest, 'same-id', 'same-id'],
+            [base64_encode(str_repeat('x', 31)), $hexDigest, 'invoice', 'properties'],
+            ['not-base64!', $hexDigest, 'invoice', 'properties'],
+            [$digest, $digest, 'invoice', 'properties'],
+            [$digest, base64_encode(strtoupper(hash('sha256', 'properties'))), 'invoice', 'properties'],
+            [$digest, $hexDigest, '1 invoice', 'properties'],
+            [$digest, $hexDigest, 'invoice', '1 properties'],
+            [$digest, $hexDigest, 'same-id', 'same-id'],
         ];
 
         foreach ($invalid as [$invoiceDigest, $propertiesDigest, $invoiceId, $propertiesId]) {

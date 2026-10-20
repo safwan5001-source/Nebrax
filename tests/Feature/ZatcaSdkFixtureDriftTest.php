@@ -68,20 +68,20 @@ class ZatcaSdkFixtureDriftTest extends TestCase
 
     /** SHA-256 لمخرجات المولِّد لكل fixture. تُحدَّث مع الملفات وbaseline في الـPR نفسه. */
     private const DIGESTS = [
-        'awj-simplified-single-line' => '865ab5141c77c3182c7605d52c83a723a021604152d881af815cdf2b30ac61fd',
-        'awj-simplified-two-lines' => '11def6febe548000024c06f90722143e1eb429938069f22daee068c6b111e86a',
-        'awj-standard-single-line' => '63d88386fbd06c8bcebbb2d337df8956fd07d43b0837288bf39fd56475b0831e',
-        'awj-standard-buyer-crn' => '54e233cb9c2c17abf397fe8bacc5b8294e0dce3769a9e67d7bb539438edcb130',
-        'awj-standard-multi-line' => '17936740d1f3ada65059d3bc266aa4708fb2878693379eac496ccb786ccae0be',
-        'awj-standard-line-discount' => '6a425149d02a5ccba95a10af15b871b659aa06f381e1cf6e3087fde1cb1bf0d0',
-        'awj-standard-document-discount' => '81be7ecb54c3d2fa6b57df3ebdefc65fdd6244abcb65740cfecef7ac5238954f',
-        'awj-standard-shipping' => '4e8a2f48deba02846e012cf02ed6e4bdbc56eed5e05322caadac1a286191f849',
-        'awj-standard-tax-inclusive' => '9a9ad7242cef82783924cbb0fea7a910dc989146cf6033f8d2bdc5350c045f92',
-        'awj-standard-small-lines' => 'd014026edfc9cc9444a5cbd7fb56cf6612fdc830e6b3d30880c7d39bc0593fdb',
-        'awj-standard-fractional-quantity' => '53a14546baa53cb73676992642f66e45e6e9f5817d0946124aaaf33d3e6a69e2',
-        'awj-standard-zero-rate' => '4f9c9be84a5a61e459ba73ecee44bf58b84b0559ad511444abee60713ba20f86',
-        'awj-standard-adjustment' => '7c077d947d68c3ffb350c458b4ca35407da16380f6a2422a1925c2cd4d144b4a',
-        'awj-simplified-document-discount' => 'eee6557648977d83d9dcd3f7a66d621da9144c0b092c45af456b08f7e4cbeef8',
+        'awj-simplified-single-line' => '836a14ada89b53d6e08ea0d4d899c7ee8af958ddf68ea9952c10b73613ce1051',
+        'awj-simplified-two-lines' => '2e41d7ce738e7f73f17b2933ba97b2a92b47e07ebf73699cea249f84c513984a',
+        'awj-standard-single-line' => 'be52c0fe4dd32703e0328fac118cf71cf05bece540dd3c81706a424c665fe5f0',
+        'awj-standard-buyer-crn' => '5fdf756b1081d4aeb1e11e2b157062b279bebdea443877a53785dc3daa9f164a',
+        'awj-standard-multi-line' => 'cff626988fb33513c544ae818fa155f481219f60007791cc87f9fb8dc08e7f73',
+        'awj-standard-line-discount' => '26dd026b823139514bcfca856b354c6c8e138c92d902c9d869ac0a3b0586c420',
+        'awj-standard-document-discount' => 'b154438ada11055297debdf608a0f3d59c78a8fc66ca468f52da8728625c321c',
+        'awj-standard-shipping' => '904bd3016e9b8812035bf558a34afb9c66b52912ae64ecee2bae5c9335e4840c',
+        'awj-standard-tax-inclusive' => 'fac3e0c60b9897ca65e8840ee325f82f8783e2288099c975d87801b825eedda9',
+        'awj-standard-small-lines' => 'e24aea21518562df086e2ae6ffed7d37b00ea1e690c2929b6c4290ba590298e1',
+        'awj-standard-fractional-quantity' => 'da1d20a1184ef3e7493ed53a069c8749b0c9e4fbd30991eff0eec861803fe48d',
+        'awj-standard-zero-rate' => '7462ab6169bd1e65d71f8442e2ded3d3d72481e866202856d8f9e3335bc25830',
+        'awj-standard-adjustment' => 'a164e8a84d40569e56ed53cec02118c12dd1c70ee41667111a65d69d3a05ab3e',
+        'awj-simplified-document-discount' => 'a76967df631fcac55834afb4cad80235bb8a82be348717147f6bc1b9f8f31bcd',
     ];
 
     #[DataProvider('fixtureProvider')]

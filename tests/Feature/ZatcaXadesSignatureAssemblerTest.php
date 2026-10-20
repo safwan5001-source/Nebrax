@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Services\Accounting\ZatcaInvoiceHasher;
 use App\Services\Accounting\ZatcaXadesSignatureAssembler;
 use App\Services\Accounting\ZatcaXmlCanonicalizer;
-use App\Services\Accounting\ZatcaXmlEcdsaSigner;
 use DateTimeImmutable;
 use DOMDocument;
 use DOMElement;
@@ -17,7 +16,7 @@ use Tests\TestCase;
 class ZatcaXadesSignatureAssemblerTest extends TestCase
 {
     /** @test */
-    public function it_assembles_and_verifies_the_complete_xades_signature_after_serialization(): void
+    public function it_inserts_the_official_xades_signature_without_reserializing_the_invoice(): void
     {
         [$privateKey, $leaf] = $this->certificate('Leaf Device');
         [, $root] = $this->certificate('Root CA');
@@ -47,24 +46,48 @@ class ZatcaXadesSignatureAssemblerTest extends TestCase
         $this->assertSame($chain[0], $certificates->item(0)?->textContent);
         $this->assertSame($chain[1], $certificates->item(1)?->textContent);
 
-        $this->assertSame(
-            app(ZatcaInvoiceHasher::class)->hash($signed),
-            $xpath->evaluate("string(//ds:Reference[@Id='invoiceSignedData']/ds:DigestValue)")
+        // البصمة الموقَّعة = هاش المستند غير الموقَّع، والإدراج لم يغيّره (لا إعادة تسلسل ولا مسافات مضافة).
+        $invoiceDigest = $xpath->evaluate("string(//ds:Reference[@Id='invoiceSignedData']/ds:DigestValue)");
+        $this->assertSame(app(ZatcaInvoiceHasher::class)->hash($this->invoiceXml()), $invoiceDigest);
+        $this->assertSame(app(ZatcaInvoiceHasher::class)->hash($signed), $invoiceDigest);
+        $this->assertSame(1, preg_match('#<ext:UBLExtensions\b.*?</ext:UBLExtensions>#s', $signed, $extension));
+        $this->assertSame($this->invoiceXml(), str_replace($extension[0], '', $signed), 'بقية المستند بايتاً ببايت');
+
+        // بصمة SignedProperties تُعاد حسابها هنا من نصّها المضمَّن بالقاعدة الرسمية (xmlns مضافة، المسافات كما هي).
+        $this->assertSame(1, preg_match('#<xades:SignedProperties\s.*?</xades:SignedProperties>#s', $signed, $properties));
+        $this->assertStringNotContainsString('xmlns', $properties[0]);
+        $standalone = preg_replace(
+            '#<ds:(\w+)#',
+            '<ds:$1 xmlns:ds="'.ZatcaXadesSignatureAssembler::XMLDSIG_NAMESPACE.'"',
+            str_replace('<xades:SignedProperties ', '<xades:SignedProperties xmlns:xades="'.ZatcaXadesSignatureAssembler::XADES_NAMESPACE.'" ', $properties[0]),
         );
+        $this->assertSame(
+            base64_encode(hash('sha256', (string) $standalone)),
+            $xpath->evaluate("string(//ds:Reference[@URI='#xadesSignedProperties']/ds:DigestValue)"),
+        );
+        $this->assertSame(0, $xpath->query("//ds:Reference[@URI='#xadesSignedProperties']/ds:Transforms")?->length);
 
-        $properties = $xpath->query("//xades:SignedProperties[@Id='xadesSignedProperties']")?->item(0);
-        $this->assertInstanceOf(DOMElement::class, $properties);
-        $propertiesDigest = base64_encode(hash('sha256', app(ZatcaXmlCanonicalizer::class)->canonicalizeElementInContext($properties), true));
-        $this->assertSame($propertiesDigest, $xpath->evaluate("string(//ds:Reference[@URI='#xadesSignedProperties']/ds:DigestValue)"));
-
+        // تحقق مستقل بـ openssl_verify: SignatureValue (DER) على بايتات هاش الفاتورة الخام بمفتاح leaf.
+        $signatureValue = base64_decode($xpath->evaluate('string(//ds:Signature/ds:SignatureValue)'), true);
+        $this->assertIsString($signatureValue);
+        $this->assertSame("\x30", $signatureValue[0]);
+        $this->assertSame(1, openssl_verify((string) base64_decode($invoiceDigest, true), $signatureValue, $this->publicKeyFromDer($leaf), OPENSSL_ALGO_SHA256));
         $signedInfo = $xpath->query('//ds:Signature/ds:SignedInfo')?->item(0);
         $this->assertInstanceOf(DOMElement::class, $signedInfo);
-        $signatureValue = $xpath->evaluate('string(//ds:Signature/ds:SignatureValue)');
-        $this->assertTrue(app(ZatcaXmlEcdsaSigner::class)->verify(
+        $this->assertSame(0, openssl_verify(
             app(ZatcaXmlCanonicalizer::class)->canonicalizeElementInContext($signedInfo),
             $signatureValue,
             $this->publicKeyFromDer($leaf),
-        ));
+            OPENSSL_ALGO_SHA256,
+        ), 'ليس توقيع XMLDSig عاماً على SignedInfo');
+
+        // سلسلة الشهادات كاملة في SigningCertificate (v1) بالترتيب نفسه، مع IssuerSerial لكل شهادة.
+        $digests = $xpath->query('//xades:SigningCertificate/xades:Cert/xades:CertDigest/ds:DigestValue');
+        $this->assertSame(2, $digests?->length);
+        $this->assertSame(base64_encode(hash('sha256', $chain[0])), $digests->item(0)?->textContent);
+        $this->assertSame(base64_encode(hash('sha256', $chain[1])), $digests->item(1)?->textContent);
+        $this->assertSame(2, $xpath->query('//xades:SigningCertificate/xades:Cert/xades:IssuerSerial/ds:X509SerialNumber')?->length);
+        $this->assertSame(1, $xpath->query('//xades:SignaturePolicyIdentifier')?->length, 'حارس السياسة باقٍ');
     }
 
     /** @test */
@@ -82,11 +105,32 @@ class ZatcaXadesSignatureAssemblerTest extends TestCase
         $document = $this->document($signed);
         $xpath = $this->xpath($document);
         $this->assertSame(2, $xpath->query('/inv:Invoice/ext:UBLExtensions/ext:UBLExtension')?->length);
+        $this->assertSame(ZatcaXadesSignatureAssembler::EXTENSION_URI, $xpath->evaluate('string(/inv:Invoice/ext:UBLExtensions/ext:UBLExtension[2]/ext:ExtensionURI)'));
+        $this->assertSame(app(ZatcaInvoiceHasher::class)->hash($invoice), app(ZatcaInvoiceHasher::class)->hash($signed));
         $this->assertSame('keep', $xpath->evaluate("string(//ext:UBLExtension[ext:ExtensionURI='urn:example:other']//cbc:Note)"));
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('مسبقاً');
         $assembler->assemble($signed, ...$arguments);
+    }
+
+    /** @test */
+    public function a_wrapper_whose_only_closing_tag_text_is_inside_a_comment_is_refused(): void
+    {
+        [$privateKey, $leaf] = $this->certificate('Leaf Device');
+        $invoice = str_replace(
+            '<cbc:ID>INV-1</cbc:ID>',
+            '<ext:UBLExtensions/><!-- </ext:UBLExtensions> --><cbc:ID>INV-1</cbc:ID>',
+            $this->invoiceXml()
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('موضعه الرسمي');
+
+        app(ZatcaXadesSignatureAssembler::class)->assemble(
+            $invoice, [base64_encode($leaf)], $privateKey, new DateTimeImmutable(),
+            'https://zatca.gov.sa/policy', base64_encode(hash('sha256', 'policy', true)),
+        );
     }
 
     /** @test */

@@ -92,12 +92,22 @@ jobs:
           done
           exit 0
 
-      - name: Validate fixtures offline (official samples, AWJ baseline, mutation liveness)
+      # REM-17: AWJ's production signing classes stamp the committed fixtures with a credential generated in
+      # memory for this run only (synthetic CA + leaf + key in $RUNNER_TEMP; never committed, printed or reused,
+      # never a ZATCA credential). Uses the runner's preinstalled PHP CLI (openssl + dom); no Laravel, no network.
+      - name: Stamp AWJ fixtures with an ephemeral synthetic credential (no secrets)
+        run: |
+          php --version | head -1
+          php scripts/zatca-sdk/sign_fixtures.php tests/Fixtures/zatca-sdk/awj "$RUNNER_TEMP/awj_stamped"
+
+      - name: Validate fixtures offline (official samples, AWJ baseline, stamped fixtures, independent crypto, mutation liveness)
         run: |
           python3 -I scripts/zatca-sdk/conformance.py run \
             --sdk-root "$RUNNER_TEMP/zatca-sdk" \
             --pin scripts/zatca-sdk/sdk-pin.json \
             --fixtures tests/Fixtures/zatca-sdk \
+            --stamped-fixtures "$RUNNER_TEMP/awj_stamped/signed" \
+            --stamp-cert-dir "$RUNNER_TEMP/awj_stamped/certificate" \
             --java "$JAVA_HOME/bin/java" \
             --summary "$GITHUB_STEP_SUMMARY" \
             --result-json "$RUNNER_TEMP/zatca-sdk-result.json"

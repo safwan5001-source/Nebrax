@@ -7,6 +7,10 @@ use DOMElement;
 use InvalidArgumentException;
 use RuntimeException;
 
+/**
+ * يبني SignedInfo لتوقيع ZATCA. في مخطط ZATCA لا يُوقَّع SignedInfo نفسه (التوقيع على هاش الفاتورة — REM-17)،
+ * لكنه يحمل البصمتين اللتين يتحقق منهما المتحقّق: بصمة الفاتورة (C14N 1.1 بعد التحويلات) وبصمة SignedProperties.
+ */
 final class ZatcaXmlDsigSignedInfoBuilder
 {
     public const XMLDSIG_NAMESPACE = 'http://www.w3.org/2000/09/xmldsig#';
@@ -27,7 +31,7 @@ final class ZatcaXmlDsigSignedInfoBuilder
         string $signedPropertiesId = 'xadesSignedProperties',
     ): string {
         $this->assertSha256Digest($invoiceDigest, 'بصمة الفاتورة');
-        $this->assertSha256Digest($signedPropertiesDigest, 'بصمة SignedProperties');
+        $this->assertHexSha256Digest($signedPropertiesDigest, 'بصمة SignedProperties');
         $this->assertXmlId($invoiceReferenceId, 'معرّف مرجع الفاتورة');
         $this->assertXmlId($signedPropertiesId, 'معرّف SignedProperties');
         if (hash_equals($invoiceReferenceId, $signedPropertiesId)) {
@@ -76,9 +80,8 @@ final class ZatcaXmlDsigSignedInfoBuilder
         $propertiesReference = $this->ds($document, 'Reference');
         $propertiesReference->setAttribute('Type', self::SIGNED_PROPERTIES_TYPE);
         $propertiesReference->setAttribute('URI', '#'.$signedPropertiesId);
-        $propertiesTransforms = $this->ds($document, 'Transforms');
-        $propertiesTransforms->appendChild($this->canonicalizationTransform($document));
-        $propertiesReference->appendChild($propertiesTransforms);
+        // بلا Transforms كما في عيّنات ZATCA الرسمية: بصمة SignedProperties ليست C14N بل Base64(hex(SHA-256))
+        // لنصّها المضمَّن (ZatcaXadesSignedPropertiesBuilder::digest)، فإعلان تحويل C14N هنا يكون إعلاناً غير صحيح.
         $propertiesReference->appendChild($this->digestMethod($document));
         $propertiesReference->appendChild(
             $this->ds($document, 'DigestValue', $signedPropertiesDigest)
@@ -98,6 +101,15 @@ final class ZatcaXmlDsigSignedInfoBuilder
         $decoded = base64_decode($value, true);
         if ($decoded === false || strlen($decoded) !== 32) {
             throw new InvalidArgumentException("{$label} يجب أن تكون SHA-256 بترميز Base64.");
+        }
+    }
+
+    /** بصمة بصيغة ZATCA: Base64 لنص SHA-256 الست عشري (64 محرفاً صغيراً). */
+    private function assertHexSha256Digest(string $value, string $label): void
+    {
+        $decoded = base64_decode($value, true);
+        if ($decoded === false || base64_encode($decoded) !== $value || preg_match('/^[0-9a-f]{64}$/D', $decoded) !== 1) {
+            throw new InvalidArgumentException("{$label} يجب أن تكون Base64 لنص SHA-256 الست عشري.");
         }
     }
 

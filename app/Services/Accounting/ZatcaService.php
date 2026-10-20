@@ -196,18 +196,35 @@ class ZatcaService
     }
 
     /**
-     * الهاش الابتدائي لسلسلة PIH = Base64 لـ SHA-256 للنص "0".
+     * PIH الابتدائي في XML قبل REM-17: Base64 لبايتات SHA-256("0") الخام. **لا يُصدَر أبداً** بعد REM-17؛
+     * يبقى للتعرّف على سلاسل تجريبية بدأت به (أول فاتورة فيها تحمله ولا يُعاد توليدها — REM-25).
+     */
+    public const LEGACY_GENESIS_HASH = 'X+zrZv/IbzjZUnhsbWlsecLbwjndTpG0ZynXOif7V+k=';
+
+    /**
+     * الهاش الابتدائي لسلسلة PIH (أول فاتورة في سلسلة جديدة فقط) — REM-17.
+     *
+     * معيار تنفيذ XML (BR-KSA-26) ينصّ حرفياً: «لأول فاتورة، الهاش السابق هو
+     * NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI0NjcyOWQ3M2EyN2ZiNTdlOQ==» = Base64 لنصّ
+     * SHA-256("0") **الست عشري** (لا لبايتاته الخام)، وهي القيمة نفسها في عيّنات SDK الرسمية وملف pih.txt.
+     * السلاسل القائمة لا تتأثر: الفاتورة التالية تشير دائماً إلى هاش XML السابق المحفوظ.
      */
     public function genesisHash(): string
     {
-        return base64_encode(hash('sha256', '0', true));
+        return base64_encode(hash('sha256', '0'));
     }
 
     /**
      * بناء حقل TLV واحد: [وسم 1 بايت][طول البايتات 1 بايت][القيمة].
+     * الطول بايت واحد (معيار ميزات الأمان §4.1): قيمة أطول من 255 بايت تُرفض ولا تُقتطع أبداً (اسم البائع بيانات
+     * هوية قانونية) — REM-17.
      */
     public function tlv(int $tag, string $value): string
     {
+        if (strlen($value) > 255) {
+            throw new RuntimeException("قيمة وسم QR رقم {$tag} تتجاوز 255 بايت؛ لا تُقتطع بيانات QR.");
+        }
+
         return chr($tag) . chr(strlen($value)) . $value;
     }
 

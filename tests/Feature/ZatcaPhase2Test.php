@@ -118,7 +118,8 @@ class ZatcaPhase2Test extends TestCase
     {
         $first = $this->postInvoice();
 
-        $genesis = base64_encode(hash('sha256', '0', true));
+        // REM-17 — BR-KSA-26 (معيار تنفيذ XML) حرفياً: Base64 لنصّ SHA-256("0") الست عشري.
+        $genesis = 'NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI0NjcyOWQ3M2EyN2ZiNTdlOQ==';
         $this->assertSame($genesis, $first->zatca_previous_hash);
     }
 
@@ -170,11 +171,13 @@ class ZatcaPhase2Test extends TestCase
     }
 
     /** @test */
-    public function genesis_hash_helper_is_sha256_of_zero(): void
+    public function genesis_hash_helper_is_base64_of_the_hex_sha256_of_zero(): void
     {
         $this->assertSame(
-            base64_encode(hash('sha256', '0', true)),
+            base64_encode(hash('sha256', '0')),
             app(ZatcaService::class)->genesisHash()
         );
+        // صيغة ما قبل REM-17 (Base64 للبايتات الخام) لا تُصدَر بعد الآن.
+        $this->assertNotSame(ZatcaService::LEGACY_GENESIS_HASH, app(ZatcaService::class)->genesisHash());
     }
 }

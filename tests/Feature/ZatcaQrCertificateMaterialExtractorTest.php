@@ -9,7 +9,7 @@ use Tests\TestCase;
 class ZatcaQrCertificateMaterialExtractorTest extends TestCase
 {
     /** @test */
-    public function it_extracts_the_uncompressed_ec_key_and_verifiable_ca_signature(): void
+    public function it_extracts_the_der_subject_public_key_info_and_verifiable_ca_signature(): void
     {
         [$caKey, $caCertificate] = $this->certificateAuthority();
         [$leafCertificate, $leafDer] = $this->leafCertificate($caKey, $caCertificate);
@@ -18,12 +18,12 @@ class ZatcaQrCertificateMaterialExtractorTest extends TestCase
         $leafKey = openssl_pkey_get_public($leafCertificate);
         $details = $leafKey === false ? false : openssl_pkey_get_details($leafKey);
         $this->assertIsArray($details);
-        // openssl_pkey_get_details يُسقط الأصفار البادئة من الإحداثيات (≈1/128 من المفاتيح العشوائية): نُتمّها إلى 32 بايتاً
-        // كما في تمثيل SEC1 غير المضغوط، وإلا يفشل الاختبار عشوائياً.
-        $x = str_pad($details['ec']['x'], 32, "\0", STR_PAD_LEFT);
-        $y = str_pad($details['ec']['y'], 32, "\0", STR_PAD_LEFT);
-        $this->assertSame("\x04".$x.$y, $material['public_key']);
-        $this->assertSame(65, strlen($material['public_key']));
+        // REM-17: الوسم 8 = SubjectPublicKeyInfo بترميز DER (الدليل الفني §6.2: 30 56 30 10 06 07 2A…، 88 بايت)،
+        // مطابق لما يصدّره OpenSSL للمفتاح العام نفسه — لا نقطة SEC1 الخام (65 بايت) كما قبل REM-17.
+        $spki = base64_decode((string) preg_replace('/-----[^-]+-----|\s+/', '', (string) $details['key']), true);
+        $this->assertSame($spki, $material['public_key']);
+        $this->assertSame(88, strlen($material['public_key']));
+        $this->assertStringStartsWith("\x30\x56\x30\x10\x06\x07\x2A\x86\x48\xCE\x3D\x02\x01\x06\x05\x2B\x81\x04\x00\x0A\x03\x42\x00\x04", $material['public_key']);
 
         $caPublicKey = openssl_pkey_get_public($caCertificate);
         $this->assertNotFalse($caPublicKey);
