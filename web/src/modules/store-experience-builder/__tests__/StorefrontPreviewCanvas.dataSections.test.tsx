@@ -64,6 +64,16 @@ describe("Canvas — data-backed sections (ADR-21)", () => {
     expect(el.querySelector("[aria-hidden=\"true\"]")).not.toBeNull();
   });
 
+  it("attaches the discovery landmark to its rendered heading", () => {
+    const { container } = renderCanvas(
+      withSections([{ id: "d-1", type: "discovery", visible: true, content: { title: "", axis: "brand", display: "tiles" } }]),
+    );
+    const discovery = section(container, "d-1");
+    const region = discovery.closest("section");
+    expect(region?.getAttribute("aria-labelledby")).toBe("preview-discovery-d-1");
+    expect(region?.querySelector("h2#preview-discovery-d-1")).not.toBeNull();
+  });
+
   it("flags a productShelf or discovery section with no stored content as incomplete", () => {
     const { container } = renderCanvas(
       withSections([

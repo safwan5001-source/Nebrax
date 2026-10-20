@@ -53,6 +53,7 @@ import {
 import type { CustomizerLocale, CustomizerMessageKey } from "./messages";
 import { resolveDiscoveryDisplay } from "./presentation/discovery-templates";
 import {
+  facetLabelHidden,
   type ResolvedFacetVisual,
   resolveFacetValueVisual,
 } from "./presentation/facet-visual";
@@ -231,7 +232,7 @@ function PreviewItem({
         ? cn(BESIDE, labelFirst && "flex-row-reverse")
         : cn("w-full min-w-0", labelFirst && "flex-col-reverse");
   // A count belongs to a visible caption (VD-4b).
-  const countVisible = display.showCounts && visual.showLabel;
+  const countVisible = display.showCounts && !facetLabelHidden(visual, picture);
 
   return (
     <li data-preview-item="" className={cn("min-w-0", layout === "carousel" && "snap-start")}>
