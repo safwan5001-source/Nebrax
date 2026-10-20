@@ -46,7 +46,15 @@ State machine: `approved → executing → executed | partially_failed | failed`
 
 ## 4. Tests and results
 
-RESULTS_PLACEHOLDER
+| Suite | Result |
+|---|---|
+| `AiActionProductExecutionTest` (15): dark by default / approval writes nothing; create + update + skip with no stock/ledger/media effect, no invented SKU, explicit zeros kept; replay and repeated requests never duplicate; another user / tenant / action cannot use an approval; expired, edited, revoked approvals refused; catalogue change after approval blocks the whole run before any write; RBAC + `view_cost` re-check at execution; branch scope; failed row isolated and only retryable rows retried (successes not repeated); rows stale between batches fail without overwrite; held lease ⇒ `execution_in_progress`, dead lease recovered; DB refuses a 2nd execution / re-run of a finished row; tenant-scoped results; traditional creation still generates SKUs; deleting an imported product is not blocked | **SQLite 15/15 · PostgreSQL 15/15** |
+| Existing AI Actions suites (foundation, intake, review, preview/approval incl. cost protection) — updated only for "images deferred" | **pass on SQLite and PostgreSQL** (all `AiAction*` + `ProductReference*`: 83/83 on both) |
+| Related product suites (traditional import `ProductImport*`, product API/lifecycle/barcode/unit/media, branch classification + isolation, RBAC) | **324 passed on SQLite, 327 on PostgreSQL** (one PostgreSQL-only test-harness failure was fixed: a savepoint around the intentional unique-violation) |
+| Full PHP suite, SQLite (local, 8,000 tests) | 7,828 passed; 27 failed: 26 `Fuel*` tests (`bcmul()` undefined — `bcmath` is not installed in this environment; CI installs it) and **1 real finding**: `ProductReferenceClassificationGuardTest` required classifying the new `product_id`-bearing model — **fixed** (`AiActionExecutionRow` ⇒ `AUDIT_HISTORY` in `ProductReferenceRegistry`; guard + product-lifecycle + AI suites re-run green on both DBs). The whole local suite was not re-run after that one-line fix; CI is the whole-suite check. |
+| Web (`vitest`) | AI Actions + products suites: **61 passed** (new: 9 execution-panel tests — no auto-run, confirmation, single call on double-click, batch loop + progress, partial failure + retry-only-failed, non-retryable explanation, server error without false success, English; preview panel opens the execution box without running it); `tsc --noEmit`: no errors in changed files |
+
+Accounting entries produced by this change: **none** — execution writes catalogue rows only (no journal entry, stock movement, invoice or opening quantity); this is asserted in every execution test (`StockMovement`, `JournalEntry`, `Invoice`, `quantity_on_hand` all unchanged).
 
 ## 5. Risks and what remains
 

@@ -424,4 +424,20 @@ class AiActionProductExecutionTest extends TestCase
         $product = app(ProductService::class)->create(['name' => 'بلا رمز', 'type' => 'good', 'sale_price' => 100, 'tenant_id' => $auth['tenant_id']], null, false);
         $this->assertNull($product->sku);
     }
+
+    /** @test */
+    public function the_result_log_does_not_block_deleting_an_imported_product(): void
+    {
+        $auth = $this->registerTenant();
+        [$id] = $this->approved($auth, [$this->good('a', 2, 'DEL-1')]);
+        $this->execute($auth['token'], $id)->assertCreated();
+        $productId = Product::withoutGlobalScopes()->where('sku', 'DEL-1')->value('id');
+
+        $this->withToken($auth['token'])->deleteJson("/api/products/{$productId}")->assertSuccessful();
+        $row = AiActionExecutionRow::withoutGlobalScopes()->firstOrFail();
+        $this->assertSame('success', $row->status);
+        // The product is soft-deleted; the log keeps its reference and its recorded result.
+        $this->assertSame($productId, $row->product_id);
+        $this->assertNotNull(Product::withoutGlobalScopes()->withTrashed()->find($productId)->deleted_at);
+    }
 }

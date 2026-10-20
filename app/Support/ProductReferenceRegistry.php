@@ -23,6 +23,7 @@ use App\Models\InventoryStockAlert;
 use App\Models\InvoiceLine;
 use App\Models\PriceListItem;
 use App\Models\ProcurementLine;
+use App\Models\AiActionExecutionRow;
 use App\Models\ProductActivity;
 use App\Models\ProductBarcode;
 use App\Models\ProductMedia;
@@ -217,6 +218,9 @@ final class ProductReferenceRegistry
 
         // ── ٧) تدقيق ───────────────────────────────────────────────────
         ProductActivity::class => ['key' => 'activity', 'classes' => [self::AUDIT_HISTORY]],
+        // AI-ACTIONS-05: the per-row result log of an AI import execution. A log, not a business
+        // document: it never blocks deleting the product (the FK nulls `product_id`), and survives it.
+        AiActionExecutionRow::class => ['key' => 'ai_action_execution_rows', 'classes' => [self::AUDIT_HISTORY]],
 
         // ── مراجع نطاق الوقود ──────────────────────────────────────────
         // مكتشفة أثناء التنفيذ، ليست في تعداد العقد. تصنيفها هنا **لازم**
