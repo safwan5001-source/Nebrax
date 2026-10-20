@@ -6,6 +6,7 @@ import {
   displayLocale,
   formatDate,
   formatDateTime,
+  formatDeliveryWindow,
   formatLongDate,
   formatShortDate,
   formatTime,
@@ -66,6 +67,10 @@ describe('central Gregorian + Latin date formatter', () => {
     expect(formatTime(FIXED_MORNING, 'ar')).toContain('صباحًا');
     expect(formatTime(FIXED_EVENING, 'ar')).toContain('مساءً');
     expect(formatTime(FIXED_EVENING, 'ar')).not.toMatch(/\bAM\b|\bPM\b/);
+  });
+
+  it('keeps delivery slot wall-clock times in UTC', () => {
+    expect(formatDeliveryWindow('19:00', '22:00', 'en')).toMatch(/7:00.*10:00/);
   });
 
   it('formats English dates as Gregorian with Latin digits and AM/PM', () => {

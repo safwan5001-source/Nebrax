@@ -56,6 +56,10 @@ function failure(error: unknown): Extract<WorkspaceSectionDataOutcome, { ok: fal
   return { ok: false, reason, message: error instanceof Error && error.message ? error.message : 'section_data_failed' };
 }
 
+function invalidSectionData(): Extract<WorkspaceSectionDataOutcome, { ok: false }> {
+  return { ok: false, reason: 'failed', message: 'section_data_invalid' };
+}
+
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
 }
@@ -63,23 +67,25 @@ function record(value: unknown): Record<string, unknown> | null {
 function discoveryPayload(value: unknown): WorkspaceDiscoveryData | null {
   const row = record(value);
   if (!row || (row.axis !== 'brand' && row.axis !== 'facet') || typeof row.name !== 'string' || !Array.isArray(row.options)) return null;
+  const options = row.options.map((item) => {
+    const option = record(item);
+    if (!option || typeof option.value !== 'string' || typeof option.name !== 'string' || typeof option.count !== 'number') return null;
+    return {
+      value: option.value,
+      name: option.name,
+      nameEn: typeof option.name_en === 'string' ? option.name_en : null,
+      count: option.count,
+      visual: record(option.visual),
+    };
+  });
+  if (options.some((option) => option === null)) return null;
   return {
     axis: row.axis,
     dimension: typeof row.dimension === 'string' ? row.dimension : undefined,
     name: row.name,
     nameEn: typeof row.name_en === 'string' ? row.name_en : null,
     visual: record(row.visual),
-    options: row.options.flatMap((item) => {
-      const option = record(item);
-      if (!option || typeof option.value !== 'string' || typeof option.name !== 'string') return [];
-      return [{
-        value: option.value,
-        name: option.name,
-        nameEn: typeof option.name_en === 'string' ? option.name_en : null,
-        count: typeof option.count === 'number' ? option.count : 0,
-        visual: record(option.visual),
-      }];
-    }),
+    options: options.filter((option): option is NonNullable<typeof option> => option !== null),
   };
 }
 
@@ -99,17 +105,20 @@ export async function fetchWorkspaceSectionData(
     const section = params.section;
     const data = body ? body.data : undefined;
     if (section === 'product_shelf') {
-      const rows = Array.isArray(data) ? data.flatMap((item) => {
-        const mapped = mapWorkspaceProductSummary(item);
-        return mapped ? [mapped] : [];
-      }) : [];
-      return { ok: true, section: 'product_shelf', products: rows };
+      if (!Array.isArray(data)) return invalidSectionData();
+      const rows = data.map((item) => mapWorkspaceProductSummary(item));
+      if (rows.some((row) => row === null)) return invalidSectionData();
+      return { ok: true, section: 'product_shelf', products: rows.filter((row): row is WorkspaceProductSummary => row !== null) };
     }
     if (section === 'discovery') {
-      return { ok: true, section: 'discovery', discovery: discoveryPayload(data) };
+      if (data === null) return { ok: true, section: 'discovery', discovery: null };
+      const discovery = discoveryPayload(data);
+      return discovery ? { ok: true, section: 'discovery', discovery } : invalidSectionData();
     }
     const row = record(data);
+    if (!row || !Object.prototype.hasOwnProperty.call(row, 'earliest')) return invalidSectionData();
     const earliest = record(row?.earliest);
+    if (row.earliest !== null && (!earliest || typeof earliest.date !== 'string' || typeof earliest.start_time !== 'string' || typeof earliest.end_time !== 'string' || typeof earliest.label !== 'string' || typeof earliest.timezone !== 'string')) return invalidSectionData();
     return {
       ok: true,
       section: 'delivery_promise',

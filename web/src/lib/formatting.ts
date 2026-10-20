@@ -207,7 +207,13 @@ export function formatDeliveryDay(input: {
 export function formatDeliveryWindow(start: string, end: string, locale: string): string | null {
   const valid = (value: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
   if (!valid(start) || !valid(end)) return null;
-  return `${formatTime(`1970-01-01T${start}:00Z`, locale)} – ${formatTime(`1970-01-01T${end}:00Z`, locale)}`;
+  const format = (value: string) => assertSafeDateOutput(new Intl.DateTimeFormat(displayLocale(locale), {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'UTC',
+    hour12: true,
+  }).format(new Date(`1970-01-01T${value}:00Z`)));
+  return `${format(start)} – ${format(end)}`;
 }
 
 export type FormatDateTimeOptions = {

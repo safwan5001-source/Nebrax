@@ -182,7 +182,7 @@ describe("Canvas — data-backed sections (ADR-21)", () => {
       <StorefrontPreviewCanvas
         config={withSections([{ id: "d-1", type: "discovery", visible: true, content: { title: "", axis: "brand", display: "tiles", layout: "carousel", rows: 2, gap: "loose", textPosition: "overlay", contentSequence: "label-first", cardStyle: "elevated", align: "start" } }])}
         locale="en"
-        viewport="desktop"
+        viewport="mobile"
         homeSectionDiscovery={{ "d-1": { axis: "brand", name: "", nameEn: null, visual: { defaults: { content: "icon" } }, options: [{ value: "b1", name: "Brand", nameEn: "Brand", count: 3, visual: { icon: "tag" } }] } }}
         homeSectionDiscoveryState={{ "d-1": "ready" }}
         onSelectSection={() => {}}
@@ -196,5 +196,33 @@ describe("Canvas — data-backed sections (ADR-21)", () => {
     expect(list?.getAttribute("data-discovery-card-style")).toBe("elevated");
     expect(list?.getAttribute("data-discovery-align")).toBe("start");
     expect((list as HTMLElement | null)?.style.getPropertyValue("--disc-rows")).toBe("2");
+  });
+
+  it("keeps text-list columns and the published desktop carousel row rule", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={withSections([{ id: "d-1", type: "discovery", visible: true, content: { title: "", axis: "brand", display: "tiles", layout: "text-list", columns: { desktop: 7 } } }])}
+        locale="en"
+        viewport="desktop"
+        homeSectionDiscovery={{ "d-1": { axis: "brand", name: "", nameEn: null, visual: null, options: [{ value: "b1", name: "Brand", nameEn: null, count: 1, visual: null }] } }}
+        homeSectionDiscoveryState={{ "d-1": "ready" }}
+        onSelectSection={() => {}}
+      />,
+    );
+    expect(container.querySelector('[data-discovery-layout="text-list"]')?.className).toContain("grid-cols-7");
+  });
+
+  it("uses the four-column Market grid default when grid is explicit", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={{ ...withSections([{ id: "shelf-1", type: "productShelf", visible: true, content: { title: "", deliverToday: false, limit: 2 }, design: { layout: "grid" } }]), themePreset: "awj-market" }}
+        locale="en"
+        viewport="desktop"
+        homeSectionProducts={{ "shelf-1": [{ id: "p1", name: "Rose", thumbnailUrl: null, priceAmountMinor: 2500, currency: "SAR", inStock: true }] }}
+        homeSectionProductsState={{ "shelf-1": "ready" }}
+        onSelectSection={() => {}}
+      />,
+    );
+    expect(container.querySelector('[data-shelf-layout="grid"]')?.className).toContain("grid-cols-4");
   });
 });

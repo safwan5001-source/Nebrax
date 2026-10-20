@@ -31,4 +31,13 @@ describe('workspace section-data client — FLOWERS-H9c', () => {
     apiMock.mockRejectedValue(new ApiError(403, 'forbidden', {}));
     await expect(fetchWorkspaceSectionData('store-1', { section: 'delivery_promise' })).resolves.toEqual({ ok: false, reason: 'forbidden', message: 'forbidden' });
   });
+
+  it('fails closed on malformed section payloads instead of showing a false empty state', async () => {
+    apiMock.mockResolvedValueOnce({ data: [{ id: 'p1' }] });
+    await expect(fetchWorkspaceSectionData('store-1', { section: 'product_shelf' })).resolves.toMatchObject({ ok: false, reason: 'failed' });
+    apiMock.mockResolvedValueOnce({ data: { axis: 'brand', name: '', options: [{ value: 'b1', name: 'Brand', count: 'bad' }] } });
+    await expect(fetchWorkspaceSectionData('store-1', { section: 'discovery' })).resolves.toMatchObject({ ok: false, reason: 'failed' });
+    apiMock.mockResolvedValueOnce({ data: { earliest: { date: '2099-01-01' } } });
+    await expect(fetchWorkspaceSectionData('store-1', { section: 'delivery_promise' })).resolves.toMatchObject({ ok: false, reason: 'failed' });
+  });
 });
