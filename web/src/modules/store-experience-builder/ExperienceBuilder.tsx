@@ -175,6 +175,18 @@ type MobileSheet =
   | "category-picker"
   | null;
 
+export function homeSectionDataKey(section: PresentationHomeSection): string {
+  if (section.type === "productShelf") {
+    const content = productShelfContentOf(section);
+    return `productShelf:${JSON.stringify({ source: content.source ?? null, deliverToday: content.deliverToday, limit: content.limit })}`;
+  }
+  if (section.type === "discovery") {
+    const content = discoveryContentOf(section);
+    return `discovery:${JSON.stringify({ axis: content.axis, dimension: content.dimension ?? null })}`;
+  }
+  return "deliveryPromise";
+}
+
 interface ExperienceBuilderProps {
   initialConfig?: StorefrontPresentationConfig;
   liveStoreName?: string | null;
@@ -1563,7 +1575,7 @@ export function ExperienceBuilder({
         : section.type === "discovery"
           ? homeSectionDiscoveryState[section.id]
           : homeSectionDeliveryState[section.id];
-      const dataKey = `${section.type}:${JSON.stringify(section.content ?? null)}`;
+      const dataKey = homeSectionDataKey(section);
       if (homeSectionDataKeyRef.current[section.id] !== dataKey || state === undefined || state === "idle") {
         homeSectionDataKeyRef.current[section.id] = dataKey;
         void loadHomeDataSection(section);
