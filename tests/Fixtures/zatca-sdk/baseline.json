@@ -172,15 +172,25 @@
       }
     }
   },
+  "awj_forbidden_warning_codes": [
+    "BR-08",
+    "BR-KSA-08",
+    "BR-KSA-09",
+    "BR-KSA-10",
+    "BR-KSA-37",
+    "BR-KSA-63",
+    "BR-KSA-66",
+    "BR-KSA-67",
+    "BR-KSA-81",
+    "BR-KSA-F-06-*"
+  ],
   "awj": {
     "awj-simplified-single-line.xml": {
       "global": "FAILED",
       "stages": {
         "XSD": {
-          "status": "FAILED",
-          "errors": [
-            "SAXParseException"
-          ]
+          "status": "PASSED",
+          "errors": []
         },
         "EN": {
           "status": "FAILED",
@@ -194,7 +204,6 @@
           "status": "FAILED",
           "errors": [
             "BR-KSA-28",
-            "BR-KSA-39",
             "BR-KSA-68"
           ]
         },
@@ -223,10 +232,8 @@
       "global": "FAILED",
       "stages": {
         "XSD": {
-          "status": "FAILED",
-          "errors": [
-            "SAXParseException"
-          ]
+          "status": "PASSED",
+          "errors": []
         },
         "EN": {
           "status": "FAILED",
@@ -240,7 +247,6 @@
           "status": "FAILED",
           "errors": [
             "BR-KSA-28",
-            "BR-KSA-39",
             "BR-KSA-68"
           ]
         },
@@ -265,14 +271,12 @@
         }
       }
     },
-    "awj-standard-single-line.xml": {
+    "awj-standard-buyer-crn.xml": {
       "global": "FAILED",
       "stages": {
         "XSD": {
-          "status": "FAILED",
-          "errors": [
-            "SAXParseException"
-          ]
+          "status": "PASSED",
+          "errors": []
         },
         "EN": {
           "status": "FAILED",
@@ -285,7 +289,37 @@
         "KSA": {
           "status": "FAILED",
           "errors": [
-            "BR-KSA-39",
+            "BR-KSA-52",
+            "BR-KSA-53",
+            "BR-KSA-68"
+          ]
+        },
+        "PIH": {
+          "status": "FAILED",
+          "errors": [
+            "KSA-13"
+          ]
+        }
+      }
+    },
+    "awj-standard-single-line.xml": {
+      "global": "FAILED",
+      "stages": {
+        "XSD": {
+          "status": "PASSED",
+          "errors": []
+        },
+        "EN": {
+          "status": "FAILED",
+          "errors": [
+            "BR-CO-04",
+            "BR-CO-15",
+            "BR-CO-18"
+          ]
+        },
+        "KSA": {
+          "status": "FAILED",
+          "errors": [
             "BR-KSA-52",
             "BR-KSA-53",
             "BR-KSA-68"

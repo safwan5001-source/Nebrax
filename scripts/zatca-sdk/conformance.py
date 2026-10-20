@@ -24,6 +24,7 @@ Stdlib only; run with `python3 -I`.
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import json
 import os
 import re
@@ -245,9 +246,21 @@ def compare_official(name: str, res: SdkResult, expect: dict, allowed_warnings: 
     return problems
 
 
-def compare_awj(res: SdkResult, expect: dict) -> tuple[str, list[str]]:
+def forbidden_warnings(res: SdkResult, forbidden: list[str]) -> list[str]:
+    """Warning codes the AWJ fixtures must never trigger (exact code, or a trailing-`*` prefix pattern).
+
+    REM-15a: the error ratchet alone cannot see party defects, because almost every seller/buyer rule is a
+    *warning* in the SDK. These are therefore pinned at zero for the synthetic fixtures; an intentional change
+    edits `awj_forbidden_warning_codes` in baseline.json in the same PR, with review."""
+    return sorted(w for w in res.warnings if any(fnmatch.fnmatchcase(w, pattern) for pattern in forbidden))
+
+
+def compare_awj(res: SdkResult, expect: dict, forbidden: list[str] | None = None) -> tuple[str, list[str]]:
     """Ratchet comparison. Returns (verdict, details); verdict in OK|REGRESSION|STALE_BASELINE."""
     regress, improve = [], []
+    bad_warnings = forbidden_warnings(res, forbidden or [])
+    if bad_warnings:
+        regress.append(f"forbidden warning codes {bad_warnings}")
     exp_stages = expect["stages"]
     for stage in sorted(set(exp_stages) | set(res.stages)):
         want = exp_stages.get(stage)
@@ -361,7 +374,7 @@ def evaluate(official: dict, awj: dict, baseline: dict) -> tuple[list[dict], boo
             rows.append({"kind": "awj", "name": name, "verdict": "UNEXPECTED_FIXTURE", "details": ["fixture without baseline entry"]})
             ok = False
         else:
-            verdict, details = compare_awj(awj[name], awj_base[name])
+            verdict, details = compare_awj(awj[name], awj_base[name], baseline.get("awj_forbidden_warning_codes", []))
             rows.append({"kind": "awj", "name": name, "verdict": verdict, "details": details, "result": awj[name]})
             ok &= verdict == "OK"
     return rows, ok
@@ -396,6 +409,10 @@ def ratchet_controls(official: dict, awj: dict, baseline: dict) -> list[str]:
     expect_rejected("baseline expects a fixture that is missing",
                     lambda b: b["awj"].update({"awj-ghost.xml": copy.deepcopy(b["awj"][name])}))
     expect_rejected("official sample count drifts", lambda b: b["official"].update(expected_count=999))
+    reported = sorted({w for r in awj.values() for w in r.warnings})
+    if reported:
+        expect_rejected("a reported warning code is declared forbidden",
+                        lambda b: b.update(awj_forbidden_warning_codes=[reported[0]]))
     return problems
 
 
@@ -490,6 +507,8 @@ def cmd_update_baseline(args) -> int:
         official, awj = collect(runner, args.sdk_root, args.fixtures)
     path = os.path.join(args.fixtures, "baseline.json")
     allowed = ["BR-KSA-98"]
+    # قائمة الإنذارات الممنوعة تُحرَّر يدوياً في المراجعة؛ التسجيل لا يمحوها (REM-15a).
+    previous = load_json(path) if os.path.isfile(path) else {}
     for name, res in official.items():
         bad = [w for w in res.warnings if w not in allowed]
         if res.global_status != "PASSED" or bad:
@@ -505,6 +524,7 @@ def cmd_update_baseline(args) -> int:
             "allowed_warning_codes": allowed,
             "samples": {n: {"stages": sorted(r.stages, key=KNOWN_STAGES.index)} for n, r in sorted(official.items())},
         },
+        "awj_forbidden_warning_codes": previous.get("awj_forbidden_warning_codes", []),
         "awj": {n: baseline_entry(r) for n, r in sorted(awj.items())},
     }
     with open(path, "w", encoding="utf-8") as fh:

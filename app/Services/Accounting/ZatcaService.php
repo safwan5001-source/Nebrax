@@ -8,6 +8,7 @@ use App\Models\Tenant;
 use App\Models\ZatcaCredential;
 use App\Support\ZatcaIcvScope;
 use App\Support\ZatcaIssueTimestamp;
+use App\Support\ZatcaPartyXml;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -43,8 +44,11 @@ class ZatcaService
         // غيابها فشل مغلق — لا رجوع صامت إلى created_at (وقت المسودة) ولا إلى الساعة الحالية.
         $issuedAt = $this->issuedAtOf($invoice);
 
-        $invoice->loadMissing('lines', 'partner');
-        $tenant = Tenant::find($invoice->tenant_id);
+        // REM-15a: كتلتا البائع والمشتري في XML واسما البائع/رقمه في QR تُشتقّ كلّها من لقطة party_snapshot (REM-14) المثبّتة
+        // عند الترحيل — لا من Tenant/Partner الحيّين. غياب اللقطة أو تلفها فشل مغلق قبل أي قفل أو استهلاك ICV.
+        $parties = ZatcaPartyXml::requireSnapshot($invoice);
+
+        $invoice->loadMissing('lines');
 
         $uuid = (string) Str::uuid();
 
@@ -83,9 +87,9 @@ class ZatcaService
         // يُبنى مرجع QR داخل XML أولاً، لكن بقيمة مؤقتة. تحويل ZATCA
         // يستبعد عقدة QR ومرجع التوقيع، لذلك يبقى Hash هو نفسه بعد تثبيت
         // قيمة QR الفعلية في المستند المجمّد.
-        $unsignedXml = $this->buildXml($invoice, $tenant, $uuid, $icv, $prev);
+        $unsignedXml = $this->buildXml($invoice, $parties, $uuid, $icv, $prev);
         $hash = $this->invoiceHasher->hash($unsignedXml);
-        $qr   = $this->qrFor($invoice, $tenant);
+        $qr   = $this->qrFor($invoice);
         $xml  = $this->attachQr($unsignedXml, $qr);
 
         // لا وجود لاعتماد = مستأجر ما زال على عقد المرحلة الأولى التاريخي.
@@ -98,8 +102,8 @@ class ZatcaService
             $final = $this->signedInvoiceFinalizer->finalize(
                 $xml,
                 $qr,
-                $tenant?->name ?? '',
-                $tenant?->vat_number ?? '',
+                ZatcaPartyXml::text($parties['seller']['name'] ?? null) ?? '',
+                ZatcaPartyXml::text($parties['seller']['vat_number'] ?? null) ?? '',
                 $issuedAt,
                 now('UTC'),
                 $this->formatAmount($invoice->total),
@@ -174,14 +178,16 @@ class ZatcaService
     /**
      * رمز QR للمرحلة 1: Base64 لحقول TLV الخمسة الإلزامية.
      */
-    public function qrFor(Invoice $invoice, ?Tenant $tenant = null): string
+    public function qrFor(Invoice $invoice): string
     {
-        $tenant ??= Tenant::find($invoice->tenant_id);
+        // الوسمان 1–2 من لقطة البائع نفسها التي يُبنى منها XML (REM-15a) فلا يختلف اسم/رقم QR عن المستند.
+        $issuedAt = $this->issuedAtOf($invoice);
+        $seller = ZatcaPartyXml::requireSnapshot($invoice)['seller'];
 
         $payload =
-            $this->tlv(1, $tenant?->name ?? '') .
-            $this->tlv(2, $tenant?->vat_number ?? '') .
-            $this->tlv(3, ZatcaIssueTimestamp::phase1QrText($this->issuedAtOf($invoice))) .
+            $this->tlv(1, ZatcaPartyXml::text($seller['name'] ?? null) ?? '') .
+            $this->tlv(2, ZatcaPartyXml::text($seller['vat_number'] ?? null) ?? '') .
+            $this->tlv(3, ZatcaIssueTimestamp::phase1QrText($issuedAt)) .
             $this->tlv(4, $this->formatAmount($invoice->total)) .
             $this->tlv(5, $this->formatAmount($invoice->tax_amount));
 
@@ -251,8 +257,11 @@ class ZatcaService
 
     /**
      * بناء مستند UBL 2.1 مبسّط للفاتورة (تمثيل بنيوي — غير مُتحقَّق مقابل XSD ZATCA).
+     * كتلتا الطرفين (REM-15a) من لقطة party_snapshot عبر ZatcaPartyXml؛ بقية الهيكل (الإجماليات/الأسطر) ضمن REM-16.
+     *
+     * @param array{seller: array<string, mixed>, buyer: array<string, mixed>} $parties
      */
-    protected function buildXml(Invoice $invoice, ?Tenant $tenant, string $uuid, int $icv, string $prev): string
+    protected function buildXml(Invoice $invoice, array $parties, string $uuid, int $icv, string $prev): string
     {
         $e = fn ($v) => htmlspecialchars((string) $v, ENT_XML1 | ENT_QUOTES, 'UTF-8');
         $amt = fn (int $m) => $this->formatAmount($m);
@@ -276,6 +285,10 @@ LINE;
         $issueDate = ZatcaIssueTimestamp::xmlDate($issuedAt);
         $issueTime = ZatcaIssueTimestamp::xmlTime($issuedAt);
         $transactionCode = $invoice->zatca_document_type === 'standard' ? '0100000' : '0200000';
+        $partiesXml = rtrim(
+            ZatcaPartyXml::supplier($parties['seller'])
+            . ZatcaPartyXml::customer($parties['buyer'], $invoice->zatca_document_type === 'standard' ? 'standard' : 'simplified')
+        );
 
         return <<<XML
 <?xml version="1.0" encoding="UTF-8"?>
@@ -315,17 +328,7 @@ LINE;
     <cbc:ID>urn:oasis:names:specification:ubl:signature:Invoice</cbc:ID>
     <cbc:SignatureMethod>urn:oasis:names:specification:ubl:dsig:enveloped:xades</cbc:SignatureMethod>
   </cac:Signature>
-  <cac:AccountingSupplierParty>
-    <cac:Party>
-      <cac:PartyTaxScheme><cbc:CompanyID>{$e($tenant?->vat_number ?? '')}</cbc:CompanyID></cac:PartyTaxScheme>
-      <cac:PartyLegalEntity><cbc:RegistrationName>{$e($tenant?->name ?? '')}</cbc:RegistrationName></cac:PartyLegalEntity>
-    </cac:Party>
-  </cac:AccountingSupplierParty>
-  <cac:AccountingCustomerParty>
-    <cac:Party>
-      <cac:PartyLegalEntity><cbc:RegistrationName>{$e($invoice->partner?->name ?? '')}</cbc:RegistrationName></cac:PartyLegalEntity>
-    </cac:Party>
-  </cac:AccountingCustomerParty>
+{$partiesXml}
   <cac:TaxTotal>
     <cbc:TaxAmount currencyID="SAR">{$e($amt($invoice->tax_amount))}</cbc:TaxAmount>
   </cac:TaxTotal>

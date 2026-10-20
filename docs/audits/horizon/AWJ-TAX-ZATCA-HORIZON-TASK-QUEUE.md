@@ -62,6 +62,8 @@
 > **Update 2026-10-15 (REM-13a).** The owner authorised REM-13a (Option 1) including the `invoices.issued_at` migration; it is **implemented in one Draft PR, not merged, not deployed** (`REM-13a-IMPLEMENTATION-REPORT.md`). XML `IssueTime` is settled by BR-KSA-70 (AST, no `Z`); QR tag-3 text (**Q1**) and the BR-KSA-04 time zone (**Q2**) remain unresolved regulatory questions for D-06 / TAX-E01 and no QR format was changed. REM-14 stays blocked on the merge of REM-13a.
 >
 > **Update 2026-10-15 (REM-14).** REM-13a is merged (`4e1ac1e`). REM-14 slices **14a + 14c** (immutable `invoices.party_snapshot` v1 captured at posting; posted invoices displayed from it; legacy `NULL` → documented live fallback) are **implemented in one Draft PR, not merged** (`REM-14-IMPLEMENTATION-REPORT.md`, audit `REM-14-AUDIT.md`). REM-14 is **not complete**: 14b (validation/preconditions/SAR guard) and the XML seller/buyer blocks (REM-15/16) remain, and P1–P6 are unresolved.
+>
+> **Update 2026-10-20 (REM-15a).** REM-14 is merged (`5fb6f23`). Per the owner, REM-15 is split: **REM-15a** (seller **and** buyer UBL party blocks built from the immutable `party_snapshot`, new `App\Support\ZatcaPartyXml`) is **implemented in one Draft PR, not merged** (`REM-15a-IMPLEMENTATION-REPORT.md`); **REM-15b** (posting preconditions/422, POS, `entity_type`, SAR 1,000) stays open and gated on P3/R1-077. REM-15a is **not** a compliance claim: the official SDK now passes XSD on the targeted fixtures and BR-KSA-39 is gone, but the remaining EN/KSA/QR/SIGNATURE/PIH errors belong to REM-16/17.
 
 Other independent tasks REM-07, REM-20, REM-37, REM-38 and tier dependencies stay in the **canonical** remediation plan; not omission or closure.
 

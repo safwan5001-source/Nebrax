@@ -113,6 +113,8 @@ class ZatcaSignedInvoicePostingTest extends TestCase
         $invoice->forceFill([
             'zatca_document_type' => 'simplified',
             'issued_at' => \Carbon\CarbonImmutable::parse('2026-01-15 07:30:00', 'UTC'),
+            // REM-15a: بناء XML/QR يتطلب لقطة الطرفين التي يلتقطها InvoiceService::post() قبل buildFor.
+            'party_snapshot' => \App\Support\InvoicePartySnapshot::capture($invoice),
         ]);
         $this->travelTo(\Carbon\CarbonImmutable::parse('2026-01-15 08:45:10', 'UTC'));
 
