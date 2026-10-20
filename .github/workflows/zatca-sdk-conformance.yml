@@ -92,12 +92,32 @@ jobs:
           done
           exit 0
 
-      - name: Validate fixtures offline (official samples, AWJ baseline, mutation liveness)
+      # REM-17: AWJ's production signing classes stamp the committed fixtures with a credential generated in
+      # memory for this run only (synthetic CA + leaf + key in $RUNNER_TEMP; never committed, printed or reused,
+      # never a ZATCA credential). Uses the runner's preinstalled PHP CLI (openssl + dom); no Laravel, no network.
+      # AWJ's C14N 1.1 hasher shells out to xmllint (libxml2-utils), as in the backend CI job.
+      - name: Install xmllint (C14N 1.1 engine of the AWJ invoice hasher)
+        run: |
+          sudo rm -f /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libxml2-utils
+          xmllint --version 2>&1 | head -1
+
+      # xdebug off + no exception arguments: a stack trace must never echo the in-memory key into the log.
+      - name: Stamp AWJ fixtures with an ephemeral synthetic credential (no secrets)
+        run: |
+          php --version | head -1
+          php -d xdebug.mode=off -d zend.exception_ignore_args=1 \
+            scripts/zatca-sdk/sign_fixtures.php tests/Fixtures/zatca-sdk/awj "$RUNNER_TEMP/awj_stamped"
+
+      - name: Validate fixtures offline (official samples, AWJ baseline, stamped fixtures, independent crypto, mutation liveness)
         run: |
           python3 -I scripts/zatca-sdk/conformance.py run \
             --sdk-root "$RUNNER_TEMP/zatca-sdk" \
             --pin scripts/zatca-sdk/sdk-pin.json \
             --fixtures tests/Fixtures/zatca-sdk \
+            --stamped-fixtures "$RUNNER_TEMP/awj_stamped/signed" \
+            --stamp-cert-dir "$RUNNER_TEMP/awj_stamped/certificate" \
             --java "$JAVA_HOME/bin/java" \
             --summary "$GITHUB_STEP_SUMMARY" \
             --result-json "$RUNNER_TEMP/zatca-sdk-result.json"

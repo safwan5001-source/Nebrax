@@ -6,21 +6,28 @@ use InvalidArgumentException;
 use RuntimeException;
 
 /**
- * يحوّل توقيع ECDSA بين DER الذي يعيده OpenSSL وصيغة XMLDSig الخام r || s.
+ * توقيع ECDSA لفاتورة ZATCA — REM-17.
  *
- * معيار XMLDSig يفرض مكوّنين ثابتين بطول 32 بايت لمنحنى secp256k1،
- * بينما OpenSSL يوقّع ويَتحقق باستخدام ASN.1 DER داخلياً.
+ * الدليل الرسمي (E-invoicing Detailed Technical Guidelines، الخطوة 2): «وقّع هاش الفاتورة الناتج من الخطوة 1
+ * (غير مُرمَّز) بـ ECDSA والمفتاح الخاص». أي أن الرسالة الموقَّعة هي **بايتات SHA-256 الخام (32 بايت) لهاش الفاتورة**،
+ * لا SignedInfo المعياري كما في XMLDSig العام. وناتج التوقيع **ASN.1 DER** (مثال الدليل `MEQCIG…` = 0x30 0x44)
+ * يوضع في SignatureValue بترميز Base64.
+ *
+ * تحقّق مستقل (REM-17 Phase A): `openssl dgst -sha256 -verify` على عيّنة ZATCA الرسمية ينجح على الـ32 بايت الخام
+ * ويفشل على نص الهاش الست عشري وعلى نصّ Base64.
  */
 final class ZatcaXmlEcdsaSigner
 {
     private const COMPONENT_LENGTH = 32;
-    private const RAW_SIGNATURE_LENGTH = self::COMPONENT_LENGTH * 2;
+    private const INVOICE_HASH_LENGTH = 32;
 
     /**
-     * يوقّع SignedInfo المعياري ويعيد SignatureValue بصيغة Base64 لـ r || s.
+     * يوقّع بايتات هاش الفاتورة الخام ويعيد SignatureValue بصيغة Base64 لتوقيع DER.
      */
-    public function sign(string $canonicalSignedInfo, string $privateKeyPem): string
+    public function sign(string $invoiceHash, string $privateKeyPem): string
     {
+        $this->assertInvoiceHash($invoiceHash);
+
         $privateKey = openssl_pkey_get_private($privateKeyPem);
         if ($privateKey === false) {
             throw new RuntimeException('مفتاح ZATCA الخاص غير صالح للتوقيع.');
@@ -28,22 +35,27 @@ final class ZatcaXmlEcdsaSigner
 
         $this->assertSecp256k1($privateKey);
 
-        if (! openssl_sign($canonicalSignedInfo, $derSignature, $privateKey, OPENSSL_ALGO_SHA256)) {
+        if (! openssl_sign($invoiceHash, $derSignature, $privateKey, OPENSSL_ALGO_SHA256)) {
             throw new RuntimeException('تعذر إنشاء توقيع ECDSA الخاص بـ ZATCA.');
         }
 
-        return base64_encode($this->derToRaw($derSignature));
+        $this->assertCanonicalDer($derSignature);
+
+        return base64_encode($derSignature);
     }
 
     /**
-     * يتحقق من SignatureValue مع رفض Base64 أو الأطوال غير المطابقة قبل OpenSSL.
+     * يتحقق من SignatureValue (Base64 لتوقيع DER قانوني) على بايتات هاش الفاتورة الخام.
      */
-    public function verify(string $canonicalSignedInfo, string $signatureValue, string $publicKeyPem): bool
+    public function verify(string $invoiceHash, string $signatureValue, string $publicKeyPem): bool
     {
-        $rawSignature = base64_decode($signatureValue, true);
-        if ($rawSignature === false || strlen($rawSignature) !== self::RAW_SIGNATURE_LENGTH) {
-            throw new InvalidArgumentException('قيمة توقيع ZATCA ليست Base64 صالحاً بطول 64 بايت.');
+        $this->assertInvoiceHash($invoiceHash);
+
+        $derSignature = base64_decode($signatureValue, true);
+        if ($derSignature === false || base64_encode($derSignature) !== $signatureValue) {
+            throw new InvalidArgumentException('قيمة توقيع ZATCA ليست Base64 قياسياً.');
         }
+        $this->assertCanonicalDer($derSignature);
 
         $publicKey = openssl_pkey_get_public($publicKeyPem);
         if ($publicKey === false) {
@@ -52,12 +64,7 @@ final class ZatcaXmlEcdsaSigner
 
         $this->assertSecp256k1($publicKey);
 
-        $result = openssl_verify(
-            $canonicalSignedInfo,
-            $this->rawToDer($rawSignature),
-            $publicKey,
-            OPENSSL_ALGO_SHA256
-        );
+        $result = openssl_verify($invoiceHash, $derSignature, $publicKey, OPENSSL_ALGO_SHA256);
 
         if ($result === -1) {
             throw new RuntimeException('تعذر التحقق من توقيع ECDSA الخاص بـ ZATCA.');
@@ -67,9 +74,9 @@ final class ZatcaXmlEcdsaSigner
     }
 
     /**
-     * @internal متاح علناً لاختبار حدّ التوافق بين OpenSSL وXMLDSig.
+     * يرفض أي ترميز ليس DER قانونياً لتوقيع ECDSA على secp256k1: SEQUENCE من عددين موجبين بأقصر ترميز، بلا بيانات زائدة.
      */
-    public function derToRaw(string $derSignature): string
+    public function assertCanonicalDer(string $derSignature): void
     {
         $offset = 0;
         $this->expectTag($derSignature, $offset, 0x30, 'تسلسل ECDSA');
@@ -80,30 +87,19 @@ final class ZatcaXmlEcdsaSigner
             throw new InvalidArgumentException('ترميز DER لتوقيع ECDSA يحتوي بيانات زائدة أو طولاً خاطئاً.');
         }
 
-        $r = $this->readInteger($derSignature, $offset, $sequenceEnd);
-        $s = $this->readInteger($derSignature, $offset, $sequenceEnd);
+        $this->readInteger($derSignature, $offset, $sequenceEnd);
+        $this->readInteger($derSignature, $offset, $sequenceEnd);
 
         if ($offset !== $sequenceEnd) {
             throw new InvalidArgumentException('ترميز DER لتوقيع ECDSA يحتوي عناصر غير متوقعة.');
         }
-
-        return $r.$s;
     }
 
-    /**
-     * @internal متاح علناً لاختبار حدّ التوافق بين XMLDSig وOpenSSL.
-     */
-    public function rawToDer(string $rawSignature): string
+    private function assertInvoiceHash(string $invoiceHash): void
     {
-        if (strlen($rawSignature) !== self::RAW_SIGNATURE_LENGTH) {
-            throw new InvalidArgumentException('توقيع ECDSA الخام يجب أن يكون بطول 64 بايت.');
+        if (strlen($invoiceHash) !== self::INVOICE_HASH_LENGTH) {
+            throw new InvalidArgumentException('توقيع ZATCA يُحسب على هاش الفاتورة الخام بطول 32 بايت.');
         }
-
-        $r = $this->encodeInteger(substr($rawSignature, 0, self::COMPONENT_LENGTH));
-        $s = $this->encodeInteger(substr($rawSignature, self::COMPONENT_LENGTH));
-        $sequence = $r.$s;
-
-        return "\x30".$this->encodeLength(strlen($sequence)).$sequence;
     }
 
     /**
@@ -119,7 +115,7 @@ final class ZatcaXmlEcdsaSigner
         }
     }
 
-    private function readInteger(string $der, int &$offset, int $limit): string
+    private function readInteger(string $der, int &$offset, int $limit): void
     {
         $this->expectTag($der, $offset, 0x02, 'عدد ECDSA');
         $length = $this->readLength($der, $offset);
@@ -146,22 +142,6 @@ final class ZatcaXmlEcdsaSigner
         if (strlen($integer) > self::COMPONENT_LENGTH || trim($integer, "\x00") === '') {
             throw new InvalidArgumentException('عدد ECDSA خارج نطاق المنحنى.');
         }
-
-        return str_pad($integer, self::COMPONENT_LENGTH, "\x00", STR_PAD_LEFT);
-    }
-
-    private function encodeInteger(string $component): string
-    {
-        if (trim($component, "\x00") === '') {
-            throw new InvalidArgumentException('مكوّن ECDSA الصفري غير صالح.');
-        }
-
-        $integer = ltrim($component, "\x00");
-        if ((ord($integer[0]) & 0x80) !== 0) {
-            $integer = "\x00".$integer;
-        }
-
-        return "\x02".$this->encodeLength(strlen($integer)).$integer;
     }
 
     private function expectTag(string $der, int &$offset, int $expected, string $label): void
@@ -203,20 +183,5 @@ final class ZatcaXmlEcdsaSigner
         }
 
         return $length;
-    }
-
-    private function encodeLength(int $length): string
-    {
-        if ($length < 0x80) {
-            return chr($length);
-        }
-
-        $encoded = '';
-        while ($length > 0) {
-            $encoded = chr($length & 0xff).$encoded;
-            $length >>= 8;
-        }
-
-        return chr(0x80 | strlen($encoded)).$encoded;
     }
 }

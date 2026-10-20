@@ -5,19 +5,43 @@ namespace App\Services\Accounting;
 use DateTimeImmutable;
 use DateTimeInterface;
 use DateTimeZone;
-use DOMDocument;
-use DOMElement;
 use InvalidArgumentException;
 use RuntimeException;
 
+/**
+ * يبني SignedProperties لتوقيع XAdES في ZATCA ويحسب بصمتها — REM-17.
+ *
+ * البنية (الدليل الفني التفصيلي، الخطوة 4، وعيّنات ZATCA الرسمية الثلاث، وXSD الخاص بـ SDK):
+ *  • `SigningTime`، ثم `SigningCertificate` (الإصدار 1: XSD الخاص بـ SDK — UBL-XAdESv132 — لا يعرف SigningCertificateV2
+ *    ويرفضه) بعنصر `Cert` لكل شهادة في السلسلة (leaf أولاً) يحمل `CertDigest` و`IssuerSerial`.
+ *  • `SignaturePolicyIdentifier` و`DataObjectFormat` **باقيان** كما يفرضهما معيار ميزات الأمان v1.2 (§2.3.3،
+ *    تعدّد 1). عيّنات SDK لا تحملهما، لكن XSD يقبلهما وبصمة SDK تغطيهما (تعديلهما يُفشل التحقق) ونتيجة SDK
+ *    الإجمالية PASSED بوجودهما — فلا يُخفَّف حارس السياسة المغلق.
+ *
+ * الترميزات (متحقَّقة على العيّنات الرسمية):
+ *  • بصمة الشهادة = Base64(hex(SHA-256(نص Base64 للشهادة))) — الخطوة 3.
+ *  • X509IssuerName بصيغة Java، وX509SerialNumber عشرياً (ZatcaCertificateFields).
+ *  • بصمة SignedProperties = Base64(hex(SHA-256(T))) حيث T هي العنصر نفسه **بمسافاته كما كُتب** مع إعلان
+ *    `xmlns:xades` على الجذر و`xmlns:ds` على كل عنصر `ds:` — وهو ما ينتجه مُسلسِل SDK للعقدة. ليست C14N، وهي
+ *    حسّاسة للمسافات: لذلك يُكتب العنصر نصاً ثابت التنسيق (تنسيق العيّنات الرسمية) ولا يُعاد تسلسله بعد ذلك.
+ */
 final class ZatcaXadesSignedPropertiesBuilder
 {
     public const XADES_NAMESPACE = 'http://uri.etsi.org/01903/v1.3.2#';
     public const XMLDSIG_NAMESPACE = 'http://www.w3.org/2000/09/xmldsig#';
     public const SHA256_ALGORITHM = 'http://www.w3.org/2001/04/xmlenc#sha256';
 
+    /** إزاحة أبناء SignedProperties في تنسيق العيّنات الرسمية؛ الوسم الختامي عند 32. */
+    private const BASE_INDENT = 36;
+    private const STEP = 4;
+
+    public function __construct(
+        private readonly ZatcaCertificateFields $certificateFields = new ZatcaCertificateFields(),
+    ) {}
+
     /**
      * @param list<string> $certificateChain Base64 DER certificates, leaf first.
+     * @return array{xml:string, digest:string} XML للتضمين كما هو، وبصمة SignedProperties الجاهزة لـ SignedInfo.
      */
     public function build(
         array $certificateChain,
@@ -26,12 +50,14 @@ final class ZatcaXadesSignedPropertiesBuilder
         string $policyDigest,
         string $signedPropertiesId = 'xadesSignedProperties',
         string $dataObjectReference = '#invoiceSignedData',
-    ): string {
-        $certificateDigests = $this->certificateDigests($certificateChain);
+    ): array {
+        $certificates = $this->certificates($certificateChain);
         $this->assertHttpsUrl($policyIdentifier);
 
         $decodedPolicyDigest = base64_decode($policyDigest, true);
-        if ($decodedPolicyDigest === false || strlen($decodedPolicyDigest) !== 32) {
+        if ($decodedPolicyDigest === false || strlen($decodedPolicyDigest) !== 32
+            || base64_encode($decodedPolicyDigest) !== $policyDigest
+        ) {
             throw new InvalidArgumentException('بصمة سياسة توقيع ZATCA يجب أن تكون SHA-256 بترميز Base64.');
         }
 
@@ -41,78 +67,101 @@ final class ZatcaXadesSignedPropertiesBuilder
         }
         $this->assertXmlId(substr($dataObjectReference, 1), 'مرجع بيانات الفاتورة');
 
-        $document = new DOMDocument('1.0', 'UTF-8');
-        $document->formatOutput = false;
-
-        $root = $document->createElementNS(self::XADES_NAMESPACE, 'xades:SignedProperties');
-        $root->setAttribute('Id', $signedPropertiesId);
-        $document->appendChild($root);
-
-        $signedSignatureProperties = $this->xades($document, 'SignedSignatureProperties');
-        $root->appendChild($signedSignatureProperties);
-
         $utcTime = DateTimeImmutable::createFromInterface($signingTime)
             ->setTimezone(new DateTimeZone('UTC'))
             ->format('Y-m-d\\TH:i:s\\Z');
-        $signedSignatureProperties->appendChild(
-            $this->xades($document, 'SigningTime', $utcTime)
+
+        $lines = [[0, '<xades:SignedSignatureProperties>']];
+        $lines[] = [1, '<xades:SigningTime>'.$utcTime.'</xades:SigningTime>'];
+        $lines[] = [1, '<xades:SigningCertificate>'];
+        foreach ($certificates as $certificate) {
+            array_push(
+                $lines,
+                [2, '<xades:Cert>'],
+                [3, '<xades:CertDigest>'],
+                [4, '<ds:DigestMethod Algorithm="'.self::SHA256_ALGORITHM.'"/>'],
+                [4, '<ds:DigestValue>'.$certificate['digest'].'</ds:DigestValue>'],
+                [3, '</xades:CertDigest>'],
+                [3, '<xades:IssuerSerial>'],
+                [4, '<ds:X509IssuerName>'.$certificate['issuer_name'].'</ds:X509IssuerName>'],
+                [4, '<ds:X509SerialNumber>'.$certificate['serial_number'].'</ds:X509SerialNumber>'],
+                [3, '</xades:IssuerSerial>'],
+                [2, '</xades:Cert>'],
+            );
+        }
+        array_push(
+            $lines,
+            [1, '</xades:SigningCertificate>'],
+            [1, '<xades:SignaturePolicyIdentifier>'],
+            [2, '<xades:SignaturePolicyId>'],
+            [3, '<xades:SigPolicyId>'],
+            [4, '<xades:Identifier>'.$policyIdentifier.'</xades:Identifier>'],
+            [3, '</xades:SigPolicyId>'],
+            [3, '<xades:SigPolicyHash>'],
+            [4, '<ds:DigestMethod Algorithm="'.self::SHA256_ALGORITHM.'"/>'],
+            [4, '<ds:DigestValue>'.$policyDigest.'</ds:DigestValue>'],
+            [3, '</xades:SigPolicyHash>'],
+            [2, '</xades:SignaturePolicyId>'],
+            [1, '</xades:SignaturePolicyIdentifier>'],
+            [0, '</xades:SignedSignatureProperties>'],
+            [0, '<xades:SignedDataObjectProperties>'],
+            [1, '<xades:DataObjectFormat ObjectReference="'.$dataObjectReference.'">'],
+            [2, '<xades:MimeType>text/xml</xades:MimeType>'],
+            [1, '</xades:DataObjectFormat>'],
+            [0, '</xades:SignedDataObjectProperties>'],
         );
 
-        $signingCertificate = $this->xades($document, 'SigningCertificateV2');
-        $signedSignatureProperties->appendChild($signingCertificate);
+        $xml = '<xades:SignedProperties Id="'.$signedPropertiesId.'">'."\n";
+        foreach ($lines as [$depth, $line]) {
+            $xml .= str_repeat(' ', self::BASE_INDENT + self::STEP * $depth).$line."\n";
+        }
+        $xml .= str_repeat(' ', self::BASE_INDENT - self::STEP).'</xades:SignedProperties>';
 
-        foreach ($certificateDigests as $digest) {
-            $certificate = $this->xades($document, 'Cert');
-            $certificateDigest = $this->xades($document, 'CertDigest');
-            $certificateDigest->appendChild($this->digestMethod($document));
-            $certificateDigest->appendChild($this->ds($document, 'DigestValue', $digest));
-            $certificate->appendChild($certificateDigest);
-            $signingCertificate->appendChild($certificate);
+        return ['xml' => $xml, 'digest' => $this->digest($xml)];
+    }
+
+    /**
+     * بصمة SignedProperties كما يحسبها SDK من نصّها المضمَّن: Base64(hex(SHA-256(T))).
+     * فشل مغلق على أي بنية لا يكون تحويلها إلى T محدَّداً بلا لبس (إعلانات أسماء، كيانات، تعليقات، CR، بادئات أخرى).
+     */
+    public function digest(string $embeddedXml): string
+    {
+        if (! str_starts_with($embeddedXml, '<xades:SignedProperties ')
+            || ! str_ends_with($embeddedXml, '</xades:SignedProperties>')
+            || preg_match('/xmlns|&|\r|\'|<!|<\?/', $embeddedXml) === 1
+        ) {
+            throw new InvalidArgumentException('SignedProperties المضمّنة ليست بالصيغة المحدّدة لحساب بصمتها.');
+        }
+        preg_match_all('#</?([^\s/>]+)#', $embeddedXml, $tags);
+        foreach ($tags[1] as $tag) {
+            if (preg_match('/^(xades|ds):[A-Za-z][A-Za-z0-9]*$/D', $tag) !== 1) {
+                throw new InvalidArgumentException('SignedProperties المضمّنة تحتوي عنصراً خارج xades/ds.');
+            }
         }
 
-        $signaturePolicyIdentifier = $this->xades($document, 'SignaturePolicyIdentifier');
-        $signaturePolicyId = $this->xades($document, 'SignaturePolicyId');
-        $signaturePolicyName = $this->xades($document, 'SigPolicyId');
-        $signaturePolicyName->appendChild(
-            $this->xades($document, 'Identifier', $policyIdentifier)
+        $standalone = preg_replace(
+            '#<ds:([A-Za-z][A-Za-z0-9]*)#',
+            '<ds:$1 xmlns:ds="'.self::XMLDSIG_NAMESPACE.'"',
+            '<xades:SignedProperties xmlns:xades="'.self::XADES_NAMESPACE.'" '.substr($embeddedXml, strlen('<xades:SignedProperties ')),
         );
-        $signaturePolicyId->appendChild($signaturePolicyName);
-
-        $signaturePolicyHash = $this->xades($document, 'SigPolicyHash');
-        $signaturePolicyHash->appendChild($this->digestMethod($document));
-        $signaturePolicyHash->appendChild(
-            $this->ds($document, 'DigestValue', $policyDigest)
-        );
-        $signaturePolicyId->appendChild($signaturePolicyHash);
-        $signaturePolicyIdentifier->appendChild($signaturePolicyId);
-        $signedSignatureProperties->appendChild($signaturePolicyIdentifier);
-
-        $signedDataObjectProperties = $this->xades($document, 'SignedDataObjectProperties');
-        $dataObjectFormat = $this->xades($document, 'DataObjectFormat');
-        $dataObjectFormat->setAttribute('ObjectReference', $dataObjectReference);
-        $dataObjectFormat->appendChild($this->xades($document, 'MimeType', 'text/xml'));
-        $signedDataObjectProperties->appendChild($dataObjectFormat);
-        $root->appendChild($signedDataObjectProperties);
-
-        $xml = $document->saveXML($root);
-        if ($xml === false) {
-            throw new RuntimeException('تعذر إنشاء SignedProperties الخاص بتوقيع ZATCA.');
+        if (! is_string($standalone)) {
+            throw new RuntimeException('تعذر حساب بصمة SignedProperties.');
         }
 
-        return $xml;
+        return base64_encode(hash('sha256', $standalone));
     }
 
     /**
      * @param list<string> $certificateChain
-     * @return list<string>
+     * @return list<array{digest:string, issuer_name:string, serial_number:string}>
      */
-    private function certificateDigests(array $certificateChain): array
+    private function certificates(array $certificateChain): array
     {
         if ($certificateChain === [] || ! array_is_list($certificateChain)) {
             throw new InvalidArgumentException('سلسلة شهادات ZATCA يجب أن تكون قائمة غير فارغة.');
         }
 
-        return array_map(function ($certificate, $index): string {
+        return array_map(function ($certificate, $index): array {
             if (! is_string($certificate) || $certificate === '') {
                 throw new InvalidArgumentException('شهادة ZATCA في السلسلة غير صالحة.');
             }
@@ -155,7 +204,13 @@ final class ZatcaXadesSignedPropertiesBuilder
                 );
             }
 
-            return base64_encode(hash('sha256', $normalizedDer, true));
+            $fields = $this->certificateFields->extract($normalizedDer);
+
+            return [
+                'digest' => base64_encode(hash('sha256', base64_encode($normalizedDer))),
+                'issuer_name' => $fields['issuer_name'],
+                'serial_number' => $fields['serial_number'],
+            ];
         }, $certificateChain, array_keys($certificateChain));
     }
 
@@ -170,6 +225,10 @@ final class ZatcaXadesSignedPropertiesBuilder
         ) {
             throw new InvalidArgumentException('معرّف سياسة توقيع ZATCA يجب أن يكون رابط HTTPS مطلقاً.');
         }
+        // يُكتب نصاً حرفياً داخل SignedProperties المحسوبة بصمتها على نصّها؛ لا تهريب ولا مسافات.
+        if (strpbrk($value, "&<>\"' \t\r\n") !== false) {
+            throw new InvalidArgumentException('معرّف سياسة توقيع ZATCA يحتوي محارف تتطلب تهريباً في XML.');
+        }
     }
 
     private function assertXmlId(string $value, string $label): void
@@ -177,37 +236,5 @@ final class ZatcaXadesSignedPropertiesBuilder
         if (preg_match('/^[A-Za-z_][A-Za-z0-9._-]*$/D', $value) !== 1) {
             throw new InvalidArgumentException("{$label} ليس XML ID صالحاً.");
         }
-    }
-
-    private function digestMethod(DOMDocument $document): DOMElement
-    {
-        $element = $this->ds($document, 'DigestMethod');
-        $element->setAttribute('Algorithm', self::SHA256_ALGORITHM);
-
-        return $element;
-    }
-
-    private function xades(DOMDocument $document, string $name, ?string $value = null): DOMElement
-    {
-        return $this->element($document, self::XADES_NAMESPACE, 'xades:'.$name, $value);
-    }
-
-    private function ds(DOMDocument $document, string $name, ?string $value = null): DOMElement
-    {
-        return $this->element($document, self::XMLDSIG_NAMESPACE, 'ds:'.$name, $value);
-    }
-
-    private function element(
-        DOMDocument $document,
-        string $namespace,
-        string $qualifiedName,
-        ?string $value,
-    ): DOMElement {
-        $element = $document->createElementNS($namespace, $qualifiedName);
-        if ($value !== null) {
-            $element->appendChild($document->createTextNode($value));
-        }
-
-        return $element;
     }
 }

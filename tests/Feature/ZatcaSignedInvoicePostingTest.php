@@ -10,8 +10,11 @@ use App\Models\ZatcaCredential;
 use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Services\Accounting\InvoiceService;
 use App\Services\Accounting\ZatcaInvoiceHasher;
+use App\Services\Accounting\ZatcaService;
+use App\Services\Accounting\ZatcaSignedInvoiceQrMaterialExtractor;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -51,8 +54,11 @@ class ZatcaSignedInvoicePostingTest extends TestCase
         $this->assertSame(range(1, 9), array_keys($qr));
         $this->assertSame('شركة أوج', $qr[1]);
         $this->assertSame('300000000000003', $qr[2]);
-        $this->assertSame($posted->zatca_hash, base64_encode($qr[6]));
+        // REM-17: الوسم 6 = نصّ Base64 للهاش المخزَّن نفسه، والوسم 7 = SignatureValue كما في XML.
+        $this->assertSame($posted->zatca_hash, $qr[6]);
         $this->assertSame(app(ZatcaInvoiceHasher::class)->hash($posted->zatca_xml), $posted->zatca_hash);
+        $this->assertStringContainsString('<ds:SignatureValue>'.$qr[7].'</ds:SignatureValue>', $posted->zatca_xml);
+        $this->assertSignatureVerifiesIndependently($posted->zatca_xml, $posted->zatca_hash);
         $this->assertSame(1, substr_count($posted->zatca_xml, $posted->zatca_qr));
         $this->assertSame(1, JournalEntry::where('source_type', Invoice::class)
             ->where('source_id', $posted->id)->count());
@@ -157,6 +163,147 @@ class ZatcaSignedInvoicePostingTest extends TestCase
         // الهاش المخزَّن = هاش XML الموقَّع المخزَّن (لا إعادة توليد).
         $this->assertSame(app(ZatcaInvoiceHasher::class)->hash($posted->zatca_xml), $posted->zatca_hash);
         $this->assertSame(1, JournalEntry::where('source_type', Invoice::class)->where('source_id', $posted->id)->count());
+    }
+
+    /** @test */
+    public function a_new_signed_sequence_starts_at_the_official_genesis_and_links_each_invoice_to_the_stored_previous_hash(): void
+    {
+        $this->enableSigning();
+
+        $first = app(InvoiceService::class)->post($this->draft());
+        $second = app(InvoiceService::class)->post($this->draft());
+        $third = app(InvoiceService::class)->post($this->draft());
+
+        $this->assertSame([1, 2, 3], [$first->zatca_icv, $second->zatca_icv, $third->zatca_icv]);
+        // BR-KSA-26: أول فاتورة = Base64 لنصّ SHA-256("0") الست عشري.
+        $this->assertSame(self::GENESIS, $first->zatca_previous_hash);
+        $this->assertSame(self::GENESIS, $this->pihOf($first->zatca_xml));
+        $this->assertSame($first->zatca_hash, $second->zatca_previous_hash);
+        $this->assertSame($first->zatca_hash, $this->pihOf($second->zatca_xml));
+        $this->assertSame($second->zatca_hash, $third->zatca_previous_hash);
+        $this->assertSame($second->zatca_hash, $this->pihOf($third->zatca_xml));
+        foreach ([$first, $second, $third] as $invoice) {
+            $this->assertSame(app(ZatcaInvoiceHasher::class)->hash($invoice->zatca_xml), $invoice->zatca_hash);
+            $this->assertSignatureVerifiesIndependently($invoice->zatca_xml, $invoice->zatca_hash);
+            app(ZatcaSignedInvoiceQrMaterialExtractor::class)->extract($invoice->zatca_xml);
+        }
+    }
+
+    /** @test */
+    public function a_chain_started_with_the_pre_rem17_genesis_continues_from_its_stored_xml_and_history_is_untouched(): void
+    {
+        $this->assertSame(base64_encode(hash('sha256', '0', true)), ZatcaService::LEGACY_GENESIS_HASH);
+
+        // حالة ما قبل REM-17: أول فاتورة مرحَّلة بالـ genesis القديم (تُحاكى هنا بتجهيز صفّ تاريخي في الاختبار فقط).
+        $legacy = app(InvoiceService::class)->post($this->draft());
+        $legacyXml = str_replace('>'.self::GENESIS.'<', '>'.ZatcaService::LEGACY_GENESIS_HASH.'<', $legacy->zatca_xml);
+        $this->assertNotSame($legacy->zatca_xml, $legacyXml);
+        DB::table('invoices')->where('id', $legacy->id)->update([
+            'zatca_xml' => $legacyXml,
+            'zatca_previous_hash' => ZatcaService::LEGACY_GENESIS_HASH,
+            'zatca_hash' => app(ZatcaInvoiceHasher::class)->hash($legacyXml),
+        ]);
+        $before = (array) DB::table('invoices')->where('id', $legacy->id)->first();
+
+        $this->enableSigning();
+        $next = app(InvoiceService::class)->post($this->draft());
+
+        // استمرار السلسلة: الهاش السابق = هاش XML المحفوظ، لا genesis جديد ولا إعادة بدء.
+        $this->assertSame(2, $next->zatca_icv);
+        $this->assertSame($before['zatca_hash'], $next->zatca_previous_hash);
+        $this->assertNotSame(self::GENESIS, $next->zatca_previous_hash);
+        $this->assertStringContainsString('<ds:Signature', $next->zatca_xml);
+        // التاريخ لا يُمسّ: XML وQR والهاش وPIH للفاتورة السابقة كما هي بايتاً ببايت (لا إصلاح صامت — REM-25).
+        $this->assertSame($before, (array) DB::table('invoices')->where('id', $legacy->id)->first());
+    }
+
+    /** @test */
+    public function tenants_keep_separate_chains_and_credentials(): void
+    {
+        $this->enableSigning();
+        $signed = app(InvoiceService::class)->post($this->draft());
+
+        $other = Tenant::create(['name' => 'مستأجر آخر', 'slug' => 'awj-zatca-other', 'vat_number' => '311111111111113', 'currency' => 'SAR']);
+        app(TenantContext::class)->set($other->id);
+        app(ChartOfAccountsSeeder::class)->seed($other->id);
+        $customer = Partner::create(['name' => 'عميل', 'type' => 'customer']);
+        $unsigned = app(InvoiceService::class)->post(app(InvoiceService::class)->create(
+            ['partner_id' => $customer->id, 'payment_type' => 'cash'],
+            [['description' => 'خدمة', 'quantity' => 1, 'unit_price' => 10000, 'tax_rate' => 15]],
+        ));
+
+        // سلسلة جديدة حقاً للمستأجر الآخر، وبلا اعتماده هو: المرحلة 1 (لا يستعير اعتماد مستأجر آخر).
+        $this->assertSame(1, $unsigned->zatca_icv);
+        $this->assertSame(self::GENESIS, $unsigned->zatca_previous_hash);
+        $this->assertStringNotContainsString('<ds:Signature', $unsigned->zatca_xml);
+        $this->assertSame(range(1, 5), array_keys($this->decodeQr($unsigned->zatca_qr)));
+
+        app(TenantContext::class)->set($this->tenant->id);
+        $next = app(InvoiceService::class)->post($this->draft());
+        $this->assertSame(2, $next->zatca_icv);
+        $this->assertSame($signed->zatca_hash, $next->zatca_previous_hash);
+    }
+
+    /** @test */
+    public function re_posting_a_signed_invoice_is_rejected_and_never_rewrites_its_signed_artifacts(): void
+    {
+        $this->enableSigning();
+        $posted = app(InvoiceService::class)->post($this->draft());
+        $before = (array) DB::table('invoices')->where('id', $posted->id)->first();
+
+        try {
+            app(InvoiceService::class)->post($posted);
+            $this->fail('كان يجب رفض إعادة ترحيل فاتورة مرحَّلة.');
+        } catch (RuntimeException) {
+            $this->addToAssertionCount(1);
+        }
+
+        $this->assertSame($before, (array) DB::table('invoices')->where('id', $posted->id)->first());
+        $this->assertSame(1, Invoice::whereNotNull('zatca_hash')->count());
+    }
+
+    /** @test */
+    public function a_phase_one_qr_value_over_255_bytes_fails_closed_instead_of_being_truncated(): void
+    {
+        $this->tenant->forceFill(['name' => str_repeat('س', 130)])->save(); // 260 بايت UTF-8
+        $invoice = $this->draft();
+
+        try {
+            app(InvoiceService::class)->post($invoice);
+            $this->fail('كان يجب رفض اسم بائع يتجاوز حدّ طول TLV.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('255', $exception->getMessage());
+        }
+
+        $this->assertSame('draft', $invoice->fresh()->status);
+        $this->assertNull($invoice->fresh()->zatca_icv);
+        $this->assertSame(0, JournalEntry::where('source_type', Invoice::class)->where('source_id', $invoice->id)->count());
+    }
+
+    private const GENESIS = 'NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI0NjcyOWQ3M2EyN2ZiNTdlOQ==';
+
+    private function enableSigning(): void
+    {
+        $this->configureCredential('developer');
+        config()->set('zatca.signature_policy.identifier', 'https://zatca.gov.sa/security-policy.pdf');
+        config()->set('zatca.signature_policy.digest', base64_encode(hash('sha256', 'pinned-policy', true)));
+    }
+
+    private function pihOf(string $xml): string
+    {
+        $this->assertSame(1, preg_match('#<cbc:ID>PIH</cbc:ID>\s*<cac:Attachment>\s*<cbc:EmbeddedDocumentBinaryObject[^>]*>([^<]+)<#', $xml, $match));
+
+        return $match[1];
+    }
+
+    /** تحقق بـ openssl_verify مباشرةً: SignatureValue (DER) على بايتات الهاش الخام بمفتاح شهادة leaf المضمّنة. */
+    private function assertSignatureVerifiesIndependently(string $xml, string $hash): void
+    {
+        $this->assertSame(1, preg_match('#<ds:SignatureValue>([^<]+)</ds:SignatureValue>#', $xml, $signature));
+        $this->assertSame(1, preg_match('#<ds:X509Certificate>([^<]+)</ds:X509Certificate>#', $xml, $certificate));
+        $key = openssl_pkey_get_public("-----BEGIN CERTIFICATE-----\n".chunk_split($certificate[1], 64, "\n")."-----END CERTIFICATE-----\n");
+        $this->assertNotFalse($key);
+        $this->assertSame(1, openssl_verify((string) base64_decode($hash, true), (string) base64_decode($signature[1], true), $key, OPENSSL_ALGO_SHA256));
     }
 
     private function draft(): Invoice

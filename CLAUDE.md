@@ -438,6 +438,16 @@ php artisan serve
 - **خارج النطاق:** `unitCode` (نصّ حرّ)، تاريخ التوريد (REM-29)، `PaymentMeans`، PIH/QR/التوقيع (REM-17)، طريقة التقريب وتوزيع الخصم (ADR-B).
 - **الحارس:** `baseline.json` يحمل `awj_forbidden_warning_codes` (تشمل BR-S-09 وBR-CO-17) و`awj_known_gap_warnings` لثلاث ثغرات موثَّقة فقط (تسوية، شحن، معدل صفري). نجاح مراحل SDK استرشادي وليس إقرار امتثال. المرجع: `docs/audits/horizon/REM-16-IMPLEMENTATION-REPORT.md`.
 
+## التوقيع وQR المرحلة 2 وPIH — REM-17
+
+كل ترميز هنا **متحقَّق منه** في Phase A: نصّ رسمي (الدليل الفني التفصيلي، معيار ميزات الأمان v1.2، معيار تنفيذ XML) + إعادة إنتاج مستقلة بـ OpenSSL على عيّنات SDK الرسمية الـ19. لا يُغيَّر شيء منها بلا دليل جديد بالمستوى نفسه.
+- **التوقيع:** ECDSA secp256k1 (DER) على **بايتات هاش الفاتورة الخام (32)** — لا على SignedInfo المعياري (`ZatcaXmlEcdsaSigner`). SignedInfo غير موقَّع في مخطط ZATCA؛ يحمل البصمتين فقط. مطابقة المفتاح للشهادة وفحص secp256k1 باقيان.
+- **SignedProperties** (`ZatcaXadesSignedPropertiesBuilder`): `SigningCertificate` **v1** (XSD في SDK يرفض V2) بعنصر `Cert` لكل شهادة في السلسلة، وكلٌّ بـ `CertDigest` = Base64(hex(SHA-256(نص Base64 للشهادة))) و`IssuerSerial` (اسم المُصدِر بصيغة Java في SDK والرقم عشرياً — `ZatcaCertificateFields`، فشل مغلق لأي سمة/قيمة لا تُمثَّل بلا لبس). **`SignaturePolicyIdentifier` و`DataObjectFormat` باقيان** (معيار الأمان §2.3.3؛ بصمة SDK تغطيهما) — **حارس السياسة المغلق لم يُخفَّف**.
+- **بصمة SignedProperties** = Base64(hex(SHA-256(T))): T هي نصّ العنصر المضمَّن **بمسافاته** مع `xmlns:xades` على الجذر و`xmlns:ds` على كل عنصر ds — ليست C14N، ولذلك مرجعها في SignedInfo بلا Transforms. **حسّاسة للمسافات:** يُدرج الامتداد نصاً بعد وسم الجذر بلا إعادة تسلسل ولا مسافة مضافة (المسافات خارج الغلاف تدخل هاش الفاتورة). مثال الخطوة 5 في الدليل بصيغة البايتات الخام يخالف العيّنات والمدقّق؛ المدقّق يرفضه فنتبع العيّنات.
+- **QR المرحلة 2** (`ZatcaPhaseTwoQrEncoder`): 6 = نصّ Base64 لـ DigestValue (44)، 7 = نصّ Base64 لـ SignatureValue، 8 = SPKI بترميز DER من الشهادة (88)، 9 = توقيع CA (DER) بلا تغيير. **الوسم 3 بلا تغيير** (Q1 غير محسومة). المرحلة 1: `ZatcaService::tlv` ترفض قيمة > 255 بايت ولا تقتطع أبداً.
+- **PIH:** أول فاتورة في سلسلة **جديدة** فقط = حرفية BR-KSA-26 `NWZlY2Vi…OQ==` (Base64 لنص SHA-256("0") الست عشري). السلسلة القائمة تستمر من XML السابق المحفوظ. سلاسل بدأت بالقيمة القديمة (`ZatcaService::LEGACY_GENESIS_HASH`) **لا تُصلَح ولا تُعاد** — قرارها في REM-25. لا إعادة توليد لأي XML/QR/توقيع/هاش تاريخي، ولا تصفير عدّادات.
+- **الأدلة في CI:** `scripts/zatca-sdk/sign_fixtures.php` يختم الـfixtures بأصناف الإنتاج واعتماد اصطناعي مؤقت لكل تشغيل (لا مفتاح في المستودع)، وتحقق مستقل بـ OpenSSL CLI في `conformance.py`. GLOBAL PASSED هنا مطابقة SDK لا قبول ZATCA فعلي. المرجع: `docs/audits/horizon/REM-17-IMPLEMENTATION-REPORT.md`.
+
 ## الترقيم التسلسلي
 
 كل أرقام المستندات تُولَّد من مصدر واحد: `App\Support\GeneratesDocumentNumbers` (trait على النموذج).

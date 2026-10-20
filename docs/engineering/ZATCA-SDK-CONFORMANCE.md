@@ -58,6 +58,29 @@ git diff tests/Fixtures/zatca-sdk      # review: the baseline diff IS the confor
 
 `update-baseline` refuses to run when `CI=true`, and refuses to record a baseline if an official sample does not pass.
 
+## Stamped fixtures and independent cryptographic checks (REM-17)
+
+* `scripts/zatca-sdk/sign_fixtures.php` stamps the committed AWJ fixtures with **AWJ's own production signing classes**
+  (no Laravel bootstrap) and a synthetic CA + leaf + secp256k1 key **generated in memory for that run**. The key and
+  certificate are written only to `$RUNNER_TEMP` in the SDK's file format; they are never committed, printed, reused
+  or uploaded, and are not a ZATCA credential. Key hygiene: the script reduces every warning/exception to class +
+  message, and the workflow runs it with `-d xdebug.mode=off -d zend.exception_ignore_args=1`, so no stack trace can
+  echo the in-memory key (guarded by `test_stamping_cannot_echo_the_ephemeral_key_into_ci_logs`). The runner needs
+  `xmllint` (libxml2-utils) because AWJ's C14N 1.1 hasher shells out to it. The signature-policy values are synthetic placeholders (the SDK does
+  not check them); production keeps failing closed until the official policy is configured.
+* `run --stamped-fixtures DIR --stamp-cert-dir DIR` validates them with a **second SDK config** whose `certPath` is
+  that synthetic leaf (the SDK compares XAdES `IssuerSerial` with the certificate its config points at). The baseline
+  carries a separate `awj_signed` section under the same ratchet rules, forbidden-warning list and known gaps. The
+  flags avoid the substring `-sign`, which the workflow guard reserves for the forbidden SDK flag.
+* A **signed mutation** (one character of the signature-policy digest) must make SIGNATURE fail: proof that the
+  SDK's SignedProperties digest covers the policy AWJ keeps.
+* `crypto_checks` re-derives, with stdlib Python and the OpenSSL CLI only (no SDK, no AWJ PHP), the material of every
+  signed official sample (the reference cases) and every stamped AWJ fixture: ECDSA over the raw 32-byte hash (and a
+  negative control over the hex text), certificate digest, SignedProperties digest, QR tags 6–9, and PIH. Official
+  results are aggregated in the result JSON (D-03d).
+* Advisory scope is unchanged: GLOBAL PASSED here is SDK conformance with a synthetic credential, **not** real ZATCA
+  acceptance.
+
 ## Security model
 
 | Control | Where enforced |

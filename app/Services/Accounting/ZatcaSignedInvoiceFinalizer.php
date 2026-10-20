@@ -52,8 +52,8 @@ final class ZatcaSignedInvoiceFinalizer
             $invoiceTime,
             $invoiceTotal,
             $vatTotal,
-            $cryptographic['invoice_hash'],
-            $cryptographic['ecdsa_signature'],
+            $cryptographic['invoice_digest'],
+            $cryptographic['signature_value'],
             $signed['public_key'],
             $documentType,
             $documentType === 'simplified' ? $signed['certificate_signature'] : null,
@@ -62,14 +62,14 @@ final class ZatcaSignedInvoiceFinalizer
         $finalXml = $this->replaceQr($signed['xml'], $currentQr, $qr);
         $verified = $this->signedMaterial->extract($finalXml);
         if (! hash_equals($cryptographic['invoice_hash'], $verified['invoice_hash'])
-            || ! hash_equals($cryptographic['ecdsa_signature'], $verified['ecdsa_signature'])
+            || ! hash_equals($cryptographic['signature_value'], $verified['signature_value'])
         ) {
             throw new RuntimeException('تغيير QR غيّر مادة توقيع فاتورة ZATCA على نحو غير متوقع.');
         }
 
         return [
             'xml' => $finalXml,
-            'hash' => base64_encode($verified['invoice_hash']),
+            'hash' => $verified['invoice_digest'],
             'qr' => $qr,
         ];
     }

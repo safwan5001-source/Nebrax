@@ -44,9 +44,16 @@ class ZatcaSignedInvoiceFinalizerTest extends TestCase
         $this->assertSame(range(1, 9), array_keys($fields));
         $this->assertSame('شركة أوج', $fields[1]);
         $this->assertSame('2026-08-30T09:13:14Z', $fields[3]);
-        $this->assertSame($signedMaterial['invoice_hash'], $fields[6]);
-        $this->assertSame($signedMaterial['ecdsa_signature'], $fields[7]);
+        // REM-17: الوسمان 6 و7 نصّا Base64 كما في XML، والوسم 8 SPKI بترميز DER.
+        $this->assertSame($signedMaterial['invoice_digest'], $fields[6]);
+        $this->assertSame($final['hash'], $fields[6]);
+        $this->assertStringContainsString('<ds:SignatureValue>'.$fields[7].'</ds:SignatureValue>', $final['xml']);
+        $this->assertSame($signedMaterial['signature_value'], $fields[7]);
         $this->assertSame($certificateMaterial['public_key'], $fields[8]);
+        $this->assertSame(88, strlen($fields[8]));
+        $leafKey = openssl_pkey_get_public("-----BEGIN CERTIFICATE-----\n".chunk_split(base64_encode($leafDer), 64, "\n")."-----END CERTIFICATE-----\n");
+        $this->assertNotFalse($leafKey);
+        $this->assertSame(1, openssl_verify($signedMaterial['invoice_hash'], (string) base64_decode($fields[7], true), $leafKey, OPENSSL_ALGO_SHA256));
         $this->assertSame($certificateMaterial['certificate_signature'], $fields[9]);
         $this->assertSame(app(ZatcaInvoiceHasher::class)->hash($final['xml']), $final['hash']);
         $this->assertSame(1, substr_count($final['xml'], $final['qr']));
