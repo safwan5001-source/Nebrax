@@ -227,16 +227,20 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
         ];
         if (filter_var($filters['include_meta'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
             $facetMeta = $facetFilter->meta($baseQuery, $facetSelection);
-            $meta = [
-                ...$facetMeta,
-                'facets' => app(StorefrontFacetVisualProjector::class)->project(
+            $projectedFacets = $request->attributes->get('section_data_preview') === true
+                ? app(StorefrontFacetVisualProjector::class)->projectWorkspace(
+                    $facetMeta['facets'],
+                    $facetFilter->activeFacetModels(),
+                    (string) $storefront->tenant_id,
+                )
+                : app(StorefrontFacetVisualProjector::class)->project(
                     $facetMeta['facets'],
                     $facetFilter->activeFacetModels(),
                     true,
-                    $request->attributes->get('section_data_preview') === true
-                        ? (string) $storefront->tenant_id
-                        : null,
-                ),
+                );
+            $meta = [
+                ...$facetMeta,
+                'facets' => $projectedFacets,
                 ...$meta,
             ];
         }
