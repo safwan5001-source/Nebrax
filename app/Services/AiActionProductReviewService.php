@@ -6,25 +6,48 @@ use App\Models\AiAction;
 use App\Models\AiActionEvent;
 use App\Models\AiActionExtraction;
 use App\Models\User;
+use App\Support\AiActionCostVisibility;
 use App\Support\AiActionException;
 use App\Support\ProductImportFields;
 
 /** AI-ACTIONS-03: edits an inert proposal only; it never calls ERP writers. */
 final class AiActionProductReviewService
 {
+    /** Decisions a reviewer may set; `needs_review` is only ever assigned by the server. */
+    private const DECISIONS = ['create', 'update', 'skip'];
+
     public function __construct(private readonly AiActionGateway $gateway) {}
 
     /** @return array{action:AiAction,proposal:array,manifest_hash:string} */
     public function show(User $actor, AiAction $action): array
     {
         $action = $this->gateway->show($actor, $action);
+        $effective = $this->effective($action);
+
+        return ['action' => $action, 'proposal' => $effective['proposal'], 'manifest_hash' => $effective['manifest_hash']];
+    }
+
+    /**
+     * The single definition of "the proposal the user is looking at": the latest
+     * saved version once it carries rows, else the immutable extraction manifest.
+     * AI-ACTIONS-04 previews bind to exactly this.
+     *
+     * @return array{proposal:array,proposal_hash:?string,manifest_hash:string,file_sha256:?string}
+     */
+    public function effective(AiAction $action): array
+    {
         $extraction = $this->extraction($action);
-        $latest = $action->versions->first();
+        $latest = $action->relationLoaded('versions') ? $action->versions->first() : $action->versions()->orderByDesc('version')->first();
         $proposal = $latest !== null && (($latest->proposal['rows'] ?? []) !== [])
             ? $latest->proposal
             : ['schema_version' => 1, 'rows' => $extraction->manifest['rows'] ?? []];
 
-        return compact('action', 'proposal') + ['manifest_hash' => $extraction->manifest_hash];
+        return [
+            'proposal' => $proposal,
+            'proposal_hash' => $latest?->proposal_hash,
+            'manifest_hash' => $extraction->manifest_hash,
+            'file_sha256' => $extraction->manifest['source']['content_sha256'] ?? null,
+        ];
     }
 
     public function edit(User $actor, AiAction $action, int $expectedVersion, array $edits): AiAction
@@ -39,22 +62,33 @@ final class AiActionProductReviewService
         foreach ($rows as $index => $row) $byId[(string) $row['row_id']] = $index;
         foreach ($edits as $edit) {
             $rowId = (string) ($edit['row_id'] ?? '');
-            if (! isset($byId[$rowId]) || ! is_array($edit['fields'] ?? null)) {
+            $decision = $edit['decision'] ?? null;
+            $hasFields = is_array($edit['fields'] ?? null) && $edit['fields'] !== [];
+            if (! isset($byId[$rowId]) || (! $hasFields && $decision === null) || (isset($edit['fields']) && ! is_array($edit['fields']))
+                || ($decision !== null && ! in_array($decision, self::DECISIONS, true))) {
                 throw new AiActionException('review_edit_invalid', 'صف أو تعديل مراجعة غير صالح.', 422);
             }
             $index = $byId[$rowId];
-            foreach ($edit['fields'] as $field => $value) {
+            foreach ($hasFields ? $edit['fields'] : [] as $field => $value) {
+                if ($field === AiActionCostVisibility::FIELD && ! AiActionCostVisibility::allows($actor)) {
+                    throw new AiActionException('cost_permission_required', 'إدخال سعر الشراء أو تعديله يتطلب صلاحية عرض التكلفة.', 403);
+                }
                 if (! is_string($field) || ProductImportFields::get($field) === null || ! $this->valid($field, $value)) {
                     throw new AiActionException('review_field_invalid', 'قيمة حقل المراجعة غير صالحة.', 422);
                 }
                 $rows[$index]['fields'][$field] = ['value' => $value, 'origin' => $value === null ? 'missing' : 'user', 'confidence' => null];
             }
-            $rows[$index]['media'] = $this->media($rows[$index]['fields']);
-            $rows[$index]['violations'] = array_values(array_filter($rows[$index]['violations'] ?? [], fn (array $v) => ! in_array($v['field'] ?? null, array_keys($edit['fields']), true)));
-            $rows[$index]['decision'] = $this->hasErrors($rows[$index]['violations']) ? 'needs_review' : 'create';
+            if ($hasFields) {
+                $rows[$index]['media'] = $this->media($rows[$index]['fields']);
+                $rows[$index]['violations'] = array_values(array_filter($rows[$index]['violations'] ?? [], fn (array $v) => ! in_array($v['field'] ?? null, array_keys($edit['fields']), true)));
+            }
+            // An explicit user decision wins; otherwise a deliberate update/skip survives a field edit.
+            $rows[$index]['decision'] = $decision ?? (in_array($rows[$index]['decision'] ?? null, ['update', 'skip'], true)
+                ? $rows[$index]['decision']
+                : ($this->hasErrors($rows[$index]['violations']) ? 'needs_review' : 'create'));
         }
         $proposal['rows'] = $rows;
-        $updated = $this->gateway->addVersion($actor, $action, $expectedVersion, $proposal);
+        $updated = $this->gateway->addVersion($actor, $action, $expectedVersion, $proposal, costGuard: false);
         AiActionEvent::create([
             'ai_action_id' => $updated->id, 'version' => $updated->version, 'event' => 'product_review_edited',
             'from_status' => AiAction::STATUS_CREATED, 'to_status' => $updated->status, 'actor_id' => $actor->id,

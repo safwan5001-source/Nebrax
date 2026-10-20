@@ -10,7 +10,16 @@ class AiAction extends BaseModel implements CompanyWide
 {
     public const STATUS_CREATED = 'created';
     public const STATUS_EDITING = 'editing';
+    public const STATUS_READY_FOR_APPROVAL = 'ready_for_approval';
+    public const STATUS_APPROVED = 'approved';
+    public const STATUS_EXPIRED = 'expired';
     public const STATUS_CANCELLED = 'cancelled';
+
+    /** States in which a draft can still change (any change invalidates previews and approvals). */
+    public const MUTABLE_STATUSES = [
+        self::STATUS_CREATED, self::STATUS_EDITING, self::STATUS_READY_FOR_APPROVAL,
+        self::STATUS_APPROVED, self::STATUS_EXPIRED,
+    ];
 
     protected $fillable = [
         'tenant_id', 'branch_id', 'type', 'schema_version', 'status', 'version',
@@ -42,6 +51,16 @@ class AiAction extends BaseModel implements CompanyWide
     public function extractions(): HasMany
     {
         return $this->hasMany(AiActionExtraction::class);
+    }
+
+    public function previews(): HasMany
+    {
+        return $this->hasMany(AiActionPreview::class);
+    }
+
+    public function approvals(): HasMany
+    {
+        return $this->hasMany(AiActionApproval::class);
     }
 
     public function creator(): BelongsTo

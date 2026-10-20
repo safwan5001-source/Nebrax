@@ -7,13 +7,17 @@ use App\Http\Requests\StoreAiActionRequest;
 use App\Http\Requests\StoreAiActionFileRequest;
 use App\Http\Requests\StoreAiActionVersionRequest;
 use App\Http\Requests\StoreAiActionReviewRequest;
+use App\Http\Requests\StoreAiActionApprovalRequest;
+use App\Http\Requests\StoreAiActionPreviewRequest;
 use App\Http\Resources\AiActionExtractionResource;
 use App\Http\Resources\AiActionResource;
 use App\Models\AiAction;
 use App\Models\AiActionFile;
 use App\Services\AiActionGateway;
 use App\Services\AiActionProductFileIntakeService;
+use App\Services\AiActionProductApprovalService;
 use App\Services\AiActionProductReviewService;
+use App\Support\AiActionCostVisibility;
 use App\Support\AiActionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -103,7 +107,8 @@ class AiActionController extends ApiController
         }
         return response()->json(['data' => [
             'action' => (new AiActionResource($data['action']))->resolve(),
-            'proposal' => $data['proposal'], 'manifest_hash' => $data['manifest_hash'],
+            'proposal' => AiActionCostVisibility::allows($request->user()) ? $data['proposal'] : AiActionCostVisibility::redactProposal($data['proposal']),
+            'manifest_hash' => $data['manifest_hash'],
         ]]);
     }
 
@@ -115,6 +120,48 @@ class AiActionController extends ApiController
             return $this->error($exception);
         }
         return (new AiActionResource($action))->response()->setStatusCode(201);
+    }
+
+    public function storePreview(StoreAiActionPreviewRequest $request, AiAction $action, AiActionProductApprovalService $approvals): JsonResponse
+    {
+        try {
+            $result = $approvals->createPreview($request->user(), $action, (int) $request->input('expected_version'));
+            $data = $approvals->present($result['preview']->load('approval'), $request->user(), $request->query());
+        } catch (AiActionException $exception) {
+            return $this->error($exception);
+        }
+        $response = response()->json(['data' => $data], $result['replayed'] ? 200 : 201);
+        if ($result['replayed']) $response->headers->set('AI-Action-Preview-Replayed', 'true');
+
+        return $response;
+    }
+
+    public function showPreview(Request $request, AiAction $action, string $preview, AiActionProductApprovalService $approvals): JsonResponse
+    {
+        try {
+            $model = $approvals->preview($request->user(), $action, $preview === 'latest' ? null : $preview);
+            $data = $approvals->present($model, $request->user(), $request->query());
+        } catch (AiActionException $exception) {
+            return $this->error($exception);
+        }
+
+        return response()->json(['data' => $data]);
+    }
+
+    public function approve(StoreAiActionApprovalRequest $request, AiAction $action, AiActionProductApprovalService $approvals): JsonResponse
+    {
+        try {
+            $result = $approvals->approve(
+                $request->user(), $action, (int) $request->input('expected_version'),
+                (string) $request->input('preview_id'), (string) $request->input('preview_hash'),
+            );
+        } catch (AiActionException $exception) {
+            return $this->error($exception);
+        }
+        $response = response()->json(['data' => $approvals->presentApproval($result['approval']) + ['action' => ['id' => $action->id, 'status' => AiAction::STATUS_APPROVED, 'version' => (int) $result['approval']->action_version]]], $result['replayed'] ? 200 : 201);
+        if ($result['replayed']) $response->headers->set('AI-Action-Approval-Replayed', 'true');
+
+        return $response;
     }
 
     private function error(AiActionException $exception): JsonResponse

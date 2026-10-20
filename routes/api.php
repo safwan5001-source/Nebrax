@@ -443,6 +443,14 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
             ->middleware([$perm('ai.actions.use'), 'throttle:60,1']);
         Route::post('ai-actions/{action}/review/versions', [AiActionController::class, 'storeReview'])
             ->middleware([$perm('ai.actions.use'), EnforceUserIdempotency::class, 'throttle:30,1']);
+        // AI-ACTIONS-04: read-only preview and an explicit, expiring approval record.
+        // Approval needs its own permission; nothing here writes products or ledger rows.
+        Route::post('ai-actions/{action}/previews', [AiActionController::class, 'storePreview'])
+            ->middleware([$perm('ai.actions.use'), EnforceUserIdempotency::class, 'throttle:10,1']);
+        Route::get('ai-actions/{action}/previews/{preview}', [AiActionController::class, 'showPreview'])
+            ->middleware([$perm('ai.actions.use'), 'throttle:60,1']);
+        Route::post('ai-actions/{action}/approvals', [AiActionController::class, 'approve'])
+            ->middleware([$perm('ai.actions.approve'), EnforceUserIdempotency::class, 'throttle:20,1']);
 
         // مركز المستندات — PR-2: استقبال يدوي خاص فقط، بلا OCR أو Queue أو إنشاء معاملات.
         Route::post('document-batches', [DocumentIntakeController::class, 'storeBatch'])
