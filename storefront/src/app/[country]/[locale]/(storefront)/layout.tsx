@@ -6,6 +6,7 @@ import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
 import type { StoreNavCategory } from "@/components/layout/CategoryNav";
 import { CategoryNav } from "@/components/layout/CategoryNav";
 import { Footer, FooterCategoryLinks } from "@/components/layout/Footer";
+import { GlobalBackgroundLayer } from "@/components/layout/GlobalBackgroundLayer";
 import { Header, HeaderMobileMenu } from "@/components/layout/Header";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { PublishedCardStyleProvider } from "@/components/layout/PublishedCardStyle";
@@ -188,7 +189,10 @@ export default async function StorefrontLayout({
   );
   const themeStyle = publishedThemeStyle(presentation);
   const backgroundStyle = presentation
-    ? resolveStorefrontBackgroundStyle(presentation, locale === "ar" ? "rtl" : "ltr")
+    ? resolveStorefrontBackgroundStyle(
+        presentation,
+        locale === "ar" ? "rtl" : "ltr",
+      )
     : undefined;
   const themeAttrs = publishedThemeAttrs(presentation);
   const compact = presentation ? headerIsCompact(presentation.header) : false;
@@ -254,6 +258,11 @@ export default async function StorefrontLayout({
 
   const chrome = (
     <>
+      <GlobalBackgroundLayer
+        background={presentation?.background}
+        resolved={identity?.presentationMedia ?? {}}
+        presentation={presentation}
+      />
       {announcements?.enabled ? (
         <AnnouncementBar
           doc={announcements}
@@ -369,7 +378,7 @@ export default async function StorefrontLayout({
     <div
       data-published-theme=""
       {...themeAttrs}
-      className="flex min-h-screen flex-1 flex-col"
+      className="relative isolate flex min-h-screen flex-1 flex-col"
       style={{ ...themeStyle, ...backgroundStyle }}
     >
       {chrome}

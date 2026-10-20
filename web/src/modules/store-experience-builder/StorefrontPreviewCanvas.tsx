@@ -82,6 +82,7 @@ import {
   type CustomizerMessageKey,
 } from "./messages";
 import { CanvasBackdrop } from "./media/CanvasBackdrop";
+import { GlobalBackgroundBackdrop } from "./GlobalBackgroundBackdrop";
 import { CanvasContentBlocks, Selectable } from "./CanvasContentBlocks";
 import { SectionActionBar, type CanvasSectionActions, type CanvasSectionEligibility } from "./CanvasSectionActions";
 import { CanvasGallery } from "./CanvasGallery";
@@ -548,7 +549,7 @@ export function StorefrontPreviewCanvas({
       {...(headerResolved.attrs ?? {})}
       dir={locale === "ar" ? "rtl" : "ltr"}
       className={cn(
-        "awj-store-preview relative min-h-full bg-store-background text-store-foreground",
+        "awj-store-preview relative isolate min-h-full bg-store-background text-store-foreground",
         PREVIEW_FONT_VARIABLES,
       )}
       style={{
@@ -557,6 +558,7 @@ export function StorefrontPreviewCanvas({
         fontFamily: fontFamilyStack(config.typography?.bodyFamily) ?? fontPresetFamilyStack(config.fontPreset),
       }}
     >
+      <GlobalBackgroundBackdrop background={config.background} presentation={config} viewport={viewport} />
       <p className="sr-only">{t("fixtureCatalogHint")}</p>
 
       <AnnouncementPreview
