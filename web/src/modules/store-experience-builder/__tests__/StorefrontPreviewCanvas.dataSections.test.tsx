@@ -222,6 +222,24 @@ describe("Canvas — data-backed sections (ADR-21)", () => {
     expect(container.querySelector('[data-discovery-layout="text-list"]')?.className).toContain("grid-cols-7");
   });
 
+  it("renders one discovery state and preserves legacy presentation controls", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={withSections([{ id: "d-1", type: "discovery", visible: true, content: { title: "", axis: "brand", display: "tiles", showCounts: true, columns: { desktop: 8 }, gap: "loose" } }])}
+        locale="en"
+        viewport="desktop"
+        homeSectionDiscovery={{ "d-1": { axis: "brand", name: "", nameEn: null, visual: null, options: [{ value: "b1", name: "Brand", nameEn: null, count: 5, visual: null }] } }}
+        homeSectionDiscoveryState={{ "d-1": "ready" }}
+        onSelectSection={() => {}}
+      />,
+    );
+    const region = container.querySelector('[data-home-data-section="discovery"]');
+    expect(region?.querySelectorAll("ul")).toHaveLength(1);
+    expect(region?.querySelector("[data-discovery-layout]")).toBeNull();
+    expect(region?.querySelector("[data-discovery-show-counts]")).toBeNull();
+    expect(region?.querySelector("li")?.textContent).toBe("Brand");
+  });
+
   it("uses the four-column Market grid default when grid is explicit", () => {
     const { container } = render(
       <StorefrontPreviewCanvas
