@@ -2,6 +2,8 @@
 // الخادم هو المرجع الوحيد: المعاينة والبصمة وحالة الموافقة تُقرأ منه ولا تُحسب هنا.
 // المبالغ تصل بالهللات (أعداد صحيحة) وتُحوَّل إلى ريال في طبقة العرض فقط.
 
+import type { PreviewImages, PreviewImagesSummary } from './product-images';
+
 export type PreviewOperation = 'create' | 'update' | 'skip' | 'blocked';
 export type RowDecision = 'create' | 'update' | 'skip' | 'needs_review';
 export type IssueSeverity = 'error' | 'warning';
@@ -44,7 +46,7 @@ export interface PreviewRow {
   };
   changes: PreviewChange[];
   prices: Partial<Record<'sale_price' | 'purchase_price' | 'min_sale_price' | 'tax_rate', PreviewPrice>> | null;
-  images: { primary: string | null; additional: string[]; count: number; will_apply: boolean; status?: 'deferred' | 'none'; fetched: boolean } | null;
+  images: PreviewImages | null;
   issues: PreviewIssue[];
 }
 
@@ -57,6 +59,7 @@ export interface PreviewTotals {
   errors: number;
   warnings: number;
   has_cost_values: boolean;
+  images: number;
 }
 
 export interface ApprovalInfo {
@@ -84,6 +87,7 @@ export interface ProductPreview {
   expires_at: string | null;
   totals: PreviewTotals;
   issues: PreviewIssue[];
+  images: PreviewImagesSummary | null;
   rows: PreviewRow[];
   pagination: { page: number; per_page: number; total: number; last_page: number; operation: PreviewOperation | null };
   approval: ApprovalInfo | null;
@@ -260,6 +264,14 @@ export const ISSUE_TITLE: Record<string, string> = {
   reference_ambiguous: 'اسم تصنيف/علامة مكرَّر',
   media_update_not_approved: 'صور المنتج الموجود غير معتمدة',
   media_deferred: 'استيراد الصور مؤجَّل',
+  remote_fetch_disabled: 'جلب الصور من الروابط غير مفعّل',
+  remote_fetch_limit: 'روابط صور أكثر من الحد',
+  image_url_blocked: 'رابط صورة مرفوض أمنياً',
+  image_fetch_failed: 'تعذّر تنزيل صورة',
+  image_invalid: 'صورة غير صالحة',
+  image_not_staged: 'صورة لم تُجهَّز',
+  archive_image_ambiguous: 'صورة تطابق أكثر من صف',
+  multiple_primary_images: 'أكثر من صورة رئيسية',
   unit_template_deferred: 'قالب الوحدات مؤجَّل',
 };
 

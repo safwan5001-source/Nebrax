@@ -1,13 +1,16 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle2, ClipboardCheck, Image as ImageIcon, Loader2, RefreshCw, ShieldCheck, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ClipboardCheck, Loader2, RefreshCw, ShieldCheck, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Money } from '@/components/ui/money';
 import { Tabs } from '@/components/ui/tabs';
 import { ProductExecutionPanel } from './product-execution-panel';
+import { imageText } from './product-images';
+import { PreviewImagesCell } from './product-images-ui';
+import { currentLang } from './product-execution';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { formatDateTime } from '@/lib/formatting';
@@ -100,19 +103,6 @@ function Prices({ row }: { row: PreviewRow }) {
         );
       })}
     </dl>
-  );
-}
-
-function Images({ row }: { row: PreviewRow }) {
-  const images = row.images;
-  if (!images || images.count === 0) return <span className="text-muted">—</span>;
-  const first = images.primary ?? images.additional[0];
-  return (
-    <div className="space-y-1 text-xs">
-      <p className="flex items-center gap-1"><ImageIcon className="h-3.5 w-3.5" aria-hidden /> {images.count} {images.count === 1 ? 'صورة' : 'صور'}</p>
-      {first && <p className="max-w-48 truncate text-muted" dir="ltr" title={first}>{first}</p>}
-      <p className="text-muted">{images.status === 'deferred' ? 'مؤجَّلة — لا تُنزَّل ولا تُرفق في هذه المرحلة' : 'لن تُطبَّق'}</p>
-    </div>
   );
 }
 
@@ -311,6 +301,11 @@ export function ProductPreviewPanel({ actionId, version, dirty, onEdit, onStatus
         <Stat label={OPERATION_LABEL.skip} value={totals.skip} tone="muted" />
         <Stat label={OPERATION_LABEL.blocked} value={totals.blocked} tone="negative" />
       </div>
+      {preview.images && preview.images.archive.total > 0 && preview.images.archive.unmatched.length > 0 && (
+        <p role="status" className="rounded border border-warning/40 bg-warning/10 p-3 text-sm" data-testid="unmatched-images">
+          {imageText(currentLang()).unmatched(preview.images.archive.unmatched.length)}: <bdi dir="ltr">{preview.images.archive.unmatched.slice(0, 8).map((image) => image.label).join(' · ')}</bdi>
+        </p>
+      )}
 
       {(preview.issues.length > 0 || counts.length > 0) && (
         <Card>
@@ -348,7 +343,7 @@ export function ProductPreviewPanel({ actionId, version, dirty, onEdit, onStatus
                     <td className="p-2"><MatchCell row={row} /></td>
                     <td className="p-2"><Changes row={row} /></td>
                     <td className="p-2"><Prices row={row} /></td>
-                    <td className="p-2"><Images row={row} /></td>
+                    <td className="p-2"><PreviewImagesCell actionId={actionId} images={row.images} /></td>
                     <td className="p-2"><Issues issues={row.issues} /></td>
                   </tr>
                 ))}
@@ -363,7 +358,7 @@ export function ProductPreviewPanel({ actionId, version, dirty, onEdit, onStatus
                 <MatchCell row={row} />
                 <Changes row={row} />
                 <Prices row={row} />
-                <Images row={row} />
+                <PreviewImagesCell actionId={actionId} images={row.images} />
                 <Issues issues={row.issues} />
               </li>
             ))}

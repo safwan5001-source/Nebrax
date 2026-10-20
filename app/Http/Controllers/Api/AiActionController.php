@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Requests\CancelAiActionRequest;
 use App\Http\Requests\StoreAiActionRequest;
 use App\Http\Requests\StoreAiActionFileRequest;
+use App\Http\Requests\StoreAiActionImageArchiveRequest;
 use App\Http\Requests\StoreAiActionVersionRequest;
 use App\Http\Requests\StoreAiActionReviewRequest;
 use App\Http\Requests\RetryAiActionExecutionRequest;
@@ -17,6 +18,7 @@ use App\Models\AiAction;
 use App\Models\AiActionFile;
 use App\Services\AiActionGateway;
 use App\Services\AiActionProductFileIntakeService;
+use App\Services\AiActionProductImageStager;
 use App\Services\AiActionProductApprovalService;
 use App\Services\AiActionProductExecutionService;
 use App\Services\AiActionProductReviewService;
@@ -203,6 +205,66 @@ class AiActionController extends ApiController
         }
 
         return response()->json(['data' => $data]);
+    }
+
+    /** AI-ACTIONS-06: validated ZIP of product images → private staging. Nothing is attached to a product. */
+    public function storeImageArchive(StoreAiActionImageArchiveRequest $request, AiAction $action, AiActionProductImageStager $stager): JsonResponse
+    {
+        try {
+            $result = $stager->stageArchive($request->user(), $action, (int) $request->input('expected_version'), $request->file('archive'));
+        } catch (AiActionException $exception) {
+            return $this->error($exception);
+        }
+
+        $response = response()->json(['data' => $this->imageList($stager, $action)], 201);
+        if ($result['replayed']) $response->headers->set('AI-Action-Images-Replayed', 'true');
+
+        return $response;
+    }
+
+    public function listImages(Request $request, AiAction $action, AiActionProductImageStager $stager): JsonResponse
+    {
+        try {
+            app(AiActionGateway::class)->authorizeFileIntake($request->user(), $action);
+        } catch (AiActionException $exception) {
+            return $this->error($exception);
+        }
+
+        return response()->json(['data' => $this->imageList($stager, $action)]);
+    }
+
+    /** Authenticated, tenant- and action-scoped thumbnail. The stored object is a re-encoded, size-bounded copy. */
+    public function showImageThumbnail(Request $request, AiAction $action, string $image, AiActionProductImageStager $stager)
+    {
+        try {
+            $thumbnail = $stager->thumbnail($request->user(), $action, $image);
+        } catch (AiActionException $exception) {
+            return $this->error($exception);
+        }
+
+        return response()->stream(function () use ($thumbnail): void {
+            fpassthru($thumbnail['stream']);
+            fclose($thumbnail['stream']);
+        }, 200, [
+            'Content-Type' => $thumbnail['mime'],
+            'X-Content-Type-Options' => 'nosniff',
+            'Content-Security-Policy' => "default-src 'none'",
+            'Cache-Control' => 'private, max-age=300',
+        ]);
+    }
+
+    /** @return array<string,mixed> */
+    private function imageList(AiActionProductImageStager $stager, AiAction $action): array
+    {
+        $catalog = $stager->catalog($action);
+
+        return [
+            'archive' => array_map(static fn (array $image): array => [
+                'id' => $image['id'], 'label' => $image['label'], 'sha256' => $image['sha256'], 'mime_type' => $image['mime_type'],
+                'size' => $image['size'], 'width' => $image['width'], 'height' => $image['height'],
+            ], $catalog['archive']),
+            'remote' => count(array_filter($catalog['by_key'], static fn (array $image): bool => $image['kind'] === 'url')),
+        ];
     }
 
     private function error(AiActionException $exception): JsonResponse

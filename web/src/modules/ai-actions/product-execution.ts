@@ -1,5 +1,6 @@
 // AI-ACTIONS-05 — عقد تنفيذ الاستيراد المعتمد وعرض نتيجته.
 // الخادم هو المرجع الوحيد للحالة والنتائج؛ الواجهة تعرضها وتقود الدفعات فقط.
+import type { ExecutionImage, ExecutionImagesSummary } from './product-images';
 
 export type ExecutionStatus = 'running' | 'completed' | 'partially_failed' | 'failed';
 export type RowStatus = 'pending' | 'success' | 'failed' | 'skipped';
@@ -18,6 +19,8 @@ export interface ExecutionRow {
   changed_fields: string[];
   deferred: string[];
   display: { name: string | null; sku: string | null; barcode: string | null } | null;
+  /** كل صورة سمّتها المعاينة، بنتيجة مستقلة عن نتيجة المنتج. */
+  images: ExecutionImage[];
 }
 
 export interface Execution {
@@ -28,10 +31,11 @@ export interface Execution {
   finished_at: string | null;
   retry_count: number;
   progress: { total: number; pending: number; success: number; failed: number; skipped: number };
-  deferred: { images: string; unit_template: string };
+  images: ExecutionImagesSummary;
+  deferred: { unit_template: string };
   rows: ExecutionRow[];
   pagination: { page: number; per_page: number; total: number; last_page: number; status: RowStatus | null };
-  permissions: { can_continue: boolean; can_retry: boolean; retryable_rows: number };
+  permissions: { can_continue: boolean; can_retry: boolean; retryable_rows: number; retryable_images: number };
 }
 
 /** لغة الواجهة الحالية (`<html lang>`)؛ العربية الافتراضية. */
@@ -45,7 +49,7 @@ const TEXT = {
     title: 'تنفيذ الاستيراد',
     intro: 'الموافقة لا تنفّذ شيئاً تلقائياً. اضغط «تنفيذ الاستيراد» لإنشاء المنتجات وتحديثها بحسب المعاينة المعتمدة فقط.',
     deferredTitle: 'مؤجَّل في هذه المرحلة',
-    deferredBody: 'صور المنتجات وقوالب الوحدات لا تُستورد ولا تُطبَّق، ولن تُعدّ ناجحة. لا يتغيّر المخزون ولا القيود المحاسبية.',
+    deferredBody: 'قوالب الوحدات لا تُطبَّق ولن تُعدّ ناجحة. تُرفق الصور المعتمدة فقط، صورةً صورة وبنتيجة مستقلة لكل صورة؛ ولا تُستبدل صور منتج موجود. لا يتغيّر المخزون ولا القيود المحاسبية.',
     run: 'تنفيذ الاستيراد',
     running: 'جارٍ التنفيذ…',
     confirmTitle: 'تأكيد تنفيذ الاستيراد',
@@ -53,11 +57,12 @@ const TEXT = {
     confirmLabel: 'تنفيذ',
     progress: (done: number, total: number) => `${done} من ${total} صف`,
     completed: 'اكتمل التنفيذ — كل الصفوف نُفِّذت أو تُخطّيت.',
-    partially: 'نُفِّذ جزء من الصفوف وفشل بعضها. الصفوف الناجحة نهائية ولن تُكرَّر.',
+    partially: 'نُفِّذ جزء من الصفوف أو الصور وفشل بعضها. الناجح نهائي ولن يُكرَّر.',
     failed: 'فشلت كل الصفوف المطلوبة.',
     retry: 'إعادة محاولة الصفوف الفاشلة',
-    retryHint: (n: number) => `${n} صفاً قابلاً لإعادة المحاولة. الصفوف الناجحة لا تُعاد.`,
-    notRetryable: 'الصفوف الفاشلة المتبقية تحتاج إصلاحاً في البيانات (استيراد جديد).',
+    retryHint: (rows: number, images: number) => `${rows} صفاً و${images} صورة قابلة لإعادة المحاولة. الناجح لا يُعاد، ولا يُعاد حفظ منتج لإصلاح صورة.`,
+    imageCounts: (summary: ExecutionImagesSummary) => `الصور: أُرفقت ${summary.success} · فشلت ${summary.failed} · لم تُرفق ${summary.skipped}${summary.pending > 0 ? ` · قيد الانتظار ${summary.pending}` : ''}`,
+    notRetryable: 'الصفوف أو الصور الفاشلة المتبقية تحتاج إصلاحاً في البيانات (استيراد جديد).',
     counts: { success: 'ناجح', failed: 'فاشل', skipped: 'متخطّى', pending: 'قيد الانتظار' },
     all: 'الكل',
     columns: ['الصف', 'المنتج', 'العملية', 'النتيجة', 'التفاصيل'],
@@ -76,7 +81,7 @@ const TEXT = {
     title: 'Run import',
     intro: 'Approval does not run anything by itself. Press “Run import” to create and update products exactly as in the approved preview.',
     deferredTitle: 'Deferred in this phase',
-    deferredBody: 'Product images and unit templates are not imported or applied and are never counted as success. Stock and accounting entries are not touched.',
+    deferredBody: 'Unit templates are not applied and never count as success. Only the approved images are attached, one by one, each with its own result; an existing product’s images are never replaced. Stock and accounting entries are not touched.',
     run: 'Run import',
     running: 'Running…',
     confirmTitle: 'Confirm import execution',
@@ -84,11 +89,12 @@ const TEXT = {
     confirmLabel: 'Run',
     progress: (done: number, total: number) => `${done} of ${total} rows`,
     completed: 'Finished — every row was applied or skipped.',
-    partially: 'Some rows were applied and some failed. Successful rows are final and will not be repeated.',
+    partially: 'Some rows or images were applied and some failed. What succeeded is final and will not be repeated.',
     failed: 'Every row that had to be applied failed.',
     retry: 'Retry failed rows',
-    retryHint: (n: number) => `${n} row(s) can be retried. Successful rows are never re-run.`,
-    notRetryable: 'The remaining failed rows need their data fixed (start a new import).',
+    retryHint: (rows: number, images: number) => `${rows} row(s) and ${images} image(s) can be retried. Successful work is never re-run, and no product is saved again to repair an image.`,
+    imageCounts: (summary: ExecutionImagesSummary) => `Images: attached ${summary.success} · failed ${summary.failed} · not attached ${summary.skipped}${summary.pending > 0 ? ` · pending ${summary.pending}` : ''}`,
+    notRetryable: 'The remaining failed rows or images need their data fixed (start a new import).',
     counts: { success: 'Succeeded', failed: 'Failed', skipped: 'Skipped', pending: 'Pending' },
     all: 'All',
     columns: ['Row', 'Product', 'Operation', 'Result', 'Details'],

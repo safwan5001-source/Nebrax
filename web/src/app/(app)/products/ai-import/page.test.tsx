@@ -12,6 +12,7 @@ vi.mock('next/link', () => ({
 }));
 vi.mock('@/lib/api', () => ({
   api,
+  fetchImageUrl: vi.fn(async () => null),
   ApiError: class ApiError extends Error {
     status = 0;
     body: unknown = null;
@@ -31,6 +32,8 @@ function mockServer(preview: unknown, costHidden = false) {
     if (options?.method === 'POST') posts.push({ path, body: options.body });
     if (path === '/ai-actions' && options?.method === 'POST') return { data: { id: 'action-1', version: 1 } };
     if (path.endsWith('/files')) return { data: {} };
+    if (path.endsWith('/image-archives')) return { data: { archive: [{ id: 'img-1', label: 'A-1.png', sha256: 'ab'.repeat(32), mime_type: 'image/png', size: 1, width: 1, height: 1 }], remote: 0 } };
+    if (path.endsWith('/images')) return { data: { archive: [], remote: 0 } };
     if (path.endsWith('/review')) return { data: { action: { id: 'action-1', version: 1, status: 'created', cost_hidden: costHidden }, proposal: { rows: [reviewRow('r1', 2, 'A-1', 'needs_review'), reviewRow('r2', 3, 'A-2', 'create')] } } };
     if (path.endsWith('/review/versions')) return { data: { version: 2, status: 'editing', latest_version: { proposal: { rows: [reviewRow('r1', 2, 'A-1', 'update'), reviewRow('r2', 3, 'A-2', 'create')] } } } };
     if (path.includes('/previews')) return { data: preview };
@@ -56,6 +59,7 @@ async function uploadFile(container: HTMLElement) {
 }
 
 beforeEach(() => {
+  document.documentElement.lang = 'ar';
   api.mockReset();
   toast.success.mockReset();
   toast.error.mockReset();
@@ -136,5 +140,45 @@ describe('استيراد المنتجات عبر مساعد أَوْج — ال�
     expect((within(box).getByRole('button', { name: /الموافقة على المعاينة/ }) as HTMLButtonElement).disabled).toBe(true);
     expect(api.mock.calls.some(([path]) => String(path).endsWith('/approvals'))).toBe(false);
     expect(screen.getByRole('link', { name: 'العودة' }).getAttribute('href')).toBe('/products');
+  });
+
+  it('يرفع أرشيف الصور بنسخة المسودة ثم يعيد تحميل المراجعة، ولا يسمح بالرفع مع تعديلات غير محفوظة', async () => {
+    const posts = mockServer(preview);
+    const { container } = render(<AiProductImportReviewPage />);
+    const user = await uploadFile(container);
+
+    const zip = () => screen.getByLabelText('اختر ملف ZIP للصور') as HTMLInputElement;
+    await user.selectOptions(screen.getByLabelText('القرار-2'), 'update');
+    expect(zip().disabled).toBe(true);
+    expect(screen.getByText('احفظ تعديلاتك أولاً ثم ارفع الصور.')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'حفظ إصدار المراجعة' }));
+    await waitFor(() => expect(zip().disabled).toBe(false));
+    const reviewsBefore = api.mock.calls.filter(([path]) => String(path).endsWith('/review')).length;
+    await user.upload(zip(), new File(['PK'], 'images.zip', { type: 'application/zip' }));
+
+    await waitFor(() => expect(posts.some((post) => post.path.endsWith('/image-archives'))).toBe(true));
+    const form = posts.find((post) => post.path.endsWith('/image-archives'))?.body as FormData;
+    expect(form.get('expected_version')).toBe('2');
+    await waitFor(() => expect(api.mock.calls.filter(([path]) => String(path).endsWith('/review')).length).toBe(reviewsBefore + 1));
+  });
+
+  it('يعرض خيار إضافة الصور لمنتج موجود لصفوف التحديث فقط، ويحفظه كقرار صريح مستقل', async () => {
+    const posts = mockServer(preview);
+    const { container } = render(<AiProductImportReviewPage />);
+    const user = await uploadFile(container);
+
+    // r1 is "needs_review", r2 is "create": neither may offer to touch an existing product's gallery.
+    expect(screen.queryByLabelText(/إضافة صور هذا الصف إلى المنتج الموجود/)).toBeNull();
+    await user.selectOptions(screen.getByLabelText('القرار-2'), 'update');
+    const box = screen.getByLabelText('إضافة صور هذا الصف إلى المنتج الموجود (إلحاق فقط، لا استبدال)-2') as HTMLInputElement;
+    expect(box.checked).toBe(false);
+    await user.click(box);
+    await user.click(screen.getByRole('button', { name: 'حفظ إصدار المراجعة' }));
+
+    await waitFor(() => expect(posts.some((post) => post.path.endsWith('/review/versions'))).toBe(true));
+    expect(posts.find((post) => post.path.endsWith('/review/versions'))?.body).toEqual({
+      expected_version: 1, edits: [{ row_id: 'r1', decision: 'update', media_update_approved: true }],
+    });
   });
 });

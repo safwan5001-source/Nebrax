@@ -18,7 +18,7 @@ const { api, ApiErrorMock, toast } = vi.hoisted(() => {
   return { api: vi.fn(), ApiErrorMock, toast: { success: vi.fn(), error: vi.fn() } };
 });
 
-vi.mock('@/lib/api', () => ({ api, ApiError: ApiErrorMock }));
+vi.mock('@/lib/api', () => ({ api, ApiError: ApiErrorMock, fetchImageUrl: vi.fn(async () => null) }));
 vi.mock('@/components/ui/toast', () => ({ useToast: () => toast }));
 
 const HASH = 'ab'.repeat(32);
@@ -34,8 +34,9 @@ function previewFixture(overrides: Partial<ProductPreview> = {}): ProductPreview
     approvable: true,
     generated_at: '2026-10-20T10:00:00Z',
     expires_at: '2026-10-20T10:30:00Z',
-    totals: { rows: 3, create: 1, update: 1, skip: 1, blocked: 0, errors: 0, warnings: 1, has_cost_values: true },
+    totals: { rows: 3, create: 1, update: 1, skip: 1, blocked: 0, errors: 0, warnings: 1, has_cost_values: true, images: 0 },
     issues: [],
+    images: null,
     rows: [
       {
         row_id: 'r1', source_row: 2, decision: 'create', display: { name: 'قهوة جديدة', sku: 'NEW-1', barcode: null },
@@ -43,7 +44,7 @@ function previewFixture(overrides: Partial<ProductPreview> = {}): ProductPreview
         match: { kind: 'none', value: null, target_product_id: null, target_version: null, target_name: null, target_sku: null },
         changes: [{ field: 'name', before: null, after: 'قهوة جديدة' }, { field: 'sale_price', before: null, after: 1050 }],
         prices: { sale_price: { before: null, after: 1050 }, purchase_price: { before: null, after: 500 }, tax_rate: { before: null, after: 15 } },
-        images: { primary: 'https://img.example/a.jpg', additional: [], count: 1, will_apply: false, status: 'deferred', fetched: false },
+        images: { count: 1, ready: 0, will_apply: false, status: 'unavailable', mode: 'new_product', existing: { count: 0, update_approved: null }, items: [{ key: 'k1', role: 'primary', position: 0, source: { kind: 'url', label: 'img.example/a.jpg' }, status: 'unavailable', code: 'remote_fetch_disabled', message: 'جلب الصور من روابط خارجية غير مفعّل على المنصة؛ لن تُطبَّق هذه الصورة.', image: null }] },
         issues: [{ code: 'unit_template_deferred', field: 'unit_template', severity: 'warning', message: '«قالب الوحدات» لا يُطبَّق في هذه المرحلة.' }],
       },
       {
@@ -110,7 +111,8 @@ describe('المعاينة النهائية والموافقة', () => {
     expect(text).toMatch(/12\.00/);
     expect(text).toMatch(/10\.00/);
     expect(screen.getAllByText('وصف جديد').length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/مؤجَّلة — لا تُنزَّل ولا تُرفق/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/جلب الصور من روابط خارجية غير مفعّل/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('غير متاحة').length).toBeGreaterThan(0);
     expect(screen.getAllByText('تخطٍّ بقرارك').length).toBeGreaterThan(0);
     expect(screen.getAllByText(/لا يُطبَّق في هذه المرحلة/).length).toBeGreaterThan(0);
     expect(onStatus).toHaveBeenCalledWith('ready_for_approval');
@@ -152,7 +154,7 @@ describe('المعاينة النهائية والموافقة', () => {
   it('لا تسمح بالموافقة عند وجود أخطاء تمنع التنفيذ وتشرح السبب', async () => {
     mountApi(previewFixture({
       approvable: false,
-      totals: { rows: 3, create: 0, update: 1, skip: 1, blocked: 1, errors: 1, warnings: 0, has_cost_values: false },
+      totals: { rows: 3, create: 0, update: 1, skip: 1, blocked: 1, errors: 1, warnings: 0, has_cost_values: false, images: 0 },
       rows: [{ ...previewFixture().rows[0], operation: 'blocked', issues: [{ code: 'required_missing', field: 'name', severity: 'error', message: '«الاسم» مطلوب لإنشاء منتج جديد.' }] }],
     }));
     renderPanel();
@@ -175,7 +177,7 @@ describe('المعاينة النهائية والموافقة', () => {
         missing('trusted_identifier_missing', null, 'يلزم رمز صنف (SKU) أو باركود لإنشاء منتج جديد؛ لن يُولَّد واحد تلقائياً.'),
       ],
     };
-    mountApi(previewFixture({ approvable: false, totals: { rows: 1, create: 0, update: 0, skip: 0, blocked: 1, errors: 4, warnings: 0, has_cost_values: false }, rows: [blocked] }));
+    mountApi(previewFixture({ approvable: false, totals: { rows: 1, create: 0, update: 0, skip: 0, blocked: 1, errors: 4, warnings: 0, has_cost_values: false, images: 0 }, rows: [blocked] }));
     renderPanel();
 
     for (const title of ['سعر الشراء مطلوب للإنشاء', 'نسبة الضريبة مطلوبة للإنشاء', 'الوحدة مطلوبة للإنشاء', 'يلزم SKU أو باركود']) {

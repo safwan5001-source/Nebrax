@@ -137,9 +137,11 @@ class AiActionProductExecutionTest extends TestCase
         $this->assertSame(2, ProductActivity::withoutGlobalScopes()->where('action', 'created')->whereIn('product_id', [$new->id, $bar->id])->count());
         $this->assertSame(1, ProductActivity::withoutGlobalScopes()->where('action', 'updated')->where('product_id', $updated->id)->count());
         $this->assertSame('executed', AiAction::findOrFail($id)->status);
-        // Images are deferred: nothing was fetched or attached, and the result says so.
+        // Remote image fetching is off: nothing was fetched or attached, and the result says so per image.
         $this->assertSame(0, ProductMedia::withoutGlobalScopes()->count());
-        $this->assertSame('deferred', $execution['deferred']['images']);
+        $this->assertSame(['unit_template' => 'deferred'], $execution['deferred']);
+        $this->assertSame(0, $execution['images']['total']);
+        $this->assertSame(['unavailable'], array_column($rows['new']['images'], 'status'));
         $this->assertNoAccountingOrStockEffect();
         $this->assertSame(1, AiActionEvent::withoutGlobalScopes()->where('event', 'execution_started')->count());
         $this->assertSame(1, AiActionEvent::withoutGlobalScopes()->where('event', 'execution_completed')->count());

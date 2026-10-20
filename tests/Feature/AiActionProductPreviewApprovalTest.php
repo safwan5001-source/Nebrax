@@ -141,10 +141,12 @@ class AiActionProductPreviewApprovalTest extends TestCase
         $this->assertSame(1050, $rows['new']['prices']['sale_price']['after']);
         $this->assertSame(500, $rows['new']['prices']['purchase_price']['after']);
         $this->assertSame(3, $rows['new']['images']['count']);
+        // Remote fetching ships off: the URLs are listed with the reason, nothing is fetched, and it is only a warning.
         $this->assertFalse($rows['new']['images']['will_apply']);
-        $this->assertSame('deferred', $rows['new']['images']['status']);
-        $this->assertContains('media_deferred', $this->codes($rows['new']));
-        $this->assertFalse($rows['new']['images']['fetched']);
+        $this->assertSame('unavailable', $rows['new']['images']['status']);
+        $this->assertSame(['unavailable', 'unavailable', 'unavailable'], array_column($rows['new']['images']['items'], 'status'));
+        $this->assertContains('remote_fetch_disabled', $this->codes($rows['new']));
+        $this->assertSame([], array_filter($rows['new']['issues'], fn (array $i) => $i['severity'] === 'error' && str_contains($i['code'], 'image')));
 
         $this->assertSame('update', $rows['upd']['operation']);
         $this->assertSame($existing['id'], $rows['upd']['match']['target_product_id']);
