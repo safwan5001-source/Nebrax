@@ -65,7 +65,11 @@ beforeEach(() => {
   toast.error.mockReset();
   vi.stubGlobal('crypto', { randomUUID: () => '11111111-1111-4111-8111-111111111111' });
 });
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  document.documentElement.lang = '';
+  vi.unstubAllGlobals();
+});
 
 describe('استيراد المنتجات عبر مساعد أَوْج — المراجعة ثم المعاينة والموافقة', () => {
   it('يحفظ القرار المختار كإصدار جديد قبل إنشاء المعاينة النهائية', async () => {

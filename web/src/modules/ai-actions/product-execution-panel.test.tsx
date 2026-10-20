@@ -70,7 +70,7 @@ beforeEach(() => {
   vi.stubGlobal('crypto', { randomUUID: () => '00000000-0000-4000-8000-000000000000' });
   vi.spyOn(window, 'confirm').mockReturnValue(true);
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); document.documentElement.lang = ''; });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); document.documentElement.lang = ''; vi.unstubAllGlobals(); });
 
 describe('pure helpers', () => {
   it('computes progress and lock states', () => {
