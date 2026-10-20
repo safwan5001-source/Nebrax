@@ -194,16 +194,21 @@ class ZatcaSignedInvoicePostingTest extends TestCase
     {
         $this->assertSame(base64_encode(hash('sha256', '0', true)), ZatcaService::LEGACY_GENESIS_HASH);
 
-        // حالة ما قبل REM-17: أول فاتورة مرحَّلة بالـ genesis القديم (تُحاكى هنا بتجهيز صفّ تاريخي في الاختبار فقط).
-        $legacy = app(InvoiceService::class)->post($this->draft());
-        $legacyXml = str_replace('>'.self::GENESIS.'<', '>'.ZatcaService::LEGACY_GENESIS_HASH.'<', $legacy->zatca_xml);
-        $this->assertNotSame($legacy->zatca_xml, $legacyXml);
-        DB::table('invoices')->where('id', $legacy->id)->update([
-            'zatca_xml' => $legacyXml,
+        // حالة ما قبل REM-17: أول فاتورة مرحَّلة بالـ genesis القديم. تُحاكى بصفّ تاريخي كما كتبه الإصدار السابق: ICV مباشرةً
+        // على `invoices` بلا مدخل سلسلة (REM-18b-2)، ومُدرَج قبل أن يملك المستأجر رأس سلسلة — وهو ما يسمح به السياج F1 وحده.
+        // XML الصفّ مأخوذ من فاتورة حقيقية رُحّلت في مستأجر آخر ثم استُبدل فيها genesis بالقيمة القديمة.
+        $legacyXml = str_replace('>'.self::GENESIS.'<', '>'.ZatcaService::LEGACY_GENESIS_HASH.'<', $this->xmlPostedInAnotherTenant());
+        $this->assertStringContainsString('>'.ZatcaService::LEGACY_GENESIS_HASH.'<', $legacyXml);
+        $legacyId = (string) \Illuminate\Support\Str::uuid();
+        DB::table('invoices')->insert([
+            'id' => $legacyId, 'tenant_id' => $this->tenant->id, 'number' => 'INV-LEGACY-1', 'partner_id' => $this->customer->id,
+            'invoice_date' => now()->toDateString(), 'status' => 'posted', 'zatca_document_type' => 'standard',
+            'zatca_icv' => 1, 'zatca_uuid' => (string) \Illuminate\Support\Str::uuid(), 'zatca_xml' => $legacyXml,
             'zatca_previous_hash' => ZatcaService::LEGACY_GENESIS_HASH,
             'zatca_hash' => app(ZatcaInvoiceHasher::class)->hash($legacyXml),
+            'created_at' => now(), 'updated_at' => now(),
         ]);
-        $before = (array) DB::table('invoices')->where('id', $legacy->id)->first();
+        $before = (array) DB::table('invoices')->where('id', $legacyId)->first();
 
         $this->enableSigning();
         $next = app(InvoiceService::class)->post($this->draft());
@@ -214,7 +219,8 @@ class ZatcaSignedInvoicePostingTest extends TestCase
         $this->assertNotSame(self::GENESIS, $next->zatca_previous_hash);
         $this->assertStringContainsString('<ds:Signature', $next->zatca_xml);
         // التاريخ لا يُمسّ: XML وQR والهاش وPIH للفاتورة السابقة كما هي بايتاً ببايت (لا إصلاح صامت — REM-25).
-        $this->assertSame($before, (array) DB::table('invoices')->where('id', $legacy->id)->first());
+        $this->assertSame($before, (array) DB::table('invoices')->where('id', $legacyId)->first());
+        $this->assertSame(1, (int) DB::table('zatca_chains')->where('tenant_id', $this->tenant->id)->value('seed_icv'), 'بذرة السلسلة = آخر ICV قديم');
     }
 
     /** @test */
@@ -304,6 +310,22 @@ class ZatcaSignedInvoicePostingTest extends TestCase
         $key = openssl_pkey_get_public("-----BEGIN CERTIFICATE-----\n".chunk_split($certificate[1], 64, "\n")."-----END CERTIFICATE-----\n");
         $this->assertNotFalse($key);
         $this->assertSame(1, openssl_verify((string) base64_decode($hash, true), (string) base64_decode($signature[1], true), $key, OPENSSL_ALGO_SHA256));
+    }
+
+    /** XML فاتورة رُحّلت فعلاً (بلا توقيع) في مستأجر منفصل؛ يعود السياق إلى مستأجر الاختبار. */
+    private function xmlPostedInAnotherTenant(): string
+    {
+        $source = Tenant::create(['name' => 'مصدر XML', 'slug' => 'awj-zatca-legacy-source', 'vat_number' => '300000000000003', 'currency' => 'SAR']);
+        app(TenantContext::class)->set($source->id);
+        app(ChartOfAccountsSeeder::class)->seed($source->id);
+        $customer = Partner::create(['name' => 'عميل', 'type' => 'customer']);
+        $xml = app(InvoiceService::class)->post(app(InvoiceService::class)->create(
+            ['partner_id' => $customer->id, 'payment_type' => 'cash'],
+            [['description' => 'خدمة', 'quantity' => 1, 'unit_price' => 10000, 'tax_rate' => 15]],
+        ))->zatca_xml;
+        app(TenantContext::class)->set($this->tenant->id);
+
+        return $xml;
     }
 
     private function draft(): Invoice

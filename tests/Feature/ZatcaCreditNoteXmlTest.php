@@ -104,6 +104,7 @@ class ZatcaCreditNoteXmlTest extends TestCase
                 ZatcaCreditNoteXml::withQr($doc, $qr);
                 $this->fail('must reject');
             } catch (RuntimeException $e) {
+                $this->rethrowAssertion($e);
                 $this->addToAssertionCount(1);
             }
         }
@@ -183,6 +184,7 @@ class ZatcaCreditNoteXmlTest extends TestCase
                 new ZatcaCreditNoteInput(...array_merge($good, [$key => $value]));
                 $this->fail("must reject: {$label}");
             } catch (InvalidArgumentException|RuntimeException $e) {
+                $this->rethrowAssertion($e);
                 $this->addToAssertionCount(1); // لقطة غائبة/تالفة = RuntimeException بعقد ZatcaPartyXml القائم (REM-15a)
             }
         }
@@ -212,6 +214,7 @@ class ZatcaCreditNoteXmlTest extends TestCase
                 new ZatcaCreditNoteLine('x', ...$a);
                 $this->fail("must reject: {$label}");
             } catch (InvalidArgumentException|RuntimeException $e) {
+                $this->rethrowAssertion($e);
                 $this->addToAssertionCount(1); // لقطة غائبة/تالفة = RuntimeException بعقد ZatcaPartyXml القائم (REM-15a)
             }
         }
@@ -251,6 +254,7 @@ class ZatcaCreditNoteXmlTest extends TestCase
                 ZatcaCreditNoteInputFactory::fromPostedNote($note, $invoice, $spec['uuid'], $spec['icv'], self::GENESIS_PIH, CarbonImmutable::parse(self::ISSUED_AT, 'UTC'), $spec['reason']);
                 $this->fail("must reject: {$label}");
             } catch (InvalidArgumentException|RuntimeException $e) {
+                $this->rethrowAssertion($e);
                 $this->addToAssertionCount(1); // لقطة غائبة/تالفة = RuntimeException بعقد ZatcaPartyXml القائم (REM-15a)
             }
         }
@@ -356,6 +360,14 @@ class ZatcaCreditNoteXmlTest extends TestCase
         $note->setRelation('lines', $lines);
 
         return [$note, $invoice];
+    }
+
+    /** `fail()` يرمي AssertionFailedError وهو RuntimeException في PHPUnit؛ لا يُبتلع فينجح الاختبار بصمت. */
+    private function rethrowAssertion(\Throwable $e): void
+    {
+        if ($e instanceof \PHPUnit\Framework\AssertionFailedError) {
+            throw $e;
+        }
     }
 
     /** @return array<int, string> */
