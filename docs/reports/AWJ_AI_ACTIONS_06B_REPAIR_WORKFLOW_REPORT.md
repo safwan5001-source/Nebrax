@@ -1,6 +1,6 @@
 # AWJ AI-ACTIONS-06B — Repair Workflow (second of two linked PRs)
 
-Stacked on **06A (product images, PR #1584)**: its base is the 06A branch, so the diff shows only the repair work. Merge 06A first.
+**06A (product images, PR #1584) is merged** (squash `be7a6c61b78b7f4c7d3f3b67f11c815c7547ce87`). This PR now targets `main` and its diff is the repair work only.
 
 ## Design in one paragraph
 A repair is a **new AI action that holds only the rows an execution could not apply**. The original action, approval, preview, execution and
@@ -63,7 +63,37 @@ unrelated test; the AI test files now unstub globals after each test (fixed in 0
 
 ## Git / CI
 
-__GIT__
+| Item | Value |
+|---|---|
+| Branch | `ai-actions-06b-repair-workflow` |
+| PR | https://github.com/safwan5001-source/Nebrax/pull/1586 (Draft, base `main`) |
+| Base | `main` @ `be7a6c61b78b7f4c7d3f3b67f11c815c7547ce87` (includes the squashed 06A) |
+| Previous head (stacked on 06A) | `60dcce1ff0464386089a8e78f895c2ebe08ac09a` — CI fully green |
+| Head | the commit that carries this report on `ai-actions-06b-repair-workflow` (current value and the CI result are on the PR; a report cannot contain its own SHA) |
+
+**How the branch was brought onto the squashed `main`.** 06A was squash-merged, so the original 06A commits on this branch no longer matched `main`.
+Instead of rewriting history (no rebase / force-push on a pushed branch), `main` was merged into the branch; every conflict was in a file that is
+*06A's content plus the repair additions*, and the resolution kept this branch's version after checking that `git diff origin/main` contained
+**no line `main` has that this branch lacks** (additions only). The 06A report touched for a CI note was restored to `main`'s version (the note lives
+in this report). The final diff against `main` is exactly these 16 files, all repair work:
+
+* Backend: `AiActionController.php` (+3 endpoints), `AiActionProductReviewService.php` (field lock, no-source-file repairs),
+  `AiActionProductImageStager.php` (+`copyBetween`, additions only), `routes/api.php`, `AiActionRepair.php` (new), `AiActionProductRepairService.php` (new),
+  `2026_11_19_010000_create_ai_action_repairs_table.php` (new).
+* Web: `product-repair.ts`, `product-repair-ui.tsx` (new), `product-execution-panel.tsx`, `app/(app)/products/ai-import/page.tsx`.
+* Tests: `AiActionProductRepairTest.php`, `product-repair-ui.test.tsx` (new), page and execution-panel tests.
+* This report.
+
+No image, approval or product-execution logic was changed to resolve the merge.
+
+**Verification on the updated branch.** `AiAction*` + repair + `ProductReferenceClassificationGuard` + `BranchIsolationGuard` + `ProductImportMediaSecurity`:
+**102 passed on PostgreSQL**, 96 on SQLite; web `vitest` 69 passed. The requested guarantees are asserted by `AiActionProductRepairTest`:
+tenant isolation (other tenant 404 on candidates and start), branch isolation (`branch_context_conflict`), RBAC (`ai.actions.repair` required; reading
+candidates needs only `use`; cost visibility), idempotency (same key replays, new key returns the single open repair), and previous results intact
+(per-row status / attempts / product ids and the event count are unchanged, successful products keep `updated_at` and one `created` activity).
+
+**Mergeability / review.** After the update GitHub reports the PR no longer conflicting (`dirty` → checks pending); no reviews and no review threads.
+CI on the new head is reported on the PR.
 
 ## Next step
 After 06A and 06B merge: retention job for staged images and repair copies (deleted with the draft), and an operator runbook for enabling

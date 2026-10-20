@@ -93,10 +93,6 @@ Web: `modules/ai-actions/product-images.ts`, `product-images-ui.tsx` (new), `pro
 | `npm run build` (Next.js) | passes |
 | `tsc --noEmit` | no errors in changed files |
 
-**CI note.** The first CI run of the web build failed in an unrelated `store-experience-builder` test. Root cause: the AI panel tests stubbed
-`crypto.randomUUID` (a constant id) and never unstubbed it, and vitest runs every file in one process, so two same-id sections collapsed in a later test.
-The test was passing in isolation. Fix (06A `a814ae0`): AI test files call `vi.unstubAllGlobals()` after each test; no unrelated test was edited.
-
 Two existing assertions changed meaning (images are no longer "deferred"): `AiActionProductPreviewApprovalTest` (remote-off URLs are `unavailable` with a warning) and `AiActionProductExecutionTest` (per-image `unavailable`, `deferred = {unit_template}`).
 
 ## Risks and what remains
