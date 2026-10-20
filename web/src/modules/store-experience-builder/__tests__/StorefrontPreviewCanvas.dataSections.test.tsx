@@ -112,7 +112,7 @@ describe("Canvas — data-backed sections (ADR-21)", () => {
         ])}
         locale="en"
         viewport="desktop"
-        homeSectionProducts={{ "shelf-1": [{ id: "p1", name: "Rose", thumbnailUrl: "/rose.jpg", priceAmountMinor: 2500, currency: "SAR", inStock: true }] }}
+        homeSectionProducts={{ "shelf-1": [{ id: "p1", name: "وردة", nameEn: "Rose", thumbnailUrl: "/rose.jpg", priceAmountMinor: 2500, currency: "SAR", inStock: true }] }}
         homeSectionProductsState={{ "shelf-1": "ready" }}
         homeSectionDiscovery={{ "d-1": { axis: "brand", name: "", nameEn: null, visual: null, options: [{ value: "b1", name: "Brand", nameEn: "Brand", count: 3, visual: null }] } }}
         homeSectionDiscoveryState={{ "d-1": "ready" }}
@@ -121,6 +121,7 @@ describe("Canvas — data-backed sections (ADR-21)", () => {
     );
     expect(container.querySelector('[data-home-data-section="productShelf"] [data-card]')).not.toBeNull();
     expect(container.querySelector('[data-home-data-section="productShelf"]')?.textContent).toContain("SAR");
+    expect(container.querySelector('[data-home-data-section="productShelf"]')?.textContent).toContain("Rose");
     expect(container.querySelector('[data-home-data-section="discovery"]')?.textContent).toContain("Brand");
   });
 });

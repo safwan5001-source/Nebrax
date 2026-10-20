@@ -255,7 +255,7 @@ interface StorefrontPreviewCanvasProps {
   sectionActions?: CanvasSectionActions;
   onRetryOffers?: () => void;
   /** FLOWERS-H9c — authoritative live data for the three data-backed home sections. */
-  homeSectionProducts?: Record<string, { id: string; name: string; thumbnailUrl: string | null; priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null; isVariantManaged?: boolean }[]>;
+  homeSectionProducts?: Record<string, { id: string; name: string; nameEn?: string | null; thumbnailUrl: string | null; priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null; isVariantManaged?: boolean }[]>;
   homeSectionProductsState?: Record<string, "idle" | "loading" | "error" | "ready">;
   homeSectionDiscovery?: Record<string, WorkspaceDiscoveryData | null>;
   homeSectionDiscoveryState?: Record<string, "idle" | "loading" | "error" | "ready">;
@@ -1686,7 +1686,7 @@ export function StorefrontPreviewCanvas({
                     ) : products.length === 0 ? (
                       <p data-home-section-empty="productShelf" className="mt-4 rounded-store border border-dashed border-store-border px-4 py-8 text-center text-sm text-store-muted-foreground">{t("homeNewArrivalsEmpty")}</p>
                     ) : (
-                      <ul className={cn("mt-4 grid gap-3", newArrivalsColumns)} {...shelfAttrs(section.design, viewport)}>{products.map((product) => <li key={product.id} data-card="" className="overflow-hidden rounded-store border border-store-border bg-store-surface"><div data-card-image="" className={cn(cardImageHeight, "relative bg-store-surface-muted")}>{product.thumbnailUrl ? <PreviewMediaImage src={product.thumbnailUrl} alt="" className="size-full object-cover" /> : null}</div><div data-card-body="" className={cardPad}><p className="line-clamp-2 text-sm font-semibold text-store-foreground"><bdi>{product.name}</bdi></p><PreviewProductMeta product={product} locale={locale} /></div></li>)}</ul>
+                      <ul className={cn("mt-4 grid gap-3", newArrivalsColumns)} {...shelfAttrs(section.design, viewport)}>{products.map((product) => <li key={product.id} data-card="" className="overflow-hidden rounded-store border border-store-border bg-store-surface"><div data-card-image="" className={cn(cardImageHeight, "relative bg-store-surface-muted")}>{product.thumbnailUrl ? <PreviewMediaImage src={product.thumbnailUrl} alt="" className="size-full object-cover" /> : null}</div><div data-card-body="" className={cardPad}><p className="line-clamp-2 text-sm font-semibold text-store-foreground"><bdi>{locale === "en" && product.nameEn ? product.nameEn : product.name}</bdi></p><PreviewProductMeta product={product} locale={locale} /></div></li>)}</ul>
                     )}
                   </section>
                 );

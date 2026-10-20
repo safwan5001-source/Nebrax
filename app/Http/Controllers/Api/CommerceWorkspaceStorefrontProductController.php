@@ -233,6 +233,7 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
                     $facetMeta['facets'],
                     $facetFilter->activeFacetModels(),
                     true,
+                    (string) $storefront->tenant_id,
                 ),
                 ...$meta,
             ];

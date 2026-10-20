@@ -5,7 +5,9 @@ namespace App\Services\Commerce;
 use App\Models\CommerceFacet;
 use App\Models\CommerceFacetVisual;
 use App\Models\StorefrontMedia;
+use App\Support\EdgeScheme;
 use App\Support\Commerce\CommerceFacetVisualNormalizer;
+use Illuminate\Support\Facades\URL;
 
 /**
  * AWJ-VD-H1 / VD-1c (§3.8-b, owner decisions D1/D2) — the public `visual` of `storefront.v1` `meta.facets[]` and of
@@ -47,7 +49,7 @@ final class StorefrontFacetVisualProjector
      * @param  array<string, CommerceFacet>  $models  active facets with their active values, keyed by facet key
      * @return list<array<string, mixed>>
      */
-    public function project(array $facets, array $models, bool $hasStorefront): array
+    public function project(array $facets, array $models, bool $hasStorefront, ?string $workspaceTenantId = null): array
     {
         if (! $hasStorefront || $facets === []) {
             return $this->withoutVisuals($facets);
@@ -111,7 +113,7 @@ final class StorefrontFacetVisualProjector
             $document = $documents[$visualId];
             if ($isFacet) {
                 if (isset($document['self']['image'])) {
-                    $image = $this->withSources($document['self']['image'], $visualId, $media);
+                    $image = $this->withSources($document['self']['image'], $visualId, $media, $workspaceTenantId);
                     if ($image === null) {
                         unset($document['self']['image']);
                     } else {
@@ -122,7 +124,7 @@ final class StorefrontFacetVisualProjector
                     }
                 }
             } elseif (isset($document['image'])) {
-                $image = $this->withSources($document['image'], $visualId, $media);
+                $image = $this->withSources($document['image'], $visualId, $media, $workspaceTenantId);
                 if ($image === null) {
                     unset($document['image']);
                 } else {
@@ -172,7 +174,7 @@ final class StorefrontFacetVisualProjector
      * @param  \Illuminate\Support\Collection<string, StorefrontMedia>  $media
      * @return array<string, mixed>|null  `null` when the media is not usable or has none of the public files
      */
-    private function withSources(array $image, string $visualId, $media): ?array
+    private function withSources(array $image, string $visualId, $media, ?string $workspaceTenantId = null): ?array
     {
         $asset = $media->get($image['mediaId'] ?? '');
         if ($asset === null) {
@@ -185,10 +187,17 @@ final class StorefrontFacetVisualProjector
             if ($variant === null) {
                 continue;
             }
+            $src = $workspaceTenantId === null
+                ? route(self::ROUTE, ['visualId' => $visualId, 'mediaId' => $asset->id, 'file' => $file], false)
+                : EdgeScheme::forBrowser(URL::temporarySignedRoute(
+                    'commerce.workspace.storefront-media.file',
+                    now()->addMinutes(20),
+                    ['media' => $asset->id, 'file' => $file, 'tenant' => $workspaceTenantId],
+                ));
             $sources[] = [
                 'width' => (int) ($variant['width'] ?? 0),
                 'format' => str_ends_with($file, '.webp') ? 'webp' : 'jpg',
-                'src' => route(self::ROUTE, ['visualId' => $visualId, 'mediaId' => $asset->id, 'file' => $file], false),
+                'src' => $src,
             ];
         }
 
