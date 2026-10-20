@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Resources\StorefrontProductResource;
 use App\Models\CommerceCategoryListing;
 use App\Models\CommerceListing;
+use App\Models\InventoryReservation;
 use App\Models\Product;
+use App\Models\ProductWarehouseStock;
 use App\Models\Storefront;
 use App\Models\Tenant;
 use App\Services\Commerce\AvailableToSellService;
@@ -17,6 +19,7 @@ use App\Tenancy\BranchScope;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Database\Eloquent\Collection;
 
 /**
  * CUST-H2-3 — قراءة منتجات مساحة عمل Commerce للمعاينة داخل مُخصِّص صفحة
@@ -49,7 +52,7 @@ use Illuminate\Http\Request;
  * تماماً.
  *
  * **الحمولة**: القائمة مُصغَّرة عمداً (مُعرِّف/اسم/صورة مصغَّرة/مؤشّر متغيّرات
- * فقط) — لا حمولة منتج كاملة لمجرَّد منتقٍ. التفصيل يعيد استخدام
+ * مع سعر/عملة وتوفر مشتقّين للبطاقات) — لا حمولة منتج كاملة لمجرَّد منتقٍ. التفصيل يعيد استخدام
  * `StorefrontProductResource` نفسه الذي يستثني أصلاً كل حقل تكلفة/هامش/مورّد/
  * مخزون داخلي (راجع تعليق ذلك المورد).
  *
@@ -67,7 +70,7 @@ use Illuminate\Http\Request;
  * يتركّب فوق بوابة الأهلية القائمة (نشط + منشور على قناة *هذا* المتجر) بـ
  * `whereIn` إضافية — لا يُغيّرها ولا يتجاوزها؛ معرّفٌ أجنبي أو غير مؤهَّل
  * يسقط من النتيجة صمتاً (لا تسريب، لا خطأ) تماماً كما يفعل الفشل الجزئي في
- * المعاينة اليوم. الحمولة نفسها (`WorkspaceProductSummary`) — لا حقل جديد.
+ * المعاينة اليوم. الحمولة نفسها (`WorkspaceProductSummary`) مع الحقول العامة الإضافية.
  */
 class CommerceWorkspaceStorefrontProductController extends ApiController
 {
@@ -155,7 +158,9 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
         $paginator = $query->paginate($perPage, ['*'], 'page', (int) ($filters['page'] ?? 1));
 
         $gallery = app(ProductMediaGalleryService::class);
-        $data = $paginator->getCollection()->map(function (Product $product) use ($gallery, $storefront) {
+        $currency = Tenant::findOrFail($storefront->tenant_id)->currency;
+        $inStockByProduct = $this->batchAvailability($paginator->getCollection(), $storefront->sales_channel_id);
+        $data = $paginator->getCollection()->map(function (Product $product) use ($gallery, $storefront, $currency, $inStockByProduct) {
             $media = StorefrontProductResource::workspaceMediaPayload($gallery->resolveGallery($product), $storefront->id);
 
             return [
@@ -164,6 +169,13 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
                 'name_en' => $product->name_en,
                 'thumbnail_url' => $media[0]['url'] ?? null,
                 'is_variant_managed' => $product->isVariantManaged(),
+                // Keep list cards aligned with the public catalogue contract.
+                // Variant products intentionally expose no guessed parent price.
+                'price' => [
+                    'amount_minor' => $product->isVariantManaged() ? null : (int) $product->sale_price,
+                    'currency' => $currency,
+                ],
+                'in_stock' => $inStockByProduct[$product->id] ?? null,
             ];
         })->all();
 
@@ -179,6 +191,34 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
                 ],
             ],
         ]);
+    }
+
+    /** @return array<string, bool|null> */
+    private function batchAvailability(Collection $products, string $channelId): array
+    {
+        $ids = $products->pluck('id')->all();
+        if ($ids === []) return [];
+
+        try {
+            $warehouse = app(FulfillmentPolicyService::class)->resolveWarehouseFor($channelId);
+        } catch (FulfillmentPolicyNotConfiguredException) {
+            return array_fill_keys($ids, null);
+        }
+
+        $onHand = ProductWarehouseStock::query()
+            ->where('warehouse_id', $warehouse->id)->whereIn('product_id', $ids)
+            ->selectRaw('product_id, sum(quantity) as on_hand_qty')->groupBy('product_id')
+            ->pluck('on_hand_qty', 'product_id');
+        $reserved = InventoryReservation::query()
+            ->where('warehouse_id', $warehouse->id)->where('status', InventoryReservation::STATUS_ACTIVE)
+            ->whereIn('product_id', $ids)->selectRaw('product_id, sum(base_quantity) as reserved_qty')
+            ->groupBy('product_id')->pluck('reserved_qty', 'product_id');
+
+        $result = [];
+        foreach ($ids as $productId) {
+            $result[$productId] = max(0, (int) ($onHand[$productId] ?? 0) - (int) ($reserved[$productId] ?? 0)) > 0;
+        }
+        return $result;
     }
 
     public function show(

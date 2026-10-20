@@ -3635,13 +3635,13 @@ export function ExperienceBuilder({
                   selectedCategoryRegionId={selectedCategoryRegion}
                   onSelectCategoryRegion={handleSelectCategoryRegion}
                   categoryGridProductsState={categoryGridProductsState}
-                  categoryGridProducts={categoryGridProducts.map((p) => ({ id: p.id, name: p.name, thumbnailUrl: p.thumbnailUrl }))}
+                  categoryGridProducts={categoryGridProducts}
                   categoryGridProductsTotal={categoryGridProductsTotal}
                   homeCategoriesState={homeCategoriesState}
                   homeCategories={homeCategories.map((c) => ({ id: c.id, name: c.name, imageUrl: c.imageUrl ?? null, color: c.color ?? null }))}
                   onRetryHomeCategories={handleRetryHomeCategories}
                   homeNewArrivalsState={homeNewArrivalsState}
-                  homeNewArrivals={homeNewArrivals.map((p) => ({ id: p.id, name: p.name, thumbnailUrl: p.thumbnailUrl }))}
+                  homeNewArrivals={homeNewArrivals}
                   onRetryHomeNewArrivals={handleRetryHomeNewArrivals}
                   featuredResolved={featuredResolved}
                   featuredResolvedState={featuredResolvedState}

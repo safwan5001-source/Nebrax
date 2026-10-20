@@ -311,3 +311,48 @@ describe("Canvas — card hooks and tokens (CUST-HV V9d-1)", () => {
   });
 });
 
+describe("Canvas — storefront price and variant parity", () => {
+  afterEach(() => cleanup());
+  const config = withSections([{ id: "new-1", type: "newArrivals", visible: true }] as never);
+
+  it("renders a legitimate zero price instead of hiding it", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={config}
+        locale="en"
+        viewport="desktop"
+        onSelectSection={() => {}}
+        homeNewArrivalsState="ready"
+        homeNewArrivals={[{ id: "p-zero", name: "Free sample", thumbnailUrl: null, priceAmountMinor: 0, currency: "SAR", inStock: true }]}
+      />,
+    );
+    expect(container.textContent).toContain("SAR");
+    expect(container.textContent).toContain("Add to cart");
+  });
+
+  it("shows option pricing and selection affordance for variant-managed products", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={config}
+        locale="en"
+        viewport="desktop"
+        onSelectSection={() => {}}
+        homeNewArrivalsState="ready"
+        homeNewArrivals={[{ id: "p-variant", name: "Shirt", thumbnailUrl: null, priceAmountMinor: null, currency: "SAR", inStock: true, isVariantManaged: true }]}
+      />,
+    );
+    expect(container.textContent).toContain("Priced by option");
+    expect(container.textContent).toContain("Select options");
+    expect(container.textContent).not.toContain("Add to cart");
+  });
+
+  it("renders one out-of-stock label, matching the published card action line", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas config={config} locale="en" viewport="desktop" onSelectSection={() => {}}
+        homeNewArrivalsState="ready"
+        homeNewArrivals={[{ id: "p-oos", name: "Unavailable", thumbnailUrl: null, priceAmountMinor: 100, currency: "SAR", inStock: false }]} />,
+    );
+    expect((container.textContent?.match(/Out of stock/g) ?? [])).toHaveLength(1);
+  });
+});
+

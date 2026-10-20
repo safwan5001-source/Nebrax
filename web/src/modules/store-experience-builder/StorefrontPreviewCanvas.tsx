@@ -200,7 +200,7 @@ interface StorefrontPreviewCanvasProps {
    * filtered by `category_id` — never invented client-side.
    */
   categoryGridProductsState?: "idle" | "loading" | "error" | "ready";
-  categoryGridProducts?: { id: string; name: string; thumbnailUrl: string | null }[];
+  categoryGridProducts?: { id: string; name: string; thumbnailUrl: string | null; priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null; isVariantManaged?: boolean }[];
   categoryGridProductsTotal?: number;
   /**
    * CUST-H4-3 — the Home "categories" section's own real Canvas preview:
@@ -223,7 +223,7 @@ interface StorefrontPreviewCanvasProps {
    * `PREVIEW_PRODUCTS` fixture this branch used before.
    */
   homeNewArrivalsState?: "idle" | "loading" | "error" | "ready";
-  homeNewArrivals?: { id: string; name: string; thumbnailUrl: string | null }[];
+  homeNewArrivals?: { id: string; name: string; thumbnailUrl: string | null; priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null; isVariantManaged?: boolean }[];
   onRetryHomeNewArrivals?: () => void;
   /**
    * CUST-H4-5 — the Home "featured" section's own real Canvas preview.
@@ -234,7 +234,7 @@ interface StorefrontPreviewCanvasProps {
    * the picker's own "selected products" chips show — replacing the bare
    * id-text-chip list this branch rendered before.
    */
-  featuredResolved?: Record<string, { id: string; name: string; thumbnailUrl: string | null }[]>;
+  featuredResolved?: Record<string, { id: string; name: string; thumbnailUrl: string | null; priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null; isVariantManaged?: boolean }[]>;
   featuredResolvedState?: Record<string, "idle" | "loading" | "error" | "ready">;
   onRetryFeatured?: (sectionId: string) => void;
   /**
@@ -1056,6 +1056,7 @@ export function StorefrontPreviewCanvas({
                             <p className="line-clamp-2 text-sm font-semibold text-store-foreground">
                               <bdi>{product.name}</bdi>
                             </p>
+                            <PreviewProductMeta product={product} locale={locale} />
                           </div>
                         </li>
                       ))}
@@ -1439,6 +1440,7 @@ export function StorefrontPreviewCanvas({
                               <p className="line-clamp-2 text-sm font-semibold text-store-foreground">
                                 <bdi>{product.name}</bdi>
                               </p>
+                            <PreviewProductMeta product={product} locale={locale} />
                             </div>
                           </li>
                         ))}
@@ -1814,6 +1816,44 @@ function formatMinorAmount(amountMinor: number, currency: string, locale: Custom
   }
 }
 
+function PreviewProductMeta({
+  product,
+  locale,
+}: {
+  product: { priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null; isVariantManaged?: boolean };
+  locale: CustomizerLocale;
+}) {
+  return (
+    <div className="mt-2 space-y-1">
+      {product.isVariantManaged ? (
+        <p className="text-xs font-medium text-store-muted-foreground">{locale === "ar" ? "السعر حسب الخيار" : "Priced by option"}</p>
+      ) : typeof product.priceAmountMinor === "number" && product.priceAmountMinor >= 0 ? (
+        <p className="text-sm font-bold text-store-primary">
+          <bdi>{formatMinorAmount(product.priceAmountMinor, product.currency ?? "SAR", locale)}</bdi>
+        </p>
+      ) : null}
+      {product.inStock === true && (
+        <p className="text-[11px] font-medium text-store-success">
+          {locale === "ar" ? "متوفر" : "In stock"}
+        </p>
+      )}
+      {product.inStock === false ? (
+        <span className="block w-full rounded-store border border-store-border px-2 py-1 text-center text-xs font-semibold text-store-muted-foreground">
+          {locale === "ar" ? "غير متوفر" : "Out of stock"}
+        </span>
+      ) : product.isVariantManaged ? (
+        <span className="block w-full rounded-store border border-store-primary px-2 py-1 text-center text-xs font-bold text-store-primary">
+          {locale === "ar" ? "اختيار الخيارات" : "Select options"}
+        </span>
+      ) : (
+        <button type="button" disabled aria-disabled="true" className="w-full rounded-store bg-store-primary px-2 py-1 text-xs font-semibold text-store-primary-foreground">
+          {locale === "ar" ? "إضافة للسلة" : "Add to cart"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 /**
  * CUST-H2-3 — real structured Product-page preview. Reuses the exact
  * presentation meaning of `storefront/.../products/[slug]/ProductDetails.tsx`
@@ -2164,7 +2204,7 @@ function CategoryPagePreview({
   selectedRegionId?: string | null;
   onSelectRegion?: (id: string) => void;
   gridProductsState?: "idle" | "loading" | "error" | "ready";
-  gridProducts?: { id: string; name: string; thumbnailUrl: string | null }[];
+  gridProducts?: { id: string; name: string; thumbnailUrl: string | null; priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null; isVariantManaged?: boolean }[];
   gridProductsTotal?: number;
 }) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
@@ -2320,6 +2360,9 @@ function CategoryPagePreview({
                       >
                         <bdi>{product.name}</bdi>
                       </p>
+                      <div className={cn(productCard === "compact" ? "px-1.5 pb-1" : "px-2 pb-1.5")}>
+                        <PreviewProductMeta product={product} locale={locale} />
+                      </div>
                     </div>
                   ))}
                 </div>
