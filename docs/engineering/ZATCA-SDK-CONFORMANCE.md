@@ -81,6 +81,17 @@ git diff tests/Fixtures/zatca-sdk      # review: the baseline diff IS the confor
 * Advisory scope is unchanged: GLOBAL PASSED here is SDK conformance with a synthetic credential, **not** real ZATCA
   acceptance.
 
+## Credit-note checks (REM-18a)
+
+Fixtures named `awj-note-*.xml` are credit notes (381) produced by `ZatcaCreditNoteXml`; their digests are pinned in
+`ZatcaCreditNoteFixtureDriftTest` (the digest guard reads both drift tests). Besides the SDK stages, `conformance.py`
+reads each note (unsigned and signed) structurally and fails unless: root `Invoice`, one `InvoiceTypeCode` = 381, exactly
+one `BillingReference` with a non-empty ID (**BR-KSA-56**, mandatory although the SDK only warns), exactly one
+`PaymentMeans` with one non-empty `InstructionNote` (**BR-KSA-17**), `PaymentMeansCode` exactly `10`. Every run also
+removes each element from a note and requires the SDK to report the matching rule id and the structural check to flag it
+(oracle liveness). Both rule ids are in `awj_forbidden_warning_codes`; a note that cannot satisfy them is a regression,
+never a baseline entry. `result.json` gains a `notes` map (fixture → problems).
+
 ## Security model
 
 | Control | Where enforced |

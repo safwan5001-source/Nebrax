@@ -128,7 +128,7 @@ class ForbiddenWarningTest(unittest.TestCase):
         self.assertTrue(c.evaluate(official, {"f1.xml": dirty}, dict(base, awj_known_gap_warnings={"f1": ["BR-CO-16"]}))[1])
         self.assertFalse(c.evaluate(official, {"f1.xml": dirty}, dict(base, awj_known_gap_warnings={"other": ["BR-CO-16"]}))[1])
 
-    def test_the_committed_baseline_pins_the_monetary_rules_and_documents_exactly_three_known_gaps(self):
+    def test_the_committed_baseline_pins_the_monetary_rules_and_documents_exactly_four_known_gaps(self):
         import json
         path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "tests", "Fixtures", "zatca-sdk", "baseline.json")
         with open(path, encoding="utf-8") as fh:
@@ -137,6 +137,7 @@ class ForbiddenWarningTest(unittest.TestCase):
                      "BR-KSA-EN16931-08", "BR-KSA-EN16931-09", "BR-KSA-EN16931-11", "BR-KSA-19"):
             self.assertIn(code, base["awj_forbidden_warning_codes"])
         self.assertEqual(base["awj_known_gap_warnings"], {
+            "awj-note-standard-zero-rate": ["BR-KSA-EN16931-08", "BR-KSA-EN16931-09"],  # REM-18a: same REM-12 gap
             "awj-standard-adjustment": ["BR-CO-16"],
             "awj-standard-shipping": ["BR-KSA-19"],
             "awj-standard-zero-rate": ["BR-KSA-EN16931-08", "BR-KSA-EN16931-09"],
@@ -239,7 +240,7 @@ class PolicyTest(unittest.TestCase):
     def test_result_metadata_has_only_awj_detail(self):
         rows, ok = c.evaluate({"a.xml": OK_OFFICIAL, "b.xml": OK_OFFICIAL}, {"f1.xml": SAME}, BASELINE)
         meta = c.result_metadata(rows, [], "proof", ok)
-        self.assertEqual(sorted(meta), ["awj", "awj_signed", "crypto", "isolation_proof", "mutation_problems", "official", "ok"])
+        self.assertEqual(sorted(meta), ["awj", "awj_signed", "crypto", "isolation_proof", "mutation_problems", "notes", "official", "ok"])
         self.assertEqual(meta["official"], {"samples": 2, "ok": 2})
         self.assertNotIn("a.xml", str(meta))
 

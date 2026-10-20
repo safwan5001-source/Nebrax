@@ -314,6 +314,120 @@ def baseline_entry(res: SdkResult) -> dict:
     }
 
 
+# ───────────────────────── credit-note structure checks (REM-18a) ─────────────────────────
+#
+# The SDK reports a missing original-invoice reference (BR-KSA-56 / BT-25) only as a WARNING although the
+# specification makes it mandatory, and it does not validate the PaymentMeansCode value at all. These checks
+# therefore read the notes' XML directly (stdlib ElementTree, no SDK, no AWJ PHP) and fail closed on:
+#   * root is Invoice, type 381 (a 383 debit note is out of REM-18a scope and is flagged, never silently accepted);
+#   * exactly one BillingReference with a non-empty InvoiceDocumentReference/ID           (BR-KSA-56, mandatory);
+#   * exactly one PaymentMeans with a non-empty InstructionNote                              (BR-KSA-17);
+#   * PaymentMeansCode is exactly "10" (cash) — AWJ policy; no code is invented for a credit refund.
+# `note_mutation_liveness` proves the SDK itself is live on those rules by removing each element from a note
+# fixture and requiring the matching rule id to appear (as warning or error).
+
+NOTE_PREFIX = "awj-note-"
+_UBL = {
+    "inv": "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2",
+    "cac": "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2",
+    "cbc": "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2",
+}
+
+
+def note_structure_problems(xml_text: str) -> list[str]:
+    """Problems found in one credit-note XML (empty = structurally sound). Pure; no SDK."""
+    import xml.etree.ElementTree as ET
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError as exc:
+        return [f"not well-formed XML: {exc}"]
+    problems: list[str] = []
+    if root.tag != "{%s}Invoice" % _UBL["inv"]:
+        problems.append(f"root element is {root.tag!r}, expected the UBL Invoice (ZATCA credit notes use the Invoice root)")
+    type_codes = root.findall("cbc:InvoiceTypeCode", _UBL)
+    if len(type_codes) != 1:
+        problems.append(f"expected exactly one InvoiceTypeCode, found {len(type_codes)}")
+    elif (type_codes[0].text or "").strip() != "381":
+        problems.append(f"InvoiceTypeCode is {(type_codes[0].text or '').strip()!r}; only credit notes (381) are in scope")
+    refs = root.findall("cac:BillingReference", _UBL)
+    ref_ids = [(r.findtext("cac:InvoiceDocumentReference/cbc:ID", default="", namespaces=_UBL) or "").strip() for r in refs]
+    if len(refs) != 1 or not ref_ids[0]:
+        problems.append(f"BR-KSA-56: exactly one BillingReference with a non-empty original invoice ID is mandatory "
+                        f"(found {len(refs)}, ids={ref_ids})")
+    means = root.findall("cac:PaymentMeans", _UBL)
+    if len(means) != 1:
+        problems.append(f"BR-KSA-17: exactly one PaymentMeans (with the issuing reason) is mandatory, found {len(means)}")
+    else:
+        notes = means[0].findall("cbc:InstructionNote", _UBL)
+        if len(notes) != 1 or not (notes[0].text or "").strip():
+            problems.append(f"BR-KSA-17: exactly one non-empty InstructionNote is mandatory (found {len(notes)})")
+        code = [(c.text or "").strip() for c in means[0].findall("cbc:PaymentMeansCode", _UBL)]
+        if code != ["10"]:
+            problems.append(f"PaymentMeansCode must be exactly '10' (cash) under AWJ policy, found {code}")
+    return problems
+
+
+def note_checks(paths: list[str], prefix: str = "") -> list[dict]:
+    """One row per credit-note fixture (unsigned or signed) whose basename starts with `awj-note-`."""
+    rows = []
+    for path in paths:
+        name = os.path.basename(path)
+        if not name.startswith(NOTE_PREFIX):
+            continue
+        with open(path, "r", encoding="utf-8") as fh:
+            problems = note_structure_problems(fh.read())
+        rows.append({"kind": "note", "name": prefix + name, "verdict": "OK" if not problems else "REGRESSION",
+                     "details": problems})
+    return rows
+
+
+_BILLING_REFERENCE = re.compile(r"\s*<cac:BillingReference>.*?</cac:BillingReference>", re.S)
+_INSTRUCTION_NOTE = re.compile(r"\s*<cbc:InstructionNote>.*?</cbc:InstructionNote>", re.S)
+
+
+def _rule_seen(res: SdkResult, rule: str) -> bool:
+    return rule in res.warnings or any(rule in codes for codes in res.errors.values())
+
+
+def note_mutation_liveness(runner: "SdkRunner", note_paths: list[str], workdir: str) -> list[str]:
+    """Remove BillingReference / InstructionNote from an AWJ note fixture; the SDK must report BR-KSA-56 /
+    BR-KSA-17 respectively, and the structural check must flag both and a changed PaymentMeansCode. The unmutated
+    fixture must report neither rule. A silent oracle (or a structural check that never fires) is caught here."""
+    candidates = [p for p in note_paths if os.path.basename(p).startswith(NOTE_PREFIX)]
+    if not candidates:
+        return ["note mutation: no AWJ credit-note fixture"]
+    with open(candidates[0], "r", encoding="utf-8") as fh:
+        body = fh.read()
+    problems: list[str] = []
+    cases = (
+        ("without BillingReference", _BILLING_REFERENCE, "", "BR-KSA-56"),
+        ("without InstructionNote", _INSTRUCTION_NOTE, "", "BR-KSA-17"),
+    )
+    base_out = os.path.join(workdir, "note-base.xml")
+    with open(base_out, "w", encoding="utf-8") as fh:
+        fh.write(body)
+    base = runner.validate(base_out)
+    for rule in ("BR-KSA-56", "BR-KSA-17"):
+        if _rule_seen(base, rule):
+            problems.append(f"note mutation: unmutated fixture already reports {rule}")
+    for label, pattern, repl, rule in cases:
+        mutated, count = pattern.subn(repl, body)
+        if count != 1:
+            problems.append(f"note mutation {label}: anchor found {count} times (expected once)")
+            continue
+        out = os.path.join(workdir, "note-mutated.xml")
+        with open(out, "w", encoding="utf-8") as fh:
+            fh.write(mutated)
+        if not _rule_seen(runner.validate(out), rule):
+            problems.append(f"note mutation {label}: SDK did not report {rule}")
+        if not any(rule in item for item in note_structure_problems(mutated)):
+            problems.append(f"note mutation {label}: structural check did not flag {rule}")
+    wrong_code = body.replace("<cbc:PaymentMeansCode>10<", "<cbc:PaymentMeansCode>30<")
+    if wrong_code == body or not any("PaymentMeansCode" in item for item in note_structure_problems(wrong_code)):
+        problems.append("note mutation: structural check did not flag a changed PaymentMeansCode")
+    return problems
+
+
 # ───────────────────────── independent cryptographic checks (REM-17) ─────────────────────────
 #
 # Re-derives, WITHOUT the SDK and WITHOUT AWJ's PHP code, the cryptographic material of every signed invoice
@@ -674,6 +788,12 @@ def render_summary(rows: list[dict], proof: str, mutation: list[str], sdk_versio
             note = "; ".join(row["details"]) if row["details"] else ""
             out.append(f"| `{row['name']}` | {row['verdict']} | " + " | ".join(cells) + f" | {note} |")
         out.append("")
+    notes = [r for r in rows if r["kind"] == "note"]
+    if notes:
+        out += ["### Credit-note structure checks (BR-KSA-56 reference + BR-KSA-17 reason; stdlib, no SDK)", "",
+                "| Credit note | Verdict | Notes |", "|---|---|---|"]
+        out += [f"| `{r['name']}` | {r['verdict']} | {'; '.join(r['details'])} |" for r in notes]
+        out.append("")
     crypto = [r for r in rows if r["kind"] == "crypto"]
     if crypto:
         out += ["### Independent cryptographic checks (stdlib + OpenSSL CLI; no SDK, no AWJ PHP)", "",
@@ -690,6 +810,7 @@ def result_metadata(rows: list[dict], mutation: list[str], proof: str, ok: bool)
     signed = {r["name"]: {"verdict": r["verdict"], **baseline_entry(r["result"])} for r in rows
               if r["kind"] == "awj_signed" and "result" in r}
     crypto = [r for r in rows if r["kind"] == "crypto"]
+    notes = [r for r in rows if r["kind"] == "note"]
     off = [r for r in rows if r["kind"] == "official"]
     return {
         "ok": bool(ok and not mutation), "isolation_proof": proof, "mutation_problems": mutation,
@@ -703,6 +824,7 @@ def result_metadata(rows: list[dict], mutation: list[str], proof: str, ok: bool)
             "awj_signed": {r["name"][len("awj-signed/"):]: r["details"] for r in crypto
                            if r["name"].startswith("awj-signed/")},
         },
+        "notes": {r["name"]: r["details"] for r in notes},
         "official": {"samples": len(off), "ok": sum(1 for r in off if r["verdict"] == "OK")},
     }
 
@@ -768,10 +890,15 @@ def cmd_run(args) -> int:
             awj_signed = {os.path.basename(p): signed_runner.validate(p) for p in signed_paths}
             mutation += signed_mutation_liveness(signed_runner, signed_paths, workdir)
         crypto = crypto_checks(args.sdk_root, signed_paths or [], workdir)
+        note_paths = list_xml(os.path.join(args.fixtures, "awj"))
+        mutation += note_mutation_liveness(runner, note_paths, workdir)
     mutation += ratchet_controls(official, awj, baseline)
     rows, ok = evaluate(official, awj, baseline, awj_signed)
     rows += crypto
     ok &= all(r["verdict"] == "OK" for r in crypto)
+    note_rows = note_checks(note_paths, "unsigned/") + note_checks(signed_paths or [], "signed/")
+    rows += note_rows
+    ok &= all(r["verdict"] == "OK" for r in note_rows)
     summary = render_summary(rows, proof, mutation, load_json(args.pin)["version"], ok)
     meta = result_metadata(rows, mutation, proof, ok)
     print(summary)
