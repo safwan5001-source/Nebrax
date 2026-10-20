@@ -124,4 +124,56 @@ describe("Canvas — data-backed sections (ADR-21)", () => {
     expect(container.querySelector('[data-home-data-section="productShelf"]')?.textContent).toContain("Rose");
     expect(container.querySelector('[data-home-data-section="discovery"]')?.textContent).toContain("Brand");
   });
+
+  it("uses resolved discovery visuals and the published fallback headings", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={withSections([
+          { id: "shelf-1", type: "productShelf", visible: true, content: { title: "", deliverToday: false, limit: 2 } },
+          { id: "d-1", type: "discovery", visible: true, content: { title: "", axis: "facet", dimension: "occasion", layout: "image-grid", template: "gift-circles" } },
+        ])}
+        locale="en"
+        viewport="desktop"
+        homeSectionProducts={{ "shelf-1": [{ id: "p1", name: "Rose", thumbnailUrl: null, priceAmountMinor: 2500, currency: "SAR", inStock: true }] }}
+        homeSectionProductsState={{ "shelf-1": "ready" }}
+        homeSectionDiscovery={{ "d-1": { axis: "facet", dimension: "occasion", name: "المناسبة", nameEn: "Occasion", visual: { defaults: { content: "image", shape: "circle" } }, options: [{ value: "birthday", name: "عيد ميلاد", nameEn: "Birthday", count: 3, visual: { image: { mediaId: "00000000-0000-4000-8000-000000000001", sources: [{ width: 320, src: "/signed-media-1.jpg" }] } } }] } }}
+        homeSectionDiscoveryState={{ "d-1": "ready" }}
+        onSelectSection={() => {}}
+      />,
+    );
+    expect(container.querySelector('[data-home-data-section="discovery"] h2')?.textContent).toContain("Shop by Occasion");
+    expect(container.querySelector('[data-home-data-section="discovery"] [data-facet-content="image"]')).not.toBeNull();
+    expect(container.querySelector('[data-home-data-section="discovery"] img')?.getAttribute("src")).toBe("/signed-media-1.jpg");
+  });
+
+  it("formats the live delivery window and uses the published heading", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={withSections([{ id: "p-1", type: "deliveryPromise", visible: true, content: { title: "", body: "" } }])}
+        locale="en"
+        viewport="desktop"
+        homeSectionDelivery={{ "p-1": { date: "2099-10-08", startTime: "19:00", endTime: "22:00", label: "raw", labelEn: "raw", timezone: "UTC" } }}
+        homeSectionDeliveryState={{ "p-1": "ready" }}
+        onSelectSection={() => {}}
+      />,
+    );
+    const text = section(container, "p-1").textContent ?? "";
+    expect(text).toContain("Earliest delivery");
+    expect(text).not.toContain("2099-10-08");
+    expect(text).toContain("7:00");
+  });
+
+  it("keeps the AWJ Market automatic shelf as a rail", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={{ ...withSections([{ id: "shelf-1", type: "productShelf", visible: true, content: { title: "", deliverToday: false, limit: 2 } }]), themePreset: "awj-market" }}
+        locale="en"
+        viewport="desktop"
+        homeSectionProducts={{ "shelf-1": [{ id: "p1", name: "Rose", thumbnailUrl: null, priceAmountMinor: 2500, currency: "SAR", inStock: true }] }}
+        homeSectionProductsState={{ "shelf-1": "ready" }}
+        onSelectSection={() => {}}
+      />,
+    );
+    expect(container.querySelector('[data-shelf-layout="rail"]')).not.toBeNull();
+  });
 });

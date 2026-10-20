@@ -116,6 +116,9 @@ import { StoreIcon } from "./StoreIcon";
 import type { BenefitsLayout, SectionDesign } from "./presentation/section-design";
 import { resolveSectionDesign } from "./presentation/section-design-resolve";
 import { resolveDiscoveryDisplay } from "./presentation/discovery-templates";
+import { resolveFacetValueVisual, type ResolvedFacetVisual } from "./presentation/facet-visual";
+import { FacetVisualTile } from "./FacetVisualTile";
+import { formatDeliveryDay, formatDeliveryWindow } from "./presentation/delivery-format";
 import { SectionDesignFrame } from "./SectionDesignFrame";
 import type { DesignContext } from "./presentation/section-design-resolve";
 import { PREVIEW_STORE_NAME } from "./preview-fixtures";
@@ -331,6 +334,52 @@ function discoveryOptionImage(visual: Record<string, unknown> | null): string | 
   if (!Array.isArray(sources)) return null;
   const source = sources.find((item) => item && typeof item === "object" && typeof (item as Record<string, unknown>).src === "string");
   return source && typeof (source) === "object" ? (source as Record<string, string>).src ?? null : null;
+}
+
+function discoveryOptionSources(visual: Record<string, unknown> | null): { src: string; srcSet?: string } | null {
+  const image = visual?.image;
+  if (!image || typeof image !== "object" || Array.isArray(image)) return null;
+  const sources = (image as Record<string, unknown>).sources;
+  if (!Array.isArray(sources)) return null;
+  const valid = sources.flatMap((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+    const source = item as Record<string, unknown>;
+    return typeof source.src === "string" && typeof source.width === "number"
+      ? [{ src: source.src, width: source.width }]
+      : [];
+  });
+  if (valid.length === 0) return null;
+  const ordered = [...valid].sort((a, b) => a.width - b.width);
+  return { src: ordered[ordered.length - 1].src, srcSet: ordered.map((source) => `${source.src} ${source.width}w`).join(", ") };
+}
+
+function resolvedDiscoveryVisual(
+  discovery: WorkspaceDiscoveryData,
+  option: WorkspaceDiscoveryData["options"][number],
+  display: ReturnType<typeof resolveDiscoveryDisplay>,
+  layout: string | null,
+): ResolvedFacetVisual {
+  const optionImage = option.visual && typeof option.visual.image === "object" && option.visual.image !== null && !Array.isArray(option.visual.image)
+    ? option.visual.image as Record<string, unknown>
+    : null;
+  const optionMediaId = typeof optionImage?.mediaId === "string" ? optionImage.mediaId : null;
+  const resolution = resolveFacetValueVisual(discovery.visual ?? {}, option.visual ?? {}, {
+    section: display.visualSection,
+    template: display.visualTemplate,
+    usableMediaIds: optionMediaId && discoveryOptionImage(option.visual) ? [optionMediaId] : [],
+  });
+  let visual = resolution.visual;
+  if (visual.content === "none" && (resolution.sources.content === "system" || resolution.sources.fallback !== null)) {
+    visual = { ...visual, content: "icon" };
+  }
+  if (layout === "icon-grid") {
+    const icon = visual.content === "icon" ? visual.icon : visual.content === "image" ? visual.fallbackIcon : undefined;
+    if (icon) {
+      const { image: _image, fallbackIcon: _fallback, ...rest } = visual;
+      visual = { ...rest, content: "icon", icon };
+    }
+  }
+  return visual;
 }
 
 function discoveryGridColumnsClass(columns: number): string {
@@ -1676,17 +1725,22 @@ export function StorefrontPreviewCanvas({
               if (section.type === "productShelf") {
                 const shelf = productShelfContentOf(section);
                 const products = homeSectionProducts[section.id] ?? [];
+                const shelfRail = (section.design?.layout ?? (isMarket ? "rail" : "grid")) === "rail";
+                const shelfListClass = shelfRail
+                  ? "mt-4 flex gap-3 overflow-x-auto pb-2 [&>li]:min-w-[10rem] [&>li]:max-w-[14rem]"
+                  : cn("mt-4 grid gap-3", newArrivalsColumns);
+                const shelfTitle = title || (shelf.deliverToday && !shelf.source ? t("canvasShelfDeliverToday") : t("canvasShelfShopSelection"));
                 return (
                   <section key={section.id} data-home-data-section="productShelf" data-incomplete={incomplete ? "" : undefined}>
-                    <div className="flex items-center justify-between gap-3"><SectionRule title={title || t("sectionProductShelf")} hideTitle={shelf.showTitle === false} action={t("viewAll")} />{shelf.deliverToday ? <span className="text-[11px] font-medium text-store-muted-foreground">{t("canvasShelfDeliverToday")}</span> : null}</div>
+                    <div className="flex items-center justify-between gap-3"><SectionRule title={shelfTitle} hideTitle={shelf.showTitle === false} action={t("viewAll")} />{shelf.deliverToday ? <span className="text-[11px] font-medium text-store-muted-foreground">{t("canvasShelfDeliverToday")}</span> : null}</div>
                     {incomplete ? <p className="mt-2 text-xs text-store-muted-foreground">{t("canvasDataSectionIncomplete")}</p> : state === "loading" || state === "idle" ? (
-                      <ul aria-hidden="true" className={cn("mt-4 grid gap-3", newArrivalsColumns)}>{Array.from({ length: Math.min(shelf.limit, 4) }).map((_, index) => <li key={index} className="overflow-hidden rounded-store border border-store-border bg-store-surface"><div className={cn(cardImageHeight, "animate-pulse bg-store-surface-muted")} /><div className={cardPad}><div className="h-3 w-3/4 animate-pulse rounded-store bg-store-surface-muted" /></div></li>)}</ul>
+                      <ul aria-hidden="true" className={shelfListClass}>{Array.from({ length: Math.min(shelf.limit, 4) }).map((_, index) => <li key={index} className="overflow-hidden rounded-store border border-store-border bg-store-surface"><div className={cn(cardImageHeight, "animate-pulse bg-store-surface-muted")} /><div className={cardPad}><div className="h-3 w-3/4 animate-pulse rounded-store bg-store-surface-muted" /></div></li>)}</ul>
                     ) : state === "error" ? (
                       <div data-home-section-error="productShelf" className="mt-4 flex flex-col items-center gap-2 rounded-store border border-dashed border-store-border px-4 py-8 text-center"><p className="text-sm text-store-muted-foreground">{t("homeNewArrivalsLoadFailed")}</p><button type="button" onClick={() => onRetryHomeDataSection?.(section.id)} className="rounded-store border border-store-border px-3 py-1.5 text-xs font-medium text-store-foreground">{t("retry")}</button></div>
                     ) : products.length === 0 ? (
                       <p data-home-section-empty="productShelf" className="mt-4 rounded-store border border-dashed border-store-border px-4 py-8 text-center text-sm text-store-muted-foreground">{t("homeNewArrivalsEmpty")}</p>
                     ) : (
-                      <ul className={cn("mt-4 grid gap-3", newArrivalsColumns)} {...shelfAttrs(section.design, viewport)}>{products.map((product) => <li key={product.id} data-card="" className="overflow-hidden rounded-store border border-store-border bg-store-surface"><div data-card-image="" className={cn(cardImageHeight, "relative bg-store-surface-muted")}>{product.thumbnailUrl ? <PreviewMediaImage src={product.thumbnailUrl} alt="" className="size-full object-cover" /> : null}</div><div data-card-body="" className={cardPad}><p className="line-clamp-2 text-sm font-semibold text-store-foreground"><bdi>{locale === "en" && product.nameEn ? product.nameEn : product.name}</bdi></p><PreviewProductMeta product={product} locale={locale} /></div></li>)}</ul>
+                      <ul className={shelfListClass} data-shelf-layout={shelfRail ? "rail" : "grid"} {...shelfAttrs(section.design, viewport)}>{products.map((product) => <li key={product.id} data-card="" className="overflow-hidden rounded-store border border-store-border bg-store-surface"><div data-card-image="" className={cn(cardImageHeight, "relative bg-store-surface-muted")}>{product.thumbnailUrl ? <PreviewMediaImage src={product.thumbnailUrl} alt="" className="size-full object-cover" /> : null}</div><div data-card-body="" className={cardPad}><p className="line-clamp-2 text-sm font-semibold text-store-foreground"><bdi>{locale === "en" && product.nameEn ? product.nameEn : product.name}</bdi></p><PreviewProductMeta product={product} locale={locale} /></div></li>)}</ul>
                     )}
                   </section>
                 );
@@ -1700,20 +1754,24 @@ export function StorefrontPreviewCanvas({
                 const options = orderedOptions.slice(0, display.maxItems);
                 const columns = viewport === "mobile" ? display.columns.mobile : viewport === "tablet" ? display.columns.tablet : display.columns.desktop;
                 const layout = display.layout;
+                const discoveryTitle = title || (discovery?.axis === "brand" ? t("canvasDiscoveryShopByBrand") : discovery?.name ? `${t("canvasDiscoveryDiscoverBy")} ${locale === "en" && discovery.nameEn ? discovery.nameEn : discovery.name}`.trim() : t("sectionDiscovery"));
                 return (
                   <section key={section.id} aria-labelledby={headingId} data-home-data-section="discovery" data-incomplete={incomplete ? "" : undefined}>
-                    <SectionRule title={title || t("sectionDiscovery")} />
-                    {incomplete ? <p className="mt-2 text-xs text-store-muted-foreground">{t("canvasDataSectionIncomplete")}</p> : state === "loading" || state === "idle" ? <div aria-hidden="true" className="mt-4 h-20 animate-pulse rounded-store bg-store-surface-muted" /> : state === "error" ? <div data-home-section-error="discovery" className="mt-4 flex flex-col items-center gap-2 rounded-store border border-dashed border-store-border px-4 py-8 text-center"><p className="text-sm text-store-muted-foreground">{t("homeNewArrivalsLoadFailed")}</p><button type="button" onClick={() => onRetryHomeDataSection?.(section.id)} className="rounded-store border border-dashed border-store-border px-3 py-1.5 text-xs font-medium text-store-foreground">{t("retry")}</button></div> : options.length === 0 ? <p data-home-section-empty="discovery" className="mt-4 rounded-store border border-dashed border-store-border px-4 py-8 text-center text-sm text-store-muted-foreground">{t("homeNewArrivalsEmpty")}</p> : content.display === "chips" && layout === null ? <ul data-discovery-layout="chips" data-discovery-show-counts={display.showCounts ? "true" : "false"} className="mt-4 flex flex-wrap gap-2">{options.map((option) => <li key={option.value}><span className="inline-flex min-h-10 items-center rounded-full border border-store-border bg-store-surface px-4 text-sm font-bold text-store-foreground"><bdi>{locale === "en" && option.nameEn ? option.nameEn : option.name}</bdi>{display.showCounts ? <span className="ms-1 text-xs text-store-muted-foreground">({option.count})</span> : null}</span></li>)}</ul> : <ul data-discovery-layout={layout ?? "tiles"} data-discovery-value-sort={display.valueSort} data-discovery-show-counts={display.showCounts ? "true" : "false"} className={cn("mt-4 grid gap-3 md:gap-4", layout === "text-list" ? "grid-cols-1" : layout === "carousel" ? "grid-flow-col auto-cols-[minmax(9rem,1fr)] overflow-x-auto" : discoveryGridColumnsClass(columns))}>{options.map((option) => { const image = discoveryOptionImage(option.visual); return <li key={option.value} className="min-w-0"><span className={cn("flex min-h-20 flex-col items-center justify-center rounded-store border border-store-border bg-store-surface px-3 py-4 text-center text-sm font-bold text-store-foreground", layout === "text-list" && "items-start text-start", layout === "image-cards" && "overflow-hidden p-0")}>{image ? <PreviewMediaImage src={image} alt="" className="mb-2 h-16 w-full object-cover" /> : null}<bdi>{locale === "en" && option.nameEn ? option.nameEn : option.name}</bdi>{display.showCounts ? <span className="mt-1 text-xs font-normal text-store-muted-foreground">{option.count}</span> : null}</span></li>; })}</ul>}
+                    <SectionRule title={discoveryTitle} />
+                    {incomplete ? <p className="mt-2 text-xs text-store-muted-foreground">{t("canvasDataSectionIncomplete")}</p> : state === "loading" || state === "idle" ? <div aria-hidden="true" className="mt-4 h-20 animate-pulse rounded-store bg-store-surface-muted" /> : state === "error" ? <div data-home-section-error="discovery" className="mt-4 flex flex-col items-center gap-2 rounded-store border border-dashed border-store-border px-4 py-8 text-center"><p className="text-sm text-store-muted-foreground">{t("homeNewArrivalsLoadFailed")}</p><button type="button" onClick={() => onRetryHomeDataSection?.(section.id)} className="rounded-store border border-dashed border-store-border px-3 py-1.5 text-xs font-medium text-store-foreground">{t("retry")}</button></div> : options.length === 0 ? <p data-home-section-empty="discovery" className="mt-4 rounded-store border border-dashed border-store-border px-4 py-8 text-center text-sm text-store-muted-foreground">{t("homeNewArrivalsEmpty")}</p> : content.display === "chips" && layout === null ? <ul data-discovery-layout="chips" data-discovery-show-counts={display.showCounts ? "true" : "false"} className="mt-4 flex flex-wrap gap-2">{options.map((option) => <li key={option.value}><span className="inline-flex min-h-10 items-center rounded-full border border-store-border bg-store-surface px-4 text-sm font-bold text-store-foreground"><bdi>{locale === "en" && option.nameEn ? option.nameEn : option.name}</bdi>{display.showCounts ? <span className="ms-1 text-xs text-store-muted-foreground">({option.count})</span> : null}</span></li>)}</ul> : <ul data-discovery-layout={layout ?? "tiles"} data-discovery-value-sort={display.valueSort} data-discovery-show-counts={display.showCounts ? "true" : "false"} className={cn("mt-4 grid gap-3 md:gap-4", layout === "text-list" ? "grid-cols-1" : layout === "carousel" ? "grid-flow-col auto-cols-[minmax(9rem,1fr)] overflow-x-auto" : discoveryGridColumnsClass(columns))}>{options.map((option) => { const visual = discovery && layout && layout !== "text-list" ? resolvedDiscoveryVisual(discovery, option, display, layout) : null; const image = visual?.content === "image" ? discoveryOptionSources(option.visual) : null; const label = locale === "en" && option.nameEn ? option.nameEn : option.name; return <li key={option.value} className="min-w-0"><span className={cn("flex min-h-20 flex-col items-center justify-center rounded-store border border-store-border bg-store-surface px-3 py-4 text-center text-sm font-bold text-store-foreground", layout === "text-list" && "items-start text-start", layout === "image-cards" && "overflow-hidden p-0")}>{visual ? <FacetVisualTile visual={visual} label={label} image={image} className="w-full" /> : <bdi>{label}</bdi>}{display.showCounts && (!visual || visual.showLabel) ? <span className="mt-1 text-xs font-normal text-store-muted-foreground">{option.count}</span> : null}</span></li>; })}</ul>}
                   </section>
                 );
               }
               const promise = deliveryPromiseContentOf(section);
               const earliest = homeSectionDelivery[section.id];
               const headingId = `preview-delivery-${section.id}`;
+              const deliveryDay = earliest ? formatDeliveryDay({ date: earliest.date, timezone: earliest.timezone, locale, todayLabel: t("canvasDeliveryToday"), tomorrowLabel: t("canvasDeliveryTomorrow") }) : null;
+              const deliveryWindow = earliest ? formatDeliveryWindow(earliest.startTime, earliest.endTime, locale) : null;
+              const deliveryLabel = deliveryDay && deliveryWindow ? `${deliveryDay}${locale === "ar" ? "، " : ", "}${deliveryWindow}` : null;
               return (
                 <section key={section.id} aria-labelledby={headingId} data-home-data-section="deliveryPromise" className="rounded-store border border-store-border bg-store-surface px-4 py-4 md:px-6 md:py-5">
-                  <h2 id={headingId} className="text-base font-extrabold text-store-foreground md:text-lg">{title || t("sectionDeliveryPromise")}</h2>
-                  {state === "loading" || state === "idle" ? <div aria-hidden="true" className="mt-2 h-5 w-2/3 animate-pulse rounded-store bg-store-surface-muted" /> : state === "error" ? <div data-home-section-error="deliveryPromise" className="mt-3 flex items-center gap-2 text-xs text-store-muted-foreground"><span>{t("homeNewArrivalsLoadFailed")}</span><button type="button" onClick={() => onRetryHomeDataSection?.(section.id)} className="underline">{t("retry")}</button></div> : earliest ? <><p className="mt-1 text-sm font-bold text-store-primary md:text-base"><bdi>{locale === "en" && earliest.labelEn ? earliest.labelEn : earliest.label}</bdi> · {earliest.date} · {earliest.startTime}–{earliest.endTime}</p>{promise.body ? <p className="mt-1 text-xs text-store-muted-foreground md:text-sm">{promise.body}</p> : null}</> : <p data-home-section-empty="deliveryPromise" className="mt-2 text-sm text-store-muted-foreground">{t("canvasDeliveryPromiseLive")}</p>}
+                  <h2 id={headingId} className="text-base font-extrabold text-store-foreground md:text-lg">{title || t("canvasDeliveryEarliest")}</h2>
+                  {state === "loading" || state === "idle" ? <div aria-hidden="true" className="mt-2 h-5 w-2/3 animate-pulse rounded-store bg-store-surface-muted" /> : state === "error" ? <div data-home-section-error="deliveryPromise" className="mt-3 flex items-center gap-2 text-xs text-store-muted-foreground"><span>{t("homeNewArrivalsLoadFailed")}</span><button type="button" onClick={() => onRetryHomeDataSection?.(section.id)} className="underline">{t("retry")}</button></div> : earliest && deliveryLabel ? <><p className="mt-1 text-sm font-bold text-store-primary md:text-base"><bdi>{deliveryLabel}</bdi></p>{promise.body ? <p className="mt-1 text-xs text-store-muted-foreground md:text-sm">{promise.body}</p> : null}</> : <p data-home-section-empty="deliveryPromise" className="mt-2 text-sm text-store-muted-foreground">{t("canvasDeliveryPromiseLive")}</p>}
                 </section>
               );
               }

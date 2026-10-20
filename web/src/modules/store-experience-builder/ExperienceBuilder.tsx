@@ -367,6 +367,7 @@ export function ExperienceBuilder({
   const [homeSectionDeliveryState, setHomeSectionDeliveryState] = useState<Record<string, "idle" | "loading" | "error" | "ready">>({});
   const homeSectionRequestRef = useRef<Record<string, number>>({});
   const homeSectionDataKeyRef = useRef<Record<string, string>>({});
+  const homeSectionExpiryRef = useRef<Record<string, number>>({});
   // CUST-H4-5 — real batched resolution for "featured" sections' own Canvas
   // preview. Unlike `homeCategories`/`homeNewArrivals` above, "featured" is
   // **not** a singleton section type (`canDuplicate: true` — a merchant may
@@ -1041,6 +1042,7 @@ export function ExperienceBuilder({
     setOffersState("idle");
     homeSectionRequestRef.current = {};
     homeSectionDataKeyRef.current = {};
+    homeSectionExpiryRef.current = {};
     setHomeSectionProducts({});
     setHomeSectionProductsState({});
     setHomeSectionDiscovery({});
@@ -1538,12 +1540,15 @@ export function ExperienceBuilder({
       return;
     }
     if (result.section === "product_shelf") {
+      homeSectionExpiryRef.current[sectionId] = Date.now() + 18 * 60 * 1000;
       setHomeSectionProductsState((prev) => ({ ...prev, [sectionId]: "ready" }));
       setHomeSectionProducts((prev) => ({ ...prev, [sectionId]: result.products }));
     } else if (result.section === "discovery") {
+      homeSectionExpiryRef.current[sectionId] = Date.now() + 18 * 60 * 1000;
       setHomeSectionDiscoveryState((prev) => ({ ...prev, [sectionId]: "ready" }));
       setHomeSectionDiscovery((prev) => ({ ...prev, [sectionId]: result.discovery }));
     } else {
+      homeSectionExpiryRef.current[sectionId] = Date.now() + 18 * 60 * 1000;
       setHomeSectionDeliveryState((prev) => ({ ...prev, [sectionId]: "ready" }));
       setHomeSectionDelivery((prev) => ({ ...prev, [sectionId]: result.earliest }));
     }
@@ -1567,20 +1572,26 @@ export function ExperienceBuilder({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, storefrontId, busy, renderedHomeSections, homeSectionProductsState, homeSectionDiscoveryState, homeSectionDeliveryState]);
 
-  // Workspace media URLs are signed and bounded. Refresh the section data
-  // before the same expiry window used by the category/header preview so a
-  // later canvas interaction cannot keep rendering stale thumbnails.
+  // Workspace media URLs are signed and bounded. Each response gets its own
+  // deadline, so loading an unrelated section never postpones an older
+  // section's refresh.
   useEffect(() => {
     if (!storefrontId) return;
-    const hasReady = Object.values(homeSectionProductsState).some((state) => state === "ready")
-      || Object.values(homeSectionDiscoveryState).some((state) => state === "ready")
-      || Object.values(homeSectionDeliveryState).some((state) => state === "ready");
-    if (!hasReady) return;
+    const deadlines = Object.entries(homeSectionExpiryRef.current);
+    if (deadlines.length === 0) return;
+    const nextExpiry = Math.min(...deadlines.map(([, expiry]) => expiry));
     const timer = window.setTimeout(() => {
-      setHomeSectionProductsState((prev) => Object.fromEntries(Object.keys(prev).map((key) => [key, "idle"])));
-      setHomeSectionDiscoveryState((prev) => Object.fromEntries(Object.keys(prev).map((key) => [key, "idle"])));
-      setHomeSectionDeliveryState((prev) => Object.fromEntries(Object.keys(prev).map((key) => [key, "idle"])));
-    }, 18 * 60 * 1000);
+      const now = Date.now();
+      const expired = Object.entries(homeSectionExpiryRef.current)
+        .filter(([, expiry]) => expiry <= now)
+        .map(([key]) => key);
+      if (expired.length === 0) return;
+      for (const key of expired) delete homeSectionExpiryRef.current[key];
+      const expiredSet = new Set(expired);
+      setHomeSectionProductsState((prev) => Object.fromEntries(Object.entries(prev).map(([key, state]) => [key, expiredSet.has(key) ? "idle" : state])));
+      setHomeSectionDiscoveryState((prev) => Object.fromEntries(Object.entries(prev).map(([key, state]) => [key, expiredSet.has(key) ? "idle" : state])));
+      setHomeSectionDeliveryState((prev) => Object.fromEntries(Object.entries(prev).map(([key, state]) => [key, expiredSet.has(key) ? "idle" : state])));
+    }, Math.max(0, nextExpiry - Date.now()));
     return () => window.clearTimeout(timer);
   }, [storefrontId, homeSectionProductsState, homeSectionDiscoveryState, homeSectionDeliveryState]);
 
