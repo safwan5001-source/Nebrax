@@ -176,4 +176,25 @@ describe("Canvas — data-backed sections (ADR-21)", () => {
     );
     expect(container.querySelector('[data-shelf-layout="rail"]')).not.toBeNull();
   });
+
+  it("applies the published discovery display controls to live values", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={withSections([{ id: "d-1", type: "discovery", visible: true, content: { title: "", axis: "brand", display: "tiles", layout: "carousel", rows: 2, gap: "loose", textPosition: "overlay", contentSequence: "label-first", cardStyle: "elevated", align: "start" } }])}
+        locale="en"
+        viewport="desktop"
+        homeSectionDiscovery={{ "d-1": { axis: "brand", name: "", nameEn: null, visual: { defaults: { content: "icon" } }, options: [{ value: "b1", name: "Brand", nameEn: "Brand", count: 3, visual: { icon: "tag" } }] } }}
+        homeSectionDiscoveryState={{ "d-1": "ready" }}
+        onSelectSection={() => {}}
+      />,
+    );
+    const list = container.querySelector('[data-home-data-section="discovery"] [data-discovery-layout="carousel"]');
+    expect(list?.getAttribute("data-discovery-gap")).toBe("loose");
+    expect(list?.getAttribute("data-discovery-rows")).toBe("2");
+    expect(list?.getAttribute("data-discovery-text-position")).toBe("overlay");
+    expect(list?.getAttribute("data-discovery-content-sequence")).toBe("label-first");
+    expect(list?.getAttribute("data-discovery-card-style")).toBe("elevated");
+    expect(list?.getAttribute("data-discovery-align")).toBe("start");
+    expect((list as HTMLElement | null)?.style.getPropertyValue("--disc-rows")).toBe("2");
+  });
 });

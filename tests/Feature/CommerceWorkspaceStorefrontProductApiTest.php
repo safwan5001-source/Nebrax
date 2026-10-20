@@ -204,6 +204,24 @@ class CommerceWorkspaceStorefrontProductApiTest extends TestCase
             ->assertNotFound();
     }
 
+    /** @test */
+    public function include_meta_keeps_the_ordered_workspace_list_query_groupable(): void
+    {
+        $auth = $this->registerTenant('workspace-meta-order', 'owner@workspace-meta-order.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->seedProduct($seeded['channel'], ['name' => 'Meta product']);
+        app(TenantContext::class)->forget();
+
+        $response = $this->withToken($auth['token'])
+            ->getJson($this->listPath($seeded['storefront']->id).'?include_meta=true')
+            ->assertOk();
+
+        $this->assertIsArray($response->json('meta.facets'));
+        $this->assertIsArray($response->json('meta.brands'));
+    }
+
     // ───────────────────────── 2/3. Foreign storefront/product → 404 ─────────────────────────
 
     /** @test */

@@ -183,6 +183,11 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
             );
         }
         $baseQuery = clone $query;
+        // The list query is intentionally ordered for the editor cards, but
+        // facet metadata groups by brand/value.  Keep the metadata clone free
+        // of that ordering so PostgreSQL/MySQL strict grouping cannot reject
+        // the read-only section-data request.
+        $baseQuery->reorder();
         $facetFilter->apply($query, $facetSelection);
 
         if ($facetSelection['collection'] !== null && blank($filters['sort'] ?? null)) {

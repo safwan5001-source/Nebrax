@@ -67,6 +67,7 @@ import {
   productShelfContentOf,
   galleryContentOf,
   sliderContentOf,
+  type DiscoveryCardStyle,
 } from "./presentation/section-content";
 import {
   buildWhatsAppUrl,
@@ -393,6 +394,38 @@ function discoveryGridColumnsClass(columns: number): string {
     8: "grid-cols-8",
   };
   return classes[Math.max(1, columns)] ?? "grid-cols-2";
+}
+
+const DISCOVERY_GAP_CLASS: Record<"tight" | "normal" | "loose", string> = {
+  tight: "gap-2",
+  normal: "gap-3 md:gap-4",
+  loose: "gap-5 md:gap-6",
+};
+
+const DISCOVERY_CARD_CLASS: Record<DiscoveryCardStyle, string> = {
+  plain: "hover:text-store-primary",
+  outlined: "border border-store-border bg-store-surface hover:border-store-primary hover:text-store-primary",
+  elevated: "bg-store-surface shadow-md hover:text-store-primary hover:shadow-lg",
+  filled: "bg-store-surface-muted hover:text-store-primary",
+};
+
+const DISCOVERY_ALIGN_CLASS = {
+  start: "items-start text-start",
+  center: "items-center text-center",
+} as const;
+
+function discoveryLinkLayoutClass(layout: string, viewport: "desktop" | "tablet" | "mobile"): string {
+  const wide = viewport !== "mobile";
+  switch (layout) {
+    case "image-cards":
+      return cn("h-full flex-col gap-2", wide ? "p-4" : "p-3");
+    case "icon-grid":
+      return cn("flex-col", wide ? "p-3" : "p-2");
+    case "text-list":
+      return "items-center gap-2 px-4 py-2 text-sm font-bold";
+    default:
+      return "flex-col p-2";
+  }
 }
 
 export function StorefrontPreviewCanvas({
@@ -1758,7 +1791,7 @@ export function StorefrontPreviewCanvas({
                 return (
                   <section key={section.id} aria-labelledby={headingId} data-home-data-section="discovery" data-incomplete={incomplete ? "" : undefined}>
                     <SectionRule title={discoveryTitle} />
-                    {incomplete ? <p className="mt-2 text-xs text-store-muted-foreground">{t("canvasDataSectionIncomplete")}</p> : state === "loading" || state === "idle" ? <div aria-hidden="true" className="mt-4 h-20 animate-pulse rounded-store bg-store-surface-muted" /> : state === "error" ? <div data-home-section-error="discovery" className="mt-4 flex flex-col items-center gap-2 rounded-store border border-dashed border-store-border px-4 py-8 text-center"><p className="text-sm text-store-muted-foreground">{t("homeNewArrivalsLoadFailed")}</p><button type="button" onClick={() => onRetryHomeDataSection?.(section.id)} className="rounded-store border border-dashed border-store-border px-3 py-1.5 text-xs font-medium text-store-foreground">{t("retry")}</button></div> : options.length === 0 ? <p data-home-section-empty="discovery" className="mt-4 rounded-store border border-dashed border-store-border px-4 py-8 text-center text-sm text-store-muted-foreground">{t("homeNewArrivalsEmpty")}</p> : content.display === "chips" && layout === null ? <ul data-discovery-layout="chips" data-discovery-show-counts={display.showCounts ? "true" : "false"} className="mt-4 flex flex-wrap gap-2">{options.map((option) => <li key={option.value}><span className="inline-flex min-h-10 items-center rounded-full border border-store-border bg-store-surface px-4 text-sm font-bold text-store-foreground"><bdi>{locale === "en" && option.nameEn ? option.nameEn : option.name}</bdi>{display.showCounts ? <span className="ms-1 text-xs text-store-muted-foreground">({option.count})</span> : null}</span></li>)}</ul> : <ul data-discovery-layout={layout ?? "tiles"} data-discovery-value-sort={display.valueSort} data-discovery-show-counts={display.showCounts ? "true" : "false"} className={cn("mt-4 grid gap-3 md:gap-4", layout === "text-list" ? "grid-cols-1" : layout === "carousel" ? "grid-flow-col auto-cols-[minmax(9rem,1fr)] overflow-x-auto" : discoveryGridColumnsClass(columns))}>{options.map((option) => { const visual = discovery && layout && layout !== "text-list" ? resolvedDiscoveryVisual(discovery, option, display, layout) : null; const image = visual?.content === "image" ? discoveryOptionSources(option.visual) : null; const label = locale === "en" && option.nameEn ? option.nameEn : option.name; return <li key={option.value} className="min-w-0"><span className={cn("flex min-h-20 flex-col items-center justify-center rounded-store border border-store-border bg-store-surface px-3 py-4 text-center text-sm font-bold text-store-foreground", layout === "text-list" && "items-start text-start", layout === "image-cards" && "overflow-hidden p-0")}>{visual ? <FacetVisualTile visual={visual} label={label} image={image} className="w-full" /> : <bdi>{label}</bdi>}{display.showCounts && (!visual || visual.showLabel) ? <span className="mt-1 text-xs font-normal text-store-muted-foreground">{option.count}</span> : null}</span></li>; })}</ul>}
+                    {incomplete ? <p className="mt-2 text-xs text-store-muted-foreground">{t("canvasDataSectionIncomplete")}</p> : state === "loading" || state === "idle" ? <div aria-hidden="true" className="mt-4 h-20 animate-pulse rounded-store bg-store-surface-muted" /> : state === "error" ? <div data-home-section-error="discovery" className="mt-4 flex flex-col items-center gap-2 rounded-store border border-dashed border-store-border px-4 py-8 text-center"><p className="text-sm text-store-muted-foreground">{t("homeNewArrivalsLoadFailed")}</p><button type="button" onClick={() => onRetryHomeDataSection?.(section.id)} className="rounded-store border border-dashed border-store-border px-3 py-1.5 text-xs font-medium text-store-foreground">{t("retry")}</button></div> : options.length === 0 ? <p data-home-section-empty="discovery" className="mt-4 rounded-store border border-dashed border-store-border px-4 py-8 text-center text-sm text-store-muted-foreground">{t("homeNewArrivalsEmpty")}</p> : content.display === "chips" && layout === null ? <ul data-discovery-layout="chips" data-discovery-show-counts={display.showCounts ? "true" : "false"} className="mt-4 flex flex-wrap gap-2">{options.map((option) => <li key={option.value}><span className="inline-flex min-h-10 items-center rounded-full border border-store-border bg-store-surface px-4 text-sm font-bold text-store-foreground"><bdi>{locale === "en" && option.nameEn ? option.nameEn : option.name}</bdi>{display.showCounts ? <span className="ms-1 text-xs text-store-muted-foreground">({option.count})</span> : null}</span></li>)}</ul> : <ul data-discovery-layout={layout ?? "tiles"} data-discovery-value-sort={display.valueSort} data-discovery-show-counts={display.showCounts ? "true" : "false"} data-discovery-gap={display.gap} data-discovery-rows={layout === "carousel" ? display.rows : 1} data-discovery-text-position={layout === "text-list" ? undefined : display.textPosition} data-discovery-content-sequence={display.contentSequence} data-discovery-card-style={display.cardStyle} data-discovery-align={display.align} style={layout === "carousel" ? ({ "--disc-rows": String(display.rows) } as CSSProperties) : undefined} className={cn("mt-4 grid", DISCOVERY_GAP_CLASS[display.gap], layout === "text-list" ? "grid-cols-1" : layout === "carousel" ? "grid-flow-col grid-rows-[repeat(var(--disc-rows),auto)] auto-cols-[minmax(9rem,1fr)] overflow-x-auto" : discoveryGridColumnsClass(columns))}>{options.map((option) => { const visual = discovery && layout && layout !== "text-list" ? resolvedDiscoveryVisual(discovery, option, display, layout) : null; const image = visual?.content === "image" ? discoveryOptionSources(option.visual) : null; const label = locale === "en" && option.nameEn ? option.nameEn : option.name; return <li key={option.value} className={cn("min-w-0", layout === "carousel" && "snap-start")}><span className={cn("flex min-h-20 w-full min-w-0 rounded-store text-store-foreground", discoveryLinkLayoutClass(layout ?? "image-grid", viewport), layout === "text-list" ? (display.align === "center" ? "justify-center text-center" : "justify-start text-start") : display.textPosition === "beside" ? "flex-row items-center" : DISCOVERY_ALIGN_CLASS[display.align], DISCOVERY_CARD_CLASS[display.cardStyle], layout === "image-cards" && "overflow-hidden")}>{visual ? <FacetVisualTile visual={visual} label={label} image={image} className="w-full" /> : <span className="line-clamp-2 min-w-0 break-words" title={label}><bdi>{label}</bdi></span>}{display.showCounts && (!visual || visual.showLabel) ? <span className={cn("shrink-0 text-xs font-medium text-store-muted-foreground", layout !== "text-list" && display.textPosition !== "beside" && "mt-1")} dir="ltr">{option.count}</span> : null}</span></li>; })}</ul>}
                   </section>
                 );
               }
