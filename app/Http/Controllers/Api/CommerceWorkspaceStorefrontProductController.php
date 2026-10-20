@@ -233,7 +233,9 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
                     $facetMeta['facets'],
                     $facetFilter->activeFacetModels(),
                     true,
-                    (string) $storefront->tenant_id,
+                    $request->attributes->get('section_data_preview') === true
+                        ? (string) $storefront->tenant_id
+                        : null,
                 ),
                 ...$meta,
             ];
@@ -276,6 +278,7 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
         ]);
 
         if ($section['section'] === 'product_shelf') {
+            $request->attributes->set('section_data_preview', true);
             $sourceKind = $section['source_kind'] ?? null;
             if ($sourceKind === 'collection') {
                 abort_if(blank($section['source_slug'] ?? null), 422, 'مصدر الرف غير مكتمل.');
@@ -293,6 +296,7 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
         }
 
         if ($section['section'] === 'discovery') {
+            $request->attributes->set('section_data_preview', true);
             abort_if(blank($section['axis'] ?? null), 422, 'محور الاكتشاف غير مكتمل.');
             if ($section['axis'] === 'facet') {
                 abort_if(blank($section['dimension'] ?? null), 422, 'بُعد الاكتشاف غير مكتمل.');
