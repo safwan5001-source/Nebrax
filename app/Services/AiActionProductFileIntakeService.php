@@ -62,7 +62,7 @@ final class AiActionProductFileIntakeService
         }
 
         try {
-            return DB::transaction(function () use ($action, $expectedVersion, $actor, $upload, $extension, $size, $sha256, $profile, $key, $fileId, $manifest, $summary): array {
+            $result = DB::transaction(function () use ($action, $expectedVersion, $actor, $upload, $extension, $size, $sha256, $profile, $key, $fileId, $manifest, $summary): array {
                 $locked = AiAction::query()->whereKey($action->id)->lockForUpdate()->firstOrFail();
                 if (! in_array($locked->status, [AiAction::STATUS_CREATED, AiAction::STATUS_EDITING], true)) {
                     throw new AiActionException('state_conflict', 'لا تقبل العملية ملفات في حالتها الحالية.', 409);
@@ -98,6 +98,14 @@ final class AiActionProductFileIntakeService
 
                 return ['file' => $file, 'extraction' => $extraction, 'replayed' => false];
             }, 3);
+            // Another request may have stored the same bytes while this one was
+            // waiting on the action lock. Its database row wins; remove this
+            // request's unreferenced private object before returning the replay.
+            if ($result['replayed']) {
+                try { $this->storage->delete($profile, $key); } catch (\Throwable) {}
+            }
+
+            return $result;
         } catch (\Throwable $e) {
             // A DB failure must not leave an accessible source object behind.
             try { $this->storage->delete($profile, $key); } catch (\Throwable) {}
