@@ -19,6 +19,7 @@ final class AiActionGateway
         private readonly AiActionPolicy $policy,
         private readonly TenantContext $tenantContext,
         private readonly BranchContext $branchContext,
+        private readonly AiActionApprovalLedger $ledger,
     ) {}
 
     public function create(User $requestActor, string $type, array $proposal): AiAction
@@ -49,6 +50,7 @@ final class AiActionGateway
         $definition = $this->registry->definition($action->type);
         $this->policy->authorize((string) $requestActor->id, AiActionPolicy::USE, $definition['domain_permission']);
         $this->assertBranchContext($action);
+        $action = $this->ledger->expireIfDue($action);
 
         return $action->load(['versions' => fn ($query) => $query->orderByDesc('version')->limit(1)]);
     }
@@ -63,6 +65,19 @@ final class AiActionGateway
         return $actor;
     }
 
+    /**
+     * Fresh authorization for one action permission (use / approve) plus the
+     * underlying domain permission, tenant, actor state and branch scope.
+     */
+    public function authorizeFor(User $requestActor, AiAction $action, string $actionPermission): User
+    {
+        $definition = $this->registry->definition($action->type);
+        $actor = $this->policy->authorize((string) $requestActor->id, $actionPermission, $definition['domain_permission']);
+        $this->assertBranchContext($action);
+
+        return $actor;
+    }
+
     public function addVersion(User $requestActor, AiAction $action, int $expectedVersion, array $proposal): AiAction
     {
         $definition = $this->registry->definition($action->type);
@@ -72,7 +87,7 @@ final class AiActionGateway
 
         return DB::transaction(function () use ($action, $expectedVersion, $proposal, $summary, $actor): AiAction {
             $locked = AiAction::query()->whereKey($action->id)->lockForUpdate()->firstOrFail();
-            if (! in_array($locked->status, [AiAction::STATUS_CREATED, AiAction::STATUS_EDITING], true)) {
+            if (! in_array($locked->status, AiAction::MUTABLE_STATUSES, true)) {
                 throw new AiActionException('state_conflict', 'لا تقبل العملية تعديلات في حالتها الحالية.', 409);
             }
             if ($locked->version !== $expectedVersion) {
@@ -92,6 +107,8 @@ final class AiActionGateway
             $locked->version = $next;
             $this->storeVersion($locked, $proposal, $summary, $actor, $next);
             $this->event($locked, 'version_created', $action->status, AiAction::STATUS_EDITING, $actor, ['row_count' => $summary['row_count']]);
+            // Any new version voids every preview and approval of the older ones.
+            $this->ledger->invalidate($locked, $actor, 'proposal_edited');
 
             return $locked->fresh()->load(['versions' => fn ($query) => $query->orderByDesc('version')->limit(1)]);
         }, 3);
@@ -111,7 +128,7 @@ final class AiActionGateway
             if ($locked->status === AiAction::STATUS_CANCELLED) {
                 return $locked;
             }
-            if (! in_array($locked->status, [AiAction::STATUS_CREATED, AiAction::STATUS_EDITING], true)) {
+            if (! in_array($locked->status, AiAction::MUTABLE_STATUSES, true)) {
                 throw new AiActionException('state_conflict', 'لا يمكن إلغاء العملية في حالتها الحالية.', 409);
             }
 
@@ -122,6 +139,7 @@ final class AiActionGateway
                 'cancelled_at' => now('UTC'),
             ])->save();
             $this->event($locked, 'action_cancelled', $from, AiAction::STATUS_CANCELLED, $actor);
+            $this->ledger->invalidate($locked, $actor, 'action_cancelled');
 
             return $locked->fresh();
         }, 3);
