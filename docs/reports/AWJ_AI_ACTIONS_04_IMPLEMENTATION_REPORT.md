@@ -78,4 +78,4 @@ AI-ACTIONS-05/06: idempotent execution through `ProductLifecycleService` that re
 | Draft PR | https://github.com/safwan5001-source/Nebrax/pull/1580 |
 | Base | `main` @ `e885d776ff893c37775d1242a9cab69603c291c6` |
 | Head (code + report at time of PR) | `a5e1c56626ebdc4cfb648863b101d15821016df5` (later commits only update this table) |
-| CI | PHP matrix (SQLite + PostgreSQL) and Web CI run on the PR; results are tracked on the PR page. Not merged, not deployed. |
+| CI on `9642bab` | **All green:** `php artisan test (L11, sqlite)` ✅ · `php artisan test (L11, pgsql)` ✅ · `web build (Next.js)` ✅ · `CI Gate` ✅ (the local `APP_KEY`/`bcmath` failures in §5 do not occur in CI). Not merged, not deployed. |
