@@ -19,6 +19,11 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 vi.mock('@/components/ui/toast', () => ({ useToast: () => toast }));
+const search = vi.hoisted(() => ({ action: null as string | null }));
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => ({ get: (name: string) => (name === 'action' ? search.action : null) }),
+  useRouter: () => ({ push: vi.fn() }),
+}));
 
 const field = (value: string | null) => ({ value, origin: value === null ? 'missing' : 'extracted', confidence: value === null ? null : 100 });
 const reviewRow = (id: string, source: number, sku: string, decision: string) => ({
@@ -59,6 +64,7 @@ async function uploadFile(container: HTMLElement) {
 }
 
 beforeEach(() => {
+  search.action = null;
   document.documentElement.lang = 'ar';
   api.mockReset();
   toast.success.mockReset();
@@ -180,5 +186,35 @@ describe('استيراد المنتجات عبر مساعد أَوْج — ال�
     expect(posts.find((post) => post.path.endsWith('/review/versions'))?.body).toEqual({
       expected_version: 1, edits: [{ row_id: 'r1', decision: 'update', media_update_approved: true }],
     });
+  });
+
+  it('يفتح إصلاحاً من رابط العملية: يعرض سبب الفشل، ويفتح الحقول المرتبطة به فقط ويقفل الباقي، ولا يعرض التعديل الجماعي للحقول', async () => {
+    search.action = 'repair-1';
+    const posts: { path: string; body: unknown }[] = [];
+    api.mockImplementation(async (path: string, options?: { method?: string; body?: unknown }) => {
+      if (options?.method === 'POST') posts.push({ path, body: options.body });
+      if (path === '/ai-actions/repair-1/review') return { data: { action: { id: 'repair-1', version: 1, status: 'created', cost_hidden: false }, proposal: { rows: [reviewRow('c', 4, 'B-3', 'create')] } } };
+      if (path === '/ai-actions/repair-1/repair') return { data: { repair_id: 'r-1', action_id: 'repair-1', origin: { action_id: 'a-1', execution_id: 'e-1', status: 'partially_failed' }, rows: [{ row_id: 'c', source_row: 4, kind: 'row', origin_operation: 'create', display: { name: 'منتج B-3', sku: 'B-3', barcode: null }, failure: { code: 'conflict_existing_product', message: 'يوجد الآن منتج بالرمز نفسه.', retryable: false }, affected_fields: ['sku', 'barcode'], scope: 'fields' }] } };
+      if (path.endsWith('/images')) return { data: { archive: [], remote: 0 } };
+      if (path.endsWith('/review/versions')) return { data: { version: 2, status: 'editing', latest_version: { proposal: { rows: [reviewRow('c', 4, 'B-3-FIXED', 'create')] } } } };
+      throw new Error(`unexpected ${options?.method ?? 'GET'} ${path}`);
+    });
+    const user = userEvent.setup();
+    render(<AiProductImportReviewPage />);
+
+    expect(await screen.findByTestId('repair-banner')).toBeTruthy();
+    expect(screen.getByText(/يوجد الآن منتج بالرمز نفسه/)).toBeTruthy();
+    expect((screen.getByLabelText('رمز الصنف-4') as HTMLInputElement).disabled).toBe(false);
+    expect((screen.getByLabelText('الاسم-4') as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText('سعر البيع-4') as HTMLInputElement).disabled).toBe(true);
+    expect(screen.queryByLabelText('حقل التعديل الجماعي')).toBeNull();
+    // Opening it did not create anything.
+    expect(posts).toEqual([]);
+
+    await user.clear(screen.getByLabelText('رمز الصنف-4'));
+    await user.type(screen.getByLabelText('رمز الصنف-4'), 'B-3-FIXED');
+    await user.click(screen.getByRole('button', { name: 'حفظ إصدار المراجعة' }));
+    await waitFor(() => expect(posts.some((post) => post.path === '/ai-actions/repair-1/review/versions')).toBe(true));
+    expect(posts.find((post) => post.path.endsWith('/review/versions'))?.body).toEqual({ expected_version: 1, edits: [{ row_id: 'c', fields: { sku: 'B-3-FIXED' } }] });
   });
 });

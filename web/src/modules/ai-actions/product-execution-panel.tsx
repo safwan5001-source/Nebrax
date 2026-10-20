@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { apiErrorMessage, errorCode, fieldLabel } from './product-preview';
 import { ExecutionImagesList } from './product-images-ui';
+import { RepairEntry } from './product-repair-ui';
 import {
   type Execution,
   type ExecutionRow,
@@ -204,6 +205,10 @@ export function ProductExecutionPanel({ actionId, version, totals, onStatus }: P
               </div>
             )}
             {isFinished(execution.status) && (progress.failed > 0 || execution.images.failed > 0) && !execution.permissions.can_retry && <p className="text-xs text-muted">{text.notRetryable}</p>}
+
+            {isFinished(execution.status) && (progress.failed > 0 || execution.images.failed > 0) && (
+              <RepairEntry actionId={actionId} executionId={execution.id} refreshKey={`${execution.retry_count}-${progress.failed}-${execution.images.failed}`} />
+            )}
 
             <Tabs tabs={tabs} value={filter} onChange={(id) => void changeFilter(id)} />
             <ResultRows rows={execution.rows} lang={lang} actionId={actionId} />

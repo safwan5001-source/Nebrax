@@ -19,6 +19,7 @@ use App\Models\AiActionFile;
 use App\Services\AiActionGateway;
 use App\Services\AiActionProductFileIntakeService;
 use App\Services\AiActionProductImageStager;
+use App\Services\AiActionProductRepairService;
 use App\Services\AiActionProductApprovalService;
 use App\Services\AiActionProductExecutionService;
 use App\Services\AiActionProductReviewService;
@@ -205,6 +206,47 @@ class AiActionController extends ApiController
         }
 
         return response()->json(['data' => $data]);
+    }
+
+    /** AI-ACTIONS-06B: what a repair of this execution would contain (read-only). */
+    public function repairCandidates(Request $request, AiAction $action, string $execution, AiActionProductRepairService $repairs): JsonResponse
+    {
+        try {
+            $plan = $repairs->candidates($request->user(), $action, $execution);
+        } catch (AiActionException $exception) {
+            return $this->error($exception);
+        }
+
+        return response()->json(['data' => [
+            'rows' => array_map(static fn (array $row): array => array_diff_key($row, ['image_ids' => 1, 'product_id' => 1]), $plan['rows']),
+            'retry_pending' => $plan['retry_pending'], 'open_repair' => $plan['open_repair'], 'reason' => $plan['reason'],
+        ]]);
+    }
+
+    /** AI-ACTIONS-06B: creates (or returns the open) repair action holding only the failed rows. */
+    public function startRepair(Request $request, AiAction $action, string $execution, AiActionProductRepairService $repairs): JsonResponse
+    {
+        try {
+            $result = $repairs->start($request->user(), $action, $execution);
+        } catch (AiActionException $exception) {
+            return $this->error($exception);
+        }
+
+        $response = response()->json(['data' => ['action_id' => $result['action']->id, 'repair_id' => $result['repair']->id, 'rows' => count($result['repair']->rows), 'replayed' => $result['replayed']]], $result['replayed'] ? 200 : 201);
+        if ($result['replayed']) $response->headers->set('AI-Action-Repair-Replayed', 'true');
+
+        return $response;
+    }
+
+    public function showRepair(Request $request, AiAction $action, AiActionProductRepairService $repairs): JsonResponse
+    {
+        try {
+            $info = $repairs->info($request->user(), $action);
+        } catch (AiActionException $exception) {
+            return $this->error($exception);
+        }
+
+        return response()->json(['data' => $info]);
     }
 
     /** AI-ACTIONS-06: validated ZIP of product images → private staging. Nothing is attached to a product. */

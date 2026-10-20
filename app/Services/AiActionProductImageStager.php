@@ -386,6 +386,82 @@ final class AiActionProductImageStager
         }
     }
 
+    /**
+     * AI-ACTIONS-06B: gives a repair action its own private copy of the images its rows named (bytes copied, not shared),
+     * under the same content hashes, so the repair's preview identifies exactly the pictures the original did. The caller
+     * discards `$written` if anything later fails.
+     *
+     * @param  list<string>  $imageIds
+     * @param  list<array{0:string,1:string}>  $written
+     */
+    public function copyBetween(AiAction $from, AiAction $to, array $imageIds, User $actor, array &$written): int
+    {
+        $copied = 0;
+        $profile = $this->storage->profile();
+        foreach (AiActionImage::query()->where('ai_action_id', $from->id)->whereIn('id', array_values(array_unique($imageIds)))->orderBy('id')->get() as $image) {
+            $id = (string) Str::uuid();
+            $base = sprintf('ai-actions/%s/%s/images/%s', $this->tenantContext->id(), $to->id, $id);
+            $key = "{$base}.{$image->extension}";
+            $thumbKey = $image->thumb_key === null ? null : "{$base}.thumb.{$image->extension}";
+            // Only bytes that still hash to the recorded identity are carried over: a corrupted object is not
+            // re-blessed, the repair simply lacks that image and the reviewer supplies it again.
+            $original = $this->readAll($image->storage_profile, $image->storage_key);
+            if ($original === null || ! hash_equals($image->content_sha256, hash('sha256', $original))) {
+                continue;
+            }
+            $thumbBytes = $image->thumb_key === null ? null : $this->readAll($image->storage_profile, $image->thumb_key);
+            foreach ([[$original, $key], [$thumbBytes, $thumbKey]] as [$bytes, $target]) {
+                if ($bytes === null || $target === null) {
+                    continue;
+                }
+                $stream = fopen('php://temp', 'r+b');
+                fwrite($stream, $bytes);
+                rewind($stream);
+                try {
+                    $this->storage->put($profile, $target, $stream);
+                    $written[] = [$profile, $target];
+                } finally {
+                    fclose($stream);
+                }
+            }
+            $isArchive = $image->source_kind === AiActionImage::KIND_ARCHIVE;
+            $this->make([
+                'id' => $id, 'ai_action_id' => $to->id, 'source_kind' => $image->source_kind,
+                'source_key' => $isArchive ? 'archive:1:'.sha1(mb_strtolower($image->source_label, 'UTF-8')) : $image->source_key,
+                'source_label' => $image->source_label, 'archive_sha256' => $image->archive_sha256, 'archive_seq' => $isArchive ? 1 : null,
+                'content_sha256' => $image->content_sha256, 'mime_type' => $image->mime_type, 'extension' => $image->extension,
+                'size_bytes' => $image->size_bytes, 'width' => $image->width, 'height' => $image->height,
+                'storage_profile' => $profile, 'storage_key' => $key, 'thumb_key' => $thumbBytes === null ? null : $thumbKey, 'thumb_mime' => $thumbBytes === null ? null : $image->thumb_mime,
+                'created_by' => $actor->id,
+            ]);
+            $copied++;
+        }
+
+        return $copied;
+    }
+
+    private function readAll(string $profile, string $key): ?string
+    {
+        try {
+            $stream = $this->storage->readStream($profile, $key);
+        } catch (Throwable) {
+            return null;
+        }
+        try {
+            $bytes = stream_get_contents($stream, ProductImageInspector::MAX_BYTES + 1);
+        } finally {
+            fclose($stream);
+        }
+
+        return is_string($bytes) && strlen($bytes) <= ProductImageInspector::MAX_BYTES ? $bytes : null;
+    }
+
+    /** @param list<array{0:string,1:string}> $written */
+    public function discardObjects(array $written): void
+    {
+        $this->discard($written);
+    }
+
     /** @param array<string,mixed> $attributes */
     private function make(array $attributes): AiActionImage
     {
