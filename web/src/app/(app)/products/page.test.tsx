@@ -24,6 +24,7 @@ const { api, downloadFile, translate, getSystemTaxInclusive, getShowStockQuantit
     tax_excl_tag: 'excl. VAT',
     empty: 'No products',
     import: 'Import',
+    ai_import: 'Import via AWJ Assistant',
     add: 'Add product',
     view: 'View',
     edit: 'Edit',
@@ -168,6 +169,23 @@ describe('ProductsPage mobile record identifiers', () => {
     const text = (await firstMobileRecord()).textContent ?? '';
     expect(text.indexOf('Diesel oil filter')).toBeLessThan(text.indexOf('Spare parts'));
     expect(text.indexOf('Spare parts')).toBeLessThan(text.indexOf('75.50'));
+  });
+});
+
+describe('ProductsPage AI import entry', () => {
+  afterEach(cleanup);
+
+  it('keeps the traditional import and exposes the assistant review route as separate permitted actions', async () => {
+    respondWith([baseProduct]);
+    const user = userEvent.setup();
+    render(<ProductsPage />);
+    await screen.findByRole('list');
+
+    expect(screen.getByRole('link', { name: 'Import' }).getAttribute('href')).toBe('/products/import');
+    // The action group keeps secondary product-management actions in its
+    // overflow menu; it is still gated exactly like the traditional import.
+    await user.click(screen.getByRole('button', { name: 'moreActions' }));
+    expect(screen.getByRole('menuitem', { name: 'Import via AWJ Assistant' }).getAttribute('href')).toBe('/products/ai-import');
   });
 });
 
