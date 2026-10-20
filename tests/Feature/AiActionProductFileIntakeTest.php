@@ -37,7 +37,14 @@ class AiActionProductFileIntakeTest extends TestCase
         return ['schema_version' => 1, 'rows' => [[
             'row_id' => 'initial-row', 'source_row' => 1,
             'match' => ['kind' => 'none', 'value' => null, 'target_product_id' => null, 'target_version' => null],
-            'decision' => 'needs_review', 'fields' => [], 'violations' => [], 'media' => null,
+            // The closed proposal schema requires an object/map here; an empty
+            // PHP array is a list, not an empty map. This seed mirrors a real
+            // persisted draft without weakening the production contract.
+            'decision' => 'needs_review',
+            'fields' => [
+                'sku' => ['value' => null, 'origin' => 'missing', 'confidence' => null],
+            ],
+            'violations' => [], 'media' => null,
         ]]];
     }
 
