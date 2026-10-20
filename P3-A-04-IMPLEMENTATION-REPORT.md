@@ -62,7 +62,7 @@
 
 ## CI عن بُعد
 
-اكتملت جميع فحوص GitHub على head النهائي `851e01469e5c3c4d9226d844b56766704e40eb94`: **9 ناجحة، صفر فاشلة أو pending**. شملت CI Gate، فحوص Storefront، Web builds، Merchant Preview Visual QA، Published Footer Visual QA، واختبارات PHP على SQLite وPostgreSQL. لا تُنسب حالات الفشل السابقة على head القديم إلى هذه النسخة.
+اكتملت جميع فحوص GitHub على head التنفيذي `851e01469e5c3c4d9226d844b56766704e40eb94`: **9 ناجحة، صفر فاشلة أو pending**. شملت CI Gate، فحوص Storefront، Web builds، Merchant Preview Visual QA، Published Footer Visual QA، واختبارات PHP على SQLite وPostgreSQL. أُضيف بعد ذلك commit توثيقي فقط لتسجيل هذه النتائج؛ head الحالي موضح أدناه. لا تُنسب حالات الفشل السابقة على head القديم إلى النسخة التنفيذية التي اجتازت CI.
 
 ## المخاطر والمتبقي
 
@@ -78,6 +78,7 @@
 - Branch: `p3-a-04-global-background-renderer`
 - Base (`main`): `8c74051b5e6d0c917babf97902954c1dc9b16ee2`
 - Implementation commit: `22ed521d91a86f198e7353bc29844955e603b48c`
-- Final Head (يتضمن التقرير): `851e01469e5c3c4d9226d844b56766704e40eb94`
+- Latest Head (تحديث توثيقي فقط بعد اكتمال CI): `15e33083faa264d0b2d79df234b9cb19171b7c36`
+- CI-validated implementation head: `851e01469e5c3c4d9226d844b56766704e40eb94`
 
 **القرار:** جاهز لمراجعة PR ونتائج CI الجديدة؛ لا Merge ولا Deploy قبل موافقتك.
