@@ -22,16 +22,16 @@ vi.mock('@/components/ui/toast', () => ({ useToast: () => toast }));
 const field = (value: string | null) => ({ value, origin: value === null ? 'missing' : 'extracted', confidence: value === null ? null : 100 });
 const reviewRow = (id: string, source: number, sku: string, decision: string) => ({
   row_id: id, source_row: source, decision, violations: [], media: null,
-  fields: { name: field(`منتج ${sku}`), sku: field(sku), sale_price: field('10'), type: field('good') },
+  fields: { name: field(`منتج ${sku}`), sku: field(sku), sale_price: field('10'), type: field('good'), purchase_price: field(null) },
 });
 
-function mockServer(preview: unknown) {
+function mockServer(preview: unknown, costHidden = false) {
   const posts: { path: string; body: unknown }[] = [];
   api.mockImplementation(async (path: string, options?: { method?: string; body?: unknown }) => {
     if (options?.method === 'POST') posts.push({ path, body: options.body });
     if (path === '/ai-actions' && options?.method === 'POST') return { data: { id: 'action-1', version: 1 } };
     if (path.endsWith('/files')) return { data: {} };
-    if (path.endsWith('/review')) return { data: { action: { id: 'action-1', version: 1, status: 'created' }, proposal: { rows: [reviewRow('r1', 2, 'A-1', 'needs_review'), reviewRow('r2', 3, 'A-2', 'create')] } } };
+    if (path.endsWith('/review')) return { data: { action: { id: 'action-1', version: 1, status: 'created', cost_hidden: costHidden }, proposal: { rows: [reviewRow('r1', 2, 'A-1', 'needs_review'), reviewRow('r2', 3, 'A-2', 'create')] } } };
     if (path.endsWith('/review/versions')) return { data: { version: 2, status: 'editing', latest_version: { proposal: { rows: [reviewRow('r1', 2, 'A-1', 'update'), reviewRow('r2', 3, 'A-2', 'create')] } } } };
     if (path.includes('/previews')) return { data: preview };
     throw new Error(`unexpected ${options?.method ?? 'GET'} ${path}`);
@@ -104,6 +104,26 @@ describe('استيراد المنتجات عبر مساعد أَوْج — ال�
 
     await waitFor(() => expect(posts.some((post) => post.path.endsWith('/review/versions'))).toBe(true));
     expect(posts.find((post) => post.path.endsWith('/review/versions'))?.body).toEqual({ expected_version: 1, edits: [{ row_id: 'r2', decision: 'skip' }] });
+  });
+
+  it('يخفي حقل سعر الشراء وخيار تعديله الجماعي لمن لا يملك صلاحية التكلفة', async () => {
+    mockServer(preview, true);
+    const { container } = render(<AiProductImportReviewPage />);
+    await uploadFile(container);
+
+    expect(screen.getByText(/سعر الشراء محجوب عنك/)).toBeTruthy();
+    expect(screen.queryByLabelText('سعر الشراء-2')).toBeNull();
+    expect(screen.queryByRole('columnheader', { name: 'سعر الشراء' })).toBeNull();
+    expect(Array.from(screen.getByLabelText('حقل التعديل الجماعي').querySelectorAll('option')).map((option) => option.textContent)).not.toContain('سعر الشراء');
+  });
+
+  it('يعرض حقل سعر الشراء لمن يملك صلاحية التكلفة', async () => {
+    mockServer(preview, false);
+    const { container } = render(<AiProductImportReviewPage />);
+    await uploadFile(container);
+
+    expect(screen.queryByText(/سعر الشراء محجوب عنك/)).toBeNull();
+    expect(screen.getByLabelText('سعر الشراء-2')).toBeTruthy();
   });
 
   it('يعرض الحالة الجاهزة بلا موافقة تلقائية وبلا أي تنفيذ', async () => {

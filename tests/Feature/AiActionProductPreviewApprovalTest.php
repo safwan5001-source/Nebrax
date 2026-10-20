@@ -175,8 +175,8 @@ class AiActionProductPreviewApprovalTest extends TestCase
 
         $this->assertFalse($preview['approvable']);
         $this->assertSame(5, $preview['totals']['blocked']);
-        $this->assertSame(['required_missing', 'required_missing'], $this->errorCodes($rows['r1']));
-        $this->assertEqualsCanonicalizing(['name', 'sale_price'], array_column(array_filter($rows['r1']['issues'], fn ($i) => $i['severity'] === 'error'), 'field'));
+        $this->assertSame(2, count(array_filter($this->errorCodes($rows['r1']), fn ($code) => $code === 'required_missing')));
+        $this->assertEqualsCanonicalizing(['name', 'sale_price'], array_column(array_filter($rows['r1']['issues'], fn ($i) => $i['code'] === 'required_missing'), 'field'));
         $this->assertContains('invalid_money', $this->codes($rows['r2']));
         $this->assertContains('integer_out_of_range', $this->codes($rows['r2']));
         $this->assertContains('min_sale_price_above_sale_price', $this->codes($rows['r3']));
@@ -582,5 +582,164 @@ class AiActionProductPreviewApprovalTest extends TestCase
         $this->assertSame([15, null], \App\Support\ProductImportValueNormalizer::normalize('tax_rate', '15%'));
         $this->assertSame([null, 'integer_out_of_range'], \App\Support\ProductImportValueNormalizer::normalize('tax_rate', '101'));
         $this->assertSame(['service', null], \App\Support\ProductImportValueNormalizer::normalize('type', 'خدمة'));
+    }
+
+    /** @test */
+    public function creating_a_product_requires_explicit_price_tax_unit_and_an_identifier_without_defaults(): void
+    {
+        $auth = $this->registerTenant();
+        $id = $this->makeAction($auth, [
+            $this->row('bare', 2, ['name' => 'عارٍ', 'type' => 'good', 'sale_price' => '10']),
+            $this->row('nocost', 3, ['sku' => 'N-1', 'name' => 'ب', 'type' => 'good', 'sale_price' => '10', 'tax_rate' => '15', 'unit' => 'قطعة']),
+            $this->row('notax', 4, ['sku' => 'N-2', 'name' => 'ج', 'type' => 'good', 'sale_price' => '10', 'purchase_price' => '5', 'unit' => 'قطعة']),
+            $this->row('nounit', 5, ['sku' => 'N-3', 'name' => 'د', 'type' => 'good', 'sale_price' => '10', 'purchase_price' => '5', 'tax_rate' => '15']),
+            $this->row('noid', 6, ['name' => 'هـ', 'type' => 'good', 'sale_price' => '10', 'purchase_price' => '5', 'tax_rate' => '15', 'unit' => 'قطعة']),
+        ]);
+        $preview = $this->preview($auth['token'], $id)->assertCreated()->json('data');
+        $rows = $this->rows($preview);
+
+        $this->assertFalse($preview['approvable']);
+        $this->assertEqualsCanonicalizing(['purchase_price_missing', 'tax_rate_missing', 'unit_missing', 'trusted_identifier_missing'], $this->errorCodes($rows['bare']));
+        $this->assertSame(['purchase_price_missing'], $this->errorCodes($rows['nocost']));
+        $this->assertSame(['tax_rate_missing'], $this->errorCodes($rows['notax']));
+        $this->assertSame(['unit_missing'], $this->errorCodes($rows['nounit']));
+        $this->assertSame(['trusted_identifier_missing'], $this->errorCodes($rows['noid']));
+        foreach ($rows as $row) {
+            $this->assertSame('blocked', $row['operation']);
+        }
+        // Nothing is invented for a missing value: no defaulted purchase price, tax, unit or generated SKU.
+        $this->assertSame(['name', 'type', 'sale_price'], array_column($rows['bare']['changes'], 'field'));
+        $this->assertArrayNotHasKey('purchase_price', $rows['bare']['prices']);
+        $this->assertArrayNotHasKey('tax_rate', $rows['bare']['prices']);
+        $this->assertNotContains('purchase_price', array_column($rows['nocost']['changes'], 'field'));
+        $this->assertNotContains('tax_rate', array_column($rows['notax']['changes'], 'field'));
+        $this->assertNotContains('unit', array_column($rows['nounit']['changes'], 'field'));
+        $this->assertNotContains('sku', array_column($rows['noid']['changes'], 'field'));
+        $this->approve($auth['token'], $id, $preview)->assertStatus(422)->assertJsonPath('error.code', 'preview_blocked');
+        $this->assertSame(0, AiActionApproval::withoutGlobalScopes()->count());
+        $this->assertNothingWritten();
+    }
+
+    /** @test */
+    public function explicit_zero_values_and_a_barcode_satisfy_the_contract_and_optional_fields_stay_optional(): void
+    {
+        $auth = $this->registerTenant();
+        $id = $this->makeAction($auth, [
+            // Explicit zeros are explicit; a barcode alone is a trusted identifier; no optional field is demanded.
+            $this->row('zero', 2, ['barcode' => '9000000000001', 'name' => 'صفري', 'type' => 'service', 'sale_price' => '0', 'purchase_price' => '0', 'tax_rate' => '0', 'unit' => 'ساعة']),
+            // An update needs none of unit/tax/purchase price/identifiers beyond its target.
+            $this->row('upd', 3, ['sku' => 'EXIST-1', 'sale_price' => '12'], 'update'),
+        ]);
+        $this->product($auth['token'], ['name' => 'قائم', 'sku' => 'EXIST-1', 'sale_price' => 1000]);
+        $preview = $this->preview($auth['token'], $id)->assertCreated()->json('data');
+        $rows = $this->rows($preview);
+
+        $this->assertTrue($preview['approvable'], json_encode($preview['issues'] + array_map(fn ($r) => $r['issues'], $preview['rows'])));
+        $this->assertSame('create', $rows['zero']['operation']);
+        $this->assertSame([], $this->codes($rows['zero']));
+        $this->assertSame(0, $rows['zero']['prices']['purchase_price']['after']);
+        $this->assertSame('update', $rows['upd']['operation']);
+        $this->approve($auth['token'], $id, $preview)->assertCreated();
+    }
+
+    /** @test */
+    public function purchase_price_is_withheld_from_every_payload_for_users_without_cost_permission(): void
+    {
+        $auth = $this->registerTenant();
+        $id = $this->makeAction($auth, [$this->good('a', 2, 'COST-1', ['purchase_price' => '7.77'])]);
+        $blind = $this->customRole($auth['tenant_id'], 'blind', ['ai.actions.use', 'ai.actions.approve', 'products.manage'], 'blind@acme.test');
+        $fileId = AiActionFile::withoutGlobalScopes()->where('ai_action_id', $id)->value('id');
+
+        // The permitted owner sees the value everywhere it is exposed.
+        $this->withToken($auth['token'])->getJson("/api/ai-actions/{$id}/review")->assertOk()->assertJsonPath('data.proposal.rows.0.fields.purchase_price.value', '7.77')->assertJsonPath('data.action.cost_hidden', false);
+        $this->withToken($auth['token'])->getJson("/api/ai-actions/{$id}/files/{$fileId}/extraction")->assertOk()->assertJsonPath('data.manifest.rows.0.fields.purchase_price.value', '7.77');
+        $this->preview($auth['token'], $id)->assertCreated();
+
+        $responses = [
+            'review' => $this->withToken($blind)->getJson("/api/ai-actions/{$id}/review"),
+            'show' => $this->withToken($blind)->getJson("/api/ai-actions/{$id}"),
+            'extraction' => $this->withToken($blind)->getJson("/api/ai-actions/{$id}/files/{$fileId}/extraction"),
+            'preview' => $this->withToken($blind)->getJson("/api/ai-actions/{$id}/previews/latest"),
+        ];
+        foreach ($responses as $name => $response) {
+            $response->assertOk();
+            $this->assertStringNotContainsString('7.77', $response->getContent(), "{$name} leaked the purchase price");
+            $this->assertStringNotContainsString('777', $response->getContent(), "{$name} leaked the purchase price in minor units");
+        }
+        $responses['review']->assertJsonPath('data.proposal.rows.0.fields.purchase_price.value', null)->assertJsonPath('data.action.cost_hidden', true);
+        $responses['show']->assertJsonPath('data.cost_hidden', true);
+        $responses['extraction']->assertJsonPath('data.cost_hidden', true)->assertJsonPath('data.manifest.rows.0.fields.purchase_price.value', null);
+        $responses['preview']->assertJsonPath('data.permissions.cost_hidden', true);
+
+        // Saving through the review flow returns a redacted version too, and does not disturb the stored cost.
+        $saved = $this->withToken($blind)->withHeader('Idempotency-Key', 'pa-cost-edit-1')->postJson("/api/ai-actions/{$id}/review/versions", ['expected_version' => 1, 'edits' => [['row_id' => 'a', 'fields' => ['name' => 'اسم جديد']]]])->assertCreated();
+        $this->assertStringNotContainsString('7.77', $saved->getContent());
+        $this->withToken($auth['token'])->getJson("/api/ai-actions/{$id}/review")->assertJsonPath('data.proposal.rows.0.fields.purchase_price.value', '7.77')->assertJsonPath('data.proposal.rows.0.fields.name.value', 'اسم جديد');
+        $this->assertNothingWritten();
+    }
+
+    /** @test */
+    public function a_user_without_cost_permission_cannot_write_purchase_prices_or_wipe_them(): void
+    {
+        $auth = $this->registerTenant();
+        $id = $this->makeAction($auth, [$this->good('a', 2, 'COST-2', ['purchase_price' => '7.77'])]);
+        $blind = $this->customRole($auth['tenant_id'], 'blind-writer', ['ai.actions.use', 'products.manage'], 'blindw@acme.test');
+
+        // Review edit and raw version/create with a purchase price are refused.
+        $this->withToken($blind)->withHeader('Idempotency-Key', 'pa-cost-w1')->postJson("/api/ai-actions/{$id}/review/versions", ['expected_version' => 1, 'edits' => [['row_id' => 'a', 'fields' => ['purchase_price' => '1']]]])
+            ->assertForbidden()->assertJsonPath('error.code', 'cost_permission_required');
+        $row = $this->row('a', 2, ['sku' => 'COST-2', 'name' => 'x', 'type' => 'good', 'sale_price' => '10', 'purchase_price' => '1']);
+        $this->withToken($blind)->withHeader('Idempotency-Key', 'pa-cost-w2')->postJson("/api/ai-actions/{$id}/versions", ['expected_version' => 1, 'proposal' => ['schema_version' => 1, 'rows' => [$row]]])
+            ->assertForbidden()->assertJsonPath('error.code', 'cost_permission_required');
+        $this->withToken($blind)->withHeader('Idempotency-Key', 'pa-cost-w3')->postJson('/api/ai-actions', ['type' => 'product_import.v1', 'proposal' => ['schema_version' => 1, 'rows' => [$row]]])
+            ->assertForbidden()->assertJsonPath('error.code', 'cost_permission_required');
+        $this->assertSame(1, AiAction::findOrFail($id)->version);
+
+        // Echoing the redacted proposal back (no cost) keeps the stored cost instead of wiping it.
+        $echo = $this->withToken($blind)->getJson("/api/ai-actions/{$id}/review")->json('data.proposal');
+        $this->withToken($blind)->withHeader('Idempotency-Key', 'pa-cost-w4')->postJson("/api/ai-actions/{$id}/versions", ['expected_version' => 1, 'proposal' => $echo])->assertCreated();
+        $this->withToken($auth['token'])->getJson("/api/ai-actions/{$id}/review")->assertJsonPath('data.proposal.rows.0.fields.purchase_price.value', '7.77');
+        $preview = $this->preview($auth['token'], $id, 2, 'pa-preview-cw')->assertCreated()->json('data');
+        $this->assertSame(777, $this->rows($preview)['a']['prices']['purchase_price']['after']);
+    }
+
+    /** @test */
+    public function cost_data_never_crosses_tenants_and_is_scoped_per_role(): void
+    {
+        $auth = $this->registerTenant();
+        $other = $this->registerTenant('beta', 'owner@beta.test');
+        $this->enable($other['tenant_id']);
+        $id = $this->makeAction($auth, [$this->good('a', 2, 'TEN-1', ['purchase_price' => '7.77'])]);
+        $preview = $this->preview($auth['token'], $id)->assertCreated()->json('data');
+        $fileId = AiActionFile::withoutGlobalScopes()->where('ai_action_id', $id)->value('id');
+
+        // The other tenant's owner holds products.view_cost in their own tenant, but the action is not theirs.
+        app(TenantContext::class)->set($other['tenant_id']);
+        foreach (["/api/ai-actions/{$id}", "/api/ai-actions/{$id}/review", "/api/ai-actions/{$id}/files/{$fileId}/extraction", "/api/ai-actions/{$id}/previews/{$preview['id']}", "/api/ai-actions/{$id}/previews/latest"] as $url) {
+            $response = $this->withToken($other['token'])->getJson($url);
+            $response->assertNotFound();
+            $this->assertStringNotContainsString('7.77', $response->getContent());
+        }
+
+        // Cost permission is per role, resolved live: revoking it hides the value on the very next read.
+        $role = $this->customRole($auth['tenant_id'], 'cost-viewer', ['ai.actions.use', 'products.manage', 'products.view_cost'], 'costviewer@acme.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->withToken($role)->getJson("/api/ai-actions/{$id}/review")->assertJsonPath('data.proposal.rows.0.fields.purchase_price.value', '7.77');
+        Role::where('slug', 'cost-viewer')->update(['permissions' => ['ai.actions.use', 'products.manage']]);
+        $after = $this->withToken($role)->getJson("/api/ai-actions/{$id}/review");
+        $this->assertStringNotContainsString('7.77', $after->getContent());
+    }
+
+    /** @test */
+    public function a_user_who_can_approve_and_see_cost_still_approves_their_own_preview(): void
+    {
+        $auth = $this->registerTenant();
+        $solo = $this->customRole($auth['tenant_id'], 'solo', ['ai.actions.use', 'ai.actions.approve', 'products.manage', 'products.view_cost'], 'solo@acme.test');
+        $id = $this->makeAction(['token' => $solo, 'tenant_id' => $auth['tenant_id']], [$this->good('a', 2, 'SOLO-1')]);
+        $preview = $this->preview($solo, $id)->assertCreated()->json('data');
+
+        $this->assertSame(AiAction::findOrFail($id)->created_by, $preview['generated_by']);
+        $this->approve($solo, $id, $preview)->assertCreated();
+        $this->assertSame(AiAction::findOrFail($id)->created_by, AiActionApproval::firstOrFail()->approved_by);
     }
 }

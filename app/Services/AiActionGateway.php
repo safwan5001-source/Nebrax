@@ -7,6 +7,7 @@ use App\Models\AiActionEvent;
 use App\Models\AiActionVersion;
 use App\Models\User;
 use App\Support\AiActionCanonicalJson;
+use App\Support\AiActionCostVisibility;
 use App\Support\AiActionException;
 use App\Tenancy\BranchContext;
 use App\Tenancy\TenantContext;
@@ -26,6 +27,7 @@ final class AiActionGateway
     {
         $definition = $this->registry->definition($type);
         $actor = $this->policy->authorize((string) $requestActor->id, AiActionPolicy::USE, $definition['domain_permission']);
+        $this->assertNoCostWrite($actor, $proposal);
         $summary = $this->registry->validateProposal($type, $proposal);
 
         return DB::transaction(function () use ($actor, $definition, $proposal, $summary): AiAction {
@@ -78,20 +80,31 @@ final class AiActionGateway
         return $actor;
     }
 
-    public function addVersion(User $requestActor, AiAction $action, int $expectedVersion, array $proposal): AiAction
+    /**
+     * `$costGuard = false` is for the review service only: it edits a copy of the real proposal and
+     * rejects cost edits itself, so its payload legitimately carries stored costs.
+     */
+    public function addVersion(User $requestActor, AiAction $action, int $expectedVersion, array $proposal, bool $costGuard = true): AiAction
     {
         $definition = $this->registry->definition($action->type);
         $actor = $this->policy->authorize((string) $requestActor->id, AiActionPolicy::USE, $definition['domain_permission']);
         $this->assertBranchContext($action);
+        if ($costGuard) {
+            $this->assertNoCostWrite($actor, $proposal);
+        }
         $summary = $this->registry->validateProposal($action->type, $proposal);
 
-        return DB::transaction(function () use ($action, $expectedVersion, $proposal, $summary, $actor): AiAction {
+        return DB::transaction(function () use ($action, $expectedVersion, $proposal, $summary, $actor, $costGuard): AiAction {
             $locked = AiAction::query()->whereKey($action->id)->lockForUpdate()->firstOrFail();
             if (! in_array($locked->status, AiAction::MUTABLE_STATUSES, true)) {
                 throw new AiActionException('state_conflict', 'لا تقبل العملية تعديلات في حالتها الحالية.', 409);
             }
             if ($locked->version !== $expectedVersion) {
                 throw new AiActionException('version_conflict', 'تغيّرت المسودة. حدّث البيانات قبل إعادة التعديل.', 409);
+            }
+
+            if ($costGuard && ! AiActionCostVisibility::allows($actor)) {
+                $proposal = AiActionCostVisibility::carryForward($proposal, $this->storedRows($locked));
             }
 
             $next = $expectedVersion + 1;
@@ -143,6 +156,26 @@ final class AiActionGateway
 
             return $locked->fresh();
         }, 3);
+    }
+
+    /** A caller who cannot see costs may not submit any: they would be writing blind. */
+    private function assertNoCostWrite(User $actor, array $proposal): void
+    {
+        if (! AiActionCostVisibility::allows($actor) && AiActionCostVisibility::carriesCost($proposal)) {
+            throw new AiActionException('cost_permission_required', 'إدخال سعر الشراء أو تعديله يتطلب صلاحية عرض التكلفة.', 403);
+        }
+    }
+
+    /** @return array<int,mixed> rows of the proposal the user was last looking at (latest version, else the extraction). */
+    private function storedRows(AiAction $locked): array
+    {
+        $latest = $locked->versions()->orderByDesc('version')->first();
+        $rows = $latest?->proposal['rows'] ?? [];
+        if ($rows !== []) {
+            return $rows;
+        }
+
+        return $locked->extractions()->orderByDesc('action_version')->first()?->manifest['rows'] ?? [];
     }
 
     private function storeVersion(AiAction $action, array $proposal, array $summary, User $actor, int $version): void

@@ -283,13 +283,16 @@ final class AiActionProductPreviewBuilder
             if (($values['type'] ?? null) === 'service' && ($values['track_inventory'] ?? false) === true) {
                 $issues[] = $this->issue('service_tracks_inventory', 'track_inventory', 'error', 'الخدمة لا تتبع مخزوناً.');
             }
+            // The AI Actions contract (architecture §6/§16.5): a created product's price, tax, unit and a
+            // trusted identifier are resolved explicitly — never defaulted (the traditional importer
+            // would write purchase price 0, the model default tax/unit, and a generated SKU).
             foreach (['purchase_price' => 'سعر الشراء', 'tax_rate' => 'نسبة الضريبة', 'unit' => 'الوحدة'] as $key => $label) {
                 if (! isset($values[$key]) && ! isset($p['errors'][$key])) {
-                    $issues[] = $this->issue($key.'_missing', $key, 'warning', "«{$label}» غير محدّد؛ لن يُخترع له قيمة.");
+                    $issues[] = $this->issue($key.'_missing', $key, 'error', "«{$label}» مطلوب لإنشاء منتج جديد؛ لا تُستخدم قيمة افتراضية صامتة (أدخل القيمة صراحةً، ولو صفراً).");
                 }
             }
-            if ($p['sku'] === null && $p['barcode'] === null) {
-                $issues[] = $this->issue('trusted_identifier_missing', null, 'warning', 'لا يوجد SKU أو باركود؛ لن يُولَّد واحد تلقائياً.');
+            if ($p['sku'] === null && $p['barcode'] === null && ! isset($p['errors']['sku']) && ! isset($p['errors']['barcode'])) {
+                $issues[] = $this->issue('trusted_identifier_missing', null, 'error', 'يلزم رمز صنف (SKU) أو باركود لإنشاء منتج جديد؛ لن يُولَّد واحد تلقائياً.');
             }
             foreach ($values as $key => $value) {
                 if ($key !== 'nebrax_id' && ! in_array($key, ProductImportFields::mediaKeys(), true)) $changes[] = ['field' => $key, 'before' => null, 'after' => $value];

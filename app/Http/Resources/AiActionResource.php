@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Support\AiActionCostVisibility;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -10,6 +11,7 @@ class AiActionResource extends JsonResource
     public function toArray(Request $request): array
     {
         $latest = $this->whenLoaded('versions', fn () => $this->versions->sortByDesc('version')->first());
+        $canCost = AiActionCostVisibility::allows($request->user());
 
         return [
             'id' => $this->id,
@@ -25,12 +27,13 @@ class AiActionResource extends JsonResource
             'latest_version' => $latest instanceof \App\Models\AiActionVersion ? [
                 'id' => $latest->id,
                 'version' => (int) $latest->version,
-                'proposal' => $latest->proposal,
+                'proposal' => $canCost ? $latest->proposal : AiActionCostVisibility::redactProposal($latest->proposal),
                 'proposal_hash' => $latest->proposal_hash,
                 'validation_summary' => $latest->validation_summary,
                 'created_by' => $latest->created_by,
                 'created_at' => optional($latest->created_at)->toIso8601String(),
             ] : null,
+            'cost_hidden' => ! $canCost,
             'created_at' => optional($this->created_at)->toIso8601String(),
             'updated_at' => optional($this->updated_at)->toIso8601String(),
         ];

@@ -6,6 +6,7 @@ use App\Models\AiAction;
 use App\Models\AiActionEvent;
 use App\Models\AiActionExtraction;
 use App\Models\User;
+use App\Support\AiActionCostVisibility;
 use App\Support\AiActionException;
 use App\Support\ProductImportFields;
 
@@ -69,6 +70,9 @@ final class AiActionProductReviewService
             }
             $index = $byId[$rowId];
             foreach ($hasFields ? $edit['fields'] : [] as $field => $value) {
+                if ($field === AiActionCostVisibility::FIELD && ! AiActionCostVisibility::allows($actor)) {
+                    throw new AiActionException('cost_permission_required', 'إدخال سعر الشراء أو تعديله يتطلب صلاحية عرض التكلفة.', 403);
+                }
                 if (! is_string($field) || ProductImportFields::get($field) === null || ! $this->valid($field, $value)) {
                     throw new AiActionException('review_field_invalid', 'قيمة حقل المراجعة غير صالحة.', 422);
                 }
@@ -84,7 +88,7 @@ final class AiActionProductReviewService
                 : ($this->hasErrors($rows[$index]['violations']) ? 'needs_review' : 'create'));
         }
         $proposal['rows'] = $rows;
-        $updated = $this->gateway->addVersion($actor, $action, $expectedVersion, $proposal);
+        $updated = $this->gateway->addVersion($actor, $action, $expectedVersion, $proposal, costGuard: false);
         AiActionEvent::create([
             'ai_action_id' => $updated->id, 'version' => $updated->version, 'event' => 'product_review_edited',
             'from_status' => AiAction::STATUS_CREATED, 'to_status' => $updated->status, 'actor_id' => $actor->id,

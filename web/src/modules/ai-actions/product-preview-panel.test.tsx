@@ -44,7 +44,7 @@ function previewFixture(overrides: Partial<ProductPreview> = {}): ProductPreview
         changes: [{ field: 'name', before: null, after: 'قهوة جديدة' }, { field: 'sale_price', before: null, after: 1050 }],
         prices: { sale_price: { before: null, after: 1050 }, purchase_price: { before: null, after: 500 }, tax_rate: { before: null, after: 15 } },
         images: { primary: 'https://img.example/a.jpg', additional: [], count: 1, will_apply: true, fetched: false },
-        issues: [{ code: 'unit_missing', field: 'unit', severity: 'warning', message: '«الوحدة» غير محدّد؛ لن يُخترع له قيمة.' }],
+        issues: [{ code: 'reference_unmanaged', field: 'category', severity: 'warning', message: '«التصنيف» بالقيمة «قهوة» غير موجود ولن يُنشأ تلقائياً.' }],
       },
       {
         row_id: 'r2', source_row: 3, decision: 'update', display: { name: 'قهوة قائمة', sku: 'EX-1', barcode: null },
@@ -112,7 +112,7 @@ describe('المعاينة النهائية والموافقة', () => {
     expect(screen.getAllByText('وصف جديد').length).toBeGreaterThan(0);
     expect(screen.getAllByText(/لم تُنزَّل بعد/).length).toBeGreaterThan(0);
     expect(screen.getAllByText('تخطٍّ بقرارك').length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/غير محدّد؛ لن يُخترع/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/غير موجود ولن يُنشأ تلقائياً/).length).toBeGreaterThan(0);
     expect(onStatus).toHaveBeenCalledWith('ready_for_approval');
     expect(screen.getByText(/لا تُنشأ منتجات ولا تُحدَّث/)).toBeTruthy();
   });
@@ -158,6 +158,28 @@ describe('المعاينة النهائية والموافقة', () => {
     expect((screen.getByRole('checkbox') as HTMLInputElement).disabled).toBe(true);
     expect((screen.getByRole('button', { name: /الموافقة على المعاينة/ }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText(/أخطاء تمنع التنفيذ؛ صحّحها/)).toBeTruthy();
+  });
+
+  it('تشرح نقص السعر والضريبة والوحدة والمعرّف كأخطاء تمنع الموافقة ولا تعرض قيماً افتراضية', async () => {
+    const missing = (code: string, field: string | null, message: string) => ({ code, field, severity: 'error' as const, message });
+    const blocked = {
+      ...previewFixture().rows[0], operation: 'blocked' as const, changes: [{ field: 'name', before: null, after: 'بلا بيانات' }], prices: { sale_price: { before: null, after: 1000 } }, images: null,
+      issues: [
+        missing('purchase_price_missing', 'purchase_price', '«سعر الشراء» مطلوب لإنشاء منتج جديد؛ لا تُستخدم قيمة افتراضية صامتة.'),
+        missing('tax_rate_missing', 'tax_rate', '«نسبة الضريبة» مطلوب لإنشاء منتج جديد؛ لا تُستخدم قيمة افتراضية صامتة.'),
+        missing('unit_missing', 'unit', '«الوحدة» مطلوب لإنشاء منتج جديد؛ لا تُستخدم قيمة افتراضية صامتة.'),
+        missing('trusted_identifier_missing', null, 'يلزم رمز صنف (SKU) أو باركود لإنشاء منتج جديد؛ لن يُولَّد واحد تلقائياً.'),
+      ],
+    };
+    mountApi(previewFixture({ approvable: false, totals: { rows: 1, create: 0, update: 0, skip: 0, blocked: 1, errors: 4, warnings: 0, has_cost_values: false }, rows: [blocked] }));
+    renderPanel();
+
+    for (const title of ['سعر الشراء مطلوب للإنشاء', 'نسبة الضريبة مطلوبة للإنشاء', 'الوحدة مطلوبة للإنشاء', 'يلزم SKU أو باركود']) {
+      expect((await screen.findAllByText(new RegExp(title))).length).toBeGreaterThan(0);
+    }
+    expect((screen.getByRole('checkbox') as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: /الموافقة على المعاينة/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect(document.body.textContent).not.toMatch(/15%/);
   });
 
   it('تمنع الموافقة مع تعديلات غير محفوظة', async () => {

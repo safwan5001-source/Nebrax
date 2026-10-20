@@ -17,6 +17,7 @@ use App\Services\AiActionGateway;
 use App\Services\AiActionProductFileIntakeService;
 use App\Services\AiActionProductApprovalService;
 use App\Services\AiActionProductReviewService;
+use App\Support\AiActionCostVisibility;
 use App\Support\AiActionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -106,7 +107,8 @@ class AiActionController extends ApiController
         }
         return response()->json(['data' => [
             'action' => (new AiActionResource($data['action']))->resolve(),
-            'proposal' => $data['proposal'], 'manifest_hash' => $data['manifest_hash'],
+            'proposal' => AiActionCostVisibility::allows($request->user()) ? $data['proposal'] : AiActionCostVisibility::redactProposal($data['proposal']),
+            'manifest_hash' => $data['manifest_hash'],
         ]]);
     }
 
