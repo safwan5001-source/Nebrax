@@ -53,6 +53,16 @@ final class AiActionGateway
         return $action->load(['versions' => fn ($query) => $query->orderByDesc('version')->limit(1)]);
     }
 
+    /** Authorizes a non-mutating extraction intake against the action's own scope. */
+    public function authorizeFileIntake(User $requestActor, AiAction $action): User
+    {
+        $definition = $this->registry->definition($action->type);
+        $actor = $this->policy->authorize((string) $requestActor->id, AiActionPolicy::USE, $definition['domain_permission']);
+        $this->assertBranchContext($action);
+
+        return $actor;
+    }
+
     public function addVersion(User $requestActor, AiAction $action, int $expectedVersion, array $proposal): AiAction
     {
         $definition = $this->registry->definition($action->type);
