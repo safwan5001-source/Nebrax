@@ -104,7 +104,8 @@ class ScopeGuardTest(unittest.TestCase):
     def test_fixtures_use_only_the_synthetic_test_vat_number(self):
         for path in glob.glob(os.path.join(FIXTURES, "awj", "*.xml")):
             ids = re.findall(r"<cbc:CompanyID>(\d+)</cbc:CompanyID>", read(path))
-            self.assertEqual(ids, ["300000000000003"], path)
+            # البائع أولاً دائماً؛ ثم (اختيارياً) رقم المشتري الاصطناعي الوحيد المسموح (REM-15a).
+            self.assertIn(ids, (["300000000000003"], ["300000000000003", "300000000000113"]), path)
 
 
 if __name__ == "__main__":

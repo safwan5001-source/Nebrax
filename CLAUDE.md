@@ -416,7 +416,17 @@ php artisan serve
 تُلتقط **مرة واحدة** في `InvoiceService::post()` بحدّ `issued_at` نفسه (بعد القفلين وقبل `ZatcaService::buildFor`) عبر `App\Support\InvoicePartySnapshot` (v1: `seller` و`buyer` ببيانات موجودة أصلاً فقط)، وتثبت بعدها (حارس `Invoice::booted` يغطي `issued_at` و`party_snapshot`، ولا يدخلان `$fillable`).
 - **العرض:** فاتورة مرحَّلة بلقطة v1 تُعرض منها (`parties` في قراءة الفاتورة المفردة، وكتلة `partner`، وPublic API، ومحوّل المستندات `invoice-parties.ts`). المسودة والمرحَّلة القديمة (`NULL`) تقرأ البيانات الحية — **توافق لا ضمان تاريخي**. لا Backfill.
 - **ممنوع** كتابة هذا العمود أو `issued_at` عبر Builder/`DB::table`/SQL خام/`saveQuietly`؛ يحرس ذلك `InvoicePartySnapshotTest` ساكناً.
-- **لم يتغيّر XML/QR/الهاش**: كتل البائع/المشتري داخل XML تبقى مهمة REM-15/16 (تُبنى من هذه اللقطة). نمذجة هوية البائع/المشتري (P1–P6) غير محسومة. المرجع: `docs/audits/horizon/REM-14-IMPLEMENTATION-REPORT.md`.
+- كتلتا البائع/المشتري في XML تُبنيان من هذه اللقطة منذ **REM-15a** (القسم التالي). نمذجة هوية البائع/المشتري (P1–P6) ما زالت غير محسومة جزئياً. المرجع: `docs/audits/horizon/REM-14-IMPLEMENTATION-REPORT.md`.
+
+## كتلتا البائع والمشتري في UBL (`ZatcaPartyXml`) — REM-15a
+
+`App\Support\ZatcaPartyXml` (دالة نقيّة) يبني `AccountingSupplierParty`/`AccountingCustomerParty` **من `invoices.party_snapshot` v1 وحده** لا من `Tenant`/`Partner`/إعدادات الشركة الحيّة؛ وكذلك وسما QR 1–2 (`ZatcaService::qrFor`) فيتّفقان مع XML حرفياً. لقطة غائبة أو تالفة (`requireSnapshot`) ⇒ فشل مغلق قبل أي قفل أو استهلاك ICV؛ ومحرف لا يصحّ في XML ⇒ يفشل الهاشر والمعاملة تتراجع (لا تنظيف صامت).
+- **لا اختلاق ولا إعادة كتابة:** عنصر بلا قيمة لا يُكتب (لا عناصر فارغة)؛ الرقم الضريبي (بائعاً/مشترياً) يُكتب كما التُقط (المشوَّه يظهر BR-KSA-40/44 ولا يُحذف)؛ الاسم بلا ترجمة؛ لا يُكتب `tenant_id`/`branch_id`/`partner_id`.
+- **السجل التجاري** `schemeID="CRN"` فقط حين يكون أحرفاً وأرقاماً (BR-KSA-08/14)؛ وللمشتري فقط حين لا رقم ضريبي له (BT-46). لا مخطّط آخر (MOM/MLS/700/SAG/OTH) — مؤجَّل لحين وجود حقل مخطّط.
+- **البلد** رمز ISO 3166-1 alpha-2 معروف (٢٤٩، مشتقة من BR-CL-14 في SDK بحذف `1A`/`XI`)؛ لا ترجمة لأسماء الدول ولا افتراض `SA`.
+- **المشتري:** الضريبية ⇒ كل ما وُجد من العنوان؛ **المبسّطة** ⇒ العنوان يُكتب مكتملاً فقط (SA: شارع/مبنى/حي/مدينة/رمز بريدي ٥ أرقام؛ أجنبي معروف: شارع/مدينة). حاوية `AccountingCustomerParty` تبقى (فارغة إن لزم) لأن XSD لدى ZATCA يشترطها.
+- **خارج النطاق (REM-15b/16):** رفض الترحيل عند نقص بيانات المشتري، POS، `entity_type`، حدّ 1,000 ريال، رقم إضافي للمشتري، تعدّد السجلات التجارية/هوية الفرع.
+- **الحارس:** `baseline.json` يحمل `awj_forbidden_warning_codes` (قواعد الأطراف إنذاراتٌ في SDK فلا يلتقطها مسطرة الأخطاء)؛ نجاح XSD/غياب الإنذارات استرشادي وليس إقرار امتثال. المرجع: `docs/audits/horizon/REM-15a-IMPLEMENTATION-REPORT.md`.
 
 ## الترقيم التسلسلي
 

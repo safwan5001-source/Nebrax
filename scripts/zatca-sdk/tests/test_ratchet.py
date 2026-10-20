@@ -72,6 +72,45 @@ class AwjRatchetTest(unittest.TestCase):
         self.assertEqual(c.compare_awj(mixed, BASE_AWJ)[0], "REGRESSION")
 
 
+class ForbiddenWarningTest(unittest.TestCase):
+    """REM-15a: party rules are SDK *warnings*, so the error ratchet cannot see them; they are pinned at zero."""
+
+    def test_a_forbidden_warning_is_a_regression_even_when_errors_are_unchanged(self):
+        dirty = res("FAILED", {"XSD": "FAILED", "EN": "FAILED", "PIH": "FAILED"},
+                    {"XSD": ["SAXParseException"], "EN": ["BR-CO-04", "BR-CO-15"], "PIH": ["KSA-13"]},
+                    warnings=["BR-KSA-81", "BR-CO-10"])
+        self.assertEqual(c.compare_awj(dirty, BASE_AWJ)[0], "OK")  # no list: previous behaviour
+        verdict, details = c.compare_awj(dirty, BASE_AWJ, ["BR-KSA-81"])
+        self.assertEqual(verdict, "REGRESSION")
+        self.assertTrue(any("BR-KSA-81" in d and "forbidden" in d for d in details))
+        self.assertFalse(any("BR-CO-10" in d for d in details))
+
+    def test_prefix_pattern_matches_a_family_of_codes_only(self):
+        dirty = res("FAILED", {"XSD": "FAILED", "EN": "FAILED", "PIH": "FAILED"},
+                    {"XSD": ["SAXParseException"], "EN": ["BR-CO-04", "BR-CO-15"], "PIH": ["KSA-13"]},
+                    warnings=["BR-KSA-F-06-C23", "BR-KSA-F-05"])
+        self.assertEqual(c.forbidden_warnings(dirty, ["BR-KSA-F-06-*"]), ["BR-KSA-F-06-C23"])
+
+    def test_evaluate_reads_the_list_from_the_baseline(self):
+        dirty = res("FAILED", {"XSD": "FAILED", "EN": "FAILED", "PIH": "FAILED"},
+                    {"XSD": ["SAXParseException"], "EN": ["BR-CO-04", "BR-CO-15"], "PIH": ["KSA-13"]},
+                    warnings=["BR-08"])
+        official = {"a.xml": OK_OFFICIAL, "b.xml": OK_OFFICIAL}
+        _, ok = c.evaluate(official, {"f1.xml": dirty}, BASELINE)
+        self.assertTrue(ok)
+        _, ok = c.evaluate(official, {"f1.xml": dirty}, dict(BASELINE, awj_forbidden_warning_codes=["BR-08"]))
+        self.assertFalse(ok)
+
+    def test_the_committed_baseline_pins_every_party_rule_at_zero(self):
+        import json
+        path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "tests", "Fixtures", "zatca-sdk", "baseline.json")
+        with open(path, encoding="utf-8") as fh:
+            forbidden = json.load(fh)["awj_forbidden_warning_codes"]
+        for code in ("BR-08", "BR-KSA-08", "BR-KSA-09", "BR-KSA-10", "BR-KSA-37", "BR-KSA-63",
+                     "BR-KSA-66", "BR-KSA-67", "BR-KSA-81"):
+            self.assertIn(code, forbidden)
+
+
 OFFICIAL = {"expected_count": 2, "allowed_warning_codes": ["BR-KSA-98"],
             "samples": {"a.xml": {"stages": ["XSD", "PIH"]}, "b.xml": {"stages": ["XSD", "PIH"]}}}
 BASELINE = {"official": OFFICIAL, "awj": {"f1.xml": BASE_AWJ}}
