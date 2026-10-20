@@ -95,3 +95,27 @@ AI-ACTIONS-06: controlled product-image import (reuse the dark, egress-reviewed 
 | Base | `main` @ `a2a740f9aea6bf73a9b3a707394387c2feb3381c` |
 | Head (code + tests, incl. §1b fix) | `92af297199e08e56f802d7d7ad9b3a295a9e1277` (later commits only update this table) |
 | CI on `92af297` | **All green:** `php artisan test (L11, sqlite)` ✅ · `php artisan test (L11, pgsql)` ✅ · `web build (Next.js)` ✅ (both runs) · `CI Gate` ✅. The earlier head `a574122` was also green. Not merged, not deployed. |
+
+## 8. CI investigation — PostgreSQL failure on head `1b8b4ef`
+
+Two consecutive `php artisan test (L11, pgsql)` runs of the same commit failed with **different tests**, which is what a flaky test looks like. Neither failure is a PostgreSQL-specific defect of the execution engine, and neither involved accounting or stock rules.
+
+| | Attempt 1 (run 39478003808, 19:02Z) | Attempt 2 (re-run, 19:46Z) |
+|---|---|---|
+| Failing test | `ZatcaMonetaryXmlTest::category_s_is_written_only_for_rate_15_and_never_inferred_from_zero_or_other_rates` (REM-16) | `AiActionProductPreviewApprovalTest::purchase_price_is_withheld_from_every_payload_for_users_without_cost_permission` and `AiActionProductExecutionTest::permissions_and_cost_authority_are_rechecked_at_execution` |
+| Message | ZATCA XML assertion on line order | `Failed asserting that '{"data":{"action":{"id":"a307774e-…` does **not contain** `"777"` |
+| Related to this PR | **No.** `Invoice::lines()` has no `ORDER BY`; PostgreSQL may return the invoice lines in any order. The commit under test only added a report file on top of the previously green `92af297`. | **Yes — a defect in this PR's own tests.** |
+| Action | Not touched (out of scope: ZATCA code/tests must not be edited to hide a failure). Documented here; the owner of REM-16 should order the lines deterministically. | Fixed (below). |
+
+**Root cause of attempt 2.** The cost-protection tests checked "the purchase price (7.77 ⇒ 777 minor units) never appears" with `assertStringNotContainsString('777', <whole JSON body>)`. Every id in the payload is a time-ordered UUIDv7 (`a30777…`), so for a few seconds at a time the id prefix itself contains `777` and the test fails although nothing leaks. It passed on the other runs only because of the clock. SQLite passed by chance on this run.
+
+**Fix (test-only, commit `651ca07`).** New trait `AssertsNoCostLeak::assertNoScalarEquals()` decodes the JSON and fails if any scalar value equals the cost (`777` as int or string). The `7.77` substring checks stay (a UUID never contains a dot). Production code is unchanged. Proven with a throw-away script: a UUID containing `777` ⇒ not flagged; `"purchase_price":777` and `"777"` ⇒ flagged.
+
+**Expected vs. real database errors.** The PostgreSQL service log in the job output is full of `ERROR: … violates foreign key / unique constraint` and `current transaction is aborted` lines. They come from tests that provoke those errors on purpose (tenant clean-up order, idempotency/ICV uniqueness guards, `FOR UPDATE NOWAIT`) and appear identically on green runs. The real failures are only the PHPUnit `FAILURES!` block (2 failures, 8,007 tests in attempt 2; 1 failure in attempt 1).
+
+**Verification after the fix (local).** PostgreSQL 16: `AiAction*` + `ProductReferenceClassification*` + `BranchIsolationGuard*` — **67 passed**; SQLite: `AiAction*` — **58 passed**.
+
+| Item | Value |
+|---|---|
+| Fix commit (code/tests) | `651ca076e64ed5f0ddcfc33ae96680c90139e053` |
+| Final Head / CI result | reported on the PR once the new CI run completes (a report commit cannot contain its own SHA) |
