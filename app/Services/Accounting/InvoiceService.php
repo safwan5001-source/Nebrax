@@ -1050,6 +1050,10 @@ class InvoiceService
             // مستقلة تماماً عن اختيار القالب — لا تخترع نوع مستند ولا تُغيّر ZATCA.
             $language = $this->freezeLanguage($invoice);
 
+            // REM-18b-2: تسجيل الفاتورة في سلسلة ZATCA المشتركة **قبل** كتابة أعمدة ZATCA عليها — السياج F1 يرفض ICV بلا
+            // مدخل مطابق، والمُشغّل T4 يُقدّم رأس السلسلة. في المعاملة نفسها: أي فشل بعده يُرجع المدخل والرأس معاً.
+            $this->zatca->record($invoice, $zatca);
+
             $invoice->update([
                 'status'              => 'posted',
                 'zatca_document_type' => $invoice->zatca_document_type,

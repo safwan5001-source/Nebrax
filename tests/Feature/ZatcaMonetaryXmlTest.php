@@ -32,6 +32,7 @@ use Tests\TestCase;
  */
 class ZatcaMonetaryXmlTest extends TestCase
 {
+    use CapturesThrowable;
     use RefreshDatabase;
     use InteractsWithApi;
 
@@ -470,12 +471,7 @@ class ZatcaMonetaryXmlTest extends TestCase
         $invoice = $this->issue(['discount' => 5000, 'shipping' => 2000], self::scenarios()['doc discount'][1]);
         $before = $invoice->only(['zatca_xml', 'zatca_hash', 'zatca_icv', 'total', 'journal_entry_id']);
 
-        try {
-            app(InvoiceService::class)->post($invoice);
-            $this->fail('الترحيل المزدوج يجب أن يُرفض.');
-        } catch (\RuntimeException) {
-            $this->addToAssertionCount(1);
-        }
+        $this->thrown(fn () => app(InvoiceService::class)->post($invoice), 'الترحيل المزدوج يجب أن يُرفض.');
 
         $this->assertSame($before, $invoice->fresh()->only(array_keys($before)));
         $this->assertSame(1, JournalEntry::where('source_type', Invoice::class)->where('source_id', $invoice->id)->count());

@@ -28,6 +28,7 @@ use Tests\TestCase;
  */
 class ZatcaChainSchemaTest extends TestCase
 {
+    use CapturesThrowable;
     use RefreshDatabase;
 
     private const CHAINS_MIGRATION = '2026_11_18_010000_create_zatca_chain_tables.php';
@@ -490,11 +491,13 @@ class ZatcaChainSchemaTest extends TestCase
     #[Test]
     public function the_chain_migration_rolls_back_and_reapplies_when_empty(): void
     {
+        $this->fenceMigration()->down(); // ترتيب التراجع الحقيقي: F1 أولاً
         $this->chainsMigration()->down();
         $this->assertFalse(Schema::hasTable('zatca_chains'));
         $this->assertFalse(Schema::hasTable('zatca_chain_entries'));
 
         $this->chainsMigration()->up();
+        $this->fenceMigration()->up();
         $this->assertTrue(Schema::hasTable('zatca_chains'));
         $this->assertTrue(Schema::hasTable('zatca_chain_entries'));
 
@@ -588,6 +591,8 @@ class ZatcaChainSchemaTest extends TestCase
     #[Test]
     public function the_migrations_leave_existing_invoice_and_credit_note_rows_untouched(): void
     {
+        // ترتيب `migrate:rollback` الحقيقي: السياج F1 (REM-18b-2) أولاً لأنه يقرأ جداول السلسلة.
+        $this->fenceMigration()->down();
         $this->notesMigration()->down();
         $this->chainsMigration()->down();
 
@@ -600,6 +605,7 @@ class ZatcaChainSchemaTest extends TestCase
 
         $this->chainsMigration()->up();
         $this->notesMigration()->up();
+        $this->fenceMigration()->up();
 
         $this->assertSame($invoicesBefore, DB::table('invoices')->orderBy('id')->get()->map(fn ($r) => (array) $r)->all(), 'الفواتير كما هي بايتاً ببايت');
         $afterNotes = DB::table('credit_notes')->orderBy('id')->get()->map(fn ($r) => (array) $r)->all();
@@ -618,28 +624,28 @@ class ZatcaChainSchemaTest extends TestCase
     // ───────────────────────── لا ربط بالمسارات القائمة ─────────────────────────
 
     #[Test]
-    public function no_existing_application_code_reads_or_writes_the_new_objects(): void
+    public function only_the_allocator_writes_the_chain_and_credit_notes_are_not_wired_yet(): void
     {
+        // REM-18b-2: المخصِّص هو الكاتب الوحيد (عبر ZatcaService للفواتير). الإشعارات الدائنة خارج السلسلة حتى REM-18b-3.
+        $allowed = ['ZatcaChain.php', 'ZatcaChainEntry.php', 'ZatcaChainAllocator.php', 'ZatcaChainSlot.php', 'ZatcaService.php'];
         $hits = [];
         $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(base_path('app'), \FilesystemIterator::SKIP_DOTS));
         foreach ($iterator as $file) {
-            if (! $file->isFile() || $file->getExtension() !== 'php') {
-                continue;
-            }
-            $name = $file->getFilename();
-            if (in_array($name, ['ZatcaChain.php', 'ZatcaChainEntry.php'], true)) {
+            if (! $file->isFile() || $file->getExtension() !== 'php' || in_array($file->getFilename(), $allowed, true)) {
                 continue;
             }
             if (preg_match('/ZatcaChain|zatca_chain|zatca_chains/', (string) file_get_contents($file->getPathname())) === 1) {
                 $hits[] = $file->getPathname();
             }
         }
-        $this->assertSame([], $hits, 'REM-18b-1 مخطط فقط: لا مخصِّص ولا سياج ولا استدعاء من مسار الترحيل.');
+        $this->assertSame([], $hits, 'لا كاتب للسلسلة خارج المخصِّص.');
 
         $fillable = (new CreditNote())->getFillable();
         foreach (self::NOTE_COLUMNS as $column) {
             $this->assertNotContains($column, $fillable, "{$column} لا يدخل \$fillable قبل REM-18b-3");
         }
+        $service = (string) file_get_contents(base_path('app/Services/Accounting/CreditNoteService.php'));
+        $this->assertDoesNotMatchRegularExpression('/ZatcaChainAllocator|ZatcaCreditNoteXml|recordInvoice|->record\(/', $service, 'إصدار الإشعار معطّل في REM-18b-2');
     }
 
     // ───────────────────────── مساعدات ─────────────────────────
@@ -647,6 +653,11 @@ class ZatcaChainSchemaTest extends TestCase
     private function chainsMigration(): object
     {
         return require database_path('migrations/'.self::CHAINS_MIGRATION);
+    }
+
+    private function fenceMigration(): object
+    {
+        return require database_path('migrations/2026_11_19_010000_add_zatca_chain_fence_to_invoices.php');
     }
 
     private function notesMigration(): object
@@ -668,12 +679,8 @@ class ZatcaChainSchemaTest extends TestCase
 
     private function assertRollbackRefused(callable $rollback, string $label): void
     {
-        try {
-            $rollback();
-            $this->fail("rollback must be refused: {$label}");
-        } catch (RuntimeException $e) {
-            $this->assertStringContainsString('Rollback refused', $e->getMessage(), $label);
-        }
+        $e = $this->thrown($rollback, "rollback must be refused: {$label}");
+        $this->assertStringContainsString('Rollback refused', $e->getMessage(), $label);
     }
 
     private function tenant(): string

@@ -15,6 +15,8 @@ use Tests\TestCase;
 
 class ZatcaXadesSignatureAssemblerTest extends TestCase
 {
+    use CapturesThrowable;
+
     /** @test */
     public function it_inserts_the_official_xades_signature_without_reserializing_the_invoice(): void
     {
@@ -193,12 +195,11 @@ class ZatcaXadesSignatureAssemblerTest extends TestCase
             '<CreditNote xmlns="urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2"/>',
             '<Foo xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"/>',
         ] as $xml) {
-            try {
-                $assembler->assemble($xml, $chain, $privateKey, new DateTimeImmutable(), 'https://zatca.gov.sa/policy', $digest);
-                $this->fail('كان يجب رفض مستند XML غير الآمن أو غير المطابق.');
-            } catch (InvalidArgumentException|RuntimeException) {
-                $this->addToAssertionCount(1);
-            }
+            $this->thrown(
+                fn () => $assembler->assemble($xml, $chain, $privateKey, new DateTimeImmutable(), 'https://zatca.gov.sa/policy', $digest),
+                'كان يجب رفض مستند XML غير الآمن أو غير المطابق.',
+                \Exception::class, // InvalidArgumentException أو RuntimeException — ولا يُبتلع AssertionFailedError
+            );
         }
 
         $this->expectException(InvalidArgumentException::class);
