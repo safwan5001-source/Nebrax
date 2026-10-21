@@ -25,6 +25,7 @@ vi.mock('next/link', () => ({
 }));
 vi.mock('@/lib/api', () => ({ api, ApiError: ApiErrorMock, fetchImageUrl: vi.fn(async () => null) }));
 vi.mock('@/components/ui/toast', () => ({ useToast: () => toast }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
 const row = (over: Partial<ExecutionRow> & Pick<ExecutionRow, 'row_id' | 'status'>): ExecutionRow => ({
   source_row: 2, operation: 'create', product_id: null, error_code: null, error_message: null, retryable: false, attempts: 1,
@@ -229,5 +230,20 @@ describe('تنفيذ الاستيراد', () => {
     expect(screen.getAllByText('ناجح').length).toBeGreaterThan(0);
     expect(screen.getByText(/0 صفاً و1 صورة قابلة لإعادة المحاولة/)).toBeTruthy();
     expect(screen.getByRole('button', { name: /إعادة محاولة الصفوف الفاشلة/ })).toBeTruthy();
+  });
+
+  it('يعرض مدخل الإصلاح تحت التنفيذ الفاشل ولا يعرضه لتنفيذ مكتمل', async () => {
+    const failed = execution({ status: 'partially_failed', progress: { total: 3, pending: 0, success: 2, failed: 1, skipped: 0 }, rows: [row({ row_id: 'b', status: 'failed', error_code: 'target_changed', error_message: 'تغيّر المنتج منذ المعاينة؛ لم يُحدَّث.' })], permissions: { can_continue: false, can_retry: false, retryable_rows: 0, retryable_images: 0 } });
+    setup((path) => {
+      if (path.includes('/executions/latest')) return { data: failed };
+      if (path.endsWith('/executions/exec-1/repair')) return { data: { rows: [{ row_id: 'b', source_row: 3, kind: 'row', operation: 'update', display: null, failure: { code: 'target_changed', message: 'x', retryable: false }, affected_fields: ['sku'], scope: 'fields' }], retry_pending: 0, open_repair: null, reason: null } };
+      return undefined;
+    });
+    expect(await screen.findByRole('button', { name: 'إصلاح وإعادة المحاولة' })).toBeTruthy();
+    cleanup();
+    api.mockReset();
+    setup((path) => (path.includes('/executions/latest') ? { data: execution() } : undefined));
+    await screen.findByText(/اكتمل التنفيذ/);
+    expect(screen.queryByTestId('repair-entry')).toBeNull();
   });
 });
