@@ -79,8 +79,11 @@ function mixHex(from: string, to: string, amount: number): string {
     .join("")}`;
 }
 
-/** A new gradient must be *visible* at once (a flat one reads as "nothing happened") yet stay close to the page colour. */
-const GRADIENT_SEED_TINT = 0.12;
+/**
+ * A new gradient must be *visible* at once (a flat one reads as "nothing happened") yet stay light enough to pass the publish
+ * contrast policy (P3-A-06) from a light page colour: at 4 % the far end keeps the secondary page text above 4.5:1 (12 % did not).
+ */
+const GRADIENT_SEED_TINT = 0.04;
 
 /** Switch to Solid or Gradient. Image needs a picked asset first, so it is a UI state, not a document edit. */
 export function switchBackgroundType(config: Config, type: "solid" | "gradient"): Config {

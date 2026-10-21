@@ -223,21 +223,21 @@ describe("Appearance — Gradient", () => {
 });
 
 describe("Appearance — Image", () => {
-  it("choosing Image writes nothing; picking stores a decorative id-only reference and shows the draft-only note", async () => {
+  it("choosing Image writes nothing; picking stores a decorative id-only reference and then judges it", async () => {
     const onChange = vi.fn();
     render(<Host onChange={onChange} />);
     fireEvent.click(type("Background image"));
     expect(onChange).not.toHaveBeenCalled();
     expect(field().querySelector("[data-global-bg-pending]")?.textContent).toMatch(/Pick an image/);
-    // the draft-only explanation is there before any picture is chosen
-    expect(field().querySelector("[data-global-bg-draft-only]")?.textContent).toMatch(/not enabled yet/);
+    // nothing to judge before a picture is chosen: no readiness claim either way
+    expect(field().querySelector("[data-global-bg-readiness]")).toBeNull();
 
     await pick("global-background", /Use: second\.jpg/);
     await waitFor(() => expect(cfg().background).toEqual({ kind: "media", media: { mediaId: MEDIA_ID_2, decorative: true } }));
     expect(field().querySelector("[data-global-bg-pending]")).toBeNull();
     // the legacy colour remains the fallback beneath the picture
     expect(cfg().backgroundColor).toBe("#ffeedd");
-    expect(field().querySelector("[data-global-bg-draft-only]")).toBeTruthy();
+    expect(field().querySelector("[data-global-bg-readiness]")).toBeTruthy();
   });
 
   it("offers a clean image slot: no alt fields (decoration), no crop/rotate editor, no animation controls", async () => {
@@ -322,50 +322,121 @@ describe("Appearance — Image", () => {
     expect("overlay" in (cfg().background as object)).toBe(false);
   });
 
-  it("the draft-only explanation never claims the image is publishable", () => {
-    render(<Host initial={withBackground({ kind: "media", media: { mediaId: MEDIA_ID, decorative: true } })} />);
-    const note = field().querySelector("[data-global-bg-draft-only]") as HTMLElement;
-    expect(note.getAttribute("role")).toBe("note");
-    expect(note.textContent).toMatch(/drafts and the preview only/);
-    expect(note.textContent).toMatch(/rejected/);
-    expect(field().textContent ?? "").not.toMatch(/ready to publish|publishable now|will be published/i);
-    // the image note no longer offers a gradient as a way to publish (gradients are gated too)
-    expect(note.textContent).not.toMatch(/gradient to publish/i);
-    // solid never shows a draft-only note; a gradient shows its *own* (contrast) note, not the image one
-    fireEvent.click(type("Gradient"));
-    expect(field().querySelector('[data-global-bg-draft-only="image"]')).toBeNull();
+  const LIGHT = { min: [250, 250, 250], max: [255, 255, 255] } as const;
+  const MID = { min: [150, 150, 150], max: [230, 230, 230] } as const;
+  const BLACK = { min: [0, 0, 0], max: [40, 40, 40] } as const;
+  const imageDoc = (over: Partial<Extract<NonNullable<Config["background"]>, { kind: "media" }>> = {}) =>
+    withBackground({ kind: "media", media: { mediaId: MEDIA_ID, decorative: true }, ...over });
+  const readiness = () => field().querySelector("[data-global-bg-readiness]") as HTMLElement | null;
+
+  it("a light, proven picture is ready — and only then does the editor say it can be published", async () => {
+    status.mockResolvedValue(usage({ contrast: { min: [...LIGHT.min], max: [...LIGHT.max] } }));
+    render(<Host initial={imageDoc()} />);
+    await waitFor(() => expect(readiness()?.getAttribute("data-global-bg-readiness")).toBe("ready"));
+    expect(readiness()!.getAttribute("role")).toBe("status");
+    expect(readiness()!.textContent).toMatch(/passes the store text-contrast check/);
+    expect(field().querySelector("[data-global-bg-apply-overlay]")).toBeNull();
+  });
+
+  it("while the evidence is being read it claims nothing", () => {
+    status.mockReturnValue(new Promise(() => {}));
+    render(<Host initial={imageDoc()} />);
+    expect(readiness()?.getAttribute("data-global-bg-readiness")).toBe("checking");
+    expect(field().textContent ?? "").not.toMatch(/can be published|ready to publish/i);
+  });
+
+  it("a picture with no usable evidence is unproven (never 'ready'), with draft and preview still available", async () => {
+    status.mockResolvedValue(usage({ contrast: null }));
+    render(<Host initial={imageDoc()} />);
+    await waitFor(() => expect(readiness()?.getAttribute("data-global-bg-reason")).toBe("unproven"));
+    expect(readiness()!.getAttribute("data-global-bg-readiness")).toBe("blocked");
+    expect(readiness()!.textContent).toMatch(/could not be proven/);
+    expect(readiness()!.textContent).toMatch(/preview and the draft work/);
+    expect(field().querySelector("[data-global-bg-apply-overlay]")).toBeNull();
+  });
+
+  it("a mid-tone picture is insufficient; the weakest light overlay is offered and applying it makes it ready", async () => {
+    status.mockResolvedValue(usage({ contrast: { min: [...MID.min], max: [...MID.max] } }));
+    render(<Host initial={imageDoc()} />);
+    await waitFor(() => expect(readiness()?.getAttribute("data-global-bg-readiness")).toBe("blocked"));
+    expect(readiness()!.textContent).toMatch(/cannot be published yet.*darkest pixels/);
+    expect(field().querySelector("[data-global-bg-failing]")?.textContent).toMatch(/Fails for:/);
+    const apply = field().querySelector("[data-global-bg-apply-overlay]") as HTMLElement;
+    expect(apply).toBeTruthy();
+
+    fireEvent.click(apply);
+    const bg = cfg().background as Extract<NonNullable<Config["background"]>, { kind: "media" }>;
+    // an approved strength of the *surface* role, written through the same overlay field the merchant edits
+    expect(bg.overlay).toMatchObject({ color: { role: "surface" } });
+    expect([5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90]).toContain(bg.overlay!.alpha);
+    expect(bg.media).toEqual({ mediaId: MEDIA_ID, decorative: true });
+    await waitFor(() => expect(readiness()?.getAttribute("data-global-bg-readiness")).toBe("ready"));
+  });
+
+  it("a very dark picture cannot be rescued: no overlay is offered and the merchant is told to pick a lighter one", async () => {
+    status.mockResolvedValue(usage({ contrast: { min: [...BLACK.min], max: [...BLACK.max] } }));
+    render(<Host initial={imageDoc()} />);
+    await waitFor(() => expect(readiness()?.getAttribute("data-global-bg-readiness")).toBe("blocked"));
+    expect(field().querySelector("[data-global-bg-apply-overlay]")).toBeNull();
+    expect(field().querySelector('[data-global-bg-overlay-suggestion="none"]')?.textContent).toMatch(/choose a lighter one/);
+  });
+
+  it("an animated picture is refused up front with a still-image message, not an 'overlay too weak' hint", async () => {
+    fetchAsset.mockResolvedValue(
+      asset({ kind: "animated", animation: { url: null, format: "gif", frames: 4, durationMs: 800, loop: true } }),
+    );
+    status.mockResolvedValue(usage({ contrast: null }));
+    render(<Host initial={imageDoc()} />);
+    await waitFor(() => expect(readiness()?.getAttribute("data-global-bg-reason")).toBe("animated"));
+    expect(readiness()!.textContent).toMatch(/Animated images are not used as the global background/);
+    expect(field().querySelector("[data-global-bg-apply-overlay]")).toBeNull();
+  });
+
+  it("never offers a readiness claim for solid, and a gradient has its own", () => {
+    render(<Host initial={imageDoc()} />);
     fireEvent.click(type("Solid colour"));
+    expect(readiness()).toBeNull();
     expect(field().querySelector("[data-global-bg-draft-only]")).toBeNull();
   });
 
-  it("a gradient is flagged draft-only: saved and previewed, publishing deferred until the contrast check", () => {
-    render(<Host />);
-    expect(field().querySelector("[data-global-bg-draft-only]")).toBeNull(); // solid: nothing to warn about
+  it("a gradient shows its predicted publish readiness: ready when the policy proves it, otherwise exactly why not", () => {
+    render(<Host initial={{ ...LEGACY, backgroundColor: DEFAULT_STORE_BACKGROUND_COLOR }} />);
+    expect(field().querySelector("[data-global-bg-readiness]")).toBeNull(); // solid: nothing to predict
     fireEvent.click(type("Gradient"));
-    const note = field().querySelector('[data-global-bg-draft-only="gradient"]') as HTMLElement;
-    expect(note.getAttribute("role")).toBe("note");
-    expect(note.textContent).toMatch(/drafts and the preview only/);
-    expect(note.textContent).toMatch(/deferred until the text-contrast check is ready/);
-    expect(note.textContent).toMatch(/Choose a solid colour to publish/);
-    expect(field().textContent ?? "").not.toMatch(/ready to publish|publishable now|will be published/i);
-    // the draft itself is still written and previewed normally
-    expect(cfg().background?.kind).toBe("gradient");
+    // the seeded gradient is light enough: ready, and the claim is about this background
+    const ready = field().querySelector('[data-global-bg-readiness="ready"]') as HTMLElement;
+    expect(ready.getAttribute("role")).toBe("status");
+    expect(ready.textContent).toMatch(/This background passes the store text-contrast check/);
+
+    // a dark end colour is not provable: the note says so and names the foregrounds that fail; draft and preview stay usable
+    const toField = field().querySelector('[data-colour-field="global-bg-to"]') as HTMLElement;
+    fireEvent.change(within(toField).getByRole("textbox", { name: /colour code/i }), { target: { value: "#1a1a1a" } });
+    expect(cfg().background).toMatchObject({ kind: "gradient", to: { hex: "#1a1a1a" } });
+    const blocked = field().querySelector('[data-global-bg-readiness="blocked"]') as HTMLElement;
+    expect(blocked.getAttribute("role")).toBe("note");
+    expect(blocked.textContent).toMatch(/cannot be published yet.*not proven readable over its whole range/);
+    expect(blocked.textContent).toMatch(/Make both colours lighter/);
+    expect(field().querySelector("[data-global-bg-failing]")?.textContent).toMatch(/Fails for:.*Secondary text/);
     expect(field().querySelector("[data-global-bg-gradient-preview]")).toBeTruthy();
-    // every direction keeps the note (it is about the type, not a particular value)
+    expect(field().textContent ?? "").not.toMatch(/ready to publish|publishable now|will be published/i);
+
+    // fixing the colour flips it back; every direction keeps the same verdict
+    fireEvent.change(within(toField).getByRole("textbox", { name: /colour code/i }), { target: { value: "#f0f0f0" } });
+    expect(field().querySelector('[data-global-bg-readiness="ready"]')).toBeTruthy();
     fireEvent.change(field().querySelector("[data-global-bg-direction]") as HTMLSelectElement, { target: { value: "to-top-start" } });
-    expect(field().querySelector('[data-global-bg-draft-only="gradient"]')).toBeTruthy();
-    // switching back to Solid removes it
+    expect(field().querySelector('[data-global-bg-readiness="ready"]')).toBeTruthy();
     fireEvent.click(type("Solid colour"));
-    expect(field().querySelector("[data-global-bg-draft-only]")).toBeNull();
+    expect(field().querySelector("[data-global-bg-readiness]")).toBeNull();
   });
 
-  it("the gradient draft-only note is shown in Arabic as well", () => {
-    render(<Host locale="ar" />);
-    fireEvent.click(type("تدرج لوني"));
-    const note = field().querySelector('[data-global-bg-draft-only="gradient"]') as HTMLElement;
-    expect(note.textContent).toMatch(/المسودة والمعاينة فقط/);
-    expect(note.textContent).toMatch(/فحص تباين النصوص/);
-    expect(note.textContent).toMatch(/لوناً ثابتاً/);
+  it("the gradient readiness is shown in Arabic as well", () => {
+    render(<Host locale="ar" initial={withBackground({ kind: "gradient", from: { hex: "#0b0b0b" }, to: { hex: "#1a1a1a" }, direction: "to-end" })} />);
+    const note = field().querySelector('[data-global-bg-readiness="blocked"]') as HTMLElement;
+    expect(note.textContent).toMatch(/لا يمكن نشر هذا التدرج بعد/);
+    expect(note.textContent).toMatch(/اجعل لونيه أفتح/);
+    expect(note.textContent).toMatch(/تفشل مع:.*النص الأساسي/);
+    fireEvent.click(type("لون ثابت"));
+    expect(field().querySelector("[data-global-bg-readiness]")).toBeNull();
   });
 
   it("a removed library image is reported by the slot itself, not silently", async () => {
@@ -425,10 +496,22 @@ describe("Appearance — Arabic and keyboard", () => {
     const options = Array.from((field().querySelector("[data-global-bg-direction]") as HTMLSelectElement).options).map((o) => o.textContent);
     expect(options).toContain("نحو نهاية السطر");
     fireEvent.click(type("صورة خلفية"));
-    expect(field().querySelector("[data-global-bg-draft-only]")?.textContent).toMatch(/المسودة والمعاينة فقط/);
+    expect(field().querySelector("[data-global-bg-draft-only]")).toBeNull();
     // the hex field stays left-to-right inside an RTL page
     fireEvent.click(type("لون ثابت"));
     expect(screen.getByRole("textbox", { name: "خلفية المتجر" }).getAttribute("dir")).toBe("ltr");
+  });
+
+  it("states the image verdict and the overlay suggestion in Arabic", async () => {
+    status.mockResolvedValue(usage({ contrast: { min: [150, 150, 150], max: [230, 230, 230] } }));
+    render(
+      <div dir="rtl">
+        <Host locale="ar" initial={withBackground({ kind: "media", media: { mediaId: MEDIA_ID, decorative: true } })} />
+      </div>,
+    );
+    await waitFor(() => expect(field().querySelector('[data-global-bg-readiness="blocked"]')).toBeTruthy());
+    expect(field().querySelector('[data-global-bg-readiness="blocked"]')?.textContent).toMatch(/لا يمكن نشر هذه الصورة بعد/);
+    expect(within(field()).getByRole("button", { name: "تطبيق التراكب الفاتح" })).toBeTruthy();
   });
 
   it("every control is a native, keyboard-operable element with an accessible name", async () => {
