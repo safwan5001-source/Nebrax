@@ -52,7 +52,7 @@
 * **سجلات الخروج** (proxy/firewall): كل طلب (نطاق، عنوان محلول، حجم، زمن، نتيجة). تنبيه على أي محاولة وصول لعناوين المنع أعلاه.
 * **سجلات التطبيق**: رموز الفشل في المعاينة (`image_url_blocked`، `image_fetch_failed`، `image_invalid`، `remote_fetch_limit`) تظهر في معاينة الصف؛ لا يُسجَّل الرابط الخام.
 * **مؤشرات للمراقبة**: نسبة `image_url_blocked` المفاجئة (مؤشر استكشاف)، عدد الجلبات في الساعة، متوسط الزمن، حجم التخزين الخاص `ai-actions/…`.
-* **تنظيف التخزين**: `php artisan ai-actions:purge-staged-images --dry-run` يعرض ما سيُحذف (انظر تقرير AI-07)؛ يعمل يومياً 03:50 إن وُصل `schedule:run`. راقب `failed`/`unsafe` في مخرجه (يعيد رمز خروج ≠ 0) وسطر السجل `ai_actions.staged_images.cleanup`.
+* **تنظيف التخزين**: `php artisan ai-actions:purge-staged-images --dry-run` يعرض ما سيُحذف (انظر تقرير AI-07)؛ الجدولة اليومية (03:50) مطفأة افتراضياً وتُفعَّل بـ`AI_ACTIONS_STAGING_PURGE_SCHEDULE_ENABLED` على `awj-scheduler` وفق `AWJ_AI_ACTIONS_SCHEDULER_RUNBOOK.md`. راقب `failed`/`unsafe` في مخرجه (يعيد رمز خروج ≠ 0) وسطر السجل `ai_actions.staged_images.cleanup`.
 
 ## 4. التفعيل (بعد استيفاء القسم 2 وموافقة المالك)
 

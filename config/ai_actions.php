@@ -35,5 +35,10 @@ return [
         'executed_days' => env('AI_ACTIONS_STAGING_EXECUTED_DAYS'),   // after a fully successful run; default 7
         'repairable_days' => env('AI_ACTIONS_STAGING_REPAIRABLE_DAYS'), // after a run with failures (repair window); default 30
     ],
+    // AI-ACTIONS-08: the daily purge (`ai-actions:purge-staged-images`) ships registered but DARK on the scheduler. It is a
+    // destructive job, so a deploy of `main` must not start it by itself: the owner enables it on `awj-scheduler` after a
+    // dry run (see docs/engineering/AWJ_AI_ACTIONS_SCHEDULER_RUNBOOK.md). Unsetting it is the rollback — no redeploy of code.
+    // The command itself stays runnable by hand regardless of this flag.
+    'staging_purge_schedule_enabled' => filter_var(env('AI_ACTIONS_STAGING_PURGE_SCHEDULE_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
     'draft_retention_days' => (int) env('AI_ACTIONS_DRAFT_RETENTION_DAYS', 30),
 ];

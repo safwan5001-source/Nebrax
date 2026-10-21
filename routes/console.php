@@ -85,6 +85,7 @@ Schedule::command('documents:sweep-scans')
     ->everyTenMinutes()
     ->withoutOverlapping()
     ->onOneServer()
+    ->when(static fn (): bool => (bool) config('ai_actions.staging_purge_schedule_enabled'))
     ->sendOutputTo('/proc/1/fd/1');
 
 // AI-02A: سياسة احتفاظ سجلات المساعد الذكي (تدقيق + طلبات منتهية). حذف مجمّع بسيط، آمن للتكرار.
@@ -93,8 +94,17 @@ Schedule::command('ai:prune-records')
     ->withoutOverlapping()
     ->onOneServer();
 
-// AI-ACTIONS-07: حذف الصور المرحلية الخاصة المنتهية حاجتها (احتفاظ حتميّ) — نفس ملاحظة التفعيل أعلاه.
-Schedule::command('ai-actions:purge-staged-images')
+// AI-ACTIONS-07/08: حذف الصور المرحلية الخاصة المنتهية حاجتها (احتفاظ حتميّ).
+// يعمل عبر خدمة Railway القائمة `awj-scheduler` (cron `*/5 * * * *` ⇒ `schedule:run`) — لا خدمة جديدة.
+// - `withoutOverlapping(30)`: قفلٌ ينتهي بعد 30 دقيقة (الافتراضي 24 ساعة كان سيوقف المهمة يوماً كاملاً بعد انهيار).
+//   وهو لا يمنع تشغيلين من حاويتَي cron مختلفتين (مخزن الكاش محلي)؛ لذلك الأمر نفسه آمن للتداخل
+//   (قفل صفّ الإجراء + حذف idempotent) ومحدود الزمن (`--max-seconds`).
+// - مسجَّل لكن **مطفأ افتراضياً**: لا يعمل إلا مع `AI_ACTIONS_STAGING_PURGE_SCHEDULE_ENABLED=true` على الخدمة (حذف
+//   مدمِّر لا يبدأ من تلقاء نشر `main`). الأمر نفسه يبقى قابلاً للتشغيل يدوياً بصرف النظر عن العلم.
+// - المخرجات إلى stdout الحاوية (PID 1) فتظهر في سجل الخدمة بدل /dev/null (كما `documents:sweep-scans`).
+Schedule::command('ai-actions:purge-staged-images --max-seconds=240')
     ->dailyAt('03:50')
-    ->withoutOverlapping()
-    ->onOneServer();
+    ->withoutOverlapping(30)
+    ->onOneServer()
+    ->when(static fn (): bool => (bool) config('ai_actions.staging_purge_schedule_enabled'))
+    ->sendOutputTo('/proc/1/fd/1');
