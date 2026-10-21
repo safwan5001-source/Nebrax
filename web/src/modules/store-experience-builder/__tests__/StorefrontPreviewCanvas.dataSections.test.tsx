@@ -223,6 +223,20 @@ describe("Canvas — data-backed sections (ADR-21)", () => {
     expect(container.querySelector('[data-discovery-layout="text-list"]')?.className).toContain("grid-cols-7");
   });
 
+  it("formats advanced discovery counts with the preview locale", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={withSections([{ id: "d-1", type: "discovery", visible: true, content: { title: "", axis: "brand", display: "tiles", layout: "image-grid", showCounts: true } }])}
+        locale="en"
+        viewport="desktop"
+        homeSectionDiscovery={{ "d-1": { axis: "brand", name: "", nameEn: null, visual: null, options: [{ value: "b1", name: "Brand", nameEn: null, count: 12345, visual: null }] } }}
+        homeSectionDiscoveryState={{ "d-1": "ready" }}
+        onSelectSection={() => {}}
+      />,
+    );
+    expect(container.querySelector('[data-home-data-section="discovery"]')?.textContent).toContain("12,345");
+  });
+
   it("renders one discovery state and preserves legacy presentation controls", () => {
     const { container } = render(
       <StorefrontPreviewCanvas
@@ -253,5 +267,21 @@ describe("Canvas — data-backed sections (ADR-21)", () => {
       />,
     );
     expect(container.querySelector('[data-shelf-layout="grid"]')?.className).toContain("grid-cols-4");
+  });
+
+  it("applies Market rail sizing when the shelf design is implicit", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={{ ...withSections([{ id: "shelf-1", type: "productShelf", visible: true, content: { title: "", deliverToday: false, limit: 2 } }]), themePreset: "awj-market" }}
+        locale="en"
+        viewport="desktop"
+        homeSectionProducts={{ "shelf-1": [{ id: "p1", name: "Rose", thumbnailUrl: null, priceAmountMinor: 2500, currency: "SAR", inStock: true }] }}
+        homeSectionProductsState={{ "shelf-1": "ready" }}
+        onSelectSection={() => {}}
+      />,
+    );
+    const list = container.querySelector('[data-shelf-layout="rail"]');
+    expect(list?.getAttribute("data-shelf")).toBe("rail");
+    expect(list?.getAttribute("data-vp")).toBe("desktop");
   });
 });
