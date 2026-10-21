@@ -72,7 +72,13 @@ Untouched: `CreditNoteService`, `CreditNote` (no `$fillable` change), `InvoiceSe
 
 ### 3.1 Regression and full suites
 
-REGRESSION_PLACEHOLDER
+| Run | Result |
+|---|---|
+| Full suite, SQLite | 8135 passed, 31 failed, 162 skipped (71164 assertions) |
+| Full suite, PostgreSQL 16 | 8290 passed, 34 failed, 4 skipped (72738 assertions) |
+| PostgreSQL subset with `PGOPTIONS='-c lock_timeout=60s'` (as CI): lock-timeout guard, F2 fence + concurrency, chain schema, rollout controls, `CreditNotePosLockOrderPostgresTest`, `CreditNoteSourcePostgresTest` | 154 passed (912 assertions), none skipped |
+
+The failures are environmental and none involves this change: 26 `Fuel*` (`bcmath` is not installed in this container; CI has it); `AiPaidProviderDisabledTest` (SQLite) and `StorefrontMediaApiTest` (PostgreSQL), both failing without this change; 4 `StorefrontPresentationGlobalGradientGateTest` cases, a stale test copy left in the local scratch application (the file does not exist in the repository since #1590); and, on PostgreSQL only, 3 `PostgresTestLockTimeoutTest` cases because the full PostgreSQL run omitted `PGOPTIONS` (they pass in the subset above). No ZATCA XML, signing or allocation code changed, so the SDK harness was not re-run locally.
 
 Covered: generated without a chain entry rejected (update and direct insert); ICV, UUID, PIH, hash and subtype mismatch rejected; entries of a sibling note, another tenant or an invoice never satisfy a note; mutation of each of the twelve columns and every state conversion rejected; unchanged rewrite accepted; recorded `disabled`/`not_generated` frozen; retroactive decisions rejected; decisions accepted in the posting update; twelve inconsistent status/column shapes and 14 incomplete-document variants; purchase notes; delete protection and tenant cascade (SQLite cannot hard-delete a tenant that has any credit note, before and after this change; asserted as equal to the baseline); historical notes; activated versus disabled versus reverted tenants; emergency stop and release; per-tenant isolation; the real `CreditNoteService` (unchanged entries while disabled, fully rolled back when activated); migration rollback refusal and re-application; concurrency (mixed note and invoice issuance on one chain, concurrent postings for activated and plain tenants, activation queueing behind the anchor, killed process, failed update rolling back entry and head).
 
