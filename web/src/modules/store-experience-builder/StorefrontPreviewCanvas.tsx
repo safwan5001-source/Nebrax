@@ -1779,6 +1779,7 @@ export function StorefrontPreviewCanvas({
               if (section.type === "productShelf") {
                 const shelf = productShelfContentOf(section);
                 const products = homeSectionProducts[section.id] ?? [];
+                const headingId = `preview-product-shelf-${section.id}`;
                 const shelfRail = (section.design?.layout ?? (isMarket ? "rail" : "grid")) === "rail";
                 const shelfDesign = section.design
                   ? shelfRail && section.design.layout === undefined
@@ -1793,8 +1794,8 @@ export function StorefrontPreviewCanvas({
                   : cn("mt-4 grid gap-3", shelfGridColumns);
                 const shelfTitle = title || (shelf.deliverToday && !shelf.source ? t("canvasShelfDeliverToday") : t("canvasShelfShopSelection"));
                 return (
-                  <section key={section.id} data-home-data-section="productShelf" data-incomplete={incomplete ? "" : undefined}>
-                    <div className="flex items-center justify-between gap-3"><SectionRule title={shelfTitle} hideTitle={shelf.showTitle === false} action={t("viewAll")} />{shelf.deliverToday ? <span className="text-[11px] font-medium text-store-muted-foreground">{t("canvasShelfDeliverToday")}</span> : null}</div>
+                  <section key={section.id} aria-labelledby={headingId} data-home-data-section="productShelf" data-incomplete={incomplete ? "" : undefined}>
+                    <div className="flex items-center justify-between gap-3"><SectionRule title={shelfTitle} headingId={headingId} hideTitle={shelf.showTitle === false} action={t("viewAll")} />{shelf.deliverToday ? <span className="text-[11px] font-medium text-store-muted-foreground">{t("canvasShelfDeliverToday")}</span> : null}</div>
                     {incomplete ? <p className="mt-2 text-xs text-store-muted-foreground">{t("canvasDataSectionIncomplete")}</p> : state === "loading" || state === "idle" ? (
                       <ul aria-hidden="true" className={shelfListClass}>{Array.from({ length: Math.min(shelf.limit, 4) }).map((_, index) => <li key={index} className="overflow-hidden rounded-store border border-store-border bg-store-surface"><div className={cn(cardImageHeight, "animate-pulse bg-store-surface-muted")} /><div className={cardPad}><div className="h-3 w-3/4 animate-pulse rounded-store bg-store-surface-muted" /></div></li>)}</ul>
                     ) : state === "error" ? (

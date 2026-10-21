@@ -130,6 +130,7 @@ describe("Canvas — data-backed sections (ADR-21)", () => {
       />,
     );
     expect(container.querySelector('[data-home-data-section="productShelf"] [data-card]')).not.toBeNull();
+    expect(container.querySelector('section[aria-labelledby="preview-product-shelf-shelf-1"] h2#preview-product-shelf-shelf-1')).not.toBeNull();
     expect(container.querySelector('[data-home-data-section="productShelf"]')?.textContent).toContain("SAR");
     expect(container.querySelector('[data-home-data-section="productShelf"]')?.textContent).toContain("Rose");
     expect(container.querySelector('[data-home-data-section="discovery"]')?.textContent).toContain("Brand");
