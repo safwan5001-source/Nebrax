@@ -206,6 +206,7 @@ describe("Canvas — data-backed sections (ADR-21)", () => {
     expect(list?.getAttribute("data-discovery-card-style")).toBe("elevated");
     expect(list?.getAttribute("data-discovery-align")).toBe("start");
     expect((list as HTMLElement | null)?.style.getPropertyValue("--disc-rows")).toBe("2");
+    expect((list as HTMLElement | null)?.style.getPropertyValue("--disc-item")).toBe("104px");
   });
 
   it("keeps text-list columns and the published desktop carousel row rule", () => {
