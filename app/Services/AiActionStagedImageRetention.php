@@ -30,6 +30,11 @@ use Throwable;
  * taken again *under the action's row lock* — the lock the execution, retry, approval, preview and repair-start paths
  * already take — so a purge can never interleave with them. Object keys are validated against the exact staging
  * layout before anything is deleted, and an object still referenced by another live row is never removed.
+ *
+ * Where the job runs matters (AI-ACTIONS-08): an object on the *durable* profile (`platform-s3`) is reachable from any
+ * host, so a missing object means "already gone". An object on the local `platform` profile lives on one container's
+ * disk — a different host (the cron scheduler) cannot see it, and "missing" there proves nothing. Such a row is
+ * reported `unverifiable` and left unpurged, so the database never claims a removal that did not happen.
  */
 final class AiActionStagedImageRetention
 {
@@ -103,28 +108,38 @@ final class AiActionStagedImageRetention
     /**
      * Sweeps every tenant (platform maintenance, like `imports:prune`).
      *
-     * @return array{dry_run:bool,actions:int,images:int,bytes:int,failed:int,unsafe:int,skipped:array<string,int>}
+     * `$maxSeconds` bounds one run (no new action is started after it): a scheduled tick can never outlive its interval,
+     * and what was not reached is reported as `remaining` and picked up by the next run.
+     *
+     * @return array{dry_run:bool,actions:int,images:int,bytes:int,failed:int,unsafe:int,unverifiable:int,remaining:int,duration_ms:int,skipped:array<string,int>}
      */
-    public function run(bool $dryRun = false, ?string $tenantId = null, int $limit = 500): array
+    public function run(bool $dryRun = false, ?string $tenantId = null, int $limit = 500, int $maxSeconds = 0): array
     {
-        $totals = ['dry_run' => $dryRun, 'actions' => 0, 'images' => 0, 'bytes' => 0, 'failed' => 0, 'unsafe' => 0, 'skipped' => []];
+        $totals = ['dry_run' => $dryRun, 'actions' => 0, 'images' => 0, 'bytes' => 0, 'failed' => 0, 'unsafe' => 0, 'unverifiable' => 0, 'remaining' => 0, 'duration_ms' => 0, 'skipped' => []];
+        $started = microtime(true);
         $now = now('UTC');
         $ids = AiActionImage::query()->withoutGlobalScopes()->whereNull('purged_at')
             ->when($tenantId, fn ($q) => $q->where('tenant_id', $tenantId))
             ->select('ai_action_id')->distinct()->orderBy('ai_action_id')->limit(max(1, $limit))->pluck('ai_action_id');
 
-        foreach ($ids as $actionId) {
+        foreach ($ids as $position => $actionId) {
+            if ($maxSeconds > 0 && microtime(true) - $started >= $maxSeconds) {
+                $totals['remaining'] = count($ids) - $position;
+                break;
+            }
             $result = $this->purgeAction((string) $actionId, $dryRun, $now);
             if ($result['purged_actions'] > 0) {
                 $totals['actions']++;
             }
-            foreach (['images', 'bytes', 'failed', 'unsafe'] as $key) {
+            foreach (['images', 'bytes', 'failed', 'unsafe', 'unverifiable'] as $key) {
                 $totals[$key] += $result[$key];
             }
             if ($result['reason'] !== 'eligible') {
                 $totals['skipped'][$result['reason']] = ($totals['skipped'][$result['reason']] ?? 0) + 1;
             }
         }
+
+        $totals['duration_ms'] = (int) round((microtime(true) - $started) * 1000);
 
         // Counts only: no ids, no object keys, no tenant data in the operational log.
         Log::info('ai_actions.staged_images.cleanup', ['dry_run' => $dryRun] + array_diff_key($totals, ['dry_run' => 1, 'skipped' => 1]) + ['skipped' => $totals['skipped']]);
@@ -136,12 +151,12 @@ final class AiActionStagedImageRetention
      * Purges one action's staged images — or counts them, in a dry run. The decision is taken under the action's
      * row lock, the same lock execution / retry / approval / preview / repair-start hold, so it is final.
      *
-     * @return array{reason:string,purged_actions:int,images:int,bytes:int,failed:int,unsafe:int}
+     * @return array{reason:string,purged_actions:int,images:int,bytes:int,failed:int,unsafe:int,unverifiable:int}
      */
     public function purgeAction(string $actionId, bool $dryRun = false, ?CarbonInterface $now = null, bool $ignoreWindows = false): array
     {
         $now ??= now('UTC');
-        $empty = ['reason' => 'gone', 'purged_actions' => 0, 'images' => 0, 'bytes' => 0, 'failed' => 0, 'unsafe' => 0];
+        $empty = ['reason' => 'gone', 'purged_actions' => 0, 'images' => 0, 'bytes' => 0, 'failed' => 0, 'unsafe' => 0, 'unverifiable' => 0];
 
         return DB::transaction(function () use ($actionId, $dryRun, $now, $ignoreWindows, $empty): array {
             $query = AiAction::query()->withoutGlobalScopes()->whereKey($actionId);
@@ -162,21 +177,29 @@ final class AiActionStagedImageRetention
 
                     continue;
                 }
-                if ($dryRun) {
-                    $result['images']++;
-                    $result['bytes'] += (int) $image->size_bytes;
-
-                    continue;
-                }
                 try {
-                    foreach ($keys as $key) {
-                        // A shared object stays until its last live reference goes.
-                        if (! $this->referencedElsewhere($image, $key)) {
+                    $doomed = array_values(array_filter($keys, fn (string $key): bool => ! $this->referencedElsewhere($image, $key))); // a shared object stays until its last live reference goes
+                    // Local-disk objects are only provable from the host that holds the disk (see the class note).
+                    $unreachable = $image->storage_profile !== DocumentStorageService::PROFILE_DURABLE
+                        && array_filter($doomed, fn (string $key): bool => ! $this->storage->exists($image->storage_profile, $key)) !== [];
+                    if (! $unreachable && ! $dryRun) {
+                        foreach ($doomed as $key) {
                             $this->storage->delete($image->storage_profile, $key);
                         }
                     }
                 } catch (Throwable) {
                     $result['failed']++; // left unpurged: the next run retries; nothing is claimed as removed
+
+                    continue;
+                }
+                if ($unreachable) {
+                    $result['unverifiable']++;
+
+                    continue;
+                }
+                if ($dryRun) {
+                    $result['images']++;
+                    $result['bytes'] += (int) $image->size_bytes;
 
                     continue;
                 }
@@ -202,7 +225,7 @@ final class AiActionStagedImageRetention
         if ($result['reason'] !== 'eligible') {
             throw new LogicException('An AI action whose staged images are still needed cannot be deleted ('.$result['reason'].').');
         }
-        if ($result['failed'] > 0 || $result['unsafe'] > 0) {
+        if ($result['failed'] > 0 || $result['unsafe'] > 0 || $result['unverifiable'] > 0) {
             throw new LogicException('The staged images of this AI action could not all be removed; it was not deleted.');
         }
     }

@@ -257,7 +257,7 @@ class AiActionStagingCleanupTest extends TestCase
         $this->assertNull($image->fresh()->purged_at);
 
         $this->assertSame(0, Artisan::call('ai-actions:purge-staged-images', ['--dry-run' => true]));
-        $this->assertStringContainsString('[dry-run] actions=1 images=1', Artisan::output());
+        $this->assertStringContainsString('[dry-run] ai-actions:purge-staged-images status=ok actions=1 images=1', Artisan::output());
         $this->assertNull($image->fresh()->purged_at);
     }
 
