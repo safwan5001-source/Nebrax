@@ -249,7 +249,7 @@ class CommerceWorkspaceStorefrontProductApiTest extends TestCase
     }
 
     /** @test */
-    public function list_prices_use_the_storefront_channels_authoritative_price_list(): void
+    public function list_prices_match_the_published_storefront_source_when_a_channel_price_list_exists(): void
     {
         $auth = $this->registerTenant('workspace-channel-price', 'owner@workspace-channel-price.test');
         $seeded = $this->seedWebStorefront($auth['tenant_id']);
@@ -269,7 +269,10 @@ class CommerceWorkspaceStorefrontProductApiTest extends TestCase
         $this->withToken($auth['token'])
             ->getJson($this->listPath($seeded['storefront']->id))
             ->assertOk()
-            ->assertJsonPath('data.0.price.amount_minor', 7500)
+            // The published shelf uses /store/v1, whose list contract is the
+            // product's public sale_price. Keep the editor on that same source
+            // rather than previewing the different /commerce/v1 resolver.
+            ->assertJsonPath('data.0.price.amount_minor', 10000)
             ->assertJsonPath('data.0.price.currency', 'SAR');
     }
 
