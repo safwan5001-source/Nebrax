@@ -62,7 +62,7 @@
 | + `ProductImportMediaSecurity` + `ProductReferenceClassificationGuard` + `BranchIsolationGuard` + `ImportJob*` + `PruneAiRecords` | **185 passed على PostgreSQL**، 181 passed (+4 skipped) على SQLite |
 | `php artisan schedule:list` | الأمر ظاهر `50 3 * * *` |
 | Web | لم يُلمس (لا يلزم) |
-| CI على Head النهائي | __CI__ |
+| CI على Head النهائي | **أخضر على `436b39d13`**: `php artisan test (L11, sqlite)` و`php artisan test (L11, pgsql)` و`CI Gate` — كلها success |
 
 ## 6. المخاطر والمتبقي (التفاصيل في الـRunbook §6)
 1. الإنتاج لا يحوي الأمر بعد (لم يُنشر #1586/#1589)؛ النشر يحصل تلقائياً عند أي دمج لاحق. هجرة `purged_at` تُنفَّذ عند إقلاع `nibras-api`؛ لو سبقها نشر الـscheduler يفشل الأمر دون حذف.
@@ -77,4 +77,10 @@
 4. (اختياري) تغيير نوافذ الاحتفاظ `AI_ACTIONS_STAGING_*_DAYS`.
 
 ## 8. Git / CI
-__GIT__
+| البند | القيمة |
+|---|---|
+| Branch | `ai-actions-08-scheduler-readiness` |
+| PR | https://github.com/safwan5001-source/Nebrax/pull/1591 (Draft، base `main`) |
+| Base SHA | `2696f53751a80368b067847310efbbc41899d575` (دمج #1589) |
+| Head المتحقَّق منه بـCI | `436b39d1381d0429038932b058f4aefcc91ba3ae` |
+| Head النهائي | الـcommit الحامل لهذا التحديث على الفرع (تحديث توثيق فقط؛ التقرير لا يحمل SHA نفسه) |
