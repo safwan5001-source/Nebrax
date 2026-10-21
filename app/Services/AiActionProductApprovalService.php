@@ -29,6 +29,7 @@ final class AiActionProductApprovalService
         private readonly AiActionGateway $gateway,
         private readonly AiActionProductReviewService $review,
         private readonly AiActionProductPreviewBuilder $builder,
+        private readonly AiActionProductImageStager $images,
         private readonly AiActionApprovalLedger $ledger,
         private readonly TenantContext $tenantContext,
         private readonly BranchContext $branchContext,
@@ -39,8 +40,10 @@ final class AiActionProductApprovalService
     {
         $actor = $this->gateway->authorizeFor($requestActor, $action, AiActionPolicy::USE);
         $this->assertProductImport($action);
+        // Network and storage work happens before — never inside — the transaction that locks the action.
+        $failures = $this->stageRemoteImages($actor, $action, $expectedVersion);
 
-        return DB::transaction(function () use ($action, $expectedVersion, $actor): array {
+        return DB::transaction(function () use ($action, $expectedVersion, $actor, $failures): array {
             $locked = AiAction::query()->whereKey($action->id)->lockForUpdate()->firstOrFail();
             if (! in_array($locked->status, AiAction::MUTABLE_STATUSES, true)) {
                 throw new AiActionException('state_conflict', 'لا تقبل العملية معاينة في حالتها الحالية.', 409);
@@ -49,7 +52,7 @@ final class AiActionProductApprovalService
                 throw new AiActionException('version_conflict', 'تغيّرت المسودة. حدّث البيانات قبل إنشاء معاينة.', 409);
             }
 
-            [$preview, $hash, $proposalHash, $manifestHash] = $this->compute($locked);
+            [$preview, $hash, $proposalHash, $manifestHash] = $this->compute($locked, $failures);
             $existing = AiActionPreview::query()->where('ai_action_id', $locked->id)->where('action_version', $locked->version)
                 ->where('preview_hash', $hash)->whereNull('invalidated_at')->where('expires_at', '>', now('UTC'))->first();
             if ($existing !== null) {
@@ -207,6 +210,7 @@ final class AiActionProductApprovalService
             'expires_at' => optional($preview->expires_at)->toIso8601String(),
             'totals' => $preview->preview['totals'] ?? [],
             'issues' => $preview->preview['issues'] ?? [],
+            'images' => $preview->preview['images'] ?? null,
             'rows' => array_map(fn (array $row): array => $canCost ? $row : $this->redactCost($row), $slice),
             'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => count($rows), 'last_page' => max(1, (int) ceil(count($rows) / $perPage)), 'operation' => $operation],
             'approval' => $approval === null ? null : $this->presentApproval($approval),
@@ -235,8 +239,40 @@ final class AiActionProductApprovalService
         ];
     }
 
-    /** @return array{0:array<string,mixed>,1:string,2:?string,3:?string} */
-    public function compute(AiAction $locked): array
+    /**
+     * Stages the remote images this version's decided rows name. A stale version stages nothing: the locked
+     * check that follows raises the conflict. Returns the sources that could not be staged, keyed by source key.
+     *
+     * @return array<string,array{status:string,code:?string,message:?string}>
+     */
+    private function stageRemoteImages(User $actor, AiAction $action, int $expectedVersion): array
+    {
+        $current = AiAction::query()->whereKey($action->id)->first();
+        if ($current === null || $current->version !== $expectedVersion || ! in_array($current->status, AiAction::MUTABLE_STATUSES, true)) {
+            return [];
+        }
+        $urls = [];
+        foreach ($this->review->effective($current)['proposal']['rows'] ?? [] as $row) {
+            $urls = array_merge($urls, AiActionProductPreviewBuilder::candidateUrls($row));
+        }
+        if ($urls === []) {
+            return [];
+        }
+        $failures = [];
+        foreach ($this->images->stageUrls($actor, $current, $urls) as $key => $outcome) {
+            if ($outcome['status'] !== 'ready') {
+                $failures[$key] = ['status' => $outcome['status'], 'code' => $outcome['code'], 'message' => $outcome['message']];
+            }
+        }
+
+        return $failures;
+    }
+
+    /**
+     * @param  array<string,array{status:string,code:?string,message:?string}>  $failures  preview-time reasons only
+     * @return array{0:array<string,mixed>,1:string,2:?string,3:?string}
+     */
+    public function compute(AiAction $locked, array $failures = []): array
     {
         $effective = $this->review->effective($locked);
         $rows = $effective['proposal']['rows'] ?? [];
@@ -246,7 +282,7 @@ final class AiActionProductApprovalService
         $preview = $this->builder->build($rows, [
             'action_id' => $locked->id, 'version' => (int) $locked->version, 'branch_id' => $this->branchContext->id(),
             'proposal_hash' => $effective['proposal_hash'], 'manifest_hash' => $effective['manifest_hash'], 'file_sha256' => $effective['file_sha256'],
-        ]);
+        ], ['catalog' => $this->images->catalog($locked), 'failures' => $failures]);
         $hash = AiActionCanonicalJson::previewHash((string) $this->tenantContext->id(), $locked->id, $locked->type, (int) $locked->version, $preview);
 
         return [$preview, $hash, $effective['proposal_hash'], $effective['manifest_hash']];

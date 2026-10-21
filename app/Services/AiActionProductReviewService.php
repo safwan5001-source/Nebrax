@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AiAction;
 use App\Models\AiActionEvent;
 use App\Models\AiActionExtraction;
+use App\Models\AiActionRepair;
 use App\Models\User;
 use App\Support\AiActionCostVisibility;
 use App\Support\AiActionException;
@@ -18,7 +19,7 @@ final class AiActionProductReviewService
 
     public function __construct(private readonly AiActionGateway $gateway) {}
 
-    /** @return array{action:AiAction,proposal:array,manifest_hash:string} */
+    /** @return array{action:AiAction,proposal:array,manifest_hash:?string} */
     public function show(User $actor, AiAction $action): array
     {
         $action = $this->gateway->show($actor, $action);
@@ -36,17 +37,17 @@ final class AiActionProductReviewService
      */
     public function effective(AiAction $action): array
     {
-        $extraction = $this->extraction($action);
         $latest = $action->relationLoaded('versions') ? $action->versions->first() : $action->versions()->orderByDesc('version')->first();
-        $proposal = $latest !== null && (($latest->proposal['rows'] ?? []) !== [])
-            ? $latest->proposal
-            : ['schema_version' => 1, 'rows' => $extraction->manifest['rows'] ?? []];
+        $hasRows = $latest !== null && (($latest->proposal['rows'] ?? []) !== []);
+        // A repair action (06B) has no source file: its rows were seeded directly into version 1.
+        $extraction = $hasRows ? $action->extractions()->orderByDesc('action_version')->first() : $this->extraction($action);
+        $proposal = $hasRows ? $latest->proposal : ['schema_version' => 1, 'rows' => $extraction->manifest['rows'] ?? []];
 
         return [
             'proposal' => $proposal,
             'proposal_hash' => $latest?->proposal_hash,
-            'manifest_hash' => $extraction->manifest_hash,
-            'file_sha256' => $extraction->manifest['source']['content_sha256'] ?? null,
+            'manifest_hash' => $extraction?->manifest_hash,
+            'file_sha256' => $extraction?->manifest['source']['content_sha256'] ?? null,
         ];
     }
 
@@ -60,16 +61,24 @@ final class AiActionProductReviewService
         $rows = $proposal['rows'] ?? [];
         $byId = [];
         foreach ($rows as $index => $row) $byId[(string) $row['row_id']] = $index;
+        // AI-ACTIONS-06B: a repair action may only change the fields tied to why its row failed.
+        $repair = AiActionRepair::query()->where('ai_action_id', $action->id)->first();
         foreach ($edits as $edit) {
             $rowId = (string) ($edit['row_id'] ?? '');
             $decision = $edit['decision'] ?? null;
             $hasFields = is_array($edit['fields'] ?? null) && $edit['fields'] !== [];
-            if (! isset($byId[$rowId]) || (! $hasFields && $decision === null) || (isset($edit['fields']) && ! is_array($edit['fields']))
-                || ($decision !== null && ! in_array($decision, self::DECISIONS, true))) {
+            // AI-ACTIONS-06: the explicit, per-row decision to append images to an EXISTING product's gallery.
+            $mediaDecision = array_key_exists('media_update_approved', $edit) ? filter_var($edit['media_update_approved'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) : null;
+            if (! isset($byId[$rowId]) || (! $hasFields && $decision === null && $mediaDecision === null) || (isset($edit['fields']) && ! is_array($edit['fields']))
+                || ($decision !== null && ! in_array($decision, self::DECISIONS, true))
+                || (array_key_exists('media_update_approved', $edit) && $mediaDecision === null)) {
                 throw new AiActionException('review_edit_invalid', 'صف أو تعديل مراجعة غير صالح.', 422);
             }
             $index = $byId[$rowId];
             foreach ($hasFields ? $edit['fields'] : [] as $field => $value) {
+                if ($repair !== null && ! in_array($field, $repair->rows[$rowId]['affected_fields'] ?? [], true)) {
+                    throw new AiActionException('repair_field_locked', 'هذا الحقل لم يتسبب في فشل الصف، فلا يُعدَّل في الإصلاح. عدّل الحقول المرتبطة بالفشل فقط.', 422);
+                }
                 if ($field === AiActionCostVisibility::FIELD && ! AiActionCostVisibility::allows($actor)) {
                     throw new AiActionException('cost_permission_required', 'إدخال سعر الشراء أو تعديله يتطلب صلاحية عرض التكلفة.', 403);
                 }
@@ -79,8 +88,16 @@ final class AiActionProductReviewService
                 $rows[$index]['fields'][$field] = ['value' => $value, 'origin' => $value === null ? 'missing' : 'user', 'confidence' => null];
             }
             if ($hasFields) {
-                $rows[$index]['media'] = $this->media($rows[$index]['fields']);
+                // Changing an image source voids an earlier "add images" decision: it was about other images.
+                if (array_intersect(array_keys($edit['fields']), ['primary_image_url', 'additional_image_urls']) !== []) {
+                    $rows[$index]['media'] = $this->media($rows[$index]['fields']);
+                }
                 $rows[$index]['violations'] = array_values(array_filter($rows[$index]['violations'] ?? [], fn (array $v) => ! in_array($v['field'] ?? null, array_keys($edit['fields']), true)));
+            }
+            if ($mediaDecision !== null) {
+                $media = $rows[$index]['media'] ?? ['primary' => null, 'additional' => [], 'existing_update_approved' => false];
+                $media['existing_update_approved'] = $mediaDecision;
+                $rows[$index]['media'] = $media;
             }
             // An explicit user decision wins; otherwise a deliberate update/skip survives a field edit.
             $rows[$index]['decision'] = $decision ?? (in_array($rows[$index]['decision'] ?? null, ['update', 'skip'], true)

@@ -1,7 +1,8 @@
 'use client';
 
-import { ChangeEvent, useMemo, useState } from 'react';
+import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { ArrowRight, FileSpreadsheet, Loader2, Search, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,12 +13,16 @@ import { useToast } from '@/components/ui/toast';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { ProductPreviewPanel } from '@/modules/ai-actions/product-preview-panel';
 import { DECISION_LABEL, FIELD_LABEL, type RowDecision, apiErrorMessage } from '@/modules/ai-actions/product-preview';
-import { isExecutionLocked } from '@/modules/ai-actions/product-execution';
+import { currentLang, isExecutionLocked } from '@/modules/ai-actions/product-execution';
+import { imageText } from '@/modules/ai-actions/product-images';
+import { ImageArchiveCard } from '@/modules/ai-actions/product-images-ui';
+import { type RepairInfo, fieldEditable, repairText } from '@/modules/ai-actions/product-repair';
+import { RepairBanner } from '@/modules/ai-actions/product-repair-ui';
 
 type Field = { value: string | number | boolean | null; origin: 'extracted' | 'user' | 'ai_suggested' | 'erp_existing' | 'missing'; confidence: number | null };
-type Row = { row_id: string; source_row: number; decision: RowDecision; fields: Record<string, Field>; violations: { field: string | null; severity: string; message: string }[]; media: unknown };
+type Row = { row_id: string; source_row: number; decision: RowDecision; fields: Record<string, Field>; violations: { field: string | null; severity: string; message: string }[]; media: { existing_update_approved: boolean } | null };
 type Review = { action: { id: string; version: number; status: string; cost_hidden?: boolean }; proposal: { rows: Row[] } };
-type Pending = Record<string, { fields: Record<string, string | null>; decision?: 'create' | 'update' | 'skip' }>;
+type Pending = Record<string, { fields: Record<string, string | null>; decision?: 'create' | 'update' | 'skip'; media_update_approved?: boolean }>;
 const fields = ['name', 'sku', 'barcode', 'type', 'purchase_price', 'sale_price', 'unit', 'category', 'tax_rate', 'primary_image_url'] as const;
 const decisions = ['create', 'update', 'skip'] as const;
 
@@ -36,12 +41,37 @@ export default function AiProductImportReviewPage() {
   const [bulkDecision, setBulkDecision] = useState<(typeof decisions)[number]>('create');
   const [pending, setPending] = useState<Pending>({});
   const [stage, setStage] = useState<'review' | 'preview'>('review');
+  const [repair, setRepair] = useState<RepairInfo | null>(null);
+  const resumeId = useSearchParams()?.get('action') ?? null;
   const dirty = Object.keys(pending).length > 0;
   // بلا `products.view_cost` يحجب الخادم سعر الشراء ويرفض تعديله؛ الواجهة تعكس ذلك ولا تعرض حقلاً قابلاً للكتابة.
   const costHidden = review?.action.cost_hidden === true;
   // بعد بدء التنفيذ تُقفل المراجعة: أي تعديل يرفضه الخادم، فلا نعرض له طريقاً.
   const locked = isExecutionLocked(review?.action.status);
   const visibleFields = fields.filter((field) => !(costHidden && field === 'purchase_price'));
+
+  // فتح عملية قائمة (إصلاح أُنشئ من نتائج تنفيذ): تُحمَّل مراجعتها، وتُقيَّد حقولها بما حدّده الخادم.
+  useEffect(() => {
+    if (!resumeId) return undefined;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const loaded = await api<{ data: Review }>(`/ai-actions/${resumeId}/review`);
+        if (cancelled) return;
+        setReview(loaded.data);
+        setPending({});
+        setStage(['created', 'editing'].includes(loaded.data.action.status) ? 'review' : 'preview');
+        try {
+          const info = await api<{ data: RepairInfo }>(`/ai-actions/${resumeId}/repair`);
+          if (!cancelled) setRepair(info.data);
+        } catch { /* ليست عملية إصلاح */ }
+      } catch (exception) {
+        if (!cancelled) error(exception instanceof ApiError ? apiErrorMessage(exception.body, 'تعذر فتح العملية.') : 'تعذر فتح العملية.');
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeId]);
 
   const rows = useMemo(() => (review?.proposal.rows ?? []).filter((row) => {
     const text = [row.fields.name?.value, row.fields.sku?.value, row.fields.barcode?.value].join(' ').toLowerCase();
@@ -66,7 +96,17 @@ export default function AiProductImportReviewPage() {
   }
   function decide(rowId: string, decision: (typeof decisions)[number]) {
     setReview((current) => current && ({ ...current, proposal: { rows: current.proposal.rows.map((row) => row.row_id !== rowId ? row : { ...row, decision }) } }));
-    setPending((current) => ({ ...current, [rowId]: { fields: current[rowId]?.fields ?? {}, decision } }));
+    setPending((current) => ({ ...current, [rowId]: { ...current[rowId], fields: current[rowId]?.fields ?? {}, decision } }));
+  }
+  function decideMedia(rowId: string, approved: boolean) {
+    setReview((current) => current && ({ ...current, proposal: { rows: current.proposal.rows.map((row) => row.row_id !== rowId ? row : { ...row, media: { ...(row.media ?? {}), existing_update_approved: approved } as Row['media'] }) } }));
+    setPending((current) => ({ ...current, [rowId]: { fields: current[rowId]?.fields ?? {}, ...(current[rowId]?.decision ? { decision: current[rowId].decision } : {}), media_update_approved: approved } }));
+  }
+  async function reloadReview() {
+    if (!review) return;
+    const loaded = await api<{ data: Review }>(`/ai-actions/${review.action.id}/review`);
+    setReview(loaded.data);
+    setPending({});
   }
   function bulkApply() { if (costHidden && bulkField === 'purchase_price') return; rows.forEach((row) => update(row.row_id, bulkField, bulkValue)); }
   function bulkDecide() { rows.forEach((row) => decide(row.row_id, bulkDecision)); }
@@ -81,7 +121,7 @@ export default function AiProductImportReviewPage() {
     }
     setSaving(true);
     try {
-      const edits = Object.entries(pending).map(([rowId, edit]) => ({ row_id: rowId, ...(Object.keys(edit.fields).length > 0 ? { fields: edit.fields } : {}), ...(edit.decision ? { decision: edit.decision } : {}) }));
+      const edits = Object.entries(pending).map(([rowId, edit]) => ({ row_id: rowId, ...(Object.keys(edit.fields).length > 0 ? { fields: edit.fields } : {}), ...(edit.decision ? { decision: edit.decision } : {}), ...(edit.media_update_approved !== undefined ? { media_update_approved: edit.media_update_approved } : {}) }));
       const result = await api<{ data: { version: number; status: string; cost_hidden?: boolean; latest_version: { proposal: { rows: Row[] } } } }>(`/ai-actions/${review.action.id}/review/versions`, { method: 'POST', headers: { 'Idempotency-Key': key() }, body: { expected_version: review.action.version, edits } });
       setReview({ action: { ...review.action, version: result.data.version, status: result.data.status, cost_hidden: result.data.cost_hidden ?? review.action.cost_hidden }, proposal: result.data.latest_version.proposal }); setPending({});
       success('حُفظ إصدار مراجعة جديد. أُبطلت أي معاينة أو موافقة سابقة.');
@@ -97,16 +137,18 @@ export default function AiProductImportReviewPage() {
   function setStatus(status: string) { setReview((current) => current && ({ ...current, action: { ...current.action, status } })); }
 
   return <div className="space-y-4 pb-20">
-    <header className="flex items-center gap-3"><Button asChild variant="ghost" size="icon" aria-label="العودة"><Link href="/products"><ArrowRight className="h-4 w-4 rtl:rotate-0 ltr:rotate-180" /></Link></Button><div><h1 className="text-xl font-semibold">استيراد عبر مساعد أَوْج</h1><p className="text-sm text-muted">{stage === 'review' ? 'استخراج ومراجعة — ثم معاينة نهائية وموافقة. لا تُنشأ منتجات أو تُحدّث في هذه المرحلة.' : 'المعاينة النهائية والموافقة — لا تُنشأ منتجات أو تُحدّث في هذه المرحلة.'}</p></div></header>
+    <header className="flex items-center gap-3"><Button asChild variant="ghost" size="icon" aria-label="العودة"><Link href="/products"><ArrowRight className="h-4 w-4 rtl:rotate-0 ltr:rotate-180" /></Link></Button><div><h1 className="text-xl font-semibold">استيراد عبر مساعد أَوْج</h1><p className="text-sm text-muted">{stage === 'review' ? 'استخراج ومراجعة — ثم معاينة نهائية وموافقة. لا يُنفَّذ شيء قبل موافقتك وضغطك «تنفيذ الاستيراد».' : 'المعاينة النهائية والموافقة — ثم التنفيذ بضغطة صريحة منك.'}</p></div></header>
     {!review ? <Card><CardHeader><CardTitle>ارفع CSV أو Excel</CardTitle></CardHeader><CardContent><label className="flex min-h-36 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-6 text-center"><FileSpreadsheet className="h-8 w-8 text-primary" /><span>{file?.name ?? 'اختر ملف المنتجات'}</span><Input className="sr-only" type="file" accept=".csv,.xlsx" onChange={upload} disabled={saving} /></label>{saving && <p className="mt-3 flex items-center gap-2 text-sm"><Loader2 className="h-4 w-4 animate-spin" /> جارٍ الاستخراج الآمن…</p>}</CardContent></Card> : <>
+      {repair && <RepairBanner repair={repair} />}
       <ol className="flex flex-wrap items-center gap-2 text-sm" aria-label="مراحل الاستيراد">
         <li><Button variant={stage === 'review' ? 'primary' : 'outline'} size="sm" aria-current={stage === 'review' ? 'step' : undefined} onClick={() => setStage('review')} disabled={locked}>١ · مراجعة البيانات</Button></li>
         <li><Button variant={stage === 'preview' ? 'primary' : 'outline'} size="sm" aria-current={stage === 'preview' ? 'step' : undefined} onClick={() => void toPreview()} disabled={saving}>٢ · المعاينة والموافقة</Button></li>
       </ol>
       {stage === 'preview' ? <ProductPreviewPanel actionId={review.action.id} version={review.action.version} dirty={dirty} onEdit={() => setStage('review')} onStatus={setStatus} /> : <>
-      <Card><CardContent className="flex flex-wrap items-center gap-3 py-4"><div className="relative min-w-52 flex-1"><Search className="absolute start-3 top-3 h-4 w-4 text-muted" /><Input className="ps-9" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="ابحث بالاسم أو SKU أو الباركود" aria-label="بحث" /></div><Button variant={needsReview ? 'primary' : 'outline'} onClick={() => setNeedsReview((v) => !v)}>يحتاج مراجعة</Button><select className="h-10 rounded-md border bg-background px-2" aria-label="حقل التعديل الجماعي" value={bulkField} onChange={(e) => setBulkField(e.target.value)}>{visibleFields.map((field) => <option key={field} value={field}>{FIELD_LABEL[field] ?? field}</option>)}</select><Input className="w-36" value={bulkValue} onChange={(e) => setBulkValue(e.target.value)} placeholder="تعديل جماعي" aria-label="قيمة التعديل الجماعي" /><Button variant="outline" onClick={bulkApply}>طبّق على الظاهر</Button><select className="h-10 rounded-md border bg-background px-2" aria-label="القرار الجماعي" value={bulkDecision} onChange={(e) => setBulkDecision(e.target.value as (typeof decisions)[number])}>{decisions.map((value) => <option key={value} value={value}>{DECISION_LABEL[value]}</option>)}</select><Button variant="outline" onClick={bulkDecide}>طبّق القرار على الظاهر</Button></CardContent></Card>
+      <ImageArchiveCard actionId={review.action.id} version={review.action.version} dirty={dirty} locked={locked} onStaged={reloadReview} />
+      <Card><CardContent className="flex flex-wrap items-center gap-3 py-4"><div className="relative min-w-52 flex-1"><Search className="absolute start-3 top-3 h-4 w-4 text-muted" /><Input className="ps-9" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="ابحث بالاسم أو SKU أو الباركود" aria-label="بحث" /></div><Button variant={needsReview ? 'primary' : 'outline'} onClick={() => setNeedsReview((v) => !v)}>يحتاج مراجعة</Button>{!repair && <><select className="h-10 rounded-md border bg-background px-2" aria-label="حقل التعديل الجماعي" value={bulkField} onChange={(e) => setBulkField(e.target.value)}>{visibleFields.map((field) => <option key={field} value={field}>{FIELD_LABEL[field] ?? field}</option>)}</select><Input className="w-36" value={bulkValue} onChange={(e) => setBulkValue(e.target.value)} placeholder="تعديل جماعي" aria-label="قيمة التعديل الجماعي" /><Button variant="outline" onClick={bulkApply}>طبّق على الظاهر</Button></>}<select className="h-10 rounded-md border bg-background px-2" aria-label="القرار الجماعي" value={bulkDecision} onChange={(e) => setBulkDecision(e.target.value as (typeof decisions)[number])}>{decisions.map((value) => <option key={value} value={value}>{DECISION_LABEL[value]}</option>)}</select><Button variant="outline" onClick={bulkDecide}>طبّق القرار على الظاهر</Button></CardContent></Card>
       {costHidden && <p className="rounded border border-border bg-surface p-3 text-sm text-muted">سعر الشراء محجوب عنك لأنه يتطلب صلاحية عرض التكلفة؛ لا يظهر هنا ولا يمكن تعديله، وتبقى قيمته المحفوظة كما هي.</p>}
-      <div className="overflow-x-auto rounded-lg border"><table className="w-full min-w-[1100px] text-sm"><thead className="bg-muted/50"><tr>{visibleFields.map((field) => <th scope="col" className="p-2 text-start" key={field}>{FIELD_LABEL[field] ?? field}</th>)}<th scope="col" className="p-2 text-start">القرار</th><th scope="col" className="p-2 text-start">الحالة</th></tr></thead><tbody>{rows.map((row) => <tr className="border-t" key={row.row_id}>{visibleFields.map((field) => <td className="p-2" key={field}><Input dir={field.includes('price') || field === 'sku' || field === 'barcode' ? 'ltr' : undefined} value={String(row.fields[field]?.value ?? '')} onChange={(e) => update(row.row_id, field, e.target.value)} aria-label={`${FIELD_LABEL[field] ?? field}-${row.source_row}`} /><small className="mt-1 block text-muted">{row.fields[field]?.origin === 'user' ? 'أدخله المستخدم' : row.fields[field]?.origin === 'missing' ? 'مفقود' : 'مستخرج من الملف'}</small></td>)}<td className="p-2"><select className="h-10 rounded-md border bg-background px-2" aria-label={`القرار-${row.source_row}`} value={row.decision === 'needs_review' ? '' : row.decision} onChange={(e) => decide(row.row_id, e.target.value as (typeof decisions)[number])}>{row.decision === 'needs_review' && <option value="" disabled>يحتاج قراراً</option>}{decisions.map((value) => <option key={value} value={value}>{DECISION_LABEL[value]}</option>)}</select></td><td className="p-2"><Badge tone={row.decision === 'needs_review' ? 'warning' : 'positive'}>{row.decision === 'needs_review' ? 'يحتاج مراجعة' : 'جاهز للمراجعة'}</Badge>{row.violations.map((v, i) => <p className="mt-1 text-xs text-negative" key={i}>{v.message}</p>)}</td></tr>)}</tbody></table></div>
+      <div className="overflow-x-auto rounded-lg border"><table className="w-full min-w-[1100px] text-sm"><thead className="bg-muted/50"><tr>{visibleFields.map((field) => <th scope="col" className="p-2 text-start" key={field}>{FIELD_LABEL[field] ?? field}</th>)}<th scope="col" className="p-2 text-start">القرار</th><th scope="col" className="p-2 text-start">الحالة</th></tr></thead><tbody>{rows.map((row) => <tr className="border-t" key={row.row_id}>{visibleFields.map((field) => <td className="p-2" key={field}><Input dir={field.includes('price') || field === 'sku' || field === 'barcode' ? 'ltr' : undefined} value={String(row.fields[field]?.value ?? '')} onChange={(e) => update(row.row_id, field, e.target.value)} aria-label={`${FIELD_LABEL[field] ?? field}-${row.source_row}`} disabled={locked || !fieldEditable(repair, row.row_id, field)} title={fieldEditable(repair, row.row_id, field) ? undefined : repairText(currentLang()).locked} /><small className="mt-1 block text-muted">{row.fields[field]?.origin === 'user' ? 'أدخله المستخدم' : row.fields[field]?.origin === 'missing' ? 'مفقود' : 'مستخرج من الملف'}</small></td>)}<td className="p-2"><select className="h-10 rounded-md border bg-background px-2" aria-label={`القرار-${row.source_row}`} value={row.decision === 'needs_review' ? '' : row.decision} onChange={(e) => decide(row.row_id, e.target.value as (typeof decisions)[number])}>{row.decision === 'needs_review' && <option value="" disabled>يحتاج قراراً</option>}{decisions.map((value) => <option key={value} value={value}>{DECISION_LABEL[value]}</option>)}</select>{row.decision === 'update' && <label className="mt-2 flex max-w-56 items-start gap-1.5 text-xs"><input type="checkbox" className="mt-0.5" checked={row.media?.existing_update_approved === true} onChange={(e) => decideMedia(row.row_id, e.target.checked)} disabled={locked} aria-label={`${imageText(currentLang()).decision}-${row.source_row}`} /><span>{imageText(currentLang()).decision}</span></label>}</td><td className="p-2"><Badge tone={row.decision === 'needs_review' ? 'warning' : 'positive'}>{row.decision === 'needs_review' ? 'يحتاج مراجعة' : 'جاهز للمراجعة'}</Badge>{row.violations.map((v, i) => <p className="mt-1 text-xs text-negative" key={i}>{v.message}</p>)}</td></tr>)}</tbody></table></div>
       <div className="flex flex-wrap items-center gap-2"><Button variant="outline" onClick={() => void save()} disabled={saving || !dirty}>{saving && <Loader2 className="me-2 h-4 w-4 animate-spin" />}حفظ إصدار المراجعة</Button><Button onClick={() => void toPreview()} disabled={saving}>{saving ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : <Upload className="me-2 h-4 w-4" aria-hidden />}المتابعة إلى المعاينة النهائية</Button>{dirty && <span role="status" className="text-sm text-warning">تعديلات غير محفوظة</span>}</div>
       </>}
     </>}

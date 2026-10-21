@@ -21,5 +21,10 @@ return [
     'execution_batch_rows' => (int) env('AI_ACTIONS_EXECUTION_BATCH_ROWS', 200),
     'execution_lease_seconds' => (int) env('AI_ACTIONS_EXECUTION_LEASE_SECONDS', 120),
     'preview_page_size' => (int) env('AI_ACTIONS_PREVIEW_PAGE_SIZE', 100),
+    // AI-ACTIONS-06: images are staged synchronously (validated, thumbnailed, stored privately) before
+    // a preview can name them, so both the archive size and the remote fetches per preview are bounded.
+    'max_archive_images' => (int) env('AI_ACTIONS_MAX_ARCHIVE_IMAGES', 200),
+    'max_remote_images_per_preview' => (int) env('AI_ACTIONS_MAX_REMOTE_IMAGES_PER_PREVIEW', 20),
+    'image_thumbnail_px' => 256,
     'draft_retention_days' => (int) env('AI_ACTIONS_DRAFT_RETENTION_DAYS', 30),
 ];

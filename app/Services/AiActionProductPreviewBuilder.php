@@ -6,6 +6,7 @@ use App\Models\BarcodeRegistryEntry;
 use App\Models\Brand;
 use App\Models\Product;
 use App\Models\ProductCategory;
+use App\Models\ProductMedia;
 use App\Support\ProductImportFields;
 use App\Support\ProductImportValueNormalizer as Normalizer;
 use Illuminate\Support\Str;
@@ -14,13 +15,16 @@ use Illuminate\Support\Str;
  * AI-ACTIONS-04: turns the proposal rows into the final, read-only picture of
  * what an import *would* do. It reads live ERP state to match existing products
  * and detect conflicts, and writes nothing. Client-supplied `match`, stored
- * `violations` and `media` are deliberately ignored: every verdict is recomputed
- * here from the field values and the live catalogue.
+ * `violations` and `media` are deliberately ignored — except the single explicit
+ * `media.existing_update_approved` decision — every verdict is recomputed here from the field values,
+ * the live catalogue and the staged image evidence.
  */
 final class AiActionProductPreviewBuilder
 {
     public const SCHEMA_VERSION = 1;
     private const CHUNK = 400;
+    /** Same ceiling the product gallery enforces (`ProductMediaService::MAX_PER_SCOPE`). */
+    private const MAX_GALLERY = 8;
     /** Locked fields never change on an existing product; a difference is an error. */
     private const LOCKED = ['type', 'track_inventory'];
     private const MONEY = ['sale_price', 'purchase_price', 'min_sale_price'];
@@ -43,18 +47,20 @@ final class AiActionProductPreviewBuilder
      * @param  array{action_id:string,version:int,branch_id:?string,proposal_hash:?string,manifest_hash:?string,file_sha256:?string}  $source
      * @return array<string,mixed> canonical preview (no volatile values, so its hash is stable)
      */
-    public function build(array $rows, array $source): array
+    public function build(array $rows, array $source, array $imageContext = []): array
     {
         usort($rows, static fn (array $a, array $b): int => [(int) ($a['source_row'] ?? 0), (string) ($a['row_id'] ?? '')] <=> [(int) ($b['source_row'] ?? 0), (string) ($b['row_id'] ?? '')]);
 
         $parsed = array_map(fn (array $row): array => $this->parse($row), $rows);
         $live = $this->liveIndex($parsed);
         $references = $this->referenceIndex($parsed);
+        $ctx = $imageContext + ['catalog' => ['by_key' => [], 'archive' => []], 'failures' => []];
+        $live['media'] = $this->mediaIndex($parsed, $live, $ctx);
 
-        $seen = ['sku' => [], 'barcode' => [], 'nebrax_id' => [], 'target' => []];
+        $seen = ['sku' => [], 'barcode' => [], 'nebrax_id' => [], 'target' => [], 'archive' => []];
         $out = [];
         foreach ($rows as $index => $row) {
-            $out[] = $this->evaluate($row, $parsed[$index], $live, $references, $seen);
+            $out[] = $this->evaluate($row, $parsed[$index], $live, $references, $seen, $ctx);
         }
 
         $issues = [];
@@ -71,6 +77,7 @@ final class AiActionProductPreviewBuilder
             'source' => $source,
             'totals' => $this->totals($out, $issues),
             'issues' => $issues,
+            'images' => $this->archiveSummary($ctx['catalog']['archive'], $seen['archive']),
             'rows' => $out,
         ];
     }
@@ -184,9 +191,10 @@ final class AiActionProductPreviewBuilder
      * @param  array<string,mixed>  $live
      * @param  array<string,array<string,bool>>  $references
      * @param  array<string,array<string,int>>  $seen
+     * @param  array{catalog:array,failures:array}  $ctx
      * @return array<string,mixed>
      */
-    private function evaluate(array $row, array $p, array $live, array $references, array &$seen): array
+    private function evaluate(array $row, array $p, array $live, array $references, array &$seen, array $ctx): array
     {
         $fields = $p['raw'];
         $display = [
@@ -362,17 +370,12 @@ final class AiActionProductPreviewBuilder
             $issues[] = $this->issue('unit_template_deferred', 'unit_template', 'warning', '«قالب الوحدات» لا يُطبَّق في هذه المرحلة؛ تبقى الوحدة المحدَّدة في الصف كما هي.');
         }
 
-        [$images, $imageIssues] = $this->images($fields);
+        [$images, $imageIssues] = $this->images($row, $p, $decision, $target, $live, $ctx, $seen);
         $issues = array_merge($issues, $imageIssues);
-        if ($images['count'] > 0) {
-            // Image import is deferred (nothing is fetched, attached or replaced); say so instead of implying success.
-            $issues[] = $decision === 'update'
-                ? $this->issue('media_update_not_approved', 'primary_image_url', 'warning', 'لم تُعتمد صور المنتج الموجود؛ لن تُطبَّق صور هذا الصف.')
-                : $this->issue('media_deferred', 'primary_image_url', 'warning', 'استيراد الصور مؤجَّل؛ لن تُنزَّل روابط الصور ولن تُرفق بالمنتج في هذه المرحلة.');
-        }
 
         $hasError = count(array_filter($issues, static fn (array $i): bool => $i['severity'] === 'error')) > 0;
-        $operation = $hasError ? 'blocked' : ($decision === 'create' ? 'create' : ($changes === [] ? 'skip' : 'update'));
+        // An approved image addition is a real change even when no product field differs.
+        $operation = $hasError ? 'blocked' : ($decision === 'create' ? 'create' : ($changes === [] && ! $images['will_apply'] ? 'skip' : 'update'));
 
         return $base + [
             'operation' => $operation,
@@ -403,35 +406,256 @@ final class AiActionProductPreviewBuilder
         return $prices;
     }
 
-    /** @param array<string,mixed> $fields @return array{0:array<string,mixed>,1:list<array<string,mixed>>} */
-    private function images(array $fields): array
+    /**
+     * Existing gallery of every update target (count + content hashes), loaded once per preview, and only
+     * when the preview can mention an image at all — an ordinary catalogue preview adds no query.
+     *
+     * @param  list<array<string,mixed>>  $parsed
+     * @return array<string,array{count:int,sha:array<string,bool>}>
+     */
+    private function mediaIndex(array $parsed, array $live, array $ctx): array
     {
-        $issues = [];
-        $valid = static function (string $url): bool {
-            $parts = parse_url($url);
+        $wanted = $ctx['catalog']['archive'] !== [];
+        foreach ($parsed as $row) {
+            $wanted = $wanted || isset($row['values']['primary_image_url']) || isset($row['values']['additional_image_urls']);
+        }
+        if (! $wanted || $live['products'] === []) {
+            return [];
+        }
+        $index = [];
+        foreach (array_chunk(array_keys($live['products']), self::CHUNK) as $chunk) {
+            foreach (ProductMedia::query()->whereIn('product_id', $chunk)->whereNull('product_option_value_id')->whereNull('product_variant_id')->get(['product_id', 'content_sha256']) as $media) {
+                $id = (string) $media->product_id;
+                $index[$id] ??= ['count' => 0, 'sha' => []];
+                $index[$id]['count']++;
+                if ($media->content_sha256 !== null) {
+                    $index[$id]['sha'][(string) $media->content_sha256] = true;
+                }
+            }
+        }
 
-            return filter_var($url, FILTER_VALIDATE_URL) !== false && mb_strlen($url) <= 2048
-                && in_array(strtolower((string) ($parts['scheme'] ?? '')), ['http', 'https'], true)
-                && ($parts['host'] ?? '') !== '' && ! isset($parts['user']) && ! isset($parts['pass']);
+        return $index;
+    }
+
+    /**
+     * Resolves a row's image sources — URLs in its cells and archive entries named after its SKU / barcode —
+     * to the *staged* evidence (identity = content SHA-256). Nothing is fetched here; an image that is not
+     * staged is reported as such, never assumed. An existing product's gallery is only ever appended to, and
+     * only after an explicit row-level decision; it is never replaced or reordered.
+     *
+     * @param  array<string,mixed>  $row
+     * @param  array<string,mixed>  $p
+     * @param  array<string,mixed>  $live
+     * @param  array{catalog:array,failures:array}  $ctx
+     * @param  array<string,array<string,mixed>>  $seen
+     * @return array{0:array<string,mixed>,1:list<array<string,mixed>>}
+     */
+    private function images(array $row, array $p, string $decision, ?Product $target, array $live, array $ctx, array &$seen): array
+    {
+        $fields = $p['raw'];
+        $issues = [];
+        $valid = static fn (string $url): bool => self::validUrl($url);
+        [$primary, $additional] = self::rawUrls($fields);
+
+        $sources = [];
+        if ($primary !== '') {
+            if ($valid($primary)) {
+                $sources[] = ['kind' => 'url', 'role' => 'primary', 'order' => 1, 'url' => $primary, 'key' => AiActionProductImageStager::urlKey($primary), 'label' => $this->urlLabel($primary)];
+            } else {
+                $issues[] = $this->issue('invalid_image_url', 'primary_image_url', 'error', 'رابط الصورة الرئيسية غير صالح؛ لم يُطلب ولم يُنزّل.');
+            }
+        }
+        foreach ($additional as $position => $url) {
+            if ($valid($url)) {
+                $sources[] = ['kind' => 'url', 'role' => 'additional', 'order' => 2 + $position, 'url' => $url, 'key' => AiActionProductImageStager::urlKey($url), 'label' => $this->urlLabel($url)];
+            } else {
+                $issues[] = $this->issue('invalid_image_url', 'additional_image_urls', 'error', 'رابط صورة إضافية غير صالح؛ لم يُطلب ولم يُنزّل.');
+            }
+        }
+
+        // Archive entries are named `<SKU|barcode>.<ext>` (cover) and `<SKU|barcode>__2.<ext>`, `__3`, … (extras).
+        $identifiers = array_values(array_unique(array_filter([
+            $p['sku'] === null ? null : mb_strtolower($p['sku'], 'UTF-8'),
+            $p['barcode'] === null ? null : mb_strtolower($p['barcode'], 'UTF-8'),
+            $target?->sku === null ? null : mb_strtolower((string) $target->sku, 'UTF-8'),
+        ], static fn ($v): bool => $v !== null && $v !== '')));
+        foreach ($ctx['catalog']['archive'] as $entry) {
+            foreach ($identifiers as $needle) {
+                $order = null;
+                if ($entry['lookup'] === $needle) {
+                    $order = 1;
+                } elseif (preg_match('/^'.preg_quote($needle, '/').'__(\d+)$/u', $entry['lookup'], $parts) === 1) {
+                    $order = max(2, (int) $parts[1]);
+                }
+                if ($order === null) {
+                    continue;
+                }
+                if (isset($seen['archive'][$entry['id']])) {
+                    $issues[] = $this->issue('archive_image_ambiguous', null, 'error', "الصورة «{$entry['label']}» تطابق أكثر من صف (أول مطابقة في الصف {$seen['archive'][$entry['id']]}).");
+                } else {
+                    $seen['archive'][$entry['id']] = (int) $row['source_row'];
+                    $sources[] = ['kind' => 'archive', 'role' => $order === 1 ? 'primary' : 'additional', 'order' => $order, 'entry' => $entry, 'key' => $entry['source_key'], 'label' => $entry['label']];
+                }
+                break;
+            }
+        }
+
+        usort($sources, static fn (array $a, array $b): int => [($a['role'] === 'primary' ? 0 : 1), $a['order'], $a['label']] <=> [($b['role'] === 'primary' ? 0 : 1), $b['order'], $b['label']]);
+        if (count(array_filter($sources, static fn (array $s): bool => $s['role'] === 'primary')) > 1) {
+            $issues[] = $this->issue('multiple_primary_images', 'primary_image_url', 'error', 'حُدّدت أكثر من صورة رئيسية للصف (رابط وصورة أرشيف)؛ أبقِ مصدراً رئيسياً واحداً.');
+        }
+
+        // — Evidence: what each source actually is, from staging only. —
+        $items = [];
+        $hashes = [];
+        foreach ($sources as $position => $source) {
+            $item = [
+                'key' => substr(hash('sha256', $source['role'].'|'.$source['key']), 0, 24), 'role' => $source['role'], 'position' => $position,
+                'source' => ['kind' => $source['kind'], 'label' => $source['label']],
+                'status' => 'ready', 'code' => null, 'message' => null, 'image' => null,
+            ];
+            $staged = $source['kind'] === 'archive' ? $source['entry'] : ($ctx['catalog']['by_key'][$source['key']] ?? null);
+            if ($staged === null) {
+                $failure = $ctx['failures'][$source['key']] ?? null;
+                if ($failure !== null) {
+                    $item['status'] = $failure['status'];
+                    $item['code'] = $failure['code'];
+                    $item['message'] = $failure['message'];
+                } elseif (config('product_import_media.remote_enabled') !== true) {
+                    $item['status'] = 'unavailable';
+                    $item['code'] = 'remote_fetch_disabled';
+                    $item['message'] = 'جلب الصور من روابط خارجية غير مفعّل على المنصة؛ لن تُطبَّق هذه الصورة.';
+                } else {
+                    $item['status'] = 'error';
+                    $item['code'] = 'image_not_staged';
+                    $item['message'] = 'لم تُجهَّز هذه الصورة للمعاينة بعد؛ أنشئ معاينة جديدة.';
+                }
+            } else {
+                $item['image'] = ['id' => $staged['id'], 'sha256' => $staged['sha256'], 'mime_type' => $staged['mime_type'], 'size' => $staged['size'], 'width' => $staged['width'], 'height' => $staged['height']];
+                if (isset($hashes[$staged['sha256']])) {
+                    $item['status'] = 'skipped';
+                    $item['code'] = 'duplicate_in_row';
+                    $item['message'] = 'الصورة نفسها مكررة داخل الصف؛ تُرفق مرة واحدة.';
+                }
+                $hashes[$staged['sha256']] = true;
+            }
+            $items[] = $item;
+        }
+
+        // — Decision: an existing product's gallery is append-only and needs an explicit, row-level approval. —
+        $existing = $target === null ? ['count' => 0, 'sha' => []] : ($live['media'][(string) $target->id] ?? ['count' => 0, 'sha' => []]);
+        $approved = ($row['media']['existing_update_approved'] ?? false) === true;
+        $mode = $decision === 'update' ? 'append_existing' : 'new_product';
+        $readyCount = count(array_filter($items, static fn (array $i): bool => $i['status'] === 'ready'));
+        if ($decision === 'update' && $readyCount > 0 && ! $approved) {
+            foreach ($items as &$item) {
+                if ($item['status'] === 'ready') {
+                    $item['status'] = 'skipped';
+                    $item['code'] = 'existing_product_needs_decision';
+                    $item['message'] = 'منتج موجود: لا تُضاف صور إلا بقرار صريح لهذا الصف.';
+                }
+            }
+            unset($item);
+            $issues[] = $this->issue('media_update_not_approved', 'primary_image_url', 'warning', 'صور هذا الصف لمنتج موجود لم تُعتمد؛ سيُحدَّث المنتج دون صور (لا استبدال ولا حذف لصوره الحالية).');
+        } elseif ($decision === 'update' && $approved) {
+            foreach ($items as &$item) {
+                if ($item['status'] === 'ready' && isset($existing['sha'][$item['image']['sha256']])) {
+                    $item['status'] = 'skipped';
+                    $item['code'] = 'already_attached';
+                    $item['message'] = 'الصورة موجودة بالفعل ضمن صور المنتج؛ لن تُكرَّر.';
+                }
+            }
+            unset($item);
+        }
+        $readyCount = count(array_filter($items, static fn (array $i): bool => $i['status'] === 'ready'));
+        $capacity = self::MAX_GALLERY;
+        if ($readyCount > 0 && ($decision === 'update' ? $existing['count'] : 0) + $readyCount > $capacity) {
+            $issues[] = $this->issue('too_many_images', 'additional_image_urls', 'error', "الحد الأقصى لمعرض المنتج {$capacity} صور؛ ستتجاوزه صور هذا الصف.");
+        }
+
+        foreach ($items as $item) {
+            $field = $item['role'] === 'primary' ? 'primary_image_url' : 'additional_image_urls';
+            if ($item['status'] === 'error') {
+                $issues[] = $this->issue((string) $item['code'], $field, 'error', "صورة «{$item['source']['label']}»: {$item['message']}");
+            } elseif ($item['status'] === 'unavailable') {
+                $issues[] = $this->issue((string) $item['code'], $field, 'warning', "صورة «{$item['source']['label']}»: {$item['message']}");
+            }
+        }
+
+        $statuses = array_count_values(array_column($items, 'status'));
+        $status = match (true) {
+            $items === [] => 'none',
+            ($statuses['error'] ?? 0) > 0 => 'error',
+            $readyCount > 0 => 'ready',
+            ($statuses['unavailable'] ?? 0) > 0 => 'unavailable',
+            in_array('existing_product_needs_decision', array_column($items, 'code'), true) => 'needs_decision',
+            default => 'skipped',
         };
+
+        return [[
+            // Raw URLs are deliberately not echoed: a signed link would otherwise be copied into every stored preview.
+            'count' => count($items), 'ready' => $readyCount,
+            'will_apply' => $readyCount > 0 && $status !== 'error', 'status' => $status, 'mode' => $mode,
+            'existing' => ['count' => $existing['count'], 'update_approved' => $decision === 'update' ? $approved : null],
+            'items' => $items,
+        ], $issues];
+    }
+
+    /**
+     * The syntactically valid image URLs of an undecided-or-decided row, in the order a preview will name them.
+     * The approval service stages exactly these (and only these) before building the preview.
+     *
+     * @param  array<string,mixed>  $row
+     * @return list<string>
+     */
+    public static function candidateUrls(array $row): array
+    {
+        if (! in_array($row['decision'] ?? null, ['create', 'update'], true) || ! is_array($row['fields'] ?? null)) {
+            return [];
+        }
+        [$primary, $additional] = self::rawUrls($row['fields']);
+
+        return array_values(array_filter(array_merge($primary === '' ? [] : [$primary], $additional), static fn (string $url): bool => self::validUrl($url)));
+    }
+
+    /** @param array<string,mixed> $fields @return array{0:string,1:list<string>} */
+    private static function rawUrls(array $fields): array
+    {
         $primary = trim((string) ($fields['primary_image_url']['value'] ?? ''));
         $additional = array_values(array_filter(array_map('trim', preg_split('/[;|\r\n]+/', (string) ($fields['additional_image_urls']['value'] ?? '')) ?: []), static fn (string $v): bool => $v !== ''));
-        $good = ['primary' => null, 'additional' => []];
-        if ($primary !== '') {
-            if ($valid($primary)) $good['primary'] = $primary;
-            else $issues[] = $this->issue('invalid_image_url', 'primary_image_url', 'error', 'رابط الصورة الرئيسية غير صالح؛ لم يُطلب ولم يُنزّل.');
-        }
-        foreach ($additional as $url) {
-            if ($valid($url)) $good['additional'][] = $url;
-            else $issues[] = $this->issue('invalid_image_url', 'additional_image_urls', 'error', 'رابط صورة إضافية غير صالح؛ لم يُطلب ولم يُنزّل.');
-        }
-        $count = ($good['primary'] === null ? 0 : 1) + count($good['additional']);
-        if ($count > 8) {
-            $issues[] = $this->issue('too_many_images', 'additional_image_urls', 'error', 'الحد الأقصى للصور هو ثماني صور.');
-        }
 
-        // URLs are shown as proposed; nothing is fetched or attached at preview time.
-        return [$good + ['count' => $count, 'will_apply' => false, 'status' => $count > 0 ? 'deferred' : 'none', 'fetched' => false], $issues];
+        return [$primary, $additional];
+    }
+
+    private static function validUrl(string $url): bool
+    {
+        $parts = parse_url($url);
+
+        return filter_var($url, FILTER_VALIDATE_URL) !== false && mb_strlen($url) <= 2048
+            && in_array(strtolower((string) ($parts['scheme'] ?? '')), ['http', 'https'], true)
+            && ($parts['host'] ?? '') !== '' && ! isset($parts['user']) && ! isset($parts['pass']);
+    }
+
+    private function urlLabel(string $url): string
+    {
+        $parts = parse_url($url) ?: [];
+
+        return mb_substr(((string) ($parts['host'] ?? '')).((string) ($parts['path'] ?? '')), 0, 255);
+    }
+
+    /**
+     * Archive-level summary: how many staged entries were used by a row and which were not (a typo in a file name
+     * must be visible, not silently dropped).
+     *
+     * @param  list<array<string,mixed>>  $archive
+     * @param  array<string,int>  $used
+     * @return array{archive:array<string,mixed>}
+     */
+    private function archiveSummary(array $archive, array $used): array
+    {
+        $unmatched = array_values(array_map(static fn (array $e): array => ['id' => $e['id'], 'label' => $e['label']], array_filter($archive, static fn (array $e): bool => ! isset($used[$e['id']]))));
+
+        return ['archive' => ['total' => count($archive), 'matched' => count($archive) - count($unmatched), 'unmatched' => $unmatched]];
     }
 
     private function existing(Product $product, string $key): mixed
@@ -473,7 +697,9 @@ final class AiActionProductPreviewBuilder
         $errors = count($presentIssues);
         $warnings = 0;
         $cost = false;
+        $images = 0;
         foreach ($rows as $row) {
+            $images += (int) ($row['images']['ready'] ?? 0);
             foreach ($row['issues'] as $issue) {
                 $issue['severity'] === 'error' ? $errors++ : $warnings++;
             }
@@ -484,7 +710,7 @@ final class AiActionProductPreviewBuilder
 
         return [
             'rows' => count($rows), 'create' => $count('create'), 'update' => $count('update'), 'skip' => $count('skip'),
-            'blocked' => $count('blocked'), 'errors' => $errors, 'warnings' => $warnings, 'has_cost_values' => $cost,
+            'blocked' => $count('blocked'), 'errors' => $errors, 'warnings' => $warnings, 'has_cost_values' => $cost, 'images' => $images,
         ];
     }
 
