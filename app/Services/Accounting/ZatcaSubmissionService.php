@@ -11,6 +11,8 @@ use RuntimeException;
 
 class ZatcaSubmissionService
 {
+    public function __construct(private readonly ZatcaIssuedDocumentIntegrity $integrity) {}
+
     /**
      * يسجل طلب إرسال يدوي دون أي اتصال شبكي. تكرار مفتاح Idempotency يعيد
      * السجل نفسه، ومحاولة جديدة أثناء pending لا تنشئ إرسالاً موازياً.
@@ -56,6 +58,11 @@ class ZatcaSubmissionService
                 if ($latest?->status === 'pending') {
                     throw new ZatcaSubmissionConflict('توجد محاولة إرسال معلقة لهذه الفاتورة.');
                 }
+
+                // سلامة المستند الصادر **قبل** تسجيل المحاولة: `request_hash` أدناه يُحسب من XML الحالي، فبدون هذا الفحص
+                // يصير XML معدَّل بعد الإصدار «لقطةً» سليمة تتجاوز فحص `assertSnapshot` لاحقاً. (إعادة مفتاح Idempotency أعلاه
+                // لا تنشئ شيئاً فلا تحتاجه.)
+                $this->integrity->assertIntact($locked);
 
                 $attempt = ZatcaSubmissionAttempt::create([
                     'branch_id' => $locked->branch_id,

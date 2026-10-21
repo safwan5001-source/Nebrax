@@ -488,6 +488,18 @@ php artisan serve
   **ثغرات موثَّقة باختبارات `ZatcaChainIssuedInvoiceIntegrityTest`:** تعديل `zatca_hash` وحده مسموح ولا يكشفه الإرسال محلياً (يكشفه استعلام Q7 قرائياً)،
   وتعديل XML قبل تسجيل محاولة الإرسال يُقبل لقطةً؛ أما الإصدار اللاحق فيفشل مغلقاً دون استهلاك ICV إن تغيّر XML المستند السابق. التصليب مقترح منفصل (التقرير §8b).
   اختبارات «يجب أن يرمي» تستعمل `CapturesThrowable::thrown()` لا `try{fail()}catch(RuntimeException)` (يبتلع AssertionFailedError).
+
+## سلامة المستند الصادر قبل الإرسال — `ZatcaIssuedDocumentIntegrity` (TAX-ZATCA Document Integrity Hardening)
+
+حارس **قراءة فقط وفشل مغلق** قبل أي إرسال إلى ZATCA. لفاتورة لها مدخل في السلسلة المشتركة يجب أن يتطابق: هاش XML المحفوظ بـ`ZatcaInvoiceHasher` الرسمي
+= `invoices.zatca_hash` = `zatca_chain_entries.hash` الثابت، مع هوية المدخل (المستأجر/الفاتورة/النوع 388/السلسلة) وICV وUUID وPIH. يُستدعى في ثلاث نقاط:
+`ZatcaSubmissionService::requestManual` (قبل إنشاء المحاولة)، `ZatcaSubmissionQueue::enqueue` (قبل الصف وإعادة الصف)، و`ZatcaSubmissionDispatcher::assertSnapshot`
+(بعد الفحوص القديمة وقبل `ZatcaHttpTransport::submit` — وهو الموضع الوحيد لاستدعاء النقل). الفشل = `ZatcaIntegrityException` (RuntimeException برمز `reason`، بلا قيم) ⇒ 422
+أو محاولة `failed / submission_preflight_failed` دون طلب شبكي.
+- **فواتير ما قبل السلسلة:** بلا مدخل وبلا رأس لمستأجرها (أو ICV ≤ البذرة أو بلا ICV) لا تُفحص ولا يُعاد تفسير هاشها الخام؛ تبقى على فحوصها القديمة. فاتورة بلا مدخل
+  وICV فوق البذرة في مستأجر له رأس مستحيلة (F1) فتُرفض. سياق مستأجر مختلف ⇒ فشل مغلق.
+- **لا تجميد في القاعدة** لـ`zatca_xml`/`zatca_hash` (قرار منفصل)، و`zatca_cleared_xml` يبقى قابلاً للكتابة. الحارس لا يكتب أبداً (يحرس ذلك `ZatcaChainSchemaTest`).
+- أي مسار إرسال جديد يجب أن يمرّ عبر `ZatcaSubmissionDispatcher` ولا يستدعي النقل مباشرةً. المرجع: `docs/audits/horizon/ZATCA-DOCUMENT-INTEGRITY-HARDENING-REPORT.md`.
 - **التراجع** يرفض متى وُجد أي مدخل: بعد أول فاتورة عبر المخصِّص يُمنع الرجوع إلى كود ما قبل REM-18b-2 (إصلاح إلى الأمام فقط).
 - **خارج النطاق:** إصدار الإشعار الدائن وF2 (REM-18b-3)، 383، نطاق الفرع/EGS (REM-25)، الإرسال (يبقى معطّلاً). اختبارات التزامن على
   PostgreSQL **تفشل ولا تتخطّى** إن غاب pcntl. المرجع وخطة النشر/التراجع: `docs/audits/horizon/REM-18b-2-IMPLEMENTATION-REPORT.md`.

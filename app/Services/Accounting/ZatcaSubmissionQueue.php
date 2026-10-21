@@ -12,7 +12,10 @@ use RuntimeException;
 /** نقطة الصف الوحيدة: تدقق الجاهزية وتسجل كل صف/إعادة صف قبل التسليم للعامل. */
 final class ZatcaSubmissionQueue
 {
-    public function __construct(private readonly ZatcaTransportReadiness $readiness) {}
+    public function __construct(
+        private readonly ZatcaTransportReadiness $readiness,
+        private readonly ZatcaIssuedDocumentIntegrity $integrity,
+    ) {}
 
     public function enqueue(ZatcaSubmissionAttempt $attempt): ZatcaSubmissionAttempt
     {
@@ -36,6 +39,8 @@ final class ZatcaSubmissionQueue
             if ($invoice->status !== 'posted' || ! is_string($invoice->zatca_xml) || $invoice->zatca_xml === '') {
                 throw new RuntimeException('لقطة فاتورة ZATCA غير صالحة للصف.');
             }
+            // لا يُصَفّ (ولا يُعاد صفّ) إرسال لمستند صادر لا يطابق سجل إصداره؛ الفحص يتكرر في المُرسِل قبل النقل.
+            $this->integrity->assertIntact($invoice);
 
             $locked->update([
                 'queue_count' => $locked->queue_count + 1,
