@@ -113,7 +113,7 @@ function asMediaList(raw: unknown): WorkspaceProductMedia[] {
   return out;
 }
 
-function mapSummary(row: unknown): WorkspaceProductSummary | null {
+export function mapWorkspaceProductSummary(row: unknown): WorkspaceProductSummary | null {
   if (!row || typeof row !== 'object' || Array.isArray(row)) return null;
   const record = row as Record<string, unknown>;
   if (typeof record.id !== 'string' || record.id === '') return null;
@@ -261,7 +261,7 @@ export async function listWorkspaceProducts(
     if (!Array.isArray(data)) return { ok: false, reason: 'failed', message: 'invalid_payload' };
     const rows: WorkspaceProductSummary[] = [];
     for (const row of data) {
-      const summary = mapSummary(row);
+      const summary = mapWorkspaceProductSummary(row);
       if (summary === null) return { ok: false, reason: 'failed', message: 'invalid_payload' };
       rows.push(summary);
     }

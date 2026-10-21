@@ -7,6 +7,7 @@ import { resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { FacetVisualTile } from '../FacetVisualTile';
 import type { ResolvedFacetVisual } from '../presentation/facet-visual';
+import { facetLabelHidden } from '../discovery-label-visibility';
 
 const repo = (path: string) => readFileSync(resolve(process.cwd(), '..', path), 'utf8');
 
@@ -40,5 +41,10 @@ describe('admin preview FacetVisualTile (VD-2)', () => {
     fireEvent.error(container.querySelector('img') as HTMLImageElement);
     expect(container.querySelector('svg')).not.toBeNull();
     expect(screen.getByText('الأم')).toBeTruthy();
+  });
+
+  it('keeps counts visible when a hidden label falls back to an initial', () => {
+    expect(facetLabelHidden({ ...visual, showLabel: false, fallbackIcon: undefined }, null)).toBe(false);
+    expect(facetLabelHidden({ ...visual, showLabel: false }, { src: '/preview.webp' })).toBe(true);
   });
 });

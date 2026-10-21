@@ -1,9 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * FLOWERS-H9c / ADR-21 — the Canvas never fabricates data for the data-backed
- * sections: it shows only the merchant-authored title and an honest "live
- * data appears here" note, and flags a section the storefront would omit.
+ * FLOWERS-H9c / ADR-21 — the Canvas renders the approved live section-data
+ * projection when present and keeps loading/empty/error states honest.
  */
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -35,7 +34,7 @@ function section(container: HTMLElement, id: string): HTMLElement {
 describe("Canvas — data-backed sections (ADR-21)", () => {
   afterEach(() => cleanup());
 
-  it("productShelf shows the authored title, the deliver-today badge and a live-data note — no products", () => {
+  it("productShelf shows authored content and the deliver-today badge while data is loading", () => {
     const { container } = renderCanvas(
       withSections([
         {
@@ -49,7 +48,7 @@ describe("Canvas — data-backed sections (ADR-21)", () => {
     const el = section(container, "shelf-1");
     expect(el.textContent).toContain("Roses for today");
     expect(el.textContent).toContain("Deliver today");
-    expect(el.textContent).toContain("Live store products appear here");
+    expect(el.querySelector("[aria-hidden=\"true\"]")).not.toBeNull();
     expect(el.hasAttribute("data-incomplete")).toBe(false);
     expect(el.querySelector("img")).toBeNull();
   });
@@ -62,7 +61,17 @@ describe("Canvas — data-backed sections (ADR-21)", () => {
     );
     const el = section(container, "d-1");
     expect(el.querySelector("h2")?.textContent?.length).toBeGreaterThan(0);
-    expect(el.textContent).toContain("appear on the published store");
+    expect(el.querySelector("[aria-hidden=\"true\"]")).not.toBeNull();
+  });
+
+  it("attaches the discovery landmark to its rendered heading", () => {
+    const { container } = renderCanvas(
+      withSections([{ id: "d-1", type: "discovery", visible: true, content: { title: "", axis: "brand", display: "tiles" } }]),
+    );
+    const discovery = section(container, "d-1");
+    const region = discovery.closest("section");
+    expect(region?.getAttribute("aria-labelledby")).toBe("preview-discovery-d-1");
+    expect(region?.querySelector("h2#preview-discovery-d-1")).not.toBeNull();
   });
 
   it("flags a productShelf or discovery section with no stored content as incomplete", () => {
@@ -85,7 +94,7 @@ describe("Canvas — data-backed sections (ADR-21)", () => {
     );
     const el = section(container, "p-1");
     expect(el.hasAttribute("data-incomplete")).toBe(false);
-    expect(el.textContent).toContain("The earliest delivery window appears here, live");
+    expect(el.querySelector("[aria-hidden=\"true\"]")).not.toBeNull();
     expect(el.textContent).not.toMatch(/\d{4}-\d{2}-\d{2}/);
   });
 
@@ -101,6 +110,248 @@ describe("Canvas — data-backed sections (ADR-21)", () => {
       withSections([{ id: "p-1", type: "deliveryPromise", visible: true }]),
       "ar",
     );
-    expect(section(container, "p-1").textContent).toContain("أقرب موعد توصيل يظهر هنا حيّاً");
+    expect(section(container, "p-1").querySelector("[aria-hidden=\"true\"]")).not.toBeNull();
+  });
+
+  it("renders server-projected product cards and discovery values instead of a placeholder", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={withSections([
+          { id: "shelf-1", type: "productShelf", visible: true, content: { title: "Shelf", deliverToday: false, limit: 2 } },
+          { id: "d-1", type: "discovery", visible: true, content: { title: "Shop by", axis: "brand", display: "tiles" } },
+        ])}
+        locale="en"
+        viewport="desktop"
+        homeSectionProducts={{ "shelf-1": [{ id: "p1", name: "وردة", nameEn: "Rose", thumbnailUrl: "/rose.jpg", priceAmountMinor: 2500, currency: "SAR", inStock: true }] }}
+        homeSectionProductsState={{ "shelf-1": "ready" }}
+        homeSectionDiscovery={{ "d-1": { axis: "brand", name: "", nameEn: null, visual: null, options: [{ value: "b1", name: "Brand", nameEn: "Brand", count: 3, visual: null }] } }}
+        homeSectionDiscoveryState={{ "d-1": "ready" }}
+        onSelectSection={() => {}}
+      />,
+    );
+    expect(container.querySelector('[data-home-data-section="productShelf"] [data-card]')).not.toBeNull();
+    expect(container.querySelector('section[aria-labelledby="preview-product-shelf-shelf-1"] h2#preview-product-shelf-shelf-1')).not.toBeNull();
+    expect(container.querySelector('[data-home-data-section="productShelf"]')?.textContent).toContain("SAR");
+    expect(container.querySelector('[data-home-data-section="productShelf"]')?.textContent).toContain("Rose");
+    expect(container.querySelector('[data-home-data-section="discovery"]')?.textContent).toContain("Brand");
+  });
+
+  it("uses resolved discovery visuals and the published fallback headings", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={withSections([
+          { id: "shelf-1", type: "productShelf", visible: true, content: { title: "", deliverToday: false, limit: 2 } },
+          { id: "d-1", type: "discovery", visible: true, content: { title: "", axis: "facet", dimension: "occasion", layout: "image-grid", template: "gift-circles" } },
+        ])}
+        locale="en"
+        viewport="desktop"
+        homeSectionProducts={{ "shelf-1": [{ id: "p1", name: "Rose", thumbnailUrl: null, priceAmountMinor: 2500, currency: "SAR", inStock: true }] }}
+        homeSectionProductsState={{ "shelf-1": "ready" }}
+        homeSectionDiscovery={{ "d-1": { axis: "facet", dimension: "occasion", name: "المناسبة", nameEn: "Occasion", visual: { defaults: { content: "image", shape: "circle" } }, options: [{ value: "birthday", name: "عيد ميلاد", nameEn: "Birthday", count: 3, visual: { image: { mediaId: "00000000-0000-4000-8000-000000000001", sources: [{ width: 320, src: "/signed-media-1.jpg" }] } } }] } }}
+        homeSectionDiscoveryState={{ "d-1": "ready" }}
+        onSelectSection={() => {}}
+      />,
+    );
+    expect(container.querySelector('[data-home-data-section="discovery"] h2')?.textContent).toContain("Shop by Occasion");
+    expect(container.querySelector('[data-home-data-section="discovery"] [data-facet-content="image"]')).not.toBeNull();
+    expect(container.querySelector('[data-home-data-section="discovery"] img')?.getAttribute("src")).toBe("/signed-media-1.jpg");
+  });
+
+  it("deduplicates discovery srcset widths and prefers WebP derivatives", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={withSections([{ id: "d-1", type: "discovery", visible: true, content: { title: "", axis: "facet", dimension: "occasion", layout: "image-grid", template: "gift-circles" } }])}
+        locale="en"
+        viewport="desktop"
+        homeSectionDiscovery={{ "d-1": { axis: "facet", dimension: "occasion", name: "Occasion", nameEn: null, visual: null, options: [{ value: "birthday", name: "Birthday", nameEn: null, count: 1, visual: { image: { mediaId: "00000000-0000-4000-8000-000000000001", sources: [{ width: 160, format: "jpg", src: "/birthday-160.jpg" }, { width: 160, format: "webp", src: "/birthday-160.webp" }, { width: 320, format: "jpg", src: "/birthday-320.jpg" }, { width: 320, format: "webp", src: "/birthday-320.webp" }] } } }] } }}
+        homeSectionDiscoveryState={{ "d-1": "ready" }}
+        onSelectSection={() => {}}
+      />,
+    );
+    const image = container.querySelector('[data-home-data-section="discovery"] img');
+    expect(image?.getAttribute("src")).toBe("/birthday-320.webp");
+    expect(image?.getAttribute("srcset")).toBe("/birthday-160.webp 160w, /birthday-320.webp 320w");
+  });
+
+  it("formats the live delivery window and uses the published heading", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={withSections([{ id: "p-1", type: "deliveryPromise", visible: true, content: { title: "", body: "" } }])}
+        locale="en"
+        viewport="desktop"
+        homeSectionDelivery={{ "p-1": { date: "2099-10-08", startTime: "19:00", endTime: "22:00", label: "raw", labelEn: "raw", timezone: "UTC" } }}
+        homeSectionDeliveryState={{ "p-1": "ready" }}
+        onSelectSection={() => {}}
+      />,
+    );
+    const text = section(container, "p-1").textContent ?? "";
+    expect(text).toContain("Earliest delivery");
+    expect(text).not.toContain("2099-10-08");
+    expect(text).toContain("7:00");
+  });
+
+  it("keeps legacy discovery columns tied to the simulated viewport", () => {
+    const config = withSections([{ id: "d-legacy", type: "discovery", visible: true, content: { title: "Legacy", axis: "brand", display: "tiles" } }]);
+    for (const [viewport, expected] of [["mobile", "grid-cols-2"], ["tablet", "grid-cols-3"], ["desktop", "grid-cols-4"]] as const) {
+      const { container } = render(
+        <StorefrontPreviewCanvas
+          config={config}
+          locale="en"
+          viewport={viewport}
+          homeSectionDiscovery={{ "d-legacy": { axis: "brand", name: "", nameEn: null, visual: null, options: [{ value: "b1", name: "Brand", nameEn: null, count: 1, visual: null }] } }}
+          homeSectionDiscoveryState={{ "d-legacy": "ready" }}
+          onSelectSection={() => {}}
+        />,
+      );
+      const list = container.querySelector('[data-home-data-section="discovery"] ul');
+      expect(list?.className).toContain(expected);
+      expect(list?.className).not.toContain("sm:grid-cols-3");
+      expect(list?.className).not.toContain("lg:grid-cols-4");
+      cleanup();
+    }
+  });
+
+  it("keeps the AWJ Market automatic shelf as a rail", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={{ ...withSections([{ id: "shelf-1", type: "productShelf", visible: true, content: { title: "", deliverToday: false, limit: 2 } }]), themePreset: "awj-market" }}
+        locale="en"
+        viewport="desktop"
+        homeSectionProducts={{ "shelf-1": [{ id: "p1", name: "Rose", thumbnailUrl: null, priceAmountMinor: 2500, currency: "SAR", inStock: true }] }}
+        homeSectionProductsState={{ "shelf-1": "ready" }}
+        onSelectSection={() => {}}
+      />,
+    );
+    expect(container.querySelector('[data-shelf-layout="rail"]')).not.toBeNull();
+  });
+
+  it("keeps an AWJ Market rail when only explicit columns are authored", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={{ ...withSections([{ id: "shelf-1", type: "productShelf", visible: true, design: { columns: 3 }, content: { title: "", deliverToday: false, limit: 2 } }]), themePreset: "awj-market" }}
+        locale="en"
+        viewport="desktop"
+        homeSectionProducts={{ "shelf-1": [{ id: "p1", name: "Rose", thumbnailUrl: null, priceAmountMinor: 2500, currency: "SAR", inStock: true }] }}
+        homeSectionProductsState={{ "shelf-1": "ready" }}
+        onSelectSection={() => {}}
+      />,
+    );
+    const list = container.querySelector('[data-home-data-section="productShelf"] [data-shelf-layout]');
+    expect(list?.getAttribute("data-shelf")).toBe("rail");
+    expect(list?.getAttribute("data-cols")).toBe("3");
+  });
+
+  it("applies the published discovery display controls to live values", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={withSections([{ id: "d-1", type: "discovery", visible: true, content: { title: "", axis: "brand", display: "tiles", layout: "carousel", rows: 2, gap: "loose", textPosition: "overlay", contentSequence: "label-first", cardStyle: "elevated", align: "start" } }])}
+        locale="en"
+        viewport="mobile"
+        homeSectionDiscovery={{ "d-1": { axis: "brand", name: "", nameEn: null, visual: { defaults: { content: "icon" } }, options: [{ value: "b1", name: "Brand", nameEn: "Brand", count: 3, visual: { icon: "tag" } }] } }}
+        homeSectionDiscoveryState={{ "d-1": "ready" }}
+        onSelectSection={() => {}}
+      />,
+    );
+    const list = container.querySelector('[data-home-data-section="discovery"] [data-discovery-layout="carousel"]');
+    expect(list?.getAttribute("data-discovery-gap")).toBe("loose");
+    expect(list?.getAttribute("data-discovery-rows")).toBe("2");
+    expect(list?.getAttribute("data-discovery-text-position")).toBe("overlay");
+    expect(list?.getAttribute("data-discovery-content-sequence")).toBe("label-first");
+    expect(list?.getAttribute("data-discovery-card-style")).toBe("elevated");
+    expect(list?.getAttribute("data-discovery-align")).toBe("start");
+    expect((list as HTMLElement | null)?.style.getPropertyValue("--disc-rows")).toBe("2");
+    expect((list as HTMLElement | null)?.style.getPropertyValue("--disc-item")).toBe("104px");
+  });
+
+  it("does not apply overlay positioning to a frameless discovery label", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={withSections([{ id: "d-none", type: "discovery", visible: true, content: { title: "", axis: "brand", display: "tiles", layout: "image-cards", textPosition: "overlay" } }])}
+        locale="en"
+        viewport="desktop"
+        homeSectionDiscovery={{ "d-none": { axis: "brand", name: "", nameEn: null, visual: { defaults: { content: "none" } }, options: [{ value: "b1", name: "Brand", nameEn: null, count: 1, visual: null }] } }}
+        homeSectionDiscoveryState={{ "d-none": "ready" }}
+        onSelectSection={() => {}}
+      />,
+    );
+    const content = container.querySelector('[data-home-data-section="discovery"] [data-facet-content="none"]');
+    expect(content).not.toBeNull();
+    expect(content?.querySelector("span:last-child")?.textContent).toBe("Brand");
+  });
+
+  it("keeps text-list columns and the published desktop carousel row rule", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={withSections([{ id: "d-1", type: "discovery", visible: true, content: { title: "", axis: "brand", display: "tiles", layout: "text-list", columns: { desktop: 7 } } }])}
+        locale="en"
+        viewport="desktop"
+        homeSectionDiscovery={{ "d-1": { axis: "brand", name: "", nameEn: null, visual: null, options: [{ value: "b1", name: "Brand", nameEn: null, count: 1, visual: null }] } }}
+        homeSectionDiscoveryState={{ "d-1": "ready" }}
+        onSelectSection={() => {}}
+      />,
+    );
+    expect(container.querySelector('[data-discovery-layout="text-list"]')?.className).toContain("grid-cols-7");
+  });
+
+  it("formats advanced discovery counts with the preview locale", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={withSections([{ id: "d-1", type: "discovery", visible: true, content: { title: "", axis: "brand", display: "tiles", layout: "image-grid", showCounts: true } }])}
+        locale="en"
+        viewport="desktop"
+        homeSectionDiscovery={{ "d-1": { axis: "brand", name: "", nameEn: null, visual: null, options: [{ value: "b1", name: "Brand", nameEn: null, count: 12345, visual: null }] } }}
+        homeSectionDiscoveryState={{ "d-1": "ready" }}
+        onSelectSection={() => {}}
+      />,
+    );
+    expect(container.querySelector('[data-home-data-section="discovery"]')?.textContent).toContain("12,345");
+  });
+
+  it("renders one discovery state and preserves legacy presentation controls", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={withSections([{ id: "d-1", type: "discovery", visible: true, content: { title: "", axis: "brand", display: "tiles", showCounts: true, columns: { desktop: 8 }, gap: "loose" } }])}
+        locale="en"
+        viewport="desktop"
+        homeSectionDiscovery={{ "d-1": { axis: "brand", name: "", nameEn: null, visual: null, options: [{ value: "b1", name: "Brand", nameEn: null, count: 5, visual: null }] } }}
+        homeSectionDiscoveryState={{ "d-1": "ready" }}
+        onSelectSection={() => {}}
+      />,
+    );
+    const region = container.querySelector('[data-home-data-section="discovery"]');
+    expect(region?.querySelectorAll("ul")).toHaveLength(1);
+    expect(region?.querySelector("[data-discovery-layout]")).toBeNull();
+    expect(region?.querySelector("[data-discovery-show-counts]")).toBeNull();
+    expect(region?.querySelector("li")?.textContent).toBe("Brand");
+  });
+
+  it("uses the four-column Market grid default when grid is explicit", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={{ ...withSections([{ id: "shelf-1", type: "productShelf", visible: true, content: { title: "", deliverToday: false, limit: 2 }, design: { layout: "grid" } }]), themePreset: "awj-market" }}
+        locale="en"
+        viewport="desktop"
+        homeSectionProducts={{ "shelf-1": [{ id: "p1", name: "Rose", thumbnailUrl: null, priceAmountMinor: 2500, currency: "SAR", inStock: true }] }}
+        homeSectionProductsState={{ "shelf-1": "ready" }}
+        onSelectSection={() => {}}
+      />,
+    );
+    expect(container.querySelector('[data-shelf-layout="grid"]')?.className).toContain("grid-cols-4");
+  });
+
+  it("applies Market rail sizing when the shelf design is implicit", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={{ ...withSections([{ id: "shelf-1", type: "productShelf", visible: true, content: { title: "", deliverToday: false, limit: 2 } }]), themePreset: "awj-market" }}
+        locale="en"
+        viewport="desktop"
+        homeSectionProducts={{ "shelf-1": [{ id: "p1", name: "Rose", thumbnailUrl: null, priceAmountMinor: 2500, currency: "SAR", inStock: true }] }}
+        homeSectionProductsState={{ "shelf-1": "ready" }}
+        onSelectSection={() => {}}
+      />,
+    );
+    const list = container.querySelector('[data-shelf-layout="rail"]');
+    expect(list?.getAttribute("data-shelf")).toBe("rail");
+    expect(list?.getAttribute("data-vp")).toBe("desktop");
   });
 });

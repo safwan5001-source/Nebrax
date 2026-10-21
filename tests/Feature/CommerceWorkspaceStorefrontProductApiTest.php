@@ -3,7 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\CommerceCategoryListing;
+use App\Models\CommerceCollection;
+use App\Models\CommerceCollectionProduct;
 use App\Models\CommerceListing;
+use App\Models\PriceList;
+use App\Models\PriceListItem;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\SalesChannel;
@@ -13,6 +17,7 @@ use App\Support\BranchSettings;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
@@ -36,6 +41,11 @@ class CommerceWorkspaceStorefrontProductApiTest extends TestCase
     private function itemPath(string $id, string $productId): string
     {
         return $this->listPath($id).'/'.$productId;
+    }
+
+    private function sectionPath(string $id): string
+    {
+        return '/api/commerce/workspace/storefronts/'.$id.'/section-data';
     }
 
     /** @return array{channel: SalesChannel, storefront: Storefront} */
@@ -155,6 +165,115 @@ class CommerceWorkspaceStorefrontProductApiTest extends TestCase
             ->getJson($this->itemPath($seeded['storefront']->id, $product->id))
             ->assertOk()
             ->assertJsonPath('data.id', $product->id);
+    }
+
+    /** @test */
+    public function section_data_uses_the_owned_storefront_channel_and_collection_order(): void
+    {
+        $auth = $this->registerTenant('section-shelf', 'owner@section-shelf.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $first = $this->seedProduct($seeded['channel'], ['name' => 'أول رف']);
+        $second = $this->seedProduct($seeded['channel'], ['name' => 'ثاني رف']);
+        $hidden = $this->seedProduct($seeded['channel'], ['name' => 'غير منشور'], published: false);
+        $collection = CommerceCollection::create([
+            'slug' => 'section-collection',
+            'title' => 'Section collection',
+            'status' => CommerceCollection::STATUS_ACTIVE,
+        ]);
+        CommerceCollectionProduct::create(['commerce_collection_id' => $collection->id, 'product_id' => $second->id, 'position' => 0]);
+        CommerceCollectionProduct::create(['commerce_collection_id' => $collection->id, 'product_id' => $first->id, 'position' => 1]);
+        app(TenantContext::class)->forget();
+
+        $response = $this->withToken($auth['token'])
+            ->getJson($this->sectionPath($seeded['storefront']->id).'?section=product_shelf&source_kind=collection&source_slug=section-collection&limit=2')
+            ->assertOk();
+
+        $this->assertSame([$second->id, $first->id], array_column($response->json('data'), 'id'));
+        $this->assertNotContains($hidden->id, array_column($response->json('data'), 'id'));
+        $this->assertArrayNotHasKey('avg_cost', $response->json('data.0'));
+    }
+
+    /** @test */
+    public function section_data_rejects_a_foreign_storefront_without_disclosing_it(): void
+    {
+        $a = $this->registerTenant('section-foreign-a', 'owner@section-foreign-a.test');
+        $b = $this->registerTenant('section-foreign-b', 'owner@section-foreign-b.test');
+        $foreign = $this->seedWebStorefront($b['tenant_id']);
+
+        $this->withToken($a['token'])
+            ->getJson($this->sectionPath($foreign['storefront']->id).'?section=delivery_promise')
+            ->assertNotFound();
+    }
+
+    /** @test */
+    public function include_meta_keeps_the_ordered_workspace_list_query_groupable(): void
+    {
+        $auth = $this->registerTenant('workspace-meta-order', 'owner@workspace-meta-order.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->seedProduct($seeded['channel'], ['name' => 'Meta product']);
+        app(TenantContext::class)->forget();
+
+        $response = $this->withToken($auth['token'])
+            ->getJson($this->listPath($seeded['storefront']->id).'?include_meta=true')
+            ->assertOk();
+
+        $this->assertIsArray($response->json('meta.facets'));
+        $this->assertIsArray($response->json('meta.brands'));
+    }
+
+    /** @test */
+    public function an_unfiltered_workspace_list_does_not_load_facet_definitions(): void
+    {
+        $auth = $this->registerTenant('workspace-no-facet-load', 'owner@workspace-no-facet-load.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->seedProduct($seeded['channel']);
+        app(TenantContext::class)->forget();
+
+        $queries = [];
+        DB::listen(static function ($query) use (&$queries): void {
+            $queries[] = strtolower($query->sql);
+        });
+
+        $this->withToken($auth['token'])
+            ->getJson($this->listPath($seeded['storefront']->id))
+            ->assertOk();
+
+        $facetQueries = array_filter($queries, static fn (string $sql): bool => str_contains($sql, 'commerce_facets'));
+        $this->assertSame([], array_values($facetQueries));
+    }
+
+    /** @test */
+    public function list_prices_match_the_published_storefront_source_when_a_channel_price_list_exists(): void
+    {
+        $auth = $this->registerTenant('workspace-channel-price', 'owner@workspace-channel-price.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $product = $this->seedProduct($seeded['channel'], ['sale_price' => 10000]);
+        $priceList = PriceList::create(['name' => 'Preview channel prices', 'is_active' => true]);
+        PriceListItem::create([
+            'price_list_id' => $priceList->id,
+            'product_id' => $product->id,
+            'unit_name' => $product->unit,
+            'price' => 7500,
+        ]);
+        $seeded['channel']->update(['default_price_list_id' => $priceList->id]);
+        app(TenantContext::class)->forget();
+
+        $this->withToken($auth['token'])
+            ->getJson($this->listPath($seeded['storefront']->id))
+            ->assertOk()
+            // The published shelf uses /store/v1, whose list contract is the
+            // product's public sale_price. Keep the editor on that same source
+            // rather than previewing the different /commerce/v1 resolver.
+            ->assertJsonPath('data.0.price.amount_minor', 10000)
+            ->assertJsonPath('data.0.price.currency', 'SAR');
     }
 
     // ───────────────────────── 2/3. Foreign storefront/product → 404 ─────────────────────────

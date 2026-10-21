@@ -160,6 +160,13 @@ final class CatalogFacetFilter
             $products->where('products.brand_id', $selection['brand_id']);
         }
 
+        // Unfiltered catalog reads do not need to load every active facet and
+        // its values. Keep ordinary workspace/product requests bounded while
+        // preserving selected-facet paths used by metadata counts.
+        if ($selection['facets'] === []) {
+            return;
+        }
+
         $active = $this->activeFacets();
         foreach ($selection['facets'] as $key => $slugs) {
             if ($key === $exceptFacetKey) {

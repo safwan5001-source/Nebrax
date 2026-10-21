@@ -52,10 +52,8 @@ import {
 } from "./discovery-preview-model";
 import type { CustomizerLocale, CustomizerMessageKey } from "./messages";
 import { resolveDiscoveryDisplay } from "./presentation/discovery-templates";
-import {
-  type ResolvedFacetVisual,
-  resolveFacetValueVisual,
-} from "./presentation/facet-visual";
+import { type ResolvedFacetVisual, resolveFacetValueVisual } from "./presentation/facet-visual";
+import { facetLabelHidden } from "./discovery-label-visibility";
 import { FACET_VISUAL_SIZE_PX } from "./presentation/facet-visual-style";
 import type { DiscoveryContent, DiscoveryGap } from "./presentation/section-content";
 import "./store-preview.css";
@@ -231,7 +229,7 @@ function PreviewItem({
         ? cn(BESIDE, labelFirst && "flex-row-reverse")
         : cn("w-full min-w-0", labelFirst && "flex-col-reverse");
   // A count belongs to a visible caption (VD-4b).
-  const countVisible = display.showCounts && visual.showLabel;
+  const countVisible = display.showCounts && !facetLabelHidden(visual, picture);
 
   return (
     <li data-preview-item="" className={cn("min-w-0", layout === "carousel" && "snap-start")}>

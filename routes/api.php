@@ -1186,6 +1186,13 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('commerce/workspace/storefronts/{id}/products', [CommerceWorkspaceStorefrontProductController::class, 'index'])
             ->whereUuid('id')
             ->middleware($perm('commerce.manage'));
+        // FLOWERS-H9c / ADR-21: bounded, read-only data for the editor's
+        // product shelf, discovery, and delivery-promise previews. The
+        // controller derives the sales channel from this tenant-owned
+        // storefront; no tenant/channel selector is accepted from the client.
+        Route::get('commerce/workspace/storefronts/{id}/section-data', [CommerceWorkspaceStorefrontProductController::class, 'sectionData'])
+            ->whereUuid('id')
+            ->middleware($perm('commerce.manage'));
         Route::get('commerce/workspace/storefronts/{id}/products/{product}', [CommerceWorkspaceStorefrontProductController::class, 'show'])
             ->whereUuid('id')->whereUuid('product')
             ->middleware($perm('commerce.manage'));
