@@ -164,6 +164,21 @@ Re-run the G0 export and compare: every pre-existing row must be identical.
 
 Rollback becomes prohibited at the first committed row in `zatca_chain_entries`, which is the first invoice posted by a REM-18b-2 instance.
 
+## 8b. F1 integrity review follow-up (tests only; no production logic changed)
+
+Owner review asked what happens when an already-issued invoice has only `zatca_hash` or only `zatca_xml` modified. Behaviour is now pinned by `ZatcaChainIssuedInvoiceIntegrityTest` (SQLite and PostgreSQL).
+
+| Case | Database | Next issuance | Submission path |
+|---|---|---|---|
+| **A: `zatca_hash` only** (well-formed, wrong value; ICV, UUID, previous hash and XML unchanged) | **Permitted** (F1 freezes chain identity only, by decision §1). The chain entry stays unchanged. | **Succeeds**, ICV +1. PIH is the immutable entry hash, equal to the hash of the stored XML; the modified column is never read. | **Not detected locally.** The transport only checks that the hash is Base64 of 32 bytes, so the wrong hash is sent with the untouched XML (`known_gap_a_*`). ZATCA would reject the mismatch remotely. Q7 (§8.5) finds the divergence offline. |
+| **B: `zatca_xml` only** (semantic change, hash unchanged) | Permitted (as today). | **Fails closed** ("XML … لا يطابق الهاش"). No ICV consumed: head, entries, journal entries and the draft are byte-identical afterwards, and restoring the XML lets the same ICV 2 issue. | Detected **only if** the change happens after the attempt was registered (`request_hash` of the XML, fails before any network call). A change **before** registration is accepted as the snapshot and sent with the original hash (`known_gap_b_*`). |
+| B′: tampering with an **older** document | Permitted. | Not detected: only the immediate predecessor is verified. | n/a. An offline walk (entry hash against the hash of each stored XML) finds it. |
+| Legitimate `zatca_cleared_xml` write by the dispatcher | Permitted; chain identity and entry unchanged (test). | n/a | Unchanged. |
+
+**Assessment.** The chain itself is safe to merge: a tampered predecessor can never be chained over silently, and the PIH never depends on the mutable column. The gaps above were not introduced by this PR; before it, no code compared stored XML with any recorded hash, so the PR only adds detection. They matter before ZATCA transmission is enabled (dispatch is disabled by default and nothing is sent here). **Proposed hardening, separate slice, needs owner decision because it touches the F1 design or submission checks:** (1) before registering an attempt and in `assertSnapshot`, require `hash(zatca_xml) == chain entry hash` and `zatca_hash == entry hash` for invoices that have an entry (legacy invoices keep today's checks, since their raw hash may legitimately differ); (2) optionally freeze `zatca_xml`/`zatca_hash` in the database for invoices with an entry, which requires reworking the tamper-detection fixtures (TaxN01, dispatcher tests) that rely on writing those columns.
+
+**Test hygiene.** `AssertionFailedError` extends `RuntimeException`, so `try { …; $this->fail() } catch (RuntimeException)` passes silently when nothing else is asserted. New trait `CapturesThrowable::thrown()` keeps `fail()` outside any catch and rethrows assertion failures. Applied to the ZATCA test files in this PR and to the silent ones in the same area (`ZatcaSignedInvoicePostingTest` ×4, `ZatcaChainSchemaTest`, `ZatcaPartyXmlTest` ×3, `ZatcaMonetaryXmlTest`, `ZatcaXadesSignatureAssemblerTest`, the allocator helper). A repo-wide scan (try body containing `fail()` or an assertion, catch of a broad exception class) still finds roughly 200 such blocks in unrelated modules; those that also assert on the caught message fail noisily, those with an empty or counter-only catch can pass silently. They are outside this PR and are listed here as a follow-up candidate (a static guard test).
+
 ## 9. Recommended next step
 
 Review this Draft PR. Then answer O-R2 and O-R4 (activation storage, emergency semantics for notes) and O-2…O-6, and start **REM-18b-3**: credit-note issuance through the same allocator, F2a/F2b, activation row off by default.

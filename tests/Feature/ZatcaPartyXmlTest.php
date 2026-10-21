@@ -35,6 +35,7 @@ use Tests\TestCase;
  */
 class ZatcaPartyXmlTest extends TestCase
 {
+    use CapturesThrowable;
     use RefreshDatabase;
     use InteractsWithApi;
 
@@ -324,12 +325,7 @@ class ZatcaPartyXmlTest extends TestCase
             [['description' => 'خدمة', 'quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]],
         );
 
-        try {
-            $service->post($draft);
-            $this->fail('كان يجب أن يفشل الترحيل مغلقاً — لا تنظيف صامت للبيانات.');
-        } catch (\Throwable) {
-            // المتوقَّع
-        }
+        $this->thrown(fn () => $service->post($draft), 'كان يجب أن يفشل الترحيل مغلقاً — لا تنظيف صامت للبيانات.', \Throwable::class);
 
         $fresh = $draft->fresh();
         $this->assertSame('draft', $fresh->status);
@@ -404,18 +400,9 @@ class ZatcaPartyXmlTest extends TestCase
 
         foreach ($malformed as $label => $snapshot) {
             $draft->setAttribute('party_snapshot', $snapshot);
-            try {
-                $service->buildFor($draft);
-                $this->fail("كان يجب الفشل المغلق: {$label}");
-            } catch (RuntimeException $e) {
-                $this->assertStringContainsString('لقطة', $e->getMessage(), $label);
-            }
-            try {
-                $service->qrFor($draft);
-                $this->fail("qrFor كان يجب أن يفشل مغلقاً: {$label}");
-            } catch (RuntimeException) {
-                $this->addToAssertionCount(1);
-            }
+            $e = $this->thrown(fn () => $service->buildFor($draft), "كان يجب الفشل المغلق: {$label}");
+            $this->assertStringContainsString('لقطة', $e->getMessage(), $label);
+            $this->thrown(fn () => $service->qrFor($draft), "qrFor كان يجب أن يفشل مغلقاً: {$label}");
         }
 
         $this->assertSame(0, Invoice::whereNotNull('zatca_icv')->count(), 'لا ICV استُهلك');
@@ -450,12 +437,7 @@ class ZatcaPartyXmlTest extends TestCase
         $invoice = $this->issue($this->partner());
         $before = $invoice->only(['zatca_xml', 'zatca_qr', 'zatca_hash', 'zatca_icv', 'party_snapshot', 'issued_at']);
 
-        try {
-            app(InvoiceService::class)->post($invoice);
-            $this->fail('الترحيل المزدوج يجب أن يُرفض.');
-        } catch (RuntimeException) {
-            $this->addToAssertionCount(1);
-        }
+        $this->thrown(fn () => app(InvoiceService::class)->post($invoice), 'الترحيل المزدوج يجب أن يُرفض.');
 
         $this->assertEquals($before, $invoice->fresh()->only(array_keys($before)));
         $this->assertSame(1, JournalEntry::where('source_type', Invoice::class)->where('source_id', $invoice->id)->count());

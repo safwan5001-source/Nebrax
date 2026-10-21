@@ -28,6 +28,7 @@ use Tests\TestCase;
  */
 class ZatcaChainSchemaTest extends TestCase
 {
+    use CapturesThrowable;
     use RefreshDatabase;
 
     private const CHAINS_MIGRATION = '2026_11_18_010000_create_zatca_chain_tables.php';
@@ -678,12 +679,8 @@ class ZatcaChainSchemaTest extends TestCase
 
     private function assertRollbackRefused(callable $rollback, string $label): void
     {
-        try {
-            $rollback();
-            $this->fail("rollback must be refused: {$label}");
-        } catch (RuntimeException $e) {
-            $this->assertStringContainsString('Rollback refused', $e->getMessage(), $label);
-        }
+        $e = $this->thrown($rollback, "rollback must be refused: {$label}");
+        $this->assertStringContainsString('Rollback refused', $e->getMessage(), $label);
     }
 
     private function tenant(): string

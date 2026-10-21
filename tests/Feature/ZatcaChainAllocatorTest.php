@@ -32,6 +32,7 @@ use Tests\TestCase;
  */
 class ZatcaChainAllocatorTest extends TestCase
 {
+    use CapturesThrowable;
     use RefreshDatabase;
 
     private Tenant $tenant;
@@ -446,20 +447,9 @@ class ZatcaChainAllocatorTest extends TestCase
         return $row['id'];
     }
 
-    /** يتوقّع RuntimeException حقيقياً — لا `fail()` (AssertionFailedError نفسه RuntimeException في PHPUnit). */
     private function runtimeFailure(callable $operation, string $label): RuntimeException
     {
-        try {
-            $operation();
-        } catch (RuntimeException $e) {
-            if ($e instanceof \PHPUnit\Framework\AssertionFailedError) {
-                throw $e;
-            }
-
-            return $e;
-        }
-
-        $this->fail("expected a RuntimeException: {$label}");
+        return $this->thrown($operation, "expected a RuntimeException: {$label}");
     }
 
     private function rejects(callable $operation, string $label = ''): void

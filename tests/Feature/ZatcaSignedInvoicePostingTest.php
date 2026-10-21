@@ -20,6 +20,7 @@ use Tests\TestCase;
 
 class ZatcaSignedInvoicePostingTest extends TestCase
 {
+    use CapturesThrowable;
     use RefreshDatabase;
 
     private Tenant $tenant;
@@ -72,12 +73,8 @@ class ZatcaSignedInvoicePostingTest extends TestCase
         config()->set('zatca.signature_policy.digest', base64_encode(hash('sha256', 'pinned-policy', true)));
         $invoice = $this->draft();
 
-        try {
-            app(InvoiceService::class)->post($invoice);
-            $this->fail('كان يجب رفض الإصدار غير الموقّع بعد بدء تهيئة ZATCA.');
-        } catch (RuntimeException $exception) {
-            $this->assertStringContainsString('developer', $exception->getMessage());
-        }
+        $exception = $this->thrown(fn () => app(InvoiceService::class)->post($invoice), 'كان يجب رفض الإصدار غير الموقّع بعد بدء تهيئة ZATCA.');
+        $this->assertStringContainsString('developer', $exception->getMessage());
 
         $invoice = $invoice->fresh();
         $this->assertSame('draft', $invoice->status);
@@ -95,12 +92,8 @@ class ZatcaSignedInvoicePostingTest extends TestCase
         config()->set('zatca.signature_policy.digest', null);
         $invoice = $this->draft();
 
-        try {
-            app(InvoiceService::class)->post($invoice);
-            $this->fail('كان يجب رفض الإصدار عند غياب سياسة توقيع ZATCA.');
-        } catch (RuntimeException $exception) {
-            $this->assertStringContainsString('سياسة توقيع ZATCA', $exception->getMessage());
-        }
+        $exception = $this->thrown(fn () => app(InvoiceService::class)->post($invoice), 'كان يجب رفض الإصدار عند غياب سياسة توقيع ZATCA.');
+        $this->assertStringContainsString('سياسة توقيع ZATCA', $exception->getMessage());
 
         $this->assertSame('draft', $invoice->fresh()->status);
         $this->assertSame(0, JournalEntry::where('source_type', Invoice::class)
@@ -257,12 +250,7 @@ class ZatcaSignedInvoicePostingTest extends TestCase
         $posted = app(InvoiceService::class)->post($this->draft());
         $before = (array) DB::table('invoices')->where('id', $posted->id)->first();
 
-        try {
-            app(InvoiceService::class)->post($posted);
-            $this->fail('كان يجب رفض إعادة ترحيل فاتورة مرحَّلة.');
-        } catch (RuntimeException) {
-            $this->addToAssertionCount(1);
-        }
+        $this->thrown(fn () => app(InvoiceService::class)->post($posted), 'كان يجب رفض إعادة ترحيل فاتورة مرحَّلة.');
 
         $this->assertSame($before, (array) DB::table('invoices')->where('id', $posted->id)->first());
         $this->assertSame(1, Invoice::whereNotNull('zatca_hash')->count());
@@ -274,12 +262,8 @@ class ZatcaSignedInvoicePostingTest extends TestCase
         $this->tenant->forceFill(['name' => str_repeat('س', 130)])->save(); // 260 بايت UTF-8
         $invoice = $this->draft();
 
-        try {
-            app(InvoiceService::class)->post($invoice);
-            $this->fail('كان يجب رفض اسم بائع يتجاوز حدّ طول TLV.');
-        } catch (RuntimeException $exception) {
-            $this->assertStringContainsString('255', $exception->getMessage());
-        }
+        $exception = $this->thrown(fn () => app(InvoiceService::class)->post($invoice), 'كان يجب رفض اسم بائع يتجاوز حدّ طول TLV.');
+        $this->assertStringContainsString('255', $exception->getMessage());
 
         $this->assertSame('draft', $invoice->fresh()->status);
         $this->assertNull($invoice->fresh()->zatca_icv);

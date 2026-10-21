@@ -485,6 +485,9 @@ php artisan serve
   (icv/uuid/previous_hash/hash)، فيُرفض الكاتب القديم `max+1` (نسخة سابقة أثناء النشر أو سكربت) فشلاً مغلقاً؛ (B) فاتورة لها مدخل لا تتغيّر
   `zatca_icv`/`zatca_uuid`/`zatca_previous_hash`. **لا يجمّد** `zatca_xml`/`zatca_hash`/`zatca_qr`/`zatca_cleared_xml` (كاليوم) — سلامة PIH من مقارنة
   الهاش بالمدخل. لا علم ولا مسار تجاوز.
+  **ثغرات موثَّقة باختبارات `ZatcaChainIssuedInvoiceIntegrityTest`:** تعديل `zatca_hash` وحده مسموح ولا يكشفه الإرسال محلياً (يكشفه استعلام Q7 قرائياً)،
+  وتعديل XML قبل تسجيل محاولة الإرسال يُقبل لقطةً؛ أما الإصدار اللاحق فيفشل مغلقاً دون استهلاك ICV إن تغيّر XML المستند السابق. التصليب مقترح منفصل (التقرير §8b).
+  اختبارات «يجب أن يرمي» تستعمل `CapturesThrowable::thrown()` لا `try{fail()}catch(RuntimeException)` (يبتلع AssertionFailedError).
 - **التراجع** يرفض متى وُجد أي مدخل: بعد أول فاتورة عبر المخصِّص يُمنع الرجوع إلى كود ما قبل REM-18b-2 (إصلاح إلى الأمام فقط).
 - **خارج النطاق:** إصدار الإشعار الدائن وF2 (REM-18b-3)، 383، نطاق الفرع/EGS (REM-25)، الإرسال (يبقى معطّلاً). اختبارات التزامن على
   PostgreSQL **تفشل ولا تتخطّى** إن غاب pcntl. المرجع وخطة النشر/التراجع: `docs/audits/horizon/REM-18b-2-IMPLEMENTATION-REPORT.md`.
