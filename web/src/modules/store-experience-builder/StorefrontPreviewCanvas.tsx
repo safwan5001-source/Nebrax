@@ -1780,7 +1780,11 @@ export function StorefrontPreviewCanvas({
                 const shelf = productShelfContentOf(section);
                 const products = homeSectionProducts[section.id] ?? [];
                 const shelfRail = (section.design?.layout ?? (isMarket ? "rail" : "grid")) === "rail";
-                const shelfDesign = section.design ?? (isMarket ? { layout: "rail" as const } : undefined);
+                const shelfDesign = section.design
+                  ? shelfRail && section.design.layout === undefined
+                    ? { ...section.design, layout: "rail" as const }
+                    : section.design
+                  : (isMarket ? { layout: "rail" as const } : undefined);
                 const shelfGridColumns = isMarket && section.design?.layout === "grid" && section.design.columns === undefined
                   ? viewport === "mobile" ? "grid-cols-2" : viewport === "tablet" ? "grid-cols-3" : "grid-cols-4"
                   : newArrivalsColumns;

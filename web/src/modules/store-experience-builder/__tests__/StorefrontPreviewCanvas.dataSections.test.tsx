@@ -224,6 +224,22 @@ describe("Canvas — data-backed sections (ADR-21)", () => {
     expect(container.querySelector('[data-shelf-layout="rail"]')).not.toBeNull();
   });
 
+  it("keeps an AWJ Market rail when only explicit columns are authored", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={{ ...withSections([{ id: "shelf-1", type: "productShelf", visible: true, design: { columns: 3 }, content: { title: "", deliverToday: false, limit: 2 } }]), themePreset: "awj-market" }}
+        locale="en"
+        viewport="desktop"
+        homeSectionProducts={{ "shelf-1": [{ id: "p1", name: "Rose", thumbnailUrl: null, priceAmountMinor: 2500, currency: "SAR", inStock: true }] }}
+        homeSectionProductsState={{ "shelf-1": "ready" }}
+        onSelectSection={() => {}}
+      />,
+    );
+    const list = container.querySelector('[data-home-data-section="productShelf"] [data-shelf-layout]');
+    expect(list?.getAttribute("data-shelf")).toBe("rail");
+    expect(list?.getAttribute("data-cols")).toBe("3");
+  });
+
   it("applies the published discovery display controls to live values", () => {
     const { container } = render(
       <StorefrontPreviewCanvas
@@ -244,6 +260,22 @@ describe("Canvas — data-backed sections (ADR-21)", () => {
     expect(list?.getAttribute("data-discovery-align")).toBe("start");
     expect((list as HTMLElement | null)?.style.getPropertyValue("--disc-rows")).toBe("2");
     expect((list as HTMLElement | null)?.style.getPropertyValue("--disc-item")).toBe("104px");
+  });
+
+  it("does not apply overlay positioning to a frameless discovery label", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={withSections([{ id: "d-none", type: "discovery", visible: true, content: { title: "", axis: "brand", display: "tiles", layout: "image-cards", textPosition: "overlay" } }])}
+        locale="en"
+        viewport="desktop"
+        homeSectionDiscovery={{ "d-none": { axis: "brand", name: "", nameEn: null, visual: { defaults: { content: "none" } }, options: [{ value: "b1", name: "Brand", nameEn: null, count: 1, visual: null }] } }}
+        homeSectionDiscoveryState={{ "d-none": "ready" }}
+        onSelectSection={() => {}}
+      />,
+    );
+    const content = container.querySelector('[data-home-data-section="discovery"] [data-facet-content="none"]');
+    expect(content).not.toBeNull();
+    expect(content?.querySelector("span:last-child")?.textContent).toBe("Brand");
   });
 
   it("keeps text-list columns and the published desktop carousel row rule", () => {
