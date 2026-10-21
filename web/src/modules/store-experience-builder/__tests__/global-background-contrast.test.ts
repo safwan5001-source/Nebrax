@@ -10,6 +10,7 @@ import {
   globalBackgroundPaint,
   globalBackgroundVerdict,
   globalForegrounds,
+  suggestLightOverlay,
 } from "../presentation/global-background-contrast";
 import { STOREFRONT_BACKGROUND_DIRECTIONS, type StorefrontBackground } from "../presentation/storefront-background";
 
@@ -149,5 +150,33 @@ describe("global background contrast — picture (P3-A-06 Checkpoint B)", () => 
     expect(globalBackgroundVerdict(config({ background: picture(), backgroundColor: "#111827" }), light)).toMatchObject({
       status: "insufficient",
     });
+  });
+});
+
+describe("global background contrast — light-overlay suggestion (P3-A-06)", () => {
+  const picture = (extra: object = {}): StorefrontBackground =>
+    ({ kind: "media", media: { mediaId: "0b9d6a3e-1f5c-4a8e-9a47-2c1d3e4f5a6b", decorative: true }, ...extra }) as StorefrontBackground;
+  const bounds = (min: [number, number, number], max: [number, number, number]) => () => ({ min, max });
+
+  it("returns the weakest approved strength that makes the picture ready, and that strength really is ready", () => {
+    const mid = bounds([150, 150, 150], [230, 230, 230]);
+    const alpha = suggestLightOverlay(config({ background: picture() }), mid);
+    expect(alpha).not.toBeNull();
+    const withOverlay = (a: number) => config({ background: picture({ overlay: { color: { role: "surface" }, alpha: a } }) });
+    expect(globalBackgroundVerdict(withOverlay(alpha!), mid).status).toBe("ready");
+    // minimal: the next weaker approved step is not enough
+    if (alpha! > 5) expect(globalBackgroundVerdict(withOverlay(alpha! - 5), mid).status).toBe("insufficient");
+  });
+
+  it("is already ready ⇒ the weakest step (5); a pitch-black picture ⇒ null; not a picture ⇒ null", () => {
+    expect(suggestLightOverlay(config({ background: picture() }), bounds([252, 252, 252], [255, 255, 255]))).toBe(5);
+    expect(suggestLightOverlay(config({ background: picture() }), bounds([0, 0, 0], [40, 40, 40]))).toBeNull();
+    expect(suggestLightOverlay(config({ background: SAFE }), bounds([255, 255, 255], [255, 255, 255]))).toBeNull();
+    expect(suggestLightOverlay(config(), bounds([255, 255, 255], [255, 255, 255]))).toBeNull();
+  });
+
+  it("cannot rescue a dark fallback colour: the suggestion is null when the fallback itself fails", () => {
+    const light = bounds([250, 250, 250], [255, 255, 255]);
+    expect(suggestLightOverlay(config({ background: picture(), backgroundColor: "#111827" }), light)).toBeNull();
   });
 });

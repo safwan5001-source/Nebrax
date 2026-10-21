@@ -47,6 +47,8 @@ final class GlobalBackgroundContrast
 
     public const CODE_MEDIA_UNPROVEN = 'global_media_contrast_unproven';
 
+    public const CODE_MEDIA_ANIMATED = 'global_media_animated_unsupported';
+
     public const CODE_SECTION_TEXT = 'global_background_text_contrast_insufficient';
 
     /**
@@ -128,10 +130,26 @@ final class GlobalBackgroundContrast
 
     /**
      * @param  array<string,mixed>  $normalized
+     * @param  \Closure|null  $media  `MediaRef` ⇒ worst-case channel bounds, or null (= unproven)
+     * @param  \Closure|null  $animated  `MediaRef` ⇒ whether the asset is animated (tenant-scoped lookup by the caller)
      * @return array<string, array{code: string, message: string}> path ⇒ error
      */
-    public static function errors(array $normalized, ?\Closure $media = null): array
+    public static function errors(array $normalized, ?\Closure $media = null, ?\Closure $animated = null): array
     {
+        $background = $normalized['background'] ?? null;
+        if (is_array($background) && ($background['kind'] ?? null) === 'media' && $animated !== null) {
+            foreach ([$background['media'] ?? null, $background['mobile'] ?? null] as $ref) {
+                if (is_array($ref) && $animated($ref) === true) {
+                    // The global layer shows a still only, and an animation's later frames have no pixel evidence
+                    // (full range): there is nothing to prove, so say so plainly instead of "overlay too weak".
+                    return ['background' => [
+                        'code' => self::CODE_MEDIA_ANIMATED,
+                        'message' => 'الصور المتحركة لا تُستخدم كخلفية عامة للمتجر؛ اختر صورة ثابتة.',
+                    ]];
+                }
+            }
+        }
+
         $paint = self::paint($normalized, $media);
         if ($paint['kind'] === null) {
             return [];

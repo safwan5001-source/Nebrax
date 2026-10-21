@@ -19,6 +19,8 @@ import { Field, Segmented, btnClass, inputClass, selectClass } from "./ControlPa
 import { ColourField } from "./design/ColourField";
 import { DIRECTION_LABEL } from "./design/DesignInspector";
 import { MediaRefField } from "./media/MediaRefField";
+import { useAnyAnimated } from "./media/use-animated-refs";
+import { useBackgroundMediaBounds } from "./media/use-background-media-bounds";
 import { FOCAL_SNAPS } from "./media/framing";
 import type { CustomizerMessageKey } from "./messages";
 import {
@@ -39,6 +41,7 @@ import {
   type GlobalBackgroundVerdict,
   type GlobalForegroundRole,
   globalBackgroundVerdict,
+  suggestLightOverlay,
 } from "./presentation/global-background-contrast";
 import type { MediaRef } from "./presentation/media-ref";
 import { DIRECTIONS, OVERLAY_ALPHAS, type MediaOverlay } from "./presentation/section-design";
@@ -87,6 +90,70 @@ function PublishReadiness({
           {t("storeBackgroundFailsFor")} {failing.join(" · ")}
         </p>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * The picture's predicted publish readiness. «Ready» only once the pixel evidence of every picture is in and the policy proves
+ * it; while evidence is still being read it says so (never ready by default); an animated asset is named as such.
+ */
+function ImageReadiness({
+  config,
+  refs,
+  bounds,
+  animated,
+  onApplyOverlay,
+  t,
+}: {
+  config: Config;
+  refs: MediaRef[];
+  bounds: ReturnType<typeof useBackgroundMediaBounds>;
+  animated: boolean;
+  onApplyOverlay: (alpha: (typeof OVERLAY_ALPHAS)[number]) => void;
+  t: T;
+}) {
+  if (animated) {
+    return (
+      <p role="note" data-global-bg-readiness="blocked" data-global-bg-reason="animated" className={DRAFT_ONLY_NOTE_CLASS}>
+        {t("storeBackgroundImageAnimated")}
+      </p>
+    );
+  }
+  if (refs.some((ref) => bounds.stateOf(ref) === "loading")) {
+    return (
+      <p role="status" data-global-bg-readiness="checking" className="text-[12px] leading-5 text-muted">
+        {t("storeBackgroundImageChecking")}
+      </p>
+    );
+  }
+  const verdict = globalBackgroundVerdict(config, bounds.lookup);
+  if (verdict.status === "ready") return <PublishReadiness verdict={verdict} blockedKey="storeBackgroundImageInsufficient" t={t} />;
+  if (verdict.status === "unproven" || verdict.status === "unresolved") {
+    return (
+      <p role="note" data-global-bg-readiness="blocked" data-global-bg-reason="unproven" className={DRAFT_ONLY_NOTE_CLASS}>
+        {t("storeBackgroundImageUnproven")}
+      </p>
+    );
+  }
+  const suggestion = suggestLightOverlay(config, bounds.lookup);
+  return (
+    <div className="space-y-2">
+      <PublishReadiness verdict={verdict} blockedKey="storeBackgroundImageInsufficient" t={t} />
+      {suggestion !== null ? (
+        <div className="flex flex-wrap items-center gap-2 text-[12px] leading-5 text-muted" data-global-bg-overlay-suggestion="">
+          <span>
+            {t("storeBackgroundImageSuggest")} <span dir="ltr">{suggestion}%</span>
+          </span>
+          <button type="button" className={btnClass} onClick={() => onApplyOverlay(suggestion)} data-global-bg-apply-overlay="">
+            {t("storeBackgroundImageApplyOverlay")}
+          </button>
+        </div>
+      ) : (
+        <p className="text-[12px] leading-5 text-muted" data-global-bg-overlay-suggestion="none">
+          {t("storeBackgroundImageNoOverlayFix")}
+        </p>
+      )}
     </div>
   );
 }
@@ -148,6 +215,10 @@ export function GlobalBackgroundField({
 
   const mediaBg = config.background?.kind === "media" ? config.background : null;
   const gradient = config.background?.kind === "gradient" ? config.background : null;
+  // The pictures of the global background need proven pixel bounds (the numbers the publish gate uses) — read-only.
+  const globalRefs = mediaBg ? [mediaBg.media, ...(mediaBg.mobile ? [mediaBg.mobile] : [])] : [];
+  const bounds = useBackgroundMediaBounds([], globalRefs);
+  const animated = useAnyAnimated(globalRefs);
 
   return (
     <fieldset className="min-w-0 space-y-3" data-global-background="" aria-labelledby={legendId}>
@@ -268,9 +339,16 @@ export function GlobalBackgroundField({
               {t("storeBackgroundImagePending")}
             </p>
           )}
-          <p role="note" data-global-bg-draft-only="image" className={DRAFT_ONLY_NOTE_CLASS}>
-            {t("storeBackgroundDraftOnly")}
-          </p>
+          {mediaBg ? (
+            <ImageReadiness
+              config={config}
+              refs={globalRefs}
+              bounds={bounds}
+              animated={animated}
+              onApplyOverlay={(alpha) => editMedia({ overlay: { color: { role: "surface" }, alpha } })}
+              t={t}
+            />
+          ) : null}
         </div>
       ) : null}
 

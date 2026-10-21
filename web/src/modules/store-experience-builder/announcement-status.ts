@@ -76,7 +76,7 @@ export function describePublishIssues(
   const bannerLines: string[] = [];
   const mediaLines: string[] = [];
   let backgroundBlocked = false;
-  let gradientBlocked: CustomizerMessageKey | null = null;
+  let backgroundContrastBlocked: CustomizerMessageKey | null = null;
   let sectionTextBlocked = false;
   for (const [path, code] of Object.entries(issues)) {
     if (path.startsWith("announcements")) {
@@ -103,11 +103,24 @@ export function describePublishIssues(
     }
     // P3-A-06 — the global gradient is judged by the contrast policy: each stable code has its own sentence.
     if (path === "background" && code === "global_gradient_contrast_insufficient") {
-      gradientBlocked = "storeBackgroundGradientContrastBlocked";
+      backgroundContrastBlocked = "storeBackgroundGradientContrastBlocked";
       continue;
     }
     if (path === "background" && code === "global_gradient_colour_unresolved") {
-      gradientBlocked = "storeBackgroundGradientUnresolvedBlocked";
+      backgroundContrastBlocked = "storeBackgroundGradientUnresolvedBlocked";
+      continue;
+    }
+    // P3-A-06 — the global picture: contrast over its worst pixels, unproven evidence, or an animated asset.
+    if (path === "background" && code === "global_media_contrast_insufficient") {
+      backgroundContrastBlocked = "storeBackgroundMediaContrastBlocked";
+      continue;
+    }
+    if (path === "background" && code === "global_media_contrast_unproven") {
+      backgroundContrastBlocked = "storeBackgroundMediaUnprovenBlocked";
+      continue;
+    }
+    if (path === "background" && code === "global_media_animated_unsupported") {
+      backgroundContrastBlocked = "storeBackgroundMediaAnimatedBlocked";
       continue;
     }
     // …and a section's explicit text colour judged against the real page paint.
@@ -139,7 +152,7 @@ export function describePublishIssues(
     parts.push(`${t("mediaPublishBlocked")}. ${shown}${more > 0 ? ` (+${more})` : ""}`);
   }
   if (backgroundBlocked) parts.push(t("storeBackgroundPublishBlocked"));
-  if (gradientBlocked) parts.push(t(gradientBlocked));
+  if (backgroundContrastBlocked) parts.push(t(backgroundContrastBlocked));
   if (sectionTextBlocked) parts.push(t("storeBackgroundSectionTextBlocked"));
   return parts.length === 0 ? null : parts.join(" ");
 }

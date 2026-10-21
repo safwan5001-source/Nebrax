@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  *
  * P3-A-05 — the global background in the real editor: immediate canvas preview, Undo / Redo, dirty state,
- * Save → reload consistency, and the merchant message for the temporary image-publish gate.
+ * Save → reload consistency, and the merchant messages for the contrast publish gates.
  */
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -162,7 +162,7 @@ describe("Publish rejection of a global gradient background (contrast policy, P3
     background: { kind: "gradient", from: { hex: "#0b0b0b" }, to: { hex: "#1a1a1a" }, direction: "to-bottom" },
   };
 
-  it("a rejected publish tells the merchant gradients are deferred — not a generic failure — and nothing is retried", async () => {
+  it("a rejected publish tells the merchant exactly why the gradient is not readable — not a generic failure — and nothing is retried", async () => {
     publishMock.mockResolvedValue({
       ok: false,
       reason: "validation",
@@ -239,10 +239,28 @@ describe("Publish rejection of a global gradient background (contrast policy, P3
   });
 });
 
-describe("Publish rejection of a global image background (temporary gate, P3-A-06)", () => {
+describe("Publish rejection of a global image background (P3-A-06)", () => {
   const t = (key: Parameters<typeof customizerMessage>[1]) => customizerMessage("en", key);
 
-  it("explains the rejection in plain words instead of a generic failure", () => {
+  it("maps each stable media code to its own actionable sentence (AR + EN) and never confuses them", () => {
+    const ar = (key: Parameters<typeof customizerMessage>[1]) => customizerMessage("ar", key);
+    const insufficient = describePublishIssues({ background: "global_media_contrast_insufficient" }, t);
+    expect(insufficient).toBe(t("storeBackgroundMediaContrastBlocked"));
+    expect(insufficient).toMatch(/not proven readable over the picture background/);
+    expect(describePublishIssues({ background: "global_media_contrast_insufficient" }, ar)).toMatch(/فوق خلفية الصورة/);
+
+    const unproven = describePublishIssues({ background: "global_media_contrast_unproven" }, t);
+    expect(unproven).toBe(t("storeBackgroundMediaUnprovenBlocked"));
+    expect(unproven).not.toBe(insufficient);
+
+    const animated = describePublishIssues({ background: "global_media_animated_unsupported" }, t);
+    expect(animated).toBe(t("storeBackgroundMediaAnimatedBlocked"));
+    expect(animated).toMatch(/still image/i);
+    expect(describePublishIssues({ background: "global_media_animated_unsupported" }, ar)).toMatch(/ثابتة/);
+    expect(new Set([insufficient, unproven, animated]).size).toBe(3);
+  });
+
+  it("the retired 'not ready' code still reads sensibly if an older server answers it", () => {
     const text = describePublishIssues({ background: "global_media_background_not_ready" }, t);
     expect(text).toBe(t("storeBackgroundPublishBlocked"));
     expect(text).toMatch(/image background cannot be published yet/);

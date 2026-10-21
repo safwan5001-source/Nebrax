@@ -81,34 +81,31 @@ final class StorefrontPresentationPublishValidator
     }
 
     /**
-     * Global (document-level) background publish safety.
-     *
-     * P3-A-06 Checkpoint A — a global *gradient* is judged by {@see GlobalBackgroundContrast}: the whole luminance range of the
-     * gradient against the page foregrounds (and the explicit text of sections that sit directly on the page). It publishes
-     * only when that is proven; the stable codes are `global_gradient_contrast_insufficient` and `global_gradient_colour_unresolved`.
-     *
-     * Global media backgrounds still stay draft-only (P3-A-02 temporary gate) until their contrast evidence is wired in
-     * (Checkpoint B). Solid (legacy colour or authored solid object) and section-level backgrounds are outside this method.
+     * Global (document-level) background publish safety (P3-A-06). A global gradient or picture publishes only when
+     * {@see GlobalBackgroundContrast} proves the page foregrounds readable over its whole luminance range; the picture is
+     * judged by its worst-case pixel evidence under the overlay (plus the fallback colour), and only from tenant-scoped
+     * evidence. Stable codes: `global_gradient_contrast_insufficient`, `global_gradient_colour_unresolved`,
+     * `global_media_contrast_insufficient`, `global_media_contrast_unproven`, `global_media_animated_unsupported`.
+     * Ownership, readiness and derivatives of the pictures are checked by {@see StorefrontMediaPublishGate} (`mediaErrors`).
+     * Solid (legacy colour or authored solid object) and section-level backgrounds are outside this method.
      *
      * @param  array<string, mixed>  $normalized
      * @return array<string, array{code: string, message: string}>
      */
     private function globalBackgroundErrors(array $normalized): array
     {
-        $background = $normalized['background'] ?? null;
-        if (is_array($background) && ($background['kind'] ?? null) === 'gradient') {
-            return GlobalBackgroundContrast::errors($normalized);
-        }
-        if (! is_array($background) || ($background['kind'] ?? null) !== 'media') {
+        $kind = is_array($normalized['background'] ?? null) ? ($normalized['background']['kind'] ?? null) : null;
+        if ($kind !== 'gradient' && $kind !== 'media') {
             return [];
         }
 
-        return [
-            'background' => [
-                'code' => 'global_media_background_not_ready',
-                'message' => 'خلفية الوسائط العامة متاحة في المسودة فقط حتى تكتمل بوابات الملكية والجاهزية والتباين.',
-            ],
-        ];
+        return GlobalBackgroundContrast::errors($normalized, $this->mediaBounds(), $this->animatedProbe());
+    }
+
+    /** Whether the (tenant-scoped, active) asset of a `MediaRef` is animated. Lazy: only a document with a global picture asks. */
+    private function animatedProbe(): \Closure
+    {
+        return static fn (array $ref): bool => app(StorefrontMediaContrastEvidence::class)->isAnimated($ref);
     }
 
     /**

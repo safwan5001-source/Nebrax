@@ -154,6 +154,9 @@ class CommerceWorkspaceStorefrontPresentationVersionController extends ApiContro
             );
         } catch (StaleVersionRevisionException|ActiveVersionImmutableException|ForwardSchemaVersionException $e) {
             abort(409, $e->getMessage());
+        } catch (PresentationPublishValidationException $e) {
+            // P3-A-06 — see the legacy save: an invalid authored global background is a 422, not a 500.
+            return response()->json($e->toPayload(), 422);
         } catch (PresentationDocumentTooLargeException $e) {
             abort(422, $e->getMessage());
         }

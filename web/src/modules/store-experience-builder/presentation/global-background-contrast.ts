@@ -22,7 +22,7 @@ import {
   worstRatioForHex,
 } from "./contrast-engine";
 import type { StorefrontPresentationConfig } from "./config";
-import type { ColorRef } from "./section-design";
+import { type ColorRef, OVERLAY_ALPHAS } from "./section-design";
 import {
   type DesignContext,
   type MediaBounds,
@@ -172,4 +172,22 @@ export function globalBackgroundVerdict(
     sectionText,
     interval: paint.interval,
   };
+}
+
+/**
+ * The weakest approved *light* overlay (the `surface` role) that makes the picture's background ready, keeping the rest of
+ * the document as is — or `null` when no approved strength can (a very dark picture cannot be rescued: the proof is the
+ * worst pixel). A suggestion the merchant applies explicitly; the verdict itself is still the policy's.
+ */
+export function suggestLightOverlay(
+  config: Config,
+  mediaBounds: (ref: MediaRef) => MediaBounds | null,
+): (typeof OVERLAY_ALPHAS)[number] | null {
+  const background = config.background;
+  if (background?.kind !== "media") return null;
+  for (const alpha of OVERLAY_ALPHAS) {
+    const trial = { ...config, background: { ...background, overlay: { color: { role: "surface" as const }, alpha } } };
+    if (globalBackgroundVerdict(trial, mediaBounds).status === "ready") return alpha;
+  }
+  return null;
 }

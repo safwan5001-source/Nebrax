@@ -216,7 +216,7 @@ class StorefrontPresentationPublishApiTest extends TestCase
     }
 
     /** @test */
-    public function global_media_background_is_saved_as_draft_but_blocked_from_publish(): void
+    public function a_global_media_background_that_cannot_be_proven_is_saved_as_draft_but_blocked_from_publish(): void
     {
         $auth = $this->registerTenant('pres-pub-global-media', 'owner@pres-pub-global-media.test');
         $seeded = $this->seedWebStorefront($auth['tenant_id']);
@@ -251,7 +251,9 @@ class StorefrontPresentationPublishApiTest extends TestCase
 
         $rejected = $token->postJson($this->path($seeded['storefront']->id).'/publish', ['draft_revision' => 1])
             ->assertStatus(422);
-        $this->assertContains('global_media_background_not_ready', $rejected->json('error_codes'));
+        // the picture does not exist for this tenant: its contrast cannot be proven (P3-A-06), and the media gate says why
+        $this->assertSame('global_media_contrast_unproven', $rejected->json('error_codes.background'));
+        $this->assertSame('media_missing', $rejected->json('error_codes')['background.media.mediaId'] ?? null);
 
         app(TenantContext::class)->set($auth['tenant_id']);
         $after = StorefrontPresentation::query()->where('storefront_id', $seeded['storefront']->id)->firstOrFail();
@@ -261,13 +263,14 @@ class StorefrontPresentationPublishApiTest extends TestCase
 
     /**
      * P3-A-05 — the full document the Appearance editor can now author (desktop + phone image, a focal
-     * point for each, an overlay) is kept in the draft yet cannot be published. Removing the object — what
+     * point for each, an overlay) is kept in the draft; here its pictures do not exist for the tenant, so it cannot be
+     * published (P3-A-06: unproven contrast). Removing the object — what
      * switching to Solid or "Restore default" does in the editor — is what unblocks publishing, because the
      * document is replaced as a whole and the legacy `backgroundColor` alone is a complete background.
      *
      * @test
      */
-    public function editor_authored_image_background_stays_unpublishable_until_the_object_is_removed(): void
+    public function an_unprovable_editor_authored_image_background_stays_unpublishable_until_the_object_is_removed(): void
     {
         $auth = $this->registerTenant('pres-pub-bg-editor', 'owner@pres-pub-bg-editor.test');
         $seeded = $this->seedWebStorefront($auth['tenant_id']);
@@ -301,7 +304,7 @@ class StorefrontPresentationPublishApiTest extends TestCase
 
         $rejected = $token->postJson($this->path($seeded['storefront']->id).'/publish', ['draft_revision' => 1])
             ->assertStatus(422);
-        $this->assertSame('global_media_background_not_ready', $rejected->json('error_codes.background'));
+        $this->assertSame('global_media_contrast_unproven', $rejected->json('error_codes.background'));
 
         // The merchant switches to Solid / restores the default: the document no longer carries `background`.
         $token->putJson($this->path($seeded['storefront']->id), [

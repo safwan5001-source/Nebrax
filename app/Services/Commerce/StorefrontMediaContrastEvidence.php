@@ -34,6 +34,24 @@ class StorefrontMediaContrastEvidence
     }
 
     /**
+     * Whether the (tenant-scoped, active) asset of a `MediaRef` is animated. Same scoped lookup as the evidence itself, so a
+     * foreign or unknown id is simply `false` (the ownership gate rejects it separately). P3-A-06: the global background is
+     * still-only and an animation's later frames have no pixel evidence.
+     *
+     * @param  array<string,mixed>  $ref
+     */
+    public function isAnimated(array $ref): bool
+    {
+        $id = $ref['mediaId'] ?? null;
+        if (! is_string($id)) {
+            return false;
+        }
+        $asset = StorefrontMedia::query()->whereKey($id)->where('state', StorefrontMedia::STATE_ACTIVE)->first();
+
+        return $asset !== null && $asset->isAnimated();
+    }
+
+    /**
      * @param  array<string,mixed>  $ref
      * @return array{min:list<int>,max:list<int>}|null
      */

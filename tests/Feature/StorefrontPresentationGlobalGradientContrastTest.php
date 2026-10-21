@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\SalesChannel;
 use App\Models\Storefront;
-use App\Models\StorefrontPresentation;
 use App\Services\Commerce\StorefrontPresentationVersionService;
 use App\Support\Commerce\ContrastEngine;
 use App\Support\Commerce\GlobalBackgroundContrast;
@@ -29,6 +28,7 @@ use Tests\TestCase;
  */
 class StorefrontPresentationGlobalGradientContrastTest extends TestCase
 {
+    use GlobalBackgroundPublishPaths;
     use InteractsWithApi;
     use RefreshDatabase;
 
@@ -37,21 +37,6 @@ class StorefrontPresentationGlobalGradientContrastTest extends TestCase
 
     /** Dark under the dark page text: unreadable. */
     private const UNSAFE = ['kind' => 'gradient', 'from' => ['hex' => '#0b0b0b'], 'to' => ['hex' => '#1a1a1a'], 'direction' => 'to-bottom'];
-
-    private function legacyPath(string $id): string
-    {
-        return '/api/commerce/workspace/storefronts/'.$id.'/presentation';
-    }
-
-    private function listPath(string $id): string
-    {
-        return $this->legacyPath($id).'/versions';
-    }
-
-    private function itemPath(string $id, string $versionId): string
-    {
-        return $this->listPath($id).'/'.$versionId;
-    }
 
     /** @return array{storefront: Storefront} */
     private function seedWebStorefront(string $tenantId): array
@@ -68,11 +53,6 @@ class StorefrontPresentationGlobalGradientContrastTest extends TestCase
         app(TenantContext::class)->forget();
 
         return compact('storefront');
-    }
-
-    private function presentationHead(string $storefrontId): ?StorefrontPresentation
-    {
-        return StorefrontPresentation::withoutGlobalScopes()->where('storefront_id', $storefrontId)->first();
     }
 
     /** @return array<string,mixed> */
@@ -277,32 +257,6 @@ class StorefrontPresentationGlobalGradientContrastTest extends TestCase
 
     // ───────────────────────── publish paths ─────────────────────────
 
-    /** Publishes a navy snapshot as version A and returns what must stay untouched. */
-    private function publishNavy($token, string $storefrontId): array
-    {
-        $a = $token->postJson($this->listPath($storefrontId), ['name' => 'أ'])->assertCreated();
-        $aId = $a->json('data.id');
-        $token->putJson($this->itemPath($storefrontId, $aId), ['config' => ['version' => 2, 'themePreset' => 'navy'], 'revision' => 1])->assertOk();
-        $token->postJson($this->itemPath($storefrontId, $aId).'/publish', [
-            'revision' => 2,
-            'expected_published_revision' => null,
-            'expected_active_version_id' => null,
-        ])->assertOk();
-        $head = $this->presentationHead($storefrontId);
-
-        return ['id' => $aId, 'config' => $head->published_config, 'at' => (string) $head->published_at, 'epoch' => (int) $head->schedule_epoch];
-    }
-
-    private function assertSnapshotUntouched(string $storefrontId, array $previous): void
-    {
-        $head = $this->presentationHead($storefrontId);
-        $this->assertSame($previous['id'], $head->active_version_id);
-        $this->assertSame(1, (int) $head->published_revision);
-        $this->assertSame($previous['config'], $head->published_config);
-        $this->assertSame($previous['at'], (string) $head->published_at);
-        $this->assertArrayNotHasKey('background', $head->published_config);
-    }
-
     /** @test */
     public function legacy_publish_accepts_a_safe_gradient_and_rejects_an_unsafe_one_without_touching_the_snapshot(): void
     {
@@ -391,16 +345,6 @@ class StorefrontPresentationGlobalGradientContrastTest extends TestCase
         $token->putJson($this->itemPath($id, $bId).'/schedule', $schedule(['revision' => $saved->json('data.revision'), 'token' => $saved->json('data.schedule_token')]))->assertOk();
         $this->assertSame($bId, $this->presentationHead($id)->scheduled_version_id);
         $this->assertSnapshotUntouched($id, $previous);
-    }
-
-    /** Marks a version due, exactly as the scheduler's persisted hand-off does. */
-    private function makeDue(string $storefrontId, string $versionId): void
-    {
-        DB::table('storefront_presentation_versions')->where('id', $versionId)->update([
-            'scheduled_for' => Carbon::now('UTC')->subMinute(),
-            'schedule_generation' => 1,
-        ]);
-        $this->presentationHead($storefrontId)->forceFill(['scheduled_version_id' => $versionId])->save();
     }
 
     /** @test */
