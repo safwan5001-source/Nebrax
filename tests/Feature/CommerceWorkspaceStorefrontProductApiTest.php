@@ -6,6 +6,8 @@ use App\Models\CommerceCategoryListing;
 use App\Models\CommerceCollection;
 use App\Models\CommerceCollectionProduct;
 use App\Models\CommerceListing;
+use App\Models\PriceList;
+use App\Models\PriceListItem;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\SalesChannel;
@@ -15,6 +17,7 @@ use App\Support\BranchSettings;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
@@ -220,6 +223,54 @@ class CommerceWorkspaceStorefrontProductApiTest extends TestCase
 
         $this->assertIsArray($response->json('meta.facets'));
         $this->assertIsArray($response->json('meta.brands'));
+    }
+
+    /** @test */
+    public function an_unfiltered_workspace_list_does_not_load_facet_definitions(): void
+    {
+        $auth = $this->registerTenant('workspace-no-facet-load', 'owner@workspace-no-facet-load.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->seedProduct($seeded['channel']);
+        app(TenantContext::class)->forget();
+
+        $queries = [];
+        DB::listen(static function ($query) use (&$queries): void {
+            $queries[] = strtolower($query->sql);
+        });
+
+        $this->withToken($auth['token'])
+            ->getJson($this->listPath($seeded['storefront']->id))
+            ->assertOk();
+
+        $facetQueries = array_filter($queries, static fn (string $sql): bool => str_contains($sql, 'commerce_facets'));
+        $this->assertSame([], array_values($facetQueries));
+    }
+
+    /** @test */
+    public function list_prices_use_the_storefront_channels_authoritative_price_list(): void
+    {
+        $auth = $this->registerTenant('workspace-channel-price', 'owner@workspace-channel-price.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $product = $this->seedProduct($seeded['channel'], ['sale_price' => 10000]);
+        $priceList = PriceList::create(['name' => 'Preview channel prices', 'is_active' => true]);
+        PriceListItem::create([
+            'price_list_id' => $priceList->id,
+            'product_id' => $product->id,
+            'unit_name' => $product->unit,
+            'price' => 7500,
+        ]);
+        $seeded['channel']->update(['default_price_list_id' => $priceList->id]);
+        app(TenantContext::class)->forget();
+
+        $this->withToken($auth['token'])
+            ->getJson($this->listPath($seeded['storefront']->id))
+            ->assertOk()
+            ->assertJsonPath('data.0.price.amount_minor', 7500)
+            ->assertJsonPath('data.0.price.currency', 'SAR');
     }
 
     // ───────────────────────── 2/3. Foreign storefront/product → 404 ─────────────────────────

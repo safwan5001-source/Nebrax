@@ -87,7 +87,7 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
     /** يطابق `MAX_FEATURED_PRODUCTS` في `section-content.ts` (كلا النسختين) — مصدر الحد نفسه. */
     private const IDS_FILTER_MAX = 8;
 
-    public function index(Request $request, string $id): JsonResponse
+    public function index(Request $request, CommercePriceResolver $prices, string $id): JsonResponse
     {
         $this->denySelfService($request);
 
@@ -188,7 +188,9 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
         // of that ordering so PostgreSQL/MySQL strict grouping cannot reject
         // the read-only section-data request.
         $baseQuery->reorder();
-        $facetFilter->apply($query, $facetSelection);
+        if ($facetFilter->isActive($facetSelection)) {
+            $facetFilter->apply($query, $facetSelection);
+        }
 
         if ($facetSelection['collection'] !== null && blank($filters['sort'] ?? null)) {
             $query->reorder();
@@ -202,8 +204,9 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
         $gallery = app(ProductMediaGalleryService::class);
         $currency = Tenant::findOrFail($storefront->tenant_id)->currency;
         $inStockByProduct = $this->batchAvailability($paginator->getCollection(), $storefront->sales_channel_id);
-        $data = $paginator->getCollection()->map(function (Product $product) use ($gallery, $storefront, $currency, $inStockByProduct) {
+        $data = $paginator->getCollection()->map(function (Product $product) use ($gallery, $prices, $storefront, $currency, $inStockByProduct) {
             $media = StorefrontProductResource::workspaceMediaPayload($gallery->resolveGallery($product), $storefront->id);
+            $resolved = $product->isVariantManaged() ? null : $prices->resolve($product->id, $storefront->sales_channel_id);
 
             return [
                 'id' => $product->id,
@@ -214,7 +217,7 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
                 // Keep list cards aligned with the public catalogue contract.
                 // Variant products intentionally expose no guessed parent price.
                 'price' => [
-                    'amount_minor' => $product->isVariantManaged() ? null : (int) $product->sale_price,
+                    'amount_minor' => $product->isVariantManaged() ? null : ($resolved?->amount ?? (int) $product->sale_price),
                     'currency' => $currency,
                 ],
                 'in_stock' => $inStockByProduct[$product->id] ?? null,
@@ -263,7 +266,7 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
      * and delivery work to CommerceDeliveryScheduleService; it never returns
      * costs, raw inventory, supplier data, or write-capable controls.
      */
-    public function sectionData(Request $request, string $id): JsonResponse
+    public function sectionData(Request $request, CommercePriceResolver $prices, string $id): JsonResponse
     {
         $this->denySelfService($request);
         $storefront = $this->ownedStorefront($id);
@@ -301,7 +304,7 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
                 'page' => 1,
             ]);
 
-            return $this->index($request, $id);
+            return $this->index($request, $prices, $id);
         }
 
         if ($section['section'] === 'discovery') {
@@ -311,7 +314,7 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
                 abort_if(blank($section['dimension'] ?? null), 422, 'بُعد الاكتشاف غير مكتمل.');
             }
             $request->merge(['per_page' => 1, 'include_meta' => 'true', 'page' => 1]);
-            $payload = $this->index($request, $id)->getData(true);
+            $payload = $this->index($request, $prices, $id)->getData(true);
             $meta = (array) ($payload['meta'] ?? []);
             if ($section['axis'] === 'brand') {
                 return response()->json(['data' => [

@@ -173,6 +173,27 @@ describe("Canvas — data-backed sections (ADR-21)", () => {
     expect(text).toContain("7:00");
   });
 
+  it("keeps legacy discovery columns tied to the simulated viewport", () => {
+    const config = withSections([{ id: "d-legacy", type: "discovery", visible: true, content: { title: "Legacy", axis: "brand", display: "tiles" } }]);
+    for (const [viewport, expected] of [["mobile", "grid-cols-2"], ["tablet", "grid-cols-3"], ["desktop", "grid-cols-4"]] as const) {
+      const { container } = render(
+        <StorefrontPreviewCanvas
+          config={config}
+          locale="en"
+          viewport={viewport}
+          homeSectionDiscovery={{ "d-legacy": { axis: "brand", name: "", nameEn: null, visual: null, options: [{ value: "b1", name: "Brand", nameEn: null, count: 1, visual: null }] } }}
+          homeSectionDiscoveryState={{ "d-legacy": "ready" }}
+          onSelectSection={() => {}}
+        />,
+      );
+      const list = container.querySelector('[data-home-data-section="discovery"] ul');
+      expect(list?.className).toContain(expected);
+      expect(list?.className).not.toContain("sm:grid-cols-3");
+      expect(list?.className).not.toContain("lg:grid-cols-4");
+      cleanup();
+    }
+  });
+
   it("keeps the AWJ Market automatic shelf as a rail", () => {
     const { container } = render(
       <StorefrontPreviewCanvas
