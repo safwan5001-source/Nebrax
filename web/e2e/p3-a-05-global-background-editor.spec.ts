@@ -62,6 +62,9 @@ test.describe('P3-A-05 — global background editor (visual)', () => {
       await field.locator('[data-global-bg-direction]').selectOption('to-end');
       const image = await canvas.evaluate((el) => getComputedStyle(el).backgroundImage);
       expect(image).toContain(dir === 'rtl' ? 'to left' : 'to right');
+      // a gradient is saved and previewed, but flagged draft-only: its contrast over text is not proven yet
+      await expect(field.locator('[data-global-bg-draft-only="gradient"]')).toBeVisible();
+      await expect(field.locator('[data-global-bg-draft-only="image"]')).toHaveCount(0);
       await field.screenshot({ path: path.join(evidenceDir, `${locale}-2-gradient.png`) });
       await page.screenshot({ path: path.join(evidenceDir, `${locale}-2-gradient-page.png`) });
 
@@ -93,7 +96,9 @@ test.describe('P3-A-05 — global background editor (visual)', () => {
       await page.screenshot({ path: path.join(evidenceDir, `${locale}-4-image-configured-page.png`) });
 
       // Restore default removes the advanced object entirely (not just the colour).
+      await expect(field.locator('[data-global-bg-draft-only="image"]')).toBeVisible();
       await field.getByRole('button', { name: names.reset }).click();
+      await expect(field.locator('[data-global-bg-draft-only]')).toHaveCount(0);
       await expect(page.locator('[data-global-background-layer]')).toHaveCount(0);
       await expect(field.getByRole('button', { name: names.solid })).toHaveAttribute('aria-pressed', 'true');
       await expect(canvas).toHaveCSS('background-image', 'none');
