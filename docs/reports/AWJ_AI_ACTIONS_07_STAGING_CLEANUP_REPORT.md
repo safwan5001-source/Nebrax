@@ -89,9 +89,9 @@ Required scenarios → test:
 | `AiActionStagingCleanupTest` (19) | **19 passed on SQLite and PostgreSQL** |
 | `AiAction*` + `ProductImport*` + `ProductMedia*` + `ProductReferenceClassificationGuard` + `BranchIsolationGuard` | **236 passed on PostgreSQL** (incl. the 06A/06B suites unchanged) |
 | `AiAction*` on SQLite | 106 passed |
-| Full PHP suite, SQLite (local) | __FULL__ |
+| Full PHP suite, SQLite (local) | 8,148 tests: 7,976 passed, 146 skipped, **26 failed — all `Fuel*`** (`bcmul()` undefined: `bcmath` missing locally, CI installs it). Nothing else failed. |
 | Web | not touched (CI `web-ci` builds it) |
-| CI | __CI__ |
+| CI | **green on `972a606ae`**: `php artisan test (L11, sqlite)`, `php artisan test (L11, pgsql)`, `CI Gate` — all success |
 
 ## 6. Risks and what remains
 1. The schedule entry is **dormant until a scheduler is wired** (same as `imports:prune`/`webhooks:prune`; current deployment has no `schedule:run`). Until then run `ai-actions:purge-staged-images` by hand (use `--dry-run` first).
@@ -102,7 +102,15 @@ Required scenarios → test:
 6. Remote fetching remains off; see the runbook — the application checks narrow SSRF exposure but do not replace a network egress policy.
 
 ## 7. Git / CI
-__GIT__
+| Item | Value |
+|---|---|
+| Branch | `ai-actions-07-staging-cleanup` |
+| PR | https://github.com/safwan5001-source/Nebrax/pull/1589 (Draft, base `main`) |
+| Base SHA | `fd2822e46e9df35ff139e1155fd9963547932e02` (`main` after #1584 + #1586) |
+| Code head (CI verified green) | `972a606aeeedda510f58432b4d4091b13cce39be` |
+| Head | the commit carrying this report (a report cannot contain its own SHA; current value is on the PR) |
+
+The local first full run showed 651 failures only because `APP_KEY` was not set in this environment (`MissingAppKeyException`); rerun with a key: 26 failures, all `Fuel*`.
 
 ## 8. Next step
 Wire a scheduler for the retention/prune commands in the deployment (separate approved task), and — only after the runbook's egress requirements are met and the owner approves — pilot remote image fetching in staging.
