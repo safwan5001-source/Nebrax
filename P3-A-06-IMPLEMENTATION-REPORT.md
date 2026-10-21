@@ -8,10 +8,11 @@
 | PR | https://github.com/safwan5001-source/Nebrax/pull/1590 |
 | Base when branched | `17822a180dc37d74fc824de51f9e60a8fb262604` (PR #1587 merge) |
 | Base now (`main`) | `2696f53751a80368b067847310efbbc41899d575` (moved after branching; see §8) |
-| Code Head (CI-validated) | `30641d348e1622afd62ca6af4d97ded353e5ffdf` |
+| Code Head | `30641d348e1622afd62ca6af4d97ded353e5ffdf` |
+| CI-validated Head | `db393637e562c345e0d5bea5485d7b3756d06cce` (identical code to `30641d3`; adds only this report) |
 | Checkpoint A commit | `a9a6b86` |
 
-> The commit that adds this report is documentation-only. All results below belong to the code head `30641d3`.
+> `db39363` differs from `30641d3` only by this report, so its CI results are the CI results of the code. The report's later edit (recording these results) is documentation-only.
 
 ## 1. Risk matrix (before coding)
 
@@ -94,7 +95,9 @@ No migration, no route, no API-contract change, no accounting impact.
 
 The sandbox has no `bcmath`, so the six `Fuel*` classes fail locally exactly as on earlier PRs; CI installs it.
 
-**GitHub CI** — see the PR checks on `30641d3` (PHP sqlite and pgsql, web build, visual QA). Results are verified directly against the check runs; the final state is recorded in the PR conversation.
+**GitHub CI on `db39363`** — read directly from the check runs: all 6 `success` — CI Gate, `php artisan test (L11, sqlite)` (full suite), `php artisan test (L11, pgsql)` (full suite), web build (Next.js), merchant preview visual QA, published footer visual QA. Web CI and Store Brand QA are also green on `30641d3`. Checkpoint A (`a9a6b86`) was green on the same set.
+
+Note: the PHP runs on `30641d3` itself were cancelled by the report push (concurrency), so the PHP evidence for the code is the `db39363` run, which carries identical code.
 
 ## 8. Security and tenant-isolation findings
 
