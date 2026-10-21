@@ -349,11 +349,16 @@ function discoveryOptionSources(visual: Record<string, unknown> | null): { src: 
     if (!item || typeof item !== "object" || Array.isArray(item)) return [];
     const source = item as Record<string, unknown>;
     return typeof source.src === "string" && typeof source.width === "number"
-      ? [{ src: source.src, width: source.width }]
+      ? [{ src: source.src, width: source.width, format: source.format === "webp" ? "webp" : "jpg" }]
       : [];
   });
   if (valid.length === 0) return null;
-  const ordered = [...valid].sort((a, b) => a.width - b.width);
+  const byWidth = new Map<number, (typeof valid)[number]>();
+  for (const source of valid) {
+    const current = byWidth.get(source.width);
+    if (!current || (source.format === "webp" && current.format !== "webp")) byWidth.set(source.width, source);
+  }
+  const ordered = [...byWidth.values()].sort((a, b) => a.width - b.width);
   return { src: ordered[ordered.length - 1].src, srcSet: ordered.map((source) => `${source.src} ${source.width}w`).join(", ") };
 }
 

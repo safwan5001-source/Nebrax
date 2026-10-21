@@ -156,6 +156,22 @@ describe("Canvas — data-backed sections (ADR-21)", () => {
     expect(container.querySelector('[data-home-data-section="discovery"] img')?.getAttribute("src")).toBe("/signed-media-1.jpg");
   });
 
+  it("deduplicates discovery srcset widths and prefers WebP derivatives", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={withSections([{ id: "d-1", type: "discovery", visible: true, content: { title: "", axis: "facet", dimension: "occasion", layout: "image-grid", template: "gift-circles" } }])}
+        locale="en"
+        viewport="desktop"
+        homeSectionDiscovery={{ "d-1": { axis: "facet", dimension: "occasion", name: "Occasion", nameEn: null, visual: null, options: [{ value: "birthday", name: "Birthday", nameEn: null, count: 1, visual: { image: { mediaId: "00000000-0000-4000-8000-000000000001", sources: [{ width: 160, format: "jpg", src: "/birthday-160.jpg" }, { width: 160, format: "webp", src: "/birthday-160.webp" }, { width: 320, format: "jpg", src: "/birthday-320.jpg" }, { width: 320, format: "webp", src: "/birthday-320.webp" }] } } }] } }}
+        homeSectionDiscoveryState={{ "d-1": "ready" }}
+        onSelectSection={() => {}}
+      />,
+    );
+    const image = container.querySelector('[data-home-data-section="discovery"] img');
+    expect(image?.getAttribute("src")).toBe("/birthday-320.webp");
+    expect(image?.getAttribute("srcset")).toBe("/birthday-160.webp 160w, /birthday-320.webp 320w");
+  });
+
   it("formats the live delivery window and uses the published heading", () => {
     const { container } = render(
       <StorefrontPreviewCanvas
