@@ -85,12 +85,26 @@ final class StorefrontPresentationPublishValidator
      * until their dedicated ownership/readiness/contrast gates land in P3-A-03
      * and P3-A-06. Section media backgrounds deliberately do not use this gate.
      *
+     * P3-A-05 follow-up — the same holds for a global *gradient*: sections are judged against the legacy
+     * `backgroundColor`, never against the document-level `background`, so text over a gradient is not
+     * proven legible. Solid (legacy colour or an authored solid object) and section-level backgrounds are
+     * outside both gates. Remove the gradient branch when P3-A-06 teaches the contrast gate to judge it
+     * (`StorefrontPresentationGlobalGradientGateTest` carries the tripwire).
+     *
      * @param  array<string, mixed>  $normalized
      * @return array<string, array{code: string, message: string}>
      */
     private function globalBackgroundErrors(array $normalized): array
     {
         $background = $normalized['background'] ?? null;
+        if (is_array($background) && ($background['kind'] ?? null) === 'gradient') {
+            return [
+                'background' => [
+                    'code' => 'global_gradient_background_not_ready',
+                    'message' => 'نشر التدرج اللوني كخلفية عامة مؤجَّل حتى يكتمل فحص تباين النصوص فوقه؛ يمكن حفظه ومعاينته في المسودة.',
+                ],
+            ];
+        }
         if (! is_array($background) || ($background['kind'] ?? null) !== 'media') {
             return [];
         }

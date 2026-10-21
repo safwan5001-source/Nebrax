@@ -57,7 +57,7 @@ import { commitDesign, setGroup } from "./design-edit";
 type T = (key: CustomizerMessageKey) => string;
 type TextField = "body" | "heading" | "link";
 
-const DIRECTION_LABEL: Record<(typeof DIRECTIONS)[number], CustomizerMessageKey> = {
+export const DIRECTION_LABEL: Record<(typeof DIRECTIONS)[number], CustomizerMessageKey> = {
   "to-end": "designDirToEnd",
   "to-start": "designDirToStart",
   "to-bottom": "designDirDown",
