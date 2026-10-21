@@ -16,6 +16,7 @@ import {
   type StorefrontPresentationConfig,
   normalizePresentationConfig,
 } from "../presentation/config";
+import { globalBackgroundVerdict } from "../presentation/global-background-contrast";
 import { resolveStorefrontBackgroundStyle } from "../presentation/storefront-background-render";
 import { STOREFRONT_BACKGROUND_DIRECTIONS, normalizeStorefrontBackground } from "../presentation/storefront-background";
 
@@ -86,7 +87,9 @@ describe("P3-A-05 background edit rules", () => {
     const ends = base.background?.kind === "gradient" ? [base.background.from, base.background.to] : [];
     expect(ends).toHaveLength(2);
     expect("hex" in ends[0] && "hex" in ends[1] && ends[0].hex !== ends[1].hex).toBe(true);
-    expect(ends[1]).toEqual({ hex: "#dce2e1" }); // 12% of the way towards the brand colour (#12372a)
+    expect(ends[1]).toEqual({ hex: "#eff1f2" }); // 4% of the way towards the brand colour (#12372a)
+    // …and the seed is publishable under the contrast policy from the default page colour (P3-A-06)
+    expect(globalBackgroundVerdict(base).status).toBe("ready");
 
     for (const direction of STOREFRONT_BACKGROUND_DIRECTIONS) {
       const next = setGradient(base, { direction });

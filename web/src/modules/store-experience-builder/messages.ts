@@ -265,10 +265,20 @@ export const CUSTOMIZER_MESSAGES = {
       "تبديل النوع يستبدل الخلفية الحالية ويمكن التراجع عنه. «استعادة الافتراضي» تحذف أي تدرج أو صورة وتعيد اللون الافتراضي.",
     storeBackgroundPublishBlocked:
       "تعذّر النشر: خلفية الصورة غير متاحة للنشر بعد. استبدلها بلون ثابت، أو أبقِ هذه النسخة مسودة.",
-    storeBackgroundGradientDraftOnly:
-      "التدرج اللوني متاح في المسودة والمعاينة فقط. نشره مؤجَّل حتى يكتمل فحص تباين النصوص فوقه، وسيُرفض النشر ما دام هذا التدرج قائماً. اختر لوناً ثابتاً للنشر.",
-    storeBackgroundGradientPublishBlocked:
-      "تعذّر النشر: نشر التدرج اللوني كخلفية عامة مؤجَّل حتى يكتمل فحص التباين. استبدله بلون ثابت، أو أبقِ هذه النسخة مسودة.",
+    storeBackgroundReady: "هذه الخلفية تجتاز فحص تباين نصوص المتجر وجاهزة للنشر.",
+    storeBackgroundGradientInsufficient:
+      "لا يمكن نشر هذا التدرج بعد: نصوص المتجر لا تُقرأ بوضوح مؤكَّد فوقه على كامل مداه. اجعل لونيه أفتح؛ ويمكنك معاينته وحفظه في المسودة.",
+    storeBackgroundFailsFor: "تفشل مع:",
+    storeBackgroundFgText: "النص الأساسي",
+    storeBackgroundFgMuted: "النص الثانوي",
+    storeBackgroundFgBrand: "روابط لون العلامة",
+    storeBackgroundFgSection: "لون نص مخصّص في قسم",
+    storeBackgroundGradientContrastBlocked:
+      "تعذّر النشر: نصوص المتجر لا تُقرأ بوضوح مؤكَّد فوق هذا التدرج على كامل مداه. اجعل لونيه أفتح، أو استبدله بلون ثابت، أو أبقِ هذه النسخة مسودة.",
+    storeBackgroundGradientUnresolvedBlocked:
+      "تعذّر النشر: تعذّر تحديد ألوان التدرج لإثبات التباين. اختر لونين صالحين أو استبدله بلون ثابت.",
+    storeBackgroundSectionTextBlocked:
+      "تعذّر النشر: لون نصٍّ مخصَّص في أحد الأقسام لا يُقرأ بوضوح مؤكَّد فوق خلفية المتجر العامة. اختر لوناً أغمق لهذا النص.",
     accentColor: "لون ثانوي",
     font: "الخط",
     fontCairoGeist: "Cairo + Geist",
@@ -1840,10 +1850,20 @@ export const CUSTOMIZER_MESSAGES = {
       "Switching type replaces the current background and can be undone. “Restore default” removes any gradient or image and returns the default colour.",
     storeBackgroundPublishBlocked:
       "Publishing was blocked: an image background cannot be published yet. Replace it with a solid colour, or keep this version as a draft.",
-    storeBackgroundGradientDraftOnly:
-      "A gradient background is available in drafts and the preview only. Publishing it is deferred until the text-contrast check is ready, and publishing is rejected while it is set. Choose a solid colour to publish.",
-    storeBackgroundGradientPublishBlocked:
-      "Publishing was blocked: a gradient background cannot be published until the contrast check is ready. Replace it with a solid colour, or keep this version as a draft.",
+    storeBackgroundReady: "This background passes the store text-contrast check and can be published.",
+    storeBackgroundGradientInsufficient:
+      "This gradient cannot be published yet: store text is not proven readable over its whole range. Make both colours lighter; you can still preview and save it in the draft.",
+    storeBackgroundFailsFor: "Fails for:",
+    storeBackgroundFgText: "Main text",
+    storeBackgroundFgMuted: "Secondary text",
+    storeBackgroundFgBrand: "Brand-colour links",
+    storeBackgroundFgSection: "A section's custom text colour",
+    storeBackgroundGradientContrastBlocked:
+      "Publishing was blocked: store text is not proven readable over this gradient across its whole range. Make both colours lighter, replace it with a solid colour, or keep this version as a draft.",
+    storeBackgroundGradientUnresolvedBlocked:
+      "Publishing was blocked: the gradient colours could not be resolved to prove contrast. Pick two valid colours or replace it with a solid colour.",
+    storeBackgroundSectionTextBlocked:
+      "Publishing was blocked: a custom text colour in a section is not proven readable over the store's global background. Choose a darker colour for that text.",
     accentColor: "Accent color",
     font: "Typography",
     fontCairoGeist: "Cairo + Geist",

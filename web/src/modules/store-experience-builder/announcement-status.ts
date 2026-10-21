@@ -76,7 +76,8 @@ export function describePublishIssues(
   const bannerLines: string[] = [];
   const mediaLines: string[] = [];
   let backgroundBlocked = false;
-  let gradientBlocked = false;
+  let gradientBlocked: CustomizerMessageKey | null = null;
+  let sectionTextBlocked = false;
   for (const [path, code] of Object.entries(issues)) {
     if (path.startsWith("announcements")) {
       const key = ISSUE_KEY[code];
@@ -100,9 +101,18 @@ export function describePublishIssues(
       backgroundBlocked = true;
       continue;
     }
-    // The gradient twin: same path, its own code — contrast over a gradient is not proven yet (P3-A-06).
-    if (path === "background" && code === "global_gradient_background_not_ready") {
-      gradientBlocked = true;
+    // P3-A-06 — the global gradient is judged by the contrast policy: each stable code has its own sentence.
+    if (path === "background" && code === "global_gradient_contrast_insufficient") {
+      gradientBlocked = "storeBackgroundGradientContrastBlocked";
+      continue;
+    }
+    if (path === "background" && code === "global_gradient_colour_unresolved") {
+      gradientBlocked = "storeBackgroundGradientUnresolvedBlocked";
+      continue;
+    }
+    // …and a section's explicit text colour judged against the real page paint.
+    if (code === "global_background_text_contrast_insufficient") {
+      sectionTextBlocked = true;
       continue;
     }
     const mediaKey = MEDIA_ISSUE_KEY[code];
@@ -129,6 +139,7 @@ export function describePublishIssues(
     parts.push(`${t("mediaPublishBlocked")}. ${shown}${more > 0 ? ` (+${more})` : ""}`);
   }
   if (backgroundBlocked) parts.push(t("storeBackgroundPublishBlocked"));
-  if (gradientBlocked) parts.push(t("storeBackgroundGradientPublishBlocked"));
+  if (gradientBlocked) parts.push(t(gradientBlocked));
+  if (sectionTextBlocked) parts.push(t("storeBackgroundSectionTextBlocked"));
   return parts.length === 0 ? null : parts.join(" ");
 }

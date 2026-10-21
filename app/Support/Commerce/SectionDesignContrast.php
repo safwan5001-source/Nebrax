@@ -99,7 +99,7 @@ final class SectionDesignContrast
      * @param  array<string,mixed>  $config
      * @return array{min:float,max:float}|null
      */
-    private static function mediaInterval(array $bg, array $config, ?\Closure $media): ?array
+    public static function mediaInterval(array $bg, array $config, ?\Closure $media): ?array
     {
         if ($media === null || ! is_array($bg['media'] ?? null)) {
             return null;

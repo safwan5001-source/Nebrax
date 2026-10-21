@@ -1,0 +1,332 @@
+{
+    "version": 1,
+    "about": "Shared PHP/TS cases for the global-background contrast policy (P3-A-06). Authority: App\\Support\\Commerce\\GlobalBackgroundContrast; twin: web/src/modules/store-experience-builder/presentation/global-background-contrast.ts.",
+    "foregrounds": {
+        "text": "#111827",
+        "muted": "#636a78"
+    },
+    "cases": [
+        {
+            "name": "seed-4pct-light",
+            "why": "page-light gradient the editor seeds",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": {}
+            },
+            "background": {
+                "kind": "gradient",
+                "from": {
+                    "hex": "#f8f9fa"
+                },
+                "to": {
+                    "hex": "#eff1f2"
+                },
+                "direction": "to-bottom"
+            },
+            "expect": {
+                "reason": null,
+                "failing": [],
+                "min": 0.868003,
+                "max": 0.954818
+            }
+        },
+        {
+            "name": "old-seed-12pct",
+            "why": "the P3-A-05 seed: too dark at its far end for the muted text",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": {}
+            },
+            "background": {
+                "kind": "gradient",
+                "from": {
+                    "hex": "#f8f9fa"
+                },
+                "to": {
+                    "hex": "#dce2e1"
+                },
+                "direction": "to-bottom"
+            },
+            "expect": {
+                "reason": null,
+                "failing": [
+                    "muted"
+                ],
+                "min": 0.741661,
+                "max": 0.954885
+            }
+        },
+        {
+            "name": "dark",
+            "why": "dark gradient: every foreground fails",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": {}
+            },
+            "background": {
+                "kind": "gradient",
+                "from": {
+                    "hex": "#0b0b0b"
+                },
+                "to": {
+                    "hex": "#1a1a1a"
+                },
+                "direction": "to-bottom"
+            },
+            "expect": {
+                "reason": null,
+                "failing": [
+                    "text",
+                    "muted",
+                    "brand"
+                ],
+                "min": 0.002701,
+                "max": 0.010976
+            }
+        },
+        {
+            "name": "mid-dip",
+            "why": "both endpoints pass the muted text, the interior does not (luminance is convex along the line)",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": {}
+            },
+            "background": {
+                "kind": "gradient",
+                "from": {
+                    "hex": "#fce8d1"
+                },
+                "to": {
+                    "hex": "#a6faff"
+                },
+                "direction": "to-end"
+            },
+            "expect": {
+                "reason": null,
+                "failing": [
+                    "muted"
+                ],
+                "min": 0.813696,
+                "max": 0.845899
+            }
+        },
+        {
+            "name": "mid-dip-reverse",
+            "why": "the same line reversed: direction and orientation do not change the verdict",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": {}
+            },
+            "background": {
+                "kind": "gradient",
+                "from": {
+                    "hex": "#a6faff"
+                },
+                "to": {
+                    "hex": "#fce8d1"
+                },
+                "direction": "to-start"
+            },
+            "expect": {
+                "reason": null,
+                "failing": [
+                    "muted"
+                ],
+                "min": 0.813696,
+                "max": 0.845899
+            }
+        },
+        {
+            "name": "roles-surface",
+            "why": "palette roles resolved to the approved tokens (surface, surfaceAlt)",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": {}
+            },
+            "background": {
+                "kind": "gradient",
+                "from": {
+                    "role": "surface"
+                },
+                "to": {
+                    "role": "surfaceAlt"
+                },
+                "direction": "to-top"
+            },
+            "expect": {
+                "reason": null,
+                "failing": [],
+                "min": 0.895129,
+                "max": 1
+            }
+        },
+        {
+            "name": "roles-dark-palette",
+            "why": "a merchant palette that makes surfaceAlt dark fails through the role",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": {
+                    "surfaceAlt": "#223344"
+                }
+            },
+            "background": {
+                "kind": "gradient",
+                "from": {
+                    "role": "surface"
+                },
+                "to": {
+                    "role": "surfaceAlt"
+                },
+                "direction": "to-end"
+            },
+            "expect": {
+                "reason": null,
+                "failing": [
+                    "text",
+                    "muted",
+                    "brand"
+                ],
+                "min": 0.021431,
+                "max": 1
+            }
+        },
+        {
+            "name": "role-brand-end",
+            "why": "white to the (dark) brand role: dark end fails",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": {}
+            },
+            "background": {
+                "kind": "gradient",
+                "from": {
+                    "hex": "#ffffff"
+                },
+                "to": {
+                    "role": "brand"
+                },
+                "direction": "to-end"
+            },
+            "expect": {
+                "reason": null,
+                "failing": [
+                    "text",
+                    "muted",
+                    "brand"
+                ],
+                "min": 0.020451,
+                "max": 1
+            }
+        },
+        {
+            "name": "light-brand",
+            "why": "a light brand colour is itself unreadable as page link text",
+            "config": {
+                "primaryColor": "#ffd500",
+                "accentColor": null,
+                "palette": {}
+            },
+            "background": {
+                "kind": "gradient",
+                "from": {
+                    "hex": "#ffffff"
+                },
+                "to": {
+                    "hex": "#f8f9fa"
+                },
+                "direction": "to-end"
+            },
+            "expect": {
+                "reason": null,
+                "failing": [
+                    "brand"
+                ],
+                "min": 0.937152,
+                "max": 1
+            }
+        },
+        {
+            "name": "accent-role",
+            "why": "accent role resolved from accentColor",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": "#fff4cc",
+                "palette": {}
+            },
+            "background": {
+                "kind": "gradient",
+                "from": {
+                    "role": "accent"
+                },
+                "to": {
+                    "hex": "#ffffff"
+                },
+                "direction": "to-bottom-end"
+            },
+            "expect": {
+                "reason": null,
+                "failing": [],
+                "min": 0.894239,
+                "max": 1
+            }
+        },
+        {
+            "name": "white-white",
+            "why": "degenerate gradient (one colour)",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": {}
+            },
+            "background": {
+                "kind": "gradient",
+                "from": {
+                    "hex": "#ffffff"
+                },
+                "to": {
+                    "hex": "#ffffff"
+                },
+                "direction": "to-end"
+            },
+            "expect": {
+                "reason": null,
+                "failing": [],
+                "min": 0.991079,
+                "max": 1
+            }
+        },
+        {
+            "name": "unresolved",
+            "why": "a colour that does not resolve is not provable",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": {}
+            },
+            "background": {
+                "kind": "gradient",
+                "from": {
+                    "hex": "not-a-colour"
+                },
+                "to": {
+                    "hex": "#ffffff"
+                },
+                "direction": "to-end"
+            },
+            "expect": {
+                "reason": "colour_unresolved",
+                "failing": null,
+                "min": null,
+                "max": null
+            }
+        }
+    ]
+}

@@ -81,15 +81,14 @@ final class StorefrontPresentationPublishValidator
     }
 
     /**
-     * P3-A-02 temporary safety gate — global media backgrounds stay draft-only
-     * until their dedicated ownership/readiness/contrast gates land in P3-A-03
-     * and P3-A-06. Section media backgrounds deliberately do not use this gate.
+     * Global (document-level) background publish safety.
      *
-     * P3-A-05 follow-up — the same holds for a global *gradient*: sections are judged against the legacy
-     * `backgroundColor`, never against the document-level `background`, so text over a gradient is not
-     * proven legible. Solid (legacy colour or an authored solid object) and section-level backgrounds are
-     * outside both gates. Remove the gradient branch when P3-A-06 teaches the contrast gate to judge it
-     * (`StorefrontPresentationGlobalGradientGateTest` carries the tripwire).
+     * P3-A-06 Checkpoint A — a global *gradient* is judged by {@see GlobalBackgroundContrast}: the whole luminance range of the
+     * gradient against the page foregrounds (and the explicit text of sections that sit directly on the page). It publishes
+     * only when that is proven; the stable codes are `global_gradient_contrast_insufficient` and `global_gradient_colour_unresolved`.
+     *
+     * Global media backgrounds still stay draft-only (P3-A-02 temporary gate) until their contrast evidence is wired in
+     * (Checkpoint B). Solid (legacy colour or authored solid object) and section-level backgrounds are outside this method.
      *
      * @param  array<string, mixed>  $normalized
      * @return array<string, array{code: string, message: string}>
@@ -98,12 +97,7 @@ final class StorefrontPresentationPublishValidator
     {
         $background = $normalized['background'] ?? null;
         if (is_array($background) && ($background['kind'] ?? null) === 'gradient') {
-            return [
-                'background' => [
-                    'code' => 'global_gradient_background_not_ready',
-                    'message' => 'نشر التدرج اللوني كخلفية عامة مؤجَّل حتى يكتمل فحص تباين النصوص فوقه؛ يمكن حفظه ومعاينته في المسودة.',
-                ],
-            ];
+            return GlobalBackgroundContrast::errors($normalized);
         }
         if (! is_array($background) || ($background['kind'] ?? null) !== 'media') {
             return [];

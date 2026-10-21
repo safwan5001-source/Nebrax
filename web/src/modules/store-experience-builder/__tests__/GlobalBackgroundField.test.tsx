@@ -338,34 +338,45 @@ describe("Appearance — Image", () => {
     expect(field().querySelector("[data-global-bg-draft-only]")).toBeNull();
   });
 
-  it("a gradient is flagged draft-only: saved and previewed, publishing deferred until the contrast check", () => {
-    render(<Host />);
-    expect(field().querySelector("[data-global-bg-draft-only]")).toBeNull(); // solid: nothing to warn about
+  it("a gradient shows its predicted publish readiness: ready when the policy proves it, otherwise exactly why not", () => {
+    render(<Host initial={{ ...LEGACY, backgroundColor: DEFAULT_STORE_BACKGROUND_COLOR }} />);
+    expect(field().querySelector("[data-global-bg-readiness]")).toBeNull(); // solid: nothing to predict
     fireEvent.click(type("Gradient"));
-    const note = field().querySelector('[data-global-bg-draft-only="gradient"]') as HTMLElement;
-    expect(note.getAttribute("role")).toBe("note");
-    expect(note.textContent).toMatch(/drafts and the preview only/);
-    expect(note.textContent).toMatch(/deferred until the text-contrast check is ready/);
-    expect(note.textContent).toMatch(/Choose a solid colour to publish/);
-    expect(field().textContent ?? "").not.toMatch(/ready to publish|publishable now|will be published/i);
-    // the draft itself is still written and previewed normally
-    expect(cfg().background?.kind).toBe("gradient");
-    expect(field().querySelector("[data-global-bg-gradient-preview]")).toBeTruthy();
-    // every direction keeps the note (it is about the type, not a particular value)
-    fireEvent.change(field().querySelector("[data-global-bg-direction]") as HTMLSelectElement, { target: { value: "to-top-start" } });
-    expect(field().querySelector('[data-global-bg-draft-only="gradient"]')).toBeTruthy();
-    // switching back to Solid removes it
-    fireEvent.click(type("Solid colour"));
+    // the seeded gradient is light enough: ready, and the claim is about this background
+    const ready = field().querySelector('[data-global-bg-readiness="ready"]') as HTMLElement;
+    expect(ready.getAttribute("role")).toBe("status");
+    expect(ready.textContent).toMatch(/This background passes the store text-contrast check/);
     expect(field().querySelector("[data-global-bg-draft-only]")).toBeNull();
+
+    // a dark end colour is not provable: the note says so and names the foregrounds that fail; draft and preview stay usable
+    const toField = field().querySelector('[data-colour-field="global-bg-to"]') as HTMLElement;
+    fireEvent.change(within(toField).getByRole("textbox", { name: /colour code/i }), { target: { value: "#1a1a1a" } });
+    expect(cfg().background).toMatchObject({ kind: "gradient", to: { hex: "#1a1a1a" } });
+    const blocked = field().querySelector('[data-global-bg-readiness="blocked"]') as HTMLElement;
+    expect(blocked.getAttribute("role")).toBe("note");
+    expect(blocked.textContent).toMatch(/cannot be published yet.*not proven readable over its whole range/);
+    expect(blocked.textContent).toMatch(/Make both colours lighter/);
+    expect(field().querySelector("[data-global-bg-failing]")?.textContent).toMatch(/Fails for:.*Secondary text/);
+    expect(field().querySelector("[data-global-bg-gradient-preview]")).toBeTruthy();
+    expect(field().textContent ?? "").not.toMatch(/ready to publish|publishable now|will be published/i);
+
+    // fixing the colour flips it back; every direction keeps the same verdict
+    fireEvent.change(within(toField).getByRole("textbox", { name: /colour code/i }), { target: { value: "#f0f0f0" } });
+    expect(field().querySelector('[data-global-bg-readiness="ready"]')).toBeTruthy();
+    fireEvent.change(field().querySelector("[data-global-bg-direction]") as HTMLSelectElement, { target: { value: "to-top-start" } });
+    expect(field().querySelector('[data-global-bg-readiness="ready"]')).toBeTruthy();
+    fireEvent.click(type("Solid colour"));
+    expect(field().querySelector("[data-global-bg-readiness]")).toBeNull();
   });
 
-  it("the gradient draft-only note is shown in Arabic as well", () => {
-    render(<Host locale="ar" />);
-    fireEvent.click(type("تدرج لوني"));
-    const note = field().querySelector('[data-global-bg-draft-only="gradient"]') as HTMLElement;
-    expect(note.textContent).toMatch(/المسودة والمعاينة فقط/);
-    expect(note.textContent).toMatch(/فحص تباين النصوص/);
-    expect(note.textContent).toMatch(/لوناً ثابتاً/);
+  it("the gradient readiness is shown in Arabic as well", () => {
+    render(<Host locale="ar" initial={withBackground({ kind: "gradient", from: { hex: "#0b0b0b" }, to: { hex: "#1a1a1a" }, direction: "to-end" })} />);
+    const note = field().querySelector('[data-global-bg-readiness="blocked"]') as HTMLElement;
+    expect(note.textContent).toMatch(/لا يمكن نشر هذا التدرج بعد/);
+    expect(note.textContent).toMatch(/اجعل لونيه أفتح/);
+    expect(note.textContent).toMatch(/تفشل مع:.*النص الأساسي/);
+    fireEvent.click(type("لون ثابت"));
+    expect(field().querySelector("[data-global-bg-readiness]")).toBeNull();
   });
 
   it("a removed library image is reported by the slot itself, not silently", async () => {

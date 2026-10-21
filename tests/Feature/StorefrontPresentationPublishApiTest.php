@@ -319,9 +319,8 @@ class StorefrontPresentationPublishApiTest extends TestCase
     }
 
     /**
-     * P3-A-05 — a gradient is a *safe* background for drafts, but publishing it is blocked until P3-A-06
-     * (the contrast gate does not judge text over it): see StorefrontPresentationGlobalGradientGateTest.
-     * What keeps publishing normally is the legacy solid colour — which is what Solid / Restore default write.
+     * P3-A-06 — a gradient publishes only when the contrast policy proves it (StorefrontPresentationGlobalGradientContrastTest).
+     * The legacy solid colour — what Solid / Restore default write — keeps publishing exactly as before.
      *
      * @test
      */
