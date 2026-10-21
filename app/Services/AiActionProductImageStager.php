@@ -158,7 +158,9 @@ final class AiActionProductImageStager
     public function stageUrls(User $actor, AiAction $action, array $urls): array
     {
         $outcomes = [];
-        $known = AiActionImage::query()->where('ai_action_id', $action->id)->where('source_kind', AiActionImage::KIND_URL)->get()->keyBy('source_key');
+        // A purged image (AI-ACTIONS-07) is no evidence any more: its URL is staged afresh, under a numbered row key.
+        $known = AiActionImage::query()->where('ai_action_id', $action->id)->where('source_kind', AiActionImage::KIND_URL)->whereNull('purged_at')
+            ->orderBy('created_at')->orderBy('id')->get()->keyBy(fn (AiActionImage $r): string => self::logicalKey($r->source_key));
         $budget = max(0, (int) config('ai_actions.max_remote_images_per_preview', 20));
         foreach (array_values(array_unique($urls)) as $url) {
             $key = self::urlKey($url);
@@ -167,6 +169,13 @@ final class AiActionProductImageStager
                 continue;
             }
             if (config('product_import_media.remote_enabled') !== true) {
+                $wasPurged = AiActionImage::query()->where('ai_action_id', $action->id)->where('source_kind', AiActionImage::KIND_URL)->whereNotNull('purged_at')
+                    ->where(fn ($q) => $q->where('source_key', $key)->orWhere('source_key', 'like', $key.'#%'))->exists();
+                if ($wasPurged) {
+                    // AI-ACTIONS-07: staged earlier, removed by the retention job, and it cannot be fetched again here.
+                    $outcomes[$key] = ['status' => 'error', 'image' => null, 'code' => 'image_purged', 'message' => 'حُذفت هذه الصورة المرحلية بعد انتهاء مدة الاحتفاظ ولا يمكن جلبها من الرابط الآن؛ ارفعها ضمن أرشيف ZIP أو أزل الرابط.'];
+                    continue;
+                }
                 $outcomes[$key] = ['status' => 'unavailable', 'image' => null, 'code' => 'remote_fetch_disabled', 'message' => 'جلب الصور من روابط خارجية غير مفعّل على المنصة؛ لن تُطبَّق هذه الصورة.'];
                 continue;
             }
@@ -192,12 +201,22 @@ final class AiActionProductImageStager
         $rows = AiActionImage::query()->where('ai_action_id', $action->id)->orderBy('created_at')->orderBy('id')->get();
         $byKey = [];
         foreach ($rows as $row) {
-            $byKey[$row->source_key] = $this->describe($row);
+            if ($row->isPurged()) {
+                continue;
+            }
+            $byKey[self::logicalKey($row->source_key)] = $this->describe($row);
         }
         $archive = $this->latestArchive($rows)
             ->sortBy('source_label')->map(fn (AiActionImage $r): array => $this->describe($r) + ['lookup' => mb_strtolower(pathinfo($r->source_label, PATHINFO_FILENAME), 'UTF-8')])->values()->all();
 
-        return ['by_key' => $byKey, 'archive' => $archive];
+        // What staging used to hold and the lifecycle job removed: said out loud, never silently treated as "no image".
+        return ['by_key' => $byKey, 'archive' => $archive, 'purged' => ['archive' => $this->purgedArchive($rows)->count()]];
+    }
+
+    /** The row key without the `#n` suffix a re-staged URL carries once an earlier copy was purged. */
+    private static function logicalKey(string $key): string
+    {
+        return preg_replace('/#\d+$/', '', $key) ?? $key;
     }
 
     /** @param list<array{0:string,1:string}> $pairs */
@@ -226,6 +245,23 @@ final class AiActionProductImageStager
      */
     private function latestArchive($rows): \Illuminate\Support\Collection
     {
+        $newest = $this->newestArchive($rows);
+
+        // An archive any of whose entries was purged is gone as a whole (a partial set must never be matched).
+        return $newest->contains(fn (AiActionImage $r): bool => $r->isPurged()) ? collect() : $newest;
+    }
+
+    /** @return \Illuminate\Support\Collection<int,AiActionImage> the newest archive, when the lifecycle job has removed it */
+    private function purgedArchive($rows): \Illuminate\Support\Collection
+    {
+        $newest = $this->newestArchive($rows);
+
+        return $newest->contains(fn (AiActionImage $r): bool => $r->isPurged()) ? $newest : collect();
+    }
+
+    /** @return \Illuminate\Support\Collection<int,AiActionImage> */
+    private function newestArchive($rows): \Illuminate\Support\Collection
+    {
         $archives = $rows->filter(fn (AiActionImage $r): bool => $r->source_kind === AiActionImage::KIND_ARCHIVE);
         $seq = $archives->max('archive_seq');
 
@@ -240,6 +276,9 @@ final class AiActionProductImageStager
         if ($image === null || $image->thumb_key === null) {
             throw new AiActionException('image_not_found', 'الصورة غير موجودة لهذه العملية.', 404);
         }
+        if ($image->isPurged()) {
+            throw new AiActionException('image_purged', 'حُذفت الصورة المرحلية بعد انتهاء مدة الاحتفاظ؛ أعد رفعها.', 410);
+        }
         try {
             return ['stream' => $this->storage->readStream($image->storage_profile, $image->thumb_key), 'mime' => (string) $image->thumb_mime];
         } catch (Throwable) {
@@ -253,6 +292,9 @@ final class AiActionProductImageStager
      */
     public function materialize(AiActionImage $image): UploadedFile
     {
+        if ($image->isPurged()) {
+            throw new AiActionException('image_purged', 'حُذفت الصورة المرحلية بعد انتهاء مدة الاحتفاظ.', 410);
+        }
         $tmp = tempnam(sys_get_temp_dir(), 'ai-staged-image-');
         if ($tmp === false) {
             throw new \RuntimeException('تعذّر إنشاء ملف مؤقت للصورة.');
@@ -299,14 +341,18 @@ final class AiActionProductImageStager
             }
 
             $written = [];
+            // An earlier copy of this URL that the lifecycle job purged still holds the key: this one is numbered.
+            $earlier = AiActionImage::query()->where('ai_action_id', $action->id)->where('source_kind', AiActionImage::KIND_URL)
+                ->where(fn ($q) => $q->where('source_key', $key)->orWhere('source_key', 'like', $key.'#%'))->count();
+            $rowKey = $earlier === 0 ? $key : $key.'#'.($earlier + 1);
             try {
                 $attributes = $this->persistBytes($action, $file, $inspected, [
-                    'source_kind' => AiActionImage::KIND_URL, 'source_key' => $key, 'source_label' => $this->label($url), 'archive_sha256' => null,
+                    'source_kind' => AiActionImage::KIND_URL, 'source_key' => $rowKey, 'source_label' => $this->label($url), 'archive_sha256' => null,
                 ], $actor, $written);
                 $image = $this->make($attributes + ['ai_action_id' => $action->id, 'created_by' => $actor->id]);
             } catch (QueryException $e) {
                 $this->discard($written);
-                $image = AiActionImage::query()->where('ai_action_id', $action->id)->where('source_key', $key)->first();
+                $image = AiActionImage::query()->where('ai_action_id', $action->id)->where('source_key', $rowKey)->whereNull('purged_at')->first();
                 if ($image === null) {
                     throw $e;
                 }
@@ -398,7 +444,7 @@ final class AiActionProductImageStager
     {
         $copied = 0;
         $profile = $this->storage->profile();
-        foreach (AiActionImage::query()->where('ai_action_id', $from->id)->whereIn('id', array_values(array_unique($imageIds)))->orderBy('id')->get() as $image) {
+        foreach (AiActionImage::query()->where('ai_action_id', $from->id)->whereNull('purged_at')->whereIn('id', array_values(array_unique($imageIds)))->orderBy('id')->get() as $image) {
             $id = (string) Str::uuid();
             $base = sprintf('ai-actions/%s/%s/images/%s', $this->tenantContext->id(), $to->id, $id);
             $key = "{$base}.{$image->extension}";

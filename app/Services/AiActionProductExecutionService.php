@@ -552,7 +552,7 @@ final class AiActionProductExecutionService
                 throw new AiActionRowFailure('product_unavailable', 'المنتج لم يعد متاحاً في نطاقك؛ لم تُرفق الصورة.', false);
             }
             $staged = $result->ai_action_image_id === null ? null : AiActionImage::query()->where('ai_action_id', $result->ai_action_id)->find($result->ai_action_image_id);
-            if ($staged === null || $staged->content_sha256 !== $result->content_sha256) {
+            if ($staged === null || $staged->isPurged() || $staged->content_sha256 !== $result->content_sha256) {
                 throw new AiActionRowFailure('image_missing', 'الصورة المعتمدة لم تعد متاحة في التخزين الخاص؛ لم تُرفق.', false);
             }
 

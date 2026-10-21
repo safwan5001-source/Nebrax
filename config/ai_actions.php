@@ -26,5 +26,14 @@ return [
     'max_archive_images' => (int) env('AI_ACTIONS_MAX_ARCHIVE_IMAGES', 200),
     'max_remote_images_per_preview' => (int) env('AI_ACTIONS_MAX_REMOTE_IMAGES_PER_PREVIEW', 20),
     'image_thumbnail_px' => 256,
+    // AI-ACTIONS-07: how long the private staged images (the bytes a preview named) are kept, by what became of the
+    // action. Days are floored in code (`AiActionStagingRetention`) and a value that is not a whole number falls
+    // back to its default, so a mistyped setting can neither purge too early nor keep forever.
+    'staging_retention' => [
+        'draft_days' => env('AI_ACTIONS_STAGING_DRAFT_DAYS'),         // idle draft; default = draft_retention_days (30)
+        'cancelled_days' => env('AI_ACTIONS_STAGING_CANCELLED_DAYS'), // after cancelling; default 1
+        'executed_days' => env('AI_ACTIONS_STAGING_EXECUTED_DAYS'),   // after a fully successful run; default 7
+        'repairable_days' => env('AI_ACTIONS_STAGING_REPAIRABLE_DAYS'), // after a run with failures (repair window); default 30
+    ],
     'draft_retention_days' => (int) env('AI_ACTIONS_DRAFT_RETENTION_DAYS', 30),
 ];

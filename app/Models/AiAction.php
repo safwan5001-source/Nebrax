@@ -37,6 +37,14 @@ class AiAction extends BaseModel implements CompanyWide
         'expires_at' => 'datetime',
     ];
 
+    protected static function booted(): void
+    {
+        // AI-ACTIONS-07: the rows' private objects must go with the action, never while still needed, never half-way.
+        static::deleting(static function (self $action): void {
+            app(\App\Services\AiActionStagedImageRetention::class)->purgeBeforeDeleting($action);
+        });
+    }
+
     public function versions(): HasMany
     {
         return $this->hasMany(AiActionVersion::class);

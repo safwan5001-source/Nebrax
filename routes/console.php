@@ -92,3 +92,9 @@ Schedule::command('ai:prune-records')
     ->dailyAt('03:40')
     ->withoutOverlapping()
     ->onOneServer();
+
+// AI-ACTIONS-07: حذف الصور المرحلية الخاصة المنتهية حاجتها (احتفاظ حتميّ) — نفس ملاحظة التفعيل أعلاه.
+Schedule::command('ai-actions:purge-staged-images')
+    ->dailyAt('03:50')
+    ->withoutOverlapping()
+    ->onOneServer();

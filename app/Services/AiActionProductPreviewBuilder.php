@@ -71,6 +71,10 @@ final class AiActionProductPreviewBuilder
             $issues[] = $this->issue('nothing_to_apply', null, 'error', 'لا يوجد صف سيُنشأ أو يُحدَّث؛ كل الصفوف مُتخطّاة أو بلا تغيير.');
         }
 
+        if (($ctx['catalog']['purged']['archive'] ?? 0) > 0) {
+            $issues[] = $this->issue('image_archive_purged', null, 'warning', 'حُذف أرشيف الصور المرفوع سابقاً بعد انتهاء مدة الاحتفاظ؛ لن تُطابَق صوره مع الصفوف حتى تعيد رفعه.');
+        }
+
         return [
             'schema_version' => self::SCHEMA_VERSION,
             'type' => AiActionRegistry::PRODUCT_IMPORT,
