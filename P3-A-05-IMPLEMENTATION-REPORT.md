@@ -1,5 +1,7 @@
 # P3-A-05 — Advanced Storefront Background Editor — Implementation Report
 
+> **Update (gradient gate):** after this report, review found the contrast gate does not judge text over a global gradient. Global gradients are now draft-only too (`422 global_gradient_background_not_ready`); see `P3-A-05-GRADIENT-GATE-REPORT.md`. Statements below that say a gradient publishes are superseded.
+
 **Verdict: READY FOR OWNER REVIEW** — PR open, not merged, not deployed.
 
 | | |
@@ -65,7 +67,7 @@ Defects found by looking at the screenshots and fixed before the PR:
 | Invariant | Evidence |
 |---|---|
 | `global_media_background_not_ready` unchanged | No PHP app code touched; PHP test confirms an editor-shaped image document (desktop + phone + focal + overlay) is saved as draft and publish returns the code |
-| Normal publishing for safe backgrounds | PHP test: gradient (hex + role, logical direction) publishes and reaches the snapshot unchanged; removing `background` (Solid / Restore default) unblocks publishing |
+| Normal publishing for safe backgrounds | Solid colour publishes; removing `background` (Solid / Restore default) unblocks publishing. **Superseded:** a global gradient is now rejected (`global_gradient_background_not_ready`) |
 | No false publish-ready state | Draft-only note shown in Image mode from the first click; test asserts no «ready/publishable» wording; solid/gradient never show it |
 | Rejection is understandable | `describePublishIssues` maps the server code to an actionable sentence (AR + EN) instead of the generic failure |
 | `backgroundColor` legacy behaviour | Unchanged and still the fallback/contrast colour; legacy documents untouched until an explicit edit |
@@ -91,7 +93,7 @@ Defects found by looking at the screenshots and fixed before the PR:
 
 ## 6. Remaining risks
 
-- **Gradient/image contrast is not judged.** The server gates read `backgroundColor`; a merchant can author a dark gradient under dark text and still publish a gradient. That gap already existed at render level (P3-A-04) and is the stated scope of P3-A-06, but this editor makes it authorable. Recommend P3-A-06 covers gradients as well as images.
+- ~~Gradient/image contrast is not judged.~~ **Resolved:** gradients are now publish-blocked like images until P3-A-06 (see `P3-A-05-GRADIENT-GATE-REPORT.md`).
 - **Switching away from Image discards the image configuration** (recoverable only via Undo within the session). No confirmation dialog was added.
 - **Solid is hex-only.** An authored solid object that uses a palette role becomes a hex on the first explicit edit.
 - **«Image» tab is UI state until a picture is picked**; it is lost if the panel remounts. Clearing the main image also clears the phone image and overlay.
