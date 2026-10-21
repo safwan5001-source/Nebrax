@@ -76,6 +76,7 @@ export function describePublishIssues(
   const bannerLines: string[] = [];
   const mediaLines: string[] = [];
   let backgroundBlocked = false;
+  let gradientBlocked = false;
   for (const [path, code] of Object.entries(issues)) {
     if (path.startsWith("announcements")) {
       const key = ISSUE_KEY[code];
@@ -97,6 +98,11 @@ export function describePublishIssues(
     // not a generic "publish failed". The gate itself stays server-side; this only explains it.
     if (path === "background" && code === "global_media_background_not_ready") {
       backgroundBlocked = true;
+      continue;
+    }
+    // The gradient twin: same path, its own code — contrast over a gradient is not proven yet (P3-A-06).
+    if (path === "background" && code === "global_gradient_background_not_ready") {
+      gradientBlocked = true;
       continue;
     }
     const mediaKey = MEDIA_ISSUE_KEY[code];
@@ -123,5 +129,6 @@ export function describePublishIssues(
     parts.push(`${t("mediaPublishBlocked")}. ${shown}${more > 0 ? ` (+${more})` : ""}`);
   }
   if (backgroundBlocked) parts.push(t("storeBackgroundPublishBlocked"));
+  if (gradientBlocked) parts.push(t("storeBackgroundGradientPublishBlocked"));
   return parts.length === 0 ? null : parts.join(" ");
 }

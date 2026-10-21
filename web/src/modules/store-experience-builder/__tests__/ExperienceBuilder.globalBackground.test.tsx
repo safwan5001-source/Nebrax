@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const listMock = vi.fn();
 const showMock = vi.fn();
 const saveMock = vi.fn();
+const publishMock = vi.fn();
 
 vi.mock("@/modules/commerce-workspace/presentation-versions", () => ({
   listPresentationVersions: (...args: unknown[]) => listMock(...args),
@@ -19,7 +20,7 @@ vi.mock("@/modules/commerce-workspace/presentation-versions", () => ({
   savePresentationVersion: (...args: unknown[]) => saveMock(...args),
   renamePresentationVersion: vi.fn(),
   deletePresentationVersion: vi.fn(),
-  publishPresentationVersion: vi.fn(),
+  publishPresentationVersion: (...args: unknown[]) => publishMock(...args),
 }));
 
 import { describePublishIssues } from "../announcement-status";
@@ -72,7 +73,7 @@ const typeBtn = (name: string) =>
 
 afterEach(() => {
   cleanup();
-  [listMock, showMock, saveMock].forEach((m) => m.mockReset());
+  [listMock, showMock, saveMock, publishMock].forEach((m) => m.mockReset());
   vi.restoreAllMocks();
 });
 
@@ -152,6 +153,58 @@ describe("ExperienceBuilder — global background (P3-A-05)", () => {
     const saved = saveMock.mock.calls[0][2] as StorefrontPresentationConfig;
     expect("background" in saved).toBe(false);
     expect(saved.backgroundColor).toBe("#112233");
+  });
+});
+
+describe("Publish rejection of a global gradient background (temporary gate, P3-A-06)", () => {
+  const GRADIENT: StorefrontPresentationConfig = {
+    ...LEGACY,
+    background: { kind: "gradient", from: { hex: "#0b0b0b" }, to: { hex: "#1a1a1a" }, direction: "to-bottom" },
+  };
+
+  it("a rejected publish tells the merchant gradients are deferred — not a generic failure — and nothing is retried", async () => {
+    publishMock.mockResolvedValue({
+      ok: false,
+      reason: "validation",
+      message: "rejected",
+      issues: { background: "global_gradient_background_not_ready" },
+    });
+    const user = await mount(GRADIENT);
+    // the draft itself opens, previews and is editable as usual
+    expect(typeBtn("تدرج لوني").getAttribute("aria-pressed")).toBe("true");
+    await waitFor(() => expect(canvas().style.backgroundImage).toContain("linear-gradient"));
+
+    await user.click(screen.getByRole("button", { name: "نشر" }));
+    await user.click(screen.getByRole("button", { name: "نشر الآن" }));
+
+    await waitFor(() => expect(screen.getByText(/نشر التدرج اللوني كخلفية عامة مؤجَّل حتى يكتمل فحص التباين/)).toBeTruthy());
+    expect(screen.queryByText(/تعذّر النشر\.$/)).toBeNull();
+    expect(publishMock).toHaveBeenCalledTimes(1);
+    // the document is not touched by the rejection: still the same gradient draft, still clean
+    expect(typeBtn("تدرج لوني").getAttribute("aria-pressed")).toBe("true");
+    expect(root().getAttribute("data-lifecycle")).toBe("clean");
+  });
+
+  it("describePublishIssues keeps the two gates apart: each code gets its own sentence", () => {
+    const t = (key: Parameters<typeof customizerMessage>[1]) => customizerMessage("en", key);
+    const gradient = describePublishIssues({ background: "global_gradient_background_not_ready" }, t);
+    const image = describePublishIssues({ background: "global_media_background_not_ready" }, t);
+    expect(gradient).toBe(t("storeBackgroundGradientPublishBlocked"));
+    expect(gradient).toMatch(/gradient background cannot be published until the contrast check is ready/);
+    expect(image).toBe(t("storeBackgroundPublishBlocked"));
+    expect(gradient).not.toBe(image);
+    // an image message must not point the merchant at the (also blocked) gradient
+    expect(image).not.toMatch(/gradient/i);
+    expect(describePublishIssues({ background: "global_gradient_background_not_ready" }, (k) => customizerMessage("ar", k))).toMatch(
+      /التدرج اللوني كخلفية عامة مؤجَّل/,
+    );
+    // sentence only once even when the server lists other problems beside it
+    const both = describePublishIssues(
+      { background: "global_gradient_background_not_ready", "announcements.items[0].window.endsAt": "window_end_not_after_start" },
+      t,
+    );
+    expect(both).toContain(t("storeBackgroundGradientPublishBlocked"));
+    expect(both).toContain(t("annPublishBlocked"));
   });
 });
 

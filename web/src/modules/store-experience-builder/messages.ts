@@ -260,11 +260,15 @@ export const CUSTOMIZER_MESSAGES = {
     storeBackgroundFocalDesktop: "نقطة تركيز الصورة الأساسية",
     storeBackgroundFocalPhone: "نقطة تركيز صورة الجوال",
     storeBackgroundDraftOnly:
-      "خلفية الصورة متاحة في المسودة والمعاينة فقط. نشرها غير مفعّل بعد، وسيُرفض النشر ما دامت هذه الخلفية قائمة. اختر لوناً أو تدرجاً للنشر.",
+      "خلفية الصورة متاحة في المسودة والمعاينة فقط. نشرها غير مفعّل بعد، وسيُرفض النشر ما دامت هذه الخلفية قائمة. اختر لوناً ثابتاً للنشر.",
     storeBackgroundResetHint:
       "تبديل النوع يستبدل الخلفية الحالية ويمكن التراجع عنه. «استعادة الافتراضي» تحذف أي تدرج أو صورة وتعيد اللون الافتراضي.",
     storeBackgroundPublishBlocked:
-      "تعذّر النشر: خلفية الصورة غير متاحة للنشر بعد. استبدلها بلون ثابت أو تدرج، أو أبقِ هذه النسخة مسودة.",
+      "تعذّر النشر: خلفية الصورة غير متاحة للنشر بعد. استبدلها بلون ثابت، أو أبقِ هذه النسخة مسودة.",
+    storeBackgroundGradientDraftOnly:
+      "التدرج اللوني متاح في المسودة والمعاينة فقط. نشره مؤجَّل حتى يكتمل فحص تباين النصوص فوقه، وسيُرفض النشر ما دام هذا التدرج قائماً. اختر لوناً ثابتاً للنشر.",
+    storeBackgroundGradientPublishBlocked:
+      "تعذّر النشر: نشر التدرج اللوني كخلفية عامة مؤجَّل حتى يكتمل فحص التباين. استبدله بلون ثابت، أو أبقِ هذه النسخة مسودة.",
     accentColor: "لون ثانوي",
     font: "الخط",
     fontCairoGeist: "Cairo + Geist",
@@ -1831,11 +1835,15 @@ export const CUSTOMIZER_MESSAGES = {
     storeBackgroundFocalDesktop: "Main image focal point",
     storeBackgroundFocalPhone: "Phone image focal point",
     storeBackgroundDraftOnly:
-      "An image background is available in drafts and the preview only. Publishing it is not enabled yet, and publishing is rejected while it is set. Choose a colour or gradient to publish.",
+      "An image background is available in drafts and the preview only. Publishing it is not enabled yet, and publishing is rejected while it is set. Choose a solid colour to publish.",
     storeBackgroundResetHint:
       "Switching type replaces the current background and can be undone. “Restore default” removes any gradient or image and returns the default colour.",
     storeBackgroundPublishBlocked:
-      "Publishing was blocked: an image background cannot be published yet. Replace it with a solid colour or gradient, or keep this version as a draft.",
+      "Publishing was blocked: an image background cannot be published yet. Replace it with a solid colour, or keep this version as a draft.",
+    storeBackgroundGradientDraftOnly:
+      "A gradient background is available in drafts and the preview only. Publishing it is deferred until the text-contrast check is ready, and publishing is rejected while it is set. Choose a solid colour to publish.",
+    storeBackgroundGradientPublishBlocked:
+      "Publishing was blocked: a gradient background cannot be published until the contrast check is ready. Replace it with a solid colour, or keep this version as a draft.",
     accentColor: "Accent color",
     font: "Typography",
     fontCairoGeist: "Cairo + Geist",

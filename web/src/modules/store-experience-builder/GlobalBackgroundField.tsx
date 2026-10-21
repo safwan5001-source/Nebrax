@@ -9,8 +9,9 @@
  * is the legacy colour with no `background` object. «Restore default» is a different action from
  * switching type: it drops any gradient/image *and* returns the default colour.
  *
- * Image backgrounds are draft-and-preview only until P3-A-06. The server gate
- * (`global_media_background_not_ready`) is untouched; this panel only says so up front.
+ * Image **and gradient** backgrounds are draft-and-preview only until P3-A-06: the contrast gate cannot yet prove
+ * text legible over them. The server gates (`global_media_background_not_ready`,
+ * `global_gradient_background_not_ready`) are authoritative; this panel only says so up front.
  * The document receives colours, enums and `MediaRef`s — never a URL, CSS string or resolved media.
  */
 import { useEffect, useId, useState } from "react";
@@ -42,6 +43,8 @@ import { isSafeHexColor } from "./presentation/tokens";
 
 type T = (key: CustomizerMessageKey) => string;
 type Config = StorefrontPresentationConfig;
+
+const DRAFT_ONLY_NOTE_CLASS = "border border-warning bg-warning-soft px-2.5 py-2 text-[12px] leading-5 text-warning";
 
 const ROW_KEYS = ["mediaRowTop", "mediaRowMiddle", "mediaRowBottom"] as const;
 const COL_KEYS = ["mediaColLeft", "mediaColCenter", "mediaColRight"] as const;
@@ -166,6 +169,9 @@ export function GlobalBackgroundField({
             className="h-10 border border-border"
             style={resolveStorefrontBackgroundStyle(config, dir)}
           />
+          <p role="note" data-global-bg-draft-only="gradient" className={DRAFT_ONLY_NOTE_CLASS}>
+            {t("storeBackgroundGradientDraftOnly")}
+          </p>
         </div>
       ) : null}
 
@@ -217,11 +223,7 @@ export function GlobalBackgroundField({
               {t("storeBackgroundImagePending")}
             </p>
           )}
-          <p
-            role="note"
-            data-global-bg-draft-only=""
-            className="border border-warning bg-warning-soft px-2.5 py-2 text-[12px] leading-5 text-warning"
-          >
+          <p role="note" data-global-bg-draft-only="image" className={DRAFT_ONLY_NOTE_CLASS}>
             {t("storeBackgroundDraftOnly")}
           </p>
         </div>

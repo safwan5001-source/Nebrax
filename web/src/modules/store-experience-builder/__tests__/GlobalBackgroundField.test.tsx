@@ -329,9 +329,43 @@ describe("Appearance — Image", () => {
     expect(note.textContent).toMatch(/drafts and the preview only/);
     expect(note.textContent).toMatch(/rejected/);
     expect(field().textContent ?? "").not.toMatch(/ready to publish|publishable now|will be published/i);
-    // solid / gradient never show it
+    // the image note no longer offers a gradient as a way to publish (gradients are gated too)
+    expect(note.textContent).not.toMatch(/gradient to publish/i);
+    // solid never shows a draft-only note; a gradient shows its *own* (contrast) note, not the image one
     fireEvent.click(type("Gradient"));
+    expect(field().querySelector('[data-global-bg-draft-only="image"]')).toBeNull();
+    fireEvent.click(type("Solid colour"));
     expect(field().querySelector("[data-global-bg-draft-only]")).toBeNull();
+  });
+
+  it("a gradient is flagged draft-only: saved and previewed, publishing deferred until the contrast check", () => {
+    render(<Host />);
+    expect(field().querySelector("[data-global-bg-draft-only]")).toBeNull(); // solid: nothing to warn about
+    fireEvent.click(type("Gradient"));
+    const note = field().querySelector('[data-global-bg-draft-only="gradient"]') as HTMLElement;
+    expect(note.getAttribute("role")).toBe("note");
+    expect(note.textContent).toMatch(/drafts and the preview only/);
+    expect(note.textContent).toMatch(/deferred until the text-contrast check is ready/);
+    expect(note.textContent).toMatch(/Choose a solid colour to publish/);
+    expect(field().textContent ?? "").not.toMatch(/ready to publish|publishable now|will be published/i);
+    // the draft itself is still written and previewed normally
+    expect(cfg().background?.kind).toBe("gradient");
+    expect(field().querySelector("[data-global-bg-gradient-preview]")).toBeTruthy();
+    // every direction keeps the note (it is about the type, not a particular value)
+    fireEvent.change(field().querySelector("[data-global-bg-direction]") as HTMLSelectElement, { target: { value: "to-top-start" } });
+    expect(field().querySelector('[data-global-bg-draft-only="gradient"]')).toBeTruthy();
+    // switching back to Solid removes it
+    fireEvent.click(type("Solid colour"));
+    expect(field().querySelector("[data-global-bg-draft-only]")).toBeNull();
+  });
+
+  it("the gradient draft-only note is shown in Arabic as well", () => {
+    render(<Host locale="ar" />);
+    fireEvent.click(type("تدرج لوني"));
+    const note = field().querySelector('[data-global-bg-draft-only="gradient"]') as HTMLElement;
+    expect(note.textContent).toMatch(/المسودة والمعاينة فقط/);
+    expect(note.textContent).toMatch(/فحص تباين النصوص/);
+    expect(note.textContent).toMatch(/لوناً ثابتاً/);
   });
 
   it("a removed library image is reported by the slot itself, not silently", async () => {

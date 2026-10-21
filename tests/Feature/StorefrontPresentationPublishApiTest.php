@@ -319,33 +319,28 @@ class StorefrontPresentationPublishApiTest extends TestCase
     }
 
     /**
-     * P3-A-05 — the supported safe backgrounds keep publishing normally: a gradient (colours as hex or palette
-     * role, an approved logical direction) reaches the published snapshot unchanged.
+     * P3-A-05 — a gradient is a *safe* background for drafts, but publishing it is blocked until P3-A-06
+     * (the contrast gate does not judge text over it): see StorefrontPresentationGlobalGradientGateTest.
+     * What keeps publishing normally is the legacy solid colour — which is what Solid / Restore default write.
      *
      * @test
      */
-    public function editor_authored_gradient_background_publishes_normally(): void
+    public function editor_authored_solid_colour_publishes_normally_and_keeps_only_the_legacy_field(): void
     {
-        $auth = $this->registerTenant('pres-pub-bg-gradient', 'owner@pres-pub-bg-gradient.test');
+        $auth = $this->registerTenant('pres-pub-bg-solid', 'owner@pres-pub-bg-solid.test');
         $seeded = $this->seedWebStorefront($auth['tenant_id']);
         $token = $this->withToken($auth['token']);
-        $gradient = [
-            'kind' => 'gradient',
-            'from' => ['hex' => '#112233'],
-            'to' => ['role' => 'surfaceAlt'],
-            'direction' => 'to-bottom-end',
-        ];
 
         $token->putJson($this->path($seeded['storefront']->id), [
-            'config' => ['backgroundColor' => '#ffeedd', 'background' => $gradient],
+            'config' => ['backgroundColor' => '#ffeedd'],
             'draft_revision' => 0,
         ])->assertOk();
         $token->postJson($this->path($seeded['storefront']->id).'/publish', ['draft_revision' => 1])->assertOk();
 
         app(TenantContext::class)->set($auth['tenant_id']);
         $published = StorefrontPresentation::query()->where('storefront_id', $seeded['storefront']->id)->firstOrFail()->published_config;
-        $this->assertSame($gradient, $published['background']);
         $this->assertSame('#ffeedd', $published['backgroundColor']);
+        $this->assertArrayNotHasKey('background', $published);
         app(TenantContext::class)->forget();
     }
 
