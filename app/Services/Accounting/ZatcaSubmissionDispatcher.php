@@ -19,6 +19,7 @@ final class ZatcaSubmissionDispatcher
         private readonly ZatcaTransportCredentialResolver $credentials,
         private readonly ZatcaHttpTransport $transport,
         private readonly ZatcaSubmissionService $submissions,
+        private readonly ZatcaIssuedDocumentIntegrity $integrity,
     ) {}
 
     public function dispatch(ZatcaSubmissionAttempt $attempt): ZatcaSubmissionAttempt
@@ -150,6 +151,11 @@ final class ZatcaSubmissionDispatcher
         if ($attempt->submission_type !== $expectedType) {
             throw new RuntimeException('نوع محاولة ZATCA لا يطابق لقطة الفاتورة.');
         }
+
+        // الحدّ الأخير قبل النقل (الطريق الوحيد إلى `ZatcaHttpTransport::submit`): لا `request_hash` وحده — هو يثبت أن XML لم يتغيّر منذ
+        // تسجيل المحاولة فقط، لا أنه ما صدر. القيمتان المرسلتان (`zatca_hash` و`zatca_xml`) هما نفسا ما يُتحقَّق منه هنا:
+        // الكائن نفسه في الذاكرة بلا إعادة قراءة بين الفحص والإرسال.
+        $this->integrity->assertIntact($invoice);
     }
 
     private function clearedXml(?string $encoded): ?string

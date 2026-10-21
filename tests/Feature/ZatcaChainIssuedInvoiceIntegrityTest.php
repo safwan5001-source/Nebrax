@@ -13,7 +13,6 @@ use App\Services\Accounting\ZatcaSubmissionService;
 use App\Support\Settings;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
@@ -24,11 +23,10 @@ use Tests\TestCase;
  *
  * السياج F1 يجمّد هوية السلسلة (`zatca_icv`/`zatca_uuid`/`zatca_previous_hash`) فقط، ويترك `zatca_xml`/`zatca_hash`/`zatca_qr`/
  * `zatca_cleared_xml` قابلةً للكتابة كاليوم (مسار الإرسال يكتب الأخير، وفحوص ما قبل الإرسال تعتمد على إمكان تغيير اللقطة).
- * هذه الاختبارات **توثّق السلوك الفعلي** على المحرّكين:
- *   - ما تمنعه السلسلة (الإصدار اللاحق يفشل مغلقاً دون استهلاك ICV حين يتغيّر XML المستند السابق دلالياً؛ ولا يتأثر PIH بعمود الهاش).
- *   - ما لا يمنعه أحد اليوم (ثغرات مسجَّلة صراحةً باسم `known_gap_*`): لا القاعدة ولا مسار الإرسال يقارن `zatca_hash` بهاش `zatca_xml`،
- *     وXML المعدَّل قبل تسجيل محاولة الإرسال يُقبل لقطةً. الإرسال معطَّل افتراضياً ولا اتصال حقيقياً هنا (`Http::fake`).
- * إن أُغلقت ثغرة لاحقاً يفشل اختبارها عمداً ويُحدَّث مع القرار الجديد.
+ * هذه الاختبارات توثّق **الإصدار اللاحق**: لا يتأثر PIH بعمود الهاش، ويفشل مغلقاً دون استهلاك ICV إن تغيّر XML المستند السابق دلالياً،
+ * ولا يتحقق إلا من السابق مباشرةً. أما **الإرسال** فيحرسه `ZatcaIssuedDocumentIntegrity` (اختبارات `ZatcaSubmissionIntegrityTest`):
+ * الثغرتان اللتان كانتا هنا (`known_gap_a` وقبول XML معدَّل لقطةً قبل تسجيل المحاولة) أُغلقتا في TAX-ZATCA Document Integrity Hardening
+ * وصارت اختباراتهما هناك رفضاً. الإرسال معطَّل افتراضياً ولا اتصال حقيقياً هنا (`Http::fake`).
  */
 class ZatcaChainIssuedInvoiceIntegrityTest extends TestCase
 {
@@ -93,23 +91,6 @@ class ZatcaChainIssuedInvoiceIntegrityTest extends TestCase
         $this->assertSame([$first->id], $divergent);
     }
 
-    #[Test]
-    public function known_gap_a_wrong_but_well_formed_hash_is_sent_to_the_transport_without_a_local_check(): void
-    {
-        $first = $this->issue(); // قبل إنشاء اعتماد النقل: الفاتورة غير موقّعة كما في ZatcaSubmissionDispatcherTest.
-        $tampered = $this->wellFormedWrongHash($this->entry($first)->hash);
-        $this->configureTransport();
-        Http::fake(['https://gw-fatoora.zatca.gov.sa/*' => Http::response(['reportingStatus' => 'REPORTED'], 200)]);
-
-        $first->update(['zatca_hash' => $tampered]);
-        $attempt = $this->requestSubmission($first);
-        app(ZatcaSubmissionDispatcher::class)->dispatch($attempt);
-
-        // الحارس المحلي يفحص شكل البصمة (Base64 لـ32 بايت) ولا يقارنها بهاش XML المخزَّن ولا بمدخل السلسلة: الرفض هنا يأتي من ZATCA وحده.
-        Http::assertSent(fn (Request $request) => $request['invoiceHash'] === $tampered
-            && base64_decode($request['invoice'], true) === $first->zatca_xml);
-    }
-
     // ═══════════════ الحالة B — تعديل zatca_xml وحده ═══════════════
 
     #[Test]
@@ -160,30 +141,14 @@ class ZatcaChainIssuedInvoiceIntegrityTest extends TestCase
     }
 
     #[Test]
-    public function known_gap_b_an_xml_change_before_the_attempt_is_registered_is_accepted_as_the_snapshot(): void
-    {
-        $first = $this->issue();
-        $originalHash = (string) $first->zatca_hash;
-        $this->configureTransport();
-        Http::fake(['https://gw-fatoora.zatca.gov.sa/*' => Http::response(['reportingStatus' => 'REPORTED'], 200)]);
-
-        $changed = $this->tamperXml($first, (string) $first->zatca_xml);
-        $attempt = $this->requestSubmission($first); // request_hash يُحسب من XML المعدَّل نفسه
-        app(ZatcaSubmissionDispatcher::class)->dispatch($attempt);
-
-        // مسار الإرسال لا يقارن XML بهاش المدخل ولا بالعمود: يُرسل XML المعدَّل مع البصمة الأصلية. ZATCA ترفض هذا التناقض من جهتها.
-        Http::assertSent(fn (Request $request) => $request['invoiceHash'] === $originalHash
-            && base64_decode($request['invoice'], true) === $changed);
-    }
-
-    #[Test]
-    public function known_gap_b_tampering_with_an_older_document_is_not_caught_by_the_next_issuance(): void
+    public function the_next_issuance_verifies_only_its_immediate_predecessor(): void
     {
         $first = $this->issue();
         $second = $this->issue();
         $this->tamperXml($first, (string) $first->zatca_xml);
 
-        // التحقق يخصّ المستند السابق مباشرةً (الذي سيُبنى PIH منه) فقط؛ سلسلة كاملة تُفحص قرائياً بمقارنة هاش كل XML بمدخله.
+        // التحقق يخصّ المستند السابق مباشرةً (الذي سيُبنى PIH منه) فقط؛ المستند الأقدم المعدَّل لا يُرسَل أبداً (ZatcaSubmissionIntegrityTest)
+        // وتُفحص السلسلة كاملة قرائياً بمقارنة هاش كل XML بمدخله.
         $third = $this->issue();
         $this->assertSame(3, (int) $third->zatca_icv);
         $this->assertSame($this->entry($second)->hash, $third->zatca_previous_hash);

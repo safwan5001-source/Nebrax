@@ -10,6 +10,7 @@ use App\Services\Accounting\InvoiceService;
 use App\Services\Accounting\ZatcaSubmissionDispatcher;
 use App\Services\Accounting\ZatcaSubmissionService;
 use App\Support\Settings;
+use App\Support\ZatcaIntegrityException;
 use App\Tenancy\TenantContext;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\QueryException;
@@ -330,8 +331,15 @@ class TaxN01ZatcaDispatcherDiagnosticsTest extends TestCase
         $this->assertNothingSensitiveLogged();
     }
 
-    /** @test */
-    public function an_invalid_stored_hash_rejected_inside_the_transport_is_a_transport_error(): void
+    /**
+     * كان رفض هذه البصمة المشوَّهة يحدث داخل النقل (`transport_error`). منذ حارس سلامة المستند الصادر (TAX-ZATCA Document Integrity
+     * Hardening) تُرفض في مرحلة اللقطة قبل الاعتماد والنقل لأي فاتورة صدرت عبر السلسلة: الفشل نفسه (failed/submission_preflight_failed،
+     * لا طلب شبكي) لكن أبكر. تحقّق النقل من شكل البصمة باقٍ دفاعاً ثانياً ويُختبر لفاتورة ما قبل السلسلة في ZatcaSubmissionIntegrityTest
+     * وZatcaHttpTransportTest.
+     *
+     * @test
+     */
+    public function an_invalid_stored_hash_is_now_rejected_at_the_snapshot_stage_before_the_transport(): void
     {
         Http::fake();
         $attempt = $this->attempt();
@@ -340,7 +348,7 @@ class TaxN01ZatcaDispatcherDiagnosticsTest extends TestCase
         $completed = app(ZatcaSubmissionDispatcher::class)->dispatch($attempt);
 
         $this->assertPersistedPreflightFailure($completed);
-        $this->assertSafeContext($this->onlyFailureLog(), $attempt, 'transport_error', RuntimeException::class);
+        $this->assertSafeContext($this->onlyFailureLog(), $attempt, 'snapshot_mismatch', ZatcaIntegrityException::class);
         Http::assertNothingSent();
     }
 

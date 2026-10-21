@@ -166,6 +166,8 @@ Rollback becomes prohibited at the first committed row in `zatca_chain_entries`,
 
 ## 8b. F1 integrity review follow-up (tests only; no production logic changed)
 
+> **Superseded in part:** the submission-path gaps listed below (A, B, and the older-invoice case for transmission) were closed by the next slice, `ZATCA-DOCUMENT-INTEGRITY-HARDENING-REPORT.md` (guard `ZatcaIssuedDocumentIntegrity` before any transmission). The table records the behaviour as reviewed at REM-18b-2.
+
 Owner review asked what happens when an already-issued invoice has only `zatca_hash` or only `zatca_xml` modified. Behaviour is now pinned by `ZatcaChainIssuedInvoiceIntegrityTest` (SQLite and PostgreSQL).
 
 | Case | Database | Next issuance | Submission path |
