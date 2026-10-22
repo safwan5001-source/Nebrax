@@ -52,7 +52,7 @@ class PosTerminalRequest extends BaseModel
 
     protected $fillable = [
         'tenant_id', 'branch_id', 'pos_session_id', 'pos_payment_terminal_id', 'payment_method_id', 'idempotency_key', 'amount', 'currency',
-        'status', 'provider_ref', 'approval_code', 'rrn', 'last4', 'failure_code', 'void_attempts', 'last_void_error', 'compensating_until',
+        'status', 'provider_ref', 'approval_code', 'rrn', 'last4', 'failure_code', 'void_attempts', 'last_void_error', 'compensating_until', 'lease_token',
         'consumed_payment_id', 'consumed_invoice_id', 'created_by', 'resolved_by', 'resolution_note',
         'approved_at', 'consumed_at', 'voided_at', 'resolved_at',
     ];

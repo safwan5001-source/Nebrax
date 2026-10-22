@@ -63,7 +63,10 @@ class PosTerminalController extends ApiController
         if (array_key_exists('pos_device_id', $data)) {
             $this->assertDevice($data['pos_device_id']);
         }
-        $this->assertUnique(isset($data['name']) ? trim($data['name']) : null, $data['code'] ?? null, $terminal->id);
+        if (isset($data['name'])) {
+            $data['name'] = trim($data['name']);
+        }
+        $this->assertUnique($data['name'] ?? null, $data['code'] ?? null, $terminal->id);
         if (isset($data['is_active']) && $data['is_active'] === false
             && PosTerminalRequest::query()->where('pos_payment_terminal_id', $terminal->id)->whereIn('status', [...PosTerminalRequest::IN_FLIGHT, PosTerminalRequest::STATUS_COMPENSATION_REQUIRED])->exists()) {
             abort(422, 'لا يمكن تعطيل جهاز عليه طلب نشط أو تعويض لم يُحل.');

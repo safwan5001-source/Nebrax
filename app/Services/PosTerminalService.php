@@ -16,6 +16,7 @@ use App\Tenancy\BranchContext;
 use App\Tenancy\TenantContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -134,7 +135,8 @@ class PosTerminalService
     {
         $lease = max(10, (int) config('pos_terminals.compensation_lease_seconds', 90));
 
-        $claimed = DB::transaction(function () use ($requestId, $lease) {
+        $token = (string) Str::uuid();
+        $claimed = DB::transaction(function () use ($requestId, $lease, $token) {
             $request = PosTerminalRequest::query()->whereKey($requestId)->lockForUpdate()->firstOrFail();
             if (! in_array($request->status, [PosTerminalRequest::STATUS_CREATED, PosTerminalRequest::STATUS_SENT], true)) {
                 return [null, $request];
@@ -142,7 +144,7 @@ class PosTerminalService
             if ($request->compensating_until !== null && $request->compensating_until->isFuture()) {
                 throw new PosTerminalException('operation_in_progress', 'عملية أخرى جارية على هذا الطلب؛ أعد المحاولة بعد لحظات.');
             }
-            $request->update(['compensating_until' => now('UTC')->addSeconds($lease)]);
+            $request->update(['compensating_until' => now('UTC')->addSeconds($lease), 'lease_token' => $token]);
 
             return [$request, $request];
         });
@@ -153,11 +155,12 @@ class PosTerminalService
         try {
             $result = $call($claimed[0]);
         } catch (Throwable $e) {
-            DB::table('pos_terminal_requests')->where('id', $requestId)->whereIn('status', [PosTerminalRequest::STATUS_CREATED, PosTerminalRequest::STATUS_SENT])->update(['compensating_until' => null]);
+            // يحرّر إيجاره هو فقط: إن انتهى وأخذه غيره فلا يمسّه.
+            DB::table('pos_terminal_requests')->where('id', $requestId)->where('lease_token', $token)->update(['compensating_until' => null, 'lease_token' => null]);
             throw $e;
         }
 
-        return $this->settle($this->apply($requestId, $result, $expireOnCancel));
+        return $this->settle($this->apply($requestId, $result, $expireOnCancel, $token));
     }
 
     /** يستعلم الجهاز (الحقيقة) ويطبّق النتيجة على طلب قيد التنفيذ. */
@@ -467,17 +470,20 @@ class PosTerminalService
         return $request;
     }
 
-    private function apply(string $requestId, PosTerminalResult $result, bool $expireOnCancel = false): PosTerminalRequest
+    private function apply(string $requestId, PosTerminalResult $result, bool $expireOnCancel = false, ?string $leaseToken = null): PosTerminalRequest
     {
-        return DB::transaction(function () use ($requestId, $result, $expireOnCancel) {
+        return DB::transaction(function () use ($requestId, $result, $expireOnCancel, $leaseToken) {
             $request = PosTerminalRequest::query()->whereKey($requestId)->lockForUpdate()->firstOrFail();
             $from = $request->status;
             if (! in_array($from, [PosTerminalRequest::STATUS_CREATED, PosTerminalRequest::STATUS_SENT], true)) {
                 return $request; // نهائي أو موافَق عليه: لا يُعاد تفسيره بنتيجة متأخرة
             }
+            if ($leaseToken !== null && $request->lease_token !== $leaseToken) {
+                return $request; // انتهى إيجار هذه العملية وأخذه غيرها: نتيجتها متأخرة ولا تُطبَّق (صاحب الإيجار الحالي يقرّر).
+            }
 
             // كل نتيجة تُحرّر إيجار عملية المزوّد (providerOp).
-            $refs = ['provider_ref' => $result->providerRef ?? $request->provider_ref, 'compensating_until' => null];
+            $refs = ['provider_ref' => $result->providerRef ?? $request->provider_ref, 'compensating_until' => null, 'lease_token' => null];
             switch ($result->status) {
                 case PosTerminalResult::PENDING:
                     $request->update([

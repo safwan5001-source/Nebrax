@@ -431,6 +431,26 @@ class PosTerminalFoundationTest extends TestCase
     }
 
     #[Test]
+    public function a_late_result_from_an_expired_lease_owner_is_fenced_and_cannot_clobber_the_new_owner(): void
+    {
+        $ctx = $this->context('pos-term-fence');
+        $id = $this->createRequest($ctx, 11500)->assertCreated()->json('data.id');
+        $this->fake->script($id, 'approved');
+
+        // نداء الاستعلام بطيء: أثناءه ينتهي إيجاره ويأخذه مالك آخر (عملية إلغاء جارية).
+        $this->fake->duringFetch = function () use ($id) {
+            DB::table('pos_terminal_requests')->where('id', $id)->update(['compensating_until' => now('UTC')->addSeconds(60), 'lease_token' => 'other-owner-token']);
+        };
+        $this->show($ctx, $id)->assertOk()->assertJsonPath('data.status', 'sent');
+        $this->fake->duringFetch = null;
+
+        $row = PosTerminalRequest::query()->withoutGlobalScopes()->findOrFail($id);
+        $this->assertSame('sent', $row->status, 'نتيجة المالك المنتهي لا تُحفظ (موافقة متأخرة)');
+        $this->assertSame('other-owner-token', $row->lease_token, 'إيجار المالك الحالي لم يُمسّ');
+        $this->assertTrue($row->compensating_until->isFuture());
+    }
+
+    #[Test]
     public function provider_operations_on_one_request_are_serialized_by_a_lease_and_the_lease_is_always_released(): void
     {
         $ctx = $this->context('pos-term-serialize');
@@ -467,6 +487,9 @@ class PosTerminalFoundationTest extends TestCase
         $this->withToken($ctx['token'])->postJson('/api/pos-payment-terminals', ['name' => 'جهاز ج', 'provider' => 'fake', 'code' => 'T-1'])->assertStatus(422);
         // نفسه لا يتعارض مع نفسه.
         $this->withToken($ctx['token'])->putJson("/api/pos-payment-terminals/{$a['id']}", ['name' => $a['name'], 'code' => 'T-1'])->assertOk();
+        // الاسم المحفوظ هو المقصوص نفسه الذي فُحص تفرّده (لا نسخة بمسافات تتجاوز الفحص لاحقاً).
+        $this->withToken($ctx['token'])->putJson("/api/pos-payment-terminals/{$b['id']}", ['name' => '  جهاز ب جديد  '])->assertOk()->assertJsonPath('data.name', 'جهاز ب جديد');
+        $this->withToken($ctx['token'])->postJson('/api/pos-payment-terminals', ['name' => 'جهاز ب جديد', 'provider' => 'fake'])->assertStatus(422);
     }
 
     #[Test]

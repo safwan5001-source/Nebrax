@@ -56,6 +56,8 @@ return new class extends Migration
             $table->unsignedSmallInteger('void_attempts')->default(0);
             $table->string('last_void_error', 48)->nullable();
             $table->timestamp('compensating_until')->nullable();
+            // رمز ملكية إيجار عملية المزوّد: نتيجة متأخرة من مالك منتهي الإيجار لا تُطبَّق (providerOp).
+            $table->string('lease_token', 36)->nullable();
             $table->foreignUuid('consumed_payment_id')->nullable()->constrained('payments')->restrictOnDelete();
             $table->foreignUuid('consumed_invoice_id')->nullable()->constrained('invoices')->restrictOnDelete();
             $table->foreignUuid('created_by')->nullable()->constrained('users')->nullOnDelete();
