@@ -257,10 +257,14 @@ class ImportJobRepairTest extends TestCase
         [$auth, $parent] = $this->failedParent();
         $fixed = $this->correctedRows($auth, $parent);
 
-        $first = $this->repair($auth, $parent, $this->xlsxFile($fixed), ['idempotency_key' => 'rp-key-1'])->assertCreated()['data']['id'];
+        // إعادة المحاولة الحقيقية ترسل **البايتات نفسها** (بصمة الملف جزء من هوية الطلب)؛ XLSX المبنيّ من جديد يحمل طابع زمن ZIP قد يختلف بين الثانيتين.
+        $file = $this->xlsxFile($fixed);
+        $same = fn () => new UploadedFile($file->getPathname(), 'fixed.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', null, true);
+
+        $first = $this->repair($auth, $parent, $same(), ['idempotency_key' => 'rp-key-1'])->assertCreated()['data']['id'];
         $this->applyAll($auth, $first)->assertJsonPath('data.status', 'completed');
 
-        $retry = $this->repair($auth, $parent, $this->xlsxFile($fixed), ['idempotency_key' => 'rp-key-1'])->assertOk();
+        $retry = $this->repair($auth, $parent, $same(), ['idempotency_key' => 'rp-key-1'])->assertOk();
         $this->assertSame($first, $retry['data']['id']);
         $this->assertSame(250, Product::query()->count());
     }
