@@ -159,12 +159,14 @@ class PosSessionController extends ApiController
             $preview['cash_drawer']['expected_amount'] = null;
             foreach ($preview['payment_methods'] as &$method) {
                 $method['expected_amount'] = null;
+                $method['clearing_amount'] = null; // الجزء المقاصّ جزء من المتوقَّع: يُحجب مع العدّ الأعمى.
             }
             unset($method);
         } else {
             $preview['cash_drawer']['expected_amount'] = Money::toRiyal($preview['cash_drawer']['expected_amount']);
             foreach ($preview['payment_methods'] as &$method) {
                 $method['expected_amount'] = Money::toRiyal($method['expected_amount']);
+                $method['clearing_amount'] = Money::toRiyal($method['clearing_amount'] ?? 0);
             }
             unset($method);
         }

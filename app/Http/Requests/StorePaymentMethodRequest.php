@@ -23,6 +23,8 @@ class StorePaymentMethodRequest extends FormRequest
             'available_online' => ['sometimes', 'boolean'],
             'is_active' => ['sometimes', 'boolean'],
             'is_default' => ['sometimes', 'boolean'],
+            // D-09: NULL/غياب = بلا مقاصة (A11). الفحص الموضوعي (نوع الطريقة، اتصال المستأجر النشط) في المتحكّم.
+            'pos_clearing_gateway_id' => ['sometimes', 'nullable', 'uuid'],
         ];
     }
 }

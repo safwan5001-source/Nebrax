@@ -411,6 +411,7 @@ class PosSessionService
                 'payment_method_name' => $method->name,
                 'settlement_type' => $method->settlement_type,
                 'expected_amount' => 0,
+                'clearing_amount' => 0,
             ];
         }
 
@@ -476,8 +477,13 @@ class PosSessionService
                 'payment_method_name' => $payment->payment_method_name ?: ($method?->name ?? $settlementType),
                 'settlement_type' => $settlementType,
                 'expected_amount' => 0,
+                // D-09: الجزء المحصَّل عبر مقاصة المستحوذ (سند ببوابة) — ينتظر التسوية ولا يصل البنك فوراً.
+                'clearing_amount' => 0,
             ];
             $rows[$key]['expected_amount'] += (int) $payment->amount;
+            if (filled($payment->payment_gateway_id)) {
+                $rows[$key]['clearing_amount'] += (int) $payment->amount;
+            }
         }
 
         ksort($rows);
