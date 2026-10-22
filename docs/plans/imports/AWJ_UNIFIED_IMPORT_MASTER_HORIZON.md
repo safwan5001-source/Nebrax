@@ -238,6 +238,7 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
 
 ### H6 — Sales & ZATCA (**gated by D-03**)
 - **IMP-H6-S1..S3:** Drafts of new sales invoices via `InvoiceService::create`, with external reference de-duplication. **Never `post()` from import. No `issued_at`, ICV, PIH, hash, QR or XML is produced by import.** Historical-invoice migration is out of scope unless D-03 says otherwise.
+  - Gates: `invoices.manage` **and the plan limit** `EnforcePlanLimit:invoices`. The direct `POST invoices` enforces that limit per request, so a bulk import must check the remaining quota for the **whole** batch before any draft is created (all-or-nothing per job) and must re-check it inside the creating transaction. Imports must not become a plan-limit bypass. A test covers a batch that exceeds the remaining quota.
 
 ### H7 — Inventory
 - **IMP-H7-S1:** Stocktake count-sheet import into an *open* stocktake (counts only; variances are posted by the stocktake's own flow).
@@ -263,6 +264,7 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
   - Flags default off.
 - **IMP-H9-S2 — Natural-language instructions.** The instruction text is parsed into a constrained, schema-validated *operation plan* (mode, policies, field mapping, row filters). Free-form model output is never executed.
 - **IMP-H9-S3 — Assistant tool `imports.open_action`.** This read and draft tool lets the assistant attach a file to an AI Action, report status, explain errors and start a repair. It **cannot** approve or execute; those remain human UI actions bound to the approval hash.
+  - The tool runs `AiActionPolicy::authorize` with the target type's full gates (H1-S7) on every call.
 - **IMP-H9-S4 — Conversational repair.** Failed rows are explained, and fixes are proposed as a new version, then go through the normal approve and execute steps.
 - Activation in any environment (provider key, `*_EXTERNAL_NETWORK_ENABLED`, tenant consent) is **D-02**, an owner decision. Code ships dark.
 
