@@ -7,6 +7,7 @@ use App\Http\Requests\StoreImportJobRequest;
 use App\Http\Resources\ImportJobResource;
 use App\Models\ImportJob;
 use App\Services\ImportJobAccess;
+use App\Services\ImportJobFailuresExporter;
 use App\Services\ImportJobService;
 use App\Support\SensitiveCostPolicy;
 use Illuminate\Http\JsonResponse;
@@ -22,6 +23,7 @@ class ImportJobController extends ApiController
     public function __construct(
         private readonly ImportJobService $jobs,
         private readonly ImportJobAccess $access,
+        private readonly ImportJobFailuresExporter $failures,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -50,10 +52,29 @@ class ImportJobController extends ApiController
     public function show(Request $request, string $id): JsonResponse
     {
         $this->access->assertViewAny($request);
-        $job = ImportJob::query()->whereKey($id)->firstOrFail();
+        $job = ImportJob::query()->whereKey($id)->withCount(['units as failed_units_count' => fn ($q) => $q->where('status', 'failed')])->firstOrFail();
         $this->access->assertView($request, $job->domain);
 
         return (new ImportJobResource($job))->response();
+    }
+
+    /**
+     * IMP-H1-S8a — الصفوف الفاشلة بقيمها الأصلية + معرّف المصدر الثابت ورمز الخطأ. **صلاحية الإدارة** (لا العرض) + قدرة المجال + نطاق فرع
+     * التشغيلة: الملف يحمل بيانات الصفوف الخام. الأعمدة الحسّاسة تُحجب لمن لا يملك صلاحية الحقل (انظر `ImportJobFailuresExporter`).
+     */
+    public function failures(Request $request, string $id)
+    {
+        $this->access->assertManageAny($request);
+        $job = ImportJob::query()->whereKey($id)->firstOrFail();
+        $this->access->assertManage($request, $job->domain);
+        $this->access->assertJobBranch($request, $job->branch_id);
+
+        $requested = (string) ($request->validate(['format' => ['sometimes', 'nullable', 'in:csv,xlsx']])['format'] ?? '');
+        $format = $requested !== '' ? $requested : (in_array($job->extension, ['csv', 'xlsx'], true) ? (string) $job->extension : 'csv');
+
+        $file = $this->domain(fn () => $this->failures->export($job, SensitiveCostPolicy::authorized($request->user()), $format));
+
+        return response()->download($file['path'], $file['filename'], ['Content-Type' => $file['mime']])->deleteFileAfterSend(true);
     }
 
     public function store(StoreImportJobRequest $request): JsonResponse

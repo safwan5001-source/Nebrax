@@ -401,12 +401,16 @@ class ImportJobService
                 );
 
                 try {
-                    $chunk = $this->withJobBranch($locked, fn () => $this->runChunk($locked, $tmpPath, $archiveTmpPath, $frozenOptions, $offset, $batchSize, $userId, $costAuthorized));
+                    // IMP-H1-S8a: القطعة معاملةٌ فرعيّة (savepoint) كاملة — فشلٌ في أي مرحلة منها (ومنها صور المنتجات بعد كتابة الصفوف) يُرجع كتابات
+                    // النافذة معاً، فلا تبقى منتجات مكتوبة بلا أن تُحسب منجزة، ويصحّ وصف الوحدات الفاشلة بأنها «لم تُطبَّق».
+                    $chunk = DB::transaction(fn () => $this->withJobBranch($locked, fn () => $this->runChunk($locked, $tmpPath, $archiveTmpPath, $frozenOptions, $offset, $batchSize, $userId, $costAuthorized)));
                 } catch (Throwable $e) {
                     $locked->forceFill([
                         'status' => ImportJobStatus::FAILED,
                         'error_message' => $e->getMessage(),
                     ])->save();
+                    // IMP-H1-S8a: الوحدات الفاشلة/غير المنجزة تُسجَّل في معاملة الفشل نفسها (حالة `failed` بلا وحداتها غير ممكنة).
+                    app(ImportJobUnitRecorder::class)->recordChunkFailure($locked, $this->domains->for($locked->domain), $offset, $batchSize, $e);
 
                     return $locked;
                 }
