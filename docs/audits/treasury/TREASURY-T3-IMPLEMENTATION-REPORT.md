@@ -94,7 +94,15 @@ Running the tests on PostgreSQL found a real defect in the first draft: a non-UU
 
 ## 5. Results
 
-RESULTS_PLACEHOLDER
+| Run (local sandbox) | Result |
+|---|---|
+| `TreasurySelectionResolverTest` | 21 passed on SQLite and 21 passed on PostgreSQL 16 |
+| Mutations (substitute an active entity for an inactive main; wire the resolver into a service) | each makes the matching test fail |
+| Full SQLite suite | 8448 passed, 194 skipped, 27 failed |
+| Full PostgreSQL suite, `--parallel --processes=4` (as CI) | 8669 tests, 27 failing |
+| CI (sqlite, pgsql, web build, CI Gate) | see the PR |
+
+The 27 local failures are the same pre-existing set as in the T1 and T2 reports and none touches treasury code: 26 `Fuel*` tests (this sandbox lacks `bcmath`; CI has it), `AiPaidProviderDisabledTest` on SQLite and `StorefrontMediaApiTest` on PostgreSQL (both fail identically on `main`). The existing treasury, payment, refund and POS suites are inside the full runs and pass unchanged, as expected since no existing file was modified.
 
 ## 6. Risks and remaining decisions
 
