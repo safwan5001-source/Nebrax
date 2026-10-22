@@ -34,4 +34,17 @@ Additive endpoints only. Railway auto-deploy of `main` runs `migrate --force` �
 
 ## Disclosures
 
-No Codex review (quota exhausted); independent subagent review recorded below if run. Full local suite not run (CI is the full gate); related subsets run locally.
+No Codex review (quota exhausted). Full local suite not run (CI is the full gate); related subsets run locally.
+
+## Independent review (read-only subagent, static — it could not run tests) — disposition
+
+No high/medium findings. Authorization chain (auth → principal → tenant → subscription → permission), single-writer lock + required audit, platform floor (no bypass), route non-collision and audit-endpoint visibility were each checked: nothing found.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | Unknown-field check used `all()`, so a query string (`?x=1`) made a valid PUT 422 | **Fixed** (body keys only; test) |
+| 2 | `tenants.settings` is one JSON blob: a non-locking `Settings::put` elsewhere can lose-update this key (pre-existing, same as the assistant-consent precedent) | **Not fixed here — pre-existing; tracked as a hardening item** |
+| 3 | Unnamed throttle bucket is per user and shared with other AI routes | Informational (existing convention) |
+| 4 | 409 here vs 403 for the same `platform_disabled` code in `AiActionPolicy` | Informational (different surfaces; documented) |
+| 5 | Audit event stored under `feature='assistant'` and visible in the assistant audit list | Cosmetic; accepted |
+| – | Test gaps: audit-failure rollback, concurrent PUTs, inactive user/tenant (covered upstream by `SetTenant`) | Noted; not added in this slice |

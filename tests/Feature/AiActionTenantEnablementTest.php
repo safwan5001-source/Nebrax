@@ -143,6 +143,8 @@ class AiActionTenantEnablementTest extends TestCase
         $this->withToken($auth['token'])->putJson(self::URL, ['enabled' => true, 'execution_enabled' => true])->assertUnprocessable();
         $this->withToken($auth['token'])->putJson(self::URL, ['enabled' => true, 'tenant_id' => 'x'])->assertUnprocessable();
         $this->assertFalse($this->tenantFlag($auth['tenant_id']));
+        // مفاتيح الاستعلام ليست جزءاً من الجسم المغلق.
+        $this->withToken($auth['token'])->putJson(self::URL.'?trace=1', ['enabled' => true])->assertOk();
     }
 
     /** @test */

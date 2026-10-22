@@ -22,7 +22,8 @@ class AiActionTenantSettingsRequest extends FormRequest
     public function after(): array
     {
         return [function ($validator): void {
-            foreach (array_diff(array_keys($this->all()), ['enabled']) as $unknown) {
+            // جسم الطلب وحده: مفاتيح الاستعلام (`?x=1`) ليست جزءاً من العقد ولا تُرفض.
+            foreach (array_diff(array_keys($this->request->all()), ['enabled']) as $unknown) {
                 $validator->errors()->add((string) $unknown, 'حقل غير مسموح.');
             }
         }];
