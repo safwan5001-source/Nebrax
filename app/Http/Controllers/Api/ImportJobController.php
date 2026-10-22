@@ -6,6 +6,7 @@ use App\Http\Requests\ApplyImportJobRequest;
 use App\Http\Requests\StoreImportJobRequest;
 use App\Http\Resources\ImportJobResource;
 use App\Models\ImportJob;
+use App\Services\ImportJobAccess;
 use App\Services\ImportJobService;
 use App\Support\SensitiveCostPolicy;
 use Illuminate\Http\JsonResponse;
@@ -18,7 +19,10 @@ use Illuminate\Http\Request;
  */
 class ImportJobController extends ApiController
 {
-    public function __construct(private readonly ImportJobService $jobs) {}
+    public function __construct(
+        private readonly ImportJobService $jobs,
+        private readonly ImportJobAccess $access,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -28,7 +32,9 @@ class ImportJobController extends ApiController
             'per_page' => ['sometimes', 'nullable', 'integer', 'min:10', 'max:100'],
         ]);
 
-        $query = ImportJob::query()->orderByDesc('created_at');
+        // IMP-H1-S1: القائمة تُصفّى إلى المجالات التي يملك المستخدم عرضها (صلاحية + قدرة) — بلا 403، وبلا تسريب
+        // لتشغيلات مجالٍ لا يراه. كانت القائمة تُظهر كل المجالات لكل من يملك `products.view`.
+        $query = ImportJob::query()->whereIn('domain', $this->access->viewableDomains($request))->orderByDesc('created_at');
         if (! empty($filters['domain'])) {
             $query->where('domain', $filters['domain']);
         }
@@ -41,9 +47,12 @@ class ImportJobController extends ApiController
         )->response();
     }
 
-    public function show(string $id): JsonResponse
+    public function show(Request $request, string $id): JsonResponse
     {
-        return (new ImportJobResource(ImportJob::query()->whereKey($id)->firstOrFail()))->response();
+        $job = ImportJob::query()->whereKey($id)->firstOrFail();
+        $this->access->assertView($request, $job->domain);
+
+        return (new ImportJobResource($job))->response();
     }
 
     public function store(StoreImportJobRequest $request): JsonResponse
@@ -75,6 +84,7 @@ class ImportJobController extends ApiController
     public function apply(ApplyImportJobRequest $request, string $id): JsonResponse
     {
         $job = ImportJob::query()->whereKey($id)->firstOrFail();
+        $this->access->assertManage($request, $job->domain);
         $job = $this->domain(fn () => $this->jobs->applyNextChunk(
             $job,
             $request->applyOptions(),
@@ -88,6 +98,7 @@ class ImportJobController extends ApiController
     public function cancel(Request $request, string $id): JsonResponse
     {
         $job = ImportJob::query()->whereKey($id)->firstOrFail();
+        $this->access->assertManage($request, $job->domain);
         $job = $this->domain(fn () => $this->jobs->cancel($job, $request->user()?->id));
 
         return (new ImportJobResource($job))->response();

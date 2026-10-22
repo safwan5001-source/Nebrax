@@ -2,14 +2,24 @@
 
 namespace App\Http\Requests;
 
+use App\Services\ImportJobAccess;
 use App\Support\ImportJobDomain;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class StoreImportJobRequest extends FormRequest
 {
+    /**
+     * IMP-H1-S1 — صلاحية الإدارة + قدرة **مجال** التشغيلة، قبل أي فحص لمحتوى الملف (يجري `authorize` قبل
+     * التحقق). مجالٌ غير معروف يُحاسَب على بوابات كتالوج المنتجات (سلوك المسار القديم نفسه) ثم يفشل
+     * التحقق 422 — فلا يتحوّل 403 إلى 422 لمن لا يملك أي صلاحية.
+     */
     public function authorize(): bool
     {
+        $domain = (string) $this->input('domain');
+        $known = in_array($domain, ImportJobDomain::values(), true) ? $domain : ImportJobDomain::PRODUCT_CATALOG;
+        app(ImportJobAccess::class)->assertManage($this, $known);
+
         return true;
     }
 

@@ -32,6 +32,19 @@ class EnsureApplicationActive
 
     public function handle(Request $request, Closure $next, string $key): Response
     {
+        $this->authorize($request, $key);
+
+        return $next($request);
+    }
+
+    /**
+     * يطبّق حارس القدرة على الطلب الحالي ويرمي 403 إن لم يُسمح — **المنطق الوحيد** لهذا الحارس.
+     * يُستدعى من `handle()` للمسارات الثابتة، ومن خدمات تعرف مفتاح القدرة وقت التنفيذ لا وقت تعريف
+     * المسار (مثل تشغيلات الاستيراد الدائم حيث يحدّد **مجال** التشغيلة القدرة). لا نسخة ثانية من
+     * القواعد: الإنفاذ التجاري/المراقبة الظلية/رسائل الرفض كلها هنا.
+     */
+    public function authorize(Request $request, string $key): void
+    {
         // اسم Middleware أو مفتاح App Guard الخاطئ لا يملك سلوكاً متسامحاً:
         // الرفض الموحّد لا يكشف إن كان الخطأ ناتجاً من كتالوج أو تهيئة مسار.
         $operation = $this->operations->classify($request);
@@ -51,11 +64,11 @@ class EnsureApplicationActive
         $this->shadow->observe($request, $key, $operation, $legacy);
 
         if ($status === 'enabled') {
-            return $next($request);
+            return;
         }
 
         if ($status === 'suspended' && $request->isMethodSafe()) {
-            return $next($request);
+            return;
         }
 
         abort(403, $status === 'suspended'
