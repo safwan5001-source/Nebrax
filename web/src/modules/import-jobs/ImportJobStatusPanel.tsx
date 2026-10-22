@@ -49,6 +49,7 @@ export function ImportJobStatusPanel({
           ) : null}
           {t(`status_${job.status}` as 'status_ready')}
         </Badge>
+        {job.parent_job_id ? <Badge tone="muted">{t('repair_job')}</Badge> : null}
         <span className="num text-xs text-muted" dir="ltr" title={job.id}>
           {job.original_filename}
         </span>

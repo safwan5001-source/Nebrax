@@ -1262,7 +1262,16 @@
     "atomic_processing": "Processing the whole file as one step — this cannot be split into partial progress.",
     "network_uncertain": "Connection interrupted — checking the actual status on the server before showing anything.",
     "cancel": "Cancel",
-    "cancelling": "Cancelling…"
+    "cancelling": "Cancelling…",
+    "repair_job": "Repair run",
+    "repair_title": "Repair failed rows",
+    "repair_hint": "{count} rows from this file were not applied. Rows that succeeded will not be repeated.",
+    "repair_step_download": "Download the failed-rows file (XLSX): it has their original values and an error column.",
+    "repair_step_fix": "Fix the rows that carry an error; the others are valid and were rolled back with their batch, so they apply unchanged.",
+    "repair_step_upload": "Upload the same file to apply the corrected rows.",
+    "repair_download": "Download failed rows",
+    "repair_upload": "Upload corrected file",
+    "repair_protected_note": "Do not edit or delete the columns starting with _awj_ — they identify each row. Cost columns appear blank if you lack the cost permission."
   },
   "demo": {
     "banner": "Preview mode — demo data, not connected to any server",

@@ -42,6 +42,8 @@ import {
   suggestedMapping,
 } from '@/modules/products/import/contract';
 import { ImportJobStatusPanel } from '@/modules/import-jobs/ImportJobStatusPanel';
+import { ImportRepairPanel } from '@/modules/import-jobs/ImportRepairPanel';
+import { downloadImportFailures } from '@/modules/import-jobs/client';
 import { useImportJobEngine, useImportJobUrlParam, useResumeFromUrl } from '@/modules/import-jobs/useImportJobEngine';
 import type { ApplyOptions } from '@/modules/import-jobs/client';
 import { cn } from '@/lib/utils';
@@ -217,6 +219,14 @@ export default function ProductImportPage() {
       return;
     }
     await engine.applyLoop(engine.job.id, engine.job.preview_bound ? {} : applyOptionsPayload());
+  }
+
+  // IMP-H1-S8c: تشغيلةٌ فاشلة لها وحداتٌ قابلة للإصلاح ⇒ ملفٌّ مصحَّح يُنشئ تشغيلة فرعية ثم يُرحَّل كأي تشغيلة (الخادم يطالب بالوحدات).
+  async function repairFailedRows(repairFile: File) {
+    if (!engine.job) return;
+    const child = await engine.repair(engine.job.id, repairFile);
+    if (!child) return;
+    await engine.applyLoop(child.id, child.preview_bound ? {} : applyOptionsPayload());
   }
 
   useEffect(() => {
@@ -711,6 +721,12 @@ export default function ProductImportPage() {
               networkUncertain={engine.networkUncertain}
               cancelling={engine.busy === 'cancelling'}
               onCancel={engine.job ? () => void engine.cancel(engine.job!.id) : undefined}
+            />
+            <ImportRepairPanel
+              job={engine.job}
+              busy={engine.busy !== null}
+              onDownload={() => void downloadImportFailures(engine.job!.id)}
+              onRepair={(repairFile) => void repairFailedRows(repairFile)}
             />
           </CardContent>
         </Card>
