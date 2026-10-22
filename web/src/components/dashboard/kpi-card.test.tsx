@@ -26,3 +26,25 @@ describe('KpiCard at phone widths (ERP-UX-024)', () => {
     expect(screen.getByText('-10,471.5 𞸁')).toBeTruthy();
   });
 });
+
+describe('KpiCard unavailable state (TREASURY-T2)', () => {
+  it('shows a dash and the reason instead of a misleading zero, with no unit or sparkline', () => {
+    render(<KpiCard label="Cash" value="0" unit="SAR" icon={Wallet} trend={[1, 2, 3]} unavailable="Balance unavailable" />);
+    expect(screen.getByText('Balance unavailable')).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toContain('Balance unavailable');
+    expect(screen.queryByText('0')).toBeNull();
+    expect(screen.queryByText('SAR')).toBeNull();
+    expect(screen.queryByRole('img')).toBeNull();
+  });
+
+  it('still renders a genuine zero balance as a number', () => {
+    render(<KpiCard label="Cash" value="0" unit="SAR" icon={Wallet} />);
+    expect(screen.getByText('0')).toBeTruthy();
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('loading wins over unavailable', () => {
+    render(<KpiCard label="Cash" value="0" icon={Wallet} loading unavailable="Balance unavailable" />);
+    expect(screen.queryByText('Balance unavailable')).toBeNull();
+  });
+});

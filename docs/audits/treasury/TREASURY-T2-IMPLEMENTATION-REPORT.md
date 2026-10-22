@@ -22,13 +22,15 @@ Every treasury created through the Treasuries & Banks module gets its own GL acc
 | File | Change |
 |---|---|
 | `app/Services/Reporting/CashAccountResolver.php` (new) | Tenant-scoped set of "cash and bank" GL accounts = accounts linked to `CashBankAccount` entities (active **and inactive**, so history survives) ∪ legacy `1110`/`1120` when they exist. It never guesses from the `111`/`112` prefix: the group accounts and any unlinked `111x` account are excluded. Read-only; no fallback to any other account. |
-| `app/Services/Reporting/ReportService.php` | `cashFlow()` takes its account set from the resolver (everything else, including classification, filters and date handling, is untouched). New `cashPosition()` returns the total and per-account balance from the same `account_balances` snapshot `/accounts` already used. |
-| `app/Http/Controllers/Api/ReportController.php`, `routes/api.php` | `GET /api/reports/cash-position` (`reports.view`, same group as `reports/cash-flow`). |
-| `web/src/app/(app)/dashboard/page.tsx` | KPI reads `/reports/cash-position` instead of summing two account codes. |
-| `web/src/lib/mock-data.ts` | Demo-mode response for the new endpoint (total equals the sum of the mock 1110 and 1120 balances). |
-| `tests/Feature/TreasuryAwareCashReportsTest.php` (new) | 16 cases, below. |
+| `app/Services/Reporting/ReportService.php` | `cashFlow()` takes its account set from the resolver (everything else, including classification, filters and date handling, is untouched). New `cashPosition()` returns **one total only**. An unrestricted user gets the company total from the same `account_balances` snapshot `/accounts` used; a branch-restricted user gets the sum of the journal lines of their own branches, i.e. the same branch rule every other report applies (`branchIds`). |
+| `app/Http/Controllers/Api/ReportController.php`, `routes/api.php` | `GET /api/reports/cash-position` (`reports.view`, same group as `reports/cash-flow`). Response is exactly `{ "balance": "2000.00" }`: no account names, codes, ids or per-account balances. |
+| `web/src/app/(app)/dashboard/page.tsx`, `web/src/lib/dashboard.ts`, `web/src/components/dashboard/kpi-card.tsx`, `web/src/messages/{ar,en}.json` | KPI reads `/reports/cash-position` in its own request, outside `Promise.all`. `loadCashPosition()` never throws: a rejection (network, 403) or a malformed response yields an explicit `unavailable` state, rendered by `KpiCard` as a dash with the text "Balance unavailable" (no number, unit or sparkline). A genuine `0.00` is shown as zero. The rest of the dashboard loads regardless. |
+| `web/src/lib/mock-data.ts` | Demo-mode response for the new endpoint (`balance` only). |
+| `tests/Feature/TreasuryAwareCashReportsTest.php` (new) | 17 cases, below. |
 
-Semantics preserved: a posted or reversed entry is included, per-entry net is signed debit minus credit over the set, a zero net (internal transfer) is skipped, an asset-sourced entry is investing, a counter-line in equity is financing, everything else is operating, branch filters apply to the lines, dates are inclusive. The dashboard KPI keeps its previous meaning (cumulative `account_balances` balance, all branches, independent of the dashboard date filter); only the account set changed.
+Review follow-up (PR review comments): the first version of the endpoint returned every account's name and balance and was company-wide for everyone, and a failing request made the whole dashboard fail to load. Both are fixed as described above, with tests (sections 4 and 5).
+
+Semantics preserved: a posted or reversed entry is included, per-entry net is signed debit minus credit over the set, a zero net (internal transfer) is skipped, an asset-sourced entry is investing, a counter-line in equity is financing, everything else is operating, branch filters apply to the lines, dates are inclusive. The dashboard KPI keeps its previous meaning for unrestricted users (cumulative `account_balances` balance, all branches, independent of the dashboard date filter); only the account set changed. **Branch-restricted users now see their own branches' cash** instead of the company total, matching `ReportService::branchIds()` ("a restricted user must not see aggregate numbers outside their scope"). No permission, role or gate changed. See section 7 for the one inconsistency this exposes.
 
 Findings the task asked about:
 
@@ -60,7 +62,9 @@ Findings the task asked about:
 | Cross-tenant isolation | `another_tenants_treasuries_and_postings_never_leak...`, `the_resolver_is_tenant_scoped` |
 | Branch filter, date boundaries | `branch_filters_and_inclusive_date_boundaries_are_preserved` (both boundary days, other-branch and out-of-period lines excluded) |
 | Opening and closing reconciliation | `opening_plus_net_flow_equals_closing_which_equals_the_position` |
-| Dashboard KPI equals the accounting balance | `the_dashboard_endpoint_returns_the_ledger_equivalent_balance...` (compared with an independent SQL sum of journal lines) |
+| Dashboard KPI equals the accounting balance | `the_dashboard_endpoint_returns_only_the_ledger_equivalent_total_and_no_account_details` (exact JSON `{balance}`, equal to an independent SQL sum of journal lines, no names in the payload) |
+| Branch-restricted user | `a_branch_restricted_user_sees_only_the_cash_of_their_own_branches_never_the_company_total` (company 740.00 vs restricted 340.00 vs empty branch 0.00; fails if the branch rule is removed) |
+| Frontend: failure isolation | `dashboard/page.test.tsx` (5): total shown via one request; request failure (500) and permission denial (403) leave the other cards loaded and the cash card "unavailable", never zero; malformed response unavailable; genuine zero shown as zero (3 of 5 fail against the previous page code). `lib/__tests__/dashboard.test.ts` `loadCashPosition` (4) and `kpi-card.test.tsx` (3) cover the helper and the card states |
 | Empty or partially provisioned tenant | `a_tenant_with_the_chart_but_without_treasury_entities...`, `a_tenant_without_any_cash_accounts...` |
 | No prefix guess | `the_resolver_is_entities_union_legacy_codes_and_never_a_code_prefix_guess` (unlinked `1119` and group `111` excluded) |
 | Reversed entry | `a_reversed_entry_stays_visible_and_nets_to_zero` |
@@ -85,7 +89,9 @@ No journal entry, amount, VAT, ZATCA, numbering or permission change; no schema 
 
 ## 7. Remaining risks
 
-- The dashboard KPI still ignores the dashboard date and branch filters (unchanged behaviour). A branch-restricted user sees the company-wide cash balance there, as before.
+- The dashboard KPI still ignores the dashboard date and branch filters (unchanged behaviour); only the user's branch restriction applies.
+- **Open inconsistency, owner decision:** the dashboard's *receivables* card still reads `/accounts` (company-wide `account_balances`), so a branch-restricted user sees a branch-scoped cash figure next to a company-wide receivables figure. That is pre-existing and outside T2; the options are to scope receivables the same way or to keep it as is. The cash card now follows the report rule rather than reproducing the old company-wide exposure through a `reports.view` endpoint.
+- A restricted user's cash figure comes from journal lines tagged with their branches; company-wide entries with no branch are not counted for them (same as every branch-filtered report).
 - `account_balances` is a maintained snapshot. The test proves it equals the ledger for these flows; any path that bypassed the ledger would break that, as it would for `/accounts`.
 - `VatRoleIntegrityService` and `ArApControlBalanceService` keep their own copies of the "entities ∪ 1110/1120" classification. They could adopt `CashAccountResolver`, left out to keep this PR reporting-only.
 - Any other report that hard-codes 1110/1120 is outside this task. A repository search found none besides the two fixed here; the production posting paths that still hard-code 1110/1120 are tracked as T4 to T8 in the audit.

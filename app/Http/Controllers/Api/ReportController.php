@@ -194,20 +194,10 @@ class ReportController extends ApiController
         ]);
     }
 
-    /** رصيد النقد والبنك الحالي لمؤشر لوحة التحكم: كل الخزائن والحسابات البنكية ∪ 1110/1120. */
+    /** إجمالي النقد والبنك لمؤشر لوحة التحكم: رقم واحد، بنطاق فروع المستخدم كبقية التقارير. */
     public function cashPosition(): JsonResponse
     {
-        $position = $this->reports->cashPosition();
-
-        return response()->json([
-            'balance'  => Money::toRiyal($position['balance']),
-            'accounts' => array_map(fn (array $account) => [
-                'id'      => $account['id'],
-                'code'    => $account['code'],
-                'name'    => $account['name'],
-                'balance' => Money::toRiyal($account['balance']),
-            ], $position['accounts']),
-        ]);
+        return response()->json(['balance' => Money::toRiyal($this->reports->cashPosition()['balance'])]);
     }
 
     /** حركة ضريبة القيمة المضافة من حسابي المدخلات والمخرجات النظاميين. */

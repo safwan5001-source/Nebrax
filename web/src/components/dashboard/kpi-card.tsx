@@ -25,6 +25,7 @@ export function KpiCard({
   trendLabel,
   sub,
   loading,
+  unavailable,
 }: {
   label: string;
   value: string;
@@ -37,6 +38,8 @@ export function KpiCard({
   /** السطر الفرعي: عنوان + قيمة، تحت خطّ منقّط. */
   sub?: { label: string; value: string; tone?: 'positive' | 'negative' | 'muted' };
   loading?: boolean;
+  /** نصّ «غير متاح»: يُعرض بدل الرقم والوحدة والشرارة — لا صفر مضلّل يُقرأ رصيداً حقيقياً. */
+  unavailable?: string;
 }) {
   // ═══════════════════════════════════════════════════════════════
   //  الأيقونة `muted` دائماً — لا صندوق ولا لون دلالي
@@ -76,6 +79,13 @@ export function KpiCard({
 
         {loading ? (
           <Skeleton className="mt-2 h-6 w-28 sm:mt-3 sm:h-7 sm:w-32" />
+        ) : unavailable ? (
+          <div className="mt-1.5 flex flex-col gap-0.5 sm:mt-2.5" role="status">
+            <span className="num text-[length:clamp(14px,12.5cqi,21px)] font-bold leading-tight text-muted sm:text-[26px]" aria-hidden>
+              —
+            </span>
+            <span className="text-[11px] leading-snug text-muted sm:text-[12px]">{unavailable}</span>
+          </div>
         ) : (
           <div className="mt-1.5 flex items-baseline gap-1.5 sm:mt-2.5">
             <span
@@ -92,7 +102,7 @@ export function KpiCard({
           </div>
         )}
 
-        {trend && !loading && (
+        {trend && !loading && !unavailable && (
           <div className="mt-1.5 flex justify-end pb-2 sm:mt-2 sm:pb-2.5">
             <Sparkline
               data={trend}

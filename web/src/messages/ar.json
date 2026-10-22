@@ -1115,6 +1115,7 @@
     "net_income": "صافي الدخل",
     "receivables": "ذمم العملاء",
     "cash": "النقد والبنك",
+    "cash_unavailable": "تعذّر تحميل الرصيد",
     "revenue_vs_expense": "الإيرادات مقابل المصروفات",
     "recent_invoices": "أحدث الفواتير",
     "expense": "المصروفات",

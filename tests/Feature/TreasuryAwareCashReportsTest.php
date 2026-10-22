@@ -376,14 +376,13 @@ class TreasuryAwareCashReportsTest extends TestCase
         $this->assertSame(999000, $theirPosition['balance']);
         $this->assertSame(11000, $myFlow['net_cash_flow']);
         $this->assertSame(11000, $myPosition['balance']);
-        $this->assertCount(3, $myPosition['accounts']);
-        $this->assertNotContains($theirCash->account_id, array_column($myPosition['accounts'], 'id'));
+        $this->assertNotContains($theirCash->account_id, app(CashAccountResolver::class)->accountIds()->all());
     }
 
     // ───────────────────────── مؤشر اللوحة (API) ─────────────────────────
 
     /** @test */
-    public function the_dashboard_endpoint_returns_the_ledger_equivalent_balance_per_account_and_in_total(): void
+    public function the_dashboard_endpoint_returns_only_the_ledger_equivalent_total_and_no_account_details(): void
     {
         $extra = $this->treasury('cash', 'خزينة إضافية');
         $bank2 = $this->treasury('bank', 'بنك إضافي');
@@ -394,16 +393,49 @@ class TreasuryAwareCashReportsTest extends TestCase
 
         $res = $this->withToken($this->auth['token'])->getJson('/api/reports/cash-position')->assertOk();
 
-        $res->assertJsonPath('balance', '2000.00');
-        $this->assertCount(4, $res->json('accounts'));
-        $codes = collect($res->json('accounts'))->pluck('code')->all();
-        $this->assertSame(['1110', '1111', '1120', '1121'], $codes);
+        // الرقم الوحيد المكشوف: لا أسماء حسابات ولا أرصدة لكل حساب ولا معرّفات.
+        $this->assertSame(['balance'], array_keys($res->json()));
+        $res->assertExactJson(['balance' => '2000.00']);
         $this->assertSame(
             number_format($this->ledgerNet(app(CashAccountResolver::class)->accountIds()->all()) / 100, 2, '.', ''),
             $res->json('balance'),
         );
-        $sum = collect($res->json('accounts'))->sum(fn ($a) => (float) $a['balance']);
-        $this->assertEqualsWithDelta((float) $res->json('balance'), $sum, 0.001);
+        $this->assertStringNotContainsString('خزينة', $res->getContent());
+        $this->assertStringNotContainsString('بنك', $res->getContent());
+    }
+
+    /** @test */
+    public function a_branch_restricted_user_sees_only_the_cash_of_their_own_branches_never_the_company_total(): void
+    {
+        $main = $this->withToken($this->auth['token'])->getJson('/api/branches')->json('data.0.id');
+        $khobar = $this->withToken($this->auth['token'])->postJson('/api/branches', ['name' => 'فرع الخبر'])->assertCreated()->json('data.id');
+        $extra = $this->treasury('cash', 'خزينة إضافية');
+        $this->receipt($this->id('1110'), 40000, '2026-03-02', $main);
+        $this->receipt($extra->account_id, 25000, '2026-03-03', $khobar);
+        $this->receipt($this->id('1120'), 9000, '2026-03-04', $khobar);
+
+        // غير المقيَّد: رصيد الشركة كله.
+        $this->withToken($this->auth['token'])->getJson('/api/reports/cash-position')
+            ->assertOk()->assertExactJson(['balance' => '740.00']);
+
+        $restricted = \App\Models\User::create([
+            'tenant_id' => $this->tenantId, 'name' => 'محدود', 'email' => 'khobar-only@t2.test',
+            'password' => bcrypt('secret1234'), 'role' => 'owner',
+        ]);
+        $restricted->branches()->sync([$khobar]);
+        $token = $restricted->createToken('t2-restricted')->plainTextToken;
+
+        $this->withToken($token)->getJson('/api/reports/cash-position')->assertOk()->assertExactJson(['balance' => '340.00']);
+        $this->assertSame(
+            34000,
+            $this->reports()->cashPosition()['balance'],
+            'الخدمة نفسها تطبّق قاعدة الفروع (لا المتحكم وحده)',
+        );
+
+        // فرع بلا حركة نقدية ⇒ صفر حقيقي (قيد الفرع الرئيسي لا يظهر له).
+        $empty = \App\Models\Branch::create(['code' => '00009', 'name' => 'فرع فارغ', 'is_main' => false]);
+        $restricted->branches()->sync([$empty->id]);
+        $this->withToken($token)->getJson('/api/reports/cash-position')->assertOk()->assertExactJson(['balance' => '0.00']);
     }
 
     /** @test */
@@ -426,7 +458,6 @@ class TreasuryAwareCashReportsTest extends TestCase
 
         $this->assertSame(25000, $this->reports()->cashFlow(['from' => '2026-03-01', 'to' => '2026-03-31'])['net_cash_flow']);
         $this->assertSame(25000, $this->reports()->cashPosition()['balance']);
-        $this->assertCount(2, $this->reports()->cashPosition()['accounts']);
     }
 
     /** @test */
@@ -438,7 +469,7 @@ class TreasuryAwareCashReportsTest extends TestCase
         $flow = $this->reports()->cashFlow(['from' => '2026-03-01', 'to' => '2026-03-31']);
 
         $this->assertSame(0, $flow['net_cash_flow']);
-        $this->assertSame(['balance' => 0, 'accounts' => []], $this->reports()->cashPosition());
+        $this->assertSame(['balance' => 0], $this->reports()->cashPosition());
         $this->assertSame([], app(CashAccountResolver::class)->accountIds()->all());
     }
 }
