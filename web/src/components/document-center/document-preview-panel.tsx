@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { AlertTriangle, FileText, Loader2 } from 'lucide-react';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, fetchPrivateFileUrl } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import type { ReviewFile } from '@/modules/document-center/contract';
 
@@ -15,6 +15,10 @@ type Props = {
   processingMessage?: string;
   scanExceptionAdmitted?: boolean;
 };
+
+function revokePreviewUrl(url: string | null): void {
+  if (url && typeof URL.revokeObjectURL === 'function') URL.revokeObjectURL(url);
+}
 
 export function DocumentPreviewPanel({ file, scanStatus, processingMessage, scanExceptionAdmitted }: Props) {
   const t = useTranslations('documentCenterReview');
@@ -37,16 +41,28 @@ export function DocumentPreviewPanel({ file, scanStatus, processingMessage, scan
     setError(null);
     try {
       const response = await api<{ url: string }>(`/document-files/${file.id}/download-url`);
-      setUrl(response.url);
+      const previewUrl = await fetchPrivateFileUrl(response.url, file.mime_type ?? undefined);
+      setUrl((previous) => {
+        revokePreviewUrl(previous);
+        return previewUrl;
+      });
       setState('ready');
     } catch (exception) {
-      setError(exception instanceof ApiError ? exception.message : t('unavailable'));
+      setError(exception instanceof ApiError && exception.message === 'preview_invalid_response'
+        ? t('previewInvalidResponse')
+        : exception instanceof ApiError ? exception.message : t('unavailable'));
       setState('error');
     }
   }, [file, t]);
 
   useEffect(() => {
     void load();
+    return () => {
+      setUrl((previous) => {
+        revokePreviewUrl(previous);
+        return null;
+      });
+    };
   }, [load]);
 
   if (!file) {
