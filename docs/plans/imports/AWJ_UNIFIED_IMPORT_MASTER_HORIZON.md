@@ -68,9 +68,9 @@ We do **not** replace any working engine. We introduce one seam per entity, and 
 5. **Approval binds to content.** Execution requires an approval bound to the exact plan hash (the AI Actions model). The standard durable path gains the same binding (preview hash ↔ job file SHA + options), see IMP-H1-S3.
 6. **Configurable policy, not imposed policy** (CLAUDE.md rule 6). Duplicate handling, blank cells and missing master data are per-run options with defaults that preserve today's behavior.
 7. **Every entry path carries the direct API's gates.** A durable job domain (H1-S1 map) and an AI Action type (H1-S7 definition) each declare the **same** permission(s) **and** application key as the entity's direct create endpoint. Invariant tests fail CI when a domain or type is registered without them.
+8. **Both paths, or a recorded exclusion.** Every entity in §3 that has a standard import either has an AI path slice or a `D-xx` exclusion in §7. There is no silent gap.
 9. **Execution unit = business document, never a raw row.** Each adapter declares `unitKey(row)`. A product, a partner or a price item is one row; a purchase is its `(supplier, ref)` group; a stocktake sheet is the whole file. Planning, reservation, durable chunking and AI execution batches all advance by **whole units**: a unit is never split across chunks, batches or transactions.
 10. **Every apply is bound to its preview.** No execution path (sync `/apply`, durable job, AI execution) accepts content that was not previewed. Sync paths require `preview_hash` on apply; durable jobs bind it at creation; AI binds it via approval (H1-S3).
-8. **Both paths, or a recorded exclusion.** Every entity in §3 that has a standard import either has an AI path slice or a `D-xx` exclusion in §7. There is no silent gap.
 
 ### 2.3 Why not merge `ImportJob` and `AiAction` into one table
 
