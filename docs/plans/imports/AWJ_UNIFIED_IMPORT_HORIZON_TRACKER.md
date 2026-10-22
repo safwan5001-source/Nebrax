@@ -11,7 +11,7 @@
 | Field | Value |
 |---|---|
 | Last merged slice | **IMP-H0-S1**: PR #1595, squash-merged 2026-10-22, Merge SHA `5e20e9edc941f83181497158fa68e6c55e95c485` |
-| **Next slice** | **IMP-H1-S5** (catalog whole-file pre-validation + fetch outside lock), then S6 → H2. Merged: H1-S1, S2, S3a/b/c, S4, S7, S8a, S8b; S8c in review. |
+| **Next slice** | **IMP-H2-S4** (tenant AI Actions enablement endpoint), then H2-S5 → IMP-X-01 → H3. Merged: H1-S1, S2, S3a/b/c, S4, S5a, S7, S8a/b/c; H2-S0 `38b9b6d`, H2-S2 `c301550`; H2-S1 (#1630) and H2-S3 (#1632) in review. **S6 (#1626) on hold — owner decision D-13.** S5b deferred (prerequisite of OPS-01 remote-image enablement). |
 | Open owner decisions | D-01, D-02 (narrowed: `import_rows` data scope only), D-03, D-04, D-06, D-07, OPS-01 (D-05 has a non-blocking default; D-08/D-09 are recorded exclusions) |
 | Railway state | Unknown (owner-reported stall; no access from the agent) |
 
@@ -30,8 +30,8 @@
 | IMP-H1-S6 | ✅ | — | Zero-value opening hits `AccountingDateGuard` | — | — | — | — | — | — | — | — | — | — | Planned | Confirm classification (master §4) |
 | IMP-H2-S0 | — | ✅ | Honest labeling on products AI import until H9-S5 connects it to the assistant | — | — | — | — | — | — | — | — | — | — | In review (PR) | — |
 | IMP-H2-S1 | ✅ | — | V2 create via `ProductService::create` (characterized) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
-| IMP-H2-S2 | — | ✅ | Shared value normalization (remove duplicated regexes) | — | — | — | — | — | — | — | — | — | — | Planned | — |
-| IMP-H2-S3 | ✅ | — | Workbook UX parity (inspect/template/mapping) | — | — | — | — | — | — | — | — | — | — | In review (PR) | Web only; report `IMP-H2-S3-REPORT.md` |
+| IMP-H2-S2 | — | ✅ | Shared value normalization (remove duplicated regexes) | — | — | — | — | — | — | — | — | — | — | **Merged** `c301550` (#1631) | — |
+| IMP-H2-S3 | ✅ | — | Workbook UX parity (inspect/template/mapping) | — | — | — | — | — | — | — | — | — | — | In review (PR #1632) | Web only; report `IMP-H2-S3-REPORT.md` |
 | IMP-H2-S4 | — | ✅ | Tenant `ai_actions.enabled` endpoint + settings UI | — | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H2-S5 | ✅ | ✅ | Sync V2 + AI preview/execution onto `ProductImportAdapter` (policy-expressed differences, parity test) | H1-S2, H2-S1, H2-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H3-S1 | ✅ | ✅ | `PartnerImportFields` + adapter (no opening balance) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |

@@ -12,6 +12,7 @@ use App\Support\AiActionCanonicalJson;
 use App\Support\AiActionException;
 use App\Support\ProductImportActionSchema;
 use App\Support\ProductImportFields;
+use App\Support\ProductImportValueNormalizer;
 use App\Support\SpreadsheetReader;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\UploadedFile;
@@ -236,17 +237,10 @@ final class AiActionProductFileIntakeService
         return ['kind' => 'url', 'value' => $value, 'sha256' => null];
     }
 
+    /** IMP-H2-S2: حكمٌ واحد مشترك مع المراجعة والمعاينة (`ProductImportValueNormalizer`) بدل نسخة regex خاصة بهذه الخطوة. */
     private function valueLooksValid(string $field, string $value): bool
     {
-        $definition = ProductImportFields::get($field) ?? [];
-        $normalized = strtr(trim($value), ['٠'=>'0','١'=>'1','٢'=>'2','٣'=>'3','٤'=>'4','٥'=>'5','٦'=>'6','٧'=>'7','٨'=>'8','٩'=>'9','٫'=>'.','٬'=>'']);
-        return match ($definition['type'] ?? null) {
-            ProductImportFields::TYPE_MONEY => preg_match('/^\d+(?:\.\d{1,4})?$/', $normalized) === 1,
-            ProductImportFields::TYPE_PERCENT => preg_match('/^\d+(?:\.\d+)?%?$/', $normalized) === 1 && (float) rtrim($normalized, '%') >= 0 && (float) rtrim($normalized, '%') <= 100,
-            ProductImportFields::TYPE_INTEGER => preg_match('/^\d+$/', $normalized) === 1,
-            ProductImportFields::TYPE_ENUM => in_array(strtolower($value), (array) ($definition['values'] ?? []), true),
-            default => true,
-        };
+        return ProductImportValueNormalizer::isValid($field, $value);
     }
 
     private function violation(string $code, ?string $field, string $severity, string $message): array
