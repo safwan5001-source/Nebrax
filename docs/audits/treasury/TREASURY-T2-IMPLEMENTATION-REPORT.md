@@ -68,7 +68,16 @@ Findings the task asked about:
 
 ## 5. Results
 
-RESULTS_PLACEHOLDER
+| Run (local sandbox) | Result |
+|---|---|
+| `TreasuryAwareCashReportsTest` | 16 passed on SQLite and 16 passed on PostgreSQL 16 |
+| Same tests against the original `ReportService` | 12 of 16 fail with the differences in section 3 (4 pass: legacy tenant, resolver cases, auth) |
+| Web: `tsc --noEmit` on the changed files, `dashboard.test.ts`, `mock-general-reports.test.ts` | no error in changed files; 22 passed (the repository has unrelated pre-existing type errors in other test files) |
+| Full SQLite suite | 8334 passed, 185 skipped, 27 failed |
+| Full PostgreSQL suite, `--parallel --processes=4` (as CI) | 8546 tests, 27 failing |
+| CI (`php artisan test` sqlite and pgsql, CI Gate) | see the PR |
+
+All 27 local failures are the same pre-existing set as in the T1 report and none touches reports or treasury: 26 `Fuel*` tests (the sandbox lacks `bcmath`; CI has it) plus `AiPaidProviderDisabledTest` on SQLite and `StorefrontMediaApiTest` on PostgreSQL (both fail identically on `main`, verified in T1). The related report and accounting suites (`GeneralReportTest`, report, payment, invoice, ledger, treasury) are inside the full runs and pass.
 
 ## 6. Accounting invariants
 
