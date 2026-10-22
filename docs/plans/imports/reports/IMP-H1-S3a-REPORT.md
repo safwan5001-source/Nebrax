@@ -30,6 +30,16 @@ branch A was active could be applied under branch B, stamping `BranchScoped` row
 restricted user → 403 on apply/cancel with no rows and job still `ready`; idempotency key across branches rejected, true retry returns the same job; legacy `NULL` job keeps old behaviour.
 Negative control (`withJobBranch` neutralised) fails the stamping test. Existing `ImportJob*`/`ImportDomain*` suites unchanged and green (195 passed).
 
+Added after the independent review: multi-chunk job with the request branch changing between chunks (all rows stamped with the job branch), a failing chunk (job `failed`, request context restored, nothing written),
+a restricted user **with** the job's branch can still apply, and an `inventory_opening` job under another request branch. Total 10 tests. Full local suite at `dc6486b`: 8192 passed / 26 env-only `bcmath`.
+
+## Scope notes (so S3a is not read as closing F-15 everywhere)
+
+- The **synchronous** endpoints (`products/import/apply`, `products/workbook/apply`, `inventory-openings/import/apply`) still use the request's branch — that is S3c.
+- `show`/`index` are not fenced by branch (the job is `CompanyWide`; only `branch_id` is visible).
+- `nullOnDelete`: deleting a branch turns its jobs into legacy jobs (request-branch behaviour, no 403 fence). `Branch::hasDocuments()` is numbering-based and does not know import jobs; changing the branch-delete guard is out of scope here and left as a possible follow-up (block deletion while a job is `ready`/`processing`).
+- `recountOnFirstApply()` also runs under the job branch (review finding; all adapters return `null` today).
+
 ## Review
 
-Codex quota exhausted — not Codex-reviewed. Independent subagent review: see PR.
+Codex quota exhausted — **not Codex-reviewed**. An independent read-only subagent reviewed the diff (static; did not run tests): no blocking defects. Its medium findings (recount outside the branch wrapper; missing multi-chunk / exception-restore / other-domain tests) are fixed above; the low ones are recorded in the scope notes.

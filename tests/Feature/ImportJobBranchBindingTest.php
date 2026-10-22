@@ -3,8 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\ImportJob;
+use App\Models\InventoryOpening;
 use App\Models\Product;
 use App\Models\User;
+use App\Models\Warehouse;
+use App\Support\SpreadsheetWriter;
 use App\Tenancy\BranchContext;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -84,6 +87,7 @@ class ImportJobBranchBindingTest extends TestCase
         $this->mainBranchRequestState();
         $jobId = $this->create($auth['token'], $this->csv('BR-MAIN'))->assertCreated()['data']['id'];
         $mainBranch = ImportJob::query()->whereKey($jobId)->value('branch_id');
+        $this->assertNotNull($mainBranch);
 
         // نرحّل والفرع النشط للطلب فرعٌ آخر.
         $this->apply($auth['token'], $jobId, ['X-Branch-Id' => $other])->assertOk()->assertJsonPath('data.status', 'completed');
@@ -155,5 +159,90 @@ class ImportJobBranchBindingTest extends TestCase
         $this->apply($auth['token'], $jobId, ['X-Branch-Id' => $other])->assertOk();
 
         $this->assertSame($other, Product::withoutGlobalScopes()->where('sku', 'BR-LEGACY')->value('branch_id'));
+    }
+
+    /** @test */
+    public function every_chunk_of_a_multi_chunk_job_is_stamped_with_the_job_branch(): void
+    {
+        $auth = $this->registerTenant();
+        $other = $this->branch($auth['token'], 'فرع الخبر');
+        $this->mainBranchRequestState();
+        $file = UploadedFile::fake()->createWithContent('catalog.csv', "sku,name,type,sale_price\nMC-1,واحد,good,10.00\nMC-2,اثنان,good,10.00\nMC-3,ثلاثة,good,10.00\n");
+        $jobId = $this->create($auth['token'], $file)->assertCreated()['data']['id'];
+        $mainBranch = ImportJob::query()->whereKey($jobId)->value('branch_id');
+
+        // قطعة بسطر واحد؛ فرع الطلب يتبدّل بين القطع.
+        foreach ([$other, null, $other] as $i => $header) {
+            $response = $this->withToken($auth['token'])
+                ->withHeaders($header === null ? [] : ['X-Branch-Id' => $header])
+                ->postJson("/api/import-jobs/{$jobId}/apply", ['mode' => 'create', 'batch_size' => 1])->assertOk();
+            $header === null ? $this->withoutHeader('X-Branch-Id') : null;
+        }
+
+        $this->assertSame('completed', $response['data']['status']);
+        $branches = Product::withoutGlobalScopes()->whereIn('sku', ['MC-1', 'MC-2', 'MC-3'])->pluck('branch_id')->unique()->all();
+        $this->assertSame([$mainBranch], $branches, 'كل القطع توسَم بفرع التشغيلة مهما تبدّل فرع الطلب بينها.');
+    }
+
+    /** @test */
+    public function a_failing_chunk_fails_the_job_and_still_restores_the_request_branch(): void
+    {
+        $auth = $this->registerTenant();
+        $other = $this->branch($auth['token'], 'فرع الخبر');
+        $this->mainBranchRequestState();
+        // اسمٌ فارغ ⇒ صفّ خطأ ⇒ تفشل القطعة (يرمي المحوّل).
+        $file = UploadedFile::fake()->createWithContent('catalog.csv', "sku,name,type,sale_price\nBAD-1,,good,10.00\n");
+        $jobId = $this->create($auth['token'], $file)->assertCreated()['data']['id'];
+
+        $this->apply($auth['token'], $jobId, ['X-Branch-Id' => $other])->assertStatus(422);
+
+        $this->assertSame('failed', ImportJob::query()->whereKey($jobId)->value('status'));
+        $this->assertSame($other, app(BranchContext::class)->id(), 'الفشل لا يترك فرع التشغيلة على سياق الطلب.');
+        $this->assertSame(0, Product::withoutGlobalScopes()->where('sku', 'BAD-1')->count());
+    }
+
+    /** @test */
+    public function a_restricted_user_who_has_the_job_branch_can_still_apply_it(): void
+    {
+        $auth = $this->registerTenant();
+        $other = $this->branch($auth['token'], 'فرع الخبر');
+        $this->mainBranchRequestState();
+
+        $token = $this->tokenForRole($auth['tenant_id'], 'admin', 'scoped@branch-ok.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        User::query()->where('email', 'scoped@branch-ok.test')->firstOrFail()->branches()->sync([$other]);
+        $this->mainBranchRequestState();
+
+        $jobId = $this->create($token, $this->csv('BR-OK'), [], ['X-Branch-Id' => $other])->assertCreated()['data']['id'];
+        $this->assertSame($other, ImportJob::query()->whereKey($jobId)->value('branch_id'));
+        $this->apply($token, $jobId, ['X-Branch-Id' => $other])->assertOk()->assertJsonPath('data.status', 'completed');
+        $this->assertSame($other, Product::withoutGlobalScopes()->where('sku', 'BR-OK')->value('branch_id'));
+    }
+
+    /** @test */
+    public function an_inventory_opening_job_applies_under_its_own_branch_too(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $other = $this->branch($auth['token'], 'فرع الخبر');
+        $this->mainBranchRequestState();
+
+        $warehouse = Warehouse::create(['name' => 'مخزن', 'code' => 'WH-BR']);
+        Product::create(['name' => 'صنف', 'sku' => 'SKU-BR', 'type' => 'good', 'sale_price' => 1000, 'track_inventory' => true]);
+        $file = UploadedFile::fake()->createWithContent('openings.csv', SpreadsheetWriter::csv(
+            ['sku', 'warehouse', 'opening_quantity', 'opening_unit_cost'],
+            [['SKU-BR', 'WH-BR', '5', '2.00']]
+        ));
+        $jobId = $this->withToken($auth['token'])->post('/api/import-jobs', ['domain' => 'inventory_opening', 'file' => $file], ['Accept' => 'application/json'])
+            ->assertCreated()['data']['id'];
+        $mainBranch = ImportJob::query()->whereKey($jobId)->value('branch_id');
+
+        $this->withToken($auth['token'])->withHeaders(['X-Branch-Id' => $other])
+            ->postJson("/api/import-jobs/{$jobId}/apply", ['opening_date' => '2026-01-01'])
+            ->assertOk()->assertJsonPath('data.status', 'completed');
+
+        $this->assertSame(1, InventoryOpening::withoutGlobalScopes()->where('tenant_id', $auth['tenant_id'])->count());
+        $this->assertSame($mainBranch, ImportJob::query()->whereKey($jobId)->value('branch_id'));
+        $this->assertNotNull($warehouse->id);
     }
 }

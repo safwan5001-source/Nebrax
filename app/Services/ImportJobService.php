@@ -301,7 +301,7 @@ class ImportJobService
                     ];
 
                     // تصحيح ذاتي اختياري لـ`row_count` عند أول ترحيل (للمجال الذي اختلف تعريفه — انظر محوّله).
-                    $recount = $this->domains->for($locked->domain)->recountOnFirstApply($tmpPath, $locked->extension);
+                    $recount = $this->withJobBranch($locked, fn () => $this->domains->for($locked->domain)->recountOnFirstApply($tmpPath, $locked->extension));
                     if ($recount !== null) {
                         $fill['row_count'] = $recount;
                     }
