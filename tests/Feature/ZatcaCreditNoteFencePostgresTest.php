@@ -22,10 +22,12 @@ use Tests\TestCase;
  *     وبعد تثبيته يمرّ الترحيل القديم، وبعد رفعه يعود السياج؛ والقرار الصريح مقبول في كل الحالات.
  *
  *  على PostgreSQL **لا يُتخطّى** هذا الصنف إن غاب `pcntl`: يفشل. يُتخطّى على SQLite فقط (لا أقفال صفوف).
- *  يعمل على قاعدة مُهاجَرة (لا RefreshDatabase) لأن العمليات الفرعية تحتاج صفوفاً مثبَّتة؛ ينظّفها `tearDown` بحذف المستأجرين.
+ *  يعمل على قاعدة العامل بلا معاملة مُغلِّفة (`UsesWorkerDatabaseWithoutTransaction`) لأن العمليات الفرعية تحتاج صفوفاً مثبَّتة، وصف المنصة عالميّ فلا يُشارَك مع عمّال آخرين؛ ينظّفها `tearDown` بحذف المستأجرين.
  */
 class ZatcaCreditNoteFencePostgresTest extends TestCase
 {
+    use UsesWorkerDatabaseWithoutTransaction;
+
     private string $dir;
 
     /** @var list<string> */

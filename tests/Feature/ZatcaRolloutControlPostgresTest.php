@@ -28,6 +28,8 @@ use Tests\TestCase;
  */
 class ZatcaRolloutControlPostgresTest extends TestCase
 {
+    use UsesWorkerDatabaseWithoutTransaction;
+
     private string $dir;
 
     /** @var list<string> */

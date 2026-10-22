@@ -29,11 +29,12 @@ use Tests\TestCase;
  *     الإصدار الجاري يكتمل (حدّ READ COMMITTED، D-B3) ثم يُحجب كل ترحيل لاحق.
  *
  *  على PostgreSQL **لا يُتخطّى** هذا الصنف إن غاب `pcntl`: يفشل. يُتخطّى على SQLite فقط (لا أقفال صفوف).
- *  يعمل على قاعدة مُهاجَرة بلا RefreshDatabase (العمليات الفرعية تحتاج صفوفاً مثبَّتة) وينظّف بحذف المستأجر المتسلسل.
+ *  يعمل على قاعدة العامل بلا معاملة مُغلِّفة (`UsesWorkerDatabaseWithoutTransaction`؛ العمليات الفرعية تحتاج صفوفاً مثبَّتة، وصف المنصة عالميّ فلا يُشارَك مع عمّال آخرين) وينظّف بحذف المستأجر المتسلسل.
  */
 class ZatcaCreditNoteIssuancePostgresTest extends TestCase
 {
     use InteractsWithApi;
+    use UsesWorkerDatabaseWithoutTransaction;
 
     private string $dir;
 
