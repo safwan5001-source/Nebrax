@@ -179,7 +179,12 @@ export default function InventoryOpeningImportPage() {
     setError(null);
     if (!engine.job) {
       if (!file) return;
-      const job = await engine.upload(file);
+      const job = await engine.upload(
+        file,
+        undefined,
+        null,
+        preview?.binding ? { binding: preview.binding, options: applyOptionsPayload() } : null
+      );
       if (!job) return;
       await engine.applyLoop(job.id, applyOptionsPayload());
       return;

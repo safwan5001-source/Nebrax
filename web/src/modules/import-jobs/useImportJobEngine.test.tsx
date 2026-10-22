@@ -57,6 +57,19 @@ describe('useImportJobEngine', () => {
     expect(result.current.job?.status).toBe('ready');
   });
 
+  it('upload forwards the preview binding and the previewed options to createImportJob (IMP-H1-S3b)', async () => {
+    createImportJob.mockResolvedValue(job());
+    const { result } = renderHook(() => useImportJobEngine('product_catalog'));
+    const file = new File(['x'], 'catalog.csv');
+    const bound = { binding: { id: 'prev-1', hash: 'h'.repeat(64), expires_at: '2026-01-01T00:00:00Z' }, options: { mode: 'create' } };
+
+    await act(async () => {
+      await result.current.upload(file, 'idem-1', null, bound);
+    });
+
+    expect(createImportJob).toHaveBeenCalledWith('product_catalog', file, 'idem-1', null, bound);
+  });
+
   it('resumes an existing job by id from the authoritative backend state', async () => {
     getImportJob.mockResolvedValue(job({ status: 'processing', processed_rows: 1 }));
     const { result } = renderHook(() => useImportJobEngine('product_catalog'));

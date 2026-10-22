@@ -89,6 +89,38 @@ class ApplyImportJobRequest extends FormRequest
     }
 
     /**
+     * الخيارات **الدلالية** التي أرسلها الطلب فعلاً (بلا افتراضات ولا `batch_size`) — تُقارَن بالمجمَّد في تشغيلةٍ مربوطةٍ
+     * بمعاينة (IMP-H1-S3b): ما لم يُرسَل لا يُعدّ تغييراً.
+     *
+     * @return array<string, mixed>
+     */
+    public function explicitOptions(): array
+    {
+        $options = [];
+        foreach (['mode', 'blank_policy', 'master_data_policy', 'opening_date'] as $key) {
+            if ($this->has($key)) {
+                $options[$key] = $this->string($key)->toString();
+            }
+        }
+        if ($this->has('mapping')) {
+            $options['mapping'] = (array) $this->input('mapping', []);
+        }
+        if ($this->has('price_list_id')) {
+            $options['price_list_id'] = $this->string('price_list_id')->toString() ?: null;
+        }
+        if ($this->has('notes')) {
+            $options['notes'] = $this->input('notes');
+        }
+        foreach (['allow_zero_cost', 'apply_product_images', 'approve_existing_media_updates'] as $key) {
+            if ($this->has($key)) {
+                $options[$key] = $this->boolean($key);
+            }
+        }
+
+        return $options;
+    }
+
+    /**
      * خيارات التطبيق كما تصل من الطلب — تُجمَّد على التشغيلة عند أول قطعة
      * فقط (`ImportJobService::applyNextChunk`)؛ القطع اللاحقة تتجاهل هذه
      * القيم وتستعمل النسخة المجمَّدة، فلا يعيد تفسير حالة واجهة تغيّرت.

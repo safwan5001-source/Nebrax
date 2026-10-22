@@ -205,7 +205,12 @@ export default function ProductImportPage() {
     setError(null);
     if (!engine.job) {
       if (!file) return; // مستأنفٌ بلا ملف يجب أن يملك تشغيلة أصلاً
-      const job = await engine.upload(file, undefined, mediaArchive);
+      const job = await engine.upload(
+        file,
+        undefined,
+        mediaArchive,
+        preview?.binding ? { binding: preview.binding, options: applyOptionsPayload() } : null
+      );
       if (!job) return;
       await engine.applyLoop(job.id, applyOptionsPayload());
       return;

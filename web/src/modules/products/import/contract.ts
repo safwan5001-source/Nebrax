@@ -3,6 +3,8 @@
  * والاختبارات معاً، فلا تنحرف الواجهة عن مفاتيح `ProductImportFields`.
  */
 
+import type { ImportBinding } from '@/modules/import-jobs/client';
+
 export type ImportMode = 'create' | 'update' | 'upsert';
 export type BlankPolicy = 'ignore' | 'clear';
 export type MasterDataPolicy = 'match_or_error' | 'match_or_text' | 'create_missing';
@@ -55,6 +57,8 @@ export interface PreviewError {
 }
 
 export interface ImportPreview {
+  /** معاينةٌ أحادية الاستعمال يحفظها الخادم — تُرفَق بإنشاء التشغيلة (IMP-H1-S3b). */
+  binding?: ImportBinding;
   mode: ImportMode;
   blank_policy: BlankPolicy;
   master_data_policy: MasterDataPolicy;

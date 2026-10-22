@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Requests\ImportInventoryOpeningRequest;
 use App\Http\Resources\InventoryOpeningResource;
 use App\Models\InventoryOpening;
+use App\Services\ImportPreviewService;
 use App\Services\Accounting\InventoryOpeningService;
 use App\Services\InventoryOpeningImportService;
+use App\Support\ImportJobDomain;
 use App\Support\Money;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -75,9 +77,16 @@ class InventoryOpeningController extends ApiController
     /** معاينة: عدّادات وحالة كل صف. **لا كتابة إطلاقاً.** */
     public function preview(ImportInventoryOpeningRequest $request): JsonResponse
     {
-        $data = $this->domain(
-            fn () => $this->imports->preview($request->file('file'), $request->importOptions())
-        );
+        $data = $this->domain(function () use ($request): array {
+            $preview = $this->imports->preview($request->file('file'), $request->importOptions());
+            // IMP-H1-S3b: معاينةٌ أحادية الاستعمال يحفظها الخادم — تُرفَق بإنشاء التشغيلة التنفيذية.
+            $preview['binding'] = app(ImportPreviewService::class)->issue(
+                ImportJobDomain::INVENTORY_OPENING, $request->file('file'), null,
+                $request->importOptions(), $request->user()?->id,
+            );
+
+            return $preview;
+        });
 
         return response()->json(['data' => $this->presentPreview($data)]);
     }

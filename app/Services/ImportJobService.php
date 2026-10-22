@@ -7,6 +7,7 @@ use App\Support\ImportChunk;
 use App\Support\ImportChunkResult;
 use App\Support\ImportJobDomain;
 use App\Support\ImportJobStatus;
+use App\Support\ImportPreviewException;
 use App\Tenancy\BranchContext;
 use App\Tenancy\TenantContext;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -32,6 +33,7 @@ class ImportJobService
         private readonly ProductImageArchiveService $imageArchives,
         private readonly ImportDomainRegistry $domains,
         private readonly BranchContext $branch,
+        private readonly ImportPreviewService $previews,
     ) {}
 
     /**
@@ -47,6 +49,9 @@ class ImportJobService
         ?string $idempotencyKey,
         ?string $userId,
         ?UploadedFile $mediaArchive = null,
+        ?array $options = null,
+        ?string $previewId = null,
+        ?string $previewHash = null,
     ): ImportJob
     {
         $idempotencyKey = $idempotencyKey !== null && trim($idempotencyKey) !== '' ? trim($idempotencyKey) : null;
@@ -72,11 +77,25 @@ class ImportJobService
         // نطاق المستخدم) ولا يتغيّر بعدها؛ كل قطعة ترحيل لاحقة تستعيده من التشغيلة لا من طلبها.
         $branchId = $this->branch->id();
 
+        // IMP-H1-S3b: خيارات التشغيلة قانونيةً (نفس الدالة التي حوّلت خيارات المعاينة) — تُجمَّد على التشغيلة وتدخل بصمة
+        // المعاينة وهوية إعادة المحاولة.
+        $canonical = $this->domains->for($domain)->canonicalOptions($options ?? []);
+
         if ($idempotencyKey !== null) {
             $existing = ImportJob::query()->where('idempotency_key', $idempotencyKey)->first();
             if ($existing) {
-                return $this->assertSameRequestOrFail($existing, $domain, $sha256, $archiveSha256, $branchId);
+                return $this->assertSameRequestOrFail($existing, $domain, $sha256, $archiveSha256, $branchId, $previewId, $previewHash, $canonical);
             }
+        }
+
+        // المعاينة تُتحقَّق **قبل** تخزين أي ملف: إنشاءٌ مرفوض لا يترك أثراً. بلا معاينة: العقد القديم ما لم يُلزَم بها.
+        $preview = null;
+        if ($previewId !== null || $previewHash !== null) {
+            $preview = $this->previews->assertConsumable(
+                (string) $previewId, (string) $previewHash, $userId, $domain, $sha256, $archiveSha256, $canonical
+            );
+        } elseif ($this->previews->requiredNow()) {
+            throw new ImportPreviewException('preview_required', 'عاين الملف قبل التنفيذ: لا تُنشأ تشغيلة تنفيذية بلا معاينة.');
         }
 
         $id = (string) Str::uuid();
@@ -96,7 +115,8 @@ class ImportJobService
             // PostgreSQL «فاشلة» فيفشل حتى استعلام SELECT البريء بعدها
             // مباشرة (25P02). `DB::transaction()` يتراجع تلقائياً عند أي
             // استثناء قبل إعادة رميه، فيعيد الاتصال صالحاً للاستعلام التالي.
-            $job = DB::transaction(fn () => ImportJob::create([
+            $job = DB::transaction(function () use ($preview, $id, $branchId, $domain, $idempotencyKey, $file, $stored, $sha256, $mediaArchive, $storedArchive, $archiveSha256, $userId, $canonical, $previewHash) {
+                $created = ImportJob::create([
                 'id' => $id,
                 'branch_id' => $branchId,
                 'domain' => $domain,
@@ -116,7 +136,28 @@ class ImportJobService
                 'media_archive_content_sha256' => $archiveSha256,
                 'created_by' => $userId,
                 'purge_after' => now()->addDays((int) config('imports.retention_days', 14)),
-            ]));
+                // خيارات مجمَّدة عند الإنشاء لتشغيلةٍ مربوطةٍ بمعاينة؛ غيرها يجمّدها أول `apply` كالسابق.
+                'preview_id' => $preview?->id,
+                'preview_hash' => $preview === null ? null : $previewHash,
+                'apply_options' => $preview === null ? null : $canonical,
+                ]);
+
+                // إنفاق المعاينة وإدراج التشغيلة **ذرّياً** في المعاملة نفسها: تعارض القيد الفريد أو فشل الإنفاق يُرجع الاثنين
+                // فتبقى المعاينة صالحة لإعادة المحاولة، ولا تشغيلة بلا إنفاق. (المعرّف من السجل المنشأ لا من `$id`.)
+                if ($preview !== null) {
+                    $this->previews->consume($preview, (string) $created->id);
+                }
+
+                return $created;
+            });
+        } catch (ImportPreviewException $e) {
+            // المعاينة أُنفقت/انتهت بين تحقّقنا وإنفاقنا (سباق): لا تشغيلة، فلا ملف يتيم.
+            $this->storage->delete($stored['path']);
+            if ($storedArchive !== null) {
+                $this->storage->delete($storedArchive['path']);
+            }
+
+            throw $e;
         } catch (UniqueConstraintViolationException $e) {
             // خسرنا سباق (tenant_id, idempotency_key): تشغيلة أخرى أُدرِجت
             // بين فحصنا المسبق وإدراجنا. الملف الذي خزّناه للتوّ يتيمٌ الآن —
@@ -136,7 +177,7 @@ class ImportJobService
                 throw $e;
             }
 
-            return $this->assertSameRequestOrFail($existing, $domain, $sha256, $archiveSha256, $branchId);
+            return $this->assertSameRequestOrFail($existing, $domain, $sha256, $archiveSha256, $branchId, $previewId, $previewHash, $canonical);
         }
 
         return $this->inspect($job);
@@ -149,17 +190,35 @@ class ImportJobService
      * آخر) يُرفض صراحةً (422 عبر `ApiController::domain()`)؛ لا يُعاد أبداً
      * سجلٌّ لا يخصّ هذا الطلب تحت ستار «نفس المفتاح».
      */
-    private function assertSameRequestOrFail(ImportJob $existing, string $domain, string $sha256, ?string $archiveSha256, ?string $branchId): ImportJob
-    {
+    /**
+     * @param  array<string, mixed>  $canonical  خيارات الطلب القانونية — تدخل الهوية (القاعدة 12): الملف نفسه بمطابقة أو خيارات
+     *                                            أو معاينة مختلفة **ليس** إعادة محاولة.
+     */
+    private function assertSameRequestOrFail(
+        ImportJob $existing,
+        string $domain,
+        string $sha256,
+        ?string $archiveSha256,
+        ?string $branchId,
+        ?string $previewId = null,
+        ?string $previewHash = null,
+        array $canonical = [],
+    ): ImportJob {
+        $differentBinding = $existing->preview_id !== $previewId
+            || $existing->preview_hash !== $previewHash
+            // الخيارات المجمَّدة تُقارَن فقط حين التشغيلة القائمة مربوطةٌ بمعاينة (غيرها تُجمَّد عند أول apply).
+            || ($existing->preview_id !== null && (array) $existing->apply_options !== $canonical);
+
         if (
-            $existing->domain !== $domain
+            $differentBinding
+            || $existing->domain !== $domain
             // تشغيلة قائمة بلا فرع (سبقت هذا العمود) تُعامَل كمطابقة؛ بفرع تُقارَن به.
             || ($existing->branch_id !== null && $existing->branch_id !== $branchId)
             || $existing->content_sha256 !== $sha256
             || $existing->media_archive_content_sha256 !== $archiveSha256
         ) {
             throw new RuntimeException(
-                'مفتاح idempotency هذا مستخدَم بالفعل لملف أو مجال أو فرع مختلف. استخدم مفتاحاً جديداً لهذا الطلب.'
+                'مفتاح idempotency هذا مستخدَم بالفعل لملف أو مجال أو فرع أو معاينة أو خيارات مختلفة. استخدم مفتاحاً جديداً لهذا الطلب.'
             );
         }
 
@@ -272,9 +331,9 @@ class ImportJobService
      * اللاحقة تتجاهل خيارات الطلب الحالي فلا تُعاد تفسير حالة واجهة تغيّرت
      * بين الاستدعاءات.
      */
-    public function applyNextChunk(ImportJob $job, array $options, ?string $userId, bool $costAuthorized): ImportJob
+    public function applyNextChunk(ImportJob $job, array $options, ?string $userId, bool $costAuthorized, ?array $explicitOptions = null): ImportJob
     {
-        $updated = DB::transaction(function () use ($job, $options, $userId, $costAuthorized) {
+        $updated = DB::transaction(function () use ($job, $options, $userId, $costAuthorized, $explicitOptions) {
             /** @var ImportJob $locked */
             $locked = ImportJob::query()->whereKey($job->id)->lockForUpdate()->firstOrFail();
 
@@ -284,8 +343,21 @@ class ImportJobService
                 return $locked;
             }
 
+            // IMP-H1-S3b: تشغيلةٌ مربوطةٌ بمعاينة تنفّذ **خياراتها المجمَّدة عند الإنشاء** (هي ما عاينه المستخدم)؛ أي خيارٍ
+            // مختلف في طلب التطبيق يُرفض صراحةً لا يُتجاهَل بصمت. `batch_size` تشغيليٌّ لا دلاليّ فيبقى من طلب أول قطعة.
+            if ($locked->preview_id !== null && $explicitOptions !== null) {
+                $this->assertOptionsFrozen($locked, $explicitOptions);
+            }
+
             $firstChunk = $locked->status === ImportJobStatus::READY;
-            $frozenOptions = $firstChunk ? $options : (array) ($locked->apply_options ?? []);
+            if ($locked->preview_id !== null) {
+                $frozenOptions = (array) ($locked->apply_options ?? []);
+                if ($firstChunk && isset($options['batch_size'])) {
+                    $frozenOptions['batch_size'] = $options['batch_size'];
+                }
+            } else {
+                $frozenOptions = $firstChunk ? $options : (array) ($locked->apply_options ?? []);
+            }
 
             $tmpPath = $this->materializeLocalCopy((string) $locked->storage_path);
             $archiveTmpPath = null;
@@ -353,6 +425,22 @@ class ImportJobService
         }
 
         return $updated;
+    }
+
+    /**
+     * خيارات الطلب الصريحة (الحقول المُرسَلة فعلاً) لا تغيّر ما جُمِّد عند الإنشاء: نُحوِّل المجمَّد + الصريح قانونياً ونقارنه
+     * بالمجمَّد قانونياً. حقلٌ لا يخصّ المجال يُسقَطه التحويل القانوني فلا يُعدّ تغييراً.
+     *
+     * @param  array<string, mixed>  $explicit
+     */
+    private function assertOptionsFrozen(ImportJob $job, array $explicit): void
+    {
+        $adapter = $this->domains->for($job->domain);
+        $frozen = $adapter->canonicalOptions((array) $job->apply_options);
+
+        if ($adapter->canonicalOptions(array_merge($frozen, $explicit)) !== $frozen) {
+            throw new ImportPreviewException('options_frozen', 'خيارات هذه التشغيلة مجمَّدة منذ المعاينة ولا تتغيّر عند التنفيذ. أنشئ معاينة جديدة بالخيارات المطلوبة.');
+        }
     }
 
     /**

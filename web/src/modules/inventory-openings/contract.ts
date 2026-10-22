@@ -7,6 +7,8 @@
  * واحد كان يفتح باباً لتسرّب حقلٍ من أحدهما إلى الآخر.
  */
 
+import type { ImportBinding } from '@/modules/import-jobs/client';
+
 export type OpeningStatus = 'draft' | 'posted';
 export type RowStatus = 'valid' | 'error';
 
@@ -67,6 +69,8 @@ export interface PreviewCounters {
 }
 
 export interface PreviewResult {
+  /** معاينةٌ أحادية الاستعمال يحفظها الخادم — تُرفَق بإنشاء التشغيلة (IMP-H1-S3b). */
+  binding?: ImportBinding;
   opening_date: string;
   allow_zero_cost: boolean;
   mapping: Record<number, string>;

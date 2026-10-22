@@ -30,9 +30,20 @@ export const APPLICABLE_STATUSES: ReadonlySet<ImportJobStatus> = new Set(['ready
 /** الحالات التي يصح فيها الإلغاء. */
 export const CANCELLABLE_STATUSES: ReadonlySet<ImportJobStatus> = new Set(['uploaded', 'ready']);
 
+/** معاينةٌ أحادية الاستعمال يحفظها الخادم (IMP-H1-S3b) — تُرفَق بإنشاء التشغيلة فيُنفَّذ ما عُوين حرفياً. */
+export interface ImportBinding {
+  id: string;
+  hash: string;
+  expires_at: string;
+}
+
 export interface ImportJob {
   id: string;
   domain: ImportJobDomain;
+  /** الفرع الذي أُنشئت فيه التشغيلة؛ ثابتٌ بعد الإنشاء (IMP-H1-S3a). */
+  branch_id?: string | null;
+  /** مربوطةٌ بمعاينة (خياراتها مجمَّدة منذ الإنشاء). */
+  preview_bound?: boolean;
   status: ImportJobStatus;
   original_filename: string;
   extension: string;
@@ -55,17 +66,40 @@ export interface ImportJob {
 /** خيارات `/apply` — حقلٌ فضفاض عمداً، يفهم كل مجالٍ حقوله وحدها (انظر `ApplyImportJobRequest`). */
 export type ApplyOptions = Record<string, string | number | boolean | Record<number, string | null> | undefined>;
 
+/**
+ * خيارات الإنشاء كحقول multipart متداخلة `options[...]` — مطابقة الأعمدة تُرسَل كما في المعاينة والتطبيق تماماً (العمود المتجاهَل
+ * `ignore` صراحةً) كي تتطابق بصمة المعاينة حرفياً.
+ */
+function appendOptions(form: FormData, options: ApplyOptions) {
+  for (const [key, value] of Object.entries(options)) {
+    if (value === undefined) continue;
+    if (key === 'mapping' && value && typeof value === 'object') {
+      for (const [index, field] of Object.entries(value as Record<number, string | null>)) {
+        form.append(`options[mapping][${index}]`, field ?? 'ignore');
+      }
+      continue;
+    }
+    form.append(`options[${key}]`, typeof value === 'boolean' ? (value ? '1' : '0') : String(value));
+  }
+}
+
 export async function createImportJob(
   domain: ImportJobDomain,
   file: File,
   idempotencyKey?: string,
-  mediaArchive?: File | null
+  mediaArchive?: File | null,
+  bound?: { binding: ImportBinding; options: ApplyOptions } | null
 ): Promise<ImportJob> {
   const form = new FormData();
   form.append('domain', domain);
   form.append('file', file);
   if (mediaArchive) form.append('media_archive', mediaArchive);
   if (idempotencyKey) form.append('idempotency_key', idempotencyKey);
+  if (bound) {
+    form.append('preview_id', bound.binding.id);
+    form.append('preview_hash', bound.binding.hash);
+    appendOptions(form, bound.options);
+  }
 
   const response = await api<{ data: ImportJob }>('/import-jobs', { method: 'POST', body: form });
   return response.data;

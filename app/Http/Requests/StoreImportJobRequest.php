@@ -3,6 +3,9 @@
 namespace App\Http\Requests;
 
 use App\Services\ImportJobAccess;
+use App\Services\ProductImportService;
+use App\Support\InventoryOpeningFields;
+use App\Support\ProductImportFields;
 use App\Support\ImportJobDomain;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -46,7 +49,42 @@ class StoreImportJobRequest extends FormRequest
                 }
             }],
             'idempotency_key' => ['sometimes', 'nullable', 'string', 'max:191'],
+            // IMP-H1-S3b — ربط التنفيذ بمعاينته: المعرّف والبصمة معاً أو لا شيء، والخيارات **نفسها** التي أُرسلت إلى المعاينة.
+            'preview_id' => ['required_with:preview_hash', 'nullable', 'uuid'],
+            'preview_hash' => ['required_with:preview_id', 'nullable', 'string', 'size:64'],
+            'options' => ['sometimes', 'nullable', 'array'],
+            'options.mode' => ['sometimes', Rule::in([ProductImportService::MODE_CREATE, ProductImportService::MODE_UPDATE, ProductImportService::MODE_UPSERT])],
+            'options.blank_policy' => ['sometimes', Rule::in([ProductImportService::BLANK_IGNORE, ProductImportService::BLANK_CLEAR])],
+            'options.master_data_policy' => ['sometimes', Rule::in([ProductImportService::MASTER_DATA_ERROR, ProductImportService::MASTER_DATA_TEXT, ProductImportService::MASTER_DATA_CREATE])],
+            'options.mapping' => ['sometimes', 'array', 'max:'.ProductImportService::MAX_COLUMNS],
+            'options.mapping.*' => ['nullable', 'string', Rule::in(array_merge(ProductImportFields::keys(), InventoryOpeningFields::keys(), ['ignore']))],
+            'options.price_list_id' => ['sometimes', 'nullable', 'uuid'],
+            'options.opening_date' => ['sometimes', 'date_format:Y-m-d'],
+            'options.allow_zero_cost' => ['sometimes', 'boolean'],
+            'options.notes' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'options.apply_product_images' => ['sometimes', 'boolean'],
+            'options.approve_existing_media_updates' => ['sometimes', 'boolean'],
         ];
+    }
+
+    /**
+     * خيارات الإنشاء كما أُرسلت (تُحوَّل قانونياً في الخدمة). الحقول المنطقية تصل نصّاً في multipart فتُحوَّل هنا.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function creationOptions(): ?array
+    {
+        $options = $this->input('options');
+        if (! is_array($options)) {
+            return null;
+        }
+        foreach (['allow_zero_cost', 'apply_product_images', 'approve_existing_media_updates'] as $key) {
+            if (array_key_exists($key, $options)) {
+                $options[$key] = filter_var($options[$key], FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? false;
+            }
+        }
+
+        return $options;
     }
 
     public function messages(): array
