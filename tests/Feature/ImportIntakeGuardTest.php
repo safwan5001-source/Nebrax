@@ -101,6 +101,26 @@ class ImportIntakeGuardTest extends TestCase
     }
 
     /** @test */
+    public function the_policy_key_exists_in_config_and_defaults_off(): void
+    {
+        $this->assertSame('off', (require base_path('config/imports.php'))['intake_scan']['mode'] ?? null, 'المفتاح `imports.intake_scan.mode` غائب أو غير مغلق افتراضياً.');
+        $this->assertFalse(app(\App\Services\SpreadsheetIntakeGuard::class)->enabled());
+    }
+
+    /** @test */
+    public function an_unrecognised_mode_value_enables_the_scan_instead_of_silently_skipping_it(): void
+    {
+        foreach (['on', 'On', ' ON ', 'true', '1', 'enabled'] as $mode) {
+            config(['imports.intake_scan.mode' => $mode]);
+            $this->assertTrue(app(\App\Services\SpreadsheetIntakeGuard::class)->enabled(), "«{$mode}» يجب أن يفعّل الفحص (فشل مغلق).");
+        }
+        foreach (['off', 'OFF', '', null] as $mode) {
+            config(['imports.intake_scan.mode' => $mode]);
+            $this->assertFalse(app(\App\Services\SpreadsheetIntakeGuard::class)->enabled(), 'القيمة '.var_export($mode, true).' تعني off.');
+        }
+    }
+
+    /** @test */
     public function with_the_policy_on_a_clean_file_proceeds_and_is_scanned_first(): void
     {
         $auth = $this->registerTenant();
@@ -236,8 +256,11 @@ class ImportIntakeGuardTest extends TestCase
     {
         try {
             $rules = (new $requestClass)->rules();
-        } catch (\Throwable) {
-            return false;
+        } catch (\Throwable $e) {
+            // `rules()` يحتاج سياق طلبٍ/مستأجر (مثل `StoreProductRequest`): لا نُسقط المسار بصمت ولا نفشل، بل نفحص **مصدر الصنف** استاتيكياً.
+            $source = (string) file_get_contents((new \ReflectionClass($requestClass))->getFileName());
+
+            return (bool) preg_match("/['\"](file|image|mimes:[^'\"]*|mimetypes:[^'\"]*)['\"]/", $source);
         }
 
         foreach ($rules as $rule) {

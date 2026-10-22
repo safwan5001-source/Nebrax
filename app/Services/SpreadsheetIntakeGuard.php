@@ -27,7 +27,10 @@ class SpreadsheetIntakeGuard
 
     public function enabled(): bool
     {
-        return config('imports.intake_scan.mode', self::MODE_OFF) === self::MODE_ON;
+        $mode = strtolower(trim((string) config('imports.intake_scan.mode', self::MODE_OFF)));
+
+        // فشل مغلق: أي قيمة غير `off`/فارغة (مثل `On` أو `true`) تُفعّل الفحص بدل أن تُترك الملفات بلا فحص بصمت.
+        return $mode !== '' && $mode !== self::MODE_OFF;
     }
 
     /** @param  iterable<UploadedFile>  $files */

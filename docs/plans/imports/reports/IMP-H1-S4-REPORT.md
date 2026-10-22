@@ -13,7 +13,7 @@ like any other and must be admitted by the same scanner **before** any parsing, 
 - `App\Services\SpreadsheetIntakeGuard` — `enabled()` reads `config('imports.intake_scan.mode')` (`off` | `on`); `admit(iterable $files)` opens each file and calls
   `DocumentSafetyScanner::scan`. **Fail closed:** `INFECTED` → 422; scanner throws / unreachable / unconfigured → 503 (details never leaked); any non-`CLEAN` status → 503.
 - `App\Http\Middleware\EnsureImportFilesScanned` — flattens `$request->allFiles()` (spreadsheet **and** `media_archive`/image archives) and admits all of them; a no-op when the policy is off.
-- `config/imports.php`: `intake_scan.mode = env('IMPORTS_INTAKE_SCAN', 'off')`.
+- `config/imports.php`: `intake_scan.mode = env('IMPORTS_INTAKE_SCAN', 'off')` (the `env()` stays in config, safe under `config:cache`). **Fail closed on typos:** `off`/empty = off; *any other* value (`On`, `true`, …) enables the scan rather than silently leaving uploads unscanned.
 - `routes/api.php`: the middleware added to `products/import` and `products/workbook` and `inventory-openings/import` (`inspect|preview|apply`), `POST import-jobs`,
   and the AI Action file / image-archive upload routes (`ai-actions/{action}/files`, `/image-archives`).
 
@@ -24,7 +24,18 @@ like any other and must be admitted by the same scanner **before** any parsing, 
 - The guard runs before RBAC for `POST import-jobs`, because that route's authorization lives in its FormRequest; an unauthenticated caller is already stopped by `auth:sanctum`. An unauthorized-but-authenticated caller could cause a scan of their own upload only when the policy is on.
 - No accounting, journal, ZATCA or inventory logic is touched.
 
-## Tests — `ImportIntakeGuardTest` (7)
+## Independent review (read-only subagent) — findings and disposition
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | `config/imports.php` carried no `intake_scan` key — the env switch was dead (real) | **Fixed** (key added; test asserts it exists and defaults `off`) |
+| 1b | A typo such as `On`/`true` meant unscanned | **Fixed** (fail closed; tested) |
+| 2 | clamd `StreamMaxLength` defaults to 25MB; archives up to 50MB would get 503 "scanner unavailable" | **Documented** in config + here: raise clamd to ≥ 50MB before enabling (part of D-04). Error text left as is (fail closed) |
+| 3 | `POST import-jobs` is guarded before its FormRequest authorization, so any authenticated tenant user could make the server stream ≤ 50MB to clamd (only when the policy is on) | **Accepted for now, tracked:** the per-user throttle already planned in S3d closes it; no behavior change to the route here |
+| 4 | Failed uploads (`isValid()` false) give 503, not the validation 422 | Accepted (fail closed) |
+| 5 | Invariant test silently skipped a FormRequest whose `rules()` throws | **Fixed** (falls back to a static scan of the FormRequest source instead of skipping; `StoreProductRequest` needs tenant context in `rules()`) |
+
+## Tests — `ImportIntakeGuardTest` (9)
 
 1. Policy off never consults the scanner. 2. On + clean proceeds, scanned first. 3. Infected refused on every import entry; nothing is created.
 4. Unavailable/unconfigured scanner → 503, no detail leak. 5. Non-`CLEAN`, non-`INFECTED` status → 503. 6. Every uploaded file in the request (including `media_archive`) is scanned.
@@ -36,6 +47,6 @@ like any other and must be admitted by the same scanner **before** any parsing, 
 
 ## Verification
 
-- `--filter=ImportIntakeGuardTest`: 7 passed (40 assertions).
+- `--filter=ImportIntakeGuardTest`: see PR for the final count (9 tests after review fixes).
 - `--filter='Import|AiAction|InventoryOpening|ProductWorkbook'`: 403 passed, 6 skipped (PostgreSQL-only in SQLite).
 - Full local suite and CI (SQLite + PostgreSQL + Gate): recorded on the PR.
