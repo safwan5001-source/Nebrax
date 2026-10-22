@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Last merged slice | — (H0 in review) |
+| Last merged slice | — (H0 in review: PR #1595) |
 | **Next slice** | **IMP-H1-S1** — import-jobs app gate + prune media archive (see `AWJ_IMPORT_OPUS_HANDOFF.md` §3) |
 | Open owner decisions | D-01, D-02, D-03, D-04, D-06, D-07, OPS-01 (D-05 has a non-blocking default) |
 | Railway state | Unknown (owner-reported stall; no access from the agent) |
@@ -19,7 +19,7 @@
 
 | Slice | Std | AI | Scope | Depends | Branch | PR | Base SHA | Head SHA | Merge SHA | Tests | CI | Deploy | Verify | Status | Next action |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| IMP-H0-S1 | — | — | Discovery, master plan, tracker, handoff (docs) | — | `claude/unified-import-h0` | _pending_ | `474aad1` | _pending_ | — | n/a (docs) | — | — | — | In Progress | Merge, then stop for the model handoff |
+| IMP-H0-S1 | — | — | Discovery, master plan, tracker, handoff (docs) | — | `claude/unified-import-h0` | #1595 | `474aad1` | _pending_ | — | n/a (docs) | — | — | — | In Progress | Merge, then stop for the model handoff |
 | IMP-H1-S1 | 🟡→✅ | — | `inventory_opening` job app gate; prune deletes media archive | H0 | — | — | — | — | — | — | — | — | — | Planned | Start (handoff §3) |
 | IMP-H1-S2 | ✅ | ✅ | `ImportDomainAdapter` + registry; existing 3 domains; no behavior change | H1-S1 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H1-S3 | ✅ | — | Preview-hash ↔ job binding; UI idempotency key; throttle | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
