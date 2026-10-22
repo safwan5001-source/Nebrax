@@ -7,9 +7,11 @@ use App\Models\AccountBalance;
 use App\Models\Branch;
 use App\Models\CashBankAccount;
 use App\Models\PaymentMethod;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Support\Rbac;
 use App\Tenancy\BranchContext;
+use App\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -22,15 +24,37 @@ class CashBankAccountService
     private const TYPES = ['cash', 'bank'];
     private const SCOPES = ['all', 'role', 'user', 'branch'];
 
-    /** يربط الحسابين النظاميين التاريخيين بالوحدة، ويعمل بأمان عند التكرار. */
+    private const DEFAULT_ENTITIES = [
+        ['code' => '1110', 'type' => 'cash', 'name' => 'الخزينة الافتراضية'],
+        ['code' => '1120', 'type' => 'bank', 'name' => 'الحساب البنكي الافتراضي'],
+    ];
+
+    /**
+     * يربط الحسابين النظاميين التاريخيين بالوحدة، ويعمل بأمان عند التكرار.
+     *
+     * **ترتيب الأقفال (TREASURY-T1):** يُستدعى هذا من `resolveForPayment` في مسارات تأخذ مِرساة المستأجر قبله
+     * (فاتورة آجلة مدفوعة: المِرساة ← التحصيل) وبعده (فاتورة نقدية: التهيئة ← القيد/المِرساة)، وفي مسارات تحمل المِرساة
+     * وتكتب سطراً على 1110 (`FOR KEY SHARE` من مفتاح الحساب الأجنبي). قفل `FOR UPDATE` على الحساب قبل المِرساة كان ضلعاً في
+     * دورتَي جمود (فاتورة نقدية ↔ إشعار دائن نقدي، وفاتورة نقدية ↔ فاتورة آجلة مدفوعة). العلاج طبقتان:
+     *  1) مسار سريع **بلا أي قفل**: المستأجر المهيَّأ (الحالة الغالبة بعد أول ترحيل) لا يأخذ قفل صفٍّ في `accounts` إطلاقاً.
+     *  2) المسار البطيء (مستأجر غير مكتمل التهيئة) يأخذ **المِرساة أولاً** ثم الحسابين بـ`FOR NO KEY UPDATE`، فيتوافق مع ترتيب
+     *     `LedgerService` (المِرساة ← الحسابات) ولا يتعارض مع `FOR KEY SHARE` للمفتاح الأجنبي. لا يحدّث هذا المسار مفتاحاً في `accounts` أبداً.
+     */
     public function bootstrapDefaults(): void
     {
+        if ($this->defaultsProvisioned()) {
+            return;
+        }
+
         DB::transaction(function () {
-            foreach ([
-                ['code' => '1110', 'type' => 'cash', 'name' => 'الخزينة الافتراضية'],
-                ['code' => '1120', 'type' => 'bank', 'name' => 'الحساب البنكي الافتراضي'],
-            ] as $default) {
-                $account = Account::where('code', $default['code'])->lockForUpdate()->first();
+            // المِرساة قبل أي قفل على الحسابات (انظر وصف الدالة). تُهمَل خارج سياق مستأجر كما كان السلوك.
+            $tenantId = app(TenantContext::class)->id();
+            if ($tenantId !== null) {
+                Tenant::whereKey($tenantId)->lockForUpdate()->first();
+            }
+
+            foreach (self::DEFAULT_ENTITIES as $default) {
+                $account = Account::where('code', $default['code'])->lock('FOR NO KEY UPDATE')->first();
                 if (! $account || CashBankAccount::where('account_id', $account->id)->exists()) {
                     continue;
                 }
@@ -76,6 +100,29 @@ class CashBankAccountService
                 ]);
             }
         });
+    }
+
+    /**
+     * هل لا يبقى للمسار البطيء ما يفعله؟ قراءات عادية بلا أقفال، وشرطها هو بالضبط شرط «لا شيء يُكتب» في `bootstrapDefaults`:
+     * كل حساب نظامي موجود له كيان (أو غائب أصلاً)، وإما توجد طرق دفع أو ينقص كيان رئيسي لنوع (فلا تُزرع).
+     * تقرأ المثبَّت وحده (READ COMMITTED) والصفوف التي تعتمد عليها لا تُحذف: الكيان النظامي لا يُحذف (`delete()` يرفضه) والقيود `restrict`؛
+     * وطرق الدفع يكفي وجودها، فحذفٌ متزامن لآخر طريقة يعيد زرعها في استدعاء لاحق كما كان تماماً (سياسة الزرع لم تتغيّر).
+     */
+    private function defaultsProvisioned(): bool
+    {
+        foreach (self::DEFAULT_ENTITIES as $default) {
+            $account = Account::where('code', $default['code'])->first();
+            if ($account && ! CashBankAccount::where('account_id', $account->id)->exists()) {
+                return false;
+            }
+        }
+
+        if (PaymentMethod::query()->exists()) {
+            return true;
+        }
+
+        return ! CashBankAccount::where('type', 'cash')->where('is_main', true)->exists()
+            || ! CashBankAccount::where('type', 'bank')->where('is_main', true)->exists();
     }
 
     public function create(array $data, ?User $actor = null): CashBankAccount
