@@ -147,10 +147,11 @@ export default function ProductWorkbookImportPage() {
         preview?.binding ? { binding: preview.binding, options: applyOptionsPayload() } : null
       );
       if (!job) return;
-      await engine.applyLoop(job.id, applyOptionsPayload());
+      // تشغيلةٌ مربوطةٌ بمعاينة تنفّذ خياراتها المجمَّدة عند الإنشاء: لا نرسل خيارات دلالية (الواجهة المستأنَفة لا تملك الأصلية).
+      await engine.applyLoop(job.id, job.preview_bound ? {} : applyOptionsPayload());
       return;
     }
-    await engine.applyLoop(engine.job.id, applyOptionsPayload());
+    await engine.applyLoop(engine.job.id, engine.job.preview_bound ? {} : applyOptionsPayload());
   }
 
   useEffect(() => {

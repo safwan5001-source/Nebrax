@@ -127,17 +127,34 @@ class ImportPreviewBindingTest extends TestCase
     }
 
     /** @test */
-    public function one_preview_yields_at_most_one_job(): void
+    public function one_preview_yields_at_most_one_job_and_an_identical_replay_returns_it(): void
+    {
+        $auth = $this->registerTenant();
+        $binding = $this->previewCatalog($auth['token'], $this->csv());
+        $first = $this->createJob($auth['token'], $this->csv(), $binding)->assertCreated();
+        $before = $this->storedFileCount();
+
+        // ضاعت الاستجابة فأعاد العميل الطلب نفسه حرفياً (بلا مفتاح idempotency): التشغيلة نفسها لا `preview_consumed`.
+        $replay = $this->createJob($auth['token'], $this->csv(), $binding)->assertOk();
+        $this->assertSame($first['data']['id'], $replay['data']['id']);
+
+        // أما أي اختلاف عن الطلب الأصلي (ملف/خيارات) فمعاينةٌ مستهلَكة تُرفض ولا تُنشئ ثانيةً.
+        $this->createJob($auth['token'], $this->csv('PB-OTHER'), $binding)->assertStatus(422)->assertJsonPath('code', 'preview_consumed');
+        $this->createJob($auth['token'], $this->csv(), $binding, ['mode' => 'upsert'])->assertStatus(422)->assertJsonPath('code', 'preview_consumed');
+
+        $this->assertSame(1, ImportJob::query()->count());
+        $this->assertSame($before, $this->storedFileCount(), 'لا ملف يتيم من الإعادة ولا من الرفض.');
+    }
+
+    /** @test */
+    public function a_replay_by_another_user_or_branch_is_not_a_replay(): void
     {
         $auth = $this->registerTenant();
         $binding = $this->previewCatalog($auth['token'], $this->csv());
         $this->createJob($auth['token'], $this->csv(), $binding)->assertCreated();
-        $before = $this->storedFileCount();
+        $colleague = $this->tokenForRole($auth['tenant_id'], 'admin', 'replay-colleague@pb.test');
 
-        $this->createJob($auth['token'], $this->csv(), $binding)->assertStatus(422)->assertJsonPath('code', 'preview_consumed');
-
-        $this->assertSame(1, ImportJob::query()->count());
-        $this->assertSame($before, $this->storedFileCount(), 'الرفض لا يترك ملفاً يتيماً.');
+        $this->createJob($colleague, $this->csv(), $binding)->assertStatus(422)->assertJsonPath('code', 'preview_consumed');
     }
 
     /** @test */

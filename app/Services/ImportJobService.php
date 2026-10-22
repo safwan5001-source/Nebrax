@@ -88,6 +88,15 @@ class ImportJobService
             }
         }
 
+        // إعادة محاولة بعد ضياع الاستجابة: معاينةٌ أُنفقت لتشغيلةٍ أُنشئت فعلاً وجاء الطلب نفسه حرفياً ⇒ نفس التشغيلة (لا `preview_consumed`).
+        if ($previewId !== null && $previewHash !== null) {
+            $spent = $this->previews->consumedPreviewFor($previewId, $previewHash, $userId, $domain, $sha256, $archiveSha256, $canonical);
+            $replayed = $spent === null ? null : ImportJob::query()->whereKey($spent->consumed_job_id)->where('preview_id', $spent->id)->first();
+            if ($replayed !== null) {
+                return $replayed;
+            }
+        }
+
         // المعاينة تُتحقَّق **قبل** تخزين أي ملف: إنشاءٌ مرفوض لا يترك أثراً. بلا معاينة: العقد القديم ما لم يُلزَم بها.
         $preview = null;
         if ($previewId !== null || $previewHash !== null) {

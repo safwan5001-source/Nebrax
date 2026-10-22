@@ -230,6 +230,37 @@ class ImportPreviewService
         return $plan;
     }
 
+    /**
+     * إعادة محاولة بعد ضياع الاستجابة: معاينةٌ أُنفقت لتشغيلةٍ **أُنشئت فعلاً** ثم أعاد العميل الطلب نفسه حرفياً (نفس المعاينة والبصمة
+     * والمستخدم والفرع والملف والخيارات) تُعاد تشغيلتها بدل `preview_consumed` — وإلا ظلّت التشغيلة المنشأة يتيمةً عن واجهةٍ لا تعرف
+     * معرّفها وأُجبر المستخدم على معاينةٍ وتشغيلةٍ ثانية. أي اختلافٍ في أيٍّ مما سبق ⇒ `null` (فيأخذ المسار العادي ويُرفض).
+     *
+     * @param  array<string, mixed>  $canonical
+     */
+    public function consumedPreviewFor(
+        string $previewId,
+        string $previewHash,
+        ?string $userId,
+        string $domain,
+        string $fileSha,
+        ?string $archiveSha,
+        array $canonical,
+    ): ?ImportPreview {
+        $preview = ImportPreview::query()->whereKey($previewId)->first();
+        if ($preview === null || $preview->consumed_job_id === null || ! hash_equals((string) $preview->preview_hash, $previewHash)) {
+            return null;
+        }
+
+        $expected = $this->hash($this->requireTenant(), $this->branch->id(), $domain, $fileSha, $archiveSha, $canonical);
+
+        return $preview->domain === $domain
+            && $preview->user_id === $userId
+            && $preview->branch_id === $this->branch->id()
+            && hash_equals($expected, (string) $preview->preview_hash)
+            ? $preview
+            : null;
+    }
+
     /** تقليم المعاينات المنتهية/المنفَقة القديمة — يُستدعى من `imports:prune`. */
     public function pruneStale(): int
     {
