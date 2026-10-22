@@ -74,11 +74,11 @@ Findings the task asked about:
 
 | Run (local sandbox) | Result |
 |---|---|
-| `TreasuryAwareCashReportsTest` | 16 passed on SQLite and 16 passed on PostgreSQL 16 |
-| Same tests against the original `ReportService` | 12 of 16 fail with the differences in section 3 (4 pass: legacy tenant, resolver cases, auth) |
-| Web: `tsc --noEmit` on the changed files, `dashboard.test.ts`, `mock-general-reports.test.ts` | no error in changed files; 22 passed (the repository has unrelated pre-existing type errors in other test files) |
-| Full SQLite suite | 8334 passed, 185 skipped, 27 failed |
-| Full PostgreSQL suite, `--parallel --processes=4` (as CI) | 8546 tests, 27 failing |
+| `TreasuryAwareCashReportsTest` | 17 passed on SQLite and 17 passed on PostgreSQL 16 |
+| Same tests against the original `ReportService` | 12 of the first 16 fail with the differences in section 3 (4 pass: legacy tenant, resolver cases, auth). Removing the branch rule from `cashPosition()` makes the restricted-user test fail |
+| Web: `vitest` on `src/lib`, `src/components/dashboard`, `dashboard/page.test.tsx` (includes i18n key parity and mock contracts) | 100 files, 769 tests passed; `tsc --noEmit` shows no error in changed files (unrelated pre-existing type errors exist in other test files) |
+| Full SQLite suite | 8335 passed, 185 skipped, 27 failed |
+| Full PostgreSQL suite, `--parallel --processes=4` (as CI) | 8547 tests, 27 failing |
 | CI (`php artisan test` sqlite and pgsql, CI Gate) | see the PR |
 
 All 27 local failures are the same pre-existing set as in the T1 report and none touches reports or treasury: 26 `Fuel*` tests (the sandbox lacks `bcmath`; CI has it) plus `AiPaidProviderDisabledTest` on SQLite and `StorefrontMediaApiTest` on PostgreSQL (both fail identically on `main`, verified in T1). The related report and accounting suites (`GeneralReportTest`, report, payment, invoice, ledger, treasury) are inside the full runs and pass.
