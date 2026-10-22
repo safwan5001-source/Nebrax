@@ -18,6 +18,8 @@ use Tests\TestCase;
  *  2) ترحيلات متزامنة: مستأجر مفعَّل ⇒ يرفضها السياج كلها بلا جمود ولا أثر؛ مستأجر معطَّل ⇒ تنجح كلها (السلوك القديم).
  *  3) تفعيل يتزامن مع ترحيل يحمل مِرساة المستأجر: التفعيل يصطفّ خلفه فيرى الترحيلُ حالة واحدة (معطَّلة)، وما بعده يُرفض.
  *  4) موت مفاجئ (SIGKILL) بعد إدراج المدخل وقبل التثبيت ⇒ لا مدخل ولا تغيّر في الإشعار ولا تقدّم للرأس.
+ *  5) حدّ اتساق الإيقاف الطارئ: الحالة الفعّالة = **آخر حالة مثبَّتة وقت عبارة الترحيل** (READ COMMITTED)؛ إيقاف غير مثبَّت لا يراه الترحيل ولا يحجبه،
+ *     وبعد تثبيته يمرّ الترحيل القديم، وبعد رفعه يعود السياج؛ والقرار الصريح مقبول في كل الحالات.
  *
  *  على PostgreSQL **لا يُتخطّى** هذا الصنف إن غاب `pcntl`: يفشل. يُتخطّى على SQLite فقط (لا أقفال صفوف).
  *  يعمل على قاعدة مُهاجَرة (لا RefreshDatabase) لأن العمليات الفرعية تحتاج صفوفاً مثبَّتة؛ ينظّفها `tearDown` بحذف المستأجرين.
@@ -44,6 +46,7 @@ class ZatcaCreditNoteFencePostgresTest extends TestCase
 
         $this->dir = sys_get_temp_dir().'/zatca_f2_'.uniqid();
         mkdir($this->dir);
+        $this->clearPlatformRows(); // لا بقايا من تشغيل سابق منقطع
     }
 
     protected function tearDown(): void
@@ -59,6 +62,7 @@ class ZatcaCreditNoteFencePostgresTest extends TestCase
             foreach ($this->tenants as $id) {
                 DB::table('tenants')->where('id', $id)->delete();
             }
+            $this->clearPlatformRows();
             foreach ($this->admins as $id) {
                 DB::table('platform_administrators')->where('id', $id)->delete();
             }
@@ -234,6 +238,63 @@ class ZatcaCreditNoteFencePostgresTest extends TestCase
         $this->assertNull(DB::table('credit_notes')->where('id', $note)->value('zatca_status'));
     }
 
+    /** @test */
+    public function the_emergency_stop_boundary_is_the_committed_state_at_the_posting_statement(): void
+    {
+        $tenant = $this->makeTenant();
+        [$beforeCommit, $afterCommit, $afterLift, $explicit] = array_map(fn () => $this->makeNote($tenant), range(1, 4));
+        $admin = $this->makeAdmin();
+        $this->enable($tenant);
+        $dir = $this->dir;
+
+        $results = $this->runConcurrently([
+            // إيقاف طارئ داخل معاملة طويلة: لا يُثبَّت إلا بعد ثانيتين ونصف.
+            function () use ($admin, $dir) {
+                return DB::transaction(function () use ($admin, $dir) {
+                    app(ZatcaRolloutControlService::class)->setPlatformState(PlatformAdministrator::findOrFail($admin), false, 'إيقاف طارئ للاختبار');
+                    touch($dir.'/stop_written');
+                    usleep(2_500_000);
+
+                    return true;
+                });
+            },
+            // ترحيل أثناء الإيقاف غير المثبَّت: لا يراه ولا يُحجب به، فيُرفض بسياج المستأجر المفعَّل.
+            function () use ($beforeCommit, $dir) {
+                $this->waitFor($dir.'/stop_written');
+                usleep(400_000);
+                $start = microtime(true);
+                try {
+                    DB::table('credit_notes')->where('id', $beforeCommit)->update(['status' => 'posted']);
+                    $rejected = false;
+                } catch (\Illuminate\Database\QueryException $e) {
+                    $rejected = str_contains($e->getMessage(), 'explicit ZATCA issuance decision');
+                }
+
+                return ['rejected' => $rejected, 'took_ms' => (int) ((microtime(true) - $start) * 1000)];
+            },
+        ]);
+
+        $this->assertAllOk($results);
+        $this->assertTrue($results[1]['value']['rejected'], 'الإيقاف غير المثبَّت غير مرئي: السياج قائم');
+        $this->assertLessThan(1500, $results[1]['value']['took_ms'], 'الترحيل لا ينتظر كاتب الإيقاف (قراءة بلا قفل)');
+        $this->assertSame('draft', DB::table('credit_notes')->where('id', $beforeCommit)->value('status'));
+
+        // بعد التثبيت: الإيقاف سارٍ ⇒ الترحيل القديم بلا قرار.
+        DB::table('credit_notes')->where('id', $afterCommit)->update(['status' => 'posted']);
+        $this->assertSame('posted', DB::table('credit_notes')->where('id', $afterCommit)->value('status'));
+
+        // وبعد رفعه يعود السياج. القرار الصريح مقبول في الحالتين.
+        app(ZatcaRolloutControlService::class)->setPlatformState(PlatformAdministrator::findOrFail($admin), true, 'رفع الإيقاف');
+        try {
+            DB::table('credit_notes')->where('id', $afterLift)->update(['status' => 'posted']);
+            $this->fail('the fence must be back once the stop is lifted');
+        } catch (\Illuminate\Database\QueryException) {
+            $this->assertSame('draft', DB::table('credit_notes')->where('id', $afterLift)->value('status'));
+        }
+        DB::table('credit_notes')->where('id', $explicit)->update(['status' => 'posted', 'zatca_status' => 'not_generated', 'zatca_skip_reason' => 'payment_means_unresolved']);
+        $this->assertSame('posted', DB::table('credit_notes')->where('id', $explicit)->value('status'));
+    }
+
     // ───────────────────────── مساعدات ─────────────────────────
 
     /** يحاكي المخصِّص: مِرساة المستأجر ← رأس السلسلة ← المدخل ← تحديث الإشعار. */
@@ -362,6 +423,23 @@ class ZatcaCreditNoteFencePostgresTest extends TestCase
     private function enable(string $tenant): void
     {
         app(ZatcaRolloutControlService::class)->setTenantState(PlatformAdministrator::findOrFail($this->makeAdmin()), $tenant, true, 'تفعيل تجريبي للاختبار');
+    }
+
+    /** صفوف المنصة لا تُحذف تطبيقياً (حراس C4/E2): تنظيف الاختبار بتعطيل مُشغّلات المستخدم مؤقتاً فقط. */
+    private function clearPlatformRows(): void
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('zatca_rollout_controls')) {
+            return;
+        }
+        try {
+            DB::unprepared('ALTER TABLE zatca_rollout_control_events DISABLE TRIGGER USER');
+            DB::unprepared('ALTER TABLE zatca_rollout_controls DISABLE TRIGGER USER');
+            DB::table('zatca_rollout_control_events')->whereNull('tenant_id')->delete();
+            DB::table('zatca_rollout_controls')->whereNull('tenant_id')->delete();
+        } finally {
+            DB::unprepared('ALTER TABLE zatca_rollout_controls ENABLE TRIGGER USER');
+            DB::unprepared('ALTER TABLE zatca_rollout_control_events ENABLE TRIGGER USER');
+        }
     }
 
     private function waitFor(string $file, float $seconds = 10.0): void

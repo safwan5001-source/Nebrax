@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Schema;
  *      إشعار المشتريات (`type = purchase`) لا يحمل أي قيمة ZATCA إطلاقاً (سلوكه القائم لا يتغيّر).
  *  S2  `generated` يشترط **مدخل سلسلة مطابقاً** في `zatca_chain_entries`: الإشعار نفسه والمستأجر نفسه ونوع المستند 381 وICV وUUID وPIH والهاش والصنف
  *      (standard|simplified). المخصِّص يُدرج المدخل قبل تحديث الإشعار في المعاملة نفسها (كالفواتير)، فيُرفض أي ICV بلا مدخل مطابق.
- *  S3  **التجميد:** متى سُجّل قرار (`zatca_status` ليس NULL) لا يتغيّر أي عمود من أعمدة ZATCA الاثني عشر أبداً — فلا يتحوّل `generated` إلى حالة أخرى،
+ *  S3  **التجميد:** متى سُجّل قرار (`zatca_status` ليس NULL) لا يتغيّر أي عمود من أعمدة ZATCA الاثني عشر ولا `tenant_id`/`id` أبداً — فلا يتحوّل `generated` إلى حالة أخرى،
  *      ولا `disabled`/`not_generated` إلى `generated` (لا إصدار رجعي)، ولا يُعدَّل XML أو هاش أو QR أو لقطة صدرت.
  *  S4  **لا قرار على إشعار مرحَّل بعد:** `zatca_status` لا يُكتب (من NULL) على إشعار حالته `posted` أصلاً؛ يُكتب قبل الترحيل أو في التحديث نفسه الذي يرحّله.
  *      فلا إصدار رجعي ولا Backfill للإشعارات المرحَّلة سابقاً.
@@ -118,6 +118,8 @@ return new class extends Migration
                             OR NEW.zatca_hash IS DISTINCT FROM OLD.zatca_hash
                             OR NEW.zatca_qr IS DISTINCT FROM OLD.zatca_qr
                             OR NEW.zatca_xml IS DISTINCT FROM OLD.zatca_xml
+                            OR NEW.tenant_id IS DISTINCT FROM OLD.tenant_id
+                            OR NEW.id IS DISTINCT FROM OLD.id
                         THEN
                             RAISE EXCEPTION 'credit_notes: the ZATCA decision and issued document are immutable';
                         END IF;
@@ -187,7 +189,7 @@ return new class extends Migration
             $fn$
             SQL);
         DB::unprepared(
-            "CREATE TRIGGER credit_notes_zatca_fence BEFORE INSERT OR UPDATE OF {$columns}, status, type ON credit_notes "
+            "CREATE TRIGGER credit_notes_zatca_fence BEFORE INSERT OR UPDATE OF {$columns}, status, type, tenant_id, id ON credit_notes "
             .'FOR EACH ROW EXECUTE FUNCTION credit_notes_zatca_fence()'
         );
 
@@ -239,7 +241,7 @@ return new class extends Migration
     private function createSqliteFences(): void
     {
         $updateColumns = implode(', ', self::ZATCA_COLUMNS);
-        $changed = implode(' OR ', array_map(fn (string $column) => "NEW.{$column} IS NOT OLD.{$column}", self::ZATCA_COLUMNS));
+        $changed = implode(' OR ', array_map(fn (string $column) => "NEW.{$column} IS NOT OLD.{$column}", [...self::ZATCA_COLUMNS, 'tenant_id', 'id']));
         $anyZatca = implode(' OR ', array_map(fn (string $column) => "NEW.{$column} IS NOT NULL", self::ZATCA_COLUMNS));
         $artifacts = implode(' OR ', array_map(fn (string $column) => "NEW.{$column} IS NOT NULL", self::ARTIFACTS));
         $blank = fn (string $column) => "COALESCE(trim(NEW.{$column}), '') = ''";
@@ -274,7 +276,7 @@ return new class extends Migration
             )
             SQL;
 
-        foreach (['INSERT' => 'insert', "UPDATE OF {$updateColumns}, status, type" => 'update'] as $event => $suffix) {
+        foreach (['INSERT' => 'insert', "UPDATE OF {$updateColumns}, status, type, tenant_id, id" => 'update'] as $event => $suffix) {
             DB::unprepared(<<<SQL
                 CREATE TRIGGER credit_notes_zatca_shape_{$suffix} BEFORE {$event} ON credit_notes
                 WHEN {$shape}
@@ -293,7 +295,7 @@ return new class extends Migration
 
         // S3
         DB::unprepared(<<<SQL
-            CREATE TRIGGER credit_notes_zatca_frozen BEFORE UPDATE OF {$updateColumns} ON credit_notes
+            CREATE TRIGGER credit_notes_zatca_frozen BEFORE UPDATE OF {$updateColumns}, tenant_id, id ON credit_notes
             WHEN OLD.zatca_status IS NOT NULL AND ({$changed})
             BEGIN
                 SELECT RAISE(ABORT, 'credit_notes: the ZATCA decision and issued document are immutable');

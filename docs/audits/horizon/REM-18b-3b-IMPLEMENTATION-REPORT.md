@@ -47,13 +47,41 @@ Invoice and POS paths do not write `credit_notes` ZATCA columns and take no new 
 
 Because 3b does not write decisions, `CreditNoteService::post` for a tenant that someone activated **fails closed** with a database error and rolls back completely (no journal entry, note stays draft). That is the point of the fence while the issuer does not exist yet; REM-18b-3c replaces the failure with a recorded decision. A test proves the service posts normally while disabled (same journal entry as before) and fails with no side effects when activated.
 
+### 1.5 Write order, circularity and the consistency boundary (verified)
+
+**Write order of the future issuer** (REM-18b-3c), checked against the triggers by `ZatcaCreditNoteFencePostgresTest::concurrent_note_and_invoice_issuances_...`: lock the note (`CreditNoteService::post` already does `lockForUpdate`) → source invoice → tenant anchor (`LedgerService`) → chain head → `INSERT zatca_chain_entries` (the 18b-1 triggers read the `credit_notes` row, which exists, tenant must match; T4 advances the head) → `UPDATE credit_notes` (F2 triggers read the entry, which is already visible inside the same transaction) → commit.
+
+**No circular dependency.** The entry triggers read `credit_notes` and the note triggers read `zatca_chain_entries`, but only the entry-then-note order is ever required: the entry insert never needs the note's ZATCA columns, and the note update needs only the entry. Both sides use plain MVCC `SELECT`s (no `FOR UPDATE`/`FOR SHARE`), so neither trigger can wait on the other transaction. The only lock the entry insert takes is the foreign-key `FOR KEY SHARE` on the note row, which the same transaction then upgrades with its own `UPDATE`; no other writer of the ZATCA columns exists. The reverse order (note first, entry second) is rejected by S2, which is the point of the fence and is covered by tests. The existing F1/chain triggers are untouched and their tests pass.
+
+**`CreditNoteService::post` today** (`lockForUpdate` on the note, re-derivation under the invoice lock, `LedgerService::post`, then the single `UPDATE ... status = 'posted'`): that update is the only application write of `status = 'posted'` on credit notes (the legacy-review service only reads). F2b therefore evaluates at that statement, after the tenant anchor is held. Triggers take **no** lock of their own, so they cannot invert the application's order; they only read committed rows.
+
+**Consistency boundary of the emergency stop.** Activation is evaluated at the posting statement under READ COMMITTED: it is the last *committed* state of the tenant control and of the platform stop at that instant. An uncommitted stop is invisible to the posting and does not block it; once committed it takes effect for every later posting statement (tested with a held-open stop transaction). Consequences, deliberately accepted:
+
+* The fence only ever **refuses** (never fabricates a decision), and an explicit decision is accepted in every state, so no combination of concurrent control changes can produce a contradictory issued document: a decision made by the future issuer is valid whether the stop commits before or after it.
+* A tenant control changes only behind the tenant anchor (3a writers lock it), so a posting that holds the anchor sees one tenant state for its whole transaction. The platform stop is not tenant-scoped and is **not** serialised behind any anchor: a stop committing between the issuer's lock-free read and its update can flip the *fence* outcome but never a recorded decision (worst case the posting is refused and retried).
+* A sales note posted **during** a stop without a decision stays undecided forever (S4 forbids a retroactive decision). That is the approved meaning of the stop (legacy behaviour), but it creates posted sales notes of an activated tenant that will never be issued. Reconciliation of such notes is an owner decision for REM-18b-3c and is not solved here.
+
+### 1.6 Bypass matrix
+
+| Attempt | PostgreSQL | SQLite |
+|---|---|---|
+| `UPDATE` of any of the 12 columns, `status`, `type`, `tenant_id` or `id` of an issued note (prepared or raw, single or bulk) | rejected | rejected |
+| Clearing every ZATCA column at once | rejected | rejected |
+| `INSERT ... ON CONFLICT DO UPDATE` over an issued note | rejected | rejected |
+| `INSERT OR REPLACE` over an issued note | n/a | rejected (REPLACE skips the delete trigger, but the entry's `RESTRICT` foreign key blocks it) |
+| `DELETE` of an issued note | rejected | rejected |
+| `TRUNCATE` / `TRUNCATE ... CASCADE` | rejected (foreign keys plus the 18b-1 truncate guard on the entries table; no extra trigger was needed, a dedicated one was tried and removed because it changed nothing) | no statement |
+| Editing, deleting or detaching the chain entry | rejected (18b-1 triggers unchanged) | rejected |
+
+Residual (SQLite test engine only): `INSERT OR REPLACE` over a note whose decision is `disabled`/`not_generated` (no entry, so no foreign key) would delete it without firing a delete trigger. Production is PostgreSQL, which has no such statement; no issued document is exposed.
+
 ## 2. Files
 
 | File | Kind |
 |---|---|
 | `database/migrations/2026_11_22_010000_add_zatca_credit_note_fences.php` | new (triggers/functions only; guarded `down()`) |
-| `tests/Feature/ZatcaCreditNoteFenceTest.php` | new, 60 test cases, both engines |
-| `tests/Feature/ZatcaCreditNoteFencePostgresTest.php` | new, 5 fork-based tests; **fails rather than skips** on PostgreSQL if `pcntl` is missing |
+| `tests/Feature/ZatcaCreditNoteFenceTest.php` | new, 65 test cases, both engines (includes the raw-SQL bypass matrix) |
+| `tests/Feature/ZatcaCreditNoteFencePostgresTest.php` | new, 6 fork-based tests; **fails rather than skips** on PostgreSQL if `pcntl` is missing |
 | `tests/Feature/ZatcaChainSchemaTest.php` | adapted: tests that insert lone ZATCA values or roll migrations back now take the F2 migration down first and re-apply it (real rollback order: F2, then F1/rollout, then note columns, then chain) |
 | `CLAUDE.md`, task queue, this report | docs |
 
@@ -63,14 +91,16 @@ Untouched: `CreditNoteService`, `CreditNote` (no `$fillable` change), `InvoiceSe
 
 | Run | Result |
 |---|---|
-| `ZatcaCreditNoteFenceTest`, SQLite | 60 passed (119 assertions) |
-| `ZatcaCreditNoteFenceTest`, PostgreSQL 16 | 60 passed (122 assertions) |
-| `ZatcaCreditNoteFencePostgresTest`, PostgreSQL 16 (`pcntl_fork`) | 5 passed (116 assertions); ran, not skipped |
+| `ZatcaCreditNoteFenceTest`, SQLite | 64 passed + 1 skipped (PostgreSQL-only TRUNCATE case), 126 assertions |
+| `ZatcaCreditNoteFenceTest`, PostgreSQL 16 | 65 passed (130 assertions) |
+| `ZatcaCreditNoteFencePostgresTest`, PostgreSQL 16 (`pcntl_fork`) | 6 passed; ran, not skipped (adds the emergency-stop boundary test) |
 | `ZatcaChainSchemaTest`, SQLite / PostgreSQL | 45 passed + 1 skipped (TRUNCATE) / 46 passed |
-| Mutation check | Dropping each of the 9 SQLite triggers and each of the 3 PostgreSQL triggers makes the suite fail (2 to 41 failures each); dropping the PostgreSQL fences makes 3 of the 5 concurrency tests fail |
+| Mutation check | Dropping each of the 9 SQLite triggers and each of the 3 PostgreSQL triggers makes the suite fail (2 to 41 failures each); dropping the PostgreSQL fences makes 3 concurrency tests fail; removing `tenant_id`/`id` from the trigger column lists fails the raw-SQL test on both engines |
 | Regression filter and full suites | see section 3.1 |
 
 ### 3.1 Regression and full suites
+
+The table below is the full-suite run of the first commit of this PR. A second commit (identity columns, bypass tests, emergency-stop boundary test, this section) was verified with the focused and regression runs listed in 3.2; the full suites for it run in CI.
 
 | Run | Result |
 |---|---|
@@ -81,6 +111,14 @@ Untouched: `CreditNoteService`, `CreditNote` (no `$fillable` change), `InvoiceSe
 The failures are environmental and none involves this change: 26 `Fuel*` (`bcmath` is not installed in this container; CI has it); `AiPaidProviderDisabledTest` (SQLite) and `StorefrontMediaApiTest` (PostgreSQL), both failing without this change; 4 `StorefrontPresentationGlobalGradientGateTest` cases, a stale test copy left in the local scratch application (the file does not exist in the repository since #1590); and, on PostgreSQL only, 3 `PostgresTestLockTimeoutTest` cases because the full PostgreSQL run omitted `PGOPTIONS` (they pass in the subset above). No ZATCA XML, signing or allocation code changed, so the SDK harness was not re-run locally.
 
 Covered: generated without a chain entry rejected (update and direct insert); ICV, UUID, PIH, hash and subtype mismatch rejected; entries of a sibling note, another tenant or an invoice never satisfy a note; mutation of each of the twelve columns and every state conversion rejected; unchanged rewrite accepted; recorded `disabled`/`not_generated` frozen; retroactive decisions rejected; decisions accepted in the posting update; twelve inconsistent status/column shapes and 14 incomplete-document variants; purchase notes; delete protection and tenant cascade (SQLite cannot hard-delete a tenant that has any credit note, before and after this change; asserted as equal to the baseline); historical notes; activated versus disabled versus reverted tenants; emergency stop and release; per-tenant isolation; the real `CreditNoteService` (unchanged entries while disabled, fully rolled back when activated); migration rollback refusal and re-application; concurrency (mixed note and invoice issuance on one chain, concurrent postings for activated and plain tenants, activation queueing behind the anchor, killed process, failed update rolling back entry and head).
+
+### 3.2 Runs after the second commit
+
+| Run | Result |
+|---|---|
+| Regression filter (`Zatca`, `TaxN01`, `CreditNote`, `PublicApi`, `BranchIsolation`, `PostgresTestLockTimeout`, `ReturnSource`, `PosExchange`, `InvoicePartySnapshot`, `LedgerTest`), SQLite | 891 passed, 38 skipped (7507 assertions), 0 failed |
+| Same filter, PostgreSQL 16 with `PGOPTIONS='-c lock_timeout=60s'` (as CI) | 927 passed, 2 skipped (8097 assertions), 0 failed; includes the fork-based concurrency suites and `CreditNotePosLockOrderPostgresTest` |
+| Mutation checks (see section 3 table) | all detected |
 
 ## 4. Security and tenant isolation
 

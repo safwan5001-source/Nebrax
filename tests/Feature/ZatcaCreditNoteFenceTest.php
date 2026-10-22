@@ -423,6 +423,112 @@ class ZatcaCreditNoteFenceTest extends TestCase
         }
     }
 
+    // ═══════════════ محاولات التجاوز بـSQL خام ═══════════════
+
+    #[Test]
+    public function raw_sql_cannot_modify_any_protected_column_of_an_issued_note(): void
+    {
+        $tenant = $this->tenant();
+        $note = $this->note($tenant);
+        $this->issue($tenant, $note);
+        $otherTenant = $this->tenant(); // موجود فعلاً: لا يصدّه مفتاح المستأجر الأجنبي
+        $before = (array) DB::table('credit_notes')->where('id', $note)->first();
+
+        $assignments = [
+            "zatca_status = NULL", "zatca_status = 'disabled'", "zatca_status = 'not_generated'", "zatca_skip_reason = 'x'",
+            "zatca_document_type = 'simplified'", "zatca_reason_code = 'other'", "issued_at = '2030-01-01 00:00:00'", "party_snapshot = NULL",
+            "zatca_uuid = NULL", "zatca_icv = NULL", "zatca_icv = zatca_icv + 1", "zatca_previous_hash = NULL", "zatca_hash = NULL",
+            "zatca_qr = NULL", "zatca_xml = NULL", "zatca_xml = zatca_xml || ' '", "status = 'cancelled'", "status = 'draft'", "type = 'purchase'",
+            "tenant_id = '{$otherTenant}'", "id = '".(string) Str::uuid()."'",
+            "zatca_status = NULL, zatca_skip_reason = NULL, zatca_document_type = NULL, zatca_reason_code = NULL, issued_at = NULL, party_snapshot = NULL, "
+                ."zatca_uuid = NULL, zatca_icv = NULL, zatca_previous_hash = NULL, zatca_hash = NULL, zatca_qr = NULL, zatca_xml = NULL",
+        ];
+        foreach ($assignments as $assignment) {
+            $this->rejects(fn () => DB::statement("UPDATE credit_notes SET {$assignment} WHERE id = ?", [$note]), $assignment);
+            $this->rejects(fn () => DB::unprepared("UPDATE credit_notes SET {$assignment} WHERE id = '{$note}'"), 'unprepared '.$assignment);
+        }
+        // تحديث متعدد الصفوف يضم الإشعار الصادر يفشل كله ولا يمسّ الإشعار العادي.
+        $plain = $this->note($tenant);
+        $this->rejects(fn () => DB::statement("UPDATE credit_notes SET zatca_xml = NULL, reason = 'جماعي' WHERE tenant_id = ?", [$tenant]), 'جماعي');
+
+        $this->assertSame($before, (array) DB::table('credit_notes')->where('id', $note)->first());
+        $this->assertNull(DB::table('credit_notes')->where('id', $plain)->value('reason'), 'تراجع الجماعي كله');
+    }
+
+    #[Test]
+    public function upsert_and_replace_cannot_overwrite_an_issued_note(): void
+    {
+        $tenant = $this->tenant();
+        $note = $this->note($tenant);
+        $this->issue($tenant, $note);
+        $before = (array) DB::table('credit_notes')->where('id', $note)->first();
+
+        // UPSERT يمرّ عبر مُشغّلات UPDATE.
+        $this->rejects(fn () => DB::statement(
+            'INSERT INTO credit_notes (id, tenant_id, number, partner_id, note_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?) '
+            .'ON CONFLICT (id) DO UPDATE SET zatca_status = NULL, zatca_xml = NULL, zatca_icv = NULL, zatca_hash = NULL, zatca_uuid = NULL, zatca_previous_hash = NULL, '
+            .'zatca_qr = NULL, zatca_document_type = NULL, zatca_reason_code = NULL, issued_at = NULL, party_snapshot = NULL',
+            [$note, $tenant, $before['number'], $before['partner_id'], '2026-02-10', now(), now()],
+        ), 'upsert');
+
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            // REPLACE يحذف الصف القديم دون مُشغّل DELETE؛ مفتاح المدخل الأجنبي RESTRICT يمنعه.
+            $this->rejects(fn () => DB::statement(
+                'INSERT OR REPLACE INTO credit_notes (id, tenant_id, number, partner_id, note_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                [$note, $tenant, $before['number'], $before['partner_id'], '2026-02-10', now(), now()],
+            ), 'replace');
+        }
+
+        $this->assertSame($before, (array) DB::table('credit_notes')->where('id', $note)->first());
+        $this->assertSame(1, DB::table('zatca_chain_entries')->where('credit_note_id', $note)->count());
+    }
+
+    #[Test]
+    public function raw_delete_and_truncate_cannot_remove_an_issued_note(): void
+    {
+        $tenant = $this->tenant();
+        $note = $this->note($tenant);
+        $this->issue($tenant, $note);
+
+        $this->rejects(fn () => DB::statement('DELETE FROM credit_notes WHERE id = ?', [$note]), 'delete');
+        $this->rejects(fn () => DB::unprepared('DELETE FROM credit_notes'), 'delete all');
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            $this->rejects(fn () => DB::unprepared('TRUNCATE credit_notes'), 'truncate');
+            $this->rejects(fn () => DB::unprepared('TRUNCATE credit_notes CASCADE'), 'truncate cascade');
+        }
+
+        $this->assertSame(1, DB::table('credit_notes')->where('id', $note)->count());
+        $this->assertSame(1, DB::table('zatca_chain_entries')->where('credit_note_id', $note)->count());
+    }
+
+    #[Test]
+    public function a_recorded_decision_without_a_document_cannot_be_truncated_on_postgresql(): void
+    {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('SQLite has no TRUNCATE statement.');
+        }
+        // لا مُشغّل TRUNCATE خاص: مفاتيح credit_note_lines/zatca_chain_entries الأجنبية وحارس TRUNCATE في جدول المداخل يرفضانه (اختبار 18b-1).
+        $tenant = $this->tenant();
+        $this->note($tenant, ['zatca_status' => 'disabled']);
+
+        $this->rejects(fn () => DB::unprepared('TRUNCATE credit_notes'), 'truncate with a decision');
+        $this->assertSame(1, DB::table('credit_notes')->where('tenant_id', $tenant)->count());
+    }
+
+    #[Test]
+    public function the_entry_of_an_issued_note_cannot_be_detached_or_edited_with_raw_sql(): void
+    {
+        $tenant = $this->tenant();
+        $note = $this->note($tenant);
+        $this->issue($tenant, $note);
+
+        // سلامة المدخل الثابت من 18b-1 باقية تحت F2: لا تعديل ولا حذف ولا فكّ ارتباط.
+        $this->rejects(fn () => DB::statement('UPDATE zatca_chain_entries SET credit_note_id = NULL WHERE credit_note_id = ?', [$note]), 'detach');
+        $this->rejects(fn () => DB::statement("UPDATE zatca_chain_entries SET hash = 'x' WHERE credit_note_id = ?", [$note]), 'hash');
+        $this->rejects(fn () => DB::statement('DELETE FROM zatca_chain_entries WHERE credit_note_id = ?', [$note]), 'delete');
+        $this->assertSame(1, DB::table('zatca_chain_entries')->where('credit_note_id', $note)->count());
+    }
+
     // ═══════════════ F2b — سياج الترحيل ═══════════════
 
     #[Test]
