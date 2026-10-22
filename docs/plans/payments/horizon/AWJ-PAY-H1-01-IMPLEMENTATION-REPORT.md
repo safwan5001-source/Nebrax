@@ -1,6 +1,6 @@
 # PAY-H1-01 — Implementation Report
 
-STATUS: **IN REVIEW** (PR مفتوح، غير مدموج، غير منشور)
+STATUS: **MERGED** (PR #1601، `dbe3693`) — غير منشور (لا Deploy)
 DATE: 2026-10-22
 
 ## Outcome
@@ -60,17 +60,16 @@ DATE: 2026-10-22
 
 ## CI
 
-PENDING_CI
+PR #1601 على Head `baa0d8c`: CI (SQLite وPostgreSQL) وWeb CI وCI Gate **ناجحة**. أخفق جوب SQLite مرة واحدة في خطوة تثبيت المحرّكات (`apt-get update` ← 403 من `packages.microsoft.com`، قبل أي اختبار)؛ نجحت إعادة تشغيله الوحيدة.
 
 ## Pre-merge review
 
-- PRE_MERGE_REVIEW: PENDING
-- Reviewed Head SHA: —
+- PRE_MERGE_REVIEW: **PASS** — Head `baa0d8c` (فروق ما بعد المراجعة: لا شيء)
 
 ## Merge / Post-merge
 
-- Merge status: لم يُدمج — بانتظار موافقة المالك. لا Deploy.
-- POST_MERGE_REVIEW: —
+- Merge: دمجه المالك — SHA `dbe3693825a27cf8a836883419d9e04a05555298`. لا Deploy.
+- POST_MERGE_REVIEW: **PASS** — CI على `main` للـMerge SHA (تشغيل push `39809962031`): SQLite وPostgreSQL ناجحان، وWeb CI ناجح. لا انحدار ولا تغيير لاحق مطلوب.
 
 ## Self-review
 
@@ -128,9 +127,10 @@ PENDING_CI
 ## Git state
 
 - Branch: `claude/awj-payments-h1-01-connection`
-- PR: —
-- Base SHA: `80cbb3c5f394de338c9a9917d3c9d635a8108113`
-- Head SHA: —
+- PR: #1601
+- Base SHA: `80cbb3c5f394de338c9a9917d3c9d635a8108113` (حُدِّث لاحقاً بدمج `main`)
+- Head SHA: `baa0d8c`
+- Merge SHA: `dbe3693825a27cf8a836883419d9e04a05555298`
 
 ## Recommended next dependency-ready task
 

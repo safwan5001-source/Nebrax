@@ -108,3 +108,10 @@ Schedule::command('ai-actions:purge-staged-images --max-seconds=240')
     ->onOneServer()
     ->when(static fn (): bool => (bool) config('ai_actions.staging_purge_schedule_enabled'))
     ->sendOutputTo('/proc/1/fd/1');
+
+// PAY-H1-02 / ADR-0004 §5 (D-25): نبضة المجدول — دليل تشغيلي أن `schedule:run` يعمل فعلاً (خدمة `awj-scheduler`، cron `*/5 * * * *`).
+// ضابط تفعيل المدفوعات يرفض تفعيل مستأجر إن كانت أقدم من ضعف الفاصل. لا أثر على أي بيانات مستأجر.
+Schedule::command('platform:scheduler-heartbeat')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(10)
+    ->onOneServer();

@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\PlatformDocumentOperationsController;
 use App\Http\Controllers\Api\PlatformAiBudgetController;
 use App\Http\Controllers\Api\PlatformIntegrationController;
 use App\Http\Controllers\Api\PlatformDocumentFileScanExceptionController;
+use App\Http\Controllers\Api\PlatformPaymentsRolloutController;
 use App\Http\Controllers\Api\PlatformSubscriptionController;
 use App\Http\Controllers\Api\PlatformSystemUpdateController;
 use App\Http\Controllers\Api\PlatformTenantController;
@@ -307,6 +308,9 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('ai-budgets', [PlatformAiBudgetController::class, 'index']);
         Route::get('tenants', [PlatformTenantController::class, 'index']);
         Route::get('tenants/{tenant}', [PlatformTenantController::class, 'show']);
+        // PAY-H1-02: ضوابط تفعيل المدفوعات (قراءة).
+        Route::get('payments-rollout', [PlatformPaymentsRolloutController::class, 'platform']);
+        Route::get('tenants/{tenant}/payments-rollout', [PlatformPaymentsRolloutController::class, 'tenant'])->whereUuid('tenant');
         Route::get('document-operations', [PlatformDocumentOperationsController::class, 'overview']);
         Route::get('document-usage', [PlatformDocumentOperationsController::class, 'usage']);
         Route::get('document-diagnostics', [PlatformDocumentOperationsController::class, 'diagnostics']);
@@ -319,6 +323,9 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         ->prefix('platform')
         ->group(function () {
             Route::patch('tenants/{tenant}', [PlatformTenantController::class, 'update']);
+            // PAY-H1-02: تفعيل/إيقاف المدفوعات لمستأجر + الإيقاف الطارئ للمنصة (بحدث تدقيق).
+            Route::put('payments-rollout', [PlatformPaymentsRolloutController::class, 'setPlatform']);
+            Route::put('tenants/{tenant}/payments-rollout', [PlatformPaymentsRolloutController::class, 'setTenant'])->whereUuid('tenant');
             // PR-NOTIF-6: تحديثات النظام / What's New — كتابة ونشر.
             Route::post('system-updates', [PlatformSystemUpdateController::class, 'store']);
             Route::put('system-updates/{id}', [PlatformSystemUpdateController::class, 'update'])->whereUuid('id');
