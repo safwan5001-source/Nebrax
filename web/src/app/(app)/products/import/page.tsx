@@ -174,7 +174,7 @@ export default function ProductImportPage() {
         method: 'POST',
         body: importFormData(file, {
           mode, blankPolicy, masterDataPolicy, mapping, forDurable: true,
-          mediaArchive, approveExistingMediaUpdates,
+          mediaArchive, applyProductImages, approveExistingMediaUpdates,
         }),
       });
       setPreview(response.data);
@@ -636,7 +636,12 @@ export default function ProductImportPage() {
                   <input
                     type="checkbox"
                     checked={applyProductImages}
-                    onChange={(event) => setApplyProductImages(event.target.checked)}
+                    onChange={(event) => {
+                      // خيارٌ مقيَّد بمعاينته (IMP-H1-S3b): تغيّره يستلزم معاينةً جديدة بالخيار نفسه، كإقرار التحديثات الموجودة.
+                      setApplyProductImages(event.target.checked);
+                      setPreview(null);
+                      setStep(0);
+                    }}
                     className="mt-0.5 h-4 w-4 rounded border-border"
                   />
                   <span>{t('import_images_apply_confirm')}</span>

@@ -150,14 +150,6 @@ class ImportJobService
 
                 return $created;
             });
-        } catch (ImportPreviewException $e) {
-            // المعاينة أُنفقت/انتهت بين تحقّقنا وإنفاقنا (سباق): لا تشغيلة، فلا ملف يتيم.
-            $this->storage->delete($stored['path']);
-            if ($storedArchive !== null) {
-                $this->storage->delete($storedArchive['path']);
-            }
-
-            throw $e;
         } catch (UniqueConstraintViolationException $e) {
             // خسرنا سباق (tenant_id, idempotency_key): تشغيلة أخرى أُدرِجت
             // بين فحصنا المسبق وإدراجنا. الملف الذي خزّناه للتوّ يتيمٌ الآن —
@@ -216,7 +208,9 @@ class ImportJobService
         $differentBinding = $existing->preview_id !== $previewId
             || $existing->preview_hash !== $previewHash
             // الخيارات المجمَّدة تُقارَن فقط حين التشغيلة القائمة مربوطةٌ بمعاينة (غيرها تُجمَّد عند أول apply).
-            || ($existing->preview_id !== null && (array) $existing->apply_options !== $canonical);
+            // `apply_options` تحمل بعد أول قطعة مفتاح `batch_size` التشغيلي أيضاً — تُقارَن قانونياً (المفاتيح الدلالية وحدها).
+            || ($existing->preview_id !== null
+                && $this->domains->for($domain)->canonicalOptions((array) $existing->apply_options) !== $canonical);
 
         if (
             $differentBinding

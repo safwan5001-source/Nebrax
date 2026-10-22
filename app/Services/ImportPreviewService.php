@@ -59,6 +59,10 @@ class ImportPreviewService
         $branchId = $this->branch->id();
         $tenantId = $this->requireTenant();
 
+        // `expires_at` يُخزَّن بتوقيت UTC (كل مقارنة هنا بـ`now('UTC')`)؛ لا يُقرأ عبر cast `datetime` لأنه يفسّر النصّ المخزَّن
+        // بمنطقة التطبيق (إن لم تكن UTC لبدت المعاينة منتهيةً فوراً أو صالحةً بعد انتهائها).
+        $expiresAt = now('UTC')->addMinutes($this->ttlMinutes());
+
         $preview = ImportPreview::create([
             'tenant_id' => $tenantId,
             'branch_id' => $branchId,
@@ -68,13 +72,13 @@ class ImportPreviewService
             'archive_sha256' => $archiveSha,
             'options' => $options,
             'preview_hash' => $this->hash($tenantId, $branchId, $domain, $fileSha, $archiveSha, $options),
-            'expires_at' => now('UTC')->addMinutes($this->ttlMinutes()),
+            'expires_at' => $expiresAt,
         ]);
 
         return [
             'id' => $preview->id,
             'hash' => $preview->preview_hash,
-            'expires_at' => $preview->expires_at->toIso8601String(),
+            'expires_at' => $expiresAt->toIso8601String(),
         ];
     }
 
@@ -101,7 +105,9 @@ class ImportPreviewService
         if ($preview->consumed_at !== null) {
             throw new ImportPreviewException('preview_consumed', 'استُعملت هذه المعاينة لتشغيلة أخرى. أعد فحص الملف.');
         }
-        if ($preview->expires_at->isPast()) {
+        // الانقضاء يُحسَم في القاعدة بنفس ساعة الكتابة (UTC) لا بقراءة السمة (انظر `issue()`).
+        $live = ImportPreview::query()->whereKey($previewId)->where('expires_at', '>', now('UTC'))->exists();
+        if (! $live) {
             throw new ImportPreviewException('preview_expired', 'انتهت صلاحية المعاينة. أعد فحص الملف قبل التنفيذ.');
         }
 

@@ -74,6 +74,7 @@ function appendOptions(form: FormData, options: ApplyOptions) {
   for (const [key, value] of Object.entries(options)) {
     if (value === undefined) continue;
     if (key === 'mapping' && value && typeof value === 'object') {
+      // مطابقة فارغة = لا مطابقة (كالمعاينة: multipart لا يرسل مصفوفةً فارغة)، فتتطابق البصمة.
       for (const [index, field] of Object.entries(value as Record<number, string | null>)) {
         form.append(`options[mapping][${index}]`, field ?? 'ignore');
       }
@@ -116,6 +117,7 @@ export async function applyImportJobChunk(id: string, options: ApplyOptions): Pr
   for (const [key, value] of Object.entries(options)) {
     if (value === undefined) continue;
     if (key === 'mapping' && value && typeof value === 'object') {
+      if (Object.keys(value as object).length === 0) continue; // مطابقة فارغة لا تُرسَل (انظر `appendOptions`).
       body.mapping = Object.fromEntries(
         Object.entries(value as Record<number, string | null>).map(([index, field]) => [index, field ?? 'ignore'])
       );

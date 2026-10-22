@@ -17,6 +17,12 @@ class ImportPreviewException extends DomainException
         parent::__construct($message);
     }
 
+    /** رفضٌ متوقَّع من العميل (422) لا خطأ خادم: لا يُبلَّغ إلى السجل/Sentry. */
+    public function report(): bool
+    {
+        return false;
+    }
+
     public function render(): JsonResponse
     {
         return response()->json(['message' => $this->getMessage(), 'code' => $this->reason], 422);

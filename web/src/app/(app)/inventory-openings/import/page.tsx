@@ -352,7 +352,7 @@ export default function InventoryOpeningImportPage() {
                   openingDate={openingDate}
                   setOpeningDate={(value) => { setOpeningDate(value); setPreview(null); }}
                   notes={notes}
-                  setNotes={setNotes}
+                  setNotes={(value) => { setNotes(value); setPreview(null); }}
                   allowZeroCost={allowZeroCost}
                   setAllowZeroCost={(value) => { setAllowZeroCost(value); setPreview(null); }}
                   t={t}

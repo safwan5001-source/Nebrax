@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\ImportJob;
 use App\Models\ImportPreview;
 use App\Models\Product;
-use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\ImportPreviewService;
 use App\Services\ProductImportService;
@@ -397,6 +396,182 @@ class ImportPreviewBindingTest extends TestCase
 
         $this->assertStringNotContainsString($binding['hash'], $response->getContent());
         $this->assertArrayNotHasKey('preview_hash', $response['data']);
-        $this->assertNotNull(User::query()->first());
+    }
+
+    // ── توقيت الانقضاء ────────────────────────────────────────────────────────
+
+    /** @test */
+    public function expiry_is_independent_of_the_application_timezone(): void
+    {
+        $auth = $this->registerTenant();
+        $original = date_default_timezone_get();
+        date_default_timezone_set('Asia/Riyadh'); // +03:00: القراءة بمنطقة التطبيق كانت تجعل المعاينة منتهيةً فوراً.
+        try {
+            $binding = $this->previewCatalog($auth['token'], $this->csv('PB-TZ'));
+            $this->assertSame('+00:00', \Carbon\Carbon::parse($binding['expires_at'])->format('P'), 'الانقضاء المُعاد بتوقيت UTC.');
+            $this->createJob($auth['token'], $this->csv('PB-TZ'), $binding)->assertCreated();
+
+            // وفي الاتجاه المعاكس: منتهيةٌ فعلاً تُرفض مهما كانت منطقة التطبيق.
+            $stale = $this->previewCatalog($auth['token'], $this->csv('PB-TZ2'));
+            ImportPreview::query()->whereKey($stale['id'])->update(['expires_at' => now('UTC')->subMinute()]);
+            $this->createJob($auth['token'], $this->csv('PB-TZ2'), $stale)->assertStatus(422)->assertJsonPath('code', 'preview_expired');
+        } finally {
+            date_default_timezone_set($original);
+        }
+    }
+
+    // ── تنظيف الملفات عند فشل الإنفاق داخل المعاملة ───────────────────────────
+
+    /** @test */
+    public function a_preview_consumed_between_the_check_and_the_insert_rolls_back_the_job_and_deletes_the_upload(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $binding = $this->previewCatalog($auth['token'], $this->csv('PB-RACE'));
+
+        // يحاكي سباقاً: يُنفَق السجل بعد اجتياز `assertConsumable` وقبل الإدراج.
+        $this->app->singleton(ImportPreviewService::class, function ($app) {
+            return new class($app->make(\App\Services\ImportDomainRegistry::class), $app->make(TenantContext::class), $app->make(BranchContext::class)) extends ImportPreviewService {
+                public function assertConsumable(string $previewId, string $previewHash, ?string $userId, string $domain, string $fileSha, ?string $archiveSha, array $canonical): ImportPreview
+                {
+                    $preview = parent::assertConsumable($previewId, $previewHash, $userId, $domain, $fileSha, $archiveSha, $canonical);
+                    ImportPreview::query()->whereKey($previewId)->update(['consumed_at' => now('UTC'), 'consumed_job_id' => '99999999-9999-4999-8999-999999999999']);
+
+                    return $preview;
+                }
+            };
+        });
+        $this->app->forgetInstance(\App\Services\ImportJobService::class);
+        $before = $this->storedFileCount();
+
+        $this->createJob($auth['token'], $this->csv('PB-RACE'), $binding)->assertStatus(422)->assertJsonPath('code', 'preview_consumed');
+
+        $this->assertSame(0, ImportJob::query()->count(), 'لا تشغيلة تبقى بلا إنفاق.');
+        $this->assertSame($before, $this->storedFileCount(), 'الملف المخزَّن حُذف.');
+    }
+
+    // ── خيارات أخرى مقيَّدة ───────────────────────────────────────────────────
+
+    /** @test */
+    public function the_image_flag_is_part_of_the_binding(): void
+    {
+        $auth = $this->registerTenant();
+        $binding = $this->previewCatalog($auth['token'], $this->csv('PB-IMG'), ['mode' => 'create']);
+
+        // معاينةٌ بلا تطبيق صور ⇒ إنشاءٌ بتطبيقها ليس المعاينة نفسها (كانت واجهةٌ تُرسلهما مختلفتين فتفشل).
+        $this->createJob($auth['token'], $this->csv('PB-IMG'), $binding, ['mode' => 'create', 'apply_product_images' => true])
+            ->assertStatus(422)->assertJsonPath('code', 'preview_mismatch');
+
+        $withImages = $this->previewCatalog($auth['token'], $this->csv('PB-IMG'), ['mode' => 'create', 'apply_product_images' => '1']);
+        $this->createJob($auth['token'], $this->csv('PB-IMG'), $withImages, ['mode' => 'create', 'apply_product_images' => true])->assertCreated();
+    }
+
+    /** @test */
+    public function apply_rejects_a_changed_mapping_but_accepts_the_same_one(): void
+    {
+        $auth = $this->registerTenant();
+        $mapping = ['0' => 'sku', '1' => 'name', '2' => 'type', '3' => 'sale_price'];
+        $binding = $this->previewCatalog($auth['token'], $this->csv('PB-MAP'), ['mode' => 'create', 'mapping' => $mapping]);
+        $jobId = $this->createJob($auth['token'], $this->csv('PB-MAP'), $binding, ['mode' => 'create', 'mapping' => $mapping])->assertCreated()['data']['id'];
+
+        $this->applyJob($auth['token'], $jobId, ['mapping' => ['0' => 'name', '1' => 'sku', '2' => 'type', '3' => 'sale_price']])
+            ->assertStatus(422)->assertJsonPath('code', 'options_frozen');
+        $this->applyJob($auth['token'], $jobId, ['approve_existing_media_updates' => true])
+            ->assertStatus(422)->assertJsonPath('code', 'options_frozen');
+        $this->assertSame(0, Product::withoutGlobalScopes()->where('sku', 'PB-MAP')->count());
+
+        $this->applyJob($auth['token'], $jobId, ['mode' => 'create', 'mapping' => $mapping])->assertOk()->assertJsonPath('data.status', 'completed');
+    }
+
+    /** @test */
+    public function an_empty_mapping_at_apply_is_not_a_change(): void
+    {
+        $auth = $this->registerTenant();
+        $binding = $this->previewCatalog($auth['token'], $this->csv('PB-EMP'), ['mode' => 'create']);
+        $jobId = $this->createJob($auth['token'], $this->csv('PB-EMP'), $binding)->assertCreated()['data']['id'];
+
+        $this->applyJob($auth['token'], $jobId, ['mode' => 'create', 'mapping' => []])->assertOk()->assertJsonPath('data.status', 'completed');
+        $this->assertSame(1, Product::withoutGlobalScopes()->where('sku', 'PB-EMP')->count());
+    }
+
+    /** @test */
+    public function opening_notes_and_zero_cost_are_frozen(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        Warehouse::create(['name' => 'مخزن', 'code' => 'WH-PB3']);
+        Product::create(['name' => 'صنف', 'sku' => 'SKU-PB3', 'type' => 'good', 'sale_price' => 1000, 'track_inventory' => true]);
+        $file = fn () => UploadedFile::fake()->createWithContent('o.csv', SpreadsheetWriter::csv(
+            ['sku', 'warehouse', 'opening_quantity', 'opening_unit_cost'], [['SKU-PB3', 'WH-PB3', '5', '2.00']]
+        ));
+        $binding = $this->withToken($auth['token'])
+            ->post('/api/inventory-openings/import/preview', ['file' => $file(), 'opening_date' => '2026-01-01', 'notes' => 'ملاحظة'], ['Accept' => 'application/json'])
+            ->assertOk()->json('data.binding');
+
+        $this->createJob($auth['token'], $file(), $binding, ['opening_date' => '2026-01-01', 'notes' => 'غيرها'], [], [], 'inventory_opening')
+            ->assertStatus(422)->assertJsonPath('code', 'preview_mismatch');
+        $jobId = $this->createJob($auth['token'], $file(), $binding, ['opening_date' => '2026-01-01', 'notes' => 'ملاحظة'], [], [], 'inventory_opening')->assertCreated()['data']['id'];
+
+        $this->applyJob($auth['token'], $jobId, ['notes' => 'تغيّرت'])->assertStatus(422)->assertJsonPath('code', 'options_frozen');
+        $this->applyJob($auth['token'], $jobId, ['allow_zero_cost' => true])->assertStatus(422)->assertJsonPath('code', 'options_frozen');
+    }
+
+    /** @test */
+    public function a_workbook_job_is_bound_including_its_price_list(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $priceList = $this->withToken($auth['token'])->postJson('/api/price-lists', ['name' => 'قائمة الجملة'])->assertCreated()['data']['id'];
+        $otherList = $this->withToken($auth['token'])->postJson('/api/price-lists', ['name' => 'قائمة أخرى'])->assertCreated()['data']['id'];
+        $this->withToken($auth['token'])->postJson('/api/products', ['name' => 'قائم', 'sku' => 'SKU-WBP', 'type' => 'good', 'sale_price' => 10000])->assertCreated();
+        $file = function () {
+            $path = tempnam(sys_get_temp_dir(), 'pb-wb-');
+            SpreadsheetWriter::workbookXlsx($path, [
+                ['name' => 'Products', 'headers' => ['sku', 'name', 'type', 'unit', 'sale_price'], 'rows' => []],
+                ['name' => 'Barcodes', 'headers' => ['sku', 'code'], 'rows' => [['SKU-WBP', '6281234500099']]],
+                ['name' => 'Unit Prices', 'headers' => ['sku', 'unit_name', 'price'], 'rows' => [['SKU-WBP', '', '55.00']]],
+            ]);
+            $f = UploadedFile::fake()->createWithContent('wb.xlsx', (string) file_get_contents($path));
+            @unlink($path);
+
+            return $f;
+        };
+        $binding = $this->withToken($auth['token'])
+            ->post('/api/products/workbook/preview', ['file' => $file(), 'price_list_id' => $priceList], ['Accept' => 'application/json'])
+            ->assertOk()->json('data.binding');
+
+        $this->createJob($auth['token'], $file(), $binding, ['price_list_id' => $otherList], [], [], 'product_workbook')
+            ->assertStatus(422)->assertJsonPath('code', 'preview_mismatch');
+        $jobId = $this->createJob($auth['token'], $file(), $binding, ['price_list_id' => $priceList], [], [], 'product_workbook')->assertCreated()['data']['id'];
+
+        $this->applyJob($auth['token'], $jobId, ['price_list_id' => $otherList])->assertStatus(422)->assertJsonPath('code', 'options_frozen');
+        $this->applyJob($auth['token'], $jobId, ['price_list_id' => $priceList])->assertOk()->assertJsonPath('data.status', 'completed');
+    }
+
+    // ── هوية إعادة المحاولة ───────────────────────────────────────────────────
+
+    /** @test */
+    public function a_create_retry_after_the_first_apply_chunk_is_still_the_same_request(): void
+    {
+        $auth = $this->registerTenant();
+        $binding = $this->previewCatalog($auth['token'], $this->csv('PB-RETRY'));
+        $first = $this->createJob($auth['token'], $this->csv('PB-RETRY'), $binding, ['mode' => 'create'], ['idempotency_key' => 'pb-retry-1'])->assertCreated();
+        // أول قطعة تُضيف `batch_size` التشغيلي إلى الخيارات المخزَّنة.
+        $this->applyJob($auth['token'], $first['data']['id'], ['batch_size' => 10])->assertOk();
+
+        $again = $this->createJob($auth['token'], $this->csv('PB-RETRY'), $binding, ['mode' => 'create'], ['idempotency_key' => 'pb-retry-1'])->assertOk();
+        $this->assertSame($first['data']['id'], $again['data']['id']);
+    }
+
+    /** @test */
+    public function a_different_option_under_the_same_key_says_why(): void
+    {
+        $auth = $this->registerTenant();
+        $binding = $this->previewCatalog($auth['token'], $this->csv('PB-WHY'));
+        $this->createJob($auth['token'], $this->csv('PB-WHY'), $binding, ['mode' => 'create'], ['idempotency_key' => 'pb-why-1'])->assertCreated();
+        $second = $this->previewCatalog($auth['token'], $this->csv('PB-WHY'), ['mode' => 'upsert']);
+
+        $response = $this->createJob($auth['token'], $this->csv('PB-WHY'), $second, ['mode' => 'upsert'], ['idempotency_key' => 'pb-why-1'])->assertStatus(422);
+        $this->assertStringContainsString('idempotency', (string) $response->json('message'));
     }
 }

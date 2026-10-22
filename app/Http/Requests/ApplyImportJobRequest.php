@@ -102,7 +102,8 @@ class ApplyImportJobRequest extends FormRequest
                 $options[$key] = $this->string($key)->toString();
             }
         }
-        if ($this->has('mapping')) {
+        // مطابقة فارغة = لا مطابقة مُرسَلة (المعاينة multipart لا تستطيع إرسال مصفوفة فارغة أصلاً): لا تُعدّ تغييراً للمجمَّد.
+        if ($this->has('mapping') && (array) $this->input('mapping', []) !== []) {
             $options['mapping'] = (array) $this->input('mapping', []);
         }
         if ($this->has('price_list_id')) {

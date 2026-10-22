@@ -30,7 +30,7 @@ Preview and execution were independent requests: nothing tied what the user appr
 
 ## Tests
 
-- `ImportPreviewBindingTest` (21): issue for all domains; bound job + frozen options + consumption; single-use (+ no orphan file); mismatch by file/options/mapping leaves no trace and does not burn the preview; canonical key order/boolean spelling; invalid/foreign-tenant/wrong-hash; other user; expired; branch; `preview_id` without hash; requirement off→on→future; frozen options on apply (reject/accept/none); legacy job still freezes at first apply; idempotent retry; same key different options/no preview; conditional consume; prune; opening domain; hash never exposed.
+- `ImportPreviewBindingTest` (30): issue for all domains; bound job + frozen options + consumption; single-use (+ no orphan file); mismatch by file/options/mapping leaves no trace and does not burn the preview; canonical key order/boolean spelling; invalid/foreign-tenant/wrong-hash; other user; expired; branch; `preview_id` without hash; requirement off→on→future; frozen options on apply (reject/accept/none); legacy job still freezes at first apply; idempotent retry; same key different options/no preview; conditional consume; prune; opening domain; hash never exposed.
 - `ImportDomainRegistryTest` + canonical options (absent vs empty mapping, drop unknown/operational keys, typing).
 - Existing `ImportJob*`, `ProductImport*`, `ProductWorkbook*`, `InventoryOpening*`, `AiActionProduct*`, `BranchIsolationGuard`: 327 passed locally.
 - Web: `client.test.ts` (multipart encoding), engine forwards the binding; existing page tests green (64 + 3).
@@ -43,4 +43,11 @@ Preview and execution were independent requests: nothing tied what the user appr
 
 ## Review
 
-Codex quota exhausted — **not Codex-reviewed**. Independent subagent review: see PR.
+Codex quota exhausted at the time of writing — **not Codex-reviewed** unless its comments appear on the PR. An independent read-only subagent reviewed the commit (static; it did not run tests) and found:
+
+- **HIGH (fixed):** the products page's "apply images" checkbox changes `apply_product_images` after the preview, and `importFormData` never sent it with the preview ⇒ the first job creation after ticking it would have returned `preview_mismatch`. Fixed: the flag is now sent with the preview request, and toggling it invalidates the preview (like the existing "approve existing updates" toggle). Test added (contract + backend `the_image_flag_is_part_of_the_binding`).
+- **MEDIUM (fixed):** `expires_at` was stored as a UTC wall-clock string but read back through the `datetime` cast in `app.timezone` (production timezone unverified): with a timezone ahead of UTC every preview looked expired. Fixed: expiry is decided in SQL against `now('UTC')`, and the returned ISO timestamp is built from the UTC instant. Test sets the PHP default timezone to `Asia/Riyadh` (negative control: with the old check it fails).
+- **LOW-MEDIUM (fixed):** opening `notes` edit after preview now invalidates the preview; an empty mapping is not a change at apply (client omits it, `explicitOptions` skips it); a create-retry after the first apply chunk is still the same request (stored options are canonicalized before comparing — the first chunk adds `batch_size`).
+- **LOW (fixed):** `ImportPreviewException::report()` returns `false` (client 422s are not error-level log noise); the in-transaction consume-failure cleanup is now covered by the generic insert-failure cleanup (S3a Codex P2) and has a test that consumes the preview between the check and the insert (negative control verified).
+- **Test gaps (added):** workbook create/apply/frozen incl. `price_list_id`; frozen `mapping`/`approve_existing_media_updates`/`notes`/`allow_zero_cost`; explicit empty mapping; same-key-different-options message; filler assertion removed. Not added: a media-archive SHA mismatch test (needs a valid ZIP fixture) — the archive SHA is part of the same HMAC input as the file SHA.
+- Confirmed by the reviewer: no bypass through options not covered by `canonicalOptions`/`explicitOptions`; no cross-tenant preview oracle; `preview_hash` never returned on a job; migration additive; the exception is not swallowed by `ApiController::domain()`.
