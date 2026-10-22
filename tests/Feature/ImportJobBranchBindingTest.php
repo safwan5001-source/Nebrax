@@ -245,4 +245,21 @@ class ImportJobBranchBindingTest extends TestCase
         $this->assertSame($mainBranch, ImportJob::query()->whereKey($jobId)->value('branch_id'));
         $this->assertNotNull($warehouse->id);
     }
+
+    /** @test */
+    public function a_branch_with_an_unfinished_job_cannot_be_deleted_so_the_job_never_loses_its_binding(): void
+    {
+        $auth = $this->registerTenant();
+        $other = $this->branch($auth['token'], 'فرع الخبر');
+        $jobId = $this->create($auth['token'], $this->csv('BR-DEL'), [], ['X-Branch-Id' => $other])->assertCreated()['data']['id'];
+        $this->mainBranchRequestState();
+
+        $this->withToken($auth['token'])->deleteJson("/api/branches/{$other}")->assertStatus(422);
+        $this->assertSame($other, ImportJob::query()->whereKey($jobId)->value('branch_id'), 'الربط باقٍ.');
+
+        // بعد إنهاء التشغيلة (إلغاء) يصحّ الحذف، وتبقى التشغيلة المنتهية للتدقيق بلا فرع.
+        $this->withToken($auth['token'])->postJson("/api/import-jobs/{$jobId}/cancel")->assertOk();
+        $this->withToken($auth['token'])->deleteJson("/api/branches/{$other}")->assertOk();
+        $this->assertNull(ImportJob::query()->whereKey($jobId)->value('branch_id'));
+    }
 }
