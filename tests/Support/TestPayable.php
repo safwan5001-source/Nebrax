@@ -3,7 +3,8 @@
 namespace Tests\Support;
 
 use App\Contracts\Payable;
-use DomainException;
+use App\Support\PaymentNotPayableException;
+use Throwable;
 
 /** Payable اختباري: المبلغ والصلاحية قابلان للتغيير ليُثبَت أن المنسّق يعيد حسابهما من المصدر. */
 final class TestPayable implements Payable
@@ -13,6 +14,7 @@ final class TestPayable implements Payable
         public int $due = 11500,
         public string $currency = 'SAR',
         public bool $payable = true,
+        public ?Throwable $infrastructureFailure = null,
     ) {}
 
     public function payableKey(): string
@@ -42,8 +44,11 @@ final class TestPayable implements Payable
 
     public function assertStillPayable(): void
     {
+        if ($this->infrastructureFailure !== null) {
+            throw $this->infrastructureFailure;
+        }
         if (! $this->payable) {
-            throw new DomainException('not payable');
+            throw new PaymentNotPayableException('not payable');
         }
     }
 }

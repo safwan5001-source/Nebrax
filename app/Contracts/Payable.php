@@ -22,6 +22,6 @@ interface Payable
     /** @return list<array<string, mixed>> أهداف التخصيص المحاسبي (تُستهلك في شريحة الترحيل). */
     public function allocationTargets(): array;
 
-    /** يرمي استثناء عمل إن لم يعد الدفع جائزاً (مسدَّد، ملغى، منتهٍ). */
+    /** يرمي `PaymentNotPayableException` (وحده) إن لم يعد الدفع جائزاً (مسدَّد، ملغى، منتهٍ)؛ أخطاء البنية تُنشر كما هي. */
     public function assertStillPayable(): void;
 }

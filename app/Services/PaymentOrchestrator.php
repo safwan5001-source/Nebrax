@@ -8,6 +8,7 @@ use App\Models\PaymentGateway;
 use App\Models\User;
 use App\Support\PaymentAttemptContext;
 use App\Support\PaymentAttemptTransitionResult;
+use App\Support\PaymentNotPayableException;
 use App\Support\PaymentOrchestrationException;
 use App\Support\PaymentProviderSnapshot;
 use App\Support\Rbac;
@@ -237,14 +238,15 @@ final class PaymentOrchestrator
         // محاولة لم تكتمل لدى المزوّد ستُستأنف بمبلغها المجمَّد: لا تُستأنف إن لم يعد الـPayable صالحاً أو تغيّر مبلغه/عملته
         // (سُدِّد جزء منه مثلاً). تُحسم وتُغلق (بمرجعها إن وُجد لدى المزوّد) ثم يُرفض الطلب ليبدأ العميل بمفتاح جديد.
         if ($existing->capture_status === PaymentAttempt::STATUS_CREATED) {
+            // الإغلاق على سبب عمل صريح فقط (`PaymentNotPayableException` أو تغيّر المبلغ/العملة)؛ فشل قراءة أو خطأ برمجي ينتشر ولا يمسّ المحاولة.
             $failure = null;
-            $changed = false;
             try {
                 $payable->assertStillPayable();
-                $changed = $payable->amountDueMinor() !== (int) $existing->amount_minor || strtoupper($payable->currency()) !== $existing->currency;
-            } catch (Throwable $e) {
+            } catch (PaymentNotPayableException $e) {
                 $failure = $e;
             }
+            $changed = $failure === null
+                && ($payable->amountDueMinor() !== (int) $existing->amount_minor || strtoupper($payable->currency()) !== $existing->currency);
             if ($failure !== null || $changed) {
                 $this->resolveCheckout($existing);
                 $this->cancel($existing);
@@ -333,7 +335,11 @@ final class PaymentOrchestrator
         if ($actor === null) {
             return; // مسار نظامي (مطابقة/webhook) — لا مستخدم
         }
-        if (! $this->tenant->has() || (string) $actor->tenant_id !== (string) $this->tenant->id() || ! Rbac::allows((string) $actor->role, 'payments.manage')) {
+        // يُعاد تحميل الفاعل من القاعدة: نموذج محمَّل قبل تعطيله/حذفه/خفض دوره، أو غير محفوظ بدور مرتفع، لا يُوثق به.
+        $fresh = $this->tenant->has() && $actor->getKey() !== null
+            ? User::query()->whereKey($actor->getKey())->where('tenant_id', (string) $this->tenant->id())->where('is_active', true)->first()
+            : null;
+        if ($fresh === null || ! Rbac::allows((string) $fresh->role, 'payments.manage')) {
             throw new PaymentOrchestrationException('forbidden', 'ليست لديك صلاحية إدارة المدفوعات.');
         }
     }

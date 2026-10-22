@@ -20,6 +20,7 @@ use App\Support\PaymentProviderSnapshot;
 use App\Support\SchedulerHeartbeat;
 use App\Tenancy\TenantContext;
 use DomainException;
+use RuntimeException;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -256,6 +257,21 @@ class PaymentAttemptTest extends TestCase
         $other->payable = false;
         $this->thrown(fn () => $this->orchestrator->start($other, $this->gateway, 'idem-key-0036'), 'unpayable', DomainException::class);
         $this->assertSame(PaymentAttempt::STATUS_CANCELLED, PaymentAttempt::query()->where('idempotency_key', 'idem-key-0036')->firstOrFail()->capture_status);
+    }
+
+    #[Test]
+    public function a_payable_read_failure_is_not_treated_as_proof_it_is_obsolete(): void
+    {
+        $this->fake->failNextCheckouts(1);
+        $this->thrown(fn () => $this->orchestrator->start(new TestPayable, $this->gateway, 'idem-key-0037'), 'outage', PaymentOrchestrationException::class);
+        $stuck = PaymentAttempt::query()->firstOrFail();
+        $calls = count($this->fake->checkoutCalls);
+
+        $broken = new TestPayable(infrastructureFailure: new RuntimeException('db connection lost'));
+        $this->thrown(fn () => $this->orchestrator->start($broken, $this->gateway, 'idem-key-0037'), 'infrastructure', RuntimeException::class);
+
+        $this->assertSame(PaymentAttempt::STATUS_CREATED, PaymentAttempt::query()->findOrFail($stuck->id)->capture_status, 'المحاولة لم تُمسّ');
+        $this->assertCount($calls, $this->fake->checkoutCalls, 'ولا استدعاء مزوّد جديد');
     }
 
     // ═══════════════ ضابط التفعيل ═══════════════
@@ -568,6 +584,32 @@ class PaymentAttemptTest extends TestCase
         $this->assertSame(0, PaymentAttempt::query()->count());
 
         $this->assertSame($accountant->id, $this->orchestrator->start(new TestPayable, $this->gateway, 'idem-key-0030', $accountant)->created_by);
+    }
+
+    #[Test]
+    public function an_actor_is_re_read_so_revoked_demoted_deleted_or_unsaved_users_are_refused(): void
+    {
+        $staffLike = fn (string $email) => User::create(['tenant_id' => $this->tenant->id, 'name' => 'م', 'email' => $email, 'password' => 'password123', 'role' => 'accountant']);
+        $attempt = $this->orchestrator->start(new TestPayable, $this->gateway, 'idem-key-0038');
+
+        $deactivated = $staffLike('a@pay-h1-03.test');
+        $demoted = $staffLike('b@pay-h1-03.test');
+        $deleted = $staffLike('c@pay-h1-03.test');
+        // النماذج في الذاكرة ما زالت «محاسباً نشطاً»؛ القاعدة تغيّرت بعد تحميلها.
+        DB::table('users')->where('id', $deactivated->id)->update(['is_active' => false]);
+        DB::table('users')->where('id', $demoted->id)->update(['role' => 'staff']);
+        $deleted->delete();
+        $unsaved = new User(['tenant_id' => $this->tenant->id, 'role' => 'owner']);
+
+        foreach (['deactivated' => $deactivated, 'demoted' => $demoted, 'deleted' => $deleted, 'unsaved owner' => $unsaved] as $label => $actor) {
+            foreach (['start' => fn () => $this->orchestrator->start(new TestPayable(key: 'invoice:r-'.$label), $this->gateway, 'idem-r-'.str_replace(' ', '-', $label), $actor),
+                'sync' => fn () => $this->orchestrator->sync($attempt, $actor),
+                'cancel' => fn () => $this->orchestrator->cancel($attempt, $actor)] as $op => $call) {
+                $e = $this->thrown($call, "{$label}/{$op}", PaymentOrchestrationException::class);
+                $this->assertSame('forbidden', $e->reason, "{$label}/{$op}");
+            }
+        }
+        $this->assertSame(PaymentAttempt::STATUS_PENDING_CUSTOMER, PaymentAttempt::query()->findOrFail($attempt->id)->capture_status);
     }
 
     // ═══════════════ لا دفتر موازٍ ═══════════════
