@@ -7,6 +7,7 @@ use App\Support\ImportChunk;
 use App\Support\ImportChunkResult;
 use App\Support\ImportJobDomain;
 use App\Support\ImportJobStatus;
+use App\Tenancy\BranchContext;
 use App\Tenancy\TenantContext;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\UploadedFile;
@@ -30,6 +31,7 @@ class ImportJobService
         private readonly ImportJobFileStorage $storage,
         private readonly ProductImageArchiveService $imageArchives,
         private readonly ImportDomainRegistry $domains,
+        private readonly BranchContext $branch,
     ) {}
 
     /**
@@ -66,10 +68,14 @@ class ImportJobService
             }
         }
 
+        // IMP-H1-S3a: فرع التشغيلة يُلتقط **مرة واحدة** من سياق الطلب (مضبوطٌ خادمياً في `SetBranch` بعد التحقق من
+        // نطاق المستخدم) ولا يتغيّر بعدها؛ كل قطعة ترحيل لاحقة تستعيده من التشغيلة لا من طلبها.
+        $branchId = $this->branch->id();
+
         if ($idempotencyKey !== null) {
             $existing = ImportJob::query()->where('idempotency_key', $idempotencyKey)->first();
             if ($existing) {
-                return $this->assertSameRequestOrFail($existing, $domain, $sha256, $archiveSha256);
+                return $this->assertSameRequestOrFail($existing, $domain, $sha256, $archiveSha256, $branchId);
             }
         }
 
@@ -92,6 +98,7 @@ class ImportJobService
             // استثناء قبل إعادة رميه، فيعيد الاتصال صالحاً للاستعلام التالي.
             $job = DB::transaction(fn () => ImportJob::create([
                 'id' => $id,
+                'branch_id' => $branchId,
                 'domain' => $domain,
                 'status' => ImportJobStatus::UPLOADED,
                 'idempotency_key' => $idempotencyKey,
@@ -129,7 +136,7 @@ class ImportJobService
                 throw $e;
             }
 
-            return $this->assertSameRequestOrFail($existing, $domain, $sha256, $archiveSha256);
+            return $this->assertSameRequestOrFail($existing, $domain, $sha256, $archiveSha256, $branchId);
         }
 
         return $this->inspect($job);
@@ -142,15 +149,17 @@ class ImportJobService
      * آخر) يُرفض صراحةً (422 عبر `ApiController::domain()`)؛ لا يُعاد أبداً
      * سجلٌّ لا يخصّ هذا الطلب تحت ستار «نفس المفتاح».
      */
-    private function assertSameRequestOrFail(ImportJob $existing, string $domain, string $sha256, ?string $archiveSha256): ImportJob
+    private function assertSameRequestOrFail(ImportJob $existing, string $domain, string $sha256, ?string $archiveSha256, ?string $branchId): ImportJob
     {
         if (
             $existing->domain !== $domain
+            // تشغيلة قائمة بلا فرع (سبقت هذا العمود) تُعامَل كمطابقة؛ بفرع تُقارَن به.
+            || ($existing->branch_id !== null && $existing->branch_id !== $branchId)
             || $existing->content_sha256 !== $sha256
             || $existing->media_archive_content_sha256 !== $archiveSha256
         ) {
             throw new RuntimeException(
-                'مفتاح idempotency هذا مستخدَم بالفعل لملف أو مجال مختلف. استخدم مفتاحاً جديداً لهذا الطلب.'
+                'مفتاح idempotency هذا مستخدَم بالفعل لملف أو مجال أو فرع مختلف. استخدم مفتاحاً جديداً لهذا الطلب.'
             );
         }
 
@@ -307,7 +316,7 @@ class ImportJobService
                 );
 
                 try {
-                    $chunk = $this->runChunk($locked, $tmpPath, $archiveTmpPath, $frozenOptions, $offset, $batchSize, $userId, $costAuthorized);
+                    $chunk = $this->withJobBranch($locked, fn () => $this->runChunk($locked, $tmpPath, $archiveTmpPath, $frozenOptions, $offset, $batchSize, $userId, $costAuthorized));
                 } catch (Throwable $e) {
                     $locked->forceFill([
                         'status' => ImportJobStatus::FAILED,
@@ -344,6 +353,26 @@ class ImportJobService
         }
 
         return $updated;
+    }
+
+    /**
+     * يجري القطعة **بفرع التشغيلة** لا بفرع الطلب الحالي، ثم يعيد سياق الفرع كما كان (finally) — `BranchContext`
+     * singleton يعيش طوال الطلب، فلا يتسرّب فرع التشغيلة إلى ما بعدها. تشغيلةٌ بلا فرع (قديمة أو مستأجر بلا فروع)
+     * تبقى على سلوكها القديم: الفرع النشط للطلب.
+     */
+    private function withJobBranch(ImportJob $job, callable $run): mixed
+    {
+        if ($job->branch_id === null) {
+            return $run();
+        }
+
+        $previous = $this->branch->id();
+        $this->branch->set($job->branch_id);
+        try {
+            return $run();
+        } finally {
+            $this->branch->set($previous);
+        }
     }
 
     /**

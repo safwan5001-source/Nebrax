@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ImportJob extends BaseModel implements CompanyWide
 {
     protected $fillable = [
-        'tenant_id', 'domain', 'status', 'idempotency_key',
+        'tenant_id', 'branch_id', 'domain', 'status', 'idempotency_key',
         'original_filename', 'extension', 'mime_type', 'byte_size',
         'storage_disk', 'storage_path', 'content_sha256',
         'media_archive_original_filename', 'media_archive_mime_type',

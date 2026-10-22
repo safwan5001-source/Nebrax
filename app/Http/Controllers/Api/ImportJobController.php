@@ -87,6 +87,7 @@ class ImportJobController extends ApiController
         // الأرضية في `ApplyImportJobRequest::authorize`؛ هنا بوابة **مجال** التشغيلة بعد البحث عنها.
         $job = ImportJob::query()->whereKey($id)->firstOrFail();
         $this->access->assertManage($request, $job->domain);
+        $this->access->assertJobBranch($request, $job->branch_id);
         $job = $this->domain(fn () => $this->jobs->applyNextChunk(
             $job,
             $request->applyOptions(),
@@ -102,6 +103,7 @@ class ImportJobController extends ApiController
         $this->access->assertManageAny($request);
         $job = ImportJob::query()->whereKey($id)->firstOrFail();
         $this->access->assertManage($request, $job->domain);
+        $this->access->assertJobBranch($request, $job->branch_id);
         $job = $this->domain(fn () => $this->jobs->cancel($job, $request->user()?->id));
 
         return (new ImportJobResource($job))->response();

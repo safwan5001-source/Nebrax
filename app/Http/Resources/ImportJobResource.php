@@ -12,6 +12,7 @@ class ImportJobResource extends JsonResource
         return [
             'id' => $this->id,
             'domain' => $this->domain,
+            'branch_id' => $this->branch_id,
             'status' => $this->status,
             'original_filename' => $this->original_filename,
             'extension' => $this->extension,
