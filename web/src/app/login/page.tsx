@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { useTranslations } from 'next-intl';
 import { Eye, EyeOff, LoaderCircle } from 'lucide-react';
 import { AuthShell } from '@/components/auth/auth-shell';
+import { DemoLoginButton } from '@/components/auth/demo-login-button';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { login } from '@/lib/auth';
@@ -111,6 +112,7 @@ export default function LoginPage() {
           </Link>
         </form>
 
+        <DemoLoginButton />
       </section>
 
       <footer className="pt-5 text-center">
