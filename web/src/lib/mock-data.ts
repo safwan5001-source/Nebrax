@@ -1878,6 +1878,11 @@ export const mockCashPosition = {
   balance: '217840.00',
 };
 
+// رصيد ذمم العملاء للوحة (إجمالي فقط؛ يطابق رصيد 1130 في بيانات العرض).
+export const mockReceivablesPosition = {
+  balance: '63200.00',
+};
+
 // تقارير الحسابات العامة في وضع العرض: تطابق عقود Laravel الحقيقية كي يبقى
 // اختبار الواجهة التجريبية كاشفاً لانحراف العقد لا سبباً لانهيار وقت التشغيل.
 export const mockCashFlow = {
@@ -4529,6 +4534,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (clean === '/reports/cost-center-profitability') return resolve(mockCostCenterProfit);
   if (clean === '/reports/cash-flow') return resolve(mockCashFlow);
   if (clean === '/reports/cash-position') return resolve(mockCashPosition);
+  if (clean === '/reports/receivables-position') return resolve(mockReceivablesPosition);
   if (clean === '/reports/tax-report') return resolve(mockTaxReport);
   if (clean === '/reports/journal-entries') return resolve(mockJournalEntries);
   const ledgerMatch = clean.match(/^\/reports\/account-ledger\/([^/]+)$/);

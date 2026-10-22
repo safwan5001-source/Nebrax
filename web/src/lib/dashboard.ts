@@ -15,12 +15,12 @@ export function toNumber(value: string | number | null | undefined): number {
 }
 
 /**
- * حالة مؤشّر النقد والبنك — مستقلّة عن بقية اللوحة (TREASURY-T2).
+ * حالة مؤشّر رصيد (النقد والبنك، ذمم العملاء) — مستقلّة عن بقية اللوحة (TREASURY-T2).
  *
- * فشل هذا الطلب (شبكة، 403، ردّ تالف) لا يُسقط اللوحة ولا يُعرض صفراً: الصفر رصيدٌ حقيقي
- * (خزينة فارغة)، و«غير متاح» حالة مختلفة تماماً. لذلك الحالات ثلاث ولا يُستنتج رقمٌ من غياب بيانات.
+ * فشل طلبه (شبكة، 403، ردّ تالف) لا يُسقط اللوحة ولا يُعرض صفراً: الصفر رصيدٌ حقيقي
+ * (خزينة فارغة، لا ذمم)، و«غير متاح» حالة مختلفة تماماً. لذلك الحالات ثلاث ولا يُستنتج رقمٌ من غياب بيانات.
  */
-export type CashPositionState =
+export type KpiBalanceState =
   | { status: 'loading' }
   | { status: 'ready'; balance: number }
   | { status: 'unavailable' };
@@ -35,10 +35,10 @@ function parseBalance(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/** يجلب رصيد النقد ويعزل أي فشل: لا يرمي أبداً، ويعيد `unavailable` عند الرفض أو التلف. */
-export async function loadCashPosition(
+/** يجلب رصيد مؤشّر ويعزل أي فشل: لا يرمي أبداً، ويعيد `unavailable` عند الرفض أو التلف. */
+export async function loadKpiBalance(
   request: () => Promise<{ balance?: unknown } | null | undefined>,
-): Promise<CashPositionState> {
+): Promise<KpiBalanceState> {
   try {
     const balance = parseBalance((await request())?.balance);
 

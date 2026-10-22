@@ -27,12 +27,11 @@ import { Registers } from '@/components/dashboard/registers';
 import { ReportFilters, EMPTY_FILTERS, filtersToQuery, type ReportFilterState } from '@/components/reports/report-filters';
 import { AwjGlobalSearch } from '@/components/dashboard/awj-global-search';
 import { api } from '@/lib/api';
-import { barPercent, dailySeries, expenseTone, loadCashPosition, netIncome, toNumber, type CashPositionState } from '@/lib/dashboard';
+import { barPercent, dailySeries, expenseTone, loadKpiBalance, netIncome, toNumber, type KpiBalanceState } from '@/lib/dashboard';
 import { SAUDI_RIYAL_SYMBOL, formatNumberShort, formatRiyal, formatRiyalShort } from '@/lib/money';
 import { cn } from '@/lib/utils';
 
 interface IncomeStatement { total_revenue: string; total_expense: string; net_income: string }
-interface Account { code: string; name: string; balance: string }
 interface Invoice {
   id: string; number: string; invoice_date: string; total: string;
   status: string; payment_status: string;
@@ -55,7 +54,7 @@ const QUICK_ACTIONS: { href: string; key: string; icon: LucideIcon }[] = [
  * مبدّلٌ ثانٍ لتناقض ما تقوله الترويسة مع ما تقوله الصفحة.
  *
  * لا حساب محاسبي هنا: الإيراد والمصروف والصافي من `/reports/income-statement`
- * المبني على الدفتر، والأرصدة من `/accounts`. ما يُشتقّ في الواجهة هو العرض
+ * المبني على الدفتر، وأرصدة النقد والذمم من `/reports/cash-position` و`/reports/receivables-position`. ما يُشتقّ في الواجهة هو العرض
  * وحده (نِسب الأشرطة، السلاسل اليومية) عبر دوال خالصة مختبَرة في `lib/dashboard`.
  */
 export default function DashboardPage() {
@@ -80,9 +79,9 @@ export default function DashboardPage() {
   });
   const [loading, setLoading] = useState(true);
   const [income, setIncome] = useState<IncomeStatement | null>(null);
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  // مؤشر النقد مستقلّ عن بقية اللوحة: فشله لا يعطّلها ولا يُظهر صفراً (انظر `loadCashPosition`).
-  const [cashPosition, setCashPosition] = useState<CashPositionState>({ status: 'loading' });
+  // مؤشرا النقد والذمم مستقلّان عن بقية اللوحة وعن بعضهما: فشل أيٍّ منهما لا يعطّل شيئاً ولا يُظهر صفراً (انظر `loadKpiBalance`).
+  const [cashPosition, setCashPosition] = useState<KpiBalanceState>({ status: 'loading' });
+  const [receivablesPosition, setReceivablesPosition] = useState<KpiBalanceState>({ status: 'loading' });
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [inventoryValue, setInventoryValue] = useState<string>('0');
   const [mobileTab, setMobileTab] = useState<'activity' | 'invoices'>('activity');
@@ -93,15 +92,13 @@ export default function DashboardPage() {
     setLoading(true);
     Promise.all([
       api<IncomeStatement>(`/reports/income-statement${query}`),
-      api<{ data: Account[] }>('/accounts'),
       api<{ data: Invoice[] }>('/invoices'),
       // AWJ-PERF-4: مجمَّع خفيف لقيمة المخزون وحدها — لا الكتالوج الكامل
       // الذي كان يحمّله `/inventory` (المسار القديم) لهذا الرقم فقط.
       api<InventorySummary>('/inventory/summary').catch(() => null),
     ])
-      .then(([inc, acc, inv, stock]) => {
+      .then(([inc, inv, stock]) => {
         setIncome(inc);
-        setAccounts(acc.data);
         setInvoices(inv.data);
         if (stock?.total_value != null) {
           setInventoryValue(stock.total_value);
@@ -110,12 +107,15 @@ export default function DashboardPage() {
       .finally(() => setLoading(false));
   }, [query]);
 
-  // TREASURY-T2: رصيد النقد والبنك من مجموعة الحسابات المربوطة بالخزائن والبنوك (∪ 1110/1120) — لا الرمزان وحدهما.
-  // طلبٌ مستقلّ لا يتبع المرشّحات (المؤشّر تراكمي)، ولا يدخل `Promise.all` فلا يُسقط بقية اللوحة عند فشله.
+  // رصيدا النقد والبنك (كل الخزائن والبنوك ∪ 1110/1120) وذمم العملاء (1130): إجمالي فقط، بنطاق فروع المستخدم نفسه في الخادم.
+  // طلبان مستقلّان لا يتبعان المرشّحات (المؤشّران تراكميان) ولا يدخلان `Promise.all`، فلا يُسقط فشلُ أيٍّ منهما بقية اللوحة.
   useEffect(() => {
     let active = true;
-    loadCashPosition(() => api<{ balance: string }>('/reports/cash-position')).then((state) => {
+    loadKpiBalance(() => api<{ balance: string }>('/reports/cash-position')).then((state) => {
       if (active) setCashPosition(state);
+    });
+    loadKpiBalance(() => api<{ balance: string }>('/reports/receivables-position')).then((state) => {
+      if (active) setReceivablesPosition(state);
     });
 
     return () => {
@@ -123,9 +123,8 @@ export default function DashboardPage() {
     };
   }, []);
 
-  const balanceOf = (code: string) => accounts.find((a) => a.code === code)?.balance ?? '0';
   const cash = cashPosition.status === 'ready' ? cashPosition.balance : 0;
-  const receivables = toNumber(balanceOf('1130'));
+  const receivables = receivablesPosition.status === 'ready' ? receivablesPosition.balance : 0;
 
   const revenue = toNumber(income?.total_revenue);
   const expense = toNumber(income?.total_expense);
@@ -186,7 +185,7 @@ export default function DashboardPage() {
           trend={spark.cash}
           trendLabel={t('spark_label')}
           loading={cashPosition.status === 'loading'}
-          unavailable={cashPosition.status === 'unavailable' ? t('cash_unavailable') : undefined}
+          unavailable={cashPosition.status === 'unavailable' ? t('kpi_unavailable') : undefined}
         />
         </div>
         <div className="order-3 lg:order-2">
@@ -197,7 +196,8 @@ export default function DashboardPage() {
           icon={Users}
           trend={spark.receivable}
           trendLabel={t('spark_label')}
-          loading={loading}
+          loading={receivablesPosition.status === 'loading'}
+          unavailable={receivablesPosition.status === 'unavailable' ? t('kpi_unavailable') : undefined}
         />
         </div>
         {/* البطاقة المدمجة: المبيعات رقماً رئيسياً والصافي سطراً فرعياً.
