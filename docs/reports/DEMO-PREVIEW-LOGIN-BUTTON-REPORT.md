@@ -21,8 +21,8 @@
 | الشرط | التنفيذ |
 |---|---|
 | يظهر فقط عند `NEXT_PUBLIC_DEMO_PREVIEW=true` | `isDemoPreviewEnabled()` في `lib/demo.ts` — مقارنة صارمة بـ`'true'`؛ `1`/`TRUE`/`false`/فارغ = معطَّل |
-| الضغط ⇒ `enableDemo()` ثم `/dashboard` | `DemoLoginButton`: `setActiveBranchId(null)` ← `enableDemo()` ← `router.replace('/dashboard')` |
-| بلا تسجيل دخول حقيقي | لا `login()`، لا `fetch`، لا توكن (مثبت باختبار `fetch` spy + e2e) |
+| الضغط ⇒ `enableDemo()` ثم `/dashboard` | `DemoLoginButton`: `clearToken()` ← `clearSessionPreferences()` ← `enableDemo()` ← `notifyAuthSessionChanged()` ← `router.replace('/dashboard')` |
+| بلا تسجيل دخول حقيقي | لا `login()` ولا `logout()` ولا `fetch`؛ ويمسح محلياً أي جلسة حقيقية سابقة (token/user/فرع) قبل التفعيل — أُضيف بعد تعليق Codex، انظر `DEMO-PREVIEW-LOGIN-CODEX-FIX-REPORT.md` |
 | غياب المتغيّر ⇒ لا زر | المكوّن يعيد `null`؛ DOM فارغ (اختبار + e2e) |
 | لا تغيير في API/Laravel/المصادقة | لم يُعدَّل `auth.ts` ولا `api.ts` ولا `isDemo()` ولا `enableDemo()` |
 | لا متغيّر في Railway | موثّق صراحةً في `web/DEPLOY.md` (§2-ب): Vercel فقط |
