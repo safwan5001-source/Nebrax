@@ -16,8 +16,9 @@ class StoreImportJobRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        $domain = (string) $this->input('domain');
-        $known = in_array($domain, ImportJobDomain::values(), true) ? $domain : ImportJobDomain::PRODUCT_CATALOG;
+        $domain = $this->input('domain');
+        // غير نصّي (`domain[]=x`) أو غير معروف: يُحاسَب على بوابات المنتجات ثم يفشل التحقق 422 — لا 500.
+        $known = is_string($domain) && in_array($domain, ImportJobDomain::values(), true) ? $domain : ImportJobDomain::PRODUCT_CATALOG;
         app(ImportJobAccess::class)->assertManage($this, $known);
 
         return true;
@@ -31,7 +32,8 @@ class StoreImportJobRequest extends FormRequest
             // المجالات معاً؛ التضييق لكل مجال (XLSX حصراً لـ`product_workbook`،
             // مطابقاً `ProductWorkbookImportRequest` حرفياً) في الإغلاق أدناه.
             'file' => ['required', 'file', 'mimes:csv,txt,xlsx', 'max:5120', function ($attribute, $value, $fail) {
-                $domain = (string) $this->input('domain');
+                $domain = $this->input('domain');
+                $domain = is_string($domain) ? $domain : ''; // `domain[]=x` يفشل بـ422 (قاعدة `in`) لا 500.
                 $extension = strtolower((string) $value->getClientOriginalExtension());
                 if ($domain === ImportJobDomain::PRODUCT_WORKBOOK && $extension !== 'xlsx') {
                     $fail('مصنّف Products/Barcodes/Unit Prices يجب أن يكون بصيغة XLSX.');
@@ -39,7 +41,7 @@ class StoreImportJobRequest extends FormRequest
             }],
             'domain' => ['required', Rule::in(ImportJobDomain::values())],
             'media_archive' => ['sometimes', 'nullable', 'file', 'mimes:zip', 'max:51200', function ($attribute, $value, $fail) {
-                if ((string) $this->input('domain') !== ImportJobDomain::PRODUCT_CATALOG) {
+                if ($this->input('domain') !== ImportJobDomain::PRODUCT_CATALOG) {
                     $fail('أرشيف صور المنتجات متاح لاستيراد كتالوج المنتجات فقط.');
                 }
             }],

@@ -2,10 +2,8 @@
 
 namespace App\Http\Requests;
 
-use App\Models\ImportJob;
 use App\Services\ImportJobAccess;
 use App\Services\ProductImportService;
-use App\Support\ImportJobDomain;
 use App\Support\InventoryOpeningFields;
 use App\Support\ProductImportFields;
 use Illuminate\Foundation\Http\FormRequest;
@@ -35,15 +33,12 @@ use Illuminate\Validation\Rule;
 class ApplyImportJobRequest extends FormRequest
 {
     /**
-     * IMP-H1-S1 — صلاحية الإدارة + قدرة **مجال** التشغيلة (من التشغيلة المخزَّنة لا من الطلب)، قبل التحقق
-     * من الخيارات. تشغيلة غير موجودة/من مستأجر آخر تُترك لـ404 في المتحكّم (نطاق المستأجر يحجبها).
+     * IMP-H1-S1 — أرضية الصلاحية فقط (إدارة أي مجال استيراد) قبل التحقق من الخيارات؛ البوابة الفعلية لمجال التشغيلة
+     * (صلاحية + قدرة) في المتحكّم بعد البحث عنها — مرة واحدة. تشغيلة غير موجودة/من مستأجر آخر: 404 هناك.
      */
     public function authorize(): bool
     {
-        $domain = ImportJob::query()->whereKey((string) $this->route('id'))->value('domain');
-        if (is_string($domain) && in_array($domain, ImportJobDomain::values(), true)) {
-            app(ImportJobAccess::class)->assertManage($this, $domain);
-        }
+        app(ImportJobAccess::class)->assertManageAny($this);
 
         return true;
     }

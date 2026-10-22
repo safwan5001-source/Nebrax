@@ -133,7 +133,8 @@ class ImportJobAuthorizationTest extends TestCase
 
         $this->withToken($scene['token'])
             ->post('/api/import-jobs', ['domain' => 'inventory_opening', 'file' => $this->openingsFile($scene['slug'])])
-            ->assertForbidden();
+            ->assertForbidden()
+            ->assertJsonPath('message', 'هذه القدرة غير مفعّلة لهذه المؤسسة.');
 
         app(TenantContext::class)->set($scene['tenant_id']);
         $this->assertSame(0, ImportJob::query()->count(), 'لا تشغيلة ولا ملف مخزَّن عند الرفض.');
@@ -168,10 +169,18 @@ class ImportJobAuthorizationTest extends TestCase
         $this->withToken($scene['token'])
             ->postJson("/api/import-jobs/{$jobId}/apply", ['opening_date' => '2026-01-01'])
             ->assertForbidden();
-        $this->withToken($scene['token'])->postJson("/api/import-jobs/{$jobId}/cancel")->assertForbidden();
+        $this->withToken($scene['token'])->postJson("/api/import-jobs/{$jobId}/cancel")
+            ->assertForbidden()
+            ->assertJsonPath('message', 'هذه القدرة معلّقة (قراءة فقط) — أعد تفعيلها لإجراء تغييرات جديدة.');
         $this->withToken($scene['token'])
             ->post('/api/import-jobs', ['domain' => 'inventory_opening', 'file' => $this->openingsFile($scene['slug'])])
             ->assertForbidden();
+
+        // القائمة قراءة: تظهر تشغيلات المجال المعلّق، ومجال المنتجات لا يتأثر بالتعليق.
+        $ids = collect($this->withToken($scene['token'])->getJson('/api/import-jobs')->assertOk()->json('data'))->pluck('id')->all();
+        $this->assertContains($jobId, $ids);
+        $catalogJob = $this->createCatalogJob($scene['token']);
+        $this->withToken($scene['token'])->postJson("/api/import-jobs/{$catalogJob}/apply", [])->assertOk();
     }
 
     /** @test */
@@ -237,6 +246,42 @@ class ImportJobAuthorizationTest extends TestCase
         // مجال غير معروف: يُحاسَب على بوابات المنتجات (لا يتحوّل 403 إلى 422 لمن لا يملك أي صلاحية).
         $this->withToken($selfService)->post('/api/import-jobs', ['domain' => 'nope', 'file' => $this->catalogFile()])->assertForbidden();
         $this->withToken($scene['token'])->post('/api/import-jobs', ['domain' => 'nope', 'file' => $this->catalogFile()])->assertStatus(422);
+    }
+
+    /** @test */
+    public function a_user_with_no_import_permission_gets_403_for_unknown_ids_and_array_domains_never_404_422_or_500(): void
+    {
+        $scene = $this->scene();
+        $selfService = $this->tokenForRole($scene['tenant_id'], 'self_service', 'ss2@acme.test');
+        $missing = '11111111-1111-4111-8111-111111111111';
+
+        $this->withToken($selfService)->getJson("/api/import-jobs/{$missing}")->assertForbidden();
+        $this->withToken($selfService)->postJson("/api/import-jobs/{$missing}/apply", ['batch_size' => 'x'])->assertForbidden();
+        $this->withToken($selfService)->postJson("/api/import-jobs/{$missing}/cancel")->assertForbidden();
+        $this->withToken($selfService)
+            ->post('/api/import-jobs', ['domain' => ['x'], 'file' => $this->catalogFile()])
+            ->assertForbidden();
+
+        // لمن يملك الصلاحية: المعرّف المجهول 404 (لا تسريب)، والمجال المصفوفة 422 لا 500.
+        $this->withToken($scene['token'])->getJson("/api/import-jobs/{$missing}")->assertNotFound();
+        $this->withToken($scene['token'])->postJson("/api/import-jobs/{$missing}/apply", [])->assertNotFound();
+        $this->withToken($scene['token'])
+            ->post('/api/import-jobs', ['domain' => ['x'], 'file' => $this->catalogFile()])
+            ->assertStatus(422);
+    }
+
+    /** @test */
+    public function a_job_stored_with_an_unknown_domain_fails_closed_with_403_not_500(): void
+    {
+        $scene = $this->scene();
+        $jobId = $this->createCatalogJob($scene['token']);
+        ImportJob::withoutGlobalScopes()->whereKey($jobId)->update(['domain' => 'legacy_unknown']);
+
+        $this->withToken($scene['token'])->getJson("/api/import-jobs/{$jobId}")->assertForbidden();
+        $this->withToken($scene['token'])->postJson("/api/import-jobs/{$jobId}/apply", [])->assertForbidden();
+        $this->withToken($scene['token'])->postJson("/api/import-jobs/{$jobId}/cancel")->assertForbidden();
+        $listed = collect($this->withToken($scene['token'])->getJson('/api/import-jobs')->assertOk()->json('data'))->pluck('id')->all();
+        $this->assertNotContains($jobId, $listed, 'مجال غير معلن لا يظهر في القائمة.');
     }
 
     /** @test */

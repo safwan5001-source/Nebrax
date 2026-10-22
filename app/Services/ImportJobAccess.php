@@ -36,6 +36,21 @@ class ImportJobAccess
     }
 
     /**
+     * أرضيةٌ **قبل** البحث عن التشغيلة: يملك المستخدم صلاحية عرض (أو إدارة) مجالٍ واحد على الأقل. فمن لا يملك أي
+     * صلاحية استيراد يحصل على 403 ثابت ولا يميّز بين معرّفٍ موجود وغير موجود (404)، وتبقى البوابة الفعلية
+     * **لمجال التشغيلة** بعد البحث. الاتحاد لا الاستثناء: مستخدمٌ بصلاحية مشتريات فقط لا يُحجب بصلاحيات المنتجات.
+     */
+    public function assertViewAny(Request $request): void
+    {
+        $this->assertAny($request, 'view');
+    }
+
+    public function assertManageAny(Request $request): void
+    {
+        $this->assertAny($request, 'manage');
+    }
+
+    /**
      * المجالات التي يجوز لهذا المستخدم **عرضها** الآن — لتصفية القائمة بلا 403. تستعمل البوابة
      * نفسها (فلا تظهر تشغيلات مجالٍ لا يملك المستخدم صلاحيته أو قدرته معطّلة).
      *
@@ -58,9 +73,28 @@ class ImportJobAccess
         return $allowed;
     }
 
+    private function assertAny(Request $request, string $level): void
+    {
+        $user = $request->user();
+        if ($user) {
+            foreach (ImportJobDomain::values() as $domain) {
+                if (Rbac::allows((string) $user->role, ImportJobDomain::authorization($domain)[$level])) {
+                    return;
+                }
+            }
+        }
+
+        abort(403, 'ليس لديك صلاحية لتنفيذ هذا الإجراء.');
+    }
+
     private function assert(Request $request, string $domain, string $level): void
     {
-        $gates = ImportJobDomain::authorization($domain);
+        try {
+            $gates = ImportJobDomain::authorization($domain);
+        } catch (\InvalidArgumentException) {
+            // تشغيلة بمجال غير معلن (بيانات قديمة/تالفة): فشل مغلق بـ403 لا 500.
+            abort(403, 'مجال الاستيراد غير مدعوم.');
+        }
 
         $user = $request->user();
         if (! $user || ! Rbac::allows((string) $user->role, $gates[$level])) {

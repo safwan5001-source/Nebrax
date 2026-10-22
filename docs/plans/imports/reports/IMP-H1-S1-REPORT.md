@@ -25,9 +25,10 @@
 - `EnsureApplicationActive::authorize(Request, string)` — the middleware body extracted unchanged (`handle()` now calls it). **Only** place the application-gate rules live; cohort enforcement, shadow observation and the Arabic messages are preserved.
 - `ImportJobAccess` — `assertView`, `assertManage`, `viewableDomains`. Order: RBAC (same `Rbac::allows` check and message as `EnsurePermission`), then application gate.
 - Enforcement points:
-  - `StoreImportJobRequest::authorize` (runs before validation and before any file is stored). An unknown `domain` is judged on the product-catalog gates (the old route behavior), then fails validation with 422.
-  - `ApplyImportJobRequest::authorize` (domain read from the stored job, before option validation).
-  - Controller: `show` (view), `cancel` (manage), `index` (filtered to viewable domains; empty list, never 403).
+  - `StoreImportJobRequest::authorize` (runs before validation and before any file is stored). An unknown or non-string `domain` (`domain[]=x`) is judged on the product-catalog gates (the old route behavior), then fails validation with 422. Its two validation closures no longer cast an array to string (pre-existing 500).
+  - **Floor before lookup:** `show`/`cancel` (controller) and `apply` (`ApplyImportJobRequest::authorize`) first require *some* domain permission (`assertViewAny`/`assertManageAny`, the union over domains). A user with no import permission gets a constant 403 and cannot tell an existing job id from a missing one.
+  - **Per-domain gate after lookup:** the controller then calls `assertView`/`assertManage` with the stored job's domain, once per request. A job stored with an unknown domain fails closed with 403, not 500.
+  - `index` is filtered to viewable domains (empty list, never 403).
 - `routes/api.php`: route-level `$perm` removed from the five `import-jobs` routes (comment explains why).
 - `PruneImportJobs`: also deletes `media_archive_storage_path`.
 
@@ -49,7 +50,7 @@ None. No migration.
 
 ## Tests
 
-`tests/Feature/ImportJobAuthorizationTest.php` (11 tests, 78 assertions):
+`tests/Feature/ImportJobAuthorizationTest.php` (13 tests, 99 assertions):
 - every domain declares valid gates; unknown domain throws;
 - opening job create/apply refused when `inventory.core` is disabled, with no `ImportJob`, no stored file and no `InventoryOpening` draft; job status unchanged;
 - suspended: read allowed, create/apply/cancel refused;
@@ -60,9 +61,24 @@ None. No migration.
 - cross-tenant: 404 on show/apply/cancel, empty list;
 - prune deletes a completed job's media archive file with its row; dry-run deletes nothing; a job inside its window is untouched.
 
-**Negative control:** against the pre-change controller/requests/routes/prune, 6 of these 11 fail; with the change all 11 pass.
+**Negative control:** against the pre-change controller/requests/routes/prune, 6 of the first 11 tests failed (the two added after review test only the new floor and array handling); with the change all 13 pass.
 
 Existing suites run on the same tree: see tracker for the full-suite result.
+
+## Independent review (replaces the unavailable Codex review)
+
+A fresh-context subagent reviewed the diff read-only. It found **no blocking issue** and verified: RBAC check identical to `EnsurePermission`; `authorize()` a pure extraction; the cohort enforcer only throws 403 and the shadow observer swallows errors (so the list cannot 500); suspended semantics; route parameter and tenant scoping; prune dry-run safety. It raised, and this slice fixed:
+- **should-fix:** an unknown or foreign job id skipped the permission check for users without import permission (403 became 404/422). Fixed with the floor above, plus tests.
+- **should-fix (low):** `domain[]=x` caused a 500 (`Array to string`). Fixed in `authorize` and in the two validation closures, plus a test.
+- **nit:** the application gate ran twice on `apply`. Fixed: floor in the request, per-domain gate once in the controller.
+- **nit:** a stored job with an unknown domain threw 500. Fixed: 403.
+- **tests:** response-message assertions were added; suspended list/catalog cases, unknown id, array domain and unknown stored domain are now covered.
+
+Accepted, not changed:
+- `GET /import-jobs` evaluates the `inventory.core` gate for the opening domain on every call, so in a cohort-enforced tenant with the capability disabled each list call logs an enforcement warning and a shadow observation although it is not an access attempt. Using a non-observing status read would diverge from the commercial enforcement the show/apply paths use, which is the worse trade. Noise only.
+- Cancel is blocked while `inventory.core` is suspended, matching the direct inventory-openings routes; a stored file then waits for `imports:prune`.
+
+This is an independent model review, **not** a Codex review, and is reported as such.
 
 ## Risks
 

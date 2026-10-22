@@ -49,6 +49,7 @@ class ImportJobController extends ApiController
 
     public function show(Request $request, string $id): JsonResponse
     {
+        $this->access->assertViewAny($request);
         $job = ImportJob::query()->whereKey($id)->firstOrFail();
         $this->access->assertView($request, $job->domain);
 
@@ -83,6 +84,7 @@ class ImportJobController extends ApiController
      */
     public function apply(ApplyImportJobRequest $request, string $id): JsonResponse
     {
+        // الأرضية في `ApplyImportJobRequest::authorize`؛ هنا بوابة **مجال** التشغيلة بعد البحث عنها.
         $job = ImportJob::query()->whereKey($id)->firstOrFail();
         $this->access->assertManage($request, $job->domain);
         $job = $this->domain(fn () => $this->jobs->applyNextChunk(
@@ -97,6 +99,7 @@ class ImportJobController extends ApiController
 
     public function cancel(Request $request, string $id): JsonResponse
     {
+        $this->access->assertManageAny($request);
         $job = ImportJob::query()->whereKey($id)->firstOrFail();
         $this->access->assertManage($request, $job->domain);
         $job = $this->domain(fn () => $this->jobs->cancel($job, $request->user()?->id));
