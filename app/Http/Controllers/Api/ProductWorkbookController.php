@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Requests\ProductWorkbookExportRequest;
 use App\Http\Requests\ProductWorkbookImportRequest;
 use App\Models\PriceList;
+use App\Services\ImportPreviewService;
 use App\Services\ProductWorkbookService;
+use App\Support\ImportJobDomain;
 use App\Support\ProductListFilters;
 use App\Support\SensitiveCostPolicy;
 use Illuminate\Http\JsonResponse;
@@ -64,12 +66,22 @@ class ProductWorkbookController extends ApiController
         $priceList = $this->resolvePriceList($request->string('price_list_id')->toString() ?: null);
 
         return response()->json([
-            'data' => $this->domain(fn () => $this->workbooks->preview(
-                $request->file('file'),
-                $request->productOptions(),
-                $priceList,
-                SensitiveCostPolicy::authorized($request->user()),
-            )),
+            'data' => $this->domain(function () use ($request, $priceList): array {
+                $preview = $this->workbooks->preview(
+                    $request->file('file'),
+                    $request->productOptions(),
+                    $priceList,
+                    SensitiveCostPolicy::authorized($request->user()),
+                );
+                // IMP-H1-S3b: معاينةٌ أحادية الاستعمال يحفظها الخادم — تُرفَق بإنشاء التشغيلة التنفيذية.
+                $preview['binding'] = app(ImportPreviewService::class)->issue(
+                    ImportJobDomain::PRODUCT_WORKBOOK, $request->file('file'), null,
+                    $request->productOptions() + ['price_list_id' => $request->string('price_list_id')->toString() ?: null],
+                    $request->user()?->id,
+                );
+
+                return $preview;
+            }),
         ]);
     }
 

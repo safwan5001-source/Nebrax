@@ -64,6 +64,9 @@ class ImportJobController extends ApiController
             $request->input('idempotency_key'),
             $request->user()?->id,
             $request->file('media_archive'),
+            $request->creationOptions(),
+            $request->input('preview_id'),
+            $request->input('preview_hash'),
         ));
 
         // `wasRecentlyCreated` هي علامة Eloquent الجاهزة (تُضبط `true` وحصراً
@@ -93,6 +96,7 @@ class ImportJobController extends ApiController
             $request->applyOptions(),
             $request->user()?->id,
             SensitiveCostPolicy::authorized($request->user()),
+            $request->explicitOptions(),
         ));
 
         return (new ImportJobResource($job))->response();

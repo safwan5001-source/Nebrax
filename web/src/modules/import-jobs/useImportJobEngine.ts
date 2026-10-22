@@ -18,6 +18,7 @@ import {
   createImportJob,
   getImportJob,
   type ApplyOptions,
+  type ImportBinding,
   type ImportJob,
   type ImportJobDomain,
 } from './client';
@@ -78,12 +79,17 @@ export function useImportJobEngine(domain: ImportJobDomain) {
     }
   }, [setJob]);
 
-  const upload = useCallback(async (file: File, idempotencyKey?: string, mediaArchive?: File | null) => {
+  const upload = useCallback(async (
+    file: File,
+    idempotencyKey?: string,
+    mediaArchive?: File | null,
+    bound?: { binding: ImportBinding; options: ApplyOptions } | null
+  ) => {
     if (inFlight.current) return;
     inFlight.current = true;
     setState({ job: null, busy: 'uploading', error: null, networkUncertain: false });
     try {
-      const job = await createImportJob(domain, file, idempotencyKey, mediaArchive);
+      const job = await createImportJob(domain, file, idempotencyKey, mediaArchive, bound);
       setJob(job);
       return job;
     } catch (err) {

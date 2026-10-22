@@ -113,4 +113,29 @@ class ImportDomainRegistryTest extends TestCase
             $this->assertStringNotContainsString($needle, $source, "ImportJobService يجب ألا يعرف «{$needle}» بعد الآن.");
         }
     }
+
+    /** @test */
+    public function canonical_options_are_closed_typed_and_keep_absent_mapping_distinct_from_an_empty_one(): void
+    {
+        $catalog = $this->registry()->for('product_catalog');
+        $absent = $catalog->canonicalOptions(['mode' => 'upsert', 'batch_size' => 50, 'foreign_key' => 'x']);
+        $this->assertArrayNotHasKey('mapping', $absent, 'غياب المطابقة = مطابقة تلقائية، لا مصفوفة فارغة.');
+        $this->assertArrayNotHasKey('batch_size', $absent);
+        $this->assertArrayNotHasKey('foreign_key', $absent);
+        $this->assertSame('upsert', $absent['mode']);
+        $this->assertFalse($absent['apply_product_images']);
+
+        $empty = $catalog->canonicalOptions(['mapping' => []]);
+        $this->assertSame([], $empty['mapping']);
+
+        $sorted = $catalog->canonicalOptions(['mapping' => ['10' => 'name', '2' => 'sku', '0' => null]]);
+        $this->assertSame(['0', '2', '10'], array_map('strval', array_keys($sorted['mapping'])));
+        $this->assertNull($sorted['mapping']['0']);
+
+        $opening = $this->registry()->for('inventory_opening')->canonicalOptions(['opening_date' => '2026-01-01', 'allow_zero_cost' => '1', 'notes' => '']);
+        $this->assertSame(['opening_date' => '2026-01-01', 'allow_zero_cost' => true, 'notes' => null], $opening);
+
+        $workbook = $this->registry()->for('product_workbook')->canonicalOptions(['price_list_id' => '']);
+        $this->assertNull($workbook['price_list_id']);
+    }
 }

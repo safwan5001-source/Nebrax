@@ -32,6 +32,19 @@ class ProductCatalogImportAdapter extends SpreadsheetImportAdapter
         return ProductImportService::DURABLE_MAX_ROWS;
     }
 
+    public function canonicalOptions(array $raw): array
+    {
+        $options = [
+            'mode' => (string) ($raw['mode'] ?? ProductImportService::MODE_CREATE),
+            'blank_policy' => (string) ($raw['blank_policy'] ?? ProductImportService::BLANK_IGNORE),
+            'master_data_policy' => (string) ($raw['master_data_policy'] ?? ProductImportService::MASTER_DATA_TEXT),
+            'apply_product_images' => $this->canonicalBool($raw['apply_product_images'] ?? false),
+            'approve_existing_media_updates' => $this->canonicalBool($raw['approve_existing_media_updates'] ?? false),
+        ];
+
+        return $this->withMapping($options, $raw);
+    }
+
     /**
      * إعادة حساب `row_count` بتعريف صفوف البيانات دون الفيزيائي مرّة واحدة عند أول ترحيل — تصحيحٌ ذاتيٌّ لتشغيلات
      * `ready` أُنشئت بالحساب الفيزيائي القديم (قبل تصحيح المراجعة) قبل أن يعتمد عليها الاكتمال، بلا نقل بيانات منفصل.
