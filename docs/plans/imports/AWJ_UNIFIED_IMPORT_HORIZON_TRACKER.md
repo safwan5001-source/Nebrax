@@ -23,7 +23,7 @@
 | IMP-H1-S1 | 🟡→✅ | — | Per-domain job authorization map (perm + app gate, index filtering); prune deletes media archive | H0 | — | — | — | — | — | — | — | — | — | Planned | Start (handoff §3) |
 | IMP-H1-S2 | ✅ | ✅ | `ImportDomainAdapter` + registry (`unitKey`/`applyUnit`, unit-based cursor); existing 3 domains; no behavior change | H1-S1 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H1-S3 | ✅ | — | Sync applies require `preview_hash`; options+mapping frozen at job creation; required preview-hash binding; `/apply` rejects changed options (legacy in-flight jobs only grandfathered); UI idempotency key; throttle | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
-| IMP-H1-S4 | ✅ | ✅ | Spreadsheet scan admission (policy; prod enable = D-04) | — | — | — | — | — | — | — | — | — | — | Planned | — |
+| IMP-H1-S4 | ✅ | ✅ | `SpreadsheetIntakeGuard` before parsing on every file-accepting import route (route invariant test; prod enable = D-04) | — | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H1-S5 | ✅ | — | Catalog job: whole-file pre-validation, fetch outside lock (repair via H1-S8) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H1-S7 | — | ✅ | AI Action type gates: `application_key` + multi-permission in registry/policy; invariant test | H1-S1 | — | — | — | — | — | — | — | — | — | Planned | Before any new AI type |
 | IMP-H1-S8 | ✅ | — | Generic standard repair: per-unit outcomes with immutable `source_unit_ref`, failures download, single-use child repair job | H1-S2, H1-S3 | — | — | — | — | — | — | — | — | — | Planned | — |
@@ -45,7 +45,7 @@
 | IMP-H4-S4 | — | ✅ | AI Actions `product_taxonomy_import.v1` + `price_list_item_import.v1` (separate gates) + parity | H4-S1, H4-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H5-S1 | ✅ | — | Expense adapter (drafts, derived tax, `import_document_reservations` with full-predicate key; reference-less fallback key + explicit distinct confirmation) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H5-S2 | ✅ | — | Expense UI + durable domain | H5-S1 | — | — | — | — | — | — | — | — | — | Planned | — |
-| IMP-H5-S3 | ✅ | — | Purchase adapter (grouped drafts with required `supplier_invoice_ref`, derived totals, `import_document_reservations` + supplier lock, PG concurrency test) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
+| IMP-H5-S3 | ✅ | — | Purchase adapter (grouped drafts with required `supplier_invoice_ref`, derived totals, `import_document_reservations` owned by the document services (create/update re-key/delete), `duplicate_reference_policy` allow|block, PG concurrency test) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H5-S4 | ✅ | — | Purchase UI + durable domain | H5-S3 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H5-S5 | — | ✅ | AI Action types `expense_import.v1` / `purchase_import.v1` | H5-S1, H5-S3 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H5-S6 | — | ✅ | Document Center builders: financial perm+app gates, adapter validation + reservations; cross-source dup test (PG); entry link | H5-S1, H5-S3 | — | — | — | — | — | — | — | — | — | Planned | — |

@@ -156,7 +156,14 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
   - **Synchronous apply is bound too (rule 10).** `/products/import/apply`, `/products/workbook/apply` and `/inventory-openings/import/apply` require the `preview_hash` from their own preview (422 `preview_required` / `preview_mismatch`).
     - Today's web UI uses only the durable jobs for execution, so no first-party caller breaks. Any external caller is named in the slice report.
     - Every **new** domain exposes sync `inspect`/`preview` only; its execution goes through the bound durable job or an AI approval.
-- **IMP-H1-S4 — Spreadsheet scan admission.** Route AI-Action and import-job spreadsheets through the existing `DocumentFileScanAdmissionService` pattern, policy-driven: off → today's behavior; on → fail-closed. Enabling it in production is **D-04** (ops).
+- **IMP-H1-S4 — Spreadsheet scan admission at every intake point.**
+  - Introduce one `SpreadsheetIntakeGuard`, called **before any parsing**, on every endpoint that receives a spreadsheet or archive:
+    - every sync `inspect`/`preview`/`apply` (products, workbook, inventory openings, and every new domain)
+    - `POST /import-jobs` and repairs
+    - AI Action file and image-archive uploads
+  - It reuses the existing `DocumentFileScanAdmissionService` pattern, policy-driven: off → today's behavior; on → fail-closed.
+  - An invariant test enumerates the import routes that accept files and asserts each one invokes the guard, so a new domain cannot skip it.
+  - Enabling it in production is **D-04** (ops).
 - **IMP-H1-S5 — Catalog job failure semantics.**
   - Pre-validate the whole file before chunk 1 (in-file duplicates across windows).
   - Expose `failed` partial results through the generic repair mechanism (H1-S8).
@@ -247,7 +254,16 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
        - Tests: delete draft ⇒ re-import succeeds; reverse posted ⇒ re-import still blocked; a delete racing an import (PostgreSQL) leaves no orphan.
     2. Inside that transaction, `lockForUpdate` on the supplier `Partner` row, then a lookup of existing `purchases.supplier_invoice_no` for that supplier (covers manually created purchases).
     - No unique index is added to `purchases`. Existing tenants may already hold duplicates, and `migrate --force` at boot would fail the deploy.
-    - Manual-vs-manual duplicates stay out of scope (pre-existing behavior; recorded as a follow-up).
+    - **One owner of the reservation lifecycle: the document service, not the importer.** `PurchaseService` / `ExpenseService` call `DocumentDuplicateReservationService` inside their own `create`, `update` and `delete` transactions:
+      - `create` reserves the key.
+      - `update` that changes any predicate field (`partner_id`, `supplier_invoice_no`; expense vendor/reference/date/amount) **re-keys atomically**: it deletes the old reservation and inserts the new one, and a collision returns 422.
+      - `delete` of a draft releases the reservation.
+      - Importers never write reservations directly.
+    - **Direct manual creation follows a configurable policy** (CLAUDE.md rule 6) in purchase/expense settings: `duplicate_reference_policy = allow | block`.
+      - `allow` is the default and preserves today's behavior: manual duplicates stay possible, manual documents do not reserve, and imports still refuse to duplicate any existing or reserved document.
+      - `block`: direct creation joins the same protocol (counterparty lock + recheck + reservation), so a direct `POST /purchases` racing an import cannot duplicate in either order.
+    - The race under `allow` is accepted by definition, since the tenant permits duplicates manually; the slice report states this.
+    - Tests: an edit re-keys; an edit into an existing key gets 422; under `block`, a direct-vs-import race in both orders yields one document (PostgreSQL); under `allow`, manual creation is unchanged.
     - Required test: a PostgreSQL concurrency test (two processes, distinct idempotency keys, same supplier + reference ⇒ exactly one draft).
 - **IMP-H5-S4:** Purchase standard UI + durable domain. Units are whole `(supplier, ref)` groups (rule 9): a chunk holds N complete invoices, and a group larger than the chunk size is one chunk by itself. A test places a group across the would-be row boundary.
 - **IMP-H5-S5:** AI path for spreadsheets: AI Action types `expense_import.v1` / `purchase_import.v1` on the H5-S1/S3 adapters.
