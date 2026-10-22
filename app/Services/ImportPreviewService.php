@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\ImportJob;
 use App\Models\ImportPreview;
+use App\Support\ImportJobStatus;
 use App\Support\ImportPreviewException;
 use App\Tenancy\BranchContext;
 use App\Tenancy\TenantContext;
@@ -49,9 +51,10 @@ class ImportPreviewService
      * يحفظ المعاينة ويُرجع ما تحتاجه الواجهة لإرفاقه بإنشاء التشغيلة.
      *
      * @param  array<string, mixed>  $rawOptions  الخيارات كما وردت في طلب المعاينة (تُحوَّل إلى القانونية هنا).
+     * @param  array<int, string>|null  $plan  خطّة الصفوف (رقم الصف → رمز) إن كان للمجال خطّة (كتالوج المنتجات فقط اليوم).
      * @return array{id: string, hash: string, expires_at: string}
      */
-    public function issue(string $domain, UploadedFile $file, ?UploadedFile $archive, array $rawOptions, ?string $userId): array
+    public function issue(string $domain, UploadedFile $file, ?UploadedFile $archive, array $rawOptions, ?string $userId, ?array $plan = null): array
     {
         $fileSha = $this->sha($file, 'الملف');
         $archiveSha = $archive === null ? null : $this->sha($archive, 'أرشيف الصور');
@@ -71,6 +74,7 @@ class ImportPreviewService
             'file_sha256' => $fileSha,
             'archive_sha256' => $archiveSha,
             'options' => $options,
+            'plan' => $plan === null ? null : self::encodePlan($plan),
             'preview_hash' => $this->hash($tenantId, $branchId, $domain, $fileSha, $archiveSha, $options),
             'expires_at' => $expiresAt,
         ]);
@@ -130,7 +134,7 @@ class ImportPreviewService
      * ينفق المعاينة بتحديثٍ شرطيّ واحد — يُستدعى **داخل** معاملة إنشاء التشغيلة. طلبان متزامنان على المعاينة نفسها:
      * الثاني ينتظر قفل الصفّ ثم يجد `consumed_at` مضبوطاً فيُحدَّث صفرُ صفّ ⇒ يُرفض.
      */
-    public function consume(ImportPreview $preview, string $jobId): void
+    public function consume(ImportPreview $preview, ?string $jobId): void
     {
         $updated = ImportPreview::query()
             ->whereKey($preview->id)
@@ -159,6 +163,73 @@ class ImportPreviewService
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR);
 
         return hash_hmac('sha256', $payload, $this->key());
+    }
+
+    /**
+     * ربط التنفيذ **المتزامن** (التطبيق المباشر بلا تشغيلة): بلا معاينة ⇒ العقد القديم ما لم يُلزَم بها (`preview_required`)؛ ومعها ⇒
+     * يُثبَت أن الملف والخيارات هي المعاينة نفسها. لا يُنفق هنا: المستدعي ينفقها (`consume`) داخل معاملة التنفيذ نفسها فيرجع الإنفاق
+     * إن فشل التنفيذ.
+     *
+     * @param  array<string, mixed>  $rawOptions
+     */
+    public function bindForSyncApply(
+        string $domain,
+        UploadedFile $file,
+        ?UploadedFile $archive,
+        array $rawOptions,
+        ?string $userId,
+        ?string $previewId,
+        ?string $previewHash,
+    ): ?ImportPreview {
+        if ($previewId === null && $previewHash === null) {
+            if ($this->requiredNow()) {
+                throw new ImportPreviewException('preview_required', 'عاين الملف قبل التنفيذ: لا يُنفَّذ استيراد بلا معاينة.');
+            }
+
+            return null;
+        }
+
+        return $this->assertConsumable(
+            (string) $previewId,
+            (string) $previewHash,
+            $userId,
+            $domain,
+            $this->sha($file, 'الملف'),
+            $archive === null ? null : $this->sha($archive, 'أرشيف الصور'),
+            $this->domains->for($domain)->canonicalOptions($rawOptions),
+        );
+    }
+
+    /** @param array<int, string> $plan */
+    public static function encodePlan(array $plan): string
+    {
+        $lines = [];
+        foreach ($plan as $row => $code) {
+            $lines[] = $row.'='.$code;
+        }
+
+        return base64_encode((string) gzcompress(implode("\n", $lines), 6));
+    }
+
+    /** @return array<int, string>|null `null` = لا خطّة (عقد قديم أو مجال بلا خطّة). */
+    public static function decodePlan(?string $encoded): ?array
+    {
+        if ($encoded === null || $encoded === '') {
+            return null;
+        }
+        $raw = base64_decode($encoded, true);
+        $text = $raw === false ? false : @gzuncompress($raw);
+        if ($text === false) {
+            throw new RuntimeException('خطّة المعاينة تالفة؛ أعد فحص الملف.');
+        }
+
+        $plan = [];
+        foreach ($text === '' ? [] : explode("\n", $text) as $line) {
+            [$row, $code] = explode('=', $line, 2);
+            $plan[(int) $row] = $code;
+        }
+
+        return $plan;
     }
 
     /**
@@ -192,11 +263,21 @@ class ImportPreviewService
             : null;
     }
 
-    /** تقليم المعاينات المنتهية/المنفَقة القديمة — يُستدعى من `imports:prune`. */
+    /**
+     * تقليم المعاينات: غير المنفَقة المنتهية منذ يوم، والمنفَقة منذ أسبوع — **إلا** معاينة تشغيلةٍ لم تنتهِ بعد (تقرأ منها القطع خطّتها).
+     */
     public function pruneStale(): int
     {
+        $unfinishedJobs = ImportJob::query()->withoutGlobalScopes()
+            ->whereIn('status', ImportJobStatus::UNFINISHED)
+            ->whereNotNull('preview_id')
+            ->select('preview_id');
+
         return ImportPreview::query()->withoutGlobalScopes()
-            ->where(fn ($q) => $q->where('expires_at', '<', now('UTC')->subDay())->orWhere('consumed_at', '<', now('UTC')->subDays(7)))
+            ->where(function ($q) use ($unfinishedJobs) {
+                $q->where(fn ($u) => $u->whereNull('consumed_at')->where('expires_at', '<', now('UTC')->subDay()))
+                    ->orWhere(fn ($c) => $c->where('consumed_at', '<', now('UTC')->subDays(7))->whereNotIn('id', $unfinishedJobs));
+            })
             ->delete();
     }
 

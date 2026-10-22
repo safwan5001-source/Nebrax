@@ -42,6 +42,9 @@ class ProductWorkbookImportRequest extends FormRequest
             ])],
             'mapping' => ['sometimes', 'array', 'max:'.ProductImportService::MAX_COLUMNS],
             'mapping.*' => ['nullable', 'string', Rule::in(array_merge(ProductImportFields::keys(), ['ignore']))],
+            // IMP-H1-S3c — ربط التنفيذ المتزامن بمعاينته: المعرّف والبصمة معاً أو لا شيء.
+            'preview_id' => ['sometimes', 'nullable', 'uuid', 'required_with:preview_hash'],
+            'preview_hash' => ['sometimes', 'nullable', 'string', 'size:64', 'required_with:preview_id'],
         ];
     }
 
