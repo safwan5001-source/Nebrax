@@ -38,6 +38,7 @@ interface Invoice {
   status: string; payment_status: string;
 }
 interface InventorySummary { total_value: string | null }
+interface CashPosition { balance: string }
 
 const QUICK_ACTIONS: { href: string; key: string; icon: LucideIcon }[] = [
   { href: '/invoices/new', key: 'qa_invoice', icon: FilePlus },
@@ -81,6 +82,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [income, setIncome] = useState<IncomeStatement | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [cashBalance, setCashBalance] = useState<string>('0');
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [inventoryValue, setInventoryValue] = useState<string>('0');
   const [mobileTab, setMobileTab] = useState<'activity' | 'invoices'>('activity');
@@ -92,14 +94,17 @@ export default function DashboardPage() {
     Promise.all([
       api<IncomeStatement>(`/reports/income-statement${query}`),
       api<{ data: Account[] }>('/accounts'),
+      // TREASURY-T2: رصيد النقد والبنك من مجموعة الحسابات المربوطة بالخزائن والبنوك (∪ 1110/1120) — لا الرمزان وحدهما.
+      api<CashPosition>('/reports/cash-position'),
       api<{ data: Invoice[] }>('/invoices'),
       // AWJ-PERF-4: مجمَّع خفيف لقيمة المخزون وحدها — لا الكتالوج الكامل
       // الذي كان يحمّله `/inventory` (المسار القديم) لهذا الرقم فقط.
       api<InventorySummary>('/inventory/summary').catch(() => null),
     ])
-      .then(([inc, acc, inv, stock]) => {
+      .then(([inc, acc, position, inv, stock]) => {
         setIncome(inc);
         setAccounts(acc.data);
+        setCashBalance(position.balance);
         setInvoices(inv.data);
         if (stock?.total_value != null) {
           setInventoryValue(stock.total_value);
@@ -109,7 +114,7 @@ export default function DashboardPage() {
   }, [query]);
 
   const balanceOf = (code: string) => accounts.find((a) => a.code === code)?.balance ?? '0';
-  const cash = toNumber(balanceOf('1110')) + toNumber(balanceOf('1120'));
+  const cash = toNumber(cashBalance);
   const receivables = toNumber(balanceOf('1130'));
 
   const revenue = toNumber(income?.total_revenue);

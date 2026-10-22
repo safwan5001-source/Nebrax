@@ -511,13 +511,15 @@ class ReportService
 
     /**
      * تدفقات نقدية بالطريقة المباشرة: يُجمع أثر النقد والبنك الفعلي لكل قيد
-     * مرحّل، فتُلغى التحويلات الداخلية بين الصندوق والبنك تلقائياً لأن صافيها صفر.
+     * مرحّل، فتُلغى التحويلات الداخلية بين أي خزينتين/بنكين تلقائياً لأن صافيها صفر.
+     * «النقد والبنك» = `CashAccountResolver` (كيانات الخزائن والبنوك ∪ 1110/1120).
      * التصنيف شفاف ومحدود: أصل ثابت = استثماري، مقابل حقوق ملكية = تمويلي، وما
      * عداه تشغيلي. لا تُشتق حركة نقدية من تغيّر الذمم أو اللقطات.
      */
     public function cashFlow(array $filters = []): array
     {
-        $cashAccounts = Account::whereIn('code', ['1110', '1120'])->pluck('id');
+        // TREASURY-T2: كل الحسابات المربوطة بخزائن/بنوك (المعطَّلة أيضاً لقيودها التاريخية) ∪ 1110/1120، لا الرمزين وحدهما.
+        $cashAccounts = app(CashAccountResolver::class)->accountIds();
         if ($cashAccounts->isEmpty()) {
             return $this->emptyCashFlow();
         }
@@ -571,6 +573,31 @@ class ReportService
             ...$results,
             'net_cash_flow' => $netCashFlow,
         ];
+    }
+
+    /**
+     * رصيد النقد والبنك الحالي (مؤشر لوحة التحكم): مجموع أرصدة حسابات `CashAccountResolver` من لقطة `account_balances`
+     * ذاتها التي يعرضها `/accounts`، فيطابق تعريفُه تعريفَ المؤشر السابق (تراكمي لكل الزمن والفروع) وكل ما تغيّر
+     * اكتمال المجموعة. الأرصدة بالهللات.
+     *
+     * @return array{balance:int, accounts:list<array{id:string,code:string,name:string,balance:int}>}
+     */
+    public function cashPosition(): array
+    {
+        $ids = app(CashAccountResolver::class)->accountIds();
+        if ($ids->isEmpty()) {
+            return ['balance' => 0, 'accounts' => []];
+        }
+
+        $accounts = Account::query()->whereIn('id', $ids)->with('balance')->orderBy('code')->get()
+            ->map(fn (Account $account) => [
+                'id'      => $account->id,
+                'code'    => $account->code,
+                'name'    => $account->name,
+                'balance' => (int) ($account->balance?->balance ?? 0),
+            ])->values()->all();
+
+        return ['balance' => array_sum(array_column($accounts, 'balance')), 'accounts' => $accounts];
     }
 
     /** @return array{operating:array, investing:array, financing:array, net_cash_flow:int} */

@@ -1875,6 +1875,15 @@ export const mockCostCenterProfit = {
 
 // تقارير الحسابات العامة في وضع العرض: تطابق عقود Laravel الحقيقية كي يبقى
 // اختبار الواجهة التجريبية كاشفاً لانحراف العقد لا سبباً لانهيار وقت التشغيل.
+// TREASURY-T2: رصيد النقد والبنك للوحة (يطابق عقد GET /reports/cash-position: المجموع = مجموع الحسابات المرتبطة).
+export const mockCashPosition = {
+  balance: '217840.00',
+  accounts: [
+    { id: 'acc-1110', code: '1110', name: 'الصندوق', balance: '54320.00' },
+    { id: 'acc-1120', code: '1120', name: 'البنك', balance: '163520.00' },
+  ],
+};
+
 export const mockCashFlow = {
   operating: {
     inflows: '38250.00', outflows: '14400.00', net: '23850.00',
@@ -4523,6 +4532,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (clean === '/reports/trial-balance') return resolve(mockTrialBalance);
   if (clean === '/reports/cost-center-profitability') return resolve(mockCostCenterProfit);
   if (clean === '/reports/cash-flow') return resolve(mockCashFlow);
+  if (clean === '/reports/cash-position') return resolve(mockCashPosition);
   if (clean === '/reports/tax-report') return resolve(mockTaxReport);
   if (clean === '/reports/journal-entries') return resolve(mockJournalEntries);
   const ledgerMatch = clean.match(/^\/reports\/account-ledger\/([^/]+)$/);
