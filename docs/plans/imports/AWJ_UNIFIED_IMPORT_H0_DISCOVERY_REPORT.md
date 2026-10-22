@@ -169,12 +169,52 @@ The AI Actions suites are `AiActionsFoundationTest` and `AiActionProduct{FileInt
 
 ---
 
-## 5. External evidence vs. AWJ decision (H0 scope)
+## 5. Architecture research (Horizon protocol §4): External Evidence → AWJ Decision → Rejected
 
-- **External Evidence:** not collected in H0. Visual and product research (Shopify CSV import, Odoo import with saved mappings, Zoho Books import, Daftra import, Business Central configuration packages) is **mandatory at IMP-H8-S1** and at each UX slice, per the Horizon protocol §4/§6. H0 does not claim any external behavior.
-- **AWJ Decision (H0):** one adapter seam, two experiences; financial imports create drafts only; AI as validated suggestions only; reuse Document Center for document extraction (see master plan §2).
-- **Rejected / Not adopted:**
-  - Merging `ImportJob` and `AiAction` into one table (high-risk migration, no user gain).
-  - Building a new extraction service for purchases/expenses (Document Center exists).
-  - Importing warehouses or branches (structural, low cardinality).
-  - Inferring partner `type` or matching by name.
+Primary sources were checked on 2026-10-22. Where a claim comes from a secondary source, it is marked as such. UI and visual research for the hub and screens is still owed at IMP-H8-S1 (protocol §6); this section covers the **architecture** decisions fixed in H0.
+
+### 5.1 External Evidence
+
+| # | Source | What it shows |
+|---|---|---|
+| E1 | Odoo 17 "Export and import data" (official docs) | Upload → preview with guessed column mapping (from the first lines) → fix mapping → Import. Existing records update **only when an External ID / Database ID column is present**; otherwise rows are created. Relations match by name, DB ID or External ID, with one mechanism per field. Order lines go one per row, and the first row is shared with the parent. Large files can time out, imports can partially succeed, and they "cannot be undone"; the docs advise smaller batches. No saved import mappings are documented (export presets exist). |
+| E2 | Microsoft Learn: Business Central configuration packages; `configurationPackage` API (`import`, `apply` actions) | A two-phase **import to staging → validate → apply** model with a per-table error list, fixed and then re-applied. Microsoft scopes it to **initial company setup** and says it is not intended for companies already in production (XMLports are recommended there). |
+| E3 | Shopify Help: "Importing products with a CSV file" | Matching is by **handle** with an explicit "Overwrite products with matching handles" option; matches are skipped otherwise. **Blank cells overwrite values with blank** when overwriting, and columns absent from the file are untouched. Imports cannot be cancelled once started and have no import history; the docs advise testing a small subset first. |
+| E4 | Stripe API: "Idempotent requests" + changelog 2015-09-03 | The idempotency layer **compares incoming parameters with the original request and errors on mismatch**, which was introduced as a breaking change to prevent silent misuse. Results are not saved when validation fails or when the request conflicts with a concurrent one. Keys may be pruned after about 24 hours. |
+| E5 | Daftra docs: importing clients / products / price lists through Excel | Upload → map columns → import, with an option to **update existing clients** and a post-import report of imported vs. failed rows to correct. |
+| E6 | Zoho Books KB: import invoices | CSV/TSV/XLS, 10 MB, encoding setting, mapping. Duplicate handling is **not documented officially**. A secondary source (a vendor blog) claims the native block is limited to the same bill number + vendor + financial year. That is unverified, so AWJ does not rely on it. |
+| E7 | Anthropic docs: structured outputs (`output_config.format` JSON schema; `strict: true` tool use) | The model output can be constrained to a provided JSON Schema, a subset of JSON Schema. This is the mechanism for schema-validated AI suggestions. |
+
+### 5.2 AWJ Decision (what the evidence changed or confirmed)
+
+- **Preview → approve → apply with a server-held plan** (E1, E2, E3). Every reference tool separates preview from commit. Odoo and Shopify show the cost of *unbound*, uncancellable, partially applied commits. AWJ binds apply to the previewed content (rules 5 and 10) and applies by business-document units (rule 9).
+- **Explicit match keys, never names, for updates** (E1, E3). Odoo updates only by explicit ID, and Shopify only by handle with an explicit overwrite toggle. AWJ keeps Nebrax ID → code/SKU and requires an explicit mode (`create|update|upsert`).
+- **Blank cells do not erase by default** (E3 is the counter-example). AWJ keeps `ignore` as the default and `clear` as an explicit per-run choice on clearable fields only. This is today's V2 behavior.
+- **Staging-and-validate is right; "first setup only" is not AWJ's scope** (E2). AWJ imports into live tenants. That is why drafts-only for financial documents, reservations and approval binding are mandatory rather than optional.
+- **Idempotency compares the full request** (E4), giving rule 12. A key reused with different frozen inputs is an error, never the earlier job.
+- **Post-import report and repair of failed rows** (E1, E5). The standard in the references is "report failures and let the user fix and re-import". AWJ formalizes it as H1-S8 (failures file + single-use child job) instead of manual re-upload guesswork.
+- **Saved mapping presets** (E1 documents none natively; AWJ adds them in H8-S2) are an improvement over the references, not a copy.
+- **AI suggestions through schema-constrained output** (E7). H9 requests mapping and correction suggestions as strict JSON Schema output and re-validates them in the adapter. Free text is never executed.
+
+### 5.3 Rejected / Not Adopted
+
+- **Shopify's blank-overwrites-value default.** It destroys data silently; AWJ requires the explicit `clear` policy.
+- **Uncancellable, history-less imports** (Shopify). AWJ keeps job history, cancel before apply, and a per-unit outcome log.
+- **Name-based relation matching as an identity** (Odoo allows it). In AWJ a name is only a suggestion that needs confirmation.
+- **Configuration-package style staging tables per entity** (Business Central). This would duplicate every domain table. AWJ stages in the `ImportJob` file plus the frozen plan, and in AI action versions.
+- **Relying on a vendor's undocumented duplicate rule** (E6). AWJ defines its own reservation protocol.
+
+### 5.4 Sources
+
+- Odoo 17: https://www.odoo.com/documentation/17.0/applications/essentials/export_import_data.html
+- Business Central: https://learn.microsoft.com/en-us/dynamics365/business-central/across-import-data-configuration-packages · https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/administration/apply-company-configuration-packages · https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/administration/api/dynamics_configurationpackage_create
+- Shopify: https://help.shopify.com/en/manual/products/import-export/import-products
+- Stripe: https://docs.stripe.com/api/idempotent_requests · https://docs.stripe.com/changelog/2015-09-03/reuse-idempotency-tokens-alter-error
+- Daftra: https://docs.daftra.com/en/user_manual/importing-clients-through-excel/ · https://docs.daftra.com/en/user_manual/importing-price-lists
+- Zoho Books: https://www.zoho.com/books/kb/invoices/imp-inv.html
+- Anthropic structured outputs: https://platform.claude.com/docs/en/build-with-claude/structured-outputs
+
+### 5.5 Still owed (not claimed here)
+
+- **Visual research** (screens, desktop/mobile, RTL, empty/error states) for the Import Hub and the entity import screens, at IMP-H8-S1 and each UI slice, per protocol §6.
+- **AI provider data-handling terms** for D-02, at IMP-H9-S1.

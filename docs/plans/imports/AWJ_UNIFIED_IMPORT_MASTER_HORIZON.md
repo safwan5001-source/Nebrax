@@ -251,6 +251,10 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
     - **A reference-less row still reserves.** Its fallback key is `SHA-256(vendor ‖ date ‖ amount ‖ "no-ref")`, so concurrent jobs, AI and Document Center cannot both create it.
       - A genuinely repeated expense (same vendor, day and amount) needs an explicit per-row **"distinct expense" confirmation** in review. That confirmation appends a **globally unique occurrence id** to the key: the import job id, AI action id, **or Document Center batch id ‖ document id**, followed by the unit id. A row ordinal would repeat in later files. The confirmation is part of the approved plan (and hence the approval hash), and is audited.
       - Per-run policy `reference_required` (default off) rejects reference-less rows outright.
+    - **Post-lock lookup of existing expenses (covers manual ones that never reserve under `allow`).** After taking the vendor/anchor lock, the adapter queries `expenses` for the same vendor + date + amount (minor units).
+      - For a **reference-less** row, any match is a duplicate. The row is rejected unless it carries the explicit distinct confirmation.
+      - For a **referenced** row, a match is reported as a *possible duplicate* that needs the same confirmation. Manual expenses have no persisted reference, so the reference cannot prove they differ.
+      - Test: sequential manual `POST /expenses` then an import with the same vendor/date/amount ⇒ rejected without confirmation, accepted with it.
     - Lock: the vendor `Partner` row when the vendor is a partner, otherwise the tenant anchor row.
   - A PostgreSQL concurrency test is required here too.
 - **IMP-H5-S2:** Expense standard UI + durable domain.
