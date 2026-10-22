@@ -31,6 +31,8 @@ vi.mock('@/lib/use-can', () => ({
 }));
 vi.mock('@/components/ui/confirm-dialog', () => ({ useConfirm: () => confirm }));
 vi.mock('@/components/ui/toast', () => ({ useToast: () => toast }));
+const { demo } = vi.hoisted(() => ({ demo: { on: false } }));
+vi.mock('@/lib/demo', () => ({ isDemo: () => demo.on }));
 
 function conn(overrides: Partial<GatewayConnection> = {}): GatewayConnection {
   return {
@@ -50,6 +52,7 @@ function listReturns(rows: GatewayConnection[]) {
 
 beforeEach(() => {
   api.mockReset();
+  demo.on = false;
   confirm.mockReset().mockResolvedValue(true);
   toast.success.mockReset();
   toast.error.mockReset();
@@ -194,5 +197,58 @@ describe.each(TEST_LOCALES)('PaymentGatewaysPage (%s)', (locale) => {
     expect(post?.[1].body).toMatchObject({ provider: 'custom', name: 'جديد', secret_key: 'sk_test_value' });
     expect(post?.[1].body).not.toHaveProperty('webhook_secret');
     expect(await screen.findByTestId('pg-item-new')).toBeTruthy();
+  });
+
+  it('revoking collects the reason the server requires and posts it', async () => {
+    perms.current = ['payments.view', 'payment_gateways.manage'];
+    api.mockImplementation((path: string, options?: { method?: string; body?: Record<string, unknown> }) => {
+      if (path === '/payment-gateways/g1/revoke' && options?.method === 'POST') return Promise.resolve({ data: conn({ status: 'revoked' }) });
+      return Promise.resolve({ data: [conn({ status: 'active' })] });
+    });
+    renderIntl(<PaymentGatewaysPage />, locale);
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: m.actions.revoke }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: m.revoke.submit }));
+    expect(within(dialog).getByRole('alert').textContent).toBe(m.revoke.reasonRequired);
+    expect(api.mock.calls.some((call) => call[1]?.method === 'POST')).toBe(false);
+
+    await user.type(within(dialog).getByLabelText(m.revoke.reason), 'أُغلق الحساب لدى المزوّد');
+    await user.click(within(dialog).getByRole('button', { name: m.revoke.submit }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith(m.done.revoke));
+    const post = api.mock.calls.find((call) => call[1]?.method === 'POST');
+    expect(post?.[1].body).toEqual({ reason: 'أُغلق الحساب لدى المزوّد' });
+    expect(within(screen.getByTestId('pg-item-g1')).getByText(m.status.revoked)).toBeTruthy();
+  });
+
+  it('locks the environment once the connection has left draft and does not send it', async () => {
+    perms.current = ['payments.view', 'payment_gateways.manage'];
+    api.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path === '/payment-gateways/g1' && options?.method === 'PUT') return Promise.resolve({ data: conn({ status: 'active', name: 'معدّل' }) });
+      return Promise.resolve({ data: [conn({ status: 'active' })] });
+    });
+    renderIntl(<PaymentGatewaysPage />, locale);
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: m.actions.edit }));
+    const env = screen.getByLabelText(m.form.environment) as HTMLSelectElement;
+    expect(env.disabled).toBe(true);
+    expect(screen.getByText(m.form.environmentLocked)).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: m.form.saveEdit }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith(m.done.edit));
+    const put = api.mock.calls.find((call) => call[1]?.method === 'PUT');
+    expect(put?.[1].body).not.toHaveProperty('environment');
+  });
+
+  it('in preview mode every mutation control is hidden and a note says why', async () => {
+    perms.current = ['*'];
+    demo.on = true;
+    api.mockResolvedValue({ data: [] });
+    renderIntl(<PaymentGatewaysPage />, locale);
+
+    expect(await screen.findByTestId('pg-demo')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: m.add })).toBeNull();
+    expect(within(await screen.findByTestId('pg-empty')).queryByRole('button')).toBeNull();
   });
 });

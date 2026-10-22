@@ -57,6 +57,8 @@ export function ConnectionFormDialog({
   const [error, setError] = useState<string | null>(null);
 
   const isEdit = editing !== null;
+  // البيئة تُقفل بعد مغادرة المسودة (الخادم يرفض تغييرها: gateway.environment_locked).
+  const environmentLocked = isEdit && editing.status !== 'draft';
   const set = <K extends keyof typeof EMPTY>(key: K, value: (typeof EMPTY)[K]) => setForm((current) => ({ ...current, [key]: value }));
 
   function close() {
@@ -79,7 +81,7 @@ export function ConnectionFormDialog({
     const body: Record<string, unknown> = {
       name: form.name.trim(),
       name_en: form.name_en.trim() || null,
-      environment: form.environment,
+      ...(environmentLocked ? {} : { environment: form.environment }),
       merchant_reference: form.merchant_reference.trim() || null,
       publishable_key: form.publishable_key.trim() || null,
     };
@@ -126,9 +128,10 @@ export function ConnectionFormDialog({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="pg-env">{t('form.environment')}</Label>
-              <Select id="pg-env" value={form.environment} onChange={(e) => set('environment', e.target.value as GatewayEnvironment)}>
+              <Select id="pg-env" value={form.environment} disabled={environmentLocked} onChange={(e) => set('environment', e.target.value as GatewayEnvironment)}>
                 {GATEWAY_ENVIRONMENTS.map((env) => <option key={env} value={env}>{t(`environments.${env}`)}</option>)}
               </Select>
+              {environmentLocked && <p className="text-xs leading-relaxed text-muted">{t('form.environmentLocked')}</p>}
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">

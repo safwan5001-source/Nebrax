@@ -12,6 +12,7 @@ import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 import { formatDateTime } from '@/lib/formatting';
+import { isDemo } from '@/lib/demo';
 import { useCan } from '@/lib/use-can';
 import { ConnectionFormDialog } from '@/modules/payments/gateways/connection-form-dialog';
 import {
@@ -28,9 +29,10 @@ import {
   type GatewayConnection,
 } from '@/modules/payments/gateways/contract';
 import { EventsDialog } from '@/modules/payments/gateways/events-dialog';
+import { RevokeDialog } from '@/modules/payments/gateways/revoke-dialog';
 import { RotateCredentialsDialog } from '@/modules/payments/gateways/rotate-credentials-dialog';
 
-type Transition = 'activate' | 'suspend' | 'revoke';
+type Transition = 'activate' | 'suspend';
 
 /**
  * الإعدادات › المالية › بوابات الدفع (PAY-H1-05). اتصالات المزوّد التي يضيفها التاجر بنفسه.
@@ -45,13 +47,17 @@ export default function PaymentGatewaysPage() {
   const { success, error: toastError } = useToast();
   const { can, hydrated } = useCan();
   const canView = can(VIEW_PERMISSION);
-  const canManage = can(MANAGE_PERMISSION);
+  // وضع المعاينة بلا خادم: لا يُحاكي هذا المسار، فتُعطَّل الإجراءات بدل نجاحٍ كاذب.
+  const [demo, setDemo] = useState(false);
+  useEffect(() => setDemo(isDemo()), []);
+  const canManage = can(MANAGE_PERMISSION) && !demo;
 
   const [connections, setConnections] = useState<GatewayConnection[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [formState, setFormState] = useState<{ editing: GatewayConnection | null; nonce: number } | null>(null);
   const [rotating, setRotating] = useState<GatewayConnection | null>(null);
+  const [revoking, setRevoking] = useState<GatewayConnection | null>(null);
   const [viewingEvents, setViewingEvents] = useState<GatewayConnection | null>(null);
 
   const load = useCallback(() => {
@@ -114,6 +120,7 @@ export default function PaymentGatewaysPage() {
     switch (action) {
       case 'edit': return setFormState({ editing: connection, nonce: Date.now() });
       case 'rotate': return setRotating(connection);
+      case 'revoke': return setRevoking(connection);
       case 'events': return setViewingEvents(connection);
       case 'delete': return void remove(connection);
       default: return void transition(connection, action);
@@ -185,6 +192,7 @@ export default function PaymentGatewaysPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-5">
       <Header t={t} canManage={canManage} onAdd={() => setFormState({ editing: null, nonce: Date.now() })} />
+      {demo && <p role="note" className="rounded-md border border-dashed border-border px-4 py-2 text-xs text-muted" data-testid="pg-demo">{t('demoReadOnly')}</p>}
 
       <Card>
         <CardHeader><CardTitle>{t('list')}</CardTitle></CardHeader>
@@ -256,6 +264,16 @@ export default function PaymentGatewaysPage() {
           upsert(rotated);
           success(t('done.rotate'));
           setRotating(null);
+        }}
+      />
+      <RevokeDialog
+        connection={revoking}
+        name={revoking ? gatewayDisplayName(revoking, locale) : ''}
+        onClose={() => setRevoking(null)}
+        onRevoked={(revoked) => {
+          upsert(revoked);
+          success(t('done.revoke'));
+          setRevoking(null);
         }}
       />
       <EventsDialog connection={viewingEvents} onClose={() => setViewingEvents(null)} />

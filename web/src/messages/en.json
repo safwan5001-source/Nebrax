@@ -11379,7 +11379,8 @@
       "saveDraft": "Save as draft",
       "saveEdit": "Save changes",
       "saving": "Saving…",
-      "saveFailed": "Could not save the connection."
+      "saveFailed": "Could not save the connection.",
+      "environmentLocked": "The environment cannot change once the connection leaves draft."
     },
     "rotate": {
       "title": "Rotate secrets",
@@ -11417,7 +11418,18 @@
       "gateway_name_taken": "That name is used by another connection.",
       "gateway_nothing_to_rotate": "There are no secrets to rotate.",
       "gateway_provider_immutable": "The provider cannot change after creation.",
-      "gateway_environment_locked": "The environment cannot change after activation."
+      "gateway_environment_locked": "The environment cannot change after activation.",
+      "gateway_has_active_attempts": "A connection with payment attempts in progress cannot be revoked. Suspend it or finish the attempts first.",
+      "gateway_reason_required": "A reason for revoking is required."
+    },
+    "demoReadOnly": "Preview mode: view only, no actions are run on connections.",
+    "revoke": {
+      "title": "Revoke the connection",
+      "reason": "Reason for revoking",
+      "reasonRequired": "Enter a reason (at least 3 characters).",
+      "submit": "Revoke",
+      "saving": "Revoking…",
+      "failed": "Could not revoke the connection."
     }
   }
 }
