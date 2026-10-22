@@ -178,6 +178,15 @@ class ImportJobService
             }
 
             return $this->assertSameRequestOrFail($existing, $domain, $sha256, $archiveSha256, $branchId, $previewId, $previewHash, $canonical);
+        } catch (Throwable $e) {
+            // أي إخفاقٍ آخر في الإدراج (مثلاً حُذف الفرع بعد أن تحقّق منه `SetBranch` فيرفض قيد الـFK `branch_id`): الملف وأرشيف
+            // الصور خُزِّنا قبل الإدراج ولا سجلّ يشير إليهما — يُحذفان قبل إعادة الرمي فلا يبقى كائنٌ يتيمٌ للأبد.
+            $this->storage->delete($stored['path']);
+            if ($storedArchive !== null) {
+                $this->storage->delete($storedArchive['path']);
+            }
+
+            throw $e;
         }
 
         return $this->inspect($job);
