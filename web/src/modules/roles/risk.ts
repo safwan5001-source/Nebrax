@@ -26,6 +26,8 @@ export const PERMISSION_RISK: Readonly<Record<string, RiskKind>> = {
   'payments.manage': 'financial',
   'supplier_refunds.manage': 'financial',
   'customer_refunds.manage': 'financial',
+  // PAY-H1-01: أسرار بوابات الدفع ومفاتيحها — من يملكها يوجّه مدفوعات المؤسسة.
+  'payment_gateways.manage': 'financial',
   'accounts.manage': 'financial',
   'accounting_settings.manage': 'financial',
   'hr.manage': 'financial',

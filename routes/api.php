@@ -105,6 +105,7 @@ use App\Http\Controllers\Api\ManualJournalController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PartnerController;
 use App\Http\Controllers\Api\PaymentController;
+use App\Http\Controllers\Api\PaymentGatewayController;
 use App\Http\Controllers\Api\PaymentMethodController;
 use App\Http\Controllers\Api\PriceListController;
 use App\Http\Controllers\Api\PayrollController;
@@ -997,6 +998,19 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::put('payment-methods/{id}', [PaymentMethodController::class, 'update'])->middleware($perm('payments.manage'));
         Route::post('payment-methods/{id}/make-default', [PaymentMethodController::class, 'makeDefault'])->middleware($perm('payments.manage'));
         Route::delete('payment-methods/{id}', [PaymentMethodController::class, 'destroy'])->middleware($perm('payments.manage'));
+
+        // PAY-H1-01: اتصالات بوابات الدفع. القراءة (بلا أسرار) payments.view؛ الكتابة والأسرار
+        // وسجل التدقيق payment_gateways.manage (owner/admin). لا استدعاء مزوّد ولا أثر محاسبي.
+        Route::get('payment-gateways', [PaymentGatewayController::class, 'index'])->middleware($perm('payments.view'));
+        Route::get('payment-gateways/{id}', [PaymentGatewayController::class, 'show'])->whereUuid('id')->middleware($perm('payments.view'));
+        Route::get('payment-gateways/{id}/events', [PaymentGatewayController::class, 'events'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));
+        Route::post('payment-gateways', [PaymentGatewayController::class, 'store'])->middleware($perm('payment_gateways.manage'));
+        Route::put('payment-gateways/{id}', [PaymentGatewayController::class, 'update'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));
+        Route::post('payment-gateways/{id}/rotate-credentials', [PaymentGatewayController::class, 'rotateCredentials'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));
+        Route::post('payment-gateways/{id}/activate', [PaymentGatewayController::class, 'activate'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));
+        Route::post('payment-gateways/{id}/suspend', [PaymentGatewayController::class, 'suspend'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));
+        Route::post('payment-gateways/{id}/revoke', [PaymentGatewayController::class, 'revoke'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));
+        Route::delete('payment-gateways/{id}', [PaymentGatewayController::class, 'destroy'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));
 
         // COM-MOBILE-PAYMENTS-1 (ADR-04/ADR-09): إدارة داخلية لالتزامات دفع
         // Commerce (COD/الاستلام) — تحصيل/إلغاء صريحان، نفس صلاحية عمليات
