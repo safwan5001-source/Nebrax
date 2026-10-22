@@ -37,7 +37,7 @@
 | IMP-H3-S1 | ✅ | ✅ | `PartnerImportFields` + adapter (no opening balance) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H3-S2 | ✅ | — | Partner inspect/preview endpoints (no sync apply) + `partner_master` job domain | H3-S1 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H3-S3 | ✅ | — | Customers/suppliers import UI | H3-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
-| IMP-H3-S4 | — | ✅ | AI Action `partner_import.v1` + parity test | H3-S1 | — | — | — | — | — | — | — | — | — | Planned | — |
+| IMP-H3-S4 | — | ✅ | AI Action `partner_import.v1` + parity test | H3-S1, **IMP-X-01 (blocking prerequisite per owner window — see Parked requirements; same for H4-S4, H5-S5, H7-S2, H7-S4)** | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H3-S5 | — | ✅ | Partner AI import UI | H3-S4 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H4-S1 | ✅ | via H4-S4 | Categories (hierarchy) + brands import (adapter + standard) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H4-S2 | ✅ | via H4-S4 | Price-list items import (adapter + standard) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
@@ -69,7 +69,7 @@
 
 ## Parked requirements (registered, not started — they do not change any slice above)
 
-Details, reuse analysis, dependencies and acceptance: `AWJ_IMPORT_PARKED_REQUIREMENTS.md`.
+Details, reuse analysis, dependencies and acceptance: `AWJ_IMPORT_PARKED_REQUIREMENTS.md`. "Parked" means *not started and not inside any current slice's scope*; it is nevertheless a **blocking prerequisite** of the first additional AI Action type (H3-S4 and every later AI Action slice), so those rows list it as a dependency. No existing slice is reordered.
 
 | ID | Requirement | Status | Window | Depends on | Owner decisions |
 |---|---|---|---|---|---|
