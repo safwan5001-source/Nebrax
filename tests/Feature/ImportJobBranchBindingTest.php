@@ -262,4 +262,26 @@ class ImportJobBranchBindingTest extends TestCase
         $this->withToken($auth['token'])->deleteJson("/api/branches/{$other}")->assertOk();
         $this->assertNull(ImportJob::query()->whereKey($jobId)->value('branch_id'));
     }
+
+    /** @test */
+    public function a_failed_insert_leaves_no_orphaned_upload(): void
+    {
+        $auth = $this->registerTenant();
+        $before = count(Storage::disk('local')->allFiles());
+
+        // فرعٌ غير موجود يُسقط قيد الـFK عند الإدراج (يحاكي حذف الفرع بين `SetBranch` والإدراج).
+        app(BranchContext::class)->set('00000000-0000-4000-8000-000000000000');
+        $service = app(\App\Services\ImportJobService::class);
+        app(TenantContext::class)->set($auth['tenant_id']);
+
+        $threw = false;
+        try {
+            $service->create($this->csv('BR-ORPHAN'), 'product_catalog', null, null);
+        } catch (\Throwable) {
+            $threw = true;
+        }
+
+        $this->assertTrue($threw, 'الإدراج يجب أن يفشل بقيد الـFK (على PostgreSQL؛ SQLite لا يفرض FK افتراضياً).');
+        $this->assertSame($before, count(Storage::disk('local')->allFiles()), 'لا ملف يتيم بعد فشل الإدراج.');
+    }
 }
