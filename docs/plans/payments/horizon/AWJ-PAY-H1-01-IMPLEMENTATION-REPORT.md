@@ -46,11 +46,17 @@ DATE: 2026-10-22
 
 ## Tests and exact results
 
-PENDING_TEST_RESULTS
+محلياً (SQLite، PHP 8.3):
+
+- الاختبارات الجديدة: `PaymentGatewayConnectionTest` (25) + `PaymentGatewayApiTest` (10) — **35 ناجحاً**. تغطي: الحالة والتفعيل والإيقاف والإلغاء، الحذف المرجعي (سند/تسوية)، التدوير ونافذة السماح، عدم تسرب الأسرار، العزل بين المستأجرين، الصلاحيات (محاسب/مستأجر آخر/غير مصادَق)، التدقيق الثابت وترتيبه، backfill الهجرة ورفض تراجعها، وصفر `Payment`/`JournalEntry`.
+- المجموعة ذات الصلة بعد آخر تعديل: `PaymentGateway|BranchIsolationGuard|CustomerRefund|PaymentReversal|ApiUnauthenticated` — **139 ناجحاً (903 assertion)**، منها اختبارات PAY-V2-3/V2-5 القائمة بلا تعديل.
+- المجموعة الكاملة `php artisan test` (قبل تعديل دقة الميكروثانية الأخير): **8176 ناجحاً، 164 متخطّى، 26 فاشلاً** — كلها في اختبارات `Fuel*` (`FuelCostBasisService.php:80,380`) لغياب امتداد `bcmath` من بيئة التطوير المحلية (تحذير `setup.sh` المعلن)، ويثبّته CI. لا فشل خارج `Fuel*`.
+- PostgreSQL: لم يُشغَّل محلياً — يغطيه CI.
+- Web: `vitest` للأدوار ومعادلة اللغات — **78 ناجحاً**.
 
 ## Build / lint / typecheck
 
-PENDING_BUILD
+- `npm run build` (web/): **نجح** (Next.js 15، بلا أخطاء). لا تغيير في `storefront/`.
 
 ## CI
 
