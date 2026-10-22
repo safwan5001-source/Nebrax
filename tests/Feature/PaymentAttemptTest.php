@@ -302,6 +302,13 @@ class PaymentAttemptTest extends TestCase
         $e = $this->thrown(fn () => $gateways->revoke($this->gateway->fresh(), $this->owner, 'إلغاء اختبار'), 'revoke while open', \App\Support\PaymentGatewayException::class);
         $this->assertSame('gateway.has_active_attempts', $e->reason);
 
+        // المحاولة الفاشلة/الملغاة التفويض كذلك: قد يؤكد المزوّد لاحقاً فيلزم رصده (تعارض الحالة).
+        foreach ([PaymentAttempt::STATUS_FAILED, PaymentAttempt::STATUS_VOIDED, PaymentAttempt::STATUS_EXPIRED] as $status) {
+            DB::table('payment_attempts')->where('id', $attempt->id)->update(['capture_status' => $status]);
+            $e = $this->thrown(fn () => $gateways->revoke($this->gateway->fresh(), $this->owner, 'إلغاء اختبار'), "revoke with {$status}", \App\Support\PaymentGatewayException::class);
+            $this->assertSame('gateway.has_active_attempts', $e->reason, $status);
+        }
+
         // بعد انتهاء صفحة الدفع المعلن لا مجال لالتقاط لاحق فيصح الإلغاء.
         DB::table('payment_attempts')->where('id', $attempt->id)->update(['expires_at' => now()->subMinute()]);
         $this->assertSame(PaymentGateway::STATUS_REVOKED, $gateways->revoke($this->gateway->fresh(), $this->owner, 'بعد الانتهاء')->status);
@@ -356,6 +363,10 @@ class PaymentAttemptTest extends TestCase
 
         $stripe = app(PaymentGatewayService::class)->create(['provider' => 'stripe', 'name' => 'Stripe', 'environment' => 'sandbox', 'secret_key' => 'sk_test_x'], $this->owner);
         DB::table('payment_gateways')->where('id', $stripe->id)->update(['status' => 'active']);
+        // مزوّد حقيقي مفعَّل بلا تحقق (كما بعد تدوير الأسرار): لا محاولات جديدة قبل التحقق.
+        $e = $this->thrown(fn () => $this->orchestrator->start(new TestPayable, $stripe->fresh(), 'idem-key-0016'), 'unverified', PaymentOrchestrationException::class);
+        $this->assertSame('gateway_unverified', $e->reason);
+        DB::table('payment_gateways')->where('id', $stripe->id)->update(['verified_at' => now()]);
         $e = $this->thrown(fn () => $this->orchestrator->start(new TestPayable, $stripe->fresh(), 'idem-key-0016'), 'no adapter', PaymentOrchestrationException::class);
         $this->assertSame('adapter_unavailable', $e->reason);
 

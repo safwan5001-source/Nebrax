@@ -210,9 +210,10 @@ final class PaymentOrchestrator
                 // قفل مشترك على صف الاتصال طوال إنشاء المحاولة: إلغاء الاعتماد (FOR UPDATE) ينتظر المحاولة أو تنتظره، فلا تنشأ محاولة
                 // على اتصال يُلغى في اللحظة نفسها (والإلغاء يرفض الاتصال ذا المحاولات النشطة).
                 $locked = PaymentGateway::query()->whereKey($gateway->getKey())->sharedLock()->first();
-                if ($locked === null || ! $locked->isUsable()) {
+                if ($locked === null) {
                     throw new PaymentOrchestrationException('gateway_unavailable', 'اتصال البوابة غير مفعّل.');
                 }
+                $this->assertUsable($locked);
 
                 return PaymentAttempt::query()->create([
                     'payment_gateway_id' => $gateway->getKey(),
@@ -368,6 +369,10 @@ final class PaymentOrchestrator
     {
         if (! $gateway->isUsable()) {
             throw new PaymentOrchestrationException('gateway_unavailable', 'اتصال البوابة غير مفعّل.');
+        }
+        // تدوير أسرار مزوّد حقيقي يصفّر التحقق: لا محاولات جديدة بأسرار غير متحقَّق منها (المطابقة/الإلغاء لا تشترطه).
+        if ($gateway->requiresVerification() && $gateway->verified_at === null) {
+            throw new PaymentOrchestrationException('gateway_unverified', 'أسرار الاتصال غير متحقَّق منها بعد.');
         }
     }
 

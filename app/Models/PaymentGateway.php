@@ -163,6 +163,15 @@ class PaymentGateway extends BaseModel implements CompanyWide
             || PaymentAttempt::query()->where('payment_gateway_id', $this->getKey())->exists();
     }
 
+    /**
+     * مزوّد حقيقي تُستعمل أسراره لاستدعاءات شبكية فيلزم التحقق منها (`verified_at`) قبل أي محاولة دفع؛ تدوير الأسرار يصفّر التحقق.
+     * `custom` ربط محاسبي بلا مزوّد، و`fake` محوّل اختبار/تطوير محلي لا يحمل أسراراً.
+     */
+    public function requiresVerification(): bool
+    {
+        return ! in_array($this->provider, [self::PROVIDER_CUSTOM, 'fake'], true);
+    }
+
     /** مفعّلة تشغيلياً: حالة active **و**مفتاح التشغيل القديم مفعّل. */
     public function isUsable(): bool
     {
