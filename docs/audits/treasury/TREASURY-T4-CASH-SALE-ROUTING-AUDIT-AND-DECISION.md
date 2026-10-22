@@ -16,7 +16,7 @@
 3. **`invoices.cash_account_id` already exists and is already validated for tenant ownership, but it is silently ignored for `payment_type=cash`.** It stores a ledger account id and is read only by the `is_paid` receipt. A user (or API client) who sets it on a cash-type invoice sees no effect and no error.
 4. **Current inconsistency this task exists to remove:** a tenant whose main cash treasury is not 1110 posts cash invoices to 1110, but receipts, POS tenders and supplier payments to the main treasury.
 5. **No ZATCA dependency:** none of the ZATCA builders (`ZatcaService`, `ZatcaMonetaryXml`, `ZatcaPartyXml`, signing, chain allocator) reads the debit account, a journal line or `cash_account_id`. Totals, VAT, hash, QR and XML are independent of which treasury is debited.
-6. **Recommendation:** `MainOfType` when nothing is selected, explicit selection always honoured, no fallback to 1110, exposed as a tenant setting with default `main` (section 6). Land it **together with or immediately before** the credit-note and return refund routing, because otherwise a sale into 1111 would be refunded out of 1110 (risk R1).
+6. **Recommendation:** `MainOfType` when nothing is selected, explicit selection always honoured, no fallback to 1110, exposed as a tenant setting whose **default is `legacy`** (today's behavior, no change); `main` and `explicit_required` are opt-in values that are **never activated automatically** (section 6). Land it **together with or immediately before** the credit-note and return refund routing, because otherwise a sale into 1111 would be refunded out of 1110 (risk R1).
 
 ## 2. Phase 1: current behavior (confirmed in code and by probe)
 
@@ -50,7 +50,7 @@
 
 ## 3. Phase 2: accounting impact (amounts in halalas; invoice 1,000.00 + 15% VAT = 1,150.00 SAR)
 
-"Before" rows are **observed** from the probe on SQLite and PostgreSQL. "After" rows are the proposed behavior; the resolver outputs were also observed, but no posting was changed.
+"Before" rows are **observed** from the probe on SQLite and PostgreSQL. "After" columns describe the behavior **once a tenant is explicitly switched** to `main` / `explicit_required`; they are not the default. The settings default is `legacy`, under which every row keeps its "Before" result (Dr 1110, `cash_account_id` ignored, no new rejections). The resolver outputs were also observed, but no posting was changed.
 
 | # | Scenario | Before (current code) | After, `MainOfType` | After, `ExplicitRequired` |
 |---|---|---|---|---|
@@ -60,7 +60,7 @@
 | 4a | 1110 entity inactive | `RuntimeException` "الخزينة ... معطّل", status `draft`, **0 entries** | Posts to the main (1111) if the main is active | As scenario 3 only |
 | 4b | Main treasury inactive | Not consulted today (posts to 1110 if its entity is active) | Rejected `inactive`; **no** substitution, **no** fallback to 1110 | Not applicable |
 | 4c | No main, or several candidates without a main | Not consulted today | Rejected `no_default` / `ambiguous_default` | Rejected `explicit_required` |
-| 4d | Tenant not provisioned | `bootstrapDefaults()` provisions 1110/1120 entities first (T1 fast path), then posts to 1110 | Same provisioning first (kept), then main (= 1110 entity) | Same |
+| 4d | Tenant not provisioned (no treasury entities yet), nothing selected | `bootstrapDefaults()` provisions the 1110/1120 entities and payment methods first (T1 path), then posts Dr 1110; the provisioning is kept | Same provisioning first, then the new main (= the 1110 entity): posts Dr 1110, provisioning kept | **Rejected `explicit_required`; the post transaction rolls back, including the provisioning** (no entities or payment methods are left behind, the invoice stays `draft`). An explicit selection cannot exist before provisioning, so such a tenant must be provisioned first (opening the treasuries screen / any receipt) or use `main`. |
 | 5a | Cash-type invoice that already carries `cash_account_id` | Ignored: Dr 1110 | Honoured: Dr that treasury; wrong type (a bank), inactive or group account is rejected, never swapped | Same |
 | 5b | `is_paid` invoice with `cash_account_id` = 1111 (not changed by T4) | Invoice: Dr 1130 / Cr 4110 / Cr 2120. Receipt: Dr **1111** 115000 / Cr 1130 115000 | Unchanged | Unchanged |
 | 5c | `is_paid`, no `cash_account_id`, main = 1111 (not changed by T4) | Receipt: Dr **1111** / Cr 1130 | Unchanged | Unchanged |
@@ -109,19 +109,19 @@ Tests that **do not exist** and the implementation PR must add (SQLite and Postg
 | Backward compatibility | **Identical only for invoices that carry no explicit selection** and belong to a tenant whose main cash treasury is the one linked to 1110. It changes (a) tenants whose main is not 1110, (b) tenants with no usable main cash entity (they post through the active 1110 entity today and would be rejected `no_default` / `ambiguous_default` / `inactive`), and (c) any cash-type draft carrying a currently ignored `cash_account_id` (it posts to 1110 today and would post to that treasury, or be rejected if invalid), even for a main = 1110 tenant. | **Breaks every existing cash-type draft**, every draft created through quote conversion, recurring invoices and the public API (none carry a treasury), and any integration that posts cash-type invoices. |
 | Financial impact | Cash lands in the main drawer, consistent with receipts, POS tenders and supplier payments. For main = 1110 tenants with no explicit selection: none. For others: the debit moves from 1110 to the main (see section 3, row 2), so past and future balances of 1110 and the main treasury differ by that flow. No retroactive rewrite. | None until a treasury is chosen; then as option A. |
 | Operational consequence | No new field for users or clients; the UI needs no change. A behavior change only for tenants with a custom main. | Needs a **new UI control** (none exists for cash type), API contract change, client migration, and a decision for non-interactive paths. Adds a click to every cash sale. |
-| Fits the configurable-policy rule (CLAUDE.md rule 6) | As the default. | As an opt-in. |
+| Fits the configurable-policy rule (CLAUDE.md rule 6) | As the routed policy (opt-in, not the settings default). | As an opt-in. |
 | Fails safe | Yes: `no_default`, `ambiguous_default`, `inactive` all reject; never 1110. | Yes. |
 
-**Recommendation.** Adopt **Option A as the default** and expose **Option B as a per-tenant sales setting** (for example `sales.cash_sale_treasury_policy` = `main` | `explicit_required`; the owner later added a third, default value `legacy` so that nothing changes until a coordinated activation), because CLAUDE.md rule 6 says a business policy with more than one reasonable answer is a setting, not a hard-coded behavior, and this serves 60+ activity types. This is a settings key, not a schema change. Per-branch or per-user default treasury (option c of D-T3) stays out of scope: it needs a schema design.
+**Recommendation.** Adopt **Option A (`MainOfType`) as the routed policy, with the explicit selection always winning**, and expose **Option B as a per-tenant sales setting**. The setting `sales.cash_sale_treasury_policy` has three values: **`legacy` (the default for every tenant, existing and new)**, `main` and `explicit_required`. `legacy` keeps today's behavior exactly (Dr 1110, `cash_account_id` ignored); `main` and `explicit_required` take effect only after a coordinated activation (a deployment gate plus a per-tenant opt-in), never automatically. This is because CLAUDE.md rule 6 says a business policy with more than one reasonable answer is a setting, not a hard-coded behavior, and this serves 60+ activity types. This is a settings key, not a schema change. Per-branch or per-user default treasury (option c of D-T3) stays out of scope: it needs a schema design.
 
 **Decisions requested from the owner**
 
 | ID | Decision | Recommended |
 |---|---|---|
-| D-T3 | Policy for T4: `MainOfType` default, explicit always wins, `ExplicitRequired` selectable per tenant | Approve as written |
+| D-T3 | Routed policy for T4: `MainOfType` when nothing is selected, explicit always wins, `ExplicitRequired` selectable per tenant; the settings default stays `legacy` | Approve as written |
 | D-T4a | Honour `cash_account_id` on cash-type invoices (it is ignored today) | Yes, with fail-closed validation |
 | D-T4b | Sequence T4 with the cash refund routing (credit note and return) to avoid risk R1 | Ship together, or T4 first behind the setting |
-| D-T4c | Add the `sales.cash_sale_treasury_policy` setting now, or defer and use `MainOfType` only | Add now (small, avoids a later retrofit) |
+| D-T4c | Add the `sales.cash_sale_treasury_policy` setting now (values `legacy` / `main` / `explicit_required`, default `legacy`), or defer | Add now with default `legacy` (small, avoids a later retrofit, changes nothing by itself) |
 
 ## 7. Pre-approval read-only checks for the owner (production, no writes)
 
@@ -145,8 +145,10 @@ If both queries return nothing, the change is a no-op for existing data (the fir
 
 ## 8. Phase 4 plan (only after explicit approval)
 
-1. `InvoiceService::post()` (lines 929 to 942 and the docblocks at 43 to 50, 868 to 872): for `payment_type=cash`, keep `bootstrapDefaults()`, then `TreasurySelectionResolver::resolve(selection, 'cash', policy, 'deposit', $actor)` where the selection is `ledgerAccount($invoice->cash_account_id)` when set, else `none()`. Debit `ResolvedTreasury::accountId`. Map `TreasurySelectionException` to the existing 422 path (optionally pass `reason` through, as the emergency-stop exception does). **No `catch` that falls back to 1110.**
-2. Read the policy from `Settings` (only if D-T4c is approved), default `main`.
+1. `InvoiceService::post()` (lines 929 to 942 and the docblocks at 43 to 50, 868 to 872): for `payment_type=cash`, branch on the effective policy.
+   - **`legacy` (default):** the current code verbatim: debit 1110, `resolveForPayment` plus `assertAllowed` on the 1110 entity, `cash_account_id` ignored, no new validation and no new rejection.
+   - **`main` / `explicit_required`:** keep `bootstrapDefaults()`, then `TreasurySelectionResolver::resolve(selection, 'cash', policy, 'deposit', $actor)` where the selection is `ledgerAccount($invoice->cash_account_id)` when set, else `none()`, with `MainOfType` for `main` and `ExplicitRequired` for `explicit_required`. Debit `ResolvedTreasury::accountId`. Map `TreasurySelectionException` to the existing 422 path (optionally pass `reason` through, as the emergency-stop exception does). **No `catch` that falls back to 1110.** A rejection rolls back the whole post transaction, including any provisioning done by `bootstrapDefaults()` (row 4d).
+2. Read the policy from `Settings` (only if D-T4c is approved) with **default `legacy`**, and do not activate the two routed values automatically: a deployment gate keeps the effective policy at `legacy` (and the settings API rejecting the other values) until the coordinated activation, after the refund paths are safe (D-T4b).
    The implementation must also include the surfaces that make the policy usable: validation of the new key in `UpdateSalesSettingsRequest` and the sales settings screen; a treasury selector on the cash-type branch of the web invoice form (today `cash_account_id` is sent only when `is_paid` is ticked) so that a tenant on `explicit_required` can satisfy it from the normal form; and contract tests for both (API validation, settings round-trip, form payload).
 3. Update the single allowed caller in the T3 static guard test deliberately; add the tests listed in section 4; run SQLite and PostgreSQL, the invoice/accounting/ZATCA/treasury suites, and the full suite before the PR.
 4. The PR must show the entries before and after for scenarios 1 to 4 in a table (the pre-PR protocol in CLAUDE.md), and must state the R1 pairing.
