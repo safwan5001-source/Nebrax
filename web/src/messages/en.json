@@ -11447,7 +11447,12 @@
       "gateway_nothing_to_rotate": "There are no secrets to rotate.",
       "gateway_provider_immutable": "The provider cannot change after creation.",
       "gateway_environment_locked": "The environment cannot change after activation.",
-      "gateway_has_active_attempts": "A connection with payment attempts in progress cannot be revoked. Suspend it or finish the attempts first.",
+      "gateway_has_active_attempts": "A connection with reconcilable payment attempts (in progress, or whose payment page is still open) cannot be revoked. Suspend it or finish the attempts first.",
+      "gateway_rotation_blocked": "Secrets cannot be rotated while payment attempts are still reconcilable; existing operations at the provider could become unreachable. Finish the attempts or wait for them to expire, then retry.",
+      "gateway_invalid_environment": "The selected environment is not valid.",
+      "gateway_invalid_grace": "The previous-secret grace period is not valid.",
+      "gateway_name_required": "A connection name is required.",
+      "gateway_unsupported_provider": "This provider is not supported yet.",
       "gateway_reason_required": "A reason for revoking is required."
     },
     "demoReadOnly": "Preview mode: view only, no actions are run on connections.",
