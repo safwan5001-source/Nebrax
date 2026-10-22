@@ -102,7 +102,7 @@ There is one execution core and two experiences. Every new entity gets an `Impor
 
 ### 3.5 After merge
 
-Continue with **IMP-H1-S2** (the adapter contract; characterization tests first). Then H1-S7 → S3 → S4 → S5 → S6, H2-S0..S5, and H3 onward, as in the tracker.
+Continue with **IMP-H1-S2** (the adapter contract; characterization tests first). Then H1-S7 → S3 → S8 → S4 → S5 → S6, H2-S0..S5, and H3 onward, as in the tracker.
 
 **Review-derived requirements already folded into the plan:**
 - Per-domain authorization (H1-S1).
@@ -116,7 +116,9 @@ Continue with **IMP-H1-S2** (the adapter contract; characterization tests first)
 - Stocktake counts get an AI path (H7-S4). Stock permits are standard-only (D-09).
 - The execution unit is the business document (rule 9): purchase groups and stocktake sheets are never split. Every apply, sync included, is bound to its preview (rule 10).
 - Reference-less expenses reserve on a fallback key; only an explicit, approved "distinct" confirmation allows a true repeat.
-- Order after H1-S1: H1-S2 → H1-S7 → H1-S3 → H1-S4 → H1-S5 → H1-S6.
+- Reservations die with their draft (same-transaction delete) and survive posted documents. A confirmed repeat uses job/action id ‖ unit id.
+- Standard repair is generic (H1-S8). Document Center builders gain the financial gates (H5-S6). A sales import is one atomic transaction with whole-batch quota (H6).
+- Order after H1-S1: H1-S2 → H1-S7 → H1-S3 → H1-S8 → H1-S4 → H1-S5 → H1-S6.
 
 ## 4. Known traps (save yourself time)
 

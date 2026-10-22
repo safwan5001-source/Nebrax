@@ -24,8 +24,9 @@
 | IMP-H1-S2 | ✅ | ✅ | `ImportDomainAdapter` + registry (`unitKey`/`applyUnit`, unit-based cursor); existing 3 domains; no behavior change | H1-S1 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H1-S3 | ✅ | — | Sync applies require `preview_hash`; options+mapping frozen at job creation; required preview-hash binding; `/apply` rejects changed options (legacy in-flight jobs only grandfathered); UI idempotency key; throttle | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H1-S4 | ✅ | ✅ | Spreadsheet scan admission (policy; prod enable = D-04) | — | — | — | — | — | — | — | — | — | — | Planned | — |
-| IMP-H1-S5 | ✅ | — | Catalog job: whole-file pre-validation, failed-rows repair set, fetch outside lock | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
+| IMP-H1-S5 | ✅ | — | Catalog job: whole-file pre-validation, fetch outside lock (repair via H1-S8) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H1-S7 | — | ✅ | AI Action type gates: `application_key` + multi-permission in registry/policy; invariant test | H1-S1 | — | — | — | — | — | — | — | — | — | Planned | Before any new AI type |
+| IMP-H1-S8 | ✅ | — | Generic standard repair: per-unit outcomes, failures download, child repair job | H1-S2, H1-S3 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H1-S6 | ✅ | — | Zero-value opening hits `AccountingDateGuard` | — | — | — | — | — | — | — | — | — | — | Planned | Confirm classification (master §4) |
 | IMP-H2-S0 | — | ✅ | Honest AI labeling on products AI import | — | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H2-S1 | ✅ | — | V2 create via `ProductService::create` (characterized) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
@@ -47,8 +48,8 @@
 | IMP-H5-S3 | ✅ | — | Purchase adapter (grouped drafts with required `supplier_invoice_ref`, derived totals, `import_document_reservations` + supplier lock, PG concurrency test) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H5-S4 | ✅ | — | Purchase UI + durable domain | H5-S3 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H5-S5 | — | ✅ | AI Action types `expense_import.v1` / `purchase_import.v1` | H5-S1, H5-S3 | — | — | — | — | — | — | — | — | — | Planned | — |
-| IMP-H5-S6 | — | ✅ | Document Center draft builders call adapter validation + reservations; cross-source dup test (PG); entry link | H5-S1, H5-S3 | — | — | — | — | — | — | — | — | — | Planned | — |
-| IMP-H6-S1..S3 | ✅ | ✅ | Sales invoice drafts (no post, no ZATCA) | **D-03** | — | — | — | — | — | — | — | — | — | Blocked (D-03) | Skip to H7 until decided |
+| IMP-H5-S6 | — | ✅ | Document Center builders: financial perm+app gates, adapter validation + reservations; cross-source dup test (PG); entry link | H5-S1, H5-S3 | — | — | — | — | — | — | — | — | — | Planned | — |
+| IMP-H6-S1..S3 | ✅ | ✅ | Sales invoice drafts (no post, no ZATCA; one atomic transaction with whole-batch quota under tenant lock) | **D-03** | — | — | — | — | — | — | — | — | — | Blocked (D-03) | Skip to H7 until decided |
 | IMP-H7-S1 | ✅ | — | Stocktake count-sheet import (whole sheet atomic, stocktake lock) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H7-S2 | — | ✅ | AI path for inventory opening | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H7-S3 | ✅ | ⛔ D-09 | Stock permit lines import (drafts; AI excluded by D-09) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
