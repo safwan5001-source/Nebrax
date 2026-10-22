@@ -102,6 +102,7 @@ Full-suite failures, all unrelated to this change: 26 `Fuel*` (`bcmath` is not i
 * The two boundary tests of section 2.1 pass as described.
 * Mutation checks: removing the issuer branch fails the service and HTTP tests while the database layer still refuses raw SQL; removing the database branch fails the raw-SQL, lifting, migration and policy tests (and, on PostgreSQL, the between-entry-and-update race); each layer is therefore independently tested.
 
+* **CI finding (ParaTest isolation).** The first CI run failed the boundary test only in the parallel PostgreSQL job. The fork classes had no database trait, so under ParaTest they all used the shared base database, and the platform emergency-stop row is global: another worker's `clearPlatformRows()` deleted the stop that the test had just committed. It reproduced locally with `--parallel --processes=4 --filter=Zatca` (3 of 3 runs failed) and is fixed by `Tests\Feature\UsesWorkerDatabaseWithoutTransaction` (`RefreshDatabase` with the wrapping transaction disabled), applied to the three platform-row fork classes (including the 3a `ZatcaRolloutControlPostgresTest`, which had the same latent exposure). Test-only change; 4 of 4 parallel runs and the sequential run pass afterwards.
 
 ## 5. Migration up/down evidence
 
