@@ -90,7 +90,7 @@ Rules:
 3. Today `AiActionPolicy::authorize()` (one enable gate for all six call sites) and `AiActionProductExecutionService::assertEnabled()` (execution only) already behave like two tiers; **the resolver must keep that split** and may add the preview/review distinction without changing which capability a current call site uses.
 4. The kill-switch semantics remain: the platform *use* switch off ⇒ preview and review off as well (a full stop), the execution switch off ⇒ execution only.
 
-OPS-01 (enabling `AI_ACTIONS_EXECUTION_ENABLED` in production) stays an owner approval; this requirement only gives that approval a runtime, audited control instead of an env edit.
+OPS-01 (enabling `AI_ACTIONS_EXECUTION_ENABLED` in production) stays an owner approval **and an environment edit**: under D-10 the env flags are a hard floor, so every Super Admin setting stays denied until OPS-01 turns the floor on (and redeploys). This requirement adds audited runtime controls **above** that floor — a second gate for narrowing/granting per platform, type and tenant after OPS-01 — it never replaces the env edit.
 
 ### Suggested timing
 
