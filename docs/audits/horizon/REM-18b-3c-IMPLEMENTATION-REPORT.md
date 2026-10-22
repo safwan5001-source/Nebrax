@@ -90,7 +90,16 @@ Untouched: every migration (**no schema change**), `LedgerService`, `InvoiceServ
 
 ## 5. Tests and results
 
-TEST_RESULTS_PLACEHOLDER
+| Run | Result |
+|---|---|
+| `ZatcaCreditNoteIssuanceTest`, SQLite / PostgreSQL 16 | 17 passed / 17 passed |
+| `ZatcaCreditNoteIssuancePostgresTest` (`pcntl_fork`, `lock_timeout=60s` as CI) | 3 passed, ran not skipped; 6 consecutive runs stable, no deadlock |
+| Regression filter (`Zatca`, `TaxN01`, `CreditNote`, `PublicApi`, `BranchIsolation`, `PostgresTestLockTimeout`, `ReturnSource`, `PosExchange`, `PosReturn`, `InvoicePartySnapshot`, `LedgerTest`, `InvoiceTest`) incl. F1/F2/chain/rollout suites and `CreditNotePosLockOrderPostgresTest`, SQLite | 998 passed, 41 skipped (8374 assertions), 0 failed |
+| Same filter, PostgreSQL 16 with `PGOPTIONS='-c lock_timeout=60s'` | 1037 passed, 2 skipped (9156 assertions), 0 failed |
+| Full suite, SQLite (first run of this branch) | 8157 passed, 28 failed, 167 skipped |
+| Full suite, PostgreSQL 16, `lock_timeout=60s` (first run of this branch) | 8319 passed, 29 failed, 4 skipped |
+
+Failures in the full runs, all explained: 26 `Fuel*` (`bcmath` is not installed in this container; CI has it); `AiPaidProviderDisabledTest` (SQLite) and `StorefrontMediaApiTest` (PostgreSQL), both failing without this change; `InvoicePartySnapshotTest` on both engines, a static guard listing the reviewed writers of `party_snapshot`, which this slice legitimately extended (the issuer copies the source invoice snapshot); fixed in a follow-up commit and now passing; and, on PostgreSQL only, one `ZatcaMonetaryXmlTest` case that asserts the order of invoice lines (`invoice_lines` has no sequence column), which passes 6/6 in isolation and in the regression run, and involves no file this slice touched. The full suites after the fix run in CI.
 
 Covered: successful eligible issuance (entry, columns, hash, QR, UUID, ICV, PIH, BillingReference, payment means 10, snapshot copied from the source); shared ICV/PIH across invoices and notes (genesis, continuity, signed and unsigned); exact journal preservation; credit refund, standalone, missing snapshot and unsupported class refused on an activated tenant with reason and full rollback; purchase notes untouched; unconfigured, disabled and platform-stopped tenants keep the legacy path with no chain rows; missing signing policy ⇒ fail closed and full rollback; a failure right after the chain entry rolls back entry, head and journal; tenant isolation (independent chains, no leak of activation); immutable issued identity and refusal of a second post; default off (no controls, dispatch disabled). PostgreSQL: concurrent notes and invoices on one chain without deadlock, postings racing activation flips (every note ends issued, legacy or refused, never inconsistent; ICV contiguous), SIGKILL after the entry insert.
 
