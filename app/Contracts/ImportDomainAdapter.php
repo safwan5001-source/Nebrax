@@ -16,7 +16,7 @@ use App\Support\ImportChunkResult;
  *  - وحدة التنفيذ (`unit()`) هي الأصغر التي لا تُجزَّأ: صفٌّ، أو ملفٌّ كامل، أو مستند (مجموعة صفوف) — فلا يمرّ مؤشّر
  *    المحرّك ولا حدّ الدفعة في منتصف وحدة (القاعدة 9).
  *
- * لا منطق صلاحيات هنا: بوابات كل مجال (RBAC + القدرة) تُفرض خارج المحوّل (شريحة IMP-H1-S1: `ImportJobAccess` على مستوى المتحكّم).
+ * لا منطق صلاحيات هنا: بوابات كل مجال (RBAC + القدرة) في `ImportJobDomain::authorization()` ويفرضها `ImportJobAccess`.
  */
 interface ImportDomainAdapter
 {

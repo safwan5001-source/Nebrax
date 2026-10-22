@@ -47,6 +47,6 @@ It is not a substitute for human or Codex review.
 
 ## Follow-ups
 
-- After S1 merges: assert in `ImportDomainRegistryTest` that every registered domain also declares
+- Done after S1 merged (`d959b98`): `ImportDomainRegistryTest` now also asserts every registered domain declares
   gates in `ImportJobDomain::authorization()`.
 - `ImportJobService::create()` still has a catalog-only media-archive check; moves in a later slice.

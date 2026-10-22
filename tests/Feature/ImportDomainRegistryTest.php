@@ -28,6 +28,12 @@ class ImportDomainRegistryTest extends TestCase
         $this->assertEqualsCanonicalizing(ImportJobDomain::values(), $this->registry()->domains());
 
         foreach (ImportJobDomain::values() as $domain) {
+            // كل مجال مسجَّل يعلن بواباته (IMP-H1-S1): إضافة محوّل بلا بوابات تُفشل هنا لا في الإنتاج.
+            $gates = ImportJobDomain::authorization($domain);
+            $this->assertNotEmpty($gates['view']);
+            $this->assertNotEmpty($gates['manage']);
+            $this->assertArrayHasKey('app', $gates);
+
             $adapter = $this->registry()->for($domain);
             $this->assertInstanceOf(ImportDomainAdapter::class, $adapter);
             $this->assertSame($domain, $adapter->domain());
