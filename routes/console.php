@@ -115,3 +115,10 @@ Schedule::command('platform:scheduler-heartbeat')
     ->everyFiveMinutes()
     ->withoutOverlapping(10)
     ->onOneServer();
+
+// PAY-H1-04 / ADR-0004 §5 (D-25): مطابقة محاولات الدفع المتأخرة مع المزوّد (استعادة المتعثّر) — إيجار ذرّي لكل محاولة، لا ترحيل.
+// يعمل عبر خدمة `awj-scheduler` نفسها؛ بلا محاولات قائمة لا يفعل شيئاً. الأمر آمن للتكرار والتزامن.
+Schedule::command('payments:reconcile-attempts')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(10)
+    ->onOneServer();

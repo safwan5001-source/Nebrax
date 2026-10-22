@@ -1,6 +1,6 @@
 # PAY-H1-03 — Implementation Report
 
-STATUS: **IN REVIEW** (PR مفتوح، غير مدموج، غير منشور)
+STATUS: **MERGED** (PR #1612، `34beba984`؛ غير منشور)
 DATE: 2026-10-22
 
 ## Outcome
@@ -52,7 +52,8 @@ DATE: 2026-10-22
 
 ## Merge / Post-merge
 
-- Merge: لم يُدمج — بانتظار موافقة المالك. لا Deploy.
+- Merge: دمجه المالك (PR #1612، `34beba984`). لا Deploy.
+- POST_MERGE_REVIEW: PENDING — CI على `main` للـSHA أعلاه (run 39842242507) لم يكتمل وقت التسجيل؛ يُسجَّل PASS بعد اكتماله أخضر.
 
 ## Self-review
 

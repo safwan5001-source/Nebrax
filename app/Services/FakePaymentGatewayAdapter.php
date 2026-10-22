@@ -7,7 +7,10 @@ use App\Models\PaymentGateway;
 use App\Support\PaymentAttemptContext;
 use App\Support\PaymentGatewayCapabilities;
 use App\Support\PaymentHostedCheckout;
+use App\Support\InvalidPaymentWebhookException;
 use App\Support\PaymentProviderSnapshot;
+use App\Support\PaymentRawWebhook;
+use App\Support\PaymentVerifiedWebhook;
 use Carbon\CarbonImmutable;
 use RuntimeException;
 
@@ -30,6 +33,9 @@ final class FakePaymentGatewayAdapter implements GatewayAdapter
 
     /** يُنفَّذ داخل `createCheckout` بعد تسجيل الدفعة وقبل الإرجاع — يحاكي سباقاً (إلغاء) أثناء استدعاء المزوّد. */
     public ?\Closure $onCheckout = null;
+
+    /** عدد استعلامات `fetchPayment` (يثبت أن الحدث/المطابِق يستعلمان المزوّد ولا يصدّقان الجسم). */
+    public int $fetchCount = 0;
 
     private int $failCheckouts = 0;
 
@@ -70,6 +76,8 @@ final class FakePaymentGatewayAdapter implements GatewayAdapter
 
     public function fetchPayment(PaymentGateway $gateway, string $providerPaymentId): PaymentProviderSnapshot
     {
+        $this->fetchCount++;
+
         if ($this->fetchFailure !== null) {
             throw $this->fetchFailure;
         }
@@ -81,6 +89,35 @@ final class FakePaymentGatewayAdapter implements GatewayAdapter
         $known = $this->payments[$providerPaymentId] ?? ['amount_minor' => 0, 'currency' => 'SAR'];
 
         return new PaymentProviderSnapshot($providerPaymentId, 'pending_customer', $known['amount_minor'], $known['currency']);
+    }
+
+    /** توقيع حتمي للاختبار: HMAC-SHA256 للجسم الخام بأحد أسرار الـwebhook، في ترويسة `x-fake-signature`. الجسم JSON `{id, type, payment_id}`. */
+    public function verifyWebhook(PaymentGateway $gateway, PaymentRawWebhook $webhook): PaymentVerifiedWebhook
+    {
+        $signature = (string) $webhook->header('x-fake-signature');
+        $valid = false;
+        foreach ($gateway->webhookSecretsForVerification() as $secret) {
+            $valid = hash_equals(hash_hmac('sha256', $webhook->body, $secret), $signature) || $valid;
+        }
+        if (! $valid) {
+            throw new InvalidPaymentWebhookException('signature');
+        }
+
+        $data = json_decode($webhook->body, true);
+        if (! is_array($data) || ! is_string($data['id'] ?? null) || $data['id'] === '') {
+            throw new InvalidPaymentWebhookException('malformed');
+        }
+
+        return new PaymentVerifiedWebhook(
+            $data['id'],
+            is_string($data['type'] ?? null) ? $data['type'] : null,
+            is_string($data['payment_id'] ?? null) ? $data['payment_id'] : null,
+        );
+    }
+
+    public static function sign(string $body, string $secret): string
+    {
+        return hash_hmac('sha256', $body, $secret);
     }
 
     // ───────────── أدوات الاختبار ─────────────
