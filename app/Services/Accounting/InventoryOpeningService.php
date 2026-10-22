@@ -56,6 +56,7 @@ class InventoryOpeningService
         protected LedgerService $ledger,
         protected InventoryService $inventory,
         protected AccountRoleResolver $accountRoles,
+        protected AccountingDateGuard $dateGuard,
     ) {}
 
     /**
@@ -314,6 +315,13 @@ class InventoryOpeningService
         if ($totalValue === 0) {
             // مستندٌ كلّه بتكلفة صفر يحرّك الكميات ولا قيمة له. قيدٌ بصفرين ضجيج
             // في كشف الأستاذ، والحركات نفسها هي أثره الصحيح.
+            //
+            // IMP-H1-S6 — **لكن التاريخ المحاسبي يبقى محروساً.** الحارس ينفَّذ داخل `LedgerService::post` فقط، وهذا المسار لا يبلغه، فكانت
+            // حركات المخزون تُؤرَّخ داخل فترةٍ مقفلة أو سنةٍ مالية مقفلة. نستدعيه صراحةً هنا (نفس الحارس ونفس القاعدة: ACC-6 و FC-3، بلا إعداد
+            // ولا تجاوز)؛ الرفض يُرجع المعاملة كلها (حركات وأرصدة) فتبقى المسودة قابلة للترحيل بتاريخ مفتوح. الاستدعاء بعد قفل المنتجات
+            // كما يحدث في المسار ذي القيمة (المنتجات ← المِرساة)، فلا ترتيب أقفال جديد.
+            $this->dateGuard->assertOpen($opening->opening_date, 'ترحيل الرصيد الافتتاحي للمخزون');
+
             return null;
         }
 
