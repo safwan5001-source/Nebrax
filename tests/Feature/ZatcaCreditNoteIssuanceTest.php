@@ -15,6 +15,7 @@ use App\Services\Accounting\InvoiceService;
 use App\Services\Accounting\ZatcaInvoiceHasher;
 use App\Services\Accounting\ZatcaRolloutControlService;
 use App\Support\Settings;
+use App\Support\ZatcaCreditNoteEmergencyStopException;
 use App\Support\ZatcaCreditNoteIneligibleException;
 use App\Tenancy\TenantContext;
 use Illuminate\Database\QueryException;
@@ -250,23 +251,70 @@ class ZatcaCreditNoteIssuanceTest extends TestCase
     }
 
     #[Test]
-    public function a_disabled_tenant_and_a_platform_stopped_tenant_keep_the_legacy_posting(): void
+    public function a_disabled_tenant_keeps_the_legacy_posting_even_after_having_been_activated(): void
     {
+        // D-B2: الإيقاف الصريح لمستأجر فُعِّل سابقاً يعيده إلى الترحيل القديم بلا قرار (فجوة امتثال معلنة في الوثائق، لا ثغرة مخفية).
         $disabled = $this->scene('simplified', 'disabled');
         $this->activate($disabled['tenant']);
         $this->controls->setTenantState($this->admin, $disabled['tenant'], false, 'تعطيل بعد التفعيل');
 
-        $stopped = $this->scene('simplified', 'stopped');
-        $this->activate($stopped['tenant']);
+        $note = $this->postNote($this->draft($disabled, 1));
+
+        $row = DB::table('credit_notes')->where('id', $note->id)->first();
+        $this->assertSame('posted', $row->status);
+        $this->assertNull($row->zatca_status);
+        $this->assertSame(0, DB::table('zatca_chain_entries')->where('credit_note_id', $note->id)->count());
+    }
+
+    #[Test]
+    public function an_activated_tenant_cannot_post_a_sales_note_during_the_platform_emergency_stop_and_everything_rolls_back(): void
+    {
+        // REM-18b-3d (السياسة B) يستبدل توقّع السياسة A («الإيقاف = ترحيل قديم»): الآن الرفض صريح وذرّي.
+        $s = $this->scene('simplified', 'stopped');
+        $this->activate($s['tenant']);
+        $headBefore = (int) DB::table('zatca_chains')->where('tenant_id', $s['tenant'])->value('last_icv');
+        $this->controls->setPlatformState($this->admin, false, 'إيقاف طارئ للاختبار');
+        $cash = $this->draft($s, 1);
+        $credit = $this->draft($s, 1, refund: 'credit'); // غير مؤهَّل أيضاً: الإيقاف يسبق الأهلية
+
+        foreach ([$cash, $credit] as $draft) {
+            $e = $this->thrown(fn () => $this->postNote($draft), 'محجوب أثناء الإيقاف');
+            $this->assertInstanceOf(ZatcaCreditNoteEmergencyStopException::class, $e);
+            $this->assertSame('platform_emergency_stop', $e->reason);
+            $this->assertSame(ZatcaCreditNoteEmergencyStopException::MESSAGE_AR, $e->getMessage());
+            $this->assertNothingIssuedAndNothingPosted($s, $draft);
+        }
+        $this->assertSame($headBefore, (int) DB::table('zatca_chains')->where('tenant_id', $s['tenant'])->value('last_icv'), 'لا ICV مستهلك');
+
+        // رفع الإيقاف ثم إعادة الترحيل يدوياً: الإصدار يستأنف بالـICV التالي.
+        $this->controls->setPlatformState($this->admin, true, 'رفع الإيقاف');
+        $note = $this->postNote(CreditNote::findOrFail($cash->id));
+        $this->assertSame('generated', DB::table('credit_notes')->where('id', $note->id)->value('zatca_status'));
+        $this->assertSame($headBefore + 1, (int) DB::table('credit_notes')->where('id', $note->id)->value('zatca_icv'));
+    }
+
+    #[Test]
+    public function the_emergency_stop_never_touches_unconfigured_disabled_or_other_tenants_and_not_purchase_notes(): void
+    {
+        $activated = $this->scene('simplified', 'activated');
+        $this->activate($activated['tenant']);
+        $purchase = $this->purchaseDraft($activated); // قبل الإيقاف: المسودة تُنشأ عادياً
+        $unconfigured = $this->scene('simplified', 'unconfigured');
+        $disabled = $this->scene('simplified', 'disabled');
+        $this->activate($disabled['tenant']);
+        $this->controls->setTenantState($this->admin, $disabled['tenant'], false, 'تعطيل');
         $this->controls->setPlatformState($this->admin, false, 'إيقاف طارئ للاختبار');
 
-        foreach ([$disabled, $stopped] as $scene) {
+        foreach ([$unconfigured, $disabled] as $scene) {
             $note = $this->postNote($this->draft($scene, 1));
             $row = DB::table('credit_notes')->where('id', $note->id)->first();
             $this->assertSame('posted', $row->status);
-            $this->assertNull($row->zatca_status, 'العقد الحالي (A): الإيقاف الطارئ = ترحيل قديم بلا قرار؛ السياسة B غير منفَّذة');
-            $this->assertSame(0, DB::table('zatca_chain_entries')->where('credit_note_id', $note->id)->count());
+            $this->assertNull($row->zatca_status, 'ترحيل قديم بلا قرار');
         }
+        app(TenantContext::class)->set($activated['tenant']);
+        $posted = $this->postNote($purchase);
+        $this->assertSame('posted', DB::table('credit_notes')->where('id', $posted->id)->value('status'), 'إشعار المشتريات لمستأجر مفعَّل غير متأثر');
+        $this->assertNull(DB::table('credit_notes')->where('id', $posted->id)->value('zatca_status'));
     }
 
     #[Test]

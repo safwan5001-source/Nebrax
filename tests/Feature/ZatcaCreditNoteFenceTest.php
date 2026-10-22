@@ -579,19 +579,38 @@ class ZatcaCreditNoteFenceTest extends TestCase
     }
 
     #[Test]
-    public function the_platform_emergency_stop_overrides_activation_and_lifting_it_restores_the_fence(): void
+    public function the_platform_emergency_stop_blocks_every_posting_of_an_activated_tenant_and_lifting_it_restores_the_fence(): void
     {
+        // REM-18b-3d (السياسة B) يستبدل توقّع السياسة A هنا («الإيقاف يعيد الترحيل القديم»): الإيقاف على مستأجر مفعَّل يمنع الترحيل كلياً.
         $tenant = $this->tenant();
-        $a = $this->note($tenant);
-        $b = $this->note($tenant);
+        [$bare, $disabled, $skipped, $issuedAttempt, $afterLift] = array_map(fn () => $this->note($tenant), range(1, 5));
         $this->controls->setTenantState($this->admin, $tenant, true, 'تفعيل تجريبي للاختبار');
         $this->controls->setPlatformState($this->admin, false, 'إيقاف طارئ للاختبار');
 
-        DB::table('credit_notes')->where('id', $a)->update(['status' => 'posted']);
-        $this->assertSame('posted', DB::table('credit_notes')->where('id', $a)->value('status'), 'الإيقاف الطارئ يُعيد الترحيل القديم');
+        $this->rejects(fn () => DB::table('credit_notes')->where('id', $bare)->update(['status' => 'posted']), 'بلا قرار');
+        $this->rejects(fn () => DB::table('credit_notes')->where('id', $disabled)->update(['status' => 'posted', 'zatca_status' => 'disabled']), 'disabled');
+        $this->rejects(
+            fn () => DB::table('credit_notes')->where('id', $skipped)->update(['status' => 'posted', 'zatca_status' => 'not_generated', 'zatca_skip_reason' => 'payment_means_unresolved']),
+            'not_generated',
+        );
+        $e = $this->rejects(fn () => $this->issue($tenant, $issuedAttempt), 'generated كامل بمدخله');
+        $this->assertStringContainsString('blocked while the platform emergency stop', $e->getMessage());
+        $this->rejects(fn () => $this->note($tenant, ['status' => 'posted']), 'إدراج مباشر بحالة posted');
 
+        // التراجع كامل: المسودات باقية قابلة للتعديل، ولا مدخل سلسلة (الإدراج داخل issue() تراجع مع التحديث).
+        foreach ([$bare, $disabled, $skipped, $issuedAttempt] as $id) {
+            $this->assertSame('draft', DB::table('credit_notes')->where('id', $id)->value('status'));
+        }
+        $this->assertSame(0, DB::table('zatca_chain_entries')->where('tenant_id', $tenant)->count());
+        DB::table('credit_notes')->where('id', $bare)->update(['reason' => 'مسودة قابلة للتعديل أثناء الإيقاف']);
+        $this->assertSame(1, DB::table('credit_notes')->where('reason', 'مسودة قابلة للتعديل أثناء الإيقاف')->count());
+
+        // رفع الإيقاف يعيد قاعدة 3b: بلا قرار مرفوض، والقرار الصريح مقبول.
         $this->controls->setPlatformState($this->admin, true, 'رفع الإيقاف');
-        $this->rejects(fn () => DB::table('credit_notes')->where('id', $b)->update(['status' => 'posted']), 'بعد رفع الإيقاف');
+        $e = $this->rejects(fn () => DB::table('credit_notes')->where('id', $afterLift)->update(['status' => 'posted']), 'بعد الرفع بلا قرار');
+        $this->assertStringContainsString('explicit ZATCA issuance decision', $e->getMessage());
+        $this->issue($tenant, $afterLift);
+        $this->assertSame('generated', DB::table('credit_notes')->where('id', $afterLift)->value('zatca_status'));
     }
 
     #[Test]

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **PROPOSAL ONLY. Not implemented. Needs explicit owner approval before any code or migration.** |
+| Status | **IMPLEMENTED in REM-18b-3d** (owner approved D-B1 to D-B4; D-B5 tax/accounting implications remain unapproved for production). Kept as the design record. |
 | Why it exists | The owner's provisional policy B ("block new sales credit-note posting for an activated tenant while a platform emergency stop is active") conflicts with the **merged** F2b and rollout-control contract (#1593, #1594), which treats a stopped tenant as effectively disabled and lets the legacy posting through. |
 | What 3c did instead | Implemented the independently safe scope against the **current** contract (policy A: stop = legacy posting, no issuance). Policy B was excluded. |
 

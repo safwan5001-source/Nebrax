@@ -192,7 +192,7 @@ class ZatcaChainSchemaTest extends TestCase
     public function the_credit_note_status_accepts_only_the_agreed_values_or_null(): void
     {
         // قيد الحالة من 18b-1 يُختبر بمعزل عن سياج F2 (REM-18b-3b) الذي يجعل القرار لمرة واحدة؛ F2 له اختباره الخاص.
-        $this->f2Migration()->down();
+        $this->f2Down();
         $tenant = $this->tenant();
         $note = $this->creditNote($tenant);
 
@@ -547,7 +547,7 @@ class ZatcaChainSchemaTest extends TestCase
         $note = $this->creditNote($tenant);
 
         // ترتيب `migrate:rollback` الحقيقي: سياج F2 يقرأ أعمدة الإشعار فيُسقَط أولاً ويُعاد أخيراً.
-        $this->f2Migration()->down();
+        $this->f2Down();
         $this->notesMigration()->down();
         foreach (self::NOTE_COLUMNS as $column) {
             $this->assertFalse(Schema::hasColumn('credit_notes', $column), $column);
@@ -558,7 +558,7 @@ class ZatcaChainSchemaTest extends TestCase
         foreach (self::NOTE_COLUMNS as $column) {
             $this->assertTrue(Schema::hasColumn('credit_notes', $column), $column);
         }
-        $this->f2Migration()->up();
+        $this->f2Up();
         $this->rejects(fn () => DB::table('credit_notes')->where('id', $note)->update(['zatca_status' => 'bogus']));
     }
 
@@ -586,7 +586,7 @@ class ZatcaChainSchemaTest extends TestCase
     public function the_credit_note_migration_refuses_to_roll_back_over_any_issued_artifact(string $column, mixed $value): void
     {
         // قيم مفردة بلا مستند مكتمل لا يقبلها سياج F2؛ نُسقطه لنُبقي الاختبار على رفض تراجع 18b-1 وحده.
-        $this->f2Migration()->down();
+        $this->f2Down();
         $tenant = $this->tenant();
         $this->creditNote($tenant, [$column => $value]);
 
@@ -599,7 +599,7 @@ class ZatcaChainSchemaTest extends TestCase
     public function the_migrations_leave_existing_invoice_and_credit_note_rows_untouched(): void
     {
         // ترتيب `migrate:rollback` الحقيقي: السياج F1 (REM-18b-2) أولاً لأنه يقرأ جداول السلسلة.
-        $this->f2Migration()->down();
+        $this->f2Down();
         $this->fenceMigration()->down();
         $this->notesMigration()->down();
         $this->chainsMigration()->down();
@@ -614,7 +614,7 @@ class ZatcaChainSchemaTest extends TestCase
         $this->chainsMigration()->up();
         $this->notesMigration()->up();
         $this->fenceMigration()->up();
-        $this->f2Migration()->up();
+        $this->f2Up();
 
         $this->assertSame($invoicesBefore, DB::table('invoices')->orderBy('id')->get()->map(fn ($r) => (array) $r)->all(), 'الفواتير كما هي بايتاً ببايت');
         $afterNotes = DB::table('credit_notes')->orderBy('id')->get()->map(fn ($r) => (array) $r)->all();
@@ -677,6 +677,24 @@ class ZatcaChainSchemaTest extends TestCase
     private function fenceMigration(): object
     {
         return require database_path('migrations/2026_11_19_010000_add_zatca_chain_fence_to_invoices.php');
+    }
+
+    /** ترتيب التراجع الحقيقي: سياسة الإيقاف B (REM-18b-3d) أولاً ثم سياج F2 (3b)؛ والتطبيق بالعكس. */
+    private function f2Down(): void
+    {
+        $this->policyBMigration()->down();
+        $this->f2Migration()->down();
+    }
+
+    private function f2Up(): void
+    {
+        $this->f2Migration()->up();
+        $this->policyBMigration()->up();
+    }
+
+    private function policyBMigration(): object
+    {
+        return require database_path('migrations/2026_11_23_010000_add_zatca_credit_note_emergency_stop_block.php');
     }
 
     private function f2Migration(): object
