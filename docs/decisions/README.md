@@ -17,3 +17,9 @@ Records follow `docs/autonomous-engineering/ADR-CONVENTION.md`. An accepted reco
 **Implementation authorisation is per task.** ADR-0002 and ADR-0003 authorise no code. ADR-0001's slice REM-13a (the `invoices.issued_at` migration included) was authorised by the owner on 2026-10-15 and is implemented in a Draft PR — see `docs/audits/horizon/REM-13a-IMPLEMENTATION-REPORT.md`; it remains unmerged and undeployed until the owner decides.
 
 Tracking: `docs/audits/horizon/TAX-ZATCA-RECONCILIATION-AUDIT.md` §7 · `TAX-HZ-00-REMEDIATION-BACKLOG.md` · `AWJ-TAX-ZATCA-HORIZON-TASK-QUEUE.md` · evidence: `docs/audits/horizon/TAX-HZ-00-EXTERNAL-EVIDENCE-REGISTER.md`.
+
+## AWJ Payments Horizon — G0 (recorded 2026-10-22)
+
+| ADR | Subject | Status | Open gates |
+|---|---|---|---|
+| [ADR-0004](ADR-0004-payments-orchestration-g0.md) | G0 decisions D-03…D-31; closed-period handling (D-12), retention (D-20), scheduler proof (D-25) | Accepted; **D-12 mechanism §3 proposed** | Owner approval of §3 before PAY-H2-02; G1–G6 |

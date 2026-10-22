@@ -417,8 +417,15 @@ class InvoicePartySnapshotTest extends TestCase
             }
         }
         sort($writers);
+        // REM-18b-3c (راجعها المالك صراحةً): الإشعار الدائن ينسخ لقطة الفاتورة المصدر **كما هي** (لا التقاط جديد) — المُصدِر وحده يكتب
+        // `credit_notes.party_snapshot`، والنموذج يعلن تحويله `array` فقط. أعمدة الفاتورة نفسها لم يتغيّر كاتبها.
         $this->assertSame(
-            ['app/Models/Invoice.php', 'app/Services/Accounting/InvoiceService.php'],
+            [
+                'app/Models/CreditNote.php',
+                'app/Models/Invoice.php',
+                'app/Services/Accounting/InvoiceService.php',
+                'app/Services/Accounting/ZatcaCreditNoteIssuer.php',
+            ],
             $writers,
             'أي كاتب جديد لـ party_snapshot يجب أن يُراجَع صراحةً.'
         );

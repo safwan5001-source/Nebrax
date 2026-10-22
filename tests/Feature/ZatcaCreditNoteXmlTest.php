@@ -286,7 +286,7 @@ class ZatcaCreditNoteXmlTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/(DB::|->save\(|::create\(|->update\(|->fresh\(|->load\(|::query\()/', $factory);
     }
 
-    public function test_the_posting_paths_do_not_call_the_note_builder_yet(): void
+    public function test_only_the_dedicated_issuer_calls_the_note_builder(): void
     {
         $dirs = ['app/Services', 'app/Http', 'app/Models', 'app/Console', 'app/Jobs', 'app/Listeners'];
         $hits = [];
@@ -303,7 +303,12 @@ class ZatcaCreditNoteXmlTest extends TestCase
                 }
             }
         }
-        $this->assertSame([], $hits, 'REM-18a: لا مسار ترحيل ولا API يستدعي بانيّ الإشعار (التكامل في REM-18b).');
+        // REM-18b-3c: المُصدِر وحده يستدعي البانيّ؛ لا خدمة ترحيل ولا API ولا نموذج يلمسه مباشرة (CreditNoteService يمرّ عبر المُصدِر).
+        $this->assertSame(
+            ['ZatcaCreditNoteIssuer.php'],
+            array_map('basename', $hits),
+            'المُصدِر هو الاستدعاء الوحيد لبانيّ الإشعار.',
+        );
     }
 
     // ───────────────────────── مساعدات ─────────────────────────

@@ -10,16 +10,16 @@
 
 | Field | Value |
 |---|---|
-| Last merged slice | — (H0 in review: PR #1595) |
-| **Next slice** | **IMP-H1-S1** — import-jobs app gate + prune media archive (see `AWJ_IMPORT_OPUS_HANDOFF.md` §3) |
-| Open owner decisions | D-01, D-02, D-03, D-04, D-06, D-07, OPS-01 (D-05 has a non-blocking default; D-08/D-09 are recorded exclusions) |
+| Last merged slice | **IMP-H0-S1**: PR #1595, squash-merged 2026-10-22, Merge SHA `5e20e9edc941f83181497158fa68e6c55e95c485` |
+| **Next slice** | **IMP-H1-S1**: per-domain import-job authorization map (permission + app gate) and prune of completed-job media archives (see `AWJ_IMPORT_OPUS_HANDOFF.md` §3). **Not started.** Execution resumes on the next model (model-handoff stop after H0). |
+| Open owner decisions | D-01, D-02 (narrowed: `import_rows` data scope only), D-03, D-04, D-06, D-07, OPS-01 (D-05 has a non-blocking default; D-08/D-09 are recorded exclusions) |
 | Railway state | Unknown (owner-reported stall; no access from the agent) |
 
 ## Slice log
 
 | Slice | Std | AI | Scope | Depends | Branch | PR | Base SHA | Head SHA | Merge SHA | Tests | CI | Deploy | Verify | Status | Next action |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| IMP-H0-S1 | — | — | Discovery, master plan, tracker, handoff (docs) | — | `claude/unified-import-h0` | #1595 | `474aad1` | _pending_ | — | n/a (docs) | — | — | — | In Progress | Merge, then stop for the model handoff |
+| IMP-H0-S1 | — | — | Discovery, master plan, tracker, handoff (docs) | — | `claude/unified-import-h0` | #1595 | `474aad1` (main at start; merged onto `d187406`) | `323e6e4` | `5e20e9e` | CI: PHP SQLite ✅, PostgreSQL ✅ (one infra re-run), CI Gate ✅. Local: 8078 passed / 26 env-only `bcmath` Fuel failures | ✅ | n/a (docs; no code change deployed) | n/a | **Merged** | Model handoff → IMP-H1-S1 |
 | IMP-H1-S1 | 🟡→✅ | — | Per-domain job authorization map (perm + app gate, index filtering); prune deletes media archive | H0 | — | — | — | — | — | — | — | — | — | Planned | Start (handoff §3) |
 | IMP-H1-S2 | ✅ | ✅ | `ImportDomainAdapter` + registry (`unitKey`/`applyUnit`, unit-based cursor); existing 3 domains; no behavior change | H1-S1 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H1-S3 | ✅ | — | Single-use `import_previews` (canonical per-unit plan, `plan_drift` on apply, minted occurrence ids); job `branch_id` bound + restored per chunk (F-15); sync applies require `preview_hash`; options+mapping frozen at job creation; required preview-hash binding; `/apply` rejects changed options (legacy in-flight jobs only grandfathered); UI idempotency key; throttle | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
@@ -28,7 +28,7 @@
 | IMP-H1-S7 | — | ✅ | AI Action type gates: `application_key` + multi-permission in registry/policy; invariant test | H1-S1 | — | — | — | — | — | — | — | — | — | Planned | Before any new AI type |
 | IMP-H1-S8 | ✅ | — | Generic standard repair: immutable `source_unit_ref`, failures download (manage + sensitive-field redaction), refs claimed atomically at child apply | H1-S2, H1-S3 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H1-S6 | ✅ | — | Zero-value opening hits `AccountingDateGuard` | — | — | — | — | — | — | — | — | — | — | Planned | Confirm classification (master §4) |
-| IMP-H2-S0 | — | ✅ | Honest AI labeling on products AI import | — | — | — | — | — | — | — | — | — | — | Planned | — |
+| IMP-H2-S0 | — | ✅ | Honest labeling on products AI import until H9-S5 connects it to the assistant | — | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H2-S1 | ✅ | — | V2 create via `ProductService::create` (characterized) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H2-S2 | — | ✅ | Shared value normalization (remove duplicated regexes) | — | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H2-S3 | ✅ | — | Workbook UX parity (inspect/template/mapping) | — | — | — | — | — | — | — | — | — | — | Planned | — |
@@ -58,13 +58,24 @@
 | IMP-H8-S1 | ✅ | ✅ | Import Hub `/imports` (visual research first) | H3 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H8-S2 | ✅ | ✅ | Saved mapping presets (new table) | H8-S1 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H8-S3 | ✅ | ✅ | Entry points on entity pages | H8-S1 | — | — | — | — | — | — | — | — | — | Planned | — |
-| IMP-H9-S1 | — | ✅ | `AiImportSuggestionService` (real provider, dark) | H2-S1, H2-S2 | — | — | — | — | — | — | — | — | — | Planned | Activation = D-02 |
-| IMP-H9-S2 | — | ✅ | NL instruction → validated operation plan | H9-S1 | — | — | — | — | — | — | — | — | — | Planned | — |
-| IMP-H9-S3 | — | ✅ | Assistant tool `imports.open_action` (no approve/execute) | H9-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
-| IMP-H9-S4 | — | ✅ | Conversational repair | H9-S3 | — | — | — | — | — | — | — | — | — | Planned | — |
+| IMP-H9-S1 | — | ✅ | Read-only assistant import tools (`imports.action_status`, `imports.explain_failures`): counts/statuses/error codes only, new default-off `import_metadata` category | H1-S7, H2-S4 | — | — | — | — | — | — | — | — | — | Planned | No D-02 needed (no row values leave) |
+| IMP-H9-S2 | — | ✅ | `imports.suggest_mapping`: headers + ≤20 sample rows, `import_rows` category, `ai_suggested` version, adapter re-validates | H9-S1, H2-S5 | — | — | — | — | — | — | — | — | — | Blocked (D-02) for activation | Code ships dark |
+| IMP-H9-S3 | — | ✅ | NL operation plan as a closed-schema tool argument → new action version (no approve/execute) | H9-S1 | — | — | — | — | — | — | — | — | — | Planned | — |
+| IMP-H9-S4 | — | ✅ | `imports.start_repair` + conversational explanation | H9-S1, H1-S8 | — | — | — | — | — | — | — | — | — | Planned | — |
+| IMP-H9-S5 | — | ✅ | "Ask the assistant" entry on AI import screens; `ai_import` context in `context.ts` | H9-S1 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H10-S1 | ✅ | ✅ | Security/accounting/reliability sweep | H1–H9 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H10-S2 | ✅ | ✅ | Std↔AI parity suite | H1–H9 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H11-S1 | — | — | Closure report | all | — | — | — | — | — | — | — | — | — | Planned | — |
+
+## H0 correction record (IMP-H0-S2)
+
+Owner-confirmed and re-verified in code: the AWJ Assistant already contains real AI (Anthropic provider, tool-planning loop, consent, budget, audit, grounding). The H0 plan wrongly framed provider enablement as pending for the import path. **Corrected:** H9 now adds import tools to the existing assistant (no new provider, no second assistant, no change to AI settings); D-02 narrows to whether import row data may be sent to the model. The standard import is unaffected and stays independent of AI. See master plan §2.4 and H9.
+
+## H0 review record
+
+- **PR #1595:** 14 Codex review rounds produced 54 threads, every one answered and resolved. They are folded into master rules 7–12 and slices H1-S3/S7/S8, H2-S5, H4-S4, H5-S1/S3/S6, H6-S4 and H7-S4.
+- The final Codex pass on `323e6e4` stayed in "running" for more than an hour and never posted a result. The merge proceeded on green CI, a clean merge state and zero open threads.
+- **CI:** the PostgreSQL job on `323e6e4` hung in package install, before any test ran. It was cancelled and re-run once, then passed.
 
 ## Decision log
 
@@ -76,4 +87,4 @@
 
 | Merge SHA | Slice | Railway deploy observed? | Evidence | Notes |
 |---|---|---|---|---|
-| — | — | — | — | No agent access to Railway; the owner confirms deploys. |
+| `5e20e9e` | IMP-H0-S1 | Not observed | None (no agent access to Railway) | Docs only; any auto-deploy it triggers ships the code already on `main`. No agent access to Railway; the owner confirms deploys. |

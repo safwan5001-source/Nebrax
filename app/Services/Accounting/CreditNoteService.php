@@ -59,6 +59,7 @@ class CreditNoteService
         protected PrintTemplateService $printTemplates,
         protected CreditNoteOwnershipResolver $ownership,
         protected AccountRoleResolver $accountRoles,
+        protected ZatcaCreditNoteIssuer $zatcaIssuer,
     ) {}
 
     /**
@@ -137,6 +138,8 @@ class CreditNoteService
 
             $note->load('lines');
 
+            $invoice = null;
+
             // REM-02: إشعار المبيعات المرتبط بفاتورة يُعاد اشتقاقه **تحت قفل
             // الفاتورة** من المرحَّل فعلاً. مسوّدتان أُنشئتا معاً لا تعرف
             // إحداهما الأخرى، فالسقف التراكمي لا يُحسَم إلا هنا. ترتيب الأقفال:
@@ -175,7 +178,9 @@ class CreditNoteService
             $pdfAssignment = $this->printTemplates->resolve($documentType, 'pdf', $note->branch_id);
             $thermalAssignment = $this->printTemplates->resolve($documentType, 'thermal', $note->branch_id);
 
-            $note->update([
+            // الأعمدة تُحمَل في الذاكرة أولاً: الإصدار الإلكتروني (REM-18b-3c) يقرأ الإجماليات والحالة المرحَّلة ليبني المستند،
+            // ثم يُحفظ كل شيء في تحديث واحد يرضي السياج F2 (المدخل يسبق التحديث داخل المعاملة نفسها). القيد المحاسبي لا يُمسّ.
+            $note->fill([
                 'status'           => 'posted',
                 'print_template_revision_id' => $printAssignment?->print_template_revision_id,
                 'pdf_template_revision_id' => $pdfAssignment?->print_template_revision_id,
@@ -185,6 +190,13 @@ class CreditNoteService
                 'total'            => $total,
                 'journal_entry_id' => $entry->id,
             ]);
+
+            // مستأجر غير مفعَّل (لا ضابط/معطَّل/إيقاف طارئ) ⇒ null: الترحيل القديم حرفياً. مفعَّل ⇒ مستند كامل أو فشل مغلق.
+            $issuance = $isPurchase ? null : $this->zatcaIssuer->issue($note, $invoice);
+            if ($issuance !== null) {
+                $note->forceFill($issuance);
+            }
+            $note->save();
 
             return $note->fresh('lines');
         });

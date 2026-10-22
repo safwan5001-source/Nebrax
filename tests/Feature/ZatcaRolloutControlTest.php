@@ -280,7 +280,9 @@ class ZatcaRolloutControlTest extends TestCase
     {
         // لا مسار HTTP ولا متحكّم ولا استعمال في ترحيل أو سلسلة أو إرسال: النموذجان والخدمة تشغيليّة للمنصة.
         $allowed = ['ZatcaRolloutControl.php', 'ZatcaRolloutControlEvent.php', 'ZatcaRolloutControlService.php', 'ZatcaRolloutState.php',
-            'ZatcaRolloutChange.php', 'ZatcaRolloutControlException.php'];
+            'ZatcaRolloutChange.php', 'ZatcaRolloutControlException.php',
+            // REM-18b-3c: القارئ الوحيد على مسار الترحيل — قراءة فعّالة بلا قفل.
+            'ZatcaCreditNoteIssuer.php'];
         $hits = [];
         $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(base_path('app'), \FilesystemIterator::SKIP_DOTS));
         foreach ($files as $file) {
@@ -297,11 +299,14 @@ class ZatcaRolloutControlTest extends TestCase
             }
         }
 
-        // لا اتصال بمسارات الترحيل/السلسلة/الإرسال بعد.
+        // الضوابط يقرؤها المُصدِر وحده (REM-18b-3c)؛ لا خدمة ترحيل ولا سلسلة ولا إرسال تقرؤها مباشرةً.
         foreach (['CreditNoteService', 'InvoiceService', 'ZatcaService', 'ZatcaChainAllocator', 'ZatcaSubmissionService', 'ZatcaSubmissionDispatcher'] as $class) {
             $source = (string) file_get_contents(base_path("app/Services/Accounting/{$class}.php"));
-            $this->assertStringNotContainsString('ZatcaRollout', $source, "{$class} لا يقرأ الضوابط في هذه الشريحة");
+            $this->assertStringNotContainsString('ZatcaRollout', $source, "{$class} لا يقرأ الضوابط مباشرةً");
         }
+        $issuer = (string) file_get_contents(base_path('app/Services/Accounting/ZatcaCreditNoteIssuer.php'));
+        $this->assertStringContainsString('effectiveForTenant', $issuer);
+        $this->assertDoesNotMatchRegularExpression('/setTenantState|setPlatformState/', $issuer, 'المُصدِر يقرأ الضوابط ولا يكتبها');
 
         // الخدمة نفسها لا تستقبل إلا PlatformAdministrator للكتابة (لا مستخدم مستأجر).
         $method = new \ReflectionMethod(ZatcaRolloutControlService::class, 'setTenantState');

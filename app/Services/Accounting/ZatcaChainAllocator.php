@@ -16,7 +16,7 @@ use RuntimeException;
  * ═══════════════════════════════════════════════════════════════
  *  مخصِّص سلسلة ZATCA المشتركة (ICV/PIH) — REM-18b-2
  * ═══════════════════════════════════════════════════════════════
- *  المصدر الوحيد لـICV والهاش السابق (PIH) لكل مستند إلكتروني يصدر (الفاتورة اليوم؛ الإشعار الدائن في REM-18b-3).
+ *  المصدر الوحيد لـICV والهاش السابق (PIH) لكل مستند إلكتروني يصدر (الفاتورة؛ والإشعار الدائن 381 منذ REM-18b-3c).
  *  يحلّ محلّ قراءة `max(invoices.zatca_icv)` في `ZatcaService` ويكتب على مخطط REM-18b-1:
  *
  *    reserve()  داخل معاملة الترحيل وبعد قفل مِرساة المستأجر: قفل رأس السلسلة (أو إنشاؤه بذرةً من السجل القديم)،
@@ -89,6 +89,46 @@ class ZatcaChainAllocator
             'invoice_id' => $invoice->id,
             'type_code' => '388',
             'subtype' => (string) $invoice->zatca_document_type,
+            'zatca_uuid' => $uuid,
+            'previous_hash' => $slot->previousHash,
+            'hash' => $hash,
+            'signed' => $signed,
+            'issued_at' => $issuedAt,
+        ]);
+        $entry->tenant_id = $slot->tenantId;
+        $entry->save();
+
+        return $entry;
+    }
+
+    /**
+     * يسجّل الإشعار الدائن المُصدَر (381) في السلسلة المشتركة — REM-18b-3c. نظير `recordInvoice()` تماماً: يُستدعى في معاملة
+     * `reserve()` نفسها و**قبل** كتابة أعمدة ZATCA على الإشعار (السياج F2 يشترط مدخلاً مطابقاً، والمُشغّل T4 يُقدّم الرأس).
+     * لحظة الإصدار تُمرَّر صراحةً لأنها لم تُحفظ على الإشعار بعد (تُكتب في التحديث الذي يلي).
+     */
+    public function recordCreditNote(
+        ZatcaChainSlot $slot,
+        CreditNote $note,
+        string $classification,
+        string $uuid,
+        string $hash,
+        bool $signed,
+        CarbonInterface $issuedAt,
+    ): ZatcaChainEntry {
+        if ($note->tenant_id !== $slot->tenantId) {
+            throw new RuntimeException('الإشعار لا يخصّ مستأجر خانة السلسلة.');
+        }
+        if (! in_array($classification, ['standard', 'simplified'], true)) {
+            throw new RuntimeException('تصنيف مستند ZATCA غير معروف؛ لا يُسجَّل مدخل سلسلة.');
+        }
+
+        $entry = new ZatcaChainEntry([
+            'chain_id' => $slot->chainId,
+            'icv' => $slot->icv,
+            'document_type' => 'credit_note',
+            'credit_note_id' => $note->id,
+            'type_code' => '381',
+            'subtype' => $classification,
             'zatca_uuid' => $uuid,
             'previous_hash' => $slot->previousHash,
             'hash' => $hash,

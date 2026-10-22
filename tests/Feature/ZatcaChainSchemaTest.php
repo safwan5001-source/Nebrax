@@ -633,11 +633,11 @@ class ZatcaChainSchemaTest extends TestCase
     // ───────────────────────── لا ربط بالمسارات القائمة ─────────────────────────
 
     #[Test]
-    public function only_the_allocator_writes_the_chain_and_credit_notes_are_not_wired_yet(): void
+    public function only_the_allocator_and_its_issuers_write_the_chain(): void
     {
-        // REM-18b-2: المخصِّص هو الكاتب الوحيد (عبر ZatcaService للفواتير). الإشعارات الدائنة خارج السلسلة حتى REM-18b-3.
+        // المخصِّص هو الكاتب الوحيد: عبر ZatcaService للفواتير (REM-18b-2) وعبر ZatcaCreditNoteIssuer للإشعارات الدائنة النقدية (REM-18b-3c).
         // ZatcaIssuedDocumentIntegrity قارئ فقط (حارس ما قبل الإرسال) — يُتحقق من ذلك أدناه.
-        $allowed = ['ZatcaChain.php', 'ZatcaChainEntry.php', 'ZatcaChainAllocator.php', 'ZatcaChainSlot.php', 'ZatcaService.php', 'ZatcaIssuedDocumentIntegrity.php'];
+        $allowed = ['ZatcaChain.php', 'ZatcaChainEntry.php', 'ZatcaChainAllocator.php', 'ZatcaChainSlot.php', 'ZatcaService.php', 'ZatcaIssuedDocumentIntegrity.php', 'ZatcaCreditNoteIssuer.php'];
         $hits = [];
         $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(base_path('app'), \FilesystemIterator::SKIP_DOTS));
         foreach ($iterator as $file) {
@@ -662,7 +662,9 @@ class ZatcaChainSchemaTest extends TestCase
             $this->assertNotContains($column, $fillable, "{$column} لا يدخل \$fillable قبل REM-18b-3");
         }
         $service = (string) file_get_contents(base_path('app/Services/Accounting/CreditNoteService.php'));
-        $this->assertDoesNotMatchRegularExpression('/ZatcaChainAllocator|ZatcaCreditNoteXml|recordInvoice|->record\(/', $service, 'إصدار الإشعار معطّل في REM-18b-2');
+        // REM-18b-3c: الإصدار عبر ZatcaCreditNoteIssuer وحده؛ الخدمة لا تلمس المخصِّص ولا البانيّ مباشرةً.
+        $this->assertDoesNotMatchRegularExpression('/ZatcaChainAllocator|ZatcaCreditNoteXml|recordInvoice|recordCreditNote|->record\(/', $service, 'CreditNoteService لا يلمس السلسلة أو البانيّ مباشرةً');
+        $this->assertStringContainsString('ZatcaCreditNoteIssuer', $service);
     }
 
     // ───────────────────────── مساعدات ─────────────────────────
