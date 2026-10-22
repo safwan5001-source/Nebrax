@@ -15,7 +15,8 @@
 | `origin/main` وقت الكتابة | `06d438cd9c637f4d567098178db91707ea864508` (لم يُدمج في الفرع؛ لم يُطلب) |
 | Head قبل هذا الإصلاح | `014daabe3b5a8bb0775cd21f283e38da38b058fe` |
 | Head commit الإصلاح | `ef73c0017acf4568761b98302123a56e2208c6ef` |
-| Head النهائي للـPR | commit هذا التقرير فوق `ef73c00` (يُرى في `git log`) |
+| رأس الـPR وقت فحوص CI أدناه | `9c8cf7429629b3b9bd8b5d095d89c1bc6015c95b` |
+| Head النهائي للـPR | commit تحديث هذا القسم فوق `9c8cf74` (docs فقط؛ يُرى في `git log`) |
 
 ## 2. التعليق
 
@@ -65,7 +66,19 @@
 
 ## 5. CI
 
-**قيد التشغيل وقت كتابة هذا الإصدار** على `ef73c00`؛ لا أعدّ شيئاً منها نجاحاً قبل اكتماله. يُحدَّث هذا القسم بالنتائج الفعلية (مع التنبيه المعروف: CI Gate يقيّم عند الدقيقة 10 قبل اكتمال حزمة PHP فيحتاج إعادة تشغيل واحدة بعد اكتمال الفحوص).
+على الرأس `9c8cf7429629b3b9bd8b5d095d89c1bc6015c95b` (commit الإصلاح `ef73c00` + هذا التقرير بنسخته الأولى):
+
+| الفحص | النتيجة | الرابط |
+|---|---|---|
+| web build (Next.js) — Vitest + build (حدث push) | ✅ success | [job](https://github.com/safwan5001-source/Nebrax/actions/runs/39842117263/job/120045608853) |
+| web build (Next.js) (حدث pull_request) | ✅ success | [job](https://github.com/safwan5001-source/Nebrax/actions/runs/39842108115/job/120045578771) |
+| php artisan test (L11, sqlite) | ✅ success | [job](https://github.com/safwan5001-source/Nebrax/actions/runs/39842117205/job/120045610110) |
+| php artisan test (L11, pgsql) | ✅ success | [job](https://github.com/safwan5001-source/Nebrax/actions/runs/39842117205/job/120045609411) |
+| CI Gate | ✅ success (دون إعادة تشغيل) | [job](https://github.com/safwan5001-source/Nebrax/actions/runs/39842117372/job/120045609729) |
+
+لم يُعَد تشغيل أي فحص. هذه المرة اكتملت حزمة PHP خلال ~16 دقيقة وسجّل CI Gate نجاحه معها، فلم يظهر سباق مهلة الـ10 دقائق الذي حدث في جولات سابقة (انظر التقرير الأول §5).
+
+**ملاحظة:** هذا التقرير نفسه (وتحديثه هذا) تغييرٌ في `docs/` فقط؛ كل دفعة تعيد تشغيل CI على رأس جديد، ونتائج الجدول أعلاه للرأس `9c8cf74` المذكور. الكود الإنتاجي والاختبارات لم تتغيّر بين `ef73c00` وأي رأس لاحق.
 
 ## 6. حدود
 
