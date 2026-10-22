@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\UnitTemplate;
 use App\Support\ImportPlanDriftException;
+use App\Support\ImportUnitFailureException;
 use App\Support\ProductImportFields;
 use App\Support\SensitiveCostPolicy;
 use App\Support\Settings;
@@ -344,7 +345,11 @@ class ProductImportService
         $this->assertCostMappingAuthorized($parsed['mapping'], $costAuthorized);
 
         if ($parsed['error_rows'] > 0) {
-            throw new RuntimeException('لا يمكن تطبيق الاستيراد قبل معالجة الأخطاء الظاهرة في المعاينة.');
+            // IMP-H1-S8a: الرسالة نفسها حرفياً (نوعٌ فرعيّ من RuntimeException)، لكنه يحمل الوحدات الفاشلة بعينها لتسجّلها التشغيلة الدائمة.
+            throw new ImportUnitFailureException(
+                'لا يمكن تطبيق الاستيراد قبل معالجة الأخطاء الظاهرة في المعاينة.',
+                $this->rowFailures($parsed['rows'], (int) ($resolved['batch_offset'] ?? 0)),
+            );
         }
         if ($parsed['total_rows'] === 0) {
             throw new RuntimeException('لا يحتوي الملف صفوف بيانات قابلة للتطبيق.');
@@ -1664,6 +1669,29 @@ class ProductImportService
     // ═══════════════════════════════════════════════════════════════
     //  أدوات
     // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * وحدات النافذة الفاشلة (صفوف الأخطاء) بترتيبها بين صفوف البيانات الفعلية — لا تُسمّي الصفوف السليمة في النافذة نفسها.
+     *
+     * @param  list<array<string, mixed>>  $rows  صفوف النافذة كما أنتجها `parse()`
+     * @return list<array{ordinal: int, code: string, message: string}>
+     */
+    private function rowFailures(array $rows, int $batchOffset): array
+    {
+        $failures = [];
+        foreach (array_values($rows) as $position => $row) {
+            if (($row['valid'] ?? true) === true) {
+                continue;
+            }
+            $failures[] = [
+                'ordinal' => $batchOffset + $position,
+                'code' => 'row_invalid',
+                'message' => implode(' · ', array_map('strval', (array) ($row['messages'] ?? []))),
+            ];
+        }
+
+        return $failures;
+    }
 
     /**
      * @param  array<string, mixed>  $row

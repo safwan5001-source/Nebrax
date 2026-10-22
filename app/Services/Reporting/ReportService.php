@@ -3,6 +3,7 @@
 namespace App\Services\Reporting;
 
 use App\Models\Account;
+use App\Models\AccountBalance;
 use App\Models\Asset;
 use App\Models\CostCenter;
 use App\Models\CreditNote;
@@ -511,13 +512,15 @@ class ReportService
 
     /**
      * تدفقات نقدية بالطريقة المباشرة: يُجمع أثر النقد والبنك الفعلي لكل قيد
-     * مرحّل، فتُلغى التحويلات الداخلية بين الصندوق والبنك تلقائياً لأن صافيها صفر.
+     * مرحّل، فتُلغى التحويلات الداخلية بين أي خزينتين/بنكين تلقائياً لأن صافيها صفر.
+     * «النقد والبنك» = `CashAccountResolver` (كيانات الخزائن والبنوك ∪ 1110/1120).
      * التصنيف شفاف ومحدود: أصل ثابت = استثماري، مقابل حقوق ملكية = تمويلي، وما
      * عداه تشغيلي. لا تُشتق حركة نقدية من تغيّر الذمم أو اللقطات.
      */
     public function cashFlow(array $filters = []): array
     {
-        $cashAccounts = Account::whereIn('code', ['1110', '1120'])->pluck('id');
+        // TREASURY-T2: كل الحسابات المربوطة بخزائن/بنوك (المعطَّلة أيضاً لقيودها التاريخية) ∪ 1110/1120، لا الرمزين وحدهما.
+        $cashAccounts = app(CashAccountResolver::class)->accountIds();
         if ($cashAccounts->isEmpty()) {
             return $this->emptyCashFlow();
         }
@@ -571,6 +574,38 @@ class ReportService
             ...$results,
             'net_cash_flow' => $netCashFlow,
         ];
+    }
+
+    /**
+     * رصيد النقد والبنك الحالي (مؤشر لوحة التحكم): إجمالي فقط — لا أسماء حسابات ولا أرصدة لكل حساب.
+     *
+     * النطاق يتبع قاعدة الفروع في كل تقرير (`branchIds`): مستخدم غير مقيَّد بفرع ⇒ رصيد الشركة كله من لقطة `account_balances`
+     * ذاتها التي كان يقرؤها المؤشر السابق (كل الزمن والفروع)؛ مستخدم مقيَّد بفروع ⇒ مجموع قيود فروعه وحدها من الدفتر،
+     * فلا يرى بهذا المسار رقماً أوسع مما يراه في بقية التقارير. الأرصدة بالهللات.
+     *
+     * @return array{balance:int}
+     */
+    public function cashPosition(): array
+    {
+        $ids = app(CashAccountResolver::class)->accountIds();
+        if ($ids->isEmpty()) {
+            return ['balance' => 0];
+        }
+
+        $branchIds = $this->branchIds([]);
+        if ($branchIds === null) {
+            return ['balance' => (int) AccountBalance::query()->whereIn('account_id', $ids)->sum('balance')];
+        }
+
+        $net = JournalLine::query()
+            ->join('journal_entries as e', 'e.id', '=', 'journal_lines.journal_entry_id')
+            ->whereIn('e.status', ['posted', 'reversed'])
+            ->whereIn('journal_lines.account_id', $ids)
+            ->whereIn('journal_lines.branch_id', $branchIds)
+            ->selectRaw('COALESCE(SUM(journal_lines.debit), 0) - COALESCE(SUM(journal_lines.credit), 0) as net')
+            ->value('net');
+
+        return ['balance' => (int) $net];
     }
 
     /** @return array{operating:array, investing:array, financing:array, net_cash_flow:int} */

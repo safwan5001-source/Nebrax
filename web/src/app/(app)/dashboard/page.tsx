@@ -27,7 +27,7 @@ import { Registers } from '@/components/dashboard/registers';
 import { ReportFilters, EMPTY_FILTERS, filtersToQuery, type ReportFilterState } from '@/components/reports/report-filters';
 import { AwjGlobalSearch } from '@/components/dashboard/awj-global-search';
 import { api } from '@/lib/api';
-import { barPercent, dailySeries, expenseTone, netIncome, toNumber } from '@/lib/dashboard';
+import { barPercent, dailySeries, expenseTone, loadCashPosition, netIncome, toNumber, type CashPositionState } from '@/lib/dashboard';
 import { SAUDI_RIYAL_SYMBOL, formatNumberShort, formatRiyal, formatRiyalShort } from '@/lib/money';
 import { cn } from '@/lib/utils';
 
@@ -81,6 +81,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [income, setIncome] = useState<IncomeStatement | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  // مؤشر النقد مستقلّ عن بقية اللوحة: فشله لا يعطّلها ولا يُظهر صفراً (انظر `loadCashPosition`).
+  const [cashPosition, setCashPosition] = useState<CashPositionState>({ status: 'loading' });
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [inventoryValue, setInventoryValue] = useState<string>('0');
   const [mobileTab, setMobileTab] = useState<'activity' | 'invoices'>('activity');
@@ -108,8 +110,21 @@ export default function DashboardPage() {
       .finally(() => setLoading(false));
   }, [query]);
 
+  // TREASURY-T2: رصيد النقد والبنك من مجموعة الحسابات المربوطة بالخزائن والبنوك (∪ 1110/1120) — لا الرمزان وحدهما.
+  // طلبٌ مستقلّ لا يتبع المرشّحات (المؤشّر تراكمي)، ولا يدخل `Promise.all` فلا يُسقط بقية اللوحة عند فشله.
+  useEffect(() => {
+    let active = true;
+    loadCashPosition(() => api<{ balance: string }>('/reports/cash-position')).then((state) => {
+      if (active) setCashPosition(state);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const balanceOf = (code: string) => accounts.find((a) => a.code === code)?.balance ?? '0';
-  const cash = toNumber(balanceOf('1110')) + toNumber(balanceOf('1120'));
+  const cash = cashPosition.status === 'ready' ? cashPosition.balance : 0;
   const receivables = toNumber(balanceOf('1130'));
 
   const revenue = toNumber(income?.total_revenue);
@@ -170,7 +185,8 @@ export default function DashboardPage() {
           icon={Wallet}
           trend={spark.cash}
           trendLabel={t('spark_label')}
-          loading={loading}
+          loading={cashPosition.status === 'loading'}
+          unavailable={cashPosition.status === 'unavailable' ? t('cash_unavailable') : undefined}
         />
         </div>
         <div className="order-3 lg:order-2">

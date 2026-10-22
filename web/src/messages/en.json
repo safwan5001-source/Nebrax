@@ -1115,6 +1115,7 @@
     "net_income": "Net income",
     "receivables": "Receivables",
     "cash": "Cash & bank",
+    "cash_unavailable": "Balance unavailable",
     "revenue_vs_expense": "Revenue vs expenses",
     "recent_invoices": "Recent invoices",
     "expense": "Expenses",

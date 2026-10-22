@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * تشغيلة استيراد دائم — هوية الملف والتشغيلة قبل أي معالجة مجزّأة أو ربط
@@ -42,6 +43,12 @@ class ImportJob extends BaseModel implements CompanyWide
             'cancelled_at' => 'datetime',
             'purge_after' => 'datetime',
         ];
+    }
+
+    /** وحدات التشغيلة الفاشلة/غير المنجزة (IMP-H1-S8a). */
+    public function units(): HasMany
+    {
+        return $this->hasMany(ImportJobUnit::class, 'import_job_id');
     }
 
     public function creator(): BelongsTo
