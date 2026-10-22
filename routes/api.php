@@ -579,6 +579,7 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('import-jobs', [ImportJobController::class, 'index']);
         Route::get('import-jobs/{id}', [ImportJobController::class, 'show']);
         Route::get('import-jobs/{id}/failures', [ImportJobController::class, 'failures']);
+        Route::post('import-jobs/{id}/repairs', [ImportJobController::class, 'repair'])->middleware(EnsureImportFilesScanned::class);
         Route::post('import-jobs', [ImportJobController::class, 'store'])->middleware(EnsureImportFilesScanned::class);
         Route::post('import-jobs/{id}/cancel', [ImportJobController::class, 'cancel']);
         Route::post('import-jobs/{id}/apply', [ImportJobController::class, 'apply']);
@@ -1808,6 +1809,7 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('reports/journal-entries', [ReportController::class, 'journalEntries'])->middleware($perm('reports.view'));
         Route::get('reports/cash-flow', [ReportController::class, 'cashFlow'])->middleware($perm('reports.view'));
         Route::get('reports/cash-position', [ReportController::class, 'cashPosition'])->middleware($perm('reports.view'));
+        Route::get('reports/receivables-position', [ReportController::class, 'receivablesPosition'])->middleware($perm('reports.view'));
         Route::get('reports/tax-report', [ReportController::class, 'taxReport'])->middleware($perm('reports.view'));
         Route::get('reports/partner-statement/{partnerId}', [ReportController::class, 'partnerStatement'])->middleware($perm('reports.view'));
         Route::get('reports/aging/{type}', [ReportController::class, 'aging'])->middleware($perm('reports.view'));

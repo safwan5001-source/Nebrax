@@ -200,6 +200,12 @@ class ReportController extends ApiController
         return response()->json(['balance' => Money::toRiyal($this->reports->cashPosition()['balance'])]);
     }
 
+    /** إجمالي ذمم العملاء لمؤشر لوحة التحكم: رقم واحد، بنطاق فروع المستخدم كبقية التقارير. */
+    public function receivablesPosition(): JsonResponse
+    {
+        return response()->json(['balance' => Money::toRiyal($this->reports->receivablesPosition()['balance'])]);
+    }
+
     /** حركة ضريبة القيمة المضافة من حسابي المدخلات والمخرجات النظاميين. */
     public function taxReport(GeneralReportRequest $request): JsonResponse
     {

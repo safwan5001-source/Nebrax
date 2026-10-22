@@ -32,7 +32,10 @@ class PruneImportJobs extends Command
         $query = ImportJob::query()
             ->withoutGlobalScopes()
             ->whereIn('status', [ImportJobStatus::CANCELLED, ImportJobStatus::FAILED, ImportJobStatus::COMPLETED])
-            ->where('purge_after', '<', now());
+            ->where('purge_after', '<', now())
+            // IMP-H1-S8b: أمٌّ لها تشغيلة إصلاح فرعية لم تنتهِ تُحفَظ — حذفها يمسح وحداتها (cascade) ويُنزع ربط الطفل (`nullOnDelete`) فيعمل بلا مطالبة.
+            ->whereNotIn('id', ImportJob::query()->withoutGlobalScopes()->whereNotNull('parent_job_id')
+                ->whereIn('status', ImportJobStatus::UNFINISHED)->select('parent_job_id'));
 
         if ((bool) $this->option('dry-run')) {
             $this->line('تشغيلات مرشّحة للتقليم: ' . $query->count());

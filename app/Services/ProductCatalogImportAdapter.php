@@ -112,6 +112,11 @@ class ProductCatalogImportAdapter extends SpreadsheetImportAdapter implements Im
             $chunkOptions['expected_plan'] = $plan;
         }
 
+        // IMP-H1-S8b: تشغيلة إصلاح فرعية تنتزع معرّفات نافذتها ذرّياً **قبل** الكتابة وداخل معاملة القطعة نفسها (تتراجع معها عند الفشل).
+        if ($job->parent_job_id !== null) {
+            app(ImportRepairClaims::class)->claimWindow($job, (string) $chunk->file->getRealPath(), (string) $job->extension, $chunk->offset, $chunk->batchSize);
+        }
+
         $archive = $chunk->archiveTmpPath === null ? null : new UploadedFile(
             $chunk->archiveTmpPath,
             (string) $job->media_archive_original_filename,
