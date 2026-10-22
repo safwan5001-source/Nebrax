@@ -31,6 +31,9 @@ class CreditNote extends BaseModel
         'subtotal'   => 'integer',
         'tax_amount' => 'integer',
         'total'      => 'integer',
+        // REM-18b-3c: أعمدة ZATCA يكتبها المُصدِر وحده (ليست في $fillable)؛ التحويلان كما في الفاتورة.
+        'issued_at'      => \App\Support\UtcSecondInstant::class,
+        'party_snapshot' => 'array',
     ];
 
     protected $attributes = [

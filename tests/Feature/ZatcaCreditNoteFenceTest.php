@@ -634,14 +634,15 @@ class ZatcaCreditNoteFenceTest extends TestCase
     public function the_real_posting_service_is_unchanged_for_a_disabled_tenant_and_fails_closed_after_activation(): void
     {
         $auth = $this->registerTenant('f2-fence', 'owner@f2-fence.test');
-        $draft = $this->draftSourceNote($auth['token']);
+        $draft = $this->draftSourceNote($auth['token']); // refund_type=credit: غير مؤهَّل للإصدار
 
         $this->controls->setTenantState($this->admin, $auth['tenant_id'], true, 'تفعيل تجريبي للاختبار');
         app(TenantContext::class)->set($auth['tenant_id']);
         $this->assertSame(0, JournalEntry::where('source_type', CreditNote::class)->where('source_id', $draft)->count());
-        $e = $this->thrown(fn () => app(CreditNoteService::class)->post(CreditNote::findOrFail($draft)), 'مفعَّل بلا مُصدِر');
-        $this->assertInstanceOf(QueryException::class, $e);
-        $this->assertStringContainsString('explicit ZATCA issuance decision', $e->getMessage());
+        // REM-18b-3c: المستأجر المفعَّل وإشعاره غير المؤهَّل ⇒ رفض صريح من المُصدِر قبل أي كتابة ZATCA (لا ترحيل صامت بلا قرار).
+        $e = $this->thrown(fn () => app(CreditNoteService::class)->post(CreditNote::findOrFail($draft)), 'مفعَّل وغير مؤهَّل');
+        $this->assertInstanceOf(\App\Support\ZatcaCreditNoteIneligibleException::class, $e);
+        $this->assertSame('refund_type_unsupported', $e->reason);
 
         // الفشل مغلق بالكامل: لا قيد ولا ترحيل ولا قرار.
         $this->assertSame('draft', DB::table('credit_notes')->where('id', $draft)->value('status'));
@@ -655,10 +656,12 @@ class ZatcaCreditNoteFenceTest extends TestCase
     }
 
     #[Test]
-    public function the_service_and_model_are_not_wired_to_the_fences(): void
+    public function the_service_reaches_the_fences_only_through_the_issuer(): void
     {
         $service = (string) file_get_contents(base_path('app/Services/Accounting/CreditNoteService.php'));
-        $this->assertDoesNotMatchRegularExpression('/ZatcaRollout|ZatcaChain|zatca_status|ZatcaCreditNoteXml/', $service, 'لا إصدار ولا قراءة ضوابط في خدمة الإشعار');
+        // REM-18b-3c: الخدمة تستدعي المُصدِر وحده؛ لا قراءة ضوابط ولا سلسلة ولا بانيّ ولا قرار مباشر فيها.
+        $this->assertDoesNotMatchRegularExpression('/ZatcaRollout|ZatcaChain|zatca_status|ZatcaCreditNoteXml/', $service, 'لا ضوابط ولا سلسلة في خدمة الإشعار');
+        $this->assertStringContainsString('ZatcaCreditNoteIssuer', $service);
         foreach (self::ZATCA_COLUMNS as $column) {
             $this->assertNotContains($column, (new CreditNote())->getFillable(), $column);
         }
