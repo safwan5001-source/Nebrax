@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { login } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
+import { startDemoSession } from '@/lib/demo-session';
 
 const schema = z.object({
   email: z.string().email(),
@@ -27,19 +28,35 @@ export default function LoginPage() {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
   const [showPw, setShowPw] = useState(false);
+  // الدخول التجريبي والحقيقي متنافيان. المرجع متزامن (يقرؤه استمرار `await login()`)، والحالة لتعطيل الواجهة.
+  const demoStartedRef = useRef(false);
+  const [demoStarted, setDemoStarted] = useState(false);
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({ resolver: zodResolver(schema) });
 
+  function onDemoStart() {
+    demoStartedRef.current = true;
+    setDemoStarted(true);
+  }
+
   async function onSubmit(values: FormValues) {
+    if (demoStartedRef.current) return; // اختار المستخدم المعاينة: لا تسجيل دخول حقيقي بعدها
     setServerError(null);
     try {
       const user = await login(values.email, values.password);
+      if (demoStartedRef.current) {
+        // بدأت المعاينة أثناء الطلب المعلّق (الواجهة تمنعه، وهذا شبكة أمان للتسابق): `login()` كتب للتوّ توكن
+        // الحساب الحقيقي ومستخدمه، فتُمسح وتُعاد المعاينة نظيفة بدل أن تنتهي الجلسة على المستأجر الحقيقي.
+        startDemoSession();
+        return;
+      }
       // دور الخدمة الذاتية بلا صلاحياتٍ على شاشات الإدارة — بوابته المخصَّصة.
       router.replace(user.role === 'self_service' ? '/me' : '/dashboard');
     } catch (error) {
+      if (demoStartedRef.current) return; // فشل طلب متأخر لا يُظهر خطأً فوق المعاينة
       setServerError(error instanceof ApiError ? error.message : t('error'));
     }
   }
@@ -103,7 +120,7 @@ export default function LoginPage() {
 
           {serverError && <p className="border border-negative/20 bg-negative/10 px-3 py-2 text-xs text-negative" role="alert">{serverError}</p>}
 
-          <Button type="submit" className="h-12 w-full text-base" disabled={isSubmitting} aria-busy={isSubmitting}>
+          <Button type="submit" className="h-12 w-full text-base" disabled={isSubmitting || demoStarted} aria-busy={isSubmitting}>
             {isSubmitting ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
             {isSubmitting ? t('submitting') : t('submit')}
           </Button>
@@ -112,7 +129,7 @@ export default function LoginPage() {
           </Link>
         </form>
 
-        <DemoLoginButton />
+        <DemoLoginButton disabled={isSubmitting || demoStarted} onStart={onDemoStart} />
       </section>
 
       <footer className="pt-5 text-center">

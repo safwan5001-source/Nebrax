@@ -69,3 +69,31 @@ test.describe(enabled ? 'DEMO_PREVIEW=true' : 'DEMO_PREVIEW غير مفعَّل'
     expect(logoutRequests).toEqual([]);
   });
 });
+
+// تسابق الدخول الحقيقي المعلّق مع الدخول التجريبي: الزر معطَّل ما دام الطلب معلّقاً، ويعود بعد الفشل.
+test('دخول حقيقي معلّق: «دخول تجريبي» معطَّل، ثم يعود بعد الاكتمال', async ({ page }) => {
+  test.skip(!enabled, 'الزر غير مبنيّ في هذا التشغيل');
+  let releaseLogin: () => void = () => {};
+  const loginGate = new Promise<void>((resolve) => { releaseLogin = resolve; });
+  await page.route(/\/api\/login$/, async (route) => {
+    await loginGate;
+    await route.fulfill({ status: 422, contentType: 'application/json', body: JSON.stringify({ message: 'بيانات غير صحيحة' }) });
+  });
+
+  await page.goto(`${baseUrl}/login`, { waitUntil: 'load' });
+  const demo = page.getByRole('button', { name: 'دخول تجريبي' });
+  await expect(demo).toBeEnabled();
+
+  await page.locator('#login-email').fill('owner@acme.sa');
+  await page.locator('#login-password').fill('secret-password');
+  await page.getByRole('button', { name: 'دخول', exact: true }).click();
+
+  await expect(demo).toBeDisabled(); // الطلب معلّق
+  expect(await page.evaluate(() => localStorage.getItem('demo'))).toBeNull();
+  await expect(page).toHaveURL(/\/login/);
+
+  releaseLogin();
+  await expect(page.locator('form [role="alert"]')).toContainText('بيانات غير صحيحة');
+  await expect(demo).toBeEnabled();
+  expect(await page.evaluate(() => localStorage.getItem('demo'))).toBeNull();
+});

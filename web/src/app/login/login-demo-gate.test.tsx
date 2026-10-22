@@ -34,6 +34,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  localStorage.clear(); // jsdom مشترك بين الملفات: لا يُترك مستخدم/توكن لاختبارات أخرى
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
 });

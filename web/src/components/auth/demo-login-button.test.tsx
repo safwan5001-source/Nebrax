@@ -49,6 +49,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  localStorage.clear(); // jsdom مشترك بين الملفات: لا يُترك مستخدم/توكن لاختبارات أخرى
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
 });
@@ -97,6 +98,42 @@ describe('DemoLoginButton — الدخول التجريبي', () => {
     cleanup();
     renderButton('en');
     expect(screen.getByRole('button', { name: enMessages.login.demo })).toBeTruthy();
+  });
+
+  it('معطَّلاً (disabled): لا يبدأ معاينة ولا يستدعي onStart ولا يمسح الجلسة', async () => {
+    seedRealSession();
+    const onStart = vi.fn();
+    render(
+      <NextIntlClientProvider locale="ar" messages={{ login: arMessages.login } as never}>
+        <DemoLoginButton disabled onStart={onStart} />
+      </NextIntlClientProvider>,
+    );
+    const button = screen.getByRole('button', { name: arMessages.login.demo }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+
+    await userEvent.click(button);
+
+    expect(onStart).not.toHaveBeenCalled();
+    expect(isDemo()).toBe(false);
+    expect(getToken()).toBe(REAL_TOKEN);
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it('onStart يُستدعى مرة واحدة قبل مسح الجلسة', async () => {
+    seedRealSession();
+    let tokenAtOnStart: string | null = null;
+    const onStart = vi.fn(() => { tokenAtOnStart = getToken(); });
+    render(
+      <NextIntlClientProvider locale="ar" messages={{ login: arMessages.login } as never}>
+        <DemoLoginButton onStart={onStart} />
+      </NextIntlClientProvider>,
+    );
+
+    await pressDemo();
+
+    expect(onStart).toHaveBeenCalledTimes(1);
+    expect(tokenAtOnStart).toBe(REAL_TOKEN); // القفل يسبق التنظيف
+    expect(isDemo()).toBe(true);
   });
 
   it('يفعّل المعاينة وينتقل إلى /dashboard بلا أي طلب شبكة ولا توكن', async () => {
