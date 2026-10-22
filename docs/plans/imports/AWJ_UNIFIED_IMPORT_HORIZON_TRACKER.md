@@ -42,19 +42,19 @@
 | IMP-H4-S1 | ✅ | via H4-S4 | Categories (hierarchy) + brands import (adapter + standard) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H4-S2 | ✅ | via H4-S4 | Price-list items import (adapter + standard) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H4-S3 | ✅ | ⛔ D-08 | Unit templates (create-only; AI excluded by D-08) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
-| IMP-H4-S4 | — | ✅ | AI Actions `product_taxonomy_import.v1` + `price_list_item_import.v1` (separate gates) + parity | H4-S1, H4-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
+| IMP-H4-S4 | — | ✅ | AI Actions `product_taxonomy_import.v1` + `price_list_item_import.v1` (separate gates) + parity | H4-S1, H4-S2, **IMP-X-01 (blocking)** | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H5-S1 | ✅ | — | Expense adapter (drafts, derived tax, `import_document_reservations` with full-predicate key; reference-less fallback key + explicit distinct confirmation) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H5-S2 | ✅ | — | Expense UI + durable domain | H5-S1 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H5-S3 | ✅ | — | Purchase adapter (grouped drafts with required `supplier_invoice_ref`, derived totals, `import_document_reservations` owned by the document services (create/update re-key/delete), `duplicate_reference_policy` allow|block, PG concurrency test) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H5-S4 | ✅ | — | Purchase UI + durable domain | H5-S3 | — | — | — | — | — | — | — | — | — | Planned | — |
-| IMP-H5-S5 | — | ✅ | AI Action types `expense_import.v1` / `purchase_import.v1` | H5-S1, H5-S3 | — | — | — | — | — | — | — | — | — | Planned | — |
+| IMP-H5-S5 | — | ✅ | AI Action types `expense_import.v1` / `purchase_import.v1` | H5-S1, H5-S3, **IMP-X-01 (blocking)** | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H5-S6 | — | ✅ | Document Center builders: financial perm+app gates, adapter validation + reservations; cross-source dup test (PG); entry link | H5-S1, H5-S3 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H6-S1..S3 | ✅ | — | Sales invoice drafts (no post, no ZATCA; one atomic transaction; shared quota lock for direct + import paths) | **D-03** | — | — | — | — | — | — | — | — | — | Blocked (D-03) | Skip to H7 until decided |
 | IMP-H6-S4 | — | ✅ | AI Action `sales_invoice_import.v1` (atomic, quota protocol, parity) | **D-03**, H6-S1..S3, H1-S7 | — | — | — | — | — | — | — | — | — | Blocked (D-03) | — |
 | IMP-H7-S1 | ✅ | — | Stocktake count-sheet import (whole sheet atomic, stocktake lock) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
-| IMP-H7-S2 | — | ✅ | AI path for inventory opening | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
+| IMP-H7-S2 | — | ✅ | AI path for inventory opening | H1-S2, **IMP-X-01 (blocking)** | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H7-S3 | ✅ | ⛔ D-09 | Stock permit lines import (drafts; AI excluded by D-09) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
-| IMP-H7-S4 | — | ✅ | AI Action `stocktake_count_import.v1` + parity + PG lock test | H7-S1, H1-S7 | — | — | — | — | — | — | — | — | — | Planned | — |
+| IMP-H7-S4 | — | ✅ | AI Action `stocktake_count_import.v1` + parity + PG lock test | H7-S1, H1-S7, **IMP-X-01 (blocking)** | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H8-S1 | ✅ | ✅ | Import Hub `/imports` (visual research first) | H3 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H8-S2 | ✅ | ✅ | Saved mapping presets (new table) | H8-S1 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H8-S3 | ✅ | ✅ | Entry points on entity pages | H8-S1 | — | — | — | — | — | — | — | — | — | Planned | — |
