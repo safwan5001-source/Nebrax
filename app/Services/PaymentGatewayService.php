@@ -295,20 +295,8 @@ final class PaymentGatewayService
                     break;
 
                 default: // revoked
-                    // الإلغاء يمحو الأسرار فيستحيل حسم/مطابقة أي محاولة قد تلتقط لدى المزوّد: الجارية، وكل محاولة غير ملتقطة (ملغاة/منتهية/فاشلة/ملغاة التفويض)
-                    // لها مرجع مزوّد ما دامت صفحة دفعها المستضافة قائمة (لا انتهاء معلوم أو لم يحن بعد) لأن المزوّد قد يؤكد لاحقاً تفويضاً/التقاطاً فيلزم رصده
-                    // (D-15 وتعارض الحالة). الإيقاف المؤقت بديل يُبقي الأسرار.
-                    $remotelyActionable = PaymentAttempt::query()
-                        ->where('payment_gateway_id', $locked->getKey())
-                        ->where(function ($query) {
-                            $query->whereIn('capture_status', PaymentAttempt::ACTIVE_STATUSES)
-                                ->orWhere(function ($closed) {
-                                    $closed->where('capture_status', '!=', PaymentAttempt::STATUS_CAPTURED)
-                                        ->whereNotNull('provider_payment_id')
-                                        ->where(fn ($expiry) => $expiry->whereNull('expires_at')->orWhere('expires_at', '>', now()));
-                                });
-                        })
-                        ->exists();
+                    // الإلغاء يمحو الأسرار فيستحيل حسم/مطابقة أي محاولة قد تلتقط لدى المزوّد (انظر `hasReconcilableAttempts`). الإيقاف المؤقت بديل يُبقي الأسرار.
+                    $remotelyActionable = $locked->hasReconcilableAttempts();
                     if ($remotelyActionable) {
                         throw new PaymentGatewayException(
                             'gateway.has_active_attempts',
@@ -344,6 +332,18 @@ final class PaymentGatewayService
     private function applyCredentials(PaymentGateway $gateway, array $input, int $graceMinutes, ?User $actor): array
     {
         $rotated = [];
+
+        // أسرار الاستدعاء (المفتاح السري وملحقاته) لا تتغيّر ما دامت لمحاولات الاتصال مراجع قد يلزم الوصول إليها بالأسرار الحالية؛
+        // سر الـwebhook خارج الحظر لأن له نافذة سماح. لا يُتخطّى الحظر إلا بانتهاء صفحات الدفع القائمة أو إغلاقها.
+        if ((array_key_exists('secret_key', $input) || array_key_exists('extra_credentials', $input))
+            && ($this->nullableString($input['secret_key'] ?? $gateway->secret_key) !== $gateway->secret_key
+                || (array_key_exists('extra_credentials', $input) && $this->normalizeExtra($input['extra_credentials']) !== $gateway->extra_credentials))
+            && $gateway->hasReconcilableAttempts()) {
+            throw new PaymentGatewayException(
+                'gateway.rotation_blocked',
+                'لا تُدوَّر أسرار الاستدعاء لاتصال له محاولات دفع جارية أو صفحات دفع لم تنتهِ بعد؛ انتظر انتهاءها أو أغلقها.'
+            );
+        }
 
         if (array_key_exists('webhook_secret', $input)) {
             $new = $this->nullableString($input['webhook_secret']);

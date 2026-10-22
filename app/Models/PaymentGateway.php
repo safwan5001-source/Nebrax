@@ -172,6 +172,26 @@ class PaymentGateway extends BaseModel implements CompanyWide
         return ! in_array($this->provider, [self::PROVIDER_CUSTOM, 'fake'], true);
     }
 
+    /**
+     * هل لمحاولات الدفع على هذا الاتصال ما قد يُلتقط لدى المزوّد ويلزم رصده بأسراره الحالية؟ الجارية، وكل محاولة غير ملتقطة لها مرجع مزوّد
+     * ما دامت صفحة دفعها المستضافة قائمة (لا انتهاء معلوم أو لم يحن بعد): التفويض/الالتقاط المتأخر (D-15 وتعارض الحالة) يُرصد بالمطابقة.
+     * يمنع إلغاء الاعتماد (يمحو الأسرار) وتدوير أسرار المزوّد (قد يغيّر الحساب فيستحيل الوصول إلى مرجع قائم).
+     */
+    public function hasReconcilableAttempts(): bool
+    {
+        return PaymentAttempt::query()
+            ->where('payment_gateway_id', $this->getKey())
+            ->where(function ($query) {
+                $query->whereIn('capture_status', PaymentAttempt::ACTIVE_STATUSES)
+                    ->orWhere(function ($closed) {
+                        $closed->where('capture_status', '!=', PaymentAttempt::STATUS_CAPTURED)
+                            ->whereNotNull('provider_payment_id')
+                            ->where(fn ($expiry) => $expiry->whereNull('expires_at')->orWhere('expires_at', '>', now()));
+                    });
+            })
+            ->exists();
+    }
+
     /** مفعّلة تشغيلياً: حالة active **و**مفتاح التشغيل القديم مفعّل. */
     public function isUsable(): bool
     {

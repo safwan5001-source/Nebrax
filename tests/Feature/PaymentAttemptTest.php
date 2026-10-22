@@ -314,6 +314,29 @@ class PaymentAttemptTest extends TestCase
         $this->assertSame(PaymentGateway::STATUS_REVOKED, $gateways->revoke($this->gateway->fresh(), $this->owner, 'بعد الانتهاء')->status);
     }
 
+    #[Test]
+    public function call_credentials_are_not_rotated_while_attempts_can_still_be_reconciled_but_the_webhook_secret_can(): void
+    {
+        $gateways = app(PaymentGatewayService::class);
+        $attempt = $this->orchestrator->start(new TestPayable, $this->gateway, 'idem-key-0041');
+
+        foreach (['secret_key' => ['secret_key' => 'sk_new_value'], 'extra_credentials' => ['extra_credentials' => ['account' => 'acct_other']]] as $label => $input) {
+            $e = $this->thrown(fn () => $gateways->rotateCredentials($this->gateway->fresh(), $input, 0, $this->owner), $label, \App\Support\PaymentGatewayException::class);
+            $this->assertSame('gateway.rotation_blocked', $e->reason, $label);
+        }
+        // الـupdate القديم للأسرار لا يلتف على الحظر أيضاً.
+        $this->thrown(fn () => $gateways->update($this->gateway->fresh(), ['secret_key' => 'sk_via_update'], $this->owner), 'update path', \App\Support\PaymentGatewayException::class);
+
+        // سر الـwebhook له نافذة سماح فيبقى مسموحاً.
+        $rotated = $gateways->rotateCredentials($this->gateway->fresh(), ['webhook_secret' => 'whsec_new'], 30, $this->owner);
+        $this->assertSame(2, $rotated->credential_version);
+
+        // بعد التقاط المحاولة يصح تدوير المفتاح.
+        $this->fake->script($attempt->provider_payment_id, 'captured');
+        $this->orchestrator->sync($attempt);
+        $this->assertSame(3, $gateways->rotateCredentials($this->gateway->fresh(), ['secret_key' => 'sk_new_value'], 0, $this->owner)->credential_version);
+    }
+
     // ═══════════════ ضابط التفعيل ═══════════════
 
     #[Test]
