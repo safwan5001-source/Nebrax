@@ -14,6 +14,21 @@ namespace App\Support;
  */
 final class ImportJobDomain
 {
+    /**
+     * بوابات كل مجال — **تطابق حرفياً** بوابات واجهة الإنشاء المباشرة لكيان المجال (IMP-H1-S1):
+     * `view`/`manage` صلاحيتا RBAC، و`app` مفتاح القدرة في `ApplicationCatalog` (أو `null` إن لم تُبوَّب
+     * الواجهة المباشرة بقدرة). مصدر واحد: كل مجال جديد **يجب** أن يعلن هنا بواباته قبل تسجيله في
+     * `values()` — يحرس ذلك `ImportJobAuthorizationTest` (لا مجال بلا بوابات، فلا يرث مجالٌ صلاحيات المنتجات).
+     *
+     * @var array<string, array{view: string, manage: string, app: ?string}>
+     */
+    private const AUTHORIZATION = [
+        self::PRODUCT_CATALOG => ['view' => 'products.view', 'manage' => 'products.manage', 'app' => null],
+        self::PRODUCT_WORKBOOK => ['view' => 'products.view', 'manage' => 'products.manage', 'app' => null],
+        // `inventory-openings/import/*` المباشرة محروسة بـ`inventory.core` (routes/api.php).
+        self::INVENTORY_OPENING => ['view' => 'products.view', 'manage' => 'products.manage', 'app' => 'inventory.core'],
+    ];
+
     public const PRODUCT_CATALOG = 'product_catalog';
 
     public const PRODUCT_WORKBOOK = 'product_workbook';
@@ -28,5 +43,16 @@ final class ImportJobDomain
             self::PRODUCT_WORKBOOK,
             self::INVENTORY_OPENING,
         ];
+    }
+
+    /**
+     * @return array{view: string, manage: string, app: ?string}
+     *
+     * @throws \InvalidArgumentException لمجال غير معلن — فشلٌ مغلق لا بوابة افتراضية.
+     */
+    public static function authorization(string $domain): array
+    {
+        return self::AUTHORIZATION[$domain]
+            ?? throw new \InvalidArgumentException("لا بوابات معلنة لمجال الاستيراد: {$domain}");
     }
 }

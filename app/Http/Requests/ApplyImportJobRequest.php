@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Services\ImportJobAccess;
 use App\Services\ProductImportService;
 use App\Support\InventoryOpeningFields;
 use App\Support\ProductImportFields;
@@ -31,8 +32,14 @@ use Illuminate\Validation\Rule;
  */
 class ApplyImportJobRequest extends FormRequest
 {
+    /**
+     * IMP-H1-S1 — أرضية الصلاحية فقط (إدارة أي مجال استيراد) قبل التحقق من الخيارات؛ البوابة الفعلية لمجال التشغيلة
+     * (صلاحية + قدرة) في المتحكّم بعد البحث عنها — مرة واحدة. تشغيلة غير موجودة/من مستأجر آخر: 404 هناك.
+     */
     public function authorize(): bool
     {
+        app(ImportJobAccess::class)->assertManageAny($this);
+
         return true;
     }
 

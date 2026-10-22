@@ -9,6 +9,7 @@ use App\Models\JournalLine;
 use App\Models\Product;
 use App\Models\ProductWarehouseStock;
 use App\Models\StockMovement;
+use App\Models\TenantApplicationState;
 use App\Models\Warehouse;
 use App\Services\ImportJobService;
 use App\Support\ImportJobStatus;
@@ -400,6 +401,13 @@ class ImportJobInventoryOpeningApplyTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        // مستأجر أُدرج خاماً بعد تاريخ القطع: `inventory.core` معطّلة افتراضياً له،
+        // وبوابة المجال (IMP-H1-S1) تفرضها على `/import-jobs` كما على المسار المباشر.
+        TenantApplicationState::updateOrCreate(
+            ['application_key' => 'inventory.core'],
+            ['requested_enabled' => true, 'status' => 'enabled'],
+        );
 
         $warehouse = Warehouse::create(['name' => 'مستودع القفل', 'code' => 'WH-LOCK']);
         Product::create([
