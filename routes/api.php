@@ -579,6 +579,7 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('import-jobs', [ImportJobController::class, 'index']);
         Route::get('import-jobs/{id}', [ImportJobController::class, 'show']);
         Route::get('import-jobs/{id}/failures', [ImportJobController::class, 'failures']);
+        Route::post('import-jobs/{id}/repairs', [ImportJobController::class, 'repair'])->middleware(EnsureImportFilesScanned::class);
         Route::post('import-jobs', [ImportJobController::class, 'store'])->middleware(EnsureImportFilesScanned::class);
         Route::post('import-jobs/{id}/cancel', [ImportJobController::class, 'cancel']);
         Route::post('import-jobs/{id}/apply', [ImportJobController::class, 'apply']);

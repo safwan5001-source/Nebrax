@@ -52,6 +52,7 @@ class ImportJobService
         ?array $options = null,
         ?string $previewId = null,
         ?string $previewHash = null,
+        ?string $parentJobId = null,
     ): ImportJob
     {
         $idempotencyKey = $idempotencyKey !== null && trim($idempotencyKey) !== '' ? trim($idempotencyKey) : null;
@@ -84,7 +85,7 @@ class ImportJobService
         if ($idempotencyKey !== null) {
             $existing = ImportJob::query()->where('idempotency_key', $idempotencyKey)->first();
             if ($existing) {
-                return $this->assertSameRequestOrFail($existing, $domain, $sha256, $archiveSha256, $branchId, $previewId, $previewHash, $canonical);
+                return $this->assertSameRequestOrFail($existing, $domain, $sha256, $archiveSha256, $branchId, $previewId, $previewHash, $canonical, $parentJobId);
             }
         }
 
@@ -124,10 +125,11 @@ class ImportJobService
             // PostgreSQL «فاشلة» فيفشل حتى استعلام SELECT البريء بعدها
             // مباشرة (25P02). `DB::transaction()` يتراجع تلقائياً عند أي
             // استثناء قبل إعادة رميه، فيعيد الاتصال صالحاً للاستعلام التالي.
-            $job = DB::transaction(function () use ($preview, $id, $branchId, $domain, $idempotencyKey, $file, $stored, $sha256, $mediaArchive, $storedArchive, $archiveSha256, $userId, $canonical, $previewHash) {
+            $job = DB::transaction(function () use ($preview, $id, $branchId, $domain, $idempotencyKey, $file, $stored, $sha256, $mediaArchive, $storedArchive, $archiveSha256, $userId, $canonical, $previewHash, $parentJobId) {
                 $created = ImportJob::create([
                 'id' => $id,
                 'branch_id' => $branchId,
+                'parent_job_id' => $parentJobId,
                 'domain' => $domain,
                 'status' => ImportJobStatus::UPLOADED,
                 'idempotency_key' => $idempotencyKey,
@@ -178,7 +180,7 @@ class ImportJobService
                 throw $e;
             }
 
-            return $this->assertSameRequestOrFail($existing, $domain, $sha256, $archiveSha256, $branchId, $previewId, $previewHash, $canonical);
+            return $this->assertSameRequestOrFail($existing, $domain, $sha256, $archiveSha256, $branchId, $previewId, $previewHash, $canonical, $parentJobId);
         } catch (Throwable $e) {
             // أي إخفاقٍ آخر في الإدراج (مثلاً حُذف الفرع بعد أن تحقّق منه `SetBranch` فيرفض قيد الـFK `branch_id`): الملف وأرشيف
             // الصور خُزِّنا قبل الإدراج ولا سجلّ يشير إليهما — يُحذفان قبل إعادة الرمي فلا يبقى كائنٌ يتيمٌ للأبد.
@@ -213,8 +215,10 @@ class ImportJobService
         ?string $previewId = null,
         ?string $previewHash = null,
         array $canonical = [],
+        ?string $parentJobId = null,
     ): ImportJob {
-        $differentBinding = $existing->preview_id !== $previewId
+        $differentBinding = $existing->parent_job_id !== $parentJobId
+            || $existing->preview_id !== $previewId
             || $existing->preview_hash !== $previewHash
             // الخيارات المجمَّدة تُقارَن فقط حين التشغيلة القائمة مربوطةٌ بمعاينة (غيرها تُجمَّد عند أول apply).
             // `apply_options` تحمل بعد أول قطعة مفتاح `batch_size` التشغيلي أيضاً — تُقارَن قانونياً (المفاتيح الدلالية وحدها).
