@@ -55,7 +55,7 @@ PR #1609 على Head `c3a6272`: SQLite وPostgreSQL ناجحان، CI Gate نا�
 ## Merge / Post-merge
 
 - Merge: دمجه المالك — SHA `b6cf409b102f80ac06a2a5ab49105b8b3c792fa3`. لا Deploy.
-- POST_MERGE_REVIEW: @@POST2@@
+- POST_MERGE_REVIEW: **PASS** — CI على `main` للـMerge SHA (تشغيل push `39819396640`): SQLite وPostgreSQL ناجحان. لا انحدار.
 
 ## Self-review
 
