@@ -63,6 +63,11 @@ class ProductCatalogImportAdapter extends SpreadsheetImportAdapter
             'batch_offset' => $chunk->offset,
             'batch_size' => $chunk->batchSize,
         ]);
+        // IMP-H1-S3c: تشغيلةٌ مربوطةٌ بمعاينةٍ تحمل خطّتها؛ كل قطعة تتحقق أن صفوف نافذتها ما زالت تفعل ما اعتُمد (plan_drift).
+        $plan = ImportPreviewService::decodePlan($job->apply_plan);
+        if ($plan !== null) {
+            $chunkOptions['expected_plan'] = $plan;
+        }
 
         $archive = $chunk->archiveTmpPath === null ? null : new UploadedFile(
             $chunk->archiveTmpPath,

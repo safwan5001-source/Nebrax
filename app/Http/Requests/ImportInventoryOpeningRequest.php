@@ -33,6 +33,9 @@ class ImportInventoryOpeningRequest extends FormRequest
             'notes'           => ['sometimes', 'nullable', 'string', 'max:500'],
             'mapping'         => ['sometimes', 'array', 'max:' . InventoryOpeningImportService::MAX_COLUMNS],
             'mapping.*'       => ['nullable', 'string', Rule::in(array_merge(InventoryOpeningFields::keys(), ['ignore']))],
+            // IMP-H1-S3c — ربط التنفيذ المتزامن بمعاينته: المعرّف والبصمة معاً أو لا شيء.
+            'preview_id' => ['sometimes', 'nullable', 'uuid', 'required_with:preview_hash'],
+            'preview_hash' => ['sometimes', 'nullable', 'string', 'size:64', 'required_with:preview_id'],
         ];
     }
 

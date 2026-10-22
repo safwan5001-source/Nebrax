@@ -21,7 +21,7 @@ class ImportJob extends BaseModel implements CompanyWide
         'media_archive_original_filename', 'media_archive_mime_type',
         'media_archive_byte_size', 'media_archive_storage_path', 'media_archive_content_sha256',
         'row_count', 'column_count', 'error_message',
-        'processed_rows', 'apply_options', 'apply_result',
+        'processed_rows', 'apply_options', 'apply_plan', 'apply_result',
         'created_by', 'cancelled_by',
         'queued_at', 'started_at', 'finished_at', 'cancelled_at', 'purge_after',
     ];
