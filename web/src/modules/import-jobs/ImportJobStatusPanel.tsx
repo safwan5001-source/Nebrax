@@ -28,12 +28,15 @@ export function ImportJobStatusPanel({
   networkUncertain = false,
   onCancel,
   cancelling = false,
+  onOpenParent,
 }: {
   job: ImportJob;
   atomic: boolean;
   networkUncertain?: boolean;
   onCancel?: () => void;
   cancelling?: boolean;
+  /** يفتح التشغيلة الأم لتشغيلة إصلاح فرعية (وحداتها التي لم يشملها الملف المصحَّح تبقى هناك). */
+  onOpenParent?: (parentId: string) => void;
 }) {
   const t = useTranslations('importJobs');
   const canCancel = Boolean(onCancel) && CANCELLABLE_STATUSES.has(job.status);
@@ -49,6 +52,12 @@ export function ImportJobStatusPanel({
           ) : null}
           {t(`status_${job.status}` as 'status_ready')}
         </Badge>
+        {job.parent_job_id ? <Badge tone="muted">{t('repair_job')}</Badge> : null}
+        {job.parent_job_id && onOpenParent ? (
+          <Button type="button" variant="ghost" size="sm" onClick={() => onOpenParent(job.parent_job_id!)}>
+            {t('repair_open_parent')}
+          </Button>
+        ) : null}
         <span className="num text-xs text-muted" dir="ltr" title={job.id}>
           {job.original_filename}
         </span>

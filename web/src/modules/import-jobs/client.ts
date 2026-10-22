@@ -7,7 +7,7 @@
  * لا تُخترع حالة أو حقل غير موجود هناك.
  */
 
-import { api } from '@/lib/api';
+import { api, downloadFile, type DownloadOutcome } from '@/lib/api';
 
 export type ImportJobDomain = 'product_catalog' | 'product_workbook' | 'inventory_opening';
 
@@ -44,6 +44,10 @@ export interface ImportJob {
   branch_id?: string | null;
   /** مربوطةٌ بمعاينة (خياراتها مجمَّدة منذ الإنشاء). */
   preview_bound?: boolean;
+  /** تشغيلة إصلاح فرعية: معرّف التشغيلة الأم الفاشلة (IMP-H1-S8b)؛ `null` لغيرها. */
+  parent_job_id?: string | null;
+  /** عدد الوحدات الفاشلة/غير المنجزة القابلة للإصلاح — يظهر في عرض التشغيلة المفردة فقط (IMP-H1-S8a). */
+  failed_units?: number;
   status: ImportJobStatus;
   original_filename: string;
   extension: string;
@@ -132,5 +136,26 @@ export async function applyImportJobChunk(id: string, options: ApplyOptions): Pr
 
 export async function cancelImportJob(id: string): Promise<ImportJob> {
   const response = await api<{ data: ImportJob }>(`/import-jobs/${id}/cancel`, { method: 'POST' });
+  return response.data;
+}
+
+/**
+ * ينزّل الصفوف الفاشلة بقيمها الأصلية + معرّف المصدر `_awj_unit_ref` ورمز الخطأ (IMP-H1-S8a). XLSX دائماً: CSV يسبق قيمَ `= + - @` بعلامة
+ * اقتباس (حماية من حقن الصيغ) فتتشوّه عند إعادة الرفع، والخادم يرفض CSV يحمل تلك العلامة.
+ */
+export function downloadImportFailures(id: string): Promise<DownloadOutcome> {
+  return downloadFile(`/import-jobs/${id}/failures?format=xlsx`, 'failures.xlsx');
+}
+
+/**
+ * تشغيلة إصلاح **فرعية** من الملف المصحَّح (IMP-H1-S8b). المجال والفرع من التشغيلة الأم؛ كل صفٍّ يحمل `_awj_unit_ref` كما نزل. تُرحَّل بعدها
+ * كأي تشغيلة (`applyImportJobChunk`) — الخادم هو من يطالب بالوحدات وحدةً وحدة.
+ */
+export async function createRepairJob(parentId: string, file: File, idempotencyKey?: string): Promise<ImportJob> {
+  const form = new FormData();
+  form.append('file', file);
+  if (idempotencyKey) form.append('idempotency_key', idempotencyKey);
+
+  const response = await api<{ data: ImportJob }>(`/import-jobs/${parentId}/repairs`, { method: 'POST', body: form });
   return response.data;
 }
