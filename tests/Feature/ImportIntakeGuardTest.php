@@ -29,7 +29,21 @@ class ImportIntakeGuardTest extends TestCase
     use InteractsWithApi;
 
     /** مسارات تقبل ملفاً وليست استيراد جداول/أرشيف استيراد (لها مسارات قبول وفحص خاصة بها أو ليست بيانات أعمال). المفتاح `METHOD uri`. */
-    private const NOT_IMPORT = [];
+    private const NOT_IMPORT = [
+        'POST api/document-batches/{batch}/files' => 'مركز المستندات: له مسار قبول وفحص أمني خاص به (DocumentSafetyScanner).',
+        'POST api/products/{id}/media' => 'صورة/وسائط منتج مفرد، لا بيانات استيراد.',
+        'POST api/product-categories' => 'صورة تصنيف، لا استيراد.',
+        'PUT api/product-categories/{id}' => 'صورة تصنيف، لا استيراد.',
+        'POST api/expenses' => 'مرفق مصروف (مستند أعمال)، لا استيراد.',
+        'PUT api/expenses/{id}' => 'مرفق مصروف (مستند أعمال)، لا استيراد.',
+        'POST api/invoices/{id}/notes' => 'مرفق ملاحظة فاتورة، لا استيراد.',
+        'POST api/commerce/workspace/storefront-media' => 'مكتبة وسائط المتجر؛ لها خط معالجة صور وبوابة خاصة.',
+        'POST api/payments' => 'مرفق سند دفع، لا استيراد.',
+        'PUT api/payments/{id}' => 'مرفق سند دفع، لا استيراد.',
+        'POST api/purchases/{id}/attachments' => 'مرفق مشترى، لا استيراد.',
+        'POST api/employees/{id}/photo' => 'صورة موظف، لا استيراد.',
+        'POST api/employees/{id}/attachments' => 'مرفق موظف، لا استيراد.',
+    ];
 
     protected function tearDown(): void
     {
