@@ -13,6 +13,7 @@ class ImportJobResource extends JsonResource
             'id' => $this->id,
             'domain' => $this->domain,
             'branch_id' => $this->branch_id,
+            'preview_bound' => $this->preview_id !== null,
             'status' => $this->status,
             'original_filename' => $this->original_filename,
             'extension' => $this->extension,
@@ -28,6 +29,8 @@ class ImportJobResource extends JsonResource
             'processed_rows' => (int) $this->processed_rows,
             'apply_result' => $this->apply_result,
             'error_message' => $this->error_message,
+            // IMP-H1-S8a: يظهر في عرض التشغيلة المفردة فقط (withCount) — صفرٌ حين لا وحدات فاشلة.
+            'failed_units' => $this->when(isset($this->failed_units_count), fn () => (int) $this->failed_units_count),
             'created_by' => $this->created_by,
             'cancelled_by' => $this->cancelled_by,
             'cancelled_at' => optional($this->cancelled_at)->toIso8601String(),

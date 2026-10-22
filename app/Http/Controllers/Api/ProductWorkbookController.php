@@ -5,10 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Http\Requests\ProductWorkbookExportRequest;
 use App\Http\Requests\ProductWorkbookImportRequest;
 use App\Models\PriceList;
+use App\Services\ImportPreviewService;
 use App\Services\ProductWorkbookService;
+use App\Support\ImportJobDomain;
 use App\Support\ProductListFilters;
 use App\Support\SensitiveCostPolicy;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 
 /**
  * PR-UOM2-4 — مصنّف Products/Barcodes/Unit Prices ثلاثي الأوراق. متحكّمٌ
@@ -64,12 +67,22 @@ class ProductWorkbookController extends ApiController
         $priceList = $this->resolvePriceList($request->string('price_list_id')->toString() ?: null);
 
         return response()->json([
-            'data' => $this->domain(fn () => $this->workbooks->preview(
-                $request->file('file'),
-                $request->productOptions(),
-                $priceList,
-                SensitiveCostPolicy::authorized($request->user()),
-            )),
+            'data' => $this->domain(function () use ($request, $priceList): array {
+                $preview = $this->workbooks->preview(
+                    $request->file('file'),
+                    $request->productOptions(),
+                    $priceList,
+                    SensitiveCostPolicy::authorized($request->user()),
+                );
+                // IMP-H1-S3b: معاينةٌ أحادية الاستعمال يحفظها الخادم — تُرفَق بإنشاء التشغيلة التنفيذية.
+                $preview['binding'] = app(ImportPreviewService::class)->issue(
+                    ImportJobDomain::PRODUCT_WORKBOOK, $request->file('file'), null,
+                    $request->productOptions() + ['price_list_id' => $request->string('price_list_id')->toString() ?: null],
+                    $request->user()?->id,
+                );
+
+                return $preview;
+            }),
         ]);
     }
 
@@ -78,13 +91,29 @@ class ProductWorkbookController extends ApiController
         $priceList = $this->resolvePriceList($request->string('price_list_id')->toString() ?: null);
 
         return response()->json([
-            'data' => $this->domain(fn () => $this->workbooks->apply(
-                $request->file('file'),
-                $request->productOptions(),
-                $priceList,
-                $request->user()?->id,
-                SensitiveCostPolicy::authorized($request->user()),
-            )),
+            'data' => $this->domain(function () use ($request, $priceList): array {
+                // IMP-H1-S3c: ربط التطبيق المتزامن بمعاينته (اختياري حتى التفعيل)؛ الإنفاق والكتابة في معاملةٍ واحدة.
+                $previews = app(ImportPreviewService::class);
+                $bound = $previews->bindForSyncApply(
+                    ImportJobDomain::PRODUCT_WORKBOOK, $request->file('file'), null,
+                    $request->productOptions() + ['price_list_id' => $request->string('price_list_id')->toString() ?: null],
+                    $request->user()?->id, $request->input('preview_id'), $request->input('preview_hash'),
+                );
+
+                return DB::transaction(function () use ($bound, $previews, $request, $priceList): array {
+                    if ($bound !== null) {
+                        $previews->consume($bound, null);
+                    }
+
+                    return $this->workbooks->apply(
+                        $request->file('file'),
+                        $request->productOptions(),
+                        $priceList,
+                        $request->user()?->id,
+                        SensitiveCostPolicy::authorized($request->user()),
+                    );
+                });
+            }),
         ]);
     }
 

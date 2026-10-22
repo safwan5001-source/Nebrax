@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\PaymentAttempt;
 use App\Models\PaymentConnectionEvent;
 use App\Models\PaymentGateway;
 use App\Models\PaymentMethod;
@@ -294,6 +295,14 @@ final class PaymentGatewayService
                     break;
 
                 default: // revoked
+                    // الإلغاء يمحو الأسرار فيستحيل حسم/مطابقة أي محاولة قد تلتقط لدى المزوّد (انظر `hasReconcilableAttempts`). الإيقاف المؤقت بديل يُبقي الأسرار.
+                    $remotelyActionable = $locked->hasReconcilableAttempts();
+                    if ($remotelyActionable) {
+                        throw new PaymentGatewayException(
+                            'gateway.has_active_attempts',
+                            'لا يمكن إلغاء اعتماد اتصال له محاولات دفع جارية أو صفحات دفع لم تنتهِ بعد. أوقفه مؤقتاً حتى تنتهي.'
+                        );
+                    }
                     $locked->status = PaymentGateway::STATUS_REVOKED;
                     $locked->is_active = false;
                     $locked->deactivated_at = $now;
@@ -323,6 +332,18 @@ final class PaymentGatewayService
     private function applyCredentials(PaymentGateway $gateway, array $input, int $graceMinutes, ?User $actor): array
     {
         $rotated = [];
+
+        // أسرار الاستدعاء (المفتاح السري وملحقاته) لا تتغيّر ما دامت لمحاولات الاتصال مراجع قد يلزم الوصول إليها بالأسرار الحالية؛
+        // سر الـwebhook خارج الحظر لأن له نافذة سماح. لا يُتخطّى الحظر إلا بانتهاء صفحات الدفع القائمة أو إغلاقها.
+        if ((array_key_exists('secret_key', $input) || array_key_exists('extra_credentials', $input))
+            && ($this->nullableString($input['secret_key'] ?? $gateway->secret_key) !== $gateway->secret_key
+                || (array_key_exists('extra_credentials', $input) && $this->normalizeExtra($input['extra_credentials']) !== $gateway->extra_credentials))
+            && $gateway->hasReconcilableAttempts()) {
+            throw new PaymentGatewayException(
+                'gateway.rotation_blocked',
+                'لا تُدوَّر أسرار الاستدعاء لاتصال له محاولات دفع جارية أو صفحات دفع لم تنتهِ بعد؛ انتظر انتهاءها أو أغلقها.'
+            );
+        }
 
         if (array_key_exists('webhook_secret', $input)) {
             $new = $this->nullableString($input['webhook_secret']);

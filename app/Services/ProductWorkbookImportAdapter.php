@@ -18,6 +18,8 @@ use RuntimeException;
  */
 class ProductWorkbookImportAdapter implements ImportDomainAdapter
 {
+    use CanonicalizesImportOptions;
+
     public function domain(): string
     {
         return ImportJobDomain::PRODUCT_WORKBOOK;
@@ -63,6 +65,20 @@ class ProductWorkbookImportAdapter implements ImportDomainAdapter
         $productsHeader = $sheets[ProductWorkbookService::SHEET_PRODUCTS][0] ?? [];
 
         return [$rowCount, count($productsHeader)];
+    }
+
+    public function canonicalOptions(array $raw): array
+    {
+        $priceList = $raw['price_list_id'] ?? null;
+
+        $options = [
+            'mode' => (string) ($raw['mode'] ?? ProductImportService::MODE_CREATE),
+            'blank_policy' => (string) ($raw['blank_policy'] ?? ProductImportService::BLANK_IGNORE),
+            'master_data_policy' => (string) ($raw['master_data_policy'] ?? ProductImportService::MASTER_DATA_TEXT),
+            'price_list_id' => $priceList === null || $priceList === '' ? null : (string) $priceList,
+        ];
+
+        return $this->withMapping($options, $raw);
     }
 
     public function recountOnFirstApply(string $tmpPath, string $extension): ?int

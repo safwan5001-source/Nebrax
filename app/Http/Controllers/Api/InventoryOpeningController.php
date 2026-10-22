@@ -5,10 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Http\Requests\ImportInventoryOpeningRequest;
 use App\Http\Resources\InventoryOpeningResource;
 use App\Models\InventoryOpening;
+use App\Services\ImportPreviewService;
 use App\Services\Accounting\InventoryOpeningService;
 use App\Services\InventoryOpeningImportService;
+use App\Support\ImportJobDomain;
 use App\Support\Money;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -75,9 +78,16 @@ class InventoryOpeningController extends ApiController
     /** معاينة: عدّادات وحالة كل صف. **لا كتابة إطلاقاً.** */
     public function preview(ImportInventoryOpeningRequest $request): JsonResponse
     {
-        $data = $this->domain(
-            fn () => $this->imports->preview($request->file('file'), $request->importOptions())
-        );
+        $data = $this->domain(function () use ($request): array {
+            $preview = $this->imports->preview($request->file('file'), $request->importOptions());
+            // IMP-H1-S3b: معاينةٌ أحادية الاستعمال يحفظها الخادم — تُرفَق بإنشاء التشغيلة التنفيذية.
+            $preview['binding'] = app(ImportPreviewService::class)->issue(
+                ImportJobDomain::INVENTORY_OPENING, $request->file('file'), null,
+                $request->importOptions(), $request->user()?->id,
+            );
+
+            return $preview;
+        });
 
         return response()->json(['data' => $this->presentPreview($data)]);
     }
@@ -85,11 +95,22 @@ class InventoryOpeningController extends ApiController
     /** إنشاء مسودة من ملف اجتاز التحقق. لا حركة ولا قيد بعد. */
     public function apply(ImportInventoryOpeningRequest $request): JsonResponse
     {
-        $opening = $this->domain(fn () => $this->imports->apply(
-            $request->file('file'),
-            $request->importOptions(),
-            $request->user()?->id
-        ));
+        $opening = $this->domain(function () use ($request) {
+            // IMP-H1-S3c: ربط التطبيق المتزامن بمعاينته (اختياري حتى التفعيل)؛ الإنفاق وإنشاء المسودة في معاملةٍ واحدة.
+            $previews = app(ImportPreviewService::class);
+            $bound = $previews->bindForSyncApply(
+                ImportJobDomain::INVENTORY_OPENING, $request->file('file'), null, $request->importOptions(),
+                $request->user()?->id, $request->input('preview_id'), $request->input('preview_hash'),
+            );
+
+            return DB::transaction(function () use ($bound, $previews, $request) {
+                if ($bound !== null) {
+                    $previews->consume($bound, null);
+                }
+
+                return $this->imports->apply($request->file('file'), $request->importOptions(), $request->user()?->id);
+            });
+        });
 
         return (new InventoryOpeningResource($opening->load(['lines.product', 'lines.warehouse'])))
             ->response()->setStatusCode(201);

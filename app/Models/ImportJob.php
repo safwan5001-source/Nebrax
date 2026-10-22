@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * تشغيلة استيراد دائم — هوية الملف والتشغيلة قبل أي معالجة مجزّأة أو ربط
@@ -15,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ImportJob extends BaseModel implements CompanyWide
 {
     protected $fillable = [
-        'tenant_id', 'branch_id', 'domain', 'status', 'idempotency_key',
+        'tenant_id', 'branch_id', 'preview_id', 'preview_hash', 'domain', 'status', 'idempotency_key',
         'original_filename', 'extension', 'mime_type', 'byte_size',
         'storage_disk', 'storage_path', 'content_sha256',
         'media_archive_original_filename', 'media_archive_mime_type',
@@ -42,6 +43,12 @@ class ImportJob extends BaseModel implements CompanyWide
             'cancelled_at' => 'datetime',
             'purge_after' => 'datetime',
         ];
+    }
+
+    /** وحدات التشغيلة الفاشلة/غير المنجزة (IMP-H1-S8a). */
+    public function units(): HasMany
+    {
+        return $this->hasMany(ImportJobUnit::class, 'import_job_id');
     }
 
     public function creator(): BelongsTo

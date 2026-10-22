@@ -52,6 +52,16 @@ interface ImportDomainAdapter
      */
     public function recountOnFirstApply(string $tmpPath, string $extension): ?int;
 
+    /**
+     * الخيارات **القانونية** لهذا المجال (IMP-H1-S3b): مفاتيح مغلقة، قيم مُطبَّعة بأنواعها وافتراضاتها، مطابقة الأعمدة مرتّبة.
+     * هي الصيغة الوحيدة التي تدخل بصمة المعاينة وتُجمَّد على التشغيلة؛ المعاينة والإنشاء والتطبيق كلها تمرّ بها فلا يختلف
+     * تفسير الخيارات بين مرحلة وأخرى. مفاتيح لا تخصّ المجال تُسقَط، والمفاتيح التشغيلية (`batch_size`…) ليست منها.
+     *
+     * @param  array<string, mixed>  $raw
+     * @return array<string, mixed>
+     */
+    public function canonicalOptions(array $raw): array;
+
     /** يرحّل قطعة واحدة (وحدات كاملة فقط) ويُرجع عدد الوحدات المنجزة ونتيجة المجال. */
     public function applyChunk(ImportChunk $chunk): ImportChunkResult;
 }
