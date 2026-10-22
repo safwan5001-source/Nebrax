@@ -26,7 +26,7 @@ use Illuminate\Validation\Rule;
  *   `ProductImportFields`/`InventoryOpeningFields` معاً (`product_workbook`
  *   يعيد استعمال معجم `ProductImportFields` لورقة Products) — القيمة التي
  *   لا تخصّ مجال هذه التشغيلة فعلاً تُرفض لاحقاً بخدمة ذلك المجال، لا هنا.
- * `ImportJobService::runChunk()`'s domain dispatch يمرّر لكل خدمةٍ حقولها
+ * تمرير `ImportDomainAdapter::applyChunk()` يمرّر لكل خدمةٍ حقولها
  * فقط (`array_intersect_key`) فلا يصلها ما لا يعنيها أصلاً.
  */
 class ApplyImportJobRequest extends FormRequest
