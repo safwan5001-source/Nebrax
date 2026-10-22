@@ -17,6 +17,8 @@
 | Deploy | Docs only. No Railway observation is available to the agent. |
 | **First task for the next model** | **IMP-H1-S1** (§3 below). Branch `claude/imp-h1-s1-import-jobs-gate-retention` from the latest `origin/main`. |
 
+**Correction (IMP-H0-S2):** the AWJ Assistant already has real AI. The AI import path is therefore built by adding **tools to the existing assistant** (H9), never a new provider or assistant. The current AI Actions wizard is deterministic and does not call the assistant (verified by grep). See master plan §2.4.
+
 Re-read master plan rules 1–12 (§2.2) before writing code. Several of them (7, 9, 10, 11, 12) came out of review and constrain every slice.
 
 ---
@@ -30,7 +32,7 @@ Re-read master plan rules 1–12 (§2.2) before writing code. Several of them (7
   - a change to an accounting or tax rule, or a sensitive ZATCA change
   - a destructive or high-risk migration
   - a risk of duplicated financial or stock operations
-  - activating an external AI provider or sending real data (D-02)
+  - sending import **row values** to the assistant's model (`import_rows`, D-02). The provider itself already exists and is the owner's configuration: never change AI settings, keys or network switches.
   - Railway, env or manual deploy work
   - a persistent failure
 - When blocked, record the evidence and options in the tracker's decision log, **skip only the affected slice**, and continue with independent safe slices. H6 is pre-blocked on D-03, so go H5 → H7.
