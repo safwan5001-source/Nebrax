@@ -106,13 +106,13 @@ Tests that **do not exist** and the implementation PR must add (SQLite and Postg
 | | **Option A: `MainOfType`** | **Option B: `ExplicitRequired`** |
 |---|---|---|
 | Behavior | Omitted selection resolves to the tenant's main cash treasury; an explicit selection always wins. | Posting fails unless a treasury is chosen. |
-| Backward compatibility | **Identical** for every tenant whose main cash treasury is the one linked to 1110 (all tenants that never changed the main). Changes only tenants whose main is not 1110. | **Breaks every existing cash-type draft**, every draft created through quote conversion, recurring invoices and the public API (none carry a treasury), and any integration that posts cash-type invoices. |
-| Financial impact | Cash lands in the main drawer, consistent with receipts, POS tenders and supplier payments. For main = 1110 tenants: none. For others: the debit moves from 1110 to the main (see section 3, row 2), so past and future balances of 1110 and the main treasury differ by that flow. No retroactive rewrite. | None until a treasury is chosen; then as option A. |
+| Backward compatibility | **Identical only for invoices that carry no explicit selection** and belong to a tenant whose main cash treasury is the one linked to 1110. It changes (a) tenants whose main is not 1110, (b) tenants with no usable main cash entity (they post through the active 1110 entity today and would be rejected `no_default` / `ambiguous_default` / `inactive`), and (c) any cash-type draft carrying a currently ignored `cash_account_id` (it posts to 1110 today and would post to that treasury, or be rejected if invalid), even for a main = 1110 tenant. | **Breaks every existing cash-type draft**, every draft created through quote conversion, recurring invoices and the public API (none carry a treasury), and any integration that posts cash-type invoices. |
+| Financial impact | Cash lands in the main drawer, consistent with receipts, POS tenders and supplier payments. For main = 1110 tenants with no explicit selection: none. For others: the debit moves from 1110 to the main (see section 3, row 2), so past and future balances of 1110 and the main treasury differ by that flow. No retroactive rewrite. | None until a treasury is chosen; then as option A. |
 | Operational consequence | No new field for users or clients; the UI needs no change. A behavior change only for tenants with a custom main. | Needs a **new UI control** (none exists for cash type), API contract change, client migration, and a decision for non-interactive paths. Adds a click to every cash sale. |
 | Fits the configurable-policy rule (CLAUDE.md rule 6) | As the default. | As an opt-in. |
 | Fails safe | Yes: `no_default`, `ambiguous_default`, `inactive` all reject; never 1110. | Yes. |
 
-**Recommendation.** Adopt **Option A as the default** and expose **Option B as a per-tenant sales setting** (for example `sales.cash_sale_treasury_policy` = `main` (default) | `explicit_required`), because CLAUDE.md rule 6 says a business policy with more than one reasonable answer is a setting, not a hard-coded behavior, and this serves 60+ activity types. This is a settings key, not a schema change. Per-branch or per-user default treasury (option c of D-T3) stays out of scope: it needs a schema design.
+**Recommendation.** Adopt **Option A as the default** and expose **Option B as a per-tenant sales setting** (for example `sales.cash_sale_treasury_policy` = `main` | `explicit_required`; the owner later added a third, default value `legacy` so that nothing changes until a coordinated activation), because CLAUDE.md rule 6 says a business policy with more than one reasonable answer is a setting, not a hard-coded behavior, and this serves 60+ activity types. This is a settings key, not a schema change. Per-branch or per-user default treasury (option c of D-T3) stays out of scope: it needs a schema design.
 
 **Decisions requested from the owner**
 
@@ -126,29 +126,31 @@ Tests that **do not exist** and the implementation PR must add (SQLite and Postg
 ## 7. Pre-approval read-only checks for the owner (production, no writes)
 
 ```sql
--- tenants whose main cash treasury is NOT the account coded 1110 (the only tenants whose postings would change)
-SELECT t.id, t.slug, a.code AS main_cash_code
+-- (a)+(b) tenants with NOT exactly one active main cash entity linked to the account coded 1110
+--         (LEFT JOIN so tenants with no main at all are listed, with main_cash_code NULL)
+SELECT t.id, t.slug, a.code AS main_cash_code, c.is_active AS main_is_active
 FROM tenants t
-JOIN cash_bank_accounts c ON c.tenant_id = t.id AND c.type = 'cash' AND c.is_main
-JOIN accounts a ON a.id = c.account_id
-WHERE a.code <> '1110';
+LEFT JOIN cash_bank_accounts c ON c.tenant_id = t.id AND c.type = 'cash' AND c.is_main
+LEFT JOIN accounts a ON a.id = c.account_id
+WHERE c.id IS NULL OR a.code IS DISTINCT FROM '1110' OR c.is_active IS NOT TRUE;
 
--- draft cash-type invoices carrying a (currently ignored) cash_account_id
+-- (c) draft cash-type invoices carrying a (currently ignored) cash_account_id, any tenant
 SELECT i.tenant_id, count(*) AS drafts
 FROM invoices i
 WHERE i.status = 'draft' AND i.payment_type = 'cash' AND i.cash_account_id IS NOT NULL
 GROUP BY i.tenant_id;
 ```
 
-If both queries return nothing, the change is a pure no-op for existing data. I did not run them; this session has no production access.
+If both queries return nothing, the change is a no-op for existing data (the first lists every tenant whose behavior could change, including tenants with no main; the second the drafts whose meaning would change). I did not run them; this session has no production access.
 
 ## 8. Phase 4 plan (only after explicit approval)
 
 1. `InvoiceService::post()` (lines 929 to 942 and the docblocks at 43 to 50, 868 to 872): for `payment_type=cash`, keep `bootstrapDefaults()`, then `TreasurySelectionResolver::resolve(selection, 'cash', policy, 'deposit', $actor)` where the selection is `ledgerAccount($invoice->cash_account_id)` when set, else `none()`. Debit `ResolvedTreasury::accountId`. Map `TreasurySelectionException` to the existing 422 path (optionally pass `reason` through, as the emergency-stop exception does). **No `catch` that falls back to 1110.**
 2. Read the policy from `Settings` (only if D-T4c is approved), default `main`.
+   The implementation must also include the surfaces that make the policy usable: validation of the new key in `UpdateSalesSettingsRequest` and the sales settings screen; a treasury selector on the cash-type branch of the web invoice form (today `cash_account_id` is sent only when `is_paid` is ticked) so that a tenant on `explicit_required` can satisfy it from the normal form; and contract tests for both (API validation, settings round-trip, form payload).
 3. Update the single allowed caller in the T3 static guard test deliberately; add the tests listed in section 4; run SQLite and PostgreSQL, the invoice/accounting/ZATCA/treasury suites, and the full suite before the PR.
 4. The PR must show the entries before and after for scenarios 1 to 4 in a table (the pre-PR protocol in CLAUDE.md), and must state the R1 pairing.
-5. Affected files (expected): `app/Services/Accounting/InvoiceService.php`, `app/Support/Settings.php` (if D-T4c), `tests/Feature/TreasurySelectionResolverTest.php` (guard), a new `tests/Feature/TreasuryCashSaleRoutingTest.php`, comments in `tests/Feature/ApiInvoiceTest.php`, `CLAUDE.md`, a T4 implementation report. **No migration, no permission or role change, no ZATCA file.**
+5. Affected files (expected): `app/Services/Accounting/InvoiceService.php`, `app/Support/Settings.php` and `UpdateSalesSettingsRequest` (if D-T4c), the web invoice form and sales settings screen with their tests, `tests/Feature/TreasurySelectionResolverTest.php` (guard), a new `tests/Feature/TreasuryCashSaleRoutingTest.php`, comments in `tests/Feature/ApiInvoiceTest.php`, `CLAUDE.md`, a T4 implementation report. **No migration, no permission or role change, no ZATCA file.**
 
 ## 9. Next implementation step
 
