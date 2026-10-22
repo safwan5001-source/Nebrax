@@ -232,6 +232,7 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
 - **IMP-H2-S2 — Shared value normalization.** Remove the duplicated regex validation in `AiActionProductFileIntakeService`/`AiActionProductReviewService`; both use `ProductImportValueNormalizer` or the adapter.
 - **IMP-H2-S3 — Workbook UX parity.** Inspect step, template download, column mapping for the Products sheet, error tables.
 - **IMP-H2-S4 — Tenant AI Actions enablement endpoint.** Owner/admin toggle for `ai_actions.enabled` (no write path exists today). Settings UI under Applications/AI settings. The platform flag still governs.
+  > Related parked requirement **IMP-X-01** (Super Admin control of AI Actions: global, per tenant, per action type) is registered in `AWJ_IMPORT_PARKED_REQUIREMENTS.md`. It is **not** part of this slice's scope and does not reorder it; it is recommended right after H2-S4 and before H3-S4.
 - **IMP-H2-S5 — Move both product consumers onto `ProductImportAdapter`.**
   - The sync `/products/import/*` endpoints (via `ProductImportService`) and the AI path use the adapter's `validateRow()`/`match()`/`applyRow()` instead of their own copies. The AI path covers `AiActionProductPreviewBuilder` (matching) and `AiActionProductExecutionService` (row write).
   - Each consumer keeps only its orchestration: the sync transaction, durable chunks, or AI versions/approval/lease.
@@ -397,6 +398,7 @@ H0 → H1 (S1 independent; S2 before every new domain; S3/S4/S5 independent of e
 H1-S2 → H3, H4, H5, H6, H7 (adapters)
 H1-S8 → every new durable domain (repair comes through the adapter)
 H1-S7 → every new AI Action type (H3-S4, H4-S4, H5-S5, H7-S2, H7-S4)
+IMP-X-01 (parked) → after H2-S4, before H3-S4 (needs H1-S7 registry + H2-S4 tenant opt-in); see AWJ_IMPORT_PARKED_REQUIREMENTS.md
 H2-S0 → anytime (copy only)       H2-S1/S2 → H2-S5 → H9-S1 (AI writes rely on one product path)
 H3-S1 → H3-S4 (AI reuses adapter)  H5-S1/S3 → H5-S5, H5-S6   H4-S1/S2 → H4-S4
 H8-S1 needs ≥2 entities with both paths (after H3)
@@ -435,6 +437,9 @@ H6 blocked on D-03 → skip and continue with H7, return when decided
 | D-07 | Journal entries / account opening balances import | Separate accounting Horizon. | — |
 | D-09 | AI path for stock permit lines | Excluded. Low volume, a known warehouse, and documents belong to the Document Center delivery-note flow. The owner may reopen this. | — (recorded exclusion) |
 | D-08 | AI path for unit templates | Excluded: conversion factors multiply stock quantities, so only the standard, create-only path is offered. The owner may reopen this. | — (recorded exclusion) |
+| D-10 | (parked IMP-X-01) Precedence between the existing env flags and runtime Super Admin controls for AI Actions | Keep the env flags as a hard floor; runtime controls above it. | Only IMP-X-01 |
+| D-11 | (parked IMP-X-01) Default for tenants | Default-deny: Super Admin grant **and** tenant opt-in. | Only IMP-X-01 |
+| D-12 | (parked IMP-X-01) Also model AI Actions as an `ApplicationCatalog` capability for commercial packaging? | Optional, orthogonal to per-type operational control. | Only IMP-X-01 |
 | OPS-01 | Enabling `AI_ACTIONS_EXECUTION_ENABLED`, remote image fetch, staged-image purge schedule | Owner approval (unchanged from AI-ACTIONS-08). | Activation only |
 
 ---

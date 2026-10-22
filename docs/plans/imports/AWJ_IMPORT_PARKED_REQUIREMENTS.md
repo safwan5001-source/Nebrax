@@ -1,0 +1,83 @@
+# AWJ Unified Import — Parked requirements register
+
+Requirements raised **during** the Horizon that are recorded now and **not started**. Nothing here changes the scope or order of any slice in `AWJ_UNIFIED_IMPORT_MASTER_HORIZON.md`; each item names its dependencies and the earliest sensible window. No code, migration, Railway or env change is made by registering an item.
+
+| ID | Title | Status | Recommended window |
+|---|---|---|---|
+| IMP-X-01 | Super Admin control of AI Actions (global, per tenant, per action type) | **Parked — not started** | Right after **IMP-H2-S4**, and **before IMP-H3-S4** (the first extra AI Action type) |
+
+---
+
+## IMP-X-01 — Super Admin control of the assistant's AI Actions
+
+**Source:** owner note, 2026-10-22 (planning note on the continuing Horizon).
+
+### Requirement (as stated)
+
+Manage the AWJ Assistant's AI Actions capabilities from the **Super Admin platform console**:
+
+1. **Global execution control** — platform-wide switches (master enable, and execution/write enable) that can be changed at runtime and stop everything at once.
+2. **Per-tenant control** — enable/disable AI Actions (and execution) for one specific tenant.
+3. **Per-action-type availability** — each supported action type (`product_import.v1` today; later `partner_import`, `expense_import`, `purchase_import`, `inventory_opening_import`, … ) can be made available independently, globally and per tenant.
+4. **Unchanged guarantees** — tenant isolation, branch isolation, RBAC, and **approval before execution** all stay exactly as they are. These controls are *necessary, never sufficient*: they never grant a permission, never widen a branch scope, never skip the preview → approval → execution chain.
+
+### Where it stands today (verified in code)
+
+| Aspect | Today |
+|---|---|
+| Platform enable | `config('ai_actions.enabled')` ← env `AI_ACTIONS_ENABLED` (default off). **Changing it = a Railway env change + redeploy.** Read in `AiActionPolicy::authorize()` |
+| Execution enable | `config('ai_actions.execution_enabled')` ← env `AI_ACTIONS_EXECUTION_ENABLED` (default off; OPS-01). Read in `AiActionProductExecutionService` |
+| Tenant enable | `Settings::group('ai_actions')['enabled']` (default `false`). **No write path exists** (this is IMP-H2-S4, owner/admin toggle) |
+| Per type | Closed `AiActionRegistry` (one type). Since **H1-S7** every type declares `domain_permissions` + `application_key`, enforced in `AiActionPolicy`; `AiActionTypeGatesTest` guards the registry. **No availability switch per type** |
+| Approval | `AiActionApprovalLedger` / `ai.actions.approve`, preview + approval bound to content; unchanged |
+
+### Reuse (do not rebuild)
+
+| Existing asset | Reuse for |
+|---|---|
+| **`PaymentsRolloutControl` / `ZatcaRolloutControl` family** — `scope` (platform\|tenant) × `feature_key`, `enabled`, `version` (CAS), append-only `*_events` audit (actor, reason, previous/new), DB triggers forbidding UPDATE/DELETE/TRUNCATE outside an audit event, service (`effectiveForTenant`, `setPlatformState`, `setTenantState`), controller + `platform:read` / `platform:manage` abilities, platform console UI | **The pattern for every control here** (platform kill-switch + tenant control + audit). Copy the shape, not the table: see "Needs new work" |
+| `PlatformAdministrator` principal, `/api/platform/*` (not through `SetTenant`), `platform:read|manage` | Authorization and isolation model for the Super Admin side |
+| `PlatformAiBudgetController` / `PlatformAiBudgetService` + platform console pages | Precedent of an AI-specific platform-admin surface and its UI conventions |
+| `PlatformApplicationOverride*` (preview → grant → revert with audit) | UX/flow precedent for a per-tenant grant with explicit preview |
+| `Settings::group('ai_actions')` tenant opt-in + **IMP-H2-S4** | The *tenant's own* opt-in (owner/admin). Stays; becomes the second layer |
+| `AiActionPolicy::authorize()` (the single enforcement point; all 6 gateway call sites) and `AiActionRegistry::types()/definition()` (H1-S7) | Where the effective state is enforced, and the source of the list of types/gates the console shows |
+| `ApplicationCatalog` + `TenantApplicationState` + commercial assignment | **Optional** commercial packaging (see decision D-12); not a per-type mechanism |
+
+### Needs new work (a separate, additive slice — not a parallel engine)
+
+1. **Control storage** keyed by `action_type` (and a capability: `use`/draft-preview vs `execution`), scope platform|tenant, with append-only audit events. Prefer **one new additive table pair** following the existing pattern over editing the payments/ZATCA tables (those are live compliance paths; generalizing them is a refactor with its own risk). A shared abstract service can be extracted later.
+2. **One resolver** — `AiActionsAccessResolver::effective(tenant, actionType, capability)` returning allowed/denied **with a reason code** (`platform_off`, `type_off`, `tenant_not_granted`, `tenant_not_opted_in`, `execution_off`, …). Single read, no lock, fail closed (same discipline as `ZatcaRolloutControlService`).
+3. **Wiring** in the existing single points only: `AiActionPolicy::authorize()` (use) and the execution service (execute) replace the direct `config(...)` reads; no new execution path, no second policy.
+4. **Platform API + console UI**: global page (master + execution + per-type matrix) and a tenant-detail card (per-tenant grant, per-type), each change with a mandatory reason and a visible audit trail.
+5. **Tenant-facing explanation**: the tenant settings screen (H2-S4) and the AI import screens show the effective state and *why* it is off (reason code → Arabic/English copy), without leaking platform internals.
+6. **Tests**: tenant A's grant never affects tenant B; kill-switch precedence; per-type independence; audit is append-only; a platform change cannot grant RBAC or bypass branch scope; preview/approval requirement unchanged with every control on; real-PostgreSQL concurrency (flip racing a use/execution) with `pcntl_fork`.
+
+### Dependencies
+
+- **IMP-H1-S7** (merged): type gates + `AiActionRegistry::types()` — the list the console enumerates.
+- **IMP-H2-S4**: the tenant opt-in write path. Design the two together so the effective state has exactly two inputs from outside the code: *platform grant* and *tenant opt-in*.
+- Existing platform console + `PlatformAdministrator` (no dependency on the Import UX slices H8).
+- Must land **before the first additional AI Action type goes live** (H3-S4, H4-S4, H5-S5, H7-S2/S4) — per-type availability only matters once there are ≥ 2 types — and **before AI Actions are enabled for any production tenant**.
+- Independent of D-02 (that decision concerns the *assistant's* data scope, not Actions) and of H9.
+
+### Decisions needed from the owner (not assumed)
+
+| ID | Decision | Recommendation |
+|---|---|---|
+| **D-10** | Precedence between the existing env flags and the new runtime controls | Keep the env flags as a **hard floor** (env off ⇒ off, deployment-level kill), and add runtime controls **above** it: effective = env floor ∧ platform control ∧ type ∧ tenant grant ∧ tenant opt-in. Removing the env floor later is a separate decision |
+| **D-11** | Default for existing/new tenants | **Default-deny** (today's behavior): a tenant gets AI Actions only after a Super Admin grant **and** the tenant's own opt-in |
+| **D-12** | Should AI Actions also be an `ApplicationCatalog` capability for commercial packaging/plans? | Optional and orthogonal: the catalog handles *commercial availability per tenant*; the new controls handle *operational on/off per action type*. Decide whether both layers are wanted |
+
+OPS-01 (enabling `AI_ACTIONS_EXECUTION_ENABLED` in production) stays an owner approval; this requirement only gives that approval a runtime, audited control instead of an env edit.
+
+### Suggested timing
+
+Start after **IMP-H2-S4** is merged and before **IMP-H3-S4** starts (the first extra action type). It is one backend slice (storage + resolver + wiring + tests), one platform-console slice (UI), and a small tenant-side message addition to H2-S4's screen. Do **not** start it now: the Horizon continues in tracker order (H1-S3 → S8 → S4 → S5 → S6 → H2 …).
+
+### Acceptance (definition of done for IMP-X-01)
+
+- A Super Admin can, from the console and with a reason each time: stop/start AI Actions globally; stop/start execution globally; grant/revoke a tenant; make a type available/unavailable globally and per tenant — all audited append-only.
+- With every control **on**, a request still requires the tenant opt-in, the type's RBAC + application gates (H1-S7), the branch scope, and the preview → approval → execution chain (unchanged tests green).
+- A denied request returns a stable reason code the UI can translate; no tenant can read another tenant's controls.
+- No new import or AI engine; the writes still go through the existing domain services and adapters.
+- Deploy evaluation recorded (additive migration; no Railway/env change; behavior for existing tenants unchanged = default-deny).

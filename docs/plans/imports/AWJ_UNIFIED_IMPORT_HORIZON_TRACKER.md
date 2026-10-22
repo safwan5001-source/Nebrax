@@ -67,6 +67,14 @@
 | IMP-H10-S2 | ✅ | ✅ | Std↔AI parity suite | H1–H9 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H11-S1 | — | — | Closure report | all | — | — | — | — | — | — | — | — | — | Planned | — |
 
+## Parked requirements (registered, not started — they do not change any slice above)
+
+Details, reuse analysis, dependencies and acceptance: `AWJ_IMPORT_PARKED_REQUIREMENTS.md`.
+
+| ID | Requirement | Status | Window | Depends on | Owner decisions |
+|---|---|---|---|---|---|
+| IMP-X-01 | Super Admin control of AI Actions — global (master + execution), per tenant, per action type; audited; no change to isolation/RBAC/approval | **Parked** | After IMP-H2-S4, before IMP-H3-S4 | H1-S7 (merged), H2-S4 | D-10, D-11, D-12 (open) |
+
 ## H0 correction record (IMP-H0-S2)
 
 Owner-confirmed and re-verified in code: the AWJ Assistant already contains real AI (Anthropic provider, tool-planning loop, consent, budget, audit, grounding). The H0 plan wrongly framed provider enablement as pending for the import path. **Corrected:** H9 now adds import tools to the existing assistant (no new provider, no second assistant, no change to AI settings); D-02 narrows to whether import row data may be sent to the model. The standard import is unaffected and stays independent of AI. See master plan §2.4 and H9.
@@ -82,6 +90,7 @@ Owner-confirmed and re-verified in code: the AWJ Assistant already contains real
 | ID | Asked | Answer | Date | Effect |
 |---|---|---|---|---|
 | D-01..D-07, OPS-01 | See master plan §7 | _open_ | — | — |
+| D-10..D-12 | Parked IMP-X-01 (env-floor precedence, default-deny, optional catalog capability) — see master plan §7 | _open_ | — | — |
 
 ## Deploy log
 
