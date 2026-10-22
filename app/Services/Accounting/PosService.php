@@ -71,6 +71,7 @@ class PosService
 
         $drawerAttempt = null;
         $paymentIds = [];
+        $claimedTerminalIds = [];
         $cartId = $data['cart_id'] ?? null;
         $auditSession = null;
 
@@ -93,9 +94,9 @@ class PosService
             }
 
             try {
-                $invoice = DB::transaction(function () use ($data, &$drawerAttempt, &$paymentIds, $cartId, $idempotencyKey, $checksum) {
+                $invoice = DB::transaction(function () use ($data, &$drawerAttempt, &$paymentIds, &$claimedTerminalIds, $cartId, $idempotencyKey, $checksum) {
                     return $this->executeCheckoutWithinTransaction(
-                        $data, $drawerAttempt, $paymentIds, $cartId, $idempotencyKey, $checksum
+                        $data, $drawerAttempt, $paymentIds, $claimedTerminalIds, $cartId, $idempotencyKey, $checksum
                     );
                 });
             } catch (QueryException $exception) {
@@ -122,9 +123,9 @@ class PosService
             if ($exception instanceof PosIdempotencyConflictException) {
                 throw $exception;
             }
-            // H6-02: فشل البيع بعد موافقة جهاز ⇒ المعاملة تراجعت كاملة (لا سند ولا فاتورة)؛ تُلغى الموافقة على الجهاز آلياً ولا تبقى يتيمة.
-            // يعيد فحص الحالة تحت القفل فلا يلمس موافقة استهلكها بيع آخر، ولا يرمي.
-            $this->compensateTerminalApprovals($data);
+            // H6-02: فشل البيع بعد اجتياز موافقة جهاز فحوص هذا البيع ⇒ المعاملة تراجعت كاملة (لا سند ولا فاتورة)؛ تُلغى تلك الموافقة آلياً على الجهاز.
+            // لا تُلغى موافقة لم تجتز التحقق (وسيلة/جلسة/مبلغ خاطئ)، ويعيد التعويض فحص الحالة تحت القفل فلا يلمس موافقة استهلكها بيع آخر، ولا يرمي.
+            $this->terminals->compensateAfterFailedCheckout($claimedTerminalIds, (string) ($data['pos_session_id'] ?? ''));
             if ($auditSession !== null && is_string($cartId) && $cartId !== '') {
                 try {
                     $this->audit->recordCheckout($auditSession, $data['actor'] ?? null, $cartId, \App\Models\PosSessionEvent::TYPE_PAYMENT_FAILED, [
@@ -157,6 +158,7 @@ class PosService
         array $data,
         ?array &$drawerAttempt,
         array &$paymentIds,
+        array &$claimedTerminalIds,
         mixed $cartId,
         string $idempotencyKey,
         string $checksum,
@@ -228,7 +230,7 @@ class PosService
             $clearingGateways = $this->clearingGatewaysFor($methods);
             $this->assertTenderReferencesAllowed($tenders, $methods);
             // H6-02: موافقات الأجهزة تُقفل وتُتحقق (جلسة/وسيلة/مبلغ/لم تُستهلك) قبل أي مستند؛ وسيلة تشترط الموافقة بلا موافقة ⇒ رفض.
-            $terminalApprovals = $this->terminals->claimApprovals($tenders, $methods, $session);
+            $terminalApprovals = $this->terminals->claimApprovals($tenders, $methods, $session, $claimedTerminalIds);
         }
 
         // بدء الإتمام دليل خادمي من داخل المعاملة الفعلية؛ لا يعتمد على
@@ -814,24 +816,6 @@ class PosService
         }
 
         return $methods->all();
-    }
-
-    /** @param array<string,mixed> $data */
-    private function compensateTerminalApprovals(array $data): void
-    {
-        $tenders = $data['tenders'] ?? [];
-        if (! is_array($tenders) || ! array_is_list($tenders) || ! is_string($data['pos_session_id'] ?? null)) {
-            return;
-        }
-        $ids = [];
-        foreach ($tenders as $tender) {
-            if (is_array($tender) && is_string($tender['terminal_request_id'] ?? null) && $tender['terminal_request_id'] !== '') {
-                $ids[] = $tender['terminal_request_id'];
-            }
-        }
-        if ($ids !== []) {
-            $this->terminals->compensateAfterFailedCheckout($ids, $data['pos_session_id']);
-        }
     }
 
     /** مراجع عملية البطاقة الاختيارية على وسيلة الدفع (D-09/H6-01): رمز الموافقة، RRN، آخر 4 أرقام. لا PAN ولا CVV أبداً. */

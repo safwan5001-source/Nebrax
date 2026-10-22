@@ -15,7 +15,10 @@ interface TerminalAdapter
 {
     public function provider(): string;
 
-    /** يرسل الطلب إلى الجهاز. يعيد `pending` (بانتظار العميل) أو نتيجة فورية. */
+    /**
+     * يرسل الطلب إلى الجهاز. يعيد `pending` (بانتظار العميل) أو نتيجة فورية، و`error` **فقط** حين يُثبت المحوّل أن شيئاً لم يُرسَل.
+     * **استثناء = نتيجة غامضة** (قد يكون الجهاز استلم ووافق وضاع الردّ): تتعامل معه الخدمة كطلب `sent` غير مؤكد فيُستعلَم/يُلغى ولا يُحرَّر الجهاز.
+     */
     public function start(PosPaymentTerminal $terminal, PosTerminalRequest $request): PosTerminalResult;
 
     /** حالة الطلب لدى المزوّد الآن (الحقيقة)، لا ما ادّعاه العميل. */

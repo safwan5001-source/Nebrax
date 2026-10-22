@@ -205,6 +205,42 @@ class PosTerminalPostgresTest extends TestCase
         $this->assertNull($row->compensating_until);
     }
 
+    /** @test */
+    public function concurrent_creates_with_one_key_and_different_payloads_never_return_a_replay_for_the_wrong_payload(): void
+    {
+        $terminal = $this->newTerminal('جهاز مفتاح');
+        $key = (string) Str::uuid();
+        $jobs = [];
+        foreach ([11500, 9900, 11500, 9900, 11500, 9900] as $amount) {
+            $jobs[] = function () use ($terminal, $key, $amount) {
+                app(TenantContext::class)->set($this->tenantId);
+                app(BranchContext::class)->set(DB::table('pos_sessions')->where('id', $this->sessionId)->value('branch_id'));
+                try {
+                    $req = app(PosTerminalService::class)->createRequest(User::query()->findOrFail($this->userId), [
+                        'pos_session_id' => $this->sessionId, 'pos_payment_terminal_id' => $terminal, 'payment_method_id' => $this->cardId,
+                        'amount' => $amount, 'idempotency_key' => $key,
+                    ]);
+
+                    return ['id' => $req->id, 'amount' => $req->amount, 'asked' => $amount];
+                } catch (PosTerminalException $e) {
+                    return ['reason' => $e->reason, 'asked' => $amount];
+                }
+            };
+        }
+        $results = $this->runConcurrently($jobs);
+
+        $this->assertAllNoDeadlock($results);
+        $winner = DB::table('pos_terminal_requests')->where('idempotency_key', $key)->first();
+        $this->assertSame(1, DB::table('pos_terminal_requests')->where('idempotency_key', $key)->count());
+        foreach (array_column($results, 'value') as $v) {
+            if ($v['asked'] === (int) $winner->amount) {
+                $this->assertSame($winner->id, $v['id'] ?? null, 'نفس المحتوى ⇒ الفائز نفسه (إنشاء أو replay)');
+            } else {
+                $this->assertSame('idempotency_conflict', $v['reason'] ?? null, 'محتوى مختلف بنفس المفتاح ⇒ تعارض لا replay');
+            }
+        }
+    }
+
     // ───────────────────────── مساعدات ─────────────────────────
 
     private function newTerminal(string $name): string

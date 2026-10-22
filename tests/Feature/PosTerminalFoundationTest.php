@@ -114,9 +114,19 @@ class PosTerminalFoundationTest extends TestCase
         $this->withToken($ctx['token'])->postJson("/api/pos/terminal-requests/{$cancelled['id']}/cancel")->assertOk()->assertJsonPath('data.status', 'cancelled');
         $this->withToken($ctx['token'])->postJson("/api/pos/terminal-requests/{$cancelled['id']}/cancel")->assertStatus(422);
 
-        $this->fake->failStartWith(new \RuntimeException('device offline'));
-        $this->createRequest($ctx, 11500)->assertCreated()->assertJsonPath('data.status', 'error')->assertJsonPath('data.failure_code', 'terminal_start_failed');
+        // استثناء من المحوّل = نتيجة غامضة: يبقى sent بعلامة start_unconfirmed ويحجز الجهاز (لا خصم ثانٍ) حتى يُستعلَم أو يُلغى.
+        $this->fake->failStartWith(new \RuntimeException('response lost'));
+        $ambiguous = $this->createRequest($ctx, 11500)->assertCreated()->assertJsonPath('data.status', 'sent')->assertJsonPath('data.failure_code', 'start_unconfirmed')->json('data.id');
         $this->fake->failStartWith(null);
+        $this->createRequest($ctx, 11500)->assertStatus(409)->assertJsonPath('reason', 'terminal_busy');
+        $this->fake->script($ambiguous, 'approved');
+        $this->show($ctx, $ambiguous)->assertOk()->assertJsonPath('data.status', 'approved')->assertJsonPath('data.failure_code', null);
+        $this->withToken($ctx['token'])->postJson("/api/pos/terminal-requests/{$ambiguous}/void")->assertOk()->assertJsonPath('data.status', 'voided');
+
+        // فشل قاطع يعلنه المحوّل (لم يُرسَل شيء) ⇒ error نهائي ويتحرر الجهاز.
+        $definitive = $this->createRequest($ctx, 11500)->assertCreated()->json('data.id');
+        $this->assertSame('sent', PosTerminalRequest::query()->withoutGlobalScopes()->findOrFail($definitive)->status);
+        $this->withToken($ctx['token'])->postJson("/api/pos/terminal-requests/{$definitive}/cancel")->assertOk();
 
         $cash = $this->methodBySettlement($ctx, 'cash');
         $this->createRequest($ctx, 11500, method: $cash['id'])->assertStatus(422)->assertJsonPath('reason', 'method_not_card');
@@ -188,22 +198,31 @@ class PosTerminalFoundationTest extends TestCase
         $this->assertSame('sent', PosTerminalRequest::query()->withoutGlobalScopes()->findOrFail($pending)->status);
         $this->withToken($ctx['token'])->postJson("/api/pos/terminal-requests/{$pending}/cancel")->assertOk();
 
-        // 2) مبلغ لا يطابق المبلغ الموافَق عليه ⇒ رفض + إلغاء آلي للموافقة (لا موافقة يتيمة).
+        // 2) مبلغ لا يطابق المبلغ الموافَق عليه ⇒ رفض، وتبقى الموافقة قائمة (لم تجتز التحقق فلا تُعوَّض آلياً)؛ يُلغيها الكاشير أو المجدول.
         $mismatch = $this->approvedRequest($ctx, 11000);
         $this->checkout($ctx, [['payment_method_id' => $card, 'amount' => 11500, 'terminal_request_id' => $mismatch]])->assertStatus(422);
-        $this->assertSame('voided', PosTerminalRequest::query()->withoutGlobalScopes()->findOrFail($mismatch)->status);
-        $this->assertContains($mismatch, $this->fake->voided);
+        $this->assertSame('approved', PosTerminalRequest::query()->withoutGlobalScopes()->findOrFail($mismatch)->status);
+        $this->assertSame([], $this->fake->voided);
+        $this->withToken($ctx['token'])->postJson("/api/pos/terminal-requests/{$mismatch}/void")->assertOk()->assertJsonPath('data.status', 'voided');
 
-        // 3) فشل بعد الاستهلاك داخل المعاملة (مبلغ بنكي يتجاوز المتبقي) ⇒ تراجع كامل + إلغاء آلي.
+        // 3) فشل بعد اجتياز الموافقة كل الفحوص (مبلغ بنكي يتجاوز المتبقي) ⇒ تراجع كامل + إلغاء آلي.
         $over = $this->approvedRequest($ctx, 20000);
         $this->checkout($ctx, [['payment_method_id' => $card, 'amount' => 20000, 'terminal_request_id' => $over]])->assertStatus(422);
         $this->assertSame('voided', PosTerminalRequest::query()->withoutGlobalScopes()->findOrFail($over)->status);
+        $this->assertContains($over, $this->fake->voided);
         $this->assertNull(PosTerminalRequest::query()->withoutGlobalScopes()->findOrFail($over)->consumed_payment_id);
 
-        // 4) مراجع يدوية مع موافقة الجهاز مرفوضة.
+        // 4) مراجع يدوية مع موافقة الجهاز مرفوضة قبل التحقق من الموافقة ⇒ لا إلغاء آلي.
         $manual = $this->approvedRequest($ctx, 11500);
         $this->checkout($ctx, [['payment_method_id' => $card, 'amount' => 11500, 'terminal_request_id' => $manual, 'rrn' => '123456789012']])->assertStatus(422);
-        $this->assertSame('voided', PosTerminalRequest::query()->withoutGlobalScopes()->findOrFail($manual)->status);
+        $this->assertSame('approved', PosTerminalRequest::query()->withoutGlobalScopes()->findOrFail($manual)->status);
+
+        // 5) وسيلة خاطئة بنفس الجلسة (ملاحظة Codex): موافقة صالحة لا تُلغى بسبب طلب خاطئ.
+        $transfer = $this->methodNamed($ctx, 'تحويل بنكي');
+        $this->checkout($ctx, [['payment_method_id' => $transfer['id'], 'amount' => 11500, 'terminal_request_id' => $manual]])->assertStatus(422);
+        $this->assertSame('approved', PosTerminalRequest::query()->withoutGlobalScopes()->findOrFail($manual)->status);
+        $this->assertNotContains($manual, $this->fake->voided);
+        $this->withToken($ctx['token'])->postJson("/api/pos/terminal-requests/{$manual}/void")->assertOk();
 
         $this->assertSame(0, Invoice::query()->count());
         $this->assertSame(0, Payment::query()->count());

@@ -56,15 +56,7 @@ class PosTerminalService
             $request = DB::transaction(function () use ($actor, $data, $amount) {
                 $existing = PosTerminalRequest::query()->where('idempotency_key', $data['idempotency_key'])->lockForUpdate()->first();
                 if ($existing !== null) {
-                    $same = $existing->pos_session_id === $data['pos_session_id']
-                        && $existing->pos_payment_terminal_id === $data['pos_payment_terminal_id']
-                        && $existing->payment_method_id === $data['payment_method_id']
-                        && $existing->amount === $amount;
-                    if (! $same) {
-                        throw new PosTerminalException('idempotency_conflict', 'مفتاح الطلب استُعمل بمحتوى مختلف.');
-                    }
-
-                    return $existing->setAttribute('idempotent_replay', true);
+                    return $this->replayOf($existing, $data, $amount);
                 }
 
                 $session = $this->sessions->requireOpenForCheckout($data['pos_session_id'], $actor->id, $actor);
@@ -89,9 +81,10 @@ class PosTerminalService
             });
         } catch (QueryException $e) {
             // الفهرس الجزئي: طلب نشط واحد لكل جهاز (أو سباق المفتاح نفسه).
+            // سباق المفتاح نفسه: الفائز يُعاد كـreplay **بعد** فحص تطابق المحتوى كالمسار العادي، وإلا تعارض.
             $existing = PosTerminalRequest::query()->where('idempotency_key', $data['idempotency_key'])->first();
             if ($existing !== null) {
-                return $existing->setAttribute('idempotent_replay', true);
+                return $this->replayOf($existing, $data, $amount);
             }
             throw new PosTerminalException('terminal_busy', 'على الجهاز طلب نشط؛ أنهِه أو ألغِه أولاً.');
         }
@@ -100,15 +93,31 @@ class PosTerminalService
             return $request;
         }
 
-        // استدعاء الجهاز خارج المعاملة. فشل الاستدعاء ⇒ error (لم تُطلَب أي موافقة بعد).
+        // استدعاء الجهاز خارج المعاملة. **استثناء من المحوّل = نتيجة غامضة** (قد يكون الجهاز استلم الطلب ووافق وضاع الردّ): يبقى الطلب `sent`
+        // بعلامة `start_unconfirmed` فيحجز الجهاز (طلب نشط واحد) ويستعلمه الكاشير/المجدول ويلغيه — لا `error` نهائياً يحرّر الجهاز لخصم ثانٍ.
+        // الفشل القاطع (لم يُرسَل شيء) يعيده المحوّل نتيجة ERROR صريحة.
         try {
             $terminal = PosPaymentTerminal::query()->findOrFail($request->pos_payment_terminal_id);
             $result = $this->adapters->for($terminal->provider)->start($terminal, $request);
         } catch (Throwable $e) {
-            return $this->apply($request->id, new PosTerminalResult(PosTerminalResult::ERROR, failureCode: 'terminal_start_failed'));
+            return $this->apply($request->id, new PosTerminalResult(PosTerminalResult::PENDING, failureCode: 'start_unconfirmed'));
         }
 
         return $this->settle($this->apply($request->id, $result));
+    }
+
+    /** @param array<string,mixed> $data */
+    private function replayOf(PosTerminalRequest $existing, array $data, int $amount): PosTerminalRequest
+    {
+        $same = $existing->pos_session_id === $data['pos_session_id']
+            && $existing->pos_payment_terminal_id === $data['pos_payment_terminal_id']
+            && $existing->payment_method_id === $data['payment_method_id']
+            && $existing->amount === $amount;
+        if (! $same) {
+            throw new PosTerminalException('idempotency_conflict', 'مفتاح الطلب استُعمل بمحتوى مختلف.');
+        }
+
+        return $existing->setAttribute('idempotent_replay', true);
     }
 
     /** يستعلم الجهاز (الحقيقة) ويطبّق النتيجة على طلب قيد التنفيذ. */
@@ -183,13 +192,14 @@ class PosTerminalService
     // ═══════════════ التكامل مع البيع (داخل معاملة checkout) ═══════════════
 
     /**
-     * يقفل ويتحقق من الموافقات التي تحملها وسائل الدفع. أي خلل ⇒ استثناء يُرجع البيع كاملاً (والتعويض يعمل بعد التراجع).
+     * يقفل ويتحقق من الموافقات التي تحملها وسائل الدفع. أي خلل ⇒ استثناء يُرجع البيع كاملاً. `$claimedIds` يُملأ بالموافقات التي اجتازت التحقق فقط
+     * (بالمرجع، فيبقى متاحاً بعد تراجع المعاملة) وهي وحدها ما يُعوَّض آلياً إن فشل البيع بعدها.
      *
      * @param  list<array<string,mixed>>  $tenders
      * @param  array<string, PaymentMethod>  $methods  مفهرسة بمعرّف الوسيلة
      * @return array<string, PosTerminalRequest> مفهرسة بمعرّف الوسيلة
      */
-    public function claimApprovals(array $tenders, array $methods, PosSession $session): array
+    public function claimApprovals(array $tenders, array $methods, PosSession $session, array &$claimedIds = []): array
     {
         $claimed = [];
         foreach ($tenders as $tender) {
@@ -231,6 +241,8 @@ class PosTerminalService
                 throw new PosTerminalException('approval_duplicate', 'لا يمكن تكرار موافقة الجهاز نفسها.');
             }
             $claimed[$methodId] = $request;
+            // لا تعويض آلي إلا لموافقة اجتازت **كل** فحوص هذا البيع (جلسة/وسيلة/مبلغ/توفر)؛ موافقة صالحة رُفض استعمالها لخلل في الطلب لا تُلغى.
+            $claimedIds[] = $request->id;
         }
 
         return $claimed;
@@ -413,12 +425,18 @@ class PosTerminalService
             $refs = ['provider_ref' => $result->providerRef ?? $request->provider_ref];
             switch ($result->status) {
                 case PosTerminalResult::PENDING:
-                    $request->update([...$refs, 'status' => PosTerminalRequest::STATUS_SENT]);
+                    $request->update([
+                        ...$refs,
+                        'status' => PosTerminalRequest::STATUS_SENT,
+                        // نتيجة استعلام لاحقة تمسح علامة "غير مؤكد" السابقة؛ العلامة تُكتب فقط مع نتيجة غامضة.
+                        'failure_code' => $result->failureCode !== null ? substr($result->failureCode, 0, 48) : null,
+                    ]);
                     break;
                 case PosTerminalResult::APPROVED:
                     $request->update([
                         ...$refs,
                         'status' => PosTerminalRequest::STATUS_APPROVED,
+                        'failure_code' => null,
                         'approval_code' => $result->approvalCode,
                         'rrn' => $result->rrn,
                         'last4' => $result->last4,
