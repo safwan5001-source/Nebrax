@@ -9,7 +9,7 @@ use DomainException;
  *
  * الرموز: rollout_disabled · platform_stop · forbidden · invalid_idempotency_key · idempotency_conflict · gateway_unavailable ·
  * adapter_unavailable · invalid_payable · invalid_snapshot · nothing_due · currency_unsupported · active_attempt_exists · provider_unavailable · attempt_not_found ·
- * not_started · provider_reference_mismatch · cannot_cancel.
+ * not_started · provider_reference_mismatch · cannot_cancel · provider_unresolved · payable_changed.
  */
 final class PaymentOrchestrationException extends DomainException
 {

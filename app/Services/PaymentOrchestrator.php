@@ -156,6 +156,13 @@ final class PaymentOrchestrator
     {
         $this->assertActor($actor);
 
+        // محاولة `created` قد تكون صفحة دفعها أُنشئت فعلاً لدى المزوّد (استجابة ضائعة): تُحسم بمفتاحها الثابت أولاً كي يُحفظ
+        // مرجعها قبل الإلغاء، فيُكشف أي التقاط لاحق (D-15). تعذّر المزوّد ⇒ لا إلغاء الآن (تُعاد المحاولة).
+        $current = $this->reload($attempt);
+        if ($current->capture_status === PaymentAttempt::STATUS_CREATED) {
+            $this->resolveCheckout($current);
+        }
+
         return DB::transaction(function () use ($attempt): PaymentAttempt {
             $locked = PaymentAttempt::query()->lockForUpdate()->find($attempt->getKey());
             if ($locked === null) {
@@ -227,6 +234,27 @@ final class PaymentOrchestrator
             throw new PaymentOrchestrationException('idempotency_conflict', 'مفتاح منع التكرار مستعمل لطلب مختلف.');
         }
 
+        // محاولة لم تكتمل لدى المزوّد ستُستأنف بمبلغها المجمَّد: لا تُستأنف إن لم يعد الـPayable صالحاً أو تغيّر مبلغه/عملته
+        // (سُدِّد جزء منه مثلاً). تُحسم وتُغلق (بمرجعها إن وُجد لدى المزوّد) ثم يُرفض الطلب ليبدأ العميل بمفتاح جديد.
+        if ($existing->capture_status === PaymentAttempt::STATUS_CREATED) {
+            $failure = null;
+            $changed = false;
+            try {
+                $payable->assertStillPayable();
+                $changed = $payable->amountDueMinor() !== (int) $existing->amount_minor || strtoupper($payable->currency()) !== $existing->currency;
+            } catch (Throwable $e) {
+                $failure = $e;
+            }
+            if ($failure !== null || $changed) {
+                $this->resolveCheckout($existing);
+                $this->cancel($existing);
+                if ($failure !== null) {
+                    throw $failure;
+                }
+                throw new PaymentOrchestrationException('payable_changed', 'تغيّر المبلغ المستحق؛ ابدأ محاولة جديدة.');
+            }
+        }
+
         return $existing;
     }
 
@@ -237,6 +265,23 @@ final class PaymentOrchestrator
             return $attempt;
         }
         $this->assertUsable($gateway);
+
+        return $this->requestAndPersistCheckout($attempt, $gateway);
+    }
+
+    /** حسم نتيجة استدعاء مزوّد لم يكتمل (للإلغاء/الإغلاق): بمفتاحه الثابت، ولا يشترط تفعيل الاتصال بل بقاء أسراره. */
+    private function resolveCheckout(PaymentAttempt $attempt): PaymentAttempt
+    {
+        $gateway = PaymentGateway::query()->find($attempt->payment_gateway_id);
+        if ($gateway === null || in_array($gateway->status, [PaymentGateway::STATUS_DRAFT, PaymentGateway::STATUS_REVOKED], true)) {
+            throw new PaymentOrchestrationException('provider_unresolved', 'تعذّر حسم نتيجة المحاولة لدى المزوّد.');
+        }
+
+        return $this->requestAndPersistCheckout($attempt, $gateway);
+    }
+
+    private function requestAndPersistCheckout(PaymentAttempt $attempt, PaymentGateway $gateway): PaymentAttempt
+    {
         $adapter = $this->adapters->for($gateway->provider);
 
         try {
@@ -250,7 +295,16 @@ final class PaymentOrchestrator
         return DB::transaction(function () use ($attempt, $checkout): PaymentAttempt {
             $locked = PaymentAttempt::query()->lockForUpdate()->findOrFail($attempt->getKey());
             if ($locked->capture_status !== PaymentAttempt::STATUS_CREATED) {
-                return $locked; // تقدّم طلب آخر أو أُلغيت أثناء الاستدعاء
+                // تقدّم طلب آخر أو سبقه إلغاء أثناء الاستدعاء: المرجع الذي أنشأه المزوّد يُحفظ دائماً (يكشف أي التقاط لاحق)، دون تغيير الحالة.
+                if ($locked->provider_payment_id === null) {
+                    $locked->forceFill([
+                        'provider_payment_id' => $checkout->providerPaymentId,
+                        'checkout_url' => $checkout->checkoutUrl,
+                        'expires_at' => $checkout->expiresAt,
+                    ])->save();
+                }
+
+                return $locked;
             }
             $locked->forceFill([
                 'provider_payment_id' => $checkout->providerPaymentId,

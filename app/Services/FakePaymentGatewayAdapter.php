@@ -28,6 +28,9 @@ final class FakePaymentGatewayAdapter implements GatewayAdapter
     /** @var array<string, PaymentProviderSnapshot> */
     private array $snapshots = [];
 
+    /** يُنفَّذ داخل `createCheckout` بعد تسجيل الدفعة وقبل الإرجاع — يحاكي سباقاً (إلغاء) أثناء استدعاء المزوّد. */
+    public ?\Closure $onCheckout = null;
+
     private int $failCheckouts = 0;
 
     private ?\Throwable $fetchFailure = null;
@@ -58,6 +61,9 @@ final class FakePaymentGatewayAdapter implements GatewayAdapter
 
         $id = 'fake_'.$context->attemptId; // نفس المحاولة ⇒ نفس المرجع (idempotent عند المزوّد)
         $this->payments[$id] = ['amount_minor' => $context->amountMinor, 'currency' => $context->currency];
+        if ($this->onCheckout !== null) {
+            ($this->onCheckout)($context);
+        }
 
         return new PaymentHostedCheckout($id, 'https://fake-checkout.invalid/pay/'.$context->attemptId, CarbonImmutable::now('UTC')->addMinutes(30));
     }

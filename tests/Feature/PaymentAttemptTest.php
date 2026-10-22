@@ -181,6 +181,83 @@ class PaymentAttemptTest extends TestCase
         $this->assertSame([$stuck->id, $stuck->id], array_column($this->fake->checkoutCalls, 'attempt_id'), 'المحاولتان بمفتاح المزوّد نفسه');
     }
 
+    #[Test]
+    public function cancelling_an_unresolved_attempt_first_resolves_the_provider_call_so_a_late_capture_is_detected(): void
+    {
+        $this->fake->failNextCheckouts(1);
+        $this->thrown(fn () => $this->orchestrator->start(new TestPayable, $this->gateway, 'idem-key-0031'), 'outage', PaymentOrchestrationException::class);
+        $stuck = PaymentAttempt::query()->firstOrFail();
+        $this->assertNull($stuck->provider_payment_id);
+
+        $cancelled = $this->orchestrator->cancel($stuck);
+
+        $this->assertSame(PaymentAttempt::STATUS_CANCELLED, $cancelled->capture_status);
+        $this->assertSame('fake_'.$stuck->id, $cancelled->provider_payment_id, 'المرجع حُسم بمفتاح المحاولة قبل الإلغاء');
+        $this->assertCount(2, $this->fake->checkoutCalls);
+
+        $this->fake->script($cancelled->provider_payment_id, 'captured');
+        $result = $this->orchestrator->sync($cancelled);
+        $this->assertTrue($result->applied);
+        $this->assertSame([PaymentAttempt::REVIEW_LATE_CAPTURE], $result->attempt->review_reasons);
+    }
+
+    #[Test]
+    public function an_unresolved_attempt_is_not_cancelled_while_the_provider_is_unreachable(): void
+    {
+        $this->fake->failNextCheckouts(2);
+        $this->thrown(fn () => $this->orchestrator->start(new TestPayable, $this->gateway, 'idem-key-0032'), 'outage', PaymentOrchestrationException::class);
+        $stuck = PaymentAttempt::query()->firstOrFail();
+
+        $e = $this->thrown(fn () => $this->orchestrator->cancel($stuck), 'still down', PaymentOrchestrationException::class);
+
+        $this->assertSame('provider_unavailable', $e->reason);
+        $this->assertSame(PaymentAttempt::STATUS_CREATED, PaymentAttempt::query()->findOrFail($stuck->id)->capture_status);
+    }
+
+    #[Test]
+    public function a_cancel_that_wins_the_race_against_the_checkout_call_still_keeps_the_provider_reference(): void
+    {
+        $this->fake->onCheckout = function ($context): void {
+            DB::table('payment_attempts')->where('id', $context->attemptId)->update(['capture_status' => PaymentAttempt::STATUS_CANCELLED]);
+        };
+
+        $attempt = $this->orchestrator->start(new TestPayable, $this->gateway, 'idem-key-0033');
+
+        $this->assertSame(PaymentAttempt::STATUS_CANCELLED, $attempt->capture_status, 'الإلغاء الأسبق يبقى');
+        $this->assertSame('fake_'.$attempt->id, $attempt->provider_payment_id, 'لكن مرجع المزوّد محفوظ');
+        $this->fake->script($attempt->provider_payment_id, 'captured');
+        $this->assertTrue($this->orchestrator->sync($attempt)->applied, 'الالتقاط المتأخر يُكتشف');
+    }
+
+    #[Test]
+    public function resuming_an_unfinished_attempt_revalidates_the_payable_and_closes_a_stale_one(): void
+    {
+        // سُدِّد جزء من المستند بعد انقطاع المزوّد: لا تُستأنف المحاولة بمبلغها القديم.
+        $payable = new TestPayable(due: 20000);
+        $this->fake->failNextCheckouts(1);
+        $this->thrown(fn () => $this->orchestrator->start($payable, $this->gateway, 'idem-key-0034'), 'outage', PaymentOrchestrationException::class);
+        $payable->due = 5000;
+
+        $e = $this->thrown(fn () => $this->orchestrator->start($payable, $this->gateway, 'idem-key-0034'), 'changed', PaymentOrchestrationException::class);
+        $this->assertSame('payable_changed', $e->reason);
+        $closed = PaymentAttempt::query()->firstOrFail();
+        $this->assertSame(PaymentAttempt::STATUS_CANCELLED, $closed->capture_status);
+        $this->assertSame(20000, $closed->amount_minor);
+        $this->assertNotNull($closed->provider_payment_id, 'حُسم لدى المزوّد قبل الإغلاق');
+
+        // ومحاولة جديدة بمفتاح جديد تأخذ المبلغ الحالي.
+        $fresh = $this->orchestrator->start($payable, $this->gateway, 'idem-key-0035');
+        $this->assertSame(5000, $fresh->amount_minor);
+
+        // لم يعد قابلاً للدفع أصلاً: يُرفض بسببه وتُغلق المحاولة العالقة.
+        $other = new TestPayable(key: 'invoice:gone');
+        $this->fake->failNextCheckouts(1);
+        $this->thrown(fn () => $this->orchestrator->start($other, $this->gateway, 'idem-key-0036'), 'outage 2', PaymentOrchestrationException::class);
+        $other->payable = false;
+        $this->thrown(fn () => $this->orchestrator->start($other, $this->gateway, 'idem-key-0036'), 'unpayable', DomainException::class);
+        $this->assertSame(PaymentAttempt::STATUS_CANCELLED, PaymentAttempt::query()->where('idempotency_key', 'idem-key-0036')->firstOrFail()->capture_status);
+    }
+
     // ═══════════════ ضابط التفعيل ═══════════════
 
     #[Test]
