@@ -31,7 +31,7 @@ use Illuminate\Support\Str;
  *  إدراج حدث تدقيق في المعاملة نفسها؛ مُشغّل القاعدة يطبّق الحالة ذرّياً (مقارنة-وتبديل بالنسخة). طلب حالة قائمة أصلاً لا يكتب شيئاً.
  *
  *  ═══ بوابة D-25 (ADR-0004 §5) ═══
- *  **تفعيل** مستأجر يُرفض (`scheduler_unproven`) ما لم تكن نبضة `scheduler` طازجة (≤ ضعف الفاصل). الإيقاف ورفع إيقاف المنصة لا يُبوَّبان:
+ *  **انتقال** مستأجر إلى «مفعَّل» يُرفض (`scheduler_unproven`) ما لم تكن نبضة `scheduler` طازجة (≤ ضعف الفاصل). طلب تفعيل قائم أصلاً (idempotent) والإيقاف ورفع إيقاف المنصة لا يُبوَّبان:
  *  الإيقاف إجراء أمان، ورفع إيقاف المنصة لا يفعّل مستأجراً لم يُفعَّل أصلاً.
  *
  *  ═══ استراتيجية القفل (للتغييرات) ═══
@@ -110,17 +110,13 @@ final class PaymentsRolloutControlService
         return DB::transaction(function () use ($actor, $tenantId, $enabled, $reason, $feature): PaymentsRolloutChange {
             $this->assertAuthorizedActor($actor);
 
-            if ($enabled && ! SchedulerHeartbeat::isFresh()) {
-                throw new PaymentsRolloutControlException('scheduler_unproven');
-            }
-
             // مِرساة المستأجر قبل الضابط (انظر ترتيب الأقفال أعلاه). مستأجر محذوف ناعماً أو غير موجود ⇒ مرفوض.
             $tenant = Tenant::query()->whereKey($tenantId)->lockForUpdate()->first();
             if ($tenant === null) {
                 throw new PaymentsRolloutControlException('tenant_not_found');
             }
 
-            return $this->applyChange($actor, PaymentsRolloutControl::SCOPE_TENANT, $tenantId, $feature, $enabled, $reason);
+            return $this->applyChange($actor, PaymentsRolloutControl::SCOPE_TENANT, $tenantId, $feature, $enabled, $reason, requireScheduler: true);
         });
     }
 
@@ -150,6 +146,7 @@ final class PaymentsRolloutControlService
         string $feature,
         bool $enabled,
         string $reason,
+        bool $requireScheduler = false,
     ): PaymentsRolloutChange {
         // الحالة الأساسية عند غياب الصف: مستأجر معطَّل، منصة بلا إيقاف.
         $baseline = $scope === PaymentsRolloutControl::SCOPE_PLATFORM;
@@ -159,6 +156,8 @@ final class PaymentsRolloutControlService
             if ($enabled === $baseline) {
                 return new PaymentsRolloutChange(false, $baseline, $baseline, null);
             }
+
+            $this->assertSchedulerProven($enabled, $requireScheduler);
 
             // ON CONFLICT DO NOTHING: تسابق إنشاءين لا يُجهض المعاملة؛ الخاسر يقرأ صف الفائز بقفل.
             DB::table('payments_rollout_controls')->insertOrIgnore([
@@ -182,6 +181,9 @@ final class PaymentsRolloutControlService
             return new PaymentsRolloutChange(false, $previous, $previous, null);
         }
 
+        // البوابة على انتقال فعلي إلى «مفعَّل» فقط: إعادة طلب تفعيل قائم (بعد ضياع الاستجابة مثلاً) تبقى idempotent أثناء تعطل المجدول.
+        $this->assertSchedulerProven($enabled, $requireScheduler);
+
         // إدراج الحدث هو التغيير: مُشغّل القاعدة يطبّق الحالة بمقارنة-وتبديل على النسخة والحالة السابقة.
         $event = new PaymentsRolloutControlEvent([
             'control_id' => $control->id,
@@ -198,6 +200,13 @@ final class PaymentsRolloutControlService
         $event->save();
 
         return new PaymentsRolloutChange(true, $previous, $enabled, $event->id);
+    }
+
+    private function assertSchedulerProven(bool $enabling, bool $required): void
+    {
+        if ($enabling && $required && ! SchedulerHeartbeat::isFresh()) {
+            throw new PaymentsRolloutControlException('scheduler_unproven');
+        }
     }
 
     private function lockedControl(string $scope, ?string $tenantId, string $feature): ?PaymentsRolloutControl

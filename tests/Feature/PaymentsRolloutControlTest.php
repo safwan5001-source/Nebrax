@@ -332,6 +332,11 @@ class PaymentsRolloutControlTest extends TestCase
         $this->assertSame(0, DB::table('payments_rollout_controls')->where('tenant_id', $other)->count(), 'الرفض لا يكتب صفاً ولا حدثاً');
         $this->assertSame(0, DB::table('payments_rollout_control_events')->where('tenant_id', $other)->count());
 
+        // إعادة طلب تفعيل قائم أصلاً لا تُبوَّب (idempotent) حتى والمجدول غير مثبت.
+        $retry = $this->service->setTenantState($this->admin, $tenant, true, 'إعادة محاولة بعد ضياع الاستجابة');
+        $this->assertFalse($retry->changed);
+        $this->assertSame(1, DB::table('payments_rollout_control_events')->where('tenant_id', $tenant)->count());
+
         // الإيقاف (تعطيل مستأجر + إيقاف المنصة + رفعه) غير مبوَّب.
         $this->assertTrue($this->service->setTenantState($this->admin, $tenant, false, 'إيقاف بلا مجدول')->changed);
         $this->assertTrue($this->service->setPlatformState($this->admin, false, 'إيقاف طارئ بلا مجدول')->changed);

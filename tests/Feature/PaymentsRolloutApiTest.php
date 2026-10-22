@@ -116,6 +116,7 @@ class PaymentsRolloutApiTest extends TestCase
 
         $this->withToken($token)->getJson('/api/platform/payments-rollout')->assertOk()->assertJsonPath('data.scheduler.fresh', false);
         $this->withToken($token)->putJson("/api/platform/tenants/{$b['tenant_id']}/payments-rollout", ['enabled' => true, 'reason' => 'مجدول غير مثبت'])->assertStatus(409);
+        $this->withToken($token)->putJson($uri, ['enabled' => true, 'reason' => 'إعادة محاولة بعد ضياع الاستجابة'])->assertOk()->assertJsonPath('data.changed', false);
         $this->withToken($token)->putJson($uri, ['enabled' => false, 'reason' => 'تعطيل مسموح دائماً'])->assertOk()->assertJsonPath('data.changed', true);
         $this->assertSame(0, DB::table('payments_rollout_controls')->where('tenant_id', $b['tenant_id'])->count());
     }
