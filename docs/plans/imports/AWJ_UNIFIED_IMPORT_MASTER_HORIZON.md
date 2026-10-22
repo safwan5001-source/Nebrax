@@ -67,6 +67,8 @@ We do **not** replace any working engine. We introduce one seam per entity, and 
 4. **Name is never an identifier.** Matching uses Nebrax ID → entity code (SKU / partner code / document reference) → registered unique keys (barcode, VAT number as a *duplicate signal*). Fuzzy and name matches are *suggestions* that a human must confirm.
 5. **Approval binds to content.** Execution requires an approval bound to the exact plan hash (the AI Actions model). The standard durable path gains the same binding (preview hash ↔ job file SHA + options), see IMP-H1-S3.
 6. **Configurable policy, not imposed policy** (CLAUDE.md rule 6). Duplicate handling, blank cells and missing master data are per-run options with defaults that preserve today's behavior.
+7. **Every entry path carries the direct API's gates.** A durable job domain (H1-S1 map) and an AI Action type (H1-S7 definition) each declare the **same** permission(s) **and** application key as the entity's direct create endpoint. Invariant tests fail CI when a domain or type is registered without them.
+8. **Both paths, or a recorded exclusion.** Every entity in §3 that has a standard import either has an AI path slice or a `D-xx` exclusion in §7. There is no silent gap.
 
 ### 2.3 Why not merge `ImportJob` and `AiAction` into one table
 
@@ -152,6 +154,14 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
   - Pre-validate the whole file before chunk 1 (in-file duplicates across windows).
   - Expose `failed` partial results as a repair set (re-upload failed rows only).
   - Move remote image fetch outside the job row lock.
+- **IMP-H1-S7 — AI Action type gates.**
+  - Extend the `AiActionRegistry` definition with `application_key` (nullable) and allow more than one `domain_permissions`.
+  - `AiActionPolicy::authorize` (today it checks only `ai.actions.*` + one domain permission, `AiActionPolicy.php:42-45`) also enforces the application key, with `EnsureApplicationActive` semantics: `suspended` means read-only, so reads pass and writes are refused. This reuses the extracted `authorize()` from H1-S1.
+  - `product_import.v1` keeps `products.manage` with no app key (no behavior change).
+  - Invariant test: every registered type declares the gates of its direct API. It must land **before** any new AI Action type (H3-S4, H4-S4, H5-S5, H7-S2, H7-S4). Expected gates:
+    - `expense_import.v1`: `expenses.manage` + `finance.operations`
+    - `purchase_import.v1`: `purchases.manage` + `purchases.cycle`
+    - `inventory_opening_import.v1` / `stocktake_count_import.v1`: `products.manage` + `inventory.core`
 - **IMP-H1-S6 — Zero-value inventory opening date guard.** `InventoryOpeningService::buildEntry` returns `null` for a zero-value document, so `post()` never reaches `AccountingDateGuard` (normally reached via `LedgerService::post`). Stock movements can then be dated inside a closed fiscal year or locked period. The fix asserts the guard explicitly before movements.
   - **Classification check:** this enforces the *existing* FC-3/ACC-6 rule and does not change it. If the reviewer disagrees, escalate to the owner and do not merge.
 
@@ -202,6 +212,8 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
 - **IMP-H5-S2:** Expense standard UI + durable domain.
 - **IMP-H5-S3:** Purchase import adapter.
   - Rows are grouped by `(supplier, supplier_invoice_ref)` into one draft with lines.
+    - **`supplier_invoice_ref` is required by the import** even though `PurchaseService::create` permits a null `supplier_invoice_no`. A row without it is a row error (`purchase_reference_required`). Rows are **never** grouped under `(supplier, null)`, which would merge separate invoices and corrupt totals.
+    - Any future reference-less mode must use an explicit per-document `document_key` column and must be a separate, owner-approved option.
   - Totals are derived; a file total that differs from the derived total is a **row error**, never silently overwritten.
   - Duplicate = an existing purchase with the same supplier + reference. **A pre-insert lookup alone is not enough**, because two concurrent jobs can both see no match. Required design:
     1. A new additive table `import_document_reservations`, `CompanyWide`:
@@ -228,7 +240,11 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
 ### H7 — Inventory
 - **IMP-H7-S1:** Stocktake count-sheet import into an *open* stocktake (counts only; variances are posted by the stocktake's own flow).
 - **IMP-H7-S2:** AI path for inventory opening (AI Action type reusing `InventoryOpeningImportService` parse/preview; posting stays manual).
-- **IMP-H7-S3:** Stock permit lines import (draft permits only).
+- **IMP-H7-S3:** Stock permit lines import (draft permits only). **Standard path only.** The AI path is excluded by **D-09**: permits are low-volume operational documents typed against a known warehouse, and a messy delivery file belongs to the Document Center delivery-note flow, not to spreadsheet AI. The owner may reopen this.
+- **IMP-H7-S4:** AI path for stocktake counts: AI Action `stocktake_count_import.v1` on the H7-S1 adapter.
+  - Gates: `products.manage` + `inventory.core`.
+  - It targets an *open* stocktake only and writes counts only. Variances still post through the stocktake's own flow.
+  - Includes a std↔AI parity test and a PostgreSQL row-lock test on the stocktake.
 - Test bar: PostgreSQL concurrency (row locks on products and the stocktake), branch isolation of warehouses, no duplicate movements on retry.
 
 ### H8 — Unified Import UX
@@ -262,6 +278,7 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
 ```text
 H0 → H1 (S1 independent; S2 before every new domain; S3/S4/S5 independent of each other)
 H1-S2 → H3, H4, H5, H6, H7 (adapters)
+H1-S7 → every new AI Action type (H3-S4, H4-S4, H5-S5, H7-S2, H7-S4)
 H2-S0 → anytime (copy only)       H2-S1/S2 → H2-S5 → H9-S1 (AI writes rely on one product path)
 H3-S1 → H3-S4 (AI reuses adapter)  H5-S1/S3 → H5-S5, H5-S6   H4-S1/S2 → H4-S4
 H8-S1 needs ≥2 entities with both paths (after H3)
@@ -298,6 +315,7 @@ H6 blocked on D-03 → skip and continue with H7, return when decided
 | D-05 | Partner duplicate keys | Default: VAT number duplicate = `error`; phone/email = `warn`. Per-run configurable. | Non-blocking (configurable default) |
 | D-06 | Employees import | Out of this Horizon (PII + payroll linkage). | — |
 | D-07 | Journal entries / account opening balances import | Separate accounting Horizon. | — |
+| D-09 | AI path for stock permit lines | Excluded. Low volume, a known warehouse, and documents belong to the Document Center delivery-note flow. The owner may reopen this. | — (recorded exclusion) |
 | D-08 | AI path for unit templates | Excluded: conversion factors multiply stock quantities, so only the standard, create-only path is offered. The owner may reopen this. | — (recorded exclusion) |
 | OPS-01 | Enabling `AI_ACTIONS_EXECUTION_ENABLED`, remote image fetch, staged-image purge schedule | Owner approval (unchanged from AI-ACTIONS-08). | Activation only |
 

@@ -102,7 +102,7 @@ There is one execution core and two experiences. Every new entity gets an `Impor
 
 ### 3.5 After merge
 
-Continue with **IMP-H1-S2** (the adapter contract; characterization tests first). Then H1-S3 → S4 → S5 → S6, H2-S0..S5, and H3 onward, as in the tracker.
+Continue with **IMP-H1-S2** (the adapter contract; characterization tests first). Then H1-S7 → S3 → S4 → S5 → S6, H2-S0..S5, and H3 onward, as in the tracker.
 
 **Review-derived requirements already folded into the plan:**
 - Per-domain authorization (H1-S1).
@@ -111,6 +111,10 @@ Continue with **IMP-H1-S2** (the adapter contract; characterization tests first)
 - Concurrency-safe document de-duplication through `import_document_reservations`, keyed by a **domain-specific** `dedupe_key`, plus a counterparty row lock and a PostgreSQL test (H5-S1/S3).
 - Document Center draft builders go through the same validation and reservation layer (H5-S6).
 - AI paths for master data come through `master_data_import.v1` (H4-S4). Unit templates are standard-only (D-08).
+- AI Action types declare the direct API's permission(s) **and** application key (H1-S7, before any new type).
+- Purchase rows require `supplier_invoice_ref` and are never grouped under a null reference (H5-S3).
+- Stocktake counts get an AI path (H7-S4). Stock permits are standard-only (D-09).
+- Order after H1-S1: H1-S2 → H1-S7 → H1-S3 → H1-S4 → H1-S5 → H1-S6.
 
 ## 4. Known traps (save yourself time)
 

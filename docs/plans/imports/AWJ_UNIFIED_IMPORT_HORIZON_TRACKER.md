@@ -12,7 +12,7 @@
 |---|---|
 | Last merged slice | — (H0 in review: PR #1595) |
 | **Next slice** | **IMP-H1-S1** — import-jobs app gate + prune media archive (see `AWJ_IMPORT_OPUS_HANDOFF.md` §3) |
-| Open owner decisions | D-01, D-02, D-03, D-04, D-06, D-07, OPS-01 (D-05 has a non-blocking default; D-08 is a recorded exclusion) |
+| Open owner decisions | D-01, D-02, D-03, D-04, D-06, D-07, OPS-01 (D-05 has a non-blocking default; D-08/D-09 are recorded exclusions) |
 | Railway state | Unknown (owner-reported stall; no access from the agent) |
 
 ## Slice log
@@ -25,6 +25,7 @@
 | IMP-H1-S3 | ✅ | — | Required preview-hash ↔ job binding (legacy in-flight jobs only grandfathered); UI idempotency key; throttle | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H1-S4 | ✅ | ✅ | Spreadsheet scan admission (policy; prod enable = D-04) | — | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H1-S5 | ✅ | — | Catalog job: whole-file pre-validation, failed-rows repair set, fetch outside lock | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
+| IMP-H1-S7 | — | ✅ | AI Action type gates: `application_key` + multi-permission in registry/policy; invariant test | H1-S1 | — | — | — | — | — | — | — | — | — | Planned | Before any new AI type |
 | IMP-H1-S6 | ✅ | — | Zero-value opening hits `AccountingDateGuard` | — | — | — | — | — | — | — | — | — | — | Planned | Confirm classification (master §4) |
 | IMP-H2-S0 | — | ✅ | Honest AI labeling on products AI import | — | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H2-S1 | ✅ | — | V2 create via `ProductService::create` (characterized) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
@@ -43,14 +44,15 @@
 | IMP-H4-S4 | — | ✅ | AI Action `master_data_import.v1` (categories/brands, price-list items) + parity | H4-S1, H4-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H5-S1 | ✅ | — | Expense adapter (drafts, derived tax, `import_document_reservations` with full-predicate key) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H5-S2 | ✅ | — | Expense UI + durable domain | H5-S1 | — | — | — | — | — | — | — | — | — | Planned | — |
-| IMP-H5-S3 | ✅ | — | Purchase adapter (grouped drafts, derived totals, `import_document_reservations` + supplier lock, PG concurrency test) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
+| IMP-H5-S3 | ✅ | — | Purchase adapter (grouped drafts with required `supplier_invoice_ref`, derived totals, `import_document_reservations` + supplier lock, PG concurrency test) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H5-S4 | ✅ | — | Purchase UI + durable domain | H5-S3 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H5-S5 | — | ✅ | AI Action types `expense_import.v1` / `purchase_import.v1` | H5-S1, H5-S3 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H5-S6 | — | ✅ | Document Center draft builders call adapter validation + reservations; cross-source dup test (PG); entry link | H5-S1, H5-S3 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H6-S1..S3 | ✅ | ✅ | Sales invoice drafts (no post, no ZATCA) | **D-03** | — | — | — | — | — | — | — | — | — | Blocked (D-03) | Skip to H7 until decided |
 | IMP-H7-S1 | ✅ | — | Stocktake count-sheet import | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H7-S2 | — | ✅ | AI path for inventory opening | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
-| IMP-H7-S3 | ✅ | — | Stock permit lines import (drafts) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
+| IMP-H7-S3 | ✅ | ⛔ D-09 | Stock permit lines import (drafts; AI excluded by D-09) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
+| IMP-H7-S4 | — | ✅ | AI Action `stocktake_count_import.v1` + parity + PG lock test | H7-S1, H1-S7 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H8-S1 | ✅ | ✅ | Import Hub `/imports` (visual research first) | H3 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H8-S2 | ✅ | ✅ | Saved mapping presets (new table) | H8-S1 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H8-S3 | ✅ | ✅ | Entry points on entity pages | H8-S1 | — | — | — | — | — | — | — | — | — | Planned | — |
