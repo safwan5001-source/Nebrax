@@ -53,7 +53,7 @@ DATE: 2026-10-22
 ## Merge / Post-merge
 
 - Merge: دمجه المالك (PR #1612، `34beba984`). لا Deploy.
-- POST_MERGE_REVIEW: PENDING — CI على `main` للـSHA أعلاه (run 39842242507) لم يكتمل وقت التسجيل؛ يُسجَّل PASS بعد اكتماله أخضر.
+- POST_MERGE_REVIEW: **PASS** — CI أخضر على `main` للـSHA أعلاه (run 39842242507، sqlite + pgsql).
 
 ## Self-review
 
