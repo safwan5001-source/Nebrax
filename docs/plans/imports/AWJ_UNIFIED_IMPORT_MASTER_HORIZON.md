@@ -437,9 +437,9 @@ H6 blocked on D-03 → skip and continue with H7, return when decided
 | D-07 | Journal entries / account opening balances import | Separate accounting Horizon. | — |
 | D-09 | AI path for stock permit lines | Excluded. Low volume, a known warehouse, and documents belong to the Document Center delivery-note flow. The owner may reopen this. | — (recorded exclusion) |
 | D-08 | AI path for unit templates | Excluded: conversion factors multiply stock quantities, so only the standard, create-only path is offered. The owner may reopen this. | — (recorded exclusion) |
-| D-10 | (parked IMP-X-01) Precedence between the existing env flags and runtime Super Admin controls for AI Actions | Keep the env flags as a hard floor; runtime controls above it. | Only IMP-X-01 |
-| D-11 | (parked IMP-X-01) Default for tenants | Default-deny: Super Admin grant **and** tenant opt-in. | Only IMP-X-01 |
-| D-12 | (parked IMP-X-01) Also model AI Actions as an `ApplicationCatalog` capability for commercial packaging? | Optional, orthogonal to per-type operational control. | Only IMP-X-01 |
+| D-10 | (parked IMP-X-01) Precedence between the existing env flags and runtime Super Admin controls for AI Actions | **Approved 2026-10-22.** Env flags stay a hard floor; runtime controls above it and can only narrow. | Only IMP-X-01 |
+| D-11 | (parked IMP-X-01) Default for tenants | **Approved 2026-10-22.** Default deny: Super Admin grant **and** tenant owner approval; every existing check continues. | Only IMP-X-01 |
+| D-12 | (parked IMP-X-01) Also model AI Actions as an `ApplicationCatalog` capability for commercial packaging? | **Approved in principle 2026-10-22.** Future linkage; commercial entitlement is independent of operational control and never grants execution. | Only IMP-X-01 |
 | OPS-01 | Enabling `AI_ACTIONS_EXECUTION_ENABLED`, remote image fetch, staged-image purge schedule | Owner approval (unchanged from AI-ACTIONS-08). | Activation only |
 
 ---

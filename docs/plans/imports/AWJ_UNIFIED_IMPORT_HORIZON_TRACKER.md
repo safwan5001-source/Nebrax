@@ -73,7 +73,7 @@ Details, reuse analysis, dependencies and acceptance: `AWJ_IMPORT_PARKED_REQUIRE
 
 | ID | Requirement | Status | Window | Depends on | Owner decisions |
 |---|---|---|---|---|---|
-| IMP-X-01 | Super Admin control of AI Actions — global (master + execution), per tenant, per action type; audited; no change to isolation/RBAC/approval | **Parked** | After IMP-H2-S4, before IMP-H3-S4 | H1-S7 (merged), H2-S4 | D-10, D-11, D-12 (open) |
+| IMP-X-01 | Super Admin control of AI Actions — global (master + execution), per tenant, per action type; audited; no change to isolation/RBAC/approval | **Parked** | After IMP-H2-S4, before IMP-H3-S4 | H1-S7 (merged), H2-S4 | D-10 ✅, D-11 ✅, D-12 ✅ in principle (2026-10-22); capability split preview/review/execution is binding |
 
 ## H0 correction record (IMP-H0-S2)
 
@@ -90,7 +90,9 @@ Owner-confirmed and re-verified in code: the AWJ Assistant already contains real
 | ID | Asked | Answer | Date | Effect |
 |---|---|---|---|---|
 | D-01..D-07, OPS-01 | See master plan §7 | _open_ | — | — |
-| D-10..D-12 | Parked IMP-X-01 (env-floor precedence, default-deny, optional catalog capability) — see master plan §7 | _open_ | — | — |
+| D-10 | Env flags stay a hard floor that Super Admin settings cannot override | **Approved** | 2026-10-22 | Binds IMP-X-01 (parked) |
+| D-11 | Default deny: Super Admin grant **and** tenant owner approval; all RBAC/isolation/preview/approval checks continue | **Approved** | 2026-10-22 | Binds IMP-X-01 (parked) |
+| D-12 | AI Actions ↔ ApplicationCatalog/plans supported later; commercial entitlement is independent of operational control and never grants execution | **Approved in principle** | 2026-10-22 | Future; not in first IMP-X-01 slice |
 
 ## Deploy log
 
