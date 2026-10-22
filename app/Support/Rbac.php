@@ -82,6 +82,10 @@ class Rbac
         // مسار ولا قارئ يستعملها بعد (PR-6b).
         'delivery_connector.audit.view',
         'payments.view', 'payments.manage',
+        // PAY-H1-01 (D-08): إدارة اتصالات بوابات الدفع وأسرارها سلطة مستقلة عن `payments.manage`
+        // (تسجيل سندات). owner/admin عبر `*` فقط؛ لا تُضاف لـ`MATRIX` ولا تُمنح لأي دور مخزَّن
+        // بهجرة. القراءة (دون أسرار) تبقى `payments.view`.
+        'payment_gateways.manage',
         'purchases.view', 'purchases.manage',
         'returns.view', 'returns.manage',
         'hr.view', 'hr.manage',

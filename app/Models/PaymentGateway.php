@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\PaymentGatewayException;
 use App\Tenancy\CompanyWide;
 use App\Tenancy\TenantContext;
 use DomainException;
@@ -15,6 +16,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  * الأسرار تُشفَّر at-rest عبر cast `encrypted` (نفس نمط WebhookEndpoint)
  * وتُخفى من التسلسل. لا قيود محاسبية ولا استدعاء مزوّد في هذا الأساس.
+ *
+ * PAY-H1-01: حقول دورة الحياة (`status`، `credential_version`، `webhook_key`، السر السابق…)
+ * خارج `$fillable` عمداً — تُكتب عبر `PaymentGatewayService` وحده. `is_active` مفتاح تشغيل قديم
+ * يبقى للتوافق؛ الاستخدام الفعلي = `isUsable()` (يتطلب الحالتين).
  */
 class PaymentGateway extends BaseModel implements CompanyWide
 {
@@ -27,6 +32,23 @@ class PaymentGateway extends BaseModel implements CompanyWide
     public const PROVIDER_CHECKOUT = 'checkout';
 
     public const PROVIDER_CUSTOM = 'custom';
+
+    public const STATUS_DRAFT = 'draft';
+
+    public const STATUS_ACTIVE = 'active';
+
+    public const STATUS_SUSPENDED = 'suspended';
+
+    public const STATUS_REVOKED = 'revoked';
+
+    public const STATUSES = [
+        self::STATUS_DRAFT,
+        self::STATUS_ACTIVE,
+        self::STATUS_SUSPENDED,
+        self::STATUS_REVOKED,
+    ];
+
+    public const MODE_BYOG = 'byog';
 
     public const ENVIRONMENT_SANDBOX = 'sandbox';
 
@@ -64,11 +86,16 @@ class PaymentGateway extends BaseModel implements CompanyWide
         'secret_key',
         'webhook_secret',
         'extra_credentials',
+        'previous_webhook_secret',
+        'webhook_key',
     ];
 
     protected $attributes = [
         'environment' => self::ENVIRONMENT_SANDBOX,
         'is_active' => true,
+        'status' => self::STATUS_DRAFT,
+        'connection_mode' => self::MODE_BYOG,
+        'credential_version' => 1,
     ];
 
     protected function casts(): array
@@ -78,6 +105,13 @@ class PaymentGateway extends BaseModel implements CompanyWide
             'secret_key' => 'encrypted',
             'webhook_secret' => 'encrypted',
             'extra_credentials' => 'encrypted:array',
+            'previous_webhook_secret' => 'encrypted',
+            'previous_secret_expires_at' => 'datetime',
+            'capabilities' => 'array',
+            'credential_version' => 'integer',
+            'verified_at' => 'datetime',
+            'activated_at' => 'datetime',
+            'deactivated_at' => 'datetime',
         ];
     }
 
@@ -97,12 +131,64 @@ class PaymentGateway extends BaseModel implements CompanyWide
 
             $gateway->tenant_id = $tenantId;
 
+            if (blank($gateway->webhook_key)) {
+                $gateway->webhook_key = bin2hex(random_bytes(32));
+            }
+
             if ($gateway->payment_method_id) {
                 if (! PaymentMethod::query()->whereKey($gateway->payment_method_id)->exists()) {
                     throw new DomainException('Payment method must belong to the active tenant.');
                 }
             }
         });
+
+        // حذف بوابة لها سند أو تسوية يمحو ربطاً مالياً (`payments.payment_gateway_id` يصير NULL).
+        // الحارس هنا يغطي كل مسار حذف عبر Eloquent لا الخدمة وحدها. الحذف الجماعي/SQL الخام
+        // وحذف المستأجر (CASCADE) خارج نطاقه عمداً.
+        static::deleting(function (self $gateway): void {
+            if ($gateway->hasFinancialReferences()) {
+                throw new PaymentGatewayException(
+                    'gateway.has_references',
+                    'لا يمكن حذف بوابة مرتبطة بسندات أو تسويات. أوقفها أو ألغِ اعتمادها بدلاً من ذلك.'
+                );
+            }
+        });
+    }
+
+    /** سندات أو تسويات تشير إلى البوابة (لكل الفروع؛ نطاق المستأجر وحده). */
+    public function hasFinancialReferences(): bool
+    {
+        return Payment::query()->where('payment_gateway_id', $this->getKey())->exists()
+            || PaymentGatewaySettlement::query()->where('payment_gateway_id', $this->getKey())->exists();
+    }
+
+    /** مفعّلة تشغيلياً: حالة active **و**مفتاح التشغيل القديم مفعّل. */
+    public function isUsable(): bool
+    {
+        return $this->status === self::STATUS_ACTIVE && (bool) $this->is_active;
+    }
+
+    /**
+     * الأسرار المقبولة للتحقق من توقيع webhook وارد الآن: الحالي، ثم السابق ما دامت نافذة السماح قائمة.
+     * يستهلكه المستقبِل لاحقاً؛ لا يُستدعى من مورد API.
+     *
+     * @return list<string>
+     */
+    public function webhookSecretsForVerification(): array
+    {
+        $secrets = [];
+        if (filled($this->webhook_secret)) {
+            $secrets[] = (string) $this->webhook_secret;
+        }
+        if (
+            filled($this->previous_webhook_secret)
+            && $this->previous_secret_expires_at !== null
+            && $this->previous_secret_expires_at->isFuture()
+        ) {
+            $secrets[] = (string) $this->previous_webhook_secret;
+        }
+
+        return $secrets;
     }
 
     public function paymentMethod(): BelongsTo
