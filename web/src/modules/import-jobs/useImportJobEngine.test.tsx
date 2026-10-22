@@ -217,4 +217,17 @@ describe('useImportJobEngine', () => {
     expect(result.current.error).toBe('المعرّف في الصف 2 لا يخصّ هذه التشغيلة.');
     expect(result.current.busy).toBeNull();
   });
+  it('a failed apply refetches the job so the repair panel receives failed_units (IMP-H1-S8c)', async () => {
+    applyImportJobChunk.mockRejectedValueOnce(new ApiError(422, 'فشلت النافذة', null));
+    getImportJob.mockResolvedValueOnce(job({ status: 'failed', failed_units: 3 }));
+    const { result } = renderHook(() => useImportJobEngine('product_catalog'));
+
+    await act(async () => {
+      await result.current.applyLoop('job-1', { mode: 'create' });
+    });
+
+    expect(result.current.job?.status).toBe('failed');
+    expect(result.current.job?.failed_units).toBe(3);
+    expect(result.current.error).toBe('فشلت النافذة');
+  });
 });

@@ -53,6 +53,9 @@ describe('ImportRepairPanel (IMP-H1-S8c)', () => {
     expect(screen.getByText(/لم تُطبَّق 150 من صفوف/)).toBeTruthy();
     expect(screen.getByRole('button', { name: /تنزيل الصفوف الفاشلة/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: /رفع الملف المصحَّح/ })).toBeTruthy();
+    // مدخل الملف المخفي لا يُعلَن ولا يُركَّز عليه (الزر المرئي هو الواجهة).
+    expect(screen.getByTestId('repair-file').getAttribute('aria-hidden')).toBe('true');
+    expect(screen.getByTestId('repair-file').getAttribute('tabindex')).toBe('-1');
   });
 
   it('renders nothing unless the job is failed AND the server reported repairable units', () => {

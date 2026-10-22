@@ -28,7 +28,7 @@ export function ImportRepairPanel({
   if (job.status !== 'failed' || failed <= 0) return null;
 
   return (
-    <section aria-labelledby="repair-title" className="space-y-3 rounded-md border border-border bg-background p-3">
+    <section aria-labelledby="repair-title" aria-busy={busy} className="space-y-3 rounded-md border border-border bg-background p-3">
       <h3 id="repair-title" className="flex items-center gap-2 text-sm font-semibold">
         <Wrench className="h-4 w-4" strokeWidth={1.7} />
         {t('repair_title')}
@@ -49,7 +49,8 @@ export function ImportRepairPanel({
           type="file"
           accept=".xlsx,.csv"
           className="sr-only"
-          aria-label={t('repair_upload')}
+          tabIndex={-1}
+          aria-hidden="true"
           data-testid="repair-file"
           onChange={(event) => {
             const file = event.target.files?.[0];
