@@ -153,7 +153,10 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
   - **`preview_hash` is required to create an executable job.** `POST /import-jobs` without it, or with a hash that does not equal HMAC(uploaded file SHA ‖ archive SHA ‖ domain ‖ frozen normalized options ‖ mapping), is rejected (422 `preview_required` / `preview_mismatch`) before `ready`.
   - **Single-use, server-held preview (rules 5 and 11).** Preview persists an `import_previews` record: `CompanyWide`, additive, holding tenant, user, branch, domain, file SHA, frozen options and mapping, the **canonical per-unit plan** (unit ref, action `create|update|skip|error`, matched target id + its `updated_at`), minted occurrence ids, `expires_at`, and `consumed_at`. It returns the record id plus its hash.
     - `POST /import-jobs` **consumes** the preview with a conditional update (`consumed_at IS NULL AND expires_at > now()`). One preview yields at most one job, so a replayed preview cannot create a second job, nor a second set of occurrence-keyed reservations.
-    - **Plan drift is a failure, never a silent change.** Apply recomputes each unit's plan against live data. If the action or matched target differs from the frozen plan (for example a create became an update because someone created the SKU meanwhile, or the target's `updated_at` moved), that unit fails with `plan_drift` and goes to repair or re-preview. It is never applied as a different action. This mirrors AI-ACTIONS `approval_stale`.
+    - **Plan drift is a failure, never a silent change, and the check is atomic with the write (rule 11).** Inside the unit's transaction, `applyUnit` first **locks the matched target row** (`lockForUpdate`), or for a planned create re-checks under the same lock/unique index that no match exists. It then compares the frozen action, target id and `updated_at`, and only then writes through the domain service in that same transaction.
+      - Any difference (for example a create became an update because someone created the SKU meanwhile, or the target's `updated_at` moved) fails that unit with `plan_drift` and sends it to repair or re-preview. It is never applied as a different action.
+      - This mirrors AI-ACTIONS `approval_stale`.
+      - PostgreSQL test: a concurrent update of the target between preview and apply ⇒ `plan_drift`, with no overwrite.
   - **Branch binding.** `ImportJob` has no `branch_id` today (finding F-15), and `SetBranch` supplies the request's current branch to `BranchScoped` writes (products, categories, brands, units, partners). A job previewed in branch A could therefore apply in branch B.
     - H1-S3 adds an immutable `branch_id` (nullable, additive) set at job creation from the server-derived branch context.
     - The branch joins the preview hash and the idempotency identity.
@@ -198,9 +201,12 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
   - **Stable repair identity.** Every unit gets an immutable `source_unit_ref`, a UUID minted at job creation and stored with its outcome. The failures file carries it in a protected `_awj_unit_ref` column next to the original data. The ref is independent of the business key, so a SKU, partner code or `supplier_invoice_ref` can be corrected, and a key that was missing can be filled.
   - `POST /import-jobs/{id}/repairs` creates a **new** child job (`parent_job_id`) from a corrected file.
     - Membership is validated by `_awj_unit_ref`: every child unit must reference a parent unit whose outcome is `failed`. Unknown, succeeded or already-repaired refs are rejected.
-    - **Atomic claim at apply, not at creation (rule 11).** Child creation only validates membership, read-only. The **first apply chunk** of the child runs, in its transaction, a conditional `UPDATE … SET status='repaired', repaired_by_job_id=:child WHERE source_unit_ref IN (…) AND status='failed'` before any adapter write. If the affected-row count differs from the child's refs, the child fails with `repair_ref_already_used` and writes nothing.
-    - An abandoned child (never applied) therefore holds nothing, and normal pruning removes it. No lease or expiry is needed.
-    - PostgreSQL race test: two concurrent children from the same failures ⇒ exactly one applies.
+    - **Per-unit atomic claim, together with that unit's write (rule 11).** Child creation only validates membership, read-only, so nothing is claimed up front.
+      - For each unit, inside the unit's own transaction or savepoint, the child runs a conditional `UPDATE … SET status='repaired', repaired_by_job_id=:child WHERE source_unit_ref = :ref AND status='failed'`, then the adapter write.
+      - An affected-row count of 0 fails only that unit with `repair_ref_already_used`.
+      - A failed write rolls the claim back with it, so the ref stays `failed` and stays repairable.
+      - A child that stops mid-way leaves its unprocessed refs untouched, and an abandoned child holds nothing. No lease or expiry is needed.
+    - PostgreSQL race test: two concurrent children over the same refs ⇒ each ref is repaired exactly once, and failed or unprocessed refs remain repairable.
     - The child goes through the normal preview, binding and apply steps.
     - Successful units are therefore never replayed; reservations and identifiers block them as a second line of defense.
   - The UI adds a "إصلاح الصفوف الفاشلة" step on the result screen, shared by every domain page.
