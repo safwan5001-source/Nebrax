@@ -48,7 +48,17 @@ Frontend `dashboard/page.test.tsx` (12): both totals shown through one request e
 
 ## 4. Results
 
-RESULTS_PLACEHOLDER
+| Run (local sandbox) | Result |
+|---|---|
+| `DashboardReceivablesPositionTest` + `TreasuryAwareCashReportsTest` | 27 passed on SQLite and 27 passed on PostgreSQL 16 |
+| Without the branch rule in `scopedBalance()` (mutation) | 5 of 27 fail |
+| Web: entire `npm test` (vitest) | 671 files, 7951 tests passed |
+| Web: `tsc --noEmit`, files touched here | no error (unrelated pre-existing errors exist in other test files) |
+| Full SQLite suite | 8416 passed, 193 skipped, 27 failed |
+| Full PostgreSQL suite, `--parallel --processes=4` (as CI) | 8636 tests, 27 failing |
+| CI (sqlite, pgsql, web build, CI Gate) | see the PR |
+
+The 27 local failures are the same pre-existing set as in the T1 and T2 reports and none touches reports or the dashboard: 26 `Fuel*` tests (this sandbox lacks `bcmath`; CI has it), `AiPaidProviderDisabledTest` on SQLite and `StorefrontMediaApiTest` on PostgreSQL (both fail identically on `main`).
 
 ## 5. Accounting invariants
 
