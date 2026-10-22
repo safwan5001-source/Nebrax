@@ -40,6 +40,12 @@ a restricted user **with** the job's branch can still apply, and an `inventory_o
 - `nullOnDelete`: deleting a branch used to turn its jobs into legacy jobs (request-branch behaviour, no 403 fence) — flagged by the independent review **and by the Codex review of this PR**. Fixed: `BranchController::destroy` now refuses (422) while an *unfinished* job (`uploaded`/`ready`/`queued`/`processing`, `ImportJobStatus::UNFINISHED`) references the branch; finished jobs (completed/failed/cancelled) don't block and keep `NULL` for audit. Covered by a test. (A rare create-between-check-and-delete race remains; it degrades to the legacy behaviour, never to data loss.)
 - `recountOnFirstApply()` also runs under the job branch (review finding; all adapters return `null` today).
 
+## Codex follow-ups on this PR (all fixed)
+
+1. Branch deletion nulling the binding of an actionable job → deletion refused while a job is unfinished (above).
+2. Uploads orphaned when the insert fails for any reason (e.g. the branch deleted between `SetBranch` and the insert) → generic cleanup (`catch Throwable` → delete stored files → rethrow), test with negative control.
+3. A terminal job whose branch was deleted matched any idempotent retry from another branch → strict branch comparison, test added.
+
 ## Review
 
 Codex (when its quota returned) reviewed commit `3983a53`: one P2 finding (branch deletion), fixed above. Before that, an independent read-only subagent reviewed the diff (static; did not run tests): no blocking defects. Its medium findings (recount outside the branch wrapper; missing multi-chunk / exception-restore / other-domain tests) are fixed above; the low ones are recorded in the scope notes.

@@ -284,4 +284,19 @@ class ImportJobBranchBindingTest extends TestCase
         $this->assertTrue($threw, 'الإدراج يجب أن يفشل بقيد الـFK (على PostgreSQL؛ SQLite لا يفرض FK افتراضياً).');
         $this->assertSame($before, count(Storage::disk('local')->allFiles()), 'لا ملف يتيم بعد فشل الإدراج.');
     }
+
+    /** @test */
+    public function a_terminal_job_whose_branch_was_deleted_is_not_returned_for_a_retry_from_another_branch(): void
+    {
+        $auth = $this->registerTenant();
+        $other = $this->branch($auth['token'], 'فرع الخبر');
+        $jobId = $this->create($auth['token'], $this->csv('BR-GONE'), ['idempotency_key' => 'gone-1'], ['X-Branch-Id' => $other])->assertCreated()['data']['id'];
+        $this->mainBranchRequestState();
+        $this->withToken($auth['token'])->postJson("/api/import-jobs/{$jobId}/cancel")->assertOk();
+        $this->withToken($auth['token'])->deleteJson("/api/branches/{$other}")->assertOk();
+        $this->assertNull(ImportJob::query()->whereKey($jobId)->value('branch_id'));
+
+        // الفرع الرئيسي يعيد المحاولة بالمفتاح نفسه: ليست إعادة محاولة للتشغيلة الملغاة من فرعٍ محذوف.
+        $this->create($auth['token'], $this->csv('BR-GONE'), ['idempotency_key' => 'gone-1'])->assertStatus(422);
+    }
 }

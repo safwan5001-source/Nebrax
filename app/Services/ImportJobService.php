@@ -162,8 +162,9 @@ class ImportJobService
     {
         if (
             $existing->domain !== $domain
-            // تشغيلة قائمة بلا فرع (سبقت هذا العمود) تُعامَل كمطابقة؛ بفرع تُقارَن به.
-            || ($existing->branch_id !== null && $existing->branch_id !== $branchId)
+            // مقارنةٌ صارمة بما فيها `NULL`: لا يُستثنى «قديمٌ بلا فرع» لأن `nullOnDelete` ينتج `NULL` أيضاً لتشغيلةٍ حُذف فرعها،
+            // فكان يُعاد سجلّها لطلبٍ من فرعٍ آخر. إعادة محاولة عبر نشر هذا العمود نفسه (ثوانٍ) تُطالَب بمفتاحٍ جديد فحسب.
+            || $existing->branch_id !== $branchId
             || $existing->content_sha256 !== $sha256
             || $existing->media_archive_content_sha256 !== $archiveSha256
         ) {
