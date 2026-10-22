@@ -400,8 +400,9 @@ class ProductImportService
 
                 $this->assertNoLiveSkuConflict((string) ($payload['sku'] ?? ''));
                 $this->assertNoLiveBarcodeConflict((string) ($payload['barcode'] ?? ''));
-                $product = Product::create($this->createPayload($payload));
-                $lifecycle->create($product, $userId);
+                // IMP-H2-S1: الإنشاء عبر الخدمة نفسها التي تستعملها بطاقة المنتج ومسار AI Actions (معاملة + حدث دورة الحياة). `generateSku: false`:
+                // الرمز يكتمل في `createPayload` أعلاه بالعدّاد نفسه فيبقى سلوك V2 حرفياً، ولا تولّد الخدمة رمزاً ثانياً.
+                $product = app(ProductService::class)->create($this->createPayload($payload), $userId, generateSku: false);
                 $created++;
                 $results[] = $this->rowSummary($row, $product);
             }
@@ -1527,6 +1528,9 @@ class ProductImportService
     private function createPayload(array $payload): array
     {
         $payload['purchase_price'] = $payload['purchase_price'] ?? 0;
+        // عقد المسار: لا كمية ولا حركة مخزون ولا قيد من الاستيراد. `ProductService::create` يسجّل رصيداً افتتاحياً إن وُجدت `initial_quantity`، فنمنعها
+        // هنا مهما ورد في الحمولة (الرصيد الافتتاحي مسارٌ مستقلّ: `InventoryOpening`).
+        unset($payload['initial_quantity']);
 
         if (blank($payload['sku'] ?? null)) {
             $prefix = (string) Settings::get('numbering', 'product_prefix');
