@@ -13,6 +13,7 @@ class ImportJobResource extends JsonResource
             'id' => $this->id,
             'domain' => $this->domain,
             'branch_id' => $this->branch_id,
+            'preview_bound' => $this->preview_id !== null,
             'status' => $this->status,
             'original_filename' => $this->original_filename,
             'extension' => $this->extension,

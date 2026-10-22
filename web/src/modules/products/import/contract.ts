@@ -3,6 +3,8 @@
  * والاختبارات معاً، فلا تنحرف الواجهة عن مفاتيح `ProductImportFields`.
  */
 
+import type { ImportBinding } from '@/modules/import-jobs/client';
+
 export type ImportMode = 'create' | 'update' | 'upsert';
 export type BlankPolicy = 'ignore' | 'clear';
 export type MasterDataPolicy = 'match_or_error' | 'match_or_text' | 'create_missing';
@@ -55,6 +57,8 @@ export interface PreviewError {
 }
 
 export interface ImportPreview {
+  /** معاينةٌ أحادية الاستعمال يحفظها الخادم — تُرفَق بإنشاء التشغيلة (IMP-H1-S3b). */
+  binding?: ImportBinding;
   mode: ImportMode;
   blank_policy: BlankPolicy;
   master_data_policy: MasterDataPolicy;
@@ -139,12 +143,15 @@ export function importFormData(
      */
     forDurable?: boolean;
     mediaArchive?: File | null;
+    /** يُرسَل مع المعاينة لأنه جزء من خياراتها المقيَّدة بالبصمة (IMP-H1-S3b) — تغيّره بعدها يُبطل المعاينة. */
+    applyProductImages?: boolean;
     approveExistingMediaUpdates?: boolean;
   } = {}
 ): FormData {
   const form = new FormData();
   form.append('file', file);
   if (options.mediaArchive) form.append('media_archive', options.mediaArchive);
+  if (options.applyProductImages) form.append('apply_product_images', '1');
   if (options.approveExistingMediaUpdates) form.append('approve_existing_media_updates', '1');
   if (options.mode) form.append('mode', options.mode);
   if (options.blankPolicy) form.append('blank_policy', options.blankPolicy);

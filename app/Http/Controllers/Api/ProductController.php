@@ -28,8 +28,10 @@ use App\Models\ProductCategory;
 use App\Models\UnitTemplate;
 use App\Services\Accounting\InventoryService;
 use App\Services\DocumentCenter\DocumentStorageService;
+use App\Services\ImportPreviewService;
 use App\Services\ProductExportService;
 use App\Services\ProductImportService;
+use App\Support\ImportJobDomain;
 use App\Services\ProductImportMediaService;
 use App\Services\ProductLifecycleService;
 use App\Services\ProductMediaService;
@@ -177,6 +179,15 @@ class ProductController extends ApiController
                 $preview['media'] = $this->importMedia->preview(
                     $request->file('file'), $options, $request->file('media_archive'),
                     $request->maxRows(), $mediaOptions['approve_existing_updates'],
+                );
+                // IMP-H1-S3b: معاينةٌ أحادية الاستعمال يحفظها الخادم — تُرفَق بإنشاء التشغيلة التنفيذية فيُنفَّذ ما عُوين.
+                $preview['binding'] = app(ImportPreviewService::class)->issue(
+                    ImportJobDomain::PRODUCT_CATALOG, $request->file('file'), $request->file('media_archive'),
+                    $options + [
+                        'apply_product_images' => $mediaOptions['apply'],
+                        'approve_existing_media_updates' => $mediaOptions['approve_existing_updates'],
+                    ],
+                    $request->user()?->id,
                 );
 
                 return $preview;

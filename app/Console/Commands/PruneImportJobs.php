@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\ImportJob;
 use App\Services\ImportJobFileStorage;
+use App\Services\ImportPreviewService;
 use App\Support\ImportJobStatus;
 use Illuminate\Console\Command;
 
@@ -56,6 +57,8 @@ class PruneImportJobs extends Command
         });
 
         $this->line('حُذفت تشغيلات استيراد: ' . $deleted);
+        // IMP-H1-S3b: معاينات منتهية الصلاحية أو منفَقة قديمة لا قيمة لها بعد (لا ملفات، صفوف فقط).
+        $this->line('حُذفت معاينات استيراد: ' . app(ImportPreviewService::class)->pruneStale());
 
         return self::SUCCESS;
     }

@@ -11,6 +11,8 @@ use App\Support\SpreadsheetReader;
  */
 abstract class SpreadsheetImportAdapter implements ImportDomainAdapter
 {
+    use CanonicalizesImportOptions;
+
     /** الأعمدة لم تتغيّر لأي مجال — سقفٌ واحد (٢٠٠) يبقى كافياً وموحَّداً. */
     protected const MAX_COLUMNS = ProductImportService::MAX_COLUMNS;
 

@@ -6,6 +6,8 @@
  * تماماً كسلوك الاستيراد الأساسي حين لا تُرسَل مطابقةٌ صريحة.
  */
 
+import type { ImportBinding } from '@/modules/import-jobs/client';
+
 import type { ImportMode, BlankPolicy, MasterDataPolicy } from '@/modules/products/import/contract';
 
 export const MAX_IMPORT_ROWS = 2000;
@@ -23,6 +25,8 @@ export interface SheetSummary {
 }
 
 export interface WorkbookPreview {
+  /** معاينةٌ أحادية الاستعمال يحفظها الخادم — تُرفَق بإنشاء التشغيلة (IMP-H1-S3b). */
+  binding?: ImportBinding;
   products: SheetSummary;
   barcodes: SheetSummary;
   unit_prices: SheetSummary;

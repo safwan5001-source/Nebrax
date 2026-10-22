@@ -31,6 +31,19 @@ class InventoryOpeningImportAdapter extends SpreadsheetImportAdapter
         return InventoryOpeningImportService::MAX_ROWS;
     }
 
+    public function canonicalOptions(array $raw): array
+    {
+        $notes = $raw['notes'] ?? null;
+
+        $options = [
+            'opening_date' => (string) ($raw['opening_date'] ?? ''),
+            'allow_zero_cost' => $this->canonicalBool($raw['allow_zero_cost'] ?? false),
+            'notes' => $notes === null || $notes === '' ? null : (string) $notes,
+        ];
+
+        return $this->withMapping($options, $raw);
+    }
+
     public function applyChunk(ImportChunk $chunk): ImportChunkResult
     {
         $openingOptions = array_intersect_key($chunk->options, array_flip(['opening_date', 'allow_zero_cost', 'notes', 'mapping']));
