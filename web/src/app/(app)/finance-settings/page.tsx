@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import {
   Banknote,
   BellRing,
+  CreditCard,
   ChevronLeft,
   HandCoins,
   ReceiptText,
@@ -26,6 +27,7 @@ const ITEMS: FinanceSettingItem[] = [
   { key: 'c_employeeCashboxes', href: null, icon: WalletCards },
   { key: 'c_settlementTypes', href: '/finance-settings/settlement-types', icon: HandCoins },
   { key: 'c_financialAlerts', href: '/finance-settings/financial-alerts', icon: BellRing },
+  { key: 'c_paymentGateways', href: '/finance-settings/payments', icon: CreditCard },
 ];
 
 export default function FinanceSettingsPage() {

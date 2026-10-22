@@ -41,6 +41,7 @@ export function IntegrationCenterLanding({
   summaryStatus,
   canOpenApplications,
   communicationsAllowed = false,
+  paymentsAllowed = false,
   onRetry,
 }: {
   access: DeliveryAccess;
@@ -49,6 +50,8 @@ export function IntegrationCenterLanding({
   canOpenApplications: boolean;
   /** صلاحية كتالوج مزوّدي الاتصالات (`company.manage`) — مستقلة عن بوابة منصات التوصيل. */
   communicationsAllowed?: boolean;
+  /** صلاحية عرض بوابات الدفع (`payments.view`) — مستقلة عن بقية البطاقات. */
+  paymentsAllowed?: boolean;
   onRetry: () => void;
 }) {
   const t = useTranslations('integrationCenter');
@@ -93,7 +96,9 @@ export function IntegrationCenterLanding({
                     canOpenApplications={canOpenApplications}
                   />
                 ) : category.key === 'communications' ? (
-                  <CommunicationsCard href={category.href} allowed={communicationsAllowed} />
+                  <CatalogCard categoryKey="communications" href={category.href} allowed={communicationsAllowed} />
+                ) : category.key === 'payments' ? (
+                  <CatalogCard categoryKey="payments" href={category.href} allowed={paymentsAllowed} />
                 ) : (
                   <PlannedCard categoryKey={category.key} />
                 )}
@@ -222,7 +227,7 @@ function SummaryLines({ summary, status }: { summary: DeliverySummary | null; st
   );
 }
 
-function PlannedCard({ categoryKey }: { categoryKey: Exclude<IntegrationCategoryKey, 'delivery' | 'communications'> }) {
+function PlannedCard({ categoryKey }: { categoryKey: Exclude<IntegrationCategoryKey, 'delivery' | 'communications' | 'payments'> }) {
   const t = useTranslations('integrationCenter');
   const Icon = ICONS[categoryKey];
 
@@ -240,26 +245,25 @@ function PlannedCard({ categoryKey }: { categoryKey: Exclude<IntegrationCategory
 }
 
 /**
- * بطاقة مزوّدي الاتصالات (AWJ-COMMS-UX-01): رابط تنقّل إلى كتالوج وصفي ثابت. لا شارة «متصل/مفعّل»
- * ولا ملخص أرقام: لا مصدر بيانات اتصال في النظام، فلا نعرض إلا ما هو مكتوب وثابت.
- * بلا الصلاحية تبقى خاملة بنيوياً (div بلا رابط) كحالة منصات التوصيل المرفوضة.
+ * بطاقة رابط تنقّل بسيطة (الاتصالات AWJ-COMMS-UX-01 وبوابات الدفع PAY-H1-05): لا شارة «متصل/مفعّل» ولا ملخص أرقام —
+ * لا نعرض إلا ما هو مكتوب وثابت (الشارة تسمّي موضع الإعداد). بلا الصلاحية تبقى خاملة بنيوياً (div بلا رابط) كحالة منصات التوصيل المرفوضة.
  */
-function CommunicationsCard({ href, allowed }: { href: string | null; allowed: boolean }) {
+function CatalogCard({ categoryKey, href, allowed }: { categoryKey: 'communications' | 'payments'; href: string | null; allowed: boolean }) {
   const t = useTranslations('integrationCenter');
   const titleId = useId();
   const descId = useId();
-  const Icon = ICONS.communications;
+  const Icon = ICONS[categoryKey];
 
   if (!allowed || href === null) {
     return (
       <div
         className="flex w-full flex-col gap-2 rounded-md border border-dashed border-border bg-surface p-4"
-        data-testid="integration-card-communications"
+        data-testid={`integration-card-${categoryKey}`}
         data-state="denied"
       >
         <Icon className="h-6 w-6 text-muted" strokeWidth={1.6} aria-hidden="true" />
-        <h2 className="text-base font-semibold text-text">{t('communications.title')}</h2>
-        <p role="note" className="text-sm leading-relaxed text-muted">{t('communications.denied')}</p>
+        <h2 className="text-base font-semibold text-text">{t(`${categoryKey}.title`)}</h2>
+        <p role="note" className="text-sm leading-relaxed text-muted">{t(`${categoryKey}.denied`)}</p>
       </div>
     );
   }
@@ -269,7 +273,7 @@ function CommunicationsCard({ href, allowed }: { href: string | null; allowed: b
       href={href}
       aria-labelledby={titleId}
       aria-describedby={descId}
-      data-testid="integration-card-communications"
+      data-testid={`integration-card-${categoryKey}`}
       data-state="allowed"
       className="group flex w-full flex-col gap-2 rounded-md border border-border bg-surface p-4 transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
     >
@@ -277,11 +281,11 @@ function CommunicationsCard({ href, allowed }: { href: string | null; allowed: b
         <Icon className="h-6 w-6 text-primary" strokeWidth={1.6} aria-hidden="true" />
         <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-muted rtl:rotate-180" strokeWidth={1.7} aria-hidden="true" />
       </div>
-      <h2 id={titleId} className="text-base font-semibold text-text">{t('communications.title')}</h2>
+      <h2 id={titleId} className="text-base font-semibold text-text">{t(`${categoryKey}.title`)}</h2>
       <div id={descId} className="space-y-1.5">
-        <p className="text-sm leading-relaxed text-muted">{t('communications.description')}</p>
+        <p className="text-sm leading-relaxed text-muted">{t(`${categoryKey}.description`)}</p>
         <div>
-          <Badge tone="muted">{t('communications.badge')}</Badge>
+          <Badge tone="muted">{t(`${categoryKey}.badge`)}</Badge>
         </div>
       </div>
     </Link>

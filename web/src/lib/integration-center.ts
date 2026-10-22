@@ -24,6 +24,10 @@ export interface IntegrationCategory {
 /** كتالوج منصات التوصيل داخل المركز (INT-UX-2). شاشة الإعداد القديمة `/delivery-platforms` تبقى كما هي. */
 export const DELIVERY_CATALOG_HREF = '/integrations/delivery-platforms';
 
+/** بوابات الدفع (PAY-H1-05): شاشة الإعدادات › المالية القائمة، لا كتالوج مكرر داخل المركز. صلاحيتها `payments.view`. */
+export const PAYMENTS_HREF = '/finance-settings/payments';
+export const PAYMENTS_PERMISSION = 'payments.view';
+
 /**
  * الترتيب هو ترتيب التصوّر المعتمد (RTL: منصات التوصيل ثم المتاجر في الصف الأول،
  * وبوابات الدفع ثم الشحن في الثاني). منصات التوصيل تدخل كتالوجها داخل المركز
@@ -32,7 +36,7 @@ export const DELIVERY_CATALOG_HREF = '/integrations/delivery-platforms';
 export const INTEGRATION_CATEGORIES: readonly IntegrationCategory[] = [
   { key: 'delivery', href: DELIVERY_CATALOG_HREF },
   { key: 'ecommerce', href: null },
-  { key: 'payments', href: null },
+  { key: 'payments', href: PAYMENTS_HREF },
   { key: 'shipping', href: null },
   // AWJ-COMMS-UX-01: تُلحَق في النهاية كي لا تتحرك مواضع البطاقات المعتمدة. كتالوج وصفي ثابت بلا قراءة خادم.
   { key: 'communications', href: COMMUNICATIONS_CATALOG_HREF },
