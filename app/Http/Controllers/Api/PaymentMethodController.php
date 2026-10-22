@@ -36,6 +36,7 @@ class PaymentMethodController extends ApiController
         $this->assertNameFree($data['name']);
         $this->assertCashBankAccount($data['cash_bank_account_id'], $data['settlement_type']);
         $this->assertPosClearingGateway($data['pos_clearing_gateway_id'], $data['settlement_type'], null);
+        $this->assertTerminalPolicy($data['pos_terminal_required'], $data['settlement_type']);
 
         $method = DB::transaction(function () use ($data) {
             if ($data['is_default']) {
@@ -56,6 +57,7 @@ class PaymentMethodController extends ApiController
         $this->assertNameFree($data['name'], $method->id);
         $this->assertCashBankAccount($data['cash_bank_account_id'], $data['settlement_type']);
         $this->assertPosClearingGateway($data['pos_clearing_gateway_id'], $data['settlement_type'], $method);
+        $this->assertTerminalPolicy($data['pos_terminal_required'], $data['settlement_type']);
 
         DB::transaction(function () use ($method, $data) {
             if (! $data['is_active'] && $data['is_default']) {
@@ -121,6 +123,7 @@ class PaymentMethodController extends ApiController
             'is_default' => (bool) $value('is_default', false),
             // غياب المفتاح في التحديث يُبقي الربط القائم؛ null الصريح يفكّه.
             'pos_clearing_gateway_id' => $value('pos_clearing_gateway_id', null),
+            'pos_terminal_required' => (bool) $value('pos_terminal_required', false),
         ];
     }
 
@@ -161,6 +164,14 @@ class PaymentMethodController extends ApiController
         $gateway = PaymentGateway::query()->find($gatewayId);
         if ($gateway === null || ! $gateway->isUsable()) {
             abort(422, 'اتصال المستحوذ المختار غير موجود أو غير نشط.');
+        }
+    }
+
+    /** شرط موافقة الجهاز يخص الطرق البنكية (بطاقة) فقط. */
+    private function assertTerminalPolicy(bool $required, string $type): void
+    {
+        if ($required && $type !== 'bank') {
+            abort(422, 'اشتراط موافقة جهاز الدفع يخص الطرق البنكية فقط.');
         }
     }
 }

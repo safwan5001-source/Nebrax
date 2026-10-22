@@ -1,0 +1,149 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Requests\StorePosPaymentTerminalRequest;
+use App\Http\Requests\StorePosTerminalRequestRequest;
+use App\Http\Resources\PosPaymentTerminalResource;
+use App\Http\Resources\PosTerminalRequestResource;
+use App\Models\PosDevice;
+use App\Models\PosPaymentTerminal;
+use App\Models\PosTerminalRequest;
+use App\Services\PosTerminalService;
+use App\Support\PosTerminalException;
+use Closure;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+/**
+ * أجهزة دفع POS وطلباتها (PAY-H6-02). تشغيلي: لا قيود ولا سندات هنا — البيع يستهلك الموافقة عبر `POST /pos/checkout` (`terminal_request_id`).
+ */
+class PosTerminalController extends ApiController
+{
+    public function __construct(private readonly PosTerminalService $terminals) {}
+
+    // ───────────── الأجهزة ─────────────
+
+    public function index(): JsonResponse
+    {
+        return PosPaymentTerminalResource::collection(PosPaymentTerminal::query()->orderBy('name')->get())->response();
+    }
+
+    public function store(StorePosPaymentTerminalRequest $request): JsonResponse
+    {
+        $data = $request->validated();
+        $terminal = $this->terminalCall(function () use ($data) {
+            $this->terminals->assertProviderAvailable($data['provider']);
+            $this->assertDevice($data['pos_device_id'] ?? null);
+            if (PosPaymentTerminal::query()->where('name', trim($data['name']))->exists()) {
+                abort(422, 'يوجد جهاز دفع بهذا الاسم.');
+            }
+
+            return PosPaymentTerminal::query()->create([
+                'name' => trim($data['name']),
+                'code' => $data['code'] ?? null,
+                'provider' => $data['provider'],
+                'pos_device_id' => $data['pos_device_id'] ?? null,
+                'is_active' => (bool) ($data['is_active'] ?? true),
+            ]);
+        });
+
+        return (new PosPaymentTerminalResource($terminal))->response()->setStatusCode(201);
+    }
+
+    public function update(Request $request, string $id): JsonResponse
+    {
+        $terminal = PosPaymentTerminal::query()->findOrFail($id);
+        $data = $request->validate([
+            'name' => ['sometimes', 'required', 'string', 'max:120'],
+            'code' => ['sometimes', 'nullable', 'string', 'max:64'],
+            'pos_device_id' => ['sometimes', 'nullable', 'uuid'],
+            'is_active' => ['sometimes', 'boolean'],
+            'provider' => ['prohibited'], // المزوّد لا يتغير بعد الإنشاء
+        ]);
+        if (array_key_exists('pos_device_id', $data)) {
+            $this->assertDevice($data['pos_device_id']);
+        }
+        if (isset($data['is_active']) && $data['is_active'] === false
+            && PosTerminalRequest::query()->where('pos_payment_terminal_id', $terminal->id)->whereIn('status', [...PosTerminalRequest::IN_FLIGHT, PosTerminalRequest::STATUS_COMPENSATION_REQUIRED])->exists()) {
+            abort(422, 'لا يمكن تعطيل جهاز عليه طلب نشط أو تعويض لم يُحل.');
+        }
+        $terminal->update($data);
+
+        return (new PosPaymentTerminalResource($terminal->fresh()))->response();
+    }
+
+    // ───────────── الطلبات ─────────────
+
+    public function sessionRequests(string $sessionId): JsonResponse
+    {
+        return PosTerminalRequestResource::collection(
+            PosTerminalRequest::query()->where('pos_session_id', $sessionId)->orderBy('created_at')->get()
+        )->response();
+    }
+
+    public function createRequest(StorePosTerminalRequestRequest $request): JsonResponse
+    {
+        $created = $this->terminalCall(fn () => $this->terminals->createRequest($request->user(), $request->validated()));
+
+        return (new PosTerminalRequestResource($created))->response()->setStatusCode($created->getAttribute('idempotent_replay') ? 200 : 201);
+    }
+
+    public function showRequest(string $id): JsonResponse
+    {
+        $found = PosTerminalRequest::query()->findOrFail($id);
+        $synced = $this->terminalCall(fn () => $this->terminals->sync($found));
+
+        return (new PosTerminalRequestResource($synced))->response();
+    }
+
+    public function cancelRequest(string $id): JsonResponse
+    {
+        $found = PosTerminalRequest::query()->findOrFail($id);
+
+        return (new PosTerminalRequestResource($this->terminalCall(fn () => $this->terminals->cancel($found))))->response();
+    }
+
+    public function voidRequest(string $id): JsonResponse
+    {
+        $found = PosTerminalRequest::query()->findOrFail($id);
+
+        return (new PosTerminalRequestResource($this->terminalCall(fn () => $this->terminals->void($found))))->response();
+    }
+
+    public function resolveRequest(Request $request, string $id): JsonResponse
+    {
+        $data = $request->validate(['note' => ['required', 'string', 'min:5', 'max:1000']]);
+        $found = PosTerminalRequest::query()->findOrFail($id);
+
+        return (new PosTerminalRequestResource($this->terminalCall(fn () => $this->terminals->resolve($found, $request->user(), $data['note']))))->response();
+    }
+
+    // ───────────── مساعدات ─────────────
+
+    private function assertDevice(?string $deviceId): void
+    {
+        if ($deviceId !== null) {
+            PosDevice::query()->findOrFail($deviceId); // نطاق المستأجر والفرع تلقائي
+        }
+    }
+
+    /** يترجم أخطاء الأجهزة إلى {message, reason} برمز ثابت؛ بقية RuntimeException ⇒ 422 كالمعتاد (ما عدا أخطاء القاعدة فتُعاد رمياً). */
+    private function terminalCall(Closure $fn): mixed
+    {
+        try {
+            return $fn();
+        } catch (PosTerminalException $e) {
+            $status = match ($e->reason) {
+                'terminal_busy', 'idempotency_conflict' => 409,
+                'terminal_unavailable_now' => 503,
+                default => 422,
+            };
+            abort(response()->json(['message' => $e->getMessage(), 'reason' => $e->reason], $status));
+        } catch (\PDOException $e) {
+            throw $e;
+        } catch (\RuntimeException $e) {
+            abort(422, $e->getMessage());
+        }
+    }
+}

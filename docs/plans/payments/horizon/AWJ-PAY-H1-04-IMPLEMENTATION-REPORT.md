@@ -1,6 +1,6 @@
 # PAY-H1-04 — Implementation Report
 
-STATUS: **IN REVIEW** (PR مفتوح، غير مدموج، غير منشور)
+STATUS: **MERGED** (PR #1620، `ee8bfea01`؛ POST_MERGE_REVIEW: PENDING — إعادة تشغيل واحدة لوظيفة sqlite الفاشلة على main (اختبار استيراد غير مرتبط `ImportPreviewBindingTest`) قيد التنفيذ؛ غير منشور)
 DATE: 2026-10-22
 
 ## Outcome
