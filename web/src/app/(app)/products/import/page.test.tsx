@@ -205,6 +205,30 @@ describe('شاشة استيراد المنتجات — المحرّك الدائ
     expect(api).not.toHaveBeenCalledWith('/products/import/inspect', expect.anything());
   });
 
+  it('تستأنف تشغيلةً مربوطةً بمعاينة بلا إرسال خيارات دلالية — تنفّذ المجمَّدة منذ الإنشاء (IMP-H1-S3b)', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState({}, '', '/products/import?job=job-1');
+    const bodies: unknown[] = [];
+    api.mockImplementation((path: string, options?: { method?: string; body?: unknown }) => {
+      if (path === '/import-jobs/job-1' && options?.method !== 'POST') {
+        return Promise.resolve({ data: jobFixture({ status: 'ready', preview_bound: true }) });
+      }
+      if (path === '/import-jobs/job-1/apply') {
+        bodies.push(options?.body);
+        return Promise.resolve({ data: jobFixture({ status: 'completed', preview_bound: true, processed_rows: 3, apply_result: { created: 3, updated: 0, skipped: 0, results: [] } }) });
+      }
+      return Promise.resolve({ data: {} });
+    });
+
+    render(<ProductImportPage />);
+    await waitFor(() => expect(screen.getByText('import_resumed_title')).toBeTruthy());
+    await user.click(screen.getByRole('button', { name: 'import_apply' }));
+
+    await waitFor(() => expect(bodies.length).toBe(1));
+    // لا mode/blank_policy/master_data_policy/صور: الخادم يرفض أي خيار دلالي مختلف عن المجمَّد (`options_frozen`).
+    expect(bodies[0]).toEqual({});
+  });
+
   /**
    * PR-DUR-HARDEN-1 — الصفحة لا تستدعي مسار التطبيق المتزامن إطلاقاً
    * (تعتمد حصراً على `/import-jobs`)، فترسل `for_durable=1` على الفحص
