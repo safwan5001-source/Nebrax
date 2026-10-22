@@ -183,25 +183,43 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
 ### H4 — Master data
 - **IMP-H4-S1:** Categories (with parent path) + brands import.
 - **IMP-H4-S2:** Price-list items standalone import (extract from the workbook "Unit Prices" logic).
-- **IMP-H4-S3:** Unit templates, create-only.
+- **IMP-H4-S3:** Unit templates, create-only. **Standard path only.** The AI path is excluded by decision record **D-08**: conversion factors multiply stock quantities, so the risk of an AI-suggested factor outweighs the convenience, and templates are few.
+- **IMP-H4-S4 — AI path for categories/brands and price-list items.**
+  - A single AI Action type, `master_data_import.v1`, parameterized by adapter (`product_categories`, `brands`, `price_list_items`). It covers the registry entry, intake, review, preview, approval and execution, all reusing the H4-S1/S2 adapters.
+  - Permissions: `ai.actions.*` + the adapter's own manage permission (`products.manage` for categories/brands, `company.manage` for price lists).
+  - Includes the AI-facing UI tab in the import hub and a std↔AI parity test per adapter.
 
 ### H5 — Purchases & expenses (drafts only)
 - **IMP-H5-S1:** Expense import adapter.
   - One row = one expense draft.
   - Category/vendor/payment-method/cost-center matching. Tax is computed by `ExpenseService` from lines; it is never trusted from the file (CLAUDE.md "totals are derived").
-  - Duplicate signal: vendor + reference + date + amount. It is enforced concurrency-safely: **H5-S1 introduces** the `import_document_reservations` table and lock (design under H5-S3), with the counterparty being the vendor partner, and H5-S3 reuses it. A PostgreSQL concurrency test is required here too.
+  - Duplicate identity: vendor + normalized reference + date + amount (minor units).
+  - Concurrency safety: **H5-S1 introduces** the `import_document_reservations` table and its service (design under H5-S3).
+    - The expense key is the **full** predicate: `dedupe_key = SHA-256(vendor id-or-normalized-name ‖ normalized reference ‖ date ‖ amount)`. Two different expenses that share only a reference never collide.
+    - A row without a reference reserves nothing and gets only a non-blocking duplicate warning (same vendor + date + amount).
+    - Lock: the vendor `Partner` row when the vendor is a partner, otherwise the tenant anchor row.
+  - A PostgreSQL concurrency test is required here too.
 - **IMP-H5-S2:** Expense standard UI + durable domain.
 - **IMP-H5-S3:** Purchase import adapter.
   - Rows are grouped by `(supplier, supplier_invoice_ref)` into one draft with lines.
   - Totals are derived; a file total that differs from the derived total is a **row error**, never silently overwritten.
   - Duplicate = an existing purchase with the same supplier + reference. **A pre-insert lookup alone is not enough**, because two concurrent jobs can both see no match. Required design:
-    1. A new additive table `import_document_reservations`, `CompanyWide`, with columns (`tenant_id`, `domain`, `counterparty_id`, `normalized_reference`, `document_id`, `source`) and a **unique** index on (`tenant_id`, `domain`, `counterparty_id`, `normalized_reference`). The reservation is inserted in the same transaction as the draft, so a concurrent duplicate fails on the unique index and becomes a row error.
+    1. A new additive table `import_document_reservations`, `CompanyWide`:
+       - Columns: `tenant_id`, `domain`, `dedupe_key` (SHA-256 of the **domain-specific** duplicate predicate), `counterparty_id` (nullable), `document_type`, `document_id`, `source` (`standard` | `ai_action` | `document_center`).
+       - **Unique** index on (`tenant_id`, `domain`, `dedupe_key`).
+       - The purchase predicate is supplier id ‖ normalized `supplier_invoice_no`. Each domain declares its predicate in its adapter, never by reusing another domain's key.
+       - The reservation is inserted in the same transaction as the draft, so a concurrent duplicate fails on the unique index and becomes a row error.
     2. Inside that transaction, `lockForUpdate` on the supplier `Partner` row, then a lookup of existing `purchases.supplier_invoice_no` for that supplier (covers manually created purchases).
     - No unique index is added to `purchases`. Existing tenants may already hold duplicates, and `migrate --force` at boot would fail the deploy.
     - Manual-vs-manual duplicates stay out of scope (pre-existing behavior; recorded as a follow-up).
     - Required test: a PostgreSQL concurrency test (two processes, distinct idempotency keys, same supplier + reference ⇒ exactly one draft).
 - **IMP-H5-S4:** Purchase standard UI + durable domain.
-- **IMP-H5-S5:** AI path for both. Spreadsheets go through an AI Action type; PDF/images go through Document Center (entry link + status hand-off, no new extractor).
+- **IMP-H5-S5:** AI path for spreadsheets: AI Action types `expense_import.v1` / `purchase_import.v1` on the H5-S1/S3 adapters.
+- **IMP-H5-S6 — Route Document Center drafts through the financial adapters.**
+  - `PurchaseDocumentDraftBuilder::build` and `ExpenseDocumentDraftBuilder::build` keep their own extraction, review and `DocumentTransactionLink` idempotency. **Before** calling `PurchaseService::create` / `ExpenseService::create`, they call the same adapter `validateRow()`/`plan()` and the `import_document_reservations` service, with `source=document_center`, in the same transaction.
+  - Result: two different batches for the same invoice cannot both create drafts, and a spreadsheet import plus a document import of the same invoice also collide.
+  - Existing Document Center tests stay green, and a new cross-source duplicate test (spreadsheet vs. document, PostgreSQL) is added.
+  - The UI adds an entry link from the purchases/expenses import screens to Document Center upload, with status hand-off. No new extractor is built.
 - Financial test bar: PostgreSQL, totals parity with manual creation, no JE at import, and a correct JE when the imported draft is posted through the existing `post()`.
 
 ### H6 — Sales & ZATCA (**gated by D-03**)
@@ -245,7 +263,7 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
 H0 → H1 (S1 independent; S2 before every new domain; S3/S4/S5 independent of each other)
 H1-S2 → H3, H4, H5, H6, H7 (adapters)
 H2-S0 → anytime (copy only)       H2-S1/S2 → H2-S5 → H9-S1 (AI writes rely on one product path)
-H3-S1 → H3-S4 (AI reuses adapter)  H5-S1/S3 → H5-S5
+H3-S1 → H3-S4 (AI reuses adapter)  H5-S1/S3 → H5-S5, H5-S6   H4-S1/S2 → H4-S4
 H8-S1 needs ≥2 entities with both paths (after H3)
 H9-S1 → H9-S2 → H9-S3 → H9-S4      H10/H11 last
 H6 blocked on D-03 → skip and continue with H7, return when decided
@@ -260,7 +278,7 @@ H6 blocked on D-03 → skip and continue with H7, return when decided
 | R1 | Every merge to `main` auto-deploys on Railway and runs `php artisan migrate --force` at boot (`deploy/entrypoint.sh:70`), with no CI wait. | Migrations must be additive only, and new capabilities ship behind flags that default off. Any migration that alters or locks large existing tables needs an explicit deploy note. Never edit Railway settings or env. |
 | R2 | A second import engine creeps in for "speed". | The adapter registry is the only write entry. PR review checks for a direct `Model::create` in any new import code. |
 | R3 | AI output is treated as truth. | Schema-validated suggestions only. The adapter re-validates them, and parity tests enforce it. |
-| R4 | Financial duplicates (purchases/expenses imported twice, including concurrently through different jobs). | `import_document_reservations` unique index + counterparty row lock + existing-document lookup (H5-S3), on top of approval binding and the idempotency key. A PostgreSQL concurrency test is mandatory. |
+| R4 | Financial duplicates: purchases/expenses imported twice, including concurrently through different jobs **or through Document Center**. | `import_document_reservations` unique index on a domain-specific `dedupe_key` + counterparty/anchor row lock + existing-document lookup (H5-S1/S3), used by spreadsheet, AI and Document Center sources alike (H5-S6). This sits on top of approval binding and the idempotency key. A PostgreSQL concurrency test is mandatory. |
 | R9 | A new durable domain inherits product permissions. | Per-domain authorization map with a coverage test (H1-S1). |
 | R5 | ZATCA chain contamination by imported sales. | Drafts only; import never calls `post()` (static guard test). D-03 governs. |
 | R6 | Partner opening balances post journals implicitly through `PartnerService::create`. | The partner import strips `opening_balance` (test asserts no JE). D-01 decides a dedicated opening document. |
@@ -280,6 +298,7 @@ H6 blocked on D-03 → skip and continue with H7, return when decided
 | D-05 | Partner duplicate keys | Default: VAT number duplicate = `error`; phone/email = `warn`. Per-run configurable. | Non-blocking (configurable default) |
 | D-06 | Employees import | Out of this Horizon (PII + payroll linkage). | — |
 | D-07 | Journal entries / account opening balances import | Separate accounting Horizon. | — |
+| D-08 | AI path for unit templates | Excluded: conversion factors multiply stock quantities, so only the standard, create-only path is offered. The owner may reopen this. | — (recorded exclusion) |
 | OPS-01 | Enabling `AI_ACTIONS_EXECUTION_ENABLED`, remote image fetch, staged-image purge schedule | Owner approval (unchanged from AI-ACTIONS-08). | Activation only |
 
 ---

@@ -108,7 +108,9 @@ Continue with **IMP-H1-S2** (the adapter contract; characterization tests first)
 - Per-domain authorization (H1-S1).
 - The preview hash is *required* for executable jobs (H1-S3).
 - Both product consumers move onto the adapter (H2-S5).
-- Concurrency-safe document de-duplication through `import_document_reservations` + a counterparty row lock + a PostgreSQL test (H5-S1/S3).
+- Concurrency-safe document de-duplication through `import_document_reservations`, keyed by a **domain-specific** `dedupe_key`, plus a counterparty row lock and a PostgreSQL test (H5-S1/S3).
+- Document Center draft builders go through the same validation and reservation layer (H5-S6).
+- AI paths for master data come through `master_data_import.v1` (H4-S4). Unit templates are standard-only (D-08).
 
 ## 4. Known traps (save yourself time)
 
