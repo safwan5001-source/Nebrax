@@ -1,6 +1,6 @@
 # PAY-H1-02 — Implementation Report
 
-STATUS: **IN REVIEW** (PR مفتوح، غير مدموج، غير منشور)
+STATUS: **MERGED** (PR #1609، `b6cf409`) — غير منشور (لا Deploy)
 DATE: 2026-10-22
 
 ## Outcome
@@ -46,16 +46,16 @@ DATE: 2026-10-22
 
 ## CI
 
-يُسجَّل بعد فتح الـPR.
+PR #1609 على Head `c3a6272`: SQLite وPostgreSQL ناجحان، CI Gate ناجح بعد إعادة تشغيل واحدة (أخفق أول مرة لأنه عمل قبل اكتمال SQLite). مراجعة Codex: ملاحظة P2 واحدة (إعادة طلب تفعيل قائم أثناء تعطل المجدول) أُصلحت في `c3a6272`.
 
 ## Pre-merge review
 
-- PRE_MERGE_REVIEW: PENDING
-- Reviewed Head SHA: —
+- PRE_MERGE_REVIEW: **PASS** — Head `c3a6272`
 
 ## Merge / Post-merge
 
-- Merge: لم يُدمج — بانتظار موافقة المالك. لا Deploy.
+- Merge: دمجه المالك — SHA `b6cf409b102f80ac06a2a5ab49105b8b3c792fa3`. لا Deploy.
+- POST_MERGE_REVIEW: @@POST2@@
 
 ## Self-review
 
@@ -86,3 +86,4 @@ PAY-H1-03 (نواة التنسيق: `payment_attempts`، `GatewayAdapter`، قر
 
 - Branch: `claude/awj-payments-h1-02-rollout`
 - Base: `dbe3693825a27cf8a836883419d9e04a05555298`
+- PR: #1609 · Head: `c3a6272` · Merge SHA: `b6cf409b102f80ac06a2a5ab49105b8b3c792fa3`

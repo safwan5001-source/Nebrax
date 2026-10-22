@@ -155,11 +155,12 @@ class PaymentGateway extends BaseModel implements CompanyWide
         });
     }
 
-    /** سندات أو تسويات تشير إلى البوابة (لكل الفروع؛ نطاق المستأجر وحده). */
+    /** سندات أو تسويات أو محاولات دفع تشير إلى البوابة (لكل الفروع؛ نطاق المستأجر وحده). */
     public function hasFinancialReferences(): bool
     {
         return Payment::query()->where('payment_gateway_id', $this->getKey())->exists()
-            || PaymentGatewaySettlement::query()->where('payment_gateway_id', $this->getKey())->exists();
+            || PaymentGatewaySettlement::query()->where('payment_gateway_id', $this->getKey())->exists()
+            || PaymentAttempt::query()->where('payment_gateway_id', $this->getKey())->exists();
     }
 
     /** مفعّلة تشغيلياً: حالة active **و**مفتاح التشغيل القديم مفعّل. */
