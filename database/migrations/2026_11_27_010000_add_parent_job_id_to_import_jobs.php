@@ -7,8 +7,9 @@ use Illuminate\Support\Facades\Schema;
 /**
  * IMP-H1-S8b — تشغيلة إصلاح فرعية: `parent_job_id` يربطها بالتشغيلة الأم التي فشلت وحداتها (`import_job_units`).
  *
- * عمودٌ واحد nullable بلا Backfill (التشغيلات القائمة = بلا أم)، ومفتاح أجنبي `nullOnDelete` على الجدول نفسه: تقليم/حذف الأم لا يحذف الطفل،
- * لكن مطالبات الوحدات (`import_job_units`) تذهب مع الأم (cascade) فيفشل ترحيل الطفل مغلقاً بـ`repair_ref_already_used` لا بنجاحٍ صامت.
+ * عمودٌ واحد nullable بلا Backfill (التشغيلات القائمة = بلا أم)، ومفتاح أجنبي `nullOnDelete` على الجدول نفسه: حذف الأم لا يحذف الطفل. وحدات الأم
+ * (`import_job_units`) تذهب معها (cascade)، فيُنزَع ربط طفلٍ لم ينتهِ ويعمل كاستيرادٍ عاديّ بلا مطالبة — لذلك **`imports:prune` لا يقلّم أمّاً لها طفلٌ غير منتهٍ**
+ * (حارسٌ في الأمر، مختبَر).
  */
 return new class extends Migration
 {

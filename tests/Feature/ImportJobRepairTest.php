@@ -240,4 +240,58 @@ class ImportJobRepairTest extends TestCase
         $rows = [['sku', '_awj_unit_ref'], ['X', (string) \Illuminate\Support\Str::uuid()]];
         $this->repair($auth, $id, $this->xlsxFile($rows))->assertStatus(422)->assertJsonPath('code', 'repair_domain_unsupported');
     }
+
+    /** @test */
+    public function a_malformed_ref_is_an_unknown_ref_not_a_server_error(): void
+    {
+        [$auth, $parent] = $this->failedParent();
+        $rows = $this->correctedRows($auth, $parent);
+        $rows[1][5] = 'abc';
+
+        $this->repair($auth, $parent, $this->xlsxFile($rows))->assertStatus(422)->assertJsonPath('code', 'repair_ref_unknown');
+    }
+
+    /** @test */
+    public function a_lost_response_retry_with_the_same_key_returns_the_same_child_even_after_it_was_applied(): void
+    {
+        [$auth, $parent] = $this->failedParent();
+        $fixed = $this->correctedRows($auth, $parent);
+
+        $first = $this->repair($auth, $parent, $this->xlsxFile($fixed), ['idempotency_key' => 'rp-key-1'])->assertCreated()['data']['id'];
+        $this->applyAll($auth, $first)->assertJsonPath('data.status', 'completed');
+
+        $retry = $this->repair($auth, $parent, $this->xlsxFile($fixed), ['idempotency_key' => 'rp-key-1'])->assertOk();
+        $this->assertSame($first, $retry['data']['id']);
+        $this->assertSame(250, Product::query()->count());
+    }
+
+    /** @test */
+    public function blank_rows_in_the_repair_file_do_not_misalign_the_claims(): void
+    {
+        [$auth, $parent] = $this->failedParent();
+        $rows = $this->correctedRows($auth, $parent);
+        array_splice($rows, 3, 0, [array_fill(0, count($rows[0]), '')]);
+        array_splice($rows, 60, 0, [array_fill(0, count($rows[0]), '')]);
+
+        $child = $this->repair($auth, $parent, $this->xlsxFile($rows))->assertCreated()['data']['id'];
+        $this->applyAll($auth, $child)->assertJsonPath('data.status', 'completed');
+
+        $this->assertSame(250, Product::query()->count());
+        $this->assertSame(0, ImportJobUnit::query()->where('import_job_id', $parent)->where('status', 'failed')->count());
+    }
+
+    /** @test */
+    public function prune_keeps_a_failed_parent_that_still_has_an_unfinished_repair_child(): void
+    {
+        [$auth, $parent] = $this->failedParent();
+        $child = $this->repair($auth, $parent, $this->xlsxFile($this->correctedRows($auth, $parent)))->assertCreated()['data']['id'];
+        ImportJob::query()->whereKey($parent)->update(['purge_after' => now()->subDay()]);
+
+        $this->artisan('imports:prune')->assertSuccessful();
+        $this->assertTrue(ImportJob::query()->whereKey($parent)->exists(), 'الأم محفوظة ما دام طفلها لم ينتهِ.');
+
+        $this->applyAll($auth, $child)->assertJsonPath('data.status', 'completed');
+        $this->artisan('imports:prune')->assertSuccessful();
+        $this->assertFalse(ImportJob::query()->whereKey($parent)->exists(), 'بعد انتهاء الطفل تُقلَّم كسائر المنتهيات.');
+    }
 }

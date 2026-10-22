@@ -60,8 +60,17 @@ class ImportRepairService
             throw new ImportRepairException('repair_ref_missing', 'ملف الإصلاح لا يحمل صفوفاً.');
         }
 
-        $this->assertNoCsvQuotePrefix($path, $extension);
-        $this->assertMembership($parent, $refs);
+        // إعادة محاولة بعد ضياع الاستجابة بالمفتاح نفسه لتشغيلةٍ فرعية أُنشئت ورُحِّلت: تُعاد تلك التشغيلة (تتحقق `create` من تطابق الطلب)،
+        // لا يُرفض الطلب لأن وحداتها صارت `repaired`.
+        $replay = $idempotencyKey !== null && trim($idempotencyKey) !== ''
+            && ImportJob::query()->where('idempotency_key', trim($idempotencyKey))->where('parent_job_id', $parent->id)->exists();
+        if (! $replay) {
+            $this->assertNoCsvQuotePrefix($path, $extension);
+            $this->assertMembership($parent, $refs);
+        }
+
+        // بلا خيارات صريحة: ترث التشغيلة الفرعية خيارات أمّها المجمَّدة (مثل `update`/`upsert` والمطابقة) لا افتراضيات الإنشاء.
+        $options ??= is_array($parent->apply_options) ? $parent->apply_options : null;
 
         return $this->jobs->create($file, $parent->domain, $idempotencyKey, $userId, null, $options, $previewId, $previewHash, $parent->id);
     }
@@ -76,6 +85,10 @@ class ImportRepairService
             $row = $index + 1;
             if ($ref === '') {
                 throw new ImportRepairException('repair_ref_missing', "الصف {$row} من الملف بلا معرّف مصدر (_awj_unit_ref).");
+            }
+            // صيغةٌ قانونية صارمة قبل أي استعلام: عمودٌ `uuid` في PostgreSQL يرفض غير الصالح بـ22P02 (500) بدل أن يكون «غير معروف».
+            if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/', $ref) !== 1) {
+                throw new ImportRepairException('repair_ref_unknown', "المعرّف في الصف {$row} ليس معرّف مصدر صالحاً.");
             }
             if (isset($seen[$ref])) {
                 throw new ImportRepairException('repair_ref_duplicate', "المعرّف في الصف {$row} مكرّر داخل الملف.");
