@@ -80,7 +80,28 @@ Untouched: `CreditNoteService`, `ZatcaRolloutControlService` and its tables, F2a
 
 Nothing unrelated was weakened.
 
-RESULTS_PLACEHOLDER
+### 4.2 Coverage
+
+Activated tenant + stop refused (service and database); raw SQL `UPDATE` (prepared, unprepared, bulk), UPSERT, insert-as-posted and a complete `generated` document with its chain entry all refused during the stop with the stop message; the NULL, `disabled`, `not_generated` and `generated` decisions all refused; unconfigured and explicitly disabled tenants keep legacy posting during the stop; purchase notes, drafts (editable), cancellations and historical posted notes unaffected; lifting the stop restores the 3b rule and issuance resumes with the next ICV; cross-tenant (unconfigured, disabled and activated tenants coexisting in one stop); full rollback of journal and chain state; HTTP 422 with the stable JSON body; migration up, down, exact definitions and re-apply; PostgreSQL real-process concurrency.
+
+### 4.3 Results
+
+| Run | SQLite | PostgreSQL 16 |
+|---|---|---|
+| `ZatcaCreditNoteEmergencyStopFenceTest` | 4 passed (36 assertions) | 4 passed (36) |
+| `ZatcaCreditNoteEmergencyStopApiTest` | 2 passed (22) | 2 passed (22) |
+| `ZatcaCreditNoteIssuancePostgresTest` (`pcntl_fork`, `lock_timeout=60s`) | skipped (no row locks on SQLite) | 6 passed (282); 5 consecutive runs stable, no deadlock |
+| Regression filter (`Zatca`, `TaxN01`, `CreditNote`, `PublicApi`, `BranchIsolation`, `PostgresTestLockTimeout`, `ReturnSource`, `PosExchange`, `PosReturn`, `InvoicePartySnapshot`, `LedgerTest`, `InvoiceTest`, `ReportStatements`) incl. F1, F2, chain, rollout and 3c suites and `CreditNotePosLockOrderPostgresTest` | 1011 passed, 44 skipped (8492), 0 failed | 1053 passed, 2 skipped (9401), 0 failed |
+| Full suite | 8166 passed, 27 failed, 170 skipped (71367) | 8331 passed, 28 failed, 4 skipped (73310) |
+
+Full-suite failures, all unrelated to this change: 26 `Fuel*` (`bcmath` is not installed in this container; CI has it), `AiPaidProviderDisabledTest` (SQLite) and `StorefrontMediaApiTest` (PostgreSQL), both failing without this change, and, on PostgreSQL only, one `ReportStatementsTest` case that asserts the order of two ledger rows posted on the same date; it passes 4 of 4 in isolation and in the regression run, and no file it exercises was touched.
+
+### 4.4 Concurrency findings (PostgreSQL, real processes)
+
+* Postings racing stop toggles for an activated tenant plus a never-activated tenant: every activated note ends either as a complete issued document or as a draft with no journal and no entry; no activated tenant ever has a posted note without a decision; the never-activated tenant always posts legacy; ICV contiguous; no deadlock.
+* The two boundary tests of section 2.1 pass as described.
+* Mutation checks: removing the issuer branch fails the service and HTTP tests while the database layer still refuses raw SQL; removing the database branch fails the raw-SQL, lifting, migration and policy tests (and, on PostgreSQL, the between-entry-and-update race); each layer is therefore independently tested.
+
 
 ## 5. Migration up/down evidence
 
