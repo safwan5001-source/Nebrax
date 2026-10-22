@@ -15,7 +15,7 @@ const { api, translate, toastSuccess } = vi.hoisted(() => ({
   ),
 }));
 
-vi.mock('next-intl', () => ({ useTranslations: () => translate }));
+vi.mock('next-intl', () => ({ useTranslations: () => translate, useLocale: () => 'ar' }));
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
     <a href={href} {...rest}>{children}</a>
@@ -71,6 +71,31 @@ function jobFixture(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+
+const inspectionFixture = {
+  sheets: {
+    products: {
+      present: true,
+      total_rows: 3,
+      columns: [
+        { index: 0, header: 'اسم الصنف', suggested_field: 'name' },
+        { index: 1, header: 'السعر', suggested_field: 'sale_price' },
+        { index: 2, header: 'عمود غريب', suggested_field: null },
+      ],
+    },
+    barcodes: { present: true, total_rows: 1, columns: [{ index: 0, header: 'Barcode', suggested_field: 'barcode' }, { index: 1, header: 'Colour', suggested_field: null }] },
+    unit_prices: { present: false, total_rows: 0, columns: [] },
+  },
+  fields: {
+    products: [
+      { key: 'name', label_ar: 'الاسم', label_en: 'Name', type: 'string', required: true, clearable: false, update_locked: false, writable: true },
+      { key: 'sale_price', label_ar: 'سعر البيع', label_en: 'Sale price', type: 'money', required: true, clearable: false, update_locked: false, writable: true },
+      { key: 'sku', label_ar: 'الرمز', label_en: 'SKU', type: 'string', required: false, clearable: true, update_locked: true, writable: true },
+    ],
+    barcodes: [],
+    unit_prices: [],
+  },
+};
 
 const cleanPreview = {
   products: { total_rows: 0, error_rows: 0, errors: [] },
@@ -172,5 +197,101 @@ describe('استيراد مصنّف المنتجات — أول واجهة دا�
 
     await waitFor(() => expect(screen.getByText('resumed_title')).toBeTruthy());
     expect(api).not.toHaveBeenCalledWith('/products/workbook/preview', expect.anything());
+  });
+
+  it('يفحص الملف عند اختياره ويعرض الأوراق والأعمدة غير المتعرَّف عليها دون أن يمنع المعاينة', async () => {
+    api.mockImplementation((path: string) => {
+      if (path === '/price-lists') return Promise.resolve({ data: priceLists });
+      if (path === '/products/workbook/inspect') return Promise.resolve({ data: inspectionFixture });
+      return Promise.resolve({ data: {} });
+    });
+    const user = userEvent.setup();
+    render(<ProductWorkbookImportPage />);
+
+    await waitFor(() => expect(screen.getByLabelText('price_list')).toBeTruthy());
+    await user.selectOptions(screen.getByLabelText('price_list'), 'pl-1');
+    await user.upload(screen.getByLabelText('step_file'), workbookFile());
+
+    await waitFor(() => expect(screen.getByText('step_sheets')).toBeTruthy());
+    // الورقة غير الموجودة تُعلَن، والعمود الذي لا يتعرّف عليه المطابق التلقائي في ورقة لا تقبل مطابقة يدوية يُعلَن تجاهله.
+    expect(screen.getByText('sheet_absent')).toBeTruthy();
+    expect(screen.getByText('sheet_unrecognized:Colour')).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'run_preview' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('يرسل مطابقة الأعمدة المعدَّلة مع المعاينة ويحجب المعاينة عند نقص حقلٍ إلزامي', async () => {
+    api.mockImplementation((path: string) => {
+      if (path === '/price-lists') return Promise.resolve({ data: priceLists });
+      if (path === '/products/workbook/inspect') return Promise.resolve({ data: inspectionFixture });
+      if (path === '/products/workbook/preview') return Promise.resolve({ data: cleanPreview });
+      return Promise.resolve({ data: {} });
+    });
+    const user = userEvent.setup();
+    render(<ProductWorkbookImportPage />);
+
+    await waitFor(() => expect(screen.getByLabelText('price_list')).toBeTruthy());
+    await user.selectOptions(screen.getByLabelText('price_list'), 'pl-1');
+    await user.upload(screen.getByLabelText('step_file'), workbookFile());
+    await waitFor(() => expect(screen.getByLabelText('اسم الصنف')).toBeTruthy());
+
+    // فك ربط عمود الاسم الإلزامي في وضع الإنشاء يحجب المعاينة.
+    await user.selectOptions(screen.getByLabelText('اسم الصنف'), '');
+    expect((screen.getByRole('button', { name: 'run_preview' }) as HTMLButtonElement).disabled).toBe(true);
+
+    await user.selectOptions(screen.getByLabelText('اسم الصنف'), 'name');
+    await user.click(screen.getByRole('button', { name: 'run_preview' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'apply' })).toBeTruthy());
+
+    const form = api.mock.calls.find((call) => call[0] === '/products/workbook/preview')?.[1]?.body as FormData;
+    expect(form.get('mapping[0]')).toBe('name');
+    expect(form.get('mapping[1]')).toBe('sale_price');
+    // العمود الذي لا اقتراح له يُرسَل تجاهلاً صريحاً فلا تعيد المطابقة التلقائية ربطه.
+    expect(form.get('mapping[2]')).toBe('ignore');
+  });
+
+  it('فشل الفحص لا يمنع المعاينة ولا يرسل مطابقة (سلوك ما قبل H2-S3)', async () => {
+    api.mockImplementation((path: string) => {
+      if (path === '/price-lists') return Promise.resolve({ data: priceLists });
+      if (path === '/products/workbook/inspect') return Promise.reject(new Error('boom'));
+      if (path === '/products/workbook/preview') return Promise.resolve({ data: cleanPreview });
+      return Promise.resolve({ data: {} });
+    });
+    const user = userEvent.setup();
+    render(<ProductWorkbookImportPage />);
+
+    await waitFor(() => expect(screen.getByLabelText('price_list')).toBeTruthy());
+    await user.selectOptions(screen.getByLabelText('price_list'), 'pl-1');
+    await user.upload(screen.getByLabelText('step_file'), workbookFile());
+    await waitFor(() => expect((screen.getByRole('button', { name: 'run_preview' }) as HTMLButtonElement).disabled).toBe(false));
+    await user.click(screen.getByRole('button', { name: 'run_preview' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'apply' })).toBeTruthy());
+
+    const form = api.mock.calls.find((call) => call[0] === '/products/workbook/preview')?.[1]?.body as FormData;
+    expect([...form.keys()].some((key) => key.startsWith('mapping'))).toBe(false);
+  });
+
+  it('يعرض أخطاء الورقة كاملةً عند التوسيع ويوفّر تنزيل التقرير', async () => {
+    const errors = Array.from({ length: 8 }, (_, i) => ({ row: i + 2, messages: [`bad ${i + 2}`] }));
+    api.mockImplementation((path: string) => {
+      if (path === '/price-lists') return Promise.resolve({ data: priceLists });
+      if (path === '/products/workbook/preview') {
+        return Promise.resolve({ data: { ...cleanPreview, ready: false, products: { total_rows: 8, error_rows: 8, errors } } });
+      }
+      return Promise.resolve({ data: {} });
+    });
+    const user = userEvent.setup();
+    render(<ProductWorkbookImportPage />);
+
+    await waitFor(() => expect(screen.getByLabelText('price_list')).toBeTruthy());
+    await user.selectOptions(screen.getByLabelText('price_list'), 'pl-1');
+    await user.upload(screen.getByLabelText('step_file'), workbookFile());
+    await waitFor(() => expect((screen.getByRole('button', { name: 'run_preview' }) as HTMLButtonElement).disabled).toBe(false));
+    await user.click(screen.getByRole('button', { name: 'run_preview' }));
+
+    await waitFor(() => expect(screen.getByText('sheet_row:2: bad 2')).toBeTruthy());
+    expect(screen.queryByText('sheet_row:9: bad 9')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'errors_show_more:8' }));
+    expect(screen.getByText('sheet_row:9: bad 9')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'download_errors' })).toBeTruthy();
   });
 });

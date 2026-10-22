@@ -1,25 +1,40 @@
 'use client';
 
-import { ChangeEvent, DragEvent, useEffect, useRef, useState } from 'react';
+import { ChangeEvent, DragEvent, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { AlertTriangle, ArrowRight, CheckCircle2, Download, FileSpreadsheet, Loader2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/toast';
 import { FormActions } from '@/components/nebrax';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, downloadFile } from '@/lib/api';
+import { downloadCsv, toCsv } from '@/lib/export';
 import { cn } from '@/lib/utils';
 import { Stepper } from '@/modules/products/import/stepper';
-import type { BlankPolicy, ImportMode, MasterDataPolicy } from '@/modules/products/import/contract';
+import {
+  fieldLabel,
+  mappingGaps,
+  suggestedMapping,
+  type BlankPolicy,
+  type ColumnMapping,
+  type ImportMode,
+  type MasterDataPolicy,
+} from '@/modules/products/import/contract';
 import {
   ACCEPTED_WORKBOOK_TYPES,
   MAX_IMPORT_BYTES,
   MAX_IMPORT_ROWS,
+  WORKBOOK_SHEETS,
+  effectiveMapping,
+  readInspection,
+  unrecognizedColumns,
   workbookFormData,
+  type WorkbookInspection,
   type WorkbookPreview,
 } from '@/modules/products/workbook/contract';
 import { ImportJobStatusPanel } from '@/modules/import-jobs/ImportJobStatusPanel';
@@ -38,11 +53,17 @@ interface PriceListOption {
 // الثلاث معاً أو تفشلها معاً.
 const STEP_KEYS = ['setup', 'preview', 'apply', 'result'] as const;
 
+/** أخطاء كل ورقة تظهر مختصرةً ثم تتوسّع؛ التقرير الكامل في ملف CSV. */
+const ERRORS_COLLAPSED = 5;
+const ERRORS_EXPANDED = 50;
+const NIL_UUID = '00000000-0000-0000-0000-000000000000';
+
 export default function ProductWorkbookImportPage() {
   const t = useTranslations('productWorkbook');
   const tp = useTranslations('products');
   const tc = useTranslations('common');
-  const { success } = useToast();
+  const locale = useLocale();
+  const { success, toast } = useToast();
   const fileInput = useRef<HTMLInputElement | null>(null);
   const { setParam } = useImportJobUrlParam();
 
@@ -56,6 +77,12 @@ export default function ProductWorkbookImportPage() {
   const [masterDataPolicy, setMasterDataPolicy] = useState<MasterDataPolicy>('match_or_text');
   const [preview, setPreview] = useState<WorkbookPreview | null>(null);
   const [previewing, setPreviewing] = useState(false);
+  const [inspection, setInspection] = useState<WorkbookInspection | null>(null);
+  const [inspecting, setInspecting] = useState(false);
+  const [mapping, setMapping] = useState<ColumnMapping>({});
+  const [expandedSheets, setExpandedSheets] = useState<Record<string, boolean>>({});
+  // يمنع ردَّ فحصٍ متأخر لملفٍ سابق من الكتابة فوق ملفٍ اختير بعده.
+  const inspectSeq = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [resumedWithoutFile, setResumedWithoutFile] = useState(false);
 
@@ -81,12 +108,21 @@ export default function ProductWorkbookImportPage() {
 
   const activePriceLists = (priceLists ?? []).filter((list) => list.is_active);
   const steps = STEP_KEYS.map((key) => ({ key, label: t(`step_${key}` as 'step_setup') }));
-  const canPreview = Boolean(file) && Boolean(priceListId);
+  const fields = inspection?.fields.products ?? [];
+  const writableFields = useMemo(() => fields.filter((field) => field.writable || field.key === 'nebrax_id'), [fields]);
+  const activeMapping = effectiveMapping(inspection, mapping);
+  const gaps = useMemo(() => mappingGaps(mapping, fields, mode), [mapping, fields, mode]);
+  const mappingReady = !activeMapping || (gaps.missingRequired.length === 0 && !gaps.missingIdentifier && !gaps.duplicate);
+  const canPreview = Boolean(file) && Boolean(priceListId) && !inspecting && mappingReady;
 
   function reset() {
     setStep(0);
     setFile(null);
     setPreview(null);
+    setInspection(null);
+    setMapping({});
+    setExpandedSheets({});
+    inspectSeq.current += 1;
     setError(null);
     setResumedWithoutFile(false);
     setParam(null);
@@ -97,13 +133,60 @@ export default function ProductWorkbookImportPage() {
   function acceptFile(next: File | null) {
     setFile(next);
     setPreview(null);
+    setInspection(null);
+    setMapping({});
+    setExpandedSheets({});
     setError(null);
+    const seq = ++inspectSeq.current;
     if (!next) return;
     if (next.size > MAX_IMPORT_BYTES) {
       setFile(null);
       setError(t('file_too_large', { limit: Math.round(MAX_IMPORT_BYTES / (1024 * 1024)) }));
       if (fileInput.current) fileInput.current.value = '';
+      return;
     }
+    void inspectFile(next, seq);
+  }
+
+  // الفحص استشاريّ (بلا تحقق ولا كتابة): فشله لا يمنع المعاينة، والخادم يطابق بالاسم تلقائياً كما كان.
+  async function inspectFile(next: File, seq: number) {
+    setInspecting(true);
+    try {
+      const form = new FormData();
+      form.append('file', next);
+      // طلب الفحص يشاركه FormRequest المصنّف فيشترط uuid لقائمة السعر، لكن الفحص نفسه لا يقرأها: معرّف صفري صالح الصياغة.
+      form.append('price_list_id', priceListId || NIL_UUID);
+      const response = await api<{ data: unknown }>('/products/workbook/inspect', { method: 'POST', body: form });
+      if (seq !== inspectSeq.current) return;
+      const result = readInspection(response.data);
+      setInspection(result);
+      setMapping(result ? suggestedMapping(result.sheets.products.columns.map((column) => ({ ...column, samples: [] }))) : {});
+    } catch {
+      if (seq === inspectSeq.current) setInspection(null);
+    } finally {
+      if (seq === inspectSeq.current) setInspecting(false);
+    }
+  }
+
+  function updateMapping(index: number, value: string) {
+    setMapping((current) => ({ ...current, [index]: value === '' ? null : value }));
+    setPreview(null);
+  }
+
+  async function downloadTemplate() {
+    try {
+      const outcome = await downloadFile('/products/workbook/template', 'nebrax-products-workbook-template.xlsx');
+      if (outcome === 'demo-unavailable') toast({ title: tp('export_demo_unavailable'), variant: 'info' });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : tc('saveFailed'));
+    }
+  }
+
+  function downloadErrors(current: WorkbookPreview) {
+    const rows = WORKBOOK_SHEETS.flatMap((sheet) =>
+      current[sheet].errors.map((issue) => [t(`sheet_${sheet}` as 'sheet_products'), issue.row, issue.messages.join(' — ')])
+    );
+    downloadCsv('nebrax-workbook-errors.csv', toCsv([t('report_sheet'), t('report_row'), t('report_messages')], rows));
   }
 
   function onDrop(event: DragEvent<HTMLDivElement>) {
@@ -119,7 +202,7 @@ export default function ProductWorkbookImportPage() {
     try {
       const response = await api<{ data: WorkbookPreview }>('/products/workbook/preview', {
         method: 'POST',
-        body: workbookFormData(file, { priceListId, mode, blankPolicy, masterDataPolicy }),
+        body: workbookFormData(file, { priceListId, mode, blankPolicy, masterDataPolicy, mapping: activeMapping }),
       });
       setPreview(response.data);
       setStep(1);
@@ -132,7 +215,13 @@ export default function ProductWorkbookImportPage() {
   }
 
   function applyOptionsPayload(): ApplyOptions {
-    return { price_list_id: priceListId, mode, blank_policy: blankPolicy, master_data_policy: masterDataPolicy };
+    return {
+      price_list_id: priceListId,
+      mode,
+      blank_policy: blankPolicy,
+      master_data_policy: masterDataPolicy,
+      ...(activeMapping ? { mapping: activeMapping } : {}),
+    };
   }
 
   async function confirmAndApply() {
@@ -183,6 +272,10 @@ export default function ProductWorkbookImportPage() {
           <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
           <p className="mt-1 max-w-3xl text-sm leading-relaxed text-muted">{t('subtitle')}</p>
         </div>
+        <Button type="button" variant="outline" onClick={() => void downloadTemplate()}>
+          <Download className="h-4 w-4" strokeWidth={1.7} />
+          {t('download_template')}
+        </Button>
       </header>
 
       <p className="num text-xs text-muted md:hidden">{t('step_of', { current: step + 1, total: steps.length })}</p>
@@ -252,6 +345,140 @@ export default function ProductWorkbookImportPage() {
                 ) : null}
               </CardContent>
             </Card>
+
+            {inspecting ? (
+              <p className="flex items-center gap-2 text-sm text-muted" role="status">
+                <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.7} />
+                {t('inspecting')}
+              </p>
+            ) : null}
+
+            {inspection ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t('step_sheets')}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {WORKBOOK_SHEETS.map((sheet) => {
+                    const detected = inspection.sheets[sheet];
+                    const unknown = unrecognizedColumns(detected);
+                    return (
+                      <div key={sheet} className="rounded-md border border-border p-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-medium text-text">{t(`sheet_${sheet}` as 'sheet_products')}</p>
+                          <Badge tone={detected.present ? 'positive' : 'muted'}>
+                            {detected.present ? t('sheet_present') : t('sheet_absent')}
+                          </Badge>
+                          {detected.present ? (
+                            <span className="num text-xs text-muted">{t('sheet_data_rows', { rows: detected.total_rows })}</span>
+                          ) : null}
+                        </div>
+                        {unknown.length > 0 && sheet !== 'products' ? (
+                          <p role="status" className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-warning">
+                            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.7} />
+                            {t('sheet_unrecognized', { columns: unknown.join('، ') })}
+                          </p>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            ) : null}
+
+            {activeMapping && inspection ? (
+              <Card>
+                <CardHeader>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <CardTitle>{t('step_mapping')}</CardTitle>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="ms-auto"
+                      onClick={() => {
+                        setMapping(suggestedMapping(inspection.sheets.products.columns.map((column) => ({ ...column, samples: [] }))));
+                        setPreview(null);
+                      }}
+                    >
+                      {tp('import_mapping_reset')}
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-xs leading-relaxed text-muted">{t('mapping_scope_note')}</p>
+                  {gaps.missingRequired.length > 0 ? (
+                    <p role="alert" className="rounded-md border border-negative/30 bg-negative/10 px-3 py-2 text-sm text-negative">
+                      {tp('import_mapping_missing_required', {
+                        fields: gaps.missingRequired.map((field) => fieldLabel(field, locale)).join('، '),
+                      })}
+                    </p>
+                  ) : null}
+                  {gaps.missingIdentifier ? (
+                    <p role="alert" className="rounded-md border border-negative/30 bg-negative/10 px-3 py-2 text-sm text-negative">
+                      {tp('import_mapping_missing_identifier')}
+                    </p>
+                  ) : null}
+                  {gaps.duplicate ? (
+                    <p role="alert" className="rounded-md border border-negative/30 bg-negative/10 px-3 py-2 text-sm text-negative">
+                      {tp('import_mapping_duplicate')}
+                    </p>
+                  ) : null}
+                  <div className="overflow-x-auto rounded-md border border-border">
+                    <table className="w-full min-w-[32rem] text-sm">
+                      <thead className="bg-background text-muted">
+                        <tr>
+                          <th className="px-3 py-2 text-start font-medium">{tp('import_mapping_source')}</th>
+                          <th className="px-3 py-2 text-start font-medium">{tp('import_mapping_target')}</th>
+                          <th className="px-3 py-2 text-start font-medium">{tp('import_mapping_state')}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {inspection.sheets.products.columns.map((column) => {
+                          const selected = mapping[column.index] ?? '';
+                          const field = fields.find((item) => item.key === selected);
+                          return (
+                            <tr key={column.index} className="border-t border-border align-top">
+                              <td className="max-w-48 px-3 py-2">
+                                <span className="block truncate font-medium text-text" title={column.header}>
+                                  {column.header || '—'}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2">
+                                <Label htmlFor={`wb-map-${column.index}`} className="sr-only">
+                                  {column.header}
+                                </Label>
+                                <Select
+                                  id={`wb-map-${column.index}`}
+                                  value={selected}
+                                  onChange={(event) => updateMapping(column.index, event.target.value)}
+                                  className="min-w-44"
+                                >
+                                  <option value="">{tp('import_mapping_ignore')}</option>
+                                  {writableFields.map((item) => (
+                                    <option key={item.key} value={item.key}>
+                                      {fieldLabel(item, locale)}
+                                    </option>
+                                  ))}
+                                </Select>
+                              </td>
+                              <td className="px-3 py-2">
+                                <span className="flex flex-wrap gap-1">
+                                  <Badge tone={selected ? 'positive' : 'muted'}>
+                                    {selected ? tp('import_mapping_mapped') : tp('import_mapping_unmapped')}
+                                  </Badge>
+                                  {field?.required ? <Badge tone="muted">{tp('import_mapping_required')}</Badge> : null}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
 
             <Card>
               <CardHeader>
@@ -328,16 +555,40 @@ export default function ProductWorkbookImportPage() {
                   </div>
                 </dl>
                 {preview[sheet].errors.length > 0 ? (
-                  <ul className="mt-2 space-y-1 text-xs leading-relaxed text-negative">
-                    {preview[sheet].errors.slice(0, 5).map((issue) => (
-                      <li key={issue.row}>
-                        {t('sheet_row', { row: issue.row })}: {issue.messages.join(' — ')}
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="mt-2 space-y-2">
+                    <ul className="space-y-1 text-xs leading-relaxed text-negative">
+                      {preview[sheet].errors
+                        .slice(0, expandedSheets[sheet] ? ERRORS_EXPANDED : ERRORS_COLLAPSED)
+                        .map((issue) => (
+                          <li key={issue.row}>
+                            {t('sheet_row', { row: issue.row })}: {issue.messages.join(' — ')}
+                          </li>
+                        ))}
+                    </ul>
+                    {preview[sheet].errors.length > ERRORS_COLLAPSED ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setExpandedSheets((current) => ({ ...current, [sheet]: !current[sheet] }))}
+                      >
+                        {expandedSheets[sheet] ? t('errors_show_less') : t('errors_show_more', { count: Math.min(preview[sheet].errors.length, ERRORS_EXPANDED) })}
+                      </Button>
+                    ) : null}
+                    {expandedSheets[sheet] && preview[sheet].errors.length > ERRORS_EXPANDED ? (
+                      <p className="text-xs text-muted">{t('errors_truncated', { shown: ERRORS_EXPANDED, total: preview[sheet].errors.length })}</p>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
             ))}
+
+            {WORKBOOK_SHEETS.some((sheet) => preview[sheet].errors.length > 0) ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => downloadErrors(preview)}>
+                <Download className="h-4 w-4" strokeWidth={1.7} />
+                {t('download_errors')}
+              </Button>
+            ) : null}
 
             {!preview.ready ? (
               <p role="alert" className="rounded-md border border-negative/30 bg-negative/10 px-3 py-2 text-sm text-negative">
