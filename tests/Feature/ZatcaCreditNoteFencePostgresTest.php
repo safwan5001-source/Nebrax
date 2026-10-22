@@ -241,8 +241,9 @@ class ZatcaCreditNoteFencePostgresTest extends TestCase
     /** @test */
     public function the_emergency_stop_boundary_is_the_committed_state_at_the_posting_statement(): void
     {
+        // REM-18b-3d (السياسة B): الحدّ ما زال «آخر حالة مثبَّتة وقت عبارة الترحيل»، لكن بعد التثبيت يُرفض كل ترحيل (لا الترحيل القديم).
         $tenant = $this->makeTenant();
-        [$beforeCommit, $afterCommit, $afterLift, $explicit] = array_map(fn () => $this->makeNote($tenant), range(1, 4));
+        [$beforeCommit, $afterCommit, $withDecision, $afterLift] = array_map(fn () => $this->makeNote($tenant), range(1, 4));
         $admin = $this->makeAdmin();
         $this->enable($tenant);
         $dir = $this->dir;
@@ -258,41 +259,50 @@ class ZatcaCreditNoteFencePostgresTest extends TestCase
                     return true;
                 });
             },
-            // ترحيل أثناء الإيقاف غير المثبَّت: لا يراه ولا يُحجب به، فيُرفض بسياج المستأجر المفعَّل.
+            // ترحيل أثناء الإيقاف غير المثبَّت: لا يراه ولا يُحجب به، فيُرفض بقاعدة القرار الصريح (3b) لا بقاعدة الإيقاف.
             function () use ($beforeCommit, $dir) {
                 $this->waitFor($dir.'/stop_written');
                 usleep(400_000);
                 $start = microtime(true);
                 try {
                     DB::table('credit_notes')->where('id', $beforeCommit)->update(['status' => 'posted']);
-                    $rejected = false;
+                    $reason = 'accepted';
                 } catch (\Illuminate\Database\QueryException $e) {
-                    $rejected = str_contains($e->getMessage(), 'explicit ZATCA issuance decision');
+                    $reason = str_contains($e->getMessage(), 'explicit ZATCA issuance decision') ? 'decision_rule'
+                        : (str_contains($e->getMessage(), 'blocked while the platform emergency stop') ? 'stop_rule' : 'other');
                 }
 
-                return ['rejected' => $rejected, 'took_ms' => (int) ((microtime(true) - $start) * 1000)];
+                return ['reason' => $reason, 'took_ms' => (int) ((microtime(true) - $start) * 1000)];
             },
         ]);
 
         $this->assertAllOk($results);
-        $this->assertTrue($results[1]['value']['rejected'], 'الإيقاف غير المثبَّت غير مرئي: السياج قائم');
+        $this->assertSame('decision_rule', $results[1]['value']['reason'], 'الإيقاف غير المثبَّت غير مرئي: تسري قاعدة القرار الصريح وحدها');
         $this->assertLessThan(1500, $results[1]['value']['took_ms'], 'الترحيل لا ينتظر كاتب الإيقاف (قراءة بلا قفل)');
         $this->assertSame('draft', DB::table('credit_notes')->where('id', $beforeCommit)->value('status'));
 
-        // بعد التثبيت: الإيقاف سارٍ ⇒ الترحيل القديم بلا قرار.
-        DB::table('credit_notes')->where('id', $afterCommit)->update(['status' => 'posted']);
-        $this->assertSame('posted', DB::table('credit_notes')->where('id', $afterCommit)->value('status'));
+        // بعد التثبيت: كل ترحيل لمستأجر مفعَّل مرفوض بقاعدة الإيقاف — بلا قرار وبقرار صريح (حتى generated كامل بمدخله).
+        $this->assertStopBlocks(fn () => DB::table('credit_notes')->where('id', $afterCommit)->update(['status' => 'posted']));
+        $this->assertStopBlocks(fn () => DB::table('credit_notes')->where('id', $withDecision)->update(['status' => 'posted', 'zatca_status' => 'not_generated', 'zatca_skip_reason' => 'payment_means_unresolved']));
+        $this->assertStopBlocks(fn () => DB::transaction(fn () => $this->issueNote($tenant, $withDecision)));
+        $this->assertSame(0, DB::table('zatca_chain_entries')->where('tenant_id', $tenant)->count(), 'لا مدخل متبقٍّ بعد الرفض');
 
-        // وبعد رفعه يعود السياج. القرار الصريح مقبول في الحالتين.
+        // وبعد رفعه تعود قاعدة 3b: القرار الصريح مقبول.
         app(ZatcaRolloutControlService::class)->setPlatformState(PlatformAdministrator::findOrFail($admin), true, 'رفع الإيقاف');
+        DB::table('credit_notes')->where('id', $afterLift)->update(['status' => 'posted', 'zatca_status' => 'not_generated', 'zatca_skip_reason' => 'payment_means_unresolved']);
+        $this->assertSame('posted', DB::table('credit_notes')->where('id', $afterLift)->value('status'));
+    }
+
+    private function assertStopBlocks(callable $operation): void
+    {
         try {
-            DB::table('credit_notes')->where('id', $afterLift)->update(['status' => 'posted']);
-            $this->fail('the fence must be back once the stop is lifted');
-        } catch (\Illuminate\Database\QueryException) {
-            $this->assertSame('draft', DB::table('credit_notes')->where('id', $afterLift)->value('status'));
+            DB::transaction($operation);
+        } catch (\Illuminate\Database\QueryException $e) {
+            $this->assertStringContainsString('blocked while the platform emergency stop', $e->getMessage());
+
+            return;
         }
-        DB::table('credit_notes')->where('id', $explicit)->update(['status' => 'posted', 'zatca_status' => 'not_generated', 'zatca_skip_reason' => 'payment_means_unresolved']);
-        $this->assertSame('posted', DB::table('credit_notes')->where('id', $explicit)->value('status'));
+        $this->fail('the posting must be blocked while the platform emergency stop is in force');
     }
 
     // ───────────────────────── مساعدات ─────────────────────────

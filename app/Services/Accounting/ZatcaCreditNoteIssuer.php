@@ -5,6 +5,7 @@ namespace App\Services\Accounting;
 use App\Models\CreditNote;
 use App\Models\Invoice;
 use App\Models\ZatcaCredential;
+use App\Support\ZatcaCreditNoteEmergencyStopException;
 use App\Support\ZatcaCreditNoteIneligibleException;
 use App\Support\ZatcaCreditNoteInputFactory;
 use App\Support\ZatcaCreditNoteXml;
@@ -30,9 +31,11 @@ use LogicException;
  *    4) `reserve()` (قفل رأس السلسلة) ← بناء XML/الهاش/QR/التوقيع ← `recordCreditNote()` (إدراج المدخل **قبل** تحديث الإشعار).
  *    5) يعيد الأعمدة؛ التحديث الواحد التالي (status=posted + هوية المستند) يرضي F2a (مدخل مطابق) وF2b (قرار صريح).
  *
+ *  الإيقاف الطارئ (REM-18b-3d، السياسة B): مفعَّل + إيقاف منصة ⇒ `ZatcaCreditNoteEmergencyStopException` قبل الأهلية وقبل أي حجز.
+ *
  *  ما يحمي من السباق: ضوابط المستأجر تتغيّر خلف مِرساة المستأجر المقفولة هنا، والإيقاف الطارئ للمنصة غير مرتبط بمِرساة؛ فإن انقلبت الحالة
  *  بين قراءتنا وتحديث الإشعار يعيد السياج F2b تقييمها في عبارة التحديث نفسها (الفشل مغلق، المعاملة تتراجع). القرار الصريح `generated`
- *  مقبول في كل الحالات. سياسة الإيقاف الطارئ للمستأجر المفعَّل (الخيار B) **غير منفَّذة**: يُعامَل كغير مفعَّل (ترحيل قديم) كعقد 3a/3b.
+ *  مقبول ما دام لا إيقاف طارئ (أثناءه يرفض السياج كل ترحيل لمستأجر مفعَّل). الإيقاف الطارئ لمستأجر مفعَّل: محجوب (السياسة B، REM-18b-3d).
  *
  *  الأهلية (كلها مطلوبة): مبيعات · استرداد نقدي `cash` (لا رمز دفع موثَّق لـ`credit` — D4) · فاتورة مصدر مرحَّلة · لقطة طرفين صالحة
  *  على الفاتورة المصدر · تصنيف standard|simplified · سطور تحقق منها `ZatcaCreditNoteInputFactory`. لا مستقل (BR-KSA-56) ولا مشتريات.
@@ -70,6 +73,13 @@ final class ZatcaCreditNoteIssuer
         }
 
         $state = $this->rollout->effectiveForTenant((string) $note->tenant_id);
+
+        // REM-18b-3d (السياسة B): ضابط المستأجر مفعَّل والمنصة في إيقاف طارئ ⇒ لا ترحيل لإشعار مبيعات جديد، لا بقرار ولا بدونه. يُرمى قبل
+        // الأهلية وقبل `reserve()` فلا يُقفل رأس السلسلة ولا يُستهلك ICV، وتتراجع المعاملة بقيدها. السياج F2b في القاعدة يفرض القاعدة نفسها لمن
+        // يتجاوز الخدمة. المستأجر غير المفعَّل (غائب/معطَّل) يبقى على الترحيل القديم.
+        if ($state->tenantEnabled && $state->platformStopped) {
+            throw new ZatcaCreditNoteEmergencyStopException();
+        }
         if (! $state->enabled) {
             return null;
         }

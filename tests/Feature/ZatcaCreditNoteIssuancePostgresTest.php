@@ -24,6 +24,9 @@ use Tests\TestCase;
  *  2) ترحيلات تتسابق مع تفعيل/تعطيل المستأجر ⇒ كل إشعار إما مرحَّل ومُصدَر بمدخل مطابق، أو مرحَّل قديماً بلا قرار ولا مدخل، أو مرفوض
  *     بسياج F2b (مسودة بلا قيد)؛ لا ICV مفقود ولا يتيم، بلا جمود.
  *  3) موت مفاجئ (SIGKILL) بعد إدراج المدخل وقبل التثبيت ⇒ لا مدخل ولا قيد ولا ترحيل ولا تقدّم للرأس، ولا يعلق شيء خلفه.
+ *  4) السياسة B (REM-18b-3d) تحت تزامن حقيقي: ترحيلات تتسابق مع تبديل الإيقاف الطارئ ⇒ لا إشعار مرحَّل بلا قرار لمستأجر مفعَّل أبداً؛
+ *     إيقاف يُثبَّت بين إدراج المدخل وتحديث الإشعار ⇒ رفض وتراجع كامل (لا ICV مستهلك)؛ وإيقاف يُثبَّت بعد عبارة التحديث وقبل commit ⇒
+ *     الإصدار الجاري يكتمل (حدّ READ COMMITTED، D-B3) ثم يُحجب كل ترحيل لاحق.
  *
  *  على PostgreSQL **لا يُتخطّى** هذا الصنف إن غاب `pcntl`: يفشل. يُتخطّى على SQLite فقط (لا أقفال صفوف).
  *  يعمل على قاعدة مُهاجَرة بلا RefreshDatabase (العمليات الفرعية تحتاج صفوفاً مثبَّتة) وينظّف بحذف المستأجر المتسلسل.
@@ -52,6 +55,7 @@ class ZatcaCreditNoteIssuancePostgresTest extends TestCase
 
         $this->dir = sys_get_temp_dir().'/zatca_issue_'.uniqid();
         mkdir($this->dir);
+        $this->clearPlatformRows(); // صفوف المنصة لا تُحذف تطبيقياً: لا بقايا من تشغيل سابق منقطع
     }
 
     protected function tearDown(): void
@@ -66,6 +70,7 @@ class ZatcaCreditNoteIssuancePostgresTest extends TestCase
             foreach ($this->tenants as $id) {
                 $this->purgeTenant($id);
             }
+            $this->clearPlatformRows();
             foreach ($this->admins as $id) {
                 DB::table('platform_administrators')->where('id', $id)->delete();
             }
@@ -188,6 +193,127 @@ class ZatcaCreditNoteIssuancePostgresTest extends TestCase
         $this->assertSame($headBefore + 1, (int) DB::table('credit_notes')->where('id', $note)->value('zatca_icv'));
     }
 
+    /** @test */
+    public function postings_racing_stop_toggles_never_leave_an_activated_tenant_with_an_undecided_posted_note(): void
+    {
+        $s = $this->scene(quantity: 12);
+        $plain = $this->scene(quantity: 6);
+        $this->enable($s['tenant']);
+        $admin = $this->makeAdmin();
+        $notes = array_map(fn () => $this->draftNote($s), range(1, 8));
+        $plainNotes = array_map(fn () => $this->draftNote($plain), range(1, 4));
+
+        $jobs = [];
+        foreach ($notes as $i => $note) {
+            $jobs[] = fn () => $this->postInChild($s['tenant'], $note);
+            $jobs[] = fn () => $this->flipPlatformInChild($admin, $i % 2 === 1, 'تبديل إيقاف متزامن '.$i);
+        }
+        foreach ($plainNotes as $note) {
+            $jobs[] = fn () => $this->postInChild($plain['tenant'], $note); // مستأجر لم يُفعَّل: ترحيل قديم دائماً
+        }
+        $results = $this->runConcurrently($jobs);
+
+        foreach ($results as $i => $result) {
+            $this->assertFalse($this->isDeadlock($result), "جمود في العملية {$i}");
+        }
+        foreach ($notes as $note) {
+            $row = DB::table('credit_notes')->where('id', $note)->first();
+            if ($row->status === 'posted') {
+                $this->assertIssuedConsistently($note, true); // الترحيل لمفعَّل = صادر كامل دائماً
+            } else {
+                $this->assertSame('draft', $row->status);
+                $this->assertNull($row->zatca_status);
+                $this->assertSame(0, DB::table('zatca_chain_entries')->where('credit_note_id', $note)->count(), 'المحجوب بلا مدخل');
+                $this->assertSame(0, DB::table('journal_entries')->where('source_type', CreditNote::class)->where('source_id', $note)->count(), 'المحجوب بلا قيد');
+            }
+        }
+        $this->assertSame(0, DB::table('credit_notes')->whereIn('id', $notes)->where('status', 'posted')->whereNull('zatca_status')->count(), 'لا مرحَّل بلا قرار لمستأجر مفعَّل');
+        foreach ($plainNotes as $note) {
+            $this->assertSame('posted', DB::table('credit_notes')->where('id', $note)->value('status'), 'المستأجر غير المفعَّل لا يتأثر بالإيقاف');
+            $this->assertNull(DB::table('credit_notes')->where('id', $note)->value('zatca_status'));
+        }
+        $entries = DB::table('zatca_chain_entries')->where('tenant_id', $s['tenant'])->orderBy('icv')->get();
+        $this->assertSame(range(1, 1 + $entries->count() - 1), $entries->pluck('icv')->map(fn ($v) => (int) $v)->all(), 'ICV متصل بلا فجوة أو يتيم');
+        $this->assertSame($entries->count(), (int) DB::table('zatca_chains')->where('tenant_id', $s['tenant'])->value('last_icv'));
+        $this->assertChainContinuity($entries);
+    }
+
+    /** @test */
+    public function a_stop_committed_between_the_chain_entry_and_the_note_update_refuses_and_rolls_everything_back(): void
+    {
+        $s = $this->scene(quantity: 4);
+        $this->enable($s['tenant']);
+        $admin = $this->makeAdmin();
+        $note = $this->draftNote($s);
+        $headBefore = (int) DB::table('zatca_chains')->where('tenant_id', $s['tenant'])->value('last_icv');
+        $dir = $this->dir;
+
+        $results = $this->runConcurrently([
+            function () use ($s, $note, $dir) {
+                Event::listen('eloquent.created: '.\App\Models\ZatcaChainEntry::class, function () use ($dir): void {
+                    touch($dir.'/entry_inserted');
+                    $this->waitFor($dir.'/stop_done'); // يبقى المدخل غير مثبَّت حتى يُثبَّت الإيقاف
+                });
+
+                return $this->postInChild($s['tenant'], $note);
+            },
+            function () use ($admin, $dir) {
+                $this->waitFor($dir.'/entry_inserted');
+                $change = $this->flipPlatformInChild($admin, false, 'إيقاف بين المدخل والتحديث');
+                touch($dir.'/stop_done');
+
+                return $change;
+            },
+        ]);
+
+        $this->assertTrue($results[1]['ok'], 'الإيقاف لا يُحجب بالترحيل الجاري (لا قفل مشترك)');
+        $this->assertFalse($results[0]['ok'], 'الإيقاف المثبَّت قبل عبارة التحديث يرفض الإشعار');
+        $this->assertStringContainsString('blocked while the platform emergency stop', (string) $results[0]['message']);
+        $this->assertFalse($this->isDeadlock($results[0]));
+        $this->assertSame('draft', DB::table('credit_notes')->where('id', $note)->value('status'));
+        $this->assertSame(0, DB::table('zatca_chain_entries')->where('credit_note_id', $note)->count(), 'المدخل تراجع');
+        $this->assertSame($headBefore, (int) DB::table('zatca_chains')->where('tenant_id', $s['tenant'])->value('last_icv'), 'لا ICV مستهلك');
+        $this->assertSame(0, DB::table('journal_entries')->where('source_type', CreditNote::class)->where('source_id', $note)->count());
+    }
+
+    /** @test */
+    public function a_stop_committed_after_the_note_update_but_before_commit_lets_the_running_issuance_finish(): void
+    {
+        $s = $this->scene(quantity: 4);
+        $this->enable($s['tenant']);
+        $admin = $this->makeAdmin();
+        [$running, $later] = [$this->draftNote($s), $this->draftNote($s)];
+        $dir = $this->dir;
+
+        $results = $this->runConcurrently([
+            function () use ($s, $running, $dir) {
+                Event::listen('eloquent.updated: '.CreditNote::class, function () use ($dir): void {
+                    touch($dir.'/note_updated');
+                    $this->waitFor($dir.'/stop_done'); // معاملة الإصدار مفتوحة وعبارة التحديث نُفِّذت
+                });
+
+                return $this->postInChild($s['tenant'], $running);
+            },
+            function () use ($admin, $dir) {
+                $this->waitFor($dir.'/note_updated');
+                $change = $this->flipPlatformInChild($admin, false, 'إيقاف بعد عبارة التحديث');
+                touch($dir.'/stop_done');
+
+                return $change;
+            },
+        ]);
+
+        // D-B3: الإصدار الجاري عبر حدّ الإيقاف يكتمل صادراً كاملاً بمدخله — لا فجوة ولا تناقض.
+        $this->assertAllOk($results);
+        $this->assertIssuedConsistently($running, true);
+
+        // وكل ترحيل لاحق محجوب بالاستثناء المُعرَّف.
+        $blocked = $this->runConcurrently([fn () => $this->postInChild($s['tenant'], $later)]);
+        $this->assertFalse($blocked[0]['ok']);
+        $this->assertSame(\App\Support\ZatcaCreditNoteEmergencyStopException::class, $blocked[0]['error_class']);
+        $this->assertSame('draft', DB::table('credit_notes')->where('id', $later)->value('status'));
+    }
+
     // ───────────────────────── مساعدات ─────────────────────────
 
     /** @return array{tenant: string, partner: string, product: string, invoice: string, line: string, class: string} */
@@ -260,6 +386,38 @@ class ZatcaCreditNoteIssuancePostgresTest extends TestCase
         $change = app(ZatcaRolloutControlService::class)->setTenantState(PlatformAdministrator::findOrFail($admin), $tenant, $enabled, $reason);
 
         return ['changed' => $change->changed];
+    }
+
+    private function flipPlatformInChild(string $admin, bool $enabled, string $reason): array
+    {
+        $change = app(ZatcaRolloutControlService::class)->setPlatformState(PlatformAdministrator::findOrFail($admin), $enabled, $reason);
+
+        return ['changed' => $change->changed];
+    }
+
+    /** صفوف المنصة لا تُحذف تطبيقياً (حراس C4/E2): تنظيف الاختبار بتعطيل مُشغّلات المستخدم مؤقتاً فقط. */
+    private function clearPlatformRows(): void
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('zatca_rollout_controls')) {
+            return;
+        }
+        try {
+            DB::unprepared('ALTER TABLE zatca_rollout_control_events DISABLE TRIGGER USER');
+            DB::unprepared('ALTER TABLE zatca_rollout_controls DISABLE TRIGGER USER');
+            DB::table('zatca_rollout_control_events')->whereNull('tenant_id')->delete();
+            DB::table('zatca_rollout_controls')->whereNull('tenant_id')->delete();
+        } finally {
+            DB::unprepared('ALTER TABLE zatca_rollout_controls ENABLE TRIGGER USER');
+            DB::unprepared('ALTER TABLE zatca_rollout_control_events ENABLE TRIGGER USER');
+        }
+    }
+
+    private function waitFor(string $file, float $seconds = 10.0): void
+    {
+        $deadline = microtime(true) + $seconds;
+        while (! file_exists($file) && microtime(true) < $deadline) {
+            usleep(1_000);
+        }
     }
 
     private function makeAdmin(): string
