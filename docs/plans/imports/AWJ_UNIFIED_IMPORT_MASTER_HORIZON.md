@@ -68,6 +68,8 @@ We do **not** replace any working engine. We introduce one seam per entity, and 
 5. **Approval binds to content.** Execution requires an approval bound to the exact plan hash (the AI Actions model). The standard durable path gains the same binding (preview hash ↔ job file SHA + options), see IMP-H1-S3.
 6. **Configurable policy, not imposed policy** (CLAUDE.md rule 6). Duplicate handling, blank cells and missing master data are per-run options with defaults that preserve today's behavior.
 7. **Every entry path carries the direct API's gates.** A durable job domain (H1-S1 map) and an AI Action type (H1-S7 definition) each declare the **same** permission(s) **and** application key as the entity's direct create endpoint. Invariant tests fail CI when a domain or type is registered without them.
+9. **Execution unit = business document, never a raw row.** Each adapter declares `unitKey(row)`. A product, a partner or a price item is one row; a purchase is its `(supplier, ref)` group; a stocktake sheet is the whole file. Planning, reservation, durable chunking and AI execution batches all advance by **whole units**: a unit is never split across chunks, batches or transactions.
+10. **Every apply is bound to its preview.** No execution path (sync `/apply`, durable job, AI execution) accepts content that was not previewed. Sync paths require `preview_hash` on apply; durable jobs bind it at creation; AI binds it via approval (H1-S3).
 8. **Both paths, or a recorded exclusion.** Every entity in §3 that has a standard import either has an AI path slice or a `D-xx` exclusion in §7. There is no silent gap.
 
 ### 2.3 Why not merge `ImportJob` and `AiAction` into one table
@@ -142,7 +144,7 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
     - index filtering
     - map-coverage test
     - prune of a completed job with an archive
-- **IMP-H1-S2 — `ImportDomainAdapter` contract + registry**, with the three existing domains wired through it. **No behavior change** (characterization tests first). `ImportJobService::runChunk` dispatches via the registry instead of `match`.
+- **IMP-H1-S2 — `ImportDomainAdapter` contract + registry**, with the three existing domains wired through it. The contract includes `unitKey(row)` and an `applyUnit(rows)` entry point; the durable cursor and batch boundaries count **units**, not rows (rule 9). For the three existing domains a unit is one row (catalog) or the whole file (workbook, opening), so behavior is unchanged. **No behavior change** (characterization tests first). `ImportJobService::runChunk` dispatches via the registry instead of `match`.
 - **IMP-H1-S3 — Durable-path approval binding & idempotency.**
   - Preview returns `preview_hash` = HMAC(file SHA-256 + archive SHA-256 + domain + normalized options + mapping).
   - **Options move to job creation.** `POST /import-jobs` gains `options` (mode, policies, domain fields such as `opening_date`/`price_list_id`) and `mapping`. The server normalizes them exactly as preview does and **freezes them on the job at creation**. Today they first arrive at `/apply`, which cannot be bound.
@@ -151,6 +153,9 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
   - **Compatibility:** the UI change ships in the same PR. Jobs already `ready` or `processing` at deploy time (`created_at` < the slice's cutover constant) may finish under the old contract; no new hashless job can execute.
   - The UI sends `idempotency_key`.
   - Add a route throttle.
+  - **Synchronous apply is bound too (rule 10).** `/products/import/apply`, `/products/workbook/apply` and `/inventory-openings/import/apply` require the `preview_hash` from their own preview (422 `preview_required` / `preview_mismatch`).
+    - Today's web UI uses only the durable jobs for execution, so no first-party caller breaks. Any external caller is named in the slice report.
+    - Every **new** domain exposes sync `inspect`/`preview` only; its execution goes through the bound durable job or an AI approval.
 - **IMP-H1-S4 — Spreadsheet scan admission.** Route AI-Action and import-job spreadsheets through the existing `DocumentFileScanAdmissionService` pattern, policy-driven: off → today's behavior; on → fail-closed. Enabling it in production is **D-04** (ops).
 - **IMP-H1-S5 — Catalog job failure semantics.**
   - Pre-validate the whole file before chunk 1 (in-file duplicates across windows).
@@ -197,8 +202,10 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
 - **IMP-H4-S2:** Price-list items standalone import (extract from the workbook "Unit Prices" logic).
 - **IMP-H4-S3:** Unit templates, create-only. **Standard path only.** The AI path is excluded by decision record **D-08**: conversion factors multiply stock quantities, so the risk of an AI-suggested factor outweighs the convenience, and templates are few.
 - **IMP-H4-S4 — AI path for categories/brands and price-list items.**
-  - A single AI Action type, `master_data_import.v1`, parameterized by adapter (`product_categories`, `brands`, `price_list_items`). It covers the registry entry, intake, review, preview, approval and execution, all reusing the H4-S1/S2 adapters.
-  - Permissions: `ai.actions.*` + the adapter's own manage permission (`products.manage` for categories/brands, `company.manage` for price lists).
+  - **Separate AI Action types**, one per permission boundary, so H1-S7's static per-type gates stay exact and an action can never switch domain through a later version:
+    - `product_taxonomy_import.v1` (categories + brands, `products.manage`)
+    - `price_list_item_import.v1` (`company.manage`; the target `price_list_id` is fixed at creation as immutable action scope)
+  - Each covers the registry entry, intake, review, preview, approval and execution on the H4-S1/S2 adapters.
   - Includes the AI-facing UI tab in the import hub and a std↔AI parity test per adapter.
 
 ### H5 — Purchases & expenses (drafts only)
@@ -208,7 +215,9 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
   - Duplicate identity: vendor + normalized reference + date + amount (minor units).
   - Concurrency safety: **H5-S1 introduces** the `import_document_reservations` table and its service (design under H5-S3).
     - The expense key is the **full** predicate: `dedupe_key = SHA-256(vendor id-or-normalized-name ‖ normalized reference ‖ date ‖ amount)`. Two different expenses that share only a reference never collide.
-    - A row without a reference reserves nothing and gets only a non-blocking duplicate warning (same vendor + date + amount).
+    - **A reference-less row still reserves.** Its fallback key is `SHA-256(vendor ‖ date ‖ amount ‖ "no-ref")`, so concurrent jobs, AI and Document Center cannot both create it.
+      - A genuinely repeated expense (same vendor, day and amount) needs an explicit per-row **"distinct expense" confirmation** in review. That confirmation appends the row's import ordinal to the key, is part of the approved plan (and hence the approval hash), and is audited.
+      - Per-run policy `reference_required` (default off) rejects reference-less rows outright.
     - Lock: the vendor `Partner` row when the vendor is a partner, otherwise the tenant anchor row.
   - A PostgreSQL concurrency test is required here too.
 - **IMP-H5-S2:** Expense standard UI + durable domain.
@@ -227,7 +236,7 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
     - No unique index is added to `purchases`. Existing tenants may already hold duplicates, and `migrate --force` at boot would fail the deploy.
     - Manual-vs-manual duplicates stay out of scope (pre-existing behavior; recorded as a follow-up).
     - Required test: a PostgreSQL concurrency test (two processes, distinct idempotency keys, same supplier + reference ⇒ exactly one draft).
-- **IMP-H5-S4:** Purchase standard UI + durable domain.
+- **IMP-H5-S4:** Purchase standard UI + durable domain. Units are whole `(supplier, ref)` groups (rule 9): a chunk holds N complete invoices, and a group larger than the chunk size is one chunk by itself. A test places a group across the would-be row boundary.
 - **IMP-H5-S5:** AI path for spreadsheets: AI Action types `expense_import.v1` / `purchase_import.v1` on the H5-S1/S3 adapters.
 - **IMP-H5-S6 — Route Document Center drafts through the financial adapters.**
   - `PurchaseDocumentDraftBuilder::build` and `ExpenseDocumentDraftBuilder::build` keep their own extraction, review and `DocumentTransactionLink` idempotency. **Before** calling `PurchaseService::create` / `ExpenseService::create`, they call the same adapter `validateRow()`/`plan()` and the `import_document_reservations` service, with `source=document_center`, in the same transaction.
@@ -241,12 +250,13 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
   - Gates: `invoices.manage` **and the plan limit** `EnforcePlanLimit:invoices`. The direct `POST invoices` enforces that limit per request, so a bulk import must check the remaining quota for the **whole** batch before any draft is created (all-or-nothing per job) and must re-check it inside the creating transaction. Imports must not become a plan-limit bypass. A test covers a batch that exceeds the remaining quota.
 
 ### H7 — Inventory
-- **IMP-H7-S1:** Stocktake count-sheet import into an *open* stocktake (counts only; variances are posted by the stocktake's own flow).
+- **IMP-H7-S1:** Stocktake count-sheet import into an *open* stocktake (counts only; variances are posted by the stocktake's own flow). The whole sheet is one atomic unit with a lock on the stocktake (rule 9), so no partial sheet can ever be posted. Required test: concurrent post during import ⇒ the post waits or fails, and never posts a partial sheet.
 - **IMP-H7-S2:** AI path for inventory opening (AI Action type reusing `InventoryOpeningImportService` parse/preview; posting stays manual).
 - **IMP-H7-S3:** Stock permit lines import (draft permits only). **Standard path only.** The AI path is excluded by **D-09**: permits are low-volume operational documents typed against a known warehouse, and a messy delivery file belongs to the Document Center delivery-note flow, not to spreadsheet AI. The owner may reopen this.
 - **IMP-H7-S4:** AI path for stocktake counts: AI Action `stocktake_count_import.v1` on the H7-S1 adapter.
   - Gates: `products.manage` + `inventory.core`.
   - It targets an *open* stocktake only and writes counts only. Variances still post through the stocktake's own flow.
+  - The whole count sheet is **one unit**, applied atomically in one transaction (standard and AI alike), with `lockForUpdate` on the stocktake. `StocktakeService::post()` cannot observe a half-applied sheet: it ignores null `counted_quantity` lines, so partial application would post silently.
   - Includes a std↔AI parity test and a PostgreSQL row-lock test on the stocktake.
 - Test bar: PostgreSQL concurrency (row locks on products and the stocktake), branch isolation of warehouses, no duplicate movements on retry.
 
