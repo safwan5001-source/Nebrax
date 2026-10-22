@@ -194,15 +194,139 @@ class ImportJobFailedUnitsTest extends TestCase
     public function atomic_file_domains_record_no_units_and_offer_no_failures_file(): void
     {
         $auth = $this->registerTenant();
-        $id = $this->withToken($auth['token'])->post('/api/import-jobs', [
+        $created = $this->withToken($auth['token'])->post('/api/import-jobs', [
             'domain' => 'inventory_opening', 'file' => UploadedFile::fake()->createWithContent('open.csv', "sku,quantity,unit_cost\nX,1,1\n"),
-        ], ['Accept' => 'application/json']);
-        if ($id->status() === 201) {
-            $jobId = $id['data']['id'];
-            $this->assertSame(0, ImportJobUnit::query()->where('import_job_id', $jobId)->count());
-            $this->withToken($auth['token'])->getJson("/api/import-jobs/{$jobId}/failures")->assertStatus(422);
-        } else {
-            $this->markTestSkipped('لا تشغيلة inventory_opening في هذا الإعداد.');
+        ], ['Accept' => 'application/json'])->assertCreated();
+        $jobId = $created['data']['id'];
+
+        $this->assertSame(0, ImportJobUnit::query()->where('import_job_id', $jobId)->count());
+        $this->withToken($auth['token'])->getJson("/api/import-jobs/{$jobId}/failures")->assertStatus(422);
+    }
+
+    /** @test */
+    public function blank_rows_do_not_shift_the_ordinal_of_the_failing_unit(): void
+    {
+        $lines = ['sku,name,type,sale_price,purchase_price', ',,,,'];
+        $ordinal = 0;
+        for ($i = 0; $i < 130; $i++) {
+            if ($i % 7 === 0) {
+                $lines[] = ',,,,';
+            }
+            $type = $i === 120 ? 'نوع_غير_معروف' : 'good';
+            $lines[] = sprintf('BL-%03d,منتج %d,%s,10.00,4.00', $i, $i, $type);
+            $ordinal++;
         }
+        $auth = $this->registerTenant();
+        $id = $this->withToken($auth['token'])->post('/api/import-jobs', [
+            'domain' => 'product_catalog', 'file' => UploadedFile::fake()->createWithContent('blank.csv', implode("\n", $lines)."\n"),
+        ], ['Accept' => 'application/json'])->assertCreated()['data']['id'];
+        for ($n = 0; $n < 4; $n++) {
+            if ($this->withToken($auth['token'])->postJson("/api/import-jobs/{$id}/apply", ['mode' => 'create'])->status() !== 200) {
+                break;
+            }
+        }
+
+        $this->assertSame('failed', ImportJob::query()->whereKey($id)->value('status'));
+        $bad = ImportJobUnit::query()->where('import_job_id', $id)->where('error_code', 'row_invalid')->firstOrFail();
+        $this->assertSame(120, $bad->unit_ordinal, 'الترتيب بين صفوف البيانات الفعلية لا الأسطر الفيزيائية.');
+
+        $rows = $this->csvRows($this->withToken($auth['token'])->get("/api/import-jobs/{$id}/failures?format=csv"));
+        $row = collect($rows)->first(fn ($r) => ($r[6] ?? null) === 'row_invalid');
+        $this->assertSame('BL-120', $row[0], 'الملف يعيد الصف الفاسد نفسه رغم الأسطر الفارغة.');
+        $this->assertSame(ImportUnitRef::for($id, 120), $row[5]);
+    }
+
+    /** @test */
+    public function a_failure_in_the_first_chunk_records_the_whole_file_as_unapplied(): void
+    {
+        $auth = $this->registerTenant();
+        $id = $this->withToken($auth['token'])->post('/api/import-jobs', [
+            'domain' => 'product_catalog', 'file' => $this->csv(250, 5),
+        ], ['Accept' => 'application/json'])->assertCreated()['data']['id'];
+        $this->withToken($auth['token'])->postJson("/api/import-jobs/{$id}/apply", ['mode' => 'create'])->assertStatus(422);
+
+        $this->assertSame(0, Product::query()->count());
+        $this->assertSame(250, ImportJobUnit::query()->where('import_job_id', $id)->count());
+        $this->assertSame(0, ImportJobUnit::query()->where('import_job_id', $id)->min('unit_ordinal'));
+    }
+
+    /** @test */
+    public function the_failures_file_can_be_downloaded_as_xlsx(): void
+    {
+        [$auth, $id] = $this->failedJob();
+
+        $response = $this->withToken($auth['token'])->get("/api/import-jobs/{$id}/failures?format=xlsx")->assertOk();
+        $path = tempnam(sys_get_temp_dir(), 'failures-x-');
+        copy($response->baseResponse->getFile()->getPathname(), $path);
+        $rows = SpreadsheetReader::read($path, 'xlsx', 5000, 200);
+        @unlink($path);
+
+        $this->assertCount(151, $rows);
+        $this->assertSame('_awj_unit_ref', $rows[0][5]);
+        $this->assertSame(ImportUnitRef::for($id, 100), $rows[1][5]);
+    }
+
+    /** @test */
+    public function a_cost_like_column_left_unmapped_is_still_redacted_for_a_user_without_cost_permission(): void
+    {
+        $auth = $this->registerTenant();
+        $lines = ['sku,name,type,sale_price,Unit Cost'];
+        for ($i = 0; $i < 3; $i++) {
+            $lines[] = sprintf('UC-%d,منتج %d,%s,10.00,7.77', $i, $i, $i === 1 ? 'نوع_غير_معروف' : 'good');
+        }
+        $id = $this->withToken($auth['token'])->post('/api/import-jobs', [
+            'domain' => 'product_catalog', 'file' => UploadedFile::fake()->createWithContent('uc.csv', implode("\n", $lines)."\n"),
+        ], ['Accept' => 'application/json'])->assertCreated()['data']['id'];
+        $this->withToken($auth['token'])->postJson("/api/import-jobs/{$id}/apply", ['mode' => 'create'])->assertStatus(422);
+
+        $role = $this->withToken($auth['token'])->postJson('/api/roles', ['name' => 'uc-mgr', 'permissions' => ['products.view', 'products.manage']])->assertCreated()['data'];
+        $this->withToken($auth['token'])->postJson('/api/users', ['name' => 'u', 'email' => 'uc@t.test', 'password' => 'password123', 'role' => $role['slug']])->assertCreated();
+        $token = $this->postJson('/api/login', ['email' => 'uc@t.test', 'password' => 'password123'])->assertOk()['token'];
+
+        $manager = $this->csvRows($this->withToken($token)->get("/api/import-jobs/{$id}/failures?format=csv"));
+        $this->assertStringNotContainsString('7.77', json_encode($manager));
+        $owner = $this->csvRows($this->withToken($auth['token'])->get("/api/import-jobs/{$id}/failures?format=csv"));
+        $this->assertStringContainsString('7.77', json_encode($owner), 'المخوَّل يرى القيمة.');
+    }
+
+    /** @test */
+    public function a_database_error_message_is_never_stored_on_a_unit(): void
+    {
+        [, $id] = $this->failedJob();
+        ImportJobUnit::query()->where('import_job_id', $id)->delete();
+        $job = ImportJob::query()->whereKey($id)->firstOrFail();
+        $e = new \Illuminate\Database\QueryException('pgsql', 'insert into products (purchase_price) values (?)', [4.00], new \PDOException('SQLSTATE[23505]'));
+
+        app(\App\Services\ImportJobUnitRecorder::class)->recordChunkFailure($job, app(\App\Services\ImportDomainRegistry::class)->for('product_catalog'), 100, 100, $e);
+
+        $message = (string) ImportJobUnit::query()->where('import_job_id', $id)->where('unit_ordinal', 100)->value('error_message');
+        $this->assertStringNotContainsString('purchase_price', $message);
+        $this->assertStringNotContainsString('insert', $message);
+        $this->assertSame('chunk_failed', ImportJobUnit::query()->where('import_job_id', $id)->where('unit_ordinal', 100)->value('error_code'));
+    }
+
+    /** @test */
+    public function a_failure_after_the_rows_were_written_rolls_the_whole_chunk_back(): void
+    {
+        // محوّلٌ يكتب الصفوف فعلاً ثم يفشل بعد ذلك (كفشل مرحلة صور المنتجات بعد كتابة المنتجات).
+        $this->app->bind(\App\Services\ProductCatalogImportAdapter::class, fn () => new class extends \App\Services\ProductCatalogImportAdapter {
+            public function applyChunk(\App\Support\ImportChunk $chunk): \App\Support\ImportChunkResult
+            {
+                parent::applyChunk($chunk);
+                throw new \RuntimeException('late failure after the rows were written');
+            }
+        });
+        $this->app->forgetInstance(\App\Services\ImportDomainRegistry::class);
+
+        $auth = $this->registerTenant();
+        $id = $this->withToken($auth['token'])->post('/api/import-jobs', [
+            'domain' => 'product_catalog', 'file' => $this->csv(120, null),
+        ], ['Accept' => 'application/json'])->assertCreated()['data']['id'];
+        $this->withToken($auth['token'])->postJson("/api/import-jobs/{$id}/apply", ['mode' => 'create'])->assertStatus(422);
+
+        $this->assertSame('failed', ImportJob::query()->whereKey($id)->value('status'));
+        $this->assertSame(0, Product::query()->count(), 'الصفوف التي كُتبت قبل فشل مرحلة الصور تراجعت مع نافذتها.');
+        $this->assertSame(0, (int) ImportJob::query()->whereKey($id)->value('processed_rows'));
+        $this->assertSame(120, ImportJobUnit::query()->where('import_job_id', $id)->count());
     }
 }

@@ -36,7 +36,11 @@ class ProductCatalogImportAdapter extends SpreadsheetImportAdapter implements Im
         return ProductImportService::DURABLE_MAX_ROWS;
     }
 
-    /** أعمدة التكلفة (سعر الشراء/الهامش) بالمطابقة المجمَّدة أو التلقائية للترويسات — نفس مصدر التصنيف الذي يحرس المعاينة والترحيل. */
+    /**
+     * أعمدة التكلفة: (١) ما طابقته المطابقة المجمَّدة/التلقائية بسعر الشراء أو الهامش — نفس مصدر التصنيف الذي يحرس المعاينة والترحيل —
+     * و(٢) أي عمودٍ **ترويسته تشبه التكلفة** حتى لو تُرك بلا مطابقة (مثل `avg_cost` في ملف تصدير): غير المطابَق لم يُستورَد لكنه يبقى في الملف
+     * الأصلي، وقيمته قد تكون تكلفة. الحجب محافظٌ عمداً (قد يحجب عموداً بريئاً الاسم؛ وهو خطأٌ آمن).
+     */
     public function sensitiveColumnIndexes(array $headers, array $frozenOptions): array
     {
         $mapping = [];
@@ -57,11 +61,16 @@ class ProductCatalogImportAdapter extends SpreadsheetImportAdapter implements Im
         $indexes = [];
         foreach ($mapping as $index => $key) {
             if (in_array($key, SensitiveCostPolicy::PRODUCT_WRITABLE_FIELDS, true)) {
-                $indexes[] = $index;
+                $indexes[$index] = true;
+            }
+        }
+        foreach (array_values($headers) as $index => $header) {
+            if (preg_match('/cost|purchase|buying|margin|profit|تكلف|شراء|هامش|ربح/iu', (string) $header) === 1) {
+                $indexes[$index] = true;
             }
         }
 
-        return $indexes;
+        return array_keys($indexes);
     }
 
     public function canonicalOptions(array $raw): array

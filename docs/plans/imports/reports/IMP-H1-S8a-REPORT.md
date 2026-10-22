@@ -19,9 +19,20 @@ Also: only `product_catalog` has a **row** unit. `product_workbook` and `invento
 
 ## Safety
 
-No accounting, ledger, ZATCA or inventory logic touched; no AI/provider setting; no env/Railway change; the migration is a new table only (nothing existing is altered). Apply behavior, chunking and statuses are unchanged — only recording and a read endpoint were added. Deploy impact: auto-deploy runs `migrate --force` for one additive table; no behavior change for existing jobs.
+No accounting, ledger, ZATCA or inventory logic touched; no AI/provider setting; no env/Railway change; the migration is a new table only (nothing existing is altered). Apply behavior, chunking and statuses are unchanged **except** one fix: a failed chunk is now fully rolled back (see review finding 2); successful runs are untouched. Deploy impact: auto-deploy runs `migrate --force` for one additive table; no behavior change for existing jobs.
 
-## Tests — `ImportJobFailedUnitsTest` (8)
+## Independent review (read-only subagent) — findings and disposition
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1a | Cost redaction covered only mapped columns; an unmapped cost-like column (e.g. `Unit Cost`, `avg_cost` from a round-tripped export) leaked to a manager without `products.view_cost` | **Fixed:** columns are redacted by mapping **or** by cost-like header (conservative); tested |
+| 1b | `chunk_failed` stored `$e->getMessage()` verbatim — a `QueryException` embeds SQL and bound values (e.g. `purchase_price`) | **Fixed:** only domain `RuntimeException`/preview messages are stored; DB errors get a generic text; tested |
+| 2 | "Rolled back" could be false: product writes were only a released savepoint, so a failure in the media stage after the rows were written left the products persisted while `processed_rows` stayed put | **Fixed — and it was a pre-existing defect:** `runChunk` now runs in its own transaction (savepoint), so the whole chunk rolls back on any failure. Test with an adapter that writes the rows and then throws; **negative control: without the wrapper 100 products persist**. This changes the failure path only (a failed chunk now leaves nothing behind, which the job status always implied) |
+| 3a | CSV writer prefixes `'` to values starting `= + - @`, so a failures file re-uploaded for repair would carry corrupted values | **Carried to S8b:** the repair reader must strip the writer's leading apostrophe for files carrying `_awj_unit_ref` (XLSX is unaffected: inline strings) |
+| 3b | Exporting a cancelled/pruned job could 500 | **Fixed:** missing/unreadable original ⇒ 422 |
+| T | Tests: no blank-row alignment, no XLSX, no first-chunk, no unmapped-cost, weak atomic-domain test, nothing PG-specific | **Added** blank-row alignment, first-chunk failure, XLSX export, unmapped-cost redaction, DB-error message, post-write rollback; atomic-domain test now asserts instead of skipping. PostgreSQL runs in CI (savepoint semantics reviewed: nested `DB::transaction` ⇒ savepoint, outer stays usable) |
+
+## Tests — `ImportJobFailedUnitsTest` (14)
 
 250-row file with a bad row at ordinal 149: chunk 1 applies (100 products), chunk 2 fails and rolls back ⇒ 150 units = 1 `row_invalid` + 99 `window_rolled_back` + 50 `not_attempted`; refs deterministic/unique and tied to the job; a fully successful job records none; the download carries original values, the stable ref and the error; **cost columns blanked and named for a manager without `products.view_cost`** (negative control: disabling redaction fails this test); manage permission required (view-only → 403) and cross-tenant → 404; no units ⇒ 422; atomic file domains record nothing and offer no export.
 Broader run (`BranchIsolation|ImportJob|ImportDomain|ImportPlan|ImportPreview|ImportIntake|ProductImport|…`): 499 passed, 42 skipped (PG-only). CI (SQLite + PostgreSQL + Gate) on the PR.

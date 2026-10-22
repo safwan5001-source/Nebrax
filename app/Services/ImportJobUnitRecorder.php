@@ -8,7 +8,9 @@ use App\Models\ImportJobUnit;
 use App\Support\ImportPreviewException;
 use App\Support\ImportUnitFailureException;
 use App\Support\ImportUnitRef;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Str;
+use PDOException;
 use Throwable;
 
 /**
@@ -57,7 +59,7 @@ class ImportJobUnitRecorder
         for ($ordinal = $offset; $ordinal < $total; $ordinal++) {
             if ($ordinal < $windowEnd) {
                 $entry = $byOrdinal[$ordinal] ?? ($byOrdinal === []
-                    ? ['code' => $windowCode, 'message' => $e->getMessage()]
+                    ? ['code' => $windowCode, 'message' => $this->safeMessage($e)]
                     : ['code' => 'window_rolled_back', 'message' => 'لم تُطبَّق لأن نافذتها فشلت وتراجعت كاملةً.']);
             } else {
                 $entry = ['code' => 'not_attempted', 'message' => 'لم تُعالَج بعد: توقّفت التشغيلة قبل الوصول إليها.'];
@@ -71,6 +73,19 @@ class ImportJobUnitRecorder
         if ($rows !== []) {
             ImportJobUnit::query()->insert($rows);
         }
+    }
+
+    /**
+     * رسالة الوحدة تظهر في ملف الفشل لمن لا يملك صلاحية التكلفة، فلا تُخزَّن رسالة خطأ قاعدة بيانات (تُضمِّن SQL وقيمه المربوطة):
+     * رسائل المجال العربية (`RuntimeException`) وحدها تُحفظ، وغيرها نصٌّ عامّ.
+     */
+    private function safeMessage(Throwable $e): string
+    {
+        if ($e instanceof QueryException || $e instanceof PDOException || ! ($e instanceof \RuntimeException || $e instanceof ImportPreviewException)) {
+            return 'تعذّر تطبيق نافذة الصفوف بسبب خطأ داخلي؛ راجع سجل التشغيلة.';
+        }
+
+        return $e->getMessage();
     }
 
     /** @param array{code: string, message: string} $entry @return array<string, mixed> */

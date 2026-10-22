@@ -110,7 +110,16 @@ class ImportJobFailuresExporter
 
     private function materialize(string $storagePath): string
     {
-        $stream = $this->storage->readStream($storagePath);
+        if ($storagePath === '') {
+            throw new RuntimeException('الملف الأصلي لهذه التشغيلة لم يعد متاحاً.');
+        }
+        try {
+            $stream = $this->storage->readStream($storagePath);
+        } catch (RuntimeException $e) {
+            throw $e;
+        } catch (\Throwable) {
+            throw new RuntimeException('الملف الأصلي لهذه التشغيلة لم يعد متاحاً.');
+        }
         $tmp = tempnam(sys_get_temp_dir(), 'import-failures-src-');
         $target = $tmp === false ? false : fopen($tmp, 'wb');
         if (! is_resource($target)) {
