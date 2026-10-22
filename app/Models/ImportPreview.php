@@ -12,7 +12,7 @@ class ImportPreview extends BaseModel implements CompanyWide
 {
     protected $fillable = [
         'tenant_id', 'branch_id', 'user_id', 'domain',
-        'file_sha256', 'archive_sha256', 'options', 'preview_hash',
+        'file_sha256', 'archive_sha256', 'options', 'plan', 'preview_hash',
         'expires_at', 'consumed_at', 'consumed_job_id',
     ];
 
