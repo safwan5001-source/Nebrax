@@ -151,6 +151,13 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
   - Preview returns `preview_hash` = HMAC(file SHA-256 + archive SHA-256 + domain + normalized options + mapping).
   - **Options move to job creation.** `POST /import-jobs` gains `options` (mode, policies, domain fields such as `opening_date`/`price_list_id`) and `mapping`. The server normalizes them exactly as preview does and **freezes them on the job at creation**. Today they first arrive at `/apply`, which cannot be bound.
   - **`preview_hash` is required to create an executable job.** `POST /import-jobs` without it, or with a hash that does not equal HMAC(uploaded file SHA ‖ archive SHA ‖ domain ‖ frozen normalized options ‖ mapping), is rejected (422 `preview_required` / `preview_mismatch`) before `ready`.
+  - **Branch binding.** `ImportJob` has no `branch_id` today (finding F-15), and `SetBranch` supplies the request's current branch to `BranchScoped` writes (products, categories, brands, units, partners). A job previewed in branch A could therefore apply in branch B.
+    - H1-S3 adds an immutable `branch_id` (nullable, additive) set at job creation from the server-derived branch context.
+    - The branch joins the preview hash and the idempotency identity.
+    - Every chunk is applied with the branch context **restored from the job**, never taken from the apply request.
+    - A user without access to that branch is refused (403).
+    - AI Actions already store the approval branch (AI-ACTIONS-04); a test asserts execution uses it.
+    - Tests: preview in A, apply with B active ⇒ rows are written to A (or 403 without access), and a cross-branch idempotency reuse is rejected.
   - **Idempotency covers the frozen inputs (rule 12).** Extend `ImportJobService::assertSameRequestOrFail()`, which today compares only domain and file/archive hashes (`ImportJobService.php:166`), to also compare the normalized options, mapping and preview hash. A test reuses a key with the same file but a different mapping and expects a rejection.
   - **`/apply` no longer accepts option changes.** It runs the frozen options. A body carrying options that differ from them returns 422 `options_frozen`; identical options are tolerated for compatibility with the old client during rollout.
   - **Compatibility:** the UI change ships in the same PR. Jobs already `ready` or `processing` at deploy time (`created_at` < the slice's cutover constant) may finish under the old contract; no new hashless job can execute.
@@ -242,7 +249,7 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
   - Concurrency safety: **H5-S1 introduces** the `import_document_reservations` table and its service (design under H5-S3).
     - The expense key is the **full** predicate: `dedupe_key = SHA-256(vendor id-or-normalized-name ‖ normalized reference ‖ date ‖ amount)`. Two different expenses that share only a reference never collide.
     - **A reference-less row still reserves.** Its fallback key is `SHA-256(vendor ‖ date ‖ amount ‖ "no-ref")`, so concurrent jobs, AI and Document Center cannot both create it.
-      - A genuinely repeated expense (same vendor, day and amount) needs an explicit per-row **"distinct expense" confirmation** in review. That confirmation appends a **globally unique occurrence id** to the key: the import job or AI action id ‖ unit id. A row ordinal would repeat in later files. The confirmation is part of the approved plan (and hence the approval hash), and is audited.
+      - A genuinely repeated expense (same vendor, day and amount) needs an explicit per-row **"distinct expense" confirmation** in review. That confirmation appends a **globally unique occurrence id** to the key: the import job id, AI action id, **or Document Center batch id ‖ document id**, followed by the unit id. A row ordinal would repeat in later files. The confirmation is part of the approved plan (and hence the approval hash), and is audited.
       - Per-run policy `reference_required` (default off) rejects reference-less rows outright.
     - Lock: the vendor `Partner` row when the vendor is a partner, otherwise the tenant anchor row.
   - A PostgreSQL concurrency test is required here too.
@@ -290,7 +297,11 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
 - Financial test bar: PostgreSQL, totals parity with manual creation, no JE at import, and a correct JE when the imported draft is posted through the existing `post()`.
 
 ### H6 — Sales & ZATCA (**gated by D-03**)
-- **IMP-H6-S1..S3:** Drafts of new sales invoices via `InvoiceService::create`, with external reference de-duplication. **Never `post()` from import. No `issued_at`, ICV, PIH, hash, QR or XML is produced by import.** Historical-invoice migration is out of scope unless D-03 says otherwise.
+- **IMP-H6-S1..S3:** Drafts of new sales invoices via `InvoiceService::create`, with external reference de-duplication.
+  - **Persistent duplicate identity.** `Invoice` has no external-reference field (`payment_reference` is a settlement reference). The import therefore reuses `import_document_reservations` (domain `sales_invoice`, key = customer id ‖ normalized external reference, `predicate` JSON persisted), with the same lifecycle owned by `InvoiceService`: reserve on create, re-key on a draft edit of the customer, release on draft delete, and keep for posted invoices.
+  - The external reference is required by the sales import; a row without it is a row error.
+  - Whether to also show it as an invoice field is a separate additive decision.
+  - Tests: a sequential re-import is blocked; delete-then-re-import succeeds. **Never `post()` from import. No `issued_at`, ICV, PIH, hash, QR or XML is produced by import.** Historical-invoice migration is out of scope unless D-03 says otherwise.
   - Gates: `invoices.manage` **and the plan limit** `EnforcePlanLimit:invoices`. The direct `POST invoices` enforces that limit per request, so imports must not become a bypass.
   - A sales import job is **one atomic execution**. All invoice units are created in a single transaction that first takes the tenant-anchor lock, then checks the remaining quota for the whole batch, then creates every draft. It is all-or-nothing, so no other request can consume capacity between chunks.
   - The batch size is capped (proposed: 500 invoices per job, which the slice confirms) to keep the transaction bounded.

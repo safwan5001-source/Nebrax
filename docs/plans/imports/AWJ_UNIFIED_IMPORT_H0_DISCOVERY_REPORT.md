@@ -121,6 +121,7 @@ Partner opening balance exists only as a per-record field. It **posts a JE** thr
 | F-12 | "AI" labeling over a deterministic pipeline, which contradicts the owner rule. | `en.json:4908`, `ai-import/page.tsx` | Medium (trust) | IMP-H2-S0 |
 | F-13 | There is no API to set tenant `ai_actions.enabled`. | `Settings.php:49-51` | Low | IMP-H2-S4 |
 | F-14 | Category/brand master-data behavior differs: V2 defaults to `match_or_text`, while AI blocks unknown names. | Assessment 05 §1b | Low (documented) | Adapter policy in IMP-H1-S2 |
+| F-15 | `ImportJob` has no `branch_id`. Chunks apply under the branch context of each apply request, so a job reviewed in branch A can write `BranchScoped` rows (products, categories, brands, units) in branch B. | `app/Models/ImportJob.php` (no branch column); `SetBranch` middleware | Medium (branch isolation) | IMP-H1-S3 |
 
 ---
 
