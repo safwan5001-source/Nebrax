@@ -71,6 +71,8 @@ We do **not** replace any working engine. We introduce one seam per entity, and 
 8. **Both paths, or a recorded exclusion.** Every entity in §3 that has a standard import either has an AI path slice or a `D-xx` exclusion in §7. There is no silent gap.
 9. **Execution unit = business document, never a raw row.** Each adapter declares `unitKey(row)`. A product, a partner or a price item is one row; a purchase is its `(supplier, ref)` group; a stocktake sheet is the whole file. Planning, reservation, durable chunking and AI execution batches all advance by **whole units**: a unit is never split across chunks, batches or transactions.
 10. **Every apply is bound to its preview.** No execution path (sync `/apply`, durable job, AI execution) accepts content that was not previewed. Sync paths require `preview_hash` on apply; durable jobs bind it at creation; AI binds it via approval (H1-S3).
+11. **No read-then-write invariants.** Every uniqueness or claim rule this plan relies on must be enforced by a database constraint, or by a row lock plus a conditional update with an affected-rows check. That covers reservations, repair claims, idempotency, partner duplicate signals, quota and single execution. A lookup followed by an insert is never enough. Each such invariant ships with a PostgreSQL race test in its slice, and each slice's PR review re-checks this rule against the code.
+12. **Idempotency identity = every frozen input.** A reused idempotency key returns the earlier job only if **all** frozen inputs are identical: domain, file SHA, archive SHA, normalized options, mapping and preview hash. Any difference returns 409/422 `idempotency_key_reused`, never the old job.
 
 ### 2.3 Why not merge `ImportJob` and `AiAction` into one table
 
@@ -149,6 +151,7 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
   - Preview returns `preview_hash` = HMAC(file SHA-256 + archive SHA-256 + domain + normalized options + mapping).
   - **Options move to job creation.** `POST /import-jobs` gains `options` (mode, policies, domain fields such as `opening_date`/`price_list_id`) and `mapping`. The server normalizes them exactly as preview does and **freezes them on the job at creation**. Today they first arrive at `/apply`, which cannot be bound.
   - **`preview_hash` is required to create an executable job.** `POST /import-jobs` without it, or with a hash that does not equal HMAC(uploaded file SHA ‖ archive SHA ‖ domain ‖ frozen normalized options ‖ mapping), is rejected (422 `preview_required` / `preview_mismatch`) before `ready`.
+  - **Idempotency covers the frozen inputs (rule 12).** Extend `ImportJobService::assertSameRequestOrFail()`, which today compares only domain and file/archive hashes (`ImportJobService.php:166`), to also compare the normalized options, mapping and preview hash. A test reuses a key with the same file but a different mapping and expects a rejection.
   - **`/apply` no longer accepts option changes.** It runs the frozen options. A body carrying options that differ from them returns 422 `options_frozen`; identical options are tolerated for compatibility with the old client during rollout.
   - **Compatibility:** the UI change ships in the same PR. Jobs already `ready` or `processing` at deploy time (`created_at` < the slice's cutover constant) may finish under the old contract; no new hashless job can execute.
   - The UI sends `idempotency_key`.
@@ -182,7 +185,9 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
   - **Stable repair identity.** Every unit gets an immutable `source_unit_ref`, a UUID minted at job creation and stored with its outcome. The failures file carries it in a protected `_awj_unit_ref` column next to the original data. The ref is independent of the business key, so a SKU, partner code or `supplier_invoice_ref` can be corrected, and a key that was missing can be filled.
   - `POST /import-jobs/{id}/repairs` creates a **new** child job (`parent_job_id`) from a corrected file.
     - Membership is validated by `_awj_unit_ref`: every child unit must reference a parent unit whose outcome is `failed`. Unknown, succeeded or already-repaired refs are rejected.
-    - Each ref can be consumed by one child only; it is marked `repaired` in the child's apply transaction.
+    - **Atomic claim at child creation (rule 11).** Creating the child runs, inside one transaction, a conditional `UPDATE … SET status='claimed', claimed_by_job_id=:child WHERE source_unit_ref IN (…) AND status='failed'`. Creation fails if the affected-row count differs from the requested refs, so two concurrent repairs from the same failures cannot both claim a ref.
+    - Apply moves `claimed` → `repaired`. Cancelling or failing the child before apply releases the claim back to `failed`.
+    - PostgreSQL race test: two concurrent repair creations yield exactly one child.
     - The child goes through the normal preview, binding and apply steps.
     - Successful units are therefore never replayed; reservations and identifiers block them as a second line of defense.
   - The UI adds a "إصلاح الصفوف الفاشلة" step on the result screen, shared by every domain page.
@@ -209,6 +214,9 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
 - **IMP-H3-S1:** `PartnerImportFields` + `PartnerImportAdapter`.
   - Modes create/update/upsert. Match by Nebrax ID → partner `code`. VAT/CR/phone/email are duplicate *signals* with a per-run policy (`error` | `skip` | `warn`).
   - `type` is fixed by the entry point (customer or supplier) and never inferred.
+  - **Concurrency-safe duplicate signals (rule 11).** `partners` is unique only on `(tenant_id, code)`. For every signal whose run policy is `error` or `skip` (for example the VAT number), the adapter's `applyUnit` takes a **tenant-scoped advisory or anchor lock** (the tenant-anchor row lock, shared with `PartnerService::create` while an import holds it), then re-checks existing partners by the normalized signal before inserting.
+    - The direct `POST partners` path is unchanged. Duplicates there remain today's behavior, and the race against an import is accepted the same way as `duplicate_reference_policy=allow` in H5.
+    - PostgreSQL race test: two concurrent imports with the same VAT and different codes yield one partner under `error`.
   - **Opening balance excluded** (D-01).
 - **IMP-H3-S2:** Standard sync endpoints `/partners/import/{template,fields,inspect,preview}?type=` (**no sync `apply`**, per rule 10; execution goes only through the bound durable job) plus `ImportJobDomain::PARTNER_MASTER`. Same gates as `POST partners` (today `partners.manage`, no app gate); add `$app` only if the owner later gates partners.
 - **IMP-H3-S3:** Standard UI. A shared import stepper is extracted from products only if used twice, and lives on `/customers` and `/suppliers` pages.

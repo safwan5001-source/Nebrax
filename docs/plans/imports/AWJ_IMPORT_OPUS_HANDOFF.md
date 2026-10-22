@@ -118,6 +118,7 @@ Continue with **IMP-H1-S2** (the adapter contract; characterization tests first)
 - Reference-less expenses reserve on a fallback key; only an explicit, approved "distinct" confirmation allows a true repeat.
 - Reservations die with their draft (same-transaction delete) and survive posted documents. A confirmed repeat uses job/action id ‖ unit id.
 - Standard repair is generic (H1-S8). Document Center builders gain the financial gates (H5-S6). A sales import is one atomic transaction with whole-batch quota (H6).
+- Rule 11: no read-then-write invariants (constraint or lock plus conditional update, with a PostgreSQL race test). Rule 12: idempotency compares every frozen input. Repair refs are claimed atomically when the child job is created.
 - Order after H1-S1: H1-S2 → H1-S7 → H1-S3 → H1-S8 → H1-S4 → H1-S5 → H1-S6.
 
 ## 4. Known traps (save yourself time)
