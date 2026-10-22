@@ -4,6 +4,21 @@
 > **To:** the executor of H1 onward (Sonnet), under the same Horizon authority.
 > **Read in this order:** this file → `AWJ_UNIFIED_IMPORT_HORIZON_TRACKER.md` → the relevant section of `AWJ_UNIFIED_IMPORT_MASTER_HORIZON.md` → `AWJ_UNIFIED_IMPORT_H0_DISCOVERY_REPORT.md` (evidence only when needed). Do **not** redo discovery.
 
+## 0. H0 status (closed)
+
+| Field | Value |
+|---|---|
+| H0 PR | #1595, `claude/unified-import-h0` |
+| Head SHA | `323e6e4f7fa9075615aac81c1ffc58202e7af37e` |
+| **Merge SHA** | **`5e20e9edc941f83181497158fa68e6c55e95c485`** (squash, 2026-10-22) |
+| CI | PHP SQLite ✅, PHP PostgreSQL ✅ (one re-run after an infra hang before tests), CI Gate ✅ |
+| Local tests | Full `php artisan test` on SQLite: 8078 passed, 157 skipped, 26 failed. All 26 failures are Fuel tests needing `bcmath`, which the local env lacks; they pass in CI. |
+| Review | 14 Codex rounds and 54 threads, all resolved and folded into the plan. The last pass stalled without a result. |
+| Deploy | Docs only. No Railway observation is available to the agent. |
+| **First task for the next model** | **IMP-H1-S1** (§3 below). Branch `claude/imp-h1-s1-import-jobs-gate-retention` from the latest `origin/main`. |
+
+Re-read master plan rules 1–12 (§2.2) before writing code. Several of them (7, 9, 10, 11, 12) came out of review and constrain every slice.
+
 ---
 
 ## 1. Authority and stop rules (unchanged from the owner brief)
