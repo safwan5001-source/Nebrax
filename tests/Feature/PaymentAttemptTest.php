@@ -274,6 +274,25 @@ class PaymentAttemptTest extends TestCase
         $this->assertCount($calls, $this->fake->checkoutCalls, 'ولا استدعاء مزوّد جديد');
     }
 
+    #[Test]
+    public function a_connection_with_active_attempts_cannot_be_revoked_until_they_are_closed(): void
+    {
+        $gateways = app(PaymentGatewayService::class);
+        $attempt = $this->orchestrator->start(new TestPayable, $this->gateway, 'idem-key-0039');
+
+        $e = $this->thrown(fn () => $gateways->revoke($this->gateway->fresh(), $this->owner, 'إلغاء اختبار'), 'revoke with attempt', \App\Support\PaymentGatewayException::class);
+        $this->assertSame('gateway.has_active_attempts', $e->reason);
+        $this->assertTrue($this->gateway->fresh()->isUsable(), 'الاتصال وأسراره سليمان');
+
+        // الإيقاف المؤقت يبقي الأسرار فتبقى المطابقة ممكنة.
+        $gateways->suspend($this->gateway->fresh(), $this->owner, 'إيقاف');
+        $this->fake->script($attempt->provider_payment_id, 'captured');
+        $this->assertTrue($this->orchestrator->sync($attempt)->applied);
+
+        // بعد التقاط المحاولة (مغلقة) يصح الإلغاء.
+        $this->assertSame(PaymentGateway::STATUS_REVOKED, $gateways->revoke($this->gateway->fresh(), $this->owner, 'إلغاء بعد الإغلاق')->status);
+    }
+
     // ═══════════════ ضابط التفعيل ═══════════════
 
     #[Test]

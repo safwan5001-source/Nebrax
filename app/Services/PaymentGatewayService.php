@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\PaymentAttempt;
 use App\Models\PaymentConnectionEvent;
 use App\Models\PaymentGateway;
 use App\Models\PaymentMethod;
@@ -294,6 +295,13 @@ final class PaymentGatewayService
                     break;
 
                 default: // revoked
+                    // الإلغاء يمحو الأسرار فيستحيل حسم أو مطابقة أي محاولة دفع جارية؛ لا يُلغى اتصال له محاولات نشطة (أوقفه مؤقتاً أو أغلقها أولاً).
+                    if (PaymentAttempt::query()->where('payment_gateway_id', $locked->getKey())->whereIn('capture_status', PaymentAttempt::ACTIVE_STATUSES)->exists()) {
+                        throw new PaymentGatewayException(
+                            'gateway.has_active_attempts',
+                            'لا يمكن إلغاء اعتماد اتصال له محاولات دفع جارية. أوقفه مؤقتاً أو ألغِ المحاولات أولاً.'
+                        );
+                    }
                     $locked->status = PaymentGateway::STATUS_REVOKED;
                     $locked->is_active = false;
                     $locked->deactivated_at = $now;

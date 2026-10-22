@@ -6,6 +6,9 @@ use App\Models\PaymentAttempt;
 use App\Models\PaymentGateway;
 use App\Models\PlatformAdministrator;
 use App\Models\Tenant;
+use App\Models\User;
+use App\Services\PaymentGatewayService;
+use App\Support\PaymentGatewayException;
 use App\Services\FakePaymentGatewayAdapter;
 use App\Services\PaymentOrchestrator;
 use App\Services\PaymentsRolloutControlService;
@@ -39,6 +42,8 @@ class PaymentAttemptPostgresTest extends TestCase
 
     private string $gatewayId;
 
+    private string $ownerId;
+
     /** @var list<string> */
     private array $tenants = [];
 
@@ -62,6 +67,7 @@ class PaymentAttemptPostgresTest extends TestCase
         $this->tenants[] = $this->tenantId = $tenant->id;
         app(TenantContext::class)->set($this->tenantId);
 
+        $this->ownerId = User::create(['tenant_id' => $this->tenantId, 'name' => 'المالك', 'email' => Str::random(8).'@pay.test', 'password' => 'password123', 'role' => 'owner'])->id;
         $admin = PlatformAdministrator::create(['name' => 'مشغّل', 'email' => Str::random(8).'@platform.test', 'password' => 'platform-password-123']);
         $this->admins[] = $admin->id;
         SchedulerHeartbeat::record();
@@ -170,6 +176,35 @@ class PaymentAttemptPostgresTest extends TestCase
         $this->assertSame(0, DB::table('payment_gateways')->where('tenant_id', $this->tenantId)->count());
     }
 
+    /** @test */
+    public function a_revoke_racing_attempt_creation_never_leaves_a_revoked_connection_with_an_active_attempt(): void
+    {
+        foreach (range(1, 4) as $round) {
+            $gateway = PaymentGateway::query()->create(['provider' => 'fake', 'name' => "Race {$round}", 'environment' => 'sandbox']);
+            DB::table('payment_gateways')->where('id', $gateway->id)->update(['status' => 'active']);
+            $tenant = $this->tenantId;
+            $owner = $this->ownerId;
+
+            $revoker = function () use ($tenant, $owner, $gateway) {
+                app(TenantContext::class)->set($tenant);
+                try {
+                    app(PaymentGatewayService::class)->revoke(PaymentGateway::findOrFail($gateway->id), User::findOrFail($owner), 'سباق');
+
+                    return ['revoked' => true];
+                } catch (PaymentGatewayException $e) {
+                    return ['revoked' => false, 'reason' => $e->reason];
+                }
+            };
+            $results = $this->runConcurrently([$this->starter("invoice:race-{$round}", "race-key-{$round}", $gateway->id), $revoker]);
+
+            $this->assertAllOk($results);
+            $revoked = DB::table('payment_gateways')->where('id', $gateway->id)->value('status') === 'revoked';
+            $active = DB::table('payment_attempts')->where('payment_gateway_id', $gateway->id)->whereIn('capture_status', PaymentAttempt::ACTIVE_STATUSES)->count();
+            $this->assertFalse($revoked && $active > 0, "الجولة {$round}: اتصال ملغى بمحاولة نشطة");
+            $this->assertTrue($revoked || $active > 0, "الجولة {$round}: أحدهما ينجح");
+        }
+    }
+
     // ───────────────────────── مساعدات ─────────────────────────
 
     private function startOne(string $payableKey, string $key): object
@@ -179,10 +214,10 @@ class PaymentAttemptPostgresTest extends TestCase
         return DB::table('payment_attempts')->where('idempotency_key', $key)->first();
     }
 
-    private function starter(string $payableKey, string $key): callable
+    private function starter(string $payableKey, string $key, ?string $gatewayId = null): callable
     {
         $tenant = $this->tenantId;
-        $gateway = $this->gatewayId;
+        $gateway = $gatewayId ?? $this->gatewayId;
 
         return function () use ($payableKey, $key, $tenant, $gateway) {
             app(TenantContext::class)->set($tenant);

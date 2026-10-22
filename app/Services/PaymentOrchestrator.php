@@ -206,16 +206,25 @@ final class PaymentOrchestrator
         }
 
         try {
-            return DB::transaction(fn (): PaymentAttempt => PaymentAttempt::query()->create([
-                'payment_gateway_id' => $gateway->getKey(),
-                'provider' => $gateway->provider,
-                'environment' => $gateway->environment,
-                'payable_key' => $payableKey,
-                'idempotency_key' => $idempotencyKey,
-                'amount_minor' => $amount,
-                'currency' => $currency,
-                'created_by' => $actor?->getKey(),
-            ]));
+            return DB::transaction(function () use ($gateway, $payableKey, $idempotencyKey, $amount, $currency, $actor): PaymentAttempt {
+                // قفل مشترك على صف الاتصال طوال إنشاء المحاولة: إلغاء الاعتماد (FOR UPDATE) ينتظر المحاولة أو تنتظره، فلا تنشأ محاولة
+                // على اتصال يُلغى في اللحظة نفسها (والإلغاء يرفض الاتصال ذا المحاولات النشطة).
+                $locked = PaymentGateway::query()->whereKey($gateway->getKey())->sharedLock()->first();
+                if ($locked === null || ! $locked->isUsable()) {
+                    throw new PaymentOrchestrationException('gateway_unavailable', 'اتصال البوابة غير مفعّل.');
+                }
+
+                return PaymentAttempt::query()->create([
+                    'payment_gateway_id' => $gateway->getKey(),
+                    'provider' => $gateway->provider,
+                    'environment' => $gateway->environment,
+                    'payable_key' => $payableKey,
+                    'idempotency_key' => $idempotencyKey,
+                    'amount_minor' => $amount,
+                    'currency' => $currency,
+                    'created_by' => $actor?->getKey(),
+                ]);
+            });
         } catch (QueryException $e) {
             // سباق: طلبان متطابقان أو محاولتان نشطتان لنفس الـPayable. المعاملة تراجعت بالكامل (آمن على PostgreSQL).
             if (! $this->isUniqueViolation($e)) {
