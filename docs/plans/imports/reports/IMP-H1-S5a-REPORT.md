@@ -18,10 +18,17 @@ Effect: a cross-window duplicate fails the job **before any row is written**, ev
 
 No migration, env, accounting, ZATCA or AI change; reads only. A clean file behaves exactly as before (tested). Sync `/products/import/*` is untouched. Cost: one extra read/parse of the file at the first chunk (bounded by the 5 MB / 20 000-row limits).
 
+## Independent review (read-only subagent)
+
+No real defect found: the check mirrors `parse()` (same mapping source, trim, row arithmetic, blank-row skip, `assertUniqueWithinFile`), no false positives, no windowing leakage from `batch_*`/`expected_plan`, the recorder cannot double-insert an ordinal, memory is bounded, and the exception path is identical to the existing error-row path. Notes recorded:
+- **Deliberate behavior change:** `update`/`upsert` with the same SKU twice was already an error inside one window and in the non-batched whole-file apply; it is now also rejected across windows (consistency). A job already mid-run at deploy time (`processed_rows > 0`) never gets the check and keeps the old behavior.
+- Cosmetic: `assertMappingCoversContract` is not called by the pre-check, so a file with both an unmapped required column and a duplicate reports the duplicate first; first-window units carry the code `window_rolled_back` although nothing was attempted (message reworded to cover "file check").
+- Test gaps reported and **closed**: unit-code distribution, named barcode row, blank SKUs not flagged, `upsert` mode, and a repair file that still contains the duplicate (fails before writing and claims nothing).
+
 ## S5b — remote image fetch outside the job lock: deferred with a hard prerequisite
 
 `ProductImportMediaService::apply()` fetches remote URLs (`ProductImageRemoteFetcher`) inside the chunk — i.e. while the job row lock and the chunk transaction are held. Moving that out needs a separate staging phase (plan URLs from the file, fetch to temp files before the lock, then attach in-lock) and its own tests. It is **not exercised in production today**: `PRODUCT_IMPORT_REMOTE_IMAGES_ENABLED` defaults to false and enabling it is an owner/ops decision (OPS-01), which this Horizon does not make. **S5b must land before that flag is enabled for any tenant**; recorded in the Tracker as a prerequisite of the OPS-01 remote-image activation.
 
-## Tests — `ImportJobPrevalidationTest` (4) + regression
+## Tests — `ImportJobPrevalidationTest` (6) + regression
 
 Cross-window duplicate: nothing is written (0 products, `processed_rows` 0), all 250 units recorded, only the second occurrence named `row_duplicate_in_file` with "first seen in row 12"; case-insensitive and barcode duplicates; clean file unaffected (no units); corrected file repairs through a child job (250 products). **Negative control:** disabling the call fails the three duplicate tests. Wider suites (BranchIsolation|ImportJob|ImportDomain|ImportPlan|ImportPreview|ImportIntake|ImportRepair|ProductImport|AiAction): 361 passed, 7 skipped. CI on the PR.

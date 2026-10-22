@@ -72,6 +72,10 @@ class ImportJobPrevalidationTest extends TestCase
         $named = $units->where('error_code', 'row_duplicate_in_file');
         $this->assertSame([160], $named->pluck('unit_ordinal')->all(), 'تُسمّى النسخة المكرَّرة (الظهور الثاني) ولو وقعت خارج النافذة الأولى.');
         $this->assertStringContainsString('أول ظهور في الصف 12', (string) $named->first()->error_message);
+
+        // الباقي: نافذة الفشل ١٠٠ وحدة `window_rolled_back` (لم يُكتب شيء قبلها) وما بعدها `not_attempted`.
+        $byCode = $units->groupBy('error_code')->map->count()->sortKeys()->all();
+        $this->assertSame(['not_attempted' => 149, 'row_duplicate_in_file' => 1, 'window_rolled_back' => 100], $byCode);
     }
 
     /** @test */
@@ -83,13 +87,14 @@ class ImportJobPrevalidationTest extends TestCase
         $caseResponse->assertStatus(422);
         $this->assertSame(0, Product::query()->count());
 
-        [, $barcodeResponse] = $this->runJob($auth, $this->csv(250, [], '6281234567890'));
+        [$barcodeJob, $barcodeResponse] = $this->runJob($auth, $this->csv(250, [], '6281234567890'));
         $barcodeResponse->assertStatus(422);
         $this->assertSame(0, Product::query()->count());
+        $this->assertSame([160], ImportJobUnit::query()->where('import_job_id', $barcodeJob)->where('error_code', 'row_duplicate_in_file')->pluck('unit_ordinal')->all());
     }
 
     /** @test */
-    public function a_clean_file_is_unaffected_and_a_corrected_repair_succeeds(): void
+    public function a_clean_file_is_unaffected(): void
     {
         $auth = $this->registerTenant();
         [$clean, $ok] = $this->runJob($auth, $this->csv(250));
@@ -130,5 +135,44 @@ class ImportJobPrevalidationTest extends TestCase
         $this->assertSame('completed', ImportJob::query()->whereKey($child)->value('status'));
         $this->assertSame(250, Product::query()->count());
         $this->assertTrue(Product::query()->where('sku', 'PV-FIXED')->exists());
+    }
+
+    /** @test */
+    public function blank_skus_are_not_duplicates_and_upsert_mode_checks_across_windows_too(): void
+    {
+        $auth = $this->registerTenant();
+        $lines = ['sku,name,type,sale_price'];
+        for ($i = 0; $i < 150; $i++) {
+            $lines[] = ($i % 3 === 0 ? '' : sprintf('BS-%03d', $i)).",منتج {$i},good,10.00";
+        }
+        $id = $this->withToken($auth['token'])->post('/api/import-jobs', ['domain' => 'product_catalog', 'file' => UploadedFile::fake()->createWithContent('b.csv', implode("\n", $lines)."\n")], ['Accept' => 'application/json'])->assertCreated()['data']['id'];
+        $this->withToken($auth['token'])->postJson("/api/import-jobs/{$id}/apply", ['mode' => 'create'])->assertOk();
+        $this->assertSame(0, ImportJobUnit::query()->where('import_job_id', $id)->count(), 'الـSKU الفارغ المتكرر ليس تكراراً.');
+
+        $dup = $this->withToken($auth['token'])->post('/api/import-jobs', ['domain' => 'product_catalog', 'file' => $this->csv(250, [160 => 'PV-010'])], ['Accept' => 'application/json'])->assertCreated()['data']['id'];
+        $this->withToken($auth['token'])->postJson("/api/import-jobs/{$dup}/apply", ['mode' => 'upsert'])->assertStatus(422);
+        $this->assertSame(0, Product::query()->where('sku', 'like', 'PV-%')->count());
+    }
+
+    /** @test */
+    public function a_repair_file_that_still_contains_the_duplicate_fails_before_writing_and_claims_nothing(): void
+    {
+        $auth = $this->registerTenant();
+        [$id] = $this->runJob($auth, $this->csv(250, [160 => 'PV-010']));
+
+        $response = $this->withToken($auth['token'])->get("/api/import-jobs/{$id}/failures")->assertOk();
+        $tmp = tempnam(sys_get_temp_dir(), 'pv-dl2-');
+        copy($response->baseResponse->getFile()->getPathname(), $tmp);
+        $rows = SpreadsheetReader::read($tmp, 'xlsx', 5000, 200);
+        @unlink($tmp);
+        $out = tempnam(sys_get_temp_dir(), 'pv-up2-').'.xlsx';
+        SpreadsheetWriter::xlsx($out, $rows[0], array_slice($rows, 1), array_fill(0, count($rows[0]), SpreadsheetWriter::TYPE_TEXT));
+        $file = new UploadedFile($out, 'same.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', null, true);
+
+        $child = $this->withToken($auth['token'])->post("/api/import-jobs/{$id}/repairs", ['file' => $file], ['Accept' => 'application/json'])->assertCreated()['data']['id'];
+        $this->withToken($auth['token'])->postJson("/api/import-jobs/{$child}/apply", [])->assertStatus(422);
+
+        $this->assertSame(0, Product::query()->count());
+        $this->assertSame(250, ImportJobUnit::query()->where('import_job_id', $id)->where('status', 'failed')->count(), 'لا مطالبة: الوحدات ما زالت قابلة للإصلاح.');
     }
 }
