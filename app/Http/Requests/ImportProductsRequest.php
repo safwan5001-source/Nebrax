@@ -53,6 +53,9 @@ class ImportProductsRequest extends FormRequest
             'batch_size' => ['sometimes', 'integer', 'min:1', 'max:'.ProductImportService::APPLY_BATCH_SIZE],
             // PR-DUR-HARDEN-1: راجع توثيق `maxRows()` أدناه.
             'for_durable' => ['sometimes', 'boolean'],
+            // IMP-H1-S3c — ربط التنفيذ المتزامن بمعاينته: المعرّف والبصمة معاً أو لا شيء.
+            'preview_id' => ['sometimes', 'nullable', 'uuid', 'required_with:preview_hash'],
+            'preview_hash' => ['sometimes', 'nullable', 'string', 'size:64', 'required_with:preview_id'],
         ];
     }
 

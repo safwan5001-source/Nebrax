@@ -86,9 +86,8 @@ class ZatcaCreditNoteIssuancePostgresTest extends TestCase
         $s = $this->scene(quantity: 8);
         $this->enable($s['tenant']);
         $notes = array_map(fn () => $this->draftNote($s), range(1, 6));
-        // الفواتير هنا **آجلة** (credit) وتُنشأ مسودات قبل التزامن: ترحيل فاتورة **نقدية** يأخذ `FOR UPDATE` على حساب الصندوق 1110
-        // (`CashBankAccountService::bootstrapDefaults`) فيتعارض مع `FOR KEY SHARE` لسطر القيد النقدي في إشعارٍ يحمل المِرساة — جمود قائم على
-        // `main` قبل هذه الشريحة ولو بلا تفعيل (يُعاد إنتاجه بإشعار نقدي قديم + فاتورة نقدية). موثَّق في التقرير، خارج النطاق، ولا يمسّه الإصدار.
+        // فواتير **نقدية** تُرحَّل بالتزامن مع إشعارات نقدية: كانت تتعارض سابقاً بجمود (قفل 1110 في تهيئة الخزينة ↔ `FOR KEY SHARE` لسطر القيد)
+        // وعولج ذلك في TREASURY-T1 (`CashBankAccountService::bootstrapDefaults`)؛ يحرسه أيضاً `TreasuryBootstrapDeadlockPostgresTest`.
         $drafts = array_map(fn () => $this->draftInvoice($s), range(1, 6));
 
         $jobs = [];
@@ -354,7 +353,7 @@ class ZatcaCreditNoteIssuancePostgresTest extends TestCase
         app(TenantContext::class)->set($s['tenant']);
 
         return app(InvoiceService::class)->create([
-            'partner_id' => $s['partner'], 'payment_type' => 'credit', 'tax_inclusive' => false, 'zatca_document_type' => 'simplified',
+            'partner_id' => $s['partner'], 'payment_type' => 'cash', 'tax_inclusive' => false, 'zatca_document_type' => 'simplified',
         ], [['product_id' => $s['product'], 'description' => 'خدمة', 'quantity' => 1, 'unit_price' => 50000, 'tax_rate' => 15]])->id;
     }
 

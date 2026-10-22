@@ -7,6 +7,7 @@ use App\Models\Brand;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\UnitTemplate;
+use App\Support\ImportPlanDriftException;
 use App\Support\ProductImportFields;
 use App\Support\SensitiveCostPolicy;
 use App\Support\Settings;
@@ -232,6 +233,19 @@ class ProductImportService
      */
     public function preview(UploadedFile $file, array $options, bool $costAuthorized = true, int $maxRows = self::MAX_ROWS): array
     {
+        return $this->previewWithPlan($file, $options, $costAuthorized, $maxRows)['preview'];
+    }
+
+    /**
+     * المعاينة نفسها **مع خطّتها** (IMP-H1-S3c): لكل صفّ بيانات صالحٍ رمزٌ مختصر لما سيُنفَّذ فعلاً وقت المعاينة (إنشاء، أو تحديث
+     * لمنتجٍ بعينه، أو تجاوز). تُحفَظ في سجلّ المعاينة وتُقارَن وقت التنفيذ: ما تغيّر بين المعاينة والتنفيذ (مثلاً أُنشئ الرمز نفسه
+     * في الأثناء فصار «دمج» تحديثاً بدل إنشاء) يُرفض `plan_drift` بدل أن يُنفَّذ فعلاً مختلفاً عمّا اعتُمد.
+     *
+     * @param  array<string, mixed>  $options
+     * @return array{preview: array<string, mixed>, plan: array<int, string>|null}
+     */
+    public function previewWithPlan(UploadedFile $file, array $options, bool $costAuthorized = true, int $maxRows = self::MAX_ROWS): array
+    {
         $parsed = $this->parse($file, $this->options($options), $maxRows);
         // PR-INV-1: فشلٌ مبكر متّسق — لا يترك المستخدم يظن أن المعاينة تفويضٌ
         // للتطبيق حين تُرفض مطابقة سعر الشراء لاحقاً هناك حتماً.
@@ -239,7 +253,7 @@ class ProductImportService
 
         $rows = array_slice($parsed['rows'], 0, self::PREVIEW_ROW_LIMIT);
 
-        return [
+        $preview = [
             'mode' => $parsed['mode'],
             'blank_policy' => $parsed['blank_policy'],
             'master_data_policy' => $parsed['master_data_policy'],
@@ -259,6 +273,54 @@ class ProductImportService
             // الأخطاء كاملة لا مقتطعة: تقرير الأخطاء القابل للتنزيل يُبنى منها.
             'errors' => $parsed['errors'],
         ];
+
+        // معاينةٌ بنافذة (`batch_offset`/`batch_size`) لا تغطّي الملف كله: خطّةٌ ناقصة كانت ستُنتج `plan_drift` زائفاً لصفوفٍ خارج
+        // النافذة عند تنفيذ الملف كاملاً — فلا تُخزَّن خطّة (تنفيذٌ بلا مقارنة = العقد القديم) بدل خطّةٍ جزئية.
+        $windowed = ((int) ($parsed['batch_offset'] ?? 0)) > 0 || ($parsed['batch_size'] ?? null) !== null;
+        $plan = [];
+        foreach ($windowed ? [] : $parsed['rows'] as $row) {
+            $plan[(int) $row['row']] = $this->planCode($row);
+        }
+
+        return ['preview' => $preview, 'plan' => $windowed ? null : $plan];
+    }
+
+    /**
+     * رمز الصفّ في الخطّة: `c` إنشاء · `u:<id>` تحديث للمنتج المحدَّد · `s:<id>` تجاوز (لا تغيير) · `e` خطأ. المعرّف دون `updated_at`
+     * عمداً: حركات المخزون والمبيعات تحدّث `updated_at` المنتج فتُنتج رفضاً زائفاً في مؤسسةٍ نشطة، بينما ما يهمّ هو **أيّ منتجٍ
+     * وأيّ فعل** (انظر تقرير IMP-H1-S3c).
+     *
+     * @param  array<string, mixed>  $row
+     */
+    private function planCode(array $row): string
+    {
+        /** @var Product|null $existing */
+        $existing = $row['existing'] ?? null;
+
+        return match ($row['action']) {
+            'create' => 'c',
+            'update' => 'u:'.($existing?->id ?? ''),
+            'skip' => 's:'.($existing?->id ?? ''),
+            default => 'e',
+        };
+    }
+
+    /**
+     * يقارن صفوف النافذة الحالية بالخطّة المجمَّدة وقت المعاينة؛ أي اختلاف ⇒ `ImportPlanDriftException` قبل أي كتابة.
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     * @param  array<int|string, string>  $expected
+     */
+    private function assertPlanHolds(array $rows, array $expected): void
+    {
+        foreach ($rows as $row) {
+            $number = (int) $row['row'];
+            $planned = $expected[$number] ?? null;
+            $live = $this->planCode($row);
+            if ($planned === null || $planned !== $live) {
+                throw new ImportPlanDriftException($number, $planned, $live);
+            }
+        }
     }
 
     /**
@@ -286,6 +348,9 @@ class ProductImportService
         }
         if ($parsed['total_rows'] === 0) {
             throw new RuntimeException('لا يحتوي الملف صفوف بيانات قابلة للتطبيق.');
+        }
+        if ($resolved['expected_plan'] !== null) {
+            $this->assertPlanHolds($parsed['rows'], $resolved['expected_plan']);
         }
 
         $lifecycle = app(ProductLifecycleService::class);
@@ -429,6 +494,8 @@ class ProductImportService
             'mapping' => $mapping,
             'batch_offset' => $batchOffset,
             'batch_size' => $batchSize,
+            // IMP-H1-S3c: خطّة المعاينة المجمَّدة (رقم الصف → رمز) إن وُجدت؛ `null` = العقد القديم بلا مقارنة.
+            'expected_plan' => isset($options['expected_plan']) && is_array($options['expected_plan']) ? $options['expected_plan'] : null,
         ];
     }
 
@@ -561,6 +628,8 @@ class ProductImportService
             'rows' => $rows,
             'errors' => $errors,
             'pending_references' => $pending,
+            'batch_offset' => $batchOffset,
+            'batch_size' => $batchSize,
         ];
     }
 
