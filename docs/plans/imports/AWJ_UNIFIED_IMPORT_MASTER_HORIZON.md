@@ -257,6 +257,8 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
     - **One owner of the reservation lifecycle: the document service, not the importer.** `PurchaseService` / `ExpenseService` call `DocumentDuplicateReservationService` inside their own `create`, `update` and `delete` transactions:
       - `create` reserves the key.
       - `update` that changes any predicate field (`partner_id`, `supplier_invoice_no`; expense vendor/reference/date/amount) **re-keys atomically**: it deletes the old reservation and inserts the new one, and a collision returns 422.
+      - The reservation row persists its **canonical predicate components** (`predicate` JSON: normalized vendor key, normalized reference, date, amount in minor units, plus any occurrence id) beside the irreversible `dedupe_key`. An expense has no persisted reference column (`Expense::$fillable` has none), so a re-key recomputes from the stored components merged with the changed fields and the reference is never lost.
+      - No schema change to `expenses` is needed. If a visible reference field is later wanted, it is a separate additive slice.
       - `delete` of a draft releases the reservation.
       - Importers never write reservations directly.
     - **Direct manual creation follows a configurable policy** (CLAUDE.md rule 6) in purchase/expense settings: `duplicate_reference_policy = allow | block`.
@@ -271,7 +273,9 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
   - **Gates first (rule 7).** `create-purchase-draft` / `create-expense-draft` today require only `documents.center.build_draft` + `document_center.core` (`routes/api.php:501-502`). Before either builder runs, also enforce the direct API's gates: `purchases.manage` + `purchases.cycle` for purchases, and `expenses.manage` + `finance.operations` for expenses. Use the H1-S1 `authorize()` semantics.
     - Negative tests: a custom role with Document Center permission but without the financial permission gets 403, and the target app disabled gets 403.
     - The behavior change is deliberate: Document Center is at Stage 0 and off by default. The report names it.
-  - `PurchaseDocumentDraftBuilder::build` and `ExpenseDocumentDraftBuilder::build` keep their own extraction, review and `DocumentTransactionLink` idempotency. **Before** calling `PurchaseService::create` / `ExpenseService::create`, they call the same adapter `validateRow()`/`plan()` and the `import_document_reservations` service, with `source=document_center`, in the same transaction.
+  - `PurchaseDocumentDraftBuilder::build` and `ExpenseDocumentDraftBuilder::build` keep their own extraction, review and `DocumentTransactionLink` idempotency.
+    - They call the same adapter `validateRow()`/`plan()`, then call `PurchaseService::create` / `ExpenseService::create` with source metadata (`source=document_center`, batch id).
+    - The **document service performs the single reservation write** (per H5-S3); builders never write reservations, which would otherwise double-insert and roll back.
   - Result: two different batches for the same invoice cannot both create drafts, and a spreadsheet import plus a document import of the same invoice also collide.
   - Existing Document Center tests stay green, and a new cross-source duplicate test (spreadsheet vs. document, PostgreSQL) is added.
   - The UI adds an entry link from the purchases/expenses import screens to Document Center upload, with status hand-off. No new extractor is built.
@@ -283,7 +287,10 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
   - A sales import job is **one atomic execution**. All invoice units are created in a single transaction that first takes the tenant-anchor lock, then checks the remaining quota for the whole batch, then creates every draft. It is all-or-nothing, so no other request can consume capacity between chunks.
   - The batch size is capped (proposed: 500 invoices per job, which the slice confirms) to keep the transaction bounded.
   - **The direct path must join the same protocol.** Today `EnforcePlanLimit` (`app/Http/Middleware/EnforcePlanLimit.php:19-36`) only counts and takes no lock, so locking the import side alone cannot prevent over-consumption.
-    - H6-S1 moves the quota check for every invoice-creating path (`POST invoices`, duplicate, quote convert, recurring generate, and import) into one service method. That method runs inside the creating transaction after the same tenant-anchor lock.
+    - H6-S1 puts the protocol **inside `InvoiceService::create` itself**, so no caller can bypass it. That covers `InvoiceController`, duplicate, `QuoteService` convert, `RecurringInvoiceService`, `PosService:242`, `FuelSaleService:173`, `DeliveryNoteSalesInvoiceDraftBuilder:216`, `PublicInvoiceController:135`, and import.
+      - Every create takes the tenant-anchor lock first, so all invoice creation is serialized against the import's count-and-create.
+      - The **quota check** inside it runs only for callers that are quota-enforced today (an explicit `enforceQuota` argument). This keeps current behavior exactly: POS, fuel, delivery-note and public paths are not newly blocked. Whether those should count against the quota is a separate owner decision, not a side effect of imports.
+    - A caller-coverage test enumerates `InvoiceService::create` call sites, so a new caller must declare its quota mode.
     - The middleware stays as a fast pre-check, and its responses are unchanged.
     - This touches subscription enforcement and is in scope only once D-03 opens H6.
   - Tests: a batch exceeding the remaining quota creates nothing, and a concurrent direct `POST invoices` during the import cannot over-consume (PostgreSQL), in both orders.
