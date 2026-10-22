@@ -71,6 +71,12 @@ class ImportRepairService
 
         // بلا خيارات صريحة: ترث التشغيلة الفرعية خيارات أمّها المجمَّدة (مثل `update`/`upsert` والمطابقة) لا افتراضيات الإنشاء.
         $options ??= is_array($parent->apply_options) ? $parent->apply_options : null;
+        // تشغيلة الإصلاح لا تحمل أرشيف صور (الملف المصحَّح وحده): نفعّل صور المنتجات إن كانت مفعَّلةً في الأمّ لكان ترحيلها يفشل على صفوف الصور بلا أرشيف.
+        // صور الصفوف المصحَّحة تُضاف بمسار صور المنتج العادي (يُذكر في تقرير S8c).
+        if (is_array($options)) {
+            $options['apply_product_images'] = false;
+            $options['approve_existing_media_updates'] = false;
+        }
 
         return $this->jobs->create($file, $parent->domain, $idempotencyKey, $userId, null, $options, $previewId, $previewHash, $parent->id);
     }

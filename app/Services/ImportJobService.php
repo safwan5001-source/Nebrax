@@ -150,7 +150,7 @@ class ImportJobService
                 // خيارات مجمَّدة عند الإنشاء لتشغيلةٍ مربوطةٍ بمعاينة؛ غيرها يجمّدها أول `apply` كالسابق.
                 'preview_id' => $preview?->id,
                 'preview_hash' => $preview === null ? null : $previewHash,
-                'apply_options' => $preview === null ? null : $canonical,
+                'apply_options' => ($preview === null && $parentJobId === null) ? null : $canonical,
                 ]);
 
                 // إنفاق المعاينة وإدراج التشغيلة **ذرّياً** في المعاملة نفسها: تعارض القيد الفريد أو فشل الإنفاق يُرجع الاثنين
@@ -222,7 +222,7 @@ class ImportJobService
             || $existing->preview_hash !== $previewHash
             // الخيارات المجمَّدة تُقارَن فقط حين التشغيلة القائمة مربوطةٌ بمعاينة (غيرها تُجمَّد عند أول apply).
             // `apply_options` تحمل بعد أول قطعة مفتاح `batch_size` التشغيلي أيضاً — تُقارَن قانونياً (المفاتيح الدلالية وحدها).
-            || ($existing->preview_id !== null
+            || (($existing->preview_id !== null || $existing->parent_job_id !== null)
                 && $this->domains->for($domain)->canonicalOptions((array) $existing->apply_options) !== $canonical);
 
         if (
@@ -362,12 +362,15 @@ class ImportJobService
 
             // IMP-H1-S3b: تشغيلةٌ مربوطةٌ بمعاينة تنفّذ **خياراتها المجمَّدة عند الإنشاء** (هي ما عاينه المستخدم)؛ أي خيارٍ
             // مختلف في طلب التطبيق يُرفض صراحةً لا يُتجاهَل بصمت. `batch_size` تشغيليٌّ لا دلاليّ فيبقى من طلب أول قطعة.
-            if ($locked->preview_id !== null && $explicitOptions !== null) {
+            // IMP-H1-S8c: تشغيلة الإصلاح الفرعية تُجمَّد خياراتها كذلك عند الإنشاء (خيارات أمّها): بلا هذا كانت أول قطعة تأخذ افتراضيات طلب التطبيق
+            // (`mode=create`) فيُنفَّذ إصلاحُ تشغيلة `update`/`upsert` إنشاءً.
+            $frozenAtCreation = $locked->preview_id !== null || $locked->parent_job_id !== null;
+            if ($frozenAtCreation && $explicitOptions !== null) {
                 $this->assertOptionsFrozen($locked, $explicitOptions);
             }
 
             $firstChunk = $locked->status === ImportJobStatus::READY;
-            if ($locked->preview_id !== null) {
+            if ($frozenAtCreation) {
                 $frozenOptions = (array) ($locked->apply_options ?? []);
                 if ($firstChunk && isset($options['batch_size'])) {
                     $frozenOptions['batch_size'] = $options['batch_size'];

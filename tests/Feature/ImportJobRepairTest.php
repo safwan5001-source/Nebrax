@@ -298,4 +298,45 @@ class ImportJobRepairTest extends TestCase
         $this->artisan('imports:prune')->assertSuccessful();
         $this->assertFalse(ImportJob::query()->whereKey($parent)->exists(), 'بعد انتهاء الطفل تُقلَّم كسائر المنتهيات.');
     }
+
+    /** @test */
+    public function a_repair_child_inherits_the_parents_frozen_options_and_rejects_conflicting_ones(): void
+    {
+        $auth = $this->registerTenant();
+        $id = $this->withToken($auth['token'])->post('/api/import-jobs', ['domain' => 'product_catalog', 'file' => $this->csv(250, self::BAD)], ['Accept' => 'application/json'])
+            ->assertCreated()['data']['id'];
+        for ($i = 0; $i < 6; $i++) {
+            if ($this->withToken($auth['token'])->postJson("/api/import-jobs/{$id}/apply", ['mode' => 'upsert'])->status() !== 200) {
+                break;
+            }
+        }
+        $this->assertSame('upsert', ImportJob::query()->whereKey($id)->value('apply_options')['mode'] ?? null);
+
+        $child = $this->repair($auth, $id, $this->xlsxFile($this->correctedRows($auth, $id)))->assertCreated()['data']['id'];
+        $this->assertSame('upsert', ImportJob::query()->whereKey($child)->value('apply_options')['mode'] ?? null, 'الطفل يرث خيارات الأمّ عند الإنشاء.');
+
+        // خيارٌ صريح مخالف يُرفض (لا يُنفَّذ إنشاءً بصمت)، وطلبٌ بلا خيارات (كما ترسل الواجهة) يعمل بالخيارات المجمَّدة.
+        $this->withToken($auth['token'])->postJson("/api/import-jobs/{$child}/apply", ['mode' => 'create'])->assertStatus(422)->assertJsonPath('code', 'options_frozen');
+        for ($i = 0; $i < 6; $i++) {
+            $response = $this->withToken($auth['token'])->postJson("/api/import-jobs/{$child}/apply", []);
+            if ($response->status() !== 200 || $response['data']['status'] === 'completed') {
+                break;
+            }
+        }
+        $this->assertSame('completed', ImportJob::query()->whereKey($child)->value('status'));
+        $this->assertSame(250, Product::query()->count());
+    }
+
+    /** @test */
+    public function a_repair_child_never_applies_product_images_even_if_the_parent_did(): void
+    {
+        [$auth, $parent] = $this->failedParent();
+        ImportJob::query()->whereKey($parent)->update(['apply_options' => ['mode' => 'create', 'apply_product_images' => true, 'approve_existing_media_updates' => true]]);
+
+        $child = $this->repair($auth, $parent, $this->xlsxFile($this->correctedRows($auth, $parent)))->assertCreated()['data']['id'];
+
+        $options = ImportJob::query()->whereKey($child)->value('apply_options');
+        $this->assertFalse($options['apply_product_images']);
+        $this->assertFalse($options['approve_existing_media_updates']);
+    }
 }

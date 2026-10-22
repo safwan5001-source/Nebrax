@@ -42,6 +42,8 @@ import {
   suggestedMapping,
 } from '@/modules/products/import/contract';
 import { ImportJobStatusPanel } from '@/modules/import-jobs/ImportJobStatusPanel';
+import { ImportRepairPanel } from '@/modules/import-jobs/ImportRepairPanel';
+import { downloadImportFailures } from '@/modules/import-jobs/client';
 import { useImportJobEngine, useImportJobUrlParam, useResumeFromUrl } from '@/modules/import-jobs/useImportJobEngine';
 import type { ApplyOptions } from '@/modules/import-jobs/client';
 import { cn } from '@/lib/utils';
@@ -217,6 +219,29 @@ export default function ProductImportPage() {
       return;
     }
     await engine.applyLoop(engine.job.id, engine.job.preview_bound ? {} : applyOptionsPayload());
+  }
+
+  // IMP-H1-S8c: تشغيلةٌ فاشلة لها وحداتٌ قابلة للإصلاح ⇒ ملفٌّ مصحَّح يُنشئ تشغيلة فرعية ثم يُرحَّل كأي تشغيلة (الخادم يطالب بالوحدات).
+  async function repairFailedRows(repairFile: File) {
+    if (!engine.job) return;
+    // مفتاح حتميّ لهذا الملف بعينه: إعادة المحاولة بعد ضياع الاستجابة تعيد التشغيلة نفسها لا تنشئ فرعيةً ثانية.
+    const key = `repair-${engine.job.id}-${repairFile.name}-${repairFile.size}-${repairFile.lastModified}`;
+    const child = await engine.repair(engine.job.id, repairFile, key);
+    if (!child) return;
+    // خيارات التشغيلة الفرعية مجمَّدة عند إنشائها من أمّها (الخادم يرفض أي خيار مخالف): لا نرسل خيارات الصفحة الحالية — وهي افتراضيات
+    // حين تُفتح التشغيلة الفاشلة من الرابط — فلا يتحوّل إصلاح `update`/`upsert` إلى `create`.
+    await engine.applyLoop(child.id, {});
+  }
+
+  async function downloadFailedRows(jobId: string) {
+    try {
+      const outcome = await downloadImportFailures(jobId);
+      if (outcome === 'demo-unavailable') {
+        toast({ title: t('export_demo_unavailable'), variant: 'info' });
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('import_repair_download_failed'));
+    }
   }
 
   useEffect(() => {
@@ -711,6 +736,13 @@ export default function ProductImportPage() {
               networkUncertain={engine.networkUncertain}
               cancelling={engine.busy === 'cancelling'}
               onCancel={engine.job ? () => void engine.cancel(engine.job!.id) : undefined}
+              onOpenParent={(parentId) => void engine.resume(parentId)}
+            />
+            <ImportRepairPanel
+              job={engine.job}
+              busy={engine.busy !== null}
+              onDownload={() => void downloadFailedRows(engine.job!.id)}
+              onRepair={(repairFile) => void repairFailedRows(repairFile)}
             />
           </CardContent>
         </Card>

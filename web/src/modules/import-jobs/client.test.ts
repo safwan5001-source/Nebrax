@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { api } = vi.hoisted(() => ({ api: vi.fn() }));
-vi.mock('@/lib/api', () => ({ api, ApiError: class ApiError extends Error {} }));
+const { api, downloadFile } = vi.hoisted(() => ({ api: vi.fn(), downloadFile: vi.fn() }));
+vi.mock('@/lib/api', () => ({ api, downloadFile, ApiError: class ApiError extends Error {} }));
 
-import { applyImportJobChunk, createImportJob } from './client';
+import { applyImportJobChunk, createImportJob, createRepairJob, downloadImportFailures } from './client';
 
 function sentForm(): FormData {
   const call = api.mock.calls.at(-1);
@@ -66,5 +66,28 @@ describe('applyImportJobChunk (IMP-H1-S3b)', () => {
     await applyImportJobChunk('job-1', { mode: 'create', mapping: {} });
 
     expect(api.mock.calls.at(-1)?.[1].body).toEqual({ mode: 'create' });
+  });
+});
+
+describe('repair client (IMP-H1-S8b/c)', () => {
+  it('creates a child job from the corrected file against the parent id, with no domain or options of its own', async () => {
+    api.mockReset();
+    api.mockResolvedValue({ data: { id: 'child-1', parent_job_id: 'parent-1' } });
+
+    const child = await createRepairJob('parent-1', new File(['x'], 'fixed.xlsx'), 'idem-r');
+
+    const [path, init] = api.mock.calls.at(-1)!;
+    expect(path).toBe('/import-jobs/parent-1/repairs');
+    expect(init.method).toBe('POST');
+    expect([...(init.body as FormData).keys()].sort()).toEqual(['file', 'idempotency_key']);
+    expect(child.parent_job_id).toBe('parent-1');
+  });
+
+  it('downloads the failures file as XLSX (CSV would corrupt values on re-upload)', async () => {
+    downloadFile.mockResolvedValue('downloaded');
+
+    await downloadImportFailures('job-9');
+
+    expect(downloadFile).toHaveBeenCalledWith('/import-jobs/job-9/failures?format=xlsx', 'failures.xlsx');
   });
 });

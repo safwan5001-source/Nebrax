@@ -4,8 +4,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useImportJobEngine } from './useImportJobEngine';
 import { ApiError } from '@/lib/api';
 
-const { createImportJob, getImportJob, applyImportJobChunk, cancelImportJob } = vi.hoisted(() => ({
+const { createImportJob, createRepairJob, getImportJob, applyImportJobChunk, cancelImportJob } = vi.hoisted(() => ({
   createImportJob: vi.fn(),
+  createRepairJob: vi.fn(),
   getImportJob: vi.fn(),
   applyImportJobChunk: vi.fn(),
   cancelImportJob: vi.fn(),
@@ -13,7 +14,7 @@ const { createImportJob, getImportJob, applyImportJobChunk, cancelImportJob } = 
 
 vi.mock('./client', async () => {
   const actual = await vi.importActual<typeof import('./client')>('./client');
-  return { ...actual, createImportJob, getImportJob, applyImportJobChunk, cancelImportJob };
+  return { ...actual, createImportJob, createRepairJob, getImportJob, applyImportJobChunk, cancelImportJob };
 });
 
 function job(overrides: Partial<Record<string, unknown>> = {}) {
@@ -186,5 +187,47 @@ describe('useImportJobEngine', () => {
 
     expect(result.current.job?.status).toBe('completed');
     expect(result.current.canApply).toBe(false);
+  });
+  it('repair makes the child job the screen job and keeps the failed parent when the server refuses (IMP-H1-S8c)', async () => {
+    const { result } = renderHook(() => useImportJobEngine('product_catalog'));
+
+    createRepairJob.mockResolvedValueOnce(job({ id: 'child-1', parent_job_id: 'job-1' }));
+    let child: unknown;
+    await act(async () => {
+      child = await result.current.repair('job-1', new File(['x'], 'fixed.xlsx'));
+    });
+    expect((child as { id: string }).id).toBe('child-1');
+    expect(result.current.job?.id).toBe('child-1');
+    expect(createRepairJob).toHaveBeenCalledWith('job-1', expect.any(File), undefined);
+  });
+
+  it('a refused repair keeps the parent on screen with the server message', async () => {
+    getImportJob.mockResolvedValueOnce(job({ id: 'job-1', status: 'failed', failed_units: 3 }));
+    const { result } = renderHook(() => useImportJobEngine('product_catalog'));
+    await act(async () => {
+      await result.current.resume('job-1');
+    });
+
+    createRepairJob.mockRejectedValueOnce(new ApiError(422, 'المعرّف في الصف 2 لا يخصّ هذه التشغيلة.', null));
+    await act(async () => {
+      await result.current.repair('job-1', new File(['x'], 'fixed.xlsx'));
+    });
+
+    expect(result.current.job?.id).toBe('job-1');
+    expect(result.current.error).toBe('المعرّف في الصف 2 لا يخصّ هذه التشغيلة.');
+    expect(result.current.busy).toBeNull();
+  });
+  it('a failed apply refetches the job so the repair panel receives failed_units (IMP-H1-S8c)', async () => {
+    applyImportJobChunk.mockRejectedValueOnce(new ApiError(422, 'فشلت النافذة', null));
+    getImportJob.mockResolvedValueOnce(job({ status: 'failed', failed_units: 3 }));
+    const { result } = renderHook(() => useImportJobEngine('product_catalog'));
+
+    await act(async () => {
+      await result.current.applyLoop('job-1', { mode: 'create' });
+    });
+
+    expect(result.current.job?.status).toBe('failed');
+    expect(result.current.job?.failed_units).toBe(3);
+    expect(result.current.error).toBe('فشلت النافذة');
   });
 });
