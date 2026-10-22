@@ -14,6 +14,7 @@ import { useConfirm } from '@/components/ui/confirm-dialog';
 import { ProductPreviewPanel } from '@/modules/ai-actions/product-preview-panel';
 import { DECISION_LABEL, FIELD_LABEL, type RowDecision, apiErrorMessage } from '@/modules/ai-actions/product-preview';
 import { currentLang, isExecutionLocked } from '@/modules/ai-actions/product-execution';
+import { ASSISTED_REVIEW_TEXT } from '@/modules/ai-actions/assisted-review-text';
 import { imageText } from '@/modules/ai-actions/product-images';
 import { ImageArchiveCard } from '@/modules/ai-actions/product-images-ui';
 import { type RepairInfo, fieldEditable, repairText } from '@/modules/ai-actions/product-repair';
@@ -137,7 +138,8 @@ export default function AiProductImportReviewPage() {
   function setStatus(status: string) { setReview((current) => current && ({ ...current, action: { ...current.action, status } })); }
 
   return <div className="space-y-4 pb-20">
-    <header className="flex items-center gap-3"><Button asChild variant="ghost" size="icon" aria-label="العودة"><Link href="/products"><ArrowRight className="h-4 w-4 rtl:rotate-0 ltr:rotate-180" /></Link></Button><div><h1 className="text-xl font-semibold">استيراد عبر مساعد أَوْج</h1><p className="text-sm text-muted">{stage === 'review' ? 'استخراج ومراجعة — ثم معاينة نهائية وموافقة. لا يُنفَّذ شيء قبل موافقتك وضغطك «تنفيذ الاستيراد».' : 'المعاينة النهائية والموافقة — ثم التنفيذ بضغطة صريحة منك.'}</p></div></header>
+    <header className="flex items-center gap-3"><Button asChild variant="ghost" size="icon" aria-label="العودة"><Link href="/products"><ArrowRight className="h-4 w-4 rtl:rotate-0 ltr:rotate-180" /></Link></Button><div><h1 className="text-xl font-semibold">{ASSISTED_REVIEW_TEXT[currentLang()].title}</h1><p className="text-sm text-muted">{stage === 'review' ? 'استخراج ومراجعة — ثم معاينة نهائية وموافقة. لا يُنفَّذ شيء قبل موافقتك وضغطك «تنفيذ الاستيراد».' : 'المعاينة النهائية والموافقة — ثم التنفيذ بضغطة صريحة منك.'}</p></div></header>
+    <p role="note" data-testid="assisted-review-notice" className="rounded-md border border-border bg-background px-3 py-2 text-sm text-muted">{ASSISTED_REVIEW_TEXT[currentLang()].notice}</p>
     {!review ? <Card><CardHeader><CardTitle>ارفع CSV أو Excel</CardTitle></CardHeader><CardContent><label className="flex min-h-36 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-6 text-center"><FileSpreadsheet className="h-8 w-8 text-primary" /><span>{file?.name ?? 'اختر ملف المنتجات'}</span><Input className="sr-only" type="file" accept=".csv,.xlsx" onChange={upload} disabled={saving} /></label>{saving && <p className="mt-3 flex items-center gap-2 text-sm"><Loader2 className="h-4 w-4 animate-spin" /> جارٍ الاستخراج الآمن…</p>}</CardContent></Card> : <>
       {repair && <RepairBanner repair={repair} />}
       <ol className="flex flex-wrap items-center gap-2 text-sm" aria-label="مراحل الاستيراد">
