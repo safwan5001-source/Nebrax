@@ -118,7 +118,7 @@ interface GatewayAdapter {
 
 | الجدول | المفاتيح الحرجة | التصنيف |
 |---|---|---|
-| `payment_attempts` | `UNIQUE(tenant_id, idempotency_key)`؛ `UNIQUE(payment_gateway_id, provider_payment_id)` جزئي؛ محاولة نشطة واحدة لكل Payable (فهرس جزئي)؛ CHECK `captured ≥ refunded` | D-07 |
+| `payment_attempts` | `UNIQUE(tenant_id, idempotency_key)`؛ `UNIQUE(payment_gateway_id, provider_payment_id)` جزئي؛ محاولة نشطة واحدة لكل Payable (فهرس جزئي)؛ `capture_status` و`dispute_status` عمودان مستقلان؛ CHECK `captured ≥ refunded` | D-07 |
 | `payment_attempt_postings` | مجموعة الترحيل الواحدة لكل التقاط: `attempt_id`، `payment_id`، `role` (`allocated`/`unallocated`)؛ `UNIQUE(attempt_id, role)` + `UNIQUE(payment_id)`؛ كل سندات الالتقاط وروابطها تُنشأ وتُرحَّل في **معاملة واحدة** (لا حالة وسيطة بعد انهيار)؛ وجود أي صف = المجموعة مكتملة | CompanyWide |
 | `payment_provider_events` | `UNIQUE(payment_gateway_id, provider_event_id)`؛ جسم مشفّر ≤ 64KB + هاش؛ لا DELETE | CompanyWide |
 | `payment_refund_attempts` | `UNIQUE(payment_gateway_id, provider_refund_id)` | CompanyWide |
@@ -135,15 +135,26 @@ interface GatewayAdapter {
 
 ## 4. آلة الحالات والضمانات
 
+ثلاثة أبعاد **مستقلة** على المحاولة (لا حالة واحدة رتيبة تخلطها)، وبُعد رابع مشتق:
+
 ```text
-created ─► pending_customer ─► authorized ─► captured ─► partially_refunded ─► refunded
-   │              │                 │            │
-   └─► cancelled  ├─► expired       └─► voided   └─► disputed ─► dispute_won / dispute_lost
-                  └─► failed
+(1) الالتقاط  capture_status (رتيب):
+    created ─► pending_customer ─► authorized ─► captured
+       │              ├─► expired         └─► voided
+       └─► cancelled  └─► failed
+
+(2) الاسترداد  مشتق من refunded_minor مقابل captured_minor:  none ─► partial ─► full
+
+(3) النزاع  dispute_status (لكل نزاع في payment_disputes، وملخّصه على المحاولة):
+    none ─► open ─► won | lost        (قد يتكرر لنزاعات لاحقة)
+
+(4) التسوية  مشتقة من بنود التسوية:  unsettled ─► in_payout ─► settled
 ```
 
-- رتبة رتيبة `status_rank`؛ لا انتقال للخلف. بُعد التسوية (`unsettled/in_payout/settled`) مشتق من بنود التسوية.
-- الأثر المالي: `captured` ⇒ **مجموعة ترحيل واحدة** ذرّية (سند 1170/1130 واحد، أو سندان مخصّص + غير مخصّص للدفعة الزائدة)؛ الاسترداد المؤكد ⇒ `CustomerRefund`؛ النزاع ⇒ D-06؛ غير ذلك لا شيء.
+- كل التركيبات مسموحة متى كان `capture_status = captured`: نزاع على المتبقي بعد استرداد جزئي، أو استرداد بعد كسب نزاع.
+- **المبلغ القابل للاسترداد** = `captured_minor − refunded_minor − Σ مبالغ النزاعات المفتوحة أو الخاسرة`. الاسترداد أثناء نزاع مفتوح ممنوع افتراضياً ما لم يسمح به المزوّد (TO VERIFY لكل مزوّد).
+- كل بُعد رتيب داخل نفسه؛ لا انتقال للخلف.
+- الأثر المالي: الوصول إلى `captured` ⇒ **مجموعة ترحيل واحدة** ذرّية (سند 1170/1130 واحد، أو سندان مخصّص + غير مخصّص للدفعة الزائدة)؛ الاسترداد المؤكد ⇒ `CustomerRefund`؛ النزاع ⇒ D-06؛ غير ذلك لا شيء.
 
 | الخطر | الضمان |
 |---|---|
