@@ -7869,7 +7869,9 @@
     "descriptionPlaceholder": "Enter a settlement type description or a relevant note…",
     "activeHint": "Only active types will appear when adding an employee custody settlement after the settlement workflow is available.",
     "backToFinanceSettings": "Back to Finance Settings",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "c_paymentGateways_t": "Payment gateways",
+    "c_paymentGateways_d": "Payment provider connections: add, activate, suspend, rotate secrets and review the change history."
   },
   "paymentMethods": {
     "title": "Payment Methods",
@@ -10406,7 +10408,10 @@
       "title": "Online stores"
     },
     "payments": {
-      "title": "Payment gateways"
+      "title": "Payment gateways",
+      "description": "Your company's online payment provider connections: add, activate and rotate their secrets.",
+      "badge": "Settings › Finance",
+      "denied": "You do not have permission to view payment gateways. Ask an owner or admin."
     },
     "shipping": {
       "title": "Shipping companies"
@@ -11279,6 +11284,140 @@
       "document_toggle": "Answer from this document",
       "document_toggle_hint": "Sends this document's reviewed values (with hidden fields excluded) to Anthropic to answer your question. No file is sent.",
       "document_basis": "Based on this document: {fields} fields, {lines} lines sent; {redacted} hidden values were not sent."
+    }
+  },
+  "paymentGateways": {
+    "title": "Payment gateways",
+    "subtitle": "The payment provider connections you add yourself. A draft stays idle until you activate it, and secrets are never shown after saving.",
+    "back": "Back to finance settings",
+    "list": "Connections",
+    "add": "Add connection",
+    "retry": "Retry",
+    "loading": "Loading connections",
+    "loadFailed": "Could not load gateway connections.",
+    "denied": "You do not have permission to view payment gateways. Ask an owner or admin.",
+    "empty": "No connections yet",
+    "emptyHint": "Add a connection to your payment provider. It is saved as a draft, and no payment is taken until it is activated and online payments are enabled for your company.",
+    "activationBlocked": "A real provider connection cannot be activated before its credentials are verified; verification becomes available once that provider's adapter is enabled. A manual (custom) link activates directly.",
+    "actionFailed": "The action could not be completed.",
+    "providers": {
+      "stripe": "Stripe",
+      "tap": "Tap",
+      "paytabs": "PayTabs",
+      "checkout": "Checkout.com",
+      "custom": "Manual (custom)"
+    },
+    "environments": {
+      "sandbox": "Sandbox",
+      "live": "Live"
+    },
+    "status": {
+      "draft": "Draft",
+      "active": "Active",
+      "suspended": "Suspended",
+      "revoked": "Revoked"
+    },
+    "fields": {
+      "secretKey": "Secret key",
+      "webhookSecret": "Webhook secret",
+      "saved": "Saved",
+      "missing": "Not set",
+      "credentialVersion": "Credential version",
+      "verified": "Verification",
+      "notVerified": "Not verified yet",
+      "graceUntil": "Previous secret valid until"
+    },
+    "actions": {
+      "cancel": "Cancel",
+      "edit": "Edit",
+      "rotate": "Rotate secrets",
+      "activate": "Activate",
+      "suspend": "Suspend",
+      "revoke": "Revoke",
+      "delete": "Delete",
+      "events": "History"
+    },
+    "confirm": {
+      "activate": "Activate the connection “{name}”?",
+      "suspend": "Suspend the connection “{name}”? You can reactivate it later.",
+      "revoke": "Permanently revoke “{name}”? Its secrets are erased and this cannot be undone; its history is kept.",
+      "delete": "Delete the connection “{name}”?"
+    },
+    "done": {
+      "create": "Connection added as a draft",
+      "edit": "Changes saved",
+      "activate": "Connection activated",
+      "suspend": "Connection suspended",
+      "revoke": "Connection revoked",
+      "delete": "Connection deleted",
+      "rotate": "Secrets rotated"
+    },
+    "form": {
+      "addTitle": "Add a payment gateway connection",
+      "editTitle": "Edit connection",
+      "steps": "Add steps",
+      "step1": "Provider",
+      "step2": "Credentials",
+      "step3": "Review",
+      "provider": "Provider",
+      "environment": "Environment",
+      "name": "Name",
+      "nameEn": "English name",
+      "merchantReference": "Merchant reference",
+      "publishableKey": "Publishable key",
+      "secretKey": "Secret key",
+      "webhookSecret": "Webhook secret",
+      "realProviderHint": "A real provider connection stays a draft until its credentials are verified by the provider adapter.",
+      "customProviderHint": "A manual link without a provider: no network calls, and it activates directly.",
+      "secretsNote": "Secrets are stored encrypted and never shown after saving. To change them later use “Rotate secrets”.",
+      "provided": "Provided",
+      "notProvided": "Not provided",
+      "draftNote": "The connection is saved as a draft; activation is a separate step.",
+      "nameRequired": "A name is required.",
+      "next": "Next",
+      "back": "Back",
+      "saveDraft": "Save as draft",
+      "saveEdit": "Save changes",
+      "saving": "Saving…",
+      "saveFailed": "Could not save the connection."
+    },
+    "rotate": {
+      "title": "Rotate secrets",
+      "intro": "Enter only the new secrets; anything left blank is unchanged. The previous webhook secret stays valid for the grace period so in-flight notifications are not lost.",
+      "grace": "Grace period (minutes)",
+      "graceHint": "0 to 10080 minutes (one week).",
+      "nothing": "Enter at least one secret.",
+      "submit": "Rotate",
+      "saving": "Rotating…",
+      "failed": "Could not rotate the secrets."
+    },
+    "events": {
+      "title": "Connection history",
+      "loading": "Loading history",
+      "empty": "No events yet.",
+      "failed": "Could not load the history.",
+      "fields": "Changed fields",
+      "types": {
+        "created": "Created",
+        "updated": "Updated",
+        "credentials_rotated": "Secrets rotated",
+        "activated": "Activated",
+        "reactivated": "Reactivated",
+        "suspended": "Suspended",
+        "revoked": "Revoked",
+        "deleted": "Deleted"
+      }
+    },
+    "errors": {
+      "gateway_has_references": "A connection linked to receipts, settlements or payment attempts cannot be deleted. Suspend or revoke it instead.",
+      "gateway_active_cannot_delete": "An active connection cannot be deleted. Suspend it first.",
+      "gateway_verification_required": "A real provider connection cannot be activated before its credentials are verified.",
+      "gateway_revoked": "The connection is revoked and cannot be changed.",
+      "gateway_not_active": "Only an active connection can be suspended.",
+      "gateway_name_taken": "That name is used by another connection.",
+      "gateway_nothing_to_rotate": "There are no secrets to rotate.",
+      "gateway_provider_immutable": "The provider cannot change after creation.",
+      "gateway_environment_locked": "The environment cannot change after activation."
     }
   }
 }
