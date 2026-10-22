@@ -409,7 +409,7 @@ class TreasurySelectionResolverTest extends TestCase
     }
 
     /** @test */
-    public function only_the_resolver_itself_references_the_contract_so_no_posting_path_is_wired_yet(): void
+    public function only_the_cash_sale_invoice_path_references_the_contract_and_no_other_posting_path_is_wired_yet(): void
     {
         $offenders = [];
         foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(base_path('app'))) as $file) {
@@ -420,6 +420,10 @@ class TreasurySelectionResolverTest extends TestCase
             if (str_ends_with($path, '/Services/Accounting/TreasurySelectionResolver.php')) {
                 continue;
             }
+            // TREASURY-T4: مسار البيع النقدي المباشر وحده (مغلق افتراضياً خلف بوابة التفعيل). T5+ تُضاف هنا عمداً.
+            if (str_ends_with($path, '/Services/Accounting/InvoiceService.php')) {
+                continue;
+            }
             // استعمال فعلي للمحلِّل (استيراد/حقن/نداء) لا مجرد ذكره في تعليق قيمةٍ مساندة.
             $source = (string) file_get_contents($file->getPathname());
             $fqcn = preg_quote('App\\Services\\Accounting\\TreasurySelectionResolver', '/');
@@ -427,7 +431,7 @@ class TreasurySelectionResolverTest extends TestCase
                 $offenders[] = $path;
             }
         }
-        $this->assertSame([], $offenders, 'T3 لا يربط العقد بأي مسار ترحيل (T4 وما بعده)');
+        $this->assertSame([], $offenders, 'العقد لا يُربط بأي مسار ترحيل غير البيع النقدي (T4)؛ T5 وما بعده بقرار منفصل');
 
         // ولا يعتمد المحلِّل على محرك القيود أو خدمات الترحيل.
         $source = (string) file_get_contents(base_path('app/Services/Accounting/TreasurySelectionResolver.php'));

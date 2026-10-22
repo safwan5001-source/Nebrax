@@ -43,6 +43,8 @@ const { api, push, replace, translate } = vi.hoisted(() => {
     tax_exclusive: 'Prices exclude VAT', tax_inclusive: 'Prices include VAT',
     discount_mode: 'Discount type', discount_amount: 'Fixed amount', discount_percent: 'Percent',
     shipping: 'Shipping', adjustment: 'Adjustment', adjustment_hint: 'Rounding, not taxed.',
+    cash_sale_treasury: 'Cash sale cashbox', cash_sale_treasury_main: 'Main cashbox (default)',
+    cash_sale_treasury_required: 'Choose a cashbox (required)', cash_sale_treasury_hint: 'Recorded in this cashbox.',
     payment_section: 'Payment', paid_already: 'Paid already',
     payment_method: 'Payment method', method_cash: 'Cash', method_transfer: 'Transfer', method_card: 'Card',
     payment_reference: 'Payment reference', cash_account: 'Cash account', cash_account_main: 'Default cashbox',
@@ -805,5 +807,124 @@ describe('InvoiceForm — delivery-note draft entry follows the backend gates', 
 
     await navStateSettled();
     expect(draftEntries()).toHaveLength(0);
+  });
+});
+
+describe('InvoiceForm — TREASURY-T4 cash-sale cashbox selector', () => {
+  afterEach(cleanup);
+  beforeEach(() => { api.mockClear(); push.mockClear(); replace.mockClear(); });
+
+  const treasuries = {
+    data: [
+      { id: 'e1', account_id: 'acc-1110', type: 'cash', name: 'Main cashbox', account_code: '1110', is_active: true, is_main: true },
+      { id: 'e2', account_id: 'acc-1111', type: 'cash', name: 'Showroom', account_code: '1111', is_active: true, is_main: false },
+      { id: 'e3', account_id: 'acc-1112', type: 'cash', name: 'Closed', account_code: '1112', is_active: false, is_main: false },
+      { id: 'e4', account_id: 'acc-1121', type: 'bank', name: 'Bank', account_code: '1121', is_active: true, is_main: false },
+    ],
+  };
+  const sales = (effective: string, paymentType = 'cash') => ({
+    data: { cash_sale_treasury_policy_effective: effective, default_payment_type: paymentType },
+  });
+
+  async function fillAndSave() {
+    await userEvent.selectOptions(screen.getAllByLabelText('Item')[0], 'pr1');
+    await waitFor(() => expect(lineField('Unit price').value).toBe('95.00'));
+    await userEvent.type(await firstQty(), '1');
+    await userEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+  }
+
+  const lastBody = () => {
+    const call = api.mock.calls.filter((c) => c[0] === '/invoices' && (c[1] as { method?: string })?.method === 'POST').at(-1);
+    return (call?.[1] as { body: Record<string, unknown> }).body;
+  };
+
+  it('stays hidden and sends no treasury while the policy is legacy (current behaviour untouched)', async () => {
+    respond({ '/invoices': { data: { id: 'inv-9' } }, '/sales-settings': sales('legacy'), '/cash-bank-accounts': treasuries });
+    render(<InvoiceForm />);
+    await firstQty();
+
+    expect(screen.queryByLabelText('Cash sale cashbox')).toBeNull();
+    // لا طلب للخزائن أصلاً ما دامت السياسة legacy
+    expect(api.mock.calls.some((c) => c[0] === '/cash-bank-accounts')).toBe(false);
+    await fillAndSave();
+    await waitFor(() => expect(lastBody().cash_account_id).toBeNull());
+  });
+
+  it('stays hidden when the sales settings are unreadable or malformed', async () => {
+    respond({ '/invoices': { data: { id: 'inv-9' } }, '/sales-settings': { data: [] }, '/cash-bank-accounts': treasuries });
+    render(<InvoiceForm />);
+    await firstQty();
+    expect(screen.queryByLabelText('Cash sale cashbox')).toBeNull();
+  });
+
+  it('lists only active cash cashboxes under the main policy and sends the chosen ledger account', async () => {
+    respond({ '/invoices': { data: { id: 'inv-9' } }, '/sales-settings': sales('main'), '/cash-bank-accounts': treasuries });
+    render(<InvoiceForm />);
+    const select = (await screen.findByLabelText('Cash sale cashbox')) as HTMLSelectElement;
+
+    const labels = Array.from(select.options).map((o) => o.textContent);
+    expect(labels).toEqual(['Main cashbox (default)', 'Main cashbox — 1110', 'Showroom — 1111']);
+
+    await userEvent.selectOptions(select, 'acc-1111');
+    await fillAndSave();
+    await waitFor(() => expect(lastBody().cash_account_id).toBe('acc-1111'));
+  });
+
+  it('sends null when nothing is chosen under main, and marks the choice required under explicit_required', async () => {
+    respond({ '/invoices': { data: { id: 'inv-9' } }, '/sales-settings': sales('main'), '/cash-bank-accounts': treasuries });
+    render(<InvoiceForm />);
+    await screen.findByLabelText('Cash sale cashbox');
+    await fillAndSave();
+    await waitFor(() => expect(lastBody().cash_account_id).toBeNull());
+    cleanup();
+
+    respond({ '/invoices': { data: { id: 'inv-9' } }, '/sales-settings': sales('explicit_required'), '/cash-bank-accounts': treasuries });
+    render(<InvoiceForm />);
+    const select = (await screen.findByLabelText('Cash sale cashbox')) as HTMLSelectElement;
+    expect(select.options[0].textContent).toBe('Choose a cashbox (required)');
+  });
+
+  it('is not shown for a credit-by-default tenant, nor once the invoice is marked paid', async () => {
+    respond({ '/invoices': { data: { id: 'inv-9' } }, '/sales-settings': sales('main', 'credit'), '/cash-bank-accounts': treasuries });
+    render(<InvoiceForm />);
+    await firstQty();
+    await waitFor(() => expect(api.mock.calls.some((c) => c[0] === '/sales-settings')).toBe(true));
+    expect(screen.queryByLabelText('Cash sale cashbox')).toBeNull();
+    cleanup();
+
+    respond({ '/invoices': { data: { id: 'inv-9' } }, '/sales-settings': sales('main', 'cash'), '/cash-bank-accounts': treasuries });
+    render(<InvoiceForm />);
+    await screen.findByLabelText('Cash sale cashbox');
+    await userEvent.click(screen.getByLabelText('Paid already'));
+    await waitFor(() => expect(screen.queryByLabelText('Cash sale cashbox')).toBeNull());
+  });
+
+  it('keeps the receipt cashbox payload for a paid invoice exactly as before', async () => {
+    respond({ '/invoices': { data: { id: 'inv-9' } }, '/sales-settings': sales('main', 'cash'), '/cash-bank-accounts': treasuries });
+    render(<InvoiceForm />);
+    await screen.findByLabelText('Cash sale cashbox');
+    await userEvent.click(screen.getByLabelText('Paid already'));
+    await fillAndSave();
+    await waitFor(() => expect(lastBody()).toMatchObject({ is_paid: true, cash_account_id: null }));
+  });
+
+  it('follows the saved payment type when editing: a credit invoice shows nothing, a cash draft preloads its cashbox', async () => {
+    const draftBody = (paymentType: string) => ({
+      data: {
+        id: 'inv-1', status: 'draft', partner_id: 'c1', payment_type: paymentType, is_paid: false, cash_account_id: 'acc-1111',
+        invoice_date: '2026-10-01', lines: [{ id: 'l1', product_id: 'pr1', description: 'x', quantity: 1, unit_price: '95.00', tax_rate: 15, line_discount: '0.00' }],
+      },
+    });
+    respond({ '/invoices': { data: { id: 'inv-9' } }, '/sales-settings': sales('main', 'credit'), '/cash-bank-accounts': treasuries, '/invoices/inv-1': draftBody('cash') });
+    render(<InvoiceForm editId="inv-1" />);
+    const select = (await screen.findByLabelText('Cash sale cashbox')) as HTMLSelectElement;
+    await waitFor(() => expect(select.value).toBe('acc-1111'));
+    cleanup();
+
+    respond({ '/invoices': { data: { id: 'inv-9' } }, '/sales-settings': sales('main', 'cash'), '/cash-bank-accounts': treasuries, '/invoices/inv-1': draftBody('credit') });
+    render(<InvoiceForm editId="inv-1" />);
+    await waitFor(() => expect(api.mock.calls.some((c) => c[0] === '/invoices/inv-1')).toBe(true));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByLabelText('Cash sale cashbox')).toBeNull();
   });
 });

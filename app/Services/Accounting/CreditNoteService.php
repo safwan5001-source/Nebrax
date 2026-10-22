@@ -147,6 +147,10 @@ class CreditNoteService
             // وتقفل الفاتورة نفسَها فتتسلسل مع ترحيل المرتجعات عليها.
             if ($type === CreditNoteOwnershipResolver::SALES && $note->original_invoice_id) {
                 $invoice = $this->resolveInvoice($note->original_invoice_id, $note->partner_id, lock: true);
+                // TREASURY-T4: ردّ نقدي لفاتورة حُصِّلت في غير 1110 يُرفض (الإشعار النقدي يُدائن 1110 مرمَّزاً حتى T5).
+                if ($note->refund_type === 'cash') {
+                    app(CashSaleRefundGuard::class)->assertCashRefundMatchesCollection($invoice);
+                }
                 $this->rederiveLines($note, $invoice);
                 $note->load('lines');
             }
