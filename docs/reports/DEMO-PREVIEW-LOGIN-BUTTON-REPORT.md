@@ -14,7 +14,7 @@
 | الفرع | `feat/demo-preview-login-button` |
 | Base (`origin/main`) | `8412a19ebb02da2d4f47dc5302395245d38c2727` |
 | Head (commit التنفيذ) | `15f5f87a42f5607e73bb1680014b83271ac6aa3c` |
-| Head النهائي للـPR | commit هذا التقرير فوق `15f5f87` (يُذكر في وصف الـPR / `git log`) |
+| Head النهائي للـPR | `4f544e6c6b728dcd1feffd7e5c585ddfd2c52902` (+ commit تحديث هذا القسم إن وُجد؛ يُرى في `git log`) |
 
 ## 2. السلوك
 
@@ -57,14 +57,18 @@
 
 ## 5. CI
 
-**قيد التشغيل وقت كتابة هذا الإصدار من التقرير** — لم تكتمل بعد لـ`15f5f87`، ولا أعدّ شيئاً منها نجاحاً قبل اكتماله. يُحدَّث هذا القسم بالنتائج الفعلية في commit لاحق.
+على الرأس `4f544e6c6b728dcd1feffd7e5c585ddfd2c52902` (فوق commit التنفيذ `15f5f87` بإضافة هذا التقرير فقط):
 
-| الفحص | الحالة | الرابط |
+| الفحص | النتيجة | الرابط |
 |---|---|---|
-| web build (Next.js) — Vitest + build | in_progress | [run 39812781199](https://github.com/safwan5001-source/Nebrax/actions/runs/39812781199) |
-| php artisan test (L11, sqlite) | in_progress | [run 39812781197](https://github.com/safwan5001-source/Nebrax/actions/runs/39812781197) |
-| php artisan test (L11, pgsql) | in_progress | [run 39812781197](https://github.com/safwan5001-source/Nebrax/actions/runs/39812781197) |
-| CI Gate | in_progress | [run 39812781037](https://github.com/safwan5001-source/Nebrax/actions/runs/39812781037) |
+| web build (Next.js) — Vitest + build | ✅ success | [job](https://github.com/safwan5001-source/Nebrax/actions/runs/39812959683/job/119943844506) |
+| php artisan test (L11, sqlite) | ✅ success | [job](https://github.com/safwan5001-source/Nebrax/actions/runs/39812959701/job/119944023728) |
+| php artisan test (L11, pgsql) | ✅ success | [job](https://github.com/safwan5001-source/Nebrax/actions/runs/39812959701/job/119944023870) |
+| CI Gate | ✅ success (بعد إعادة تشغيل واحدة) | [job](https://github.com/safwan5001-source/Nebrax/actions/runs/39812959719/job/119960674254) |
+
+**أول تشغيل لـCI Gate فشل** (job `119943990672`) بسبب سباق توقيت في البوابة نفسها: قيّمت الفحوص الثلاثة المطلوبة وقت كانت قيد التشغيل فسجّلت «workflow never triggered (10 min grace)»، بينما نجح web وsqlite لاحقاً وpgsql بعد ~21 دقيقة. لا علاقة له بالكود. أُعيد تشغيل الوظيفة الفاشلة وحدها مرة واحدة بعد اكتمال الفحوص الثلاثة (`rerun_failed_jobs`) فنجح. لم يُعَد تشغيل أي فحص آخر.
+
+الفحوص التي استُبعدت بمرشّح المسارات (storefront، mobile، preview-host، Docker smoke) غير مطلوبة لهذا التغيير، وفق جدول البوابة.
 
 ## 6. ملاحظات وحدود (بصراحة)
 
