@@ -58,6 +58,7 @@ class PosSessionResource extends JsonResource
                 'payment_method_name' => $row->payment_method_name,
                 'settlement_type' => $row->settlement_type,
                 'expected_amount' => Money::toRiyal($row->expected_amount),
+                'clearing_amount' => $row->clearing_amount === null ? null : Money::toRiyal($row->clearing_amount),
                 'counted_amount' => Money::toRiyal($row->counted_amount),
                 'difference' => Money::toRiyal($row->difference),
                 'count_source' => $row->count_source,
