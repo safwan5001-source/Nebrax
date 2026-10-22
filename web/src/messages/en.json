@@ -4917,7 +4917,7 @@
     "no_unit_template": "No template",
     "unit_template_hint": "Lets you buy and sell in a unit larger than the stock unit.",
     "import": "Import products",
-    "ai_import": "Import via AWJ Assistant",
+    "ai_import": "Assisted review import",
     "workbook_import": "Import workbook (Products/Barcodes/Prices)",
     "import_title": "Import products",
     "import_subtitle": "Upload a CSV or XLSX file, map its columns to AWJ fields, review the result, then apply the changes safely.",
