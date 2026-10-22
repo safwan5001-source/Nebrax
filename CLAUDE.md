@@ -288,6 +288,15 @@ php artisan serve
 - **مؤجل صراحةً إلى مهمة محاسبية مستقلة:** رسوم البوابات، ضريبة القيمة المضافة على الرسوم، قواعد قابلية الخصم، حساب مصروف الرسوم، وصافي تسوية البوابة أو أي تغيير في قيود القبض والصرف.
 - تظل قيود القبض والصرف القياسية قائمة من دون توسعة: قبض = مدين البنك/الصندوق ودائن العملاء؛ صرف = مدين الموردين ودائن البنك/الصندوق.
 
+## عقد اختيار الخزينة/الحساب البنكي للترحيل (TREASURY-T3 — غير مربوط بأي مسار بعد)
+
+`App\Services\Accounting\TreasurySelectionResolver` هو العقد الموحَّد الذي **ستستعمله** مسارات الترحيل النقدي لاحقاً (T4 وما بعده) بدل رموز 1110/1120؛ يقرأ فقط (لا قيد، لا تهيئة، لا قفل صفوف) ويعيد `ResolvedTreasury` يُرحَّل على `accountId` منه.
+- **المدخل:** `TreasurySelection::entity($id)` (كيان `cash_bank_accounts`) أو `::ledgerAccount($id)` (حساب الأستاذ المخزَّن في أعمدة `cash_account_id` القائمة) أو `::none()`؛ `null` وحده يعني «غير مُرسَل». النوع المطلوب `cash|bank` إلزامي.
+- **الصريح يتقدّم دائماً:** يُحلّ في نطاق المستأجر الحالي (معرّف مستأجر آخر أو غير UUID أو رمز حساب = `not_found` بالرسالة نفسها)، ثم النوع، ثم الكيان نشط، ثم حسابه الدفتري موجود ونشط وحركي وأصل. **لا تخمين من بادئة 111/112 ولا من رمز الحساب.**
+- **الغياب:** `TreasurySelectionPolicy::MainOfType` (الافتراضي = سلوك السندات اليوم: الكيان الرئيسي) أو `ExplicitRequired`؛ لا رئيسي ⇒ `ambiguous_default` (أكثر من مرشّح نشط) أو `no_default`؛ رئيسي معطَّل ⇒ `inactive` ولا يُستبدل. خيار «افتراضي لكل فرع/مستخدم» يحتاج مخططاً ويبقى مؤجَّلاً (D-T3 ج).
+- **التفويض:** اختياري وصريح (`$authorize = 'deposit'|'withdraw'` + الفاعل) ويطبّق `CashBankAccount::allows()` بفرع الطلب؛ بدونه يبقى `CashBankAccountService::assertAllowed` على المستدعي كما اليوم.
+- **الأخطاء:** `TreasurySelectionException` (يرث `RuntimeException` ⇒ 422) برمز `reason` ثابت. المرجع: `docs/audits/treasury/TREASURY-T3-IMPLEMENTATION-REPORT.md`. يحرس عدم الربط المبكر اختبار ساكن في `TreasurySelectionResolverTest`.
+
 ## أدوار ضريبة القيمة المضافة (REM-05 / ACC-01)
 
 `App\Services\Accounting\VatRoleIntegrityService` هو مصدر قواعد دورَي `tax_input`/`tax_output` وسياق تقرير الضريبة. لا يكتب شيئاً.

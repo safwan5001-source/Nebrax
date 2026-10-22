@@ -106,7 +106,9 @@ use App\Http\Controllers\Api\ManualJournalController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PartnerController;
 use App\Http\Controllers\Api\PaymentController;
+use App\Http\Controllers\Api\PaymentAttemptController;
 use App\Http\Controllers\Api\PaymentGatewayController;
+use App\Http\Controllers\Api\PaymentWebhookController;
 use App\Http\Controllers\Api\PaymentMethodController;
 use App\Http\Controllers\Api\PriceListController;
 use App\Http\Controllers\Api\PayrollController;
@@ -227,6 +229,10 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         ->middleware('throttle:register')
         ->name('auth.public-register');
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+    // PAY-H1-04: مستقبِل webhook مزوّد الدفع — عام (الهوية = مفتاح الاتصال + توقيع المزوّد)، بلا SetTenant، بحد حجم 64KB داخل الخدمة.
+    Route::post('payment-webhooks/{provider}/{webhookKey}', [PaymentWebhookController::class, 'receive'])
+        ->where(['provider' => '[a-z0-9_]{2,32}', 'webhookKey' => '[A-Za-z0-9]{32,128}'])
+        ->middleware('throttle:600,1');
     Route::get('company-browser-identity', [CompanyBrowserIdentityController::class, 'show'])
         ->middleware('throttle:60,1');
 
@@ -1011,6 +1017,8 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
 
         // PAY-H1-01: اتصالات بوابات الدفع. القراءة (بلا أسرار) payments.view؛ الكتابة والأسرار
         // وسجل التدقيق payment_gateways.manage (owner/admin). لا استدعاء مزوّد ولا أثر محاسبي.
+        // PAY-H1-04: مطابقة يدوية لمحاولة عالقة (مكافئ المطابِق المجدول).
+        Route::post('payment-attempts/{id}/sync', [PaymentAttemptController::class, 'sync'])->whereUuid('id')->middleware($perm('payments.manage'));
         Route::get('payment-gateways', [PaymentGatewayController::class, 'index'])->middleware($perm('payments.view'));
         Route::get('payment-gateways/{id}', [PaymentGatewayController::class, 'show'])->whereUuid('id')->middleware($perm('payments.view'));
         Route::get('payment-gateways/{id}/events', [PaymentGatewayController::class, 'events'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));

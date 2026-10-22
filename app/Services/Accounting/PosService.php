@@ -7,6 +7,7 @@ use App\Models\DeliveryPlatformProfile;
 use App\Models\DeliveryPlatformProfileVersion as Version;
 use App\Models\Invoice;
 use App\Models\Partner;
+use App\Models\PaymentGateway;
 use App\Models\PaymentMethod;
 use App\Models\PosCheckoutAttempt;
 use App\Models\PriceList;
@@ -208,6 +209,7 @@ class PosService
 
         $this->cashBankAccounts->bootstrapDefaults();
         $tenders = $this->normalizedTenders($data['tenders'] ?? []);
+        $clearingGateways = [];
         if ($platformCollected) {
             if ($tenders !== []) {
                 throw new RuntimeException('تحصيل منصة التوصيل لا يقبل وسيلة دفع في نقطة البيع.');
@@ -216,6 +218,8 @@ class PosService
         } else {
             $this->assertPosPaymentMethodsAvailable();
             $methods = $this->configuredPaymentMethods($tenders);
+            $clearingGateways = $this->clearingGatewaysFor($methods);
+            $this->assertTenderReferencesAllowed($tenders, $methods);
         }
 
         // بدء الإتمام دليل خادمي من داخل المعاملة الفعلية؛ لا يعتمد على
@@ -291,6 +295,8 @@ class PosService
 
                 // 2) سند قبض بالوسيلة المهيأة: PaymentService يلتقط الحساب
                 // المقابل واسم الوسيلة ثم يرحّل القيد المتوازن عبر LedgerService.
+                // D-09: طريقة مرتبطة بمقاصة مستحوذ ⇒ السند يحمل اتصالها فيرحّله PaymentService A12 (مدين 1170)؛ بلا ربط: A11 كما كان.
+                // مرجع العملية (Approval/RRN/آخر 4) إضافي بحت: يُخزَّن على السند ولا يغيّر قيداً.
                 $payment = $this->payments->post($this->payments->create([
                     'partner_id'        => $invoice->partner_id,
                     'invoice_id'        => $invoice->id,
@@ -300,6 +306,7 @@ class PosService
                     'amount'            => $applied,
                     'notes'             => "{$method->name} — بيع {$invoice->number}",
                     'created_by'        => $data['created_by'] ?? null,
+                    ...$this->tenderPaymentExtras($tender, $clearingGateways[$method->id] ?? null),
                 ]), $data['actor'] ?? null);
                 $paymentIds[] = $payment->id;
 
@@ -419,10 +426,19 @@ class PosService
                 if (! is_array($tender)) {
                     continue;
                 }
-                $normalizedTenders[] = [
+                $normalized = [
                     'payment_method_id' => $tender['payment_method_id'] ?? null,
                     'amount' => (int) ($tender['amount'] ?? 0),
                 ];
+                // المراجع تدخل البصمة فقط عند وجودها: بيع قديم بلا مراجع يحتفظ ببصمته حرفياً (لا 409 عابر للنشر)،
+                // وإعادة إرسال بنفس المفتاح بمرجع مختلف تُعامَل محتوى مختلفاً.
+                foreach (self::TENDER_REFERENCE_KEYS as $key) {
+                    $value = $this->normalizeTenderReference($tender[$key] ?? null);
+                    if ($value !== null) {
+                        $normalized[$key] = $value;
+                    }
+                }
+                $normalizedTenders[] = $normalized;
             }
             usort($normalizedTenders, fn (array $a, array $b) => strcmp((string) $a['payment_method_id'], (string) $b['payment_method_id']));
         } else {
@@ -686,7 +702,14 @@ class PosService
             if (array_key_exists($id, $normalized)) {
                 throw new RuntimeException('لا يمكن تكرار وسيلة الدفع نفسها في عملية POS واحدة.');
             }
-            $normalized[$id] = ['payment_method_id' => $id, 'amount' => $amount];
+            $entry = ['payment_method_id' => $id, 'amount' => $amount];
+            foreach (self::TENDER_REFERENCE_KEYS as $key) {
+                $value = $this->normalizeTenderReference($tender[$key] ?? null);
+                if ($value !== null) {
+                    $entry[$key] = $value;
+                }
+            }
+            $normalized[$id] = $entry;
         }
 
         return array_values($normalized);
@@ -771,5 +794,81 @@ class PosService
         }
 
         return $methods->all();
+    }
+
+    /** مراجع عملية البطاقة الاختيارية على وسيلة الدفع (D-09/H6-01): رمز الموافقة، RRN، آخر 4 أرقام. لا PAN ولا CVV أبداً. */
+    private const TENDER_REFERENCE_KEYS = ['approval_code', 'rrn', 'last4'];
+
+    private function normalizeTenderReference(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $value = trim((string) $value);
+
+        return $value === '' ? null : $value;
+    }
+
+    /**
+     * D-09: الوسائل المرتبطة بمقاصة مستحوذ → اتصالها. اتصال غير نشط/محذوف/ملغى ⇒ رفض البيع قبل إنشاء الفاتورة (فشل مغلق): لا عودة صامتة إلى A11
+     * لأنها تغيّر القيد الذي اختاره المالك؛ يختار الكاشير وسيلة أخرى أو يفكّ المالك الربط.
+     *
+     * @param  array<string, PaymentMethod>  $methods
+     * @return array<string, PaymentGateway> مفهرسة بمعرّف الوسيلة
+     */
+    private function clearingGatewaysFor(array $methods): array
+    {
+        $gateways = [];
+        foreach ($methods as $method) {
+            if (! filled($method->pos_clearing_gateway_id)) {
+                continue;
+            }
+            $gateway = PaymentGateway::query()->find($method->pos_clearing_gateway_id);
+            if ($gateway === null || ! $gateway->isUsable()) {
+                throw new RuntimeException("وسيلة الدفع «{$method->name}» مرتبطة باتصال مستحوذ غير نشط؛ اختر وسيلة أخرى أو اطلب من المالك مراجعة الربط.");
+            }
+            $gateways[$method->id] = $gateway;
+        }
+
+        return $gateways;
+    }
+
+    /** المراجع تخص التحصيل غير النقدي فقط، وبصيغ لا تحتمل بيانات بطاقة حساسة. */
+    private function assertTenderReferencesAllowed(array $tenders, array $methods): void
+    {
+        foreach ($tenders as $tender) {
+            $given = array_intersect_key($tender, array_flip(self::TENDER_REFERENCE_KEYS));
+            if ($given === []) {
+                continue;
+            }
+            if (($methods[$tender['payment_method_id']]->settlement_type ?? null) === 'cash') {
+                throw new RuntimeException('مرجع العملية لا ينطبق على التحصيل النقدي.');
+            }
+            if (isset($given['approval_code']) && ! preg_match('/^[A-Za-z0-9\-]{1,32}$/', $given['approval_code'])) {
+                throw new RuntimeException('رمز الموافقة غير صالح (أحرف وأرقام وشرطة حتى 32).');
+            }
+            if (isset($given['rrn']) && ! preg_match('/^[A-Za-z0-9]{6,32}$/', $given['rrn'])) {
+                throw new RuntimeException('مرجع الاسترجاع RRN غير صالح (أحرف وأرقام من 6 إلى 32).');
+            }
+            if (isset($given['last4']) && ! preg_match('/^\d{4}$/', $given['last4'])) {
+                throw new RuntimeException('آخر أربعة أرقام من البطاقة يجب أن تكون 4 أرقام بالضبط.');
+            }
+        }
+    }
+
+    /** @return array<string, mixed> مفاتيح السند الإضافية (فارغة لوسيلة بلا مقاصة ولا مرجع ⇒ السند كما كان حرفياً) */
+    private function tenderPaymentExtras(array $tender, ?PaymentGateway $gateway): array
+    {
+        $extras = [];
+        if ($gateway !== null) {
+            $extras['payment_gateway_id'] = $gateway->id;
+        }
+        $given = array_intersect_key($tender, array_flip(self::TENDER_REFERENCE_KEYS));
+        if ($given !== []) {
+            $extras['reference'] = $given['rrn'] ?? $given['approval_code'] ?? null;
+            $extras['payment_details'] = json_encode($given, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        }
+
+        return $extras;
     }
 }

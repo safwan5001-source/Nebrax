@@ -41,4 +41,20 @@ class AiActionProductReviewTest extends TestCase
         $this->withToken($auth['token'])->withHeader('Idempotency-Key', 'review-edit-0002')->postJson("/api/ai-actions/{$id}/review/versions", $payload)->assertConflict()->assertJsonPath('error.code', 'version_conflict');
         $this->assertSame(0, Product::count());
     }
+
+    /** @test */
+    public function the_review_step_judges_cells_exactly_like_the_final_preview(): void
+    {
+        $auth = $this->registerTenant(); $id = $this->createReviewableAction($auth);
+        $edit = fn (array $fields, string $key) => $this->withToken($auth['token'])->withHeader('Idempotency-Key', $key)
+            ->postJson("/api/ai-actions/{$id}/review/versions", ['expected_version' => 1, 'edits' => [['row_id' => 'source-2', 'fields' => $fields]]]);
+
+        // IMP-H2-S2: حكم المعاين النهائي (`ProductImportValueNormalizer`) هو المرجع — أكثر من منزلتين عشريتين للمال مرفوض هنا لا في المعاينة وحدها.
+        $edit(['sale_price' => '10.1234'], 'review-agree-0001')->assertStatus(422)->assertJsonPath('error.code', 'review_field_invalid');
+        $edit(['tax_rate' => '15.5'], 'review-agree-0002')->assertStatus(422)->assertJsonPath('error.code', 'review_field_invalid');
+        $edit(['track_inventory' => 'ربما'], 'review-agree-0003')->assertStatus(422)->assertJsonPath('error.code', 'review_field_invalid');
+
+        // ويقبل ما يقبله المعاين: أرقام عربية وفاصل آلاف ونسبة بـ% وأسماء النوع البديلة.
+        $edit(['sale_price' => '١٬٢٣٤٫٥٠', 'tax_rate' => '١٥%', 'type' => 'سلعة'], 'review-agree-0004')->assertCreated();
+    }
 }

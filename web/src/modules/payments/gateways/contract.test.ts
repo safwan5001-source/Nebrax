@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import ar from '@/messages/ar.json';
+import en from '@/messages/en.json';
 import { ApiError } from '@/lib/api';
 import {
   activationBlock,
   apiErrorCode,
   apiErrorMessage,
+  errorMessageKey,
   availableActions,
   gatewayDisplayName,
   secretsPayload,
@@ -67,5 +70,22 @@ describe('gateway contract', () => {
     expect(gatewayDisplayName(c, 'en')).toBe('Name');
     expect(gatewayDisplayName(c, 'ar')).toBe('اسم');
     expect(gatewayDisplayName(connection({ name: 'اسم' }), 'en')).toBe('اسم');
+  });
+});
+
+describe('رموز أخطاء الاتصالات الثابتة', () => {
+  // كل رمز يعيده الخادم (PaymentGatewayService/PaymentOrchestrator) يجب أن يكون له نص عربي وإنجليزي، وإلا ظهر مفتاح خام للمستخدم.
+  const codes = [
+    'gateway.active_cannot_delete', 'gateway.environment_locked', 'gateway.has_active_attempts', 'gateway.has_references',
+    'gateway.invalid_environment', 'gateway.invalid_grace', 'gateway.name_required', 'gateway.name_taken', 'gateway.not_active',
+    'gateway.nothing_to_rotate', 'gateway.provider_immutable', 'gateway.reason_required', 'gateway.revoked', 'gateway.rotation_blocked',
+    'gateway.unsupported_provider', 'gateway.verification_required',
+  ];
+
+  it.each(codes)('%s مترجم بالعربية والإنجليزية', (code) => {
+    const key = errorMessageKey(code).replace('errors.', '');
+    for (const messages of [ar, en]) {
+      expect(JSON.stringify(messages)).toContain(`"${key}":`);
+    }
   });
 });
