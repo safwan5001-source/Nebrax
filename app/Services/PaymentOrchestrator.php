@@ -1,16 +1,15 @@
 <?php
 
-namespace App\Services\Payments;
+namespace App\Services;
 
-use App\Contracts\Payments\Payable;
+use App\Contracts\Payable;
 use App\Models\PaymentAttempt;
 use App\Models\PaymentGateway;
 use App\Models\User;
-use App\Services\PaymentsRolloutControlService;
-use App\Support\Payments\AttemptContext;
-use App\Support\Payments\AttemptTransitionResult;
-use App\Support\Payments\PaymentOrchestrationException;
-use App\Support\Payments\ProviderPaymentSnapshot;
+use App\Support\PaymentAttemptContext;
+use App\Support\PaymentAttemptTransitionResult;
+use App\Support\PaymentOrchestrationException;
+use App\Support\PaymentProviderSnapshot;
 use App\Support\Rbac;
 use App\Tenancy\TenantContext;
 use Illuminate\Database\QueryException;
@@ -43,7 +42,7 @@ final class PaymentOrchestrator
 
     public function __construct(
         private readonly PaymentsRolloutControlService $rollout,
-        private readonly GatewayAdapterRegistry $adapters,
+        private readonly PaymentGatewayAdapterRegistry $adapters,
         private readonly TenantContext $tenant,
     ) {}
 
@@ -65,7 +64,7 @@ final class PaymentOrchestrator
     }
 
     /** يستعلم المزوّد (الحقيقة) ويطبّق اللقطة رتيباً. */
-    public function sync(PaymentAttempt $attempt, ?User $actor = null): AttemptTransitionResult
+    public function sync(PaymentAttempt $attempt, ?User $actor = null): PaymentAttemptTransitionResult
     {
         $this->assertActor($actor);
         $attempt = $this->reload($attempt);
@@ -88,9 +87,9 @@ final class PaymentOrchestrator
         return $this->applySnapshot($attempt, $snapshot);
     }
 
-    public function applySnapshot(PaymentAttempt $attempt, ProviderPaymentSnapshot $snapshot): AttemptTransitionResult
+    public function applySnapshot(PaymentAttempt $attempt, PaymentProviderSnapshot $snapshot): PaymentAttemptTransitionResult
     {
-        return DB::transaction(function () use ($attempt, $snapshot): AttemptTransitionResult {
+        return DB::transaction(function () use ($attempt, $snapshot): PaymentAttemptTransitionResult {
             $locked = PaymentAttempt::query()->lockForUpdate()->find($attempt->getKey());
             if ($locked === null) {
                 throw new PaymentOrchestrationException('attempt_not_found', 'محاولة الدفع غير موجودة.');
@@ -109,7 +108,7 @@ final class PaymentOrchestrator
             if ($target === $from) {
                 $locked->forceFill(['last_synced_at' => $now])->save();
 
-                return new AttemptTransitionResult($locked, false, 'duplicate');
+                return new PaymentAttemptTransitionResult($locked, false, 'duplicate');
             }
 
             if (! PaymentAttempt::canTransition($from, $target)) {
@@ -122,7 +121,7 @@ final class PaymentOrchestrator
                 }
                 $locked->forceFill($updates)->save();
 
-                return new AttemptTransitionResult($locked, false, $heldMoney ? 'state_conflict' : 'stale');
+                return new PaymentAttemptTransitionResult($locked, false, $heldMoney ? 'state_conflict' : 'stale');
             }
 
             $updates = ['capture_status' => $target, 'last_synced_at' => $now];
@@ -148,7 +147,7 @@ final class PaymentOrchestrator
             }
             $locked->forceFill($updates)->save();
 
-            return new AttemptTransitionResult($locked, true);
+            return new PaymentAttemptTransitionResult($locked, true);
         });
     }
 
@@ -241,7 +240,7 @@ final class PaymentOrchestrator
         $adapter = $this->adapters->for($gateway->provider);
 
         try {
-            $checkout = $adapter->createCheckout(new AttemptContext(
+            $checkout = $adapter->createCheckout(new PaymentAttemptContext(
                 $gateway, (string) $attempt->getKey(), (int) $attempt->amount_minor, $attempt->currency, $attempt->payable_key,
             ));
         } catch (Throwable $e) {

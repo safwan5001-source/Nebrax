@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Support\Payments;
+namespace App\Support;
 
 use Carbon\CarbonImmutable;
 use InvalidArgumentException;
@@ -9,7 +9,7 @@ use InvalidArgumentException;
  * لقطة موحّدة لحالة دفعة لدى المزوّد، مطبَّعة إلى حالات المحاولة والهللات. المحوّل وحده يعرف صيغة المزوّد.
  * `status` أحد ثوابت `PaymentAttempt::STATUS_*` (لا `created`).
  */
-final class ProviderPaymentSnapshot
+final class PaymentProviderSnapshot
 {
     public function __construct(
         public readonly string $providerPaymentId,

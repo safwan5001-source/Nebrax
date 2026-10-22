@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Support\Payments;
+namespace App\Support;
 
 /** قدرات محوّل مزوّد (ما يدعمه فعلياً، لا ما يُعلنه التاجر). */
-final class GatewayCapabilities
+final class PaymentGatewayCapabilities
 {
     /** @param list<string> $currencies رموز ISO 4217 */
     public function __construct(

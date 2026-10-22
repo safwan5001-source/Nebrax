@@ -1,21 +1,21 @@
 <?php
 
-namespace App\Services\Payments;
+namespace App\Services;
 
-use App\Contracts\Payments\GatewayAdapter;
+use App\Contracts\GatewayAdapter;
 use App\Models\PaymentGateway;
-use App\Support\Payments\AttemptContext;
-use App\Support\Payments\GatewayCapabilities;
-use App\Support\Payments\HostedCheckout;
-use App\Support\Payments\ProviderPaymentSnapshot;
+use App\Support\PaymentAttemptContext;
+use App\Support\PaymentGatewayCapabilities;
+use App\Support\PaymentHostedCheckout;
+use App\Support\PaymentProviderSnapshot;
 use Carbon\CarbonImmutable;
 use RuntimeException;
 
 /**
- * محوّل وهمي حتمي للاختبار: لا شبكة ولا أموال حقيقية. يُحلّ من `GatewayAdapterRegistry` في `local`/`testing` فقط.
+ * محوّل وهمي حتمي للاختبار: لا شبكة ولا أموال حقيقية. يُحلّ من `PaymentGatewayAdapterRegistry` في `local`/`testing` فقط.
  * يسجّل الاستدعاءات ويسمح بحقن الأعطال وبرمجة لقطات المزوّد (بما فيها الخارجة عن الترتيب) — لا يزيّف اعتماداً حقيقياً.
  */
-final class FakeGatewayAdapter implements GatewayAdapter
+final class FakePaymentGatewayAdapter implements GatewayAdapter
 {
     public const PROVIDER = 'fake';
 
@@ -25,7 +25,7 @@ final class FakeGatewayAdapter implements GatewayAdapter
     /** @var array<string, array{amount_minor: int, currency: string}> */
     private array $payments = [];
 
-    /** @var array<string, ProviderPaymentSnapshot> */
+    /** @var array<string, PaymentProviderSnapshot> */
     private array $snapshots = [];
 
     private int $failCheckouts = 0;
@@ -37,12 +37,12 @@ final class FakeGatewayAdapter implements GatewayAdapter
         return self::PROVIDER;
     }
 
-    public function capabilities(): GatewayCapabilities
+    public function capabilities(): PaymentGatewayCapabilities
     {
-        return new GatewayCapabilities(true, ['SAR']);
+        return new PaymentGatewayCapabilities(true, ['SAR']);
     }
 
-    public function createCheckout(AttemptContext $context): HostedCheckout
+    public function createCheckout(PaymentAttemptContext $context): PaymentHostedCheckout
     {
         $this->checkoutCalls[] = [
             'attempt_id' => $context->attemptId,
@@ -59,10 +59,10 @@ final class FakeGatewayAdapter implements GatewayAdapter
         $id = 'fake_'.$context->attemptId; // نفس المحاولة ⇒ نفس المرجع (idempotent عند المزوّد)
         $this->payments[$id] = ['amount_minor' => $context->amountMinor, 'currency' => $context->currency];
 
-        return new HostedCheckout($id, 'https://fake-checkout.invalid/pay/'.$context->attemptId, CarbonImmutable::now('UTC')->addMinutes(30));
+        return new PaymentHostedCheckout($id, 'https://fake-checkout.invalid/pay/'.$context->attemptId, CarbonImmutable::now('UTC')->addMinutes(30));
     }
 
-    public function fetchPayment(PaymentGateway $gateway, string $providerPaymentId): ProviderPaymentSnapshot
+    public function fetchPayment(PaymentGateway $gateway, string $providerPaymentId): PaymentProviderSnapshot
     {
         if ($this->fetchFailure !== null) {
             throw $this->fetchFailure;
@@ -74,7 +74,7 @@ final class FakeGatewayAdapter implements GatewayAdapter
 
         $known = $this->payments[$providerPaymentId] ?? ['amount_minor' => 0, 'currency' => 'SAR'];
 
-        return new ProviderPaymentSnapshot($providerPaymentId, 'pending_customer', $known['amount_minor'], $known['currency']);
+        return new PaymentProviderSnapshot($providerPaymentId, 'pending_customer', $known['amount_minor'], $known['currency']);
     }
 
     // ───────────── أدوات الاختبار ─────────────
@@ -94,7 +94,7 @@ final class FakeGatewayAdapter implements GatewayAdapter
     {
         $known = $this->payments[$providerPaymentId] ?? ['amount_minor' => 0, 'currency' => 'SAR'];
         $amount = $amountMinor ?? $known['amount_minor'];
-        $this->snapshots[$providerPaymentId] = new ProviderPaymentSnapshot(
+        $this->snapshots[$providerPaymentId] = new PaymentProviderSnapshot(
             $providerPaymentId,
             $status,
             $amount,

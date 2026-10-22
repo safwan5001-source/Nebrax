@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Contracts\Payments;
+namespace App\Contracts;
 
 /**
  * شيء يمكن دفعه إلكترونياً (فاتورة، طلب تجاري، أمر جهاز…). يملك المبلغ والعملة والطرف والصلاحية للدفع،

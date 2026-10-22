@@ -6,11 +6,11 @@ use App\Models\PaymentAttempt;
 use App\Models\PaymentGateway;
 use App\Models\PlatformAdministrator;
 use App\Models\Tenant;
-use App\Services\Payments\FakeGatewayAdapter;
-use App\Services\Payments\PaymentOrchestrator;
+use App\Services\FakePaymentGatewayAdapter;
+use App\Services\PaymentOrchestrator;
 use App\Services\PaymentsRolloutControlService;
-use App\Support\Payments\PaymentOrchestrationException;
-use App\Support\Payments\ProviderPaymentSnapshot;
+use App\Support\PaymentOrchestrationException;
+use App\Support\PaymentProviderSnapshot;
 use App\Support\SchedulerHeartbeat;
 use App\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
@@ -186,7 +186,7 @@ class PaymentAttemptPostgresTest extends TestCase
 
         return function () use ($payableKey, $key, $tenant, $gateway) {
             app(TenantContext::class)->set($tenant);
-            app()->singleton(FakeGatewayAdapter::class);
+            app()->singleton(FakePaymentGatewayAdapter::class);
             try {
                 $attempt = app(PaymentOrchestrator::class)->start(new TestPayable(key: $payableKey), PaymentGateway::query()->findOrFail($gateway), $key);
 
@@ -206,7 +206,7 @@ class PaymentAttemptPostgresTest extends TestCase
             $captured = $status === 'captured' ? 11500 : 0;
             $result = app(PaymentOrchestrator::class)->applySnapshot(
                 PaymentAttempt::query()->findOrFail($attemptId),
-                new ProviderPaymentSnapshot($providerPaymentId, $status, 11500, 'SAR', $captured),
+                new PaymentProviderSnapshot($providerPaymentId, $status, 11500, 'SAR', $captured),
             );
 
             return ['applied' => $result->applied, 'status' => $result->attempt->capture_status];

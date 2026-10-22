@@ -26,9 +26,10 @@ DATE: 2026-10-22
 
 - `database/migrations/2026_11_25_010000_create_payment_attempts_table.php`.
 - `app/Models/PaymentAttempt.php`؛ `app/Models/PaymentGateway.php` (`hasFinancialReferences()` تشمل المحاولات — بند B-2).
-- `app/Contracts/Payments/Payable.php`, `GatewayAdapter.php`.
-- `app/Support/Payments/`: `GatewayCapabilities`, `AttemptContext`, `HostedCheckout`, `ProviderPaymentSnapshot`, `AttemptTransitionResult`, `PaymentOrchestrationException`.
-- `app/Services/Payments/`: `PaymentOrchestrator`, `GatewayAdapterRegistry`, `FakeGatewayAdapter`.
+- `app/Contracts/Payable.php`, `GatewayAdapter.php`.
+- `app/Support/`: `PaymentGatewayCapabilities`, `PaymentAttemptContext`, `PaymentHostedCheckout`, `PaymentProviderSnapshot`, `PaymentAttemptTransitionResult`, `PaymentOrchestrationException`.
+- `app/Services/`: `PaymentOrchestrator`, `PaymentGatewayAdapterRegistry`, `FakePaymentGatewayAdapter`.
+- **لا مجلدات جديدة تحت `app/`**: «حارس قائمة النسخ» في CI (يجمّع المشروع بقوائم مجلدات صريحة) أسقط النسخة الأولى التي أضافت `app/*/Payments`؛ نُقلت الأصناف إلى المجلدات المشمولة بأسماء بادئتها `Payment` بدل تعديل `ci.yml`/`deploy/assemble.sh`/`setup.sh` (مسار النشر).
 - اختبارات: `PaymentAttemptTest` (24)، `PaymentAttemptPostgresTest` (5، `pcntl_fork`)، `tests/Support/TestPayable.php`؛ تعديل حارس «لا مسار وصول للضوابط» في `PaymentsRolloutControlTest` ليسمح بالمنسّق قارئاً وحيداً.
 - توثيق: تحديث تقريرَي H1-01/H1-02 والطابور (بلا PR توثيقي منفصل).
 

@@ -2,7 +2,7 @@
 
 namespace Tests\Support;
 
-use App\Contracts\Payments\Payable;
+use App\Contracts\Payable;
 use DomainException;
 
 /** Payable اختباري: المبلغ والصلاحية قابلان للتغيير ليُثبَت أن المنسّق يعيد حسابهما من المصدر. */

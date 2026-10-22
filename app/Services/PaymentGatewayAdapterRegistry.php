@@ -1,17 +1,17 @@
 <?php
 
-namespace App\Services\Payments;
+namespace App\Services;
 
-use App\Contracts\Payments\GatewayAdapter;
-use App\Support\Payments\PaymentOrchestrationException;
+use App\Contracts\GatewayAdapter;
+use App\Support\PaymentOrchestrationException;
 
 /**
  * يحلّ محوّل المزوّد من مفتاحه. المحوّلات الحقيقية تُضاف إلى `ADAPTERS` مع شرائحها (H2-01 وما بعدها)؛ لا مزوّد بلا محوّل.
  *
- * `FakeGatewayAdapter` للاختبار والتطوير المحلي فقط: لا يُحلّ في أي بيئة غير `local`/`testing`، ولا يُقبل
+ * `FakePaymentGatewayAdapter` للاختبار والتطوير المحلي فقط: لا يُحلّ في أي بيئة غير `local`/`testing`، ولا يُقبل
  * اتصال بمزوّد `fake` من واجهة الإدارة (خارج `PaymentGateway::PROVIDERS`).
  */
-final class GatewayAdapterRegistry
+final class PaymentGatewayAdapterRegistry
 {
     /** @var array<string, class-string<GatewayAdapter>> */
     private const ADAPTERS = [];
@@ -34,8 +34,8 @@ final class GatewayAdapterRegistry
     /** @return class-string<GatewayAdapter>|null */
     private function classFor(string $provider): ?string
     {
-        if ($provider === FakeGatewayAdapter::PROVIDER) {
-            return app()->environment(['local', 'testing']) ? FakeGatewayAdapter::class : null;
+        if ($provider === FakePaymentGatewayAdapter::PROVIDER) {
+            return app()->environment(['local', 'testing']) ? FakePaymentGatewayAdapter::class : null;
         }
 
         return self::ADAPTERS[$provider] ?? null;

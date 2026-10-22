@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Support\Payments;
+namespace App\Support;
 
 use App\Models\PaymentGateway;
 
 /** مدخلات إنشاء صفحة الدفع. `attemptId` هو مفتاح idempotency الثابت عند المزوّد. */
-final class AttemptContext
+final class PaymentAttemptContext
 {
     public function __construct(
         public readonly PaymentGateway $gateway,

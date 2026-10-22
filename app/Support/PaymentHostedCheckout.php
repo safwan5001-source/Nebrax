@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Support\Payments;
+namespace App\Support;
 
 use Carbon\CarbonImmutable;
 
 /** نتيجة إنشاء صفحة دفع مستضافة لدى المزوّد. */
-final class HostedCheckout
+final class PaymentHostedCheckout
 {
     public function __construct(
         public readonly string $providerPaymentId,

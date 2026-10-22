@@ -295,7 +295,7 @@ class PaymentsRolloutControlTest extends TestCase
         }
         $this->assertSame([], $hits, 'لا شيء خارج الخدمة والنموذجين والمتحكّم يلمس الضوابط');
 
-        $orchestrator = (string) file_get_contents(base_path('app/Services/Payments/PaymentOrchestrator.php'));
+        $orchestrator = (string) file_get_contents(base_path('app/Services/PaymentOrchestrator.php'));
         $this->assertStringContainsString('effectiveForCurrentTenant', $orchestrator);
         $this->assertDoesNotMatchRegularExpression('/setTenantState|setPlatformState/', $orchestrator, 'المنسّق يقرأ الضوابط ولا يكتبها');
 

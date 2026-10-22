@@ -10,13 +10,13 @@ use App\Models\PaymentGateway;
 use App\Models\PlatformAdministrator;
 use App\Models\Tenant;
 use App\Models\User;
-use App\Services\Payments\FakeGatewayAdapter;
-use App\Services\Payments\GatewayAdapterRegistry;
-use App\Services\Payments\PaymentOrchestrator;
+use App\Services\FakePaymentGatewayAdapter;
+use App\Services\PaymentGatewayAdapterRegistry;
+use App\Services\PaymentOrchestrator;
 use App\Services\PaymentGatewayService;
 use App\Services\PaymentsRolloutControlService;
-use App\Support\Payments\PaymentOrchestrationException;
-use App\Support\Payments\ProviderPaymentSnapshot;
+use App\Support\PaymentOrchestrationException;
+use App\Support\PaymentProviderSnapshot;
 use App\Support\SchedulerHeartbeat;
 use App\Tenancy\TenantContext;
 use DomainException;
@@ -44,7 +44,7 @@ class PaymentAttemptTest extends TestCase
 
     private PaymentGateway $gateway;
 
-    private FakeGatewayAdapter $fake;
+    private FakePaymentGatewayAdapter $fake;
 
     private PaymentOrchestrator $orchestrator;
 
@@ -58,8 +58,8 @@ class PaymentAttemptTest extends TestCase
         $this->admin = PlatformAdministrator::create(['name' => 'مشغّل', 'email' => 'ops@pay-h1-03.test', 'password' => 'platform-password-123']);
         SchedulerHeartbeat::record();
 
-        $this->app->singleton(FakeGatewayAdapter::class);
-        $this->fake = app(FakeGatewayAdapter::class);
+        $this->app->singleton(FakePaymentGatewayAdapter::class);
+        $this->fake = app(FakePaymentGatewayAdapter::class);
         $this->orchestrator = app(PaymentOrchestrator::class);
         $this->gateway = $this->activeGateway();
         $this->enableRollout();
@@ -239,7 +239,7 @@ class PaymentAttemptTest extends TestCase
     #[Test]
     public function the_fake_adapter_cannot_be_resolved_outside_local_and_testing(): void
     {
-        $registry = app(GatewayAdapterRegistry::class);
+        $registry = app(PaymentGatewayAdapterRegistry::class);
         $this->assertTrue($registry->has('fake'));
 
         $this->app['env'] = 'production';
@@ -354,10 +354,10 @@ class PaymentAttemptTest extends TestCase
     {
         $attempt = $this->orchestrator->start(new TestPayable, $this->gateway, 'idem-key-0024');
 
-        $e = $this->thrown(fn () => $this->orchestrator->applySnapshot($attempt, new ProviderPaymentSnapshot('someone_elses', 'captured', 11500, 'SAR', 11500)), 'foreign', PaymentOrchestrationException::class);
+        $e = $this->thrown(fn () => $this->orchestrator->applySnapshot($attempt, new PaymentProviderSnapshot('someone_elses', 'captured', 11500, 'SAR', 11500)), 'foreign', PaymentOrchestrationException::class);
         $this->assertSame('provider_reference_mismatch', $e->reason);
 
-        $e = $this->thrown(fn () => $this->orchestrator->applySnapshot($attempt, new ProviderPaymentSnapshot($attempt->provider_payment_id, 'teleported', 11500, 'SAR')), 'unknown', PaymentOrchestrationException::class);
+        $e = $this->thrown(fn () => $this->orchestrator->applySnapshot($attempt, new PaymentProviderSnapshot($attempt->provider_payment_id, 'teleported', 11500, 'SAR')), 'unknown', PaymentOrchestrationException::class);
         $this->assertSame('invalid_snapshot', $e->reason);
         $this->assertSame(PaymentAttempt::STATUS_PENDING_CUSTOMER, PaymentAttempt::query()->find($attempt->id)->capture_status);
     }
@@ -499,7 +499,10 @@ class PaymentAttemptTest extends TestCase
     public function the_orchestration_layer_never_touches_the_ledger_or_payment_services(): void
     {
         $forbidden = '/LedgerService|PaymentService|JournalEntry|JournalLine|InvoiceService|ZatcaService|CustomerRefund|PaymentGatewaySettlement|table\([\'"](journal_|payments[\'"]|invoices)/';
-        $files = array_merge(glob(base_path('app/Services/Payments/*.php')) ?: [], glob(base_path('app/Support/Payments/*.php')) ?: [], [base_path('app/Models/PaymentAttempt.php')]);
+        $files = array_merge(
+            [base_path('app/Services/PaymentOrchestrator.php'), base_path('app/Services/PaymentGatewayAdapterRegistry.php'), base_path('app/Services/FakePaymentGatewayAdapter.php'), base_path('app/Contracts/Payable.php'), base_path('app/Contracts/GatewayAdapter.php'), base_path('app/Models/PaymentAttempt.php')],
+            glob(base_path('app/Support/Payment{Gateway,Attempt,Hosted,Provider,Orchestration}*.php'), GLOB_BRACE) ?: [],
+        );
         $this->assertNotEmpty($files);
         foreach ($files as $file) {
             $this->assertDoesNotMatchRegularExpression($forbidden, php_strip_whitespace($file), basename($file).' (الشيفرة بلا تعليقات)');

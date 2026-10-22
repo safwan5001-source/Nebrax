@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Support\Payments;
+namespace App\Support;
 
 use App\Models\PaymentAttempt;
 
 /** نتيجة تطبيق لقطة مزوّد: `applied=false` ⇒ لقطة متأخرة/مكررة تُجوهلت ولا أثر لها (السبب في `ignoredReason`). */
-final class AttemptTransitionResult
+final class PaymentAttemptTransitionResult
 {
     public function __construct(
         public readonly PaymentAttempt $attempt,

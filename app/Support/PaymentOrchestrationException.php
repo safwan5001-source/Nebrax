@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Support\Payments;
+namespace App\Support;
 
 use DomainException;
 
