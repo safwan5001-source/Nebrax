@@ -29,6 +29,8 @@ final class FakePosTerminalAdapter implements TerminalAdapter
 
     private ?Throwable $startFailure = null;
 
+    private ?Throwable $cancelFailure = null;
+
     public function provider(): string
     {
         return self::PROVIDER;
@@ -54,6 +56,9 @@ final class FakePosTerminalAdapter implements TerminalAdapter
     public function cancel(PosPaymentTerminal $terminal, PosTerminalRequest $request): PosTerminalResult
     {
         $this->calls['cancel']++;
+        if ($this->cancelFailure !== null) {
+            throw $this->cancelFailure;
+        }
         $this->scripted[$request->id] = new PosTerminalResult(PosTerminalResult::CANCELLED, 'fake_term_'.$request->id);
 
         return $this->scripted[$request->id];
@@ -89,6 +94,11 @@ final class FakePosTerminalAdapter implements TerminalAdapter
     public function failVoidWith(?Throwable $failure): void
     {
         $this->voidFailure = $failure;
+    }
+
+    public function failCancelWith(?Throwable $failure): void
+    {
+        $this->cancelFailure = $failure;
     }
 
     public function failStartWith(?Throwable $failure): void

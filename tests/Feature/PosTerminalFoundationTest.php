@@ -430,6 +430,72 @@ class PosTerminalFoundationTest extends TestCase
         $this->withToken($ctx['token'])->postJson("/api/pos/terminal-requests/{$id}/resolve", ['note' => 'أُعيد المبلغ خارجياً'])->assertOk()->assertJsonPath('data.status', 'compensated');
     }
 
+    #[Test]
+    public function provider_operations_on_one_request_are_serialized_by_a_lease_and_the_lease_is_always_released(): void
+    {
+        $ctx = $this->context('pos-term-serialize');
+        $id = $this->createRequest($ctx, 11500)->assertCreated()->json('data.id');
+        $this->assertNull(PosTerminalRequest::query()->withoutGlobalScopes()->findOrFail($id)->compensating_until, 'بعد start يُحرَّر الإيجار');
+
+        // عملية أخرى جارية ⇒ استعلام وإلغاء يُرفضان بلا نداء للجهاز (لا موافقة محلية تُحفَظ بينما يلغيها المزوّد).
+        DB::table('pos_terminal_requests')->where('id', $id)->update(['compensating_until' => now('UTC')->addSeconds(60)]);
+        $before = $this->fake->calls;
+        $this->show($ctx, $id)->assertStatus(409)->assertJsonPath('reason', 'operation_in_progress');
+        $this->withToken($ctx['token'])->postJson("/api/pos/terminal-requests/{$id}/cancel")->assertStatus(409)->assertJsonPath('reason', 'operation_in_progress');
+        $this->assertSame($before, $this->fake->calls);
+
+        // انتهاء الإيجار ⇒ تعمل العملية وتُحرّره؛ وفشل المزوّد يُحرّره أيضاً (لا إيجار عالق).
+        DB::table('pos_terminal_requests')->where('id', $id)->update(['compensating_until' => now('UTC')->subSecond()]);
+        $this->fake->failCancelWith(new \RuntimeException('down'));
+        $this->withToken($ctx['token'])->postJson("/api/pos/terminal-requests/{$id}/cancel")->assertStatus(503)->assertJsonPath('reason', 'terminal_unavailable_now');
+        $this->assertNull(PosTerminalRequest::query()->withoutGlobalScopes()->findOrFail($id)->compensating_until);
+        $this->fake->failCancelWith(null);
+        $this->withToken($ctx['token'])->postJson("/api/pos/terminal-requests/{$id}/cancel")->assertOk()->assertJsonPath('data.status', 'cancelled');
+        $this->assertNull(PosTerminalRequest::query()->withoutGlobalScopes()->findOrFail($id)->compensating_until);
+    }
+
+    #[Test]
+    public function terminal_name_and_code_uniqueness_are_validation_errors_on_create_and_update(): void
+    {
+        $ctx = $this->context('pos-term-unique');
+        $a = $ctx['terminal'];
+        $b = $this->terminal($ctx, 'جهاز ب');
+        $this->withToken($ctx['token'])->putJson("/api/pos-payment-terminals/{$a['id']}", ['code' => 'T-1'])->assertOk();
+
+        $this->withToken($ctx['token'])->putJson("/api/pos-payment-terminals/{$b['id']}", ['name' => $a['name']])->assertStatus(422);
+        $this->withToken($ctx['token'])->putJson("/api/pos-payment-terminals/{$b['id']}", ['code' => 'T-1'])->assertStatus(422);
+        $this->withToken($ctx['token'])->postJson('/api/pos-payment-terminals', ['name' => 'جهاز ج', 'provider' => 'fake', 'code' => 'T-1'])->assertStatus(422);
+        // نفسه لا يتعارض مع نفسه.
+        $this->withToken($ctx['token'])->putJson("/api/pos-payment-terminals/{$a['id']}", ['name' => $a['name'], 'code' => 'T-1'])->assertOk();
+    }
+
+    #[Test]
+    public function repeatedly_failing_stale_requests_cannot_starve_later_orphan_approvals_in_the_sweep(): void
+    {
+        $ctx = $this->context('pos-term-fair');
+        $stale = [];
+        foreach (['تجويع أ', 'تجويع ب', 'تجويع ج'] as $name) {
+            $t = $this->terminal($ctx, $name);
+            $id = $this->createRequest($ctx, 5000, terminal: $t['id'])->assertCreated()->json('data.id');
+            DB::table('pos_terminal_requests')->where('id', $id)->update(['created_at' => now('UTC')->subMinutes(60), 'updated_at' => now('UTC')->subMinutes(50)]);
+            $stale[] = $id;
+        }
+        $orphanTerminal = $this->terminal($ctx, 'جهاز يتيم');
+        $orphan = $this->approvedRequest($ctx, 7000, terminal: $orphanTerminal['id']);
+        // الأحدث تحديثاً ⇒ أسوأ حالة: يأتي بعد الفاشلة في الترتيب.
+        DB::table('pos_terminal_requests')->where('id', $orphan)->update(['approved_at' => now('UTC')->subMinutes(30), 'updated_at' => now('UTC')->subMinutes(40)]);
+
+        $this->fake->failCancelWith(new \RuntimeException('provider down'));
+        for ($i = 0; $i < 3; $i++) {
+            $this->artisan('pos:sweep-terminals', ['--limit' => 2])->assertSuccessful();
+        }
+
+        $this->assertSame('voided', PosTerminalRequest::query()->withoutGlobalScopes()->findOrFail($orphan)->status, 'لم يُجوَّع اليتيم رغم فشل غيره المتكرر');
+        foreach ($stale as $id) {
+            $this->assertSame('sent', PosTerminalRequest::query()->withoutGlobalScopes()->findOrFail($id)->status);
+        }
+    }
+
     // ═══════════════ المجدول ═══════════════
 
     #[Test]
@@ -437,7 +503,7 @@ class PosTerminalFoundationTest extends TestCase
     {
         $ctx = $this->context('pos-term-sweep');
         $orphan = $this->approvedRequest($ctx, 11500);
-        DB::table('pos_terminal_requests')->where('id', $orphan)->update(['approved_at' => now('UTC')->subMinutes(30)]);
+        DB::table('pos_terminal_requests')->where('id', $orphan)->update(['approved_at' => now('UTC')->subMinutes(30), 'updated_at' => now('UTC')->subMinutes(40)]);
 
         // طلب معلّق قديم على جهاز ثانٍ.
         $second = $this->terminal($ctx, 'جهاز ثانٍ');

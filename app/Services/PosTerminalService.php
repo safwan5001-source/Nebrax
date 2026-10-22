@@ -93,24 +93,24 @@ class PosTerminalService
             throw new PosTerminalException('terminal_busy', 'على الجهاز طلب نشط؛ أنهِه أو ألغِه أولاً.');
         }
 
-        if ($request->getAttribute('idempotent_replay') ?? false) {
+        if ($request->getAttribute('idempotent_replay') === true) {
             return $request;
         }
 
-        // استدعاء الجهاز خارج المعاملة. **استثناء من المحوّل = نتيجة غامضة** (قد يكون الجهاز استلم الطلب ووافق وضاع الردّ): يبقى الطلب `sent`
+        // استدعاء الجهاز خارج المعاملة وبإيجار على الطلب. **استثناء من المحوّل = نتيجة غامضة** (قد يكون الجهاز استلم ووافق وضاع الردّ): يبقى الطلب `sent`
         // بعلامة `start_unconfirmed` فيحجز الجهاز (طلب نشط واحد) ويستعلمه الكاشير/المجدول ويلغيه — لا `error` نهائياً يحرّر الجهاز لخصم ثانٍ.
         // الفشل القاطع (لم يُرسَل شيء) يعيده المحوّل نتيجة ERROR صريحة.
-        try {
-            $terminal = PosPaymentTerminal::query()->findOrFail($request->pos_payment_terminal_id);
-            $result = $this->adapters->for($terminal->provider)->start($terminal, $request);
-        } catch (Throwable $e) {
-            return $this->apply($request->id, new PosTerminalResult(PosTerminalResult::PENDING, failureCode: 'start_unconfirmed'));
-        }
+        return $this->providerOp($request->id, function (PosTerminalRequest $claimed) {
+            try {
+                $terminal = PosPaymentTerminal::query()->findOrFail($claimed->pos_payment_terminal_id);
 
-        return $this->settle($this->apply($request->id, $result));
+                return $this->adapters->for($terminal->provider)->start($terminal, $claimed);
+            } catch (Throwable) {
+                return new PosTerminalResult(PosTerminalResult::PENDING, failureCode: 'start_unconfirmed');
+            }
+        });
     }
 
-    /** @param array<string,mixed> $data */
     private function replayOf(PosTerminalRequest $existing, array $data, int $amount): PosTerminalRequest
     {
         $same = $existing->pos_session_id === $data['pos_session_id']
@@ -124,6 +124,42 @@ class PosTerminalService
         return $existing->setAttribute('idempotent_replay', true);
     }
 
+    /**
+     * عملية مزوّد على طلب غير نهائي (created/sent) **متسلسلة بإيجار**: استعلام وإلغاء متزامنان لا يمرّان معاً — وإلا حُفظت موافقة محلياً بينما ألغاها
+     * المزوّد فيُستهلك تفويضٌ ملغى. الإيجار يُسلَّم في معاملة قصيرة، والاستدعاء خارج المعاملة، وتطبيق النتيجة يُحرّره (`apply`)؛ الاستثناء يحرّره أيضاً.
+     *
+     * @param  \Closure(PosTerminalRequest): PosTerminalResult  $call
+     */
+    private function providerOp(string $requestId, \Closure $call, bool $expireOnCancel = false): PosTerminalRequest
+    {
+        $lease = max(10, (int) config('pos_terminals.compensation_lease_seconds', 90));
+
+        $claimed = DB::transaction(function () use ($requestId, $lease) {
+            $request = PosTerminalRequest::query()->whereKey($requestId)->lockForUpdate()->firstOrFail();
+            if (! in_array($request->status, [PosTerminalRequest::STATUS_CREATED, PosTerminalRequest::STATUS_SENT], true)) {
+                return [null, $request];
+            }
+            if ($request->compensating_until !== null && $request->compensating_until->isFuture()) {
+                throw new PosTerminalException('operation_in_progress', 'عملية أخرى جارية على هذا الطلب؛ أعد المحاولة بعد لحظات.');
+            }
+            $request->update(['compensating_until' => now('UTC')->addSeconds($lease)]);
+
+            return [$request, $request];
+        });
+        if ($claimed[0] === null) {
+            return $claimed[1];
+        }
+
+        try {
+            $result = $call($claimed[0]);
+        } catch (Throwable $e) {
+            DB::table('pos_terminal_requests')->where('id', $requestId)->whereIn('status', [PosTerminalRequest::STATUS_CREATED, PosTerminalRequest::STATUS_SENT])->update(['compensating_until' => null]);
+            throw $e;
+        }
+
+        return $this->settle($this->apply($requestId, $result, $expireOnCancel));
+    }
+
     /** يستعلم الجهاز (الحقيقة) ويطبّق النتيجة على طلب قيد التنفيذ. */
     public function sync(PosTerminalRequest $request): PosTerminalRequest
     {
@@ -131,14 +167,15 @@ class PosTerminalService
         if (! in_array($request->status, [PosTerminalRequest::STATUS_CREATED, PosTerminalRequest::STATUS_SENT], true)) {
             return $request;
         }
-        $terminal = PosPaymentTerminal::query()->findOrFail($request->pos_payment_terminal_id);
-        try {
-            $result = $this->adapters->for($terminal->provider)->fetch($terminal, $request);
-        } catch (Throwable) {
-            throw new PosTerminalException('terminal_unavailable_now', 'تعذّر الوصول إلى الجهاز الآن؛ أعد المحاولة.');
-        }
 
-        return $this->settle($this->apply($request->id, $result));
+        return $this->providerOp($request->id, function (PosTerminalRequest $claimed) {
+            $terminal = PosPaymentTerminal::query()->findOrFail($claimed->pos_payment_terminal_id);
+            try {
+                return $this->adapters->for($terminal->provider)->fetch($terminal, $claimed);
+            } catch (Throwable) {
+                throw new PosTerminalException('terminal_unavailable_now', 'تعذّر الوصول إلى الجهاز الآن؛ أعد المحاولة.');
+            }
+        });
     }
 
     /** إلغاء طلب لم يُوافَق عليه. إن سبقته موافقة على الجهاز تُسجَّل موافقة (ويلغيها المجدول/الكاشير). */
@@ -148,14 +185,15 @@ class PosTerminalService
         if (! in_array($request->status, [PosTerminalRequest::STATUS_CREATED, PosTerminalRequest::STATUS_SENT], true)) {
             throw new PosTerminalException('not_cancellable', 'لا يمكن إلغاء الطلب في حالته الحالية؛ استعمل إلغاء الموافقة.');
         }
-        $terminal = PosPaymentTerminal::query()->findOrFail($request->pos_payment_terminal_id);
-        try {
-            $result = $this->adapters->for($terminal->provider)->cancel($terminal, $request);
-        } catch (Throwable) {
-            throw new PosTerminalException('terminal_unavailable_now', 'تعذّر الوصول إلى الجهاز الآن؛ أعد المحاولة.');
-        }
 
-        return $this->settle($this->apply($request->id, $result));
+        return $this->providerOp($request->id, function (PosTerminalRequest $claimed) {
+            $terminal = PosPaymentTerminal::query()->findOrFail($claimed->pos_payment_terminal_id);
+            try {
+                return $this->adapters->for($terminal->provider)->cancel($terminal, $claimed);
+            } catch (Throwable) {
+                throw new PosTerminalException('terminal_unavailable_now', 'تعذّر الوصول إلى الجهاز الآن؛ أعد المحاولة.');
+            }
+        });
     }
 
     /** إلغاء يدوي لموافقة قائمة أو إعادة محاولة إلغاء فاشل. */
@@ -357,7 +395,8 @@ class PosTerminalService
                     ->orWhere(fn ($b) => $b->whereIn('status', [PosTerminalRequest::STATUS_CREATED, PosTerminalRequest::STATUS_SENT])->where('created_at', '<=', $now->copy()->subMinutes($pending)))
                     ->orWhere(fn ($c) => $c->where('status', PosTerminalRequest::STATUS_COMPENSATION_REQUIRED)->where('updated_at', '<=', $now->copy()->subMinutes(5)));
             })
-            ->orderBy('created_at')->limit($limit)->get(['id', 'tenant_id', 'branch_id', 'status']);
+            // الأقدم تحديثاً أولاً: صف يفشل في التشغيل يُحرَّك إلى آخر الدور (touch أدناه) فلا يحتكر الدفعة ويجوّع غيره.
+            ->orderBy('updated_at')->limit($limit)->get(['id', 'tenant_id', 'branch_id', 'status']);
 
         $tenant = app(TenantContext::class);
         $branch = app(BranchContext::class);
@@ -370,10 +409,15 @@ class PosTerminalService
                     $result = $this->compensate($row->id);
                     $result->status === PosTerminalRequest::STATUS_VOIDED ? $summary['voided']++ : $summary['failed']++;
                 } else {
-                    $summary[$this->expirePending($row->id) ? 'expired' : 'failed']++;
+                    $expired = $this->expirePending($row->id);
+                    $summary[$expired ? 'expired' : 'failed']++;
+                    if (! $expired) {
+                        DB::table('pos_terminal_requests')->where('id', $row->id)->update(['updated_at' => now('UTC')]);
+                    }
                 }
             } catch (Throwable $e) {
                 $summary['failed']++;
+                DB::table('pos_terminal_requests')->where('id', $row->id)->update(['updated_at' => now('UTC')]);
                 report($e);
             } finally {
                 $tenant->forget();
@@ -391,9 +435,11 @@ class PosTerminalService
         if (! in_array($request->status, [PosTerminalRequest::STATUS_CREATED, PosTerminalRequest::STATUS_SENT], true)) {
             return true;
         }
-        $terminal = PosPaymentTerminal::query()->findOrFail($request->pos_payment_terminal_id);
-        $result = $this->adapters->for($terminal->provider)->cancel($terminal, $request);
-        $applied = $this->settle($this->apply($requestId, $result, expireOnCancel: true));
+        $applied = $this->providerOp($requestId, function (PosTerminalRequest $claimed) {
+            $terminal = PosPaymentTerminal::query()->findOrFail($claimed->pos_payment_terminal_id);
+
+            return $this->adapters->for($terminal->provider)->cancel($terminal, $claimed);
+        }, expireOnCancel: true);
 
         return $applied->status === PosTerminalRequest::STATUS_EXPIRED;
     }
@@ -430,7 +476,8 @@ class PosTerminalService
                 return $request; // نهائي أو موافَق عليه: لا يُعاد تفسيره بنتيجة متأخرة
             }
 
-            $refs = ['provider_ref' => $result->providerRef ?? $request->provider_ref];
+            // كل نتيجة تُحرّر إيجار عملية المزوّد (providerOp).
+            $refs = ['provider_ref' => $result->providerRef ?? $request->provider_ref, 'compensating_until' => null];
             switch ($result->status) {
                 case PosTerminalResult::PENDING:
                     $request->update([

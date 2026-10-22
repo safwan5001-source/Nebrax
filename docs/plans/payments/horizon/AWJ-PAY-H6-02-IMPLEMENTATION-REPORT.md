@@ -47,7 +47,7 @@ STATUS: **IN REVIEW** (PR مفتوح) · DATE: 2026-10-22
 - `app/Services/PosTerminalService.php`, `PosTerminalAdapterRegistry.php`, `FakePosTerminalAdapter.php`.
 - تعديل `PosService` (استهلاك الموافقة، البصمة، التعويض بعد الفشل)، `PosSessionService` (منع الإقفال + `terminal_blockers` في المعاينة)، `PaymentMethod*` (سياسة الاشتراط).
 - `PosTerminalController` + طلبان + موردان + مسارات (`/api/pos-payment-terminals`, `/api/pos/terminal-requests*`)؛ `pos:sweep-terminals` (مجدول)؛ `config/pos_terminals.php` (مهل افتراضية محافظة).
-- اختبارات: `PosTerminalFoundationTest` (20)، `PosTerminalPostgresTest` (5، `pcntl_fork`).
+- اختبارات: `PosTerminalFoundationTest` (23)، `PosTerminalPostgresTest` (6، `pcntl_fork`) — SQLite وPostgreSQL ×3 خضراء.
 - لا مجلدات جديدة تحت `app/`؛ لا تعديل لـ`PaymentService`/`LedgerService`.
 
 ## Tests and exact results
@@ -61,6 +61,8 @@ STATUS: **IN REVIEW** (PR مفتوح) · DATE: 2026-10-22
 ثلاث ملاحظات صحيحة عولجت في الدفعة نفسها بدل الدمج: P1 تعويض موافقة لم تُتحقق (الآن: المُجتازة فقط) · P2 سباق المفتاح بلا فحص تطابق (الآن: يُفحص) · P1 استثناء `start()` غامض يُحرّر الجهاز (الآن: `sent/start_unconfirmed`). كل ملاحظة لها اختبار.
 
 **الجولة الثانية (رأس 43baf32) — أربع ملاحظات صحيحة أخرى عولجت:** P1 ملكية الجلسة (عرض/إلغاء/void/قائمة الجلسة لكاشير الجلسة أو معتمد `pos.variance.approve` فقط) · P2 ربط الجهاز بجهاز POS (جهاز مخصَّص لا يخدم جلسة جهاز آخر؛ غير المخصَّص متاح) · P2 حذف طريقة دفع لها عمليات أجهزة ⇒ 422 لا 500 · P1 الحل اليدوي مرفوض أثناء إيجار إلغاء حيّ (`compensation_in_progress`) منعاً لرد مزدوج. لكل منها اختبار.
+
+**الجولة الثالثة (رأس a923e7a) — ثلاث ملاحظات صحيحة عولجت:** P2 عدالة المجدول (الترتيب بـ`updated_at` الأقدم أولاً وصفٌ يفشل يُحرَّك إلى آخر الدور، فلا يجوّع الموافقات اليتيمة) · P2 تفرّد اسم/رمز الجهاز يعود 422 بدل 500 · P1 عمليات المزوّد (إنشاء/استعلام/إلغاء/انتهاء) متسلسلة بإيجار على الطلب (`operation_in_progress` ⇒ 409) فلا تُحفظ موافقة بينما ألغاها المزوّد. لكل منها اختبار (واحد على PostgreSQL للتزامن).
 
 ## CI / Merge
 

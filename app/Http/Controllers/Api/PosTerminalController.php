@@ -36,9 +36,7 @@ class PosTerminalController extends ApiController
         $terminal = $this->terminalCall(function () use ($data) {
             $this->terminals->assertProviderAvailable($data['provider']);
             $this->assertDevice($data['pos_device_id'] ?? null);
-            if (PosPaymentTerminal::query()->where('name', trim($data['name']))->exists()) {
-                abort(422, 'يوجد جهاز دفع بهذا الاسم.');
-            }
+            $this->assertUnique(trim($data['name']), $data['code'] ?? null, null);
 
             return PosPaymentTerminal::query()->create([
                 'name' => trim($data['name']),
@@ -65,6 +63,7 @@ class PosTerminalController extends ApiController
         if (array_key_exists('pos_device_id', $data)) {
             $this->assertDevice($data['pos_device_id']);
         }
+        $this->assertUnique(isset($data['name']) ? trim($data['name']) : null, $data['code'] ?? null, $terminal->id);
         if (isset($data['is_active']) && $data['is_active'] === false
             && PosTerminalRequest::query()->where('pos_payment_terminal_id', $terminal->id)->whereIn('status', [...PosTerminalRequest::IN_FLIGHT, PosTerminalRequest::STATUS_COMPENSATION_REQUIRED])->exists()) {
             abort(422, 'لا يمكن تعطيل جهاز عليه طلب نشط أو تعويض لم يُحل.');
@@ -144,6 +143,30 @@ class PosTerminalController extends ApiController
         }
     }
 
+    /** الاسم فريد في الفرع والرمز فريد في المؤسسة: يُفحصان قبل الكتابة فيعود 422 لا 500 من قيد القاعدة. */
+    private function assertUnique(?string $name, ?string $code, ?string $exceptId): void
+    {
+        if ($name !== null) {
+            $q = PosPaymentTerminal::query()->where('name', $name);
+            if ($exceptId !== null) {
+                $q->whereKeyNot($exceptId);
+            }
+            if ($q->exists()) {
+                abort(422, 'يوجد جهاز دفع بهذا الاسم.');
+            }
+        }
+        if ($code !== null && $code !== '') {
+            // الرمز فريد على مستوى المؤسسة (كل الفروع): فحص بلا نطاق الفرع.
+            $q = PosPaymentTerminal::query()->withoutGlobalScopes()->where('tenant_id', app(\App\Tenancy\TenantContext::class)->id())->where('code', $code);
+            if ($exceptId !== null) {
+                $q->whereKeyNot($exceptId);
+            }
+            if ($q->exists()) {
+                abort(422, 'يوجد جهاز دفع بهذا الرمز.');
+            }
+        }
+    }
+
     private function assertDevice(?string $deviceId): void
     {
         if ($deviceId !== null) {
@@ -158,7 +181,7 @@ class PosTerminalController extends ApiController
             return $fn();
         } catch (PosTerminalException $e) {
             $status = match ($e->reason) {
-                'terminal_busy', 'idempotency_conflict' => 409,
+                'terminal_busy', 'idempotency_conflict', 'operation_in_progress' => 409,
                 'terminal_unavailable_now' => 503,
                 default => 422,
             };

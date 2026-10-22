@@ -241,6 +241,43 @@ class PosTerminalPostgresTest extends TestCase
         }
     }
 
+    /** @test */
+    public function concurrent_sync_and_cancel_on_one_request_are_serialized_without_deadlock_and_never_leave_a_stuck_lease(): void
+    {
+        foreach (range(1, 3) as $round) {
+            $terminal = $this->newTerminal("جهاز تسلسل {$round}");
+            $id = $this->withToken($this->token)->postJson('/api/pos/terminal-requests', [
+                'pos_session_id' => $this->sessionId, 'pos_payment_terminal_id' => $terminal, 'payment_method_id' => $this->cardId,
+                'amount' => 11500, 'idempotency_key' => (string) Str::uuid(),
+            ])->assertCreated()->json('data.id');
+            $this->fake->script($id, 'approved');
+
+            $op = function (string $kind) use ($id) {
+                return function () use ($id, $kind) {
+                    app(TenantContext::class)->set($this->tenantId);
+                    app(BranchContext::class)->set(DB::table('pos_sessions')->where('id', $this->sessionId)->value('branch_id'));
+                    $request = PosTerminalRequest::query()->findOrFail($id);
+                    try {
+                        $kind === 'sync' ? app(PosTerminalService::class)->sync($request) : app(PosTerminalService::class)->cancel($request);
+
+                        return ['done' => $kind];
+                    } catch (PosTerminalException $e) {
+                        return ['reason' => $e->reason];
+                    }
+                };
+            };
+            $results = $this->runConcurrently([$op('sync'), $op('cancel'), $op('sync'), $op('cancel')]);
+
+            $this->assertAllNoDeadlock($results);
+            $row = DB::table('pos_terminal_requests')->where('id', $id)->first();
+            $this->assertContains($row->status, ['approved', 'cancelled'], "الجولة {$round}: {$row->status}");
+            $this->assertNull($row->compensating_until, 'لا إيجار عالق');
+            foreach (array_column($results, 'value') as $v) {
+                $this->assertTrue(isset($v['done']) || in_array($v['reason'] ?? '', ['operation_in_progress', 'not_cancellable'], true), json_encode($v));
+            }
+        }
+    }
+
     // ───────────────────────── مساعدات ─────────────────────────
 
     private function newTerminal(string $name): string
