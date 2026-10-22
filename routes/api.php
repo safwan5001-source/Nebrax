@@ -173,6 +173,7 @@ use App\Http\Middleware\EnsureApplicationActive;
 use App\Http\Middleware\EnsureApplicationOperationActive;
 use App\Http\Middleware\EnsureCommercialApplicationAccess;
 use App\Http\Middleware\EnsureCustomerPrincipal;
+use App\Http\Middleware\EnsureImportFilesScanned;
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\EnsurePlatformAdministrator;
 use App\Http\Middleware\EnsureUserPrincipal;
@@ -444,7 +445,7 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // AI-ACTIONS-02: private intake and deterministic extraction only;
         // there is still no product-writing, approval, or execution route.
         Route::post('ai-actions/{action}/files', [AiActionController::class, 'storeFile'])
-            ->middleware([$perm('ai.actions.use'), EnforceUserIdempotency::class, 'throttle:10,1']);
+            ->middleware([$perm('ai.actions.use'), EnforceUserIdempotency::class, 'throttle:10,1', EnsureImportFilesScanned::class]);
         Route::get('ai-actions/{action}/files/{file}/extraction', [AiActionController::class, 'showExtraction'])
             ->middleware([$perm('ai.actions.use'), 'throttle:60,1']);
         Route::get('ai-actions/{action}/review', [AiActionController::class, 'review'])
@@ -469,7 +470,7 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // AI-ACTIONS-06: product images. Staging only — validated bytes go to private storage; nothing here
         // touches a product (that happens, per image, inside the approved execution).
         Route::post('ai-actions/{action}/image-archives', [AiActionController::class, 'storeImageArchive'])
-            ->middleware([$perm('ai.actions.use'), EnforceUserIdempotency::class, 'throttle:10,1']);
+            ->middleware([$perm('ai.actions.use'), EnforceUserIdempotency::class, 'throttle:10,1', EnsureImportFilesScanned::class]);
         Route::get('ai-actions/{action}/images', [AiActionController::class, 'listImages'])
             ->middleware([$perm('ai.actions.use'), 'throttle:60,1']);
         Route::get('ai-actions/{action}/images/{image}/thumbnail', [AiActionController::class, 'showImageThumbnail'])
@@ -559,16 +560,16 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('products/export', [ProductController::class, 'export'])->middleware($perm('products.view'));
         Route::get('products/import/template', [ProductController::class, 'importTemplate'])->middleware($perm('products.manage'));
         Route::get('products/import/fields', [ProductController::class, 'importFields'])->middleware($perm('products.manage'));
-        Route::post('products/import/inspect', [ProductController::class, 'importInspect'])->middleware($perm('products.manage'));
-        Route::post('products/import/preview', [ProductController::class, 'importPreview'])->middleware($perm('products.manage'));
-        Route::post('products/import/apply', [ProductController::class, 'importApply'])->middleware($perm('products.manage'));
+        Route::post('products/import/inspect', [ProductController::class, 'importInspect'])->middleware([$perm('products.manage'), EnsureImportFilesScanned::class]);
+        Route::post('products/import/preview', [ProductController::class, 'importPreview'])->middleware([$perm('products.manage'), EnsureImportFilesScanned::class]);
+        Route::post('products/import/apply', [ProductController::class, 'importApply'])->middleware([$perm('products.manage'), EnsureImportFilesScanned::class]);
         // PR-UOM2-4: مصنّف Products/Barcodes/Unit Prices ثلاثي الأوراق — مسارٌ
         // إضافيٌّ مستقلّ عن الاستيراد/التصدير أحادي الورقة أعلاه، بلا أي تعديل عليه.
         Route::get('products/workbook/template', [ProductWorkbookController::class, 'template'])->middleware($perm('products.manage'));
         Route::get('products/workbook/fields', [ProductWorkbookController::class, 'fields'])->middleware($perm('products.manage'));
-        Route::post('products/workbook/inspect', [ProductWorkbookController::class, 'inspect'])->middleware($perm('products.manage'));
-        Route::post('products/workbook/preview', [ProductWorkbookController::class, 'preview'])->middleware($perm('products.manage'));
-        Route::post('products/workbook/apply', [ProductWorkbookController::class, 'apply'])->middleware($perm('products.manage'));
+        Route::post('products/workbook/inspect', [ProductWorkbookController::class, 'inspect'])->middleware([$perm('products.manage'), EnsureImportFilesScanned::class]);
+        Route::post('products/workbook/preview', [ProductWorkbookController::class, 'preview'])->middleware([$perm('products.manage'), EnsureImportFilesScanned::class]);
+        Route::post('products/workbook/apply', [ProductWorkbookController::class, 'apply'])->middleware([$perm('products.manage'), EnsureImportFilesScanned::class]);
         Route::get('products/workbook/export', [ProductWorkbookController::class, 'export'])->middleware($perm('products.view'));
 
         // PR-DUR-1: بنية تشغيلة الاستيراد الدائم — رفع/فحص هيكلي/عرض/إلغاء فقط.
@@ -577,7 +578,7 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // `ImportJobAccess` (من `ImportJobDomain::authorization`) في الطلب/المتحكّم، فلا يرث مجالٌ صلاحيات المنتجات.
         Route::get('import-jobs', [ImportJobController::class, 'index']);
         Route::get('import-jobs/{id}', [ImportJobController::class, 'show']);
-        Route::post('import-jobs', [ImportJobController::class, 'store']);
+        Route::post('import-jobs', [ImportJobController::class, 'store'])->middleware(EnsureImportFilesScanned::class);
         Route::post('import-jobs/{id}/cancel', [ImportJobController::class, 'cancel']);
         Route::post('import-jobs/{id}/apply', [ImportJobController::class, 'apply']);
         Route::get('products/{id}', [ProductController::class, 'show'])->middleware($perm('products.view'));
@@ -1533,9 +1534,9 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('inventory-openings', [InventoryOpeningController::class, 'index'])->middleware([$perm('products.view'), $app('inventory.core')]);
         Route::get('inventory-openings/import/template', [InventoryOpeningController::class, 'template'])->middleware([$perm('products.manage'), $app('inventory.core')]);
         Route::get('inventory-openings/import/fields', [InventoryOpeningController::class, 'fields'])->middleware([$perm('products.manage'), $app('inventory.core')]);
-        Route::post('inventory-openings/import/inspect', [InventoryOpeningController::class, 'inspect'])->middleware([$perm('products.manage'), $app('inventory.core')]);
-        Route::post('inventory-openings/import/preview', [InventoryOpeningController::class, 'preview'])->middleware([$perm('products.manage'), $app('inventory.core')]);
-        Route::post('inventory-openings/import/apply', [InventoryOpeningController::class, 'apply'])->middleware([$perm('products.manage'), $app('inventory.core')]);
+        Route::post('inventory-openings/import/inspect', [InventoryOpeningController::class, 'inspect'])->middleware([$perm('products.manage'), $app('inventory.core'), EnsureImportFilesScanned::class]);
+        Route::post('inventory-openings/import/preview', [InventoryOpeningController::class, 'preview'])->middleware([$perm('products.manage'), $app('inventory.core'), EnsureImportFilesScanned::class]);
+        Route::post('inventory-openings/import/apply', [InventoryOpeningController::class, 'apply'])->middleware([$perm('products.manage'), $app('inventory.core'), EnsureImportFilesScanned::class]);
         Route::get('inventory-openings/{id}', [InventoryOpeningController::class, 'show'])->middleware([$perm('products.view'), $app('inventory.core')]);
         Route::post('inventory-openings/{id}/post', [InventoryOpeningController::class, 'post'])->middleware([$perm('products.manage'), $app('inventory.core')]);
         Route::delete('inventory-openings/{id}', [InventoryOpeningController::class, 'destroy'])->middleware([$perm('products.manage'), $app('inventory.core')]);
