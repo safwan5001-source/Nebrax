@@ -26,7 +26,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use LogicException;
 use PHPUnit\Framework\Attributes\Test;
-use Tests\Support\TestPayable;
 use Tests\TestCase;
 
 /** PAY-H1-03 — نواة التنسيق: المحاولات، آلة الحالات الرتيبة، idempotency، الأحداث المتأخرة، ضابط التفعيل، العزل، RBAC. */

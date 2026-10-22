@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Support;
+namespace Tests\Feature;
 
 use App\Contracts\Payable;
 use App\Support\PaymentNotPayableException;
