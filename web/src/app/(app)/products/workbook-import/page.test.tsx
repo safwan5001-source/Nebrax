@@ -294,4 +294,31 @@ describe('استيراد مصنّف المنتجات — أول واجهة دا�
     expect(screen.getByText('sheet_row:9: bad 9')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'download_errors' })).toBeTruthy();
   });
+
+  it('معاينة متأخرة لمطابقة سابقة لا تُعرض بعد تغيير المطابقة أثناء الطلب', async () => {
+    let release: (value: unknown) => void = () => {};
+    api.mockImplementation((path: string) => {
+      if (path === '/price-lists') return Promise.resolve({ data: priceLists });
+      if (path === '/products/workbook/inspect') return Promise.resolve({ data: inspectionFixture });
+      if (path === '/products/workbook/preview') return new Promise((resolve) => { release = resolve; });
+      return Promise.resolve({ data: {} });
+    });
+    const user = userEvent.setup();
+    render(<ProductWorkbookImportPage />);
+
+    await waitFor(() => expect(screen.getByLabelText('price_list')).toBeTruthy());
+    await user.selectOptions(screen.getByLabelText('price_list'), 'pl-1');
+    await user.upload(screen.getByLabelText('step_file'), workbookFile());
+    await waitFor(() => expect(screen.getByLabelText('اسم الصنف')).toBeTruthy());
+    await user.click(screen.getByRole('button', { name: 'run_preview' }));
+
+    // أثناء الطلب: يتعطّل الزر (لا معاينتان متوازيتان)، وتغيير المطابقة يُبطل الرد القادم.
+    expect((screen.getByRole('button', { name: 'run_preview' }) as HTMLButtonElement).disabled).toBe(true);
+    await user.selectOptions(screen.getByLabelText('عمود غريب'), 'sku');
+    release({ data: cleanPreview });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(screen.queryByRole('button', { name: 'apply' })).toBeNull();
+    expect((screen.getByRole('button', { name: 'run_preview' }) as HTMLButtonElement).disabled).toBe(false);
+  });
 });

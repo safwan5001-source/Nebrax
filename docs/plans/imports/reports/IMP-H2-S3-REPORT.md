@@ -38,4 +38,15 @@ backend already exposed `inspect`, `template`, `fields` and accepted `mapping` o
 ## Disclosures
 
 - No screenshots/visual check of the new UI were taken (consistent with S8c / H2-S0); verified by component tests and typecheck only.
-- No Codex review (quota exhausted); no independent subagent review run for this web-only slice yet.
+- No Codex review (quota exhausted). An independent read-only subagent reviewed the diff (code read only, nothing executed): **no high/medium defects**; preview-fingerprint encoding (`mapping[i]` vs `options[mapping][i]`, `ignore`, ordering via server `canonicalMapping`) found consistent.
+
+## Independent review — disposition
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | No sequence guard on `runPreview`; a late response for old inputs could show a stale preview (apply would fail closed with `preview_mismatch`); double click issues two previews | **Fixed** (`previewSeq`, `!previewing` in `canPreview`; test with a deferred response) |
+| 2 | `inspecting` spinner could stick after a cleared/oversize file or reset | **Fixed** (reset in `acceptFile`/`reset`) |
+| 3 | `readInspection` truthy check only; a payload without `columns` would throw | **Fixed** (array checks; test) |
+| 4 | Errors CSV does not neutralize `= + - @` | **Fixed** locally with the same `'` prefix as the failures export (shared `toCsv` left untouched) |
+| 5 | `engine.error` is never rendered: a failed job creation (`preview_mismatch`/`consumed`/`expired`) leaves a blank step 2 (pre-existing at HEAD) | **Not fixed here — pre-existing, shared by all import screens; tracked for a dedicated slice** |
+| 6 | An existing `engine.job` overrides a newer preview after stepping back (pre-existing) | **Not fixed here — pre-existing; tracked with #5** |

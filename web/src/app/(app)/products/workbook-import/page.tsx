@@ -56,6 +56,8 @@ const STEP_KEYS = ['setup', 'preview', 'apply', 'result'] as const;
 /** أخطاء كل ورقة تظهر مختصرةً ثم تتوسّع؛ التقرير الكامل في ملف CSV. */
 const ERRORS_COLLAPSED = 5;
 const ERRORS_EXPANDED = 50;
+// رسائل الخادم قد تقتبس قيم خلايا؛ بادئة صيغة (= + - @) تُعطَّل كي لا تُنفَّذ إن فُتح التقرير في Excel (كتقرير الصفوف الفاشلة).
+const spreadsheetSafe = (value: string) => (/^[=+\-@]/.test(value) ? `'${value}` : value);
 const NIL_UUID = '00000000-0000-0000-0000-000000000000';
 
 export default function ProductWorkbookImportPage() {
@@ -83,6 +85,8 @@ export default function ProductWorkbookImportPage() {
   const [expandedSheets, setExpandedSheets] = useState<Record<string, boolean>>({});
   // يمنع ردَّ فحصٍ متأخر لملفٍ سابق من الكتابة فوق ملفٍ اختير بعده.
   const inspectSeq = useRef(0);
+  // نفس الحارس للمعاينة: ردٌّ متأخر لمدخلات سابقة (ملف/مطابقة تغيّرا أثناء الطلب) لا يُعرض.
+  const previewSeq = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [resumedWithoutFile, setResumedWithoutFile] = useState(false);
 
@@ -113,7 +117,7 @@ export default function ProductWorkbookImportPage() {
   const activeMapping = effectiveMapping(inspection, mapping);
   const gaps = useMemo(() => mappingGaps(mapping, fields, mode), [mapping, fields, mode]);
   const mappingReady = !activeMapping || (gaps.missingRequired.length === 0 && !gaps.missingIdentifier && !gaps.duplicate);
-  const canPreview = Boolean(file) && Boolean(priceListId) && !inspecting && mappingReady;
+  const canPreview = Boolean(file) && Boolean(priceListId) && !inspecting && !previewing && mappingReady;
 
   function reset() {
     setStep(0);
@@ -123,6 +127,9 @@ export default function ProductWorkbookImportPage() {
     setMapping({});
     setExpandedSheets({});
     inspectSeq.current += 1;
+    previewSeq.current += 1;
+    setInspecting(false);
+    setPreviewing(false);
     setError(null);
     setResumedWithoutFile(false);
     setParam(null);
@@ -138,6 +145,9 @@ export default function ProductWorkbookImportPage() {
     setExpandedSheets({});
     setError(null);
     const seq = ++inspectSeq.current;
+    previewSeq.current += 1;
+    setInspecting(false);
+    setPreviewing(false);
     if (!next) return;
     if (next.size > MAX_IMPORT_BYTES) {
       setFile(null);
@@ -170,6 +180,8 @@ export default function ProductWorkbookImportPage() {
 
   function updateMapping(index: number, value: string) {
     setMapping((current) => ({ ...current, [index]: value === '' ? null : value }));
+    previewSeq.current += 1;
+    setPreviewing(false);
     setPreview(null);
   }
 
@@ -184,7 +196,7 @@ export default function ProductWorkbookImportPage() {
 
   function downloadErrors(current: WorkbookPreview) {
     const rows = WORKBOOK_SHEETS.flatMap((sheet) =>
-      current[sheet].errors.map((issue) => [t(`sheet_${sheet}` as 'sheet_products'), issue.row, issue.messages.join(' — ')])
+      current[sheet].errors.map((issue) => [t(`sheet_${sheet}` as 'sheet_products'), issue.row, spreadsheetSafe(issue.messages.join(' — '))])
     );
     downloadCsv('nebrax-workbook-errors.csv', toCsv([t('report_sheet'), t('report_row'), t('report_messages')], rows));
   }
@@ -197,6 +209,7 @@ export default function ProductWorkbookImportPage() {
 
   async function runPreview() {
     if (!file || !priceListId) return;
+    const seq = ++previewSeq.current;
     setPreviewing(true);
     setError(null);
     try {
@@ -204,13 +217,15 @@ export default function ProductWorkbookImportPage() {
         method: 'POST',
         body: workbookFormData(file, { priceListId, mode, blankPolicy, masterDataPolicy, mapping: activeMapping }),
       });
+      if (seq !== previewSeq.current) return;
       setPreview(response.data);
       setStep(1);
     } catch (err) {
+      if (seq !== previewSeq.current) return;
       setPreview(null);
       setError(err instanceof ApiError ? err.message : tc('saveFailed'));
     } finally {
-      setPreviewing(false);
+      if (seq === previewSeq.current) setPreviewing(false);
     }
   }
 
@@ -398,6 +413,8 @@ export default function ProductWorkbookImportPage() {
                       className="ms-auto"
                       onClick={() => {
                         setMapping(suggestedMapping(inspection.sheets.products.columns.map((column) => ({ ...column, samples: [] }))));
+                        previewSeq.current += 1;
+                        setPreviewing(false);
                         setPreview(null);
                       }}
                     >

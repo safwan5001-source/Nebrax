@@ -17,6 +17,7 @@ describe('workbook contract (IMP-H2-S3)', () => {
     expect(readInspection({})).toBeNull();
     expect(readInspection(null)).toBeNull();
     expect(readInspection({ sheets: { products: sheet(0, []) }, fields: {} })).toBeNull();
+    expect(readInspection({ sheets: { products: { present: true }, barcodes: sheet(0, []), unit_prices: sheet(0, []) }, fields: { products: [] } })).toBeNull();
     expect(readInspection(inspection())).not.toBeNull();
   });
 

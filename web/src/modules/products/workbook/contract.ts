@@ -69,7 +69,8 @@ export interface WorkbookInspection {
 export function readInspection(payload: unknown): WorkbookInspection | null {
   const value = payload as Partial<WorkbookInspection> | null | undefined;
   if (!value?.sheets || !value.fields) return null;
-  return WORKBOOK_SHEETS.every((key) => value.sheets?.[key]) ? (value as WorkbookInspection) : null;
+  const wellFormed = WORKBOOK_SHEETS.every((key) => Array.isArray(value.sheets?.[key]?.columns));
+  return wellFormed && Array.isArray(value.fields.products) ? (value as WorkbookInspection) : null;
 }
 
 /** أعمدة ورقةٍ لا يقبل الخادم مطابقتها يدوياً (الباركودات/الأسعار) ولم يتعرّف عليها المطابق التلقائي — تُتجاهل بصمت لولا هذا العرض. */
