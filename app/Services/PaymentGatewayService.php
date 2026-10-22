@@ -295,11 +295,23 @@ final class PaymentGatewayService
                     break;
 
                 default: // revoked
-                    // الإلغاء يمحو الأسرار فيستحيل حسم أو مطابقة أي محاولة دفع جارية؛ لا يُلغى اتصال له محاولات نشطة (أوقفه مؤقتاً أو أغلقها أولاً).
-                    if (PaymentAttempt::query()->where('payment_gateway_id', $locked->getKey())->whereIn('capture_status', PaymentAttempt::ACTIVE_STATUSES)->exists()) {
+                    // الإلغاء يمحو الأسرار فيستحيل حسم/مطابقة أي محاولة قد تلتقط لدى المزوّد: الجارية، والملغاة/المنتهية محلياً ما دامت صفحة
+                    // دفعها المستضافة قائمة (لا انتهاء معلوم أو لم يحن بعد) لأن العميل قد يُتمّها فيلزم رصد التقاطها (D-15). الإيقاف المؤقت بديل يُبقي الأسرار.
+                    $remotelyActionable = PaymentAttempt::query()
+                        ->where('payment_gateway_id', $locked->getKey())
+                        ->where(function ($query) {
+                            $query->whereIn('capture_status', PaymentAttempt::ACTIVE_STATUSES)
+                                ->orWhere(function ($closed) {
+                                    $closed->whereIn('capture_status', [PaymentAttempt::STATUS_CANCELLED, PaymentAttempt::STATUS_EXPIRED])
+                                        ->whereNotNull('provider_payment_id')
+                                        ->where(fn ($expiry) => $expiry->whereNull('expires_at')->orWhere('expires_at', '>', now()));
+                                });
+                        })
+                        ->exists();
+                    if ($remotelyActionable) {
                         throw new PaymentGatewayException(
                             'gateway.has_active_attempts',
-                            'لا يمكن إلغاء اعتماد اتصال له محاولات دفع جارية. أوقفه مؤقتاً أو ألغِ المحاولات أولاً.'
+                            'لا يمكن إلغاء اعتماد اتصال له محاولات دفع جارية أو صفحات دفع لم تنتهِ بعد. أوقفه مؤقتاً حتى تنتهي.'
                         );
                     }
                     $locked->status = PaymentGateway::STATUS_REVOKED;

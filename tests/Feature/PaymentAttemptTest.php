@@ -292,6 +292,21 @@ class PaymentAttemptTest extends TestCase
         $this->assertSame(PaymentGateway::STATUS_REVOKED, $gateways->revoke($this->gateway->fresh(), $this->owner, 'إلغاء بعد الإغلاق')->status);
     }
 
+    #[Test]
+    public function a_cancelled_attempt_whose_hosted_checkout_is_still_open_also_blocks_revocation_until_it_expires(): void
+    {
+        $gateways = app(PaymentGatewayService::class);
+        $attempt = $this->orchestrator->start(new TestPayable, $this->gateway, 'idem-key-0040');
+        $this->orchestrator->cancel($attempt); // محلي فقط: صفحة الدفع لدى المزوّد قائمة وقد تُتمّ
+
+        $e = $this->thrown(fn () => $gateways->revoke($this->gateway->fresh(), $this->owner, 'إلغاء اختبار'), 'revoke while open', \App\Support\PaymentGatewayException::class);
+        $this->assertSame('gateway.has_active_attempts', $e->reason);
+
+        // بعد انتهاء صفحة الدفع المعلن لا مجال لالتقاط لاحق فيصح الإلغاء.
+        DB::table('payment_attempts')->where('id', $attempt->id)->update(['expires_at' => now()->subMinute()]);
+        $this->assertSame(PaymentGateway::STATUS_REVOKED, $gateways->revoke($this->gateway->fresh(), $this->owner, 'بعد الانتهاء')->status);
+    }
+
     // ═══════════════ ضابط التفعيل ═══════════════
 
     #[Test]
