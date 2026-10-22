@@ -48,7 +48,8 @@ class ImportJobUnitRecorder
         $byOrdinal = [];
         if ($e instanceof ImportUnitFailureException) {
             foreach ($e->failures as $failure) {
-                if ($failure['ordinal'] >= $offset && $failure['ordinal'] < $windowEnd) {
+                // تُسمَّى الوحدات الفاشلة أينما وقعت من `offset` فصاعداً (فحص الملف كله قد يسمّي صفوفاً خارج النافذة الأولى).
+                if ($failure['ordinal'] >= $offset && $failure['ordinal'] < $total) {
                     $byOrdinal[$failure['ordinal']] = ['code' => $failure['code'], 'message' => $failure['message']];
                 }
             }
@@ -57,10 +58,12 @@ class ImportJobUnitRecorder
         $windowCode = $e instanceof ImportPreviewException ? $e->reason : 'chunk_failed';
         $rows = [];
         for ($ordinal = $offset; $ordinal < $total; $ordinal++) {
-            if ($ordinal < $windowEnd) {
-                $entry = $byOrdinal[$ordinal] ?? ($byOrdinal === []
+            if (isset($byOrdinal[$ordinal])) {
+                $entry = $byOrdinal[$ordinal];
+            } elseif ($ordinal < $windowEnd) {
+                $entry = ($byOrdinal === []
                     ? ['code' => $windowCode, 'message' => $this->safeMessage($e)]
-                    : ['code' => 'window_rolled_back', 'message' => 'لم تُطبَّق لأن نافذتها فشلت وتراجعت كاملةً.']);
+                    : ['code' => 'window_rolled_back', 'message' => 'لم تُطبَّق: توقّفت التشغيلة بسبب فشل في نافذتها أو في فحص الملف، وتراجعت كاملةً.']);
             } else {
                 $entry = ['code' => 'not_attempted', 'message' => 'لم تُعالَج بعد: توقّفت التشغيلة قبل الوصول إليها.'];
             }

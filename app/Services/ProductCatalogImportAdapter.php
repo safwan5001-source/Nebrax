@@ -112,6 +112,11 @@ class ProductCatalogImportAdapter extends SpreadsheetImportAdapter implements Im
             $chunkOptions['expected_plan'] = $plan;
         }
 
+        // IMP-H1-S5: قبل أول قطعة (ولا كتابة بعد) — الملف كله يُفحص للتكرار عبر النوافذ، فلا تُرحَّل نوافذ ثم يفشل تكرارٌ متأخر.
+        if ($chunk->offset === 0) {
+            app(ProductImportService::class)->prevalidateWholeFile($chunk->file, $chunkOptions, ProductImportService::DURABLE_MAX_ROWS);
+        }
+
         // IMP-H1-S8b: تشغيلة إصلاح فرعية تنتزع معرّفات نافذتها ذرّياً **قبل** الكتابة وداخل معاملة القطعة نفسها (تتراجع معها عند الفشل).
         if ($job->parent_job_id !== null) {
             app(ImportRepairClaims::class)->claimWindow($job, (string) $chunk->file->getRealPath(), (string) $job->extension, $chunk->offset, $chunk->batchSize);

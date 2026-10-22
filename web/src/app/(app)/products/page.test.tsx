@@ -24,7 +24,7 @@ const { api, downloadFile, translate, getSystemTaxInclusive, getShowStockQuantit
     tax_excl_tag: 'excl. VAT',
     empty: 'No products',
     import: 'Import',
-    ai_import: 'Import via AWJ Assistant',
+    ai_import: 'Assisted review import',
     add: 'Add product',
     view: 'View',
     edit: 'Edit',
@@ -185,7 +185,7 @@ describe('ProductsPage AI import entry', () => {
     // The action group keeps secondary product-management actions in its
     // overflow menu; it is still gated exactly like the traditional import.
     await user.click(screen.getByRole('button', { name: 'moreActions' }));
-    expect(screen.getByRole('menuitem', { name: 'Import via AWJ Assistant' }).getAttribute('href')).toBe('/products/ai-import');
+    expect(screen.getByRole('menuitem', { name: 'Assisted review import' }).getAttribute('href')).toBe('/products/ai-import');
   });
 });
 
