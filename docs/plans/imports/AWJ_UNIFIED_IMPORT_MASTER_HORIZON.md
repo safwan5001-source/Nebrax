@@ -145,7 +145,9 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
 - **IMP-H1-S2 — `ImportDomainAdapter` contract + registry**, with the three existing domains wired through it. **No behavior change** (characterization tests first). `ImportJobService::runChunk` dispatches via the registry instead of `match`.
 - **IMP-H1-S3 — Durable-path approval binding & idempotency.**
   - Preview returns `preview_hash` = HMAC(file SHA-256 + archive SHA-256 + domain + normalized options + mapping).
-  - **`preview_hash` is required to create an executable job.** `POST /import-jobs` without it, or with a hash that does not match the uploaded file and options, is rejected (422 `preview_required` / `preview_mismatch`). Apply re-verifies the frozen options against the bound hash.
+  - **Options move to job creation.** `POST /import-jobs` gains `options` (mode, policies, domain fields such as `opening_date`/`price_list_id`) and `mapping`. The server normalizes them exactly as preview does and **freezes them on the job at creation**. Today they first arrive at `/apply`, which cannot be bound.
+  - **`preview_hash` is required to create an executable job.** `POST /import-jobs` without it, or with a hash that does not equal HMAC(uploaded file SHA ‖ archive SHA ‖ domain ‖ frozen normalized options ‖ mapping), is rejected (422 `preview_required` / `preview_mismatch`) before `ready`.
+  - **`/apply` no longer accepts option changes.** It runs the frozen options. A body carrying options that differ from them returns 422 `options_frozen`; identical options are tolerated for compatibility with the old client during rollout.
   - **Compatibility:** the UI change ships in the same PR. Jobs already `ready` or `processing` at deploy time (`created_at` < the slice's cutover constant) may finish under the old contract; no new hashless job can execute.
   - The UI sends `idempotency_key`.
   - Add a route throttle.

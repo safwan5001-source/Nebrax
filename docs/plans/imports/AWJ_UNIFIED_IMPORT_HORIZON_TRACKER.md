@@ -22,7 +22,7 @@
 | IMP-H0-S1 | — | — | Discovery, master plan, tracker, handoff (docs) | — | `claude/unified-import-h0` | #1595 | `474aad1` | _pending_ | — | n/a (docs) | — | — | — | In Progress | Merge, then stop for the model handoff |
 | IMP-H1-S1 | 🟡→✅ | — | Per-domain job authorization map (perm + app gate, index filtering); prune deletes media archive | H0 | — | — | — | — | — | — | — | — | — | Planned | Start (handoff §3) |
 | IMP-H1-S2 | ✅ | ✅ | `ImportDomainAdapter` + registry; existing 3 domains; no behavior change | H1-S1 | — | — | — | — | — | — | — | — | — | Planned | — |
-| IMP-H1-S3 | ✅ | — | Required preview-hash ↔ job binding (legacy in-flight jobs only grandfathered); UI idempotency key; throttle | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
+| IMP-H1-S3 | ✅ | — | Options+mapping frozen at job creation; required preview-hash binding; `/apply` rejects changed options (legacy in-flight jobs only grandfathered); UI idempotency key; throttle | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H1-S4 | ✅ | ✅ | Spreadsheet scan admission (policy; prod enable = D-04) | — | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H1-S5 | ✅ | — | Catalog job: whole-file pre-validation, failed-rows repair set, fetch outside lock | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H1-S7 | — | ✅ | AI Action type gates: `application_key` + multi-permission in registry/policy; invariant test | H1-S1 | — | — | — | — | — | — | — | — | — | Planned | Before any new AI type |
