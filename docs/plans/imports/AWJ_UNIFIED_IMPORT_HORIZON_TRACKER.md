@@ -11,7 +11,7 @@
 | Field | Value |
 |---|---|
 | Last merged slice | **IMP-H0-S1**: PR #1595, squash-merged 2026-10-22, Merge SHA `5e20e9edc941f83181497158fa68e6c55e95c485` |
-| **Next slice** | **IMP-H1-S1**: per-domain import-job authorization map (permission + app gate) and prune of completed-job media archives (see `AWJ_IMPORT_OPUS_HANDOFF.md` §3). **Not started.** Execution resumes on the next model (model-handoff stop after H0). |
+| **Next slice** | **IMP-H1-S7** (AI Action type gates), then H1-S3 → S8 → S4 → S5 → S6. H1-S1 merged; H1-S2 in review. |
 | Open owner decisions | D-01, D-02 (narrowed: `import_rows` data scope only), D-03, D-04, D-06, D-07, OPS-01 (D-05 has a non-blocking default; D-08/D-09 are recorded exclusions) |
 | Railway state | Unknown (owner-reported stall; no access from the agent) |
 
@@ -20,8 +20,8 @@
 | Slice | Std | AI | Scope | Depends | Branch | PR | Base SHA | Head SHA | Merge SHA | Tests | CI | Deploy | Verify | Status | Next action |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | IMP-H0-S1 | — | — | Discovery, master plan, tracker, handoff (docs) | — | `claude/unified-import-h0` | #1595 | `474aad1` (main at start; merged onto `d187406`) | `323e6e4` | `5e20e9e` | CI: PHP SQLite ✅, PostgreSQL ✅ (one infra re-run), CI Gate ✅. Local: 8078 passed / 26 env-only `bcmath` Fuel failures | ✅ | n/a (docs; no code change deployed) | n/a | **Merged** | Model handoff → IMP-H1-S1 |
-| IMP-H1-S1 | 🟡→✅ | — | Per-domain job authorization map (perm + app gate, index filtering); prune deletes media archive | H0 | — | — | — | — | — | — | — | — | — | Planned | Start (handoff §3) |
-| IMP-H1-S2 | ✅ | ✅ | `ImportDomainAdapter` + registry (`unitKey`/`applyUnit`, unit-based cursor); existing 3 domains; no behavior change | H1-S1 | — | — | — | — | — | — | — | — | — | Planned | — |
+| IMP-H1-S1 | ✅ | — | Per-domain job authorization map (perm + app gate, index filtering); prune deletes media archive | H0 | `claude/imp-h1-s1-import-jobs-gate-retention` | #1603 | `1c8b643` | `dcb9af8` | `d959b98` | CI: SQLite ✅, PostgreSQL ✅ (first run caught a hand-inserted-tenant row-lock test needing `inventory.core`; fixed), CI Gate ✅. Local: 8155 passed / 26 env-only `bcmath` | ✅ | no migration, no env change; intended narrow behavior change (see report) | n/a | **Merged** | H1-S2 |
+| IMP-H1-S2 | ✅ | ✅ | `ImportDomainAdapter` + registry; existing 3 domains moved behind it; no behavior change (unit-cursor/`applyUnit` deferred to H1-S3) | H1-S1 | `claude/imp-h1-s2-import-domain-adapter` | (this PR) | `d959b98` | — | — | pending CI; local 8165 passed / 26 env-only `bcmath` | ✅ | no migration, no env change, no journal entry | n/a | In review | H1-S7 |
 | IMP-H1-S3 | ✅ | — | Single-use `import_previews` (canonical per-unit plan, `plan_drift` on apply, minted occurrence ids); job `branch_id` bound + restored per chunk (F-15); sync applies require `preview_hash`; options+mapping frozen at job creation; required preview-hash binding; `/apply` rejects changed options (legacy in-flight jobs only grandfathered); UI idempotency key; throttle | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H1-S4 | ✅ | ✅ | `SpreadsheetIntakeGuard` before parsing on every file-accepting import route (route invariant test; prod enable = D-04) | — | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H1-S5 | ✅ | — | Catalog job: whole-file pre-validation, fetch outside lock (repair via H1-S8) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
