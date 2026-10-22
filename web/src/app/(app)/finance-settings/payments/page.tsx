@@ -154,7 +154,7 @@ export default function PaymentGatewaysPage() {
 
   function detailRows(connection: GatewayConnection) {
     return (
-      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+      <dl className="mt-3 grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1.5 text-xs">
         <dt className="text-muted">{t('fields.secretKey')}</dt>
         <dd className="text-text">{connection.has_secret_key ? t('fields.saved') : t('fields.missing')}</dd>
         <dt className="text-muted">{t('fields.webhookSecret')}</dt>

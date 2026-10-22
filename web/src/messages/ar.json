@@ -11309,7 +11309,7 @@
     },
     "environments": {
       "sandbox": "تجريبي",
-      "live": "فعلي"
+      "live": "مباشر"
     },
     "status": {
       "draft": "مسودة",
