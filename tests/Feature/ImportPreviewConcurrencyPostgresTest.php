@@ -156,6 +156,8 @@ class ImportPreviewConcurrencyPostgresTest extends TestCase
             }
             if ($pid === 0) {
                 DB::purge(config('database.default'));
+                // الاتصال يُفتح **قبل** الحاجز فيبدأ الجميع الإنفاق معاً لا متعاقبين بفعل زمن فتح الاتصال.
+                DB::connection()->getPdo();
                 $deadline = microtime(true) + 10.0;
                 while (! file_exists($barrier) && microtime(true) < $deadline) {
                     usleep(500);

@@ -71,7 +71,7 @@ class ImportPlanDriftTest extends TestCase
     // ── الخطّة تُحفَظ وتُنسَخ ────────────────────────────────────────────────
 
     /** @test */
-    public function the_catalog_preview_stores_a_compressed_plan_and_the_job_gets_a_copy(): void
+    public function the_catalog_preview_stores_a_compressed_plan_that_the_job_reads_through_its_preview(): void
     {
         $auth = $this->registerTenant();
         $binding = $this->preview($auth['token'], $this->csv([['PD-1', 'واحد'], ['PD-2', 'اثنان']]));
@@ -80,7 +80,9 @@ class ImportPlanDriftTest extends TestCase
         $this->assertSame([2 => 'c', 3 => 'c'], $plan);
 
         $jobId = $this->createJob($auth['token'], $this->csv([['PD-1', 'واحد'], ['PD-2', 'اثنان']]), $binding)->assertCreated()['data']['id'];
-        $this->assertSame($plan, ImportPreviewService::decodePlan(ImportJob::query()->whereKey($jobId)->value('apply_plan')));
+        // التشغيلة لا تحمل نسخةً من الخطّة (عمودٌ ضخم يُحمَّل مع كل قراءة): تقرؤها من سجلّ معاينتها وقت القطعة.
+        $this->assertSame($binding['id'], ImportJob::query()->whereKey($jobId)->value('preview_id'));
+        $this->assertArrayNotHasKey('apply_plan', ImportJob::query()->whereKey($jobId)->firstOrFail()->getAttributes());
     }
 
     /** @test */
@@ -206,7 +208,7 @@ class ImportPlanDriftTest extends TestCase
 
         $this->withToken($auth['token'])->post('/api/products/import/apply', [
             'file' => $this->csv($rows), 'mode' => 'upsert', 'preview_id' => $binding['id'], 'preview_hash' => $binding['hash'],
-        ], ['Accept' => 'application/json'])->assertStatus(422);
+        ], ['Accept' => 'application/json'])->assertStatus(422)->assertJsonPath('code', 'plan_drift');
 
         $this->assertNull(ImportPreview::query()->whereKey($binding['id'])->value('consumed_at'), 'الإنفاق رجع مع فشل التنفيذ.');
     }
@@ -245,8 +247,9 @@ class ImportPlanDriftTest extends TestCase
             ->assertStatus(422)->assertJsonPath('code', 'preview_required');
         $this->withToken($auth['token'])->post('/api/products/import/apply', ['file' => $this->csv([['PD-REQ', 'x']]), 'mode' => 'create'], ['Accept' => 'application/json'])
             ->assertStatus(422)->assertJsonPath('code', 'preview_required');
-        $this->withToken($auth['token'])->post('/api/products/workbook/apply', ['file' => $this->csv([['PD-REQ', 'x']]), 'price_list_id' => '00000000-0000-4000-8000-000000000000'], ['Accept' => 'application/json'])
-            ->assertStatus(422);
+        $priceList = $this->withToken($auth['token'])->postJson('/api/price-lists', ['name' => 'قائمة'])->assertCreated()['data']['id'];
+        $this->withToken($auth['token'])->post('/api/products/workbook/apply', ['file' => $this->workbook('SKU-PD'), 'price_list_id' => $priceList], ['Accept' => 'application/json'])
+            ->assertStatus(422)->assertJsonPath('code', 'preview_required');
         $this->assertSame(0, Product::withoutGlobalScopes()->where('sku', 'PD-REQ')->count());
 
         // ومع معاينتها تعمل.
@@ -255,5 +258,83 @@ class ImportPlanDriftTest extends TestCase
         $this->withToken($auth['token'])->post('/api/inventory-openings/import/apply', [
             'file' => $opening(), 'opening_date' => '2026-02-01', 'preview_id' => $binding['id'], 'preview_hash' => $binding['hash'],
         ], ['Accept' => 'application/json'])->assertCreated();
+    }
+
+    private function workbook(string $sku): UploadedFile
+    {
+        $path = tempnam(sys_get_temp_dir(), 'pd-wb-');
+        SpreadsheetWriter::workbookXlsx($path, [
+            ['name' => 'Products', 'headers' => ['sku', 'name', 'type', 'unit', 'sale_price'], 'rows' => []],
+            ['name' => 'Barcodes', 'headers' => ['sku', 'code'], 'rows' => [[$sku, '6281234500123']]],
+            ['name' => 'Unit Prices', 'headers' => ['sku', 'unit_name', 'price'], 'rows' => [[$sku, '', '55.00']]],
+        ]);
+        $file = UploadedFile::fake()->createWithContent('wb.xlsx', (string) file_get_contents($path));
+        @unlink($path);
+
+        return $file;
+    }
+
+    /** @test */
+    public function a_sync_workbook_apply_with_its_binding_runs_and_consumes_the_preview(): void
+    {
+        $auth = $this->registerTenant();
+        $priceList = $this->withToken($auth['token'])->postJson('/api/price-lists', ['name' => 'قائمة'])->assertCreated()['data']['id'];
+        $this->product($auth['token'], 'SKU-WBS');
+        $binding = $this->withToken($auth['token'])->post('/api/products/workbook/preview', ['file' => $this->workbook('SKU-WBS'), 'price_list_id' => $priceList], ['Accept' => 'application/json'])
+            ->assertOk()->json('data.binding');
+        $body = ['price_list_id' => $priceList, 'preview_id' => $binding['id'], 'preview_hash' => $binding['hash']];
+
+        $this->withToken($auth['token'])->post('/api/products/workbook/apply', ['file' => $this->workbook('SKU-WBS')] + $body, ['Accept' => 'application/json'])->assertOk();
+        $this->assertNotNull(ImportPreview::query()->whereKey($binding['id'])->value('consumed_at'));
+
+        $this->withToken($auth['token'])->post('/api/products/workbook/apply', ['file' => $this->workbook('SKU-WBS')] + $body, ['Accept' => 'application/json'])
+            ->assertStatus(422)->assertJsonPath('code', 'preview_consumed');
+    }
+
+    // ── نافذة المعاينة · قطعٌ لاحقة · التقليم ─────────────────────────────────
+
+    /** @test */
+    public function a_windowed_preview_stores_no_partial_plan(): void
+    {
+        $auth = $this->registerTenant();
+        $binding = $this->preview($auth['token'], $this->csv([['PD-W1', 'واحد'], ['PD-W2', 'اثنان']]), ['mode' => 'create', 'batch_offset' => 0, 'batch_size' => 1]);
+
+        $this->assertNull(ImportPreview::query()->whereKey($binding['id'])->value('plan'), 'خطّةٌ ناقصة كانت ستُنتج plan_drift زائفاً خارج النافذة.');
+    }
+
+    /** @test */
+    public function a_drift_in_a_later_chunk_fails_the_job_after_the_earlier_chunks_were_written(): void
+    {
+        $auth = $this->registerTenant();
+        $rows = [['PD-L1', 'واحد'], ['PD-L2', 'اثنان'], ['PD-L3', 'ثلاثة']];
+        $binding = $this->preview($auth['token'], $this->csv($rows), ['mode' => 'upsert']);
+        $jobId = $this->createJob($auth['token'], $this->csv($rows), $binding)->assertCreated()['data']['id'];
+
+        $this->applyJob($auth['token'], $jobId, ['batch_size' => 1])->assertOk();
+        $this->applyJob($auth['token'], $jobId, ['batch_size' => 1])->assertOk();
+        $this->product($auth['token'], 'PD-L3', 'ظهر في الأثناء'); // الصف الأخير تغيّر من «إنشاء» إلى «تحديث»
+
+        $this->applyJob($auth['token'], $jobId)->assertStatus(422);
+        $this->assertSame('failed', ImportJob::query()->whereKey($jobId)->value('status'));
+        // ما سبق التقاط الانجراف بقي مكتوباً (فشل على مستوى القطعة لا الملف — تحقّق الملف كاملاً قبل الكتابة = S5)، والمنتج الخارجي لم يُمسّ.
+        $this->assertSame(2, Product::withoutGlobalScopes()->whereIn('sku', ['PD-L1', 'PD-L2'])->count());
+        $this->assertSame('ظهر في الأثناء', Product::withoutGlobalScopes()->where('sku', 'PD-L3')->value('name'));
+    }
+
+    /** @test */
+    public function prune_keeps_the_preview_of_an_unfinished_job_and_removes_it_once_the_job_ends(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $binding = $this->preview($auth['token'], $this->csv([['PD-PR', 'واحد']]), ['mode' => 'create']);
+        $jobId = $this->createJob($auth['token'], $this->csv([['PD-PR', 'واحد']]), $binding, ['mode' => 'create'])->assertCreated()['data']['id'];
+        ImportPreview::query()->whereKey($binding['id'])->update(['consumed_at' => now('UTC')->subDays(30), 'expires_at' => now('UTC')->subDays(30)]);
+
+        $this->artisan('imports:prune')->assertSuccessful();
+        $this->assertNotNull(ImportPreview::query()->whereKey($binding['id'])->first(), 'تشغيلةٌ لم تنتهِ ما زالت تقرأ خطّتها من هذه المعاينة.');
+
+        $this->withToken($auth['token'])->postJson("/api/import-jobs/{$jobId}/cancel")->assertOk();
+        $this->artisan('imports:prune')->assertSuccessful();
+        $this->assertNull(ImportPreview::query()->whereKey($binding['id'])->first());
     }
 }

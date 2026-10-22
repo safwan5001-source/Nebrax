@@ -149,8 +149,6 @@ class ImportJobService
                 'preview_id' => $preview?->id,
                 'preview_hash' => $preview === null ? null : $previewHash,
                 'apply_options' => $preview === null ? null : $canonical,
-                // خطّة المعاينة تُنسَخ إلى التشغيلة (لا تُقرأ من السجلّ لاحقاً: التقليم قد يسبق انتهاء تشغيلةٍ طويلة).
-                'apply_plan' => $preview?->plan,
                 ]);
 
                 // إنفاق المعاينة وإدراج التشغيلة **ذرّياً** في المعاملة نفسها: تعارض القيد الفريد أو فشل الإنفاق يُرجع الاثنين

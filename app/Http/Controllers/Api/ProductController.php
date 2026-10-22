@@ -205,16 +205,6 @@ class ProductController extends ApiController
 
         return response()->json([
             'data' => $this->domain(function () use ($request, $options, $mediaOptions): array {
-                // Preflight is deliberately before catalog mutation: an unsafe ZIP,
-                // blocked URL or missing explicit approval cannot leave products written.
-                $mediaPreview = $this->importMedia->preview(
-                    $request->file('file'), $options, $request->file('media_archive'),
-                    ProductImportService::MAX_ROWS, $mediaOptions['approve_existing_updates'],
-                );
-                if ($mediaOptions['apply'] && ($mediaPreview['error_rows'] > 0 || $mediaPreview['needs_approval_rows'] > 0)) {
-                    throw new RuntimeException('لا يمكن حفظ صور المنتجات قبل معالجة أخطاء المعاينة والموافقات المطلوبة.');
-                }
-
                 // IMP-H1-S3c: ربط التطبيق المتزامن بمعاينته (اختياري حتى التفعيل): إنفاق المعاينة وكتابة الكتالوج في معاملةٍ واحدة،
                 // وخطّتها تُقارَن بالواقع قبل أي كتابة (`plan_drift`).
                 $previews = app(ImportPreviewService::class);
@@ -226,6 +216,16 @@ class ProductController extends ApiController
                     ],
                     $request->user()?->id, $request->input('preview_id'), $request->input('preview_hash'),
                 );
+                // Preflight is deliberately before catalog mutation: an unsafe ZIP,
+                // blocked URL or missing explicit approval cannot leave products written.
+                $mediaPreview = $this->importMedia->preview(
+                    $request->file('file'), $options, $request->file('media_archive'),
+                    ProductImportService::MAX_ROWS, $mediaOptions['approve_existing_updates'],
+                );
+                if ($mediaOptions['apply'] && ($mediaPreview['error_rows'] > 0 || $mediaPreview['needs_approval_rows'] > 0)) {
+                    throw new RuntimeException('لا يمكن حفظ صور المنتجات قبل معالجة أخطاء المعاينة والموافقات المطلوبة.');
+                }
+
                 $applyOptions = $options;
                 $plan = ImportPreviewService::decodePlan($bound?->plan);
                 if ($plan !== null) {

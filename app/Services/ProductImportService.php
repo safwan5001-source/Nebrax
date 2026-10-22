@@ -242,7 +242,7 @@ class ProductImportService
      * في الأثناء فصار «دمج» تحديثاً بدل إنشاء) يُرفض `plan_drift` بدل أن يُنفَّذ فعلاً مختلفاً عمّا اعتُمد.
      *
      * @param  array<string, mixed>  $options
-     * @return array{preview: array<string, mixed>, plan: array<int, string>}
+     * @return array{preview: array<string, mixed>, plan: array<int, string>|null}
      */
     public function previewWithPlan(UploadedFile $file, array $options, bool $costAuthorized = true, int $maxRows = self::MAX_ROWS): array
     {
@@ -274,12 +274,15 @@ class ProductImportService
             'errors' => $parsed['errors'],
         ];
 
+        // معاينةٌ بنافذة (`batch_offset`/`batch_size`) لا تغطّي الملف كله: خطّةٌ ناقصة كانت ستُنتج `plan_drift` زائفاً لصفوفٍ خارج
+        // النافذة عند تنفيذ الملف كاملاً — فلا تُخزَّن خطّة (تنفيذٌ بلا مقارنة = العقد القديم) بدل خطّةٍ جزئية.
+        $windowed = ((int) ($parsed['batch_offset'] ?? 0)) > 0 || ($parsed['batch_size'] ?? null) !== null;
         $plan = [];
-        foreach ($parsed['rows'] as $row) {
+        foreach ($windowed ? [] : $parsed['rows'] as $row) {
             $plan[(int) $row['row']] = $this->planCode($row);
         }
 
-        return ['preview' => $preview, 'plan' => $plan];
+        return ['preview' => $preview, 'plan' => $windowed ? null : $plan];
     }
 
     /**
@@ -625,6 +628,8 @@ class ProductImportService
             'rows' => $rows,
             'errors' => $errors,
             'pending_references' => $pending,
+            'batch_offset' => $batchOffset,
+            'batch_size' => $batchSize,
         ];
     }
 

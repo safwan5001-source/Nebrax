@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ImportPreview;
 use App\Support\ImportChunk;
 use App\Support\ImportChunkResult;
 use App\Support\ImportJobDomain;
@@ -64,7 +65,9 @@ class ProductCatalogImportAdapter extends SpreadsheetImportAdapter
             'batch_size' => $chunk->batchSize,
         ]);
         // IMP-H1-S3c: تشغيلةٌ مربوطةٌ بمعاينةٍ تحمل خطّتها؛ كل قطعة تتحقق أن صفوف نافذتها ما زالت تفعل ما اعتُمد (plan_drift).
-        $plan = ImportPreviewService::decodePlan($job->apply_plan);
+        $plan = ImportPreviewService::decodePlan(
+            $job->preview_id === null ? null : ImportPreview::query()->whereKey($job->preview_id)->value('plan')
+        );
         if ($plan !== null) {
             $chunkOptions['expected_plan'] = $plan;
         }

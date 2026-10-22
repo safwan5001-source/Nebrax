@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\ImportJob;
 use App\Models\ImportPreview;
+use App\Support\ImportJobStatus;
 use App\Support\ImportPreviewException;
 use App\Tenancy\BranchContext;
 use App\Tenancy\TenantContext;
@@ -261,11 +263,21 @@ class ImportPreviewService
             : null;
     }
 
-    /** تقليم المعاينات المنتهية/المنفَقة القديمة — يُستدعى من `imports:prune`. */
+    /**
+     * تقليم المعاينات: غير المنفَقة المنتهية منذ يوم، والمنفَقة منذ أسبوع — **إلا** معاينة تشغيلةٍ لم تنتهِ بعد (تقرأ منها القطع خطّتها).
+     */
     public function pruneStale(): int
     {
+        $unfinishedJobs = ImportJob::query()->withoutGlobalScopes()
+            ->whereIn('status', ImportJobStatus::UNFINISHED)
+            ->whereNotNull('preview_id')
+            ->select('preview_id');
+
         return ImportPreview::query()->withoutGlobalScopes()
-            ->where(fn ($q) => $q->where('expires_at', '<', now('UTC')->subDay())->orWhere('consumed_at', '<', now('UTC')->subDays(7)))
+            ->where(function ($q) use ($unfinishedJobs) {
+                $q->where(fn ($u) => $u->whereNull('consumed_at')->where('expires_at', '<', now('UTC')->subDay()))
+                    ->orWhere(fn ($c) => $c->where('consumed_at', '<', now('UTC')->subDays(7))->whereNotIn('id', $unfinishedJobs));
+            })
             ->delete();
     }
 
