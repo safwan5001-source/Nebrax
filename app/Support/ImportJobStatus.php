@@ -36,6 +36,17 @@ final class ImportJobStatus
         self::QUEUED,
     ];
 
+    /**
+     * حالات تشغيلةٍ **لم تنتهِ** وقد تُرحَّل لاحقاً (IMP-H1-S3a): فرعٌ تعتمد عليها لا يُحذف، وإلا نُزع ربطها بالفرع
+     * (`nullOnDelete`) فعادت تُرحَّل بفرع الطلب لا فرعها.
+     */
+    public const UNFINISHED = [
+        self::UPLOADED,
+        self::READY,
+        self::QUEUED,
+        self::PROCESSING,
+    ];
+
     /** الحالات التي يقبل منها الإلغاء. */
     public const CANCELLABLE_FROM = [
         self::UPLOADED,

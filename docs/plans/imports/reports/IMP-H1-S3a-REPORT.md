@@ -37,9 +37,9 @@ a restricted user **with** the job's branch can still apply, and an `inventory_o
 
 - The **synchronous** endpoints (`products/import/apply`, `products/workbook/apply`, `inventory-openings/import/apply`) still use the request's branch — that is S3c.
 - `show`/`index` are not fenced by branch (the job is `CompanyWide`; only `branch_id` is visible).
-- `nullOnDelete`: deleting a branch turns its jobs into legacy jobs (request-branch behaviour, no 403 fence). `Branch::hasDocuments()` is numbering-based and does not know import jobs; changing the branch-delete guard is out of scope here and left as a possible follow-up (block deletion while a job is `ready`/`processing`).
+- `nullOnDelete`: deleting a branch used to turn its jobs into legacy jobs (request-branch behaviour, no 403 fence) — flagged by the independent review **and by the Codex review of this PR**. Fixed: `BranchController::destroy` now refuses (422) while an *unfinished* job (`uploaded`/`ready`/`queued`/`processing`, `ImportJobStatus::UNFINISHED`) references the branch; finished jobs (completed/failed/cancelled) don't block and keep `NULL` for audit. Covered by a test. (A rare create-between-check-and-delete race remains; it degrades to the legacy behaviour, never to data loss.)
 - `recountOnFirstApply()` also runs under the job branch (review finding; all adapters return `null` today).
 
 ## Review
 
-Codex quota exhausted — **not Codex-reviewed**. An independent read-only subagent reviewed the diff (static; did not run tests): no blocking defects. Its medium findings (recount outside the branch wrapper; missing multi-chunk / exception-restore / other-domain tests) are fixed above; the low ones are recorded in the scope notes.
+Codex (when its quota returned) reviewed commit `3983a53`: one P2 finding (branch deletion), fixed above. Before that, an independent read-only subagent reviewed the diff (static; did not run tests): no blocking defects. Its medium findings (recount outside the branch wrapper; missing multi-chunk / exception-restore / other-domain tests) are fixed above; the low ones are recorded in the scope notes.

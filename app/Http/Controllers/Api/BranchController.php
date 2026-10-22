@@ -6,7 +6,9 @@ use App\Http\Requests\StoreBranchRequest;
 use App\Http\Resources\BranchResource;
 use App\Models\Branch;
 use App\Models\DeliveryPlatformVersionOverride;
+use App\Models\ImportJob;
 use App\Support\BranchSettings;
+use App\Support\ImportJobStatus;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -94,6 +96,12 @@ class BranchController extends ApiController
         $referenced = fn () => DeliveryPlatformVersionOverride::query()->where('branch_id', $branch->id)->exists();
         if ($referenced()) {
             abort(422, $overrideMessage);
+        }
+
+        // IMP-H1-S3a: تشغيلة استيراد لم تنتهِ مربوطةٌ بهذا الفرع — حذفه ينزع ربطها (`nullOnDelete`) فتُرحَّل بفرعٍ آخر.
+        // المنتهية (مكتملة/فاشلة/ملغاة) لا تُرحَّل بعدها فلا تمنع الحذف.
+        if (ImportJob::query()->where('branch_id', $branch->id)->whereIn('status', ImportJobStatus::UNFINISHED)->exists()) {
+            abort(422, 'لا يمكن حذف فرع له تشغيلات استيراد لم تنتهِ — أكملها أو ألغها أولاً، أو عطّل الفرع بدل حذفه.');
         }
 
         try {
