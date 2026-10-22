@@ -355,6 +355,81 @@ class PosTerminalFoundationTest extends TestCase
         $this->assertSame(0, Payment::query()->count());
     }
 
+    // ═══════════════ ملاحظات المراجعة: ملكية الجلسة، ربط الجهاز، حذف الطريقة، إيجار الحل ═══════════════
+
+    #[Test]
+    public function only_the_session_cashier_or_an_approver_can_inspect_cancel_or_void_a_terminal_request(): void
+    {
+        $ctx = $this->context('pos-term-owner');
+        $id = $this->approvedRequest($ctx, 11500);
+        $other = $this->tokenForRole($ctx['tenant_id'], 'accountant', 'acct@pos-term-owner.test'); // invoices.manage بلا pos.variance.approve
+        app(TenantContext::class)->set($ctx['tenant_id']);
+
+        $this->withToken($other)->getJson("/api/pos/terminal-requests/{$id}")->assertForbidden();
+        $this->withToken($other)->postJson("/api/pos/terminal-requests/{$id}/cancel")->assertForbidden();
+        $this->withToken($other)->postJson("/api/pos/terminal-requests/{$id}/void")->assertForbidden();
+        $this->withToken($other)->getJson("/api/pos-sessions/{$ctx['session']}/terminal-requests")->assertForbidden();
+        $this->assertSame('approved', PosTerminalRequest::query()->withoutGlobalScopes()->findOrFail($id)->status, 'لم يُلغَ بيع كاشير آخر');
+        $this->assertSame([], $this->fake->voided);
+
+        // كاشير الجلسة (المالك) والمعتمد (admin بـ*) يعملان.
+        $this->withToken($ctx['token'])->getJson("/api/pos-sessions/{$ctx['session']}/terminal-requests")->assertOk();
+        $admin = $this->tokenForRole($ctx['tenant_id'], 'admin', 'admin@pos-term-owner.test');
+        $this->withToken($admin)->postJson("/api/pos/terminal-requests/{$id}/void")->assertOk()->assertJsonPath('data.status', 'voided');
+    }
+
+    #[Test]
+    public function a_terminal_assigned_to_a_pos_device_only_serves_sessions_on_that_device(): void
+    {
+        $ctx = $this->context('pos-term-device');
+        app(TenantContext::class)->set($ctx['tenant_id']);
+        $deviceA = PosSession::query()->withoutGlobalScopes()->findOrFail($ctx['session'])->pos_device_id;
+        $this->withToken($ctx['token'])->putJson("/api/pos-payment-terminals/{$ctx['terminal']['id']}", ['pos_device_id' => $deviceA])->assertOk();
+
+        $adminToken = $this->tokenForRole($ctx['tenant_id'], 'admin', 'admin@pos-term-device.test');
+        app(TenantContext::class)->set($ctx['tenant_id']);
+        $adminCtx = [...$ctx, 'token' => $adminToken];
+        $adminCtx['session'] = $this->openSession($adminCtx); // جهاز POS آخر
+        $this->createRequest($adminCtx, 11500)->assertStatus(422)->assertJsonPath('reason', 'terminal_device_mismatch');
+
+        $this->createRequest($ctx, 11500)->assertCreated()->assertJsonPath('data.status', 'sent'); // جهازه
+        $this->assertSame(1, PosTerminalRequest::query()->withoutGlobalScopes()->count());
+
+        // غير مخصَّص ⇒ متاح لأي جهاز في الفرع.
+        $free = $this->terminal($ctx, 'جهاز حر');
+        $this->createRequest($adminCtx, 11500, terminal: $free['id'])->assertCreated();
+    }
+
+    #[Test]
+    public function deleting_a_payment_method_with_terminal_history_is_a_validation_error_not_a_500(): void
+    {
+        $ctx = $this->context('pos-term-del');
+        $method = $this->withToken($ctx['token'])->postJson('/api/payment-methods', [
+            'name' => 'بطاقة اختبار الحذف', 'settlement_type' => 'bank', 'cash_bank_account_id' => $ctx['card']['cash_bank_account_id'],
+        ])->assertCreated()['data'];
+        $id = $this->createRequest($ctx, 11500, method: $method['id'])->assertCreated()->json('data.id');
+        $this->fake->script($id, 'declined');
+        $this->show($ctx, $id)->assertJsonPath('data.status', 'declined');
+
+        $this->withToken($ctx['token'])->deleteJson("/api/payment-methods/{$method['id']}")->assertStatus(422);
+        $this->assertNotNull(\App\Models\PaymentMethod::query()->find($method['id']));
+    }
+
+    #[Test]
+    public function a_manager_cannot_resolve_while_a_void_attempt_holds_a_live_lease(): void
+    {
+        $ctx = $this->context('pos-term-lease-resolve');
+        $id = $this->approvedRequest($ctx, 11500);
+        DB::table('pos_terminal_requests')->where('id', $id)->update(['status' => 'compensation_required', 'compensating_until' => now('UTC')->addSeconds(60)]);
+
+        $this->withToken($ctx['token'])->postJson("/api/pos/terminal-requests/{$id}/resolve", ['note' => 'أُعيد المبلغ خارجياً'])->assertStatus(422)
+            ->assertJsonPath('reason', 'compensation_in_progress');
+        $this->assertSame('compensation_required', PosTerminalRequest::query()->withoutGlobalScopes()->findOrFail($id)->status);
+
+        DB::table('pos_terminal_requests')->where('id', $id)->update(['compensating_until' => now('UTC')->subSecond()]);
+        $this->withToken($ctx['token'])->postJson("/api/pos/terminal-requests/{$id}/resolve", ['note' => 'أُعيد المبلغ خارجياً'])->assertOk()->assertJsonPath('data.status', 'compensated');
+    }
+
     // ═══════════════ المجدول ═══════════════
 
     #[Test]

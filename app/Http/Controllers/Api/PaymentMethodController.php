@@ -97,6 +97,10 @@ class PaymentMethodController extends ApiController
         if ($method->payments()->exists()) {
             abort(422, 'لا يمكن حذف طريقة دفع مستخدمة في سندات. عطّلها بدلاً من ذلك.');
         }
+        // H6-02: طلبات أجهزة الدفع دليل مالي (FK مقيِّد): الحذف يُرفض بتحقق عادي لا 500.
+        if (\App\Models\PosTerminalRequest::query()->withoutGlobalScopes()->where('payment_method_id', $method->id)->exists()) {
+            abort(422, 'لا يمكن حذف طريقة دفع لها عمليات على أجهزة الدفع. عطّلها بدلاً من ذلك.');
+        }
         if ($method->is_default) {
             abort(422, 'لا يمكن حذف طريقة الدفع الافتراضية. عيّن بديلاً أولاً.');
         }

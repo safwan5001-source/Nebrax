@@ -64,6 +64,10 @@ class PosTerminalService
                 if ($terminal === null || ! $terminal->is_active) {
                     throw new PosTerminalException('terminal_unavailable', 'جهاز الدفع غير موجود أو معطّل.');
                 }
+                // جهاز مخصَّص لجهاز POS معيّن لا يخدم جلسة جهاز آخر (الجهاز غير المخصَّص متاح لأي جهاز في الفرع).
+                if ($terminal->pos_device_id !== null && $terminal->pos_device_id !== $session->pos_device_id) {
+                    throw new PosTerminalException('terminal_device_mismatch', 'جهاز الدفع مخصَّص لجهاز نقطة بيع آخر.');
+                }
                 $this->assertProviderAvailable($terminal->provider);
                 $method = PaymentMethod::query()->whereKey($data['payment_method_id'])->first();
                 if ($method === null || ! $method->is_active || $method->settlement_type !== 'bank') {
@@ -177,6 +181,10 @@ class PosTerminalService
             $locked = PosTerminalRequest::query()->whereKey($request->id)->lockForUpdate()->firstOrFail();
             if ($locked->status !== PosTerminalRequest::STATUS_COMPENSATION_REQUIRED) {
                 throw new PosTerminalException('not_resolvable', 'الطلب لا يحتاج حلاً.');
+            }
+            // محاولة إلغاء حيّة (إيجار) ⇒ لا حلّ يدوي الآن: قد ينجح الإلغاء بعد إقرار المدير بأن المبلغ أُعيد خارجياً فيُرَدّ مرتين.
+            if ($locked->compensating_until !== null && $locked->compensating_until->isFuture()) {
+                throw new PosTerminalException('compensation_in_progress', 'محاولة إلغاء جارية على الجهاز؛ انتظر انتهاءها ثم أعد المحاولة.');
             }
             $locked->update([
                 'status' => PosTerminalRequest::STATUS_COMPENSATED,

@@ -8,6 +8,7 @@ use App\Http\Resources\PosPaymentTerminalResource;
 use App\Http\Resources\PosTerminalRequestResource;
 use App\Models\PosDevice;
 use App\Models\PosPaymentTerminal;
+use App\Models\PosSession;
 use App\Models\PosTerminalRequest;
 use App\Services\PosTerminalService;
 use App\Support\PosTerminalException;
@@ -75,8 +76,10 @@ class PosTerminalController extends ApiController
 
     // ───────────── الطلبات ─────────────
 
-    public function sessionRequests(string $sessionId): JsonResponse
+    public function sessionRequests(Request $request, string $sessionId): JsonResponse
     {
+        $this->authorizeSession(PosSession::query()->findOrFail($sessionId), $request);
+
         return PosTerminalRequestResource::collection(
             PosTerminalRequest::query()->where('pos_session_id', $sessionId)->orderBy('created_at')->get()
         )->response();
@@ -89,24 +92,24 @@ class PosTerminalController extends ApiController
         return (new PosTerminalRequestResource($created))->response()->setStatusCode($created->getAttribute('idempotent_replay') ? 200 : 201);
     }
 
-    public function showRequest(string $id): JsonResponse
+    public function showRequest(Request $request, string $id): JsonResponse
     {
-        $found = PosTerminalRequest::query()->findOrFail($id);
+        $found = $this->ownedRequest($request, $id);
         $synced = $this->terminalCall(fn () => $this->terminals->sync($found));
 
         return (new PosTerminalRequestResource($synced))->response();
     }
 
-    public function cancelRequest(string $id): JsonResponse
+    public function cancelRequest(Request $request, string $id): JsonResponse
     {
-        $found = PosTerminalRequest::query()->findOrFail($id);
+        $found = $this->ownedRequest($request, $id);
 
         return (new PosTerminalRequestResource($this->terminalCall(fn () => $this->terminals->cancel($found))))->response();
     }
 
-    public function voidRequest(string $id): JsonResponse
+    public function voidRequest(Request $request, string $id): JsonResponse
     {
-        $found = PosTerminalRequest::query()->findOrFail($id);
+        $found = $this->ownedRequest($request, $id);
 
         return (new PosTerminalRequestResource($this->terminalCall(fn () => $this->terminals->void($found))))->response();
     }
@@ -120,6 +123,26 @@ class PosTerminalController extends ApiController
     }
 
     // ───────────── مساعدات ─────────────
+
+    /**
+     * طلب جهاز يخص جلسة كاشير: لا يعمل عليه (استعلام/إلغاء/إلغاء موافقة) إلا كاشير الجلسة أو معتمد (`pos.variance.approve`) —
+     * كما يفرض الإنشاء والبيع (`requireOpenForCheckout`). كاشير آخر بالفرع نفسه لا يلغي بيع بطاقة مسجّل آخر.
+     */
+    private function ownedRequest(Request $request, string $id): PosTerminalRequest
+    {
+        $found = PosTerminalRequest::query()->findOrFail($id);
+        $this->authorizeSession(PosSession::query()->findOrFail($found->pos_session_id), $request);
+
+        return $found;
+    }
+
+    private function authorizeSession(PosSession $session, Request $request): void
+    {
+        $user = $request->user();
+        if ($session->opened_by !== null && $session->opened_by !== $user?->id && ! $user?->hasPermission('pos.variance.approve')) {
+            abort(403, 'طلب جهاز الدفع يخص جلسة كاشير آخر.');
+        }
+    }
 
     private function assertDevice(?string $deviceId): void
     {
