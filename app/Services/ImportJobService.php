@@ -407,6 +407,8 @@ class ImportJobService
                         'status' => ImportJobStatus::FAILED,
                         'error_message' => $e->getMessage(),
                     ])->save();
+                    // IMP-H1-S8a: الوحدات الفاشلة/غير المنجزة تُسجَّل في معاملة الفشل نفسها (حالة `failed` بلا وحداتها غير ممكنة).
+                    app(ImportJobUnitRecorder::class)->recordChunkFailure($locked, $this->domains->for($locked->domain), $offset, $batchSize, $e);
 
                     return $locked;
                 }
