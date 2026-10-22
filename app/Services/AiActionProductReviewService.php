@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Support\AiActionCostVisibility;
 use App\Support\AiActionException;
 use App\Support\ProductImportFields;
+use App\Support\ProductImportValueNormalizer;
 
 /** AI-ACTIONS-03: edits an inert proposal only; it never calls ERP writers. */
 final class AiActionProductReviewService
@@ -122,20 +123,10 @@ final class AiActionProductReviewService
         return $extraction;
     }
 
+    /** IMP-H2-S2: حكمٌ واحد مشترك مع الاستخراج والمعاينة (`ProductImportValueNormalizer`) بدل نسخة regex خاصة بهذه الخطوة. */
     private function valid(string $field, mixed $value): bool
     {
-        if ($value !== null && ! is_string($value) && ! is_int($value) && ! is_float($value) && ! is_bool($value)) return false;
-        $definition = ProductImportFields::get($field) ?? [];
-        if (is_string($value) && mb_strlen($value) > (int) ($definition['max'] ?? 10000)) return false;
-        if ($value === null) return true;
-        $normal = strtr(trim((string) $value), ['٠'=>'0','١'=>'1','٢'=>'2','٣'=>'3','٤'=>'4','٥'=>'5','٦'=>'6','٧'=>'7','٨'=>'8','٩'=>'9','٫'=>'.','٬'=>'']);
-        return match ($definition['type'] ?? null) {
-            ProductImportFields::TYPE_MONEY => preg_match('/^\d+(?:\.\d{1,4})?$/', $normal) === 1,
-            ProductImportFields::TYPE_PERCENT => preg_match('/^\d+(?:\.\d+)?%?$/', $normal) === 1 && (float) rtrim($normal, '%') <= 100,
-            ProductImportFields::TYPE_INTEGER => preg_match('/^\d+$/', $normal) === 1,
-            ProductImportFields::TYPE_ENUM => in_array(strtolower((string) $value), (array) ($definition['values'] ?? []), true),
-            default => true,
-        };
+        return ProductImportValueNormalizer::isValid($field, $value);
     }
 
     private function media(array $fields): ?array
