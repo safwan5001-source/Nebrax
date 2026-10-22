@@ -20,9 +20,9 @@
 | Slice | Std | AI | Scope | Depends | Branch | PR | Base SHA | Head SHA | Merge SHA | Tests | CI | Deploy | Verify | Status | Next action |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | IMP-H0-S1 | — | — | Discovery, master plan, tracker, handoff (docs) | — | `claude/unified-import-h0` | #1595 | `474aad1` | _pending_ | — | n/a (docs) | — | — | — | In Progress | Merge, then stop for the model handoff |
-| IMP-H1-S1 | 🟡→✅ | — | `inventory_opening` job app gate; prune deletes media archive | H0 | — | — | — | — | — | — | — | — | — | Planned | Start (handoff §3) |
+| IMP-H1-S1 | 🟡→✅ | — | Per-domain job authorization map (perm + app gate, index filtering); prune deletes media archive | H0 | — | — | — | — | — | — | — | — | — | Planned | Start (handoff §3) |
 | IMP-H1-S2 | ✅ | ✅ | `ImportDomainAdapter` + registry; existing 3 domains; no behavior change | H1-S1 | — | — | — | — | — | — | — | — | — | Planned | — |
-| IMP-H1-S3 | ✅ | — | Preview-hash ↔ job binding; UI idempotency key; throttle | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
+| IMP-H1-S3 | ✅ | — | Required preview-hash ↔ job binding (legacy in-flight jobs only grandfathered); UI idempotency key; throttle | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H1-S4 | ✅ | ✅ | Spreadsheet scan admission (policy; prod enable = D-04) | — | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H1-S5 | ✅ | — | Catalog job: whole-file pre-validation, failed-rows repair set, fetch outside lock | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H1-S6 | ✅ | — | Zero-value opening hits `AccountingDateGuard` | — | — | — | — | — | — | — | — | — | — | Planned | Confirm classification (master §4) |
@@ -31,6 +31,7 @@
 | IMP-H2-S2 | — | ✅ | Shared value normalization (remove duplicated regexes) | — | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H2-S3 | ✅ | — | Workbook UX parity (inspect/template/mapping) | — | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H2-S4 | — | ✅ | Tenant `ai_actions.enabled` endpoint + settings UI | — | — | — | — | — | — | — | — | — | — | Planned | — |
+| IMP-H2-S5 | ✅ | ✅ | Sync V2 + AI preview/execution onto `ProductImportAdapter` (policy-expressed differences, parity test) | H1-S2, H2-S1, H2-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H3-S1 | ✅ | ✅ | `PartnerImportFields` + adapter (no opening balance) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H3-S2 | ✅ | — | Partner sync endpoints + `partner_master` job domain | H3-S1 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H3-S3 | ✅ | — | Customers/suppliers import UI | H3-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
@@ -41,7 +42,7 @@
 | IMP-H4-S3 | ✅ | — | Unit templates (create-only) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H5-S1 | ✅ | — | Expense adapter (drafts, derived tax) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H5-S2 | ✅ | — | Expense UI + durable domain | H5-S1 | — | — | — | — | — | — | — | — | — | Planned | — |
-| IMP-H5-S3 | ✅ | — | Purchase adapter (grouped drafts, derived totals) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
+| IMP-H5-S3 | ✅ | — | Purchase adapter (grouped drafts, derived totals, `import_document_reservations` + supplier lock, PG concurrency test) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H5-S4 | ✅ | — | Purchase UI + durable domain | H5-S3 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H5-S5 | — | ✅ | AI path: AI Action types + Document Center hand-off | H5-S1, H5-S3 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H6-S1..S3 | ✅ | ✅ | Sales invoice drafts (no post, no ZATCA) | **D-03** | — | — | — | — | — | — | — | — | — | Blocked (D-03) | Skip to H7 until decided |

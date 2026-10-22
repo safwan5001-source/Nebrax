@@ -117,16 +117,36 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
 - **IMP-H0-S1:** Discovery report, this master plan, tracker, and Opus→Sonnet handoff. Docs only.
 
 ### H1 — Shared core alignment (fix what both paths stand on)
-- **IMP-H1-S1 — Import-jobs gate & retention fixes.**
-  - (a) An `inventory_opening` import job must honour `EnsureApplicationActive:inventory.core` semantics on store/apply/cancel (today `/import-jobs` has no app gate, so a tenant with `inventory.core` disabled can still create opening drafts).
+- **IMP-H1-S1 — Domain-aware import-job authorization + retention fix.**
+  - (a) Add **one per-domain authorization map** on `ImportJobDomain`: `{view permission, manage permission, application key|null}`. Every `/import-jobs` operation enforces it with the same semantics as `EnsurePermission` + `EnsureApplicationActive`. That covers store (domain from the request, before any file is stored), show, apply and cancel (domain from the loaded job), and index (filtered to the domains the user may view).
+    - Today `/import-jobs` checks only `products.view|manage`, with no app gate. A tenant with `inventory.core` disabled can therefore still create opening drafts.
+    - Initial map:
+
+      | Domain | View | Manage | App key |
+      |---|---|---|---|
+      | `product_catalog` | `products.view` | `products.manage` | — |
+      | `product_workbook` | `products.view` | `products.manage` | — |
+      | `inventory_opening` | `products.view` | `products.manage` | `inventory.core` |
+
+    - **Invariant:** a domain cannot be registered without an entry in this map; a test asserts the map covers `ImportJobDomain::values()`. Every later domain must declare exactly the gates of its direct API:
+      - partners: `partners.view|manage`
+      - expenses: `expenses.view|manage` + `finance.operations`
+      - purchases: `purchases.view|manage` + `purchases.cycle`
+      - and so on.
+    - The route-level `products.*` middleware moves into this map, so a purchases-only user can use purchase jobs without product permissions.
   - (b) `imports:prune` must delete `media_archive_storage_path` for completed jobs (today it deletes only `storage_path`, so archives leak).
-  - Tests: negative app-gate tests (disabled / suspended), and prune of a completed job with an archive.
+  - Tests:
+    - negative permission and app-gate tests (disabled / suspended) per domain
+    - index filtering
+    - map-coverage test
+    - prune of a completed job with an archive
 - **IMP-H1-S2 — `ImportDomainAdapter` contract + registry**, with the three existing domains wired through it. **No behavior change** (characterization tests first). `ImportJobService::runChunk` dispatches via the registry instead of `match`.
 - **IMP-H1-S3 — Durable-path approval binding & idempotency.**
-  - Preview returns `preview_hash`. The `POST /import-jobs` request may include it, and it is verified against the file SHA + options before `ready`.
+  - Preview returns `preview_hash` = HMAC(file SHA-256 + archive SHA-256 + domain + normalized options + mapping).
+  - **`preview_hash` is required to create an executable job.** `POST /import-jobs` without it, or with a hash that does not match the uploaded file and options, is rejected (422 `preview_required` / `preview_mismatch`). Apply re-verifies the frozen options against the bound hash.
+  - **Compatibility:** the UI change ships in the same PR. Jobs already `ready` or `processing` at deploy time (`created_at` < the slice's cutover constant) may finish under the old contract; no new hashless job can execute.
   - The UI sends `idempotency_key`.
   - Add a route throttle.
-  - Backward compatible: a request without a hash keeps working.
 - **IMP-H1-S4 — Spreadsheet scan admission.** Route AI-Action and import-job spreadsheets through the existing `DocumentFileScanAdmissionService` pattern, policy-driven: off → today's behavior; on → fail-closed. Enabling it in production is **D-04** (ops).
 - **IMP-H1-S5 — Catalog job failure semantics.**
   - Pre-validate the whole file before chunk 1 (in-file duplicates across windows).
@@ -136,11 +156,19 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
   - **Classification check:** this enforces the *existing* FC-3/ACC-6 rule and does not change it. If the reviewer disagrees, escalate to the owner and do not merge.
 
 ### H2 — Products completion
+
+(H2-S5 is the slice that makes the shared adapter real for products. Without it the parity definition of done cannot be met.)
 - **IMP-H2-S0 — Honest AI labeling.** Until IMP-H9 lands, the products "AI import" entry and page must not claim AI. Relabel it to an advanced/assisted review import, or show an explicit "AI suggestions unavailable" state. Copy is in AR+EN.
 - **IMP-H2-S1 — Product write-path convergence.** V2 create goes through `ProductService::create(..., generateSku: false)` and keeps V2 semantics byte-for-byte (characterization tests from `ProductImportV2Test`).
 - **IMP-H2-S2 — Shared value normalization.** Remove the duplicated regex validation in `AiActionProductFileIntakeService`/`AiActionProductReviewService`; both use `ProductImportValueNormalizer` or the adapter.
 - **IMP-H2-S3 — Workbook UX parity.** Inspect step, template download, column mapping for the Products sheet, error tables.
 - **IMP-H2-S4 — Tenant AI Actions enablement endpoint.** Owner/admin toggle for `ai_actions.enabled` (no write path exists today). Settings UI under Applications/AI settings. The platform flag still governs.
+- **IMP-H2-S5 — Move both product consumers onto `ProductImportAdapter`.**
+  - The sync `/products/import/*` endpoints (via `ProductImportService`) and the AI path use the adapter's `validateRow()`/`match()`/`applyRow()` instead of their own copies. The AI path covers `AiActionProductPreviewBuilder` (matching) and `AiActionProductExecutionService` (row write).
+  - Each consumer keeps only its orchestration: the sync transaction, durable chunks, or AI versions/approval/lease.
+  - The behavioral difference is expressed as **policy**, not code: the AI path calls the adapter with `master_data=match_or_error`; V2 keeps its `match_or_text` default.
+  - Characterization tests come first. `ProductImportV2Test` and all `AiActionProduct*Test` suites stay green unchanged.
+  - The parity test is the same file + the same policies ⇒ identical plan rows (creates/updates/skips/errors).
 
 ### H3 — Customers & suppliers
 - **IMP-H3-S1:** `PartnerImportFields` + `PartnerImportAdapter`.
@@ -161,12 +189,17 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
 - **IMP-H5-S1:** Expense import adapter.
   - One row = one expense draft.
   - Category/vendor/payment-method/cost-center matching. Tax is computed by `ExpenseService` from lines; it is never trusted from the file (CLAUDE.md "totals are derived").
-  - Duplicate signal: vendor + reference + date + amount.
+  - Duplicate signal: vendor + reference + date + amount. It is enforced concurrency-safely: **H5-S1 introduces** the `import_document_reservations` table and lock (design under H5-S3), with the counterparty being the vendor partner, and H5-S3 reuses it. A PostgreSQL concurrency test is required here too.
 - **IMP-H5-S2:** Expense standard UI + durable domain.
 - **IMP-H5-S3:** Purchase import adapter.
   - Rows are grouped by `(supplier, supplier_invoice_ref)` into one draft with lines.
   - Totals are derived; a file total that differs from the derived total is a **row error**, never silently overwritten.
-  - Duplicate = an existing purchase with the same supplier + reference.
+  - Duplicate = an existing purchase with the same supplier + reference. **A pre-insert lookup alone is not enough**, because two concurrent jobs can both see no match. Required design:
+    1. A new additive table `import_document_reservations`, `CompanyWide`, with columns (`tenant_id`, `domain`, `counterparty_id`, `normalized_reference`, `document_id`, `source`) and a **unique** index on (`tenant_id`, `domain`, `counterparty_id`, `normalized_reference`). The reservation is inserted in the same transaction as the draft, so a concurrent duplicate fails on the unique index and becomes a row error.
+    2. Inside that transaction, `lockForUpdate` on the supplier `Partner` row, then a lookup of existing `purchases.supplier_invoice_no` for that supplier (covers manually created purchases).
+    - No unique index is added to `purchases`. Existing tenants may already hold duplicates, and `migrate --force` at boot would fail the deploy.
+    - Manual-vs-manual duplicates stay out of scope (pre-existing behavior; recorded as a follow-up).
+    - Required test: a PostgreSQL concurrency test (two processes, distinct idempotency keys, same supplier + reference ⇒ exactly one draft).
 - **IMP-H5-S4:** Purchase standard UI + durable domain.
 - **IMP-H5-S5:** AI path for both. Spreadsheets go through an AI Action type; PDF/images go through Document Center (entry link + status hand-off, no new extractor).
 - Financial test bar: PostgreSQL, totals parity with manual creation, no JE at import, and a correct JE when the imported draft is posted through the existing `post()`.
@@ -211,7 +244,7 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
 ```text
 H0 → H1 (S1 independent; S2 before every new domain; S3/S4/S5 independent of each other)
 H1-S2 → H3, H4, H5, H6, H7 (adapters)
-H2-S0 → anytime (copy only)       H2-S1/S2 → H9-S1 (AI writes rely on one product path)
+H2-S0 → anytime (copy only)       H2-S1/S2 → H2-S5 → H9-S1 (AI writes rely on one product path)
 H3-S1 → H3-S4 (AI reuses adapter)  H5-S1/S3 → H5-S5
 H8-S1 needs ≥2 entities with both paths (after H3)
 H9-S1 → H9-S2 → H9-S3 → H9-S4      H10/H11 last
@@ -227,7 +260,8 @@ H6 blocked on D-03 → skip and continue with H7, return when decided
 | R1 | Every merge to `main` auto-deploys on Railway and runs `php artisan migrate --force` at boot (`deploy/entrypoint.sh:70`), with no CI wait. | Migrations must be additive only, and new capabilities ship behind flags that default off. Any migration that alters or locks large existing tables needs an explicit deploy note. Never edit Railway settings or env. |
 | R2 | A second import engine creeps in for "speed". | The adapter registry is the only write entry. PR review checks for a direct `Model::create` in any new import code. |
 | R3 | AI output is treated as truth. | Schema-validated suggestions only. The adapter re-validates them, and parity tests enforce it. |
-| R4 | Financial duplicates (purchases/expenses imported twice). | Duplicate signals + approval binding + idempotency key + DB uniqueness where the reference exists. |
+| R4 | Financial duplicates (purchases/expenses imported twice, including concurrently through different jobs). | `import_document_reservations` unique index + counterparty row lock + existing-document lookup (H5-S3), on top of approval binding and the idempotency key. A PostgreSQL concurrency test is mandatory. |
+| R9 | A new durable domain inherits product permissions. | Per-domain authorization map with a coverage test (H1-S1). |
 | R5 | ZATCA chain contamination by imported sales. | Drafts only; import never calls `post()` (static guard test). D-03 governs. |
 | R6 | Partner opening balances post journals implicitly through `PartnerService::create`. | The partner import strips `opening_balance` (test asserts no JE). D-01 decides a dedicated opening document. |
 | R7 | Tenant data sent to an external LLM without approval. | Existing consent and acknowledgement + network gate + budget. A new data category `import_rows` is opt-in, and payloads are minimized. D-02 governs. |

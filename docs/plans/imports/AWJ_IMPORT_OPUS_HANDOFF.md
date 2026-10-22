@@ -37,57 +37,78 @@ There is one execution core and two experiences. Every new entity gets an `Impor
 
 ## 3. First slice ready for execution: **IMP-H1-S1**
 
-**Title:** Import jobs — honour the `inventory.core` app gate for `inventory_opening` jobs; prune media archives of completed jobs.
+**Title:** Import jobs: per-domain authorization map (permission + app gate) and pruning of completed-job media archives.
 **Branch:** `claude/imp-h1-s1-import-jobs-gate-retention`, from the latest `origin/main`.
 **Type:** security/retention fix. No migration, no accounting change, no UI change.
 
-### 3.1 Problem (verified in H0)
+### 3.1 Problem (verified in H0; widened by review of PR #1595)
 
-1. `routes/api.php:568-572`: `/import-jobs` routes carry only `$perm(...)`. `POST /import-jobs` with `domain=inventory_opening` and `/import-jobs/{id}/apply` create an inventory-opening **draft** even when `inventory.core` is `disabled` (or `suspended`). The direct routes `inventory-openings/import/*` enforce `$app('inventory.core')` (`routes/api.php:1510-1518`).
+1. `routes/api.php:568-572`: `/import-jobs` routes carry only `$perm('products.view'|'products.manage')`.
+   - `POST /import-jobs` with `domain=inventory_opening` and `/import-jobs/{id}/apply` create an inventory-opening **draft** even when `inventory.core` is `disabled` (or `suspended`).
+   - The direct routes `inventory-openings/import/*` enforce `$app('inventory.core')` (`routes/api.php:1510-1518`).
+   - Structurally, every future domain (partners, expenses, purchases) would inherit *product* permissions instead of its own. This is fixed now, before any new domain exists.
 2. `app/Console/Commands/PruneImportJobs.php:42-46` deletes `storage_path` only. A `completed` catalog job keeps `media_archive_storage_path`, so the ZIP stays in private storage forever. `cancel()` and the inspect-failure path already clean it (`ImportJobService.php:211, 600`).
 
 ### 3.2 Required change
 
-**(a) Domain-aware app gate**
+**(a) Per-domain authorization map**
 
-- Add a single mapping from domain to application key, for example `ImportJobDomain::applicationKey(string $domain): ?string`, returning `inventory.core` for `inventory_opening` and `null` for the product domains. The product domains have no app gate today; keep it that way.
-- Enforce it with **exactly** the semantics of `App\Http\Middleware\EnsureApplicationActive`:
-  - `enabled` passes.
-  - `suspended` allows safe methods only (`GET`/`HEAD`).
-  - Otherwise `403` with the same Arabic messages.
-  - The cohort-enforcement and shadow-observation calls must still happen.
-- **Preferred implementation:** extract the body of `EnsureApplicationActive::handle` into a public method (for example `authorize(Request $request, string $key): void`). `handle` calls it and then `$next`; `ImportJobController` calls it for `store` (key from the request `domain`, checked **before** any file is stored) and for `show`/`apply`/`cancel` (key from the loaded job's domain, after the tenant-scoped lookup).
-- Do not duplicate the status logic in the controller.
-- `index` stays ungated: it lists metadata only. Mention this in the report.
+- Add one source of truth, for example `ImportJobDomain::authorization(string $domain): array{view: string, manage: string, app: ?string}`:
+
+  | Domain | View | Manage | App key |
+  |---|---|---|---|
+  | `product_catalog` | `products.view` | `products.manage` | — |
+  | `product_workbook` | `products.view` | `products.manage` | — |
+  | `inventory_opening` | `products.view` | `products.manage` | `inventory.core` |
+
+  These are exactly the gates of each domain's direct API.
+- Route middleware on `/import-jobs` becomes domain-neutral: authentication + tenant only. Keep the existing group middleware and remove only the `products.*` `$perm`. The controller enforces the map:
+  - `store`: domain from the validated request, checked **before** any file is stored. Requires `manage` + app.
+  - `show`: requires `view` + app, where `suspended` allows it as a safe method.
+  - `apply` / `cancel`: require `manage` + app.
+  - `index`: requires no single permission; it **filters** to the domains whose `view` permission the user holds, and to domains whose app is not `disabled`. It returns an empty list, never a 403, when none qualify. This is the one deliberate change of behavior and must be stated in the report.
+- Enforce with **exactly** the semantics of the existing middlewares; do not re-implement status logic in the controller.
+  - Extract the body of `EnsureApplicationActive::handle` into a public method (for example `authorize(Request $request, string $key): void`, including cohort enforcement and shadow observation). `handle` calls it and then `$next`.
+  - For permissions, use the same check as `EnsurePermission` (`Rbac::allows($user->role, $permission)`, `app/Http/Middleware/EnsurePermission.php:20`) with its message.
+  - **Error order:** permission 403 first, then the app 403 with the same Arabic messages.
+- **Invariant test:** the authorization map covers every value of `ImportJobDomain::values()`, so adding a domain without gates fails CI.
 
 **(b) Prune completed-job archives**
 
-- In `PruneImportJobs`, also delete `media_archive_storage_path` when it is not null, before deleting the row.
-- In `--dry-run`, count only; no change to dry-run output semantics beyond that.
+- In `PruneImportJobs`, also delete `media_archive_storage_path` when it is not null, before deleting the row. `--dry-run` only counts.
 
-### 3.3 Tests (new, in the existing suites)
+### 3.3 Tests (new, in the existing suites or a new `ImportJobAuthorizationTest`)
 
-- `ImportJobInventoryOpeningApplyTest` (or a new `ImportJobApplicationGateTest`):
-  - Use `registerTenant(..., autoEnableApplications: false)` as in `ApplicationSemanticsEnforcementTest.php:136`.
+- **App gate.** Use `registerTenant(..., autoEnableApplications: false)` as in `ApplicationSemanticsEnforcementTest.php:136`.
   - `POST /import-jobs` with `domain=inventory_opening` and `inventory.core` disabled → **403**, no `ImportJob` row, nothing stored.
-  - With `inventory.core` enabled → a ready job, then disable it → `apply` returns **403**, there is no `InventoryOpening` draft, and the job status is unchanged.
-  - With `inventory.core` suspended → `GET /import-jobs/{id}` returns 200, while `apply` and `cancel` return 403.
+  - With the app enabled → a ready job. Then disable it → `apply` returns **403**, no `InventoryOpening` draft is created, and the job status is unchanged.
+  - With the app suspended → `GET /import-jobs/{id}` returns 200, while `apply` and `cancel` return 403.
   - `product_catalog` jobs are unaffected when `inventory.core` is disabled (regression).
-  - Cross-tenant: tenant B cannot apply tenant A's job (already covered; keep it green).
-- `ImportJobTest` (prune):
-  - A completed `product_catalog` job with a media archive, past `purge_after`, has its archive file deleted from the import disk and its row deleted.
-  - `--dry-run` deletes nothing.
-- Run the full `php artisan test` locally on SQLite. CI covers PostgreSQL.
+- **Permission.** Use a role without `products.manage`:
+  - `store`, `apply` and `cancel` return 403 for every current domain.
+  - A role with `products.view` only can `show` but not `apply`.
+- **Index filtering.** With `inventory.core` disabled, the index omits `inventory_opening` jobs and still lists product jobs.
+- **Map coverage.** Every `ImportJobDomain::values()` entry has an authorization entry.
+- **Cross-tenant.** Tenant B cannot show or apply tenant A's job (already covered; keep it green).
+- **Prune.** A completed `product_catalog` job with a media archive, past `purge_after`, has its archive file deleted and its row deleted. `--dry-run` deletes nothing.
+- **Regression.** All existing `ImportJob*Test` suites and the `EnsureApplicationActive`/application semantics suites stay green.
+- **Full suite.** Run the full `php artisan test` locally on SQLite; CI covers PostgreSQL.
 
 ### 3.4 Acceptance
 
 - Every new test passes and the full suite is green.
-- No route signature change; the `EnsureApplicationActive` middleware behaves identically for all existing routes (its existing tests stay green).
+- Paths and methods are unchanged. Only the `products.*` `$perm` on `/import-jobs` moves into the domain map. `EnsureApplicationActive` and `EnsurePermission` behave identically for all other routes, and their existing tests stay green.
 - PR body: "No journal entry; no migration; no UI change." Plus the tracker row update (Base/Head SHAs) and `docs/plans/imports/reports/IMP-H1-S1-REPORT.md`.
 
 ### 3.5 After merge
 
-Continue with **IMP-H1-S2** (the adapter contract; characterization tests first). Then H1-S3 → S4 → S5 → S6, H2-S0..S4, and H3 onward, as in the tracker.
+Continue with **IMP-H1-S2** (the adapter contract; characterization tests first). Then H1-S3 → S4 → S5 → S6, H2-S0..S5, and H3 onward, as in the tracker.
+
+**Review-derived requirements already folded into the plan:**
+- Per-domain authorization (H1-S1).
+- The preview hash is *required* for executable jobs (H1-S3).
+- Both product consumers move onto the adapter (H2-S5).
+- Concurrency-safe document de-duplication through `import_document_reservations` + a counterparty row lock + a PostgreSQL test (H5-S1/S3).
 
 ## 4. Known traps (save yourself time)
 
