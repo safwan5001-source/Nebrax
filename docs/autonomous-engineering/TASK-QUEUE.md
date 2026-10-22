@@ -27,6 +27,12 @@ Authoritative TAX programme plan/queue:
 
 Authoritative plan/queue: `docs/plans/store/visual-dimensions/AWJ-VD-H1-MASTER-PLAN.md` · `AWJ-VD-H1-TASK-QUEUE.md` · `AWJ-VD-H1-DECISION-REGISTER.md`. No file overlap with the TAX-ZATCA horizon.
 
+## PARALLEL HORIZON — AWJ-PAYMENTS-HZ-01 (Owner launch 2026-10-22)
+
+**Status:** PROPOSED — **at owner Decision Gate G0**. Only PAY-H0-01 (documentation PR) is authorized. No application code or database change until the horizon documents are reviewed and the execution plan and G0 decisions are approved. Every merge needs explicit owner approval; no deploy.
+
+Authoritative documents: `docs/plans/payments/horizon/AWJ_PAYMENTS_HORIZON_CHARTER.md` · `AWJ_PAYMENTS_HORIZON_MASTER_PLAN.md` · `AWJ_PAYMENTS_HORIZON_TASK_QUEUE.md` · `AWJ_PAYMENTS_HORIZON_ACCEPTANCE_MATRIX.md` · `AWJ_PAYMENTS_HORIZON_RISK_REGISTER.md`. Possible overlap with the TAX-ZATCA horizon only through `InvoiceService`/ZATCA invariants, which this horizon must not change.
+
 ---
 
 ## Purpose
