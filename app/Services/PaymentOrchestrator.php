@@ -152,6 +152,28 @@ final class PaymentOrchestrator
         });
     }
 
+    /**
+     * مطابقة نظامية (مجدولة): تحسم استدعاء مزوّد لم يكتمل لمحاولة `created`، ثم تطبّق حقيقة المزوّد رتيباً، ثم تُنهي محلياً محاولة ما زال
+     * المزوّد يراها معلّقة بعد انتهاء صفحة دفعها (فيتحرر حجز الـPayable)؛ الالتقاط المتأخر بعد ذلك يُعالَج بـD-15. بلا فاعل بشري ولا ضابط تفعيل.
+     */
+    public function reconcile(PaymentAttempt $attempt): PaymentAttemptTransitionResult
+    {
+        $attempt = $this->reload($attempt);
+        if ($attempt->capture_status === PaymentAttempt::STATUS_CREATED) {
+            $attempt = $this->resolveCheckout($attempt);
+        }
+
+        $result = $this->sync($attempt);
+        $current = $result->attempt;
+        if ($current->capture_status === PaymentAttempt::STATUS_PENDING_CUSTOMER && $current->expires_at !== null && $current->expires_at->isPast()) {
+            return $this->applySnapshot($current, new PaymentProviderSnapshot(
+                (string) $current->provider_payment_id, PaymentAttempt::STATUS_EXPIRED, (int) $current->amount_minor, $current->currency,
+            ));
+        }
+
+        return $result;
+    }
+
     /** إلغاء محلي لمحاولة لم تُلتقط (لا أثر لدى المزوّد؛ التقاط متأخر لاحق يُعالج بـD-15). idempotent. */
     public function cancel(PaymentAttempt $attempt, ?User $actor = null): PaymentAttempt
     {
