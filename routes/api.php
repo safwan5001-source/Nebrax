@@ -1808,6 +1808,7 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('reports/journal-entries', [ReportController::class, 'journalEntries'])->middleware($perm('reports.view'));
         Route::get('reports/cash-flow', [ReportController::class, 'cashFlow'])->middleware($perm('reports.view'));
         Route::get('reports/cash-position', [ReportController::class, 'cashPosition'])->middleware($perm('reports.view'));
+        Route::get('reports/receivables-position', [ReportController::class, 'receivablesPosition'])->middleware($perm('reports.view'));
         Route::get('reports/tax-report', [ReportController::class, 'taxReport'])->middleware($perm('reports.view'));
         Route::get('reports/partner-statement/{partnerId}', [ReportController::class, 'partnerStatement'])->middleware($perm('reports.view'));
         Route::get('reports/aging/{type}', [ReportController::class, 'aging'])->middleware($perm('reports.view'));

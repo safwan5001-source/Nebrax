@@ -27,68 +27,94 @@ vi.mock('@/components/charts/sparkline', () => ({ Sparkline: () => null }));
 import DashboardPage from './page';
 
 const income = { total_revenue: '5000.00', total_expense: '1000.00', net_income: '4000.00' };
-const accounts = { data: [{ code: '1130', name: 'العملاء', balance: '777.00' }] };
 
-function respond(cash: () => Promise<unknown>) {
+type Reply = () => Promise<unknown>;
+
+function respond(cash: Reply, receivables: Reply = () => Promise.resolve({ balance: '777.00' })) {
   apiMock.mockImplementation((path?: string) => {
     if (typeof path !== 'string') return Promise.resolve({});
     if (path.startsWith('/reports/income-statement')) return Promise.resolve(income);
-    if (path === '/accounts') return Promise.resolve(accounts);
     if (path === '/reports/cash-position') return cash();
+    if (path === '/reports/receivables-position') return receivables();
     if (path === '/invoices') return Promise.resolve({ data: [] });
     if (path === '/inventory/summary') return Promise.resolve({ total_value: '300.00' });
     return Promise.resolve({});
   });
 }
 
-const cashCard = () => screen.getByText('cash').closest('[class*="rounded-2xl"]') as HTMLElement;
-const receivablesCard = () => screen.getByText('receivables').closest('[class*="rounded-2xl"]') as HTMLElement;
+const fail = (status: number) => () => Promise.reject(Object.assign(new Error(`http ${status}`), { status }));
+const card = (label: string) => screen.getByText(label).closest('[class*="rounded-2xl"]') as HTMLElement;
+const cashCard = () => card('cash');
+const receivablesCard = () => card('receivables');
 
-describe('Dashboard cash KPI isolation (TREASURY-T2)', () => {
+describe('Dashboard cash and receivables KPI isolation (TREASURY-T2)', () => {
   beforeEach(() => apiMock.mockReset());
   afterEach(cleanup);
 
-  it('shows the cash-position total through the same single request', async () => {
+  it('shows both totals, each through one request, and no longer loads the account list', async () => {
     respond(() => Promise.resolve({ balance: '2000.00' }));
     render(<DashboardPage />);
 
     await waitFor(() => expect(within(cashCard()).getByText(/2[.,]?0/)).toBeTruthy());
+    await waitFor(() => expect(within(receivablesCard()).getByText(/777/)).toBeTruthy());
     expect(apiMock).toHaveBeenCalledWith('/reports/cash-position');
+    expect(apiMock).toHaveBeenCalledWith('/reports/receivables-position');
+    expect(apiMock).not.toHaveBeenCalledWith('/accounts');
     expect(within(cashCard()).queryByRole('status')).toBeNull();
+    expect(within(receivablesCard()).queryByRole('status')).toBeNull();
   });
 
-  it('keeps the rest of the dashboard loading when the cash request fails, and shows an explicit unavailable state — not zero', async () => {
-    respond(() => Promise.reject(Object.assign(new Error('network down'), { status: 500 })));
+  for (const [name, reply] of [
+    ['a network/server failure (500)', fail(500)],
+    ['a permission denial (403)', fail(403)],
+    ['a malformed response', () => Promise.resolve({ unexpected: true })],
+    ['an empty response', () => Promise.resolve(null)],
+  ] as const) {
+    it(`cash: ${name} is isolated and explicit — the other cards still load and no zero is shown`, async () => {
+      respond(reply);
+      render(<DashboardPage />);
+
+      await waitFor(() => expect(within(cashCard()).getByRole('status').textContent).toContain('kpi_unavailable'));
+      await waitFor(() => expect(within(receivablesCard()).getByText(/777/)).toBeTruthy());
+      expect(within(cashCard()).queryByText('0')).toBeNull();
+      expect(within(cashCard()).queryByText('0.00')).toBeNull();
+    });
+
+    it(`receivables: ${name} is isolated and explicit — cash and the rest still load and no zero is shown`, async () => {
+      respond(() => Promise.resolve({ balance: '2000.00' }), reply);
+      render(<DashboardPage />);
+
+      await waitFor(() => expect(within(receivablesCard()).getByRole('status').textContent).toContain('kpi_unavailable'));
+      await waitFor(() => expect(within(cashCard()).getByText(/2[.,]?0/)).toBeTruthy());
+      expect(within(receivablesCard()).queryByText('0')).toBeNull();
+      expect(within(receivablesCard()).queryByText('0.00')).toBeNull();
+    });
+  }
+
+  it('both KPIs failing leaves the rest of the dashboard (inventory, revenue) loaded', async () => {
+    respond(fail(500), fail(403));
     render(<DashboardPage />);
 
-    await waitFor(() => expect(within(cashCard()).getByRole('status').textContent).toContain('cash_unavailable'));
-    // بقية البطاقات حُمِّلت رغم فشل النقد.
-    await waitFor(() => expect(within(receivablesCard()).getByText(/777/)).toBeTruthy());
-    // لا صفر مضلِّل في بطاقة النقد.
-    expect(within(cashCard()).queryByText('0')).toBeNull();
-    expect(within(cashCard()).queryByText('0.00')).toBeNull();
+    await waitFor(() => expect(within(cashCard()).getByRole('status')).toBeTruthy());
+    await waitFor(() => expect(within(receivablesCard()).getByRole('status')).toBeTruthy());
+    await waitFor(() => expect(apiMock).toHaveBeenCalledWith('/inventory/summary'));
+    expect(screen.getAllByRole('status')).toHaveLength(2);
   });
 
-  it('treats a permission denial (403) the same way: isolated and explicit', async () => {
-    respond(() => Promise.reject(Object.assign(new Error('forbidden'), { status: 403 })));
-    render(<DashboardPage />);
-
-    await waitFor(() => expect(within(cashCard()).getByRole('status').textContent).toContain('cash_unavailable'));
-    await waitFor(() => expect(within(receivablesCard()).getByText(/777/)).toBeTruthy());
-  });
-
-  it('a malformed response is unavailable, not a zero balance', async () => {
-    respond(() => Promise.resolve({ unexpected: true }));
-    render(<DashboardPage />);
-
-    await waitFor(() => expect(within(cashCard()).getByRole('status').textContent).toContain('cash_unavailable'));
-  });
-
-  it('a genuine zero balance is shown as zero, distinct from unavailable', async () => {
-    respond(() => Promise.resolve({ balance: '0.00' }));
+  it('a genuine zero is shown as zero for each KPI, distinct from unavailable', async () => {
+    respond(() => Promise.resolve({ balance: '0.00' }), () => Promise.resolve({ balance: '0.00' }));
     render(<DashboardPage />);
 
     await waitFor(() => expect(within(cashCard()).queryByRole('status')).toBeNull());
     await waitFor(() => expect(within(cashCard()).getByText('0')).toBeTruthy());
+    await waitFor(() => expect(within(receivablesCard()).queryByRole('status')).toBeNull());
+    await waitFor(() => expect(within(receivablesCard()).getByText('0')).toBeTruthy());
+  });
+
+  it('a negative receivable (customer credit) keeps its sign', async () => {
+    respond(() => Promise.resolve({ balance: '10.00' }), () => Promise.resolve({ balance: '-200.00' }));
+    render(<DashboardPage />);
+
+    await waitFor(() => expect(within(receivablesCard()).getByText(/-\s?200/)).toBeTruthy());
   });
 });
