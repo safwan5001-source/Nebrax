@@ -43,6 +43,20 @@ final class ProductImportValueNormalizer
         };
     }
 
+    /**
+     * هل الخلية صالحة كما سيحكم عليها المعاين النهائي؟ (IMP-H2-S2) — مصدر حكمٍ واحد لمرحلة الاستخراج والمراجعة والمعاينة، فلا يمرّ الصف في خطوةٍ
+     * ويُرفض في التالية. الخلية الفارغة صالحة (الإلزام يُفحص منفصلاً). حقلٌ بلا تعريف في عقد الاستيراد (مثل حقول سياق المراجعة) يُترك كما كان:
+     * لا يُحكم عليه هنا.
+     */
+    public static function isValid(string $field, mixed $raw): bool
+    {
+        if (ProductImportFields::get($field) === null) {
+            return true;
+        }
+
+        return self::normalize($field, $raw)[1] === null;
+    }
+
     public static function digits(string $value): string
     {
         return strtr($value, [
@@ -54,7 +68,8 @@ final class ProductImportValueNormalizer
     /** @return array{0:?int,1:?string} */
     private static function money(string $text): array
     {
-        $normalized = str_replace(['٫', '،'], ['.', ''], self::digits($text));
+        // ٬ (U+066C فاصل الآلاف العربي) كان يقبله الاستخراج والمراجعة دون المعاين؛ يُقبل هنا كي يتّفق الحكم في الخطوات الثلاث (IMP-H2-S2).
+        $normalized = str_replace(['٫', '،', '٬'], ['.', '', ''], self::digits($text));
         $normalized = preg_replace('/[,\s\x{00A0}]/u', '', $normalized) ?? $normalized;
         if (preg_match('/^\d+(?:\.\d{1,2})?$/', $normalized) !== 1) {
             return [null, 'invalid_money'];
@@ -70,7 +85,7 @@ final class ProductImportValueNormalizer
     /** @return array{0:?int,1:?string} */
     private static function integer(string $text, int $min, int $max): array
     {
-        $normalized = rtrim(trim(preg_replace('/[,\s\x{00A0}]/u', '', self::digits($text)) ?? ''), '%');
+        $normalized = rtrim(trim(preg_replace('/[,\s\x{00A0}\x{066C}\x{060C}]/u', '', self::digits($text)) ?? ''), '%');
         if (preg_match('/^(\d+)\.0+$/', $normalized, $matches) === 1) {
             $normalized = $matches[1];
         }

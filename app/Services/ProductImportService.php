@@ -1671,6 +1671,46 @@ class ProductImportService
     // ═══════════════════════════════════════════════════════════════
 
     /**
+     * فحصٌ استباقي **للملف كله** قبل أي كتابة (IMP-H1-S5): تكرار رمز الصنف/الباركود/معرّف نبراكس **عبر النوافذ**. `parse()` يرى نافذته وحدها
+     * (`$seen` محلّي لها)، فتكرارٌ بين صفٍّ في النافذة ١ وآخر في النافذة ٣ كان يمرّ بالمعاينة المقطّعة ثم يفشل متأخراً عند الكتابة بعد أن رُحِّلت
+     * نوافذ سابقة. هنا قراءةٌ واحدة بلا استعلام قاعدة بيانات ولا كتابة؛ يرمي `ImportUnitFailureException` باسم كل صفٍّ مكرَّر (الظهور الثاني فصاعداً).
+     *
+     * @param  array<string, mixed>  $options  نفس خيارات `apply()` (المطابقة والوضع)
+     */
+    public function prevalidateWholeFile(UploadedFile $file, array $options, int $maxRows): void
+    {
+        $resolved = $this->options($options);
+        $raw = $this->readFile($file, $maxRows);
+        $headers = array_map(static fn ($value): string => trim((string) $value), array_shift($raw) ?? []);
+        if ($headers === [] || implode('', $headers) === '') {
+            return; // الرسالة الدقيقة تصدر من `parse()` عند أول نافذة.
+        }
+        $mapping = $resolved['mapping'] ?? $this->autoMapping($headers);
+
+        $seen = [];
+        $failures = [];
+        $ordinal = -1;
+        foreach ($raw as $offset => $values) {
+            if (self::isBlankRow($values)) {
+                continue;
+            }
+            $ordinal++;
+            $messages = [];
+            $this->assertUniqueWithinFile($this->cells($values, $mapping), $offset + 2, $seen, $messages);
+            if ($messages !== []) {
+                $failures[] = ['ordinal' => $ordinal, 'code' => 'row_duplicate_in_file', 'message' => implode(' · ', $messages)];
+            }
+        }
+
+        if ($failures !== []) {
+            throw new ImportUnitFailureException(
+                'الملف يحوي قيماً مكرّرة بين صفوفه ('.count($failures).' صفاً). صحّحها قبل الترحيل: لا يُرحَّل شيء قبل فحص الملف كله.',
+                $failures,
+            );
+        }
+    }
+
+    /**
      * وحدات النافذة الفاشلة (صفوف الأخطاء) بترتيبها بين صفوف البيانات الفعلية — لا تُسمّي الصفوف السليمة في النافذة نفسها.
      *
      * @param  list<array<string, mixed>>  $rows  صفوف النافذة كما أنتجها `parse()`

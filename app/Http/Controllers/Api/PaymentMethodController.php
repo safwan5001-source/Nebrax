@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Requests\StorePaymentMethodRequest;
 use App\Http\Resources\PaymentMethodResource;
 use App\Models\CashBankAccount;
+use App\Models\PaymentGateway;
 use App\Models\PaymentMethod;
 use App\Services\Accounting\CashBankAccountService;
 use Illuminate\Http\JsonResponse;
@@ -21,7 +22,7 @@ class PaymentMethodController extends ApiController
 
         return PaymentMethodResource::collection(
             PaymentMethod::query()
-                ->with('cashBankAccount.account')
+                ->with(['cashBankAccount.account', 'posClearingGateway'])
                 ->withCount('payments')
                 ->orderByDesc('is_default')
                 ->orderBy('name')
@@ -34,6 +35,7 @@ class PaymentMethodController extends ApiController
         $data = $this->normalize($request->validated());
         $this->assertNameFree($data['name']);
         $this->assertCashBankAccount($data['cash_bank_account_id'], $data['settlement_type']);
+        $this->assertPosClearingGateway($data['pos_clearing_gateway_id'], $data['settlement_type'], null);
 
         $method = DB::transaction(function () use ($data) {
             if ($data['is_default']) {
@@ -43,7 +45,7 @@ class PaymentMethodController extends ApiController
             return PaymentMethod::create($data);
         });
 
-        return (new PaymentMethodResource($method->load('cashBankAccount.account')))
+        return (new PaymentMethodResource($method->load(['cashBankAccount.account', 'posClearingGateway'])))
             ->response()->setStatusCode(201);
     }
 
@@ -53,6 +55,7 @@ class PaymentMethodController extends ApiController
         $data = $this->normalize($request->validated(), $method);
         $this->assertNameFree($data['name'], $method->id);
         $this->assertCashBankAccount($data['cash_bank_account_id'], $data['settlement_type']);
+        $this->assertPosClearingGateway($data['pos_clearing_gateway_id'], $data['settlement_type'], $method);
 
         DB::transaction(function () use ($method, $data) {
             if (! $data['is_active'] && $data['is_default']) {
@@ -68,7 +71,7 @@ class PaymentMethodController extends ApiController
             $method->update($data);
         });
 
-        return (new PaymentMethodResource($method->fresh()->load('cashBankAccount.account')))->response();
+        return (new PaymentMethodResource($method->fresh()->load(['cashBankAccount.account', 'posClearingGateway'])))->response();
     }
 
     public function makeDefault(string $id): JsonResponse
@@ -83,7 +86,7 @@ class PaymentMethodController extends ApiController
             $method->update(['is_default' => true]);
         });
 
-        return (new PaymentMethodResource($method->fresh()->load('cashBankAccount.account')))->response();
+        return (new PaymentMethodResource($method->fresh()->load(['cashBankAccount.account', 'posClearingGateway'])))->response();
     }
 
     public function destroy(string $id): JsonResponse
@@ -116,6 +119,8 @@ class PaymentMethodController extends ApiController
             'available_online' => (bool) $value('available_online', false),
             'is_active' => (bool) $value('is_active', true),
             'is_default' => (bool) $value('is_default', false),
+            // غياب المفتاح في التحديث يُبقي الربط القائم؛ null الصريح يفكّه.
+            'pos_clearing_gateway_id' => $value('pos_clearing_gateway_id', null),
         ];
     }
 
@@ -135,6 +140,27 @@ class PaymentMethodController extends ApiController
         $entity = CashBankAccount::with('account')->find($id);
         if (! $entity || $entity->type !== $type || ! $entity->is_active || ! $entity->account?->is_active) {
             abort(422, 'الخزينة أو الحساب البنكي المختار غير نشط أو لا يطابق نوع التسوية.');
+        }
+    }
+
+    /**
+     * D-09: ربط المقاصة يخص طريقة بنكية (بطاقة/تحويل) فقط، وباتصال نشط للمستأجر. الربط القائم غير المتغيّر لا يُعاد فحصه (كي لا تُحجب
+     * تعديلات الطريقة الأخرى لأن اتصالها أُوقف لاحقاً)؛ POS يفحص صلاحيته عند كل بيع ويفشل مغلقاً.
+     */
+    private function assertPosClearingGateway(?string $gatewayId, string $type, ?PaymentMethod $current): void
+    {
+        if ($gatewayId === null) {
+            return;
+        }
+        if ($type !== 'bank') {
+            abort(422, 'مقاصة نقطة البيع تخص الطرق البنكية فقط؛ فكّ الربط قبل تحويل الطريقة إلى نقدية.');
+        }
+        if ($current !== null && $current->pos_clearing_gateway_id === $gatewayId) {
+            return;
+        }
+        $gateway = PaymentGateway::query()->find($gatewayId);
+        if ($gateway === null || ! $gateway->isUsable()) {
+            abort(422, 'اتصال المستحوذ المختار غير موجود أو غير نشط.');
         }
     }
 }

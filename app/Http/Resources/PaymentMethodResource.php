@@ -21,6 +21,10 @@ class PaymentMethodResource extends JsonResource
             'available_online' => $this->available_online,
             'is_active' => $this->is_active,
             'is_default' => $this->is_default,
+            // D-09: مقاصة POS (NULL = مطفأة). اسم الاتصال وصلاحيته للعرض فقط — لا أسرار.
+            'pos_clearing_gateway_id' => $this->pos_clearing_gateway_id,
+            'pos_clearing_gateway_name' => $this->whenLoaded('posClearingGateway', fn () => $this->posClearingGateway?->name),
+            'pos_clearing_gateway_usable' => $this->whenLoaded('posClearingGateway', fn () => $this->posClearingGateway?->isUsable()),
             'payments_count' => $this->when(isset($this->payments_count), $this->payments_count),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),

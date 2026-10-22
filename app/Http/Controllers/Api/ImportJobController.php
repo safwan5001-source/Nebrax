@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\ApplyImportJobRequest;
 use App\Http\Requests\StoreImportJobRequest;
+use App\Http\Requests\StoreImportRepairRequest;
 use App\Http\Resources\ImportJobResource;
 use App\Models\ImportJob;
 use App\Services\ImportJobAccess;
 use App\Services\ImportJobFailuresExporter;
 use App\Services\ImportJobService;
+use App\Services\ImportRepairService;
 use App\Support\SensitiveCostPolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,6 +26,7 @@ class ImportJobController extends ApiController
         private readonly ImportJobService $jobs,
         private readonly ImportJobAccess $access,
         private readonly ImportJobFailuresExporter $failures,
+        private readonly ImportRepairService $repairs,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -70,11 +73,35 @@ class ImportJobController extends ApiController
         $this->access->assertJobBranch($request, $job->branch_id);
 
         $requested = (string) ($request->validate(['format' => ['sometimes', 'nullable', 'in:csv,xlsx']])['format'] ?? '');
-        $format = $requested !== '' ? $requested : (in_array($job->extension, ['csv', 'xlsx'], true) ? (string) $job->extension : 'csv');
+        // XLSX افتراضياً: ملف الإصلاح يُعاد رفعه، وCSV يسبق قيمَ `= + - @` بعلامة اقتباس (حماية من حقن الصيغ) فتتشوّه عند إعادة الرفع.
+        $format = $requested !== '' ? $requested : 'xlsx';
 
         $file = $this->domain(fn () => $this->failures->export($job, SensitiveCostPolicy::authorized($request->user()), $format));
 
         return response()->download($file['path'], $file['filename'], ['Content-Type' => $file['mime']])->deleteFileAfterSend(true);
+    }
+
+    /**
+     * IMP-H1-S8b — تشغيلة إصلاح **فرعية** من ملفٍّ مصحَّح (معرّف المصدر `_awj_unit_ref` لكل صف). صلاحية إدارة مجال الأم + قدرته + نطاق فرعها؛
+     * العضوية تُتحقَّق قبل الإنشاء، والمطالبة الذرّية وحدةً وحدة عند الترحيل.
+     */
+    public function repair(StoreImportRepairRequest $request, string $id): JsonResponse
+    {
+        $parent = $request->parent();
+        $this->access->assertManage($request, $parent->domain);
+        $this->access->assertJobBranch($request, $parent->branch_id);
+
+        $job = $this->domain(fn () => $this->repairs->start(
+            $parent,
+            $request->file('file'),
+            $request->input('idempotency_key'),
+            $request->user()?->id,
+            $request->creationOptions(),
+            $request->input('preview_id'),
+            $request->input('preview_hash'),
+        ));
+
+        return (new ImportJobResource($job))->response()->setStatusCode($job->wasRecentlyCreated ? 201 : 200);
     }
 
     public function store(StoreImportJobRequest $request): JsonResponse

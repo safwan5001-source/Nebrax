@@ -16,11 +16,12 @@ class PosSessionReconciliation extends BaseModel
     protected $fillable = [
         'tenant_id', 'branch_id', 'pos_session_id', 'reconciliation_key',
         'payment_method_id', 'payment_method_name', 'settlement_type',
-        'expected_amount', 'counted_amount', 'difference', 'count_source', 'created_at',
+        'expected_amount', 'clearing_amount', 'counted_amount', 'difference', 'count_source', 'created_at',
     ];
 
     protected $casts = [
         'expected_amount' => 'integer',
+        'clearing_amount' => 'integer',
         'counted_amount' => 'integer',
         'difference' => 'integer',
         'created_at' => 'datetime',

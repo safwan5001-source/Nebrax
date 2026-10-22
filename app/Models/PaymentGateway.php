@@ -160,7 +160,8 @@ class PaymentGateway extends BaseModel implements CompanyWide
     {
         return Payment::query()->where('payment_gateway_id', $this->getKey())->exists()
             || PaymentGatewaySettlement::query()->where('payment_gateway_id', $this->getKey())->exists()
-            || PaymentAttempt::query()->where('payment_gateway_id', $this->getKey())->exists();
+            || PaymentAttempt::query()->where('payment_gateway_id', $this->getKey())->exists()
+            || PaymentMethod::query()->where('pos_clearing_gateway_id', $this->getKey())->exists();
     }
 
     /**

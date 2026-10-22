@@ -77,6 +77,32 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe('IMP-H2-S0 — تسمية صادقة للمسار', () => {
+  afterEach(() => {
+    cleanup();
+    document.documentElement.lang = '';
+  });
+
+  it('يسمّي الشاشة استيراداً بمراجعة مساعدة ويعلن أن المساعد غير مربوط بها (عربي)', () => {
+    search.action = null;
+    render(<AiProductImportReviewPage />);
+
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('استيراد بمراجعة مساعدة');
+    const notice = screen.getByTestId('assisted-review-notice').textContent ?? '';
+    expect(notice).toContain('بلا نموذج ذكاء اصطناعي');
+    expect(notice).toContain('غير مربوط بهذه الشاشة بعد');
+  });
+
+  it('يعرض النص نفسه بالإنجليزية حين تكون لغة الواجهة إنجليزية', () => {
+    document.documentElement.lang = 'en';
+    search.action = null;
+    render(<AiProductImportReviewPage />);
+
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Assisted review import');
+    expect(screen.getByTestId('assisted-review-notice').textContent).toContain('not yet connected to this screen');
+  });
+});
+
 describe('استيراد المنتجات عبر مساعد أَوْج — المراجعة ثم المعاينة والموافقة', () => {
   it('يحفظ القرار المختار كإصدار جديد قبل إنشاء المعاينة النهائية', async () => {
     const posts = mockServer(preview);
