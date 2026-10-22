@@ -186,6 +186,26 @@ class PosCardClearingTest extends TestCase
         app(PaymentReversalService::class)->reverse($payment->fresh(), null, 'بعد التسوية');
     }
 
+    #[Test]
+    public function a_cash_refund_of_an_a12_card_sale_is_rejected_by_the_default_policy_exactly_like_a11(): void
+    {
+        $auth = $this->tenant('pos-clr-return');
+        $session = $this->openSession($auth);
+        $partner = $this->customer($auth);
+        $card = $this->linkedCard($auth, $this->gateway());
+        $this->checkout($auth, $partner, $session, [['payment_method_id' => $card['id'], 'amount' => 11500]])->assertCreated();
+        $invoice = Invoice::with('lines')->sole();
+
+        // سياسة المرتجع القائمة (لا استرداد نقدي لبيع بطاقة افتراضياً) تحمي مقاصة 1170 من استرداد من الدرج؛ استرداد البطاقة نفسه ← H6-04.
+        $this->withToken($auth['token'])->postJson('/api/pos/returns', [
+            'idempotency_key' => (string) Str::uuid(), 'pos_session_id' => $session, 'original_invoice_id' => $invoice->id, 'payment_type' => 'cash',
+            'items' => [['source_line_id' => $invoice->lines->firstOrFail()->id, 'quantity' => 1]],
+        ])->assertStatus(422);
+
+        $this->assertSame(11500, $this->balance('1170'));
+        $this->assertSame(0, $this->balance('1110'));
+    }
+
     // ═══════════════ مرجع العملية ═══════════════
 
     #[Test]
