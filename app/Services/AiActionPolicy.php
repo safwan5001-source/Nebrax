@@ -59,6 +59,8 @@ final class AiActionPolicy
             }
         }
         if ($applicationKey !== null) {
+            // HTTP فقط: `request()` هو طلب المتحكّم الحالي (لا مسار طابور/أمر يصل هنا اليوم). مساراتٌ غير HTTP تحتاج
+            // تمرير تصنيف القراءة/الكتابة صراحةً قبل أن يحمل أي نوعٍ مفتاح قدرة.
             try {
                 $this->applications->authorize(request(), $applicationKey);
             } catch (HttpExceptionInterface $e) {

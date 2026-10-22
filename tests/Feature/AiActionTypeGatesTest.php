@@ -70,6 +70,24 @@ class AiActionTypeGatesTest extends TestCase
         }
     }
 
+    /**
+     * `AiActionPolicy` و`AiActionRegistry` فئتان `final` فلا يُستبدلان بمحاكاة؛ والنوع الحقيقي الوحيد بلا مفتاح قدرة،
+     * فلا يكشف اختبار سلوكي عطباً في تمرير المفتاح. لذلك حارسٌ ساكن: كل استدعاء `authorize` في البوابة يمرّر
+     * صلاحيات المجال والمفتاح من تعريف النوع، لا قيمة ثابتة ولا حذفاً (خطأ في موضع واحد من ستة يمرّ دون أن يلاحظه أحد).
+     */
+    /** @test */
+    public function every_gateway_policy_call_forwards_the_definitions_permissions_and_application_key(): void
+    {
+        $source = (string) file_get_contents(base_path('app/Services/AiActionGateway.php'));
+
+        $calls = preg_match_all('/->policy->authorize\(/', $source);
+        $forwarding = preg_match_all('/->policy->authorize\([^;]*\$definition\[\'domain_permissions\'\], \$definition\[\'application_key\'\]\)/', $source);
+
+        $this->assertGreaterThanOrEqual(6, $calls);
+        $this->assertSame($calls, $forwarding, 'استدعاء policy->authorize في AiActionGateway لا يمرّر domain_permissions وapplication_key من التعريف.');
+        $this->assertStringNotContainsString("['domain_permission']", $source);
+    }
+
     // ── سلوك السياسة (النوع الحقيقي الوحيد لا يحمل قدرة، فنختبر الآلية مباشرة) ─────────
 
     private function actor(string $role): User
