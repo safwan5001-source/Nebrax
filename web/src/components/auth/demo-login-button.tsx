@@ -3,13 +3,14 @@
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
-import { setActiveBranchId } from '@/lib/branch';
+import { clearToken } from '@/lib/api';
+import { clearSessionPreferences, notifyAuthSessionChanged } from '@/lib/auth';
 import { enableDemo, isDemoPreviewEnabled } from '@/lib/demo';
 
 /**
  * «دخول تجريبي» — يدخل وضع المعاينة المحلي (بيانات وهمية، بلا خادم ولا توكن) ويفتح لوحة التحكم.
  * يُرسم فقط في بناءٍ فُعِّل فيه `NEXT_PUBLIC_DEMO_PREVIEW=true` (انظر `isDemoPreviewEnabled`).
- * لا يمرّ عبر `login()` ولا يستدعي أي endpoint.
+ * لا يمرّ عبر `login()` ولا `logout()` ولا يستدعي أي endpoint.
  */
 export function DemoLoginButton() {
   const t = useTranslations('login');
@@ -18,9 +19,13 @@ export function DemoLoginButton() {
   if (!isDemoPreviewEnabled()) return null;
 
   function start() {
-    // فرعٌ نشط متبقٍّ من حساب حقيقي لا يخصّ بيانات المعاينة (انظر clearSessionPreferences في auth.ts).
-    setActiveBranchId(null);
+    // جلسة حقيقية سابقة (توكن + مستخدم + فرع نشط) لا تبقى خلف المعاينة: تُمسح محلياً بدوال تنظيف الجلسة نفسها
+    // التي يستعملها الخروج، **بلا** `logout()` فلا استدعاء لـ`/logout` ولا اتصال بالخادم (التوكن يبقى صالحاً هناك).
+    // وإلا عاد التوكن حيّاً حين يُمسح علم المعاينة بلا خروج كامل.
+    clearToken();
+    clearSessionPreferences();
     enableDemo();
+    notifyAuthSessionChanged();
     router.replace('/dashboard');
   }
 

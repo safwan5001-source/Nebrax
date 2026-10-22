@@ -33,6 +33,15 @@ test.describe(enabled ? 'DEMO_PREVIEW=true' : 'DEMO_PREVIEW غير مفعَّل'
 
     await expect(demo).toBeVisible();
     await expect(page.getByText('لاستكشاف التجربة قبل ربط حسابك')).toBeVisible();
+
+    // جلسة حقيقية سابقة (كما يكتبها login()): يجب أن تُمسح قبل المعاينة، محلياً وبلا طلب /logout.
+    const logoutRequests: string[] = [];
+    page.on('request', (request) => { if (/\/logout/.test(request.url())) logoutRequests.push(request.url()); });
+    await page.evaluate(() => {
+      localStorage.setItem('token', '41|real-sanctum-token');
+      localStorage.setItem('user', JSON.stringify({ id: 'u-real', name: 'مستخدم حقيقي', email: 'owner@acme.sa', role: 'owner', permissions: ['*'], tenant_id: 'tenant-real' }));
+      localStorage.setItem('nibras_active_branch', '0b9b8a4e-0000-4000-8000-000000000001');
+    });
     await demo.click();
 
     // أول طلب لـ/dashboard على خادم dev يتضمن ترجمة المسار (> مهلة expect الافتراضية).
@@ -40,6 +49,9 @@ test.describe(enabled ? 'DEMO_PREVIEW=true' : 'DEMO_PREVIEW غير مفعَّل'
     await expect(page.getByText('وضع المعاينة — بيانات تجريبية، لا تتصل بأي خادم')).toBeVisible();
     expect(await page.evaluate(() => localStorage.getItem('demo'))).toBe('true');
     expect(await page.evaluate(() => localStorage.getItem('token'))).toBeNull();
+    // مبدّل الفروع يضبط فرع المعاينة (br-1) بنفسه؛ المطلوب ألّا يبقى فرع الحساب الحقيقي.
+    expect(await page.evaluate(() => localStorage.getItem('nibras_active_branch'))).not.toBe('0b9b8a4e-0000-4000-8000-000000000001');
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('user') ?? '{}').id)).toBe('demo-user');
 
     // الخروج: قائمة المستخدم في الشريط العلوي.
     await page.getByRole('button', { name: 'الحساب', exact: true }).first().click();
@@ -48,10 +60,12 @@ test.describe(enabled ? 'DEMO_PREVIEW=true' : 'DEMO_PREVIEW غير مفعَّل'
     await expect(page).toHaveURL(/\/login/);
     expect(await page.evaluate(() => localStorage.getItem('demo'))).toBeNull();
     expect(await page.evaluate(() => localStorage.getItem('user'))).toBeNull();
+    expect(await page.evaluate(() => localStorage.getItem('token'))).toBeNull(); // لا استعادة للجلسة الحقيقية
 
     // بعد الخروج لا جلسة: فتح لوحة التحكم يعيد إلى الدخول.
     await page.goto(`${baseUrl}/dashboard`, { waitUntil: 'load' });
     await expect(page).toHaveURL(/\/login/);
     expect(apiCalls).toEqual([]);
+    expect(logoutRequests).toEqual([]);
   });
 });
