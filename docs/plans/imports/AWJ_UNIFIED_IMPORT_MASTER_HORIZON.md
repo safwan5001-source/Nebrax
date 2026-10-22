@@ -35,7 +35,7 @@ The non-negotiable is **one execution core, two experiences.** Both paths reach 
 | Inventory Opening (`InventoryOpeningImportService` → `InventoryOpeningService`) | Opening stock document → one JE | `applyReceipt` + `LedgerService::post` | No |
 | AI Actions (`AiAction*`, AI-ACTIONS-00..08) | `product_import.v1` only | `ProductService::create` / `ProductLifecycleService::update` | **No LLM call anywhere.** The `ai_suggested` origin is declared but never produced. |
 | Intelligent Document Center (`DocumentCenter/*`) | Purchase invoice / expense (PDF/image) → drafts | `PurchaseService::create` / `ExpenseService::create` | **Yes.** Anthropic, OpenAI or Gemini; off by default (Stage 0). |
-| AI Assistant (`AiAssistantGateway`) | Read-only finance tools | No writes | Anthropic/mock; off by default. Has no import or file tool. |
+| AI Assistant (`AiAssistantGateway`, `AnthropicAssistantProvider`) | Read-only finance tools; model-planned tool calls | No writes | **Real AI (Anthropic).** The model plans tool calls, the gateway re-authorizes each one and executes it from a closed tool registry, then the model composes a grounded answer from redacted digests. It has no import or file tool yet. |
 
 ### 2.2 The unifying seam: **Import Domain Adapter**
 
@@ -82,11 +82,21 @@ The two records have different contracts. `ImportJob` is a durable *file* job wi
 
 | Input kind | AI engine to reuse | Why |
 |---|---|---|
-| Spreadsheets (CSV/XLSX) | AI Actions pipeline + a **new** suggestion step (IMP-H9) that calls the provider through the existing assistant provider/consent/budget gates | AI Actions already has versioning, provenance (`origin`), approval and repair. It lacks only the model. |
+| Spreadsheets (CSV/XLSX) | AI Actions pipeline **driven by the existing AWJ Assistant**: import tools registered in `AiAssistantToolRegistry` (IMP-H9) | AI Actions already has versioning, provenance (`origin`), approval and repair. The assistant already has the real model, consent, budget, audit and grounding. We add **tools**, not a provider or a second assistant. |
 | Documents (PDF/images: purchase invoices, expenses) | **Intelligent Document Center**, as is | It already does LLM extraction, matching, financial validation, human review and the draft builders. Building a third extractor is forbidden. |
-| Conversation | AI Assistant gateway + a new **import tool** that opens or advances an AI Action (never executes) | Keeps one assistant, one consent model and one budget. |
+| Conversation | AI Assistant gateway + **import tools** that report, explain and propose on an AI Action (never approve or execute) | Keeps one assistant, one consent model and one budget. |
 
-Until a provider is approved and enabled (decision **D-02**), the AI path must show its deterministic state honestly. It must not label deterministic mapping as "AI" (see IMP-H2-S0).
+**Correction (IMP-H0-S2, owner-confirmed and re-verified in code):** the AWJ Assistant already contains real AI. `AiAssistantGateway` + `AnthropicAssistantProvider` implement the model call, the tool-planning loop, per-call re-authorization, budget reservation, consent, audit and answer grounding (`AiAnswerGuard`). The H0 wording that treated a real provider as something "to be approved" for the import path was too cautious. Provider choice and credentials are the owner's existing configuration and are **not touched** by this Horizon. What this Horizon adds is **tools** on that assistant, and what remains an owner decision (D-02) is only whether **import row data** may be sent to the model.
+
+**What is verified deterministic today:** the current `/products/ai-import` wizard and the whole AI Actions pipeline (AI-ACTIONS-00..08) never call the assistant or any model (grep of `AiAction*`, `AiActionController` and `ProductImportActionSchema` finds no reference to `AiAssistant*`, `Anthropic*`, `AiRequestLedger` or `AiBudget*`). Its label «استيراد عبر مساعد أَوْج» therefore describes a goal, not current behavior (see IMP-H2-S0). The **standard** import stays fully independent of AI.
+
+**Constraints the existing assistant imposes on our tools (verified in `AiAssistantGateway`/`AiAssistantToolRegistry`):**
+- A tool declares `name`, `description`, a closed `inputSchema`, `validate`, `requiredPermission`, `dataCategory` and `execute`. The gateway runs `policy->authorize` with a fresh actor and `scopeGuard` before `validate` and `execute`, on every call.
+- The registry is closed. A tool that must not be model-planned implements `AiExplicitInvocationOnly`; `offeredToModel()` hides it.
+- A model-planned call is capped at `ai_assistant.limits.max_tool_calls` (3) per turn.
+- Tool results sent back to the model are **digested** (`AiToolResultDigest`, token-capped, names tokenized), and audit `meta` accepts only the whitelisted keys of `AiAuditRecorder::META_KEYS`. Import tools therefore return **counts, statuses and error codes**, never raw rows, and need new audited keys added to that whitelist.
+- A new data category must be added to `AiAssistantDataCategory` and is unavailable until the platform and the tenant both opt in.
+- The assistant message API carries text and an optional `document_id` only. Files still enter through the existing `ai-actions/{id}/files` upload, and the conversation refers to the action by its id.
 
 ---
 
@@ -217,7 +227,7 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
 ### H2 — Products completion
 
 (H2-S5 is the slice that makes the shared adapter real for products. Without it the parity definition of done cannot be met.)
-- **IMP-H2-S0 — Honest AI labeling.** Until IMP-H9 lands, the products "AI import" entry and page must not claim AI. Relabel it to an advanced/assisted review import, or show an explicit "AI suggestions unavailable" state. Copy is in AR+EN.
+- **IMP-H2-S0 — Honest AI labeling.** Until the assistant tools of H9 are connected, the products "AI import" entry and page must not claim AI that does not run. Relabel the wizard to what it is, an assisted review import with a deterministic pipeline, and show an explicit state that the assistant is not yet connected to it. When H9-S1 lands, the label returns together with a visible "Ask the assistant" entry that opens the assistant on this action. Copy is in AR+EN.
 - **IMP-H2-S1 — Product write-path convergence.** V2 create goes through `ProductService::create(..., generateSku: false)` and keeps V2 semantics byte-for-byte (characterization tests from `ProductImportV2Test`).
 - **IMP-H2-S2 — Shared value normalization.** Remove the duplicated regex validation in `AiActionProductFileIntakeService`/`AiActionProductReviewService`; both use `ProductImportValueNormalizer` or the adapter.
 - **IMP-H2-S3 — Workbook UX parity.** Inspect step, template download, column mapping for the Products sheet, error tables.
@@ -353,17 +363,23 @@ Each slice is one branch and one PR from the latest `origin/main`, squash-merged
 - **IMP-H8-S3:** Entry points on entity pages (products, customers, suppliers, purchases, expenses, inventory openings, stocktakes). The standard path is never hidden behind AI.
 - Visual research is mandatory before S1 (Horizon protocol §4/§6): Shopify, Odoo, Zoho Books, Daftra, and Dynamics 365 Business Central configuration packages.
 
-### H9 — AI Assistant integration (real AI)
-- **IMP-H9-S1 — AI suggestion service.**
-  - `AiImportSuggestionService` calls the provider through the existing assistant provider, consent, budget and network gates.
-  - It sends **headers + bounded sample rows only** (data-minimization per D-02) and writes `origin = ai_suggested` + confidence into a *new action version*. It never writes to the domain.
-  - Mock provider in tests.
-  - Flags default off.
-- **IMP-H9-S2 — Natural-language instructions.** The instruction text is parsed into a constrained, schema-validated *operation plan* (mode, policies, field mapping, row filters). Free-form model output is never executed.
-- **IMP-H9-S3 — Assistant tool `imports.open_action`.** This read and draft tool lets the assistant attach a file to an AI Action, report status, explain errors and start a repair. It **cannot** approve or execute; those remain human UI actions bound to the approval hash.
-  - The tool runs `AiActionPolicy::authorize` with the target type's full gates (H1-S7) on every call.
-- **IMP-H9-S4 — Conversational repair.** Failed rows are explained, and fixes are proposed as a new version, then go through the normal approve and execute steps.
-- Activation in any environment (provider key, `*_EXTERNAL_NETWORK_ENABLED`, tenant consent) is **D-02**, an owner decision. Code ships dark.
+### H9 — AWJ Assistant integration (real AI, existing assistant)
+
+The assistant, provider, consent, budget, audit and grounding already exist. **H9 adds import tools to `AiAssistantToolRegistry` and nothing else on the AI side**: no second assistant, no new provider, no change to AI settings, and no model call outside `AiAssistantGateway`.
+
+- **IMP-H9-S1 — Read-only import tools.** Register `imports.action_status` and `imports.explain_failures` (names final in the slice). Both take an AI Action id (a UUID) and return only counts, statuses and aggregated error codes.
+  - `requiredPermission` is the target action type's domain permission, plus `ai.actions.use`. The action must belong to the actor's tenant and branch scope.
+  - New `AiAuditRecorder::META_KEYS` entries for action id, state and counts, with no values.
+  - A new data category (for example `import_metadata`) holds the opt-in. It stays unavailable until the platform and the tenant enable it, and the default is off.
+  - The result digest carries no cell values, so nothing about row content leaves the server in this slice.
+  - Tests use the mock provider and follow `AiAssistantGatewayTest` patterns, including the cross-tenant and revoked-permission negatives.
+- **IMP-H9-S2 — Suggestion tool with minimized sample data (blocked on D-02).** `imports.suggest_mapping` returns a column-mapping proposal as a **new action version** with `origin = ai_suggested` and a confidence. The model sees **headers plus at most 20 sample rows**, with values redacted by the same digest rules, and only under the opt-in category `import_rows`.
+  - Whatever the model returns is **schema-validated and then re-validated by the adapter**. It is never executed as is.
+  - Code ships dark; activation needs D-02.
+- **IMP-H9-S3 — Natural-language operation plan.** The model proposes a constrained operation plan (mode, policies, mapping, row filter) as arguments of an import tool. `validate()` checks it against a closed schema, and the plan becomes a new action version that goes through preview and approval like any other.
+- **IMP-H9-S4 — Draft-and-repair tools.** `imports.start_repair` creates the repair action of AI-ACTIONS-06B from failed rows. The conversational explanation reuses S1. These tools **cannot approve or execute**: those stay human UI actions bound to the approval hash.
+- **IMP-H9-S5 — UI connection.** `/products/ai-import` and every AI import screen gain an "Ask the assistant" entry that opens the assistant panel with the action as its context (`context.ts` gains an `ai_import` kind). The assistant's answers link back to the preview and approval screens.
+- **Activation and settings:** provider, key, network switches and tenant consent are the owner's existing configuration. This Horizon never changes them. The new data categories are default-off.
 
 ### H10 — Security, accounting & reliability sweep
 - **IMP-H10-S1:** Cross-entity test sweep. It covers tenant and branch isolation, RBAC negatives, approval integrity (tamper the hash or version), idempotency replay, PostgreSQL concurrency, file security (zip bomb, formula injection, MIME spoof), SSRF (remote images), duplicate prevention, accounting integrity (drafts → no JE), and ZATCA non-interference.
@@ -401,7 +417,7 @@ H6 blocked on D-03 → skip and continue with H7, return when decided
 | R9 | A new durable domain inherits product permissions. | Per-domain authorization map with a coverage test (H1-S1). |
 | R5 | ZATCA chain contamination by imported sales. | Drafts only; import never calls `post()` (static guard test). D-03 governs. |
 | R6 | Partner opening balances post journals implicitly through `PartnerService::create`. | The partner import strips `opening_balance` (test asserts no JE). D-01 decides a dedicated opening document. |
-| R7 | Tenant data sent to an external LLM without approval. | Existing consent and acknowledgement + network gate + budget. A new data category `import_rows` is opt-in, and payloads are minimized. D-02 governs. |
+| R7 | Import data sent to the external model without approval. | The existing consent, acknowledgement, network gate and budget stay in force. New categories (`import_metadata`, `import_rows`) are default-off opt-ins, tool results are digested, and `import_rows` payloads are minimized to headers plus at most 20 sample rows. D-02 governs `import_rows`. |
 | R8 | Request-bound execution (`QUEUE_CONNECTION=sync`). | Keep the client-driven chunk loop (proven). Do not introduce workers in this Horizon. |
 
 ---
@@ -411,7 +427,7 @@ H6 blocked on D-03 → skip and continue with H7, return when decided
 | ID | Decision | Recommendation | Blocks |
 |---|---|---|---|
 | D-01 | Customer/supplier opening balances in import | Exclude from master-data import. Later add a dedicated *Partner Opening Balances* document (like Inventory Opening: draft → one JE → Dr/Cr control vs 3130). | Only the opening-balance feature (not H3) |
-| D-02 | Enabling a real AI provider for imports (what data leaves, which provider, budget) | Headers + ≤20 sample rows, no full file. Opt-in data category `import_rows`, per-tenant acknowledgement, platform budget row required. Ship dark. | Activation of H9 (not the code) |
+| D-02 | May **import row data** (headers plus at most 20 sample rows) be sent to the assistant's model? The provider itself already exists and is configured by the owner; this decision covers only the new data scope. | Headers + ≤20 sample rows, never the full file. Opt-in data category `import_rows`, per-tenant acknowledgement, existing budget rows. Ship dark. | Only IMP-H9-S2 activation (not its code). H9-S1, S3 (the metadata-only parts), S4 and S5 do not need it. |
 | D-03 | Sales invoice import scope | Drafts of new invoices only. No historical migration (already-reported invoices would get a new ICV/issued_at if posted). | H6 |
 | D-04 | Malware scanning of spreadsheets in production (ClamAV service exists per media-storage closure) | Enable fail-closed after a smoke test. | Enabling H1-S4 policy in production |
 | D-05 | Partner duplicate keys | Default: VAT number duplicate = `error`; phone/email = `warn`. Per-run configurable. | Non-blocking (configurable default) |

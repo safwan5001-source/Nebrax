@@ -82,9 +82,9 @@
 
 ### 1.7 AI Assistant
 
-- **Provider:** `mock` by default. Anthropic is wired and shares the `document_ai` platform credential with Document Center.
-- **Gates:** consent with acknowledgement, a required budget row, and a network gate.
-- **Tool registry:** read-only finance tools only. **No import tool, no file attachment, no link to AI Actions.**
+- **Real AI:** `AnthropicAssistantProvider` is implemented (`AI_ASSISTANT_PROVIDER=anthropic`; `mock` is only the config default). The gateway runs the model call, lets the model plan tool calls, re-authorizes each call with a fresh actor, executes it from the closed registry, and composes the answer from digested results, with answer grounding (`AiAnswerGuard`). The key and model come from the `document_ai` platform integration shared with Document Center. *(Corrected in IMP-H0-S2: the original wording understated this.)*
+- **Gates:** consent with acknowledgement, a required budget row with reservation and settlement, a network gate, and a mandatory audit event before any external call.
+- **Tool registry:** read-only finance tools plus the explicit-only document reader. **No import tool, no file attachment, no link to AI Actions yet.**
 - **UI:** the assistant panel has no products or import context.
 
 ### 1.8 Everything else
@@ -118,7 +118,7 @@ Partner opening balance exists only as a per-record field. It **posts a JE** thr
 | F-9 | Two product write paths: V2 uses `Product::create` and AI uses `ProductService::create`. | **[verified]** see §1.1 and §1.5 | Medium (divergence) | IMP-H2-S1 |
 | F-10 | Duplicated value-validation regexes in the AI intake and review services. | `AiActionProductFileIntakeService.php:244-247`, `AiActionProductReviewService.php:133-136` | Low | IMP-H2-S2 |
 | F-11 | AI Action spreadsheets bypass malware scan admission. Document Center scans PDF/images only. | `AiActionProductFileIntakeService.php` (no scan call) | Medium | IMP-H1-S4 + D-04 |
-| F-12 | "AI" labeling over a deterministic pipeline, which contradicts the owner rule. | `en.json:4908`, `ai-import/page.tsx` | Medium (trust) | IMP-H2-S0 |
+| F-12 | The import wizard is labeled as assistant-driven but **never calls the assistant or any model** (re-verified by grep, IMP-H0-S2). The real AI lives in `AiAssistantGateway`, and nothing connects the two. The fix is to connect them (H9), and to label honestly until then. | `en.json:4908`, `ai-import/page.tsx` | Medium (trust) | IMP-H2-S0 |
 | F-13 | There is no API to set tenant `ai_actions.enabled`. | `Settings.php:49-51` | Low | IMP-H2-S4 |
 | F-14 | Category/brand master-data behavior differs: V2 defaults to `match_or_text`, while AI blocks unknown names. | Assessment 05 §1b | Low (documented) | Adapter policy in IMP-H1-S2 |
 | F-15 | `ImportJob` has no `branch_id`. Chunks apply under the branch context of each apply request, so a job reviewed in branch A can write `BranchScoped` rows (products, categories, brands, units) in branch B. | `app/Models/ImportJob.php` (no branch column); `SetBranch` middleware | Medium (branch isolation) | IMP-H1-S3 |
@@ -217,4 +217,4 @@ Primary sources were checked on 2026-10-22. Where a claim comes from a secondary
 ### 5.5 Still owed (not claimed here)
 
 - **Visual research** (screens, desktop/mobile, RTL, empty/error states) for the Import Hub and the entity import screens, at IMP-H8-S1 and each UI slice, per protocol §6.
-- **AI provider data-handling terms** for D-02, at IMP-H9-S1.
+- **Data-handling terms of the configured provider** for D-02 (`import_rows`), before IMP-H9-S2 is activated.
