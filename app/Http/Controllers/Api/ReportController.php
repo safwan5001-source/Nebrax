@@ -194,6 +194,12 @@ class ReportController extends ApiController
         ]);
     }
 
+    /** إجمالي النقد والبنك لمؤشر لوحة التحكم: رقم واحد، بنطاق فروع المستخدم كبقية التقارير. */
+    public function cashPosition(): JsonResponse
+    {
+        return response()->json(['balance' => Money::toRiyal($this->reports->cashPosition()['balance'])]);
+    }
+
     /** حركة ضريبة القيمة المضافة من حسابي المدخلات والمخرجات النظاميين. */
     public function taxReport(GeneralReportRequest $request): JsonResponse
     {

@@ -15,6 +15,40 @@ export function toNumber(value: string | number | null | undefined): number {
 }
 
 /**
+ * حالة مؤشّر النقد والبنك — مستقلّة عن بقية اللوحة (TREASURY-T2).
+ *
+ * فشل هذا الطلب (شبكة، 403، ردّ تالف) لا يُسقط اللوحة ولا يُعرض صفراً: الصفر رصيدٌ حقيقي
+ * (خزينة فارغة)، و«غير متاح» حالة مختلفة تماماً. لذلك الحالات ثلاث ولا يُستنتج رقمٌ من غياب بيانات.
+ */
+export type CashPositionState =
+  | { status: 'loading' }
+  | { status: 'ready'; balance: number }
+  | { status: 'unavailable' };
+
+/** يقرأ رصيد النقد بالريال من ردّ الـ API: نصٌّ/رقمٌ صالح فقط، وإلا `null` (لا صفر بديل). */
+function parseBalance(value: unknown): number | null {
+  if (typeof value !== 'string' && typeof value !== 'number') return null;
+  const raw = typeof value === 'number' ? String(value) : value.replace(/,/g, '').trim();
+  if (raw === '') return null;
+  const n = Number(raw);
+
+  return Number.isFinite(n) ? n : null;
+}
+
+/** يجلب رصيد النقد ويعزل أي فشل: لا يرمي أبداً، ويعيد `unavailable` عند الرفض أو التلف. */
+export async function loadCashPosition(
+  request: () => Promise<{ balance?: unknown } | null | undefined>,
+): Promise<CashPositionState> {
+  try {
+    const balance = parseBalance((await request())?.balance);
+
+    return balance === null ? { status: 'unavailable' } : { status: 'ready', balance };
+  } catch {
+    return { status: 'unavailable' };
+  }
+}
+
+/**
  * صافي الدخل = الإيراد − المصروف.
  *
  * يُحسب هنا ولا يُقرأ من `net_income` وحده لأن بطاقة «الأداء المالي» تعرض
