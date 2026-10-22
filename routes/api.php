@@ -565,11 +565,13 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
 
         // PR-DUR-1: بنية تشغيلة الاستيراد الدائم — رفع/فحص هيكلي/عرض/إلغاء فقط.
         // إضافيّ ومستقل تماماً عن مسارات الاستيراد أعلاه؛ لا شيء هنا يستهلكها بعد.
-        Route::get('import-jobs', [ImportJobController::class, 'index'])->middleware($perm('products.view'));
-        Route::get('import-jobs/{id}', [ImportJobController::class, 'show'])->middleware($perm('products.view'));
-        Route::post('import-jobs', [ImportJobController::class, 'store'])->middleware($perm('products.manage'));
-        Route::post('import-jobs/{id}/cancel', [ImportJobController::class, 'cancel'])->middleware($perm('products.manage'));
-        Route::post('import-jobs/{id}/apply', [ImportJobController::class, 'apply'])->middleware($perm('products.manage'));
+        // IMP-H1-S1: لا `$perm` على مستوى المسار — الصلاحية والقدرة **حسب مجال التشغيلة** يفرضهما
+        // `ImportJobAccess` (من `ImportJobDomain::authorization`) في الطلب/المتحكّم، فلا يرث مجالٌ صلاحيات المنتجات.
+        Route::get('import-jobs', [ImportJobController::class, 'index']);
+        Route::get('import-jobs/{id}', [ImportJobController::class, 'show']);
+        Route::post('import-jobs', [ImportJobController::class, 'store']);
+        Route::post('import-jobs/{id}/cancel', [ImportJobController::class, 'cancel']);
+        Route::post('import-jobs/{id}/apply', [ImportJobController::class, 'apply']);
         Route::get('products/{id}', [ProductController::class, 'show'])->middleware($perm('products.view'));
         Route::get('products/{id}/activity', [ProductController::class, 'activity'])->middleware($perm('products.view'));
         Route::get('products/{id}/barcodes', [ProductController::class, 'indexBarcodes'])->middleware($perm('products.view'));

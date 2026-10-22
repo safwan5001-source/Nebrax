@@ -9328,6 +9328,7 @@
     "edited": "Edited",
     "previewLoading": "Loading safe preview…",
     "previewUnavailable": "Preview is unavailable until safety scanning completes or the file is ready.",
+    "previewInvalidResponse": "The safe preview returned content that is not a valid document.",
     "scanExceptionNotice": "This document was processed under an approved file-scan exception. The file was not malware-scanned, so preview and download remain unavailable.",
     "previewUnsupported": "This file type cannot be rendered inline.",
     "extractionWarnings": "Extraction warnings",

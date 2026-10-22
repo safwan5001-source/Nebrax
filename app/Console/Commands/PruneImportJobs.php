@@ -45,6 +45,11 @@ class PruneImportJobs extends Command
                 if ($job->storage_path !== null) {
                     $storage->delete($job->storage_path);
                 }
+                // IMP-H1-S1: أرشيف صور تشغيلة `completed` كان يبقى في التخزين الخاص إلى الأبد (الإلغاء وفشل الفحص
+                // كانا ينظّفانه وحدهما)، فيتجاوز نافذة الاحتفاظ.
+                if ($job->media_archive_storage_path !== null) {
+                    $storage->delete($job->media_archive_storage_path);
+                }
                 $job->delete();
                 $deleted++;
             }
