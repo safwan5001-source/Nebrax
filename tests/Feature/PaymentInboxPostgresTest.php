@@ -30,6 +30,8 @@ use Tests\TestCase;
  */
 class PaymentInboxPostgresTest extends TestCase
 {
+    use UsesWorkerDatabaseWithoutTransaction;
+
     private const SECRET = 'whsec_inbox_pg';
 
     private string $dir;
