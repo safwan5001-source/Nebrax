@@ -193,7 +193,7 @@ final class PaymentGatewayService
         try {
             $verifier->verifyCredentials($current);
         } catch (PaymentGatewayException $e) {
-            $this->record($current, 'verification_failed', $current->status, $current->status, $actor, substr($e->reason, 0, 255));
+            $this->recordVerificationFailure($current, $fingerprint, $e->reason, $actor);
             throw $e;
         }
 
@@ -209,6 +209,25 @@ final class PaymentGatewayService
             $this->record($locked, 'verified', $locked->status, $locked->status, $actor);
 
             return $locked->fresh();
+        });
+    }
+
+    /**
+     * رفض مصادقة قاطع من المزوّد (`*.unauthorized`) يُسقط التحقق السابق: المفتاح المخزَّن ثبت بطلانه، فلا يبقى `verified_at` مبرّراً لقبول محاولات
+     * جديدة (`assertUsable`). يتم تحت قفل الصف وبعد تأكّد أن البصمة لم تتغيّر (تدوير لاحق لا يُسقَط تحققه بنتيجة مفتاح قديم).
+     * أعطال التوفر/الحدّ (`unavailable`/`rate_limited`) مؤقتة فتُدقَّق فقط ويبقى التحقق.
+     */
+    private function recordVerificationFailure(PaymentGateway $current, string $fingerprint, string $reason, ?User $actor): void
+    {
+        $definitive = str_ends_with($reason, '.unauthorized');
+        DB::transaction(function () use ($current, $fingerprint, $reason, $actor, $definitive): void {
+            $locked = $this->lock($current);
+            $invalidate = $definitive && $locked->verified_at !== null && $this->credentialFingerprint($locked) === $fingerprint;
+            if ($invalidate) {
+                $locked->verified_at = null;
+                $locked->save();
+            }
+            $this->record($locked, 'verification_failed', $locked->status, $locked->status, $actor, substr($reason, 0, 255), $invalidate ? ['verified_at'] : null);
         });
     }
 

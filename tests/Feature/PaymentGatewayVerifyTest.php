@@ -19,6 +19,7 @@ use Tests\TestCase;
  */
 class PaymentGatewayVerifyTest extends TestCase
 {
+    use CapturesThrowable;
     use InteractsWithApi;
     use RefreshDatabase;
 
@@ -105,6 +106,38 @@ class PaymentGatewayVerifyTest extends TestCase
         $this->assertCount(4, $events);
         $this->assertSame(['moyasar.unauthorized', 'moyasar.unauthorized', 'moyasar.rate_limited', 'moyasar.unavailable'], $events->sortBy('occurred_at')->pluck('reason')->values()->all());
         $this->assertStringNotContainsString(self::SECRET, json_encode($events->toArray()));
+    }
+
+    #[Test]
+    public function a_definitive_authorization_rejection_drops_a_prior_verification_but_a_transient_failure_keeps_it(): void
+    {
+        $id = $this->createMoyasar();
+        $this->fakeHttp(['api.moyasar.com/v1/invoices*' => Http::response(['invoices' => []])]);
+        $this->verify($id)->assertOk();
+        $this->withToken($this->auth['token'])->postJson("/api/payment-gateways/{$id}/activate")->assertOk();
+
+        foreach ([429, 503] as $status) {
+            $this->fakeHttp(['api.moyasar.com/v1/invoices*' => Http::response([], $status)]);
+            $this->verify($id)->assertUnprocessable();
+            $this->assertNotNull($this->row($id)->verified_at, "transient {$status}");
+        }
+
+        // المفتاح أُبطل لدى المزوّد: التحقق يسقط ولا يبقى الاتصال صالحاً لمحاولات جديدة.
+        $this->fakeHttp(['api.moyasar.com/v1/invoices*' => Http::response([], 401)]);
+        $this->verify($id)->assertUnprocessable()->assertJsonPath('error.code', 'moyasar.unauthorized');
+        $this->assertNull($this->row($id)->verified_at);
+        $event = PaymentConnectionEvent::query()->where('payment_gateway_id', $id)->where('event_type', 'verification_failed')->latest('occurred_at')->first();
+        $this->assertSame(['verified_at'], $event->changed_fields);
+        $this->assertSame('moyasar.unauthorized', $event->reason);
+
+        // التنسيق مفعَّل للمستأجر كي يكون الرفض سببه التحقق لا الإطلاق.
+        app(TenantContext::class)->set($this->auth['tenant_id']);
+        \App\Support\SchedulerHeartbeat::record();
+        $admin = \App\Models\PlatformAdministrator::create(['name' => 'مشغّل', 'email' => 'ops@h2-verify.test', 'password' => 'platform-password-123']);
+        app(\App\Services\PaymentsRolloutControlService::class)->setTenantState($admin, $this->auth['tenant_id'], true, 'تفعيل للاختبار');
+        $orchestrator = app(\App\Services\PaymentOrchestrator::class);
+        $e = $this->thrown(fn () => $orchestrator->start(new TestPayable(), $this->row($id), 'idem-verify-401'), 'unverified expected', \App\Support\PaymentOrchestrationException::class);
+        $this->assertSame('gateway_unverified', $e->reason);
     }
 
     #[Test]
