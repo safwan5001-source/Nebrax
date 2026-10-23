@@ -36,9 +36,19 @@ test('no step prints the environment or the secret variables', () => {
 });
 
 test('artifacts are uploaded only after the exact-value secret scan succeeded', () => {
-  assert.match(yml, /if: always\(\) && steps\.scan\.outcome == 'success'/);
+  assert.match(yml, /if: always\(\) && inputs\.mode == 'full' && steps\.scan\.outcome == 'success'/);
 });
 
 test('the production-bucket guard exists', () => {
   assert.match(yml, /R2_PRODUCTION_BUCKET_NAMES/);
+});
+
+test('the default mode is the cheap auth diagnosis; the full matrix needs an explicit choice', () => {
+  assert.match(yml, /mode:[\s\S]*?default: diagnose-auth/);
+  const full = ['id: vh', 'id: ps', 'id: scan', 'id: decision'];
+  for (const id of full) {
+    const at = yml.indexOf(id);
+    assert.ok(at > 0 && /inputs\.mode == 'full'/.test(yml.slice(at, at + 120)), `${id} must be gated on mode == full`);
+  }
+  assert.match(yml, /id: diag\n\s+if: inputs\.mode == 'diagnose-auth'/);
 });
