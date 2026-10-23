@@ -4,15 +4,16 @@ namespace App\Services;
 
 use App\Support\ImportChunk;
 use App\Support\ImportChunkResult;
+use App\Support\ImportJobDomain;
 
 /**
- * محوّل `stocktake_count` (IMP-H7-S1): كتابة أعداد ورقة جردٍ مفتوح، **ذرّي بطبيعته** — وحدته الورقة كلها (لا ورقة نصف معدودة). **غير مسجَّل بعد** في
- * `ImportDomainRegistry` ولا في `ImportJobDomain`، فلا يصل إليه أي طلب. بوابة الكتابة المباشرة المقابلة (`POST stocktakes/{id}/count`) هي `products.manage` + `inventory.core`.
+ * محوّل `stocktake_count` (IMP-H7-S1): كتابة أعداد ورقة جردٍ مفتوح، **ذرّي بطبيعته** — وحدته الورقة كلها (لا ورقة نصف معدودة). مسجَّل في
+ * `ImportDomainRegistry` و`ImportJobDomain` منذ IMP-H7-S1b (مربوط بمعاينة وحده). بوابة الكتابة المباشرة المقابلة (`POST stocktakes/{id}/count`) هي `products.manage` + `inventory.core`.
  * يكتب العدّ فقط؛ ترحيل الفروق فعلٌ منفصل ولا يمرّ من هنا أبداً.
  */
 class StocktakeCountImportAdapter extends SpreadsheetImportAdapter
 {
-    public const DOMAIN = 'stocktake_count';
+    public const DOMAIN = ImportJobDomain::STOCKTAKE_COUNT;
 
     public function domain(): string
     {
