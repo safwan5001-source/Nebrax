@@ -123,6 +123,12 @@ Schedule::command('payments:reconcile-attempts')
     ->withoutOverlapping(10)
     ->onOneServer();
 
+// PAY-H2-02c: شبكة أمان لترحيل التقاطات الدفع الإلكتروني المعلّقة (فشل المستمع/انهيار). idempotent: لا سند ثانٍ أبداً (UNIQUE + قفل).
+Schedule::command('payments:post-captured')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(10)
+    ->onOneServer();
+
 // PAY-H6-02 — موافقات أجهزة الدفع اليتيمة: لا مرور بلا طلبات قائمة. آمن للتكرار والتزامن (إيجار ذرّي لكل طلب).
 Schedule::command('pos:sweep-terminals')
     ->everyFiveMinutes()
