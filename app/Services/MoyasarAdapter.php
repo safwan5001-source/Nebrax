@@ -315,8 +315,7 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
             if (in_array($status, ['paid', 'captured', 'refunded'], true)) {
                 // `captured` (الحقل الموثّق) هو المبلغ الملتقَط فعلاً وقد يقلّ عن `amount` في الالتقاط الجزئي. غيابه أو صفره على دفعة مسدَّدة
                 // ⇒ المبلغ كاملاً (دفعة `paid` بلا التقاط جزئي)؛ ولا يتجاوز أبداً مبلغ الدفعة. قيمة صفر الفعلية تُثبَّت في Sandbox.
-                $captured = $this->intOrNull($payment['captured'] ?? null);
-                $chargeable = $captured !== null && $captured > 0 ? min($captured, $paymentAmount) : $paymentAmount;
+                $chargeable = $this->chargeableOf($payment, $paymentAmount);
                 $capturedMinor += $chargeable;
                 // المسترد التراكمي (حقل `refunded` الموثّق، عدد صحيح ≤ مبلغ الدفعة): حقيقة المزوّد لمطابقة الاسترداد؛ لا يتجاوز مبلغ الدفعة.
                 $refunded = $payment['refunded'] ?? null;
@@ -408,8 +407,12 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
             throw new PaymentRefundRejectedException('moyasar.malformed_response', 'بيانات الدفعة غير صالحة للاسترداد.');
         }
 
-        $captured = $this->intOrNull($payment['captured'] ?? null);
-        $chargeable = $captured !== null && $captured > 0 ? min($captured, $paymentAmount) : $paymentAmount;
+        try {
+            $chargeable = $this->chargeableOf($payment, $paymentAmount);
+        } catch (PaymentGatewayException $e) {
+            // سقف الاسترداد مجهول ⇒ لا نُرسل (قد يُفرَط الاسترداد) ⇒ رفض قاطع قبل أي POST.
+            throw new PaymentRefundRejectedException($e->reason, 'قيمة المبلغ الملتقط لدى المزوّد غير صالحة؛ لا يُرسَل الاسترداد.');
+        }
         $rawRefunded = $payment['refunded'] ?? null;
         $refundedBefore = $rawRefunded === null ? 0 : $this->intOrNull($rawRefunded);
         // التراكمي قبل الإرسال أساس السقف: قيمة معيبة (سالبة/غير عددية/أكبر من الملتقط الفعلي) ⇒ لا نُرسل (قد يُفرَط الاسترداد) ⇒ رفض قاطع.
@@ -440,6 +443,27 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
         }
 
         return new PaymentProviderRefund($paymentId, $refundedAfter, $currency, $this->parseTime($response['refunded_at'] ?? null));
+    }
+
+    /**
+     * المبلغ الملتقط الفعلي القابل للاسترداد: الحقل غائب/null أو صفر ⇒ مبلغ الدفعة كاملاً؛ وجوده بقيمة غير عددية/سالبة
+     * معيب ⇒ السقف مجهول فلا يُطبَّع إلى المبلغ الكامل.
+     *
+     * @param  array<string, mixed>  $payment
+     */
+    private function chargeableOf(array $payment, int $paymentAmount): int
+    {
+        $raw = $payment['captured'] ?? null;
+        if ($raw === null) {
+            return $paymentAmount;
+        }
+        $captured = $this->intOrNull($raw);
+        if ($captured === null || $captured < 0) {
+            throw new PaymentGatewayException('moyasar.malformed_response', 'قيمة المبلغ الملتقط غير صالحة.');
+        }
+
+        // أكبر من مبلغ الدفعة يُقصّ إلى مبلغها (سلوك الالتقاط القائم)؛ ولا يتجاوزه سقف الاسترداد أبداً.
+        return $captured > 0 ? min($captured, $paymentAmount) : $paymentAmount;
     }
 
     private function intOrNull(mixed $value): ?int
