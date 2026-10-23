@@ -22,7 +22,7 @@
 
 ## Tests
 
-- `ProductTaxonomyImportTest` (28, SQLite + PostgreSQL): contract (no media/parent_id/price fields, Arabic header mapping, legacy `id` not mapped), templates importable as-is, option validation, ordered hierarchical create, missing-parent policy both ways, shared implicit parents never duplicated, same name under different parents vs sibling clash, in-file duplicate fails the file before any write, malformed cells (colour, separator in name, empty level, depth, bad boolean, too long), update by path touches only description/colour/status, blank policy, upsert mix, **no rename/move by Nebrax ID**, unknown/malformed id, implicit-then-explicit parent (upsert/create), **branch isolation** (other isolated branch blocks the name, cannot be updated or used as a parent — categories and brands), brands (create/update/dedupe, no rename, in-file duplicate), **no product or journal side effects**, windows, plan stable across windows, plan drift, atomic abort on a bad row, wide row, adapter options and chunk.
+- `ProductTaxonomyImportTest` (35, SQLite + PostgreSQL): contract (no media/parent_id/price fields, Arabic header mapping, legacy `id` not mapped), templates importable as-is, option validation, ordered hierarchical create, missing-parent policy both ways, shared implicit parents never duplicated, same name under different parents vs sibling clash, in-file duplicate fails the file before any write, malformed cells (colour, separator in name, empty level, depth, bad boolean, too long), update by path touches only description/colour/status, blank policy, upsert mix, **no rename/move by Nebrax ID**, unknown/malformed id, implicit-then-explicit parent (upsert/create), **branch isolation** (other isolated branch blocks the name, cannot be updated or used as a parent — categories and brands), brands (create/update/dedupe, no rename, in-file duplicate), **no product or journal side effects**, windows, plan stable across windows, plan drift, atomic abort on a bad row, wide row, adapter options and chunk.
 - `ProductTaxonomyImportConcurrencyPostgresTest` (2, real PostgreSQL + `pcntl_fork`): four racing imports of the same 30 brands create each brand once (one wins, the rest fail with a named row failure); four racing imports of the same three-level path with `create_missing` create each level exactly once. **Negative control:** with the advisory lock removed both fail; restored → green. Validated on a local PostgreSQL 16, not only in CI.
 
 ## Known limits (disclosed)
@@ -31,3 +31,17 @@
 - Cross-branch visibility depends on the `share_products` setting exactly as the controllers; implicit parents are created in the *current* branch.
 - Category images, rename/move, and product linkage are out of scope (parked).
 - No endpoints/UI until the next slices; no screenshots (no UI here).
+
+## Independent review (read-only subagent) — disposition
+
+No data-corrupting, tenant-isolation or preview/apply-disagreement defect found (virtual-vs-real nodes across windows, update of a node created earlier in the same window, rows that error never mutating the tree, soft-deleted rows, branch visibility, lock placement all checked). Findings and what was done:
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | The same node targeted once by `nebrax_id` and once by name in one file was not linked (second row judged against pre-write state → contradictory instruction silently dropped) | **Fixed** (`duplicate_in_file` within the analysed window) + test. *Limit:* across different windows of an unbound run the two forms are still not linked; a bound preview (whole-file) shows the error, so approval is blocked |
+| 2 | Existing category names containing `>`/`›`/`»` (the screen allows them) cannot be addressed by `parent_path`; a path through them forked a lookalike tree | **Fixed**: when parent resolution fails/needs creation and any such name exists, the row is refused (`ambiguous_separator_name`) + test |
+| 3 | A name of `0` showed as empty in the preview | **Fixed** + test |
+| 4 | The advisory lock only serialises imports against each other; the screen's create endpoints are lock-free | **Accepted, documented** (same stance as partners; fix belongs in the controllers) |
+| T | Weak tests: vacuous atomic test, no cross-tenant id test, preview-only branch tests, vacuous sibling assertion, window test without `expected_plan` | **Strengthened**: injected mid-write failure rolls back, foreign-tenant ids for both kinds, branch tests now exercise `apply`, sibling test applies, windows run with `expected_plan` |
+
+No Codex review (quota exhausted).

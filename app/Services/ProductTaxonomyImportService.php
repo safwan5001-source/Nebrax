@@ -589,6 +589,7 @@ class ProductTaxonomyImportService
         foreach (BranchScope::reference(Brand::class)->get(['id', 'name']) as $brand) {
             $byName[(string) $brand->name] = (string) $brand->id;
         }
+        $touched = [];
 
         foreach ($entries as &$entry) {
             $entry['action'] = 'error';
@@ -613,6 +614,12 @@ class ProductTaxonomyImportService
                 }
                 continue;
             }
+            // العنصر نفسه مستهدَفٌ بصفّين (مرةً بالمعرّف ومرةً بالاسم): الثاني يُقارَن بحالة ما قبل الكتابة فيضيع حكمه صامتاً.
+            if (isset($touched[(string) $existing->id])) {
+                $this->addIssue($entry, 'duplicate_in_file', "العلامة نفسها مستهدَفة أيضاً في الصف {$touched[(string) $existing->id]}.");
+                continue;
+            }
+            $touched[(string) $existing->id] = $entry['row'];
             $this->classifyExisting($entry, $options, $existing, 'العلامة «'.$existing->name.'»');
         }
         unset($entry);
@@ -701,6 +708,9 @@ class ProductTaxonomyImportService
         $info = $tree['info'];
         $virtual = 0;
         $implicit = 0;
+        $touched = [];
+        // أسماءٌ قائمة تحمل فاصل المسار (يقبلها المتحكّم) لا يمكن عنونتها في «مسار الأب»: لا يُنشأ بجانبها شجرةٌ شبيهة صامتة.
+        $separatorNames = array_filter($info, static fn (array $node): bool => preg_match('/[>›»]/u', $node['name']) === 1) !== [];
 
         foreach ($entries as &$entry) {
             $entry['action'] = 'error';
@@ -738,6 +748,10 @@ class ProductTaxonomyImportService
                     continue;
                 }
                 [$walkCursor, $pending, $problem] = $this->walkParents($entry['segments'], $children, $models, $options['parent_policy']);
+                if (($problem !== null || $pending !== []) && $separatorNames) {
+                    $this->addIssue($entry, 'ambiguous_separator_name', 'يوجد في مؤسستك تصنيفٌ يحمل اسمه فاصل المسار (> أو › أو »)، فلا يمكن عنونة الآباء بالمسار بأمان. أعد تسميته أولاً.');
+                    continue;
+                }
                 if ($problem !== null) {
                     $this->addIssue($entry, $problem[0], $problem[1]);
                     continue;
@@ -772,6 +786,13 @@ class ProductTaxonomyImportService
                 $children[$cursor][$entry['leaf']] = 'v'.(++$virtual);
                 continue;
             }
+
+            $touchKey = $entry['target_is_node'] ? (string) $entry['target'] : 'p:'.$this->pathKey($entry['segments'], $entry['leaf']);
+            if (isset($touched[$touchKey])) {
+                $this->addIssue($entry, 'duplicate_in_file', "التصنيف نفسه مستهدَف أيضاً في الصف {$touched[$touchKey]}.");
+                continue;
+            }
+            $touched[$touchKey] = $entry['row'];
 
             if ($existing === false) {
                 // عقدة افتراضية أنشأها صفٌّ سابق في هذه النافذة (أبٌ ضمني): لا نموذج بعد، فالمقارنة بالافتراضات.
@@ -928,7 +949,8 @@ class ProductTaxonomyImportService
     /** @param array<string, mixed> $row @return array<string, mixed> */
     private function rowSummary(array $row): array
     {
-        $name = $row['values']['name'] ?? ($row['leaf'] ?? null) ?: null;
+        $name = $row['values']['name'] ?? $row['leaf'] ?? null;
+        $name = $name === '' ? null : $name;
 
         return [
             'row' => $row['row'], 'action' => $row['action'], 'status' => $row['status'], 'valid' => $row['valid'],

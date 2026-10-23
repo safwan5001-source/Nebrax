@@ -202,7 +202,9 @@ class ProductTaxonomyImportTest extends TestCase
 
         $this->assertSame(['create', 'error'], $this->actions($preview));
         $this->assertStringContainsString('يطابق عنصراً موجوداً', $preview['errors'][0]['messages'][0]);
-        $this->assertSame(0, ProductCategory::query()->where('parent_id', $parts->id)->count());
+
+        $this->service()->apply($this->file([['name' => 'فلاتر', 'parent_path' => 'قطع غيار']]), ['kind' => 'category']);
+        $this->assertSame(1, ProductCategory::query()->where('parent_id', $parts->id)->count());
     }
 
     /** @test */
@@ -382,7 +384,14 @@ class ProductTaxonomyImportTest extends TestCase
 
         $update = $this->service()->preview($this->file([['name' => 'زيوت', 'description' => 'x']]), ['kind' => 'category', 'mode' => 'update']);
         $this->assertSame(['error'], $this->actions($update));
-        $this->assertNull(ProductCategory::withoutGlobalScope(BranchScope::class)->whereKey($foreign->id)->value('description'));
+
+        try {
+            $this->service()->apply($this->file([['name' => 'زيوت', 'description' => 'x']]), ['kind' => 'category', 'mode' => 'update']);
+            $this->fail('كان يجب رفض تحديث تصنيف فرعٍ آخر.');
+        } catch (ImportUnitFailureException) {
+            $this->assertNull(ProductCategory::withoutGlobalScope(BranchScope::class)->whereKey($foreign->id)->value('description'));
+            $this->assertSame(1, ProductCategory::withoutGlobalScope(BranchScope::class)->count());
+        }
     }
 
     // ═══════════════════════════════ العلامات التجارية ═══════════════════════════════
@@ -432,6 +441,9 @@ class ProductTaxonomyImportTest extends TestCase
 
         $this->assertSame(['error'], $this->actions($preview));
         $this->assertStringContainsString('خارج نطاق فرعك', $preview['errors'][0]['messages'][0]);
+
+        $this->expectException(ImportUnitFailureException::class);
+        $this->service()->apply($this->file([['name' => 'تويوتا']]), ['kind' => 'brand', 'mode' => 'upsert']);
     }
 
     // ═══════════════════════════════ لا آثار جانبية ═══════════════════════════════
@@ -461,10 +473,11 @@ class ProductTaxonomyImportTest extends TestCase
         ];
         $options = ['kind' => 'category', 'parent_policy' => 'create_missing'];
 
-        $first = $this->service()->apply($this->file($rows), $options + ['batch_offset' => 0, 'batch_size' => 2]);
+        $plan = $this->service()->previewWithPlan($this->file($rows), $options)['plan'];
+        $first = $this->service()->apply($this->file($rows), $options + ['expected_plan' => $plan, 'batch_offset' => 0, 'batch_size' => 2]);
         $this->assertSame([2, 1, 3], [$first['created'], $first['implicit_parents_created'], $first['total_rows']]);
 
-        $second = $this->service()->apply($this->file($rows), $options + ['batch_offset' => 2, 'batch_size' => 2]);
+        $second = $this->service()->apply($this->file($rows), $options + ['expected_plan' => $plan, 'batch_offset' => 2, 'batch_size' => 2]);
         $this->assertSame([1, 0], [$second['created'], $second['implicit_parents_created']]);
         $this->assertSame(['جذر', 'جذر > أ', 'جذر > ب', 'جذر > ج'], $this->paths());
     }
@@ -506,6 +519,97 @@ class ProductTaxonomyImportTest extends TestCase
         } finally {
             $this->assertSame(0, ProductCategory::query()->count());
         }
+    }
+
+    /** @test */
+    public function a_failure_in_the_middle_of_writing_rolls_back_the_whole_window(): void
+    {
+        ProductCategory::creating(function (ProductCategory $category): void {
+            if ($category->name === 'ينفجر') {
+                throw new \RuntimeException('فشل كتابة مُحقَن');
+            }
+        });
+
+        try {
+            $this->service()->apply($this->file([['name' => 'أول'], ['name' => 'ينفجر']]), ['kind' => 'category']);
+            $this->fail('كان يجب أن يفشل الكتابة.');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('فشل كتابة مُحقَن', $e->getMessage());
+        } finally {
+            ProductCategory::flushEventListeners();
+        }
+        $this->assertSame(0, ProductCategory::query()->count());
+    }
+
+    /** @test */
+    public function the_same_node_targeted_by_nebrax_id_and_by_name_in_one_file_is_a_duplicate(): void
+    {
+        $brand = Brand::create(['name' => 'تويوتا']);
+        $category = ProductCategory::create(['name' => 'زيوت']);
+
+        $brands = $this->service()->preview($this->file([['nebrax_id' => $brand->id, 'is_active' => 'لا'], ['name' => 'تويوتا', 'is_active' => 'نعم']]), ['kind' => 'brand', 'mode' => 'update']);
+        $categories = $this->service()->preview($this->file([['nebrax_id' => $category->id, 'is_active' => 'لا'], ['name' => 'زيوت', 'is_active' => 'نعم']]), ['kind' => 'category', 'mode' => 'update']);
+
+        $this->assertSame(['update', 'error'], $this->actions($brands));
+        $this->assertSame(['update', 'error'], $this->actions($categories));
+        $this->assertStringContainsString('مستهدَفة أيضاً', $brands['errors'][0]['messages'][0]);
+    }
+
+    /** @test */
+    public function a_category_whose_name_holds_the_path_separator_blocks_parent_addressing_instead_of_forking_a_lookalike_tree(): void
+    {
+        ProductCategory::create(['name' => 'زيت > فلاتر']);
+
+        $preview = $this->service()->preview($this->file([['name' => 'س', 'parent_path' => 'زيت > فلاتر']]), ['kind' => 'category', 'parent_policy' => 'create_missing']);
+
+        $this->assertSame(['error'], $this->actions($preview));
+        $this->assertStringContainsString('فاصل المسار', $preview['errors'][0]['messages'][0]);
+    }
+
+    /** @test */
+    public function a_name_that_is_falsy_in_php_still_shows_in_the_preview(): void
+    {
+        $preview = $this->service()->preview($this->file([['name' => '0']]), ['kind' => 'category']);
+
+        $this->assertSame(['0', '0'], [$preview['rows'][0]['name'], $preview['rows'][0]['path']]);
+    }
+
+    /** @test */
+    public function soft_deleted_items_do_not_block_their_names(): void
+    {
+        Brand::create(['name' => 'قديمة'])->delete();
+        ProductCategory::create(['name' => 'محذوف'])->delete();
+
+        $result = $this->service()->apply($this->file([['name' => 'قديمة']]), ['kind' => 'brand']);
+        $this->assertSame(1, $result['created']);
+        $result = $this->service()->apply($this->file([['name' => 'محذوف']]), ['kind' => 'category']);
+        $this->assertSame(1, $result['created']);
+    }
+
+    /** @test */
+    public function update_mode_never_creates_parents_even_with_create_missing(): void
+    {
+        $preview = $this->service()->preview($this->file([['name' => 'ورقة', 'parent_path' => 'غير موجود']]), ['kind' => 'category', 'mode' => 'update', 'parent_policy' => 'create_missing']);
+
+        $this->assertSame(['error'], $this->actions($preview));
+        $this->assertSame(0, ProductCategory::query()->count());
+    }
+
+    /** @test */
+    public function a_foreign_tenants_nebrax_id_is_not_found(): void
+    {
+        $other = $this->registerTenant('other-tax', 'other@tax.test');
+        app(TenantContext::class)->set($other['tenant_id']);
+        $theirs = ProductCategory::create(['name' => 'غريب']);
+        $theirBrand = Brand::create(['name' => 'علامة غريبة']);
+        app(TenantContext::class)->set($this->tenantId);
+
+        $categories = $this->service()->preview($this->file([['nebrax_id' => $theirs->id, 'description' => 'x']]), ['kind' => 'category', 'mode' => 'update']);
+        $brands = $this->service()->preview($this->file([['nebrax_id' => $theirBrand->id, 'is_active' => 'لا']]), ['kind' => 'brand', 'mode' => 'update']);
+
+        $this->assertSame(['error'], $this->actions($categories));
+        $this->assertSame(['error'], $this->actions($brands));
+        $this->assertStringContainsString('لا يطابق', $categories['errors'][0]['messages'][0]);
     }
 
     /** @test */
