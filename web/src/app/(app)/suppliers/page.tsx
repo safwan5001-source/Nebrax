@@ -6,7 +6,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { displayLocale } from '@/lib/formatting';
 import Link from 'next/link';
 import { type ColumnDef } from '@tanstack/react-table';
-import { BookOpen, ChevronLeft, ChevronRight, FileText, Plus, Pencil } from 'lucide-react';
+import { BookOpen, ChevronLeft, ChevronRight, FileText, Plus, Pencil, Upload } from 'lucide-react';
 import { AdvancedFilterDialog } from '@/components/data-explorer/advanced-filter-dialog';
 import { DataExplorerToolbar } from '@/components/data-explorer/data-explorer-toolbar';
 import { DataTable } from '@/components/data-table';
@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select } from '@/components/ui/select';
 import { PartnerDialog, type Partner } from '@/components/partners/partner-dialog';
 import { api } from '@/lib/api';
+import { useCan } from '@/lib/use-can';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import { parseExplorerState, removeFilter, replaceFilter, serializeExplorerState } from '@/lib/data-explorer/url-state';
 
@@ -41,6 +42,8 @@ function uniqueOptions(values: Array<string | null | undefined>) {
  */
 export default function SuppliersPage() {
   const ts = useTranslations('suppliers');
+  const tpi = useTranslations('partnerImport');
+  const { can } = useCan();
   const tl = useTranslations('listUi');
   const tp = useTranslations('partners');
   const locale = useLocale();
@@ -185,7 +188,12 @@ export default function SuppliersPage() {
   return <div className="space-y-4">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <h1 className="text-xl font-semibold text-text">{ts('title')}</h1>
-      <Button onClick={() => { setEditing(null); setDialogOpen(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{ts('add')}</Button>
+      <div className="flex flex-wrap items-center gap-2">
+        {can('partners.manage') ? (
+          <Button asChild variant="outline"><Link href="/suppliers/import"><Upload className="h-4 w-4" strokeWidth={1.8} />{tpi('import')}</Link></Button>
+        ) : null}
+        <Button onClick={() => { setEditing(null); setDialogOpen(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{ts('add')}</Button>
+      </div>
     </div>
 
     <DataExplorerToolbar
