@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import type { GalleryLabels, GalleryViewerItem } from "./GalleryClient";
+import { REDUCED_MOTION_QUERY } from "@/lib/presentation/animated-sources";
 
 const SWIPE_MIN_PX = 50;
 const SWIPE_MAX_VERTICAL_PX = 75;
@@ -182,6 +183,8 @@ export function GalleryLightbox({
       ) : null}
       <figure data-gallery-viewer-figure="">
         <picture>
+          {item.animation ? <source media={REDUCED_MOTION_QUERY} type="image/webp" srcSet={item.webp || item.src} /> : null}
+          {item.animation ? <source type={item.format === "gif" ? "image/gif" : "image/webp"} srcSet={item.animation} /> : null}
           {item.webp ? (
             <source type="image/webp" srcSet={item.webp} sizes="100vw" />
           ) : null}
