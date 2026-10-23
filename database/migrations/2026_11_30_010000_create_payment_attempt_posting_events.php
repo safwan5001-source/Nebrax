@@ -57,10 +57,12 @@ END;
 
             return;
         }
-        foreach (['UPDATE', 'DELETE'] as $event) {
-            DB::unprepared('CREATE TRIGGER payment_attempt_posting_events_no_'.strtolower($event).' BEFORE '.$event.' ON '.self::TABLE
-                ." BEGIN SELECT RAISE(ABORT, 'payment_attempt_posting_events is append-only'); END");
-        }
+        DB::unprepared('CREATE TRIGGER payment_attempt_posting_events_no_update BEFORE UPDATE ON '.self::TABLE
+            ." BEGIN SELECT RAISE(ABORT, 'payment_attempt_posting_events is append-only'); END");
+        // حذف المستأجر المتسلسل يمرّ (المستأجر لم يعد موجوداً عند حذف الابن)، والحذف المباشر مرفوض — كما في PostgreSQL.
+        DB::unprepared('CREATE TRIGGER payment_attempt_posting_events_no_delete BEFORE DELETE ON '.self::TABLE
+            .' WHEN EXISTS (SELECT 1 FROM tenants WHERE id = OLD.tenant_id)'
+            ." BEGIN SELECT RAISE(ABORT, 'payment_attempt_posting_events is append-only'); END");
     }
 
     private function dropGuards(): void

@@ -238,6 +238,50 @@ class PaymentAttemptRepostTest extends TestCase
         $this->assertSame($before['can_close'], $after['can_close'], 'تنبيه لا مانع');
     }
 
+    #[Test]
+    public function the_blocked_list_paginates_and_reports_the_full_total(): void
+    {
+        $requests = [];
+        foreach (range(1, 3) as $i) {   // الفواتير تُرحَّل قبل القفل (القفل يمنع ترحيلها بتاريخ اليوم)
+            $invoice = app(InvoiceService::class)->post(app(InvoiceService::class)->create(
+                ['partner_id' => $this->customer->id, 'payment_type' => 'credit'],
+                [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]],
+            ));
+            $requests[] = $this->requests->create($invoice, $this->gateway, $this->owner);
+        }
+        app(AccountingPeriodLockService::class)->create('2026-10-01', '2026-10-31', 'إقفال أكتوبر', $this->owner);
+        [$first, $second, $third] = array_map(function (InvoicePaymentRequest $request): PaymentAttempt {
+            $attempt = $this->requests->startAttempt($request, 'idem-pg-'.uniqid(), null, $this->owner);
+            $this->fake->script($attempt->provider_payment_id, 'captured');
+            $this->orchestrator->sync($attempt);
+
+            return $attempt->fresh();
+        }, $requests);
+        $token = $this->owner->createToken('t')->plainTextToken;
+
+        $page1 = $this->withToken($token)->getJson('/api/payment-attempts/blocked?per_page=2')->assertOk()
+            ->assertJsonPath('meta.total', 3)->assertJsonPath('meta.count', 3)->assertJsonPath('meta.last_page', 2)->assertJsonCount(2, 'data');
+        $page2 = $this->withToken($token)->getJson('/api/payment-attempts/blocked?per_page=2&page=2')->assertOk()->assertJsonCount(1, 'data');
+        $ids = array_merge(array_column($page1->json('data'), 'id'), array_column($page2->json('data'), 'id'));
+        $this->assertEqualsCanonicalizing([$first->id, $second->id, $third->id], $ids, 'كل المحجوب يمكن الوصول إليه');
+        $this->withToken($token)->getJson('/api/payment-attempts/blocked?per_page=1000')->assertOk()->assertJsonPath('meta.per_page', 100);
+    }
+
+    #[Test]
+    public function deleting_a_tenant_with_posting_events_cascades_cleanly_but_direct_deletes_stay_refused(): void
+    {
+        [$attempt] = $this->blockedAttempt();
+        $this->posting->repost($attempt, $this->owner, 'سجل قرار للاختبار');
+        $eventId = PaymentAttemptPostingEvent::query()->sole()->id;
+
+        $this->thrown(fn () => DB::transaction(fn () => DB::table('payment_attempt_posting_events')->where('id', $eventId)->delete()), 'direct delete', QueryException::class);
+
+        // الحذف المتسلسل للمستأجر يزيل أحداثه معه (لا يعلق بالمُشغّل)، على SQLite وPostgreSQL.
+        DB::table('tenants')->where('id', $this->tenant->id)->delete();
+        $this->assertSame(0, DB::table('payment_attempt_posting_events')->where('id', $eventId)->count());
+        $this->assertSame(0, DB::table('tenants')->where('id', $this->tenant->id)->count());
+    }
+
     /** @return array{0: PaymentAttempt, 1: Invoice, 2: array<string, mixed>} محاولة ملتقطة محجوبة بقفل فترة أكتوبر. */
     private function blockedAttempt(): array
     {

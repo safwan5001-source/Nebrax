@@ -17,15 +17,16 @@ class PaymentAttemptPostingController extends ApiController
 {
     public function __construct(private PaymentAttemptPostingService $posting) {}
 
-    public function blocked(): JsonResponse
+    public function blocked(Request $request): JsonResponse
     {
-        $rows = PaymentAttempt::query()
+        $perPage = max(1, min(100, (int) $request->query('per_page', 50)));
+        $page = PaymentAttempt::query()
             ->where('posting_status', PaymentAttempt::POSTING_BLOCKED_PERIOD)
             ->where('payable_key', 'like', InvoicePaymentRequest::PAYABLE_TYPE.':%')
-            ->orderBy('captured_at')->limit(200)->get();
+            ->orderBy('captured_at')->orderBy('id')->paginate($perPage);
 
         return response()->json([
-            'data' => $rows->map(fn (PaymentAttempt $a) => [
+            'data' => $page->getCollection()->map(fn (PaymentAttempt $a) => [
                 'id' => $a->id,
                 'payable_key' => $a->payable_key,
                 'amount_minor' => (int) $a->captured_minor,
@@ -34,7 +35,13 @@ class PaymentAttemptPostingController extends ApiController
                 'accounting_date' => $a->accounting_date?->toDateString(),
                 'blocked_reason' => $a->posting_blocked_reason,
             ])->values(),
-            'meta' => ['count' => $rows->count()],
+            'meta' => [
+                'count' => $page->total(),          // الإجمالي الكامل (للتنبيه)، لا حجم الصفحة
+                'total' => $page->total(),
+                'page' => $page->currentPage(),
+                'per_page' => $page->perPage(),
+                'last_page' => $page->lastPage(),
+            ],
         ]);
     }
 
