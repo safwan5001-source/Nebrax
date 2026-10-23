@@ -573,7 +573,10 @@ function Fixture() {
   } catch {
     display = undefined;
   }
-  const config = configFor(locale, scenario, params.get("layout"), display);
+  const baseConfig = configFor(locale, scenario, params.get("layout"), display);
+  // Typography Library Expansion — `?fontPreset=<catalogue key>` previews the global font (normalised: an unknown key fails closed).
+  const fontPresetParam = params.get("fontPreset");
+  const config = fontPresetParam ? normalizePresentationConfig({ ...baseConfig, fontPreset: fontPresetParam }) : baseConfig;
   const categoryCount = Math.max(0, Math.min(8, Number(params.get("count") ?? 8) || 0));
   const noImage = (params.get("noimage") ?? "5,6")
     .split(",")

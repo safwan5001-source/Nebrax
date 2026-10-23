@@ -34,7 +34,9 @@ describe("Store Customizer — Typography control (CUST-H3-2)", () => {
     const select = screen.getByLabelText("Typography") as HTMLSelectElement;
     expect(select.disabled).toBe(false);
     const optionLabels = Array.from(select.options).map((o) => o.textContent);
-    expect(optionLabels).toEqual(["Cairo + Geist", "Tajawal + Geist"]);
+    // the global selector lists the whole catalogue; the legacy two keep their labels and position
+    expect(optionLabels).toEqual(["Cairo + Geist", "Tajawal + Geist", "IBM Plex Sans Arabic", "Noto Sans Arabic · Inter", "Readex Pro", "Rubik", "El Messiri", "Amiri · Lora", "Almarai", "Alexandria", "Noto Kufi Arabic", "Reem Kufi", "Thmanyah Sans", "Thmanyah Serif Display", "Thmanyah Serif Text"]);
+    expect(new Set(optionLabels).size).toBe(optionLabels.length);
   });
 
   it("selecting Tajawal patches only fontPreset, leaving primaryColor and other fields untouched", async () => {
@@ -56,6 +58,54 @@ describe("Store Customizer — Typography control (CUST-H3-2)", () => {
     expect(onChange).toHaveBeenCalledTimes(1);
     const next = onChange.mock.calls[0][0];
     expect(next.fontPreset).toBe("tajawal-geist");
+    expect(next.primaryColor).toBe(DEFAULT_PRESENTATION_CONFIG.primaryColor);
+    expect(next.themePreset).toBe(DEFAULT_PRESENTATION_CONFIG.themePreset);
+    expect(next.radius).toBe(DEFAULT_PRESENTATION_CONFIG.radius);
+  });
+
+  it("selecting a Thmanyah family patches only fontPreset, leaving primaryColor and other fields untouched", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <ControlPanels
+        panel="theme"
+        config={DEFAULT_PRESENTATION_CONFIG}
+        locale="en"
+        liveStoreName={null}
+        onChange={onChange}
+      />,
+    );
+
+    const select = screen.getByLabelText("Typography") as HTMLSelectElement;
+    await user.selectOptions(select, "thmanyah-serif-display");
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const next = onChange.mock.calls[0][0];
+    expect(next.fontPreset).toBe("thmanyah-serif-display");
+    expect(next.primaryColor).toBe(DEFAULT_PRESENTATION_CONFIG.primaryColor);
+    expect(next.themePreset).toBe(DEFAULT_PRESENTATION_CONFIG.themePreset);
+    expect(next.radius).toBe(DEFAULT_PRESENTATION_CONFIG.radius);
+  });
+
+  it("selecting a Thmanyah family patches only fontPreset, leaving primaryColor and other fields untouched", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <ControlPanels
+        panel="theme"
+        config={DEFAULT_PRESENTATION_CONFIG}
+        locale="en"
+        liveStoreName={null}
+        onChange={onChange}
+      />,
+    );
+
+    const select = screen.getByLabelText("Typography") as HTMLSelectElement;
+    await user.selectOptions(select, "thmanyah-serif-display");
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const next = onChange.mock.calls[0][0];
+    expect(next.fontPreset).toBe("thmanyah-serif-display");
     expect(next.primaryColor).toBe(DEFAULT_PRESENTATION_CONFIG.primaryColor);
     expect(next.themePreset).toBe(DEFAULT_PRESENTATION_CONFIG.themePreset);
     expect(next.radius).toBe(DEFAULT_PRESENTATION_CONFIG.radius);

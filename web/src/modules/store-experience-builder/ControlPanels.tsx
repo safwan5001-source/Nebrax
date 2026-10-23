@@ -582,7 +582,9 @@ function ThemePanel({
           >
             {FONT_PRESETS.map((preset) => (
               <option key={preset.id} value={preset.id}>
-                {t(preset.labelKey as CustomizerMessageKey)}
+                {preset.labelKey
+                  ? t(preset.labelKey as CustomizerMessageKey)
+                  : preset.name}
               </option>
             ))}
           </select>

@@ -75,7 +75,11 @@ final class StorefrontPresentationNormalizer
      * falls back to `cairo-geist` for anything else, so every existing stored
      * document keeps rendering exactly as before.
      */
-    public const FONT_PRESETS = ['cairo-geist', 'tajawal-geist'];
+    /**
+     * الخط العام يقبل كل مفاتيح كتالوج الخطوط (الأولان هما القيمتان القديمتان بلا تغيير)؛ مصدر السلطة
+     * `StorefrontGlobalTokensNormalizer::FONT_FAMILIES`. الافتراضي الصامت يبقى `cairo-geist`.
+     */
+    public const FONT_PRESETS = StorefrontGlobalTokensNormalizer::FONT_FAMILIES;
 
     public const DENSITY_PRESETS = ['comfortable', 'compact'];
 

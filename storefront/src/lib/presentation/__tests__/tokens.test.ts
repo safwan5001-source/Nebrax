@@ -50,11 +50,12 @@ describe("presentation tokens", () => {
     expect(primaryForeground("#9d2449")).toBe("#ffffff");
   });
 
-  it("CUST-H3-2: registers the curated tajawal-geist preset alongside cairo-geist", () => {
-    expect(FONT_PRESETS.map((preset) => preset.id)).toEqual([
+  it("CUST-H3-2: registers the curated tajawal-geist preset alongside cairo-geist (legacy two stay first; the catalogue follows)", () => {
+    expect(FONT_PRESETS.slice(0, 2).map((preset) => preset.id)).toEqual([
       "cairo-geist",
       "tajawal-geist",
     ]);
+    expect(FONT_PRESETS.length).toBeGreaterThan(2);
   });
 
   it("CUST-H3-2: resolves the full font-family stack deterministically and fails closed to Cairo", () => {

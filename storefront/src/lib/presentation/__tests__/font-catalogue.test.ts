@@ -30,13 +30,31 @@ describe("font catalogue (V5e-2c)", () => {
     expect(keys).toEqual([...FONT_FAMILY_KEYS]);
   });
 
-  it("the first two keys are the legacy fontPreset values and resolve to the exact same stacks", () => {
-    expect(FONT_PRESETS.map((preset) => preset.id)).toEqual(
-      FONT_FAMILY_KEYS.slice(0, 2),
+  it("the global font selector (fontPreset) offers every catalogue key; the legacy two keep their exact stacks", () => {
+    expect(FONT_PRESETS.map((preset) => preset.id)).toEqual([
+      ...FONT_FAMILY_KEYS,
+    ]);
+    expect(FONT_PRESETS.slice(0, 2).map((preset) => preset.labelKey)).toEqual([
+      "fontCairoGeist",
+      "fontTajawalGeist",
+    ]);
+    for (const preset of FONT_PRESETS)
+      expect(fontPresetFamilyStack(preset.id)).toBe(fontFamilyStack(preset.id));
+    expect(fontPresetFamilyStack("cairo-geist")).toBe(
+      "var(--font-geist), var(--font-cairo), system-ui, sans-serif",
     );
-    for (const preset of FONT_PRESETS) {
-      expect(fontFamilyStack(preset.id)).toBe(fontPresetFamilyStack(preset.id));
-    }
+    expect(fontPresetFamilyStack("tajawal-geist")).toBe(
+      "var(--font-geist-tajawal), var(--font-tajawal), system-ui, sans-serif",
+    );
+  });
+
+  it("PHP presentation FONT_PRESETS is the catalogue authority (single list)", () => {
+    const php = read(
+      "app/Support/Commerce/StorefrontPresentationNormalizer.php",
+    );
+    expect(php).toMatch(
+      /FONT_PRESETS\s*=\s*StorefrontGlobalTokensNormalizer::FONT_FAMILIES;/,
+    );
   });
 
   it("is append-only: the original eight keys keep their position and stack (Typography Library Expansion)", () => {
