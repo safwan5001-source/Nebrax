@@ -12,11 +12,11 @@ H2-S5 as written assumes a shared `ProductImportAdapter` (`validateRow/match/app
 2. **Intended AI-only rules (pinned as divergences):** on create AI Actions never defaults purchase price / tax / unit and requires a trusted identifier (V2 defaults them and generates a SKU); references are never kept as free text (V2's default `match_or_text` keeps them — under `match_or_error` V2 agrees); AI can match an update by a trusted barcode alone, V2 requires an id/SKU column. These are the policy knobs S5b has to name.
 3. **Defect found — a sale-price-only update was silently dropped.** `sale_price` is an accessor over `ProductUnitPrice` (VAR-PRICE-1), so assigning it never marks the model dirty:
    - **V2 import** classified a row whose only change was `sale_price` as `skip` (preview *and* apply: `updated 0, skipped 1`, price unchanged). The same row *with* another changed column did apply the price.
-   - **Root cause** is in `ProductLifecycleService::update`, which returned early on `getDirty() === []`, so the pending price was never flushed. This is also the write path of **AI Actions execution**, which therefore could report a price-only update without persisting it. The product card is unaffected (its API does not accept `sale_price`).
+   - **Root cause** is in `ProductLifecycleService::update`, which returned early on `getDirty() === []`, so the pending price was never flushed. It is the common write path of **three** callers, so all were affected: V2 import, **AI Actions execution** (a price-only row reported applied without persisting), and the **product card** (`PUT /api/products/{id}` — the form always sends every field, including `sale_price`; a full payload that changed only the price returned 200 and left the price at its old value). An earlier draft of this report said the card was unaffected; that was wrong (a debug request had failed validation for missing fields) and was corrected after the independent review, with an empirical before/after check on `main`.
 
 ## Fix (small, localized)
 
-- `ProductLifecycleService::update`: compares `sale_price` explicitly before assigning; saves when it changed (so the pending price is flushed) and records it in the update activity `diff` (`sale_price: [before, after]`, previously never recorded).
+- `ProductLifecycleService::update`: compares `sale_price` explicitly before assigning; saves when it changed (so the pending price is flushed), **bumps `updated_at`** (the AI Actions `target_changed` version guard compares it — a price-only edit would otherwise be invisible to it), and records the change in the update activity `diff` (`sale_price: [before, after]`, previously never recorded).
 - `ProductImportService::isNoOpUpdate`: a payload whose only difference is `sale_price` is no longer a no-op. The extra query runs only for rows that otherwise look unchanged.
 - **Preview/plan effect:** such rows move from plan code `s:` to `u:`. A preview issued before deploy and applied after would hit the existing `plan_drift` guard (safe, re-preview). No stored data is rewritten; no Backfill.
 
@@ -27,7 +27,17 @@ H2-S5 as written assumes a shared `ProductImportAdapter` (`validateRow/match/app
 
 ## Deploy evaluation
 
-Behavior change limited to the previously broken price-only case (strictly a bug fix). No migration/env/ledger. Additive field in the product-activity `diff`. Safe for auto-deploy.
+Behavior change limited to the previously broken price-only case (strictly a bug fix) — now including the product card, where users will see a price change finally persist (and a new `updated` activity row). No migration/env/ledger. Additive field in the product-activity `diff`. Safe for auto-deploy.
+
+## Independent review (read-only subagent, static) — disposition
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | Report wrongly said the product card is unaffected | **Fixed** (verified empirically; regression test added; report/PR corrected) |
+| 2 | A price-only save did not bump `updated_at`, so AI `target_changed` could not see it | **Fixed** (`updated_at` bumped; test) |
+| 3 | Unit changed in the same payload as an echoed price: price lands on the new unit's row, diff lacks `sale_price` (pre-existing behaviour) | **Not fixed here — pre-existing, rare; tracked** |
+| 4 | `sale_price => null` would cast to 0 | Hypothetical (imports exclude it; card requires integer) |
+| – | `save()` with empty dirty fires `saving`/`saved` so the flush runs; no ledger/inventory code touched; no existing test breaks | Confirmed by the reviewer (static read) |
 
 ## Disclosures
 

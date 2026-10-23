@@ -99,6 +99,11 @@ class ProductLifecycleService
             if ($dirty === [] && ! $priceChanged) {
                 return $product;
             }
+            if ($dirty === []) {
+                // لا عمود متغيّر فلن يُحدَّث `updated_at` تلقائياً؛ وهو «نسخة» المنتج التي يقارنها تنفيذ AI Actions (`target_changed`)،
+                // فتعديل السعر وحده يجب أن يغيّرها كغيره من التعديلات.
+                $product->setAttribute('updated_at', $product->freshTimestamp());
+            }
 
             $diff = [];
             foreach ($dirty as $field => $value) {

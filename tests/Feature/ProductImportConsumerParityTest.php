@@ -184,9 +184,12 @@ class ProductImportConsumerParityTest extends TestCase
         // The root cause behind the import symptom above: `ProductLifecycleService::update` returned early when no real
         // column was dirty. It is also the write path of AI Actions execution, so the fix is here, not in each caller.
         $product = \App\Models\Product::query()->where('sku', 'A-1')->firstOrFail();
-        app(\App\Services\ProductLifecycleService::class)->update($product, ['sale_price' => 1500], null);
+        \Illuminate\Support\Facades\DB::table('products')->where('id', $product->id)->update(['updated_at' => '2020-01-01 00:00:00']);
+        app(\App\Services\ProductLifecycleService::class)->update($product->refresh(), ['sale_price' => 1500], null);
 
         $this->assertSame(1500, (int) \App\Models\Product::query()->where('sku', 'A-1')->firstOrFail()->sale_price);
+        // The product "version" (`updated_at`) moves too: AI Actions execution compares it (`target_changed`).
+        $this->assertTrue(\App\Models\Product::query()->where('sku', 'A-1')->firstOrFail()->updated_at->gt('2021-01-01'));
         $activity = \App\Models\ProductActivity::query()->where('product_id', $product->id)->where('action', 'updated')->latest('id')->first();
         $this->assertNotNull($activity);
         $this->assertSame([1000, 1500], $activity->diff['sale_price'] ?? null);
@@ -195,6 +198,18 @@ class ProductImportConsumerParityTest extends TestCase
         $before = \App\Models\ProductActivity::query()->where('product_id', $product->id)->count();
         app(\App\Services\ProductLifecycleService::class)->update($product->refresh(), ['sale_price' => 1500], null);
         $this->assertSame($before, \App\Models\ProductActivity::query()->where('product_id', $product->id)->count());
+    }
+
+    /** @test */
+    public function the_product_card_put_with_only_a_changed_sale_price_now_persists(): void
+    {
+        // Before the fix this returned 200 and left the price untouched (the form always sends every field).
+        $body = ['name' => 'قهوة', 'sku' => 'A-1', 'type' => 'good', 'sale_price' => 1500, 'purchase_price' => 500];
+        $id = \App\Models\Product::query()->where('sku', 'A-1')->firstOrFail()->id;
+
+        $this->withToken($this->token)->putJson("/api/products/{$id}", $body)->assertOk();
+
+        $this->assertSame(1500, (int) \App\Models\Product::query()->findOrFail($id)->sale_price);
     }
 
     /** @test */
