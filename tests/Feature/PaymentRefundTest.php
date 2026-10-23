@@ -520,10 +520,61 @@ class PaymentRefundTest extends TestCase
         [, , $approved] = $this->approvedRefund(40000);
         PaymentRefund::query()->whereKey($approved->id)->first()->forceFill(['status' => PaymentRefund::SUBMITTING])->save();
 
-        $this->assertFalse($this->refunds->recoverOrphanedSubmission($approved, 10), 'داخل المهلة');
-        $this->assertTrue($this->refunds->recoverOrphanedSubmission($approved, 0));
+        $this->assertSame('skipped', $this->refunds->recoverOrphanedSubmission($approved, 10), 'داخل المهلة');
+        $this->assertSame('returned_to_approved', $this->refunds->recoverOrphanedSubmission($approved, 0));
         $this->assertSame(PaymentRefund::APPROVED, $approved->fresh()->status);
         $this->assertSame([], $this->fake->refundCalls);
+    }
+
+    #[Test]
+    public function a_retry_whose_baseline_fetch_never_recorded_an_invocation_is_not_stuck_in_submitting(): void
+    {
+        [$attempt, , $approved] = $this->approvedRefund(40000);
+        $this->fake->failNextRefund('unknown_not_applied');
+        $unknown = $this->refunds->submit($approved, $this->admin);
+        $this->assertSame('retry_scheduled', $this->refunds->reconcileUnknown($unknown, 0));
+        $retry = $unknown->fresh();
+        $this->assertSame(1, $retry->retry_count);
+        $this->assertSame(1, PaymentRefundAttempt::query()->where('payment_refund_id', $retry->id)->count());
+
+        // التقديم الثاني حجز الخانة ثم انهار قبل تسجيل استدعائه: سجل التقديم الأول لا يُعدّ دليلاً على إرسال الحالي.
+        $retry->forceFill(['status' => PaymentRefund::SUBMITTING])->save();
+
+        $this->assertSame('returned_to_approved', $this->refunds->recoverOrphanedSubmission($retry, 0));
+        $this->assertSame(PaymentRefund::APPROVED, $retry->fresh()->status);
+        $this->assertSame(0, $attempt->fresh()->refunded_minor);
+    }
+
+    #[Test]
+    public function a_crash_between_the_invocation_record_and_the_result_becomes_unknown_and_is_resolvable(): void
+    {
+        [$attempt, , $approved] = $this->approvedRefund(40000);
+        PaymentRefund::query()->whereKey($approved->id)->first()->forceFill(['status' => PaymentRefund::SUBMITTING])->save();
+        PaymentRefundAttempt::query()->create(['payment_refund_id' => $approved->id, 'seq' => 1, 'baseline_refunded_minor' => 0, 'amount_minor' => 40000]);
+
+        $this->assertSame('marked_unknown', $this->refunds->recoverOrphanedSubmission($approved, 0));
+
+        $unknown = $approved->fresh();
+        $this->assertSame(PaymentRefund::UNKNOWN, $unknown->status);
+        $this->assertSame('worker_lost', PaymentRefundAttemptResult::query()->sole()->error_code);
+        $this->assertSame('skipped', $this->refunds->recoverOrphanedSubmission($unknown, 0), 'لا تكرار');
+        // الآن يدخل مسار المطابقة العادي: observed = baseline ⇒ لم يُطبَّق ⇒ إعادة واحدة.
+        $this->assertSame('retry_scheduled', $this->refunds->reconcileUnknown($unknown, 0));
+        $this->assertSame(0, $attempt->fresh()->refunded_minor);
+    }
+
+    #[Test]
+    public function an_unresolved_unknown_refund_rotates_so_the_reconciler_does_not_starve_others(): void
+    {
+        [, , $approved] = $this->approvedRefund(40000);
+        $this->fake->failNextRefund('unknown_applied');
+        $unknown = $this->refunds->submit($approved, $this->admin);
+        $before = $unknown->fresh()->updated_at;
+        $this->travel(5)->minutes();
+
+        $this->assertSame('probable_applied', $this->refunds->reconcileUnknown($unknown, 0));
+
+        $this->assertTrue($unknown->fresh()->updated_at->gt($before), 'يدور المصنَّف بلا تغيير حالة إلى آخر الطابور');
     }
 
     #[Test]
@@ -542,6 +593,7 @@ class PaymentRefundTest extends TestCase
         $this->assertSame(1, $summary['retry_scheduled']);
         $this->assertSame(1, $summary['orphans']);
         $this->assertSame(1, $summary['recovered']);
+        $this->assertSame(0, $summary['marked_unknown']);
         $this->assertSame(0, $summary['failed']);
         app(TenantContext::class)->set($this->tenant->id);
         $this->assertSame(PaymentRefund::APPROVED, $unknownA->fresh()->status);

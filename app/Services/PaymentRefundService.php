@@ -312,21 +312,26 @@ final class PaymentRefundService
         // المرحلة 5: النتيجة.
         return DB::transaction(function () use ($claim, $invocation, $outcome, $error): PaymentRefund {
             [$locked, $attempt] = $this->lockRefund($claim);
-            $this->assertStatus($locked, [PaymentRefund::SUBMITTING]);
+            // الحالة `unknown` ممكنة هنا: استعاد المطابِق `submitting` كـ`worker_lost` أثناء بطء المزوّد؛ النتيجة الحقيقية تحسمها (unknown → confirmed|failed مشروع).
+            $this->assertStatus($locked, [PaymentRefund::SUBMITTING, PaymentRefund::UNKNOWN]);
 
             if ($outcome instanceof PaymentProviderRefund) {
                 return $this->confirm($locked, $attempt, $invocation, $outcome, null, 'direct');
             }
 
             $kind = $error['kind'] ?? 'unknown';
+            if ($kind === 'unknown' && $locked->status === PaymentRefund::UNKNOWN) {
+                return $locked; // وُسم unknown بنتيجته مسبقاً (worker_lost) ولا جديد
+            }
             PaymentRefundAttemptResult::query()->create([
                 'payment_refund_attempt_id' => $invocation->getKey(),
                 'outcome' => $kind === 'rejected' ? PaymentRefundAttemptResult::OUTCOME_REJECTED : PaymentRefundAttemptResult::OUTCOME_UNKNOWN,
                 'error_code' => substr((string) ($error['code'] ?? ''), 0, 64),
             ]);
             if ($kind === 'rejected') {
+                $from = $locked->status;
                 $locked->forceFill(['status' => PaymentRefund::FAILED, 'failure_code' => substr((string) $error['code'], 0, 64)])->save();
-                $this->event($locked, 'failed', PaymentRefund::SUBMITTING, PaymentRefund::FAILED, null, (string) $error['code']);
+                $this->event($locked, 'failed', $from, PaymentRefund::FAILED, null, (string) $error['code']);
             } else {
                 $locked->forceFill(['status' => PaymentRefund::UNKNOWN, 'failure_code' => substr((string) ($error['code'] ?? ''), 0, 64)])->save();
                 $this->event($locked, 'unknown', PaymentRefund::SUBMITTING, PaymentRefund::UNKNOWN, null, (string) ($error['code'] ?? ''));
@@ -389,6 +394,7 @@ final class PaymentRefundService
                 return 'retry_scheduled';
             }
             $verdict = $observed === $baseline + $amount ? 'probable_applied' : 'needs_human';
+            $locked->touch();   // يدور المطابِق على غيره بدل أن يُغرقه المصنَّف بلا تغيير (updated_at ليس حقل هوية)
             $last = PaymentRefundEvent::query()->where('payment_refund_id', $locked->getKey())->where('action', 'reconcile_'.$verdict)->latest('created_at')->first();
             if ($last === null || (int) ($last->meta['observed_minor'] ?? -1) !== $observed) {
                 $this->event($locked, 'reconcile_'.$verdict, PaymentRefund::UNKNOWN, PaymentRefund::UNKNOWN, null, null, ['observed_minor' => $observed, 'baseline_minor' => $baseline, 'amount_minor' => $amount]);
@@ -398,21 +404,42 @@ final class PaymentRefundService
         });
     }
 
-    /** `submitting` بلا سجل استدعاء لمدة تتجاوز المهلة ⇒ لم يُرسَل شيء قطعاً ⇒ يعود `approved` (تُحرَّر الخانة). */
-    public function recoverOrphanedSubmission(PaymentRefund $refund, int $graceMinutes = self::ORPHAN_GRACE_MINUTES): bool
+    /**
+     * `submitting` عالقة تجاوزت المهلة (انهيار/قتل عامل). **لا تبقى عالقة أبداً** (فهرس الإرسال الواحد يحجب كل استرداد على الدفعة):
+     *  • بلا سجل استدعاء **للتقديم الحالي** ⇒ لم يُرسَل شيء قطعاً ⇒ يعود `approved` (تُحرَّر الخانة).
+     *  • بسجل استدعاء بلا نتيجة (انهيار بين المرحلتين 3 و5) ⇒ قد يكون نُفِّذ ⇒ `unknown` بنتيجة `worker_lost` ليحسمه المطابِق/الحسم البشري (ADR-0007 §5-3).
+     *
+     * @return 'returned_to_approved'|'marked_unknown'|'skipped'
+     */
+    public function recoverOrphanedSubmission(PaymentRefund $refund, int $graceMinutes = self::ORPHAN_GRACE_MINUTES): string
     {
-        return DB::transaction(function () use ($refund, $graceMinutes): bool {
+        return DB::transaction(function () use ($refund, $graceMinutes): string {
             [$locked] = $this->lockRefund($refund);
-            if ($locked->status !== PaymentRefund::SUBMITTING || $this->latestInvocation($locked) !== null) {
-                return false;
+            if ($locked->status !== PaymentRefund::SUBMITTING) {
+                return 'skipped';
             }
             if ($locked->updated_at !== null && $locked->updated_at->gt(now('UTC')->subMinutes($graceMinutes))) {
-                return false;
+                return 'skipped';
             }
-            $locked->forceFill(['status' => PaymentRefund::APPROVED])->save();
-            $this->event($locked, 'orphan_recovered', PaymentRefund::SUBMITTING, PaymentRefund::APPROVED, null, 'no_invocation_record');
+            $invocation = $this->currentInvocation($locked);
+            if ($invocation === null) {
+                $locked->forceFill(['status' => PaymentRefund::APPROVED])->save();
+                $this->event($locked, 'orphan_recovered', PaymentRefund::SUBMITTING, PaymentRefund::APPROVED, null, 'no_invocation_record');
 
-            return true;
+                return 'returned_to_approved';
+            }
+            if (PaymentRefundAttemptResult::query()->where('payment_refund_attempt_id', $invocation->getKey())->exists()) {
+                return 'skipped'; // النتيجة مسجَّلة ولم تكتمل المعاملة الأخيرة؛ المنفِّذ الأصلي يكملها
+            }
+            PaymentRefundAttemptResult::query()->create([
+                'payment_refund_attempt_id' => $invocation->getKey(),
+                'outcome' => PaymentRefundAttemptResult::OUTCOME_UNKNOWN,
+                'error_code' => 'worker_lost',
+            ]);
+            $locked->forceFill(['status' => PaymentRefund::UNKNOWN, 'failure_code' => 'worker_lost'])->save();
+            $this->event($locked, 'unknown', PaymentRefund::SUBMITTING, PaymentRefund::UNKNOWN, null, 'worker_lost');
+
+            return 'marked_unknown';
         });
     }
 
@@ -579,7 +606,7 @@ final class PaymentRefundService
     {
         DB::transaction(function () use ($claim, $code): void {
             [$locked] = $this->lockRefund($claim);
-            if ($locked->status === PaymentRefund::SUBMITTING && $this->latestInvocation($locked) === null) {
+            if ($locked->status === PaymentRefund::SUBMITTING && $this->currentInvocation($locked) === null) {
                 $locked->forceFill(['status' => PaymentRefund::APPROVED])->save();
                 $this->event($locked, 'submit_aborted', PaymentRefund::SUBMITTING, PaymentRefund::APPROVED, null, $code);
             }
@@ -743,6 +770,17 @@ final class PaymentRefundService
         }
 
         return $existing->load('allocations');
+    }
+
+    /**
+     * سجل استدعاء **التقديم الحالي** إن وُجد: التقديمات المسجَّلة ≤ retry_count + 1 (الأولى + كل إعادة مبرَّرة)، فاكتمال العدد يعني أن الحالي سجّل استدعاءه،
+     * أما سجل تقديم سابق (قبل إعادة) فلا يُعدّ دليلاً على إرسال الحالي.
+     */
+    private function currentInvocation(PaymentRefund $refund): ?PaymentRefundAttempt
+    {
+        $count = PaymentRefundAttempt::query()->where('payment_refund_id', $refund->getKey())->count();
+
+        return $count === (int) $refund->retry_count + 1 ? $this->latestInvocation($refund) : null;
     }
 
     private function latestInvocation(PaymentRefund $refund): ?PaymentRefundAttempt

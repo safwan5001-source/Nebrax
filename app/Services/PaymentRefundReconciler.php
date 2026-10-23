@@ -18,10 +18,10 @@ final class PaymentRefundReconciler
         private readonly TenantContext $tenant,
     ) {}
 
-    /** @return array{unknown: int, orphans: int, retry_scheduled: int, probable_applied: int, needs_human: int, recovered: int, failed: int} */
+    /** @return array{unknown: int, orphans: int, retry_scheduled: int, probable_applied: int, needs_human: int, recovered: int, marked_unknown: int, failed: int} */
     public function run(int $limit = 100, int $unknownGraceMinutes = PaymentRefundService::UNKNOWN_GRACE_MINUTES, int $orphanGraceMinutes = PaymentRefundService::ORPHAN_GRACE_MINUTES): array
     {
-        $summary = ['unknown' => 0, 'orphans' => 0, 'retry_scheduled' => 0, 'probable_applied' => 0, 'needs_human' => 0, 'recovered' => 0, 'failed' => 0];
+        $summary = ['unknown' => 0, 'orphans' => 0, 'retry_scheduled' => 0, 'probable_applied' => 0, 'needs_human' => 0, 'recovered' => 0, 'marked_unknown' => 0, 'failed' => 0];
 
         $unknown = PaymentRefund::query()->withoutGlobalScopes()->where('status', PaymentRefund::UNKNOWN)->orderBy('updated_at')->limit($limit)->get(['id', 'tenant_id']);
         foreach ($unknown as $row) {
@@ -40,8 +40,10 @@ final class PaymentRefundReconciler
             $recovered = $this->within((string) $row->tenant_id, fn () => $this->refunds->recoverOrphanedSubmission(PaymentRefund::query()->findOrFail($row->id), $orphanGraceMinutes));
             if ($recovered === null) {
                 $summary['failed']++;
-            } elseif ($recovered === true) {
+            } elseif ($recovered === 'returned_to_approved') {
                 $summary['recovered']++;
+            } elseif ($recovered === 'marked_unknown') {
+                $summary['marked_unknown']++;
             }
         }
 
