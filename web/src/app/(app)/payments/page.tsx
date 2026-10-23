@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { type ColumnDef } from '@tanstack/react-table';
-import { Plus } from 'lucide-react';
+import { CreditCard, Plus } from 'lucide-react';
 import { AdvancedFilterDialog } from '@/components/data-explorer/advanced-filter-dialog';
 import { DataTable } from '@/components/data-table';
 import { ListToolbar, PageHeader, Pagination, type PageAction, type SortOption } from '@/components/nebrax';
@@ -188,6 +188,7 @@ export default function PaymentsPage() {
 
   const headerActions: PageAction[] = [
     { key: 'create', label: t('create'), icon: Plus, href: '/payments/new', variant: 'primary' },
+    { key: 'online', label: t('online_log'), icon: CreditCard, href: '/payments/online', variant: 'outline' },
   ];
 
   return <div className="space-y-4">

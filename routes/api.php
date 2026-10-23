@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\PlatformDocumentOperationsController;
 use App\Http\Controllers\Api\PlatformAiBudgetController;
 use App\Http\Controllers\Api\PlatformIntegrationController;
 use App\Http\Controllers\Api\PlatformDocumentFileScanExceptionController;
+use App\Http\Controllers\Api\PlatformAiActionControlController;
 use App\Http\Controllers\Api\PlatformPaymentsRolloutController;
 use App\Http\Controllers\Api\PlatformSubscriptionController;
 use App\Http\Controllers\Api\PlatformSystemUpdateController;
@@ -99,6 +100,7 @@ use App\Http\Controllers\Api\InventoryReportController;
 use App\Http\Controllers\Api\InventorySettingsController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\InvoicePaymentRequestController;
+use App\Http\Controllers\Api\PaymentAttemptLogController;
 use App\Http\Controllers\Api\PaymentAttemptPostingController;
 use App\Http\Controllers\Api\PublicPaymentLinkController;
 use App\Http\Controllers\Api\JobLevelController;
@@ -110,6 +112,9 @@ use App\Http\Controllers\Api\ManualJournalController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PartnerController;
 use App\Http\Controllers\Api\PartnerImportController;
+use App\Http\Controllers\Api\PriceListItemImportController;
+use App\Http\Controllers\Api\ProductTaxonomyImportController;
+use App\Http\Controllers\Api\UnitTemplateImportController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PaymentAttemptController;
 use App\Http\Controllers\Api\PaymentGatewayController;
@@ -332,6 +337,9 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // PAY-H1-02: ضوابط تفعيل المدفوعات (قراءة).
         Route::get('payments-rollout', [PlatformPaymentsRolloutController::class, 'platform']);
         Route::get('tenants/{tenant}/payments-rollout', [PlatformPaymentsRolloutController::class, 'tenant'])->whereUuid('tenant');
+        // IMP-X-01a: ضوابط المشغّل لإجراءات المساعد (قراءة).
+        Route::get('ai-action-controls', [PlatformAiActionControlController::class, 'platform']);
+        Route::get('tenants/{tenant}/ai-action-controls', [PlatformAiActionControlController::class, 'tenant'])->whereUuid('tenant');
         Route::get('document-operations', [PlatformDocumentOperationsController::class, 'overview']);
         Route::get('document-usage', [PlatformDocumentOperationsController::class, 'usage']);
         Route::get('document-diagnostics', [PlatformDocumentOperationsController::class, 'diagnostics']);
@@ -347,6 +355,9 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
             // PAY-H1-02: تفعيل/إيقاف المدفوعات لمستأجر + الإيقاف الطارئ للمنصة (بحدث تدقيق).
             Route::put('payments-rollout', [PlatformPaymentsRolloutController::class, 'setPlatform']);
             Route::put('tenants/{tenant}/payments-rollout', [PlatformPaymentsRolloutController::class, 'setTenant'])->whereUuid('tenant');
+            // IMP-X-01a: منح/سحب ضوابط إجراءات المساعد (بسببٍ وحدث تدقيق).
+            Route::put('ai-action-controls', [PlatformAiActionControlController::class, 'setPlatform']);
+            Route::put('tenants/{tenant}/ai-action-controls', [PlatformAiActionControlController::class, 'setTenant'])->whereUuid('tenant');
             // PR-NOTIF-6: تحديثات النظام / What's New — كتابة ونشر.
             Route::post('system-updates', [PlatformSystemUpdateController::class, 'store']);
             Route::put('system-updates/{id}', [PlatformSystemUpdateController::class, 'update'])->whereUuid('id');
@@ -456,6 +467,9 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('ai-actions-settings', [AiActionSettingsController::class, 'show'])->middleware('throttle:60,1');
         Route::put('ai-actions-settings', [AiActionSettingsController::class, 'update'])
             ->middleware([$perm('ai.actions.manage'), 'throttle:20,1']);
+        // IMP-X-01c: موافقة مالك المؤسسة على التنفيذ (المفتاح الثاني بعد منحة المشغّل، D-11).
+        Route::put('ai-actions-settings/execution-approval', [AiActionSettingsController::class, 'updateExecutionApproval'])
+            ->middleware([$perm('ai.actions.execution_approve'), 'throttle:20,1']);
 
         // AI-ACTIONS-01: persisted/versioned drafts only. There is deliberately
         // no approve/execute/repair endpoint in this foundation slice.
@@ -655,6 +669,15 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::delete('products/{id}/variants/{variantId}', [ProductVariantController::class, 'destroyVariant'])->middleware($perm('products.manage'));
 
         // تصنيفات المنتجات والعلامات التجارية (قوائم تصنيف — لا أثر محاسبي)
+        // IMP-H4-S5: استيراد التصنيفات والعلامات (`?kind=category|brand`) وقوالب الوحدات — قالب/حقول/فحص/معاينة فقط (لا apply متزامن؛ التنفيذ عبر import-jobs المربوط بالمعاينة).
+        Route::get('product-taxonomy/import/template', [ProductTaxonomyImportController::class, 'template'])->middleware($perm('products.manage'));
+        Route::get('product-taxonomy/import/fields', [ProductTaxonomyImportController::class, 'fields'])->middleware($perm('products.manage'));
+        Route::post('product-taxonomy/import/inspect', [ProductTaxonomyImportController::class, 'inspect'])->middleware([$perm('products.manage'), EnsureImportFilesScanned::class]);
+        Route::post('product-taxonomy/import/preview', [ProductTaxonomyImportController::class, 'preview'])->middleware([$perm('products.manage'), EnsureImportFilesScanned::class]);
+        Route::get('unit-templates/import/template', [UnitTemplateImportController::class, 'template'])->middleware($perm('products.manage'));
+        Route::get('unit-templates/import/fields', [UnitTemplateImportController::class, 'fields'])->middleware($perm('products.manage'));
+        Route::post('unit-templates/import/inspect', [UnitTemplateImportController::class, 'inspect'])->middleware([$perm('products.manage'), EnsureImportFilesScanned::class]);
+        Route::post('unit-templates/import/preview', [UnitTemplateImportController::class, 'preview'])->middleware([$perm('products.manage'), EnsureImportFilesScanned::class]);
         Route::get('product-categories', [ProductCategoryController::class, 'index'])->middleware($perm('products.view'));
         Route::post('product-categories', [ProductCategoryController::class, 'store'])->middleware($perm('products.manage'));
         Route::put('product-categories/{id}', [ProductCategoryController::class, 'update'])->middleware($perm('products.manage'));
@@ -795,6 +818,11 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
 
         // قوائم الأسعار: إعداد شركة مشترك يختاره البائع يدوياً في المسودة؛
         // سعر السطر النهائي يبقى لقطة مستقلة ولا يتغير بتعديل القائمة لاحقاً.
+        // IMP-H4-S5: استيراد أسعار قائمة سعر — بوابة الكتابة المباشرة `company.manage` نفسها؛ قالب/حقول/فحص/معاينة فقط.
+        Route::get('price-lists/import/template', [PriceListItemImportController::class, 'template'])->middleware($perm('company.manage'));
+        Route::get('price-lists/import/fields', [PriceListItemImportController::class, 'fields'])->middleware($perm('company.manage'));
+        Route::post('price-lists/import/inspect', [PriceListItemImportController::class, 'inspect'])->middleware([$perm('company.manage'), EnsureImportFilesScanned::class]);
+        Route::post('price-lists/import/preview', [PriceListItemImportController::class, 'preview'])->middleware([$perm('company.manage'), EnsureImportFilesScanned::class]);
         Route::get('price-lists', [PriceListController::class, 'index'])->middleware($perm('invoices.view'));
         Route::get('price-lists/{id}', [PriceListController::class, 'show'])->middleware($perm('invoices.view'));
         Route::get('price-lists/{id}/resolve', [PriceListController::class, 'resolve'])->middleware($perm('invoices.manage'));
@@ -1059,6 +1087,8 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('payment-requests/{id}/link', [InvoicePaymentRequestController::class, 'issueLink'])->whereUuid('id')->middleware([$perm('payments.manage'), 'throttle:20,1']);
         Route::post('payment-requests/{id}/attempts', [InvoicePaymentRequestController::class, 'startAttempt'])->whereUuid('id')->middleware([$perm('payments.manage'), 'throttle:30,1']);
         // PAY-H2-02d: دفعات إلكترونية محجوبة بفترة مقفلة + إعادة ترحيل صريحة بفاعل وسبب (owner/admin).
+        Route::get('payment-attempts', [PaymentAttemptLogController::class, 'index'])->middleware($perm('payments.view'));
+        Route::get('payment-attempts/{id}', [PaymentAttemptLogController::class, 'show'])->whereUuid('id')->middleware($perm('payments.view'));
         Route::get('payment-attempts/blocked', [PaymentAttemptPostingController::class, 'blocked'])->middleware($perm('payments.resolve_blocked'));
         Route::post('payment-attempts/{id}/repost', [PaymentAttemptPostingController::class, 'repost'])->whereUuid('id')->middleware([$perm('payments.resolve_blocked'), 'throttle:20,1']);
         Route::post('payment-attempts/{id}/sync', [PaymentAttemptController::class, 'sync'])->whereUuid('id')->middleware($perm('payments.manage'));

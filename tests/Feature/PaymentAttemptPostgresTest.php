@@ -11,7 +11,6 @@ use App\Services\PaymentGatewayService;
 use App\Support\PaymentGatewayException;
 use App\Services\FakePaymentGatewayAdapter;
 use App\Services\PaymentOrchestrator;
-use App\Services\PaymentsRolloutControlService;
 use App\Support\PaymentOrchestrationException;
 use App\Support\PaymentProviderSnapshot;
 use App\Support\SchedulerHeartbeat;
@@ -35,6 +34,9 @@ use Tests\TestCase;
  */
 class PaymentAttemptPostgresTest extends TestCase
 {
+    use UsesWorkerDatabaseWithoutTransaction;
+    use DiagnosesUnprovenScheduler;
+
     private string $dir;
 
     private string $tenantId;
@@ -70,7 +72,7 @@ class PaymentAttemptPostgresTest extends TestCase
         $admin = PlatformAdministrator::create(['name' => 'مشغّل', 'email' => Str::random(8).'@platform.test', 'password' => 'platform-password-123']);
         $this->admins[] = $admin->id;
         SchedulerHeartbeat::record();
-        app(PaymentsRolloutControlService::class)->setTenantState($admin, $this->tenantId, true, 'تفعيل اختبار التزامن');
+        $this->enableTenantPaymentsOrDiagnose($admin, $this->tenantId, 'تفعيل اختبار التزامن');
 
         $gateway = PaymentGateway::query()->create(['provider' => 'fake', 'name' => 'Fake', 'environment' => 'sandbox']);
         DB::table('payment_gateways')->where('id', $gateway->id)->update(['status' => 'active']);

@@ -4,9 +4,14 @@ namespace App\Http\Requests;
 
 use App\Services\ImportJobAccess;
 use App\Services\PartnerImportService;
+use App\Services\ProductTaxonomyImportService;
+use App\Services\UnitTemplateImportService;
 use App\Services\ProductImportService;
 use App\Support\InventoryOpeningFields;
 use App\Support\PartnerImportFields;
+use App\Support\PriceListItemImportFields;
+use App\Support\ProductTaxonomyImportFields;
+use App\Support\UnitTemplateImportFields;
 use App\Support\ProductImportFields;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -67,11 +72,18 @@ class ApplyImportJobRequest extends FormRequest
                 ProductImportFields::keys(),
                 InventoryOpeningFields::keys(),
                 PartnerImportFields::keys(),
+                ProductTaxonomyImportFields::allKeys(),
+                PriceListItemImportFields::keys(),
+                UnitTemplateImportFields::keys(),
                 ['ignore']
             ))],
             // IMP-H3-S2 — خياراتا `partner_master`: النوع (عميل/مورّد) وسياسة إشارات التكرار.
             'type' => ['sometimes', Rule::in(PartnerImportService::TYPES)],
             'duplicate_signal_policy' => ['sometimes', Rule::in([PartnerImportService::SIGNAL_ERROR, PartnerImportService::SIGNAL_SKIP, PartnerImportService::SIGNAL_WARN])],
+            // IMP-H4-S5 — خيارات `product_taxonomy` (النوع وسياسة الآباء) و`unit_templates` (سياسة القوالب القائمة).
+            'kind' => ['sometimes', Rule::in(ProductTaxonomyImportFields::KINDS)],
+            'parent_policy' => ['sometimes', Rule::in([ProductTaxonomyImportService::PARENT_ERROR, ProductTaxonomyImportService::PARENT_CREATE])],
+            'existing_policy' => ['sometimes', Rule::in([UnitTemplateImportService::EXISTING_ERROR, UnitTemplateImportService::EXISTING_SKIP])],
             'batch_size' => ['sometimes', 'integer', 'min:1', 'max:'.ProductImportService::APPLY_BATCH_SIZE],
             'price_list_id' => ['sometimes', 'nullable', 'uuid'],
             'opening_date' => ['sometimes', 'date_format:Y-m-d'],
@@ -103,7 +115,7 @@ class ApplyImportJobRequest extends FormRequest
     public function explicitOptions(): array
     {
         $options = [];
-        foreach (['mode', 'blank_policy', 'master_data_policy', 'opening_date', 'type', 'duplicate_signal_policy'] as $key) {
+        foreach (['mode', 'blank_policy', 'master_data_policy', 'opening_date', 'type', 'duplicate_signal_policy', 'kind', 'parent_policy', 'existing_policy'] as $key) {
             if ($this->has($key)) {
                 $options[$key] = $this->string($key)->toString();
             }
@@ -157,7 +169,7 @@ class ApplyImportJobRequest extends FormRequest
         if ($this->has('opening_date')) {
             $options['opening_date'] = (string) $this->input('opening_date');
         }
-        foreach (['type', 'duplicate_signal_policy'] as $key) {
+        foreach (['type', 'duplicate_signal_policy', 'kind', 'parent_policy', 'existing_policy'] as $key) {
             if ($this->has($key)) {
                 $options[$key] = $this->string($key)->toString();
             }

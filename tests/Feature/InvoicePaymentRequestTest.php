@@ -228,7 +228,7 @@ class InvoicePaymentRequestTest extends TestCase
         $this->withToken($staff)->getJson("/api/invoices/{$invoice->id}/payment-requests")->assertOk();      // payments.view
 
         $created = $this->withToken($accountant)->postJson("/api/invoices/{$invoice->id}/payment-requests", $body)->assertCreated()
-            ->assertJsonPath('data.status', 'open')->assertJsonPath('data.allow_partial', false)->assertJsonMissingPath('data.token_hash');
+            ->assertJsonPath('data.status', 'open')->assertJsonPath('data.allow_partial', false)->assertJsonPath('data.link_issued', false)->assertJsonMissingPath('data.token_hash');
         $id = $created->json('data.id');
 
         $this->withToken($accountant)->postJson("/api/invoices/{$invoice->id}/payment-requests", $body)

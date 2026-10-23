@@ -232,6 +232,9 @@ class Rbac
             // IMP-H2-S4: إدارة قبول المؤسسة لـAI Actions (`ai_actions.enabled`) — سلطة مستقلة عن استعمالها واعتمادها وإصلاحها،
             // وعن موافقة المساعد (`ai.consent.manage`). owner/admin عبر `*` فقط؛ لا تُمنح لغيرهما تلقائياً.
             'ai.actions.manage',
+            // IMP-X-01c (D-11): موافقة **مالك** المؤسسة على تنفيذ AI Actions — المفتاح الثاني بعد منحة المشغّل. owner/admin عبر `*` في الكتالوج،
+            // لكن الخدمة تشترط دور `owner` صراحةً (لا admin ولا دور مخصّص) فلا يكفي منح الصلاحية وحدها.
+            'ai.actions.execution_approve',
     ];
 
     /**

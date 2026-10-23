@@ -26,7 +26,7 @@ final class AiActionGateway
     public function create(User $requestActor, string $type, array $proposal): AiAction
     {
         $definition = $this->registry->definition($type);
-        $actor = $this->policy->authorize((string) $requestActor->id, AiActionPolicy::USE, $definition['domain_permissions'], $definition['application_key']);
+        $actor = $this->policy->authorize((string) $requestActor->id, AiActionPolicy::USE, $definition['domain_permissions'], $definition['application_key'], $definition['type']);
         $this->assertNoCostWrite($actor, $proposal);
         $summary = $this->registry->validateProposal($type, $proposal);
 
@@ -50,7 +50,7 @@ final class AiActionGateway
     public function show(User $requestActor, AiAction $action): AiAction
     {
         $definition = $this->registry->definition($action->type);
-        $this->policy->authorize((string) $requestActor->id, AiActionPolicy::USE, $definition['domain_permissions'], $definition['application_key']);
+        $this->policy->authorize((string) $requestActor->id, AiActionPolicy::USE, $definition['domain_permissions'], $definition['application_key'], $definition['type']);
         $this->assertBranchContext($action);
         $action = $this->ledger->expireIfDue($action);
 
@@ -61,7 +61,7 @@ final class AiActionGateway
     public function authorizeFileIntake(User $requestActor, AiAction $action): User
     {
         $definition = $this->registry->definition($action->type);
-        $actor = $this->policy->authorize((string) $requestActor->id, AiActionPolicy::USE, $definition['domain_permissions'], $definition['application_key']);
+        $actor = $this->policy->authorize((string) $requestActor->id, AiActionPolicy::USE, $definition['domain_permissions'], $definition['application_key'], $definition['type']);
         $this->assertBranchContext($action);
 
         return $actor;
@@ -74,7 +74,7 @@ final class AiActionGateway
     public function authorizeFor(User $requestActor, AiAction $action, string $actionPermission): User
     {
         $definition = $this->registry->definition($action->type);
-        $actor = $this->policy->authorize((string) $requestActor->id, $actionPermission, $definition['domain_permissions'], $definition['application_key']);
+        $actor = $this->policy->authorize((string) $requestActor->id, $actionPermission, $definition['domain_permissions'], $definition['application_key'], $definition['type']);
         $this->assertBranchContext($action);
 
         return $actor;
@@ -87,7 +87,7 @@ final class AiActionGateway
     public function addVersion(User $requestActor, AiAction $action, int $expectedVersion, array $proposal, bool $costGuard = true): AiAction
     {
         $definition = $this->registry->definition($action->type);
-        $actor = $this->policy->authorize((string) $requestActor->id, AiActionPolicy::USE, $definition['domain_permissions'], $definition['application_key']);
+        $actor = $this->policy->authorize((string) $requestActor->id, AiActionPolicy::USE, $definition['domain_permissions'], $definition['application_key'], $definition['type']);
         $this->assertBranchContext($action);
         if ($costGuard) {
             $this->assertNoCostWrite($actor, $proposal);
@@ -130,7 +130,7 @@ final class AiActionGateway
     public function cancel(User $requestActor, AiAction $action, int $expectedVersion): AiAction
     {
         $definition = $this->registry->definition($action->type);
-        $actor = $this->policy->authorize((string) $requestActor->id, AiActionPolicy::USE, $definition['domain_permissions'], $definition['application_key']);
+        $actor = $this->policy->authorize((string) $requestActor->id, AiActionPolicy::USE, $definition['domain_permissions'], $definition['application_key'], $definition['type']);
         $this->assertBranchContext($action);
 
         return DB::transaction(function () use ($action, $expectedVersion, $actor): AiAction {

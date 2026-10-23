@@ -29,6 +29,8 @@ use Tests\TestCase;
  */
 class PaymentsRolloutControlPostgresTest extends TestCase
 {
+    use UsesWorkerDatabaseWithoutTransaction;
+
     private string $dir;
 
     /** @var list<string> */
