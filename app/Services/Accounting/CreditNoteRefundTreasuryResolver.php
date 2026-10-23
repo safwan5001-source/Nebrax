@@ -2,6 +2,7 @@
 
 namespace App\Services\Accounting;
 
+use App\Models\Account;
 use App\Models\CashBankAccount;
 use App\Models\Invoice;
 use App\Models\JournalLine;
@@ -23,7 +24,14 @@ use App\Support\TreasurySelectionPolicy;
  *  3. يُحلّ الاختيار بمحلِّل T3 (مستأجر/نوع نقد/كيان نشط/حساب أصل حركي) ثم يُفحص تخويل `withdraw` للفاعل — الاتجاه سحب لا إيداع.
  *  4. عملة الخزينة = عملة المؤسسة.
  *
- * قراءة فقط: لا كتابة ولا قفل ولا تهيئة (الكيان المشتقّ موجود حتماً)؛ يُستدعى قبل القيد فيتراجع كل شيء بلا ICV ولا مدخل سلسلة.
+ * لا كتابة ولا تهيئة (الكيان المشتقّ موجود حتماً)؛ يُستدعى قبل القيد فيتراجع كل شيء بلا ICV ولا مدخل سلسلة.
+ *
+ * التزامن مع التعطيل: يأخذ **قفل `FOR KEY SHARE` على حساب الأستاذ المشتقّ** قبل قراءة حالة الكيان، ويُمسك إلى التزام معاملة الترحيل.
+ * `CashBankAccountService::update/deactivate` يبدأ بـ`FOR UPDATE` على الحساب نفسه فيتعارض مع هذا القفل، لذلك: إما يسبق التعطيلُ الترحيلَ
+ * فيقرأ الترحيل الحالة المعطَّلة ويُرفض، وإما يسبقه الترحيل فينتظر التعطيل التزامَه. بلا القفل كان يمكن أن يلتزم تعطيلٌ بين قراءة المحلِّل
+ * وكتابة القيد (انتظار مِرساة المستأجر) فيلتزم الترحيل بعده، وفي خزينة نظامية (1110) لا يردّه فحص المحرك لأن حسابها الدفتري لا يُعطَّل؛
+ * وكان كل منهما يمسك قفلاً يريده الآخر (حساب ↔ مِرساة) فيقع جمود 40P01. القفل لا يتعارض مع `FOR NO KEY UPDATE` الذي تستعمله تهيئة T1،
+ * ولا مع ترحيلات القيود الأخرى (مفاتيح أجنبية = KEY SHARE)؛ ولا يأخذ قفل مِرساة ولا يعيد ترتيب أقفال المحرك.
  */
 class CreditNoteRefundTreasuryResolver
 {
@@ -48,6 +56,9 @@ class CreditNoteRefundTreasuryResolver
         if ($treasuryAccounts->count() !== 1) {
             throw TreasurySelectionException::for(TreasurySelectionException::SOURCE_TREASURY_UNRESOLVED);
         }
+
+        // قبل أي قراءة لحالة الكيان (انظر رأس الصنف). على SQLite لا أثر للقفل.
+        Account::query()->whereKey((string) $treasuryAccounts->first())->lock('for key share')->first();
 
         $resolved = $this->resolver->resolve(
             TreasurySelection::ledgerAccount((string) $treasuryAccounts->first()),

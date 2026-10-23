@@ -495,6 +495,58 @@ class TreasuryCreditNoteRefundRoutingTest extends TestCase
         $this->assertSame('draft', $noteA->fresh()->status);
     }
 
+    /**
+     * مراجع غير سليمة مزروعة بـSQL خام داخل قيد البيع (لا يصنعها أي مسار تطبيقي): سطر مدين لمستأجر آخر على قيدنا، ثم حساب خزينة
+     * لمستأجر آخر على سطر مدين يحمل مستأجرنا. كل القراءات في المحلِّل مقيَّدة بالمستأجر: لا شيء من مستأجر آخر يُرى ولا يُستعمل ولا يظهر في القيد.
+     *
+     * @test
+     */
+    public function planted_cross_tenant_lines_and_accounts_inside_the_source_entry_are_never_seen_or_used(): void
+    {
+        $this->activate('main');
+        $sale = $this->sale();
+        $ours = $this->entity('1110');
+
+        [$otherTenant] = $this->newTenant('t5-other-planted');
+        app(CashBankAccountService::class)->bootstrapDefaults();
+        $foreignTreasuryAccount = DB::table('cash_bank_accounts')->where('tenant_id', $otherTenant)->where('type', 'cash')->value('account_id');
+        $this->assertNotNull($foreignTreasuryAccount, 'خزينة المستأجر الآخر موجودة');
+        app(TenantContext::class)->set($this->tenantId);
+
+        // (أ) سطر مدين يحمل tenant_id المستأجر الآخر وحسابه، على قيد بيعنا: غير مرئي ⇒ تبقى خزينتنا الوحيدة 1110 ويُرحَّل منها.
+        DB::table('journal_lines')->insert([
+            'id' => (string) Str::uuid(), 'tenant_id' => $otherTenant, 'journal_entry_id' => $sale->journal_entry_id,
+            'account_id' => $foreignTreasuryAccount, 'debit' => 5, 'credit' => 0, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $note = $this->postNote($this->note($sale), $this->owner);
+        $this->assertSame('posted', $note->status);
+        $accounts = DB::table('journal_lines')->where('journal_entry_id', $note->journal_entry_id)->pluck('account_id')->all();
+        $this->assertContains($ours->account_id, $accounts, 'الاسترداد من خزينتنا المشتقّة');
+        $this->assertNotContains($foreignTreasuryAccount, $accounts, 'لا أثر لحساب مستأجر آخر في القيد');
+        $this->assertSame($this->tenantId, DB::table('journal_entries')->where('id', $note->journal_entry_id)->value('tenant_id'));
+
+        // (ب) سطر مدين يحمل مستأجرنا لكن حسابه لمستأجر آخر (وحذف سطر خزينتنا): الكيان الأجنبي غير مرئي ⇒ لا خزينة مشتقّة، فشل مغلق.
+        $sale2 = $this->sale();
+        DB::table('journal_lines')->where('journal_entry_id', $sale2->journal_entry_id)->where('debit', '>', 0)
+            ->update(['account_id' => $foreignTreasuryAccount]);
+        $draft = $this->note($sale2);
+        $before = $this->snapshot();
+        $this->assertSame(TreasurySelectionException::SOURCE_TREASURY_UNRESOLVED, $this->reason(fn () => $this->postNote($draft, $this->owner)));
+        $this->assertSame('draft', $draft->fresh()->status);
+        $this->assertSame($before, $this->snapshot(), 'الرفض لم يترك أثراً');
+    }
+
+    /** @test */
+    public function the_resolver_reads_only_through_tenant_scoped_models_and_never_by_raw_sql(): void
+    {
+        $src = file_get_contents(app_path('Services/Accounting/CreditNoteRefundTreasuryResolver.php'));
+        $this->assertStringNotContainsString('withoutGlobalScope', $src);
+        $this->assertStringNotContainsString('DB::table', $src);
+        $this->assertStringNotContainsString('DB::select', $src);
+        $this->assertStringNotContainsString('->toBase()', $src);
+        $this->assertStringNotContainsString('tenant_id', $src, 'لا معرّف مستأجر يُمرَّر من المدخلات');
+    }
+
     // ───────────────────────── الذرّية والتراجع ─────────────────────────
 
     /** @test */

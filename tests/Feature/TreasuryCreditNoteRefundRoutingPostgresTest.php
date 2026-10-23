@@ -130,10 +130,78 @@ class TreasuryCreditNoteRefundRoutingPostgresTest extends TestCase
         }
     }
 
+    /**
+     * نافذة السباق الوحيدة: الخزينة تُقرأ نشطةً (المحلِّل) ثم يتأخر الترحيل (انتظار مِرساة المستأجر مثلاً) قبل كتابة القيد، فيُثبَّت التعطيل
+     * في الفاصل. يُحاكى التأخير بعد آخر استعلام للحلّ (فحص العملة) وقبل قفل المِرساة وكتابة القيد، بخطّاف `DB::listen`. الخزينة 1110 حساب نظامي: التعطيل لا
+     * يمسّ حسابها الدفتري، فلا يردّه فحص `assertPostable` في المحرك — فهي الحالة التي يكشف فيها غياب القفل الإشعارَ المرحَّل بعد التعطيل.
+     *
+     * الثابتة المطلوبة: لا يلتزم ترحيل (commit) بعد تثبيت تعطيل خزينته. إما أن يرى الترحيل الخزينة نشطة عند الكتابة لأن التعطيل ينتظر التزامه،
+     * وإما يُرفض كلياً.
+     *
+     * @test
+     */
+    public function a_deactivation_cannot_commit_between_the_treasury_resolution_and_the_ledger_write_of_a_routed_refund(): void
+    {
+        $s = $this->scene(quantity: 12, saleOn1110: true);
+        $note = $this->draftNote($s);
+        $e1110 = CashBankAccount::whereHas('account', fn ($q) => $q->where('code', '1110'))->firstOrFail();
+        $this->assertTrue((bool) $e1110->account->is_system, 'حالة الاختبار: حساب الخزينة نظامي فلا يردّه المحرك');
+
+        $jobs = [
+            function () use ($s, $note, $e1110) {
+                app(TenantContext::class)->set($s['tenant']);
+                $owner = User::findOrFail($s['owner']);
+                $seen = ['entity_active_at_write' => null];
+                $hooked = false;
+                DB::listen(function ($q) use (&$hooked, &$seen, $s, $e1110) {
+                    if ($hooked || ! str_contains($q->sql, 'select "currency" from "tenants"')) {
+                        return;
+                    }
+                    $hooked = true;
+                    touch($this->dir.'/resolved');
+                    $this->waitFor($this->dir.'/deactivated', 1.0);
+                    $seen['entity_active_at_write'] = (bool) DB::selectOne('select is_active from cash_bank_accounts where id = ?', [$e1110->id])->is_active;
+                });
+                try {
+                    $status = app(CreditNoteService::class)->post(CreditNote::findOrFail($note), $owner)->status;
+                } catch (\Throwable $e) {
+                    return $seen + ['status' => 'rejected', 'why' => $e->getMessage()];
+                }
+
+                return $seen + ['status' => $status];
+            },
+            function () use ($s, $e1110) {
+                $this->waitFor($this->dir.'/resolved', 5.0);
+                app(TenantContext::class)->set($s['tenant']);
+                $t = microtime(true);
+                app(CashBankAccountService::class)->deactivate(CashBankAccount::findOrFail($e1110->id));
+                touch($this->dir.'/deactivated');
+
+                return ['deactivated' => true, 'waited' => microtime(true) - $t];
+            },
+        ];
+        $results = $this->runConcurrently($jobs);
+
+        foreach ($results as $i => $r) {
+            $this->assertFalse($this->isDeadlock($r), "جمود في العملية {$i}");
+        }
+        $this->assertTrue($results[1]['ok'] ?? false, 'التعطيل نجح: '.($results[1]['message'] ?? ''));
+        $p = $results[0]['value'] ?? [];
+        if (($p['status'] ?? null) === 'posted') {
+            $this->assertTrue($p['entity_active_at_write'], 'ترحيل التزم بعد تثبيت تعطيل خزينته (نافذة سباق)');
+            $this->assertGreaterThan(0.3, $results[1]['value']['waited'], 'التعطيل انتظر التزام الترحيل الجاري');
+            $this->assertSame(1, DB::table('journal_entries')->where('source_type', CreditNote::class)->where('source_id', $note)->count());
+        } else {
+            $this->assertSame('draft', DB::table('credit_notes')->where('id', $note)->value('status'));
+            $this->assertSame(0, DB::table('journal_entries')->where('source_type', CreditNote::class)->where('source_id', $note)->count());
+        }
+        $this->assertFalse((bool) DB::table('cash_bank_accounts')->where('id', $e1110->id)->value('is_active'), 'التعطيل ثبت في النهاية');
+    }
+
     // ───────────────────────── مساعدات ─────────────────────────
 
     /** @return array{tenant:string, partner:string, product:string, invoice:string, line:string, owner:string, t1111:string} */
-    private function scene(int $quantity, bool $moveMainBack = false): array
+    private function scene(int $quantity, bool $moveMainBack = false, bool $saleOn1110 = false): array
     {
         $slug = 'refund-pg-'.substr(uniqid(), -8);
         $auth = $this->registerTenant($slug, "owner@{$slug}.test");
@@ -146,7 +214,9 @@ class TreasuryCreditNoteRefundRoutingPostgresTest extends TestCase
         $cash = app(CashBankAccountService::class);
         $cash->bootstrapDefaults();
         $t1111 = $cash->create(['type' => 'cash', 'name' => 'خزينة 1111', 'currency' => 'SAR', 'deposit_scope' => 'all', 'withdraw_scope' => 'all'], $owner);
-        $cash->makeMain(CashBankAccount::findOrFail($t1111->id));
+        if (! $saleOn1110) {
+            $cash->makeMain(CashBankAccount::findOrFail($t1111->id));
+        }
         config(['treasury.cash_sale_routing_enabled' => true]);
         Settings::put('sales', ['cash_sale_treasury_policy' => 'main']);
 

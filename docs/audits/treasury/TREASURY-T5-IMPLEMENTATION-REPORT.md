@@ -87,6 +87,20 @@ ZATCA: the generated credit-note XML has the same structure and monetary totals 
 3. Tenants that refund credit-type or standalone notes in cash move to credit-then-voucher.
 4. A coordinated change record to set `TREASURY_CASH_SALE_ROUTING_ENABLED=true`, then per-tenant opt-in. Rollback: settings back to `legacy` or close the gate; posted entries are never rewritten.
 
-## 8. Next step
+## 8. Final review: tenant isolation and concurrency (post-CI)
+
+**Isolation: no defect.** Every read in `CreditNoteRefundTreasuryResolver` goes through tenant-scoped models (`Invoice` found under the tenant scope, `JournalLine`, `CashBankAccount`, T3 resolution); a static test forbids `withoutGlobalScopes`, `DB::table`/`DB::select`, `toBase()` and any `tenant_id` input. New test `planted_cross_tenant_lines_and_accounts_inside_the_source_entry_are_never_seen_or_used` plants, with raw SQL, (a) a debit line of another tenant (its treasury account) inside our sale entry: the refund still credits our treasury and the foreign account never appears in the entry; (b) our-tenant debit line pointing at another tenant's treasury account: no treasury is derived (`source_treasury_unresolved`), draft kept, no entry/ICV/chain change. Mutation (unscoped `CashBankAccount` read) fails both tests. The foreign-entry-on-invoice case was already covered. Residual: `TenantScope` is a no-op without a `TenantContext`, a repo-wide design property; the posting path cannot run without a context (ledger anchor), so no new exposure.
+
+**Concurrency: defect found and fixed (minimal).**
+
+| | Before | After |
+|---|---|---|
+| Window | The treasury state was read without a lock; between that read and the ledger write (waiting for the tenant anchor, etc.) a deactivation could commit and the refund then committed after it. For a system treasury (1110) the ledger's `assertPostable` cannot catch it (its GL account is not deactivated). Reproduced on PostgreSQL: the note posted while the entity was already inactive | Closed: the resolver takes `FOR KEY SHARE` on the derived GL account first. `deactivate/update` starts with `FOR UPDATE` on that account, so it waits for the posting transaction (measured wait 1.03s in the test); if the deactivation wins, the posting reads the inactive entity and is rejected |
+| Deadlock | Reproduced (`40P01`) between a posting that holds the tenant anchor and a deactivation that holds the account row and then needs the tenant row (FK check) | No cycle on this path: the deactivation waits holding nothing |
+| Lock compatibility | | `FOR KEY SHARE` conflicts only with `FOR UPDATE`/delete; the T1 bootstrap uses `FOR NO KEY UPDATE`, other postings take KEY SHARE through FKs. No anchor lock added, engine ordering untouched |
+
+New test `a_deactivation_cannot_commit_between_the_treasury_resolution_and_the_ledger_write_of_a_routed_refund` (failed before the fix, passes after, 3 consecutive runs). **Not fixed, out of T5 scope:** the same deactivation-versus-posting cycle exists for any other posting path that credits/debits the deactivated account (sales, receipts, etc.), because `CashBankAccountService::update` locks the account before the tenant anchor. It fails safe (PostgreSQL aborts one side, full rollback) and is a candidate fix for the finance settings slice.
+
+## 9. Next step
 
 T6 (returns and POS exchange) under the same gate, or T5b (purchase debit notes), whichever the owner prioritizes.
