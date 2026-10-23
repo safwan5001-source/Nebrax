@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\PlatformDocumentOperationsController;
 use App\Http\Controllers\Api\PlatformAiBudgetController;
 use App\Http\Controllers\Api\PlatformIntegrationController;
 use App\Http\Controllers\Api\PlatformDocumentFileScanExceptionController;
+use App\Http\Controllers\Api\PlatformAiActionControlController;
 use App\Http\Controllers\Api\PlatformPaymentsRolloutController;
 use App\Http\Controllers\Api\PlatformSubscriptionController;
 use App\Http\Controllers\Api\PlatformSystemUpdateController;
@@ -332,6 +333,9 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // PAY-H1-02: ضوابط تفعيل المدفوعات (قراءة).
         Route::get('payments-rollout', [PlatformPaymentsRolloutController::class, 'platform']);
         Route::get('tenants/{tenant}/payments-rollout', [PlatformPaymentsRolloutController::class, 'tenant'])->whereUuid('tenant');
+        // IMP-X-01a: ضوابط المشغّل لإجراءات المساعد (قراءة).
+        Route::get('ai-action-controls', [PlatformAiActionControlController::class, 'platform']);
+        Route::get('tenants/{tenant}/ai-action-controls', [PlatformAiActionControlController::class, 'tenant'])->whereUuid('tenant');
         Route::get('document-operations', [PlatformDocumentOperationsController::class, 'overview']);
         Route::get('document-usage', [PlatformDocumentOperationsController::class, 'usage']);
         Route::get('document-diagnostics', [PlatformDocumentOperationsController::class, 'diagnostics']);
@@ -347,6 +351,9 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
             // PAY-H1-02: تفعيل/إيقاف المدفوعات لمستأجر + الإيقاف الطارئ للمنصة (بحدث تدقيق).
             Route::put('payments-rollout', [PlatformPaymentsRolloutController::class, 'setPlatform']);
             Route::put('tenants/{tenant}/payments-rollout', [PlatformPaymentsRolloutController::class, 'setTenant'])->whereUuid('tenant');
+            // IMP-X-01a: منح/سحب ضوابط إجراءات المساعد (بسببٍ وحدث تدقيق).
+            Route::put('ai-action-controls', [PlatformAiActionControlController::class, 'setPlatform']);
+            Route::put('tenants/{tenant}/ai-action-controls', [PlatformAiActionControlController::class, 'setTenant'])->whereUuid('tenant');
             // PR-NOTIF-6: تحديثات النظام / What's New — كتابة ونشر.
             Route::post('system-updates', [PlatformSystemUpdateController::class, 'store']);
             Route::put('system-updates/{id}', [PlatformSystemUpdateController::class, 'update'])->whereUuid('id');
