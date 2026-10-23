@@ -52,7 +52,7 @@ class PosTerminalRequest extends BaseModel
 
     protected $fillable = [
         'tenant_id', 'branch_id', 'pos_session_id', 'pos_payment_terminal_id', 'payment_method_id', 'idempotency_key', 'amount', 'currency',
-        'status', 'provider_ref', 'approval_code', 'rrn', 'last4', 'failure_code', 'void_attempts', 'last_void_error', 'compensating_until', 'lease_token',
+        'status', 'provider_ref', 'approval_code', 'rrn', 'last4', 'failure_code', 'void_attempts', 'last_void_error', 'compensating_until', 'lease_token', 'lease_op',
         'consumed_payment_id', 'consumed_invoice_id', 'created_by', 'resolved_by', 'resolution_note',
         'approved_at', 'consumed_at', 'voided_at', 'resolved_at',
     ];
@@ -107,9 +107,17 @@ class PosTerminalRequest extends BaseModel
         return $this->belongsTo(PaymentMethod::class);
     }
 
+    /**
+     * عملية مزوّد/تعويض لم تُنهِ نفسها: الإيجار حيّ **أو** رمزه باقٍ بعد انتهاء مدته (نداء قد لا يزال جارياً عند المزوّد).
+     * الموافقة المرتبطة به غير متاحة للاستهلاك ولا للحلّ اليدوي حتى تنتهي العملية أو يُعيد المجدول المحاولة.
+     */
+    public function hasOutstandingLease(): bool
+    {
+        return $this->lease_token !== null || ($this->compensating_until !== null && $this->compensating_until->isFuture());
+    }
+
     public function isApprovalAvailable(): bool
     {
-        return $this->status === self::STATUS_APPROVED
-            && ($this->compensating_until === null || $this->compensating_until->isPast());
+        return $this->status === self::STATUS_APPROVED && ! $this->hasOutstandingLease();
     }
 }

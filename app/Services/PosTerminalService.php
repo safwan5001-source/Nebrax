@@ -101,7 +101,7 @@ class PosTerminalService
         // استدعاء الجهاز خارج المعاملة وبإيجار على الطلب. **استثناء من المحوّل = نتيجة غامضة** (قد يكون الجهاز استلم ووافق وضاع الردّ): يبقى الطلب `sent`
         // بعلامة `start_unconfirmed` فيحجز الجهاز (طلب نشط واحد) ويستعلمه الكاشير/المجدول ويلغيه — لا `error` نهائياً يحرّر الجهاز لخصم ثانٍ.
         // الفشل القاطع (لم يُرسَل شيء) يعيده المحوّل نتيجة ERROR صريحة.
-        return $this->providerOp($request->id, function (PosTerminalRequest $claimed) {
+        return $this->providerOp($request->id, 'start', function (PosTerminalRequest $claimed) {
             try {
                 $terminal = PosPaymentTerminal::query()->findOrFail($claimed->pos_payment_terminal_id);
 
@@ -136,12 +136,20 @@ class PosTerminalService
      *
      * @param  \Closure(PosTerminalRequest): PosTerminalResult  $call
      */
-    private function providerOp(string $requestId, \Closure $call, bool $expireOnCancel = false): PosTerminalRequest
+    /** الإيجار لا يقلّ عن ثلاثة أضعاف مهلة نداء المزوّد: نداء أبطأ من ذلك مخالفة لعقد المحوّل (`TerminalAdapter`)، لا حالة طبيعية. */
+    private function leaseSeconds(): int
     {
-        $lease = max(10, (int) config('pos_terminals.compensation_lease_seconds', 90));
+        $timeout = max(1, (int) config('pos_terminals.provider_timeout_seconds', 20));
+
+        return max(10, $timeout * 3, (int) config('pos_terminals.compensation_lease_seconds', 90));
+    }
+
+    private function providerOp(string $requestId, string $op, \Closure $call, bool $expireOnCancel = false): PosTerminalRequest
+    {
+        $lease = $this->leaseSeconds();
 
         $token = (string) Str::uuid();
-        $claimed = DB::transaction(function () use ($requestId, $lease, $token) {
+        $claimed = DB::transaction(function () use ($requestId, $lease, $token, $op) {
             $request = PosTerminalRequest::query()->whereKey($requestId)->lockForUpdate()->firstOrFail();
             if (! in_array($request->status, [PosTerminalRequest::STATUS_CREATED, PosTerminalRequest::STATUS_SENT], true)) {
                 return [null, $request];
@@ -149,7 +157,12 @@ class PosTerminalService
             if ($request->compensating_until !== null && $request->compensating_until->isFuture()) {
                 throw new PosTerminalException('operation_in_progress', 'عملية أخرى جارية على هذا الطلب؛ أعد المحاولة بعد لحظات.');
             }
-            $request->update(['compensating_until' => now('UTC')->addSeconds($lease), 'lease_token' => $token]);
+            // إيجار منتهٍ لإلغاء لم يكتمل: نتيجته عند المزوّد مجهولة (قد يُنفَّذ لاحقاً) ⇒ لا يخلفه استعلام قد يسجّل موافقة سيعكسها ذلك الإلغاء؛
+            // يخلفه إلغاء آخر فقط (مُتماثل القدرة فيتقارب الطرفان على «ملغى»).
+            if ($request->lease_token !== null && $request->lease_op === 'cancel' && $op !== 'cancel') {
+                throw new PosTerminalException('operation_in_progress', 'إلغاء سابق لم يتأكد بعد؛ أعد الإلغاء بدل الاستعلام.');
+            }
+            $request->update(['compensating_until' => now('UTC')->addSeconds($lease), 'lease_token' => $token, 'lease_op' => $op]);
 
             return [$request, $request];
         });
@@ -161,7 +174,7 @@ class PosTerminalService
             $result = $call($claimed[0]);
         } catch (Throwable $e) {
             // يحرّر إيجاره هو فقط: إن انتهى وأخذه غيره فلا يمسّه.
-            DB::table('pos_terminal_requests')->where('id', $requestId)->where('lease_token', $token)->update(['compensating_until' => null, 'lease_token' => null]);
+            DB::table('pos_terminal_requests')->where('id', $requestId)->where('lease_token', $token)->update(['compensating_until' => null, 'lease_token' => null, 'lease_op' => null]);
             throw $e;
         }
 
@@ -176,7 +189,7 @@ class PosTerminalService
             return $request;
         }
 
-        return $this->providerOp($request->id, function (PosTerminalRequest $claimed) {
+        return $this->providerOp($request->id, 'fetch', function (PosTerminalRequest $claimed) {
             $terminal = PosPaymentTerminal::query()->findOrFail($claimed->pos_payment_terminal_id);
             try {
                 return $this->adapters->for($terminal->provider)->fetch($terminal, $claimed);
@@ -194,7 +207,7 @@ class PosTerminalService
             throw new PosTerminalException('not_cancellable', 'لا يمكن إلغاء الطلب في حالته الحالية؛ استعمل إلغاء الموافقة.');
         }
 
-        return $this->providerOp($request->id, function (PosTerminalRequest $claimed) {
+        return $this->providerOp($request->id, 'cancel', function (PosTerminalRequest $claimed) {
             $terminal = PosPaymentTerminal::query()->findOrFail($claimed->pos_payment_terminal_id);
             try {
                 return $this->adapters->for($terminal->provider)->cancel($terminal, $claimed);
@@ -229,7 +242,7 @@ class PosTerminalService
                 throw new PosTerminalException('not_resolvable', 'الطلب لا يحتاج حلاً.');
             }
             // محاولة إلغاء حيّة (إيجار) ⇒ لا حلّ يدوي الآن: قد ينجح الإلغاء بعد إقرار المدير بأن المبلغ أُعيد خارجياً فيُرَدّ مرتين.
-            if ($locked->compensating_until !== null && $locked->compensating_until->isFuture()) {
+            if ($locked->hasOutstandingLease()) {
                 throw new PosTerminalException('compensation_in_progress', 'محاولة إلغاء جارية على الجهاز؛ انتظر انتهاءها ثم أعد المحاولة.');
             }
             $locked->update([
@@ -340,7 +353,7 @@ class PosTerminalService
      */
     public function compensate(string $requestId): PosTerminalRequest
     {
-        $lease = max(10, (int) config('pos_terminals.compensation_lease_seconds', 90));
+        $lease = $this->leaseSeconds();
 
         $token = (string) Str::uuid();
         $claimed = DB::transaction(function () use ($requestId, $lease, $token) {
@@ -350,7 +363,7 @@ class PosTerminalService
                 || ($request->compensating_until !== null && $request->compensating_until->isFuture())) {
                 return null;
             }
-            $request->update(['compensating_until' => now('UTC')->addSeconds($lease), 'lease_token' => $token, 'void_attempts' => $request->void_attempts + 1]);
+            $request->update(['compensating_until' => now('UTC')->addSeconds($lease), 'lease_token' => $token, 'lease_op' => 'void', 'void_attempts' => $request->void_attempts + 1]);
 
             return $request;
         });
@@ -378,9 +391,9 @@ class PosTerminalService
                 return $request; // انتهى إيجار هذه المحاولة وأخذه غيرها: نتيجتها متأخرة ولا تُنهي الحالة ولا تحرّر إيجار المالك الحالي.
             }
             if ($error === null) {
-                $request->update(['status' => PosTerminalRequest::STATUS_VOIDED, 'voided_at' => now('UTC'), 'compensating_until' => null, 'lease_token' => null, 'last_void_error' => null]);
+                $request->update(['status' => PosTerminalRequest::STATUS_VOIDED, 'voided_at' => now('UTC'), 'compensating_until' => null, 'lease_token' => null, 'lease_op' => null, 'last_void_error' => null]);
             } else {
-                $request->update(['status' => PosTerminalRequest::STATUS_COMPENSATION_REQUIRED, 'compensating_until' => null, 'lease_token' => null, 'last_void_error' => substr($error, 0, 48)]);
+                $request->update(['status' => PosTerminalRequest::STATUS_COMPENSATION_REQUIRED, 'compensating_until' => null, 'lease_token' => null, 'lease_op' => null, 'last_void_error' => substr($error, 0, 48)]);
             }
 
             return $request->fresh();
@@ -447,7 +460,7 @@ class PosTerminalService
         if (! in_array($request->status, [PosTerminalRequest::STATUS_CREATED, PosTerminalRequest::STATUS_SENT], true)) {
             return true;
         }
-        $applied = $this->providerOp($requestId, function (PosTerminalRequest $claimed) {
+        $applied = $this->providerOp($requestId, 'cancel', function (PosTerminalRequest $claimed) {
             $terminal = PosPaymentTerminal::query()->findOrFail($claimed->pos_payment_terminal_id);
 
             return $this->adapters->for($terminal->provider)->cancel($terminal, $claimed);
@@ -492,7 +505,7 @@ class PosTerminalService
             }
 
             // كل نتيجة تُحرّر إيجار عملية المزوّد (providerOp).
-            $refs = ['provider_ref' => $result->providerRef ?? $request->provider_ref, 'compensating_until' => null, 'lease_token' => null];
+            $refs = ['provider_ref' => $result->providerRef ?? $request->provider_ref, 'compensating_until' => null, 'lease_token' => null, 'lease_op' => null];
             switch ($result->status) {
                 case PosTerminalResult::PENDING:
                     $request->update([

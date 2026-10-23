@@ -23,7 +23,7 @@ return new class extends Migration
         Schema::create('pos_payment_terminals', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignUuid('tenant_id')->constrained()->cascadeOnDelete();
-            $table->foreignUuid('branch_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignUuid('branch_id')->nullable()->constrained()->restrictOnDelete(); // حذف الفرع لا يحوّل جهازه/طلباته إلى «بلا فرع» (مرئي لكل الفروع)
             $table->foreignUuid('pos_device_id')->nullable()->constrained('pos_devices')->nullOnDelete();
             $table->string('name', 120);
             $table->string('code', 64)->nullable();
@@ -40,7 +40,7 @@ return new class extends Migration
         Schema::create('pos_terminal_requests', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignUuid('tenant_id')->constrained()->cascadeOnDelete();
-            $table->foreignUuid('branch_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignUuid('branch_id')->nullable()->constrained()->restrictOnDelete(); // حذف الفرع لا يحوّل جهازه/طلباته إلى «بلا فرع» (مرئي لكل الفروع)
             $table->foreignUuid('pos_session_id')->constrained('pos_sessions')->restrictOnDelete();
             $table->foreignUuid('pos_payment_terminal_id')->constrained('pos_payment_terminals')->restrictOnDelete();
             $table->foreignUuid('payment_method_id')->constrained('payment_methods')->restrictOnDelete();
@@ -58,6 +58,7 @@ return new class extends Migration
             $table->timestamp('compensating_until')->nullable();
             // رمز ملكية إيجار عملية المزوّد: نتيجة متأخرة من مالك منتهي الإيجار لا تُطبَّق (providerOp).
             $table->string('lease_token', 36)->nullable();
+            $table->string('lease_op', 12)->nullable(); // نوع العملية الحاملة للإيجار (start/fetch/cancel)
             $table->foreignUuid('consumed_payment_id')->nullable()->constrained('payments')->restrictOnDelete();
             $table->foreignUuid('consumed_invoice_id')->nullable()->constrained('invoices')->restrictOnDelete();
             $table->foreignUuid('created_by')->nullable()->constrained('users')->nullOnDelete();

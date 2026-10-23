@@ -10,6 +10,9 @@ return [
     // طلب لم يصل إلى حالة نهائية خلال هذه المدة يُستعلَم عنه ثم يُلغى (انتهاء).
     'pending_expire_minutes' => (int) env('POS_TERMINAL_PENDING_EXPIRE_MINUTES', 15),
 
+    // أقصى مدة لنداء واحد إلى المزوّد (يلتزم بها كل محوّل حقيقي). الإيجار يُفرَض ≥ ثلاثة أضعافها فلا تتراكب عمليتان على طلب واحد في الحالة الطبيعية.
+    'provider_timeout_seconds' => (int) env('POS_TERMINAL_PROVIDER_TIMEOUT_SECONDS', 20),
+
     // إيجار الإلغاء/التعويض: يمنع مُعوِّضين متزامنين، وينتهي تلقائياً بعد انهيار العامل.
     'compensation_lease_seconds' => (int) env('POS_TERMINAL_COMPENSATION_LEASE_SECONDS', 90),
 ];

@@ -492,6 +492,55 @@ class PosTerminalFoundationTest extends TestCase
     }
 
     #[Test]
+    public function an_approval_whose_void_call_still_holds_a_lease_token_is_neither_consumable_nor_manually_resolvable_even_after_the_lease_time_passed(): void
+    {
+        $ctx = $this->context('pos-term-token-hold');
+        $id = $this->approvedRequest($ctx, 11500);
+        DB::table('pos_terminal_requests')->where('id', $id)->update(['compensating_until' => now('UTC')->subSeconds(5), 'lease_token' => 'void-in-flight', 'lease_op' => 'void']);
+
+        $this->checkout($ctx, [['payment_method_id' => $ctx['card']['id'], 'amount' => 11500, 'terminal_request_id' => $id]])->assertStatus(422);
+        $this->assertSame(0, Invoice::query()->count());
+        $this->assertSame('approved', PosTerminalRequest::query()->withoutGlobalScopes()->findOrFail($id)->status);
+
+        DB::table('pos_terminal_requests')->where('id', $id)->update(['status' => 'compensation_required']);
+        $this->withToken($ctx['token'])->postJson("/api/pos/terminal-requests/{$id}/resolve", ['note' => 'أُعيد المبلغ خارجياً'])->assertStatus(422)
+            ->assertJsonPath('reason', 'compensation_in_progress');
+
+        // إعادة المحاولة (المجدول/الكاشير) تستلم الإيجار المنتهي وتُنهي ويُحرَّر الرمز.
+        $this->withToken($ctx['token'])->postJson("/api/pos/terminal-requests/{$id}/void")->assertOk()->assertJsonPath('data.status', 'voided');
+        $this->assertNull(PosTerminalRequest::query()->withoutGlobalScopes()->findOrFail($id)->lease_token);
+    }
+
+    #[Test]
+    public function after_an_unconfirmed_expired_cancel_only_another_cancel_may_take_over_never_a_sync(): void
+    {
+        $ctx = $this->context('pos-term-cancel-takeover');
+        $id = $this->createRequest($ctx, 11500)->assertCreated()->json('data.id');
+        $this->fake->script($id, 'approved'); // لو استُعلم الآن لسُجّلت موافقة سيعكسها الإلغاء المعلّق
+        DB::table('pos_terminal_requests')->where('id', $id)->update(['compensating_until' => now('UTC')->subSeconds(5), 'lease_token' => 'cancel-in-flight', 'lease_op' => 'cancel']);
+
+        $before = $this->fake->calls['fetch'];
+        $this->show($ctx, $id)->assertStatus(409)->assertJsonPath('reason', 'operation_in_progress');
+        $this->assertSame($before, $this->fake->calls['fetch'], 'لم يُستعلم المزوّد');
+        $this->assertSame('sent', PosTerminalRequest::query()->withoutGlobalScopes()->findOrFail($id)->status);
+
+        $this->withToken($ctx['token'])->postJson("/api/pos/terminal-requests/{$id}/cancel")->assertOk()->assertJsonPath('data.status', 'cancelled');
+        $this->assertNull(PosTerminalRequest::query()->withoutGlobalScopes()->findOrFail($id)->lease_token);
+    }
+
+    #[Test]
+    public function a_branch_that_owns_payment_terminals_cannot_be_deleted(): void
+    {
+        $ctx = $this->context('pos-term-branch-del');
+        $branch = $this->withToken($ctx['token'])->postJson('/api/branches', ['name' => 'فرع للحذف'])->assertCreated()->json('data.id');
+        $this->withToken($ctx['token'])->withHeaders(['X-Branch-Id' => $branch])
+            ->postJson('/api/pos-payment-terminals', ['name' => 'جهاز الفرع', 'provider' => 'fake'])->assertCreated();
+
+        $this->withToken($ctx['token'])->deleteJson("/api/branches/{$branch}")->assertStatus(422);
+        $this->assertSame($branch, DB::table('pos_payment_terminals')->where('name', 'جهاز الفرع')->value('branch_id'), 'الجهاز باقٍ بفرعه');
+    }
+
+    #[Test]
     public function provider_operations_on_one_request_are_serialized_by_a_lease_and_the_lease_is_always_released(): void
     {
         $ctx = $this->context('pos-term-serialize');

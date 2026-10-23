@@ -47,7 +47,7 @@ STATUS: **IN REVIEW** (PR مفتوح) · DATE: 2026-10-22
 - `app/Services/PosTerminalService.php`, `PosTerminalAdapterRegistry.php`, `FakePosTerminalAdapter.php`.
 - تعديل `PosService` (استهلاك الموافقة، البصمة، التعويض بعد الفشل)، `PosSessionService` (منع الإقفال + `terminal_blockers` في المعاينة)، `PaymentMethod*` (سياسة الاشتراط).
 - `PosTerminalController` + طلبان + موردان + مسارات (`/api/pos-payment-terminals`, `/api/pos/terminal-requests*`)؛ `pos:sweep-terminals` (مجدول)؛ `config/pos_terminals.php` (مهل افتراضية محافظة).
-- اختبارات: `PosTerminalFoundationTest` (26)، `PosTerminalPostgresTest` (6، `pcntl_fork`) — SQLite وPostgreSQL ×3 خضراء.
+- اختبارات: `PosTerminalFoundationTest` (29)، `PosTerminalPostgresTest` (6، `pcntl_fork`) — SQLite وPostgreSQL ×3 خضراء.
 - لا مجلدات جديدة تحت `app/`؛ لا تعديل لـ`PaymentService`/`LedgerService`.
 
 ## Tests and exact results
@@ -67,6 +67,8 @@ STATUS: **IN REVIEW** (PR مفتوح) · DATE: 2026-10-22
 **الجولة الرابعة (رأس 828a1df) — ملاحظتان صحيحتان:** P1 إيجار المزوّد بلا مالك ⇒ أُضيف `lease_token` (رمز ملكية)؛ `apply()` وتحرير الاستثناء يتحققان منه، فنتيجة مالك انتهى إيجاره وأخذه غيره **لا تُطبَّق** ولا تمسّ إيجار المالك الحالي · P2 تُحفظ القيمة المقصوصة نفسها التي فُحص تفرّدها. اختباران.
 
 **الجولة الخامسة (رأس 508a507) — ملاحظتان صحيحتان:** P1 تعويض `void` بلا ملكية إيجار ⇒ `compensate()` يأخذ `lease_token` ويتحقق منه عند الإنهاء (نتيجة مالك منتهٍ لا تُنهي الحالة ولا تحرّر إيجار الحالي، فيبقى الحلّ اليدوي مرفوضاً) · P2 إعادة الطلب بالمفتاح نفسه (العادية وسباق المفتاح) تتحقق من ملكية الجلسة كالإنشاء فلا يكشف كاشيرٌ آخر مراجع الموافقة. اختباران.
+
+**الجولة السادسة (رأس 4ede8c6) — ثلاث ملاحظات صحيحة:** P1 تراكب نداءات المزوّد بعد انتهاء الإيجار ⇒ (أ) عقد مهلة صلبة في `TerminalAdapter` والإيجار ≥ 3× `provider_timeout_seconds`، (ب) `lease_op`: بعد إيجار إلغاء منتهٍ لم يتأكد لا يخلفه إلا إلغاء (لا استعلام يسجّل موافقة سيعكسها الإلغاء المعلّق) · P1 موافقة يحمل `void` رمز إيجارها ⇒ غير متاحة للاستهلاك ولا للحلّ اليدوي حتى بعد انتهاء المدة (`hasOutstandingLease`) ويستلمها إعادة المحاولة/المجدول · P2 حذف الفرع لا يحوّل جهازه إلى «بلا فرع»: FK مقيِّد + رفض 422 صريح في حذف الفرع. **قيد معلن:** أمان التراكب المطلق مع مزوّد حقيقي يعتمد على التزام المحوّل بالمهلة (يُتحقَّق منه في شريحة المحوّل الحقيقي H6-03). ثلاثة اختبارات.
 
 ## CI / Merge
 
