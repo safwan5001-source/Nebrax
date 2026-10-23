@@ -49,7 +49,8 @@ SUPERSEDES: لا شيء (يفصّل D-28 من «عتبة قابلة للضبط»
 |---|---|---|
 | `payment_refunds` | مستند الاسترداد (طلب ← موافقة ← مزوّد ← ترحيل) | `number` (تسلسل عبر `GeneratesDocumentNumbers`)، `partner_id`، `payment_attempt_id`، `payment_gateway_id`، `amount_minor`، `currency`، `status`، `requested_by`، `approved_by`، `approved_at`، `reject_reason`، `provider_refund_ref`، `provider_refunded_minor`/`confirmed_at`، `posting_status`، `accounting_date`، `posted_at`، `journal_entry_id`؛ **CHECK `approved_by IS NULL OR approved_by <> requested_by`**؛ `UNIQUE(tenant, idempotency_key)`؛ لا حذف |
 | `payment_refund_allocations` | تخصيص الاسترداد على إشعار دائن/مرتجع (نمط `customer_refund_allocations` نفسه) | `payment_refund_id`، `source_type`، `source_id`، `amount`؛ `UNIQUE` للتخصيص الواحد |
-| `payment_refund_attempts` | سجل **ثابت** لكل استدعاء مزوّد (للمطابقة ومنع الازدواج) | `payment_refund_id`، `seq`، `baseline_refunded_minor` (التراكمي قبل الاستدعاء)، `requested_minor`، `outcome` (`confirmed`/`rejected`/`unknown`)، `observed_refunded_minor`، `provider_ref`، `error_code`؛ append-only بمشغّلات |
+| `payment_refund_attempts` | **سجل الاستدعاء** ثابت (يُدرج **قبل** الاتصال بالمزوّد ولا يتغيّر): `payment_refund_id`، `seq`، `baseline_refunded_minor` (التراكمي لدى المزوّد قبل الاستدعاء)، `requested_minor`، `started_at` | append-only بمشغّلات؛ `UNIQUE(payment_refund_id, seq)` |
+| `payment_refund_attempt_results` | **سجل النتيجة** ثابت منفصل (يُدرج **بعد** الاتصال، وبعد المطابقة لاحقاً): `attempt_id`، `outcome` (`confirmed`/`rejected`/`unknown`)، `observed_refunded_minor`، `provider_ref`، `error_code`، `recorded_at` | append-only؛ نتيجة `unknown` قد يتبعها صف **نهائي واحد** (`confirmed`/`rejected`) من المطابقة: `UNIQUE(attempt_id)` على النهائي بفهرس جزئي؛ لا UPDATE أبداً (يعالج: سجل يُدرج قبل الاتصال ولا يمكن تحديثه) |
 | `payment_refund_events` | قرارات بشرية ثابتة (طلب/اعتماد/رفض/إلغاء/إعادة ترحيل) بالفاعل والسبب | نمط `payment_attempt_posting_events` |
 
 التصنيف الفرعي: `PaymentRefund`/`Allocation` **`BelongsToBranch`** (الفرع يُورَّث من التصحيح التجاري كـ`CustomerRefund` — لا اختيار مستقل)؛ `Attempts`/`Events` `CompanyWide`. تحرسه `BranchIsolationGuardTest`.
@@ -62,14 +63,18 @@ requested ──approve(≠requester)──► approved ──submit──► su
    └─cancel(requester)──► cancelled   └─cancel(المعتمِد/الطالب قبل الإرسال)   └────────► unknown  ──reconcile──► confirmed | failed
 ```
 
-- `confirmed`/`failed`/`rejected`/`cancelled` نهائية بلا رجوع؛ `unknown` **لا تُحرَّر** حصتها حتى تُحسم بالمطابقة (لا إعادة استرداد على المبلغ نفسه).
-- **الاحتجاز (reservation):** تُحتجز الكمية من رصيد المصدر ومن المتبقي من الدفعة في حالات `requested/approved/submitting/unknown/confirmed(غير مرحَّل)`؛ تُحرَّر عند `rejected/failed/cancelled`. بذلك يمنع طلبان متزامنان تجاوز السقف **قبل** وصول التأكيد.
+- `confirmed`/`failed`/`rejected`/`cancelled` نهائية بلا رجوع؛ `unknown` **لا تُحرَّر** حصتها حتى تُحسم بالمطابقة (لا إعادة استرداد على المبلغ نفسه)، **وتحجب أي إرسال آخر لنفس الدفعة** (§5-3).
+- **الاحتجاز (reservation) — حسابان منفصلان لا يتداخلان:**
+  - **جهة المصدر** (إشعار دائن/مرتجع): `refundable_source = total − Σ تخصيصات الاستردادات النقدية/البنكية المرحّلة غير المعكوسة (القائمة) − Σ تخصيصات `PaymentRefund` في الحالات {`requested`, `approved`, `submitting`, `unknown`, `confirmed`}`. **`confirmed` تبقى مستهلكة من المصدر سواء رُحِّلت أم حُجبت بفترة** (المال خرج)؛ تُحرَّر فقط عند `rejected/failed/cancelled`.
+  - **جهة الدفعة** (الملتقط): `refundable_payment = captured_minor − refunded_minor − Σ مبالغ `PaymentRefund` في الحالات {`requested`, `approved`, `submitting`, `unknown`}`. **`confirmed` لا تُخصم هنا مرتين**: أثرها داخل `refunded_minor` (حقيقة المزوّد المحدَّثة عند التأكيد). مثال: ملتقط 1,150 واسترداد مؤكَّد محجوب بفترة 400 ⇒ المتاح على الدفعة **750** (لا 350).
+  - **الرصيد المشترك مع الاسترداد اليدوي (إلزامي):** `CustomerRefundService::refundedTotal()` يُعدَّل (في شريحة H3-01b، إضافياً) ليستعمل **دالة رصيد مشتركة واحدة** تجمع الجهتين أعلاه؛ فلا يرى مسار الاسترداد النقدي/البنكي القائم المصدرَ "كامل الرصيد" بعد استرداد بوابة، ولا العكس. اختبار تكافؤ يحرس ذلك في الاتجاهين (بوابة ثم نقدي، ونقدي ثم بوابة، وبالتزامن).
 
 ## 5. منع التجاوز والازدواج (خوارزمية)
 
-1. **السقف عند الطلب والاعتماد والإرسال (يُعاد داخل القفل):** `amount ≤ refundable(source)` **و** `amount ≤ captured_minor − refunded_minor(attempt) − Σ in-flight(attempt)`.
+1. **الأهلية والسقف عند الطلب والاعتماد والإرسال (يُعاد داخل القفل):** المحاولة المستردة **مُرحَّلة** (`posting_status = posted`) — **مفتاح الأهلية**: التقاط `blocked_period/pending/not_postable` **لا يُستردّ** (`capture_not_posted`) لأن قيد A1 لم يُعترف به؛ استرداده بقيد A5 يترك مديناً يتيماً على 1130 ودائناً على 1170 (ADR-0006 M9-R3)؛ يُعاد الطلب بعد إعادة ترحيل الالتقاط. ثم `amount ≤ refundable_source` **و** `amount ≤ refundable_payment` (التعريفان في §4.2).
 2. **ترتيب الأقفال:** `payment_refund` ← المصادر (مرتجعات ثم إشعارات، بمعرّف تصاعدي — كـ`CustomerRefundService`) ← `payment_attempt` ← مِرساة المستأجر (داخل `LedgerService`). **لا شبكة داخل معاملة ولا أثناء أي قفل.**
-3. **الإرسال:** داخل معاملة قصيرة تنتقل `approved → submitting` وتُسجَّل `payment_refund_attempts` (`baseline_refunded_minor` من `fetchPayment` الحالي)؛ ثم استدعاء المزوّد **خارج** المعاملة؛ ثم معاملة نتيجة تسجّل `confirmed/failed/unknown`.
+3. **التسلسل لكل دفعة (يعالج السباق على خط الأساس):** **إرسال واحد في الطيران لكل دفعة** — فهرس جزئي فريد على `payment_refunds(payment_attempt_id) WHERE status IN ('submitting','unknown')`. طلبان جزئيان (400 و300) على دفعة واحدة **لا يُرسَلان معاً**: الثاني يبقى `approved` ويعيد `submit` النتيجة `busy` (يلتقطه المُجدوِل/المطابِق بعد انتهاء الأول). وحالة `unknown` **تحجب إرسالات تلك الدفعة** حتى تُحسم. بذلك `baseline` لكل استدعاء حقيقة معروفة تماماً وتنجح معادلة `observed = baseline + amount` دائماً.
+   **الإرسال:** داخل معاملة قصيرة تنتقل `approved → submitting` ويُدرج سجل الاستدعاء (`payment_refund_attempts`) بـ`baseline` من `fetchPayment` الحالي؛ ثم استدعاء المزوّد **خارج** المعاملة؛ ثم معاملة نتيجة تُدرج صف `payment_refund_attempt_results` وتنقل المستند إلى `confirmed/failed/unknown`.
 4. **التكرار/الانهيار:** حالة `submitting`/`unknown` لا تُعاد بإرسال أعمى. المطابِق (`payments:reconcile-refunds`، مجدول بـlease كالمطابق القائم) يستعلم `fetchPayment`: إن `observed_refunded = baseline + amount` ⇒ **confirmed** (لا استدعاء ثانٍ)؛ إن `observed = baseline` بعد مهلة ⇒ يجوز **إعادة إرسال واحدة** (توصية المزوّد) بـ`baseline` جديد؛ غير ذلك (`observed` بين/خارج القيم المتوقعة) ⇒ `unknown` + مراجعة بشرية (لا قيد).
 5. **التفرّد:** `UNIQUE(payment_refund)` على مجموعة القيد (`payment_refund_postings`: مدخل واحد لكل استرداد) ⇒ ترحيل مكرّر = `already_posted`؛ `UNIQUE(tenant, idempotency_key)` على الطلب.
 6. **استرداد خارجي** (من لوحة المزوّد، `refunded` يتجاوز المسجَّل): **لا قيد تلقائي**؛ علم مراجعة `unrecognized_refund` على المحاولة وإشعار — القرار المحاسبي له مؤجَّل (خارج H3-01).
@@ -101,6 +106,7 @@ requested ──approve(≠requester)──► approved ──submit──► su
 | **R9** | فترة/سنة مقفلة | مؤكَّد من المزوّد؛ `accounting_date` في فترة/سنة مقفلة | **لا قيد** | `confirmed` + `posting_status=blocked_period`؛ **يُحتفظ بالإثبات** (`provider_refund_ref`، المبلغ، `refunded_at`، سجل المحاولة)؛ لا تغيير تلقائي للتاريخ |
 | **R10** | إعادة ترحيل بعد فتح الفترة رسمياً | `payments.resolve_blocked` + سبب ≥ 5 أحرف | **القيد R1/R2/R3 نفسه** بالتاريخ الأصلي | قرار ثابت يُسجَّل (الفاعل/السبب/النتيجة)؛ إن ظلت الفترة مقفلة يبقى `blocked_period` |
 | **R11** | عكس استرداد مؤكَّد | — | **غير مدعوم** | المال خرج فعلاً لدى المزوّد؛ لا `reverse` محاسبي (تصحيح خطأ بمسار مستقل لاحق) |
+| **R12** | التقاط غير مُرحَّل | `payment_attempts.posting_status ≠ posted` (محجوب بفترة/معلّق/غير قابل) | **لا طلب ولا قيد** (`capture_not_posted`) | A1 لم يُعترف به فلا A5؛ بعد إعادة ترحيل الالتقاط (R10 من ADR-0006) يصير مؤهَّلاً. حالة استرداد المزوّد الخارجي لتقاط محجوب = مراجعة فقط (§5-6) |
 
 **لا أثر على:** ضريبة المخرجات، XML/QR/السلسلة في ZATCA (الإشعار الدائن هو حامل الضريبة)، المخزون، `Invoice::paid_amount`، رسوم المزوّد (لا افتراض استردادها — لا قيد رسوم).
 
@@ -121,14 +127,14 @@ requested ──approve(≠requester)──► approved ──submit──► su
 | الشريحة | المحتوى | محاسبي؟ | تبدأ |
 |---|---|---|---|
 | **H3-01a** | عقد المحوّل: DTOs (`PaymentProviderRefund`)، قدرة `refunds`، `refundedMinor` في اللقطة، `FakeAdapter` وMoyasar `refund` (Fixture) | لا | **الآن (بالتوازي)** |
-| H3-01b | المخطط + نماذج + آلة الحالات + خدمة الطلب/الاعتماد/الإرسال/المطابقة **بلا ترحيل** | لا (لا قيد) | بعد 01a؛ **يتأثر بقرار النموذج §4** |
+| H3-01b | المخطط + نماذج + آلة الحالات + خدمة الطلب/الاعتماد/الإرسال/المطابقة **بلا ترحيل** + **دالة الرصيد المشتركة** مع `CustomerRefundService` (§4.2) + فهرس الإرسال الواحد لكل دفعة (§5-3) | لا (لا قيد) | بعد 01a؛ **يتأثر بقرار النموذج §4** |
 | **H3-01c** | ترحيل A5 (`PaymentRefundPostingService` عبر `LedgerService`) + `blocked_period` + إعادة الترحيل | **نعم (A5)** | **بعد موافقتك على §6** |
 | H3-01d | API + الصلاحيات + RBAC + العزل | لا | بعد 01b |
 | H3-01e | الواجهة (ar/en، RTL) | لا | بعد 01d |
 
 ## 10. القرارات المطلوبة منك (A5)
 
-1. **اعتماد المصفوفة §6** (R1–R11) كما هي — أو تعديل صريح.
+1. **اعتماد المصفوفة §6** (R1–R12) كما هي — أو تعديل صريح.
 2. **النموذج §4:** مستند مستقل `PaymentRefund` (موصى به) أم توسيع `customer_refunds` بهجرة تعديل enum؟
 3. **تاريخ القيد:** `refunded_at` من المزوّد (موصى به) أم لحظة التأكيد المحلية دائماً؟
 4. **الأثر المعلن لفصل المهام:** قبول أن مؤسسة بمخوّل واحد لا تسترد عبر البوابة؟
