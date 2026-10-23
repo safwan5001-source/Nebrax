@@ -5,6 +5,10 @@ namespace App\Services\Accounting;
 use App\Models\Account;
 use App\Models\Expense;
 use App\Models\Partner;
+use App\Tenancy\BranchScope;
+use App\Services\DocumentDuplicateReservationService;
+use App\Support\DuplicateDocumentException;
+use App\Support\Settings;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -37,6 +41,7 @@ class ExpenseService
     public function __construct(
         protected LedgerService $ledger,
         protected AccountRoleResolver $accountRoles,
+        protected DocumentDuplicateReservationService $duplicates,
     ) {}
 
     /**
@@ -44,8 +49,11 @@ class ExpenseService
      *                         'amount'=>int(هللات), 'tax_rate'=>?int,
      *                         'payment_method'=>'cash|bank|credit', 'partner_id'=>?uuid,
      *                         'expense_date'=>?, 'description'=>?, 'number'=>?, 'created_by'=>?]
+     * @param  array|null  $reservation  ['source'=>DocumentDuplicateReservationService::SOURCE_*, 'reference'=>?string, 'occurrence_id'=>?string]
+     *         — يمرّره المستورد/مركز المستندات فقط (IMP-H5-S1b). `null` = إنشاء مباشر: لا يحجز إلا حين `finance.duplicate_reference_policy = block`.
+     *         المصروف بلا عمود مرجع، فالمرجع/معرّف التمييز يعيشان في مسند الحجز وحده.
      */
-    public function create(array $data): Expense
+    public function create(array $data, ?array $reservation = null): Expense
     {
         $amount = (int) ($data['amount'] ?? 0);
         if ($amount <= 0) {
@@ -54,13 +62,18 @@ class ExpenseService
 
         $this->assertExpenseAccount($data['account_id']);
 
-        return DB::transaction(function () use ($data, $amount) {
+        return DB::transaction(function () use ($data, $amount, $reservation) {
             $date = $data['expense_date'] ?? now()->toDateString();
             $rate = (int) ($data['tax_rate'] ?? 15);
             $tax  = $this->calcTax($amount, $rate);
 
-            return Expense::create([
-                'number'         => $data['number'] ?? $this->nextNumber($date),
+            // الترقيم أولاً (يأخذ قفل مِرساة الترقيم حتى commit) ثم القفل الاستشاري: ترتيبٌ ثابت مِرساة ← استشاري في كل مسار، فلا حلقة انتظار بين
+            // مستوردٍ ينشئ عدة مصروفات في معاملة واحدة ومنشئٍ مباشر ينتظر المِرساة وهو يحمل قفل هوية.
+            $number = $data['number'] ?? $this->nextNumber($date);
+            $predicate = $this->guardDuplicate($data, $date, $amount, $reservation);
+
+            $expense = Expense::create([
+                'number'         => $number,
                 'account_id'     => $data['account_id'],
                 'category_id'    => $data['category_id'] ?? null,
                 'partner_id'     => $data['partner_id'] ?? null,
@@ -76,6 +89,19 @@ class ExpenseService
                 'status'         => 'draft',
                 'created_by'     => $data['created_by'] ?? null,
             ]);
+
+            if ($predicate !== null) {
+                $this->duplicates->reserve(
+                    DocumentDuplicateReservationService::DOMAIN_EXPENSE,
+                    $predicate,
+                    'expense',
+                    $expense->id,
+                    $reservation['source'] ?? DocumentDuplicateReservationService::SOURCE_MANUAL,
+                    $data['partner_id'] ?? null,
+                );
+            }
+
+            return $expense;
         });
     }
 
@@ -99,6 +125,28 @@ class ExpenseService
         return DB::transaction(function () use ($expense, $data, $amount) {
             $rate = (int) ($data['tax_rate'] ?? 15);
             $tax = $this->calcTax($amount, $rate);
+            $date = $data['expense_date'] ?? $expense->expense_date->toDateString();
+
+            // مصروفٌ محجوز الهوية (مستورد/سياسة block): تعديل مورّده/تاريخه/مبلغه يعيد اشتقاق الحجز ذرّياً، والمرجع ومعرّف التمييز
+            // يبقيان من المسند المخزَّن (لا عمود مرجع على المصروف). تنازع ⇒ DuplicateDocumentException ⇒ 422 وتراجع كامل.
+            $held = $this->duplicates->forDocument('expense', $expense->id);
+            if ($held !== null) {
+                $predicate = DocumentDuplicateReservationService::expensePredicate(
+                    $data['partner_id'] ?? null,
+                    $data['vendor_name'] ?? null,
+                    $held->predicate['reference'] ?? null,
+                    $date,
+                    $amount,
+                    $held->predicate['occurrence'] ?? null,
+                );
+                // الهوية الواسعة (مورّد ‖ تاريخ ‖ مبلغ) تغيّرت ⇒ القفل والفحص نفسهما كالإنشاء (باستثناء المصروف نفسه)، فلا يُنتج التعديل تكراراً يرفضه الإنشاء.
+                $widened = [$predicate['vendor'], $predicate['date'], $predicate['amount']];
+                $before = DocumentDuplicateReservationService::expensePredicate($expense->partner_id, $expense->vendor_name, null, $expense->expense_date->toDateString(), (int) $expense->amount);
+                if ($widened !== [$before['vendor'], $before['date'], $before['amount']] && ($held->predicate['occurrence'] ?? null) === null) {
+                    $this->lockAndLookup($data, $predicate, $amount, $expense->id);
+                }
+                $this->duplicates->rekey('expense', $expense->id, $predicate, $data['partner_id'] ?? null);
+            }
 
             $expense->update([
                 'account_id'     => $data['account_id'],
@@ -106,7 +154,7 @@ class ExpenseService
                 'partner_id'     => $data['partner_id'] ?? null,
                 'vendor_name'    => $data['vendor_name'] ?? null,
                 'cost_center_id' => $data['cost_center_id'] ?? null,
-                'expense_date'   => $data['expense_date'] ?? $expense->expense_date->toDateString(),
+                'expense_date'   => $date,
                 'payment_method' => $data['payment_method'] ?? 'cash',
                 'description'    => $data['description'] ?? null,
                 'amount'         => $amount,
@@ -117,6 +165,100 @@ class ExpenseService
 
             return $expense->fresh();
         });
+    }
+
+    /**
+     * حذف مسودة المصروف مع تحرير حجز هويته في المعاملة نفسها (IMP-H5-S1b): الحجز يعيش بعمر مستنده، فيُقبل إعادة الاستيراد بعد تصحيح الخطأ.
+     * المصروف المرحّل لا يُحذف (يبقى حجزه ويمنع إعادة الاستيراد). المرفقات يحذف صفوفها المستدعي مع هذا الاستدعاء كما كان.
+     */
+    public function discardDraft(Expense $expense): void
+    {
+        if (! $expense->isDraft()) {
+            throw new RuntimeException('لا يمكن حذف مصروف مرحّل أو ملغى.');
+        }
+
+        DB::transaction(function () use ($expense) {
+            // الحالة تُقرأ تحت قفل الصف: ترحيلٌ متزامن (post يقفل الصف نفسه) لا يمرّ بين الفحص والحذف فيُحذف مصروفٌ رُحِّل ويُحرَّر حجزه.
+            $locked = Expense::query()->whereKey($expense->id)->lockForUpdate()->first();
+            if ($locked === null || ! $locked->isDraft()) {
+                throw new RuntimeException('لا يمكن حذف مصروف مرحّل أو ملغى.');
+            }
+            $expense->attachments()->delete();
+            $this->duplicates->release('expense', $expense->id);
+            $expense->delete();
+        });
+    }
+
+    /**
+     * يحدّد هل يُحجز هذا الإنشاء، وإن كان كذلك يقفل الطرف ويعيد فحص المستندات القائمة (تغطي ما أُنشئ قبل أي حجز) ثم يعيد المسند.
+     * `null` = لا حجز (إنشاء مباشر تحت `allow`): السلوك القديم حرفياً. معرّف التمييز الصريح يتجاوز فحص القائم (المستخدم أقرّ التكرار)
+     * ويبقى الفهرس الفريد حاكماً على المعرّف نفسه.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function guardDuplicate(array $data, string $date, int $amount, ?array $reservation): ?array
+    {
+        $block = (string) (Settings::group('finance')['duplicate_reference_policy'] ?? 'allow') === 'block';
+        if ($reservation === null && ! $block) {
+            return null;
+        }
+
+        try {
+            $predicate = DocumentDuplicateReservationService::expensePredicate(
+                $data['partner_id'] ?? null, $data['vendor_name'] ?? null, $reservation['reference'] ?? null, $date, $amount, $reservation['occurrence_id'] ?? null,
+            );
+        } catch (\LogicException) {
+            throw new RuntimeException('تاريخ المصروف غير صالح.');
+        }
+
+        if ($predicate['occurrence'] === null) {
+            $this->lockAndLookup($data, $predicate, $amount, null);
+        } else {
+            $this->lockIdentity($predicate, $amount);
+        }
+
+        return $predicate;
+    }
+
+    /**
+     * يقفل الهوية الواسعة (مورّد ‖ تاريخ ‖ مبلغ) ثم يفحص المصروفات القائمة (تغطي ما أُنشئ قبل أي حجز) ويرمي `DuplicateDocumentException` عند التطابق.
+     * التاريخ في الفحص هو المطبَّع نفسه المستعمل في المسند والقفل (لا نصّ الطلب الخام).
+     *
+     * @param  array<string, mixed>  $predicate
+     */
+    private function lockAndLookup(array $data, array $predicate, int $amount, ?string $excludeId): void
+    {
+        $this->lockIdentity($predicate, $amount);
+
+        $partnerId = $data['partner_id'] ?? null;
+        // التكرار مسألة مؤسسية لا فرعية: الفحص يتجاوز نطاق الفرع عمداً (نطاق المستأجر باقٍ).
+        $existing = Expense::query()->withoutGlobalScope(BranchScope::class)
+            ->when($excludeId !== null, fn ($q) => $q->whereKeyNot($excludeId))
+            ->whereDate('expense_date', $predicate['date'])->where('amount', $amount)
+            ->when($partnerId !== null,
+                fn ($q) => $q->where('partner_id', $partnerId),
+                fn ($q) => $q->whereNull('partner_id'))
+            ->get(['id', 'vendor_name'])
+            ->first(fn (Expense $e) => $partnerId !== null
+                || DocumentDuplicateReservationService::normalizeName($e->vendor_name) === DocumentDuplicateReservationService::normalizeName($data['vendor_name'] ?? null));
+        if ($existing !== null) {
+            throw new DuplicateDocumentException(DocumentDuplicateReservationService::DOMAIN_EXPENSE, 'expense', $existing->id);
+        }
+    }
+
+    /**
+     * قفل استشاري على مستوى المعاملة (يتحرر عند commit/rollback) يسلسل المتنافسين على الهوية الواسعة نفسها بغضّ النظر عن المرجع: فحص «القائم» لا يرى مصروفاً
+     * غير مثبَّت، والفهرس الفريد وحده لا يلتقط مصروفين بمرجعين مختلفين لهوية واحدة. SQLite تسلسل كتابتها أصلاً.
+     *
+     * @param  array<string, mixed>  $predicate
+     */
+    private function lockIdentity(array $predicate, int $amount): void
+    {
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            DB::select('select pg_advisory_xact_lock(hashtextextended(?, 0))', [
+                'expense-dup:'.app(\App\Tenancy\TenantContext::class)->id().':'.$predicate['vendor'].':'.$predicate['date'].':'.$amount,
+            ]);
+        }
     }
 
     /**
