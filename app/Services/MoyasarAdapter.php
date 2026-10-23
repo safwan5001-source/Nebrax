@@ -318,7 +318,7 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
                 $captured = $this->intOrNull($payment['captured'] ?? null);
                 $capturedMinor += $captured !== null && $captured > 0 ? min($captured, $paymentAmount) : $paymentAmount;
                 // المسترد التراكمي (حقل `refunded` الموثّق، عدد صحيح ≤ مبلغ الدفعة): حقيقة المزوّد لمطابقة الاسترداد؛ لا يتجاوز مبلغ الدفعة.
-                $refundedMinor += min($this->intOrNull($payment['refunded'] ?? null) ?? 0, $paymentAmount);
+                $refundedMinor += max(0, min($this->intOrNull($payment['refunded'] ?? null) ?? 0, $paymentAmount));
                 $stamp = $this->parseTime($payment['captured_at'] ?? $payment['updated_at'] ?? $payment['created_at'] ?? null);
                 if ($stamp !== null && ($capturedAt === null || $stamp->greaterThan($capturedAt))) {
                     $capturedAt = $stamp;
@@ -401,7 +401,7 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
 
         $captured = $this->intOrNull($payment['captured'] ?? null);
         $chargeable = $captured !== null && $captured > 0 ? min($captured, $paymentAmount) : $paymentAmount;
-        $refundedBefore = min($this->intOrNull($payment['refunded'] ?? null) ?? 0, $paymentAmount);
+        $refundedBefore = max(0, min($this->intOrNull($payment['refunded'] ?? null) ?? 0, $paymentAmount));
         if ($amountMinor > $chargeable - $refundedBefore) {
             throw new PaymentRefundRejectedException('moyasar.refund_exceeds_available', 'مبلغ الاسترداد يتجاوز المتاح للاسترداد لدى المزوّد.');
         }
@@ -417,8 +417,11 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
 
         $refundedAfter = $this->intOrNull($response['refunded'] ?? null);
         $currency = strtoupper((string) ($response['currency'] ?? ''));
-        if (! is_string($response['id'] ?? null) || ! hash_equals($paymentId, $response['id']) || $refundedAfter === null || $refundedAfter > $paymentAmount || strlen($currency) !== 3) {
-            throw new PaymentRefundUnknownException('moyasar.malformed_response', 'استجابة الاسترداد غير مفهومة؛ قد يكون نُفِّذ.');
+        // النجاح يشترط **إثبات** أن هذا الـPOST طُبِّق: التراكمي ≥ ما قبل + المبلغ (قد يزيد باسترداد خارجي متزامن ويحسمه المستدعي) وضمن مبلغ الدفعة.
+        // ردّ 2xx بتراكمي أقل (لم يُطبَّق، أو سالب/معيب) لا يُعدّ نجاحاً ولا رفضاً قاطعاً: بعد الإرسال ⇒ غير معروف يحسمه المطابِق.
+        if (! is_string($response['id'] ?? null) || ! hash_equals($paymentId, $response['id']) || $refundedAfter === null
+            || $refundedAfter < $refundedBefore + $amountMinor || $refundedAfter > $paymentAmount || strlen($currency) !== 3) {
+            throw new PaymentRefundUnknownException('moyasar.malformed_response', 'استجابة الاسترداد لا تثبت تطبيقه؛ قد يكون نُفِّذ.');
         }
 
         return new PaymentProviderRefund($paymentId, $refundedAfter, $currency, $this->parseTime($response['refunded_at'] ?? null));

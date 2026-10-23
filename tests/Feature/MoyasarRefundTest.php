@@ -179,6 +179,8 @@ class MoyasarRefundTest extends TestCase
             array_merge($this->paid(refunded: 100), ['id' => 'someone-else']),
             array_diff_key($this->paid(refunded: 100), ['refunded' => 1]),
             $this->paid(refunded: 999999),   // تراكمي يتجاوز مبلغ الدفعة
+            $this->paid(refunded: 0),        // 2xx لا يثبت التطبيق (التراكمي لم يتقدّم)
+            $this->paid(refunded: -5),       // سالب معيب: لا يتسرّب كاستثناء خارج العقد
         ] as $response) {
             $this->fakeHttp([
                 'api.moyasar.com/v1/invoices/*' => Http::response($this->invoiceWith($this->paid())),
@@ -187,6 +189,36 @@ class MoyasarRefundTest extends TestCase
             $e = $this->thrown(fn () => $this->adapter->refundPayment($this->gateway, MoyasarFixtures::INVOICE_ID, 100), 'malformed ok', PaymentRefundUnknownException::class);
             $this->assertSame('moyasar.malformed_response', $e->reason);
         }
+    }
+
+    #[Test]
+    public function a_response_must_prove_the_cumulative_advanced_by_at_least_the_requested_amount(): void
+    {
+        // قبل: 40000. طلب 10000. ردّ بـ40000 (لم يتقدّم) أو 49999 (أقل من المتوقع) ⇒ غير معروف؛ 50000 أو أكثر (استرداد خارجي متزامن) ⇒ نجاح.
+        foreach ([[40000, false], [49999, false], [50000, true], [52000, true]] as [$after, $ok]) {
+            $this->fakeHttp([
+                'api.moyasar.com/v1/invoices/*' => Http::response($this->invoiceWith($this->paid(refunded: 40000, status: 'refunded'))),
+                'api.moyasar.com/v1/payments/*' => Http::response($this->paid(refunded: $after, status: 'refunded')),
+            ]);
+            if ($ok) {
+                $this->assertSame($after, $this->adapter->refundPayment($this->gateway, MoyasarFixtures::INVOICE_ID, 10000)->refundedMinor);
+            } else {
+                $this->thrown(fn () => $this->adapter->refundPayment($this->gateway, MoyasarFixtures::INVOICE_ID, 10000), "after {$after}", PaymentRefundUnknownException::class);
+            }
+        }
+    }
+
+    #[Test]
+    public function a_negative_refunded_in_the_snapshot_or_preflight_is_clamped_never_an_escaping_exception(): void
+    {
+        $this->fakeHttp(['api.moyasar.com/v1/invoices/*' => Http::response($this->invoiceWith($this->paid(refunded: -7)))]);
+
+        $this->assertSame(0, $this->adapter->fetchPayment($this->gateway, MoyasarFixtures::INVOICE_ID)->refundedMinor);
+        $this->fakeHttp([
+            'api.moyasar.com/v1/invoices/*' => Http::response($this->invoiceWith($this->paid(refunded: -7))),
+            'api.moyasar.com/v1/payments/*' => Http::response($this->paid(refunded: 100, status: 'refunded')),
+        ]);
+        $this->assertSame(100, $this->adapter->refundPayment($this->gateway, MoyasarFixtures::INVOICE_ID, 100)->refundedMinor);
     }
 
     #[Test]
