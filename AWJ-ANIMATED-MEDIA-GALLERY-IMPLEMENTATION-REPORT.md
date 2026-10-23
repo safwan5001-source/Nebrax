@@ -5,7 +5,8 @@
 | **PR** | [#1652](https://github.com/safwan5001-source/Nebrax/pull/1652) — `feat/storefront-gallery-animated-media` → `main` |
 | **Original base SHA** | `7273b591dc66b8ad7288c6e8dbaa9ff424a6b6f2` (draft opened here) |
 | **Draft head SHA (before this work)** | `579d397e5a59bd592cefd5893a9b0cce7573d7b5` |
-| **Code head SHA (this work, before the report commit)** | `3734c75381d4334c4df194acb41f38438d5a577c` |
+| **Code head SHA — original work** | `819276cc2453442564cb1994566b1decb8a2b088` |
+| **Code head SHA — off-screen gating fix (§8)** | `47ed730` (code) · `3ba4467` (tests + report) · final head: see the PR |
 | **Merged-in `main`** | `cc8b1a4b68dcaf9f54c8cbea21733adee51469c9` (clean merge; only unrelated treasury files came in) |
 | **Status** | Ready for review. **Not merged, not deployed.** |
 
@@ -71,11 +72,11 @@ The 5 s window uses the existing "drop the animated `<source>`s" mechanism (an a
 | PHP `StorefrontGalleryAnimatedMediaTest` + `StorefrontAnimatedMediaTest` + `StorefrontGalleryTest` (incl. all fixture cases) | **115 passed** (720 assertions) |
 | PHP negative control — new test against `main`'s gate | **4 of 8 fail** (as they must) |
 | PHP `--filter=Storefront` (broader) | **1472 passed, 17 skipped** (14,766 assertions, 0 failures; on the pre-merge-of-main tree — `main`'s only new files are unrelated treasury code) |
-| Storefront vitest (full) | **2990 passed, 15 skipped** (216 files) |
+| Storefront vitest (full) | **3001 passed, 15 skipped** (216 files) — after the §8 fix (was 2990 before it) |
 | Storefront `tsc --noEmit` | clean |
 | Web vitest `store-experience-builder` (159 files, incl. CSS-parity tests) | **2956 passed** |
 | Web `tsc --noEmit` | no errors in any non-test file I touched (pre-existing errors exist in unrelated `*.test.tsx` files on `main`) |
-| **Real Chromium** (`playwright.animated-media.config.ts`) | **20 passed, 3 skipped** (the three "frames really change" canaries — see §6) |
+| **Real Chromium** (`playwright.animated-media.config.ts`) | after §8, full run of 28 specs: **25 passed, 3 skipped, 0 failed** (the three "frames really change" canaries — see §6). An earlier 27-spec run had 1 failure caused by a bug in my own new spec (it passed on the not-yet-animated still); it was rewritten into 2 specs and the full run repeated |
 
 **CI on code head `819276c`:** all 7 checks green — `php artisan test` (sqlite **and** pgsql, full suite), `web build (Next.js)`, `storefront (lint + typecheck + test)`, `merchant preview visual QA`, `published footer visual QA`, `CI Gate`; mergeable state `clean`. (An earlier `CI Gate` failure on `85d43d7` was only the gate's own "stale gate: PR head is now 819276c" guard, not a test failure.)
 
