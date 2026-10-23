@@ -220,6 +220,8 @@ class PriceListItemImportService
         if ($listId !== null && ! Str::isUuid($listId)) {
             throw new RuntimeException('معرّف قائمة السعر غير صالح.');
         }
+        // صيغة واحدة للمعرّف: PostgreSQL يحلّ UUID بأي حالة أحرف، ومفتاح القفل الاستشاري نصّي فيجب أن يتطابق للقائمة نفسها.
+        $listId = $listId === null ? null : mb_strtolower($listId, 'UTF-8');
 
         $mode = (string) ($options['mode'] ?? self::MODE_UPSERT);
         if (! in_array($mode, [self::MODE_CREATE, self::MODE_UPDATE, self::MODE_UPSERT], true)) {

@@ -41,7 +41,7 @@ class PriceListItemImportAdapter extends SpreadsheetImportAdapter implements Imp
     public function canonicalOptions(array $raw): array
     {
         $options = [
-            'price_list_id' => isset($raw['price_list_id']) && $raw['price_list_id'] !== '' ? (string) $raw['price_list_id'] : null,
+            'price_list_id' => isset($raw['price_list_id']) && $raw['price_list_id'] !== '' ? mb_strtolower((string) $raw['price_list_id'], 'UTF-8') : null,
             'mode' => (string) ($raw['mode'] ?? PriceListItemImportService::MODE_UPSERT),
         ];
 

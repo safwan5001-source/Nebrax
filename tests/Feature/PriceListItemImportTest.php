@@ -330,6 +330,77 @@ class PriceListItemImportTest extends TestCase
         $this->service()->preview($this->file([['sku' => 'SKU-PLAIN', 'price' => '1']]), ['price_list_id' => $theirList]);
     }
 
+    // ═══════════════════════════════ من المراجعة المستقلة ═══════════════════════════════
+
+    /** @test */
+    public function a_zero_price_is_accepted_like_the_direct_api_allows_it(): void
+    {
+        $result = $this->service()->apply($this->file([['sku' => 'SKU-PLAIN', 'price' => '0']]), $this->opts());
+
+        $this->assertSame(1, $result['created']);
+        $this->assertSame(0, $this->item($this->plain['id'])->price);
+    }
+
+    /** @test */
+    public function an_explicit_base_unit_and_a_blank_unit_address_the_same_stored_row(): void
+    {
+        $this->service()->apply($this->file([['sku' => 'SKU-BOX', 'unit_name' => 'قطعة', 'price' => '5']]), $this->opts());
+
+        $blank = $this->service()->preview($this->file([['sku' => 'SKU-BOX', 'price' => '5']]), $this->opts());
+        $this->assertSame(['skip'], $this->actions($blank));
+
+        $this->service()->apply($this->file([['sku' => 'SKU-BOX', 'price' => '6']]), $this->opts());
+        $this->assertSame(1, PriceListItem::query()->where('product_id', $this->boxed['id'])->count());
+        $this->assertSame(600, $this->item($this->boxed['id'])->price);
+    }
+
+    /** @test */
+    public function update_mode_with_an_equal_price_is_a_skip(): void
+    {
+        $this->service()->apply($this->file([['sku' => 'SKU-PLAIN', 'price' => '10']]), $this->opts());
+
+        $preview = $this->service()->preview($this->file([['sku' => 'SKU-PLAIN', 'price' => '10.00']]), $this->opts(['mode' => 'update']));
+
+        $this->assertSame(['skip'], $this->actions($preview));
+    }
+
+    /** @test */
+    public function an_uppercase_price_list_id_is_canonicalised_so_one_list_has_one_lock_key(): void
+    {
+        $options = $this->service()->options(['price_list_id' => strtoupper($this->listId)]);
+        $this->assertSame($this->listId, $options['price_list_id']);
+        $this->assertSame($this->listId, app(PriceListItemImportAdapter::class)->canonicalOptions(['price_list_id' => strtoupper($this->listId)])['price_list_id']);
+
+        $result = $this->service()->apply($this->file([['sku' => 'SKU-PLAIN', 'price' => '1']]), ['price_list_id' => strtoupper($this->listId)]);
+        $this->assertSame(1, $result['created']);
+    }
+
+    /** @test */
+    public function a_duplicate_whose_first_occurrence_is_in_an_earlier_window_still_fails_its_own_window(): void
+    {
+        $rows = [['sku' => 'SKU-PLAIN', 'price' => '1'], ['sku' => 'SKU-BOX', 'price' => '2'], ['sku' => 'SKU-PLAIN', 'price' => '3']];
+
+        $this->service()->apply($this->file($rows), $this->opts(['batch_offset' => 1, 'batch_size' => 1]));
+
+        $this->expectException(ImportUnitFailureException::class);
+        $this->service()->apply($this->file($rows), $this->opts(['batch_offset' => 2, 'batch_size' => 1]));
+    }
+
+    /** @test */
+    public function a_product_in_another_isolated_branch_is_not_addressable(): void
+    {
+        \App\Support\BranchSettings::merge(['share_products' => false]);
+        $mainId = $this->withToken($this->token)->getJson('/api/branches')['data'][0]['id'];
+        $otherId = $this->withToken($this->token)->postJson('/api/branches', ['name' => 'فرع آخر'])->assertCreated()['data']['id'];
+        Product::withoutGlobalScope(\App\Tenancy\BranchScope::class)->create(['name' => 'منتج فرع آخر', 'sku' => 'SKU-OTHER', 'type' => 'good', 'sale_price' => 100, 'branch_id' => $otherId]);
+        app(\App\Tenancy\BranchContext::class)->set($mainId);
+
+        $preview = $this->service()->preview($this->file([['sku' => 'SKU-OTHER', 'price' => '1']]), $this->opts());
+
+        $this->assertSame(['error'], $this->actions($preview));
+        $this->assertStringContainsString('رمز الصنف لا يطابق', $preview['errors'][0]['messages'][0]);
+    }
+
     // ═══════════════════════════════ المحوّل ═══════════════════════════════
 
     /** @test */

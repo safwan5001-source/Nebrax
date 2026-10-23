@@ -20,7 +20,7 @@ This extracts the workbook's "Unit Prices" sheet logic into a standalone, row-un
 
 ## Tests
 
-- `PriceListItemImportTest` (16, SQLite + PostgreSQL): contract (no list/variant/cost, Arabic mapping, legacy `id` not mapped), template importable, missing/inactive/foreign price list + bad options fail closed, base/named-unit creates in halalas (Arabic digits), upsert create/update/skip with `current_price`, create/update mode errors, product resolution (unknown, malformed, conflicting, inactive, blank, never by name), unit and price validation incl. the exact cap boundary, **cross-form in-file duplicates fail the whole file**, windows + plan drift, atomic abort, wide-row guard, **no product-card price change and no journal entry**, **tenant isolation**, adapter options and chunk.
+- `PriceListItemImportTest` (22, SQLite + PostgreSQL): contract (no list/variant/cost, Arabic mapping, legacy `id` not mapped), template importable, missing/inactive/foreign price list + bad options fail closed, base/named-unit creates in halalas (Arabic digits), upsert create/update/skip with `current_price`, create/update mode errors, product resolution (unknown, malformed, conflicting, inactive, blank, never by name), unit and price validation incl. the exact cap boundary, **cross-form in-file duplicates fail the whole file**, windows + plan drift, atomic abort, wide-row guard, **no product-card price change and no journal entry**, **tenant isolation**, adapter options and chunk.
 - `PriceListItemImportConcurrencyPostgresTest` (1, real PostgreSQL + `pcntl_fork`): four racing `create` imports of the same 30 prices — exactly one succeeds, the rest fail with a named row failure; 30 rows total. **Negative control:** with the lock removed all four "succeed" (4 ≠ 1); restored → green. Local PostgreSQL 16, not only CI.
 
 ## Known limits (disclosed)
@@ -29,3 +29,17 @@ This extracts the workbook's "Unit Prices" sheet logic into a standalone, row-un
 - Whole-file identity resolution runs once per chunk (light columns, bounded; revisit if 20k-row files show up slow).
 - Unit-name matching inherits `UnitConversion`/template semantics as-is (no extra case folding).
 - No endpoints/UI until the next slices; no screenshots (no UI here).
+
+## Independent review (read-only subagent) — disposition
+
+No blocking defect; stored-vs-requested unit handling, duplicate-key correctness, window/ordinal handling, price bounds, preview-vs-apply and tenant/branch scoping were traced clean. Findings:
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | The advisory-lock key used the raw `price_list_id` string; PostgreSQL resolves a UUID in any letter case, so two spellings of one list took different locks | **Fixed**: the id is lower-cased in `options()` and in the adapter's canonical form + test |
+| 2 | The lock serialises import against import only; the screen's `storeItem`/`destroyItem` and the workbook sheet take no lock, so an API write landing between analysis and write is overwritten by `updateOrCreate` | **Accepted, documented** (same stance as partners/taxonomy; closing it needs the lock in `PriceListService`, a separate hardening) |
+| 3 | A row that later errors (unit/inactive/…) still registers its product+unit key as the "first occurrence", so the duplicate message can point at an erroring row | **Accepted** (cosmetic; the file fails either way) |
+| 4 | Inherited normaliser: `25,5` is read as 255 (comma = thousands separator), as in the workbook and product import | **Disclosed**: the preview shows the parsed price per row; a bound preview is the control. Parked as a cross-importer policy question, not changed here |
+| T | Missing tests: price 0, explicit-base vs blank unit round trip, update-mode equal price, uppercase id, duplicate in a later window, other-branch product | **Added** (adapter plan/repair-claim branches are exercised by the shared engine tests, not duplicated here) |
+
+No Codex review (quota exhausted).
