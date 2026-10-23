@@ -286,7 +286,9 @@ class PaymentsRolloutControlTest extends TestCase
             // PAY-H1-03: القارئ الوحيد على مسار الدفع — قراءة فعّالة بلا قفل، ولا يكتب الضوابط.
             'PaymentOrchestrator.php',
             // PAY-H2-02b: يتحقق من التفعيل قبل إنشاء طلب دفع — قراءة فعّالة فقط، ولا يكتب الضوابط.
-            'InvoicePaymentRequestService.php'];
+            'InvoicePaymentRequestService.php',
+            // PAY-H3-01b: يتحقق من التفعيل قبل طلب/اعتماد/إرسال استرداد البوابة — قراءة فعّالة فقط، ولا يكتب الضوابط.
+            'PaymentRefundService.php'];
         $hits = [];
         $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(base_path('app'), \FilesystemIterator::SKIP_DOTS));
         foreach ($files as $file) {
@@ -300,6 +302,9 @@ class PaymentsRolloutControlTest extends TestCase
         $orchestrator = (string) file_get_contents(base_path('app/Services/PaymentOrchestrator.php'));
         $this->assertStringContainsString('effectiveForCurrentTenant', $orchestrator);
         $this->assertDoesNotMatchRegularExpression('/setTenantState|setPlatformState/', $orchestrator, 'المنسّق يقرأ الضوابط ولا يكتبها');
+        $refunds = (string) file_get_contents(base_path('app/Services/PaymentRefundService.php'));
+        $this->assertStringContainsString('effectiveForCurrentTenant', $refunds);
+        $this->assertDoesNotMatchRegularExpression('/setTenantState|setPlatformState/', $refunds, 'خدمة الاستردادات تقرأ الضوابط ولا تكتبها');
         $requests = (string) file_get_contents(base_path('app/Services/InvoicePaymentRequestService.php'));
         $this->assertStringContainsString('effectiveForCurrentTenant', $requests);
         $this->assertDoesNotMatchRegularExpression('/setTenantState|setPlatformState/', $requests, 'خدمة الطلبات تقرأ الضوابط ولا تكتبها');

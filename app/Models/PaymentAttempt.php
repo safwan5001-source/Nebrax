@@ -47,6 +47,12 @@ class PaymentAttempt extends BaseModel implements CompanyWide
 
     public const DISPUTE_NONE = 'none';
 
+    public const DISPUTE_OPEN = 'open';
+
+    public const DISPUTE_WON = 'won';
+
+    public const DISPUTE_LOST = 'lost';
+
     public const REVIEW_LATE_CAPTURE = 'late_capture';
 
     public const REVIEW_AMOUNT_MISMATCH = 'amount_mismatch';
@@ -122,6 +128,8 @@ class PaymentAttempt extends BaseModel implements CompanyWide
             'accounting_date' => 'date:Y-m-d',
             'posting_blocked_reason' => 'array',
             'posted_at' => 'datetime',
+            'unrecognized_refund_at' => 'datetime',
+            'unrecognized_refund_minor' => 'integer',
         ];
     }
 

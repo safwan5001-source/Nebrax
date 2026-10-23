@@ -34,6 +34,7 @@ use App\Models\StockPermit;
 use App\Models\Stocktake;
 use App\Models\SupplierRefund;
 use App\Models\CustomerRefund;
+use App\Models\PaymentRefund;
 use App\Models\Warehouse;
 
 /**
@@ -148,6 +149,11 @@ class DocumentNumberingCatalog
             'model'  => CustomerRefund::class,
             'yearly' => true,
             'series' => [['key' => 'default', 'prefix' => 'CRF']],
+        ],
+        'payment_refund' => [
+            'model'  => PaymentRefund::class,
+            'yearly' => true,
+            'series' => [['key' => 'default', 'prefix' => 'PRF']],
         ],
         'credit_note' => [
             'model'  => CreditNote::class,

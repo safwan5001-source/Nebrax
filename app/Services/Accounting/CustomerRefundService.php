@@ -73,14 +73,13 @@ class CustomerRefundService
         return (int) $source->total - $this->refundedTotal($this->sourceKind($source), $source->id);
     }
 
-    /** ما استُرد فعلاً عن مصدر واحد (المرحّل غير المعكوس فقط). */
+    /**
+     * ما استُهلك فعلاً عن مصدر واحد: الاستردادات النقدية/البنكية المرحّلة **و** استردادات البوابة المحتجزة/المؤكَّدة (PAY-H3-01b) — دالة `RefundSourceBalance`
+     * المشتركة، فلا يُدفع المصدر نفسه من الطريقين.
+     */
     private function refundedTotal(string $kind, string $sourceId): int
     {
-        return (int) CustomerRefundAllocation::query()
-            ->where('source_type', self::SOURCE_MODELS[$kind])
-            ->where('source_id', $sourceId)
-            ->whereHas('customerRefund', fn ($q) => $q->where('status', 'posted'))
-            ->sum('amount');
+        return app(RefundSourceBalance::class)->consumed(self::SOURCE_MODELS[$kind], $sourceId);
     }
 
     /**
@@ -501,7 +500,7 @@ class CustomerRefundService
      *
      * @param  array<int, ReturnDocument|CreditNote>  $sources
      */
-    private function sharedSourceBranch(array $sources): ?string
+    public function sharedSourceBranch(array $sources): ?string
     {
         $unique = array_values(array_unique(array_map(
             fn (ReturnDocument|CreditNote $source) => $source->branch_id,
@@ -530,7 +529,7 @@ class CustomerRefundService
         }
     }
 
-    private function loadSource(string $model, string $sourceId): ReturnDocument|CreditNote
+    public function loadSource(string $model, string $sourceId): ReturnDocument|CreditNote
     {
         $source = $model::find($sourceId);
         if (! $source) {
@@ -540,7 +539,7 @@ class CustomerRefundService
         return $source;
     }
 
-    private function assertSourceEligible(ReturnDocument|CreditNote $source, string $partnerId): void
+    public function assertSourceEligible(ReturnDocument|CreditNote $source, string $partnerId): void
     {
         if ($source instanceof ReturnDocument) {
             if ($source->type !== 'sales') {
@@ -572,7 +571,7 @@ class CustomerRefundService
     /**
      * @param  \Illuminate\Support\Collection<int, CustomerRefundAllocation>  $allocations
      */
-    private function lockSources($allocations): void
+    public function lockSources($allocations): void
     {
         $returnIds = $allocations
             ->where('source_type', ReturnDocument::class)
@@ -593,7 +592,7 @@ class CustomerRefundService
         }
     }
 
-    private function sourceKind(ReturnDocument|CreditNote $source): string
+    public function sourceKind(ReturnDocument|CreditNote $source): string
     {
         return $source instanceof ReturnDocument
             ? self::SOURCE_SALES_RETURN

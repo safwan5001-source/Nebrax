@@ -89,6 +89,9 @@ class Rbac
         // PAY-H2-02d (ADR-0006 M5-R1): إعادة ترحيل التقاط دفع إلكتروني محجوب بفترة/سنة مقفلة بعد فتحها رسمياً، وعرض المحجوب. قرار مالي
         // بفاعل وسبب مسجَّلين. owner/admin عبر `*` فقط؛ لا تُضاف لـ`MATRIX` ولا تُمنح لأي دور مخزَّن بهجرة.
         'payments.resolve_blocked',
+        // PAY-H3-01b (ADR-0007، D-28): استرداد البوابة — أربع سلطات مستقلة: العرض، الطلب، الاعتماد المستقل (≠ الطالب، يُفرض في الخدمة والقاعدة)،
+        // وحسم الاسترداد غير المعروف/الخارجي. owner/admin عبر `*` فقط؛ لا تُضاف لـ`MATRIX` ولا تُمنح لأي دور مخزَّن بهجرة (لا منح ضمني).
+        'payment_refunds.view', 'payment_refunds.request', 'payment_refunds.approve', 'payment_refunds.resolve_unknown',
         'purchases.view', 'purchases.manage',
         'returns.view', 'returns.manage',
         'hr.view', 'hr.manage',
