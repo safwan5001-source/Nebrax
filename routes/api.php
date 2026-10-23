@@ -99,6 +99,7 @@ use App\Http\Controllers\Api\InventoryReportController;
 use App\Http\Controllers\Api\InventorySettingsController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\InvoicePaymentRequestController;
+use App\Http\Controllers\Api\PaymentAttemptPostingController;
 use App\Http\Controllers\Api\JobLevelController;
 use App\Http\Controllers\Api\JobTitleController;
 use App\Http\Controllers\Api\JournalEntryController;
@@ -1041,6 +1042,9 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('invoices/{invoiceId}/payment-requests', [InvoicePaymentRequestController::class, 'store'])->whereUuid('invoiceId')->middleware($perm('payments.manage'));
         Route::post('payment-requests/{id}/cancel', [InvoicePaymentRequestController::class, 'cancel'])->whereUuid('id')->middleware($perm('payments.manage'));
         Route::post('payment-requests/{id}/attempts', [InvoicePaymentRequestController::class, 'startAttempt'])->whereUuid('id')->middleware([$perm('payments.manage'), 'throttle:30,1']);
+        // PAY-H2-02d: دفعات إلكترونية محجوبة بفترة مقفلة + إعادة ترحيل صريحة بفاعل وسبب (owner/admin).
+        Route::get('payment-attempts/blocked', [PaymentAttemptPostingController::class, 'blocked'])->middleware($perm('payments.resolve_blocked'));
+        Route::post('payment-attempts/{id}/repost', [PaymentAttemptPostingController::class, 'repost'])->whereUuid('id')->middleware([$perm('payments.resolve_blocked'), 'throttle:20,1']);
         Route::post('payment-attempts/{id}/sync', [PaymentAttemptController::class, 'sync'])->whereUuid('id')->middleware($perm('payments.manage'));
         Route::get('payment-gateways', [PaymentGatewayController::class, 'index'])->middleware($perm('payments.view'));
         Route::get('payment-gateways/{id}', [PaymentGatewayController::class, 'show'])->whereUuid('id')->middleware($perm('payments.view'));
