@@ -24,7 +24,7 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->foreignUuid('tenant_id')->constrained()->cascadeOnDelete();
             $table->foreignUuid('branch_id')->nullable()->constrained()->restrictOnDelete(); // حذف الفرع لا يحوّل جهازه/طلباته إلى «بلا فرع» (مرئي لكل الفروع)
-            $table->foreignUuid('pos_device_id')->nullable()->constrained('pos_devices')->nullOnDelete();
+            $table->foreignUuid('pos_device_id')->nullable()->constrained('pos_devices')->restrictOnDelete(); // حذف الجهاز لا يحوّل جهاز الدفع المخصَّص إلى «غير مخصَّص» (يخدم أي جهاز في الفرع)
             $table->string('name', 120);
             $table->string('code', 64)->nullable();
             $table->string('provider', 32);

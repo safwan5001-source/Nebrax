@@ -47,7 +47,7 @@ STATUS: **IN REVIEW** (PR مفتوح) · DATE: 2026-10-22
 - `app/Services/PosTerminalService.php`, `PosTerminalAdapterRegistry.php`, `FakePosTerminalAdapter.php`.
 - تعديل `PosService` (استهلاك الموافقة، البصمة، التعويض بعد الفشل)، `PosSessionService` (منع الإقفال + `terminal_blockers` في المعاينة)، `PaymentMethod*` (سياسة الاشتراط).
 - `PosTerminalController` + طلبان + موردان + مسارات (`/api/pos-payment-terminals`, `/api/pos/terminal-requests*`)؛ `pos:sweep-terminals` (مجدول)؛ `config/pos_terminals.php` (مهل افتراضية محافظة).
-- اختبارات: `PosTerminalFoundationTest` (31)، `PosTerminalPostgresTest` (6، `pcntl_fork`) — SQLite وPostgreSQL ×3 خضراء.
+- اختبارات: `PosTerminalFoundationTest` (32)، `PosTerminalPostgresTest` (6، `pcntl_fork`) — SQLite وPostgreSQL ×3 خضراء.
 - لا مجلدات جديدة تحت `app/`؛ لا تعديل لـ`PaymentService`/`LedgerService`.
 
 ## Tests and exact results
@@ -71,6 +71,8 @@ STATUS: **IN REVIEW** (PR مفتوح) · DATE: 2026-10-22
 **الجولة السادسة (رأس 4ede8c6) — ثلاث ملاحظات صحيحة:** P1 تراكب نداءات المزوّد بعد انتهاء الإيجار ⇒ (أ) عقد مهلة صلبة في `TerminalAdapter` والإيجار ≥ 3× `provider_timeout_seconds`، (ب) `lease_op`: بعد إيجار إلغاء منتهٍ لم يتأكد لا يخلفه إلا إلغاء (لا استعلام يسجّل موافقة سيعكسها الإلغاء المعلّق) · P1 موافقة يحمل `void` رمز إيجارها ⇒ غير متاحة للاستهلاك ولا للحلّ اليدوي حتى بعد انتهاء المدة (`hasOutstandingLease`) ويستلمها إعادة المحاولة/المجدول · P2 حذف الفرع لا يحوّل جهازه إلى «بلا فرع»: FK مقيِّد + رفض 422 صريح في حذف الفرع. **قيد معلن:** أمان التراكب المطلق مع مزوّد حقيقي يعتمد على التزام المحوّل بالمهلة (يُتحقَّق منه في شريحة المحوّل الحقيقي H6-03). ثلاثة اختبارات.
 
 **الجولة السابعة (رأس 6f26c90) — أربع ملاحظات صحيحة:** P2 إعدادات وسائل الدفع في POS تُطبَّق قبل بدء طلب الجهاز (`PosSettings::allowsPaymentMethod`) · P2 `down()` لا يُسقط مُشغّلات SQLite على PostgreSQL (مُتحقَّق بتشغيله على PG) · P1 استثناء `cancel` غامض يُبقي علامة الإلغاء (لا يخلفه إلا إلغاء، والاستعلام يعيد الصف بلا نداء) · P1 استثناء `void` غامض يُبقي رمز الإيجار ⇒ لا حلّ يدوي ولا استهلاك حتى تنجح إعادة إلغاء؛ الرفض الصريح من المزوّد (قاطع) يبقى قابلاً للحلّ اليدوي. **قرار مفتوح للمالك:** مخرج الحلّ اليدوي عند تعذّر المزوّد دائماً (انظر ملخص الجولة).
+
+**الجولة الثامنة (رأس 2d3df91) — ملاحظة واحدة صحيحة (ليست من عائلة الإيجار):** P2 حذف جهاز POS مخصَّص له جهاز دفع كان يحوّله إلى «غير مخصَّص» فيخدم أي جهاز ⇒ FK مقيِّد + رفض 422 في `PosDeviceService::delete`. اختبار.
 
 ## CI / Merge
 

@@ -579,6 +579,22 @@ class PosTerminalFoundationTest extends TestCase
     }
 
     #[Test]
+    public function a_pos_device_with_a_bound_payment_terminal_cannot_be_deleted(): void
+    {
+        $ctx = $this->context('pos-term-device-del');
+        $n = ++$this->seq;
+        $warehouse = $this->withToken($ctx['token'])->postJson('/api/warehouses', ['name' => "مخزن {$n}", 'code' => "TRM-W-{$n}", 'is_active' => true])->assertCreated()['data']['id'];
+        $device = $this->withToken($ctx['token'])->postJson('/api/pos-devices', ['name' => "كاشير {$n}", 'code' => "TRM-D-{$n}", 'warehouse_id' => $warehouse, 'is_active' => true])->assertCreated()['data']['id'];
+        $this->withToken($ctx['token'])->putJson("/api/pos-payment-terminals/{$ctx['terminal']['id']}", ['pos_device_id' => $device])->assertOk();
+
+        $this->withToken($ctx['token'])->deleteJson("/api/pos-devices/{$device}")->assertStatus(422);
+        $this->assertSame($device, DB::table('pos_payment_terminals')->where('id', $ctx['terminal']['id'])->value('pos_device_id'), 'الجهاز باقٍ مخصَّصاً');
+
+        $this->withToken($ctx['token'])->putJson("/api/pos-payment-terminals/{$ctx['terminal']['id']}", ['pos_device_id' => null])->assertOk();
+        $this->withToken($ctx['token'])->deleteJson("/api/pos-devices/{$device}")->assertOk();
+    }
+
+    #[Test]
     public function provider_operations_on_one_request_are_serialized_by_a_lease_and_the_lease_is_always_released(): void
     {
         $ctx = $this->context('pos-term-serialize');
