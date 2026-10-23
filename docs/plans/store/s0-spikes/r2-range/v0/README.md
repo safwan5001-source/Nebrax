@@ -7,6 +7,8 @@ server-to-server with the browser's `Range`*. Laravel never streams the bytes. S
 |---|---|
 | `v0-signer.php` | the "Laravel side": signs with the app's own AWS SDK (`aws/aws-sdk-php`), uploads/deletes the disposable test objects |
 | `v0-r2-range-probe.mjs` | the "Node proxy side": runs the matrix with `fetch(..., {redirect: 'manual'})`, includes the reference SSRF host allow-list |
+| `v0-vg1-decision.mjs` / `.test.mjs` | the V-G1 GO / NO-GO per PR #1551 §4.6 over `observed.gate` (consumed properties) + security gates + verified cleanup; diagnostic cases and synthesised headers cannot fail it |
+| `v0-workflow-guard.test.mjs` | static guard on the manual workflow (single trigger, read-only token, main + environment, no secret printing) |
 | `v0-gates.mjs` | the pass/fail LOGIC of R11 (ETag), R13 (redirects) and R18 (header-value leaks), the I10 redirect-host classifier (`classifyLocation`: exact validated hostnames, never a suffix), plus the redaction helpers (`redactText`, `redactDeep`, `safeSerialize`), free of I/O so it is unit-testable |
 | `v0-gates.test.mjs` | regression tests for those gates and for cleanup verification (`node --test v0-gates.test.mjs`) |
 | `v0-probe-wiring.test.mjs` | structural tests on the probe source: one `fetch()` (inside `hit()`), every `hit()` result tracked, I9 tracked without consuming its stream, cleanup in the exit status, nothing secret printed |
@@ -41,6 +43,16 @@ S3_PATH_STYLE=1   node v0-r2-range-probe.mjs --label=r2-pathstyle      --autoloa
 S3_PATH_STYLE=0   node v0-r2-range-probe.mjs --label=r2-virtualhosted  --autoload=/home/user/nibras-app/vendor/autoload.php
 ```
 (`S3_PATH_STYLE=0` is the app's current configuration: `R2_USE_PATH_STYLE_ENDPOINT` defaults to false.) Defaults: 8 MiB object, 4 s TTL for the expiry cases.
+
+## Run it from GitHub Actions (manual, `.github/workflows/v0-r2-range-probe.yml`)
+The workflow is `workflow_dispatch` only, runs only from `main`, only inside the GitHub Environment **`r2-vg1-probe`**, and needs the confirmation input `RUN-V-G1-ON-REAL-R2`.
+
+One-time owner setup (nothing here is created by the repository):
+1. **Environment** `r2-vg1-probe` → *Required reviewers* (independent approval) and *Deployment branches: `main` only*.
+2. **Environment secrets** `S3_ENDPOINT` (`https://<account>.r2.cloudflarestorage.com`), `S3_KEY`, `S3_SECRET`, `S3_BUCKET` — a **dedicated private test bucket** and a **bucket-scoped, Object Read & Write, short-lived** token. Do not reuse the production `R2_*` credentials: an R2 token is scoped to a bucket, not to a key prefix, so a token that reaches a bucket holding customer files can in principle modify them; the harness's prefix discipline is behaviour, not a permission boundary.
+3. Optional repository variable `R2_PRODUCTION_BUCKET_NAMES` (comma-separated): the preflight refuses to run if `S3_BUCKET` is listed.
+
+The run: harness unit tests → preflight (nothing printed) → probe (virtual-hosted; path-style optional) → exact-value secret scan of the new reports → **`v0-vg1-decision.mjs`** (PR #1551 §4.6, applied to the recorded sub-results `observed.gate`, never to the combined `pass`) → artifact upload only if the scan passed. Verified cleanup is part of the verdict. Afterwards: revoke the token and delete the bucket (or rotate it).
 
 ## What it touches and what it prints
 * Writes only `v0-range-probe/<run-id>/{probe,other,empty}.bin` (random bytes generated locally — no production or customer data), deletes them at the end and verifies they are gone.

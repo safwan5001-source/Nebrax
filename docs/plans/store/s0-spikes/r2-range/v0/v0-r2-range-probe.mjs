@@ -17,7 +17,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { allowedUpstream, guardedFetch, UpstreamRefused } from './v0-upstream-guard.mjs';
-import { classifyLocation, cleanupGate, etagGate, leakGate, redactText, redirectGate, safeSerialize, scanHeaderValues, scanText, sensitiveTokens } from './v0-gates.mjs';
+import { classifyLocation, cleanupGate, etagGate, gateSub, leakGate, redactText, redirectGate, safeSerialize, scanHeaderValues, scanText, sensitiveTokens } from './v0-gates.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const arg = (n, d) => (process.argv.find((a) => a.startsWith(`--${n}=`)) ?? `--${n}=${d}`).split('=').slice(1).join('=');
@@ -195,10 +195,10 @@ try {
 
   // R1
   const full = track(await hit(getUrl), 'signed', 'R1');
-  rec('R1', 'R', PLAN[0][2], full.status === 200 && full.headers['content-length'] === String(N) && full.headers['accept-ranges'] === 'bytes' && !!full.headers.etag && full.headers['content-type'] === 'video/mp4' && full.sha === sha(data), brief(full));
+  rec('R1', 'R', PLAN[0][2], full.status === 200 && full.headers['content-length'] === String(N) && full.headers['accept-ranges'] === 'bytes' && !!full.headers.etag && full.headers['content-type'] === 'video/mp4' && full.sha === sha(data), { ...brief(full), gate: gateSub(full, { status: 200, length: N, hash: sha(data) }) });
   const ranged = async (id, desc, v, s, e, expectStatus = 206) => {
     const r = await R(v, undefined, id); const want = `bytes ${s}-${e}/${N}`;
-    rec(id, 'R', desc, r.status === expectStatus && r.headers['content-range'] === want && r.bodyLen === e - s + 1 && r.sha === sha(slice(s, e)) && r.headers['content-length'] === String(e - s + 1), { range: v, ...brief(r) });
+    rec(id, 'R', desc, r.status === expectStatus && r.headers['content-range'] === want && r.bodyLen === e - s + 1 && r.sha === sha(slice(s, e)) && r.headers['content-length'] === String(e - s + 1), { range: v, ...brief(r), gate: gateSub(r, { status: expectStatus, length: e - s + 1, range: want, hash: sha(slice(s, e)) }) });
     return r;
   };
   const r2 = await ranged('R2', PLAN[1][2], 'bytes=100-199', 100, 199);
