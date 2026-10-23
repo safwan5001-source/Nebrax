@@ -254,4 +254,174 @@ describe("HeroSection (COM-7-P3A)", () => {
       expect(container.querySelector('a[href="/sa/en/products"]')).toBeTruthy();
     });
   });
+
+  describe("display options (AWJ-HERO-DISPLAY)", () => {
+    const base = {
+      basePath: "/sa/en",
+      locale: "en",
+      storeName: "Shop",
+      headline: "Welcome",
+      subheadline: "Fresh daily",
+      ctas: [{ label: "Browse", href: "/collections/new" }],
+    };
+    const render_ = async (extra: Record<string, unknown> = {}) => {
+      const { HeroSection } = await import("../HeroSection");
+      return render(
+        await HeroSection({
+          ...base,
+          ...extra,
+          backdrop: extra.backdrop ?? undefined,
+        } as Parameters<typeof HeroSection>[0]),
+      ).container;
+    };
+    const visible = (container: HTMLElement) => ({
+      // the sr-only heading is hidden from sight, so it never counts as "visible title"
+      title: container.querySelector("h1:not(.sr-only)") !== null,
+      description: container.querySelector("p") !== null,
+      button: container.querySelector("a") !== null,
+    });
+
+    // The five combinations the merchant can build: image only · +title · +title+description · +title+button · all.
+    const combos: Array<
+      [string, Record<string, boolean>, ReturnType<typeof visible>]
+    > = [
+      [
+        "image only",
+        { showTitle: false, showSubheadline: false, showCtas: false },
+        { title: false, description: false, button: false },
+      ],
+      [
+        "image + title",
+        { showTitle: true, showSubheadline: false, showCtas: false },
+        { title: true, description: false, button: false },
+      ],
+      [
+        "image + title + description",
+        { showTitle: true, showSubheadline: true, showCtas: false },
+        { title: true, description: true, button: false },
+      ],
+      [
+        "image + title + button",
+        { showTitle: true, showSubheadline: false, showCtas: true },
+        { title: true, description: false, button: true },
+      ],
+      [
+        "image + title + description + button",
+        { showTitle: true, showSubheadline: true, showCtas: true },
+        { title: true, description: true, button: true },
+      ],
+    ];
+    for (const [name, flags, expected] of combos) {
+      it(`${name}: shows exactly the chosen parts and nothing else`, async () => {
+        const container = await render_(flags);
+        expect(visible(container)).toEqual(expected);
+        // no empty wrapper: the content box exists only while something is drawn in it
+        const box = container.querySelector("[data-section-content]");
+        const anything =
+          expected.title || expected.description || expected.button;
+        expect(container.querySelector("section > div") !== null).toBe(
+          anything,
+        );
+        if (box) expect(box.children.length).toBeGreaterThan(0);
+      });
+    }
+
+    it("image only keeps the page's one heading for assistive technology, visually hidden", async () => {
+      const container = await render_({
+        showTitle: false,
+        showSubheadline: false,
+        showCtas: false,
+      });
+      const h1 = container.querySelector("h1#home-hero");
+      expect(h1?.className).toContain("sr-only");
+      expect(h1?.textContent).toBe("Welcome");
+      expect(
+        container.querySelector("section")?.getAttribute("aria-labelledby"),
+      ).toBe("home-hero");
+      expect(container.querySelector("section")?.children).toHaveLength(1);
+    });
+
+    it("hiding the buttons also hides the default 'shop now'", async () => {
+      const container = await render_({ ctas: null, showCtas: false });
+      expect(container.querySelector("a")).toBeNull();
+      const shown = await render_({ ctas: null });
+      expect(shown.querySelector('a[href="/sa/en/products"]')).toBeTruthy();
+    });
+
+    it("every switch defaulting to shown renders byte-for-byte what it rendered before the options existed", async () => {
+      const explicit = await render_({
+        showTitle: true,
+        showSubheadline: true,
+        showCtas: true,
+        imageHref: null,
+      });
+      const legacy = await render_();
+      expect(explicit.innerHTML).toBe(legacy.innerHTML);
+    });
+
+    it("a hidden description does not leave an empty paragraph, even with copy authored", async () => {
+      const container = await render_({ showSubheadline: false });
+      expect(container.querySelector("p")).toBeNull();
+      expect(container.textContent).not.toContain("Fresh daily");
+    });
+
+    describe("clickable image", () => {
+      const backdrop = <div data-sd-backdrop="" aria-hidden="true" />;
+
+      it("links the picture to a store path, keeping the buttons clickable", async () => {
+        const container = await render_({
+          backdrop,
+          designed: true,
+          imageHref: "/collections/new",
+        });
+        const link = container.querySelector("a[data-hero-image-link]");
+        expect(link?.getAttribute("href")).toBe("/sa/en/collections/new");
+        expect(link?.getAttribute("aria-label")).toBe("Welcome");
+        // under the backdrop and under the copy, which lets clicks through except on its own links
+        const section = container.querySelector("section");
+        expect(section?.className).toContain("relative");
+        expect(section?.firstElementChild).toBe(link);
+        expect(
+          container.querySelector("[data-section-content]")?.className,
+        ).toContain("pointer-events-none");
+        expect(container.querySelector("a[data-hero-cta]")).toBeTruthy();
+      });
+
+      it("works for an image-only hero and passes an https link through", async () => {
+        const container = await render_({
+          backdrop,
+          imageHref: "https://example.com/sale",
+          designed: true,
+          showTitle: false,
+          showSubheadline: false,
+          showCtas: false,
+        });
+        expect(container.querySelectorAll("a")).toHaveLength(1);
+        expect(
+          container
+            .querySelector("a[data-hero-image-link]")
+            ?.getAttribute("href"),
+        ).toBe("https://example.com/sale");
+        expect(container.querySelector("[data-section-content]")).toBeNull();
+      });
+
+      it("is not a link without a picture, or without a link", async () => {
+        const noPicture = await render_({ imageHref: "/collections/new" });
+        expect(noPicture.querySelector("[data-hero-image-link]")).toBeNull();
+        const noLink = await render_({ backdrop });
+        expect(noLink.querySelector("[data-hero-image-link]")).toBeNull();
+        expect(noLink.querySelector("section")?.className).not.toContain(
+          "relative",
+        );
+      });
+
+      it("an unsafe link is never rendered", async () => {
+        const container = await render_({
+          backdrop,
+          imageHref: "javascript:alert(1)",
+        });
+        expect(container.querySelector("[data-hero-image-link]")).toBeNull();
+      });
+    });
+  });
 });

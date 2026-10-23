@@ -198,6 +198,7 @@ export function DesignInspector({
   onChange,
   locale = "ar",
   bounds,
+  textless = false,
 }: {
   type: string;
   design: SectionDesign | undefined;
@@ -207,6 +208,8 @@ export function DesignInspector({
   locale?: "ar" | "en";
   /** V6b-4b — why a picture is (not yet) provable: still measuring vs. no valid measurement. */
   bounds?: BackgroundMediaBounds;
+  /** AWJ-HERO-DISPLAY — a hero showing no title, description or button: no text over the picture to prove. */
+  textless?: boolean;
 }) {
   const capability = SECTION_DESIGN_CAPABILITIES[type];
   const clipboard = useDesignClipboard();
@@ -225,7 +228,7 @@ export function DesignInspector({
     );
   }
 
-  const issues = sectionContrastIssues(current, ctx, type);
+  const issues = sectionContrastIssues(current, ctx, type, textless);
   const text = effectiveText(current, ctx, type);
   const hasBackground = !!current.background;
   const ownsSurface = SURFACE_OWNING_TYPES.has(type) && !hasBackground;
@@ -234,12 +237,12 @@ export function DesignInspector({
   );
   const hasSeparator = activeSeparatorKinds.length > 0;
   // V6c-4 — overlap needs a hero that really paints a picture (the resolver's own test) and no bottom separator.
-  const overlapInactive = resolveSectionDesign(type, current, ctx)?.attrs["data-sd"]?.split(" ").includes("ovlp") !== true;
+  const overlapInactive = resolveSectionDesign(type, current, ctx, textless)?.attrs["data-sd"]?.split(" ").includes("ovlp") !== true;
   // V6c-7 — a hero's split needs a picture that really paints (and ≥ md); say so rather than do nothing
   const layoutInactive =
     type === "hero" &&
     current.layout === "split" &&
-    resolveSectionDesign(type, current, ctx)?.attrs["data-sd"]?.split(" ").includes("lsplit") !== true;
+    resolveSectionDesign(type, current, ctx, textless)?.attrs["data-sd"]?.split(" ").includes("lsplit") !== true;
   const hasDesignBackground = current.background?.kind === "solid" || current.background?.kind === "gradient";
   // The colour a separator takes when the merchant picks none — exactly the resolver's defaults:
   // a line follows the border role, a band the brand, a shape the page behind it (brand when the section has no designed background, so it is visible). Mixed edges

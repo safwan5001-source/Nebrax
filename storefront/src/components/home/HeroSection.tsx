@@ -73,6 +73,20 @@ interface HeroSectionProps {
    * is not painted and the button keeps its style's look.
    */
   designCtx?: DesignContext;
+  /**
+   * AWJ-HERO-DISPLAY — the merchant's display switches. Each hides its part entirely: no element, no empty container, and
+   * for the buttons no default "shop now" either. All three hidden ⇒ the hero is its picture alone. Absent ⇒ shown, so a
+   * hero that never set them renders byte-for-byte as before. A hidden title is still the section's heading for assistive
+   * technology (visually hidden), so the page keeps exactly one `<h1>`.
+   */
+  showTitle?: boolean;
+  showSubheadline?: boolean;
+  showCtas?: boolean;
+  /**
+   * AWJ-HERO-DISPLAY — makes the hero's picture a link. Honoured only while a picture really renders (`backdrop`); a hero
+   * on its brand gradient has no image to click.
+   */
+  imageHref?: string | null;
 }
 
 /**
@@ -111,6 +125,10 @@ export async function HeroSection({
   headingLevel = 1,
   backdrop,
   designCtx,
+  showTitle = true,
+  showSubheadline = true,
+  showCtas = true,
+  imageHref,
 }: HeroSectionProps) {
   const t = await getTranslations({
     locale: locale as Locale,
@@ -144,96 +162,125 @@ export async function HeroSection({
         colour: CtaColour | undefined;
       } => cta.label !== "" && cta.href !== null,
     );
+  const subtext = showSubheadline ? subheadline?.trim() : "";
+  const imageLink =
+    backdrop && imageHref ? destination(basePath, imageHref) : null;
+  // A hidden part leaves no element behind, and a content box with nothing in it is not rendered at all.
+  const hasButtons = showCtas && (!hasAuthoredCtas || authored.length > 0);
+  const hasContent = showTitle || Boolean(subtext) || hasButtons;
+  const headingClass = showTitle
+    ? "text-xl font-black leading-tight sm:text-2xl lg:text-4xl"
+    : "sr-only";
 
   return (
     <section
       aria-labelledby={headingId}
       className={cn(
         "flex items-center rounded-store bg-linear-to-r rtl:bg-linear-to-l from-primary-700 via-primary-600 to-primary-500 text-store-primary-foreground",
+        imageLink && "relative",
         isMarket
           ? "min-h-[7rem] md:min-h-[9rem] lg:min-h-[10rem]"
           : "min-h-[11rem] md:min-h-[16rem] lg:min-h-[18rem]",
       )}
     >
-      {backdrop}
-      <div
-        data-section-content={designed ? "" : undefined}
-        className={cn(
-          "max-w-2xl",
-          isMarket ? "p-4 md:p-6 lg:p-8" : "p-5 md:p-10 lg:p-14",
-        )}
-      >
-        <Heading
-          id={headingId}
-          className="text-xl font-black leading-tight sm:text-2xl lg:text-4xl"
-        >
+      {/* A hidden title is still the section's heading (visually hidden). It sits before the backdrop so the backdrop's
+          sibling rules never restyle it. */}
+      {showTitle ? null : (
+        <Heading id={headingId} className={headingClass}>
           <bdi>{title}</bdi>
         </Heading>
-        {subheadline?.trim() && (
-          <p className="mt-2 line-clamp-2 text-xs text-store-primary-foreground/80 md:mt-3 md:text-sm">
-            {subheadline}
-          </p>
-        )}
-        {!hasAuthoredCtas ? (
-          <Link
-            href={`${basePath}/products`}
-            className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-store bg-store-primary-foreground px-4 text-xs font-bold text-store-primary shadow-md transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-store-primary-foreground md:mt-5 md:h-11 md:px-6 md:text-sm"
-          >
-            <span>{t("shopNow")}</span>
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              fill="none"
-              strokeWidth={2.5}
-              className="size-3.5 stroke-current rtl:rotate-180 md:size-4"
+      )}
+      {/* The picture as a link: beneath the backdrop (which takes no pointer events) and beneath the copy, which lets
+          clicks through except on its own links. */}
+      {imageLink ? (
+        <Link
+          href={imageLink}
+          aria-label={title}
+          data-hero-image-link=""
+          className="absolute inset-0 rounded-store focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-store-primary-foreground"
+        />
+      ) : null}
+      {backdrop}
+      {hasContent ? (
+        <div
+          data-section-content={designed ? "" : undefined}
+          className={cn(
+            "max-w-2xl",
+            isMarket ? "p-4 md:p-6 lg:p-8" : "p-5 md:p-10 lg:p-14",
+            imageLink && "pointer-events-none [&_a]:pointer-events-auto",
+          )}
+        >
+          {showTitle ? (
+            <Heading id={headingId} className={headingClass}>
+              <bdi>{title}</bdi>
+            </Heading>
+          ) : null}
+          {subtext && (
+            <p className="mt-2 line-clamp-2 text-xs text-store-primary-foreground/80 md:mt-3 md:text-sm">
+              {subheadline}
+            </p>
+          )}
+          {!showCtas ? null : !hasAuthoredCtas ? (
+            <Link
+              href={`${basePath}/products`}
+              className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-store bg-store-primary-foreground px-4 text-xs font-bold text-store-primary shadow-md transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-store-primary-foreground md:mt-5 md:h-11 md:px-6 md:text-sm"
             >
-              <path
-                d="M9 5l7 7-7 7"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </Link>
-        ) : authored.length === 0 ? null : (
-          <div className="mt-4 flex flex-wrap items-center gap-2 md:mt-5 md:gap-3">
-            {authored.map((cta, index) => {
-              // CUST-HV V6c-5 — absent style ⇒ by position (first solid, second outline), exactly as before.
-              const style = effectiveCtaStyle(cta.style, index);
-              // CUST-HV V6c-6 — an explicit colour paints the button from validated custom properties.
-              const paint =
-                cta.colour && designCtx
-                  ? ctaPaint(style, cta.colour, designCtx)
-                  : null;
-              return (
-                <Link
-                  key={`${index}-${cta.href}`}
-                  href={cta.href}
-                  data-hero-cta={index === 0 ? "primary" : "secondary"}
-                  data-cta-style={style}
-                  data-cta-colour={paint ? cta.colour : undefined}
-                  style={
-                    paint
-                      ? ({
-                          "--cta-fill": paint.fill,
-                          "--cta-label": paint.label,
-                          "--cta-border": paint.border,
-                        } as CSSProperties)
-                      : undefined
-                  }
-                  className={cn(
-                    "inline-flex h-9 items-center gap-1.5 rounded-store px-4 text-xs font-bold transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-store-primary-foreground md:h-11 md:px-6 md:text-sm",
-                    paint
-                      ? [COLOURED_CTA, style === "link" && COLOURED_LINK]
-                      : HERO_CTA_LOOK[style],
-                  )}
-                >
-                  <span>{cta.label}</span>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </div>
+              <span>{t("shopNow")}</span>
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                strokeWidth={2.5}
+                className="size-3.5 stroke-current rtl:rotate-180 md:size-4"
+              >
+                <path
+                  d="M9 5l7 7-7 7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </Link>
+          ) : authored.length === 0 ? null : (
+            <div className="mt-4 flex flex-wrap items-center gap-2 md:mt-5 md:gap-3">
+              {authored.map((cta, index) => {
+                // CUST-HV V6c-5 — absent style ⇒ by position (first solid, second outline), exactly as before.
+                const style = effectiveCtaStyle(cta.style, index);
+                // CUST-HV V6c-6 — an explicit colour paints the button from validated custom properties.
+                const paint =
+                  cta.colour && designCtx
+                    ? ctaPaint(style, cta.colour, designCtx)
+                    : null;
+                return (
+                  <Link
+                    key={`${index}-${cta.href}`}
+                    href={cta.href}
+                    data-hero-cta={index === 0 ? "primary" : "secondary"}
+                    data-cta-style={style}
+                    data-cta-colour={paint ? cta.colour : undefined}
+                    style={
+                      paint
+                        ? ({
+                            "--cta-fill": paint.fill,
+                            "--cta-label": paint.label,
+                            "--cta-border": paint.border,
+                          } as CSSProperties)
+                        : undefined
+                    }
+                    className={cn(
+                      "inline-flex h-9 items-center gap-1.5 rounded-store px-4 text-xs font-bold transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-store-primary-foreground md:h-11 md:px-6 md:text-sm",
+                      paint
+                        ? [COLOURED_CTA, style === "link" && COLOURED_LINK]
+                        : HERO_CTA_LOOK[style],
+                    )}
+                  >
+                    <span>{cta.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : null}
     </section>
   );
 }

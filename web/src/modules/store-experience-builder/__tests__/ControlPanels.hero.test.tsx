@@ -184,3 +184,99 @@ describe("hero editor (CUST-HV V6a)", () => {
     expect(authored).not.toHaveBeenCalled();
   });
 });
+
+describe("hero display options (AWJ-HERO-DISPLAY)", () => {
+  const toggle = (label: string) => screen.getAllByLabelText(label)[0] as HTMLInputElement;
+
+  it("all parts are shown by default and a legacy hero gains no key until the merchant chooses", () => {
+    const onChange = mount(
+      config([{ id: "hero", type: "hero", visible: true }], { heroHeadline: "Legacy" }),
+    );
+    expect(toggle("Show title").checked).toBe(true);
+    expect(toggle("Show description").checked).toBe(true);
+    expect(toggle("Show buttons").checked).toBe(true);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("switching a part off stores false (seeding the legacy text), switching it back on removes the key", () => {
+    const onChange = mount(
+      config([{ id: "hero", type: "hero", visible: true }], {
+        heroHeadline: "Legacy",
+        heroSubheadline: "Line",
+      }),
+    );
+    fireEvent.click(toggle("Show description"));
+    expect(sectionsOf(onChange)[0].content).toEqual({
+      headline: "Legacy",
+      subheadline: "Line",
+      showSubheadline: false,
+    });
+    cleanup();
+    const again = mount(
+      config([
+        { id: "hero", type: "hero", visible: true, content: { headline: "H", showTitle: false } },
+      ]),
+    );
+    expect(toggle("Show title").checked).toBe(false);
+    fireEvent.click(toggle("Show title"));
+    expect(sectionsOf(again)[0].content).toEqual({ headline: "H" });
+  });
+
+  it("image only: the three switches off say so, keep the authored text, and each edit preserves the flags", () => {
+    const onChange = mount(
+      config([
+        {
+          id: "hero",
+          type: "hero",
+          visible: true,
+          content: {
+            headline: "H",
+            subheadline: "S",
+            ctas: [{ label: "Go", href: "/go" }],
+            showTitle: false,
+            showSubheadline: false,
+            showCtas: false,
+          },
+        },
+      ]),
+    );
+    expect(screen.getByText(/Image only:/)).toBeTruthy();
+    fireEvent.change(input("Hero headline"), { target: { value: "H2" } });
+    expect(sectionsOf(onChange)[0].content).toEqual({
+      headline: "H2",
+      subheadline: "S",
+      ctas: [{ label: "Go", href: "/go" }],
+      showTitle: false,
+      showSubheadline: false,
+      showCtas: false,
+    });
+  });
+
+  it("the image link is committed on blur, sanitised, and removed by clearing it", () => {
+    const onChange = mount(
+      config([{ id: "hero", type: "hero", visible: true, content: { headline: "H" } }]),
+    );
+    const link = input("Image link (optional)");
+    fireEvent.focus(link);
+    onChange.mockClear();
+    fireEvent.change(link, { target: { value: "https://example.com/sale" } });
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.blur(link);
+    expect(sectionsOf(onChange)[0].content).toEqual({
+      headline: "H",
+      imageHref: "https://example.com/sale",
+    });
+    cleanup();
+    const cleared = mount(
+      config([
+        { id: "hero", type: "hero", visible: true, content: { headline: "H", imageHref: "/sale" } },
+      ]),
+    );
+    const field = input("Image link (optional)");
+    fireEvent.focus(field);
+    fireEvent.change(field, { target: { value: "" } });
+    fireEvent.blur(field);
+    expect(sectionsOf(cleared)[0].content).toEqual({ headline: "H" });
+  });
+});
+

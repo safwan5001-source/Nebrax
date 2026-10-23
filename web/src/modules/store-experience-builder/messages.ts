@@ -1004,6 +1004,14 @@ export const CUSTOMIZER_MESSAGES = {
       "لا يمكن نشر هذا اللون: تباينه مع خلفية القسم أقل من 4.5:1 لهذا النمط. اختر لوناً آخر أو نمط «مملوء» أو «ناعم».",
     ctaColourUnprovable:
       "لا يمكن إثبات وضوح هذا اللون فوق خلفية القسم الحالية. غيّر الخلفية أو اختر نمط «مملوء» أو «ناعم».",
+    heroShowTitle: "إظهار العنوان",
+    heroShowSubheadline: "إظهار الوصف",
+    heroShowCtas: "إظهار الأزرار",
+    heroImageOnlyHint:
+      "صورة فقط: لا عنوان ولا وصف ولا أزرار. يبقى العنوان مقروءاً لقارئات الشاشة ويعرض القسم الصورة وحدها.",
+    heroImageHref: "رابط الصورة (اختياري)",
+    heroImageHrefHint:
+      "يجعل صورة البطل قابلة للنقر. مسار داخل المتجر يبدأ بـ / أو عنوان https://. يعمل مع خلفية صورة فقط.",
     heroCtaHint:
       "بلا أزرار تظهر «تسوّق الآن» تلقائياً. الرابط مسار داخل المتجر يبدأ بـ / أو عنوان https://؛ والزر الناقص لا يظهر.",
     bannerCtaHint:
@@ -2605,6 +2613,14 @@ export const CUSTOMIZER_MESSAGES = {
       "This colour cannot be published: its contrast with the section background is under 4.5:1 for this style. Pick another colour, or the Filled or Soft style.",
     ctaColourUnprovable:
       "This colour cannot be proven legible over the section's current background. Change the background, or use the Filled or Soft style.",
+    heroShowTitle: "Show title",
+    heroShowSubheadline: "Show description",
+    heroShowCtas: "Show buttons",
+    heroImageOnlyHint:
+      "Image only: no title, description or buttons. The title stays available to screen readers, and the preview shows the picture alone.",
+    heroImageHref: "Image link (optional)",
+    heroImageHrefHint:
+      "Makes the hero picture clickable. A store path starting with / or an https:// address. Works with a picture background only.",
     heroCtaHint:
       "With no buttons the default “Shop now” appears. A link is a store path starting with / or an https:// address; an incomplete button is not shown.",
     bannerCtaHint:

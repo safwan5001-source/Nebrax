@@ -8,6 +8,7 @@ import {
   resolveHeaderOverlay,
 } from "@/lib/presentation/header-overlay";
 import type { ResolvedMediaMap } from "@/lib/presentation/media-ref";
+import { isTextlessSection } from "@/lib/presentation/section-content";
 import {
   type DesignContext,
   resolveSectionDesign,
@@ -42,7 +43,12 @@ export function publishedHeaderOverlay(
   const section = sections[index];
   if (!section) return null;
   const rendered =
-    resolveSectionDesign(section.type, section.design, design)
+    resolveSectionDesign(
+      section.type,
+      section.design,
+      design,
+      isTextlessSection(section),
+    )
       ?.attrs["data-sd"]?.split(" ")
       .includes("mbg") === true && sectionBackdrop(section, index, media);
   return rendered ? decision.overlay : null;

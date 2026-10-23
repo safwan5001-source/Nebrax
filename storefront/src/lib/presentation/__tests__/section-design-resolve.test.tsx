@@ -504,6 +504,27 @@ describe("resolveSectionDesign — picture backgrounds (CUST-HV V6b-3)", () => {
     );
     expect(r?.attrs["data-sd"]).toContain("mbg");
   });
+
+  it("a hero showing no text (image only, AWJ-HERO-DISPLAY) paints a wide-range picture with no overlay, and sets no text colours", () => {
+    const r = resolveSectionDesign("hero", picture(), withBounds(wide), true);
+    const tokens = r?.attrs["data-sd"].split(" ") ?? [];
+    expect(tokens).toContain("mbg");
+    expect(tokens).not.toContain("ovl");
+    // it never invents a darkening layer: an overlay exists only when the merchant authored one
+    expect(r?.style["--sec-ovl-a"]).toBeUndefined();
+  });
+
+  it("image only still needs the picture's own luminance evidence — no evidence ⇒ nothing is painted", () => {
+    for (const c of [ctx, withBounds(null)]) {
+      const r = resolveSectionDesign("hero", picture(), c, true);
+      expect(r?.attrs["data-sd"] ?? "").not.toContain("mbg");
+    }
+  });
+
+  it("a hero that still shows any text keeps the full proof (the default is not textless)", () => {
+    const r = resolveSectionDesign("hero", picture(), withBounds(wide), false);
+    expect(r?.attrs["data-sd"] ?? "").not.toContain("mbg");
+  });
 });
 
 describe("resolveSectionDesign — placement and height (CUST-HV V6c-3)", () => {

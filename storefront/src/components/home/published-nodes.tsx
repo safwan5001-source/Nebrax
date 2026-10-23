@@ -42,6 +42,7 @@ import {
   deliveryPromiseContentOf,
   discoveryContentOf,
   featuredContentOf,
+  isTextlessSection,
   newArrivalsContentOf,
   offersContentOf,
   productShelfContentOf,
@@ -176,7 +177,12 @@ export async function publishedNodes(
     (section) =>
       section.visible &&
       section.design?.motion?.reveal === "fade-up" &&
-      resolveSectionDesign(section.type, section.design, design) !== null,
+      resolveSectionDesign(
+        section.type,
+        section.design,
+        design,
+        isTextlessSection(section),
+      ) !== null,
   );
   if (reveals) nodes.push(<SectionReveal key="section-reveal" />);
   return nodes;
@@ -197,6 +203,7 @@ function backdropNode(
     section.type,
     section.design,
     ctx.design,
+    isTextlessSection(section),
   );
   if (!resolved?.attrs["data-sd"]?.split(" ").includes("mbg")) return null;
   const data = sectionBackdrop(section, index, ctx.media ?? {});
@@ -215,7 +222,12 @@ async function pushSectionNode(
     // every other built-in — a designed hero is wrapped by its frame alone, an undesigned one keeps
     // the legacy div, so a content-less default hero is byte-identical to before.
     const framed =
-      resolveSectionDesign(section.type, section.design, ctx.design) !== null;
+      resolveSectionDesign(
+        section.type,
+        section.design,
+        ctx.design,
+        isTextlessSection(section),
+      ) !== null;
     const isFirstHero = section.id === firstHeroId;
     const node = ctx.renderHero({
       section,
@@ -244,7 +256,12 @@ async function pushSectionNode(
     // ...but only when the design actually resolves to a frame: a design that renders
     // nothing (e.g. only default steps) keeps the legacy wrapper byte-for-byte.
     const framed =
-      resolveSectionDesign(section.type, section.design, ctx.design) !== null;
+      resolveSectionDesign(
+        section.type,
+        section.design,
+        ctx.design,
+        isTextlessSection(section),
+      ) !== null;
     const node = ctx.implemented[section.type];
     // The hero's content-box marker is emitted only while a design frame is active, so an
     // undesigned hero stays byte-identical to its legacy output.
@@ -321,8 +338,12 @@ async function pushSectionNode(
         basePath={ctx.basePath}
         headingId={`banner-${section.id}`}
         designed={
-          resolveSectionDesign(section.type, section.design, ctx.design) !==
-          null
+          resolveSectionDesign(
+            section.type,
+            section.design,
+            ctx.design,
+            isTextlessSection(section),
+          ) !== null
         }
         backdrop={backdropNode(section, index, ctx, false)}
         designCtx={ctx.design}
@@ -380,8 +401,12 @@ async function pushSectionNode(
         headingId={`benefits-${section.id}`}
         title={ctx.benefitsTitle}
         designed={
-          resolveSectionDesign(section.type, section.design, ctx.design) !==
-          null
+          resolveSectionDesign(
+            section.type,
+            section.design,
+            ctx.design,
+            isTextlessSection(section),
+          ) !== null
         }
         layout={
           (section.design?.layout as BenefitsLayout | undefined) ?? undefined

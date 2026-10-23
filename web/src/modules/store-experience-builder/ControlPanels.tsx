@@ -53,6 +53,7 @@ import {
   type HeroContent,
   galleryContentOf,
   heroContentOf,
+  isTextlessSection,
   sliderContentOf,
   benefitsContentOf,
   customContentOf,
@@ -1342,6 +1343,7 @@ function HomepagePanel({
                   t={t}
                   locale={locale === "en" ? "en" : "ar"}
                   bounds={backgroundBounds}
+                  textless={isTextlessSection(selected)}
                   onChange={(design) =>
                     updateSection(selectedIndex, {
                       ...selected,
@@ -2469,6 +2471,10 @@ function HeroFields({
     headline: string;
     subheadline: string;
     ctas: CtaSlot[];
+    showTitle: boolean;
+    showSubheadline: boolean;
+    showCtas: boolean;
+    imageHref: string;
   }) => {
     // an empty slot is not stored; the remaining buttons keep their order
     const kept = next.ctas.filter((cta) => cta.label !== "" || cta.href !== "");
@@ -2476,15 +2482,55 @@ function HeroFields({
       headline: next.headline,
       ...(next.subheadline !== "" ? { subheadline: next.subheadline } : {}),
       ...(kept.length > 0 ? { ctas: kept } : {}),
+      // AWJ-HERO-DISPLAY — a switch is stored only while OFF (`false`); turning it on removes the key, so a hero
+      // that never hid anything keeps exactly the document it had.
+      ...(next.showTitle ? {} : { showTitle: false as const }),
+      ...(next.showSubheadline ? {} : { showSubheadline: false as const }),
+      ...(next.showCtas ? {} : { showCtas: false as const }),
+      ...(next.imageHref !== "" ? { imageHref: next.imageHref } : {}),
     });
   };
   const state = {
     headline: value.headline,
     subheadline: value.subheadline ?? "",
     ctas,
+    showTitle: value.showTitle !== false,
+    showSubheadline: value.showSubheadline !== false,
+    showCtas: value.showCtas !== false,
+    imageHref: value.imageHref ?? "",
   };
+  const imageOnly = !state.showTitle && !state.showSubheadline && !state.showCtas;
   return (
     <div className="space-y-3" data-hero-fields="">
+      <div className="divide-y divide-neutral-200 border-y border-neutral-200" data-hero-display="">
+        <Toggle
+          label={t("heroShowTitle")}
+          checked={state.showTitle}
+          onChange={(showTitle) => commit({ ...state, showTitle })}
+        />
+        <Toggle
+          label={t("heroShowSubheadline")}
+          checked={state.showSubheadline}
+          onChange={(showSubheadline) => commit({ ...state, showSubheadline })}
+        />
+        <Toggle
+          label={t("heroShowCtas")}
+          checked={state.showCtas}
+          onChange={(showCtas) => commit({ ...state, showCtas })}
+        />
+      </div>
+      {imageOnly ? (
+        <p className="text-[12px] leading-5 text-muted" data-hero-image-only="">
+          {t("heroImageOnlyHint")}
+        </p>
+      ) : null}
+      <DeferredCommitField
+        label={t("heroImageHref")}
+        value={state.imageHref}
+        dir="ltr"
+        onCommit={(imageHref) => commit({ ...state, imageHref })}
+      />
+      <p className="text-[12px] leading-5 text-muted">{t("heroImageHrefHint")}</p>
       <Field label={t("heroHeadline")}>
         <input
           className={inputClass}
@@ -2503,7 +2549,8 @@ function HeroFields({
         slots={ctas}
         slotAttr="data-hero-cta-slot"
         t={t}
-        judge={(list) => ctaColourIssues("hero", list, design, ctx)}
+        // hidden buttons are not drawn, so their colours are not judged (the publish gate skips them the same way)
+        judge={(list) => (state.showCtas ? ctaColourIssues("hero", list, design, ctx) : [])}
         onChange={(next) => commit({ ...state, ctas: next })}
       />
       <p className="text-[12px] leading-5 text-muted">{t("heroCtaHint")}</p>

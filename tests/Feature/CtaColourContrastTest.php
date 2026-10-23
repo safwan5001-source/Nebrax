@@ -99,6 +99,20 @@ class CtaColourContrastTest extends TestCase
     }
 
     /** @test */
+    public function buttons_a_hero_hides_are_not_judged(): void
+    {
+        $failing = [['label' => 'B', 'href' => '/b', 'style' => 'outline', 'colour' => 'text']];
+        $document = fn (array $extra): array => (new StorefrontPresentationNormalizer)->normalize([
+            'primaryColor' => '#12372a',
+            'homepage' => ['sections' => [['id' => 'hero', 'type' => 'hero', 'visible' => true, 'content' => ['headline' => 'H', 'ctas' => $failing] + $extra]]],
+        ]);
+        $validator = new StorefrontPresentationPublishValidator;
+
+        $this->assertNotSame([], $validator->errors($document([])));
+        $this->assertSame([], $validator->errors($document(['showCtas' => false])));
+    }
+
+    /** @test */
     public function a_hidden_section_does_not_block_publishing(): void
     {
         $this->assertSame([], (new StorefrontPresentationPublishValidator)->errors($this->document([
