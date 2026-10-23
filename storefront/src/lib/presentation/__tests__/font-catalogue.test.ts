@@ -39,6 +39,41 @@ describe("font catalogue (V5e-2c)", () => {
     }
   });
 
+  it("is append-only: the original eight keys keep their position and stack (Typography Library Expansion)", () => {
+    expect(FONT_FAMILY_KEYS.slice(0, 8)).toEqual([
+      "cairo-geist",
+      "tajawal-geist",
+      "plex-arabic",
+      "noto-inter",
+      "readex",
+      "rubik",
+      "el-messiri",
+      "amiri-lora",
+    ]);
+    expect(fontFamilyStack("readex")).toBe(
+      "var(--font-readex), system-ui, sans-serif",
+    );
+    expect(fontFamilyStack("amiri-lora")).toBe(
+      "var(--font-lora), var(--font-amiri), Georgia, serif",
+    );
+  });
+
+  it("adds almarai, alexandria, noto-kufi and reem-kufi, with unique display names (no duplicate option)", () => {
+    for (const key of ["almarai", "alexandria", "noto-kufi", "reem-kufi"])
+      expect(FONT_FAMILY_KEYS).toContain(key);
+    const names = FONT_CATALOGUE.map((entry) => entry.name);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("does not ship Thmanyah: no licensed files in the repo and no catalogue key", () => {
+    expect(FONT_FAMILY_KEYS.join(",")).not.toMatch(/thmanyah/i);
+    for (const file of [
+      "storefront/src/components/layout/DocumentShell.tsx",
+      "web/src/modules/store-experience-builder/presentation/fonts.ts",
+    ])
+      expect(read(file)).not.toMatch(/thmanyah|next\/font\/local/i);
+  });
+
   it("only catalogue keys resolve — a name, a CSS string or a custom upload is never a stack", () => {
     expect(fontFamilyStack("Cairo")).toBeUndefined();
     expect(fontFamilyStack("custom:0a1b2c")).toBeUndefined();
@@ -82,11 +117,11 @@ describe("font catalogue (V5e-2c)", () => {
             /=\s*(?!Geist|Cairo|Tajawal)([A-Z][A-Za-z_]+)\(\{([\s\S]*?)\}\);/g,
           ),
         ].filter((m) =>
-          /--font-(plex|inter|noto|readex|rubik|el-messiri|lora|amiri)/.test(
+          /--font-(plex|inter|noto|readex|rubik|el-messiri|lora|amiri|almarai|alexandria|reem)/.test(
             m[2],
           ),
         );
-        expect(calls.length).toBe(8);
+        expect(calls.length).toBe(12);
         for (const [, name, body] of calls) {
           expect(body, name).toContain('display: "swap"');
           expect(body, name).toContain("preload: false");

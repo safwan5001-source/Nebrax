@@ -29,6 +29,11 @@ vi.mock('next/font/google', () => {
     Noto_Sans_Arabic: loader,
     Readex_Pro: loader,
     Rubik: loader,
+    // Typography Library Expansion — appended catalogue families
+    Almarai: loader,
+    Alexandria: loader,
+    Noto_Kufi_Arabic: loader,
+    Reem_Kufi: loader,
   };
 });
 

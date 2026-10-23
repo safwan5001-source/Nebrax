@@ -2,6 +2,8 @@ import { GoogleTagManager } from "@next/third-parties/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import {
+  Alexandria,
+  Almarai,
   Amiri,
   Cairo,
   El_Messiri,
@@ -9,8 +11,10 @@ import {
   IBM_Plex_Sans_Arabic,
   Inter,
   Lora,
+  Noto_Kufi_Arabic,
   Noto_Sans_Arabic,
   Readex_Pro,
+  Reem_Kufi,
   Rubik,
   Tajawal,
 } from "next/font/google";
@@ -168,6 +172,32 @@ const amiri = Amiri({
   preload: false,
 });
 
+const almarai = Almarai({
+  variable: "--font-almarai",
+  subsets: ["arabic", "latin"],
+  weight: ["400", "700", "800"],
+  display: "swap",
+  preload: false,
+});
+const alexandria = Alexandria({
+  variable: "--font-alexandria",
+  subsets: ["arabic", "latin"],
+  display: "swap",
+  preload: false,
+});
+const notoKufi = Noto_Kufi_Arabic({
+  variable: "--font-noto-kufi",
+  subsets: ["arabic", "latin"],
+  display: "swap",
+  preload: false,
+});
+const reemKufi = Reem_Kufi({
+  variable: "--font-reem-kufi",
+  subsets: ["arabic", "latin"],
+  display: "swap",
+  preload: false,
+});
+
 /** The CSS variable classes of the catalogue faces, applied once on the document root. */
 export const CATALOGUE_FONT_VARIABLES = [
   plexArabic,
@@ -178,6 +208,10 @@ export const CATALOGUE_FONT_VARIABLES = [
   elMessiri,
   lora,
   amiri,
+  almarai,
+  alexandria,
+  notoKufi,
+  reemKufi,
 ]
   .map((font) => font.variable)
   .join(" ");

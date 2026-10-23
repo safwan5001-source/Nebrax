@@ -30,6 +30,21 @@
       "expected": { "typography": { "headingFamily": "cairo-geist", "bodyFamily": "tajawal-geist" } }
     },
     {
+      "name": "typography library expansion: the four appended keys are accepted for both slots; Thmanyah keys are not catalogue keys",
+      "input": { "typography": { "headingFamily": "reem-kufi", "bodyFamily": "almarai" } },
+      "expected": { "typography": { "headingFamily": "reem-kufi", "bodyFamily": "almarai" } }
+    },
+    {
+      "name": "typography library expansion: alexandria and noto-kufi are accepted",
+      "input": { "typography": { "headingFamily": "alexandria", "bodyFamily": "noto-kufi" } },
+      "expected": { "typography": { "headingFamily": "alexandria", "bodyFamily": "noto-kufi" } }
+    },
+    {
+      "name": "typography library expansion: thmanyah (gated, no licensed files) is dropped like any unknown key",
+      "input": { "typography": { "headingFamily": "thmanyah-sans", "bodyFamily": "thmanyah-serif-text", "lineHeight": "tight" } },
+      "expected": { "typography": { "lineHeight": "tight" } }
+    },
+    {
       "name": "font families: a family name, a CSS stack, a custom upload or a non-string is never a key",
       "input": { "typography": { "headingFamily": "Cairo", "bodyFamily": "custom:0a1b2c3d" } },
       "expected": {}

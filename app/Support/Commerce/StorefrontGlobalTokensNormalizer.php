@@ -34,7 +34,7 @@ final class StorefrontGlobalTokensNormalizer
      * `font-catalogue.ts`. الأولان هما قيمتا `fontPreset` القديمتان. `custom:<mediaId>`
      * محجوز (§5.4) وغير مُفعَّل فيُسقط. كلها OFL ومستضافة ذاتياً (`next/font`).
      */
-    public const FONT_FAMILIES = ['cairo-geist', 'tajawal-geist', 'plex-arabic', 'noto-inter', 'readex', 'rubik', 'el-messiri', 'amiri-lora'];
+    public const FONT_FAMILIES = ['cairo-geist', 'tajawal-geist', 'plex-arabic', 'noto-inter', 'readex', 'rubik', 'el-messiri', 'amiri-lora', 'almarai', 'alexandria', 'noto-kufi', 'reem-kufi'];
 
     public const BUTTON_STYLES = ['solid', 'soft', 'outline', 'link'];
 
