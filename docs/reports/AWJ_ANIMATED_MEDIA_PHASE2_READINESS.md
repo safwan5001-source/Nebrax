@@ -13,12 +13,21 @@
 | Item | Status | Evidence class |
 |---|---|---|
 | **Architecture B2** (Laravel authorises; Next.js streams video bytes from R2 using server-side signed URLs) | **Approved architecturally by the owner** | Owner decision |
-| **Poster design P2** (the poster belongs to the video asset itself; **no** `poster_media_id` migration) | **Approved by the owner** — supersedes option P1 in §5 #4 | Owner decision |
+| **Poster design P2** (the poster belongs to the video asset itself; **no** `poster_media_id` migration) | **Approved by the owner** — supersedes option P1 in §5 #4. **P2 is the only poster design in this plan:** no `poster_media_id` migration, and approval #4 is **granted** (not outstanding) | Owner decision |
 | **Animated WebP** | **Manually tested successfully by the owner on a real iPhone, in the Canvas and on the published storefront** | Owner-reported (not independently verified in this repository); closes the "WebP unverified" gap for that one device |
 | Every other real-device and security acceptance test (second iOS version, Low Power Mode, reduced motion on device, Android, Safari desktop, Firefox, animated AVIF, MP4/WebM playback, real-R2 Range/presigned behaviour, Railway edge streaming) | **Remain unverified** unless independently evidenced | — |
-| **These approvals do NOT authorise video rollout.** | They fix the *design direction* only. No video code, upload route, authorise endpoint, flag, canary or production change is authorised; the gates in §4.6 and §6 still apply, and approvals #1, #5, #6, #10, #11, #12 in §5 are still required before their slices. The AMEND-1 clarification (#7) is covered in principle by the B2 approval but its ADR text is still to be written (slice V0). | — |
+| **These approvals do NOT authorise video rollout.** | They fix the *design direction* only. No video code, upload route, authorise endpoint, flag, canary or production change is authorised; the gates in §4.6 and §6 still apply, and approvals #1, #5, #6, #10, #11, #12 in §5 are still required before their slices (#4 is already granted — P2). The AMEND-1 clarification (#7) is covered in principle by the B2 approval but its ADR text is still to be written (slice V0). | — |
 
-**First slice from this review:** `P2-0` (proxy safety for the existing buffered image path) — see `AWJ_ANIMATED_MEDIA_P2_0_REPORT.md`.
+### Delivery status after this review (repository state, verified against `main`)
+
+| Slice / gate | State | Where |
+|---|---|---|
+| **P2-0** — proxy safety for the existing buffered image path (incl. P2-0b delivery-memory budget) | **Implemented and merged** — PR #1552, merge commit `3cf914235` | Report: [`docs/reports/AWJ_ANIMATED_MEDIA_P2_0_REPORT.md`](AWJ_ANIMATED_MEDIA_P2_0_REPORT.md) (this file did not exist in the tree when this review was first written — the first review round flagged the reference as dangling; the report landed with #1552) |
+| **V0** — delivery spike, harness part | **Harness merged** — PR #1558 (`5732917`) and follow-up PR #1646 (`f5bb08f8a`): credential-safe probe, SSRF guard, redaction, verified cleanup, fault injection. **Local S3 look-alike only — NOT R2 evidence.** | [`AWJ_ANIMATED_MEDIA_V0_R2_RANGE_REPORT.md`](AWJ_ANIMATED_MEDIA_V0_R2_RANGE_REPORT.md), [`AWJ_ANIMATED_MEDIA_V0_FOLLOWUP_REPORT.md`](AWJ_ANIMATED_MEDIA_V0_FOLLOWUP_REPORT.md) |
+| **V-G1** — presigned GET + `Range` on **real Cloudflare R2** | **NOT RUN → gate state NO-GO.** No R2 result file exists in the repository; the owner prerequisites (test bucket, bucket-scoped token as `S3_*`, egress) are still outstanding (V0 report §6) | — |
+| V-G2 … V-G7, approvals #1, #5, #6, #7, #10, #11, #12 | Not started / not granted | §4.6, §5 |
+
+**Gate rule (unchanged by anything above):** the MP4 "CONDITIONAL GO" in §0 is *conditional on V-G1 passing on real R2* — it is not permission to start video code. **Until V-G1 has passed on real Cloudflare R2, slices V1–V7 must not start and MP4 stays NO-GO for implementation.** A passing local look-alike run proves the harness, nothing about R2. If V-G1 fails and no safe proxy-side shim exists, video stays NO-GO; Laravel streaming is never the fallback.
 
 ## 0. Verdict at a glance
 
@@ -124,16 +133,38 @@ Option A (Next proxy → **Laravel `video` route** → R2 `GetObject` with `Rang
 | D Edge worker (HMAC check in front of R2) | Browser → edge → R2 | Strong | **New infrastructure** — future option, not for this phase |
 
 ### 4.3 B2 in detail
-- **Flow:** `GET /api/storefront/media/customizer/{id}/video.mp4` (browser, same-origin) → Next route validates id/file → calls Laravel **internal authorise endpoint** (forwarded host + gateway secret, as today) → receives `{url, expiresAt, size, etag, contentType}` → fetches `url` from R2 with the browser's `Range`/`If-Range`, `redirect:"manual"`, host allow-listed to the configured R2 endpoint (no SSRF) → returns `206/200/416` with `Content-Range`, `Accept-Ranges: bytes`, `Content-Length`, `nosniff`, content-derived `ETag`, streaming the body with backpressure (S0: 189 MiB for 100 slow clients vs 1,833 MiB buffered).
+- **Flow:** `GET /api/storefront/media/customizer/{id}/video.mp4` (browser, same-origin) → Next route validates id/file → calls Laravel **internal authorise endpoint** (forwarded host + gateway secret, as today) → receives `{url, expiresAt, size, etag, contentType}` (`etag` = the **client-facing, content-derived strong ETag**, see §4.3a — never R2's object ETag) → evaluates the browser's `If-Range` **itself** (§4.3a) and fetches `url` from R2 with **at most one validated `Range` and no conditional headers**, `redirect:"manual"`, host allow-listed to the configured R2 endpoint (no SSRF; the V0 `guardedFetch` rule) → returns `206/200/416` with `Content-Range`, `Accept-Ranges: bytes`, `Content-Length`, `nosniff`, that same `ETag`, streaming the body with backpressure (S0: 189 MiB for 100 slow clients vs 1,833 MiB buffered).
 - **Signed access:** URL TTL 60–120 s (the Cloudflare doc says presigned URLs are bearer tokens: here they live only server-to-server, are redacted from logs, and are never sent to a client). `Range` is not a signed header, so the browser's range can be applied to the signed GET (**[Unverified] on R2 — gate V-G1**).
 - **Load on Laravel:** one tiny request per *authorisation* (published-index check + offline SigV4 signing, no R2 round trip). Safari issues a probe `bytes=0-1` then ranges, so the proxy caches the authorisation per (host, id) for ≤ 60 s (≤ URL TTL − 10 s); revocation window = cache + signature TTL ≈ ≤ 3 min, within the existing 5-minute public-cache window. Add a per-IP throttle and a kill-switch; **never fall back to Laravel streaming on error** (fail closed to the poster).
 - **Where the risk moves:** the single Node replica (CPU, egress, memory). Capacity must be measured and capped (max concurrent video streams, per-IP cap, idle timeout), and a storefront overload must not touch the ERP API — it does not share a process with Laravel.
 - **Images stay as they are:** Laravel-served, buffered, bounded (≤ 5 MB). Do **not** make that path streaming (§0 finding 2).
 
+### 4.3a `If-Range` and validator contract (the proxy owns it)
+
+*Why:* R2's own `GetObject` list names `Range`, `If-Match`, `If-None-Match` but not `If-Range` **[Ext]**; the S0 report concludes "`If-Range` must be handled at our origin, not delegated" **[S0]**; and the V0 look-alike run showed a server that **ignores** `If-Range` (a mismatching ETag still returned 206, `result-selftest-scality.json` I6 — *look-alike behaviour, not R2 evidence*). Forwarding the header would also compare the client's validator with a value the client never saw: the ETag the browser holds is the proxy's content-derived ETag, whereas R2 would compare with its own object ETag. Both effects can silently turn a resume/seek into a full-object transfer (egress, Safari seeking). The contract below therefore does **not depend on any R2 `If-Range` behaviour**.
+
+1. **One client-facing validator.** The authorise response's `etag` is a *strong*, quoted, content-derived ETag (same family as the existing media ETags, derived from the asset identity of §5a — it changes if the video or the poster changes). The proxy sends exactly this value on every 200/206 and compares client validators with exactly this value. R2's object `ETag` and `Last-Modified` are never sent to the client and never compared with client headers. The proxy emits **no `Last-Modified`** for video.
+2. **Upstream request** (proxy → R2, presigned GET): `Range` only — the single, syntactically validated range (multi-range/malformed handled by the proxy's own validator: ignore → 200 or 416, per the ADR). The proxy **never forwards `If-Range`, `If-Match`, `If-None-Match`, `If-Modified-Since` or `If-Unmodified-Since`** from the browser.
+3. **Evaluation** (RFC 9110 §13.1.5, verified against the RFC text):
+
+| Browser request | Proxy decision | Upstream request | Response |
+|---|---|---|---|
+| `Range` + `If-Range: "<etag>"` strongly equal to the authorised ETag | condition true | `Range: <as validated>` | `206` + `Content-Range` + that ETag |
+| `Range` + `If-Range: "<other>"` | condition false → **ignore `Range`** | **no `Range`** (full object; video ≤ 15 MB cap) | `200`, full body, authorised ETag |
+| `Range` + `If-Range: W/"<etag>"` (weak) | strong comparison fails → false | no `Range` | `200` full |
+| `Range` + `If-Range: <HTTP-date>` (any date) | no `Last-Modified` was ever issued, so an exact match is impossible → false | no `Range` | `200` full |
+| `Range` + unparseable `If-Range` | treated as false (conservative) | no `Range` | `200` full |
+| `If-Range` **without** `Range` | MUST be ignored | none | normal `200` |
+| `Range` without `If-Range` | process normally | `Range` | `206` / `416` |
+
+   Rationale for the false branches: RFC 9110 §13.1.5 — "A recipient of an If-Range header field MUST ignore the Range header field if the If-Range condition evaluates to false", entity-tags use the strong comparison function, and a date must "exactly match" `Last-Modified`.
+4. **Evidence required in V2 (Node tests, spy on the upstream call):** each row above; the upstream request **never** carries `If-Range` or any other conditional header; a mismatching `If-Range` costs one full-object upstream fetch and returns `200`; the response ETag always equals the authorised ETag, also when the upstream (look-alike or R2) returns a different `ETag`. 
+5. **Effect on V-G1:** R2's own `If-Range` behaviour is still *recorded* (probe case I6, informational) but is **not a gate input** — it cannot block or enable the design. V-G1 keeps its other criteria (Range, 416, ETag stability R11, redirects R13, header leaks R18, host allow-list R20).
+
 ### 4.4 Remaining delivery unknowns (the only new spikes needed)
 | Id | Unknown | Needs | Blocks |
 |---|---|---|---|
-| V-G1 | R2 behaviour for presigned GET + `Range` (single, suffix, open-ended, past-EOF → 416, `If-Range`, HEAD) via the AWS SDK | R2 **test bucket + scoped token** (S0-B was blocked on this); script already exists (`s0-spikes/r2-range/range-probe.php`) + a presigned variant | any video code |
+| V-G1 | R2 behaviour for presigned GET + `Range` (single, suffix, open-ended, past-EOF → 416, HEAD; `If-Range` recorded only — the proxy owns it, §4.3a) via the AWS SDK | R2 **test bucket + scoped token** (S0-B was blocked on this); script already exists (`s0-spikes/r2-range/range-probe.php`) + a presigned variant | any video code |
 | V-G2 | Authorise-endpoint latency/CPU under the Safari probe pattern at N concurrent viewers | local rig (the S0 harness reused) | V1 sizing |
 | V-G3 | Node streaming proxy behind **Railway's edge**: long responses, `206`, idle timeouts, egress cost | a **staging service or an owner-supervised canary** | rollout |
 | V-G4 | Real iOS/macOS Safari plays the proxied MP4 (206 requirement) | real devices | rollout |
@@ -146,7 +177,7 @@ Option A (Next proxy → **Laravel `video` route** → R2 `GetObject` with `Rang
 ### 4.6 MP4 / WebM GO / NO-GO
 | Gate | GO when | NO-GO when |
 |---|---|---|
-| V-G1 R2 | Presigned+Range matrix passes on **real R2** | R2 mishandles Range/416/If-Range in a way Safari trips on, and no proxy-side shim is safe |
+| V-G1 R2 | Presigned+Range matrix passes on **real R2** | R2 mishandles Range/416 (or returns an unstable ETag) in a way Safari trips on, and no proxy-side shim is safe. **Current state: NOT RUN on real R2 ⇒ NO-GO** |
 | V-G2 Laravel load | Authorise endpoint p95 and CPU negligible vs. image route at the target concurrency; throttle + kill-switch proven | per-request cost comparable to streaming |
 | V-G3 Edge/Node | N concurrent slow streams (S0-E rig): proxy RSS bounded (≈ streaming figure), no 5xx, API health unaffected | Railway edge truncates/times out 206 streams |
 | V-G4 Devices | **iPhone Safari (2 iOS versions), macOS Safari, Chrome Android, Chrome/Firefox desktop** play inline, muted, looped; Low Power Mode shows poster + play; reduced-motion/Save-Data never fetch the video | iOS cannot play through the proxy |
@@ -164,7 +195,7 @@ Option A (Next proxy → **Laravel `video` route** → R2 `GetObject` with `Rang
 | 1 | **Dockerfile:** `libavif-dev`, `gd --with-avif`, pinned base tag, AVIF smoke assertion | AVIF | No (image change) | **REQUIRED** |
 | 2 | New closed file name `animated.avif` (PHP regex, proxy regex, TS twin), `animation.format` enum += `avif`, accept `image/avif` uploads, env flag `STOREFRONT_MEDIA_AVIF_ENABLED` (default **false**) | AVIF | Additive (old storefront ignores unknown format → still) | Informational |
 | 3 | `kind='video'`, `mime video/mp4`, `variants` JSON entry — **no schema change** | video | No | None |
-| 4 | **Poster ownership — RESOLVED: P2 approved (see Status update).** *(Original options kept for the record.)* *Option P1:* nullable `storefront_media.poster_media_id` (additive migration; deletion/reference checks extended) — your earlier "preferred" design. *Option P2 (new, recommended to evaluate):* **the poster is part of the video asset** — uploaded in the same request, processed by the existing static pipeline into the asset's own ladder (exactly how animated assets already own a first-frame ladder). **Zero migration, no cross-asset reference, no deletion-protection problem**; trade-off: a poster is not reusable elsewhere and the upload takes two files | video | P1: schema change · P2: none | **REQUIRED** (choose P1 vs P2; P2 changes the design you approved) |
+| 4 | **Poster ownership — RESOLVED: P2 approved and granted (see Status update); P1 is superseded and must not be built.** *(Original options kept for the record only.)* *Option P1:* nullable `storefront_media.poster_media_id` (additive migration; deletion/reference checks extended) — your earlier "preferred" design. *Option P2 (new, recommended to evaluate):* **the poster is part of the video asset** — uploaded in the same request, processed by the existing static pipeline into the asset's own ladder (exactly how animated assets already own a first-frame ladder). **Zero migration, no cross-asset reference, no deletion-protection problem**; trade-off: a poster is not reusable elsewhere and the upload takes two files | video | P1: schema change (**superseded — do not implement**) · P2: none | **GRANTED — P2 only.** No decision pending |
 | 5 | **Video upload endpoint** (multipart `video` + `poster`) or extension of the existing `files[]` contract | video | Additive | **REQUIRED** (new API surface) |
 | 6 | **Internal authorise endpoint** (gateway-secret protected, forwarded-host scoped) returning a presigned R2 URL | video | Additive, internal | **REQUIRED** (new API + security design) |
 | 7 | ADR clarifying AMEND-1: *server-to-server signed R2 fetch by the storefront proxy is not "direct R2 exposure"* | video | Contract interpretation | **REQUIRED** |
@@ -173,6 +204,20 @@ Option A (Next proxy → **Laravel `video` route** → R2 `GetObject` with `Rang
 | 10 | Staging environment (own DB + R2 test bucket + hostname) and/or an owner-supervised production canary | V-G3/V-G4, AVIF G-A3 | Infrastructure | **REQUIRED** |
 | 11 | R2 test bucket + scoped token for the V-G1 spike | V-G1 | Credentials | **REQUIRED** |
 | 12 | CSP Report-Only on the storefront (`media-src 'self'` suffices under B2) | video | Production header | **REQUIRED**, later slice |
+
+### 5a. P2 asset identity — the poster is part of the identity (no migration)
+
+*Current behaviour* **[Repo]**: `StorefrontMediaService::upload` hashes the **one** uploaded file (`sha256`), looks up an *active* asset of the same tenant with that hash (index `tenant_id, sha256`, non-unique) and, on a hit, returns the existing asset **before** the quota check and before any storage write; the media ETag is derived from `sha256` + file name. Under P2 an asset is **two** uploaded files. Reusing this lookup on the video hash alone would deduplicate "the same MP4 with a corrected or differently cropped poster" onto the first asset and silently keep the old poster (and the old ETag).
+
+*Rule (V3):*
+1. **Composite digest.** `asset_digest = SHA-256( "awj-video-asset/v1" ‖ 0x00 ‖ SHA-256(video upload bytes) ‖ SHA-256(poster upload bytes) )`, the two inner digests as fixed-length raw bytes (32 + 32, so there is no concatenation ambiguity), written as 64-char hex into the existing `sha256` column. Hashes are over the **uploaded** bytes, not re-encoded output, so an identical re-upload deduplicates and any change to either file does not. No schema change; the existing tenant-scoped, active-state lookup and the ETag formula keep working unchanged, and the poster ladder's ETag now changes with the poster.
+2. **Domain separation.** A plain image/animated asset stores the SHA-256 of its raw bytes; a composite digest carries the version tag, so a video asset can never be matched as an image (or the reverse) short of a SHA-256 collision. Lookup is by the composite digest **only** — never by the video hash alone or the poster hash alone.
+3. **Order.** Validate both files first (reject-don't-repair; a missing poster is `video_poster_required`), then compute the digest from the validated uploads, then look up; a miss creates the asset, a hit returns it with no storage write and no quota charge.
+4. **Audit fields without a migration.** The component hashes are kept in the asset's `variants` JSON (`video.sha256`, `poster.source_sha256`).
+5. **Accepted cost.** The same MP4 with a different poster is stored again (≤ 15 MB, counted against the tenant quota). Sharing the video object between assets (content-addressed storage) is a later optimisation, not part of V3.
+6. **Known pre-existing property (not changed here):** lookup-then-insert is not atomic and the index is non-unique, so two simultaneous identical uploads can produce two assets today for images as well; V3 decides whether to serialise per tenant.
+
+*Required V3 tests:* same MP4 + same poster → `deduplicated`, same id, no storage write, no quota change · **same MP4 + different poster (corrected or cropped) → new asset id, poster ladder and ETag from the new poster, first asset untouched** · different MP4 + same poster → new asset · poster/video roles swapped → both rejected by the validators, and the swapped pair's digest differs from the original's · an image whose bytes equal the video's SHA-256 input can never match a video asset (domain separation) · tenant isolation (same pair in another tenant → independent assets) · soft-deleted asset does not deduplicate.
 
 Explicitly **not** needed: new service, queue worker, ffmpeg, transcoding, public bucket/CDN, changes to accounting/ERP code.
 
@@ -184,16 +229,16 @@ Each PR: own branch, docs-style evidence section, sqlite+pgsql CI; none touches 
 
 | PR | Scope | Depends | Approval | Test / exit evidence |
 |---|---|---|---|---|
-| **P2-0** | Proxy safety (no behaviour change): bounded body size + concurrency cap on the buffered image path; test pinning "Laravel-served bytes are never streamed to clients" | — | — | vitest; S0 `proxy-memory.js` rerun for 5 MB |
+| **P2-0** *(done — #1552)* | Proxy safety (no behaviour change): bounded body size + concurrency cap on the buffered image path; test pinning "Laravel-served bytes are never streamed to clients" | — | — | vitest; S0 `proxy-memory.js` rerun for 5 MB |
 | **A0** | Dockerfile AVIF + pinned base + smoke assertion; **no consumer** | — | **#1** | Build green; `gd_info` AVIF true in CI image; size/time delta recorded |
 | **A1** | `AvifContainerInspector` (pure PHP) + header-first bomb guard + metadata rejection; unit/fuzz tests; **not wired** | A0 | — | Fuzz ≥ 500 k, bomb RSS ≈ idle |
 | **A2** | Upload branch for AVIF (flag **off**): limits, codes, GD-decoded poster, ladder, no-storage-on-reject, quota, kill-switch | A1 | — | PHP feature tests incl. isolation; sqlite+pgsql |
 | **A3** | Delivery + render: `animated.avif` vocabulary, payload format, `<source type="image/avif">`, picker/Canvas pick-up, i18n | A2 | — | Playwright (Chromium/WebKit/Firefox) + **device matrix G-A3** |
 | **A4** | Canary enable (config only) | A3 + G-A1…G-A5 | **#10** | Rollback drill |
-| **V0** | Delivery spike → written results + ADR draft (throwaway scripts): V-G1, V-G2, V-G4 stub | R2 token | **#11, #7** | Go/no-go on B2 |
+| **V0** | Delivery spike → written results + ADR draft (throwaway scripts): V-G1, V-G2, V-G4 stub. *Harness merged (#1558, #1646); **real-R2 run outstanding — V-G1 NO-GO*** | R2 token | **#11, #7** | Go/no-go on B2 |
 | **V1** | Internal authorise endpoint + presign (flag **off**), isolation tests, throttle | V0 | **#6** | Isolation matrix; expiry/replay tests |
-| **V2** | Next `video` route: Range/If-Range pass-through, authorisation cache, caps, 206/416 | V1 | — | Node tests; S0-E rig; **V-G3, V-G7** |
-| **V3** | Video asset + MP4 validator (flag **off**): `kind=video`, limits/codes, poster per P1/P2, publish-gate slots, purge | V0 decision | **#4, #5** (+ migration if P1) | Fuzz ≥ 500 k, gate + isolation tests, migration up/down on pgsql if P1 |
+| **V2** | Next `video` route: Range validation + **proxy-side `If-Range` evaluation (§4.3a, no conditional header ever forwarded)**, authorisation cache, caps, 206/416 | V1 | — | Node tests; S0-E rig; **V-G3, V-G7** |
+| **V3** | Video asset + MP4 validator (flag **off**): `kind=video`, limits/codes, **poster uploaded with the video (P2, no migration)**, composite asset identity (§5a), publish-gate slots, purge | V0 decision (**V-G1 passed on real R2**) | **#5** (#4 already granted) | Fuzz ≥ 500 k, gate + isolation tests, §5a identity tests |
 | **V4** | Storefront `MotionVideo` (poster, IntersectionObserver gating, reduced-motion/Save-Data/no-JS, `MotionToggle`), backdrop + slider | V2, V3 | — | Playwright 3 engines + **V-G4** |
 | **V5** | Admin UI: upload (video+poster), badge, errors AR/EN/RTL; Canvas shows poster (+ optional play) | V3 | — | vitest + visual |
 | **V6** | CSP Report-Only | V4 | **#12** | Zero unexplained violations |
@@ -215,7 +260,7 @@ Recommended order: **P2-0 → (A0…A3 and V0 in parallel) → V1 → V2 → V3 
 | R5 | libavif/dav1d C attack surface + image-rebuild/CVE duty | Medium | Pinned base, header-first guard, fuzz, rebuild policy |
 | R6 | AVIF fallback loses animation on non-supporting browsers | Medium | Offer AVIF only after G-A3; GIF/WebP remain default |
 | R7 | Presigned URL is a bearer token | Medium | Server-to-server only, 60–120 s TTL, host allow-list, log redaction |
-| R8 | Poster design choice (P1 vs P2) and new APIs need owner decisions | Process | §5 |
+| R8 | New upload/authorise APIs need owner decisions (poster design is settled: P2) | Process | §5 (#5, #6) |
 | R9 | Railway edge behaviour for 206 unmeasured | Medium | V-G3 |
 | R10 | Headless CI cannot prove animation/H.264 playback | Medium | Chrome stable + WebKit/Firefox Playwright + real devices |
 | R11 | Phase 1 itself: animated WebP and non-iPhone devices still unverified; proxy buffers ≤ 5 MB bodies (≈ 600 MB at 100 slow clients, extrapolated from the 15 MB measurement) | Medium | Close Phase 1 gaps first; P2-0 |
@@ -227,10 +272,11 @@ Out of scope and untouched: banner text/layout, accounting/ERP modules, `MediaRe
 1. **Do not start video on the proposal's delivery design.** Adopt **B2** (Laravel authorises, Node streams from R2 via server-to-server presigned URL) and spend the first video effort on **V0** (needs your R2 test token + ADR approval). If V-G1 fails, video stays NO-GO — do **not** fall back to Laravel streaming.
 2. **AVIF:** approve A0 (image change) and proceed A0→A2 behind the flag; **hold A3/A4 until iOS Safari animated-AVIF is measured on a real device.** If iOS does not animate it, drop AVIF; Phase 1 formats stay.
 3. **WebM:** defer; revisit after MP4 canary with Safari evidence.
-4. **Approvals needed now:** #1 (image), #4 (poster P1 vs P2), #5/#6 (new upload and internal authorise APIs), #7 (AMEND-1 ADR), #10 (staging or supervised canary), #11 (R2 test bucket/token). CSP (#12) can wait.
+4. **Approvals needed now:** #1 (image), #5/#6 (new upload and internal authorise APIs), #7 (AMEND-1 ADR), #10 (staging or supervised canary), #11 (R2 test bucket/token). CSP (#12) can wait.
 5. **Before any Phase 2 rollout:** close the Phase 1 verification gaps (animated WebP, second iOS version, Low Power Mode, reduced motion on device) and take the 5-minute decision on the default of `STOREFRONT_MEDIA_ANIMATED_ENABLED` noted in the staging-acceptance document.
 
 ## 9. Testing status and identifiers
 - **Testing:** none run — this is a documentation-only review (no code changed). Evidence is cited from existing S0 results and read-only checks; the new read-only checks are the Railway build log, two Cloudflare R2 doc pages, MDN and php.net.
-- Branch `claude/awj-animated-media-support-7kzzga` (restarted from `main` because #1541 and #1547 are merged) · Base SHA `1296e1ce7` (`main` at start of this task) · PR and Head SHA are given in the hand-off message.
+- Branch `claude/awj-animated-media-support-7kzzga` (PR #1551). First written against `main` `1296e1ce7`; the review-resolution revision merges `main` at `f5bb08f8a` (which contains #1552, #1558 and #1646) and changes this document only. Head SHA: see the PR.
+- Review-resolution revision (docs only): validator contract §4.3a, asset identity §5a, P2-only reconciliation (§5, §6, §7, §8), delivery-status ledger and gate rule (Status update). Checks run: reference/link and SHA verification against the tree, RFC 9110 §13.1.5 text check, source-of-truth re-read of `StorefrontMediaService::upload`/media ETag, V0 look-alike I6 result re-read. No code, test or infrastructure change.
 - No merge, deployment, migration, infrastructure or production change was made.
