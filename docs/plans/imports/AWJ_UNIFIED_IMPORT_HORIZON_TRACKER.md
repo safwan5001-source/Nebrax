@@ -10,10 +10,10 @@
 
 | Field | Value |
 |---|---|
-| Last merged slice | **IMP-H0-S1**: PR #1595, squash-merged 2026-10-22, Merge SHA `5e20e9edc941f83181497158fa68e6c55e95c485` |
-| **Next slice** | **IMP-H2-S4** (tenant AI Actions enablement endpoint), then H2-S5 → IMP-X-01 → H3. Merged: H1-S1..S5a, S7, S8a/b/c; H2-S0 `38b9b6d` (#1628), H2-S1 `bf9968d` (#1630), H2-S2 `c301550` (#1631). H2-S3 in review (#1632). **On hold:** H1-S6 (PR #1626, owner decision D-13). S5b deferred (prerequisite of OPS-01 remote-image enablement). |
+| Last merged slice | **IMP-H4-S5**: PR #1683, Merge SHA `dc1db3d20`; later import-horizon merge on `main`: none. Merge SHAs of this window: #1662 `408218b`, #1663 `6ae0536`, #1664 `fa40c92`, #1666 `9de26a7`, #1667 `da9dbf7`, #1668 `2355d31`, #1670 `4514493`, #1671 `a148c01`, #1672 `6432e59`, #1675 `f80f1c7`, #1676 `b0d81e7`, #1679 `7f1bc70` (payments test isolation), #1683 `dc1db3d`, #1684 `f2110a0` |
+| **Next slice** | **IMP-H5-S1c** (expense import adapter), then **H7-S1b** (stocktake endpoints + job domain + UI), then H5-S2 / H5-S3 and the H3/H4 UI wizards. AI slices (H3-S4, H4-S4, H5-S5, H7-S2, H7-S4) follow the X-01 operational state (see Operational blockers). **On hold:** H1-S6 (PR #1626 Draft, owner decision D-13). S5b deferred (prerequisite of OPS-01 remote-image enablement). |
 | Open owner decisions | D-01, D-02 (narrowed: `import_rows` data scope only), D-03, D-04, D-06, D-07, OPS-01 (D-05 has a non-blocking default; D-08/D-09 are recorded exclusions) |
-| Railway state | Unknown (owner-reported stall; no access from the agent) |
+| Railway state | Owner-reported 2026-10-23: the three AI Actions deploy flags are on and the `nibras-api` deploy succeeded; tenant enablement and owner approval show enabled. Not independently verified by the agent (no Railway access). See Operational blockers. |
 
 ## Slice log
 
@@ -31,7 +31,7 @@
 | IMP-H2-S0 | — | ✅ | Honest labeling on products AI import until H9-S5 connects it to the assistant | — | — | — | — | — | — | — | — | — | — | **Merged** `38b9b6d` (#1628) | — |
 | IMP-H2-S1 | ✅ | — | V2 create via `ProductService::create` (characterized) | H1-S2 | — | — | — | — | — | — | — | — | — | **Merged** `bf9968d` (#1630) | — |
 | IMP-H2-S2 | — | ✅ | Shared value normalization (remove duplicated regexes) | — | — | — | — | — | — | — | — | — | — | **Merged** `c301550` (#1631) | — |
-| IMP-H2-S3 | ✅ | — | Workbook UX parity (inspect/template/mapping) | — | — | — | — | — | — | — | — | — | — | In review (PR #1632) | Web only; report `IMP-H2-S3-REPORT.md` |
+| IMP-H2-S3 | ✅ | — | Workbook UX parity (inspect/template/mapping) | — | — | — | — | — | — | — | — | — | — | **Merged** `2f2699a` (#1632) | Web only; report `IMP-H2-S3-REPORT.md` |
 | IMP-H2-S4 | — | ✅ | Tenant `ai_actions.enabled` endpoint (backend; UI split to S4b) | — | — | — | — | — | — | — | — | — | — | **Merged** `0572fa4` (#1634) | `ai.actions.manage`; report `IMP-H2-S4-REPORT.md` |
 | IMP-H2-S4b | — | ✅ | Settings card for the tenant opt-in + reason on AI import screens | H2-S4 | — | — | — | — | — | — | — | — | — | **Merged** `e8aa36a` (#1637) | Web only; report `IMP-H2-S4b-REPORT.md` |
 | IMP-H2-S5 | ✅ | ✅ | Sync V2 + AI preview/execution onto `ProductImportAdapter` (policy-expressed differences, parity test) | H1-S2, H2-S1, H2-S2 | — | — | — | — | — | — | — | — | — | **Split:** S5a **merged** `8537303` (#1640) · S5b planned | — |
@@ -41,11 +41,11 @@
 | IMP-H3-S4 | — | ✅ | AI Action `partner_import.v1` + parity test | H3-S1, **IMP-X-01 (blocking prerequisite per owner window — see Parked requirements; same for H4-S4, H5-S5, H7-S2, H7-S4)** | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H3-S5 | — | ✅ | Partner AI import UI | H3-S4 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H4-S1 | ✅ | via H4-S4 | Categories (hierarchy) + brands import (adapter + standard) | H1-S2 | — | — | — | — | — | — | — | — | — | **Merged** `fa40c92` (#1664) | Adapter not registered until the endpoints slice; path identity, `parent_policy`, no rename/move; report `IMP-H4-S1-REPORT.md` |
-| IMP-H4-S2 | ✅ | via H4-S4 | Price-list items import (adapter + standard) | H1-S2 | — | — | — | — | — | — | — | — | — | In review (PR) | Adapter not registered until the endpoints slice; domain gate must be `company.manage`; report `IMP-H4-S2-REPORT.md` |
+| IMP-H4-S2 | ✅ | via H4-S4 | Price-list items import (adapter + standard) | H1-S2 | — | — | — | — | — | — | — | — | — | **Merged** `9de26a7` (#1666) | Adapter registered by H4-S5; domain gate `company.manage`; report `IMP-H4-S2-REPORT.md` |
 | IMP-H4-S3 | ✅ | ⛔ D-08 | Unit templates (create-only; AI excluded by D-08) | H1-S2 | — | — | — | — | — | — | — | — | — | **Merged** `da9dbf7` (#1667) | `UNIT_FILE` atomic adapter, not registered; gate `products.manage`; report `IMP-H4-S3-REPORT.md` |
 | IMP-H4-S4 | — | ✅ | AI Actions `product_taxonomy_import.v1` + `price_list_item_import.v1` (separate gates) + parity | H4-S1, H4-S2, **IMP-X-01 (blocking)** | — | — | — | — | — | — | — | — | — | Planned | — |
-| IMP-H4-S5 | ✅ | — | **Added (plan gap):** standard endpoints + durable job domains for the three H4 adapters (`product_taxonomy`, `price_list_items`, `unit_templates`); no sync apply | H4-S1..S3 | — | — | — | — | — | — | — | — | — | In review (PR, stacked on #1666/#1667) | Gates = direct API's (`company.manage` for price lists); report `IMP-H4-S5-REPORT.md` |
-| IMP-H5-S1 | ✅ | — | Expense adapter (drafts, derived tax, `import_document_reservations` with full-predicate key; reference-less fallback key + explicit distinct confirmation) | H1-S2 | — | — | — | — | — | — | — | — | — | **Split:** S1a reservation foundation — in review; S1b document-service hooks + `duplicate_reference_policy`, S1c expense adapter — planned | S1a is additive (no consumer); report `IMP-H5-S1a-REPORT.md` |
+| IMP-H4-S5 | ✅ | — | **Added (plan gap):** standard endpoints + durable job domains for the three H4 adapters (`product_taxonomy`, `price_list_items`, `unit_templates`); no sync apply | H4-S1..S3 | — | — | — | — | — | — | — | — | — | **Merged** `dc1db3d` (#1683) | Durable-only: `PREVIEW_BOUND_ONLY` domains require a bound preview (single-use, hash-bound); gates = direct API's (`company.manage` for price lists); report `IMP-H4-S5-REPORT.md` |
+| IMP-H5-S1 | ✅ | — | Expense adapter (drafts, derived tax, `import_document_reservations` with full-predicate key; reference-less fallback key + explicit distinct confirmation) | H1-S2 | — | — | — | — | — | — | — | — | — | **Split:** S1a reservation foundation — **merged** `f80f1c7` (#1675) · S1b `ExpenseService` reservation lifecycle + `finance.duplicate_reference_policy` — **merged** `b0d81e7` (#1676) · S1c expense adapter — **next** | Reports `IMP-H5-S1a-REPORT.md`, `IMP-H5-S1b-REPORT.md` |
 | IMP-H5-S2 | ✅ | — | Expense UI + durable domain | H5-S1 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H5-S3 | ✅ | — | Purchase adapter (grouped drafts with required `supplier_invoice_ref`, derived totals, `import_document_reservations` owned by the document services (create/update re-key/delete), `duplicate_reference_policy` allow|block, PG concurrency test) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H5-S4 | ✅ | — | Purchase UI + durable domain | H5-S3 | — | — | — | — | — | — | — | — | — | Planned | — |
@@ -53,7 +53,7 @@
 | IMP-H5-S6 | — | ✅ | Document Center builders: financial perm+app gates, adapter validation + reservations; cross-source dup test (PG); entry link | H5-S1, H5-S3 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H6-S1..S3 | ✅ | — | Sales invoice drafts (no post, no ZATCA; one atomic transaction; shared quota lock for direct + import paths) | **D-03** | — | — | — | — | — | — | — | — | — | Blocked (D-03) | Skip to H7 until decided |
 | IMP-H6-S4 | — | ✅ | AI Action `sales_invoice_import.v1` (atomic, quota protocol, parity) | **D-03**, H6-S1..S3, H1-S7 | — | — | — | — | — | — | — | — | — | Blocked (D-03) | — |
-| IMP-H7-S1 | ✅ | — | Stocktake count-sheet import (whole sheet atomic, stocktake lock) | H1-S2 | — | — | — | — | — | — | — | — | — | **Split:** S1a core + adapter (unregistered) — in review; S1b endpoints + job domain + UI — planned (after H4-S5 registry change) | Report `IMP-H7-S1a-REPORT.md` |
+| IMP-H7-S1 | ✅ | — | Stocktake count-sheet import (whole sheet atomic, stocktake lock) | H1-S2 | — | — | — | — | — | — | — | — | — | **Split:** S1a core + adapter (unregistered) — **merged** `f2110a0` (#1684) · S1b endpoints + job domain + UI — planned (after H5-S1c) | Report `IMP-H7-S1a-REPORT.md` |
 | IMP-H7-S2 | — | ✅ | AI path for inventory opening | H1-S2, **IMP-X-01 (blocking)** | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H7-S3 | ✅ | ⛔ D-09 | Stock permit lines import (drafts; AI excluded by D-09) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H7-S4 | — | ✅ | AI Action `stocktake_count_import.v1` + parity + PG lock test | H7-S1, H1-S7, **IMP-X-01 (blocking)** | — | — | — | — | — | — | — | — | — | Planned | — |
@@ -69,13 +69,21 @@
 | IMP-H10-S2 | ✅ | ✅ | Std↔AI parity suite | H1–H9 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H11-S1 | — | — | Closure report | all | — | — | — | — | — | — | — | — | — | Planned | — |
 
+## Operational blockers and watch items
+
+| ID | Item | State | Next step |
+|---|---|---|---|
+| OPS-02 | **AI Actions execution unavailable in Beta UI.** After the owner enabled the three Railway flags, the tenant enablement and owner approval, the product import screen still shows «التنفيذ غير متاح حاليًا من إدارة المنصة». Per D-11 (default deny) the most likely cause is a missing platform (Super Admin) operator grant for `product_import.v1` (use and/or execution) — **a hypothesis, not verified**. Independent of Horizon development: no slice waits on it. | Open — needs owner/platform-admin check | Verify the platform operator-control rows for `product_import.v1` in the platform console (do not change Railway variables; do not bypass platform controls). Record the result here. |
+| WATCH-01 | `scheduler_unproven` failures on the PostgreSQL job (#1666 twice, #1672, #1676) | **Root-caused and fixed** (#1679 `7f1bc70`): four payments `pcntl_fork` tests deleted the global scheduler heartbeat from a database shared across ParaTest workers; they now use a per-worker database. Reproduced with ParaTest before and verified after. | None. |
+| WATCH-02 | One `ReturnSourceVatAccuracyTest` 422 on the #1676 PostgreSQL job; re-run passed | **Unexplained** — not called flaky. | Re-examine if it recurs; do not merge over a repeat without a root cause. |
+
 ## Parked requirements (registered, not started — they do not change any slice above)
 
 Details, reuse analysis, dependencies and acceptance: `AWJ_IMPORT_PARKED_REQUIREMENTS.md`. "Parked" means *not started and not inside any current slice's scope*; it is nevertheless a **blocking prerequisite** of the first additional AI Action type (H3-S4 and every later AI Action slice), so those rows list it as a dependency. No existing slice is reordered.
 
 | ID | Requirement | Status | Window | Depends on | Owner decisions |
 |---|---|---|---|---|---|
-| IMP-X-01 | Super Admin control of AI Actions — global (master + execution), per tenant, per action type; audited; no change to isolation/RBAC/approval | **In progress — split:** **X-01a** storage + resolver + platform API (unwired, no behaviour change) — **merged** `2355d31` (#1668) · **X-01b** wiring into `AiActionPolicy`/`ExecutionService` behind a deploy gate (default off) + per-row in-flight stop — **merged** `4514493` (#1670; gate default off), report `IMP-X-01b-REPORT.md` · **X-01c** tenant-owner approval write path (owner-only) + availability explanation in the settings status — **merged** `a148c01` (#1671), report `IMP-X-01c-REPORT.md`; web copy goes with X-01d · **X-01d** platform console UI (+ tenant owner-approval card) — in review (PR #1672), report `IMP-X-01d-REPORT.md`. Report `IMP-X-01a-REPORT.md` | Its place has arrived: H2-S4 merged, H3-S4 is the next AI slice | H1-S7 (merged), H2-S4 | D-10 ✅, D-11 ✅, D-12 ✅ in principle (2026-10-22); capability split preview/review/execution is binding |
+| IMP-X-01 | Super Admin control of AI Actions — global (master + execution), per tenant, per action type; audited; no change to isolation/RBAC/approval | **In progress — split:** **X-01a** storage + resolver + platform API (unwired, no behaviour change) — **merged** `2355d31` (#1668) · **X-01b** wiring into `AiActionPolicy`/`ExecutionService` behind a deploy gate (default off) + per-row in-flight stop — **merged** `4514493` (#1670; gate default off), report `IMP-X-01b-REPORT.md` · **X-01c** tenant-owner approval write path (owner-only) + availability explanation in the settings status — **merged** `a148c01` (#1671), report `IMP-X-01c-REPORT.md`; web copy goes with X-01d · **X-01d** platform console UI (+ tenant owner-approval card) — **merged** `6432e59` (#1672), report `IMP-X-01d-REPORT.md`. Report `IMP-X-01a-REPORT.md` | Its place has arrived: H2-S4 merged, H3-S4 is the next AI slice | H1-S7 (merged), H2-S4 | D-10 ✅, D-11 ✅, D-12 ✅ in principle (2026-10-22); capability split preview/review/execution is binding |
 
 ## H0 correction record (IMP-H0-S2)
 
