@@ -57,7 +57,7 @@ class PosTerminalService
             $request = DB::transaction(function () use ($actor, $data, $amount) {
                 $existing = PosTerminalRequest::query()->where('idempotency_key', $data['idempotency_key'])->lockForUpdate()->first();
                 if ($existing !== null) {
-                    return $this->replayOf($existing, $data, $amount);
+                    return $this->replayOf($actor, $existing, $data, $amount);
                 }
 
                 $session = $this->sessions->requireOpenForCheckout($data['pos_session_id'], $actor->id, $actor);
@@ -89,7 +89,7 @@ class PosTerminalService
             // سباق المفتاح نفسه: الفائز يُعاد كـreplay **بعد** فحص تطابق المحتوى كالمسار العادي، وإلا تعارض.
             $existing = PosTerminalRequest::query()->where('idempotency_key', $data['idempotency_key'])->first();
             if ($existing !== null) {
-                return $this->replayOf($existing, $data, $amount);
+                return $this->replayOf($actor, $existing, $data, $amount);
             }
             throw new PosTerminalException('terminal_busy', 'على الجهاز طلب نشط؛ أنهِه أو ألغِه أولاً.');
         }
@@ -112,8 +112,13 @@ class PosTerminalService
         });
     }
 
-    private function replayOf(PosTerminalRequest $existing, array $data, int $amount): PosTerminalRequest
+    private function replayOf(User $actor, PosTerminalRequest $existing, array $data, int $amount): PosTerminalRequest
     {
+        // الإعادة تكشف مراجع الموافقة وحالتها: تُفحص ملكية الجلسة كما يفحصها الإنشاء (لا كاشير آخر بمفتاح معروف).
+        $owner = PosSession::query()->whereKey($existing->pos_session_id)->value('opened_by');
+        if ($owner !== null && $owner !== $actor->id) {
+            throw new PosTerminalException('session_forbidden', 'جلسة نقطة البيع تخص كاشيراً آخر.');
+        }
         $same = $existing->pos_session_id === $data['pos_session_id']
             && $existing->pos_payment_terminal_id === $data['pos_payment_terminal_id']
             && $existing->payment_method_id === $data['payment_method_id']
@@ -337,14 +342,15 @@ class PosTerminalService
     {
         $lease = max(10, (int) config('pos_terminals.compensation_lease_seconds', 90));
 
-        $claimed = DB::transaction(function () use ($requestId, $lease) {
+        $token = (string) Str::uuid();
+        $claimed = DB::transaction(function () use ($requestId, $lease, $token) {
             $request = PosTerminalRequest::query()->whereKey($requestId)->lockForUpdate()->first();
             if ($request === null
                 || ! in_array($request->status, [PosTerminalRequest::STATUS_APPROVED, PosTerminalRequest::STATUS_COMPENSATION_REQUIRED], true)
                 || ($request->compensating_until !== null && $request->compensating_until->isFuture())) {
                 return null;
             }
-            $request->update(['compensating_until' => now('UTC')->addSeconds($lease), 'void_attempts' => $request->void_attempts + 1]);
+            $request->update(['compensating_until' => now('UTC')->addSeconds($lease), 'lease_token' => $token, 'void_attempts' => $request->void_attempts + 1]);
 
             return $request;
         });
@@ -363,15 +369,18 @@ class PosTerminalService
             $error = 'void_failed';
         }
 
-        return DB::transaction(function () use ($requestId, $error) {
+        return DB::transaction(function () use ($requestId, $error, $token) {
             $request = PosTerminalRequest::query()->whereKey($requestId)->lockForUpdate()->firstOrFail();
             if (! in_array($request->status, [PosTerminalRequest::STATUS_APPROVED, PosTerminalRequest::STATUS_COMPENSATION_REQUIRED], true)) {
                 return $request;
             }
+            if ($request->lease_token !== $token) {
+                return $request; // انتهى إيجار هذه المحاولة وأخذه غيرها: نتيجتها متأخرة ولا تُنهي الحالة ولا تحرّر إيجار المالك الحالي.
+            }
             if ($error === null) {
-                $request->update(['status' => PosTerminalRequest::STATUS_VOIDED, 'voided_at' => now('UTC'), 'compensating_until' => null, 'last_void_error' => null]);
+                $request->update(['status' => PosTerminalRequest::STATUS_VOIDED, 'voided_at' => now('UTC'), 'compensating_until' => null, 'lease_token' => null, 'last_void_error' => null]);
             } else {
-                $request->update(['status' => PosTerminalRequest::STATUS_COMPENSATION_REQUIRED, 'compensating_until' => null, 'last_void_error' => substr($error, 0, 48)]);
+                $request->update(['status' => PosTerminalRequest::STATUS_COMPENSATION_REQUIRED, 'compensating_until' => null, 'lease_token' => null, 'last_void_error' => substr($error, 0, 48)]);
             }
 
             return $request->fresh();

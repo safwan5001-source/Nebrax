@@ -34,6 +34,9 @@ final class FakePosTerminalAdapter implements TerminalAdapter
     /** @var (\Closure(PosTerminalRequest): void)|null يُستدعى أثناء `fetch` (قبل الرد) لمحاكاة عملية أخرى تتزامن مع نداء بطيء */
     public ?\Closure $duringFetch = null;
 
+    /** @var (\Closure(PosTerminalRequest): void)|null يُستدعى أثناء `void` (قبل الرد) */
+    public ?\Closure $duringVoid = null;
+
     public function provider(): string
     {
         return self::PROVIDER;
@@ -73,6 +76,9 @@ final class FakePosTerminalAdapter implements TerminalAdapter
     public function void(PosPaymentTerminal $terminal, PosTerminalRequest $request): PosTerminalResult
     {
         $this->calls['void']++;
+        if ($this->duringVoid !== null) {
+            ($this->duringVoid)($request);
+        }
         if ($this->voidFailure !== null) {
             throw $this->voidFailure;
         }

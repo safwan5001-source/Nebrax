@@ -451,6 +451,47 @@ class PosTerminalFoundationTest extends TestCase
     }
 
     #[Test]
+    public function a_late_void_result_from_an_expired_compensation_lease_is_fenced(): void
+    {
+        $ctx = $this->context('pos-term-fence-void');
+        $id = $this->approvedRequest($ctx, 11500);
+
+        // نداء void بطيء: أثناءه ينتهي إيجاره ويأخذه مالك آخر.
+        $this->fake->duringVoid = function () use ($id) {
+            DB::table('pos_terminal_requests')->where('id', $id)->update(['compensating_until' => now('UTC')->addSeconds(60), 'lease_token' => 'other-owner-token']);
+        };
+        $this->withToken($ctx['token'])->postJson("/api/pos/terminal-requests/{$id}/void")->assertOk()->assertJsonPath('data.status', 'approved');
+        $this->fake->duringVoid = null;
+
+        $row = PosTerminalRequest::query()->withoutGlobalScopes()->findOrFail($id);
+        $this->assertSame('approved', $row->status, 'نتيجة المالك المنتهي لا تُنهي الحالة');
+        $this->assertSame('other-owner-token', $row->lease_token);
+        $this->assertTrue($row->compensating_until->isFuture());
+        // والحلّ اليدوي يبقى مرفوضاً ما دام إيجار المالك الحالي حيّاً.
+        DB::table('pos_terminal_requests')->where('id', $id)->update(['status' => 'compensation_required']);
+        $this->withToken($ctx['token'])->postJson("/api/pos/terminal-requests/{$id}/resolve", ['note' => 'أُعيد المبلغ خارجياً'])->assertStatus(422)->assertJsonPath('reason', 'compensation_in_progress');
+    }
+
+    #[Test]
+    public function an_idempotent_replay_does_not_expose_another_cashiers_request(): void
+    {
+        $ctx = $this->context('pos-term-replay-auth');
+        $key = (string) Str::uuid();
+        $id = $this->createRequest($ctx, 11500, $key)->assertCreated()->json('data.id');
+        $this->createRequest($ctx, 11500, $key)->assertOk()->assertJsonPath('data.id', $id); // المالك يعيد بأمان
+
+        $other = $this->tokenForRole($ctx['tenant_id'], 'accountant', 'acct@pos-term-replay-auth.test');
+        app(TenantContext::class)->set($ctx['tenant_id']);
+        $this->withToken($other)->postJson('/api/pos/terminal-requests', [
+            'pos_session_id' => $ctx['session'],
+            'pos_payment_terminal_id' => $ctx['terminal']['id'],
+            'payment_method_id' => $ctx['card']['id'],
+            'amount' => 11500,
+            'idempotency_key' => $key,
+        ])->assertStatus(422)->assertJsonMissingPath('data.id');
+    }
+
+    #[Test]
     public function provider_operations_on_one_request_are_serialized_by_a_lease_and_the_lease_is_always_released(): void
     {
         $ctx = $this->context('pos-term-serialize');
