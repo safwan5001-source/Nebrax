@@ -28,8 +28,11 @@ use App\Models\ProductCategory;
 use App\Models\UnitTemplate;
 use App\Services\Accounting\InventoryService;
 use App\Services\DocumentCenter\DocumentStorageService;
+use App\Services\ImportPreviewService;
 use App\Services\ProductExportService;
 use App\Services\ProductImportService;
+use App\Support\ImportJobDomain;
+use App\Services\ProductImportMediaService;
 use App\Services\ProductLifecycleService;
 use App\Services\ProductMediaService;
 use App\Services\ProductPricingService;
@@ -51,6 +54,7 @@ class ProductController extends ApiController
         protected DocumentStorageService $documentStorage,
         protected R2StorageService $r2,
         protected ProductImportService $imports,
+        protected ProductImportMediaService $importMedia,
         protected ProductExportService $exports,
         protected ProductLifecycleService $lifecycle,
         protected ProductMediaService $media,
@@ -163,28 +167,92 @@ class ProductController extends ApiController
     /** معاينة غير مغيرة للبيانات؛ لا تكتب شيئاً في الكتالوج. */
     public function importPreview(ImportProductsRequest $request): JsonResponse
     {
+        $options = $request->importOptions();
+        $mediaOptions = $request->mediaOptions();
+
         return response()->json([
-            'data' => $this->domain(fn () => $this->imports->preview(
-                $request->file('file'),
-                $request->importOptions(),
-                SensitiveCostPolicy::authorized($request->user()),
-                $request->maxRows(),
-            )),
+            'data' => $this->domain(function () use ($request, $options, $mediaOptions): array {
+                $withPlan = $this->imports->previewWithPlan(
+                    $request->file('file'), $options,
+                    SensitiveCostPolicy::authorized($request->user()), $request->maxRows(),
+                );
+                $preview = $withPlan['preview'];
+                $preview['media'] = $this->importMedia->preview(
+                    $request->file('file'), $options, $request->file('media_archive'),
+                    $request->maxRows(), $mediaOptions['approve_existing_updates'],
+                );
+                // IMP-H1-S3b: معاينةٌ أحادية الاستعمال يحفظها الخادم — تُرفَق بإنشاء التشغيلة التنفيذية فيُنفَّذ ما عُوين.
+                $preview['binding'] = app(ImportPreviewService::class)->issue(
+                    ImportJobDomain::PRODUCT_CATALOG, $request->file('file'), $request->file('media_archive'),
+                    $options + [
+                        'apply_product_images' => $mediaOptions['apply'],
+                        'approve_existing_media_updates' => $mediaOptions['approve_existing_updates'],
+                    ],
+                    $request->user()?->id,
+                    $withPlan['plan'],
+                );
+
+                return $preview;
+            }),
         ]);
     }
 
     /** يكرر التحقق ثم ينشئ أو يحدّث الكتالوج في معاملة واحدة. */
     public function importApply(ImportProductsRequest $request): JsonResponse
     {
+        $options = $request->importOptions();
+        $mediaOptions = $request->mediaOptions();
+
         return response()->json([
-            'data' => $this->domain(fn () => $this->imports->apply(
-                $request->file('file'),
-                $request->importOptions(),
-                $request->user()?->id,
-                // PR-INV-1: لا تثق بصلاحية جلسة المعاينة — يُعاد فحصها هنا حيّةً،
-                // فرخصةٌ سُحبت بين المعاينة والتطبيق تُرفض عند التطبيق حتماً.
-                SensitiveCostPolicy::authorized($request->user()),
-            )),
+            'data' => $this->domain(function () use ($request, $options, $mediaOptions): array {
+                // IMP-H1-S3c: ربط التطبيق المتزامن بمعاينته (اختياري حتى التفعيل): إنفاق المعاينة وكتابة الكتالوج في معاملةٍ واحدة،
+                // وخطّتها تُقارَن بالواقع قبل أي كتابة (`plan_drift`).
+                $previews = app(ImportPreviewService::class);
+                $bound = $previews->bindForSyncApply(
+                    ImportJobDomain::PRODUCT_CATALOG, $request->file('file'), $request->file('media_archive'),
+                    $options + [
+                        'apply_product_images' => $mediaOptions['apply'],
+                        'approve_existing_media_updates' => $mediaOptions['approve_existing_updates'],
+                    ],
+                    $request->user()?->id, $request->input('preview_id'), $request->input('preview_hash'),
+                );
+                // Preflight is deliberately before catalog mutation: an unsafe ZIP,
+                // blocked URL or missing explicit approval cannot leave products written.
+                $mediaPreview = $this->importMedia->preview(
+                    $request->file('file'), $options, $request->file('media_archive'),
+                    ProductImportService::MAX_ROWS, $mediaOptions['approve_existing_updates'],
+                );
+                if ($mediaOptions['apply'] && ($mediaPreview['error_rows'] > 0 || $mediaPreview['needs_approval_rows'] > 0)) {
+                    throw new RuntimeException('لا يمكن حفظ صور المنتجات قبل معالجة أخطاء المعاينة والموافقات المطلوبة.');
+                }
+
+                $applyOptions = $options;
+                $plan = ImportPreviewService::decodePlan($bound?->plan);
+                if ($plan !== null) {
+                    $applyOptions['expected_plan'] = $plan;
+                }
+
+                $result = DB::transaction(function () use ($bound, $previews, $request, $applyOptions) {
+                    if ($bound !== null) {
+                        $previews->consume($bound, null);
+                    }
+
+                    return $this->imports->apply(
+                        $request->file('file'), $applyOptions, $request->user()?->id,
+                        // PR-INV-1: لا تثق بصلاحية جلسة معاينة قديمة.
+                        SensitiveCostPolicy::authorized($request->user()),
+                    );
+                });
+                $result['media'] = $mediaOptions['apply']
+                    ? $this->importMedia->apply(
+                        $request->file('file'), $options, $result['results'],
+                        $request->file('media_archive'), (string) $request->user()?->id,
+                        ProductImportService::MAX_ROWS, $mediaOptions['approve_existing_updates'],
+                    )
+                    : $mediaPreview;
+
+                return $result;
+            }),
         ]);
     }
 

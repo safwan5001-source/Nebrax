@@ -42,6 +42,8 @@ import {
   suggestedMapping,
 } from '@/modules/products/import/contract';
 import { ImportJobStatusPanel } from '@/modules/import-jobs/ImportJobStatusPanel';
+import { ImportRepairPanel } from '@/modules/import-jobs/ImportRepairPanel';
+import { downloadImportFailures } from '@/modules/import-jobs/client';
 import { useImportJobEngine, useImportJobUrlParam, useResumeFromUrl } from '@/modules/import-jobs/useImportJobEngine';
 import type { ApplyOptions } from '@/modules/import-jobs/client';
 import { cn } from '@/lib/utils';
@@ -61,10 +63,14 @@ export default function ProductImportPage() {
   const locale = useLocale();
   const { success, toast } = useToast();
   const fileInput = useRef<HTMLInputElement | null>(null);
+  const mediaArchiveInput = useRef<HTMLInputElement | null>(null);
   const { setParam } = useImportJobUrlParam();
 
   const [step, setStep] = useState(0);
   const [file, setFile] = useState<File | null>(null);
+  const [mediaArchive, setMediaArchive] = useState<File | null>(null);
+  const [applyProductImages, setApplyProductImages] = useState(false);
+  const [approveExistingMediaUpdates, setApproveExistingMediaUpdates] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [inspection, setInspection] = useState<InspectResult | null>(null);
   const [mapping, setMapping] = useState<ColumnMapping>({});
@@ -107,6 +113,9 @@ export default function ProductImportPage() {
   function reset() {
     setStep(0);
     setFile(null);
+    setMediaArchive(null);
+    setApplyProductImages(false);
+    setApproveExistingMediaUpdates(false);
     setInspection(null);
     setMapping({});
     setPreview(null);
@@ -115,6 +124,7 @@ export default function ProductImportPage() {
     setParam(null);
     engine.reset();
     if (fileInput.current) fileInput.current.value = '';
+    if (mediaArchiveInput.current) mediaArchiveInput.current.value = '';
   }
 
   async function acceptFile(next: File | null) {
@@ -164,7 +174,10 @@ export default function ProductImportPage() {
     try {
       const response = await api<{ data: ImportPreview }>('/products/import/preview', {
         method: 'POST',
-        body: importFormData(file, { mode, blankPolicy, masterDataPolicy, mapping, forDurable: true }),
+        body: importFormData(file, {
+          mode, blankPolicy, masterDataPolicy, mapping, forDurable: true,
+          mediaArchive, applyProductImages, approveExistingMediaUpdates,
+        }),
       });
       setPreview(response.data);
       setStep(1);
@@ -184,6 +197,8 @@ export default function ProductImportPage() {
       // ملفٌ استُؤنف بلا نسخةٍ محلية منه لا يملك مطابقةً مُختارة — تُترَك
       // فارغة فيطابق الخادم الأعمدة تلقائياً بالاسم (سلوك V1 الافتراضي نفسه).
       ...(file ? { mapping } : {}),
+      apply_product_images: applyProductImages,
+      approve_existing_media_updates: approveExistingMediaUpdates,
     };
   }
 
@@ -192,12 +207,41 @@ export default function ProductImportPage() {
     setError(null);
     if (!engine.job) {
       if (!file) return; // مستأنفٌ بلا ملف يجب أن يملك تشغيلة أصلاً
-      const job = await engine.upload(file);
+      const job = await engine.upload(
+        file,
+        undefined,
+        mediaArchive,
+        preview?.binding ? { binding: preview.binding, options: applyOptionsPayload() } : null
+      );
       if (!job) return;
-      await engine.applyLoop(job.id, applyOptionsPayload());
+      // تشغيلةٌ مربوطةٌ بمعاينة تنفّذ خياراتها المجمَّدة عند الإنشاء: لا نرسل خيارات دلالية (الواجهة المستأنَفة لا تملك الأصلية).
+      await engine.applyLoop(job.id, job.preview_bound ? {} : applyOptionsPayload());
       return;
     }
-    await engine.applyLoop(engine.job.id, applyOptionsPayload());
+    await engine.applyLoop(engine.job.id, engine.job.preview_bound ? {} : applyOptionsPayload());
+  }
+
+  // IMP-H1-S8c: تشغيلةٌ فاشلة لها وحداتٌ قابلة للإصلاح ⇒ ملفٌّ مصحَّح يُنشئ تشغيلة فرعية ثم يُرحَّل كأي تشغيلة (الخادم يطالب بالوحدات).
+  async function repairFailedRows(repairFile: File) {
+    if (!engine.job) return;
+    // مفتاح حتميّ لهذا الملف بعينه: إعادة المحاولة بعد ضياع الاستجابة تعيد التشغيلة نفسها لا تنشئ فرعيةً ثانية.
+    const key = `repair-${engine.job.id}-${repairFile.name}-${repairFile.size}-${repairFile.lastModified}`;
+    const child = await engine.repair(engine.job.id, repairFile, key);
+    if (!child) return;
+    // خيارات التشغيلة الفرعية مجمَّدة عند إنشائها من أمّها (الخادم يرفض أي خيار مخالف): لا نرسل خيارات الصفحة الحالية — وهي افتراضيات
+    // حين تُفتح التشغيلة الفاشلة من الرابط — فلا يتحوّل إصلاح `update`/`upsert` إلى `create`.
+    await engine.applyLoop(child.id, {});
+  }
+
+  async function downloadFailedRows(jobId: string) {
+    try {
+      const outcome = await downloadImportFailures(jobId);
+      if (outcome === 'demo-unavailable') {
+        toast({ title: t('export_demo_unavailable'), variant: 'info' });
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('import_repair_download_failed'));
+    }
   }
 
   useEffect(() => {
@@ -353,6 +397,31 @@ export default function ProductImportPage() {
                     ) : null}
                   </div>
                 ) : null}
+
+                <div className="space-y-2 rounded-md border border-border bg-background p-3">
+                  <Label htmlFor="product-images-archive">{t('import_images_archive')}</Label>
+                  <Input
+                    id="product-images-archive"
+                    ref={mediaArchiveInput}
+                    type="file"
+                    accept=".zip,application/zip"
+                    onChange={(event) => {
+                      const next = event.target.files?.[0] ?? null;
+                      if (next && next.size > 50 * 1024 * 1024) {
+                        setError(t('import_images_archive_too_large'));
+                        event.target.value = '';
+                        setMediaArchive(null);
+                        return;
+                      }
+                      setMediaArchive(next);
+                      // اختيار الأرشيف ليس موافقةً على الحفظ؛ التأكيد مستقل
+                      // ويظهر بعد المعاينة كي يرى المستخدم المطابقة أولاً.
+                      setApplyProductImages(false);
+                      setPreview(null);
+                    }}
+                  />
+                  <p className="text-xs leading-relaxed text-muted">{t('import_images_archive_hint')}</p>
+                </div>
               </CardContent>
             </Card>
 
@@ -543,6 +612,84 @@ export default function ProductImportPage() {
               </p>
             ) : null}
 
+            {preview.media && (
+              preview.media.source_count > 0
+              || preview.media.unmatched_archive.length > 0
+              || preview.media.missing_rows.length > 0
+              || preview.media.error_rows > 0
+              || preview.media.needs_approval_rows > 0
+            ) ? (
+              <div className="space-y-3 rounded-md border border-border bg-background p-3">
+                <p className="text-sm font-medium text-text">
+                  {t('import_images_preview', {
+                    ready: preview.media.ready_rows,
+                    review: preview.media.needs_approval_rows,
+                    errors: preview.media.error_rows,
+                  })}
+                </p>
+                {preview.media.unmatched_archive.length > 0 ? (
+                  <p className="text-xs text-warning">
+                    {t('import_images_unmatched', { count: preview.media.unmatched_archive.length })}
+                  </p>
+                ) : null}
+                {preview.media.missing_rows.length > 0 ? (
+                  <p className="text-xs text-muted">
+                    {t('import_images_missing', { count: preview.media.missing_rows.length })}
+                  </p>
+                ) : null}
+                {preview.media.rows.length > 0 ? (
+                  <div className="max-h-56 space-y-2 overflow-y-auto" aria-label={t('import_images_matches')}>
+                    {preview.media.rows.slice(0, 20).map((row) => (
+                      <div key={row.row} className="rounded border border-border px-2.5 py-2 text-xs">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="num font-medium text-text">{t('import_row')} {row.row}</span>
+                          <Badge tone={row.status === 'ready' ? 'positive' : row.status === 'error' ? 'negative' : 'warning'}>
+                            {row.status}
+                          </Badge>
+                          <span className="text-muted" dir="ltr">{row.sku || row.barcode || '—'}</span>
+                        </div>
+                        {row.sources.length > 0 ? (
+                          <p className="mt-1 break-all text-muted" dir="ltr">
+                            {row.sources.map((source) => `${source.role}: ${source.name}`).join(' · ')}
+                          </p>
+                        ) : null}
+                        {row.messages.length > 0 ? <p className="mt-1 text-negative">{row.messages.join(' · ')}</p> : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                <label className="flex items-start gap-2 text-sm text-text">
+                  <input
+                    type="checkbox"
+                    checked={applyProductImages}
+                    onChange={(event) => {
+                      // خيارٌ مقيَّد بمعاينته (IMP-H1-S3b): تغيّره يستلزم معاينةً جديدة بالخيار نفسه، كإقرار التحديثات الموجودة.
+                      setApplyProductImages(event.target.checked);
+                      setPreview(null);
+                      setStep(0);
+                    }}
+                    className="mt-0.5 h-4 w-4 rounded border-border"
+                  />
+                  <span>{t('import_images_apply_confirm')}</span>
+                </label>
+                {preview.media.needs_approval_rows > 0 ? (
+                  <label className="flex items-start gap-2 text-sm text-warning">
+                    <input
+                      type="checkbox"
+                      checked={approveExistingMediaUpdates}
+                      onChange={(event) => {
+                        setApproveExistingMediaUpdates(event.target.checked);
+                        setPreview(null);
+                        setStep(0);
+                      }}
+                      className="mt-0.5 h-4 w-4 rounded border-border"
+                    />
+                    <span>{t('import_images_existing_confirm')}</span>
+                  </label>
+                ) : null}
+              </div>
+            ) : null}
+
             {preview.total_rows === 0 ? (
               <p className="text-sm text-muted">{t('import_no_rows')}</p>
             ) : (
@@ -564,7 +711,10 @@ export default function ProductImportPage() {
                 </Button>
               }
               primary={
-                <Button disabled={!canApplyPreview} onClick={() => void confirmAndApply()}>
+                <Button
+                  disabled={!canApplyPreview || Boolean(applyProductImages && preview.media && (preview.media.error_rows > 0 || preview.media.needs_approval_rows > 0))}
+                  onClick={() => void confirmAndApply()}
+                >
                   <Upload className="h-4 w-4" strokeWidth={1.7} />
                   {t('import_apply')}
                 </Button>
@@ -586,6 +736,13 @@ export default function ProductImportPage() {
               networkUncertain={engine.networkUncertain}
               cancelling={engine.busy === 'cancelling'}
               onCancel={engine.job ? () => void engine.cancel(engine.job!.id) : undefined}
+              onOpenParent={(parentId) => void engine.resume(parentId)}
+            />
+            <ImportRepairPanel
+              job={engine.job}
+              busy={engine.busy !== null}
+              onDownload={() => void downloadFailedRows(engine.job!.id)}
+              onRepair={(repairFile) => void repairFailedRows(repairFile)}
             />
           </CardContent>
         </Card>

@@ -82,6 +82,10 @@ class Rbac
         // مسار ولا قارئ يستعملها بعد (PR-6b).
         'delivery_connector.audit.view',
         'payments.view', 'payments.manage',
+        // PAY-H1-01 (D-08): إدارة اتصالات بوابات الدفع وأسرارها سلطة مستقلة عن `payments.manage`
+        // (تسجيل سندات). owner/admin عبر `*` فقط؛ لا تُضاف لـ`MATRIX` ولا تُمنح لأي دور مخزَّن
+        // بهجرة. القراءة (دون أسرار) تبقى `payments.view`.
+        'payment_gateways.manage',
         'purchases.view', 'purchases.manage',
         'returns.view', 'returns.manage',
         'hr.view', 'hr.manage',
@@ -216,6 +220,15 @@ class Rbac
             // قراءة سجل تدقيق المساعد الذكي (وصفي فقط) سلطة مستقلة عن استعماله. owner/admin عبر `*`؛
             // لا تُمنح للمحاسب ولا غيره تلقائياً.
             'ai.audit.view',
+            // إدارة موافقة المؤسسة على المساعد الذكي (تفعيل/تعطيل + فئات البيانات) — سلطة مستقلة عن
+            // استعماله وعن قراءة تدقيقه. owner/admin عبر `*` فقط؛ لا تُمنح للمحاسب ولا غيره تلقائياً.
+            'ai.consent.manage',
+            // AI Actions are mutation-adjacent and therefore never inherit
+            // `ai.assistant.use`. Approval and repair remain independently assignable.
+            'ai.actions.use', 'ai.actions.approve', 'ai.actions.repair',
+            // IMP-H2-S4: إدارة قبول المؤسسة لـAI Actions (`ai_actions.enabled`) — سلطة مستقلة عن استعمالها واعتمادها وإصلاحها،
+            // وعن موافقة المساعد (`ai.consent.manage`). owner/admin عبر `*` فقط؛ لا تُمنح لغيرهما تلقائياً.
+            'ai.actions.manage',
     ];
 
     /**

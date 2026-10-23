@@ -179,12 +179,18 @@ export default function InventoryOpeningImportPage() {
     setError(null);
     if (!engine.job) {
       if (!file) return;
-      const job = await engine.upload(file);
+      const job = await engine.upload(
+        file,
+        undefined,
+        null,
+        preview?.binding ? { binding: preview.binding, options: applyOptionsPayload() } : null
+      );
       if (!job) return;
-      await engine.applyLoop(job.id, applyOptionsPayload());
+      // تشغيلةٌ مربوطةٌ بمعاينة تنفّذ خياراتها المجمَّدة عند الإنشاء: لا نرسل خيارات دلالية (الواجهة المستأنَفة لا تملك الأصلية).
+      await engine.applyLoop(job.id, job.preview_bound ? {} : applyOptionsPayload());
       return;
     }
-    await engine.applyLoop(engine.job.id, applyOptionsPayload());
+    await engine.applyLoop(engine.job.id, engine.job.preview_bound ? {} : applyOptionsPayload());
   }
 
   useEffect(() => {
@@ -347,7 +353,7 @@ export default function InventoryOpeningImportPage() {
                   openingDate={openingDate}
                   setOpeningDate={(value) => { setOpeningDate(value); setPreview(null); }}
                   notes={notes}
-                  setNotes={setNotes}
+                  setNotes={(value) => { setNotes(value); setPreview(null); }}
                   allowZeroCost={allowZeroCost}
                   setAllowZeroCost={(value) => { setAllowZeroCost(value); setPreview(null); }}
                   t={t}

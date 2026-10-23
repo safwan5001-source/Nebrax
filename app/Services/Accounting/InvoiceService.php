@@ -12,10 +12,13 @@ use App\Models\InvoiceLineCostCenterAllocation;
 use App\Models\JournalLine;
 use App\Models\Product;
 use App\Models\User;
+use App\Support\CashSaleTreasuryPolicy;
 use App\Support\DocumentLineVariantResolver;
 use App\Support\InvoicePartySnapshot;
 use App\Support\PrintTemplateContract;
+use App\Support\ResolvedTreasury;
 use App\Support\Settings;
+use App\Support\TreasurySelection;
 use App\Support\ZatcaIssueTimestamp;
 use App\Services\PrintTemplates\PrintTemplateService;
 use App\Services\ClassificationService;
@@ -40,13 +43,10 @@ class InvoiceService
     // document_adjustment/tax_output تُحلّ عبر AccountRoleResolver أدناه، لا
     // بأكواد ثابتة هنا بعد اليوم.
     //
-    // البيع النقدي وحده يبقى على 1110 صراحةً — عمداً خارج ACC-3: `debitCode`
-    // نفسه لا يُستبدل بدور دلالي عام (كان سيبتدع دوراً محاسبياً عاماً للنقد
-    // ممنوعاً صراحةً بعقد ACC-2/ACC-3؛ الحساب النقدي المحدد يبقى ملك نطاق
-    // CashBankAccount وحده). لكن منذ PR-ACL-CASH-SALE، الخزينة *وراء* 1110
-    // تُحلّ وتُخوَّل عبر CashBankAccountService قبل الترحيل (انظر `post()`) —
-    // تماماً كما يفعل `settle()` أدناه لمسار `is_paid=true`. هذا الفارق
-    // موثَّق في تقرير التنفيذ.
+    // البيع النقدي وحده خارج ACC-3: `debitCode` نفسه لا يُستبدل بدور دلالي عام (كان سيبتدع دوراً محاسبياً
+    // عاماً للنقد ممنوعاً صراحةً بعقد ACC-2/ACC-3؛ الحساب النقدي المحدد ملك نطاق CashBankAccount وحده).
+    // السلوك الافتراضي `legacy` يبقى على 1110؛ وبعد التفعيل المنسَّق (TREASURY-T4) تُحلّ الخزينة عبر
+    // `TreasurySelectionResolver` — انظر `cashSaleDebitAccountId()`. الخزينة *وراء* 1110 تُحلّ وتُخوَّل في الحالتين.
     private const ACC_CASH        = '1110'; // الصندوق (بيع نقدي)
     private const VAT_RATE        = 15;     // نسبة ضريبة القيمة المضافة للشحن
 
@@ -96,6 +96,8 @@ class InvoiceService
             $zatcaType = $this->zatcaDocumentType($data, $data['partner_id']);
             $overrides = $this->designOverrideAttributes($data, $zatcaType);
             $language = $this->languageAttribute($data);
+            $paymentType = $this->paymentType($data['payment_type'] ?? Settings::get('sales', 'default_payment_type'), $isPaid);
+            $this->assertCashSaleSelectionValid($paymentType, $data['cash_account_id'] ?? null);
 
             $invoice = Invoice::create([
                 'number'            => $data['number'] ?? $this->nextNumber($date, $branchId),
@@ -106,7 +108,7 @@ class InvoiceService
                 'price_list_id'     => $priceListId,
                 'pos_session_id'    => $data['pos_session_id'] ?? null,
                 'type'              => 'sale',
-                'payment_type'      => $this->paymentType($data['payment_type'] ?? Settings::get('sales', 'default_payment_type'), $isPaid),
+                'payment_type'      => $paymentType,
                 'is_paid'           => $isPaid,
                 'payment_method'    => $this->paymentMethod($data['payment_method'] ?? null),
                 'payment_reference' => $data['payment_reference'] ?? null,
@@ -191,13 +193,15 @@ class InvoiceService
             $zatcaType = $this->zatcaDocumentType($data, $data['partner_id'], $invoice->zatca_document_type);
             $overrides = $this->designOverrideAttributes($data, $zatcaType, $invoice);
             $language = $this->languageAttribute($data, $invoice);
+            $paymentType = $this->paymentType($keep('payment_type', $invoice->payment_type) ?? $invoice->payment_type, $isPaid);
+            $this->assertCashSaleSelectionValid($paymentType, $keep('cash_account_id', $invoice->cash_account_id));
 
             $invoice->update([
                 'partner_id'        => $data['partner_id'],
                 'zatca_document_type' => $zatcaType,
                 'warehouse_id'      => $keep('warehouse_id', $invoice->warehouse_id),
                 'price_list_id'     => $keep('price_list_id', $invoice->price_list_id),
-                'payment_type'      => $this->paymentType($keep('payment_type', $invoice->payment_type) ?? $invoice->payment_type, $isPaid),
+                'payment_type'      => $paymentType,
                 'is_paid'           => $isPaid,
                 'payment_method'    => $this->paymentMethod($keep('payment_method', $invoice->payment_method)),
                 'payment_reference' => $keep('payment_reference', $invoice->payment_reference),
@@ -927,19 +931,8 @@ class InvoiceService
             $this->assertWithinCreditLimit($invoice, $total);
 
             $debitAccountId = $invoice->payment_type === 'cash'
-                ? $this->accountId(self::ACC_CASH)
+                ? $this->cashSaleDebitAccountId($invoice, $actor)
                 : $this->accountRoles->resolve('accounts_receivable')->id;
-
-            // PR-ACL-CASH-SALE: البيع النقدي المباشر يمدِّن 1110 كما هو —
-            // GL routing لا يتغيّر — لكن الخزينة *وراء* هذا الحساب تُحلّ
-            // وتُخوَّل الآن قبل الترحيل، تماماً كما يفعل السند الحقيقي في
-            // settle() أدناه لمسار is_paid=true. resolveForPayment() يعيد
-            // بالضبط نفس كيان الخزينة الرئيسية التي أنشأها bootstrapDefaults()
-            // على حساب 1110 نفسه — لا خزينة بديلة، لا مسار اختيار جديد.
-            if ($invoice->payment_type === 'cash') {
-                $cashEntity = $this->cashBankAccounts->resolveForPayment($debitAccountId, 'cash');
-                $this->cashBankAccounts->assertAllowed($cashEntity, 'deposit', $actor);
-            }
 
             $lines = [[
                 'account_id'   => $debitAccountId,
@@ -1050,6 +1043,10 @@ class InvoiceService
             // مستقلة تماماً عن اختيار القالب — لا تخترع نوع مستند ولا تُغيّر ZATCA.
             $language = $this->freezeLanguage($invoice);
 
+            // REM-18b-2: تسجيل الفاتورة في سلسلة ZATCA المشتركة **قبل** كتابة أعمدة ZATCA عليها — السياج F1 يرفض ICV بلا
+            // مدخل مطابق، والمُشغّل T4 يُقدّم رأس السلسلة. في المعاملة نفسها: أي فشل بعده يُرجع المدخل والرأس معاً.
+            $this->zatca->record($invoice, $zatca);
+
             $invoice->update([
                 'status'              => 'posted',
                 'zatca_document_type' => $invoice->zatca_document_type,
@@ -1077,6 +1074,71 @@ class InvoiceService
 
             return $invoice->fresh('lines.costCenterAllocations.costCenter');
         });
+    }
+
+    /**
+     * TREASURY-T4 (D-T4a): اختيار خزينة صريح على مسوّدة نقدية يُتحقَّق منه عند الحفظ لا عند الترحيل وحده — حساب بنكي أو
+     * معطَّل أو غير مرتبط بخزينة أو من مستأجر آخر يُرفض فوراً (422). لا أثر ما دامت السياسة الفعّالة `legacy`
+     * (الحقل يبقى مخزَّناً ومتجاهَلاً كما كان). غياب الاختيار لا يُرفض هنا: قد يكتمل لاحقاً، والإلزام عند الترحيل.
+     */
+    private function assertCashSaleSelectionValid(string $paymentType, ?string $cashAccountId): void
+    {
+        if ($paymentType !== 'cash' || $cashAccountId === null || $cashAccountId === '') {
+            return;
+        }
+        $policy = CashSaleTreasuryPolicy::effective();
+        if ($policy === CashSaleTreasuryPolicy::LEGACY) {
+            return;
+        }
+        $this->resolveCashSaleTreasury($cashAccountId, $policy, null);
+    }
+
+    /**
+     * الحساب المدين للبيع النقدي المباشر (TREASURY-T4).
+     *
+     * ═══ `legacy` (الافتراضي وكل ما دامت بوابة التفعيل مغلقة) ═══
+     *  السلوك القائم حرفياً: 1110 دوماً، يُحلّ كيانه ويُخوَّل الإيداع عليه، و`cash_account_id` يُتجاهل.
+     *
+     * ═══ `main` / `explicit_required` ═══
+     *  عبر عقد T3 (`TreasurySelectionResolver`): الاختيار الصريح (`cash_account_id`، حساب أستاذ) يتقدّم ويُتحقَّق
+     *  منه (مستأجر/نوع/نشاط/حساب أصل حركي)، وغيابه ⇒ الخزينة النقدية الرئيسية أو رفض. تخويل الإيداع على الكيان
+     *  المحلول. **لا سقوط صامت إلى 1110 عند أي فشل** — الاستثناء (422) يلغي الترحيل كله.
+     */
+    protected function cashSaleDebitAccountId(Invoice $invoice, ?User $actor): string
+    {
+        $policy = CashSaleTreasuryPolicy::effective();
+
+        if ($policy === CashSaleTreasuryPolicy::LEGACY) {
+            // PR-ACL-CASH-SALE: البيع النقدي المباشر يمدِّن 1110 كما هو — لكن الخزينة *وراء* هذا الحساب تُحلّ
+            // وتُخوَّل قبل الترحيل، تماماً كما يفعل السند الحقيقي في settle() لمسار is_paid=true.
+            $accountId  = $this->accountId(self::ACC_CASH);
+            $cashEntity = $this->cashBankAccounts->resolveForPayment($accountId, 'cash');
+            $this->cashBankAccounts->assertAllowed($cashEntity, 'deposit', $actor);
+
+            return $accountId;
+        }
+
+        // التهيئة الكسولة كما في resolveForPayment (مسار سريع بلا أقفال للمستأجر المهيَّأ — T1)؛ المحلِّل نفسه قراءة فقط.
+        $this->cashBankAccounts->bootstrapDefaults();
+
+        return $this->resolveCashSaleTreasury($invoice->cash_account_id, $policy, 'deposit', $actor)->accountId;
+    }
+
+    /** @param ?string $authorize 'deposit' عند الترحيل؛ null عند فحص مسوّدة (لا فاعل ولا أثر مالي بعد). */
+    protected function resolveCashSaleTreasury(?string $cashAccountId, string $policy, ?string $authorize, ?User $actor = null): ResolvedTreasury
+    {
+        $resolved = app(TreasurySelectionResolver::class)->resolve(
+            $cashAccountId ? TreasurySelection::ledgerAccount($cashAccountId) : TreasurySelection::none(),
+            'cash',
+            CashSaleTreasuryPolicy::selectionPolicy($policy),
+            $authorize,
+            $actor,
+        );
+
+        // مبالغ الفاتورة بعملة المؤسسة (وكذلك مبالغ ZATCA): فحص موحَّد مع الاسترداد (T5)، فشل مغلق بلا تحويل ولا سقوط إلى 1110.
+        app(TreasuryCurrencyGuard::class)->assertMatchesTenant($resolved);
+
+        return $resolved;
     }
 
     /**

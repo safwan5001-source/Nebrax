@@ -7,6 +7,7 @@ use App\Models\CommerceCategoryListing;
 use App\Models\ProductCategory;
 use App\Models\Storefront;
 use App\Support\EdgeScheme;
+use App\Tenancy\BranchScope;
 use App\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -31,14 +32,10 @@ use Illuminate\Support\Facades\URL;
  * مستأجرٍ آخر، أو غير نشط، أو غير منشور على قناة هذا المتجر بعينها (بما فيه
  * منشورٌ على قناة *أخرى* لنفس المستأجر) → 404 لا 403، بلا تسريب وجود جزئي.
  *
- * **عزل الفروع**: `ProductCategory` مصنَّفٌ `BranchShareable`/`BranchScoped`
- * (بنفس مفتاح مشاركة `Product`, `share_products` — راجع تعليق النموذج نفسه:
- * ربطه بمفتاح آخر كان سيسمح بحالة فاسدة). هذا المتحكّم **لا** يتجاوز نطاق
- * الفرع (`withoutGlobalScope(BranchScope::class)`) كما يفعل
- * `StorefrontCategoryController` العام — ذاك مجهولٌ لا سياق فرع له أصلاً؛
- * هذا يعمل داخل مساحة عمل موثَّقة بفرعٍ نشطٍ حقيقي (`SetBranch`)، فيطابق
- * تماماً القرار الذي اتّخذه `CommerceWorkspaceStorefrontProductController`
- * لـ`Product` (نفس التصنيف الفرعي بالضبط) — لا حالة جديدة تُخترع هنا.
+ * **عزل الفروع**: المعاينة هنا تحاكي كتالوج المتجر العام، لا متصفح البيانات
+ * التشغيلية للفرع النشط. لذلك تتجاوز `BranchScope` فقط بعد `ownedStorefront()`
+ * وصلاحية `commerce.manage`، مع بقاء `TenantScope` وبوابة النشر على قناة هذا
+ * المتجر تحديداً. الحمولة عامة ومصغرة؛ لا يوسّع ذلك أي مسار إدارة منتجات.
  *
  * **الحمولة**: القائمة مُصغَّرة (معرّف/اسم/تلميح تسلسل هرمي فقط؛ و— AWJ-STORE-CAT-DESIGN-01 — `color` ورابط صورةٍ موقَّع قصير الأجل **عند** `with_media=true` لمعاينة Canvas) — لا حمولة
  * تصنيف كاملة لمجرَّد منتقٍ. التفصيل يعيد استخدام `StorefrontCategoryResource`
@@ -106,9 +103,12 @@ class CommerceWorkspaceStorefrontCategoryController extends ApiController
         ]);
 
         $query = ProductCategory::query()
+            ->withoutGlobalScope(BranchScope::class)
             ->where('is_active', true)
             ->whereIn('id', $this->publishedCategoryIds($storefront->sales_channel_id))
-            ->with(['parent:id,name'])
+            ->with(['parent' => fn ($q) => $q
+                ->withoutGlobalScope(BranchScope::class)
+                ->select(['id', 'name'])])
             ->orderBy('name')
             ->orderBy('id');
 
@@ -170,9 +170,13 @@ class CommerceWorkspaceStorefrontCategoryController extends ApiController
         $publishedIds = $this->publishedCategoryIds($storefront->sales_channel_id);
 
         $categoryModel = ProductCategory::query()
+            ->withoutGlobalScope(BranchScope::class)
             ->where('is_active', true)
             ->whereIn('id', $publishedIds)
-            ->with(['children' => fn ($q) => $q->where('is_active', true)->whereIn('id', $publishedIds)])
+            ->with(['children' => fn ($q) => $q
+                ->withoutGlobalScope(BranchScope::class)
+                ->where('is_active', true)
+                ->whereIn('id', $publishedIds)])
             ->find($category);
 
         if ($categoryModel === null) {
@@ -186,7 +190,10 @@ class CommerceWorkspaceStorefrontCategoryController extends ApiController
         $cursor = $categoryModel->parent_id;
         $depth = 0;
         while ($cursor !== null && $depth < self::MAX_ANCESTOR_DEPTH) {
-            $parent = ProductCategory::query()->whereIn('id', $publishedIds)->find($cursor);
+            $parent = ProductCategory::query()
+                ->withoutGlobalScope(BranchScope::class)
+                ->whereIn('id', $publishedIds)
+                ->find($cursor);
             if ($parent === null) {
                 break;
             }

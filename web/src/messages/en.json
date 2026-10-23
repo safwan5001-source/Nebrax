@@ -1115,6 +1115,7 @@
     "net_income": "Net income",
     "receivables": "Receivables",
     "cash": "Cash & bank",
+    "kpi_unavailable": "Balance unavailable",
     "revenue_vs_expense": "Revenue vs expenses",
     "recent_invoices": "Recent invoices",
     "expense": "Expenses",
@@ -1261,7 +1262,17 @@
     "atomic_processing": "Processing the whole file as one step — this cannot be split into partial progress.",
     "network_uncertain": "Connection interrupted — checking the actual status on the server before showing anything.",
     "cancel": "Cancel",
-    "cancelling": "Cancelling…"
+    "cancelling": "Cancelling…",
+    "repair_job": "Repair run",
+    "repair_title": "Repair failed rows",
+    "repair_hint": "{count, plural, one {# row from this file was not applied.} other {# rows from this file were not applied.}} Rows that succeeded will not be repeated.",
+    "repair_step_download": "Download the failed-rows file (XLSX): it has their original values and an error column.",
+    "repair_step_fix": "Fix the rows that carry an error; the others are valid and were rolled back with their batch, so they apply unchanged.",
+    "repair_step_upload": "Upload the same file to apply the corrected rows.",
+    "repair_download": "Download failed rows",
+    "repair_upload": "Upload corrected file",
+    "repair_protected_note": "Do not edit or delete the columns starting with _awj_ — they identify each row. Cost columns appear blank if you lack the cost permission.",
+    "repair_open_parent": "View original run"
   },
   "demo": {
     "banner": "Preview mode — demo data, not connected to any server",
@@ -1999,6 +2010,7 @@
       "fiscal_years": "Fiscal years",
       "fuel": "Fuel operations",
       "fuel_stations": "Fuel stations",
+      "payment_gateways": "Payment gateways",
       "pos": "Point of sale",
       "sales": "Sales",
       "self_service": "Employee self-service",
@@ -2046,7 +2058,8 @@
       "operate": "Operate",
       "publish": "Publish",
       "reassign": "Reassign",
-      "use": "Use"
+      "use": "Use",
+      "repair": "Repair executed action"
     },
     "weekdays": [
       "Sunday",
@@ -2121,6 +2134,7 @@
     "cancel": "Cancel",
     "close": "Close",
     "perm_areas": {
+      "actions": "Executable actions",
       "alerts": "Alerts",
       "audit": "Audit",
       "avi": "Vehicle ID (AVI)",
@@ -2146,7 +2160,8 @@
       "settings": "Settings",
       "shift": "Shifts",
       "variance": "Variances",
-      "assistant": "Assistant"
+      "assistant": "Assistant",
+      "consent": "Consent"
     }
   },
   "inventory": {
@@ -2483,6 +2498,10 @@
     "payment_reference": "Reference number",
     "cash_account": "Cash account",
     "cash_account_main": "Main",
+    "cash_sale_treasury": "Cash sale cashbox",
+    "cash_sale_treasury_main": "Main cashbox (default)",
+    "cash_sale_treasury_required": "Choose a cashbox (required)",
+    "cash_sale_treasury_hint": "A direct cash invoice is recorded in this cashbox. With no selection the main cashbox is used, or posting is rejected when the company policy requires a choice.",
     "line_cost_center": "Line cost center",
     "line_cost_center_none": "No line allocation",
     "line_cost_center_single": "Single center",
@@ -2954,7 +2973,9 @@
     "periodLocks": "Period Locks",
     "fiscalYears": "Fiscal Years",
     "users": "Users",
-    "roles": "Roles & permissions"
+    "roles": "Roles & permissions",
+    "intelligence": "Financial Intelligence",
+    "intelligenceSettings": "Assistant settings"
   },
   "partnerProfile": {
     "back": "Back",
@@ -3940,7 +3961,8 @@
     "exchange_action_total": "Exchange value difference",
     "exchange_submitting": "Posting exchange…",
     "exchange_confirm": "Confirm exchange",
-    "exchange_done": "Exchange posted; the replacement invoice is {number}."
+    "exchange_done": "Exchange posted; the replacement invoice is {number}.",
+    "terminal_hold_back": "You cannot go back while a payment-terminal request is open; cancel it or complete the sale first."
   },
   "posReport": {
     "title": "POS report",
@@ -4767,7 +4789,9 @@
     "preview_scan_error": "Test scan error",
     "preview_payment_success": "Test payment success",
     "preview_payment_error": "Test payment error",
-    "sound_autoplay_hint": "Your browser may block sound until the first interaction with POS. This never blocks sale or payment."
+    "sound_autoplay_hint": "Your browser may block sound until the first interaction with POS. This never blocks sale or payment.",
+    "c_terminals_t": "Card payment terminals",
+    "c_terminals_d": "Register payment terminals and link them to POS devices to send the amount and capture the approval."
   },
   "posDevices": {
     "title": "POS devices",
@@ -4900,6 +4924,7 @@
     "no_unit_template": "No template",
     "unit_template_hint": "Lets you buy and sell in a unit larger than the stock unit.",
     "import": "Import products",
+    "ai_import": "Assisted review import",
     "workbook_import": "Import workbook (Products/Barcodes/Prices)",
     "import_title": "Import products",
     "import_subtitle": "Upload a CSV or XLSX file, map its columns to AWJ fields, review the result, then apply the changes safely.",
@@ -5022,6 +5047,15 @@
     "import_drop_hint": "Drag the file here, or pick one from your device.",
     "import_file_too_large": "The file exceeds {limit} MB. Split it into smaller batches.",
     "import_file_size": "{size} KB",
+    "import_images_archive": "Product image archive (optional)",
+    "import_images_archive_hint": "A safe ZIP: name images with the barcode or SKU and use __2, __3 for additional images. Nothing is stored before confirmation.",
+    "import_images_archive_too_large": "The image archive exceeds 50 MB.",
+    "import_images_preview": "Image preview: {ready} ready, {review} need approval, {errors} have errors.",
+    "import_images_unmatched": "{count} image file(s) did not match any row.",
+    "import_images_missing": "No image matched {count} row(s); images will not be invented or replaced automatically.",
+    "import_images_matches": "Product image matching details",
+    "import_images_apply_confirm": "I approve storing the matched safe images when the import runs.",
+    "import_images_existing_confirm": "I explicitly approve adding the shown images to existing products (without deleting their current images).",
     "import_inspecting": "Reading the file columns…",
     "import_mode_upsert": "Upsert (update existing, create new)",
     "import_mode_upsert_hint": "Matches by ID or SKU; creates the product when no match is found.",
@@ -5125,7 +5159,8 @@
     "variants_hex_label": "Hex value",
     "variants_visual_title": "Option value appearance",
     "variants_visual_none_hint": "The value remains text-only with no color metadata.",
-    "variants_visual_saved": "Value appearance saved."
+    "variants_visual_saved": "Value appearance saved.",
+    "import_repair_download_failed": "Could not download the failed rows."
   },
   "purchaseForm": {
     "title": "New purchase invoice",
@@ -6506,6 +6541,12 @@
     "allow_standalone_credit_notes_off": "Source invoice required (recommended)",
     "allow_standalone_credit_notes_on": "Allowed — credit notes without an invoice",
     "allow_standalone_credit_notes_hint": "A business policy, not an accounting rule. A credit note linked to a posted invoice inherits that invoice’s net amount, VAT and rate and can never exceed what was invoiced, together with returns. A standalone note has no such cap and takes its VAT rate from the default above, so enable it only for negotiated settlements that have no invoice.",
+    "cash_sale_treasury_policy": "Direct cash-sale cashbox",
+    "cash_sale_treasury_policy_legacy": "Cashbox 1110 (current behaviour)",
+    "cash_sale_treasury_policy_main": "Main cashbox, honouring an explicit choice",
+    "cash_sale_treasury_policy_explicit": "A choice is required on every cash invoice",
+    "cash_sale_treasury_policy_hint": "A business policy, not an accounting rule: which cashbox records the collection of a direct cash invoice. Existing entries never change, and cash refunds are not routed until refund routing is completed.",
+    "cash_sale_treasury_policy_locked": "The other two options are not available yet: they are enabled by a coordinated platform decision.",
     "prefix_moved": "The prefix is now set from",
     "prefix_moved_link": "Document numbering"
   },
@@ -7853,7 +7894,9 @@
     "descriptionPlaceholder": "Enter a settlement type description or a relevant note…",
     "activeHint": "Only active types will appear when adding an employee custody settlement after the settlement workflow is available.",
     "backToFinanceSettings": "Back to Finance Settings",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "c_paymentGateways_t": "Payment gateways",
+    "c_paymentGateways_d": "Payment provider connections: add, activate, suspend, rotate secrets and review the change history."
   },
   "paymentMethods": {
     "title": "Payment Methods",
@@ -7924,8 +7967,16 @@
       "minimum": "Minimum fee",
       "expenseAccount": "Payment-fee expense account",
       "chooseExpenseAccount": "Choose an expense account",
-      "feeHint": "The fee is calculated as a percentage of the voucher amount, then the minimum is applied and the fixed amount is added. The fee is posted as a company expense and its tax as input VAT."
-    }
+      "feeHint": "The fee is calculated as a percentage of the voucher amount, then the minimum is applied and the fixed amount is added. The fee is posted as a company expense and its tax as input VAT.",
+      "posCardTitle": "Card payment at POS",
+      "clearingGateway": "POS card clearing (optional)",
+      "clearingNone": "No clearing (default)",
+      "clearingHint": "When linked, receipts of this method post to the gateway clearing account and are settled to the bank later; without it the direct bank posting stays as is.",
+      "terminalRequired": "Require approval from a payment terminal",
+      "terminalRequiredHint": "When on, a POS sale with this method is only confirmed with a confirmed approval from a payment terminal. Off by default."
+    },
+    "badgeTerminalRequired": "Terminal required",
+    "badgeClearing": "Card clearing"
   },
   "printTemplateAssignments": {
     "title": "Template assignments",
@@ -9132,7 +9183,42 @@
     "scanExRevoking": "Revoking…",
     "scanExRevoked": "Exception revoked.",
     "scanExRevokeFailed": "Could not revoke the exception.",
-    "coreTitle": "Storage, scanning and processing"
+    "coreTitle": "Storage, scanning and processing",
+    "aiBudgetTitle": "AI budgets",
+    "aiBudgetDescription": "Platform and per-organization monthly caps for the assistant (and document extraction when metered). A request is refused before anything is sent when no cap is set or it is used up.",
+    "aiBudgetLoadFailed": "Could not load AI budgets.",
+    "aiBudgetMeterOn": "Document extraction counts against these budgets",
+    "aiBudgetMeterOff": "Document extraction is not metered here",
+    "aiBudgetProvider": "Assistant provider: {provider}",
+    "aiBudgetNetworkOn": "Assistant external connection: on",
+    "aiBudgetNetworkOff": "Assistant external connection: off",
+    "aiBudgetOverAllocated": "Organization caps add up to more than the platform cap. This is allowed — the first to reach its cap is blocked.",
+    "aiBudgetGlobal": "Platform cap",
+    "aiBudgetNoGlobal": "No platform cap for this month — every billable request is refused.",
+    "aiBudgetTenants": "Organization caps",
+    "aiBudgetNoTenants": "No organization caps for this month — organizations without a cap are refused.",
+    "aiBudgetByFeature": "Consumption by feature",
+    "aiBudgetNoUsage": "No usage recorded for this month.",
+    "aiBudgetSet": "Set or change a cap",
+    "aiBudgetScope": "Scope",
+    "aiBudgetTenantOne": "Organization",
+    "aiBudgetTenantSearch": "Search organizations",
+    "aiBudgetTenantChoose": "Choose an organization",
+    "aiBudgetPeriod": "Month",
+    "aiBudgetTokens": "Token cap",
+    "aiBudgetUsd": "Cost cap (USD)",
+    "aiBudgetEdit": "Edit",
+    "aiBudgetSave": "Save cap",
+    "aiBudgetSaving": "Saving…",
+    "aiBudgetSaved": "Cap saved.",
+    "aiBudgetRejected": "The cap was rejected. Check the password, the month, the limits and that an organization cap does not exceed the platform cap.",
+    "aiBudgetHint": "Lowering a cap below current usage stops new requests immediately; it does not change what was already used.",
+    "aiBudgetError_tokens": "Enter the token cap as a whole number.",
+    "aiBudgetError_usd": "Enter the cost cap in USD with up to six decimals.",
+    "aiBudgetError_period": "Enter the current or a future month as YYYY-MM.",
+    "aiBudgetError_tenant": "Choose an organization.",
+    "aiBudgetError_password": "Enter your current password.",
+    "aiBudgetError_limits": "The cap is above the allowed maximum."
   },
   "documentCenterReview": {
     "title": "Document Center",
@@ -9278,6 +9364,7 @@
     "edited": "Edited",
     "previewLoading": "Loading safe preview…",
     "previewUnavailable": "Preview is unavailable until safety scanning completes or the file is ready.",
+    "previewInvalidResponse": "The safe preview returned content that is not a valid document.",
     "scanExceptionNotice": "This document was processed under an approved file-scan exception. The file was not malware-scanned, so preview and download remain unavailable.",
     "previewUnsupported": "This file type cannot be rendered inline.",
     "extractionWarnings": "Extraction warnings",
@@ -10354,7 +10441,10 @@
       "title": "Online stores"
     },
     "payments": {
-      "title": "Payment gateways"
+      "title": "Payment gateways",
+      "description": "Your company's online payment provider connections: add, activate and rotate their secrets.",
+      "badge": "Settings › Finance",
+      "denied": "You do not have permission to view payment gateways. Ask an owner or admin."
     },
     "shipping": {
       "title": "Shipping companies"
@@ -10743,5 +10833,743 @@
     "description_clone": "A new custom role pre-filled from an existing one. The original is not changed.",
     "cloned_from": "Copied from \"{name}\". Review the permissions before saving.",
     "clone_skipped": "{n, plural, one {1 permission you cannot grant was left out.} other {{count} permissions you cannot grant were left out.}}"
+  },
+  "intelligence": {
+    "title": "AWJ Intelligence",
+    "subtitle": "Read-only financial analysis grounded in your own reports",
+    "demo": {
+      "badge": "Demo",
+      "reply": "Demo reply from a simulated provider — not an analysis from a real AI model.",
+      "figures": "The figures below are read directly from AWJ reports, not generated by the assistant.",
+      "provider_mode": "Provider mode: simulated (no external connection)"
+    },
+    "trigger": {
+      "label": "AWJ assistant",
+      "short": "Assistant"
+    },
+    "panel": {
+      "title": "AWJ assistant",
+      "description": "Reference financial answers from your reports — read-only",
+      "close": "Close assistant",
+      "back": "Back to page",
+      "context_label": "Current screen",
+      "context_note": "Only the screen name is used to order suggestions — page content is never sent.",
+      "clear": "Clear conversation",
+      "placeholder": "Ask about the income statement or aging…",
+      "send": "Send",
+      "sending": "Working…",
+      "counter": "{count} / {max}",
+      "too_long": "Message is longer than {max} characters.",
+      "hint": "Enter to send · Shift+Enter for a new line",
+      "empty_title": "Ask about your numbers, from your reports",
+      "empty_body": "I answer only from the reports you are authorized to read, and I state the period, scope and source. I never write or post anything.",
+      "suggestions": "Suggestions",
+      "you": "You",
+      "assistant": "Assistant",
+      "open_canvas": "Open in Canvas",
+      "open_report": "Open original report",
+      "open_settings": "Assistant settings",
+      "open_canvas_empty": "Financial Canvas",
+      "loading_status": "Checking permissions…",
+      "status_error": "Could not read assistant status",
+      "retry": "Retry",
+      "pending": "Working on it…",
+      "result_ready": "Result ready",
+      "no_tool": "No report was run for this question. Try a suggestion or use the Canvas.",
+      "quick": {
+        "income_statement": "Income statement this month",
+        "receivables_aging": "Receivables aging",
+        "payables_aging": "Payables aging"
+      },
+      "quick_message": {
+        "income_statement": "Income statement",
+        "receivables_aging": "Receivables aging",
+        "payables_aging": "Payables aging"
+      },
+      "suggestions_for_screen": "Suggested for this screen",
+      "more_reports": "Other reports",
+      "not_yet": "Not available yet: period comparison, charts and trend analysis. The assistant shows nothing for what current reports do not support."
+    },
+    "context": {
+      "dashboard": "Dashboard",
+      "invoices": "Invoices",
+      "invoice_detail": "Invoice details",
+      "payments": "Payments",
+      "purchases": "Purchases",
+      "partners": "Customers & suppliers",
+      "reports": "Reports",
+      "income_statement_report": "Income statement report",
+      "receivables_aging_report": "Receivables aging report",
+      "payables_aging_report": "Payables aging report",
+      "intelligence": "Financial Canvas",
+      "other": "Other screen",
+      "entity": "Specific record",
+      "document_review": "Document review"
+    },
+    "canvas": {
+      "title": "Financial Intelligence Canvas",
+      "description": "Explicitly run approved read-only reports with full figures and sources. No model computes the numbers.",
+      "tool": "Report",
+      "tools": {
+        "income_statement": "Income statement",
+        "receivables_aging": "Receivables aging",
+        "payables_aging": "Payables aging"
+      },
+      "from": "From",
+      "to": "To",
+      "as_of": "As of",
+      "run": "Run report",
+      "running": "Running…",
+      "today": "Today (organization time): {date}",
+      "date_invalid": "Invalid date",
+      "date_future": "Future dates are not allowed",
+      "date_inverted": "Start is after end",
+      "date_too_long": "Period exceeds 366 days",
+      "history": "Runs in this session",
+      "history_note": "Kept in memory only; cleared when the tab closes or the organization changes.",
+      "history_empty": "No report run yet.",
+      "empty_title": "Pick a report and run it",
+      "empty_body": "No financial figure is read until you press “Run report”.",
+      "back_to_assistant": "Back to assistant",
+      "ask_assistant": "Ask the assistant",
+      "loading": "Reading the report…",
+      "source_assistant": "From assistant",
+      "source_canvas": "Explicit run",
+      "checking": "Checking permissions…",
+      "status_error": "Could not read assistant status",
+      "controls": "Report controls",
+      "read_only": "Read-only"
+    },
+    "result": {
+      "income_statement": "Income statement",
+      "receivables_aging": "Receivables aging",
+      "payables_aging": "Payables aging",
+      "period": "Period",
+      "as_of": "As of",
+      "generated_at": "Read at",
+      "revenues": "Revenue",
+      "expenses": "Expenses",
+      "total_revenue": "Total revenue",
+      "total_expense": "Total expenses",
+      "net_income": "Net income",
+      "unallocated": "Not allocated to a branch",
+      "account": "Account",
+      "code": "Code",
+      "amount": "Amount",
+      "partner": "Party",
+      "unnamed_partner": "Unnamed",
+      "total": "Total",
+      "no_rows": "No open balances.",
+      "no_lines": "No lines.",
+      "partner_withheld": "Party details are withheld for your account; totals only.",
+      "buckets": {
+        "b0_30": "0–30",
+        "b31_60": "31–60",
+        "b61_90": "61–90",
+        "b90_plus": "90+"
+      },
+      "days": "days",
+      "currency_sar": "Saudi riyal",
+      "evidence": "Evidence & scope",
+      "scope": "Scope",
+      "basis": "Basis",
+      "sources": "Sources",
+      "warnings": "Warnings",
+      "open_source": "Open original report",
+      "source_api": "API path",
+      "scope_branch": {
+        "all": "All branches",
+        "selected": "Selected branches",
+        "assigned": "Branches you are assigned"
+      },
+      "scope_warehouse": "Warehouses: not applicable to financial totals",
+      "scope_warehouse_note": "Warehouse restriction governs inventory reads only and does not filter these figures.",
+      "scope_authorization": "Authorization scope, not a data filter",
+      "scope_authorization_note": "Shows what you may access; it does not mean the figures are filtered by your warehouse.",
+      "basis_income": "Posted entries within the period, by entry date",
+      "basis_aging": "Current outstanding balance; the “as of” date only sets the age reference and no historical balance is rebuilt",
+      "reconciled": "Reconciled to the control ledger account",
+      "not_reconciled": "Not automatically reconciled to the control ledger account",
+      "currency_note": "Currency is Saudi riyal (SAR)",
+      "timezone": "Time zone: {tz}",
+      "warning": {
+        "as_of_not_historical": "The selected date is not today, but balances are the current balances as of the read time ({balance_as_of}); no historical balance was rebuilt. The date only sets the age reference.",
+        "unknown": "Server warning: {code}"
+      },
+      "summary": "Summary"
+    },
+    "settings": {
+      "title": "Assistant settings",
+      "description": "Your organization’s consent to use the assistant and the data categories it may read.",
+      "back": "Back to Intelligence",
+      "denied_title": "This page is for the organization owner or admin",
+      "denied_body": "Managing consent needs a permission your role does not include.",
+      "platform_off": "The feature is not enabled at platform level. You can withdraw consent, but new consent cannot be granted right now.",
+      "master": "Enable the assistant for my organization",
+      "master_help": "Turning it off withdraws all consent immediately; turning it on again needs fresh consent.",
+      "categories": "Data categories",
+      "category": {
+        "assistant_messages": "Assistant messages",
+        "financial_summary": "Financial summaries",
+        "document_projected_text": "Extracted document text"
+      },
+      "category_help": {
+        "assistant_messages": "The text you type to the assistant is processed through the gateway.",
+        "financial_summary": "Lets tools read the income statement and aging, within each user’s own permissions.",
+        "document_projected_text": "Lets an authorized user read the reviewed, redacted values of one Document Center document at a time. Completely separate from Document Center consent to send documents."
+      },
+      "unavailable": "Not enabled on the platform",
+      "granted": "Granted",
+      "not_granted": "Not granted",
+      "saving": "Saving…",
+      "saved": "Consent saved and effective immediately.",
+      "save_failed": "Change was not saved",
+      "document_center_note": "Document Center consent (sending documents) is entirely separate and neither grants nor withdraws anything here.",
+      "privacy_title": "Privacy notice",
+      "privacy_points": {
+        "p1": "No text or figure is sent to an outside party today; the current provider is a simulation.",
+        "p2": "Audit records describe the operation only (who, when, which tool, outcome) — never the question or answer text.",
+        "p3": "Each user’s permissions limit what the assistant reads; it cannot exceed them.",
+        "p4": "You can withdraw consent at any time and it applies from the next request."
+      },
+      "confirm_title": "Grant consent",
+      "confirm_enable": "Your organization will grant: {categories}.",
+      "acknowledge": "I have read the privacy notice and consent on behalf of the organization.",
+      "confirm": "Grant consent",
+      "cancel": "Cancel",
+      "revoke_confirm": "Withdraw consent",
+      "audit": "Recent activity (metadata only)",
+      "audit_empty": "No recorded activity.",
+      "audit_error": "Could not read the log",
+      "audit_note": "The log never contains question or answer text.",
+      "audit_event": "Event",
+      "audit_outcome": "Outcome",
+      "audit_reason": "Reason",
+      "audit_time": "Time",
+      "outcome": {
+        "allowed": "Allowed",
+        "denied": "Denied",
+        "error": "Error"
+      },
+      "loading": "Loading settings…",
+      "status_error": "Could not read settings",
+      "retry": "Retry",
+      "mock_note": "Current provider mode: simulated — no external connection.",
+      "confirm_enable_only": "You are turning the assistant on for your organization. No data category is granted until you grant each one separately.",
+      "document_privacy_title": "Document category privacy notice",
+      "document_privacy_points": {
+        "d1": "Only person-reviewed values are shown, after approved redaction and within strict limits; the original file and its storage link are never shown.",
+        "d2": "Each read is one document the user picks from their own screen; the assistant never chooses or searches documents.",
+        "d3": "Values are not sent to any outside provider; they are shown to the authorized user only, and audit records keep a document reference and counts only — no values or text.",
+        "d4": "Reading needs Document Center view permission and an allowed branch, and unreviewed, quarantined, held or expired documents are refused. You can withdraw consent any time and it applies from the next request."
+      },
+      "document_separate": "This consent is independent of “sending documents” in Document Center settings.",
+      "external_title": "Sending to an external AI provider",
+      "external_help": "Your questions and a summary of the report figures are sent to Anthropic to write the answer. Party names, ids and documents are never sent.",
+      "external_acknowledge_cta": "Review and acknowledge",
+      "external_revoke": "Withdraw acknowledgement",
+      "external_confirm": "Acknowledge that the assistant sends data to an external AI provider.",
+      "external_note": "Current provider mode: external (Anthropic).",
+      "external_privacy_title": "External provider notice",
+      "external_privacy_points": {
+        "e1": "What is sent: the text of each question you ask, and a de-identified summary of the report figures the assistant used (amounts and dates).",
+        "e2": "What is never sent: customer or supplier names, ids, branch identifiers, tenant or user identity, and any Document Center content.",
+        "e3": "Written answers are checked against the report figures; an answer containing a number that is not in the report is withheld.",
+        "e4": "Acknowledgement is withdrawn automatically when the assistant is turned off, and can be withdrawn here at any time."
+      },
+      "external_acknowledge": "I acknowledge, on behalf of the organization, that questions and figure summaries are sent to Anthropic.",
+      "external_documents_title": "Sending reviewed documents to an external AI provider",
+      "external_documents_help": "When you ask about a document, its human-reviewed and redacted values are sent to Anthropic. Original files, hidden values and other documents are never sent.",
+      "external_documents_requires": "Requires: the assistant on, the external sending acknowledgement, and consent to extracted document text.",
+      "external_documents_platform_off": "The platform has not enabled sending documents to an external provider.",
+      "external_documents_cta": "Review and acknowledge document sending",
+      "external_documents_revoke": "Withdraw acknowledgement",
+      "external_documents_confirm": "Acknowledge that reviewed document values are sent to an external AI provider when someone asks about a document.",
+      "external_documents_privacy_title": "Document sending notice",
+      "external_documents_acknowledge": "I acknowledge, on behalf of the organization, that reviewed document values are sent to Anthropic when a user asks about a document.",
+      "external_documents_privacy_points": {
+        "x1": "What is sent: the question you type and the human-reviewed values of ONE document you chose (amounts as decimals, dates, document numbers, line descriptions).",
+        "x2": "What is never sent: the original file, scan, file name, storage location, hidden (redacted) values, tax numbers, document or company identifiers, and any other document.",
+        "x3": "The issuer and recipient names are replaced by labels (Party-1, Party-2) before sending and restored here in the answer.",
+        "x4": "Answers are checked against the document values; an answer with a figure that is not in the document is withheld. Withdrawing the acknowledgement stops this immediately."
+      }
+    },
+    "notice": {
+      "action_settings": "Open assistant settings",
+      "action_admin": "Ask the organization owner or an admin",
+      "action_retry": "Try again",
+      "code": "Code",
+      "platform_disabled": {
+        "title": "The assistant is not enabled on the platform",
+        "body": "The platform has not turned this feature on yet. Nothing is sent and nothing is read. No action is needed from you."
+      },
+      "tenant_disabled": {
+        "title": "The assistant is not enabled for your organization",
+        "body": "An owner or admin turns it on from the assistant settings after consenting to data categories."
+      },
+      "consent_required": {
+        "title": "Organization consent is required",
+        "body": "The data category needed for this action has not been granted. No request was made."
+      },
+      "permission_denied": {
+        "title": "You do not have permission for this",
+        "body": "Your account does not include the required permission. Ask an admin to adjust your role if appropriate."
+      },
+      "tool_permission_denied": {
+        "title": "You cannot read financial reports",
+        "body": "Financial tools need report-viewing permission in addition to assistant access."
+      },
+      "provider_unavailable": {
+        "title": "The assistant provider is unavailable",
+        "body": "No provider is active right now, so no reply is produced. The explicit financial tools in the Canvas do not need a provider."
+      },
+      "currency_unsupported": {
+        "title": "Organization currency is not supported",
+        "body": "Financial tools support Saudi riyal only for now. No figures were read."
+      },
+      "branch_scope_forbidden": {
+        "title": "Branch outside your scope",
+        "body": "The requested branch is not among the branches you are authorized for."
+      },
+      "warehouse_scope_forbidden": {
+        "title": "Warehouse outside your scope",
+        "body": "The requested warehouse is not among those you are authorized for."
+      },
+      "scope_not_supported": {
+        "title": "Unsupported scope",
+        "body": "This kind of scope is not supported by the financial tool."
+      },
+      "invalid_tool_arguments": {
+        "title": "Invalid parameters",
+        "body": "Check the dates: they must be valid, not in the future, and the period at most 366 days."
+      },
+      "invalid_request": {
+        "title": "Invalid request",
+        "body": "The server rejected the request. Adjust it and try again."
+      },
+      "budget_not_configured": {
+        "title": "Assistant budget is not configured",
+        "body": "No spend cap is set for this organization, so no billable reply is made. The platform operator sets it."
+      },
+      "budget_exceeded": {
+        "title": "Assistant budget is used up",
+        "body": "The organization reached its usage cap. The request was not run."
+      },
+      "platform_budget_exceeded": {
+        "title": "Platform budget is used up",
+        "body": "Overall usage reached the platform cap. The request was not run."
+      },
+      "pricing_unknown": {
+        "title": "Provider pricing is unknown",
+        "body": "The request cost cannot be estimated, so it was not run."
+      },
+      "acknowledgement_required": {
+        "title": "Acknowledgement required",
+        "body": "Grant consent after reading the privacy notice and ticking the acknowledgement."
+      },
+      "data_category_unavailable": {
+        "title": "Data category unavailable",
+        "body": "This category is not available and cannot be granted."
+      },
+      "duplicate_request": {
+        "title": "Request already in progress",
+        "body": "An identical request is still running. Wait for it to finish before sending again."
+      },
+      "rate_limited": {
+        "title": "Too many requests",
+        "body": "You exceeded the request limit. Wait a moment and try again."
+      },
+      "network_error": {
+        "title": "Could not reach the server",
+        "body": "The request or its answer did not arrive. No result is shown. Check your connection and try again."
+      },
+      "server_error": {
+        "title": "Server error",
+        "body": "Something failed while processing and no result was produced. Try again shortly."
+      },
+      "unknown_error": {
+        "title": "The request could not be completed",
+        "body": "No result was produced. Try again."
+      },
+      "category_unavailable": {
+        "title": "Document reading is not enabled on the platform",
+        "body": "The “document text” category is not turned on at platform level yet, so it cannot be granted or used. No document is read."
+      },
+      "document_center_unavailable": {
+        "title": "Document Center is not available to your organization",
+        "body": "The Document Center capability is not entitled or not enabled, so the assistant reads no document."
+      },
+      "document_unavailable": {
+        "title": "This document is not available to you",
+        "body": "We could not open this document within your permissions and current branch. Check the document and the active branch."
+      },
+      "document_not_reviewed": {
+        "title": "The document has not been reviewed yet",
+        "body": "The assistant only reads documents a person has finished reviewing. Complete the review in Document Center, then try again."
+      },
+      "document_review_stale": {
+        "title": "The document review changed after approval",
+        "body": "A newer extraction or a value edit appeared after the last human approval. Re-approve the review in Document Center, then try again."
+      },
+      "document_quarantined": {
+        "title": "The document is quarantined",
+        "body": "A quarantined document is never read. A Document Center administrator handles it."
+      },
+      "document_scan_incomplete": {
+        "title": "The safety scan has not completed",
+        "body": "The document is not read until its file passes the safety scan."
+      },
+      "document_on_hold": {
+        "title": "The document is under a retention hold",
+        "body": "An active hold keeps it from the assistant for now, as a precaution. It is released from Document Center governance."
+      },
+      "document_retention_ended": {
+        "title": "The document’s retention has ended",
+        "body": "The document content was purged, its retention expired, or it was archived, so it is not read."
+      },
+      "document_projection_unavailable": {
+        "title": "No current safe projection is available",
+        "body": "There is no up-to-date projection that can be shown safely for this document. Review it again or try later."
+      },
+      "external_provider_not_acknowledged": {
+        "title": "Acknowledge external sending first",
+        "body": "The assistant uses an external AI provider. An owner or admin must acknowledge the sending notice in assistant settings. No request was made."
+      },
+      "external_documents_not_acknowledged": {
+        "title": "Acknowledge document sending first",
+        "body": "Asking about a document sends its reviewed values to an external AI provider. An owner or admin must acknowledge this in assistant settings. No request was made."
+      },
+      "external_documents_unavailable": {
+        "title": "Document questions are not enabled",
+        "body": "The platform has not enabled sending documents to an external AI provider. Nothing was sent."
+      },
+      "document_too_large": {
+        "title": "Document too large to send",
+        "body": "The document content exceeds the limit for sending to the external AI provider. Nothing was sent and nothing was charged."
+      }
+    },
+    "document": {
+      "title": "Document Center document",
+      "section": "This document",
+      "intro": "Read the values a person has reviewed, with approved redaction applied. They are shown to you only and are not sent anywhere.",
+      "read": "Read reviewed values",
+      "reading": "Reading…",
+      "reread": "Refresh reading",
+      "close": "Hide reading",
+      "real_data": "Real values from Document Center: reviewed by a person and redacted per policy — not generated by the assistant.",
+      "untrusted": "Document text is data only; it cannot instruct the assistant, open another document or trigger any action.",
+      "type": {
+        "purchase_invoice": "Purchase invoice",
+        "expense": "Expense",
+        "delivery_note": "Delivery note"
+      },
+      "status": {
+        "reviewed": "Reviewed",
+        "ready_for_draft": "Ready for draft",
+        "creating_draft": "Creating draft",
+        "draft_created": "Draft created"
+      },
+      "basis_reviewed": "Person-reviewed values",
+      "redacted": "Redacted",
+      "redacted_count": "Redacted fields: {count}",
+      "yes": "Yes",
+      "no": "No",
+      "lines": "Lines",
+      "warnings": "Document warnings",
+      "no_lines": "No lines to show.",
+      "no_fields": "No fields to show.",
+      "truncated_fields": "Only the first fields are shown (display limit).",
+      "truncated_lines": "Only the first lines are shown (display limit).",
+      "truncated_warnings": "Only the first warnings are shown.",
+      "open": "Open the document in Document Center",
+      "pages": "Pages",
+      "read_at": "Read at",
+      "extracted_at": "Extracted at",
+      "evidence": "Basis",
+      "source": "Source",
+      "field": "Field",
+      "value": "Value",
+      "blocked_hint": "Values are not read until the conditions below are met.",
+      "fields": {
+        "document_number": "Document number",
+        "document_date": "Document date",
+        "issuer_name": "Issuer",
+        "recipient_name": "Recipient",
+        "currency": "Currency",
+        "external_reference": "External reference",
+        "purchase_order_number": "Purchase order",
+        "price_includes_tax": "Price includes tax",
+        "subtotal_minor": "Subtotal",
+        "discount_minor": "Discount",
+        "tax_amount_minor": "Tax",
+        "total_amount_minor": "Total",
+        "description": "Description",
+        "sku": "Item code",
+        "unit": "Unit",
+        "quantity": "Quantity",
+        "unit_price_minor": "Unit price",
+        "total_minor": "Line total"
+      }
+    },
+    "external": {
+      "badge": "Anthropic",
+      "reply": "Written by an external AI model from your report figures. The figures in the cards are read directly from AWJ reports.",
+      "document_toggle": "Answer from this document",
+      "document_toggle_hint": "Sends this document's reviewed values (with hidden fields excluded) to Anthropic to answer your question. No file is sent.",
+      "document_basis": "Based on this document: {fields} fields, {lines} lines sent; {redacted} hidden values were not sent."
+    }
+  },
+  "paymentGateways": {
+    "title": "Payment gateways",
+    "subtitle": "The payment provider connections you add yourself. A draft stays idle until you activate it, and secrets are never shown after saving.",
+    "back": "Back to finance settings",
+    "list": "Connections",
+    "add": "Add connection",
+    "retry": "Retry",
+    "loading": "Loading connections",
+    "loadFailed": "Could not load gateway connections.",
+    "denied": "You do not have permission to view payment gateways. Ask an owner or admin.",
+    "empty": "No connections yet",
+    "emptyHint": "Add a connection to your payment provider. It is saved as a draft, and no payment is taken until it is activated and online payments are enabled for your company.",
+    "activationBlocked": "A real provider connection cannot be activated before its credentials are verified; verification becomes available once that provider's adapter is enabled. A manual (custom) link activates directly.",
+    "actionFailed": "The action could not be completed.",
+    "providers": {
+      "stripe": "Stripe",
+      "tap": "Tap",
+      "paytabs": "PayTabs",
+      "checkout": "Checkout.com",
+      "custom": "Manual (custom)"
+    },
+    "environments": {
+      "sandbox": "Sandbox",
+      "live": "Live"
+    },
+    "status": {
+      "draft": "Draft",
+      "active": "Active",
+      "suspended": "Suspended",
+      "revoked": "Revoked"
+    },
+    "fields": {
+      "secretKey": "Secret key",
+      "webhookSecret": "Webhook secret",
+      "saved": "Saved",
+      "missing": "Not set",
+      "credentialVersion": "Credential version",
+      "verified": "Verification",
+      "notVerified": "Not verified yet",
+      "graceUntil": "Previous secret valid until"
+    },
+    "actions": {
+      "cancel": "Cancel",
+      "edit": "Edit",
+      "rotate": "Rotate secrets",
+      "activate": "Activate",
+      "suspend": "Suspend",
+      "revoke": "Revoke",
+      "delete": "Delete",
+      "events": "History"
+    },
+    "confirm": {
+      "activate": "Activate the connection “{name}”?",
+      "suspend": "Suspend the connection “{name}”? You can reactivate it later.",
+      "revoke": "Permanently revoke “{name}”? Its secrets are erased and this cannot be undone; its history is kept.",
+      "delete": "Delete the connection “{name}”?"
+    },
+    "done": {
+      "create": "Connection added as a draft",
+      "edit": "Changes saved",
+      "activate": "Connection activated",
+      "suspend": "Connection suspended",
+      "revoke": "Connection revoked",
+      "delete": "Connection deleted",
+      "rotate": "Secrets rotated"
+    },
+    "form": {
+      "addTitle": "Add a payment gateway connection",
+      "editTitle": "Edit connection",
+      "steps": "Add steps",
+      "step1": "Provider",
+      "step2": "Credentials",
+      "step3": "Review",
+      "provider": "Provider",
+      "environment": "Environment",
+      "name": "Name",
+      "nameEn": "English name",
+      "merchantReference": "Merchant reference",
+      "publishableKey": "Publishable key",
+      "secretKey": "Secret key",
+      "webhookSecret": "Webhook secret",
+      "realProviderHint": "A real provider connection stays a draft until its credentials are verified by the provider adapter.",
+      "customProviderHint": "A manual link without a provider: no network calls, and it activates directly.",
+      "secretsNote": "Secrets are stored encrypted and never shown after saving. To change them later use “Rotate secrets”.",
+      "provided": "Provided",
+      "notProvided": "Not provided",
+      "draftNote": "The connection is saved as a draft; activation is a separate step.",
+      "nameRequired": "A name is required.",
+      "next": "Next",
+      "back": "Back",
+      "saveDraft": "Save as draft",
+      "saveEdit": "Save changes",
+      "saving": "Saving…",
+      "saveFailed": "Could not save the connection.",
+      "environmentLocked": "The environment cannot change once the connection leaves draft."
+    },
+    "rotate": {
+      "title": "Rotate secrets",
+      "intro": "Enter only the new secrets; anything left blank is unchanged. The previous webhook secret stays valid for the grace period so in-flight notifications are not lost.",
+      "grace": "Grace period (minutes)",
+      "graceHint": "0 to 10080 minutes (one week).",
+      "nothing": "Enter at least one secret.",
+      "submit": "Rotate",
+      "saving": "Rotating…",
+      "failed": "Could not rotate the secrets."
+    },
+    "events": {
+      "title": "Connection history",
+      "loading": "Loading history",
+      "empty": "No events yet.",
+      "failed": "Could not load the history.",
+      "fields": "Changed fields",
+      "types": {
+        "created": "Created",
+        "updated": "Updated",
+        "credentials_rotated": "Secrets rotated",
+        "activated": "Activated",
+        "reactivated": "Reactivated",
+        "suspended": "Suspended",
+        "revoked": "Revoked",
+        "deleted": "Deleted"
+      }
+    },
+    "errors": {
+      "gateway_has_references": "A connection linked to receipts, settlements or payment attempts cannot be deleted. Suspend or revoke it instead.",
+      "gateway_active_cannot_delete": "An active connection cannot be deleted. Suspend it first.",
+      "gateway_verification_required": "A real provider connection cannot be activated before its credentials are verified.",
+      "gateway_revoked": "The connection is revoked and cannot be changed.",
+      "gateway_not_active": "Only an active connection can be suspended.",
+      "gateway_name_taken": "That name is used by another connection.",
+      "gateway_nothing_to_rotate": "There are no secrets to rotate.",
+      "gateway_provider_immutable": "The provider cannot change after creation.",
+      "gateway_environment_locked": "The environment cannot change after activation.",
+      "gateway_has_active_attempts": "A connection with reconcilable payment attempts (in progress, or whose payment page is still open) cannot be revoked. Suspend it or finish the attempts first.",
+      "gateway_rotation_blocked": "Secrets cannot be rotated while payment attempts are still reconcilable; existing operations at the provider could become unreachable. Finish the attempts or wait for them to expire, then retry.",
+      "gateway_invalid_environment": "The selected environment is not valid.",
+      "gateway_invalid_grace": "The previous-secret grace period is not valid.",
+      "gateway_name_required": "A connection name is required.",
+      "gateway_unsupported_provider": "This provider is not supported yet.",
+      "gateway_reason_required": "A reason for revoking is required."
+    },
+    "demoReadOnly": "Preview mode: view only, no actions are run on connections.",
+    "revoke": {
+      "title": "Revoke the connection",
+      "reason": "Reason for revoking",
+      "reasonRequired": "Enter a reason (at least 3 characters).",
+      "submit": "Revoke",
+      "saving": "Revoking…",
+      "failed": "Could not revoke the connection."
+    }
+  },
+  "posTerminals": {
+    "title": "Card payment terminals",
+    "subtitle": "Register payment terminals and link them to POS devices. The amount is sent to the terminal and the approval is captured before the sale completes.",
+    "back_to_settings": "Back to POS settings",
+    "add": "Add terminal",
+    "add_title": "Add payment terminal",
+    "edit_title": "Edit payment terminal",
+    "edit": "Edit {name}",
+    "name": "Name",
+    "code": "Code (optional)",
+    "code_hint": "Unique within the company, e.g. the terminal serial number.",
+    "provider": "Provider",
+    "provider_fixed": "The provider cannot change after creation.",
+    "device": "POS device",
+    "device_hint": "Leave on “Any device” to serve every device in the branch, or bind it to a single POS device.",
+    "any_device": "Any device in the branch",
+    "status_col": "Status",
+    "active": "Active",
+    "inactive": "Inactive",
+    "search": "Search payment terminals",
+    "empty": "No payment terminals yet.",
+    "read_only": "Read only — managing terminals needs company-management permission.",
+    "simulated": "Simulation — not a real payment",
+    "simulated_env_note": "This environment offers a simulated provider: terminals created on it are for testing only and move no real money.",
+    "no_provider_title": "No payment-terminal provider is available yet",
+    "no_provider_body": "Real terminal integrations are still being set up; a terminal cannot be registered before an approved provider is enabled. Payment methods that do not require a terminal keep working as before.",
+    "loading": "Loading payment terminals…",
+    "panel_title": "Pay with card terminal",
+    "simulated_note": "Test terminal (simulation): no money is taken from any real card.",
+    "simulated_approval": "Test approval — no real money was taken.",
+    "required_note": "This method requires a confirmed approval from the payment terminal before the sale completes.",
+    "required_unavailable": "This method requires a payment terminal, and no active terminal is available for this session. Enable a terminal or choose another method.",
+    "choose_terminal": "Choose payment terminal",
+    "terminal_label": "Terminal: {name}",
+    "send_amount": "Send {amount} to terminal",
+    "enter_amount": "Enter the card amount first",
+    "waiting_customer": "Waiting for the customer on the terminal…",
+    "poll_warning": "Terminal is momentarily unreachable; still trying.",
+    "approved_ready": "Approved on the terminal — ready to complete the sale.",
+    "card_last4": "Card •••• {last4}",
+    "approval_code": "Approval code {code}",
+    "cancel_request": "Cancel request",
+    "void_approval": "Void approval",
+    "confirm_void": "Void the approval on the terminal? The customer will not be charged.",
+    "retry_void": "Retry void",
+    "copy_for_manager": "Copy summary for manager",
+    "try_again": "Try again",
+    "amount_locked": "The amount is locked while the request is open. You cannot leave the payment screen until it is cancelled or the sale completes.",
+    "compensation_title": "The operation could not be voided on the terminal",
+    "compensation_body": "The customer’s money may be held or charged. This operation cannot complete the sale and the session cannot be closed until it is resolved. Retry the void; if it keeps failing, escalate to a manager (variance-approval permission) with the copied summary.",
+    "status": {
+      "created": "Created",
+      "sent": "Waiting for terminal",
+      "approved": "Approved",
+      "declined": "Declined by terminal",
+      "cancelled": "Cancelled",
+      "expired": "Expired",
+      "error": "Error",
+      "consumed": "Used in sale",
+      "voided": "Approval voided",
+      "compensation_required": "Needs compensation",
+      "compensated": "Resolved manually"
+    },
+    "status_hint": {
+      "declined": "The terminal declined the operation. Try another card or payment method.",
+      "cancelled": "The request was cancelled; nothing was charged.",
+      "expired": "The request timed out; nothing was charged.",
+      "error": "The request could not be sent to the terminal. Try again.",
+      "voided": "The approval was voided on the terminal; the amount was not charged."
+    },
+    "failure": {
+      "declined": "The terminal declined the operation.",
+      "amount_mismatch": "The terminal amount differs from the requested one, so the approval was voided.",
+      "start_unconfirmed": "It is not confirmed that the request reached the terminal; check the terminal before resending.",
+      "void_failed": "Could not reach the terminal while voiding.",
+      "void_not_confirmed": "The terminal did not confirm the void.",
+      "void_rejected": "The terminal rejected the void request."
+    },
+    "errors": {
+      "terminal_busy": "The terminal has an active request; finish or cancel it first.",
+      "idempotency_conflict": "Request conflict; try again.",
+      "operation_in_progress": "Another operation is running on this request; try again in a moment.",
+      "terminal_unavailable_now": "The terminal cannot be reached right now; try again.",
+      "terminal_unavailable": "The payment terminal does not exist or is disabled.",
+      "terminal_device_mismatch": "This terminal is assigned to another POS device.",
+      "provider_unavailable": "The terminal provider is not available in this environment.",
+      "adapter_unavailable": "No adapter is enabled for this provider.",
+      "method_not_card": "The payment method must be an active bank method.",
+      "method_not_allowed_in_pos": "The payment method is not enabled in the POS settings.",
+      "session_forbidden": "This session belongs to another cashier.",
+      "invalid_amount": "The amount is not valid.",
+      "not_cancellable": "The request cannot be cancelled in its current state.",
+      "not_voidable": "There is no standing approval to void.",
+      "compensation_in_progress": "A void attempt is running on the terminal; wait for it to finish, then try again.",
+      "generic": "The payment-terminal operation failed."
+    },
+    "alert_compensation_title": "Payment-terminal operations need compensation ({count})",
+    "alert_blocking_title": "Pending payment-terminal operations block closing ({count})",
+    "alert_compensation_body": "One or more operations could not be voided on the payment terminal, and the customer’s money may be held. The session cannot be closed until they are resolved: retry the void.",
+    "alert_blocking_body": "The payment terminal has unresolved operations. Complete the sale or cancel the request/approval before closing the session.",
+    "alert_escalation": "If it keeps failing: copy the summary and escalate to a manager (variance-approval permission) or support. The escalation summary contains no card data."
   }
 }

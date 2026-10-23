@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { type ColumnDef } from '@tanstack/react-table';
-import { Copy, Download, Eye, FileSpreadsheet, Pencil, Plus, Trash2, Upload } from 'lucide-react';
+import { Bot, Copy, Download, Eye, FileSpreadsheet, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { AdvancedFilterDialog } from '@/components/data-explorer/advanced-filter-dialog';
 import { ListToolbar, PageHeader, Pagination, type PageAction, type SortOption } from '@/components/nebrax';
@@ -297,6 +297,7 @@ export default function ProductsPage() {
   const headerActions: PageAction[] = [
     { key: 'export', label: t('export'), icon: Download, onClick: () => setExportOpen(true), variant: 'outline', emphasis: 'secondary' },
     { key: 'import', label: t('import'), icon: Upload, href: '/products/import', variant: 'outline', emphasis: 'secondary' },
+    { key: 'aiImport', label: t('ai_import'), icon: Bot, href: '/products/ai-import', variant: 'outline', emphasis: 'secondary' },
     { key: 'workbookImport', label: t('workbook_import'), icon: FileSpreadsheet, href: '/products/workbook-import', variant: 'outline', emphasis: 'secondary' },
     { key: 'add', label: t('add'), icon: Plus, href: '/products/new', variant: 'primary' },
   ];

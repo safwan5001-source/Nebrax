@@ -3,9 +3,12 @@
 namespace App\Services;
 
 use App\Models\ImportJob;
+use App\Support\ImportChunk;
+use App\Support\ImportChunkResult;
 use App\Support\ImportJobDomain;
 use App\Support\ImportJobStatus;
-use App\Support\SpreadsheetReader;
+use App\Support\ImportPreviewException;
+use App\Tenancy\BranchContext;
 use App\Tenancy\TenantContext;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\UploadedFile;
@@ -25,30 +28,13 @@ use Throwable;
  */
 class ImportJobService
 {
-    /**
-     * PR-DUR-HARDEN-1 — سقف الصفوف لم يعد واحداً مشتركاً بين المجالات
-     * الثلاثة: `product_catalog` مجزَّأٌ فعلياً فسقفه `DURABLE_MAX_ROWS`
-     * (أعلى بعشر مرّات، مبرَّرٌ بالقياس — راجع توثيقه)؛ `product_workbook`
-     * و`inventory_opening` ذرّيّان (تطبيقهما كتلةٌ واحدة بلا تجزئة ممكنة
-     * أصلاً — PR-DUR-3/4)، فسقفهما يبقى سقف خدمة كلٍّ منهما نفسه، غير
-     * مرفوعٍ هنا ولا في أي مكانٍ آخر. `maxRowsFor()` يفرض هذا التمييز صراحةً
-     * بدل ثابتٍ واحد يُطبَّق على الجميع سهواً (`MAX_COLUMNS` وحده يبقى
-     * ثابتاً موحَّداً أدناه — لم يظهر ما يبرّر تفريقه).
-     */
-    private function maxRowsFor(string $domain): int
-    {
-        return match ($domain) {
-            ImportJobDomain::PRODUCT_CATALOG => ProductImportService::DURABLE_MAX_ROWS,
-            ImportJobDomain::PRODUCT_WORKBOOK => ProductWorkbookService::MAX_ROWS,
-            ImportJobDomain::INVENTORY_OPENING => InventoryOpeningImportService::MAX_ROWS,
-            default => ProductImportService::MAX_ROWS,
-        };
-    }
-
-    /** الأعمدة لم تتغيّر لأي مجال — سقفٌ واحد (٢٠٠) يبقى كافياً وموحَّداً. */
-    private const MAX_COLUMNS = ProductImportService::MAX_COLUMNS;
-
-    public function __construct(private readonly ImportJobFileStorage $storage) {}
+    public function __construct(
+        private readonly ImportJobFileStorage $storage,
+        private readonly ProductImageArchiveService $imageArchives,
+        private readonly ImportDomainRegistry $domains,
+        private readonly BranchContext $branch,
+        private readonly ImportPreviewService $previews,
+    ) {}
 
     /**
      * إنشاءٌ آمنٌ تحت التزامن: القيد الفريد `(tenant_id, idempotency_key)` في
@@ -57,23 +43,81 @@ class ImportJobService
      * بالقيد فيُنظِّف ملفه اليتيم ويعيد تشغيلة الفائز — بعد التحقق من تطابق
      * الطلب (المجال + بصمة SHA-256)، لا إعادة سجلٍّ لا يخصّه أبداً.
      */
-    public function create(UploadedFile $file, string $domain, ?string $idempotencyKey, ?string $userId): ImportJob
+    public function create(
+        UploadedFile $file,
+        string $domain,
+        ?string $idempotencyKey,
+        ?string $userId,
+        ?UploadedFile $mediaArchive = null,
+        ?array $options = null,
+        ?string $previewId = null,
+        ?string $previewHash = null,
+        ?string $parentJobId = null,
+    ): ImportJob
     {
         $idempotencyKey = $idempotencyKey !== null && trim($idempotencyKey) !== '' ? trim($idempotencyKey) : null;
         $sha256 = hash_file('sha256', $file->getRealPath());
         if ($sha256 === false) {
             throw new RuntimeException('تعذّر حساب بصمة الملف.');
         }
+        $archiveSha256 = null;
+        if ($mediaArchive !== null) {
+            if ($domain !== ImportJobDomain::PRODUCT_CATALOG) {
+                throw new RuntimeException('أرشيف صور المنتجات متاح لاستيراد كتالوج المنتجات فقط.');
+            }
+            // فحصٌ كامل قبل التخزين: بنية ZIP، المسارات، التشفير، الأحجام،
+            // نسبة الضغط، ثم MIME/محتوى كل صورة لا امتدادها وحده.
+            $this->imageArchives->manifest($mediaArchive);
+            $archiveSha256 = hash_file('sha256', $mediaArchive->getRealPath());
+            if ($archiveSha256 === false) {
+                throw new RuntimeException('تعذّر حساب بصمة أرشيف الصور.');
+            }
+        }
+
+        // IMP-H1-S3a: فرع التشغيلة يُلتقط **مرة واحدة** من سياق الطلب (مضبوطٌ خادمياً في `SetBranch` بعد التحقق من
+        // نطاق المستخدم) ولا يتغيّر بعدها؛ كل قطعة ترحيل لاحقة تستعيده من التشغيلة لا من طلبها.
+        $branchId = $this->branch->id();
+
+        // IMP-H1-S3b: خيارات التشغيلة قانونيةً (نفس الدالة التي حوّلت خيارات المعاينة) — تُجمَّد على التشغيلة وتدخل بصمة
+        // المعاينة وهوية إعادة المحاولة.
+        $canonical = $this->domains->for($domain)->canonicalOptions($options ?? []);
 
         if ($idempotencyKey !== null) {
             $existing = ImportJob::query()->where('idempotency_key', $idempotencyKey)->first();
             if ($existing) {
-                return $this->assertSameRequestOrFail($existing, $domain, $sha256);
+                return $this->assertSameRequestOrFail($existing, $domain, $sha256, $archiveSha256, $branchId, $previewId, $previewHash, $canonical, $parentJobId);
             }
+        }
+
+        // إعادة محاولة بعد ضياع الاستجابة: معاينةٌ أُنفقت لتشغيلةٍ أُنشئت فعلاً وجاء الطلب نفسه حرفياً ⇒ نفس التشغيلة (لا `preview_consumed`).
+        if ($previewId !== null && $previewHash !== null) {
+            $spent = $this->previews->consumedPreviewFor($previewId, $previewHash, $userId, $domain, $sha256, $archiveSha256, $canonical);
+            $replayed = $spent === null ? null : ImportJob::query()->whereKey($spent->consumed_job_id)->where('preview_id', $spent->id)->first();
+            if ($replayed !== null) {
+                return $replayed;
+            }
+        }
+
+        // المعاينة تُتحقَّق **قبل** تخزين أي ملف: إنشاءٌ مرفوض لا يترك أثراً. بلا معاينة: العقد القديم ما لم يُلزَم بها.
+        $preview = null;
+        if ($previewId !== null || $previewHash !== null) {
+            $preview = $this->previews->assertConsumable(
+                (string) $previewId, (string) $previewHash, $userId, $domain, $sha256, $archiveSha256, $canonical
+            );
+        } elseif ($this->previews->requiredNow()) {
+            throw new ImportPreviewException('preview_required', 'عاين الملف قبل التنفيذ: لا تُنشأ تشغيلة تنفيذية بلا معاينة.');
         }
 
         $id = (string) Str::uuid();
         $stored = $this->storage->store((string) app(TenantContext::class)->id(), $id, $file, $sha256);
+        try {
+            $storedArchive = $mediaArchive === null
+                ? null
+                : $this->storage->storeMediaArchive((string) app(TenantContext::class)->id(), $id, $mediaArchive);
+        } catch (Throwable $exception) {
+            $this->storage->delete($stored['path']);
+            throw $exception;
+        }
 
         try {
             // معاملة صريحة: عند تعارض القيد الفريد، يجب أن تعود القاعدة إلى
@@ -81,8 +125,11 @@ class ImportJobService
             // PostgreSQL «فاشلة» فيفشل حتى استعلام SELECT البريء بعدها
             // مباشرة (25P02). `DB::transaction()` يتراجع تلقائياً عند أي
             // استثناء قبل إعادة رميه، فيعيد الاتصال صالحاً للاستعلام التالي.
-            $job = DB::transaction(fn () => ImportJob::create([
+            $job = DB::transaction(function () use ($preview, $id, $branchId, $domain, $idempotencyKey, $file, $stored, $sha256, $mediaArchive, $storedArchive, $archiveSha256, $userId, $canonical, $previewHash, $parentJobId) {
+                $created = ImportJob::create([
                 'id' => $id,
+                'branch_id' => $branchId,
+                'parent_job_id' => $parentJobId,
                 'domain' => $domain,
                 'status' => ImportJobStatus::UPLOADED,
                 'idempotency_key' => $idempotencyKey,
@@ -93,14 +140,35 @@ class ImportJobService
                 'storage_disk' => $stored['disk'],
                 'storage_path' => $stored['path'],
                 'content_sha256' => $sha256,
+                'media_archive_original_filename' => $mediaArchive?->getClientOriginalName(),
+                'media_archive_mime_type' => $storedArchive['mime_type'] ?? null,
+                'media_archive_byte_size' => $storedArchive['byte_size'] ?? null,
+                'media_archive_storage_path' => $storedArchive['path'] ?? null,
+                'media_archive_content_sha256' => $archiveSha256,
                 'created_by' => $userId,
                 'purge_after' => now()->addDays((int) config('imports.retention_days', 14)),
-            ]));
+                // خيارات مجمَّدة عند الإنشاء لتشغيلةٍ مربوطةٍ بمعاينة؛ غيرها يجمّدها أول `apply` كالسابق.
+                'preview_id' => $preview?->id,
+                'preview_hash' => $preview === null ? null : $previewHash,
+                'apply_options' => ($preview === null && $parentJobId === null) ? null : $canonical,
+                ]);
+
+                // إنفاق المعاينة وإدراج التشغيلة **ذرّياً** في المعاملة نفسها: تعارض القيد الفريد أو فشل الإنفاق يُرجع الاثنين
+                // فتبقى المعاينة صالحة لإعادة المحاولة، ولا تشغيلة بلا إنفاق. (المعرّف من السجل المنشأ لا من `$id`.)
+                if ($preview !== null) {
+                    $this->previews->consume($preview, (string) $created->id);
+                }
+
+                return $created;
+            });
         } catch (UniqueConstraintViolationException $e) {
             // خسرنا سباق (tenant_id, idempotency_key): تشغيلة أخرى أُدرِجت
             // بين فحصنا المسبق وإدراجنا. الملف الذي خزّناه للتوّ يتيمٌ الآن —
             // يُحذف فوراً؛ لا نسخة ثانية تبقى بلا سجل يشير إليها.
             $this->storage->delete($stored['path']);
+            if ($storedArchive !== null) {
+                $this->storage->delete($storedArchive['path']);
+            }
 
             if ($idempotencyKey === null) {
                 // لا قيد فريد يمكن أن يصطدم به مفتاحٌ غائب أصلاً — دفاعي فقط.
@@ -112,7 +180,16 @@ class ImportJobService
                 throw $e;
             }
 
-            return $this->assertSameRequestOrFail($existing, $domain, $sha256);
+            return $this->assertSameRequestOrFail($existing, $domain, $sha256, $archiveSha256, $branchId, $previewId, $previewHash, $canonical, $parentJobId);
+        } catch (Throwable $e) {
+            // أي إخفاقٍ آخر في الإدراج (مثلاً حُذف الفرع بعد أن تحقّق منه `SetBranch` فيرفض قيد الـFK `branch_id`): الملف وأرشيف
+            // الصور خُزِّنا قبل الإدراج ولا سجلّ يشير إليهما — يُحذفان قبل إعادة الرمي فلا يبقى كائنٌ يتيمٌ للأبد.
+            $this->storage->delete($stored['path']);
+            if ($storedArchive !== null) {
+                $this->storage->delete($storedArchive['path']);
+            }
+
+            throw $e;
         }
 
         return $this->inspect($job);
@@ -125,11 +202,40 @@ class ImportJobService
      * آخر) يُرفض صراحةً (422 عبر `ApiController::domain()`)؛ لا يُعاد أبداً
      * سجلٌّ لا يخصّ هذا الطلب تحت ستار «نفس المفتاح».
      */
-    private function assertSameRequestOrFail(ImportJob $existing, string $domain, string $sha256): ImportJob
-    {
-        if ($existing->domain !== $domain || $existing->content_sha256 !== $sha256) {
+    /**
+     * @param  array<string, mixed>  $canonical  خيارات الطلب القانونية — تدخل الهوية (القاعدة 12): الملف نفسه بمطابقة أو خيارات
+     *                                            أو معاينة مختلفة **ليس** إعادة محاولة.
+     */
+    private function assertSameRequestOrFail(
+        ImportJob $existing,
+        string $domain,
+        string $sha256,
+        ?string $archiveSha256,
+        ?string $branchId,
+        ?string $previewId = null,
+        ?string $previewHash = null,
+        array $canonical = [],
+        ?string $parentJobId = null,
+    ): ImportJob {
+        $differentBinding = $existing->parent_job_id !== $parentJobId
+            || $existing->preview_id !== $previewId
+            || $existing->preview_hash !== $previewHash
+            // الخيارات المجمَّدة تُقارَن فقط حين التشغيلة القائمة مربوطةٌ بمعاينة (غيرها تُجمَّد عند أول apply).
+            // `apply_options` تحمل بعد أول قطعة مفتاح `batch_size` التشغيلي أيضاً — تُقارَن قانونياً (المفاتيح الدلالية وحدها).
+            || (($existing->preview_id !== null || $existing->parent_job_id !== null)
+                && $this->domains->for($domain)->canonicalOptions((array) $existing->apply_options) !== $canonical);
+
+        if (
+            $differentBinding
+            || $existing->domain !== $domain
+            // مقارنةٌ صارمة بما فيها `NULL`: لا يُستثنى «قديمٌ بلا فرع» لأن `nullOnDelete` ينتج `NULL` أيضاً لتشغيلةٍ حُذف فرعها،
+            // فكان يُعاد سجلّها لطلبٍ من فرعٍ آخر. إعادة محاولة عبر نشر هذا العمود نفسه (ثوانٍ) تُطالَب بمفتاحٍ جديد فحسب.
+            || $existing->branch_id !== $branchId
+            || $existing->content_sha256 !== $sha256
+            || $existing->media_archive_content_sha256 !== $archiveSha256
+        ) {
             throw new RuntimeException(
-                'مفتاح idempotency هذا مستخدَم بالفعل لملف أو مجال مختلف. استخدم مفتاحاً جديداً لهذا الطلب.'
+                'مفتاح idempotency هذا مستخدَم بالفعل لملف أو مجال أو فرع أو معاينة أو خيارات مختلفة. استخدم مفتاحاً جديداً لهذا الطلب.'
             );
         }
 
@@ -166,9 +272,13 @@ class ImportJobService
             return $job;
         } catch (Throwable $e) {
             $this->storage->delete($job->storage_path);
+            if ($job->media_archive_storage_path !== null) {
+                $this->storage->delete($job->media_archive_storage_path);
+            }
             $job->update([
                 'status' => ImportJobStatus::FAILED,
                 'storage_path' => null,
+                'media_archive_storage_path' => null,
                 'error_message' => $e->getMessage(),
             ]);
 
@@ -208,71 +318,13 @@ class ImportJobService
     }
 
     /**
-     * PR-DUR-3/4 — عدّاد الصفوف/الأعمدة يتفرّع حسب شكل الملف، لا حسب عدد
-     * المجالات: `product_workbook` مصنّفٌ ثلاثي الأوراق
-     * (`SpreadsheetReader::readWorkbookXlsx()` — نفس القارئ الذي تستهلكه
-     * `ProductWorkbookService::readWorkbook()` بلا نسخة ثانية)، `row_count`
-     * له = مجموع صفوف البيانات في الأوراق الثلاث الحاضرة. **كل ما عداه**
-     * (`product_catalog` و`inventory_opening` معاً) ملفٌّ أحادي الورقة بنفس
-     * الشكل تماماً (`SpreadsheetReader::read()`، سلوك PR-DUR-1/2 حرفياً) —
-     * `InventoryOpeningImportService::isBlankRow()` تعريفٌ مطابقٌ حرفياً
-     * لـ`ProductImportService::isBlankRow()` (كل خلية تُقلَّم فارغة)، فلا
-     * حاجة لفرعٍ ثالث؛ يكفي أن يبقى `product_workbook` وحده استثناءً صريحاً.
+     * فحصٌ هيكلي عبر محوّل المجال (IMP-H1-S2) — لا معرفة بمجالٍ بعينه هنا. المجال غير المسجَّل يفشل مغلقاً.
      *
      * @return array{0: int, 1: int} [row_count, column_count]
      */
     private function inspectCounts(string $domain, string $tmpPath, string $extension): array
     {
-        if ($domain === ImportJobDomain::PRODUCT_WORKBOOK) {
-            $sheets = SpreadsheetReader::readWorkbookXlsx($tmpPath, $this->maxRowsFor($domain), self::MAX_COLUMNS);
-            if (! isset($sheets[ProductWorkbookService::SHEET_PRODUCTS])) {
-                throw new RuntimeException(
-                    'المصنّف لا يحتوي ورقة «'.ProductWorkbookService::SHEET_PRODUCTS.'» — هي الورقة الإلزامية الوحيدة.'
-                );
-            }
-
-            $rowCount = 0;
-            $sheetNames = [
-                ProductWorkbookService::SHEET_PRODUCTS,
-                ProductWorkbookService::SHEET_BARCODES,
-                ProductWorkbookService::SHEET_UNIT_PRICES,
-            ];
-            foreach ($sheetNames as $sheetName) {
-                if (! isset($sheets[$sheetName])) {
-                    continue;
-                }
-                $dataRows = array_slice($sheets[$sheetName], 1);
-                $rowCount += count(array_filter(
-                    $dataRows,
-                    static fn (array $row): bool => ! ProductImportService::isBlankRow($row)
-                ));
-            }
-
-            $productsHeader = $sheets[ProductWorkbookService::SHEET_PRODUCTS][0] ?? [];
-
-            return [$rowCount, count($productsHeader)];
-        }
-
-        $rows = SpreadsheetReader::read($tmpPath, $extension, $this->maxRowsFor($domain), self::MAX_COLUMNS);
-
-        return [$this->countDataRows($rows), $rows === [] ? 0 : count($rows[0])];
-    }
-
-    /**
-     * عدد صفوف البيانات الفعلية (بلا صف العناوين ولا الصفوف الفارغة) —
-     * التعريف الوحيد المستعمل لـ`row_count` ولاكتمال الترحيل معاً، مطابقاً
-     * حرفياً لتعريف `dataIndex` في `ProductImportService::parse()`.
-     *
-     * @param  array<int, array<int, string>>  $rows  ناتج `SpreadsheetReader::read()` كاملاً (يشمل صف العناوين).
-     */
-    private function countDataRows(array $rows): int
-    {
-        $dataRows = $rows === [] ? [] : array_slice($rows, 1);
-
-        return count(array_filter(
-            $dataRows,
-            static fn (array $row): bool => ! ProductImportService::isBlankRow($row)
-        ));
+        return $this->domains->for($domain)->inspect($tmpPath, $extension);
     }
 
     /**
@@ -296,9 +348,9 @@ class ImportJobService
      * اللاحقة تتجاهل خيارات الطلب الحالي فلا تُعاد تفسير حالة واجهة تغيّرت
      * بين الاستدعاءات.
      */
-    public function applyNextChunk(ImportJob $job, array $options, ?string $userId, bool $costAuthorized): ImportJob
+    public function applyNextChunk(ImportJob $job, array $options, ?string $userId, bool $costAuthorized, ?array $explicitOptions = null): ImportJob
     {
-        $updated = DB::transaction(function () use ($job, $options, $userId, $costAuthorized) {
+        $updated = DB::transaction(function () use ($job, $options, $userId, $costAuthorized, $explicitOptions) {
             /** @var ImportJob $locked */
             $locked = ImportJob::query()->whereKey($job->id)->lockForUpdate()->firstOrFail();
 
@@ -308,11 +360,31 @@ class ImportJobService
                 return $locked;
             }
 
+            // IMP-H1-S3b: تشغيلةٌ مربوطةٌ بمعاينة تنفّذ **خياراتها المجمَّدة عند الإنشاء** (هي ما عاينه المستخدم)؛ أي خيارٍ
+            // مختلف في طلب التطبيق يُرفض صراحةً لا يُتجاهَل بصمت. `batch_size` تشغيليٌّ لا دلاليّ فيبقى من طلب أول قطعة.
+            // IMP-H1-S8c: تشغيلة الإصلاح الفرعية تُجمَّد خياراتها كذلك عند الإنشاء (خيارات أمّها): بلا هذا كانت أول قطعة تأخذ افتراضيات طلب التطبيق
+            // (`mode=create`) فيُنفَّذ إصلاحُ تشغيلة `update`/`upsert` إنشاءً.
+            $frozenAtCreation = $locked->preview_id !== null || $locked->parent_job_id !== null;
+            if ($frozenAtCreation && $explicitOptions !== null) {
+                $this->assertOptionsFrozen($locked, $explicitOptions);
+            }
+
             $firstChunk = $locked->status === ImportJobStatus::READY;
-            $frozenOptions = $firstChunk ? $options : (array) ($locked->apply_options ?? []);
+            if ($frozenAtCreation) {
+                $frozenOptions = (array) ($locked->apply_options ?? []);
+                if ($firstChunk && isset($options['batch_size'])) {
+                    $frozenOptions['batch_size'] = $options['batch_size'];
+                }
+            } else {
+                $frozenOptions = $firstChunk ? $options : (array) ($locked->apply_options ?? []);
+            }
 
             $tmpPath = $this->materializeLocalCopy((string) $locked->storage_path);
+            $archiveTmpPath = null;
             try {
+                if ($locked->media_archive_storage_path !== null) {
+                    $archiveTmpPath = $this->materializeLocalCopy((string) $locked->media_archive_storage_path);
+                }
                 if ($firstChunk) {
                     $fill = [
                         'status' => ImportJobStatus::PROCESSING,
@@ -320,15 +392,10 @@ class ImportJobService
                         'started_at' => now(),
                     ];
 
-                    if ($locked->domain === ImportJobDomain::PRODUCT_CATALOG) {
-                        // إعادة حساب `row_count` بتعريف صفوف البيانات دون الفيزيائي
-                        // مرّة واحدة هنا — تصحيحٌ ذاتيٌّ لتشغيلات `ready` أُنشئت
-                        // بالحساب الفيزيائي القديم (قبل تصحيح المراجعة) قبل أن
-                        // يعتمد عليها الاكتمال أدناه، بلا نقل بيانات منفصل.
-                        // `product_workbook` (PR-DUR-3) أُضيف بعد هذا التصحيح —
-                        // `inspect()` يحسبه بالتعريف الصحيح من أول يوم.
-                        $rows = SpreadsheetReader::read($tmpPath, $locked->extension, ProductImportService::DURABLE_MAX_ROWS, self::MAX_COLUMNS);
-                        $fill['row_count'] = $this->countDataRows($rows);
+                    // تصحيح ذاتي اختياري لـ`row_count` عند أول ترحيل (للمجال الذي اختلف تعريفه — انظر محوّله).
+                    $recount = $this->withJobBranch($locked, fn () => $this->domains->for($locked->domain)->recountOnFirstApply($tmpPath, $locked->extension));
+                    if ($recount !== null) {
+                        $fill['row_count'] = $recount;
                     }
 
                     $locked->forceFill($fill)->save();
@@ -341,17 +408,21 @@ class ImportJobService
                 );
 
                 try {
-                    $chunk = $this->runChunk($locked, $tmpPath, $frozenOptions, $offset, $batchSize, $userId, $costAuthorized);
+                    // IMP-H1-S8a: القطعة معاملةٌ فرعيّة (savepoint) كاملة — فشلٌ في أي مرحلة منها (ومنها صور المنتجات بعد كتابة الصفوف) يُرجع كتابات
+                    // النافذة معاً، فلا تبقى منتجات مكتوبة بلا أن تُحسب منجزة، ويصحّ وصف الوحدات الفاشلة بأنها «لم تُطبَّق».
+                    $chunk = DB::transaction(fn () => $this->withJobBranch($locked, fn () => $this->runChunk($locked, $tmpPath, $archiveTmpPath, $frozenOptions, $offset, $batchSize, $userId, $costAuthorized)));
                 } catch (Throwable $e) {
                     $locked->forceFill([
                         'status' => ImportJobStatus::FAILED,
                         'error_message' => $e->getMessage(),
                     ])->save();
+                    // IMP-H1-S8a: الوحدات الفاشلة/غير المنجزة تُسجَّل في معاملة الفشل نفسها (حالة `failed` بلا وحداتها غير ممكنة).
+                    app(ImportJobUnitRecorder::class)->recordChunkFailure($locked, $this->domains->for($locked->domain), $offset, $batchSize, $e);
 
                     return $locked;
                 }
 
-                $processed = $offset + $chunk['processed_in_chunk'];
+                $processed = $offset + $chunk->processedUnits;
                 $totalRows = (int) $locked->row_count;
                 $completed = $processed >= $totalRows;
 
@@ -359,13 +430,16 @@ class ImportJobService
                     'processed_rows' => $processed,
                     'status' => $completed ? ImportJobStatus::COMPLETED : ImportJobStatus::PROCESSING,
                     'finished_at' => $completed ? now() : null,
-                    'apply_result' => $chunk['result'],
+                    'apply_result' => $chunk->result,
                 ])->save();
 
                 return $locked;
             } finally {
                 if (is_file($tmpPath)) {
                     @unlink($tmpPath);
+                }
+                if ($archiveTmpPath !== null && is_file($archiveTmpPath)) {
+                    @unlink($archiveTmpPath);
                 }
             }
         });
@@ -378,108 +452,53 @@ class ImportJobService
     }
 
     /**
-     * يبني ملف الإدخال المشترك ثم يوزّع على محرّك المجال — لا منطق مطابقة/
-     * تحقق/كتابة هنا نفسه، فقط تحويل النتيجة إلى شكلٍ موحّد يفهمه
-     * `applyNextChunk()`: كم صفاً اعتُبر منجَزاً في هذه القطعة، والنتيجة
-     * الخام لتخزينها في `apply_result`.
+     * خيارات الطلب الصريحة (الحقول المُرسَلة فعلاً) لا تغيّر ما جُمِّد عند الإنشاء: نُحوِّل المجمَّد + الصريح قانونياً ونقارنه
+     * بالمجمَّد قانونياً. حقلٌ لا يخصّ المجال يُسقَطه التحويل القانوني فلا يُعدّ تغييراً.
+     *
+     * @param  array<string, mixed>  $explicit
+     */
+    private function assertOptionsFrozen(ImportJob $job, array $explicit): void
+    {
+        $adapter = $this->domains->for($job->domain);
+        $frozen = $adapter->canonicalOptions((array) $job->apply_options);
+
+        if ($adapter->canonicalOptions(array_merge($frozen, $explicit)) !== $frozen) {
+            throw new ImportPreviewException('options_frozen', 'خيارات هذه التشغيلة مجمَّدة منذ المعاينة ولا تتغيّر عند التنفيذ. أنشئ معاينة جديدة بالخيارات المطلوبة.');
+        }
+    }
+
+    /**
+     * يجري القطعة **بفرع التشغيلة** لا بفرع الطلب الحالي، ثم يعيد سياق الفرع كما كان (finally) — `BranchContext`
+     * singleton يعيش طوال الطلب، فلا يتسرّب فرع التشغيلة إلى ما بعدها. تشغيلةٌ بلا فرع (قديمة أو مستأجر بلا فروع)
+     * تبقى على سلوكها القديم: الفرع النشط للطلب.
+     */
+    private function withJobBranch(ImportJob $job, callable $run): mixed
+    {
+        if ($job->branch_id === null) {
+            return $run();
+        }
+
+        $previous = $this->branch->id();
+        $this->branch->set($job->branch_id);
+        try {
+            return $run();
+        } finally {
+            $this->branch->set($previous);
+        }
+    }
+
+    /**
+     * يبني مدخلات القطعة ويفوّض الترحيل إلى محوّل المجال (IMP-H1-S2) — لا منطق مطابقة/تحقق/كتابة هنا.
      *
      * @param  array<string, mixed>  $options
-     * @return array{processed_in_chunk: int, result: array<string, mixed>}
      */
-    private function runChunk(ImportJob $job, string $tmpPath, array $options, int $offset, int $batchSize, ?string $userId, bool $costAuthorized): array
+    private function runChunk(ImportJob $job, string $tmpPath, ?string $archiveTmpPath, array $options, int $offset, int $batchSize, ?string $userId, bool $costAuthorized): ImportChunkResult
     {
         $file = new UploadedFile($tmpPath, (string) $job->original_filename, $job->mime_type, null, true);
 
-        return match ($job->domain) {
-            ImportJobDomain::PRODUCT_CATALOG => $this->runProductCatalogChunk($file, $options, $offset, $batchSize, $userId, $costAuthorized),
-            ImportJobDomain::PRODUCT_WORKBOOK => $this->runProductWorkbookChunk($file, $options, (int) $job->row_count, $userId, $costAuthorized),
-            ImportJobDomain::INVENTORY_OPENING => $this->runInventoryOpeningChunk($file, $options, (int) $job->row_count, $userId),
-            default => throw new RuntimeException('لا يوجد محرّك ترحيل مجزّأ لهذا المجال بعد.'),
-        };
-    }
-
-    /** @param array<string, mixed> $options @return array{processed_in_chunk: int, result: array<string, mixed>} */
-    private function runProductCatalogChunk(UploadedFile $file, array $options, int $offset, int $batchSize, ?string $userId, bool $costAuthorized): array
-    {
-        $chunkOptions = array_merge($options, [
-            'batch_offset' => $offset,
-            'batch_size' => $batchSize,
-        ]);
-
-        $result = app(ProductImportService::class)->apply($file, $chunkOptions, $userId, $costAuthorized, ProductImportService::DURABLE_MAX_ROWS);
-
-        return [
-            'processed_in_chunk' => $result['created'] + $result['updated'] + $result['skipped'],
-            'result' => $result,
-        ];
-    }
-
-    /**
-     * المصنّف ثلاثي الأوراق (Products/Barcodes/Unit Prices) ذرّيٌّ بطبيعته:
-     * `ProductWorkbookService::apply()` يطبّق أوراقه الثلاث داخل معاملةٍ
-     * واحدة بترتيبٍ مقصود (Products أولاً فيصبح مرئياً لبقية الأوراق داخل
-     * نفس المعاملة — تعليق `ProductWorkbookService::apply()` نفسه)، ولا
-     * يقبل `batch_offset`/`batch_size` أصلاً. تقطيعه صفّاً صفّاً كان يكسر
-     * هذه الرؤية المتبادلة بين الأوراق أو يعيد تصميم عقد PR-UOM2-4 المعتمد —
-     * كلاهما خارج نطاق هذا الـPR («لا تعِد تصميم Durable Imports»، «لا تغيّر
-     * قواعد UOM/barcode/pricing المعتمدة»). القطعة الوحيدة الممكنة هنا هي
-     * المصنّف كله؛ الاستئناف/التزامن/عدم التكرار محفوظة عبر نفس القفل
-     * والمعاملة في `applyNextChunk()` تماماً كمجال `product_catalog` — لا
-     * عبر تقسيم صفوف. تشغيلةٌ تنجح تكتمل من أول استدعاء؛ تشغيلةٌ فشلت
-     * تصبح نهائية (`failed`) كبقية المجالات — لا حالة وسيطة قابلة للاستئناف
-     * لمصنّفٍ فشل جزئياً، لأن معاملته الداخلية تتراجع كلها أصلاً.
-     *
-     * @param array<string, mixed> $options
-     * @return array{processed_in_chunk: int, result: array<string, mixed>}
-     */
-    private function runProductWorkbookChunk(UploadedFile $file, array $options, int $totalRows, ?string $userId, bool $costAuthorized): array
-    {
-        $priceList = app(ProductWorkbookService::class)->resolveActivePriceList($options['price_list_id'] ?? null);
-        $productOptions = array_intersect_key($options, array_flip(['mode', 'blank_policy', 'master_data_policy', 'mapping']));
-
-        $result = app(ProductWorkbookService::class)->apply($file, $productOptions, $priceList, $userId, $costAuthorized);
-
-        return [
-            'processed_in_chunk' => $totalRows,
-            'result' => $result,
-        ];
-    }
-
-    /**
-     * الرصيد الافتتاحي ذرّيٌّ بطبيعته تماماً كمصنّف Products/Barcodes/Unit
-     * Prices (PR-DUR-3): `InventoryOpeningImportService::apply()` لا يقبل
-     * `batch_offset`/`batch_size` أصلاً — يحلّل الملف كاملاً ثم يستدعي
-     * `InventoryOpeningService::createDraft()` مرّةً واحدة لكل أسطره معاً
-     * داخل معاملةٍ واحدة (رقم مستند واحد، إجماليات محسوبة من كل السطور).
-     * تقطيعه سطراً سطراً كان يعني إمّا توليد عدّة مستندات مسودة من ملفٍ واحد
-     * (كسرٌ لعقد «مستندٍ واحد لكل ملف») أو إعادة كتابة `createDraft()` نفسها
-     * — كلاهما خارج نطاق هذا الـPR. **القطعة الوحيدة الممكنة: الملف كله.**
-     *
-     * **مسودة فقط — لا ترحيل:** `apply()` هنا يستدعي `createDraft()` حصراً؛
-     * `InventoryOpeningService::post()` (الحركات + المتوسط + القيد) مسارٌ
-     * منفصل تماماً بفعلٍ بشريٍّ صريح لاحق، غير مربوطٍ بهذا المحرّك ولن يُربط
-     * به في هذا الـPR.
-     *
-     * @param array<string, mixed> $options
-     * @return array{processed_in_chunk: int, result: array<string, mixed>}
-     */
-    private function runInventoryOpeningChunk(UploadedFile $file, array $options, int $totalRows, ?string $userId): array
-    {
-        $openingOptions = array_intersect_key($options, array_flip(['opening_date', 'allow_zero_cost', 'notes', 'mapping']));
-
-        $opening = app(InventoryOpeningImportService::class)->apply($file, $openingOptions, $userId);
-
-        return [
-            'processed_in_chunk' => $totalRows,
-            'result' => [
-                'inventory_opening_id' => $opening->id,
-                'number' => $opening->number,
-                'status' => $opening->status,
-                'total_quantity' => $opening->total_quantity,
-                'total_value' => $opening->total_value,
-                'lines_count' => $opening->lines->count(),
-            ],
-        ];
+        return $this->domains->for($job->domain)->applyChunk(
+            new ImportChunk($job, $file, $archiveTmpPath, $options, $offset, $batchSize, $userId, $costAuthorized)
+        );
     }
 
     /**
@@ -490,12 +509,7 @@ class ImportJobService
      */
     private function assertApplicable(ImportJob $job): void
     {
-        $enginesAvailable = [
-            ImportJobDomain::PRODUCT_CATALOG,
-            ImportJobDomain::PRODUCT_WORKBOOK,
-            ImportJobDomain::INVENTORY_OPENING,
-        ];
-        if (! in_array($job->domain, $enginesAvailable, true)) {
+        if (! $this->domains->has($job->domain)) {
             throw new RuntimeException('لا يوجد محرّك ترحيل مجزّأ لهذا المجال بعد.');
         }
 
@@ -514,10 +528,14 @@ class ImportJobService
         if ($job->storage_path !== null) {
             $this->storage->delete($job->storage_path);
         }
+        if ($job->media_archive_storage_path !== null) {
+            $this->storage->delete($job->media_archive_storage_path);
+        }
 
         $job->update([
             'status' => ImportJobStatus::CANCELLED,
             'storage_path' => null,
+            'media_archive_storage_path' => null,
             'cancelled_by' => $userId,
             'cancelled_at' => now(),
         ]);

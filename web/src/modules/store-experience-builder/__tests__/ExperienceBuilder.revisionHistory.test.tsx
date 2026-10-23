@@ -143,6 +143,7 @@ describe('ExperienceBuilder — CUST-H5-4 saved history & restore', () => {
     expect(revShowMock).toHaveBeenCalledWith('store-1', 'v1', 'r1');
     expect(dialog()).toBeNull();
     expect(root().getAttribute('data-history-preview')).toBe('true');
+    expect(root().getAttribute('data-preview-mode')).toBe('history');
     expect((document.querySelector('[data-save]') as HTMLButtonElement).disabled).toBe(true);
     expect((document.querySelector('[data-publish]') as HTMLButtonElement).disabled).toBe(true);
     expect(historyBtn().disabled).toBe(true);
@@ -155,6 +156,7 @@ describe('ExperienceBuilder — CUST-H5-4 saved history & restore', () => {
     await user.click(screen.getByRole('button', { name: 'Exit preview' }));
     expect(document.querySelector('[data-history-preview-bar]')).toBeNull();
     expect(root().getAttribute('data-history-preview')).toBe('false');
+    expect(root().getAttribute('data-preview-mode')).toBe('draft');
     expect(root().getAttribute('data-lifecycle')).toBe('clean');
     expect(document.body.textContent).not.toContain('اسم قديم من اللقطة');
   });

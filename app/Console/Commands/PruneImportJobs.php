@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\ImportJob;
 use App\Services\ImportJobFileStorage;
+use App\Services\ImportPreviewService;
 use App\Support\ImportJobStatus;
 use Illuminate\Console\Command;
 
@@ -31,7 +32,10 @@ class PruneImportJobs extends Command
         $query = ImportJob::query()
             ->withoutGlobalScopes()
             ->whereIn('status', [ImportJobStatus::CANCELLED, ImportJobStatus::FAILED, ImportJobStatus::COMPLETED])
-            ->where('purge_after', '<', now());
+            ->where('purge_after', '<', now())
+            // IMP-H1-S8b: أمٌّ لها تشغيلة إصلاح فرعية لم تنتهِ تُحفَظ — حذفها يمسح وحداتها (cascade) ويُنزع ربط الطفل (`nullOnDelete`) فيعمل بلا مطالبة.
+            ->whereNotIn('id', ImportJob::query()->withoutGlobalScopes()->whereNotNull('parent_job_id')
+                ->whereIn('status', ImportJobStatus::UNFINISHED)->select('parent_job_id'));
 
         if ((bool) $this->option('dry-run')) {
             $this->line('تشغيلات مرشّحة للتقليم: ' . $query->count());
@@ -45,12 +49,19 @@ class PruneImportJobs extends Command
                 if ($job->storage_path !== null) {
                     $storage->delete($job->storage_path);
                 }
+                // IMP-H1-S1: أرشيف صور تشغيلة `completed` كان يبقى في التخزين الخاص إلى الأبد (الإلغاء وفشل الفحص
+                // كانا ينظّفانه وحدهما)، فيتجاوز نافذة الاحتفاظ.
+                if ($job->media_archive_storage_path !== null) {
+                    $storage->delete($job->media_archive_storage_path);
+                }
                 $job->delete();
                 $deleted++;
             }
         });
 
         $this->line('حُذفت تشغيلات استيراد: ' . $deleted);
+        // IMP-H1-S3b: معاينات منتهية الصلاحية أو منفَقة قديمة لا قيمة لها بعد (لا ملفات، صفوف فقط).
+        $this->line('حُذفت معاينات استيراد: ' . app(ImportPreviewService::class)->pruneStale());
 
         return self::SUCCESS;
     }

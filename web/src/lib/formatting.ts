@@ -185,6 +185,47 @@ export function formatTime(
   });
 }
 
+/** Storefront-compatible delivery day labels from an authoritative timezone. */
+export function formatDeliveryDay(input: {
+  date: string;
+  timezone: string;
+  locale: string;
+  todayLabel: string;
+  tomorrowLabel: string;
+  now?: Date;
+}): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) return null;
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: input.timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(input.now ?? new Date());
+  const [year, month, day] = today.split("-").map(Number);
+  const tomorrow = new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
+  if (input.date === today) return input.todayLabel;
+  if (input.date === tomorrow) return input.tomorrowLabel;
+  // Delivery promises use the storefront's calendar-day label (weekday and
+  // month/day), without an audit-style year.
+  const [dateYear, dateMonth, dateDay] = input.date.split('-').map(Number);
+  const formatted = new Intl.DateTimeFormat(displayLocale(input.locale), {
+    ...BASE_OPTIONS,
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(dateYear, dateMonth - 1, dateDay, 12)));
+  return assertSafeDateOutput(formatted);
+}
+
+/** Storefront-compatible locale-aware delivery window. */
+export function formatDeliveryWindow(start: string, end: string, locale: string): string | null {
+  const valid = (value: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+  if (!valid(start) || !valid(end)) return null;
+  const format = (value: string) => assertSafeDateOutput(new Intl.DateTimeFormat(displayLocale(locale), {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'UTC',
+    hour12: true,
+  }).format(new Date(`1970-01-01T${value}:00Z`)));
+  return `${format(start)} – ${format(end)}`;
+}
+
 export type FormatDateTimeOptions = {
   fallback?: string;
   dateStyle?: 'short' | 'medium' | 'long';

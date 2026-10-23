@@ -2,12 +2,11 @@
 
 namespace App\Services\Accounting;
 
-use App\Models\Branch;
 use App\Models\Invoice;
-use App\Models\Tenant;
 use App\Models\ZatcaCredential;
-use App\Support\ZatcaIcvScope;
 use App\Support\ZatcaIssueTimestamp;
+use App\Support\ZatcaMonetaryXml;
+use App\Support\ZatcaPartyXml;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -30,12 +29,13 @@ class ZatcaService
     public function __construct(
         private readonly ZatcaInvoiceHasher $invoiceHasher,
         private readonly ZatcaSignedInvoiceFinalizer $signedInvoiceFinalizer,
+        private readonly ZatcaChainAllocator $chain,
     ) {}
 
     /**
      * بناء كامل بيانات الفاتورة الإلكترونية عند الترحيل.
      *
-     * @return array{uuid:string, icv:int, prev:string, xml:string, hash:string, qr:string}
+     * @return array{uuid:string, icv:int, prev:string, xml:string, hash:string, qr:string, signed:bool, slot:ZatcaChainSlot}
      */
     public function buildFor(Invoice $invoice): array
     {
@@ -43,63 +43,47 @@ class ZatcaService
         // غيابها فشل مغلق — لا رجوع صامت إلى created_at (وقت المسودة) ولا إلى الساعة الحالية.
         $issuedAt = $this->issuedAtOf($invoice);
 
-        $invoice->loadMissing('lines', 'partner');
-        $tenant = Tenant::find($invoice->tenant_id);
+        // REM-15a: كتلتا البائع والمشتري في XML واسما البائع/رقمه في QR تُشتقّ كلّها من لقطة party_snapshot (REM-14) المثبّتة
+        // عند الترحيل — لا من Tenant/Partner الحيّين. غياب اللقطة أو تلفها فشل مغلق قبل أي قفل أو استهلاك ICV.
+        $parties = ZatcaPartyXml::requireSnapshot($invoice);
+
+        $invoice->loadMissing('lines');
 
         $uuid = (string) Str::uuid();
 
         // ═══════════════════════════════════════════════════════════
-        //  عدّاد ZATCA — نطاقه مضبوط، وافتراضه المستأجر
+        //  ICV/PIH من سلسلة ZATCA المشتركة — REM-18b-2
         // ═══════════════════════════════════════════════════════════
-        //  ICV يمثّل سلسلة إصدار الفاتورة الإلكترونية لرقمٍ ضريبيٍّ مسجَّل.
-        //  الافتراض `tenant` — سلسلة واحدة للكيان القانوني — ولا يتغيّر
-        //  لمستأجر قائم أو جديد. و`branch` خيارٌ يتطلّب تفعيلاً صريحاً
-        //  **ورقماً ضريبياً مستقلاً لكل فرع**؛ يحرسه `ZatcaIcvScope` فيتجاهل
-        //  المخزَّن إن لم تتحقّق شروطه. لذلك يُقرأ النطاق منه لا من الإعداد
-        //  مباشرةً — ولا يمرّ هذا العدّاد بطبقة `GeneratesDocumentNumbers`
-        //  إطلاقاً، فهو ليس رقم مستند.
-        //
-        //  القفل يُسلسِل الترحيلات المتزامنة على **مِرساة نطاقه**: بدونه يقرأ
-        //  ترحيلان العدّادَ نفسه فيُنتجان ICV مكرراً **بصمت** — والقيد الفريد
-        //  هو الحاجز الأخير خلفه.
-        $branchScoped = ZatcaIcvScope::current() === ZatcaIcvScope::BRANCH
-            && $invoice->branch_id !== null;
-
-        $branchScoped
-            ? Branch::whereKey($invoice->branch_id)->lockForUpdate()->first()
-            : Tenant::whereKey($invoice->tenant_id)->lockForUpdate()->first();
-
-        // سلسلة الهاش: آخر فاتورة مُرحَّلة (بهاش) **في النطاق نفسه** تحدّد
-        // العدّاد والهاش السابق. فالسلسلتان تنفصلان معاً — عدّاداً وهاشاً —
-        // إذ لا معنى لعدّادٍ منفصل يتسلسل هاشُه مع سلسلةٍ أخرى.
-        $last = Invoice::whereNotNull('zatca_hash')
-            ->when($branchScoped, fn ($q) => $q->where('branch_id', $invoice->branch_id))
-            ->orderByDesc('zatca_icv')
-            ->first();
-
-        $icv  = ($last->zatca_icv ?? 0) + 1;
-        $prev = $this->previousInvoiceHash($last);
+        //  `ZatcaChainAllocator` يقفل مِرساة المستأجر ثم رأس السلسلة (أو يُنشئه بذرةً من السجل القديم)، ويعيد ICV التالي
+        //  وهاش XML المحفوظ للمستند السابق — فاتورةً كان أو إشعاراً دائناً لاحقاً. لا يُقرأ `max(invoices.zatca_icv)` هنا بعد
+        //  اليوم: الرأس هو المصدر، والسياج F1 يرفض أي كتابة ICV على الفواتير لا يقابلها مدخل سلسلة. الخانة لا تُستهلك إلا
+        //  بـ`record()` قبل تحديث الفاتورة في معاملة الترحيل نفسها؛ وأي فشل قبله يُرجع كل شيء فلا يضيع ICV.
+        //  نطاق الفرع (`ZatcaIcvScope`) غير متاح اليوم، والمخصِّص يفشل مغلقاً إن أُتيح دون سلسلته الخاصة (REM-25).
+        $slot = $this->chain->reserve($invoice->tenant_id);
+        $icv  = $slot->icv;
+        $prev = $slot->previousHash;
 
         // يُبنى مرجع QR داخل XML أولاً، لكن بقيمة مؤقتة. تحويل ZATCA
         // يستبعد عقدة QR ومرجع التوقيع، لذلك يبقى Hash هو نفسه بعد تثبيت
         // قيمة QR الفعلية في المستند المجمّد.
-        $unsignedXml = $this->buildXml($invoice, $tenant, $uuid, $icv, $prev);
+        $unsignedXml = $this->buildXml($invoice, $parties, $uuid, $icv, $prev);
         $hash = $this->invoiceHasher->hash($unsignedXml);
-        $qr   = $this->qrFor($invoice, $tenant);
+        $qr   = $this->qrFor($invoice);
         $xml  = $this->attachQr($unsignedXml, $qr);
 
         // لا وجود لاعتماد = مستأجر ما زال على عقد المرحلة الأولى التاريخي.
         // بمجرد وجود أي صف اعتماد يبدأ مسار المرحلة الثانية ولا يُسمح بالرجوع
         // الصامت إلى XML غير موقّع بسبب اختيار بيئة بلا اعتماد أو سياسة ناقصة؛
         // finalizer يفشل مغلقاً، ومعاملة InvoiceService تتراجع بكامل أثرها.
-        if (ZatcaCredential::query()->exists()) {
+        $signed = ZatcaCredential::query()->exists();
+        if ($signed) {
             // وقت الإصدار (للوسم 3 في QR المرحلة الثانية) هو لحظة الإصدار المخزَّنة؛ ووقت التوقيع
             // `now('UTC')` لحظة مستقلة عنها بالتصميم (ADR-0001 قرار 4) — لا يُفترض تطابقهما قانونياً.
             $final = $this->signedInvoiceFinalizer->finalize(
                 $xml,
                 $qr,
-                $tenant?->name ?? '',
-                $tenant?->vat_number ?? '',
+                ZatcaPartyXml::text($parties['seller']['name'] ?? null) ?? '',
+                ZatcaPartyXml::text($parties['seller']['vat_number'] ?? null) ?? '',
                 $issuedAt,
                 now('UTC'),
                 $this->formatAmount($invoice->total),
@@ -111,7 +95,23 @@ class ZatcaService
             $qr = $final['qr'];
         }
 
-        return compact('uuid', 'icv', 'prev', 'xml', 'hash', 'qr');
+        return compact('uuid', 'icv', 'prev', 'xml', 'hash', 'qr', 'signed', 'slot');
+    }
+
+    /**
+     * يسجّل الفاتورة المبنية في سلسلة ZATCA المشتركة — REM-18b-2. يُستدعى من `InvoiceService::post()` في معاملة الترحيل
+     * نفسها، **بعد** `buildFor()` و**قبل** كتابة أعمدة ZATCA على الفاتورة (السياج F1 يشترط وجود هذا المدخل مطابقاً).
+     *
+     * @param array{uuid:string, icv:int, prev:string, xml:string, hash:string, qr:string, signed:bool, slot:ZatcaChainSlot} $built
+     */
+    public function record(Invoice $invoice, array $built): void
+    {
+        $slot = $built['slot'];
+        if (! $slot instanceof ZatcaChainSlot || $slot->icv !== $built['icv'] || $slot->previousHash !== $built['prev']) {
+            throw new RuntimeException('مخرجات ZATCA لا تطابق خانة السلسلة المحجوزة.');
+        }
+
+        $this->chain->recordInvoice($slot, $invoice, $built['uuid'], $built['hash'], $built['signed']);
     }
 
     /**
@@ -152,36 +152,18 @@ class ZatcaService
     }
 
     /**
-     * يشتق PIH دائماً من XML السابق المحفوظ، لا من عمود الهاش.
-     *
-     * هذا يجعل حدّ ترقية الخوارزمية آمناً: الهاشات التاريخية الخام تبقى
-     * كسجلٍ غير معدّل، لكن أول فاتورة جديدة تشير إلى C14N 1.1 الصحيح
-     * لمستندها السابق. وغياب XML يمنع الترحيل بدلاً من كسر السلسلة بصمت.
-     */
-    private function previousInvoiceHash(?Invoice $last): string
-    {
-        if ($last === null) {
-            return $this->genesisHash();
-        }
-
-        if (! is_string($last->zatca_xml) || trim($last->zatca_xml) === '') {
-            throw new RuntimeException('تعذر متابعة سلسلة ZATCA: XML الفاتورة السابقة غير محفوظ.');
-        }
-
-        return $this->invoiceHasher->hash($last->zatca_xml);
-    }
-
-    /**
      * رمز QR للمرحلة 1: Base64 لحقول TLV الخمسة الإلزامية.
      */
-    public function qrFor(Invoice $invoice, ?Tenant $tenant = null): string
+    public function qrFor(Invoice $invoice): string
     {
-        $tenant ??= Tenant::find($invoice->tenant_id);
+        // الوسمان 1–2 من لقطة البائع نفسها التي يُبنى منها XML (REM-15a) فلا يختلف اسم/رقم QR عن المستند.
+        $issuedAt = $this->issuedAtOf($invoice);
+        $seller = ZatcaPartyXml::requireSnapshot($invoice)['seller'];
 
         $payload =
-            $this->tlv(1, $tenant?->name ?? '') .
-            $this->tlv(2, $tenant?->vat_number ?? '') .
-            $this->tlv(3, ZatcaIssueTimestamp::phase1QrText($this->issuedAtOf($invoice))) .
+            $this->tlv(1, ZatcaPartyXml::text($seller['name'] ?? null) ?? '') .
+            $this->tlv(2, ZatcaPartyXml::text($seller['vat_number'] ?? null) ?? '') .
+            $this->tlv(3, ZatcaIssueTimestamp::phase1QrText($issuedAt)) .
             $this->tlv(4, $this->formatAmount($invoice->total)) .
             $this->tlv(5, $this->formatAmount($invoice->tax_amount));
 
@@ -189,18 +171,35 @@ class ZatcaService
     }
 
     /**
-     * الهاش الابتدائي لسلسلة PIH = Base64 لـ SHA-256 للنص "0".
+     * PIH الابتدائي في XML قبل REM-17: Base64 لبايتات SHA-256("0") الخام. **لا يُصدَر أبداً** بعد REM-17؛
+     * يبقى للتعرّف على سلاسل تجريبية بدأت به (أول فاتورة فيها تحمله ولا يُعاد توليدها — REM-25).
+     */
+    public const LEGACY_GENESIS_HASH = 'X+zrZv/IbzjZUnhsbWlsecLbwjndTpG0ZynXOif7V+k=';
+
+    /**
+     * الهاش الابتدائي لسلسلة PIH (أول فاتورة في سلسلة جديدة فقط) — REM-17.
+     *
+     * معيار تنفيذ XML (BR-KSA-26) ينصّ حرفياً: «لأول فاتورة، الهاش السابق هو
+     * NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI0NjcyOWQ3M2EyN2ZiNTdlOQ==» = Base64 لنصّ
+     * SHA-256("0") **الست عشري** (لا لبايتاته الخام)، وهي القيمة نفسها في عيّنات SDK الرسمية وملف pih.txt.
+     * السلاسل القائمة لا تتأثر: الفاتورة التالية تشير دائماً إلى هاش XML السابق المحفوظ.
      */
     public function genesisHash(): string
     {
-        return base64_encode(hash('sha256', '0', true));
+        return base64_encode(hash('sha256', '0'));
     }
 
     /**
      * بناء حقل TLV واحد: [وسم 1 بايت][طول البايتات 1 بايت][القيمة].
+     * الطول بايت واحد (معيار ميزات الأمان §4.1): قيمة أطول من 255 بايت تُرفض ولا تُقتطع أبداً (اسم البائع بيانات
+     * هوية قانونية) — REM-17.
      */
     public function tlv(int $tag, string $value): string
     {
+        if (strlen($value) > 255) {
+            throw new RuntimeException("قيمة وسم QR رقم {$tag} تتجاوز 255 بايت؛ لا تُقتطع بيانات QR.");
+        }
+
         return chr($tag) . chr(strlen($value)) . $value;
     }
 
@@ -251,31 +250,31 @@ class ZatcaService
 
     /**
      * بناء مستند UBL 2.1 مبسّط للفاتورة (تمثيل بنيوي — غير مُتحقَّق مقابل XSD ZATCA).
+     * كتلتا الطرفين (REM-15a) من لقطة party_snapshot عبر ZatcaPartyXml؛ والمبالغ/الأسطر (REM-16) تُعرض كما خُزّنت عبر
+     * ZatcaMonetaryXml بلا أي إعادة حساب. الترويسة والتوقيع/QR/PIH خارج هذه الدالة.
+     *
+     * @param array{seller: array<string, mixed>, buyer: array<string, mixed>} $parties
      */
-    protected function buildXml(Invoice $invoice, ?Tenant $tenant, string $uuid, int $icv, string $prev): string
+    protected function buildXml(Invoice $invoice, array $parties, string $uuid, int $icv, string $prev): string
     {
         $e = fn ($v) => htmlspecialchars((string) $v, ENT_XML1 | ENT_QUOTES, 'UTF-8');
-        $amt = fn (int $m) => $this->formatAmount($m);
 
+        // REM-16: المبالغ والأسطر تُعرض كما خُزّنت (ZatcaMonetaryXml) — لا إعادة حساب هنا.
         $linesXml = '';
         foreach ($invoice->lines as $i => $line) {
-            $linesXml .= <<<LINE
-  <cac:InvoiceLine>
-    <cbc:ID>{$e($i + 1)}</cbc:ID>
-    <cbc:InvoicedQuantity>{$e($this->lineQuantity($line))}</cbc:InvoicedQuantity>
-    <cbc:LineExtensionAmount currencyID="SAR">{$e($amt($line->line_subtotal))}</cbc:LineExtensionAmount>
-    <cac:Item><cbc:Name>{$e($line->description ?? '-')}</cbc:Name></cac:Item>
-    <cac:Price><cbc:PriceAmount currencyID="SAR">{$e($amt($line->unit_price))}</cbc:PriceAmount></cac:Price>
-  </cac:InvoiceLine>
-
-LINE;
+            $linesXml .= ZatcaMonetaryXml::line($invoice, $line, $i + 1, $this->lineQuantity($line));
         }
+        $monetaryXml = ZatcaMonetaryXml::documentBlock($invoice);
 
         // REM-13a / BR-KSA-70: توقيت السعودية (AST) بلا Z، مشتق من لحظة الإصدار المخزَّنة.
         $issuedAt = $this->issuedAtOf($invoice);
         $issueDate = ZatcaIssueTimestamp::xmlDate($issuedAt);
         $issueTime = ZatcaIssueTimestamp::xmlTime($issuedAt);
         $transactionCode = $invoice->zatca_document_type === 'standard' ? '0100000' : '0200000';
+        $partiesXml = rtrim(
+            ZatcaPartyXml::supplier($parties['seller'])
+            . ZatcaPartyXml::customer($parties['buyer'], $invoice->zatca_document_type === 'standard' ? 'standard' : 'simplified')
+        );
 
         return <<<XML
 <?xml version="1.0" encoding="UTF-8"?>
@@ -295,6 +294,7 @@ LINE;
   <cbc:IssueTime>{$e($issueTime)}</cbc:IssueTime>
   <cbc:InvoiceTypeCode name="{$transactionCode}">388</cbc:InvoiceTypeCode>
   <cbc:DocumentCurrencyCode>SAR</cbc:DocumentCurrencyCode>
+  <cbc:TaxCurrencyCode>SAR</cbc:TaxCurrencyCode>
   <cac:AdditionalDocumentReference>
     <cbc:ID>ICV</cbc:ID>
     <cbc:UUID>{$e($icv)}</cbc:UUID>
@@ -315,26 +315,8 @@ LINE;
     <cbc:ID>urn:oasis:names:specification:ubl:signature:Invoice</cbc:ID>
     <cbc:SignatureMethod>urn:oasis:names:specification:ubl:dsig:enveloped:xades</cbc:SignatureMethod>
   </cac:Signature>
-  <cac:AccountingSupplierParty>
-    <cac:Party>
-      <cac:PartyTaxScheme><cbc:CompanyID>{$e($tenant?->vat_number ?? '')}</cbc:CompanyID></cac:PartyTaxScheme>
-      <cac:PartyLegalEntity><cbc:RegistrationName>{$e($tenant?->name ?? '')}</cbc:RegistrationName></cac:PartyLegalEntity>
-    </cac:Party>
-  </cac:AccountingSupplierParty>
-  <cac:AccountingCustomerParty>
-    <cac:Party>
-      <cac:PartyLegalEntity><cbc:RegistrationName>{$e($invoice->partner?->name ?? '')}</cbc:RegistrationName></cac:PartyLegalEntity>
-    </cac:Party>
-  </cac:AccountingCustomerParty>
-  <cac:TaxTotal>
-    <cbc:TaxAmount currencyID="SAR">{$e($amt($invoice->tax_amount))}</cbc:TaxAmount>
-  </cac:TaxTotal>
-  <cac:LegalMonetaryTotal>
-    <cbc:TaxExclusiveAmount currencyID="SAR">{$e($amt($invoice->subtotal))}</cbc:TaxExclusiveAmount>
-    <cbc:TaxInclusiveAmount currencyID="SAR">{$e($amt($invoice->total))}</cbc:TaxInclusiveAmount>
-    <cbc:PayableAmount currencyID="SAR">{$e($amt($invoice->total))}</cbc:PayableAmount>
-  </cac:LegalMonetaryTotal>
-{$linesXml}</Invoice>
+{$partiesXml}
+{$monetaryXml}{$linesXml}</Invoice>
 XML;
     }
 }

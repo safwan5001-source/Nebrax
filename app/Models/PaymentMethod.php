@@ -19,12 +19,15 @@ class PaymentMethod extends BaseModel implements CompanyWide
         'available_online',
         'is_active',
         'is_default',
+        'pos_clearing_gateway_id',
+        'pos_terminal_required',
     ];
 
     protected $casts = [
         'available_online' => 'boolean',
         'is_active' => 'boolean',
         'is_default' => 'boolean',
+        'pos_terminal_required' => 'boolean',
     ];
 
     protected $attributes = [
@@ -38,6 +41,14 @@ class PaymentMethod extends BaseModel implements CompanyWide
     public function cashBankAccount(): BelongsTo
     {
         return $this->belongsTo(CashBankAccount::class, 'cash_bank_account_id');
+    }
+
+    /**
+     * D-09: اتصال المستحوذ الذي تُقاصّ عليه مبيعات POS بهذه الطريقة (NULL = مطفأ ⇒ A11، الافتراضي). يقرؤه `PosService` وحده عند إنشاء السند.
+     */
+    public function posClearingGateway(): BelongsTo
+    {
+        return $this->belongsTo(PaymentGateway::class, 'pos_clearing_gateway_id');
     }
 
     /** السندات التي اختارت الطريقة؛ تمنع حذف إعداد مستخدم. */

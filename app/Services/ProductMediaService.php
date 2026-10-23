@@ -10,6 +10,7 @@ use App\Services\DocumentCenter\DocumentStorageService;
 use Aws\Exception\AwsException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -38,6 +39,7 @@ class ProductMediaService
         private readonly DocumentStorageService $documentStorage,
         private readonly R2StorageService $r2,
         private readonly ProductMediaDerivativeService $derivatives,
+        private readonly ProductImageInspector $inspector,
     ) {}
 
     /** AWJ-R2-4A: يبقى false افتراضياً — تراجعٌ فوريٌّ بمتغيّر بيئة بلا نشر كود. */
@@ -53,12 +55,12 @@ class ProductMediaService
      *
      * @param  list<UploadedFile>  $files
      */
-    public function attachToProduct(Product $product, array $files, ?string $uploadedBy): array
+    public function attachToProduct(Product $product, array $files, ?string $uploadedBy, bool $preventDuplicates = false): array
     {
         return $this->store($product, $files, $uploadedBy, [
             'countQuery' => fn () => ProductMedia::where('product_id', $product->id)
                 ->whereNull('product_option_value_id')->whereNull('product_variant_id'),
-        ]);
+        ], $preventDuplicates);
     }
 
     /** @param  list<UploadedFile>  $files */
@@ -88,7 +90,7 @@ class ProductMediaService
     }
 
     /** @param  list<UploadedFile>  $files */
-    private function store(Product $product, array $files, ?string $uploadedBy, array $scope): array
+    private function store(Product $product, array $files, ?string $uploadedBy, array $scope, bool $preventDuplicates = false): array
     {
         $countQuery = $scope['countQuery'];
         unset($scope['countQuery']);
@@ -97,17 +99,35 @@ class ProductMediaService
             throw new RuntimeException('الحد الأقصى للوسائط في هذا النطاق هو '.self::MAX_PER_SCOPE.' صور. احذف صورة قبل الرفع.');
         }
 
+        // افحص الدفعة كاملة قبل أول كتابة تخزين: ملف ثانٍ خبيث أو مكرر لا
+        // يترك الصورة الأولى محفوظة وحدها في معرض جزئي.
+        $inspectedFiles = [];
+        $seenHashes = [];
+        foreach (array_values($files) as $file) {
+            $inspected = $this->inspector->inspect($file);
+            if ($preventDuplicates && (isset($seenHashes[$inspected->sha256])
+                || ProductMedia::query()->where('product_id', $product->id)->where('content_sha256', $inspected->sha256)->exists())) {
+                throw new RuntimeException('هذه الصورة مرفقة بالمنتج بالفعل.');
+            }
+            $seenHashes[$inspected->sha256] = true;
+            $inspectedFiles[] = [$file, $inspected];
+        }
+
         $start = (int) ($countQuery()->max('sort_order') ?? -1) + 1;
         $created = [];
 
-        foreach (array_values($files) as $offset => $file) {
-            $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: 'bin');
+        foreach ($inspectedFiles as $offset => [$file, $inspected]) {
+            $extension = $inspected->extension;
             $filename = Str::uuid().".{$extension}";
             $media = new ProductMedia(array_merge([
                 'product_id' => $product->id,
                 'original_name' => $file->getClientOriginalName(),
-                'mime_type' => $file->getMimeType(),
-                'size' => $file->getSize(),
+                'mime_type' => $inspected->mimeType,
+                'size' => $inspected->size,
+                // Historical direct gallery uploads allow identical image bytes.
+                // Import uses the explicit opt-in guard below, where the hash also
+                // provides idempotent de-duplication across a retry.
+                'content_sha256' => $preventDuplicates ? $inspected->sha256 : null,
                 'sort_order' => $start + $offset,
                 'uploaded_by' => $uploadedBy,
             ], $scope));
@@ -141,6 +161,9 @@ class ProductMediaService
                     report($cleanupException);
                 }
 
+                if ($exception instanceof UniqueConstraintViolationException) {
+                    throw new RuntimeException('هذه الصورة مرفقة بالمنتج بالفعل.', previous: $exception);
+                }
                 throw $exception;
             }
             $created[] = $media;

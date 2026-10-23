@@ -63,8 +63,8 @@ describe('IntegrationsPage', () => {
 
     await waitFor(() => expect(screen.getByTestId('integration-card-delivery').getAttribute('data-state')).toBe('app_off'));
     expect(api.mock.calls.map((call) => call[0])).toEqual(['/applications/nav-state']);
-    // مالك: رابط إدارة التطبيقات، وكتالوج الاتصالات الثابت مستقل عن بوابة نقاط البيع.
-    expect(screen.getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/applications', '/integrations/communications']);
+    // مالك: رابط إدارة التطبيقات، وبطاقتا بوابات الدفع (PAY-H1-05) والاتصالات مستقلتان عن بوابة نقاط البيع.
+    expect(screen.getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/applications', '/finance-settings/payments', '/integrations/communications']);
   });
 
   it('allowed: enters the catalog and summarizes A and B from the two existing reads', async () => {
@@ -136,7 +136,7 @@ describe('IntegrationsPage', () => {
     expect(document.body.textContent).not.toContain(m.delivery.nativeNone);
     // البطاقة تبقى قابلة للدخول رغم فشل الملخص (وبطاقة الاتصالات الثابتة لا تتأثر).
     expect(screen.getByTestId('integration-card-delivery').getAttribute('href')).toBe('/integrations/delivery-platforms');
-    expect(screen.getAllByRole('link')).toHaveLength(2);
+    expect(screen.getAllByRole('link')).toHaveLength(3); // + بوابات الدفع (مالك)
 
     healthy = true;
     await user.click(screen.getByRole('button', { name: m.retry }));

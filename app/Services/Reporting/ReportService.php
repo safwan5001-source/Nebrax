@@ -3,6 +3,7 @@
 namespace App\Services\Reporting;
 
 use App\Models\Account;
+use App\Models\AccountBalance;
 use App\Models\Asset;
 use App\Models\CostCenter;
 use App\Models\CreditNote;
@@ -511,13 +512,15 @@ class ReportService
 
     /**
      * تدفقات نقدية بالطريقة المباشرة: يُجمع أثر النقد والبنك الفعلي لكل قيد
-     * مرحّل، فتُلغى التحويلات الداخلية بين الصندوق والبنك تلقائياً لأن صافيها صفر.
+     * مرحّل، فتُلغى التحويلات الداخلية بين أي خزينتين/بنكين تلقائياً لأن صافيها صفر.
+     * «النقد والبنك» = `CashAccountResolver` (كيانات الخزائن والبنوك ∪ 1110/1120).
      * التصنيف شفاف ومحدود: أصل ثابت = استثماري، مقابل حقوق ملكية = تمويلي، وما
      * عداه تشغيلي. لا تُشتق حركة نقدية من تغيّر الذمم أو اللقطات.
      */
     public function cashFlow(array $filters = []): array
     {
-        $cashAccounts = Account::whereIn('code', ['1110', '1120'])->pluck('id');
+        // TREASURY-T2: كل الحسابات المربوطة بخزائن/بنوك (المعطَّلة أيضاً لقيودها التاريخية) ∪ 1110/1120، لا الرمزين وحدهما.
+        $cashAccounts = app(CashAccountResolver::class)->accountIds();
         if ($cashAccounts->isEmpty()) {
             return $this->emptyCashFlow();
         }
@@ -571,6 +574,67 @@ class ReportService
             ...$results,
             'net_cash_flow' => $netCashFlow,
         ];
+    }
+
+    /**
+     * رصيد النقد والبنك الحالي (مؤشر لوحة التحكم): إجمالي فقط — لا أسماء حسابات ولا أرصدة لكل حساب.
+     *
+     * النطاق يتبع قاعدة الفروع في كل تقرير (`branchIds`): مستخدم غير مقيَّد بفرع ⇒ رصيد الشركة كله من لقطة `account_balances`
+     * ذاتها التي كان يقرؤها المؤشر السابق (كل الزمن والفروع)؛ مستخدم مقيَّد بفروع ⇒ مجموع قيود فروعه وحدها من الدفتر،
+     * فلا يرى بهذا المسار رقماً أوسع مما يراه في بقية التقارير. الأرصدة بالهللات.
+     *
+     * @return array{balance:int}
+     */
+    public function cashPosition(): array
+    {
+        return ['balance' => $this->scopedBalance(app(CashAccountResolver::class)->accountIds())];
+    }
+
+    /**
+     * رصيد ذمم العملاء الحالي (مؤشر لوحة التحكم): إجمالي حساب العملاء النظامي 1130 فقط — لا تفصيل حسابات ولا فروع.
+     * المعنى كما كان المؤشر السابق (لقطة `account_balances` لكل الزمن والفروع لغير المقيَّد)، ونطاق الفروع هو نطاق `cashPosition`
+     * نفسه: المستخدم المقيَّد بفروع يرى ذمم قيود فروعه وحدها. لا مجموعة أدوار هنا عمداً (سياسة الإقفال المالي لها خدمتها).
+     * الحساب الغائب (مستأجر قديم/ناقص) ⇒ صفر كما كان.
+     *
+     * @return array{balance:int}
+     */
+    public function receivablesPosition(): array
+    {
+        return ['balance' => $this->scopedBalance(Account::query()->where('code', '1130')->pluck('id'))];
+    }
+
+    /**
+     * رصيد مجموعة حسابات بنطاق فروع المستخدم (قاعدة `branchIds` الموحَّدة للتقارير):
+     * غير مقيَّد ⇒ لقطة `account_balances` (كل الفروع)؛ مقيَّد ⇒ مجموع سطور القيود المرحّلة/المعكوسة لفروعه من الدفتر،
+     * بإشارة طبيعة كل حساب كما تحسبها `LedgerService::applyToBalance` (مدين الطبيعة: مدين − دائن، وإلا العكس).
+     * القيد المعكوس يبقى مع عاكسه فيصافيان صفراً.
+     *
+     * @param  Collection<int, string>  $accountIds
+     */
+    protected function scopedBalance(Collection $accountIds): int
+    {
+        if ($accountIds->isEmpty()) {
+            return 0;
+        }
+
+        $branchIds = $this->branchIds([]);
+        if ($branchIds === null) {
+            return (int) AccountBalance::query()->whereIn('account_id', $accountIds)->sum('balance');
+        }
+
+        $normal = Account::query()->whereIn('id', $accountIds)->pluck('normal_balance', 'id');
+        $rows = JournalLine::query()
+            ->join('journal_entries as e', 'e.id', '=', 'journal_lines.journal_entry_id')
+            ->whereIn('e.status', ['posted', 'reversed'])
+            ->whereIn('journal_lines.account_id', $accountIds)
+            ->whereIn('journal_lines.branch_id', $branchIds)
+            ->groupBy('journal_lines.account_id')
+            ->selectRaw('journal_lines.account_id as account_id, COALESCE(SUM(journal_lines.debit), 0) as debit, COALESCE(SUM(journal_lines.credit), 0) as credit')
+            ->get();
+
+        return (int) $rows->sum(fn ($row) => ($normal[$row->account_id] ?? 'debit') === 'debit'
+            ? (int) $row->debit - (int) $row->credit
+            : (int) $row->credit - (int) $row->debit);
     }
 
     /** @return array{operating:array, investing:array, financing:array, net_cash_flow:int} */

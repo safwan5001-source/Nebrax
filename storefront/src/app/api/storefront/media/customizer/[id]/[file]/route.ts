@@ -9,6 +9,17 @@ import {
   isCustomizerMediaId,
   isCustomizerProxyFile,
 } from "@/lib/commerce/customizer-media";
+import {
+  BodyTooLargeError,
+  deliverBuffered,
+  MIN_DELIVERY_CHARGE_BYTES,
+  mediaProxyLimits,
+  type Permit,
+  READ_COPY_FACTOR,
+  readBodyBounded,
+  sharedMediaProxyGate,
+  warnIfLimitsConstrained,
+} from "@/lib/commerce/media-proxy-guard";
 
 /**
  * CUST-HV V2c — same-origin delivery of Customizer media (V0 §7.8,
@@ -26,6 +37,21 @@ import {
  *
  * Params are validated against the contract before anything is forwarded — a
  * malformed id/file never reaches Laravel.
+ *
+ * AWJ-ANIMATED-MEDIA P2-0 — the body is still BUFFERED (that keeps slow visitors
+ * off Laravel's Apache workers; Laravel-served bytes are never streamed to the
+ * client), but the buffering is now bounded and guarded: at most
+ * `maxBodyBytes` are ever held (whatever `Content-Length` says), only a bounded
+ * number of origin round-trips run at once (globally and per visitor host), every
+ * round-trip has a deadline and follows the visitor's disconnect, and every
+ * failure is a uniform, uncached, body-less response — nothing about the origin
+ * (URL, status text, secret, stack) reaches the client. See media-proxy-guard.ts.
+ *
+ * P2-0b — the memory budget also covers the response DELIVERY: the origin slot is
+ * freed as soon as the origin read ends (a slow visitor never holds a Laravel
+ * worker), but the buffered body keeps its share of the budget until it has been
+ * handed to the visitor, or the visitor left, or the delivery deadline passed.
+ * The permit is released exactly once on every path (it is idempotent).
  */
 export const CUSTOMIZER_MEDIA_CACHE_CONTROL =
   "public, max-age=300, must-revalidate";
@@ -62,39 +88,96 @@ export async function GET(
     upstreamHeaders["If-None-Match"] = condition;
   }
 
-  const upstream = await fetch(
-    buildStorefrontUrl(
-      `media/customizer/${encodeURIComponent(id)}/${encodeURIComponent(file)}`,
-    ),
-    { headers: upstreamHeaders, cache: "no-store" },
-  );
-
-  // Anything but 200/304 is the origin's uniform "not available" — pass the
-  // status through and never attach a public cache header to a failure.
-  if (upstream.status !== 200 && upstream.status !== 304) {
+  const limits = mediaProxyLimits();
+  warnIfLimitsConstrained(limits);
+  const gate = sharedMediaProxyGate(limits);
+  let permit: Permit;
+  try {
+    // a slot AND the worst-case read memory (received chunks + assembled copy) from the shared budget
+    permit = await gate.acquire(
+      visitorHost.toLowerCase(),
+      request.signal,
+      limits.maxBodyBytes * READ_COPY_FACTOR,
+    );
+  } catch {
+    // at capacity (or the visitor already left): shed load instead of queueing without bound
     return new Response(null, {
-      status: upstream.status === 404 ? 404 : 502,
-      headers: { "Cache-Control": "no-store" },
+      status: 503,
+      headers: { "Cache-Control": "no-store", "Retry-After": "2" },
     });
   }
 
-  const responseHeaders: Record<string, string> = {
-    "Cache-Control": CUSTOMIZER_MEDIA_CACHE_CONTROL,
-    "X-Content-Type-Options": "nosniff",
-  };
-  const etag = upstream.headers.get("etag");
-  if (etag) {
-    responseHeaders.ETag = etag;
-  }
+  let handedOver = false;
+  try {
+    const upstream = await fetch(
+      buildStorefrontUrl(
+        `media/customizer/${encodeURIComponent(id)}/${encodeURIComponent(file)}`,
+      ),
+      {
+        headers: upstreamHeaders,
+        cache: "no-store",
+        signal: AbortSignal.any([
+          request.signal,
+          AbortSignal.timeout(limits.timeoutMs),
+        ]),
+      },
+    );
 
-  if (upstream.status === 304) {
-    return new Response(null, { status: 304, headers: responseHeaders });
-  }
+    // Anything but 200/304 is the origin's uniform "not available" — pass the
+    // status through and never attach a public cache header to a failure.
+    if (upstream.status !== 200 && upstream.status !== 304) {
+      await upstream.body?.cancel().catch(() => undefined);
+      return failure(upstream.status === 404 ? 404 : 502);
+    }
 
-  responseHeaders["Content-Type"] =
-    upstream.headers.get("content-type") ?? "application/octet-stream";
-  return new Response(await upstream.arrayBuffer(), {
-    status: 200,
-    headers: responseHeaders,
+    const responseHeaders: Record<string, string> = {
+      "Cache-Control": CUSTOMIZER_MEDIA_CACHE_CONTROL,
+      "X-Content-Type-Options": "nosniff",
+    };
+    const etag = upstream.headers.get("etag");
+    if (etag) {
+      responseHeaders.ETag = etag;
+    }
+
+    if (upstream.status === 304) {
+      return new Response(null, { status: 304, headers: responseHeaders });
+    }
+
+    responseHeaders["Content-Type"] =
+      upstream.headers.get("content-type") ?? "application/octet-stream";
+    const body = await readBodyBounded(upstream, limits.maxBodyBytes);
+    // The origin round-trip is over (slot freed); the buffered body now keeps only its own size in the budget until delivered.
+    permit.endRound(Math.max(body.byteLength, MIN_DELIVERY_CHARGE_BYTES));
+    const response = new Response(
+      deliverBuffered(body, {
+        onSettled: permit,
+        deadlineMs: limits.deliveryTimeoutMs,
+        signal: request.signal,
+      }),
+      { status: 200, headers: responseHeaders },
+    );
+    handedOver = true;
+    return response;
+  } catch (error) {
+    if (error instanceof BodyTooLargeError) {
+      // server-side only; the visitor just sees a uniform failure
+      console.warn("[media-proxy] origin body over the bound", {
+        id,
+        file,
+        limit: limits.maxBodyBytes,
+      });
+    }
+    return failure(502);
+  } finally {
+    // Every path that did not hand the buffered body to a delivery releases here; the delivery releases its own share.
+    if (!handedOver) permit();
+  }
+}
+
+/** A body-less, uncached failure: identical for every cause, so nothing about the origin leaks. */
+function failure(status: 404 | 502): Response {
+  return new Response(null, {
+    status,
+    headers: { "Cache-Control": "no-store" },
   });
 }

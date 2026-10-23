@@ -417,8 +417,15 @@ class InvoicePartySnapshotTest extends TestCase
             }
         }
         sort($writers);
+        // REM-18b-3c (راجعها المالك صراحةً): الإشعار الدائن ينسخ لقطة الفاتورة المصدر **كما هي** (لا التقاط جديد) — المُصدِر وحده يكتب
+        // `credit_notes.party_snapshot`، والنموذج يعلن تحويله `array` فقط. أعمدة الفاتورة نفسها لم يتغيّر كاتبها.
         $this->assertSame(
-            ['app/Models/Invoice.php', 'app/Services/Accounting/InvoiceService.php'],
+            [
+                'app/Models/CreditNote.php',
+                'app/Models/Invoice.php',
+                'app/Services/Accounting/InvoiceService.php',
+                'app/Services/Accounting/ZatcaCreditNoteIssuer.php',
+            ],
             $writers,
             'أي كاتب جديد لـ party_snapshot يجب أن يُراجَع صراحةً.'
         );
@@ -469,11 +476,14 @@ class InvoicePartySnapshotTest extends TestCase
         $first = $this->posted();
         $xml = (string) $first->zatca_xml;
 
-        // XML ما زال يحمل ما كان يحمله فقط: رقم البائع واسمه، واسم المشتري — لا عنوان ولا CRN ولا رقم المشتري (يُصحَّح في REM-15/16).
-        $this->assertStringContainsString('<cbc:CompanyID>300000000000003</cbc:CompanyID>', $xml);
-        $this->assertStringContainsString('<cbc:RegistrationName>شركة الأفق</cbc:RegistrationName>', $xml);
-        $this->assertStringContainsString('<cbc:RegistrationName>شركة الأمل</cbc:RegistrationName>', $xml);
-        foreach (['1010101010', '12643', '8228', '300111222333003', 'PostalAddress', 'PartyIdentification'] as $absent) {
+        // REM-15a: كتلتا الطرفين في XML تُبنيان من اللقطة (تفصيلها في ZatcaPartyXmlTest): البائع بعنوانه وCRN، والمشتري برقمه وعنوانه.
+        foreach (['<cbc:CompanyID>300000000000003</cbc:CompanyID>', '<cbc:ID schemeID="CRN">1010101010</cbc:ID>', '<cbc:PostalZone>12643</cbc:PostalZone>',
+            '<cbc:RegistrationName>شركة الأفق</cbc:RegistrationName>', '<cbc:CompanyID>300111222333003</cbc:CompanyID>',
+            '<cbc:RegistrationName>شركة الأمل</cbc:RegistrationName>', '<cbc:PostalZone>31411</cbc:PostalZone>'] as $present) {
+            $this->assertStringContainsString($present, $xml, $present);
+        }
+        // لا تسرُّب لما لا تحمله اللقطة من هذه الكتل (البريد/الهاتف/النص الحر/الاسم الإنجليزي).
+        foreach (['secret@example.test', '0551111111', 'نص حر لا يُلتقط', 'Al Amal Co'] as $absent) {
             $this->assertStringNotContainsString($absent, $xml, $absent);
         }
         $this->assertSame(app(ZatcaInvoiceHasher::class)->hash($xml), $first->zatca_hash);
@@ -488,8 +498,9 @@ class InvoicePartySnapshotTest extends TestCase
         $second = $this->posted();
         $this->assertSame([1, 2], [(int) $first->zatca_icv, (int) $second->zatca_icv]);
         $this->assertSame(app(ZatcaInvoiceHasher::class)->hash($xml), $second->zatca_previous_hash);
-        // البائع/المشتري في XML الجديد ما زالا يقرآن حيّاً (لم يُغيَّر المولِّد): دليل أن REM-14 لا يمسّ XML.
+        // XML الفاتورة الثانية يتبع **لقطتها هي** (التُقطت بعد تعديل البيانات الحيّة)، وXML الأولى لم يتغيّر.
         $this->assertStringContainsString('<cbc:RegistrationName>اسم جديد للمؤسسة</cbc:RegistrationName>', $second->zatca_xml);
+        $this->assertSame($xml, (string) $first->fresh()->zatca_xml);
     }
 
     // ───────────────────────── العزل ─────────────────────────

@@ -48,9 +48,15 @@ class StorePosSaleRequest extends FormRequest
         if (array_is_list($this->input('tenders', []))) {
             return [
                 ...$rules,
-                'tenders.*'                   => ['required', 'array:payment_method_id,amount'],
+                // مراجع عملية البطاقة اختيارية (D-09/H6-01). الاتصال/الحساب/المقاصة لا تُقبل من العميل أبداً: الخادم يشتقها من الوسيلة.
+                'tenders.*'                   => ['required', 'array:payment_method_id,amount,approval_code,rrn,last4,terminal_request_id'],
                 'tenders.*.payment_method_id' => ['required', 'uuid', 'distinct'],
                 'tenders.*.amount'            => ['required', 'integer', 'min:1', 'max:100000000000'], // هللات
+                'tenders.*.approval_code'     => ['nullable', 'string', 'regex:/^[A-Za-z0-9\-]{1,32}$/'],
+                'tenders.*.rrn'               => ['nullable', 'string', 'regex:/^[A-Za-z0-9]{6,32}$/'],
+                'tenders.*.last4'             => ['nullable', 'string', 'regex:/^\d{4}$/'],
+                // H6-02: موافقة جهاز دفع مؤكدة (يتحقق منها الخادم: الجلسة/الوسيلة/المبلغ/لم تُستهلك).
+                'tenders.*.terminal_request_id' => ['nullable', 'uuid'],
             ];
         }
 

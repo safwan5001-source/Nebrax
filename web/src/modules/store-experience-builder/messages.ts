@@ -203,6 +203,27 @@ export const CUSTOMIZER_MESSAGES = {
     appsIntro: "روابط المتاجر العامة. بدون رابط صالح لا يظهر القسم.",
     appsPlacement: "موضع الظهور في المتجر",
     theme: "المظهر",
+    designLibraryNav: "مكتبة التصميم",
+    designLibraryTitle: "مكتبة تصميم المتجر",
+    designLibraryHint:
+      "عاين أنماطاً جاهزة ثم أضفها أو طبّقها على أقسامك الحالية. يمكنك تخصيص كل اختيار من أدوات التصميم المعتادة.",
+    designLibrarySearchLabel: "البحث في مكتبة التصميم",
+    designLibrarySearchPlaceholder: "ابحث عن نمط…",
+    designLibraryCategoryLabel: "فئات مكتبة التصميم",
+    designLibraryAll: "الكل",
+    designLibraryCategoryProducts: "بطاقات المنتجات",
+    designLibraryCategoryCategories: "التصنيفات",
+    designLibraryCategoryPromotions: "العروض",
+    designLibraryCategoryFeatured: "المنتجات المختارة",
+    designLibraryCategoryContent: "المحتوى",
+    designLibraryEmpty: "لا توجد أنماط مطابقة لبحثك.",
+    designLibraryApply: "تطبيق النمط",
+    designLibraryAdd: "إضافة للقسم",
+    designLibraryAddAnother: "إضافة قسم آخر",
+    designLibraryApplied: "مطبّق",
+    designLibraryOriginal: "التصميم الأصلي",
+    designLibraryWorkflowHint:
+      "تُحفظ اختيارات المكتبة في المسودة فقط. استخدم المعاينة قبل النشر، ورتّب الأقسام من لوحة الصفحة الرئيسية، أو استعد نسخة سابقة متى احتجت.",
     branding: "الهوية",
     // CUST-H3-1 — مقدّمة لوحة الهوية: تُثبّت أن اسم المتجر، الشعار، الشعار
     // المصغّر وأيقونة التبويب أربعة حقول لهوية واحدة لا أربع إعدادات متفرقة.
@@ -226,6 +247,52 @@ export const CUSTOMIZER_MESSAGES = {
     presetAwjMarket: "أَوْج ماركت",
     presetAwjBloom: "أَوْج بلوم",
     primaryColor: "اللون الأساسي",
+    storeBackground: "خلفية المتجر",
+    storeBackgroundHint: "لون خلفية الصفحات العامة. لا يغيّر خلفيات الأقسام المخصصة.",
+    storeBackgroundReset: "استعادة الافتراضي",
+    storeBackgroundType: "نوع الخلفية",
+    storeBackgroundSolid: "لون ثابت",
+    storeBackgroundGradient: "تدرج لوني",
+    storeBackgroundImage: "صورة خلفية",
+    storeBackgroundGradientPreview: "معاينة التدرج",
+    storeBackgroundHexInvalid: "أدخل لوناً بصيغة HEX مثل #f8f9fa.",
+    storeBackgroundImagePending: "اختر صورة لتفعيل خلفية الصورة. حتى ذلك الحين تبقى الخلفية الحالية.",
+    storeBackgroundFocalDesktop: "نقطة تركيز الصورة الأساسية",
+    storeBackgroundFocalPhone: "نقطة تركيز صورة الجوال",
+    storeBackgroundResetHint:
+      "تبديل النوع يستبدل الخلفية الحالية ويمكن التراجع عنه. «استعادة الافتراضي» تحذف أي تدرج أو صورة وتعيد اللون الافتراضي.",
+    storeBackgroundPublishBlocked:
+      "تعذّر النشر: خلفية الصورة غير متاحة للنشر بعد. استبدلها بلون ثابت، أو أبقِ هذه النسخة مسودة.",
+    storeBackgroundReady: "هذه الخلفية تجتاز فحص تباين نصوص المتجر وجاهزة للنشر.",
+    storeBackgroundImageChecking: "جارٍ التحقق من تباين نصوص المتجر فوق الصورة…",
+    storeBackgroundImageUnproven:
+      "لا يمكن نشر هذه الخلفية بعد: تعذّر إثبات تباين نصوص المتجر فوق الصورة (لا دليل بكسل صالح لها، أو أنها غير جاهزة أو شفافة). تعمل المعاينة والمسودة، ويُعاد الفحص عند اكتمال المعالجة.",
+    storeBackgroundImageInsufficient:
+      "لا يمكن نشر هذه الصورة بعد: نصوص المتجر لا تُقرأ بوضوح مؤكَّد فوق أغمق بكسل فيها. أضف تراكباً فاتحاً أقوى أو استخدم صورة أفتح؛ ويمكنك معاينتها وحفظها في المسودة.",
+    storeBackgroundImageAnimated:
+      "الصور المتحركة لا تُستخدم كخلفية عامة للمتجر (تُعرض ثابتة ولا دليل لتباينها). اختر صورة ثابتة للنشر.",
+    storeBackgroundImageSuggest: "أضعف تراكب فاتح يكفي:",
+    storeBackgroundImageApplyOverlay: "تطبيق التراكب الفاتح",
+    storeBackgroundImageNoOverlayFix: "لا يكفي أي تراكب فاتح لهذه الصورة؛ اختر صورة أفتح.",
+    storeBackgroundMediaContrastBlocked:
+      "تعذّر النشر: نصوص المتجر لا تُقرأ بوضوح مؤكَّد فوق خلفية الصورة. أضف تراكباً فاتحاً أقوى، أو استخدم صورة أفتح، أو استبدلها بلون ثابت، أو أبقِ هذه النسخة مسودة.",
+    storeBackgroundMediaUnprovenBlocked:
+      "تعذّر النشر: تعذّر إثبات تباين النصوص فوق خلفية الصورة (لا دليل بكسل صالح لها، أو أنها غير جاهزة أو شفافة). انتظر اكتمال معالجتها، أو اختر صورة أخرى، أو استبدلها بلون ثابت.",
+    storeBackgroundMediaAnimatedBlocked:
+      "تعذّر النشر: الصور المتحركة لا تُستخدم كخلفية عامة للمتجر. اختر صورة ثابتة، أو استبدلها بلون ثابت.",
+    storeBackgroundGradientInsufficient:
+      "لا يمكن نشر هذا التدرج بعد: نصوص المتجر لا تُقرأ بوضوح مؤكَّد فوقه على كامل مداه. اجعل لونيه أفتح؛ ويمكنك معاينته وحفظه في المسودة.",
+    storeBackgroundFailsFor: "تفشل مع:",
+    storeBackgroundFgText: "النص الأساسي",
+    storeBackgroundFgMuted: "النص الثانوي",
+    storeBackgroundFgBrand: "روابط لون العلامة",
+    storeBackgroundFgSection: "لون نص مخصّص في قسم",
+    storeBackgroundGradientContrastBlocked:
+      "تعذّر النشر: نصوص المتجر لا تُقرأ بوضوح مؤكَّد فوق هذا التدرج على كامل مداه. اجعل لونيه أفتح، أو استبدله بلون ثابت، أو أبقِ هذه النسخة مسودة.",
+    storeBackgroundGradientUnresolvedBlocked:
+      "تعذّر النشر: تعذّر تحديد ألوان التدرج لإثبات التباين. اختر لونين صالحين أو استبدله بلون ثابت.",
+    storeBackgroundSectionTextBlocked:
+      "تعذّر النشر: لون نصٍّ مخصَّص في أحد الأقسام لا يُقرأ بوضوح مؤكَّد فوق خلفية المتجر العامة. اختر لوناً أغمق لهذا النص.",
     accentColor: "لون ثانوي",
     font: "الخط",
     fontCairoGeist: "Cairo + Geist",
@@ -904,8 +971,14 @@ export const CUSTOMIZER_MESSAGES = {
     deliveryPromiseBodyLabel: "نص إضافي",
     canvasShelfLive: "تظهر هنا منتجات المتجر الحيّة",
     canvasShelfDeliverToday: "التسليم اليوم",
+    canvasShelfShopSelection: "تسوّق المختارات",
     canvasDiscoveryLive: "قيم البُعد وصورها تظهر في المتجر المنشور. شاهدها في «معاينة مباشرة» ضمن إعدادات هذا القسم.",
+    canvasDiscoveryShopByBrand: "تسوّق حسب العلامة التجارية",
+    canvasDiscoveryDiscoverBy: "تسوّق حسب",
     canvasDeliveryPromiseLive: "أقرب موعد توصيل يظهر هنا حيّاً",
+    canvasDeliveryEarliest: "أقرب موعد توصيل",
+    canvasDeliveryToday: "اليوم",
+    canvasDeliveryTomorrow: "غداً",
     canvasDataSectionIncomplete: "القسم غير مكتمل — لن يظهر في المتجر",
     selectedSectionHint: "تظهر هنا إعدادات القسم المحدد فقط.",
     sectionManagedNote:
@@ -1734,6 +1807,27 @@ export const CUSTOMIZER_MESSAGES = {
       "Public store URLs. The section stays absent without a valid link.",
     appsPlacement: "Where they appear",
     theme: "Appearance",
+    designLibraryNav: "Design library",
+    designLibraryTitle: "Store Design Library",
+    designLibraryHint:
+      "Preview curated variants, then add them or apply them to existing sections. Every choice remains customizable with the usual design controls.",
+    designLibrarySearchLabel: "Search the Design Library",
+    designLibrarySearchPlaceholder: "Search variants…",
+    designLibraryCategoryLabel: "Design Library categories",
+    designLibraryAll: "All",
+    designLibraryCategoryProducts: "Product cards",
+    designLibraryCategoryCategories: "Categories",
+    designLibraryCategoryPromotions: "Promotions",
+    designLibraryCategoryFeatured: "Featured products",
+    designLibraryCategoryContent: "Content",
+    designLibraryEmpty: "No variants match your search.",
+    designLibraryApply: "Apply variant",
+    designLibraryAdd: "Add section",
+    designLibraryAddAnother: "Add another",
+    designLibraryApplied: "Applied",
+    designLibraryOriginal: "Original design",
+    designLibraryWorkflowHint:
+      "Library choices stay in the draft until you publish. Preview first, reorder sections from the Homepage panel, or restore an earlier revision whenever needed.",
     branding: "Identity",
     // CUST-H3-1 — Identity panel intro: makes explicit that display name,
     // logo, compact logo and favicon are four fields of one Identity, not
@@ -1758,6 +1852,52 @@ export const CUSTOMIZER_MESSAGES = {
     presetAwjMarket: "AWJ Market",
     presetAwjBloom: "AWJ Bloom",
     primaryColor: "Primary color",
+    storeBackground: "Store background",
+    storeBackgroundHint: "The page background colour. It does not change custom section backgrounds.",
+    storeBackgroundReset: "Restore default",
+    storeBackgroundType: "Background type",
+    storeBackgroundSolid: "Solid colour",
+    storeBackgroundGradient: "Gradient",
+    storeBackgroundImage: "Background image",
+    storeBackgroundGradientPreview: "Gradient preview",
+    storeBackgroundHexInvalid: "Enter a HEX colour such as #f8f9fa.",
+    storeBackgroundImagePending: "Pick an image to turn on the image background. Until then the current background stays.",
+    storeBackgroundFocalDesktop: "Main image focal point",
+    storeBackgroundFocalPhone: "Phone image focal point",
+    storeBackgroundResetHint:
+      "Switching type replaces the current background and can be undone. “Restore default” removes any gradient or image and returns the default colour.",
+    storeBackgroundPublishBlocked:
+      "Publishing was blocked: an image background cannot be published yet. Replace it with a solid colour, or keep this version as a draft.",
+    storeBackgroundReady: "This background passes the store text-contrast check and can be published.",
+    storeBackgroundImageChecking: "Checking store text contrast over the picture…",
+    storeBackgroundImageUnproven:
+      "This background cannot be published yet: store text contrast over the picture could not be proven (no valid pixel evidence for it, or it is not ready, or it is translucent). The preview and the draft work, and the check reruns when processing finishes.",
+    storeBackgroundImageInsufficient:
+      "This image cannot be published yet: store text is not proven readable over its darkest pixels. Add a stronger light overlay or use a lighter image; you can still preview and save it in the draft.",
+    storeBackgroundImageAnimated:
+      "Animated images are not used as the global background (they are shown as a still and have no contrast evidence). Choose a still image to publish.",
+    storeBackgroundImageSuggest: "Weakest light overlay that is enough:",
+    storeBackgroundImageApplyOverlay: "Apply the light overlay",
+    storeBackgroundImageNoOverlayFix: "No light overlay is enough for this image; choose a lighter one.",
+    storeBackgroundMediaContrastBlocked:
+      "Publishing was blocked: store text is not proven readable over the picture background. Add a stronger light overlay, use a lighter image, replace it with a solid colour, or keep this version as a draft.",
+    storeBackgroundMediaUnprovenBlocked:
+      "Publishing was blocked: text contrast over the picture background could not be proven (no valid pixel evidence for it, or it is not ready, or it is translucent). Wait for it to finish processing, choose another image, or replace it with a solid colour.",
+    storeBackgroundMediaAnimatedBlocked:
+      "Publishing was blocked: animated images are not used as the global background. Choose a still image, or replace it with a solid colour.",
+    storeBackgroundGradientInsufficient:
+      "This gradient cannot be published yet: store text is not proven readable over its whole range. Make both colours lighter; you can still preview and save it in the draft.",
+    storeBackgroundFailsFor: "Fails for:",
+    storeBackgroundFgText: "Main text",
+    storeBackgroundFgMuted: "Secondary text",
+    storeBackgroundFgBrand: "Brand-colour links",
+    storeBackgroundFgSection: "A section's custom text colour",
+    storeBackgroundGradientContrastBlocked:
+      "Publishing was blocked: store text is not proven readable over this gradient across its whole range. Make both colours lighter, replace it with a solid colour, or keep this version as a draft.",
+    storeBackgroundGradientUnresolvedBlocked:
+      "Publishing was blocked: the gradient colours could not be resolved to prove contrast. Pick two valid colours or replace it with a solid colour.",
+    storeBackgroundSectionTextBlocked:
+      "Publishing was blocked: a custom text colour in a section is not proven readable over the store's global background. Choose a darker colour for that text.",
     accentColor: "Accent color",
     font: "Typography",
     fontCairoGeist: "Cairo + Geist",
@@ -2432,8 +2572,14 @@ export const CUSTOMIZER_MESSAGES = {
     deliveryPromiseBodyLabel: "Extra text",
     canvasShelfLive: "Live store products appear here",
     canvasShelfDeliverToday: "Deliver today",
+    canvasShelfShopSelection: "Shop the selection",
     canvasDiscoveryLive: "The dimension's values and pictures appear on the published store. Preview them under “Live preview” in this section's settings.",
+    canvasDiscoveryShopByBrand: "Shop by brand",
+    canvasDiscoveryDiscoverBy: "Shop by",
     canvasDeliveryPromiseLive: "The earliest delivery window appears here, live",
+    canvasDeliveryEarliest: "Earliest delivery",
+    canvasDeliveryToday: "Today",
+    canvasDeliveryTomorrow: "Tomorrow",
     canvasDataSectionIncomplete: "Incomplete — this section will not appear in the store",
     selectedSectionHint: "Only the selected section's settings appear here.",
     sectionManagedNote:

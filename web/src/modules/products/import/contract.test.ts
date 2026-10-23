@@ -106,12 +106,28 @@ describe('importFormData', () => {
     expect((form.get('file') as File).name).toBe('products.csv');
   });
 
+  it('يرسل خيار تطبيق الصور مع المعاينة لأنه مقيَّد ببصمتها (IMP-H1-S3b)', () => {
+    const file = new File(['sku,name'], 'products.csv');
+
+    expect(importFormData(file, { applyProductImages: true }).get('apply_product_images')).toBe('1');
+    expect(importFormData(file, {}).has('apply_product_images')).toBe(false);
+  });
+
   it('يرسل العمود المتجاهَل صراحةً كي لا تعود المطابقة التلقائية', () => {
     const file = new File([''], 'products.csv');
     const form = importFormData(file, { mapping: { 0: 'sku', 1: null } });
 
     expect(form.get('mapping[0]')).toBe('sku');
     expect(form.get('mapping[1]')).toBe('ignore');
+  });
+
+  it('يرسل أرشيف الصور وموافقة تحديث صور المنتجات الموجودة صراحةً', () => {
+    const file = new File([''], 'products.csv');
+    const archive = new File(['zip'], 'images.zip', { type: 'application/zip' });
+    const form = importFormData(file, { mediaArchive: archive, approveExistingMediaUpdates: true });
+
+    expect((form.get('media_archive') as File).name).toBe('images.zip');
+    expect(form.get('approve_existing_media_updates')).toBe('1');
   });
 
   it('لا يرسل مفاتيح لم تُطلب', () => {

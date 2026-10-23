@@ -10,7 +10,12 @@ use InvalidArgumentException;
 use RuntimeException;
 
 /**
- * يجمع توقيع XAdES داخل امتداد UBL ثم يتحقق منه بعد إعادة تسلسل المستند.
+ * يجمع توقيع XAdES داخل امتداد UBL — REM-17.
+ *
+ * التسلسل (الدليل الفني التفصيلي، الخطوات 1–6): هاش الفاتورة → توقيع ECDSA على بايتات الهاش الخام (DER) →
+ * SignedProperties وبصمتها → SignedInfo بالبصمتين → إدراج الامتداد. يُدرج الامتداد **نصاً** مباشرةً بعد وسم الجذر
+ * الافتتاحي ولا يُعاد تسلسل المستند: بصمة SignedProperties حسّاسة للمسافات، وأي مسافة تُضاف حول UBLExtensions تغيّر
+ * هاش الفاتورة نفسه. بعد الإدراج يُعاد التحقق من أن هاش الناتج يساوي البصمة الموقَّعة.
  *
  * لا تقرأ هذه الطبقة الأسرار من التخزين ولا ترسل الفاتورة؛ مدخلاتها صريحة
  * حتى يبقى حد التوقيع قابلاً للاختبار قبل ربطه بدورة ترحيل الفاتورة.
@@ -28,11 +33,14 @@ final class ZatcaXadesSignatureAssembler
     public const SIGNATURE_INFORMATION_ID = 'urn:oasis:names:specification:ubl:signature:1';
     public const REFERENCED_SIGNATURE_ID = 'urn:oasis:names:specification:ubl:signature:Invoice';
 
+    /** وسم جذر Invoice الافتتاحي (بعد إعلان XML وتعليقات/تعليمات معالجة اختيارية). */
+    private const ROOT_START_TAG = '/^(?:\xEF\xBB\xBF)?(?:<\?xml[^>]*\?>)?(?:\s|<!--(?:(?!-->).)*-->|<\?(?:(?!\?>).)*\?>)*'
+        .'<(?:[A-Za-z_][\w.-]*:)?Invoice(?:\s+[^\s=\/>]+\s*=\s*(?:"[^"]*"|\'[^\']*\'))*\s*>/s';
+
     public function __construct(
         private readonly ZatcaInvoiceHasher $invoiceHasher,
         private readonly ZatcaXadesSignedPropertiesBuilder $signedPropertiesBuilder,
         private readonly ZatcaXmlDsigSignedInfoBuilder $signedInfoBuilder,
-        private readonly ZatcaXmlCanonicalizer $canonicalizer,
         private readonly ZatcaXmlEcdsaSigner $signer,
     ) {
     }
@@ -59,116 +67,130 @@ final class ZatcaXadesSignatureAssembler
         if ($this->query($xpath, '//ds:Signature')->length !== 0) {
             throw new InvalidArgumentException('فاتورة ZATCA تحتوي توقيع XML مسبقاً.');
         }
+        $existingWrapper = $this->query($xpath, '/inv:Invoice/ext:UBLExtensions')->item(0);
+        if ($this->query($xpath, '//ext:UBLExtensions')->length !== ($existingWrapper === null ? 0 : 1)) {
+            throw new InvalidArgumentException('غلاف UBLExtensions في فاتورة ZATCA مكرر أو في غير موضعه.');
+        }
         if ($this->query($xpath, "//ext:UBLExtension[ext:ExtensionURI='".self::EXTENSION_URI."']")->length !== 0) {
             throw new InvalidArgumentException('فاتورة ZATCA تحتوي امتداد XAdES مسبقاً.');
         }
 
+        $certificates = $this->canonicalChain($certificateChain);
+        $publicKeyPem = $this->leafPublicKey($certificates);
+
         $invoiceDigest = $this->invoiceHasher->hash($invoiceXml);
-        $signature = $this->createSignatureContainer($document, $signatureId);
+        $invoiceHash = base64_decode($invoiceDigest, true);
+        if (! is_string($invoiceHash) || strlen($invoiceHash) !== 32) {
+            throw new RuntimeException('هاش فاتورة ZATCA غير صالح للتوقيع.');
+        }
 
-        $object = $this->ds($document, 'Object');
-        $qualifyingProperties = $this->element($document, self::XADES_NAMESPACE, 'xades:QualifyingProperties');
-        $qualifyingProperties->setAttribute('Target', '#'.$signatureId);
-        $object->appendChild($qualifyingProperties);
-        $signature->appendChild($object);
+        $signatureValue = $this->signer->sign($invoiceHash, $privateKeyPem);
+        if (! $this->signer->verify($invoiceHash, $signatureValue, $publicKeyPem)) {
+            throw new RuntimeException('مفتاح ZATCA الخاص لا يطابق شهادة التوقيع.');
+        }
 
-        $signedPropertiesXml = $this->signedPropertiesBuilder->build(
-            $certificateChain,
+        $signedProperties = $this->signedPropertiesBuilder->build(
+            $certificates,
             $signingTime,
             $policyIdentifier,
             $policyDigest,
             $signedPropertiesId,
             '#'.$invoiceReferenceId,
         );
-        $signedProperties = $this->importRoot($document, $signedPropertiesXml, 'SignedProperties');
-        $qualifyingProperties->appendChild($signedProperties);
-        $signedPropertiesDigest = base64_encode(hash(
-            'sha256',
-            $this->canonicalizer->canonicalizeElementInContext($signedProperties),
-            true
-        ));
-
-        $signedInfoXml = $this->signedInfoBuilder->build(
+        $signedInfo = $this->signedInfoBuilder->build(
             $invoiceDigest,
-            $signedPropertiesDigest,
+            $signedProperties['digest'],
             $invoiceReferenceId,
             $signedPropertiesId,
         );
-        $signedInfo = $this->importRoot($document, $signedInfoXml, 'SignedInfo');
-        $signature->insertBefore($signedInfo, $object);
 
-        $canonicalSignedInfo = $this->canonicalizer->canonicalizeElementInContext($signedInfo);
-        $signatureValueText = $this->signer->sign($canonicalSignedInfo, $privateKeyPem);
-        $signatureValue = $this->ds($document, 'SignatureValue', $signatureValueText);
-        $signature->insertBefore($signatureValue, $object);
-        $signature->insertBefore($this->keyInfo($document, $certificateChain), $object);
-
-        $publicKeyPem = $this->leafPublicKey($certificateChain);
-        if (! $this->signer->verify($canonicalSignedInfo, $signatureValueText, $publicKeyPem)) {
-            throw new RuntimeException('مفتاح ZATCA الخاص لا يطابق شهادة التوقيع.');
+        $keyInfo = '';
+        foreach ($certificates as $certificate) {
+            $keyInfo .= '<ds:X509Certificate>'.$certificate.'</ds:X509Certificate>';
         }
 
-        $signedXml = $document->saveXML();
-        if ($signedXml === false) {
-            throw new RuntimeException('تعذر تسلسل فاتورة ZATCA الموقعة.');
-        }
+        $extension = '<ext:UBLExtension xmlns:ext="'.self::EXT_NAMESPACE.'">'
+            .'<ext:ExtensionURI>'.self::EXTENSION_URI.'</ext:ExtensionURI><ext:ExtensionContent>'
+            .'<sig:UBLDocumentSignatures xmlns:sig="'.self::SIG_NAMESPACE.'" xmlns:sac="'.self::SAC_NAMESPACE.'" xmlns:sbc="'.self::SBC_NAMESPACE.'">'
+            .'<sac:SignatureInformation><cbc:ID xmlns:cbc="'.self::CBC_NAMESPACE.'">'.self::SIGNATURE_INFORMATION_ID.'</cbc:ID>'
+            .'<sbc:ReferencedSignatureID>'.self::REFERENCED_SIGNATURE_ID.'</sbc:ReferencedSignatureID>'
+            .'<ds:Signature xmlns:ds="'.self::XMLDSIG_NAMESPACE.'" Id="'.$signatureId.'">'
+            .$signedInfo
+            .'<ds:SignatureValue>'.$signatureValue.'</ds:SignatureValue>'
+            .'<ds:KeyInfo><ds:X509Data>'.$keyInfo.'</ds:X509Data></ds:KeyInfo>'
+            .'<ds:Object><xades:QualifyingProperties xmlns:xades="'.self::XADES_NAMESPACE.'" Target="#'.$signatureId.'">'
+            .$signedProperties['xml']
+            .'</xades:QualifyingProperties></ds:Object>'
+            .'</ds:Signature></sac:SignatureInformation></sig:UBLDocumentSignatures>'
+            .'</ext:ExtensionContent></ext:UBLExtension>';
 
-        $this->verifySerializedSignature($signedXml, $publicKeyPem);
+        $signedXml = $existingWrapper instanceof DOMElement
+            ? $this->appendToExistingWrapper($invoiceXml, $existingWrapper, $extension)
+            : $this->insertWrapper($invoiceXml, $extension);
+
+        $signedDocument = $this->parseSecurely($signedXml);
+        $firstChild = $signedDocument->documentElement?->firstElementChild;
+        if (! $firstChild instanceof DOMElement
+            || $firstChild->namespaceURI !== self::EXT_NAMESPACE
+            || $firstChild->localName !== 'UBLExtensions'
+        ) {
+            throw new RuntimeException('تعذر إدراج امتداد توقيع ZATCA أولَ أبناء جذر الفاتورة.');
+        }
+        // الإدراج نصّي: يُثبت أن التوقيع صار عنصراً فعلياً واحداً داخل الامتداد الرسمي (لا داخل تعليق مثلاً).
+        $signedXpath = $this->xpath($signedDocument);
+        if ($this->query($signedXpath, '//ds:Signature')->length !== 1
+            || $this->query($signedXpath, "/inv:Invoice/ext:UBLExtensions/ext:UBLExtension[ext:ExtensionURI='".self::EXTENSION_URI."']"
+                ."/ext:ExtensionContent//ds:Signature[@Id='".$signatureId."']")->length !== 1
+        ) {
+            throw new RuntimeException('امتداد توقيع ZATCA لم يُدرج في موضعه الرسمي.');
+        }
+        if (! hash_equals($invoiceDigest, $this->invoiceHasher->hash($signedXml))) {
+            throw new RuntimeException('إدراج توقيع ZATCA غيّر هاش الفاتورة.');
+        }
 
         return $signedXml;
     }
 
-    private function createSignatureContainer(DOMDocument $document, string $signatureId): DOMElement
+    /** غلاف جديد مباشرةً بعد وسم الجذر الافتتاحي، بلا أي مسافة مضافة (المسافات خارج الغلاف تدخل في هاش الفاتورة). */
+    private function insertWrapper(string $invoiceXml, string $extension): string
     {
-        $root = $document->documentElement;
-        if (! $root instanceof DOMElement) {
-            throw new RuntimeException('XML الفاتورة يفتقد العنصر الجذر.');
+        if (preg_match(self::ROOT_START_TAG, $invoiceXml, $match) !== 1) {
+            throw new InvalidArgumentException('تعذر تحديد وسم جذر فاتورة ZATCA لإدراج التوقيع.');
         }
 
-        $xpath = $this->xpath($document);
-        $extensions = $this->query($xpath, '/inv:Invoice/ext:UBLExtensions')->item(0);
-        if (! $extensions instanceof DOMElement) {
-            $extensions = $this->element($document, self::EXT_NAMESPACE, 'ext:UBLExtensions');
-            $root->insertBefore($extensions, $root->firstChild);
-        }
-
-        $extension = $this->element($document, self::EXT_NAMESPACE, 'ext:UBLExtension');
-        $extension->appendChild($this->element($document, self::EXT_NAMESPACE, 'ext:ExtensionURI', self::EXTENSION_URI));
-        $content = $this->element($document, self::EXT_NAMESPACE, 'ext:ExtensionContent');
-        $extension->appendChild($content);
-        $extensions->appendChild($extension);
-
-        $documentSignatures = $this->element($document, self::SIG_NAMESPACE, 'sig:UBLDocumentSignatures');
-        $signatureInformation = $this->element($document, self::SAC_NAMESPACE, 'sac:SignatureInformation');
-        $signatureInformation->appendChild($this->element($document, self::CBC_NAMESPACE, 'cbc:ID', self::SIGNATURE_INFORMATION_ID));
-        $signatureInformation->appendChild($this->element($document, self::SBC_NAMESPACE, 'sbc:ReferencedSignatureID', self::REFERENCED_SIGNATURE_ID));
-        $signature = $this->ds($document, 'Signature');
-        $signature->setAttribute('Id', $signatureId);
-        $signatureInformation->appendChild($signature);
-        $documentSignatures->appendChild($signatureInformation);
-        $content->appendChild($documentSignatures);
-
-        return $signature;
+        return $match[0].'<ext:UBLExtensions xmlns:ext="'.self::EXT_NAMESPACE.'">'.$extension.'</ext:UBLExtensions>'
+            .substr($invoiceXml, strlen($match[0]));
     }
 
-    /** @param list<string> $certificateChain */
-    private function keyInfo(DOMDocument $document, array $certificateChain): DOMElement
+    /** امتدادات غير التوقيع تبقى كما هي، ويُضاف امتداد التوقيع آخرها قبل الوسم الختامي الوحيد للغلاف. */
+    private function appendToExistingWrapper(string $invoiceXml, DOMElement $wrapper, string $extension): string
+    {
+        if ($wrapper->prefix !== 'ext' || substr_count($invoiceXml, '</ext:UBLExtensions>') !== 1) {
+            throw new InvalidArgumentException('تعذر تحديد غلاف UBLExtensions القائم بلا لبس لإدراج التوقيع.');
+        }
+        $position = strpos($invoiceXml, '</ext:UBLExtensions>');
+
+        return substr($invoiceXml, 0, (int) $position).$extension.substr($invoiceXml, (int) $position);
+    }
+
+    /**
+     * @param list<string> $certificateChain
+     * @return list<string> Base64 قياسي بلا مسافات لكل شهادة (هو نفسه في KeyInfo وفي بصمة الشهادة).
+     */
+    private function canonicalChain(array $certificateChain): array
     {
         if ($certificateChain === [] || ! array_is_list($certificateChain)) {
             throw new InvalidArgumentException('سلسلة شهادات ZATCA يجب أن تكون قائمة غير فارغة.');
         }
 
-        $keyInfo = $this->ds($document, 'KeyInfo');
-        $x509Data = $this->ds($document, 'X509Data');
-        foreach ($certificateChain as $certificate) {
-            if (! is_string($certificate) || base64_decode($certificate, true) === false) {
+        return array_map(function ($certificate): string {
+            $der = is_string($certificate) ? base64_decode($certificate, true) : false;
+            if (! is_string($der) || $der === '') {
                 throw new InvalidArgumentException('سلسلة شهادات ZATCA تحتوي شهادة غير صالحة.');
             }
-            $x509Data->appendChild($this->ds($document, 'X509Certificate', $certificate));
-        }
-        $keyInfo->appendChild($x509Data);
 
-        return $keyInfo;
+            return base64_encode($der);
+        }, $certificateChain);
     }
 
     /** @param list<string> $certificateChain */
@@ -190,25 +212,6 @@ final class ZatcaXadesSignatureAssembler
         }
 
         return $publicKeyPem;
-    }
-
-    private function verifySerializedSignature(string $xml, string $publicKeyPem): void
-    {
-        $document = $this->parseSecurely($xml);
-        $xpath = $this->xpath($document);
-        $signedInfo = $this->query($xpath, '//ds:Signature/ds:SignedInfo')->item(0);
-        $signatureValue = $this->query($xpath, '//ds:Signature/ds:SignatureValue')->item(0);
-        if (! $signedInfo instanceof DOMElement || ! $signatureValue instanceof DOMElement) {
-            throw new RuntimeException('فاتورة ZATCA الموقعة تفتقد عناصر XMLDSig الأساسية.');
-        }
-
-        if (! $this->signer->verify(
-            $this->canonicalizer->canonicalizeElementInContext($signedInfo),
-            trim($signatureValue->textContent),
-            $publicKeyPem,
-        )) {
-            throw new RuntimeException('فشل التحقق من توقيع ZATCA بعد تسلسل XML.');
-        }
     }
 
     private function parseSecurely(string $xml): DOMDocument
@@ -255,34 +258,6 @@ final class ZatcaXadesSignatureAssembler
         return $nodes;
     }
 
-    private function importRoot(DOMDocument $target, string $xml, string $label): DOMElement
-    {
-        $source = $this->parseFragment($xml, $label);
-        $imported = $target->importNode($source->documentElement, true);
-        if (! $imported instanceof DOMElement) {
-            throw new RuntimeException("تعذر إدراج {$label} داخل توقيع ZATCA.");
-        }
-
-        return $imported;
-    }
-
-    private function parseFragment(string $xml, string $label): DOMDocument
-    {
-        $previous = libxml_use_internal_errors(true);
-        try {
-            $document = new DOMDocument();
-            if (! $document->loadXML($xml, LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING | LIBXML_COMPACT)
-                || $document->documentElement === null || $document->doctype !== null) {
-                throw new RuntimeException("{$label} الذي تم إنشاؤه غير صالح.");
-            }
-
-            return $document;
-        } finally {
-            libxml_clear_errors();
-            libxml_use_internal_errors($previous);
-        }
-    }
-
     private function assertDistinctXmlIds(string ...$ids): void
     {
         foreach ($ids as $id) {
@@ -312,20 +287,5 @@ final class ZatcaXadesSignatureAssembler
                 }
             }
         }
-    }
-
-    private function ds(DOMDocument $document, string $name, ?string $value = null): DOMElement
-    {
-        return $this->element($document, self::XMLDSIG_NAMESPACE, 'ds:'.$name, $value);
-    }
-
-    private function element(DOMDocument $document, string $namespace, string $name, ?string $value = null): DOMElement
-    {
-        $element = $document->createElementNS($namespace, $name);
-        if ($value !== null) {
-            $element->appendChild($document->createTextNode($value));
-        }
-
-        return $element;
     }
 }

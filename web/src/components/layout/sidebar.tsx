@@ -72,6 +72,7 @@ import {
   Workflow,
   Wrench,
   X,
+  Sparkles,
 } from 'lucide-react';
 import { CompanyLogoMark } from '@/components/layout/company-logo-mark';
 import { useCompany } from '@/lib/company';
@@ -316,6 +317,9 @@ const GROUPS: NavGroup[] = [
     icon: Settings,
     items: [
       { href: '/reports', icon: BarChart3, key: 'reports', built: true },
+      // الذكاء المالي (AI-03): مساحة التحليل بصلاحية استخدام المساعد، وإعدادات الموافقة بصلاحيتها المستقلة (مالك/مدير).
+      { href: '/intelligence', icon: Sparkles, key: 'intelligence', built: true, permission: 'ai.assistant.use' },
+      { href: '/intelligence/settings', icon: ShieldCheck, key: 'intelligenceSettings', built: true, permission: 'ai.consent.manage' },
       { href: '/document-design', icon: LayoutTemplate, key: 'documentDesign', built: true },
       { href: '/numbering-settings', icon: Hash, key: 'numberingSettings', built: true },
       { href: '/tax-settings', icon: ReceiptText, key: 'taxSettings', built: true },

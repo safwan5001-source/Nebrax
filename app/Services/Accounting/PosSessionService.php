@@ -205,6 +205,7 @@ class PosSessionService
             if ($session->opened_by !== null && $session->opened_by !== $userId) {
                 throw new RuntimeException('إغلاق الجلسة وتقديم عهدتها متاحان لكاشير الجلسة فقط.');
             }
+            $this->assertNoTerminalBlockers($session);
 
             $cash = $this->cashMovement($session);
             $expected = $session->opening_balance + $cash['net'];
@@ -327,7 +328,35 @@ class PosSessionService
                 'expected_amount' => $session->opening_balance + $cash['net'],
             ],
             'payment_methods' => array_values($this->expectedNonCashTenderRows($session)),
+            'terminal_blockers' => $this->terminalBlockers($session),
         ];
+    }
+
+    /**
+     * H6-02: لا إقفال وعلى أجهزة الدفع موافقة معلّقة أو تعويض لم يُحلّ — وإلا بقي مال عميل محتجزاً/مخصوماً بلا بيع ولا أثر في عهدة الجلسة.
+     * الحل: إتمام البيع، أو إلغاء الموافقة، أو إعادة محاولة الإلغاء، أو إقرار مدير بحلٍّ خارجي (`resolve`).
+     *
+     * @return array{compensation_required:int, in_flight:int}
+     */
+    public function terminalBlockers(PosSession $session): array
+    {
+        $base = \App\Models\PosTerminalRequest::query()->where('pos_session_id', $session->id);
+
+        return [
+            'compensation_required' => (clone $base)->where('status', \App\Models\PosTerminalRequest::STATUS_COMPENSATION_REQUIRED)->count(),
+            'in_flight' => (clone $base)->whereIn('status', \App\Models\PosTerminalRequest::IN_FLIGHT)->count(),
+        ];
+    }
+
+    private function assertNoTerminalBlockers(PosSession $session): void
+    {
+        $blockers = $this->terminalBlockers($session);
+        if ($blockers['compensation_required'] > 0) {
+            throw new RuntimeException('لا يمكن إقفال الجلسة: توجد عمليات جهاز دفع تحتاج تعويضاً. أعد محاولة الإلغاء أو أقرّ حلّها قبل الإقفال.');
+        }
+        if ($blockers['in_flight'] > 0) {
+            throw new RuntimeException('لا يمكن إقفال الجلسة: توجد عملية على جهاز الدفع لم تكتمل. أتمّ البيع أو ألغِ الموافقة أولاً.');
+        }
     }
 
     public function confirmHandover(PosSession $session, User $actor, string $note): PosSession
@@ -411,6 +440,7 @@ class PosSessionService
                 'payment_method_name' => $method->name,
                 'settlement_type' => $method->settlement_type,
                 'expected_amount' => 0,
+                'clearing_amount' => 0,
             ];
         }
 
@@ -476,8 +506,13 @@ class PosSessionService
                 'payment_method_name' => $payment->payment_method_name ?: ($method?->name ?? $settlementType),
                 'settlement_type' => $settlementType,
                 'expected_amount' => 0,
+                // D-09: الجزء المحصَّل عبر مقاصة المستحوذ (سند ببوابة) — ينتظر التسوية ولا يصل البنك فوراً.
+                'clearing_amount' => 0,
             ];
             $rows[$key]['expected_amount'] += (int) $payment->amount;
+            if (filled($payment->payment_gateway_id)) {
+                $rows[$key]['clearing_amount'] += (int) $payment->amount;
+            }
         }
 
         ksort($rows);

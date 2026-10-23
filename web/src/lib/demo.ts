@@ -5,6 +5,17 @@ import type { AuthUser } from './auth';
 
 const DEMO_KEY = 'demo';
 
+/**
+ * هل يُعرض زر «دخول تجريبي»؟ مفتاح بناء: `NEXT_PUBLIC_DEMO_PREVIEW=true` يُدمج وقت البناء، فيلزم
+ * إعادة نشر بعد أي تغيير. التفعيل لمعاينات Vercel وحدها ولا يوضع في Railway. عند غياب المتغيّر
+ * لا يستبدله Next وقت البناء (يبقى قراءةً من `process.env` في المتصفح وتعيد `undefined`)، فالنتيجة
+ * `false` والزر لا يُرسم أبداً — لكن كوده يُشحن خاملاً، فالضمان سلوكي لا حذف كود.
+ * المقارنة صارمة بـ`'true'` فلا يفعّلها `1` ولا `TRUE`. لا يمسّ هذا `isDemo()`.
+ */
+export function isDemoPreviewEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_DEMO_PREVIEW === 'true';
+}
+
 export function isDemo(): boolean {
   if (typeof window === 'undefined') return false;
   return localStorage.getItem(DEMO_KEY) === 'true';

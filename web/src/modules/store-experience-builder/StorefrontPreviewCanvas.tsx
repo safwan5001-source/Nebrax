@@ -6,7 +6,7 @@ import {
   announcementBarVisible,
 } from "./AnnouncementPreview";
 import { Eye, Home, LayoutGrid, Search, ShoppingBag, User } from "lucide-react";
-import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { OfficialStoreBadge } from "./OfficialStoreBadge";
 import { ContactDetail, contactDetailText } from "./ContactDetail";
 import { IdentityDetail } from "./IdentityDetail";
@@ -27,6 +27,7 @@ import { CanvasFooter } from "./CanvasFooter";
 import { CanvasNavItem, canvasNavItems } from "./CanvasNav";
 import { mainMenu } from "./presentation/navigation";
 import type { PresentationHomeSection } from "./presentation/config";
+import { resolveStorefrontBackgroundStyle } from "./presentation/storefront-background-render";
 import { canDeleteSection, canDuplicateSection } from "./presentation/section-capabilities";
 import { sectionIsAuthored } from "./presentation/section-ops";
 import { overlayMarker, resolveHeaderOverlay } from "./presentation/header-overlay";
@@ -36,6 +37,7 @@ import type { WorkspaceProductDetail } from "@/modules/commerce-workspace/worksp
 import type { WorkspaceCategoryDetail } from "@/modules/commerce-workspace/workspace-categories";
 import { displayLocale } from "@/lib/formatting";
 import type { WorkspaceOffer } from "@/modules/commerce-workspace/workspace-offers";
+import type { WorkspaceDeliveryEarliest, WorkspaceDiscoveryData } from "@/modules/commerce-workspace/workspace-section-data";
 import {
   formatOfferMoney,
   isDiscountBadgeVisible,
@@ -66,6 +68,7 @@ import {
   productShelfContentOf,
   galleryContentOf,
   sliderContentOf,
+  type DiscoveryCardStyle,
 } from "./presentation/section-content";
 import {
   buildWhatsAppUrl,
@@ -74,6 +77,25 @@ import {
   sanitizeExternalUrl,
 } from "./presentation/urls";
 import { cn } from "@/lib/utils";
+
+/** Signed preview media must fail closed when a URL expires or is revoked. */
+function PreviewMediaImage({
+  src,
+  alt = "",
+  className,
+}: {
+  src: string;
+  alt?: string;
+  className?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [src]);
+  if (failed) return null;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- signed tenant media URL
+    <img src={src} alt={alt} className={className} loading="lazy" decoding="async" onError={() => setFailed(true)} />
+  );
+}
 import { SbcSeal } from "./SbcSeal";
 import {
   customizerMessage,
@@ -81,6 +103,7 @@ import {
   type CustomizerMessageKey,
 } from "./messages";
 import { CanvasBackdrop } from "./media/CanvasBackdrop";
+import { GlobalBackgroundBackdrop } from "./GlobalBackgroundBackdrop";
 import { CanvasContentBlocks, Selectable } from "./CanvasContentBlocks";
 import { SectionActionBar, type CanvasSectionActions, type CanvasSectionEligibility } from "./CanvasSectionActions";
 import { CanvasGallery } from "./CanvasGallery";
@@ -95,12 +118,16 @@ import type { HeadingBlock, ParagraphBlock } from "./presentation/content-blocks
 import { StoreIcon } from "./StoreIcon";
 import type { BenefitsLayout, SectionDesign } from "./presentation/section-design";
 import { resolveSectionDesign } from "./presentation/section-design-resolve";
+import { resolveDiscoveryDisplay } from "./presentation/discovery-templates";
+import { resolveFacetValueVisual, type ResolvedFacetVisual } from "./presentation/facet-visual";
+import { FACET_VISUAL_SIZE_PX } from "./presentation/facet-visual-style";
+import { facetLabelHidden } from "./discovery-label-visibility";
+import { previewCarouselItemWidth } from "./discovery-preview-model";
+import { FacetVisualTile } from "./FacetVisualTile";
+import { formatDeliveryDay, formatDeliveryWindow } from "./presentation/delivery-format";
 import { SectionDesignFrame } from "./SectionDesignFrame";
 import type { DesignContext } from "./presentation/section-design-resolve";
-import {
-  PREVIEW_CATEGORIES,
-  PREVIEW_STORE_NAME,
-} from "./preview-fixtures";
+import { PREVIEW_STORE_NAME } from "./preview-fixtures";
 import { CanvasCategoryDisplay } from "./CanvasCategoryDisplay";
 import "./store-preview.css";
 
@@ -184,7 +211,7 @@ interface StorefrontPreviewCanvasProps {
    * filtered by `category_id` — never invented client-side.
    */
   categoryGridProductsState?: "idle" | "loading" | "error" | "ready";
-  categoryGridProducts?: { id: string; name: string; thumbnailUrl: string | null }[];
+  categoryGridProducts?: { id: string; name: string; thumbnailUrl: string | null; priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null; isVariantManaged?: boolean }[];
   categoryGridProductsTotal?: number;
   /**
    * CUST-H4-3 — the Home "categories" section's own real Canvas preview:
@@ -207,7 +234,7 @@ interface StorefrontPreviewCanvasProps {
    * `PREVIEW_PRODUCTS` fixture this branch used before.
    */
   homeNewArrivalsState?: "idle" | "loading" | "error" | "ready";
-  homeNewArrivals?: { id: string; name: string; thumbnailUrl: string | null }[];
+  homeNewArrivals?: { id: string; name: string; thumbnailUrl: string | null; priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null; isVariantManaged?: boolean }[];
   onRetryHomeNewArrivals?: () => void;
   /**
    * CUST-H4-5 — the Home "featured" section's own real Canvas preview.
@@ -218,7 +245,7 @@ interface StorefrontPreviewCanvasProps {
    * the picker's own "selected products" chips show — replacing the bare
    * id-text-chip list this branch rendered before.
    */
-  featuredResolved?: Record<string, { id: string; name: string; thumbnailUrl: string | null }[]>;
+  featuredResolved?: Record<string, { id: string; name: string; thumbnailUrl: string | null; priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null; isVariantManaged?: boolean }[]>;
   featuredResolvedState?: Record<string, "idle" | "loading" | "error" | "ready">;
   onRetryFeatured?: (sectionId: string) => void;
   /**
@@ -236,6 +263,14 @@ interface StorefrontPreviewCanvasProps {
    */
   sectionActions?: CanvasSectionActions;
   onRetryOffers?: () => void;
+  /** FLOWERS-H9c — authoritative live data for the three data-backed home sections. */
+  homeSectionProducts?: Record<string, { id: string; name: string; nameEn?: string | null; thumbnailUrl: string | null; priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null; isVariantManaged?: boolean }[]>;
+  homeSectionProductsState?: Record<string, "idle" | "loading" | "error" | "ready">;
+  homeSectionDiscovery?: Record<string, WorkspaceDiscoveryData | null>;
+  homeSectionDiscoveryState?: Record<string, "idle" | "loading" | "error" | "ready">;
+  homeSectionDelivery?: Record<string, WorkspaceDeliveryEarliest | null>;
+  homeSectionDeliveryState?: Record<string, "idle" | "loading" | "error" | "ready">;
+  onRetryHomeDataSection?: (sectionId: string) => void;
 }
 
 export interface StorefrontBusinessIdentity {
@@ -298,6 +333,124 @@ function shelfAttrs(design: SectionDesign | undefined, viewport: "desktop" | "ta
   };
 }
 
+function discoveryOptionImage(visual: Record<string, unknown> | null): string | null {
+  const image = visual?.image;
+  if (!image || typeof image !== "object" || Array.isArray(image)) return null;
+  const sources = (image as Record<string, unknown>).sources;
+  if (!Array.isArray(sources)) return null;
+  const source = sources.find((item) => item && typeof item === "object" && typeof (item as Record<string, unknown>).src === "string");
+  return source && typeof (source) === "object" ? (source as Record<string, string>).src ?? null : null;
+}
+
+function discoveryOptionSources(visual: Record<string, unknown> | null): { src: string; srcSet?: string } | null {
+  const image = visual?.image;
+  if (!image || typeof image !== "object" || Array.isArray(image)) return null;
+  const sources = (image as Record<string, unknown>).sources;
+  if (!Array.isArray(sources)) return null;
+  const valid = sources.flatMap((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+    const source = item as Record<string, unknown>;
+    return typeof source.src === "string" && typeof source.width === "number"
+      ? [{ src: source.src, width: source.width, format: source.format === "webp" ? "webp" : "jpg" }]
+      : [];
+  });
+  if (valid.length === 0) return null;
+  const byWidth = new Map<number, (typeof valid)[number]>();
+  for (const source of valid) {
+    const current = byWidth.get(source.width);
+    if (!current || (source.format === "webp" && current.format !== "webp")) byWidth.set(source.width, source);
+  }
+  const ordered = [...byWidth.values()].sort((a, b) => a.width - b.width);
+  return { src: ordered[ordered.length - 1].src, srcSet: ordered.map((source) => `${source.src} ${source.width}w`).join(", ") };
+}
+
+function resolvedDiscoveryVisual(
+  discovery: WorkspaceDiscoveryData,
+  option: WorkspaceDiscoveryData["options"][number],
+  display: ReturnType<typeof resolveDiscoveryDisplay>,
+  layout: string | null,
+): ResolvedFacetVisual {
+  const optionImage = option.visual && typeof option.visual.image === "object" && option.visual.image !== null && !Array.isArray(option.visual.image)
+    ? option.visual.image as Record<string, unknown>
+    : null;
+  const optionMediaId = typeof optionImage?.mediaId === "string" ? optionImage.mediaId : null;
+  const resolution = resolveFacetValueVisual(discovery.visual ?? {}, option.visual ?? {}, {
+    section: display.visualSection,
+    template: display.visualTemplate,
+    usableMediaIds: optionMediaId && discoveryOptionImage(option.visual) ? [optionMediaId] : [],
+  });
+  let visual = resolution.visual;
+  if (visual.content === "none" && (resolution.sources.content === "system" || resolution.sources.fallback !== null)) {
+    visual = { ...visual, content: "icon" };
+  }
+  if (layout === "icon-grid") {
+    const icon = visual.content === "icon" ? visual.icon : visual.content === "image" ? visual.fallbackIcon : undefined;
+    if (icon) {
+      const { image: _image, fallbackIcon: _fallback, ...rest } = visual;
+      visual = { ...rest, content: "icon", icon };
+    }
+  }
+  return visual;
+}
+
+function discoveryGridColumnsClass(columns: number): string {
+  const classes: Record<number, string> = {
+    1: "grid-cols-1",
+    2: "grid-cols-2",
+    3: "grid-cols-3",
+    4: "grid-cols-4",
+    5: "grid-cols-5",
+    6: "grid-cols-6",
+    7: "grid-cols-7",
+    8: "grid-cols-8",
+  };
+  return classes[Math.max(1, columns)] ?? "grid-cols-2";
+}
+
+const DISCOVERY_GAP_CLASS: Record<"tight" | "normal" | "loose", string> = {
+  tight: "gap-2",
+  normal: "gap-3 md:gap-4",
+  loose: "gap-5 md:gap-6",
+};
+
+const DISCOVERY_CARD_CLASS: Record<DiscoveryCardStyle, string> = {
+  plain: "hover:text-store-primary",
+  outlined: "border border-store-border bg-store-surface hover:border-store-primary hover:text-store-primary",
+  elevated: "bg-store-surface shadow-md hover:text-store-primary hover:shadow-lg",
+  filled: "bg-store-surface-muted hover:text-store-primary",
+};
+
+const DISCOVERY_ALIGN_CLASS = {
+  start: "items-start text-start",
+  center: "items-center text-center",
+} as const;
+
+const LEGACY_DISCOVERY_ITEM_CLASS = "flex min-h-20 items-center justify-center rounded-store border border-store-border bg-store-surface px-3 py-4 text-center text-sm font-bold text-store-foreground md:text-base";
+
+function legacyDiscoveryListClass(viewport: "desktop" | "tablet" | "mobile"): string {
+  if (viewport === "mobile") return "mt-4 grid grid-cols-2 gap-3";
+  if (viewport === "tablet") return "mt-4 grid grid-cols-3 gap-3 md:gap-4";
+  return "mt-4 grid grid-cols-4 gap-3 md:gap-4";
+}
+
+function discoveryLinkLayoutClass(layout: string, viewport: "desktop" | "tablet" | "mobile"): string {
+  const wide = viewport !== "mobile";
+  switch (layout) {
+    case "image-cards":
+      return cn("h-full flex-col gap-2", wide ? "p-4" : "p-3");
+    case "icon-grid":
+      return cn("flex-col", wide ? "p-3" : "p-2");
+    case "text-list":
+      return "items-center gap-2 px-4 py-2 text-sm font-bold";
+    default:
+      return "flex-col p-2";
+  }
+}
+
+function discoveryRowsForViewport(rows: number, layout: string | null, viewport: "desktop" | "tablet" | "mobile"): number {
+  return layout === "carousel" && viewport === "mobile" ? rows : 1;
+}
+
 export function StorefrontPreviewCanvas({
   config,
   locale,
@@ -337,6 +490,13 @@ export function StorefrontPreviewCanvas({
   offersState = "idle",
   sectionActions,
   onRetryOffers,
+  homeSectionProducts = {},
+  homeSectionProductsState = {},
+  homeSectionDiscovery = {},
+  homeSectionDiscoveryState = {},
+  homeSectionDelivery = {},
+  homeSectionDeliveryState = {},
+  onRetryHomeDataSection,
 }: StorefrontPreviewCanvasProps) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
   const storeName = previewStoreName(
@@ -352,7 +512,8 @@ export function StorefrontPreviewCanvas({
   // theme wrapper uses (absent ⇒ nothing is added).
   const globalTokens = resolveGlobalTokens(config, config);
   const vars = {
-    ...presentationCssVars(config.primaryColor, config.radius, config.accentColor),
+    ...presentationCssVars(config.primaryColor, config.radius, config.accentColor, config.backgroundColor),
+    ...resolveStorefrontBackgroundStyle(config, locale === "ar" ? "rtl" : "ltr"),
     ...(globalTokens?.style ?? {}),
   } as CSSProperties;
   // The published Header only ties `header.style === "compact"` to two things:
@@ -402,6 +563,7 @@ export function StorefrontPreviewCanvas({
   const designContext: DesignContext = {
     primaryColor: config.primaryColor,
     accentColor: config.accentColor,
+    pageBackground: config.backgroundColor,
     palette: config.palette,
     dir: locale === "ar" ? "rtl" : "ltr",
     mediaBounds: backgroundBounds.lookup,
@@ -448,6 +610,7 @@ export function StorefrontPreviewCanvas({
   const density = config.density === "compact" ? "compact" : "comfortable";
   const cardPad = config.productCard === "compact" ? "p-2.5" : "p-3";
   const isMarket = config.themePreset === "awj-market";
+  const shownHomeCategories = homeCategories.slice(0, isMarket ? 18 : 12);
   // The exact fixed heights ProductCard.tsx itself resolves to at each
   // breakpoint — not the `sm:`/`md:` classes themselves. This preview frame
   // is a plain, width-constrained div rendered inside the real Customizer
@@ -545,7 +708,7 @@ export function StorefrontPreviewCanvas({
       {...(headerResolved.attrs ?? {})}
       dir={locale === "ar" ? "rtl" : "ltr"}
       className={cn(
-        "awj-store-preview relative min-h-full bg-store-background text-store-foreground",
+        "awj-store-preview relative isolate min-h-full bg-store-background text-store-foreground",
         PREVIEW_FONT_VARIABLES,
       )}
       style={{
@@ -554,6 +717,7 @@ export function StorefrontPreviewCanvas({
         fontFamily: fontFamilyStack(config.typography?.bodyFamily) ?? fontPresetFamilyStack(config.fontPreset),
       }}
     >
+      <GlobalBackgroundBackdrop background={config.background} presentation={config} viewport={viewport} />
       <p className="sr-only">{t("fixtureCatalogHint")}</p>
 
       <AnnouncementPreview
@@ -735,9 +899,9 @@ export function StorefrontPreviewCanvas({
                   <span className="rounded-md bg-store-surface px-2 py-1 font-medium text-store-foreground">
                     {t("allProducts")}
                   </span>
-                  {PREVIEW_CATEGORIES.map((category) => (
+                  {homeCategories.map((category) => (
                     <span key={category.id} className="text-store-muted-foreground">
-                      {category.name[locale]}
+                      {category.name}
                     </span>
                   ))}
                 </>
@@ -865,7 +1029,10 @@ export function StorefrontPreviewCanvas({
             if (section.type === "categories") {
               return (
                 <section key="categories" aria-labelledby="preview-categories">
-                  <SectionRule title={t("browseCategories")} action={t("viewAll")} />
+                  <SectionRule
+                    title={t("browseCategories")}
+                    action={homeCategories.length > shownHomeCategories.length ? t("viewAll") : undefined}
+                  />
                   {/* "idle" (no fetch triggered yet — e.g. no storefrontId,
                       or a direct render with no `ExperienceBuilder` data
                       wired up) renders identically to "loading": unknown
@@ -914,13 +1081,13 @@ export function StorefrontPreviewCanvas({
                     // stylesheet, pinned to the simulated device. Without one the classic preview tiles below are untouched.
                     <CanvasCategoryDisplay
                       display={section.design.display}
-                      categories={homeCategories}
+                      categories={shownHomeCategories}
                       viewport={viewport}
                       dir={locale === "ar" ? "rtl" : "ltr"}
                     />
                   ) : (
                     <ul className={cn("mt-4 grid", categoriesGap, categoriesColumns)}>
-                      {homeCategories.map((category) => (
+                      {shownHomeCategories.map((category) => (
                         <li key={category.id}>
                           <div
                             className={cn(
@@ -1013,8 +1180,7 @@ export function StorefrontPreviewCanvas({
                             )}
                           >
                             {product.thumbnailUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element -- tenant media URL, not a static asset
-                              <img
+                              <PreviewMediaImage
                                 src={product.thumbnailUrl}
                                 alt=""
                                 className="size-full object-cover"
@@ -1036,6 +1202,7 @@ export function StorefrontPreviewCanvas({
                             <p className="line-clamp-2 text-sm font-semibold text-store-foreground">
                               <bdi>{product.name}</bdi>
                             </p>
+                            <PreviewProductMeta product={product} locale={locale} />
                           </div>
                         </li>
                       ))}
@@ -1408,8 +1575,7 @@ export function StorefrontPreviewCanvas({
                           >
                             <div data-card-image="" className={cn(cardImageHeight, "bg-store-surface-muted")}>
                               {product.thumbnailUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element -- tenant media URL, not a static asset
-                                <img
+                                <PreviewMediaImage
                                   src={product.thumbnailUrl}
                                   alt=""
                                   className="size-full object-cover"
@@ -1420,6 +1586,7 @@ export function StorefrontPreviewCanvas({
                               <p className="line-clamp-2 text-sm font-semibold text-store-foreground">
                                 <bdi>{product.name}</bdi>
                               </p>
+                            <PreviewProductMeta product={product} locale={locale} />
                             </div>
                           </li>
                         ))}
@@ -1514,8 +1681,7 @@ export function StorefrontPreviewCanvas({
                         >
                           <div data-card-image="" className={cn(cardImageHeight, "relative bg-store-surface-muted")}>
                             {offer.product.thumbnailUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element -- tenant media URL, not a static asset
-                              <img
+                              <PreviewMediaImage
                                 src={offer.product.thumbnailUrl}
                                 alt=""
                                 className="size-full object-cover"
@@ -1598,58 +1764,93 @@ export function StorefrontPreviewCanvas({
               section.type === "discovery" ||
               section.type === "deliveryPromise"
             ) {
-              // FLOWERS-H9c / ADR-21 — data-backed sections read live store data
-              // on the published storefront. The builder never fabricates
-              // products, counts or delivery windows: this is an honest
-              // placeholder that shows only what the merchant authored. An
-              // incomplete section (no stored content) is flagged because the
-              // storefront omits it.
+              // FLOWERS-H9c / ADR-21 — the editor receives the same bounded,
+              // tenant/storefront/channel-scoped projections as the published
+              // sections. It never computes commercial fields and keeps
+              // controls decorative/inactive inside the preview frame.
               const incomplete =
                 section.type !== "deliveryPromise" && section.content === undefined;
-              let title = "";
-              let note: CustomizerMessageKey = "canvasShelfLive";
-              let badge: string | null = null;
-              let hideShelfTitle = false;
+              const state = section.type === "productShelf"
+                ? (homeSectionProductsState[section.id] ?? "idle")
+                : section.type === "discovery"
+                  ? (homeSectionDiscoveryState[section.id] ?? "idle")
+                  : (homeSectionDeliveryState[section.id] ?? "idle");
+              const title = section.type === "productShelf"
+                ? productShelfContentOf(section).title.trim()
+                : section.type === "discovery"
+                  ? discoveryContentOf(section).title.trim()
+                  : deliveryPromiseContentOf(section).title.trim();
               if (section.type === "productShelf") {
                 const shelf = productShelfContentOf(section);
-                hideShelfTitle = shelf.showTitle === false;
-                title = shelf.title.trim();
-                note = "canvasShelfLive";
-                badge = shelf.deliverToday ? t("canvasShelfDeliverToday") : null;
-              } else if (section.type === "discovery") {
-                title = discoveryContentOf(section).title.trim();
-                note = "canvasDiscoveryLive";
-              } else {
-                const promise = deliveryPromiseContentOf(section);
-                title = promise.title.trim();
-                note = "canvasDeliveryPromiseLive";
+                const products = homeSectionProducts[section.id] ?? [];
+                const headingId = `preview-product-shelf-${section.id}`;
+                const shelfRail = (section.design?.layout ?? (isMarket ? "rail" : "grid")) === "rail";
+                const shelfDesign = section.design
+                  ? shelfRail && section.design.layout === undefined
+                    ? { ...section.design, layout: "rail" as const }
+                    : section.design
+                  : (isMarket ? { layout: "rail" as const } : undefined);
+                const shelfGridColumns = isMarket && section.design?.layout === "grid" && section.design.columns === undefined
+                  ? viewport === "mobile" ? "grid-cols-2" : viewport === "tablet" ? "grid-cols-3" : "grid-cols-4"
+                  : newArrivalsColumns;
+                const shelfListClass = shelfRail
+                  ? "mt-4 flex gap-3 overflow-x-auto pb-2"
+                  : cn("mt-4 grid gap-3", shelfGridColumns);
+                const shelfTitle = title || (shelf.deliverToday && !shelf.source ? t("canvasShelfDeliverToday") : t("canvasShelfShopSelection"));
+                return (
+                  <section key={section.id} aria-labelledby={headingId} data-home-data-section="productShelf" data-incomplete={incomplete ? "" : undefined}>
+                    <div className="flex items-center justify-between gap-3"><SectionRule title={shelfTitle} headingId={headingId} hideTitle={shelf.showTitle === false} action={t("viewAll")} />{shelf.deliverToday ? <span className="text-[11px] font-medium text-store-muted-foreground">{t("canvasShelfDeliverToday")}</span> : null}</div>
+                    {incomplete ? <p className="mt-2 text-xs text-store-muted-foreground">{t("canvasDataSectionIncomplete")}</p> : state === "loading" || state === "idle" ? (
+                      <ul aria-hidden="true" className={shelfListClass}>{Array.from({ length: Math.min(shelf.limit, 4) }).map((_, index) => <li key={index} className="overflow-hidden rounded-store border border-store-border bg-store-surface"><div className={cn(cardImageHeight, "animate-pulse bg-store-surface-muted")} /><div className={cardPad}><div className="h-3 w-3/4 animate-pulse rounded-store bg-store-surface-muted" /></div></li>)}</ul>
+                    ) : state === "error" ? (
+                      <div data-home-section-error="productShelf" className="mt-4 flex flex-col items-center gap-2 rounded-store border border-dashed border-store-border px-4 py-8 text-center"><p className="text-sm text-store-muted-foreground">{t("homeNewArrivalsLoadFailed")}</p><button type="button" onClick={() => onRetryHomeDataSection?.(section.id)} className="rounded-store border border-store-border px-3 py-1.5 text-xs font-medium text-store-foreground">{t("retry")}</button></div>
+                    ) : products.length === 0 ? (
+                      <p data-home-section-empty="productShelf" className="mt-4 rounded-store border border-dashed border-store-border px-4 py-8 text-center text-sm text-store-muted-foreground">{t("homeNewArrivalsEmpty")}</p>
+                    ) : (
+                      <ul className={shelfListClass} data-shelf-layout={shelfRail ? "rail" : "grid"} {...shelfAttrs(shelfDesign, viewport)}>{products.map((product) => <li key={product.id} data-card="" className="overflow-hidden rounded-store border border-store-border bg-store-surface"><div data-card-image="" className={cn(cardImageHeight, "relative bg-store-surface-muted")}>{product.thumbnailUrl ? <PreviewMediaImage src={product.thumbnailUrl} alt="" className="size-full object-cover" /> : null}</div><div data-card-body="" className={cardPad}><p className="line-clamp-2 text-sm font-semibold text-store-foreground"><bdi>{locale === "en" && product.nameEn ? product.nameEn : product.name}</bdi></p><PreviewProductMeta product={product} locale={locale} /></div></li>)}</ul>
+                    )}
+                  </section>
+                );
               }
-              const headingId = `preview-data-${section.id}`;
+              if (section.type === "discovery") {
+                const content = discoveryContentOf(section);
+                const discovery = homeSectionDiscovery[section.id];
+                const headingId = `preview-discovery-${section.id}`;
+                const resolvedDisplay = resolveDiscoveryDisplay(content);
+                const display = { ...resolvedDisplay, rows: discoveryRowsForViewport(resolvedDisplay.rows, resolvedDisplay.layout, viewport) };
+                const orderedOptions = [...(discovery?.options ?? [])].sort((a, b) => display.valueSort === "count" ? b.count - a.count : 0);
+                const options = orderedOptions.slice(0, display.maxItems);
+                const columns = viewport === "mobile" ? display.columns.mobile : viewport === "tablet" ? display.columns.tablet : display.columns.desktop;
+                const layout = display.layout;
+                const legacy = layout === null;
+                const discoveryNumberFormatter = new Intl.NumberFormat(displayLocale(locale));
+                const carouselItemWidth = layout === "carousel"
+                  ? previewCarouselItemWidth(options.map((option) => {
+                      const visual = discovery ? resolvedDiscoveryVisual(discovery, option, display, layout) : null;
+                      return FACET_VISUAL_SIZE_PX[visual?.size ?? "md"] ?? FACET_VISUAL_SIZE_PX.md;
+                    }))
+                  : null;
+                const discoveryTitle = title || (discovery?.axis === "brand" ? t("canvasDiscoveryShopByBrand") : discovery?.name ? `${t("canvasDiscoveryDiscoverBy")} ${locale === "en" && discovery.nameEn ? discovery.nameEn : discovery.name}`.trim() : t("sectionDiscovery"));
+                return (
+                  <section key={section.id} aria-labelledby={headingId} data-home-data-section="discovery" data-incomplete={incomplete ? "" : undefined}>
+                    <SectionRule title={discoveryTitle} headingId={headingId} />
+                    {incomplete ? <p className="mt-2 text-xs text-store-muted-foreground">{t("canvasDataSectionIncomplete")}</p> : state === "loading" || state === "idle" ? <div aria-hidden="true" className="mt-4 h-20 animate-pulse rounded-store bg-store-surface-muted" /> : state === "error" ? <div data-home-section-error="discovery" className="mt-4 flex flex-col items-center gap-2 rounded-store border border-dashed border-store-border px-4 py-8 text-center"><p className="text-sm text-store-muted-foreground">{t("homeNewArrivalsLoadFailed")}</p><button type="button" onClick={() => onRetryHomeDataSection?.(section.id)} className="rounded-store border border-dashed border-store-border px-3 py-1.5 text-xs font-medium text-store-foreground">{t("retry")}</button></div> : options.length === 0 ? <p data-home-section-empty="discovery" className="mt-4 rounded-store border border-dashed border-store-border px-4 py-8 text-center text-sm text-store-muted-foreground">{t("homeNewArrivalsEmpty")}</p> : content.display === "chips" && legacy ? <ul className="mt-4 flex flex-wrap gap-2">{options.map((option) => <li key={option.value}><span className="inline-flex min-h-11 items-center rounded-full border border-store-border bg-store-surface px-4 text-sm font-bold text-store-foreground"><bdi>{locale === "en" && option.nameEn ? option.nameEn : option.name}</bdi></span></li>)}</ul> : legacy ? <ul className={legacyDiscoveryListClass(viewport)}>{options.map((option) => <li key={option.value} className="min-w-0"><span className={LEGACY_DISCOVERY_ITEM_CLASS}><span className="min-w-0 break-words"><bdi>{locale === "en" && option.nameEn ? option.nameEn : option.name}</bdi></span></span></li>)}</ul> : <ul data-discovery-layout={layout} data-discovery-value-sort={display.valueSort} data-discovery-show-counts={display.showCounts ? "true" : "false"} data-discovery-gap={display.gap} data-discovery-rows={layout === "carousel" ? display.rows : 1} data-discovery-text-position={layout === "text-list" ? undefined : display.textPosition} data-discovery-content-sequence={display.contentSequence} data-discovery-card-style={display.cardStyle} data-discovery-align={display.align} style={layout === "carousel" ? ({ "--disc-rows": String(display.rows), "--disc-item": `${carouselItemWidth}px` } as CSSProperties) : undefined} className={cn("mt-4 grid", DISCOVERY_GAP_CLASS[display.gap], layout === "carousel" ? "grid-flow-col grid-rows-[repeat(var(--disc-rows),auto)] auto-cols-[var(--disc-item)] overflow-x-auto" : discoveryGridColumnsClass(columns))}>{options.map((option) => { const visual = discovery && layout && layout !== "text-list" ? resolvedDiscoveryVisual(discovery, option, display, layout) : null; const image = visual?.content === "image" ? discoveryOptionSources(option.visual) : null; const label = locale === "en" && option.nameEn ? option.nameEn : option.name; return <li key={option.value} className={cn("min-w-0", layout === "carousel" && "snap-start")}><span className={cn("flex min-h-20 w-full min-w-0 rounded-store text-store-foreground", discoveryLinkLayoutClass(layout, viewport), layout === "text-list" ? (display.align === "center" ? "justify-center text-center" : "justify-start text-start") : display.textPosition === "beside" ? "flex-row items-center" : DISCOVERY_ALIGN_CLASS[display.align], DISCOVERY_CARD_CLASS[display.cardStyle], layout === "image-cards" && "overflow-hidden")}>{visual ? <FacetVisualTile visual={visual} label={label} image={image} className="w-full" /> : <span className="line-clamp-2 min-w-0 break-words" title={label}><bdi>{label}</bdi></span>}{display.showCounts && !facetLabelHidden(visual, image) ? <span className={cn("shrink-0 text-xs font-medium text-store-muted-foreground", layout !== "text-list" && display.textPosition !== "beside" && "mt-1")} dir="ltr">{discoveryNumberFormatter.format(option.count)}</span> : null}</span></li>; })}</ul>}
+                  </section>
+                );
+              }
+              const promise = deliveryPromiseContentOf(section);
+              const earliest = homeSectionDelivery[section.id];
+              const headingId = `preview-delivery-${section.id}`;
+              const deliveryDay = earliest ? formatDeliveryDay({ date: earliest.date, timezone: earliest.timezone, locale, todayLabel: t("canvasDeliveryToday"), tomorrowLabel: t("canvasDeliveryTomorrow") }) : null;
+              const deliveryWindow = earliest ? formatDeliveryWindow(earliest.startTime, earliest.endTime, locale) : null;
+              const deliveryLabel = deliveryDay && deliveryWindow ? `${deliveryDay}${locale === "ar" ? "، " : ", "}${deliveryWindow}` : null;
               return (
-                <section
-                  key={section.id}
-                  aria-labelledby={headingId}
-                  data-home-data-section={section.type}
-                  data-incomplete={incomplete ? "" : undefined}
-                  className="rounded-store border border-dashed border-store-border-strong bg-store-surface px-4 py-5"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <h2
-                      id={headingId}
-                      className={cn("text-sm font-bold text-store-foreground", hideShelfTitle && "sr-only")}
-                    >
-                      {title || t(SECTION_TITLE[section.type] ?? "sectionCustomContent")}
-                    </h2>
-                    {badge ? (
-                      <span className="text-[11px] font-medium text-store-muted-foreground">{badge}</span>
-                    ) : null}
-                  </div>
-                  <p className="mt-1 text-xs text-store-muted-foreground">
-                    {incomplete ? t("canvasDataSectionIncomplete") : t(note)}
-                  </p>
+                <section key={section.id} aria-labelledby={headingId} data-home-data-section="deliveryPromise" className="rounded-store border border-store-border bg-store-surface px-4 py-4 md:px-6 md:py-5">
+                  <h2 id={headingId} className="text-base font-extrabold text-store-foreground md:text-lg">{title || t("canvasDeliveryEarliest")}</h2>
+                  {state === "loading" || state === "idle" ? <div aria-hidden="true" className="mt-2 h-5 w-2/3 animate-pulse rounded-store bg-store-surface-muted" /> : state === "error" ? <div data-home-section-error="deliveryPromise" className="mt-3 flex items-center gap-2 text-xs text-store-muted-foreground"><span>{t("homeNewArrivalsLoadFailed")}</span><button type="button" onClick={() => onRetryHomeDataSection?.(section.id)} className="underline">{t("retry")}</button></div> : earliest && deliveryLabel ? <><p className="mt-1 text-sm font-bold text-store-primary md:text-base"><bdi>{deliveryLabel}</bdi></p>{promise.body ? <p className="mt-1 text-xs text-store-muted-foreground md:text-sm">{promise.body}</p> : null}</> : <p data-home-section-empty="deliveryPromise" className="mt-2 text-sm text-store-muted-foreground">{t("canvasDeliveryPromiseLive")}</p>}
                 </section>
               );
-            }
+              }
 
             return (
               <section
@@ -1725,6 +1926,7 @@ export function StorefrontPreviewCanvas({
         social={enabledSocial.map((item) => ({ id: item.id, network: item.network, href: item.href, label: socialLabel(t, item.network) }))}
         identity={{ legalName, crNumber, vatNumber, has: hasBusinessIdentity }}
         apps={{ ios, android, has: hasApps }}
+        categories={homeCategories}
         colourContext={{ primaryColor: config.primaryColor, accentColor: config.accentColor, palette: config.palette }}
       />
 
@@ -1793,6 +1995,44 @@ function formatMinorAmount(amountMinor: number, currency: string, locale: Custom
   } catch {
     return `${(amountMinor / 100).toFixed(2)} ${currency}`;
   }
+}
+
+function PreviewProductMeta({
+  product,
+  locale,
+}: {
+  product: { priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null; isVariantManaged?: boolean };
+  locale: CustomizerLocale;
+}) {
+  return (
+    <div className="mt-2 space-y-1">
+      {product.isVariantManaged ? (
+        <p className="text-xs font-medium text-store-muted-foreground">{locale === "ar" ? "السعر حسب الخيار" : "Priced by option"}</p>
+      ) : typeof product.priceAmountMinor === "number" && product.priceAmountMinor >= 0 ? (
+        <p className="text-sm font-bold text-store-primary">
+          <bdi>{formatMinorAmount(product.priceAmountMinor, product.currency ?? "SAR", locale)}</bdi>
+        </p>
+      ) : null}
+      {product.inStock === true && (
+        <p className="text-[11px] font-medium text-store-success">
+          {locale === "ar" ? "متوفر" : "In stock"}
+        </p>
+      )}
+      {product.inStock === false ? (
+        <span className="block w-full rounded-store border border-store-border px-2 py-1 text-center text-xs font-semibold text-store-muted-foreground">
+          {locale === "ar" ? "غير متوفر" : "Out of stock"}
+        </span>
+      ) : product.isVariantManaged ? (
+        <span className="block w-full rounded-store border border-store-primary px-2 py-1 text-center text-xs font-bold text-store-primary">
+          {locale === "ar" ? "اختيار الخيارات" : "Select options"}
+        </span>
+      ) : (
+        <button type="button" disabled aria-disabled="true" className="w-full rounded-store bg-store-primary px-2 py-1 text-xs font-semibold text-store-primary-foreground">
+          {locale === "ar" ? "إضافة للسلة" : "Add to cart"}
+        </button>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -1913,14 +2153,12 @@ function ProductPagePreview({
                 {product.media.length > 0 ? (
                   <div className="grid gap-2">
                     <div className="aspect-square overflow-hidden rounded-store bg-store-surface-muted">
-                      {/* eslint-disable-next-line @next/next/no-img-element -- tenant media URL, not a static asset */}
-                      <img src={product.media[0].url} alt={product.media[0].alt ?? ""} className="size-full object-cover" />
+                      <PreviewMediaImage src={product.media[0].url} alt={product.media[0].alt ?? ""} className="size-full object-cover" />
                     </div>
                     {product.media.length > 1 && (
                       <div className="flex gap-2 overflow-x-auto">
                         {product.media.slice(1, 5).map((m) => (
-                          // eslint-disable-next-line @next/next/no-img-element -- tenant media URL, not a static asset
-                          <img key={m.id} src={m.url} alt={m.alt ?? ""} className="size-14 shrink-0 rounded-store object-cover" />
+                          <PreviewMediaImage key={m.id} src={m.url} alt={m.alt ?? ""} className="size-14 shrink-0 rounded-store object-cover" />
                         ))}
                       </div>
                     )}
@@ -2147,7 +2385,7 @@ function CategoryPagePreview({
   selectedRegionId?: string | null;
   onSelectRegion?: (id: string) => void;
   gridProductsState?: "idle" | "loading" | "error" | "ready";
-  gridProducts?: { id: string; name: string; thumbnailUrl: string | null }[];
+  gridProducts?: { id: string; name: string; thumbnailUrl: string | null; priceAmountMinor?: number | null; currency?: string; inStock?: boolean | null; isVariantManaged?: boolean }[];
   gridProductsTotal?: number;
 }) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
@@ -2292,8 +2530,7 @@ function CategoryPagePreview({
                     <div key={product.id} className="overflow-hidden rounded-store bg-store-surface-muted">
                       <div className="aspect-square">
                         {product.thumbnailUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element -- tenant media URL, not a static asset
-                          <img src={product.thumbnailUrl} alt="" className="size-full object-cover" />
+                          <PreviewMediaImage src={product.thumbnailUrl} alt="" className="size-full object-cover" />
                         ) : null}
                       </div>
                       <p
@@ -2304,6 +2541,9 @@ function CategoryPagePreview({
                       >
                         <bdi>{product.name}</bdi>
                       </p>
+                      <div className={cn(productCard === "compact" ? "px-1.5 pb-1" : "px-2 pb-1.5")}>
+                        <PreviewProductMeta product={product} locale={locale} />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -2428,19 +2668,21 @@ function SectionRule({
   title,
   action,
   hideTitle = false,
+  headingId,
 }: {
   title: string;
-  action: string;
+  action?: string;
+  headingId?: string;
   /** CUST-HV V9d-3 — the merchant chose not to show the shelf title: it stays as the accessible name, only the action remains visible. */
   hideTitle?: boolean;
 }) {
   if (hideTitle) {
     return (
       <div data-section-heading="" data-title-hidden="" className="flex items-start justify-end gap-4">
-        <h2 className="sr-only">
+        <h2 id={headingId} className="sr-only">
           {title}
         </h2>
-        <span data-section-action="" className="text-xs font-bold text-store-primary md:text-sm">{action}</span>
+        {action ? <span data-section-action="" className="text-xs font-bold text-store-primary md:text-sm">{action}</span> : null}
       </div>
     );
   }
@@ -2452,11 +2694,11 @@ function SectionRule({
           data-heading-bar=""
           className="mt-1 h-4 w-1.5 shrink-0 rounded-full bg-store-primary md:h-5"
         />
-        <h2 className="text-base font-extrabold leading-tight text-store-foreground md:text-lg">
+        <h2 id={headingId} className="text-base font-extrabold leading-tight text-store-foreground md:text-lg">
           {title}
         </h2>
       </div>
-      <span data-section-action="" className="text-xs font-bold text-store-primary md:text-sm">{action}</span>
+      {action ? <span data-section-action="" className="text-xs font-bold text-store-primary md:text-sm">{action}</span> : null}
     </div>
   );
 }

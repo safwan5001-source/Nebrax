@@ -34,6 +34,22 @@ class Settings
             'consented_categories' => [],
         ],
         /**
+         * AI-07: إقرار مالك المؤسسة بأن رسائل المساعد وملخّصات أرقامه تُرسَل إلى **مزوّد خارجي**. مجموعة مستقلة عمداً
+         * عن `ai_assistant` (عقدها ذو المفتاحين ثابت): موافقات صدرت حين كان المزوّد تجريبياً لا تنقلب ضمنياً إلى
+         * موافقة على إرسال خارجي. الافتراضي `false` ولا يُمنح إلا بإقرار صريح، ويُسحب بتعطيل المساعد.
+         */
+        'ai_assistant_external' => [
+            'acknowledged' => false,
+            // إقرار **ثانٍ ومستقل** (AI-07ب): القيم المراجَعة والمنقَّحة لمستندٍ يختاره المستخدم تُرسَل إلى المزوّد الخارجي لتلخيصها
+            // والإجابة عنها. لا يتبع الإقرار الأول ولا موافقة فئة `document_projected_text`؛ يُسحب بسحب أيٍّ منهما أو بتعطيل المساعد.
+            'documents_acknowledged' => false,
+        ],
+        // AI-ACTIONS-01: tenant opt-in for persisted action drafts. This is
+        // independent from assistant/provider consent and enables no ERP execution.
+        'ai_actions' => [
+            'enabled' => false,
+        ],
+        /**
          * هوية الشركة. `logo` صورة (data URL) تُعرَض في **قشرة التطبيق**
          * (الشريط العلوي والجانبي) وفي رؤوس المستندات.
          *
@@ -123,6 +139,17 @@ class Settings
              * يفعّلوا السياسة بقرار واعٍ؛ فلا تتعطل فواتيرهم بترقية صامتة.
              */
             'enforce_min_sale_price' => true,
+            /**
+             * خزينة البيع النقدي المباشر (`payment_type=cash`) — TREASURY-T4.
+             *
+             * **سياسة عمل لا صحّة تقنية** (CLAUDE.md قاعدة 6): `legacy` الصندوق 1110 دوماً (السلوك القائم)،
+             * `main` الاختيار الصريح ثم الخزينة النقدية الرئيسية، `explicit_required` الاختيار إلزامي.
+             *
+             * **الافتراض `legacy`** لكل مستأجر قائم وجديد: لا يتغيّر قيدٌ بنشر الكود. والقيم الأخرى
+             * لا يقبلها الـAPI ولا يعمل بها الترحيل إلا بعد فتح بوابة `config('treasury.cash_sale_routing_enabled')`
+             * بقرار تفعيل منسَّق (انظر `App\Support\CashSaleTreasuryPolicy`).
+             */
+            'cash_sale_treasury_policy' => 'legacy',
         ],
         /**
          * إعدادات المخزون والمنتجات.

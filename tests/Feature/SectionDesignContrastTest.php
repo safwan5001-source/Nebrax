@@ -61,10 +61,11 @@ class SectionDesignContrastTest extends TestCase
     }
 
     /** @param array<string,mixed> $design */
-    private function document(array $design, bool $visible = true, string $type = 'hero'): array
+    private function document(array $design, bool $visible = true, string $type = 'hero', string $background = '#f8f9fa'): array
     {
         return (new StorefrontPresentationNormalizer)->normalize([
             'primaryColor' => '#12372a',
+            'backgroundColor' => $background,
             'homepage' => ['sections' => [['id' => $type, 'type' => $type, 'visible' => $visible, 'design' => $design]]],
         ]);
     }
@@ -114,6 +115,17 @@ class SectionDesignContrastTest extends TestCase
         $this->assertSame([], (new StorefrontPresentationPublishValidator)->errors((new StorefrontPresentationNormalizer)->normalize([])));
     }
 
+    /** @test */
+    public function text_only_sections_use_the_configured_store_background(): void
+    {
+        $design = ['text' => ['body' => ['hex' => '#ffffff']]];
+        $this->assertSame([], (new StorefrontPresentationPublishValidator)->errors(
+            $this->document($design, type: 'benefits', background: '#111827'),
+        ));
+        $this->assertNotSame([], (new StorefrontPresentationPublishValidator)->errors(
+            $this->document($design, type: 'benefits', background: '#ffffff'),
+        ));
+    }
     /** @test */
     public function any_background_is_publishable_with_the_automatic_foreground(): void
     {

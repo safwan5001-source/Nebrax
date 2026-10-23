@@ -16,8 +16,10 @@ import {
   applyImportJobChunk,
   cancelImportJob,
   createImportJob,
+  createRepairJob,
   getImportJob,
   type ApplyOptions,
+  type ImportBinding,
   type ImportJob,
   type ImportJobDomain,
 } from './client';
@@ -78,12 +80,17 @@ export function useImportJobEngine(domain: ImportJobDomain) {
     }
   }, [setJob]);
 
-  const upload = useCallback(async (file: File, idempotencyKey?: string) => {
+  const upload = useCallback(async (
+    file: File,
+    idempotencyKey?: string,
+    mediaArchive?: File | null,
+    bound?: { binding: ImportBinding; options: ApplyOptions } | null
+  ) => {
     if (inFlight.current) return;
     inFlight.current = true;
     setState({ job: null, busy: 'uploading', error: null, networkUncertain: false });
     try {
-      const job = await createImportJob(domain, file, idempotencyKey);
+      const job = await createImportJob(domain, file, idempotencyKey, mediaArchive, bound);
       setJob(job);
       return job;
     } catch (err) {
@@ -98,6 +105,30 @@ export function useImportJobEngine(domain: ImportJobDomain) {
       inFlight.current = false;
     }
   }, [domain, setJob]);
+
+  /**
+   * ينشئ تشغيلة إصلاح فرعية من ملفٍّ مصحَّح (IMP-H1-S8b) ويجعلها تشغيلة الشاشة؛ يرحّلها المستدعي بـ`applyLoop` كأي تشغيلة. بخلاف `upload` يبقى
+   * الخطأ (مثل `repair_ref_*`) مع التشغيلة الأم الفاشلة المعروضة فلا تضيع شاشة الإصلاح.
+   */
+  const repair = useCallback(async (parentJobId: string, file: File, idempotencyKey?: string) => {
+    if (inFlight.current) return null;
+    inFlight.current = true;
+    setState((current) => ({ ...current, busy: 'uploading', error: null, networkUncertain: false }));
+    try {
+      const child = await createRepairJob(parentJobId, file, idempotencyKey);
+      setJob(child);
+      return child;
+    } catch (err) {
+      setState((current) => ({
+        ...current,
+        busy: null,
+        error: err instanceof ApiError ? err.message : String((err as Error)?.message ?? err),
+      }));
+      return null;
+    } finally {
+      inFlight.current = false;
+    }
+  }, [setJob]);
 
   /**
    * قطعةٌ واحدة، ثم — لمجال الكتالوج المجزّأ فقط — استمرارٌ تلقائي حتى
@@ -209,6 +240,7 @@ export function useImportJobEngine(domain: ImportJobDomain) {
     canApply: state.job !== null && APPLICABLE_STATUSES.has(state.job.status) && state.job.status !== 'completed',
     isTerminal: state.job !== null && TERMINAL_STATUSES.has(state.job.status),
     upload,
+    repair,
     resume,
     applyLoop,
     cancel,

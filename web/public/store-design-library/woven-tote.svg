@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240" viewBox="0 0 320 240" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="22" y1="8" x2="304" y2="226" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D6E5D5"/>
+      <stop offset="1" stop-color="#6E9472"/>
+    </linearGradient>
+    <pattern id="weave" width="12" height="12" patternUnits="userSpaceOnUse">
+      <path d="M0 3H12M0 9H12M3 0V12M9 0V12" stroke="#8A5B36" stroke-opacity=".28" stroke-width="2"/>
+    </pattern>
+  </defs>
+  <rect width="320" height="240" rx="24" fill="url(#bg)"/>
+  <path d="M0 194C70 166 128 178 190 149C245 124 281 129 320 109V240H0V194Z" fill="#EFF3E8" fill-opacity=".74"/>
+  <ellipse cx="161" cy="207" rx="92" ry="13" fill="#314A34" fill-opacity=".18"/>
+  <path d="M107 92C107 61 128 42 160 42C192 42 213 61 213 92" stroke="#704828" stroke-width="14" stroke-linecap="round"/>
+  <path d="M87 91H233L217 207H103L87 91Z" fill="#C89B65"/>
+  <path d="M87 91H233L217 207H103L87 91Z" fill="url(#weave)"/>
+  <path d="M87 91H233" stroke="#704828" stroke-width="8"/>
+  <rect x="145" y="127" width="30" height="23" rx="5" fill="#EFF3E8"/>
+  <path d="M151 137H169" stroke="#704828" stroke-width="3" stroke-linecap="round"/>
+</svg>

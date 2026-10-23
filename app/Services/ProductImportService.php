@@ -7,6 +7,8 @@ use App\Models\Brand;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\UnitTemplate;
+use App\Support\ImportPlanDriftException;
+use App\Support\ImportUnitFailureException;
 use App\Support\ProductImportFields;
 use App\Support\SensitiveCostPolicy;
 use App\Support\Settings;
@@ -232,6 +234,19 @@ class ProductImportService
      */
     public function preview(UploadedFile $file, array $options, bool $costAuthorized = true, int $maxRows = self::MAX_ROWS): array
     {
+        return $this->previewWithPlan($file, $options, $costAuthorized, $maxRows)['preview'];
+    }
+
+    /**
+     * المعاينة نفسها **مع خطّتها** (IMP-H1-S3c): لكل صفّ بيانات صالحٍ رمزٌ مختصر لما سيُنفَّذ فعلاً وقت المعاينة (إنشاء، أو تحديث
+     * لمنتجٍ بعينه، أو تجاوز). تُحفَظ في سجلّ المعاينة وتُقارَن وقت التنفيذ: ما تغيّر بين المعاينة والتنفيذ (مثلاً أُنشئ الرمز نفسه
+     * في الأثناء فصار «دمج» تحديثاً بدل إنشاء) يُرفض `plan_drift` بدل أن يُنفَّذ فعلاً مختلفاً عمّا اعتُمد.
+     *
+     * @param  array<string, mixed>  $options
+     * @return array{preview: array<string, mixed>, plan: array<int, string>|null}
+     */
+    public function previewWithPlan(UploadedFile $file, array $options, bool $costAuthorized = true, int $maxRows = self::MAX_ROWS): array
+    {
         $parsed = $this->parse($file, $this->options($options), $maxRows);
         // PR-INV-1: فشلٌ مبكر متّسق — لا يترك المستخدم يظن أن المعاينة تفويضٌ
         // للتطبيق حين تُرفض مطابقة سعر الشراء لاحقاً هناك حتماً.
@@ -239,7 +254,7 @@ class ProductImportService
 
         $rows = array_slice($parsed['rows'], 0, self::PREVIEW_ROW_LIMIT);
 
-        return [
+        $preview = [
             'mode' => $parsed['mode'],
             'blank_policy' => $parsed['blank_policy'],
             'master_data_policy' => $parsed['master_data_policy'],
@@ -259,6 +274,54 @@ class ProductImportService
             // الأخطاء كاملة لا مقتطعة: تقرير الأخطاء القابل للتنزيل يُبنى منها.
             'errors' => $parsed['errors'],
         ];
+
+        // معاينةٌ بنافذة (`batch_offset`/`batch_size`) لا تغطّي الملف كله: خطّةٌ ناقصة كانت ستُنتج `plan_drift` زائفاً لصفوفٍ خارج
+        // النافذة عند تنفيذ الملف كاملاً — فلا تُخزَّن خطّة (تنفيذٌ بلا مقارنة = العقد القديم) بدل خطّةٍ جزئية.
+        $windowed = ((int) ($parsed['batch_offset'] ?? 0)) > 0 || ($parsed['batch_size'] ?? null) !== null;
+        $plan = [];
+        foreach ($windowed ? [] : $parsed['rows'] as $row) {
+            $plan[(int) $row['row']] = $this->planCode($row);
+        }
+
+        return ['preview' => $preview, 'plan' => $windowed ? null : $plan];
+    }
+
+    /**
+     * رمز الصفّ في الخطّة: `c` إنشاء · `u:<id>` تحديث للمنتج المحدَّد · `s:<id>` تجاوز (لا تغيير) · `e` خطأ. المعرّف دون `updated_at`
+     * عمداً: حركات المخزون والمبيعات تحدّث `updated_at` المنتج فتُنتج رفضاً زائفاً في مؤسسةٍ نشطة، بينما ما يهمّ هو **أيّ منتجٍ
+     * وأيّ فعل** (انظر تقرير IMP-H1-S3c).
+     *
+     * @param  array<string, mixed>  $row
+     */
+    private function planCode(array $row): string
+    {
+        /** @var Product|null $existing */
+        $existing = $row['existing'] ?? null;
+
+        return match ($row['action']) {
+            'create' => 'c',
+            'update' => 'u:'.($existing?->id ?? ''),
+            'skip' => 's:'.($existing?->id ?? ''),
+            default => 'e',
+        };
+    }
+
+    /**
+     * يقارن صفوف النافذة الحالية بالخطّة المجمَّدة وقت المعاينة؛ أي اختلاف ⇒ `ImportPlanDriftException` قبل أي كتابة.
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     * @param  array<int|string, string>  $expected
+     */
+    private function assertPlanHolds(array $rows, array $expected): void
+    {
+        foreach ($rows as $row) {
+            $number = (int) $row['row'];
+            $planned = $expected[$number] ?? null;
+            $live = $this->planCode($row);
+            if ($planned === null || $planned !== $live) {
+                throw new ImportPlanDriftException($number, $planned, $live);
+            }
+        }
     }
 
     /**
@@ -282,10 +345,17 @@ class ProductImportService
         $this->assertCostMappingAuthorized($parsed['mapping'], $costAuthorized);
 
         if ($parsed['error_rows'] > 0) {
-            throw new RuntimeException('لا يمكن تطبيق الاستيراد قبل معالجة الأخطاء الظاهرة في المعاينة.');
+            // IMP-H1-S8a: الرسالة نفسها حرفياً (نوعٌ فرعيّ من RuntimeException)، لكنه يحمل الوحدات الفاشلة بعينها لتسجّلها التشغيلة الدائمة.
+            throw new ImportUnitFailureException(
+                'لا يمكن تطبيق الاستيراد قبل معالجة الأخطاء الظاهرة في المعاينة.',
+                $this->rowFailures($parsed['rows'], (int) ($resolved['batch_offset'] ?? 0)),
+            );
         }
         if ($parsed['total_rows'] === 0) {
             throw new RuntimeException('لا يحتوي الملف صفوف بيانات قابلة للتطبيق.');
+        }
+        if ($resolved['expected_plan'] !== null) {
+            $this->assertPlanHolds($parsed['rows'], $resolved['expected_plan']);
         }
 
         $lifecycle = app(ProductLifecycleService::class);
@@ -330,8 +400,9 @@ class ProductImportService
 
                 $this->assertNoLiveSkuConflict((string) ($payload['sku'] ?? ''));
                 $this->assertNoLiveBarcodeConflict((string) ($payload['barcode'] ?? ''));
-                $product = Product::create($this->createPayload($payload));
-                $lifecycle->create($product, $userId);
+                // IMP-H2-S1: الإنشاء عبر الخدمة نفسها التي تستعملها بطاقة المنتج ومسار AI Actions (معاملة + حدث دورة الحياة). `generateSku: false`:
+                // الرمز يكتمل في `createPayload` أعلاه بالعدّاد نفسه فيبقى سلوك V2 حرفياً، ولا تولّد الخدمة رمزاً ثانياً.
+                $product = app(ProductService::class)->create($this->createPayload($payload), $userId, generateSku: false);
                 $created++;
                 $results[] = $this->rowSummary($row, $product);
             }
@@ -429,6 +500,8 @@ class ProductImportService
             'mapping' => $mapping,
             'batch_offset' => $batchOffset,
             'batch_size' => $batchSize,
+            // IMP-H1-S3c: خطّة المعاينة المجمَّدة (رقم الصف → رمز) إن وُجدت؛ `null` = العقد القديم بلا مقارنة.
+            'expected_plan' => isset($options['expected_plan']) && is_array($options['expected_plan']) ? $options['expected_plan'] : null,
         ];
     }
 
@@ -561,6 +634,8 @@ class ProductImportService
             'rows' => $rows,
             'errors' => $errors,
             'pending_references' => $pending,
+            'batch_offset' => $batchOffset,
+            'batch_size' => $batchSize,
         ];
     }
 
@@ -640,6 +715,9 @@ class ProductImportService
 
         foreach (ProductImportFields::all() as $key => $field) {
             if (! $field['writable']) {
+                continue;
+            }
+            if (($field['media_only'] ?? false) === true) {
                 continue;
             }
             $present = in_array($key, $mapped, true);
@@ -1201,6 +1279,9 @@ class ProductImportService
             if (! $field['writable']) {
                 continue;
             }
+            if (($field['media_only'] ?? false) === true) {
+                continue;
+            }
             $cell = $normalized[$key];
 
             if ($cell['blank']) {
@@ -1242,6 +1323,9 @@ class ProductImportService
 
         foreach (ProductImportFields::all() as $key => $field) {
             if (! $field['writable']) {
+                continue;
+            }
+            if (($field['media_only'] ?? false) === true) {
                 continue;
             }
             $cell = $normalized[$key];
@@ -1444,6 +1528,9 @@ class ProductImportService
     private function createPayload(array $payload): array
     {
         $payload['purchase_price'] = $payload['purchase_price'] ?? 0;
+        // عقد المسار: لا كمية ولا حركة مخزون ولا قيد من الاستيراد. `ProductService::create` يسجّل رصيداً افتتاحياً إن وُجدت `initial_quantity`، فنمنعها
+        // هنا مهما ورد في الحمولة (الرصيد الافتتاحي مسارٌ مستقلّ: `InventoryOpening`).
+        unset($payload['initial_quantity']);
 
         if (blank($payload['sku'] ?? null)) {
             $prefix = (string) Settings::get('numbering', 'product_prefix');
@@ -1586,6 +1673,69 @@ class ProductImportService
     // ═══════════════════════════════════════════════════════════════
     //  أدوات
     // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * فحصٌ استباقي **للملف كله** قبل أي كتابة (IMP-H1-S5): تكرار رمز الصنف/الباركود/معرّف نبراكس **عبر النوافذ**. `parse()` يرى نافذته وحدها
+     * (`$seen` محلّي لها)، فتكرارٌ بين صفٍّ في النافذة ١ وآخر في النافذة ٣ كان يمرّ بالمعاينة المقطّعة ثم يفشل متأخراً عند الكتابة بعد أن رُحِّلت
+     * نوافذ سابقة. هنا قراءةٌ واحدة بلا استعلام قاعدة بيانات ولا كتابة؛ يرمي `ImportUnitFailureException` باسم كل صفٍّ مكرَّر (الظهور الثاني فصاعداً).
+     *
+     * @param  array<string, mixed>  $options  نفس خيارات `apply()` (المطابقة والوضع)
+     */
+    public function prevalidateWholeFile(UploadedFile $file, array $options, int $maxRows): void
+    {
+        $resolved = $this->options($options);
+        $raw = $this->readFile($file, $maxRows);
+        $headers = array_map(static fn ($value): string => trim((string) $value), array_shift($raw) ?? []);
+        if ($headers === [] || implode('', $headers) === '') {
+            return; // الرسالة الدقيقة تصدر من `parse()` عند أول نافذة.
+        }
+        $mapping = $resolved['mapping'] ?? $this->autoMapping($headers);
+
+        $seen = [];
+        $failures = [];
+        $ordinal = -1;
+        foreach ($raw as $offset => $values) {
+            if (self::isBlankRow($values)) {
+                continue;
+            }
+            $ordinal++;
+            $messages = [];
+            $this->assertUniqueWithinFile($this->cells($values, $mapping), $offset + 2, $seen, $messages);
+            if ($messages !== []) {
+                $failures[] = ['ordinal' => $ordinal, 'code' => 'row_duplicate_in_file', 'message' => implode(' · ', $messages)];
+            }
+        }
+
+        if ($failures !== []) {
+            throw new ImportUnitFailureException(
+                'الملف يحوي قيماً مكرّرة بين صفوفه ('.count($failures).' صفاً). صحّحها قبل الترحيل: لا يُرحَّل شيء قبل فحص الملف كله.',
+                $failures,
+            );
+        }
+    }
+
+    /**
+     * وحدات النافذة الفاشلة (صفوف الأخطاء) بترتيبها بين صفوف البيانات الفعلية — لا تُسمّي الصفوف السليمة في النافذة نفسها.
+     *
+     * @param  list<array<string, mixed>>  $rows  صفوف النافذة كما أنتجها `parse()`
+     * @return list<array{ordinal: int, code: string, message: string}>
+     */
+    private function rowFailures(array $rows, int $batchOffset): array
+    {
+        $failures = [];
+        foreach (array_values($rows) as $position => $row) {
+            if (($row['valid'] ?? true) === true) {
+                continue;
+            }
+            $failures[] = [
+                'ordinal' => $batchOffset + $position,
+                'code' => 'row_invalid',
+                'message' => implode(' · ', array_map('strval', (array) ($row['messages'] ?? []))),
+            ];
+        }
+
+        return $failures;
+    }
 
     /**
      * @param  array<string, mixed>  $row

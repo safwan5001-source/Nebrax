@@ -1,5 +1,6 @@
+// @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api, ApiError } from '../api';
+import { api, ApiError, fetchPrivateFileUrl } from '../api';
 
 const successResponse = () => new Response(JSON.stringify({ data: {} }), {
   status: 200,
@@ -76,5 +77,46 @@ describe('api error message extraction', () => {
       expect((exception as ApiError).status).toBe(422);
       expect(((exception as ApiError).body as { data: { code: string } }).data.code).toBe('document_retry_limit_reached');
     }
+  });
+});
+
+describe('private document preview transport', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    localStorage.clear();
+  });
+
+  it('sends the existing Bearer token and branch context to the signed document URL', async () => {
+    localStorage.setItem('token', 'tenant-token');
+    localStorage.setItem('nibras_active_branch', 'branch-a');
+    const fetchMock = vi.fn().mockResolvedValue(new Response('%PDF-1.7', {
+      status: 200,
+      headers: { 'Content-Type': 'application/pdf' },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:private-pdf'), revokeObjectURL: vi.fn() });
+
+    await expect(fetchPrivateFileUrl('https://api.example.test/api/document-files/f1/download?signature=signed', 'application/pdf'))
+      .resolves.toBe('blob:private-pdf');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example.test/api/document-files/f1/download?signature=signed',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Accept: 'application/pdf',
+          Authorization: 'Bearer tenant-token',
+          'X-Branch-Id': 'branch-a',
+        }),
+      }),
+    );
+  });
+
+  it('rejects a JSON success response instead of handing it to the PDF viewer', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ message: 'Unauthenticated.' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })));
+
+    await expect(fetchPrivateFileUrl('/document-files/f1/download?signature=signed', 'application/pdf'))
+      .rejects.toMatchObject({ status: 502, message: 'preview_invalid_response' });
   });
 });

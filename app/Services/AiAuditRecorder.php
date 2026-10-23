@@ -22,6 +22,17 @@ class AiAuditRecorder
         'branch_mode' => 'string', 'branch_count' => 'int', 'warehouse_mode' => 'string', 'warehouse_count' => 'int',
         'message_chars' => 'int', 'tool_calls_planned' => 'int', 'tool_calls_executed' => 'int', 'billable' => 'bool',
         'overrun' => 'bool', 'row_count' => 'int', 'period_days' => 'int', 'partner_detail' => 'string',
+        // تغيير موافقة المؤسسة (AI-03): أعلام وأسماء فئات معروفة فقط — لا نص حرّ.
+        'consent_enabled' => 'bool', 'categories_granted' => 'categories', 'categories_revoked' => 'categories',
+        // قراءة مستند مُسقَط (AI-04): مرجع المستند (UUID) ونوعه وحالته وأعداد فقط — لا قيمة ولا نص ولا اسم ملف.
+        'document_ref' => 'uuid', 'document_type' => 'string', 'document_status' => 'string',
+        'fields_returned' => 'int', 'lines_returned' => 'int', 'redactions_applied' => 'int',
+        // مزوّد خارجي (AI-07): أعلام فقط — لا نص رسالة ولا جواب ولا رقم.
+        // قبول المؤسسة لـAI Actions (IMP-H2-S4): علم فقط.
+        'ai_actions_enabled' => 'bool',
+        'external_ack' => 'bool', 'composed' => 'bool', 'grounded' => 'bool', 'results_digested' => 'int',
+        // مستند عبر مزوّد خارجي (AI-07ب): أعلام وأعداد فقط — لا قيمة ولا اسم ولا نص.
+        'document_external' => 'bool', 'document_ack' => 'bool', 'document_fields_sent' => 'int', 'document_lines_sent' => 'int',
     ];
 
     private const CODE = '/^[a-z][a-z0-9_.]{0,79}$/';
@@ -108,9 +119,14 @@ class AiAuditRecorder
             $clean[$key] = match ($type) {
                 'int' => (int) $value,
                 'bool' => (bool) $value,
+                // قائمة أسماء فئات من الكتالوج المعتمد فقط؛ أي اسم آخر يسقط.
+                'categories' => is_array($value)
+                    ? array_values(array_intersect(array_map('strval', $value), \App\Support\AiAssistantDataCategory::ALL))
+                    : null,
+                'uuid' => preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/', (string) $value) === 1 ? (string) $value : null,
                 default => preg_match('/^[a-z_]{1,24}$/', (string) $value) === 1 ? (string) $value : null,
             };
-            if ($clean[$key] === null) {
+            if ($clean[$key] === null || ($type === 'categories' && $clean[$key] === [])) {
                 unset($clean[$key]);
             }
         }

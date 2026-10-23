@@ -40,6 +40,19 @@ class ImportJobFileStorage
         // حتى لو تشارك السائق نفسه (bucket واحد لكل النظام في وضع s3).
         $key = "imports/{$tenantId}/{$jobId}/original.{$extension}";
 
+        return $this->storeAt($key, $file);
+    }
+
+    /** @return array{path: string, disk: string, byte_size: int, mime_type: ?string} */
+    public function storeMediaArchive(string $tenantId, string $jobId, UploadedFile $file): array
+    {
+        return $this->storeAt("imports/{$tenantId}/{$jobId}/product-images.zip", $file);
+    }
+
+    /** @return array{path: string, disk: string, byte_size: int, mime_type: ?string} */
+    private function storeAt(string $key, UploadedFile $file): array
+    {
+
         $stream = fopen($file->getRealPath(), 'rb');
         if (! is_resource($stream)) {
             throw new RuntimeException('تعذّرت قراءة الملف المرفوع.');

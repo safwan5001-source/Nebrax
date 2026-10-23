@@ -6,6 +6,8 @@ use App\Http\Controllers\Api\FiscalYearController;
 use App\Http\Controllers\Api\AccountRoutingController;
 use App\Http\Controllers\Api\AccountSettingsController;
 use App\Http\Controllers\Api\AppointmentController;
+use App\Http\Controllers\Api\AiActionController;
+use App\Http\Controllers\Api\AiActionSettingsController;
 use App\Http\Controllers\Api\AssetController;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuthController;
@@ -16,8 +18,10 @@ use App\Http\Controllers\Api\PlatformCommercialAssignmentController;
 use App\Http\Controllers\Api\PlatformCommercialCatalogController;
 use App\Http\Controllers\Api\PlatformDashboardController;
 use App\Http\Controllers\Api\PlatformDocumentOperationsController;
+use App\Http\Controllers\Api\PlatformAiBudgetController;
 use App\Http\Controllers\Api\PlatformIntegrationController;
 use App\Http\Controllers\Api\PlatformDocumentFileScanExceptionController;
+use App\Http\Controllers\Api\PlatformPaymentsRolloutController;
 use App\Http\Controllers\Api\PlatformSubscriptionController;
 use App\Http\Controllers\Api\PlatformSystemUpdateController;
 use App\Http\Controllers\Api\PlatformTenantController;
@@ -103,6 +107,9 @@ use App\Http\Controllers\Api\ManualJournalController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PartnerController;
 use App\Http\Controllers\Api\PaymentController;
+use App\Http\Controllers\Api\PaymentAttemptController;
+use App\Http\Controllers\Api\PaymentGatewayController;
+use App\Http\Controllers\Api\PaymentWebhookController;
 use App\Http\Controllers\Api\PaymentMethodController;
 use App\Http\Controllers\Api\PriceListController;
 use App\Http\Controllers\Api\PayrollController;
@@ -121,6 +128,7 @@ use App\Http\Controllers\Api\DeliveryConnectorAccountController;
 use App\Http\Controllers\Api\DeliveryConnectorIngestionController;
 use App\Http\Controllers\Api\DeliveryHubOrderController;
 use App\Http\Controllers\Api\PosDeviceController;
+use App\Http\Controllers\Api\PosTerminalController;
 use App\Http\Controllers\Api\PosSessionController;
 use App\Http\Controllers\Api\PrintTemplateController;
 use App\Http\Controllers\Api\ProcurementController;
@@ -169,6 +177,7 @@ use App\Http\Middleware\EnsureApplicationActive;
 use App\Http\Middleware\EnsureApplicationOperationActive;
 use App\Http\Middleware\EnsureCommercialApplicationAccess;
 use App\Http\Middleware\EnsureCustomerPrincipal;
+use App\Http\Middleware\EnsureImportFilesScanned;
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\EnsurePlatformAdministrator;
 use App\Http\Middleware\EnsureUserPrincipal;
@@ -222,6 +231,10 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         ->middleware('throttle:register')
         ->name('auth.public-register');
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+    // PAY-H1-04: مستقبِل webhook مزوّد الدفع — عام (الهوية = مفتاح الاتصال + توقيع المزوّد)، بلا SetTenant، بحد حجم 64KB داخل الخدمة.
+    Route::post('payment-webhooks/{provider}/{webhookKey}', [PaymentWebhookController::class, 'receive'])
+        ->where(['provider' => '[a-z0-9_]{2,32}', 'webhookKey' => '[A-Za-z0-9]{32,128}'])
+        ->middleware('throttle:600,1');
     Route::get('company-browser-identity', [CompanyBrowserIdentityController::class, 'show'])
         ->middleware('throttle:60,1');
 
@@ -301,8 +314,12 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('me', [PlatformAuthController::class, 'me']);
         Route::get('overview', [PlatformDashboardController::class, 'overview']);
         Route::get('integrations', [PlatformIntegrationController::class, 'index']);
+        Route::get('ai-budgets', [PlatformAiBudgetController::class, 'index']);
         Route::get('tenants', [PlatformTenantController::class, 'index']);
         Route::get('tenants/{tenant}', [PlatformTenantController::class, 'show']);
+        // PAY-H1-02: ضوابط تفعيل المدفوعات (قراءة).
+        Route::get('payments-rollout', [PlatformPaymentsRolloutController::class, 'platform']);
+        Route::get('tenants/{tenant}/payments-rollout', [PlatformPaymentsRolloutController::class, 'tenant'])->whereUuid('tenant');
         Route::get('document-operations', [PlatformDocumentOperationsController::class, 'overview']);
         Route::get('document-usage', [PlatformDocumentOperationsController::class, 'usage']);
         Route::get('document-diagnostics', [PlatformDocumentOperationsController::class, 'diagnostics']);
@@ -315,12 +332,16 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         ->prefix('platform')
         ->group(function () {
             Route::patch('tenants/{tenant}', [PlatformTenantController::class, 'update']);
+            // PAY-H1-02: تفعيل/إيقاف المدفوعات لمستأجر + الإيقاف الطارئ للمنصة (بحدث تدقيق).
+            Route::put('payments-rollout', [PlatformPaymentsRolloutController::class, 'setPlatform']);
+            Route::put('tenants/{tenant}/payments-rollout', [PlatformPaymentsRolloutController::class, 'setTenant'])->whereUuid('tenant');
             // PR-NOTIF-6: تحديثات النظام / What's New — كتابة ونشر.
             Route::post('system-updates', [PlatformSystemUpdateController::class, 'store']);
             Route::put('system-updates/{id}', [PlatformSystemUpdateController::class, 'update'])->whereUuid('id');
             Route::post('system-updates/{id}/publish', [PlatformSystemUpdateController::class, 'publish'])->whereUuid('id');
             Route::delete('system-updates/{id}', [PlatformSystemUpdateController::class, 'destroy'])->whereUuid('id');
             Route::put('integrations/{integration}', [PlatformIntegrationController::class, 'update']);
+            Route::put('ai-budgets', [PlatformAiBudgetController::class, 'update']);
             Route::post('integrations/{integration}/test', [PlatformIntegrationController::class, 'test']);
             Route::post('document-file-scan-exceptions', [PlatformDocumentFileScanExceptionController::class, 'store']);
             Route::post('document-file-scan-exceptions/{exception}/revoke', [PlatformDocumentFileScanExceptionController::class, 'revoke'])->whereUuid('exception');
@@ -410,6 +431,71 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // سجل تدقيق المساعد (وصفي، للمستأجر نفسه) — صلاحية مستقلة عن الاستعمال.
         Route::get('ai-assistant/audit-events', [AiAuditController::class, 'index'])
             ->middleware([$perm('ai.audit.view'), 'throttle:60,1']);
+        // AWJ Intelligence (AI-03): حالة المساعد للواجهة، وتحديث موافقة المؤسسة، وتشغيل أداة قراءة مالية صريحة.
+        // الثلاثة تعيد التفويض كاملاً بفاعل طازج؛ الإخفاء في الواجهة ليس حدّاً أمنياً.
+        Route::get('ai-assistant/status', [AiAssistantController::class, 'status'])
+            ->middleware('throttle:60,1');
+        Route::put('ai-assistant/settings', [AiAssistantController::class, 'updateSettings'])
+            ->middleware([$perm('ai.consent.manage'), 'throttle:20,1']);
+        Route::post('ai-assistant/tools/run', [AiAssistantController::class, 'runTool'])
+            ->middleware([$perm('ai.assistant.use'), 'throttle:30,1']);
+
+        // IMP-H2-S4: قبول المؤسسة لـAI Actions. المسار قبل `ai-actions/{action}` ولا يتقاطع معه (اسم مستقل).
+        Route::get('ai-actions-settings', [AiActionSettingsController::class, 'show'])->middleware('throttle:60,1');
+        Route::put('ai-actions-settings', [AiActionSettingsController::class, 'update'])
+            ->middleware([$perm('ai.actions.manage'), 'throttle:20,1']);
+
+        // AI-ACTIONS-01: persisted/versioned drafts only. There is deliberately
+        // no approve/execute/repair endpoint in this foundation slice.
+        Route::post('ai-actions', [AiActionController::class, 'store'])
+            ->middleware([$perm('ai.actions.use'), EnforceUserIdempotency::class, 'throttle:20,1']);
+        Route::get('ai-actions/{action}', [AiActionController::class, 'show'])
+            ->middleware([$perm('ai.actions.use'), 'throttle:60,1']);
+        Route::post('ai-actions/{action}/versions', [AiActionController::class, 'storeVersion'])
+            ->middleware([$perm('ai.actions.use'), EnforceUserIdempotency::class, 'throttle:30,1']);
+        Route::post('ai-actions/{action}/cancel', [AiActionController::class, 'cancel'])
+            ->middleware([$perm('ai.actions.use'), EnforceUserIdempotency::class, 'throttle:20,1']);
+        // AI-ACTIONS-02: private intake and deterministic extraction only;
+        // there is still no product-writing, approval, or execution route.
+        Route::post('ai-actions/{action}/files', [AiActionController::class, 'storeFile'])
+            ->middleware([$perm('ai.actions.use'), EnforceUserIdempotency::class, 'throttle:10,1', EnsureImportFilesScanned::class]);
+        Route::get('ai-actions/{action}/files/{file}/extraction', [AiActionController::class, 'showExtraction'])
+            ->middleware([$perm('ai.actions.use'), 'throttle:60,1']);
+        Route::get('ai-actions/{action}/review', [AiActionController::class, 'review'])
+            ->middleware([$perm('ai.actions.use'), 'throttle:60,1']);
+        Route::post('ai-actions/{action}/review/versions', [AiActionController::class, 'storeReview'])
+            ->middleware([$perm('ai.actions.use'), EnforceUserIdempotency::class, 'throttle:30,1']);
+        // AI-ACTIONS-04: read-only preview and an explicit, expiring approval record.
+        // Approval needs its own permission; nothing here writes products or ledger rows.
+        Route::post('ai-actions/{action}/previews', [AiActionController::class, 'storePreview'])
+            ->middleware([$perm('ai.actions.use'), EnforceUserIdempotency::class, 'throttle:10,1']);
+        Route::get('ai-actions/{action}/previews/{preview}', [AiActionController::class, 'showPreview'])
+            ->middleware([$perm('ai.actions.use'), 'throttle:60,1']);
+        Route::post('ai-actions/{action}/approvals', [AiActionController::class, 'approve'])
+            ->middleware([$perm('ai.actions.approve'), EnforceUserIdempotency::class, 'throttle:20,1']);
+        // AI-ACTIONS-06B: repair of failed rows = a NEW action with only those rows; the original is never modified.
+        Route::get('ai-actions/{action}/executions/{execution}/repair', [AiActionController::class, 'repairCandidates'])
+            ->middleware([$perm('ai.actions.use'), 'throttle:60,1']);
+        Route::post('ai-actions/{action}/executions/{execution}/repairs', [AiActionController::class, 'startRepair'])
+            ->middleware([$perm('ai.actions.repair'), EnforceUserIdempotency::class, 'throttle:10,1']);
+        Route::get('ai-actions/{action}/repair', [AiActionController::class, 'showRepair'])
+            ->middleware([$perm('ai.actions.use'), 'throttle:60,1']);
+        // AI-ACTIONS-06: product images. Staging only — validated bytes go to private storage; nothing here
+        // touches a product (that happens, per image, inside the approved execution).
+        Route::post('ai-actions/{action}/image-archives', [AiActionController::class, 'storeImageArchive'])
+            ->middleware([$perm('ai.actions.use'), EnforceUserIdempotency::class, 'throttle:10,1', EnsureImportFilesScanned::class]);
+        Route::get('ai-actions/{action}/images', [AiActionController::class, 'listImages'])
+            ->middleware([$perm('ai.actions.use'), 'throttle:60,1']);
+        Route::get('ai-actions/{action}/images/{image}/thumbnail', [AiActionController::class, 'showImageThumbnail'])
+            ->middleware([$perm('ai.actions.use'), 'throttle:600,1']);
+        // AI-ACTIONS-05: applies the approved preview to the catalogue. Gated by
+        // `ai_actions.execution_enabled` (off by default); the approver alone may execute their approval.
+        Route::post('ai-actions/{action}/executions', [AiActionController::class, 'execute'])
+            ->middleware([$perm('ai.actions.approve'), EnforceUserIdempotency::class, 'throttle:60,1']);
+        Route::get('ai-actions/{action}/executions/{execution}', [AiActionController::class, 'showExecution'])
+            ->middleware([$perm('ai.actions.use'), 'throttle:120,1']);
+        Route::post('ai-actions/{action}/executions/{execution}/retry', [AiActionController::class, 'retryExecution'])
+            ->middleware([$perm('ai.actions.approve'), EnforceUserIdempotency::class, 'throttle:20,1']);
 
         // مركز المستندات — PR-2: استقبال يدوي خاص فقط، بلا OCR أو Queue أو إنشاء معاملات.
         Route::post('document-batches', [DocumentIntakeController::class, 'storeBatch'])
@@ -487,25 +573,29 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('products/export', [ProductController::class, 'export'])->middleware($perm('products.view'));
         Route::get('products/import/template', [ProductController::class, 'importTemplate'])->middleware($perm('products.manage'));
         Route::get('products/import/fields', [ProductController::class, 'importFields'])->middleware($perm('products.manage'));
-        Route::post('products/import/inspect', [ProductController::class, 'importInspect'])->middleware($perm('products.manage'));
-        Route::post('products/import/preview', [ProductController::class, 'importPreview'])->middleware($perm('products.manage'));
-        Route::post('products/import/apply', [ProductController::class, 'importApply'])->middleware($perm('products.manage'));
+        Route::post('products/import/inspect', [ProductController::class, 'importInspect'])->middleware([$perm('products.manage'), EnsureImportFilesScanned::class]);
+        Route::post('products/import/preview', [ProductController::class, 'importPreview'])->middleware([$perm('products.manage'), EnsureImportFilesScanned::class]);
+        Route::post('products/import/apply', [ProductController::class, 'importApply'])->middleware([$perm('products.manage'), EnsureImportFilesScanned::class]);
         // PR-UOM2-4: مصنّف Products/Barcodes/Unit Prices ثلاثي الأوراق — مسارٌ
         // إضافيٌّ مستقلّ عن الاستيراد/التصدير أحادي الورقة أعلاه، بلا أي تعديل عليه.
         Route::get('products/workbook/template', [ProductWorkbookController::class, 'template'])->middleware($perm('products.manage'));
         Route::get('products/workbook/fields', [ProductWorkbookController::class, 'fields'])->middleware($perm('products.manage'));
-        Route::post('products/workbook/inspect', [ProductWorkbookController::class, 'inspect'])->middleware($perm('products.manage'));
-        Route::post('products/workbook/preview', [ProductWorkbookController::class, 'preview'])->middleware($perm('products.manage'));
-        Route::post('products/workbook/apply', [ProductWorkbookController::class, 'apply'])->middleware($perm('products.manage'));
+        Route::post('products/workbook/inspect', [ProductWorkbookController::class, 'inspect'])->middleware([$perm('products.manage'), EnsureImportFilesScanned::class]);
+        Route::post('products/workbook/preview', [ProductWorkbookController::class, 'preview'])->middleware([$perm('products.manage'), EnsureImportFilesScanned::class]);
+        Route::post('products/workbook/apply', [ProductWorkbookController::class, 'apply'])->middleware([$perm('products.manage'), EnsureImportFilesScanned::class]);
         Route::get('products/workbook/export', [ProductWorkbookController::class, 'export'])->middleware($perm('products.view'));
 
         // PR-DUR-1: بنية تشغيلة الاستيراد الدائم — رفع/فحص هيكلي/عرض/إلغاء فقط.
         // إضافيّ ومستقل تماماً عن مسارات الاستيراد أعلاه؛ لا شيء هنا يستهلكها بعد.
-        Route::get('import-jobs', [ImportJobController::class, 'index'])->middleware($perm('products.view'));
-        Route::get('import-jobs/{id}', [ImportJobController::class, 'show'])->middleware($perm('products.view'));
-        Route::post('import-jobs', [ImportJobController::class, 'store'])->middleware($perm('products.manage'));
-        Route::post('import-jobs/{id}/cancel', [ImportJobController::class, 'cancel'])->middleware($perm('products.manage'));
-        Route::post('import-jobs/{id}/apply', [ImportJobController::class, 'apply'])->middleware($perm('products.manage'));
+        // IMP-H1-S1: لا `$perm` على مستوى المسار — الصلاحية والقدرة **حسب مجال التشغيلة** يفرضهما
+        // `ImportJobAccess` (من `ImportJobDomain::authorization`) في الطلب/المتحكّم، فلا يرث مجالٌ صلاحيات المنتجات.
+        Route::get('import-jobs', [ImportJobController::class, 'index']);
+        Route::get('import-jobs/{id}', [ImportJobController::class, 'show']);
+        Route::get('import-jobs/{id}/failures', [ImportJobController::class, 'failures']);
+        Route::post('import-jobs/{id}/repairs', [ImportJobController::class, 'repair'])->middleware(EnsureImportFilesScanned::class);
+        Route::post('import-jobs', [ImportJobController::class, 'store'])->middleware(EnsureImportFilesScanned::class);
+        Route::post('import-jobs/{id}/cancel', [ImportJobController::class, 'cancel']);
+        Route::post('import-jobs/{id}/apply', [ImportJobController::class, 'apply']);
         Route::get('products/{id}', [ProductController::class, 'show'])->middleware($perm('products.view'));
         Route::get('products/{id}/activity', [ProductController::class, 'activity'])->middleware($perm('products.view'));
         Route::get('products/{id}/barcodes', [ProductController::class, 'indexBarcodes'])->middleware($perm('products.view'));
@@ -779,6 +869,16 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('pos-devices/{id}/cash-drawer/test/complete', [PosDeviceController::class, 'completeCashDrawerTest'])->middleware([$perm('pos.cash_drawer.open'), $app('sales.pos')]);
         Route::post('pos-devices/{id}/cash-drawer/test/unavailable', [PosDeviceController::class, 'drawerBridgeUnavailable'])->middleware([$perm('pos.cash_drawer.open'), $app('sales.pos')]);
         Route::delete('pos-devices/{id}', [PosDeviceController::class, 'destroy'])->middleware([$perm('company.manage'), $app('sales.pos')]);
+        // PAY-H6-02: أجهزة دفع POS وطلباتها (تشغيلي — لا قيود). إدارة الأجهزة إدارة شركة؛ الكاشير يقرأ وينشئ طلبات جلسته؛ حل التعويض لمعتمد الفروقات.
+        Route::get('pos-payment-terminals', [PosTerminalController::class, 'index'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::post('pos-payment-terminals', [PosTerminalController::class, 'store'])->middleware([$perm('company.manage'), $app('sales.pos')]);
+        Route::put('pos-payment-terminals/{id}', [PosTerminalController::class, 'update'])->whereUuid('id')->middleware([$perm('company.manage'), $app('sales.pos')]);
+        Route::get('pos-sessions/{sessionId}/terminal-requests', [PosTerminalController::class, 'sessionRequests'])->whereUuid('sessionId')->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::post('pos/terminal-requests', [PosTerminalController::class, 'createRequest'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::get('pos/terminal-requests/{id}', [PosTerminalController::class, 'showRequest'])->whereUuid('id')->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::post('pos/terminal-requests/{id}/cancel', [PosTerminalController::class, 'cancelRequest'])->whereUuid('id')->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::post('pos/terminal-requests/{id}/void', [PosTerminalController::class, 'voidRequest'])->whereUuid('id')->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::post('pos/terminal-requests/{id}/resolve', [PosTerminalController::class, 'resolveRequest'])->whereUuid('id')->middleware([$perm('pos.variance.approve'), $app('sales.pos')]);
         Route::get('pos/products', [PosController::class, 'products'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos/barcode', [PosController::class, 'resolveBarcode'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         // الأدلة التشغيلية للسلة تُسجل في PosSessionEvent القائم ولا تنشئ مستنداً أو قيداً.
@@ -931,6 +1031,21 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::put('payment-methods/{id}', [PaymentMethodController::class, 'update'])->middleware($perm('payments.manage'));
         Route::post('payment-methods/{id}/make-default', [PaymentMethodController::class, 'makeDefault'])->middleware($perm('payments.manage'));
         Route::delete('payment-methods/{id}', [PaymentMethodController::class, 'destroy'])->middleware($perm('payments.manage'));
+
+        // PAY-H1-01: اتصالات بوابات الدفع. القراءة (بلا أسرار) payments.view؛ الكتابة والأسرار
+        // وسجل التدقيق payment_gateways.manage (owner/admin). لا استدعاء مزوّد ولا أثر محاسبي.
+        // PAY-H1-04: مطابقة يدوية لمحاولة عالقة (مكافئ المطابِق المجدول).
+        Route::post('payment-attempts/{id}/sync', [PaymentAttemptController::class, 'sync'])->whereUuid('id')->middleware($perm('payments.manage'));
+        Route::get('payment-gateways', [PaymentGatewayController::class, 'index'])->middleware($perm('payments.view'));
+        Route::get('payment-gateways/{id}', [PaymentGatewayController::class, 'show'])->whereUuid('id')->middleware($perm('payments.view'));
+        Route::get('payment-gateways/{id}/events', [PaymentGatewayController::class, 'events'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));
+        Route::post('payment-gateways', [PaymentGatewayController::class, 'store'])->middleware($perm('payment_gateways.manage'));
+        Route::put('payment-gateways/{id}', [PaymentGatewayController::class, 'update'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));
+        Route::post('payment-gateways/{id}/rotate-credentials', [PaymentGatewayController::class, 'rotateCredentials'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));
+        Route::post('payment-gateways/{id}/activate', [PaymentGatewayController::class, 'activate'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));
+        Route::post('payment-gateways/{id}/suspend', [PaymentGatewayController::class, 'suspend'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));
+        Route::post('payment-gateways/{id}/revoke', [PaymentGatewayController::class, 'revoke'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));
+        Route::delete('payment-gateways/{id}', [PaymentGatewayController::class, 'destroy'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));
 
         // COM-MOBILE-PAYMENTS-1 (ADR-04/ADR-09): إدارة داخلية لالتزامات دفع
         // Commerce (COD/الاستلام) — تحصيل/إلغاء صريحان، نفس صلاحية عمليات
@@ -1120,6 +1235,13 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // (commerce.manage) — لا صلاحية جديدة. الأهلية مقيَّدة بقناة *هذا*
         // المتجر تحديداً (`Storefront.sales_channel_id`)، لا أي قناة للمستأجر.
         Route::get('commerce/workspace/storefronts/{id}/products', [CommerceWorkspaceStorefrontProductController::class, 'index'])
+            ->whereUuid('id')
+            ->middleware($perm('commerce.manage'));
+        // FLOWERS-H9c / ADR-21: bounded, read-only data for the editor's
+        // product shelf, discovery, and delivery-promise previews. The
+        // controller derives the sales channel from this tenant-owned
+        // storefront; no tenant/channel selector is accepted from the client.
+        Route::get('commerce/workspace/storefronts/{id}/section-data', [CommerceWorkspaceStorefrontProductController::class, 'sectionData'])
             ->whereUuid('id')
             ->middleware($perm('commerce.manage'));
         Route::get('commerce/workspace/storefronts/{id}/products/{product}', [CommerceWorkspaceStorefrontProductController::class, 'show'])
@@ -1439,9 +1561,9 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('inventory-openings', [InventoryOpeningController::class, 'index'])->middleware([$perm('products.view'), $app('inventory.core')]);
         Route::get('inventory-openings/import/template', [InventoryOpeningController::class, 'template'])->middleware([$perm('products.manage'), $app('inventory.core')]);
         Route::get('inventory-openings/import/fields', [InventoryOpeningController::class, 'fields'])->middleware([$perm('products.manage'), $app('inventory.core')]);
-        Route::post('inventory-openings/import/inspect', [InventoryOpeningController::class, 'inspect'])->middleware([$perm('products.manage'), $app('inventory.core')]);
-        Route::post('inventory-openings/import/preview', [InventoryOpeningController::class, 'preview'])->middleware([$perm('products.manage'), $app('inventory.core')]);
-        Route::post('inventory-openings/import/apply', [InventoryOpeningController::class, 'apply'])->middleware([$perm('products.manage'), $app('inventory.core')]);
+        Route::post('inventory-openings/import/inspect', [InventoryOpeningController::class, 'inspect'])->middleware([$perm('products.manage'), $app('inventory.core'), EnsureImportFilesScanned::class]);
+        Route::post('inventory-openings/import/preview', [InventoryOpeningController::class, 'preview'])->middleware([$perm('products.manage'), $app('inventory.core'), EnsureImportFilesScanned::class]);
+        Route::post('inventory-openings/import/apply', [InventoryOpeningController::class, 'apply'])->middleware([$perm('products.manage'), $app('inventory.core'), EnsureImportFilesScanned::class]);
         Route::get('inventory-openings/{id}', [InventoryOpeningController::class, 'show'])->middleware([$perm('products.view'), $app('inventory.core')]);
         Route::post('inventory-openings/{id}/post', [InventoryOpeningController::class, 'post'])->middleware([$perm('products.manage'), $app('inventory.core')]);
         Route::delete('inventory-openings/{id}', [InventoryOpeningController::class, 'destroy'])->middleware([$perm('products.manage'), $app('inventory.core')]);
@@ -1711,6 +1833,8 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('reports/account-ledger/{accountId}', [ReportController::class, 'accountLedger'])->middleware($perm('reports.view'));
         Route::get('reports/journal-entries', [ReportController::class, 'journalEntries'])->middleware($perm('reports.view'));
         Route::get('reports/cash-flow', [ReportController::class, 'cashFlow'])->middleware($perm('reports.view'));
+        Route::get('reports/cash-position', [ReportController::class, 'cashPosition'])->middleware($perm('reports.view'));
+        Route::get('reports/receivables-position', [ReportController::class, 'receivablesPosition'])->middleware($perm('reports.view'));
         Route::get('reports/tax-report', [ReportController::class, 'taxReport'])->middleware($perm('reports.view'));
         Route::get('reports/partner-statement/{partnerId}', [ReportController::class, 'partnerStatement'])->middleware($perm('reports.view'));
         Route::get('reports/aging/{type}', [ReportController::class, 'aging'])->middleware($perm('reports.view'));

@@ -28,7 +28,12 @@ import {
   presentationConfigsEqual,
   type StorefrontPresentationConfig,
 } from "./presentation";
-import { featuredContentOf } from "./presentation/section-content";
+import {
+  deliveryPromiseContentOf,
+  discoveryContentOf,
+  featuredContentOf,
+  productShelfContentOf,
+} from "./presentation/section-content";
 import {
   THEME_AREAS,
   THEME_KEPT,
@@ -53,6 +58,11 @@ import {
   type WorkspaceProductDetail,
   type WorkspaceProductSummary,
 } from "@/modules/commerce-workspace/workspace-products";
+import {
+  fetchWorkspaceSectionData,
+  type WorkspaceDeliveryEarliest,
+  type WorkspaceDiscoveryData,
+} from "@/modules/commerce-workspace/workspace-section-data";
 import {
   createWorkspaceOffer,
   deleteWorkspaceOffer,
@@ -138,11 +148,10 @@ export const PREVIEW_WIDTHS = {
   desktop: 1280,
 } as const;
 
-// CUST-H4-3 — bounds on the Home "categories"/"newArrivals" Canvas preview
-// fetches, matching Published's own homepage defaults (`CategoriesSection.tsx`'s
-// `HOME_CATEGORY_LIMIT`, `NewArrivals.tsx`'s `limit = 8`) rather than an
-// arbitrary editor-only number.
-const HOME_CATEGORIES_PREVIEW_LIMIT = 12;
+// The public category navigation and default footer are both backed by the
+// complete root catalogue. Fetch pages of that same ordered result here; the
+// Canvas performs the public homepage's 12/18-item presentation limit itself.
+const ROOT_CATEGORIES_PAGE_SIZE = 50;
 const HOME_NEW_ARRIVALS_PREVIEW_LIMIT = 8;
 
 export const STORE_BUILDER_SIDEBAR_STORAGE_KEY =
@@ -165,6 +174,18 @@ type MobileSheet =
   | "product-picker"
   | "category-picker"
   | null;
+
+export function homeSectionDataKey(section: PresentationHomeSection): string {
+  if (section.type === "productShelf") {
+    const content = productShelfContentOf(section);
+    return `productShelf:${JSON.stringify({ source: content.source ?? null, deliverToday: content.deliverToday, limit: content.limit })}`;
+  }
+  if (section.type === "discovery") {
+    const content = discoveryContentOf(section);
+    return `discovery:${JSON.stringify({ axis: content.axis, dimension: content.dimension ?? null })}`;
+  }
+  return "deliveryPromise";
+}
 
 interface ExperienceBuilderProps {
   initialConfig?: StorefrontPresentationConfig;
@@ -244,6 +265,11 @@ export function ExperienceBuilder({
   const canvasConfig = historyPreview ? historyPreview.config : themed?.ok ? themed.config : draft;
   // أقسام الصفحة الرئيسية التي تعرضها المعاينة الآن: لقطة السجل إن فُتحت، وإلا المسودة. محمِّلات البيانات (التصنيفات/وصل حديثاً/المميّز/العروض) تقرأ منها لا من المسودة وحدها.
   const homeSectionsShown = historyPreview ? historyPreview.config.homepage.sections : draft.homepage.sections;
+  // Data-backed sections must follow the exact configuration rendered by the
+  // canvas. Theme packs can add sections that are absent from the authored
+  // draft, so the section-data loader/retry path uses this list instead of
+  // the editor-only authored list above.
+  const renderedHomeSections = canvasConfig.homepage.sections;
   // React 18 renders `inert` only as a string attribute: while a theme is previewed the editing UI is not operable or focusable.
   const inertWhenThemePreview = readOnlyPreview ? ({ inert: "" } as Record<string, string>) : {};
   const [panel, setPanel] = useState<CustomizerPanel>("theme");
@@ -323,13 +349,13 @@ export function ExperienceBuilder({
     "idle" | "loading" | "error" | "ready"
   >("idle");
   const categoryGridRequestRef = useRef(0);
-  // CUST-H4-3 — real catalog data for the Home "categories"/"newArrivals"
-  // sections' own Canvas preview. Deliberately **not** the same state as
+  // Real root catalogue data feeds the Header, default Footer and Home
+  // categories section. It is deliberately **not** the same state as
   // `categoryList`/`productList` above: those back the Product/Category
   // *preview pickers*, scoped to the merchant's own live search term —
   // incompatible filter semantics to reuse for a home section that must
-  // always show the storefront's real root categories / real newest
-  // products, never whatever the picker's search box currently holds.
+  // always show the storefront's real root categories / real newest products,
+  // never whatever the picker's search box currently holds.
   // `"ready"` with an empty array *is* the honest empty state (no separate
   // `"empty"` value), mirroring `categoryGridProductsState` above exactly.
   const [homeCategories, setHomeCategories] = useState<WorkspaceCategorySummary[]>([]);
@@ -342,6 +368,18 @@ export function ExperienceBuilder({
     "idle" | "loading" | "error" | "ready"
   >("idle");
   const homeNewArrivalsRequestRef = useRef(0);
+  // FLOWERS-H9c / ADR-21 — live data for each authored data-backed home
+  // section. Keys are section instance ids so duplicate shelves/discovery
+  // bands never share or overwrite one another's channel-scoped response.
+  const [homeSectionProducts, setHomeSectionProducts] = useState<Record<string, WorkspaceProductSummary[]>>({});
+  const [homeSectionProductsState, setHomeSectionProductsState] = useState<Record<string, "idle" | "loading" | "error" | "ready">>({});
+  const [homeSectionDiscovery, setHomeSectionDiscovery] = useState<Record<string, WorkspaceDiscoveryData | null>>({});
+  const [homeSectionDiscoveryState, setHomeSectionDiscoveryState] = useState<Record<string, "idle" | "loading" | "error" | "ready">>({});
+  const [homeSectionDelivery, setHomeSectionDelivery] = useState<Record<string, WorkspaceDeliveryEarliest | null>>({});
+  const [homeSectionDeliveryState, setHomeSectionDeliveryState] = useState<Record<string, "idle" | "loading" | "error" | "ready">>({});
+  const homeSectionRequestRef = useRef<Record<string, number>>({});
+  const homeSectionDataKeyRef = useRef<Record<string, string>>({});
+  const homeSectionExpiryRef = useRef<Record<string, number>>({});
   // CUST-H4-5 — real batched resolution for "featured" sections' own Canvas
   // preview. Unlike `homeCategories`/`homeNewArrivals` above, "featured" is
   // **not** a singleton section type (`canDuplicate: true` — a merchant may
@@ -525,6 +563,17 @@ export function ExperienceBuilder({
   );
   const activePanel = CUSTOMIZER_PANELS.find((item) => item.id === panel);
   const isPublishedReadOnly = selectedVersion?.state === "published";
+  // Keep the source of the canvas explicit for accessibility/QA and for the
+  // comparison affordances: a published version is still editable only after
+  // the existing "create draft" flow, while theme/history previews are
+  // intentionally read-only overlays.
+  const previewMode: "draft" | "published" | "theme" | "history" = historyPreview
+    ? "history"
+    : previewTheme
+      ? "theme"
+      : isPublishedReadOnly
+        ? "published"
+        : "draft";
   const candidateVersions = versions.filter((v) => v.state !== "published");
   // بلا `storefrontId` لا يوجد شيء يُحمَّل أو يُحفَظ (سلوك سابق للتحرير المحلي
   // البحت عبر `initialConfig` — يبقى كما هو حرفياً)، فبوابات النسخ لا تنطبق.
@@ -1003,6 +1052,15 @@ export function ExperienceBuilder({
     setOffersRows([]);
     setOffersMax(null);
     setOffersState("idle");
+    homeSectionRequestRef.current = {};
+    homeSectionDataKeyRef.current = {};
+    homeSectionExpiryRef.current = {};
+    setHomeSectionProducts({});
+    setHomeSectionProductsState({});
+    setHomeSectionDiscovery({});
+    setHomeSectionDiscoveryState({});
+    setHomeSectionDelivery({});
+    setHomeSectionDeliveryState({});
 
     if (!storefrontId) {
       setBusy(null);
@@ -1232,60 +1290,62 @@ export function ExperienceBuilder({
   }
 
   // CUST-H4-3 — real data for the Home "categories" section's own Canvas
-  // preview (`StorefrontPreviewCanvas`'s `categories` branch), replacing the
-  // static `PREVIEW_CATEGORIES` fixture. `rootOnly: true` (CUST-H4-3 parity
-  // fix) asks the backend to apply `whereNull('parent_id')` *before*
-  // pagination, matching Published's own `depth_eq: 0` semantics
-  // (`CategoriesSection.tsx`) exactly — this request fetches only the
-  // bounded number of root categories this section actually shows, never a
-  // larger mixed-depth page filtered down afterwards on the client (that
-  // approach could silently lose real root categories behind enough
-  // alphabetically-earlier children on a single page; the server-side
-  // filter can't, since it runs before the page is cut).
+  // preview (`StorefrontPreviewCanvas`'s categories branch), header and
+  // footer. `rootOnly: true` asks the backend to apply `whereNull('parent_id')`
+  // before pagination, matching Published exactly. We page through the whole
+  // root result because Header/CategoryNav are not homepage-limited.
   async function loadHomeCategories() {
     if (!storefrontId) return;
     const token = ++homeCategoriesRequestRef.current;
     const originStorefrontId = storefrontId;
     setHomeCategoriesState("loading");
-    const result = await listWorkspaceCategories(storefrontId, {
-      rootOnly: true,
-      // AWJ-STORE-CAT-DESIGN-01 — colour + signed picture URL, so a chosen card display previews with the real pictures.
-      withMedia: true,
-      perPage: HOME_CATEGORIES_PREVIEW_LIMIT,
-    });
-    if (token !== homeCategoriesRequestRef.current || storefrontIdRef.current !== originStorefrontId) return;
-    if (!result.ok) {
-      setHomeCategoriesState("error");
-      setHomeCategories([]);
-      return;
+    const rows: WorkspaceCategorySummary[] = [];
+    let page = 1;
+    let hasMore = true;
+    while (hasMore) {
+      const result = await listWorkspaceCategories(storefrontId, {
+        rootOnly: true,
+        // The same records drive category cards, so retain the real image and
+        // colour projection rather than introducing a chrome-only fixture.
+        withMedia: true,
+        perPage: ROOT_CATEGORIES_PAGE_SIZE,
+        page,
+      });
+      if (token !== homeCategoriesRequestRef.current || storefrontIdRef.current !== originStorefrontId) return;
+      if (!result.ok) {
+        setHomeCategoriesState("error");
+        setHomeCategories([]);
+        return;
+      }
+      rows.push(...result.data);
+      hasMore = result.hasMore;
+      page += 1;
     }
+    if (token !== homeCategoriesRequestRef.current || storefrontIdRef.current !== originStorefrontId) return;
     setHomeCategoriesState("ready");
-    setHomeCategories(result.data);
+    setHomeCategories(rows);
   }
 
-  const categoriesSectionVisible = homeSectionsShown.some(
-    (section) => section.type === "categories" && section.visible,
-  );
-
   useEffect(() => {
-    // `busy === "loading"` means `draft` is still the transient default
-    // config this component seeds itself with before the real, persisted
-    // Version config has loaded (see the `[storefrontId, versionId]` reset
-    // effect above) — evaluating `categoriesSectionVisible` against that
-    // placeholder, rather than waiting for the real one, could fire a fetch
-    // for a section the merchant's actual saved homepage doesn't even show.
-    if (
-      currentPage !== "home" ||
-      !storefrontId ||
-      busy === "loading" ||
-      !categoriesSectionVisible ||
-      homeCategoriesState !== "idle"
-    ) {
+    // Header/footer are global chrome and need the same catalogue on every
+    // previewed page, even if the Home categories section is hidden.
+    if (!storefrontId || busy === "loading" || homeCategoriesState !== "idle") {
       return;
     }
     void loadHomeCategories();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, storefrontId, busy, categoriesSectionVisible, homeCategoriesState]);
+  }, [storefrontId, busy, homeCategoriesState]);
+
+  useEffect(() => {
+    // Signed category image URLs expire after 20 minutes. Refresh the
+    // catalogue before that window closes, even when Home is not the current
+    // page, so a later navigation never starts with stale media references.
+    if (!storefrontId || homeCategoriesState !== "ready") return;
+    const timer = window.setTimeout(() => {
+      setHomeCategoriesState("idle");
+    }, 18 * 60 * 1000);
+    return () => window.clearTimeout(timer);
+  }, [storefrontId, homeCategoriesState]);
 
   function handleRetryHomeCategories() {
     void loadHomeCategories();
@@ -1443,6 +1503,113 @@ export function ExperienceBuilder({
 
   function handleRetryFeaturedPickerList() {
     void loadFeaturedPickerList(featuredPickerSearch);
+  }
+
+  async function loadHomeDataSection(section: PresentationHomeSection) {
+    if (!storefrontId || !["productShelf", "discovery", "deliveryPromise"].includes(section.type)) return;
+    const sectionId = section.id;
+    const originStorefrontId = storefrontId;
+    const token = (homeSectionRequestRef.current[sectionId] ?? 0) + 1;
+    homeSectionRequestRef.current[sectionId] = token;
+    if (section.type === "productShelf") setHomeSectionProductsState((prev) => ({ ...prev, [sectionId]: "loading" }));
+    if (section.type === "discovery") setHomeSectionDiscoveryState((prev) => ({ ...prev, [sectionId]: "loading" }));
+    if (section.type === "deliveryPromise") setHomeSectionDeliveryState((prev) => ({ ...prev, [sectionId]: "loading" }));
+
+    const params: Record<string, string | number | boolean | undefined> = {
+      section: section.type === "productShelf" ? "product_shelf" : section.type === "discovery" ? "discovery" : "delivery_promise",
+    };
+    if (section.type === "productShelf") {
+      const content = productShelfContentOf(section);
+      params.limit = content.limit;
+      params.deliver_today = content.deliverToday;
+      if (content.source?.kind === "collection") {
+        params.source_kind = "collection";
+        params.source_slug = content.source.slug;
+      } else if (content.source?.kind === "facet") {
+        params.source_kind = "facet";
+        params.source_key = content.source.key;
+        params.source_value = content.source.value;
+      }
+    } else if (section.type === "discovery") {
+      const content = discoveryContentOf(section);
+      params.axis = content.axis;
+      params.dimension = content.dimension;
+    }
+
+    const result = await fetchWorkspaceSectionData(storefrontId, params);
+    if (homeSectionRequestRef.current[sectionId] !== token || storefrontIdRef.current !== originStorefrontId) return;
+    if (!result.ok) {
+      if (section.type === "productShelf") {
+        setHomeSectionProductsState((prev) => ({ ...prev, [sectionId]: "error" }));
+        setHomeSectionProducts((prev) => ({ ...prev, [sectionId]: [] }));
+      } else if (section.type === "discovery") {
+        setHomeSectionDiscoveryState((prev) => ({ ...prev, [sectionId]: "error" }));
+        setHomeSectionDiscovery((prev) => ({ ...prev, [sectionId]: null }));
+      } else {
+        setHomeSectionDeliveryState((prev) => ({ ...prev, [sectionId]: "error" }));
+        setHomeSectionDelivery((prev) => ({ ...prev, [sectionId]: null }));
+      }
+      return;
+    }
+    if (result.section === "product_shelf") {
+      homeSectionExpiryRef.current[sectionId] = Date.now() + 18 * 60 * 1000;
+      setHomeSectionProductsState((prev) => ({ ...prev, [sectionId]: "ready" }));
+      setHomeSectionProducts((prev) => ({ ...prev, [sectionId]: result.products }));
+    } else if (result.section === "discovery") {
+      homeSectionExpiryRef.current[sectionId] = Date.now() + 18 * 60 * 1000;
+      setHomeSectionDiscoveryState((prev) => ({ ...prev, [sectionId]: "ready" }));
+      setHomeSectionDiscovery((prev) => ({ ...prev, [sectionId]: result.discovery }));
+    } else {
+      homeSectionExpiryRef.current[sectionId] = Date.now() + 18 * 60 * 1000;
+      setHomeSectionDeliveryState((prev) => ({ ...prev, [sectionId]: "ready" }));
+      setHomeSectionDelivery((prev) => ({ ...prev, [sectionId]: result.earliest }));
+    }
+  }
+
+  useEffect(() => {
+    if (currentPage !== "home" || !storefrontId || busy === "loading") return;
+    for (const section of renderedHomeSections) {
+      if (!section.visible || !["productShelf", "discovery", "deliveryPromise"].includes(section.type)) continue;
+      const state = section.type === "productShelf"
+        ? homeSectionProductsState[section.id]
+        : section.type === "discovery"
+          ? homeSectionDiscoveryState[section.id]
+          : homeSectionDeliveryState[section.id];
+      const dataKey = homeSectionDataKey(section);
+      if (homeSectionDataKeyRef.current[section.id] !== dataKey || state === undefined || state === "idle") {
+        homeSectionDataKeyRef.current[section.id] = dataKey;
+        void loadHomeDataSection(section);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, storefrontId, busy, renderedHomeSections, homeSectionProductsState, homeSectionDiscoveryState, homeSectionDeliveryState]);
+
+  // Workspace media URLs are signed and bounded. Each response gets its own
+  // deadline, so loading an unrelated section never postpones an older
+  // section's refresh.
+  useEffect(() => {
+    if (!storefrontId) return;
+    const deadlines = Object.entries(homeSectionExpiryRef.current);
+    if (deadlines.length === 0) return;
+    const nextExpiry = Math.min(...deadlines.map(([, expiry]) => expiry));
+    const timer = window.setTimeout(() => {
+      const now = Date.now();
+      const expired = Object.entries(homeSectionExpiryRef.current)
+        .filter(([, expiry]) => expiry <= now)
+        .map(([key]) => key);
+      if (expired.length === 0) return;
+      for (const key of expired) delete homeSectionExpiryRef.current[key];
+      const expiredSet = new Set(expired);
+      setHomeSectionProductsState((prev) => Object.fromEntries(Object.entries(prev).map(([key, state]) => [key, expiredSet.has(key) ? "idle" : state])));
+      setHomeSectionDiscoveryState((prev) => Object.fromEntries(Object.entries(prev).map(([key, state]) => [key, expiredSet.has(key) ? "idle" : state])));
+      setHomeSectionDeliveryState((prev) => Object.fromEntries(Object.entries(prev).map(([key, state]) => [key, expiredSet.has(key) ? "idle" : state])));
+    }, Math.max(0, nextExpiry - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [storefrontId, homeSectionProductsState, homeSectionDiscoveryState, homeSectionDeliveryState]);
+
+  function handleRetryHomeDataSection(sectionId: string) {
+    const section = renderedHomeSections.find((item) => item.id === sectionId);
+    if (section) void loadHomeDataSection(section);
   }
 
   // CUST-H4-7 — the single workspace Offers read (see `offersRows`). Aborts a
@@ -2549,6 +2716,9 @@ export function ExperienceBuilder({
     id: string | null,
     origin: "sidebar" | "preview",
   ) {
+    if (id !== null && currentPage !== "home") {
+      handleSelectPage("home");
+    }
     setSelectedSection(id);
     setSelectedChrome(null);
     if (id === null) return;
@@ -2909,6 +3079,7 @@ export function ExperienceBuilder({
       data-selected-version-id={selectedVersion?.id ?? ""}
       data-selected-version-state={selectedVersion?.state ?? ""}
       data-selected-version-revision={selectedVersion?.revision ?? ""}
+      data-preview-mode={previewMode}
       onInputCapture={(event) => {
         if (isContinuousInputTarget(event.target)) continuousInput.mark(performance.now());
       }}
@@ -3585,6 +3756,22 @@ export function ExperienceBuilder({
               // `Dropdown` component or `StorefrontPreviewCanvas`.
               className="relative z-0 h-full min-h-0 overflow-y-auto overscroll-contain p-3 md:overflow-y-scroll md:p-5 xl:p-8"
             >
+              {homeCategoriesState === "error" && (
+                <div
+                  data-home-categories-global-error=""
+                  aria-live="polite"
+                  className="mx-auto mb-3 flex max-w-5xl items-center justify-between gap-3 rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-sm text-text"
+                >
+                  <span>{t("homeCategoriesLoadFailed")}</span>
+                  <button
+                    type="button"
+                    onClick={handleRetryHomeCategories}
+                    className="min-h-10 rounded-md border border-border px-3 font-medium hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                  >
+                    {t("retry")}
+                  </button>
+                </div>
+              )}
               <div
                 data-preview-frame=""
                 className="mx-auto overflow-hidden border border-neutral-300 bg-white"
@@ -3615,14 +3802,21 @@ export function ExperienceBuilder({
                   selectedCategoryRegionId={selectedCategoryRegion}
                   onSelectCategoryRegion={handleSelectCategoryRegion}
                   categoryGridProductsState={categoryGridProductsState}
-                  categoryGridProducts={categoryGridProducts.map((p) => ({ id: p.id, name: p.name, thumbnailUrl: p.thumbnailUrl }))}
+                  categoryGridProducts={categoryGridProducts}
                   categoryGridProductsTotal={categoryGridProductsTotal}
                   homeCategoriesState={homeCategoriesState}
                   homeCategories={homeCategories.map((c) => ({ id: c.id, name: c.name, imageUrl: c.imageUrl ?? null, color: c.color ?? null }))}
                   onRetryHomeCategories={handleRetryHomeCategories}
                   homeNewArrivalsState={homeNewArrivalsState}
-                  homeNewArrivals={homeNewArrivals.map((p) => ({ id: p.id, name: p.name, thumbnailUrl: p.thumbnailUrl }))}
+                  homeNewArrivals={homeNewArrivals}
                   onRetryHomeNewArrivals={handleRetryHomeNewArrivals}
+                  homeSectionProducts={homeSectionProducts}
+                  homeSectionProductsState={homeSectionProductsState}
+                  homeSectionDiscovery={homeSectionDiscovery}
+                  homeSectionDiscoveryState={homeSectionDiscoveryState}
+                  homeSectionDelivery={homeSectionDelivery}
+                  homeSectionDeliveryState={homeSectionDeliveryState}
+                  onRetryHomeDataSection={handleRetryHomeDataSection}
                   featuredResolved={featuredResolved}
                   featuredResolvedState={featuredResolvedState}
                   onRetryFeatured={handleRetryFeaturedResolution}
@@ -4187,6 +4381,14 @@ function NavIcon({ panel }: { panel: CustomizerPanel }) {
         <circle cx="6" cy="6" r="2.25" />
         <circle cx="11" cy="5.5" r="1.75" />
         <circle cx="9.5" cy="11" r="2" />
+      </svg>
+    ),
+    designLibrary: (
+      <svg {...common}>
+        <rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1" />
+        <rect x="9" y="2.5" width="4.5" height="4.5" rx="1" />
+        <rect x="2.5" y="9" width="4.5" height="4.5" rx="1" />
+        <path d="M9 11.25h4.5M11.25 9v4.5" strokeLinecap="round" />
       </svg>
     ),
     announcements: (

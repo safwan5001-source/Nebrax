@@ -2,14 +2,28 @@
 
 namespace App\Http\Requests;
 
+use App\Services\ImportJobAccess;
+use App\Services\ProductImportService;
+use App\Support\InventoryOpeningFields;
+use App\Support\ProductImportFields;
 use App\Support\ImportJobDomain;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class StoreImportJobRequest extends FormRequest
 {
+    /**
+     * IMP-H1-S1 — صلاحية الإدارة + قدرة **مجال** التشغيلة، قبل أي فحص لمحتوى الملف (يجري `authorize` قبل
+     * التحقق). مجالٌ غير معروف يُحاسَب على بوابات كتالوج المنتجات (سلوك المسار القديم نفسه) ثم يفشل
+     * التحقق 422 — فلا يتحوّل 403 إلى 422 لمن لا يملك أي صلاحية.
+     */
     public function authorize(): bool
     {
+        $domain = $this->input('domain');
+        // غير نصّي (`domain[]=x`) أو غير معروف: يُحاسَب على بوابات المنتجات ثم يفشل التحقق 422 — لا 500.
+        $known = is_string($domain) && in_array($domain, ImportJobDomain::values(), true) ? $domain : ImportJobDomain::PRODUCT_CATALOG;
+        app(ImportJobAccess::class)->assertManage($this, $known);
+
         return true;
     }
 
@@ -21,15 +35,56 @@ class StoreImportJobRequest extends FormRequest
             // المجالات معاً؛ التضييق لكل مجال (XLSX حصراً لـ`product_workbook`،
             // مطابقاً `ProductWorkbookImportRequest` حرفياً) في الإغلاق أدناه.
             'file' => ['required', 'file', 'mimes:csv,txt,xlsx', 'max:5120', function ($attribute, $value, $fail) {
-                $domain = (string) $this->input('domain');
+                $domain = $this->input('domain');
+                $domain = is_string($domain) ? $domain : ''; // `domain[]=x` يفشل بـ422 (قاعدة `in`) لا 500.
                 $extension = strtolower((string) $value->getClientOriginalExtension());
                 if ($domain === ImportJobDomain::PRODUCT_WORKBOOK && $extension !== 'xlsx') {
                     $fail('مصنّف Products/Barcodes/Unit Prices يجب أن يكون بصيغة XLSX.');
                 }
             }],
             'domain' => ['required', Rule::in(ImportJobDomain::values())],
+            'media_archive' => ['sometimes', 'nullable', 'file', 'mimes:zip', 'max:51200', function ($attribute, $value, $fail) {
+                if ($this->input('domain') !== ImportJobDomain::PRODUCT_CATALOG) {
+                    $fail('أرشيف صور المنتجات متاح لاستيراد كتالوج المنتجات فقط.');
+                }
+            }],
             'idempotency_key' => ['sometimes', 'nullable', 'string', 'max:191'],
+            // IMP-H1-S3b — ربط التنفيذ بمعاينته: المعرّف والبصمة معاً أو لا شيء، والخيارات **نفسها** التي أُرسلت إلى المعاينة.
+            'preview_id' => ['required_with:preview_hash', 'nullable', 'uuid'],
+            'preview_hash' => ['required_with:preview_id', 'nullable', 'string', 'size:64'],
+            'options' => ['sometimes', 'nullable', 'array'],
+            'options.mode' => ['sometimes', Rule::in([ProductImportService::MODE_CREATE, ProductImportService::MODE_UPDATE, ProductImportService::MODE_UPSERT])],
+            'options.blank_policy' => ['sometimes', Rule::in([ProductImportService::BLANK_IGNORE, ProductImportService::BLANK_CLEAR])],
+            'options.master_data_policy' => ['sometimes', Rule::in([ProductImportService::MASTER_DATA_ERROR, ProductImportService::MASTER_DATA_TEXT, ProductImportService::MASTER_DATA_CREATE])],
+            'options.mapping' => ['sometimes', 'array', 'max:'.ProductImportService::MAX_COLUMNS],
+            'options.mapping.*' => ['nullable', 'string', Rule::in(array_merge(ProductImportFields::keys(), InventoryOpeningFields::keys(), ['ignore']))],
+            'options.price_list_id' => ['sometimes', 'nullable', 'uuid'],
+            'options.opening_date' => ['sometimes', 'date_format:Y-m-d'],
+            'options.allow_zero_cost' => ['sometimes', 'boolean'],
+            'options.notes' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'options.apply_product_images' => ['sometimes', 'boolean'],
+            'options.approve_existing_media_updates' => ['sometimes', 'boolean'],
         ];
+    }
+
+    /**
+     * خيارات الإنشاء كما أُرسلت (تُحوَّل قانونياً في الخدمة). الحقول المنطقية تصل نصّاً في multipart فتُحوَّل هنا.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function creationOptions(): ?array
+    {
+        $options = $this->input('options');
+        if (! is_array($options)) {
+            return null;
+        }
+        foreach (['allow_zero_cost', 'apply_product_images', 'approve_existing_media_updates'] as $key) {
+            if (array_key_exists($key, $options)) {
+                $options[$key] = filter_var($options[$key], FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? false;
+            }
+        }
+
+        return $options;
     }
 
     public function messages(): array
@@ -40,6 +95,8 @@ class StoreImportJobRequest extends FormRequest
             'file.max' => 'حجم ملف الاستيراد يجب ألا يتجاوز 5 ميغابايت.',
             'domain.required' => 'حدّد مجال الاستيراد.',
             'domain.in' => 'مجال الاستيراد غير مدعوم.',
+            'media_archive.mimes' => 'أرشيف الصور يجب أن يكون ملف ZIP صالحاً.',
+            'media_archive.max' => 'حجم أرشيف الصور يجب ألا يتجاوز 50 ميغابايت.',
         ];
     }
 }

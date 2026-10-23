@@ -30,7 +30,7 @@ export interface AuthUser {
 
 /**
  * ═══════════════════════════════════════════════════════════════
- *  مسح تفضيلات الجلسة السابقة — يُستدعى عند كل دخول وخروج
+ *  مسح تفضيلات الجلسة السابقة — يُستدعى عند كل دخول وخروج وعند الدخول التجريبي
  * ═══════════════════════════════════════════════════════════════
  *  الفرع النشط ووضع المعاينة يعيشان في `localStorage`، فيبقيان بعد تبديل
  *  الحساب. وقد تسبّب ذلك بعطل إنتاج حقيقي: متصفّح احتفظ بفرع المعاينة
@@ -39,7 +39,7 @@ export interface AuthUser {
  *  المسح هنا لا يُغني عن تحصين الخادم (`SetBranch` يتجاهل ما ليس UUID) —
  *  الطبقتان معاً: الخادم لا ينهار، والعميل لا يرسل ما لا يخصّه أصلاً.
  */
-function clearSessionPreferences(): void {
+export function clearSessionPreferences(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem('nibras_active_branch');
   localStorage.removeItem('demo');

@@ -27,6 +27,10 @@ class ImportProductsRequest extends FormRequest
             // `mimes` يعتمد على الامتداد وعلى نوع MIME المكتشَف؛ ملفات Excel
             // تصل أحياناً بـ`application/zip` فيُذكر الامتدادان معاً.
             'file' => ['required', 'file', 'mimes:csv,txt,xlsx', 'max:5120'],
+            // اختياري تماماً: غيابه يبقي عقد كل ملفات الاستيراد القديمة كما هو.
+            'media_archive' => ['sometimes', 'nullable', 'file', 'mimes:zip', 'max:51200'],
+            'apply_product_images' => ['sometimes', 'boolean'],
+            'approve_existing_media_updates' => ['sometimes', 'boolean'],
             'mode' => ['sometimes', Rule::in([
                 ProductImportService::MODE_CREATE,
                 ProductImportService::MODE_UPDATE,
@@ -49,6 +53,9 @@ class ImportProductsRequest extends FormRequest
             'batch_size' => ['sometimes', 'integer', 'min:1', 'max:'.ProductImportService::APPLY_BATCH_SIZE],
             // PR-DUR-HARDEN-1: راجع توثيق `maxRows()` أدناه.
             'for_durable' => ['sometimes', 'boolean'],
+            // IMP-H1-S3c — ربط التنفيذ المتزامن بمعاينته: المعرّف والبصمة معاً أو لا شيء.
+            'preview_id' => ['sometimes', 'nullable', 'uuid', 'required_with:preview_hash'],
+            'preview_hash' => ['sometimes', 'nullable', 'string', 'size:64', 'required_with:preview_id'],
         ];
     }
 
@@ -83,6 +90,8 @@ class ImportProductsRequest extends FormRequest
             'file.required' => 'اختر ملف CSV أو XLSX قبل المتابعة.',
             'file.mimes' => 'ارفع ملف CSV بترميز UTF-8 أو ملف Excel بصيغة XLSX.',
             'file.max' => 'حجم ملف الاستيراد يجب ألا يتجاوز 5 ميغابايت.',
+            'media_archive.mimes' => 'مرفق صور المنتجات يجب أن يكون ZIP صالحاً.',
+            'media_archive.max' => 'حجم ZIP الخاص بالصور يجب ألا يتجاوز 50 ميغابايت.',
             'mode.in' => 'اختر وضع الإنشاء أو التحديث أو الدمج.',
             'blank_policy.in' => 'سياسة القيم الفارغة غير صالحة.',
             'master_data_policy.in' => 'سياسة البيانات الأساسية غير صالحة.',
@@ -115,5 +124,14 @@ class ImportProductsRequest extends FormRequest
         }
 
         return $options;
+    }
+
+    /** @return array{apply:bool,approve_existing_updates:bool} */
+    public function mediaOptions(): array
+    {
+        return [
+            'apply' => $this->boolean('apply_product_images'),
+            'approve_existing_updates' => $this->boolean('approve_existing_media_updates'),
+        ];
     }
 }

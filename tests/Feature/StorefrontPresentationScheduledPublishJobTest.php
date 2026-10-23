@@ -139,6 +139,50 @@ class StorefrontPresentationScheduledPublishJobTest extends TestCase
     }
 
     /** @test */
+    public function a_due_global_media_background_is_rejected_without_changing_the_published_snapshot(): void
+    {
+        $auth = $this->registerTenant('job-global-media', 'owner@job-global-media.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+
+        $created = $token->postJson($this->listPath($seeded['storefront']->id), ['name' => 'وسائط عامة'])
+            ->assertCreated();
+        $versionId = $created->json('data.id');
+        $token->putJson($this->itemPath($seeded['storefront']->id, $versionId), [
+            'config' => [
+                'background' => [
+                    'kind' => 'media',
+                    'media' => ['mediaId' => '0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e'],
+                ],
+            ],
+            'revision' => 1,
+        ])->assertOk();
+
+        // Simulate only the scheduler's persisted hand-off. The API schedule
+        // gate is tested separately; this proves the execution boundary cannot
+        // be bypassed by a stale/manual queue row.
+        DB::table('storefront_presentation_versions')->where('id', $versionId)->update([
+            'scheduled_for' => Carbon::now('UTC')->subMinute(),
+            'schedule_generation' => 1,
+        ]);
+        $head = $this->presentationHead($seeded['storefront']->id);
+        $head->forceFill(['scheduled_version_id' => $versionId])->save();
+
+        $outcome = app(StorefrontPresentationVersionService::class)->executeScheduledPublish(
+            $seeded['storefront']->id,
+            $versionId,
+            1,
+        );
+
+        $this->assertSame(StorefrontPresentationVersionService::OUTCOME_VALIDATION_REJECTED, $outcome);
+        $after = $this->presentationHead($seeded['storefront']->id);
+        $this->assertNull($after->published_config);
+        $this->assertNull($after->active_version_id);
+        $this->assertSame($versionId, $after->scheduled_version_id);
+        $this->assertNotNull($this->version($versionId)->scheduled_for);
+    }
+
+    /** @test */
     public function a_due_scheduled_version_with_page_presentation_publishes_it_without_information_loss(): void
     {
         // CUST-H2-1 — the last H1 lifecycle path this slice's schema bump

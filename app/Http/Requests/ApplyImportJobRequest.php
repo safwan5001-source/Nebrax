@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Services\ImportJobAccess;
 use App\Services\ProductImportService;
 use App\Support\InventoryOpeningFields;
 use App\Support\ProductImportFields;
@@ -26,13 +27,19 @@ use Illuminate\Validation\Rule;
  *   `ProductImportFields`/`InventoryOpeningFields` معاً (`product_workbook`
  *   يعيد استعمال معجم `ProductImportFields` لورقة Products) — القيمة التي
  *   لا تخصّ مجال هذه التشغيلة فعلاً تُرفض لاحقاً بخدمة ذلك المجال، لا هنا.
- * `ImportJobService::runChunk()`'s domain dispatch يمرّر لكل خدمةٍ حقولها
+ * تمرير `ImportDomainAdapter::applyChunk()` يمرّر لكل خدمةٍ حقولها
  * فقط (`array_intersect_key`) فلا يصلها ما لا يعنيها أصلاً.
  */
 class ApplyImportJobRequest extends FormRequest
 {
+    /**
+     * IMP-H1-S1 — أرضية الصلاحية فقط (إدارة أي مجال استيراد) قبل التحقق من الخيارات؛ البوابة الفعلية لمجال التشغيلة
+     * (صلاحية + قدرة) في المتحكّم بعد البحث عنها — مرة واحدة. تشغيلة غير موجودة/من مستأجر آخر: 404 هناك.
+     */
     public function authorize(): bool
     {
+        app(ImportJobAccess::class)->assertManageAny($this);
+
         return true;
     }
 
@@ -64,6 +71,8 @@ class ApplyImportJobRequest extends FormRequest
             'opening_date' => ['sometimes', 'date_format:Y-m-d'],
             'allow_zero_cost' => ['sometimes', 'boolean'],
             'notes' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'apply_product_images' => ['sometimes', 'boolean'],
+            'approve_existing_media_updates' => ['sometimes', 'boolean'],
         ];
     }
 
@@ -77,6 +86,39 @@ class ApplyImportJobRequest extends FormRequest
             'price_list_id.uuid' => 'معرّف قائمة السعر غير صالح.',
             'opening_date.date_format' => 'تاريخ الرصيد الافتتاحي يجب أن يكون بصيغة YYYY-MM-DD.',
         ];
+    }
+
+    /**
+     * الخيارات **الدلالية** التي أرسلها الطلب فعلاً (بلا افتراضات ولا `batch_size`) — تُقارَن بالمجمَّد في تشغيلةٍ مربوطةٍ
+     * بمعاينة (IMP-H1-S3b): ما لم يُرسَل لا يُعدّ تغييراً.
+     *
+     * @return array<string, mixed>
+     */
+    public function explicitOptions(): array
+    {
+        $options = [];
+        foreach (['mode', 'blank_policy', 'master_data_policy', 'opening_date'] as $key) {
+            if ($this->has($key)) {
+                $options[$key] = $this->string($key)->toString();
+            }
+        }
+        // مطابقة فارغة = لا مطابقة مُرسَلة (المعاينة multipart لا تستطيع إرسال مصفوفة فارغة أصلاً): لا تُعدّ تغييراً للمجمَّد.
+        if ($this->has('mapping') && (array) $this->input('mapping', []) !== []) {
+            $options['mapping'] = (array) $this->input('mapping', []);
+        }
+        if ($this->has('price_list_id')) {
+            $options['price_list_id'] = $this->string('price_list_id')->toString() ?: null;
+        }
+        if ($this->has('notes')) {
+            $options['notes'] = $this->input('notes');
+        }
+        foreach (['allow_zero_cost', 'apply_product_images', 'approve_existing_media_updates'] as $key) {
+            if ($this->has($key)) {
+                $options[$key] = $this->boolean($key);
+            }
+        }
+
+        return $options;
     }
 
     /**
@@ -114,6 +156,12 @@ class ApplyImportJobRequest extends FormRequest
         }
         if ($this->has('notes')) {
             $options['notes'] = $this->input('notes');
+        }
+        if ($this->has('apply_product_images')) {
+            $options['apply_product_images'] = $this->boolean('apply_product_images');
+        }
+        if ($this->has('approve_existing_media_updates')) {
+            $options['approve_existing_media_updates'] = $this->boolean('approve_existing_media_updates');
         }
 
         return $options;

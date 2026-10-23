@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Resources\StorefrontProductResource;
 use App\Models\CommerceCategoryListing;
 use App\Models\CommerceListing;
+use App\Models\InventoryReservation;
 use App\Models\Product;
+use App\Models\ProductWarehouseStock;
 use App\Models\Storefront;
 use App\Models\Tenant;
 use App\Services\Commerce\AvailableToSellService;
@@ -13,9 +15,17 @@ use App\Services\Commerce\CommercePriceResolver;
 use App\Services\Commerce\FulfillmentPolicyNotConfiguredException;
 use App\Services\Commerce\FulfillmentPolicyService;
 use App\Services\ProductMediaGalleryService;
+use App\Services\Commerce\CommerceDeliveryScheduleService;
+use App\Models\CommerceDeliverySlot;
+use App\Services\Commerce\StorefrontFacetVisualProjector;
+use App\Support\Commerce\CatalogFacetFilter;
+use App\Support\Commerce\DeliverTodayFilter;
+use App\Tenancy\BranchScope;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Validation\Rule;
 
 /**
  * CUST-H2-3 — قراءة منتجات مساحة عمل Commerce للمعاينة داخل مُخصِّص صفحة
@@ -48,7 +58,7 @@ use Illuminate\Http\Request;
  * تماماً.
  *
  * **الحمولة**: القائمة مُصغَّرة عمداً (مُعرِّف/اسم/صورة مصغَّرة/مؤشّر متغيّرات
- * فقط) — لا حمولة منتج كاملة لمجرَّد منتقٍ. التفصيل يعيد استخدام
+ * مع سعر/عملة وتوفر مشتقّين للبطاقات) — لا حمولة منتج كاملة لمجرَّد منتقٍ. التفصيل يعيد استخدام
  * `StorefrontProductResource` نفسه الذي يستثني أصلاً كل حقل تكلفة/هامش/مورّد/
  * مخزون داخلي (راجع تعليق ذلك المورد).
  *
@@ -66,7 +76,7 @@ use Illuminate\Http\Request;
  * يتركّب فوق بوابة الأهلية القائمة (نشط + منشور على قناة *هذا* المتجر) بـ
  * `whereIn` إضافية — لا يُغيّرها ولا يتجاوزها؛ معرّفٌ أجنبي أو غير مؤهَّل
  * يسقط من النتيجة صمتاً (لا تسريب، لا خطأ) تماماً كما يفعل الفشل الجزئي في
- * المعاينة اليوم. الحمولة نفسها (`WorkspaceProductSummary`) — لا حقل جديد.
+ * المعاينة اليوم. الحمولة نفسها (`WorkspaceProductSummary`) مع الحقول العامة الإضافية.
  */
 class CommerceWorkspaceStorefrontProductController extends ApiController
 {
@@ -101,9 +111,22 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
             'per_page' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:'.self::PER_PAGE_MAX],
             'ids' => ['sometimes', 'array', 'max:'.self::IDS_FILTER_MAX],
             'ids.*' => ['uuid'],
+            // FLOWERS-H9c / ADR-21 — additive filters used by the approved
+            // section-data preview contract. Existing callers omit these.
+            'city' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'region' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'include_meta' => ['sometimes', 'nullable', Rule::in(['1', '0', 'true', 'false', 1, 0, true, false])],
+            ...DeliverTodayFilter::rules(),
+            ...CatalogFacetFilter::rules(),
         ]);
 
         $query = Product::query()
+            // The storefront catalogue is company-wide: publication belongs to
+            // this storefront's sales channel, not to whichever operational
+            // branch the merchant currently has selected in the back office.
+            // TenantScope remains active, and ownedStorefront() + the channel
+            // publication subquery below are the two explicit authority gates.
+            ->withoutGlobalScope(BranchScope::class)
             ->where('is_active', true)
             ->whereIn('id', CommerceListing::query()
                 ->where('sales_channel_id', $storefront->sales_channel_id)
@@ -144,11 +167,44 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
             }
         }
 
+        // The public storefront applies collection context first, then its
+        // derived deliver-today filter, then the selected facet/brand filters.
+        // Reuse the same filter authority here so a shelf cannot preview a
+        // product that the published channel would omit.
+        $facetFilter = new CatalogFacetFilter();
+        $facetSelection = CatalogFacetFilter::selection($filters);
+        $facetFilter->applyCollection($query, $facetSelection);
+        if (DeliverTodayFilter::requested($filters)) {
+            app(DeliverTodayFilter::class)->apply(
+                $query,
+                $storefront->sales_channel_id,
+                $filters['city'] ?? null,
+                $filters['region'] ?? null,
+            );
+        }
+        $baseQuery = clone $query;
+        // The list query is intentionally ordered for the editor cards, but
+        // facet metadata groups by brand/value.  Keep the metadata clone free
+        // of that ordering so PostgreSQL/MySQL strict grouping cannot reject
+        // the read-only section-data request.
+        $baseQuery->reorder();
+        if ($facetFilter->isActive($facetSelection)) {
+            $facetFilter->apply($query, $facetSelection);
+        }
+
+        if ($facetSelection['collection'] !== null && blank($filters['sort'] ?? null)) {
+            $query->reorder();
+            $facetFilter->orderByCollectionPosition($query, $facetSelection);
+            $query->orderBy('name')->orderBy('id');
+        }
+
         $perPage = min((int) ($filters['per_page'] ?? self::PER_PAGE_DEFAULT), self::PER_PAGE_MAX);
         $paginator = $query->paginate($perPage, ['*'], 'page', (int) ($filters['page'] ?? 1));
 
         $gallery = app(ProductMediaGalleryService::class);
-        $data = $paginator->getCollection()->map(function (Product $product) use ($gallery, $storefront) {
+        $currency = Tenant::findOrFail($storefront->tenant_id)->currency;
+        $inStockByProduct = $this->batchAvailability($paginator->getCollection(), $storefront->sales_channel_id);
+        $data = $paginator->getCollection()->map(function (Product $product) use ($gallery, $storefront, $currency, $inStockByProduct) {
             $media = StorefrontProductResource::workspaceMediaPayload($gallery->resolveGallery($product), $storefront->id);
 
             return [
@@ -157,21 +213,196 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
                 'name_en' => $product->name_en,
                 'thumbnail_url' => $media[0]['url'] ?? null,
                 'is_variant_managed' => $product->isVariantManaged(),
+                // Keep list cards aligned with the public catalogue contract.
+                // Variant products intentionally expose no guessed parent price.
+                'price' => [
+                    'amount_minor' => $product->isVariantManaged() ? null : (int) $product->sale_price,
+                    'currency' => $currency,
+                ],
+                'in_stock' => $inStockByProduct[$product->id] ?? null,
             ];
         })->all();
 
+        $meta = [
+            'pagination' => [
+                'page' => $paginator->currentPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'last_page' => $paginator->lastPage(),
+                'has_more' => $paginator->hasMorePages(),
+            ],
+        ];
+        if (filter_var($filters['include_meta'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            $facetMeta = $facetFilter->meta($baseQuery, $facetSelection);
+            $projectedFacets = $request->attributes->get('section_data_preview') === true
+                ? app(StorefrontFacetVisualProjector::class)->projectWorkspace(
+                    $facetMeta['facets'],
+                    $facetFilter->activeFacetModels(),
+                    (string) $storefront->tenant_id,
+                )
+                : app(StorefrontFacetVisualProjector::class)->project(
+                    $facetMeta['facets'],
+                    $facetFilter->activeFacetModels(),
+                    true,
+                );
+            $meta = [
+                ...$facetMeta,
+                'facets' => $projectedFacets,
+                ...$meta,
+            ];
+        }
+
         return response()->json([
             'data' => $data,
-            'meta' => [
-                'pagination' => [
-                    'page' => $paginator->currentPage(),
-                    'per_page' => $paginator->perPage(),
-                    'total' => $paginator->total(),
-                    'last_page' => $paginator->lastPage(),
-                    'has_more' => $paginator->hasMorePages(),
-                ],
-            ],
+            'meta' => $meta,
         ]);
+    }
+
+    /**
+     * FLOWERS-H9c / ADR-21 — one read-only, editor-scoped contract for the
+     * three sections whose published data is resolved at request time. This
+     * adapter delegates product/facet work to the existing index authority
+     * and delivery work to CommerceDeliveryScheduleService; it never returns
+     * costs, raw inventory, supplier data, or write-capable controls.
+     */
+    public function sectionData(Request $request, string $id): JsonResponse
+    {
+        $this->denySelfService($request);
+        $storefront = $this->ownedStorefront($id);
+        if ($storefront === null) {
+            abort(404, 'المتجر غير موجود.');
+        }
+
+        $section = $request->validate([
+            'section' => ['required', Rule::in(['product_shelf', 'discovery', 'delivery_promise'])],
+            'source_kind' => ['sometimes', 'nullable', Rule::in(['collection', 'facet'])],
+            'source_slug' => ['sometimes', 'nullable', 'string', 'max:64'],
+            'source_key' => ['sometimes', 'nullable', 'string', 'max:64'],
+            'source_value' => ['sometimes', 'nullable', 'string', 'max:1000'],
+            'limit' => ['sometimes', 'nullable', 'integer', 'min:2', 'max:12'],
+            'axis' => ['sometimes', 'nullable', Rule::in(['brand', 'facet'])],
+            'dimension' => ['sometimes', 'nullable', 'string', 'max:64'],
+            'method' => ['sometimes', Rule::in(CommerceDeliverySlot::METHODS)],
+            'city' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'region' => ['sometimes', 'nullable', 'string', 'max:120'],
+            ...DeliverTodayFilter::rules(),
+        ]);
+
+        if ($section['section'] === 'product_shelf') {
+            $request->attributes->set('section_data_preview', true);
+            $sourceKind = $section['source_kind'] ?? null;
+            if ($sourceKind === 'collection') {
+                abort_if(blank($section['source_slug'] ?? null), 422, 'مصدر الرف غير مكتمل.');
+                $request->merge(['collection' => $section['source_slug']]);
+            } elseif ($sourceKind === 'facet') {
+                abort_if(blank($section['source_key'] ?? null) || blank($section['source_value'] ?? null), 422, 'مصدر الرف غير مكتمل.');
+                $request->merge(['facet' => [$section['source_key'] => $section['source_value']]]);
+            }
+            $request->merge([
+                'per_page' => (int) ($section['limit'] ?? 8),
+                'page' => 1,
+            ]);
+
+            return $this->index($request, $id);
+        }
+
+        if ($section['section'] === 'discovery') {
+            $request->attributes->set('section_data_preview', true);
+            abort_if(blank($section['axis'] ?? null), 422, 'محور الاكتشاف غير مكتمل.');
+            if ($section['axis'] === 'facet') {
+                abort_if(blank($section['dimension'] ?? null), 422, 'بُعد الاكتشاف غير مكتمل.');
+            }
+            $request->merge(['per_page' => 1, 'include_meta' => 'true', 'page' => 1]);
+            $payload = $this->index($request, $id)->getData(true);
+            $meta = (array) ($payload['meta'] ?? []);
+            if ($section['axis'] === 'brand') {
+                return response()->json(['data' => [
+                    'axis' => 'brand',
+                    'name' => '',
+                    'options' => array_map(static fn (array $brand): array => [
+                        'value' => (string) ($brand['id'] ?? ''),
+                        'name' => (string) ($brand['name'] ?? ''),
+                        'count' => (int) ($brand['count'] ?? 0),
+                    ], array_values(array_filter((array) ($meta['brands'] ?? []), static fn ($row): bool => is_array($row)))),
+                ]]);
+            }
+            $facet = collect((array) ($meta['facets'] ?? []))->firstWhere('key', $section['dimension']);
+            if (! is_array($facet)) {
+                return response()->json(['data' => null]);
+            }
+
+            return response()->json(['data' => [
+                'axis' => 'facet',
+                'dimension' => $facet['key'],
+                'name' => $facet['name'] ?? '',
+                'name_en' => $facet['name_en'] ?? null,
+                'visual' => $facet['visual'] ?? null,
+                'options' => array_map(static fn (array $value): array => [
+                    'value' => (string) ($value['slug'] ?? ''),
+                    'name' => (string) ($value['name'] ?? ''),
+                    'name_en' => $value['name_en'] ?? null,
+                    'count' => (int) ($value['count'] ?? 0),
+                    'visual' => $value['visual'] ?? null,
+                ], array_values(array_filter((array) ($facet['values'] ?? []), static fn ($row): bool => is_array($row)))),
+            ]]);
+        }
+
+        $options = app(CommerceDeliveryScheduleService::class)->options(
+            $storefront->sales_channel_id,
+            $section['method'] ?? CommerceDeliverySlot::METHOD_DELIVERY,
+            $section['city'] ?? null,
+            $section['region'] ?? null,
+        );
+        $earliest = null;
+        if (($options['enabled'] ?? false) && is_array($options['earliest'] ?? null)) {
+            $date = $options['earliest']['date'] ?? null;
+            $slotId = $options['earliest']['slot_id'] ?? null;
+            foreach ((array) ($options['dates'] ?? []) as $day) {
+                if (($day['date'] ?? null) !== $date) continue;
+                foreach ((array) ($day['slots'] ?? []) as $slot) {
+                    if (($slot['id'] ?? null) !== $slotId) continue;
+                    $earliest = [
+                        'date' => $date,
+                        'start_time' => $slot['start_time'] ?? null,
+                        'end_time' => $slot['end_time'] ?? null,
+                        'label' => $slot['label'] ?? '',
+                        'label_en' => $slot['label_en'] ?? null,
+                        'timezone' => $options['timezone'] ?? null,
+                    ];
+                    break 2;
+                }
+            }
+        }
+
+        return response()->json(['data' => ['earliest' => $earliest]]);
+    }
+
+    /** @return array<string, bool|null> */
+    private function batchAvailability(Collection $products, string $channelId): array
+    {
+        $ids = $products->pluck('id')->all();
+        if ($ids === []) return [];
+
+        try {
+            $warehouse = app(FulfillmentPolicyService::class)->resolveWarehouseFor($channelId);
+        } catch (FulfillmentPolicyNotConfiguredException) {
+            return array_fill_keys($ids, null);
+        }
+
+        $onHand = ProductWarehouseStock::query()
+            ->where('warehouse_id', $warehouse->id)->whereIn('product_id', $ids)
+            ->selectRaw('product_id, sum(quantity) as on_hand_qty')->groupBy('product_id')
+            ->pluck('on_hand_qty', 'product_id');
+        $reserved = InventoryReservation::query()
+            ->where('warehouse_id', $warehouse->id)->where('status', InventoryReservation::STATUS_ACTIVE)
+            ->whereIn('product_id', $ids)->selectRaw('product_id, sum(base_quantity) as reserved_qty')
+            ->groupBy('product_id')->pluck('reserved_qty', 'product_id');
+
+        $result = [];
+        foreach ($ids as $productId) {
+            $result[$productId] = max(0, (int) ($onHand[$productId] ?? 0) - (int) ($reserved[$productId] ?? 0)) > 0;
+        }
+        return $result;
     }
 
     public function show(
@@ -203,8 +434,11 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
         }
 
         $productModel = Product::query()
+            ->withoutGlobalScope(BranchScope::class)
             ->where('is_active', true)
-            ->with(['productCategory:id,name'])
+            ->with(['productCategory' => fn ($q) => $q
+                ->withoutGlobalScope(BranchScope::class)
+                ->select(['id', 'name'])])
             ->find($product);
 
         if ($productModel === null) {

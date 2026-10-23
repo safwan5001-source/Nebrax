@@ -8,8 +8,8 @@ use App\Tenancy\TenantContext;
 
 /**
  * سجلّ الأدوات **المغلق**. يُعلَن هنا فقط ما يُسمح للمساعد باستدعائه؛ لا اكتشاف ديناميكي ولا اسم أداة
- * من النموذج يُحلّ خارج هذه القائمة. AI-01: فارغ. AI-02B: ثلاث أدوات قراءة مالية حتمية فقط (قائمة
- * الدخل، أعمار الذمم المدينة، أعمار الذمم الدائنة). أي أداة جديدة قرارٌ مراجَع يُضاف هنا وحده.
+ * من النموذج يُحلّ خارج هذه القائمة. AI-01: فارغ. AI-02B: ثلاث أدوات قراءة مالية حتمية (قائمة
+ * الدخل، أعمار الذمم المدينة، أعمار الذمم الدائنة). AI-04: أداة قراءة مستند مُسقَط صريحة الاستدعاء. أي أداة جديدة قرارٌ مراجَع يُضاف هنا وحده.
  */
 class AiAssistantToolRegistry
 {
@@ -26,6 +26,8 @@ class AiAssistantToolRegistry
             new AiIncomeStatementTool($tenant, $reports),
             new AiAgingReportTool($tenant, $reports, 'receivable'),
             new AiAgingReportTool($tenant, $reports, 'payable'),
+            // AI-04: قراءة نصّ مستند مُسقَط — صريحة الاستدعاء فقط (لا يخطّط لها المزوّد).
+            app(AiDocumentProjectionTool::class),
         ];
     }
 
@@ -36,6 +38,20 @@ class AiAssistantToolRegistry
             ->all();
 
         return $this->index[$name] ?? null;
+    }
+
+    /**
+     * الأدوات التي يجوز عرضها على **نموذج خارجي** (AI-07): كلّ المسجَّل عدا الصريحة الاستدعاء (قراءة المستند).
+     * فلا يرى النموذج وجودها أصلاً، ولو اقترح اسمها لرفضتها البوابة كـ`tool_not_registered`.
+     *
+     * @return list<AiAssistantTool>
+     */
+    public function offeredToModel(): array
+    {
+        return array_values(array_filter(
+            $this->definitions(),
+            static fn (AiAssistantTool $tool): bool => ! $tool instanceof \App\Contracts\AiExplicitInvocationOnly,
+        ));
     }
 
     /** @return list<string> */

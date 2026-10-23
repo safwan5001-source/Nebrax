@@ -9,6 +9,7 @@ import {
   DELIVERY_PERMISSION,
   deliverySummary,
   isApplicationHidden,
+  PAYMENTS_PERMISSION,
   type DeliveryAccess,
   type DeliverySummary,
 } from '@/lib/integration-center';
@@ -29,6 +30,7 @@ export default function IntegrationsPage() {
   const [attempt, setAttempt] = useState(0);
   const [canOpenApplications, setCanOpenApplications] = useState(false);
   const [communicationsAllowed, setCommunicationsAllowed] = useState(false);
+  const [paymentsAllowed, setPaymentsAllowed] = useState(false);
 
   const retry = useCallback(() => setAttempt((value) => value + 1), []);
 
@@ -38,6 +40,9 @@ export default function IntegrationsPage() {
     setCanOpenApplications(hasPermission(user?.permissions, user?.role, 'apps.view'));
     // كتالوج مزوّدي الاتصالات ثابت (لا طلب شبكة) فبوابته الصلاحية وحدها، مستقلةً عن بوابة منصات التوصيل.
     setCommunicationsAllowed(hasPermission(user?.permissions, user?.role, COMMUNICATIONS_PERMISSION));
+
+    // بوابات الدفع: رابط تنقّل فقط (بلا طلب بيانات)، بوابته `payments.view` وحدها.
+    setPaymentsAllowed(hasPermission(user?.permissions, user?.role, PAYMENTS_PERMISSION));
 
     // بلا صلاحية: لا طلب بيانات إطلاقاً.
     if (!hasPermission(user?.permissions, user?.role, DELIVERY_PERMISSION)) {
@@ -88,6 +93,7 @@ export default function IntegrationsPage() {
       summaryStatus={summaryStatus}
       canOpenApplications={canOpenApplications}
       communicationsAllowed={communicationsAllowed}
+      paymentsAllowed={paymentsAllowed}
       onRetry={retry}
     />
   );

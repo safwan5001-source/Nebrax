@@ -30,6 +30,9 @@ final class StorefrontPublishedMediaResolver
     public const PROXY_PREFIX = '/api/storefront/media/customizer/';
 
     /** V8b — مسار صورة شريحة (`homepage.sections.{i}.content.slides.{j}.media|mobile`) كما يفتاحها الماسح. */
+    /** P3-A-03/06 — the document-level background (still-only consumer). */
+    private const GLOBAL_BACKGROUND_PATH = '/\Abackground\.(?:media|mobile)\z/';
+
     private const SLIDE_PICTURE_PATH = '/\Ahomepage\.sections\.\d+\.content\.slides\.\d+\.(?:media|mobile)\z/';
 
     public function __construct(private readonly StorefrontMediaReferenceScanner $scanner) {}
@@ -69,6 +72,11 @@ final class StorefrontPublishedMediaResolver
             }
 
             $entry = $this->entry($asset, $ref);
+            if ($entry !== null && preg_match(self::GLOBAL_BACKGROUND_PATH, $path) === 1) {
+                // P3-A-06 — the document-level background is still-only: never expose an animation for it (defence in
+                // depth; the publish gate already refuses an animated asset there).
+                unset($entry['animation']);
+            }
             if ($entry !== null) {
                 // V6b-3 — حدود التباين لصور خلفيات الأقسام فقط؛ غيابها (دليلٌ غير صالح) = «غير مُثبَت» فلا لون نص تلقائي.
                 // V8b — وصور شرائح `slider` (الافتراضية والجوال) كذلك: النص يقع فوق كل صورة، والمتجر يعيد قرار لون النص

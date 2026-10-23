@@ -15,6 +15,10 @@ import {
 } from "./section-content";
 import { normalizeSectionDesign, type SectionDesign } from "./section-design";
 import {
+  normalizeStorefrontBackground,
+  type StorefrontBackground,
+} from "./storefront-background";
+import {
   CONTENT_PAGE_SLUGS,
   type ContentPageSlug,
   DENSITY_PRESETS,
@@ -107,10 +111,16 @@ export interface PresentationContentPage {
   enabled: boolean;
 }
 
+export const DEFAULT_STORE_BACKGROUND_COLOR = "#f8f9fa";
+
 export interface StorefrontPresentationConfig {
   version: typeof PRESENTATION_CONFIG_VERSION;
   themePreset: ThemePresetId;
   primaryColor: string;
+  /** Independent solid page background; legacy documents fall back to AWJ Modern neutral. */
+  backgroundColor?: string;
+  /** Additive document-level background; valid values take precedence at runtime. */
+  background?: StorefrontBackground;
   accentColor: string | null;
   fontPreset: FontPresetId;
   density: DensityId;
@@ -254,6 +264,7 @@ export const DEFAULT_PRESENTATION_CONFIG: StorefrontPresentationConfig = {
   version: PRESENTATION_CONFIG_VERSION,
   themePreset: "awj-modern",
   primaryColor: "#12372a",
+  backgroundColor: "#f8f9fa",
   accentColor: null,
   fontPreset: "cairo-geist",
   density: "comfortable",
@@ -557,6 +568,12 @@ export function normalizePresentationConfig(
   const primaryColor = isSafeHexColor(asString(raw.primaryColor))
     ? asString(raw.primaryColor).trim()
     : presetPrimary(themePreset);
+  const hasBackgroundColor = Object.hasOwn(raw, "backgroundColor");
+  const backgroundRaw = asString(raw.backgroundColor).trim();
+  const backgroundColor = isSafeHexColor(backgroundRaw)
+    ? backgroundRaw
+    : DEFAULT_STORE_BACKGROUND_COLOR;
+  const background = normalizeStorefrontBackground(raw.background);
   const accentRaw = asString(raw.accentColor).trim();
   const accentColor = isSafeHexColor(accentRaw) ? accentRaw : null;
 
@@ -574,6 +591,8 @@ export function normalizePresentationConfig(
     version: PRESENTATION_CONFIG_VERSION,
     themePreset,
     primaryColor,
+    ...(hasBackgroundColor ? { backgroundColor } : {}),
+    ...(background !== null ? { background } : {}),
     accentColor,
     fontPreset: inList(
       raw.fontPreset,

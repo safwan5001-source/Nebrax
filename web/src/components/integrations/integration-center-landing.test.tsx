@@ -18,6 +18,7 @@ function renderLanding(
     summaryStatus: SummaryStatus;
     canOpenApplications: boolean;
     communicationsAllowed: boolean;
+    paymentsAllowed: boolean;
     onRetry: () => void;
   }> = {},
 ) {
@@ -68,19 +69,21 @@ describe.each(TEST_LOCALES)('Integration Center landing (%s)', (locale) => {
     expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
 
-  it('the three future cards are structurally inert: no link, button, tabindex or interactive role', () => {
+  it('the two future cards (and the payments card without permission) are structurally inert: no link, button, tabindex or interactive role', () => {
     renderLanding(locale);
 
     for (const key of ['ecommerce', 'payments', 'shipping']) {
       const card = screen.getByTestId(`integration-card-${key}`);
       expect(card.tagName).toBe('DIV');
-      expect(card.getAttribute('data-inert')).toBe('true');
+      if (key !== 'payments') expect(card.getAttribute('data-inert')).toBe('true');
+      else expect(card.getAttribute('data-state')).toBe('denied');
       expect(card.hasAttribute('tabindex')).toBe(false);
       expect(card.hasAttribute('role')).toBe(false);
       expect(card.hasAttribute('onclick')).toBe(false);
       expect(card.closest('a')).toBeNull();
       expect(card.querySelectorAll('a, button, input, select, textarea, [tabindex], [role="button"], [role="link"]')).toHaveLength(0);
-      expect(within(card).getByText(m.planned)).toBeTruthy();
+      if (key === 'payments') expect(within(card).getByRole('note').textContent).toBe(m.payments.denied);
+      else expect(within(card).getByText(m.planned)).toBeTruthy();
     }
     expect(screen.getByTestId('integration-center-planned-note').textContent).toBe(m.plannedNote);
   });
@@ -285,5 +288,29 @@ describe('Integration Center copy reconciliation', () => {
         ? Object.entries(node as Record<string, unknown>).flatMap(([k, v]) => keys(v, prefix ? `${prefix}.${k}` : k))
         : [prefix];
     expect(keys(TEST_MESSAGES.ar.integrationCenter).sort()).toEqual(keys(TEST_MESSAGES.en.integrationCenter).sort());
+  });
+});
+
+describe.each(TEST_LOCALES)('Integration Center landing — payment gateways card (%s)', (locale) => {
+  const m = TEST_MESSAGES[locale].integrationCenter;
+
+  it('with payments.view it is a link to the finance settings screen with a name and description', () => {
+    renderLanding(locale, { paymentsAllowed: true });
+
+    const link = screen.getByRole('link', { name: m.payments.title });
+    expect(link.getAttribute('href')).toBe('/finance-settings/payments');
+    expect(link.getAttribute('data-testid')).toBe('integration-card-payments');
+    expect(link.getAttribute('aria-describedby')).toBeTruthy();
+    expect(link.textContent).toContain(m.payments.description);
+    expect(link.textContent).toContain(m.payments.badge);
+    expect(screen.getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/integrations/delivery-platforms', '/finance-settings/payments']);
+  });
+
+  it('claims no live connection or partnership: the badge names the settings location only', () => {
+    renderLanding(locale, { paymentsAllowed: true });
+
+    const text = screen.getByTestId('integration-card-payments').textContent ?? '';
+    expect(text).toContain(m.payments.badge);
+    expect(screen.getByText(m.payments.badge).className).not.toMatch(/positive/);
   });
 });

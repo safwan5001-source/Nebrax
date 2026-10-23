@@ -13,6 +13,8 @@ import { Dialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/toast';
+import { PosTerminalSessionAlert } from '@/components/pos/pos-terminal-session-alert';
+import { totalBlockers, type TerminalBlockers } from '@/modules/pos-terminals/contract';
 import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
 import { formatRiyal, riyalToMinor, isNegative, isValidRiyal } from '@/lib/money';
@@ -50,6 +52,8 @@ interface ClosingPreviewMethod { payment_method_id: string | null; payment_metho
 interface ClosingPreview {
   cash_drawer: { reconciliation_key: string; name: string; settlement_type: 'cash'; expected_amount: string | null };
   payment_methods: ClosingPreviewMethod[];
+  /** H6-02: عمليات جهاز دفع معلّقة أو تحتاج تعويضاً تمنع الإقفال (الخادم يفرضه). */
+  terminal_blockers?: TerminalBlockers;
 }
 interface SessionReport {
   cash_sales: string;
@@ -101,6 +105,7 @@ export default function PosSessionsPage() {
   const [openDialog, setOpenDialog] = useState(false);
   const [closeId, setCloseId] = useState<string | null>(null);
   const [closePreview, setClosePreview] = useState<ClosingPreview | null>(null);
+  const [terminalReload, setTerminalReload] = useState(0);
   const [closePreviewLoading, setClosePreviewLoading] = useState(false);
   const [paymentCounts, setPaymentCounts] = useState<Record<string, string>>({});
   const [handoverNote, setHandoverNote] = useState('');
@@ -239,6 +244,15 @@ export default function PosSessionsPage() {
       });
       success(t('handover_submitted_success')); setCloseId(null); setAmount(''); setClosePreview(null); setPaymentCounts({}); setHandoverNote(''); load();
     } catch (e) { setError(e instanceof ApiError ? e.message : tc('saveFailed')); } finally { setBusy(false); }
+  }
+
+  /** بعد إلغاء/إعادة محاولة على الجهاز: أعد قراءة موانع الإقفال فقط (دون مسح ما أدخله المستخدم). */
+  async function refreshTerminalBlockers(sessionId: string) {
+    try {
+      const result = await api<{ data: ClosingPreview }>(`/pos-sessions/${sessionId}/closing-preview`);
+      setClosePreview((current) => (current ? { ...current, terminal_blockers: result.data?.terminal_blockers } : current));
+      setTerminalReload((n) => n + 1);
+    } catch { /* يبقى المانع ظاهراً؛ الخادم هو الحاسم عند الإقفال */ }
   }
 
   async function prepareClose(session: Session) {
@@ -473,6 +487,7 @@ export default function PosSessionsPage() {
       <Dialog open={!!closeId} onClose={() => setCloseId(null)} title={t('close_title')}>
         <form onSubmit={(e) => { e.preventDefault(); submitClose(); }} className="space-y-4">
           <p className="rounded bg-primary-soft px-3 py-2 text-xs text-text">{t('close_reconciliation_hint')}</p>
+          {closeId && totalBlockers(closePreview?.terminal_blockers) > 0 && <PosTerminalSessionAlert sessionId={closeId} mode="blocking" reloadKey={terminalReload} onChanged={() => void refreshTerminalBlockers(closeId)} />}
           {closePreviewLoading && <p className="text-sm text-muted">{tc('loading')}</p>}
           {closePreview && <div className="overflow-hidden rounded-md border border-border">
             <div className="grid grid-cols-[minmax(0,1fr)_140px] gap-3 border-b border-border bg-surface-subtle px-3 py-2 text-xs font-medium text-muted">
@@ -494,7 +509,7 @@ export default function PosSessionsPage() {
           {error && <p role="alert" className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => setCloseId(null)}>{t('cancel')}</Button>
-            <Button type="submit" disabled={busy || closePreviewLoading || !closePreview || !isValidRiyal(amount) || handoverNote.trim().length < 3 || closePreview.payment_methods.some((method) => Boolean(method.payment_method_id) && !isValidRiyal(paymentCounts[method.payment_method_id as string] ?? ''))}>{t('close_and_submit_handover')}</Button>
+            <Button type="submit" disabled={busy || closePreviewLoading || !closePreview || !isValidRiyal(amount) || totalBlockers(closePreview.terminal_blockers) > 0 || handoverNote.trim().length < 3 || closePreview.payment_methods.some((method) => Boolean(method.payment_method_id) && !isValidRiyal(paymentCounts[method.payment_method_id as string] ?? ''))}>{t('close_and_submit_handover')}</Button>
           </div>
         </form>
       </Dialog>

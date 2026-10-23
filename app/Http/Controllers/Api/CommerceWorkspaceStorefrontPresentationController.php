@@ -58,6 +58,10 @@ class CommerceWorkspaceStorefrontPresentationController extends ApiController
             );
         } catch (StaleDraftRevisionException|ForwardSchemaVersionException $e) {
             abort(409, $e->getMessage());
+        } catch (PresentationPublishValidationException $e) {
+            // P3-A-06 — an authored global background that is not valid (e.g. an unapproved overlay strength) is a
+            // client error with the standard validation payload, not a 500 (the save gate throws it before normalising).
+            return response()->json($e->toPayload(), 422);
         } catch (PresentationDocumentTooLargeException $e) {
             abort(422, $e->getMessage());
         }

@@ -69,6 +69,19 @@
   }
 }
 
+/* P3-A-04 — frame a global background's optional mobile still with its own validated focal point. */
+[data-global-background-layer] [data-global-background-image] {
+  object-position: var(--global-bg-position, 50% 50%);
+}
+@media (max-width: 767px) {
+  [data-global-background-layer][data-has-mobile] [data-global-background-image] {
+    object-position: var(
+      --global-bg-position-mobile,
+      var(--global-bg-position, 50% 50%)
+    );
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

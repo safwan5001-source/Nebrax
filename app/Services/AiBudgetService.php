@@ -6,6 +6,7 @@ use App\Models\AiBudget;
 use App\Support\AiAssistantDenied;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 
 /**
@@ -49,13 +50,20 @@ class AiBudgetService
         }
 
         $key = $this->key($tenantId);
-        $budget = AiBudget::query()->firstOrNew(['budget_key' => $key, 'period' => $period]);
-        $budget->tenant_id = $tenantId;
-        $budget->cap_tokens = $capTokens;
-        $budget->cap_cost_micro_usd = $capCostMicroUsd;
-        $budget->save();
 
-        return $budget;
+        // `INSERT … ON CONFLICT (period, budget_key) DO UPDATE` — **جملة ذرّية واحدة** تحدّث أعمدة السقف وحدها: لا قراءة-ثم-كتابة
+        // فلا تكتب فوق عدّادات (reserved/used) غيّرها حجزٌ أو تسوية متزامنة، ولا سباق إنشاء بين كاتبين (لا استثناء فهرس فريد)،
+        // وتتسلسل مع الحجز على قفل الصف نفسه.
+        DB::table('ai_budgets')->upsert(
+            [[
+                'id' => (string) Str::uuid(), 'budget_key' => $key, 'tenant_id' => $tenantId, 'period' => $period,
+                'cap_tokens' => $capTokens, 'cap_cost_micro_usd' => $capCostMicroUsd, 'created_at' => now(), 'updated_at' => now(),
+            ]],
+            ['period', 'budget_key'],
+            ['cap_tokens', 'cap_cost_micro_usd', 'updated_at'],
+        );
+
+        return AiBudget::query()->where('budget_key', $key)->where('period', $period)->firstOrFail();
     }
 
     /**
@@ -85,7 +93,10 @@ class AiBudgetService
      * ينقل الطلب من `reserved` إلى حالة نهائية ويُسوّي الميزانيتين. `$usage = null` ⇒ طبّق سياسة
      * الفشل على المحجوز. يعيد `false` إن سبقه من سوّى الطلب (لا أثر مزدوج).
      *
-     * @param  array{input_tokens:int, output_tokens:int, cost_micro_usd:int}|null  $usage
+     * `unmetered_tokens` (اختياري): جزء لم يُبلَّغ استهلاكه وقُدِّر بالحجز (مثلاً نداء ثانٍ فشل بعد نجاح الأول) فيُحتسب
+     * إلى جانب المقيس الفعلي، فلا يضيع استهلاك ولا يُحتسب نداءٌ واحد مرتين.
+     *
+     * @param  array{input_tokens:int, output_tokens:int, cost_micro_usd:int, unmetered_tokens?:int}|null  $usage
      */
     public function finalize(string $requestId, string $status, ?array $usage, ?string $errorCode): bool
     {
@@ -101,7 +112,7 @@ class AiBudgetService
             if ($usage !== null) {
                 $in = max(0, (int) $usage['input_tokens']);
                 $out = max(0, (int) $usage['output_tokens']);
-                $unmetered = 0;
+                $unmetered = max(0, (int) ($usage['unmetered_tokens'] ?? 0));
                 $cost = max(0, (int) $usage['cost_micro_usd']);
             } elseif (config('ai_assistant.budget.failure_charge', 'reserved') === 'none') {
                 [$in, $out, $unmetered, $cost] = [0, 0, 0, 0];

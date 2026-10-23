@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -22,7 +22,7 @@ vi.mock('@/modules/commerce-workspace/presentation-versions', () => ({
 }));
 
 import { DEFAULT_PRESENTATION_CONFIG } from '../presentation';
-import { ExperienceBuilder } from '../ExperienceBuilder';
+import { ExperienceBuilder, homeSectionDataKey } from '../ExperienceBuilder';
 
 function versionSummary(overrides: Record<string, unknown> = {}) {
   return {
@@ -76,6 +76,50 @@ describe('ExperienceBuilder persistence wiring — CUST-H1-2 version APIs', () =
     await waitFor(() => expect(showMock).toHaveBeenCalledWith('store-1', 'v1'));
     expect(screen.getByText('Store Experience Builder')).toBeTruthy();
     expect(screen.queryByText('Verified')).toBeNull();
+  });
+
+  it('persists a Design Library choice through the existing tenant-scoped draft save', async () => {
+    listMock.mockResolvedValue({ ok: true, data: [versionSummary()] });
+    showMock.mockResolvedValue({ ok: true, data: versionDetail() });
+    saveMock.mockResolvedValue({
+      ok: true,
+      data: versionDetail({ revision: 1 }),
+    });
+    const user = userEvent.setup();
+    render(
+      <ExperienceBuilder
+        storefrontId="store-1"
+        initialLocale="en"
+        liveStoreName="Al-Noor Store"
+      />,
+    );
+    await waitFor(() => expect(showMock).toHaveBeenCalledWith('store-1', 'v1'));
+
+    await user.click(screen.getByRole('button', { name: 'Design library' }));
+    const card = document.querySelector(
+      '[data-design-library-variant="product-editorial"]',
+    ) as HTMLElement;
+    await user.click(
+      within(card).getByRole('button', { name: 'Apply variant' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    await waitFor(() =>
+      expect(saveMock).toHaveBeenCalledWith(
+        'store-1',
+        'v1',
+        expect.objectContaining({
+          productCard: 'standard',
+          cards: {
+            align: 'center',
+            imageRatio: '3:4',
+            imageFit: 'cover',
+            hover: 'lift',
+          },
+        }),
+        0,
+      ),
+    );
   });
 
   it('opens the exact version named by the versionId prop directly, bypassing the ambiguous-choice auto-select', async () => {
@@ -478,5 +522,18 @@ describe('ExperienceBuilder persistence wiring — CUST-H1-2 version APIs', () =
       screen.getByRole('link', { name: 'Manage company information' }).getAttribute('href'),
     ).toBe('/settings');
     expect(screen.queryByDisplayValue('legacy-cr-must-not-edit')).toBeNull();
+  });
+
+  it('reloads section data only when commerce inputs change', () => {
+    const shelf = {
+      id: 'shelf-1',
+      type: 'productShelf',
+      visible: true,
+      content: { title: 'First title', source: { kind: 'collection', slug: 'roses' }, deliverToday: false, limit: 8 },
+    };
+    const renamedShelf = { ...shelf, content: { ...shelf.content, title: 'Second title' } };
+    const changedShelf = { ...shelf, content: { ...shelf.content, limit: 4 } };
+    expect(homeSectionDataKey(renamedShelf as never)).toBe(homeSectionDataKey(shelf as never));
+    expect(homeSectionDataKey(changedShelf as never)).not.toBe(homeSectionDataKey(shelf as never));
   });
 });

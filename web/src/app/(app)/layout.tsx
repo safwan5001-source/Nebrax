@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { BranchScope, useBranchVersion } from '@/components/layout/branch-scope';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Topbar } from '@/components/layout/topbar';
@@ -12,6 +12,8 @@ import { currentUser, isAuthenticated } from '@/lib/auth';
 import { usePermissionRefresh } from '@/lib/use-can';
 import { applyAwjUiGate } from '@/lib/awj-ui-gate';
 import { CardTitleLevel } from '@/components/ui/card';
+import { AssistantPanel } from '@/components/intelligence/assistant-panel';
+import { IntelligenceProvider } from '@/modules/intelligence/store';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -21,6 +23,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const branchVersion = useBranchVersion();
   const t = useTranslations('topbar');
+  const locale = useLocale() === 'en' ? 'en' : 'ar';
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -60,6 +63,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
+    <IntelligenceProvider locale={locale}>
     <div data-posture="ledger" className="flex min-h-screen flex-col bg-background">
       {/* أول عنصر قابل للتركيز: يتخطّى الشريط الجانبي والعلوي (~40 ضغطة Tab) إلى المحتوى (ERP-UX-006). */}
       <a
@@ -88,6 +92,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </main>
         </div>
       </div>
+      {/* مساعد أَوْج: حالته في الذاكرة فقط؛ لا طلب قبل فتح اللوحة أو الدخول إلى المساحة. */}
+      <AssistantPanel />
     </div>
+    </IntelligenceProvider>
   );
 }

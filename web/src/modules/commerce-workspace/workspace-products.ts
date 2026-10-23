@@ -27,6 +27,9 @@ export interface WorkspaceProductSummary {
   nameEn: string | null;
   thumbnailUrl: string | null;
   isVariantManaged: boolean;
+  priceAmountMinor?: number | null;
+  currency?: string;
+  inStock?: boolean | null;
 }
 
 export interface WorkspaceProductOptionValue {
@@ -110,7 +113,7 @@ function asMediaList(raw: unknown): WorkspaceProductMedia[] {
   return out;
 }
 
-function mapSummary(row: unknown): WorkspaceProductSummary | null {
+export function mapWorkspaceProductSummary(row: unknown): WorkspaceProductSummary | null {
   if (!row || typeof row !== 'object' || Array.isArray(row)) return null;
   const record = row as Record<string, unknown>;
   if (typeof record.id !== 'string' || record.id === '') return null;
@@ -121,6 +124,15 @@ function mapSummary(row: unknown): WorkspaceProductSummary | null {
     nameEn: typeof record.name_en === 'string' ? record.name_en : null,
     thumbnailUrl: typeof record.thumbnail_url === 'string' ? record.thumbnail_url : null,
     isVariantManaged: record.is_variant_managed === true,
+    priceAmountMinor:
+      record.price && typeof record.price === 'object' && typeof (record.price as Record<string, unknown>).amount_minor === 'number'
+        ? (record.price as Record<string, unknown>).amount_minor as number
+        : null,
+    currency:
+      record.price && typeof record.price === 'object' && typeof (record.price as Record<string, unknown>).currency === 'string'
+        ? (record.price as Record<string, unknown>).currency as string
+        : 'SAR',
+    inStock: typeof record.in_stock === 'boolean' ? record.in_stock : null,
   };
 }
 
@@ -249,7 +261,7 @@ export async function listWorkspaceProducts(
     if (!Array.isArray(data)) return { ok: false, reason: 'failed', message: 'invalid_payload' };
     const rows: WorkspaceProductSummary[] = [];
     for (const row of data) {
-      const summary = mapSummary(row);
+      const summary = mapWorkspaceProductSummary(row);
       if (summary === null) return { ok: false, reason: 'failed', message: 'invalid_payload' };
       rows.push(summary);
     }

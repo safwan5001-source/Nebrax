@@ -127,7 +127,10 @@ class VatSemanticRoutingTest extends TestCase
 
         $expense = $this->expense();
 
-        $this->assertSame([
+        // `JournalEntry::lines()` does not define an SQL order. The accounts
+        // and debit/credit values are the accounting contract, so the test
+        // intentionally ignores retrieval order across database engines.
+        $this->assertEqualsCanonicalizing([
             '5130' => [100000, 0],
             '1158' => [15000, 0],
             '1110' => [0, 115000],

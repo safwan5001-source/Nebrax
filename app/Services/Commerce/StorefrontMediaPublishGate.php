@@ -35,6 +35,13 @@ class StorefrontMediaPublishGate
      */
     private const ANIMATED_ALLOWED_PATH = '/\Ahomepage\.sections\.\d+\.(?:design\.background\.(?:media|mobile)|content\.slides\.\d+\.(?:media|mobile))\z/';
 
+    /**
+     * P3-A-03 — the global background is a still-only consumer. An animated
+     * asset is valid here only when its base still ladder is ready (checked by
+     * `isReady()` above); its animation variant is deliberately not used.
+     */
+    private const GLOBAL_STILL_ONLY_PATH = '/\Abackground\.(?:media|mobile)\z/';
+
     public function __construct(
         private readonly StorefrontMediaReferenceScanner $scanner,
         private readonly StorefrontMediaDerivativeService $derivatives,
@@ -74,7 +81,9 @@ class StorefrontMediaPublishGate
                 continue;
             }
 
-            if ($asset->isAnimated() && preg_match(self::ANIMATED_ALLOWED_PATH, $path) !== 1) {
+            if ($asset->isAnimated()
+                && preg_match(self::ANIMATED_ALLOWED_PATH, $path) !== 1
+                && preg_match(self::GLOBAL_STILL_ONLY_PATH, $path) !== 1) {
                 $errors["{$path}.mediaId"] = ['code' => 'animated_not_allowed_here', 'message' => 'الصور المتحركة تُعرض في خلفيات الأقسام وشرائح السلايدر فقط. اختر صورة ثابتة لهذا الموضع.'];
 
                 continue;

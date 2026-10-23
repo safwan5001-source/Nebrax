@@ -216,6 +216,137 @@ class StorefrontPresentationPublishApiTest extends TestCase
     }
 
     /** @test */
+    public function a_global_media_background_that_cannot_be_proven_is_saved_as_draft_but_blocked_from_publish(): void
+    {
+        $auth = $this->registerTenant('pres-pub-global-media', 'owner@pres-pub-global-media.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+        $mediaId = '0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e';
+
+        $token->putJson($this->path($seeded['storefront']->id), [
+            'config' => [
+                'background' => [
+                    'kind' => 'media',
+                    'media' => [
+                        'mediaId' => strtoupper($mediaId),
+                        'url' => 'https://evil.example/background.jpg',
+                        'style' => 'background-image: url(https://evil.example)',
+                        'animation' => 'spin',
+                        'video' => 'https://evil.example/video.mp4',
+                        'autoplay' => true,
+                    ],
+                ],
+            ],
+            'draft_revision' => 0,
+        ])->assertOk();
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $saved = StorefrontPresentation::query()->where('storefront_id', $seeded['storefront']->id)->firstOrFail();
+        $this->assertSame([
+            'kind' => 'media',
+            'media' => ['mediaId' => $mediaId, 'decorative' => true],
+        ], $saved->draft_config['background']);
+        $this->assertNull($saved->published_config);
+        app(TenantContext::class)->forget();
+
+        $rejected = $token->postJson($this->path($seeded['storefront']->id).'/publish', ['draft_revision' => 1])
+            ->assertStatus(422);
+        // the picture does not exist for this tenant: its contrast cannot be proven (P3-A-06), and the media gate says why
+        $this->assertSame('global_media_contrast_unproven', $rejected->json('error_codes.background'));
+        $this->assertSame('media_missing', $rejected->json('error_codes')['background.media.mediaId'] ?? null);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $after = StorefrontPresentation::query()->where('storefront_id', $seeded['storefront']->id)->firstOrFail();
+        $this->assertNull($after->published_config, 'Global media must not reach the published snapshot.');
+        app(TenantContext::class)->forget();
+    }
+
+    /**
+     * P3-A-05 — the full document the Appearance editor can now author (desktop + phone image, a focal
+     * point for each, an overlay) is kept in the draft; here its pictures do not exist for the tenant, so it cannot be
+     * published (P3-A-06: unproven contrast). Removing the object — what
+     * switching to Solid or "Restore default" does in the editor — is what unblocks publishing, because the
+     * document is replaced as a whole and the legacy `backgroundColor` alone is a complete background.
+     *
+     * @test
+     */
+    public function an_unprovable_editor_authored_image_background_stays_unpublishable_until_the_object_is_removed(): void
+    {
+        $auth = $this->registerTenant('pres-pub-bg-editor', 'owner@pres-pub-bg-editor.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+        $desktop = '0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e';
+        $phone = '7c1d3e4f-5a6b-4c8d-9e0f-1a2b3c4d5e6f';
+
+        $token->putJson($this->path($seeded['storefront']->id), [
+            'config' => [
+                'backgroundColor' => '#ffeedd',
+                'background' => [
+                    'kind' => 'media',
+                    'media' => ['mediaId' => $desktop, 'decorative' => true, 'focal' => ['x' => 100, 'y' => 0]],
+                    'mobile' => ['mediaId' => $phone, 'decorative' => true, 'focal' => ['x' => 0, 'y' => 100]],
+                    'overlay' => ['color' => ['role' => 'overlay'], 'alpha' => 35],
+                ],
+            ],
+            'draft_revision' => 0,
+        ])->assertOk();
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $saved = StorefrontPresentation::query()->where('storefront_id', $seeded['storefront']->id)->firstOrFail();
+        // Key order is not part of the contract (the normaliser writes `focal` before `decorative`).
+        $this->assertEquals([
+            'kind' => 'media',
+            'media' => ['mediaId' => $desktop, 'decorative' => true, 'focal' => ['x' => 100, 'y' => 0]],
+            'mobile' => ['mediaId' => $phone, 'decorative' => true, 'focal' => ['x' => 0, 'y' => 100]],
+            'overlay' => ['color' => ['role' => 'overlay'], 'alpha' => 35],
+        ], $saved->draft_config['background']);
+        app(TenantContext::class)->forget();
+
+        $rejected = $token->postJson($this->path($seeded['storefront']->id).'/publish', ['draft_revision' => 1])
+            ->assertStatus(422);
+        $this->assertSame('global_media_contrast_unproven', $rejected->json('error_codes.background'));
+
+        // The merchant switches to Solid / restores the default: the document no longer carries `background`.
+        $token->putJson($this->path($seeded['storefront']->id), [
+            'config' => ['backgroundColor' => '#ffeedd'],
+            'draft_revision' => 1,
+        ])->assertOk();
+        $token->postJson($this->path($seeded['storefront']->id).'/publish', ['draft_revision' => 2])->assertOk();
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $after = StorefrontPresentation::query()->where('storefront_id', $seeded['storefront']->id)->firstOrFail();
+        $this->assertArrayNotHasKey('background', $after->draft_config);
+        $this->assertArrayNotHasKey('background', $after->published_config);
+        $this->assertSame('#ffeedd', $after->published_config['backgroundColor']);
+        app(TenantContext::class)->forget();
+    }
+
+    /**
+     * P3-A-06 — a gradient publishes only when the contrast policy proves it (StorefrontPresentationGlobalGradientContrastTest).
+     * The legacy solid colour — what Solid / Restore default write — keeps publishing exactly as before.
+     *
+     * @test
+     */
+    public function editor_authored_solid_colour_publishes_normally_and_keeps_only_the_legacy_field(): void
+    {
+        $auth = $this->registerTenant('pres-pub-bg-solid', 'owner@pres-pub-bg-solid.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+
+        $token->putJson($this->path($seeded['storefront']->id), [
+            'config' => ['backgroundColor' => '#ffeedd'],
+            'draft_revision' => 0,
+        ])->assertOk();
+        $token->postJson($this->path($seeded['storefront']->id).'/publish', ['draft_revision' => 1])->assertOk();
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $published = StorefrontPresentation::query()->where('storefront_id', $seeded['storefront']->id)->firstOrFail()->published_config;
+        $this->assertSame('#ffeedd', $published['backgroundColor']);
+        $this->assertArrayNotHasKey('background', $published);
+        app(TenantContext::class)->forget();
+    }
+
+    /** @test */
     public function unknown_publish_envelope_keys_are_rejected(): void
     {
         $auth = $this->registerTenant('pres-pub-env', 'owner@pres-pub-env.test');

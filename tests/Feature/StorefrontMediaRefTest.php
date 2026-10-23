@@ -261,6 +261,31 @@ class StorefrontMediaRefTest extends TestCase
     }
 
     /** @test */
+    public function normalized_global_background_references_are_discovered_with_desktop_and_mobile_paths(): void
+    {
+        $id = '0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e';
+        $normalized = app(StorefrontPresentationNormalizer::class)->normalize([
+            'background' => [
+                'kind' => 'media',
+                'media' => ['mediaId' => strtoupper($id), 'url' => 'https://evil.example/background.jpg'],
+                'mobile' => ['mediaId' => $id, 'style' => 'background-image: url(https://evil.example)'],
+            ],
+            'unrelated' => ['mediaId' => $id],
+        ], 3);
+
+        $refs = app(\App\Services\Commerce\StorefrontMediaReferenceScanner::class)->extractRefs($normalized);
+
+        $this->assertSame([
+            'background.media',
+            'background.mobile',
+        ], array_column($refs, 'path'));
+        $this->assertSame([$id, $id], array_column(array_column($refs, 'ref'), 'mediaId'));
+        $json = json_encode($normalized, JSON_THROW_ON_ERROR);
+        $this->assertStringNotContainsString('evil.example', $json);
+        $this->assertStringNotContainsString('unrelated', $json);
+    }
+
+    /** @test */
     public function repeated_background_references_cost_one_media_query_and_no_derivative_query_for_default_usages(): void
     {
         $this->fakeStorefrontMediaR2();

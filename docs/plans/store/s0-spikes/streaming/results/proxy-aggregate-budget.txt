@@ -1,0 +1,28 @@
+# proxy-aggregate-budget.mjs — read-phase RSS with C origin reads in flight, each holding ~maxBodyBytes (node 22, 16 GiB host)
+# BEFORE the budget (head e7dd59de5): limits are independent, product C x L unbounded
+--- default
+{"limits":{"maxConcurrent":16,"maxBodyBytes_MiB":8},"product_C_x_L_MiB":128,"requests":32,"ok":32,"shed":0,"failed":0,"rss_baseline_MiB":74,"rss_peak_MiB":298,"rss_over_baseline_MiB":224}
+--- STOREFRONT_MEDIA_PROXY_MAX_CONCURRENT=64
+{"limits":{"maxConcurrent":64,"maxBodyBytes_MiB":8},"product_C_x_L_MiB":512,"requests":128,"ok":128,"shed":0,"failed":0,"rss_baseline_MiB":74,"rss_peak_MiB":743,"rss_over_baseline_MiB":669}
+--- STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES=33554432
+{"limits":{"maxConcurrent":16,"maxBodyBytes_MiB":32},"product_C_x_L_MiB":512,"requests":32,"ok":32,"shed":0,"failed":0,"rss_baseline_MiB":74,"rss_peak_MiB":714,"rss_over_baseline_MiB":640}
+--- STOREFRONT_MEDIA_PROXY_MAX_CONCURRENT=64 STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES=33554432
+{"limits":{"maxConcurrent":64,"maxBodyBytes_MiB":32},"product_C_x_L_MiB":2048,"requests":128,"ok":64,"shed":64,"failed":0,"rss_baseline_MiB":74,"rss_peak_MiB":2278,"rss_over_baseline_MiB":2204}
+
+# AFTER the budget (this change): concurrency is fitted so C x L x 2 <= maxBufferedBytes
+--- X=1
+{"limits":{"maxConcurrent":16,"maxBodyBytes_MiB":8,"maxBufferedBytes_MiB":256},"product_C_x_L_MiB":128,"requests":32,"ok":32,"shed":0,"failed":0,"rss_baseline_MiB":75,"rss_peak_MiB":312,"rss_over_baseline_MiB":237}
+--- STOREFRONT_MEDIA_PROXY_MAX_CONCURRENT=64
+{"limits":{"maxConcurrent":16,"maxBodyBytes_MiB":8,"maxBufferedBytes_MiB":256},"product_C_x_L_MiB":128,"requests":32,"ok":32,"shed":0,"failed":0,"rss_baseline_MiB":75,"rss_peak_MiB":372,"rss_over_baseline_MiB":297}
+--- STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES=33554432
+{"limits":{"maxConcurrent":4,"maxBodyBytes_MiB":32,"maxBufferedBytes_MiB":256},"product_C_x_L_MiB":128,"requests":8,"ok":8,"shed":0,"failed":0,"rss_baseline_MiB":75,"rss_peak_MiB":322,"rss_over_baseline_MiB":247}
+--- STOREFRONT_MEDIA_PROXY_MAX_CONCURRENT=64 STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES=33554432
+{"limits":{"maxConcurrent":4,"maxBodyBytes_MiB":32,"maxBufferedBytes_MiB":256},"product_C_x_L_MiB":128,"requests":8,"ok":8,"shed":0,"failed":0,"rss_baseline_MiB":75,"rss_peak_MiB":302,"rss_over_baseline_MiB":227}
+--- STOREFRONT_MEDIA_PROXY_MAX_CONCURRENT=256 STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES=33554432 STOREFRONT_MEDIA_PROXY_MAX_BUFFERED_BYTES=536870912
+{"limits":{"maxConcurrent":8,"maxBodyBytes_MiB":32,"maxBufferedBytes_MiB":512},"product_C_x_L_MiB":256,"requests":16,"ok":16,"shed":0,"failed":0,"rss_baseline_MiB":75,"rss_peak_MiB":418,"rss_over_baseline_MiB":343}
+
+# AFTER the body-override floor (P2 review round 3): a too-small STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES is raised to 6 MiB; budget still holds
+--- STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES=1
+{"limits":{"maxConcurrent":16,"maxBodyBytes_MiB":6,"maxBufferedBytes_MiB":256},"product_C_x_L_MiB":96,"requests":32,"ok":32,"shed":0,"failed":0,"rss_baseline_MiB":75,"rss_peak_MiB":253,"rss_over_baseline_MiB":178}
+--- STOREFRONT_MEDIA_PROXY_MAX_BODY_BYTES=1 STOREFRONT_MEDIA_PROXY_MAX_CONCURRENT=256
+{"limits":{"maxConcurrent":21,"maxBodyBytes_MiB":6,"maxBufferedBytes_MiB":256},"product_C_x_L_MiB":126,"requests":42,"ok":42,"shed":0,"failed":0,"rss_baseline_MiB":75,"rss_peak_MiB":290,"rss_over_baseline_MiB":215}

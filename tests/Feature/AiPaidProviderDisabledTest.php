@@ -15,19 +15,21 @@ use Tests\TestCase;
 class AiPaidProviderDisabledTest extends TestCase
 {
     #[Test]
-    public function the_shipped_configuration_is_off_mock_only_and_prices_no_real_provider(): void
+    public function the_shipped_configuration_is_off_mock_default_and_ships_no_real_provider_price(): void
     {
         $config = require base_path('config/ai_assistant.php');
 
         $this->assertFalse($config['enabled']);
         $this->assertSame('mock', $config['provider']);
-        $this->assertSame(['mock'], array_keys($config['pricing']), 'no real provider has a price entry');
+        // AI-07: the `anthropic` slot exists but is EMPTY by default (the owner supplies prices; an unpriced model is refused).
+        $this->assertSame(['mock', 'anthropic'], array_keys($config['pricing']));
+        $this->assertSame([], $config['pricing']['anthropic'], 'no real provider price is shipped');
         $this->assertFalse($config['pricing']['mock']['mock-1']['billable']);
         $this->assertSame(0, $config['pricing']['mock']['mock-1']['input_micro_usd_per_1k'] + $config['pricing']['mock']['mock-1']['output_micro_usd_per_1k']);
     }
 
     #[Test]
-    public function the_mock_is_the_only_provider_implementation_in_the_codebase(): void
+    public function only_the_mock_and_the_platform_anthropic_provider_implement_the_provider_contract(): void
     {
         $implementers = [];
         $dirs = [base_path('app')];
@@ -40,13 +42,15 @@ class AiPaidProviderDisabledTest extends TestCase
                 $path = $dir . '/' . $entry;
                 if (is_dir($path)) {
                     $dirs[] = $path;
-                } elseif (str_ends_with($entry, '.php') && preg_match('/implements\s+[^{]*\bAiAssistantProvider\b/', (string) file_get_contents($path)) === 1) {
+                } elseif (str_ends_with($entry, '.php') && preg_match('/implements\s+[^{]*\bAi(?:External)?AssistantProvider\b/', (string) file_get_contents($path)) === 1) {
                     $implementers[] = basename($path);
                 }
             }
         }
 
-        $this->assertSame(['MockAiAssistantProvider.php'], $implementers);
+        sort($implementers);
+        // AI-07: the only external implementation reuses the platform's Anthropic integration; any other provider is a new, reviewed decision.
+        $this->assertSame(['AnthropicAssistantProvider.php', 'MockAiAssistantProvider.php'], $implementers);
         $this->assertTrue(interface_exists(AiAssistantProvider::class));
     }
 

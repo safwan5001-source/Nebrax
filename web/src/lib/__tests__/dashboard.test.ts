@@ -4,6 +4,7 @@ import {
   dailySeries,
   expenseTone,
   groupTop,
+  loadKpiBalance,
   netIncome,
   toNumber,
 } from '../dashboard';
@@ -139,5 +140,35 @@ describe('groupTop', () => {
   it('يقصّ عند الحدّ فيبقى الرسم مقروءاً', () => {
     const many = Array.from({ length: 20 }, (_, i) => ({ name: `ص${i}`, total: i }));
     expect(groupTop(many, (r) => r.name, (r) => r.total, 5)).toHaveLength(5);
+  });
+});
+
+
+/**
+ * مؤشرا النقد والبنك وذمم العملاء (TREASURY-T2): فشل طلب أيٍّ منهما معزول، ولا يتحوّل أبداً إلى صفر يُقرأ رصيداً حقيقياً.
+ * الصفر الصادق (خزينة فارغة) و«غير متاح» حالتان مختلفتان.
+ */
+describe('loadKpiBalance', () => {
+  it('يقرأ الرصيد الصالح كما أرسله الخادم', async () => {
+    await expect(loadKpiBalance(async () => ({ balance: '2000.00' }))).resolves.toEqual({ status: 'ready', balance: 2000 });
+    await expect(loadKpiBalance(async () => ({ balance: '1,234.50' }))).resolves.toEqual({ status: 'ready', balance: 1234.5 });
+    await expect(loadKpiBalance(async () => ({ balance: '-15.00' }))).resolves.toEqual({ status: 'ready', balance: -15 });
+  });
+
+  it('الصفر الصادق جاهزٌ لا غير متاح', async () => {
+    await expect(loadKpiBalance(async () => ({ balance: '0.00' }))).resolves.toEqual({ status: 'ready', balance: 0 });
+  });
+
+  it('رفض الطلب (شبكة أو 403) غير متاح — ولا يرمي', async () => {
+    await expect(loadKpiBalance(() => Promise.reject(new Error('network')))).resolves.toEqual({ status: 'unavailable' });
+    const forbidden = Object.assign(new Error('forbidden'), { status: 403 });
+    await expect(loadKpiBalance(() => Promise.reject(forbidden))).resolves.toEqual({ status: 'unavailable' });
+    await expect(loadKpiBalance(() => { throw new Error('sync'); })).resolves.toEqual({ status: 'unavailable' });
+  });
+
+  it('الردّ التالف أو الناقص غير متاح لا صفر', async () => {
+    for (const bad of [null, undefined, {}, { balance: null }, { balance: '' }, { balance: 'abc' }, { balance: {} }, { balance: NaN }]) {
+      await expect(loadKpiBalance(async () => bad as never)).resolves.toEqual({ status: 'unavailable' });
+    }
   });
 });

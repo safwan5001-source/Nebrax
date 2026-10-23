@@ -1,0 +1,113 @@
+<?php
+
+namespace App\Services;
+
+use App\Contracts\ImportDomainAdapter;
+use App\Models\ImportJob;
+use App\Models\ImportJobUnit;
+use App\Support\ImportPreviewException;
+use App\Support\ImportUnitFailureException;
+use App\Support\ImportUnitRef;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Str;
+use PDOException;
+use Throwable;
+
+/**
+ * يسجّل الوحدات الفاشلة/غير المنجزة لقطعةٍ فشلت (IMP-H1-S8a) — **داخل معاملة فشل التشغيلة نفسها** فلا حالة `failed` بلا وحداتها.
+ *
+ * لا يسجّل إلا لمجالات **وحدتها الصفّ** (`UNIT_ROW`): قطعتها تفشل كاملةً وتتراجع، فما بعد `processed_rows` كله غير منجز. المجالات ذات
+ * الملف/المستند كوحدة ذرّية تفشل كاملةً بلا حالة جزئية، فلا إصلاح جزئي لها (تُصحَّح وتُرفع من جديد) — كل مجالٍ لاحق من نوع المستند يضيف
+ * اختبار إصلاحه.
+ *
+ * التصنيف (كلها `failed` وكلها قابلة للإصلاح):
+ *  - وحداتٌ بعينها سمّاها الاستثناء (`ImportUnitFailureException`) برمزها ورسالتها؛
+ *  - بقية نافذة القطعة: `window_rolled_back` (تراجعت مع نافذتها وليست سبب الفشل)؛
+ *  - ما بعد النافذة: `not_attempted`؛
+ *  - فشلٌ بلا تسمية وحدات (مثل `plan_drift` أو خطأ كتابة): النافذة كلها بالرمز الأخصّ (`plan_drift` أو `chunk_failed`).
+ */
+class ImportJobUnitRecorder
+{
+    private const INSERT_CHUNK = 500;
+
+    private const MESSAGE_LIMIT = 1000;
+
+    public function recordChunkFailure(ImportJob $job, ImportDomainAdapter $adapter, int $offset, int $batchSize, Throwable $e): void
+    {
+        if ($adapter->unit() !== ImportDomainAdapter::UNIT_ROW) {
+            return;
+        }
+
+        $total = (int) $job->row_count;
+        $windowEnd = min($offset + $batchSize, $total);
+        if ($offset >= $total) {
+            return;
+        }
+
+        /** @var array<int, array{code: string, message: string}> $byOrdinal */
+        $byOrdinal = [];
+        if ($e instanceof ImportUnitFailureException) {
+            foreach ($e->failures as $failure) {
+                // تُسمَّى الوحدات الفاشلة أينما وقعت من `offset` فصاعداً (فحص الملف كله قد يسمّي صفوفاً خارج النافذة الأولى).
+                if ($failure['ordinal'] >= $offset && $failure['ordinal'] < $total) {
+                    $byOrdinal[$failure['ordinal']] = ['code' => $failure['code'], 'message' => $failure['message']];
+                }
+            }
+        }
+
+        $windowCode = $e instanceof ImportPreviewException ? $e->reason : 'chunk_failed';
+        $rows = [];
+        for ($ordinal = $offset; $ordinal < $total; $ordinal++) {
+            if (isset($byOrdinal[$ordinal])) {
+                $entry = $byOrdinal[$ordinal];
+            } elseif ($ordinal < $windowEnd) {
+                $entry = ($byOrdinal === []
+                    ? ['code' => $windowCode, 'message' => $this->safeMessage($e)]
+                    : ['code' => 'window_rolled_back', 'message' => 'لم تُطبَّق: توقّفت التشغيلة بسبب فشل في نافذتها أو في فحص الملف، وتراجعت كاملةً.']);
+            } else {
+                $entry = ['code' => 'not_attempted', 'message' => 'لم تُعالَج بعد: توقّفت التشغيلة قبل الوصول إليها.'];
+            }
+            $rows[] = $this->row($job, $ordinal, $entry);
+            if (count($rows) >= self::INSERT_CHUNK) {
+                ImportJobUnit::query()->insert($rows);
+                $rows = [];
+            }
+        }
+        if ($rows !== []) {
+            ImportJobUnit::query()->insert($rows);
+        }
+    }
+
+    /**
+     * رسالة الوحدة تظهر في ملف الفشل لمن لا يملك صلاحية التكلفة، فلا تُخزَّن رسالة خطأ قاعدة بيانات (تُضمِّن SQL وقيمه المربوطة):
+     * رسائل المجال العربية (`RuntimeException`) وحدها تُحفظ، وغيرها نصٌّ عامّ.
+     */
+    private function safeMessage(Throwable $e): string
+    {
+        if ($e instanceof QueryException || $e instanceof PDOException || ! ($e instanceof \RuntimeException || $e instanceof ImportPreviewException)) {
+            return 'تعذّر تطبيق نافذة الصفوف بسبب خطأ داخلي؛ راجع سجل التشغيلة.';
+        }
+
+        return $e->getMessage();
+    }
+
+    /** @param array{code: string, message: string} $entry @return array<string, mixed> */
+    private function row(ImportJob $job, int $ordinal, array $entry): array
+    {
+        $now = now();
+
+        return [
+            'id' => (string) Str::uuid(),
+            'tenant_id' => $job->tenant_id,
+            'import_job_id' => $job->id,
+            'source_unit_ref' => ImportUnitRef::for($job->id, $ordinal),
+            'unit_ordinal' => $ordinal,
+            'status' => ImportJobUnit::FAILED,
+            'error_code' => $entry['code'],
+            'error_message' => mb_substr($entry['message'], 0, self::MESSAGE_LIMIT),
+            'repaired_by_job_id' => null,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ];
+    }
+}

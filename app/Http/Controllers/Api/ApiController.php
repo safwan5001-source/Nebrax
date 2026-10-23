@@ -27,6 +27,9 @@ abstract class ApiController extends Controller
         } catch (\App\Services\Pos\PosIdempotencyConflictException $e) {
             // تعارض idempotency → 409 من المتحكّم، لا 422 عام.
             throw $e;
+        } catch (\App\Support\ZatcaCreditNoteEmergencyStopException $e) {
+            // REM-18b-3d: 422 بجسم {message, reason: platform_emergency_stop} تُنتجه render() الخاصة بالاستثناء.
+            throw $e;
         } catch (\App\Services\DeliveryHub\DeliveryHubNotFoundException) {
             abort(404);
         } catch (\App\Services\DeliveryHub\DeliveryHubConflictException) {

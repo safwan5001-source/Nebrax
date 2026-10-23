@@ -141,6 +141,41 @@ export async function fetchImageUrl(path: string): Promise<string | null> {
 }
 
 /**
+ * يجلب أصلاً خاصاً للعرض داخل الصفحة مع نفس مصادقة API، ثم يعيده كرابط blob.
+ * لا تستخدم عناصر iframe/img رابط API مباشرةً لأن تنقّل المتصفح لا يرسل Bearer.
+ * يرفض JSON (مثل رد 401) قبل أن يصل إلى عارض PDF على أنه محتوى مستند.
+ */
+export async function fetchPrivateFileUrl(pathOrUrl: string, expectedMime?: string): Promise<string> {
+  if (isDemo()) throw new ApiError(0, 'demo-unavailable', null);
+
+  const token = getToken();
+  const branchId = typeof window !== 'undefined' ? localStorage.getItem('nibras_active_branch') : null;
+  const res = await fetch(resolveApiUrl(pathOrUrl), {
+    headers: {
+      Accept: expectedMime ?? '*/*',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(branchId ? { 'X-Branch-Id': branchId } : {}),
+    },
+  });
+
+  if (res.status === 401 && typeof window !== 'undefined') {
+    clearToken();
+    if (!window.location.pathname.startsWith('/login')) window.location.assign('/login');
+  }
+
+  const contentType = (res.headers.get('Content-Type') ?? '').split(';', 1)[0].trim().toLowerCase();
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, extractErrorMessage(body, 'حدث خطأ'), body);
+  }
+  if (contentType === 'application/json' || (expectedMime && contentType !== expectedMime.toLowerCase())) {
+    throw new ApiError(502, 'preview_invalid_response', { contentType });
+  }
+
+  return URL.createObjectURL(await res.blob());
+}
+
+/**
  * يستخرج اسم الملف من `Content-Disposition` — يدعم `filename*=UTF-8''…`
  * المرمَّز و`filename="…"` العادي. يعيد `null` حين لا تحمل الترويسة اسماً.
  */

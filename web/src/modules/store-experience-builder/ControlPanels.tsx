@@ -40,6 +40,7 @@ import {
 } from "./presentation";
 import { HeaderDesignPanel } from "./HeaderDesignPanel";
 import { FooterEditor } from "./FooterEditor";
+import { GlobalBackgroundField } from "./GlobalBackgroundField";
 import { NavigationPanel } from "./NavigationPanel";
 import { emptyMainMenu, migrateLegacyLinks, withMainMenu } from "./navigation-edit";
 import { presentationCssVars } from "./presentation/tokens";
@@ -106,9 +107,11 @@ import type { DesignContext } from "./presentation/section-design-resolve";
 import { OfferSummary, OfferThumb } from "./OfferParts";
 import { offerDisplayName } from "./offers-display";
 import type { OfferManagement } from "./offers-management";
+import { DesignLibraryPanel } from "./DesignLibraryPanel";
 
 export type CustomizerPanel =
   | "theme"
+  | "designLibrary"
   | "branding"
   | "header"
   | "homepage"
@@ -129,6 +132,7 @@ export const CUSTOMIZER_NAV_GROUPS: Array<{
   {
     items: [
       { id: "theme", label: "theme" },
+      { id: "designLibrary", label: "designLibraryNav" },
       { id: "branding", label: "branding" },
     ],
   },
@@ -272,7 +276,17 @@ export function ControlPanels({
 
   switch (panel) {
     case "theme":
-      return <ThemePanel config={config} t={t} patch={patch} locale={locale} />;
+      return <ThemePanel config={config} t={t} patch={patch} replace={onChange} locale={locale} />;
+    case "designLibrary":
+      return (
+        <DesignLibraryPanel
+          config={config}
+          locale={locale}
+          selectedSection={selectedSection}
+          onChange={onChange}
+          onSelectSection={onSelectSection}
+        />
+      );
     case "branding":
       return (
         <BrandingPanel
@@ -464,11 +478,14 @@ function ThemePanel({
   config,
   t,
   patch,
+  replace,
   locale = "ar",
 }: {
   config: StorefrontPresentationConfig;
   t: (key: CustomizerMessageKey) => string;
   patch: (partial: Partial<StorefrontPresentationConfig>) => void;
+  /** Whole-config write: the global background must be able to *remove* its `background` object. */
+  replace: (next: StorefrontPresentationConfig) => void;
   locale?: CustomizerLocale;
 }) {
   const contrast = contrastRatio(config.primaryColor, "#ffffff");
@@ -552,6 +569,7 @@ function ThemePanel({
           />
         </div>
       </Field>
+      <GlobalBackgroundField config={config} onReplace={replace} t={t} locale={locale === "en" ? "en" : "ar"} />
       <div className="space-y-5">
         <Field label={t("font")}>
           <select
@@ -1528,7 +1546,7 @@ function HomepagePanel({
                 locale={locale}
                 t={t}
                 storeVars={
-                  presentationCssVars(config.primaryColor, config.radius, config.accentColor) as CSSProperties
+                  presentationCssVars(config.primaryColor, config.radius, config.accentColor, config.backgroundColor) as CSSProperties
                 }
                 onChange={(content) =>
                   updateSection(selectedIndex, { ...selected, content })

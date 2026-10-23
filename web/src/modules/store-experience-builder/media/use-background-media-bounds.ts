@@ -66,8 +66,15 @@ export function backgroundPictureRefs(sections: ReadonlyArray<PictureSection>): 
   return out;
 }
 
-export function useBackgroundMediaBounds(sections: ReadonlyArray<PictureSection>): BackgroundMediaBounds {
-  const refs = backgroundPictureRefs(sections);
+/**
+ * `extraRefs` — pictures outside the sections that also need proven bounds (P3-A-06: the document-level global
+ * background's desktop and phone pictures). Same endpoint, same numbers the publish gate uses.
+ */
+export function useBackgroundMediaBounds(
+  sections: ReadonlyArray<PictureSection>,
+  extraRefs: ReadonlyArray<MediaRef> = [],
+): BackgroundMediaBounds {
+  const refs = [...backgroundPictureRefs(sections), ...extraRefs];
   const signature = refs.map((ref) => usageKey(ref)).join("|");
   const [entries, setEntries] = useState<Record<string, Entry>>({});
   const generation = useRef(0);

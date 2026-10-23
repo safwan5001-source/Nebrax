@@ -6,6 +6,7 @@ import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
 import type { StoreNavCategory } from "@/components/layout/CategoryNav";
 import { CategoryNav } from "@/components/layout/CategoryNav";
 import { Footer, FooterCategoryLinks } from "@/components/layout/Footer";
+import { GlobalBackgroundLayer } from "@/components/layout/GlobalBackgroundLayer";
 import { Header, HeaderMobileMenu } from "@/components/layout/Header";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { PublishedCardStyleProvider } from "@/components/layout/PublishedCardStyle";
@@ -27,6 +28,7 @@ import {
 import { publishedFooterGroups } from "@/lib/presentation/public-footer";
 import { publishedMainNav } from "@/lib/presentation/public-navigation";
 import { publishedLogoMedia } from "@/lib/presentation/resolved-media";
+import { resolveStorefrontBackgroundStyle } from "@/lib/presentation/storefront-background-render";
 import {
   isSafeAppStoreUrl,
   isSafePlayStoreUrl,
@@ -186,6 +188,12 @@ export default async function StorefrontLayout({
     footerMessages("shop"),
   );
   const themeStyle = publishedThemeStyle(presentation);
+  const backgroundStyle = presentation
+    ? resolveStorefrontBackgroundStyle(
+        presentation,
+        locale === "ar" ? "rtl" : "ltr",
+      )
+    : undefined;
   const themeAttrs = publishedThemeAttrs(presentation);
   const compact = presentation ? headerIsCompact(presentation.header) : false;
   const logoUrl = publishedLogoUrl(presentation, compact);
@@ -250,6 +258,11 @@ export default async function StorefrontLayout({
 
   const chrome = (
     <>
+      <GlobalBackgroundLayer
+        background={presentation?.background}
+        resolved={identity?.presentationMedia ?? {}}
+        presentation={presentation}
+      />
       {announcements?.enabled ? (
         <AnnouncementBar
           doc={announcements}
@@ -365,8 +378,8 @@ export default async function StorefrontLayout({
     <div
       data-published-theme=""
       {...themeAttrs}
-      className="flex min-h-screen flex-1 flex-col"
-      style={themeStyle}
+      className="relative isolate flex min-h-screen flex-1 flex-col"
+      style={{ ...themeStyle, ...backgroundStyle }}
     >
       {chrome}
     </div>
