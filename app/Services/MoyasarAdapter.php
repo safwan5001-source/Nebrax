@@ -310,7 +310,7 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
             if (! is_array($payment)) {
                 continue;
             }
-            $status = strtolower((string) ($payment['status'] ?? ''));
+            $status = $this->statusOf($payment);
             $paymentAmount = $this->intOrNull($payment['amount'] ?? null) ?? 0;
             if (in_array($status, ['paid', 'captured', 'refunded'], true)) {
                 // `captured` (الحقل الموثّق) هو المبلغ الملتقَط فعلاً وقد يقلّ عن `amount` في الالتقاط الجزئي. غيابه أو صفره على دفعة مسدَّدة
@@ -336,7 +336,7 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
             }
         }
 
-        $invoiceStatus = strtolower((string) ($invoice['status'] ?? ''));
+        $invoiceStatus = $this->statusOf($invoice);
         if ($capturedMinor > 0) {
             $status = PaymentAttempt::STATUS_CAPTURED;
         } elseif ($invoiceStatus === 'paid') {
@@ -386,10 +386,15 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
         }
 
         $paid = [];
-        foreach (is_array($invoice['payments'] ?? null) ? $invoice['payments'] : [] as $payment) {
-            if (is_array($payment) && in_array(strtolower((string) ($payment['status'] ?? '')), ['paid', 'captured', 'refunded'], true)) {
-                $paid[] = $payment;
+        try {
+            foreach (is_array($invoice['payments'] ?? null) ? $invoice['payments'] : [] as $payment) {
+                if (is_array($payment) && in_array($this->statusOf($payment), ['paid', 'captured', 'refunded'], true)) {
+                    $paid[] = $payment;
+                }
             }
+        } catch (PaymentGatewayException $e) {
+            // حالة دفعة معيبة (غير نصية) ⇒ لا يمكن حسم أيها المسدَّد ⇒ رفض قاطع قبل الإرسال.
+            throw new PaymentRefundRejectedException($e->reason, 'بيانات حالة الدفعة غير صالحة؛ لا يُرسَل الاسترداد.');
         }
         if (count($paid) !== 1) {
             throw new PaymentRefundRejectedException(
@@ -443,6 +448,24 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
         }
 
         return new PaymentProviderRefund($paymentId, $refundedAfter, $currency, $this->parseTime($response['refunded_at'] ?? null));
+    }
+
+    /**
+     * حالة نصية صغيرة؛ غائبة/null ⇒ فارغ، وغير النص (مصفوفة/كائن/رقم) معيب ⇒ `malformed_response` بدل تحويل يُصدر خطأ يخرج عن العقد.
+     *
+     * @param  array<string, mixed>  $document
+     */
+    private function statusOf(array $document): string
+    {
+        $value = $document['status'] ?? null;
+        if ($value === null) {
+            return '';
+        }
+        if (! is_string($value)) {
+            throw new PaymentGatewayException('moyasar.malformed_response', 'حالة الدفعة غير صالحة.');
+        }
+
+        return strtolower($value);
     }
 
     /**

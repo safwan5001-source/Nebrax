@@ -136,6 +136,19 @@ class MoyasarRefundTest extends TestCase
     }
 
     #[Test]
+    public function a_non_string_payment_status_is_a_definite_rejection_before_any_post_and_fails_the_snapshot_read(): void
+    {
+        foreach ([['paid'], new \stdClass, 7] as $bad) {
+            $this->fakeHttp(['api.moyasar.com/v1/invoices/*' => Http::response($this->invoiceWith(array_merge($this->paid(), ['status' => $bad])))]);
+            $e = $this->thrown(fn () => $this->adapter->refundPayment($this->gateway, MoyasarFixtures::INVOICE_ID, 100), 'bad status', PaymentRefundRejectedException::class);
+            $this->assertSame('moyasar.malformed_response', $e->reason);
+            Http::assertNotSent(fn (Request $r) => $r->method() === 'POST');
+
+            $this->thrown(fn () => $this->adapter->fetchPayment($this->gateway, MoyasarFixtures::INVOICE_ID), 'bad status snapshot', \App\Support\PaymentGatewayException::class);
+        }
+    }
+
+    #[Test]
     public function a_response_total_beyond_the_captured_amount_is_unknown_not_proof(): void
     {
         $partial = array_merge($this->paid(), ['captured' => 60000]);
