@@ -7,7 +7,7 @@
 | Was real Cloudflare R2 tested? | **No. BLOCKED.** This environment has no R2 test bucket, no scoped token and no R2 endpoint. **No claim of real-R2 validation is made anywhere in this report.** |
 | Is architecture B2 feasible on R2? | **Not yet proven. Not disproven.** The documented capabilities and the app's own SDK are compatible with B2 (§3), but every R2-specific behaviour (§5) is **unverified**. |
 | What was delivered instead | A complete, reproducible, credential-safe V0 test harness, validated end-to-end against a SigV4-validating **local look-alike** (24/24 required cases) and proven to detect (or correctly ignore) injected faults — including the three gate defects found in review (§5a) — **none of it is R2 evidence**. |
-| Video implementation | **NO-GO** until the harness passes on real R2 (V-G1). No video endpoint, DB change, UI, bucket or Railway change was made. |
+| Video implementation | **NO-GO** until the harness passes on real R2 (V-G1). *Status ladder (post-merge, see follow-up report): local simulation ✔ · real R2 test ✘ not run · V-G1 ✘ not approved · MP4/WebM ✘ not implemented · production ✘ not applicable.* No video endpoint, DB change, UI, bucket or Railway change was made. |
 | What unblocks it | Owner action in §6 (an isolated R2 test bucket + a bucket-scoped token as environment variables, and network egress to the R2 host). About 15 minutes of owner time, then one command. |
 
 | | |
@@ -189,6 +189,15 @@ Local look-alike only (**not R2**). The probe reads the 8 MiB object at ≈ 1 Mi
 
 Conclusions, limited to this simulator: (1) the signature is validated at request start — a download that began before expiry continued for ≈ 14 s after it and delivered every byte in **3 of 3** runs; (2) the trailing `UND_ERR_SOCKET` occurs on expiring *and* non-expiring URLs alike (1/3 vs 2/3), so it is a **transport artefact of the look-alike's connection handling, not an expiry effect**, and the occasional 64 KiB-short run (2 of 10) is the same artefact. I9 therefore stays **informational** and **unproven for R2**; the probe now records `socketErrorAfterAllBytes` so a clean tail is distinguishable from a truncated one. The B2 proxy does not rely on this behaviour (its own total deadline and URL TTL are independent).
 
+
+### 5c. Post-merge follow-up (PR #1558 review findings left open at merge)
+Two P2 threads were still open when #1558 merged (`5732917`). Both were confirmed in `main`, fixed in the follow-up PR, and recorded in `docs/reports/AWJ_ANIMATED_MEDIA_V0_FOLLOWUP_REPORT.md`:
+| # | Finding | Fix |
+|---|---|---|
+| P2-A | `v0-i9-experiment.mjs` never checked `res.status`: a 403/404/500 download URL produced a row and exit 0 (reproduced: pre-fix exit 0 on HTTP 403) | only HTTP 200 starts the measured download; anything else / no response → abort, no rows, body cancelled, exit 1, cleanup still verified |
+| P2-B | `classifyLocation` used `hostname.endsWith(endpointHost)`, so `evilacct.<endpoint>` was reported `same-host-https` | exact validated hostnames (`permittedHostnames`): the configured R2 endpoint host or `<valid-bucket>.<endpoint host>`, same port, no userinfo; shared with the guard; redirects still never followed |
+
+Local evidence only — **not R2**. 104 → 125 `node:test` tests pass; the new tests fail on the pre-fix code. The 24-case Scality look-alike run was **not repeated** in that environment (no Docker daemon), see the follow-up report.
 
 ## 6. Blockers requiring owner action
 | # | Action | Why | Constraint |
