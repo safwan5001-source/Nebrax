@@ -21,8 +21,12 @@ import { formatDateTime } from '@/lib/formatting';
 import { formatPayAmount } from '@/lib/pay-link';
 import { useCan } from '@/lib/use-can';
 import { apiErrorCode } from '@/modules/payments/gateways/contract';
+import { RefundsPanel } from '@/modules/payment-refunds/RefundsPanel';
+import { RequestRefundDialog } from '@/modules/payment-refunds/RequestRefundDialog';
+import { ResolveExternalDialog } from '@/modules/payment-refunds/ResolveExternalDialog';
+import { REQUEST_PERMISSION, RESOLVE_UNKNOWN_PERMISSION, VIEW_PERMISSION as REFUNDS_VIEW_PERMISSION } from '@/modules/payment-refunds/contract';
 import {
-  CAPTURE_STATUSES, REASON_MAX, RESOLVE_PERMISSION, VIEW_PERMISSION, blockedKind, buildListQuery, canRepost, knownRepostError, knownReviewReason,
+  CAPTURE_STATUSES, REASON_MAX, canRequestRefund, RESOLVE_PERMISSION, VIEW_PERMISSION, blockedKind, buildListQuery, canRepost, knownRepostError, knownReviewReason,
   providerOutcomeTone, knownProviderOutcome, reasonValid, rowPhase, rowTone, type AttemptDetail, type AttemptRow, type ListMeta, type RepostResult, type TabKey, type TimelineEvent,
 } from './contract';
 
@@ -39,6 +43,10 @@ export function PaymentsOnlinePage() {
   const demo = isDemo();
   const canView = can(VIEW_PERMISSION) && !demo;
   const canResolve = can(RESOLVE_PERMISSION);
+  const canViewRefunds = can(REFUNDS_VIEW_PERMISSION);
+  const canRequest = can(REQUEST_PERMISSION);
+  const canResolveExternal = can(RESOLVE_UNKNOWN_PERMISSION);
+  const tr = useTranslations('paymentRefunds');
 
   const [tab, setTab] = useState<TabKey>('all');
   const [captureStatus, setCaptureStatus] = useState('');
@@ -51,6 +59,10 @@ export function PaymentsOnlinePage() {
   const [error, setError] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [repostFor, setRepostFor] = useState<AttemptRow | null>(null);
+  const [section, setSection] = useState<'payments' | 'refunds'>('payments');
+  const [requestFor, setRequestFor] = useState<string | null>(null);
+  const [resolveFor, setResolveFor] = useState<string | null>(null);
+  const [refundsKey, setRefundsKey] = useState(0);
 
   // آخر طلب هو الحاسم: ردٌّ متأخر لاستعلام قديم (تبويب/مرشّح/صفحة تغيّرت) لا يكتب فوق الأحدث.
   const latest = useRef(0);
@@ -115,6 +127,7 @@ export function PaymentsOnlinePage() {
           <div className="flex flex-wrap items-center gap-1">
             <Badge tone={rowTone(r)}>{t(`phase_${rowPhase(r)}` as 'phase_none')}</Badge>
             {r.review_reasons.map((reason) => <Badge key={reason} tone="warning">{reviewLabel(reason)}</Badge>)}
+            {r.unrecognized_refund && <Badge tone="warning">{tr('external_flag')}</Badge>}
           </div>
         );
       },
@@ -127,10 +140,11 @@ export function PaymentsOnlinePage() {
         <div className="flex flex-wrap justify-end gap-1">
           <Button size="sm" variant="ghost" onClick={() => setDetailId(row.original.id)}>{t('action_details')}</Button>
           {canRepost(row.original, canResolve) && <Button size="sm" variant="outline" onClick={() => setRepostFor(row.original)}>{t('action_repost')}</Button>}
+          {canRequestRefund(row.original, canRequest) && <Button size="sm" variant="outline" onClick={() => setRequestFor(row.original.id)}>{tr('action_request_refund')}</Button>}
         </div>
       ),
     },
-  ], [t, locale, canResolve, reviewLabel]);
+  ], [t, tr, locale, canResolve, canRequest, reviewLabel]);
 
   const tabs: TabDef[] = [
     { id: 'all', label: t('tab_all') },
@@ -150,6 +164,17 @@ export function PaymentsOnlinePage() {
   return (
     <div className="space-y-4">
       <PageHeader title={t('title')} description={t('description')} />
+      {canViewRefunds && (
+        <Tabs
+          tabs={[{ id: 'payments', label: tr('section_payments') }, { id: 'refunds', label: tr('section_refunds') }]}
+          value={section}
+          onChange={(id) => setSection(id as 'payments' | 'refunds')}
+        />
+      )}
+      {canViewRefunds && section === 'refunds' ? (
+        <RefundsPanel refreshKey={refundsKey} onChanged={() => void load()} />
+      ) : (
+      <>
       <Tabs tabs={tabs} value={tab} onChange={(id) => { setTab(id as TabKey); setPage(1); }} />
       {tab === 'all' && (
         <div className="flex max-w-xs flex-col gap-1.5">
@@ -175,7 +200,24 @@ export function PaymentsOnlinePage() {
         <Pagination page={meta.page} lastPage={meta.last_page} perPage={meta.per_page} total={meta.total} onPageChange={setPage} onPerPageChange={(n) => { setPerPage(n); setPage(1); }} />
       )}
 
-      {detailId && <DetailSheet id={detailId} locale={locale} reviewLabel={reviewLabel} onClose={() => setDetailId(null)} />}
+      </>
+      )}
+
+      {detailId && <DetailSheet id={detailId} locale={locale} reviewLabel={reviewLabel} canResolveExternal={canResolveExternal} onResolveExternal={(attemptId) => setResolveFor(attemptId)} onClose={() => setDetailId(null)} />}
+      {requestFor && (
+        <RequestRefundDialog
+          attemptId={requestFor}
+          onClose={() => setRequestFor(null)}
+          onDone={() => { setRequestFor(null); setRefundsKey((k) => k + 1); if (canViewRefunds) setSection('refunds'); }}
+        />
+      )}
+      {resolveFor && (
+        <ResolveExternalDialog
+          attemptId={resolveFor}
+          onClose={() => setResolveFor(null)}
+          onDone={() => { setResolveFor(null); setDetailId(null); setRefundsKey((k) => k + 1); void load(); }}
+        />
+      )}
       {repostFor && (
         <RepostDialog
           row={repostFor}
@@ -187,8 +229,11 @@ export function PaymentsOnlinePage() {
   );
 }
 
-function DetailSheet({ id, locale, reviewLabel, onClose }: { id: string; locale: string; reviewLabel: (r: string) => string; onClose: () => void }) {
+function DetailSheet({ id, locale, reviewLabel, canResolveExternal, onResolveExternal, onClose }: {
+  id: string; locale: string; reviewLabel: (r: string) => string; canResolveExternal: boolean; onResolveExternal: (attemptId: string) => void; onClose: () => void;
+}) {
   const t = useTranslations('paymentsOnline');
+  const tr = useTranslations('paymentRefunds');
   const [detail, setDetail] = useState<AttemptDetail | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -234,6 +279,15 @@ function DetailSheet({ id, locale, reviewLabel, onClose }: { id: string; locale:
                 <p role="note" className="rounded border border-negative/30 bg-negative/5 p-3 text-sm leading-6 text-negative">
                   {t(`blocked_${blockedKind(detail)}` as 'blocked_period')}
                 </p>
+              )}
+              {detail.unrecognized_refund_at && (
+                <div role="note" className="space-y-2 rounded border border-warning/30 bg-warning/5 p-3 text-sm leading-6 text-warning">
+                  <p>{tr('external_flag_note', { amount: formatPayAmount(detail.unrecognized_refund_minor ?? 0, detail.currency) })}</p>
+                  {canResolveExternal && <Button size="sm" variant="outline" onClick={() => onResolveExternal(detail.id)}>{tr('action_resolve_external')}</Button>}
+                </div>
+              )}
+              {detail.refunded_minor > 0 && (
+                <p className="text-sm text-muted">{tr('already_refunded')}: <bdi dir="ltr">{formatPayAmount(detail.refunded_minor, detail.currency)}</bdi></p>
               )}
               {detail.postings.length > 0 && (
                 <section aria-labelledby="po-postings" className="space-y-2">

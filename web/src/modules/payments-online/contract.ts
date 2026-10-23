@@ -21,6 +21,8 @@ export interface AttemptRow {
   captured_minor: number;
   currency: string;
   review_reasons: string[];
+  /** رُصد استرداد لدى المزوّد لا يفسّره استرداد داخلي (PAY-H3-01): يمنع طلبات الاسترداد حتى حسمه. */
+  unrecognized_refund: boolean;
   blocked_reason: { kind?: string; [key: string]: unknown } | null;
   accounting_date: string | null;
   captured_at: string | null;
@@ -43,6 +45,8 @@ export type TimelineEvent =
 export interface AttemptDetail extends AttemptRow {
   failure_code: string | null;
   refunded_minor: number;
+  unrecognized_refund_at: string | null;
+  unrecognized_refund_minor: number | null;
   postings: AttemptPosting[];
   timeline: TimelineEvent[];
 }
@@ -107,3 +111,7 @@ export const knownProviderOutcome = (outcome: string | null | undefined): Provid
 /** `applied` عادي؛ المكرَّر/القديم مُهمَل بلا أثر؛ التعارض وعدم وجود المحاولة يحتاجان انتباهاً. */
 export const providerOutcomeTone = (outcome: ProviderOutcome | 'other'): BadgeTone =>
   outcome === 'applied' ? 'neutral' : outcome === 'state_conflict' || outcome === 'attempt_not_found' ? 'warning' : 'muted';
+
+/** طلب استرداد: دفعة مرحَّلة التقاطها ولمن يملك الصلاحية (الخادم يعيد التحقق من الأهلية ويشرح المانع). */
+export const canRequestRefund = (row: Pick<AttemptRow, 'capture_status' | 'posting_status'>, allowed: boolean): boolean =>
+  allowed && row.capture_status === 'captured' && row.posting_status === 'posted';
