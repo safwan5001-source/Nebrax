@@ -98,7 +98,7 @@ final class ProductImportValueNormalizer
     }
 
     /** @return array{0:?bool,1:?string} */
-    private static function boolean(string $text): array
+    public static function boolean(string $text): array
     {
         $value = mb_strtolower(self::digits($text), 'UTF-8');
         if (in_array($value, self::BOOLEAN_TRUE, true)) {
