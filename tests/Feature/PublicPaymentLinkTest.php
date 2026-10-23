@@ -403,6 +403,39 @@ class PublicPaymentLinkTest extends TestCase
     }
 
     #[Test]
+    public function skipped_expired_requests_with_active_attempts_do_not_starve_later_stale_ones_and_captured_unposted_ones_are_never_expired(): void
+    {
+        // طلبان منتهيان بمحاولة نشطة (يُتخطَّيان)، وطلب منتهٍ بالتقاط غير مرحَّل (لا يُنهى)، ثم مسدَّد يجب أن يُكنس رغم limit=1.
+        $stuck = [];
+        foreach (range(1, 2) as $i) {
+            $request = $this->requests->create($this->invoice(), $this->gateway, $this->owner, false, now()->addMinutes(5));
+            $this->requests->startAttempt($request, 'idem-skip-000'.$i, null, $this->owner);
+            $stuck[] = $request;
+        }
+        $capturedInvoice = $this->invoice();
+        $capturedRequest = $this->requests->create($capturedInvoice, $this->gateway, $this->owner, false, now()->addMinutes(5));
+        $attempt = $this->requests->startAttempt($capturedRequest, 'idem-skip-0003', null, $this->owner);
+        \Illuminate\Support\Facades\Event::fake([\App\Events\PaymentAttemptCaptured::class]);
+        $this->fake->script($attempt->provider_payment_id, 'captured');
+        app(\App\Services\PaymentOrchestrator::class)->sync($attempt);
+
+        $settledInvoice = $this->invoice();
+        $settled = $this->requests->create($settledInvoice, $this->gateway, $this->owner);
+        $payments = app(PaymentService::class);
+        $payments->post($payments->create(['partner_id' => $settledInvoice->partner_id, 'amount' => 115000, 'direction' => 'received', 'method' => 'cash', 'invoice_id' => $settledInvoice->id]));
+        $this->travel(10)->minutes();
+
+        $summary = $this->requests->closeStale(1);
+
+        $this->assertSame(1, $summary['cancelled'], 'المسدَّد وُصل إليه رغم المتخطّاة قبله');
+        $this->assertSame('cancelled', $settled->fresh()->status);
+        $this->assertSame('open', $capturedRequest->fresh()->status, 'الالتقاط غير المرحَّل لا يُنهى');
+        foreach ($stuck as $request) {
+            $this->assertSame('open', $request->fresh()->status);
+        }
+    }
+
+    #[Test]
     public function the_sweeper_never_cancels_a_request_whose_payment_was_captured_at_the_provider(): void
     {
         $invoice = $this->invoice();
