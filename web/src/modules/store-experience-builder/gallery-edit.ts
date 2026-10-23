@@ -94,6 +94,7 @@ export function compactOptions(resolved: ResolvedGalleryOptions): GalleryOptions
   if (resolved.gap !== GALLERY_DEFAULT_GAP) out.gap = resolved.gap as Exclude<typeof resolved.gap, "md">;
   if (resolved.captions) out.captions = true;
   if (resolved.lightbox) out.lightbox = true;
+  if (resolved.showMotionControls) out.showMotionControls = true;
   return out;
 }
 

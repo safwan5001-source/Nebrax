@@ -1290,6 +1290,7 @@ export function StorefrontPreviewCanvas({
                     label: t("canvasGalleryLabel"),
                     empty: t("canvasGalleryEmpty"),
                     item: t("canvasGalleryItem"),
+                    motion: { pause: t("canvasMotionPause"), play: t("canvasMotionPlay") },
                   }}
                 />
               );

@@ -1,5 +1,11 @@
 import type { CSSProperties } from "react";
+import { MotionPicture, MotionToggle } from "@/components/ui/motion-picture";
 import { destination } from "@/lib/home/destination";
+import {
+  animatedPictureSources,
+  exceedsMotionBudget,
+  MOTION_BUDGET_MS,
+} from "@/lib/presentation/animated-sources";
 import {
   type GalleryImageView,
   type GalleryView,
@@ -20,6 +26,12 @@ export type { GalleryLabels } from "./GalleryClient";
  *    (a no-JS visitor simply opens the picture) that `GalleryClient` upgrades to the modal viewer after hydration;
  *  - captions (when switched on) are `<figcaption>`s under the picture, on the section surface.
  *
+ * AWJ-ANIMATED-MEDIA — a picture whose asset is an animated GIF / WebP plays through `MotionPicture` (first-frame still for
+ * SSR / no-JS / reduced motion, animation added after hydration) in the grid AND in the viewer. WCAG 2.2.2 is met per
+ * gallery by the merchant's `showMotionControls`: on ⇒ ONE pause/play control for the whole gallery (grid and viewer share its
+ * state); off (the default) ⇒ no control is drawn and each looping / long animation instead plays a bounded window
+ * (`MOTION_BUDGET_MS`) once on screen and settles on its still frame. Galleries without an animated picture render exactly as before.
+ *
  * No colour, URL or style from the document reaches the DOM except through validated custom properties and the existing
  * destination / media-proxy rules.
  */
@@ -35,21 +47,51 @@ function sizesFor(columns: number): string {
   return `(min-width: 1024px) ${Math.round(100 / columns)}vw, (min-width: 640px) ${Math.round(100 / tabletColumns(columns))}vw, ${Math.round(100 / PHONE_COLUMNS)}vw`;
 }
 
+/** What makes a gallery picture animated: its `MotionPicture` identity and sources (both the grid and the viewer read it). */
+interface GalleryMotion {
+  id: string;
+  sources: NonNullable<ReturnType<typeof animatedPictureSources>>;
+  autoStopMs?: number;
+}
+
+function motionOf(
+  image: GalleryImageView,
+  sizes: string,
+  sectionId: string,
+  controls: boolean,
+): GalleryMotion | null {
+  const animation = image.media.animation;
+  const sources = animatedPictureSources(image.media, undefined, sizes);
+  if (!animation || !sources) return null;
+  return {
+    // one shared state with a visible control; otherwise each picture runs its own bounded window
+    id: controls
+      ? `${sectionId}-gallery-motion`
+      : `${sectionId}-gallery-motion-${image.id}`,
+    sources,
+    ...(!controls && exceedsMotionBudget(animation)
+      ? { autoStopMs: MOTION_BUDGET_MS }
+      : {}),
+  };
+}
+
 function Picture({
   image,
   sizes,
   eager,
+  motion,
 }: {
   image: GalleryImageView;
   sizes: string;
   eager: boolean;
+  motion: GalleryMotion | null;
 }) {
   const data = pictureData(image.media);
   const position = image.focal
     ? `${image.focal.x}% ${image.focal.y}%`
     : undefined;
-  return (
-    <picture data-gallery-picture="">
+  const contents = (
+    <>
       {data.webp ? (
         <source type="image/webp" srcSet={data.webp} sizes={sizes} />
       ) : null}
@@ -67,7 +109,19 @@ function Picture({
           position ? ({ objectPosition: position } as CSSProperties) : undefined
         }
       />
-    </picture>
+    </>
+  );
+  return motion ? (
+    <MotionPicture
+      id={motion.id}
+      sources={motion.sources}
+      autoStopMs={motion.autoStopMs}
+      data-gallery-picture=""
+    >
+      {contents}
+    </MotionPicture>
+  ) : (
+    <picture data-gallery-picture="">{contents}</picture>
   );
 }
 
@@ -89,9 +143,19 @@ export function HomeGallery({
 }) {
   const { images, options, layout } = view;
   const sizes = sizesFor(options.columns);
-  const viewerItems = images.map((image) => {
+  const controls = options.showMotionControls;
+  // the viewer's picture is full-bleed, so its sources are built for `100vw`; the grid's for the column widths
+  const gridMotion = images.map((image) =>
+    motionOf(image, sizes, sectionId, controls),
+  );
+  const hasMotion = gridMotion.some(Boolean);
+  const viewerItems = images.map((image, index) => {
     const data = pictureData(image.media);
+    const viewerMotion = gridMotion[index]
+      ? motionOf(image, "100vw", sectionId, controls)
+      : null;
     return {
+      ...(viewerMotion ? { motion: viewerMotion } : {}),
       webp: data.webp,
       jpg: data.jpg,
       src: data.fallback,
@@ -119,7 +183,15 @@ export function HomeGallery({
         viewer={options.lightbox}
         dir={dir}
         sectionId={sectionId}
+        motionToggleId={
+          controls && hasMotion ? `${sectionId}-gallery-motion` : undefined
+        }
       >
+        {controls && hasMotion ? (
+          <div data-gallery-motion="">
+            <MotionToggle id={`${sectionId}-gallery-motion`} />
+          </div>
+        ) : null}
         <ul data-gallery-list="">
           {images.map((image, index) => {
             const href = image.link ? destination(basePath, image.link) : null;
@@ -133,6 +205,7 @@ export function HomeGallery({
                   image={image}
                   sizes={sizes}
                   eager={priority && index < options.columns}
+                  motion={gridMotion[index]}
                 />
               </span>
             );

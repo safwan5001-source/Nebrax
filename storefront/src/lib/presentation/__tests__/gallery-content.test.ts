@@ -78,6 +78,7 @@ describe("gallery helpers (V8d)", () => {
       gap: "md",
       captions: false,
       lightbox: false,
+      showMotionControls: false,
     });
     expect(
       resolveGalleryOptions({
@@ -86,6 +87,7 @@ describe("gallery helpers (V8d)", () => {
         gap: "none",
         captions: true,
         lightbox: true,
+        showMotionControls: true,
       }),
     ).toEqual({
       columns: 6,
@@ -93,6 +95,7 @@ describe("gallery helpers (V8d)", () => {
       gap: "none",
       captions: true,
       lightbox: true,
+      showMotionControls: true,
     });
   });
 
