@@ -17,6 +17,8 @@ const GalleryLightbox = dynamic(
 );
 
 export interface GalleryViewerItem {
+  animation?: string;
+  format?: "gif" | "webp";
   webp: string;
   jpg: string;
   src: string;
