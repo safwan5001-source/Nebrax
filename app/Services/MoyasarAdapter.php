@@ -319,11 +319,11 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
                 $capturedMinor += $captured !== null && $captured > 0 ? min($captured, $paymentAmount) : $paymentAmount;
                 // المسترد التراكمي (حقل `refunded` الموثّق، عدد صحيح ≤ مبلغ الدفعة): حقيقة المزوّد لمطابقة الاسترداد؛ لا يتجاوز مبلغ الدفعة.
                 $refunded = $payment['refunded'] ?? null;
-                if ($refunded !== null && (($refundedInt = $this->intOrNull($refunded)) === null || $refundedInt < 0)) {
-                    // مسترد سالب/غير عددي معيب: لا يُطبَّع إلى صفر (يُخفي استرداداً حقيقياً من المطابِق) — قراءة فاشلة قابلة لإعادة المحاولة.
+                if ($refunded !== null && (($refundedInt = $this->intOrNull($refunded)) === null || $refundedInt < 0 || $refundedInt > $paymentAmount)) {
+                    // مسترد سالب/غير عددي/أكبر من مبلغ الدفعة معيب: لا يُطبَّع (صفراً يُخفي استرداداً حقيقياً، أو كاملاً يبدو دليل اكتمال) — قراءة فاشلة قابلة للإعادة.
                     throw new PaymentGatewayException('moyasar.malformed_response', 'قيمة المبلغ المسترد غير صالحة.');
                 }
-                $refundedMinor += min($refundedInt ?? 0, $paymentAmount);
+                $refundedMinor += $refundedInt ?? 0;
                 $stamp = $this->parseTime($payment['captured_at'] ?? $payment['updated_at'] ?? $payment['created_at'] ?? null);
                 if ($stamp !== null && ($capturedAt === null || $stamp->greaterThan($capturedAt))) {
                     $capturedAt = $stamp;
@@ -400,7 +400,10 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
         $payment = $paid[0];
         $paymentId = $payment['id'] ?? null;
         $paymentAmount = $this->intOrNull($payment['amount'] ?? null);
-        if (! is_string($paymentId) || $paymentId === '' || $paymentAmount === null || strtoupper((string) ($payment['currency'] ?? '')) !== strtoupper((string) ($invoice['currency'] ?? ''))) {
+        $paymentCurrency = strtoupper((string) ($payment['currency'] ?? ''));
+        // العملة تُتحقق **شكلاً** قبل الإرسال (ثلاثة أحرف) ثم تُطابق عملة الفاتورة؛ فلا تمرّ بيانات معيبة متماثلة ثم تفشل بعد التنفيذ.
+        if (! is_string($paymentId) || $paymentId === '' || $paymentAmount === null || preg_match('/^[A-Z]{3}$/', $paymentCurrency) !== 1
+            || $paymentCurrency !== strtoupper((string) ($invoice['currency'] ?? ''))) {
             throw new PaymentRefundRejectedException('moyasar.malformed_response', 'بيانات الدفعة غير صالحة للاسترداد.');
         }
 
@@ -427,7 +430,7 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
 
         $refundedAfter = $this->intOrNull($response['refunded'] ?? null);
         $currency = strtoupper((string) ($response['currency'] ?? ''));
-        $expectedCurrency = strtoupper((string) ($payment['currency'] ?? ''));
+        $expectedCurrency = $paymentCurrency;
         // النجاح يشترط **إثبات** أن هذا الـPOST طُبِّق: التراكمي ≥ ما قبل + المبلغ (قد يزيد باسترداد خارجي متزامن ويحسمه المستدعي) وضمن مبلغ الدفعة.
         // ردّ 2xx بتراكمي أقل (لم يُطبَّق، أو سالب/معيب) لا يُعدّ نجاحاً ولا رفضاً قاطعاً: بعد الإرسال ⇒ غير معروف يحسمه المطابِق.
         if (! is_string($response['id'] ?? null) || ! hash_equals($paymentId, $response['id']) || $refundedAfter === null

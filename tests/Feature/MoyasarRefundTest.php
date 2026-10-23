@@ -216,10 +216,31 @@ class MoyasarRefundTest extends TestCase
         $e = $this->thrown(fn () => $this->adapter->fetchPayment($this->gateway, MoyasarFixtures::INVOICE_ID), 'snapshot negative', \App\Support\PaymentGatewayException::class);
         $this->assertSame('moyasar.malformed_response', $e->reason);
 
+        // مسترد أكبر من مبلغ الدفعة في اللقطة: لا يُطبَّع إلى «استرداد كامل» (دليل اكتمال زائف للمطابِق).
+        $this->fakeHttp(['api.moyasar.com/v1/invoices/*' => Http::response($this->invoiceWith($this->paid(refunded: 999999)))]);
+        $e = $this->thrown(fn () => $this->adapter->fetchPayment($this->gateway, MoyasarFixtures::INVOICE_ID), 'snapshot overlarge', \App\Support\PaymentGatewayException::class);
+        $this->assertSame('moyasar.malformed_response', $e->reason);
+
         // الفحص المسبق: خط الأساس المعيب (سالب أو أكبر من مبلغ الدفعة) ⇒ لا إرسال.
         foreach ([-7, 999999] as $bad) {
             $this->fakeHttp(['api.moyasar.com/v1/invoices/*' => Http::response($this->invoiceWith($this->paid(refunded: $bad)))]);
             $e = $this->thrown(fn () => $this->adapter->refundPayment($this->gateway, MoyasarFixtures::INVOICE_ID, 100), "preflight {$bad}", PaymentRefundRejectedException::class);
+            $this->assertSame('moyasar.malformed_response', $e->reason);
+            Http::assertNotSent(fn (Request $r) => $r->method() === 'POST');
+        }
+    }
+
+    #[Test]
+    public function a_malformed_currency_on_both_invoice_and_payment_is_rejected_before_any_post(): void
+    {
+        foreach ([null, '', 'SA', 'SARX', '12$'] as $bad) {
+            $payment = $this->paid();
+            $payment['currency'] = $bad;
+            $invoice = $this->invoiceWith($payment);
+            $invoice['currency'] = $bad;
+            $this->fakeHttp(['api.moyasar.com/v1/invoices/*' => Http::response($invoice)]);
+
+            $e = $this->thrown(fn () => $this->adapter->refundPayment($this->gateway, MoyasarFixtures::INVOICE_ID, 100), 'currency '.json_encode($bad), PaymentRefundRejectedException::class);
             $this->assertSame('moyasar.malformed_response', $e->reason);
             Http::assertNotSent(fn (Request $r) => $r->method() === 'POST');
         }
