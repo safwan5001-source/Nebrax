@@ -62,11 +62,22 @@ final class MoyasarApiClient
     }
 
     /**
+     * استرداد دفعة (PAY-H3-01a): `POST /payments/{id}/refund` بـ`{amount}` — **بلا أي إعادة محاولة** (لا idempotency موثّق للاسترداد). المسار الوحيد
+     * الذي يلمس `/payments` في هذه الطبقة، ولا يُنشئ دفعة ولا يحمل بطاقة. يرجع كائن الدفعة المحدَّث (يحمل `refunded` التراكمي).
+     *
+     * @return array<string, mixed>
+     */
+    public function refundPayment(PaymentGateway $gateway, string $paymentId, int $amountMinor): array
+    {
+        return $this->send($gateway, 'POST', '/payments/'.rawurlencode($paymentId).'/refund', json: ['amount' => $amountMinor], definiteRejectionsOnly: true);
+    }
+
+    /**
      * @param  array<string, string>  $query
      * @param  array<string, mixed>|null  $json
      * @return array<string, mixed>
      */
-    private function send(PaymentGateway $gateway, string $method, string $path, array $query = [], ?array $json = null): array
+    private function send(PaymentGateway $gateway, string $method, string $path, array $query = [], ?array $json = null, bool $definiteRejectionsOnly = false): array
     {
         $this->policy->assert((string) $gateway->environment, $gateway->publishable_key, $gateway->secret_key);
         $secret = (string) $gateway->secret_key;
@@ -97,11 +108,11 @@ final class MoyasarApiClient
             throw new PaymentGatewayException('moyasar.unavailable', 'تعذّر الاتصال بـMoyasar.');
         }
 
-        return $this->decode($response);
+        return $this->decode($response, $definiteRejectionsOnly);
     }
 
     /** @return array<string, mixed> */
-    private function decode(Response $response): array
+    private function decode(Response $response, bool $definiteRejectionsOnly = false): array
     {
         $status = $response->status();
 
@@ -116,6 +127,10 @@ final class MoyasarApiClient
         }
         if ($status === 404) {
             throw new PaymentGatewayException('moyasar.not_found', 'المورد غير موجود لدى Moyasar.');
+        }
+        // POST لا يُعاد: رفض «قاطع» (لم يُنفَّذ شيء) لا يُعلَن إلا لحالتَي 400/422؛ غيرها (408/409/3xx/4xx من وسيط) لا يثبت أن الطلب لم يبلغ المزوّد.
+        if ($definiteRejectionsOnly && ($status < 200 || $status >= 300) && ! in_array($status, [400, 422], true)) {
+            throw new PaymentGatewayException('moyasar.unexpected_status', "حالة HTTP غير متوقعة من Moyasar ({$status}).");
         }
         if ($status < 200 || $status >= 300) {
             throw new PaymentGatewayException('moyasar.rejected', "رفض Moyasar الطلب (HTTP {$status}).");

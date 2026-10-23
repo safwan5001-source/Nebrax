@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Contracts\GatewayAdapter;
+use App\Contracts\RefundsPayments;
 use App\Contracts\RedactsStoredWebhookBody;
 use App\Contracts\VerifiesGatewayCredentials;
 use App\Models\PaymentAttempt;
@@ -13,6 +14,9 @@ use App\Support\PaymentGatewayCapabilities;
 use App\Support\PaymentGatewayException;
 use App\Support\PaymentHostedCheckout;
 use App\Support\PaymentProviderSnapshot;
+use App\Support\PaymentRefundUnknownException;
+use App\Support\PaymentRefundRejectedException;
+use App\Support\PaymentProviderRefund;
 use App\Support\PaymentRawWebhook;
 use App\Support\PaymentVerifiedWebhook;
 use Carbon\CarbonImmutable;
@@ -32,7 +36,7 @@ use Throwable;
  *
  * ما يلزم تثبيته في Sandbox الحقيقي ولا يُفترض هنا: شكل غلاف قائمة الفواتير، وهل تقبل فاتورة `failed` محاولة جديدة، وجسم `payment_paid` الفعلي.
  */
-final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, VerifiesGatewayCredentials
+final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, RefundsPayments, VerifiesGatewayCredentials
 {
     public const PROVIDER = 'moyasar';
 
@@ -54,7 +58,8 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
 
     public function capabilities(): PaymentGatewayCapabilities
     {
-        return new PaymentGatewayCapabilities(true, ['SAR'], self::MIN_AMOUNT_MINOR);
+        // `refunds`: مدعوم بالعقد وFixtures؛ استرداد Sandbox الحقيقي PENDING(EXT-01) فلا يُفعَّل مسار مستخدم قبل شريحته وضابطه.
+        return new PaymentGatewayCapabilities(true, ['SAR'], self::MIN_AMOUNT_MINOR, true);
     }
 
     public function createCheckout(PaymentAttemptContext $context): PaymentHostedCheckout
@@ -296,6 +301,7 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
         }
 
         $capturedMinor = 0;
+        $refundedMinor = 0;
         $capturedAt = null;
         $authorized = false;
         $failureCode = null;
@@ -304,13 +310,20 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
             if (! is_array($payment)) {
                 continue;
             }
-            $status = strtolower((string) ($payment['status'] ?? ''));
+            $status = $this->statusOf($payment);
             $paymentAmount = $this->intOrNull($payment['amount'] ?? null) ?? 0;
             if (in_array($status, ['paid', 'captured', 'refunded'], true)) {
                 // `captured` (الحقل الموثّق) هو المبلغ الملتقَط فعلاً وقد يقلّ عن `amount` في الالتقاط الجزئي. غيابه أو صفره على دفعة مسدَّدة
                 // ⇒ المبلغ كاملاً (دفعة `paid` بلا التقاط جزئي)؛ ولا يتجاوز أبداً مبلغ الدفعة. قيمة صفر الفعلية تُثبَّت في Sandbox.
-                $captured = $this->intOrNull($payment['captured'] ?? null);
-                $capturedMinor += $captured !== null && $captured > 0 ? min($captured, $paymentAmount) : $paymentAmount;
+                $chargeable = $this->chargeableOf($payment, $paymentAmount);
+                $capturedMinor += $chargeable;
+                // المسترد التراكمي (حقل `refunded` الموثّق، عدد صحيح ≤ مبلغ الدفعة): حقيقة المزوّد لمطابقة الاسترداد؛ لا يتجاوز مبلغ الدفعة.
+                $refunded = $payment['refunded'] ?? null;
+                if ($refunded !== null && (($refundedInt = $this->intOrNull($refunded)) === null || $refundedInt < 0 || $refundedInt > $chargeable)) {
+                    // مسترد سالب/غير عددي/أكبر من **المبلغ الملتقط الفعلي** (لا مبلغ الشحن الأصلي) معيب: لا يُطبَّع (صفراً يُخفي استرداداً حقيقياً، أو كاملاً يبدو دليل اكتمال) — قراءة فاشلة قابلة للإعادة.
+                    throw new PaymentGatewayException('moyasar.malformed_response', 'قيمة المبلغ المسترد غير صالحة.');
+                }
+                $refundedMinor += $refundedInt ?? 0;
                 $stamp = $this->parseTime($payment['captured_at'] ?? $payment['updated_at'] ?? $payment['created_at'] ?? null);
                 if ($stamp !== null && ($capturedAt === null || $stamp->greaterThan($capturedAt))) {
                     $capturedAt = $stamp;
@@ -323,7 +336,7 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
             }
         }
 
-        $invoiceStatus = strtolower((string) ($invoice['status'] ?? ''));
+        $invoiceStatus = $this->statusOf($invoice);
         if ($capturedMinor > 0) {
             $status = PaymentAttempt::STATUS_CAPTURED;
         } elseif ($invoiceStatus === 'paid') {
@@ -347,7 +360,178 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
             $capturedMinor,
             $status === PaymentAttempt::STATUS_CAPTURED ? ($capturedAt ?? CarbonImmutable::now('UTC')) : null,
             $failureCode,
+            $refundedMinor,
         );
+    }
+
+    /**
+     * استرداد دفعة (PAY-H3-01a، ADR-0007). `$providerPaymentId` مرجع المحاولة (فاتورة Moyasar): تُجلب الفاتورة (GET آمن) وتُحلّ منها **الدفعة المسدَّدة الوحيدة**
+     * (صفر أو أكثر من واحدة ⇒ رفض قاطع غامض)، ويُتحقق من العملة والسقف (≤ الملتقط − المسترد حتى الآن) **قبل** الإرسال. ثم `POST` واحد بلا إعادة محاولة.
+     * الخطأ قبل الإرسال أو رفض المزوّد (4xx/401/403/429/404) = `PaymentRefundRejectedException` (لم يُنفَّذ شيء)؛ انقطاع/مهلة/5xx/استجابة غير مفهومة
+     * **بعد** الإرسال = `PaymentRefundUnknownException` (قد يكون نُفِّذ — يحسمه المطابِق بالتراكمي). الاستجابة تُفحص: المعرّف والعملة، و`refunded` عدد صحيح.
+     */
+    public function refundPayment(PaymentGateway $gateway, string $providerPaymentId, int $amountMinor): PaymentProviderRefund
+    {
+        if ($amountMinor <= 0) {
+            throw new PaymentRefundRejectedException('moyasar.invalid_refund_amount', 'مبلغ الاسترداد يجب أن يكون موجباً.');
+        }
+
+        try {
+            $invoice = $this->client->fetchInvoice($gateway, $providerPaymentId);
+        } catch (PaymentGatewayException $e) {
+            throw new PaymentRefundRejectedException($e->reason, $e->getMessage());
+        }
+        if (! is_string($invoice['id'] ?? null) || ! hash_equals($providerPaymentId, $invoice['id'])) {
+            throw new PaymentRefundRejectedException('moyasar.reference_mismatch', 'مرجع الفاتورة لا يطابق المطلوب.');
+        }
+
+        $paid = [];
+        $rawPayments = $invoice['payments'] ?? [];
+        if ($rawPayments !== null && ! is_array($rawPayments)) {
+            throw new PaymentRefundRejectedException('moyasar.malformed_response', 'قائمة الدفعات غير صالحة؛ لا يُرسَل الاسترداد.');
+        }
+        try {
+            foreach ($rawPayments ?? [] as $payment) {
+                // مدخل غير مصفوفة ⇒ حالته مجهولة فلا يمكن الجزم بوحدانية الدفعة المسدَّدة ⇒ رفض قاطع.
+                if (! is_array($payment)) {
+                    throw new PaymentGatewayException('moyasar.malformed_response', 'مدخل دفعة غير صالح.');
+                }
+                if (in_array($this->statusOf($payment), ['paid', 'captured', 'refunded'], true)) {
+                    $paid[] = $payment;
+                }
+            }
+        } catch (PaymentGatewayException $e) {
+            // حالة دفعة معيبة (غير نصية) ⇒ لا يمكن حسم أيها المسدَّد ⇒ رفض قاطع قبل الإرسال.
+            throw new PaymentRefundRejectedException($e->reason, 'بيانات حالة الدفعة غير صالحة؛ لا يُرسَل الاسترداد.');
+        }
+        if (count($paid) !== 1) {
+            throw new PaymentRefundRejectedException(
+                $paid === [] ? 'moyasar.no_paid_payment' : 'moyasar.ambiguous_payment',
+                $paid === [] ? 'لا توجد دفعة مسدَّدة لاستردادها.' : 'أكثر من دفعة مسدَّدة على الفاتورة؛ لا يُحسم الاسترداد آلياً.',
+            );
+        }
+        $payment = $paid[0];
+        $paymentId = $payment['id'] ?? null;
+        $paymentAmount = $this->intOrNull($payment['amount'] ?? null);
+        $paymentCurrency = $this->currencyOf($payment);
+        // العملة تُتحقق **شكلاً** قبل الإرسال (ثلاثة أحرف) ثم تُطابق عملة الفاتورة؛ فلا تمرّ بيانات معيبة متماثلة ثم تفشل بعد التنفيذ.
+        // الدفعة المختارة يجب أن تنتمي لهذه الفاتورة نصّاً (لا تُسترد دفعة فاتورة أخرى بردّ متناقض).
+        if (! is_string($payment['invoice_id'] ?? null) || ! hash_equals($providerPaymentId, $payment['invoice_id'])) {
+            throw new PaymentRefundRejectedException('moyasar.reference_mismatch', 'الدفعة لا تنتمي إلى الفاتورة المطلوبة.');
+        }
+        if (! is_string($paymentId) || $paymentId === '' || $paymentAmount === null || preg_match('/^[A-Z]{3}$/', $paymentCurrency) !== 1
+            || $paymentCurrency !== $this->currencyOf($invoice)) {
+            throw new PaymentRefundRejectedException('moyasar.malformed_response', 'بيانات الدفعة غير صالحة للاسترداد.');
+        }
+
+        try {
+            $chargeable = $this->chargeableOf($payment, $paymentAmount);
+        } catch (PaymentGatewayException $e) {
+            // سقف الاسترداد مجهول ⇒ لا نُرسل (قد يُفرَط الاسترداد) ⇒ رفض قاطع قبل أي POST.
+            throw new PaymentRefundRejectedException($e->reason, 'قيمة المبلغ الملتقط لدى المزوّد غير صالحة؛ لا يُرسَل الاسترداد.');
+        }
+        $rawRefunded = $payment['refunded'] ?? null;
+        $refundedBefore = $rawRefunded === null ? 0 : $this->intOrNull($rawRefunded);
+        // التراكمي قبل الإرسال أساس السقف: قيمة معيبة (سالبة/غير عددية/أكبر من الملتقط الفعلي) ⇒ لا نُرسل (قد يُفرَط الاسترداد) ⇒ رفض قاطع.
+        if ($refundedBefore === null || $refundedBefore < 0 || $refundedBefore > $chargeable) {
+            throw new PaymentRefundRejectedException('moyasar.malformed_response', 'قيمة المبلغ المسترد لدى المزوّد غير صالحة؛ لا يُرسَل الاسترداد.');
+        }
+        // حالة `refunded` (مسترد بالكامل) بتراكمي صفر/غائب بيانات متناقضة: لا نُرسل فوق دفعة مستردة فعلاً.
+        if ($this->statusOf($payment) === 'refunded' && $refundedBefore === 0) {
+            throw new PaymentRefundRejectedException('moyasar.malformed_response', 'دفعة بحالة «مستردة» بلا مبلغ مسترد؛ بيانات متناقضة، لا يُرسَل الاسترداد.');
+        }
+        if ($amountMinor > $chargeable - $refundedBefore) {
+            throw new PaymentRefundRejectedException('moyasar.refund_exceeds_available', 'مبلغ الاسترداد يتجاوز المتاح للاسترداد لدى المزوّد.');
+        }
+
+        try {
+            $response = $this->client->refundPayment($gateway, $paymentId, $amountMinor);
+        } catch (PaymentGatewayException $e) {
+            // بعد الإرسال: انقطاع/5xx/حالة غير متوقعة/استجابة غير مفهومة قد يعني أن الاسترداد نُفِّذ ⇒ غير معروف. غير ذلك رفض/اعتماد/حدّ طلبات ⇒ لم يُنفَّذ.
+            throw in_array($e->reason, ['moyasar.unavailable', 'moyasar.malformed_response', 'moyasar.unexpected_status'], true)
+                ? new PaymentRefundUnknownException($e->reason, $e->getMessage())
+                : new PaymentRefundRejectedException($e->reason, $e->getMessage());
+        } catch (\Throwable) {
+            // أي استثناء آخر بعد الإرسال (مثلاً RequestException من Guzzle لإعادة ضبط الاتصال) قد يعني أن الاسترداد نُفِّذ ⇒ غير معروف، لا يخرج عن العقد.
+            throw new PaymentRefundUnknownException('moyasar.unavailable', 'تعذّر إكمال طلب الاسترداد بعد إرساله؛ قد يكون نُفِّذ.');
+        }
+
+        try {
+            return $this->provenRefund($response, $paymentId, $refundedBefore, $amountMinor, $chargeable, $paymentCurrency);
+        } catch (PaymentRefundUnknownException $e) {
+            throw $e;
+        } catch (\Throwable) {
+            throw new PaymentRefundUnknownException('moyasar.malformed_response', 'استجابة الاسترداد لا تثبت تطبيقه؛ قد يكون نُفِّذ.');
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $response
+     */
+    private function provenRefund(array $response, string $paymentId, int $refundedBefore, int $amountMinor, int $chargeable, string $paymentCurrency): PaymentProviderRefund
+    {
+        $refundedAfter = $this->intOrNull($response['refunded'] ?? null);
+        $currency = $this->currencyOf($response);
+        $expectedCurrency = $paymentCurrency;
+        // النجاح يشترط **إثبات** أن هذا الـPOST طُبِّق: التراكمي ≥ ما قبل + المبلغ (قد يزيد باسترداد خارجي متزامن ويحسمه المستدعي) وضمن مبلغ الدفعة.
+        // ردّ 2xx بتراكمي أقل (لم يُطبَّق، أو سالب/معيب) لا يُعدّ نجاحاً ولا رفضاً قاطعاً: بعد الإرسال ⇒ غير معروف يحسمه المطابِق.
+        if (! is_string($response['id'] ?? null) || ! hash_equals($paymentId, $response['id']) || $refundedAfter === null
+            || $refundedAfter < $refundedBefore + $amountMinor || $refundedAfter > $chargeable || $currency !== $expectedCurrency) {
+            throw new PaymentRefundUnknownException('moyasar.malformed_response', 'استجابة الاسترداد لا تثبت تطبيقه؛ قد يكون نُفِّذ.');
+        }
+
+        return new PaymentProviderRefund($paymentId, $refundedAfter, $currency, $this->parseTime($response['refunded_at'] ?? null));
+    }
+
+    /**
+     * حالة نصية صغيرة؛ غائبة/null ⇒ فارغ، وغير النص (مصفوفة/كائن/رقم) معيب ⇒ `malformed_response` بدل تحويل يُصدر خطأ يخرج عن العقد.
+     *
+     * @param  array<string, mixed>  $document
+     */
+    private function statusOf(array $document): string
+    {
+        $value = $document['status'] ?? null;
+        if ($value === null) {
+            return '';
+        }
+        if (! is_string($value)) {
+            throw new PaymentGatewayException('moyasar.malformed_response', 'حالة الدفعة غير صالحة.');
+        }
+
+        return strtolower($value);
+    }
+
+    /**
+     * عملة بصيغة نصية كبيرة فقط؛ غير النص (مصفوفة/كائن/رقم) ⇒ فارغ (معيب) بدل تحويل يُصدر تحذير array-to-string يخرج عن عقد الاسترداد.
+     *
+     * @param  array<string, mixed>  $document
+     */
+    private function currencyOf(array $document): string
+    {
+        $value = $document['currency'] ?? null;
+
+        return is_string($value) ? strtoupper($value) : '';
+    }
+
+    /**
+     * المبلغ الملتقط الفعلي القابل للاسترداد: الحقل غائب/null أو صفر ⇒ مبلغ الدفعة كاملاً؛ وجوده بقيمة غير عددية/سالبة
+     * معيب ⇒ السقف مجهول فلا يُطبَّع إلى المبلغ الكامل.
+     *
+     * @param  array<string, mixed>  $payment
+     */
+    private function chargeableOf(array $payment, int $paymentAmount): int
+    {
+        $raw = $payment['captured'] ?? null;
+        if ($raw === null) {
+            return $paymentAmount;
+        }
+        $captured = $this->intOrNull($raw);
+        if ($captured === null || $captured < 0) {
+            throw new PaymentGatewayException('moyasar.malformed_response', 'قيمة المبلغ الملتقط غير صالحة.');
+        }
+
+        // أكبر من مبلغ الدفعة يُقصّ إلى مبلغها (سلوك الالتقاط القائم)؛ ولا يتجاوزه سقف الاسترداد أبداً.
+        return $captured > 0 ? min($captured, $paymentAmount) : $paymentAmount;
     }
 
     private function intOrNull(mixed $value): ?int
