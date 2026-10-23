@@ -137,6 +137,34 @@ class DocumentDuplicateReservationConcurrencyPostgresTest extends TestCase
     }
 
     /** @test */
+    public function concurrent_rekeys_of_one_document_never_lose_an_edit(): void
+    {
+        $tenant = $this->tenant();
+        $doc = (string) Str::uuid();
+        DB::transaction(fn () => app(Svc::class)->reserve(Svc::DOMAIN_EXPENSE, Svc::expensePredicate(null, 'V', 'R0', '2026-10-01', 1), 'expense', $doc, Svc::SOURCE_STANDARD));
+
+        $jobs = [];
+        foreach (['R1', 'R2', 'R3', 'R4'] as $ref) {
+            $jobs[] = function () use ($tenant, $doc, $ref) {
+                app(TenantContext::class)->set($tenant);
+
+                return DB::transaction(function () use ($doc, $ref) {
+                    app(Svc::class)->rekey('expense', $doc, Svc::expensePredicate(null, 'V', $ref, '2026-10-01', 1));
+                    usleep(30_000);
+
+                    return $ref;
+                });
+            };
+        }
+        $results = $this->runConcurrently($jobs);
+
+        app(TenantContext::class)->set($tenant);
+        $this->assertSame(1, ImportDocumentReservation::query()->count(), json_encode($results));
+        // الحجز الباقي هو إحدى الهويات المطلوبة فعلاً (لا R0 الأصلية): لا تعديلٌ ضاع بصمت.
+        $this->assertContains(strtoupper((string) ImportDocumentReservation::query()->first()->predicate['reference']), ['R1', 'R2', 'R3', 'R4'], json_encode($results));
+    }
+
+    /** @test */
     public function it_refuses_to_run_outside_a_transaction(): void
     {
         $this->tenant();

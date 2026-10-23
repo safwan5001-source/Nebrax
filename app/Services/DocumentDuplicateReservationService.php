@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Models\ImportDocumentReservation;
+use App\Models\Partner;
 use App\Support\DuplicateDocumentException;
 use App\Tenancy\TenantContext;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use LogicException;
@@ -42,6 +44,11 @@ final class DocumentDuplicateReservationService
         if ($reference === null) {
             return null;
         }
+        if (class_exists(\Normalizer::class)) {
+            $reference = \Normalizer::normalize($reference, \Normalizer::FORM_KC) ?: $reference;   // عرض كامل العرض → لاتيني، تركيبات → موحَّدة
+        }
+        // أشكال عربية مكافئة بصرياً: ألف مهموزة/موصولة → ا، ياء فارسية/مقصورة → ي، كاف فارسية → ك، والتطويل يُحذف.
+        $reference = strtr($reference, ['أ' => 'ا', 'إ' => 'ا', 'آ' => 'ا', 'ٱ' => 'ا', 'ى' => 'ي', 'ی' => 'ي', 'ک' => 'ك', 'ـ' => '']);
         $latin = strtr($reference, ['٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4', '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
             '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4', '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9']);
         $clean = preg_replace('/[^\p{L}\p{N}]+/u', '', mb_strtolower($latin, 'UTF-8')) ?? '';
@@ -79,22 +86,43 @@ final class DocumentDuplicateReservationService
         return [
             'vendor' => self::vendorKey($partnerId, $vendorName),
             'reference' => self::normalizeReference($reference),
-            'date' => $date,
+            'date' => self::normalizeDate($date),
             'amount' => $amountMinor,
-            'occurrence' => $occurrenceId,
+            'occurrence' => ($occurrenceId === null || $occurrenceId === '') ? null : $occurrenceId,
         ];
     }
 
     /** @return array<string, mixed> */
     public static function purchasePredicate(string $supplierId, string $supplierInvoiceNo): array
     {
-        return ['supplier' => mb_strtolower($supplierId, 'UTF-8'), 'reference' => self::normalizeReference($supplierInvoiceNo)];
+        $reference = self::normalizeReference($supplierInvoiceNo);
+        if ($reference === null) {
+            // مسند المشترى لا يحمل تاريخاً ولا مبلغاً: مرجعٌ فارغ بعد التطبيع كان سيدمج كل مشتريات المورّد بلا مرجع في هوية واحدة.
+            throw new LogicException('رقم فاتورة المورّد مطلوب (ولا يتكوّن من رموز فقط) لحجز هوية المشترى.');
+        }
+
+        return ['supplier' => mb_strtolower($supplierId, 'UTF-8'), 'reference' => $reference];
+    }
+
+    /** تاريخ بصيغة Y-m-d، وإلا LogicException (مفتاح التكرار لا يقبل تواريخ بصيغ متعددة). */
+    public static function normalizeDate(string $date): string
+    {
+        try {
+            return \Carbon\Carbon::parse($date)->toDateString();
+        } catch (\Throwable) {
+            throw new LogicException("تاريخ غير صالح لحجز الهوية: {$date}");
+        }
     }
 
     /** بصمة SHA-256 للمسند الخاص بالمجال (مفاتيح مرتّبة ⇒ ثابتة). */
     public static function key(string $domain, array $predicate): string
     {
         self::assertDomain($domain);
+        foreach ($predicate as $name => $value) {
+            if ($value !== null && ! is_int($value) && ! is_string($value)) {
+                throw new LogicException("قيمة مسند الحجز '{$name}' يجب أن تكون عدداً صحيحاً أو نصاً أو null (لا float ولا مصفوفة): الهاش يميّز 100 عن \"100\".");
+            }
+        }
         ksort($predicate);
 
         return hash('sha256', $domain."\x1f".json_encode($predicate, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
@@ -113,6 +141,7 @@ final class DocumentDuplicateReservationService
         self::assertDomain($domain);
         $this->assertSource($source);
         $tenantId = $this->tenantId();
+        $this->assertCounterparty($counterpartyId);
         $key = self::key($domain, $predicate);
 
         $row = [
@@ -122,22 +151,32 @@ final class DocumentDuplicateReservationService
             'created_at' => now(), 'updated_at' => now(),
         ];
         if (DB::table('import_document_reservations')->insertOrIgnore($row) !== 1) {
-            $existing = $this->find($domain, $key);
-            throw new DuplicateDocumentException($domain, $existing?->document_type, $existing?->document_id);
+            $holder = $this->find($domain, $key);
+            if ($holder !== null && $holder->document_type === $documentType && $holder->document_id === $documentId) {
+                return $holder;   // إعادة محاولة متماثلة لمستندٍ يحمل الحجز نفسه: لا خطأ.
+            }
+            if ($holder === null) {
+                // المفتاح حرّ لكن المستند نفسه محجوز بهوية أخرى (فهرس المستند الفريد): مستند واحد = حجز واحد؛ تغيير الهوية عبر rekey فقط.
+                throw new LogicException('هذا المستند يحمل حجزاً بهوية مختلفة؛ غيّرها عبر rekey().');
+            }
+            throw new DuplicateDocumentException($domain, $holder->document_type, $holder->document_id);
         }
 
         return ImportDocumentReservation::query()->whereKey($row['id'])->firstOrFail();
     }
 
     /**
-     * يعيد اشتقاق حجز مستندٍ لمسندٍ جديد (تعديل حقلٍ من مسنده) ذرّياً: حذف القديم ثم إدراج الجديد؛ المسند نفسه ⇒ لا شيء؛ التنازع ⇒ استثناء.
-     * مستندٌ بلا حجز (أُنشئ يدوياً بسياسة `allow`) لا يُحجَز هنا: الحجز يبدأ عند إنشائه فقط.
+     * يعيد اشتقاق حجز مستندٍ لمسندٍ جديد (تعديل حقلٍ من مسنده) **في الصف نفسه** (UPDATE لا حذف+إدراج): من قفل الصف ينتظر معدّلٌ متزامن
+     * فيرى النسخة المحدَّثة (سلسلة التحديث) بدل أن يجد صفاً محذوفاً فيتجاهل طلبه بصمت. التنازع ⇒ استثناء، والتحديث داخل نقطة حفظ فلا يبقى
+     * أثرٌ جزئي حتى لو التقط المستدعي الاستثناء وتابع. المسند نفسه ⇒ لا شيء؛ مستندٌ بلا حجز (أُنشئ يدوياً تحت allow) ⇒ لا شيء.
      *
      * @param  array<string, mixed>  $predicate
      */
-    public function rekey(string $documentType, string $documentId, array $predicate): void
+    public function rekey(string $documentType, string $documentId, array $predicate, ?string $counterpartyId = null): void
     {
         $this->assertInTransaction();
+        $this->tenantId();
+        $this->assertCounterparty($counterpartyId);
         $current = ImportDocumentReservation::query()->where('document_type', $documentType)->where('document_id', $documentId)->lockForUpdate()->first();
         if ($current === null) {
             return;
@@ -147,24 +186,37 @@ final class DocumentDuplicateReservationService
             return;
         }
 
-        $source = $current->source;
-        $counterparty = $current->counterparty_id;
-        $domain = $current->domain;
-        $current->delete();
-        $this->reserve($domain, $predicate, $documentType, $documentId, $source, $counterparty);
+        try {
+            DB::transaction(fn () => $current->forceFill([
+                'dedupe_key' => $key, 'predicate' => $predicate, 'counterparty_id' => $counterpartyId,
+            ])->save());
+        } catch (UniqueConstraintViolationException) {
+            $holder = $this->find($current->domain, $key);
+            throw new DuplicateDocumentException($current->domain, $holder?->document_type, $holder?->document_id);
+        }
     }
 
     /** يحرّر حجز مستندٍ (حذف مسودة). يعيد عدد ما حُرِّر. */
     public function release(string $documentType, string $documentId): int
     {
         $this->assertInTransaction();
+        $this->tenantId();
 
         return ImportDocumentReservation::query()->where('document_type', $documentType)->where('document_id', $documentId)->delete();
+    }
+
+    /** حجز مستندٍ بعينه (للتعديل: يُقرأ مسنده المخزَّن لإعادة الاشتقاق)، أو `null` إن لم يُحجز. */
+    public function forDocument(string $documentType, string $documentId): ?ImportDocumentReservation
+    {
+        $this->tenantId();
+
+        return ImportDocumentReservation::query()->where('document_type', $documentType)->where('document_id', $documentId)->first();
     }
 
     /** @param array<string, mixed>|string $predicateOrKey */
     public function find(string $domain, array|string $predicateOrKey): ?ImportDocumentReservation
     {
+        $this->tenantId();
         $key = is_array($predicateOrKey) ? self::key($domain, $predicateOrKey) : $predicateOrKey;
 
         return ImportDocumentReservation::query()->where('domain', $domain)->where('dedupe_key', $key)->first();
@@ -180,6 +232,14 @@ final class DocumentDuplicateReservationService
         }
 
         return $id;
+    }
+
+    /** الطرف (إن أُعطي) يجب أن يكون من المؤسسة الحالية — لا معرّف طرفٍ من مؤسسة أخرى في عمود تشخيصي. */
+    private function assertCounterparty(?string $counterpartyId): void
+    {
+        if ($counterpartyId !== null && ! Partner::query()->whereKey($counterpartyId)->exists()) {
+            throw new LogicException('طرف الحجز غير موجود في المؤسسة الحالية.');
+        }
     }
 
     private function assertInTransaction(): void

@@ -32,7 +32,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['tenant_id', 'domain', 'dedupe_key'], 'import_doc_reservation_unique');
-            $table->index(['tenant_id', 'document_type', 'document_id'], 'import_doc_reservation_document_idx');
+            $table->unique(['tenant_id', 'document_type', 'document_id'], 'import_doc_reservation_document_unique');   // مستند واحد = حجز واحد
         });
     }
 

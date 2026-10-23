@@ -152,8 +152,16 @@ class DocumentDuplicateReservationTest extends TestCase
 
         $this->assertSame($tenantB, $row->tenant_id);
         $this->assertSame(1, ImportDocumentReservation::query()->count());
-        $this->assertNull($this->svc->find(Svc::DOMAIN_EXPENSE, 'nope'));
+        $docOfA = DB::table('import_document_reservations')->where('tenant_id', $this->tenant)->value('document_id');
+        // مفتاح مؤسسة A الحقيقي نفسه، من سياق B: يخص صفَّ B لا A.
+        $this->assertNotSame($docOfA, $this->svc->find(Svc::DOMAIN_EXPENSE, $this->expense())?->document_id);
+        $this->assertSame(0, DB::transaction(fn () => $this->svc->release('expense', (string) $docOfA)));
+        DB::transaction(fn () => $this->svc->rekey('expense', (string) $docOfA, $this->expense('ZZ')));
+        $this->assertSame(2, DB::table('import_document_reservations')->count());
+        $this->assertNull($this->svc->forDocument('expense', (string) $docOfA));
         app(TenantContext::class)->set($this->tenant);
+        $this->assertNotNull($this->svc->forDocument('expense', (string) $docOfA));
+        $this->assertSame('inv001', $this->svc->forDocument('expense', (string) $docOfA)->predicate['reference']);
         $this->assertSame(1, ImportDocumentReservation::query()->count());
         $this->assertSame(2, DB::table('import_document_reservations')->count());
     }
@@ -184,17 +192,51 @@ class DocumentDuplicateReservationTest extends TestCase
     }
 
     /** @test */
-    public function rekey_to_a_taken_identity_throws_and_rolls_back_leaving_the_original(): void
+    public function rekey_to_a_taken_identity_throws_and_leaves_the_original_even_when_the_caller_swallows_it(): void
     {
         $doc = (string) Str::uuid();
+        $holder = (string) Str::uuid();
         $this->reserve($this->expense('A-1'), $doc);
-        $this->reserve($this->expense('B-1'));
+        $this->reserve($this->expense('B-1'), $holder);
 
-        $e = $this->caught(fn () => DB::transaction(fn () => $this->svc->rekey('expense', $doc, $this->expense('B-1'))), DuplicateDocumentException::class);
+        // المستدعي يلتقط الاستثناء ويتابع داخل معاملته (مسار «صفٌّ فاشل ونكمل»): لا يجوز أن يبقى أثرٌ جزئي.
+        DB::transaction(function () use ($doc) {
+            $caught = null;
+            try {
+                $this->svc->rekey('expense', $doc, $this->expense('B-1'));
+            } catch (DuplicateDocumentException $e) {
+                $caught = $e;
+            }
+            $this->assertNotNull($caught);
+        });
 
-        $this->assertInstanceOf(DuplicateDocumentException::class, $e);
         $this->assertSame($doc, $this->svc->find(Svc::DOMAIN_EXPENSE, $this->expense('A-1'))?->document_id);
+        $this->assertSame($holder, $this->svc->find(Svc::DOMAIN_EXPENSE, $this->expense('B-1'))?->document_id);
         $this->assertSame(2, ImportDocumentReservation::query()->count());
+    }
+
+    /** @test */
+    public function rekey_updates_the_same_row_in_place(): void
+    {
+        $doc = (string) Str::uuid();
+        $row = $this->reserve($this->expense('A-1'), $doc);
+        DB::transaction(fn () => $this->svc->rekey('expense', $doc, $this->expense('A-2')));
+        $this->assertSame($row->id, $this->svc->forDocument('expense', $doc)->id);
+        $this->assertSame('a2', $this->svc->forDocument('expense', $doc)->predicate['reference']);
+    }
+
+    /** @test */
+    public function one_document_holds_one_reservation_and_a_same_identity_retry_is_idempotent(): void
+    {
+        $doc = (string) Str::uuid();
+        $first = $this->reserve($this->expense('A-1'), $doc);
+
+        $again = $this->reserve($this->expense('a 1'), $doc);   // إعادة محاولة بالهوية نفسها
+        $this->assertSame($first->id, $again->id);
+
+        $e = $this->caught(fn () => $this->reserve($this->expense('A-9'), $doc), LogicException::class);   // هوية أخرى لمستند محجوز: rekey فقط
+        $this->assertStringContainsString('rekey', $e->getMessage());
+        $this->assertSame(1, ImportDocumentReservation::query()->count());
     }
 
     /** @test */
@@ -243,6 +285,14 @@ class DocumentDuplicateReservationTest extends TestCase
     public function it_requires_a_tenant_context(): void
     {
         app(TenantContext::class)->forget();
+        foreach ([
+            fn () => $this->svc->find(Svc::DOMAIN_EXPENSE, 'k'),
+            fn () => $this->svc->forDocument('expense', 'x'),
+            fn () => DB::transaction(fn () => $this->svc->release('expense', 'x')),
+            fn () => DB::transaction(fn () => $this->svc->rekey('expense', 'x', [])),
+        ] as $op) {
+            $this->caught($op, LogicException::class);
+        }
         $this->caught(fn () => DB::transaction(fn () => $this->svc->reserve(Svc::DOMAIN_EXPENSE, $this->expense(), 'expense', (string) Str::uuid(), Svc::SOURCE_STANDARD)), LogicException::class);
     }
 
@@ -256,5 +306,39 @@ class DocumentDuplicateReservationTest extends TestCase
             'created_at' => now(), 'updated_at' => now(),
         ];
         $this->assertSame(0, DB::table('import_document_reservations')->insertOrIgnore($dup));
+    }
+
+    /** @test */
+    public function normalization_folds_fullwidth_arabic_variants_and_tatweel(): void
+    {
+        $this->assertSame('inv001', Svc::normalizeReference('ＩＮＶ００１'));
+        $this->assertSame(Svc::normalizeReference('أحمد-1'), Svc::normalizeReference('احمد 1'));
+        $this->assertSame(Svc::normalizeReference('إيصال'), Svc::normalizeReference('ايصال'));
+        $this->assertSame(Svc::normalizeReference('فاتورة'), Svc::normalizeReference('فـاتـورة'));
+        $this->assertSame(Svc::normalizeReference('كتاب'), Svc::normalizeReference('کتاب'));
+    }
+
+    /** @test */
+    public function dates_and_occurrence_ids_are_canonicalised_and_bad_values_rejected(): void
+    {
+        $a = Svc::expensePredicate(null, 'V', 'R', '2026-10-01', 5, '');
+        $b = Svc::expensePredicate(null, 'V', 'R', '2026-10-01 00:00:00', 5, null);
+        $this->assertSame(Svc::key(Svc::DOMAIN_EXPENSE, $a), Svc::key(Svc::DOMAIN_EXPENSE, $b));
+        $this->caught(fn () => Svc::expensePredicate(null, 'V', 'R', 'not-a-date', 5), LogicException::class);
+        $this->caught(fn () => Svc::key(Svc::DOMAIN_EXPENSE, ['amount' => 100.0]), LogicException::class);
+        $this->caught(fn () => Svc::key(Svc::DOMAIN_EXPENSE, ['x' => ['nested']]), LogicException::class);
+    }
+
+    /** @test */
+    public function a_purchase_without_a_usable_reference_has_no_identity(): void
+    {
+        $this->caught(fn () => Svc::purchasePredicate((string) Str::uuid(), ' --- '), LogicException::class);
+    }
+
+    /** @test */
+    public function a_counterparty_from_another_tenant_is_rejected(): void
+    {
+        $this->caught(fn () => DB::transaction(fn () => $this->svc->reserve(Svc::DOMAIN_EXPENSE, $this->expense(), 'expense', (string) Str::uuid(), Svc::SOURCE_STANDARD, (string) Str::uuid())), LogicException::class);
+        $this->assertSame(0, ImportDocumentReservation::query()->count());
     }
 }
