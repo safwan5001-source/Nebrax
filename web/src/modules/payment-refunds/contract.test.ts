@@ -47,7 +47,7 @@ describe('payment refund contract', () => {
     ]);
     expect(autoAllocate(sources, 50001)).toBeNull();
     expect(autoAllocate([], 100)).toBeNull();
-    const many = Array.from({ length: 21 }, (_, i) => ({ source_type: 'credit_note', id: `n${i}`, number: `CN-${String(i).padStart(2, '0')}`, date: '2026-10-01', total: 100, refunded: 0, refundable: 100 }));
+    const many = Array.from({ length: 21 }, (_, i) => ({ source_type: 'credit_note' as const, id: `n${i}`, number: `CN-${String(i).padStart(2, '0')}`, date: '2026-10-01', total: 100, refunded: 0, refundable: 100 }));
     expect(autoAllocate(many, 2000)).toHaveLength(20);
     expect(autoAllocate(many, 2100)).toBeNull();   // 21 مصدراً > سقف الخادم (20)
     expect(maxRefundable({ refundable_minor: 40000, sources })).toBe(40000);
