@@ -8,6 +8,8 @@ use App\Models\DeliveryPlatformProfileVersion as Version;
 use App\Models\Invoice;
 use App\Models\Partner;
 use App\Models\PaymentGateway;
+use App\Models\PosTerminalRequest;
+use App\Services\PosTerminalService;
 use App\Models\PaymentMethod;
 use App\Models\PosCheckoutAttempt;
 use App\Models\PriceList;
@@ -51,6 +53,7 @@ class PosService
         protected PosAuditService $audit,
         protected DeliveryPlatformConfigService $deliveryPlatforms,
         protected DeliveryInvoiceContextService $deliveryContexts,
+        protected PosTerminalService $terminals,
     ) {}
 
     /**
@@ -68,6 +71,7 @@ class PosService
 
         $drawerAttempt = null;
         $paymentIds = [];
+        $claimedTerminalIds = [];
         $cartId = $data['cart_id'] ?? null;
         $auditSession = null;
 
@@ -90,9 +94,9 @@ class PosService
             }
 
             try {
-                $invoice = DB::transaction(function () use ($data, &$drawerAttempt, &$paymentIds, $cartId, $idempotencyKey, $checksum) {
+                $invoice = DB::transaction(function () use ($data, &$drawerAttempt, &$paymentIds, &$claimedTerminalIds, $cartId, $idempotencyKey, $checksum) {
                     return $this->executeCheckoutWithinTransaction(
-                        $data, $drawerAttempt, $paymentIds, $cartId, $idempotencyKey, $checksum
+                        $data, $drawerAttempt, $paymentIds, $claimedTerminalIds, $cartId, $idempotencyKey, $checksum
                     );
                 });
             } catch (QueryException $exception) {
@@ -119,6 +123,9 @@ class PosService
             if ($exception instanceof PosIdempotencyConflictException) {
                 throw $exception;
             }
+            // H6-02: فشل البيع بعد اجتياز موافقة جهاز فحوص هذا البيع ⇒ المعاملة تراجعت كاملة (لا سند ولا فاتورة)؛ تُلغى تلك الموافقة آلياً على الجهاز.
+            // لا تُلغى موافقة لم تجتز التحقق (وسيلة/جلسة/مبلغ خاطئ)، ويعيد التعويض فحص الحالة تحت القفل فلا يلمس موافقة استهلكها بيع آخر، ولا يرمي.
+            $this->terminals->compensateAfterFailedCheckout($claimedTerminalIds, (string) ($data['pos_session_id'] ?? ''));
             if ($auditSession !== null && is_string($cartId) && $cartId !== '') {
                 try {
                     $this->audit->recordCheckout($auditSession, $data['actor'] ?? null, $cartId, \App\Models\PosSessionEvent::TYPE_PAYMENT_FAILED, [
@@ -151,6 +158,7 @@ class PosService
         array $data,
         ?array &$drawerAttempt,
         array &$paymentIds,
+        array &$claimedTerminalIds,
         mixed $cartId,
         string $idempotencyKey,
         string $checksum,
@@ -210,6 +218,7 @@ class PosService
         $this->cashBankAccounts->bootstrapDefaults();
         $tenders = $this->normalizedTenders($data['tenders'] ?? []);
         $clearingGateways = [];
+        $terminalApprovals = [];
         if ($platformCollected) {
             if ($tenders !== []) {
                 throw new RuntimeException('تحصيل منصة التوصيل لا يقبل وسيلة دفع في نقطة البيع.');
@@ -220,6 +229,8 @@ class PosService
             $methods = $this->configuredPaymentMethods($tenders);
             $clearingGateways = $this->clearingGatewaysFor($methods);
             $this->assertTenderReferencesAllowed($tenders, $methods);
+            // H6-02: موافقات الأجهزة تُقفل وتُتحقق (جلسة/وسيلة/مبلغ/لم تُستهلك) قبل أي مستند؛ وسيلة تشترط الموافقة بلا موافقة ⇒ رفض.
+            $terminalApprovals = $this->terminals->claimApprovals($tenders, $methods, $session, $claimedTerminalIds);
         }
 
         // بدء الإتمام دليل خادمي من داخل المعاملة الفعلية؛ لا يعتمد على
@@ -306,9 +317,12 @@ class PosService
                     'amount'            => $applied,
                     'notes'             => "{$method->name} — بيع {$invoice->number}",
                     'created_by'        => $data['created_by'] ?? null,
-                    ...$this->tenderPaymentExtras($tender, $clearingGateways[$method->id] ?? null),
+                    ...$this->tenderPaymentExtras($tender, $clearingGateways[$method->id] ?? null, $terminalApprovals[$method->id] ?? null),
                 ]), $data['actor'] ?? null);
                 $paymentIds[] = $payment->id;
+                if (isset($terminalApprovals[$method->id])) {
+                    $this->terminals->markConsumed($terminalApprovals[$method->id], $payment, $invoice);
+                }
 
                 $remaining -= $applied;
             }
@@ -430,6 +444,10 @@ class PosService
                     'payment_method_id' => $tender['payment_method_id'] ?? null,
                     'amount' => (int) ($tender['amount'] ?? 0),
                 ];
+                $terminalRequestId = $this->normalizeTenderReference($tender['terminal_request_id'] ?? null);
+                if ($terminalRequestId !== null) {
+                    $normalized['terminal_request_id'] = $terminalRequestId;
+                }
                 // المراجع تدخل البصمة فقط عند وجودها: بيع قديم بلا مراجع يحتفظ ببصمته حرفياً (لا 409 عابر للنشر)،
                 // وإعادة إرسال بنفس المفتاح بمرجع مختلف تُعامَل محتوى مختلفاً.
                 foreach (self::TENDER_REFERENCE_KEYS as $key) {
@@ -703,6 +721,10 @@ class PosService
                 throw new RuntimeException('لا يمكن تكرار وسيلة الدفع نفسها في عملية POS واحدة.');
             }
             $entry = ['payment_method_id' => $id, 'amount' => $amount];
+            $terminalRequestId = $this->normalizeTenderReference($tender['terminal_request_id'] ?? null);
+            if ($terminalRequestId !== null) {
+                $entry['terminal_request_id'] = $terminalRequestId;
+            }
             foreach (self::TENDER_REFERENCE_KEYS as $key) {
                 $value = $this->normalizeTenderReference($tender[$key] ?? null);
                 if ($value !== null) {
@@ -838,6 +860,9 @@ class PosService
     {
         foreach ($tenders as $tender) {
             $given = array_intersect_key($tender, array_flip(self::TENDER_REFERENCE_KEYS));
+            if (isset($tender['terminal_request_id']) && $given !== []) {
+                throw new RuntimeException('مراجع العملية تأتي من موافقة الجهاز؛ لا تُرسَل معها يدوياً.');
+            }
             if ($given === []) {
                 continue;
             }
@@ -857,13 +882,22 @@ class PosService
     }
 
     /** @return array<string, mixed> مفاتيح السند الإضافية (فارغة لوسيلة بلا مقاصة ولا مرجع ⇒ السند كما كان حرفياً) */
-    private function tenderPaymentExtras(array $tender, ?PaymentGateway $gateway): array
+    private function tenderPaymentExtras(array $tender, ?PaymentGateway $gateway, ?PosTerminalRequest $approval = null): array
     {
         $extras = [];
         if ($gateway !== null) {
             $extras['payment_gateway_id'] = $gateway->id;
         }
         $given = array_intersect_key($tender, array_flip(self::TENDER_REFERENCE_KEYS));
+        if ($approval !== null) {
+            // مراجع موافقة الجهاز مصدرها الجهاز لا العميل (assertTenderReferencesAllowed يمنع الجمع).
+            $given = array_filter([
+                'approval_code' => $approval->approval_code,
+                'rrn' => $approval->rrn,
+                'last4' => $approval->last4,
+                'terminal_request_id' => $approval->id,
+            ], fn ($v) => $v !== null);
+        }
         if ($given !== []) {
             $extras['reference'] = $given['rrn'] ?? $given['approval_code'] ?? null;
             $extras['payment_details'] = json_encode($given, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);

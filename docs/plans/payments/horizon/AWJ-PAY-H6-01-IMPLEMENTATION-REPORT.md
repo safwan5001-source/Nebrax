@@ -1,6 +1,6 @@
 # PAY-H6-01 — Implementation Report
 
-STATUS: **IN REVIEW** (PR مفتوح، غير مدموج، غير منشور) · DATE: 2026-10-22
+STATUS: **MERGED** (PR #1625، `e4f2976c5`؛ POST_MERGE_REVIEW: PASS — CI أخضر على main، run 39865103670؛ غير منشور) · DATE: 2026-10-22
 القرار: **D-09 — الخيار 1 (اعتمده المالك):** مقاصة بطاقات POS **اختيارية لكل طريقة دفع، ومعطّلة افتراضياً لجميع المستأجرين**.
 
 ## Outcome

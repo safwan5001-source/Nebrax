@@ -1,6 +1,6 @@
 # PAY-H1-04 — Implementation Report
 
-STATUS: **IN REVIEW** (PR مفتوح، غير مدموج، غير منشور)
+STATUS: **MERGED** (PR #1620، `ee8bfea01`؛ POST_MERGE_REVIEW: PASS — فشل أول لوظيفة sqlite على main في اختبار استيراد غير مرتبط (`ImportPreviewBindingTest`)؛ إعادة تشغيل واحدة نجحت (run 39865079366، المحاولة 2) وpgsql أخضر والدمجان اللاحقان أخضران؛ غير منشور)
 DATE: 2026-10-22
 
 ## Outcome
