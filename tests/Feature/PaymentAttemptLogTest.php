@@ -176,6 +176,29 @@ class PaymentAttemptLogTest extends TestCase
         $this->withToken($other['token'])->getJson("/api/payment-attempts/{$attempt->id}")->assertNotFound();
     }
 
+    #[Test]
+    public function a_soft_deleted_actor_stays_named_in_the_audit_timeline(): void
+    {
+        $invoice = app(InvoiceService::class)->post(app(InvoiceService::class)->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'credit'],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]],
+        ));
+        $request = $this->requests->create($invoice, $this->gateway, $this->owner);
+        app(AccountingPeriodLockService::class)->create('2026-10-01', '2026-10-31', 'إقفال أكتوبر', $this->owner);
+        $attempt = $this->attemptFor($request);
+        $this->fake->script($attempt->provider_payment_id, 'captured');
+        $this->orchestrator->sync($attempt);
+        $admin = User::create(['tenant_id' => $this->tenant->id, 'name' => 'مدير سابق', 'email' => 'former@pay-h2-03c.test', 'password' => 'password123', 'role' => 'admin']);
+        app(PaymentAttemptPostingService::class)->repost($attempt->fresh(), $admin, 'قرار قبل مغادرة الموظف');
+        $admin->delete();
+        $this->assertNotNull(User::withTrashed()->find($admin->id)->deleted_at);
+
+        $token = $this->owner->createToken('t')->plainTextToken;
+        $timeline = $this->withToken($token)->getJson("/api/payment-attempts/{$attempt->id}")->assertOk()->json('data.timeline');
+        $repost = collect($timeline)->firstWhere('type', 'repost');
+        $this->assertSame('مدير سابق', $repost['actor']);
+    }
+
     private function requestFor(): InvoicePaymentRequest
     {
         $invoice = app(InvoiceService::class)->post(app(InvoiceService::class)->create(

@@ -151,6 +151,53 @@ describe.each(TEST_LOCALES)('PaymentsOnlinePage (%s)', (locale) => {
     expect(within(sheet).getAllByRole('listitem').length).toBeGreaterThanOrEqual(4);
   });
 
+  it('ignores a slow response for an old query after the tab changed', async () => {
+    let releaseAll: (v: unknown) => void = () => {};
+    const slowAll = new Promise((resolve) => { releaseAll = resolve; });
+    apiMock.mockImplementation(async (path: string) => {
+      if (path === '/payment-attempts?posting_status=blocked_period&per_page=1') return { data: [], meta: meta(1) };
+      if (path === '/payment-attempts?page=1&per_page=25') return slowAll;
+      if (path === '/payment-attempts?page=1&per_page=25&posting_status=blocked_period') {
+        return { data: [row({ id: 'b1', posting_status: 'blocked_period', blocked_reason: { kind: 'period' }, invoice: { id: 'i9', number: 'INV-BLOCKED' } })], meta: meta(1) };
+      }
+      throw new Error(`unrouted ${path}`);
+    });
+    ui();
+    fireEvent.click(await screen.findByRole('tab', { name: /1/ }));
+    expect((await screen.findAllByRole('link', { name: 'INV-BLOCKED' })).length).toBeGreaterThan(0);
+    releaseAll({ data: [row({ id: 'old', invoice: { id: 'i0', number: 'INV-STALE' } })], meta: meta(1) });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryAllByRole('link', { name: 'INV-STALE' })).toHaveLength(0);
+    expect(screen.getAllByRole('link', { name: 'INV-BLOCKED' }).length).toBeGreaterThan(0);
+  });
+
+  it('moves to the last valid page when a repost empties the current one', async () => {
+    state.perms = new Set(['payments.view', 'payments.resolve_blocked']);
+    const seen: string[] = [];
+    let reposted = false;
+    apiMock.mockImplementation(async (path: string, options?: { method?: string }) => {
+      if (options?.method === 'POST') { reposted = true; return { data: { id: 'b2', outcome: 'posted', posting_status: 'posted' } }; }
+      if (path.startsWith('/payment-attempts?posting_status=blocked_period&per_page=1')) return { data: [], meta: meta(reposted ? 1 : 2) };
+      seen.push(path);
+      const page = Number(new URLSearchParams(path.split('?')[1]).get('page'));
+      if (page === 2) {
+        return reposted
+          ? { data: [], meta: { total: 1, page: 2, per_page: 1, last_page: 1 } }
+          : { data: [row({ id: 'b2', posting_status: 'blocked_period', blocked_reason: { kind: 'period' } })], meta: { total: 2, page: 2, per_page: 1, last_page: 2 } };
+      }
+      return { data: [row({ id: 'b1', posting_status: 'blocked_period', blocked_reason: { kind: 'period' } })], meta: { total: reposted ? 1 : 2, page: 1, per_page: 1, last_page: reposted ? 1 : 2 } };
+    });
+    ui();
+    await screen.findAllByRole('link', { name: 'INV-0001' });
+    // انتقل إلى الصفحة ٢ عبر التنقّل
+    fireEvent.click((await screen.findAllByRole('button')).find((b) => /next|التالي/i.test(b.getAttribute('aria-label') ?? ''))!);
+    fireEvent.click((await screen.findAllByRole('button', { name: /Repost|إعادة الترحيل/ }))[0]);
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'سبب كافٍ للقرار' } });
+    fireEvent.click(within(dialog).getAllByRole('button').find((b) => /^(Repost|إعادة الترحيل)$/.test(b.textContent ?? ''))!);
+    await waitFor(() => expect(seen.filter((p) => p.includes('page=1')).length).toBeGreaterThanOrEqual(2));
+  });
+
   it('shows a retryable error when the list fails', async () => {
     route({
       'GET /payment-attempts': () => new Error('boom'),

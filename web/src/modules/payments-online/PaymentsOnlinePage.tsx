@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Badge } from '@/components/ui/badge';
@@ -52,16 +52,27 @@ export function PaymentsOnlinePage() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [repostFor, setRepostFor] = useState<AttemptRow | null>(null);
 
+  // آخر طلب هو الحاسم: ردٌّ متأخر لاستعلام قديم (تبويب/مرشّح/صفحة تغيّرت) لا يكتب فوق الأحدث.
+  const latest = useRef(0);
+
   const load = useCallback(async () => {
+    const mine = ++latest.current;
     setLoading(true);
     setError(null);
     try {
       const res = await api<{ data: AttemptRow[]; meta: ListMeta }>(`/payment-attempts?${buildListQuery({ tab, captureStatus, page, perPage })}`);
+      if (mine !== latest.current) return;
+      // صفحة خرجت عن النطاق (أُفرغت بإعادة ترحيل): ننتقل لآخر صفحة صالحة بدل ترك `page` غير صالح.
+      if (res.data.length === 0 && res.meta.total > 0 && page > res.meta.last_page) {
+        setPage(res.meta.last_page);
+        return;
+      }
       setRows(res.data);
       setMeta(res.meta);
+      setLoading(false);
     } catch (e) {
+      if (mine !== latest.current) return;
       setError(hasApiStatus(e, 403) ? t('forbidden') : t('load_failed'));
-    } finally {
       setLoading(false);
     }
   }, [tab, captureStatus, page, perPage, t]);

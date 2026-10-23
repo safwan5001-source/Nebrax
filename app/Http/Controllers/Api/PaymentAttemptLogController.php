@@ -11,6 +11,7 @@ use App\Models\PaymentAttemptPostingEvent;
 use App\Models\PaymentGateway;
 use App\Models\PaymentProviderEvent;
 use App\Models\User;
+use App\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -69,7 +70,9 @@ class PaymentAttemptLogController extends ApiController
         $postings = PaymentAttemptPosting::query()->where('payment_attempt_id', $attempt->id)->orderBy('created_at')->get();
         $payments = Payment::query()->whereIn('id', $postings->pluck('payment_id'))->get(['id', 'number'])->keyBy('id');
         $events = PaymentAttemptPostingEvent::query()->where('payment_attempt_id', $attempt->id)->orderBy('created_at')->get();
-        $actors = User::query()->whereIn('id', $events->pluck('actor_id')->filter())->get(['id', 'name'])->keyBy('id');
+        // الفاعل المحذوف ناعماً يبقى في سجل التدقيق (الحدث ثابت)؛ `User` بلا نطاق مستأجر تلقائي فيُقيَّد صراحةً.
+        $actors = User::withTrashed()->where('tenant_id', app(TenantContext::class)->id())
+            ->whereIn('id', $events->pluck('actor_id')->filter())->get(['id', 'name'])->keyBy('id');
         $providerEvents = PaymentProviderEvent::query()->where('payment_attempt_id', $attempt->id)
             ->orderBy('received_at')->get(['id', 'event_type', 'status', 'outcome', 'received_at']);
 
