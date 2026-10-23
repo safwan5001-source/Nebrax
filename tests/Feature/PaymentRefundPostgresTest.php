@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Events\PaymentRefundConfirmed;
 use App\Models\CreditNote;
 use App\Models\Partner;
 use App\Models\PaymentAttempt;
@@ -18,12 +19,14 @@ use App\Services\Accounting\InvoiceService;
 use App\Services\FakePaymentGatewayAdapter;
 use App\Services\InvoicePaymentRequestService;
 use App\Services\PaymentOrchestrator;
+use App\Services\PaymentRefundPostingService;
 use App\Services\PaymentRefundService;
 use App\Support\PaymentRefundException;
 use App\Support\SchedulerHeartbeat;
 use App\Support\Settings;
 use App\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -215,6 +218,37 @@ class PaymentRefundPostgresTest extends TestCase
         foreach (array_column(array_column($results, 'value'), 'outcome') as $o) {
             $this->assertContains($o, ['requested', 'exceeds_payment_capacity', 'exceeds_source_balance']);
         }
+    }
+
+    /** @test */
+    public function concurrent_posting_of_one_confirmed_refund_creates_a_single_balanced_entry(): void
+    {
+        [$attemptId, $noteId] = $this->capturedAttemptAndNote();
+        Event::fake([PaymentRefundConfirmed::class]);   // الترحيل صراحةً من الأطفال
+        $refundId = $this->requestRefund($attemptId, $noteId, 115000, 'idem-pg-post-'.Str::random(6), approve: true);
+        $done = app(PaymentRefundService::class)->submit(PaymentRefund::query()->findOrFail($refundId), User::query()->findOrFail($this->adminId));
+        $this->assertSame('confirmed', $done->status);
+        $tenant = $this->tenantId;
+        $poster = function () use ($refundId, $tenant) {
+            app(TenantContext::class)->set($tenant);
+
+            return ['outcome' => app(PaymentRefundPostingService::class)->process(PaymentRefund::query()->findOrFail($refundId))];
+        };
+
+        $results = $this->runConcurrently(array_fill(0, 6, $poster));
+
+        $this->assertAllOk($results);
+        $outcomes = array_column(array_column($results, 'value'), 'outcome');
+        $this->assertSame(1, count(array_filter($outcomes, fn ($o) => $o === 'posted')), 'ترحيل واحد فعلي');
+        foreach ($outcomes as $o) {
+            $this->assertContains($o, ['posted', 'already_posted']);
+        }
+        $entries = DB::table('journal_entries')->where('tenant_id', $this->tenantId)->where('source_type', PaymentRefund::class)->get();
+        $this->assertCount(1, $entries);
+        $lines = DB::table('journal_lines')->where('journal_entry_id', $entries[0]->id)->get();
+        $this->assertSame(115000, (int) $lines->sum('debit'));
+        $this->assertSame(115000, (int) $lines->sum('credit'));
+        $this->assertSame('posted', DB::table('payment_refunds')->where('id', $refundId)->value('posting_status'));
     }
 
     // ═══════════════ أدوات ═══════════════

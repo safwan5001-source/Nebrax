@@ -70,6 +70,14 @@ class PaymentRefund extends BaseModel
         self::FAILED => [],
     ];
 
+    /** @var array<string, list<string>> ترحيل A5: pending ← posted | blocked_period؛ blocked_period ← posted (R10)؛ المرحَّل نهائي. */
+    public const POSTING_TRANSITIONS = [
+        '' => [self::POSTING_PENDING],
+        self::POSTING_PENDING => [self::POSTING_POSTED, self::POSTING_BLOCKED_PERIOD],
+        self::POSTING_BLOCKED_PERIOD => [self::POSTING_POSTED],
+        self::POSTING_POSTED => [],
+    ];
+
     private const IMMUTABLE = [
         'tenant_id', 'number', 'partner_id', 'payment_attempt_id', 'payment_gateway_id', 'amount_minor', 'currency',
         'requested_by', 'requested_at', 'idempotency_key',
@@ -142,6 +150,13 @@ class PaymentRefund extends BaseModel
             foreach (['approved_by', 'approved_at', 'confirmed_at', 'provider_refunded_at', 'journal_entry_id', 'accounting_date', 'posted_at'] as $field) {
                 if ($refund->isDirty($field) && $refund->getOriginal($field) !== null) {
                     throw new LogicException("Payment refund field [{$field}] is immutable once recorded.");
+                }
+            }
+            if ($refund->isDirty('posting_status')) {
+                $from = (string) $refund->getOriginal('posting_status');
+                $to = (string) $refund->posting_status;
+                if (! in_array($to, self::POSTING_TRANSITIONS[$from] ?? [], true)) {
+                    throw new LogicException("Illegal payment refund posting transition {$from} → {$to}.");
                 }
             }
             if ($refund->isDirty('status')) {

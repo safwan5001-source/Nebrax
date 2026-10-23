@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Events\PaymentRefundConfirmed;
 use App\Models\InvoicePaymentRequest;
 use App\Models\PaymentAttempt;
 use App\Models\PaymentGateway;
@@ -29,7 +30,7 @@ use Throwable;
 
 /**
  * ═══════════════════════════════════════════════════════════════
- *  PaymentRefundService — دورة استرداد البوابة (PAY-H3-01b، ADR-0007 accepted). **بلا قيود: لا LedgerService ولا سند.**
+ *  PaymentRefundService — دورة استرداد البوابة (PAY-H3-01b، ADR-0007 accepted). **بلا قيود: لا كتابة في الأستاذ ولا سند.**
  * ═══════════════════════════════════════════════════════════════
  *  طلب ← اعتماد مستقل (الطالب ≠ المعتمِد دائماً، حتى للمستأجر ذي المستخدم الواحد) ← إرسال خماسي المراحل ← تأكيد/فشل/غير معروف. التأكيد يترك
  *  `posting_status = pending`؛ الترحيل (A5) شريحة 01c.
@@ -598,6 +599,10 @@ final class PaymentRefundService
         if ($excess > 0) {
             $this->flagAttempt($attempt, $provider->refundedMinor, 'external_refund_flagged', 'confirm_excess', $actor);
         }
+        // الترحيل A5 بعد الالتزام (PAY-H3-01c): الإثبات محفوظ مهما فشل الترحيل؛ المستمع/الأمر الدوري idempotent.
+        $tenantId = (string) $locked->tenant_id;
+        $refundId = (string) $locked->getKey();
+        DB::afterCommit(fn () => event(new PaymentRefundConfirmed($tenantId, $refundId)));
 
         return $locked;
     }

@@ -134,6 +134,22 @@ class FiscalCloseService
             ), ['count' => $blockedCount, 'amount_minor' => $blockedAmount]);
         }
 
+        // PAY-H3-01c: استردادات بوابة مؤكَّدة من المزوّد لكنها محجوبة بفترة مقفلة داخل السنة — المال خرج فعلاً ولم يُرحَّل إلى الدفتر؛ تنبيه لا يمنع الإقفال.
+        $blockedRefunds = \App\Models\PaymentRefund::query()
+            ->where('posting_status', \App\Models\PaymentRefund::POSTING_BLOCKED_PERIOD)
+            ->whereDate('accounting_date', '>=', $year->start_date->toDateString())
+            ->whereDate('accounting_date', '<=', $year->end_date->toDateString());
+        $blockedRefundCount = (clone $blockedRefunds)->count();
+        if ($blockedRefundCount > 0) {
+            $blockedRefundAmount = (int) (clone $blockedRefunds)->sum('amount_minor');
+            $items[] = $this->item(self::SEVERITY_WARNING, 'blocked_refunds', sprintf(
+                'توجد %d عملية استرداد عبر البوابة (%s) مؤكَّدة من المزوّد ومحجوبة بفترة مقفلة داخل السنة ولم تُرحَّل إلى الدفتر. '
+                . 'تُعالج بفتح الفترة رسمياً ثم إعادة ترحيلها بصلاحية معالجة المحجوب.',
+                $blockedRefundCount,
+                $this->money($blockedRefundAmount),
+            ), ['count' => $blockedRefundCount, 'amount_minor' => $blockedRefundAmount]);
+        }
+
         // ── معلومات.
         $items[] = $this->item(self::SEVERITY_INFO, 'result', sprintf(
             'إيرادات السنة %s ومصروفاتها %s، والنتيجة %s.',
