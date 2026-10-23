@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Type | **Audit and plan only.** No production code, schema, API or ZATCA change. The T4 gate stays closed. Nothing is merged or deployed by this report. |
+| Type | **Audit and plan, updated with the owner's decisions D-T5-1 to D-T5-7 (section 10).** This PR carries documentation only. No production code, schema, API or ZATCA change. The T4 gate stays closed. Nothing is merged or deployed by this report. The implementation is a separate Draft PR |
 | Branch | `claude/treasury-t5-audit` |
 | Base SHA | `120defa05023c8d326ead6ed00eb2d138d0dc846` (`origin/main`, includes T3 #1627, T4 #1633 and #1635) |
 | Head SHA | filled in the PR description when the docs PR is opened |
@@ -18,7 +18,7 @@
 4. A second, independent finding: **today any user with `invoices.manage` can refund cash out of a drawer whose `withdraw` scope excludes them**, because the refund path has no authorization at all (probe f). `CreditNoteController::post` does not even pass the actor to the service.
 5. Direction matters: a sales credit note **withdraws** from the treasury (money out); the T4 sale was a **deposit**. A purchase debit note (cash) would be a **deposit**. The permission must follow the direction, never be shared.
 6. ZATCA does not read the treasury account anywhere (issuer, input factory, XML, QR, hash, chain). Routing can change which account is credited without changing any ZATCA payload.
-7. **Recommended smallest safe T5:** route sales credit-note cash refunds through the T3 resolver, deriving the treasury from the original sale entry; `withdraw` authorization on the resolved entity; currency check; same closed gate as T4; no migration, no API shape change. Details in section 6.
+7. **Approved smallest safe T5:** when the T4 gate is open and the tenant policy is not `legacy`, a cash refund is allowed **only** for a linked, posted, cash-type sale collected in exactly one active cash treasury; the refund is credited to that same treasury, with `withdraw` authorization on it and a currency check. **Every other cash refund (standalone notes, notes against credit-type invoices, ambiguous or missing collection treasury) is rejected, whatever the tenant policy (`main` or `explicit_required`).** The supported alternative is a `credit` note followed by a refund voucher from a chosen treasury. Same closed gate as T4; no migration, no API shape change. Details in section 6.
 
 ## 2. Phase 1: paths and files
 
@@ -41,7 +41,7 @@ Tests that bind this area: `CreditNoteTest`, `ZatcaCreditNoteIssuanceTest`, `Zat
 | F1 | Cash refund credits 1110 regardless of where the sale was collected | **High once the T4 gate opens** (it is the reason the gate cannot open); none today | Contained by the T4 guard (rejection), not solved |
 | F2 | **No treasury authorization on a cash refund.** The probe posts a cash credit note while the 1110 `withdraw` scope is restricted to another user: it posts. The service has no actor parameter, and the controller does not pass one | **Medium, exists today** | Open |
 | F3 | No currency check on the credited treasury | Medium once routed (the credited account would be chosen by data, not code) | Open (T4 added it for the sale only) |
-| F4 | Standalone notes (no invoice) and notes against credit-type invoices have no determinable collection treasury, and `credit_notes` has no field to carry a choice | Medium for the design (decision D-T5-2) | Open |
+| F4 | Standalone notes (no invoice) and notes against credit-type invoices have no determinable collection treasury, and `credit_notes` has no field to carry a choice | Medium for the design | **Resolved by D-T5-2: such cash refunds are rejected when the gate is open; use the credit-then-voucher route** |
 | F5 | The sale entry can contain **more than one debit line** (a negative adjustment debits `document_adjustment`, probe d: `1110 Dr 229500` and `5170 Dr 500`). Deriving the collection account must therefore pick the debit line whose account is a treasury entity, never "the first debit" | Low (design rule) | Open, handled in the plan |
 | F6 | The negative-balance policy (`allow_negative_transfer_balance`) is enforced only by transfers. Refunds, vouchers and payments do not check it | Low, pre-existing, outside T5 | Open (decision D-T5-5) |
 | F7 | Purchase **debit notes** with `refund_type = cash` debit 1110 the same way (a deposit, opposite direction) | Low (same class) | Open, not in this slice (section 8) |
@@ -58,8 +58,9 @@ Credit note of 1 unit of a 2-unit sale at 1,000.00 + 15% VAT = 115000. Revenue/V
 | 3 | Source treasury deactivated after the sale | n/a (1110 only) | Rejected `inactive`, no entry, no fallback. Use the existing escape hatch: a `credit` note, then a refund voucher from a chosen treasury |
 | 4 | Source treasury currency differs from the tenant's | n/a | Rejected `currency_mismatch` |
 | 5 | Source treasury moved from main to another entity after the sale | Cr 1110 | Cr the **original** account (the main is irrelevant to a linked refund) |
-| 6 | Source invoice is credit-type (including `is_paid` = credit + receipt, and POS) | Cr 1110 (probe e) | No single collection account is derivable (several receipts are possible). Falls back to the tenant policy: `main` resolves the main cash treasury; `explicit_required` is rejected (see D-T5-2). POS refunds are T6 |
-| 7 | Standalone note, `refund_type = cash` | Cr 1110 (probe g) | Same fallback as row 6 |
+| 6 | Source invoice is credit-type (including `is_paid` = credit + receipt, and POS) | Cr 1110 (probe e) | **Rejected** (`refund_source_required`), whatever the tenant policy (`main` or `explicit_required`). No entry, no ICV. Alternative: a `credit` note (Cr 1130), then a refund voucher from a chosen treasury (`withdraw` checked). POS refunds are T6 |
+| 7 | Standalone note, `refund_type = cash` | Cr 1110 (probe g) | **Rejected** (`refund_source_required`), same as row 6 |
+| 7b | Cash-type source whose entry has no treasury debit line, or more than one (ambiguous) | n/a | **Rejected** (`source_treasury_unresolved`): exactly one active cash treasury must be identifiable |
 | 8 | Withdraw scope on the resolved entity excludes the actor | Posts (probe f, **no check**) | Rejected `not_permitted`, no entry, no ICV |
 | 9 | Cross-tenant | n/a | Derivation reads only this tenant's entry and entities (scoped models); a foreign id never enters, because the id is derived, not accepted |
 | 10 | Re-post a posted note | "not a draft", 1 entry | unchanged |
@@ -86,14 +87,15 @@ The two sides are never symmetric: a credit note must not reuse the sale's `depo
 
 1. `CreditNoteService::post(CreditNote $note, ?User $actor = null)`: add the optional actor (internal signature only; HTTP shape unchanged). `CreditNoteController::post` passes `$request->user()`.
 2. Add a small read-only resolver step before `ledger->post` (so a rejection rolls back before any lock on the anchor, ICV or chain entry), active only when `CashSaleTreasuryPolicy::effective()` is not `legacy`:
-   - **Derive**: take the source invoice's `journal_entry_id`; among its debit lines select the one whose account belongs to a `CashBankAccount` entity (rule from F5); `TreasurySelection::ledgerAccount($thatAccountId)`.
+   - **Require a source**: the note must be linked to a posted, **cash-type** invoice; otherwise reject (`refund_source_required`).
+   - **Derive**: take the source invoice's `journal_entry_id`; among its debit lines select those whose account belongs to a `CashBankAccount` entity (rule from F5). **Exactly one** is accepted; zero or several are rejected (`source_treasury_unresolved`). Then `TreasurySelection::ledgerAccount($thatAccountId)`.
    - **Resolve** with the T3 resolver, `type = cash`, then `authorize = 'withdraw'` with the actor.
    - **Currency**: reuse the T4 check (extract it into one shared helper so sale and refund cannot drift).
    - Credit `ResolvedTreasury::accountId`. Any failure is a 422 with the T3 reason and a full rollback. **No fallback to 1110.**
-3. For credit-type sources and standalone notes, apply the tenant policy through the same resolver (`none()`), per D-T5-2.
-4. `CashSaleRefundGuard` stays for `ReturnService` (T6) and is no longer called from `CreditNoteService`, because the credit note now follows the sale instead of being rejected.
+3. Credit-type sources and standalone notes are **not** routed: they are rejected (D-T5-2). No tenant-policy fallback and no main-treasury fallback exist for refunds.
+4. `CashSaleRefundGuard` stays for `ReturnService` (T6). In `CreditNoteService` it stays on the **legacy** branch only (a tenant that routed sales and then switched back to `legacy`); on the routed branch the credit note follows the sale instead of being rejected.
 5. Same gate and setting as T4: `treasury.cash_sale_routing_enabled` and `sales.cash_sale_treasury_policy`; `legacy` and gate-closed behavior stay byte-identical (including the missing authorization, deliberately, until activation). No new setting is needed.
-6. UI: none for linked notes. The credit-note form keeps its cash/credit choice; a rejection shows the existing error banner. Standalone cash under `explicit_required` shows the message that points to the credit-then-voucher route.
+6. UI: none. The credit-note form keeps its cash/credit choice; a rejection shows the existing error banner, whose message points to the credit-then-voucher route.
 7. Files expected: `CreditNoteService.php`, `CreditNoteController.php`, a small shared helper next to `CashSaleRefundGuard` (or the guard itself), the T4 currency check moved into it, `InvoiceService.php` (call the shared helper), tests, `CLAUDE.md`, a T5 implementation report. **No migration, no new route, no permission or role change, no ZATCA file.**
 
 **Why this is the smallest safe slice.** Everything it needs is stored today; it removes the activation blocker; it adds the missing `withdraw` authorization on the routed path only; and the credit-note/ZATCA code outside `salesLines` is untouched.
@@ -123,7 +125,7 @@ The two sides are never symmetric: a credit note must not reuse the sale's `depo
 - Invoice routed to 1111 → Cr 1111 (scenario 2); a note against the same invoice after the main moved still credits 1111 (scenario 5).
 - Sale with a negative adjustment (two debit lines) → derivation picks the treasury line (F5).
 - Treasury deactivated / currency changed after the sale → rejected, no entry, no ICV (scenarios 3, 4).
-- Credit-type and standalone sources under `main` and `explicit_required` (scenarios 6, 7); `refund_type = credit` unchanged (scenario 12).
+- Credit-type sources (including `is_paid`) and standalone notes: **rejected under both `main` and `explicit_required`** with no entry and no ICV (scenarios 6, 7); a cash-type source with zero or several treasury debit lines is rejected (scenario 7b); `refund_type = credit` unchanged (scenario 12), and the credit-then-voucher alternative posts normally.
 - Gate closed and `legacy`: Cr 1110 byte for byte, including the absence of authorization (scenario 13).
 
 **Permissions and isolation**
@@ -141,18 +143,20 @@ The two sides are never symmetric: a credit note must not reuse the sale's `depo
 
 Full local SQLite and PostgreSQL suites before the PR, as in T4.
 
-## 10. Decisions needed before implementation
+## 10. Owner decisions (approved)
 
-| ID | Decision | Recommendation |
+The owner approved the seven decisions; D-T5-2 was changed from the recommendation. Where the owner's message did not restate a decision, it is recorded as approved as recommended.
+
+| ID | Decision | Outcome |
 |---|---|---|
-| D-T5-1 | Refund treasury for a linked cash-type sale: derive strictly from the original sale, or allow an explicit override on the note (needs a new `credit_notes.cash_account_id` column and a UI selector) | **Derive strictly.** Fewer moving parts, matches the audit trail; an override can come later as its own slice |
-| D-T5-2 | Credit-type source or standalone note with `refund_type = cash`: (a) use the tenant policy (`main` → main cashbox, `explicit_required` → rejected) or (b) always reject cash refund and require credit-then-voucher | **(a)**, because `explicit_required` then remains usable through the voucher route, and `main` behaves like every other cash path |
-| D-T5-3 | Source treasury inactive: reject (recommended) or fall back to the main | **Reject**, no silent substitution; the credit-then-voucher route is the supported alternative |
-| D-T5-4 | Controller/service signature: add an optional actor to `CreditNoteService::post` (internal) | Approve (needed for `withdraw`) |
-| D-T5-5 | Apply the negative-balance policy to refunds | Not in T5; open a separate finance-policy slice |
-| D-T5-6 | Purchase debit notes as **T5b** after T5 | Approve the split |
-| D-T5-7 | Also add the missing authorization to the **legacy** path (gate closed) | **No.** It would change production behavior now; it arrives with the activation |
+| D-T5-1 | Refund treasury for a linked cash-type sale | **Derive strictly from the original sale entry**, never from the current main treasury. No override column or selector in T5. Exactly one active cash treasury must be identifiable; ambiguity or absence is rejected |
+| D-T5-2 | Credit-type source or standalone note with `refund_type = cash` | **Changed: reject the direct cash refund regardless of tenant policy (`main` or `explicit_required`).** Alternative path: `credit` note, then a refund voucher |
+| D-T5-3 | Source treasury inactive | **Reject**, no substitution, no fallback |
+| D-T5-4 | Optional actor on `CreditNoteService::post` (internal) | Approved; the controller passes `$request->user()` |
+| D-T5-5 | Negative-balance policy on refunds | Not in T5 (separate finance-policy slice) |
+| D-T5-6 | Purchase debit notes | Separate slice T5b |
+| D-T5-7 | Authorization on the legacy path | No; it arrives with the activation |
 
 ## 11. Next step
 
-Owner reviews this report and answers D-T5-1 to D-T5-7. Then one Draft PR for T5 (credit-note cash refund routing) under the same closed gate, with before/after entries and the tests above.
+One Draft PR for the T5 implementation under the same closed T4 gate, with before/after entries and the tests above. Merge, deploy and opening the gate remain separate approvals.
