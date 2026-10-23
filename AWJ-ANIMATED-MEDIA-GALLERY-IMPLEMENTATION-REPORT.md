@@ -32,10 +32,10 @@ The draft in #1652 only opened the publish gate and wired `MotionPicture`/lightb
 
 | `showMotionControls` | Visible pause button | Motion | WCAG 2.2.2 mechanism |
 |---|---|---|---|
-| **off (default)** | none (the merchant's requested design) | each animated picture plays a **bounded window of 5 s once it is ≥25 % on screen**, then settles on its still frame | motion never lasts > 5 s ⇒ no pause control required |
+| **off (default)** | none (the merchant's requested design) | each animated picture **adds its animation only when first ≥25 % on screen** and plays a **bounded window of 5 s from that same moment**, then settles on its still frame (an off-screen picture neither fetches nor plays it) | motion never lasts > 5 s ⇒ no pause control required |
 | **on** | **one** pause/play button for the whole gallery (top inline-end corner; the lightbox shows the same button and **shares state**) | continuous | the button |
 | either | — | `prefers-reduced-motion`: the browser picks the poster `<source>`; the animation file is **never requested**; no button | OS-level preference honoured |
-| either | — | no JS / SSR: still frame only; the animated `<source>`s are added after hydration; no dead button | no motion without a control |
+| either | — | no JS / SSR: still frame only; with the control on, the animated `<source>`s are added after hydration; with it off, only once the picture is in view; no dead button | no motion without a control |
 
 The 5 s window uses the existing "drop the animated `<source>`s" mechanism (an animated `<img>` cannot be paused), started by a timer. A short play-once file (`loop=false` and `durationMs ≤ 5000`) is exempt (it ends by itself) so it is never yanked back to frame 1. This is a **policy decision for the owner** (`configurable-policies.md` principle): the alternative "always show a pause button" is one toggle away per gallery.
 
@@ -48,7 +48,7 @@ The 5 s window uses the existing "drop the animated `<source>`s" mechanism (an a
 
 **Storefront**
 - `src/lib/presentation/animated-sources.ts` — `MOTION_BUDGET_MS`, `exceedsMotionBudget()`.
-- `src/components/ui/motion-picture.tsx` — optional `autoStopMs` + `useMotionBudget` (IntersectionObserver start; unchanged when not passed).
+- `src/components/ui/motion-picture.tsx` — optional `autoStopMs` + `useMotionBudget` (IntersectionObserver gates **adding** the animated `<source>`s and starts the clock in the next effect of that same commit; inert and unchanged when not passed).
 - `src/components/home/HomeGallery.tsx`, `GalleryClient.tsx`, `GalleryLightbox.tsx` — grid + viewer rendering, shared control.
 - `src/lib/presentation/gallery-content.ts` — twin of the PHP normalizer.
 - `src/app/globals.css` — `[data-gallery-motion]` + viewer toggle rules.
@@ -97,7 +97,7 @@ Not run locally: the **full** PHP suite and the two `next build`s — they ran i
 2. **Manual checks still owed** (no WebKit/Firefox/real devices here): Safari/iOS (animated WebP + GIF in `<picture>`), Firefox, real phone scroll performance with several animated tiles, and a visual pass of the control over light/busy thumbnails.
 3. **Finite repeat counts ≥ 2** (GIF/WebP loop count `N`) are not exposed by the analyser (`loop` = infinite only), so a `loop=false` file that plays `N × duration > 5 s` is treated as "ends by itself". Rare; the fix is to expose the loop count in the animation meta (additive, but a separate change to the media pipeline).
 4. **Policy call for the owner:** with the control off, motion is capped at 5 s per picture. If the owner prefers continuous motion by default the setting must default to `true` (it would then show the button) — there is no compliant "continuous and invisible" option.
-5. **Perf:** a gallery of up to 24 animated tiles each fetches its full `animated.*` after hydration (no `srcset` for animations, by design of the P1 pipeline). The 25 %-visible IntersectionObserver gates only the *timer*, not the fetch; the existing per-file limits bound it. Recommend merchants use few animated tiles; a future slice could lazy-mount animated sources on visibility.
+5. **Perf:** with the control **off**, an animated tile fetches its `animated.*` only when it first scrolls into view (≥25 %), so a 24-tile gallery no longer downloads every animation at hydration. With the control **on** the tiles are not gated (unchanged behaviour: animations are added at hydration, the control is the WCAG mechanism), so that mode still fetches all animated files after hydration; a future slice could gate those too without touching the policy. There is no `srcset` for animations (P1 pipeline design); the existing per-file limits bound each file.
 6. **No code review yet** (Codex bot hit its usage limit; comment `@codex review` to retry). Pre-existing lint errors in unrelated storefront files (`CategoriesSection.display.test.tsx`, `header-overlay.ts`) are on `main`, not introduced here.
 
 **Manual checklist:** (a) upload a real GIF and an animated WebP → add to a gallery → Preview shows motion, (b) publish passes, (c) published page: motion starts after load, settles after ~5 s with the default, (d) turn on *Show a pause button…* → one button, pause/play works in grid and viewer, (e) OS "reduce motion" → still only, (f) Arabic/RTL and a phone width, (g) Safari iOS.
@@ -105,3 +105,21 @@ Not run locally: the **full** PHP suite and the two `next build`s — they ran i
 ## 7. Proposed next action
 
 Review the PR; run the manual checklist on a staging store; decide the §6.4 policy default; then merge when CI is green. **No deploy** is implied — Deploy/Production needs separate explicit approval.
+
+## 8. Follow-up: off-screen gating (review finding on #1652)
+
+**Finding.** With `showMotionControls` off, `MotionPicture` added the animated `<source>` at hydration — so an off-screen tile downloaded and played its GIF/WebP — while the 5 s clock only started when the tile entered view. Motion and clock were out of step: a tile scrolled to after a while could be mid-loop (or already past 5 s of motion) the moment it appeared, and every animation was fetched up front.
+
+**Fix** (`storefront/src/components/ui/motion-picture.tsx` only; no API, DB, schema or publish-rule change):
+- `useMotionBudget` now returns `entered`. On a budgeted picture (`autoStopMs` set) the animated `<source>`s are **not rendered** until the picture is first ≥25 % on screen (immediately where `IntersectionObserver` is missing).
+- The 5 s timer is a separate effect keyed on `entered`, so it starts in the same commit that adds the sources — source and clock start together; one cleanup cancels both observer and timer.
+- **Unchanged:** control on (`autoStopMs` undefined → `entered` is `true`, no observer, no timer, sources added at hydration, shared pause state); reduced motion (poster `<source>`s still precede the animation, so the file is never requested even once added); SSR / no-JS (still only); short play-once files (not budgeted, no observer); `SectionBackdrop` / `HomeSlider` (never pass `autoStopMs`).
+
+**Semantics (documented choices).**
+- A window **spent** (timer fired → shared `paused` state) stays spent for the lifetime of the page: re-mounting the grid or stepping away/back in the viewer never re-animates it.
+- A picture left **before** its window ended is a new visit when it is shown again (new observer, new ≤5 s window). Each visit is bounded and started by the visitor's own navigation; the total across a session is therefore not capped. Accepted; the alternative (a cumulative budget per picture) is a small follow-up if the owner wants it.
+- Grid and viewer share the per-picture identity (`{sectionId}-gallery-motion-{imageId}`), so the viewer opens on an already-spent picture as a still. Verified in real Chromium, which also confirms the lazily-loaded viewer chunk shares the module-level pause state with the grid.
+
+**Tests added** (all fail against the previous implementation — 6 of the new unit tests fail on it):
+- Unit (`HomeGalleryAnimated.test.tsx`, now 26 tests): off-screen picture has no animated source and no timer (`vi.getTimerCount() === 0`) even after 20 s; entering view adds the source and the timer in the same step, each tile with its own clock; control on → no observer, no timer, sources at hydration, nothing auto-settles; short play-once not gated; reduced-motion ordering; no `IntersectionObserver` fallback; unmount before entering leaves no observer/timer, unmount mid-window cancels the timer; spent window stays spent after re-mount; viewer gated + own window; viewer step-away/back (still ⇄ animated ⇄ spent); closing the viewer leaves no observer; control on → viewer ungated.
+- Real Chromium (`animated-media-visual.spec.ts`, +6): below-the-fold gallery requests **no** `animated.*` for 6.5 s, scrolling in fetches it and it settles ~5 s later (3.5–8.5 s measured from appearance); reduced motion + scroll → never requested; control on + off-screen → unchanged; viewer after a spent grid window stays still; viewer on an unspent picture plays and settles. A spec bug in my first draft of the last pair (the grid poll passed on the not-yet-animated still) was fixed — a test error, not a product defect.

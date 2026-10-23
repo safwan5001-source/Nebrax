@@ -611,23 +611,47 @@ test.describe("animated media — real Chromium", () => {
     );
   });
 
-  test("gallery viewer (no control): opening it starts the animation and its window; closing and reopening a spent picture stays still", async ({
+  test("gallery viewer (no control): a window spent in the grid stays spent in the viewer; an unspent picture gets its own window there", async ({
     page,
   }) => {
     const log: string[] = [];
     await serveMedia(page, log);
     await open(page, "gallery-gif");
+    // the animation really starts, then the grid window is spent
+    await expect.poll(() => currentSrc(page, GAL)).toMatch(/animated\.gif$/);
     await expect
       .poll(() => currentSrc(page, GAL), { timeout: 9_000 })
-      .toMatch(/800w\.(webp|jpg)$/); // grid window spent first
+      .toMatch(/800w\.(webp|jpg)$/);
     await page.locator("a[data-gallery-open='0']").click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
-    await page.waitForTimeout(800);
-    expect(await currentSrc(page, VIEWER_IMG)).toMatch(
-      /1600w\.jpg$|800w\.(webp|jpg)$/,
-    ); // spent ⇒ still in the viewer too
+    await page.waitForTimeout(1_000);
+    expect(await currentSrc(page, VIEWER_IMG)).toMatch(/\.(webp|jpg)$/);
+    expect(await currentSrc(page, VIEWER_IMG)).not.toMatch(/animated/);
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);
+  });
+
+  test("gallery viewer (no control): opening a picture whose grid window is unspent plays it in the viewer and settles ~5 s later", async ({
+    page,
+  }) => {
+    await serveMedia(page, []);
+    await open(page, "gallery-offscreen"); // grid picture below the fold ⇒ its window has not started
+    await page.waitForLoadState("networkidle");
+    await page.evaluate(() => {
+      (
+        document.querySelector("a[data-gallery-open='0']") as HTMLElement
+      ).click();
+    });
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect
+      .poll(() => currentSrc(page, VIEWER_IMG))
+      .toMatch(/animated\.gif$/);
+    const shown = Date.now();
+    await expect
+      .poll(() => currentSrc(page, VIEWER_IMG), { timeout: 9_000 })
+      .not.toMatch(/animated/);
+    expect(Date.now() - shown).toBeGreaterThan(3_500);
   });
 });
