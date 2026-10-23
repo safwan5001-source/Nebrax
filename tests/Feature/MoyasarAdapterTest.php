@@ -179,11 +179,32 @@ class MoyasarAdapterTest extends TestCase
     #[Test]
     public function a_checkout_url_outside_the_provider_domain_or_without_https_is_refused(): void
     {
-        foreach (['https://evil.example/pay', 'http://checkout.moyasar.com/invoices/x', 'https://moyasar.com.evil.example/x', 'javascript:alert(1)'] as $url) {
+        foreach (['https://evil.example/pay', 'http://evil.example/invoices/x', 'http://moyasar.com.evil.example/x', 'https://moyasar.com.evil.example/x', 'javascript:alert(1)'] as $url) {
             $this->fakeHttp(['api.moyasar.com/v1/invoices*' => Http::sequence()->push(['invoices' => []])->push(array_merge(MoyasarFixtures::invoice(), ['url' => $url]), 201)]);
             $e = $this->thrown(fn () => $this->adapter->createCheckout($this->context(11500)), "untrusted url {$url}", PaymentGatewayException::class);
             $this->assertSame('moyasar.malformed_response', $e->reason, $url);
         }
+    }
+
+    #[Test]
+    public function the_documented_http_checkout_url_on_the_trusted_host_is_upgraded_to_https(): void
+    {
+        $this->fakeHttp(['api.moyasar.com/v1/invoices*' => Http::sequence()->push(['invoices' => []])->push(array_merge(MoyasarFixtures::invoice(), ['url' => 'http://checkout.moyasar.com/invoices/'.MoyasarFixtures::INVOICE_ID.'?lang=en']), 201)]);
+
+        $checkout = $this->adapter->createCheckout($this->context(11500));
+
+        $this->assertSame('https://checkout.moyasar.com/invoices/'.MoyasarFixtures::INVOICE_ID.'?lang=en', $checkout->checkoutUrl);
+    }
+
+    #[Test]
+    public function the_checkout_lock_outlives_the_worst_case_lookup_retries_plus_create(): void
+    {
+        config(['payment_providers.moyasar.timeout_seconds' => 15, 'payment_providers.moyasar.read_retries' => 2, 'payment_providers.moyasar.retry_sleep_ms' => 200]);
+        $method = new \ReflectionMethod(MoyasarAdapter::class, 'checkoutLockSeconds');
+        $method->setAccessible(true);
+
+        // 3 قراءات × 15 ث + POST 15 ث = 60 ث قبل الفواصل والهامش.
+        $this->assertGreaterThanOrEqual(60 + 1, $method->invoke($this->adapter));
     }
 
     // ═══════════════ الأخطاء والشبكة ═══════════════
@@ -391,7 +412,12 @@ class MoyasarAdapterTest extends TestCase
     {
         $attempt = $this->startedAttempt();
         $this->fakeHttp(['api.moyasar.com/v1/invoices/*' => Http::response(MoyasarFixtures::invoice('paid', payments: [MoyasarFixtures::payment('paid')]))]);
-        $raw = json_encode(MoyasarFixtures::event('payment_paid', 'evt-ok'));
+        $event = MoyasarFixtures::event('payment_paid', 'evt-ok');
+        $event['data']['source'] = array_merge($event['data']['source'], [
+            'token' => 'token_SENSITIVE_1234', 'name' => 'HOLDER SENSITIVE', 'number' => '4111XXXXXXXX1111', 'message' => 'AUTH_SENSITIVE_3DS',
+        ]);
+        $event['data']['authentication'] = ['cavv' => 'CAVV_SENSITIVE'];
+        $raw = json_encode($event);
 
         $this->deliver($raw)->assertOk();
 
@@ -401,7 +427,12 @@ class MoyasarAdapterTest extends TestCase
         $this->assertSame(MoyasarFixtures::INVOICE_ID, $event->provider_payment_id);
         $this->assertSame(hash('sha256', $raw), $event->body_hash);
         $this->assertStringNotContainsString(MoyasarFixtures::WEBHOOK_SECRET, (string) $event->body);
-        $this->assertStringContainsString('[redacted]', (string) $event->body);
+        foreach (['SENSITIVE', '4111', 'token_', 'cavv', 'source'] as $needle) {
+            $this->assertStringNotContainsString($needle, (string) $event->body, $needle);
+        }
+        $stored = json_decode((string) $event->body, true);
+        $this->assertTrue($stored['redacted']);
+        $this->assertEqualsCanonicalizing(['id' => MoyasarFixtures::payment('paid')['id'], 'invoice_id' => MoyasarFixtures::INVOICE_ID, 'status' => 'paid', 'amount' => 11500, 'currency' => 'SAR'], $stored['data']);
         $this->assertStringNotContainsString(MoyasarFixtures::WEBHOOK_SECRET, json_encode(DB::table('payment_provider_events')->get()->all()));
         $this->assertNoFinancialArtifacts();
     }

@@ -41,9 +41,7 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody
     /** أقل مبلغ تقبله Moyasar للفاتورة (100 هللة = 1.00 ريال). */
     public const MIN_AMOUNT_MINOR = 100;
 
-    /** مدة قفل إنشاء الفاتورة (تغطي مهلة POST) وأقصى انتظار لطلب متزامن آخر لنفس المحاولة. */
-    private const CHECKOUT_LOCK_SECONDS = 40;
-
+    /** أقصى انتظار لطلب متزامن آخر لنفس المحاولة (مدة القفل نفسها تُحسب من مهل الاتصال: `checkoutLockSeconds()`). */
     private const CHECKOUT_LOCK_WAIT_SECONDS = 20;
 
     public function __construct(private readonly MoyasarApiClient $client) {}
@@ -67,11 +65,25 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody
         // قرار «ابحث ثم أنشئ» يُسلسَل لكل محاولة: طلبان متزامنان لنفس المحاولة المنشأة كانا يمرّان من البحث معاً فينشئان فاتورتين
         // (المنسّق يقفل المحاولة بعد الاستدعاء الخارجي لا قبله). القفل في الذاكرة المشتركة (Cache) لا قفل صف، لأنه يمتد عبر استدعاء شبكي.
         try {
-            return Cache::lock('moyasar:checkout:'.$context->attemptId, self::CHECKOUT_LOCK_SECONDS)
+            return Cache::lock('moyasar:checkout:'.$context->attemptId, $this->checkoutLockSeconds())
                 ->block(self::CHECKOUT_LOCK_WAIT_SECONDS, fn () => $this->resumeOrCreate($context));
         } catch (LockTimeoutException) {
             throw new PaymentGatewayException('moyasar.checkout_busy', 'طلب دفع آخر لهذه المحاولة قيد الإنشاء؛ أعد المحاولة بعد لحظات.');
         }
+    }
+
+    /**
+     * عمر القفل = أسوأ حالة للعملية كلها: بحث (مهلة × (محاولات القراءة + 1) + فواصل) ثم POST واحد، مع هامش.
+     * قصره عن هذا يتيح لطلب متأخر أخذ القفل المنتهي والـPOST الأول ما زال جارياً فتتكرر الفاتورة.
+     */
+    private function checkoutLockSeconds(): int
+    {
+        $config = (array) config('payment_providers.moyasar');
+        $timeout = max(1, (int) ($config['timeout_seconds'] ?? 15));
+        $reads = max(0, (int) ($config['read_retries'] ?? 2)) + 1;
+        $sleeps = (int) ceil(max(0, (int) ($config['retry_sleep_ms'] ?? 0)) * $reads / 1000);
+
+        return $timeout * ($reads + 1) + $sleeps + 15;
     }
 
     private function resumeOrCreate(PaymentAttemptContext $context): PaymentHostedCheckout
@@ -160,11 +172,16 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody
         if (! is_array($data)) {
             return json_encode(['redacted' => true]);
         }
-        if (array_key_exists('secret_token', $data)) {
-            $data['secret_token'] = '[redacted]';
-        }
 
-        $encoded = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        // قائمة سماح لا حذف: جسم `payment_*` الفعلي هو كائن الدفعة وفيه `source` (رمز بطاقة، اسم حاملها، قناع الرقم) وقيم مصادقة 3DS.
+        // نحفظ مغلّف التدقيق فقط (الحدث والفاتورة والحالة والمبلغ) ولا شيء عن مصدر الدفع؛ الحقيقة الكاملة تُجلب من API عند الحاجة.
+        $envelope = array_intersect_key($data, array_flip(['id', 'type', 'created_at', 'live']));
+        if (is_array($data['data'] ?? null)) {
+            $envelope['data'] = array_intersect_key($data['data'], array_flip(['id', 'invoice_id', 'status', 'amount', 'currency']));
+        }
+        $envelope['redacted'] = true;
+
+        $encoded = json_encode($envelope, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
         return $encoded === false ? json_encode(['redacted' => true]) : $encoded;
     }
@@ -175,7 +192,7 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody
     private function checkoutFrom(array $invoice, ?CarbonImmutable $fallbackExpiry): PaymentHostedCheckout
     {
         $id = $invoice['id'] ?? null;
-        $url = $invoice['url'] ?? null;
+        $url = is_string($invoice['url'] ?? null) ? $this->upgradeTrustedScheme($invoice['url']) : null;
         if (! is_string($id) || $id === '' || ! is_string($url) || ! $this->isTrustedCheckoutUrl($url)) {
             throw new PaymentGatewayException('moyasar.malformed_response', 'استجابة إنشاء الفاتورة غير صالحة.');
         }
@@ -190,6 +207,20 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody
         }
 
         return new PaymentHostedCheckout($id, $url, $expiresAt);
+    }
+
+    /**
+     * مثال استجابة Moyasar الموثّق يعيد رابط الدفع بـ`http://` على مضيفها نفسه. نرقّي المخطط إلى https **لمضيف موثوق فقط** قبل الفحص؛
+     * مضيف غريب أو مخطط آخر يبقى كما هو فيُرفض. لا نقبل http أبداً ولا نكتبه في المحاولة.
+     */
+    private function upgradeTrustedScheme(string $url): string
+    {
+        $parts = parse_url($url);
+        if (is_array($parts) && strtolower((string) ($parts['scheme'] ?? '')) === 'http' && $this->isTrustedCheckoutUrl('https'.substr($url, 4))) {
+            return 'https'.substr($url, 4);
+        }
+
+        return $url;
     }
 
     /** رابط الدفع: https ومضيف ينتهي بنطاق Moyasar الموثّق، فلا يُوجَّه العميل إلى مضيف غريب لو تلفت الاستجابة. */
