@@ -548,6 +548,9 @@ class ReturnService
 
             // الحارس يُعاد **داخل المعاملة**: مسوّدتان أُنشئتا معاً لا تحجزان
             // كميةً، فالفحص عند الإنشاء وحده يسمح لثانيتهما بتجاوز المتبقي.
+            // سياسة T4 تُقرأ **مرة واحدة** وتُثبَّت لكامل الترحيل: قراءتان متباعدتان كانتا تسمحان بأن يرى الحارس «موجَّهة» ويرى الحلّ «legacy»
+            // (تغيّر السياسة بينهما) فيُتخطّيان معاً وتُدائَن 1110 لبيع حُصِّل في خزينة أخرى.
+            $treasuryPolicy = CashSaleTreasuryPolicy::effective();
             $source = null;
             if ($return->original_id) {
                 $source = $this->resolveSource([
@@ -561,7 +564,7 @@ class ReturnService
                     // TREASURY-T4: على المسار القديم (`legacy`) المرتجع النقدي يُدائن 1110؛ فإن كانت الفاتورة حُصِّلت في غيره (بيع وُجِّه ثم
                     // عادت السياسة إلى legacy) يُرفض. على المسار الموجَّه تتبع الخزينةَ المشتقّة أدناه (TREASURY-T6) فلا حاجة لهذا الحارس.
                     if ($return->isSales() && $return->payment_type === 'cash' && $source instanceof \App\Models\Invoice
-                        && CashSaleTreasuryPolicy::effective() === CashSaleTreasuryPolicy::LEGACY) {
+                        && $treasuryPolicy === CashSaleTreasuryPolicy::LEGACY) {
                         app(CashSaleRefundGuard::class)->assertCashRefundMatchesCollection($source);
                     }
                     $this->assertWithinSource(
@@ -594,7 +597,7 @@ class ReturnService
             // TREASURY-T6: الخزينة المدينة للردّ النقدي تُحلّ **قبل** القيد (فالرفض يتراجع قبل أي قفل مِرساة أو أثر). مغلق افتراضياً:
             // ما دامت سياسة T4 الفعّالة `legacy` يبقى 1110 بلا تخويل كما كان. لا سقوط إلى 1110 عند أي فشل.
             $cashAccountId = null;
-            if ($return->isSales() && $return->payment_type === 'cash' && CashSaleTreasuryPolicy::effective() !== CashSaleTreasuryPolicy::LEGACY) {
+            if ($return->isSales() && $return->payment_type === 'cash' && $treasuryPolicy !== CashSaleTreasuryPolicy::LEGACY) {
                 $invoiceSource = $source instanceof \App\Models\Invoice ? $source : null;
                 $cashAccountId = ($return->pos_session_id !== null
                     ? app(PosCashRefundTreasuryResolver::class)->resolve(PosSession::query()->find($return->pos_session_id), $invoiceSource, $actor)

@@ -542,6 +542,15 @@ class TreasuryReturnRefundRoutingTest extends TestCase
     }
 
     /** @test */
+    public function each_refund_post_reads_the_effective_policy_exactly_once_so_the_guard_and_the_routing_cannot_disagree(): void
+    {
+        foreach (['ReturnService', 'CreditNoteService'] as $service) {
+            $src = (string) file_get_contents(app_path("Services/Accounting/{$service}.php"));
+            $this->assertSame(1, substr_count($src, 'CashSaleTreasuryPolicy::effective()'), "{$service}: قراءة واحدة للسياسة لكامل الترحيل");
+        }
+    }
+
+    /** @test */
     public function routed_branches_resolve_before_the_ledger_and_the_legacy_fallback_exists_only_on_the_legacy_branch(): void
     {
         $returns = (string) file_get_contents(app_path('Services/Accounting/ReturnService.php'));
