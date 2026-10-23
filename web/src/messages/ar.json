@@ -2034,6 +2034,7 @@
       "ai": "الذكاء الاصطناعي"
     },
     "perm_actions": {
+      "execution_approve": "الموافقة على التنفيذ",
       "view": "عرض",
       "manage": "إدارة",
       "create": "إنشاء",

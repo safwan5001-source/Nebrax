@@ -2034,6 +2034,7 @@
       "ai": "AI"
     },
     "perm_actions": {
+      "execution_approve": "Approve execution",
       "view": "View",
       "manage": "Manage",
       "create": "Create",
