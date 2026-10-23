@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Support\CashSaleTreasuryPolicy;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateSalesSettingsRequest extends FormRequest
 {
@@ -22,6 +24,20 @@ class UpdateSalesSettingsRequest extends FormRequest
             'return_window_days'      => ['nullable', 'integer', 'min:0', 'max:3650'],
             'enforce_min_sale_price' => ['nullable', 'boolean'],
             'allow_standalone_credit_notes' => ['nullable', 'boolean'],
+            // TREASURY-T4: القيم غير `legacy` مرفوضة (422) ما دامت بوابة التفعيل المنسَّق مغلقة — لا يُفعَّل التوجيه بقرار مستأجر منفرد.
+            'cash_sale_treasury_policy' => [
+                'nullable',
+                Rule::in(CashSaleTreasuryPolicy::activationOpen() ? CashSaleTreasuryPolicy::VALUES : [CashSaleTreasuryPolicy::LEGACY]),
+            ],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'cash_sale_treasury_policy.in' => CashSaleTreasuryPolicy::activationOpen()
+                ? 'سياسة خزينة البيع النقدي غير صالحة.'
+                : 'توجيه خزينة البيع النقدي غير مفعَّل بعد لهذا النظام؛ القيمة الوحيدة المتاحة «legacy».',
         ];
     }
 }

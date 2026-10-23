@@ -139,6 +139,17 @@ class Settings
              * يفعّلوا السياسة بقرار واعٍ؛ فلا تتعطل فواتيرهم بترقية صامتة.
              */
             'enforce_min_sale_price' => true,
+            /**
+             * خزينة البيع النقدي المباشر (`payment_type=cash`) — TREASURY-T4.
+             *
+             * **سياسة عمل لا صحّة تقنية** (CLAUDE.md قاعدة 6): `legacy` الصندوق 1110 دوماً (السلوك القائم)،
+             * `main` الاختيار الصريح ثم الخزينة النقدية الرئيسية، `explicit_required` الاختيار إلزامي.
+             *
+             * **الافتراض `legacy`** لكل مستأجر قائم وجديد: لا يتغيّر قيدٌ بنشر الكود. والقيم الأخرى
+             * لا يقبلها الـAPI ولا يعمل بها الترحيل إلا بعد فتح بوابة `config('treasury.cash_sale_routing_enabled')`
+             * بقرار تفعيل منسَّق (انظر `App\Support\CashSaleTreasuryPolicy`).
+             */
+            'cash_sale_treasury_policy' => 'legacy',
         ],
         /**
          * إعدادات المخزون والمنتجات.
