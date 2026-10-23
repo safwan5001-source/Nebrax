@@ -45,6 +45,25 @@ vi.mock("next/font/google", () => ({
     variable: options.variable,
   }),
   Rubik: (options: Record<string, unknown>) => ({ variable: options.variable }),
+  // Typography Library Expansion — appended catalogue families
+  Almarai: (options: Record<string, unknown>) => ({
+    variable: options.variable,
+  }),
+  Alexandria: (options: Record<string, unknown>) => ({
+    variable: options.variable,
+  }),
+  Noto_Kufi_Arabic: (options: Record<string, unknown>) => ({
+    variable: options.variable,
+  }),
+  Reem_Kufi: (options: Record<string, unknown>) => ({
+    variable: options.variable,
+  }),
+}));
+
+vi.mock("next/font/local", () => ({
+  default: (options: Record<string, unknown>) => ({
+    variable: options.variable,
+  }),
 }));
 
 vi.mock("@next/third-parties/google", () => ({

@@ -32,9 +32,9 @@ final class StorefrontGlobalTokensNormalizer
     /**
      * كتالوج الخطوط المنتقى (V0 §5.2 / N-5) — مفاتيح فقط، توأم `FONT_FAMILY_KEYS` في
      * `font-catalogue.ts`. الأولان هما قيمتا `fontPreset` القديمتان. `custom:<mediaId>`
-     * محجوز (§5.4) وغير مُفعَّل فيُسقط. كلها OFL ومستضافة ذاتياً (`next/font`).
+     * محجوز (§5.4) وغير مُفعَّل فيُسقط. معظمها OFL ومستضافة ذاتياً (`next/font`)؛ خطوط ثمانية الثلاثة الأخيرة بترخيصها الخاص (`docs/legal/thmanyah/`).
      */
-    public const FONT_FAMILIES = ['cairo-geist', 'tajawal-geist', 'plex-arabic', 'noto-inter', 'readex', 'rubik', 'el-messiri', 'amiri-lora'];
+    public const FONT_FAMILIES = ['cairo-geist', 'tajawal-geist', 'plex-arabic', 'noto-inter', 'readex', 'rubik', 'el-messiri', 'amiri-lora', 'almarai', 'alexandria', 'noto-kufi', 'reem-kufi', 'thmanyah-sans', 'thmanyah-serif-display', 'thmanyah-serif-text'];
 
     public const BUTTON_STYLES = ['solid', 'soft', 'outline', 'link'];
 
