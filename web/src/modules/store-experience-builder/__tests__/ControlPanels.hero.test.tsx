@@ -185,6 +185,35 @@ describe("hero editor (CUST-HV V6a)", () => {
   });
 });
 
+describe("deleting a hero edited only through display options (AWJ-HERO-DISPLAY review on #1645)", () => {
+  const cases: Array<[string, object]> = [
+    ["title hidden", { showTitle: false }],
+    ["description hidden", { showSubheadline: false }],
+    ["buttons hidden", { showCtas: false }],
+    ["picture link set", { imageHref: "/collections/new" }],
+  ];
+  for (const [name, extra] of cases) {
+    it(`asks first when the only edit is: ${name} (text fields still empty)`, () => {
+      const onChange = mount(
+        config([{ id: "hero", type: "hero", visible: true, content: { headline: "", ...extra } as never }]),
+        null,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Delete section" }));
+      expect(screen.getByRole("alertdialog")).toBeTruthy();
+      expect(onChange).not.toHaveBeenCalled(); // nothing is removed before the merchant confirms
+    });
+  }
+  it("a hero with no edit at all still deletes immediately (backward compatible)", () => {
+    const onChange = mount(
+      config([{ id: "hero", type: "hero", visible: true, content: { headline: "" } }]),
+      null,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Delete section" }));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(sectionsOf(onChange)).toEqual([]);
+  });
+});
+
 describe("hero display options (AWJ-HERO-DISPLAY)", () => {
   const toggle = (label: string) => screen.getAllByLabelText(label)[0] as HTMLInputElement;
 

@@ -377,10 +377,17 @@ describe("HeroSection (COM-7-P3A)", () => {
         const link = container.querySelector("a[data-hero-image-link]");
         expect(link?.getAttribute("href")).toBe("/sa/en/collections/new");
         expect(link?.getAttribute("aria-label")).toBe("Welcome");
-        // under the backdrop and under the copy, which lets clicks through except on its own links
+        // the link sits above the picture and below the copy; the copy lets clicks through except on its own links
         const section = container.querySelector("section");
         expect(section?.className).toContain("relative");
-        expect(section?.firstElementChild).toBe(link);
+        // above the picture (so its focus ring is painted over it), below the copy (later in the DOM)
+        const order = [...(section?.children ?? [])];
+        expect(order.indexOf(link as Element)).toBe(
+          order.findIndex((el) => el.hasAttribute("data-sd-backdrop")) + 1,
+        );
+        expect(order.indexOf(link as Element)).toBeLessThan(
+          order.findIndex((el) => el.hasAttribute("data-section-content")),
+        );
         expect(
           container.querySelector("[data-section-content]")?.className,
         ).toContain("pointer-events-none");
@@ -413,6 +420,17 @@ describe("HeroSection (COM-7-P3A)", () => {
         expect(noLink.querySelector("section")?.className).not.toContain(
           "relative",
         );
+      });
+
+      it("its focus indicator is the two-colour ring in the stylesheet, not a single-colour outline utility (review on #1645)", async () => {
+        const container = await render_({
+          backdrop,
+          imageHref: "/collections/new",
+        });
+        const link = container.querySelector("a[data-hero-image-link]");
+        // no outline colour utility on the element: a text/brand colour could vanish on the picture, and the
+        // section frame recolours `focus-visible:outline-store-*` indicators to the section foreground
+        expect(link?.className ?? "").not.toMatch(/outline/);
       });
 
       it("an unsafe link is never rendered", async () => {

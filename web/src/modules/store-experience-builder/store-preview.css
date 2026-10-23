@@ -1337,6 +1337,26 @@
   outline: 2px solid var(--sl-fg);
   outline-offset: 3px;
 }
+/* AWJ-HERO-DISPLAY — the hero picture as a link has no content of its own, so its focus indicator cannot borrow a text colour
+   and must not depend on the picture (a picture may span black to white) or on the page behind (the ring would sit on it).
+   Two adjacent rings inside the hero's edge: a black outline over a white inset band — whatever the pixels are, one of the
+   two contrasts with them, and with each other. Fixed colours on purpose (not theme tokens). */
+/* It follows the backdrop in the DOM, so the generic `[data-sd-backdrop] ~ *` rule would make it `position: relative`: it is a full-area overlay */
+.awj-store-preview [data-hero-image-link] {
+  position: absolute;
+  inset: 0;
+}
+.awj-store-preview [data-hero-image-link]:focus-visible {
+  outline: 3px solid #000;
+  outline-offset: -3px;
+  box-shadow: inset 0 0 0 6px #fff;
+}
+@media (forced-colors: active) {
+  .awj-store-preview [data-hero-image-link]:focus-visible {
+    outline: 3px solid Highlight;
+    box-shadow: none;
+  }
+}
 /* controls: translucent dark discs / pill — their glyphs contrast with their OWN fill, whatever the picture */
 .awj-store-preview [data-slider-arrow],
 .awj-store-preview [data-slider-pause],

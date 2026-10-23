@@ -190,17 +190,19 @@ export async function HeroSection({
           <bdi>{title}</bdi>
         </Heading>
       )}
-      {/* The picture as a link: beneath the backdrop (which takes no pointer events) and beneath the copy, which lets
-          clicks through except on its own links. */}
+      {backdrop}
+      {/* The picture as a link: ABOVE the picture, so its focus ring is painted over it (a link under the backdrop would
+          draw its ring beneath the picture), and BELOW the copy (later in the DOM at the same level), which lets clicks through
+          except on its own links. Its focus indicator is a two-colour ring drawn INSIDE the hero
+          (`[data-hero-image-link]:focus-visible` in globals.css), so it reads on any picture and on the page behind. */}
       {imageLink ? (
         <Link
           href={imageLink}
           aria-label={title}
           data-hero-image-link=""
-          className="absolute inset-0 rounded-store focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-store-primary-foreground"
+          className="absolute inset-0 rounded-store"
         />
       ) : null}
-      {backdrop}
       {hasContent ? (
         <div
           data-section-content={designed ? "" : undefined}
