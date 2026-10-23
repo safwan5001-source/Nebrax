@@ -27,8 +27,10 @@ use Illuminate\Support\Facades\DB;
  */
 final class PaymentGatewayService
 {
-    public function __construct(private readonly TenantContext $tenantContext)
-    {
+    public function __construct(
+        private readonly TenantContext $tenantContext,
+        private readonly PaymentGatewayAdapterRegistry $adapters,
+    ) {
     }
 
     /** @return Collection<int, PaymentGateway> */
@@ -113,6 +115,10 @@ final class PaymentGatewayService
                 'publishable_key' => $payload['publishable_key'],
                 'payment_method_id' => $payload['payment_method_id'],
             ]);
+            // البيئة والمفتاح القابل للنشر جزء مما تحقّقنا منه: تغيّرهما يبطل التحقق السابق (يُعاد بـ`verify`).
+            if ($locked->requiresVerification() && ($locked->isDirty('environment') || $locked->isDirty('publishable_key'))) {
+                $locked->verified_at = null;
+            }
             $changed = array_keys($locked->getDirty());
             $locked->save();
 
@@ -159,6 +165,57 @@ final class PaymentGatewayService
 
             return $locked->fresh();
         });
+    }
+
+    /**
+     * التحقق من بيانات اعتماد المزوّد بمحوّله (قراءة آمنة لدى المزوّد) وضبط `verified_at` عند القبول فقط.
+     *
+     * الشبكة **خارج** المعاملة. بعد الاستجابة يُقفل الصف ويُعاد فحص بصمة الاعتماد (النسخة والبيئة والمفتاح القابل للنشر): تدوير أو تعديل
+     * أثناء الاستدعاء ⇒ `gateway.credentials_changed` ولا يُختم تحقّق على أسرار لم تُفحص. الفشل يُسجَّل حدث تدقيق برمز السبب دون أي قيمة،
+     * ولا يغيّر حالة الاتصال. لا يُنشئ شيئاً ولا يحرّك مالاً.
+     */
+    public function verify(PaymentGateway $gateway, ?User $actor = null): PaymentGateway
+    {
+        $tenantId = $this->requireTenant();
+        $this->assertSameTenant($tenantId, $gateway);
+
+        $current = $this->find($gateway->getKey());
+        $this->assertNotRevoked($current);
+        if (! $current->requiresVerification()) {
+            throw new PaymentGatewayException('gateway.verification_not_required', 'هذا النوع من الاتصال لا يحتاج تحققاً من مزوّد.');
+        }
+        $verifier = $this->adapters->verifier($current->provider);
+        if ($verifier === null) {
+            throw new PaymentGatewayException('gateway.verification_unsupported', 'لا يوجد محوّل مفعّل للتحقق من هذا المزوّد بعد.');
+        }
+
+        $fingerprint = $this->credentialFingerprint($current);
+        try {
+            $verifier->verifyCredentials($current);
+        } catch (PaymentGatewayException $e) {
+            $this->record($current, 'verification_failed', $current->status, $current->status, $actor, substr($e->reason, 0, 255));
+            throw $e;
+        }
+
+        return DB::transaction(function () use ($current, $fingerprint, $actor): PaymentGateway {
+            $locked = $this->lock($current);
+            $this->assertNotRevoked($locked);
+            if ($this->credentialFingerprint($locked) !== $fingerprint) {
+                throw new PaymentGatewayException('gateway.credentials_changed', 'تغيّرت بيانات الاعتماد أثناء التحقق؛ أعد المحاولة.');
+            }
+
+            $locked->verified_at = now();
+            $locked->save();
+            $this->record($locked, 'verified', $locked->status, $locked->status, $actor);
+
+            return $locked->fresh();
+        });
+    }
+
+    /** بصمة ما يشمله التحقق، بلا قيم سرية (تقارَن داخل العملية ولا تُخزَّن). */
+    private function credentialFingerprint(PaymentGateway $gateway): string
+    {
+        return hash('sha256', json_encode([$gateway->credential_version, $gateway->environment, $gateway->publishable_key]));
     }
 
     /** تفعيل: من مسودة أو موقوف. لمزوّد حقيقي يتطلب `verified_at`؛ `custom` بلا تحقق. */

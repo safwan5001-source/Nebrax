@@ -1042,6 +1042,7 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('payment-gateways', [PaymentGatewayController::class, 'store'])->middleware($perm('payment_gateways.manage'));
         Route::put('payment-gateways/{id}', [PaymentGatewayController::class, 'update'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));
         Route::post('payment-gateways/{id}/rotate-credentials', [PaymentGatewayController::class, 'rotateCredentials'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));
+        Route::post('payment-gateways/{id}/verify', [PaymentGatewayController::class, 'verify'])->whereUuid('id')->middleware([$perm('payment_gateways.manage'), 'throttle:10,1']);
         Route::post('payment-gateways/{id}/activate', [PaymentGatewayController::class, 'activate'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));
         Route::post('payment-gateways/{id}/suspend', [PaymentGatewayController::class, 'suspend'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));
         Route::post('payment-gateways/{id}/revoke', [PaymentGatewayController::class, 'revoke'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));

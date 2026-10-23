@@ -1,0 +1,24 @@
+# AWJ-PAY-H2-01b — التحقق من بيانات اعتماد المزوّد
+
+**الحالة:** منفَّذ بـMock؛ **التحقق الحقيقي معلّق (EXT-01: مفاتيح Sandbox تُدخلها صفوان عبر الواجهة، لا في الدردشة أو PR أو السجلات).**
+لا قيد محاسبي، لا `Payment`، لا مفاتيح حقيقية، لا Deploy/Migration.
+
+## ما بُني
+| البند | التفصيل |
+|---|---|
+| عقد اختياري `VerifiesGatewayCredentials` | `verifyCredentials(PaymentGateway): void` يرمي `PaymentGatewayException` برمز ثابت؛ لا يكتب في الاتصال. `PaymentGatewayAdapterRegistry::verifier()` يحلّه (أو `null`). |
+| Moyasar | `MoyasarApiClient::probeAccess()` = `GET /invoices?page=1` بالمفتاح السري (قراءة فقط)، بعد سياسة المفاتيح (رفض Live قبل أي شبكة). نجاح الاستجابة = المفتاح مقبول. **لا يثبت** سرّ الـwebhook ولا المفتاح القابل للنشر (لا استدعاء موثّق لهما). |
+| `PaymentGatewayService::verify()` | الشبكة **خارج** المعاملة؛ ثم قفل الصف وإعادة فحص **بصمة الاعتماد** (النسخة + البيئة + المفتاح القابل للنشر) ⇒ تدوير أثناء الاستدعاء = `gateway.credentials_changed` ولا يُختم تحقق على سرّ لم يُفحص؛ ثم `verified_at = now()` وحدث `verified`. الفشل ⇒ حدث `verification_failed` برمز السبب فقط. |
+| إبطال التحقق | تدوير السرّ كان يصفّره؛ أُضيف: تغيّر `environment` أو `publishable_key` لمزوّد حقيقي يصفّره أيضاً (إعادة الحفظ بالقيمة نفسها لا تُبطله). |
+| API | `POST /payment-gateways/{id}/verify` — `payment_gateways.manage`، `throttle:10,1`. أخطاء بصيغة `{error:{code,message}}` (422). |
+| رموز جديدة | `gateway.verification_not_required` · `gateway.verification_unsupported` · `gateway.credentials_changed` · أحداث `verified`/`verification_failed`. |
+| الواجهة | إجراء «تحقق من الاعتماد» في صف الاتصال لمزوّد له محوّل (`VERIFIABLE_PROVIDERS = [moyasar]`)، قبل «تفعيل»؛ بلا تأكيد (قراءة آمنة)؛ رسائل `gateway.moyasar_*`/`moyasar.*` وأنواع الأحداث بالعربية والإنجليزية؛ نص حجب التفعيل مُحدَّث. |
+
+## الاختبارات (Mock/Fixture)
+- `PaymentGatewayVerifyTest` (8): قبول ⇒ `verified_at` + حدثان + فتح التفعيل + لا Payment/قيد + طلب GET واحد بـBasic؛ رفض 401/403/429/503 ⇒ لا تحقق + حدث بالرمز + لا تسريب للسر؛ انقطاع الشبكة؛ مفتاح live كُتب خارج الخدمة لا يصل الشبكة؛ RBAC (محاسب 403) وعزل المستأجر (404) بلا استدعاء شبكة؛ custom/مزوّد بلا محوّل/ملغى بلا شبكة؛ إبطال التحقق بتدوير السر أو المفتاح القابل للنشر؛ **تدوير أثناء الاستدعاء لا يختم التحقق**؛ الخنق.
+- vitest: العقد (ظهور الإجراء فقط لمزوّد له محوّل) + الصفحة (رفض برمزه ثم نجاح، وحظر التفعيل قبل التحقق، AR/EN).
+
+## معلّق (EXT-01 — بمفاتيح Sandbox الحقيقية)
+- أن `GET /invoices` يقبل المفتاح السري الصحيح ويرفض الخاطئ فعلاً (401/403) وشكل استجابته.
+- أن ذلك الفحص كافٍ لإثبات الحساب؛ وإلا يُستبدل باستدعاء قراءة آخر داخل `probeAccess` فقط.
+- بقية بنود التحقق الحقيقي المسجّلة في تقرير H2-01a (غلاف القائمة، `metadata[key]`، `payment_paid`، `captured`، مهلة webhook، دفع نجاح/رفض/3DS).

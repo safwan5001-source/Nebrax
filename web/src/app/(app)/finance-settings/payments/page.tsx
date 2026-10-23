@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
-import { ArrowRight, CreditCard, History, KeyRound, Pause, Pencil, Play, Plus, ShieldOff, Trash2 } from 'lucide-react';
+import { ArrowRight, CreditCard, History, KeyRound, Pause, Pencil, Play, Plus, ShieldCheck, ShieldOff, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -104,6 +104,20 @@ export default function PaymentGatewaysPage() {
     }
   }
 
+  /** التحقق قراءة آمنة لدى المزوّد (لا أثر مالي) فلا يحتاج تأكيداً؛ النتيجة تُعرض فوراً وسجل الاتصال يحفظ المحاولة. */
+  async function verify(connection: GatewayConnection) {
+    setBusy(connection.id);
+    try {
+      const response = await api<{ data: GatewayConnection }>(`/payment-gateways/${connection.id}/verify`, { method: 'POST', body: {} });
+      upsert(response.data);
+      success(t('done.verify'));
+    } catch (err) {
+      failure(err, t('actionFailed'));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function remove(connection: GatewayConnection) {
     if (!(await askConfirm({ message: t('confirm.delete', { name: gatewayDisplayName(connection, locale) }), tone: 'danger' }))) return;
     setBusy(connection.id);
@@ -125,6 +139,7 @@ export default function PaymentGatewaysPage() {
       case 'revoke': return setRevoking(connection);
       case 'events': return setViewingEvents(connection);
       case 'delete': return void remove(connection);
+      case 'verify': return void verify(connection);
       default: return void transition(connection, action);
     }
   }
@@ -135,7 +150,7 @@ export default function PaymentGatewaysPage() {
     const blocked = activationBlock(connection);
     const disabled = busy === connection.id;
     const icons: Record<GatewayAction, typeof Pencil> = {
-      edit: Pencil, rotate: KeyRound, activate: Play, suspend: Pause, revoke: ShieldOff, delete: Trash2, events: History,
+      edit: Pencil, rotate: KeyRound, verify: ShieldCheck, activate: Play, suspend: Pause, revoke: ShieldOff, delete: Trash2, events: History,
     };
 
     return (

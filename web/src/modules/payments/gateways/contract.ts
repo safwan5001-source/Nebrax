@@ -54,7 +54,7 @@ export interface GatewayEvent {
   occurred_at: string | null;
 }
 
-export type GatewayAction = 'edit' | 'rotate' | 'activate' | 'suspend' | 'revoke' | 'delete' | 'events';
+export type GatewayAction = 'edit' | 'rotate' | 'verify' | 'activate' | 'suspend' | 'revoke' | 'delete' | 'events';
 
 export type BadgeTone = 'neutral' | 'muted' | 'positive' | 'warning' | 'negative';
 
@@ -67,6 +67,13 @@ export function statusTone(status: GatewayStatus): BadgeTone {
   }
 }
 
+/** مزوّدون لمحوّلهم إجراء تحقق من الاعتماد على الخادم (`POST /payment-gateways/{id}/verify`)؛ غيرهم لا يُعرض لهم زر (لا نزيّف تحققاً). */
+export const VERIFIABLE_PROVIDERS: readonly GatewayProvider[] = ['moyasar'];
+
+export function canVerify(connection: Pick<GatewayConnection, 'provider' | 'status'>): boolean {
+  return VERIFIABLE_PROVIDERS.includes(connection.provider) && connection.status !== 'revoked';
+}
+
 /** مزوّد حقيقي (له محوّل) يحتاج تحققاً قبل التفعيل؛ `custom` يُفعَّل مباشرة. */
 export function isRealProvider(provider: GatewayProvider): boolean {
   return provider !== 'custom';
@@ -74,7 +81,7 @@ export function isRealProvider(provider: GatewayProvider): boolean {
 
 /**
  * سبب منع التفعيل المعروف سلفاً (الخادم يتحقق أيضاً). `verification_required`: اتصال مزوّد حقيقي بلا `verified_at`
- * — زر التحقق يصل مع أول محوّل حقيقي (PAY-H2-01)، فلا نعرض زراً يزيّف التحقق.
+ * — زر «تحقق» يظهر لمزوّد له محوّل تحقق (`VERIFIABLE_PROVIDERS`)، فلا نعرض زراً يزيّف التحقق لغيره.
  */
 export function activationBlock(connection: GatewayConnection): 'verification_required' | null {
   return isRealProvider(connection.provider) && connection.verified_at === null ? 'verification_required' : null;
@@ -83,10 +90,11 @@ export function activationBlock(connection: GatewayConnection): 'verification_re
 /** الإجراءات المتاحة لاتصال بحالته. من لا يملك `payment_gateways.manage` لا إجراء له (قراءة فقط). */
 export function availableActions(connection: GatewayConnection, canManage: boolean): GatewayAction[] {
   if (!canManage) return [];
+  const verify: GatewayAction[] = canVerify(connection) ? ['verify'] : [];
   switch (connection.status) {
-    case 'draft': return ['edit', 'rotate', 'activate', 'delete', 'events'];
-    case 'active': return ['edit', 'rotate', 'suspend', 'revoke', 'events'];
-    case 'suspended': return ['edit', 'rotate', 'activate', 'revoke', 'delete', 'events'];
+    case 'draft': return ['edit', 'rotate', ...verify, 'activate', 'delete', 'events'];
+    case 'active': return ['edit', 'rotate', ...verify, 'suspend', 'revoke', 'events'];
+    case 'suspended': return ['edit', 'rotate', ...verify, 'activate', 'revoke', 'delete', 'events'];
     default: return ['events']; // revoked: مرجع تاريخي نهائي
   }
 }

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Contracts\GatewayAdapter;
 use App\Contracts\RedactsStoredWebhookBody;
+use App\Contracts\VerifiesGatewayCredentials;
 use App\Models\PaymentAttempt;
 use App\Models\PaymentGateway;
 use App\Support\InvalidPaymentWebhookException;
@@ -31,7 +32,7 @@ use Throwable;
  *
  * ما يلزم تثبيته في Sandbox الحقيقي ولا يُفترض هنا: شكل غلاف قائمة الفواتير، وهل تقبل فاتورة `failed` محاولة جديدة، وجسم `payment_paid` الفعلي.
  */
-final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody
+final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, VerifiesGatewayCredentials
 {
     public const PROVIDER = 'moyasar';
 
@@ -150,6 +151,11 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody
             || strtoupper((string) ($invoice['currency'] ?? '')) !== strtoupper($context->currency)) {
             throw new PaymentGatewayException('moyasar.invoice_conflict', 'فاتورة هذه المحاولة بمبلغ أو عملة مختلفة عن المطلوب.');
         }
+    }
+
+    public function verifyCredentials(PaymentGateway $gateway): void
+    {
+        $this->client->probeAccess($gateway);
     }
 
     public function fetchPayment(PaymentGateway $gateway, string $providerPaymentId): PaymentProviderSnapshot
