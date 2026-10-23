@@ -13,6 +13,8 @@ final class PaymentGatewayCapabilities
         public readonly bool $hostedCheckout,
         public readonly array $currencies,
         public readonly int $minAmountMinor = 1,
+        /** يدعم المحوّل استرداد دفعة ملتقَطة (`RefundsPayments`). الافتراضي لا: لا قدرة تُعلَن بلا تنفيذ (PAY-H3-01a). */
+        public readonly bool $refunds = false,
     ) {}
 
     public function supportsAmount(int $amountMinor): bool

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Contracts\GatewayAdapter;
+use App\Contracts\RefundsPayments;
 use App\Contracts\VerifiesGatewayCredentials;
 use App\Support\PaymentOrchestrationException;
 
@@ -44,6 +45,18 @@ final class PaymentGatewayAdapterRegistry
         $adapter = app($class);
 
         return $adapter instanceof VerifiesGatewayCredentials ? $adapter : null;
+    }
+
+    /** محوّل المزوّد إن كان يدعم الاسترداد (PAY-H3-01a)، وإلا `null`. */
+    public function refunder(string $provider): ?RefundsPayments
+    {
+        $class = $this->classFor($provider);
+        if ($class === null) {
+            return null;
+        }
+        $adapter = app($class);
+
+        return $adapter instanceof RefundsPayments ? $adapter : null;
     }
 
     /** @return class-string<GatewayAdapter>|null */

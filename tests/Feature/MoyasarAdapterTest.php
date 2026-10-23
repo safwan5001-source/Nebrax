@@ -668,7 +668,9 @@ class MoyasarAdapterTest extends TestCase
             $source = $this->codeWithoutComments((string) file_get_contents(base_path($file)));
             $this->assertDoesNotMatchRegularExpression('/\b(cvc|cvv|card_number|creditcard|[\'"]source[\'"])\b/i', $source, "{$file}: بيانات بطاقة");
             $this->assertDoesNotMatchRegularExpression('/\b(LedgerService|PaymentService|JournalEntry|InvoiceService|ZatcaService)\b/', $source, "{$file}: لمس الدفتر");
-            $this->assertDoesNotMatchRegularExpression('/[\'"]\/payments/', $source, "{$file}: مسار /payments (إنشاء دفعة ببطاقة) ممنوع");
+            // PAY-H3-01a: مسار الاسترداد `/payments/{id}/refund` هو **الاستثناء الوحيد** (لا ينشئ دفعة ولا يحمل بطاقة)؛ أي `/payments` آخر ممنوع.
+            $withoutRefundPath = str_replace("'/payments/'.rawurlencode(\$paymentId).'/refund'", '', $source);
+            $this->assertDoesNotMatchRegularExpression('/[\'"]\/payments/', $withoutRefundPath, "{$file}: مسار /payments (إنشاء دفعة ببطاقة) ممنوع");
         }
         $rules = (new \App\Http\Requests\StorePaymentGatewayRequest())->rules();
         $this->assertSame([], array_intersect(['card', 'card_number', 'number', 'cvc', 'cvv', 'source'], array_keys($rules)));

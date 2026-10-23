@@ -3,12 +3,16 @@
 namespace App\Services;
 
 use App\Contracts\GatewayAdapter;
+use App\Contracts\RefundsPayments;
 use App\Models\PaymentGateway;
 use App\Support\PaymentAttemptContext;
 use App\Support\PaymentGatewayCapabilities;
 use App\Support\PaymentHostedCheckout;
 use App\Support\InvalidPaymentWebhookException;
+use App\Support\PaymentProviderRefund;
 use App\Support\PaymentProviderSnapshot;
+use App\Support\PaymentRefundRejectedException;
+use App\Support\PaymentRefundUnknownException;
 use App\Support\PaymentRawWebhook;
 use App\Support\PaymentVerifiedWebhook;
 use Carbon\CarbonImmutable;
@@ -18,7 +22,7 @@ use RuntimeException;
  * محوّل وهمي حتمي للاختبار: لا شبكة ولا أموال حقيقية. يُحلّ من `PaymentGatewayAdapterRegistry` في `local`/`testing` فقط.
  * يسجّل الاستدعاءات ويسمح بحقن الأعطال وبرمجة لقطات المزوّد (بما فيها الخارجة عن الترتيب) — لا يزيّف اعتماداً حقيقياً.
  */
-final class FakePaymentGatewayAdapter implements GatewayAdapter
+final class FakePaymentGatewayAdapter implements GatewayAdapter, RefundsPayments
 {
     public const PROVIDER = 'fake';
 
@@ -39,6 +43,15 @@ final class FakePaymentGatewayAdapter implements GatewayAdapter
 
     private int $failCheckouts = 0;
 
+    /** @var list<array{provider_payment_id: string, amount_minor: int}> كل استدعاء `refundPayment` (بما فيه الفاشل) — يثبت عدم الإرسال المزدوج. */
+    public array $refundCalls = [];
+
+    /** @var array<string, int> المسترد التراكمي لكل دفعة لدى «المزوّد» (حقيقته؛ يقرؤه `fetchPayment`). */
+    private array $refunded = [];
+
+    /** طابور أعطال الاسترداد: `rejected` (لم يُنفَّذ) · `unknown_not_applied` (انقطع ولم يُنفَّذ) · `unknown_applied` (انقطع بعد التنفيذ). */
+    private array $refundFailures = [];
+
     private ?\Throwable $fetchFailure = null;
 
     public function provider(): string
@@ -48,7 +61,7 @@ final class FakePaymentGatewayAdapter implements GatewayAdapter
 
     public function capabilities(): PaymentGatewayCapabilities
     {
-        return new PaymentGatewayCapabilities(true, ['SAR']);
+        return new PaymentGatewayCapabilities(true, ['SAR'], 1, true);
     }
 
     public function createCheckout(PaymentAttemptContext $context): PaymentHostedCheckout
@@ -83,12 +96,43 @@ final class FakePaymentGatewayAdapter implements GatewayAdapter
         }
 
         if (isset($this->snapshots[$providerPaymentId])) {
-            return $this->snapshots[$providerPaymentId];
+            return $this->withRefunded($this->snapshots[$providerPaymentId]);
         }
 
         $known = $this->payments[$providerPaymentId] ?? ['amount_minor' => 0, 'currency' => 'SAR'];
 
-        return new PaymentProviderSnapshot($providerPaymentId, 'pending_customer', $known['amount_minor'], $known['currency']);
+        return $this->withRefunded(new PaymentProviderSnapshot($providerPaymentId, 'pending_customer', $known['amount_minor'], $known['currency']));
+    }
+
+    /**
+     * استرداد وهمي حتمي: يراكم `refunded` ويرفض ما يتجاوز المبلغ الملتقط. يحاكي الأعطال بالطابور: `rejected` لا يُنفَّذ، `unknown_not_applied` ينقطع قبل
+     * التنفيذ، `unknown_applied` ينفَّذ ثم ينقطع الردّ (الحالة الخطرة التي يحسمها المطابِق بالتراكمي). لا idempotency (كالمزوّد الحقيقي).
+     */
+    public function refundPayment(PaymentGateway $gateway, string $providerPaymentId, int $amountMinor): PaymentProviderRefund
+    {
+        $this->refundCalls[] = ['provider_payment_id' => $providerPaymentId, 'amount_minor' => $amountMinor];
+
+        $failure = array_shift($this->refundFailures);
+        if ($failure === 'rejected') {
+            throw new PaymentRefundRejectedException('fake.refund_rejected', 'رفض المزوّد الوهمي الاسترداد.');
+        }
+        if ($failure === 'unknown_not_applied') {
+            throw new PaymentRefundUnknownException('fake.unavailable', 'انقطاع المزوّد الوهمي قبل التنفيذ.');
+        }
+
+        $snapshot = $this->fetchSnapshotFor($providerPaymentId);
+        $available = $snapshot->capturedMinor - ($this->refunded[$providerPaymentId] ?? 0);
+        if ($amountMinor <= 0 || $amountMinor > $available) {
+            throw new PaymentRefundRejectedException('fake.refund_exceeds_available', 'الاسترداد يتجاوز المتاح لدى المزوّد الوهمي.');
+        }
+
+        $this->refunded[$providerPaymentId] = ($this->refunded[$providerPaymentId] ?? 0) + $amountMinor;
+
+        if ($failure === 'unknown_applied') {
+            throw new PaymentRefundUnknownException('fake.unavailable', 'انقطع ردّ المزوّد الوهمي بعد التنفيذ.');
+        }
+
+        return new PaymentProviderRefund($providerPaymentId, $this->refunded[$providerPaymentId], $snapshot->currency, CarbonImmutable::now('UTC'));
     }
 
     /** توقيع حتمي للاختبار: HMAC-SHA256 للجسم الخام بأحد أسرار الـwebhook، في ترويسة `x-fake-signature`. الجسم JSON `{id, type, payment_id}`. */
@@ -121,6 +165,34 @@ final class FakePaymentGatewayAdapter implements GatewayAdapter
     }
 
     // ───────────── أدوات الاختبار ─────────────
+
+    /** @param  'rejected'|'unknown_not_applied'|'unknown_applied'  $kind */
+    public function failNextRefund(string $kind): void
+    {
+        $this->refundFailures[] = $kind;
+    }
+
+    /** يحاكي استرداداً خارجياً (من لوحة المزوّد) رفع المسترد التراكمي دون علم أَوْج. */
+    public function scriptRefunded(string $providerPaymentId, int $refundedMinor): void
+    {
+        $this->refunded[$providerPaymentId] = $refundedMinor;
+    }
+
+    private function fetchSnapshotFor(string $providerPaymentId): PaymentProviderSnapshot
+    {
+        return $this->snapshots[$providerPaymentId]
+            ?? new PaymentProviderSnapshot($providerPaymentId, 'pending_customer', ($this->payments[$providerPaymentId]['amount_minor'] ?? 0), ($this->payments[$providerPaymentId]['currency'] ?? 'SAR'));
+    }
+
+    private function withRefunded(PaymentProviderSnapshot $snapshot): PaymentProviderSnapshot
+    {
+        $refunded = $this->refunded[$snapshot->providerPaymentId] ?? 0;
+
+        return $refunded === $snapshot->refundedMinor ? $snapshot : new PaymentProviderSnapshot(
+            $snapshot->providerPaymentId, $snapshot->status, $snapshot->amountMinor, $snapshot->currency,
+            $snapshot->capturedMinor, $snapshot->capturedAt, $snapshot->failureCode, $refunded,
+        );
+    }
 
     public function failNextCheckouts(int $times = 1): void
     {

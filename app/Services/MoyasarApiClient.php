@@ -62,6 +62,17 @@ final class MoyasarApiClient
     }
 
     /**
+     * استرداد دفعة (PAY-H3-01a): `POST /payments/{id}/refund` بـ`{amount}` — **بلا أي إعادة محاولة** (لا idempotency موثّق للاسترداد). المسار الوحيد
+     * الذي يلمس `/payments` في هذه الطبقة، ولا يُنشئ دفعة ولا يحمل بطاقة. يرجع كائن الدفعة المحدَّث (يحمل `refunded` التراكمي).
+     *
+     * @return array<string, mixed>
+     */
+    public function refundPayment(PaymentGateway $gateway, string $paymentId, int $amountMinor): array
+    {
+        return $this->send($gateway, 'POST', '/payments/'.rawurlencode($paymentId).'/refund', json: ['amount' => $amountMinor]);
+    }
+
+    /**
      * @param  array<string, string>  $query
      * @param  array<string, mixed>|null  $json
      * @return array<string, mixed>
