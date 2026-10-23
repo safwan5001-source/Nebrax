@@ -152,7 +152,7 @@ describe('pre-paint twin', () => {
   it('never applies on the excluded (non-workspace) paths', () => {
     window.localStorage.setItem(AWJ_UI_STORAGE_KEY, '3');
     const script = buildAwjUiPrePaintScript('3');
-    for (const p of ['/', '/login', '/register', '/platform/tenants', '/fuel-stations/sales', '/auth/handoff']) {
+    for (const p of ['/', '/login', '/register', '/platform/tenants', '/fuel-stations/sales', '/auth/handoff', '/pay/abc']) {
       expect(runPrePaint(script, p), p).toBeNull();
     }
   });

@@ -48,6 +48,8 @@ class Settings
         // independent from assistant/provider consent and enables no ERP execution.
         'ai_actions' => [
             'enabled' => false,
+            // IMP-X-01 (D-11): موافقة مالك المؤسسة على **التنفيذ** — المفتاح الثاني بعد منحة المشغّل. لا مسار كتابة له بعد (IMP-X-01c)؛ الافتراضي رفض.
+            'execution_approved' => false,
         ],
         /**
          * هوية الشركة. `logo` صورة (data URL) تُعرَض في **قشرة التطبيق**
