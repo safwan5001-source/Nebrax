@@ -46,6 +46,14 @@ class PlatformAiActionControlController extends ApiController
             ],
             'master' => $state(AiActionControl::ALL_TYPES),
             'types' => collect($this->registry->types())->map(fn (string $type) => ['action_type' => $type] + ['state' => $state($type)])->all(),
+            // سجل التدقيق لتغييرات نطاق المنصة (آخر 30): كل تغيير مرئي بسببه وفاعله.
+            'events' => AiActionControlEvent::query()->where('scope', AiActionControl::SCOPE_PLATFORM)
+                ->orderByDesc('occurred_at')->orderByDesc('version')->limit(30)->get()
+                ->map(fn (AiActionControlEvent $event) => [
+                    'action_type' => $event->action_type, 'capability' => $event->capability, 'version' => $event->version,
+                    'previous_enabled' => $event->previous_enabled, 'new_enabled' => $event->new_enabled, 'reason' => $event->reason,
+                    'platform_administrator_id' => $event->platform_administrator_id, 'occurred_at' => $event->occurred_at?->toIso8601String(),
+                ])->all(),
         ]]);
     }
 
