@@ -153,3 +153,120 @@ describe("Header mode control (V7c-2)", () => {
     expect(document.querySelector("[data-header-mode-note]")).toBeNull();
   });
 });
+
+// ───────────── AWJ-HEADER-SCRIM — the protection layer (editor control, explanation and Canvas parity) ─────────────
+const WIDE: { min: [number, number, number]; max: [number, number, number] } = { min: [0, 0, 0], max: [255, 255, 255] };
+const plainPicture = { background: { kind: "media", media: { mediaId: MEDIA_ID, decorative: true } } };
+// An image-only hero (AWJ-HERO-DISPLAY): with no text over it only the picture's own evidence is judged, so a full-range picture still paints —
+// exactly the hero the store that reported the defect published.
+const imageOnly = (design: Record<string, unknown> = plainPicture): PresentationHomeSection =>
+  ({ id: "hero", type: "hero", visible: true, content: { headline: "", showTitle: false, showSubheadline: false, showCtas: false }, design }) as PresentationHomeSection;
+
+describe("Canvas — the protection layer (AWJ-HEADER-SCRIM)", () => {
+  it("a full-range picture stays solid without the option (what a store with this picture showed) and is overlaid, with a proven layer, with it", async () => {
+    status.mockResolvedValue(usage({ contrast: WIDE }));
+    const solid = mount(config([imageOnly()]));
+    await waitFor(() => expect(solid.querySelector("[data-sd-backdrop]")).toBeTruthy());
+    await new Promise((r) => setTimeout(r, 30));
+    expect(solid.querySelector("[data-ho]")).toBeNull();
+    cleanup();
+
+    const c = mount(config([imageOnly()], { mode: "overlay-hero", overlayScrim: "auto" }));
+    await waitFor(() => expect(c.querySelector("[data-ho]")?.getAttribute("data-ho")).toBe("on d s5"));
+    expect((c.querySelector("[data-preview-canvas]") as HTMLElement).getAttribute("data-hd")).toBe("hmo");
+    expect(c.querySelector("header")?.hasAttribute("data-header-live")).toBe(true);
+  });
+
+  it("a forced tone gets its own proven layer (white text needs the stronger black layer)", async () => {
+    status.mockResolvedValue(usage({ contrast: WIDE }));
+    const c = mount(config([imageOnly()], { mode: "overlay-hero", overlayTone: "light", overlayScrim: "auto" }));
+    await waitFor(() => expect(c.querySelector("[data-ho]")?.getAttribute("data-ho")).toBe("on l s6"));
+  });
+
+  it("is never added when the picture alone proves the text: the marker is exactly the V7c-2 one", async () => {
+    status.mockResolvedValue(usage({ contrast: DARK }));
+    const c = mount(config([imageOnly()], { mode: "overlay-hero", overlayScrim: "auto" }));
+    await waitFor(() => expect(c.querySelector("[data-ho]")?.getAttribute("data-ho")).toBe("on l"));
+  });
+
+  it("the structural rules still win: a split hero or an unproven picture stays solid even with the option", async () => {
+    status.mockResolvedValue(usage({ contrast: WIDE }));
+    const split = mount(config([imageOnly({ ...plainPicture, layout: "split" })], { mode: "overlay-hero", overlayScrim: "auto" }));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(split.querySelector("[data-ho]")).toBeNull();
+    cleanup();
+    status.mockResolvedValue(usage({ contrast: null as never }));
+    const unproven = mount(config([imageOnly()], { mode: "overlay-hero", overlayScrim: "auto" }));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(unproven.querySelector("[data-ho]")).toBeNull();
+  });
+});
+
+describe("Header protection-layer control (AWJ-HEADER-SCRIM)", () => {
+  const panel = (cfg: StorefrontPresentationConfig, onChange = vi.fn()) => {
+    render(<ControlPanels panel="header" config={cfg} locale="en" liveStoreName={null} onChange={onChange} />);
+    return onChange;
+  };
+  const scrim = () => document.querySelector("[data-header-design='overlay-scrim']") as HTMLSelectElement | null;
+  const lastDesign = (onChange: ReturnType<typeof vi.fn>) => (onChange.mock.calls.at(-1)?.[0] as StorefrontPresentationConfig).header.design;
+
+  it("is hidden until the header is transparent over the hero, then starts on Default (no layer)", () => {
+    panel(config([imageOnly()], { layout: "standard" }));
+    expect(scrim()).toBeNull();
+    cleanup();
+    panel(config([imageOnly()], { mode: "solid" }));
+    expect(scrim()).toBeNull();
+    cleanup();
+    panel(config([imageOnly()]));
+    expect(scrim()?.value).toBe("");
+    expect(Array.from(scrim()?.options ?? []).map((o) => o.value)).toEqual(["", "auto"]);
+  });
+
+  it("choosing Automatic writes overlayScrim, keeps the rest, and Default removes the key again", async () => {
+    const user = userEvent.setup();
+    const onChange = panel(config([imageOnly()], { mode: "overlay-hero", overlayTone: "dark", sticky: "off" }));
+    await user.selectOptions(scrim() as HTMLSelectElement, "auto");
+    expect(lastDesign(onChange)).toEqual({ mode: "overlay-hero", overlayTone: "dark", overlayScrim: "auto", sticky: "off" });
+    cleanup();
+    const again = panel(config([imageOnly()], { mode: "overlay-hero", overlayScrim: "auto" }));
+    expect(scrim()?.value).toBe("auto");
+    await user.selectOptions(scrim() as HTMLSelectElement, "");
+    expect(lastDesign(again)).toEqual({ mode: "overlay-hero" });
+  });
+
+  it("switching the header back to solid drops the inert scrim with the tone (normalised)", async () => {
+    const user = userEvent.setup();
+    const onChange = panel(config([imageOnly()], { mode: "overlay-hero", overlayScrim: "auto" }));
+    await user.selectOptions(document.querySelector("[data-header-design='mode']") as HTMLSelectElement, "solid");
+    expect(lastDesign(onChange)).toEqual({ mode: "solid" });
+  });
+
+  it("EXPLAINS the contrast reason the merchant hit — a full-range picture with no layer — instead of staying silent", async () => {
+    status.mockResolvedValue(usage({ contrast: WIDE }));
+    panel(config([imageOnly()]));
+    await waitFor(() => expect(document.querySelector("[data-header-mode-inactive][data-reason='unprovable']")).toBeTruthy());
+    expect(screen.getByText(/cannot be proven legible over the whole picture/)).toBeTruthy();
+    expect(document.querySelector("[data-header-mode-inactive][data-reason='unprovable']")?.textContent).toMatch(/Protection layer behind the header/);
+  });
+
+  it("with Automatic it says the layer is active and how strong; a picture that needs none shows no note", async () => {
+    status.mockResolvedValue(usage({ contrast: WIDE }));
+    panel(config([imageOnly()], { mode: "overlay-hero", overlayScrim: "auto" }));
+    await waitFor(() => expect(document.querySelector("[data-header-mode-scrim]")?.textContent).toMatch(/strength 50%/));
+    expect(document.querySelector("[data-header-mode-inactive]")).toBeNull();
+    cleanup();
+    status.mockResolvedValue(usage({ contrast: DARK }));
+    panel(config([imageOnly()], { mode: "overlay-hero", overlayScrim: "auto" }));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(document.querySelector("[data-header-mode-scrim]")).toBeNull();
+    expect(document.querySelector("[data-header-mode-inactive]")).toBeNull();
+  });
+
+  it("says nothing about contrast while the picture is still being measured (no claim without a measurement)", async () => {
+    status.mockImplementation(() => new Promise(() => {}));
+    panel(config([imageOnly()]));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(document.querySelector("[data-header-mode-inactive]")).toBeNull();
+  });
+});
+

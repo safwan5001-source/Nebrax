@@ -15,7 +15,7 @@
 // 6 viewports x AR RTL / EN LTR. `--strip` removes the overlay rules from the stylesheet (negative control: must fail).
 //   node scripts/pixel-proof/build-css.mjs <dir>
 //   HEADER_OVERLAY_PROOF_DIR=<dir> npx vitest run src/components/layout/__tests__/header-overlay-proof.render.test.tsx
-//   node scripts/header-proof/measure-overlay.mjs <dir> [--strip]   (PIXEL_PROOF_CHROMIUM=<path> selects a Chromium binary)
+//   node scripts/header-proof/measure-overlay.mjs <dir> [--strip|--strip-scrim]   (PIXEL_PROOF_CHROMIUM=<path> selects a Chromium binary)
 import { createRequire } from "node:module";
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -31,6 +31,9 @@ const controller = esbuild.buildSync({
 }).outputFiles[0].text;
 const dir = resolve(process.argv[2]);
 const strip = process.argv.includes("--strip");
+// AWJ-HEADER-SCRIM negative control: remove ONLY the protection-layer rules — the proof must then fail on every layered scenario
+// (the full-range picture shows through the header text and the pixel proof catches it)
+const stripScrim = process.argv.includes("--strip-scrim");
 const browser = await chromium.launch(process.env.PIXEL_PROOF_CHROMIUM ? { executablePath: process.env.PIXEL_PROOF_CHROMIUM } : {});
 const viewports = [[390, 844], [430, 932], [768, 1024], [1024, 768], [1280, 800], [1440, 900]];
 const scenarios = JSON.parse(readFileSync(join(dir, "scenarios.json"), "utf8"));
@@ -40,15 +43,33 @@ if (strip) {
   parsed.walkRules((r) => { if (/\[data-ho|\[data-header-solid|\[data-header-live|\[data-hd~="?hmo/.test(r.selector)) r.remove(); });
   stripped = parsed.toString();
 }
+if (stripScrim) {
+  const parsed = postcss.parse(readFileSync(join(dir, "storefront.css"), "utf8"));
+  parsed.walkRules((r) => { if (/\[data-ho~="?s[3-8]"?\]/.test(r.selector)) r.remove(); });
+  stripped = parsed.toString();
+}
 const files = readdirSync(join(dir, "pages")).filter((f) => f.endsWith(".html")).sort();
 const violations = [];
 let checks = 0, pixelChecks = 0;
 const ok = (cond, msg) => { checks++; if (!cond) violations.push(msg); };
 const near = (a, b, tol) => Math.abs(a - b) <= tol;
-const rgb = (str) => { const x = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/.exec(str ?? ""); return x ? [+x[1], +x[2], +x[3], x[4] === undefined ? 1 : +x[4]] : null; };
+const rgb = (str) => {
+  const x = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/.exec(str ?? "");
+  if (x) return [+x[1], +x[2], +x[3], x[4] === undefined ? 1 : +x[4]];
+  // AWJ-HEADER-SCRIM: `color-mix(in srgb, …)` is serialised by Chromium as `color(srgb r g b / a)` with 0..1 channels
+  const c = /color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)(?: \/ ([\d.]+))?\)/.exec(str ?? "");
+  return c ? [Math.round(+c[1] * 255), Math.round(+c[2] * 255), Math.round(+c[3] * 255), c[4] === undefined ? 1 : +c[4]] : null;
+};
 const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
 const same = (got, want) => { const g = rgb(got); return !!g && g.slice(0, 3).every((v, i) => v === want[i]); };
 const transparent = (str) => { const g = rgb(str); return !!g && g[3] === 0; };
+// the colour a band must have at the top: fully transparent, or (AWJ-HEADER-SCRIM) the proven layer — the colour OPPOSITE to the text, at the proven strength
+const bandAtTop = (str, sc, fg) => {
+  if (!sc.expectScrim) return transparent(str);
+  const g = rgb(str); const want = fg === "#ffffff" ? [0, 0, 0] : [255, 255, 255];
+  return !!g && want.every((v, i) => Math.abs(g[i] - v) <= 1) && Math.abs(g[3] - sc.expectScrim / 100) <= 0.011;
+};
+const ANN = 36; // the announcement bar's height in the proof pages
 
 const measure = (page) => page.evaluate(() => {
   const vis = (e) => !!e && e.getClientRects().length > 0 && getComputedStyle(e).display !== "none";
@@ -78,8 +99,8 @@ const measure = (page) => page.evaluate(() => {
     header: r(header), headerPos: getComputedStyle(header).position, live: header.hasAttribute("data-header-live"), solid: header.hasAttribute("data-header-solid"),
     block: rects.length ? { t: Math.min(...rects.map((x) => x.top)), b: Math.max(...rects.map((x) => x.bottom)) } : null,
     hdBlock: parseFloat(wrapper.style.getPropertyValue("--hd-block")) || null,
-    marker: marked ? marked.getAttribute("data-ho") : null,
-    section: r(section), backdrop: r(backdrop), sectionPad: section ? parseFloat(getComputedStyle(section).paddingTop) : null, sectionRadius: section ? getComputedStyle(section).borderTopLeftRadius : null,
+    marker: marked ? marked.getAttribute("data-ho") : null, sd: marked ? marked.getAttribute("data-sd") : null,
+    section: r(section), backdrop: r(backdrop), sectionPad: section ? parseFloat(getComputedStyle(section).paddingTop) : null, contentMt: (() => { const c = section?.querySelector("[data-section-content]"); return c ? parseFloat(getComputedStyle(c).marginTop) : null; })(), sectionRadius: section ? getComputedStyle(section).borderTopLeftRadius : null,
     h1: r(h1), cta: r(cta),
     bg: { row: row ? getComputedStyle(row).backgroundColor : null, utility: utility ? getComputedStyle(utility).backgroundColor : null, rail: (() => { const n = header.querySelector("[data-rail]"); return n && vis(n) ? getComputedStyle(n).backgroundColor : null; })() },
     border: row ? getComputedStyle(row).borderBottomColor : null,
@@ -110,6 +131,8 @@ for (const file of files.filter((f) => f.endsWith(".html"))) {
   const decision = JSON.parse(readFileSync(join(dir, "pages", `${name}.${dirName}.decision.json`), "utf8"));
   ok((decision !== null) === sc.expectOverlay, `${name}.${dirName} production decision ${JSON.stringify(decision)} vs expected overlay=${sc.expectOverlay}`);
   if (sc.expectOverlay && sc.expectFg) ok(decision?.fg === sc.expectFg, `${name}.${dirName} fg ${decision?.fg}, want ${sc.expectFg}`);
+  if (sc.expectOverlay) ok((decision?.scrim?.alpha ?? null) === (sc.expectScrim ?? null), `${name}.${dirName} production layer ${JSON.stringify(decision?.scrim ?? null)} vs expected ${sc.expectScrim ?? "none"}`);
+  const top = sc.announcement ? ANN : 0; // where the sticky header sits once the page has scrolled
   const up = sc.header.sticky === "on-scroll-up";
   const stickyOn = sc.header.sticky !== "off";
 
@@ -140,6 +163,7 @@ for (const file of files.filter((f) => f.endsWith(".html"))) {
 
     if (sc.expectOverlay) {
       ok(m.marker !== null && m.marker.startsWith("on"), `${tag} hero lacks the overlay marker (${m.marker})`);
+      ok(m.marker === `on ${decision.fg === "#ffffff" ? "l" : "d"}${sc.expectScrim ? ` s${sc.expectScrim / 10}` : ""}`, `${tag} marker ${m.marker}`);
       ok(near(m.header.h, 0, 0.5), `${tag} header still takes ${m.header.h}px`);
       ok(m.live === stickyOn, `${tag} data-header-live=${m.live}, want ${stickyOn}`);
       ok(m.headerPos === (stickyOn ? "sticky" : "relative"), `${tag} header position ${m.headerPos}`);
@@ -147,10 +171,22 @@ for (const file of files.filter((f) => f.endsWith(".html"))) {
       ok(m.backdrop.l <= 0.5 && m.backdrop.r >= m.vw - 0.5, `${tag} picture does not reach both edges (${m.backdrop.l}..${m.backdrop.r} of ${m.vw})`);
       ok(m.sectionRadius === "0px", `${tag} bleeding hero keeps a radius ${m.sectionRadius}`);
       ok(near(m.containerPad ? parseFloat(m.containerPad) : 0, 0, 0.5), `${tag} container still pads the top (${m.containerPad})`);
-      ok(m.h1.t >= m.block.b - 0.5, `${tag} heading under the header (${m.h1.t} < ${m.block.b})`);
-      ok(m.cta.t >= m.block.b - 0.5, `${tag} first button under the header (${m.cta.t} < ${m.block.b})`);
+      if (!sc.imageOnlyHero) {
+        ok(m.h1.t >= m.block.b - 0.5, `${tag} heading under the header (${m.h1.t} < ${m.block.b})`);
+        ok(m.cta.t >= m.block.b - 0.5, `${tag} first button under the header (${m.cta.t} < ${m.block.b})`);
+      }
+      if (sc.announcement) {
+        ok(near(m.block.t, ANN, 0.5) && near(m.section.t, ANN, 0.5), `${tag} header/hero do not start under the announcement bar (${m.block.t}/${m.section.t})`);
+        const ann = await page.evaluate(() => { const a = document.querySelector("[data-announcement]").getBoundingClientRect(); const e = document.elementFromPoint(innerWidth / 2, 8); return { t: a.top, b: a.bottom, onTop: !!e?.closest("[data-announcement]") }; });
+        ok(near(ann.t, 0, 0.5) && near(ann.b, ANN, 0.5) && ann.onTop, `${tag} announcement bar covered or moved (${JSON.stringify(ann)})`);
+      }
       ok(m.hdBlock !== null && near(m.hdBlock, m.block.b - m.block.t, 1.5), `${tag} --hd-block ${m.hdBlock} vs bands ${m.block.b - m.block.t}`);
-      ok(near(m.sectionPad, m.hdBlock, 1.5), `${tag} hero reserves ${m.sectionPad}px, header is ${m.hdBlock}px`);
+      // a natural-ratio hero keeps the picture at the very top and reserves the header's room on the copy (its margin); an image-only one has no copy
+      const naturalRatio = /\brat\b/.test(m.sd ?? "");
+      if (naturalRatio) {
+        ok(near(m.sectionPad, 0, 0.5), `${tag} natural-ratio hero still pads its picture down by ${m.sectionPad}px`);
+        if (m.contentMt !== null) ok(near(m.contentMt, m.hdBlock, 1.5), `${tag} hero copy reserves ${m.contentMt}px, header is ${m.hdBlock}px`);
+      } else ok(near(m.sectionPad, m.hdBlock, 1.5), `${tag} hero reserves ${m.sectionPad}px, header is ${m.hdBlock}px`);
       ok(!m.solid, `${tag} solid at the top`);
       const fg = sc.expectFg ?? decision.fg;
       const want = hex(fg);
@@ -158,7 +194,7 @@ for (const file of files.filter((f) => f.endsWith(".html"))) {
         if (got) ok(same(got, want), `${tag} ${label} ${got}, want ${fg}`);
       }
       for (const [label, got] of [["row", m.bg.row], ["utility", m.bg.utility], ["rail", m.bg.rail]]) {
-        if (got) ok(transparent(got), `${tag} ${label} band not transparent at the top: ${got}`);
+        if (got) ok(bandAtTop(got, sc, fg), `${tag} ${label} band is ${got} at the top — expected ${sc.expectScrim ? `the ${sc.expectScrim}% layer opposite ${fg}` : "transparent"}`);
       }
       ok(transparent(m.border), `${tag} row border visible over the picture: ${m.border}`);
       if (m.colour.pill) ok(same(m.colour.pill, hex("#12372a")), `${tag} cart pill recoloured ${m.colour.pill}`);
@@ -169,6 +205,18 @@ for (const file of files.filter((f) => f.endsWith(".html"))) {
       const worst = await worstAgainst(page, `data:image/png;base64,${shot.toString("base64")}`, fg);
       pixelChecks++;
       await hider.evaluate((e) => e.remove());
+      if (sc.expectScrim) {
+        // the layer is the header rows' own background: it must not reach the picture BELOW them — the pixel just under the bands is the same
+        // with the header drawn and with the header hidden
+        const probe = { x: Math.floor(m.vw / 2), y: Math.ceil(m.block.b) + 6, width: 1, height: 1 };
+        const grab = async () => { const b = await page.screenshot({ clip: probe }); return page.evaluate(async (u) => { const i = new Image(); i.src = u; await i.decode(); const c = document.createElement("canvas"); c.width = 1; c.height = 1; const g = c.getContext("2d"); g.drawImage(i, 0, 0); return Array.from(g.getImageData(0, 0, 1, 1).data.slice(0, 3)); }, `data:image/png;base64,${b.toString("base64")}`); };
+        const withHeader = await grab();
+        const hide = await page.addStyleTag({ content: "header{visibility:hidden!important}" });
+        const withoutHeader = await grab();
+        await hide.evaluate((e) => e.remove());
+        pixelChecks++;
+        ok(withHeader.every((v, i) => Math.abs(v - withoutHeader[i]) <= 2), `${tag} the layer bleeds below the header rows (${withHeader} vs ${withoutHeader})`);
+      }
       if (name === "ovLie") ok(worst < 4.5, `${tag} the negative control was NOT caught by the pixel proof (worst ${worst.toFixed(2)})`);
       else ok(worst >= 4.5, `${tag} pixels behind the header give only ${worst.toFixed(2)}:1 against ${fg}`);
 
@@ -183,13 +231,13 @@ for (const file of files.filter((f) => f.endsWith(".html"))) {
       }
       ok(s.solid, `${tag} not solid after scrolling`);
       for (const [label, got] of [["row", s.bg.row], ["utility", s.bg.utility]]) if (got) ok(rgb(got)[3] === 1, `${tag} ${label} band not opaque once solid: ${got}`);
-      if (stickyOn && !up) ok(near(s.block.t, 0, 0.5), `${tag} sticky overlay header left the top (${s.block.t})`);
+      if (stickyOn && !up) ok(near(s.block.t, top, 0.5), `${tag} sticky overlay header left the top (${s.block.t}, want ${top})`);
       if (!stickyOn) ok(s.block.b < 0, `${tag} sticky-off header did not scroll away (${s.block.b})`);
       if (s.colour.brand && !sc.header.surface) ok(same(s.colour.brand, hex("#12372a")), `${tag} solid wordmark ${s.colour.brand}`);
       if (sc.header.surface) ok(same(s.bg.row, hex("#12372a")), `${tag} solid row ignores the designed background: ${s.bg.row}`);
       await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(450);
       s = await measure(page);
-      ok(!s.solid && transparent(s.bg.row), `${tag} not transparent again at the top`);
+      ok(!s.solid && bandAtTop(s.bg.row, sc, fg), `${tag} not back to its top state at scroll 0 (${s.bg.row})`);
       await page.evaluate(() => document.querySelector("[data-search-input]").focus()); await page.waitForTimeout(450);
       s = await measure(page);
       ok(s.solid && rgb(s.bg.row)[3] === 1, `${tag} focus inside did not make the header solid`);
@@ -206,9 +254,10 @@ for (const file of files.filter((f) => f.endsWith(".html"))) {
     // no JavaScript: an overlay header is not sticky and never sits over later content
     if (sc.expectOverlay) {
       const { ctx: c2, page: p2 } = await load(false);
+      await p2.waitForTimeout(350); // let the rows' 200 ms colour transition settle (a layout pass after the picture decodes can start one)
       const n = await measure(p2);
       ok(n.headerPos === "relative" && !n.live, `${tag} (no JS) header ${n.headerPos}, live=${n.live}`);
-      ok(near(n.header.h, 0, 0.5) && transparent(n.bg.row), `${tag} (no JS) overlay not applied at the top`);
+      ok(near(n.header.h, 0, 0.5) && bandAtTop(n.bg.row, sc, sc.expectFg ?? decision.fg), `${tag} (no JS) overlay not applied at the top`);
       await p2.evaluate(() => window.scrollTo(0, 1500));
       const away = await measure(p2);
       ok(away.block.b < 0, `${tag} (no JS) header followed the page over later content (${away.block.b})`);
@@ -217,7 +266,7 @@ for (const file of files.filter((f) => f.endsWith(".html"))) {
   }
 }
 await browser.close();
-console.log(`${strip ? "STRIPPED (negative control)" : "production"}: ${files.filter((f) => f.endsWith(".html")).length} pages x ${viewports.length} viewports, ${checks} checks (${pixelChecks} pixel proofs), ${violations.length} violations`);
+console.log(`${strip ? "STRIPPED (negative control)" : stripScrim ? "SCRIM-STRIPPED (negative control)" : "production"}: ${files.filter((f) => f.endsWith(".html")).length} pages x ${viewports.length} viewports, ${checks} checks (${pixelChecks} pixel proofs), ${violations.length} violations`);
 for (const v of violations.slice(0, 120)) console.log("  ✗", v);
 if (violations.length > 120) console.log(`  … ${violations.length - 120} more`);
-process.exit(strip ? (violations.length > 0 ? 0 : 1) : violations.length > 0 ? 1 : 0);
+process.exit(strip || stripScrim ? (violations.length > 0 ? 0 : 1) : violations.length > 0 ? 1 : 0);

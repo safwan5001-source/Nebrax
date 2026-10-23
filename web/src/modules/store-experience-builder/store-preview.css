@@ -261,9 +261,11 @@
 }
 .awj-store-preview[data-hd~="hmo"]:has([data-ho~="on"][data-ho~="l"]) > header {
   --ov-fg: #ffffff;
+  --ov-sc: #000000;
 }
 .awj-store-preview[data-hd~="hmo"]:has([data-ho~="on"][data-ho~="d"]) > header {
   --ov-fg: #000000;
+  --ov-sc: #ffffff;
 }
 /* solid state: the bands carry the surface the zero-height header cannot */
 .awj-store-preview[data-hd~="hmo"]:has([data-ho~="on"]) > header > [data-header-row] {
@@ -296,6 +298,28 @@
 .awj-store-preview[data-hd~="hmo"]:has([data-ho~="on"]) > header:not([data-header-solid]) [data-header-row] svg:not(.bg-store-primary-soft svg) {
   color: var(--ov-fg);
 }
+/* AWJ-HEADER-SCRIM — the protection layer: only when the server PROVED it (`s3` … `s8` = 30 … 80 %; the picture alone could not prove the
+   text and the merchant opted in). It is the header rows' own background, in the colour opposite to the text (`--ov-sc`), so it covers exactly
+   what the text sits on and nothing else of the picture, and it follows the rows' transparent → solid transition. Rows only: no fade onto the
+   hero below, whose own text was proven without it. */
+.awj-store-preview[data-hd~="hmo"]:has([data-ho~="s3"]) > header:not([data-header-solid]) > :is(div, nav) {
+  background-color: color-mix(in srgb, var(--ov-sc) 30%, transparent);
+}
+.awj-store-preview[data-hd~="hmo"]:has([data-ho~="s4"]) > header:not([data-header-solid]) > :is(div, nav) {
+  background-color: color-mix(in srgb, var(--ov-sc) 40%, transparent);
+}
+.awj-store-preview[data-hd~="hmo"]:has([data-ho~="s5"]) > header:not([data-header-solid]) > :is(div, nav) {
+  background-color: color-mix(in srgb, var(--ov-sc) 50%, transparent);
+}
+.awj-store-preview[data-hd~="hmo"]:has([data-ho~="s6"]) > header:not([data-header-solid]) > :is(div, nav) {
+  background-color: color-mix(in srgb, var(--ov-sc) 60%, transparent);
+}
+.awj-store-preview[data-hd~="hmo"]:has([data-ho~="s7"]) > header:not([data-header-solid]) > :is(div, nav) {
+  background-color: color-mix(in srgb, var(--ov-sc) 70%, transparent);
+}
+.awj-store-preview[data-hd~="hmo"]:has([data-ho~="s8"]) > header:not([data-header-solid]) > :is(div, nav) {
+  background-color: color-mix(in srgb, var(--ov-sc) 80%, transparent);
+}
 .awj-store-preview[data-hd~="hmo"]:has([data-ho~="on"]):is([data-hd~="hx-s"]) > header[data-header-solid] {
   filter: drop-shadow(0 1px 2px color-mix(in oklab, var(--store-foreground) 14%, transparent));
 }
@@ -313,6 +337,14 @@
 [data-ho~="on"] > section {
   border-radius: 0;
   padding-block-start: var(--hd-block, calc(var(--store-header-offset, 8.5rem) - var(--store-announcement-height, 0px)));
+}
+/* natural ratio: the picture is IN FLOW (a one-cell grid), so padding on the section would push the picture itself below the header.
+   Keep the picture at the very top and give the header's room to the copy instead (a margin, so the copy keeps its own padding) — the picture then really sits under the header. */
+[data-ho~="on"][data-sd~="rat"] > section {
+  padding-block-start: 0;
+}
+[data-ho~="on"][data-sd~="rat"] > section > [data-section-content] {
+  margin-block-start: var(--hd-block, calc(var(--store-header-offset, 8.5rem) - var(--store-announcement-height, 0px)));
 }
 [data-ho~="on"] [data-sd-backdrop] {
   border-radius: 0;

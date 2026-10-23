@@ -361,6 +361,17 @@ export const CUSTOMIZER_MESSAGES = {
     headerOverlayToneAuto: "تلقائي (الأوضح حسب الصورة)",
     headerOverlayToneLight: "نص فاتح (فوق صورة داكنة)",
     headerOverlayToneDark: "نص داكن (فوق صورة فاتحة)",
+    headerOverlayScrim: "طبقة حماية خلف الترويسة",
+    headerOverlayScrimAuto: "تلقائية — فقط عند الحاجة",
+    headerOverlayScrimHint:
+      "حين لا تكفي الصورة وحدها لإثبات وضوح نص الترويسة (صورة تجمع مناطق فاتحة وداكنة)، تُضاف طبقة شبه شفافة خلف صفوف الترويسة فقط — لا على بقية الصورة — بأضعف قوة تُثبت الوضوح (٣٠–٨٠٪). لا تُضاف أبداً إن كانت الصورة كافية وحدها، وتزول مع التمرير حين تصبح الترويسة عادية. «الافتراضي» = بلا طبقة.",
+    headerModeActiveScrim: "مفعّل بطبقة حماية خلف صفوف الترويسة، بقوة",
+    headerModeInactiveUnprovable:
+      "غير مفعّل الآن: لا يمكن إثبات وضوح نص الترويسة فوق كامل الصورة (تجمع مناطق فاتحة وداكنة معاً، فلا يكفي لون واحد). فعّل «طبقة حماية خلف الترويسة» أو اختر صورة أو تعتيماً للبطل يجعل الإثبات ممكناً.",
+    headerModeInactiveToneUnprovable:
+      "غير مفعّل الآن: لا يمكن إثبات وضوح اللون المختار للنص فوق الصورة. اختر «تلقائي» أو فعّل طبقة الحماية.",
+    headerModeInactiveScrimUnprovable:
+      "غير مفعّل الآن: لا تكفي حتى أقوى طبقة حماية (٨٠٪) لإثبات وضوح النص فوق هذه الصورة.",
     headerOverlayToneHint:
       "يُطبَّق فقط إذا أمكن إثبات وضوحه فوق الصورة كلّها (٤٫٥:١)، وإلا تبقى الترويسة عادية بدل أن تصبح غير مقروءة. تُعاين النتيجة مباشرة في المعاينة.",
     headerStickyOnScrollUp: "تظهر عند التمرير للأعلى",
@@ -1995,6 +2006,17 @@ export const CUSTOMIZER_MESSAGES = {
     headerOverlayToneAuto: "Automatic (clearest for the picture)",
     headerOverlayToneLight: "Light text (over a dark picture)",
     headerOverlayToneDark: "Dark text (over a light picture)",
+    headerOverlayScrim: "Protection layer behind the header",
+    headerOverlayScrimAuto: "Automatic — only when needed",
+    headerOverlayScrimHint:
+      "When the picture alone cannot prove the header text legible (a picture mixing light and dark areas), a translucent layer is added behind the header rows only — not over the rest of the picture — at the weakest strength that proves it (30–80%). It is never added when the picture is enough on its own, and it goes away on scroll when the header turns solid. “Default” = no layer.",
+    headerModeActiveScrim: "Active with a protection layer behind the header rows, strength",
+    headerModeInactiveUnprovable:
+      "Not active now: the header text cannot be proven legible over the whole picture (it mixes light and dark areas, so no single colour clears it). Turn on “Protection layer behind the header”, or pick a picture or a hero overlay that makes the proof possible.",
+    headerModeInactiveToneUnprovable:
+      "Not active now: the chosen text colour cannot be proven legible over the picture. Pick “Automatic” or turn on the protection layer.",
+    headerModeInactiveScrimUnprovable:
+      "Not active now: even the strongest protection layer (80%) cannot prove the text legible over this picture.",
     headerOverlayToneHint:
       "Applied only when its legibility over the whole picture can be proven (4.5:1); otherwise the header stays solid instead of becoming unreadable. Preview the result live.",
     headerStickyOnScrollUp: "Returns when scrolling up",

@@ -36,6 +36,9 @@ final class StorefrontHeaderDesignNormalizer
      */
     public const OVERLAY_TONES = ['light', 'dark'];
 
+    /** AWJ-HEADER-SCRIM — `auto` = a proven protection band behind the header rows when the picture alone cannot prove the text. Absent = none. */
+    public const OVERLAY_SCRIMS = ['auto'];
+
     public const STICKY = ['always', 'on-scroll-up', 'off'];
 
     public const BORDER_WIDTHS = ['none', 'hairline', 'medium'];
@@ -81,6 +84,7 @@ final class StorefrontHeaderDesignNormalizer
         self::put($out, 'mode', $raw['mode'] ?? null, self::MODES);
         if (($out['mode'] ?? null) === 'overlay-hero') {
             self::put($out, 'overlayTone', $raw['overlayTone'] ?? null, self::OVERLAY_TONES);
+            self::put($out, 'overlayScrim', $raw['overlayScrim'] ?? null, self::OVERLAY_SCRIMS);
         }
         self::put($out, 'sticky', $raw['sticky'] ?? null, self::STICKY);
 

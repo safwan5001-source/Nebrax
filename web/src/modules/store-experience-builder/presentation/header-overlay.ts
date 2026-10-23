@@ -15,12 +15,17 @@
  *     an average, not a band estimate) is the judged region, so the band — a subset of it — is covered a fortiori
  *     (§4.5.7).
  *
- * **No automatic scrim (AWJ decision, V7c-2).** V0 §9.3.3 allows a ≤ 40 % scrim "when needed". Under this proof it is
- * never needed: the header text and the hero's own text are judged against the *same* whole-picture interval with
- * the same better-of-white/black rule, and a hero whose text cannot be proven does not render its picture at all
- * (`mbg` is never emitted) — so a hero that is eligible here already passes with no scrim, and one that does not
- * pass is not eligible. A scrim becomes meaningful only with a per-band region proof (a top-band-only evidence that
- * is more permissive than the whole picture), which does not exist yet.
+ * **No scrim unless the merchant asks for one (AWJ decision, V7c-2; extended by AWJ-HEADER-SCRIM).** V7c-2 added none: the
+ * header text and the hero's own text are judged against the *same* whole-picture interval, so a hero eligible here already
+ * passes with no scrim. That left a real gap: a picture whose evidence spans nearly the whole range (any photograph with a
+ * white and a black pixel — the evidence is the picture's exact per-channel min / max) can never pass, whatever the colour,
+ * so an opted-in header stayed solid with nothing the merchant could do. `design.overlayScrim: "auto"` fills exactly that
+ * gap: the header's own rows get a translucent layer in the colour OPPOSITE to the text (white behind black text, black
+ * behind white text), at the weakest strength (30 … 80 %, steps of 10) for which the text is proven ≥ 4.5:1 over the
+ * picture composited with it. It never darkens the rest of the picture, it is never added when the picture alone proves the
+ * text, and the V0 §9.3.3 figure of ≤ 40 % is superseded for this explicit opt-in: 40 % white over a black pixel gives only
+ * ≈ 3.7:1 under black text, so no weaker layer can prove a full-range picture. (A per-band region proof — evidence for the
+ * header's band only — would need less; it needs new media evidence and is not built.)
  *
  * **Forced tone (AWJ-HEADER-OVERLAY-TONE).** `design.overlayTone` (`light` = white text, `dark` = black text) replaces the
  * automatic better-of-white/black choice but not the proof: the chosen colour must clear 4.5:1 over the same whole-picture
@@ -42,12 +47,21 @@ import {
   mediaBackgroundBounds,
 } from "./section-design-resolve";
 
+/** The strengths (percent) a protection layer may take, weakest first. */
+export const SCRIM_ALPHAS = [30, 40, 50, 60, 70, 80] as const;
+export type ScrimAlpha = (typeof SCRIM_ALPHAS)[number];
+
 export interface HeaderOverlay {
   /** The hero instance that carries the marker and reserves the header's height. */
   sectionId: string;
   tone: "light" | "dark";
   /** Text / icon colour over the picture. */
   fg: "#ffffff" | "#000000";
+  /**
+   * AWJ-HEADER-SCRIM — present only when the picture alone could not prove the text and the merchant opted in with
+   * `overlayScrim: "auto"`: the layer behind the header rows (colour = opposite of `fg`) and its proven strength.
+   */
+  scrim?: { alpha: ScrimAlpha };
 }
 
 /** The slice of a home section the decision needs (structurally a `PresentationHomeSection`). */
@@ -67,7 +81,8 @@ export type OverlayInactiveReason =
   | "not-picture"
   | "split-layout"
   | "unprovable"
-  | "tone-unprovable";
+  | "tone-unprovable"
+  | "scrim-unprovable";
 
 /** The structural part of the decision (no contrast): the eligible hero, or why there is none. */
 export function overlayHeroCandidate(
@@ -76,7 +91,10 @@ export function overlayHeroCandidate(
   | { ok: true; section: OverlayCandidateSection }
   | {
       ok: false;
-      reason: Exclude<OverlayInactiveReason, "unprovable" | "tone-unprovable">;
+      reason: Exclude<
+        OverlayInactiveReason,
+        "unprovable" | "tone-unprovable" | "scrim-unprovable"
+      >;
     } {
   const first = sections.find((section) => section.visible);
   if (!first || first.type !== "hero") return { ok: false, reason: "no-hero" };
@@ -117,6 +135,19 @@ export function resolveHeaderOverlay(
     : null;
   const fg = forced ?? autoForeground(interval);
   if (!passes(worstRatioForHex(fg, widened(interval)))) {
+    // AWJ-HEADER-SCRIM — the picture alone cannot prove it; a merchant who opted in gets a layer behind the header rows
+    if (design.overlayScrim === "auto") {
+      const protectedTone = protectWithScrim(lo, hi, forced);
+      if (!protectedTone) return { reason: "scrim-unprovable" };
+      return {
+        overlay: {
+          sectionId: candidate.section.id,
+          tone: protectedTone.fg === "#ffffff" ? "light" : "dark",
+          fg: protectedTone.fg,
+          scrim: { alpha: protectedTone.alpha },
+        },
+      };
+    }
     return { reason: forced ? "tone-unprovable" : "unprovable" };
   }
   return {
@@ -126,6 +157,36 @@ export function resolveHeaderOverlay(
       fg,
     },
   };
+}
+
+/**
+ * The weakest strength at which `fg` over the picture (channel bounds `lo`..`hi` after the hero's own overlay) composited with
+ * a layer of the OPPOSITE colour clears 4.5:1 over the whole range — per tone; with no forced tone both are tried and the
+ * weaker layer wins (a tie keeps the better-of-white/black first choice). `null` = even the strongest step is not enough.
+ */
+function protectWithScrim(
+  lo: [number, number, number],
+  hi: [number, number, number],
+  forced: "#ffffff" | "#000000" | null,
+): { fg: "#ffffff" | "#000000"; alpha: ScrimAlpha } | null {
+  const whole = channelBoundsInterval(lo, hi, null);
+  const first = autoForeground(whole);
+  const tones: Array<"#ffffff" | "#000000"> = forced
+    ? [forced]
+    : [first, first === "#ffffff" ? "#000000" : "#ffffff"];
+  let best: { fg: "#ffffff" | "#000000"; alpha: ScrimAlpha } | null = null;
+  for (const fg of tones) {
+    const rgb: [number, number, number] =
+      fg === "#ffffff" ? [0, 0, 0] : [255, 255, 255];
+    for (const alpha of SCRIM_ALPHAS) {
+      const under = channelBoundsInterval(lo, hi, { rgb, alpha: alpha / 100 });
+      if (passes(worstRatioForHex(fg, widened(under)))) {
+        if (!best || alpha < best.alpha) best = { fg, alpha };
+        break;
+      }
+    }
+  }
+  return best;
 }
 
 /** One 8-bit level of slack on a luminance interval for the extra compositing step the browser performs. */
@@ -143,5 +204,9 @@ function widened(interval: { min: number; max: number }) {
  * trip: `on` · `l` (white text) / `d` (black text).
  */
 export function overlayMarker(overlay: HeaderOverlay): string {
-  return `on ${overlay.tone === "light" ? "l" : "d"}`;
+  const tone = overlay.tone === "light" ? "l" : "d";
+  // AWJ-HEADER-SCRIM — `s3` … `s8` = a protection layer of 30 … 80 %; absent ⇒ exactly the marker V7c-2 always emitted
+  return overlay.scrim
+    ? `on ${tone} s${overlay.scrim.alpha / 10}`
+    : `on ${tone}`;
 }
