@@ -43,6 +43,8 @@ import { PosCategorySwatch } from '@/components/pos/pos-category-swatch';
 import { resolveCategoryVisual } from '@/lib/pos-category-presentation';
 import { cartHasUnsavedData, createPosActiveCart, usePosActiveCarts, type PosCartLine } from '@/components/pos/use-pos-active-carts';
 import { PosShortcuts } from '@/components/pos/pos-shortcuts';
+import { PosTerminalSessionAlert } from '@/components/pos/pos-terminal-session-alert';
+import { totalBlockers, type TerminalBlockers } from '@/modules/pos-terminals/contract';
 import { PosPayment, type PaymentSummaryItem, type PosPaymentMethod, type PosTender } from '@/components/pos/pos-payment';
 import type { PosDeliveryPlatformOption } from '@/components/pos/pos-delivery-platform-picker';
 import { PosExchangeDialog } from '@/components/pos/pos-exchange-dialog';
@@ -223,6 +225,8 @@ interface ClosingPreviewMethod {
 interface ClosingPreview {
   cash_drawer: { reconciliation_key: string; name: string; settlement_type: 'cash'; expected_amount: string | null };
   payment_methods: ClosingPreviewMethod[];
+  /** H6-02: عمليات جهاز دفع معلّقة أو تحتاج تعويضاً تمنع الإقفال (الخادم يفرضه). */
+  terminal_blockers?: TerminalBlockers;
 }
 /**
  * R5: يطابق حرفياً ما يعيده `InvoiceResource` بعد `POS/checkout` — الفاتورة
@@ -380,6 +384,7 @@ export default function PosPage() {
   // PR-7: معاينة الإغلاق الخادمية (نقد + كل طريقة دفع غير نقدية) — نفس عقد
   // `/pos/sessions/page.tsx` حرفياً، حتى يُطابق حوار الإغلاق هنا ذاك المرجعي.
   const [closePreview, setClosePreview] = useState<ClosingPreview | null>(null);
+  const [terminalReload, setTerminalReload] = useState(0);
   const [closePreviewLoading, setClosePreviewLoading] = useState(false);
   const [paymentCounts, setPaymentCounts] = useState<Record<string, string>>({});
   const [handoverNote, setHandoverNote] = useState('');
@@ -1216,6 +1221,16 @@ export default function PosPage() {
     } finally {
       setClosePreviewLoading(false);
     }
+  }
+
+  /** بعد إلغاء/إعادة محاولة على الجهاز: أعد قراءة موانع الإقفال فقط (دون مسح ما أدخله الكاشير من عدّ). */
+  async function refreshTerminalBlockers() {
+    if (!session) return;
+    try {
+      const result = await api<{ data: ClosingPreview }>(`/pos-sessions/${session.id}/closing-preview`);
+      setClosePreview((current) => (current ? { ...current, terminal_blockers: result.data?.terminal_blockers } : current));
+      setTerminalReload((n) => n + 1);
+    } catch { /* يبقى المانع ظاهراً؛ الخادم هو الحاسم عند الإقفال */ }
   }
 
   function closeSessionDialog() {
@@ -2193,6 +2208,10 @@ export default function PosPage() {
         </div>
       )}
 
+      {session && (
+        <PosTerminalSessionAlert sessionId={session.id} mode="attention" pollMs={60000} className="no-print mx-3 my-2 sm:mx-4" />
+      )}
+
       {step === 'payment' ? (
         <PosPayment
           subMinor={subMinor}
@@ -2217,6 +2236,7 @@ export default function PosPage() {
           deliveryPlatforms={deliveryPlatforms}
           selectedDeliveryPlatformId={selectedDeliveryPlatformId}
           onSelectDeliveryPlatform={setSelectedDeliveryPlatformId}
+          terminalContext={session ? { sessionId: session.id, posDeviceId: session.pos_device_id ?? null } : undefined}
           externalOrderReference={deliveryReference}
           onExternalOrderReference={setDeliveryReference}
         />
@@ -2475,6 +2495,9 @@ export default function PosPage() {
             </div>
           )}
           <p className="rounded bg-primary-soft px-3 py-2 text-xs text-text">{ts('close_reconciliation_hint')}</p>
+          {session && totalBlockers(closePreview?.terminal_blockers) > 0 && (
+            <PosTerminalSessionAlert sessionId={session.id} mode="blocking" reloadKey={terminalReload} onChanged={() => void refreshTerminalBlockers()} />
+          )}
           {closePreviewLoading && <p className="text-sm text-muted">{tc('loading')}</p>}
           {closePreview && (
             <div className="overflow-hidden rounded-md border border-border">
@@ -2547,6 +2570,7 @@ export default function PosPage() {
                 closePreviewLoading ||
                 !closePreview ||
                 !isValidRiyal(countedBal) ||
+                totalBlockers(closePreview.terminal_blockers) > 0 ||
                 handoverNote.trim().length < 3 ||
                 closePreview.payment_methods.some(
                   (method) => Boolean(method.payment_method_id) && !isValidRiyal(paymentCounts[method.payment_method_id as string] ?? ''),

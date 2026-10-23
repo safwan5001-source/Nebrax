@@ -357,6 +357,12 @@ export const CUSTOMIZER_MESSAGES = {
     headerModeInactiveNoHero: "غير مفعّل الآن: أول قسم ظاهر في الصفحة الرئيسية ليس بطلاً.",
     headerModeInactiveNotPicture: "غير مفعّل الآن: يحتاج البطل خلفية صورة.",
     headerModeInactiveSplit: "غير مفعّل الآن: تخطيط «منقسم» للبطل لا يدعم الترويسة الشفافة.",
+    headerOverlayTone: "لون نص الترويسة الشفافة",
+    headerOverlayToneAuto: "تلقائي (الأوضح حسب الصورة)",
+    headerOverlayToneLight: "نص فاتح (فوق صورة داكنة)",
+    headerOverlayToneDark: "نص داكن (فوق صورة فاتحة)",
+    headerOverlayToneHint:
+      "يُطبَّق فقط إذا أمكن إثبات وضوحه فوق الصورة كلّها (٤٫٥:١)، وإلا تبقى الترويسة عادية بدل أن تصبح غير مقروءة. تُعاين النتيجة مباشرة في المعاينة.",
     headerStickyOnScrollUp: "تظهر عند التمرير للأعلى",
     headerStickyAlways: "ثابتة أثناء التمرير",
     headerStickyOff: "تتحرك مع الصفحة",
@@ -556,6 +562,18 @@ export const CUSTOMIZER_MESSAGES = {
     designHeightScreen: "بطول الشاشة",
     designHeightHint:
       "حدّ أدنى للارتفاع: لا يُقصّ المحتوى أبداً، ولا يتجاوز «بطول الشاشة» ٥٦ rem. بلا اختيار يبقى ارتفاع القسم كما كان.",
+    designMobileHeight: "ارتفاع القسم على الجوال",
+    designMobileHeightHint:
+      "يستبدل الارتفاع أعلاه تحت عرض ٧٦٨px (الجوال). بلا اختيار يتبع الجوال الارتفاع العام.",
+    designPictureTreatment: "صورة البطل",
+    designRatioNatural: "ارتفاع بنسبة الصورة الأصلية",
+    designRatioNaturalHint:
+      "تُعرض الصورة كاملة بعرض القسم دون قصّ أو تشويه، وتُتجاهل الارتفاعات المُعدّة مسبقاً. يزيد الارتفاع فقط إن كان النص أطول من الصورة.",
+    designPictureBleed: "صورة بعرض الشاشة كاملة (بلا هوامش جانبية)",
+    designPictureBleedHint:
+      "تمتد الصورة من حافة الشاشة إلى حافتها، وتبدأ مباشرة أسفل الترويسة إن كان البطل أول قسم. لا تتأثر الأقسام الأخرى.",
+    designPictureTreatmentInactive:
+      "غير مفعّل الآن: يحتاج البطل خلفية صورة مُثبَتة التباين وتخطيطاً غير «منقسم».",
     designOverlap: "تداخل القسم التالي",
     designOverlapSm: "خفيف",
     designOverlapMd: "متوسط",
@@ -802,6 +820,9 @@ export const CUSTOMIZER_MESSAGES = {
     galleryGapXl: "كبيرة جداً",
     galleryCaptions: "إظهار التعليقات تحت الصور",
     galleryLightbox: "فتح الصورة مكبّرة عند النقر",
+    galleryShowMotionControls: "إظهار زرّ إيقاف الحركة للصور المتحركة",
+    galleryShowMotionControlsHint:
+      "معطّل افتراضياً. عند التعطيل لا يظهر أي زرّ، وتتحرك كل صورة متحركة نحو ٥ ثوانٍ بعد ظهورها ثم تستقر على لقطتها الثابتة (متطلّب إتاحة الوصول WCAG 2.2.2). فعّله لتستمر الحركة مع زرّ واحد للمعرض يُوقفها ويُشغّلها.",
     designLayoutGrid: "شبكة",
     designLayoutCarousel: "شريط قابل للتمرير",
     designLayoutGalleryHint: "الشبكة تعرض كل الصور؛ الشريط يعرضها في صفٍّ واحد يُمرَّر أفقياً.",
@@ -1004,6 +1025,14 @@ export const CUSTOMIZER_MESSAGES = {
       "لا يمكن نشر هذا اللون: تباينه مع خلفية القسم أقل من 4.5:1 لهذا النمط. اختر لوناً آخر أو نمط «مملوء» أو «ناعم».",
     ctaColourUnprovable:
       "لا يمكن إثبات وضوح هذا اللون فوق خلفية القسم الحالية. غيّر الخلفية أو اختر نمط «مملوء» أو «ناعم».",
+    heroShowTitle: "إظهار العنوان",
+    heroShowSubheadline: "إظهار الوصف",
+    heroShowCtas: "إظهار الأزرار",
+    heroImageOnlyHint:
+      "صورة فقط: لا عنوان ولا وصف ولا أزرار. يبقى العنوان مقروءاً لقارئات الشاشة ويعرض القسم الصورة وحدها.",
+    heroImageHref: "رابط الصورة (اختياري)",
+    heroImageHrefHint:
+      "يجعل صورة البطل قابلة للنقر. مسار داخل المتجر يبدأ بـ / أو عنوان https://. يعمل مع خلفية صورة فقط.",
     heroCtaHint:
       "بلا أزرار تظهر «تسوّق الآن» تلقائياً. الرابط مسار داخل المتجر يبدأ بـ / أو عنوان https://؛ والزر الناقص لا يظهر.",
     bannerCtaHint:
@@ -1580,7 +1609,7 @@ export const CUSTOMIZER_MESSAGES = {
     mediaIssue_derivative_not_ready: "إطار الصورة لم يكتمل — أعد حفظ المسودة أو أعد المحاولة",
     mediaIssue_derivative_failed: "فشلت معالجة إطار الصورة — أعد المحاولة",
     mediaIssue_animated_transform_unsupported: "الصورة المتحركة لا تدعم القصّ أو التدوير أو إعادة التأطير",
-    mediaIssue_animated_not_allowed_here: "الصور المتحركة تُعرض في خلفيات الأقسام وشرائح السلايدر فقط",
+    mediaIssue_animated_not_allowed_here: "الصور المتحركة تُعرض في خلفيات الأقسام وشرائح السلايدر ومعرض الصور فقط",
     mediaMotionBadge: "متحرك",
     mediaMotionPlay: "تشغيل معاينة الحركة",
     mediaMotionStop: "إيقاف معاينة الحركة",
@@ -1962,6 +1991,12 @@ export const CUSTOMIZER_MESSAGES = {
     headerModeInactiveNoHero: "Not active now: the first visible home section is not a hero.",
     headerModeInactiveNotPicture: "Not active now: the hero needs a picture background.",
     headerModeInactiveSplit: "Not active now: the hero's Split layout does not support a transparent header.",
+    headerOverlayTone: "Transparent header text tone",
+    headerOverlayToneAuto: "Automatic (clearest for the picture)",
+    headerOverlayToneLight: "Light text (over a dark picture)",
+    headerOverlayToneDark: "Dark text (over a light picture)",
+    headerOverlayToneHint:
+      "Applied only when its legibility over the whole picture can be proven (4.5:1); otherwise the header stays solid instead of becoming unreadable. Preview the result live.",
     headerStickyOnScrollUp: "Returns when scrolling up",
     headerStickyAlways: "Stays while scrolling",
     headerStickyOff: "Scrolls with the page",
@@ -2161,6 +2196,18 @@ export const CUSTOMIZER_MESSAGES = {
     designHeightScreen: "Screen height",
     designHeightHint:
       "A minimum height: content is never clipped, and “Screen height” never exceeds 56 rem. With no choice the section keeps its height as before.",
+    designMobileHeight: "Section height on phones",
+    designMobileHeightHint:
+      "Replaces the height above below 768 px (phones). With no choice phones follow the general height.",
+    designPictureTreatment: "Hero picture",
+    designRatioNatural: "Height follows the picture's own proportions",
+    designRatioNaturalHint:
+      "The picture is shown whole at the section's width — never cropped or distorted — and the height presets are ignored. The section grows only if the text is taller than the picture.",
+    designPictureBleed: "Full-width picture (no side margins)",
+    designPictureBleedHint:
+      "The picture runs edge to edge and starts directly under the header when the hero is the first section. Other sections are unaffected.",
+    designPictureTreatmentInactive:
+      "Not active now: the hero needs a contrast-proven picture background and a layout other than Split.",
     designOverlap: "Next-section overlap",
     designOverlapSm: "Small",
     designOverlapMd: "Medium",
@@ -2404,6 +2451,9 @@ export const CUSTOMIZER_MESSAGES = {
     galleryGapXl: "Extra large",
     galleryCaptions: "Show captions under the pictures",
     galleryLightbox: "Open the picture enlarged on click",
+    galleryShowMotionControls: "Show a pause button for animated pictures",
+    galleryShowMotionControlsHint:
+      "Off by default. When off, no button is shown and each animated picture plays for about 5 seconds once it is on screen, then settles on its still frame (accessibility requirement WCAG 2.2.2). Turn on to keep the motion running, with one pause / play button for the gallery.",
     designLayoutGrid: "Grid",
     designLayoutCarousel: "Scrolling strip",
     designLayoutGalleryHint: "The grid shows every picture; the strip puts them in one row that scrolls sideways.",
@@ -2605,6 +2655,14 @@ export const CUSTOMIZER_MESSAGES = {
       "This colour cannot be published: its contrast with the section background is under 4.5:1 for this style. Pick another colour, or the Filled or Soft style.",
     ctaColourUnprovable:
       "This colour cannot be proven legible over the section's current background. Change the background, or use the Filled or Soft style.",
+    heroShowTitle: "Show title",
+    heroShowSubheadline: "Show description",
+    heroShowCtas: "Show buttons",
+    heroImageOnlyHint:
+      "Image only: no title, description or buttons. The title stays available to screen readers, and the preview shows the picture alone.",
+    heroImageHref: "Image link (optional)",
+    heroImageHrefHint:
+      "Makes the hero picture clickable. A store path starting with / or an https:// address. Works with a picture background only.",
     heroCtaHint:
       "With no buttons the default “Shop now” appears. A link is a store path starting with / or an https:// address; an incomplete button is not shown.",
     bannerCtaHint:
@@ -3182,7 +3240,7 @@ export const CUSTOMIZER_MESSAGES = {
     mediaIssue_derivative_not_ready: "the image frame is not ready — save the draft again or retry",
     mediaIssue_derivative_failed: "processing the image frame failed — retry",
     mediaIssue_animated_transform_unsupported: "an animated image can't be cropped, rotated or reframed",
-    mediaIssue_animated_not_allowed_here: "animated images are supported in section backgrounds and slider slides only",
+    mediaIssue_animated_not_allowed_here: "animated images are supported in section backgrounds, slider slides and gallery images only",
     mediaMotionBadge: "Animated",
     mediaMotionPlay: "Play motion preview",
     mediaMotionStop: "Stop motion preview",

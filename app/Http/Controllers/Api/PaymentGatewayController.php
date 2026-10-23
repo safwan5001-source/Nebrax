@@ -13,6 +13,7 @@ use App\Support\PaymentGatewayException;
 use Closure;
 use DomainException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 /**
  * اتصالات بوابات الدفع للمستأجر (PAY-H1-01). القراءة `payments.view` (بلا أسرار)،
@@ -88,6 +89,13 @@ class PaymentGatewayController extends ApiController
     {
         return $this->guarded(fn () => (new PaymentGatewayResource(
             $this->gateways->activate($this->gateways->find($id), $request->user(), $request->validated('reason'))
+        ))->response());
+    }
+
+    public function verify(Request $request, string $id): JsonResponse
+    {
+        return $this->guarded(fn () => (new PaymentGatewayResource(
+            $this->gateways->verify($this->gateways->find($id), $request->user())
         ))->response());
     }
 

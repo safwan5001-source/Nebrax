@@ -30,6 +30,7 @@ const fixture = JSON.parse(
       string,
       { min: [number, number, number]; max: [number, number, number] } | null
     >;
+    textless?: boolean;
     expected: Array<{ field: string; code: string; ratio: number }>;
   }>;
 };
@@ -45,7 +46,12 @@ describe("section design publish contrast — shared fixture with the PHP gate (
         dir: "ltr",
         mediaBounds: (ref) => c.media?.[ref.mediaId] ?? null,
       };
-      const actual = sectionContrastIssues(design, ctx, c.type);
+      const actual = sectionContrastIssues(
+        design,
+        ctx,
+        c.type,
+        c.textless ?? false,
+      );
       expect(actual.map((i) => [i.field, i.code])).toEqual(
         c.expected.map((i) => [i.field, i.code]),
       );

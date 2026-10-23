@@ -5,7 +5,7 @@
  *
  *   content = { images: Image[≤24 stored, ≥2 to publish], options?: Options }
  *   Image   = { id, media: MediaRef, caption?: string, link?: string }
- *   Options = { columns?: 2|4|6, aspect?: "4:3"|"16:9"|"4:5", gap?: "none"|"xs"|"sm"|"lg"|"xl", captions?: true, lightbox?: true }
+ *   Options = { columns?: 2|4|6, aspect?: "4:3"|"16:9"|"4:5", gap?: "none"|"xs"|"sm"|"lg"|"xl", captions?: true, lightbox?: true, showMotionControls?: true }
  *
  * The layout `grid | carousel` lives in `design.layout` (V0 §3.4): absent = grid, only `carousel` is stored.
  *
@@ -16,6 +16,9 @@
  *  - Options store only what differs from the default (3 columns, 1:1, gap `md`, no captions, no
  *    lightbox) so equivalent documents match literally. Unknown keys drop one by one; an image
  *    without a usable media reference drops whole.
+ *  - `showMotionControls` (AWJ-ANIMATED-MEDIA; gallery-only): stored only as `true`, so no legacy document gains a key and no
+ *    published byte changes. Absent = no visible pause button, and the storefront then caps animated pictures to a bounded
+ *    play window (WCAG 2.2.2); `true` shows ONE pause/play control for the whole gallery. Meaningless without an animated picture.
  *  - A caption is text in the store's language (like slide headings): kept as written (code-point
  *    truncated; the editor re-normalises on every keystroke), whitespace alone is absence. It is
  *    always kept — switching `captions` off does not lose it — and drawn only when `captions` is on.
@@ -55,6 +58,7 @@ export interface GalleryOptions {
   gap?: Exclude<GalleryGap, "md">;
   captions?: true;
   lightbox?: true;
+  showMotionControls?: true;
 }
 
 export interface GalleryContent {
@@ -69,6 +73,7 @@ export interface ResolvedGalleryOptions {
   gap: GalleryGap;
   captions: boolean;
   lightbox: boolean;
+  showMotionControls: boolean;
 }
 
 export function resolveGalleryOptions(
@@ -80,6 +85,7 @@ export function resolveGalleryOptions(
     gap: options?.gap ?? GALLERY_DEFAULT_GAP,
     captions: options?.captions === true,
     lightbox: options?.lightbox === true,
+    showMotionControls: options?.showMotionControls === true,
   };
 }
 
@@ -148,6 +154,7 @@ function normalizeOptions(raw: unknown): GalleryOptions {
   }
   if (raw.captions === true) out.captions = true;
   if (raw.lightbox === true) out.lightbox = true;
+  if (raw.showMotionControls === true) out.showMotionControls = true;
   return out;
 }
 

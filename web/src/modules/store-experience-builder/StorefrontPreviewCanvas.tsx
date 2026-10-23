@@ -58,6 +58,7 @@ import {
   bannerContentOf,
   bannerCtasOf,
   heroContentOf,
+  isTextlessSection,
   benefitsContentOf,
   customContentOf,
   featuredContentOf,
@@ -576,7 +577,7 @@ export function StorefrontPreviewCanvas({
   const backdropFor = (section: (typeof config.homepage.sections)[number]): ReactNode => {
     const bg = section.design?.background;
     if (bg?.kind !== "media") return null;
-    const resolved = resolveSectionDesign(section.type, section.design, designContext);
+    const resolved = resolveSectionDesign(section.type, section.design, designContext, isTextlessSection(section));
     if (!resolved?.attrs["data-sd"]?.split(" ").includes("mbg")) return null;
     return <CanvasBackdrop background={bg} viewport={viewport} motionLabels={{ pause: t("canvasMotionPause"), play: t("canvasMotionPlay") }} />;
   };
@@ -975,28 +976,46 @@ export function StorefrontPreviewCanvas({
                   cta.label.trim() !== "" &&
                   (cta.href.startsWith("/") || cta.href.startsWith("https://")),
               );
+              // AWJ-HERO-DISPLAY — the same switches the storefront's `HeroSection` honours: a hidden part leaves no
+              // element behind, a hidden title stays as the (visually hidden) heading, and an empty content box is dropped.
+              const showTitle = own?.showTitle !== false;
+              const showSub = own?.showSubheadline !== false;
+              const showCtas = own?.showCtas !== false;
+              const subText = showSub ? sub : "";
+              const hasButtons = showCtas && (!hasAuthoredCtas || ctas.length > 0);
+              const hasContent = showTitle || subText !== "" || hasButtons;
+              const imageLinked = Boolean(own?.imageHref) && backdropFor(section) !== null;
               // exactly one <h1> per page: the first visible hero; any further one is an <h2>
               const Heading = section.id === firstHeroId ? "h1" : "h2";
               return (
                 <section
                   key={section.id}
                   aria-label={t("sectionHero")}
+                  data-preview-hero-image-link={imageLinked ? own?.imageHref : undefined}
                   className="flex min-h-[11rem] items-center rounded-store bg-gradient-to-r from-primary-700 via-primary-600 to-primary-500 text-store-primary-foreground md:min-h-[16rem]"
                 >
-                  {backdropFor(section)}
-                  <div data-section-content="" className="max-w-2xl p-5 md:p-10">
-                    <Heading
-                      data-preview-hero-heading=""
-                      className="text-xl font-black leading-tight sm:text-2xl lg:text-4xl"
-                    >
+                  {showTitle ? null : (
+                    <Heading data-preview-hero-heading="" className="sr-only">
                       <bdi>{title}</bdi>
                     </Heading>
-                    {sub ? (
+                  )}
+                  {backdropFor(section)}
+                  {hasContent ? (
+                  <div data-section-content="" className="max-w-2xl p-5 md:p-10">
+                    {showTitle ? (
+                      <Heading
+                        data-preview-hero-heading=""
+                        className="text-xl font-black leading-tight sm:text-2xl lg:text-4xl"
+                      >
+                        <bdi>{title}</bdi>
+                      </Heading>
+                    ) : null}
+                    {subText ? (
                       <p className="mt-2 line-clamp-2 text-xs text-store-primary-foreground/80 md:mt-3 md:text-sm">
                         {sub}
                       </p>
                     ) : null}
-                    {!hasAuthoredCtas ? (
+                    {!showCtas ? null : !hasAuthoredCtas ? (
                       <span className="mt-4 inline-flex h-9 items-center rounded-store bg-store-primary-foreground px-4 text-xs font-bold text-store-primary md:mt-5 md:h-11 md:px-6 md:text-sm">
                         {t("shopNow")}
                       </span>
@@ -1022,6 +1041,7 @@ export function StorefrontPreviewCanvas({
                       </div>
                     )}
                   </div>
+                  ) : null}
                 </section>
               );
             }
@@ -1270,6 +1290,7 @@ export function StorefrontPreviewCanvas({
                     label: t("canvasGalleryLabel"),
                     empty: t("canvasGalleryEmpty"),
                     item: t("canvasGalleryItem"),
+                    motion: { pause: t("canvasMotionPause"), play: t("canvasMotionPlay") },
                   }}
                 />
               );
@@ -1375,7 +1396,7 @@ export function StorefrontPreviewCanvas({
               // A section without a design keeps its legacy preview exactly; the published
               // card surface (and the block marker its design rules address) apply only
               // while a design frame wraps it.
-              const designed = resolveSectionDesign(section.type, section.design, designContext) !== null;
+              const designed = resolveSectionDesign(section.type, section.design, designContext, isTextlessSection(section)) !== null;
               const benefitsLayout = section.design?.layout as BenefitsLayout | undefined;
               const benefitsFlat = benefitsLayout === "flat";
               return (
@@ -1449,7 +1470,7 @@ export function StorefrontPreviewCanvas({
               }
               // The accordion mirror belongs to a designed section (its card surfaces are what the
               // design rules reason about); an undesigned one keeps its flat legacy preview.
-              const designedContent = resolveSectionDesign(section.type, section.design, designContext) !== null;
+              const designedContent = resolveSectionDesign(section.type, section.design, designContext, isTextlessSection(section)) !== null;
               if (designedContent && config.themePreset === "awj-market" && groups.filter((group) => group.heading).length >= 2) {
                 return (
                   <section key={section.id} className="min-w-0 max-w-3xl space-y-2 break-words">

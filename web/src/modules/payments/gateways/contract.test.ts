@@ -8,6 +8,7 @@ import {
   apiErrorMessage,
   errorMessageKey,
   availableActions,
+  canVerify,
   gatewayDisplayName,
   secretsPayload,
   statusTone,
@@ -87,5 +88,19 @@ describe('رموز أخطاء الاتصالات الثابتة', () => {
     for (const messages of [ar, en]) {
       expect(JSON.stringify(messages)).toContain(`"${key}":`);
     }
+  });
+  it('offers verify only for providers with a verification adapter and never for custom, other providers or revoked', () => {
+    const moyasar = (status: GatewayConnection['status']) => connection({ provider: 'moyasar', status });
+    for (const status of ['draft', 'active', 'suspended'] as const) {
+      const actions = availableActions(moyasar(status), true);
+      expect(actions).toContain('verify');
+      expect(availableActions(connection({ provider: 'stripe', status }), true)).not.toContain('verify');
+      expect(availableActions(connection({ provider: 'custom', status }), true)).not.toContain('verify');
+    }
+    expect(availableActions(moyasar('draft'), true).indexOf('verify')).toBeLessThan(availableActions(moyasar('draft'), true).indexOf('activate'));
+    expect(availableActions(moyasar('revoked'), true)).toEqual(['events']);
+    expect(availableActions(moyasar('draft'), false)).toEqual([]);
+    expect(canVerify({ provider: 'moyasar', status: 'draft' })).toBe(true);
+    expect(canVerify({ provider: 'tap', status: 'draft' })).toBe(false);
   });
 });

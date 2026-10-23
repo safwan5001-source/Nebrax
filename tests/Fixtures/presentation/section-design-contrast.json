@@ -1163,6 +1163,113 @@
                     "ratio": 1.0607
                 }
             ]
+        },
+        {
+            "name": "textless hero (AWJ-HERO-DISPLAY): a full-range picture needs no overlay when no text is shown",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    }
+                }
+            },
+            "media": {
+                "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+                    "min": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "max": [
+                        255,
+                        255,
+                        255
+                    ]
+                }
+            },
+            "expected": [],
+            "textless": true
+        },
+        {
+            "name": "textless hero (AWJ-HERO-DISPLAY): the picture still needs its own luminance evidence",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    }
+                },
+                "text": {
+                    "body": {
+                        "hex": "#ffffff"
+                    }
+                }
+            },
+            "media": {
+                "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": null
+            },
+            "expected": [
+                {
+                    "field": "background",
+                    "code": "contrast_unprovable",
+                    "ratio": 1
+                }
+            ],
+            "textless": true
+        },
+        {
+            "name": "textless hero (AWJ-HERO-DISPLAY): explicit text colours are not judged when nothing is shown",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    }
+                },
+                "text": {
+                    "body": {
+                        "hex": "#777777"
+                    }
+                }
+            },
+            "media": {
+                "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+                    "min": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "max": [
+                        255,
+                        255,
+                        255
+                    ]
+                }
+            },
+            "expected": [],
+            "textless": true
         }
     ]
 }

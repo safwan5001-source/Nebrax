@@ -54,6 +54,13 @@ export const HEADER_MOBILE_LAYOUTS = ["logo-centre", "logo-start"] as const;
 export const HEADER_HEIGHTS = ["compact", "standard", "tall"] as const;
 export const HEADER_LOGO_SIZES = ["sm", "md", "lg", "xl"] as const;
 export const HEADER_MODES = ["solid", "overlay-hero"] as const;
+/**
+ * AWJ-HEADER-OVERLAY-TONE — the text/icon tone of a transparent (overlay) header: `light` = white text (over a dark
+ * picture), `dark` = black text. Absent = automatic (the better of white / black the proof can establish). Stored only
+ * with `mode: overlay-hero` (otherwise it would be inert data). A tone the picture's whole range cannot support at
+ * 4.5:1 keeps the header solid at render time (no publish error) — never a forced unreadable overlay.
+ */
+export const HEADER_OVERLAY_TONES = ["light", "dark"] as const;
 export const HEADER_STICKY = ["always", "on-scroll-up", "off"] as const;
 export const HEADER_BORDER_WIDTHS = ["none", "hairline", "medium"] as const;
 export const HEADER_SHADOWS = ["none", "soft", "medium"] as const;
@@ -63,6 +70,7 @@ export type HeaderMobileLayout = (typeof HEADER_MOBILE_LAYOUTS)[number];
 export type HeaderHeight = (typeof HEADER_HEIGHTS)[number];
 export type HeaderLogoSize = (typeof HEADER_LOGO_SIZES)[number];
 export type HeaderMode = (typeof HEADER_MODES)[number];
+export type HeaderOverlayTone = (typeof HEADER_OVERLAY_TONES)[number];
 export type HeaderSticky = (typeof HEADER_STICKY)[number];
 export type HeaderBorderWidth = (typeof HEADER_BORDER_WIDTHS)[number];
 export type HeaderShadow = (typeof HEADER_SHADOWS)[number];
@@ -80,6 +88,8 @@ export interface HeaderDesign {
   icon?: ColorRef;
   /** V7c-2 — `overlay-hero`: transparent over a proven full-bleed picture hero on Home (see `header-overlay.ts`). */
   mode?: HeaderMode;
+  /** AWJ-HEADER-OVERLAY-TONE — with `overlay-hero` only: force light / dark text over the picture (absent = automatic). */
+  overlayTone?: HeaderOverlayTone;
   sticky?: HeaderSticky;
   border?: { width: HeaderBorderWidth };
   shadow?: HeaderShadow;
@@ -127,6 +137,10 @@ export function normalizeHeaderDesign(raw: unknown): HeaderDesign | undefined {
 
   const mode = pick(raw.mode, HEADER_MODES);
   if (mode) out.mode = mode;
+  if (mode === "overlay-hero") {
+    const overlayTone = pick(raw.overlayTone, HEADER_OVERLAY_TONES);
+    if (overlayTone) out.overlayTone = overlayTone;
+  }
 
   const sticky = pick(raw.sticky, HEADER_STICKY);
   if (sticky) out.sticky = sticky;

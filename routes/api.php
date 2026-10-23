@@ -98,6 +98,7 @@ use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\InventoryReportController;
 use App\Http\Controllers\Api\InventorySettingsController;
 use App\Http\Controllers\Api\InvoiceController;
+use App\Http\Controllers\Api\InvoicePaymentRequestController;
 use App\Http\Controllers\Api\JobLevelController;
 use App\Http\Controllers\Api\JobTitleController;
 use App\Http\Controllers\Api\JournalEntryController;
@@ -1035,6 +1036,11 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // PAY-H1-01: اتصالات بوابات الدفع. القراءة (بلا أسرار) payments.view؛ الكتابة والأسرار
         // وسجل التدقيق payment_gateways.manage (owner/admin). لا استدعاء مزوّد ولا أثر محاسبي.
         // PAY-H1-04: مطابقة يدوية لمحاولة عالقة (مكافئ المطابِق المجدول).
+        // PAY-H2-02b (ADR-0006): طلبات دفع الفواتير. القراءة payments.view؛ الإنشاء/الإلغاء/بدء المحاولة payments.manage.
+        Route::get('invoices/{invoiceId}/payment-requests', [InvoicePaymentRequestController::class, 'index'])->whereUuid('invoiceId')->middleware($perm('payments.view'));
+        Route::post('invoices/{invoiceId}/payment-requests', [InvoicePaymentRequestController::class, 'store'])->whereUuid('invoiceId')->middleware($perm('payments.manage'));
+        Route::post('payment-requests/{id}/cancel', [InvoicePaymentRequestController::class, 'cancel'])->whereUuid('id')->middleware($perm('payments.manage'));
+        Route::post('payment-requests/{id}/attempts', [InvoicePaymentRequestController::class, 'startAttempt'])->whereUuid('id')->middleware([$perm('payments.manage'), 'throttle:30,1']);
         Route::post('payment-attempts/{id}/sync', [PaymentAttemptController::class, 'sync'])->whereUuid('id')->middleware($perm('payments.manage'));
         Route::get('payment-gateways', [PaymentGatewayController::class, 'index'])->middleware($perm('payments.view'));
         Route::get('payment-gateways/{id}', [PaymentGatewayController::class, 'show'])->whereUuid('id')->middleware($perm('payments.view'));
@@ -1042,6 +1048,7 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('payment-gateways', [PaymentGatewayController::class, 'store'])->middleware($perm('payment_gateways.manage'));
         Route::put('payment-gateways/{id}', [PaymentGatewayController::class, 'update'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));
         Route::post('payment-gateways/{id}/rotate-credentials', [PaymentGatewayController::class, 'rotateCredentials'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));
+        Route::post('payment-gateways/{id}/verify', [PaymentGatewayController::class, 'verify'])->whereUuid('id')->middleware([$perm('payment_gateways.manage'), 'throttle:10,1']);
         Route::post('payment-gateways/{id}/activate', [PaymentGatewayController::class, 'activate'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));
         Route::post('payment-gateways/{id}/suspend', [PaymentGatewayController::class, 'suspend'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));
         Route::post('payment-gateways/{id}/revoke', [PaymentGatewayController::class, 'revoke'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));

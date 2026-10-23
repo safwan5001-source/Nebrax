@@ -7,6 +7,7 @@ import {
   canMoveSection,
   deleteSection,
   duplicateSection,
+  isHeroAuthored,
   moveSection,
   moveSectionTo,
   sectionIsAuthored,
@@ -95,5 +96,35 @@ describe("section list operations", () => {
     expect(sectionIsAuthored({ id: "a", type: "customContent", visible: true, content: { blocks: [{ id: "x", kind: "heading", text: "T" }] } })).toBe(true);
     expect(sectionIsAuthored({ id: "a", type: "hero", visible: true, content: { headline: "" } })).toBe(false);
     expect(sectionIsAuthored({ id: "a", type: "hero", visible: true, content: { headline: "Hi" } })).toBe(true);
+  });
+
+  // AWJ-HERO-DISPLAY (review on #1645): a display-only edit is merchant work too, even while every text field is still empty
+  it("a hero whose only edit is a display choice or a picture link counts as authored (delete asks first)", () => {
+    const hero = (content: object) => ({ id: "a", type: "hero" as const, visible: true, content: { headline: "", ...content } });
+    for (const content of [
+      { showTitle: false as const },
+      { showSubheadline: false as const },
+      { showCtas: false as const },
+      { imageHref: "/collections/new" },
+      { imageHref: "https://example.com/sale" },
+      { showTitle: false as const, showSubheadline: false as const, showCtas: false as const },
+    ]) {
+      expect(isHeroAuthored(hero(content).content), JSON.stringify(content)).toBe(true);
+      expect(sectionIsAuthored(hero(content)), JSON.stringify(content)).toBe(true);
+    }
+  });
+
+  it("a hero with nothing but an empty headline, whitespace or an empty link stays NOT authored (nothing to lose)", () => {
+    expect(isHeroAuthored(undefined)).toBe(false);
+    expect(isHeroAuthored({ headline: "" })).toBe(false);
+    expect(isHeroAuthored({ headline: "   " })).toBe(false);
+    expect(isHeroAuthored({ headline: "", imageHref: "   " })).toBe(false);
+    expect(sectionIsAuthored({ id: "a", type: "hero", visible: true, content: { headline: "" } })).toBe(false);
+  });
+
+  it("the authored predicate is unchanged for the choices that existed before: headline, description, a button", () => {
+    expect(isHeroAuthored({ headline: "Hi" })).toBe(true);
+    expect(isHeroAuthored({ headline: "", subheadline: "Line" })).toBe(true);
+    expect(isHeroAuthored({ headline: "", ctas: [{ label: "Go", href: "/go" }] })).toBe(true);
   });
 });

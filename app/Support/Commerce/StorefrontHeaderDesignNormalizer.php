@@ -29,6 +29,13 @@ final class StorefrontHeaderDesignNormalizer
 
     public const MODES = ['solid', 'overlay-hero'];
 
+    /**
+     * AWJ-HEADER-OVERLAY-TONE — نغمة نصّ الترويسة الشفافة فوق بطل الصورة: `light` = نصّ أبيض (فوق صورة داكنة)، `dark` = نصّ أسود.
+     * الغياب = تلقائي (الأفضل إثباتاً من الأبيض/الأسود). تُخزَّن مع `mode: overlay-hero` فقط (وإلا فهي بيانات خاملة)، وتُحكم وقت العرض:
+     * نغمةٌ لا يثبتها تباين الصورة كلّها ≥ 4.5:1 تُبقي الترويسة صلبة (لا فشل نشر) كما كان الوضع التلقائي.
+     */
+    public const OVERLAY_TONES = ['light', 'dark'];
+
     public const STICKY = ['always', 'on-scroll-up', 'off'];
 
     public const BORDER_WIDTHS = ['none', 'hairline', 'medium'];
@@ -72,6 +79,9 @@ final class StorefrontHeaderDesignNormalizer
         }
 
         self::put($out, 'mode', $raw['mode'] ?? null, self::MODES);
+        if (($out['mode'] ?? null) === 'overlay-hero') {
+            self::put($out, 'overlayTone', $raw['overlayTone'] ?? null, self::OVERLAY_TONES);
+        }
         self::put($out, 'sticky', $raw['sticky'] ?? null, self::STICKY);
 
         if (self::isObject($raw['border'] ?? null)) {

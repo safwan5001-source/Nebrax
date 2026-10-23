@@ -31,6 +31,9 @@ class PaymentGateway extends BaseModel implements CompanyWide
 
     public const PROVIDER_CHECKOUT = 'checkout';
 
+    /** Moyasar — المزوّد الأول (ADR-0005، Sandbox فقط حتى قرار G-LIVE). */
+    public const PROVIDER_MOYASAR = 'moyasar';
+
     public const PROVIDER_CUSTOM = 'custom';
 
     public const STATUS_DRAFT = 'draft';
@@ -59,6 +62,7 @@ class PaymentGateway extends BaseModel implements CompanyWide
         self::PROVIDER_TAP,
         self::PROVIDER_PAYTABS,
         self::PROVIDER_CHECKOUT,
+        self::PROVIDER_MOYASAR,
         self::PROVIDER_CUSTOM,
     ];
 

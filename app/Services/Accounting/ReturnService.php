@@ -15,6 +15,7 @@ use App\Models\ReturnDocument;
 use App\Models\ReturnLine;
 use App\Models\User;
 use App\Services\Pos\PosAuditService;
+use App\Support\CashSaleTreasuryPolicy;
 use App\Support\DocumentLineVariantResolver;
 use App\Support\Money;
 use App\Support\Settings;
@@ -528,13 +529,17 @@ class ReturnService
     /**
      * ترحيل المرتجع: توليد القيد العكسي ومعالجة المخزون.
      */
-    public function post(ReturnDocument $return): ReturnDocument
+    /**
+     * @param  ?User  $actor  الفاعل المصادَق عليه — يُستعمل لتخويل `withdraw` في الردّ النقدي الموجَّه (TREASURY-T6)، ولا أثر له ما دامت
+     *                        سياسة T4 الفعّالة `legacy` (بوابة مغلقة).
+     */
+    public function post(ReturnDocument $return, ?User $actor = null): ReturnDocument
     {
         if (! $return->isDraft()) {
             throw new RuntimeException('لا يمكن ترحيل مرتجع غير مسوّد (draft).');
         }
 
-        return DB::transaction(function () use ($return) {
+        return DB::transaction(function () use ($return, $actor) {
             // قفل الصف وإعادة فحص الحالة — يمنع الترحيل المزدوج المتزامن.
             $return = ReturnDocument::lockForUpdate()->findOrFail($return->id);
             if (! $return->isDraft()) {
@@ -543,6 +548,10 @@ class ReturnService
 
             // الحارس يُعاد **داخل المعاملة**: مسوّدتان أُنشئتا معاً لا تحجزان
             // كميةً، فالفحص عند الإنشاء وحده يسمح لثانيتهما بتجاوز المتبقي.
+            // سياسة T4 تُقرأ **مرة واحدة** وتُثبَّت لكامل الترحيل: قراءتان متباعدتان كانتا تسمحان بأن يرى الحارس «موجَّهة» ويرى الحلّ «legacy»
+            // (تغيّر السياسة بينهما) فيُتخطّيان معاً وتُدائَن 1110 لبيع حُصِّل في خزينة أخرى.
+            $treasuryPolicy = CashSaleTreasuryPolicy::effective();
+            $source = null;
             if ($return->original_id) {
                 $source = $this->resolveSource([
                     'original_id'   => $return->original_id,
@@ -552,8 +561,10 @@ class ReturnService
                 ], $return->type, lock: $return->pos_session_id === null);
 
                 if ($source) {
-                    // TREASURY-T4: مرتجع نقدي لفاتورة حُصِّلت في غير 1110 يُرفض (المرتجع النقدي يُدائن 1110 مرمَّزاً حتى T6).
-                    if ($return->isSales() && $return->payment_type === 'cash' && $source instanceof \App\Models\Invoice) {
+                    // TREASURY-T4: على المسار القديم (`legacy`) المرتجع النقدي يُدائن 1110؛ فإن كانت الفاتورة حُصِّلت في غيره (بيع وُجِّه ثم
+                    // عادت السياسة إلى legacy) يُرفض. على المسار الموجَّه تتبع الخزينةَ المشتقّة أدناه (TREASURY-T6) فلا حاجة لهذا الحارس.
+                    if ($return->isSales() && $return->payment_type === 'cash' && $source instanceof \App\Models\Invoice
+                        && $treasuryPolicy === CashSaleTreasuryPolicy::LEGACY) {
                         app(CashSaleRefundGuard::class)->assertCashRefundMatchesCollection($source);
                     }
                     $this->assertWithinSource(
@@ -583,8 +594,19 @@ class ReturnService
                 }
             }
 
+            // TREASURY-T6: الخزينة المدينة للردّ النقدي تُحلّ **قبل** القيد (فالرفض يتراجع قبل أي قفل مِرساة أو أثر). مغلق افتراضياً:
+            // ما دامت سياسة T4 الفعّالة `legacy` يبقى 1110 بلا تخويل كما كان. لا سقوط إلى 1110 عند أي فشل.
+            $cashAccountId = null;
+            if ($return->isSales() && $return->payment_type === 'cash' && $treasuryPolicy !== CashSaleTreasuryPolicy::LEGACY) {
+                $invoiceSource = $source instanceof \App\Models\Invoice ? $source : null;
+                $cashAccountId = ($return->pos_session_id !== null
+                    ? app(PosCashRefundTreasuryResolver::class)->resolve(PosSession::query()->find($return->pos_session_id), $invoiceSource, $actor)
+                    : app(CreditNoteRefundTreasuryResolver::class)->resolve($invoiceSource, $actor)
+                )->accountId;
+            }
+
             return $return->isSales()
-                ? $this->postSalesReturn($return)
+                ? $this->postSalesReturn($return, $cashAccountId)
                 : $this->postPurchaseReturn($return);
         });
     }
@@ -592,7 +614,7 @@ class ReturnService
     /**
      * مرتجع مبيعات: عكس الإيراد والضريبة، وإرجاع البضاعة للمخزون بقيد عكس التكلفة.
      */
-    protected function postSalesReturn(ReturnDocument $return): ReturnDocument
+    protected function postSalesReturn(ReturnDocument $return, ?string $cashAccountId = null): ReturnDocument
     {
         $return->loadMissing('lines.product', 'lines.variant');
 
@@ -606,7 +628,9 @@ class ReturnService
             $lines[] = ['account_id' => $this->accountRoles->resolve('tax_output')->id, 'debit' => $taxAmount];
         }
         $creditLine = [
-            'account_id' => $this->accountId($return->payment_type === 'cash' ? self::ACC_CASH : self::ACC_RECEIVABLE),
+            'account_id' => $return->payment_type === 'cash'
+                ? ($cashAccountId ?? $this->accountId(self::ACC_CASH))
+                : $this->accountId(self::ACC_RECEIVABLE),
             'credit'     => $total,
         ];
         if ($return->payment_type === 'credit') {

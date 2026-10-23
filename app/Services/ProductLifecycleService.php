@@ -88,15 +88,29 @@ class ProductLifecycleService
             $product = Product::lockForUpdate()->findOrFail($product->id);
             $this->assertInventoryIdentityCanChange($product, $data);
 
+            // `sale_price` ليس عموداً في `products` (VAR-PRICE-1): Accessor فوق `ProductUnitPrice` يخزّن القيمة معلّقةً ولا يُوسِم النموذج
+            // متغيّراً. تعديلٌ كل ما فيه سعر البيع كان يُعاد منه مبكراً بلا حفظ فيضيع صامتاً (الاستيراد وتنفيذ AI Actions)، فيُقارَن
+            // السعر صراحةً قبل الإسناد، ويُحفظ النموذج كي يُفرَّغ السعر المعلّق (حدث `saved`)، ويدخل التغيير في سجلّ التعديل.
+            $priceBefore = array_key_exists('sale_price', $data) ? (int) $product->sale_price : null;
+
             $product->fill($data);
             $dirty = $product->getDirty();
-            if ($dirty === []) {
+            $priceChanged = $priceBefore !== null && (int) $data['sale_price'] !== $priceBefore;
+            if ($dirty === [] && ! $priceChanged) {
                 return $product;
+            }
+            if ($dirty === []) {
+                // لا عمود متغيّر فلن يُحدَّث `updated_at` تلقائياً؛ وهو «نسخة» المنتج التي يقارنها تنفيذ AI Actions (`target_changed`)،
+                // فتعديل السعر وحده يجب أن يغيّرها كغيره من التعديلات.
+                $product->setAttribute('updated_at', $product->freshTimestamp());
             }
 
             $diff = [];
             foreach ($dirty as $field => $value) {
                 $diff[$field] = [$product->getOriginal($field), $value];
+            }
+            if ($priceChanged) {
+                $diff['sale_price'] = [$priceBefore, (int) $data['sale_price']];
             }
             $statusChanged = array_key_exists('is_active', $diff);
 

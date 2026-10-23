@@ -15,10 +15,34 @@
  * `leading` is slots 1–2, `beforeDesktop` is slot 4. For a document with no animation both are empty and
  * callers render exactly what they rendered before.
  */
-import type { ResolvedMedia, ResolvedMediaSource } from "./media-ref";
+import type {
+  ResolvedAnimation,
+  ResolvedMedia,
+  ResolvedMediaSource,
+} from "./media-ref";
 
 export const PHONE_QUERY = "(max-width: 767px)";
 export const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+
+/**
+ * WCAG 2.2.2 (Pause, Stop, Hide): motion that starts automatically and lasts more than five seconds needs a mechanism to
+ * stop it. A surface that shows no pause control (the merchant's choice) therefore plays an animation for at most this
+ * long, counted from the moment it is on screen, and then settles on the still frame.
+ */
+export const MOTION_BUDGET_MS = 5000;
+
+/**
+ * `true` unless the file is known to end by itself within the budget. `loop` is the infinite-loop flag the sanitiser
+ * measured, so a finite file is exempt only when its single pass fits (a finite repeat COUNT above 1 is not exposed by
+ * the analyser — recorded as a known limit in the implementation report).
+ */
+export function exceedsMotionBudget(animation: ResolvedAnimation): boolean {
+  return (
+    animation.loop ||
+    animation.durationMs > MOTION_BUDGET_MS ||
+    animation.durationMs <= 0
+  );
+}
 
 export interface PictureSource {
   media?: string;

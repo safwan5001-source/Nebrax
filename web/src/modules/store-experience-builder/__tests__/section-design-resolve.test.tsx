@@ -390,6 +390,27 @@ describe("resolveSectionDesign — picture backgrounds (CUST-HV V6b-3)", () => {
     const r = resolveSectionDesign("hero", picture({ alpha: 80 }), withBounds(wide));
     expect(r?.attrs["data-sd"]).toContain("mbg");
   });
+
+  it("a hero showing no text (image only, AWJ-HERO-DISPLAY) paints a wide-range picture with no overlay, and sets no text colours", () => {
+    const r = resolveSectionDesign("hero", picture(), withBounds(wide), true);
+    const tokens = r?.attrs["data-sd"].split(" ") ?? [];
+    expect(tokens).toContain("mbg");
+    expect(tokens).not.toContain("ovl");
+    // it never invents a darkening layer: an overlay exists only when the merchant authored one
+    expect(r?.style["--sec-ovl-a"]).toBeUndefined();
+  });
+
+  it("image only still needs the picture's own luminance evidence — no evidence ⇒ nothing is painted", () => {
+    for (const c of [ctx, withBounds(null)]) {
+      const r = resolveSectionDesign("hero", picture(), c, true);
+      expect(r?.attrs["data-sd"] ?? "").not.toContain("mbg");
+    }
+  });
+
+  it("a hero that still shows any text keeps the full proof (the default is not textless)", () => {
+    const r = resolveSectionDesign("hero", picture(), withBounds(wide), false);
+    expect(r?.attrs["data-sd"] ?? "").not.toContain("mbg");
+  });
 });
 
 describe("resolveSectionDesign — placement and height (CUST-HV V6c-3)", () => {
@@ -637,5 +658,199 @@ describe("resolveSectionDesign — a shelf's own card tokens (CUST-HV V9d-2)", (
     const r = resolveSectionDesign("offers", { cards: { align: "center", imageRatio: "1:1", hover: "lift" } }, ctx)!;
     const names = [...Object.keys(r.style), ...(r.attrs["data-sd"] ?? "").split(" ")].join(" ");
     expect(names).not.toMatch(/price|discount|sale|stock|avail|offer|tax|total/i);
+  });
+});
+
+describe("resolveSectionDesign — hero picture treatments (AWJ-HERO-FULLBLEED)", () => {
+  const A = "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e";
+  const dark = { min: [0, 0, 0], max: [40, 50, 60] } as const;
+  const proven: DesignContext = { ...ctx, mediaBounds: () => ({ min: [...dark.min], max: [...dark.max] }) };
+  const tokensOf = (type: string, design: SectionDesign, c: DesignContext) =>
+    resolveSectionDesign(type, design, c)?.attrs["data-sd"].split(" ") ?? [];
+  const hero = (mediaTreatment: SectionDesign["mediaTreatment"], extra: Partial<SectionDesign> = {}): SectionDesign => ({
+    background: { kind: "media", media: { mediaId: A, decorative: true } },
+    mediaTreatment,
+    ...extra,
+  });
+
+  it("bleed emits `hbl`, drops radius / shadow / separators and needs no width mode", () => {
+    const r = resolveSectionDesign(
+      "hero",
+      hero({ bleed: true }, { radius: "lg", shadow: "soft", separator: { bottom: "wave" } }),
+      proven,
+    )!;
+    const tokens = r.attrs["data-sd"].split(" ");
+    expect(tokens).toContain("hbl");
+    expect(tokens).toContain("mbg");
+    for (const gone of ["radius", "shadow", "sep", "bleed"]) expect(tokens).not.toContain(gone);
+    expect(r.style["--sec-radius"]).toBeUndefined();
+    expect(r.style["--sec-shadow"]).toBeUndefined();
+  });
+
+  it("a contained hero (no bleed) keeps its radius and shadow exactly as before", () => {
+    const tokens = tokensOf("hero", hero(undefined, { radius: "lg", shadow: "soft" }), proven);
+    expect(tokens).toEqual(expect.arrayContaining(["radius", "shadow"]));
+    expect(tokens).not.toContain("hbl");
+  });
+
+  it("ratio natural emits `rat` and replaces the height presets (they have nothing left to say)", () => {
+    const r = resolveSectionDesign("hero", hero({ ratio: "natural", height: "tall", mobileHeight: "compact" }), proven)!;
+    const tokens = r.attrs["data-sd"].split(" ");
+    expect(tokens).toContain("rat");
+    for (const gone of ["hgt", "hgtm"]) expect(tokens).not.toContain(gone);
+    expect(r.style["--sec-minh"]).toBeUndefined();
+    expect(r.style["--sec-minh-m"]).toBeUndefined();
+  });
+
+  it("bleed and natural ratio compose", () => {
+    expect(tokensOf("hero", hero({ bleed: true, ratio: "natural" }), proven)).toEqual(
+      expect.arrayContaining(["hbl", "rat", "mbg"]),
+    );
+  });
+
+  it("neither applies without a proven picture, nor to a split hero (the picture covers half the box)", () => {
+    const noBounds: DesignContext = { ...ctx, mediaBounds: () => null };
+    for (const c of [noBounds, ctx]) {
+      const tokens = tokensOf("hero", hero({ bleed: true, ratio: "natural" }), c);
+      expect(tokens).not.toContain("hbl");
+      expect(tokens).not.toContain("rat");
+    }
+    const split = tokensOf("hero", hero({ bleed: true, ratio: "natural" }, { layout: "split" }), proven);
+    expect(split).not.toContain("hbl");
+    expect(split).not.toContain("rat");
+  });
+
+  it("neither applies to a solid / gradient hero, nor to another type", () => {
+    const solid: SectionDesign = {
+      background: { kind: "solid", color: { role: "brand" } },
+      mediaTreatment: { bleed: true, ratio: "natural" },
+    };
+    expect(tokensOf("hero", solid, proven)).not.toContain("hbl");
+    for (const type of ["banner", "slider"]) {
+      const tokens = tokensOf(type, hero({ bleed: true, ratio: "natural" } as never), proven);
+      expect(tokens).not.toContain("hbl");
+      expect(tokens).not.toContain("rat");
+    }
+  });
+
+  it("mobileHeight: the real storefront gets both values plus a media query token", () => {
+    const r = resolveSectionDesign("hero", hero({ height: "tall", mobileHeight: "compact" }), proven)!;
+    const tokens = r.attrs["data-sd"].split(" ");
+    expect(tokens).toEqual(expect.arrayContaining(["hgt", "hgtm"]));
+    expect(r.style["--sec-minh"]).toBe("28rem");
+    expect(r.style["--sec-minh-m"]).toBe("10rem");
+  });
+
+  it("mobileHeight alone leaves desktop at its automatic height", () => {
+    const r = resolveSectionDesign("hero", hero({ mobileHeight: "screen" }), proven)!;
+    const tokens = r.attrs["data-sd"].split(" ");
+    expect(tokens).toContain("hgtm");
+    expect(tokens).not.toContain("hgt");
+    expect(r.style["--sec-minh"]).toBeUndefined();
+  });
+
+  it("the Canvas resolves the simulated device itself (no media query against the host window)", () => {
+    const design = hero({ height: "tall", mobileHeight: "compact" });
+    const phone = resolveSectionDesign("hero", design, { ...proven, simulatedWidthPx: 390 })!;
+    expect(phone.style["--sec-minh"]).toBe("10rem");
+    expect(phone.attrs["data-sd"].split(" ")).not.toContain("hgtm");
+    const desktop = resolveSectionDesign("hero", design, { ...proven, simulatedWidthPx: 1280 })!;
+    expect(desktop.style["--sec-minh"]).toBe("28rem");
+    expect(desktop.attrs["data-sd"].split(" ")).not.toContain("hgtm");
+    const tablet = resolveSectionDesign("hero", design, { ...proven, simulatedWidthPx: 768 })!;
+    expect(tablet.style["--sec-minh"]).toBe("28rem");
+    // a phone with only `mobileHeight` gets it; a desktop with only `mobileHeight` gets nothing
+    expect(
+      resolveSectionDesign("hero", hero({ mobileHeight: "tall" }), { ...proven, simulatedWidthPx: 390 })!.style["--sec-minh"],
+    ).toBe("28rem");
+    expect(
+      resolveSectionDesign("hero", hero({ mobileHeight: "tall" }), { ...proven, simulatedWidthPx: 1280 })!.style["--sec-minh"],
+    ).toBeUndefined();
+  });
+
+  it("`height` alone is byte-for-byte what V6c-3 emitted (no mobile token, same variable)", () => {
+    const r = resolveSectionDesign("hero", hero({ height: "standard" }), proven)!;
+    expect(r.style["--sec-minh"]).toBe("18rem");
+    expect(r.attrs["data-sd"].split(" ")).not.toContain("hgtm");
+    expect(r.style["--sec-minh-m"]).toBeUndefined();
+  });
+
+  it("a hero without any of the new fields resolves exactly as before (no new token, no new variable)", () => {
+    const r = resolveSectionDesign("hero", hero(undefined, { radius: "md" }), proven)!;
+    const tokens = r.attrs["data-sd"].split(" ");
+    for (const added of ["hbl", "rat", "hgtm"]) expect(tokens).not.toContain(added);
+    for (const key of Object.keys(r.style)) expect(["--sec-minh-m"]).not.toContain(key);
+  });
+});
+
+describe("normalizeSectionDesign — hero picture treatments (AWJ-HERO-FULLBLEED)", () => {
+  it("round-trips every field on a hero and is idempotent", () => {
+    const input = { mediaTreatment: { bleed: true, ratio: "natural", mobileHeight: "compact", height: "tall" } };
+    const out = normalizeSectionDesign("hero", input);
+    expect(out).toEqual({ mediaTreatment: { height: "tall", mobileHeight: "compact", ratio: "natural", bleed: true } });
+    expect(Object.keys(out?.mediaTreatment ?? {})).toEqual(["height", "mobileHeight", "ratio", "bleed"]);
+    expect(normalizeSectionDesign("hero", out)).toEqual(out);
+  });
+
+  it("drops contain (it would reveal an unproven surface), false, strings and unknown presets", () => {
+    expect(normalizeSectionDesign("hero", { mediaTreatment: { ratio: "contain" } })).toBeUndefined();
+    expect(normalizeSectionDesign("hero", { mediaTreatment: { bleed: false } })).toBeUndefined();
+    expect(normalizeSectionDesign("hero", { mediaTreatment: { bleed: "true" } })).toBeUndefined();
+    expect(normalizeSectionDesign("hero", { mediaTreatment: { bleed: 1 } })).toBeUndefined();
+    expect(normalizeSectionDesign("hero", { mediaTreatment: { mobileHeight: "huge", height: "tall" } })).toEqual({
+      mediaTreatment: { height: "tall" },
+    });
+  });
+
+  it("banner and slider keep `height` only", () => {
+    const input = { mediaTreatment: { height: "tall", mobileHeight: "compact", ratio: "natural", bleed: true } };
+    expect(normalizeSectionDesign("banner", input)).toEqual({ mediaTreatment: { height: "tall" } });
+    expect(normalizeSectionDesign("slider", input)).toEqual({ mediaTreatment: { height: "tall" } });
+  });
+});
+
+describe("backward compatibility — published heroes are untouched (AWJ-HERO-FULLBLEED)", () => {
+  const A = "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e";
+  const proven: DesignContext = { ...ctx, mediaBounds: () => ({ min: [0, 0, 0], max: [40, 50, 60] }) };
+
+  it("a hero that already ticked the full-width band over a picture stays a contained card (the old checkbox never bled a picture)", () => {
+    const r = resolveSectionDesign(
+      "hero",
+      {
+        background: { kind: "media", media: { mediaId: A, decorative: true } },
+        width: { mode: "full" },
+        radius: "lg",
+        mediaTreatment: { height: "tall" },
+      },
+      proven,
+    )!;
+    const tokens = r.attrs["data-sd"].split(" ");
+    for (const added of ["hbl", "rat", "hgtm", "bleed"]) expect(tokens).not.toContain(added);
+    expect(tokens).toEqual(expect.arrayContaining(["mbg", "radius", "hgt"]));
+    expect(r.style["--sec-minh"]).toBe("28rem");
+    expect(r.style["--sec-radius"]).toBeDefined();
+  });
+
+  it("the solid full-width band is exactly what it was", () => {
+    const r = resolveSectionDesign(
+      "hero",
+      { background: { kind: "solid", color: { hex: "#12372a" } }, width: { mode: "full" }, radius: "lg", mediaTreatment: { bleed: true } },
+      proven,
+    )!;
+    const tokens = r.attrs["data-sd"].split(" ");
+    expect(tokens).toContain("bleed");
+    expect(tokens).not.toContain("hbl");
+    expect(tokens).not.toContain("radius");
+    expect(r.style["--sec-bleed"]).toBe("0 0 0 100vmax #12372a");
+  });
+
+  it("documents written before these fields existed normalise to themselves", () => {
+    const legacy = {
+      background: { kind: "media", media: { mediaId: A, decorative: true }, overlay: { color: { hex: "#000000" }, alpha: 40 } },
+      width: { mode: "full", max: "wide" },
+      mediaTreatment: { height: "screen" },
+      overlap: "sm",
+    };
+    expect(normalizeSectionDesign("hero", legacy)).toEqual(legacy);
   });
 });

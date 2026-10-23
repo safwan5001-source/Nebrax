@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Contracts\RedactsStoredWebhookBody;
 use App\Models\PaymentAttempt;
 use App\Models\PaymentGateway;
 use App\Models\PaymentProviderEvent;
@@ -67,7 +68,8 @@ final class PaymentWebhookInbox
         $gateway = PaymentGateway::query()->findOrFail($gateway->getKey());
 
         try {
-            $verified = $this->adapters->for($gateway->provider)->verifyWebhook($gateway, new PaymentRawWebhook($body, $headers));
+            $adapter = $this->adapters->for($gateway->provider);
+            $verified = $adapter->verifyWebhook($gateway, new PaymentRawWebhook($body, $headers));
         } catch (InvalidPaymentWebhookException $e) {
             return $e->reason === 'malformed' ? new PaymentWebhookResult(400, 'malformed') : new PaymentWebhookResult(401, 'invalid_signature');
         }
@@ -81,7 +83,8 @@ final class PaymentWebhookInbox
                 'event_type' => $verified->eventType !== null ? substr($verified->eventType, 0, 96) : null,
                 'provider_payment_id' => $verified->providerPaymentId !== null ? substr($verified->providerPaymentId, 0, 191) : null,
                 'body_hash' => $hash,
-                'body' => $body,
+                // محوّل يحمل سرّه داخل الجسم (Moyasar) يُخزَّن جسمه منقّحاً؛ البصمة أعلاه على الخام.
+                'body' => $adapter instanceof RedactsStoredWebhookBody ? $adapter->redactForStorage($body) : $body,
             ]));
         } catch (QueryException $e) {
             if (! $this->isUniqueViolation($e)) {
