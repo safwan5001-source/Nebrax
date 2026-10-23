@@ -221,6 +221,14 @@ class MoyasarRefundTest extends TestCase
         $e = $this->thrown(fn () => $this->adapter->fetchPayment($this->gateway, MoyasarFixtures::INVOICE_ID), 'snapshot overlarge', \App\Support\PaymentGatewayException::class);
         $this->assertSame('moyasar.malformed_response', $e->reason);
 
+        // دفعة ملتقطة جزئياً: المسترد المقبول يُحدّ بالملتقط الفعلي (60000) لا بمبلغ الشحن (115000).
+        $partial = array_merge($this->paid(refunded: 80000), ['captured' => 60000]);
+        $this->fakeHttp(['api.moyasar.com/v1/invoices/*' => Http::response($this->invoiceWith($partial))]);
+        $e = $this->thrown(fn () => $this->adapter->fetchPayment($this->gateway, MoyasarFixtures::INVOICE_ID), 'above captured', \App\Support\PaymentGatewayException::class);
+        $this->assertSame('moyasar.malformed_response', $e->reason);
+        $e = $this->thrown(fn () => $this->adapter->refundPayment($this->gateway, MoyasarFixtures::INVOICE_ID, 100), 'preflight above captured', PaymentRefundRejectedException::class);
+        $this->assertSame('moyasar.malformed_response', $e->reason);
+
         // الفحص المسبق: خط الأساس المعيب (سالب أو أكبر من مبلغ الدفعة) ⇒ لا إرسال.
         foreach ([-7, 999999] as $bad) {
             $this->fakeHttp(['api.moyasar.com/v1/invoices/*' => Http::response($this->invoiceWith($this->paid(refunded: $bad)))]);

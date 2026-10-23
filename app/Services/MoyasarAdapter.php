@@ -316,11 +316,12 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
                 // `captured` (الحقل الموثّق) هو المبلغ الملتقَط فعلاً وقد يقلّ عن `amount` في الالتقاط الجزئي. غيابه أو صفره على دفعة مسدَّدة
                 // ⇒ المبلغ كاملاً (دفعة `paid` بلا التقاط جزئي)؛ ولا يتجاوز أبداً مبلغ الدفعة. قيمة صفر الفعلية تُثبَّت في Sandbox.
                 $captured = $this->intOrNull($payment['captured'] ?? null);
-                $capturedMinor += $captured !== null && $captured > 0 ? min($captured, $paymentAmount) : $paymentAmount;
+                $chargeable = $captured !== null && $captured > 0 ? min($captured, $paymentAmount) : $paymentAmount;
+                $capturedMinor += $chargeable;
                 // المسترد التراكمي (حقل `refunded` الموثّق، عدد صحيح ≤ مبلغ الدفعة): حقيقة المزوّد لمطابقة الاسترداد؛ لا يتجاوز مبلغ الدفعة.
                 $refunded = $payment['refunded'] ?? null;
-                if ($refunded !== null && (($refundedInt = $this->intOrNull($refunded)) === null || $refundedInt < 0 || $refundedInt > $paymentAmount)) {
-                    // مسترد سالب/غير عددي/أكبر من مبلغ الدفعة معيب: لا يُطبَّع (صفراً يُخفي استرداداً حقيقياً، أو كاملاً يبدو دليل اكتمال) — قراءة فاشلة قابلة للإعادة.
+                if ($refunded !== null && (($refundedInt = $this->intOrNull($refunded)) === null || $refundedInt < 0 || $refundedInt > $chargeable)) {
+                    // مسترد سالب/غير عددي/أكبر من **المبلغ الملتقط الفعلي** (لا مبلغ الشحن الأصلي) معيب: لا يُطبَّع (صفراً يُخفي استرداداً حقيقياً، أو كاملاً يبدو دليل اكتمال) — قراءة فاشلة قابلة للإعادة.
                     throw new PaymentGatewayException('moyasar.malformed_response', 'قيمة المبلغ المسترد غير صالحة.');
                 }
                 $refundedMinor += $refundedInt ?? 0;
@@ -411,8 +412,8 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
         $chargeable = $captured !== null && $captured > 0 ? min($captured, $paymentAmount) : $paymentAmount;
         $rawRefunded = $payment['refunded'] ?? null;
         $refundedBefore = $rawRefunded === null ? 0 : $this->intOrNull($rawRefunded);
-        // التراكمي قبل الإرسال أساس السقف: قيمة معيبة (سالبة/غير عددية/أكبر من مبلغ الدفعة) ⇒ لا نُرسل (قد يُفرَط الاسترداد) ⇒ رفض قاطع.
-        if ($refundedBefore === null || $refundedBefore < 0 || $refundedBefore > $paymentAmount) {
+        // التراكمي قبل الإرسال أساس السقف: قيمة معيبة (سالبة/غير عددية/أكبر من الملتقط الفعلي) ⇒ لا نُرسل (قد يُفرَط الاسترداد) ⇒ رفض قاطع.
+        if ($refundedBefore === null || $refundedBefore < 0 || $refundedBefore > $chargeable) {
             throw new PaymentRefundRejectedException('moyasar.malformed_response', 'قيمة المبلغ المسترد لدى المزوّد غير صالحة؛ لا يُرسَل الاسترداد.');
         }
         if ($amountMinor > $chargeable - $refundedBefore) {
