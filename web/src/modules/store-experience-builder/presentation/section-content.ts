@@ -238,6 +238,16 @@ export interface HeroContent {
   subheadline?: string;
   /** At most {@link MAX_HERO_CTAS}; the model never needs a later migration for a second CTA. */
   ctas?: HeroCta[];
+  /**
+   * AWJ-HERO-DISPLAY — optional display switches. Each is stored only as `false` (absence = shown, exactly as before, so a
+   * stored document never gains a key on its own); hidden content is not rendered and leaves no empty container. A hero that
+   * hides all three shows its picture alone.
+   */
+  showTitle?: false;
+  showSubheadline?: false;
+  showCtas?: false;
+  /** AWJ-HERO-DISPLAY — optional link that makes the hero picture clickable (same link rules as a CTA). Absent ⇒ not a link. */
+  imageHref?: string;
 }
 
 export const MAX_HERO_HEADLINE_LENGTH = 120;
@@ -268,6 +278,24 @@ export function heroContentOf(section: {
   return section.type === "hero" && section.content && "headline" in section.content
     ? section.content
     : undefined;
+}
+
+
+/**
+ * AWJ-HERO-DISPLAY — a hero whose merchant hid its title, description and buttons: nothing is left to read over the picture,
+ * so the picture is judged by its own evidence alone (twin of PHP `SectionDesignContrast::isTextlessHero`).
+ */
+export function isTextlessSection(section: {
+  type: string;
+  content?: SectionContent;
+}): boolean {
+  const own = heroContentOf(section);
+  return (
+    own !== undefined &&
+    own.showTitle === false &&
+    own.showSubheadline === false &&
+    own.showCtas === false
+  );
 }
 
 
@@ -541,14 +569,27 @@ function normalizeHero(raw: unknown): HeroContent | undefined {
   const headline = heroText(source.headline, MAX_HERO_HEADLINE_LENGTH);
   const subheadline = heroText(source.subheadline, MAX_HERO_SUBHEADLINE_LENGTH);
   const ctas = normalizeCtaList(source.ctas, MAX_HERO_CTAS);
+  // AWJ-HERO-DISPLAY — a display switch is kept only as `false`; anything else is "shown" and is not stored.
+  const hidden = (["showTitle", "showSubheadline", "showCtas"] as const).filter(
+    (flag) => source[flag] === false,
+  );
+  const imageHref = sanitizeContentHref(asString(source.imageHref));
   // explicit content only when something was written: a string `headline` key (even empty),
-  // a subheadline, or a CTA
-  if (typeof source.headline !== "string" && subheadline === "" && ctas.length === 0) {
+  // a subheadline, a CTA, or a display choice
+  if (
+    typeof source.headline !== "string" &&
+    subheadline === "" &&
+    ctas.length === 0 &&
+    hidden.length === 0 &&
+    imageHref === ""
+  ) {
     return undefined;
   }
   const content: HeroContent = { headline };
   if (subheadline !== "") content.subheadline = subheadline;
   if (ctas.length > 0) content.ctas = ctas;
+  for (const flag of hidden) content[flag] = false;
+  if (imageHref !== "") content.imageHref = imageHref;
   return content;
 }
 

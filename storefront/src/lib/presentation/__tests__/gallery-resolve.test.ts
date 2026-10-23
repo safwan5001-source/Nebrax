@@ -130,6 +130,7 @@ describe("resolveGallery (CUST-HV V8e)", () => {
       gap: "md",
       captions: false,
       lightbox: false,
+      showMotionControls: false,
     });
     const strip = resolveGallery(
       gallery(

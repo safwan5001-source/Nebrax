@@ -74,7 +74,7 @@ jobs:
       #  الـ CI هنا** برسالة تقول أين يُضاف.
       - name: حارس قائمة النسخ
         run: |
-          ALLOWED="app/Contracts app/Mail app/Jobs/Accounting app/Jobs/DocumentCenter app/Models app/Models/Concerns app/Services app/Services/Accounting app/Services/Commerce app/Services/Commerce/Edge app/Services/Commerce/Otp app/Services/DocumentCenter app/Services/AppBuilder app/Services/DeliveryHub app/Services/Pos app/Services/Pos/Hardware \
+          ALLOWED="app/Contracts app/Mail app/Events app/Listeners app/Jobs/Accounting app/Jobs/DocumentCenter app/Models app/Models/Concerns app/Services app/Services/Accounting app/Services/Commerce app/Services/Commerce/Edge app/Services/Commerce/Otp app/Services/DocumentCenter app/Services/AppBuilder app/Services/DeliveryHub app/Services/Pos app/Services/Pos/Hardware \
                    app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory app/Support/Dns app/Support/Commerce app/Services/Communications app/Support/Communications app/Tenancy \
                    app/Http/Middleware app/Http/Controllers/Api \
                    app/Http/Requests app/Http/Resources app/Providers \
@@ -152,12 +152,14 @@ jobs:
         run: |
           CORE="$GITHUB_WORKSPACE"
           cd "$APP_DIR"
-          mkdir -p app/Contracts app/Mail app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Commerce app/Services/Commerce/Edge app/Services/Commerce/Otp app/Services/DocumentCenter app/Services/AppBuilder app/Services/DeliveryHub app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory app/Support/Dns app/Support/Commerce app/Services/Communications app/Support/Communications \
+          mkdir -p app/Contracts app/Mail app/Events app/Listeners app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Commerce app/Services/Commerce/Edge app/Services/Commerce/Otp app/Services/DocumentCenter app/Services/AppBuilder app/Services/DeliveryHub app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory app/Support/Dns app/Support/Commerce app/Services/Communications app/Support/Communications \
                    app/Tenancy app/Http/Middleware app/Http/Controllers/Api \
                    app/Http/Requests app/Http/Resources app/Console/Commands \
                    app/Models/Concerns tests/Feature tests/Fixtures/presentation routes config docs/openapi contracts/app-builder contracts/flowers-journey contracts/flowers-admin-journey/responses
           cp -r "$CORE/app/Models/"*.php                  app/Models/
           cp -r "$CORE/app/Mail/"*.php                    app/Mail/ 2>/dev/null || true
+          cp -r "$CORE/app/Events/"*.php  app/Events/ 2>/dev/null || true
+          cp -r "$CORE/app/Listeners/"*.php  app/Listeners/ 2>/dev/null || true
           cp -r "$CORE/app/Contracts/"*.php                app/Contracts/
           cp -r "$CORE/app/Jobs/DocumentCenter/"*.php      app/Jobs/DocumentCenter/
           cp -r "$CORE/app/Jobs/Accounting/"*.php          app/Jobs/Accounting/

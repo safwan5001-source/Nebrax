@@ -169,4 +169,28 @@ describe("GalleryFields (CUST-HV V8f)", () => {
     fireEvent.click(screen.getByLabelText(t("galleryLightbox")));
     expect(seen.at(-1)?.options).toBeUndefined();
   });
+
+  it("the motion-controls choice is off by default, explained, and stored only when switched on", () => {
+    const seen: GalleryContent[] = [];
+    render(<Harness initial={{ images: [image("a"), image("b")] }} onContent={(c) => seen.push(c)} />);
+    const toggle = screen.getByLabelText(t("galleryShowMotionControls")) as HTMLInputElement;
+    expect(toggle.checked).toBe(false);
+    const options = document.querySelector("[data-gallery-options]") as HTMLElement;
+    expect(options.querySelector("[data-gallery-motion-hint]")?.textContent).toBe(t("galleryShowMotionControlsHint"));
+    fireEvent.click(toggle);
+    expect(seen.at(-1)?.options).toEqual({ showMotionControls: true });
+    fireEvent.click(toggle);
+    expect(seen.at(-1)?.options).toBeUndefined();
+  });
+
+  it("AR and EN carry the choice and the WCAG explanation, and the publish-error wording names the gallery", () => {
+    for (const key of ["galleryShowMotionControls", "galleryShowMotionControlsHint"] as const) {
+      expect(customizerMessage("ar", key)).not.toBe(customizerMessage("en", key));
+      expect(customizerMessage("ar", key).length).toBeGreaterThan(10);
+    }
+    expect(customizerMessage("ar", "galleryShowMotionControlsHint")).toContain("WCAG 2.2.2");
+    expect(customizerMessage("en", "galleryShowMotionControlsHint")).toContain("WCAG 2.2.2");
+    expect(customizerMessage("ar", "mediaIssue_animated_not_allowed_here")).toContain("معرض الصور");
+    expect(customizerMessage("en", "mediaIssue_animated_not_allowed_here")).toContain("gallery");
+  });
 });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { ArrowRight, Banknote, CalendarClock, Check, Landmark, Loader2, TriangleAlert, User } from 'lucide-react';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
@@ -8,6 +8,9 @@ import type { PosCheckoutPhase } from '@/lib/pos-checkout-attempt';
 import { PosNumericEditor } from '@/components/pos/pos-numeric-editor';
 import { orderedTenderPayload, simulateTenders, type PosTenderInput } from '@/lib/pos-payment-tender';
 import { PosDeliveryPlatformPicker, type PosDeliveryPlatformOption } from '@/components/pos/pos-delivery-platform-picker';
+import { PosTerminalPay, amountToMinor, usePosTerminals } from '@/components/pos/pos-terminal-pay';
+import { api } from '@/lib/api';
+import { holdsPayment, isApproved, isPending, needsCompensation, type PosTerminalRequest } from '@/modules/pos-terminals/contract';
 
 export interface PaymentSummaryItem { name: string; qty: number; unitPrice: string; lineTotal: number }
 export interface PosPaymentMethod {
@@ -17,8 +20,13 @@ export interface PosPaymentMethod {
   settlement_type: 'cash' | 'bank';
   is_active: boolean;
   is_default: boolean;
+  /** H6-02: الوسيلة تشترط موافقة مؤكدة من جهاز الدفع (الخادم يفرضه أيضاً). */
+  pos_terminal_required?: boolean;
 }
-export interface PosTender { payment_method_id: string; amount: number }
+export interface PosTender { payment_method_id: string; amount: number; terminal_request_id?: string }
+
+/** سياق جهاز الدفع: غيابه = لا زر جهاز ولا اشتراط (سلوك ما قبل H6-02 حرفياً). */
+export interface PosTerminalContext { sessionId: string; posDeviceId: string | null }
 
 /** شاشة الدفع: وسائل مهيأة للمؤسسة + آجل محكوم بإعداد POS. */
 export function PosPayment({
@@ -46,6 +54,7 @@ export function PosPayment({
   onSelectDeliveryPlatform,
   externalOrderReference = '',
   onExternalOrderReference,
+  terminalContext,
 }: {
   subMinor?: number;
   discMinor?: number;
@@ -80,11 +89,33 @@ export function PosPayment({
   onSelectDeliveryPlatform?: (id: string | null) => void;
   externalOrderReference?: string;
   onExternalOrderReference?: (value: string) => void;
+  terminalContext?: PosTerminalContext;
 }) {
   const t = useTranslations('pos');
   const locale = useLocale();
   const [tenders, setTenders] = useState<Record<string, string>>({});
   const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
+  const [terminalRequests, setTerminalRequests] = useState<Record<string, PosTerminalRequest>>({});
+  const terminalsState = usePosTerminals(Boolean(terminalContext));
+  const setMethodRequest = useCallback((methodId: string, next: PosTerminalRequest | null) => {
+    setTerminalRequests((current) => {
+      const copy = { ...current };
+      if (next) copy[methodId] = next; else delete copy[methodId];
+      return copy;
+    });
+  }, []);
+  const terminalHold = Object.values(terminalRequests).some((request) => holdsPayment(request.status));
+  // فشل البيع بعد موافقة ⇒ الخادم يلغيها تلقائياً: أعد قراءة حالتها كي لا تبقى «موافَقاً عليها» في الشاشة.
+  useEffect(() => {
+    if (!error) return;
+    Object.values(terminalRequests).filter((request) => isApproved(request.status)).forEach((request) => {
+      api<{ data: PosTerminalRequest }>(`/pos/terminal-requests/${request.id}`)
+        .then((res) => setMethodRequest(request.payment_method_id, res.data))
+        .catch(() => {});
+    });
+    // يُعاد فقط عند ظهور خطأ جديد؛ الطلبات الحالية تُقرأ من آخر تصيير.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [error]);
 
   const resolvedDefaultId = useMemo(() => {
     const configured = paymentMethods.find((method) => method.id === defaultPaymentMethodId);
@@ -98,6 +129,7 @@ export function PosPayment({
 
   const set = (id: string, value: string) => {
     if (paying || checkoutPhase === 'submitting' || checkoutPhase === 'recovering' || offline) return;
+    if (terminalRequests[id] && holdsPayment(terminalRequests[id].status)) return; // المبلغ مقفل على طلب الجهاز
     setSelectedMethodId(id);
     setTenders((current) => ({ ...current, [id]: value }));
   };
@@ -122,8 +154,17 @@ export function PosPayment({
   const selectedPlatform = deliveryPlatforms.find((platform) => platform.id === selectedDeliveryPlatformId) ?? null;
   const platformCollected = selectedPlatform?.collection_mode === 'platform_collected';
   const referenceOk = selectedPlatform?.external_reference_policy !== 'required' || externalOrderReference.trim() !== '';
+  // H6-02: طلب جهاز معلّق/بحاجة تعويض يمنع التأكيد؛ الموافقة يجب أن تطابق مبلغ الوسيلة؛ والوسيلة التي تشترط الجهاز لا تُؤكَّد بلا موافقة.
+  const terminalOk = !terminalContext || paymentMethods.every((method) => {
+    const request = terminalRequests[method.id];
+    const amount = riyalToMinor(tenders[method.id] ?? '');
+    if (request && (isPending(request.status) || needsCompensation(request.status))) return false;
+    if (request && isApproved(request.status)) return amount === amountToMinor(request.amount);
+    return !(method.pos_terminal_required && amount > 0);
+  });
   const canConfirm = totalMinor > 0
     && referenceOk
+    && (platformCollected || terminalOk)
     && (platformCollected
       ? true
       : !paymentMethodsLoadError
@@ -132,6 +173,8 @@ export function PosPayment({
         && (allowDeferredPayment || remainingMinor <= 0));
   const selectedMethod = paymentMethods.find((method) => method.id === selectedMethodId) ?? null;
   const locked = paying || offline || checkoutPhase === 'submitting' || checkoutPhase === 'recovering';
+  const selectedRequest = selectedMethod ? terminalRequests[selectedMethod.id] : undefined;
+  const amountLocked = Boolean(selectedRequest && holdsPayment(selectedRequest.status));
 
   function label(method: PosPaymentMethod): string {
     return locale === 'en' ? method.name_en || method.name : method.name;
@@ -148,7 +191,12 @@ export function PosPayment({
   const quick = [quickBase, 50, 100, 200, 500];
 
   function tenderPayload(): PosTender[] {
-    return orderedTenderPayload(tenderInputs).map((tender) => ({ payment_method_id: tender.payment_method_id, amount: tender.amount }));
+    return orderedTenderPayload(tenderInputs).map((tender) => {
+      const request = terminalRequests[tender.payment_method_id];
+      return request && isApproved(request.status)
+        ? { payment_method_id: tender.payment_method_id, amount: tender.amount, terminal_request_id: request.id }
+        : { payment_method_id: tender.payment_method_id, amount: tender.amount };
+    });
   }
 
   function confirmLabel(): string {
@@ -167,7 +215,8 @@ export function PosPayment({
         <button
           type="button"
           onClick={onBack}
-          disabled={locked}
+          disabled={locked || terminalHold}
+          title={terminalHold ? t('terminal_hold_back') : undefined}
           className="flex min-h-11 items-center gap-2 rounded-lg border border-border px-3 text-[13px] font-semibold text-text touch-manipulation hover:bg-background focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:opacity-50"
         >
           <ArrowRight className="h-4 w-4" strokeWidth={2} />
@@ -292,7 +341,7 @@ export function PosPayment({
                 <PosNumericEditor
                   allowDecimal
                   className="min-h-14 w-full text-2xl font-bold"
-                  disabled={locked}
+                  disabled={locked || amountLocked}
                   inputAriaLabel={label(selectedMethod)}
                   keyClassName="min-h-14"
                   labels={numericEditorLabels}
@@ -307,7 +356,7 @@ export function PosPayment({
                   value={tenders[selectedMethod.id] ?? ''}
                   onChange={(event) => set(selectedMethod.id, event.target.value)}
                   inputMode="decimal"
-                  disabled={locked}
+                  disabled={locked || amountLocked}
                   placeholder="0.00"
                   className="num min-h-14 w-full rounded-md border border-border bg-background px-3 text-center text-2xl font-bold text-text outline-none focus:border-primary focus:bg-surface focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50"
                 />
@@ -316,6 +365,22 @@ export function PosPayment({
                 <p className="mt-1.5 text-[11px] font-semibold text-negative" role="alert" data-testid="pos-payment-method-invalid">
                   {t('payment_bank_amount_exceeds_remaining')}
                 </p>
+              )}
+              {terminalContext && selectedMethod.settlement_type === 'bank' && (
+                <div className="mt-3">
+                  <PosTerminalPay
+                    sessionId={terminalContext.sessionId}
+                    posDeviceId={terminalContext.posDeviceId}
+                    methodId={selectedMethod.id}
+                    amountMinor={riyalToMinor(tenders[selectedMethod.id] ?? '')}
+                    maxMinor={remainingForMethod(selectedMethod.id)}
+                    required={Boolean(selectedMethod.pos_terminal_required)}
+                    disabled={locked}
+                    terminalsState={terminalsState}
+                    request={terminalRequests[selectedMethod.id] ?? null}
+                    onRequest={setMethodRequest}
+                  />
+                </div>
               )}
             </div>
           )}
@@ -345,7 +410,7 @@ export function PosPayment({
                   key={index}
                   type="button"
                   onClick={() => selectedMethod && set(selectedMethod.id, amount.toFixed(2))}
-                  disabled={!selectedMethod || locked}
+                  disabled={!selectedMethod || locked || amountLocked}
                   className={
                     'num min-h-11 rounded-lg border px-2 py-2 text-[13px] font-bold touch-manipulation focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 ' +
                     (index === 0 ? 'col-span-2 sm:col-auto ' : '') +

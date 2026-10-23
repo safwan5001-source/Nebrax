@@ -30,10 +30,11 @@ class StorefrontMediaPublishGate
 
     /**
      * AWJ-ANIMATED-MEDIA P1 — المواضع التي يُصيِّر المتجر فيها الحركة فعلاً: خلفية قسم (hero/banner) وصور شرائح
-     * السلايدر. في أي موضعٍ آخر (شعار، معرض، كتل محتوى…) ستظهر صورةً ثابتة بصمت، فنرفضها عند النشر برمزٍ صريح
+     * السلايدر وصور المعرض `gallery` (`content.images.N.media`، الصورة المصغّرة والعارض المكبّر كلاهما، مع مهلة التشغيل
+     * أو زرّ الإيقاف حسب `options.showMotionControls`). في أي موضعٍ آخر (شعار، كتل محتوى…) ستظهر صورةً ثابتة بصمت، فنرفضها عند النشر برمزٍ صريح
      * بدل خداع التاجر. (المسارات كما يفتاحها الماسح: `homepage.sections.N.…`).
      */
-    private const ANIMATED_ALLOWED_PATH = '/\Ahomepage\.sections\.\d+\.(?:design\.background\.(?:media|mobile)|content\.slides\.\d+\.(?:media|mobile))\z/';
+    private const ANIMATED_ALLOWED_PATH = '/\Ahomepage\.sections\.\d+\.(?:design\.background\.(?:media|mobile)|content\.slides\.\d+\.(?:media|mobile)|content\.images\.\d+\.media)\z/';
 
     /**
      * P3-A-03 — the global background is a still-only consumer. An animated
@@ -84,7 +85,7 @@ class StorefrontMediaPublishGate
             if ($asset->isAnimated()
                 && preg_match(self::ANIMATED_ALLOWED_PATH, $path) !== 1
                 && preg_match(self::GLOBAL_STILL_ONLY_PATH, $path) !== 1) {
-                $errors["{$path}.mediaId"] = ['code' => 'animated_not_allowed_here', 'message' => 'الصور المتحركة تُعرض في خلفيات الأقسام وشرائح السلايدر فقط. اختر صورة ثابتة لهذا الموضع.'];
+                $errors["{$path}.mediaId"] = ['code' => 'animated_not_allowed_here', 'message' => 'الصور المتحركة تُعرض في خلفيات الأقسام وشرائح السلايدر ومعرض الصور فقط. اختر صورة ثابتة لهذا الموضع.'];
 
                 continue;
             }

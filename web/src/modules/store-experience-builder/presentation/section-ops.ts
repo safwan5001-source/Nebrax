@@ -28,13 +28,21 @@ export function legacyHeroContent(homepage: { heroHeadline: string; heroSubheadl
   };
 }
 
-/** A hero is "authored" once it says something — an explicit empty headline is not content to lose. */
+/**
+ * A hero is "authored" once it says something — an explicit empty headline is not content to lose. A display choice is a merchant
+ * edit too (AWJ-HERO-DISPLAY): hiding the title / description / buttons, or linking the picture, is worth a delete confirmation
+ * even while the text fields are still empty.
+ */
 export function isHeroAuthored(content: HeroContent | undefined): boolean {
   if (!content) return false;
   return (
     content.headline.trim() !== "" ||
     (content.subheadline ?? "").trim() !== "" ||
-    (content.ctas?.length ?? 0) > 0
+    (content.ctas?.length ?? 0) > 0 ||
+    content.showTitle === false ||
+    content.showSubheadline === false ||
+    content.showCtas === false ||
+    (content.imageHref ?? "").trim() !== ""
   );
 }
 

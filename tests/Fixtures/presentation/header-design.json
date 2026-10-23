@@ -48,6 +48,12 @@
     {"name": "sticky: on-scroll-up is a valid choice (V7c-1)", "input": {"sticky": "on-scroll-up", "height": "compact"}, "expected": {"height": "compact", "sticky": "on-scroll-up"}},
     {"name": "mode: overlay-hero and solid are the only modes (V7c-2); transparent stays rejected", "input": {"mode": "overlay-hero", "sticky": "off"}, "expected": {"mode": "overlay-hero", "sticky": "off"}},
     {"name": "mode: solid is a real choice", "input": {"mode": "solid"}, "expected": {"mode": "solid"}},
-    {"name": "mode: transparent is dropped on its own", "input": {"mode": "transparent", "shadow": "soft"}, "expected": {"shadow": "soft"}}
+    {"name": "mode: transparent is dropped on its own", "input": {"mode": "transparent", "shadow": "soft"}, "expected": {"shadow": "soft"}},
+    {"name": "AWJ-HEADER-OVERLAY-TONE: dark is kept with overlay-hero, canonical order (mode, overlayTone, sticky)", "input": {"sticky": "off", "overlayTone": "dark", "mode": "overlay-hero"}, "expected": {"mode": "overlay-hero", "overlayTone": "dark", "sticky": "off"}},
+    {"name": "AWJ-HEADER-OVERLAY-TONE: light is kept with overlay-hero", "input": {"mode": "overlay-hero", "overlayTone": "light"}, "expected": {"mode": "overlay-hero", "overlayTone": "light"}},
+    {"name": "AWJ-HEADER-OVERLAY-TONE: without overlay-hero the tone is inert and dropped (solid mode)", "input": {"mode": "solid", "overlayTone": "dark", "shadow": "soft"}, "expected": {"mode": "solid", "shadow": "soft"}},
+    {"name": "AWJ-HEADER-OVERLAY-TONE: no mode at all drops the tone", "input": {"overlayTone": "light", "shadow": "soft"}, "expected": {"shadow": "soft"}},
+    {"name": "AWJ-HEADER-OVERLAY-TONE: an invalid tone (auto) is dropped on its own", "input": {"mode": "overlay-hero", "overlayTone": "auto"}, "expected": {"mode": "overlay-hero"}},
+    {"name": "AWJ-HEADER-OVERLAY-TONE: a colour object or non-string tone is dropped", "input": {"mode": "overlay-hero", "overlayTone": {"hex": "#ffffff"}}, "expected": {"mode": "overlay-hero"}}
   ]
 }

@@ -269,3 +269,61 @@ describe("header chrome CSS is one rule set in both stylesheets", () => {
     expect(norm(pv)).toBe(norm(sf));
   });
 });
+
+describe("Header overlay tone control (AWJ-HEADER-OVERLAY-TONE)", () => {
+  function setup(config: StorefrontPresentationConfig, onChange = vi.fn()) {
+    render(<ControlPanels panel="header" config={config} locale="en" liveStoreName={null} onChange={onChange} />);
+    return onChange;
+  }
+  const tone = () => document.querySelector("[data-header-design='overlay-tone']") as HTMLSelectElement | null;
+  const lastDesign = (onChange: ReturnType<typeof vi.fn>) =>
+    (onChange.mock.calls.at(-1)?.[0] as StorefrontPresentationConfig).header.design;
+
+  it("is hidden until the header is transparent over the hero", () => {
+    setup(DEFAULT_PRESENTATION_CONFIG);
+    expect(tone()).toBeNull();
+    cleanup();
+    setup(withDesign({ mode: "solid" }));
+    expect(tone()).toBeNull();
+  });
+
+  it("offers Automatic / light / dark text, starting on Automatic, and explains the fail-closed rule", () => {
+    setup(withDesign({ mode: "overlay-hero" }));
+    expect([...(tone()?.options ?? [])].map((o) => o.value)).toEqual(["", "light", "dark"]);
+    expect(tone()?.value).toBe("");
+    expect(document.querySelector("[data-header-overlay-tone-hint]")?.textContent).toMatch(/stays solid/);
+  });
+
+  it("writes the tone beside the mode; Automatic removes it again", async () => {
+    const user = userEvent.setup();
+    const onChange = setup(withDesign({ mode: "overlay-hero" }));
+    await user.selectOptions(tone() as HTMLSelectElement, "dark");
+    expect(lastDesign(onChange)).toEqual({ mode: "overlay-hero", overlayTone: "dark" });
+    cleanup();
+    const again = setup(withDesign({ mode: "overlay-hero", overlayTone: "dark" }));
+    expect(tone()?.value).toBe("dark");
+    await user.selectOptions(tone() as HTMLSelectElement, "");
+    expect(lastDesign(again)).toEqual({ mode: "overlay-hero" });
+  });
+
+  it("leaving the transparent mode drops the tone — nothing inert is kept", async () => {
+    const user = userEvent.setup();
+    const onChange = setup(withDesign({ mode: "overlay-hero", overlayTone: "light" }));
+    await user.selectOptions(document.querySelector("[data-header-design='mode']") as HTMLSelectElement, "solid");
+    expect(lastDesign(onChange)).toEqual({ mode: "solid" });
+  });
+
+  it("has AR and EN copy for every new key", async () => {
+    const { CUSTOMIZER_MESSAGES } = await import("../messages");
+    for (const key of [
+      "headerOverlayTone",
+      "headerOverlayToneAuto",
+      "headerOverlayToneLight",
+      "headerOverlayToneDark",
+      "headerOverlayToneHint",
+    ] as const) {
+      expect(CUSTOMIZER_MESSAGES.ar[key]).toBeTruthy();
+      expect(CUSTOMIZER_MESSAGES.en[key]).toBeTruthy();
+    }
+  });
+});

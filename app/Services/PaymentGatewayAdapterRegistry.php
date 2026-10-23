@@ -3,10 +3,11 @@
 namespace App\Services;
 
 use App\Contracts\GatewayAdapter;
+use App\Contracts\VerifiesGatewayCredentials;
 use App\Support\PaymentOrchestrationException;
 
 /**
- * يحلّ محوّل المزوّد من مفتاحه. المحوّلات الحقيقية تُضاف إلى `ADAPTERS` مع شرائحها (H2-01 وما بعدها)؛ لا مزوّد بلا محوّل.
+ * يحلّ محوّل المزوّد من مفتاحه. المحوّلات الحقيقية تُضاف إلى `ADAPTERS` مع شرائحها (Moyasar: H2-01a؛ ما بعده H2-04)؛ لا مزوّد بلا محوّل.
  *
  * `FakePaymentGatewayAdapter` للاختبار والتطوير المحلي فقط: لا يُحلّ في أي بيئة غير `local`/`testing`، ولا يُقبل
  * اتصال بمزوّد `fake` من واجهة الإدارة (خارج `PaymentGateway::PROVIDERS`).
@@ -14,7 +15,9 @@ use App\Support\PaymentOrchestrationException;
 final class PaymentGatewayAdapterRegistry
 {
     /** @var array<string, class-string<GatewayAdapter>> */
-    private const ADAPTERS = [];
+    private const ADAPTERS = [
+        MoyasarAdapter::PROVIDER => MoyasarAdapter::class,
+    ];
 
     public function has(string $provider): bool
     {
@@ -29,6 +32,18 @@ final class PaymentGatewayAdapterRegistry
         }
 
         return app($class);
+    }
+
+    /** محوّل المزوّد إن كان يدعم التحقق من بيانات الاعتماد، وإلا `null`. */
+    public function verifier(string $provider): ?VerifiesGatewayCredentials
+    {
+        $class = $this->classFor($provider);
+        if ($class === null) {
+            return null;
+        }
+        $adapter = app($class);
+
+        return $adapter instanceof VerifiesGatewayCredentials ? $adapter : null;
     }
 
     /** @return class-string<GatewayAdapter>|null */

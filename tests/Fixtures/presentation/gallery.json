@@ -1337,7 +1337,8 @@
                     "aspect": "1:1",
                     "gap": "md",
                     "captions": false,
-                    "lightbox": false
+                    "lightbox": false,
+                    "showMotionControls": false
                 }
             },
             "expected": {
@@ -2158,6 +2159,174 @@
                     "gap": "lg",
                     "captions": true,
                     "lightbox": true
+                }
+            }
+        },
+        {
+            "name": "showMotionControls true",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "showMotionControls": true
+                }
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "showMotionControls": true
+                }
+            }
+        },
+        {
+            "name": "showMotionControls must be exactly true",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "showMotionControls": "yes"
+                }
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "showMotionControls 1 and null never opt in",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "showMotionControls": 1
+                }
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "options canonical order with motion controls last",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "showMotionControls": true,
+                    "lightbox": true,
+                    "captions": true,
+                    "gap": "lg",
+                    "aspect": "4:3",
+                    "columns": 6
+                }
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "columns": 6,
+                    "aspect": "4:3",
+                    "gap": "lg",
+                    "captions": true,
+                    "lightbox": true,
+                    "showMotionControls": true
                 }
             }
         },

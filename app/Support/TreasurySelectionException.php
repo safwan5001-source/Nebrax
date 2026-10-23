@@ -33,11 +33,23 @@ final class TreasurySelectionException extends RuntimeException
     public const NOT_PERMITTED = 'not_permitted';
     /** عملة الخزينة لا تطابق عملة المستند/المستأجر — يرميه المستدعي (T4)، لا المحلِّل. */
     public const CURRENCY_MISMATCH = 'currency_mismatch';
+    /** استرداد نقدي مباشر بلا فاتورة نقدية مرحَّلة مصدراً (مستقل أو آجل) — T5/D-T5-2، يرميه المستدعي لا المحلِّل. */
+    public const REFUND_SOURCE_REQUIRED = 'refund_source_required';
+    /** خزينة التحصيل الأصلية في قيد البيع غير محددة بلا غموض (لا واحدة أو أكثر من واحدة) — T5/D-T5-1. */
+    public const SOURCE_TREASURY_UNRESOLVED = 'source_treasury_unresolved';
+
+    /** جلسة POS بلا خزينة مثبَّتة (جلسة قديمة) — T6/D-T6-1، يرميه المستدعي لا المحلِّل. */
+    public const SESSION_TREASURY_REQUIRED = 'session_treasury_required';
+    /** خزينة التحصيل النقدي الأصلية لا تطابق خزينة الجلسة التي سيُصرف منها الردّ — T6، لا صرف عبر خزائن بلا سياسة صريحة. */
+    public const REFUND_TREASURY_MISMATCH = 'refund_treasury_mismatch';
 
     private function __construct(
         public readonly string $reason,
         string $message,
-    ) {}
+    ) {
+        // الرسالة تصل المستدعي (ApiController::domain ⇒ 422 برسالة مقروءة) — بدونها كانت كل حالات الرفض تعود بنص فارغ.
+        parent::__construct($message);
+    }
 
     public static function for(string $reason): self
     {
@@ -53,6 +65,10 @@ final class TreasurySelectionException extends RuntimeException
             self::EXPLICIT_REQUIRED => 'يجب اختيار الخزينة أو الحساب البنكي صراحةً.',
             self::NOT_PERMITTED => 'لا تملك صلاحية العملية على هذه الخزينة أو الحساب البنكي.',
             self::CURRENCY_MISMATCH => 'عملة الخزينة أو الحساب البنكي لا تطابق عملة المؤسسة؛ لا تُحوَّل المبالغ تلقائياً. اختر خزينة بعملة المؤسسة.',
+            self::REFUND_SOURCE_REQUIRED => 'الاسترداد النقدي المباشر متاح فقط لمستند مرتبط بفاتورة نقدية مرحَّلة. للمستند المستقل أو المرتبط بفاتورة آجلة أنشئ مستنداً آجلاً (رصيداً للعميل) ثم سند صرف من الخزينة المناسبة.',
+            self::SESSION_TREASURY_REQUIRED => 'جلسة نقطة البيع لا تحمل خزينة مثبتة (جلسة قديمة)؛ لا يمكن ردّ نقد منها. افتح جلسة جديدة أو أنشئ رصيداً للعميل ثم سند صرف.',
+            self::REFUND_TREASURY_MISMATCH => 'لا يمكن ردّ النقد من خزينة الجلسة: الفاتورة المصدر حُصِّلت نقداً في خزينة مختلفة، ولا توجد سياسة تسمح بالصرف عبر خزائن. أنشئ رصيداً للعميل ثم سند صرف من خزينة التحصيل.',
+            self::SOURCE_TREASURY_UNRESOLVED => 'تعذّر تحديد خزينة التحصيل الأصلية بلا غموض (يلزم خزينة نقدية واحدة في قيد البيع). أنشئ إشعاراً آجلاً ثم سند صرف من الخزينة المناسبة.',
         });
     }
 }

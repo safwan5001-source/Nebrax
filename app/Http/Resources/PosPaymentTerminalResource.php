@@ -14,6 +14,7 @@ class PosPaymentTerminalResource extends JsonResource
             'name' => $this->name,
             'code' => $this->code,
             'provider' => $this->provider,
+            'simulated' => \App\Services\PosTerminalAdapterRegistry::isSimulated((string) $this->provider),
             'pos_device_id' => $this->pos_device_id,
             'is_active' => $this->is_active,
             'created_at' => $this->created_at?->toISOString(),

@@ -37,6 +37,12 @@ class PosTerminalService
 
     // ═══════════════ الأجهزة ═══════════════
 
+    /** @return list<string> */
+    public function availableProviders(): array
+    {
+        return $this->adapters->availableProviders();
+    }
+
     public function assertProviderAvailable(string $provider): void
     {
         if (! $this->adapters->has($provider)) {

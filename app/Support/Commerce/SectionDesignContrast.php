@@ -195,18 +195,39 @@ final class SectionDesignContrast
     }
 
     /**
+     * AWJ-HERO-DISPLAY — بطلٌ أخفى التاجر عنوانه ووصفه وأزراره معاً (صورة فقط). توأم TS `isTextlessSection`.
+     *
+     * @param  array<string,mixed>  $section
+     */
+    public static function isTextlessHero(array $section): bool
+    {
+        $content = $section['content'] ?? null;
+
+        return ($section['type'] ?? null) === 'hero'
+            && is_array($content)
+            && ($content['showTitle'] ?? null) === false
+            && ($content['showSubheadline'] ?? null) === false
+            && ($content['showCtas'] ?? null) === false;
+    }
+
+    /**
      * أخطاء النشر لتصميم قسمٍ واحد. المفتاح هو الحقل الذي يصلحه التاجر.
      *
      * @param  array<string,mixed>  $design
      * @param  array<string,mixed>  $config
      * @return list<array{field:string,code:string,ratio:float}>
      */
-    public static function issues(array $design, array $config, ?string $type = null, ?\Closure $media = null): array
+    public static function issues(array $design, array $config, ?string $type = null, ?\Closure $media = null, bool $textless = false): array
     {
         // V6b-2 — صورةٌ لا يُثبَت لمعانها (دليل غائب/قيد المعالجة/فاشل/ألفا) لا تُنشَر أيّاً كان النص:
         // الحكم «غير مُثبَت = غير مطابق»، ويُصلَح بالخلفية نفسها.
         if (($design['background']['kind'] ?? null) === 'media' && self::backgroundInterval($design, $config, $media) === null) {
             return [['field' => 'background', 'code' => 'contrast_unprovable', 'ratio' => 1.0]];
+        }
+        // AWJ-HERO-DISPLAY — بطلٌ لا يعرض عنواناً ولا وصفاً ولا زرّاً: لا نصّ فوق الصورة ليُثبَت وضوحه (دليل لمعان الصورة نفسه
+        // ما زال مطلوباً أعلاه). توأم TS: `sectionContrastIssues(..., textless)`.
+        if ($textless) {
+            return [];
         }
         $text = self::effectiveText($design, $config, $type, $media);
         if ($text['judged'] === null) {
@@ -261,7 +282,7 @@ final class SectionDesignContrast
             if (! is_array($section) || ($section['visible'] ?? false) !== true || ! is_array($section['design'] ?? null)) {
                 continue; // قسمٌ مخفي لا يُنشر فلا يُحجَب به النشر.
             }
-            foreach (self::issues($section['design'], $config, is_string($section['type'] ?? null) ? $section['type'] : null, $media) as $issue) {
+            foreach (self::issues($section['design'], $config, is_string($section['type'] ?? null) ? $section['type'] : null, $media, self::isTextlessHero($section)) as $issue) {
                 $path = $issue['field'] === 'background'
                     ? "homepage.sections[{$i}].design.background"
                     : "homepage.sections[{$i}].design.text.{$issue['field']}";

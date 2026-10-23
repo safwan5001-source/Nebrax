@@ -101,6 +101,21 @@ export const HEIGHT_PRESETS = [
   "tall",
   "screen",
 ] as const;
+/**
+ * AWJ-HERO-FULLBLEED — hero-only `mediaTreatment` fields beyond `height`: `mobileHeight` (a preset that overrides `height` below
+ * 768 px), `ratio: natural` (the hero's height follows its picture's own proportions at the section width — nothing cropped,
+ * nothing distorted, so the contrast evidence still covers every pixel) and `bleed: true` (the picture reaches both viewport
+ * edges). Absent = the default (preset height, contained card). `contain` is deliberately not offered: a frame that does not
+ * fill the box would reveal a surface the contrast evidence does not cover (see `normalizeBackgroundRef`).
+ */
+export const MEDIA_RATIOS = ["natural"] as const;
+/** The hero's `mediaTreatment` fields, in canonical output order. */
+export const HERO_MEDIA_TREATMENT = [
+  "height",
+  "mobileHeight",
+  "ratio",
+  "bleed",
+] as const;
 /** V6b-2 — background kinds every section may use; `media` is hero/banner only. */
 export const BACKGROUND_KINDS = ["solid", "gradient"] as const;
 /** V6b-2 — media overlay opacity: percent in steps of 5, capped at 90 (the picture never vanishes). */
@@ -281,6 +296,12 @@ export interface SectionMotion {
 
 export interface SectionMediaTreatment {
   height?: (typeof HEIGHT_PRESETS)[number];
+  /** AWJ-HERO-FULLBLEED — hero only: overrides `height` below 768 px. */
+  mobileHeight?: (typeof HEIGHT_PRESETS)[number];
+  /** AWJ-HERO-FULLBLEED — hero only: the height follows the picture's own proportions. */
+  ratio?: (typeof MEDIA_RATIOS)[number];
+  /** AWJ-HERO-FULLBLEED — hero only, stored only as `true`: the picture reaches both viewport edges. */
+  bleed?: true;
 }
 
 export interface SectionDesign {
@@ -350,7 +371,7 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     shadow: true,
     separator: true,
     overlap: true,
-    mediaTreatment: ["height"],
+    mediaTreatment: HERO_MEDIA_TREATMENT,
     motion: ["reveal"],
   },
   banner: {
@@ -898,13 +919,31 @@ export function normalizeSectionDesign(
     // `none` is the same as absent: the default is never stored.
     if (overlap && overlap !== "none") out.overlap = overlap;
   }
-  if (
-    capability.mediaTreatment &&
-    isRecord(raw.mediaTreatment) &&
-    allowsField(capability.mediaTreatment, "height")
-  ) {
-    const height = pick(raw.mediaTreatment.height, HEIGHT_PRESETS);
-    if (height) out.mediaTreatment = { height };
+  if (capability.mediaTreatment && isRecord(raw.mediaTreatment)) {
+    const treatment: SectionMediaTreatment = {};
+    if (allowsField(capability.mediaTreatment, "height")) {
+      const height = pick(raw.mediaTreatment.height, HEIGHT_PRESETS);
+      if (height) treatment.height = height;
+    }
+    if (allowsField(capability.mediaTreatment, "mobileHeight")) {
+      const mobileHeight = pick(
+        raw.mediaTreatment.mobileHeight,
+        HEIGHT_PRESETS,
+      );
+      if (mobileHeight) treatment.mobileHeight = mobileHeight;
+    }
+    if (allowsField(capability.mediaTreatment, "ratio")) {
+      const ratio = pick(raw.mediaTreatment.ratio, MEDIA_RATIOS);
+      if (ratio) treatment.ratio = ratio;
+    }
+    // Stored only as `true` (absent = contained): any other value drops the key.
+    if (
+      allowsField(capability.mediaTreatment, "bleed") &&
+      raw.mediaTreatment.bleed === true
+    ) {
+      treatment.bleed = true;
+    }
+    if (Object.keys(treatment).length > 0) out.mediaTreatment = treatment;
   }
   if (capability.motion && isRecord(raw.motion)) {
     const reveal = pick(raw.motion.reveal, REVEALS);

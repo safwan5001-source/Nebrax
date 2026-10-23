@@ -545,22 +545,22 @@ class StorefrontAnimatedMediaTest extends TestCase
 
         $codes = static fn (array $doc): array => array_map(static fn (array $e): string => $e['code'], $gate->errors($doc));
 
-        // مسموح: خلفية قسم (سطح مكتب/جوال) وشريحة سلايدر (سطح مكتب/جوال).
+        // مسموح: خلفية قسم (سطح مكتب/جوال) وشريحة سلايدر (سطح مكتب/جوال) وصورة معرض (التفاصيل في StorefrontGalleryAnimatedMediaTest).
         $this->assertSame([], $codes(['homepage' => ['sections' => [['design' => ['background' => ['media' => $ref, 'mobile' => $ref]]]]]]));
         $sliderDoc = ['homepage' => ['sections' => [[
             'content' => ['slides' => [['media' => $ref, 'mobile' => $ref]]],
         ]]]];
         $this->assertSame([], $codes($sliderDoc));
+        $this->assertSame([], $codes(['homepage' => ['sections' => [['content' => ['images' => [['media' => $ref]]]]]]]));
 
         // الخلفية العامة مستهلك still-only: جاهزية سلّم الإطار الأول تكفي،
         // ولا يُسمح لمسار الحركة بالخروج من بوابة الجاهزية.
         $this->assertSame([], $codes(['background' => ['kind' => 'media', 'media' => $ref, 'mobile' => $ref]]));
 
-        // مرفوض بوضوح: شعار، معرض، كتلة محتوى — سيظهر ثابتاً بصمت.
+        // مرفوض بوضوح: شعار، كتلة محتوى — سيظهر ثابتاً بصمت.
         $denied = 'animated_not_allowed_here';
         $this->assertSame(['branding.logoMedia.mediaId' => $denied], $codes(['branding' => ['logoMedia' => $ref]]));
         $this->assertSame(['branding.faviconMedia.mediaId' => $denied], $codes(['branding' => ['faviconMedia' => $ref]]));
-        $this->assertSame(['homepage.sections.0.content.images.0.media.mediaId' => $denied], $codes(['homepage' => ['sections' => [['content' => ['images' => [['media' => $ref]]]]]]]));
         $this->assertSame(['homepage.sections.0.content.blocks.0.media.mediaId' => $denied], $codes(['homepage' => ['sections' => [['content' => ['blocks' => [['media' => $ref]]]]]]]));
 
         // الصورة الثابتة لا تتأثر بالقاعدة في أي موضع.

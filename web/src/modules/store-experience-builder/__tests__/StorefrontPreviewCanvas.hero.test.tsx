@@ -216,3 +216,43 @@ describe("Canvas CTA colour (CUST-HV V6c-6)", () => {
     expect(a.getAttribute("style")).toBeNull();
   });
 });
+
+describe("Canvas hero display options (AWJ-HERO-DISPLAY)", () => {
+  const hero = (content: object) =>
+    canvas([{ id: "hero", type: "hero", visible: true, content: { headline: "Welcome", subheadline: "Line", ctas: [{ label: "Go", href: "/go" }], ...content } as never }]);
+
+  it("shows every part by default, exactly as before", () => {
+    const c = hero({});
+    const h = c.querySelector("[data-preview-hero-heading]");
+    expect(h?.className).not.toContain("sr-only");
+    expect(c.textContent).toContain("Line");
+    expect(c.querySelector("[data-preview-hero-cta]")).toBeTruthy();
+  });
+
+  it("image only: no visible title, description or button, no content box, the heading kept sr-only", () => {
+    const c = hero({ showTitle: false, showSubheadline: false, showCtas: false });
+    const section = c.querySelector('section[aria-label="Hero"]') as HTMLElement;
+    const h = section.querySelector("[data-preview-hero-heading]");
+    expect(h?.tagName).toBe("H1");
+    expect(h?.className).toContain("sr-only");
+    expect(section.querySelector("[data-section-content]")).toBeNull();
+    expect(section.querySelector("p")).toBeNull();
+    expect(section.querySelector("[data-preview-hero-cta]")).toBeNull();
+    expect(homeH1(c)).toHaveLength(1);
+  });
+
+  it("each part hides on its own, and hiding the buttons also hides the default 'shop now'", () => {
+    expect(hero({ showSubheadline: false }).textContent).not.toContain("Line");
+    expect(hero({ showCtas: false }).querySelector("[data-preview-hero-cta]")).toBeNull();
+    const noButtons = hero({ ctas: undefined, showCtas: false });
+    expect(noButtons.textContent).not.toContain("Shop now");
+    const title = hero({ showTitle: false });
+    expect(title.querySelector("[data-section-content] [data-preview-hero-heading]")).toBeNull();
+    expect(title.textContent).toContain("Line");
+  });
+
+  it("a picture link is only marked while a picture really renders", () => {
+    expect(hero({ imageHref: "/sale" }).querySelector("[data-preview-hero-image-link]")).toBeNull();
+  });
+});
+

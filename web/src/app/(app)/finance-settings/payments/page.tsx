@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
-import { ArrowRight, CreditCard, History, KeyRound, Pause, Pencil, Play, Plus, ShieldOff, Trash2 } from 'lucide-react';
+import { ArrowRight, CreditCard, History, KeyRound, Pause, Pencil, Play, Plus, ShieldCheck, ShieldOff, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +14,8 @@ import { api } from '@/lib/api';
 import { formatDateTime } from '@/lib/formatting';
 import { isDemo } from '@/lib/demo';
 import { useCan } from '@/lib/use-can';
+import { PaymentBrandMark } from '@/components/payments/payment-brand-mark';
+import { gatewayProviderBrand } from '@/lib/payment-brand-registry';
 import { ConnectionFormDialog } from '@/modules/payments/gateways/connection-form-dialog';
 import {
   MANAGE_PERMISSION,
@@ -102,6 +104,20 @@ export default function PaymentGatewaysPage() {
     }
   }
 
+  /** التحقق قراءة آمنة لدى المزوّد (لا أثر مالي) فلا يحتاج تأكيداً؛ النتيجة تُعرض فوراً وسجل الاتصال يحفظ المحاولة. */
+  async function verify(connection: GatewayConnection) {
+    setBusy(connection.id);
+    try {
+      const response = await api<{ data: GatewayConnection }>(`/payment-gateways/${connection.id}/verify`, { method: 'POST', body: {} });
+      upsert(response.data);
+      success(t('done.verify'));
+    } catch (err) {
+      failure(err, t('actionFailed'));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function remove(connection: GatewayConnection) {
     if (!(await askConfirm({ message: t('confirm.delete', { name: gatewayDisplayName(connection, locale) }), tone: 'danger' }))) return;
     setBusy(connection.id);
@@ -123,6 +139,7 @@ export default function PaymentGatewaysPage() {
       case 'revoke': return setRevoking(connection);
       case 'events': return setViewingEvents(connection);
       case 'delete': return void remove(connection);
+      case 'verify': return void verify(connection);
       default: return void transition(connection, action);
     }
   }
@@ -133,7 +150,7 @@ export default function PaymentGatewaysPage() {
     const blocked = activationBlock(connection);
     const disabled = busy === connection.id;
     const icons: Record<GatewayAction, typeof Pencil> = {
-      edit: Pencil, rotate: KeyRound, activate: Play, suspend: Pause, revoke: ShieldOff, delete: Trash2, events: History,
+      edit: Pencil, rotate: KeyRound, verify: ShieldCheck, activate: Play, suspend: Pause, revoke: ShieldOff, delete: Trash2, events: History,
     };
 
     return (
@@ -223,9 +240,15 @@ export default function PaymentGatewaysPage() {
               {connections.map((connection) => (
                 <li key={connection.id} className="rounded-md border border-border p-4" data-testid={`pg-item-${connection.id}`}>
                   <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <h2 className="font-medium text-text">{gatewayDisplayName(connection, locale)}</h2>
-                      <p className="mt-0.5 text-xs text-muted">{t(`providers.${connection.provider}`)}</p>
+                    <div className="flex min-w-0 items-start gap-3">
+                      {(() => {
+                        const brand = gatewayProviderBrand(connection.provider);
+                        return brand ? <PaymentBrandMark brand={brand} withIcon className="mt-0.5" /> : null;
+                      })()}
+                      <div className="min-w-0">
+                        <h2 className="font-medium text-text">{gatewayDisplayName(connection, locale)}</h2>
+                        <p className="mt-0.5 text-xs text-muted">{t(`providers.${connection.provider}`)}</p>
+                      </div>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       <Badge tone={connection.environment === 'live' ? 'neutral' : 'muted'}>{t(`environments.${connection.environment}`)}</Badge>

@@ -10,6 +10,7 @@ import {
   HEADER_LOGO_SIZES,
   HEADER_MODES,
   HEADER_MOBILE_LAYOUTS,
+  HEADER_OVERLAY_TONES,
   HEADER_SHADOWS,
   HEADER_STICKY,
   type HeaderDesign,
@@ -45,6 +46,10 @@ const LOGO_LABEL: Record<(typeof HEADER_LOGO_SIZES)[number], CustomizerMessageKe
 const MODE_LABEL: Record<(typeof HEADER_MODES)[number], CustomizerMessageKey> = {
   solid: "headerModeSolid",
   "overlay-hero": "headerModeOverlay",
+};
+const TONE_LABEL: Record<(typeof HEADER_OVERLAY_TONES)[number], CustomizerMessageKey> = {
+  light: "headerOverlayToneLight",
+  dark: "headerOverlayToneDark",
 };
 const STICKY_LABEL: Record<(typeof HEADER_STICKY)[number], CustomizerMessageKey> = {
   always: "headerStickyAlways",
@@ -195,6 +200,24 @@ export function HeaderDesignPanel({
       {current.mode === "overlay-hero" ? (
         <div className="space-y-1" data-header-mode-note="">
           <p className="text-[12px] leading-5 text-muted">{t("headerModeHint")}</p>
+          <Field label={t("headerOverlayTone")}>
+            <select
+              className={selectClass}
+              data-header-design="overlay-tone"
+              value={current.overlayTone ?? ""}
+              onChange={(event) => set("overlayTone", event.target.value || undefined)}
+            >
+              <option value="">{t("headerOverlayToneAuto")}</option>
+              {HEADER_OVERLAY_TONES.map((tone) => (
+                <option key={tone} value={tone}>
+                  {t(TONE_LABEL[tone])}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <p className="text-[12px] leading-5 text-muted" data-header-overlay-tone-hint="">
+            {t("headerOverlayToneHint")}
+          </p>
           {(() => {
             const candidate = overlayHeroCandidate(sections);
             if (candidate.ok) return null;

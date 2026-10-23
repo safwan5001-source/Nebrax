@@ -212,6 +212,14 @@ export function GalleryFields({
         </Field>
         <Toggle label={t("galleryCaptions")} checked={options.captions} onChange={(captions) => onChange(setOptions(content, { captions }))} />
         <Toggle label={t("galleryLightbox")} checked={options.lightbox} onChange={(lightbox) => onChange(setOptions(content, { lightbox }))} />
+        <Toggle
+          label={t("galleryShowMotionControls")}
+          checked={options.showMotionControls}
+          onChange={(showMotionControls) => onChange(setOptions(content, { showMotionControls }))}
+        />
+        <p className="text-[12px] leading-5 text-muted" data-gallery-motion-hint="">
+          {t("galleryShowMotionControlsHint")}
+        </p>
       </fieldset>
     </div>
   );
