@@ -27,6 +27,8 @@ final class ImportJobDomain
         self::PRODUCT_WORKBOOK => ['view' => 'products.view', 'manage' => 'products.manage', 'app' => null],
         // `inventory-openings/import/*` المباشرة محروسة بـ`inventory.core` (routes/api.php).
         self::INVENTORY_OPENING => ['view' => 'products.view', 'manage' => 'products.manage', 'app' => 'inventory.core'],
+        // IMP-H3-S2: `POST/PUT partners` المباشرة محروسة بـ`partners.view/manage` بلا بوابة قدرة (routes/api.php)؛ لا نخترع أخرى هنا.
+        self::PARTNER_MASTER => ['view' => 'partners.view', 'manage' => 'partners.manage', 'app' => null],
     ];
 
     public const PRODUCT_CATALOG = 'product_catalog';
@@ -35,6 +37,9 @@ final class ImportJobDomain
 
     public const INVENTORY_OPENING = 'inventory_opening';
 
+    /** العملاء والموردون (IMP-H3-S2) — النوع (عميل/مورّد) خيارٌ من خيارات التشغيلة لا مجالٌ منفصل. */
+    public const PARTNER_MASTER = 'partner_master';
+
     /** @return list<string> */
     public static function values(): array
     {
@@ -42,6 +47,7 @@ final class ImportJobDomain
             self::PRODUCT_CATALOG,
             self::PRODUCT_WORKBOOK,
             self::INVENTORY_OPENING,
+            self::PARTNER_MASTER,
         ];
     }
 

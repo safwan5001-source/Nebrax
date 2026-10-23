@@ -2034,6 +2034,7 @@
       "ai": "AI"
     },
     "perm_actions": {
+      "resolve_blocked": "Resolve blocked",
       "view": "View",
       "manage": "Manage",
       "create": "Create",

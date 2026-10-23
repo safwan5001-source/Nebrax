@@ -4,7 +4,9 @@ namespace App\Http\Requests;
 
 use App\Services\ImportJobAccess;
 use App\Services\ProductImportService;
+use App\Services\PartnerImportService;
 use App\Support\InventoryOpeningFields;
+use App\Support\PartnerImportFields;
 use App\Support\ProductImportFields;
 use App\Support\ImportJobDomain;
 use Illuminate\Foundation\Http\FormRequest;
@@ -57,7 +59,10 @@ class StoreImportJobRequest extends FormRequest
             'options.blank_policy' => ['sometimes', Rule::in([ProductImportService::BLANK_IGNORE, ProductImportService::BLANK_CLEAR])],
             'options.master_data_policy' => ['sometimes', Rule::in([ProductImportService::MASTER_DATA_ERROR, ProductImportService::MASTER_DATA_TEXT, ProductImportService::MASTER_DATA_CREATE])],
             'options.mapping' => ['sometimes', 'array', 'max:'.ProductImportService::MAX_COLUMNS],
-            'options.mapping.*' => ['nullable', 'string', Rule::in(array_merge(ProductImportFields::keys(), InventoryOpeningFields::keys(), ['ignore']))],
+            'options.mapping.*' => ['nullable', 'string', Rule::in(array_merge(ProductImportFields::keys(), InventoryOpeningFields::keys(), PartnerImportFields::keys(), ['ignore']))],
+            // IMP-H3-S2: النوع إلزامي لمجال الأطراف (يحدّد عميلاً أم مورّداً ولا يُستنتج من الملف) ويُرفض لغيره؛ فشلُ غيابه بعد الإنشاء كان سيظهر وقت التطبيق.
+            'options.type' => [Rule::requiredIf(fn () => $this->input('domain') === ImportJobDomain::PARTNER_MASTER), Rule::in(PartnerImportService::TYPES)],
+            'options.duplicate_signal_policy' => ['sometimes', Rule::in([PartnerImportService::SIGNAL_ERROR, PartnerImportService::SIGNAL_SKIP, PartnerImportService::SIGNAL_WARN])],
             'options.price_list_id' => ['sometimes', 'nullable', 'uuid'],
             'options.opening_date' => ['sometimes', 'date_format:Y-m-d'],
             'options.allow_zero_cost' => ['sometimes', 'boolean'],

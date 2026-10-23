@@ -19,8 +19,9 @@ class ImportDomainRegistry
         ProductCatalogImportAdapter $catalog,
         ProductWorkbookImportAdapter $workbook,
         InventoryOpeningImportAdapter $opening,
+        PartnerImportAdapter $partners,
     ) {
-        foreach ([$catalog, $workbook, $opening] as $adapter) {
+        foreach ([$catalog, $workbook, $opening, $partners] as $adapter) {
             $this->adapters[$adapter->domain()] = $adapter;
         }
     }
