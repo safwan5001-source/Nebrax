@@ -35,7 +35,7 @@
 | IMP-H2-S4 | — | ✅ | Tenant `ai_actions.enabled` endpoint (backend; UI split to S4b) | — | — | — | — | — | — | — | — | — | — | **Merged** `0572fa4` (#1634) | `ai.actions.manage`; report `IMP-H2-S4-REPORT.md` |
 | IMP-H2-S4b | — | ✅ | Settings card for the tenant opt-in + reason on AI import screens | H2-S4 | — | — | — | — | — | — | — | — | — | In review (PR) | Web only; report `IMP-H2-S4b-REPORT.md` |
 | IMP-H2-S5 | ✅ | ✅ | Sync V2 + AI preview/execution onto `ProductImportAdapter` (policy-expressed differences, parity test) | H1-S2, H2-S1, H2-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
-| IMP-H3-S1 | ✅ | ✅ | `PartnerImportFields` + adapter (no opening balance) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
+| IMP-H3-S1 | ✅ | ✅ | `PartnerImportFields` + adapter (no opening balance) | H1-S2 | — | — | — | — | — | — | — | — | — | In review (PR) | Adapter not registered until S2; report `IMP-H3-S1-REPORT.md` |
 | IMP-H3-S2 | ✅ | — | Partner inspect/preview endpoints (no sync apply) + `partner_master` job domain | H3-S1 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H3-S3 | ✅ | — | Customers/suppliers import UI | H3-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H3-S4 | — | ✅ | AI Action `partner_import.v1` + parity test | H3-S1, **IMP-X-01 (blocking prerequisite per owner window — see Parked requirements; same for H4-S4, H5-S5, H7-S2, H7-S4)** | — | — | — | — | — | — | — | — | — | Planned | — |
