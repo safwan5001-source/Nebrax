@@ -209,16 +209,32 @@ class MoyasarRefundTest extends TestCase
     }
 
     #[Test]
-    public function a_negative_refunded_in_the_snapshot_or_preflight_is_clamped_never_an_escaping_exception(): void
+    public function a_malformed_refunded_in_the_snapshot_is_a_failed_read_and_in_the_preflight_a_definite_rejection_before_any_post(): void
     {
+        // قراءة (fetchPayment): لا تُطبَّع إلى صفر فتخفي استرداداً حقيقياً من المطابِق — تفشل قراءةً قابلة للإعادة.
         $this->fakeHttp(['api.moyasar.com/v1/invoices/*' => Http::response($this->invoiceWith($this->paid(refunded: -7)))]);
+        $e = $this->thrown(fn () => $this->adapter->fetchPayment($this->gateway, MoyasarFixtures::INVOICE_ID), 'snapshot negative', \App\Support\PaymentGatewayException::class);
+        $this->assertSame('moyasar.malformed_response', $e->reason);
 
-        $this->assertSame(0, $this->adapter->fetchPayment($this->gateway, MoyasarFixtures::INVOICE_ID)->refundedMinor);
+        // الفحص المسبق: خط الأساس المعيب (سالب أو أكبر من مبلغ الدفعة) ⇒ لا إرسال.
+        foreach ([-7, 999999] as $bad) {
+            $this->fakeHttp(['api.moyasar.com/v1/invoices/*' => Http::response($this->invoiceWith($this->paid(refunded: $bad)))]);
+            $e = $this->thrown(fn () => $this->adapter->refundPayment($this->gateway, MoyasarFixtures::INVOICE_ID, 100), "preflight {$bad}", PaymentRefundRejectedException::class);
+            $this->assertSame('moyasar.malformed_response', $e->reason);
+            Http::assertNotSent(fn (Request $r) => $r->method() === 'POST');
+        }
+    }
+
+    #[Test]
+    public function a_success_response_in_another_currency_than_the_payment_is_unknown_not_accepted(): void
+    {
         $this->fakeHttp([
-            'api.moyasar.com/v1/invoices/*' => Http::response($this->invoiceWith($this->paid(refunded: -7))),
-            'api.moyasar.com/v1/payments/*' => Http::response($this->paid(refunded: 100, status: 'refunded')),
+            'api.moyasar.com/v1/invoices/*' => Http::response($this->invoiceWith($this->paid())),
+            'api.moyasar.com/v1/payments/*' => Http::response(array_merge($this->paid(refunded: 100, status: 'refunded'), ['currency' => 'USD'])),
         ]);
-        $this->assertSame(100, $this->adapter->refundPayment($this->gateway, MoyasarFixtures::INVOICE_ID, 100)->refundedMinor);
+
+        $e = $this->thrown(fn () => $this->adapter->refundPayment($this->gateway, MoyasarFixtures::INVOICE_ID, 100), 'currency', PaymentRefundUnknownException::class);
+        $this->assertSame('moyasar.malformed_response', $e->reason);
     }
 
     #[Test]
