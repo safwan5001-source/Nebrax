@@ -100,7 +100,12 @@ class VatSemanticRoutingTest extends TestCase
         $entry = JournalEntry::with('lines.account')->where('source_type', $sourceType)->where('source_id', $sourceId)->sole();
         $this->assertSame((int) $entry->lines->sum('debit'), (int) $entry->lines->sum('credit'), 'قيد غير متوازن');
 
-        return $entry->lines->mapWithKeys(fn (JournalLine $l) => [$l->account->code => [(int) $l->debit, (int) $l->credit]])->all();
+        // ترتيب حتمي: المدين أولاً ثم الدائن، وكلٌّ بالمبلغ الأكبر أولاً. `lines` بلا ORDER BY فترتيب الصفوف على PostgreSQL غير مضمون،
+        // و`assertSame` على مصفوفة ترابطية يقارن الترتيب أيضاً (كان يُنتج فشلاً متقطعاً على CI لا علاقة له بالمحتوى).
+        return $entry->lines
+            ->sortBy(fn (JournalLine $l) => [(int) $l->debit > 0 ? 0 : 1, -max((int) $l->debit, (int) $l->credit)])
+            ->mapWithKeys(fn (JournalLine $l) => [$l->account->code => [(int) $l->debit, (int) $l->credit]])
+            ->all();
     }
 
     // ───────────────────────────── المصروفات ─────────────────────────────
