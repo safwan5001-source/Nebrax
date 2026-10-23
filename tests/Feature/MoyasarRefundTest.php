@@ -105,6 +105,18 @@ class MoyasarRefundTest extends TestCase
     }
 
     #[Test]
+    public function a_response_total_beyond_the_captured_amount_is_unknown_not_proof(): void
+    {
+        $partial = array_merge($this->paid(), ['captured' => 60000]);
+        $this->fakeHttp([
+            'api.moyasar.com/v1/invoices/*' => Http::response($this->invoiceWith($partial)),
+            'api.moyasar.com/v1/payments/*' => Http::response(array_merge($partial, ['refunded' => 80000, 'status' => 'refunded'])),
+        ]);
+
+        $this->thrown(fn () => $this->adapter->refundPayment($this->gateway, MoyasarFixtures::INVOICE_ID, 100), 'over captured', PaymentRefundUnknownException::class);
+    }
+
+    #[Test]
     public function an_invalid_amount_and_an_unpaid_or_ambiguous_invoice_are_definite_rejections_before_any_post(): void
     {
         $this->fakeHttp(['api.moyasar.com/v1/invoices/*' => Http::response($this->invoiceWith($this->paid()))]);

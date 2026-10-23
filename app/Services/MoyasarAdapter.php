@@ -435,7 +435,7 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
         // النجاح يشترط **إثبات** أن هذا الـPOST طُبِّق: التراكمي ≥ ما قبل + المبلغ (قد يزيد باسترداد خارجي متزامن ويحسمه المستدعي) وضمن مبلغ الدفعة.
         // ردّ 2xx بتراكمي أقل (لم يُطبَّق، أو سالب/معيب) لا يُعدّ نجاحاً ولا رفضاً قاطعاً: بعد الإرسال ⇒ غير معروف يحسمه المطابِق.
         if (! is_string($response['id'] ?? null) || ! hash_equals($paymentId, $response['id']) || $refundedAfter === null
-            || $refundedAfter < $refundedBefore + $amountMinor || $refundedAfter > $paymentAmount || $currency !== $expectedCurrency) {
+            || $refundedAfter < $refundedBefore + $amountMinor || $refundedAfter > $chargeable || $currency !== $expectedCurrency) {
             throw new PaymentRefundUnknownException('moyasar.malformed_response', 'استجابة الاسترداد لا تثبت تطبيقه؛ قد يكون نُفِّذ.');
         }
 
