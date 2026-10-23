@@ -684,6 +684,18 @@ input[type="search"]::-webkit-search-cancel-button {
 [data-ho~="on"] [data-sd-backdrop] {
   inset-inline: calc(50% - 50vw);
 }
+/* AWJ-HERO-FULLBLEED — the page-level half of a bleeding hero (storefront: viewport units; the Canvas twin is in store-preview.css). */
+[data-sd~="hbl"] {
+  --sd-vw: 100vw;
+}
+/* the picture is wider than the page container by up to a scrollbar's width: clip it at the page, never a horizontal scroll */
+main:has([data-sd~="hbl"]) {
+  overflow-x: clip;
+}
+/* directly below the header: the first thing in the page stack starts at the header's edge (no container top padding) */
+:has(> [data-sd~="hbl"]:first-child) {
+  padding-block-start: 0;
+}
 
 @layer base {
   * {
@@ -1156,6 +1168,57 @@ input[type="search"]::-webkit-search-cancel-button {
   inset: 0;
   background: var(--sec-ovl);
   opacity: var(--sec-ovl-a);
+}
+/* AWJ-HERO-FULLBLEED — three hero-only picture treatments. The resolver emits each token only for a hero that really paints a
+   proven picture whose layout fills the whole box (never `split`), so the contrast evidence still covers every visible pixel.
+   hgtm  mobile height — below md the phone's own minimum replaces `height` (the real storefront; the Canvas resolves the device's
+         choice in the resolver instead of asking the host window's media query).
+   rat   natural ratio — the picture is IN FLOW: the section root becomes a one-cell grid in which picture and copy share the cell,
+         so the hero is as tall as the picture at the section's width (nothing cropped, nothing distorted) and grows only when the
+         copy is taller. The phone picture's own proportions apply below md because it is the picture that is rendered there.
+   hbl   bleed — no radius, the picture reaches both viewport edges. `--sd-vw` is the width of that frame (100vw on the storefront,
+         100cqw in the Canvas — set outside this block); unset it is 100%, i.e. contained. */
+@media (max-width: 767.98px) {
+  [data-sd~="hgtm"][data-sd] > * {
+    min-block-size: var(--sec-minh-m);
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: var(--sec-vj, center);
+  }
+}
+[data-sd~="rat"][data-sd] > * {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-block-size: 0;
+}
+[data-sd~="rat"][data-sd] > * > :is([data-sd-backdrop], [data-section-content]) {
+  grid-area: 1 / 1;
+}
+[data-sd~="rat"][data-sd] > * > [data-section-content] {
+  justify-self: start;
+  align-self: var(--sec-vj, center);
+}
+[data-sd~="rat"][data-sd] [data-sd-backdrop] {
+  position: relative;
+}
+[data-sd~="rat"][data-sd] [data-sd-backdrop] picture {
+  display: contents;
+}
+[data-sd~="rat"][data-sd] [data-sd-backdrop] img {
+  height: auto;
+  min-block-size: 100%;
+}
+[data-sd~="hbl"][data-sd] > *,
+[data-sd~="hbl"][data-sd] [data-sd-backdrop] {
+  border-radius: 0;
+}
+[data-sd~="hbl"][data-sd] [data-sd-backdrop] {
+  inset-inline: calc(50% - var(--sd-vw, 100%) / 2);
+}
+[data-sd~="rat"][data-sd~="hbl"][data-sd] [data-sd-backdrop] {
+  inline-size: var(--sd-vw, 100%);
+  justify-self: start;
 }
 /* Section-level text only — never inside a surface nested in the section. */
 [data-sd~="heading"] :is(h1, h2, h3):not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"])) {

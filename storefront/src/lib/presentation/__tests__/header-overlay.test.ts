@@ -207,3 +207,91 @@ describe("overlayIsSolid (V7c-2)", () => {
     expect(overlayIsSolid(-80, false)).toBe(false);
   });
 });
+
+describe("resolveHeaderOverlay — forced tone (AWJ-HEADER-OVERLAY-TONE)", () => {
+  const bright = {
+    min: [200, 210, 220] as [number, number, number],
+    max: [250, 250, 250] as [number, number, number],
+  };
+
+  it("a forced tone that the picture supports is used exactly (and marks the same tokens)", () => {
+    const light = resolveHeaderOverlay(
+      { ...ON, overlayTone: "light" },
+      [hero()],
+      ctx(dark),
+    );
+    expect(light).toEqual({
+      overlay: { sectionId: "hero", tone: "light", fg: "#ffffff" },
+    });
+    const darkText = resolveHeaderOverlay(
+      { ...ON, overlayTone: "dark" },
+      [hero()],
+      ctx(bright),
+    );
+    expect(darkText).toEqual({
+      overlay: { sectionId: "hero", tone: "dark", fg: "#000000" },
+    });
+    expect(overlayMarker((light as { overlay: never }).overlay)).toBe("on l");
+    expect(overlayMarker((darkText as { overlay: never }).overlay)).toBe(
+      "on d",
+    );
+  });
+
+  it("a tone the whole picture cannot support keeps the header solid — never an unreadable overlay", () => {
+    expect(
+      resolveHeaderOverlay({ ...ON, overlayTone: "dark" }, [hero()], ctx(dark)),
+    ).toEqual({
+      reason: "tone-unprovable",
+    });
+    expect(
+      resolveHeaderOverlay(
+        { ...ON, overlayTone: "light" },
+        [hero()],
+        ctx(bright),
+      ),
+    ).toEqual({
+      reason: "tone-unprovable",
+    });
+  });
+
+  it("the automatic choice is untouched when no tone is forced (a bright picture still gets black text)", () => {
+    expect(resolveHeaderOverlay(ON, [hero()], ctx(bright))).toMatchObject({
+      overlay: { tone: "dark", fg: "#000000" },
+    });
+    expect(
+      resolveHeaderOverlay(
+        ON,
+        [hero()],
+        ctx({ min: [0, 0, 0], max: [255, 255, 255] }),
+      ),
+    ).toEqual({
+      reason: "unprovable",
+    });
+  });
+
+  it("a forced tone never widens what is provable: a mid-tone / full-range picture stays solid for either tone", () => {
+    const wide = ctx({ min: [0, 0, 0], max: [255, 255, 255] });
+    expect(
+      resolveHeaderOverlay({ ...ON, overlayTone: "light" }, [hero()], wide),
+    ).toEqual({ reason: "tone-unprovable" });
+    expect(
+      resolveHeaderOverlay({ ...ON, overlayTone: "dark" }, [hero()], wide),
+    ).toEqual({ reason: "tone-unprovable" });
+  });
+
+  it("structural reasons come first, whatever the tone", () => {
+    expect(
+      resolveHeaderOverlay({ ...ON, overlayTone: "light" }, [], ctx(dark)),
+    ).toEqual({ reason: "no-hero" });
+  });
+
+  it("without the opt-in a tone does nothing", () => {
+    expect(
+      resolveHeaderOverlay(
+        { overlayTone: "light" } as never,
+        [hero()],
+        ctx(dark),
+      ),
+    ).toBeNull();
+  });
+});

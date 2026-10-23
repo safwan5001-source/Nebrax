@@ -79,6 +79,17 @@ final class StorefrontSectionDesignNormalizer
     /** V6c-3 (V0 §8.3) — ارتفاع القسم المُعدّ مسبقاً للبطل واللافتة (حدّ أدنى فقط؛ المحتوى لا يُقصّ أبداً). */
     public const HEIGHT_PRESETS = ['compact', 'standard', 'tall', 'screen'];
 
+    /**
+     * AWJ-HERO-FULLBLEED — `mediaTreatment` للبطل وحده: `height` (الارتفاع الأدنى لكل الأجهزة) و`mobileHeight` (يتجاوزه تحت 768px)
+     * و`ratio` (`natural` فقط: يتبع ارتفاعُ البطل نسبةَ صورته عند عرض القسم — بلا قصّ ولا تشويه، فيبقى إثبات التباين صالحاً لأن
+     * الصورة تملأ الصندوق كلّه) و`bleed` (`true` فقط: صورة البطل إلى حافتَي الشاشة). غير المخزَّن هو الافتراضي دائماً.
+     * `contain` غير مقبول عمداً: إطارٌ لا يملأ الصندوق يكشف سطحاً لا تغطّيه أدلة التباين (انظر `normalizeBackgroundRef`).
+     */
+    public const MEDIA_RATIOS = ['natural'];
+
+    /** حقول `mediaTreatment` المسموحة للبطل (لافتة وشريحة: `height` وحده). الترتيب القانوني للإخراج: height، mobileHeight، ratio، bleed. */
+    public const HERO_MEDIA_TREATMENT = ['height', 'mobileHeight', 'ratio', 'bleed'];
+
     /** V6b-2 — أنواع الخلفية المتاحة لكل الأقسام؛ `media` للبطل واللافتة وحدهما. */
     public const BACKGROUND_KINDS = ['solid', 'gradient'];
 
@@ -182,6 +193,9 @@ final class StorefrontSectionDesignNormalizer
             }
             if ($group === 'separator') {
                 $heroOnly['overlap'] = true;
+            }
+            if ($group === 'mediaTreatment') {
+                $heroOnly['mediaTreatment'] = self::HERO_MEDIA_TREATMENT;
             }
         }
         $shelf = ['background' => self::BACKGROUND_KINDS, 'text' => ['heading'], 'typography' => ['headingStyle'], 'width' => true, 'spacing' => true, 'layout' => self::LAYOUTS['shelf'], 'columns' => self::SHELF_COLUMNS, 'cards' => true, 'separator' => true];
@@ -321,11 +335,33 @@ final class StorefrontSectionDesignNormalizer
                 $out['overlap'] = $overlap;
             }
         }
-        if (isset($capability['mediaTreatment']) && self::isObject($raw['mediaTreatment'] ?? null)
-            && self::allows($capability['mediaTreatment'], 'height')) {
-            $height = self::pick($raw['mediaTreatment']['height'] ?? null, self::HEIGHT_PRESETS);
-            if ($height !== null) {
-                $out['mediaTreatment'] = ['height' => $height];
+        if (isset($capability['mediaTreatment']) && self::isObject($raw['mediaTreatment'] ?? null)) {
+            $treatment = [];
+            $rawTreatment = $raw['mediaTreatment'];
+            if (self::allows($capability['mediaTreatment'], 'height')) {
+                $height = self::pick($rawTreatment['height'] ?? null, self::HEIGHT_PRESETS);
+                if ($height !== null) {
+                    $treatment['height'] = $height;
+                }
+            }
+            if (self::allows($capability['mediaTreatment'], 'mobileHeight')) {
+                $mobileHeight = self::pick($rawTreatment['mobileHeight'] ?? null, self::HEIGHT_PRESETS);
+                if ($mobileHeight !== null) {
+                    $treatment['mobileHeight'] = $mobileHeight;
+                }
+            }
+            if (self::allows($capability['mediaTreatment'], 'ratio')) {
+                $ratio = self::pick($rawTreatment['ratio'] ?? null, self::MEDIA_RATIOS);
+                if ($ratio !== null) {
+                    $treatment['ratio'] = $ratio;
+                }
+            }
+            // `bleed` يُخزَّن `true` فقط (الغياب = داخل الحاوية)؛ أي قيمة أخرى تُسقط المفتاح.
+            if (self::allows($capability['mediaTreatment'], 'bleed') && ($rawTreatment['bleed'] ?? null) === true) {
+                $treatment['bleed'] = true;
+            }
+            if ($treatment !== []) {
+                $out['mediaTreatment'] = $treatment;
             }
         }
         if (isset($capability['motion'])) {

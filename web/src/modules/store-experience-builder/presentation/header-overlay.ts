@@ -22,6 +22,10 @@
  * pass is not eligible. A scrim becomes meaningful only with a per-band region proof (a top-band-only evidence that
  * is more permissive than the whole picture), which does not exist yet.
  *
+ * **Forced tone (AWJ-HEADER-OVERLAY-TONE).** `design.overlayTone` (`light` = white text, `dark` = black text) replaces the
+ * automatic better-of-white/black choice but not the proof: the chosen colour must clear 4.5:1 over the same whole-picture
+ * interval, else the header stays solid (`tone-unprovable`). The merchant can pick the look; never an unreadable header.
+ *
  * No publish gate: an unprovable overlay is not an error, it renders solid. The editor shows why it is inactive.
  */
 
@@ -62,14 +66,18 @@ export type OverlayInactiveReason =
   | "no-hero"
   | "not-picture"
   | "split-layout"
-  | "unprovable";
+  | "unprovable"
+  | "tone-unprovable";
 
 /** The structural part of the decision (no contrast): the eligible hero, or why there is none. */
 export function overlayHeroCandidate(
   sections: readonly OverlayCandidateSection[],
 ):
   | { ok: true; section: OverlayCandidateSection }
-  | { ok: false; reason: Exclude<OverlayInactiveReason, "unprovable"> } {
+  | {
+      ok: false;
+      reason: Exclude<OverlayInactiveReason, "unprovable" | "tone-unprovable">;
+    } {
   const first = sections.find((section) => section.visible);
   if (!first || first.type !== "hero") return { ok: false, reason: "no-hero" };
   const background = first.design?.background as { kind?: unknown } | undefined;
@@ -102,9 +110,14 @@ export function resolveHeaderOverlay(
     ? composite(bounds.overlay.rgb, bounds.overlay.alpha, bounds.max)
     : bounds.max;
   const interval = channelBoundsInterval(lo, hi, null);
-  const fg = autoForeground(interval);
+  const forced = design.overlayTone
+    ? design.overlayTone === "light"
+      ? "#ffffff"
+      : "#000000"
+    : null;
+  const fg = forced ?? autoForeground(interval);
   if (!passes(worstRatioForHex(fg, widened(interval)))) {
-    return { reason: "unprovable" };
+    return { reason: forced ? "tone-unprovable" : "unprovable" };
   }
   return {
     overlay: {
