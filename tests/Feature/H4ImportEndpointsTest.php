@@ -63,6 +63,12 @@ class H4ImportEndpointsTest extends TestCase
         return $this->withToken($token)->postJson('/api/price-lists', ['name' => $name])->assertCreated()['data']['id'];
     }
 
+    /** ربط معاينة لملف وخيارات (الإنشاء بلا ربط مرفوض لهذه المجالات). */
+    private function bind(string $token, string $previewUri, array $rows, array $options): array
+    {
+        return $this->upload($token, $previewUri, ['file' => $this->file($rows)] + $options)->assertOk()->json('data.binding');
+    }
+
     /** يشغّل التشغيلة حتى تكتمل ويعيد حالتها. */
     private function runJob(string $token, string $id, array $body = []): string
     {
@@ -162,8 +168,8 @@ class H4ImportEndpointsTest extends TestCase
         $this->upload($viewer, '/api/import-jobs', ['domain' => 'product_taxonomy', 'file' => $this->file($rows), 'options' => ['kind' => 'brand']])->assertForbidden();
 
         $manager = $this->customRole($tid, 'tax_manager', ['products.view', 'products.manage'], 'm@h4.test');
-        $this->upload($manager, '/api/product-taxonomy/import/preview', ['file' => $this->file($rows), 'kind' => 'brand'])->assertOk();
-        $this->upload($manager, '/api/import-jobs', ['domain' => 'product_taxonomy', 'file' => $this->file($rows), 'options' => ['kind' => 'brand']])->assertCreated();
+        $b = $this->bind($manager, '/api/product-taxonomy/import/preview', $rows, ['kind' => 'brand']);
+        $this->upload($manager, '/api/import-jobs', ['domain' => 'product_taxonomy', 'file' => $this->file($rows), 'options' => ['kind' => 'brand'], 'preview_id' => $b['id'], 'preview_hash' => $b['hash']])->assertCreated();
     }
 
     // ═══════════════════════════════ قوالب الوحدات ═══════════════════════════════
@@ -204,7 +210,8 @@ class H4ImportEndpointsTest extends TestCase
             ['template_name' => 'سليم', 'base_unit' => 'قطعة', 'unit_name' => 'كرتون', 'factor' => '12'],
             ['template_name' => 'سيئ', 'base_unit' => 'قطعة', 'unit_name' => 'علبة', 'factor' => '1'],
         ];
-        $job = $this->upload($auth['token'], '/api/import-jobs', ['domain' => 'unit_templates', 'file' => $this->file($rows)])->assertCreated()->json('data');
+        $b = $this->bind($auth['token'], '/api/unit-templates/import/preview', $rows, []);
+        $job = $this->upload($auth['token'], '/api/import-jobs', ['domain' => 'unit_templates', 'file' => $this->file($rows), 'preview_id' => $b['id'], 'preview_hash' => $b['hash']])->assertCreated()->json('data');
 
         $this->withToken($auth['token'])->postJson("/api/import-jobs/{$job['id']}/apply", [])->assertStatus(422);
 
@@ -243,7 +250,7 @@ class H4ImportEndpointsTest extends TestCase
     }
 
     /** @test */
-    public function another_tenants_price_list_is_refused_at_preview_and_at_job_run(): void
+    public function another_tenants_price_list_is_refused_at_preview_and_at_job_creation(): void
     {
         $a = $this->registerTenant('h4-a', 'owner@h4-a.test');
         $b = $this->registerTenant('h4-b', 'owner@h4-b.test');
@@ -252,8 +259,13 @@ class H4ImportEndpointsTest extends TestCase
 
         $this->upload($a['token'], '/api/price-lists/import/preview', ['file' => $this->file($rows), 'price_list_id' => $theirs])->assertUnprocessable();
 
-        $job = $this->upload($a['token'], '/api/import-jobs', ['domain' => 'price_list_items', 'file' => $this->file($rows), 'options' => ['price_list_id' => $theirs]])->assertCreated()->json('data');
-        $this->withToken($a['token'])->postJson("/api/import-jobs/{$job['id']}/apply", [])->assertStatus(422);
+        // لا تُنشأ تشغيلة بقائمة غير مرئية للمستأجر: حتى بربط معاينةٍ سليمة لقائمته هو، خيار القائمة يجب أن يطابق ما عاينه.
+        $mine = $this->priceList($a['token'], 'قائمتي');
+        $bind = $this->bind($a['token'], '/api/price-lists/import/preview', $rows, ['price_list_id' => $mine]);
+        $this->upload($a['token'], '/api/import-jobs', [
+            'domain' => 'price_list_items', 'file' => $this->file($rows), 'options' => ['price_list_id' => $theirs],
+            'preview_id' => $bind['id'], 'preview_hash' => $bind['hash'],
+        ])->assertUnprocessable();
         app(TenantContext::class)->set($b['tenant_id']);
         $this->assertSame(0, PriceListItem::count());
     }
@@ -271,9 +283,43 @@ class H4ImportEndpointsTest extends TestCase
         $this->upload($productsManager, '/api/import-jobs', ['domain' => 'price_list_items', 'file' => $this->file($rows), 'options' => ['price_list_id' => $list]])->assertForbidden();
 
         $companyManager = $this->customRole($tid, 'company_mgr', ['company.manage', 'invoices.view'], 'cm@h4.test');
-        $this->upload($companyManager, '/api/price-lists/import/preview', ['file' => $this->file($rows), 'price_list_id' => $list])->assertOk();
-        $this->upload($companyManager, '/api/import-jobs', ['domain' => 'price_list_items', 'file' => $this->file($rows), 'options' => ['price_list_id' => $list]])->assertCreated();
+        $b = $this->bind($companyManager, '/api/price-lists/import/preview', $rows, ['price_list_id' => $list]);
+        $this->upload($companyManager, '/api/import-jobs', ['domain' => 'price_list_items', 'file' => $this->file($rows), 'options' => ['price_list_id' => $list], 'preview_id' => $b['id'], 'preview_hash' => $b['hash']])->assertCreated();
 
         $this->flushHeaders()->getJson('/api/price-lists/import/fields')->assertUnauthorized();
+    }
+
+    /** @test */
+    public function row_unit_domains_preview_and_inspect_files_up_to_the_durable_limit_not_the_synchronous_one(): void
+    {
+        // المحوّل يقبل التشغيلة حتى DURABLE_MAX_ROWS؛ لو بقيت المعاينة عند سقف المتزامن (2000) لما حصل ملفٌ أكبر على ربط ولا يمكن إرساله أبداً.
+        $auth = $this->registerTenant();
+        $rows = array_map(fn (int $n): array => ['name' => "علامة {$n}"], range(1, 2100));
+
+        $inspect = $this->upload($auth['token'], '/api/product-taxonomy/import/inspect', ['file' => $this->file($rows), 'kind' => 'brand'])->assertOk()->json('data');
+        $this->assertSame(2100, $inspect['total_rows']);
+
+        $preview = $this->upload($auth['token'], '/api/product-taxonomy/import/preview', ['file' => $this->file($rows), 'kind' => 'brand', 'mode' => 'create'])->assertOk()->json('data');
+        $this->assertNotEmpty($preview['binding']['id']);
+        $this->assertSame(2100, $preview['total_rows'] ?? $preview['create_rows'] + $preview['skip_rows']);
+    }
+
+    /** @test */
+    public function jobs_for_the_option_dependent_domains_cannot_be_created_without_a_preview_binding(): void
+    {
+        // التشغيلة غير المربوطة تحمل apply_options = null وطلب التطبيق لا يقبل kind/type/price_list_id/السياسات: كانت تفشل (أو تُهمَل سياستها) وقت التطبيق.
+        $auth = $this->registerTenant();
+        $list = $this->priceList($auth['token']);
+        $cases = [
+            ['product_taxonomy', [['name' => 'ع']], ['kind' => 'brand']],
+            ['price_list_items', [['sku' => 'X', 'price' => '1']], ['price_list_id' => $list]],
+            ['unit_templates', [['template_name' => 'ق', 'base_unit' => 'قطعة']], ['existing_policy' => 'skip']],
+            ['partner_master', [['name' => 'عميل']], ['type' => 'customer']],
+        ];
+        foreach ($cases as [$domain, $rows, $options]) {
+            $res = $this->upload($auth['token'], '/api/import-jobs', ['domain' => $domain, 'file' => $this->file($rows), 'options' => $options]);
+            $res->assertUnprocessable();
+            $this->assertArrayHasKey('preview_id', $res->json('errors') ?? [], $domain);
+        }
     }
 }

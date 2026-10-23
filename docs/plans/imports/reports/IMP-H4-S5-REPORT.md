@@ -15,3 +15,12 @@
 
 ## Disclosures
 UI (import wizards for these three) is the next slice; the standard path is API-complete here. A job's apply request defaults `mode=create` when none was frozen — for price-list jobs created through the wizard `mode` is always sent (default `upsert` there). No Codex review (quota exhausted); no independent review for this wiring slice beyond the invariant suites (it adds no new write logic: it reuses the three reviewed adapters and the H3-S2 pattern).
+
+## Codex review (PR #1683) — two P2 findings, both verified and fixed
+
+| Finding | Verdict | Fix |
+|---|---|---|
+| Preview/inspect read files with the synchronous `MAX_ROWS` (2,000) while the adapters accept `DURABLE_MAX_ROWS`, so a 2,001–20,000-row file can never obtain a binding | **Valid** — and the same gap existed in the already-merged H3-S2 partner endpoints | `inspect`/`previewWithPlan` of the partner, taxonomy and price-list controllers now pass `DURABLE_MAX_ROWS` (unit templates are file-atomic: their adapter limit *is* the 2,000). Test: a 2,100-row brand file inspects and previews with a binding |
+| An unbound job keeps `apply_options = null`, and the apply request cannot carry `kind` / `price_list_id` / `type` / policies, so the job fails at apply (or silently drops a creation-time policy) | **Valid** (also for partner `type` and unit-template / parent policies) | Job creation for `partner_master`, `product_taxonomy`, `price_list_items` and `unit_templates` now **requires a preview binding** (`ImportJobDomain::PREVIEW_BOUND_ONLY`, 422 on `preview_id`). The engine freezes options at creation only for bound jobs, so this is the least invasive correct fix and no legacy unbound flow exists for these domains. Six existing tests that created unbound jobs for convenience now create bound ones; the foreign-tenant price-list case is now refused at creation (options must match the preview) instead of at run |
+
+Negative controls: with either fix reverted its new test fails. Local: SQLite 203 passed (Import*/Partner*/H4 endpoints), PostgreSQL 129 passed.

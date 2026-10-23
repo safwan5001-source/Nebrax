@@ -58,7 +58,7 @@ class StoreImportJobRequest extends FormRequest
             }],
             'idempotency_key' => ['sometimes', 'nullable', 'string', 'max:191'],
             // IMP-H1-S3b — ربط التنفيذ بمعاينته: المعرّف والبصمة معاً أو لا شيء، والخيارات **نفسها** التي أُرسلت إلى المعاينة.
-            'preview_id' => ['required_with:preview_hash', 'nullable', 'uuid'],
+            'preview_id' => [Rule::requiredIf(fn () => in_array($this->input('domain'), ImportJobDomain::PREVIEW_BOUND_ONLY, true)), 'required_with:preview_hash', 'nullable', 'uuid'],
             'preview_hash' => ['required_with:preview_id', 'nullable', 'string', 'size:64'],
             'options' => ['sometimes', 'nullable', 'array'],
             'options.mode' => ['sometimes', Rule::in([ProductImportService::MODE_CREATE, ProductImportService::MODE_UPDATE, ProductImportService::MODE_UPSERT])],
@@ -110,6 +110,7 @@ class StoreImportJobRequest extends FormRequest
             'file.max' => 'حجم ملف الاستيراد يجب ألا يتجاوز 5 ميغابايت.',
             'domain.required' => 'حدّد مجال الاستيراد.',
             'domain.in' => 'مجال الاستيراد غير مدعوم.',
+            'preview_id.required' => 'هذا المجال يتطلب معاينة الملف أولاً ثم إنشاء التشغيلة من نتيجتها.',
             'media_archive.mimes' => 'أرشيف الصور يجب أن يكون ملف ZIP صالحاً.',
             'media_archive.max' => 'حجم أرشيف الصور يجب ألا يتجاوز 50 ميغابايت.',
         ];

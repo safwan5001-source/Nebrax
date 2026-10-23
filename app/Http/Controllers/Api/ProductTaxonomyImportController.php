@@ -38,7 +38,7 @@ class ProductTaxonomyImportController extends ApiController
 
     public function inspect(ProductTaxonomyImportRequest $request): JsonResponse
     {
-        $data = $this->domain(fn () => $this->imports->inspect($request->file('file'), $request->string('kind')->toString()));
+        $data = $this->domain(fn () => $this->imports->inspect($request->file('file'), $request->string('kind')->toString(), ProductTaxonomyImportService::DURABLE_MAX_ROWS));
 
         return response()->json(['data' => $data]);
     }
@@ -47,7 +47,7 @@ class ProductTaxonomyImportController extends ApiController
     public function preview(ProductTaxonomyImportRequest $request): JsonResponse
     {
         $data = $this->domain(function () use ($request): array {
-            ['preview' => $preview, 'plan' => $plan] = $this->imports->previewWithPlan($request->file('file'), $request->importOptions());
+            ['preview' => $preview, 'plan' => $plan] = $this->imports->previewWithPlan($request->file('file'), $request->importOptions(), ProductTaxonomyImportService::DURABLE_MAX_ROWS);
             $preview['binding'] = app(ImportPreviewService::class)->issue(
                 ImportJobDomain::PRODUCT_TAXONOMY, $request->file('file'), null, $request->importOptions(), $request->user()?->id, $plan,
             );

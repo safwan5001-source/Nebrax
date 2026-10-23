@@ -170,10 +170,11 @@ class PartnerImportApiTest extends TestCase
     {
         $auth = $this->registerTenant();
         $rows = [['code' => 'OK-1', 'name' => 'سليم'], ['code' => 'BAD', 'name' => 'سيئ', 'email' => 'not-an-email']];
-        $job = $this->upload($auth['token'], '/api/import-jobs', ['domain' => 'partner_master', 'file' => $this->file($rows), 'options' => ['type' => 'customer']])
+        $b = $this->upload($auth['token'], '/api/partners/import/preview', ['file' => $this->file($rows), 'type' => 'customer'])->assertOk()->json('data.binding');
+        $job = $this->upload($auth['token'], '/api/import-jobs', ['domain' => 'partner_master', 'file' => $this->file($rows), 'options' => ['type' => 'customer'], 'preview_id' => $b['id'], 'preview_hash' => $b['hash']])
             ->assertCreated()->json('data');
 
-        $this->withToken($auth['token'])->postJson("/api/import-jobs/{$job['id']}/apply", ['type' => 'customer'])->assertStatus(422);
+        $this->withToken($auth['token'])->postJson("/api/import-jobs/{$job['id']}/apply", [])->assertStatus(422);
 
         app(TenantContext::class)->set($auth['tenant_id']);
         $this->assertSame(0, Partner::count());
@@ -194,7 +195,8 @@ class PartnerImportApiTest extends TestCase
         $this->upload($auth['token'], '/api/import-jobs', ['domain' => 'partner_master', 'file' => $this->file($rows), 'options' => ['type' => 'both']])->assertUnprocessable();
 
         $manager = $this->customRole($tid, 'partner_manager', ['partners.view', 'partners.manage'], 'pm@pi.test');
-        $this->upload($manager, '/api/import-jobs', ['domain' => 'partner_master', 'file' => $this->file($rows), 'options' => ['type' => 'customer']])->assertCreated();
+        $b = $this->upload($manager, '/api/partners/import/preview', ['file' => $this->file($rows), 'type' => 'customer'])->assertOk()->json('data.binding');
+        $this->upload($manager, '/api/import-jobs', ['domain' => 'partner_master', 'file' => $this->file($rows), 'options' => ['type' => 'customer'], 'preview_id' => $b['id'], 'preview_hash' => $b['hash']])->assertCreated();
         // the same user cannot create a product job: the gates are per domain, not inherited from products
         $this->upload($manager, '/api/import-jobs', ['domain' => 'product_catalog', 'file' => $this->file($rows)])->assertForbidden();
 

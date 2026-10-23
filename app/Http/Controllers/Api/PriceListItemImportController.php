@@ -31,7 +31,7 @@ class PriceListItemImportController extends ApiController
 
     public function inspect(PriceListItemImportRequest $request): JsonResponse
     {
-        $data = $this->domain(fn () => $this->imports->inspect($request->file('file')));
+        $data = $this->domain(fn () => $this->imports->inspect($request->file('file'), PriceListItemImportService::DURABLE_MAX_ROWS));
 
         return response()->json(['data' => $data]);
     }
@@ -39,7 +39,7 @@ class PriceListItemImportController extends ApiController
     public function preview(PriceListItemImportRequest $request): JsonResponse
     {
         $data = $this->domain(function () use ($request): array {
-            ['preview' => $preview, 'plan' => $plan] = $this->imports->previewWithPlan($request->file('file'), $request->importOptions());
+            ['preview' => $preview, 'plan' => $plan] = $this->imports->previewWithPlan($request->file('file'), $request->importOptions(), PriceListItemImportService::DURABLE_MAX_ROWS);
             $preview['binding'] = app(ImportPreviewService::class)->issue(
                 ImportJobDomain::PRICE_LIST_ITEMS, $request->file('file'), null, $request->importOptions(), $request->user()?->id, $plan,
             );

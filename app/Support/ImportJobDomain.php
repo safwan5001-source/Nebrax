@@ -55,6 +55,15 @@ final class ImportJobDomain
     public const UNIT_TEMPLATES = 'unit_templates';
 
     /** @return list<string> */
+    /**
+     * مجالات لا تُنشأ لها تشغيلة إلا مربوطةً بمعاينتها: خياراتها الدلالية الإلزامية (النوع/التصنيف·العلامة/قائمة السعر) وسياساتها تُجمَّد من المعاينة،
+     * أما التشغيلة غير المربوطة فتحمل `apply_options = null` وطلب التطبيق لا يقبل هذه المفاتيح — فتفشل وقت التطبيق (أو تُهمَل سياستها بصمت). لا مسار
+     * قديم غير مربوط لها أصلاً، فالإلزام لا يكسر أحداً.
+     *
+     * @var list<string>
+     */
+    public const PREVIEW_BOUND_ONLY = [self::PARTNER_MASTER, self::PRODUCT_TAXONOMY, self::PRICE_LIST_ITEMS, self::UNIT_TEMPLATES];
+
     public static function values(): array
     {
         return [
