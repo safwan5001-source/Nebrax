@@ -101,6 +101,7 @@ use App\Http\Controllers\Api\InventorySettingsController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\InvoicePaymentRequestController;
 use App\Http\Controllers\Api\PaymentAttemptPostingController;
+use App\Http\Controllers\Api\PublicPaymentLinkController;
 use App\Http\Controllers\Api\JobLevelController;
 use App\Http\Controllers\Api\JobTitleController;
 use App\Http\Controllers\Api\JournalEntryController;
@@ -109,6 +110,7 @@ use App\Http\Controllers\Api\LeaveTypeController;
 use App\Http\Controllers\Api\ManualJournalController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PartnerController;
+use App\Http\Controllers\Api\PartnerImportController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PaymentAttemptController;
 use App\Http\Controllers\Api\PaymentGatewayController;
@@ -238,6 +240,14 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
     Route::post('payment-webhooks/{provider}/{webhookKey}', [PaymentWebhookController::class, 'receive'])
         ->where(['provider' => '[a-z0-9_]{2,32}', 'webhookKey' => '[A-Za-z0-9]{32,128}'])
         ->middleware('throttle:600,1');
+    // PAY-H2-02e: واجهة رابط الدفع العام — بلا مصادقة (الرمز هو القدرة)، تحدّ لكل رمز وIP، رؤوس no-store.
+    Route::prefix('pay/v1/{token}')   // لا قيد صيغة على المسار: الصيغة الخاطئة يردّها `ResolvePaymentLink` بالـ404 الموحّد نفسه وبرؤوس الحماية
+        ->middleware([\App\Http\Middleware\HardenPaymentLinkResponse::class, \App\Http\Middleware\ForceJsonResponse::class, 'throttle:pay-link', \App\Http\Middleware\ResolvePaymentLink::class])
+        ->group(function (): void {
+            Route::get('/', [PublicPaymentLinkController::class, 'show']);
+            Route::post('attempts', [PublicPaymentLinkController::class, 'startAttempt']);
+            Route::get('status', [PublicPaymentLinkController::class, 'status']);
+        });
     Route::get('company-browser-identity', [CompanyBrowserIdentityController::class, 'show'])
         ->middleware('throttle:60,1');
 
@@ -556,6 +566,11 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('partners/{id}', [PartnerController::class, 'show'])->middleware($perm('partners.view'));
         Route::post('partners', [PartnerController::class, 'store'])->middleware($perm('partners.manage'));
         Route::put('partners/{id}', [PartnerController::class, 'update'])->middleware($perm('partners.manage'));
+        // IMP-H3-S2: استيراد العملاء/الموردين — قالب/حقول/فحص/معاينة فقط (لا apply متزامن؛ التنفيذ عبر import-jobs المربوط بالمعاينة).
+        Route::get('partners/import/template', [PartnerImportController::class, 'template'])->middleware($perm('partners.manage'));
+        Route::get('partners/import/fields', [PartnerImportController::class, 'fields'])->middleware($perm('partners.manage'));
+        Route::post('partners/import/inspect', [PartnerImportController::class, 'inspect'])->middleware([$perm('partners.manage'), EnsureImportFilesScanned::class]);
+        Route::post('partners/import/preview', [PartnerImportController::class, 'preview'])->middleware([$perm('partners.manage'), EnsureImportFilesScanned::class]);
         // مواعيد العملاء (غير محاسبية)
         Route::get('appointments', [AppointmentController::class, 'index'])->middleware($perm('partners.view'));
         Route::get('invoices/{id}/appointments', [AppointmentController::class, 'forInvoice'])->middleware($perm('partners.view'));
@@ -1051,6 +1066,7 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('invoices/{invoiceId}/payment-requests', [InvoicePaymentRequestController::class, 'index'])->whereUuid('invoiceId')->middleware($perm('payments.view'));
         Route::post('invoices/{invoiceId}/payment-requests', [InvoicePaymentRequestController::class, 'store'])->whereUuid('invoiceId')->middleware($perm('payments.manage'));
         Route::post('payment-requests/{id}/cancel', [InvoicePaymentRequestController::class, 'cancel'])->whereUuid('id')->middleware($perm('payments.manage'));
+        Route::post('payment-requests/{id}/link', [InvoicePaymentRequestController::class, 'issueLink'])->whereUuid('id')->middleware([$perm('payments.manage'), 'throttle:20,1']);
         Route::post('payment-requests/{id}/attempts', [InvoicePaymentRequestController::class, 'startAttempt'])->whereUuid('id')->middleware([$perm('payments.manage'), 'throttle:30,1']);
         // PAY-H2-02d: دفعات إلكترونية محجوبة بفترة مقفلة + إعادة ترحيل صريحة بفاعل وسبب (owner/admin).
         Route::get('payment-attempts/blocked', [PaymentAttemptPostingController::class, 'blocked'])->middleware($perm('payments.resolve_blocked'));
