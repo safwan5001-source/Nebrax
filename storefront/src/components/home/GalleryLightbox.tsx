@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
+import { MotionPicture, MotionToggle } from "@/components/ui/motion-picture";
 import type { GalleryLabels, GalleryViewerItem } from "./GalleryClient";
-import { REDUCED_MOTION_QUERY } from "@/lib/presentation/animated-sources";
 
 const SWIPE_MIN_PX = 50;
 const SWIPE_MAX_VERTICAL_PX = 75;
@@ -21,6 +21,10 @@ function fill(template: string, values: Record<string, string | number>) {
  * picture that opened it (the parent restores it). Direction is the document's: the previous / next buttons sit on the
  * logical edges, ← / → follow the VISUAL direction (so in RTL, ← is "next"), and a swipe toward the inline-start edge goes
  * forward. Nothing animates (the viewer is the same under `prefers-reduced-motion`).
+ *
+ * AWJ-ANIMATED-MEDIA — an animated picture is drawn by `MotionPicture`, exactly as in the grid (still first, reduced-motion poster,
+ * animation added once hydrated). It carries the gallery's motion identity, so a picture the visitor already paused / that already
+ * used its bounded window stays still here; with `showMotionControls` the same pause/play control sits in the viewer.
  */
 export function GalleryLightbox({
   items,
@@ -29,6 +33,7 @@ export function GalleryLightbox({
   onClose,
   labels,
   dir,
+  motionToggleId,
 }: {
   items: GalleryViewerItem[];
   index: number;
@@ -36,6 +41,7 @@ export function GalleryLightbox({
   onClose: () => void;
   labels: GalleryLabels;
   dir: "ltr" | "rtl";
+  motionToggleId?: string;
 }) {
   const total = items.length;
   const item = items[index];
@@ -111,6 +117,24 @@ export function GalleryLightbox({
 
   if (!item) return null;
 
+  const viewerPicture = (
+    <>
+      {item.webp ? (
+        <source type="image/webp" srcSet={item.webp} sizes="100vw" />
+      ) : null}
+      <img
+        key={item.src}
+        src={item.src}
+        srcSet={item.jpg || undefined}
+        sizes="100vw"
+        width={item.width}
+        height={item.height}
+        alt={item.alt}
+        decoding="async"
+      />
+    </>
+  );
+
   return (
     <div
       ref={rootRef}
@@ -181,24 +205,22 @@ export function GalleryLightbox({
           </button>
         </>
       ) : null}
+      {motionToggleId && item.motion ? (
+        <MotionToggle id={motionToggleId} />
+      ) : null}
       <figure data-gallery-viewer-figure="">
-        <picture>
-          {item.animation ? <source media={REDUCED_MOTION_QUERY} type="image/webp" srcSet={item.webp || item.src} /> : null}
-          {item.animation ? <source type={item.format === "gif" ? "image/gif" : "image/webp"} srcSet={item.animation} /> : null}
-          {item.webp ? (
-            <source type="image/webp" srcSet={item.webp} sizes="100vw" />
-          ) : null}
-          <img
+        {item.motion ? (
+          <MotionPicture
             key={item.src}
-            src={item.src}
-            srcSet={item.jpg || undefined}
-            sizes="100vw"
-            width={item.width}
-            height={item.height}
-            alt={item.alt}
-            decoding="async"
-          />
-        </picture>
+            id={item.motion.id}
+            sources={item.motion.sources}
+            autoStopMs={item.motion.autoStopMs}
+          >
+            {viewerPicture}
+          </MotionPicture>
+        ) : (
+          <picture>{viewerPicture}</picture>
+        )}
         {item.caption ? <figcaption>{item.caption}</figcaption> : null}
       </figure>
       <p data-gallery-viewer-count="" role="status" aria-live="polite">

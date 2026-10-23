@@ -347,4 +347,207 @@ test.describe("animated media — real Chromium", () => {
     expect(log.filter((f) => f.startsWith("animated."))).toEqual([]);
     await expect(page.locator(TOGGLE)).toHaveCount(0);
   });
+
+  // ── gallery (AWJ-ANIMATED-MEDIA, PR #1652) ─────────────────────────────────────────────────────
+  const GAL = "[data-gallery-item]:first-child [data-gallery-picture] img";
+  const GAL_STILL =
+    "[data-gallery-item]:nth-child(2) [data-gallery-picture] img";
+  const VIEWER_IMG = "[data-gallery-viewer] img";
+
+  test("gallery GIF: still first, then the animation; the still neighbour is untouched; no hydration errors", async ({
+    page,
+  }) => {
+    const log: string[] = [];
+    const errors = watchErrors(page);
+    await serveMedia(page, log);
+    await open(page, "gallery-gif");
+    await expect.poll(() => currentSrc(page, GAL)).toMatch(/animated\.gif$/);
+    expect(await currentSrc(page, GAL_STILL)).toMatch(/800w\.(webp|jpg)$/);
+    expect(
+      await page.evaluate(
+        (sel) => (document.querySelector(sel) as HTMLImageElement).naturalWidth,
+        GAL,
+      ),
+    ).toBeGreaterThan(0);
+    expect(errors, errors.join("\n")).toEqual([]);
+  });
+
+  test("gallery GIF playback: frames really change (skipped where the browser cannot animate a control GIF)", async ({
+    page,
+  }) => {
+    await serveMedia(page, []);
+    await open(page, "gallery-gif");
+    await expect.poll(() => currentSrc(page, GAL)).toMatch(/animated\.gif$/);
+    test.skip(
+      !(await browserAnimates(page)),
+      "this Chromium build does not advance animated images",
+    );
+    const seen = new Set(await frames(page, GAL));
+    expect(seen.has("r") && seen.has("b") && seen.has("g")).toBe(true);
+  });
+
+  test("gallery animated WebP decodes and renders at the right size", async ({
+    page,
+  }) => {
+    await serveMedia(page, []);
+    await open(page, "gallery-webp");
+    await expect.poll(() => currentSrc(page, GAL)).toMatch(/animated\.webp$/);
+    expect(
+      await page.evaluate(
+        (sel) => (document.querySelector(sel) as HTMLImageElement).naturalWidth,
+        GAL,
+      ),
+    ).toBe(400);
+  });
+
+  test("gallery default (showMotionControls off): no pause button; the animation settles on the still after the 5 s window", async ({
+    page,
+  }) => {
+    await serveMedia(page, []);
+    await open(page, "gallery-gif");
+    await expect.poll(() => currentSrc(page, GAL)).toMatch(/animated\.gif$/);
+    await expect(page.locator(TOGGLE)).toHaveCount(0);
+    await expect(page.locator("[data-gallery-motion]")).toHaveCount(0);
+    // WCAG 2.2.2: never longer than ~5 s of automatic motion without a control
+    await expect
+      .poll(() => currentSrc(page, GAL), { timeout: 9_000 })
+      .toMatch(/800w\.(webp|jpg)$/);
+    expect(await currentSrc(page, GAL)).not.toMatch(/animated/);
+  });
+
+  test("gallery with showMotionControls: one control pauses and resumes, keyboard operable, nothing auto-settles", async ({
+    page,
+  }) => {
+    await serveMedia(page, []);
+    await open(page, "gallery-controls");
+    const toggle = page.locator(`[data-gallery-motion] ${TOGGLE}`);
+    await expect(toggle).toHaveCount(1);
+    await expect.poll(() => currentSrc(page, GAL)).toMatch(/animated\.gif$/);
+    await page.waitForTimeout(6_500); // past the default window
+    expect(await currentSrc(page, GAL)).toMatch(/animated\.gif$/);
+    await toggle.focus();
+    await page.keyboard.press("Enter");
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    await expect.poll(() => currentSrc(page, GAL)).toMatch(/800w\.(webp|jpg)$/);
+    await page.keyboard.press("Enter");
+    await expect.poll(() => currentSrc(page, GAL)).toMatch(/animated\.gif$/);
+    const box = await toggle.boundingBox();
+    expect(box?.width ?? 0).toBeGreaterThanOrEqual(40);
+  });
+
+  test("gallery control sits at the inline end of the gallery, in LTR and RTL", async ({
+    page,
+  }) => {
+    await serveMedia(page, []);
+    for (const [locale, inlineEndIsRight] of [
+      ["en", true],
+      ["ar", false],
+    ] as const) {
+      await open(page, "gallery-controls", locale);
+      const toggle = page.locator(`[data-gallery-motion] ${TOGGLE}`);
+      await expect(toggle).toBeVisible();
+      const box = await toggle.boundingBox();
+      const gallery = await page.locator("[data-gallery]").boundingBox();
+      if (!box || !gallery) throw new Error("no layout");
+      const midpoint = gallery.x + gallery.width / 2;
+      expect(box.x + box.width / 2 > midpoint).toBe(inlineEndIsRight);
+    }
+  });
+
+  test("gallery lightbox: opens on the animation, shares the control, closes back to the opener", async ({
+    page,
+  }) => {
+    await serveMedia(page, []);
+    await open(page, "gallery-controls");
+    await expect.poll(() => currentSrc(page, GAL)).toMatch(/animated\.gif$/);
+    await page.locator("a[data-gallery-open='0']").click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect
+      .poll(() => currentSrc(page, VIEWER_IMG))
+      .toMatch(/animated\.gif$/);
+    const viewerToggle = dialog.locator(TOGGLE);
+    await expect(viewerToggle).toHaveAccessibleName("Pause animation");
+    await viewerToggle.click();
+    await expect
+      .poll(() => currentSrc(page, VIEWER_IMG))
+      .toMatch(/\.(webp|jpg)$/);
+    // next ⇒ the still picture has no control; previous ⇒ back on the (paused) animated one
+    await page.getByRole("button", { name: "Next picture" }).click();
+    await expect(dialog.locator(TOGGLE)).toHaveCount(0);
+    expect(await currentSrc(page, VIEWER_IMG)).toMatch(/\.(webp|jpg)$/);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+  });
+
+  test("gallery reduced motion: stills only, the animation is NEVER requested, no control", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ reducedMotion: "reduce" });
+    const page = await context.newPage();
+    const log: string[] = [];
+    await serveMedia(page, log);
+    await open(page, "gallery-controls");
+    await page.waitForLoadState("networkidle");
+    await expect.poll(() => currentSrc(page, GAL)).toMatch(/800w\.(webp|jpg)$/);
+    expect(log.filter((f) => f.startsWith("animated."))).toEqual([]);
+    await expect(page.locator(TOGGLE)).toHaveCount(0);
+    await context.close();
+  });
+
+  test("gallery without JavaScript: the still only, nothing fetched, no dead control", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ javaScriptEnabled: false });
+    const page = await context.newPage();
+    const log: string[] = [];
+    await serveMedia(page, log);
+    await open(page, "gallery-controls");
+    await page.waitForLoadState("networkidle");
+    expect(await currentSrc(page, GAL)).toMatch(/800w\.(webp|jpg)$/);
+    expect(log.filter((f) => f.startsWith("animated."))).toEqual([]);
+    await expect(page.locator("[data-motion-toggle]")).toHaveCount(0);
+    await context.close();
+  });
+
+  test("gallery on a phone: no horizontal scroll, the control is a touch-sized target inside the gallery", async ({
+    browser,
+  }) => {
+    const phone = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      isMobile: true,
+      hasTouch: true,
+      deviceScaleFactor: 3,
+    });
+    const page = await phone.newPage();
+    await serveMedia(page, []);
+    await open(page, "gallery-controls");
+    await expect.poll(() => currentSrc(page, GAL)).toMatch(/animated\.gif$/);
+    const box = await page
+      .locator(`[data-gallery-motion] ${TOGGLE}`)
+      .boundingBox();
+    const gallery = await page.locator("[data-gallery]").boundingBox();
+    if (!box || !gallery) throw new Error("no layout");
+    expect(box.width).toBeGreaterThanOrEqual(40);
+    expect(box.x).toBeGreaterThanOrEqual(gallery.x);
+    expect(box.x + box.width).toBeLessThanOrEqual(gallery.x + gallery.width);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+    await phone.close();
+  });
+
+  test("static gallery: byte-for-byte the old behaviour — no animation request, no control", async ({
+    page,
+  }) => {
+    const log: string[] = [];
+    await serveMedia(page, log);
+    await open(page, "gallery-static");
+    await page.waitForLoadState("networkidle");
+    expect(log.filter((f) => f.startsWith("animated."))).toEqual([]);
+    await expect(page.locator(TOGGLE)).toHaveCount(0);
+    await expect(page.locator("[data-gallery-motion]")).toHaveCount(0);
+  });
 });

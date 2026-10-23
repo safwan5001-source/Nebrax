@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
+import type { AnimatedPictureSources } from "@/lib/presentation/animated-sources";
 
 /** The viewer is loaded the first time a picture is opened — its focus handling and navigation never ship with the page. */
 const GalleryLightbox = dynamic(
@@ -17,8 +18,12 @@ const GalleryLightbox = dynamic(
 );
 
 export interface GalleryViewerItem {
-  animation?: string;
-  format?: "gif" | "webp";
+  /** Present only for an animated picture: its `MotionPicture` identity and sources (built for the viewer's full width). */
+  motion?: {
+    id: string;
+    sources: AnimatedPictureSources;
+    autoStopMs?: number;
+  };
   webp: string;
   jpg: string;
   src: string;
@@ -60,6 +65,7 @@ export function GalleryClient({
   viewer,
   dir,
   sectionId,
+  motionToggleId,
   children,
 }: {
   labels: GalleryLabels;
@@ -68,6 +74,8 @@ export function GalleryClient({
   viewer: boolean;
   dir: "ltr" | "rtl";
   sectionId: string;
+  /** Set when the gallery shows its pause/play control: the viewer then shows the same control (same state). */
+  motionToggleId?: string;
   children: ReactNode;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -188,6 +196,7 @@ export function GalleryClient({
           onClose={() => setOpen(null)}
           labels={labels}
           dir={dir}
+          motionToggleId={motionToggleId}
         />
       ) : null}
     </div>

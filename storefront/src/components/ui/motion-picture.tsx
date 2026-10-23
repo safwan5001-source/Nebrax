@@ -5,6 +5,7 @@ import {
   type ComponentPropsWithoutRef,
   type ReactNode,
   useEffect,
+  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
@@ -26,6 +27,10 @@ import {
  *    still ladder (the reduced-motion `<source>`s and the `<img>`); the animated `<source>`s are added after
  *    hydration, together with the pause control. As a side benefit the still paints first (LCP) and the
  *    animation file is fetched only once the page is interactive.
+ *  - **A surface with no visible pause control** (a gallery whose merchant keeps `showMotionControls` off) passes `autoStopMs`:
+ *    the animation then plays for that long once the picture is on screen and settles on the still frame — the same
+ *    "drop the animated sources" mechanism, started by a timer instead of a button (WCAG 2.2.2). Surfaces that do show a
+ *    control never pass it, so their behaviour is unchanged.
  */
 
 const paused = new Map<string, boolean>();
@@ -60,15 +65,52 @@ export function useMotionPaused(id: string): boolean {
   );
 }
 
+/** Starts the clock when the picture is first visible (immediately where `IntersectionObserver` is missing), then pauses `id`. */
+function useMotionBudget(
+  ref: React.RefObject<HTMLPictureElement | null>,
+  id: string,
+  budgetMs: number | undefined,
+  armed: boolean,
+): void {
+  useEffect(() => {
+    if (!budgetMs || !armed) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const start = () => {
+      timer ??= setTimeout(() => setPaused(id, true), budgetMs);
+    };
+    const target = ref.current?.querySelector("img") ?? ref.current;
+    if (!target || typeof IntersectionObserver === "undefined") {
+      start();
+      return () => clearTimeout(timer);
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        observer.disconnect();
+        start();
+      },
+      { threshold: 0.25 },
+    );
+    observer.observe(target);
+    return () => {
+      observer.disconnect();
+      clearTimeout(timer);
+    };
+  }, [ref, id, budgetMs, armed]);
+}
+
 export function MotionPicture({
   id,
   sources,
   phoneStills,
+  autoStopMs,
   children,
   ...pictureProps
 }: {
   id: string;
   sources: AnimatedPictureSources;
+  /** Play at most this long once visible, then settle on the still (see the file header). Omit where a pause control is shown. */
+  autoStopMs?: number;
   /** The caller's existing phone-sized stills (slot 3). */
   phoneStills?: ReactNode;
   /** The caller's existing desktop WebP `<source>` and the `<img>` (slot 5). */
@@ -76,6 +118,8 @@ export function MotionPicture({
 } & ComponentPropsWithoutRef<"picture">) {
   const isPaused = useMotionPaused(id);
   const hydrated = useHydrated();
+  const pictureRef = useRef<HTMLPictureElement>(null);
+  useMotionBudget(pictureRef, id, autoStopMs, hydrated && !isPaused);
   // Animated sources exist only while hydrated and not paused; the stills are always present.
   const live = (list: AnimatedPictureSources["leading"]) =>
     list.filter((s) => !(s.animated && (isPaused || !hydrated)));
@@ -93,7 +137,7 @@ export function MotionPicture({
   );
 
   return (
-    <picture {...pictureProps}>
+    <picture ref={pictureRef} {...pictureProps}>
       {live(sources.leading).map((s, i) => toSource(s, `l${i}`))}
       {phoneStills}
       {live(sources.beforeDesktop).map((s, i) => toSource(s, `d${i}`))}

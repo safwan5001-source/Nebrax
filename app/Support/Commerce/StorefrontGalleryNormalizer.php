@@ -9,7 +9,7 @@ namespace App\Support\Commerce;
  * ```
  * content = { images: Image[2-24 في النشر، حتى 24 في المسودة], options?: Options }
  * Image   = { id, media: MediaRef, caption?: string, link?: string }
- * Options = { columns?: 2|4|6, aspect?: '4:3'|'16:9'|'4:5', gap?: 'none'|'xs'|'sm'|'lg'|'xl', captions?: true, lightbox?: true }
+ * Options = { columns?: 2|4|6, aspect?: '4:3'|'16:9'|'4:5', gap?: 'none'|'xs'|'sm'|'lg'|'xl', captions?: true, lightbox?: true, showMotionControls?: true }
  * ```
  * والتخطيط `grid | carousel` يعيش في `design.layout` (V0 §3.4: الغياب = شبكة، `carousel` وحده يُخزَّن).
  *
@@ -18,6 +18,9 @@ namespace App\Support\Commerce;
  *    والنص البديل لكل لغة تحرسه بوابة الوسائط العامة (AMEND-10/14) بلا مسارٍ جديد.
  *  - **الإعدادات** لا يُخزَّن منها إلا ما يخالف الافتراضي (3 أعمدة، 1:1، فجوة md، بلا تعليقات، بلا lightbox) فتتطابق الوثائق
  *    المتكافئة حرفياً. المفاتيح خارج القائمة تسقط واحداً واحداً؛ وصورةٌ بلا مرجع صالح تسقط كلّها.
+ *  - **`showMotionControls`** (AWJ-ANIMATED-MEDIA، يخصّ المعرض وحده): يُخزَّن `true` فقط حين يختاره التاجر، فلا يدخل مفتاحٌ جديد وثيقةً قديمة
+ *    ولا يتغيّر بايت منشور. الغياب = بلا زرّ إيقاف ظاهر، وعندها يقصر المتجر الحركة على مهلة تشغيل محدودة (WCAG 2.2.2)؛ وتفعيله
+ *    يُظهر زرّ إيقاف/تشغيل واحداً للمعرض. لا أثر له على معرضٍ بلا صورة متحركة.
  *  - **التعليق** نصٌّ بلغة المتجر (كعناوين الشرائح): يُحفظ كما كُتب بقصٍّ بنقاط الترميز، والفراغ وحده غياب. يُعرض فقط حين
  *    `captions` مفعّل، لكنه يُحفظ دائماً فلا يضيع بتبديل الخيار.
  *  - **الرابط** per-image عبر قواعد روابط المحتوى المشتركة (`sanitizeContentHref`) فلا `javascript:` ولا مضيف خارجي غير آمن.
@@ -139,6 +142,9 @@ final class StorefrontGalleryNormalizer
         }
         if (($raw['lightbox'] ?? null) === true) {
             $out['lightbox'] = true;
+        }
+        if (($raw['showMotionControls'] ?? null) === true) {
+            $out['showMotionControls'] = true;
         }
 
         return $out;

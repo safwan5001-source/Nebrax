@@ -72,10 +72,18 @@ describe("gallery helpers (V8d)", () => {
       gap: "md",
       captions: false,
       lightbox: false,
+      showMotionControls: false,
     });
     expect(
-      resolveGalleryOptions({ columns: 6, aspect: "4:5", gap: "none", captions: true, lightbox: true }),
-    ).toEqual({ columns: 6, aspect: "4:5", gap: "none", captions: true, lightbox: true });
+      resolveGalleryOptions({
+        columns: 6,
+        aspect: "4:5",
+        gap: "none",
+        captions: true,
+        lightbox: true,
+        showMotionControls: true,
+      }),
+    ).toEqual({ columns: 6, aspect: "4:5", gap: "none", captions: true, lightbox: true, showMotionControls: true });
   });
 
   it("galleryContentOf reads only a gallery's own images", () => {

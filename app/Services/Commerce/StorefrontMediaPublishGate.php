@@ -30,7 +30,8 @@ class StorefrontMediaPublishGate
 
     /**
      * AWJ-ANIMATED-MEDIA P1 — المواضع التي يُصيِّر المتجر فيها الحركة فعلاً: خلفية قسم (hero/banner) وصور شرائح
-     * السلايدر. في أي موضعٍ آخر (شعار، معرض، كتل محتوى…) ستظهر صورةً ثابتة بصمت، فنرفضها عند النشر برمزٍ صريح
+     * السلايدر وصور المعرض `gallery` (`content.images.N.media`، الصورة المصغّرة والعارض المكبّر كلاهما، مع مهلة التشغيل
+     * أو زرّ الإيقاف حسب `options.showMotionControls`). في أي موضعٍ آخر (شعار، كتل محتوى…) ستظهر صورةً ثابتة بصمت، فنرفضها عند النشر برمزٍ صريح
      * بدل خداع التاجر. (المسارات كما يفتاحها الماسح: `homepage.sections.N.…`).
      */
     private const ANIMATED_ALLOWED_PATH = '/\Ahomepage\.sections\.\d+\.(?:design\.background\.(?:media|mobile)|content\.slides\.\d+\.(?:media|mobile)|content\.images\.\d+\.media)\z/';

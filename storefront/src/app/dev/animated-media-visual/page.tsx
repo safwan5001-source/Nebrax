@@ -1,6 +1,9 @@
 import { notFound } from "next/navigation";
+import { HomeGallery } from "@/components/home/HomeGallery";
 import { HomeSlider, type SliderLabels } from "@/components/home/HomeSlider";
 import { SectionBackdrop } from "@/components/home/SectionBackdrop";
+import { resolveGalleryOptions } from "@/lib/presentation/gallery-content";
+import type { GalleryImageView } from "@/lib/presentation/gallery-resolve";
 import type { ResolvedMedia } from "@/lib/presentation/media-ref";
 import { resolveSliderBehaviour } from "@/lib/presentation/slider-content";
 import type { SlideView } from "@/lib/presentation/slider-resolve";
@@ -13,7 +16,8 @@ import { PublishedFrame } from "../customizer-visual/frame";
  * and `HomeSlider` against resolved media whose URLs are the same-origin proxy paths; the Playwright spec
  * (`e2e/animated-media-visual.spec.ts`) answers those paths with the sanitised fixtures. Production requests 404.
  *
- * `?scenario=` desktop-gif | desktop-webp | phone-gif | static | slider · `?locale=` ar | en
+ * `?scenario=` desktop-gif | desktop-webp | phone-gif | static | slider | gallery-gif | gallery-webp | gallery-controls |
+ * gallery-static · `?locale=` ar | en (gallery: animated first picture, a still second, `-controls` = `showMotionControls`).
  */
 const ID = "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e";
 const P = `/api/storefront/media/customizer/${ID}`;
@@ -23,7 +27,18 @@ type Scenario =
   | "desktop-webp"
   | "phone-gif"
   | "static"
-  | "slider";
+  | "slider"
+  | "gallery-gif"
+  | "gallery-webp"
+  | "gallery-controls"
+  | "gallery-static";
+
+const GALLERY_SCENARIOS: readonly Scenario[] = [
+  "gallery-gif",
+  "gallery-webp",
+  "gallery-controls",
+  "gallery-static",
+];
 
 const stills = (tag: string): ResolvedMedia["sources"] => [
   {
@@ -92,6 +107,31 @@ function slide(i: number, animated?: "gif"): SlideView {
   };
 }
 
+function galleryImage(i: number, animated?: "gif" | "webp"): GalleryImageView {
+  return {
+    id: `g${i}`,
+    position: i + 1,
+    media: media(`g${i}-`, animated),
+    fit: "cover",
+    alt: `Picture ${i + 1}`,
+    caption: "",
+    link: null,
+  };
+}
+
+const GALLERY_LABELS = {
+  label: "Gallery",
+  item: "Picture {number}",
+  previous: "Previous pictures",
+  next: "Next pictures",
+  open: "View picture {number} larger",
+  viewer: "Picture viewer",
+  close: "Close viewer",
+  viewerPrevious: "Previous picture",
+  viewerNext: "Next picture",
+  counter: "{current} of {total}",
+};
+
 export default async function AnimatedMediaVisualPage({
   searchParams,
 }: {
@@ -106,8 +146,9 @@ export default async function AnimatedMediaVisualPage({
     params.scenario === "desktop-webp" ||
     params.scenario === "phone-gif" ||
     params.scenario === "static" ||
-    params.scenario === "slider"
-      ? params.scenario
+    params.scenario === "slider" ||
+    GALLERY_SCENARIOS.includes(params.scenario as Scenario)
+      ? (params.scenario as Scenario)
       : "desktop-gif";
 
   const backdrop =
@@ -127,7 +168,38 @@ export default async function AnimatedMediaVisualPage({
         data-scenario={scenario}
         className="min-h-dvh bg-store-background text-store-foreground"
       >
-        {scenario === "slider" ? (
+        {GALLERY_SCENARIOS.includes(scenario) ? (
+          <div style={{ maxWidth: 720, margin: "0 auto", padding: 16 }}>
+            <HomeGallery
+              view={{
+                images: [
+                  galleryImage(
+                    0,
+                    scenario === "gallery-static"
+                      ? undefined
+                      : scenario === "gallery-webp"
+                        ? "webp"
+                        : "gif",
+                  ),
+                  galleryImage(1),
+                ],
+                options: resolveGalleryOptions({
+                  columns: 2,
+                  lightbox: true,
+                  ...(scenario === "gallery-controls"
+                    ? { showMotionControls: true }
+                    : {}),
+                }),
+                layout: "grid",
+              }}
+              labels={GALLERY_LABELS}
+              basePath="/dev/animated-media-visual"
+              dir={locale === "ar" ? "rtl" : "ltr"}
+              priority
+              sectionId="dev-gallery"
+            />
+          </div>
+        ) : scenario === "slider" ? (
           <HomeSlider
             view={{
               slides: [slide(0, "gif"), slide(1), slide(2)],
