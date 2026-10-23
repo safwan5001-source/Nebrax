@@ -67,7 +67,7 @@
 ## 5. Build / CI
 
 * لم يُشغَّل `next build` محلياً (Web CI وStorefront CI يفرضانه على الـPR). التحقق المحلي: `tsc --noEmit`، `biome format` على ملفات storefront المتغيّرة، و`vitest`.
-* حزمة PHP الكاملة: النتيجة في وصف الـPR/أدناه.
+* حزمة PHP الكاملة محلياً (`php artisan test`، sqlite): **8598 passed / 206 skipped / 26 failed**. الإخفاقات الـ26 كلها في ست فئات وقود (`FuelAviRfidServiceTest`، `FuelReconciliationTest`، `FuelSaleApiTest`، `FuelSaleServiceTest`، `FuelSupplyReceivingApiTest`، `FuelSupplyReceivingTest`) وسببها غياب امتداد PHP `bcmath` في هذه البيئة (`bcmul`… في `FuelCostBasisService`)، وهو ما حذّر منه هوك تهيئة الجلسة؛ تنجح في CI الذي يحمّل الامتداد. لا صلة لها بتغيير الـHero (لا يلمس الوقود ولا المحاسبة). كل اختبارات العرض/التباين/المحتوى الخاصة بالمهمة ضمن الناجحة.
 
 ## 6. المخاطر والمتبقي
 
