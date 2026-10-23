@@ -22,17 +22,20 @@ final class AiActionPolicy
         private readonly TenantContext $tenantContext,
         private readonly BranchContext $branchContext,
         private readonly EnsureApplicationActive $applications,
+        private readonly AiActionsAccessResolver $controls,
     ) {}
 
     /**
      * @param list<string> $domainPermissions كلها مطلوبة (AND) — صلاحيات واجهة المجال المباشرة.
      * @param ?string $applicationKey قدرة التطبيق التي تحرس واجهة المجال المباشرة، أو null إن لم تحرسها.
      *
+     * `$actionType`: نوع الإجراء لضوابط المشغّل؛ كل استدعاء من `AiActionGateway` يمرّره (يحرس ذلك `AiActionControlWiringTest`).
+     *
      * قدرة التطبيق تمرّ بـ`EnsureApplicationActive::authorize` نفسها (لا نسخة ثانية من القواعد):
      * `suspended` قراءة فقط فتمرّ القراءات (GET) وتُرفض الكتابات. كل استدعاءات AI Actions تأتي من طلب HTTP،
      * فتصنيف القراءة/الكتابة هو تصنيف الطلب الحالي.
      */
-    public function authorize(string $actorId, string $actionPermission, array $domainPermissions, ?string $applicationKey = null): User
+    public function authorize(string $actorId, string $actionPermission, array $domainPermissions, ?string $applicationKey = null, ?string $actionType = null): User
     {
         if (config('ai_actions.enabled') !== true) {
             throw new AiActionException('platform_disabled', 'AI Actions غير مفعّلة على المنصة.', 403);
@@ -49,6 +52,10 @@ final class AiActionPolicy
         }
         if ((Settings::group('ai_actions', $tenant)['enabled'] ?? false) !== true) {
             throw new AiActionException('tenant_not_enabled', 'AI Actions غير مفعّلة لهذه المؤسسة.', 403);
+        }
+        // IMP-X-01b: ضوابط المشغّل (معاينة/مراجعة). خلف بوابة نشر مغلقة افتراضياً؛ شرط لازم لا كافٍ — RBAC والفرع والمعاينة والموافقة تتبع كما هي.
+        if ($actionType !== null) {
+            $this->controls->assertAllowed($tenantId, $actionType, AiActionsAccessResolver::PREVIEW);
         }
         if (! Rbac::allows((string) $actor->role, $actionPermission)) {
             throw new AiActionException('permission_denied', 'ليس لديك صلاحية AI Action أو صلاحية المجال المطلوبة.', 403);

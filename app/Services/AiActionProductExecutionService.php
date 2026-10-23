@@ -58,6 +58,7 @@ final class AiActionProductExecutionService
         private readonly ProductImageInspector $inspector,
         private readonly TenantContext $tenantContext,
         private readonly BranchContext $branchContext,
+        private readonly AiActionsAccessResolver $controls,
     ) {}
 
     /**
@@ -71,6 +72,7 @@ final class AiActionProductExecutionService
         $this->assertEnabled();
         $actor = $this->gateway->authorizeFor($requestActor, $action, AiActionPolicy::APPROVE);
         $this->assertProductImport($action);
+        $this->controls->assertAllowed($this->tenantContext->id(), $action->type, AiActionsAccessResolver::EXECUTION);
         $action = $this->ledger->expireIfDue($action);
 
         $outcome = DB::transaction(function () use ($action, $expectedVersion, $actor): array {
@@ -154,6 +156,7 @@ final class AiActionProductExecutionService
         $this->assertEnabled();
         $actor = $this->gateway->authorizeFor($requestActor, $action, AiActionPolicy::APPROVE);
         $this->assertProductImport($action);
+        $this->controls->assertAllowed($this->tenantContext->id(), $action->type, AiActionsAccessResolver::EXECUTION);
         $execution = $this->find($action, $executionId);
 
         DB::transaction(function () use ($action, $execution, $actor): void {
@@ -339,8 +342,12 @@ final class AiActionProductExecutionService
                 ->limit(max(1, (int) config('ai_actions.execution_batch_rows', 200)))->get();
             $done = ['success' => 0, 'failed' => 0];
             foreach ($batch as $result) {
+                // IMP-X-01b: إيقاف المشغّل أثناء التنفيذ يسري خلال صفٍّ واحد — قراءة واحدة قبل كل كتابة؛ لا يُكتب صفٌّ بعد الإيقاف ولا تُكتب صور،
+                // والصفوف المتبقية تبقى «معلّقة» فيُستأنف التنفيذ بـ`run()` لاحقاً عند رفع الإيقاف (لا نصف صفٍّ أبداً: كل صف بمعاملته).
+                $this->controls->assertAllowed($this->tenantContext->id(), AiActionRegistry::PRODUCT_IMPORT, AiActionsAccessResolver::EXECUTION);
                 $done[$this->executeRow($actor, $result, $rows[$result->row_id] ?? null) ? 'success' : 'failed']++;
             }
+            $this->controls->assertAllowed($this->tenantContext->id(), AiActionRegistry::PRODUCT_IMPORT, AiActionsAccessResolver::EXECUTION);
             // Images follow their (already saved) product, each with its own result — a failed image never
             // changes the product row, and a saved product is never written again for the sake of an image.
             $pendingImages = AiActionExecutionImage::query()->where('ai_action_execution_id', $execution->id)
