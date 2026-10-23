@@ -180,7 +180,7 @@ export function PosTerminalPay({
             type="button"
             onClick={send}
             disabled={disabled || busy || amountMinor <= 0 || amountMinor > maxMinor}
-            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-bold text-white touch-manipulation focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:opacity-50"
+            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground touch-manipulation focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:opacity-50"
             data-testid="pos-terminal-send"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <CreditCard className="h-4 w-4" aria-hidden />}
@@ -241,12 +241,12 @@ export function PosTerminalPay({
             )}
             {needsCompensation(status) && (
               <>
-                <button type="button" onClick={() => void run(async () => (await api<{ data: PosTerminalRequest }>(`/pos/terminal-requests/${request.id}/void`, { method: 'POST' })).data)} disabled={busy} className="min-h-11 rounded-md bg-negative px-3 text-sm font-semibold text-white touch-manipulation focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50" data-testid="pos-terminal-retry-void">{t('retry_void')}</button>
+                <button type="button" onClick={() => void run(async () => (await api<{ data: PosTerminalRequest }>(`/pos/terminal-requests/${request.id}/void`, { method: 'POST' })).data)} disabled={busy} className="min-h-11 rounded-md bg-negative px-3 text-sm font-semibold text-primary-foreground touch-manipulation focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50" data-testid="pos-terminal-retry-void">{t('retry_void')}</button>
                 <button type="button" onClick={copySummary} className="min-h-11 rounded-md border border-border px-3 text-sm font-semibold text-text touch-manipulation hover:bg-background focus-visible:ring-2 focus-visible:ring-primary/40">{t('copy_for_manager')}</button>
               </>
             )}
             {isRetryable(status) && (
-              <button type="button" onClick={() => { setError(null); onRequest(null); }} disabled={disabled || busy} className="min-h-11 rounded-md bg-primary px-3 text-sm font-semibold text-white touch-manipulation focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50" data-testid="pos-terminal-retry">{t('try_again')}</button>
+              <button type="button" onClick={() => { setError(null); onRequest(null); }} disabled={disabled || busy} className="min-h-11 rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground touch-manipulation focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50" data-testid="pos-terminal-retry">{t('try_again')}</button>
             )}
           </div>
           {holdsPayment(status) && <p className="text-[11px] text-muted">{t('amount_locked')}</p>}

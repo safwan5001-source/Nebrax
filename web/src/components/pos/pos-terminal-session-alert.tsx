@@ -98,7 +98,7 @@ export function PosTerminalSessionAlert({
                 )}
                 {needsCompensation(request.status) && (
                   <>
-                    <button type="button" disabled={busyId === request.id} onClick={() => void act(request, 'void')} className="min-h-10 rounded-md bg-negative px-3 font-semibold text-white focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50" data-testid="pos-terminal-alert-retry-void">{t('retry_void')}</button>
+                    <button type="button" disabled={busyId === request.id} onClick={() => void act(request, 'void')} className="min-h-10 rounded-md bg-negative px-3 font-semibold text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50" data-testid="pos-terminal-alert-retry-void">{t('retry_void')}</button>
                     <button type="button" onClick={() => void navigator.clipboard?.writeText(escalationSummary(request, terminal?.name ?? null)).catch(() => {})} className="min-h-10 rounded-md border border-border px-3 font-semibold hover:bg-background focus-visible:ring-2 focus-visible:ring-primary/40">{t('copy_for_manager')}</button>
                   </>
                 )}
