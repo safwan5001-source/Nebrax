@@ -34,7 +34,7 @@
 | IMP-H2-S3 | ✅ | — | Workbook UX parity (inspect/template/mapping) | — | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H2-S4 | — | ✅ | Tenant `ai_actions.enabled` endpoint (backend; UI split to S4b) | — | — | — | — | — | — | — | — | — | — | In review (PR) | `ai.actions.manage`; report `IMP-H2-S4-REPORT.md` |
 | IMP-H2-S4b | — | ✅ | Settings card for the tenant opt-in + reason on AI import screens | H2-S4 | — | — | — | — | — | — | — | — | — | Planned | Web only |
-| IMP-H2-S5 | ✅ | ✅ | Sync V2 + AI preview/execution onto `ProductImportAdapter` (policy-expressed differences, parity test) | H1-S2, H2-S1, H2-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
+| IMP-H2-S5 | ✅ | ✅ | Sync V2 + AI preview/execution onto `ProductImportAdapter` (policy-expressed differences, parity test) | H1-S2, H2-S1, H2-S2 | — | — | — | — | — | — | — | — | — | **Split:** S5a in review (PR) · S5b planned | — |
 | IMP-H3-S1 | ✅ | ✅ | `PartnerImportFields` + adapter (no opening balance) | H1-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H3-S2 | ✅ | — | Partner inspect/preview endpoints (no sync apply) + `partner_master` job domain | H3-S1 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H3-S3 | ✅ | — | Customers/suppliers import UI | H3-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
