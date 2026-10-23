@@ -54,6 +54,12 @@
     {"name": "AWJ-HEADER-OVERLAY-TONE: without overlay-hero the tone is inert and dropped (solid mode)", "input": {"mode": "solid", "overlayTone": "dark", "shadow": "soft"}, "expected": {"mode": "solid", "shadow": "soft"}},
     {"name": "AWJ-HEADER-OVERLAY-TONE: no mode at all drops the tone", "input": {"overlayTone": "light", "shadow": "soft"}, "expected": {"shadow": "soft"}},
     {"name": "AWJ-HEADER-OVERLAY-TONE: an invalid tone (auto) is dropped on its own", "input": {"mode": "overlay-hero", "overlayTone": "auto"}, "expected": {"mode": "overlay-hero"}},
-    {"name": "AWJ-HEADER-OVERLAY-TONE: a colour object or non-string tone is dropped", "input": {"mode": "overlay-hero", "overlayTone": {"hex": "#ffffff"}}, "expected": {"mode": "overlay-hero"}}
+    {"name": "AWJ-HEADER-OVERLAY-TONE: a colour object or non-string tone is dropped", "input": {"mode": "overlay-hero", "overlayTone": {"hex": "#ffffff"}}, "expected": {"mode": "overlay-hero"}},
+    {"name": "AWJ-HEADER-SCRIM: auto is kept with overlay-hero, canonical order (mode, overlayTone, overlayScrim, sticky)", "input": {"sticky": "off", "overlayScrim": "auto", "overlayTone": "dark", "mode": "overlay-hero"}, "expected": {"mode": "overlay-hero", "overlayTone": "dark", "overlayScrim": "auto", "sticky": "off"}},
+    {"name": "AWJ-HEADER-SCRIM: auto alone with overlay-hero (no forced tone)", "input": {"mode": "overlay-hero", "overlayScrim": "auto"}, "expected": {"mode": "overlay-hero", "overlayScrim": "auto"}},
+    {"name": "AWJ-HEADER-SCRIM: without overlay-hero the scrim is inert and dropped (solid mode)", "input": {"mode": "solid", "overlayScrim": "auto", "shadow": "soft"}, "expected": {"mode": "solid", "shadow": "soft"}},
+    {"name": "AWJ-HEADER-SCRIM: no mode at all drops the scrim", "input": {"overlayScrim": "auto", "shadow": "soft"}, "expected": {"shadow": "soft"}},
+    {"name": "AWJ-HEADER-SCRIM: any other value (none, on) is dropped on its own", "input": {"mode": "overlay-hero", "overlayScrim": "none"}, "expected": {"mode": "overlay-hero"}},
+    {"name": "AWJ-HEADER-SCRIM: a non-string scrim (true, an object) is dropped", "input": {"mode": "overlay-hero", "overlayScrim": true}, "expected": {"mode": "overlay-hero"}}
   ]
 }

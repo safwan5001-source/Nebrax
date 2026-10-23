@@ -61,6 +61,14 @@ export const HEADER_MODES = ["solid", "overlay-hero"] as const;
  * 4.5:1 keeps the header solid at render time (no publish error) — never a forced unreadable overlay.
  */
 export const HEADER_OVERLAY_TONES = ["light", "dark"] as const;
+/**
+ * AWJ-HEADER-SCRIM — the protection layer of a transparent (overlay) header. Absent = none (exactly what every stored document
+ * does today: a picture the text cannot be proven over keeps the header solid). `auto` = add a band behind the header's rows
+ * (never over the rest of the picture) **only when the picture alone cannot prove the text legible**, at the weakest strength
+ * (one of a few steps) the contrast proof accepts; unprovable even at the strongest step keeps the header solid. Stored only
+ * with `mode: overlay-hero`.
+ */
+export const HEADER_OVERLAY_SCRIMS = ["auto"] as const;
 export const HEADER_STICKY = ["always", "on-scroll-up", "off"] as const;
 export const HEADER_BORDER_WIDTHS = ["none", "hairline", "medium"] as const;
 export const HEADER_SHADOWS = ["none", "soft", "medium"] as const;
@@ -71,6 +79,7 @@ export type HeaderHeight = (typeof HEADER_HEIGHTS)[number];
 export type HeaderLogoSize = (typeof HEADER_LOGO_SIZES)[number];
 export type HeaderMode = (typeof HEADER_MODES)[number];
 export type HeaderOverlayTone = (typeof HEADER_OVERLAY_TONES)[number];
+export type HeaderOverlayScrim = (typeof HEADER_OVERLAY_SCRIMS)[number];
 export type HeaderSticky = (typeof HEADER_STICKY)[number];
 export type HeaderBorderWidth = (typeof HEADER_BORDER_WIDTHS)[number];
 export type HeaderShadow = (typeof HEADER_SHADOWS)[number];
@@ -90,6 +99,8 @@ export interface HeaderDesign {
   mode?: HeaderMode;
   /** AWJ-HEADER-OVERLAY-TONE — with `overlay-hero` only: force light / dark text over the picture (absent = automatic). */
   overlayTone?: HeaderOverlayTone;
+  /** AWJ-HEADER-SCRIM — with `overlay-hero` only: `auto` adds a proven protection band behind the header rows when the picture alone cannot prove the text. */
+  overlayScrim?: HeaderOverlayScrim;
   sticky?: HeaderSticky;
   border?: { width: HeaderBorderWidth };
   shadow?: HeaderShadow;
@@ -140,6 +151,8 @@ export function normalizeHeaderDesign(raw: unknown): HeaderDesign | undefined {
   if (mode === "overlay-hero") {
     const overlayTone = pick(raw.overlayTone, HEADER_OVERLAY_TONES);
     if (overlayTone) out.overlayTone = overlayTone;
+    const overlayScrim = pick(raw.overlayScrim, HEADER_OVERLAY_SCRIMS);
+    if (overlayScrim) out.overlayScrim = overlayScrim;
   }
 
   const sticky = pick(raw.sticky, HEADER_STICKY);

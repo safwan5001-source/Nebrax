@@ -10,6 +10,7 @@ import {
   HEADER_LOGO_SIZES,
   HEADER_MODES,
   HEADER_MOBILE_LAYOUTS,
+  HEADER_OVERLAY_SCRIMS,
   HEADER_OVERLAY_TONES,
   HEADER_SHADOWS,
   HEADER_STICKY,
@@ -18,7 +19,7 @@ import {
   normalizeHeaderDesign,
   resolveHeaderDesign,
 } from "./presentation/header-design";
-import { type OverlayCandidateSection, overlayHeroCandidate } from "./presentation/header-overlay";
+import { type OverlayCandidateSection, resolveHeaderOverlay } from "./presentation/header-overlay";
 import type { ColorRef } from "./presentation/section-design";
 import type { DesignContext } from "./presentation/section-design-resolve";
 
@@ -51,6 +52,9 @@ const TONE_LABEL: Record<(typeof HEADER_OVERLAY_TONES)[number], CustomizerMessag
   light: "headerOverlayToneLight",
   dark: "headerOverlayToneDark",
 };
+const SCRIM_LABEL: Record<(typeof HEADER_OVERLAY_SCRIMS)[number], CustomizerMessageKey> = {
+  auto: "headerOverlayScrimAuto",
+};
 const STICKY_LABEL: Record<(typeof HEADER_STICKY)[number], CustomizerMessageKey> = {
   always: "headerStickyAlways",
   "on-scroll-up": "headerStickyOnScrollUp",
@@ -77,6 +81,7 @@ export function HeaderDesignPanel({
   design,
   ctx,
   sections,
+  pictureReady = true,
   t,
   onChange,
 }: {
@@ -84,6 +89,11 @@ export function HeaderDesignPanel({
   ctx: DesignContext;
   /** The home sections, to explain why an opted-in overlay is not active. */
   sections: readonly OverlayCandidateSection[];
+  /**
+   * Whether the hero picture's measured bounds are in. Until then (still measuring, or no valid measurement) the contrast
+   * reasons are NOT shown — "unprovable" would be a claim about a measurement that does not exist yet. Default: ready.
+   */
+  pictureReady?: boolean;
   t: (key: CustomizerMessageKey) => string;
   onChange: (next: HeaderDesign | undefined) => void;
 }) {
@@ -218,17 +228,44 @@ export function HeaderDesignPanel({
           <p className="text-[12px] leading-5 text-muted" data-header-overlay-tone-hint="">
             {t("headerOverlayToneHint")}
           </p>
+          {select(
+            "overlay-scrim",
+            "headerOverlayScrim",
+            current.overlayScrim,
+            HEADER_OVERLAY_SCRIMS,
+            SCRIM_LABEL,
+            "overlayScrim",
+          )}
+          <p className="text-[12px] leading-5 text-muted" data-header-overlay-scrim-hint="">
+            {t("headerOverlayScrimHint")}
+          </p>
           {(() => {
-            const candidate = overlayHeroCandidate(sections);
-            if (candidate.ok) return null;
+            // The same decision the published Home makes: every reason it falls back to solid is explained here, including the
+            // contrast ones (a picture whose lightest and darkest pixels no single text colour can clear).
+            const decision = resolveHeaderOverlay(design, sections, ctx);
+            if (!decision) return null;
+            const contrastReason =
+              "reason" in decision &&
+              (decision.reason === "unprovable" || decision.reason === "tone-unprovable" || decision.reason === "scrim-unprovable");
+            if (contrastReason && !pictureReady) return null;
+            if ("overlay" in decision) {
+              return decision.overlay.scrim ? (
+                <p role="status" data-header-mode-scrim="" className="text-[12px] leading-5 text-muted">
+                  {t("headerModeActiveScrim")} {decision.overlay.scrim.alpha}%
+                </p>
+              ) : null;
+            }
             const reason = {
               "no-hero": "headerModeInactiveNoHero",
               "not-picture": "headerModeInactiveNotPicture",
               "split-layout": "headerModeInactiveSplit",
+              unprovable: "headerModeInactiveUnprovable",
+              "tone-unprovable": "headerModeInactiveToneUnprovable",
+              "scrim-unprovable": "headerModeInactiveScrimUnprovable",
             } as const;
             return (
-              <p role="status" data-header-mode-inactive="" className="text-[12px] leading-5 text-warning">
-                {t(reason[candidate.reason])}
+              <p role="status" data-header-mode-inactive="" data-reason={decision.reason} className="text-[12px] leading-5 text-warning">
+                {t(reason[decision.reason])}
               </p>
             );
           })()}

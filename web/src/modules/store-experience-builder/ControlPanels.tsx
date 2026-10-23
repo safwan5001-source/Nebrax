@@ -847,6 +847,9 @@ function HeaderPanel({
   locale: string;
   storefrontId?: string | null;
 }) {
+  // The server's proven bounds of the hero picture: the overlay explanation below judges the SAME evidence the published Home does
+  // (without them every picture would read as "unprovable").
+  const backgroundBounds = useBackgroundMediaBounds(config.homepage.sections);
   const [skippedLinks, setSkippedLinks] = useState<string[]>([]);
   const hasMainMenu = Boolean(mainMenu(config.navigation));
   return (
@@ -873,11 +876,17 @@ function HeaderPanel({
       <HeaderDesignPanel
         design={config.header.design}
         sections={config.homepage.sections}
+        pictureReady={(() => {
+          const first = config.homepage.sections.find((section) => section.visible);
+          const bg = first?.type === "hero" ? first.design?.background : undefined;
+          return bg?.kind !== "media" || [bg.media, ...(bg.mobile ? [bg.mobile] : [])].every((ref) => backgroundBounds.stateOf(ref) === "ready");
+        })()}
         ctx={{
           primaryColor: config.primaryColor,
           accentColor: config.accentColor,
           palette: config.palette,
           dir: locale === "en" ? "ltr" : "rtl",
+          mediaBounds: backgroundBounds.lookup,
         }}
         t={t}
         onChange={(design) => {

@@ -295,3 +295,218 @@ describe("resolveHeaderOverlay — forced tone (AWJ-HEADER-OVERLAY-TONE)", () =>
     ).toBeNull();
   });
 });
+
+describe("resolveHeaderOverlay — protection layer (AWJ-HEADER-SCRIM)", () => {
+  const wide = {
+    min: [0, 0, 0] as [number, number, number],
+    max: [255, 255, 255] as [number, number, number],
+  };
+  const mid = {
+    min: [100, 100, 100] as [number, number, number],
+    max: [160, 160, 160] as [number, number, number],
+  };
+  const AUTO = { mode: "overlay-hero" as const, overlayScrim: "auto" as const };
+
+  // The published configuration of the store that reported the defect (alrshd): overlay-hero, no forced tone, a first visible
+  // hero whose picture carries the evidence `{min: 0,0,0, max: 255,255,255}` and no overlay of its own.
+  it("REPRODUCTION — a full-range picture with no scrim: the opted-in header stays solid because NEITHER white nor black is provable", () => {
+    const sections = [hero(picture())];
+    expect(
+      resolveHeaderOverlay(ON, sections, ctx(wide)),
+      "without the scrim option: unprovable (what the store showed)",
+    ).toEqual({ reason: "unprovable" });
+    // …and a forced tone does not help either, for either colour
+    for (const overlayTone of ["light", "dark"] as const) {
+      expect(
+        resolveHeaderOverlay({ ...ON, overlayTone }, sections, ctx(wide)),
+      ).toEqual({ reason: "tone-unprovable" });
+    }
+  });
+
+  it("the same document with overlayScrim:auto gets a provable overlay with the weakest sufficient layer", () => {
+    const r = resolveHeaderOverlay(AUTO, [hero(picture())], ctx(wide));
+    expect(r).toMatchObject({
+      overlay: { sectionId: "hero", scrim: { alpha: expect.any(Number) } },
+    });
+    const overlay = (
+      r as {
+        overlay: {
+          tone: "light" | "dark";
+          fg: string;
+          scrim: { alpha: number };
+        };
+      }
+    ).overlay;
+    // 40 % cannot prove a black-to-white picture (white over black ≈ 3.7:1); the chosen strength is one of the steps, at least 50 %
+    expect(overlay.scrim.alpha).toBeGreaterThanOrEqual(50);
+    expect([30, 40, 50, 60, 70, 80]).toContain(overlay.scrim.alpha);
+    expect(overlayMarker((r as { overlay: never }).overlay)).toBe(
+      `on ${overlay.tone === "light" ? "l" : "d"} s${overlay.scrim.alpha / 10}`,
+    );
+  });
+
+  it("is never added when the picture alone proves the text (no darkening of a provable picture)", () => {
+    for (const bounds of [
+      dark,
+      {
+        min: [221, 228, 234] as [number, number, number],
+        max: [244, 247, 249] as [number, number, number],
+      },
+    ]) {
+      const plain = resolveHeaderOverlay(ON, [hero(picture())], ctx(bounds));
+      const withOption = resolveHeaderOverlay(
+        AUTO,
+        [hero(picture())],
+        ctx(bounds),
+      );
+      expect(withOption).toEqual(plain);
+      expect((withOption as { overlay: object }).overlay).not.toHaveProperty(
+        "scrim",
+      );
+    }
+  });
+
+  it("a mid-tone picture (unprovable alone) is rescued by a layer too", () => {
+    const r = resolveHeaderOverlay(AUTO, [hero(picture())], ctx(mid)) as {
+      overlay: { scrim: { alpha: number } };
+    };
+    expect(r.overlay.scrim.alpha).toBeGreaterThan(0);
+  });
+
+  it("every accepted layer really clears 4.5:1 over the whole range, and the next weaker step does not (it is the weakest)", async () => {
+    const { channelBoundsInterval, worstRatioForHex } = await import(
+      "../contrast-engine"
+    );
+    for (const bounds of [
+      wide,
+      mid,
+      {
+        min: [0, 0, 0] as [number, number, number],
+        max: [200, 180, 160] as [number, number, number],
+      },
+    ]) {
+      for (const overlayTone of [undefined, "light", "dark"] as const) {
+        const r = resolveHeaderOverlay(
+          { ...AUTO, ...(overlayTone ? { overlayTone } : {}) },
+          [hero(picture())],
+          ctx(bounds),
+        ) as {
+          overlay: { fg: "#ffffff" | "#000000"; scrim?: { alpha: number } };
+        };
+        const { fg, scrim } = r.overlay;
+        if (!scrim) continue;
+        const rgb: [number, number, number] =
+          fg === "#ffffff" ? [0, 0, 0] : [255, 255, 255];
+        const at = (alpha: number) =>
+          worstRatioForHex(
+            fg,
+            channelBoundsInterval(bounds.min, bounds.max, {
+              rgb,
+              alpha: alpha / 100,
+            }),
+          );
+        expect(at(scrim.alpha)).toBeGreaterThanOrEqual(4.5);
+        if (scrim.alpha > 30)
+          expect(
+            at(scrim.alpha - 10),
+            `${scrim.alpha - 10}% should not suffice`,
+          ).toBeLessThan(4.5);
+        if (overlayTone)
+          expect(fg).toBe(overlayTone === "light" ? "#ffffff" : "#000000");
+      }
+    }
+  });
+
+  it("the layer is the colour OPPOSITE to the text: black text over a white layer, white text over a black layer (marker tone follows the text)", () => {
+    const r = resolveHeaderOverlay(
+      { ...AUTO, overlayTone: "dark" },
+      [hero(picture())],
+      ctx(wide),
+    ) as { overlay: { tone: string; fg: string } };
+    expect(r.overlay).toMatchObject({ tone: "dark", fg: "#000000" });
+    const l = resolveHeaderOverlay(
+      { ...AUTO, overlayTone: "light" },
+      [hero(picture())],
+      ctx(wide),
+    ) as { overlay: { tone: string; fg: string } };
+    expect(l.overlay).toMatchObject({ tone: "light", fg: "#ffffff" });
+  });
+
+  it("a forced tone keeps its colour and gets its own proven layer", () => {
+    const light = resolveHeaderOverlay(
+      { ...AUTO, overlayTone: "light" },
+      [hero(picture())],
+      ctx(wide),
+    ) as { overlay: { scrim: { alpha: number } } };
+    const dark_ = resolveHeaderOverlay(
+      { ...AUTO, overlayTone: "dark" },
+      [hero(picture())],
+      ctx(wide),
+    ) as { overlay: { scrim: { alpha: number } } };
+    // white text needs the stronger layer over a full-range picture (a black layer must bring white pixels under L≈0.18)
+    expect(light.overlay.scrim.alpha).toBeGreaterThan(
+      dark_.overlay.scrim.alpha - 1,
+    );
+  });
+
+  it("every structural rule still applies first: no hero, not a picture, split layout, no evidence ⇒ solid, even with the option", () => {
+    expect(resolveHeaderOverlay(AUTO, [], ctx(wide))).toEqual({
+      reason: "no-hero",
+    });
+    expect(resolveHeaderOverlay(AUTO, [hero({})], ctx(wide))).toEqual({
+      reason: "not-picture",
+    });
+    expect(
+      resolveHeaderOverlay(
+        AUTO,
+        [hero({ ...picture(), layout: "split" })],
+        ctx(wide),
+      ),
+    ).toEqual({ reason: "split-layout" });
+    expect(resolveHeaderOverlay(AUTO, [hero(picture())], ctx(null))).toEqual({
+      reason: "unprovable",
+    });
+  });
+
+  it("without the opt-in nothing changes: the option is inert unless the header is overlay-hero and `auto`", () => {
+    expect(
+      resolveHeaderOverlay(
+        { mode: "solid", overlayScrim: "auto" } as never,
+        [hero(picture())],
+        ctx(wide),
+      ),
+    ).toBeNull();
+    expect(
+      resolveHeaderOverlay(
+        { mode: "overlay-hero" },
+        [hero(picture())],
+        ctx(wide),
+      ),
+    ).toEqual({ reason: "unprovable" });
+  });
+
+  it("the marker without a layer is exactly the V7c-2 marker (byte-identical for every stored document)", () => {
+    expect(
+      overlayMarker({ sectionId: "hero", tone: "light", fg: "#ffffff" }),
+    ).toBe("on l");
+    expect(
+      overlayMarker({ sectionId: "hero", tone: "dark", fg: "#000000" }),
+    ).toBe("on d");
+    expect(
+      overlayMarker({
+        sectionId: "hero",
+        tone: "dark",
+        fg: "#000000",
+        scrim: { alpha: 50 },
+      }),
+    ).toBe("on d s5");
+    expect(
+      overlayMarker({
+        sectionId: "hero",
+        tone: "light",
+        fg: "#ffffff",
+        scrim: { alpha: 80 },
+      }),
+    ).toBe("on l s8");
+  });
+});

@@ -41,6 +41,16 @@ vi.mock("next-intl/server", () => ({
     return (key: string) => table[key] ?? key;
   },
 }));
+// client components of the header (`HeaderNavLinks`) read `useTranslations`; the proof renders to static markup with no provider
+vi.mock("next-intl", async (original) => ({
+  ...(await original<typeof import("next-intl")>()),
+  useTranslations: (namespace: string) => (key: string) => {
+    const table =
+      (en as unknown as Record<string, Record<string, string>>)[namespace] ??
+      {};
+    return table[key] ?? key;
+  },
+}));
 vi.mock("next/dynamic", () => ({ default: () => () => null }));
 vi.mock("@/lib/spree", () => ({ isWholesaleEnabled: () => false }));
 vi.mock("@/components/layout/StoreSearch", () => ({
@@ -141,6 +151,14 @@ interface Scenario {
   plainHero?: boolean;
   /** a banner before the hero */
   bannerFirst?: boolean;
+  /** AWJ-HEADER-SCRIM — an image-only hero (title, description and buttons hidden): only the picture's own evidence is judged */
+  imageOnlyHero?: boolean;
+  /** AWJ-HEADER-SCRIM — the protection layer (percent) the production decision must prove for this scenario */
+  expectScrim?: number;
+  /** extra hero design keys (e.g. the full-bleed / natural-ratio treatment of the reporting store) */
+  heroDesignExtra?: Record<string, unknown>;
+  /** a sticky announcement bar above the header (the real one: relative z-[45] sticky top-0, publishing --store-announcement-height) */
+  announcement?: boolean;
   header: Record<string, unknown>;
   /** the proof pages also mount the controllers (hydration stand-in) */
   expectOverlay: boolean;
@@ -240,6 +258,99 @@ const SCENARIOS: Record<string, Scenario> = {
     expectOverlay: true,
     expectFg: "#ffffff",
   },
+  // ── AWJ-HEADER-SCRIM ── the store that reported the defect: an image-only hero on a full-range picture, overlay-hero selected
+  // no option ⇒ the header stays solid (the reported behaviour, kept for every stored document)
+  ovWideImageOnly: {
+    picture: "wide",
+    imageOnlyHero: true,
+    header: OV,
+    expectOverlay: false,
+  },
+  // the option ⇒ a transparent header over the picture with a proven layer behind its rows
+  ovWideScrim: {
+    picture: "wide",
+    imageOnlyHero: true,
+    header: { ...OV, overlayScrim: "auto" },
+    expectOverlay: true,
+    expectFg: "#000000",
+    expectScrim: 50,
+  },
+  ovWideScrimLight: {
+    picture: "wide",
+    imageOnlyHero: true,
+    header: { ...OV, overlayTone: "light", overlayScrim: "auto" },
+    expectOverlay: true,
+    expectFg: "#ffffff",
+    expectScrim: 60,
+  },
+  ovMidScrim: {
+    picture: "mid",
+    imageOnlyHero: true,
+    header: { ...OV, overlayScrim: "auto" },
+    expectOverlay: true,
+    expectFg: "#000000",
+    expectScrim: 30,
+  },
+  // the sticky announcement bar of the reporting store + the layer + the two-row header
+  ovWideScrimAnnouncement: {
+    picture: "wide",
+    imageOnlyHero: true,
+    announcement: true,
+    header: { ...OV, overlayScrim: "auto", layout: "two-row", height: "tall" },
+    expectOverlay: true,
+    expectFg: "#000000",
+    expectScrim: 50,
+  },
+  ovWideScrimStickyUp: {
+    picture: "wide",
+    imageOnlyHero: true,
+    header: { ...OV, overlayScrim: "auto", sticky: "on-scroll-up" },
+    expectOverlay: true,
+    expectFg: "#000000",
+    expectScrim: 50,
+  },
+  // the reporting store's own configuration, end to end: bleeding natural-ratio image-only hero, sticky announcement bar,
+  // overlay-hero + sticky always + no border / shadow + brand icons, the protection layer on
+  ovStoreReplica: {
+    picture: "wide",
+    imageOnlyHero: true,
+    announcement: true,
+    heroDesignExtra: {
+      width: { max: "wide" },
+      align: "center",
+      valign: "center",
+      layout: "centered",
+      border: { width: "none" },
+      radius: "none",
+      mediaTreatment: { ratio: "natural", bleed: true },
+    },
+    header: {
+      ...OV,
+      overlayScrim: "auto",
+      sticky: "always",
+      border: { width: "none" },
+      shadow: "none",
+      icon: { role: "brand" },
+    },
+    expectOverlay: true,
+    expectFg: "#000000",
+    expectScrim: 50,
+  },
+  // a picture that proves the text on its own: the option adds NOTHING (no layer, the V7c-2 transparent header)
+  ovDarkScrimNotNeeded: {
+    picture: "dark",
+    header: { ...OV, overlayScrim: "auto" },
+    expectOverlay: true,
+    expectFg: "#ffffff",
+  },
+  // a forced tone the picture cannot support alone: the layer makes it provable
+  ovDarkForcedDarkScrim: {
+    picture: "dark",
+    header: { ...OV, overlayTone: "dark", overlayScrim: "auto" },
+    expectOverlay: true,
+    expectFg: "#000000",
+    expectScrim: 40,
+  },
 };
 
 describe("header overlay proof", () => {
@@ -270,6 +381,7 @@ describe("header overlay proof", () => {
                   : {}),
               },
               ...(sc.heroLayout ? { layout: sc.heroLayout } : {}),
+              ...(sc.heroDesignExtra ?? {}),
             };
         const sections: Record<string, unknown>[] = [
           ...(sc.bannerFirst
@@ -286,14 +398,21 @@ describe("header overlay proof", () => {
             id: "hero",
             type: "hero",
             visible: true,
-            content: {
-              headline: "Overlay proof headline",
-              subheadline: "A supporting line that explains the offer",
-              ctas: [
-                { label: "Shop now", href: "/products" },
-                { label: "Learn more", href: "/about" },
-              ],
-            },
+            content: sc.imageOnlyHero
+              ? {
+                  headline: "Image only hero",
+                  showTitle: false,
+                  showSubheadline: false,
+                  showCtas: false,
+                }
+              : {
+                  headline: "Overlay proof headline",
+                  subheadline: "A supporting line that explains the offer",
+                  ctas: [
+                    { label: "Shop now", href: "/products" },
+                    { label: "Learn more", href: "/about" },
+                  ],
+                },
             ...(Object.keys(heroDesign).length ? { design: heroDesign } : {}),
           },
         ];
@@ -370,6 +489,9 @@ describe("header overlay proof", () => {
               headline: own ? own.headline : "",
               subheadline: own ? (own.subheadline ?? null) : "",
               ctas: own?.ctas ?? null,
+              showTitle: own?.showTitle !== false,
+              showSubheadline: own?.showSubheadline !== false,
+              showCtas: own?.showCtas !== false,
               headingId: "home-hero",
               headingLevel: a.headingLevel,
               themePreset: "awj-market",
@@ -431,6 +553,23 @@ describe("header overlay proof", () => {
             className="flex min-h-screen flex-1 flex-col"
             style={style}
           >
+            {sc.announcement ? (
+              <div
+                data-announcement=""
+                className="relative z-[45] sticky top-0"
+                style={{
+                  height: "2.25rem",
+                  background: "#f88f15",
+                  color: "#111",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "0.875rem",
+                }}
+              >
+                Announcement
+              </div>
+            ) : null}
             {header}
             <main
               id="main-content"
@@ -447,7 +586,7 @@ describe("header overlay proof", () => {
             </main>
           </div>,
         );
-        const html = `<!doctype html><html lang="${locale}" dir="${dir}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><style>:root{--store-primary:#12372a;--store-primary-foreground:#ffffff;--store-foreground:#111827;--store-muted-foreground:#4b5563;--store-border:#d1d5db;--store-surface:#ffffff;--store-surface-muted:#f3f4f6;--store-radius:14px}body{background:#f8f9fa;margin:0;font-family:system-ui,sans-serif}</style></head><body>${wrapper}</body></html>`;
+        const html = `<!doctype html><html lang="${locale}" dir="${dir}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><style>:root{--store-primary:#12372a;--store-primary-foreground:#ffffff;--store-foreground:#111827;--store-muted-foreground:#4b5563;--store-border:#d1d5db;--store-surface:#ffffff;--store-surface-muted:#f3f4f6;--store-radius:14px}${sc.announcement ? ":root{--store-announcement-height:36px}" : ""}body{background:#f8f9fa;margin:0;font-family:system-ui,sans-serif}</style></head><body>${wrapper}</body></html>`;
         writeFileSync(join(DIR, "pages", `${name}.${dir}.html`), html);
         // the server's own decision, for the proof to cross-check
         writeFileSync(
