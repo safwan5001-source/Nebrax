@@ -226,6 +226,9 @@ class Rbac
             // AI Actions are mutation-adjacent and therefore never inherit
             // `ai.assistant.use`. Approval and repair remain independently assignable.
             'ai.actions.use', 'ai.actions.approve', 'ai.actions.repair',
+            // IMP-H2-S4: إدارة قبول المؤسسة لـAI Actions (`ai_actions.enabled`) — سلطة مستقلة عن استعمالها واعتمادها وإصلاحها،
+            // وعن موافقة المساعد (`ai.consent.manage`). owner/admin عبر `*` فقط؛ لا تُمنح لغيرهما تلقائياً.
+            'ai.actions.manage',
     ];
 
     /**

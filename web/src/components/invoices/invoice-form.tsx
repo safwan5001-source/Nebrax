@@ -32,6 +32,10 @@ import { PartnerDialog } from '@/components/partners/partner-dialog';
 import { ProductDialog } from '@/components/products/product-dialog';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
+import {
+  cashAccountIdPayload, cashSaleSelectorVisible, parseCashSaleSettings, toCashTreasuryOptions,
+  type CashSaleSettings, type CashTreasuryOption,
+} from '@/lib/cash-sale-treasury';
 import { useNumberPreview } from '@/lib/use-number-preview';
 import { cn } from '@/lib/utils';
 import { SAUDI_RIYAL_SYMBOL, formatRiyal, riyalToMinor } from '@/lib/money';
@@ -182,6 +186,11 @@ export function InvoiceForm({ editId }: { editId?: string }) {
   const [payMethod, setPayMethod] = useState('cash');
   const [payReference, setPayReference] = useState('');
   const [cashAccountId, setCashAccountId] = useState('');
+  // TREASURY-T4: خزينة البيع النقدي المباشر — حالة مستقلة عن خزينة سند «المدفوع بالفعل» حتى لا يتسرّب اختيار أحدهما للآخر.
+  const [cashSale, setCashSale] = useState<CashSaleSettings>({ effective: 'legacy', defaultPaymentType: 'credit' });
+  const [cashTreasuries, setCashTreasuries] = useState<CashTreasuryOption[]>([]);
+  const [cashSaleAccountId, setCashSaleAccountId] = useState('');
+  const [documentPaymentType, setDocumentPaymentType] = useState<string | null>(null);
   const [lines, setLines] = useState<Line[]>([newLine()]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -249,6 +258,15 @@ export function InvoiceForm({ editId }: { editId?: string }) {
     api<{ data: Account[] }>('/accounts')
       .then((r) => setCashAccounts(r.data.filter((a) => !a.is_group && a.type === 'asset' && /^11[12]/.test(a.code))))
       .catch(() => {});
+    // TREASURY-T4: السياسة الفعّالة لخزينة البيع النقدي. أي فشل أو استجابة غير مفهومة ⇒ legacy (لا محدِّد، ولا تغيير فيما يُرسَل).
+    api<{ data: unknown }>('/sales-settings')
+      .then((r) => {
+        const parsed = parseCashSaleSettings(r?.data);
+        setCashSale(parsed);
+        if (parsed.effective === 'legacy') return;
+        return api<{ data: unknown }>('/cash-bank-accounts').then((tr) => setCashTreasuries(toCashTreasuryOptions(tr?.data)));
+      })
+      .catch(() => {});
     // افتراضي المؤسسة للغة المستند — يُعرَض في المحدِّد كسياق فقط ولا يُفرَض.
     api<{ data: { default_language: 'ar' | 'en' | 'bilingual' | null } }>('/document-display-settings')
       .then((r) => setTenantDefaultLanguage(r.data.default_language ?? null))
@@ -279,6 +297,8 @@ export function InvoiceForm({ editId }: { editId?: string }) {
         setPayMethod(inv.payment_method ?? 'cash');
         setPayReference(inv.payment_reference ?? '');
         setCashAccountId(inv.cash_account_id ?? '');
+        setCashSaleAccountId(inv.is_paid ? '' : inv.cash_account_id ?? '');
+        setDocumentPaymentType(inv.payment_type ?? null);
         setDate(inv.invoice_date ?? '');
         setDueDate(inv.due_date ?? '');
         setCenterId(inv.cost_center_id ?? '');
@@ -614,7 +634,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
       is_paid: isPaid,
       payment_method: isPaid ? payMethod : null,
       payment_reference: isPaid ? payReference || null : null,
-      cash_account_id: isPaid ? cashAccountId || null : null,
+      cash_account_id: cashAccountIdPayload({ isPaid, receiptAccountId: cashAccountId, selectorVisible: cashSaleSelectorOn, cashSaleAccountId }),
       print_template_override_revision_id: designOverrideRevisionId,
       pdf_template_override_revision_id: designOverrideRevisionId,
       language: documentLanguage,
@@ -848,6 +868,21 @@ export function InvoiceForm({ editId }: { editId?: string }) {
               </div>
   ) : null;
 
+  const cashSaleSelectorOn = cashSaleSelectorVisible({ settings: cashSale, isPaid, documentPaymentType });
+
+  const cashSaleField = cashSaleSelectorOn ? (
+    <div className="space-y-1.5 pt-3">
+      <Label htmlFor="cash-sale-treasury">{t('cash_sale_treasury')}</Label>
+      <Select id="cash-sale-treasury" value={cashSaleAccountId} onChange={(e) => setCashSaleAccountId(e.target.value)}>
+        <option value="">{cashSale.effective === 'explicit_required' ? t('cash_sale_treasury_required') : t('cash_sale_treasury_main')}</option>
+        {cashTreasuries.map((o) => (
+          <option key={o.accountId} value={o.accountId}>{o.label}</option>
+        ))}
+      </Select>
+      <p className="text-xs leading-relaxed text-muted">{t('cash_sale_treasury_hint')}</p>
+    </div>
+  ) : null;
+
   const paymentBody = (
     <><label className="flex cursor-pointer items-center gap-2 py-0.5 text-sm font-medium text-text">
           <input
@@ -893,6 +928,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
             </div>
           </div>
         </div>
+        {cashSaleField}
       </>
   );
 

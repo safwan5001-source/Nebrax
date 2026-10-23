@@ -31,6 +31,8 @@ final class TreasurySelectionException extends RuntimeException
     public const EXPLICIT_REQUIRED = 'explicit_required';
     /** نطاق إيداع/سحب الكيان لا يسمح للفاعل. */
     public const NOT_PERMITTED = 'not_permitted';
+    /** عملة الخزينة لا تطابق عملة المستند/المستأجر — يرميه المستدعي (T4)، لا المحلِّل. */
+    public const CURRENCY_MISMATCH = 'currency_mismatch';
 
     private function __construct(
         public readonly string $reason,
@@ -50,6 +52,7 @@ final class TreasurySelectionException extends RuntimeException
             self::AMBIGUOUS_DEFAULT => 'توجد عدة خزائن أو حسابات بنكية بلا افتراضي حاسم. اختر واحداً صراحةً.',
             self::EXPLICIT_REQUIRED => 'يجب اختيار الخزينة أو الحساب البنكي صراحةً.',
             self::NOT_PERMITTED => 'لا تملك صلاحية العملية على هذه الخزينة أو الحساب البنكي.',
+            self::CURRENCY_MISMATCH => 'عملة الخزينة أو الحساب البنكي لا تطابق عملة المؤسسة؛ لا تُحوَّل المبالغ تلقائياً. اختر خزينة بعملة المؤسسة.',
         });
     }
 }

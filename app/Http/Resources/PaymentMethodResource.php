@@ -23,6 +23,7 @@ class PaymentMethodResource extends JsonResource
             'is_default' => $this->is_default,
             // D-09: مقاصة POS (NULL = مطفأة). اسم الاتصال وصلاحيته للعرض فقط — لا أسرار.
             'pos_clearing_gateway_id' => $this->pos_clearing_gateway_id,
+            'pos_terminal_required' => (bool) $this->pos_terminal_required,
             'pos_clearing_gateway_name' => $this->whenLoaded('posClearingGateway', fn () => $this->posClearingGateway?->name),
             'pos_clearing_gateway_usable' => $this->whenLoaded('posClearingGateway', fn () => $this->posClearingGateway?->isUsable()),
             'payments_count' => $this->when(isset($this->payments_count), $this->payments_count),

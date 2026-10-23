@@ -23,6 +23,9 @@ interface SalesSettings {
   enforce_min_sale_price: boolean;
   allow_standalone_credit_notes: boolean;
   default_terms: string;
+  // TREASURY-T4: القيمة المخزَّنة، وهل فُتحت بوابة التفعيل في الخادم (للقراءة فقط).
+  cash_sale_treasury_policy?: string;
+  cash_sale_treasury_routing_available?: boolean;
 }
 
 /** نطاق عدّاد ICV — إعدادٌ مستقلّ عن بادئات ترقيم المستندات أعلاه. */
@@ -91,6 +94,10 @@ export default function InvoiceSettingsPage() {
           enforce_min_sale_price: form.enforce_min_sale_price,
           allow_standalone_credit_notes: form.allow_standalone_credit_notes,
           default_terms: form.default_terms || null,
+          // لا يُرسَل غير legacy ما لم يفتح الخادم البوابة: قيمة مخزَّنة خارج الـAPI لا تُفشل حفظ بقية الإعدادات.
+          ...(form.cash_sale_treasury_routing_available || (form.cash_sale_treasury_policy ?? 'legacy') === 'legacy'
+            ? { cash_sale_treasury_policy: form.cash_sale_treasury_policy ?? 'legacy' }
+            : {}),
         },
       });
       success(tc('updated'));
@@ -186,6 +193,23 @@ export default function InvoiceSettingsPage() {
                     <option value="1">{t('allow_standalone_credit_notes_on')}</option>
                   </Select>
                   <p className="text-xs leading-relaxed text-muted">{t('allow_standalone_credit_notes_hint')}</p>
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="cash-sale-treasury-policy">{t('cash_sale_treasury_policy')}</Label>
+                  <Select
+                    id="cash-sale-treasury-policy"
+                    value={form.cash_sale_treasury_policy ?? 'legacy'}
+                    onChange={(e) => set('cash_sale_treasury_policy', e.target.value)}
+                  >
+                    <option value="legacy">{t('cash_sale_treasury_policy_legacy')}</option>
+                    <option value="main" disabled={!form.cash_sale_treasury_routing_available}>{t('cash_sale_treasury_policy_main')}</option>
+                    <option value="explicit_required" disabled={!form.cash_sale_treasury_routing_available}>{t('cash_sale_treasury_policy_explicit')}</option>
+                  </Select>
+                  <p className="text-xs leading-relaxed text-muted">
+                    {t('cash_sale_treasury_policy_hint')}
+                    {!form.cash_sale_treasury_routing_available ? ` ${t('cash_sale_treasury_policy_locked')}` : ''}
+                  </p>
                 </div>
               </div>
               {/* الشروط المطبوعة على المستند تأتي من «تصميم المستندات» لا من هنا —

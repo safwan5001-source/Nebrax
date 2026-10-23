@@ -20,12 +20,14 @@ class PaymentMethod extends BaseModel implements CompanyWide
         'is_active',
         'is_default',
         'pos_clearing_gateway_id',
+        'pos_terminal_required',
     ];
 
     protected $casts = [
         'available_online' => 'boolean',
         'is_active' => 'boolean',
         'is_default' => 'boolean',
+        'pos_terminal_required' => 'boolean',
     ];
 
     protected $attributes = [
