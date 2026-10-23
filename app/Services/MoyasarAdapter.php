@@ -93,10 +93,7 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody
             if (($invoice['metadata'][self::ATTEMPT_METADATA_KEY] ?? null) !== $context->attemptId) {
                 continue;
             }
-            if ($this->intOrNull($invoice['amount'] ?? null) !== $context->amountMinor
-                || strtoupper((string) ($invoice['currency'] ?? '')) !== strtoupper($context->currency)) {
-                throw new PaymentGatewayException('moyasar.invoice_conflict', 'فاتورة موجودة لهذه المحاولة بمبلغ أو عملة مختلفة.');
-            }
+            $this->assertInvoiceMatches($invoice, $context);
 
             return $this->checkoutFrom($invoice, null);
         }
@@ -119,7 +116,20 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody
             }
         }
 
-        return $this->checkoutFrom($this->client->createInvoice($context->gateway, $payload), $expiresAt);
+        $created = $this->client->createInvoice($context->gateway, $payload);
+        // الاستجابة نفسها تُفحص قبل عرض الرابط: فاتورة بمبلغ/عملة غير ما طلبناه لا يُرسَل إليها العميل (يُكتشف الفرق بعد الدفع فقط).
+        $this->assertInvoiceMatches($created, $context);
+
+        return $this->checkoutFrom($created, $expiresAt);
+    }
+
+    /** @param array<string, mixed> $invoice */
+    private function assertInvoiceMatches(array $invoice, PaymentAttemptContext $context): void
+    {
+        if ($this->intOrNull($invoice['amount'] ?? null) !== $context->amountMinor
+            || strtoupper((string) ($invoice['currency'] ?? '')) !== strtoupper($context->currency)) {
+            throw new PaymentGatewayException('moyasar.invoice_conflict', 'فاتورة هذه المحاولة بمبلغ أو عملة مختلفة عن المطلوب.');
+        }
     }
 
     public function fetchPayment(PaymentGateway $gateway, string $providerPaymentId): PaymentProviderSnapshot

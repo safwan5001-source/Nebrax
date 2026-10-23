@@ -192,6 +192,18 @@ class MoyasarAdapterTest extends TestCase
     }
 
     #[Test]
+    public function a_created_invoice_whose_amount_or_currency_differs_is_never_exposed_to_the_customer(): void
+    {
+        foreach ([['amount' => 100], ['amount' => null], ['currency' => 'USD'], ['currency' => null]] as $override) {
+            $this->fakeHttp(['api.moyasar.com/v1/invoices*' => Http::sequence()->push(['invoices' => []])->push(array_merge(MoyasarFixtures::invoice(), $override), 201)]);
+
+            $e = $this->thrown(fn () => $this->adapter->createCheckout($this->context(11500)), 'mismatch expected: '.json_encode($override), PaymentGatewayException::class);
+
+            $this->assertSame('moyasar.invoice_conflict', $e->reason, json_encode($override));
+        }
+    }
+
+    #[Test]
     public function a_checkout_url_outside_the_provider_domain_or_without_https_is_refused(): void
     {
         foreach (['https://evil.example/pay', 'http://evil.example/invoices/x', 'http://moyasar.com.evil.example/x', 'https://moyasar.com.evil.example/x', 'javascript:alert(1)'] as $url) {
