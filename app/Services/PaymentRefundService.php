@@ -635,6 +635,52 @@ final class PaymentRefundService
     }
 
     /**
+     * أول مانع على مستوى الدفعة (قبل المبلغ والمصادر) كاستثناء غير مرمي، أو `null` إن كانت الدفعة قابلة للاسترداد. تستعمله `assertEligible` وواجهة السياق
+     * (لتشرح للمستخدم لماذا لا تُسترد الدفعة). قراءة فقط.
+     */
+    public function attemptBlocker(PaymentAttempt $attempt): ?PaymentRefundException
+    {
+        if ($attempt->capture_status !== PaymentAttempt::STATUS_CAPTURED) {
+            return new PaymentRefundException('not_captured', 'المحاولة غير ملتقطة.');
+        }
+        if ($attempt->posting_status !== PaymentAttempt::POSTING_POSTED) {
+            return new PaymentRefundException('capture_not_posted', 'التقاط هذه الدفعة لم يُرحَّل بعد؛ لا يُسترد قبل ترحيله.');
+        }
+        if ($this->partnerIdOf($attempt) === null) {
+            return new PaymentRefundException('not_refundable', 'هذه الدفعة ليست دفعة فاتورة بعميل معروف؛ لا استرداد عبر البوابة.');
+        }
+        if ($attempt->dispute_status === PaymentAttempt::DISPUTE_OPEN) {
+            return new PaymentRefundException('dispute_active', 'على الدفعة نزاع مفتوح؛ لا استرداد حتى يُحسم.');
+        }
+        if ($attempt->unrecognized_refund_at !== null) {
+            return new PaymentRefundException('unrecognized_refund_open', 'رُصد استرداد خارجي على هذه الدفعة؛ يلزم حسمه أولاً.');
+        }
+        $gateway = PaymentGateway::query()->find($attempt->payment_gateway_id);
+        if ($gateway === null || in_array($gateway->status, [PaymentGateway::STATUS_DRAFT, PaymentGateway::STATUS_REVOKED], true)) {
+            return new PaymentRefundException('gateway_unavailable', 'اتصال البوابة غير متاح.');
+        }
+        if ($this->adapters->refunder($attempt->provider) === null || ! $this->adapters->for($attempt->provider)->capabilities()->refunds) {
+            return new PaymentRefundException('refunds_unsupported', 'هذه البوابة لا تدعم الاسترداد.');
+        }
+        $tenantCurrency = (string) (Tenant::query()->whereKey($this->tenant->id())->value('currency') ?: 'SAR');
+        if (strcasecmp((string) $attempt->currency, $tenantCurrency) !== 0) {
+            return new PaymentRefundException('currency_mismatch', 'عملة الدفعة تخالف عملة المؤسسة.');
+        }
+
+        return null;
+    }
+
+    /** العميل المشتق من طلب دفع الفاتورة للالتقاط، أو `null` (ليست دفعة فاتورة / بلا طرف). */
+    public function partnerIdOf(PaymentAttempt $attempt): ?string
+    {
+        $prefix = InvoicePaymentRequest::PAYABLE_TYPE.':';
+        $payableKey = (string) $attempt->payable_key;
+        $request = str_starts_with($payableKey, $prefix) ? InvoicePaymentRequest::query()->find(substr($payableKey, strlen($prefix))) : null;
+
+        return $request?->partner_id === null ? null : (string) $request->partner_id;
+    }
+
+    /**
      * أهلية الاسترداد وسقوفه (تُعاد داخل القفل عند الطلب والاعتماد والإرسال).
      *
      * @param  list<array{kind: string, model: class-string, source_id: string, amount: int}>  $normalized
@@ -642,39 +688,11 @@ final class PaymentRefundService
      */
     private function assertEligible(PaymentAttempt $attempt, int $amountMinor, array $normalized, ?string $excludingRefundId): array
     {
-        if ($attempt->capture_status !== PaymentAttempt::STATUS_CAPTURED) {
-            throw new PaymentRefundException('not_captured', 'المحاولة غير ملتقطة.');
+        $blocker = $this->attemptBlocker($attempt);
+        if ($blocker !== null) {
+            throw $blocker;
         }
-        if ($attempt->posting_status !== PaymentAttempt::POSTING_POSTED) {
-            throw new PaymentRefundException('capture_not_posted', 'التقاط هذه الدفعة لم يُرحَّل بعد؛ لا يُسترد قبل ترحيله.');
-        }
-        $payableKey = (string) $attempt->payable_key;
-        $prefix = InvoicePaymentRequest::PAYABLE_TYPE.':';
-        $request = str_starts_with($payableKey, $prefix) ? InvoicePaymentRequest::query()->find(substr($payableKey, strlen($prefix))) : null;
-        if ($request === null || $request->partner_id === null) {
-            throw new PaymentRefundException('not_refundable', 'هذه الدفعة ليست دفعة فاتورة بعميل معروف؛ لا استرداد عبر البوابة.');
-        }
-        $partnerId = (string) $request->partner_id;
-
-        if ($attempt->dispute_status === PaymentAttempt::DISPUTE_OPEN) {
-            throw new PaymentRefundException('dispute_active', 'على الدفعة نزاع مفتوح؛ لا استرداد حتى يُحسم.');
-        }
-        if ($attempt->unrecognized_refund_at !== null) {
-            throw new PaymentRefundException('unrecognized_refund_open', 'رُصد استرداد خارجي على هذه الدفعة؛ يلزم حسمه أولاً.');
-        }
-
-        $gateway = PaymentGateway::query()->find($attempt->payment_gateway_id);
-        if ($gateway === null || in_array($gateway->status, [PaymentGateway::STATUS_DRAFT, PaymentGateway::STATUS_REVOKED], true)) {
-            throw new PaymentRefundException('gateway_unavailable', 'اتصال البوابة غير متاح.');
-        }
-        if ($this->adapters->refunder($attempt->provider) === null || ! $this->adapters->for($attempt->provider)->capabilities()->refunds) {
-            throw new PaymentRefundException('refunds_unsupported', 'هذه البوابة لا تدعم الاسترداد.');
-        }
-
-        $tenantCurrency = (string) (Tenant::query()->whereKey($this->tenant->id())->value('currency') ?: 'SAR');
-        if (strcasecmp((string) $attempt->currency, $tenantCurrency) !== 0) {
-            throw new PaymentRefundException('currency_mismatch', 'عملة الدفعة تخالف عملة المؤسسة.');
-        }
+        $partnerId = (string) $this->partnerIdOf($attempt);
 
         $sources = [];
         foreach ($normalized as $allocation) {
