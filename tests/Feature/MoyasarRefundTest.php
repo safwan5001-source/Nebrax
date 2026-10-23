@@ -113,7 +113,8 @@ class MoyasarRefundTest extends TestCase
             'api.moyasar.com/v1/payments/*' => Http::response(array_merge($partial, ['refunded' => 80000, 'status' => 'refunded'])),
         ]);
 
-        $this->thrown(fn () => $this->adapter->refundPayment($this->gateway, MoyasarFixtures::INVOICE_ID, 100), 'over captured', PaymentRefundUnknownException::class);
+        $e = $this->thrown(fn () => $this->adapter->refundPayment($this->gateway, MoyasarFixtures::INVOICE_ID, 100), 'over captured', PaymentRefundUnknownException::class);
+        $this->assertSame('moyasar.malformed_response', $e->reason);
     }
 
     #[Test]
