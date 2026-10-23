@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Requests\AiActionExecutionApprovalRequest;
 use App\Http\Requests\AiActionTenantSettingsRequest;
 use App\Models\Tenant;
 use App\Services\AiActionTenantEnablementService;
@@ -31,6 +32,18 @@ class AiActionSettingsController extends ApiController
     {
         try {
             $data = $enablement->update($request->user(), $request->boolean('enabled'));
+        } catch (AiActionException $exception) {
+            return response()->json(['error' => ['code' => $exception->reason, 'message' => $exception->getMessage()]], $exception->status);
+        }
+
+        return response()->json(['data' => $data]);
+    }
+
+    /** موافقة مالك المؤسسة على تنفيذ AI Actions (IMP-X-01c). الصلاحية في المسار، ودور `owner` وحده في الخدمة. */
+    public function updateExecutionApproval(AiActionExecutionApprovalRequest $request, AiActionTenantEnablementService $enablement): JsonResponse
+    {
+        try {
+            $data = $enablement->updateExecutionApproval($request->user(), $request->boolean('approved'));
         } catch (AiActionException $exception) {
             return response()->json(['error' => ['code' => $exception->reason, 'message' => $exception->getMessage()]], $exception->status);
         }
