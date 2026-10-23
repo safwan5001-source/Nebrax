@@ -239,7 +239,7 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         ->where(['provider' => '[a-z0-9_]{2,32}', 'webhookKey' => '[A-Za-z0-9]{32,128}'])
         ->middleware('throttle:600,1');
     // PAY-H2-02e: واجهة رابط الدفع العام — بلا مصادقة (الرمز هو القدرة)، تحدّ لكل رمز وIP، رؤوس no-store.
-    Route::prefix('pay/v1/{token}')->where(['token' => '[A-Za-z0-9_-]{43}'])
+    Route::prefix('pay/v1/{token}')   // لا قيد صيغة على المسار: الصيغة الخاطئة يردّها `ResolvePaymentLink` بالـ404 الموحّد نفسه وبرؤوس الحماية
         ->middleware([\App\Http\Middleware\HardenPaymentLinkResponse::class, \App\Http\Middleware\ForceJsonResponse::class, 'throttle:pay-link', \App\Http\Middleware\ResolvePaymentLink::class])
         ->group(function (): void {
             Route::get('/', [PublicPaymentLinkController::class, 'show']);

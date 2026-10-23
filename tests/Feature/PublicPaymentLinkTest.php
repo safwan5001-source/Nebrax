@@ -134,13 +134,13 @@ class PublicPaymentLinkTest extends TestCase
     public function unknown_malformed_and_foreign_tokens_get_one_uniform_404(): void
     {
         $this->link($this->invoice());
-        $bodies = [];
-        foreach ([PaymentLinkToken::generate(), str_repeat('a', 43), str_repeat('A', 42), 'short', str_repeat('-', 43)] as $bad) {
-            $r = $this->getJson("/api/pay/v1/{$bad}");
+        foreach ([PaymentLinkToken::generate(), str_repeat('a', 43), str_repeat('A', 42), 'short', str_repeat('-', 43), str_repeat('a', 44), 'bad token!'.str_repeat('x', 40)] as $bad) {
+            $r = $this->getJson('/api/pay/v1/'.rawurlencode($bad));
             $this->assertSame(404, $r->getStatusCode(), $bad);
-            $bodies[] = $r->json('error.code');
+            $this->assertSame('link_not_found', $r->json('error.code'), "جسم موحّد: {$bad}");
+            $this->assertSame('no-store, private', $r->headers->get('Cache-Control'), "رؤوس الحماية: {$bad}");
+            $this->assertSame('no-referrer', $r->headers->get('Referrer-Policy'));
         }
-        $this->assertSame(['link_not_found'], array_values(array_unique(array_filter($bodies))));
         $this->postJson('/api/pay/v1/'.PaymentLinkToken::generate().'/attempts', [], ['Idempotency-Key' => 'idem-pub-0001'])->assertNotFound();
         $this->getJson('/api/pay/v1/'.PaymentLinkToken::generate().'/status')->assertNotFound();
     }
