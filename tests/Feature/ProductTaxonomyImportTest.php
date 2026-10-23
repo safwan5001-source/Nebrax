@@ -31,6 +31,7 @@ use Tests\TestCase;
 class ProductTaxonomyImportTest extends TestCase
 {
     use RefreshDatabase;
+    use CapturesThrowable;
     use InteractsWithApi;
 
     private string $tenantId;
@@ -119,12 +120,8 @@ class ProductTaxonomyImportTest extends TestCase
     public function an_unknown_kind_or_option_is_refused(): void
     {
         foreach ([['kind' => 'product'], ['kind' => 'brand', 'mode' => 'delete'], ['kind' => 'brand', 'parent_policy' => 'x'], ['kind' => 'brand', 'mapping' => [0 => 'sale_price']]] as $options) {
-            try {
-                $this->service()->options($options);
-                $this->fail('كان يجب رفض الخيار: '.json_encode($options));
-            } catch (\RuntimeException $e) {
-                $this->assertNotSame('', $e->getMessage());
-            }
+            $e = $this->thrown(fn () => $this->service()->options($options), 'كان يجب رفض الخيار: '.json_encode($options));
+            $this->assertNotSame('', $e->getMessage());
         }
         $this->assertSame('error', $this->service()->options(['kind' => 'brand', 'parent_policy' => 'create_missing'])['parent_policy'], 'العلامات بلا آباء: السياسة تُثبَّت');
     }
