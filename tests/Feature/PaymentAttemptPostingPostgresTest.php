@@ -39,6 +39,8 @@ use Tests\TestCase;
  */
 class PaymentAttemptPostingPostgresTest extends TestCase
 {
+    use UsesWorkerDatabaseWithoutTransaction;
+
     private string $dir;
 
     private string $tenantId;
