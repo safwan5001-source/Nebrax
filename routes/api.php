@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\AccountRoutingController;
 use App\Http\Controllers\Api\AccountSettingsController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AiActionController;
+use App\Http\Controllers\Api\AiActionSettingsController;
 use App\Http\Controllers\Api\AssetController;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuthController;
@@ -438,6 +439,11 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
             ->middleware([$perm('ai.consent.manage'), 'throttle:20,1']);
         Route::post('ai-assistant/tools/run', [AiAssistantController::class, 'runTool'])
             ->middleware([$perm('ai.assistant.use'), 'throttle:30,1']);
+
+        // IMP-H2-S4: قبول المؤسسة لـAI Actions. المسار قبل `ai-actions/{action}` ولا يتقاطع معه (اسم مستقل).
+        Route::get('ai-actions-settings', [AiActionSettingsController::class, 'show'])->middleware('throttle:60,1');
+        Route::put('ai-actions-settings', [AiActionSettingsController::class, 'update'])
+            ->middleware([$perm('ai.actions.manage'), 'throttle:20,1']);
 
         // AI-ACTIONS-01: persisted/versioned drafts only. There is deliberately
         // no approve/execute/repair endpoint in this foundation slice.

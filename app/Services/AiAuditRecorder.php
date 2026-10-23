@@ -28,6 +28,8 @@ class AiAuditRecorder
         'document_ref' => 'uuid', 'document_type' => 'string', 'document_status' => 'string',
         'fields_returned' => 'int', 'lines_returned' => 'int', 'redactions_applied' => 'int',
         // مزوّد خارجي (AI-07): أعلام فقط — لا نص رسالة ولا جواب ولا رقم.
+        // قبول المؤسسة لـAI Actions (IMP-H2-S4): علم فقط.
+        'ai_actions_enabled' => 'bool',
         'external_ack' => 'bool', 'composed' => 'bool', 'grounded' => 'bool', 'results_digested' => 'int',
         // مستند عبر مزوّد خارجي (AI-07ب): أعلام وأعداد فقط — لا قيمة ولا اسم ولا نص.
         'document_external' => 'bool', 'document_ack' => 'bool', 'document_fields_sent' => 'int', 'document_lines_sent' => 'int',
