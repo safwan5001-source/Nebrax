@@ -3,6 +3,7 @@
 namespace App\Services\Accounting;
 
 use App\Models\PosDevice;
+use App\Models\PosPaymentTerminal;
 use App\Models\PosSession;
 use App\Models\Warehouse;
 use App\Tenancy\BranchContext;
@@ -70,6 +71,11 @@ class PosDeviceService
     {
         if (PosSession::where('pos_device_id', $device->id)->exists()) {
             throw new RuntimeException('لا يمكن حذف جهاز له جلسات مسجلة — عطّله بدلاً من ذلك.');
+        }
+
+        // جهاز دفع مخصَّص لهذا الجهاز: حذفه كان سيجعله «غير مخصَّص» فيخدم أي جهاز في الفرع (FK مقيِّد).
+        if (PosPaymentTerminal::query()->withoutGlobalScopes()->where('pos_device_id', $device->id)->exists()) {
+            throw new RuntimeException('لا يمكن حذف جهاز نقطة بيع مخصَّص له جهاز دفع — أزل التخصيص أو عطّله بدلاً من ذلك.');
         }
 
         $device->delete();

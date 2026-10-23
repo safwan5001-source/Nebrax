@@ -127,6 +127,7 @@ use App\Http\Controllers\Api\DeliveryConnectorAccountController;
 use App\Http\Controllers\Api\DeliveryConnectorIngestionController;
 use App\Http\Controllers\Api\DeliveryHubOrderController;
 use App\Http\Controllers\Api\PosDeviceController;
+use App\Http\Controllers\Api\PosTerminalController;
 use App\Http\Controllers\Api\PosSessionController;
 use App\Http\Controllers\Api\PrintTemplateController;
 use App\Http\Controllers\Api\ProcurementController;
@@ -862,6 +863,16 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('pos-devices/{id}/cash-drawer/test/complete', [PosDeviceController::class, 'completeCashDrawerTest'])->middleware([$perm('pos.cash_drawer.open'), $app('sales.pos')]);
         Route::post('pos-devices/{id}/cash-drawer/test/unavailable', [PosDeviceController::class, 'drawerBridgeUnavailable'])->middleware([$perm('pos.cash_drawer.open'), $app('sales.pos')]);
         Route::delete('pos-devices/{id}', [PosDeviceController::class, 'destroy'])->middleware([$perm('company.manage'), $app('sales.pos')]);
+        // PAY-H6-02: أجهزة دفع POS وطلباتها (تشغيلي — لا قيود). إدارة الأجهزة إدارة شركة؛ الكاشير يقرأ وينشئ طلبات جلسته؛ حل التعويض لمعتمد الفروقات.
+        Route::get('pos-payment-terminals', [PosTerminalController::class, 'index'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::post('pos-payment-terminals', [PosTerminalController::class, 'store'])->middleware([$perm('company.manage'), $app('sales.pos')]);
+        Route::put('pos-payment-terminals/{id}', [PosTerminalController::class, 'update'])->whereUuid('id')->middleware([$perm('company.manage'), $app('sales.pos')]);
+        Route::get('pos-sessions/{sessionId}/terminal-requests', [PosTerminalController::class, 'sessionRequests'])->whereUuid('sessionId')->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::post('pos/terminal-requests', [PosTerminalController::class, 'createRequest'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::get('pos/terminal-requests/{id}', [PosTerminalController::class, 'showRequest'])->whereUuid('id')->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::post('pos/terminal-requests/{id}/cancel', [PosTerminalController::class, 'cancelRequest'])->whereUuid('id')->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::post('pos/terminal-requests/{id}/void', [PosTerminalController::class, 'voidRequest'])->whereUuid('id')->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::post('pos/terminal-requests/{id}/resolve', [PosTerminalController::class, 'resolveRequest'])->whereUuid('id')->middleware([$perm('pos.variance.approve'), $app('sales.pos')]);
         Route::get('pos/products', [PosController::class, 'products'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos/barcode', [PosController::class, 'resolveBarcode'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         // الأدلة التشغيلية للسلة تُسجل في PosSessionEvent القائم ولا تنشئ مستنداً أو قيداً.

@@ -7,6 +7,8 @@ use App\Http\Resources\BranchResource;
 use App\Models\Branch;
 use App\Models\DeliveryPlatformVersionOverride;
 use App\Models\ImportJob;
+use App\Models\PosPaymentTerminal;
+use App\Models\PosTerminalRequest;
 use App\Support\BranchSettings;
 use App\Support\ImportJobStatus;
 use Illuminate\Database\QueryException;
@@ -104,6 +106,14 @@ class BranchController extends ApiController
             abort(422, 'لا يمكن حذف فرع له تشغيلات استيراد لم تنتهِ — أكملها أو ألغها أولاً، أو عطّل الفرع بدل حذفه.');
         }
 
+        // أجهزة دفع POS وطلباتها: حذف الفرع كان سيحوّلها إلى «بلا فرع» فتظهر لكل الفروع (FK مقيِّد). التعطيل يحفظها.
+        $terminalsMessage = 'لا يمكن حذف فرع له أجهزة دفع أو طلبات أجهزة — عطّله بدل حذفه.';
+        $hasTerminals = fn () => PosPaymentTerminal::query()->withoutGlobalScopes()->where('branch_id', $branch->id)->exists()
+            || PosTerminalRequest::query()->withoutGlobalScopes()->where('branch_id', $branch->id)->exists();
+        if ($hasTerminals()) {
+            abort(422, $terminalsMessage);
+        }
+
         try {
             // معاملة (savepoint إن كانت متداخلة): فشل FK لا يُبقي الاتصال في معاملة ملغاة على PostgreSQL.
             DB::transaction(fn () => $branch->delete());
@@ -113,6 +123,9 @@ class BranchController extends ApiController
             if (($e->errorInfo[0] ?? null) === '23503' || str_contains(strtolower($e->getMessage()), 'foreign key')) {
                 if ($referenced()) {
                     abort(422, $overrideMessage);
+                }
+                if ($hasTerminals()) {
+                    abort(422, $terminalsMessage);
                 }
             }
             throw $e;

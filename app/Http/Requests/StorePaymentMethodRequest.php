@@ -25,6 +25,8 @@ class StorePaymentMethodRequest extends FormRequest
             'is_default' => ['sometimes', 'boolean'],
             // D-09: NULL/غياب = بلا مقاصة (A11). الفحص الموضوعي (نوع الطريقة، اتصال المستأجر النشط) في المتحكّم.
             'pos_clearing_gateway_id' => ['sometimes', 'nullable', 'uuid'],
+            // H6-02: تشترط موافقة جهاز مؤكدة لكل بيع POS بها (افتراضي false = مطفأ).
+            'pos_terminal_required' => ['sometimes', 'boolean'],
         ];
     }
 }
