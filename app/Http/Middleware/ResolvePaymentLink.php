@@ -12,7 +12,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * يحسم رابط الدفع العام (PAY-H2-02e): الرمز → SHA-256 → طلب الدفع، ويقيم سياق مستأجر الطلب لمدة الطلب فقط ثم ينسخه. رمز غير مطابق للصيغة/مجهول/مستأجر
- * معطَّل ⇒ 404 موحّد بلا تمييز (لا كشف لوجود رابط). لا مصادقة مستخدم: الرمز نفسه هو القدرة، ولا يمنح إلا الدفع لفاتورة واحدة. رؤوس no-store وno-referrer.
+ * معطَّل ⇒ 404 موحّد بلا تمييز (لا كشف لوجود رابط). لا مصادقة مستخدم: الرمز نفسه هو القدرة، ولا يمنح إلا الدفع لفاتورة واحدة. الرؤوس تضيفها `HardenPaymentLinkResponse` قبل المحدِّد.
  */
 class ResolvePaymentLink
 {
@@ -26,25 +26,16 @@ class ResolvePaymentLink
             : null;
         $active = $paymentRequest !== null && Tenant::query()->whereKey($paymentRequest->tenant_id)->where('is_active', true)->exists();
         if (! $active) {
-            return $this->harden(response()->json(['error' => ['code' => 'link_not_found', 'message' => 'رابط الدفع غير صالح.']], 404));
+            return response()->json(['error' => ['code' => 'link_not_found', 'message' => 'رابط الدفع غير صالح.']], 404);
         }
 
         $this->tenant->set((string) $paymentRequest->tenant_id);
         try {
             $request->attributes->set('payment_link_request_id', (string) $paymentRequest->getKey());
 
-            return $this->harden($next($request));
+            return $next($request);
         } finally {
             $this->tenant->forget();
         }
-    }
-
-    private function harden(Response $response): Response
-    {
-        $response->headers->set('Cache-Control', 'no-store, private');
-        $response->headers->set('Referrer-Policy', 'no-referrer');
-        $response->headers->set('X-Robots-Tag', 'noindex, nofollow');
-
-        return $response;
     }
 }

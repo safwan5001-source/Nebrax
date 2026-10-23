@@ -27,6 +27,9 @@ use Illuminate\Support\Facades\DB;
  */
 final class InvoicePaymentRequestService
 {
+    /** سقف مسح المكنسة في التشغيل الواحد (حماية من مسح غير محدود). */
+    private const SWEEP_SCAN_CAP = 2000;
+
     public function __construct(
         private readonly PaymentOrchestrator $orchestrator,
         private readonly PaymentsRolloutControlService $rollout,
@@ -167,8 +170,27 @@ final class InvoicePaymentRequestService
         $summary = ['cancelled' => 0, 'expired' => 0, 'skipped' => 0];
         $previous = $this->tenant->id();
 
-        $rows = InvoicePaymentRequest::query()->withoutGlobalScopes()
-            ->where('status', InvoicePaymentRequest::STATUS_OPEN)->orderBy('created_at')->limit($limit)->get(['id', 'tenant_id']);
+        // مرشّحون محتملون فقط (منتهٍ أو فاتورته لم تعد قابلة للدفع) وبمسح بالمعرّف حتى سقف ثابت، فلا تُجوِّع صفوفٌ حيّة قديمة الطابور.
+        $now = now('UTC');
+        $candidates = fn () => InvoicePaymentRequest::query()->withoutGlobalScopes()
+            ->where('status', InvoicePaymentRequest::STATUS_OPEN)
+            ->where(function ($q) use ($now) {
+                $q->where('expires_at', '<=', $now)->orWhereExists(function ($s) {
+                    $s->select(DB::raw(1))->from('invoices')->whereColumn('invoices.id', 'invoice_payment_requests.invoice_id')
+                        ->where(fn ($i) => $i->where('invoices.status', '!=', 'posted')->orWhereRaw('invoices.total - invoices.paid_amount <= 0'));
+                });
+            });
+        $rows = collect();
+        $cursor = null;
+        for ($scanned = 0; $scanned < self::SWEEP_SCAN_CAP && $rows->count() < $limit; ) {
+            $batch = $candidates()->when($cursor !== null, fn ($q) => $q->where('id', '>', $cursor))->orderBy('id')->limit($limit)->get(['id', 'tenant_id']);
+            if ($batch->isEmpty()) {
+                break;
+            }
+            $rows = $rows->concat($batch);
+            $cursor = $batch->last()->id;
+            $scanned += $batch->count();
+        }
         foreach ($rows as $row) {
             $this->tenant->set((string) $row->tenant_id);
             try {
@@ -220,6 +242,14 @@ final class InvoicePaymentRequestService
         }
         if ($request->expires_at !== null && $request->expires_at->isPast()) {
             throw new PaymentOrchestrationException('request_expired', 'انتهت صلاحية طلب الدفع.');
+        }
+
+        // مال التُقط لدى المزوّد ولم ينعكس بعد على المتبقي (ترحيل معلّق أو محجوب بفترة مقفلة): محاولة جديدة قد تخصم الدافع مرتين.
+        $unreflected = PaymentAttempt::query()->where('payable_key', $request->payableKey())
+            ->where('capture_status', PaymentAttempt::STATUS_CAPTURED)
+            ->whereIn('posting_status', [PaymentAttempt::POSTING_PENDING, PaymentAttempt::POSTING_BLOCKED_PERIOD])->exists();
+        if ($unreflected) {
+            throw new PaymentOrchestrationException('payment_captured', 'اكتمل دفع لدى المزوّد ولم يُرحَّل بعد؛ لا يمكن بدء دفعة جديدة.');
         }
 
         $invoice = Invoice::query()->findOrFail($request->invoice_id);

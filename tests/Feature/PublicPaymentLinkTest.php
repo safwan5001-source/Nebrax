@@ -244,6 +244,49 @@ class PublicPaymentLinkTest extends TestCase
         $this->assertSame(200, $codes[0]);
     }
 
+    #[Test]
+    public function rate_limited_and_unknown_responses_carry_the_capability_url_protection_headers(): void
+    {
+        $token = $this->link($this->invoice());
+        $limited = null;
+        for ($i = 0; $i < 25 && ($limited === null || $limited->getStatusCode() !== 429); $i++) {
+            $limited = $this->getJson("/api/pay/v1/{$token}/status");
+        }
+        $this->assertSame(429, $limited->getStatusCode());
+        $this->assertSame('no-store, private', $limited->headers->get('Cache-Control'));
+        $this->assertSame('no-referrer', $limited->headers->get('Referrer-Policy'));
+        $this->assertStringContainsString('noindex', (string) $limited->headers->get('X-Robots-Tag'));
+
+        $unknown = $this->getJson('/api/pay/v1/'.PaymentLinkToken::generate());
+        $this->assertSame(404, $unknown->getStatusCode());
+        $this->assertSame('no-store, private', $unknown->headers->get('Cache-Control'));
+    }
+
+    #[Test]
+    public function a_late_capture_of_an_older_attempt_wins_over_a_newer_attempt_in_status_and_blocks_a_second_charge(): void
+    {
+        $invoice = $this->invoice();
+        $request = $this->requests->create($invoice, $this->gateway, $this->owner);
+        $token = $this->requests->issueLink($request, $this->owner);
+        $orchestrator = app(\App\Services\PaymentOrchestrator::class);
+
+        $older = $this->requests->startAttempt($request, 'idem-late-0001', null, $this->owner);
+        $orchestrator->cancel($older, $this->owner);
+        $newer = $this->requests->startAttempt($request, 'idem-late-0002', null, $this->owner);
+        $this->assertNotSame($older->id, $newer->id);
+
+        \Illuminate\Support\Facades\Event::fake([\App\Events\PaymentAttemptCaptured::class]);   // الترحيل معلّق: المتبقي لم ينعكس بعد
+        $this->fake->script($older->provider_payment_id, 'captured');
+        $orchestrator->sync($older->fresh());
+
+        $this->getJson("/api/pay/v1/{$token}/status")->assertOk()->assertJsonPath('data.payment', 'paid');
+        $this->assertSame(115000, $invoice->fresh()->remaining(), 'الفاتورة لم تُرحَّل بعد');
+        $this->postJson("/api/pay/v1/{$token}/attempts", [], ['Idempotency-Key' => 'idem-late-0003'])
+            ->assertStatus(409)->assertJsonPath('error.code', 'payment_captured');
+        $e = $this->thrown(fn () => $this->requests->startAttempt($request->fresh(), 'idem-late-0004', null, $this->owner), 'second charge', PaymentOrchestrationException::class);
+        $this->assertSame('payment_captured', $e->reason);
+    }
+
     // ═══════════════ المكنسة ═══════════════
 
     #[Test]
@@ -270,6 +313,32 @@ class PublicPaymentLinkTest extends TestCase
         $this->assertSame($entries, DB::table('journal_entries')->count());
         $this->assertSame(['cancelled' => 0, 'expired' => 0, 'skipped' => 0], $this->requests->closeStale(), 'idempotent');
         $this->assertSame($this->tenant->id, app(TenantContext::class)->id(), 'المكنسة تعيد السياق السابق');
+    }
+
+    #[Test]
+    public function long_lived_open_requests_cannot_starve_the_sweep_of_later_settled_ones(): void
+    {
+        $live = [];
+        foreach (range(1, 4) as $i) {
+            $live[] = $this->requests->create($this->invoice(), $this->gateway, $this->owner);
+        }
+        $settled = [];
+        foreach (range(1, 2) as $i) {
+            $invoice = $this->invoice();
+            $settled[] = $this->requests->create($invoice, $this->gateway, $this->owner);
+            $payments = app(PaymentService::class);
+            $payments->post($payments->create(['partner_id' => $invoice->partner_id, 'amount' => 115000, 'direction' => 'received', 'method' => 'cash', 'invoice_id' => $invoice->id]));
+        }
+
+        $summary = $this->requests->closeStale(2);   // الحدّ أصغر من عدد الحيّة القديمة
+
+        $this->assertSame(2, $summary['cancelled']);
+        foreach ($settled as $request) {
+            $this->assertSame('cancelled', $request->fresh()->status);
+        }
+        foreach ($live as $request) {
+            $this->assertSame('open', $request->fresh()->status);
+        }
     }
 
     #[Test]

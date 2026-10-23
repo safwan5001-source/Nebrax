@@ -51,7 +51,7 @@ class PublicPaymentLinkController extends ApiController
             $attempt = $this->requests->startAttempt($paymentRequest, (string) $request->header('Idempotency-Key', ''), isset($data['amount_minor']) ? (int) $data['amount_minor'] : null, null);
         } catch (PaymentOrchestrationException $e) {
             [$status, $code] = match ($e->reason) {
-                'request_not_open', 'request_expired', 'invoice_not_payable', 'active_attempt_exists', 'payable_changed', 'nothing_due', 'idempotency_conflict' => [409, $e->reason],
+                'request_not_open', 'request_expired', 'invoice_not_payable', 'active_attempt_exists', 'payable_changed', 'nothing_due', 'idempotency_conflict', 'payment_captured' => [409, $e->reason],
                 'partial_not_allowed', 'amount_exceeds_remaining', 'invalid_amount', 'invalid_idempotency_key', 'amount_below_minimum' => [422, $e->reason],
                 default => [503, 'payment_unavailable'],   // التفعيل/البوابة/المزوّد: لا نكشف سبباً داخلياً للدافع
             };
@@ -71,14 +71,17 @@ class PublicPaymentLinkController extends ApiController
     public function status(Request $request): JsonResponse
     {
         $paymentRequest = $this->resolved($request);
-        $attempt = PaymentAttempt::query()->where('payable_key', $paymentRequest->payableKey())->latest('created_at')->first();
+        $attempts = PaymentAttempt::query()->where('payable_key', $paymentRequest->payableKey());
+        // أي محاولة ملتقطة تغلب الأحدث: التقاط متأخر لمحاولة أقدم (D-15) يعني أن الدفع تمّ فعلاً، فلا يُدفع الدافع لمتابعة محاولة أحدث (ازدواج خصم).
+        $latest = (clone $attempts)->latest('created_at')->first();
+        $captured = (clone $attempts)->where('capture_status', PaymentAttempt::STATUS_CAPTURED)->exists();
 
         return response()->json(['data' => [
             'request_status' => $paymentRequest->status,
             'payment' => match (true) {
-                $attempt === null => 'none',
-                $attempt->capture_status === PaymentAttempt::STATUS_CAPTURED => 'paid',
-                $attempt->isActive() => 'pending',
+                $captured => 'paid',
+                $latest === null => 'none',
+                $latest->isActive() => 'pending',
                 default => 'not_completed',
             },
         ]]);
