@@ -10,6 +10,7 @@ use App\Models\PosSession;
 use App\Models\PosTerminalRequest;
 use App\Models\User;
 use App\Services\Accounting\PosSessionService;
+use App\Support\PosSettings;
 use App\Support\PosTerminalException;
 use App\Support\PosTerminalResult;
 use App\Tenancy\BranchContext;
@@ -73,6 +74,10 @@ class PosTerminalService
                 $method = PaymentMethod::query()->whereKey($data['payment_method_id'])->first();
                 if ($method === null || ! $method->is_active || $method->settlement_type !== 'bank') {
                     throw new PosTerminalException('method_not_card', 'طريقة الدفع يجب أن تكون بنكية نشطة.');
+                }
+                // نفس سياسة البيع: وسيلة معطَّلة في إعدادات نقطة بيع هذا الفرع لا تُشحَن على الجهاز (وإلا بقيت موافقة لا يقبلها الدفع).
+                if (! PosSettings::allowsPaymentMethod($method->id)) {
+                    throw new PosTerminalException('method_not_allowed_in_pos', 'وسيلة الدفع غير مفعلة في إعدادات نقطة البيع.');
                 }
 
                 return PosTerminalRequest::query()->create([
@@ -160,7 +165,7 @@ class PosTerminalService
             // إيجار منتهٍ لإلغاء لم يكتمل: نتيجته عند المزوّد مجهولة (قد يُنفَّذ لاحقاً) ⇒ لا يخلفه استعلام قد يسجّل موافقة سيعكسها ذلك الإلغاء؛
             // يخلفه إلغاء آخر فقط (مُتماثل القدرة فيتقارب الطرفان على «ملغى»).
             if ($request->lease_token !== null && $request->lease_op === 'cancel' && $op !== 'cancel') {
-                throw new PosTerminalException('operation_in_progress', 'إلغاء سابق لم يتأكد بعد؛ أعد الإلغاء بدل الاستعلام.');
+                return [null, $request]; // يُعاد الصف كما هو بلا نداء للمزوّد؛ المجدول/الكاشير يعيدان الإلغاء فيُحسم
             }
             $request->update(['compensating_until' => now('UTC')->addSeconds($lease), 'lease_token' => $token, 'lease_op' => $op]);
 
@@ -173,8 +178,11 @@ class PosTerminalService
         try {
             $result = $call($claimed[0]);
         } catch (Throwable $e) {
-            // يحرّر إيجاره هو فقط: إن انتهى وأخذه غيره فلا يمسّه.
-            DB::table('pos_terminal_requests')->where('id', $requestId)->where('lease_token', $token)->update(['compensating_until' => null, 'lease_token' => null, 'lease_op' => null]);
+            // يحرّر إيجاره هو فقط: إن انتهى وأخذه غيره فلا يمسّه. استثناء من `cancel` = نتيجة **غامضة** (قد ينفّذه المزوّد لاحقاً): تُفرَّغ المدّة ويبقى
+            // رمز الإلغاء علامةً فلا يخلفه إلا إلغاء آخر، ولا يسجّل استعلامٌ موافقةً سيعكسها ذلك الإلغاء.
+            $keepCancelMarker = $op === 'cancel';
+            DB::table('pos_terminal_requests')->where('id', $requestId)->where('lease_token', $token)
+                ->update($keepCancelMarker ? ['compensating_until' => null] : ['compensating_until' => null, 'lease_token' => null, 'lease_op' => null]);
             throw $e;
         }
 
@@ -372,6 +380,7 @@ class PosTerminalService
         }
 
         $error = null;
+        $ambiguous = false;
         try {
             $terminal = PosPaymentTerminal::query()->findOrFail($claimed->pos_payment_terminal_id);
             $result = $this->adapters->for($terminal->provider)->void($terminal, $claimed);
@@ -379,10 +388,12 @@ class PosTerminalService
                 $error = $result->failureCode ?: 'void_not_confirmed';
             }
         } catch (Throwable) {
+            // استثناء نقل: قد يكون المزوّد نفّذ الإلغاء وضاع الردّ ⇒ نتيجة غامضة (تختلف عن رفض صريح من المزوّد).
             $error = 'void_failed';
+            $ambiguous = true;
         }
 
-        return DB::transaction(function () use ($requestId, $error, $token) {
+        return DB::transaction(function () use ($requestId, $error, $token, $ambiguous) {
             $request = PosTerminalRequest::query()->whereKey($requestId)->lockForUpdate()->firstOrFail();
             if (! in_array($request->status, [PosTerminalRequest::STATUS_APPROVED, PosTerminalRequest::STATUS_COMPENSATION_REQUIRED], true)) {
                 return $request;
@@ -392,6 +403,9 @@ class PosTerminalService
             }
             if ($error === null) {
                 $request->update(['status' => PosTerminalRequest::STATUS_VOIDED, 'voided_at' => now('UTC'), 'compensating_until' => null, 'lease_token' => null, 'lease_op' => null, 'last_void_error' => null]);
+            } elseif ($ambiguous) {
+                // يبقى رمز الإيجار علامةً: لا استهلاك ولا حلّ يدوي (خطر رد مزدوج) حتى تنجح إعادة إلغاء (idempotent) أو يُحسم الأمر؛ المدّة تُفرَّغ فتستلمها إعادة المحاولة.
+                $request->update(['status' => PosTerminalRequest::STATUS_COMPENSATION_REQUIRED, 'compensating_until' => null, 'last_void_error' => substr($error, 0, 48)]);
             } else {
                 $request->update(['status' => PosTerminalRequest::STATUS_COMPENSATION_REQUIRED, 'compensating_until' => null, 'lease_token' => null, 'lease_op' => null, 'last_void_error' => substr($error, 0, 48)]);
             }

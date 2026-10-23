@@ -104,8 +104,11 @@ return new class extends Migration
             $table->dropColumn('pos_terminal_required');
         });
         DB::statement('DROP INDEX IF EXISTS pos_terminal_requests_one_active_per_terminal');
-        DB::statement('DROP TRIGGER IF EXISTS pos_terminal_requests_guard_insert');
-        DB::statement('DROP TRIGGER IF EXISTS pos_terminal_requests_guard_update');
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            // مُشغّلات SQLite وحدها (PostgreSQL يستعمل قيود CHECK وتسقط مع الجدول؛ وصياغة DROP TRIGGER فيه تشترط ON table).
+            DB::statement('DROP TRIGGER IF EXISTS pos_terminal_requests_guard_insert');
+            DB::statement('DROP TRIGGER IF EXISTS pos_terminal_requests_guard_update');
+        }
         Schema::dropIfExists('pos_terminal_requests');
         Schema::dropIfExists('pos_payment_terminals');
     }

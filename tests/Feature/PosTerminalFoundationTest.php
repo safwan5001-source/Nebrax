@@ -304,6 +304,9 @@ class PosTerminalFoundationTest extends TestCase
         $this->assertSame('void_failed', $request->last_void_error);
         $this->assertSame(1, $request->void_attempts);
         $this->assertNull($request->compensating_until);
+        $this->assertNotNull($request->lease_token, 'استثناء نقل = نتيجة غامضة: العلامة باقية');
+        // غامض ⇒ لا حلّ يدوي (قد ينفّذ المزوّد الإلغاء لاحقاً فيُرَدّ المبلغ مرتين).
+        $this->withToken($ctx['token'])->postJson("/api/pos/terminal-requests/{$id}/resolve", ['note' => 'أُعيد المبلغ خارجياً'])->assertStatus(422)->assertJsonPath('reason', 'compensation_in_progress');
 
         $preview = $this->withToken($ctx['token'])->getJson("/api/pos-sessions/{$ctx['session']}/closing-preview")->assertOk()['data'];
         $this->assertSame(1, $preview['terminal_blockers']['compensation_required']);
@@ -328,8 +331,9 @@ class PosTerminalFoundationTest extends TestCase
         // موافقة قائمة غير مستهلكة تمنع الإقفال.
         $this->withToken($ctx['token'])->postJson("/api/pos-sessions/{$ctx['session']}/close", ['closing_balance' => 0])->assertStatus(422);
 
-        $this->fake->failVoidWith(new \RuntimeException('down'));
+        $this->fake->rejectVoid = true; // رفض صريح من المزوّد (قاطع) ⇒ الحلّ اليدوي ممكن
         $this->withToken($ctx['token'])->postJson("/api/pos/terminal-requests/{$id}/void")->assertOk()->assertJsonPath('data.status', 'compensation_required');
+        $this->assertNull(PosTerminalRequest::query()->withoutGlobalScopes()->findOrFail($id)->lease_token);
 
         $this->withToken($ctx['token'])->postJson("/api/pos/terminal-requests/{$id}/resolve", ['note' => 'abc'])->assertStatus(422);
         $this->withToken($ctx['token'])->postJson("/api/pos/terminal-requests/{$id}/resolve", ['note' => 'أُعيد المبلغ للعميل من لوحة المزوّد'])->assertOk()
@@ -520,7 +524,7 @@ class PosTerminalFoundationTest extends TestCase
         DB::table('pos_terminal_requests')->where('id', $id)->update(['compensating_until' => now('UTC')->subSeconds(5), 'lease_token' => 'cancel-in-flight', 'lease_op' => 'cancel']);
 
         $before = $this->fake->calls['fetch'];
-        $this->show($ctx, $id)->assertStatus(409)->assertJsonPath('reason', 'operation_in_progress');
+        $this->show($ctx, $id)->assertOk()->assertJsonPath('data.status', 'sent');
         $this->assertSame($before, $this->fake->calls['fetch'], 'لم يُستعلم المزوّد');
         $this->assertSame('sent', PosTerminalRequest::query()->withoutGlobalScopes()->findOrFail($id)->status);
 
@@ -538,6 +542,40 @@ class PosTerminalFoundationTest extends TestCase
 
         $this->withToken($ctx['token'])->deleteJson("/api/branches/{$branch}")->assertStatus(422);
         $this->assertSame($branch, DB::table('pos_payment_terminals')->where('name', 'جهاز الفرع')->value('branch_id'), 'الجهاز باقٍ بفرعه');
+    }
+
+    #[Test]
+    public function an_ambiguous_cancel_failure_keeps_the_cancel_marker_so_a_sync_cannot_record_an_approval_it_would_reverse(): void
+    {
+        $ctx = $this->context('pos-term-cancel-ambiguous');
+        $id = $this->createRequest($ctx, 11500)->assertCreated()->json('data.id');
+        $this->fake->script($id, 'approved');
+        $this->fake->failCancelWith(new \RuntimeException('timeout'));
+
+        $this->withToken($ctx['token'])->postJson("/api/pos/terminal-requests/{$id}/cancel")->assertStatus(503);
+        $row = PosTerminalRequest::query()->withoutGlobalScopes()->findOrFail($id);
+        $this->assertNotNull($row->lease_token);
+        $this->assertSame('cancel', $row->lease_op);
+        $this->assertNull($row->compensating_until);
+
+        $before = $this->fake->calls['fetch'];
+        $this->show($ctx, $id)->assertOk()->assertJsonPath('data.status', 'sent');
+        $this->assertSame($before, $this->fake->calls['fetch']);
+
+        $this->fake->failCancelWith(null);
+        $this->withToken($ctx['token'])->postJson("/api/pos/terminal-requests/{$id}/cancel")->assertOk()->assertJsonPath('data.status', 'cancelled');
+        $this->assertNull(PosTerminalRequest::query()->withoutGlobalScopes()->findOrFail($id)->lease_token);
+    }
+
+    #[Test]
+    public function a_payment_method_disabled_in_the_pos_settings_cannot_start_a_terminal_request(): void
+    {
+        $ctx = $this->context('pos-term-method-setting');
+        $before = $this->fake->calls['start'];
+        $this->withToken($ctx['token'])->putJson('/api/sales-config/pos', ['data' => ['payment_methods_mode' => 'none', 'enabled_payment_method_ids' => [], 'default_payment_method_id' => null]])->assertOk();
+        $this->createRequest($ctx, 11500)->assertStatus(422)->assertJsonPath('reason', 'method_not_allowed_in_pos');
+        $this->assertSame($before, $this->fake->calls['start'], 'لم يُنادَ الجهاز');
+        $this->assertSame(0, PosTerminalRequest::query()->withoutGlobalScopes()->count());
     }
 
     #[Test]

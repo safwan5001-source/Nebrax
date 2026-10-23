@@ -37,6 +37,9 @@ final class FakePosTerminalAdapter implements TerminalAdapter
     /** @var (\Closure(PosTerminalRequest): void)|null يُستدعى أثناء `void` (قبل الرد) */
     public ?\Closure $duringVoid = null;
 
+    /** رفض صريح من المزوّد للإلغاء (نتيجة قاطعة) بخلاف الاستثناء الذي هو نتيجة غامضة */
+    public bool $rejectVoid = false;
+
     public function provider(): string
     {
         return self::PROVIDER;
@@ -81,6 +84,9 @@ final class FakePosTerminalAdapter implements TerminalAdapter
         }
         if ($this->voidFailure !== null) {
             throw $this->voidFailure;
+        }
+        if ($this->rejectVoid) {
+            return new PosTerminalResult(PosTerminalResult::ERROR, 'fake_term_'.$request->id, failureCode: 'void_rejected');
         }
         $this->voided[] = $request->id;
         $this->scripted[$request->id] = new PosTerminalResult(PosTerminalResult::VOIDED, 'fake_term_'.$request->id);
