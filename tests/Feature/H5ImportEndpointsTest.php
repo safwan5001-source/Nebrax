@@ -12,6 +12,7 @@ use App\Models\Role;
 use App\Models\TenantApplicationState;
 use App\Models\User;
 use App\Services\AiActionRegistry;
+use App\Services\ExpenseImportAdapter;
 use App\Support\SpreadsheetWriter;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -189,6 +190,33 @@ class H5ImportEndpointsTest extends TestCase
             $this->withToken($auth['token'])->postJson("/api/import-jobs/{$job['id']}/apply", $changed)->assertStatus(422)->assertJsonPath('code', 'options_frozen');
         }
         $this->assertSame('completed', $this->runJob($auth['token'], $job['id']));
+    }
+
+    /** @test */
+    public function explicit_options_equal_to_the_frozen_ones_are_not_a_change_but_an_edited_repeat_row_is(): void
+    {
+        $auth = $this->registerTenant();
+        $rows = [$this->row(), $this->row()];
+        $options = ['default_tax_rate' => 5, 'confirmed_repeat_rows' => [3]];
+        $job = $this->createJob($auth['token'], $rows, $options)->assertCreated()->json('data');
+
+        // تعديل صف مؤكَّد موجود (لا إضافة) تغيير
+        $this->withToken($auth['token'])->postJson("/api/import-jobs/{$job['id']}/apply", ['confirmed_repeat_rows' => [4]])->assertStatus(422)->assertJsonPath('code', 'options_frozen');
+        // نفس القيم بصيغ مختلفة (نص/مصفوفة نصوص) ليست تغييراً
+        $this->withToken($auth['token'])->postJson("/api/import-jobs/{$job['id']}/apply", ['default_tax_rate' => '5', 'confirmed_repeat_rows' => ['3']])->assertOk();
+    }
+
+    /** @test */
+    public function a_repair_child_never_inherits_confirmed_repeat_rows_because_its_file_is_renumbered(): void
+    {
+        $this->assertSame([], ExpenseImportAdapter::effectiveOptions(true, ['confirmed_repeat_rows' => [3, 5], 'default_tax_rate' => 5])['confirmed_repeat_rows']);
+        $this->assertSame([3, 5], ExpenseImportAdapter::effectiveOptions(false, ['confirmed_repeat_rows' => [3, 5]])['confirmed_repeat_rows']);
+        // وقيمٌ فاسدة (مصفوفة بدل نص) تُرفض رفضاً مسمّى لا ErrorException
+        $adapter = app(ExpenseImportAdapter::class);
+        $bad = $adapter->canonicalOptions(['default_payment_method' => ['x'], 'reference_policy' => ['y']]);
+        $this->thrown(fn () => app(\App\Services\ExpenseImportService::class)->options($bad), 'array option', \RuntimeException::class);
+        // JSON 5.0 و"5" متكافئان
+        $this->assertSame($adapter->canonicalOptions(['default_tax_rate' => 5.0, 'confirmed_repeat_rows' => [3.0]]), $adapter->canonicalOptions(['default_tax_rate' => '5', 'confirmed_repeat_rows' => ['3']]));
     }
 
     /** @test */
