@@ -82,7 +82,7 @@ class CreditNoteController extends ApiController
         return (new CreditNoteResource($note))->response();
     }
 
-    public function post(string $id): JsonResponse
+    public function post(Request $request, string $id): JsonResponse
     {
         // REM-03b: الحارس قبل أي أثر محاسبي. **الإشعار نفسه** بالفرع النشط فقط؛ أما الفاتورة المصدر
         // (`original_invoice_id`) فتبقى على سياسة المرجع القائمة (الفروع المسموحة) — لا تشديد هنا.
@@ -96,7 +96,7 @@ class CreditNoteController extends ApiController
                 []
             );
         }
-        $posted = $this->domain(fn () => $this->creditNotes->post($note));
+        $posted = $this->domain(fn () => $this->creditNotes->post($note, $request->user()));
 
         return (new CreditNoteResource($posted->load(['lines', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])))->response();
     }

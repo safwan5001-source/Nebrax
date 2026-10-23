@@ -639,10 +639,21 @@ class TreasuryCashSaleRoutingTest extends TestCase
     }
 
     /** @test */
-    public function a_cash_credit_note_for_an_invoice_collected_outside_1110_is_rejected_without_any_entry(): void
+    public function a_cash_credit_note_for_a_routed_sale_is_refunded_from_that_same_treasury_since_t5(): void
     {
-        $routed = $this->routedInvoiceTo1111();
+        $routed = $this->routedInvoiceTo1111(2);
+        $note = app(CreditNoteService::class)->post($this->cashNoteFor($routed), $this->owner());
+
+        $this->assertSame('posted', $note->status);
+        $this->assertContains('1111 Cr 115000', $this->lines($note->id), 'T5: الاسترداد يتبع خزينة التحصيل بدل الرفض');
+    }
+
+    /** @test */
+    public function the_legacy_branch_keeps_the_t4_guard_for_a_sale_routed_before_the_policy_went_back_to_legacy(): void
+    {
+        $routed = $this->routedInvoiceTo1111(2);
         $note = $this->cashNoteFor($routed);
+        $this->store('legacy');                                   // السياسة عادت إلى legacy بعد بيع موجَّه
         $before = $this->entryCount();
 
         $e = $this->failure(fn () => app(CreditNoteService::class)->post($note));

@@ -10,6 +10,8 @@ use App\Models\InvoiceLine;
 use App\Models\Partner;
 use App\Models\Product;
 use App\Services\PrintTemplates\PrintTemplateService;
+use App\Models\User;
+use App\Support\CashSaleTreasuryPolicy;
 use App\Support\DocumentLineVariantResolver;
 use App\Support\Money;
 use App\Support\Settings;
@@ -118,8 +120,11 @@ class CreditNoteService
 
     /**
      * ترحيل الإشعار: توليد القيد العكسي المتوازن عبر LedgerService.
+     *
+     * @param  ?User  $actor  الفاعل المصادَق عليه (مسار HTTP) — يُستعمل لتخويل `withdraw` في الاسترداد النقدي الموجَّه (TREASURY-T5)،
+     *                        ولا أثر له ما دامت سياسة T4 الفعّالة `legacy` (بوابة مغلقة).
      */
-    public function post(CreditNote $note): CreditNote
+    public function post(CreditNote $note, ?User $actor = null): CreditNote
     {
         if (! $note->isDraft()) {
             throw new RuntimeException('لا يمكن ترحيل إشعار غير مسوّد (draft).');
@@ -129,7 +134,7 @@ class CreditNoteService
         // ولا يصل إلى القيد أو القالب أو تغيير الحالة.
         $type = $this->ownership->forNote($note);
 
-        return DB::transaction(function () use ($note, $type) {
+        return DB::transaction(function () use ($note, $type, $actor) {
             // قفل الصف وإعادة فحص الحالة — يمنع الترحيل المزدوج المتزامن.
             $note = CreditNote::lockForUpdate()->findOrFail($note->id);
             if (! $note->isDraft()) {
@@ -147,12 +152,22 @@ class CreditNoteService
             // وتقفل الفاتورة نفسَها فتتسلسل مع ترحيل المرتجعات عليها.
             if ($type === CreditNoteOwnershipResolver::SALES && $note->original_invoice_id) {
                 $invoice = $this->resolveInvoice($note->original_invoice_id, $note->partner_id, lock: true);
-                // TREASURY-T4: ردّ نقدي لفاتورة حُصِّلت في غير 1110 يُرفض (الإشعار النقدي يُدائن 1110 مرمَّزاً حتى T5).
-                if ($note->refund_type === 'cash') {
+                // TREASURY-T4: على المسار القديم (`legacy`) الإشعار النقدي يُدائن 1110؛ فإن كانت الفاتورة حُصِّلت في غيره (بيع وُجِّه ثم عادت
+                // السياسة إلى legacy) يُرفض. على المسار الموجَّه تتبع الخزينةَ المشتقّة أدناه (TREASURY-T5) فلا حاجة لهذا الحارس.
+                if ($note->refund_type === 'cash' && CashSaleTreasuryPolicy::effective() === CashSaleTreasuryPolicy::LEGACY) {
                     app(CashSaleRefundGuard::class)->assertCashRefundMatchesCollection($invoice);
                 }
                 $this->rederiveLines($note, $invoice);
                 $note->load('lines');
+            }
+
+            // TREASURY-T5: الخزينة المدينة للاسترداد النقدي تُحلّ **قبل** القيد (فالرفض يتراجع قبل أي قفل مِرساة أو ICV أو مدخل سلسلة).
+            // مغلق افتراضياً: ما دامت سياسة T4 الفعّالة `legacy` تبقى 1110 بلا تخويل كما كانت. لا سقوط إلى 1110 عند أي فشل.
+            $refundTreasuryAccountId = null;
+            if ($type === CreditNoteOwnershipResolver::SALES
+                && $note->refund_type === 'cash'
+                && CashSaleTreasuryPolicy::effective() !== CashSaleTreasuryPolicy::LEGACY) {
+                $refundTreasuryAccountId = app(CreditNoteRefundTreasuryResolver::class)->resolve($invoice, $actor)->accountId;
             }
 
             // إعادة احتساب الإجماليات من السطور (مصدر الحقيقة) قبل توليد القيد.
@@ -163,7 +178,7 @@ class CreditNoteService
             $isPurchase = $type === CreditNoteOwnershipResolver::PURCHASE;
             $lines = $isPurchase
                 ? $this->purchaseLines($note, $subtotal, $taxAmount, $total)
-                : $this->salesLines($note, $subtotal, $taxAmount, $total);
+                : $this->salesLines($note, $subtotal, $taxAmount, $total, $refundTreasuryAccountId);
 
             $label = $isPurchase ? 'إشعار مدين' : 'إشعار دائن';
 
@@ -485,7 +500,7 @@ class CreditNoteService
      *   مدين 4110 المبيعات + مدين `tax_output` ضريبة المخرجات (افتراضياً 2120) / دائن 1130 أو 1110
      *   REM-06 (R6-1): الدور الحالي وقت الترحيل، لا حساب الفاتورة الأصلية؛ تعيين مفقود/فاسد = فشل مغلق.
      */
-    protected function salesLines(CreditNote $note, int $subtotal, int $taxAmount, int $total): array
+    protected function salesLines(CreditNote $note, int $subtotal, int $taxAmount, int $total, ?string $cashAccountId = null): array
     {
         $lines = [['account_id' => $this->accountId(self::ACC_SALES), 'debit' => $subtotal]];
 
@@ -494,7 +509,8 @@ class CreditNoteService
         }
 
         $creditLine = [
-            'account_id' => $this->accountId($note->refund_type === 'cash' ? self::ACC_CASH : self::ACC_RECEIVABLE),
+            // الاسترداد النقدي: الخزينة المشتقّة (T5) إن وُجدت، وإلا 1110 على المسار القديم فقط (`$cashAccountId` null ⇒ legacy).
+            'account_id' => $note->refund_type === 'cash' ? ($cashAccountId ?? $this->accountId(self::ACC_CASH)) : $this->accountId(self::ACC_RECEIVABLE),
             'credit'     => $total,
         ];
         if ($note->refund_type === 'credit') {
