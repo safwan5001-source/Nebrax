@@ -80,6 +80,10 @@ class AiActionControlApiTest extends TestCase
         $this->withToken($token)->putJson('/api/platform/ai-action-controls', ['action_type' => '*', 'capability' => 'use', 'enabled' => true, 'reason' => 'تشغيل المفتاح الرئيسي'])
             ->assertOk()->assertJsonPath('data.changed', true);
         $this->withToken($token)->putJson('/api/platform/ai-action-controls', ['action_type' => self::TYPE, 'capability' => 'use', 'enabled' => true, 'reason' => 'توفّر النوع'])->assertOk();
+        $platform = $this->withToken($token)->getJson('/api/platform/ai-action-controls')->assertOk()->assertJsonCount(2, 'data.events');
+        $reasons = array_column($platform->json('data.events'), 'reason');
+        sort($reasons);
+        $this->assertSame(['تشغيل المفتاح الرئيسي', 'توفّر النوع'], $reasons);
         $this->withToken($token)->putJson($tenantUri, ['action_type' => self::TYPE, 'capability' => 'use', 'enabled' => true, 'reason' => 'منحة للمؤسسة'])
             ->assertOk()->assertJsonPath('data.changed', true)
             ->tap(fn ($r) => $this->assertSame('tenant_not_enabled', $r->json('data.effective')[self::TYPE]['preview']['reason']));
