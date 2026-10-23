@@ -102,6 +102,7 @@ use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\InvoicePaymentRequestController;
 use App\Http\Controllers\Api\PaymentAttemptLogController;
 use App\Http\Controllers\Api\PaymentAttemptPostingController;
+use App\Http\Controllers\Api\PaymentRefundController;
 use App\Http\Controllers\Api\PublicPaymentLinkController;
 use App\Http\Controllers\Api\JobLevelController;
 use App\Http\Controllers\Api\JobTitleController;
@@ -1091,6 +1092,18 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('payment-attempts/{id}', [PaymentAttemptLogController::class, 'show'])->whereUuid('id')->middleware($perm('payments.view'));
         Route::get('payment-attempts/blocked', [PaymentAttemptPostingController::class, 'blocked'])->middleware($perm('payments.resolve_blocked'));
         Route::post('payment-attempts/{id}/repost', [PaymentAttemptPostingController::class, 'repost'])->whereUuid('id')->middleware([$perm('payments.resolve_blocked'), 'throttle:20,1']);
+        // PAY-H3-01d (ADR-0007): استردادات البوابة. أربع صلاحيات مستقلة (owner/admin)؛ الطلب والاعتماد بفاعلَين مختلفَين دائماً؛ إعادة الترحيل payments.resolve_blocked.
+        Route::get('payment-refunds', [PaymentRefundController::class, 'index'])->middleware($perm('payment_refunds.view'));
+        Route::get('payment-refunds/{id}', [PaymentRefundController::class, 'show'])->whereUuid('id')->middleware($perm('payment_refunds.view'));
+        Route::get('payment-attempts/{id}/refund-context', [PaymentRefundController::class, 'context'])->whereUuid('id')->middleware($perm('payment_refunds.view'));
+        Route::post('payment-refunds', [PaymentRefundController::class, 'store'])->middleware([$perm('payment_refunds.request'), 'throttle:30,1']);
+        Route::post('payment-refunds/{id}/approve', [PaymentRefundController::class, 'approve'])->whereUuid('id')->middleware([$perm('payment_refunds.approve'), 'throttle:30,1']);
+        Route::post('payment-refunds/{id}/submit', [PaymentRefundController::class, 'submit'])->whereUuid('id')->middleware([$perm('payment_refunds.approve'), 'throttle:30,1']);
+        Route::post('payment-refunds/{id}/reject', [PaymentRefundController::class, 'reject'])->whereUuid('id')->middleware([$perm('payment_refunds.approve'), 'throttle:30,1']);
+        Route::post('payment-refunds/{id}/cancel', [PaymentRefundController::class, 'cancel'])->whereUuid('id')->middleware([$perm('payment_refunds.view'), 'throttle:30,1']);
+        Route::post('payment-refunds/{id}/resolve', [PaymentRefundController::class, 'resolve'])->whereUuid('id')->middleware([$perm('payment_refunds.resolve_unknown'), 'throttle:20,1']);
+        Route::post('payment-refunds/{id}/repost', [PaymentRefundController::class, 'repost'])->whereUuid('id')->middleware([$perm('payments.resolve_blocked'), 'throttle:20,1']);
+        Route::post('payment-attempts/{id}/resolve-external-refund', [PaymentRefundController::class, 'resolveExternal'])->whereUuid('id')->middleware([$perm('payment_refunds.resolve_unknown'), 'throttle:20,1']);
         Route::post('payment-attempts/{id}/sync', [PaymentAttemptController::class, 'sync'])->whereUuid('id')->middleware($perm('payments.manage'));
         Route::get('payment-gateways', [PaymentGatewayController::class, 'index'])->middleware($perm('payments.view'));
         Route::get('payment-gateways/{id}', [PaymentGatewayController::class, 'show'])->whereUuid('id')->middleware($perm('payments.view'));

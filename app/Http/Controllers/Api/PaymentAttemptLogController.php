@@ -92,6 +92,8 @@ class PaymentAttemptLogController extends ApiController
         return response()->json(['data' => $this->row($attempt, $context) + [
             'failure_code' => $attempt->failure_code,
             'refunded_minor' => (int) $attempt->refunded_minor,
+            'unrecognized_refund_at' => $attempt->unrecognized_refund_at?->toISOString(),
+            'unrecognized_refund_minor' => $attempt->unrecognized_refund_minor === null ? null : (int) $attempt->unrecognized_refund_minor,
             'postings' => $postings->map(fn ($p) => [
                 'role' => $p->role,
                 'amount_minor' => (int) $p->amount_minor,
@@ -130,6 +132,7 @@ class PaymentAttemptLogController extends ApiController
             'captured_minor' => (int) $a->captured_minor,
             'currency' => $a->currency,
             'review_reasons' => $a->review_reasons ?? [],
+            'unrecognized_refund' => $a->unrecognized_refund_at !== null,
             'blocked_reason' => $a->posting_blocked_reason,
             'accounting_date' => $a->accounting_date?->toDateString(),
             'captured_at' => $a->captured_at?->toISOString(),
