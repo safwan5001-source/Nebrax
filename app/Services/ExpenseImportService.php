@@ -51,7 +51,7 @@ class ExpenseImportService
     private const CELL_ERRORS = [
         'too_long' => 'القيمة تتجاوز الحد المسموح.',
         'invalid_date' => 'التاريخ غير صالح (استخدم YYYY-MM-DD أو DD/MM/YYYY).',
-        'invalid_money' => 'المبلغ يجب أن يكون رقماً بمنزلتين عشريتين على الأكثر.',
+        'invalid_money' => 'المبلغ يجب أن يكون رقماً بمنزلتين عشريتين على الأكثر (الفاصلة العشرية نقطة، والفاصلة للآلاف).',
         'money_out_of_range' => 'المبلغ يتجاوز النطاق المالي الآمن.',
         'amount_not_positive' => 'المبلغ يجب أن يكون أكبر من صفر.',
         'invalid_integer' => 'القيمة يجب أن تكون عدداً صحيحاً.',
@@ -465,8 +465,8 @@ class ExpenseImportService
             [, $year, $month, $day] = $m;
         } elseif (preg_match('/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/', $value, $m) === 1) {
             [, $day, $month, $year] = $m;   // اليوم أولاً (العرف السعودي)، لا شهر/يوم
-        } elseif (preg_match('/^\d{5}(?:\.0+)?$/', $value) === 1) {
-            // رقم تسلسلي لتاريخ Excel (أصل 1899-12-30).
+        } elseif (preg_match('/^\d{5}(?:\.\d+)?$/', $value) === 1) {
+            // رقم تسلسلي لتاريخ Excel (أصل 1899-12-30)؛ الجزء الكسري وقتٌ من اليوم يُهمل.
             $date = Carbon::create(1899, 12, 30)->addDays((int) $value);
 
             return $date->year >= 2000 && $date->year <= 2100 ? [$date->toDateString(), null] : [null, 'invalid_date'];
@@ -481,6 +481,10 @@ class ExpenseImportService
     /** @return array{0: ?int, 1: ?string} */
     private function amount(string $text): array
     {
+        // فاصلة عشرية بأسلوب أوروبي («85,50») كانت ستُقرأ فاصل آلاف فتتضاعف قيمة مصروف مرحَّل ×100: فاصلة يتبعها رقم أو رقمان في نهاية القيمة مرفوضة.
+        if (preg_match('/[,،]\d{1,2}$/u', trim(Normalizer::digits($text))) === 1) {
+            return [null, 'invalid_money'];
+        }
         [$minor, $error] = Normalizer::money($text);
         if ($error !== null) {
             return [null, $error];

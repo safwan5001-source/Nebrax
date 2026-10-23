@@ -31,7 +31,18 @@ Standard (non-AI) import: **one row = one expense DRAFT** through `ExpenseServic
 - SQLite: `ExpenseImportTest` 38 passed (163 assertions). PostgreSQL: the same 38 + 3 race tests passed, race file repeated 3× stable.
 - Negative controls (mutation): disabling the existing-expense check fails 4 tests; disabling in-file duplicate flagging fails 2.
 - Lock order verified by the opposite-order importer + direct creator race (no 40P01): numbering anchor → advisory identity lock → reservation, as already established in H5-S1b.
-- Independent subagent review (Codex quota-limited): see PR conversation for dispositions.
+- SQLite 42 / PostgreSQL 45 (incl. 3 race tests) passed after review fixes.
+- Independent subagent review (Codex quota-limited — no Codex review is claimed):
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | `canonicalOptions` coerced `default_tax_rate` (`""`→0% VAT) and `confirmed_repeat_rows` (`3.9`→3) before validation | **Fixed** — invalid values pass through unchanged and `options()` rejects them; tests added |
+| 2 | Cross-branch importers hold different numbering anchors, then tenant-wide identity locks in opposite order → possible 40P01 | **Accepted, documented.** Fails closed (rolled-back chunk, no corruption, retryable); a pre-lock in sorted order would invert the established anchor→identity order and create a worse deadlock with direct creators. Same design as H5-S1b |
+| 3 | `85,50` read as thousands → ×100 | **Fixed** — a comma followed by 1–2 trailing digits is `invalid_money` (expense-only guard; shared normalizer untouched) |
+| 4 | Plan drift is checked before row errors (siblings check errors first) | **Kept deliberately** — a change since approval is drift; test locks it |
+| 5 | Default `occurrence_scope` `standalone` | **No action** — no sync apply exists; adapter always scopes by job id and overrides a forged scope; fails closed |
+| 6 | Fractional Excel serials rejected | **Fixed** |
+| T | Tautological category assertion; missing cross-tenant, blank-row, later-window-confirm tests | **Fixed / added** (branch-scoping of partner/category is covered by the shared `BranchScope` and H3 tests; not duplicated here) |
 
 ## Not in scope / next
 

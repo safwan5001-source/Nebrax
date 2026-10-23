@@ -228,7 +228,7 @@ class ExpenseImportTest extends TestCase
 
         $preview = $this->preview([$this->row(['category' => 'إيجارات']), $this->row(['category' => 'صيانة', 'amount' => '2']), $this->row(['category' => 'سفر', 'amount' => '3']), $this->row(['category' => 'لا شيء', 'amount' => '4'])]);
 
-        $this->assertSame([1, 1, 1], [$preview['error_rows'] - 0 > 0 ? 1 : 0, 1, 1]);
+        $this->assertSame(3, $preview['error_rows']);
         $this->assertSame('ok', $preview['rows'][0]['status']);
         $this->assertStringContainsString('غير موجود أو غير نشط', $this->messages($preview, 1));
         $this->assertStringContainsString('أكثر من تصنيف', $this->messages($preview, 2));
@@ -257,7 +257,7 @@ class ExpenseImportTest extends TestCase
     public function dates_accept_iso_day_first_arabic_digits_and_excel_serials_and_reject_the_rest(): void
     {
         $rows = [];
-        foreach (['2026-10-05', '06/10/2026', '٠٧-١٠-٢٠٢٦', '2026/10/08', '46304'] as $i => $date) {
+        foreach (['2026-10-05', '06/10/2026', '٠٧-١٠-٢٠٢٦', '2026/10/08', '46304.5'] as $i => $date) {
             $rows[] = $this->row(['expense_date' => $date, 'amount' => (string) ($i + 1)]);
         }
         $this->apply($rows);
@@ -275,6 +275,30 @@ class ExpenseImportTest extends TestCase
         $preview = $this->preview([$this->row(['amount' => '0']), $this->row(['amount' => '-5', 'vendor_name' => 'ب']), $this->row(['amount' => '1.234', 'vendor_name' => 'ج']), $this->row(['amount' => 'abc', 'vendor_name' => 'د']), $this->row(['amount' => '99999999999', 'vendor_name' => 'هـ'])]);
 
         $this->assertSame(5, $preview['error_rows']);
+    }
+
+    /** @test */
+    public function a_european_decimal_comma_is_refused_instead_of_being_read_as_thousands(): void
+    {
+        $preview = $this->preview([$this->row(['amount' => '85,50']), $this->row(['amount' => '85,5', 'vendor_name' => 'ب']), $this->row(['amount' => '1,234.50', 'vendor_name' => 'ج']), $this->row(['amount' => '1,234', 'vendor_name' => 'د'])]);
+
+        $this->assertSame([false, false, true, true], array_column($preview['rows'], 'valid'));
+    }
+
+    /** @test */
+    public function codes_of_another_tenant_never_resolve(): void
+    {
+        $other = $this->registerTenant('other', 'o@other.test');
+        app(TenantContext::class)->set($other['tenant_id']);
+        Account::create(['code' => '5777', 'name' => 'حساب غيري', 'type' => 'expense', 'normal_balance' => 'debit']);
+        Partner::create(['code' => 'S-OTH', 'name' => 'مورد غيري', 'type' => 'supplier']);
+        CostCenter::create(['code' => 'CC-OTH', 'name' => 'مركز غيري', 'is_active' => true]);
+        ExpenseCategory::create(['name' => 'تصنيف غيري']);
+        app(TenantContext::class)->set($this->tenantId);
+
+        $preview = $this->preview([$this->row(['account_code' => '5777']), $this->row(['supplier_code' => 'S-OTH', 'amount' => '2']), $this->row(['cost_center_code' => 'CC-OTH', 'amount' => '3']), $this->row(['category' => 'تصنيف غيري', 'amount' => '4'])]);
+
+        $this->assertSame(4, $preview['error_rows']);
     }
 
     /** @test */
@@ -443,6 +467,30 @@ class ExpenseImportTest extends TestCase
     }
 
     /** @test */
+    public function blank_rows_between_data_rows_do_not_shift_ordinals_or_sheet_row_numbers(): void
+    {
+        $csv = "التاريخ,المبلغ قبل الضريبة,كود حساب المصروف,اسم البائع\n2026-10-01,1,5130,أ\n,,,\n2026-10-02,2,9999,ب\n";
+        $preview = $this->service()->preview(UploadedFile::fake()->createWithContent('b.csv', $csv), []);
+
+        $this->assertSame([2, 4], array_column($preview['rows'], 'row'));
+        $e = $this->thrown(fn () => $this->service()->apply(UploadedFile::fake()->createWithContent('b.csv', $csv), []), 'blank', ImportUnitFailureException::class);
+        $this->assertSame([1], array_column($e->failures, 'ordinal'));
+    }
+
+    /** @test */
+    public function a_confirmed_row_in_a_later_window_is_honoured(): void
+    {
+        $rows = [$this->row(), $this->row(), $this->row(['amount' => '5', 'vendor_name' => 'ثالث'])];
+        $options = ['confirmed_repeat_rows' => [3], 'occurrence_scope' => 'job-W'];
+
+        $first = $this->service()->apply($this->file($rows), $options + ['batch_offset' => 0, 'batch_size' => 1]);
+        $second = $this->service()->apply($this->file($rows), $options + ['batch_offset' => 1, 'batch_size' => 2]);
+
+        $this->assertSame([1, 2], [$first['created'], $second['created']]);
+        $this->assertSame(3, Expense::query()->count());
+    }
+
+    /** @test */
     public function the_plan_binds_the_preview_and_a_later_conflict_is_plan_drift(): void
     {
         $withPlan = $this->service()->previewWithPlan($this->file([$this->row()]), []);
@@ -491,9 +539,14 @@ class ExpenseImportTest extends TestCase
         $this->assertSame($adapter::UNIT_ROW, $adapter->unit());
         $this->assertSame(ExpenseImportService::DURABLE_MAX_ROWS, $adapter->maxRows());
         $this->assertSame([], $adapter->sensitiveColumnIndexes(['a'], []));
+        // قيمٌ فاسدة لا تُحوَّل صامتةً إلى أصفار: تبقى كما وردت فيرفضها `options()` عند المعاينة/التنفيذ
+        $bad = $adapter->canonicalOptions(['default_tax_rate' => '', 'confirmed_repeat_rows' => ['3.9', 'x']]);
+        $this->assertSame('', $bad['default_tax_rate']);
+        $this->assertSame(['3.9', 'x'], $bad['confirmed_repeat_rows']);
+        $this->thrown(fn () => $this->service()->options($bad), 'tax', RuntimeException::class);
         $this->assertSame(
             ['reference_policy' => 'required', 'default_account_id' => '', 'default_payment_method' => 'cash', 'default_tax_rate' => 15, 'confirmed_repeat_rows' => [3, 5], 'mapping' => ['0' => 'amount', '1' => 'expense_date']],
-            $adapter->canonicalOptions(['reference_policy' => 'required', 'confirmed_repeat_rows' => [5, '3', 3, 'x'], 'mapping' => [1 => 'expense_date', 0 => 'amount'], 'junk' => 1, 'occurrence_scope' => 'forged']),
+            $adapter->canonicalOptions(['reference_policy' => 'required', 'confirmed_repeat_rows' => [5, '3', 3], 'mapping' => [1 => 'expense_date', 0 => 'amount'], 'junk' => 1, 'occurrence_scope' => 'forged']),
         );
     }
 

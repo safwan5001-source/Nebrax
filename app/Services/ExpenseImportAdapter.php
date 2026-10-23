@@ -40,15 +40,21 @@ class ExpenseImportAdapter extends SpreadsheetImportAdapter implements ImportFai
 
     public function canonicalOptions(array $raw): array
     {
-        $repeats = array_values(array_unique(array_map('intval', array_filter((array) ($raw['confirmed_repeat_rows'] ?? []), 'is_numeric'))));
-        sort($repeats);
+        // لا تحويل مُسقِط للقيم الفاسدة: القيمة غير الصالحة تبقى كما وردت ليرفضها `ExpenseImportService::options()` (التحويل الصامت يجمّد خياراً مالياً خاطئاً على المهمة).
+        $integer = static fn (mixed $value): mixed => is_string($value) && preg_match('/^\d{1,12}$/', $value) === 1 ? (int) $value : $value;
+        $repeats = [];
+        foreach ((array) ($raw['confirmed_repeat_rows'] ?? []) as $row) {
+            $row = $integer($row);
+            $repeats[is_scalar($row) ? gettype($row).':'.$row : serialize($row)] = $row;
+        }
+        ksort($repeats);
 
         $options = [
             'reference_policy' => (string) ($raw['reference_policy'] ?? ExpenseImportService::REFERENCE_OPTIONAL),
             'default_account_id' => strtolower(trim((string) ($raw['default_account_id'] ?? ''))),
             'default_payment_method' => (string) ($raw['default_payment_method'] ?? 'cash'),
-            'default_tax_rate' => (int) ($raw['default_tax_rate'] ?? 15),
-            'confirmed_repeat_rows' => $repeats,
+            'default_tax_rate' => $integer($raw['default_tax_rate'] ?? 15),
+            'confirmed_repeat_rows' => array_values($repeats),
         ];
 
         return $this->withMapping($options, $raw);
