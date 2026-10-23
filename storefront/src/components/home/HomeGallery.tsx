@@ -52,6 +52,7 @@ function Picture({
     : undefined;
   const motion = animatedPictureSources(image.media, undefined, sizes);
   const contents = (
+    <>
       {data.webp ? (
         <source type="image/webp" srcSet={data.webp} sizes={sizes} />
       ) : null}
