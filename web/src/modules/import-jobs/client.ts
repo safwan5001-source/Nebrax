@@ -9,7 +9,7 @@
 
 import { api, downloadFile, type DownloadOutcome } from '@/lib/api';
 
-export type ImportJobDomain = 'product_catalog' | 'product_workbook' | 'inventory_opening';
+export type ImportJobDomain = 'product_catalog' | 'product_workbook' | 'inventory_opening' | 'partner_master';
 
 /** مطابقٌ حرفياً لـ`App\Support\ImportJobStatus`. `queued` مفردة مُقرَّرة سلفاً بلا مسار كودٍ يبلغها اليوم. */
 export type ImportJobStatus =

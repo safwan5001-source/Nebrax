@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { type ColumnDef } from '@tanstack/react-table';
-import { Pencil, Plus } from 'lucide-react';
+import { Pencil, Plus, Upload } from 'lucide-react';
 import { AdvancedFilterDialog } from '@/components/data-explorer/advanced-filter-dialog';
 import { DataTable } from '@/components/data-table';
 import { ListToolbar, PageHeader, Pagination, type PageAction, type SortOption } from '@/components/nebrax';
@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PartnerDialog, type Partner } from '@/components/partners/partner-dialog';
 import { api, ApiError } from '@/lib/api';
+import { useCan } from '@/lib/use-can';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import { parseExplorerState, removeFilter, replaceFilter, serializeExplorerState } from '@/lib/data-explorer/url-state';
 
@@ -36,6 +37,8 @@ function uniqueOptions(values: Array<string | null | undefined>) {
 export default function PartnersPage() {
   const tp = useTranslations('partners');
   const router = useRouter();
+  const { can } = useCan();
+  const tpi = useTranslations('partnerImport');
   const searchParams = useSearchParams();
   const [data, setData] = useState<Partner[]>([]);
   const [loading, setLoading] = useState(true);
@@ -177,6 +180,8 @@ export default function PartnersPage() {
 
   const headerActions: PageAction[] = [
     { key: 'add', label: tp('add'), icon: Plus, onClick: () => { setEditing(null); setDialogOpen(true); }, variant: 'primary' },
+    // IMP-H3-S3: الاستيراد بالجملة — لمن يملك إدارة الأطراف فقط (الخادم يفرضها أيضاً).
+    ...(can('partners.manage') ? [{ key: 'import', label: tpi('import'), icon: Upload, href: '/partners/import', variant: 'outline' as const }] : []),
   ];
 
   return (
