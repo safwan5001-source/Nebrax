@@ -5,12 +5,14 @@ namespace Tests\Feature;
 use App\Models\CashBankAccount;
 use App\Models\Invoice;
 use App\Models\JournalEntry;
+use App\Models\AccountRoleMapping;
 use App\Models\Partner;
 use App\Models\Payment;
 use App\Models\PaymentGateway;
 use App\Models\PaymentGatewaySettlement;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Accounting\AccountingPeriodLockService;
 use App\Services\Accounting\CashBankAccountService;
 use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Services\Accounting\InvoiceService;
@@ -112,6 +114,8 @@ class PaymentGatewaySettlementReadApiTest extends TestCase
         $res = $this->preview($payment, net: 1, fee: 0, gross: 200000)->assertOk();
         $this->assertContains('invalid_items', collect($res->json('data.blockers'))->pluck('code')->all());
         $this->assertFalse($res->json('data.postable'));
+        $this->assertNull($res->json('data.difference'), 'no meaningless difference when the items are invalid');
+        $this->assertNull($res->json('data.gross'));
     }
 
     #[Test]
@@ -135,8 +139,86 @@ class PaymentGatewaySettlementReadApiTest extends TestCase
         $show->assertJsonPath('data.items.0.gross_amount', 41000)->assertJsonPath('data.journal_entry_id', $settlement->journal_entry_id);
         $this->assertStringNotContainsString('sk_test', $show->getContent());
 
-        $res = $this->preview($payment, net: 40000, fee: 1000, gross: 41000, ref: 'SET-A', event: 'EVT-B')->assertOk();
-        $res->assertJsonPath('data.replay', true);
+        // التكرار الآمن (المرجع نفسه بالمبالغ نفسها) يحكمه replayMatches كما في post(): قابل للترحيل (لا قيد جديد) ولو استُهلكت مراجع البنود.
+        foreach (['EVT-A', 'EVT-B'] as $event) {
+            $res = $this->preview($payment, net: 40000, fee: 1000, gross: 41000, ref: 'SET-A', event: $event)->assertOk();
+            $res->assertJsonPath('data.replay', true)->assertJsonPath('data.postable', true)->assertJsonPath('data.blockers', []);
+        }
+        $entries = JournalEntry::query()->count();
+        app(PaymentGatewaySettlementService::class)->post([
+            'payment_gateway_id' => $this->gateway->id, 'cash_bank_account_id' => $bank->id, 'provider_settlement_ref' => 'SET-A',
+            'net_bank_amount' => 40000, 'provider_fee_ex_tax' => 1000,
+            'items' => [['payment_id' => $payment->id, 'gross_amount' => 41000, 'provider_event_ref' => 'EVT-A']],
+        ]);
+        $this->assertSame($entries, JournalEntry::query()->count(), 'post() replay does not create a second entry');
+
+        // المرجع نفسه بمبالغ مختلفة: post() يرفض، فالمعاينة تُظهر التعارض ولو كان باقي المعادلة متوازناً.
+        $changed = $this->preview($payment, net: 73000, fee: 1000, gross: 74000, ref: 'SET-A', event: 'EVT-C')->assertOk();
+        $changed->assertJsonPath('data.replay', true)->assertJsonPath('data.postable', false);
+        $this->assertContains('reference_conflict', collect($changed->json('data.blockers'))->pluck('code')->all());
+        try {
+            app(PaymentGatewaySettlementService::class)->post([
+                'payment_gateway_id' => $this->gateway->id, 'cash_bank_account_id' => $bank->id, 'provider_settlement_ref' => 'SET-A',
+                'net_bank_amount' => 73000, 'provider_fee_ex_tax' => 1000,
+                'items' => [['payment_id' => $payment->id, 'gross_amount' => 74000, 'provider_event_ref' => 'EVT-C']],
+            ]);
+            $this->fail('post() accepted a changed replay');
+        } catch (DomainException) {
+            $this->addToAssertionCount(1);
+        }
+    }
+
+    #[Test]
+    public function preview_reports_every_pre_write_condition_post_enforces(): void
+    {
+        $payment = $this->collect(115000);
+
+        // دور مقاصة غير معيَّن
+        $mapping = AccountRoleMapping::query()->where('role_key', 'gateway_clearing')->firstOrFail();
+        $backup = $mapping->only(['role_key', 'account_id']);
+        \DB::table('account_role_mappings')->where('id', $mapping->id)->delete();
+        $res = $this->preview($payment, net: 112000, fee: 3000)->assertOk();
+        $this->assertContains('role_unmapped', collect($res->json('data.blockers'))->pluck('code')->all());
+        $this->assertFalse($res->json('data.postable'));
+        AccountRoleMapping::query()->create($backup + ['tenant_id' => $this->tenant->id]);
+
+        // فترة مقفلة
+        app(AccountingPeriodLockService::class)->create(now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString(), 'إقفال', User::query()->firstOrFail());
+        $res = $this->preview($payment, net: 112000, fee: 3000)->assertOk();
+        $this->assertContains('period_locked', collect($res->json('data.blockers'))->pluck('code')->all());
+        $this->assertFalse($res->json('data.postable'));
+
+        // مرجع مفقود يُرفض بالتحقق، وحساب بنكي غير موجود يُبلَّغ
+        $this->withToken($this->ownerToken)->postJson('/api/payment-gateway-settlements/preview', [
+            'payment_gateway_id' => $this->gateway->id, 'cash_bank_account_id' => $this->mainBank()->id, 'net_bank_amount' => 1,
+            'items' => [['payment_id' => $payment->id, 'gross_amount' => 1]],
+        ])->assertUnprocessable();
+        $res = $this->withToken($this->ownerToken)->postJson('/api/payment-gateway-settlements/preview', [
+            'payment_gateway_id' => $this->gateway->id, 'cash_bank_account_id' => '00000000-0000-4000-8000-000000000000', 'provider_settlement_ref' => 'NB-1',
+            'net_bank_amount' => 112000, 'provider_fee_ex_tax' => 3000, 'items' => [['payment_id' => $payment->id, 'gross_amount' => 115000]],
+        ])->assertOk();
+        $this->assertContains('bank_account_not_found', collect($res->json('data.blockers'))->pluck('code')->all());
+    }
+
+    #[Test]
+    public function unsettled_payments_are_filtered_in_sql_and_paginated(): void
+    {
+        $first = $this->collect(115000);
+        $second = $this->collect(115000);
+        $third = $this->collect(115000);
+        $bank = $this->mainBank();
+        app(PaymentGatewaySettlementService::class)->post([
+            'payment_gateway_id' => $this->gateway->id, 'cash_bank_account_id' => $bank->id, 'provider_settlement_ref' => 'SET-FULL',
+            'net_bank_amount' => 112000, 'provider_fee_ex_tax' => 3000, 'items' => [['payment_id' => $first->id, 'gross_amount' => 115000]],
+        ]);
+
+        $page = $this->getJson2("/api/payment-gateways/{$this->gateway->id}/unsettled-payments?per_page=1")->assertOk();
+        $this->assertCount(1, $page->json('data'));
+        $this->assertTrue($page->json('meta.has_more'));
+        $this->assertNotSame($first->id, $page->json('data.0.payment_id'), 'fully settled payments are excluded');
+        $all = $this->getJson2("/api/payment-gateways/{$this->gateway->id}/unsettled-payments")->assertOk();
+        $this->assertEqualsCanonicalizing([$second->id, $third->id], collect($all->json('data'))->pluck('payment_id')->all());
+        $this->assertFalse($all->json('meta.has_more'));
     }
 
     #[Test]
@@ -152,7 +234,8 @@ class PaymentGatewaySettlementReadApiTest extends TestCase
         $other = $this->registerTenant('pay-h3-02a-b', 'owner@pay-h3-02a-b.test');
         $this->withToken($other['token'])->getJson("/api/payment-gateways/{$this->gateway->id}/unsettled-payments")->assertNotFound();
         $this->withToken($other['token'])->postJson('/api/payment-gateway-settlements/preview', [
-            'payment_gateway_id' => $this->gateway->id, 'net_bank_amount' => 1, 'items' => [['payment_id' => $payment->id, 'gross_amount' => 1]],
+            'payment_gateway_id' => $this->gateway->id, 'cash_bank_account_id' => $this->mainBank()->id, 'provider_settlement_ref' => 'X-1',
+            'net_bank_amount' => 1, 'items' => [['payment_id' => $payment->id, 'gross_amount' => 1]],
         ])->assertNotFound();
         $this->withToken($other['token'])->getJson('/api/payment-gateway-settlements')->assertOk()->assertJsonPath('meta.total', 0);
     }
@@ -168,7 +251,7 @@ class PaymentGatewaySettlementReadApiTest extends TestCase
     private function preview(Payment $payment, int $net, int $fee, array $extra = [], ?int $gross = null, string $ref = 'SET-PREVIEW', string $event = 'EVT-P')
     {
         return $this->withToken($this->ownerToken)->postJson('/api/payment-gateway-settlements/preview', [
-            'payment_gateway_id' => $this->gateway->id, 'provider_settlement_ref' => $ref,
+            'payment_gateway_id' => $this->gateway->id, 'cash_bank_account_id' => $this->mainBank()->id, 'provider_settlement_ref' => $ref,
             'net_bank_amount' => $net, 'provider_fee_ex_tax' => $fee,
             'items' => [['payment_id' => $payment->id, 'gross_amount' => $gross ?? 115000, 'provider_event_ref' => $event]],
         ] + $extra);

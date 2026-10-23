@@ -51,32 +51,42 @@ class PaymentGatewaySettlementController extends ApiController
         ]]);
     }
 
-    public function unsettled(string $gatewayId): JsonResponse
+    public function unsettled(Request $request, string $gatewayId): JsonResponse
     {
+        $data = $request->validate(['per_page' => ['nullable', 'integer', 'min:1', 'max:200'], 'page' => ['nullable', 'integer', 'min:1', 'max:100000']]);
         PaymentGateway::query()->findOrFail($gatewayId);   // مستأجر آخر ⇒ 404
 
-        return response()->json(['data' => $this->settlements->unsettledPayments($gatewayId)]);
+        $perPage = (int) ($data['per_page'] ?? 100);
+        $page = (int) ($data['page'] ?? 1);
+        $rows = $this->settlements->unsettledPayments($gatewayId, $perPage, ($page - 1) * $perPage);
+
+        return response()->json([
+            'data' => array_slice($rows, 0, $perPage),
+            'meta' => ['page' => $page, 'per_page' => $perPage, 'has_more' => count($rows) > $perPage],
+        ]);
     }
 
     public function preview(Request $request): JsonResponse
     {
         $data = $request->validate([
             'payment_gateway_id' => ['required', 'uuid'],
-            'provider_settlement_ref' => ['nullable', 'string', 'max:191'],
-            'net_bank_amount' => ['required', 'integer', 'min:0'],
-            'provider_fee_ex_tax' => ['nullable', 'integer', 'min:0'],
-            'provider_fee_tax' => ['nullable', 'integer', 'min:0'],
-            'provider_deductions' => ['nullable', 'integer', 'min:0'],
-            'provider_credits' => ['nullable', 'integer', 'min:0'],
-            'items' => ['required', 'array', 'min:1', 'max:500'],
+            'cash_bank_account_id' => ['required', 'uuid'],
+            'provider_settlement_ref' => ['required', 'string', 'max:191'],
+            'settlement_date' => ['nullable', 'date_format:Y-m-d'],
+            'net_bank_amount' => ['required', 'integer', 'min:0', 'max:999999999999'],
+            'provider_fee_ex_tax' => ['nullable', 'integer', 'min:0', 'max:999999999999'],
+            'provider_fee_tax' => ['nullable', 'integer', 'min:0', 'max:999999999999'],
+            'provider_deductions' => ['nullable', 'integer', 'min:0', 'max:999999999999'],
+            'provider_credits' => ['nullable', 'integer', 'min:0', 'max:999999999999'],
+            'items' => ['required', 'array', 'min:1', 'max:200'],
             'items.*.payment_id' => ['required', 'uuid'],
-            'items.*.gross_amount' => ['required', 'integer', 'min:1'],
+            'items.*.gross_amount' => ['required', 'integer', 'min:1', 'max:999999999999'],
             'items.*.provider_event_ref' => ['nullable', 'string', 'max:191'],
         ]);
         PaymentGateway::query()->findOrFail($data['payment_gateway_id']);
 
         try {
-            return response()->json(['data' => $this->settlements->preview($data)]);
+            return response()->json(['data' => $this->settlements->preview($data, $request->user())]);
         } catch (DomainException $e) {
             return response()->json(['error' => ['code' => 'operation_rejected', 'message' => $e->getMessage()]], 422);
         }

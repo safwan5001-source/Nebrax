@@ -162,9 +162,9 @@ final class PaymentGatewaySettlementService
      * لا قيد ولا سجل تسوية ولا أقفال صفوف؛ تستعمل قواعد الترحيل نفسها فيطابق «قابل للترحيل» ما سيقبله `post()` اليوم.
      *
      * @param  array<string, mixed>  $input
-     * @return array{gross: int, net_bank_amount: int, provider_fee_ex_tax: int, provider_fee_tax: int, provider_deductions: int, provider_credits: int, difference: int, reconciled: bool, postable: bool, replay: bool, blockers: list<array{code: string, message: string}>}
+     * @return array{gross: int|null, net_bank_amount: int, provider_fee_ex_tax: int, provider_fee_tax: int, provider_deductions: int, provider_credits: int, difference: int|null, reconciled: bool, postable: bool, replay: bool, blockers: list<array{code: string, message: string}>}
      */
-    public function preview(array $input): array
+    public function preview(array $input, ?User $actor = null): array
     {
         $tenantId = $this->requireTenant();
         $blockers = [];
@@ -192,10 +192,59 @@ final class PaymentGatewaySettlementService
             $block('gateway_not_found', 'Payment gateway must belong to the active tenant.');
         }
 
+        // نفس شروط ما قبل الكتابة في post(): مرجع، حساب بنكي فعّال ومسموح، أدوار الحسابات، وقفل الفترة.
+        $ref = trim((string) ($input['provider_settlement_ref'] ?? ''));
+        if ($ref === '') {
+            $block('reference_required', 'Gateway settlement requires a provider reference.');
+        }
+        $cashEntity = CashBankAccount::query()->whereKey((string) ($input['cash_bank_account_id'] ?? ''))->first();
+        if ($cashEntity === null) {
+            $block('bank_account_not_found', 'Cash bank account must belong to the active tenant.');
+        } else {
+            if (! $cashEntity->is_active) {
+                $block('bank_account_inactive', 'الحساب البنكي المختار معطّل.');
+            }
+            try {
+                $this->cashBankAccounts->assertAllowed($cashEntity, 'deposit', $actor);
+            } catch (\Throwable $e) {
+                $block('bank_account_forbidden', $e->getMessage());
+            }
+        }
+        foreach (['gateway_clearing', 'provider_fee_expense'] as $role) {
+            try {
+                $this->accountRoles->resolve($role);
+            } catch (RuntimeException $e) {
+                $block('role_unmapped', $e->getMessage());
+            }
+        }
+        try {
+            app(AccountingDateGuard::class)->assertOpen((string) ($input['settlement_date'] ?? now()->toDateString()), 'تسوية البوابة');
+        } catch (RuntimeException $e) {
+            $block('period_locked', $e->getMessage());
+        }
+
         $gross = 0;
         $itemsInput = $input['items'] ?? [];
+        $replay = false;
+        $existing = $gateway !== null && $ref !== ''
+            ? PaymentGatewaySettlement::query()->where('payment_gateway_id', $gateway->id)->where('provider_settlement_ref', $ref)->first()
+            : null;
+
         if (! is_array($itemsInput) || $itemsInput === []) {
             $block('items_required', 'Gateway settlement requires at least one matched payment.');
+        } elseif ($existing !== null) {
+            // مرجع موجود: يحكم `replayOrReject` (تكرار آمن بالمبالغ نفسها أو رفض) وتُتجاوز أهلية البنود الجديدة كما في post().
+            $replay = true;
+            try {
+                foreach ($itemsInput as $raw) {
+                    $gross += $this->money($raw['gross_amount'] ?? null, 'item gross');
+                }
+                if (! $this->replayMatches($existing, $net, $feeExTax, $feeTax, $deductions, $credits, $itemsInput)) {
+                    $block('reference_conflict', 'Provider settlement reference already posted with different amounts.');
+                }
+            } catch (DomainException $e) {
+                $block('invalid_amount', $e->getMessage());
+            }
         } elseif ($gateway !== null) {
             try {
                 foreach ($this->normalizeItems($tenantId, (string) $gateway->id, $itemsInput, false) as $item) {
@@ -216,19 +265,16 @@ final class PaymentGatewaySettlementService
             $block('credits_unsupported', 'Unsupported provider credits cannot be posted.');
         }
 
-        $difference = $gross - ($net + $feeExTax + $feeTax + $deductions - $credits);
-        if ($gross > 0 && $difference !== 0) {
+        $itemsOk = ! in_array(true, array_map(fn ($b) => in_array($b['code'], ['invalid_items', 'items_required', 'gateway_not_found', 'invalid_amount'], true), $blockers), true);
+        $difference = $itemsOk ? $gross - ($net + $feeExTax + $feeTax + $deductions - $credits) : null;
+        if ($difference !== null && $gross > 0 && $difference !== 0) {
             $block('unreconciled_difference', "Settlement does not reconcile: difference {$difference}.");
         }
 
-        $ref = trim((string) ($input['provider_settlement_ref'] ?? ''));
-        $replay = $gateway !== null && $ref !== '' && PaymentGatewaySettlement::query()
-            ->where('payment_gateway_id', $gateway->id)->where('provider_settlement_ref', $ref)->exists();
-
-        $reconciled = $gross > 0 && $difference === 0;
+        $reconciled = $difference !== null && $gross > 0 && $difference === 0;
 
         return [
-            'gross' => $gross,
+            'gross' => $itemsOk ? $gross : null,
             'net_bank_amount' => $net,
             'provider_fee_ex_tax' => $feeExTax,
             'provider_fee_tax' => $feeTax,
@@ -244,10 +290,11 @@ final class PaymentGatewaySettlementService
 
     /**
      * سندات القبض المرحَّلة عبر بوابة والتي بقي منها مبلغ غير مسوّى في 1170 (قراءة فقط، بلا أقفال).
+     * الترشيح في SQL (مجموع البنود المرحَّلة بتسوية فرعية) مع ترقيم؛ يعيد `$limit + 1` صفاً كحدّ أقصى ليعرف المستدعي وجود المزيد.
      *
      * @return list<array{payment_id: string, number: ?string, date: ?string, amount: int, settled: int, remaining: int, partner_id: ?string}>
      */
-    public function unsettledPayments(string $gatewayId): array
+    public function unsettledPayments(string $gatewayId, int $limit = 100, int $offset = 0): array
     {
         $this->requireTenant();
         $gateway = PaymentGateway::query()->whereKey($gatewayId)->first();
@@ -255,36 +302,30 @@ final class PaymentGatewaySettlementService
             throw new DomainException('Payment gateway must belong to the active tenant.');
         }
 
+        $settledSql = '(SELECT COALESCE(SUM(i.gross_amount), 0) FROM payment_gateway_settlement_items i '
+            .'JOIN payment_gateway_settlements s ON s.id = i.settlement_id '
+            ."WHERE i.payment_id = payments.id AND s.status = 'posted')";
+
         $payments = Payment::query()
+            ->select('payments.*')
+            ->selectRaw("{$settledSql} AS settled_minor")
             ->where('payment_gateway_id', $gateway->id)
             ->where('direction', 'received')
             ->where('status', 'posted')
+            ->whereRaw("payments.amount > {$settledSql}")
             ->orderBy('payment_date')->orderBy('id')
+            ->offset(max(0, $offset))->limit(max(1, min(500, $limit)) + 1)
             ->get();
-        $settled = PaymentGatewaySettlementItem::query()
-            ->whereIn('payment_id', $payments->pluck('id'))
-            ->whereHas('settlement', fn ($q) => $q->where('status', PaymentGatewaySettlement::STATUS_POSTED))
-            ->selectRaw('payment_id, SUM(gross_amount) as total')
-            ->groupBy('payment_id')->pluck('total', 'payment_id');
 
-        $rows = [];
-        foreach ($payments as $payment) {
-            $done = (int) ($settled[$payment->id] ?? 0);
-            $remaining = (int) $payment->amount - $done;
-            if ($remaining > 0) {
-                $rows[] = [
-                    'payment_id' => (string) $payment->id,
-                    'number' => $payment->number,
-                    'date' => $payment->payment_date?->toDateString(),
-                    'amount' => (int) $payment->amount,
-                    'settled' => $done,
-                    'remaining' => $remaining,
-                    'partner_id' => $payment->partner_id,
-                ];
-            }
-        }
-
-        return $rows;
+        return $payments->map(fn (Payment $payment) => [
+            'payment_id' => (string) $payment->id,
+            'number' => $payment->number,
+            'date' => $payment->payment_date?->toDateString(),
+            'amount' => (int) $payment->amount,
+            'settled' => (int) $payment->settled_minor,
+            'remaining' => (int) $payment->amount - (int) $payment->settled_minor,
+            'partner_id' => $payment->partner_id,
+        ])->all();
     }
 
     private function assertUnsupportedAdjustmentsAreZero(int $deductions, int $credits): void
@@ -311,25 +352,36 @@ final class PaymentGatewaySettlementService
         int $credits,
         array $itemsInput,
     ): PaymentGatewaySettlement {
+        if (! $this->replayMatches($existing, $net, $feeExTax, $feeTax, $deductions, $credits, $itemsInput)) {
+            throw new DomainException('Provider settlement reference already posted with different amounts.');
+        }
+
+        return $existing->fresh(['items', 'journalEntry.lines']);
+    }
+
+    /** نفس شرط التكرار الآمن لـ`post()`: المرجع نفسه بالمبالغ نفسها وتسوية مرحَّلة بقيد؛ تستعمله المعاينة فلا يتباعد الحكمان. */
+    private function replayMatches(
+        PaymentGatewaySettlement $existing,
+        int $net,
+        int $feeExTax,
+        int $feeTax,
+        int $deductions,
+        int $credits,
+        array $itemsInput,
+    ): bool {
         $gross = 0;
         foreach ($itemsInput as $item) {
             $gross += $this->money($item['gross_amount'] ?? null, 'item gross');
         }
 
-        $same = $existing->isPosted()
+        return $existing->isPosted()
             && (int) $existing->gross_amount === $gross
             && (int) $existing->net_bank_amount === $net
             && (int) $existing->provider_fee_ex_tax === $feeExTax
             && (int) $existing->provider_fee_tax === $feeTax
             && (int) $existing->provider_deductions === $deductions
             && (int) $existing->provider_credits === $credits
-            && $existing->journal_entry_id;
-
-        if (! $same) {
-            throw new DomainException('Provider settlement reference already posted with different amounts.');
-        }
-
-        return $existing->fresh(['items', 'journalEntry.lines']);
+            && (bool) $existing->journal_entry_id;
     }
 
     private function normalizeItems(string $tenantId, string $gatewayId, array $itemsInput, bool $lock = true): array

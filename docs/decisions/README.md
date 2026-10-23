@@ -26,4 +26,4 @@ Tracking: `docs/audits/horizon/TAX-ZATCA-RECONCILIATION-AUDIT.md` §7 · `TAX-HZ
 | [ADR-0005](ADR-0005-moyasar-first-byog-provider.md) | G1: Moyasar أول مزوّد BYOG (Sandbox فقط) | Accepted (اختيار المزوّد والاختبارات فقط) | EXT-01 المفاتيح والتحقق |
 | [ADR-0006](ADR-0006-payments-h2-02-owner-decisions-and-posting-matrix.md) | D-16، D-24، D-26، ADR-0004 §3 (R1) + مصفوفة قيود ترحيل الالتقاط | Accepted | R2/R3 والتفويض خارج النطاق |
 | [ADR-0007](ADR-0007-payments-h3-01-gateway-refund-and-a5-matrix.md) | PAY-H3-01: استرداد البوابة، D-28 (موافقة مستقلة دائمة) + مصفوفة قيود A5 (R1–R12) | **Accepted — بوابة A5 مغلقة (2026-10-23)** | اعتماد المالك للمصفوفة والنموذج قبل أي كود محاسبي؛ EXT-01 لاسترداد Sandbox |
-| [ADR-0008](ADR-0008-payments-h3-02-settlement-v2-and-a6-matrix.md) | PAY-H3-02: التسوية v2 ومصفوفة قيود A6 + مقترح D-04/D-21/D-22 — **proposed** بانتظار قرار المالك |
+| [ADR-0008](ADR-0008-payments-h3-02-settlement-v2-and-a6-matrix.md) | PAY-H3-02: التسوية v2 ومصفوفة قيود A6 + مقترح D-04/D-21/D-22 | **Proposed — بانتظار قرار المالك** | قرار المالك على D-04/D-21/D-22 ومصفوفة A6؛ EXT-05 قبل تفعيل ضريبة الرسوم؛ لا كود محاسبي قبل الاعتماد |
