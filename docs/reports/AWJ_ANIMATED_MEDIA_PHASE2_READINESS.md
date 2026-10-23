@@ -34,7 +34,7 @@
 
 | Item | Recommendation |
 |---|---|
-| **Animated AVIF** | **CONDITIONAL GO** for backend slices A0–A2 behind a flag, after owner approval of the image change. **A3 may be built behind the disabled flag; rollout (A4 canary onward) is NO-GO until animated-AVIF playback is measured on real iOS Safari and Chrome Android** — nobody has that evidence (§3), and it can only be collected on the A3 build. Benefit over today's WebP/GIF is file size only. |
+| **Animated AVIF** | **CONDITIONAL GO** for slices A0–A3 behind the disabled flag, after owner approval of the image change. **A3 (delivery and rendering) may be built behind that flag; rollout (A4 canary onward) is NO-GO until animated-AVIF playback is measured on real iOS Safari and Chrome Android** — nobody has that evidence (§3), and it can only be collected on the A3 build. Benefit over today's WebP/GIF is file size only. |
 | **MP4 (H.264)** | **CONDITIONAL GO, gated on one delivery decision.** The byte path **must not be Laravel** (your constraint, and S0-E proved why). The proposal's Option A ("stream through Laravel") is **withdrawn**. Recommended replacement: *Laravel authorises (short request), the Next/Node proxy streams the bytes from R2 with a server-to-server presigned URL* (§4). Needs one cheap delivery spike with R2 credentials before any video code. |
 | **WebM** | **NO-GO / defer.** No Safari/iOS evidence; Firefox playback not proven; add only after MP4 ships, as an optional alternate source. |
 | **Server-side transcoding / ffmpeg** | **Out** (reject-don't-repair stays). |
