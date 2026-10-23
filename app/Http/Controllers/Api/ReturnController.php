@@ -63,7 +63,7 @@ class ReturnController extends ApiController
         // الحارس قبل أي أثر محاسبي/مخزني.
         $return = $this->scopeToCurrentBranchOnly(ReturnDocument::query())->findOrFail($id);
         $this->assertWarehouseAllowed($return->warehouse_id, $return->branch_id);
-        $posted = $this->domain(fn () => $this->returns->post($return));
+        $posted = $this->domain(fn () => $this->returns->post($return, $request->user()));
 
         return (new ReturnResource($posted->load('lines')))->response();
     }

@@ -663,10 +663,21 @@ class TreasuryCashSaleRoutingTest extends TestCase
     }
 
     /** @test */
-    public function a_cash_return_for_an_invoice_collected_outside_1110_is_rejected_without_any_entry(): void
+    public function a_cash_return_for_a_routed_sale_is_refunded_from_that_same_treasury_since_t6(): void
+    {
+        $routed = $this->routedInvoiceTo1111(2);
+        $return = app(ReturnService::class)->post($this->returnFor($routed), $this->owner());
+
+        $this->assertSame('posted', $return->status);
+        $this->assertContains('1111 Cr 115000', $this->lines($return->id), 'T6: المرتجع النقدي يتبع خزينة التحصيل بدل الرفض');
+    }
+
+    /** @test */
+    public function the_legacy_branch_keeps_the_t4_guard_for_a_cash_return_of_a_sale_routed_before_the_policy_went_back_to_legacy(): void
     {
         $routed = $this->routedInvoiceTo1111();
         $return = $this->returnFor($routed);
+        $this->store('legacy');
         $before = $this->entryCount();
 
         $e = $this->failure(fn () => app(ReturnService::class)->post($return));
