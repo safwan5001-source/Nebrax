@@ -26,6 +26,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -103,6 +104,34 @@ class MoyasarAdapterTest extends TestCase
         $this->assertSame([], array_intersect(['source', 'number', 'cvc', 'card', 'name', 'month', 'year', 'token'], array_keys($body)));
         $this->assertStringNotContainsString(MoyasarFixtures::SECRET_KEY, json_encode($body));
         $this->assertNoFinancialArtifacts();
+    }
+
+    #[Test]
+    public function the_lookup_and_create_decision_is_serialized_per_attempt_by_a_lock_held_across_the_post(): void
+    {
+        $heldDuringPost = null;
+        $attemptId = null;
+        $this->fakeHttp(['api.moyasar.com/v1/invoices*' => function (Request $request) use (&$heldDuringPost, &$attemptId) {
+            if ($request->method() === 'GET') {
+                return Http::response(['invoices' => []]);
+            }
+            $attemptId = $request->data()['metadata']['awj_attempt_id'];
+            $competing = Cache::lock('moyasar:checkout:'.$attemptId, 5);
+            $heldDuringPost = ! $competing->get(); // قفل المحاولة محجوز أثناء الإنشاء ⇒ طلب متزامن لا يدخل
+            if (! $heldDuringPost) {
+                $competing->release();
+            }
+
+            return Http::response(MoyasarFixtures::invoice(attemptId: $attemptId), 201);
+        }]);
+
+        $this->orchestrator->start(new TestPayable(), $this->gateway, 'idem-moy-lock-1');
+
+        $this->assertTrue($heldDuringPost);
+        // وبعد الانتهاء يُحرَّر القفل.
+        $after = Cache::lock('moyasar:checkout:'.$attemptId, 5);
+        $this->assertTrue($after->get());
+        $after->release();
     }
 
     #[Test]
@@ -261,6 +290,9 @@ class MoyasarAdapterTest extends TestCase
             'paid' => [MoyasarFixtures::invoice('paid', payments: [$paid]), 'captured', 11500],
             'paid after an earlier failure' => [MoyasarFixtures::invoice('paid', payments: [MoyasarFixtures::payment('failed', id: 'f1'), $paid]), 'captured', 11500, 'payment_failed'],
             'partial payment' => [MoyasarFixtures::invoice('paid', payments: [MoyasarFixtures::payment('paid', 5000)]), 'captured', 5000],
+            'partial capture of a larger authorization' => [MoyasarFixtures::invoice('paid', payments: [array_merge(MoyasarFixtures::payment('paid'), ['captured' => 5000])]), 'captured', 5000],
+            'captured never exceeds the payment amount' => [MoyasarFixtures::invoice('paid', payments: [array_merge(MoyasarFixtures::payment('paid'), ['captured' => 99999])]), 'captured', 11500],
+            'captured zero on a paid payment falls back to the full amount' => [MoyasarFixtures::invoice('paid', payments: [array_merge(MoyasarFixtures::payment('paid'), ['captured' => 0])]), 'captured', 11500],
             'refunded payment was paid' => [MoyasarFixtures::invoice('refunded', payments: [MoyasarFixtures::payment('refunded')]), 'captured', 11500],
             'authorized only' => [MoyasarFixtures::invoice('initiated', payments: [MoyasarFixtures::payment('authorized')]), 'authorized', 0],
             'expired' => [MoyasarFixtures::invoice('expired'), 'expired', 0],

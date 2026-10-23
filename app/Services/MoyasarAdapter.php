@@ -15,6 +15,8 @@ use App\Support\PaymentProviderSnapshot;
 use App\Support\PaymentRawWebhook;
 use App\Support\PaymentVerifiedWebhook;
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Support\Facades\Cache;
 use Throwable;
 
 /**
@@ -39,6 +41,11 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody
     /** أقل مبلغ تقبله Moyasar للفاتورة (100 هللة = 1.00 ريال). */
     public const MIN_AMOUNT_MINOR = 100;
 
+    /** مدة قفل إنشاء الفاتورة (تغطي مهلة POST) وأقصى انتظار لطلب متزامن آخر لنفس المحاولة. */
+    private const CHECKOUT_LOCK_SECONDS = 40;
+
+    private const CHECKOUT_LOCK_WAIT_SECONDS = 20;
+
     public function __construct(private readonly MoyasarApiClient $client) {}
 
     public function provider(): string
@@ -57,6 +64,18 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody
             throw new PaymentGatewayException('moyasar.amount_below_minimum', 'المبلغ أقل من الحد الأدنى لدى Moyasar (1.00 ريال).');
         }
 
+        // قرار «ابحث ثم أنشئ» يُسلسَل لكل محاولة: طلبان متزامنان لنفس المحاولة المنشأة كانا يمرّان من البحث معاً فينشئان فاتورتين
+        // (المنسّق يقفل المحاولة بعد الاستدعاء الخارجي لا قبله). القفل في الذاكرة المشتركة (Cache) لا قفل صف، لأنه يمتد عبر استدعاء شبكي.
+        try {
+            return Cache::lock('moyasar:checkout:'.$context->attemptId, self::CHECKOUT_LOCK_SECONDS)
+                ->block(self::CHECKOUT_LOCK_WAIT_SECONDS, fn () => $this->resumeOrCreate($context));
+        } catch (LockTimeoutException) {
+            throw new PaymentGatewayException('moyasar.checkout_busy', 'طلب دفع آخر لهذه المحاولة قيد الإنشاء؛ أعد المحاولة بعد لحظات.');
+        }
+    }
+
+    private function resumeOrCreate(PaymentAttemptContext $context): PaymentHostedCheckout
+    {
         // استئناف: محاولة سبق أن أُنشئت لها فاتورة (استجابة ضائعة/إعادة طلب) تعيد الصفحة نفسها دون فاتورة ثانية.
         foreach ($this->client->listInvoicesByAttempt($context->gateway, $context->attemptId) as $invoice) {
             if (($invoice['metadata'][self::ATTEMPT_METADATA_KEY] ?? null) !== $context->attemptId) {
@@ -221,7 +240,10 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody
             $status = strtolower((string) ($payment['status'] ?? ''));
             $paymentAmount = $this->intOrNull($payment['amount'] ?? null) ?? 0;
             if (in_array($status, ['paid', 'captured', 'refunded'], true)) {
-                $capturedMinor += $paymentAmount;
+                // `captured` (الحقل الموثّق) هو المبلغ الملتقَط فعلاً وقد يقلّ عن `amount` في الالتقاط الجزئي. غيابه أو صفره على دفعة مسدَّدة
+                // ⇒ المبلغ كاملاً (دفعة `paid` بلا التقاط جزئي)؛ ولا يتجاوز أبداً مبلغ الدفعة. قيمة صفر الفعلية تُثبَّت في Sandbox.
+                $captured = $this->intOrNull($payment['captured'] ?? null);
+                $capturedMinor += $captured !== null && $captured > 0 ? min($captured, $paymentAmount) : $paymentAmount;
                 $stamp = $this->parseTime($payment['captured_at'] ?? $payment['updated_at'] ?? $payment['created_at'] ?? null);
                 if ($stamp !== null && ($capturedAt === null || $stamp->greaterThan($capturedAt))) {
                     $capturedAt = $stamp;
