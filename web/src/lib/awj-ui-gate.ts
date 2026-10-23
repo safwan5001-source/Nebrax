@@ -23,7 +23,7 @@ export const AWJ_UI_GATE_VALUE = '3';
 export const AWJ_UI_LEGACY_VALUE = 'legacy';
 
 /** Routes that never opt in: they sit outside the workspace route groups (MIGRATION.md §1.4). */
-export const AWJ_UI_EXCLUDED_PATH_PATTERN = '^(/$|/(login|register|forgot-password|reset-password|verify-email|auth|platform|document-qa|dev|fuel-stations|me|api)(/|$))';
+export const AWJ_UI_EXCLUDED_PATH_PATTERN = '^(/$|/(login|register|forgot-password|reset-password|verify-email|auth|platform|document-qa|dev|fuel-stations|me|pay|api)(/|$))';
 
 /** The build-time default; `undefined`/anything but "3" means legacy. Pure for testing. */
 export function resolveAwjUiDefault(envValue: string | undefined = process.env.NEXT_PUBLIC_AWJ_UI_DEFAULT): typeof AWJ_UI_GATE_VALUE | null {

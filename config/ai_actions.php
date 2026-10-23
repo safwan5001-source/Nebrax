@@ -41,4 +41,8 @@ return [
     // The command itself stays runnable by hand regardless of this flag.
     'staging_purge_schedule_enabled' => filter_var(env('AI_ACTIONS_STAGING_PURGE_SCHEDULE_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
     'draft_retention_days' => (int) env('AI_ACTIONS_DRAFT_RETENTION_DAYS', 30),
+    // IMP-X-01b: operator controls (`ai_action_controls`) are enforced only when this deploy gate is on. It ships DARK so merging the wiring changes
+    // nothing for any tenant; turning it on is a separate owner-approved env change (default deny then applies: no tenant works until the Super Admin
+    // grants it and, for execution, the tenant owner approves). The env floors above stay a hard floor either way (D-10).
+    'runtime_controls_enforced' => filter_var(env('AI_ACTIONS_RUNTIME_CONTROLS_ENFORCED', false), FILTER_VALIDATE_BOOLEAN),
 ];
