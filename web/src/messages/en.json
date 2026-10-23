@@ -3957,7 +3957,8 @@
     "exchange_action_total": "Exchange value difference",
     "exchange_submitting": "Posting exchange…",
     "exchange_confirm": "Confirm exchange",
-    "exchange_done": "Exchange posted; the replacement invoice is {number}."
+    "exchange_done": "Exchange posted; the replacement invoice is {number}.",
+    "terminal_hold_back": "You cannot go back while a payment-terminal request is open; cancel it or complete the sale first."
   },
   "posReport": {
     "title": "POS report",
@@ -4784,7 +4785,9 @@
     "preview_scan_error": "Test scan error",
     "preview_payment_success": "Test payment success",
     "preview_payment_error": "Test payment error",
-    "sound_autoplay_hint": "Your browser may block sound until the first interaction with POS. This never blocks sale or payment."
+    "sound_autoplay_hint": "Your browser may block sound until the first interaction with POS. This never blocks sale or payment.",
+    "c_terminals_t": "Card payment terminals",
+    "c_terminals_d": "Register payment terminals and link them to POS devices to send the amount and capture the approval."
   },
   "posDevices": {
     "title": "POS devices",
@@ -7954,8 +7957,16 @@
       "minimum": "Minimum fee",
       "expenseAccount": "Payment-fee expense account",
       "chooseExpenseAccount": "Choose an expense account",
-      "feeHint": "The fee is calculated as a percentage of the voucher amount, then the minimum is applied and the fixed amount is added. The fee is posted as a company expense and its tax as input VAT."
-    }
+      "feeHint": "The fee is calculated as a percentage of the voucher amount, then the minimum is applied and the fixed amount is added. The fee is posted as a company expense and its tax as input VAT.",
+      "posCardTitle": "Card payment at POS",
+      "clearingGateway": "POS card clearing (optional)",
+      "clearingNone": "No clearing (default)",
+      "clearingHint": "When linked, receipts of this method post to the gateway clearing account and are settled to the bank later; without it the direct bank posting stays as is.",
+      "terminalRequired": "Require approval from a payment terminal",
+      "terminalRequiredHint": "When on, a POS sale with this method is only confirmed with a confirmed approval from a payment terminal. Off by default."
+    },
+    "badgeTerminalRequired": "Terminal required",
+    "badgeClearing": "Card clearing"
   },
   "printTemplateAssignments": {
     "title": "Template assignments",
@@ -11448,5 +11459,107 @@
       "saving": "Revoking…",
       "failed": "Could not revoke the connection."
     }
+  },
+  "posTerminals": {
+    "title": "Card payment terminals",
+    "subtitle": "Register payment terminals and link them to POS devices. The amount is sent to the terminal and the approval is captured before the sale completes.",
+    "back_to_settings": "Back to POS settings",
+    "add": "Add terminal",
+    "add_title": "Add payment terminal",
+    "edit_title": "Edit payment terminal",
+    "edit": "Edit {name}",
+    "name": "Name",
+    "code": "Code (optional)",
+    "code_hint": "Unique within the company, e.g. the terminal serial number.",
+    "provider": "Provider",
+    "provider_fixed": "The provider cannot change after creation.",
+    "device": "POS device",
+    "device_hint": "Leave on “Any device” to serve every device in the branch, or bind it to a single POS device.",
+    "any_device": "Any device in the branch",
+    "status_col": "Status",
+    "active": "Active",
+    "inactive": "Inactive",
+    "search": "Search payment terminals",
+    "empty": "No payment terminals yet.",
+    "read_only": "Read only — managing terminals needs company-management permission.",
+    "simulated": "Simulation — not a real payment",
+    "simulated_env_note": "This environment offers a simulated provider: terminals created on it are for testing only and move no real money.",
+    "no_provider_title": "No payment-terminal provider is available yet",
+    "no_provider_body": "Real terminal integrations are still being set up; a terminal cannot be registered before an approved provider is enabled. Payment methods that do not require a terminal keep working as before.",
+    "loading": "Loading payment terminals…",
+    "panel_title": "Pay with card terminal",
+    "simulated_note": "Test terminal (simulation): no money is taken from any real card.",
+    "simulated_approval": "Test approval — no real money was taken.",
+    "required_note": "This method requires a confirmed approval from the payment terminal before the sale completes.",
+    "required_unavailable": "This method requires a payment terminal, and no active terminal is available for this session. Enable a terminal or choose another method.",
+    "choose_terminal": "Choose payment terminal",
+    "terminal_label": "Terminal: {name}",
+    "send_amount": "Send {amount} to terminal",
+    "enter_amount": "Enter the card amount first",
+    "waiting_customer": "Waiting for the customer on the terminal…",
+    "poll_warning": "Terminal is momentarily unreachable; still trying.",
+    "approved_ready": "Approved on the terminal — ready to complete the sale.",
+    "card_last4": "Card •••• {last4}",
+    "approval_code": "Approval code {code}",
+    "cancel_request": "Cancel request",
+    "void_approval": "Void approval",
+    "confirm_void": "Void the approval on the terminal? The customer will not be charged.",
+    "retry_void": "Retry void",
+    "copy_for_manager": "Copy summary for manager",
+    "try_again": "Try again",
+    "amount_locked": "The amount is locked while the request is open. You cannot leave the payment screen until it is cancelled or the sale completes.",
+    "compensation_title": "The operation could not be voided on the terminal",
+    "compensation_body": "The customer’s money may be held or charged. This operation cannot complete the sale and the session cannot be closed until it is resolved. Retry the void; if it keeps failing, escalate to a manager (variance-approval permission) with the copied summary.",
+    "status": {
+      "created": "Created",
+      "sent": "Waiting for terminal",
+      "approved": "Approved",
+      "declined": "Declined by terminal",
+      "cancelled": "Cancelled",
+      "expired": "Expired",
+      "error": "Error",
+      "consumed": "Used in sale",
+      "voided": "Approval voided",
+      "compensation_required": "Needs compensation",
+      "compensated": "Resolved manually"
+    },
+    "status_hint": {
+      "declined": "The terminal declined the operation. Try another card or payment method.",
+      "cancelled": "The request was cancelled; nothing was charged.",
+      "expired": "The request timed out; nothing was charged.",
+      "error": "The request could not be sent to the terminal. Try again.",
+      "voided": "The approval was voided on the terminal; the amount was not charged."
+    },
+    "failure": {
+      "declined": "The terminal declined the operation.",
+      "amount_mismatch": "The terminal amount differs from the requested one, so the approval was voided.",
+      "start_unconfirmed": "It is not confirmed that the request reached the terminal; check the terminal before resending.",
+      "void_failed": "Could not reach the terminal while voiding.",
+      "void_not_confirmed": "The terminal did not confirm the void.",
+      "void_rejected": "The terminal rejected the void request."
+    },
+    "errors": {
+      "terminal_busy": "The terminal has an active request; finish or cancel it first.",
+      "idempotency_conflict": "Request conflict; try again.",
+      "operation_in_progress": "Another operation is running on this request; try again in a moment.",
+      "terminal_unavailable_now": "The terminal cannot be reached right now; try again.",
+      "terminal_unavailable": "The payment terminal does not exist or is disabled.",
+      "terminal_device_mismatch": "This terminal is assigned to another POS device.",
+      "provider_unavailable": "The terminal provider is not available in this environment.",
+      "adapter_unavailable": "No adapter is enabled for this provider.",
+      "method_not_card": "The payment method must be an active bank method.",
+      "method_not_allowed_in_pos": "The payment method is not enabled in the POS settings.",
+      "session_forbidden": "This session belongs to another cashier.",
+      "invalid_amount": "The amount is not valid.",
+      "not_cancellable": "The request cannot be cancelled in its current state.",
+      "not_voidable": "There is no standing approval to void.",
+      "compensation_in_progress": "A void attempt is running on the terminal; wait for it to finish, then try again.",
+      "generic": "The payment-terminal operation failed."
+    },
+    "alert_compensation_title": "Payment-terminal operations need compensation ({count})",
+    "alert_blocking_title": "Pending payment-terminal operations block closing ({count})",
+    "alert_compensation_body": "One or more operations could not be voided on the payment terminal, and the customer’s money may be held. The session cannot be closed until they are resolved: retry the void.",
+    "alert_blocking_body": "The payment terminal has unresolved operations. Complete the sale or cancel the request/approval before closing the session.",
+    "alert_escalation": "If it keeps failing: copy the summary and escalate to a manager (variance-approval permission) or support. The escalation summary contains no card data."
   }
 }

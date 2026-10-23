@@ -6,6 +6,7 @@ import {
   Archive,
   ChevronLeft,
   Clock3,
+  CreditCard,
   MonitorDown,
   Settings2,
   TabletSmartphone,
@@ -25,6 +26,7 @@ const ITEMS: PosSettingsItem[] = [
   { key: 'shifts', href: '/pos/settings/shifts', icon: Clock3 },
   { key: 'devices', href: '/pos/settings/devices', icon: TabletSmartphone },
   { key: 'cash_drawer', href: '/pos/settings/cash-drawer', icon: Archive },
+  { key: 'terminals', href: '/pos/settings/terminals', icon: CreditCard },
   { key: 'desktop', href: null, icon: MonitorDown },
 ];
 
