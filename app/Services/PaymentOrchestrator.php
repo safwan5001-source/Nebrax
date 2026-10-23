@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Contracts\Payable;
+use App\Events\PaymentAttemptCaptured;
+use App\Models\InvoicePaymentRequest;
 use App\Models\PaymentAttempt;
 use App\Models\PaymentGateway;
 use App\Models\User;
@@ -142,11 +144,21 @@ final class PaymentOrchestrator
                 }
                 $updates['captured_minor'] = $snapshot->capturedMinor;
                 $updates['captured_at'] = $snapshot->capturedAt ?? $now;
+                // PAY-H2-02c: التقاط Payable فاتورة ينتظر الترحيل المحاسبي (تنفّذه خدمة منفصلة بعد الالتزام؛ هنا حالة تنسيق فقط).
+                if (str_starts_with((string) $locked->payable_key, InvoicePaymentRequest::PAYABLE_TYPE.':')) {
+                    $updates['posting_status'] = PaymentAttempt::POSTING_PENDING;
+                }
                 if ($reasons !== []) {
                     $updates['review_reasons'] = $this->withReasons($locked, $reasons);
                 }
             }
             $locked->forceFill($updates)->save();
+
+            if (($updates['posting_status'] ?? null) === PaymentAttempt::POSTING_PENDING) {
+                $tenantId = (string) $locked->tenant_id;
+                $attemptId = (string) $locked->getKey();
+                DB::afterCommit(fn () => event(new PaymentAttemptCaptured($tenantId, $attemptId)));
+            }
 
             return new PaymentAttemptTransitionResult($locked, true);
         });
