@@ -58,27 +58,34 @@ documented in V5e-2c; a weight a family lacks falls to its nearest real cut.
 
 ## 4. Thmanyah — why it was not added
 
-- Not on Google Fonts, not in the repo, and there is no Thmanyah file anywhere in the codebase.
-- Per Thmanyah's published help page (found through search; the page itself returned 404/429 to automated fetch, so
-  **the full licence text was not read verbatim**), the files are delivered by **email after a form on the official
-  site**, and the published terms are described as permitting personal/commercial *use* while **prohibiting
-  redistributing, uploading or hosting the files** and modifying/renaming them. Hosting the files on AWJ's origin so
-  tenants' storefronts can serve them is exactly what such terms restrict.
-- The owner reports having permission from Thmanyah. **That grant is not documented in the repository**, and its scope
-  (hosting by a SaaS, serving to all tenants' storefront visitors, WOFF2 conversion, subsetting) is unknown. Converting
-  to WOFF2 or subsetting is also a *modification* that the public terms forbid without consent.
-- Using an unofficial copy (npm/GitHub mirrors) was rejected as instructed.
+**Update — official package reviewed.** The owner supplied `Thmanyah-Font-Family_2.zip` (official package: `LICENSE.pdf`,
+`ترخيص خط ثمانية.pdf` (Arabic, prevails), a aesthetics guide, and for each of `thmanyahsans`, `thmanyahserifdisplay`,
+`thmanyahseriftext`: Light / Regular / Medium / Bold / Black in OTF and WOFF2). The files are available and official.
+The **licence in that package, however, does not cover this use**, and the zip contains no written exception:
 
-**To unlock (a follow-up slice, no architecture needed beyond this one):**
-1. Obtain the official files from Thmanyah and a **written grant** covering: SaaS hosting, serving to third-party
-   storefronts, WOFF2 conversion/subsetting, and tenant-facing selection. Store it under `docs/legal/`.
-2. Add the files under `storefront/src/fonts/thmanyah/` and a CSP/`next/font/local` declaration with `display: swap`,
-   `preload: false`, and the same Arabic+Latin handling; mirror the declaration in the Canvas `fonts.ts`.
-3. Append `thmanyah-sans`, `thmanyah-serif-display`, `thmanyah-serif-text` to the three twin lists (PHP
-   `FONT_FAMILIES`, both `font-catalogue.ts`) and the fixture. Keys are append-only.
+| Licence clause (thmanyah's Font License, © 2026) | Effect on a multi-tenant storefront |
+|---|---|
+| *Prohibited:* "Redistribute, share, upload, **host**, or make the Font Software available for download on any website, **server**, digital platform…. May only be downloaded from the official website and used on your own devices and projects." | Committing the files to the repo (a hosted server) or serving them from AWJ's origin is hosting |
+| *Prohibited:* "Make the Font Software available in any manner that allows end users or third parties to extract, download, access, reuse… **including through web embedding**" | A storefront `@font-face` serves a downloadable WOFF2 to every visitor |
+| *Permitted:* embed in websites/web apps "**only as part of a compiled, packaged, or obfuscated product**" | A publicly fetchable `.woff2` URL is not an obfuscated package |
+| *Non-exclusive, non-transferable*; "sell, rent, lease, **sublicense**" prohibited | Tenant merchants selecting the font for their own stores is arguably sublicensing |
+| *Prohibited:* "Modify, edit, adapt… in any way" | Subsetting/re-encoding is modification (the supplied WOFF2 are usable as delivered) |
+| "No amendment to, or exception from, this License is effective unless **made in writing and issued by the Company**." Exceptions: ask@thmanyah.com | The owner's reported permission only counts once issued in writing by thmanyah |
 
-Until then, any `thmanyah-*` value in a document is **dropped by the PHP normalizer** like any unknown key (fixture-pinned), and
-a test fails if Thmanyah or `next/font/local` appears in either font module, so it cannot ship accidentally.
+Conclusion: the standard licence permits AWJ itself to use the font in its own products, but **not** to host it for
+third-party tenants' public storefronts. No code or font file was added. (This is an engineering reading of the licence, not
+legal advice.)
+
+**To unlock:** a written exception from thmanyah (ask@thmanyah.com) that explicitly covers (1) hosting the WOFF2 files on
+AWJ infrastructure/CDN, (2) serving them publicly via `@font-face` on tenant storefronts and in the Customizer, (3) tenant
+merchants selecting the family for their own stores (sublicensing/third-party use), and (4) committing/storing the files in the
+source repository. File it under `docs/legal/`. Then:
+1. Add the WOFF2 files that match the weights the editor offers (Regular 400, Medium 500, Bold 700, Black 900→ editor max 800) under `storefront/src/fonts/thmanyah/`, declared with `next/font/local`, `display: swap`, `preload: false`; mirror in the Canvas `fonts.ts`.
+2. Append `thmanyah-sans`, `thmanyah-serif-display`, `thmanyah-serif-text` to the three twin lists (PHP `FONT_FAMILIES`, both `font-catalogue.ts`) and the fixture. Keys are append-only.
+3. Relax the guard test that currently forbids `thmanyah`/`next/font/local` in the font modules.
+
+Until then, any `thmanyah-*` value in a document is **dropped by the PHP normalizer** like any unknown key (fixture-pinned),
+and a test fails if Thmanyah or `next/font/local` appears in either font module, so it cannot ship accidentally.
 
 ## 5. Integration details
 
@@ -144,7 +151,7 @@ storage; settings stay in each store's own document) · legacy documents unchang
 
 ## 9. Not completed
 
-- Thmanyah ×3 (licence/files — §4).
+- Thmanyah ×3 (files received; standard licence prohibits hosting/web embedding — written exception needed, §4).
 - Standalone Cairo / Tajawal entries (already offered as Geist pairs; not duplicated).
 - Visual browser proof and mobile screenshots.
 
