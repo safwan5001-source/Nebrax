@@ -201,6 +201,40 @@ class PaymentGatewaySettlementReadApiTest extends TestCase
     }
 
     #[Test]
+    public function a_matching_replay_ignores_prerequisites_that_only_govern_new_postings(): void
+    {
+        $payment = $this->collect(115000);
+        $bank = $this->mainBank();
+        app(PaymentGatewaySettlementService::class)->post([
+            'payment_gateway_id' => $this->gateway->id, 'cash_bank_account_id' => $bank->id, 'provider_settlement_ref' => 'SET-R',
+            'net_bank_amount' => 112000, 'provider_fee_ex_tax' => 3000, 'items' => [['payment_id' => $payment->id, 'gross_amount' => 115000]],
+        ]);
+        // بعد الترحيل: قُفلت الفترة وعُطّل حساب البنك الدفتري وأُزيل تعيين المقاصة — post() يعيد التسوية القائمة قبل هذه الفحوص.
+        app(AccountingPeriodLockService::class)->create(now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString(), 'إقفال', User::query()->firstOrFail());
+        \DB::table('accounts')->where('id', $bank->account_id)->update(['is_active' => false]);
+        \DB::table('account_role_mappings')->where('role_key', 'gateway_clearing')->delete();
+
+        $res = $this->preview($payment, net: 112000, fee: 3000, ref: 'SET-R', event: 'EVT-X')->assertOk();
+        $res->assertJsonPath('data.replay', true)->assertJsonPath('data.postable', true)->assertJsonPath('data.blockers', []);
+        $this->assertSame('SET-R', app(PaymentGatewaySettlementService::class)->post([
+            'payment_gateway_id' => $this->gateway->id, 'cash_bank_account_id' => $bank->id, 'provider_settlement_ref' => 'SET-R',
+            'net_bank_amount' => 112000, 'provider_fee_ex_tax' => 3000, 'items' => [['payment_id' => $payment->id, 'gross_amount' => 115000]],
+        ])->provider_settlement_ref);
+    }
+
+    #[Test]
+    public function a_disabled_bank_ledger_account_is_reported_before_posting(): void
+    {
+        $payment = $this->collect(115000);
+        $bank = $this->mainBank();
+        \DB::table('accounts')->where('id', $bank->account_id)->update(['is_active' => false]);
+
+        $res = $this->preview($payment, net: 112000, fee: 3000)->assertOk();
+        $this->assertContains('bank_ledger_account_inactive', collect($res->json('data.blockers'))->pluck('code')->all());
+        $this->assertFalse($res->json('data.postable'));
+    }
+
+    #[Test]
     public function unsettled_payments_are_filtered_in_sql_and_paginated(): void
     {
         $first = $this->collect(115000);

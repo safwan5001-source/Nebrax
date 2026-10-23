@@ -192,43 +192,53 @@ final class PaymentGatewaySettlementService
             $block('gateway_not_found', 'Payment gateway must belong to the active tenant.');
         }
 
-        // نفس شروط ما قبل الكتابة في post(): مرجع، حساب بنكي فعّال ومسموح، أدوار الحسابات، وقفل الفترة.
+        // مرجع التسوية موجود؟ post() يحسم التكرار (replayOrReject) قبل أي شرط خاص بالترحيل الجديد (بنك/أدوار/فترة)، فتتبعه المعاينة.
         $ref = trim((string) ($input['provider_settlement_ref'] ?? ''));
         if ($ref === '') {
             $block('reference_required', 'Gateway settlement requires a provider reference.');
         }
-        $cashEntity = CashBankAccount::query()->whereKey((string) ($input['cash_bank_account_id'] ?? ''))->first();
-        if ($cashEntity === null) {
-            $block('bank_account_not_found', 'Cash bank account must belong to the active tenant.');
-        } else {
-            if (! $cashEntity->is_active) {
-                $block('bank_account_inactive', 'الحساب البنكي المختار معطّل.');
+        $existing = $gateway !== null && $ref !== ''
+            ? PaymentGatewaySettlement::query()->where('payment_gateway_id', $gateway->id)->where('provider_settlement_ref', $ref)->first()
+            : null;
+
+        if ($existing === null) {
+            // نفس شروط ما قبل الكتابة في post(): حساب بنكي فعّال (وحسابه الدفتري حركي) ومسموح، أدوار الحسابات، وقفل الفترة.
+            $cashEntity = CashBankAccount::query()->whereKey((string) ($input['cash_bank_account_id'] ?? ''))->first();
+            if ($cashEntity === null) {
+                $block('bank_account_not_found', 'Cash bank account must belong to the active tenant.');
+            } else {
+                if (! $cashEntity->is_active) {
+                    $block('bank_account_inactive', 'الحساب البنكي المختار معطّل.');
+                }
+                $bankLedger = $cashEntity->account()->first();
+                if ($bankLedger === null || ! $bankLedger->is_active) {
+                    $block('bank_ledger_account_inactive', 'الحساب الدفتري للبنك غير موجود أو معطَّل.');
+                } elseif ($bankLedger->is_group) {
+                    $block('bank_ledger_account_group', 'الحساب الدفتري للبنك تجميعي ولا يقبل ترحيلاً مباشراً.');
+                }
+                try {
+                    $this->cashBankAccounts->assertAllowed($cashEntity, 'deposit', $actor);
+                } catch (\Throwable $e) {
+                    $block('bank_account_forbidden', $e->getMessage());
+                }
+            }
+            foreach (['gateway_clearing', 'provider_fee_expense'] as $role) {
+                try {
+                    $this->accountRoles->resolve($role);
+                } catch (RuntimeException $e) {
+                    $block('role_unmapped', $e->getMessage());
+                }
             }
             try {
-                $this->cashBankAccounts->assertAllowed($cashEntity, 'deposit', $actor);
-            } catch (\Throwable $e) {
-                $block('bank_account_forbidden', $e->getMessage());
-            }
-        }
-        foreach (['gateway_clearing', 'provider_fee_expense'] as $role) {
-            try {
-                $this->accountRoles->resolve($role);
+                app(AccountingDateGuard::class)->assertOpen((string) ($input['settlement_date'] ?? now()->toDateString()), 'تسوية البوابة');
             } catch (RuntimeException $e) {
-                $block('role_unmapped', $e->getMessage());
+                $block('period_locked', $e->getMessage());
             }
-        }
-        try {
-            app(AccountingDateGuard::class)->assertOpen((string) ($input['settlement_date'] ?? now()->toDateString()), 'تسوية البوابة');
-        } catch (RuntimeException $e) {
-            $block('period_locked', $e->getMessage());
         }
 
         $gross = 0;
         $itemsInput = $input['items'] ?? [];
         $replay = false;
-        $existing = $gateway !== null && $ref !== ''
-            ? PaymentGatewaySettlement::query()->where('payment_gateway_id', $gateway->id)->where('provider_settlement_ref', $ref)->first()
-            : null;
 
         if (! is_array($itemsInput) || $itemsInput === []) {
             $block('items_required', 'Gateway settlement requires at least one matched payment.');
