@@ -8,7 +8,7 @@
 |---|---|
 | عقد اختياري `VerifiesGatewayCredentials` | `verifyCredentials(PaymentGateway): void` يرمي `PaymentGatewayException` برمز ثابت؛ لا يكتب في الاتصال. `PaymentGatewayAdapterRegistry::verifier()` يحلّه (أو `null`). |
 | Moyasar | `MoyasarApiClient::probeAccess()` = `GET /invoices?page=1` بالمفتاح السري (قراءة فقط)، بعد سياسة المفاتيح (رفض Live قبل أي شبكة). نجاح الاستجابة = المفتاح مقبول. **لا يثبت** سرّ الـwebhook ولا المفتاح القابل للنشر (لا استدعاء موثّق لهما). |
-| `PaymentGatewayService::verify()` | الشبكة **خارج** المعاملة؛ ثم قفل الصف وإعادة فحص **بصمة الاعتماد** (النسخة + البيئة + المفتاح القابل للنشر) ⇒ تدوير أثناء الاستدعاء = `gateway.credentials_changed` ولا يُختم تحقق على سرّ لم يُفحص؛ ثم `verified_at = now()` وحدث `verified`. الفشل ⇒ حدث `verification_failed` برمز السبب فقط؛ **ورفض مصادقة قاطع (`*.unauthorized`) يُسقط `verified_at` السابق** (تحت قفل الصف وبعد تأكد البصمة) فلا يقبل الاتصال محاولات جديدة بمفتاح ثبت بطلانه، أما أعطال التوفر/الحدّ فتؤقت ولا تُسقطه. |
+| `PaymentGatewayService::verify()` | الشبكة **خارج** المعاملة؛ ثم قفل الصف وإعادة فحص **بصمة الاعتماد** (ما يُصادَق به لدى المزوّد فقط: المفتاح السري والبيانات الإضافية والبيئة والمفتاح القابل للنشر — لا سرّ الـwebhook ولا عدّاد النسخة) ⇒ تدوير أثناء الاستدعاء = `gateway.credentials_changed` ولا يُختم تحقق على سرّ لم يُفحص؛ ثم `verified_at = now()` وحدث `verified`. الفشل ⇒ حدث `verification_failed` برمز السبب فقط؛ **ورفض مصادقة قاطع (`*.unauthorized`) يُسقط `verified_at` السابق** (تحت قفل الصف وبعد تأكد البصمة) فلا يقبل الاتصال محاولات جديدة بمفتاح ثبت بطلانه، أما أعطال التوفر/الحدّ فتؤقت ولا تُسقطه. |
 | إبطال التحقق | تدوير السرّ كان يصفّره؛ أُضيف: تغيّر `environment` أو `publishable_key` لمزوّد حقيقي يصفّره أيضاً (إعادة الحفظ بالقيمة نفسها لا تُبطله). |
 | API | `POST /payment-gateways/{id}/verify` — `payment_gateways.manage`، `throttle:10,1`. أخطاء بصيغة `{error:{code,message}}` (422). |
 | رموز جديدة | `gateway.verification_not_required` · `gateway.verification_unsupported` · `gateway.credentials_changed` · أحداث `verified`/`verification_failed`. |
@@ -27,3 +27,4 @@
 | الملاحظة | القرار |
 |---|---|
 | P2 رفض المصادقة لا يُسقط `verified_at` السابق فيبقى الاتصال يقبل محاولات | **أُصلح:** كما في الجدول أعلاه؛ الحدث يسجّل `changed_fields=['verified_at']`. اختبار: 429/503 تُبقي التحقق، 401 يُسقطه ويمنع `start` بـ`gateway_unverified`. |
+| P2 بصمة تضم عدّاد النسخة فيمنع تدوير webhook وحده إسقاط التحقق بعد رفض المصادقة | **أُصلح:** البصمة تقتصر على ما يُصادَق به لدى المزوّد؛ تدوير webhook أثناء الاستدعاء لا يمنع ختم نجاح ولا يحمي مفتاحاً باطلاً. اختبار للحالتين. |

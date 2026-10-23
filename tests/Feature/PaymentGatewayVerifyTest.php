@@ -231,6 +231,35 @@ class PaymentGatewayVerifyTest extends TestCase
     }
 
     #[Test]
+    public function a_webhook_only_rotation_during_the_probe_neither_blocks_a_success_nor_shields_an_invalid_key(): void
+    {
+        $id = $this->createMoyasar();
+        $rotateWebhook = function () use ($id) {
+            app(TenantContext::class)->set($this->auth['tenant_id']);
+            $gateway = PaymentGateway::query()->findOrFail($id);
+            $gateway->forceFill(['webhook_secret' => 'tok_rotated_'.uniqid(), 'credential_version' => $gateway->credential_version + 1])->save();
+        };
+
+        // نجاح مع تدوير webhook أثناء الاستدعاء ⇒ يُختم التحقق (ما فُحص لم يتغيّر).
+        $this->fakeHttp(['api.moyasar.com/v1/invoices*' => function () use ($rotateWebhook) {
+            $rotateWebhook();
+
+            return Http::response(['invoices' => []]);
+        }]);
+        $this->verify($id)->assertOk();
+        $this->assertNotNull($this->row($id)->verified_at);
+
+        // رفض مصادقة قاطع مع تدوير webhook أثناء الاستدعاء ⇒ يسقط التحقق ولا يحميه التدوير غير ذي الصلة.
+        $this->fakeHttp(['api.moyasar.com/v1/invoices*' => function () use ($rotateWebhook) {
+            $rotateWebhook();
+
+            return Http::response([], 401);
+        }]);
+        $this->verify($id)->assertUnprocessable()->assertJsonPath('error.code', 'moyasar.unauthorized');
+        $this->assertNull($this->row($id)->verified_at);
+    }
+
+    #[Test]
     public function the_endpoint_is_throttled(): void
     {
         $id = $this->createMoyasar();
