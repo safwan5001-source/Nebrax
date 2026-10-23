@@ -55,6 +55,9 @@ class PaymentAttempt extends BaseModel implements CompanyWide
 
     public const REVIEW_STATE_CONFLICT = 'state_conflict';
 
+    /** دفعة زائدة على المتبقي رُحّل فائضها كرصيد دائن غير مخصص (D-26، ADR-0006 M3). */
+    public const REVIEW_OVERPAYMENT = 'overpayment';
+
     /** حالة ترحيل الالتقاط (ADR-0006): null قبل الالتقاط. pending ← posted | blocked_period | not_postable؛ blocked_period ← posted (R1). */
     public const POSTING_PENDING = 'pending';
 
