@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  blockedKind, buildListQuery, canRepost, knownRepostError, knownReviewReason, reasonValid, rowPhase, rowTone,
+  blockedKind, buildListQuery, canRepost, knownProviderOutcome, knownRepostError, knownReviewReason, providerOutcomeTone, reasonValid, rowPhase, rowTone,
 } from './contract';
 
 const row = (over: Partial<Parameters<typeof rowPhase>[0]> = {}) => ({
@@ -66,5 +66,18 @@ describe('labels', () => {
     expect(blockedKind({ blocked_reason: { kind: 'period' } })).toBe('period');
     expect(blockedKind({ blocked_reason: { kind: 'year' } })).toBe('year');
     expect(blockedKind({ blocked_reason: null })).toBe('other');
+  });
+});
+
+describe('provider outcomes', () => {
+  it('classifies known outcomes, hides absent ones and flags attention cases', () => {
+    expect(knownProviderOutcome(null)).toBeNull();
+    expect(knownProviderOutcome('')).toBeNull();
+    expect(knownProviderOutcome('duplicate')).toBe('duplicate');
+    expect(knownProviderOutcome('weird')).toBe('other');
+    expect(providerOutcomeTone('applied')).toBe('neutral');
+    expect(providerOutcomeTone('duplicate')).toBe('muted');
+    expect(providerOutcomeTone('state_conflict')).toBe('warning');
+    expect(providerOutcomeTone('attempt_not_found')).toBe('warning');
   });
 });

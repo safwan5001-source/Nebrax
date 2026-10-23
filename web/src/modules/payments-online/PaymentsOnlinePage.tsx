@@ -23,7 +23,7 @@ import { useCan } from '@/lib/use-can';
 import { apiErrorCode } from '@/modules/payments/gateways/contract';
 import {
   CAPTURE_STATUSES, REASON_MAX, RESOLVE_PERMISSION, VIEW_PERMISSION, blockedKind, buildListQuery, canRepost, knownRepostError, knownReviewReason,
-  reasonValid, rowPhase, rowTone, type AttemptDetail, type AttemptRow, type ListMeta, type RepostResult, type TabKey, type TimelineEvent,
+  providerOutcomeTone, knownProviderOutcome, reasonValid, rowPhase, rowTone, type AttemptDetail, type AttemptRow, type ListMeta, type RepostResult, type TabKey, type TimelineEvent,
 } from './contract';
 
 /**
@@ -254,7 +254,15 @@ function DetailSheet({ id, locale, reviewLabel, onClose }: { id: string; locale:
                   {detail.timeline.map((e, i) => (
                     <li key={`${e.type}-${i}`} className="relative text-sm">
                       <span aria-hidden className="absolute -start-[21px] top-1.5 h-2 w-2 rounded-full bg-border" />
-                      <p className="font-medium">{eventLabel(e)}</p>
+                      <p className="flex flex-wrap items-center gap-1.5 font-medium">
+                        {eventLabel(e)}
+                        {e.type === 'provider_event' && (() => {
+                          const outcome = knownProviderOutcome(e.outcome);
+                          return outcome === null ? null : (
+                            <Badge tone={providerOutcomeTone(outcome)}>{outcome === 'other' ? e.outcome : t(`outcome_${outcome}` as 'outcome_applied')}</Badge>
+                          );
+                        })()}
+                      </p>
                       <p className="text-xs text-muted"><bdi>{e.at ? formatDateTime(e.at, locale) : '—'}</bdi></p>
                       {e.type === 'repost' && (
                         <p className="mt-0.5 text-xs leading-5 text-muted">{e.actor ? `${e.actor} — ` : ''}{e.reason}</p>

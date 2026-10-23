@@ -137,6 +137,8 @@ describe.each(TEST_LOCALES)('PaymentsOnlinePage (%s)', (locale) => {
           postings: [{ role: 'allocated', amount_minor: 115000, payment_id: 'p1', payment_number: 'PAY-0001' }],
           timeline: [
             { type: 'created', at: '2026-10-23T08:59:00Z' },
+            { type: 'provider_event', at: '2026-10-23T08:59:55Z', event_type: 'payment_paid', outcome: 'duplicate' },
+            { type: 'provider_event', at: '2026-10-23T08:59:56Z', event_type: 'payment_failed', outcome: 'state_conflict' },
             { type: 'captured', at: '2026-10-23T09:00:00Z' },
             { type: 'repost', at: '2026-10-23T10:00:00Z', outcome: 'posted', actor: 'المالك', reason: 'بعد الفتح الرسمي للفترة' },
           ],
@@ -149,6 +151,8 @@ describe.each(TEST_LOCALES)('PaymentsOnlinePage (%s)', (locale) => {
     expect(await within(sheet).findByText('PAY-0001')).toBeTruthy();
     expect(within(sheet).getByText(/بعد الفتح الرسمي للفترة/)).toBeTruthy();
     expect(within(sheet).getAllByRole('listitem').length).toBeGreaterThanOrEqual(4);
+    expect(within(sheet).getByText(/Duplicate — ignored|مكرَّر — تجاهلناه/)).toBeTruthy();
+    expect(within(sheet).getByText(/State conflict|تعارض حالة/)).toBeTruthy();
   });
 
   it('ignores a slow response for an old query after the tab changed', async () => {

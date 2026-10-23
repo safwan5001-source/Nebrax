@@ -97,3 +97,13 @@ export const knownRepostError = (code: string | null): (typeof REPOST_ERRORS)[nu
   (REPOST_ERRORS as readonly string[]).includes(code ?? '') ? (code as (typeof REPOST_ERRORS)[number]) : 'unknown';
 
 export interface RepostResult { id: string; outcome: 'posted' | 'blocked_period' | string; posting_status: string }
+
+/** نتيجة معالجة حدث المزوّد كما يسجّلها الخادم؛ غيرها (أو غيابها) لا تُعرض. */
+export const PROVIDER_OUTCOMES = ['applied', 'duplicate', 'stale', 'state_conflict', 'attempt_not_found'] as const;
+export type ProviderOutcome = (typeof PROVIDER_OUTCOMES)[number];
+export const knownProviderOutcome = (outcome: string | null | undefined): ProviderOutcome | 'other' | null =>
+  outcome == null || outcome === '' ? null : (PROVIDER_OUTCOMES as readonly string[]).includes(outcome) ? (outcome as ProviderOutcome) : 'other';
+
+/** `applied` عادي؛ المكرَّر/القديم مُهمَل بلا أثر؛ التعارض وعدم وجود المحاولة يحتاجان انتباهاً. */
+export const providerOutcomeTone = (outcome: ProviderOutcome | 'other'): BadgeTone =>
+  outcome === 'applied' ? 'neutral' : outcome === 'state_conflict' || outcome === 'attempt_not_found' ? 'warning' : 'muted';
