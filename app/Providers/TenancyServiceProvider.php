@@ -67,6 +67,8 @@ class TenancyServiceProvider extends ServiceProvider
         $this->app->register(PosServiceProvider::class);
         // Commerce Workspace admin routes stay isolated from the public storefront API.
         $this->app->register(CommerceWorkspaceServiceProvider::class);
+        // PAY-H2-02c: ربط حدث التقاط الدفع بترحيله المحاسبي.
+        $this->app->register(PaymentPostingServiceProvider::class);
     }
 
     public function boot(): void
