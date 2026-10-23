@@ -4,18 +4,20 @@ PR: #1678 · Branch: `claude/awj-pg-ci-stabilization` · Independent of PR #1551
 
 | | SHA |
 |---|---|
-| **Base** (`main` at branch creation = merge-base) | `a148c0141d438c3f68d82e850975a92941b442e2` |
-| **Code head tested by CI** | `6db9a253892d621433ea2ca7ce4229c595afcc94` |
-| Head after this report | the PR head (this report is the only change on top of the code head; docs-only) |
+| **Original base** (`main` at branch creation) | `a148c0141d438c3f68d82e850975a92941b442e2` |
+| Code head first tested by CI | `6db9a253892d621433ea2ca7ce4229c595afcc94` |
+| **Merged `main`** (conflict update) | `9de26a791` (includes #1679 `7f1bc7000`) |
+| Head after the merge | see the PR (merge commit `e7fa42285` + this report update) |
 
-`main` had moved to `2e64c267f` when this report was written; the branch has not been rebased or merged (no overlap — the PR touches four test files only).
+### Conflict update (merge of `main`, no force push)
+GitHub reported conflicts after #1679 landed on `main`. The two real conflicts were identical in shape and are resolved by keeping **both** traits: `tests/Feature/PaymentAttemptPostgresTest.php` and `tests/Feature/PaymentAttemptPostingPostgresTest.php` (`use UsesWorkerDatabaseWithoutTransaction;` from #1679 + `use DiagnosesUnprovenScheduler;` from this PR). `ZatcaMonetaryXmlTest.php` and the new trait file merged cleanly. No production code touched.
 
 ## 1. Scope and result
 
 | # | Item | Result |
 |---|---|---|
 | 1 | `ZatcaMonetaryXmlTest` depends on unspecified `InvoiceLine` order | **Fixed** (test-only), root cause demonstrated |
-| 2 | `scheduler_unproven` in `PaymentAttempt*PostgresTest` | **Root cause NOT determined. Not fixed.** Failure-time diagnostics added |
+| 2 | `scheduler_unproven` in `PaymentAttempt*PostgresTest` | **Fixed on `main` by #1679 (not by this PR).** This PR keeps the failure-time diagnostics only |
 | 3 | PostgreSQL 16 first, then CI | Done (below) |
 | 4 | No test disabled, no assertion weakened, CI Gate untouched | Held (below) |
 | 5 | Payments logic / DB change needs approval | **No such change made**; none proposed yet (see §6) |
@@ -50,13 +52,15 @@ Diff vs base: 4 files, +138 / −11 (tests only).
 
 **Ruled out by reading the code:** `platform_runtime_heartbeats.component` is `UNIQUE` (one row — not a duplicate-row ordering issue); freshness window is 10 min; no test/app code sets the PostgreSQL session timezone; the column is `timestamptz` and the CI server timezone is UTC.
 
-**Not reproduced:** serially on PG16, 6× on the class; 199 `Postgres`-tagged tests 2×; and 4 iterations of `--parallel --processes=4` over `Payment|Postgres|Scheduler|Heartbeat` (only the locally-unconfigured `PostgresTestLockTimeoutTest` failed, because `PGOPTIONS=-c lock_timeout=60s` from the CI step was not set locally).
+**Root cause (established by #1679, merged on `main` after this investigation; I did not reproduce it independently):** the four payments fork tests used no DB trait, so under ParaTest they ran on the shared base database instead of a per-worker one. The platform rows they rely on (the `scheduler` heartbeat, the emergency-stop row) are global, so another worker's `tearDown` cleanup could delete them mid-`setUp`. That matches every observation here: parallel-CI only, in `setUp`, right after `record()`, and not reproducible in a single process. #1679 adds `UsesWorkerDatabaseWithoutTransaction` (worker DB, no wrapping transaction). My hypotheses about leaked state/forked sockets above are superseded.
+
+**Not reproduced (before #1679):** serially on PG16, 6× on the class; 199 `Postgres`-tagged tests 2×; and 4 iterations of `--parallel --processes=4` over `Payment|Postgres|Scheduler|Heartbeat` (only the locally-unconfigured `PostgresTestLockTimeoutTest` failed, because `PGOPTIONS=-c lock_timeout=60s` from the CI step was not set locally).
 
 **Hypotheses still open (not claimed):** state leaked between tests in a worker (forked children share the parent's DB socket — the existing tests fork), or an interaction with a neighbouring test in the same worker. Neither is evidenced.
 
 **What was added.** The snapshot in the failure message: heartbeat row (`last_seen_at::text`, `updated_at`), DB `now()`, session `TimeZone`, backend pid, row count, PHP clock and pid, `Carbon::hasTestNow()`, transaction level, `isFresh()`, and `isFresh()` after re-recording. Exercised locally with a stale heartbeat: the message carried the full snapshot (`is_fresh_now:false`, `is_fresh_after_rerecord:true`) and the cause chain. The failure still fails with the same cause class.
 
-**Next step once it recurs:** read the snapshot. If `is_fresh_after_rerecord` is true with a sane row, the write is not visible/not applied at the moment of the check (connection/transaction state); if the row's time is off, it is clock/timezone; if the row is missing, another actor deleted it.
+**Role of the diagnostics now:** a cheap guard — if `scheduler_unproven` ever recurs despite #1679, the failure message carries the evidence. They can be removed later without any other change. **If it recurs:** read the snapshot. If `is_fresh_after_rerecord` is true with a sane row, the write is not visible/not applied at the moment of the check (connection/transaction state); if the row's time is off, it is clock/timezone; if the row is missing, another actor deleted it.
 
 ## 5. Verification
 
@@ -65,7 +69,9 @@ Diff vs base: 4 files, +138 / −11 (tests only).
 | PG 16 (local), 3 affected classes, `PGOPTIONS` as CI | 54 passed, 1225 assertions |
 | `ZatcaMonetaryXmlTest` PG16 and sqlite, default order | 45 passed, 1072 assertions each |
 | Order-independence (random / desc orders) | 45 passed each; old test fails under random |
-| CI on `6db9a2538` | `php artisan test (L11, pgsql)` ✅ · `php artisan test (L11, sqlite)` ✅ · `CI Gate` ✅ (run 39969574482 / 39969574511) |
+| After merging `main` (#1679): 3 affected classes serially on PG16 | 54 passed, 1225 assertions |
+| After merging `main`: 5 classes (`PaymentAttempt*`, `PaymentInbox*`, `PaymentsRolloutControl*`, `ZatcaMonetaryXml`) with `--parallel --processes=4`, CI-like `max_locks_per_transaction=1024` and `PGOPTIONS` | 63 passed, 1446 assertions |
+| CI on `6db9a2538` (pre-merge) | `php artisan test (L11, pgsql)` ✅ · `php artisan test (L11, sqlite)` ✅ · `CI Gate` ✅ (run 39969574482 / 39969574511) |
 
 A single green pgsql run does **not** show the `scheduler_unproven` flake is gone (it appeared in 1 of the 6 failed `main` pgsql runs examined, and in two of the pgsql runs on #1551); it only shows this change breaks nothing. The full suite was run only by CI, once.
 
