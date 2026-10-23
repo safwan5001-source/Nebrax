@@ -11,6 +11,7 @@ use App\Models\PosExchangeAttempt;
 use App\Models\ReturnDocument;
 use App\Models\User;
 use App\Services\Pos\PosIdempotencyConflictException;
+use App\Support\CashSaleTreasuryPolicy;
 use App\Support\PosSettings;
 use App\Tenancy\BranchContext;
 use Illuminate\Database\QueryException;
@@ -199,6 +200,13 @@ class PosExchangeService
             }
         }
 
+        // TREASURY-T6: خزينة فائض الاستبدال النقدي تُحلّ **قبل** أي كتابة محاسبية (فالرفض يتراجع بالمعاملة كلها). مغلق افتراضياً: ما دامت
+        // سياسة T4 الفعّالة `legacy` يبقى 1110 بلا تخويل كما كان. لا سقوط إلى 1110 عند أي فشل.
+        $surplusTreasuryAccountId = null;
+        if ($surplus > 0 && $refundMethod === 'cash' && CashSaleTreasuryPolicy::effective() !== CashSaleTreasuryPolicy::LEGACY) {
+            $surplusTreasuryAccountId = app(PosCashRefundTreasuryResolver::class)->resolve($session, $source, $actor)->accountId;
+        }
+
         // PosService يحدّث فقط ما حُصّل فعلياً؛ تطبيق رصيد المرتجع يصفّر
         // المتبقي على الفاتورة البديلة بلا سند قبض وهمي ولا تغير في قيدها.
         $paidAfterTenders = (int) $replacement->paid_amount;
@@ -224,7 +232,7 @@ class PosExchangeService
 
         $settlementEntryId = null;
         if ($surplus > 0 && $refundMethod === 'cash') {
-            $settlementEntryId = $this->postCashSurplus($exchange, $source, $surplus, $actor);
+            $settlementEntryId = $this->postCashSurplus($exchange, $source, $surplus, $actor, $surplusTreasuryAccountId);
         }
 
         $exchange->update([
@@ -333,7 +341,7 @@ class PosExchangeService
     }
 
     /** يسدد رصيد العميل نقداً؛ لا ينشئ سند قبض/صرف لأن المصدر مرتجع مبيعات مثبت. */
-    private function postCashSurplus(PosExchange $exchange, Invoice $source, int $amount, User $actor): string
+    private function postCashSurplus(PosExchange $exchange, Invoice $source, int $amount, User $actor, ?string $treasuryAccountId = null): string
     {
         $entry = $this->ledger->post([
             [
@@ -342,7 +350,7 @@ class PosExchangeService
                 'partner_type' => Partner::class,
                 'partner_id' => $source->partner_id,
             ],
-            ['account_id' => $this->accountId(self::ACC_CASH), 'credit' => $amount],
+            ['account_id' => $treasuryAccountId ?? $this->accountId(self::ACC_CASH), 'credit' => $amount],
         ], [
             'entry_date' => now()->toDateString(),
             'description' => "رد فرق استبدال POS {$exchange->id}",
