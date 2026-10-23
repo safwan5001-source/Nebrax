@@ -550,4 +550,84 @@ test.describe("animated media — real Chromium", () => {
     await expect(page.locator(TOGGLE)).toHaveCount(0);
     await expect(page.locator("[data-gallery-motion]")).toHaveCount(0);
   });
+
+  // ── gallery: an off-screen picture is neither fetched nor timed (review follow-up on #1652) ──────────
+  test("gallery off-screen (no control): the animation is NOT fetched while below the fold; scrolling in starts it, and it settles ~5 s later", async ({
+    page,
+  }) => {
+    const log: string[] = [];
+    await serveMedia(page, log);
+    await open(page, "gallery-offscreen");
+    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(6_500); // longer than the whole window: nothing may have started or been spent
+    expect(log.filter((f) => f.startsWith("animated."))).toEqual([]);
+    expect(await currentSrc(page, GAL)).toMatch(/800w\.(webp|jpg)$/);
+
+    await page.locator("[data-gallery]").scrollIntoViewIfNeeded();
+    const shown = Date.now();
+    await expect.poll(() => currentSrc(page, GAL)).toMatch(/animated\.gif$/);
+    expect(log.filter((f) => f.startsWith("animated.")).length).toBeGreaterThan(
+      0,
+    );
+    await expect
+      .poll(() => currentSrc(page, GAL), { timeout: 9_000 })
+      .toMatch(/800w\.(webp|jpg)$/);
+    const playedMs = Date.now() - shown;
+    // the window is measured from when motion began: not instant, and not far beyond 5 s
+    expect(playedMs).toBeGreaterThan(3_500);
+    expect(playedMs).toBeLessThan(8_500);
+  });
+
+  test("gallery off-screen with reduced motion: scrolling in still never requests the animation", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ reducedMotion: "reduce" });
+    const page = await context.newPage();
+    const log: string[] = [];
+    await serveMedia(page, log);
+    await open(page, "gallery-offscreen");
+    await page.locator("[data-gallery]").scrollIntoViewIfNeeded();
+    await page.waitForTimeout(1_500);
+    await expect.poll(() => currentSrc(page, GAL)).toMatch(/800w\.(webp|jpg)$/);
+    expect(log.filter((f) => f.startsWith("animated."))).toEqual([]);
+    await context.close();
+  });
+
+  test("gallery off-screen WITH the control: behaviour is unchanged — the animation is added at hydration and nothing auto-settles", async ({
+    page,
+  }) => {
+    const log: string[] = [];
+    await serveMedia(page, log);
+    await open(page, "gallery-offscreen-controls");
+    await expect
+      .poll(() => log.some((f) => f.startsWith("animated.")))
+      .toBe(true);
+    await page.locator("[data-gallery]").scrollIntoViewIfNeeded();
+    await expect.poll(() => currentSrc(page, GAL)).toMatch(/animated\.gif$/);
+    await page.waitForTimeout(6_500);
+    expect(await currentSrc(page, GAL)).toMatch(/animated\.gif$/);
+    await expect(page.locator(`[data-gallery-motion] ${TOGGLE}`)).toHaveCount(
+      1,
+    );
+  });
+
+  test("gallery viewer (no control): opening it starts the animation and its window; closing and reopening a spent picture stays still", async ({
+    page,
+  }) => {
+    const log: string[] = [];
+    await serveMedia(page, log);
+    await open(page, "gallery-gif");
+    await expect
+      .poll(() => currentSrc(page, GAL), { timeout: 9_000 })
+      .toMatch(/800w\.(webp|jpg)$/); // grid window spent first
+    await page.locator("a[data-gallery-open='0']").click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await page.waitForTimeout(800);
+    expect(await currentSrc(page, VIEWER_IMG)).toMatch(
+      /1600w\.jpg$|800w\.(webp|jpg)$/,
+    ); // spent ⇒ still in the viewer too
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+  });
 });

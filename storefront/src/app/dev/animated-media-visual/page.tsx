@@ -17,7 +17,7 @@ import { PublishedFrame } from "../customizer-visual/frame";
  * (`e2e/animated-media-visual.spec.ts`) answers those paths with the sanitised fixtures. Production requests 404.
  *
  * `?scenario=` desktop-gif | desktop-webp | phone-gif | static | slider | gallery-gif | gallery-webp | gallery-controls |
- * gallery-static · `?locale=` ar | en (gallery: animated first picture, a still second, `-controls` = `showMotionControls`).
+ * gallery-static | gallery-offscreen | gallery-offscreen-controls (a 3000px spacer puts the gallery below the fold) · `?locale=` ar | en (gallery: animated first picture, a still second, `-controls` = `showMotionControls`).
  */
 const ID = "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e";
 const P = `/api/storefront/media/customizer/${ID}`;
@@ -31,13 +31,17 @@ type Scenario =
   | "gallery-gif"
   | "gallery-webp"
   | "gallery-controls"
-  | "gallery-static";
+  | "gallery-static"
+  | "gallery-offscreen"
+  | "gallery-offscreen-controls";
 
 const GALLERY_SCENARIOS: readonly Scenario[] = [
   "gallery-gif",
   "gallery-webp",
   "gallery-controls",
   "gallery-static",
+  "gallery-offscreen",
+  "gallery-offscreen-controls",
 ];
 
 const stills = (tag: string): ResolvedMedia["sources"] => [
@@ -170,6 +174,9 @@ export default async function AnimatedMediaVisualPage({
       >
         {GALLERY_SCENARIOS.includes(scenario) ? (
           <div style={{ maxWidth: 720, margin: "0 auto", padding: 16 }}>
+            {scenario.startsWith("gallery-offscreen") ? (
+              <div aria-hidden="true" style={{ height: 3000 }} />
+            ) : null}
             <HomeGallery
               view={{
                 images: [
@@ -186,7 +193,8 @@ export default async function AnimatedMediaVisualPage({
                 options: resolveGalleryOptions({
                   columns: 2,
                   lightbox: true,
-                  ...(scenario === "gallery-controls"
+                  ...(scenario === "gallery-controls" ||
+                  scenario === "gallery-offscreen-controls"
                     ? { showMotionControls: true }
                     : {}),
                 }),

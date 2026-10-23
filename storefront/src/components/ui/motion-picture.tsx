@@ -29,7 +29,9 @@ import {
  *    animation file is fetched only once the page is interactive.
  *  - **A surface with no visible pause control** (a gallery whose merchant keeps `showMotionControls` off) passes `autoStopMs`:
  *    the animation then plays for that long once the picture is on screen and settles on the still frame — the same
- *    "drop the animated sources" mechanism, started by a timer instead of a button (WCAG 2.2.2). Surfaces that do show a
+ *    "drop the animated sources" mechanism, started by a timer instead of a button (WCAG 2.2.2). Such a picture does not even
+ *    ADD its animated `<source>`s until it is first on screen, and the timer starts in the same step, so an off-screen picture
+ *    neither loads nor plays its animation and the window is measured from the moment motion actually begins. Surfaces that do show a
  *    control never pass it, so their behaviour is unchanged.
  */
 
@@ -65,38 +67,51 @@ export function useMotionPaused(id: string): boolean {
   );
 }
 
-/** Starts the clock when the picture is first visible (immediately where `IntersectionObserver` is missing), then pauses `id`. */
+/**
+ * The bounded play window for a surface with no visible control (`budgetMs`). It has two halves that must stay in step:
+ *
+ *  1. **Entering view** — returns `entered`, which stays `false` until the picture is first ≥25 % on screen (immediately, in the
+ *     same effect, where `IntersectionObserver` is missing). The caller adds the animated `<source>`s ONLY once `entered`, so an
+ *     off-screen picture never fetches or plays its animation.
+ *  2. **The clock** — starts in the effect that follows the commit that rendered those sources, i.e. the same moment the
+ *     browser begins loading / playing them, and pauses `id` after `budgetMs`.
+ *
+ * Without a budget (a surface that shows a pause control) it is inert and returns `true`, so such pictures behave as before.
+ */
 function useMotionBudget(
   ref: React.RefObject<HTMLPictureElement | null>,
   id: string,
   budgetMs: number | undefined,
   armed: boolean,
-): void {
+): boolean {
+  const [entered, setEntered] = useState(false);
+
   useEffect(() => {
-    if (!budgetMs || !armed) return;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const start = () => {
-      timer ??= setTimeout(() => setPaused(id, true), budgetMs);
-    };
+    if (!budgetMs || !armed || entered) return;
     const target = ref.current?.querySelector("img") ?? ref.current;
     if (!target || typeof IntersectionObserver === "undefined") {
-      start();
-      return () => clearTimeout(timer);
+      setEntered(true);
+      return;
     }
     const observer = new IntersectionObserver(
       (entries) => {
         if (!entries.some((entry) => entry.isIntersecting)) return;
         observer.disconnect();
-        start();
+        setEntered(true);
       },
       { threshold: 0.25 },
     );
     observer.observe(target);
-    return () => {
-      observer.disconnect();
-      clearTimeout(timer);
-    };
-  }, [ref, id, budgetMs, armed]);
+    return () => observer.disconnect();
+  }, [ref, budgetMs, armed, entered]);
+
+  useEffect(() => {
+    if (!budgetMs || !armed || !entered) return;
+    const timer = setTimeout(() => setPaused(id, true), budgetMs);
+    return () => clearTimeout(timer);
+  }, [id, budgetMs, armed, entered]);
+
+  return !budgetMs || entered;
 }
 
 export function MotionPicture({
@@ -119,10 +134,15 @@ export function MotionPicture({
   const isPaused = useMotionPaused(id);
   const hydrated = useHydrated();
   const pictureRef = useRef<HTMLPictureElement>(null);
-  useMotionBudget(pictureRef, id, autoStopMs, hydrated && !isPaused);
-  // Animated sources exist only while hydrated and not paused; the stills are always present.
+  const inWindow = useMotionBudget(
+    pictureRef,
+    id,
+    autoStopMs,
+    hydrated && !isPaused,
+  );
+  // Animated sources exist only while hydrated, not paused and — on a budgeted surface — in view; the stills are always present.
   const live = (list: AnimatedPictureSources["leading"]) =>
-    list.filter((s) => !(s.animated && (isPaused || !hydrated)));
+    list.filter((s) => !(s.animated && (isPaused || !hydrated || !inWindow)));
   const toSource = (
     s: AnimatedPictureSources["leading"][number],
     key: string,
