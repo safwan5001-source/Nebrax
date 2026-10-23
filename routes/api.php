@@ -112,6 +112,9 @@ use App\Http\Controllers\Api\ManualJournalController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PartnerController;
 use App\Http\Controllers\Api\PartnerImportController;
+use App\Http\Controllers\Api\PriceListItemImportController;
+use App\Http\Controllers\Api\ProductTaxonomyImportController;
+use App\Http\Controllers\Api\UnitTemplateImportController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PaymentAttemptController;
 use App\Http\Controllers\Api\PaymentGatewayController;
@@ -666,6 +669,15 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::delete('products/{id}/variants/{variantId}', [ProductVariantController::class, 'destroyVariant'])->middleware($perm('products.manage'));
 
         // تصنيفات المنتجات والعلامات التجارية (قوائم تصنيف — لا أثر محاسبي)
+        // IMP-H4-S5: استيراد التصنيفات والعلامات (`?kind=category|brand`) وقوالب الوحدات — قالب/حقول/فحص/معاينة فقط (لا apply متزامن؛ التنفيذ عبر import-jobs المربوط بالمعاينة).
+        Route::get('product-taxonomy/import/template', [ProductTaxonomyImportController::class, 'template'])->middleware($perm('products.manage'));
+        Route::get('product-taxonomy/import/fields', [ProductTaxonomyImportController::class, 'fields'])->middleware($perm('products.manage'));
+        Route::post('product-taxonomy/import/inspect', [ProductTaxonomyImportController::class, 'inspect'])->middleware([$perm('products.manage'), EnsureImportFilesScanned::class]);
+        Route::post('product-taxonomy/import/preview', [ProductTaxonomyImportController::class, 'preview'])->middleware([$perm('products.manage'), EnsureImportFilesScanned::class]);
+        Route::get('unit-templates/import/template', [UnitTemplateImportController::class, 'template'])->middleware($perm('products.manage'));
+        Route::get('unit-templates/import/fields', [UnitTemplateImportController::class, 'fields'])->middleware($perm('products.manage'));
+        Route::post('unit-templates/import/inspect', [UnitTemplateImportController::class, 'inspect'])->middleware([$perm('products.manage'), EnsureImportFilesScanned::class]);
+        Route::post('unit-templates/import/preview', [UnitTemplateImportController::class, 'preview'])->middleware([$perm('products.manage'), EnsureImportFilesScanned::class]);
         Route::get('product-categories', [ProductCategoryController::class, 'index'])->middleware($perm('products.view'));
         Route::post('product-categories', [ProductCategoryController::class, 'store'])->middleware($perm('products.manage'));
         Route::put('product-categories/{id}', [ProductCategoryController::class, 'update'])->middleware($perm('products.manage'));
@@ -806,6 +818,11 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
 
         // قوائم الأسعار: إعداد شركة مشترك يختاره البائع يدوياً في المسودة؛
         // سعر السطر النهائي يبقى لقطة مستقلة ولا يتغير بتعديل القائمة لاحقاً.
+        // IMP-H4-S5: استيراد أسعار قائمة سعر — بوابة الكتابة المباشرة `company.manage` نفسها؛ قالب/حقول/فحص/معاينة فقط.
+        Route::get('price-lists/import/template', [PriceListItemImportController::class, 'template'])->middleware($perm('company.manage'));
+        Route::get('price-lists/import/fields', [PriceListItemImportController::class, 'fields'])->middleware($perm('company.manage'));
+        Route::post('price-lists/import/inspect', [PriceListItemImportController::class, 'inspect'])->middleware([$perm('company.manage'), EnsureImportFilesScanned::class]);
+        Route::post('price-lists/import/preview', [PriceListItemImportController::class, 'preview'])->middleware([$perm('company.manage'), EnsureImportFilesScanned::class]);
         Route::get('price-lists', [PriceListController::class, 'index'])->middleware($perm('invoices.view'));
         Route::get('price-lists/{id}', [PriceListController::class, 'show'])->middleware($perm('invoices.view'));
         Route::get('price-lists/{id}/resolve', [PriceListController::class, 'resolve'])->middleware($perm('invoices.manage'));

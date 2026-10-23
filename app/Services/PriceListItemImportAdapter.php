@@ -6,6 +6,7 @@ use App\Contracts\ImportFailureExportAdapter;
 use App\Models\ImportPreview;
 use App\Support\ImportChunk;
 use App\Support\ImportChunkResult;
+use App\Support\ImportJobDomain;
 
 /**
  * محوّل `price_list_items` (IMP-H4-S2): استيراد أسعار قائمة سعر بوحدة الصفّ عبر `PriceListItemImportService` وحده. **غير مسجَّل بعد** في
@@ -16,11 +17,11 @@ use App\Support\ImportChunkResult;
  */
 class PriceListItemImportAdapter extends SpreadsheetImportAdapter implements ImportFailureExportAdapter
 {
-    public const DOMAIN = 'price_list_items';
+    public const DOMAIN = ImportJobDomain::PRICE_LIST_ITEMS;
 
     public function domain(): string
     {
-        return self::DOMAIN;
+        return ImportJobDomain::PRICE_LIST_ITEMS;
     }
 
     public function unit(): string

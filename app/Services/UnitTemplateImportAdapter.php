@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Support\ImportChunk;
 use App\Support\ImportChunkResult;
+use App\Support\ImportJobDomain;
 
 /**
  * محوّل `unit_templates` (IMP-H4-S3): إنشاء قوالب الوحدات، **ذرّي بطبيعته** — وحدته الملف كله (القالب مجموعة صفوف لا تُجزَّأ، والقوالب قليلة). **غير مسجَّل بعد**
@@ -13,11 +14,11 @@ use App\Support\ImportChunkResult;
  */
 class UnitTemplateImportAdapter extends SpreadsheetImportAdapter
 {
-    public const DOMAIN = 'unit_templates';
+    public const DOMAIN = ImportJobDomain::UNIT_TEMPLATES;
 
     public function domain(): string
     {
-        return self::DOMAIN;
+        return ImportJobDomain::UNIT_TEMPLATES;
     }
 
     public function unit(): string

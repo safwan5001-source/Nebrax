@@ -29,6 +29,11 @@ final class ImportJobDomain
         self::INVENTORY_OPENING => ['view' => 'products.view', 'manage' => 'products.manage', 'app' => 'inventory.core'],
         // IMP-H3-S2: `POST/PUT partners` المباشرة محروسة بـ`partners.view/manage` بلا بوابة قدرة (routes/api.php)؛ لا نخترع أخرى هنا.
         self::PARTNER_MASTER => ['view' => 'partners.view', 'manage' => 'partners.manage', 'app' => null],
+        // IMP-H4-S5: `product-categories`/`brands`/`unit-templates` المباشرة محروسة بـ`products.view/manage` بلا قدرة؛ عناصر قوائم السعر بـ`company.manage`
+        // للكتابة و`invoices.view` للقراءة (routes/api.php) — لا نخترع بوابة أضعف ولا أقوى.
+        self::PRODUCT_TAXONOMY => ['view' => 'products.view', 'manage' => 'products.manage', 'app' => null],
+        self::PRICE_LIST_ITEMS => ['view' => 'invoices.view', 'manage' => 'company.manage', 'app' => null],
+        self::UNIT_TEMPLATES => ['view' => 'products.view', 'manage' => 'products.manage', 'app' => null],
     ];
 
     public const PRODUCT_CATALOG = 'product_catalog';
@@ -40,7 +45,25 @@ final class ImportJobDomain
     /** العملاء والموردون (IMP-H3-S2) — النوع (عميل/مورّد) خيارٌ من خيارات التشغيلة لا مجالٌ منفصل. */
     public const PARTNER_MASTER = 'partner_master';
 
+    /** تصنيفات المنتجات وعلاماتها (IMP-H4-S5) — النوع (تصنيف/علامة) خيارٌ من خيارات التشغيلة. */
+    public const PRODUCT_TAXONOMY = 'product_taxonomy';
+
+    /** عناصر قائمة سعر واحدة (IMP-H4-S5) — القائمة خيارٌ مجمَّد للتشغيلة. */
+    public const PRICE_LIST_ITEMS = 'price_list_items';
+
+    /** قوالب الوحدات، إنشاء فقط ولا مسار ذكاء اصطناعي (IMP-H4-S5، D-08). */
+    public const UNIT_TEMPLATES = 'unit_templates';
+
     /** @return list<string> */
+    /**
+     * مجالات لا تُنشأ لها تشغيلة إلا مربوطةً بمعاينتها: خياراتها الدلالية الإلزامية (النوع/التصنيف·العلامة/قائمة السعر) وسياساتها تُجمَّد من المعاينة،
+     * أما التشغيلة غير المربوطة فتحمل `apply_options = null` وطلب التطبيق لا يقبل هذه المفاتيح — فتفشل وقت التطبيق (أو تُهمَل سياستها بصمت). لا مسار
+     * قديم غير مربوط لها أصلاً، فالإلزام لا يكسر أحداً.
+     *
+     * @var list<string>
+     */
+    public const PREVIEW_BOUND_ONLY = [self::PARTNER_MASTER, self::PRODUCT_TAXONOMY, self::PRICE_LIST_ITEMS, self::UNIT_TEMPLATES];
+
     public static function values(): array
     {
         return [
@@ -48,6 +71,9 @@ final class ImportJobDomain
             self::PRODUCT_WORKBOOK,
             self::INVENTORY_OPENING,
             self::PARTNER_MASTER,
+            self::PRODUCT_TAXONOMY,
+            self::PRICE_LIST_ITEMS,
+            self::UNIT_TEMPLATES,
         ];
     }
 

@@ -5,8 +5,14 @@ namespace App\Http\Requests;
 use App\Services\ImportJobAccess;
 use App\Services\ProductImportService;
 use App\Services\PartnerImportService;
+use App\Services\PriceListItemImportService;
+use App\Services\ProductTaxonomyImportService;
+use App\Services\UnitTemplateImportService;
 use App\Support\InventoryOpeningFields;
 use App\Support\PartnerImportFields;
+use App\Support\PriceListItemImportFields;
+use App\Support\ProductTaxonomyImportFields;
+use App\Support\UnitTemplateImportFields;
 use App\Support\ProductImportFields;
 use App\Support\ImportJobDomain;
 use Illuminate\Foundation\Http\FormRequest;
@@ -52,18 +58,22 @@ class StoreImportJobRequest extends FormRequest
             }],
             'idempotency_key' => ['sometimes', 'nullable', 'string', 'max:191'],
             // IMP-H1-S3b — ربط التنفيذ بمعاينته: المعرّف والبصمة معاً أو لا شيء، والخيارات **نفسها** التي أُرسلت إلى المعاينة.
-            'preview_id' => ['required_with:preview_hash', 'nullable', 'uuid'],
+            'preview_id' => [Rule::requiredIf(fn () => in_array($this->input('domain'), ImportJobDomain::PREVIEW_BOUND_ONLY, true)), 'required_with:preview_hash', 'nullable', 'uuid'],
             'preview_hash' => ['required_with:preview_id', 'nullable', 'string', 'size:64'],
             'options' => ['sometimes', 'nullable', 'array'],
             'options.mode' => ['sometimes', Rule::in([ProductImportService::MODE_CREATE, ProductImportService::MODE_UPDATE, ProductImportService::MODE_UPSERT])],
             'options.blank_policy' => ['sometimes', Rule::in([ProductImportService::BLANK_IGNORE, ProductImportService::BLANK_CLEAR])],
             'options.master_data_policy' => ['sometimes', Rule::in([ProductImportService::MASTER_DATA_ERROR, ProductImportService::MASTER_DATA_TEXT, ProductImportService::MASTER_DATA_CREATE])],
             'options.mapping' => ['sometimes', 'array', 'max:'.ProductImportService::MAX_COLUMNS],
-            'options.mapping.*' => ['nullable', 'string', Rule::in(array_merge(ProductImportFields::keys(), InventoryOpeningFields::keys(), PartnerImportFields::keys(), ['ignore']))],
+            'options.mapping.*' => ['nullable', 'string', Rule::in(array_merge(ProductImportFields::keys(), InventoryOpeningFields::keys(), PartnerImportFields::keys(), ProductTaxonomyImportFields::allKeys(), PriceListItemImportFields::keys(), UnitTemplateImportFields::keys(), ['ignore']))],
             // IMP-H3-S2: النوع إلزامي لمجال الأطراف (يحدّد عميلاً أم مورّداً ولا يُستنتج من الملف) ويُرفض لغيره؛ فشلُ غيابه بعد الإنشاء كان سيظهر وقت التطبيق.
             'options.type' => [Rule::requiredIf(fn () => $this->input('domain') === ImportJobDomain::PARTNER_MASTER), Rule::in(PartnerImportService::TYPES)],
             'options.duplicate_signal_policy' => ['sometimes', Rule::in([PartnerImportService::SIGNAL_ERROR, PartnerImportService::SIGNAL_SKIP, PartnerImportService::SIGNAL_WARN])],
-            'options.price_list_id' => ['sometimes', 'nullable', 'uuid'],
+            // IMP-H4-S5: النوع (تصنيف/علامة) إلزامي لمجال التصنيفات؛ سياسة الآباء للتصنيفات؛ سياسة القوالب القائمة؛ وقائمة السعر إلزامية لمجال عناصرها.
+            'options.kind' => [Rule::requiredIf(fn () => $this->input('domain') === ImportJobDomain::PRODUCT_TAXONOMY), Rule::in(ProductTaxonomyImportFields::KINDS)],
+            'options.parent_policy' => ['sometimes', Rule::in([ProductTaxonomyImportService::PARENT_ERROR, ProductTaxonomyImportService::PARENT_CREATE])],
+            'options.existing_policy' => ['sometimes', Rule::in([UnitTemplateImportService::EXISTING_ERROR, UnitTemplateImportService::EXISTING_SKIP])],
+            'options.price_list_id' => $this->input('domain') === ImportJobDomain::PRICE_LIST_ITEMS ? ['required', 'uuid'] : ['sometimes', 'nullable', 'uuid'],
             'options.opening_date' => ['sometimes', 'date_format:Y-m-d'],
             'options.allow_zero_cost' => ['sometimes', 'boolean'],
             'options.notes' => ['sometimes', 'nullable', 'string', 'max:500'],
@@ -100,6 +110,7 @@ class StoreImportJobRequest extends FormRequest
             'file.max' => 'حجم ملف الاستيراد يجب ألا يتجاوز 5 ميغابايت.',
             'domain.required' => 'حدّد مجال الاستيراد.',
             'domain.in' => 'مجال الاستيراد غير مدعوم.',
+            'preview_id.required' => 'هذا المجال يتطلب معاينة الملف أولاً ثم إنشاء التشغيلة من نتيجتها.',
             'media_archive.mimes' => 'أرشيف الصور يجب أن يكون ملف ZIP صالحاً.',
             'media_archive.max' => 'حجم أرشيف الصور يجب ألا يتجاوز 50 ميغابايت.',
         ];

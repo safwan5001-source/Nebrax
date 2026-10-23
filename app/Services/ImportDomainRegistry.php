@@ -20,8 +20,11 @@ class ImportDomainRegistry
         ProductWorkbookImportAdapter $workbook,
         InventoryOpeningImportAdapter $opening,
         PartnerImportAdapter $partners,
+        ProductTaxonomyImportAdapter $taxonomy,
+        PriceListItemImportAdapter $priceListItems,
+        UnitTemplateImportAdapter $unitTemplates,
     ) {
-        foreach ([$catalog, $workbook, $opening, $partners] as $adapter) {
+        foreach ([$catalog, $workbook, $opening, $partners, $taxonomy, $priceListItems, $unitTemplates] as $adapter) {
             $this->adapters[$adapter->domain()] = $adapter;
         }
     }
