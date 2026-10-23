@@ -13,7 +13,7 @@ export const GATEWAY_ENVIRONMENTS = ['sandbox', 'live'] as const;
 export type GatewayEnvironment = (typeof GATEWAY_ENVIRONMENTS)[number];
 
 /** مزوّدو `PaymentGateway::PROVIDERS`. `custom` = ربط محاسبي يدوي بلا مزوّد (لا محوّل ولا اتصال شبكي). */
-export const GATEWAY_PROVIDERS = ['stripe', 'tap', 'paytabs', 'checkout', 'custom'] as const;
+export const GATEWAY_PROVIDERS = ['stripe', 'tap', 'paytabs', 'checkout', 'moyasar', 'custom'] as const;
 export type GatewayProvider = (typeof GATEWAY_PROVIDERS)[number];
 
 export const MANAGE_PERMISSION = 'payment_gateways.manage';
