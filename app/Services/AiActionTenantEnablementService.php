@@ -42,7 +42,7 @@ final class AiActionTenantEnablementService
             'reason' => ! $platform ? 'platform_disabled' : ($enabled ? 'enabled' : 'tenant_not_enabled'),
             'execution_approved' => ($settings['execution_approved'] ?? false) === true,
             'controls_enforced' => $enforced,
-            'access' => $enforced ? $this->controls->matrix((string) $tenant->getKey()) : null,
+            'access' => $enforced ? $this->tenantFacing($this->controls->matrix((string) $tenant->getKey())) : null,
         ];
     }
 
@@ -96,7 +96,10 @@ final class AiActionTenantEnablementService
             $was = (Settings::group('ai_actions', $tenant)['enabled'] ?? false) === true;
 
             if ($was !== $enabled) {
-                Settings::put('ai_actions', ['enabled' => $enabled], $tenant);
+                // إيقاف قبول المؤسسة يسحب موافقة التنفيذ معه (IMP-X-01c، من مراجعة مستقلة): إعادة التفعيل لاحقاً — ولو بيد admin — لا تُعيد صلاحية
+                // تنفيذ منحها المالك قبل أن تُوقف المؤسسة AI Actions؛ يلزم موافقة مالك جديدة (D-11).
+                $dropsApproval = ! $enabled && (Settings::group('ai_actions', $tenant)['execution_approved'] ?? false) === true;
+                Settings::put('ai_actions', ['enabled' => $enabled] + ($dropsApproval ? ['execution_approved' => false] : []), $tenant);
                 $this->audit->record(
                     (string) Str::uuid(),
                     (string) $tenant->getKey(),
@@ -104,12 +107,33 @@ final class AiActionTenantEnablementService
                     'ai_actions.enablement.updated',
                     'allowed',
                     'ok',
-                    ['meta' => ['ai_actions_enabled' => $enabled]],
+                    ['meta' => ['ai_actions_enabled' => $enabled] + ($dropsApproval ? ['ai_actions_execution_approved' => false] : [])],
                     required: true,
                 );
             }
 
             return $this->status($tenant->refresh());
         });
+    }
+
+    /**
+     * أسباب مستوى المنصة (أرضية البيئة، المفتاح الرئيسي، توفّر النوع) تُدمج في `platform_unavailable` للمستأجر: يعرف أن الميزة غير متاحة من المنصة
+     * دون أن تُكشف أعلام البيئة أو تفاصيل ضوابط المشغّل؛ أسباب مستواه هو (المنحة، قبول المؤسسة، موافقة المالك) تبقى كما هي.
+     *
+     * @param  array<string, array<string, array{allowed: bool, reason: string}>>  $matrix
+     * @return array<string, array<string, array{allowed: bool, reason: string}>>
+     */
+    private function tenantFacing(array $matrix): array
+    {
+        $platform = ['env_floor_off', 'platform_off', 'type_off', 'execution_env_floor_off', 'execution_platform_off', 'execution_type_off'];
+        foreach ($matrix as $type => $capabilities) {
+            foreach ($capabilities as $capability => $decision) {
+                if (in_array($decision['reason'], $platform, true)) {
+                    $matrix[$type][$capability]['reason'] = 'platform_unavailable';
+                }
+            }
+        }
+
+        return $matrix;
     }
 }

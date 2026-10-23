@@ -85,9 +85,27 @@ class AiActionExecutionApprovalTest extends TestCase
 
         $this->optIn($auth['token']);
         $this->withToken($auth['token'])->putJson(self::URL, ['approved' => true])->assertOk();
-        // إيقاف قبول المؤسسة لا يمسح الموافقة، لكن السحب يعمل في أي حال.
-        $this->withToken($auth['token'])->putJson('/api/ai-actions-settings', ['enabled' => false])->assertOk();
+        // السحب يعمل في أي حال، ولو بعد إيقاف قبول المؤسسة.
         $this->withToken($auth['token'])->putJson(self::URL, ['approved' => false])->assertOk()->assertJsonPath('data.execution_approved', false);
+    }
+
+    /** @test */
+    public function turning_the_organisations_acceptance_off_withdraws_the_execution_approval_and_re_enabling_does_not_restore_it(): void
+    {
+        $auth = $this->registerTenant();
+        $this->optIn($auth['token']);
+        $this->withToken($auth['token'])->putJson(self::URL, ['approved' => true])->assertOk();
+        $admin = $this->tokenForRole($auth['tenant_id'], 'admin', 'admin@exec-reenable.test');
+
+        $this->withToken($auth['token'])->putJson('/api/ai-actions-settings', ['enabled' => false])->assertOk()->assertJsonPath('data.execution_approved', false);
+        $this->assertFalse($this->approved($auth['tenant_id']));
+
+        // إعادة التفعيل — حتى بيد admin — لا تعيد موافقة المالك القديمة.
+        $this->withToken($admin)->putJson('/api/ai-actions-settings', ['enabled' => true])->assertOk()->assertJsonPath('data.execution_approved', false);
+        $this->assertFalse($this->approved($auth['tenant_id']));
+
+        $event = AiAuditEvent::query()->withoutGlobalScopes()->where('tenant_id', $auth['tenant_id'])->where('event', 'ai_actions.enablement.updated')->orderBy('occurred_at')->get()->first(fn ($e) => ($e->meta['ai_actions_enabled'] ?? null) === false);
+        $this->assertSame(['ai_actions_enabled' => false, 'ai_actions_execution_approved' => false], $event->meta);
     }
 
     /** @test */
@@ -153,7 +171,7 @@ class AiActionExecutionApprovalTest extends TestCase
         config(['ai_actions.runtime_controls_enforced' => true]);
         $access = $this->withToken($auth['token'])->getJson('/api/ai-actions-settings')->assertOk()
             ->assertJsonPath('data.controls_enforced', true)->json('data.access');
-        $this->assertSame('platform_off', $access['product_import.v1']['preview']['reason']);
+        $this->assertSame('platform_unavailable', $access['product_import.v1']['preview']['reason'], 'أسباب المنصة لا تُكشف للمستأجر');
         $this->assertFalse($access['product_import.v1']['execution']['allowed']);
     }
 }

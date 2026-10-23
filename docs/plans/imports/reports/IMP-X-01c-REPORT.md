@@ -8,11 +8,13 @@
 - `GET /api/ai-actions-settings` now also returns `execution_approved`, `controls_enforced` and — only when the operator gate is open — `access`: per action type and capability `{allowed, reason}` with the stable reason codes (`platform_off`, `tenant_not_granted`, `tenant_owner_not_approved`, …) so the tenant can see *why* something is off without platform internals. `AiActionTenantEnablementTest` expectations updated for the new keys.
 - Not widened: the approval grants nothing by itself — operator grants, env floors, RBAC, branch scope, preview and approval-before-execution all still apply.
 
-## Design notes recorded (from the X-01a review)
-- The approval is **sticky** (it is not reset when the operator revokes/re-grants execution or when the tenant toggles its opt-in): D-11 says "grant AND approval", not "fresh approval". The owner can withdraw at any time. Making it expire on re-grant is an owner decision, not assumed.
+## Design notes recorded (X-01a/b/c reviews)
+- **Disabling AI Actions for the organisation withdraws the owner's execution approval** (changed after review): re-enabling later — even by an admin holding `ai.actions.manage` — no longer silently restores an old approval; a fresh owner approval is required (audit meta records both flags). The approval is still **not** reset when the *operator* revokes/re-grants execution (D-11 says "grant AND approval", not "fresh approval"): making it expire on an operator re-grant is an owner decision, not assumed. The owner can withdraw at any time, and a withdrawal stops a running execution within one write (tested).
+- The tenant-facing `access` matrix collapses the platform-layer reasons (`env_floor_off`, `platform_off`, `type_off` and their `execution_*` forms) into `platform_unavailable`, so tenants never see environment flags or operator-control details (changed after review).
+- `status()` gained additive keys (`execution_approved`, `controls_enforced`, `access`); the web client reads only the old fields.
 
 ## Tests
 `AiActionExecutionApprovalTest` (7): owner approve/withdraw + audit trail, unchanged value writes nothing, opt-in prerequisite but withdrawal always allowed, owner-only (admin, custom role with the permission, accountant), closed contract + unauthenticated, tenant isolation, availability explanation only when the gate is open. `AiActionTenantEnablementTest` + Rbac suites green.
 
 ## Not here
-The web card (toggle + reason copy, ar/en) and the platform console are the web slices (X-01d); no screenshots in this backend slice. No Codex review (quota exhausted); independent read-only review: see the PR.
+The web card (toggle + reason copy, ar/en) and the platform console are the web slices (X-01d); no screenshots in this backend slice. Independent read-only review (shared with X-01b): owner-only approval verified clean (role check, custom-role slugs cannot collide with `owner`, atomic, audited, no other writer of `ai_actions`); its findings on sticky approval and tenant-visible operator state were **fixed** as above. No Codex review (quota exhausted).
