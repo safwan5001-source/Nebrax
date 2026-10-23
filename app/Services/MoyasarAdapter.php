@@ -436,6 +436,10 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
         if ($refundedBefore === null || $refundedBefore < 0 || $refundedBefore > $chargeable) {
             throw new PaymentRefundRejectedException('moyasar.malformed_response', 'قيمة المبلغ المسترد لدى المزوّد غير صالحة؛ لا يُرسَل الاسترداد.');
         }
+        // حالة `refunded` (مسترد بالكامل) بتراكمي صفر/غائب بيانات متناقضة: لا نُرسل فوق دفعة مستردة فعلاً.
+        if ($this->statusOf($payment) === 'refunded' && $refundedBefore === 0) {
+            throw new PaymentRefundRejectedException('moyasar.malformed_response', 'دفعة بحالة «مستردة» بلا مبلغ مسترد؛ بيانات متناقضة، لا يُرسَل الاسترداد.');
+        }
         if ($amountMinor > $chargeable - $refundedBefore) {
             throw new PaymentRefundRejectedException('moyasar.refund_exceeds_available', 'مبلغ الاسترداد يتجاوز المتاح للاسترداد لدى المزوّد.');
         }
@@ -443,12 +447,29 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
         try {
             $response = $this->client->refundPayment($gateway, $paymentId, $amountMinor);
         } catch (PaymentGatewayException $e) {
-            // بعد الإرسال: انقطاع/5xx/استجابة غير مفهومة قد يعني أن الاسترداد نُفِّذ ⇒ غير معروف. غير ذلك رفض/اعتماد/حدّ طلبات ⇒ لم يُنفَّذ.
-            throw in_array($e->reason, ['moyasar.unavailable', 'moyasar.malformed_response'], true)
+            // بعد الإرسال: انقطاع/5xx/حالة غير متوقعة/استجابة غير مفهومة قد يعني أن الاسترداد نُفِّذ ⇒ غير معروف. غير ذلك رفض/اعتماد/حدّ طلبات ⇒ لم يُنفَّذ.
+            throw in_array($e->reason, ['moyasar.unavailable', 'moyasar.malformed_response', 'moyasar.unexpected_status'], true)
                 ? new PaymentRefundUnknownException($e->reason, $e->getMessage())
                 : new PaymentRefundRejectedException($e->reason, $e->getMessage());
+        } catch (\Throwable) {
+            // أي استثناء آخر بعد الإرسال (مثلاً RequestException من Guzzle لإعادة ضبط الاتصال) قد يعني أن الاسترداد نُفِّذ ⇒ غير معروف، لا يخرج عن العقد.
+            throw new PaymentRefundUnknownException('moyasar.unavailable', 'تعذّر إكمال طلب الاسترداد بعد إرساله؛ قد يكون نُفِّذ.');
         }
 
+        try {
+            return $this->provenRefund($response, $paymentId, $refundedBefore, $amountMinor, $chargeable, $paymentCurrency);
+        } catch (PaymentRefundUnknownException $e) {
+            throw $e;
+        } catch (\Throwable) {
+            throw new PaymentRefundUnknownException('moyasar.malformed_response', 'استجابة الاسترداد لا تثبت تطبيقه؛ قد يكون نُفِّذ.');
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $response
+     */
+    private function provenRefund(array $response, string $paymentId, int $refundedBefore, int $amountMinor, int $chargeable, string $paymentCurrency): PaymentProviderRefund
+    {
         $refundedAfter = $this->intOrNull($response['refunded'] ?? null);
         $currency = $this->currencyOf($response);
         $expectedCurrency = $paymentCurrency;

@@ -171,6 +171,18 @@ class MoyasarRefundTest extends TestCase
     }
 
     #[Test]
+    public function a_refunded_status_with_no_refunded_amount_is_contradictory_and_never_posts(): void
+    {
+        foreach ([null, 0] as $refunded) {
+            $payment = array_merge($this->paid(status: 'refunded'), ['refunded' => $refunded]);
+            $this->fakeHttp(['api.moyasar.com/v1/invoices/*' => Http::response($this->invoiceWith($payment))]);
+            $e = $this->thrown(fn () => $this->adapter->refundPayment($this->gateway, MoyasarFixtures::INVOICE_ID, 100), 'refunded contradiction', PaymentRefundRejectedException::class);
+            $this->assertSame('moyasar.malformed_response', $e->reason);
+            Http::assertNotSent(fn (Request $r) => $r->method() === 'POST');
+        }
+    }
+
+    #[Test]
     public function a_response_total_beyond_the_captured_amount_is_unknown_not_proof(): void
     {
         $partial = array_merge($this->paid(), ['captured' => 60000]);
@@ -225,6 +237,10 @@ class MoyasarRefundTest extends TestCase
                 if ($outcome === 'connection') {
                     throw new ConnectionException('boom');
                 }
+                if ($outcome === 'reset') {
+                    // cURL 56 (إعادة ضبط الاتصال) لا يتحول إلى ConnectException في Guzzle فيصل خام.
+                    throw new \GuzzleHttp\Exception\RequestException('connection reset', new \GuzzleHttp\Psr7\Request('POST', 'https://api.moyasar.com/v1/payments/x/refund'));
+                }
 
                 return Http::response($outcome === 'badjson' ? 'not json' : ['message' => 'x'], $outcome === 'badjson' ? 200 : (int) $outcome);
             },
@@ -246,7 +262,12 @@ class MoyasarRefundTest extends TestCase
             '429 حدّ الطلبات' => [429, PaymentRefundRejectedException::class, 'moyasar.rate_limited'],
             '500 بعد الإرسال' => [500, PaymentRefundUnknownException::class, 'moyasar.unavailable'],
             '503 بعد الإرسال' => [503, PaymentRefundUnknownException::class, 'moyasar.unavailable'],
+            '422 رفض أعمال' => [422, PaymentRefundRejectedException::class, 'moyasar.rejected'],
+            '408 مهلة الطلب' => [408, PaymentRefundUnknownException::class, 'moyasar.unexpected_status'],
+            '409 تعارض' => [409, PaymentRefundUnknownException::class, 'moyasar.unexpected_status'],
+            '302 إعادة توجيه' => [302, PaymentRefundUnknownException::class, 'moyasar.unexpected_status'],
             'انقطاع/مهلة' => ['connection', PaymentRefundUnknownException::class, 'moyasar.unavailable'],
+            'إعادة ضبط الاتصال (استثناء خام)' => ['reset', PaymentRefundUnknownException::class, 'moyasar.unavailable'],
             '200 بجسم غير JSON' => ['badjson', PaymentRefundUnknownException::class, 'moyasar.malformed_response'],
         ];
     }
