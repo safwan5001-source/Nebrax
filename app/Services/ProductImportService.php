@@ -1565,7 +1565,18 @@ class ProductImportService
         $probe = clone $existing;
         $probe->fill($payload);
 
-        return $probe->getDirty() === [];
+        if ($probe->getDirty() !== []) {
+            return false;
+        }
+
+        // `sale_price` ليس عموداً في `products` (VAR-PRICE-1): هو Accessor فوق `ProductUnitPrice`، وإسناده عبر `fill()` لا يُوسِم
+        // النموذج متغيّراً أبداً. صفٌّ كل تغييره سعر البيع كان يُصنَّف «تخطٍّ» فيُهمَل صامتاً (معاينةً وتنفيذاً)، فيُقارَن السعر صراحةً.
+        // الاستعلام (سعر الوحدة الأساسية) لا يجري إلا لصفٍّ بدا بلا تغيير غيره، فلا يُضاعف كلفة الملف.
+        if (array_key_exists('sale_price', $payload) && (int) $payload['sale_price'] !== (int) $existing->sale_price) {
+            return false;
+        }
+
+        return true;
     }
 
     // ═══════════════════════════════════════════════════════════════
