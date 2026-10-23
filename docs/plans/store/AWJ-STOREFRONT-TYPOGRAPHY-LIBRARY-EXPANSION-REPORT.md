@@ -4,7 +4,7 @@
 |---|---|
 | **Branch** | `feat/storefront-typography-library-expansion` |
 | **Base SHA** | `2e64c267fca8586e3ddb4f051e5d6a52e5f208d8` (`main`) |
-| **Head SHA / PR URL** | see the PR (filled in the PR description; the report commit is the PR head) |
+| **Head SHA / PR URL** | code head `45f718acb919a33a96e937aea3a90ff7e513af05` (this report is the following commit) · https://github.com/safwan5001-source/Nebrax/pull/1681 |
 | **Merge / Deploy / Production** | NOT PERFORMED |
 
 ## 1. Summary
