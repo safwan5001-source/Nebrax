@@ -28,6 +28,9 @@ export const PERMISSION_RISK: Readonly<Record<string, RiskKind>> = {
   'customer_refunds.manage': 'financial',
   // PAY-H1-01: أسرار بوابات الدفع ومفاتيحها — من يملكها يوجّه مدفوعات المؤسسة.
   'payment_gateways.manage': 'financial',
+  // PAY-H3-01b: اعتماد استرداد البوابة وحسم الاسترداد غير المعروف/الخارجي — قرارات تُخرج مالاً أو تغيّر سجلاً مالياً.
+  'payment_refunds.approve': 'financial',
+  'payment_refunds.resolve_unknown': 'financial',
   'accounts.manage': 'financial',
   'accounting_settings.manage': 'financial',
   'hr.manage': 'financial',

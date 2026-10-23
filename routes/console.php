@@ -123,6 +123,12 @@ Schedule::command('payments:reconcile-attempts')
     ->withoutOverlapping(10)
     ->onOneServer();
 
+// PAY-H3-01b / ADR-0007 §5-4: مطابقة استردادات البوابة غير المعروفة واستعادة الإرسال اليتيم — لا تأكيد آلي ولا إعادة إرسال أعمى ولا ترحيل.
+Schedule::command('payments:reconcile-refunds')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(10)
+    ->onOneServer();
+
 // PAY-H2-02c: شبكة أمان لترحيل التقاطات الدفع الإلكتروني المعلّقة (فشل المستمع/انهيار). idempotent: لا سند ثانٍ أبداً (UNIQUE + قفل).
 Schedule::command('payments:post-captured')
     ->everyFiveMinutes()

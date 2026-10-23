@@ -100,6 +100,10 @@ final class PaymentOrchestrator
             if ($locked->provider_payment_id === null || ! hash_equals($locked->provider_payment_id, $snapshot->providerPaymentId)) {
                 throw new PaymentOrchestrationException('provider_reference_mismatch', 'مرجع المزوّد لا يطابق المحاولة.');
             }
+            // PAY-H3-01b (ADR-0007 §3): المزامنة لا تكتب refunded_minor؛ أي زيادة غير معترَف بها لدى المزوّد تُوسم للمراجعة البشرية.
+            if ($snapshot->refundedMinor > 0) {
+                app(PaymentRefundObservation::class)->observe($locked, $snapshot->refundedMinor);
+            }
             $target = $snapshot->status;
             if ($target === PaymentAttempt::STATUS_CREATED || ! in_array($target, PaymentAttempt::STATUSES, true)) {
                 throw new PaymentOrchestrationException('invalid_snapshot', 'حالة المزوّد غير معروفة.');
