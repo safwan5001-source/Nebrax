@@ -358,6 +358,64 @@ class PaymentRefundPostingTest extends TestCase
     }
 
     #[Test]
+    public function repeatedly_failing_refunds_do_not_starve_later_pending_ones_in_the_safety_net(): void
+    {
+        $attempt = $this->postedCapture();
+        $note = $this->creditNote();
+        $first = $this->confirmedRefund($attempt, $note, 40000);
+        $second = $this->confirmedRefund($attempt, $note, 30000);
+        $mapping = AccountRoleMapping::query()->where('role_key', 'gateway_clearing')->firstOrFail();
+        $backup = $mapping->only(['role_key', 'account_id']);
+        DB::table('account_role_mappings')->where('id', $mapping->id)->delete();
+        $firstTouched = $first->fresh()->updated_at->getTimestamp();
+        $secondTouched = $second->fresh()->updated_at->getTimestamp();
+
+        $this->travel(1)->minute();
+        $this->assertSame(1, $this->safely(fn () => $this->posting->runPending(1))['failed']);
+        $this->travel(1)->minute();
+        $this->assertSame(1, $this->safely(fn () => $this->posting->runPending(1))['failed']);
+
+        // الدورتان بحدّ 1 بلغتا الاسترداد كليهما (لولا التأخير لأعادت الدورتان الأول وحده)
+        $this->assertNotEquals($firstTouched, $first->fresh()->updated_at->getTimestamp());
+        $this->assertNotEquals($secondTouched, $second->fresh()->updated_at->getTimestamp());
+
+        AccountRoleMapping::query()->create($backup + ['tenant_id' => $this->tenant->id]);
+        $this->assertSame(2, $this->posting->runPending()['posted']);
+    }
+
+    #[Test]
+    public function close_readiness_warns_about_confirmed_refunds_stuck_unposted(): void
+    {
+        $refund = $this->confirmedRefund($this->postedCapture(), $this->creditNote(), 115000);
+        $created = app(FiscalYearService::class)->create(['name' => '2026', 'start_date' => '2026-01-01', 'end_date' => '2026-12-31'], null);
+        $year = FiscalYear::query()->findOrFail($created['id']);
+        $codes = fn () => collect(app(FiscalCloseService::class)->readiness($year->fresh())['warnings'])->pluck('code');
+
+        $this->assertNotContains('unposted_refunds', $codes(), 'قبل مرور ساعة لا تنبيه (المستمع قد يكون في الطريق)');
+        $this->travel(2)->hours();
+        $warning = collect(app(FiscalCloseService::class)->readiness($year->fresh())['warnings'])->firstWhere('code', 'unposted_refunds');
+        $this->assertNotNull($warning);
+        $this->assertSame(115000, $warning['details']['amount_minor']);
+
+        $this->posting->process($refund->fresh());
+        $this->assertNotContains('unposted_refunds', $codes());
+    }
+
+    #[Test]
+    public function the_transition_trigger_rejects_null_posting_status_jumps(): void
+    {
+        $attempt = $this->postedCapture();
+        $note = $this->creditNote();
+        $refund = $this->approvedRefund($attempt, $note, 115000);   // posting_status = NULL
+        foreach (['posted', 'blocked_period', 'bogus'] as $to) {
+            $this->thrown(fn () => DB::transaction(fn () => DB::table('payment_refunds')->where('id', $refund->id)->update(['posting_status' => $to])), "null→{$to}", QueryException::class);
+        }
+        $confirmed = $this->confirmedRefund($this->postedCapture(), $this->creditNote(), 115000);
+        $this->thrown(fn () => DB::transaction(fn () => DB::table('payment_refunds')->where('id', $confirmed->id)->update(['posting_status' => null])), 'pending→null', QueryException::class);
+        $this->assertSame(PaymentRefund::POSTING_PENDING, $confirmed->fresh()->posting_status);
+    }
+
+    #[Test]
     public function confirmation_dispatches_the_listener_that_posts_without_a_manual_call(): void
     {
         \Illuminate\Support\Facades\Event::swap(new \Illuminate\Events\Dispatcher($this->app));

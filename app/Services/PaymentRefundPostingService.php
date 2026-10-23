@@ -126,7 +126,7 @@ final class PaymentRefundPostingService
         $rows = PaymentRefund::query()->withoutGlobalScopes()
             ->where('status', PaymentRefund::CONFIRMED)
             ->where('posting_status', PaymentRefund::POSTING_PENDING)
-            ->orderBy('confirmed_at')->limit($limit)->get(['id', 'tenant_id']);
+            ->orderBy('updated_at')->orderBy('confirmed_at')->limit($limit)->get(['id', 'tenant_id']);
 
         $previous = $this->tenant->id();
         foreach ($rows as $row) {
@@ -138,17 +138,27 @@ final class PaymentRefundPostingService
                 match ($outcome) {
                     self::OUTCOME_POSTED, self::OUTCOME_ALREADY_POSTED => $summary['posted']++,
                     self::OUTCOME_BLOCKED_PERIOD => $summary['blocked']++,
-                    default => null,
+                    default => $this->deferRetry($row->getKey()),
                 };
             } catch (Throwable $e) {
                 $summary['failed']++;
                 report($e);
+                $this->deferRetry($row->getKey());
             } finally {
                 $previous === null ? $this->tenant->forget() : $this->tenant->set($previous);
             }
         }
 
         return $summary;
+    }
+
+    /**
+     * صف لم يُرحَّل يبقى `pending`؛ نؤخّره في الترتيب (updated_at) حتى لا تحتجز المحاولات الفاشلة المتكررة
+     * (تعيين دور مفقود لمستأجر مثلاً) أول $limit صف فلا تبلغ الدورة استردادات المستأجرين السليمين.
+     */
+    private function deferRetry(string $id): void
+    {
+        PaymentRefund::query()->withoutGlobalScopes()->whereKey($id)->update(['updated_at' => now()]);
     }
 
     private function postWithinTransaction(PaymentRefund $refund, bool $explicit): string

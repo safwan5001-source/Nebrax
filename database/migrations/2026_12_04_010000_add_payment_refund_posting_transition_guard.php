@@ -14,9 +14,12 @@ return new class extends Migration
 
     public function up(): void
     {
-        $legal = "(COALESCE(OLD.posting_status, '') = '' AND NEW.posting_status = 'pending') "
-            ."OR (OLD.posting_status = 'pending' AND NEW.posting_status IN ('posted','blocked_period')) "
-            ."OR (OLD.posting_status = 'blocked_period' AND NEW.posting_status = 'posted')";
+        // COALESCE على الطرفين: مقارنة NULL تعطي NULL فيتجاوز NOT(...) الشرط (NULL→posted كان يمرّ).
+        $old = "COALESCE(OLD.posting_status, '')";
+        $new = "COALESCE(NEW.posting_status, '')";
+        $legal = "({$old} = '' AND {$new} = 'pending') "
+            ."OR ({$old} = 'pending' AND {$new} IN ('posted','blocked_period')) "
+            ."OR ({$old} = 'blocked_period' AND {$new} = 'posted')";
         $changed = DB::connection()->getDriverName() === 'pgsql'
             ? 'NEW.posting_status IS DISTINCT FROM OLD.posting_status'
             : 'NEW.posting_status IS NOT OLD.posting_status';
