@@ -18,6 +18,14 @@ on:
         description: 'Type RUN-V-G1-ON-REAL-R2 to confirm this uses the dedicated R2 TEST bucket secrets'
         required: true
         type: string
+      mode:
+        description: 'diagnose-auth (default) = a handful of cheap auth calls, one 1-byte object, nothing else; full = the whole V-G1 matrix'
+        required: false
+        type: choice
+        options:
+          - diagnose-auth
+          - full
+        default: diagnose-auth
       path_style:
         description: 'Also run the path-style addressing variant (the app itself uses virtual-hosted)'
         required: false
@@ -65,7 +73,7 @@ jobs:
       - name: Harness unit tests (offline — no credentials)
         run: |
           cd "$V0_DIR"
-          node --test v0-gates.test.mjs v0-upstream-guard.test.mjs v0-probe-wiring.test.mjs v0-results-secret-scan.test.mjs v0-i9-experiment.test.mjs v0-vg1-decision.test.mjs v0-workflow-guard.test.mjs
+          node --test v0-gates.test.mjs v0-upstream-guard.test.mjs v0-probe-wiring.test.mjs v0-results-secret-scan.test.mjs v0-i9-experiment.test.mjs v0-vg1-decision.test.mjs v0-auth-diagnosis.test.mjs v0-workflow-guard.test.mjs
 
       - name: Preflight (no secret is printed)
         env:
@@ -87,8 +95,26 @@ jobs:
           done
           echo "preflight ok (values not shown)"
 
+      - name: R2 auth diagnosis (default mode — credentials vs signing, no secret printed)
+        id: diag
+        if: inputs.mode == 'diagnose-auth'
+        env:
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+          S3_KEY: ${{ secrets.S3_KEY }}
+          S3_SECRET: ${{ secrets.S3_SECRET }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          S3_REGION: auto
+        run: |
+          cd "$V0_DIR"
+          set +e
+          node v0-auth-diagnose.mjs --autoload="$V0_AUTOLOAD" | tee "$RUNNER_TEMP/auth-diagnosis.md"
+          code=${PIPESTATUS[0]}
+          cat "$RUNNER_TEMP/auth-diagnosis.md" >> "$GITHUB_STEP_SUMMARY"
+          exit "$code"
+
       - name: Run the probe (virtual-hosted — the app's configuration)
         id: vh
+        if: inputs.mode == 'full'
         env:
           S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
           S3_KEY: ${{ secrets.S3_KEY }}
@@ -105,7 +131,7 @@ jobs:
 
       - name: Run the probe (path-style, optional)
         id: ps
-        if: inputs.path_style
+        if: inputs.mode == 'full' && inputs.path_style
         env:
           S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
           S3_KEY: ${{ secrets.S3_KEY }}
@@ -122,6 +148,7 @@ jobs:
 
       - name: Secret scan of the new reports (exact values)
         id: scan
+        if: inputs.mode == 'full'
         env:
           V0_SCAN_VALUES: ${{ format('{0},{1},{2}', secrets.S3_KEY, secrets.S3_SECRET, secrets.S3_ENDPOINT) }}
         run: |
@@ -130,6 +157,7 @@ jobs:
 
       - name: V-G1 decision (PR #1551 §4.6)
         id: decision
+        if: inputs.mode == 'full'
         run: |
           cd "$V0_DIR"
           files=$(ls result-r2-*.json 2>/dev/null || true)
@@ -142,7 +170,7 @@ jobs:
           exit "$code"
 
       - name: Upload the redacted reports (only after the secret scan passed)
-        if: always() && steps.scan.outcome == 'success'
+        if: always() && inputs.mode == 'full' && steps.scan.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: v0-r2-range-results
