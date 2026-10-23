@@ -14,6 +14,23 @@ final class PosTerminalAdapterRegistry
     /** @var array<string, class-string<TerminalAdapter>> */
     private const ADAPTERS = [];
 
+    /** مفاتيح المزوّدين المتاحين فعلاً في هذه البيئة (للواجهة: لا يُعرض خيار غير قابل للإنشاء). @return list<string> */
+    public function availableProviders(): array
+    {
+        $keys = array_keys(self::ADAPTERS);
+        if ($this->classFor(FakePosTerminalAdapter::PROVIDER) !== null) {
+            $keys[] = FakePosTerminalAdapter::PROVIDER;
+        }
+
+        return array_values(array_unique($keys));
+    }
+
+    /** المزوّد الوهمي محاكاة لا دفع حقيقي: تُعلنه الواجهة صراحةً ولا تعرضه كجهاز حقيقي. */
+    public static function isSimulated(string $provider): bool
+    {
+        return $provider === FakePosTerminalAdapter::PROVIDER;
+    }
+
     public function has(string $provider): bool
     {
         return $this->classFor($provider) !== null;

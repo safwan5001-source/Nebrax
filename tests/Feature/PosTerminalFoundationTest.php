@@ -595,6 +595,21 @@ class PosTerminalFoundationTest extends TestCase
     }
 
     #[Test]
+    public function the_terminal_list_declares_simulated_terminals_and_only_the_providers_actually_available(): void
+    {
+        $ctx = $this->context('pos-term-simulated');
+        $res = $this->withToken($ctx['token'])->getJson('/api/pos-payment-terminals')->assertOk();
+        $this->assertTrue($res['data'][0]['simulated'], 'محوّل fake محاكاة لا دفع حقيقي');
+        $this->assertSame([['key' => 'fake', 'simulated' => true]], $res['meta']['providers']);
+
+        // الإنتاج: لا مزوّد متاح قبل H6-03 ⇒ لا خيار إنشاء، والإنشاء مرفوض.
+        $this->app['env'] = 'production';
+        $prod = $this->withToken($ctx['token'])->getJson('/api/pos-payment-terminals')->assertOk();
+        $this->assertSame([], $prod['meta']['providers']);
+        $this->withToken($ctx['token'])->postJson('/api/pos-payment-terminals', ['name' => 'جهاز إنتاج', 'provider' => 'fake'])->assertStatus(422)->assertJsonPath('reason', 'provider_unavailable');
+    }
+
+    #[Test]
     public function provider_operations_on_one_request_are_serialized_by_a_lease_and_the_lease_is_always_released(): void
     {
         $ctx = $this->context('pos-term-serialize');
