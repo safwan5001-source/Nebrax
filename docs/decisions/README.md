@@ -23,3 +23,5 @@ Tracking: `docs/audits/horizon/TAX-ZATCA-RECONCILIATION-AUDIT.md` §7 · `TAX-HZ
 | ADR | Subject | Status | Open gates |
 |---|---|---|---|
 | [ADR-0004](ADR-0004-payments-orchestration-g0.md) | G0 decisions D-03…D-31; closed-period handling (D-12), retention (D-20), scheduler proof (D-25) | Accepted; **D-12 mechanism §3 proposed** | Owner approval of §3 before PAY-H2-02; G1–G6 |
+| [ADR-0005](ADR-0005-moyasar-first-byog-provider.md) | G1: Moyasar أول مزوّد BYOG (Sandbox فقط) | Accepted (اختيار المزوّد والاختبارات فقط) | EXT-01 المفاتيح والتحقق |
+| [ADR-0006](ADR-0006-payments-h2-02-owner-decisions-and-posting-matrix.md) | D-16، D-24، D-26، ADR-0004 §3 (R1) + مصفوفة قيود ترحيل الالتقاط | Accepted | R2/R3 والتفويض خارج النطاق |

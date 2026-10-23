@@ -11331,13 +11331,14 @@
     "denied": "You do not have permission to view payment gateways. Ask an owner or admin.",
     "empty": "No connections yet",
     "emptyHint": "Add a connection to your payment provider. It is saved as a draft, and no payment is taken until it is activated and online payments are enabled for your company.",
-    "activationBlocked": "A real provider connection cannot be activated before its credentials are verified; verification becomes available once that provider's adapter is enabled. A manual (custom) link activates directly.",
+    "activationBlocked": "A real provider connection cannot be activated before its credentials are verified. Use “Verify credentials” where the provider has an adapter; otherwise verification is not available yet. A manual (custom) link activates directly.",
     "actionFailed": "The action could not be completed.",
     "providers": {
       "stripe": "Stripe",
       "tap": "Tap",
       "paytabs": "PayTabs",
       "checkout": "Checkout.com",
+      "moyasar": "Moyasar",
       "custom": "Manual (custom)"
     },
     "environments": {
@@ -11364,6 +11365,7 @@
       "cancel": "Cancel",
       "edit": "Edit",
       "rotate": "Rotate secrets",
+      "verify": "Verify credentials",
       "activate": "Activate",
       "suspend": "Suspend",
       "revoke": "Revoke",
@@ -11377,6 +11379,7 @@
       "delete": "Delete the connection “{name}”?"
     },
     "done": {
+      "verify": "Credentials verified",
       "create": "Connection added as a draft",
       "edit": "Changes saved",
       "activate": "Connection activated",
@@ -11432,6 +11435,8 @@
       "failed": "Could not load the history.",
       "fields": "Changed fields",
       "types": {
+        "verified": "Credentials verified",
+        "verification_failed": "Verification failed",
         "created": "Created",
         "updated": "Updated",
         "credentials_rotated": "Secrets rotated",
@@ -11443,6 +11448,21 @@
       }
     },
     "errors": {
+      "gateway_verification_not_required": "This connection type does not need provider verification.",
+      "gateway_verification_unsupported": "There is no active adapter to verify this provider yet.",
+      "gateway_credentials_changed": "The credentials changed while verifying. Try again.",
+      "gateway_moyasar_live_not_enabled": "Live mode is not enabled for Moyasar. Use Sandbox keys.",
+      "gateway_moyasar_key_type_mismatch": "A secret key was entered where a publishable key belongs, or the reverse.",
+      "gateway_moyasar_live_key_in_sandbox": "Live keys are not accepted on a Sandbox connection. Use sk_test_ / pk_test_ keys.",
+      "gateway_moyasar_test_key_in_live": "Test keys are not accepted on a Live connection.",
+      "gateway_moyasar_invalid_key_format": "The key format is not valid for Moyasar (sk_test_… / pk_test_…).",
+      "moyasar_unauthorized": "Moyasar rejected the credentials. Check the secret key.",
+      "moyasar_rate_limited": "Moyasar is rate limiting requests. Try again shortly.",
+      "moyasar_unavailable": "Moyasar is unreachable right now. Try again shortly.",
+      "moyasar_not_found": "Moyasar did not find the requested resource.",
+      "moyasar_rejected": "Moyasar rejected the request.",
+      "moyasar_malformed_response": "Moyasar returned an unexpected response.",
+      "moyasar_credentials_missing": "The Moyasar secret key is not set.",
       "gateway_has_references": "A connection linked to receipts, settlements or payment attempts cannot be deleted. Suspend or revoke it instead.",
       "gateway_active_cannot_delete": "An active connection cannot be deleted. Suspend it first.",
       "gateway_verification_required": "A real provider connection cannot be activated before its credentials are verified.",

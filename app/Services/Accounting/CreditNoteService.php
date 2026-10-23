@@ -145,6 +145,9 @@ class CreditNoteService
 
             $invoice = null;
 
+            // سياسة T4 تُقرأ **مرة واحدة** وتُثبَّت لكامل الترحيل (قراءتان كانتا تسمحان بتخطّي الحارس وحلّ الخزينة معاً إن تغيّرت بينهما).
+            $treasuryPolicy = CashSaleTreasuryPolicy::effective();
+
             // REM-02: إشعار المبيعات المرتبط بفاتورة يُعاد اشتقاقه **تحت قفل
             // الفاتورة** من المرحَّل فعلاً. مسوّدتان أُنشئتا معاً لا تعرف
             // إحداهما الأخرى، فالسقف التراكمي لا يُحسَم إلا هنا. ترتيب الأقفال:
@@ -154,7 +157,7 @@ class CreditNoteService
                 $invoice = $this->resolveInvoice($note->original_invoice_id, $note->partner_id, lock: true);
                 // TREASURY-T4: على المسار القديم (`legacy`) الإشعار النقدي يُدائن 1110؛ فإن كانت الفاتورة حُصِّلت في غيره (بيع وُجِّه ثم عادت
                 // السياسة إلى legacy) يُرفض. على المسار الموجَّه تتبع الخزينةَ المشتقّة أدناه (TREASURY-T5) فلا حاجة لهذا الحارس.
-                if ($note->refund_type === 'cash' && CashSaleTreasuryPolicy::effective() === CashSaleTreasuryPolicy::LEGACY) {
+                if ($note->refund_type === 'cash' && $treasuryPolicy === CashSaleTreasuryPolicy::LEGACY) {
                     app(CashSaleRefundGuard::class)->assertCashRefundMatchesCollection($invoice);
                 }
                 $this->rederiveLines($note, $invoice);
@@ -166,7 +169,7 @@ class CreditNoteService
             $refundTreasuryAccountId = null;
             if ($type === CreditNoteOwnershipResolver::SALES
                 && $note->refund_type === 'cash'
-                && CashSaleTreasuryPolicy::effective() !== CashSaleTreasuryPolicy::LEGACY) {
+                && $treasuryPolicy !== CashSaleTreasuryPolicy::LEGACY) {
                 $refundTreasuryAccountId = app(CreditNoteRefundTreasuryResolver::class)->resolve($invoice, $actor)->accountId;
             }
 

@@ -48,6 +48,7 @@ class SectionDesignContrastTest extends TestCase
             $case['config'],
             $case['type'],
             static fn (array $ref): ?array => $media[$ref['mediaId']] ?? null,
+            $case['textless'] ?? false,
         );
 
         $this->assertSame(
@@ -113,6 +114,68 @@ class SectionDesignContrastTest extends TestCase
         $this->assertNotSame([], (new StorefrontPresentationPublishValidator)->errors($this->document($bad, type: 'banner')));
         $this->assertSame([], (new StorefrontPresentationPublishValidator)->errors($this->document($bad, visible: false, type: 'banner')));
         $this->assertSame([], (new StorefrontPresentationPublishValidator)->errors((new StorefrontPresentationNormalizer)->normalize([])));
+    }
+
+    /**
+     * AWJ-HERO-DISPLAY — a full-range picture, no overlay: its text can never be proven, so a hero that shows any text
+     * cannot publish it; a hero that shows none (image only) can, because there is nothing to read over it.
+     *
+     * @param  array<string,mixed>  $content
+     * @return array<string,mixed>
+     */
+    private function pictureHero(array $content): array
+    {
+        return (new StorefrontPresentationNormalizer)->normalize([
+            'primaryColor' => '#12372a',
+            'homepage' => ['sections' => [[
+                'id' => 'hero',
+                'type' => 'hero',
+                'visible' => true,
+                'content' => $content,
+                'design' => ['background' => ['kind' => 'media', 'media' => ['mediaId' => '0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e', 'decorative' => true]]],
+            ]]],
+        ]);
+    }
+
+    /** @test */
+    public function an_image_only_hero_publishes_a_full_range_picture_that_a_hero_with_text_cannot(): void
+    {
+        $fullRange = static fn (array $ref): array => ['min' => [0, 0, 0], 'max' => [255, 255, 255]];
+        $hidden = ['showTitle' => false, 'showSubheadline' => false, 'showCtas' => false];
+
+        $withText = SectionDesignContrast::errors($this->pictureHero(['headline' => 'H']), $fullRange);
+        $this->assertSame(['homepage.sections[0].design.background'], array_keys($withText));
+
+        // each part still shown keeps the full proof
+        foreach (['showTitle', 'showSubheadline', 'showCtas'] as $only) {
+            $partial = $this->pictureHero(['headline' => 'H'] + array_diff_key($hidden, [$only => true]));
+            $this->assertNotSame([], SectionDesignContrast::errors($partial, $fullRange), "$only shown");
+        }
+
+        $this->assertSame([], SectionDesignContrast::errors($this->pictureHero(['headline' => 'H'] + $hidden), $fullRange));
+    }
+
+    /** @test */
+    public function an_image_only_hero_still_needs_the_pictures_own_evidence(): void
+    {
+        $hidden = ['headline' => 'H', 'showTitle' => false, 'showSubheadline' => false, 'showCtas' => false];
+
+        $errors = SectionDesignContrast::errors($this->pictureHero($hidden), static fn (array $ref): ?array => null);
+
+        $this->assertSame('contrast_unprovable', $errors['homepage.sections[0].design.background']['code']);
+    }
+
+    /** @test */
+    public function only_a_hero_that_hides_all_three_parts_is_textless(): void
+    {
+        $section = static fn (string $type, array $content): array => ['type' => $type, 'content' => $content];
+        $hidden = ['showTitle' => false, 'showSubheadline' => false, 'showCtas' => false];
+
+        $this->assertTrue(SectionDesignContrast::isTextlessHero($section('hero', $hidden)));
+        $this->assertFalse(SectionDesignContrast::isTextlessHero($section('hero', ['headline' => 'H'])));
+        $this->assertFalse(SectionDesignContrast::isTextlessHero($section('hero', ['showTitle' => false])));
+        $this->assertFalse(SectionDesignContrast::isTextlessHero($section('banner', $hidden)));
+        $this->assertFalse(SectionDesignContrast::isTextlessHero(['type' => 'hero']));
     }
 
     /** @test */

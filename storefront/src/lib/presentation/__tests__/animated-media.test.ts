@@ -8,6 +8,8 @@ import {
 } from "@/lib/commerce/customizer-media";
 import {
   animatedPictureSources,
+  exceedsMotionBudget,
+  MOTION_BUDGET_MS,
   PHONE_QUERY,
   REDUCED_MOTION_QUERY,
 } from "../animated-sources";
@@ -170,5 +172,26 @@ describe("animatedPictureSources — ordering is the contract", () => {
     );
     expect(r?.leading.every((s) => !s.animated)).toBe(true);
     expect(r?.beforeDesktop[0]?.animated).toBe(true);
+  });
+});
+
+describe("exceedsMotionBudget (WCAG 2.2.2 five-second rule)", () => {
+  const anim = (loop: boolean, durationMs: number) => ({
+    src: `${P}${ID}/animated.gif`,
+    format: "gif" as const,
+    frames: 4,
+    durationMs,
+    loop,
+  });
+
+  it("an infinite loop always exceeds it, however short one pass is", () => {
+    expect(exceedsMotionBudget(anim(true, 200))).toBe(true);
+  });
+
+  it("a play-once file exceeds it only beyond five seconds (or when its length is unknown)", () => {
+    expect(MOTION_BUDGET_MS).toBe(5000);
+    expect(exceedsMotionBudget(anim(false, 5000))).toBe(false);
+    expect(exceedsMotionBudget(anim(false, 5001))).toBe(true);
+    expect(exceedsMotionBudget(anim(false, 0))).toBe(true);
   });
 });

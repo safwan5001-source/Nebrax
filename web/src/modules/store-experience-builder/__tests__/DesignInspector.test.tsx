@@ -652,3 +652,99 @@ describe("hero / banner layout variants (CUST-HV V6c-7)", () => {
     }
   });
 });
+
+describe("hero picture treatments (AWJ-HERO-FULLBLEED)", () => {
+  const MEDIA = "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e";
+  const dark = { min: [0, 0, 0] as [number, number, number], max: [40, 50, 60] as [number, number, number] };
+  const provenCtx: DesignContext = { ...ctx, mediaBounds: () => dark };
+  const picture: SectionDesign = { background: { kind: "media", media: { mediaId: MEDIA, decorative: true } } };
+  const ratio = () => document.querySelector("[data-design-ratio-natural]") as HTMLInputElement;
+  const bleed = () => document.querySelector("[data-design-picture-bleed]") as HTMLInputElement;
+  const mobile = () => document.querySelector("[data-design-mobile-height]") as HTMLSelectElement;
+  const inactive = () => document.querySelector("[data-design-picture-treatment-inactive]");
+
+  function Proven({ initial }: { initial: SectionDesign }) {
+    const [design, setDesign] = useState<SectionDesign | undefined>(initial);
+    return (
+      <>
+        <DesignInspector type="hero" design={design} ctx={provenCtx} t={t} onChange={setDesign} />
+        <output data-testid="design">{JSON.stringify(design ?? null)}</output>
+      </>
+    );
+  }
+
+  it("is hero-only: banner / slider / other sections show none of the three controls", () => {
+    for (const type of ["banner", "slider", "categories", "benefits"]) {
+      const view = render(<Harness type={type} />);
+      expect(ratio()).toBeNull();
+      expect(bleed()).toBeNull();
+      expect(mobile()).toBeNull();
+      view.unmount();
+    }
+    render(<Harness type="hero" />);
+    expect(ratio()).not.toBeNull();
+    expect(bleed()).not.toBeNull();
+    expect(mobile()).not.toBeNull();
+  });
+
+  it("each control writes only its own field and never rewrites the others", () => {
+    render(<Proven initial={picture} />);
+    fireEvent.change(screen.getByLabelText("Section height") as HTMLSelectElement, { target: { value: "tall" } });
+    fireEvent.change(mobile(), { target: { value: "compact" } });
+    fireEvent.click(bleed());
+    fireEvent.click(ratio());
+    expect(out().mediaTreatment).toEqual({ height: "tall", mobileHeight: "compact", ratio: "natural", bleed: true });
+    expect(Object.keys(out().mediaTreatment)).toEqual(["height", "mobileHeight", "ratio", "bleed"]);
+    // clearing one leaves the rest; clearing the last removes the whole group
+    fireEvent.click(bleed());
+    expect(out().mediaTreatment).toEqual({ height: "tall", mobileHeight: "compact", ratio: "natural" });
+    fireEvent.change(screen.getByLabelText("Section height") as HTMLSelectElement, { target: { value: "" } });
+    fireEvent.change(mobile(), { target: { value: "" } });
+    fireEvent.click(ratio());
+    expect(out().mediaTreatment).toBeUndefined();
+  });
+
+  it("the phone height select offers the same named presets as the general one", () => {
+    render(<Harness type="hero" />);
+    expect([...mobile().options].map((o) => o.value)).toEqual(["", "compact", "standard", "tall", "screen"]);
+  });
+
+  it("explains the natural ratio and the full-width picture once they are on", () => {
+    render(<Proven initial={{ ...picture, mediaTreatment: { ratio: "natural", bleed: true } }} />);
+    expect(screen.getByText(/never cropped or distorted/)).toBeTruthy();
+    expect(screen.getByText(/runs edge to edge/)).toBeTruthy();
+    expect(inactive()).toBeNull();
+  });
+
+  it("says so when a chosen treatment cannot apply (no proven picture, or a split layout)", () => {
+    const none = render(<Harness type="hero" initial={{ mediaTreatment: { bleed: true } }} />);
+    expect(inactive()).not.toBeNull();
+    none.unmount();
+    const split = render(<Proven initial={{ ...picture, layout: "split", mediaTreatment: { ratio: "natural" } }} />);
+    expect(inactive()).not.toBeNull();
+    split.unmount();
+    render(<Proven initial={{ ...picture, mediaTreatment: { ratio: "natural", bleed: true } }} />);
+    expect(inactive()).toBeNull();
+  });
+
+  it("no warning while nothing is chosen", () => {
+    render(<Harness type="hero" />);
+    expect(inactive()).toBeNull();
+  });
+
+  it("has AR and EN copy for every new key", () => {
+    for (const key of [
+      "designMobileHeight",
+      "designMobileHeightHint",
+      "designPictureTreatment",
+      "designRatioNatural",
+      "designRatioNaturalHint",
+      "designPictureBleed",
+      "designPictureBleedHint",
+      "designPictureTreatmentInactive",
+    ] as const) {
+      expect(CUSTOMIZER_MESSAGES.ar[key]).toBeTruthy();
+      expect(CUSTOMIZER_MESSAGES.en[key]).toBeTruthy();
+    }
+  });
+});

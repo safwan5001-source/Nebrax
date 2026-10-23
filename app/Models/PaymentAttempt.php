@@ -55,6 +55,26 @@ class PaymentAttempt extends BaseModel implements CompanyWide
 
     public const REVIEW_STATE_CONFLICT = 'state_conflict';
 
+    /** حالة ترحيل الالتقاط (ADR-0006): null قبل الالتقاط. pending ← posted | blocked_period | not_postable؛ blocked_period ← posted (R1). */
+    public const POSTING_PENDING = 'pending';
+
+    public const POSTING_POSTED = 'posted';
+
+    public const POSTING_BLOCKED_PERIOD = 'blocked_period';
+
+    public const POSTING_NOT_POSTABLE = 'not_postable';
+
+    public const POSTING_STATUSES = [self::POSTING_PENDING, self::POSTING_POSTED, self::POSTING_BLOCKED_PERIOD, self::POSTING_NOT_POSTABLE];
+
+    /** @var array<string, list<string|null>> */
+    public const POSTING_TRANSITIONS = [
+        '' => [self::POSTING_PENDING],
+        self::POSTING_PENDING => [self::POSTING_POSTED, self::POSTING_BLOCKED_PERIOD, self::POSTING_NOT_POSTABLE],
+        self::POSTING_BLOCKED_PERIOD => [self::POSTING_POSTED],
+        self::POSTING_POSTED => [],
+        self::POSTING_NOT_POSTABLE => [],
+    ];
+
     /** @var array<string, list<string>> */
     public const TRANSITIONS = [
         self::STATUS_CREATED => [self::STATUS_PENDING_CUSTOMER, self::STATUS_CANCELLED, self::STATUS_FAILED, self::STATUS_EXPIRED],
@@ -96,7 +116,15 @@ class PaymentAttempt extends BaseModel implements CompanyWide
             'expires_at' => 'datetime',
             'captured_at' => 'datetime',
             'last_synced_at' => 'datetime',
+            'accounting_date' => 'date:Y-m-d',
+            'posting_blocked_reason' => 'array',
+            'posted_at' => 'datetime',
         ];
+    }
+
+    public static function canTransitionPosting(?string $from, ?string $to): bool
+    {
+        return $to !== null && in_array($to, self::POSTING_TRANSITIONS[(string) $from] ?? [], true);
     }
 
     public static function canTransition(string $from, string $to): bool
@@ -138,6 +166,22 @@ class PaymentAttempt extends BaseModel implements CompanyWide
             }
             if ($attempt->isDirty('refunded_minor') && (int) $attempt->refunded_minor < (int) $attempt->getOriginal('refunded_minor')) {
                 throw new LogicException('Refunded amount can only grow.');
+            }
+            if ($attempt->isDirty('posting_status')) {
+                $from = $attempt->getOriginal('posting_status');
+                $to = $attempt->posting_status;
+                if (! self::canTransitionPosting($from, $to)) {
+                    throw new LogicException('Illegal payment attempt posting transition '.($from ?? 'null').' → '.($to ?? 'null').'.');
+                }
+                if ($attempt->capture_status !== self::STATUS_CAPTURED) {
+                    throw new LogicException('Posting state requires a captured attempt.');
+                }
+            }
+            if ($attempt->isDirty('accounting_date') && $attempt->getOriginal('accounting_date') !== null) {
+                throw new LogicException('Accounting date is immutable once recorded.');
+            }
+            if ($attempt->isDirty('posted_at') && $attempt->getOriginal('posted_at') !== null) {
+                throw new LogicException('Posted timestamp is immutable once recorded.');
             }
             if ($attempt->isDirty('capture_status')) {
                 $from = (string) $attempt->getOriginal('capture_status');

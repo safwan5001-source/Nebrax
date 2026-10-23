@@ -439,6 +439,99 @@
                     }
                 ]
             }
+        },
+        {
+            "name": "hero AWJ-HERO-DISPLAY: every display option, canonical order (…ctas, showTitle, showSubheadline, showCtas, imageHref); the link is trimmed",
+            "type": "hero",
+            "input": {
+                "imageHref": " /collections/new ",
+                "showCtas": false,
+                "showSubheadline": false,
+                "showTitle": false,
+                "ctas": [
+                    {
+                        "label": "Shop",
+                        "href": "/shop"
+                    }
+                ],
+                "subheadline": "Line",
+                "headline": "Welcome"
+            },
+            "expected": {
+                "headline": "Welcome",
+                "subheadline": "Line",
+                "ctas": [
+                    {
+                        "label": "Shop",
+                        "href": "/shop"
+                    }
+                ],
+                "showTitle": false,
+                "showSubheadline": false,
+                "showCtas": false,
+                "imageHref": "/collections/new"
+            }
+        },
+        {
+            "name": "hero AWJ-HERO-DISPLAY: a switch is stored only as false — true, strings and numbers mean shown and are dropped",
+            "type": "hero",
+            "input": {
+                "headline": "H",
+                "showTitle": true,
+                "showSubheadline": "false",
+                "showCtas": 0
+            },
+            "expected": {
+                "headline": "H"
+            }
+        },
+        {
+            "name": "hero AWJ-HERO-DISPLAY: a hidden-part choice alone is explicit content (headline stays empty), not the absent legacy case",
+            "type": "hero",
+            "input": {
+                "showCtas": false
+            },
+            "expected": {
+                "headline": "",
+                "showCtas": false
+            }
+        },
+        {
+            "name": "hero AWJ-HERO-DISPLAY: image only — all three hidden plus a picture link",
+            "type": "hero",
+            "input": {
+                "headline": "Hero",
+                "showTitle": false,
+                "showSubheadline": false,
+                "showCtas": false,
+                "imageHref": "https://example.com/sale"
+            },
+            "expected": {
+                "headline": "Hero",
+                "showTitle": false,
+                "showSubheadline": false,
+                "showCtas": false,
+                "imageHref": "https://example.com/sale"
+            }
+        },
+        {
+            "name": "hero AWJ-HERO-DISPLAY: an unsafe or malformed image link is dropped; it alone is not content",
+            "type": "hero",
+            "input": {
+                "imageHref": "javascript:alert(1)"
+            },
+            "expected": null
+        },
+        {
+            "name": "hero AWJ-HERO-DISPLAY: protocol-relative and spaced image links are dropped, the rest of the content is kept",
+            "type": "hero",
+            "input": {
+                "headline": "H",
+                "imageHref": "//evil.example/x"
+            },
+            "expected": {
+                "headline": "H"
+            }
         }
     ]
 }

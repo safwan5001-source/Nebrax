@@ -34,6 +34,9 @@ type Scenario =
   | "global"
   | "heroes"
   | "overlay"
+  | "overlay-light"
+  | "overlay-dark"
+  | "hero-bleed"
   | "navigation"
   | "footer"
   | "slider"
@@ -53,6 +56,9 @@ function scenarioOf(value: string | null): Scenario {
     value === "global" ||
     value === "heroes" ||
     value === "overlay" ||
+    value === "overlay-light" ||
+    value === "overlay-dark" ||
+    value === "hero-bleed" ||
     value === "navigation" ||
     value === "footer" ||
     value === "slider" ||
@@ -276,13 +282,17 @@ function configFor(
       },
     });
   }
-  if (scenario === "overlay") {
+  if (scenario === "overlay" || scenario === "overlay-light" || scenario === "overlay-dark" || scenario === "hero-bleed") {
     // CUST-HV V7c-2 — a header that overlays a full-picture hero (the e2e spec mocks the media endpoints with a
-    // dark picture, so the proof passes) above the catalogue.
+    // dark picture, so the proof passes) above the catalogue. AWJ-HEADER-OVERLAY-TONE: `overlay-light` forces light text
+    // (provable over that dark picture), `overlay-dark` forces dark text (unprovable ⇒ the header stays solid).
+    // AWJ-HERO-FULLBLEED: `hero-bleed` is an ordinary (solid) header above a full-width, natural-proportion picture hero.
     const ar = locale === "ar";
+    const bleed = scenario === "hero-bleed";
+    const overlayTone = scenario === "overlay-light" ? "light" : scenario === "overlay-dark" ? "dark" : undefined;
     return normalizePresentationConfig({
       ...configFor(locale, "populated"),
-      header: { design: { mode: "overlay-hero" } },
+      header: bleed ? { design: { sticky: "always" } } : { design: { mode: "overlay-hero", ...(overlayTone ? { overlayTone } : {}) } },
       homepage: {
         ...configFor(locale, "populated").homepage,
         sections: [
@@ -301,6 +311,7 @@ function configFor(
                 media: { mediaId: "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e", decorative: true },
                 overlay: { color: { role: "overlay" }, alpha: 40 },
               },
+              ...(bleed ? { mediaTreatment: { bleed: true, ratio: "natural" } } : {}),
             },
           },
           // the populated catalogue below the hero, so the page is tall enough to scroll

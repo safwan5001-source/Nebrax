@@ -94,4 +94,21 @@ describe("gallery-edit (CUST-HV V8f)", () => {
     expect(content.options).toBeUndefined();
     expect(compactOptions(resolveGalleryOptions(undefined))).toEqual({});
   });
+
+  it("showMotionControls round-trips as an opt-in `true` and never leaks into a legacy document", () => {
+    const legacy = two();
+    expect(JSON.stringify(setOptions(legacy, {}))).toBe(JSON.stringify(legacy));
+    expect("options" in setOptions(legacy, { showMotionControls: false })).toBe(false);
+    const on = setOptions(legacy, { showMotionControls: true });
+    expect(on.options).toEqual({ showMotionControls: true });
+    stable(on);
+    // canonical key order: the opt-in comes after the existing options
+    expect(Object.keys(setOptions(on, { columns: 4, captions: true, lightbox: true }).options ?? {})).toEqual([
+      "columns",
+      "captions",
+      "lightbox",
+      "showMotionControls",
+    ]);
+    expect(setOptions(on, { showMotionControls: false }).options).toBeUndefined();
+  });
 });

@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import type { PresentationHomeSection } from "./presentation/config";
+import { isTextlessSection } from "./presentation/section-content";
 import {
   type DesignContext,
   resolveSectionDesign,
@@ -17,13 +18,13 @@ export function SectionDesignFrame({
   extraAttrs,
   children,
 }: {
-  section: Pick<PresentationHomeSection, "type" | "design">;
+  section: Pick<PresentationHomeSection, "type" | "design" | "content">;
   context: DesignContext;
   /** V7c-2 — the overlay-on-hero marker (`data-ho`) of the hero the header sits over. */
   extraAttrs?: Record<string, string>;
   children: ReactNode;
 }) {
-  const resolved = resolveSectionDesign(section.type, section.design, context);
+  const resolved = resolveSectionDesign(section.type, section.design, context, isTextlessSection(section));
   if (!resolved) return <>{children}</>;
   return (
     <div {...resolved.attrs} {...extraAttrs} style={resolved.style as CSSProperties}>

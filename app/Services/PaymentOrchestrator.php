@@ -223,6 +223,9 @@ final class PaymentOrchestrator
         if (! $adapter->capabilities()->supportsCurrency($currency)) {
             throw new PaymentOrchestrationException('currency_unsupported', 'العملة غير مدعومة لدى هذا المزوّد.');
         }
+        if (! $adapter->capabilities()->supportsAmount($amount)) {
+            throw new PaymentOrchestrationException('amount_below_minimum', 'المبلغ أقل من الحد الأدنى المقبول لدى هذا المزوّد.');
+        }
         if (PaymentAttempt::query()->where('payable_key', $payableKey)->whereIn('capture_status', PaymentAttempt::ACTIVE_STATUSES)->exists()) {
             throw new PaymentOrchestrationException('active_attempt_exists', 'توجد محاولة دفع نشطة لهذا المستند.');
         }

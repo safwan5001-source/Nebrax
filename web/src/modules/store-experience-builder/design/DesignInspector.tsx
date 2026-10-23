@@ -198,6 +198,7 @@ export function DesignInspector({
   onChange,
   locale = "ar",
   bounds,
+  textless = false,
 }: {
   type: string;
   design: SectionDesign | undefined;
@@ -207,6 +208,8 @@ export function DesignInspector({
   locale?: "ar" | "en";
   /** V6b-4b — why a picture is (not yet) provable: still measuring vs. no valid measurement. */
   bounds?: BackgroundMediaBounds;
+  /** AWJ-HERO-DISPLAY — a hero showing no title, description or button: no text over the picture to prove. */
+  textless?: boolean;
 }) {
   const capability = SECTION_DESIGN_CAPABILITIES[type];
   const clipboard = useDesignClipboard();
@@ -225,7 +228,7 @@ export function DesignInspector({
     );
   }
 
-  const issues = sectionContrastIssues(current, ctx, type);
+  const issues = sectionContrastIssues(current, ctx, type, textless);
   const text = effectiveText(current, ctx, type);
   const hasBackground = !!current.background;
   const ownsSurface = SURFACE_OWNING_TYPES.has(type) && !hasBackground;
@@ -234,12 +237,12 @@ export function DesignInspector({
   );
   const hasSeparator = activeSeparatorKinds.length > 0;
   // V6c-4 — overlap needs a hero that really paints a picture (the resolver's own test) and no bottom separator.
-  const overlapInactive = resolveSectionDesign(type, current, ctx)?.attrs["data-sd"]?.split(" ").includes("ovlp") !== true;
+  const overlapInactive = resolveSectionDesign(type, current, ctx, textless)?.attrs["data-sd"]?.split(" ").includes("ovlp") !== true;
   // V6c-7 — a hero's split needs a picture that really paints (and ≥ md); say so rather than do nothing
   const layoutInactive =
     type === "hero" &&
     current.layout === "split" &&
-    resolveSectionDesign(type, current, ctx)?.attrs["data-sd"]?.split(" ").includes("lsplit") !== true;
+    resolveSectionDesign(type, current, ctx, textless)?.attrs["data-sd"]?.split(" ").includes("lsplit") !== true;
   const hasDesignBackground = current.background?.kind === "solid" || current.background?.kind === "gradient";
   // The colour a separator takes when the merchant picks none — exactly the resolver's defaults:
   // a line follows the border role, a band the brand, a shape the page behind it (brand when the section has no designed background, so it is visible). Mixed edges
@@ -261,6 +264,14 @@ export function DesignInspector({
   const bleedsBand = current.width?.mode === "full" && current.background?.kind === "solid";
   const set = <K extends DesignGroup>(group: K, value: SectionDesign[K] | undefined) =>
     onChange(setGroup(type, design, group, value));
+  // AWJ-HERO-FULLBLEED — one `mediaTreatment` field at a time: the group holds several (height, mobileHeight, ratio, bleed), so a
+  // single control must never rewrite the others. An undefined field is removed; an empty group is dropped.
+  const setTreatment = (patch: Partial<NonNullable<SectionDesign["mediaTreatment"]>>) => {
+    const next: Record<string, unknown> = { ...(current.mediaTreatment ?? {}), ...patch };
+    for (const key of Object.keys(next)) if (next[key] === undefined) delete next[key];
+    set("mediaTreatment", Object.keys(next).length > 0 ? (next as SectionDesign["mediaTreatment"]) : undefined);
+  };
+  const resolvedTokens = resolveSectionDesign(type, current, ctx, textless)?.attrs["data-sd"]?.split(" ") ?? [];
 
   // ── background ────────────────────────────────────────────────────────────
   const bgKind: "none" | "solid" | "gradient" | "media" =
@@ -865,12 +876,7 @@ export function DesignInspector({
               data-design-height=""
               value={current.mediaTreatment?.height ?? ""}
               onChange={(event) =>
-                set(
-                  "mediaTreatment",
-                  event.target.value
-                    ? { ...current.mediaTreatment, height: event.target.value as (typeof HEIGHT_PRESETS)[number] }
-                    : undefined,
-                )
+                setTreatment({ height: (event.target.value || undefined) as (typeof HEIGHT_PRESETS)[number] | undefined })
               }
             >
               {unsetOption}
@@ -882,7 +888,71 @@ export function DesignInspector({
             </select>
           </Field>
           <p className="text-[12px] leading-5 text-muted">{t("designHeightHint")}</p>
+          {allows(capability.mediaTreatment, "mobileHeight") ? (
+            <>
+              <Field label={t("designMobileHeight")}>
+                <select
+                  className={selectClass}
+                  data-design-mobile-height=""
+                  value={current.mediaTreatment?.mobileHeight ?? ""}
+                  onChange={(event) =>
+                    setTreatment({
+                      mobileHeight: (event.target.value || undefined) as (typeof HEIGHT_PRESETS)[number] | undefined,
+                    })
+                  }
+                >
+                  {unsetOption}
+                  {HEIGHT_PRESETS.map((height) => (
+                    <option key={height} value={height}>
+                      {t(HEIGHT_LABEL[height])}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <p className="text-[12px] leading-5 text-muted">{t("designMobileHeightHint")}</p>
+            </>
+          ) : null}
         </div>
+      ) : null}
+
+      {allows(capability.mediaTreatment, "ratio") || allows(capability.mediaTreatment, "bleed") ? (
+        <fieldset className="min-w-0 space-y-2" data-design-picture-treatment="">
+          <legend className="mb-1 text-[12px] font-semibold tracking-wide text-muted">{t("designPictureTreatment")}</legend>
+          {allows(capability.mediaTreatment, "ratio") ? (
+            <label className="flex items-center gap-2 text-[12px] text-text">
+              <input
+                type="checkbox"
+                data-design-ratio-natural=""
+                checked={current.mediaTreatment?.ratio === "natural"}
+                onChange={(event) => setTreatment({ ratio: event.target.checked ? "natural" : undefined })}
+              />
+              <span>{t("designRatioNatural")}</span>
+            </label>
+          ) : null}
+          {current.mediaTreatment?.ratio === "natural" ? (
+            <p className="text-[12px] leading-5 text-muted">{t("designRatioNaturalHint")}</p>
+          ) : null}
+          {allows(capability.mediaTreatment, "bleed") ? (
+            <label className="flex items-center gap-2 text-[12px] text-text">
+              <input
+                type="checkbox"
+                data-design-picture-bleed=""
+                checked={current.mediaTreatment?.bleed === true}
+                onChange={(event) => setTreatment({ bleed: event.target.checked ? true : undefined })}
+              />
+              <span>{t("designPictureBleed")}</span>
+            </label>
+          ) : null}
+          {current.mediaTreatment?.bleed === true ? (
+            <p className="text-[12px] leading-5 text-muted">{t("designPictureBleedHint")}</p>
+          ) : null}
+          {(current.mediaTreatment?.ratio === "natural" && !resolvedTokens.includes("rat")) ||
+          (current.mediaTreatment?.bleed === true && !resolvedTokens.includes("hbl")) ? (
+            <p data-design-picture-treatment-inactive="" role="status" className="text-[12px] leading-5 text-warning">
+              {t("designPictureTreatmentInactive")}
+            </p>
+          ) : null}
+        </fieldset>
       ) : null}
 
       {capability.typography ? (

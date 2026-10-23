@@ -119,6 +119,10 @@ export default async function HomePage({ params }: HomePageProps) {
                 headline={own ? own.headline : heroHeadline}
                 subheadline={own ? (own.subheadline ?? null) : heroSubheadline}
                 ctas={own?.ctas ?? null}
+                showTitle={own?.showTitle !== false}
+                showSubheadline={own?.showSubheadline !== false}
+                showCtas={own?.showCtas !== false}
+                imageHref={own?.imageHref ?? null}
                 headingId={
                   section.id === "hero"
                     ? "home-hero"

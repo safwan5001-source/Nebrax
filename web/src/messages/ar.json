@@ -11331,13 +11331,14 @@
     "denied": "ليست لديك صلاحية عرض بوابات الدفع. اطلب من المالك أو المدير.",
     "empty": "لا توجد اتصالات بعد",
     "emptyHint": "أضف اتصالاً بمزوّد الدفع لديك. يحفظ الاتصال كمسودة، ولا يُجرى أي دفع قبل تفعيله وتفعيل المدفوعات الإلكترونية لمؤسستك.",
-    "activationBlocked": "اتصال مزوّد حقيقي لا يُفعَّل قبل التحقق من اعتماده، والتحقق يتوفر مع تفعيل محوّل هذا المزوّد. الربط اليدوي (مخصص) يُفعَّل مباشرة.",
+    "activationBlocked": "لا يُفعَّل اتصال مزوّد حقيقي قبل التحقق من اعتماده. استخدم «تحقق من الاعتماد» للمزوّد الذي له محوّل؛ وإلا فالتحقق غير متاح بعد. الربط اليدوي (المخصص) يُفعَّل مباشرة.",
     "actionFailed": "تعذر تنفيذ الإجراء.",
     "providers": {
       "stripe": "Stripe",
       "tap": "Tap",
       "paytabs": "PayTabs",
       "checkout": "Checkout.com",
+      "moyasar": "ميسّر (Moyasar)",
       "custom": "ربط يدوي (مخصص)"
     },
     "environments": {
@@ -11364,6 +11365,7 @@
       "cancel": "إلغاء",
       "edit": "تعديل",
       "rotate": "تدوير الأسرار",
+      "verify": "تحقق من الاعتماد",
       "activate": "تفعيل",
       "suspend": "إيقاف مؤقت",
       "revoke": "إلغاء الاعتماد",
@@ -11377,6 +11379,7 @@
       "delete": "حذف الاتصال «{name}»؟"
     },
     "done": {
+      "verify": "تم التحقق من بيانات الاعتماد",
       "create": "أُضيف الاتصال كمسودة",
       "edit": "حُفظت التعديلات",
       "activate": "تم تفعيل الاتصال",
@@ -11432,6 +11435,8 @@
       "failed": "تعذر تحميل السجل.",
       "fields": "الحقول المتغيّرة",
       "types": {
+        "verified": "تم التحقق من الاعتماد",
+        "verification_failed": "فشل التحقق",
         "created": "إنشاء",
         "updated": "تعديل",
         "credentials_rotated": "تدوير الأسرار",
@@ -11443,6 +11448,21 @@
       }
     },
     "errors": {
+      "gateway_verification_not_required": "هذا النوع من الاتصال لا يحتاج تحققاً من مزوّد.",
+      "gateway_verification_unsupported": "لا يوجد محوّل مفعّل للتحقق من هذا المزوّد بعد.",
+      "gateway_credentials_changed": "تغيّرت بيانات الاعتماد أثناء التحقق. أعد المحاولة.",
+      "gateway_moyasar_live_not_enabled": "الوضع الحي غير مفعّل لـMoyasar. استخدم مفاتيح Sandbox.",
+      "gateway_moyasar_key_type_mismatch": "أُدخل مفتاح سري في خانة المفتاح القابل للنشر أو العكس.",
+      "gateway_moyasar_live_key_in_sandbox": "لا تُقبل المفاتيح الحية على اتصال Sandbox. استخدم مفاتيح sk_test_ / pk_test_.",
+      "gateway_moyasar_test_key_in_live": "لا تُقبل مفاتيح الاختبار على اتصال حي.",
+      "gateway_moyasar_invalid_key_format": "صيغة المفتاح غير صالحة لـMoyasar (sk_test_… / pk_test_…).",
+      "moyasar_unauthorized": "رفضت Moyasar بيانات الاعتماد. تحقق من المفتاح السري.",
+      "moyasar_rate_limited": "Moyasar تحدّ من الطلبات حالياً. أعد المحاولة بعد قليل.",
+      "moyasar_unavailable": "تعذّر الوصول إلى Moyasar حالياً. أعد المحاولة بعد قليل.",
+      "moyasar_not_found": "لم تجد Moyasar المورد المطلوب.",
+      "moyasar_rejected": "رفضت Moyasar الطلب.",
+      "moyasar_malformed_response": "أعادت Moyasar استجابة غير متوقعة.",
+      "moyasar_credentials_missing": "المفتاح السري لـMoyasar غير مُدخل.",
       "gateway_has_references": "لا يمكن حذف اتصال مرتبط بسندات أو تسويات أو محاولات دفع. أوقفه أو ألغِ اعتماده بدلاً من ذلك.",
       "gateway_active_cannot_delete": "لا يُحذف اتصال مفعّل. أوقفه أولاً.",
       "gateway_verification_required": "لا يُفعَّل اتصال مزوّد حقيقي قبل التحقق من اعتماده.",

@@ -180,7 +180,7 @@ class PosReturnService
             'created_by' => $actor->id,
         ], $items);
 
-        $posted = $this->returns->post($return);
+        $posted = $this->returns->post($return, $actor);
         $this->sessions->recordReturn($session, $posted, $actor);
 
         return $posted;
