@@ -340,6 +340,10 @@ class PartnerImportService
             $entry['messages'] = array_map(fn (string $code): string => $this->message($code), $entry['errors']);
             $entry['warnings'] = [];
             $entry['file_dup'] = false;
+            // صفٌّ أعرض من صف العناوين تسقط قيمةٌ منه صامتةً (فاصلة غير مقتبَسة في عنوان مثلاً) — أخطر من خطأ صريح.
+            if (count($values) > count($headers)) {
+                $this->addIssue($entry, 'row_wider_than_header', 'عدد الأعمدة في هذا الصف يتجاوز صف العناوين، فبعض القيم ستسقط. صحّح الملف.');
+            }
 
             foreach (['nebrax_id', 'code'] as $key) {
                 $value = $entry['values'][$key] ?? null;
@@ -446,7 +450,10 @@ class PartnerImportService
         $signals = [];
         foreach (Fields::DUPLICATE_SIGNALS as $key) {
             if (isset($present[$key])) {
-                $signals[$key] = $this->signalValue($key, (string) $present[$key]);
+                $value = $this->signalValue($key, (string) $present[$key]);
+                if ($value !== null) {
+                    $signals[$key] = $value;
+                }
             }
         }
 
@@ -503,11 +510,17 @@ class PartnerImportService
     private function signalValue(string $key, string $value): ?string
     {
         if ($key === 'email') {
-            return mb_strtolower(trim($value), 'UTF-8');
-        }
-        $digits = preg_replace('/\D+/', '', Normalizer::digits($value)) ?? '';
+            $email = mb_strtolower(trim($value), 'UTF-8');
 
-        return $digits === '' ? null : $digits;
+            return $email === '' ? null : $email;
+        }
+        $latin = Normalizer::digits($value);
+        // السجل التجاري قد يحمل حروفاً: أحرف وأرقام فقط بحالة موحَّدة (لا يُختزل إلى أرقام فيُدمج `ABC-123` مع `XYZ123`).
+        $clean = $key === 'cr_number'
+            ? mb_strtoupper(preg_replace('/[^\p{L}\p{N}]+/u', '', $latin) ?? '', 'UTF-8')
+            : (preg_replace('/\D+/', '', $latin) ?? '');
+
+        return $clean === '' ? null : $clean;
     }
 
     private function message(string $code): string
@@ -601,7 +614,11 @@ class PartnerImportService
             $existing = $byIdMatch ?? $byCodeMatch;
             $entry['matched_by'] = $byIdMatch !== null ? 'nebrax_id' : ($byCodeMatch !== null ? 'code' : null);
 
-            if ($existing === null && isset($entry['values']['code']) && isset($takenElsewhere[(string) $entry['values']['code']])) {
+            // الكود فريدٌ على المستأجر: يُرفض إن حمله طرفٌ لا نراه، سواء في الإنشاء أو عند تغيير كود طرفٍ قائم بمعرّف نبراكس.
+            $changesCode = $existing !== null && $entry['matched_by'] === 'nebrax_id'
+                && isset($entry['values']['code']) && (string) $entry['values']['code'] !== (string) $existing->code;
+            if (($existing === null || $changesCode) && isset($entry['values']['code']) && isset($takenElsewhere[(string) $entry['values']['code']])
+                && $byCodeMatch === null) {
                 $this->addIssue($entry, 'code_taken', 'الكود مستخدم بالفعل لطرف آخر في المؤسسة.');
             }
             if ($existing !== null && ! $this->typeCompatible($existing, $options['type'])) {
@@ -634,18 +651,20 @@ class PartnerImportService
     private function signalHolders(array $signalValues): array
     {
         $holders = [];
-        foreach ($signalValues as $key => $values) {
-            if ($values === []) {
+        foreach ($signalValues as $key => $needed) {
+            if ($needed === []) {
                 continue;
             }
-            foreach (array_chunk(array_keys($values), self::LOOKUP_CHUNK) as $chunk) {
-                foreach (Partner::query()->whereIn($key, $chunk)->get(['id', $key]) as $partner) {
+            // المخزَّن قد يحمل تنسيقاً (هاتف بمسافات أو +966، بريد بحالة أحرف مختلفة): يُطبَّع في PHP بالدالة نفسها ثم يُقارَن، فلا يفوت
+            // التطابقَ تنسيقٌ تاريخي. لا يُحمَّل إلا عمودٌ واحد غير فارغ للمستأجر على دفعات، وتُحتفَظ فقط القيم المطلوبة.
+            Partner::query()->whereNotNull($key)->where($key, '!=', '')->select(['id', $key])->chunkById(2000, function ($partners) use ($key, $needed, &$holders): void {
+                foreach ($partners as $partner) {
                     $normalized = $this->signalValue($key, (string) $partner->{$key});
-                    if ($normalized !== null) {
+                    if ($normalized !== null && isset($needed[$normalized])) {
                         $holders[$key][$normalized][] = (string) $partner->id;
                     }
                 }
-            }
+            });
         }
 
         return $holders;

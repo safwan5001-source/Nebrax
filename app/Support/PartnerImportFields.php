@@ -27,8 +27,17 @@ final class PartnerImportFields
     /** حقول تُعامَل «إشارات تكرار» بسياسة التشغيلة (error | skip | warn). */
     public const DUPLICATE_SIGNALS = ['vat_number', 'cr_number', 'phone', 'mobile', 'email'];
 
+    /** @var array<string, array<string, mixed>>|null */
+    private static ?array $cache = null;
+
     /** @return array<string, array<string, mixed>> */
     public static function all(): array
+    {
+        return self::$cache ??= self::build();
+    }
+
+    /** @return array<string, array<string, mixed>> */
+    private static function build(): array
     {
         $text = static fn (string $ar, string $en, array $aliases, bool $clearable = true, int $max = 255): array => [
             'type' => self::TYPE_TEXT, 'required' => false, 'clearable' => $clearable, 'update_locked' => false, 'writable' => true,
@@ -39,7 +48,7 @@ final class PartnerImportFields
             'nebrax_id' => [
                 'type' => self::TYPE_IDENTIFIER, 'required' => false, 'clearable' => false, 'update_locked' => true, 'writable' => false,
                 'label_ar' => 'معرّف نبراكس', 'label_en' => 'Nebrax ID',
-                'aliases' => ['nebraxid', 'partnerid', 'customerid', 'supplierid', 'id', 'uuid', 'معرفنبراكس', 'المعرف', 'معرفالطرف'],
+                'aliases' => ['nebraxid', 'partnerid', 'uuid', 'معرفنبراكس', 'المعرف', 'معرفالطرف'],
             ],
             'code' => $text('الكود', 'Code', ['code', 'partnercode', 'customercode', 'suppliercode', 'accountnumber', 'الكود', 'كود', 'رمزالعميل', 'رقمالعميل', 'كودالطرف'], false),
             'name' => ['required' => true, 'clearable' => false] + $text('الاسم', 'Name', ['name', 'partnername', 'customername', 'suppliername', 'companyname', 'الاسم', 'اسمالعميل', 'اسمالمورد', 'اسمالشركة']),

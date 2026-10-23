@@ -374,4 +374,52 @@ class PartnerImportTest extends TestCase
         $this->assertSame(2, $result->processedUnits);
         $this->assertSame(['AD-1', 'AD-2'], Partner::orderBy('code')->pluck('code')->all());
     }
+
+    // ═══════════════════════════════ مراجعة مستقلة ═══════════════════════════════
+
+    /** @test */
+    public function changing_a_code_by_nebrax_id_to_one_held_by_a_hidden_partner_is_refused_before_the_write(): void
+    {
+        $gone = $this->partner(['code' => 'TAKEN', 'name' => 'محذوف']);
+        $gone->delete();
+        $target = $this->partner(['code' => 'MINE', 'name' => 'هدف']);
+
+        $preview = $this->service()->preview($this->file([['nebrax_id' => $target->id, 'code' => 'TAKEN']]), ['type' => 'customer', 'mode' => 'update']);
+
+        $this->assertSame(['error'], $this->actions($preview));
+        $this->assertStringContainsString('الكود مستخدم', $preview['errors'][0]['messages'][0]);
+        $this->assertSame('MINE', $target->refresh()->code);
+    }
+
+    /** @test */
+    public function stored_values_with_other_formatting_are_still_recognised_as_duplicate_signals(): void
+    {
+        $this->partner(['code' => 'H-0', 'name' => 'قائم', 'mobile' => '+966 50-000-0000', 'email' => 'Dup@X.test', 'cr_number' => 'ABC-123']);
+        $rows = [
+            ['code' => 'H-1', 'name' => 'جوال', 'mobile' => '966500000000'],
+            ['code' => 'H-2', 'name' => 'بريد', 'email' => 'dup@x.TEST'],
+            ['code' => 'H-3', 'name' => 'سجل مختلف', 'cr_number' => 'XYZ123'],
+            ['code' => 'H-4', 'name' => 'سجل مكرر', 'cr_number' => 'abc 123'],
+        ];
+
+        $this->assertSame(['skip', 'skip', 'create', 'skip'], $this->actions($this->service()->preview($this->file($rows), ['type' => 'customer', 'duplicate_signal_policy' => 'skip'])));
+    }
+
+    /** @test */
+    public function a_row_wider_than_the_header_is_an_error_not_a_silent_truncation(): void
+    {
+        $csv = "code,name\nW-1,اسم سليم\nW-2,شارع 1, مبنى 2\n";
+        $file = UploadedFile::fake()->createWithContent('wide.csv', $csv);
+
+        $preview = $this->service()->preview($file, ['type' => 'customer']);
+
+        $this->assertSame(['create', 'error'], $this->actions($preview));
+        $this->assertStringContainsString('يتجاوز صف العناوين', $preview['errors'][0]['messages'][0]);
+    }
+
+    /** @test */
+    public function a_legacy_numeric_customer_id_column_is_not_mistaken_for_the_nebrax_uuid(): void
+    {
+        $this->assertSame([null, 'name'], array_values(PartnerImportFields::autoMap(['customer_id', 'الاسم'])));
+    }
 }

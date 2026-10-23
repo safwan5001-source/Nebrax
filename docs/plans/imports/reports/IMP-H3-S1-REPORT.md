@@ -19,14 +19,28 @@
 
 ## Tests
 
-- `PartnerImportTest` (20, SQLite + PostgreSQL): contract (no type/opening balance, Arabic header mapping, template importable as-is); typed create + type fixed by entry; opening-balance column ignored and zero journal entries; per-row validation + named unit failures; update/upsert/skip classification; code-vs-id rule; other-kind vs `both`; unknown/conflicting ids; blank policy; in-file duplicates fail the whole file before any write; the three signal policies (DB and in-file); soft-deleted code refused; same code in another tenant is not a conflict; windows; plan drift; adapter options and chunk.
+- `PartnerImportTest` (24, SQLite + PostgreSQL): contract (no type/opening balance, Arabic header mapping, template importable as-is); typed create + type fixed by entry; opening-balance column ignored and zero journal entries; per-row validation + named unit failures; update/upsert/skip classification; code-vs-id rule; other-kind vs `both`; unknown/conflicting ids; blank policy; in-file duplicates fail the whole file before any write; the three signal policies (DB and in-file); soft-deleted code refused; same code in another tenant is not a conflict; windows; plan drift; adapter options and chunk.
 - `PartnerImportConcurrencyPostgresTest` (2, real PostgreSQL + `pcntl_fork`): four racing imports with the same VAT and different codes create exactly **one** partner under `error` (the others fail with a named row failure) and under `skip` (1 created, 3 skipped). **Negative control:** removing the lock makes both fail 3/3 runs; restored → green. Validated locally against a throwaway PostgreSQL 16, not only in CI.
 
 ## Known limits (disclosed)
 
-- Signal comparison is exact on the normalized form against stored values: historical rows stored with different formatting (e.g. phones with dashes) are not detected as duplicates.
+- Signals are compared per field (a number in `phone` on one partner and in `mobile` on another is not matched) and within the visible branch scope, while code uniqueness is tenant-wide: a duplicate VAT held by a partner in another branch is invisible under `error`/`skip`.
+- Plan drift between windows is possible (rare, fails closed): an earlier window moves a partner's phone away, so a later row that was a `skip` at preview becomes a `create`.
 - `default_price_list_id`, classifications and the legacy `classification` text are not importable yet.
 - No UI and no endpoints until H3-S2/S3.
+
+## Independent review (read-only subagent, static) — disposition
+
+No ordinal/window, branch-scoping, locking, security or CI-guard defects. Findings and what was done:
+
+| # | Finding | Disposition |
+|---|---|---|
+| F1 | Changing a code by `nebrax_id` skipped the `code_taken` guard (DB error mid-chunk, unnamed row) | **Fixed** + test |
+| F2 | Duplicate-signal DB check compared normalized probes to raw stored values (formatted phone, mixed-case email missed; CR digits-only collapse gave false positives) | **Fixed**: stored values are normalized with the same function (one pass per signal, chunked); CR normalized as upper-case alphanumerics; + tests |
+| F3 | Rows wider than the header silently lost values (product import errors on this) | **Fixed** + test |
+| F4 | Whole file re-normalized each chunk; `Fields::all()` rebuilt per call; null signals used as keys | **Fixed**: field registry memoized; null signals skipped. Full-file normalization per chunk kept deliberately (needed for deterministic in-file duplicate detection) — measured cost is bounded; revisit if 20k-row files show up slow |
+| F5 | `customerid`/`supplierid` aliases would map legacy numeric IDs to the UUID field | **Fixed** (aliases removed) + test |
+| F6 | Plan drift between windows under skip/error | **Documented** (rare, fails closed) |
 
 ## Disclosures
 
