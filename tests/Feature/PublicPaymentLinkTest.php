@@ -81,6 +81,10 @@ class PublicPaymentLinkTest extends TestCase
         $this->assertTrue(PaymentLinkToken::wellFormed($token));
         $this->assertSame(43, strlen($token));
         $this->assertSame(PaymentLinkToken::hash($token), $request->fresh()->token_hash);
+        $resource = (new \App\Http\Resources\InvoicePaymentRequestResource($request->fresh()))->toArray(request());
+        $this->assertTrue($resource['link_issued']);
+        $this->assertArrayNotHasKey('token_hash', $resource);
+        $this->assertStringNotContainsString($token, json_encode($resource));
         $this->assertNotSame($token, $request->fresh()->token_hash);
         $this->assertFalse(DB::table('invoice_payment_requests')->where('token_hash', $token)->exists());
         $e = $this->thrown(fn () => $this->requests->issueLink($request, $this->owner), 'second issue', PaymentOrchestrationException::class);
