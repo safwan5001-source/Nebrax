@@ -622,7 +622,7 @@ class TreasuryCreditNoteRefundRoutingTest extends TestCase
     // ───────────────────────── حارس ثابت ─────────────────────────
 
     /** @test */
-    public function only_the_two_routed_paths_use_the_treasury_resolver_and_returns_stay_unrouted(): void
+    public function only_the_routed_paths_use_the_treasury_resolver_namely_sale_credit_note_and_pos_refund(): void
     {
         $users = [];
         foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(base_path('app'))) as $file) {
@@ -638,11 +638,13 @@ class TreasuryCreditNoteRefundRoutingTest extends TestCase
             }
         }
         sort($users);
-        $this->assertSame(['CreditNoteRefundTreasuryResolver.php', 'InvoiceService.php'], $users, 'T4 البيع وT5 الاسترداد؛ المرتجعات T6');
+        $this->assertSame(['CreditNoteRefundTreasuryResolver.php', 'InvoiceService.php', 'PosCashRefundTreasuryResolver.php'], $users, 'T4 البيع وT5 الاسترداد وT6 ردّ POS؛ المرتجعات والاستبدال تستعمل مُحلِّلَي T5/T6 لا المحلِّل العام مباشرة');
 
+        // T6: المرتجعات توجَّه عبر مُحلِّلَي الاسترداد، وحارس T4 يبقى على فرع legacy فقط.
         $returns = (string) file_get_contents(base_path('app/Services/Accounting/ReturnService.php'));
-        $this->assertStringNotContainsString('CreditNoteRefundTreasuryResolver', $returns);
-        $this->assertStringContainsString('CashSaleRefundGuard', $returns, 'المرتجعات تبقى على حارس T4 حتى T6');
+        $this->assertStringContainsString('CreditNoteRefundTreasuryResolver', $returns);
+        $this->assertStringContainsString('PosCashRefundTreasuryResolver', $returns);
+        $this->assertStringContainsString('CashSaleRefundGuard', $returns, 'حارس T4 يبقى على فرع legacy');
     }
 
     /** @test */
