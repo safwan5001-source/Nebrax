@@ -74,7 +74,7 @@ Details, reuse analysis, dependencies and acceptance: `AWJ_IMPORT_PARKED_REQUIRE
 
 | ID | Requirement | Status | Window | Depends on | Owner decisions |
 |---|---|---|---|---|---|
-| IMP-X-01 | Super Admin control of AI Actions — global (master + execution), per tenant, per action type; audited; no change to isolation/RBAC/approval | **In progress — split:** **X-01a** storage + resolver + platform API (unwired, no behaviour change) — in review (PR) · X-01b wiring into `AiActionPolicy`/`ExecutionService` behind a deploy gate (default off) + per-row in-flight stop · X-01c tenant-owner approval write path + tenant-side reason copy · X-01d platform console UI. Report `IMP-X-01a-REPORT.md` | Its place has arrived: H2-S4 merged, H3-S4 is the next AI slice | H1-S7 (merged), H2-S4 | D-10 ✅, D-11 ✅, D-12 ✅ in principle (2026-10-22); capability split preview/review/execution is binding |
+| IMP-X-01 | Super Admin control of AI Actions — global (master + execution), per tenant, per action type; audited; no change to isolation/RBAC/approval | **In progress — split:** **X-01a** storage + resolver + platform API (unwired, no behaviour change) — **merged** `2355d31` (#1668) · **X-01b** wiring into `AiActionPolicy`/`ExecutionService` behind a deploy gate (default off) + per-row in-flight stop — in review (PR, stacked on X-01a), report `IMP-X-01b-REPORT.md` · X-01c tenant-owner approval write path + tenant-side reason copy · X-01d platform console UI. Report `IMP-X-01a-REPORT.md` | Its place has arrived: H2-S4 merged, H3-S4 is the next AI slice | H1-S7 (merged), H2-S4 | D-10 ✅, D-11 ✅, D-12 ✅ in principle (2026-10-22); capability split preview/review/execution is binding |
 
 ## H0 correction record (IMP-H0-S2)
 
