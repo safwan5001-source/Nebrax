@@ -77,7 +77,9 @@ The 5 s window uses the existing "drop the animated `<source>`s" mechanism (an a
 | Web `tsc --noEmit` | no errors in any non-test file I touched (pre-existing errors exist in unrelated `*.test.tsx` files on `main`) |
 | **Real Chromium** (`playwright.animated-media.config.ts`) | **20 passed, 3 skipped** (the three "frames really change" canaries — see §6) |
 
-Not run locally: the **full** PHP suite (hours; CI runs it on sqlite+pgsql), `web` `next build`, `storefront` `next build` — left to CI (see §6).
+**CI on code head `819276c`:** all 7 checks green — `php artisan test` (sqlite **and** pgsql, full suite), `web build (Next.js)`, `storefront (lint + typecheck + test)`, `merchant preview visual QA`, `published footer visual QA`, `CI Gate`; mergeable state `clean`. (An earlier `CI Gate` failure on `85d43d7` was only the gate's own "stale gate: PR head is now 819276c" guard, not a test failure.)
+
+Not run locally: the **full** PHP suite and the two `next build`s — they ran in CI (above). The Codex review bot did not review (its usage limit was reached: "We couldn't complete this review"); there are no review threads, so **no automated or human code review has happened yet.**
 
 ## 5. Analysis
 
@@ -96,7 +98,7 @@ Not run locally: the **full** PHP suite (hours; CI runs it on sqlite+pgsql), `we
 3. **Finite repeat counts ≥ 2** (GIF/WebP loop count `N`) are not exposed by the analyser (`loop` = infinite only), so a `loop=false` file that plays `N × duration > 5 s` is treated as "ends by itself". Rare; the fix is to expose the loop count in the animation meta (additive, but a separate change to the media pipeline).
 4. **Policy call for the owner:** with the control off, motion is capped at 5 s per picture. If the owner prefers continuous motion by default the setting must default to `true` (it would then show the button) — there is no compliant "continuous and invisible" option.
 5. **Perf:** a gallery of up to 24 animated tiles each fetches its full `animated.*` after hydration (no `srcset` for animations, by design of the P1 pipeline). The 25 %-visible IntersectionObserver gates only the *timer*, not the fetch; the existing per-file limits bound it. Recommend merchants use few animated tiles; a future slice could lazy-mount animated sources on visibility.
-6. **CI not yet observed** at the time of writing — see the PR checks. Pre-existing lint errors in unrelated storefront files (`CategoriesSection.display.test.tsx`, `header-overlay.ts`) are on `main`, not introduced here.
+6. **No code review yet** (Codex bot hit its usage limit; comment `@codex review` to retry). Pre-existing lint errors in unrelated storefront files (`CategoriesSection.display.test.tsx`, `header-overlay.ts`) are on `main`, not introduced here.
 
 **Manual checklist:** (a) upload a real GIF and an animated WebP → add to a gallery → Preview shows motion, (b) publish passes, (c) published page: motion starts after load, settles after ~5 s with the default, (d) turn on *Show a pause button…* → one button, pause/play works in grid and viewer, (e) OS "reduce motion" → still only, (f) Arabic/RTL and a phone width, (g) Safari iOS.
 
