@@ -81,10 +81,10 @@ class AiActionTypeGatesTest extends TestCase
         $source = (string) file_get_contents(base_path('app/Services/AiActionGateway.php'));
 
         $calls = preg_match_all('/->policy->authorize\(/', $source);
-        $forwarding = preg_match_all('/->policy->authorize\([^;]*\$definition\[\'domain_permissions\'\], \$definition\[\'application_key\'\]\)/', $source);
+        $forwarding = preg_match_all('/->policy->authorize\([^;]*\$definition\[\'domain_permissions\'\], \$definition\[\'application_key\'\], \$definition\[\'type\'\]\)/', $source);
 
         $this->assertGreaterThanOrEqual(6, $calls);
-        $this->assertSame($calls, $forwarding, 'استدعاء policy->authorize في AiActionGateway لا يمرّر domain_permissions وapplication_key من التعريف.');
+        $this->assertSame($calls, $forwarding, 'استدعاء policy->authorize في AiActionGateway لا يمرّر domain_permissions وapplication_key وtype من التعريف (type لضوابط المشغّل، IMP-X-01b).');
         $this->assertStringNotContainsString("['domain_permission']", $source);
     }
 

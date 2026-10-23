@@ -463,6 +463,9 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('ai-actions-settings', [AiActionSettingsController::class, 'show'])->middleware('throttle:60,1');
         Route::put('ai-actions-settings', [AiActionSettingsController::class, 'update'])
             ->middleware([$perm('ai.actions.manage'), 'throttle:20,1']);
+        // IMP-X-01c: موافقة مالك المؤسسة على التنفيذ (المفتاح الثاني بعد منحة المشغّل، D-11).
+        Route::put('ai-actions-settings/execution-approval', [AiActionSettingsController::class, 'updateExecutionApproval'])
+            ->middleware([$perm('ai.actions.execution_approve'), 'throttle:20,1']);
 
         // AI-ACTIONS-01: persisted/versioned drafts only. There is deliberately
         // no approve/execute/repair endpoint in this foundation slice.

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\AiActionControl;
 use App\Models\Tenant;
+use App\Support\AiActionException;
 use App\Support\AiActionsAccessDecision;
 use App\Support\Settings;
 use Illuminate\Support\Str;
@@ -20,8 +21,8 @@ use Illuminate\Support\Str;
  *  مفتاح المنصة للتنفيذ، توفّر النوع للتنفيذ، منحة المستأجر للتنفيذ، **وموافقة مالك المؤسسة** `ai_actions.execution_approved`). إيقاف التنفيذ بأي مستوى
  *  يترك المعاينة والمراجعة تعملان؛ ومنحة قدرة أدنى لا تفيد أعلى.
  *
- *  هذا القرار شرط لازم لا كافٍ: لا يمنح صلاحية RBAC ولا يوسّع نطاق فرع ولا يتجاوز المعاينة والموافقة قبل التنفيذ. لا يقرؤه أي مسار بعد (التوصيل:
- *  IMP-X-01b خلف بوابة نشر مغلقة).
+ *  هذا القرار شرط لازم لا كافٍ: لا يمنح صلاحية RBAC ولا يوسّع نطاق فرع ولا يتجاوز المعاينة والموافقة قبل التنفيذ. لا يقرؤه مسار إلا عبر `assertAllowed` من
+ *  `AiActionPolicy` و`AiActionProductExecutionService` وخلف بوابة النشر `ai_actions.runtime_controls_enforced` (مغلقة افتراضياً) — IMP-X-01b.
  */
 final class AiActionsAccessResolver
 {
@@ -31,7 +32,56 @@ final class AiActionsAccessResolver
 
     public const CAPABILITIES = [self::PREVIEW, self::REVIEW, self::EXECUTION];
 
+    /** رسالة عرض لكل رمز سبب (الواجهة تترجم بالرمز وتسقط على النص). */
+    private const MESSAGES = [
+        'env_floor_off' => 'AI Actions غير مفعّلة على المنصة.',
+        'platform_off' => 'AI Actions متوقفة من إدارة المنصة.',
+        'type_off' => 'هذا النوع من الإجراءات غير متاح حالياً من إدارة المنصة.',
+        'tenant_not_granted' => 'لم تمنح إدارة المنصة هذه المؤسسة صلاحية هذا النوع بعد.',
+        'tenant_inactive' => 'المؤسسة غير نشطة.',
+        'tenant_not_enabled' => 'AI Actions غير مفعّلة لهذه المؤسسة.',
+        'execution_env_floor_off' => 'تنفيذ AI Actions غير مفعّل على المنصة.',
+        'execution_platform_off' => 'تنفيذ AI Actions متوقف من إدارة المنصة.',
+        'execution_type_off' => 'تنفيذ هذا النوع غير متاح حالياً من إدارة المنصة.',
+        'execution_tenant_not_granted' => 'لم تمنح إدارة المنصة هذه المؤسسة صلاحية تنفيذ هذا النوع بعد.',
+        'tenant_owner_not_approved' => 'تنفيذ AI Actions يحتاج موافقة مالك المؤسسة أولاً.',
+        'unknown_type' => 'نوع AI Action غير مسجّل.',
+        'no_tenant_context' => 'تعذّر تحديد المؤسسة.',
+        'invalid_capability' => 'قدرة غير معروفة.',
+    ];
+
     public function __construct(private readonly AiActionRegistry $registry) {}
+
+    /** بوابة النشر `AI_ACTIONS_RUNTIME_CONTROLS_ENFORCED`: مغلقة افتراضياً فلا يقرأ أي مسار هذا القرار (IMP-X-01b). */
+    public static function enforced(): bool
+    {
+        return config('ai_actions.runtime_controls_enforced') === true;
+    }
+
+    /**
+     * نقطة التوصيل الوحيدة: ترمي `AiActionException` (403) برمز السبب الثابت إن رُفض القرار، ولا شيء إن سُمح أو كانت البوابة مغلقة.
+     * لا تمنح شيئاً: المستدعي يبقى خلف RBAC والفرع والمعاينة والموافقة كما هو.
+     */
+    public function assertAllowed(?string $tenantId, string $actionType, string $capability): void
+    {
+        $denial = $this->denial($tenantId, $actionType, $capability);
+        if ($denial !== null) {
+            throw $denial;
+        }
+    }
+
+    /** كـ`assertAllowed` لكن يعيد الاستثناء بدل رميه (لمن يحتاج أن يُنهي عمله قبل الرمي، مثل إيقاف التنفيذ بين الكتابات). `null` = مسموح أو البوابة مغلقة. */
+    public function denial(?string $tenantId, string $actionType, string $capability): ?AiActionException
+    {
+        if (! self::enforced()) {
+            return null;
+        }
+        $decision = $this->effective($tenantId, $actionType, $capability);
+
+        return $decision->allowed
+            ? null
+            : new AiActionException($decision->reason, self::MESSAGES[$decision->reason] ?? 'AI Action غير متاحة حالياً.', 403);
+    }
 
     public function effective(?string $tenantId, string $actionType, string $capability): AiActionsAccessDecision
     {
