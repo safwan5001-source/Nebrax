@@ -60,6 +60,12 @@ vi.mock("next/font/google", () => ({
   }),
 }));
 
+vi.mock("next/font/local", () => ({
+  default: (options: Record<string, unknown>) => ({
+    variable: options.variable,
+  }),
+}));
+
 vi.mock("@next/third-parties/google", () => ({
   GoogleTagManager: () => null,
 }));

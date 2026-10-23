@@ -16,8 +16,9 @@
  * Typography Library Expansion appended `almarai`, `alexandria`, `noto-kufi` and `reem-kufi`
  * (all Google Fonts, OFL). Cairo, Tajawal, IBM Plex Sans Arabic and Readex Pro were already
  * offered (`cairo-geist`, `tajawal-geist`, `plex-arabic`, `readex`) and are NOT duplicated.
- * The three Thmanyah families are deliberately absent: their licence forbids hosting the files
- * and no documented grant covers a multi-tenant SaaS (see the Typography Expansion report).
+ * `thmanyah-sans`, `thmanyah-serif-display` and `thmanyah-serif-text` are self-hosted from the
+ * official files (`next/font/local`, not OFL): shipped on the owner's responsibility without a
+ * written licence exception on file — see the Typography Expansion report §4.
  * Keys are append-only — order is part of the PHP/TS contract.
  *
  * The first two keys are the legacy `fontPreset` values — `fontPreset` maps onto the catalogue so
@@ -41,6 +42,9 @@ export const FONT_FAMILY_KEYS = [
   "alexandria",
   "noto-kufi",
   "reem-kufi",
+  "thmanyah-sans",
+  "thmanyah-serif-display",
+  "thmanyah-serif-text",
 ] as const;
 
 export type FontFamilyKey = (typeof FONT_FAMILY_KEYS)[number];
@@ -127,6 +131,24 @@ export const FONT_CATALOGUE: readonly FontFamilyEntry[] = [
     name: "Reem Kufi",
     kind: "display",
     stack: "var(--font-reem-kufi), system-ui, sans-serif",
+  },
+  {
+    key: "thmanyah-sans",
+    name: "Thmanyah Sans",
+    kind: "sans",
+    stack: "var(--font-thmanyah-sans), system-ui, sans-serif",
+  },
+  {
+    key: "thmanyah-serif-display",
+    name: "Thmanyah Serif Display",
+    kind: "display",
+    stack: "var(--font-thmanyah-serif-display), Georgia, serif",
+  },
+  {
+    key: "thmanyah-serif-text",
+    name: "Thmanyah Serif Text",
+    kind: "serif",
+    stack: "var(--font-thmanyah-serif-text), Georgia, serif",
   },
 ];
 

@@ -37,6 +37,11 @@ vi.mock('next/font/google', () => {
   };
 });
 
+// `next/font/local` is likewise compiled by Next.js; the Thmanyah faces use it.
+vi.mock('next/font/local', () => ({
+  default: () => ({ variable: '--font-mock', className: 'font-mock' }),
+}));
+
 /**
  * AWJ-STORE-CTX-1 — المتجر النشط يصمد الآن في `sessionStorage` و`?store=` (هذا هو الإصلاح نفسه)، وبيئة jsdom
  * مشتركة بين اختبارات الملف الواحد. يُمسح هذا السياق وحده بعد كل اختبار كي لا يرث اختبارٌ متجرَ سابقه؛ بقية

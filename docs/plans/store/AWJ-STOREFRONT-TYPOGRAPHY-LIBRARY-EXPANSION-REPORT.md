@@ -15,8 +15,8 @@ selects (heading font and body font are already independent), are stored as cata
 `typography.headingFamily` / `bodyFamily`, and render through the existing token pipeline on the public storefront
 and in the Customizer Canvas.
 
-**The three Thmanyah families (Sans, Serif Display, Serif Text) were NOT added** — see §4. This is a deliberate
-stop, not an omission.
+The three **Thmanyah** families (Sans, Serif Display, Serif Text) were added from the official files **on the project
+owner's explicit instruction and responsibility, with NO written licence exception on file** — read §4 before merging.
 
 ## 2. Fonts: requested vs. existing vs. added
 
@@ -30,10 +30,12 @@ stop, not an omission.
 | Alexandria | **added** | `alexandria` |
 | Noto Kufi Arabic | **added** | `noto-kufi` |
 | Reem Kufi | **added** | `reem-kufi` |
-| Thmanyah Sans / Serif Display / Serif Text | **NOT added (gated)** | — |
+| Thmanyah Sans | **added — owner-accepted licence risk (§4)** | `thmanyah-sans` |
+| Thmanyah Serif Display | **added — owner-accepted licence risk (§4)** | `thmanyah-serif-display` |
+| Thmanyah Serif Text | **added — owner-accepted licence risk (§4)** | `thmanyah-serif-text` |
 
 Previously present (8, unchanged, same order and stacks): `cairo-geist`, `tajawal-geist`, `plex-arabic`, `noto-inter`,
-`readex`, `rubik`, `el-messiri`, `amiri-lora`. Catalogue is now 12 entries. Keys are append-only (order is part of
+`readex`, `rubik`, `el-messiri`, `amiri-lora`. Catalogue is now 15 entries. Keys are append-only (order is part of
 the PHP/TS contract); a test pins the original eight.
 
 Note on Cairo/Tajawal: they exist only as the Arabic half of a Geist pair. If a standalone "Cairo only" /
@@ -73,19 +75,23 @@ The **licence in that package, however, does not cover this use**, and the zip c
 | "No amendment to, or exception from, this License is effective unless **made in writing and issued by the Company**." Exceptions: ask@thmanyah.com | The owner's reported permission only counts once issued in writing by thmanyah |
 
 Conclusion: the standard licence permits AWJ itself to use the font in its own products, but **not** to host it for
-third-party tenants' public storefronts. No code or font file was added. (This is an engineering reading of the licence, not
-legal advice.)
+third-party tenants' public storefronts. (An engineering reading of the licence, not legal advice.)
 
-**To unlock:** a written exception from thmanyah (ask@thmanyah.com) that explicitly covers (1) hosting the WOFF2 files on
-AWJ infrastructure/CDN, (2) serving them publicly via `@font-face` on tenant storefronts and in the Customizer, (3) tenant
-merchants selecting the family for their own stores (sublicensing/third-party use), and (4) committing/storing the files in the
-source repository. File it under `docs/legal/`. Then:
-1. Add the WOFF2 files that match the weights the editor offers (Regular 400, Medium 500, Bold 700, Black 900→ editor max 800) under `storefront/src/fonts/thmanyah/`, declared with `next/font/local`, `display: swap`, `preload: false`; mirror in the Canvas `fonts.ts`.
-2. Append `thmanyah-sans`, `thmanyah-serif-display`, `thmanyah-serif-text` to the three twin lists (PHP `FONT_FAMILIES`, both `font-catalogue.ts`) and the fixture. Keys are append-only.
-3. Relax the guard test that currently forbids `thmanyah`/`next/font/local` in the font modules.
+**Decision recorded:** the owner instructed that the files be added and stated they accept the responsibility. This
+report does **not** claim a licence grant exists. The residual risk — demand for removal, licence revocation, and a damages
+claim under the licence's Enforcement section (Saudi law, Riyadh courts) — is the owner's. **Recommended before merge/deploy:**
+obtain the written exception from ask@thmanyah.com (hosting/CDN, public `@font-face` serving, tenant selection, repository storage).
 
-Until then, any `thmanyah-*` value in a document is **dropped by the PHP normalizer** like any unknown key (fixture-pinned),
-and a test fails if Thmanyah or `next/font/local` appears in either font module, so it cannot ship accidentally.
+**What was shipped:** the 12 official WOFF2 files (Regular 400 / Medium 500 / Bold 700 / Black 900 for each family; Light not
+used), byte-for-byte unmodified (no subsetting or re-encoding), in `storefront/src/fonts/thmanyah/` and a duplicate under
+`web/.../presentation/fonts/thmanyah/` for the Canvas; declared with `next/font/local`, `display: swap`, `preload: false`
+(≈80 KB each, fetched only when the family is selected and used; verified: 0 font preloads, 12 `@font-face` rules emitted).
+The two licence PDFs are in `docs/legal/thmanyah/`. Editor heading weight 800 renders as Black (900), the nearest heavier cut.
+
+**Removal (one commit):** delete the three `localFont` declarations in `DocumentShell.tsx` and `fonts.ts`, the three keys from the PHP
+list, both catalogue twins and the fixture, and the two `fonts/thmanyah/` folders. A store that saved a Thmanyah key then falls back to the
+default font (the key is dropped); nothing else is affected. Because keys are append-only for backward compatibility, prefer
+disabling over re-ordering.
 
 ## 5. Integration details
 
@@ -107,7 +113,7 @@ No new settings, controls, fields, APIs or migrations. The existing flow carries
 
 | File | Change |
 |---|---|
-| `app/Support/Commerce/StorefrontGlobalTokensNormalizer.php` | +4 keys in `FONT_FAMILIES` |
+| `app/Support/Commerce/StorefrontGlobalTokensNormalizer.php` | +7 keys in `FONT_FAMILIES` (4 Google + 3 Thmanyah) |
 | `storefront/src/lib/presentation/font-catalogue.ts` | +4 keys/entries, doc comment |
 | `web/src/modules/store-experience-builder/presentation/font-catalogue.ts` | byte-identical twin |
 | `storefront/src/components/layout/DocumentShell.tsx` | +4 `next/font/google` faces |
@@ -117,6 +123,8 @@ No new settings, controls, fields, APIs or migrations. The existing flow carries
 | `storefront/src/components/layout/DocumentShell.test.tsx` | `next/font/google` mock knows the 4 new exports |
 | `web/vitest.setup.ts` | same mock update (44 canvas test files import `fonts.ts`) |
 | `web/src/modules/store-experience-builder/__tests__/GlobalTokensEditor.test.tsx` | option list, names, no duplicates, no Thmanyah |
+| `storefront/src/fonts/thmanyah/*.woff2`, `web/.../presentation/fonts/thmanyah/*.woff2` | 12 official files each (unmodified) |
+| `docs/legal/thmanyah/` | the two licence PDFs from the official package |
 | this report | new |
 
 ## 7. Tests and results (local)
@@ -130,7 +138,8 @@ No new settings, controls, fields, APIs or migrations. The existing flow carries
 | Storefront `tsc --noEmit`, `biome check` on changed files | clean |
 | Storefront `next build` | compiled successfully; four new families' `@font-face` emitted; **0 font preloads** in prerendered HTML, none for the new faces |
 | Web `tsc --noEmit` | one error in `SliderFields.test.tsx` — **pre-existing**, a file this change does not touch |
-| Web `next build` | compiled successfully |
+| Web `next build` | compiled successfully (also after the Thmanyah files were added) |
+| Thmanyah | storefront build emits 12 `@font-face` (400/500/700/900 × 3), 0 font preloads; tests assert the files exist, are real `wOF2`, are `swap` + `preload: false`; fixture 44 cases / 0 failures; web editor 3012 passed; storefront presentation + layout 1703 passed |
 
 Coverage of the requested list: old fonts retained (append-only test) · no duplicate options · new fonts visible
 (editor test) · save/reload (existing token round-trip fixtures + new cases) · tenant isolation unchanged (no new
@@ -151,11 +160,11 @@ storage; settings stay in each store's own document) · legacy documents unchang
 
 ## 9. Not completed
 
-- Thmanyah ×3 (files received; standard licence prohibits hosting/web embedding — written exception needed, §4).
+- A written Thmanyah licence exception (shipped on owner responsibility instead, §4).
 - Standalone Cairo / Tajawal entries (already offered as Geist pairs; not duplicated).
 - Visual browser proof and mobile screenshots.
 
 ## 10. Suggested next step
 
-Obtain Thmanyah's official files and the written hosting grant, then land §4 as a small follow-up slice; in parallel run the existing Canvas
+Obtain Thmanyah's written exception before merge/deploy; in parallel run the existing Canvas
 proof harness with the new faces at 390/1440 in AR and EN.

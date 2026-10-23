@@ -135,14 +135,13 @@ describe("GlobalTokensEditor (CUST-HV V5e-2a)", () => {
   it("fonts: every catalogue family is offered by name and kind, and choosing one writes its key", () => {
     const { field, patch } = mount();
     const options = [...field("typography.bodyFamily").querySelectorAll("option")].map((o) => o.value);
-    expect(options).toEqual(["", "cairo-geist", "tajawal-geist", "plex-arabic", "noto-inter", "readex", "rubik", "el-messiri", "amiri-lora", "almarai", "alexandria", "noto-kufi", "reem-kufi"]);
-    for (const name of ["Almarai", "Alexandria", "Noto Kufi Arabic", "Reem Kufi"]) {
+    expect(options).toEqual(["", "cairo-geist", "tajawal-geist", "plex-arabic", "noto-inter", "readex", "rubik", "el-messiri", "amiri-lora", "almarai", "alexandria", "noto-kufi", "reem-kufi", "thmanyah-sans", "thmanyah-serif-display", "thmanyah-serif-text"]);
+    for (const name of ["Almarai", "Alexandria", "Noto Kufi Arabic", "Reem Kufi", "Thmanyah Sans", "Thmanyah Serif Display", "Thmanyah Serif Text"]) {
       expect(field("typography.bodyFamily").textContent).toContain(name);
     }
-    // no duplicate option labels, and no Thmanyah entry (gated)
+    // no duplicate option labels
     const labels = [...field("typography.bodyFamily").querySelectorAll("option")].map((o) => o.textContent);
     expect(new Set(labels).size).toBe(labels.length);
-    expect(field("typography.bodyFamily").textContent).not.toMatch(/thmanyah/i);
     expect(field("typography.headingFamily").textContent).toContain("Amiri · Lora");
     expect(field("typography.headingFamily").textContent).toContain(tEn("gtFontKindSerif"));
     fireEvent.change(field("typography.headingFamily"), { target: { value: "amiri-lora" } });

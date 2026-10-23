@@ -40,9 +40,14 @@
       "expected": { "typography": { "headingFamily": "alexandria", "bodyFamily": "noto-kufi" } }
     },
     {
-      "name": "typography library expansion: thmanyah (gated, no licensed files) is dropped like any unknown key",
-      "input": { "typography": { "headingFamily": "thmanyah-sans", "bodyFamily": "thmanyah-serif-text", "lineHeight": "tight" } },
-      "expected": { "typography": { "lineHeight": "tight" } }
+      "name": "typography library expansion: the three thmanyah keys are accepted; a thmanyah-like name is not",
+      "input": { "typography": { "headingFamily": "thmanyah-serif-display", "bodyFamily": "thmanyah-sans" } },
+      "expected": { "typography": { "headingFamily": "thmanyah-serif-display", "bodyFamily": "thmanyah-sans" } }
+    },
+    {
+      "name": "typography library expansion: thmanyah-serif-text accepted; unknown thmanyah variants dropped",
+      "input": { "typography": { "headingFamily": "thmanyah-serif-text", "bodyFamily": "thmanyah-mono", "lineHeight": "tight" } },
+      "expected": { "typography": { "lineHeight": "tight", "headingFamily": "thmanyah-serif-text" } }
     },
     {
       "name": "font families: a family name, a CSS stack, a custom upload or a non-string is never a key",
