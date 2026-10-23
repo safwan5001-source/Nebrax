@@ -129,6 +129,12 @@ Schedule::command('payments:post-captured')
     ->withoutOverlapping(10)
     ->onOneServer();
 
+// PAY-H2-02e: إغلاق طلبات دفع الفواتير التي لم تعد قابلة للدفع (سُدّدت/خُفّضت إلى صفر بإشعار دائن/انتهت) — لا أثر محاسبي.
+Schedule::command('payments:close-stale-requests')
+    ->everyTenMinutes()
+    ->withoutOverlapping(10)
+    ->onOneServer();
+
 // PAY-H6-02 — موافقات أجهزة الدفع اليتيمة: لا مرور بلا طلبات قائمة. آمن للتكرار والتزامن (إيجار ذرّي لكل طلب).
 Schedule::command('pos:sweep-terminals')
     ->everyFiveMinutes()

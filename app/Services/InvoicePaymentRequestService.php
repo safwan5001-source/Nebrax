@@ -5,9 +5,11 @@ namespace App\Services;
 use App\Models\Invoice;
 use App\Models\InvoicePaymentRequest;
 use App\Models\PaymentAttempt;
+use App\Support\PaymentLinkToken;
 use App\Models\PaymentGateway;
 use App\Models\User;
 use App\Support\InvoicePayable;
+use App\Support\PaymentNotPayableException;
 use App\Support\PaymentOrchestrationException;
 use App\Support\Rbac;
 use App\Tenancy\TenantContext;
@@ -25,6 +27,9 @@ use Illuminate\Support\Facades\DB;
  */
 final class InvoicePaymentRequestService
 {
+    /** سقف مسح المكنسة في التشغيل الواحد (حماية من مسح غير محدود). */
+    private const SWEEP_SCAN_CAP = 2000;
+
     public function __construct(
         private readonly PaymentOrchestrator $orchestrator,
         private readonly PaymentsRolloutControlService $rollout,
@@ -98,6 +103,11 @@ final class InvoicePaymentRequestService
             throw new PaymentOrchestrationException('request_not_open', 'طلب الدفع لم يعد مفتوحاً.');
         }
 
+        // التقاط مؤكَّد لم يُرحَّل بعد: الطلب سيكتمل بالترحيل، فلا يُلغى (وإلا بقي مدفوعٌ مسجَّلاً ملغى إلى الأبد).
+        if ($this->hasUnreflectedCapture($request)) {
+            throw new PaymentOrchestrationException('payment_captured', 'اكتمل الدفع لدى المزوّد؛ لا يمكن إلغاء الطلب.');
+        }
+
         $active = PaymentAttempt::query()->where('payable_key', $request->payableKey())->whereIn('capture_status', PaymentAttempt::ACTIVE_STATUSES)->first();
         if ($active !== null) {
             // الإلغاء محلي لا أثر له لدى المزوّد، فيُستعلم المزوّد (الحقيقة) أولاً: دفعٌ التُقط فعلاً لا يُلغى (الدفع حقيقة).
@@ -131,6 +141,89 @@ final class InvoicePaymentRequestService
     }
 
     /**
+     * يُصدر رابط الدفع العام لطلب مفتوح مرة واحدة: رمز عشوائي 32 بايت (base64url، 43 حرفاً) يُعاد خاماً **هنا فقط**، ويُخزَّن SHA-256 له وحده
+     * (`token_hash`، ثابت بعد التثبيت). ضياع الرمز ⇒ إلغاء الطلب وإنشاء آخر (لا إعادة عرض ولا تدوير).
+     */
+    public function issueLink(InvoicePaymentRequest $request, ?User $actor): string
+    {
+        $this->assertActor($actor);
+        $this->assertEnabled();
+
+        return DB::transaction(function () use ($request): string {
+            $locked = InvoicePaymentRequest::query()->lockForUpdate()->findOrFail($request->getKey());
+            if ($locked->status !== InvoicePaymentRequest::STATUS_OPEN) {
+                throw new PaymentOrchestrationException('request_not_open', 'طلب الدفع لم يعد مفتوحاً.');
+            }
+            // لا يُستهلك الرمز الوحيد على طلب مات فعلاً قبل أن تكنسه المكنسة (منتهٍ/فاتورة مسدَّدة أو غير مرحَّلة).
+            if ($locked->expires_at !== null && $locked->expires_at->isPast()) {
+                throw new PaymentOrchestrationException('request_expired', 'انتهت صلاحية طلب الدفع.');
+            }
+            $invoice = Invoice::query()->find($locked->invoice_id);
+            if ($invoice === null || ! $invoice->isPosted() || $invoice->remaining() <= 0) {
+                throw new PaymentOrchestrationException('invoice_not_payable', 'الفاتورة لم تعد قابلة للدفع.');
+            }
+            if ($locked->token_hash !== null) {
+                throw new PaymentOrchestrationException('link_already_issued', 'أُصدر رابط هذا الطلب سابقاً ولا يُعاد عرضه؛ ألغِ الطلب وأنشئ آخر.');
+            }
+            $token = PaymentLinkToken::generate();
+            $locked->forceFill(['token_hash' => PaymentLinkToken::hash($token)])->save();
+
+            return $token;
+        });
+    }
+
+    /**
+     * مكنسة دورية عبر المستأجرين (مسار نظامي بلا فاعل): تلغي طلباً مفتوحاً لفاتورة لم تعد قابلة للدفع (سُدّدت/خُفّضت بإشعار دائن إلى صفر/لم تعد
+     * مرحَّلة) بالمسار القائم (يستعلم المزوّد أولاً؛ دفعة ملتقطة لا تُلغى)، وتُنهي منتهي الصلاحية بلا محاولة نشطة. لا قيد ولا سند ولا مساس بالمحاسبة.
+     *
+     * @return array{cancelled: int, expired: int, skipped: int}
+     */
+    public function closeStale(int $limit = 200): array
+    {
+        $summary = ['cancelled' => 0, 'expired' => 0, 'skipped' => 0];
+        $previous = $this->tenant->id();
+
+        // مرشّحون محتملون فقط (منتهٍ أو فاتورته لم تعد قابلة للدفع) وبمسح بالمعرّف حتى سقف ثابت، فلا تُجوِّع صفوفٌ حيّة قديمة الطابور.
+        $now = now('UTC');
+        $candidates = fn () => InvoicePaymentRequest::query()->withoutGlobalScopes()
+            ->where('status', InvoicePaymentRequest::STATUS_OPEN)
+            ->where(function ($q) use ($now) {
+                $q->where('expires_at', '<=', $now)->orWhereExists(function ($s) {
+                    $s->select(DB::raw(1))->from('invoices')->whereColumn('invoices.id', 'invoice_payment_requests.invoice_id')
+                        ->where(fn ($i) => $i->where('invoices.status', '!=', 'posted')->orWhereRaw('invoices.total - invoices.paid_amount <= 0'));
+                });
+            });
+        // مسح بالمعرّف على دفعات: الصفوف المتخطّاة (محاولة نشطة، التقاط غير مرحَّل، فشل) لا تحجز مكان غيرها — المؤشّر يتقدّم، والتوقف عند `limit` انتقالاً فعلياً أو سقف المسح.
+        $cursor = null;
+        for ($scanned = 0; $scanned < self::SWEEP_SCAN_CAP && $summary['cancelled'] + $summary['expired'] < $limit; ) {
+            $batch = $candidates()->when($cursor !== null, fn ($q) => $q->where('id', '>', $cursor))->orderBy('id')->limit(100)->get(['id', 'tenant_id']);
+            if ($batch->isEmpty()) {
+                break;
+            }
+            $cursor = $batch->last()->id;
+            $scanned += $batch->count();
+            foreach ($batch as $row) {
+                $this->tenant->set((string) $row->tenant_id);
+                try {
+                    $outcome = $this->closeOne((string) $row->id);
+                    if ($outcome !== null) {
+                        $summary[$outcome]++;
+                    }
+                } catch (\Throwable $e) {
+                    $summary['skipped']++;
+                    if (! $e instanceof PaymentOrchestrationException) {
+                        report($e);
+                    }
+                } finally {
+                    $previous === null ? $this->tenant->forget() : $this->tenant->set($previous);
+                }
+            }
+        }
+
+        return $summary;
+    }
+
+    /**
      * بدء محاولة دفع لطلب مفتوح. `$amountMinor = null` ⇒ المتبقي كاملاً. مبلغ جزئي يتطلب `allow_partial` للرابط (D-16) ولا يتجاوز المتبقي.
      */
     public function startAttempt(InvoicePaymentRequest $request, string $idempotencyKey, ?int $amountMinor, ?User $actor = null): PaymentAttempt
@@ -141,6 +234,11 @@ final class InvoicePaymentRequestService
         }
         if ($request->expires_at !== null && $request->expires_at->isPast()) {
             throw new PaymentOrchestrationException('request_expired', 'انتهت صلاحية طلب الدفع.');
+        }
+
+        // مال التُقط لدى المزوّد ولم ينعكس بعد على المتبقي (ترحيل معلّق أو محجوب بفترة مقفلة): محاولة جديدة قد تخصم الدافع مرتين.
+        if ($this->hasUnreflectedCapture($request)) {
+            throw new PaymentOrchestrationException('payment_captured', 'اكتمل دفع لدى المزوّد ولم يُرحَّل بعد؛ لا يمكن بدء دفعة جديدة.');
         }
 
         $invoice = Invoice::query()->findOrFail($request->invoice_id);
@@ -164,7 +262,54 @@ final class InvoicePaymentRequestService
             throw new PaymentOrchestrationException('gateway_unavailable', 'اتصال البوابة غير موجود.');
         }
 
-        return $this->orchestrator->start(new InvoicePayable($request, $amountMinor), $gateway, $idempotencyKey, $actor);
+        try {
+            return $this->orchestrator->start(new InvoicePayable($request, $amountMinor), $gateway, $idempotencyKey, $actor);
+        } catch (PaymentNotPayableException $e) {
+            // الفاتورة سُدّدت/لم تعد مرحَّلة/تغيّر طرفها بعد إنشاء الطلب: خطأ عمل بصيغة موحّدة لا 500.
+            throw new PaymentOrchestrationException('invoice_not_payable', 'الفاتورة لم تعد قابلة للدفع.', $e);
+        }
+    }
+
+    /** @return 'cancelled'|'expired'|'skipped'|null  (null = لم يعد مرشّحاً) */
+    private function closeOne(string $id): ?string
+    {
+        $request = InvoicePaymentRequest::query()->find($id);
+        if ($request === null || $request->status !== InvoicePaymentRequest::STATUS_OPEN) {
+            return null;
+        }
+        // مال التُقط ولم يُرحَّل بعد: الطلب سيكتمل بالترحيل، فلا يُلغى ولا يُنهى.
+        if ($this->hasUnreflectedCapture($request)) {
+            return 'skipped';
+        }
+        $invoice = Invoice::query()->find($request->invoice_id);
+        if ($invoice === null || ! $invoice->isPosted() || $invoice->remaining() <= 0) {
+            $this->cancel($request, null);
+
+            return 'cancelled';
+        }
+        if ($request->expires_at !== null && $request->expires_at->isPast()) {
+            if (PaymentAttempt::query()->where('payable_key', $request->payableKey())->whereIn('capture_status', PaymentAttempt::ACTIVE_STATUSES)->exists()) {
+                return 'skipped';
+            }
+            DB::transaction(function () use ($request): void {
+                $locked = InvoicePaymentRequest::query()->lockForUpdate()->findOrFail($request->getKey());
+                if ($locked->status === InvoicePaymentRequest::STATUS_OPEN) {
+                    $locked->forceFill(['status' => InvoicePaymentRequest::STATUS_EXPIRED])->save();
+                }
+            });
+
+            return 'expired';
+        }
+
+        return null;
+    }
+
+    /** التُقط مال لدى المزوّد ولم ينعكس بعد على المتبقي (ترحيل معلّق أو محجوب بفترة مقفلة). */
+    private function hasUnreflectedCapture(InvoicePaymentRequest $request): bool
+    {
+        return PaymentAttempt::query()->where('payable_key', $request->payableKey())
+            ->where('capture_status', PaymentAttempt::STATUS_CAPTURED)
+            ->whereIn('posting_status', [PaymentAttempt::POSTING_PENDING, PaymentAttempt::POSTING_BLOCKED_PERIOD])->exists();
     }
 
     private function tenantCurrency(Invoice $invoice): string
