@@ -8,10 +8,14 @@ use App\Models\InvoicePaymentRequest;
 use App\Models\Payment;
 use App\Models\PaymentAttempt;
 use App\Models\PaymentAttemptPosting;
+use App\Models\PaymentAttemptPostingEvent;
+use App\Models\User;
 use App\Services\Accounting\AccountingDateGuard;
 use App\Services\Accounting\AccountingPeriodLockedException;
 use App\Services\Accounting\FiscalYearClosedException;
 use App\Services\Accounting\PaymentService;
+use App\Support\PaymentOrchestrationException;
+use App\Support\Rbac;
 use App\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -73,6 +77,49 @@ final class PaymentAttemptPostingService
             // التراجع كامل (لا سند ولا قيد). نسجّل الحجب بمعاملة مستقلة.
             return $this->recordBlocked($attempt, $e);
         }
+    }
+
+    /**
+     * M5-R1 — إعادة ترحيل صريحة لالتقاط محجوب بفترة/سنة مقفلة **بعد فتحها رسمياً**، بقرار مخوَّل (`payments.resolve_blocked`) وسبب مسجَّل. التاريخ
+     * المحاسبي الأصلي لا يتغير. ما زال التاريخ مقفلاً ⇒ يبقى محجوباً والقرار يُسجَّل `still_blocked`. القرار والترحيل في معاملة واحدة (لا ترحيل بلا أثر تدقيق).
+     *
+     * @return self::OUTCOME_POSTED|self::OUTCOME_BLOCKED_PERIOD
+     */
+    public function repost(PaymentAttempt $attempt, User $actor, string $reason): string
+    {
+        $reason = trim($reason);
+        if (mb_strlen($reason) < 5 || mb_strlen($reason) > 500) {
+            throw new PaymentOrchestrationException('reason_required', 'سبب إعادة الترحيل مطلوب (5–500 حرفاً).');
+        }
+        // يُعاد تحميل الفاعل من القاعدة: خفض الدور/التعطيل بعد التحميل لا يُتجاوز.
+        $fresh = $this->tenant->has() && $actor->getKey() !== null
+            ? User::query()->whereKey($actor->getKey())->where('tenant_id', (string) $this->tenant->id())->where('is_active', true)->first()
+            : null;
+        if ($fresh === null || ! Rbac::allows((string) $fresh->role, 'payments.resolve_blocked')) {
+            throw new PaymentOrchestrationException('forbidden', 'ليست لديك صلاحية معالجة الدفعات المحجوبة.');
+        }
+
+        return DB::transaction(function () use ($attempt, $fresh, $reason): string {
+            $current = PaymentAttempt::query()->lockForUpdate()->find($attempt->getKey());
+            if ($current === null || ! self::handles((string) $current->payable_key)
+                || $current->posting_status !== PaymentAttempt::POSTING_BLOCKED_PERIOD) {
+                throw new PaymentOrchestrationException('not_blocked', 'الدفعة ليست محجوبة بفترة مقفلة.');
+            }
+
+            $outcome = $this->process($current, true);
+            if (! in_array($outcome, [self::OUTCOME_POSTED, self::OUTCOME_BLOCKED_PERIOD], true)) {
+                throw new PaymentOrchestrationException('not_postable', 'تعذّر ترحيل الدفعة (تحتاج مراجعة).');
+            }
+            PaymentAttemptPostingEvent::create([
+                'payment_attempt_id' => $current->id,
+                'action' => PaymentAttemptPostingEvent::ACTION_REPOST,
+                'outcome' => $outcome === self::OUTCOME_POSTED ? PaymentAttemptPostingEvent::OUTCOME_POSTED : PaymentAttemptPostingEvent::OUTCOME_STILL_BLOCKED,
+                'actor_id' => $fresh->id,
+                'reason' => $reason,
+            ]);
+
+            return $outcome;
+        });
     }
 
     /**
