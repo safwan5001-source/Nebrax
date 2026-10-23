@@ -69,7 +69,7 @@ final class StocktakeCountImportFields
     /** @return list<string> */
     public static function templateHeaders(): array
     {
-        return ['sku', 'barcode', 'product_name', 'counted_quantity'];
+        return ['nebrax_id', 'sku', 'barcode', 'product_name', 'counted_quantity'];
     }
 
     /** @param list<string> $headers @return array<int, string|null> */

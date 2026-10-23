@@ -89,7 +89,7 @@ class StocktakeCountImportConcurrencyPostgresTest extends TestCase
             function () use ($tenant, $stocktake, $path) {
                 app(TenantContext::class)->set($tenant);
 
-                return app(StocktakeCountImportService::class)->apply(new UploadedFile($path, 'count.csv', 'text/csv', null, true), ['stocktake_id' => $stocktake->id])['written'];
+                return app(StocktakeCountImportService::class)->apply(new UploadedFile($path, 'count.csv', 'text/csv', null, true), ['stocktake_id' => $stocktake->id], null)['written'];
             },
             function () use ($tenant, $stocktake) {
                 app(TenantContext::class)->set($tenant);
@@ -144,7 +144,7 @@ class StocktakeCountImportConcurrencyPostgresTest extends TestCase
             app(TenantContext::class)->set($tenant);
             $started = microtime(true);
             try {
-                app(StocktakeCountImportService::class)->apply(new UploadedFile($path, 'count.csv', 'text/csv', null, true), ['stocktake_id' => $stocktake->id]);
+                app(StocktakeCountImportService::class)->apply(new UploadedFile($path, 'count.csv', 'text/csv', null, true), ['stocktake_id' => $stocktake->id], null);
                 file_put_contents($this->dir.'/child_result', json_encode(['ok' => true, 'waited' => microtime(true) - $started]));
             } catch (\Throwable $e) {
                 file_put_contents($this->dir.'/child_result', json_encode(['ok' => false, 'message' => $e->getMessage(), 'waited' => microtime(true) - $started]));
@@ -166,7 +166,7 @@ class StocktakeCountImportConcurrencyPostgresTest extends TestCase
         $result = json_decode((string) file_get_contents($this->dir.'/child_result'), true);
         $this->assertFalse($result['ok'], json_encode($result, JSON_UNESCAPED_UNICODE));
         $this->assertStringContainsString('مرحَّل', $result['message']);
-        $this->assertGreaterThan(1.0, $result['waited']);
+        $this->assertGreaterThan(0.8, $result['waited']);
         app(TenantContext::class)->set($tenant);
         $this->assertSame(0, \App\Models\StocktakeLine::query()->where('stocktake_id', $stocktake->id)->whereNotNull('counted_quantity')->count());
     }

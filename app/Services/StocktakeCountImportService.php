@@ -58,15 +58,15 @@ class StocktakeCountImportService
      * قالب عدّ **أعمى** لجردٍ بعينه: صفٌّ لكل صنف في ورقته (رمز/باركود/اسم) وعمود عدّ فارغ — لا رصيد نظام فيه ليبقى العدّ مستقلاً عن الدفتر.
      * يخضع لوصول المستخدم نفسه.
      */
-    public function template(string $stocktakeId, ?string $userId = null): string
+    public function template(string $stocktakeId, ?string $userId): string
     {
         $stocktake = $this->loadStocktake($stocktakeId, $userId, requireDraft: false);
         $rows = [];
         foreach ($stocktake->lines()->with('product')->get() as $line) {
             $product = $line->product;
-            $rows[] = [(string) ($product?->sku ?? ''), (string) ($product?->barcode ?? ''), (string) ($product?->name ?? ''), ''];
+            $rows[] = [(string) $line->product_id, (string) ($product?->sku ?? ''), (string) ($product?->barcode ?? ''), (string) ($product?->name ?? ''), ''];
         }
-        usort($rows, static fn (array $a, array $b): int => strcmp($a[0].$a[2], $b[0].$b[2]));
+        usort($rows, static fn (array $a, array $b): int => strcmp($a[1].$a[3], $b[1].$b[3]));
 
         return SpreadsheetWriter::csv(array_map(static fn (string $key): string => (string) Fields::get($key)['label_ar'], Fields::templateHeaders()), $rows);
     }
@@ -105,7 +105,7 @@ class StocktakeCountImportService
      * @param  array<string, mixed>  $options
      * @return array<string, mixed>
      */
-    public function preview(UploadedFile $file, array $options, ?string $userId = null, int $maxRows = self::MAX_ROWS): array
+    public function preview(UploadedFile $file, array $options, ?string $userId, int $maxRows = self::MAX_ROWS): array
     {
         $resolved = $this->options($options);
         $stocktake = $this->loadStocktake($resolved['stocktake_id'], $userId);
@@ -132,14 +132,14 @@ class StocktakeCountImportService
      * @param  array<string, mixed>  $options
      * @return array<string, mixed>
      */
-    public function apply(UploadedFile $file, array $options, ?string $userId = null, int $maxRows = self::MAX_ROWS): array
+    public function apply(UploadedFile $file, array $options, ?string $userId, int $maxRows = self::MAX_ROWS): array
     {
         $resolved = $this->options($options);
 
         return DB::transaction(function () use ($file, $resolved, $userId, $maxRows): array {
             // القفل أولاً: `StocktakeService::post` يقفل الصف نفسه، فيتسلسل الترحيل والاستيراد؛ والحالة تُقرأ تحت القفل لا قبله.
             $stocktake = $this->loadStocktake($resolved['stocktake_id'], $userId, lock: true);
-            $parsed = $this->parse($file, $resolved, $stocktake, $maxRows);
+            $parsed = $this->parse($file, $resolved, $stocktake, $maxRows, lockLines: true);
 
             if ($parsed['total_rows'] === 0) {
                 throw new RuntimeException('لا يحتوي الملف صفوف بيانات قابلة للتطبيق.');
@@ -220,10 +220,13 @@ class StocktakeCountImportService
             $query->lockForUpdate();
         }
         $stocktake = $query->first();
+        // `$userId = null` = مشغّل نظام موثوق (لا مستخدم)؛ المحرّك يمرّر دائماً منشئ التشغيلة. معرّف مستخدم غير موجود/محذوف ⇒ رفض لا تجاوز.
         $user = $userId !== null ? User::query()->find($userId) : null;
+        $denied = $userId !== null && ($user === null
+            // كمتحكّم العدّ: الجرد بلا فرع (`branch_id` فارغ) لا يُفحص فرعه، ويُفحص مخزنه دائماً.
+            || ($stocktake !== null && (($stocktake->branch_id !== null && ! $user->canAccessBranch($stocktake->branch_id)) || ! $user->canAccessWarehouse($stocktake->warehouse_id))));
 
-        if ($stocktake === null
-            || ($user !== null && (! $user->canAccessBranch($stocktake->branch_id) || ! $user->canAccessWarehouse($stocktake->warehouse_id)))) {
+        if ($stocktake === null || $denied) {
             throw new RuntimeException('الجرد غير موجود.');
         }
         if ($requireDraft && ! $stocktake->isDraft()) {
@@ -248,7 +251,7 @@ class StocktakeCountImportService
      * @param  array{stocktake_id: string, existing_count_policy: string, mapping: array<int, string|null>|null}  $options
      * @return array<string, mixed>
      */
-    private function parse(UploadedFile $file, array $options, Stocktake $stocktake, int $maxRows): array
+    private function parse(UploadedFile $file, array $options, Stocktake $stocktake, int $maxRows, bool $lockLines = false): array
     {
         $raw = $this->readFile($file, $maxRows);
         if ($raw === []) {
@@ -261,7 +264,8 @@ class StocktakeCountImportService
         /** @var array<string, StocktakeLine> $lines بمعرّف المنتج */
         $lines = [];
         $bySku = $byBarcode = [];
-        foreach ($stocktake->lines()->with('product')->get() as $line) {
+        // تحت القفل: أسطر الجرد تُقفل بترتيب المنتج الثابت، فلا يتسلّل عدٌّ مباشر بين قراءة سياسة «العدّ القائم» وكتابتها.
+        foreach ($stocktake->lines()->with('product')->orderBy('product_id')->when($lockLines, fn ($q) => $q->lockForUpdate())->get() as $line) {
             $lines[$line->product_id] = $line;
             if (($sku = trim((string) ($line->product?->sku ?? ''))) !== '') {
                 $bySku[$sku][] = $line->product_id;
@@ -382,7 +386,9 @@ class StocktakeCountImportService
      */
     private function resolveLine(array $cells, array $lines, array $bySku, array $byBarcode, array &$messages): ?StocktakeLine
     {
-        $id = strtolower($cells['nebrax_id'] ?? '');
+        // كل معرّف مذكور يُحلّ مستقلاً إلى مجموعة أسطر؛ المعرّفات المتعددة يجب أن تتقاطع في سطر واحد (لا يفوز أحدها صامتاً على الآخر).
+        $sets = [];
+        $id = strtolower($this->unquote($cells['nebrax_id'] ?? ''));
         if ($id !== '') {
             if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/', $id) !== 1) {
                 $messages[] = 'معرّف نبراكس غير صالح. احذف العمود لتتم المطابقة برمز الصنف.';
@@ -394,33 +400,51 @@ class StocktakeCountImportService
 
                 return null;
             }
-
-            return $lines[$id];
+            $sets['معرّف نبراكس'] = [$id];
         }
-
         foreach ([['sku', $bySku, 'الرمز'], ['barcode', $byBarcode, 'الباركود']] as [$field, $index, $label]) {
-            $value = $cells[$field] ?? '';
+            $value = $this->unquote($cells[$field] ?? '');
             if ($value === '') {
                 continue;
             }
             $matches = $index[$value] ?? [];
-            if (count($matches) > 1) {
-                $messages[] = "{$label} «{$value}» يطابق أكثر من صنف في ورقة الجرد. استخدم معرّف نبراكس.";
-
-                return null;
-            }
             if ($matches === []) {
                 $messages[] = "لا صنف بـ{$label} «{$value}» في ورقة هذا الجرد. الاستيراد لا يضيف أصنافاً إلى الورقة.";
 
                 return null;
             }
-
-            return $lines[$matches[0]];
+            $sets[$label] = $matches;
         }
 
-        $messages[] = 'الصف بلا معرّف صنف. أضف رمز الصنف أو الباركود أو معرّف نبراكس.';
+        if ($sets === []) {
+            $messages[] = 'الصف بلا معرّف صنف. أضف رمز الصنف أو الباركود أو معرّف نبراكس.';
 
-        return null;
+            return null;
+        }
+        $common = array_values(array_intersect(...array_values($sets)));
+        if ($common === []) {
+            $messages[] = 'معرّفات الصف متعارضة: تشير إلى أصناف مختلفة ('.implode('، ', array_keys($sets)).'). صحّح الصف أو احذف الأعمدة الزائدة.';
+
+            return null;
+        }
+        if (count($common) > 1) {
+            $messages[] = 'المعرّف يطابق أكثر من صنف في ورقة الجرد. استخدم معرّف نبراكس.';
+
+            return null;
+        }
+
+        return $lines[$common[0]];
+    }
+
+    /**
+     * التصدير يسبق الخلايا التي تبدأ بـ `= + - @` بفاصلة عليا منعاً لحقن الصيغ في Excel، والقارئ لا يزيلها: نزيلها هنا حتى يعمل ملف round-trip
+     * لرمز/باركود مثل `-123`. لا أثر على قيمة لا تبدأ بها.
+     */
+    private function unquote(string $value): string
+    {
+        $value = trim($value);
+
+        return preg_match("/^'[=+\\-@\t\r]/", $value) === 1 ? substr($value, 1) : $value;
     }
 
     /**
@@ -431,14 +455,18 @@ class StocktakeCountImportService
      */
     private function quantity(string $text, array &$messages): ?int
     {
-        $digits = preg_replace('/[,\s\x{00A0}]/u', '', Normalizer::digits(trim($text))) ?? '';
+        $digits = Normalizer::digits(trim($text));
+        // الفاصلة/المسافة مقبولتان **فاصل آلاف صارماً** فقط (1,000 · 12 500)؛ `1,5` أو `12,5` كانتا ستصيران 15 و125 — عشريّ بفاصلة يضخّم العدّ عشرة أضعاف.
+        if (preg_match('/^\d{1,3}(?:[,\x{00A0} ]\d{3})+$/u', $digits) === 1) {
+            $digits = preg_replace('/[,\x{00A0} ]/u', '', $digits) ?? $digits;
+        }
         if ($digits === '') {
             $messages[] = '«الكمية المعدودة» فارغة. احذف الصف إن لم يُعدّ الصنف — الفراغ لا يعني صفراً.';
 
             return null;
         }
         if (preg_match('/^\d{1,9}$/', $digits) !== 1) {
-            $messages[] = '«الكمية المعدودة» يجب أن تكون عدداً صحيحاً غير سالب بلا كسور.';
+            $messages[] = '«الكمية المعدودة» يجب أن تكون عدداً صحيحاً غير سالب بلا كسور (فاصل الآلاف المقبول: 1,000).';
 
             return null;
         }
