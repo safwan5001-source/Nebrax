@@ -50,6 +50,18 @@ class InvoicePaymentRequestController extends ApiController
         return $this->guarded(fn () => (new InvoicePaymentRequestResource($this->requests->cancel($paymentRequest, $request->user())))->response());
     }
 
+    /** يُصدر رابط الدفع العام مرة واحدة: الرمز الخام يظهر في هذا الرد فقط (يُخزَّن هاشه وحده). */
+    public function issueLink(Request $request, string $id): JsonResponse
+    {
+        $paymentRequest = $this->requests->find($id);
+
+        return $this->guarded(function () use ($paymentRequest, $request) {
+            $token = $this->requests->issueLink($paymentRequest, $request->user());
+
+            return response()->json(['data' => ['token' => $token, 'path' => '/pay/'.$token]], 201)->header('Cache-Control', 'no-store, private');
+        });
+    }
+
     public function startAttempt(StartInvoicePaymentAttemptRequest $request, string $id): JsonResponse
     {
         $paymentRequest = $this->requests->find($id);
@@ -80,7 +92,7 @@ class InvoicePaymentRequestController extends ApiController
                 'forbidden' => 403,
                 'provider_unavailable' => 503,
                 'open_request_exists', 'request_not_open', 'request_expired', 'active_attempt_exists', 'idempotency_conflict',
-                'payable_changed', 'payment_captured', 'gateway_unavailable' => 409,
+                'payable_changed', 'payment_captured', 'gateway_unavailable', 'link_already_issued', 'invoice_not_payable', 'nothing_due' => 409,
                 default => 422,
             };
 

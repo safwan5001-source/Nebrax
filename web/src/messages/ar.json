@@ -2034,6 +2034,7 @@
       "ai": "الذكاء الاصطناعي"
     },
     "perm_actions": {
+      "resolve_blocked": "معالجة المحجوبة",
       "view": "عرض",
       "manage": "إدارة",
       "create": "إنشاء",
