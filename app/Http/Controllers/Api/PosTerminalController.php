@@ -10,6 +10,7 @@ use App\Models\PosDevice;
 use App\Models\PosPaymentTerminal;
 use App\Models\PosSession;
 use App\Models\PosTerminalRequest;
+use App\Services\PosTerminalAdapterRegistry;
 use App\Services\PosTerminalService;
 use App\Support\PosTerminalException;
 use Closure;
@@ -27,7 +28,14 @@ class PosTerminalController extends ApiController
 
     public function index(): JsonResponse
     {
-        return PosPaymentTerminalResource::collection(PosPaymentTerminal::query()->orderBy('name')->get())->response();
+        $providers = array_map(
+            fn (string $key) => ['key' => $key, 'simulated' => PosTerminalAdapterRegistry::isSimulated($key)],
+            $this->terminals->availableProviders(),
+        );
+
+        return PosPaymentTerminalResource::collection(PosPaymentTerminal::query()->orderBy('name')->get())
+            ->additional(['meta' => ['providers' => $providers]])
+            ->response();
     }
 
     public function store(StorePosPaymentTerminalRequest $request): JsonResponse
