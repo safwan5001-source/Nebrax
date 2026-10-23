@@ -1,4 +1,6 @@
 import type { CSSProperties } from "react";
+import { MotionPicture } from "@/components/ui/motion-picture";
+import { animatedPictureSources } from "@/lib/presentation/animated-sources";
 import { destination } from "@/lib/home/destination";
 import {
   type GalleryImageView,
@@ -48,8 +50,8 @@ function Picture({
   const position = image.focal
     ? `${image.focal.x}% ${image.focal.y}%`
     : undefined;
-  return (
-    <picture data-gallery-picture="">
+  const motion = animatedPictureSources(image.media, undefined, sizes);
+  const contents = (
       {data.webp ? (
         <source type="image/webp" srcSet={data.webp} sizes={sizes} />
       ) : null}
@@ -67,7 +69,14 @@ function Picture({
           position ? ({ objectPosition: position } as CSSProperties) : undefined
         }
       />
-    </picture>
+    </>
+  );
+  return motion ? (
+    <MotionPicture id={image.media.animation!.src} sources={motion} data-gallery-picture="">
+      {contents}
+    </MotionPicture>
+  ) : (
+    <picture data-gallery-picture="">{contents}</picture>
   );
 }
 
@@ -92,6 +101,8 @@ export function HomeGallery({
   const viewerItems = images.map((image) => {
     const data = pictureData(image.media);
     return {
+      animation: image.media.animation?.src,
+      format: image.media.animation?.format,
       webp: data.webp,
       jpg: data.jpg,
       src: data.fallback,
