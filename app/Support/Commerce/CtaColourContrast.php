@@ -133,6 +133,9 @@ final class CtaColourContrast
             if (! is_array($section) || ($section['visible'] ?? false) !== true || ! is_array($section['content']['ctas'] ?? null)) {
                 continue; // قسمٌ مخفي لا يُنشر فلا يُحجَب به النشر.
             }
+            if (($section['content']['showCtas'] ?? null) === false) {
+                continue; // AWJ-HERO-DISPLAY — أزرار مخفية لا تُرسم فلا يُحكَم على ألوانها.
+            }
             $type = is_string($section['type'] ?? null) ? $section['type'] : '';
             $design = is_array($section['design'] ?? null) ? $section['design'] : null;
             foreach (self::issues($type, $section['content']['ctas'], $design, $config, $media) as $issue) {

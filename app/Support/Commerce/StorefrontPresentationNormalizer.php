@@ -1074,7 +1074,12 @@ final class StorefrontPresentationNormalizer
      * homepage.heroHeadline/heroSubheadline» (V0 §8.1.4)، أما `{headline: ""}` فهو محتوى صريح فارغ
      * (اسم المتجر + CTA الافتراضي) ويبقى. الترتيب القانوني: headline، subheadline، ctas.
      *
-     * @return array{headline: string, subheadline?: string, ctas?: list<array{label: string, href: string}>}|null
+     * AWJ-HERO-DISPLAY — خيارات عرض اختيارية: `showTitle` / `showSubheadline` / `showCtas` لا تُخزَّن إلا بقيمة `false`
+     * (الغياب = ظاهر كما كان فلا تتغيّر وثيقة قديمة)، و`imageHref` رابط صورة البطل بقواعد `sanitizeContentHref`. وجود أيٍّ
+     * منها محتوى صريح (الإخفاء قرار تاجر). الترتيب القانوني: headline، subheadline، ctas، showTitle، showSubheadline،
+     * showCtas، imageHref.
+     *
+     * @return array{headline: string, subheadline?: string, ctas?: list<array{label: string, href: string}>, showTitle?: false, showSubheadline?: false, showCtas?: false, imageHref?: string}|null
      */
     private function normalizeHeroContent(mixed $raw): ?array
     {
@@ -1089,8 +1094,16 @@ final class StorefrontPresentationNormalizer
 
         $ctas = $this->normalizeCtaList($raw['ctas'] ?? null, self::MAX_HERO_CTAS);
 
-        // محتوى صريح فقط إن كُتب شيء: مفتاح headline نصّي (حتى الفارغ)، أو عنوان فرعي، أو CTA.
-        if (! (array_key_exists('headline', $raw) && is_string($raw['headline'])) && $subheadline === '' && $ctas === []) {
+        $hidden = [];
+        foreach (['showTitle', 'showSubheadline', 'showCtas'] as $flag) {
+            if (($raw[$flag] ?? null) === false) {
+                $hidden[] = $flag;
+            }
+        }
+        $imageHref = $this->sanitizeContentHref($this->asString($raw['imageHref'] ?? null));
+
+        // محتوى صريح فقط إن كُتب شيء: مفتاح headline نصّي (حتى الفارغ)، أو عنوان فرعي، أو CTA، أو خيار عرض.
+        if (! (array_key_exists('headline', $raw) && is_string($raw['headline'])) && $subheadline === '' && $ctas === [] && $hidden === [] && $imageHref === '') {
             return null;
         }
 
@@ -1100,6 +1113,12 @@ final class StorefrontPresentationNormalizer
         }
         if ($ctas !== []) {
             $content['ctas'] = $ctas;
+        }
+        foreach ($hidden as $flag) {
+            $content[$flag] = false;
+        }
+        if ($imageHref !== '') {
+            $content['imageHref'] = $imageHref;
         }
 
         return $content;

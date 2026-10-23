@@ -371,6 +371,7 @@ export function sectionContrastIssues(
   design: SectionDesign,
   ctx: DesignContext,
   type?: string,
+  textless = false,
 ): SectionContrastIssue[] {
   // V6b-2 — a picture whose luminance cannot be proven is never publishable, whatever the
   // text colours are: "unprovable = non-conforming", fixed on the background itself.
@@ -380,6 +381,9 @@ export function sectionContrastIssues(
   ) {
     return [{ field: "background", code: "contrast_unprovable", ratio: 1 }];
   }
+  // AWJ-HERO-DISPLAY — a hero showing no title, description or button has no text over the picture to prove (the picture's
+  // own evidence above is still required). Twin of PHP `SectionDesignContrast::issues($textless)`.
+  if (textless) return [];
   const text = effectiveText(design, ctx, type);
   if (!text.judged) return [];
   const out = new Map<string, SectionContrastIssue>();
@@ -495,6 +499,7 @@ export function resolveSectionDesign(
   type: string,
   design: SectionDesign | undefined,
   ctx: DesignContext,
+  textless = false,
 ): ResolvedDesign | null {
   if (!design || Object.keys(design).length === 0) return null;
   const sd: string[] = [];
@@ -508,7 +513,7 @@ export function resolveSectionDesign(
   const mediaProven =
     bg?.kind === "media" &&
     effectiveText(design, ctx, type).background !== null &&
-    sectionContrastIssues(design, ctx, type).length === 0;
+    sectionContrastIssues(design, ctx, type, textless).length === 0;
   const text =
     bg?.kind === "media" && !mediaProven
       ? effectiveText({ ...design, background: undefined }, ctx, type)
