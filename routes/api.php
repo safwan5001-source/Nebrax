@@ -108,6 +108,7 @@ use App\Http\Controllers\Api\LeaveTypeController;
 use App\Http\Controllers\Api\ManualJournalController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PartnerController;
+use App\Http\Controllers\Api\PartnerImportController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PaymentAttemptController;
 use App\Http\Controllers\Api\PaymentGatewayController;
@@ -546,6 +547,11 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('partners/{id}', [PartnerController::class, 'show'])->middleware($perm('partners.view'));
         Route::post('partners', [PartnerController::class, 'store'])->middleware($perm('partners.manage'));
         Route::put('partners/{id}', [PartnerController::class, 'update'])->middleware($perm('partners.manage'));
+        // IMP-H3-S2: استيراد العملاء/الموردين — قالب/حقول/فحص/معاينة فقط (لا apply متزامن؛ التنفيذ عبر import-jobs المربوط بالمعاينة).
+        Route::get('partners/import/template', [PartnerImportController::class, 'template'])->middleware($perm('partners.manage'));
+        Route::get('partners/import/fields', [PartnerImportController::class, 'fields'])->middleware($perm('partners.manage'));
+        Route::post('partners/import/inspect', [PartnerImportController::class, 'inspect'])->middleware([$perm('partners.manage'), EnsureImportFilesScanned::class]);
+        Route::post('partners/import/preview', [PartnerImportController::class, 'preview'])->middleware([$perm('partners.manage'), EnsureImportFilesScanned::class]);
         // مواعيد العملاء (غير محاسبية)
         Route::get('appointments', [AppointmentController::class, 'index'])->middleware($perm('partners.view'));
         Route::get('invoices/{id}/appointments', [AppointmentController::class, 'forInvoice'])->middleware($perm('partners.view'));
