@@ -118,6 +118,24 @@ class MoyasarRefundTest extends TestCase
     }
 
     #[Test]
+    public function a_non_scalar_currency_is_a_definite_rejection_before_and_unknown_after_the_post(): void
+    {
+        foreach ([['SAR'], new \stdClass, 123] as $bad) {
+            $this->fakeHttp(['api.moyasar.com/v1/invoices/*' => Http::response($this->invoiceWith(array_merge($this->paid(), ['currency' => $bad])))]);
+            $e = $this->thrown(fn () => $this->adapter->refundPayment($this->gateway, MoyasarFixtures::INVOICE_ID, 100), 'bad pre currency', PaymentRefundRejectedException::class);
+            $this->assertSame('moyasar.malformed_response', $e->reason);
+            Http::assertNotSent(fn (Request $r) => $r->method() === 'POST');
+
+            $this->fakeHttp([
+                'api.moyasar.com/v1/invoices/*' => Http::response($this->invoiceWith($this->paid())),
+                'api.moyasar.com/v1/payments/*' => Http::response(array_merge($this->paid(refunded: 100, status: 'refunded'), ['currency' => $bad])),
+            ]);
+            $e = $this->thrown(fn () => $this->adapter->refundPayment($this->gateway, MoyasarFixtures::INVOICE_ID, 100), 'bad post currency', PaymentRefundUnknownException::class);
+            $this->assertSame('moyasar.malformed_response', $e->reason);
+        }
+    }
+
+    #[Test]
     public function a_response_total_beyond_the_captured_amount_is_unknown_not_proof(): void
     {
         $partial = array_merge($this->paid(), ['captured' => 60000]);

@@ -400,10 +400,10 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
         $payment = $paid[0];
         $paymentId = $payment['id'] ?? null;
         $paymentAmount = $this->intOrNull($payment['amount'] ?? null);
-        $paymentCurrency = strtoupper((string) ($payment['currency'] ?? ''));
+        $paymentCurrency = $this->currencyOf($payment);
         // العملة تُتحقق **شكلاً** قبل الإرسال (ثلاثة أحرف) ثم تُطابق عملة الفاتورة؛ فلا تمرّ بيانات معيبة متماثلة ثم تفشل بعد التنفيذ.
         if (! is_string($paymentId) || $paymentId === '' || $paymentAmount === null || preg_match('/^[A-Z]{3}$/', $paymentCurrency) !== 1
-            || $paymentCurrency !== strtoupper((string) ($invoice['currency'] ?? ''))) {
+            || $paymentCurrency !== $this->currencyOf($invoice)) {
             throw new PaymentRefundRejectedException('moyasar.malformed_response', 'بيانات الدفعة غير صالحة للاسترداد.');
         }
 
@@ -433,7 +433,7 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
         }
 
         $refundedAfter = $this->intOrNull($response['refunded'] ?? null);
-        $currency = strtoupper((string) ($response['currency'] ?? ''));
+        $currency = $this->currencyOf($response);
         $expectedCurrency = $paymentCurrency;
         // النجاح يشترط **إثبات** أن هذا الـPOST طُبِّق: التراكمي ≥ ما قبل + المبلغ (قد يزيد باسترداد خارجي متزامن ويحسمه المستدعي) وضمن مبلغ الدفعة.
         // ردّ 2xx بتراكمي أقل (لم يُطبَّق، أو سالب/معيب) لا يُعدّ نجاحاً ولا رفضاً قاطعاً: بعد الإرسال ⇒ غير معروف يحسمه المطابِق.
@@ -443,6 +443,18 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
         }
 
         return new PaymentProviderRefund($paymentId, $refundedAfter, $currency, $this->parseTime($response['refunded_at'] ?? null));
+    }
+
+    /**
+     * عملة بصيغة نصية كبيرة فقط؛ غير النص (مصفوفة/كائن/رقم) ⇒ فارغ (معيب) بدل تحويل يُصدر تحذير array-to-string يخرج عن عقد الاسترداد.
+     *
+     * @param  array<string, mixed>  $document
+     */
+    private function currencyOf(array $document): string
+    {
+        $value = $document['currency'] ?? null;
+
+        return is_string($value) ? strtoupper($value) : '';
     }
 
     /**
