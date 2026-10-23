@@ -23,6 +23,7 @@ import { useToast } from '@/components/ui/toast';
 import { InvoiceDocument, type Company, type Customer } from '@/components/invoices/invoice-document';
 import { resolveInvoiceParties, type InvoiceParties } from '@/modules/documents/builder/invoice-parties';
 import { CreateReturnDialog } from '@/components/returns/create-return-dialog';
+import { InvoiceOnlinePayments } from '@/modules/invoice-payment-requests/InvoiceOnlinePayments';
 import { InvoiceNoteDialog } from '@/components/invoices/invoice-note-dialog';
 import { api, downloadFile, hasApiStatus } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
@@ -967,6 +968,7 @@ export default function InvoiceDetailPage() {
           ]}
         />
         <WorkspaceTabs tabs={wsTabs} value={wsTab} onChange={setWsTab} />
+        <div className="mt-3"><InvoiceOnlinePayments invoiceId={id} invoicePosted={isPosted} fullyPaid={invoice.payment_status === 'paid'} /></div>
         <section aria-label={t('activity')} className="mt-3"><RevisionLog type="invoice" id={id} collapsible defaultOpen={false} /></section>
         {printOutputs}
         <TotalsDock
@@ -1114,6 +1116,8 @@ export default function InvoiceDetailPage() {
         </Card>
         <div className="lg:hidden"><Accordion><AccordionItem id="payments" title={t('payments')} count={relationsLoading ? undefined : payments.length} open={relationSection === 'payments'} onToggle={() => toggleRelationSection('payments')}>{paymentsContent}</AccordionItem><AccordionItem id="notes" title={t('notes_attachments')} count={relationsLoading ? undefined : notesLog.length} open={relationSection === 'notes'} onToggle={() => toggleRelationSection('notes')}>{notesContent}</AccordionItem><AccordionItem id="inventory" title={t('inventory_movements')} count={relationsLoading ? undefined : inventoryMovements.length} open={relationSection === 'inventory'} onToggle={() => toggleRelationSection('inventory')}>{inventoryContent}</AccordionItem><AccordionItem id="accounting" title={t('accounting')} open={relationSection === 'accounting'} onToggle={() => toggleRelationSection('accounting')}>{accountingContent}</AccordionItem></Accordion></div>
       </section>
+
+      <InvoiceOnlinePayments invoiceId={id} invoicePosted={isPosted} fullyPaid={invoice.payment_status === 'paid'} />
 
       {printOutputs}
 
