@@ -5,6 +5,7 @@ import {
   normalizePresentationConfig,
   previewStoreName,
 } from "../config";
+import { FONT_FAMILY_KEYS } from "../font-catalogue";
 import {
   FONT_PRESETS,
   HOME_BUILDER_SECTION_KEYS,
@@ -232,10 +233,23 @@ describe("normalizePresentationConfig", () => {
       normalizePresentationConfig({ fontPreset: "helvetica-geist" }).fontPreset,
     ).toBe("cairo-geist");
     expect(normalizePresentationConfig({}).fontPreset).toBe("cairo-geist");
+    // the global selector offers the whole catalogue (legacy keys first, order unchanged)
     expect(FONT_PRESETS.map((preset) => preset.id)).toEqual([
+      ...FONT_FAMILY_KEYS,
+    ]);
+    expect(FONT_PRESETS.slice(0, 2).map((preset) => preset.id)).toEqual([
       "cairo-geist",
       "tajawal-geist",
     ]);
+    for (const key of [
+      "almarai",
+      "thmanyah-sans",
+      "thmanyah-serif-display",
+      "thmanyah-serif-text",
+    ])
+      expect(normalizePresentationConfig({ fontPreset: key }).fontPreset).toBe(
+        key,
+      );
   });
 
   it("rejects unsupported colours instead of applying them", () => {

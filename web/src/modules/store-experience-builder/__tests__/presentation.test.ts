@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_PRESENTATION_CONFIG, normalizePresentationConfig } from '../presentation/config';
+import { FONT_FAMILY_KEYS, fontFamilyStack } from '../presentation/font-catalogue';
 import {
   fontPresetFamilyStack,
   FONT_PRESETS,
@@ -155,7 +156,13 @@ describe('web presentation contract', () => {
       'cairo-geist',
     );
     expect(normalizePresentationConfig({}).fontPreset).toBe('cairo-geist');
-    expect(FONT_PRESETS.map((preset) => preset.id)).toEqual(['cairo-geist', 'tajawal-geist']);
+    // the global selector offers the whole catalogue (legacy keys first, order unchanged)
+    expect(FONT_PRESETS.map((preset) => preset.id)).toEqual(FONT_FAMILY_KEYS);
+    expect(FONT_PRESETS.slice(0, 2).map((preset) => preset.id)).toEqual(['cairo-geist', 'tajawal-geist']);
+    for (const key of ['almarai', 'thmanyah-sans', 'thmanyah-serif-display', 'thmanyah-serif-text']) {
+      expect(normalizePresentationConfig({ fontPreset: key }).fontPreset).toBe(key);
+      expect(fontPresetFamilyStack(key as never)).toBe(fontFamilyStack(key));
+    }
   });
 
   it('CUST-H3-2: resolves the full font-family stack deterministically and fails closed to Cairo', () => {

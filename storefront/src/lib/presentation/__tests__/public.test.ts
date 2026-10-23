@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_PRESENTATION_CONFIG } from "../config";
+import { fontFamilyStack } from "../font-catalogue";
 import {
   publishedExtraNav,
   publishedFaviconUrl,
@@ -128,6 +129,33 @@ describe("published presentation runtime helpers", () => {
     // would answer for Arabic glyphs before Tajawal is ever reached.
     expect(tajawalStyle?.fontFamily).not.toContain("--font-cairo");
     expect(tajawalStyle?.fontFamily).not.toMatch(/var\(--font-geist\),/);
+  });
+
+  it("the global font (fontPreset) accepts any catalogue family — incl. Thmanyah — and explicit body/heading overrides still win", () => {
+    for (const key of [
+      "almarai",
+      "thmanyah-sans",
+      "thmanyah-serif-display",
+      "thmanyah-serif-text",
+    ] as const) {
+      const style = publishedThemeStyle({
+        ...DEFAULT_PRESENTATION_CONFIG,
+        fontPreset: key,
+      });
+      expect(style?.fontFamily).toBe(fontFamilyStack(key));
+    }
+    // an explicit body family beats the global font; the heading family is emitted separately
+    const overridden = publishedThemeStyle({
+      ...DEFAULT_PRESENTATION_CONFIG,
+      fontPreset: "thmanyah-sans",
+      typography: { bodyFamily: "readex", headingFamily: "amiri-lora" },
+    });
+    expect(overridden?.fontFamily).toBe(fontFamilyStack("readex"));
+    expect(overridden?.["--gt-hf"]).toBe(fontFamilyStack("amiri-lora"));
+    // a store that never chose anything keeps the Cairo + Geist default
+    expect(publishedThemeStyle(DEFAULT_PRESENTATION_CONFIG)?.fontFamily).toBe(
+      "var(--font-geist), var(--font-cairo), system-ui, sans-serif",
+    );
   });
 
   it("no-presentation routes keep the Cairo + Geist default — never crash, never leak a stale stack", () => {

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Support\Commerce\StorefrontGlobalTokensNormalizer;
 use App\Support\Commerce\StorefrontPresentationNormalizer;
 use Tests\TestCase;
 
@@ -361,10 +362,17 @@ class StorefrontPresentationNormalizerTest extends TestCase
             'cairo-geist',
             $this->normalizer->normalize(['fontPreset' => 'helvetica-geist'])['fontPreset'],
         );
+        // الخط العام يقبل كل كتالوج الخطوط (الأولان القديمان أولاً وبلا تغيير)، ومصدره الوحيد كتالوج الرموز العامة
         $this->assertSame(
-            ['cairo-geist', 'tajawal-geist'],
+            StorefrontGlobalTokensNormalizer::FONT_FAMILIES,
             StorefrontPresentationNormalizer::FONT_PRESETS,
         );
+        $this->assertSame(['cairo-geist', 'tajawal-geist'], array_slice(StorefrontPresentationNormalizer::FONT_PRESETS, 0, 2));
+        foreach (['almarai', 'thmanyah-sans', 'thmanyah-serif-display', 'thmanyah-serif-text'] as $key) {
+            $this->assertSame($key, $this->normalizer->normalize(['fontPreset' => $key])['fontPreset']);
+        }
+        // مفتاح غير معروف (حتى لو يشبه ثمانية) يسقط إلى الافتراضي كما كان
+        $this->assertSame('cairo-geist', $this->normalizer->normalize(['fontPreset' => 'thmanyah-mono'])['fontPreset']);
     }
 
     /** @test */

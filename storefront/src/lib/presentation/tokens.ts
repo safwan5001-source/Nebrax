@@ -1,4 +1,9 @@
 import { DEFAULT_HOME_SECTIONS } from "@/lib/home/sections";
+import {
+  FONT_CATALOGUE,
+  type FontFamilyKey,
+  fontFamilyStack,
+} from "./font-catalogue";
 
 export const PRESENTATION_CONFIG_VERSION = 3 as const;
 
@@ -14,15 +19,28 @@ export const THEME_PRESETS = [
 
 export type ThemePresetId = (typeof THEME_PRESETS)[number]["id"];
 
-export const FONT_PRESETS = [
-  { id: "cairo-geist", labelKey: "fontCairoGeist" },
-  { id: "tajawal-geist", labelKey: "fontTajawalGeist" },
-] as const;
+/**
+ * The global font selector offers the whole curated catalogue (`font-catalogue.ts`), so a store's
+ * `fontPreset` can be any catalogue key. The two legacy values keep their localised labels; the
+ * rest show the catalogue's proper-noun name. Keys and stored values are unchanged — the list is
+ * append-only and `cairo-geist` stays the fail-closed default.
+ */
+const LEGACY_FONT_PRESET_LABELS: Partial<Record<FontFamilyKey, string>> = {
+  "cairo-geist": "fontCairoGeist",
+  "tajawal-geist": "fontTajawalGeist",
+};
 
-export type FontPresetId = (typeof FONT_PRESETS)[number]["id"];
+export const FONT_PRESETS = FONT_CATALOGUE.map((entry) => ({
+  id: entry.key,
+  name: entry.name,
+  labelKey: LEGACY_FONT_PRESET_LABELS[entry.key],
+}));
+
+export type FontPresetId = FontFamilyKey;
 
 /**
- * Resolves a merchant font preset to its complete CSS font-family stack.
+ * Resolves a merchant font preset to its complete CSS font-family stack (any catalogue key;
+ * the two legacy keys resolve to the exact stacks described below).
  * Latin always resolves through Geist (CUST-H3-2 decision — one
  * merchant-facing Typography control, no heading/body split); only the
  * Arabic face swaps between presets.
@@ -46,9 +64,10 @@ export type FontPresetId = (typeof FONT_PRESETS)[number]["id"];
  * presets fail closed to Cairo.
  */
 export function fontPresetFamilyStack(id: FontPresetId): string {
-  return id === "tajawal-geist"
-    ? "var(--font-geist-tajawal), var(--font-tajawal), system-ui, sans-serif"
-    : "var(--font-geist), var(--font-cairo), system-ui, sans-serif";
+  return (
+    fontFamilyStack(id) ??
+    "var(--font-geist), var(--font-cairo), system-ui, sans-serif"
+  );
 }
 
 export const DENSITY_PRESETS = ["comfortable", "compact"] as const;
