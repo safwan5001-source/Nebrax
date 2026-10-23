@@ -2,6 +2,8 @@ import { GoogleTagManager } from "@next/third-parties/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import {
+  Alexandria,
+  Almarai,
   Amiri,
   Cairo,
   El_Messiri,
@@ -9,11 +11,14 @@ import {
   IBM_Plex_Sans_Arabic,
   Inter,
   Lora,
+  Noto_Kufi_Arabic,
   Noto_Sans_Arabic,
   Readex_Pro,
+  Reem_Kufi,
   Rubik,
   Tajawal,
 } from "next/font/google";
+import localFont from "next/font/local";
 import { Suspense } from "react";
 import { localeDirection } from "@/i18n/locales";
 
@@ -168,6 +173,125 @@ const amiri = Amiri({
   preload: false,
 });
 
+const almarai = Almarai({
+  variable: "--font-almarai",
+  subsets: ["arabic", "latin"],
+  weight: ["400", "700", "800"],
+  display: "swap",
+  preload: false,
+});
+const alexandria = Alexandria({
+  variable: "--font-alexandria",
+  subsets: ["arabic", "latin"],
+  display: "swap",
+  preload: false,
+});
+const notoKufi = Noto_Kufi_Arabic({
+  variable: "--font-noto-kufi",
+  subsets: ["arabic", "latin"],
+  display: "swap",
+  preload: false,
+});
+const reemKufi = Reem_Kufi({
+  variable: "--font-reem-kufi",
+  subsets: ["arabic", "latin"],
+  display: "swap",
+  preload: false,
+});
+
+/**
+ * Thmanyah families — official WOFF2 files supplied by the project owner, used UNMODIFIED
+ * (no subsetting / re-encoding). Licence: `docs/legal/thmanyah/`. The standard licence restricts
+ * hosting and web embedding; shipping them here is an owner-accepted decision made WITHOUT a written
+ * exception on file (see the Typography Expansion report §4). To remove: delete these declarations,
+ * the `thmanyah-*` catalogue keys and the font files.
+ * Loaded only when used (`preload: false`, `display: swap`); 400/500/700/900 cuts.
+ */
+const thmanyahSans = localFont({
+  variable: "--font-thmanyah-sans",
+  src: [
+    {
+      path: "../../fonts/thmanyah/thmanyahsans-Regular.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../fonts/thmanyah/thmanyahsans-Medium.woff2",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../../fonts/thmanyah/thmanyahsans-Bold.woff2",
+      weight: "700",
+      style: "normal",
+    },
+    {
+      path: "../../fonts/thmanyah/thmanyahsans-Black.woff2",
+      weight: "900",
+      style: "normal",
+    },
+  ],
+  display: "swap",
+  preload: false,
+  adjustFontFallback: "Arial",
+});
+const thmanyahSerifDisplay = localFont({
+  variable: "--font-thmanyah-serif-display",
+  src: [
+    {
+      path: "../../fonts/thmanyah/thmanyahserifdisplay-Regular.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../fonts/thmanyah/thmanyahserifdisplay-Medium.woff2",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../../fonts/thmanyah/thmanyahserifdisplay-Bold.woff2",
+      weight: "700",
+      style: "normal",
+    },
+    {
+      path: "../../fonts/thmanyah/thmanyahserifdisplay-Black.woff2",
+      weight: "900",
+      style: "normal",
+    },
+  ],
+  display: "swap",
+  preload: false,
+  adjustFontFallback: "Times New Roman",
+});
+const thmanyahSerifText = localFont({
+  variable: "--font-thmanyah-serif-text",
+  src: [
+    {
+      path: "../../fonts/thmanyah/thmanyahseriftext-Regular.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../fonts/thmanyah/thmanyahseriftext-Medium.woff2",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../../fonts/thmanyah/thmanyahseriftext-Bold.woff2",
+      weight: "700",
+      style: "normal",
+    },
+    {
+      path: "../../fonts/thmanyah/thmanyahseriftext-Black.woff2",
+      weight: "900",
+      style: "normal",
+    },
+  ],
+  display: "swap",
+  preload: false,
+  adjustFontFallback: "Times New Roman",
+});
+
 /** The CSS variable classes of the catalogue faces, applied once on the document root. */
 export const CATALOGUE_FONT_VARIABLES = [
   plexArabic,
@@ -178,6 +302,13 @@ export const CATALOGUE_FONT_VARIABLES = [
   elMessiri,
   lora,
   amiri,
+  almarai,
+  alexandria,
+  notoKufi,
+  reemKufi,
+  thmanyahSans,
+  thmanyahSerifDisplay,
+  thmanyahSerifText,
 ]
   .map((font) => font.variable)
   .join(" ");

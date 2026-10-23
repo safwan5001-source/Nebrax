@@ -40,7 +40,7 @@ class PartnerImportController extends ApiController
     /** فحص الملف: أعمدته وعيّناته ومطابقتها المقترحة. لا كتابة. */
     public function inspect(PartnerImportRequest $request): JsonResponse
     {
-        $data = $this->domain(fn () => $this->imports->inspect($request->file('file')));
+        $data = $this->domain(fn () => $this->imports->inspect($request->file('file'), PartnerImportService::DURABLE_MAX_ROWS));
 
         return response()->json(['data' => $data]);
     }
@@ -49,7 +49,7 @@ class PartnerImportController extends ApiController
     public function preview(PartnerImportRequest $request): JsonResponse
     {
         $data = $this->domain(function () use ($request): array {
-            ['preview' => $preview, 'plan' => $plan] = $this->imports->previewWithPlan($request->file('file'), $request->importOptions());
+            ['preview' => $preview, 'plan' => $plan] = $this->imports->previewWithPlan($request->file('file'), $request->importOptions(), PartnerImportService::DURABLE_MAX_ROWS);
             $preview['binding'] = app(ImportPreviewService::class)->issue(
                 ImportJobDomain::PARTNER_MASTER, $request->file('file'), null, $request->importOptions(), $request->user()?->id, $plan,
             );

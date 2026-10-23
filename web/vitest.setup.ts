@@ -29,8 +29,18 @@ vi.mock('next/font/google', () => {
     Noto_Sans_Arabic: loader,
     Readex_Pro: loader,
     Rubik: loader,
+    // Typography Library Expansion — appended catalogue families
+    Almarai: loader,
+    Alexandria: loader,
+    Noto_Kufi_Arabic: loader,
+    Reem_Kufi: loader,
   };
 });
+
+// `next/font/local` is likewise compiled by Next.js; the Thmanyah faces use it.
+vi.mock('next/font/local', () => ({
+  default: () => ({ variable: '--font-mock', className: 'font-mock' }),
+}));
 
 /**
  * AWJ-STORE-CTX-1 — المتجر النشط يصمد الآن في `sessionStorage` و`?store=` (هذا هو الإصلاح نفسه)، وبيئة jsdom

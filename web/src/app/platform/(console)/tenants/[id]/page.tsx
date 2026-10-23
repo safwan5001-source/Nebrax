@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ContractManagementCard, type ContractSubscription } from '@/components/platform/contract-management-card';
 import { CommercialOperationsCard } from '@/components/platform/commercial-operations-card';
 import { ApplicationOverrideCard } from '@/components/platform/application-override-card';
+import { AiActionControlsCard } from '@/components/platform/ai-action-controls-card';
 import { ConfirmDialog } from '@/components/platform/confirm-dialog';
 import { ApiError } from '@/lib/api';
 import { isPlatformAuthenticated } from '@/lib/platform-auth';
@@ -269,6 +270,7 @@ export default function PlatformTenantDetailPage() {
             <ContractManagementCard tenantId={tenantId} subscriptions={tenant.subscriptions} onChanged={load} />
             <CommercialOperationsCard tenantId={tenantId} onChanged={load} />
             <ApplicationOverrideCard tenantId={tenantId} onChanged={load} />
+            <AiActionControlsCard tenantId={tenantId} />
           </div>
 
           <section aria-labelledby="tenant-access">
