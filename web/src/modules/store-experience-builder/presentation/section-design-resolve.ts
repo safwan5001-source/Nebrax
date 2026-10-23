@@ -569,13 +569,40 @@ export function resolveSectionDesign(
     style["--sec-vj"] = VALIGN[design.valign];
     sd.push("valign");
   }
-  if (design.mediaTreatment?.height) {
-    style["--sec-minh"] =
-      design.mediaTreatment.height === "screen" && ctx.screenHeightPx
-        ? `clamp(24rem, ${Math.round(ctx.screenHeightPx)}px, 56rem)`
-        : MIN_HEIGHT[design.mediaTreatment.height];
-    sd.push("hgt");
+  // AWJ-HERO-FULLBLEED — hero-only picture treatments. Each needs a picture that really paints (a "media hero") and a layout
+  // whose picture fills the whole box (`split` covers half of it), so the contrast evidence still covers every visible pixel.
+  const treatment = design.mediaTreatment;
+  const fullPicture =
+    type === "hero" && mediaProven && design.layout !== "split";
+  // `ratio: natural` — the hero's height follows its picture's own proportions (the stylesheet sizes it from the in-flow
+  // picture; copy is laid over it and the box only grows if the copy is taller). Height presets then have nothing to say.
+  const natural = fullPicture && treatment?.ratio === "natural";
+  if (natural) sd.push("rat");
+  const presetHeight = (preset: keyof typeof MIN_HEIGHT) =>
+    preset === "screen" && ctx.screenHeightPx
+      ? `clamp(24rem, ${Math.round(ctx.screenHeightPx)}px, 56rem)`
+      : MIN_HEIGHT[preset];
+  // `height` applies at every width; `mobileHeight` overrides it below `md` (768 px). The Canvas simulates a device, so it
+  // resolves the choice here (no media query against the host window); the real storefront gets both values + a media query.
+  const phone =
+    ctx.simulatedWidthPx !== undefined && ctx.simulatedWidthPx < 768;
+  if (!natural) {
+    const height =
+      phone && treatment?.mobileHeight
+        ? treatment.mobileHeight
+        : treatment?.height;
+    if (height) {
+      style["--sec-minh"] = presetHeight(height);
+      sd.push("hgt");
+    }
+    if (treatment?.mobileHeight && ctx.simulatedWidthPx === undefined) {
+      style["--sec-minh-m"] = presetHeight(treatment.mobileHeight);
+      sd.push("hgtm");
+    }
   }
+  // `bleed` — the picture reaches both viewport edges, directly below the header (no card, no radius, no side margins).
+  const pictureBleed = fullPicture && treatment?.bleed === true;
+  if (pictureBleed) sd.push("hbl");
 
   // Typography (V0 §5.2): named steps resolved here, never pixel inputs.
   const ty = design.typography;
@@ -635,14 +662,15 @@ export function resolveSectionDesign(
     sd.push("border");
   }
 
-  // A full-bleed band is a solid colour that extends past the page container; a
-  // radius or a drop shadow on something that bleeds off the screen has no meaning,
-  // so they apply to contained sections only (a gradient does not bleed — see header).
-  const bleeds = design.width?.mode === "full" && solidBg !== null;
-  if (bleeds) {
+  // A full-bleed band is a solid colour that extends past the page container (and, since AWJ-HERO-FULLBLEED, a hero's
+  // picture can reach both viewport edges too); a radius or a drop shadow on something that bleeds off the screen has no
+  // meaning, so they apply to contained sections only (a gradient does not bleed — see header).
+  const solidBleed = design.width?.mode === "full" && solidBg !== null;
+  const bleeds = solidBleed || pictureBleed;
+  if (solidBleed) {
     style["--sec-bleed"] = `0 0 0 100vmax ${solidBg}`;
     sd.push("bleed");
-  } else {
+  } else if (!bleeds) {
     if (design.radius) {
       style["--sec-radius"] = RADIUS[design.radius];
       sd.push("radius");

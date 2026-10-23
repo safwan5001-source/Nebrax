@@ -335,6 +335,21 @@
   padding-block-start: 0;
 }
 
+/*
+ * AWJ-HERO-FULLBLEED — Canvas-only half of a bleeding hero: container-query units instead of viewport units (the preview frame is
+ * not the editor window), clipped at the preview root, and the padded container sits one wrapper above the hero.
+ */
+.awj-store-preview:has([data-sd~="hbl"]) {
+  container-type: inline-size;
+  overflow-x: clip;
+}
+.awj-store-preview [data-sd~="hbl"] {
+  --sd-vw: 100cqw;
+}
+.awj-store-preview :has(> .awj-preview-section:first-child > [data-sd~="hbl"]) {
+  padding-block-start: 0;
+}
+
 /* ── CUST-HV V8f — the gallery in the Canvas. The shared gallery rules (below the V5c marker, parity-tested) pick the visible column count
    with media queries against the HOST window; `data-vp` carries the simulated device, so these higher-specificity rules take the device's
    own count (phones 2, tablets the cap, desktops the authored count — the storefront's numbers). The picture the editor has selected is
@@ -889,6 +904,57 @@
   inset: 0;
   background: var(--sec-ovl);
   opacity: var(--sec-ovl-a);
+}
+/* AWJ-HERO-FULLBLEED — three hero-only picture treatments. The resolver emits each token only for a hero that really paints a
+   proven picture whose layout fills the whole box (never `split`), so the contrast evidence still covers every visible pixel.
+   hgtm  mobile height — below md the phone's own minimum replaces `height` (the real storefront; the Canvas resolves the device's
+         choice in the resolver instead of asking the host window's media query).
+   rat   natural ratio — the picture is IN FLOW: the section root becomes a one-cell grid in which picture and copy share the cell,
+         so the hero is as tall as the picture at the section's width (nothing cropped, nothing distorted) and grows only when the
+         copy is taller. The phone picture's own proportions apply below md because it is the picture that is rendered there.
+   hbl   bleed — no radius, the picture reaches both viewport edges. `--sd-vw` is the width of that frame (100vw on the storefront,
+         100cqw in the Canvas — set outside this block); unset it is 100%, i.e. contained. */
+@media (max-width: 767.98px) {
+  .awj-store-preview [data-sd~="hgtm"][data-sd] > * {
+    min-block-size: var(--sec-minh-m);
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: var(--sec-vj, center);
+  }
+}
+.awj-store-preview [data-sd~="rat"][data-sd] > * {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-block-size: 0;
+}
+.awj-store-preview [data-sd~="rat"][data-sd] > * > :is([data-sd-backdrop], [data-section-content]) {
+  grid-area: 1 / 1;
+}
+.awj-store-preview [data-sd~="rat"][data-sd] > * > [data-section-content] {
+  justify-self: start;
+  align-self: var(--sec-vj, center);
+}
+.awj-store-preview [data-sd~="rat"][data-sd] [data-sd-backdrop] {
+  position: relative;
+}
+.awj-store-preview [data-sd~="rat"][data-sd] [data-sd-backdrop] picture {
+  display: contents;
+}
+.awj-store-preview [data-sd~="rat"][data-sd] [data-sd-backdrop] img {
+  height: auto;
+  min-block-size: 100%;
+}
+.awj-store-preview [data-sd~="hbl"][data-sd] > *,
+.awj-store-preview [data-sd~="hbl"][data-sd] [data-sd-backdrop] {
+  border-radius: 0;
+}
+.awj-store-preview [data-sd~="hbl"][data-sd] [data-sd-backdrop] {
+  inset-inline: calc(50% - var(--sd-vw, 100%) / 2);
+}
+.awj-store-preview [data-sd~="rat"][data-sd~="hbl"][data-sd] [data-sd-backdrop] {
+  inline-size: var(--sd-vw, 100%);
+  justify-self: start;
 }
 /* Section-level text only — never inside a surface nested in the section. */
 .awj-store-preview [data-sd~="heading"] :is(h1, h2, h3):not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"])) {

@@ -357,6 +357,12 @@ export const CUSTOMIZER_MESSAGES = {
     headerModeInactiveNoHero: "غير مفعّل الآن: أول قسم ظاهر في الصفحة الرئيسية ليس بطلاً.",
     headerModeInactiveNotPicture: "غير مفعّل الآن: يحتاج البطل خلفية صورة.",
     headerModeInactiveSplit: "غير مفعّل الآن: تخطيط «منقسم» للبطل لا يدعم الترويسة الشفافة.",
+    headerOverlayTone: "لون نص الترويسة الشفافة",
+    headerOverlayToneAuto: "تلقائي (الأوضح حسب الصورة)",
+    headerOverlayToneLight: "نص فاتح (فوق صورة داكنة)",
+    headerOverlayToneDark: "نص داكن (فوق صورة فاتحة)",
+    headerOverlayToneHint:
+      "يُطبَّق فقط إذا أمكن إثبات وضوحه فوق الصورة كلّها (٤٫٥:١)، وإلا تبقى الترويسة عادية بدل أن تصبح غير مقروءة. تُعاين النتيجة مباشرة في المعاينة.",
     headerStickyOnScrollUp: "تظهر عند التمرير للأعلى",
     headerStickyAlways: "ثابتة أثناء التمرير",
     headerStickyOff: "تتحرك مع الصفحة",
@@ -556,6 +562,18 @@ export const CUSTOMIZER_MESSAGES = {
     designHeightScreen: "بطول الشاشة",
     designHeightHint:
       "حدّ أدنى للارتفاع: لا يُقصّ المحتوى أبداً، ولا يتجاوز «بطول الشاشة» ٥٦ rem. بلا اختيار يبقى ارتفاع القسم كما كان.",
+    designMobileHeight: "ارتفاع القسم على الجوال",
+    designMobileHeightHint:
+      "يستبدل الارتفاع أعلاه تحت عرض ٧٦٨px (الجوال). بلا اختيار يتبع الجوال الارتفاع العام.",
+    designPictureTreatment: "صورة البطل",
+    designRatioNatural: "ارتفاع بنسبة الصورة الأصلية",
+    designRatioNaturalHint:
+      "تُعرض الصورة كاملة بعرض القسم دون قصّ أو تشويه، وتُتجاهل الارتفاعات المُعدّة مسبقاً. يزيد الارتفاع فقط إن كان النص أطول من الصورة.",
+    designPictureBleed: "صورة بعرض الشاشة كاملة (بلا هوامش جانبية)",
+    designPictureBleedHint:
+      "تمتد الصورة من حافة الشاشة إلى حافتها، وتبدأ مباشرة أسفل الترويسة إن كان البطل أول قسم. لا تتأثر الأقسام الأخرى.",
+    designPictureTreatmentInactive:
+      "غير مفعّل الآن: يحتاج البطل خلفية صورة مُثبَتة التباين وتخطيطاً غير «منقسم».",
     designOverlap: "تداخل القسم التالي",
     designOverlapSm: "خفيف",
     designOverlapMd: "متوسط",
@@ -1970,6 +1988,12 @@ export const CUSTOMIZER_MESSAGES = {
     headerModeInactiveNoHero: "Not active now: the first visible home section is not a hero.",
     headerModeInactiveNotPicture: "Not active now: the hero needs a picture background.",
     headerModeInactiveSplit: "Not active now: the hero's Split layout does not support a transparent header.",
+    headerOverlayTone: "Transparent header text tone",
+    headerOverlayToneAuto: "Automatic (clearest for the picture)",
+    headerOverlayToneLight: "Light text (over a dark picture)",
+    headerOverlayToneDark: "Dark text (over a light picture)",
+    headerOverlayToneHint:
+      "Applied only when its legibility over the whole picture can be proven (4.5:1); otherwise the header stays solid instead of becoming unreadable. Preview the result live.",
     headerStickyOnScrollUp: "Returns when scrolling up",
     headerStickyAlways: "Stays while scrolling",
     headerStickyOff: "Scrolls with the page",
@@ -2169,6 +2193,18 @@ export const CUSTOMIZER_MESSAGES = {
     designHeightScreen: "Screen height",
     designHeightHint:
       "A minimum height: content is never clipped, and “Screen height” never exceeds 56 rem. With no choice the section keeps its height as before.",
+    designMobileHeight: "Section height on phones",
+    designMobileHeightHint:
+      "Replaces the height above below 768 px (phones). With no choice phones follow the general height.",
+    designPictureTreatment: "Hero picture",
+    designRatioNatural: "Height follows the picture's own proportions",
+    designRatioNaturalHint:
+      "The picture is shown whole at the section's width — never cropped or distorted — and the height presets are ignored. The section grows only if the text is taller than the picture.",
+    designPictureBleed: "Full-width picture (no side margins)",
+    designPictureBleedHint:
+      "The picture runs edge to edge and starts directly under the header when the hero is the first section. Other sections are unaffected.",
+    designPictureTreatmentInactive:
+      "Not active now: the hero needs a contrast-proven picture background and a layout other than Split.",
     designOverlap: "Next-section overlap",
     designOverlapSm: "Small",
     designOverlapMd: "Medium",

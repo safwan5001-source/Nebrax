@@ -35,7 +35,10 @@
             "separator": true,
             "overlap": true,
             "mediaTreatment": [
-                "height"
+                "height",
+                "mobileHeight",
+                "ratio",
+                "bleed"
             ],
             "motion": [
                 "reveal"
@@ -3895,6 +3898,167 @@
             "input": {
                 "display": {
                     "layout": "grid"
+                }
+            },
+            "expected": null
+        },
+        {
+            "name": "AWJ-HERO-FULLBLEED: every hero mediaTreatment field is kept, canonical order (height, mobileHeight, ratio, bleed)",
+            "type": "hero",
+            "input": {
+                "mediaTreatment": {
+                    "bleed": true,
+                    "ratio": "natural",
+                    "mobileHeight": "compact",
+                    "height": "tall"
+                }
+            },
+            "expected": {
+                "mediaTreatment": {
+                    "height": "tall",
+                    "mobileHeight": "compact",
+                    "ratio": "natural",
+                    "bleed": true
+                }
+            }
+        },
+        {
+            "name": "AWJ-HERO-FULLBLEED: mobileHeight alone is kept (it overrides height only below 768px)",
+            "type": "hero",
+            "input": {
+                "mediaTreatment": {
+                    "mobileHeight": "screen"
+                }
+            },
+            "expected": {
+                "mediaTreatment": {
+                    "mobileHeight": "screen"
+                }
+            }
+        },
+        {
+            "name": "AWJ-HERO-FULLBLEED: ratio 'natural' alone is kept",
+            "type": "hero",
+            "input": {
+                "mediaTreatment": {
+                    "ratio": "natural"
+                }
+            },
+            "expected": {
+                "mediaTreatment": {
+                    "ratio": "natural"
+                }
+            }
+        },
+        {
+            "name": "AWJ-HERO-FULLBLEED: bleed true alone is kept",
+            "type": "hero",
+            "input": {
+                "mediaTreatment": {
+                    "bleed": true
+                }
+            },
+            "expected": {
+                "mediaTreatment": {
+                    "bleed": true
+                }
+            }
+        },
+        {
+            "name": "AWJ-HERO-FULLBLEED: bleed is stored only as true (false, strings, numbers drop the key)",
+            "type": "hero",
+            "input": {
+                "mediaTreatment": {
+                    "bleed": false,
+                    "height": "compact"
+                }
+            },
+            "expected": {
+                "mediaTreatment": {
+                    "height": "compact"
+                }
+            }
+        },
+        {
+            "name": "AWJ-HERO-FULLBLEED: bleed as the string 'true' is not true (nothing survives)",
+            "type": "hero",
+            "input": {
+                "mediaTreatment": {
+                    "bleed": "true"
+                }
+            },
+            "expected": null
+        },
+        {
+            "name": "AWJ-HERO-FULLBLEED: ratio 'contain' / 'cover' / unknown are dropped (contain would reveal an unproven surface)",
+            "type": "hero",
+            "input": {
+                "mediaTreatment": {
+                    "ratio": "contain",
+                    "height": "standard"
+                }
+            },
+            "expected": {
+                "mediaTreatment": {
+                    "height": "standard"
+                }
+            }
+        },
+        {
+            "name": "AWJ-HERO-FULLBLEED: an invalid mobileHeight is dropped on its own",
+            "type": "hero",
+            "input": {
+                "mediaTreatment": {
+                    "mobileHeight": "huge",
+                    "bleed": true
+                }
+            },
+            "expected": {
+                "mediaTreatment": {
+                    "bleed": true
+                }
+            }
+        },
+        {
+            "name": "AWJ-HERO-FULLBLEED: a banner keeps height only (bleed / ratio / mobileHeight are hero-only)",
+            "type": "banner",
+            "input": {
+                "mediaTreatment": {
+                    "height": "tall",
+                    "mobileHeight": "compact",
+                    "ratio": "natural",
+                    "bleed": true
+                }
+            },
+            "expected": {
+                "mediaTreatment": {
+                    "height": "tall"
+                }
+            }
+        },
+        {
+            "name": "AWJ-HERO-FULLBLEED: a slider keeps height only",
+            "type": "slider",
+            "input": {
+                "mediaTreatment": {
+                    "height": "compact",
+                    "bleed": true,
+                    "ratio": "natural"
+                }
+            },
+            "expected": {
+                "mediaTreatment": {
+                    "height": "compact"
+                }
+            }
+        },
+        {
+            "name": "AWJ-HERO-FULLBLEED: a section without mediaTreatment capability drops it all",
+            "type": "categories",
+            "input": {
+                "mediaTreatment": {
+                    "bleed": true,
+                    "height": "tall"
                 }
             },
             "expected": null
