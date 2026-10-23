@@ -117,6 +117,23 @@ class FiscalCloseService
             }
         }
 
+        // PAY-H2-02d: دفعات إلكترونية مؤكدة من المزوّد لكنها محجوبة بفترة مقفلة داخل السنة — ليست في الدفتر بعد؛ بعد الإقفال لا يُرحَّل ما
+        // يخص السنة إلا بعد فتحها رسمياً. تنبيه (لا يمنع الإقفال ولا يغيّر `can_close`) حتى لا تُقفل سنةٌ ناقصة الإيرادات بلا علم.
+        $blocked = \App\Models\PaymentAttempt::query()
+            ->where('posting_status', \App\Models\PaymentAttempt::POSTING_BLOCKED_PERIOD)
+            ->whereDate('accounting_date', '>=', $year->start_date->toDateString())
+            ->whereDate('accounting_date', '<=', $year->end_date->toDateString());
+        $blockedCount = (clone $blocked)->count();
+        if ($blockedCount > 0) {
+            $blockedAmount = (int) (clone $blocked)->sum('captured_minor');
+            $items[] = $this->item(self::SEVERITY_WARNING, 'blocked_payments', sprintf(
+                'توجد %d دفعة إلكترونية مؤكدة من المزوّد (%s) محجوبة بفترة مقفلة داخل السنة ولم تُرحَّل إلى الدفتر. '
+                . 'تُعالج بفتح الفترة رسمياً ثم إعادة ترحيلها بصلاحية معالجة الدفعات المحجوبة.',
+                $blockedCount,
+                $this->money($blockedAmount),
+            ), ['count' => $blockedCount, 'amount_minor' => $blockedAmount]);
+        }
+
         // ── معلومات.
         $items[] = $this->item(self::SEVERITY_INFO, 'result', sprintf(
             'إيرادات السنة %s ومصروفاتها %s، والنتيجة %s.',
