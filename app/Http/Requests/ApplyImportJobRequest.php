@@ -5,12 +5,14 @@ namespace App\Http\Requests;
 use App\Services\ImportJobAccess;
 use App\Services\PartnerImportService;
 use App\Services\ProductTaxonomyImportService;
+use App\Services\StocktakeCountImportService;
 use App\Services\UnitTemplateImportService;
 use App\Services\ProductImportService;
 use App\Support\InventoryOpeningFields;
 use App\Support\PartnerImportFields;
 use App\Support\PriceListItemImportFields;
 use App\Support\ProductTaxonomyImportFields;
+use App\Support\StocktakeCountImportFields;
 use App\Support\UnitTemplateImportFields;
 use App\Support\ProductImportFields;
 use Illuminate\Foundation\Http\FormRequest;
@@ -75,6 +77,7 @@ class ApplyImportJobRequest extends FormRequest
                 ProductTaxonomyImportFields::allKeys(),
                 PriceListItemImportFields::keys(),
                 UnitTemplateImportFields::keys(),
+                StocktakeCountImportFields::keys(),
                 ['ignore']
             ))],
             // IMP-H3-S2 — خياراتا `partner_master`: النوع (عميل/مورّد) وسياسة إشارات التكرار.
@@ -84,6 +87,9 @@ class ApplyImportJobRequest extends FormRequest
             'kind' => ['sometimes', Rule::in(ProductTaxonomyImportFields::KINDS)],
             'parent_policy' => ['sometimes', Rule::in([ProductTaxonomyImportService::PARENT_ERROR, ProductTaxonomyImportService::PARENT_CREATE])],
             'existing_policy' => ['sometimes', Rule::in([UnitTemplateImportService::EXISTING_ERROR, UnitTemplateImportService::EXISTING_SKIP])],
+            // IMP-H7-S1b — خياراتا `stocktake_count`: الجرد المستهدف وسياسة العدّ القائم.
+            'stocktake_id' => ['sometimes', 'nullable', 'uuid'],
+            'existing_count_policy' => ['sometimes', Rule::in([StocktakeCountImportService::POLICY_ERROR, StocktakeCountImportService::POLICY_OVERWRITE, StocktakeCountImportService::POLICY_SKIP])],
             'batch_size' => ['sometimes', 'integer', 'min:1', 'max:'.ProductImportService::APPLY_BATCH_SIZE],
             'price_list_id' => ['sometimes', 'nullable', 'uuid'],
             'opening_date' => ['sometimes', 'date_format:Y-m-d'],
@@ -115,7 +121,7 @@ class ApplyImportJobRequest extends FormRequest
     public function explicitOptions(): array
     {
         $options = [];
-        foreach (['mode', 'blank_policy', 'master_data_policy', 'opening_date', 'type', 'duplicate_signal_policy', 'kind', 'parent_policy', 'existing_policy'] as $key) {
+        foreach (['mode', 'blank_policy', 'master_data_policy', 'opening_date', 'type', 'duplicate_signal_policy', 'kind', 'parent_policy', 'existing_policy', 'stocktake_id', 'existing_count_policy'] as $key) {
             if ($this->has($key)) {
                 $options[$key] = $this->string($key)->toString();
             }
@@ -169,7 +175,7 @@ class ApplyImportJobRequest extends FormRequest
         if ($this->has('opening_date')) {
             $options['opening_date'] = (string) $this->input('opening_date');
         }
-        foreach (['type', 'duplicate_signal_policy', 'kind', 'parent_policy', 'existing_policy'] as $key) {
+        foreach (['type', 'duplicate_signal_policy', 'kind', 'parent_policy', 'existing_policy', 'stocktake_id', 'existing_count_policy'] as $key) {
             if ($this->has($key)) {
                 $options[$key] = $this->string($key)->toString();
             }

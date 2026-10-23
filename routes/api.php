@@ -166,6 +166,7 @@ use App\Http\Controllers\Api\ShiftController;
 use App\Http\Controllers\Api\StockPermitController;
 use App\Http\Controllers\Api\InventoryOpeningController;
 use App\Http\Controllers\Api\StocktakeController;
+use App\Http\Controllers\Api\StocktakeCountImportController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\SystemUpdateController;
 use App\Http\Controllers\Api\SupplierRefundController;
@@ -1645,6 +1646,11 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('inventory-openings/{id}/post', [InventoryOpeningController::class, 'post'])->middleware([$perm('products.manage'), $app('inventory.core')]);
         Route::delete('inventory-openings/{id}', [InventoryOpeningController::class, 'destroy'])->middleware([$perm('products.manage'), $app('inventory.core')]);
 
+        // IMP-H7-S1b: استيراد أعداد ورقة جردٍ مفتوح — قالب أعمى/حقول/فحص/معاينة فقط (لا apply متزامن؛ التنفيذ عبر import-jobs المربوط بالمعاينة). البوابات = `POST stocktakes/{id}/count`.
+        Route::get('stocktakes/count-import/fields', [StocktakeCountImportController::class, 'fields'])->middleware([$perm('products.manage'), $app('inventory.core')]);
+        Route::get('stocktakes/{id}/count-import/template', [StocktakeCountImportController::class, 'template'])->middleware([$perm('products.manage'), $app('inventory.core')]);
+        Route::post('stocktakes/count-import/inspect', [StocktakeCountImportController::class, 'inspect'])->middleware([$perm('products.manage'), $app('inventory.core'), EnsureImportFilesScanned::class]);
+        Route::post('stocktakes/count-import/preview', [StocktakeCountImportController::class, 'preview'])->middleware([$perm('products.manage'), $app('inventory.core'), EnsureImportFilesScanned::class]);
         Route::get('stocktakes', [StocktakeController::class, 'index'])->middleware([$perm('products.view'), $app('inventory.core')]);
         Route::get('stocktakes/{id}', [StocktakeController::class, 'show'])->middleware([$perm('products.view'), $app('inventory.core')]);
         Route::post('stocktakes', [StocktakeController::class, 'store'])->middleware([$perm('products.manage'), $app('inventory.core')]);

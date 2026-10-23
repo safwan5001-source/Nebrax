@@ -24,7 +24,7 @@ use RuntimeException;
 use Tests\TestCase;
 
 /**
- * IMP-H7-S1 — استيراد ورقة عدّ إلى جردٍ مفتوح: العقد، التعريف بالصنف، القيم، سياسة العدّ القائم، الذرّية، الوصول، الحالة، وعدم أي أثر مخزني/محاسبي. المحوّل غير مسجَّل بعد.
+ * IMP-H7-S1 — استيراد ورقة عدّ إلى جردٍ مفتوح: العقد، التعريف بالصنف، القيم، سياسة العدّ القائم، الذرّية، الوصول، الحالة، وعدم أي أثر مخزني/محاسبي. المحوّل مسجَّل منذ IMP-H7-S1b (انظر H7ImportEndpointsTest للنقاط والمهام).
  *
  * تشغيل: php artisan test --filter=StocktakeCountImportTest
  */
@@ -388,12 +388,14 @@ class StocktakeCountImportTest extends TestCase
     }
 
     /** @test */
-    public function the_adapter_is_not_registered_anywhere_yet(): void
+    public function the_adapter_is_registered_with_the_gates_of_the_direct_count_route(): void
     {
-        $root = dirname(__DIR__, 2);
-        foreach (['app/Services/ImportDomainRegistry.php', 'app/Support/ImportJobDomain.php', 'routes/api.php'] as $file) {
-            $this->assertStringNotContainsString('StocktakeCountImport', (string) file_get_contents($root.'/'.$file), $file);
-        }
+        $this->assertTrue(app(\App\Services\ImportDomainRegistry::class)->has('stocktake_count'));
+        $this->assertSame(
+            ['view' => 'products.view', 'manage' => 'products.manage', 'app' => 'inventory.core'],
+            \App\Support\ImportJobDomain::authorization('stocktake_count'),
+        );
+        $this->assertContains('stocktake_count', \App\Support\ImportJobDomain::PREVIEW_BOUND_ONLY);
     }
 
     /** @test */

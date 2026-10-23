@@ -7,11 +7,13 @@ use App\Services\ProductImportService;
 use App\Services\PartnerImportService;
 use App\Services\PriceListItemImportService;
 use App\Services\ProductTaxonomyImportService;
+use App\Services\StocktakeCountImportService;
 use App\Services\UnitTemplateImportService;
 use App\Support\InventoryOpeningFields;
 use App\Support\PartnerImportFields;
 use App\Support\PriceListItemImportFields;
 use App\Support\ProductTaxonomyImportFields;
+use App\Support\StocktakeCountImportFields;
 use App\Support\UnitTemplateImportFields;
 use App\Support\ProductImportFields;
 use App\Support\ImportJobDomain;
@@ -65,7 +67,7 @@ class StoreImportJobRequest extends FormRequest
             'options.blank_policy' => ['sometimes', Rule::in([ProductImportService::BLANK_IGNORE, ProductImportService::BLANK_CLEAR])],
             'options.master_data_policy' => ['sometimes', Rule::in([ProductImportService::MASTER_DATA_ERROR, ProductImportService::MASTER_DATA_TEXT, ProductImportService::MASTER_DATA_CREATE])],
             'options.mapping' => ['sometimes', 'array', 'max:'.ProductImportService::MAX_COLUMNS],
-            'options.mapping.*' => ['nullable', 'string', Rule::in(array_merge(ProductImportFields::keys(), InventoryOpeningFields::keys(), PartnerImportFields::keys(), ProductTaxonomyImportFields::allKeys(), PriceListItemImportFields::keys(), UnitTemplateImportFields::keys(), ['ignore']))],
+            'options.mapping.*' => ['nullable', 'string', Rule::in(array_merge(ProductImportFields::keys(), InventoryOpeningFields::keys(), PartnerImportFields::keys(), ProductTaxonomyImportFields::allKeys(), PriceListItemImportFields::keys(), UnitTemplateImportFields::keys(), StocktakeCountImportFields::keys(), ['ignore']))],
             // IMP-H3-S2: النوع إلزامي لمجال الأطراف (يحدّد عميلاً أم مورّداً ولا يُستنتج من الملف) ويُرفض لغيره؛ فشلُ غيابه بعد الإنشاء كان سيظهر وقت التطبيق.
             'options.type' => [Rule::requiredIf(fn () => $this->input('domain') === ImportJobDomain::PARTNER_MASTER), Rule::in(PartnerImportService::TYPES)],
             'options.duplicate_signal_policy' => ['sometimes', Rule::in([PartnerImportService::SIGNAL_ERROR, PartnerImportService::SIGNAL_SKIP, PartnerImportService::SIGNAL_WARN])],
@@ -74,6 +76,9 @@ class StoreImportJobRequest extends FormRequest
             'options.parent_policy' => ['sometimes', Rule::in([ProductTaxonomyImportService::PARENT_ERROR, ProductTaxonomyImportService::PARENT_CREATE])],
             'options.existing_policy' => ['sometimes', Rule::in([UnitTemplateImportService::EXISTING_ERROR, UnitTemplateImportService::EXISTING_SKIP])],
             'options.price_list_id' => $this->input('domain') === ImportJobDomain::PRICE_LIST_ITEMS ? ['required', 'uuid'] : ['sometimes', 'nullable', 'uuid'],
+            // IMP-H7-S1b: الجرد المستهدف إلزامي لمجال أعداد الجرد (مجمَّد مع المعاينة)، وسياسة العدّ القائم.
+            'options.stocktake_id' => $this->input('domain') === ImportJobDomain::STOCKTAKE_COUNT ? ['required', 'uuid'] : ['sometimes', 'nullable', 'uuid'],
+            'options.existing_count_policy' => ['sometimes', Rule::in([StocktakeCountImportService::POLICY_ERROR, StocktakeCountImportService::POLICY_OVERWRITE, StocktakeCountImportService::POLICY_SKIP])],
             'options.opening_date' => ['sometimes', 'date_format:Y-m-d'],
             'options.allow_zero_cost' => ['sometimes', 'boolean'],
             'options.notes' => ['sometimes', 'nullable', 'string', 'max:500'],

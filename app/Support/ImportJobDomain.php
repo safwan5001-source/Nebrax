@@ -34,6 +34,8 @@ final class ImportJobDomain
         self::PRODUCT_TAXONOMY => ['view' => 'products.view', 'manage' => 'products.manage', 'app' => null],
         self::PRICE_LIST_ITEMS => ['view' => 'invoices.view', 'manage' => 'company.manage', 'app' => null],
         self::UNIT_TEMPLATES => ['view' => 'products.view', 'manage' => 'products.manage', 'app' => null],
+        // IMP-H7-S1b: `stocktakes/{id}/count` المباشرة محروسة بـ`products.manage` + `inventory.core` (routes/api.php) — البوابات نفسها لا أضعف.
+        self::STOCKTAKE_COUNT => ['view' => 'products.view', 'manage' => 'products.manage', 'app' => 'inventory.core'],
     ];
 
     public const PRODUCT_CATALOG = 'product_catalog';
@@ -54,6 +56,9 @@ final class ImportJobDomain
     /** قوالب الوحدات، إنشاء فقط ولا مسار ذكاء اصطناعي (IMP-H4-S5، D-08). */
     public const UNIT_TEMPLATES = 'unit_templates';
 
+    /** أعداد ورقة جردٍ مفتوح (IMP-H7-S1b) — وحدته الورقة كلها ذرّياً؛ الجرد المستهدف خيارٌ مجمَّد، والترحيل فعلٌ منفصل لا يمرّ من هنا. */
+    public const STOCKTAKE_COUNT = 'stocktake_count';
+
     /** @return list<string> */
     /**
      * مجالات لا تُنشأ لها تشغيلة إلا مربوطةً بمعاينتها: خياراتها الدلالية الإلزامية (النوع/التصنيف·العلامة/قائمة السعر) وسياساتها تُجمَّد من المعاينة،
@@ -62,7 +67,7 @@ final class ImportJobDomain
      *
      * @var list<string>
      */
-    public const PREVIEW_BOUND_ONLY = [self::PARTNER_MASTER, self::PRODUCT_TAXONOMY, self::PRICE_LIST_ITEMS, self::UNIT_TEMPLATES];
+    public const PREVIEW_BOUND_ONLY = [self::PARTNER_MASTER, self::PRODUCT_TAXONOMY, self::PRICE_LIST_ITEMS, self::UNIT_TEMPLATES, self::STOCKTAKE_COUNT];
 
     public static function values(): array
     {
@@ -74,6 +79,7 @@ final class ImportJobDomain
             self::PRODUCT_TAXONOMY,
             self::PRICE_LIST_ITEMS,
             self::UNIT_TEMPLATES,
+            self::STOCKTAKE_COUNT,
         ];
     }
 
