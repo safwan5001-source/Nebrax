@@ -157,6 +157,136 @@ final class PaymentGatewaySettlementService
         });
     }
 
+    /**
+     * معاينة المعادلة بلا أي كتابة (PAY-H3-02a، D-21): تُظهر الفرق وسبب عدم قابلية الترحيل بدل الرفض الصامت.
+     * لا قيد ولا سجل تسوية ولا أقفال صفوف؛ تستعمل قواعد الترحيل نفسها فيطابق «قابل للترحيل» ما سيقبله `post()` اليوم.
+     *
+     * @param  array<string, mixed>  $input
+     * @return array{gross: int, net_bank_amount: int, provider_fee_ex_tax: int, provider_fee_tax: int, provider_deductions: int, provider_credits: int, difference: int, reconciled: bool, postable: bool, replay: bool, blockers: list<array{code: string, message: string}>}
+     */
+    public function preview(array $input): array
+    {
+        $tenantId = $this->requireTenant();
+        $blockers = [];
+        $block = function (string $code, string $message) use (&$blockers): void {
+            $blockers[] = ['code' => $code, 'message' => $message];
+        };
+
+        $parse = function (string $key, string $label, bool $required = false) use ($input, $block): int {
+            try {
+                return $this->money($input[$key] ?? ($required ? null : 0), $label);
+            } catch (DomainException $e) {
+                $block('invalid_amount', $e->getMessage());
+
+                return 0;
+            }
+        };
+        $net = $parse('net_bank_amount', 'net bank amount', true);
+        $feeExTax = $parse('provider_fee_ex_tax', 'provider fee');
+        $feeTax = $parse('provider_fee_tax', 'provider fee tax');
+        $deductions = $parse('provider_deductions', 'provider deductions');
+        $credits = $parse('provider_credits', 'provider credits');
+
+        $gateway = PaymentGateway::query()->whereKey((string) ($input['payment_gateway_id'] ?? ''))->first();
+        if ($gateway === null) {
+            $block('gateway_not_found', 'Payment gateway must belong to the active tenant.');
+        }
+
+        $gross = 0;
+        $itemsInput = $input['items'] ?? [];
+        if (! is_array($itemsInput) || $itemsInput === []) {
+            $block('items_required', 'Gateway settlement requires at least one matched payment.');
+        } elseif ($gateway !== null) {
+            try {
+                foreach ($this->normalizeItems($tenantId, (string) $gateway->id, $itemsInput, false) as $item) {
+                    $gross += $item['gross_amount'];
+                }
+            } catch (DomainException $e) {
+                $block('invalid_items', $e->getMessage());
+            }
+        }
+
+        if ($feeTax > 0) {
+            $block('fee_tax_not_authorized', 'Provider fee tax posting is not authorized until an approved input-tax routing policy exists.');
+        }
+        if ($deductions > 0) {
+            $block('deductions_unsupported', 'Unsupported provider deductions cannot be posted.');
+        }
+        if ($credits > 0) {
+            $block('credits_unsupported', 'Unsupported provider credits cannot be posted.');
+        }
+
+        $difference = $gross - ($net + $feeExTax + $feeTax + $deductions - $credits);
+        if ($gross > 0 && $difference !== 0) {
+            $block('unreconciled_difference', "Settlement does not reconcile: difference {$difference}.");
+        }
+
+        $ref = trim((string) ($input['provider_settlement_ref'] ?? ''));
+        $replay = $gateway !== null && $ref !== '' && PaymentGatewaySettlement::query()
+            ->where('payment_gateway_id', $gateway->id)->where('provider_settlement_ref', $ref)->exists();
+
+        $reconciled = $gross > 0 && $difference === 0;
+
+        return [
+            'gross' => $gross,
+            'net_bank_amount' => $net,
+            'provider_fee_ex_tax' => $feeExTax,
+            'provider_fee_tax' => $feeTax,
+            'provider_deductions' => $deductions,
+            'provider_credits' => $credits,
+            'difference' => $difference,
+            'reconciled' => $reconciled,
+            'postable' => $reconciled && $blockers === [],
+            'replay' => $replay,
+            'blockers' => $blockers,
+        ];
+    }
+
+    /**
+     * سندات القبض المرحَّلة عبر بوابة والتي بقي منها مبلغ غير مسوّى في 1170 (قراءة فقط، بلا أقفال).
+     *
+     * @return list<array{payment_id: string, number: ?string, date: ?string, amount: int, settled: int, remaining: int, partner_id: ?string}>
+     */
+    public function unsettledPayments(string $gatewayId): array
+    {
+        $this->requireTenant();
+        $gateway = PaymentGateway::query()->whereKey($gatewayId)->first();
+        if ($gateway === null) {
+            throw new DomainException('Payment gateway must belong to the active tenant.');
+        }
+
+        $payments = Payment::query()
+            ->where('payment_gateway_id', $gateway->id)
+            ->where('direction', 'received')
+            ->where('status', 'posted')
+            ->orderBy('payment_date')->orderBy('id')
+            ->get();
+        $settled = PaymentGatewaySettlementItem::query()
+            ->whereIn('payment_id', $payments->pluck('id'))
+            ->whereHas('settlement', fn ($q) => $q->where('status', PaymentGatewaySettlement::STATUS_POSTED))
+            ->selectRaw('payment_id, SUM(gross_amount) as total')
+            ->groupBy('payment_id')->pluck('total', 'payment_id');
+
+        $rows = [];
+        foreach ($payments as $payment) {
+            $done = (int) ($settled[$payment->id] ?? 0);
+            $remaining = (int) $payment->amount - $done;
+            if ($remaining > 0) {
+                $rows[] = [
+                    'payment_id' => (string) $payment->id,
+                    'number' => $payment->number,
+                    'date' => $payment->payment_date?->toDateString(),
+                    'amount' => (int) $payment->amount,
+                    'settled' => $done,
+                    'remaining' => $remaining,
+                    'partner_id' => $payment->partner_id,
+                ];
+            }
+        }
+
+        return $rows;
+    }
+
     private function assertUnsupportedAdjustmentsAreZero(int $deductions, int $credits): void
     {
         if ($deductions > 0) {
@@ -202,7 +332,7 @@ final class PaymentGatewaySettlementService
         return $existing->fresh(['items', 'journalEntry.lines']);
     }
 
-    private function normalizeItems(string $tenantId, string $gatewayId, array $itemsInput): array
+    private function normalizeItems(string $tenantId, string $gatewayId, array $itemsInput, bool $lock = true): array
     {
         $normalized = [];
         $seenPayments = [];
@@ -240,7 +370,8 @@ final class PaymentGatewaySettlementService
                 }
             }
 
-            $payment = Payment::query()->whereKey($paymentId)->lockForUpdate()->first();
+            $paymentQuery = Payment::query()->whereKey($paymentId);
+            $payment = ($lock ? $paymentQuery->lockForUpdate() : $paymentQuery)->first();
             if ($payment === null) {
                 throw new DomainException('Settlement payment must belong to the active tenant.');
             }
