@@ -1,7 +1,7 @@
 # ADR-0004 — AWJ Payments: قرارات بوابة G0
 
 DATE: 2026-10-22
-STATUS: **accepted** (D-03, D-07, D-08, D-11, D-19, D-20, D-23, D-25, D-27, D-29, D-30, D-31 — وD-12 اتجاهاً) · **proposed** (آلية D-12 §3 — تحتاج اعتماداً صريحاً قبل PAY-H2-02)
+STATUS: **accepted** (D-03, D-07, D-08, D-11, D-19, D-20, D-23, D-25, D-27, D-29, D-30, D-31 — وD-12 اتجاهاً) · **accepted 2026-10-23** (آلية D-12 §3 — الأساس R1 فقط، انظر ADR-0006؛ R2 غير معتمد وR3 مؤجَّل لـH3-01)
 DECIDED_BY: صفوان (المالك)، رسالة الاعتماد 2026-10-22 بتوصيات `AWJ_PAYMENTS_HORIZON_MASTER_PLAN.md` §13 وبالضوابط أدناه
 SUPERSEDES: —
 RELATED_TASKS: PAY-H0-02/03، PAY-H1-01..04، PAY-H2-02، PAY-H8-01 · الأفق: `docs/plans/payments/horizon/`
