@@ -7,6 +7,7 @@ use App\Models\CostCenter;
 use App\Models\CreditNote;
 use App\Models\Invoice;
 use App\Models\Partner;
+use App\Models\Tenant;
 use App\Models\InvoiceLine;
 use App\Models\InvoiceLineCostCenterAllocation;
 use App\Models\JournalLine;
@@ -19,11 +20,13 @@ use App\Support\PrintTemplateContract;
 use App\Support\ResolvedTreasury;
 use App\Support\Settings;
 use App\Support\TreasurySelection;
+use App\Support\TreasurySelectionException;
 use App\Support\ZatcaIssueTimestamp;
 use App\Services\PrintTemplates\PrintTemplateService;
 use App\Services\ClassificationService;
 use App\Tenancy\BranchContext;
 use App\Tenancy\BranchScope;
+use App\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -1127,13 +1130,22 @@ class InvoiceService
     /** @param ?string $authorize 'deposit' عند الترحيل؛ null عند فحص مسوّدة (لا فاعل ولا أثر مالي بعد). */
     protected function resolveCashSaleTreasury(?string $cashAccountId, string $policy, ?string $authorize, ?User $actor = null): ResolvedTreasury
     {
-        return app(TreasurySelectionResolver::class)->resolve(
+        $resolved = app(TreasurySelectionResolver::class)->resolve(
             $cashAccountId ? TreasurySelection::ledgerAccount($cashAccountId) : TreasurySelection::none(),
             'cash',
             CashSaleTreasuryPolicy::selectionPolicy($policy),
             $authorize,
             $actor,
         );
+
+        // مبالغ الفاتورة بعملة المؤسسة (وكذلك مبالغ ZATCA): خزينة بعملة أخرى كانت ستسجَّل بها هللات ريال على أنها عملتها
+        // فتفسد رصيدها. فشل مغلق بلا تحويل ولا سقوط إلى 1110؛ الفحص هنا لا في المحلِّل العام (عقد T3 لا يعرف عملة المستند).
+        $tenantCurrency = (string) (Tenant::query()->whereKey(app(TenantContext::class)->id())->value('currency') ?: 'SAR');
+        if (strcasecmp($resolved->currency, $tenantCurrency) !== 0) {
+            throw TreasurySelectionException::for(TreasurySelectionException::CURRENCY_MISMATCH);
+        }
+
+        return $resolved;
     }
 
     /**

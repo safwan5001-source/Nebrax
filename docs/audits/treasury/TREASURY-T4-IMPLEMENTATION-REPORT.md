@@ -26,6 +26,7 @@
 | `app/Support/Settings.php` | New `sales` default `cash_sale_treasury_policy = 'legacy'` (existing settings infrastructure; no migration). |
 | `app/Http/Requests/UpdateSalesSettingsRequest.php` | Validation of the key; non-`legacy` rejected while the gate is closed. |
 | `app/Http/Controllers/Api/SalesSettingsController.php` | Adds read-only `cash_sale_treasury_routing_available` and `cash_sale_treasury_policy_effective` to the response. |
+| `app/Support/TreasurySelectionException.php` | Additive reason `currency_mismatch` (thrown by the cash-sale branch, never by the resolver). |
 | `app/Services/Accounting/InvoiceService.php` | `post()` debit account via `cashSaleDebitAccountId()` (legacy branch is the previous code verbatim); draft-time validation of an explicit selection in `create()`/`update()` when the policy is routed. |
 | `app/Services/Accounting/CashSaleRefundGuard.php` (new) | Read-only fail-closed guard. |
 | `app/Services/Accounting/CreditNoteService.php`, `ReturnService.php` | One guarded call each, only for cash refunds with a source invoice. |
@@ -46,6 +47,7 @@ Every row is asserted by `TreasuryCashSaleRoutingTest` on SQLite and PostgreSQL.
 | 3b | Explicit 1110 while main = 1111 | Dr 1110 | Dr 1110 | Dr 1110 | Dr 1110 |
 | 4a | Selection is a bank account / unlinked 111x / non-treasury GL / `'1110'` text | Stored, ignored, Dr 1110 | Stored, ignored, Dr 1110 | 422 `wrong_type` / `not_found`, at save and at post | same |
 | 4b | Inactive treasury, or ledger account inactive / group / non-asset | Dr 1110 (ignored) or 422 if the 1110 entity is inactive | same as before | 422 `inactive` / `gl_account_inactive` / `gl_account_invalid`; no entry | same |
+| 4c-bis | Resolved treasury in a currency other than the tenant's (e.g. a USD cashbox, selected or main) | Dr 1110 | Dr 1110 | **422 `currency_mismatch`** (at save for an explicit selection, and at post); no conversion, no entry, never 1110 | same |
 | 4c | Main inactive / no main (several candidates) / no main (one candidate) | Dr 1110 | Dr 1110 | 422 `inactive` / `ambiguous_default` / `no_default`; **never 1110** | same |
 | 5 | Treasury of another tenant | API 422; ignored by the service | same | API 422; service `not_found` (same message as unknown id); a draft seeded with it by raw SQL is rejected at post | same |
 | 6 | Deposit scope restricted to another user on the resolved treasury | Checked on the 1110 entity | same | 422 `not_permitted`, draft kept, no entry, no ICV | same |
@@ -89,6 +91,7 @@ VAT and ZATCA: totals, `tax_amount`, `discount`, `shipping`, `adjustment` are eq
 | Draft carrying an ignored `cash_account_id` | Becomes effective only after activation; invalid values then fail closed. The audit's read-only scan lists them before activation. |
 | Authorization moves from the 1110 entity to the resolved entity | Intended, only after activation. |
 | Tenants with no usable main would be rejected after activation | Intended (`no_default` / `ambiguous_default` / `inactive`), listed by the audit's query. |
+| Currency | The routed branch rejects a treasury whose currency differs from the tenant currency (`currency_mismatch`); the generic T3 resolver is unchanged. Receipts, payment vouchers and refunds have no such check today (pre-existing, T5/T6 should adopt it). |
 | Concurrency | Resolver is read-only; the legacy lock order is untouched; `bootstrapDefaults()` fast path keeps the T1 guarantees. Main changing between resolve and post is benign under READ COMMITTED (the invoice posts to the treasury it resolved). |
 
 ## 6. Remaining activation conditions (all required, separate approval)

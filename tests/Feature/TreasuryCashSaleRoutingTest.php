@@ -420,6 +420,39 @@ class TreasuryCashSaleRoutingTest extends TestCase
         $this->assertSame($before, $this->entryCount());
     }
 
+    /** @test */
+    public function a_treasury_in_another_currency_is_rejected_never_converted_and_never_replaced_by_1110(): void
+    {
+        $usd = $this->newTreasury('cash', 'خزينة دولار');
+        DB::table('cash_bank_accounts')->where('id', $usd->id)->update(['currency' => 'USD']);
+        $this->activate('main');
+        $before = $this->entryCount();
+
+        // صريح: يُرفض عند الحفظ
+        $this->assertReason(TreasurySelectionException::CURRENCY_MISMATCH, fn () => $this->draft(['cash_account_id' => $usd->account_id]));
+
+        // الرئيسية بعملة أخرى: تُرفض عند الترحيل، بلا قيد ولا ICV
+        $this->makeMain($usd->fresh());
+        $draft = $this->draft();
+        $chain = DB::table('zatca_chain_entries')->count();
+        $this->assertReason(TreasurySelectionException::CURRENCY_MISMATCH, fn () => $this->postInv($draft));
+        $this->assertSame('draft', $draft->fresh()->status);
+        $this->assertSame($before, $this->entryCount());
+        $this->assertSame($chain, DB::table('zatca_chain_entries')->count());
+
+        // مسوّدة مزروعة بمعرّف صريح خارج الحفظ (SQL خام) تُرفض كذلك عند الترحيل
+        $seeded = $this->draft(['cash_account_id' => $this->entity('1110')->account_id]);
+        DB::table('invoices')->where('id', $seeded->id)->update(['cash_account_id' => $usd->account_id]);
+        $this->assertReason(TreasurySelectionException::CURRENCY_MISMATCH, fn () => $this->postInv($seeded->fresh()));
+
+        // الخزينة بعملة المؤسسة (ولو بحروف صغيرة) مقبولة، و legacy لا يتأثر أصلاً
+        DB::table('cash_bank_accounts')->where('id', $usd->id)->update(['currency' => 'sar']);
+        $this->assertSame('1111', $this->debitCode($this->postInv($draft->fresh())));
+        DB::table('cash_bank_accounts')->where('id', $usd->id)->update(['currency' => 'USD']);
+        $this->store('legacy');
+        $this->assertSame('1110', $this->debitCode($this->postInv($this->draft())));
+    }
+
     // ───────────────────────── عزل المستأجرين ─────────────────────────
 
     /** @test */
