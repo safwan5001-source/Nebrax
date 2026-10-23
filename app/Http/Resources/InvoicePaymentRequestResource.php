@@ -21,6 +21,8 @@ class InvoicePaymentRequestResource extends JsonResource
             'payment_gateway_id' => $this->payment_gateway_id,
             'status' => $this->status,
             'allow_partial' => (bool) $this->allow_partial,
+            // هل أُصدر رابط الدفع العام؟ (الرمز لا يُعاد أبداً؛ هذا مؤشر لإظهار/إخفاء إجراء «إصدار الرابط» في الواجهة.)
+            'link_issued' => $this->token_hash !== null,
             'currency' => $this->currency,
             'expires_at' => $this->expires_at?->toISOString(),
             'cancelled_at' => $this->cancelled_at?->toISOString(),

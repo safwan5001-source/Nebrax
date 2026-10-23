@@ -34,6 +34,7 @@ use Tests\TestCase;
  */
 class PaymentAttemptPostgresTest extends TestCase
 {
+    use UsesWorkerDatabaseWithoutTransaction;
     use DiagnosesUnprovenScheduler;
 
     private string $dir;
