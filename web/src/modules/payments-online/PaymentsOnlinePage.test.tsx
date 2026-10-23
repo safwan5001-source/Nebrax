@@ -198,6 +198,31 @@ describe.each(TEST_LOCALES)('PaymentsOnlinePage (%s)', (locale) => {
     await waitFor(() => expect(seen.filter((p) => p.includes('page=1')).length).toBeGreaterThanOrEqual(2));
   });
 
+  it('keeps the newest blocked count when an older count response arrives last', async () => {
+    state.perms = new Set(['payments.view', 'payments.resolve_blocked']);
+    const countResolvers: Array<(v: unknown) => void> = [];
+    let reposted = false;
+    apiMock.mockImplementation(async (path: string, options?: { method?: string }) => {
+      if (options?.method === 'POST') { reposted = true; return { data: { id: 'b1', outcome: 'posted', posting_status: 'posted' } }; }
+      if (path.startsWith('/payment-attempts?posting_status=blocked_period&per_page=1')) {
+        return new Promise((resolve) => { countResolvers.push(resolve); });
+      }
+      return { data: reposted ? [] : [row({ id: 'b1', posting_status: 'blocked_period', blocked_reason: { kind: 'period' } })], meta: meta(reposted ? 0 : 1) };
+    });
+    ui();
+    fireEvent.click((await screen.findAllByRole('button', { name: /Repost|إعادة الترحيل/ }))[0]);
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'سبب كافٍ للقرار' } });
+    fireEvent.click(within(dialog).getAllByRole('button').find((b) => /^(Repost|إعادة الترحيل)$/.test(b.textContent ?? ''))!);
+    await waitFor(() => expect(countResolvers.length).toBe(2));
+    countResolvers[1]({ data: [], meta: meta(0) });   // الأحدث: لا محجوب
+    await waitFor(() => expect(screen.queryByLabelText(/Blocked payments exist|توجد دفعات محجوبة/)).toBeNull());
+    countResolvers[0]({ data: [], meta: meta(1) });   // الأقدم يصل أخيراً بإجمالي ما قبل الترحيل
+    await new Promise((r) => setTimeout(r, 50));
+    const tab = screen.getByRole('tab', { name: /Blocked by closed period|محجوبة بفترة مقفلة/ });
+    expect(tab.textContent).not.toMatch(/1/);
+  });
+
   it('shows a retryable error when the list fails', async () => {
     route({
       'GET /payment-attempts': () => new Error('boom'),

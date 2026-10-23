@@ -77,12 +77,14 @@ export function PaymentsOnlinePage() {
     }
   }, [tab, captureStatus, page, perPage, t]);
 
+  const latestCount = useRef(0);
   const loadBlockedCount = useCallback(async () => {
+    const mine = ++latestCount.current;
     try {
       const res = await api<{ meta: ListMeta }>('/payment-attempts?posting_status=blocked_period&per_page=1');
-      setBlockedCount(res.meta.total);
+      if (mine === latestCount.current) setBlockedCount(res.meta.total);
     } catch {
-      setBlockedCount(null);
+      if (mine === latestCount.current) setBlockedCount(null);
     }
   }, []);
 
