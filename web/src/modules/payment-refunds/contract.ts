@@ -72,18 +72,13 @@ export interface RefundContext {
 
 export interface ListMeta { total: number; page: number; per_page: number; last_page: number }
 
-export function buildListQuery(f: { tab: RefundTab; page: number; perPage: number }): string {
+export function buildListQuery(f: { tab: RefundTab; page: number; perPage: number; status?: string }): string {
   const q = new URLSearchParams();
   q.set('page', String(f.page));
   q.set('per_page', String(f.perPage));
+  if (f.tab !== 'all') q.set('scope', f.tab);   // الترشيح في الخادم: الصفوف خارج الصفحة المحمَّلة لا تختفي
+  if (f.tab === 'all' && f.status) q.set('status', f.status);   // مرشح الحالة يخصّ تبويب «الكل» فقط
   return q.toString();
-}
-
-/** تبويبات تُرشَّح في الواجهة (الخادم يعيد الصفحة كاملة بالترتيب الزمني): بانتظار الاعتماد/الإرسال، وما يحتاج تدخلاً بشرياً. */
-export function inTab(row: Pick<RefundRow, 'status' | 'posting_status'>, tab: RefundTab): boolean {
-  if (tab === 'pending') return row.status === 'requested' || row.status === 'approved';
-  if (tab === 'attention') return row.status === 'unknown' || row.status === 'failed' || row.posting_status === 'blocked_period';
-  return true;
 }
 
 export function statusTone(status: RefundStatus, posting: RefundRow['posting_status']): BadgeTone {
@@ -118,7 +113,7 @@ export const KNOWN_ERRORS = [
   'capture_not_posted', 'not_refundable', 'dispute_active', 'unrecognized_refund_open', 'gateway_unavailable', 'refunds_unsupported', 'currency_mismatch',
   'partner_mismatch', 'source_ineligible', 'source_branch_mismatch', 'capture_branch_mismatch', 'branch_context_mismatch', 'exceeds_source_balance',
   'exceeds_payment_capacity', 'invalid_state', 'self_approval', 'busy', 'provider_unavailable', 'reason_required', 'evidence_missing', 'no_unrecognized_refund',
-  'not_blocked', 'not_postable', 'baseline_regressed',
+  'not_blocked', 'not_postable', 'baseline_regressed', 'operation_rejected', 'refund_not_found',
 ] as const;
 export type KnownError = (typeof KNOWN_ERRORS)[number];
 export const knownError = (code: string | null | undefined): KnownError | 'unknown' =>
@@ -131,6 +126,8 @@ export function newIdempotencyKey(): string {
 }
 
 /** تخصيص تلقائي بالترتيب (الأقدم أولاً) على المصادر المؤهَّلة حتى يُغطّى المبلغ؛ يعيد `null` إن لم تكفِ المصادر. */
+export const MAX_ALLOCATIONS = 20;   // سقف الخادم لعدد المصادر في طلب واحد
+
 export function autoAllocate(sources: EligibleSource[], amountMinor: number): { source_type: string; source_id: string; amount_minor: number }[] | null {
   let left = amountMinor;
   const out: { source_type: string; source_id: string; amount_minor: number }[] = [];
@@ -142,7 +139,7 @@ export function autoAllocate(sources: EligibleSource[], amountMinor: number): { 
       left -= take;
     }
   }
-  return left === 0 && out.length > 0 ? out : null;
+  return left === 0 && out.length > 0 && out.length <= MAX_ALLOCATIONS ? out : null;
 }
 
 export const maxRefundable = (ctx: Pick<RefundContext, 'refundable_minor' | 'sources'>): number =>

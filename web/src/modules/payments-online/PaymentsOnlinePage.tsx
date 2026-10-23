@@ -203,7 +203,7 @@ export function PaymentsOnlinePage() {
       </>
       )}
 
-      {detailId && <DetailSheet id={detailId} locale={locale} reviewLabel={reviewLabel} canResolveExternal={canResolveExternal} onResolveExternal={(attemptId) => setResolveFor(attemptId)} onClose={() => setDetailId(null)} />}
+      {detailId && <DetailSheet id={detailId} locale={locale} reviewLabel={reviewLabel} canResolveExternal={canResolveExternal} onResolveExternal={(attemptId) => { setDetailId(null); setResolveFor(attemptId); }} onClose={() => setDetailId(null)} />}
       {requestFor && (
         <RequestRefundDialog
           attemptId={requestFor}

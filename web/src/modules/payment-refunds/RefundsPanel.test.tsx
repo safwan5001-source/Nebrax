@@ -130,16 +130,40 @@ describe.each(TEST_LOCALES)('RefundsPanel (%s)', (locale) => {
     expect(screen.getAllByRole('button', { name: /إعادة الترحيل|Repost/ }).length).toBeGreaterThan(0);
   });
 
-  it('filters the attention tab client-side and the status filter server-side', async () => {
+  it('asks the server for the attention scope and keeps the status filter to the all tab', async () => {
     route({
-      'GET /payment-refunds?page=1&per_page=25': () => ({ data: [row({ number: 'PRF-OK', status: 'confirmed', posting_status: 'posted' }), row({ id: 'u1', number: 'PRF-U', status: 'unknown' })], meta: meta(2) }),
-      'GET /payment-refunds?page=1&per_page=25&status=unknown': () => ({ data: [row({ id: 'u1', number: 'PRF-U', status: 'unknown' })], meta: meta(1) }),
+      'GET /payment-refunds?page=1&per_page=25': () => ({ data: [row({ number: 'PRF-OK', status: 'confirmed', posting_status: 'posted' })], meta: meta(1) }),
+      'GET /payment-refunds?page=1&per_page=25&scope=attention': () => ({ data: [row({ id: 'u1', number: 'PRF-U', status: 'unknown' })], meta: meta(1) }),
     });
     ui();
     await screen.findAllByText('PRF-OK');
     fireEvent.click(screen.getByRole('tab', { name: /تحتاج تدخلاً|Needs attention/ }));
     await waitFor(() => expect(screen.queryByText('PRF-OK')).toBeNull());
     expect(screen.getAllByText('PRF-U').length).toBeGreaterThan(0);
+    expect(apiMock).toHaveBeenCalledWith('/payment-refunds?page=1&per_page=25&scope=attention');
+  });
+
+  it('never reports success when approval worked but sending failed, or the refund ended unknown', async () => {
+    state.perms = new Set(['payment_refunds.view', 'payment_refunds.approve']);
+    route({
+      'GET /payment-refunds': () => ({ data: [row()], meta: meta(1) }),
+      'POST /payment-refunds/r1/approve': () => ({ data: row({ status: 'approved' }), meta: { submit_error: { code: 'provider_unavailable', message: 'x' } } }),
+    });
+    ui();
+    fireEvent.click((await screen.findAllByRole('button', { name: /اعتماد وإرسال|Approve & send/ }))[0]);
+    await waitFor(() => expect(toastMock.error).toHaveBeenCalledTimes(1));
+    expect(toastMock.success).not.toHaveBeenCalled();
+
+    cleanup();
+    toastMock.error.mockReset();
+    route({
+      'GET /payment-refunds': () => ({ data: [row()], meta: meta(1) }),
+      'POST /payment-refunds/r1/approve': () => ({ data: row({ status: 'unknown' }), meta: { submit_error: null } }),
+    });
+    ui();
+    fireEvent.click((await screen.findAllByRole('button', { name: /اعتماد وإرسال|Approve & send/ }))[0]);
+    await waitFor(() => expect(toastMock.error).toHaveBeenCalledTimes(1));
+    expect(toastMock.success).not.toHaveBeenCalled();
   });
 });
 

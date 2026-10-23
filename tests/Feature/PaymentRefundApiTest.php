@@ -278,6 +278,25 @@ class PaymentRefundApiTest extends TestCase
     }
 
     #[Test]
+    public function the_list_scopes_filter_pending_and_attention_on_the_server(): void
+    {
+        $attempt = $this->postedCapture();
+        $note = $this->creditNote();
+        $requested = $this->requestRefund($attempt, $note, 10000, 'idem-scope-0001');
+        $unknown = $this->requestRefund($attempt, $note, 20000, 'idem-scope-0002');
+        $this->withToken($this->adminToken)->postJson("/api/payment-refunds/{$unknown->id}/approve")->assertOk();
+        $this->fake->failNextRefund('unknown_applied');
+        $this->withToken($this->adminToken)->postJson("/api/payment-refunds/{$unknown->id}/submit")->assertOk()->assertJsonPath('data.status', 'unknown');
+
+        $pending = $this->withToken($this->adminToken)->getJson('/api/payment-refunds?scope=pending')->assertOk();
+        $this->assertSame([$requested->id], collect($pending->json('data'))->pluck('id')->all());
+        $attention = $this->withToken($this->adminToken)->getJson('/api/payment-refunds?scope=attention')->assertOk();
+        $this->assertSame([$unknown->id], collect($attention->json('data'))->pluck('id')->all());
+        $this->withToken($this->adminToken)->getJson('/api/payment-refunds?scope=bogus')->assertUnprocessable();
+        $this->withToken($this->adminToken)->getJson('/api/payment-refunds')->assertOk()->assertJsonPath('meta.total', 2);
+    }
+
+    #[Test]
     public function another_tenant_cannot_see_or_act_on_these_refunds(): void
     {
         $attempt = $this->postedCapture();

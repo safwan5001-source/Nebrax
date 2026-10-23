@@ -58,7 +58,7 @@ export function RequestRefundDialog({ attemptId, onClose, onDone }: { attemptId:
   }
 
   return (
-    <Dialog open title={t('request_title')} onClose={onClose} closeLabel={t('close')}>
+    <Dialog open title={t('request_title')} onClose={() => { if (!saving) onClose(); }} closeLabel={t('close')}>
       <div className="space-y-4">
         <p className="text-sm leading-6 text-muted">{t('request_intro')}</p>
         {loadFailed && <p role="alert" className="text-sm text-negative">{t('load_failed')}</p>}
@@ -81,7 +81,7 @@ export function RequestRefundDialog({ attemptId, onClose, onDone }: { attemptId:
               <>
                 <div className="space-y-1.5">
                   <Label htmlFor="rf-amount">{t('amount')} ({ctx.currency})</Label>
-                  <Input id="rf-amount" inputMode="decimal" dir="ltr" value={amount} onChange={(e) => setAmount(e.target.value)} aria-invalid={overMax || (amount !== '' && minor === null)} aria-describedby="rf-amount-hint" />
+                  <Input id="rf-amount" inputMode="decimal" dir="ltr" value={amount} onChange={(e) => { setAmount(e.target.value); key.current = newIdempotencyKey(); }} aria-invalid={overMax || (amount !== '' && minor === null)} aria-describedby="rf-amount-hint" />
                   <p id="rf-amount-hint" className="text-xs text-muted">{overMax ? t('amount_over', { max: formatPayAmount(max, ctx.currency) }) : t('amount_hint')}</p>
                 </div>
                 {allocations && (

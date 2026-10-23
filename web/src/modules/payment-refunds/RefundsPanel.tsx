@@ -20,7 +20,7 @@ import { formatPayAmount } from '@/lib/pay-link';
 import { useCan, useCurrentUser } from '@/lib/use-can';
 import { apiErrorCode } from '@/modules/payments/gateways/contract';
 import {
-  APPROVE_PERMISSION, REASON_MAX, REPOST_PERMISSION, RESOLVE_UNKNOWN_PERMISSION, buildListQuery, canCancel, canDecide, canRepost, canResolve, canSubmit, inTab, knownError,
+  APPROVE_PERMISSION, REASON_MAX, REPOST_PERMISSION, RESOLVE_UNKNOWN_PERMISSION, buildListQuery, canCancel, canDecide, canRepost, canResolve, canSubmit, knownError,
   reasonValid, statusTone, type ListMeta, type RefundDetail, type RefundRow, type RefundTab,
 } from './contract';
 
@@ -59,7 +59,7 @@ export function RefundsPanel({ refreshKey, onChanged }: { refreshKey: number; on
     setLoading(true);
     setError(null);
     try {
-      const q = buildListQuery({ tab, page, perPage }) + (status ? `&status=${status}` : '');
+      const q = buildListQuery({ tab, page, perPage, status });
       const res = await api<{ data: RefundRow[]; meta: ListMeta }>(`/payment-refunds?${q}`);
       if (mine !== latest.current) return;
       setRows(res.data);
@@ -74,13 +74,15 @@ export function RefundsPanel({ refreshKey, onChanged }: { refreshKey: number; on
 
   useEffect(() => { void load(); }, [load, refreshKey]);
 
-  const visible = useMemo(() => rows.filter((r) => inTab(r, tab)), [rows, tab]);
-
   async function run(path: string, row: RefundRow, body?: Record<string, unknown>, success?: string) {
     setBusyId(row.id);
     try {
-      await api(`/payment-refunds/${row.id}/${path}`, { method: 'POST', body });
-      if (success) toast.success(success);
+      const res = await api<{ data?: RefundDetail; meta?: { submit_error?: { code: string } | null } }>(`/payment-refunds/${row.id}/${path}`, { method: 'POST', body });
+      // 200 لا يعني نجاح الإرسال: الاعتماد قد ينجح ويفشل الإرسال، والإرسال قد ينتهي failed/unknown.
+      if (res?.meta?.submit_error) toast.error(t('approved_not_sent'));
+      else if (res?.data?.status === 'failed') toast.error(t('outcome_failed'));
+      else if (res?.data?.status === 'unknown') toast.error(t('outcome_unknown'));
+      else if (success) toast.success(success);
       await load();
       onChanged();
     } catch (e) {
@@ -152,11 +154,11 @@ export function RefundsPanel({ refreshKey, onChanged }: { refreshKey: number; on
           <Label htmlFor="rf-status">{t('filter_status')}</Label>
           <Select id="rf-status" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
             <option value="">{t('filter_all')}</option>
-            {(['requested', 'approved', 'confirmed', 'failed', 'unknown', 'rejected', 'cancelled'] as const).map((s) => <option key={s} value={s}>{t(`status_${s}` as 'status_requested')}</option>)}
+            {(['requested', 'approved', 'submitting', 'confirmed', 'failed', 'unknown', 'rejected', 'cancelled'] as const).map((s) => <option key={s} value={s}>{t(`status_${s}` as 'status_requested')}</option>)}
           </Select>
         </div>
       )}
-      <DataTable columns={columns} data={visible} loading={loading} showToolbar={false} error={error} onRetry={() => void load()} emptyLabel={t(`empty_${tab}` as 'empty_all')} />
+      <DataTable columns={columns} data={rows} loading={loading} showToolbar={false} error={error} onRetry={() => void load()} emptyLabel={t(`empty_${tab}` as 'empty_all')} />
       {meta && meta.total > 0 && (
         <Pagination page={meta.page} lastPage={meta.last_page} perPage={meta.per_page} total={meta.total} onPageChange={setPage} onPerPageChange={(n) => { setPerPage(n); setPage(1); }} />
       )}
@@ -189,8 +191,9 @@ function ReasonDialog({ kind, row, onClose, onDone }: { kind: ActionKind; row: R
       const body: Record<string, unknown> = { reason: reason.trim() };
       if (kind === 'resolve_confirm') body.decision = 'confirm';
       if (kind === 'resolve_not_applied') body.decision = 'not_applied';
-      await api(`/payment-refunds/${row.id}/${ACTION_PATH[kind]}`, { method: 'POST', body });
-      toast.success(t(`done_${kind}` as 'done_reject'));
+      const res = await api<{ data?: { outcome?: string } }>(`/payment-refunds/${row.id}/${ACTION_PATH[kind]}`, { method: 'POST', body });
+      if (kind === 'repost' && res?.data?.outcome === 'still_blocked') toast.error(t('outcome_still_blocked'));
+      else toast.success(t(`done_${kind}` as 'done_reject'));
       onDone();
     } catch (e) {
       setError(t(`error_${knownError(apiErrorCode(e))}` as 'error_unknown'));

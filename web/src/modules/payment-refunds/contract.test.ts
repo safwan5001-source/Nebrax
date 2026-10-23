@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  autoAllocate, canCancel, canDecide, canRepost, canResolve, canSubmit, inTab, knownError, maxRefundable, newIdempotencyKey, parseMajorToMinor, reasonValid, statusTone,
+  autoAllocate, canCancel, canDecide, canRepost, canResolve, buildListQuery, canSubmit, knownError, maxRefundable, newIdempotencyKey, parseMajorToMinor, reasonValid, statusTone,
   type EligibleSource,
 } from './contract';
 
@@ -30,10 +30,9 @@ describe('payment refund contract', () => {
   });
 
   it('filters tabs and tones statuses', () => {
-    expect(inTab({ status: 'requested', posting_status: null }, 'pending')).toBe(true);
-    expect(inTab({ status: 'unknown', posting_status: null }, 'attention')).toBe(true);
-    expect(inTab({ status: 'confirmed', posting_status: 'blocked_period' }, 'attention')).toBe(true);
-    expect(inTab({ status: 'confirmed', posting_status: 'posted' }, 'attention')).toBe(false);
+    expect(buildListQuery({ tab: 'attention', page: 2, perPage: 25, status: 'confirmed' })).toBe('page=2&per_page=25&scope=attention');
+    expect(buildListQuery({ tab: 'pending', page: 1, perPage: 10 })).toBe('page=1&per_page=10&scope=pending');
+    expect(buildListQuery({ tab: 'all', page: 1, perPage: 25, status: 'unknown' })).toBe('page=1&per_page=25&status=unknown');
     expect(statusTone('confirmed', 'posted')).toBe('positive');
     expect(statusTone('confirmed', 'blocked_period')).toBe('warning');
     expect(statusTone('failed', null)).toBe('negative');
@@ -48,6 +47,9 @@ describe('payment refund contract', () => {
     ]);
     expect(autoAllocate(sources, 50001)).toBeNull();
     expect(autoAllocate([], 100)).toBeNull();
+    const many = Array.from({ length: 21 }, (_, i) => ({ source_type: 'credit_note', id: `n${i}`, number: `CN-${String(i).padStart(2, '0')}`, date: '2026-10-01', total: 100, refunded: 0, refundable: 100 }));
+    expect(autoAllocate(many, 2000)).toHaveLength(20);
+    expect(autoAllocate(many, 2100)).toBeNull();   // 21 مصدراً > سقف الخادم (20)
     expect(maxRefundable({ refundable_minor: 40000, sources })).toBe(40000);
     expect(maxRefundable({ refundable_minor: 90000, sources })).toBe(50000);
   });
