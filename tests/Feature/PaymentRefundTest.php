@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Events\PaymentRefundConfirmed;
 use App\Models\CreditNote;
 use App\Models\CustomerRefund;
 use App\Models\InvoicePaymentRequest;
@@ -35,6 +36,7 @@ use App\Tenancy\TenantContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use LogicException;
 use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
@@ -91,6 +93,8 @@ class PaymentRefundTest extends TestCase
         $this->requests = app(InvoicePaymentRequestService::class);
         $this->orchestrator = app(PaymentOrchestrator::class);
         $this->refunds = app(PaymentRefundService::class);
+        // الترحيل A5 (H3-01c) يُختبر في PaymentRefundPostingTest؛ هنا تُعزل دورة الحياة عن القيد.
+        Event::fake([PaymentRefundConfirmed::class]);
     }
 
     // ───────────────────────── المسار السعيد ─────────────────────────

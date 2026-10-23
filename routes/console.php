@@ -135,6 +135,12 @@ Schedule::command('payments:post-captured')
     ->withoutOverlapping(10)
     ->onOneServer();
 
+// PAY-H3-01c: شبكة أمان لترحيل A5 لاستردادات البوابة المؤكَّدة المعلّقة (فشل المستمع/انهيار). idempotent: لا قيد ثانٍ أبداً (قفل + مفتاح فريد).
+Schedule::command('payments:post-refunds')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(10)
+    ->onOneServer();
+
 // PAY-H2-02e: إغلاق طلبات دفع الفواتير التي لم تعد قابلة للدفع (سُدّدت/خُفّضت إلى صفر بإشعار دائن/انتهت) — لا أثر محاسبي.
 Schedule::command('payments:close-stale-requests')
     ->everyTenMinutes()

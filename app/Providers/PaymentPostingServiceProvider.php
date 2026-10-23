@@ -3,7 +3,9 @@
 namespace App\Providers;
 
 use App\Events\PaymentAttemptCaptured;
+use App\Events\PaymentRefundConfirmed;
 use App\Listeners\PostCapturedPaymentAttempt;
+use App\Listeners\PostConfirmedPaymentRefund;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
@@ -16,6 +18,8 @@ class PaymentPostingServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Event::listen(PaymentAttemptCaptured::class, PostCapturedPaymentAttempt::class);
+        // PAY-H3-01c: ترحيل A5 لاسترداد بوابة مؤكَّد (متزامن كذلك؛ شبكة الأمان `payments:post-refunds`).
+        Event::listen(PaymentRefundConfirmed::class, PostConfirmedPaymentRefund::class);
 
         // PAY-H2-02e: واجهة رابط الدفع العام — حدّ لكل (رمز، IP) وحدّ أوسع لكل IP (يمنع تخمين الرموز ومسح العناوين).
         // الرد 429 يُبنى هنا بالرؤوس الواقية نفسها: المحدِّد (ThrottleRequests) ذو أولوية في ترتيب الوسطاء فيعمل قبل `HardenPaymentLinkResponse`.

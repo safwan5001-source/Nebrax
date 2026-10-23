@@ -134,6 +134,39 @@ class FiscalCloseService
             ), ['count' => $blockedCount, 'amount_minor' => $blockedAmount]);
         }
 
+        // PAY-H3-01c: استردادات بوابة مؤكَّدة من المزوّد لكنها محجوبة بفترة مقفلة داخل السنة — المال خرج فعلاً ولم يُرحَّل إلى الدفتر؛ تنبيه لا يمنع الإقفال.
+        $blockedRefunds = \App\Models\PaymentRefund::query()
+            ->where('posting_status', \App\Models\PaymentRefund::POSTING_BLOCKED_PERIOD)
+            ->whereDate('accounting_date', '>=', $year->start_date->toDateString())
+            ->whereDate('accounting_date', '<=', $year->end_date->toDateString());
+        $blockedRefundCount = (clone $blockedRefunds)->count();
+        if ($blockedRefundCount > 0) {
+            $blockedRefundAmount = (int) (clone $blockedRefunds)->sum('amount_minor');
+            $items[] = $this->item(self::SEVERITY_WARNING, 'blocked_refunds', sprintf(
+                'توجد %d عملية استرداد عبر البوابة (%s) مؤكَّدة من المزوّد ومحجوبة بفترة مقفلة داخل السنة ولم تُرحَّل إلى الدفتر. '
+                . 'تُعالج بفتح الفترة رسمياً ثم إعادة ترحيلها بصلاحية معالجة المحجوب.',
+                $blockedRefundCount,
+                $this->money($blockedRefundAmount),
+            ), ['count' => $blockedRefundCount, 'amount_minor' => $blockedRefundAmount]);
+        }
+
+        // PAY-H3-01c: مؤكَّد من المزوّد ولم يُرحَّل بعد مرور ساعة (فشل متكرر لشبكة الأمان، كتعيين دور مفقود) — المال خرج ولا أثر له في الدفتر؛ تنبيه لا يمنع الإقفال.
+        $stuckRefunds = \App\Models\PaymentRefund::query()
+            ->where('status', \App\Models\PaymentRefund::CONFIRMED)
+            ->where('posting_status', \App\Models\PaymentRefund::POSTING_PENDING)
+            ->where('confirmed_at', '<=', now()->subHour())
+            ->whereDate('confirmed_at', '<=', $year->end_date->toDateString());
+        $stuckRefundCount = (clone $stuckRefunds)->count();
+        if ($stuckRefundCount > 0) {
+            $stuckRefundAmount = (int) (clone $stuckRefunds)->sum('amount_minor');
+            $items[] = $this->item(self::SEVERITY_WARNING, 'unposted_refunds', sprintf(
+                'توجد %d عملية استرداد عبر البوابة (%s) مؤكَّدة من المزوّد ولم تُرحَّل إلى الدفتر بعد (تعذّر الترحيل التلقائي). '
+                . 'راجع تعيينات الأدوار (حسابا العملاء ومقاصة البوابة) ثم يعيد المجدول ترحيلها.',
+                $stuckRefundCount,
+                $this->money($stuckRefundAmount),
+            ), ['count' => $stuckRefundCount, 'amount_minor' => $stuckRefundAmount]);
+        }
+
         // ── معلومات.
         $items[] = $this->item(self::SEVERITY_INFO, 'result', sprintf(
             'إيرادات السنة %s ومصروفاتها %s، والنتيجة %s.',
