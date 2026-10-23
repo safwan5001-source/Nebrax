@@ -86,6 +86,9 @@ class Rbac
         // (تسجيل سندات). owner/admin عبر `*` فقط؛ لا تُضاف لـ`MATRIX` ولا تُمنح لأي دور مخزَّن
         // بهجرة. القراءة (دون أسرار) تبقى `payments.view`.
         'payment_gateways.manage',
+        // PAY-H2-02d (ADR-0006 M5-R1): إعادة ترحيل التقاط دفع إلكتروني محجوب بفترة/سنة مقفلة بعد فتحها رسمياً، وعرض المحجوب. قرار مالي
+        // بفاعل وسبب مسجَّلين. owner/admin عبر `*` فقط؛ لا تُضاف لـ`MATRIX` ولا تُمنح لأي دور مخزَّن بهجرة.
+        'payments.resolve_blocked',
         'purchases.view', 'purchases.manage',
         'returns.view', 'returns.manage',
         'hr.view', 'hr.manage',

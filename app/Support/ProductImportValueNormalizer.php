@@ -66,7 +66,7 @@ final class ProductImportValueNormalizer
     }
 
     /** @return array{0:?int,1:?string} */
-    private static function money(string $text): array
+    public static function money(string $text): array
     {
         // ٬ (U+066C فاصل الآلاف العربي) كان يقبله الاستخراج والمراجعة دون المعاين؛ يُقبل هنا كي يتّفق الحكم في الخطوات الثلاث (IMP-H2-S2).
         $normalized = str_replace(['٫', '،', '٬'], ['.', '', ''], self::digits($text));
@@ -83,7 +83,7 @@ final class ProductImportValueNormalizer
     }
 
     /** @return array{0:?int,1:?string} */
-    private static function integer(string $text, int $min, int $max): array
+    public static function integer(string $text, int $min, int $max): array
     {
         $normalized = rtrim(trim(preg_replace('/[,\s\x{00A0}\x{066C}\x{060C}]/u', '', self::digits($text)) ?? ''), '%');
         if (preg_match('/^(\d+)\.0+$/', $normalized, $matches) === 1) {
@@ -98,7 +98,7 @@ final class ProductImportValueNormalizer
     }
 
     /** @return array{0:?bool,1:?string} */
-    private static function boolean(string $text): array
+    public static function boolean(string $text): array
     {
         $value = mb_strtolower(self::digits($text), 'UTF-8');
         if (in_array($value, self::BOOLEAN_TRUE, true)) {
