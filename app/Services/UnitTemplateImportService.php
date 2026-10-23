@@ -242,7 +242,7 @@ class UnitTemplateImportService
         }
 
         // القوالب القائمة (المؤسسة كلها — كالمتحكّم) لأسماء الملف فقط.
-        $names = array_values(array_unique(array_filter(array_map(static fn (array $entry): ?string => $entry['values']['template_name'] ?? null, $entries))));
+        $names = array_values(array_unique(array_filter(array_map(static fn (array $entry): ?string => $entry['values']['template_name'] ?? null, $entries), static fn (?string $name): bool => $name !== null)));
         $existing = [];
         foreach (array_chunk($names, 400) as $chunk) {
             foreach (BranchScope::reference(UnitTemplate::class)->whereIn('name', $chunk)->pluck('name') as $name) {
@@ -332,10 +332,27 @@ class UnitTemplateImportService
         $field = Fields::get($key);
 
         return match ($field['type']) {
-            Fields::TYPE_INTEGER => Normalizer::integer($text, (int) $field['min'], (int) $field['max']),
+            Fields::TYPE_INTEGER => $this->factor($text, (int) $field['min'], (int) $field['max']),
             Fields::TYPE_BOOLEAN => Normalizer::boolean($text),
             default => mb_strlen($text) > (int) ($field['max'] ?? 255) ? [null, 'too_long'] : [$text, null],
         };
+    }
+
+    /**
+     * المعامل يضرب كمية المخزون: **أرقام فقط** بعد تحويل الأرقام العربية، بلا فواصل آلاف ولا فاصلة عشرية ولا `%` ولا أصفار بادئة ولا `.0`
+     * (`2,5` كانت ستصير 25 و`1,2` ستصير 12 في معيِّر المنتجات المتسامح). ما يرفضه `integer` في `StoreUnitTemplateRequest` أو يلتبس كعشري يُرفض هنا.
+     *
+     * @return array{0: ?int, 1: ?string}
+     */
+    private function factor(string $text, int $min, int $max): array
+    {
+        $digits = Normalizer::digits(trim($text));
+        if (preg_match('/^[1-9]\d{0,9}$/', $digits) !== 1) {
+            return [null, 'invalid_integer'];
+        }
+        $value = (int) $digits;
+
+        return $value < $min || $value > $max ? [null, 'integer_out_of_range'] : [$value, null];
     }
 
     private function message(string $code): string
@@ -378,12 +395,16 @@ class UnitTemplateImportService
         if ($entry['errors'] !== []) {
             return;
         }
+        // قالبٌ قائم يُتخطّى: لا تُفحص وحداته (الرسالة تقول إنها لا تُقارَن) — أخطاء الخلايا وحدها تُفشل الملف.
+        if ($group['action'] === 'skip') {
+            return;
+        }
         if ($group['base_unit'] === null && $base !== null) {
             $group['base_unit'] = $base;
         }
-        if ($base === null && $group['base_unit'] === null) {
-            $entry['messages'][] = '«وحدة الأساس» مطلوبة.';
-        } elseif ($base !== null && $base !== $group['base_unit']) {
+        if ($base === null) {
+            $entry['messages'][] = '«وحدة الأساس» مطلوبة في كل صف.';
+        } elseif ($base !== $group['base_unit']) {
             $entry['messages'][] = "وحدة الأساس «{$base}» تخالف «{$group['base_unit']}» المذكورة لهذا القالب في الصف {$group['first_row']}.";
         }
         if (array_key_exists('is_active', $entry['values'])) {

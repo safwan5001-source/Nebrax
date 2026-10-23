@@ -301,6 +301,68 @@ class UnitTemplateImportTest extends TestCase
         $this->assertSame(['create', 'error'], $this->actions($preview));
     }
 
+    // ═══════════════════════════════ من المراجعة المستقلة ═══════════════════════════════
+
+    /** @test */
+    public function the_factor_accepts_plain_digits_only_so_a_mistyped_decimal_never_becomes_a_bigger_factor(): void
+    {
+        foreach (['2,5', '1,2', '1 2', '1٬2', '1،2', '12%', '012', '12.0', '12.00', '1e3', '0x10', '1.5', '-12', '+12'] as $bad) {
+            $preview = $this->service()->preview($this->file([$this->row('ق', 'قطعة', 'كرتون', $bad)]), []);
+            $this->assertSame(['error'], $this->actions($preview), "«{$bad}» كان يجب أن يُرفض");
+        }
+        foreach (['2' => 2, '12' => 12, '٢٠' => 20, '1000000' => 1000000] as $good => $expected) {
+            $preview = $this->service()->preview($this->file([$this->row('ق', 'قطعة', 'كرتون', (string) $good)]), []);
+            $this->assertSame(['create'], $this->actions($preview), "«{$good}»");
+            $this->assertSame($expected, $preview['rows'][0]['factor']);
+        }
+    }
+
+    /** @test */
+    public function a_template_named_zero_is_detected_as_existing(): void
+    {
+        UnitTemplate::create(['name' => '0', 'base_unit' => 'قطعة']);
+
+        $error = $this->service()->preview($this->file([$this->row('0', 'قطعة')]), []);
+        $skip = $this->service()->preview($this->file([$this->row('0', 'قطعة')]), ['existing_policy' => 'skip']);
+
+        $this->assertSame(['error'], $this->actions($error));
+        $this->assertSame([0, 1], [$skip['create_templates'], $skip['skipped_templates']]);
+    }
+
+    /** @test */
+    public function a_blank_base_unit_on_any_row_is_an_error(): void
+    {
+        $preview = $this->service()->preview($this->file([$this->row('أ', 'قطعة', 'كرتون', '12'), $this->row('أ', '', 'دزينة', '12')]), []);
+
+        $this->assertSame(['create', 'error'], $this->actions($preview));
+        $this->assertStringContainsString('كل صف', $preview['errors'][0]['messages'][0]);
+    }
+
+    /** @test */
+    public function under_skip_a_skipped_templates_units_are_not_validated_but_cell_errors_still_fail(): void
+    {
+        UnitTemplate::create(['name' => 'قائم', 'base_unit' => 'قطعة']);
+
+        $ok = $this->service()->preview($this->file([$this->row('قائم', 'علبة', 'دزينة', '12'), $this->row('قائم', 'علبة', 'دزينة', '12')]), ['existing_policy' => 'skip']);
+        $this->assertSame([0, 1], [$ok['error_rows'], $ok['skipped_templates']]);
+
+        $cell = $this->service()->preview($this->file([$this->row('قائم', 'قطعة', 'كرتون', 'abc')]), ['existing_policy' => 'skip']);
+        $this->assertSame(1, $cell['error_rows']);
+    }
+
+    /** @test */
+    public function preview_counts_equal_what_apply_does_and_an_empty_file_is_refused_at_apply(): void
+    {
+        $rows = [$this->row('أ', 'قطعة', 'كرتون', '12'), $this->row('أ', 'قطعة', 'دزينة', '12'), $this->row('ب', 'قطعة')];
+        $preview = $this->service()->preview($this->file($rows), []);
+        $result = $this->service()->apply($this->file($rows), []);
+
+        $this->assertSame([$preview['create_templates'], $preview['create_units']], [$result['created'], $result['created_units']]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->service()->apply(UploadedFile::fake()->createWithContent('e.csv', "template_name,base_unit\n"), []);
+    }
+
     // ═══════════════════════════════ المحوّل ═══════════════════════════════
 
     /** @test */

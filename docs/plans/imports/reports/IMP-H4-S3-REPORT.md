@@ -12,10 +12,25 @@
 - `UnitTemplateImportAdapter` (`unit_templates`, `UNIT_FILE`, like the workbook/opening adapters). The direct API gate is `products.manage`; the registered domain must declare the same.
 
 ## Tests
-- `UnitTemplateImportTest` (17, SQLite + PostgreSQL): contract, importable template, option/mapping refusals, multi-template create with units/active flag, `factorFor` parity, non-adjacent rows, every controller rule per row (base-named unit, factor 1 / over cap / non-numeric, duplicate, conflicting base, factor without unit, bad boolean, conflicting active flag), >50 units, error anywhere writes nothing, **injected mid-write failure rolls everything back**, existing template error / skip (untouched), other isolated branch still blocks the name, no product touched, wide-row guard, adapter options and chunk.
+- `UnitTemplateImportTest` (22, SQLite + PostgreSQL): contract, importable template, option/mapping refusals, multi-template create with units/active flag, `factorFor` parity, non-adjacent rows, every controller rule per row (base-named unit, factor 1 / over cap / non-numeric, duplicate, conflicting base, factor without unit, bad boolean, conflicting active flag), >50 units, error anywhere writes nothing, **injected mid-write failure rolls everything back**, existing template error / skip (untouched), other isolated branch still blocks the name, no product touched, wide-row guard, adapter options and chunk.
 - `UnitTemplateImportConcurrencyPostgresTest` (1, real PostgreSQL + `pcntl_fork`): four racing imports of the same 30 templates → 30 rows, one winner, losers fail with a named row failure. **Negative control:** lock removed → fails; restored → green.
 
 ## Known limits
 - Template-edit, adding units to an existing template, and product linkage are intentionally out of scope.
 - No endpoints/UI yet; no screenshots.
-- Independent review: see the PR description.
+
+## Independent review (read-only subagent) — disposition
+
+Clean: rows that error never leak into a created template, first-row errors, name/unit trimming and lengths, tenant/branch isolation, lock correctness. Findings:
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | **HIGH.** The factor reused the lenient product-import integer parser: `2,5`→25, `1,2`→12, `1 2`→12, `12%`→12, `012`, `12.0`, `٢٠` were accepted — a mistyped decimal becomes a 10× factor, which multiplies stock | **Fixed**: a strict factor parser (digits only after Arabic-digit conversion, no separators / `%` / leading zeros / `.0`, 2…1,000,000) + a test over 13 bad and 4 good formats |
+| 2 | A template named `0` was dropped by `array_filter` and never seen as existing (duplicate created) | **Fixed** (`!== null` filter) + test |
+| 3 | A blank `base_unit` on a later row was silently inherited | **Fixed**: required on every row + test. (An `is_active` declared on any row applies to the template; conflicting declarations remain an error — documented) |
+| 4 | Under `skip`, an existing template's unit rows were still validated, contradicting the "not compared" warning | **Fixed**: only cell-format errors still fail the file; unit rules are not applied to a skipped template + test |
+| 5 | Preview of an empty file returns zeros while apply refuses | **Accepted** (apply refusal is the guard; asserted) |
+| T | Missing tests: factor formats, falsy name, valid-units-of-errored-template, preview counts = apply counts, zero-row apply | **Added** |
+| — | The lock serialises import vs import only (the screen's create is lock-free; no DB unique index) | **Accepted, documented** (same stance as the other importers) |
+
+No Codex review (quota exhausted).
