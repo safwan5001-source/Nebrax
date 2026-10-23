@@ -207,8 +207,9 @@ class InvoicePaymentRequestTest extends TestCase
         $this->fake->script($attempt->provider_payment_id, 'captured');
 
         $this->assertReason('payment_captured', fn () => $this->service->cancel($request, $this->owner));
-        $this->assertSame('open', $request->fresh()->status);
-        $this->assertNoFinancialArtifacts();
+        // مزامنة المزوّد قبل الإلغاء طبّقت الالتقاط؛ منذ PAY-H2-02c يُرحَّل فيكتمل الطلب (لا إلغاء أبداً لدفعة ملتقطة).
+        $this->assertSame('completed', $request->fresh()->status);
+        $this->assertSame(1, Payment::query()->count());
     }
 
     // ═══════════════ الصلاحيات والعزل (API) ═══════════════
