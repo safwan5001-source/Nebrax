@@ -25,6 +25,7 @@ use Tests\TestCase;
 class UnitTemplateImportTest extends TestCase
 {
     use RefreshDatabase;
+    use CapturesThrowable;
     use InteractsWithApi;
 
     private string $tenantId;
@@ -90,23 +91,15 @@ class UnitTemplateImportTest extends TestCase
     {
         $file = $this->file([$this->row('ق', 'قطعة', 'كرتون', '12')]);
         foreach ([['existing_policy' => 'overwrite'], ['mapping' => [0 => 'product_id']]] as $options) {
-            try {
-                $this->service()->preview($file, $options);
-                $this->fail('كان يجب الرفض: '.json_encode($options));
-            } catch (\RuntimeException $e) {
-                $this->assertNotSame('', $e->getMessage());
-            }
+            $e = $this->thrown(fn () => $this->service()->preview($file, $options), 'كان يجب الرفض: '.json_encode($options));
+            $this->assertNotSame('', $e->getMessage());
         }
         foreach ([
             "template_name,unit_name,factor\nق,كرتون,12\n",                 // بلا وحدة أساس
             "template_name,base_unit,unit_name\nق,قطعة,كرتون\n",             // وحدة بلا معامل
         ] as $csv) {
-            try {
-                $this->service()->preview(UploadedFile::fake()->createWithContent('m.csv', $csv), []);
-                $this->fail('كان يجب رفض الخريطة.');
-            } catch (\RuntimeException $e) {
-                $this->assertNotSame('', $e->getMessage());
-            }
+            $e = $this->thrown(fn () => $this->service()->preview(UploadedFile::fake()->createWithContent('m.csv', $csv), []), 'كان يجب رفض الخريطة.');
+            $this->assertNotSame('', $e->getMessage());
         }
     }
 
