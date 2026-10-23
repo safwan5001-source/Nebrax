@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Contracts\GatewayAdapter;
+use App\Contracts\VerifiesGatewayCredentials;
 use App\Support\PaymentOrchestrationException;
 
 /**
@@ -31,6 +32,18 @@ final class PaymentGatewayAdapterRegistry
         }
 
         return app($class);
+    }
+
+    /** محوّل المزوّد إن كان يدعم التحقق من بيانات الاعتماد، وإلا `null`. */
+    public function verifier(string $provider): ?VerifiesGatewayCredentials
+    {
+        $class = $this->classFor($provider);
+        if ($class === null) {
+            return null;
+        }
+        $adapter = app($class);
+
+        return $adapter instanceof VerifiesGatewayCredentials ? $adapter : null;
     }
 
     /** @return class-string<GatewayAdapter>|null */

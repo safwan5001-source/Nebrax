@@ -38,6 +38,15 @@ final class MoyasarApiClient
     }
 
     /**
+     * فحص قراءة آمن لقبول المفتاح السري (صفحة واحدة من الفواتير؛ لا كتابة). نجاح الاستجابة = المفتاح مقبول لدى الحساب.
+     * لا يُثبت صحة سرّ الـwebhook ولا المفتاح القابل للنشر (لا استدعاء موثّق لهما).
+     */
+    public function probeAccess(PaymentGateway $gateway): void
+    {
+        $this->send($gateway, 'GET', '/invoices', query: ['page' => '1']);
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */

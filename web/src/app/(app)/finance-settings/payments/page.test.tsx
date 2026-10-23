@@ -6,7 +6,7 @@ import PaymentGatewaysPage from './page';
 import { renderIntl, TEST_LOCALES, TEST_MESSAGES } from '@/test-utils/intl';
 import type { GatewayConnection } from '@/modules/payments/gateways/contract';
 
-const { api, perms, confirm, toast, ApiErrorMock } = vi.hoisted(() => {
+const { api, perms, confirm, toast, ApiErrorMock, verifyOutcome } = vi.hoisted(() => {
   class ApiErrorMock extends Error {
     status: number;
     body: unknown;
@@ -22,6 +22,7 @@ const { api, perms, confirm, toast, ApiErrorMock } = vi.hoisted(() => {
     confirm: vi.fn(),
     toast: { success: vi.fn(), error: vi.fn() },
     ApiErrorMock,
+    verifyOutcome: { next: 'ok' as 'ok' | 'fail' },
   };
 });
 
@@ -254,6 +255,38 @@ describe.each(TEST_LOCALES)('PaymentGatewaysPage (%s)', (locale) => {
     expect(mark.getAttribute('data-brand')).toBe('moyasar');
     expect(moyasar.querySelector('img')).toBeNull();
     expect(within(screen.getByTestId('pg-item-s1')).queryByTestId('payment-brand-mark')).toBeNull();
+  });
+
+  it('verifies a Moyasar connection from the row, shows the new state, and surfaces provider rejections by code', async () => {
+    perms.current = ['payments.view', 'payment_gateways.manage'];
+    const draft = conn({ id: 'm2', provider: 'moyasar', name: 'ميسّر', name_en: 'Moyasar', verified_at: null });
+    api.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path === '/payment-gateways') return Promise.resolve({ data: [draft] });
+      if (path === '/payment-gateways/m2/verify' && options?.method === 'POST') {
+        return verifyOutcome.next === 'ok'
+          ? Promise.resolve({ data: { ...draft, verified_at: '2026-10-23T10:00:00Z' } })
+          : Promise.reject(new ApiErrorMock(422, 'rejected', { error: { code: 'moyasar.unauthorized', message: 'x' } }));
+      }
+      return Promise.reject(new Error(`unexpected ${options?.method ?? 'GET'} ${path}`));
+    });
+    renderIntl(<PaymentGatewaysPage />, locale);
+
+    const row = await screen.findByTestId('pg-item-m2');
+    const verifyButton = within(row).getByRole('button', { name: m.actions.verify });
+    // قبل التحقق لا تفعيل
+    expect((within(row).getByRole('button', { name: m.actions.activate }) as HTMLButtonElement).disabled).toBe(true);
+
+    verifyOutcome.next = 'fail';
+    await userEvent.click(verifyButton);
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(m.errors.moyasar_unauthorized));
+    expect(toast.success).not.toHaveBeenCalled();
+
+    verifyOutcome.next = 'ok';
+    await userEvent.click(within(row).getByRole('button', { name: m.actions.verify }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith(m.done.verify));
+    await waitFor(() => expect((within(screen.getByTestId('pg-item-m2')).getByRole('button', { name: m.actions.activate }) as HTMLButtonElement).disabled).toBe(false));
+    // لا تأكيد مسبق لقراءة آمنة، ولا زر تحقق لمزوّد بلا محوّل
+    expect(confirm).not.toHaveBeenCalled();
   });
 
   it('in preview mode every mutation control is hidden and a note says why', async () => {
