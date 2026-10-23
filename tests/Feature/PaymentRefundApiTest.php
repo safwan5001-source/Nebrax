@@ -244,6 +244,40 @@ class PaymentRefundApiTest extends TestCase
     }
 
     #[Test]
+    public function domain_failures_in_repost_return_422_with_a_stable_code_not_500(): void
+    {
+        $attempt = $this->postedCapture();
+        $note = $this->creditNote();
+        $lock = app(AccountingPeriodLockService::class)->create('2026-10-01', '2026-10-31', 'إقفال أكتوبر', $this->owner);
+        $refund = $this->requestRefund($attempt, $note, 115000, 'idem-422-0001');
+        $this->withToken($this->adminToken)->postJson("/api/payment-refunds/{$refund->id}/approve", ['submit' => true])->assertOk()
+            ->assertJsonPath('data.posting_status', 'blocked_period');
+        app(AccountingPeriodLockService::class)->release($lock['id'], 'فتح رسمي', $this->owner);
+        DB::table('account_role_mappings')->where('role_key', 'gateway_clearing')->delete();
+
+        $this->withToken($this->adminToken)->postJson("/api/payment-refunds/{$refund->id}/repost", ['reason' => 'بعد الفتح الرسمي للفترة'])
+            ->assertStatus(422)->assertJsonPath('error.code', 'operation_rejected');
+        $this->assertSame('blocked_period', $refund->fresh()->posting_status);
+    }
+
+    #[Test]
+    public function the_requester_cannot_reject_their_own_request_and_unknown_sources_are_refused(): void
+    {
+        $attempt = $this->postedCapture();
+        $note = $this->creditNote();
+        $refund = $this->requestRefund($attempt, $note, 5000, 'idem-self-0001');
+
+        $this->withToken($this->ownerToken)->postJson("/api/payment-refunds/{$refund->id}/reject", ['reason' => 'أرفض طلبي بنفسي'])
+            ->assertStatus(409)->assertJsonPath('error.code', 'self_approval');
+        $this->assertSame(PaymentRefund::REQUESTED, $refund->fresh()->status);
+
+        $payload = $this->payload($attempt, $note, 5000, 'idem-self-0002');
+        $payload['allocations'][0]['source_id'] = '00000000-0000-4000-8000-000000000000';
+        $this->withToken($this->ownerToken)->postJson('/api/payment-refunds', $payload)->assertStatus(422);
+        $this->assertSame(1, PaymentRefund::query()->count());
+    }
+
+    #[Test]
     public function another_tenant_cannot_see_or_act_on_these_refunds(): void
     {
         $attempt = $this->postedCapture();

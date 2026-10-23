@@ -14,6 +14,7 @@ use App\Services\PaymentRefundPostingService;
 use App\Services\PaymentRefundService;
 use App\Support\PaymentRefundException;
 use App\Tenancy\TenantContext;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -41,7 +42,7 @@ class PaymentRefundController extends ApiController
             'partner_id' => ['nullable', 'uuid'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
-        $query = PaymentRefund::query();
+        $query = PaymentRefund::query()->with('partner:id,name');
         foreach (['status', 'posting_status', 'payment_attempt_id', 'partner_id'] as $filter) {
             if (! empty($data[$filter])) {
                 $query->where($filter, $data[$filter]);
@@ -148,6 +149,12 @@ class PaymentRefundController extends ApiController
                 } catch (PaymentRefundException $e) {
                     $submitError = ['code' => $e->reason, 'message' => $e->getMessage()];
                     $approved = $approved->fresh();
+                } catch (\RuntimeException $e) {
+                    if ($e instanceof QueryException) {
+                        throw $e;   // أخطاء القاعدة لا تُحوَّل إلى رسالة (قد تحمل SQL)
+                    }
+                    $submitError = ['code' => 'operation_rejected', 'message' => $e->getMessage()];
+                    $approved = $approved->fresh();
                 }
             }
 
@@ -226,6 +233,13 @@ class PaymentRefundController extends ApiController
             };
 
             return response()->json(['error' => ['code' => $e->reason, 'message' => $e->getMessage()]], $status);
+        } catch (\RuntimeException $e) {
+            // رفض نطاقي من المحرك/المحلِّل (تعيين دور مفقود، فترة مقفلة…) ⇒ 422 برمز ثابت بدل 500؛ أخطاء القاعدة تبقى استثناءً.
+            if ($e instanceof QueryException) {
+                throw $e;
+            }
+
+            return response()->json(['error' => ['code' => 'operation_rejected', 'message' => $e->getMessage()]], 422);
         }
     }
 
@@ -267,7 +281,7 @@ class PaymentRefundController extends ApiController
             'amount_minor' => (int) $r->amount_minor,
             'currency' => $r->currency,
             'partner_id' => $r->partner_id,
-            'partner_name' => $r->partner()->value('name'),
+            'partner_name' => $r->partner?->name,
             'payment_attempt_id' => $r->payment_attempt_id,
             'requested_by' => ['id' => $r->requested_by, 'name' => $actors[$r->requested_by] ?? null],
             'requested_at' => $r->requested_at?->toISOString(),
