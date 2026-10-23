@@ -70,8 +70,8 @@ The 5 s window uses the existing "drop the animated `<source>`s" mechanism (an a
 |---|---|
 | PHP `StorefrontGalleryAnimatedMediaTest` + `StorefrontAnimatedMediaTest` + `StorefrontGalleryTest` (incl. all fixture cases) | **115 passed** (720 assertions) |
 | PHP negative control — new test against `main`'s gate | **4 of 8 fail** (as they must) |
-| PHP `--filter=Storefront` (broader) | __PHP_SF__ |
-| Storefront vitest (full) | __SF_ALL__ |
+| PHP `--filter=Storefront` (broader) | **1472 passed, 17 skipped** (14,766 assertions, 0 failures; on the pre-merge-of-main tree — `main`'s only new files are unrelated treasury code) |
+| Storefront vitest (full) | **2990 passed, 15 skipped** (216 files) |
 | Storefront `tsc --noEmit` | clean |
 | Web vitest `store-experience-builder` (159 files, incl. CSS-parity tests) | **2956 passed** |
 | Web `tsc --noEmit` | no errors in any non-test file I touched (pre-existing errors exist in unrelated `*.test.tsx` files on `main`) |
