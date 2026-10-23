@@ -106,6 +106,52 @@ class ZatcaMonetaryXmlTest extends TestCase
         return $out;
     }
 
+    /**
+     * مسار سطر الفاتورة في XML بوصفه (cbc:Name) لا بموضعه. علاقة `Invoice::lines()` بلا ORDER BY، وPostgreSQL لا يضمن
+     * ترتيب الصفوف (يتبع الخطة والتخزين الفعلي)، فلا يصحّ افتراض أن «السطر الأول المخزَّن» هو InvoiceLine[1] في XML.
+     * الأوصاف المستعملة في الاختبارات التي تستدعيه فريدة.
+     */
+    private function linePathByName(DOMXPath $xp, string $description): string
+    {
+        $positions = [];
+        foreach ($xp->query('/i:Invoice/cac:InvoiceLine') as $i => $node) {
+            if ($xp->query('cac:Item/cbc:Name', $node)->item(0)?->textContent === $description) {
+                $positions[] = $i + 1;
+            }
+        }
+        $this->assertCount(1, $positions, "الوصف «{$description}» يطابق سطراً واحداً في XML");
+
+        return '/i:Invoice/cac:InvoiceLine[' . $positions[0] . ']';
+    }
+
+    /**
+     * الأسطر المخزَّنة مرتّبة كما في XML (مطابقة بالوصف، وأول سطر غير مستعمل عند التكرار — الأسطر المتطابقة الوصف في
+     * السيناريوهات متطابقة المبالغ). تُبقي مقارنة «كل سطر مخزَّن ↔ سطره في XML» صارمة دون افتراض ترتيب الاستعلام.
+     *
+     * @return list<InvoiceLine>
+     */
+    private function linesInXmlOrder(Invoice $invoice, DOMXPath $xp): array
+    {
+        $pool = $invoice->lines->all();
+        $ordered = [];
+        foreach ($xp->query('/i:Invoice/cac:InvoiceLine') as $node) {
+            $name = $xp->query('cac:Item/cbc:Name', $node)->item(0)?->textContent;
+            $idx = null;
+            foreach ($pool as $k => $line) {
+                if (($line->description ?? '-') === $name) {
+                    $idx = $k;
+                    break;
+                }
+            }
+            $this->assertNotNull($idx, "لا سطر مخزَّن بوصف «{$name}»");
+            $ordered[] = $pool[$idx];
+            unset($pool[$idx]);
+        }
+        $this->assertSame([], $pool, 'كل سطر مخزَّن له سطر في XML');
+
+        return $ordered;
+    }
+
     /** @return array<string, array{0: array<string, mixed>, 1: list<array<string, mixed>>}> */
     public static function scenarios(): array
     {
@@ -177,7 +223,7 @@ class ZatcaMonetaryXmlTest extends TestCase
         $this->assertSame(['TaxAmount'], $this->children($xp, $taxTotals . '[1]'));
 
         // الأسطر
-        foreach ($invoice->lines as $i => $line) {
+        foreach ($this->linesInXmlOrder($invoice, $xp) as $i => $line) {
             $p = '/i:Invoice/cac:InvoiceLine[' . ($i + 1) . ']';
             $this->assertSame((int) $line->line_subtotal - (int) $line->line_discount, $this->minor($this->text($xp, "$p/cbc:LineExtensionAmount")));
             $this->assertSame((int) $line->line_tax, $this->minor($this->text($xp, "$p/cac:TaxTotal/cbc:TaxAmount")));
@@ -293,17 +339,19 @@ class ZatcaMonetaryXmlTest extends TestCase
         ]);
         $xp = $this->xp((string) $invoice->zatca_xml);
 
-        $this->assertSame(['Name', 'ClassifiedTaxCategory'], $this->children($xp, '/i:Invoice/cac:InvoiceLine[1]/cac:Item'));
-        $this->assertSame(['Name'], $this->children($xp, '/i:Invoice/cac:InvoiceLine[2]/cac:Item'), 'الصفر لا يُصنَّف Z/E/O');
-        $this->assertSame(['Name'], $this->children($xp, '/i:Invoice/cac:InvoiceLine[3]/cac:Item'), '5٪ غير محسوم (G-I3)');
+        $this->assertSame(['Name', 'ClassifiedTaxCategory'], $this->children($xp, $this->linePathByName($xp, 'standard') . '/cac:Item'));
+        $this->assertSame(['Name'], $this->children($xp, $this->linePathByName($xp, 'zero') . '/cac:Item'), 'الصفر لا يُصنَّف Z/E/O');
+        $this->assertSame(['Name'], $this->children($xp, $this->linePathByName($xp, 'five') . '/cac:Item'), '5٪ غير محسوم (G-I3)');
         $this->assertSame(0, $xp->query('//cbc:ID[normalize-space()="Z" or normalize-space()="E" or normalize-space()="O"]')->length);
         // فئات مختلطة ⇒ لا ملخّص ضريبة مُختلَق (تقسيم الضريبة المخزَّنة غير مخزَّن) — فجوة BR-CO-18 صريحة.
         $this->assertSame(0, $xp->query('//cac:TaxSubtotal')->length);
         // الضريبة المخزَّنة تبقى كما هي في TaxTotal وفي كل سطر.
         $this->assertSame((int) $invoice->tax_amount, $this->minor($this->text($xp, '/i:Invoice/cac:TaxTotal[2]/cbc:TaxAmount')));
+        $byName = $invoice->lines->mapWithKeys(fn ($l) => [$l->description => (int) $l->line_tax])->all();
+        $this->assertCount(3, $byName);
         $this->assertSame(
-            [1500, 0, 500],
-            array_map(fn ($l) => (int) $l->line_tax, $invoice->lines->all()),
+            ['standard' => 1500, 'zero' => 0, 'five' => 500],
+            ['standard' => $byName['standard'] ?? null, 'zero' => $byName['zero'] ?? null, 'five' => $byName['five'] ?? null],
         );
     }
 
@@ -385,7 +433,8 @@ class ZatcaMonetaryXmlTest extends TestCase
         $this->assertSame(6750, (int) $invoice->tax_amount);
         $this->assertSame(7500, (int) $invoice->lines->sum('line_tax'), 'ضريبة السطور قبل خصم الرأس');
         $this->assertSame(6750, $this->minor($this->text($xp, '/i:Invoice/cac:TaxTotal[2]/cbc:TaxAmount')));
-        $this->assertSame(4500, $this->minor($this->text($xp, '/i:Invoice/cac:InvoiceLine[1]/cac:TaxTotal/cbc:TaxAmount')));
+        $this->assertSame(4500, $this->minor($this->text($xp, $this->linePathByName($xp, 'A') . '/cac:TaxTotal/cbc:TaxAmount')));
+        $this->assertSame(3000, $this->minor($this->text($xp, $this->linePathByName($xp, 'B') . '/cac:TaxTotal/cbc:TaxAmount')));
     }
 
     // ───────────────────────── المساعد النقي (بلا قاعدة بيانات) ─────────────────────────
