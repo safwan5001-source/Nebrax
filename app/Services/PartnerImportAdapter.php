@@ -6,20 +6,19 @@ use App\Contracts\ImportFailureExportAdapter;
 use App\Models\ImportPreview;
 use App\Support\ImportChunk;
 use App\Support\ImportChunkResult;
+use App\Support\ImportJobDomain;
 
 /**
- * محوّل `partner_master` (IMP-H3-S1): استيراد العملاء/الموردين بوحدة الصفّ عبر `PartnerImportService` وحده. **غير مسجَّل بعد** في
- * `ImportDomainRegistry` ولا في `ImportJobDomain` — التسجيل ونقاط النهاية في IMP-H3-S2، فلا يصل إليه أي طلب قبلها.
+ * محوّل `partner_master` (IMP-H3-S1): استيراد العملاء/الموردين بوحدة الصفّ عبر `PartnerImportService` وحده. مسجَّل في
+ * `ImportDomainRegistry` و`ImportJobDomain` (بواباته `partners.view/manage`) منذ IMP-H3-S2.
  *
  * لا أعمدة حسّاسة: عقد الحقول بلا تكلفة ولا رصيد افتتاحي (D-01)، فملف الصفوف الفاشلة يصدّر كاملاً لمن يملك صلاحية الإدارة.
  */
 class PartnerImportAdapter extends SpreadsheetImportAdapter implements ImportFailureExportAdapter
 {
-    public const DOMAIN = 'partner_master';
-
     public function domain(): string
     {
-        return self::DOMAIN;
+        return ImportJobDomain::PARTNER_MASTER;
     }
 
     public function unit(): string
