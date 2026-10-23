@@ -5,9 +5,11 @@ namespace App\Services;
 use App\Models\Invoice;
 use App\Models\InvoicePaymentRequest;
 use App\Models\PaymentAttempt;
+use App\Support\PaymentLinkToken;
 use App\Models\PaymentGateway;
 use App\Models\User;
 use App\Support\InvoicePayable;
+use App\Support\PaymentNotPayableException;
 use App\Support\PaymentOrchestrationException;
 use App\Support\Rbac;
 use App\Tenancy\TenantContext;
@@ -131,6 +133,83 @@ final class InvoicePaymentRequestService
     }
 
     /**
+     * يُصدر رابط الدفع العام لطلب مفتوح مرة واحدة: رمز عشوائي 32 بايت (base64url، 43 حرفاً) يُعاد خاماً **هنا فقط**، ويُخزَّن SHA-256 له وحده
+     * (`token_hash`، ثابت بعد التثبيت). ضياع الرمز ⇒ إلغاء الطلب وإنشاء آخر (لا إعادة عرض ولا تدوير).
+     */
+    public function issueLink(InvoicePaymentRequest $request, ?User $actor): string
+    {
+        $this->assertActor($actor);
+        $this->assertEnabled();
+
+        return DB::transaction(function () use ($request): string {
+            $locked = InvoicePaymentRequest::query()->lockForUpdate()->findOrFail($request->getKey());
+            if ($locked->status !== InvoicePaymentRequest::STATUS_OPEN) {
+                throw new PaymentOrchestrationException('request_not_open', 'طلب الدفع لم يعد مفتوحاً.');
+            }
+            if ($locked->token_hash !== null) {
+                throw new PaymentOrchestrationException('link_already_issued', 'أُصدر رابط هذا الطلب سابقاً ولا يُعاد عرضه؛ ألغِ الطلب وأنشئ آخر.');
+            }
+            $token = PaymentLinkToken::generate();
+            $locked->forceFill(['token_hash' => PaymentLinkToken::hash($token)])->save();
+
+            return $token;
+        });
+    }
+
+    /**
+     * مكنسة دورية عبر المستأجرين (مسار نظامي بلا فاعل): تلغي طلباً مفتوحاً لفاتورة لم تعد قابلة للدفع (سُدّدت/خُفّضت بإشعار دائن إلى صفر/لم تعد
+     * مرحَّلة) بالمسار القائم (يستعلم المزوّد أولاً؛ دفعة ملتقطة لا تُلغى)، وتُنهي منتهي الصلاحية بلا محاولة نشطة. لا قيد ولا سند ولا مساس بالمحاسبة.
+     *
+     * @return array{cancelled: int, expired: int, skipped: int}
+     */
+    public function closeStale(int $limit = 200): array
+    {
+        $summary = ['cancelled' => 0, 'expired' => 0, 'skipped' => 0];
+        $previous = $this->tenant->id();
+
+        $rows = InvoicePaymentRequest::query()->withoutGlobalScopes()
+            ->where('status', InvoicePaymentRequest::STATUS_OPEN)->orderBy('created_at')->limit($limit)->get(['id', 'tenant_id']);
+        foreach ($rows as $row) {
+            $this->tenant->set((string) $row->tenant_id);
+            try {
+                $request = InvoicePaymentRequest::query()->find($row->id);
+                if ($request === null || $request->status !== InvoicePaymentRequest::STATUS_OPEN) {
+                    continue;
+                }
+                $invoice = Invoice::query()->find($request->invoice_id);
+                $settled = $invoice === null || ! $invoice->isPosted() || $invoice->remaining() <= 0;
+                if ($settled) {
+                    $this->cancel($request, null);
+                    $summary['cancelled']++;
+                } elseif ($request->expires_at !== null && $request->expires_at->isPast()) {
+                    $hasActive = PaymentAttempt::query()->where('payable_key', $request->payableKey())->whereIn('capture_status', PaymentAttempt::ACTIVE_STATUSES)->exists();
+                    if ($hasActive) {
+                        $summary['skipped']++;
+
+                        continue;
+                    }
+                    DB::transaction(function () use ($request): void {
+                        $locked = InvoicePaymentRequest::query()->lockForUpdate()->findOrFail($request->getKey());
+                        if ($locked->status === InvoicePaymentRequest::STATUS_OPEN) {
+                            $locked->forceFill(['status' => InvoicePaymentRequest::STATUS_EXPIRED])->save();
+                        }
+                    });
+                    $summary['expired']++;
+                }
+            } catch (\Throwable $e) {
+                $summary['skipped']++;
+                if (! $e instanceof PaymentOrchestrationException) {
+                    report($e);
+                }
+            } finally {
+                $previous === null ? $this->tenant->forget() : $this->tenant->set($previous);
+            }
+        }
+
+        return $summary;
+    }
+
+    /**
      * بدء محاولة دفع لطلب مفتوح. `$amountMinor = null` ⇒ المتبقي كاملاً. مبلغ جزئي يتطلب `allow_partial` للرابط (D-16) ولا يتجاوز المتبقي.
      */
     public function startAttempt(InvoicePaymentRequest $request, string $idempotencyKey, ?int $amountMinor, ?User $actor = null): PaymentAttempt
@@ -164,7 +243,12 @@ final class InvoicePaymentRequestService
             throw new PaymentOrchestrationException('gateway_unavailable', 'اتصال البوابة غير موجود.');
         }
 
-        return $this->orchestrator->start(new InvoicePayable($request, $amountMinor), $gateway, $idempotencyKey, $actor);
+        try {
+            return $this->orchestrator->start(new InvoicePayable($request, $amountMinor), $gateway, $idempotencyKey, $actor);
+        } catch (PaymentNotPayableException $e) {
+            // الفاتورة سُدّدت/لم تعد مرحَّلة/تغيّر طرفها بعد إنشاء الطلب: خطأ عمل بصيغة موحّدة لا 500.
+            throw new PaymentOrchestrationException('invoice_not_payable', 'الفاتورة لم تعد قابلة للدفع.', $e);
+        }
     }
 
     private function tenantCurrency(Invoice $invoice): string
