@@ -21,10 +21,22 @@
 - Document Center's `ExpenseDocumentDraftBuilder` still calls `create($data)` (manual source) until H5-S6 passes `source=document_center`.
 - No UI for the setting in this slice (web toggle is planned with H5-S2).
 
+## Independent review (read-only subagent; not Codex) — findings and disposition
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | Document Center expense draft would 500 under `block` (duplicate error unmapped) | **Fixed** — `DuplicateDocumentException::render()` ⇒ 422 `{message, reason: duplicate_document}` (no internal ids) and `ApiController::domain()` rethrows it so API responses carry the same body. Bad dates under `block` ⇒ RuntimeException (422 where wrapped) |
+| 2 | Lock-order inversion advisory lock ↔ numbering anchor (latent for multi-row importers) | **Fixed** — number (anchor) is taken **before** the advisory lock in every path; PG test omits `number`, runs two importers writing 5 rows each in opposite order plus direct creates: no 40P01 |
+| 3 | `update` re-key skipped the lookup/lock (edit could create a duplicate that create refuses; racing create) | **Fixed** — when the broad identity changes, the same advisory lock + lookup (excluding the expense itself) run before `rekey`; test: edit into an identity held under a different reference ⇒ 422 |
+| 4 | Lookup used the raw date string | **Fixed** — normalised date everywhere; test with `2026-10-01 10:30:00` |
+| 5 | `discardDraft` checked status on a stale model | **Fixed** — row locked and status re-read inside the transaction |
+| 6 | `duplicate()` unusable same-day under `block` | Already disclosed; by design |
+| — | Weak tests (delete-vs-reimport passes in every interleaving; posted test relied on the lookup) | **Noted** — the race tests assert invariants (no orphan, one document), not a specific winner; posted-reservation survival is asserted by the reservation count |
+
 ## Tests
 
-- `ExpenseDuplicateReservationTest` (15, SQLite + PG): default/validation of the setting; `allow` unchanged (two identical expenses, zero reservations); `block` refuses identical and passes different amount/date/vendor; vendor-name normalisation; `block` refuses a legacy unreserved duplicate; import reserves under `allow` and refuses a reserved *and* an existing manual duplicate (reports the holder); explicit occurrence id lets one confirmed repeat through (and only once); failed import leaves no expense/reservation; edit re-keys keeping the reference; edit into a taken identity ⇒ 422, unchanged; edit of an unreserved expense never reserves; delete releases and a corrected re-import succeeds; posted keeps its reservation and cannot be deleted; **posting an imported draft yields the same journal lines as a manual one** (no ledger change); copy action unchanged under `allow`.
-- `ExpenseDuplicateReservationConcurrencyPostgresTest` (2, real PG + `pcntl_fork`): 8 racers (half import, half direct under `block`) ⇒ exactly one expense and one reservation, losers get `DuplicateDocumentException`; a delete racing a re-import leaves no orphan reservation. **Negative control (manual):** with the advisory lock disabled the first test failed in 3 of 4 runs; with it, 0 of 4.
+- `ExpenseDuplicateReservationTest` (21, SQLite + PG): default/validation of the setting; `allow` unchanged (two identical expenses, zero reservations); `block` refuses identical and passes different amount/date/vendor; vendor-name normalisation; `block` refuses a legacy unreserved duplicate; import reserves under `allow` and refuses a reserved *and* an existing manual duplicate (reports the holder); explicit occurrence id lets one confirmed repeat through (and only once); failed import leaves no expense/reservation; edit re-keys keeping the reference; edit into a taken identity ⇒ 422, unchanged; edit of an unreserved expense never reserves; delete releases and a corrected re-import succeeds; posted keeps its reservation and cannot be deleted; **posting an imported draft yields the same journal lines as a manual one** (no ledger change); copy action unchanged under `allow`.
+- `ExpenseDuplicateReservationConcurrencyPostgresTest` (3, real PG + `pcntl_fork`): 8 racers (half import, half direct under `block`) ⇒ exactly one expense and one reservation, losers get `DuplicateDocumentException`; a delete racing a re-import leaves no orphan reservation. **Negative control (manual):** with the advisory lock disabled the first test failed in 3 of 4 runs; with it, 0 of 4.
 - Regression: `Expense*`, `FinanceSettings*`, `CashBankAccount*`, `Settings*`, `DocumentCenter*` — 185 passed locally (SQLite). Full suite in CI.
 
 ## Accounting statement

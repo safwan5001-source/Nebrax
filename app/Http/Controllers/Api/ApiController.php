@@ -30,6 +30,9 @@ abstract class ApiController extends Controller
         } catch (\App\Support\ZatcaCreditNoteEmergencyStopException $e) {
             // REM-18b-3d: 422 بجسم {message, reason: platform_emergency_stop} تُنتجه render() الخاصة بالاستثناء.
             throw $e;
+        } catch (\App\Support\DuplicateDocumentException $e) {
+            // IMP-H5-S1b: 422 بجسم {message, reason: duplicate_document} تُنتجه render() الخاصة بالاستثناء.
+            throw $e;
         } catch (\App\Services\DeliveryHub\DeliveryHubNotFoundException) {
             abort(404);
         } catch (\App\Services\DeliveryHub\DeliveryHubConflictException) {

@@ -243,4 +243,67 @@ class ExpenseDuplicateReservationTest extends TestCase
         $this->withToken($this->auth['token'])->postJson("/api/expenses/{$id}/duplicate")->assertCreated();
         $this->assertSame(0, $this->reservations());
     }
+
+    /** @test */
+    public function editing_into_a_vendor_date_amount_held_by_a_different_reference_is_refused_like_create(): void
+    {
+        $this->service()->create($this->importData(['amount' => 100]), ['source' => Dup::SOURCE_STANDARD, 'reference' => 'INV-1']);
+        $b = $this->service()->create($this->importData(['amount' => 200]), ['source' => Dup::SOURCE_STANDARD, 'reference' => 'INV-2']);
+
+        $this->withToken($this->auth['token'])->putJson("/api/expenses/{$b->id}", $this->body(['amount' => 100]))->assertUnprocessable();
+
+        $this->assertSame(200, (int) $b->fresh()->amount);
+        // تعديل لا يغيّر الهوية الواسعة (وصف مثلاً) لا يُرفض بسبب «نفسه»
+        $this->withToken($this->auth['token'])->putJson("/api/expenses/{$b->id}", $this->body(['amount' => 200, 'description' => 'تحديث']))->assertOk();
+    }
+
+    /** @test */
+    public function a_datetime_expense_date_still_matches_the_existing_document(): void
+    {
+        $this->policy('block');
+        $this->postExpense(['expense_date' => '2026-10-01'])->assertCreated();
+
+        $this->postExpense(['expense_date' => '2026-10-01 10:30:00'])->assertUnprocessable();
+    }
+
+    /** @test */
+    public function the_duplicate_error_has_a_stable_422_body_with_a_reason(): void
+    {
+        $this->policy('block');
+        $this->postExpense()->assertCreated();
+
+        $this->postExpense()->assertUnprocessable()->assertJsonPath('reason', 'duplicate_document');
+
+        $rendered = (new DuplicateDocumentException(Dup::DOMAIN_EXPENSE, 'expense', 'x'))->render();
+        $this->assertSame(422, $rendered->getStatusCode());
+        $this->assertStringNotContainsString('"x"', (string) $rendered->getContent(), 'لا معرّف داخلياً في الجسم.');
+    }
+
+    /** @test */
+    public function an_empty_occurrence_id_is_treated_as_absent(): void
+    {
+        $this->service()->create($this->importData(), ['source' => Dup::SOURCE_STANDARD, 'occurrence_id' => '']);
+        $this->thrown(fn () => $this->service()->create($this->importData(), ['source' => Dup::SOURCE_STANDARD, 'occurrence_id' => '']), 'مكرر', DuplicateDocumentException::class);
+    }
+
+    /** @test */
+    public function discarding_a_posted_expense_through_the_service_is_refused_and_keeps_the_reservation(): void
+    {
+        $a = $this->service()->create($this->importData(), ['source' => Dup::SOURCE_STANDARD, 'reference' => 'Q-1']);
+        $this->withToken($this->auth['token'])->postJson("/api/expenses/{$a->id}/post")->assertOk();
+
+        $this->thrown(fn () => $this->service()->discardDraft(Expense::query()->findOrFail($a->id)->forceFill(['status' => 'draft'])), 'مرحّل', \RuntimeException::class);
+
+        $this->assertSame(1, $this->reservations());
+        $this->assertSame(1, Expense::query()->count());
+    }
+
+    /** @test */
+    public function numbers_are_generated_when_omitted_and_stay_unique_across_reserved_and_direct_creates(): void
+    {
+        $this->policy('block');
+        $a = $this->service()->create(['number' => null] + $this->body(['amount' => 1]), ['source' => Dup::SOURCE_STANDARD]);
+        $b = $this->service()->create($this->body(['amount' => 2]));
+        $this->assertNotSame($a->number, $b->number);
+    }
 }

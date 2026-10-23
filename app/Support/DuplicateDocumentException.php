@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use Illuminate\Http\JsonResponse;
 use RuntimeException;
 
 /**
@@ -17,5 +18,11 @@ final class DuplicateDocumentException extends RuntimeException
         public readonly string $reason = 'duplicate_document',
     ) {
         parent::__construct('يوجد مستند بالهوية نفسها (مورّد/مرجع/تاريخ/مبلغ) بالفعل؛ لا يُنشأ مكرراً.');
+    }
+
+    /** 422 بجسم ثابت `{message, reason}` لأي مسار لا يلتقطه `domain()` (مثل منشئ مسودات مركز المستندات)، دون أي معرّف داخلي. */
+    public function render(): JsonResponse
+    {
+        return response()->json(['message' => $this->getMessage(), 'reason' => $this->reason], 422);
     }
 }

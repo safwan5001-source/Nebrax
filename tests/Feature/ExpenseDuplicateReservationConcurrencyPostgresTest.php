@@ -77,7 +77,7 @@ class ExpenseDuplicateReservationConcurrencyPostgresTest extends TestCase
         foreach (range(1, 8) as $i) {
             $jobs[] = function () use ($tenant, $account, $i) {
                 app(TenantContext::class)->set($tenant);
-                $data = ['account_id' => $account, 'amount' => 7700, 'tax_rate' => 15, 'vendor_name' => 'مورّد السباق', 'expense_date' => '2026-10-05', 'number' => "EXP-R-{$i}"];
+                $data = ['account_id' => $account, 'amount' => 7700, 'tax_rate' => 15, 'vendor_name' => 'مورّد السباق', 'expense_date' => '2026-10-05'];
 
                 // نصف المتسابقين مستوردون والنصف الآخر إنشاء مباشر تحت block
                 return app(ExpenseService::class)->create($data, $i % 2 === 0 ? ['source' => Dup::SOURCE_STANDARD, 'reference' => 'R-1'] : null)->id;
@@ -95,6 +95,49 @@ class ExpenseDuplicateReservationConcurrencyPostgresTest extends TestCase
                 $this->assertSame(DuplicateDocumentException::class, $r['error_class'] ?? null, json_encode($r, JSON_UNESCAPED_UNICODE));
             }
         }
+    }
+
+    /** @test */
+    public function an_importer_creating_many_expenses_in_one_transaction_never_deadlocks_with_direct_creates(): void
+    {
+        [$tenant, $account] = $this->tenantWithAccount();
+        Settings::put('finance', ['duplicate_reference_policy' => 'block']);
+        $row = fn (int $n): array => ['account_id' => $account, 'amount' => 1000 + $n, 'tax_rate' => 15, 'vendor_name' => 'مورّد متعدد', 'expense_date' => '2026-10-07'];
+
+        $jobs = [];
+        // مستوردان يكتبان الصفوف نفسها في معاملة واحدة بترتيبين متعاكسين + منشئان مباشران لصفوف متقاطعة
+        foreach ([[1, 2, 3, 4, 5], [5, 4, 3, 2, 1]] as $order) {
+            $jobs[] = function () use ($tenant, $order, $row) {
+                app(TenantContext::class)->set($tenant);
+
+                return DB::transaction(function () use ($order, $row) {
+                    foreach ($order as $n) {
+                        app(ExpenseService::class)->create($row($n), ['source' => Dup::SOURCE_STANDARD, 'reference' => "M-{$n}"]);
+                        usleep(20_000);
+                    }
+
+                    return 'ok';
+                });
+            };
+        }
+        foreach ([3, 5] as $n) {
+            $jobs[] = function () use ($tenant, $n, $row) {
+                app(TenantContext::class)->set($tenant);
+
+                return app(ExpenseService::class)->create($row($n))->id;
+            };
+        }
+
+        $results = $this->runConcurrently($jobs);
+
+        app(TenantContext::class)->set($tenant);
+        foreach ($results as $r) {
+            if (($r['ok'] ?? false) !== true) {
+                $this->assertSame(DuplicateDocumentException::class, $r['error_class'] ?? null, 'فشلٌ غير متوقع (40P01؟): '.json_encode($r, JSON_UNESCAPED_UNICODE));
+            }
+        }
+        // لا هوية واسعة مكرّرة مهما كان الفائز
+        $this->assertSame(Expense::query()->count(), Expense::query()->distinct()->count('amount'));
     }
 
     /** @test */

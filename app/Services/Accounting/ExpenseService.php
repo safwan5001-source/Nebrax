@@ -67,10 +67,13 @@ class ExpenseService
             $rate = (int) ($data['tax_rate'] ?? 15);
             $tax  = $this->calcTax($amount, $rate);
 
+            // الترقيم أولاً (يأخذ قفل مِرساة الترقيم حتى commit) ثم القفل الاستشاري: ترتيبٌ ثابت مِرساة ← استشاري في كل مسار، فلا حلقة انتظار بين
+            // مستوردٍ ينشئ عدة مصروفات في معاملة واحدة ومنشئٍ مباشر ينتظر المِرساة وهو يحمل قفل هوية.
+            $number = $data['number'] ?? $this->nextNumber($date);
             $predicate = $this->guardDuplicate($data, $date, $amount, $reservation);
 
             $expense = Expense::create([
-                'number'         => $data['number'] ?? $this->nextNumber($date),
+                'number'         => $number,
                 'account_id'     => $data['account_id'],
                 'category_id'    => $data['category_id'] ?? null,
                 'partner_id'     => $data['partner_id'] ?? null,
@@ -128,14 +131,21 @@ class ExpenseService
             // يبقيان من المسند المخزَّن (لا عمود مرجع على المصروف). تنازع ⇒ DuplicateDocumentException ⇒ 422 وتراجع كامل.
             $held = $this->duplicates->forDocument('expense', $expense->id);
             if ($held !== null) {
-                $this->duplicates->rekey('expense', $expense->id, DocumentDuplicateReservationService::expensePredicate(
+                $predicate = DocumentDuplicateReservationService::expensePredicate(
                     $data['partner_id'] ?? null,
                     $data['vendor_name'] ?? null,
                     $held->predicate['reference'] ?? null,
                     $date,
                     $amount,
                     $held->predicate['occurrence'] ?? null,
-                ), $data['partner_id'] ?? null);
+                );
+                // الهوية الواسعة (مورّد ‖ تاريخ ‖ مبلغ) تغيّرت ⇒ القفل والفحص نفسهما كالإنشاء (باستثناء المصروف نفسه)، فلا يُنتج التعديل تكراراً يرفضه الإنشاء.
+                $widened = [$predicate['vendor'], $predicate['date'], $predicate['amount']];
+                $before = DocumentDuplicateReservationService::expensePredicate($expense->partner_id, $expense->vendor_name, null, $expense->expense_date->toDateString(), (int) $expense->amount);
+                if ($widened !== [$before['vendor'], $before['date'], $before['amount']] && ($held->predicate['occurrence'] ?? null) === null) {
+                    $this->lockAndLookup($data, $predicate, $amount, $expense->id);
+                }
+                $this->duplicates->rekey('expense', $expense->id, $predicate, $data['partner_id'] ?? null);
             }
 
             $expense->update([
@@ -168,6 +178,11 @@ class ExpenseService
         }
 
         DB::transaction(function () use ($expense) {
+            // الحالة تُقرأ تحت قفل الصف: ترحيلٌ متزامن (post يقفل الصف نفسه) لا يمرّ بين الفحص والحذف فيُحذف مصروفٌ رُحِّل ويُحرَّر حجزه.
+            $locked = Expense::query()->whereKey($expense->id)->lockForUpdate()->first();
+            if ($locked === null || ! $locked->isDraft()) {
+                throw new RuntimeException('لا يمكن حذف مصروف مرحّل أو ملغى.');
+            }
             $expense->attachments()->delete();
             $this->duplicates->release('expense', $expense->id);
             $expense->delete();
@@ -188,34 +203,62 @@ class ExpenseService
             return null;
         }
 
-        $partnerId = $data['partner_id'] ?? null;
-        $predicate = DocumentDuplicateReservationService::expensePredicate(
-            $partnerId, $data['vendor_name'] ?? null, $reservation['reference'] ?? null, $date, $amount, $reservation['occurrence_id'] ?? null,
-        );
+        try {
+            $predicate = DocumentDuplicateReservationService::expensePredicate(
+                $data['partner_id'] ?? null, $data['vendor_name'] ?? null, $reservation['reference'] ?? null, $date, $amount, $reservation['occurrence_id'] ?? null,
+            );
+        } catch (\LogicException) {
+            throw new RuntimeException('تاريخ المصروف غير صالح.');
+        }
 
-        // تسلسل الفاحصين المتنافسين على الهوية الواسعة نفسها (مورّد ‖ تاريخ ‖ مبلغ) — بغضّ النظر عن المرجع: فحص «القائم» لا يرى مصروفاً غير مثبَّت،
-        // والفهرس الفريد وحده لا يلتقط مصروفين بمرجعين مختلفين لهوية واحدة. قفل استشاري على مستوى المعاملة (يتحرر عند commit/rollback)، وSQLite تسلسل كتابتها.
+        if ($predicate['occurrence'] === null) {
+            $this->lockAndLookup($data, $predicate, $amount, null);
+        } else {
+            $this->lockIdentity($predicate, $amount);
+        }
+
+        return $predicate;
+    }
+
+    /**
+     * يقفل الهوية الواسعة (مورّد ‖ تاريخ ‖ مبلغ) ثم يفحص المصروفات القائمة (تغطي ما أُنشئ قبل أي حجز) ويرمي `DuplicateDocumentException` عند التطابق.
+     * التاريخ في الفحص هو المطبَّع نفسه المستعمل في المسند والقفل (لا نصّ الطلب الخام).
+     *
+     * @param  array<string, mixed>  $predicate
+     */
+    private function lockAndLookup(array $data, array $predicate, int $amount, ?string $excludeId): void
+    {
+        $this->lockIdentity($predicate, $amount);
+
+        $partnerId = $data['partner_id'] ?? null;
+        // التكرار مسألة مؤسسية لا فرعية: الفحص يتجاوز نطاق الفرع عمداً (نطاق المستأجر باقٍ).
+        $existing = Expense::query()->withoutGlobalScope(BranchScope::class)
+            ->when($excludeId !== null, fn ($q) => $q->whereKeyNot($excludeId))
+            ->whereDate('expense_date', $predicate['date'])->where('amount', $amount)
+            ->when($partnerId !== null,
+                fn ($q) => $q->where('partner_id', $partnerId),
+                fn ($q) => $q->whereNull('partner_id'))
+            ->get(['id', 'vendor_name'])
+            ->first(fn (Expense $e) => $partnerId !== null
+                || DocumentDuplicateReservationService::normalizeName($e->vendor_name) === DocumentDuplicateReservationService::normalizeName($data['vendor_name'] ?? null));
+        if ($existing !== null) {
+            throw new DuplicateDocumentException(DocumentDuplicateReservationService::DOMAIN_EXPENSE, 'expense', $existing->id);
+        }
+    }
+
+    /**
+     * قفل استشاري على مستوى المعاملة (يتحرر عند commit/rollback) يسلسل المتنافسين على الهوية الواسعة نفسها بغضّ النظر عن المرجع: فحص «القائم» لا يرى مصروفاً
+     * غير مثبَّت، والفهرس الفريد وحده لا يلتقط مصروفين بمرجعين مختلفين لهوية واحدة. SQLite تسلسل كتابتها أصلاً.
+     *
+     * @param  array<string, mixed>  $predicate
+     */
+    private function lockIdentity(array $predicate, int $amount): void
+    {
         if (DB::connection()->getDriverName() === 'pgsql') {
             DB::select('select pg_advisory_xact_lock(hashtextextended(?, 0))', [
                 'expense-dup:'.app(\App\Tenancy\TenantContext::class)->id().':'.$predicate['vendor'].':'.$predicate['date'].':'.$amount,
             ]);
         }
-        if (($reservation['occurrence_id'] ?? null) === null) {
-            // التكرار مسألة مؤسسية لا فرعية: الفحص يتجاوز نطاق الفرع عمداً (نطاق المستأجر باقٍ).
-            $existing = Expense::query()->withoutGlobalScope(BranchScope::class)
-                ->whereDate('expense_date', $date)->where('amount', $amount)
-                ->when($partnerId !== null,
-                    fn ($q) => $q->where('partner_id', $partnerId),
-                    fn ($q) => $q->whereNull('partner_id'))
-                ->get(['id', 'vendor_name'])
-                ->first(fn (Expense $e) => $partnerId !== null
-                    || DocumentDuplicateReservationService::normalizeName($e->vendor_name) === DocumentDuplicateReservationService::normalizeName($data['vendor_name'] ?? null));
-            if ($existing !== null) {
-                throw new DuplicateDocumentException(DocumentDuplicateReservationService::DOMAIN_EXPENSE, 'expense', $existing->id);
-            }
-        }
-
-        return $predicate;
     }
 
     /**
