@@ -7,19 +7,47 @@
 //
 // Refusals carry a reason code only — never the URL, its host or any part of the query.
 
-/** A signed URL may be fetched only if it is https (or http for the loopback self-test), carries no userinfo/port tricks, and its host is exactly the configured endpoint
- *  host or `<bucket>.<endpoint host>`. Anything else is refused BEFORE a request is made. */
-export function allowedUpstream(rawUrl, { endpoint, bucket, allowInsecureLoopback = false }) {
+// ───────────── the permitted hostname formats (review round 5, P2-B) ─────────────
+// Exact, validated comparisons only — never a suffix test. A host is permitted if and only if it is
+//   (1) the configured endpoint host, which must itself be an R2 S3 API endpoint — `<account>.r2.cloudflarestorage.com`, or the jurisdiction forms
+//       `<account>.eu.r2.cloudflarestorage.com` / `<account>.fedramp.r2.cloudflarestorage.com` (ONE label for the account, so `evil.<account>.r2…` is not an endpoint) —
+//       or, for the local self-test only (`allowInsecureLoopback`), the loopback IP / `localhost` the owner configured; or
+//   (2) the virtual-hosted form `<bucket>.<endpoint host>`, for a bucket that is a valid DNS label (R2 bucket names: lowercase letters, digits, hyphens, ≤ 63, no leading/
+//       trailing hyphen), never for an IP literal or `localhost`.
+// The endpoint is owner configuration, but it is validated anyway: a mistyped or hostile S3_ENDPOINT must not turn the allow-list into "any host".
+const R2_ENDPOINT_HOST = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.(?:eu|fedramp))?\.r2\.cloudflarestorage\.com$/;
+const DNS_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+const isLoopbackHost = (h) => h === '127.0.0.1' || h === 'localhost';
+
+/** The exact hostnames a signed URL (or a redirect target) may have for this configuration; empty = the configuration itself is not acceptable (fail closed). */
+export function permittedHostnames({ endpoint, bucket, allowInsecureLoopback = false }) {
+  let e; try { e = new URL(endpoint); } catch { return []; }
+  const base = e.hostname.toLowerCase();
+  if (e.username || e.password) return [];
+  if (!(R2_ENDPOINT_HOST.test(base) || (allowInsecureLoopback && isLoopbackHost(base)))) return [];
+  const hosts = [base];
+  if (typeof bucket === 'string' && DNS_LABEL.test(bucket.toLowerCase()) && !isLoopbackHost(base)) hosts.push(`${bucket.toLowerCase()}.${base}`);
+  return hosts;
+}
+
+/** Host, port and userinfo of an already parsed URL against the configuration (scheme is the caller's concern). Exact string comparison on the parsed hostname. */
+export function hostPortPermitted(u, policy) {
+  let e; try { e = new URL(policy.endpoint); } catch { return false; }
+  if (u.username || u.password) return false;
+  if ((u.port || '') !== (e.port || '')) return false;
+  return permittedHostnames(policy).includes(u.hostname.toLowerCase());
+}
+
+/** A signed URL may be fetched only if it is https (or http for the loopback self-test), carries no userinfo/port tricks, and its host is exactly one of
+ *  {@link permittedHostnames}. Anything else is refused BEFORE a request is made. */
+export function allowedUpstream(rawUrl, policy) {
+  const { endpoint, allowInsecureLoopback = false } = policy;
   let u; let e;
   try { u = new URL(rawUrl); e = new URL(endpoint); } catch { return false; }
-  if (u.username || u.password) return false;
-  const loopback = allowInsecureLoopback && (e.hostname === '127.0.0.1' || e.hostname === 'localhost');
+  const loopback = allowInsecureLoopback && isLoopbackHost(e.hostname);
   if (!(u.protocol === 'https:' || (loopback && u.protocol === 'http:'))) return false;
   if (u.protocol !== e.protocol) return false;
-  if ((u.port || '') !== (e.port || '')) return false;
-  const host = u.hostname.toLowerCase();
-  const base = e.hostname.toLowerCase();
-  return host === base || host === `${bucket.toLowerCase()}.${base}`;
+  return hostPortPermitted(u, policy);
 }
 
 export class UpstreamRefused extends Error {

@@ -99,6 +99,81 @@ test('I9: a cleanup that cannot be verified still exits nonzero after a successf
     assert.deepEqual(JSON.parse(r.out).cleanup.unverified, ['probe']);
   }));
 });
+// ───────────── HTTP status validation (review round 5, P2-A): fetch does not throw on 403/404/500 — only a plain 200 starts the download being measured ─────────────
+/** a storage stand-in that answers every request with the given status (and a short error body that must never be treated as the object) */
+async function withStatus(status, fn, extraHeaders = {}) {
+  let requests = 0;
+  const srv = http.createServer((q, r) => { requests += 1; r.writeHead(status, { 'content-type': 'application/xml', ...extraHeaders }); r.end('<Error><Code>X</Code></Error>'); });
+  await new Promise((ok) => srv.listen(0, '127.0.0.1', ok));
+  try { return await fn(`http://127.0.0.1:${srv.address().port}/obj`, () => requests); } finally { srv.close(); }
+}
+for (const status of [403, 404, 500, 503]) {
+  test(`I9 fail closed: a download URL answering HTTP ${status} aborts — exit 1, no rows, nothing reads as "survived expiry"; cleanup still verified`, async () => {
+    await withDir(async (dir) => withStatus(status, async (base, requests) => {
+      fakePhp(dir, { put: { ok: true, etag: 'abc' }, urlBase: base });
+      const r = await run({ PATH: `${dir}:${process.env.PATH}`, S3_ENDPOINT: originOf(base) });
+      assert.equal(r.code, 1, r.err);
+      const j = JSON.parse(r.out);
+      assert.ok(new RegExp(`HTTP ${status}, not 200`).test(j.aborted), JSON.stringify(j));
+      assert.deepEqual(j.rows, []);
+      assert.equal(requests(), 1, 'it stops at the first URL: the second download is never attempted');
+      assert.equal(j.cleanup.pass, true, 'cleanup is still attempted and verified');
+      assert.ok(/ABORTED/.test(r.err));
+      assert.ok(!r.out.includes('cafebabe') && !r.err.includes('cafebabe'), 'no signed URL in the output');
+    }));
+  });
+}
+for (const status of [206, 301, 302, 304]) {
+  test(`I9 fail closed: a non-200 success/redirect (${status}) is not a download either — exit 1, no rows`, async () => {
+    await withDir(async (dir) => withStatus(status, async (base) => {
+      fakePhp(dir, { put: { ok: true, etag: 'abc' }, urlBase: base });
+      const r = await run({ PATH: `${dir}:${process.env.PATH}`, S3_ENDPOINT: originOf(base) });
+      assert.equal(r.code, 1, r.err);
+      assert.deepEqual(JSON.parse(r.out).rows, []);
+    }, status >= 300 && status < 400 ? { location: 'http://127.0.0.1:1/elsewhere' } : {}));
+  });
+}
+test('I9 fail closed: the SECOND URL failing discards the first URL\'s row — a partial run never reads as a completed experiment', async () => {
+  await withDir(async (dir) => {
+    const body = Buffer.alloc(0.0625 * 1048576, 1); let n = 0;
+    const srv = http.createServer((q, r) => { n += 1; if (n === 1) { r.writeHead(200, { 'content-length': body.length }); r.end(body); } else { r.writeHead(403); r.end('denied'); } });
+    await new Promise((ok) => srv.listen(0, '127.0.0.1', ok));
+    try {
+      const base = `http://127.0.0.1:${srv.address().port}/obj`;
+      fakePhp(dir, { put: { ok: true, etag: 'abc' }, urlBase: base });
+      const r = await run({ PATH: `${dir}:${process.env.PATH}`, S3_ENDPOINT: originOf(base) });
+      assert.equal(r.code, 1, r.err);
+      const j = JSON.parse(r.out);
+      assert.ok(/HTTP 403/.test(j.aborted)); assert.deepEqual(j.rows, []);
+    } finally { srv.close(); }
+  });
+});
+test('I9 fail closed: no response at all (connection refused) aborts too — it is not an observation of the expiry', async () => {
+  await withDir(async (dir) => {
+    const probe = http.createServer(); await new Promise((ok) => probe.listen(0, '127.0.0.1', ok));
+    const port = probe.address().port; await new Promise((ok) => probe.close(ok)); // a port nothing listens on
+    const base = `http://127.0.0.1:${port}/obj`;
+    fakePhp(dir, { put: { ok: true, etag: 'abc' }, urlBase: base });
+    const r = await run({ PATH: `${dir}:${process.env.PATH}`, S3_ENDPOINT: originOf(base) });
+    assert.equal(r.code, 1, r.err);
+    const j = JSON.parse(r.out);
+    assert.ok(/before any response/.test(j.aborted), JSON.stringify(j)); assert.deepEqual(j.rows, []);
+  });
+});
+test('I9 positive control (status gate): HTTP 200 still runs both rows and exits 0', async () => {
+  await withDir(async (dir) => withServer(async (base) => {
+    fakePhp(dir, { put: { ok: true, etag: 'abc' }, urlBase: base });
+    const r = await run({ PATH: `${dir}:${process.env.PATH}`, S3_ENDPOINT: originOf(base) });
+    assert.equal(r.code, 0, r.err);
+    const j = JSON.parse(r.out);
+    assert.equal(j.aborted, undefined); assert.equal(j.rows.length, 2); assert.ok(j.rows.every((x) => x.status === 200));
+  }));
+});
+test('I9 source: the response status is checked against 200 before the body is read (structural pin)', () => {
+  const src = readFileSync(script, 'utf8');
+  const check = src.search(/status !== 200/); const read = src.search(/for await \(const c of res\.body\)/);
+  assert.ok(check > 0 && read > 0 && check < read, 'the 200 check must precede the body loop');
+});
 // ───────────── upstream allow-list (review round 4): the signed URL is fetched only if its host is the configured endpoint ─────────────
 for (const [name, endpoint] of [['a remote R2 endpoint (https, other host)', 'https://acct.r2.cloudflarestorage.com'], ['a loopback self-test endpoint (same IP, other port)', 'http://127.0.0.1:9']]) {
   test(`I9 allow-list: a signer URL on a malicious host is refused BEFORE any connection — ${name}`, async () => {

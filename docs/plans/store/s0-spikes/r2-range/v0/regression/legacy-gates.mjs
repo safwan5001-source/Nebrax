@@ -1,7 +1,15 @@
 // REGRESSION REFERENCE — the gate logic exactly as it behaved BEFORE the three review fixes on PR #1558 (probe at db1ac4c5b), behind the same interface as ../v0-gates.mjs.
 // It exists only so `V0_GATES=./regression/legacy-gates.mjs node --test v0-gates.test.mjs` can show that every regression test FAILS on the old behaviour and passes on the fix.
 // Do not import it from the probe.
-export { classifyLocation } from '../v0-gates.mjs';
+// I10 classification before PR #1558 round 5 (P2-B): an unbounded hostname SUFFIX test, so `evilacct.<endpoint>` counted as the same host.
+export function classifyLocation(location, endpointHost) {
+  if (!location) return 'none';
+  try {
+    const u = new URL(location, 'http://placeholder.invalid');
+    if (u.protocol === 'https:' && u.hostname.toLowerCase().endsWith(String(endpointHost?.endpoint ? new URL(endpointHost.endpoint).hostname : endpointHost).toLowerCase())) return 'same-host-https';
+    return u.protocol === 'https:' ? 'other-host-https' : `non-https(${u.protocol.replace(':', '')})`;
+  } catch { return 'unparseable'; }
+}
 
 export const sensitiveTokens = () => [];            // header VALUES were never inspected
 export const scanHeaderValues = () => [];

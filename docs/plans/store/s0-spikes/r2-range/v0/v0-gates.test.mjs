@@ -40,11 +40,65 @@ test('R13 preserved: a redirect on any correctly signed HTTPS request still fail
 test('R13 preserved: 304 is a conditional response, not a redirect', () => {
   assert.equal(redirectGate([...signed(), { id: 'I7', kind: 'signed', status: 304 }]).pass, true);
 });
+// ───────────── I10 redirect host classification (PR #1558 review round 5, P2-B): exact, validated hostnames — never a suffix ─────────────
+// `policy` is the one the guard enforces. Run against the pre-fix suffix logic (`V0_GATES=./regression/legacy-gates.mjs`) the look-alike cases FAIL.
+const POLICY = { endpoint: 'https://acct.r2.cloudflarestorage.com', bucket: 'b' };
 test('I10 location classification never exposes a URL', () => {
-  assert.equal(classifyLocation('https://acct.r2.cloudflarestorage.com/b/k?X-Amz-Signature=zz', 'acct.r2.cloudflarestorage.com'), 'same-host-https');
-  assert.equal(classifyLocation('https://evil.example/x', 'acct.r2.cloudflarestorage.com'), 'other-host-https');
-  assert.equal(classifyLocation('http://acct.r2.cloudflarestorage.com/x', 'acct.r2.cloudflarestorage.com'), 'non-https(http)');
-  assert.equal(classifyLocation(null, 'x'), 'none');
+  assert.equal(classifyLocation('https://acct.r2.cloudflarestorage.com/b/k?X-Amz-Signature=zz', POLICY), 'same-host-https');
+  assert.equal(classifyLocation('https://evil.example/x', POLICY), 'other-host-https');
+  assert.equal(classifyLocation('http://acct.r2.cloudflarestorage.com/x', POLICY), 'non-https(http)');
+  assert.equal(classifyLocation(null, POLICY), 'none');
+  assert.equal(classifyLocation('::not a url::', POLICY), 'non-https(http)'); // resolved against a placeholder base: never the configured host
+  for (const v of ['same-host-https', 'other-host-https']) assert.ok(!/acct|evil|X-Amz/.test(v));
+});
+test('I10 positive: exactly the configured endpoint host and `<bucket>.<endpoint host>` are the same host (case-insensitive, default port)', () => {
+  for (const url of ['https://acct.r2.cloudflarestorage.com/b/k', 'https://b.acct.r2.cloudflarestorage.com/k', 'https://ACCT.R2.CLOUDFLARESTORAGE.COM/b/k', 'https://B.Acct.R2.Cloudflarestorage.Com/k']) {
+    assert.equal(classifyLocation(url, POLICY), 'same-host-https', url);
+  }
+  // the jurisdiction endpoint formats are permitted when they ARE the configured endpoint
+  assert.equal(classifyLocation('https://acct.eu.r2.cloudflarestorage.com/b/k', { endpoint: 'https://acct.eu.r2.cloudflarestorage.com', bucket: 'b' }), 'same-host-https');
+  assert.equal(classifyLocation('https://b.acct.fedramp.r2.cloudflarestorage.com/k', { endpoint: 'https://acct.fedramp.r2.cloudflarestorage.com', bucket: 'b' }), 'same-host-https');
+});
+test('I10 negative: look-alike and attacker-controlled hosts are never the same host (the review finding: suffix matching)', () => {
+  const LOOKALIKES = [
+    ['attacker account sharing the suffix (the finding)', 'https://evilacct.r2.cloudflarestorage.com/b/k'],
+    ['attacker prefix label on the endpoint host', 'https://evil.acct.r2.cloudflarestorage.com/b/k'],
+    ['another bucket on the same account', 'https://other.acct.r2.cloudflarestorage.com/k'],
+    ['endpoint host as a prefix of an attacker domain', 'https://acct.r2.cloudflarestorage.com.evil.example/b/k'],
+    ['endpoint host as a path of an attacker domain', 'https://evil.example/acct.r2.cloudflarestorage.com/b/k'],
+    ['userinfo trick', 'https://acct.r2.cloudflarestorage.com@evil.example/b/k'],
+    ['userinfo on the real host', 'https://user:pw@acct.r2.cloudflarestorage.com/b/k'],
+    ['trailing-dot FQDN (not an exact match)', 'https://acct.r2.cloudflarestorage.com./b/k'],
+    ['other port on the real host', 'https://acct.r2.cloudflarestorage.com:8443/b/k'],
+    ['hyphen-joined look-alike', 'https://evil-acct.r2.cloudflarestorage.com/b/k'],
+    ['different account, same service', 'https://acct2.r2.cloudflarestorage.com/b/k'],
+    ['unicode homoglyph of the host (punycode)', 'https://acct.r2.cloudflarestorage.com\u2024evil.example/b/k'],
+    ['IP literal', 'https://169.254.169.254/latest/meta-data'],
+    ['protocol-relative', '//evil.example/x'],
+  ];
+  for (const [name, url] of LOOKALIKES) assert.notEqual(classifyLocation(url, POLICY), 'same-host-https', name);
+  // every one is either another https host or not a parseable URL at all (a URL the platform rejects can never be followed or matched)
+  for (const [name, url] of LOOKALIKES.filter(([, u]) => /^https:/.test(u))) assert.ok(['other-host-https', 'unparseable'].includes(classifyLocation(url, POLICY)), name);
+  assert.equal(classifyLocation('https://evilacct.r2.cloudflarestorage.com/b/k', POLICY), 'other-host-https');
+});
+test('I10: only explicitly permitted endpoint / bucket formats count — an unrecognised endpoint or bucket permits nothing extra (fail closed)', () => {
+  // a configured endpoint that is not an R2 endpoint format (typo, hostile env): nothing is "the same host", not even itself
+  assert.equal(classifyLocation('https://evil.example/x', { endpoint: 'https://evil.example', bucket: 'b' }), 'other-host-https');
+  assert.equal(classifyLocation('https://acct.r2.cloudflarestorage.com/x', { endpoint: 'not a url', bucket: 'b' }), 'other-host-https');
+  // an unusable bucket name yields no virtual-hosted form
+  for (const bucket of ['', 'UP.dots', 'a/b', 'a..b', '-x', 'x-', 'x'.repeat(64), undefined]) {
+    assert.equal(classifyLocation(`https://${bucket ?? ''}.acct.r2.cloudflarestorage.com/k`, { ...POLICY, bucket }), 'other-host-https', String(bucket));
+  }
+  // an endpoint with an extra label before the account (attacker-controlled sub-tree) is not an endpoint format
+  assert.equal(classifyLocation('https://x.evil.r2.cloudflarestorage.com/k', { endpoint: 'https://x.evil.r2.cloudflarestorage.com', bucket: 'b' }), 'other-host-https');
+});
+test('I10: the loopback self-test endpoint is a permitted host only when the self-test flag is set, with the same port', () => {
+  const lo = { endpoint: 'http://127.0.0.1:9000', bucket: 'b', allowInsecureLoopback: true };
+  assert.equal(classifyLocation('https://127.0.0.1:9000/b/k', lo), 'same-host-https');
+  assert.equal(classifyLocation('https://127.0.0.1:9001/b/k', lo), 'other-host-https');
+  assert.equal(classifyLocation('https://localhost:9000/b/k', lo), 'other-host-https');
+  assert.notEqual(classifyLocation('https://b.127.0.0.1:9000/k', lo), 'same-host-https');
+  assert.equal(classifyLocation('https://127.0.0.1:9000/b/k', { ...lo, allowInsecureLoopback: false }), 'other-host-https');
 });
 
 // ───────────── R18 — header VALUES, not just names ─────────────
