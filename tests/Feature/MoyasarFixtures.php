@@ -29,7 +29,7 @@ final class MoyasarFixtures
             'amount_format' => number_format($amount / 100, 2).' SAR',
             'url' => "https://checkout.moyasar.com/invoices/{$id}?lang=en",
             'callback_url' => null,
-            'expired_at' => '2026-10-23T12:00:00.000Z',
+            'expired_at' => gmdate('Y-m-d\\TH:i:s.000\\Z', time() + 3600), // دائماً في المستقبل: الفاتورة الحيّة لا تصير «منتهية» بمرور الزمن
             'created_at' => '2026-10-23T11:00:00.000Z',
             'updated_at' => '2026-10-23T11:05:00.000Z',
             'payments' => $payments,

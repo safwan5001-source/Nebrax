@@ -93,6 +93,11 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody
             if (($invoice['metadata'][self::ATTEMPT_METADATA_KEY] ?? null) !== $context->attemptId) {
                 continue;
             }
+            // فاتورة ميّتة غير مدفوعة (منتهية/ملغاة) لا تُبعث: صفحتها لا تقبل دفعاً بعد `expired_at`، فيُنشأ بدلها فاتورة جديدة لنفس المحاولة.
+            // المدفوعة تُعاد دائماً (تُطابَق بالجلب)، وأول فاتورة حيّة تفوز عند وجود أكثر من واحدة.
+            if ($this->isDeadUnpaid($invoice)) {
+                continue;
+            }
             $this->assertInvoiceMatches($invoice, $context);
 
             return $this->checkoutFrom($invoice, null);
@@ -121,6 +126,21 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody
         $this->assertInvoiceMatches($created, $context);
 
         return $this->checkoutFrom($created, $expiresAt);
+    }
+
+    /** @param array<string, mixed> $invoice */
+    private function isDeadUnpaid(array $invoice): bool
+    {
+        $status = strtolower((string) ($invoice['status'] ?? ''));
+        if ($status === 'paid' || $status === 'refunded') {
+            return false;
+        }
+        if (in_array($status, ['expired', 'canceled', 'voided'], true)) {
+            return true;
+        }
+        $expiresAt = $this->parseTime($invoice['expired_at'] ?? null);
+
+        return $expiresAt !== null && $expiresAt->lessThanOrEqualTo(CarbonImmutable::now('UTC'));
     }
 
     /** @param array<string, mixed> $invoice */

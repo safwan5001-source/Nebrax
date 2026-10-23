@@ -204,6 +204,33 @@ class MoyasarAdapterTest extends TestCase
     }
 
     #[Test]
+    public function a_recovered_expired_or_canceled_invoice_is_replaced_but_a_paid_or_live_one_is_resumed(): void
+    {
+        $attemptId = 'attempt-recovery-1';
+        $past = '2020-01-01T00:00:00.000Z';
+        $dead = [
+            'status expired' => MoyasarFixtures::invoice('expired', attemptId: $attemptId),
+            'status canceled' => MoyasarFixtures::invoice('canceled', attemptId: $attemptId),
+            'initiated but past expired_at' => array_merge(MoyasarFixtures::invoice('initiated', attemptId: $attemptId), ['expired_at' => $past]),
+        ];
+        foreach ($dead as $label => $old) {
+            $fresh = array_merge(MoyasarFixtures::invoice(attemptId: $attemptId), ['id' => 'fresh-invoice-id', 'url' => 'https://checkout.moyasar.com/invoices/fresh-invoice-id']);
+            $this->fakeHttp(['api.moyasar.com/v1/invoices*' => Http::sequence()->push(['invoices' => [$old]])->push($fresh, 201)]);
+
+            $checkout = $this->adapter->createCheckout($this->context(11500, $attemptId));
+
+            $this->assertSame('fresh-invoice-id', $checkout->providerPaymentId, $label);
+            Http::assertSent(fn (Request $r) => $r->method() === 'POST');
+        }
+
+        // مدفوعة ⇒ تُعاد (يلتقطها الجلب)، لا فاتورة ثانية.
+        $paid = MoyasarFixtures::invoice('paid', payments: [MoyasarFixtures::payment('paid')], attemptId: $attemptId);
+        $this->fakeHttp(['api.moyasar.com/v1/invoices*' => Http::response(['invoices' => [MoyasarFixtures::invoice('expired', attemptId: $attemptId), $paid]])]);
+        $this->assertSame(MoyasarFixtures::INVOICE_ID, $this->adapter->createCheckout($this->context(11500, $attemptId))->providerPaymentId);
+        Http::assertNotSent(fn (Request $r) => $r->method() === 'POST');
+    }
+
+    #[Test]
     public function a_checkout_url_outside_the_provider_domain_or_without_https_is_refused(): void
     {
         foreach (['https://evil.example/pay', 'http://evil.example/invoices/x', 'http://moyasar.com.evil.example/x', 'https://moyasar.com.evil.example/x', 'javascript:alert(1)'] as $url) {
@@ -688,9 +715,9 @@ class MoyasarAdapterTest extends TestCase
         return $this->orchestrator->start(new TestPayable(), $this->gateway, 'idem-moy-'.uniqid());
     }
 
-    private function context(int $amount): PaymentAttemptContext
+    private function context(int $amount, string $attemptId = '11111111-2222-4333-8444-555555555555'): PaymentAttemptContext
     {
-        return new PaymentAttemptContext($this->gateway, '11111111-2222-4333-8444-555555555555', $amount, 'SAR', 'invoice:inv-1');
+        return new PaymentAttemptContext($this->gateway, $attemptId, $amount, 'SAR', 'invoice:inv-1');
     }
 
     private function expectProviderUnavailable(callable $operation): void
