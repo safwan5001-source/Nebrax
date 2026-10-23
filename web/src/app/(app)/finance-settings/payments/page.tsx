@@ -14,6 +14,8 @@ import { api } from '@/lib/api';
 import { formatDateTime } from '@/lib/formatting';
 import { isDemo } from '@/lib/demo';
 import { useCan } from '@/lib/use-can';
+import { PaymentBrandMark } from '@/components/payments/payment-brand-mark';
+import { gatewayProviderBrand } from '@/lib/payment-brand-registry';
 import { ConnectionFormDialog } from '@/modules/payments/gateways/connection-form-dialog';
 import {
   MANAGE_PERMISSION,
@@ -223,9 +225,15 @@ export default function PaymentGatewaysPage() {
               {connections.map((connection) => (
                 <li key={connection.id} className="rounded-md border border-border p-4" data-testid={`pg-item-${connection.id}`}>
                   <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <h2 className="font-medium text-text">{gatewayDisplayName(connection, locale)}</h2>
-                      <p className="mt-0.5 text-xs text-muted">{t(`providers.${connection.provider}`)}</p>
+                    <div className="flex min-w-0 items-start gap-3">
+                      {(() => {
+                        const brand = gatewayProviderBrand(connection.provider);
+                        return brand ? <PaymentBrandMark brand={brand} withIcon className="mt-0.5" /> : null;
+                      })()}
+                      <div className="min-w-0">
+                        <h2 className="font-medium text-text">{gatewayDisplayName(connection, locale)}</h2>
+                        <p className="mt-0.5 text-xs text-muted">{t(`providers.${connection.provider}`)}</p>
+                      </div>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       <Badge tone={connection.environment === 'live' ? 'neutral' : 'muted'}>{t(`environments.${connection.environment}`)}</Badge>
