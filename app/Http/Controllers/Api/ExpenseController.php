@@ -90,10 +90,7 @@ class ExpenseController extends ApiController
         }
 
         $attachments = $expense->attachments()->get();
-        DB::transaction(function () use ($expense) {
-            $expense->attachments()->delete();
-            $expense->delete();
-        });
+        $this->expenses->discardDraft($expense);
 
         // الصف حُذف أولاً (يبقى السجل صحيحاً)؛ فشل حذف الكائن يُسجَّل ولا يُفشل الطلب.
         $this->attachmentStorage->discard($attachments->all());
