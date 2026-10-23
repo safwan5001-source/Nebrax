@@ -30,6 +30,7 @@ vi.mock('@/lib/api', () => ({ ApiError }));
 vi.mock('@/components/platform/contract-management-card', () => ({ ContractManagementCard: () => <div data-testid="contracts" /> }));
 vi.mock('@/components/platform/commercial-operations-card', () => ({ CommercialOperationsCard: () => <div data-testid="commercial" /> }));
 vi.mock('@/components/platform/application-override-card', () => ({ ApplicationOverrideCard: () => <div data-testid="overrides" /> }));
+vi.mock('@/components/platform/ai-action-controls-card', () => ({ AiActionControlsCard: () => <div data-testid="ai-controls" /> }));
 
 const tenant = (over: Record<string, unknown> = {}) => ({
   id: 'tenant-1', name: 'Reference Co', slug: 'reference-co', account_number: 1000000, support_number: 1000,

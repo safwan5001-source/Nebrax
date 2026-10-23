@@ -116,3 +116,68 @@ describe('AiActionsDisabledNotice', () => {
     expect(second.container.textContent).toBe('');
   });
 });
+
+describe('AiActionsEnablementCard — owner approval of execution (IMP-X-01c)', () => {
+  const enabled = (over: Partial<Enablement> = {}): Enablement => state({ tenant_enabled: true, effective: true, reason: 'enabled', execution_approved: false, controls_enforced: false, access: null, ...over });
+
+  it('the owner sees the approval switch and saves what the server returns', async () => {
+    api.mockImplementation((path: string, options?: { method?: string; body?: unknown }) => {
+      if (options?.method === 'PUT') return Promise.resolve({ data: enabled({ execution_approved: true }) });
+      return Promise.resolve({ data: enabled() });
+    });
+    const user = userEvent.setup();
+    render(<AiActionsEnablementCard canManage isOwner />);
+
+    const toggle = await screen.findByRole('switch', { name: /approve AI Actions execution/i });
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+    await user.click(toggle);
+
+    await waitFor(() => expect(screen.getByRole('switch', { name: /approve AI Actions execution/i }).getAttribute('aria-checked')).toBe('true'));
+    expect(api).toHaveBeenCalledWith('/ai-actions-settings/execution-approval', { method: 'PUT', body: { approved: true } });
+  });
+
+  it('a non-owner sees the state but no switch to change it', async () => {
+    api.mockResolvedValue({ data: enabled({ execution_approved: true }) });
+    render(<AiActionsEnablementCard canManage />);
+
+    expect(await screen.findByTestId('ai-actions-execution-approval')).toBeTruthy();
+    expect(screen.queryByRole('switch', { name: /approve AI Actions execution/i })).toBeNull();
+    expect(screen.getByTestId('ai-actions-execution-approval').textContent).toContain('Only the organization owner');
+  });
+
+  it('the approval section stays hidden until the organization itself has accepted AI Actions', async () => {
+    api.mockResolvedValue({ data: state() });
+    render(<AiActionsEnablementCard canManage isOwner />);
+    await screen.findByRole('switch');
+    expect(screen.queryByTestId('ai-actions-execution-approval')).toBeNull();
+  });
+
+  it('explains why execution is unavailable only when the operator gate is open, with tenant-safe wording', async () => {
+    const access = { 'product_import.v1': { preview: { allowed: true, reason: 'allowed' }, review: { allowed: true, reason: 'allowed' }, execution: { allowed: false, reason: 'platform_unavailable' } } };
+    api.mockResolvedValue({ data: enabled({ controls_enforced: true, access }) });
+    render(<AiActionsEnablementCard canManage isOwner />);
+
+    expect((await screen.findByTestId('ai-actions-execution-reason')).textContent).toContain('not available from the platform administration');
+    cleanup();
+    api.mockResolvedValue({ data: enabled({ controls_enforced: false, access: null }) });
+    render(<AiActionsEnablementCard canManage isOwner />);
+    await screen.findByTestId('ai-actions-execution-approval');
+    expect(screen.queryByTestId('ai-actions-execution-reason')).toBeNull();
+  });
+
+  it('a failed approval shows the server message and reloads the real state', async () => {
+    let first = true;
+    api.mockImplementation((path: string, options?: { method?: string }) => {
+      if (options?.method === 'PUT') return Promise.reject(new ApiErrorMock(403, 'x', { error: { code: 'owner_required', message: 'موافقة التنفيذ لمالك المؤسسة وحده.' } }));
+      first = false;
+      return Promise.resolve({ data: enabled() });
+    });
+    const user = userEvent.setup();
+    render(<AiActionsEnablementCard canManage isOwner />);
+    await user.click(await screen.findByRole('switch', { name: /approve AI Actions execution/i }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(first).toBe(false);
+    expect(screen.getByRole('switch', { name: /approve AI Actions execution/i }).getAttribute('aria-checked')).toBe('false');
+  });
+});
