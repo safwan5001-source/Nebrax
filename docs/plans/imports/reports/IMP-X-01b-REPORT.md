@@ -4,7 +4,7 @@
 
 ## What it does (only the existing single enforcement points; no new engine, no second policy)
 - `AiActionPolicy::authorize(..., ?string $actionType)` → after the existing tenant/actor/opt-in checks it calls `assertAllowed(tenant, type, PREVIEW)`; **every one of the six `AiActionGateway` call sites passes the type** (previously guarded statically for permissions + application key; that invariant now also requires `type`). `approve` and repair `start` keep their current mapping (the `use` tier), as the requirement's default says.
-- `AiActionProductExecutionService`: `run()` and `retry()` call `assertAllowed(.., EXECUTION)` after `assertProductImport`; **in-flight stop = option (a), the recommended one:** the resolver is re-read **before every row write** (one cheap read set) and once before the images. A stop leaves the remaining rows `pending` and the execution `running`, releases the lease, writes nothing after the stop (no row, no image), and a later `run()` resumes from where it stopped without repeating a row — each row stays in its own transaction, never half-applied.
+- `AiActionProductExecutionService`: `run()` and `retry()` call `assertAllowed(.., EXECUTION)` after `assertProductImport` (before the replay branch — like the existing env check, so a replay of a finished execution is refused while execution is off; `GET` still shows the result); **in-flight stop = option (a), the recommended one:** the resolver is re-read **before every write — each row and each image**. A stop leaves the remaining rows/images `pending`, records the batch's counts (`finish()` runs), releases the lease, then throws the denial; nothing is written after the stop, and an execution whose last write already happened is finalised normally (a stop *after* the last write does not strand it as `running`). A later `run()` resumes from where it stopped without repeating a row or image — each row stays in its own transaction, never half-applied.
 - Stable denial reason codes returned as `error.code` (403): `platform_off`, `type_off`, `tenant_not_granted`, `tenant_not_enabled`, `execution_env_floor_off`, `execution_platform_off`, `execution_type_off`, `execution_tenant_not_granted`, `tenant_owner_not_approved`, … with Arabic messages (UI translation is X-01d).
 
 ## Guarantees kept (tested)
@@ -13,4 +13,16 @@ Gate closed ⇒ no behaviour change (full `AiAction*` suites green: 157 + the ne
 ## Not here
 X-01c (owner-only approval write path `ai_actions.execution_approved` + tenant-side reason copy) and X-01d (console UI) — until X-01c lands nobody can approve execution, which is the intended default-deny state, and the gate stays off.
 
-No Codex review (quota exhausted); independent read-only review: see below.
+## Independent review (read-only subagent) — disposition
+Gate-off behaviour, enforcement coverage (all six gateway sites, every service path, the only other caller is the maintenance purge), claim-token release and the no-double-write on resume were verified clean. Findings:
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | Image attachment ignored the in-flight stop (one check before a loop of up to 50 media writes) | **Fixed**: re-read before every image + test (3 staged images, stop after the first → exactly 1 media, resumes to 3) |
+| 2 | A check after the last write stranded a finished import as `running` and dropped the batch counts | **Fixed**: checks only precede real writes; `finish()` always runs before the denial is thrown + test |
+| 4b | The operator check ran before RBAC, so an unauthorised user saw `type_off`/`platform_off` instead of `permission_denied` | **Fixed**: moved after RBAC/domain permissions |
+| 6 | Gate on: replay of a completed execution returns 403 while execution is off | **Accepted, documented** (same position as the existing env check; `GET` still returns the result) |
+| T | No tests for images, the retry path, post-loop stop, mid-run owner withdrawal, closed-gate query count; weak static `>= 4` check | **Added** `AiActionControlInFlightStopTest` (4) and a stricter static invariant |
+| 3, 4a, 5 | Sticky approval after re-enable; operator state visible in tenant status; additive `status()` fields | **Belong to X-01c** (fixed/recorded there) |
+
+No Codex review (quota exhausted).

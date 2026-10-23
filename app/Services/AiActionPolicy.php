@@ -53,10 +53,6 @@ final class AiActionPolicy
         if ((Settings::group('ai_actions', $tenant)['enabled'] ?? false) !== true) {
             throw new AiActionException('tenant_not_enabled', 'AI Actions غير مفعّلة لهذه المؤسسة.', 403);
         }
-        // IMP-X-01b: ضوابط المشغّل (معاينة/مراجعة). خلف بوابة نشر مغلقة افتراضياً؛ شرط لازم لا كافٍ — RBAC والفرع والمعاينة والموافقة تتبع كما هي.
-        if ($actionType !== null) {
-            $this->controls->assertAllowed($tenantId, $actionType, AiActionsAccessResolver::PREVIEW);
-        }
         if (! Rbac::allows((string) $actor->role, $actionPermission)) {
             throw new AiActionException('permission_denied', 'ليس لديك صلاحية AI Action أو صلاحية المجال المطلوبة.', 403);
         }
@@ -64,6 +60,11 @@ final class AiActionPolicy
             if (! Rbac::allows((string) $actor->role, $permission)) {
                 throw new AiActionException('permission_denied', 'ليس لديك صلاحية AI Action أو صلاحية المجال المطلوبة.', 403);
             }
+        }
+        // IMP-X-01b: ضوابط المشغّل (معاينة/مراجعة) بعد RBAC لا قبله: مستخدمٌ بلا صلاحية يرى `permission_denied` لا حالة المنصة. خلف بوابة نشر مغلقة
+        // افتراضياً؛ شرط لازم لا كافٍ — الفرع والمعاينة والموافقة تتبع كما هي.
+        if ($actionType !== null) {
+            $this->controls->assertAllowed($tenantId, $actionType, AiActionsAccessResolver::PREVIEW);
         }
         if ($applicationKey !== null) {
             // HTTP فقط: `request()` هو طلب المتحكّم الحالي (لا مسار طابور/أمر يصل هنا اليوم). مساراتٌ غير HTTP تحتاج

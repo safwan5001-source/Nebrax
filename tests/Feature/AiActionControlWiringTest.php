@@ -199,7 +199,9 @@ class AiActionControlWiringTest extends TestCase
         }
 
         $executor = (string) file_get_contents(base_path('app/Services/AiActionProductExecutionService.php'));
-        $this->assertGreaterThanOrEqual(4, substr_count($executor, 'controls->assertAllowed('), 'run + retry + قبل كل صف + قبل الصور');
+        $this->assertGreaterThanOrEqual(2, substr_count($executor, 'controls->assertAllowed('), 'run + retry');
+        $this->assertGreaterThanOrEqual(2, substr_count($executor, 'controls->denial('), 'قبل كل صف وقبل كل صورة');
+        $this->assertStringContainsString('throw $stop;', $executor, 'الرفض يُرمى بعد finish() لا قبله');
     }
 
     /** @return array{0: string, 1: array<string, mixed>} */
