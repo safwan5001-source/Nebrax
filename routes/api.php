@@ -80,6 +80,7 @@ use App\Http\Controllers\Api\EmployeeRequestController;
 use App\Http\Controllers\Api\EmploymentTypeController;
 use App\Http\Controllers\Api\ExpenseCategoryController;
 use App\Http\Controllers\Api\ExpenseController;
+use App\Http\Controllers\Api\ExpenseImportController;
 use App\Http\Controllers\Api\FinanceSettingsController;
 use App\Http\Controllers\Api\FuelStationsWorkspaceController;
 use App\Http\Controllers\Api\FuelAviController;
@@ -747,6 +748,11 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // — نطاق finance.operations هنا وحده: العُهَد أدناه أيضاً. لا الخزائن/
         // الحسابات البنكية ولا السندات (`payments`)، فهي مرجع مشترك تستهلكه
         // شاشة السندات نفسها غير المرتبطة بأي مفتاح كتالوج (ميزة أساسية دوماً).
+        // IMP-H5-S2: استيراد المصروفات مسوداتٍ — قالب/حقول/فحص/معاينة فقط (لا apply متزامن؛ التنفيذ عبر import-jobs المربوط بالمعاينة). البوابات = `POST expenses`.
+        Route::get('expenses/import/template', [ExpenseImportController::class, 'template'])->middleware([$perm('expenses.manage'), $app('finance.operations')]);
+        Route::get('expenses/import/fields', [ExpenseImportController::class, 'fields'])->middleware([$perm('expenses.manage'), $app('finance.operations')]);
+        Route::post('expenses/import/inspect', [ExpenseImportController::class, 'inspect'])->middleware([$perm('expenses.manage'), $app('finance.operations'), EnsureImportFilesScanned::class]);
+        Route::post('expenses/import/preview', [ExpenseImportController::class, 'preview'])->middleware([$perm('expenses.manage'), $app('finance.operations'), EnsureImportFilesScanned::class]);
         Route::get('expenses', [ExpenseController::class, 'index'])->middleware([$perm('expenses.view'), $app('finance.operations')]);
         Route::get('expenses/{id}/attachments/{attachmentId}', [ExpenseController::class, 'downloadAttachment'])->middleware([$perm('expenses.view'), $app('finance.operations')]);
         Route::get('expenses/{id}', [ExpenseController::class, 'show'])->middleware([$perm('expenses.view'), $app('finance.operations')]);

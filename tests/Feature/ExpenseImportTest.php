@@ -25,7 +25,7 @@ use RuntimeException;
 use Tests\TestCase;
 
 /**
- * IMP-H5-S1c — استيراد المصروفات مسوداتٍ: العقد، المراجع بمعرّفات موثوقة، القيم، منع التكرار (داخل الملف/القائم/المؤكَّد)، الاشتقاق، وعدم أي أثر محاسبي. المحوّل غير مسجَّل بعد.
+ * IMP-H5-S1c — استيراد المصروفات مسوداتٍ: العقد، المراجع بمعرّفات موثوقة، القيم، منع التكرار (داخل الملف/القائم/المؤكَّد)، الاشتقاق، وعدم أي أثر محاسبي. المحوّل مسجَّل منذ IMP-H5-S2 (انظر H5ImportEndpointsTest للنقاط والمهام).
  *
  * تشغيل: php artisan test --filter=ExpenseImportTest
  */
@@ -565,12 +565,14 @@ class ExpenseImportTest extends TestCase
     }
 
     /** @test */
-    public function the_adapter_is_not_registered_anywhere_yet(): void
+    public function the_adapter_is_registered_with_the_gates_of_the_direct_expense_route(): void
     {
-        $root = dirname(__DIR__, 2);
-        foreach (['app/Services/ImportDomainRegistry.php', 'app/Support/ImportJobDomain.php', 'routes/api.php'] as $file) {
-            $this->assertStringNotContainsString('ExpenseImport', (string) file_get_contents($root.'/'.$file), $file);
-        }
+        $this->assertTrue(app(\App\Services\ImportDomainRegistry::class)->has('expense_import'));
+        $this->assertSame(
+            ['view' => 'expenses.view', 'manage' => 'expenses.manage', 'app' => 'finance.operations'],
+            \App\Support\ImportJobDomain::authorization('expense_import'),
+        );
+        $this->assertContains('expense_import', \App\Support\ImportJobDomain::PREVIEW_BOUND_ONLY);
     }
 
     /** @test */

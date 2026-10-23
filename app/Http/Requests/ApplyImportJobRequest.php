@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Services\ImportJobAccess;
 use App\Services\PartnerImportService;
 use App\Services\ProductTaxonomyImportService;
+use App\Services\ExpenseImportService;
 use App\Services\StocktakeCountImportService;
 use App\Services\UnitTemplateImportService;
 use App\Services\ProductImportService;
@@ -12,6 +13,7 @@ use App\Support\InventoryOpeningFields;
 use App\Support\PartnerImportFields;
 use App\Support\PriceListItemImportFields;
 use App\Support\ProductTaxonomyImportFields;
+use App\Support\ExpenseImportFields;
 use App\Support\StocktakeCountImportFields;
 use App\Support\UnitTemplateImportFields;
 use App\Support\ProductImportFields;
@@ -78,6 +80,7 @@ class ApplyImportJobRequest extends FormRequest
                 PriceListItemImportFields::keys(),
                 UnitTemplateImportFields::keys(),
                 StocktakeCountImportFields::keys(),
+                ExpenseImportFields::keys(),
                 ['ignore']
             ))],
             // IMP-H3-S2 — خياراتا `partner_master`: النوع (عميل/مورّد) وسياسة إشارات التكرار.
@@ -90,6 +93,13 @@ class ApplyImportJobRequest extends FormRequest
             // IMP-H7-S1b — خياراتا `stocktake_count`: الجرد المستهدف وسياسة العدّ القائم.
             'stocktake_id' => ['sometimes', 'nullable', 'uuid'],
             'existing_count_policy' => ['sometimes', Rule::in([StocktakeCountImportService::POLICY_ERROR, StocktakeCountImportService::POLICY_OVERWRITE, StocktakeCountImportService::POLICY_SKIP])],
+            // IMP-H5-S2 — سياسات `expense_import`: المرجع، الحساب/الدفع/الضريبة الافتراضية، وصفوف التكرار المؤكَّد.
+            'reference_policy' => ['sometimes', Rule::in([ExpenseImportService::REFERENCE_OPTIONAL, ExpenseImportService::REFERENCE_REQUIRED])],
+            'default_account_id' => ['sometimes', 'nullable', 'uuid'],
+            'default_payment_method' => ['sometimes', Rule::in(ExpenseImportFields::PAYMENT_METHODS)],
+            'default_tax_rate' => ['sometimes', 'integer', 'min:0', 'max:100'],
+            'confirmed_repeat_rows' => ['sometimes', 'array', 'max:'.ExpenseImportService::MAX_ROWS],
+            'confirmed_repeat_rows.*' => ['integer', 'min:2'],
             'batch_size' => ['sometimes', 'integer', 'min:1', 'max:'.ProductImportService::APPLY_BATCH_SIZE],
             'price_list_id' => ['sometimes', 'nullable', 'uuid'],
             'opening_date' => ['sometimes', 'date_format:Y-m-d'],
@@ -121,7 +131,7 @@ class ApplyImportJobRequest extends FormRequest
     public function explicitOptions(): array
     {
         $options = [];
-        foreach (['mode', 'blank_policy', 'master_data_policy', 'opening_date', 'type', 'duplicate_signal_policy', 'kind', 'parent_policy', 'existing_policy', 'stocktake_id', 'existing_count_policy'] as $key) {
+        foreach (['mode', 'blank_policy', 'master_data_policy', 'opening_date', 'type', 'duplicate_signal_policy', 'kind', 'parent_policy', 'existing_policy', 'stocktake_id', 'existing_count_policy', 'reference_policy', 'default_account_id', 'default_payment_method', 'default_tax_rate'] as $key) {
             if ($this->has($key)) {
                 $options[$key] = $this->string($key)->toString();
             }
@@ -129,6 +139,9 @@ class ApplyImportJobRequest extends FormRequest
         // مطابقة فارغة = لا مطابقة مُرسَلة (المعاينة multipart لا تستطيع إرسال مصفوفة فارغة أصلاً): لا تُعدّ تغييراً للمجمَّد.
         if ($this->has('mapping') && (array) $this->input('mapping', []) !== []) {
             $options['mapping'] = (array) $this->input('mapping', []);
+        }
+        if ($this->has('confirmed_repeat_rows') && (array) $this->input('confirmed_repeat_rows', []) !== []) {
+            $options['confirmed_repeat_rows'] = (array) $this->input('confirmed_repeat_rows', []);
         }
         if ($this->has('price_list_id')) {
             $options['price_list_id'] = $this->string('price_list_id')->toString() ?: null;
@@ -168,6 +181,9 @@ class ApplyImportJobRequest extends FormRequest
             $options['batch_size'] = (int) $this->input('batch_size');
         }
 
+        if ($this->has('confirmed_repeat_rows') && (array) $this->input('confirmed_repeat_rows', []) !== []) {
+            $options['confirmed_repeat_rows'] = (array) $this->input('confirmed_repeat_rows', []);
+        }
         if ($this->has('price_list_id')) {
             $options['price_list_id'] = $this->string('price_list_id')->toString() ?: null;
         }
@@ -175,7 +191,7 @@ class ApplyImportJobRequest extends FormRequest
         if ($this->has('opening_date')) {
             $options['opening_date'] = (string) $this->input('opening_date');
         }
-        foreach (['type', 'duplicate_signal_policy', 'kind', 'parent_policy', 'existing_policy', 'stocktake_id', 'existing_count_policy'] as $key) {
+        foreach (['type', 'duplicate_signal_policy', 'kind', 'parent_policy', 'existing_policy', 'stocktake_id', 'existing_count_policy', 'reference_policy', 'default_account_id', 'default_payment_method', 'default_tax_rate'] as $key) {
             if ($this->has($key)) {
                 $options[$key] = $this->string($key)->toString();
             }

@@ -6,17 +6,17 @@ use App\Contracts\ImportFailureExportAdapter;
 use App\Models\ImportPreview;
 use App\Support\ImportChunk;
 use App\Support\ImportChunkResult;
+use App\Support\ImportJobDomain;
 
 /**
- * محوّل `expense_import` (IMP-H5-S1c): استيراد المصروفات مسوداتٍ بوحدة الصفّ عبر `ExpenseImportService` وحده. **غير مسجَّل بعد** في `ImportDomainRegistry`
- * ولا في `ImportJobDomain`، فلا يصل إليه أي طلب (تسجيله وبواباته في IMP-H5-S2). بوابة الكتابة المباشرة المقابلة (`POST /expenses`) هي `expenses.manage`
- * + `EnsureApplicationActive:finance.operations`، وتبقى هي المرجع عند التسجيل.
+ * محوّل `expense_import` (IMP-H5-S1c): استيراد المصروفات مسوداتٍ بوحدة الصفّ عبر `ExpenseImportService` وحده. مسجَّل في `ImportDomainRegistry` و`ImportJobDomain`
+ * منذ IMP-H5-S2 (مربوط بمعاينة وحده). بوابة الكتابة المباشرة المقابلة (`POST /expenses`) هي `expenses.manage` + `EnsureApplicationActive:finance.operations`.
  *
  * لا أعمدة حسّاسة: عقد الحقول لا يحمل تكلفة ولا رصيداً، فملف الصفوف الفاشلة يصدّر كاملاً لمن يملك صلاحية الإدارة.
  */
 class ExpenseImportAdapter extends SpreadsheetImportAdapter implements ImportFailureExportAdapter
 {
-    public const DOMAIN = 'expense_import';
+    public const DOMAIN = ImportJobDomain::EXPENSE_IMPORT;
 
     public function domain(): string
     {
