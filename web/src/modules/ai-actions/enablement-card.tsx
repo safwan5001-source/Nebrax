@@ -8,13 +8,13 @@ import { ApiError } from '@/lib/api';
 import { useToast } from '@/components/ui/toast';
 import { apiErrorMessage } from './product-preview';
 import { currentLang } from './product-execution';
-import { ENABLEMENT_TEXT, fetchEnablement, saveEnablement, type Enablement } from './enablement';
+import { ENABLEMENT_TEXT, executionBlockReason, fetchEnablement, saveEnablement, saveExecutionApproval, type Enablement } from './enablement';
 
 /**
  * بطاقة قبول المؤسسة لـAI Actions. التبديل لمن يملك `ai.actions.manage` فقط (الخادم يفرضها)؛ التفعيل معطَّل
  * ما دامت المنصة مطفأة (الخادم يرفضه 409)، والإيقاف متاح دائماً.
  */
-export function AiActionsEnablementCard({ canManage }: { canManage: boolean }) {
+export function AiActionsEnablementCard({ canManage, isOwner = false }: { canManage: boolean; isOwner?: boolean }) {
   const text = ENABLEMENT_TEXT[currentLang()];
   const { success, error } = useToast();
   const [state, setState] = useState<Enablement | null>(null);
@@ -45,6 +45,22 @@ export function AiActionsEnablementCard({ canManage }: { canManage: boolean }) {
     }
   }
 
+  async function changeApproval(next: boolean) {
+    if (saving) return;
+    setSaving(true);
+    try {
+      setState(await saveExecutionApproval(next));
+      success(text.saved);
+    } catch (exception) {
+      error(exception instanceof ApiError ? apiErrorMessage(exception.body, text.failed) : text.failed);
+      await load();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const blockReason = state ? executionBlockReason(state) : null;
+
   return (
     <Card data-testid="ai-actions-enablement">
       <CardHeader>
@@ -67,6 +83,23 @@ export function AiActionsEnablementCard({ canManage }: { canManage: boolean }) {
             />
             {text.toggle}
           </label>
+        ) : null}
+        {state && state.tenant_enabled ? (
+          <section aria-label={text.approvalTitle} data-testid="ai-actions-execution-approval" className="space-y-2 border-t border-border pt-3">
+            <h3 className="text-sm font-medium text-text">{text.approvalTitle}</h3>
+            <p className="text-sm leading-relaxed text-muted">{text.approvalHint}</p>
+            {isOwner ? (
+              <label className="flex items-center gap-3 text-sm text-text">
+                <Switch aria-label={text.approvalToggle} checked={state.execution_approved === true} disabled={saving} onCheckedChange={(next) => void changeApproval(next)} />
+                {text.approvalToggle}
+              </label>
+            ) : (
+              <p className="text-sm text-muted">{state.execution_approved ? text.on : text.off} · {text.approvalOwnerOnly}</p>
+            )}
+            {state.controls_enforced && blockReason ? (
+              <p role="status" data-testid="ai-actions-execution-reason" className="text-sm text-warning">{text.executionReasons[blockReason] ?? blockReason}</p>
+            ) : null}
+          </section>
         ) : null}
       </CardContent>
     </Card>

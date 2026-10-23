@@ -11818,5 +11818,62 @@
     "error_payment_captured": "اكتمل الدفع لدى المزوّد؛ لا يمكن الإلغاء.",
     "error_invalid_expiry": "مدة الصلاحية غير صالحة.",
     "error_unknown": "تعذّر تنفيذ العملية. حاول مرة أخرى."
+  },
+  "platformAiActions": {
+    "title": "إجراءات المساعد (AI Actions)",
+    "tenantTitle": "إجراءات المساعد لهذه المؤسسة",
+    "hint": "الافتراضي رفض: لا تعمل إجراءات المساعد لمؤسسة إلا بمنحة منك وقبول المؤسسة نفسها، والتنفيذ يحتاج أيضاً موافقة مالك المؤسسة. هذه الضوابط شرط لازم لا كافٍ: لا تمنح صلاحية ولا تتجاوز المعاينة والموافقة قبل التنفيذ.",
+    "envFloor": "أرضية البيئة",
+    "envFloorHint": "أعلام بيئة للقراءة فقط (حد أدنى صلب): إن كانت مطفأة فلا يفيد أي ضبط هنا.",
+    "floorOn": "مفعّلة",
+    "floorOff": "مطفأة",
+    "master": "المفتاح الرئيسي (كل الأنواع)",
+    "capability": {
+      "use": "المعاينة والمراجعة",
+      "execution": "التنفيذ"
+    },
+    "effective": {
+      "preview": "معاينة",
+      "review": "مراجعة",
+      "execution": "تنفيذ"
+    },
+    "columns": {
+      "target": "النطاق",
+      "effective": "الحالة الفعّالة"
+    },
+    "granted": "ممنوحة",
+    "notGranted": "غير ممنوحة",
+    "allowed": "متاحة",
+    "toggleLabel": "{target} — {capability}",
+    "confirmGrantTitle": "منح",
+    "confirmRevokeTitle": "سحب",
+    "confirmGrant": "سيُمنح «{target}» ({capability}). يُسجَّل التغيير في سجل التدقيق بسببه.",
+    "confirmRevoke": "سيُسحب «{target}» ({capability}). يسري السحب على التنفيذ الجاري خلال صفٍّ واحد، ويُسجَّل بسببه.",
+    "reason": "السبب (إلزامي)",
+    "reasonHint": "من 3 إلى 500 حرف؛ يظهر في سجل التدقيق.",
+    "confirm": "تأكيد",
+    "cancel": "تراجع",
+    "close": "إغلاق",
+    "retry": "إعادة المحاولة",
+    "saved": "تم حفظ التغيير.",
+    "saveFailed": "تعذّر حفظ التغيير.",
+    "loadFailed": "تعذّر تحميل ضوابط إجراءات المساعد.",
+    "events": "آخر التغييرات",
+    "noEvents": "لا تغييرات مسجّلة بعد.",
+    "reasons": {
+      "env_floor_off": "أرضية البيئة مطفأة",
+      "platform_off": "المفتاح الرئيسي غير ممنوح",
+      "type_off": "النوع غير متاح على المنصة",
+      "tenant_not_granted": "لم تُمنح للمؤسسة",
+      "tenant_inactive": "المؤسسة غير نشطة",
+      "tenant_not_enabled": "المؤسسة لم تقبل AI Actions",
+      "execution_env_floor_off": "أرضية التنفيذ البيئية مطفأة",
+      "execution_platform_off": "تنفيذ المنصة غير ممنوح",
+      "execution_type_off": "تنفيذ النوع غير متاح",
+      "execution_tenant_not_granted": "تنفيذ المؤسسة غير ممنوح",
+      "tenant_owner_not_approved": "بانتظار موافقة مالك المؤسسة على التنفيذ",
+      "unknown_type": "نوع غير معروف",
+      "no_tenant_context": "لا مؤسسة محددة"
+    }
   }
 }

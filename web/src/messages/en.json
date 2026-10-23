@@ -11818,5 +11818,62 @@
     "error_payment_captured": "The payment was completed at the provider; it can't be cancelled.",
     "error_invalid_expiry": "The validity period is not valid.",
     "error_unknown": "Couldn't complete the action. Please try again."
+  },
+  "platformAiActions": {
+    "title": "AI Actions",
+    "tenantTitle": "AI Actions for this organization",
+    "hint": "Default is deny: AI Actions only work for an organization once you grant them and the organization itself accepts; execution also needs the organization owner's approval. These controls are necessary, never sufficient: they grant no permission and never skip preview and approval before execution.",
+    "envFloor": "Environment floor",
+    "envFloorHint": "Read-only environment flags (a hard floor): if one is off, nothing set here can turn it on.",
+    "floorOn": "On",
+    "floorOff": "Off",
+    "master": "Master switch (all types)",
+    "capability": {
+      "use": "Preview & review",
+      "execution": "Execution"
+    },
+    "effective": {
+      "preview": "Preview",
+      "review": "Review",
+      "execution": "Execution"
+    },
+    "columns": {
+      "target": "Scope",
+      "effective": "Effective state"
+    },
+    "granted": "Granted",
+    "notGranted": "Not granted",
+    "allowed": "Available",
+    "toggleLabel": "{target} — {capability}",
+    "confirmGrantTitle": "Grant",
+    "confirmRevokeTitle": "Revoke",
+    "confirmGrant": "“{target}” ({capability}) will be granted. The change is recorded in the audit trail with its reason.",
+    "confirmRevoke": "“{target}” ({capability}) will be revoked. A running execution stops within one row, and the change is recorded with its reason.",
+    "reason": "Reason (required)",
+    "reasonHint": "3 to 500 characters; shown in the audit trail.",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "close": "Close",
+    "retry": "Retry",
+    "saved": "Change saved.",
+    "saveFailed": "Could not save the change.",
+    "loadFailed": "Could not load the AI Actions controls.",
+    "events": "Recent changes",
+    "noEvents": "No changes recorded yet.",
+    "reasons": {
+      "env_floor_off": "Environment floor is off",
+      "platform_off": "Master switch not granted",
+      "type_off": "Type not available on the platform",
+      "tenant_not_granted": "Not granted to the organization",
+      "tenant_inactive": "Organization inactive",
+      "tenant_not_enabled": "Organization has not accepted AI Actions",
+      "execution_env_floor_off": "Execution environment floor is off",
+      "execution_platform_off": "Platform execution not granted",
+      "execution_type_off": "Execution of the type not available",
+      "execution_tenant_not_granted": "Execution not granted to the organization",
+      "tenant_owner_not_approved": "Waiting for the organization owner's execution approval",
+      "unknown_type": "Unknown type",
+      "no_tenant_context": "No organization selected"
+    }
   }
 }

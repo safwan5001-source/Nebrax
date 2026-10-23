@@ -30,6 +30,7 @@ import { platformApi } from '@/lib/platform-api';
 import { hydrateAiForm, isGoogleGeminiDirty } from './ai-form';
 import { isolateAuto } from './isolate';
 import { AiBudgetsCard } from './ai-budgets-card';
+import { AiActionControlsCard } from '@/components/platform/ai-action-controls-card';
 import { FileScanExceptions } from './file-scan-exceptions';
 import {
   geminiErrorCodeFromUnknown,
@@ -305,6 +306,7 @@ export default function PlatformIntegrationsPage() {
 
             <FileScanExceptions />
             <AiBudgetsCard />
+            <AiActionControlsCard />
             <SettingsCard title={t('processingTitle')} description={t('processingDescription')} icon={ServerCog} className="xl:col-span-2" enabled={forms.document_processing.enabled} summary={summaries.document_processing} onEnabled={(value) => update('document_processing', 'enabled', value)} actions={<CardActions name="document_processing" busy={busy} testing={testing} save={() => save('document_processing')} test={() => testConnection('document_processing')} t={t} />}>
               <p className="sm:col-span-2 text-xs leading-relaxed text-muted">{aiForm.processing_mode === 'sync' ? t('processingPolicyAsyncOnly') : t('processingPolicyApplies')}</p>
               <Field label={t('maxAttempts')}><Input className="h-11" type="number" min={1} max={5} value={forms.document_processing.max_attempts} onChange={(event) => update('document_processing', 'max_attempts', event.target.value)} dir="ltr" /></Field>

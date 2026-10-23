@@ -25,6 +25,8 @@ const router = { replace, push: vi.fn() };
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
 vi.mock('@/lib/platform-auth', () => ({ isPlatformAuthenticated: () => true }));
 vi.mock('@/lib/platform-api', () => ({ platformApi }));
+// بطاقة ضوابط AI Actions لها اختباراتها الخاصة (components/platform)؛ هنا تُستبدل كي لا تلوّث تنبيهات الصفحة.
+vi.mock('@/components/platform/ai-action-controls-card', () => ({ AiActionControlsCard: () => <div data-testid="ai-controls" /> }));
 vi.mock('@/lib/api', () => ({ ApiError }));
 
 const t = (key: string, values?: Record<string, string | number>) => translators.en(key, values);
