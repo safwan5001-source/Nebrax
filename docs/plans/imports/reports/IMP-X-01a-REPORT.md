@@ -14,10 +14,23 @@
 - Platform API (`/api/platform/*`, `platform:read` / `platform:manage`, never through `SetTenant`): `GET/PUT ai-action-controls`, `GET/PUT tenants/{tenant}/ai-action-controls` (grants, effective matrix, last 30 audit events).
 
 ## Tests
-- `AiActionControlTest` (18, SQLite + PostgreSQL), `AiActionControlApiTest` (6), `AiActionControlConcurrencyPostgresTest` (2, real `pcntl_fork`: four racing grants → one event; racing grant/revoke → gapless consistent audit chain). Related suites (`AiAction*`, `Settings*`, `Platform*`: 538 tests) green.
+- `AiActionControlTest` (19, SQLite + PostgreSQL), `AiActionControlApiTest` (6), `AiActionControlConcurrencyPostgresTest` (3, real `pcntl_fork`: four racing grants → one event; racing grant/revoke → gapless consistent audit chain). Related suites (`AiAction*`, `Settings*`, `Platform*`: 538 tests) green.
 
 ## Not in this slice (next)
 - **X-01b** wiring + deploy gate `AI_ACTIONS_RUNTIME_CONTROLS_ENFORCED` (default off) + in-flight stop (re-read before each row write) + the "who approves" and "where approve sits" design points recorded in the parked doc.
 - **X-01c** tenant-owner approval (owner-only) and tenant-side reason copy; **X-01d** console UI. No Railway/env change in any of them; enabling the gate or OPS-01 stays an owner decision.
 
-No Codex review (quota exhausted); independent read-only review: see below.
+## Independent review (read-only subagent) — disposition
+
+Clean on all six axes (triggers/SQL on both engines incl. NULL-tenant partial indexes, authorization, resolver order/isolation/Settings key handling, lock order and `insertOrIgnore` + re-read, no change to existing behaviour). Findings were test gaps and notes:
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | The platform-scope *first-create* race was never exercised (tenant rows are serialised by the tenant anchor) | **Added** a real-PostgreSQL test: four administrators making the first grant of `*|execution` at once → one control, one event, one `changed` (platform rows cleaned with the payments-test trigger-disable pattern) |
+| 2 | `tenant_inactive` branch untested | **Added** (inactive and soft-deleted tenant, preview and execution) |
+| 3 | Cross-type independence untestable with one registered type (`AiActionRegistry` is final) | **Accepted**: the SQL keys every read by `action_type`; becomes testable with the second registered type (H3-S4) — noted for that slice |
+| 4 | `execution_approved` is sticky across operator re-grants / tenant opt-in toggles | **Design note for X-01c** (D-11 says "grant AND approval", not "fresh"): kept sticky and visible; the owner can withdraw at any time and a withdrawal stops a running execution within one row. Making it expire on re-grant is an owner call, not assumed |
+| 5 | Platform-scope changes could not be read back | **Fixed**: `GET /platform/ai-action-controls` returns the last 30 platform events (+ test) |
+| 6 | Branch behind `origin/main` | Merged before the PR |
+
+No Codex review (quota exhausted).

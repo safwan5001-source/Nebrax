@@ -177,6 +177,23 @@ class AiActionControlTest extends TestCase
     }
 
     #[Test]
+    public function an_inactive_or_soft_deleted_tenant_is_denied_even_with_every_grant(): void
+    {
+        $tenant = $this->makeTenant(optedIn: true, approved: true);
+        $this->grantUseChain($tenant);
+        $this->grantExecutionChain($tenant);
+        $this->assertTrue($this->resolver->effective($tenant, self::TYPE, Resolver::PREVIEW)->allowed);
+
+        Tenant::query()->whereKey($tenant)->update(['is_active' => false]);
+        $this->assertSame('tenant_inactive', $this->resolver->effective($tenant, self::TYPE, Resolver::PREVIEW)->reason);
+        $this->assertSame('tenant_inactive', $this->resolver->effective($tenant, self::TYPE, Resolver::EXECUTION)->reason);
+
+        Tenant::query()->whereKey($tenant)->update(['is_active' => true]);
+        Tenant::query()->whereKey($tenant)->first()->delete();
+        $this->assertFalse($this->resolver->effective($tenant, self::TYPE, Resolver::PREVIEW)->allowed);
+    }
+
+    #[Test]
     public function the_environment_floor_can_never_be_overridden_by_any_operator_setting(): void
     {
         $tenant = $this->makeTenant(optedIn: true, approved: true);

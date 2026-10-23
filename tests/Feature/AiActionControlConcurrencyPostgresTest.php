@@ -26,6 +26,9 @@ class AiActionControlConcurrencyPostgresTest extends TestCase
     /** @var list<string> */
     private array $tenants = [];
 
+    /** @var list<string> */
+    private array $admins = [];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -37,6 +40,7 @@ class AiActionControlConcurrencyPostgresTest extends TestCase
 
         $this->dir = sys_get_temp_dir().'/ai_control_race_'.uniqid();
         mkdir($this->dir);
+        $this->clearPlatformRows(); // لا بقايا من تشغيل سابق منقطع
     }
 
     protected function tearDown(): void
@@ -50,6 +54,10 @@ class AiActionControlConcurrencyPostgresTest extends TestCase
         if (DB::connection()->getDriverName() === 'pgsql') {
             foreach ($this->tenants as $id) {
                 DB::table('tenants')->where('id', $id)->delete();
+            }
+            $this->clearPlatformRows();
+            foreach ($this->admins as $id) {
+                DB::table('platform_administrators')->where('id', $id)->delete();
             }
         }
 
@@ -65,6 +73,7 @@ class AiActionControlConcurrencyPostgresTest extends TestCase
         $admins = [];
         foreach ($enabledByRacer as $i => $enabled) {
             $admins[$i] = PlatformAdministrator::create(['name' => "مدير {$i}", 'email' => Str::random(8)."@race{$i}.test", 'password' => 'secret-password-1', 'is_active' => true])->id;
+            $this->admins[] = $admins[$i];
         }
 
         $jobs = [];
@@ -96,6 +105,30 @@ class AiActionControlConcurrencyPostgresTest extends TestCase
     }
 
     /** @test */
+    public function two_administrators_making_the_first_platform_grant_at_once_create_one_control_and_one_event(): void
+    {
+        $this->assertTrue(true);
+        $admins = [];
+        foreach ([0, 1, 2, 3] as $i) {
+            $admins[$i] = PlatformAdministrator::create(['name' => "مدير {$i}", 'email' => Str::random(8)."@first{$i}.test", 'password' => 'secret-password-1', 'is_active' => true])->id;
+            $this->admins[] = $admins[$i];
+        }
+        // مفتاح لم يُنشأ صفّه بعد: السباق على الإنشاء الأول (insertOrIgnore ثم قراءة الصف الفائز بقفل) لا على صف قائم.
+        $jobs = array_map(fn (int $i) => function () use ($admins, $i) {
+            $change = app(AiActionControlService::class)->setPlatformState(PlatformAdministrator::query()->findOrFail($admins[$i]), '*', 'execution', true, "أول منحة رقم {$i}");
+
+            return ['changed' => $change->changed];
+        }, [0, 1, 2, 3]);
+
+        $results = $this->runConcurrently($jobs);
+
+        $this->assertSame(4, count(array_filter($results, fn ($r) => ($r['ok'] ?? false) === true)), json_encode($results, JSON_UNESCAPED_UNICODE));
+        $this->assertSame(1, AiActionControl::query()->where('scope', 'platform')->where('action_type', '*')->where('capability', 'execution')->count());
+        $this->assertSame(1, AiActionControlEvent::query()->where('scope', 'platform')->where('action_type', '*')->where('capability', 'execution')->count());
+        $this->assertSame(1, count(array_filter($results, fn ($r) => ($r['value']['changed'] ?? false) === true)));
+    }
+
+    /** @test */
     public function racing_grants_and_revocations_leave_a_gapless_consistent_audit_trail(): void
     {
         [$tenant, $jobs] = $this->racers([true, false, true, false]);
@@ -114,6 +147,19 @@ class AiActionControlConcurrencyPostgresTest extends TestCase
         }
         $this->assertSame($previous, (bool) $control->enabled);
         $this->assertSame(4, count(array_filter($results, fn ($r) => ($r['ok'] ?? false) === true)), json_encode($results, JSON_UNESCAPED_UNICODE));
+    }
+
+    private function clearPlatformRows(): void
+    {
+        try {
+            DB::unprepared('ALTER TABLE ai_action_control_events DISABLE TRIGGER USER');
+            DB::unprepared('ALTER TABLE ai_action_controls DISABLE TRIGGER USER');
+            DB::table('ai_action_control_events')->whereNull('tenant_id')->delete();
+            DB::table('ai_action_controls')->whereNull('tenant_id')->delete();
+        } finally {
+            DB::unprepared('ALTER TABLE ai_action_controls ENABLE TRIGGER USER');
+            DB::unprepared('ALTER TABLE ai_action_control_events ENABLE TRIGGER USER');
+        }
     }
 
     /** @param list<callable> $jobs @return array<int, array<string, mixed>> */
