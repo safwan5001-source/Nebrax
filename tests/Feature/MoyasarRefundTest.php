@@ -149,6 +149,28 @@ class MoyasarRefundTest extends TestCase
     }
 
     #[Test]
+    public function a_malformed_payments_entry_or_a_foreign_invoice_payment_is_rejected_before_any_post(): void
+    {
+        $cases = [
+            'scalar entry' => [$this->paid(), 'x'],
+            'null entry' => [$this->paid(), null],
+        ];
+        foreach ($cases as $label => $payments) {
+            $this->fakeHttp(['api.moyasar.com/v1/invoices/*' => Http::response(MoyasarFixtures::invoice('paid', 11500, $payments))]);
+            $e = $this->thrown(fn () => $this->adapter->refundPayment($this->gateway, MoyasarFixtures::INVOICE_ID, 100), $label, PaymentRefundRejectedException::class);
+            $this->assertSame('moyasar.malformed_response', $e->reason, $label);
+            Http::assertNotSent(fn (Request $r) => $r->method() === 'POST');
+        }
+
+        foreach (['another-invoice-id', null, ['x']] as $foreign) {
+            $this->fakeHttp(['api.moyasar.com/v1/invoices/*' => Http::response($this->invoiceWith(array_merge($this->paid(), ['invoice_id' => $foreign])))]);
+            $e = $this->thrown(fn () => $this->adapter->refundPayment($this->gateway, MoyasarFixtures::INVOICE_ID, 100), 'foreign payment', PaymentRefundRejectedException::class);
+            $this->assertSame('moyasar.reference_mismatch', $e->reason);
+            Http::assertNotSent(fn (Request $r) => $r->method() === 'POST');
+        }
+    }
+
+    #[Test]
     public function a_response_total_beyond_the_captured_amount_is_unknown_not_proof(): void
     {
         $partial = array_merge($this->paid(), ['captured' => 60000]);

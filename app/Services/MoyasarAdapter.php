@@ -386,9 +386,17 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
         }
 
         $paid = [];
+        $rawPayments = $invoice['payments'] ?? [];
+        if ($rawPayments !== null && ! is_array($rawPayments)) {
+            throw new PaymentRefundRejectedException('moyasar.malformed_response', 'قائمة الدفعات غير صالحة؛ لا يُرسَل الاسترداد.');
+        }
         try {
-            foreach (is_array($invoice['payments'] ?? null) ? $invoice['payments'] : [] as $payment) {
-                if (is_array($payment) && in_array($this->statusOf($payment), ['paid', 'captured', 'refunded'], true)) {
+            foreach ($rawPayments ?? [] as $payment) {
+                // مدخل غير مصفوفة ⇒ حالته مجهولة فلا يمكن الجزم بوحدانية الدفعة المسدَّدة ⇒ رفض قاطع.
+                if (! is_array($payment)) {
+                    throw new PaymentGatewayException('moyasar.malformed_response', 'مدخل دفعة غير صالح.');
+                }
+                if (in_array($this->statusOf($payment), ['paid', 'captured', 'refunded'], true)) {
                     $paid[] = $payment;
                 }
             }
@@ -407,6 +415,10 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
         $paymentAmount = $this->intOrNull($payment['amount'] ?? null);
         $paymentCurrency = $this->currencyOf($payment);
         // العملة تُتحقق **شكلاً** قبل الإرسال (ثلاثة أحرف) ثم تُطابق عملة الفاتورة؛ فلا تمرّ بيانات معيبة متماثلة ثم تفشل بعد التنفيذ.
+        // الدفعة المختارة يجب أن تنتمي لهذه الفاتورة نصّاً (لا تُسترد دفعة فاتورة أخرى بردّ متناقض).
+        if (! is_string($payment['invoice_id'] ?? null) || ! hash_equals($providerPaymentId, $payment['invoice_id'])) {
+            throw new PaymentRefundRejectedException('moyasar.reference_mismatch', 'الدفعة لا تنتمي إلى الفاتورة المطلوبة.');
+        }
         if (! is_string($paymentId) || $paymentId === '' || $paymentAmount === null || preg_match('/^[A-Z]{3}$/', $paymentCurrency) !== 1
             || $paymentCurrency !== $this->currencyOf($invoice)) {
             throw new PaymentRefundRejectedException('moyasar.malformed_response', 'بيانات الدفعة غير صالحة للاسترداد.');
