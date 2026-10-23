@@ -11,7 +11,7 @@
 | Field | Value |
 |---|---|
 | Last merged slice | **IMP-H0-S1**: PR #1595, squash-merged 2026-10-22, Merge SHA `5e20e9edc941f83181497158fa68e6c55e95c485` |
-| **Next slice** | **IMP-H2-S2** (shared value normalization), then S3 → S4 → IMP-X-01 → H3. Merged: H1-S1..S5a, S7, S8a/b/c. **On hold:** H1-S6 (PR #1626, owner decision D-13). H2-S0 merged `38b9b6d` (#1628). |
+| **Next slice** | **IMP-H2-S4** (tenant AI Actions enablement endpoint), then H2-S5 → IMP-X-01 → H3. Merged: H1-S1..S5a, S7, S8a/b/c; H2-S0 `38b9b6d` (#1628), H2-S1 `bf9968d` (#1630), H2-S2 `c301550` (#1631). H2-S3 in review (#1632). **On hold:** H1-S6 (PR #1626, owner decision D-13). S5b deferred (prerequisite of OPS-01 remote-image enablement). |
 | Open owner decisions | D-01, D-02 (narrowed: `import_rows` data scope only), D-03, D-04, D-06, D-07, OPS-01 (D-05 has a non-blocking default; D-08/D-09 are recorded exclusions) |
 | Railway state | Unknown (owner-reported stall; no access from the agent) |
 
@@ -29,14 +29,14 @@
 | IMP-H1-S8 | ✅ | — | **Split:** **S8a** failed-unit persistence (`import_job_units`, deterministic `source_unit_ref`) + `GET /import-jobs/{id}/failures` (manage + sensitive-field redaction) — **merged** #1618 `cd69cda` (SQLite ✅ PostgreSQL ✅ Gate ✅; independent subagent review, Codex quota exhausted — no Codex review claimed) · **S8b** repair child job backend (`parent_job_id`, `POST /import-jobs/{id}/repairs`, membership by ref, per-unit atomic claim, real-PG race test) — **merged** #1619 `8c61ba8` (SQLite ✅ PostgreSQL ✅ Gate ✅; first PG run failed on a timing flaw in my own retry test — fixed, test-only; independent subagent review, Codex quota exhausted — no Codex review claimed) · **S8c** UI step "إصلاح الصفوف الفاشلة" + web contract — **merged** #1623 `7cc6f5d` (CI SQLite ✅ PostgreSQL ✅ web build ✅ Gate ✅; also fixed a review-found S8b gap: repair-child options frozen from the parent). Original scope: generic standard repair: immutable `source_unit_ref`, failures download (manage + sensitive-field redaction), refs claimed atomically at child apply | H1-S2, H1-S3 | — | — | — | — | — | — | — | — | — | Merged (S8a, S8b, S8c) | — |
 | IMP-H1-S6 | ✅ | — | Zero-value opening hits `AccountingDateGuard` | — | — | — | — | — | — | — | — | — | — | **On hold — #1626 Draft (do not merge)** | D-13 (2026-10-23): owner chose *policy unification* (B), not blanket enforcement. Superseded by the separate accounting slice **ACC-INV-DATE-01**; decision matrix `docs/audits/accounting/ACC-INV-DATE-01-DECISION-MATRIX.md` **awaits owner approval — no rule change before it** |
 | IMP-H2-S0 | — | ✅ | Honest labeling on products AI import until H9-S5 connects it to the assistant | — | — | — | — | — | — | — | — | — | — | **Merged** `38b9b6d` (#1628) | — |
-| IMP-H2-S1 | ✅ | — | V2 create via `ProductService::create` (characterized) | H1-S2 | — | — | — | — | — | — | — | — | — | **Merged** (#1630) | — |
+| IMP-H2-S1 | ✅ | — | V2 create via `ProductService::create` (characterized) | H1-S2 | — | — | — | — | — | — | — | — | — | **Merged** `bf9968d` (#1630) | — |
 | IMP-H2-S2 | — | ✅ | Shared value normalization (remove duplicated regexes) | — | — | — | — | — | — | — | — | — | — | **Merged** `c301550` (#1631) | — |
-| IMP-H2-S3 | ✅ | — | Workbook UX parity (inspect/template/mapping) | — | — | — | — | — | — | — | — | — | — | Planned | — |
+| IMP-H2-S3 | ✅ | — | Workbook UX parity (inspect/template/mapping) | — | — | — | — | — | — | — | — | — | — | In review (PR #1632) | Web only; report `IMP-H2-S3-REPORT.md` |
 | IMP-H2-S4 | — | ✅ | Tenant `ai_actions.enabled` endpoint (backend; UI split to S4b) | — | — | — | — | — | — | — | — | — | — | **Merged** `0572fa4` (#1634) | `ai.actions.manage`; report `IMP-H2-S4-REPORT.md` |
 | IMP-H2-S4b | — | ✅ | Settings card for the tenant opt-in + reason on AI import screens | H2-S4 | — | — | — | — | — | — | — | — | — | **Merged** `e8aa36a` (#1637) | Web only; report `IMP-H2-S4b-REPORT.md` |
 | IMP-H2-S5 | ✅ | ✅ | Sync V2 + AI preview/execution onto `ProductImportAdapter` (policy-expressed differences, parity test) | H1-S2, H2-S1, H2-S2 | — | — | — | — | — | — | — | — | — | **Split:** S5a **merged** `8537303` (#1640) · S5b planned | — |
 | IMP-H3-S1 | ✅ | ✅ | `PartnerImportFields` + adapter (no opening balance) | H1-S2 | — | — | — | — | — | — | — | — | — | **Merged** `879ec83` (#1643) | Adapter registered by S2; report `IMP-H3-S1-REPORT.md` |
-| IMP-H3-S2 | ✅ | — | Partner inspect/preview endpoints (no sync apply) + `partner_master` job domain | H3-S1 | — | — | — | — | — | — | — | — | — | In review (PR, stacked on #1643) | Report `IMP-H3-S2-REPORT.md` |
+| IMP-H3-S2 | ✅ | — | Partner inspect/preview endpoints (no sync apply) + `partner_master` job domain | H3-S1 | — | — | — | — | — | — | — | — | — | **Merged** (#1662, squash; SHA recorded in the next docs update) | Report `IMP-H3-S2-REPORT.md` |
 | IMP-H3-S3 | ✅ | — | Customers/suppliers import UI | H3-S2 | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H3-S4 | — | ✅ | AI Action `partner_import.v1` + parity test | H3-S1, **IMP-X-01 (blocking prerequisite per owner window — see Parked requirements; same for H4-S4, H5-S5, H7-S2, H7-S4)** | — | — | — | — | — | — | — | — | — | Planned | — |
 | IMP-H3-S5 | — | ✅ | Partner AI import UI | H3-S4 | — | — | — | — | — | — | — | — | — | Planned | — |
