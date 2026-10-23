@@ -99,6 +99,10 @@ test('guard: allowedUpstream behaviour is unchanged for the loopback self-test (
 test('guard: permitted hostnames are exact — the configured R2 endpoint host and `<bucket>.<endpoint host>`, nothing else', () => {
   assert.deepEqual(permittedHostnames(POLICY), ['acct.r2.cloudflarestorage.com', 'b.acct.r2.cloudflarestorage.com']);
   assert.deepEqual(permittedHostnames({ endpoint: 'https://acct.eu.r2.cloudflarestorage.com', bucket: 'my-bucket-1' }), ['acct.eu.r2.cloudflarestorage.com', 'my-bucket-1.acct.eu.r2.cloudflarestorage.com']);
+  // every documented jurisdiction endpoint (default, eu, fedramp, us — developers.cloudflare.com/r2/api/tokens) is a permitted format
+  for (const j of ['eu', 'fedramp', 'us']) assert.deepEqual(permittedHostnames({ endpoint: `https://acct.${j}.r2.cloudflarestorage.com`, bucket: 'b' }), [`acct.${j}.r2.cloudflarestorage.com`, `b.acct.${j}.r2.cloudflarestorage.com`], j);
+  assert.equal(allowedUpstream('https://acct.us.r2.cloudflarestorage.com/b/k', { endpoint: 'https://acct.us.r2.cloudflarestorage.com', bucket: 'b' }), true);
+  assert.deepEqual(permittedHostnames({ endpoint: 'https://acct.evil.r2.cloudflarestorage.com', bucket: 'b' }), [], 'an undocumented jurisdiction label is not an endpoint format');
   assert.deepEqual(permittedHostnames({ endpoint: 'https://ACCT.R2.CLOUDFLARESTORAGE.COM', bucket: 'B' }), ['acct.r2.cloudflarestorage.com', 'b.acct.r2.cloudflarestorage.com']);
 });
 test('guard: an endpoint that is not an R2 endpoint format permits NO host (fail closed), including itself', () => {

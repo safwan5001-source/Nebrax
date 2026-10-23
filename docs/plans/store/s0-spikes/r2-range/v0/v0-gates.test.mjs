@@ -58,6 +58,8 @@ test('I10 positive: exactly the configured endpoint host and `<bucket>.<endpoint
   // the jurisdiction endpoint formats are permitted when they ARE the configured endpoint
   assert.equal(classifyLocation('https://acct.eu.r2.cloudflarestorage.com/b/k', { endpoint: 'https://acct.eu.r2.cloudflarestorage.com', bucket: 'b' }), 'same-host-https');
   assert.equal(classifyLocation('https://b.acct.fedramp.r2.cloudflarestorage.com/k', { endpoint: 'https://acct.fedramp.r2.cloudflarestorage.com', bucket: 'b' }), 'same-host-https');
+  assert.equal(classifyLocation('https://acct.us.r2.cloudflarestorage.com/b/k', { endpoint: 'https://acct.us.r2.cloudflarestorage.com', bucket: 'b' }), 'same-host-https');
+  assert.equal(classifyLocation('https://b.acct.us.r2.cloudflarestorage.com/k', { endpoint: 'https://acct.us.r2.cloudflarestorage.com', bucket: 'b' }), 'same-host-https');
 });
 test('I10 negative: look-alike and attacker-controlled hosts are never the same host (the review finding: suffix matching)', () => {
   const LOOKALIKES = [

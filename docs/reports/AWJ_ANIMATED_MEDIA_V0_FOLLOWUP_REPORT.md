@@ -41,7 +41,7 @@
 ### P2-B — exact redirect host classification (`v0-gates.mjs`, `v0-upstream-guard.mjs`)
 * `classifyLocation(location, policy)` — `same-host-https` iff the parsed hostname is **exactly** a permitted hostname, on the endpoint's port, with no userinfo; otherwise `other-host-https`; non-https ⇒ `non-https(<scheme>)`. No URL, host or signature is ever returned.
 * Permitted hostnames (`permittedHostnames`, shared with `allowedUpstream`):
-  1. the configured endpoint host, which must itself be an R2 S3 endpoint — `<account>.r2.cloudflarestorage.com`, `<account>.eu.…`, `<account>.fedramp.…` (a **single** account label, so `evil.<account>.r2…` is not an endpoint) — or, for the self-test only (`allowInsecureLoopback`), the loopback IP/`localhost` the owner configured;
+  1. the configured endpoint host, which must itself be an R2 S3 endpoint — `<account>.r2.cloudflarestorage.com`, `<account>.eu.…`, `<account>.fedramp.…`, `<account>.us.…` (the documented jurisdictions; a **single** account label, so `evil.<account>.r2…` is not an endpoint) — or, for the self-test only (`allowInsecureLoopback`), the loopback IP/`localhost` the owner configured;
   2. `<bucket>.<endpoint host>` for a valid DNS-label bucket, never for an IP literal/`localhost`.
   An endpoint that is not one of those formats permits **no** host (fail closed). An invalid bucket adds nothing.
 * Rejected look-alikes (all tested): `evilacct.<endpoint>` (the finding), `evil.<account>.<endpoint>`, other bucket, `<endpoint>.evil.example`, endpoint host as a path of another host, userinfo tricks, trailing-dot FQDN, other port, `acct2`, hyphen-joined, IP literal, protocol-relative.
