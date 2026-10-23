@@ -46,7 +46,12 @@ describe("section design publish contrast — shared fixture with the PHP gate (
         dir: "ltr",
         mediaBounds: (ref) => c.media?.[ref.mediaId] ?? null,
       };
-      const actual = sectionContrastIssues(design, ctx, c.type, c.textless ?? false);
+      const actual = sectionContrastIssues(
+        design,
+        ctx,
+        c.type,
+        c.textless ?? false,
+      );
       expect(actual.map((i) => [i.field, i.code])).toEqual(
         c.expected.map((i) => [i.field, i.code]),
       );
