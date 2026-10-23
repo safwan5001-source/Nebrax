@@ -53,7 +53,7 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody
 
     public function capabilities(): PaymentGatewayCapabilities
     {
-        return new PaymentGatewayCapabilities(true, ['SAR']);
+        return new PaymentGatewayCapabilities(true, ['SAR'], self::MIN_AMOUNT_MINOR);
     }
 
     public function createCheckout(PaymentAttemptContext $context): PaymentHostedCheckout

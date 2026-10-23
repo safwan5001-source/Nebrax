@@ -177,6 +177,21 @@ class MoyasarAdapterTest extends TestCase
     }
 
     #[Test]
+    public function a_sub_minimum_payable_is_rejected_before_any_attempt_is_persisted_so_the_payable_never_gets_stuck(): void
+    {
+        $this->fakeHttp([]);
+
+        $e = $this->thrown(fn () => $this->orchestrator->start(new TestPayable(due: 99), $this->gateway, 'idem-moy-min-1'), 'minimum expected', PaymentOrchestrationException::class);
+
+        $this->assertSame('amount_below_minimum', $e->reason);
+        $this->assertSame(0, PaymentAttempt::query()->count());
+        Http::assertNothingSent();
+        // والمبلغ المقبول بعدها يبدأ طبيعياً: لا محاولة نشطة عالقة.
+        $this->fakeHttp(['api.moyasar.com/v1/invoices*' => Http::sequence()->push(['invoices' => []])->push(MoyasarFixtures::invoice(), 201)]);
+        $this->assertSame(PaymentAttempt::STATUS_PENDING_CUSTOMER, $this->orchestrator->start(new TestPayable(), $this->gateway, 'idem-moy-min-2')->capture_status);
+    }
+
+    #[Test]
     public function a_checkout_url_outside_the_provider_domain_or_without_https_is_refused(): void
     {
         foreach (['https://evil.example/pay', 'http://evil.example/invoices/x', 'http://moyasar.com.evil.example/x', 'https://moyasar.com.evil.example/x', 'javascript:alert(1)'] as $url) {
