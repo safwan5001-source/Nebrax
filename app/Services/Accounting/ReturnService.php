@@ -552,6 +552,10 @@ class ReturnService
                 ], $return->type, lock: $return->pos_session_id === null);
 
                 if ($source) {
+                    // TREASURY-T4: مرتجع نقدي لفاتورة حُصِّلت في غير 1110 يُرفض (المرتجع النقدي يُدائن 1110 مرمَّزاً حتى T6).
+                    if ($return->isSales() && $return->payment_type === 'cash' && $source instanceof \App\Models\Invoice) {
+                        app(CashSaleRefundGuard::class)->assertCashRefundMatchesCollection($source);
+                    }
                     $this->assertWithinSource(
                         $source,
                         $return->lines()->get()->map(fn ($l) => [
