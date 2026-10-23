@@ -1,0 +1,153 @@
+# V-G1 — presigned GET + Range on REAL Cloudflare R2 (PR #1551 §4.6). MANUAL ONLY.
+#
+#  • Trigger: workflow_dispatch and nothing else — no push, no pull_request (a fork or branch PR can never reach the secrets).
+#  • Runs only from `main` (reviewed code) and only inside the GitHub Environment `r2-vg1-probe`. Configure that environment with
+#    required reviewers (independent approval), "deployment branches: main only", and the four environment secrets below.
+#    Use a bucket-scoped, Object Read & Write, short-lived R2 token for a PRIVATE TEST bucket — see
+#    docs/plans/store/s0-spikes/r2-range/v0/README.md. Production account-wide credentials must not be used (the guard below
+#    refuses the repository variable R2_PRODUCTION_BUCKET_NAMES).
+#  • The harness writes only v0-range-probe/<run>/{probe,other,empty}.bin (random bytes), deletes them and VERIFIES they are gone.
+#    No secret or signed URL is printed: the harness redacts, results are re-scanned for the exact secret values before upload.
+#  • The GO / NO-GO is v0-vg1-decision.mjs applied to the recorded sub-results (PR #1551 §4.6), not the combined per-case `pass`.
+name: V0 R2 range probe (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type RUN-V-G1-ON-REAL-R2 to confirm this uses the dedicated R2 TEST bucket secrets'
+        required: true
+        type: string
+      path_style:
+        description: 'Also run the path-style addressing variant (the app itself uses virtual-hosted)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v0-r2-range-probe
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    name: V-G1 on real R2
+    if: github.ref == 'refs/heads/main' && inputs.confirm == 'RUN-V-G1-ON-REAL-R2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: r2-vg1-probe
+    env:
+      V0_DIR: docs/plans/store/s0-spikes/r2-range/v0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, curl, simplexml, dom
+          coverage: none
+
+      - name: Install the signer's SDK (same version as the app)
+        run: |
+          mkdir -p "$RUNNER_TEMP/v0-sdk"
+          cd "$RUNNER_TEMP/v0-sdk"
+          composer require "aws/aws-sdk-php:3.401.2" --no-interaction --quiet
+          echo "V0_AUTOLOAD=$RUNNER_TEMP/v0-sdk/vendor/autoload.php" >> "$GITHUB_ENV"
+
+      - name: Harness unit tests (offline — no credentials)
+        run: |
+          cd "$V0_DIR"
+          node --test v0-gates.test.mjs v0-upstream-guard.test.mjs v0-probe-wiring.test.mjs v0-results-secret-scan.test.mjs v0-i9-experiment.test.mjs v0-vg1-decision.test.mjs v0-workflow-guard.test.mjs
+
+      - name: Preflight (no secret is printed)
+        env:
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+          S3_KEY: ${{ secrets.S3_KEY }}
+          S3_SECRET: ${{ secrets.S3_SECRET }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          PRODUCTION_BUCKETS: ${{ vars.R2_PRODUCTION_BUCKET_NAMES }}
+        run: |
+          for v in S3_ENDPOINT S3_KEY S3_SECRET S3_BUCKET; do
+            if [ -z "${!v}" ]; then echo "::error::environment secret $v is not set in the r2-vg1-probe environment"; exit 1; fi
+          done
+          case "$S3_ENDPOINT" in
+            https://*.r2.cloudflarestorage.com) ;;
+            *) echo "::error::S3_ENDPOINT must be https://<account>.r2.cloudflarestorage.com"; exit 1 ;;
+          esac
+          for b in $(echo "${PRODUCTION_BUCKETS:-}" | tr ',' ' '); do
+            if [ "$b" = "$S3_BUCKET" ]; then echo "::error::S3_BUCKET is listed in R2_PRODUCTION_BUCKET_NAMES — use a dedicated test bucket"; exit 1; fi
+          done
+          echo "preflight ok (values not shown)"
+
+      - name: Run the probe (virtual-hosted — the app's configuration)
+        id: vh
+        env:
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+          S3_KEY: ${{ secrets.S3_KEY }}
+          S3_SECRET: ${{ secrets.S3_SECRET }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          S3_REGION: auto
+          S3_PATH_STYLE: '0'
+        run: |
+          cd "$V0_DIR"
+          set +e
+          node v0-r2-range-probe.mjs --label=r2-virtualhosted --autoload="$V0_AUTOLOAD"
+          echo "exit=$?" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Run the probe (path-style, optional)
+        id: ps
+        if: inputs.path_style
+        env:
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+          S3_KEY: ${{ secrets.S3_KEY }}
+          S3_SECRET: ${{ secrets.S3_SECRET }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          S3_REGION: auto
+          S3_PATH_STYLE: '1'
+        run: |
+          cd "$V0_DIR"
+          set +e
+          node v0-r2-range-probe.mjs --label=r2-pathstyle --autoload="$V0_AUTOLOAD"
+          echo "exit=$?" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Secret scan of the new reports (exact values)
+        id: scan
+        env:
+          V0_SCAN_VALUES: ${{ format('{0},{1},{2}', secrets.S3_KEY, secrets.S3_SECRET, secrets.S3_ENDPOINT) }}
+        run: |
+          cd "$V0_DIR"
+          node --test v0-results-secret-scan.test.mjs
+
+      - name: V-G1 decision (PR #1551 §4.6)
+        id: decision
+        run: |
+          cd "$V0_DIR"
+          files=$(ls result-r2-*.json 2>/dev/null || true)
+          if [ -z "$files" ]; then echo "::error::no result file was written (the probe failed before reporting, or the redaction sweep refused to write it)"; echo "verdict=NO-GO" >> "$GITHUB_OUTPUT"; exit 1; fi
+          set +e
+          node v0-vg1-decision.mjs $files | tee "$RUNNER_TEMP/decision.md"
+          code=${PIPESTATUS[0]}
+          cat "$RUNNER_TEMP/decision.md" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$code" -eq 0 ]; then echo "verdict=GO" >> "$GITHUB_OUTPUT"; else echo "verdict=NO-GO" >> "$GITHUB_OUTPUT"; fi
+          exit "$code"
+
+      - name: Upload the redacted reports (only after the secret scan passed)
+        if: always() && steps.scan.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: v0-r2-range-results
+          path: |
+            docs/plans/store/s0-spikes/r2-range/v0/result-r2-*.json
+            ${{ runner.temp }}/decision.md
+          retention-days: 14
+          if-no-files-found: warn

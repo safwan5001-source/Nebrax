@@ -189,3 +189,20 @@ export function safeSerialize(value, tokens = [], space = 2) {
   const remaining = scanText(text, tokens);
   return remaining.length ? { text: null, sweepKinds: [...new Set([...kinds, ...remaining])].sort(), clean: false } : { text, sweepKinds: kinds, clean: true };
 }
+
+// PR #1551 §4.6: V-G1 gates only what the proxy consumes from R2 (status, Content-Length, verified Content-Range, no Content-Encoding, body hash). `pass` above also
+// folds in headers the proxy replaces (Accept-Ranges, ETag, Content-Type), so each sub-check is recorded separately (booleans only — nothing here can carry a secret)
+// and the decision (v0-vg1-decision.mjs) reads these, never the combined `pass`.
+export function gateSub(r, want) {
+  return {
+    consumed: {
+      statusOk: r.status === want.status,
+      contentLengthOk: r.headers['content-length'] === String(want.length),
+      ...(want.range ? { contentRangeOk: r.headers['content-range'] === want.range } : {}),
+      noContentEncoding: !r.headers['content-encoding'],
+      bodyLengthOk: r.bodyLen === want.length,
+      bodyHashOk: r.sha === want.hash,
+    },
+    diagnosticOnly: { acceptRangesBytes: r.headers['accept-ranges'] === 'bytes', etagPresent: !!r.headers.etag, contentTypeOk: r.headers['content-type'] === 'video/mp4' },
+  };
+}
