@@ -7,6 +7,7 @@ use App\Models\JournalEntry;
 use App\Models\Product;
 use App\Models\Role;
 use App\Models\StockMovement;
+use App\Models\TenantApplicationState;
 use App\Models\Stocktake;
 use App\Models\Warehouse;
 use App\Services\Accounting\InventoryService;
@@ -187,6 +188,49 @@ class H7ImportEndpointsTest extends TestCase
 
         $this->withToken($auth['token'])->get("/api/stocktakes/{$foreign->id}/count-import/template")->assertUnprocessable();
         $this->upload($auth['token'], '/api/stocktakes/count-import/preview', ['file' => $this->file($rows), 'stocktake_id' => $foreign->id])->assertUnprocessable();
+    }
+
+    private function disableInventory(string $tenantId): void
+    {
+        app(TenantContext::class)->set($tenantId);
+        TenantApplicationState::updateOrCreate(['application_key' => 'inventory.core'], ['requested_enabled' => false, 'status' => 'disabled']);
+    }
+
+    /** @test */
+    public function a_disabled_inventory_core_refuses_the_endpoints_and_job_creation_and_apply(): void
+    {
+        [$auth, $stocktake, $p] = $this->tenantWithStocktake();
+        $rows = [['sku' => 'SKU-Aacme', 'counted_quantity' => '9']];
+        $binding = $this->upload($auth['token'], '/api/stocktakes/count-import/preview', ['file' => $this->file($rows), 'stocktake_id' => $stocktake->id])->assertOk()->json('data.binding');
+        $job = $this->upload($auth['token'], '/api/import-jobs', [
+            'domain' => 'stocktake_count', 'file' => $this->file($rows), 'options' => ['stocktake_id' => $stocktake->id], 'preview_id' => $binding['id'], 'preview_hash' => $binding['hash'],
+        ])->assertCreated()->json('data');
+
+        $this->disableInventory($auth['tenant_id']);
+
+        $this->withToken($auth['token'])->getJson('/api/stocktakes/count-import/fields')->assertForbidden();
+        $this->upload($auth['token'], '/api/stocktakes/count-import/preview', ['file' => $this->file($rows), 'stocktake_id' => $stocktake->id])->assertForbidden();
+        $this->upload($auth['token'], '/api/import-jobs', ['domain' => 'stocktake_count', 'file' => $this->file($rows), 'options' => ['stocktake_id' => $stocktake->id]])->assertForbidden();
+        $this->withToken($auth['token'])->postJson("/api/import-jobs/{$job['id']}/apply", [])->assertForbidden();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->assertNull($stocktake->fresh('lines')->lines->firstWhere('product_id', $p['a']->id)->counted_quantity);
+    }
+
+    /** @test */
+    public function apply_rejects_a_different_stocktake_or_policy_than_the_frozen_ones(): void
+    {
+        [$auth, $stocktake] = $this->tenantWithStocktake();
+        $other = app(StocktakeService::class)->open(['warehouse_id' => $stocktake->warehouse_id]);
+        $rows = [['sku' => 'SKU-Aacme', 'counted_quantity' => '9']];
+        $binding = $this->upload($auth['token'], '/api/stocktakes/count-import/preview', ['file' => $this->file($rows), 'stocktake_id' => $stocktake->id])->assertOk()->json('data.binding');
+        $job = $this->upload($auth['token'], '/api/import-jobs', [
+            'domain' => 'stocktake_count', 'file' => $this->file($rows), 'options' => ['stocktake_id' => $stocktake->id], 'preview_id' => $binding['id'], 'preview_hash' => $binding['hash'],
+        ])->assertCreated()->json('data');
+
+        foreach ([['stocktake_id' => $other->id], ['existing_count_policy' => 'overwrite']] as $changed) {
+            $this->withToken($auth['token'])->postJson("/api/import-jobs/{$job['id']}/apply", $changed)->assertStatus(422)->assertJsonPath('code', 'options_frozen');
+        }
+        $this->assertSame('completed', $this->runJob($auth['token'], $job['id']));
     }
 
     /** @test */
