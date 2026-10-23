@@ -1,3 +1,4 @@
+import { hostPortPermitted } from './v0-upstream-guard.mjs';
 // V0 SPIKE — NOT production code. The pass/fail LOGIC of the three gates that review found too weak, kept free of I/O so it can be unit-tested
 // (v0-gates.test.mjs) and re-run against the pre-fix behaviour (regression/legacy-gates.mjs). The probe feeds these functions; it never prints what they scan.
 //
@@ -111,13 +112,18 @@ export function etagGate(log, requiredIds) {
   };
 }
 
-/** Describes where a redirect points without exposing the URL (used for I10). */
-export function classifyLocation(location, endpointHost) {
+/**
+ * Describes where a redirect points without exposing the URL (used for I10). `same-host-https` means the parsed hostname is EXACTLY a permitted one — the configured R2
+ * endpoint host or `<bucket>.<endpoint host>` — on the endpoint's port with no userinfo (`permittedHostnames`); a suffix, prefix, trailing-dot, userinfo, other-port or
+ * other-account look-alike is `other-host-https`. The classification is evidence only: a redirect is never followed (`guardedFetch` forces `redirect: 'manual'`).
+ * @param {string|null|undefined} location  @param {{endpoint: string, bucket: string, allowInsecureLoopback?: boolean}} policy  the same policy the guard enforces
+ */
+export function classifyLocation(location, policy) {
   if (!location) return 'none';
   try {
     const u = new URL(location, 'http://placeholder.invalid');
-    if (u.protocol === 'https:' && u.hostname.toLowerCase().endsWith(String(endpointHost).toLowerCase())) return 'same-host-https';
-    return u.protocol === 'https:' ? 'other-host-https' : `non-https(${u.protocol.replace(':', '')})`;
+    if (u.protocol !== 'https:') return `non-https(${u.protocol.replace(':', '')})`;
+    return hostPortPermitted(u, policy) ? 'same-host-https' : 'other-host-https';
   } catch { return 'unparseable'; }
 }
 

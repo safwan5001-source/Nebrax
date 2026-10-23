@@ -11,7 +11,7 @@ import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { allowedUpstream, guardedFetch, UpstreamRefused } from './v0-upstream-guard.mjs';
+import { allowedUpstream, guardedFetch, permittedHostnames, UpstreamRefused } from './v0-upstream-guard.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const probe = process.env.V0_PROBE ?? join(here, 'v0-r2-range-probe.mjs');
@@ -93,6 +93,43 @@ test('guard: allowedUpstream behaviour is unchanged for the loopback self-test (
   assert.equal(allowedUpstream('http://127.0.0.1:8001/b/k', p), false);
   assert.equal(allowedUpstream('http://localhost:8000/b/k', p), false);
   assert.equal(allowedUpstream('http://127.0.0.1:8000/b/k', { ...p, allowInsecureLoopback: false }), false);
+});
+
+// ───────────── the permitted hostname formats (review round 5, P2-B) ─────────────
+test('guard: permitted hostnames are exact — the configured R2 endpoint host and `<bucket>.<endpoint host>`, nothing else', () => {
+  assert.deepEqual(permittedHostnames(POLICY), ['acct.r2.cloudflarestorage.com', 'b.acct.r2.cloudflarestorage.com']);
+  assert.deepEqual(permittedHostnames({ endpoint: 'https://acct.eu.r2.cloudflarestorage.com', bucket: 'my-bucket-1' }), ['acct.eu.r2.cloudflarestorage.com', 'my-bucket-1.acct.eu.r2.cloudflarestorage.com']);
+  // every documented jurisdiction endpoint (default, eu, fedramp, us — developers.cloudflare.com/r2/api/tokens) is a permitted format
+  for (const j of ['eu', 'fedramp', 'us']) assert.deepEqual(permittedHostnames({ endpoint: `https://acct.${j}.r2.cloudflarestorage.com`, bucket: 'b' }), [`acct.${j}.r2.cloudflarestorage.com`, `b.acct.${j}.r2.cloudflarestorage.com`], j);
+  assert.equal(allowedUpstream('https://acct.us.r2.cloudflarestorage.com/b/k', { endpoint: 'https://acct.us.r2.cloudflarestorage.com', bucket: 'b' }), true);
+  assert.deepEqual(permittedHostnames({ endpoint: 'https://acct.evil.r2.cloudflarestorage.com', bucket: 'b' }), [], 'an undocumented jurisdiction label is not an endpoint format');
+  assert.deepEqual(permittedHostnames({ endpoint: 'https://ACCT.R2.CLOUDFLARESTORAGE.COM', bucket: 'B' }), ['acct.r2.cloudflarestorage.com', 'b.acct.r2.cloudflarestorage.com']);
+});
+test('guard: an endpoint that is not an R2 endpoint format permits NO host (fail closed), including itself', () => {
+  for (const endpoint of ['https://evil.example', 'https://r2.cloudflarestorage.com', 'https://x.evil.r2.cloudflarestorage.com', 'https://acct.r2.cloudflarestorage.com.evil.example', 'https://u:p@acct.r2.cloudflarestorage.com', 'nope', '']) {
+    assert.deepEqual(permittedHostnames({ endpoint, bucket: 'b' }), [], endpoint);
+    assert.equal(allowedUpstream(`${endpoint || 'x'}/b/k`, { endpoint, bucket: 'b' }), false, endpoint);
+  }
+});
+test('guard: loopback is a permitted endpoint only for the self-test flag, and never gets a virtual-hosted form', () => {
+  assert.deepEqual(permittedHostnames({ endpoint: 'http://127.0.0.1:9', bucket: 'b' }), []);
+  assert.deepEqual(permittedHostnames({ endpoint: 'http://127.0.0.1:9', bucket: 'b', allowInsecureLoopback: true }), ['127.0.0.1']);
+  assert.deepEqual(permittedHostnames({ endpoint: 'http://localhost:9', bucket: 'b', allowInsecureLoopback: true }), ['localhost']);
+});
+test('guard: an unusable bucket name adds no virtual-hosted host (it never widens the allow-list)', () => {
+  for (const bucket of ['', 'A.B', 'a/b', 'a..b', '-x', 'x-', 'x'.repeat(64), 'evil.example', null, undefined]) {
+    assert.deepEqual(permittedHostnames({ endpoint: POLICY.endpoint, bucket }), ['acct.r2.cloudflarestorage.com'], String(bucket));
+  }
+});
+test('guard: a redirect to a LOOK-ALIKE host is recorded, never followed — the look-alike listener sees zero connections', async () => {
+  const lookalike = await listener();
+  const good = await listener((q, r) => { r.writeHead(302, { location: `http://localhost:${lookalike.port}/stolen?${SIGNED}` }); r.end(); });
+  try {
+    const policy = { endpoint: `http://127.0.0.1:${good.port}`, bucket: 'b', allowInsecureLoopback: true };
+    const res = await guardedFetch(`http://127.0.0.1:${good.port}/b/k?${SIGNED}`, { redirect: 'follow' }, policy);
+    assert.equal(res.status, 302);
+    assert.deepEqual(lookalike.seen, { connections: 0, requests: 0 });
+  } finally { good.close(); lookalike.close(); }
 });
 
 // ───────────── the probe end to end (fake `php` signer; a listener that must stay untouched) ─────────────

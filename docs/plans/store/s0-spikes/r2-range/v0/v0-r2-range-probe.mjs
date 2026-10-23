@@ -154,7 +154,7 @@ async function hit(url, { method = 'GET', headers = {}, body, read = true, keepB
   } else { await res.body?.cancel().catch(() => undefined); }
   // header VALUES are scanned here, in memory, against the unscrubbed tokens; only {header, kind} survives
   const valueFindings = [...scanHeaderValues(rawEntries, tk), ...scanHeaderValues(rawEntries.map(([k]) => ['<header-name>', k]), tk)];
-  return { ...(keepBody ? { res } : {}), status: res.status, headers: seen, headerNames: allNames, valueFindings, bodyLeaks, bodyLen: len, sha, errorCode, locationClass: res.headers.get('location') ? classifyLocation(res.headers.get('location'), new URL(cfg.endpoint).hostname) : null };
+  return { ...(keepBody ? { res } : {}), status: res.status, headers: seen, headerNames: allNames, valueFindings, bodyLeaks, bodyLen: len, sha, errorCode, locationClass: res.headers.get('location') ? classifyLocation(res.headers.get('location'), upstreamPolicy) : null };
 }
 
 const data = randomBytes(N);
