@@ -287,6 +287,67 @@ class PublicPaymentLinkTest extends TestCase
         $this->assertSame('payment_captured', $e->reason);
     }
 
+    #[Test]
+    public function a_posted_partial_payment_reports_partially_paid_and_a_pending_retry_reports_pending(): void
+    {
+        $invoice = $this->invoice();
+        $request = $this->requests->create($invoice, $this->gateway, $this->owner, true);
+        $token = $this->requests->issueLink($request, $this->owner);
+        $orchestrator = app(\App\Services\PaymentOrchestrator::class);
+
+        $first = $this->requests->startAttempt($request, 'idem-part-0001', 50000, $this->owner);
+        $this->fake->script($first->provider_payment_id, 'captured');
+        $orchestrator->sync($first);     // يُرحَّل فوراً: المتبقي 65000 والطلب مفتوح
+
+        $this->assertSame('open', $request->fresh()->status);
+        $this->getJson("/api/pay/v1/{$token}/status")->assertJsonPath('data.payment', 'partially_paid');
+
+        $this->requests->startAttempt($request->fresh(), 'idem-part-0002', null, $this->owner);
+        $this->getJson("/api/pay/v1/{$token}/status")->assertJsonPath('data.payment', 'pending');
+    }
+
+    #[Test]
+    public function the_one_shot_token_is_not_consumed_by_an_expired_or_settled_request(): void
+    {
+        $expired = $this->requests->create($this->invoice(), $this->gateway, $this->owner, false, now()->addMinutes(5));
+        $settledInvoice = $this->invoice();
+        $settled = $this->requests->create($settledInvoice, $this->gateway, $this->owner);
+        $payments = app(PaymentService::class);
+        $payments->post($payments->create(['partner_id' => $settledInvoice->partner_id, 'amount' => 115000, 'direction' => 'received', 'method' => 'cash', 'invoice_id' => $settledInvoice->id]));
+        $this->travel(10)->minutes();
+
+        $e = $this->thrown(fn () => $this->requests->issueLink($expired, $this->owner), 'expired issue', PaymentOrchestrationException::class);
+        $this->assertSame('request_expired', $e->reason);
+        $e = $this->thrown(fn () => $this->requests->issueLink($settled, $this->owner), 'settled issue', PaymentOrchestrationException::class);
+        $this->assertSame('invoice_not_payable', $e->reason);
+        $this->assertNull($expired->fresh()->token_hash);
+        $this->assertNull($settled->fresh()->token_hash);
+    }
+
+    #[Test]
+    public function a_request_with_an_unposted_captured_payment_is_neither_cancelled_manually_nor_swept(): void
+    {
+        $invoice = $this->invoice();
+        $request = $this->requests->create($invoice, $this->gateway, $this->owner);
+        $attempt = $this->requests->startAttempt($request, 'idem-keep-0001', null, $this->owner);
+        \Illuminate\Support\Facades\Event::fake([\App\Events\PaymentAttemptCaptured::class]);   // يبقى الالتقاط pending
+        $this->fake->script($attempt->provider_payment_id, 'captured');
+        app(\App\Services\PaymentOrchestrator::class)->sync($attempt);
+        // الفاتورة سُدّدت بطريقة أخرى فصارت مرشّحة للكنس
+        $payments = app(PaymentService::class);
+        $payments->post($payments->create(['partner_id' => $invoice->partner_id, 'amount' => 115000, 'direction' => 'received', 'method' => 'cash', 'invoice_id' => $invoice->id]));
+
+        $e = $this->thrown(fn () => $this->requests->cancel($request->fresh(), $this->owner), 'manual cancel', PaymentOrchestrationException::class);
+        $this->assertSame('payment_captured', $e->reason);
+        $summary = $this->requests->closeStale();
+
+        $this->assertSame(0, $summary['cancelled']);
+        $this->assertSame('open', $request->fresh()->status);
+        // بعد الترحيل (فائض غير مخصص) يكتمل الطلب أو يبقى مفتوحاً لكنه ليس ملغى
+        app(\App\Services\PaymentAttemptPostingService::class)->process($attempt->fresh());
+        $this->assertNotSame('cancelled', $request->fresh()->status);
+    }
+
     // ═══════════════ المكنسة ═══════════════
 
     #[Test]

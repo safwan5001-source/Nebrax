@@ -72,16 +72,19 @@ class PublicPaymentLinkController extends ApiController
     {
         $paymentRequest = $this->resolved($request);
         $attempts = PaymentAttempt::query()->where('payable_key', $paymentRequest->payableKey());
-        // أي محاولة ملتقطة تغلب الأحدث: التقاط متأخر لمحاولة أقدم (D-15) يعني أن الدفع تمّ فعلاً، فلا يُدفع الدافع لمتابعة محاولة أحدث (ازدواج خصم).
-        $latest = (clone $attempts)->latest('created_at')->first();
-        $captured = (clone $attempts)->where('capture_status', PaymentAttempt::STATUS_CAPTURED)->exists();
+        $active = (clone $attempts)->whereIn('capture_status', PaymentAttempt::ACTIVE_STATUSES)->exists();   // واحدة نشطة كحدّ أقصى (فهرس فريد)
+        $anyAttempt = (clone $attempts)->exists();
+        $captured = (clone $attempts)->where('capture_status', PaymentAttempt::STATUS_CAPTURED);
+        // مدفوع كلياً: الطلب اكتمل، أو التقاطٌ (ولو لمحاولة أقدم من الأحدث، D-15) لم ينعكس بعد على المتبقي — فلا يُدفع الدافع لمتابعة محاولة أحدث.
+        $unreflected = (clone $captured)->whereIn('posting_status', [PaymentAttempt::POSTING_PENDING, PaymentAttempt::POSTING_BLOCKED_PERIOD])->exists();
 
         return response()->json(['data' => [
             'request_status' => $paymentRequest->status,
             'payment' => match (true) {
-                $captured => 'paid',
-                $latest === null => 'none',
-                $latest->isActive() => 'pending',
+                $unreflected, $paymentRequest->status === InvoicePaymentRequest::STATUS_COMPLETED => 'paid',
+                $active => 'pending',
+                $captured->exists() => 'partially_paid',   // دفعة جزئية رُحّلت والمتبقي قائم
+                ! $anyAttempt => 'none',
                 default => 'not_completed',
             },
         ]]);
