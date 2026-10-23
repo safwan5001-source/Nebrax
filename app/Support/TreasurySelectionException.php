@@ -33,6 +33,10 @@ final class TreasurySelectionException extends RuntimeException
     public const NOT_PERMITTED = 'not_permitted';
     /** عملة الخزينة لا تطابق عملة المستند/المستأجر — يرميه المستدعي (T4)، لا المحلِّل. */
     public const CURRENCY_MISMATCH = 'currency_mismatch';
+    /** استرداد نقدي مباشر بلا فاتورة نقدية مرحَّلة مصدراً (مستقل أو آجل) — T5/D-T5-2، يرميه المستدعي لا المحلِّل. */
+    public const REFUND_SOURCE_REQUIRED = 'refund_source_required';
+    /** خزينة التحصيل الأصلية في قيد البيع غير محددة بلا غموض (لا واحدة أو أكثر من واحدة) — T5/D-T5-1. */
+    public const SOURCE_TREASURY_UNRESOLVED = 'source_treasury_unresolved';
 
     private function __construct(
         public readonly string $reason,
@@ -53,6 +57,8 @@ final class TreasurySelectionException extends RuntimeException
             self::EXPLICIT_REQUIRED => 'يجب اختيار الخزينة أو الحساب البنكي صراحةً.',
             self::NOT_PERMITTED => 'لا تملك صلاحية العملية على هذه الخزينة أو الحساب البنكي.',
             self::CURRENCY_MISMATCH => 'عملة الخزينة أو الحساب البنكي لا تطابق عملة المؤسسة؛ لا تُحوَّل المبالغ تلقائياً. اختر خزينة بعملة المؤسسة.',
+            self::REFUND_SOURCE_REQUIRED => 'الاسترداد النقدي المباشر متاح فقط لإشعار مرتبط بفاتورة نقدية مرحَّلة. للإشعار المستقل أو المرتبط بفاتورة آجلة أنشئ إشعاراً آجلاً ثم سند صرف من الخزينة المناسبة.',
+            self::SOURCE_TREASURY_UNRESOLVED => 'تعذّر تحديد خزينة التحصيل الأصلية بلا غموض (يلزم خزينة نقدية واحدة في قيد البيع). أنشئ إشعاراً آجلاً ثم سند صرف من الخزينة المناسبة.',
         });
     }
 }
