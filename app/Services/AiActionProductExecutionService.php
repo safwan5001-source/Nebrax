@@ -58,6 +58,7 @@ final class AiActionProductExecutionService
         private readonly ProductImageInspector $inspector,
         private readonly TenantContext $tenantContext,
         private readonly BranchContext $branchContext,
+        private readonly AiActionsAccessResolver $controls,
     ) {}
 
     /**
@@ -71,6 +72,7 @@ final class AiActionProductExecutionService
         $this->assertEnabled();
         $actor = $this->gateway->authorizeFor($requestActor, $action, AiActionPolicy::APPROVE);
         $this->assertProductImport($action);
+        $this->controls->assertAllowed($this->tenantContext->id(), $action->type, AiActionsAccessResolver::EXECUTION);
         $action = $this->ledger->expireIfDue($action);
 
         $outcome = DB::transaction(function () use ($action, $expectedVersion, $actor): array {
@@ -154,6 +156,7 @@ final class AiActionProductExecutionService
         $this->assertEnabled();
         $actor = $this->gateway->authorizeFor($requestActor, $action, AiActionPolicy::APPROVE);
         $this->assertProductImport($action);
+        $this->controls->assertAllowed($this->tenantContext->id(), $action->type, AiActionsAccessResolver::EXECUTION);
         $execution = $this->find($action, $executionId);
 
         DB::transaction(function () use ($action, $execution, $actor): void {
@@ -338,22 +341,39 @@ final class AiActionProductExecutionService
                 ->where('status', AiActionExecutionRow::STATUS_PENDING)->orderBy('source_row')
                 ->limit(max(1, (int) config('ai_actions.execution_batch_rows', 200)))->get();
             $done = ['success' => 0, 'failed' => 0];
+            // IMP-X-01b: إيقاف المشغّل أثناء التنفيذ يسري خلال كتابةٍ واحدة — قراءة واحدة قبل **كل** كتابة (كل صف وكل صورة)؛ لا يُكتب شيء بعد الإيقاف.
+            // الصفوف/الصور المتبقية تبقى «معلّقة» فيُستأنف التنفيذ بـ`run()` عند رفع الإيقاف (لا نصف صفٍّ: كل صف بمعاملته). يُسجَّل ما أُنجز في الدفعة
+            // ويُنهى التنفيذ إن لم يبقَ شيء معلّق (`finish`) ثم يُرمى الرفض — فلا يُترك استيرادٌ مكتمل «قيد التشغيل» لأن الإيقاف وقع بعد آخر كتابة.
+            $stop = null;
             foreach ($batch as $result) {
+                $stop = $this->controls->denial($this->tenantContext->id(), AiActionRegistry::PRODUCT_IMPORT, AiActionsAccessResolver::EXECUTION);
+                if ($stop !== null) {
+                    break;
+                }
                 $done[$this->executeRow($actor, $result, $rows[$result->row_id] ?? null) ? 'success' : 'failed']++;
             }
-            // Images follow their (already saved) product, each with its own result — a failed image never
-            // changes the product row, and a saved product is never written again for the sake of an image.
-            $pendingImages = AiActionExecutionImage::query()->where('ai_action_execution_id', $execution->id)
-                ->where('status', AiActionExecutionImage::STATUS_PENDING)
-                ->whereIn('ai_action_execution_row_id', $this->savedRowIds($execution))
-                ->orderBy('ai_action_execution_row_id')->orderBy('position')
-                ->limit(max(1, (int) config('ai_actions.execution_batch_images', 50)))->get();
-            $execRows = AiActionExecutionRow::query()->whereIn('id', $pendingImages->pluck('ai_action_execution_row_id')->unique()->all())->get()->keyBy('id');
-            foreach ($pendingImages as $image) {
-                $execRow = $execRows[$image->ai_action_execution_row_id] ?? null;
-                $this->applyImage($actor, $image, $execRow, $execRow === null ? null : ($rows[$execRow->row_id] ?? null));
+            if ($stop === null) {
+                // Images follow their (already saved) product, each with its own result — a failed image never
+                // changes the product row, and a saved product is never written again for the sake of an image.
+                $pendingImages = AiActionExecutionImage::query()->where('ai_action_execution_id', $execution->id)
+                    ->where('status', AiActionExecutionImage::STATUS_PENDING)
+                    ->whereIn('ai_action_execution_row_id', $this->savedRowIds($execution))
+                    ->orderBy('ai_action_execution_row_id')->orderBy('position')
+                    ->limit(max(1, (int) config('ai_actions.execution_batch_images', 50)))->get();
+                $execRows = AiActionExecutionRow::query()->whereIn('id', $pendingImages->pluck('ai_action_execution_row_id')->unique()->all())->get()->keyBy('id');
+                foreach ($pendingImages as $image) {
+                    $stop = $this->controls->denial($this->tenantContext->id(), AiActionRegistry::PRODUCT_IMPORT, AiActionsAccessResolver::EXECUTION);
+                    if ($stop !== null) {
+                        break;
+                    }
+                    $execRow = $execRows[$image->ai_action_execution_row_id] ?? null;
+                    $this->applyImage($actor, $image, $execRow, $execRow === null ? null : ($rows[$execRow->row_id] ?? null));
+                }
             }
             $this->finish($actor, $execution, $done);
+            if ($stop !== null) {
+                throw $stop;
+            }
         } finally {
             AiActionExecution::query()->whereKey($execution->id)->where('claim_token', $token)->update(['claim_token' => null, 'locked_until' => null]);
         }

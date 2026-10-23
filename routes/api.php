@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\PlatformDocumentOperationsController;
 use App\Http\Controllers\Api\PlatformAiBudgetController;
 use App\Http\Controllers\Api\PlatformIntegrationController;
 use App\Http\Controllers\Api\PlatformDocumentFileScanExceptionController;
+use App\Http\Controllers\Api\PlatformAiActionControlController;
 use App\Http\Controllers\Api\PlatformPaymentsRolloutController;
 use App\Http\Controllers\Api\PlatformSubscriptionController;
 use App\Http\Controllers\Api\PlatformSystemUpdateController;
@@ -100,6 +101,7 @@ use App\Http\Controllers\Api\InventorySettingsController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\InvoicePaymentRequestController;
 use App\Http\Controllers\Api\PaymentAttemptPostingController;
+use App\Http\Controllers\Api\PublicPaymentLinkController;
 use App\Http\Controllers\Api\JobLevelController;
 use App\Http\Controllers\Api\JobTitleController;
 use App\Http\Controllers\Api\JournalEntryController;
@@ -241,6 +243,14 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
     Route::post('payment-webhooks/{provider}/{webhookKey}', [PaymentWebhookController::class, 'receive'])
         ->where(['provider' => '[a-z0-9_]{2,32}', 'webhookKey' => '[A-Za-z0-9]{32,128}'])
         ->middleware('throttle:600,1');
+    // PAY-H2-02e: واجهة رابط الدفع العام — بلا مصادقة (الرمز هو القدرة)، تحدّ لكل رمز وIP، رؤوس no-store.
+    Route::prefix('pay/v1/{token}')   // لا قيد صيغة على المسار: الصيغة الخاطئة يردّها `ResolvePaymentLink` بالـ404 الموحّد نفسه وبرؤوس الحماية
+        ->middleware([\App\Http\Middleware\HardenPaymentLinkResponse::class, \App\Http\Middleware\ForceJsonResponse::class, 'throttle:pay-link', \App\Http\Middleware\ResolvePaymentLink::class])
+        ->group(function (): void {
+            Route::get('/', [PublicPaymentLinkController::class, 'show']);
+            Route::post('attempts', [PublicPaymentLinkController::class, 'startAttempt']);
+            Route::get('status', [PublicPaymentLinkController::class, 'status']);
+        });
     Route::get('company-browser-identity', [CompanyBrowserIdentityController::class, 'show'])
         ->middleware('throttle:60,1');
 
@@ -326,6 +336,9 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // PAY-H1-02: ضوابط تفعيل المدفوعات (قراءة).
         Route::get('payments-rollout', [PlatformPaymentsRolloutController::class, 'platform']);
         Route::get('tenants/{tenant}/payments-rollout', [PlatformPaymentsRolloutController::class, 'tenant'])->whereUuid('tenant');
+        // IMP-X-01a: ضوابط المشغّل لإجراءات المساعد (قراءة).
+        Route::get('ai-action-controls', [PlatformAiActionControlController::class, 'platform']);
+        Route::get('tenants/{tenant}/ai-action-controls', [PlatformAiActionControlController::class, 'tenant'])->whereUuid('tenant');
         Route::get('document-operations', [PlatformDocumentOperationsController::class, 'overview']);
         Route::get('document-usage', [PlatformDocumentOperationsController::class, 'usage']);
         Route::get('document-diagnostics', [PlatformDocumentOperationsController::class, 'diagnostics']);
@@ -341,6 +354,9 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
             // PAY-H1-02: تفعيل/إيقاف المدفوعات لمستأجر + الإيقاف الطارئ للمنصة (بحدث تدقيق).
             Route::put('payments-rollout', [PlatformPaymentsRolloutController::class, 'setPlatform']);
             Route::put('tenants/{tenant}/payments-rollout', [PlatformPaymentsRolloutController::class, 'setTenant'])->whereUuid('tenant');
+            // IMP-X-01a: منح/سحب ضوابط إجراءات المساعد (بسببٍ وحدث تدقيق).
+            Route::put('ai-action-controls', [PlatformAiActionControlController::class, 'setPlatform']);
+            Route::put('tenants/{tenant}/ai-action-controls', [PlatformAiActionControlController::class, 'setTenant'])->whereUuid('tenant');
             // PR-NOTIF-6: تحديثات النظام / What's New — كتابة ونشر.
             Route::post('system-updates', [PlatformSystemUpdateController::class, 'store']);
             Route::put('system-updates/{id}', [PlatformSystemUpdateController::class, 'update'])->whereUuid('id');
@@ -450,6 +466,9 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('ai-actions-settings', [AiActionSettingsController::class, 'show'])->middleware('throttle:60,1');
         Route::put('ai-actions-settings', [AiActionSettingsController::class, 'update'])
             ->middleware([$perm('ai.actions.manage'), 'throttle:20,1']);
+        // IMP-X-01c: موافقة مالك المؤسسة على التنفيذ (المفتاح الثاني بعد منحة المشغّل، D-11).
+        Route::put('ai-actions-settings/execution-approval', [AiActionSettingsController::class, 'updateExecutionApproval'])
+            ->middleware([$perm('ai.actions.execution_approve'), 'throttle:20,1']);
 
         // AI-ACTIONS-01: persisted/versioned drafts only. There is deliberately
         // no approve/execute/repair endpoint in this foundation slice.
@@ -1064,6 +1083,7 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('invoices/{invoiceId}/payment-requests', [InvoicePaymentRequestController::class, 'index'])->whereUuid('invoiceId')->middleware($perm('payments.view'));
         Route::post('invoices/{invoiceId}/payment-requests', [InvoicePaymentRequestController::class, 'store'])->whereUuid('invoiceId')->middleware($perm('payments.manage'));
         Route::post('payment-requests/{id}/cancel', [InvoicePaymentRequestController::class, 'cancel'])->whereUuid('id')->middleware($perm('payments.manage'));
+        Route::post('payment-requests/{id}/link', [InvoicePaymentRequestController::class, 'issueLink'])->whereUuid('id')->middleware([$perm('payments.manage'), 'throttle:20,1']);
         Route::post('payment-requests/{id}/attempts', [InvoicePaymentRequestController::class, 'startAttempt'])->whereUuid('id')->middleware([$perm('payments.manage'), 'throttle:30,1']);
         // PAY-H2-02d: دفعات إلكترونية محجوبة بفترة مقفلة + إعادة ترحيل صريحة بفاعل وسبب (owner/admin).
         Route::get('payment-attempts/blocked', [PaymentAttemptPostingController::class, 'blocked'])->middleware($perm('payments.resolve_blocked'));

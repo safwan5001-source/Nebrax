@@ -55,11 +55,11 @@ class AiActionTenantEnablementTest extends TestCase
         $auth = $this->registerTenant();
 
         $this->withToken($auth['token'])->getJson(self::URL)->assertOk()
-            ->assertJsonPath('data', ['platform_enabled' => true, 'tenant_enabled' => false, 'effective' => false, 'reason' => 'tenant_not_enabled']);
+            ->assertJsonPath('data', ['platform_enabled' => true, 'tenant_enabled' => false, 'effective' => false, 'reason' => 'tenant_not_enabled', 'execution_approved' => false, 'controls_enforced' => false, 'access' => null]);
         $this->draft($auth['token'], 'enable-0001')->assertForbidden()->assertJsonPath('error.code', 'tenant_not_enabled');
 
         $this->withToken($auth['token'])->putJson(self::URL, ['enabled' => true])->assertOk()
-            ->assertJsonPath('data', ['platform_enabled' => true, 'tenant_enabled' => true, 'effective' => true, 'reason' => 'enabled']);
+            ->assertJsonPath('data', ['platform_enabled' => true, 'tenant_enabled' => true, 'effective' => true, 'reason' => 'enabled', 'execution_approved' => false, 'controls_enforced' => false, 'access' => null]);
         $this->assertTrue($this->tenantFlag($auth['tenant_id']));
         $this->draft($auth['token'], 'enable-0002')->assertCreated();
 

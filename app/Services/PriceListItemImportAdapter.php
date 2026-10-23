@@ -17,6 +17,8 @@ use App\Support\ImportJobDomain;
  */
 class PriceListItemImportAdapter extends SpreadsheetImportAdapter implements ImportFailureExportAdapter
 {
+    public const DOMAIN = ImportJobDomain::PRICE_LIST_ITEMS;
+
     public function domain(): string
     {
         return ImportJobDomain::PRICE_LIST_ITEMS;

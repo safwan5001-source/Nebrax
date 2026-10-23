@@ -14,6 +14,8 @@ use App\Support\ImportJobDomain;
  */
 class UnitTemplateImportAdapter extends SpreadsheetImportAdapter
 {
+    public const DOMAIN = ImportJobDomain::UNIT_TEMPLATES;
+
     public function domain(): string
     {
         return ImportJobDomain::UNIT_TEMPLATES;
