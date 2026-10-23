@@ -2035,6 +2035,7 @@
     },
     "perm_actions": {
       "execution_approve": "Approve execution",
+      "resolve_blocked": "Resolve blocked",
       "view": "View",
       "manage": "Manage",
       "create": "Create",
