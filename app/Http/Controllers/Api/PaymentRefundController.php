@@ -40,6 +40,7 @@ class PaymentRefundController extends ApiController
             'posting_status' => ['nullable', 'string', 'in:pending,posted,blocked_period'],
             'payment_attempt_id' => ['nullable', 'uuid'],
             'partner_id' => ['nullable', 'uuid'],
+            'scope' => ['nullable', 'string', 'in:pending,attention'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
         $query = PaymentRefund::query()->with('partner:id,name');
@@ -47,6 +48,13 @@ class PaymentRefundController extends ApiController
             if (! empty($data[$filter])) {
                 $query->where($filter, $data[$filter]);
             }
+        }
+        // تبويبا الواجهة يُرشَّحان في الخادم كي لا تختفي الصفوف خارج الصفحة المحمَّلة: بانتظار الإجراء / تحتاج تدخلاً بشرياً.
+        if (($data['scope'] ?? null) === 'pending') {
+            $query->whereIn('status', [PaymentRefund::REQUESTED, PaymentRefund::APPROVED]);
+        } elseif (($data['scope'] ?? null) === 'attention') {
+            $query->where(fn ($q) => $q->whereIn('status', [PaymentRefund::UNKNOWN, PaymentRefund::FAILED])
+                ->orWhere('posting_status', PaymentRefund::POSTING_BLOCKED_PERIOD));
         }
         $page = $query->orderByDesc('created_at')->orderByDesc('id')->paginate((int) ($data['per_page'] ?? 25));
         $actors = $this->actors($page->getCollection());
