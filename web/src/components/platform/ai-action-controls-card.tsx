@@ -148,7 +148,7 @@ export function AiActionControlsCard({ tenantId }: { tenantId?: string }): JSX.E
             <section aria-label={t('envFloor')} className="flex flex-wrap items-center gap-2 text-sm">
               <span className="font-medium">{t('envFloor')}</span>
               {CAPABILITIES.map((capability) => (
-                <Badge key={capability} tone={platform.env_floor[capability] ? 'positive' : 'muted'}>
+                <Badge wrap key={capability} tone={platform.env_floor[capability] ? 'positive' : 'muted'}>
                   {t(`capability.${capability}`)}: {platform.env_floor[capability] ? t('floorOn') : t('floorOff')}
                 </Badge>
               ))}
@@ -207,7 +207,7 @@ export function AiActionControlsCard({ tenantId }: { tenantId?: string }): JSX.E
                     <td className="space-y-1 p-2">
                       {(['preview', 'review', 'execution'] as const).map((capability) => (
                         <div key={capability} className="flex flex-wrap items-center gap-2">
-                          <Badge tone={decisions[capability].allowed ? 'positive' : 'muted'}>{t(`effective.${capability}`)}</Badge>
+                          <Badge wrap tone={decisions[capability].allowed ? 'positive' : 'muted'}>{t(`effective.${capability}`)}</Badge>
                           <span className="text-xs text-muted">{decisions[capability].allowed ? t('allowed') : label(decisions[capability].reason)}</span>
                         </div>
                       ))}
