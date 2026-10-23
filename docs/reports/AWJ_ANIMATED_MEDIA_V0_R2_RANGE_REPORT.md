@@ -197,7 +197,7 @@ Two P2 threads were still open when #1558 merged (`5732917`). Both were confirme
 | P2-A | `v0-i9-experiment.mjs` never checked `res.status`: a 403/404/500 download URL produced a row and exit 0 (reproduced: pre-fix exit 0 on HTTP 403) | only HTTP 200 starts the measured download; anything else / no response → abort, no rows, body cancelled, exit 1, cleanup still verified |
 | P2-B | `classifyLocation` used `hostname.endsWith(endpointHost)`, so `evilacct.<endpoint>` was reported `same-host-https` | exact validated hostnames (`permittedHostnames`): the configured R2 endpoint host or `<valid-bucket>.<endpoint host>`, same port, no userinfo; shared with the guard; redirects still never followed |
 
-Local evidence only — **not R2**. 104 → 125 `node:test` tests pass; the new tests fail on the pre-fix code. The 24-case Scality look-alike run was **not repeated** in that environment (no Docker daemon), see the follow-up report.
+Local evidence only — **not R2**. 104 → 125 `node:test` tests pass; the new tests fail on the pre-fix code. The 24-case Scality look-alike run was repeated on the follow-up branch in a verification session with Docker (24/24, cleanup verified), see the follow-up report §4.
 
 ## 6. Blockers requiring owner action
 | # | Action | Why | Constraint |
