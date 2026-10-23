@@ -64,13 +64,23 @@ final class AiActionsAccessResolver
      */
     public function assertAllowed(?string $tenantId, string $actionType, string $capability): void
     {
+        $denial = $this->denial($tenantId, $actionType, $capability);
+        if ($denial !== null) {
+            throw $denial;
+        }
+    }
+
+    /** كـ`assertAllowed` لكن يعيد الاستثناء بدل رميه (لمن يحتاج أن يُنهي عمله قبل الرمي، مثل إيقاف التنفيذ بين الكتابات). `null` = مسموح أو البوابة مغلقة. */
+    public function denial(?string $tenantId, string $actionType, string $capability): ?AiActionException
+    {
         if (! self::enforced()) {
-            return;
+            return null;
         }
         $decision = $this->effective($tenantId, $actionType, $capability);
-        if (! $decision->allowed) {
-            throw new AiActionException($decision->reason, self::MESSAGES[$decision->reason] ?? 'AI Action غير متاحة حالياً.', 403);
-        }
+
+        return $decision->allowed
+            ? null
+            : new AiActionException($decision->reason, self::MESSAGES[$decision->reason] ?? 'AI Action غير متاحة حالياً.', 403);
     }
 
     public function effective(?string $tenantId, string $actionType, string $capability): AiActionsAccessDecision
