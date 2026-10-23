@@ -33,7 +33,7 @@ class StorefrontMediaPublishGate
      * السلايدر. في أي موضعٍ آخر (شعار، معرض، كتل محتوى…) ستظهر صورةً ثابتة بصمت، فنرفضها عند النشر برمزٍ صريح
      * بدل خداع التاجر. (المسارات كما يفتاحها الماسح: `homepage.sections.N.…`).
      */
-    private const ANIMATED_ALLOWED_PATH = '/\Ahomepage\.sections\.\d+\.(?:design\.background\.(?:media|mobile)|content\.slides\.\d+\.(?:media|mobile)|content\\.images\\.\\d+\\.media)\\z/';
+    private const ANIMATED_ALLOWED_PATH = '/\Ahomepage\.sections\.\d+\.(?:design\.background\.(?:media|mobile)|content\.slides\.\d+\.(?:media|mobile)|content\.images\.\d+\.media)\z/';
 
     /**
      * P3-A-03 — the global background is a still-only consumer. An animated
