@@ -6,7 +6,7 @@ use App\Contracts\GatewayAdapter;
 use App\Support\PaymentOrchestrationException;
 
 /**
- * يحلّ محوّل المزوّد من مفتاحه. المحوّلات الحقيقية تُضاف إلى `ADAPTERS` مع شرائحها (H2-01 وما بعدها)؛ لا مزوّد بلا محوّل.
+ * يحلّ محوّل المزوّد من مفتاحه. المحوّلات الحقيقية تُضاف إلى `ADAPTERS` مع شرائحها (Moyasar: H2-01a؛ ما بعده H2-04)؛ لا مزوّد بلا محوّل.
  *
  * `FakePaymentGatewayAdapter` للاختبار والتطوير المحلي فقط: لا يُحلّ في أي بيئة غير `local`/`testing`، ولا يُقبل
  * اتصال بمزوّد `fake` من واجهة الإدارة (خارج `PaymentGateway::PROVIDERS`).
@@ -14,7 +14,9 @@ use App\Support\PaymentOrchestrationException;
 final class PaymentGatewayAdapterRegistry
 {
     /** @var array<string, class-string<GatewayAdapter>> */
-    private const ADAPTERS = [];
+    private const ADAPTERS = [
+        MoyasarAdapter::PROVIDER => MoyasarAdapter::class,
+    ];
 
     public function has(string $provider): bool
     {

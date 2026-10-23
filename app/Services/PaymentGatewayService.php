@@ -7,6 +7,7 @@ use App\Models\PaymentConnectionEvent;
 use App\Models\PaymentGateway;
 use App\Models\PaymentMethod;
 use App\Models\User;
+use App\Support\MoyasarCredentialPolicy;
 use App\Support\PaymentGatewayException;
 use App\Tenancy\TenantContext;
 use DomainException;
@@ -333,6 +334,10 @@ final class PaymentGatewayService
     {
         $rotated = [];
 
+        if (array_key_exists('secret_key', $input)) {
+            $this->assertProviderCredentialPolicy($gateway->provider, (string) $gateway->environment, $gateway->publishable_key, $this->nullableString($input['secret_key']));
+        }
+
         // أسرار الاستدعاء (المفتاح السري وملحقاته) لا تتغيّر ما دامت لمحاولات الاتصال مراجع قد يلزم الوصول إليها بالأسرار الحالية؛
         // سر الـwebhook خارج الحظر لأن له نافذة سماح. لا يُتخطّى الحظر إلا بانتهاء صفحات الدفع القائمة أو إغلاقها.
         if ((array_key_exists('secret_key', $input) || array_key_exists('extra_credentials', $input))
@@ -477,6 +482,10 @@ final class PaymentGatewayService
             ? $this->normalizeExtra($input['extra_credentials'])
             : ($current?->extra_credentials);
 
+        $publishable = $this->nullableString($this->value($input, $current, 'publishable_key', null));
+        $secret = array_key_exists('secret_key', $input) ? $this->nullableString($input['secret_key']) : $current?->secret_key;
+        $this->assertProviderCredentialPolicy($provider, $environment, $publishable, $secret);
+
         return [
             'provider' => $provider,
             'name' => $name,
@@ -494,6 +503,14 @@ final class PaymentGatewayService
             'extra_credentials' => is_array($extra) ? $extra : null,
             'payment_method_id' => $paymentMethodId,
         ];
+    }
+
+    /** سياسات مفاتيح خاصة بالمزوّد (Moyasar: Sandbox فقط ورفض مفاتيح live). مزوّد بلا سياسة لا يتأثر. */
+    private function assertProviderCredentialPolicy(string $provider, string $environment, ?string $publishableKey, ?string $secretKey): void
+    {
+        if ($provider === PaymentGateway::PROVIDER_MOYASAR) {
+            app(MoyasarCredentialPolicy::class)->assert($environment, $publishableKey, $secretKey);
+        }
     }
 
     private function assertLocalPaymentMethod(string $paymentMethodId): void
