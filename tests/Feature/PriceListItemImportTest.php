@@ -26,6 +26,7 @@ use Tests\TestCase;
 class PriceListItemImportTest extends TestCase
 {
     use RefreshDatabase;
+    use CapturesThrowable;
     use InteractsWithApi;
 
     private string $token;
@@ -120,12 +121,8 @@ class PriceListItemImportTest extends TestCase
     {
         $file = $this->file([['sku' => 'SKU-PLAIN', 'price' => '10']]);
         foreach ([[], ['price_list_id' => '00000000-0000-4000-8000-000000000000'], ['price_list_id' => 'x'], $this->opts(['mode' => 'delete']), $this->opts(['mapping' => [0 => 'cost']])] as $options) {
-            try {
-                $this->service()->preview($file, $options);
-                $this->fail('كان يجب الرفض: '.json_encode($options));
-            } catch (\RuntimeException $e) {
-                $this->assertNotSame('', $e->getMessage());
-            }
+            $e = $this->thrown(fn () => $this->service()->preview($file, $options), 'كان يجب الرفض: '.json_encode($options));
+            $this->assertNotSame('', $e->getMessage());
         }
         $this->withToken($this->token)->putJson("/api/price-lists/{$this->listId}", ['name' => 'قائمة الجملة', 'is_active' => false])->assertOk();
         $this->expectExceptionMessage('غير نشطة');
