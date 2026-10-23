@@ -241,6 +241,21 @@ describe.each(TEST_LOCALES)('PaymentGatewaysPage (%s)', (locale) => {
     expect(put?.[1].body).not.toHaveProperty('environment');
   });
 
+  it('shows the Moyasar brand mark only on a Moyasar connection, never a lookalike on other providers', async () => {
+    perms.current = ['payments.view'];
+    listReturns([
+      conn({ id: 'm1', provider: 'moyasar' as GatewayConnection['provider'], name: 'ميسّر الرئيسي', name_en: 'Moyasar main' }),
+      conn({ id: 's1', provider: 'stripe' }),
+    ]);
+    renderIntl(<PaymentGatewaysPage />, locale);
+
+    const moyasar = await screen.findByTestId('pg-item-m1');
+    const mark = within(moyasar).getByTestId('payment-brand-mark');
+    expect(mark.getAttribute('data-brand')).toBe('moyasar');
+    expect(moyasar.querySelector('img')).toBeNull();
+    expect(within(screen.getByTestId('pg-item-s1')).queryByTestId('payment-brand-mark')).toBeNull();
+  });
+
   it('in preview mode every mutation control is hidden and a note says why', async () => {
     perms.current = ['*'];
     demo.on = true;
