@@ -120,6 +120,20 @@ class PurchaseImportTest extends TestCase
         $this->assertStringContainsString('S-002', implode(' ', $preview['units'][1]['messages']));
     }
 
+    /** @test */
+    public function the_template_rows_are_valid_as_shipped_when_their_suppliers_and_products_exist_in_either_tax_mode(): void
+    {
+        Partner::create(['name' => 'مورّد ثانٍ', 'type' => 'supplier', 'code' => 'S-002']);
+        // الصف الثالث في القالب يعرّف المنتج بالباركود 6281000000011 (= إسمنت في setUp)
+
+        foreach ([false, true] as $inclusive) {
+            $csv = UploadedFile::fake()->createWithContent('t.csv', $this->service()->template());
+            $preview = $this->service()->preview($csv, ['tax_inclusive' => $inclusive]);
+            $this->assertSame(0, $preview['error_units'], json_encode($preview['errors'], JSON_UNESCAPED_UNICODE)." inclusive={$inclusive}");
+            $this->assertSame(2, $preview['create_units']);
+        }
+    }
+
     // ═══════════════════════════════ التجميع والاشتقاق ═══════════════════════════════
 
     /** @test */

@@ -25,7 +25,7 @@
 
 ## Tests
 
-- `PurchaseImportTest` (32, SQLite + PG): contract has no derived/system fields; template round-trips onto every field; grouping into one draft with all lines and derived totals; **total parity with manual creation (inclusive and exclusive)**; file-total match / mismatch (no write); missing and symbol-only references never grouped; header conflict + inheritance; date rules; non-contiguous warning; same ref for different suppliers = two invoices; supplier resolution (code only, customer, inactive); default supplier; product resolution (id/sku/barcode, conflict, unknown, name not an identifier, inactive, variant-managed); numeric validation; warehouse option; bad options; existing/reserved/manual duplicate refused, delete-then-reimport succeeds; unit windows; `plan_drift` before any write; drafts + reservations only (no journal entry, stock movement or payment); failed apply leaves nothing; **posting an imported draft yields the same journal-line shape as a manual one**.
+- `PurchaseImportTest` (33, SQLite + PG): contract has no derived/system fields; template round-trips onto every field; grouping into one draft with all lines and derived totals; **total parity with manual creation (inclusive and exclusive)**; file-total match / mismatch (no write); missing and symbol-only references never grouped; header conflict + inheritance; date rules; non-contiguous warning; same ref for different suppliers = two invoices; supplier resolution (code only, customer, inactive); default supplier; product resolution (id/sku/barcode, conflict, unknown, name not an identifier, inactive, variant-managed); numeric validation; warehouse option; bad options; existing/reserved/manual duplicate refused, delete-then-reimport succeeds; unit windows; `plan_drift` before any write; drafts + reservations only (no journal entry, stock movement or payment); failed apply leaves nothing; **posting an imported draft yields the same journal-line shape as a manual one**.
 - `PurchaseImportConcurrencyPostgresTest` (2, real PG + `pcntl_fork`, fails rather than skips without pcntl): 6 concurrent imports of the same two-line file ⇒ exactly one draft with both lines and one reservation, losers fail as `ImportUnitFailureException`; 4 imports racing 4 direct creations under `block` (two spellings of the number) ⇒ one purchase. 3/3 runs green.
 - Local-only failures present without this change: Fuel tests (no `bcmath`), 2 `InventoryOpeningZeroValueDateGuardTest` cases.
 
@@ -44,6 +44,12 @@ Verified by the reviewer as correct: grouping key = the same normalisation as th
 | 7 | Leniencies: `10%` accepted for quantity, zero price passes, date regex tolerates a trailing text | Accepted/noted (zero price mirrors `POST /purchases` `min:0`) |
 | 8 | `RuntimeException` catch could put a `QueryException` (SQL + bindings) into a failure message | **Fixed**: `QueryException` is rethrown (chunk fails and rolls back; no SQL in user-visible messages) |
 | — | Test gaps (cross-tenant, settings fallbacks, inactive warehouse, wide row, line cap, serial date, multi-line mismatch, concurrency loser code) | **Added** all except asserting the `duplicate_document` code for a concurrency loser: a late starter is stopped by the pre-check (`unit_invalid`) before the savepoint path, so the race outcome (one draft, one reservation, all losers named unit failures) is what is asserted |
+
+## Codex review (P2) — disposition
+
+| Finding | Disposition |
+|---|---|
+| The shipped template's first invoice carries `invoice_total` 362.50 while its lines total 416.30 (exclusive) — the template failed its own check | **Fixed (valid):** the example column is left blank (works with either tax preference); new test `the_template_rows_are_valid_as_shipped…` runs the template through preview in both tax modes with its suppliers/products present and requires zero errors |
 
 ## Journal entries
 
