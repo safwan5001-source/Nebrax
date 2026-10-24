@@ -4,7 +4,9 @@
   "private": true,
   "packageManager": "pnpm@10.33.4",
   "scripts": {
+    "predev": "pnpm sync:payment-brands",
     "dev": "next dev -p 3001 --turbopack",
+    "prebuild": "pnpm sync:payment-brands",
     "build": "next build",
     "start": "next start -p 3001",
     "lint": "biome lint .",
@@ -15,6 +17,7 @@
     "check:locales": "tsx scripts/check-locale-parity.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "sync:payment-brands": "node scripts/sync-payment-brands.mjs",
     "e2e:up": "docker compose -f e2e-backend/docker-compose.yml up -d --wait && ./scripts/e2e/bootstrap-spree.sh",
     "e2e:down": "docker compose -f e2e-backend/docker-compose.yml down -v"
   },

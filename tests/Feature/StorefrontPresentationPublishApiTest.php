@@ -74,7 +74,17 @@ class StorefrontPresentationPublishApiTest extends TestCase
 
         $this->withToken($auth['token'])
             ->putJson($this->path($seeded['storefront']->id), [
-                'config' => ['themePreset' => 'burgundy', 'homepage' => ['heroHeadline' => 'منشور']],
+                'config' => [
+                    'themePreset' => 'burgundy',
+                    'homepage' => ['heroHeadline' => 'منشور'],
+                    'footer' => ['paymentLogos' => [
+                        'enabled' => true,
+                        'brands' => ['mastercard', 'mada'],
+                        'style' => 'cards',
+                        'size' => 'md',
+                        'showTitle' => true,
+                    ]],
+                ],
                 'draft_revision' => 0,
             ])
             ->assertOk();
@@ -87,6 +97,7 @@ class StorefrontPresentationPublishApiTest extends TestCase
         $this->assertSame(1, $res->json('data.published_revision'));
         $this->assertSame('burgundy', $res->json('data.published.themePreset'));
         $this->assertSame('منشور', $res->json('data.published.homepage.heroHeadline'));
+        $this->assertSame(['mastercard', 'mada'], $res->json('data.published.footer.paymentLogos.brands'));
         $this->assertNotNull($res->json('data.published_at'));
         $this->assertSame($res->json('data.draft.homepage.heroHeadline'), $res->json('data.published.homepage.heroHeadline'));
     }

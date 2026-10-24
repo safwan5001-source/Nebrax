@@ -6,8 +6,9 @@
 # API at runtime (AWJ_COMMERCE_API_URL / STOREFRONT_GATEWAY_SECRET). There is
 # no Spree backend in production and none is required at build time.
 #
-# Build:
-#   docker build -t storefront .
+# Build from the repository root so the canonical payment-brand assets stay in
+# the image build context without committing a second copy under storefront/:
+#   docker build -f storefront/Dockerfile -t storefront .
 #
 # Run (runtime env, not baked into the image):
 #   docker run -p 3001:3001 \
@@ -34,7 +35,7 @@ WORKDIR /app
 # libc6-compat keeps a few native modules happy on Alpine (musl).
 RUN apk add --no-cache libc6-compat
 
-COPY package.json pnpm-lock.yaml ./
+COPY storefront/package.json storefront/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
 
@@ -54,7 +55,8 @@ ENV SENTRY_DSN=$SENTRY_DSN \
     SENTRY_PROJECT=$SENTRY_PROJECT
 
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY storefront/ .
+COPY web/public/payment-brands /web/public/payment-brands
 
 RUN pnpm run build
 

@@ -9,6 +9,7 @@ import {
   officialSocialLinkClassName,
 } from "@/components/brand/OfficialSocialMark";
 import { FooterGroupDisclosure } from "@/components/layout/FooterGroupDisclosure";
+import { FooterPaymentLogos } from "@/components/layout/FooterPaymentLogos";
 import { NavItemContent } from "@/components/layout/NavItemContent";
 import { SbcSeal } from "@/components/layout/SbcSeal";
 import { StoreBrand } from "@/components/layout/StoreBrand";
@@ -29,6 +30,7 @@ import type {
   ResolvedFooterGroup,
   ResolvedNavChild,
 } from "@/lib/presentation/navigation-resolve";
+import type { FooterPaymentLogos as FooterPaymentLogosConfig } from "@/lib/presentation/payment-logos";
 import { isSafeAppStoreUrl, isSafePlayStoreUrl } from "@/lib/presentation/urls";
 import { isWholesaleEnabled } from "@/lib/spree";
 
@@ -71,6 +73,8 @@ interface FooterProps {
   groups?: ResolvedFooterGroup[] | null;
   /** CUST-HV V7e-2 — resolved `footer.design` (colour variables, spacing, logo size, alignment). */
   design?: ResolvedFooterDesign;
+  /** Display-only payment marks; independent from checkout gateways. */
+  paymentLogos?: FooterPaymentLogosConfig;
 }
 
 interface FooterCategoryLinksProps {
@@ -211,10 +215,10 @@ interface FooterGroupView {
  * A dark band closing the page, as the approved baseline draws it.
  *
  * It carries only navigation the storefront actually has — categories from the
- * catalogue, the account routes, and the configured policy pages. Payment marks
- * stay absent. Commercial registration and the VAT number are canonical tenant
- * facts with AWJ utility icons, not official seals. A footer is exactly where
- * an invented official claim reads as a commitment.
+ * catalogue, the account routes, and the configured policy pages. Optional
+ * payment marks are merchant-authored visual Beta content and do not claim or
+ * configure checkout acceptance. Commercial registration and the VAT number
+ * are canonical tenant facts with AWJ utility icons, not official seals.
  *
  * CUST-HV V7e-2: with no `layout`, `groups` or `design` the footer below is the
  * original one, unchanged. A merchant-chosen `layout` redraws the same data (no
@@ -243,6 +247,7 @@ export async function Footer({
   layout,
   groups = null,
   design,
+  paymentLogos,
 }: FooterProps) {
   const t = await getTranslations({ locale, namespace: "footer" });
   const tp = await getTranslations({ locale, namespace: "policies" });
@@ -772,6 +777,11 @@ export async function Footer({
         }
       >
         {body}
+        <FooterPaymentLogos
+          settings={paymentLogos}
+          title={t("paymentMethods")}
+          align={resolved.align}
+        />
       </StoreContainer>
       {minimal ? null : bottomBar}
     </footer>

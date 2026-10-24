@@ -23,6 +23,28 @@ const baseProps = {
 };
 
 describe("Footer SBC presentation", () => {
+  it("renders configured display-only payment marks in the published footer", async () => {
+    const view = await Footer({
+      ...baseProps,
+      paymentLogos: {
+        enabled: true,
+        brands: ["mastercard", "mada"],
+        style: "strip",
+        size: "lg",
+        showTitle: true,
+      },
+    });
+    const screen = render(view);
+    const block = screen.getByRole("region", { name: "paymentMethods" });
+    expect(block).toHaveAttribute("data-payment-logo-style", "strip");
+    expect(block).toHaveAttribute("data-payment-logo-size", "lg");
+    expect(
+      Array.from(block.querySelectorAll("img")).map((img) =>
+        img.getAttribute("alt"),
+      ),
+    ).toEqual(["Mastercard", "mada"]);
+  });
+
   it("keeps the text-only fallback when no seal token is configured", async () => {
     const view = await Footer({
       ...baseProps,
