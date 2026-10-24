@@ -74,6 +74,25 @@ describe.each(TEST_LOCALES)('PaymentsOnlinePage (%s)', (locale) => {
     await waitFor(() => expect(apiMock.mock.calls.some((c) => String(c[0]).startsWith('/payment-gateway-settlements'))).toBe(true));
   });
 
+  it('offers the reports section only with reports.view and keeps the other sections intact', async () => {
+    route({
+      'GET /payment-attempts': () => ({ data: [row()], meta: meta(1) }),
+      'GET /payment-gateways': () => ({ data: [] }),
+      'GET /payment-reports/clearing-reconciliation': () => ({ data: { status: 'reconciled', mapping_state: 'mapped', ledger_balance: 0, expected_balance: 0, difference: 0, accounts: [], documents: { captures: 0, settled_gross: 0, refunds: 0, deducted_refunds: 0, capture_count: 0, refund_count: 0, unsettled_captures: 0, unsettled_refunds: 0 }, checks: [], other_sources: [], per_gateway: [], not_checked: [] } }),
+    });
+    ui();
+    await screen.findAllByText('INV-0001');
+    expect(screen.getAllByRole('tab').some((t) => /^(التقارير|Reports)$/.test(t.textContent ?? ''))).toBe(false);
+    cleanup();
+
+    state.perms = new Set(['payments.view', 'reports.view']);
+    ui();
+    await screen.findAllByText('INV-0001');
+    fireEvent.click(screen.getAllByRole('tab').find((t) => /^(التقارير|Reports)$/.test(t.textContent ?? ''))!);
+    await waitFor(() => expect(apiMock.mock.calls.some((c) => c[0] === '/payment-reports/clearing-reconciliation')).toBe(true));
+    expect(screen.getAllByRole('tab').some((t) => /التسويات|^Settlements/.test(t.textContent ?? ''))).toBe(true);
+  });
+
   it('lists attempts with status, amount and a review flag; no repost button without the resolve permission', async () => {
     route({
       'GET /payment-attempts': () => ({ data: [row(), row({ id: 'a2', posting_status: 'blocked_period', blocked_reason: { kind: 'period' }, review_reasons: ['overpayment'] })], meta: meta(2) }),
