@@ -6,6 +6,7 @@ use App\Models\ImportPreview;
 use App\Support\ImportChunk;
 use App\Support\ImportChunkResult;
 use App\Support\ImportJobDomain;
+use App\Support\Settings;
 use Illuminate\Http\UploadedFile;
 
 /**
@@ -49,12 +50,15 @@ class PurchaseImportAdapter extends SpreadsheetImportAdapter
         };
         $payment = $raw['default_payment_type'] ?? null;
         $inclusive = $raw['tax_inclusive'] ?? null;
+        $rate = $integer($raw['default_tax_rate'] ?? null);
 
+        // الغياب يعني «تفضيل المؤسسة» — يُحسَم **هنا** فيدخل بصمة المعاينة ويُجمَّد على التشغيلة: تفضيلٌ يتبدّل بين معاينة وقطعة لاحقة لا يغيّر ضريبة/إجمالي/نوع دفع فواتير
+        // التشغيلة الواحدة صامتاً، وتبدّله بين المعاينة وإنشاء التشغيلة يُظهر اختلاف الخيارات فتُعاد المعاينة.
         $options = [
             'default_supplier_id' => $lower($raw['default_supplier_id'] ?? null),
-            'default_payment_type' => $payment === null || $payment === '' ? null : (is_scalar($payment) ? (string) $payment : $payment),
-            'default_tax_rate' => $integer($raw['default_tax_rate'] ?? null),
-            'tax_inclusive' => $inclusive === null || $inclusive === '' ? null : (is_bool($inclusive) ? $inclusive : (filter_var($inclusive, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? $inclusive)),
+            'default_payment_type' => $payment === null || $payment === '' ? (string) Settings::get('purchases', 'default_payment_type') : (is_scalar($payment) ? (string) $payment : $payment),
+            'default_tax_rate' => $rate ?? (int) Settings::get('purchases', 'default_tax_rate'),
+            'tax_inclusive' => $inclusive === null || $inclusive === '' ? (bool) Settings::get('purchases', 'default_tax_inclusive') : (is_bool($inclusive) ? $inclusive : (filter_var($inclusive, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? $inclusive)),
             'warehouse_id' => $lower($raw['warehouse_id'] ?? null),
         ];
 
@@ -65,7 +69,13 @@ class PurchaseImportAdapter extends SpreadsheetImportAdapter
     {
         $file = new UploadedFile($tmpPath, 'purchases.'.$extension, null, null, true);
 
-        return app(PurchaseImportService::class)->unitCount($file, $frozenOptions, PurchaseImportService::DURABLE_MAX_ROWS);
+        try {
+            return app(PurchaseImportService::class)->unitCount($file, $frozenOptions, PurchaseImportService::DURABLE_MAX_ROWS);
+        } catch (\RuntimeException) {
+            // التعداد يحلّ المراجع من قاعدة البيانات (مورّد افتراضي عُطِّل، مستودع، …). فشله هنا خارج معاملة القطعة كان يُبقي التشغيلة `ready` للأبد (كل ترحيل 422 دون
+            // انتقال حالة). نُبقي التقدير، فتفشل القطعة الأولى بالسبب نفسه برسالتها فتصير التشغيلة `failed` بوضوح.
+            return null;
+        }
     }
 
     public function applyChunk(ImportChunk $chunk): ImportChunkResult
@@ -82,6 +92,12 @@ class PurchaseImportAdapter extends SpreadsheetImportAdapter
         }
 
         $result = app(PurchaseImportService::class)->apply($chunk->file, $chunkOptions, $chunk->userId, PurchaseImportService::DURABLE_MAX_ROWS);
+
+        // قائمة الفواتير تُشتقّ حيّةً في كل قطعة (مراجع المورّد/المنتج من القاعدة). تغيّر عددها منذ بدء التشغيلة (تعديل مراجع متزامن) يُقصي فواتير بصمت أو يُبقي التشغيلة
+        // `processing` للأبد: نفشل مغلقين — الاستثناء يتراجع بمعاملة القطعة كلها (لا فواتير جزئية من هذه القطعة).
+        if ((int) $result['total_units'] !== (int) $job->row_count) {
+            throw new \RuntimeException('تغيّر عدد الفواتير في الملف منذ بدء التشغيلة (تعديل متزامن لمراجع المورّدين أو المنتجات). أعد المعاينة وأنشئ تشغيلة جديدة.');
+        }
 
         return new ImportChunkResult($result['created'] + $result['updated'] + $result['skipped'], $result);
     }

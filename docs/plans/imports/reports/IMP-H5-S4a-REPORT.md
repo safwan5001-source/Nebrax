@@ -21,9 +21,23 @@
 
 ## Tests
 
-- `PurchaseImportEndpointsTest` (14, SQLite + PG): domain registration/bound-only/document unit and no AI action; no sync apply; fields/template/inspect/preview write nothing and issue a plan-carrying binding; **a job counts invoices not rows (5 rows → 3 invoices, `batch_size=1`, an invoice straddling the row boundary), drafts + reservations only, no journal entry/stock movement**; recount uses the frozen mapping and default supplier; preview required and option mismatch refused; frozen policies can't change on apply while equivalent forms are accepted; a duplicate created after the preview is `plan_drift` with nothing written; an invalid invoice fails the job with a message naming it; viewer/manager gates; disabled `purchases.cycle` refuses endpoints/creation/apply; **warehouse scope enforced at preview and per chunk (withdrawal between them fails)**; cross-tenant supplier code; adapter canonicalisation.
+- `PurchaseImportEndpointsTest` (19, SQLite + PG): domain registration/bound-only/document unit and no AI action; no sync apply; fields/template/inspect/preview write nothing and issue a plan-carrying binding; **a job counts invoices not rows (5 rows → 3 invoices, `batch_size=1`, an invoice straddling the row boundary), drafts + reservations only, no journal entry/stock movement**; recount uses the frozen mapping and default supplier; preview required and option mismatch refused; frozen policies can't change on apply while equivalent forms are accepted; a duplicate created after the preview is `plan_drift` with nothing written; an invalid invoice fails the job with a message naming it; viewer/manager gates; disabled `purchases.cycle` refuses endpoints/creation/apply; **warehouse scope enforced at preview and per chunk (withdrawal between them fails)**; cross-tenant supplier code; adapter canonicalisation.
 - Mutation controls: recount → `null` fails 2 tests; removing the per-chunk warehouse check fails the warehouse test.
 - Regression (`Import*`, `Purchase*`, registry, H5/H7 endpoints; 921 tests SQLite, 69 on PG) green.
+
+## Independent review (read-only subagent; not Codex) — findings and disposition
+
+Verified correct by the reviewer: `unitCount` and `parse` share `loadEntries`/`group`, so identical frozen options give identical unit lists and order; every implementer of the changed interface updated; routes/middleware mirror `POST purchases`; warehouse check at preview and every chunk; cross-tenant lookups.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | A recount failure (e.g. default supplier deactivated after job creation) escaped before the chunk transaction and left the job stuck `ready` (every apply 422, no state change) | **Fixed**: recount failure keeps the estimate, so the first chunk fails with the real reason and the job becomes `failed`. Mutation-verified test |
+| 2 | `tax_inclusive` / `default_tax_rate` / `default_payment_type` stayed `null` in frozen options and were resolved from live tenant settings per chunk — a settings change mid-run would silently change totals | **Fixed**: absent values are resolved to the tenant preference **in `canonicalOptions`**, so they enter the preview hash and are frozen on the job. A preference change between preview and job creation now shows as a preview mismatch (422, re-preview); after creation it cannot affect the run. 2 mutation-verified tests |
+| 3 | The unit list is re-derived live per chunk; concurrent reference edits could shrink it (job stuck `processing`) or grow it (completes early, invoices skipped) | **Fixed**: a chunk whose derived unit count differs from the frozen `row_count` throws, rolling the chunk back — fails closed. Mutation-verified test |
+| 4 | Controller passed the raw (possibly upper-case) `warehouse_id` to the access check | **Fixed** (lower-cased) |
+| 5 | `ApplyImportJobRequest` `default_tax_rate` non-nullable | **Not needed now**: after #2 the frozen value is always a concrete integer, so replaying frozen options never sends null; the shared rule is untouched (expense domain unaffected) |
+| 6 | A later failing chunk leaves earlier chunks' drafts committed; no resume/failure ledger | **Accepted, as documented**: earlier chunks are valid drafts that the next preview will list as existing invoices (and refuse as duplicates), so a corrected re-upload only needs the remainder; a document-level failure ledger is a future slice |
+| — | Test gaps (recount + multi-chunk, warehouse error text, stuck-ready, settings freeze) | **Added**: multi-chunk run with frozen mapping + default supplier completes exactly at the invoice count; warehouse failure asserts the access message |
 
 ## Journal entries
 

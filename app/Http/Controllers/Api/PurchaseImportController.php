@@ -41,7 +41,8 @@ class PurchaseImportController extends ApiController
     {
         $data = $this->domain(function () use ($request): array {
             $options = $request->importOptions();
-            $this->imports->assertWarehouseAccess(($options['warehouse_id'] ?? '') !== '' ? ($options['warehouse_id'] ?? null) : null, $request->user()?->id);
+            $warehouse = (string) ($options['warehouse_id'] ?? '');
+            $this->imports->assertWarehouseAccess($warehouse !== '' ? mb_strtolower($warehouse, 'UTF-8') : null, $request->user()?->id);
             ['preview' => $preview, 'plan' => $plan] = $this->imports->previewWithPlan($request->file('file'), $options, PurchaseImportService::DURABLE_MAX_ROWS);
             $preview['binding'] = app(ImportPreviewService::class)->issue(
                 ImportJobDomain::PURCHASE_IMPORT, $request->file('file'), null, $options, $request->user()?->id, $plan,

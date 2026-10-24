@@ -256,6 +256,91 @@ class PurchaseImportEndpointsTest extends TestCase
         $this->assertSame(0, ImportDocumentReservation::query()->count());
     }
 
+    /** @test */
+    public function multiple_chunks_with_a_frozen_mapping_and_default_supplier_complete_exactly_at_the_invoice_count(): void
+    {
+        $supplier = Partner::query()->where('code', 'S-001')->firstOrFail();
+        $rows = [];
+        foreach (['M-1', 'M-2', 'M-3', 'M-4'] as $ref) {
+            $rows[] = ['ref' => $ref, 'date' => '2026-10-01', 'item' => 'CEM-50', 'qty' => '2', 'price' => '10.00'];
+            $rows[] = ['ref' => $ref, 'date' => '', 'item' => 'SAND-1', 'qty' => '1', 'price' => '5.00'];
+        }
+        $options = ['default_supplier_id' => $supplier->id, 'mapping' => [0 => 'supplier_invoice_ref', 1 => 'purchase_date', 2 => 'sku', 3 => 'quantity', 4 => 'unit_price']];
+        $job = $this->createJob($this->auth['token'], $rows, $options)->assertCreated()->json('data');
+        $this->assertSame(8, $job['row_count']);
+
+        $this->assertSame('completed', $this->runJob($this->auth['token'], $job['id'], ['batch_size' => 3]));
+
+        $done = ImportJob::query()->findOrFail($job['id']);
+        $this->assertSame([4, 4], [(int) $done->row_count, (int) $done->processed_rows]);
+        $this->assertSame(4, Purchase::query()->count());
+        $this->assertSame([2], Purchase::query()->withCount('lines')->pluck('lines_count')->unique()->values()->all());
+    }
+
+    /** @test */
+    public function a_recount_failure_fails_the_job_cleanly_instead_of_stranding_it_ready(): void
+    {
+        $supplier = Partner::query()->where('code', 'S-001')->firstOrFail();
+        $rows = [$this->row(['supplier_code' => ''])];
+        $rows = array_map(fn ($r) => array_diff_key($r, ['supplier_code' => 1]), $rows);
+        $job = $this->createJob($this->auth['token'], $rows, ['default_supplier_id' => $supplier->id])->assertCreated()->json('data');
+
+        // المورّد الافتراضي يُعطَّل بعد المعاينة وقبل أول ترحيل
+        $supplier->forceFill(['is_active' => false])->save();
+
+        $this->assertSame('failed', $this->runJob($this->auth['token'], $job['id']));
+        $this->assertSame(0, Purchase::query()->count());
+        $this->assertStringContainsString('المورّد الافتراضي', (string) ImportJob::query()->findOrFail($job['id'])->error_message);
+    }
+
+    /** @test */
+    public function tenant_preferences_are_frozen_with_the_preview_so_a_later_settings_change_cannot_change_a_runs_totals(): void
+    {
+        \App\Support\Settings::put('purchases', ['default_tax_rate' => 15, 'default_tax_inclusive' => false, 'default_payment_type' => 'credit']);
+        $rows = [$this->row(['tax_rate' => '', 'supplier_invoice_ref' => 'F-1', 'quantity' => '10', 'unit_price' => '10.00'])];
+        $job = $this->createJob($this->auth['token'], $rows)->assertCreated()->json('data');
+
+        // يتبدّل التفضيل بعد إنشاء التشغيلة وقبل الترحيل
+        \App\Support\Settings::put('purchases', ['default_tax_rate' => 0, 'default_tax_inclusive' => true, 'default_payment_type' => 'cash']);
+
+        $this->assertSame('completed', $this->runJob($this->auth['token'], $job['id']));
+        $p = Purchase::query()->firstOrFail();
+        $this->assertSame([10000, 1500, 11500, 'credit'], [(int) $p->subtotal, (int) $p->tax_amount, (int) $p->total, $p->payment_type], 'قيم المعاينة (15% غير شاملة، آجل) لا التفضيل الجديد');
+    }
+
+    /** @test */
+    public function a_preference_change_between_preview_and_job_creation_is_a_preview_mismatch_not_a_silent_drift(): void
+    {
+        \App\Support\Settings::put('purchases', ['default_tax_rate' => 15]);
+        $rows = [$this->row(['tax_rate' => ''])];
+        $binding = $this->bind($this->auth['token'], $rows);
+
+        \App\Support\Settings::put('purchases', ['default_tax_rate' => 5]);
+
+        $this->upload($this->auth['token'], '/api/import-jobs', [
+            'domain' => 'purchase_import', 'file' => $this->file($rows), 'preview_id' => $binding['id'], 'preview_hash' => $binding['hash'],
+        ])->assertUnprocessable();
+    }
+
+    /** @test */
+    public function a_unit_count_that_changes_mid_run_fails_the_chunk_closed_and_never_completes_silently(): void
+    {
+        $rows = [];
+        foreach (['G-1', 'G-2', 'G-3'] as $ref) {
+            $rows[] = $this->row(['supplier_invoice_ref' => $ref]);
+        }
+        $job = $this->createJob($this->auth['token'], $rows)->assertCreated()->json('data');
+
+        $this->withToken($this->auth['token'])->postJson("/api/import-jobs/{$job['id']}/apply", ['batch_size' => 1])->assertOk();
+        $this->assertSame(1, Purchase::query()->count());
+        // العدد المجمَّد يخالف ما تشتقه القطعة التالية (تعديل متزامن لمراجع الملف) ⇒ فشل مغلق بلا فواتير إضافية
+        ImportJob::query()->whereKey($job['id'])->update(['row_count' => 2]);
+
+        $this->assertSame('failed', $this->runJob($this->auth['token'], $job['id']));
+        $this->assertSame(1, Purchase::query()->count(), 'القطعة الفاشلة تراجعت كلها');
+        $this->assertStringContainsString('تغيّر عدد الفواتير', (string) ImportJob::query()->findOrFail($job['id'])->error_message);
+    }
+
     // ═══════════════════════════════ البوابات والعزل ═══════════════════════════════
 
     /** @test */
@@ -308,6 +393,7 @@ class PurchaseImportEndpointsTest extends TestCase
         // ثم يُسحب نطاقه قبل التنفيذ ⇒ القطعة ترفض (الفحص في كل قطعة لا عند المعاينة وحدها)
         $user->warehouses()->sync([$other->id]);
         $this->assertSame('failed', $this->runJob($token, $job['id']));
+        $this->assertStringContainsString('خارج نطاق صلاحياتك', (string) ImportJob::query()->findOrFail($job['id'])->error_message);
         app(TenantContext::class)->set($this->auth['tenant_id']);
         $this->assertSame(0, Purchase::query()->count());
 
