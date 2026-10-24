@@ -18,7 +18,8 @@ export type ImportJobDomain =
   | 'price_list_items'
   | 'unit_templates'
   | 'stocktake_count'
-  | 'expense_import';
+  | 'expense_import'
+  | 'purchase_import';
 
 /** مطابقٌ حرفياً لـ`App\Support\ImportJobStatus`. `queued` مفردة مُقرَّرة سلفاً بلا مسار كودٍ يبلغها اليوم. */
 export type ImportJobStatus =
