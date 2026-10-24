@@ -170,6 +170,7 @@ use App\Http\Controllers\Api\ShiftController;
 use App\Http\Controllers\Api\StockPermitController;
 use App\Http\Controllers\Api\InventoryOpeningController;
 use App\Http\Controllers\Api\StocktakeController;
+use App\Http\Controllers\Api\StockPermitImportController;
 use App\Http\Controllers\Api\StocktakeCountImportController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\SystemUpdateController;
@@ -1657,6 +1658,11 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('procurement/{id}/convert', [ProcurementController::class, 'convert'])->middleware([$perm('purchases.manage'), $app('purchases.cycle')]);
 
         // الأذون المخزنية (الترحيل يحرّك المخزون ويولّد القيد معاً)
+        // IMP-H7-S3: استيراد بنود إذنٍ مسودة — قبل `stock-permits/{id}`؛ البوابات بوابتا `POST stock-permits` نفسهما.
+        Route::get('stock-permits/import/template', [StockPermitImportController::class, 'template'])->middleware([$perm('products.manage'), $app('inventory.core')]);
+        Route::get('stock-permits/import/fields', [StockPermitImportController::class, 'fields'])->middleware([$perm('products.manage'), $app('inventory.core')]);
+        Route::post('stock-permits/import/inspect', [StockPermitImportController::class, 'inspect'])->middleware([$perm('products.manage'), $app('inventory.core'), EnsureImportFilesScanned::class]);
+        Route::post('stock-permits/import/preview', [StockPermitImportController::class, 'preview'])->middleware([$perm('products.manage'), $app('inventory.core'), EnsureImportFilesScanned::class]);
         Route::get('stock-permits', [StockPermitController::class, 'index'])->middleware([$perm('products.view'), $app('inventory.core')]);
         Route::get('stock-permits/{id}', [StockPermitController::class, 'show'])->middleware([$perm('products.view'), $app('inventory.core')]);
         Route::post('stock-permits', [StockPermitController::class, 'store'])->middleware([$perm('products.manage'), $app('inventory.core')]);

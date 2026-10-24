@@ -40,6 +40,8 @@ final class ImportJobDomain
         self::EXPENSE_IMPORT => ['view' => 'expenses.view', 'manage' => 'expenses.manage', 'app' => 'finance.operations'],
         // IMP-H5-S4a: `POST purchases` المباشرة محروسة بـ`purchases.manage` + `purchases.cycle` (القراءة `purchases.view`) — البوابات نفسها لا أضعف؛ ويُفحص المستودع على الفاعل في الخدمة.
         self::PURCHASE_IMPORT => ['view' => 'purchases.view', 'manage' => 'purchases.manage', 'app' => 'purchases.cycle'],
+        // IMP-H7-S3: `POST stock-permits` المباشرة محروسة بـ`products.manage` + `inventory.core` (القراءة `products.view`) — البوابات نفسها لا أضعف؛ ويُفحص مخزن الفاعل في الخدمة.
+        self::STOCK_PERMIT_IMPORT => ['view' => 'products.view', 'manage' => 'products.manage', 'app' => 'inventory.core'],
     ];
 
     public const PRODUCT_CATALOG = 'product_catalog';
@@ -69,6 +71,9 @@ final class ImportJobDomain
     /** مسودات فواتير مشتريات (IMP-H5-S4a): وحدتها الفاتورة كلها (مجموعة صفوف بـ مورّد ‖ رقم فاتورته)، بلا ترحيل ولا قيد ولا حركة مخزون؛ منع التكرار بحجز الهوية. */
     public const PURCHASE_IMPORT = 'purchase_import';
 
+    /** مسودة إذنٍ مخزني واحد من ملف (IMP-H7-S3): وحدتها الملف كله ذرّياً، بلا ترحيل ولا قيد ولا حركة مخزون، ولا مسار ذكاء اصطناعي (D-09). */
+    public const STOCK_PERMIT_IMPORT = 'stock_permit_import';
+
     /** @return list<string> */
     /**
      * مجالات لا تُنشأ لها تشغيلة إلا مربوطةً بمعاينتها: خياراتها الدلالية الإلزامية (النوع/التصنيف·العلامة/قائمة السعر) وسياساتها تُجمَّد من المعاينة،
@@ -77,7 +82,7 @@ final class ImportJobDomain
      *
      * @var list<string>
      */
-    public const PREVIEW_BOUND_ONLY = [self::PARTNER_MASTER, self::PRODUCT_TAXONOMY, self::PRICE_LIST_ITEMS, self::UNIT_TEMPLATES, self::STOCKTAKE_COUNT, self::EXPENSE_IMPORT, self::PURCHASE_IMPORT];
+    public const PREVIEW_BOUND_ONLY = [self::PARTNER_MASTER, self::PRODUCT_TAXONOMY, self::PRICE_LIST_ITEMS, self::UNIT_TEMPLATES, self::STOCKTAKE_COUNT, self::EXPENSE_IMPORT, self::PURCHASE_IMPORT, self::STOCK_PERMIT_IMPORT];
 
     public static function values(): array
     {
@@ -92,6 +97,7 @@ final class ImportJobDomain
             self::STOCKTAKE_COUNT,
             self::EXPENSE_IMPORT,
             self::PURCHASE_IMPORT,
+            self::STOCK_PERMIT_IMPORT,
         ];
     }
 

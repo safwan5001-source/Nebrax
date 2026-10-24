@@ -98,6 +98,11 @@ class StoreImportJobRequest extends FormRequest
             'options.warehouse_id' => ['sometimes', 'nullable', 'uuid'],
             'options.opening_date' => ['sometimes', 'date_format:Y-m-d'],
             'options.allow_zero_cost' => ['sometimes', 'boolean'],
+            // IMP-H7-S3: رأس إذن المخزن (يُجمَّد مع المعاينة)؛ النوع إلزامي لمجاله ولا افتراضي له.
+            'options.permit_type' => [Rule::requiredIf(fn () => $this->input('domain') === ImportJobDomain::STOCK_PERMIT_IMPORT), Rule::in(\App\Models\StockPermit::TYPES)],
+            'options.target_warehouse_id' => ['sometimes', 'nullable', 'uuid'],
+            'options.permit_date' => ['sometimes', 'date_format:Y-m-d'],
+            'options.reason' => ['sometimes', 'nullable', 'string', 'max:255'],
             'options.notes' => ['sometimes', 'nullable', 'string', 'max:500'],
             'options.apply_product_images' => ['sometimes', 'boolean'],
             'options.approve_existing_media_updates' => ['sometimes', 'boolean'],
