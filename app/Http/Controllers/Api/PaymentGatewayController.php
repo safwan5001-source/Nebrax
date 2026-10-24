@@ -79,6 +79,8 @@ class PaymentGatewayController extends ApiController
                 $data,
                 (int) ($data['grace_minutes'] ?? 60),
                 $request->user(),
+                (bool) ($data['emergency'] ?? false),
+                $data['reason'] ?? null,
             );
 
             return (new PaymentGatewayResource($gateway))->response();
