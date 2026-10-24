@@ -103,6 +103,7 @@ use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\InvoicePaymentRequestController;
 use App\Http\Controllers\Api\PaymentAttemptLogController;
 use App\Http\Controllers\Api\PaymentAttemptPostingController;
+use App\Http\Controllers\Api\PaymentClearingReportController;
 use App\Http\Controllers\Api\PaymentGatewayAdjustmentController;
 use App\Http\Controllers\Api\PaymentGatewaySettlementController;
 use App\Http\Controllers\Api\PaymentRefundController;
@@ -1116,6 +1117,10 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('payment-gateway-adjustments/{id}/reject', [PaymentGatewayAdjustmentController::class, 'reject'])->whereUuid('id')->middleware([$perm('payment_settlements.approve_adjustment'), 'throttle:30,1']);
         Route::post('payment-gateway-adjustments/{id}/cancel', [PaymentGatewayAdjustmentController::class, 'cancel'])->whereUuid('id')->middleware([$perm('payments.view'), 'throttle:30,1']);
         Route::get('payment-gateways/{gatewayId}/reserve-balance', [PaymentGatewayAdjustmentController::class, 'reserve'])->whereUuid('gatewayId')->middleware($perm('payments.view'));
+        // PAY-H3-03 (الحد الأساسي): مطابقة المقاصة 1170 · فروقات التسويات · أعمار الأرصدة حسب الفرع — قراءة فقط (`reports.view`).
+        Route::get('payment-reports/clearing-reconciliation', [PaymentClearingReportController::class, 'reconciliation'])->middleware([$perm('reports.view'), 'throttle:30,1']);
+        Route::get('payment-reports/settlement-differences', [PaymentClearingReportController::class, 'differences'])->middleware([$perm('reports.view'), 'throttle:30,1']);
+        Route::get('payment-reports/clearing-aging', [PaymentClearingReportController::class, 'aging'])->middleware([$perm('reports.view'), 'throttle:30,1']);
         Route::get('payment-gateways/{gatewayId}/unsettled-refunds', [PaymentGatewaySettlementController::class, 'unsettledRefunds'])->whereUuid('gatewayId')->middleware($perm('payment_refunds.view'));
         Route::get('payment-gateways/{gatewayId}/unsettled-payments', [PaymentGatewaySettlementController::class, 'unsettled'])->whereUuid('gatewayId')->middleware($perm('payments.view'));
 
