@@ -31,6 +31,7 @@ final class CommercePaymentIntentService
 {
     public function __construct(
         private readonly PaymentMethodChannelAvailabilityService $paymentAvailability,
+        private readonly CommerceOnlinePaymentService $online,
     ) {}
 
     /**
@@ -61,12 +62,29 @@ final class CommercePaymentIntentService
         $paymentMethod = $paymentMethodId === null ? null : $this->resolvePaymentMethod($order, $paymentMethodId);
         $currency = Tenant::findOrFail($order->tenant_id)->currency;
 
+        // PAY-H4-04a — اختيار صريح لطريقة دفع مرتبطة ببوابة (والبوابة المنصّية مفتوحة) يجعل النية إلكترونية `pending`؛ وإلا COD/الاستلام كما كان حرفياً.
+        // طريقة مرتبطة ببوابة لكنها غير جاهزة ⇒ رفض (يُلغى الإتمام كله بمعاملته) — لا سقوط صامت إلى COD.
+        $status = CommercePaymentIntent::STATUS_AWAITING_COLLECTION;
+        // طلبات المتجر الإلكتروني فقط (`storefront_id`)؛ الجوّال/`/commerce/v1` بلا مسار دفع بعد ⇒ سلوكه كما كان.
+        if ($paymentMethod !== null && $order->storefront_id !== null && CommerceOnlinePaymentService::enabled() && $this->online->isGatewayLinked($paymentMethod)) {
+            $gateway = $this->online->usableGatewayFor($paymentMethod);
+            if ($gateway === null) {
+                throw new RuntimeException('الدفع الإلكتروني بهذه الطريقة غير متاح حالياً؛ اختر طريقة أخرى.');
+            }
+            // المزوّد لا يقبل هذا المبلغ/العملة (حدّ أدنى أو عملة غير مدعومة): يُرفض الإتمام قبل الالتزام فيُصحَّح الاختيار بدل طلب لا يُدفع أبداً.
+            if (! $this->online->gatewaySupports($gateway, (int) $order->total, (string) $currency)) {
+                throw new RuntimeException('الدفع الإلكتروني بهذه الطريقة لا يدعم مبلغ الطلب أو عملته؛ اختر طريقة أخرى.');
+            }
+            $method = CommercePaymentIntent::METHOD_ONLINE;
+            $status = CommercePaymentIntent::STATUS_PENDING;
+        }
+
         return CommercePaymentIntent::create([
             'commerce_order_id' => $order->id,
             'payment_method_id' => $paymentMethod?->id,
             'payment_method_name' => $paymentMethod?->name,
             'method' => $method,
-            'status' => CommercePaymentIntent::STATUS_AWAITING_COLLECTION,
+            'status' => $status,
             'amount_minor' => $order->total,
             'currency' => $currency,
         ]);
@@ -88,7 +106,7 @@ final class CommercePaymentIntentService
         return DB::transaction(function () use ($intent, $note): CommercePaymentIntent {
             $locked = CommercePaymentIntent::query()->whereKey($intent->id)->lockForUpdate()->firstOrFail();
 
-            if ($locked->status !== CommercePaymentIntent::STATUS_AWAITING_COLLECTION) {
+            if ($locked->status !== CommercePaymentIntent::STATUS_AWAITING_COLLECTION || $locked->isOnline()) {
                 throw new RuntimeException('لا يمكن تحصيل التزام دفع ليس بانتظار التحصيل.');
             }
 
@@ -110,14 +128,20 @@ final class CommercePaymentIntentService
      */
     public function cancel(CommercePaymentIntent $intent): CommercePaymentIntent
     {
-        return DB::transaction(function () use ($intent): CommercePaymentIntent {
+        // الترتيب (PAY-H4-04a): تُقفَل النية وتُلغى **أولاً** (التزام)، ثم تُغلق محاولاتها الجارية خارج المعاملة. بدء دفع يسابق الإلغاء إما يُرفض عند
+        // `assertStillPayable` (نية ملغاة) أو يُتراجع عنه بعد ولادة محاولته (يعيد `start` فحص النية)؛ فلا تبقى صفحة دفع حيّة لنية ملغاة. مبلغ ملتقَط
+        // يُرفض إلغاؤه تحت القفل نفسه (يُسترد ولا يُلغى، ADR-04 §14).
+        $cancelled = DB::transaction(function () use ($intent): CommercePaymentIntent {
             $locked = CommercePaymentIntent::query()->whereKey($intent->id)->lockForUpdate()->firstOrFail();
 
-            if ($locked->isCollected()) {
+            if ($locked->isCollected() || $locked->isPaid()) {
                 throw new RuntimeException('لا يمكن إلغاء التزام دفع مُحصَّل بالفعل.');
             }
             if ($locked->isCancelled()) {
                 throw new RuntimeException('التزام الدفع مُلغىً بالفعل.');
+            }
+            if ($locked->isOnline() && $this->online->hasCapture($locked)) {
+                throw new RuntimeException('سبق التقاط دفعة لهذا الطلب؛ لا يُلغى التزام الدفع.');
             }
 
             $locked->update([
@@ -127,6 +151,12 @@ final class CommercePaymentIntentService
 
             return $locked->fresh();
         });
+
+        if ($cancelled->isOnline()) {
+            $this->online->closeActiveAttempts($cancelled); // best-effort؛ التقاط لاحق على صفحة بقيت حيّة يُوسم late_capture للمراجعة
+        }
+
+        return $cancelled;
     }
 
     /**

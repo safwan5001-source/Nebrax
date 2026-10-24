@@ -2,8 +2,10 @@
 
 namespace App\Providers;
 
+use App\Events\CommercePaymentAttemptCaptured;
 use App\Events\PaymentAttemptCaptured;
 use App\Events\PaymentRefundConfirmed;
+use App\Listeners\CompleteCommerceOnlinePayment;
 use App\Listeners\PostCapturedPaymentAttempt;
 use App\Listeners\PostConfirmedPaymentRefund;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -18,6 +20,8 @@ class PaymentPostingServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Event::listen(PaymentAttemptCaptured::class, PostCapturedPaymentAttempt::class);
+        // PAY-H4-04a: التقاط محاولة طلب متجر ⇒ تثبيت النية مدفوعة (متزامن؛ شبكة الأمان `payments:complete-commerce-captures`). لا ترحيل محاسبي.
+        Event::listen(CommercePaymentAttemptCaptured::class, CompleteCommerceOnlinePayment::class);
         // PAY-H3-01c: ترحيل A5 لاسترداد بوابة مؤكَّد (متزامن كذلك؛ شبكة الأمان `payments:post-refunds`).
         Event::listen(PaymentRefundConfirmed::class, PostConfirmedPaymentRefund::class);
 

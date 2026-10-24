@@ -13,5 +13,7 @@ final class PaymentAttemptContext
         public readonly int $amountMinor,
         public readonly string $currency,
         public readonly string $payableKey,
+        /** عنوان عودة المتصفح بعد الدفع (https، مضيف المتجر الموثَّق من الخادم). اختياري؛ لا يُعدّ إثباتاً للدفع أبداً. */
+        public readonly ?string $returnUrl = null,
     ) {}
 }

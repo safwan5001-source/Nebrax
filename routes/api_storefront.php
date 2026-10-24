@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\StorefrontCartController;
 use App\Http\Controllers\Api\StorefrontCategoryController;
 use App\Http\Controllers\Api\StorefrontCollectionController;
 use App\Http\Controllers\Api\StorefrontCheckoutController;
+use App\Http\Controllers\Api\StorefrontOnlinePaymentController;
 use App\Http\Controllers\Api\StorefrontConfigController;
 use App\Http\Controllers\Api\StorefrontDeliveryScheduleController;
 use App\Http\Controllers\Api\StorefrontCustomizerMediaController;
@@ -91,7 +92,13 @@ Route::middleware([
     // COM-MOBILE-PAYMENTS-1 — طرق الدفع المتاحة فعلياً للقناة الحالية
     // (ADR-09 §3)، عبر PaymentMethodChannelAvailabilityService. قراءة فقط.
     Route::get('checkout/payment-methods', [StorefrontCheckoutController::class, 'paymentMethods'])->name('checkout.payment_methods.index');
+    // PAY-H4-04a — حالة الدفع الإلكتروني لطلب (حقيقة الخادم، لا عودة المتصفح). الملكية بمرجع الطلب الموقَّع؛ مغلق (404) خلف البوابة المنصّية.
+    Route::get('orders/{order}/payment-status', [StorefrontOnlinePaymentController::class, 'status'])
+        ->whereUuid('order')->middleware('throttle:30,1')->name('orders.payment_status');
     Route::middleware(RequireStorefrontMutationGateway::class)->group(function () {
+        // PAY-H4-04a — بدء/استئناف محاولة دفع إلكتروني للطلب (يعيد `checkout_url` لصفحة المزوّد المستضافة).
+        Route::post('checkout/payment-intent', [StorefrontOnlinePaymentController::class, 'start'])
+            ->middleware('throttle:10,1')->name('checkout.payment_intent.store');
         Route::post('checkout', [StorefrontCheckoutController::class, 'store'])->name('checkout.store');
         Route::patch('checkout/contact', [StorefrontCheckoutController::class, 'updateContact'])->name('checkout.contact.update');
         Route::patch('checkout/address', [StorefrontCheckoutController::class, 'updateAddress'])->name('checkout.address.update');

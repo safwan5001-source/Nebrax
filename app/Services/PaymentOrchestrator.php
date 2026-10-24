@@ -3,11 +3,14 @@
 namespace App\Services;
 
 use App\Contracts\Payable;
+use App\Events\CommercePaymentAttemptCaptured;
 use App\Events\PaymentAttemptCaptured;
+use App\Models\CommercePaymentIntent;
 use App\Models\InvoicePaymentRequest;
 use App\Models\PaymentAttempt;
 use App\Models\PaymentGateway;
 use App\Models\User;
+use App\Services\Commerce\CommerceReturnUrlResolver;
 use App\Support\PaymentAttemptContext;
 use App\Support\PaymentAttemptTransitionResult;
 use App\Support\PaymentNotPayableException;
@@ -64,6 +67,12 @@ final class PaymentOrchestrator
             : $this->create($payable, $gateway, $idempotencyKey, $actor);
 
         return $this->ensureCheckout($attempt, $gateway);
+    }
+
+    /** هل يُسمح ببدء دفع جديد للمستأجر الحالي الآن (ضابط التفعيل والإيقاف الطارئ)؟ قراءة فقط؛ لا يلمس `sync`/`cancel` أبداً. */
+    public function canStart(): bool
+    {
+        return $this->rollout->effectiveForCurrentTenant()->enabled;
     }
 
     /** يستعلم المزوّد (الحقيقة) ويطبّق اللقطة رتيباً. */
@@ -162,6 +171,14 @@ final class PaymentOrchestrator
                 $tenantId = (string) $locked->tenant_id;
                 $attemptId = (string) $locked->getKey();
                 DB::afterCommit(fn () => event(new PaymentAttemptCaptured($tenantId, $attemptId)));
+            }
+
+            // PAY-H4-04a: التقاط Payable متجر يُثبَّت على نيته بعد الالتزام (idempotent، شبكة الأمان `payments:complete-commerce-captures`).
+            // لا ترحيل محاسبي هنا (`posting_status` يبقى فارغاً) إلى أن تُعتمد قرارات G3.
+            if ($target === PaymentAttempt::STATUS_CAPTURED && str_starts_with((string) $locked->payable_key, CommercePaymentIntent::PAYABLE_TYPE.':')) {
+                $tenantId = (string) $locked->tenant_id;
+                $attemptId = (string) $locked->getKey();
+                DB::afterCommit(fn () => event(new CommercePaymentAttemptCaptured($tenantId, $attemptId)));
             }
 
             return new PaymentAttemptTransitionResult($locked, true);
@@ -340,6 +357,7 @@ final class PaymentOrchestrator
         try {
             $checkout = $adapter->createCheckout(new PaymentAttemptContext(
                 $gateway, (string) $attempt->getKey(), (int) $attempt->amount_minor, $attempt->currency, $attempt->payable_key,
+                app(CommerceReturnUrlResolver::class)->forPayableKey((string) $attempt->payable_key),
             ));
         } catch (Throwable $e) {
             throw new PaymentOrchestrationException('provider_unavailable', 'تعذر الوصول إلى مزوّد الدفع.', $e);

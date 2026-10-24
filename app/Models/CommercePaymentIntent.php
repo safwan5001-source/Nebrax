@@ -29,7 +29,15 @@ class CommercePaymentIntent extends BaseModel implements CompanyWide
 
     public const METHOD_PAY_ON_PICKUP = 'pay_on_pickup';
 
+    /** PAY-H4-04a: دفع إلكتروني عبر بوابة؛ المحاولات في `payment_attempts` (`payable_key` = `PAYABLE_TYPE:<id>`). */
+    public const METHOD_ONLINE = 'online';
+
+    /** عقد V1 المنشور (OpenAPI `CheckoutPayment.method`): COD/الاستلام فقط؛ `online` خلف بوابة `payments.commerce_online_checkout.enabled` حتى يُوثَّق عقده. */
     public const METHODS = [self::METHOD_COD, self::METHOD_PAY_ON_PICKUP];
+
+    public const ALL_METHODS = [self::METHOD_COD, self::METHOD_PAY_ON_PICKUP, self::METHOD_ONLINE];
+
+    public const PAYABLE_TYPE = 'commerce_payment_intent';
 
     public const STATUS_PENDING = 'pending';
 
@@ -37,17 +45,21 @@ class CommercePaymentIntent extends BaseModel implements CompanyWide
 
     public const STATUS_COLLECTED = 'collected';
 
+    /** إلكتروني: التقاط مؤكَّد من المزوّد (حقيقة الخادم لا عودة المتصفح). لا يعني ترحيلاً محاسبياً (G3). */
+    public const STATUS_PAID = 'paid';
+
     public const STATUS_CANCELLED = 'cancelled';
 
     protected $fillable = [
         'tenant_id', 'commerce_order_id', 'payment_method_id', 'payment_method_name',
         'method', 'status', 'amount_minor', 'currency',
-        'collected_at', 'cancelled_at', 'collection_note',
+        'collected_at', 'paid_at', 'cancelled_at', 'collection_note',
     ];
 
     protected $casts = [
         'amount_minor' => 'integer',
         'collected_at' => 'datetime',
+        'paid_at' => 'datetime',
         'cancelled_at' => 'datetime',
     ];
 
@@ -68,6 +80,21 @@ class CommercePaymentIntent extends BaseModel implements CompanyWide
     public function isCollected(): bool
     {
         return $this->status === self::STATUS_COLLECTED;
+    }
+
+    public function isOnline(): bool
+    {
+        return $this->method === self::METHOD_ONLINE;
+    }
+
+    public function isPaid(): bool
+    {
+        return $this->status === self::STATUS_PAID;
+    }
+
+    public function payableKey(): string
+    {
+        return self::PAYABLE_TYPE.':'.$this->getKey();
     }
 
     public function isCancelled(): bool
