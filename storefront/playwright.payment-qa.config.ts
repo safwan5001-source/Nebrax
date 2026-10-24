@@ -9,7 +9,7 @@ export default defineConfig({
   workers: 1,
   reporter: [["list"]],
   use: {
-    baseURL: "http://127.0.0.1:3001",
+    baseURL: "http://localhost:3001",
     headless: true,
     launchOptions: {
       args: ["--no-sandbox"],
@@ -27,7 +27,7 @@ export default defineConfig({
     },
     {
       command: "pnpm dev",
-      url: "http://127.0.0.1:3001/sa/en",
+      url: "http://localhost:3001/sa/en",
       reuseExistingServer: false,
       timeout: 180_000,
       stdout: "pipe",
