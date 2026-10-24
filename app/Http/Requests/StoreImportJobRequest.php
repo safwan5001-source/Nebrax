@@ -87,7 +87,8 @@ class StoreImportJobRequest extends FormRequest
             'options.reference_policy' => ['sometimes', Rule::in([ExpenseImportService::REFERENCE_OPTIONAL, ExpenseImportService::REFERENCE_REQUIRED])],
             'options.default_account_id' => ['sometimes', 'nullable', 'uuid'],
             'options.default_payment_method' => ['sometimes', Rule::in(ExpenseImportFields::PAYMENT_METHODS)],
-            'options.default_tax_rate' => ['sometimes', 'integer', 'min:0', 'max:100'],
+            // null/فارغ = «تفضيل المؤسسة» لمجال المشتريات (يحسمه المحوّل قانونياً)؛ بقية المجالات تعامله غياباً كما كان الغياب.
+            'options.default_tax_rate' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:100'],
             'options.confirmed_repeat_rows' => ['sometimes', 'array', 'max:'.ExpenseImportService::MAX_ROWS],
             'options.confirmed_repeat_rows.*' => ['integer', 'min:2'],
             // IMP-H5-S4a: سياسات مسودات المشتريات (تُجمَّد مع المعاينة)؛ المورّد الافتراضي والمستودع يُتحقَّق منهما وقت المعاينة/التنفيذ.

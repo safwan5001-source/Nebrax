@@ -21,7 +21,7 @@
 
 ## Tests
 
-- `PurchaseImportEndpointsTest` (19, SQLite + PG): domain registration/bound-only/document unit and no AI action; no sync apply; fields/template/inspect/preview write nothing and issue a plan-carrying binding; **a job counts invoices not rows (5 rows → 3 invoices, `batch_size=1`, an invoice straddling the row boundary), drafts + reservations only, no journal entry/stock movement**; recount uses the frozen mapping and default supplier; preview required and option mismatch refused; frozen policies can't change on apply while equivalent forms are accepted; a duplicate created after the preview is `plan_drift` with nothing written; an invalid invoice fails the job with a message naming it; viewer/manager gates; disabled `purchases.cycle` refuses endpoints/creation/apply; **warehouse scope enforced at preview and per chunk (withdrawal between them fails)**; cross-tenant supplier code; adapter canonicalisation.
+- `PurchaseImportEndpointsTest` (20, SQLite + PG): domain registration/bound-only/document unit and no AI action; no sync apply; fields/template/inspect/preview write nothing and issue a plan-carrying binding; **a job counts invoices not rows (5 rows → 3 invoices, `batch_size=1`, an invoice straddling the row boundary), drafts + reservations only, no journal entry/stock movement**; recount uses the frozen mapping and default supplier; preview required and option mismatch refused; frozen policies can't change on apply while equivalent forms are accepted; a duplicate created after the preview is `plan_drift` with nothing written; an invalid invoice fails the job with a message naming it; viewer/manager gates; disabled `purchases.cycle` refuses endpoints/creation/apply; **warehouse scope enforced at preview and per chunk (withdrawal between them fails)**; cross-tenant supplier code; adapter canonicalisation.
 - Mutation controls: recount → `null` fails 2 tests; removing the per-chunk warehouse check fails the warehouse test.
 - Regression (`Import*`, `Purchase*`, registry, H5/H7 endpoints; 921 tests SQLite, 69 on PG) green.
 
@@ -38,6 +38,12 @@ Verified correct by the reviewer: `unitCount` and `parse` share `loadEntries`/`g
 | 5 | `ApplyImportJobRequest` `default_tax_rate` non-nullable | **Not needed now**: after #2 the frozen value is always a concrete integer, so replaying frozen options never sends null; the shared rule is untouched (expense domain unaffected) |
 | 6 | A later failing chunk leaves earlier chunks' drafts committed; no resume/failure ledger | **Accepted, as documented**: earlier chunks are valid drafts that the next preview will list as existing invoices (and refuse as duplicates), so a corrected re-upload only needs the remainder; a document-level failure ledger is a future slice |
 | — | Test gaps (recount + multi-chunk, warehouse error text, stuck-ready, settings freeze) | **Added**: multi-chunk run with frozen mapping + default supplier completes exactly at the invoice count; warehouse failure asserts the access message |
+
+## Codex review (P2) — disposition
+
+| Finding | Disposition |
+|---|---|
+| Preview accepts `default_tax_rate: null`/blank (meaning company default) but `POST /import-jobs` rejected it (`integer` without `nullable`), so a valid preview could not round-trip | **Fixed (valid):** `options.default_tax_rate` is `nullable` in `StoreImportJobRequest` and `default_tax_rate` in `ApplyImportJobRequest`; an explicit `null` on apply is treated as absent (it must not read as `''` ≠ the frozen value). Other domains already treat a missing/null rate as absent. New test: preview with a blank rate → job → apply with `null` → totals use the company 5 % |
 
 ## Journal entries
 
