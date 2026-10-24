@@ -23,6 +23,8 @@ import { useCan } from '@/lib/use-can';
 import { apiErrorCode } from '@/modules/payments/gateways/contract';
 import { AdjustmentsPanel } from '@/modules/payment-settlements/AdjustmentsPanel';
 import { SettlementsPanel } from '@/modules/payment-settlements/SettlementsPanel';
+import { ReportsPanel } from '@/modules/payment-reports/ReportsPanel';
+import { VIEW_PERMISSION as REPORTS_VIEW_PERMISSION } from '@/modules/payment-reports/contract';
 import { RefundsPanel } from '@/modules/payment-refunds/RefundsPanel';
 import { RequestRefundDialog } from '@/modules/payment-refunds/RequestRefundDialog';
 import { ResolveExternalDialog } from '@/modules/payment-refunds/ResolveExternalDialog';
@@ -46,10 +48,12 @@ export function PaymentsOnlinePage() {
   const canView = can(VIEW_PERMISSION) && !demo;
   const canResolve = can(RESOLVE_PERMISSION);
   const canViewRefunds = can(REFUNDS_VIEW_PERMISSION);
+  const canViewReports = can(REPORTS_VIEW_PERMISSION);
   const canRequest = can(REQUEST_PERMISSION);
   const canResolveExternal = can(RESOLVE_UNKNOWN_PERMISSION);
   const tr = useTranslations('paymentRefunds');
   const ts = useTranslations('paymentSettlements');
+  const trp = useTranslations('paymentReports');
 
   const [tab, setTab] = useState<TabKey>('all');
   const [captureStatus, setCaptureStatus] = useState('');
@@ -62,7 +66,7 @@ export function PaymentsOnlinePage() {
   const [error, setError] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [repostFor, setRepostFor] = useState<AttemptRow | null>(null);
-  const [section, setSection] = useState<'payments' | 'refunds' | 'settlements' | 'adjustments'>('payments');
+  const [section, setSection] = useState<'payments' | 'refunds' | 'settlements' | 'adjustments' | 'reports'>('payments');
   const [settlementsKey, setSettlementsKey] = useState(0);
   const [requestFor, setRequestFor] = useState<string | null>(null);
   const [resolveFor, setResolveFor] = useState<string | null>(null);
@@ -174,11 +178,14 @@ export function PaymentsOnlinePage() {
           ...(canViewRefunds ? [{ id: 'refunds', label: tr('section_refunds') }] : []),
           { id: 'settlements', label: ts('section_settlements') },
           { id: 'adjustments', label: ts('section_adjustments') },
+          ...(canViewReports ? [{ id: 'reports', label: trp('section_reports') }] : []),
         ]}
         value={section}
         onChange={(id) => setSection(id as typeof section)}
       />
-      {section === 'settlements' ? (
+      {canViewReports && section === 'reports' ? (
+        <ReportsPanel />
+      ) : section === 'settlements' ? (
         <SettlementsPanel refreshKey={settlementsKey} onChanged={() => { setSettlementsKey((k) => k + 1); setRefundsKey((k) => k + 1); void load(); }} />
       ) : section === 'adjustments' ? (
         <AdjustmentsPanel refreshKey={settlementsKey} onChanged={() => setSettlementsKey((k) => k + 1)} />
