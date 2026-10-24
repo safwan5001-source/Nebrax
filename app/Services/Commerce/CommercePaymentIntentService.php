@@ -67,8 +67,13 @@ final class CommercePaymentIntentService
         $status = CommercePaymentIntent::STATUS_AWAITING_COLLECTION;
         // طلبات المتجر الإلكتروني فقط (`storefront_id`)؛ الجوّال/`/commerce/v1` بلا مسار دفع بعد ⇒ سلوكه كما كان.
         if ($paymentMethod !== null && $order->storefront_id !== null && CommerceOnlinePaymentService::enabled() && $this->online->isGatewayLinked($paymentMethod)) {
-            if ($this->online->usableGatewayFor($paymentMethod) === null) {
+            $gateway = $this->online->usableGatewayFor($paymentMethod);
+            if ($gateway === null) {
                 throw new RuntimeException('الدفع الإلكتروني بهذه الطريقة غير متاح حالياً؛ اختر طريقة أخرى.');
+            }
+            // المزوّد لا يقبل هذا المبلغ/العملة (حدّ أدنى أو عملة غير مدعومة): يُرفض الإتمام قبل الالتزام فيُصحَّح الاختيار بدل طلب لا يُدفع أبداً.
+            if (! $this->online->gatewaySupports($gateway, (int) $order->total, (string) $currency)) {
+                throw new RuntimeException('الدفع الإلكتروني بهذه الطريقة لا يدعم مبلغ الطلب أو عملته؛ اختر طريقة أخرى.');
             }
             $method = CommercePaymentIntent::METHOD_ONLINE;
             $status = CommercePaymentIntent::STATUS_PENDING;

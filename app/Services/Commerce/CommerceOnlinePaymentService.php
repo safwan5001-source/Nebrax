@@ -61,6 +61,14 @@ final class CommerceOnlinePaymentService
         return $this->linkedGateways($method)->isNotEmpty();
     }
 
+    /** هل يدعم محوّل الاتصال المبلغ والعملة المطلوبين؟ يُفحص عند الإتمام كي لا يُلتزم بطلب إلكتروني لا يقبله المزوّد أصلاً (حدّ أدنى/عملة). */
+    public function gatewaySupports(PaymentGateway $gateway, int $amountMinor, string $currency): bool
+    {
+        $capabilities = $this->adapters->for((string) $gateway->provider)->capabilities();
+
+        return $capabilities->supportsCurrency(strtoupper($currency)) && $capabilities->supportsAmount($amountMinor);
+    }
+
     /** أول اتصال جاهز لطلب الدفع (نشط، متحقَّق من أسراره، بمحوّل) مرتبط بالطريقة؛ وإلا null. التفعيل المنصّي/المستأجر شرط. */
     public function usableGatewayFor(PaymentMethod $method): ?PaymentGateway
     {
@@ -326,7 +334,6 @@ final class CommerceOnlinePaymentService
     {
         return PaymentGateway::query()
             ->where('payment_method_id', $method->getKey())
-            ->whereNotIn('status', [PaymentGateway::STATUS_REVOKED])
             ->orderBy('created_at')->orderBy('id')
             ->get()
             ->filter(fn (PaymentGateway $g): bool => $this->adapters->has((string) $g->provider))

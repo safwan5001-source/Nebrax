@@ -78,9 +78,9 @@ class StorefrontOnlinePaymentTest extends TestCase
     // ───────────────────────── الإعداد ─────────────────────────
 
     /** @return array{tenant: Tenant, channel: SalesChannel, storefront: Storefront} */
-    private function makeStore(string $host, string $slug): array
+    private function makeStore(string $host, string $slug, string $currency = 'SAR'): array
     {
-        $tenant = Tenant::create(['name' => $host, 'slug' => $slug.'-'.Str::random(6), 'vat_number' => '300000000000003', 'currency' => 'SAR', 'is_active' => true]);
+        $tenant = Tenant::create(['name' => $host, 'slug' => $slug.'-'.Str::random(6), 'vat_number' => '300000000000003', 'currency' => $currency, 'is_active' => true]);
         app(TenantContext::class)->set($tenant->id);
         $channel = SalesChannel::create(['slug' => 'web', 'name' => 'Web', 'type' => SalesChannel::TYPE_WEB, 'is_active' => true]);
         $storefront = Storefront::create(['slug' => 'main', 'name' => 'Main', 'sales_channel_id' => $channel->id, 'is_active' => true]);
@@ -277,6 +277,32 @@ class StorefrontOnlinePaymentTest extends TestCase
         // السلة لم تُستهلك: يمكن الإتمام بعد إصلاح الاتصال أو اختيار طريقة أخرى
         DB::table('payment_gateways')->where('id', $this->gateway->id)->update(['status' => PaymentGateway::STATUS_ACTIVE, 'is_active' => true]);
         $this->complete($token, 'idem-online-retry')->assertCreated()->assertJsonPath('data.order.payment.method', 'online');
+    }
+
+    #[Test]
+    public function a_revoked_gateway_linked_to_the_selected_method_is_rejected_never_silently_downgraded_to_cod(): void
+    {
+        $product = $this->product($this->tenant, $this->channel);
+        $token = $this->readyCheckout($product, $this->method->id);
+        DB::table('payment_gateways')->where('id', $this->gateway->id)->update(['status' => PaymentGateway::STATUS_REVOKED, 'is_active' => false]);
+
+        $this->complete($token)->assertStatus(422);
+        $this->assertSame(0, DB::table('commerce_orders')->count());
+        $this->assertSame(0, DB::table('commerce_payment_intents')->count());
+    }
+
+    #[Test]
+    public function a_currency_the_provider_does_not_support_is_rejected_at_checkout_before_any_order_is_committed(): void
+    {
+        ['tenant' => $usd, 'channel' => $channel] = $this->makeStore('online-pay-usd.test', 'online-pay-usd', 'USD');
+        [$method] = $this->wirePayments($usd, $channel);
+        $product = $this->product($usd, $channel);
+        $token = $this->readyCheckout($product, $method->id, 'online-pay-usd.test');
+
+        $this->complete($token, 'idem-usd-001', 'online-pay-usd.test')->assertStatus(422);
+
+        $this->assertSame(0, DB::table('commerce_orders')->count());
+        $this->assertSame(0, DB::table('commerce_payment_intents')->count());
     }
 
     // ═══════════════ الرحلة الكاملة ═══════════════
