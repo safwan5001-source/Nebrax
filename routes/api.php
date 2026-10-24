@@ -1101,10 +1101,12 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('payment-attempts/blocked', [PaymentAttemptPostingController::class, 'blocked'])->middleware($perm('payments.resolve_blocked'));
         Route::post('payment-attempts/{id}/repost', [PaymentAttemptPostingController::class, 'repost'])->whereUuid('id')->middleware([$perm('payments.resolve_blocked'), 'throttle:20,1']);
         // PAY-H3-01d (ADR-0007): استردادات البوابة. أربع صلاحيات مستقلة (owner/admin)؛ الطلب والاعتماد بفاعلَين مختلفَين دائماً؛ إعادة الترحيل payments.resolve_blocked.
-        // PAY-H3-02a: تسويات البوابة — قراءة ومعاينة المعادلة فقط (لا ترحيل قبل اعتماد ADR-0008).
+        // PAY-H3-02: تسويات البوابة — قراءة ومعاينة (`payments.view`) وتسجيل/ترحيل (`payment_settlements.manage`، ADR-0008).
         Route::get('payment-gateway-settlements', [PaymentGatewaySettlementController::class, 'index'])->middleware($perm('payments.view'));
         Route::get('payment-gateway-settlements/{id}', [PaymentGatewaySettlementController::class, 'show'])->whereUuid('id')->middleware($perm('payments.view'));
+        Route::post('payment-gateway-settlements', [PaymentGatewaySettlementController::class, 'store'])->middleware([$perm('payment_settlements.manage'), 'throttle:30,1']);
         Route::post('payment-gateway-settlements/preview', [PaymentGatewaySettlementController::class, 'preview'])->middleware([$perm('payments.view'), 'throttle:60,1']);
+        Route::get('payment-gateways/{gatewayId}/unsettled-refunds', [PaymentGatewaySettlementController::class, 'unsettledRefunds'])->whereUuid('gatewayId')->middleware($perm('payments.view'));
         Route::get('payment-gateways/{gatewayId}/unsettled-payments', [PaymentGatewaySettlementController::class, 'unsettled'])->whereUuid('gatewayId')->middleware($perm('payments.view'));
 
         Route::get('payment-refunds', [PaymentRefundController::class, 'index'])->middleware($perm('payment_refunds.view'));

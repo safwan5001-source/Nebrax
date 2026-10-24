@@ -6,12 +6,14 @@ use App\Models\PaymentGateway;
 use App\Models\PaymentGatewaySettlement;
 use App\Services\Accounting\PaymentGatewaySettlementService;
 use DomainException;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * تسويات بوابات الدفع (PAY-H3-02a): **قراءة ومعاينة فقط** بصلاحية `payments.view` ومعزولة بالمستأجر (معرّف مستأجر آخر ⇒ 404).
- * لا ترحيل ولا قيد ولا كتابة هنا: `POST preview` يحسب المعادلة والفرق (D-21) ويشرح ما يمنع الترحيل؛ مسار الترحيل نفسه بعد اعتماد ADR-0008.
+ * تسويات بوابات الدفع (PAY-H3-02): القراءة والمعاينة بصلاحية `payments.view`، والتسجيل (`POST /payment-gateway-settlements`) بصلاحية
+ * `payment_settlements.manage`؛ كلها معزولة بالمستأجر (معرّف مستأجر آخر ⇒ 404). `POST preview` يحسب المعادلة والفرق (D-21) ولا يكتب شيئاً.
+ * التسجيل: فرق صفري ⇒ ترحيل بقيد واحد عبر `LedgerService`؛ فرق غير مفسَّر ⇒ حفظ `unreconciled` بلا قيد. الأخطاء النطاقية ⇒ 422/409 برمز ثابت لا 500.
  * لا يكشف أسرار البوابة (لا `secret_key` ولا إعداداتها) — أرقام وحالات وتواريخ فقط.
  */
 class PaymentGatewaySettlementController extends ApiController
@@ -40,15 +42,28 @@ class PaymentGatewaySettlementController extends ApiController
 
     public function show(string $id): JsonResponse
     {
-        $settlement = PaymentGatewaySettlement::query()->with('items')->findOrFail($id);
+        return response()->json(['data' => $this->detail(PaymentGatewaySettlement::query()->findOrFail($id))]);
+    }
 
-        return response()->json(['data' => $this->row($settlement) + [
+    /** @return array<string, mixed> */
+    private function detail(PaymentGatewaySettlement $settlement): array
+    {
+        $settlement->loadMissing(['items', 'lines.refund']);
+
+        return $this->row($settlement) + [
             'items' => $settlement->items->map(fn ($i) => [
                 'payment_id' => $i->payment_id,
                 'provider_event_ref' => $i->provider_event_ref,
                 'gross_amount' => (int) $i->gross_amount,
             ])->values(),
-        ]]);
+            'lines' => $settlement->lines->map(fn ($l) => [
+                'line_type' => $l->line_type,
+                'payment_refund_id' => $l->payment_refund_id,
+                'refund_number' => $l->refund?->number,
+                'amount_minor' => (int) $l->amount_minor,
+                'provider_event_ref' => $l->provider_event_ref,
+            ])->values(),
+        ];
     }
 
     public function unsettled(Request $request, string $gatewayId): JsonResponse
@@ -68,7 +83,58 @@ class PaymentGatewaySettlementController extends ApiController
 
     public function preview(Request $request): JsonResponse
     {
-        $data = $request->validate([
+        $data = $request->validate($this->rules());
+        PaymentGateway::query()->findOrFail($data['payment_gateway_id']);
+
+        try {
+            return response()->json(['data' => $this->settlements->preview($data, $request->user())]);
+        } catch (DomainException $e) {
+            return $this->rejected($e);
+        }
+    }
+
+    /** تسجيل التسوية: ترحيل (فرق صفري) أو حفظ `unreconciled` (D-21)؛ إعادة الإرسال بالمرجع نفسه تحدّث المسودة أو تعيد المرحَّلة. */
+    public function store(Request $request): JsonResponse
+    {
+        $data = $request->validate($this->rules());
+        PaymentGateway::query()->findOrFail($data['payment_gateway_id']);
+        // الفاعل من المصادقة لا من الطلب؛ التواريخ الافتراضية من الخادم.
+        unset($data['created_by']);
+
+        try {
+            $settlement = $this->settlements->record($data, $request->user());
+        } catch (DomainException $e) {
+            return $this->rejected($e);
+        } catch (\RuntimeException $e) {
+            if ($e instanceof QueryException) {
+                throw $e;   // أخطاء القاعدة لا تُحوَّل إلى رسالة (قد تحمل SQL)
+            }
+
+            return response()->json(['error' => ['code' => 'operation_rejected', 'message' => $e->getMessage()]], 422);
+        }
+
+        return response()->json(['data' => $this->detail($settlement)]);
+    }
+
+    public function unsettledRefunds(Request $request, string $gatewayId): JsonResponse
+    {
+        $data = $request->validate(['per_page' => ['nullable', 'integer', 'min:1', 'max:200'], 'page' => ['nullable', 'integer', 'min:1', 'max:100000']]);
+        PaymentGateway::query()->findOrFail($gatewayId);
+
+        $perPage = (int) ($data['per_page'] ?? 100);
+        $page = (int) ($data['page'] ?? 1);
+        $rows = $this->settlements->unsettledRefunds($gatewayId, $perPage, ($page - 1) * $perPage);
+
+        return response()->json([
+            'data' => array_slice($rows, 0, $perPage),
+            'meta' => ['page' => $page, 'per_page' => $perPage, 'has_more' => count($rows) > $perPage],
+        ]);
+    }
+
+    /** @return array<string, list<string>> */
+    private function rules(): array
+    {
+        return [
             'payment_gateway_id' => ['required', 'uuid'],
             'cash_bank_account_id' => ['required', 'uuid'],
             'provider_settlement_ref' => ['required', 'string', 'max:191'],
@@ -82,14 +148,21 @@ class PaymentGatewaySettlementController extends ApiController
             'items.*.payment_id' => ['required', 'uuid'],
             'items.*.gross_amount' => ['required', 'integer', 'min:1', 'max:999999999999'],
             'items.*.provider_event_ref' => ['nullable', 'string', 'max:191'],
-        ]);
-        PaymentGateway::query()->findOrFail($data['payment_gateway_id']);
+            'refunds' => ['nullable', 'array', 'max:100'],
+            'refunds.*.payment_refund_id' => ['required', 'uuid'],
+            'refunds.*.amount_minor' => ['required', 'integer', 'min:1', 'max:999999999999'],
+            'refunds.*.provider_event_ref' => ['nullable', 'string', 'max:191'],
+            'currency' => ['nullable', 'string', 'size:3'],
+        ];
+    }
 
-        try {
-            return response()->json(['data' => $this->settlements->preview($data, $request->user())]);
-        } catch (DomainException $e) {
-            return response()->json(['error' => ['code' => 'operation_rejected', 'message' => $e->getMessage()]], 422);
-        }
+    private function rejected(DomainException $e): JsonResponse
+    {
+        // الرسائل النطاقية قد تبدأ برمز ثابت «code: ...»؛ غيره `operation_rejected`.
+        $code = preg_match('/^([a-z_]+):\s/', $e->getMessage(), $m) === 1 ? $m[1] : 'operation_rejected';
+        $status = in_array($code, ['rollout_disabled'], true) ? 409 : 422;
+
+        return response()->json(['error' => ['code' => $code, 'message' => $e->getMessage()]], $status);
     }
 
     /** @return array<string, mixed> */
@@ -109,6 +182,8 @@ class PaymentGatewaySettlementController extends ApiController
             'provider_fee_tax' => (int) $s->provider_fee_tax,
             'provider_deductions' => (int) $s->provider_deductions,
             'provider_credits' => (int) $s->provider_credits,
+            'refunds_total' => (int) $s->refunds_total,
+            'unreconciled_minor' => $s->unreconciled_minor === null ? null : (int) $s->unreconciled_minor,
             'journal_entry_id' => $s->journal_entry_id,
             'posted_at' => $s->posted_at?->toISOString(),
         ];
