@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { type ColumnDef } from '@tanstack/react-table';
-import { Eye, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Eye, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { AdvancedFilterDialog } from '@/components/data-explorer/advanced-filter-dialog';
 import { ListToolbar, PageHeader, Pagination, type PageAction, type SortOption } from '@/components/nebrax';
@@ -329,6 +329,7 @@ export default function PurchasesPage() {
   ];
 
   const headerActions: PageAction[] = [
+    { key: 'import', label: t('import_from_file'), icon: Upload, href: '/purchases/import', variant: 'outline', emphasis: 'secondary' },
     { key: 'create', label: t('create'), icon: Plus, href: '/purchases/new', variant: 'primary' },
   ];
 
