@@ -239,6 +239,7 @@ export function ProductTaxonomyImportWizard({ kind }: { kind: TaxonomyKind }) {
 
   async function repairFailedRows(repairFile: File) {
     if (!engine.job) return;
+    setError(null);
     const key = `repair-${engine.job.id}-${repairFile.name}-${repairFile.size}-${repairFile.lastModified}`;
     const child = await engine.repair(engine.job.id, repairFile, key);
     if (!child) return;
@@ -247,6 +248,7 @@ export function ProductTaxonomyImportWizard({ kind }: { kind: TaxonomyKind }) {
   }
 
   async function downloadFailedRows(jobId: string) {
+    setError(null);
     try {
       if ((await downloadImportFailures(jobId)) === 'demo-unavailable') toast({ title: t('demo_unavailable'), variant: 'info' });
     } catch (err) {
@@ -282,6 +284,7 @@ export function ProductTaxonomyImportWizard({ kind }: { kind: TaxonomyKind }) {
   // `apply_result` يحمل قطعة التنفيذ الأخيرة وحدها؛ الإجمالي التراكمي للصفوف المنجزة هو `processed_rows`.
   const applyResult = engine.job?.apply_result as { created?: number; updated?: number; skipped?: number } | null | undefined;
   const processedTotal = engine.job?.processed_rows ?? 0;
+  const failedAfterPartial = engine.job?.status === 'failed' && processedTotal > 0;
   const visibleRows = preview ? (rowsExpanded ? preview.rows : preview.rows.slice(0, ROWS_COLLAPSED)) : [];
   const gapSeparator = locale.startsWith('ar') ? '، ' : ', ';
 
@@ -303,7 +306,7 @@ export function ProductTaxonomyImportWizard({ kind }: { kind: TaxonomyKind }) {
         </Button>
       </header>
 
-      <Stepper steps={steps} current={step} onSelect={(index) => index <= step && engine.busy !== 'applying' && engine.busy !== 'uploading' && setStep(index)} label={t('step_label')} />
+      <Stepper steps={steps} current={step} onSelect={(index) => index <= step && (index !== 1 || preview !== null) && engine.busy !== 'applying' && engine.busy !== 'uploading' && setStep(index)} label={t('step_label')} />
 
       {error || engine.error ? (
         <p role="alert" className="rounded-md border border-negative/30 bg-negative/10 px-3 py-2 text-sm text-negative">
@@ -333,6 +336,7 @@ export function ProductTaxonomyImportWizard({ kind }: { kind: TaxonomyKind }) {
               <p className="text-sm leading-relaxed text-muted">{t('resumed_hint', { name: engine.job.original_filename })}</p>
               {engine.job.preview_bound ? null : <p role="alert" className="text-sm text-negative">{t('resumed_unbound')}</p>}
               <FormActions
+                secondary={<Button type="button" variant="outline" onClick={reset}>{t('start_another')}</Button>}
                 primary={
                   <Button disabled={!engine.job.preview_bound} onClick={() => void confirmAndApply()}>
                     <Upload className="h-4 w-4" strokeWidth={1.7} />
@@ -391,7 +395,7 @@ export function ProductTaxonomyImportWizard({ kind }: { kind: TaxonomyKind }) {
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-xs leading-relaxed text-muted">{t(kind === 'category' ? 'rules_note_category' : 'rules_note_brand')}</p>
-                <div className={cn('grid grid-cols-1 gap-4', kind === 'category' ? 'lg:grid-cols-3' : 'lg:grid-cols-2')}>
+                <div className={cn('grid grid-cols-1 gap-4', kind === 'category' ? 'lg:grid-cols-3' : 'lg:grid-cols-1')}>
                   <div className="space-y-1.5">
                     <Label htmlFor="ti-mode">{t('mode')}</Label>
                     <Select id="ti-mode" value={mode} onChange={(event) => { setMode(event.target.value as TaxonomyMode); invalidatePreview(); }}>
@@ -399,16 +403,18 @@ export function ProductTaxonomyImportWizard({ kind }: { kind: TaxonomyKind }) {
                         <option key={value} value={value}>{t(`mode_${value}`)}</option>
                       ))}
                     </Select>
-                    <p className="text-xs leading-relaxed text-muted">{t(`mode_${mode}_hint`)}</p>
+                    <p className="text-xs leading-relaxed text-muted">{t(kind === 'brand' && mode === 'update' ? 'mode_update_hint_brand' : `mode_${mode}_hint`)}</p>
                   </div>
+                  {kind === 'category' ? (
                   <div className="space-y-1.5">
                     <Label htmlFor="ti-blank">{t('blank_policy')}</Label>
                     <Select id="ti-blank" value={blankPolicy} disabled={mode === 'create'} onChange={(event) => { setBlankPolicy(event.target.value as TaxonomyBlankPolicy); invalidatePreview(); }}>
                       <option value="ignore">{t('blank_ignore')}</option>
                       <option value="clear">{t('blank_clear')}</option>
                     </Select>
-                    <p className="text-xs leading-relaxed text-muted">{t(`blank_${blankPolicy}_hint`)}</p>
+                    <p className="text-xs leading-relaxed text-muted">{t(mode === 'create' ? 'blank_create_hint' : `blank_${blankPolicy}_hint`)}</p>
                   </div>
+                  ) : null}
                   {kind === 'category' ? (
                     <div className="space-y-1.5">
                       <Label htmlFor="ti-parent">{t('parent_policy')}</Label>
@@ -649,12 +655,20 @@ export function ProductTaxonomyImportWizard({ kind }: { kind: TaxonomyKind }) {
               onCancel={engine.job ? () => void engine.cancel(engine.job!.id) : undefined}
               onOpenParent={(parentId) => void engine.resume(parentId)}
             />
+            {failedAfterPartial ? (
+              <p role="status" className="rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-xs leading-relaxed text-text">
+                {t('partial_failure_note', { count: processedTotal })}
+              </p>
+            ) : null}
             <ImportRepairPanel
               job={engine.job}
               busy={engine.busy !== null}
               onDownload={() => void downloadFailedRows(engine.job!.id)}
               onRepair={(repairFile) => void repairFailedRows(repairFile)}
             />
+            {engine.job.status === 'failed' ? (
+              <FormActions primary={<Button variant="outline" onClick={reset}>{t('start_another')}</Button>} />
+            ) : null}
           </CardContent>
         </Card>
       ) : null}

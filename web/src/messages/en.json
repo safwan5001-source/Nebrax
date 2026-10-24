@@ -1453,7 +1453,10 @@
     "demo_unavailable": "Not available in the demo.",
     "repair_download_failed": "Could not download the failed rows.",
     "continue_hint": "The job is paused midway (a disconnect or page refresh). Continue applying what was previewed.",
-    "continue_apply": "Continue"
+    "continue_apply": "Continue",
+    "mode_update_hint_brand": "Each row updates an existing brand (status only); a missing one is an error.",
+    "blank_create_hint": "Not used when only creating.",
+    "partial_failure_note": "{count, plural, one {# row was} other {# rows were}} already applied before the failure and cannot be undone here. Re-previewing the same file in \"Create only\" will reject those rows as existing — use \"Create or update\" to apply the rest."
   },
   "stocktakeImport": {
     "title": "Import stocktake counts",

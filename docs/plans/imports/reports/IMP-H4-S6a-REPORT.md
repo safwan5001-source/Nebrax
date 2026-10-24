@@ -24,6 +24,23 @@
 - A first draft of the brand test checked for the parent control *after* leaving the setup step (vacuously true); the mutation run caught it and the test was rewritten to assert before the step change.
 - Full web suite and `tsc` on touched files: see PR.
 
+## Reviews — dispositions
+
+**Codex (P2)** — a foreign-domain job (`?job=` of another domain, already `processing`) reached the Continue button: **fixed** (see above; mutation-tested).
+
+**Independent subagent review (not Codex)** found no blocker; parity of preview form vs job options, i18n key sets (81 keys, same placeholders in ar/en), a11y/RTL verified. Dispositions:
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | No recovery path after a failed job; taxonomy chunks commit one by one so a failure after N rows leaves N applied, and re-previewing in «Create only» rejects them with no explanation | **Fixed:** «Start another» on a failed job; a partial-failure note («N rows were already applied… use Create or update to apply the rest»), absent when nothing was applied. Mutation-verified |
+| 2 | A stale local error masked `engine.error` after a failed download then a rejected repair | **Fixed:** the local error clears at the start of repair/download |
+| 3 | Blank Preview card reachable from the stepper after a resume; resumed card had no reset | **Fixed:** the stepper can't select Preview without a preview; the resumed card has «Start another». Mutation-verified (same guard added to the purchase wizard) |
+| 4 | Resumed-job domain guard only on step 0 | **Fixed** (same as the Codex finding) |
+| 5 | Copy: update hint said «description, colour and status» for brands; the blank-cell select was shown for brands (nothing clearable) and its hint while disabled | **Fixed:** brand-specific update hint; blank-cell policy shown for categories only; «not used when only creating» hint |
+| 6 | The import button is visible to users without `products.manage` | **Accepted:** the routes return 403 at inspect and the existing categories/brands pages have no permission gating either |
+| 7 | More than 50 preview errors: only 50 listed | **Accepted:** the CSV has them all; same as every sibling wizard |
+| — | Test gaps (repair flow, resume success, Continue, networkUncertain, file-too-large) | Partly added (failure/partial, stepper, blank-policy); the rest are shared-engine behaviours covered by the engine's own tests |
+
 ## Journal entries
 
 None — taxonomy only, no accounting or stock.

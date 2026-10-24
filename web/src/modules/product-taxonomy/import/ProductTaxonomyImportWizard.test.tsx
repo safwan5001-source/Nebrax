@@ -230,6 +230,55 @@ describe('ProductTaxonomyImportWizard (IMP-H4-S6a)', () => {
     expect(screen.getByText('preview_used')).toBeTruthy();
   });
 
+  it('explains a failure after earlier chunks applied rows and offers a fresh start; no note when nothing was applied', async () => {
+    for (const processed of [3, 0]) {
+      window.history.replaceState({}, '', '/inventory-settings/categories/import');
+      api.mockReset();
+      api.mockImplementation((path: string, options?: { method?: string }) => {
+        if (path === '/product-taxonomy/import/inspect') return Promise.resolve({ data: inspection });
+        if (path === '/product-taxonomy/import/preview') return Promise.resolve({ data: cleanPreview });
+        if (path === '/import-jobs' && options?.method === 'POST') return Promise.resolve({ data: jobFixture() });
+        if (path.startsWith('/import-jobs/job-1')) return Promise.resolve({ data: jobFixture({ status: 'failed', processed_rows: processed, error_message: 'تعذّر' }) });
+        return Promise.resolve({ data: {} });
+      });
+      const user = userEvent.setup();
+      const { unmount } = render(<ProductTaxonomyImportWizard kind="category" />);
+      await user.upload(screen.getByLabelText('step_file'), csv());
+      await waitFor(() => expect(screen.getByLabelText('عمود غريب')).toBeTruthy());
+      await user.click(screen.getByRole('button', { name: 'run_preview' }));
+      await waitFor(() => expect(screen.getByRole('button', { name: 'apply' })).toBeTruthy());
+      await user.click(screen.getByRole('button', { name: 'apply' }));
+
+      await waitFor(() => expect(screen.getByRole('button', { name: 'start_another' })).toBeTruthy());
+      if (processed > 0) expect(screen.getByText(`partial_failure_note:${processed}`)).toBeTruthy();
+      else expect(screen.queryByText(/partial_failure_note/)).toBeNull();
+      unmount();
+    }
+  });
+
+  it('does not let the stepper jump to a preview that does not exist', async () => {
+    window.history.replaceState({}, '', '/inventory-settings/categories/import?job=job-9');
+    api.mockImplementation((path: string) => {
+      if (path === '/import-jobs/job-9') return Promise.resolve({ data: jobFixture({ id: 'job-9', status: 'failed', processed_rows: 1, error_message: 'تعذّر' }) });
+      return Promise.resolve({ data: [] });
+    });
+    const user = userEvent.setup();
+    render(<ProductTaxonomyImportWizard kind="category" />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'start_another' })).toBeTruthy());
+
+    await user.click(screen.getByRole('button', { name: 'step_preview' }));
+    expect(screen.queryByRole('button', { name: 'apply' })).toBeNull();   // لا بطاقة فارغة ولا زر تنفيذ بلا معاينة
+    expect(screen.getByRole('button', { name: 'start_another' })).toBeTruthy();
+  });
+
+  it('shows the blank-cell policy for categories only, since a brand has nothing to clear', () => {
+    const category = render(<ProductTaxonomyImportWizard kind="category" />);
+    expect(screen.getByLabelText('blank_policy')).toBeTruthy();
+    category.unmount();
+    render(<ProductTaxonomyImportWizard kind="brand" />);
+    expect(screen.queryByLabelText('blank_policy')).toBeNull();
+  });
+
   it('does not offer a preview when the inspection failed', async () => {
     const { ApiError } = await import('@/lib/api');
     api.mockImplementation((path: string) => {
