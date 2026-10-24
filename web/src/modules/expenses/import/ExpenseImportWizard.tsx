@@ -17,6 +17,7 @@ import { downloadCsv, toCsv } from '@/lib/export';
 import { formatMinorRiyal } from '@/lib/money';
 import { cn } from '@/lib/utils';
 import { Stepper } from '@/modules/products/import/stepper';
+import { DocumentCenterEntryLink } from '@/modules/import-jobs/DocumentCenterEntryLink';
 import { ImportJobStatusPanel } from '@/modules/import-jobs/ImportJobStatusPanel';
 import { ImportRepairPanel } from '@/modules/import-jobs/ImportRepairPanel';
 import { downloadImportFailures, hasFrozenOptions, type ApplyOptions } from '@/modules/import-jobs/client';
@@ -374,6 +375,7 @@ export function ExpenseImportWizard() {
           </Card>
         ) : (
           <div className="space-y-4">
+            <DocumentCenterEntryLink kind="expense" />
             <Card>
               <CardHeader>
                 <CardTitle>{t('step_file')}</CardTitle>

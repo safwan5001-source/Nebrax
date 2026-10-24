@@ -17,7 +17,9 @@ use App\Models\DocumentProcessingRun;
 use App\Models\DocumentProviderAttempt;
 use App\Models\Expense;
 use App\Models\ExpenseCategory;
+use App\Models\ImportDocumentReservation;
 use App\Models\Partner;
+use App\Models\Role;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Accounting\ExpenseService;
@@ -25,7 +27,9 @@ use App\Services\DocumentCenter\DocumentReviewMutationGate;
 use App\Services\DocumentCenter\DocumentWorkflowService;
 use App\Services\DocumentCenter\ExpenseDocumentDraftBuilder;
 use App\Services\DocumentCenter\ExpenseDraftBuildOptions;
+use App\Services\DocumentDuplicateReservationService;
 use App\Services\EntitlementGrantService;
+use App\Services\TenantApplicationService;
 use App\Support\BranchSettings;
 use App\Support\DocumentProcessingStatus;
 use App\Support\DocumentScanStatus;
@@ -394,6 +398,152 @@ class DocumentExpenseDraftBuilderTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $migration->down();
+    }
+
+    /** @test */
+    public function expense_draft_endpoint_also_requires_the_direct_expense_gates(): void
+    {
+        $fixture = $this->readyFixture();
+        app(TenantContext::class)->set($fixture['tenant_id']);
+        Role::create(['slug' => 'doc-only', 'name' => 'doc-only', 'is_system' => false, 'permissions' => ['documents.center.view', 'documents.center.review', 'documents.center.build_draft']]);
+        $docOnly = $this->tokenForRole($fixture['tenant_id'], 'doc-only', 'doc-only@expense-draft-builder.test');
+        Role::create(['slug' => 'doc-spender', 'name' => 'doc-spender', 'is_system' => false, 'permissions' => ['documents.center.view', 'documents.center.review', 'documents.center.build_draft', 'expenses.view', 'expenses.manage']]);
+        $docSpender = $this->tokenForRole($fixture['tenant_id'], 'doc-spender', 'doc-spender@expense-draft-builder.test');
+        $uri = "/api/document-batches/{$fixture['batch']->id}/create-expense-draft";
+
+        // صلاحية مركز المستندات وحدها لا تكفي: المسودة تنتهي بـ`ExpenseService::create`.
+        $this->withToken($docOnly)->postJson($uri, $this->payload($fixture))->assertForbidden();
+        $this->assertNoDraftState($fixture);
+
+        // التطبيق التجاري `finance.operations` المعطَّل يحجب حتى من يملك الصلاحيتين.
+        app(TenantApplicationService::class)->disable('finance.operations', $fixture['actor']);
+        $this->withToken($docSpender)->postJson($uri, $this->payload($fixture))->assertForbidden();
+        $this->assertNoDraftState($fixture);
+    }
+
+    /** @test */
+    public function expense_draft_endpoint_accepts_a_role_holding_both_the_document_and_expense_permissions(): void
+    {
+        $fixture = $this->readyFixture();
+        app(TenantContext::class)->set($fixture['tenant_id']);
+        Role::create(['slug' => 'doc-spender', 'name' => 'doc-spender', 'is_system' => false, 'permissions' => ['documents.center.view', 'documents.center.review', 'documents.center.build_draft', 'expenses.view', 'expenses.manage']]);
+        $token = $this->tokenForRole($fixture['tenant_id'], 'doc-spender', 'doc-spender@expense-draft-builder.test');
+
+        $this->withToken($token)->postJson("/api/document-batches/{$fixture['batch']->id}/create-expense-draft", $this->payload($fixture))->assertCreated();
+        $this->assertDatabaseCount('expenses', 1);
+    }
+
+    /** @test */
+    public function the_draft_reserves_the_expense_identity_with_the_document_center_source(): void
+    {
+        $fixture = $this->readyFixture();
+
+        $created = $this->buildDraft($fixture, 'إنشاء مسودة مصروف تحجز هويتها.');
+
+        $reservation = ImportDocumentReservation::query()->where('document_id', $created->transactionId)->firstOrFail();
+        $this->assertSame('expense', $reservation->domain);
+        $this->assertSame(DocumentDuplicateReservationService::SOURCE_DOCUMENT_CENTER, $reservation->source);
+        $this->assertSame('exp100', $reservation->predicate['reference'] ?? null);   // رقم المستند المراجَع بعد التطبيع
+        $this->assertSame(10000, $reservation->predicate['amount'] ?? null);
+        $this->assertDatabaseCount('journal_entries', 0);
+    }
+
+    /** @test */
+    public function a_second_batch_for_the_same_expense_is_refused_as_a_duplicate_without_any_partial_state(): void
+    {
+        $fixture = $this->readyFixture();
+        $this->buildDraft($fixture, 'الدفعة الأولى للمصروف نفسه.');
+        $second = $this->secondReadyBatch($fixture, 'EXP-100', 10000);
+
+        $this->withToken($fixture['token'])
+            ->postJson("/api/document-batches/{$second->id}/create-expense-draft", $this->payload(['batch' => $second] + $fixture))
+            ->assertUnprocessable()
+            ->assertJsonPath('reason', 'duplicate_document');
+
+        $this->assertDatabaseCount('expenses', 1);
+        $this->assertDatabaseCount('document_transaction_links', 1);
+        $this->assertDatabaseCount('import_document_reservations', 1);
+        $this->assertDatabaseHas('document_batches', ['id' => $second->id, 'status' => 'ready_for_draft']);
+    }
+
+    /** @test */
+    public function a_different_amount_for_the_same_vendor_and_day_is_not_a_duplicate(): void
+    {
+        $fixture = $this->readyFixture();
+        $this->buildDraft($fixture, 'الدفعة الأولى.');
+        $second = $this->secondReadyBatch($fixture, 'EXP-101', 25000);
+
+        $this->withToken($fixture['token'])
+            ->postJson("/api/document-batches/{$second->id}/create-expense-draft", $this->payload(['batch' => $second] + $fixture))
+            ->assertCreated();
+        $this->assertDatabaseCount('expenses', 2);
+        $this->assertDatabaseCount('import_document_reservations', 2);
+    }
+
+    /** @test */
+    public function a_standard_import_expense_blocks_the_document_center_for_the_same_vendor_day_and_amount(): void
+    {
+        $fixture = $this->readyFixture();
+        app(ExpenseService::class)->create($this->expenseData($fixture), ['source' => DocumentDuplicateReservationService::SOURCE_STANDARD, 'reference' => 'EXP-100']);
+
+        $this->withToken($fixture['token'])
+            ->postJson("/api/document-batches/{$fixture['batch']->id}/create-expense-draft", $this->payload($fixture))
+            ->assertUnprocessable()
+            ->assertJsonPath('reason', 'duplicate_document');
+
+        $this->assertDatabaseCount('expenses', 1);
+        $this->assertDatabaseCount('document_transaction_links', 0);
+        $this->assertDatabaseHas('document_batches', ['id' => $fixture['batch']->id, 'status' => 'ready_for_draft']);
+    }
+
+    /** @test */
+    public function a_document_center_expense_blocks_a_later_standard_import_of_the_same_identity(): void
+    {
+        $fixture = $this->readyFixture();
+        $this->buildDraft($fixture, 'مركز المستندات أولاً.');
+
+        $this->expectException(\App\Support\DuplicateDocumentException::class);
+        app(ExpenseService::class)->create($this->expenseData($fixture), ['source' => DocumentDuplicateReservationService::SOURCE_STANDARD, 'reference' => 'EXP-100']);
+    }
+
+    /** @return array<string,mixed> بيانات المصروف المطابقة لدليل الاختبار: المورّد والتاريخ 2026-08-25 والمبلغ 10000 هللة. */
+    private function expenseData(array $fixture): array
+    {
+        return ['account_id' => $fixture['account']->id, 'partner_id' => $fixture['partner']->id, 'payment_method' => 'cash', 'expense_date' => '2026-08-25', 'amount' => 10000, 'tax_rate' => 15];
+    }
+
+    /** يُنشئ دفعة مصروف ثانية جاهزة في المستأجر نفسه بالمورّد نفسه ورقم مستند ومبلغ مختارين. */
+    private function secondReadyBatch(array $fixture, string $documentNumber, int $subtotalMinor): DocumentBatch
+    {
+        $actor = $fixture['actor'];
+        $workflow = app(DocumentWorkflowService::class);
+        $batch = DocumentBatch::create(['document_type' => 'expense', 'source_type' => 'manual', 'created_by' => $actor->id]);
+        foreach ([[DocumentWorkflowStatus::RECEIVING, 'fixture_receiving'], [DocumentWorkflowStatus::RECEIVED, 'fixture_received'], [DocumentWorkflowStatus::NEEDS_REVIEW, 'fixture_review']] as [$status, $action]) {
+            $batch = $workflow->transition($batch, $status, $action, 'user', $actor->id, 'تهيئة دليل المصروف.');
+        }
+        $file = DocumentFile::create([
+            'document_batch_id' => $batch->id, 'original_name' => 'expense-2.pdf', 'object_key' => 'fixtures/second/'.md5($documentNumber.$subtotalMinor).'.pdf',
+            'declared_mime' => 'application/pdf', 'detected_mime' => 'application/pdf', 'size_bytes' => 128, 'page_count' => 1,
+            'sha256' => hash('sha256', 'second'.$documentNumber.$subtotalMinor), 'scan_status' => DocumentScanStatus::CLEAN, 'scanned_at' => now('UTC'),
+        ]);
+        $run = DocumentProcessingRun::create(['document_batch_id' => $batch->id, 'document_file_id' => $file->id, 'stage' => 'extraction', 'status' => DocumentProcessingStatus::SUCCEEDED, 'attempt_count' => 1, 'queued_at' => now('UTC'), 'started_at' => now('UTC'), 'finished_at' => now('UTC')]);
+        $attempt = DocumentProviderAttempt::create(['document_batch_id' => $batch->id, 'document_file_id' => $file->id, 'document_processing_run_id' => $run->id, 'sequence' => 1, 'provider_key' => 'fixture', 'model' => 'local', 'status' => 'succeeded', 'page_count' => 1, 'started_at' => now('UTC'), 'finished_at' => now('UTC')]);
+        $payload = $fixture['result']->normalized_payload;
+        $payload['fields']['document_number'] = $documentNumber;
+        $payload['fields']['subtotal_minor'] = $subtotalMinor;
+        $payload['fields']['tax_amount_minor'] = intdiv($subtotalMinor * 15, 100);
+        $payload['fields']['total_amount_minor'] = $subtotalMinor + intdiv($subtotalMinor * 15, 100);
+        $payload['lines'][0]['unit_price_minor'] = $subtotalMinor;
+        $payload['lines'][0]['tax_amount_minor'] = intdiv($subtotalMinor * 15, 100);
+        $payload['lines'][0]['total_minor'] = $subtotalMinor + intdiv($subtotalMinor * 15, 100);
+        $result = DocumentExtractionResult::create([
+            'document_batch_id' => $batch->id, 'document_file_id' => $file->id, 'document_processing_run_id' => $run->id, 'document_provider_attempt_id' => $attempt->id,
+            'provider_key' => 'fixture', 'model' => 'local', 'schema_version' => 1, 'detected_document_type' => 'expense', 'detected_language' => 'ar',
+            'confidence_basis_points' => 9900, 'normalized_payload' => $payload, 'extracted_at' => now('UTC'),
+        ]);
+        $this->confirmedMatch($batch, $result, 'header', 'header.counterparty', 'partner', $fixture['partner']->id);
+
+        return $workflow->transition($batch, DocumentWorkflowStatus::READY_FOR_DRAFT, 'fixture_ready', 'user', $actor->id, 'المراجعة مكتملة.');
     }
 
     /** @return array<string,mixed> */

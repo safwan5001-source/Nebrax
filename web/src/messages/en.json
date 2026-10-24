@@ -1350,6 +1350,11 @@
     "continue_hint": "The job is paused midway (a disconnect or page refresh). Continue applying what was previewed.",
     "continue_apply": "Continue"
   },
+  "documentCenterEntry": {
+    "purchase_hint": "A photographed supplier invoice or a PDF? Upload it in the Document Center to extract and review its data and create a purchase draft. The draft follows the same duplicate protection, so an invoice you already imported is not created twice.",
+    "expense_hint": "A photographed expense receipt or a PDF? Upload it in the Document Center to extract and review its data and create an expense draft. The draft follows the same duplicate protection, so an expense you already imported is not created twice.",
+    "open": "Open the Document Center"
+  },
   "purchaseImport": {
     "title": "Import purchase invoices",
     "subtitle": "Upload a CSV or XLSX file whose rows are invoice lines, map its columns, review the invoices it forms, then safely create purchase drafts. Nothing is posted from here; stock does not move and totals are derived by the system.",
