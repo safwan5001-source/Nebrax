@@ -121,7 +121,9 @@ const json = (route: Route, body: unknown, status = 200) => route.fulfill({ stat
 const PAY_LINKS: Record<string, { view: unknown; status: unknown } | 404> = {
   tok_open: { view: { status: 'open', merchant: 'شركة نبراس الطموح', invoice_number: 'INV-0042', currency: 'SAR', amount_due_minor: 115000, allow_partial: false, expires_at: '2026-11-30T12:00:00Z' }, status: { request_status: 'open', payment: 'none' } },
   tok_partial: { view: { status: 'open', merchant: 'شركة نبراس الطموح', invoice_number: 'INV-0043', currency: 'SAR', amount_due_minor: 230000, allow_partial: true, expires_at: null }, status: { request_status: 'open', payment: 'partially_paid' } },
-  tok_paid: { view: { status: 'open', merchant: 'شركة نبراس الطموح', invoice_number: 'INV-0044', currency: 'SAR', amount_due_minor: 0, allow_partial: false, expires_at: null }, status: { request_status: 'completed', payment: 'paid' } },
+  // الخادم لا يعيد التفاصيل إلا لرابط مفتوح؛ المسدَّد/المتعذَّر يعيد الحالة وحدها (PublicPaymentLinkController::show).
+  tok_completed: { view: { status: 'completed' }, status: { request_status: 'completed', payment: 'paid' } },
+  tok_unavailable: { view: { status: 'unavailable' }, status: { request_status: 'open', payment: 'none' } },
   tok_expired: { view: { status: 'expired' }, status: { request_status: 'expired', payment: 'none' } },
   tok_cancelled: { view: { status: 'cancelled' }, status: { request_status: 'cancelled', payment: 'none' } },
   tok_gone: 404,
@@ -213,7 +215,7 @@ async function setup(page: Page, w: World, opts: { locale: Locale; theme: Theme;
 // ───────────────────────── فحوص مشتركة ─────────────────────────
 
 /** يجمع أخطاء الصفحة وأخطاء الـconsole (المعروفة والمبرَّرة فقط تُستثنى). */
-function watchErrors(page: Page): string[] {
+function watchErrors(page: Page, tolerateHttpError = false): string[] {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   page.on('console', (message) => {
@@ -224,7 +226,7 @@ function watchErrors(page: Page): string[] {
     // تحذير next-intl (تطوير فقط) عن مفاتيح تحوي «.» في appBuilder/developer.events: عيب سابق خارج المدفوعات (مسجَّل في تقرير QA كـP3 مفتوح).
     if (/INVALID_KEY: Namespace keys can not contain/.test(text) && /appBuilder\.|developer\.events/.test(text)) return;
     // طلب مُعترَض يعيد 404/403 عمداً في حالة الاختبار (رابط دفع غير موجود، تقرير محجوب بنطاق الفرع).
-    if (/Failed to load resource: the server responded with a status of (403|404)/.test(text)) return;
+    if (tolerateHttpError && /Failed to load resource: the server responded with a status of (403|404)/.test(text)) return;
     errors.push(`console: ${text}`);
   });
   return errors;
@@ -244,7 +246,6 @@ async function baseChecks(page: Page, ctx: Ctx) {
       return Array.from(document.querySelectorAll<HTMLElement>('body *'))
         .filter((el) => {
           if (el.closest('aside.fixed, [role=dialog]')) return false;   // أدراج/حوارات ثابتة خارج الشاشة لا تُنتج تمريراً
-          if (el.closest('header[data-awj-shell="topbar"]')) return false;   // عيب قشرة معروف مسجَّل (انظر أدناه) لا يخصّ المدفوعات
           for (let cur = el.parentElement; cur && cur !== document.body; cur = cur.parentElement) {
             if (/(auto|scroll|hidden)/.test(getComputedStyle(cur).overflowX) && cur.getBoundingClientRect().right <= vw + 1) return false;   // داخل حاوية تمرير أفقي مستقلة
           }
@@ -256,9 +257,6 @@ async function baseChecks(page: Page, ctx: Ctx) {
         .map((el) => `${el.tagName.toLowerCase()}.${(el.className?.toString() ?? '').slice(0, 70)} [${Math.round(el.getBoundingClientRect().left)}..${Math.round(el.getBoundingClientRect().right)}]`);
     });
     expect(offenders, `horizontal overflow ${overflow}px at ${ctx.vw}`).toEqual([]);
-    // لم يبقَ متجاوز خارج شريط القشرة العلوي: التجاوز كلّه من الشريط العلوي (عيب سابق خارج المدفوعات، P2 مفتوح في تقرير QA).
-    test.info().annotations.push({ type: 'known-shell-defect', description: `topbar overflows ${overflow}px at ${ctx.vw}px (${ctx.locale})` });
-    return;
   }
   expect(overflow, 'no horizontal page scroll').toBeLessThanOrEqual(1);
 }
@@ -294,7 +292,7 @@ async function a11yBasics(page: Page): Promise<string[]> {
     }
     for (const el of Array.from(document.querySelectorAll('[role=dialog]'))) {
       if (!visible(el)) continue;
-      if (!nameOf(el)) issues.push('dialog without accessible name');
+      if (!el.getAttribute('aria-label')?.trim() && !el.getAttribute('aria-labelledby')) issues.push('dialog without accessible name');
       if (el.getAttribute('aria-modal') !== 'true') issues.push('dialog without aria-modal');
     }
     for (const el of Array.from(document.querySelectorAll('img'))) {
@@ -647,15 +645,7 @@ const SCENARIOS: Scenario[] = [
       expect(await a11yBasics(page)).toEqual([]);
     },
   },
-  {
-    id: 'paylink-paid',
-    run: async (page, c) => {
-      await page.goto(`${baseUrl}/pay/tok_paid`, { waitUntil: 'domcontentloaded' });
-      await expect(page.getByText(c.t('payLink', 'state_paid_title')).first()).toBeVisible();
-      await expect(page.getByRole('button', { name: payButtonName(c) })).toHaveCount(0);   // لا زر دفع بعد السداد
-    },
-  },
-  ...(['expired', 'cancelled'] as const).map((state): Scenario => ({
+  ...(['expired', 'cancelled', 'completed', 'unavailable'] as const).map((state): Scenario => ({
     id: `paylink-${state}`,
     run: async (page, c) => {
       await page.goto(`${baseUrl}/pay/tok_${state}`, { waitUntil: 'domcontentloaded' });
@@ -687,7 +677,7 @@ test.describe('PAY-H8-02 payments screens', () => {
     for (const { vw, locale, theme } of combos) {
       test(`${scenario.id} · ${vw} · ${locale} · ${theme}`, async ({ page }) => {
         const w = newWorld(scenario.world);
-        const errors = watchErrors(page);
+        const errors = watchErrors(page, ['paylink-not-found', 'reports-branch-scope-forbidden'].includes(scenario.id));
         const ctx: Ctx = { locale, theme, vw, w, t: (ns, key) => msg(locale, ns, key) };
         await setup(page, w, { locale, theme, vw });
         await scenario.run(page, ctx);

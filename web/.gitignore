@@ -11,3 +11,4 @@ next-env.d.ts
 
 /playwright-report
 /test-results
+/test-results-pay-qa
