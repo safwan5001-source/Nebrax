@@ -178,6 +178,10 @@ class CommerceInvoiceOnPaymentTest extends TestCase
         $this->assertContains(['1130', 5000, 0], $rows);
         $this->assertContains(['2120', 0, 652], $rows);
         $this->assertContains(['4110', 0, 4348], $rows);
+        // تكلفة البضاعة المباعة (متوسط 2000): مدين 5110 / دائن 1140 — من الفاتورة نفسها لا من الحجز.
+        $cogs = JournalEntry::query()->withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->where('status', 'posted')
+            ->get()->first(fn ($e) => $this->lines($e) === [['1140', 0, 2000], ['5110', 2000, 0]]);
+        $this->assertNotNull($cogs, 'قيد COGS: مدين 5110 / دائن 1140 بقيمة 2000');
         // سند القبض A1.
         $this->assertSame([['1130', 0, 5000], ['1170', 5000, 0]], $this->lines(JournalEntry::query()->withoutGlobalScopes()->where('source_type', Payment::class)->where('source_id', $payment->id)->sole()));
 
@@ -284,5 +288,75 @@ class CommerceInvoiceOnPaymentTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/LedgerService|JournalEntry::|JournalLine|table\([\'"]journal_|table\([\'"]stock_movements/', $bridge);
         $this->assertStringContainsString('InvoiceService', $bridge);
         $this->assertStringContainsString('PaymentService', $bridge);
+    }
+
+    #[Test]
+    public function a_credit_limited_customer_does_not_block_a_paid_order_because_the_gateway_voucher_settles_it_in_the_same_transaction(): void
+    {
+        $this->open();
+        $paid = $this->paid($this->tracked(), 'idem-iv-credit');
+        $orderPartner = CommerceOrder::query()->withoutGlobalScopes()->findOrFail($paid['order']['order_id'])->partner_id;
+        DB::table('partners')->where('id', $orderPartner)->update(['credit_limit' => 1]);
+
+        $this->runPosting();
+
+        $this->assertSame(PaymentAttempt::POSTING_POSTED, $paid['attempt']->fresh()->posting_status);
+        $this->assertSame('paid', Invoice::query()->withoutGlobalScopes()->sole()->payment_status);
+    }
+
+    #[Test]
+    public function a_second_capture_for_an_already_posted_order_is_not_marked_posted_without_a_voucher(): void
+    {
+        $this->open();
+        $paid = $this->paid($this->tracked(), 'idem-iv-dup');
+        $this->runPosting();
+        $first = $paid['attempt']->fresh();
+        $dup = $first->replicate();
+        $dup->forceFill(['idempotency_key' => 'dup-'.Str::random(8), 'provider_payment_id' => 'dup-'.Str::random(8), 'posting_status' => PaymentAttempt::POSTING_PENDING, 'accounting_date' => null, 'posted_at' => null])->save();
+
+        app(TenantContext::class)->set($this->tenant->id);
+        $outcome = app(PaymentAttemptPostingService::class)->process(PaymentAttempt::query()->findOrFail($dup->id));
+
+        $this->assertSame(PaymentAttemptPostingService::OUTCOME_NOT_POSTABLE, $outcome);
+        $this->assertSame('duplicate_capture', PaymentAttempt::query()->findOrFail($dup->id)->posting_blocked_reason['reason']);
+        $this->assertSame(1, DB::table('payments')->count());
+        $this->assertSame(1, DB::table('commerce_order_postings')->count());
+    }
+
+    #[Test]
+    public function a_not_postable_capture_can_be_retried_explicitly_after_the_cause_is_fixed_and_the_policy_switch_never_wedges_the_batch(): void
+    {
+        $this->open();
+        \Illuminate\Support\Facades\Event::fake([\App\Events\CommercePaymentAttemptCaptured::class]); // بلا مستمع: يبقى الترحيل pending
+        $paid = $this->paid($this->tracked(), 'idem-iv-retry');
+        $this->assertSame(PaymentAttempt::POSTING_PENDING, $paid['attempt']->fresh()->posting_status);
+        $this->open(true, 'none', 'inclusive'); // السياسة أُغلقت بعد الالتقاط
+        $this->runPosting();
+        $attempt = $paid['attempt']->fresh();
+        $this->assertSame(PaymentAttempt::POSTING_NOT_POSTABLE, $attempt->posting_status);
+        $this->assertSame('feature_disabled', $attempt->posting_blocked_reason['reason']);
+        $this->assertSame(0, $this->runPosting()['processed'], 'لا pending يسدّ الدفعة');
+
+        $this->open();
+        app(TenantContext::class)->set($this->tenant->id);
+        $owner = \App\Models\User::create(['tenant_id' => $this->tenant->id, 'name' => 'o', 'email' => 'o3-'.Str::random(5).'@online-pay.test', 'password' => 'password123', 'role' => 'owner']);
+        $this->assertSame(PaymentAttemptPostingService::OUTCOME_POSTED, app(PaymentAttemptPostingService::class)->repost(PaymentAttempt::query()->findOrFail($attempt->id), $owner, 'بعد إعادة تفعيل السياسة'));
+        $this->assertSame(PaymentAttempt::POSTING_POSTED, PaymentAttempt::query()->findOrFail($attempt->id)->posting_status);
+        $this->assertSame(1, DB::table('commerce_order_postings')->count());
+    }
+
+    #[Test]
+    public function a_closed_period_does_not_block_a_capture_that_fails_the_eligibility_checks_first(): void
+    {
+        $this->open();
+        app(TenantContext::class)->set($this->tenant->id);
+        $owner = \App\Models\User::create(['tenant_id' => $this->tenant->id, 'name' => 'o', 'email' => 'o4-'.Str::random(5).'@online-pay.test', 'password' => 'password123', 'role' => 'owner']);
+        app(AccountingPeriodLockService::class)->create('2026-10-01', '2026-10-31', 'إقفال أكتوبر', $owner);
+        app(TenantContext::class)->forget();
+        $paid = $this->paid($this->tracked(10, 5), 'idem-iv-guard'); // معدل غير مدعوم ⇒ لن يُرحَّل أصلاً
+
+        $this->runPosting();
+
+        $this->assertSame(PaymentAttempt::POSTING_NOT_POSTABLE, $paid['attempt']->fresh()->posting_status, 'لا يُحجب بفترة ما سيُرفض بالأهلية أصلاً');
     }
 }

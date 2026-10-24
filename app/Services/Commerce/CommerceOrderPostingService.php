@@ -12,10 +12,12 @@ use App\Models\PaymentAttempt;
 use App\Models\PaymentAttemptPosting;
 use App\Models\Product;
 use App\Models\Warehouse;
+use App\Services\Accounting\AccountingDateGuard;
 use App\Services\Accounting\AccountingPeriodLockedException;
 use App\Services\Accounting\InvoiceService;
 use App\Services\Accounting\PaymentService;
 use App\Support\CommerceInvoiceOnPayment;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -51,6 +53,7 @@ final class CommerceOrderPostingService
         private readonly PaymentService $payments,
         private readonly CommerceOrderReservationService $reservations,
         private readonly FulfillmentPolicyService $fulfillment,
+        private readonly AccountingDateGuard $dateGuard,
     ) {}
 
     public static function handles(string $payableKey): bool
@@ -79,11 +82,16 @@ final class CommerceOrderPostingService
         if ($order === null) {
             return [self::OUTCOME_NOT_POSTABLE, 'order_missing'];
         }
-        if (CommerceOrderPosting::query()->where('commerce_order_id', $order->id)->orWhere('payment_attempt_id', $attempt->id)->exists()) {
+        if (CommerceOrderPosting::query()->where('payment_attempt_id', $attempt->id)->exists()) {
             return [self::OUTCOME_ALREADY_POSTED, null];
         }
+        // التقاط ثانٍ لطلب رُحِّل بالفعل (دفعة مزدوجة): لا يُعلَّم «مرحَّلاً» بلا سند — يبقى للمراجعة البشرية (مال بوابة غير مقيَّد).
+        if (CommerceOrderPosting::query()->where('commerce_order_id', $order->id)->exists()) {
+            return [self::OUTCOME_NOT_POSTABLE, 'duplicate_capture'];
+        }
         if (! CommerceInvoiceOnPayment::active()) {
-            return [self::OUTCOME_SKIPPED, null]; // أُغلقت البوابة/السياسة بعد الالتقاط: لا ترحيل رجعي تلقائي
+            // أُغلقت البوابة/السياسة بعد الالتقاط: لا ترحيل رجعي تلقائي، ولا يبقى `pending` يسدّ الدفعة؛ يمكن إعادة الترحيل صراحةً بعد إعادة التفعيل.
+            return [self::OUTCOME_NOT_POSTABLE, 'feature_disabled'];
         }
         if ($order->partner_id === null) {
             return [self::OUTCOME_SKIPPED, null]; // سياسة manual_link: ينتظر ربط موظف
@@ -118,6 +126,9 @@ final class CommerceOrderPostingService
             }
         }
 
+        // الفترة/السنة المقفلة تُفحص بعد استبعاد حالات التخطي/الرفض أعلاه (فلا يُحجب بها ما لن يُرحَّل أصلاً).
+        $this->dateGuard->assertOpen($date, 'ترحيل التقاط طلب متجر إلكتروني');
+
         try {
             // نقطة حفظ: رفض عمل لاحق يتراجع عمّا أنشأه الجسر وحده، دون إسقاط معاملة المنسّق (تُسجَّل النتيجة فيها).
             return DB::transaction(fn (): array => $this->issue($attempt, $order, $partner, $warehouse, $date));
@@ -125,6 +136,8 @@ final class CommerceOrderPostingService
             throw $e;
         } catch (CommerceOrderPostingRejection $e) {
             return [self::OUTCOME_NOT_POSTABLE, $e->reason];
+        } catch (QueryException $e) {
+            throw $e; // خطأ قاعدة بيانات (مهلة قفل/جمود/انقطاع) عابر: يتراجع كل شيء وتبقى المحاولة pending فتُعاد، لا `not_postable` نهائي
         } catch (RuntimeException $e) {
             report($e);
 
@@ -178,7 +191,7 @@ final class CommerceOrderPostingService
         }
 
         $this->reservations->consumeActive((string) $order->id);
-        $invoice = $this->invoices->post($invoice);
+        $invoice = $this->invoices->post($invoice, null, null, true);
         if ((int) $invoice->total !== $total) {
             throw new CommerceOrderPostingRejection('invoice_total_mismatch');
         }

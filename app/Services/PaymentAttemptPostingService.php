@@ -108,9 +108,12 @@ final class PaymentAttemptPostingService
 
         return DB::transaction(function () use ($attempt, $fresh, $reason): string {
             $current = PaymentAttempt::query()->lockForUpdate()->find($attempt->getKey());
+            $commerceRetry = $current !== null && $current->posting_status === PaymentAttempt::POSTING_NOT_POSTABLE
+                && CommerceOrderPostingService::handles((string) $current->payable_key)
+                && (($current->posting_blocked_reason['kind'] ?? null) === 'commerce');
             if ($current === null || ! self::handles((string) $current->payable_key)
-                || $current->posting_status !== PaymentAttempt::POSTING_BLOCKED_PERIOD) {
-                throw new PaymentOrchestrationException('not_blocked', 'الدفعة ليست محجوبة بفترة مقفلة.');
+                || ($current->posting_status !== PaymentAttempt::POSTING_BLOCKED_PERIOD && ! $commerceRetry)) {
+                throw new PaymentOrchestrationException('not_blocked', 'الدفعة ليست محجوبة بفترة مقفلة ولا مرفوضة بسبب قابل للمعالجة.');
             }
 
             $outcome = $this->process($current, true);
@@ -184,12 +187,20 @@ final class PaymentAttemptPostingService
 
     private function postWithinTransaction(PaymentAttempt $attempt, bool $explicit): string
     {
+        // H4-03: ترتيب القفل للطلب التجاري «النية ← المحاولة» كما في `completeCaptured` (يقفل النية ثم يكتب المحاولة)، فلا جمود بينهما.
+        if (CommerceOrderPostingService::handles((string) $attempt->payable_key)) {
+            CommercePaymentIntent::query()->lockForUpdate()->find(substr((string) $attempt->payable_key, strlen(CommercePaymentIntent::PAYABLE_TYPE) + 1));
+        }
         $locked = PaymentAttempt::query()->lockForUpdate()->find($attempt->getKey());
         if ($locked === null || ! self::handles((string) $locked->payable_key)) {
             return self::OUTCOME_SKIPPED;
         }
+        // `not_postable` نهائي إلا لالتقاط طلب متجر برمز عمل (`kind=commerce`) يُعاد ترحيله **صراحةً** بقرار مخوَّل بعد معالجة السبب (`repost`).
+        $retriableCommerce = $locked->posting_status === PaymentAttempt::POSTING_NOT_POSTABLE && $explicit
+            && CommerceOrderPostingService::handles((string) $locked->payable_key)
+            && (($locked->posting_blocked_reason['kind'] ?? null) === 'commerce');
         if ($locked->capture_status !== PaymentAttempt::STATUS_CAPTURED || $locked->posting_status === null
-            || $locked->posting_status === PaymentAttempt::POSTING_NOT_POSTABLE) {
+            || ($locked->posting_status === PaymentAttempt::POSTING_NOT_POSTABLE && ! $retriableCommerce)) {
             return self::OUTCOME_SKIPPED;
         }
         if ($locked->posting_status === PaymentAttempt::POSTING_POSTED) {
@@ -277,8 +288,6 @@ final class PaymentAttemptPostingService
     {
         $date = $locked->accounting_date?->toDateString()
             ?? $locked->captured_at->copy()->setTimezone(self::ACCOUNTING_TIMEZONE)->toDateString();
-        $this->dateGuard->assertOpen($date, 'ترحيل التقاط طلب متجر إلكتروني');
-
         [$outcome, $reason] = $this->commerce->post($locked, $date);
 
         if ($outcome === CommerceOrderPostingService::OUTCOME_POSTED) {
