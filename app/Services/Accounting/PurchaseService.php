@@ -8,8 +8,10 @@ use App\Models\Purchase;
 use App\Models\PurchaseLine;
 use App\Models\FuelSupplierInvoice;
 use App\Models\User;
+use App\Services\DocumentDuplicateReservationService;
 use App\Services\PrintTemplates\PrintTemplateService;
 use App\Support\DocumentLineVariantResolver;
+use App\Support\DuplicateDocumentException;
 use App\Support\PrintTemplateContract;
 use App\Support\Settings;
 use Illuminate\Support\Facades\DB;
@@ -55,6 +57,7 @@ class PurchaseService
         protected PaymentService $payments,
         protected PrintTemplateService $printTemplates,
         protected AccountRoleResolver $accountRoles,
+        protected DocumentDuplicateReservationService $duplicates,
     ) {}
 
     /**
@@ -63,15 +66,20 @@ class PurchaseService
      * @param  array  $data   ['partner_id'=>uuid, 'payment_type'=>'cash|credit', 'purchase_date'=>?,
      *                         'due_date'=>?, 'supplier_invoice_no'=>?, 'notes'=>?, 'number'=>?]
      * @param  array  $items  [['product_id'=>?, 'description'=>?, 'quantity'=>int, 'unit_price'=>int, 'tax_rate'=>?int], ...]
+     * @param  array|null  $reservation  ['source'=>DocumentDuplicateReservationService::SOURCE_*] — يمرّره المستورد/مركز المستندات فقط (IMP-H5-S3a)،
+     *         ورقم فاتورة المورّد حينئذٍ إلزامي (هويته). `null` = إنشاء مباشر: لا يحجز إلا حين `purchases.duplicate_reference_policy = block`
+     *         **وللفاتورة رقم مورّد**؛ بلا رقم لا هوية تُحجز (السلوك القديم).
      */
-    public function create(array $data, array $items): Purchase
+    public function create(array $data, array $items, ?array $reservation = null): Purchase
     {
         if (empty($items)) {
             throw new RuntimeException('فاتورة المشتريات يجب أن تحتوي على سطر واحد على الأقل.');
         }
 
-        return DB::transaction(function () use ($data, $items) {
+        return DB::transaction(function () use ($data, $items, $reservation) {
             $date = $data['purchase_date'] ?? now()->toDateString();
+
+            $predicate = $this->guardDuplicate($data['partner_id'], $data['supplier_invoice_no'] ?? null, $reservation, null);
 
             // الغياب يعني «استخدم تفضيل المستأجر»؛ القيمة المرسلة تسبقه دائماً.
             $inclusive = (bool) ($data['tax_inclusive'] ?? Settings::get('purchases', 'default_tax_inclusive'));
@@ -100,10 +108,62 @@ class PurchaseService
                 'language'            => $language,
             ]);
 
+            if ($predicate !== null) {
+                $this->duplicates->reserve(
+                    DocumentDuplicateReservationService::DOMAIN_PURCHASE,
+                    $predicate,
+                    'purchase',
+                    $purchase->id,
+                    $reservation['source'] ?? DocumentDuplicateReservationService::SOURCE_MANUAL,
+                    $data['partner_id'],
+                );
+            }
+
             $this->writeLines($purchase, $items, $inclusive);
 
             return $purchase->load('lines');
         });
+    }
+
+    /**
+     * يقرّر هل يُحجز هذا الإنشاء/التعديل، وإن كان كذلك يفحص المشتريات القائمة (تغطي ما أُنشئ قبل أي حجز) ثم يعيد المسند (مورّد ‖ رقم فاتورته المطبَّع).
+     * التسلسل بين المتنافسين على الهوية نفسها يتولاه الفهرس الفريد لحجز الهوية (`reserve()` تنتظر الفائز حتى commit ثم ترمي)؛ لا قفل استشاري هنا
+     * عمداً: الهوية هي مفتاح الحجز نفسه (بخلاف المصروف حيث الهوية الواسعة أعرض من مفتاح الحجز)، وقفلٌ إضافي لا يضيف حمايةً (مثبَت بتعطيله في اختبار
+     * التزامن) ويضيف ترتيب أقفال يجب صيانته. `null` = لا حجز: السلوك القديم حرفياً (إنشاء مباشر تحت `allow`، أو تحت `block` بلا رقم مورّد — لا هوية تُقارن).
+     * المستورد (`$reservation !== null`) بلا رقم مورّد يُرفض: رقم الفاتورة هو هوية المستند في هذا المجال.
+     *
+     * @param  string|null  $excludeId  مشترى يُستثنى من فحص القائم (التعديل)
+     * @return array<string, string>|null
+     */
+    private function guardDuplicate(string $supplierId, ?string $supplierInvoiceNo, ?array $reservation, ?string $excludeId): ?array
+    {
+        $block = (string) (Settings::get('purchases', 'duplicate_reference_policy') ?? 'allow') === 'block';
+        if ($reservation === null && ! $block) {
+            return null;
+        }
+
+        $reference = DocumentDuplicateReservationService::normalizeReference($supplierInvoiceNo);
+        if ($reference === null) {
+            if ($reservation !== null) {
+                throw new RuntimeException('رقم فاتورة المورّد مطلوب لاستيراد فاتورة مشتريات (هويتها).');
+            }
+
+            return null;
+        }
+
+        $predicate = DocumentDuplicateReservationService::purchasePredicate($supplierId, (string) $supplierInvoiceNo);
+
+        // التكرار مسألة مؤسسية: النموذج بتصفية فرع صريحة (BelongsToBranch) فلا نطاق فرع تلقائياً هنا؛ الفحص بنطاق المستأجر كاملاً.
+        $existing = Purchase::query()
+            ->when($excludeId !== null, fn ($q) => $q->whereKeyNot($excludeId))
+            ->where('partner_id', $supplierId)->whereNotNull('supplier_invoice_no')
+            ->get(['id', 'supplier_invoice_no'])
+            ->first(fn (Purchase $p) => DocumentDuplicateReservationService::normalizeReference($p->supplier_invoice_no) === $reference);
+        if ($existing !== null) {
+            throw new DuplicateDocumentException(DocumentDuplicateReservationService::DOMAIN_PURCHASE, 'purchase', $existing->id);
+        }
+
+        return $predicate;
     }
 
     /**
@@ -266,6 +326,13 @@ class PurchaseService
                 throw new RuntimeException('لا يمكن تعديل فاتورة مشتريات مرحّلة.');
             }
 
+            // هوية المورّد/الرقم المحجوزة تُعاد قبل أي كتابة: تنازعٌ ⇒ DuplicateDocumentException ⇒ المعاملة كلها تتراجع (السطور لم تُمسّ بعد).
+            $this->reconcileReservation(
+                $purchase,
+                $data['partner_id'],
+                array_key_exists('supplier_invoice_no', $data) ? $data['supplier_invoice_no'] : $purchase->supplier_invoice_no,
+            );
+
             // مسوّدة: لا قيد ولا حركة مخزون، فحذف السطور وإعادة بنائها آمن.
             $purchase->lines()->delete();
 
@@ -345,8 +412,48 @@ class PurchaseService
                 throw new RuntimeException('لا يمكن حذف مسودة مشتريات مرتبطة بمستند؛ استخدم الإلغاء أو الأرشفة وفق دورة المشتريات.');
             }
             $purchase->lines()->delete();
+            // الحجز يُحرَّر مع المسودة في المعاملة نفسها: إعادة استيراد الفاتورة نفسها بعد حذفها مسموحة، ولا حجز يتيم يحجب هويةً بلا مستند.
+            $this->duplicates->release('purchase', $purchase->id);
             $purchase->delete();
         });
+    }
+
+    /**
+     * يعيد اشتقاق حجز مسودةٍ عند تعديل مورّدها/رقم فاتورته (داخل معاملة التعديل، والمشترى مقفل).
+     *  - محجوزة (مستوردة أو أُنشئت تحت block): الرقم يُمحى ⇒ يُحرَّر الحجز؛ الهوية تغيّرت ⇒ قفل + فحص القائم (يستثني نفسها) + `rekey`.
+     *  - غير محجوزة: لا شيء إلا تحت `block` وتغيّرت الهوية فعلاً (مورّد أو رقم مطبَّع) — فمسودة قديمة مكرَّرة سلفاً لا تُحجب بتعديل ملاحظة.
+     */
+    private function reconcileReservation(Purchase $purchase, string $supplierId, ?string $supplierInvoiceNo): void
+    {
+        $held = $this->duplicates->forDocument('purchase', $purchase->id);
+        $reference = DocumentDuplicateReservationService::normalizeReference($supplierInvoiceNo);
+
+        if ($held !== null) {
+            if ($reference === null) {
+                $this->duplicates->release('purchase', $purchase->id);
+
+                return;
+            }
+            $predicate = DocumentDuplicateReservationService::purchasePredicate($supplierId, (string) $supplierInvoiceNo);
+            if (DocumentDuplicateReservationService::key(DocumentDuplicateReservationService::DOMAIN_PURCHASE, $predicate) === $held->dedupe_key) {
+                return;
+            }
+            // `$reservation` غير فارغ ⇒ فحص القائم إلزامي (مستند محميّ الهوية) أياً كانت السياسة.
+            $this->guardDuplicate($supplierId, $supplierInvoiceNo, ['source' => $held->source], $purchase->id);
+            $this->duplicates->rekey('purchase', $purchase->id, $predicate, $supplierId);
+
+            return;
+        }
+
+        $unchanged = $purchase->partner_id === $supplierId
+            && DocumentDuplicateReservationService::normalizeReference($purchase->supplier_invoice_no) === $reference;
+        if ($unchanged) {
+            return;
+        }
+        $predicate = $this->guardDuplicate($supplierId, $supplierInvoiceNo, null, $purchase->id);
+        if ($predicate !== null) {
+            $this->duplicates->reserve(DocumentDuplicateReservationService::DOMAIN_PURCHASE, $predicate, 'purchase', $purchase->id, DocumentDuplicateReservationService::SOURCE_MANUAL, $supplierId);
+        }
     }
 
     /**
