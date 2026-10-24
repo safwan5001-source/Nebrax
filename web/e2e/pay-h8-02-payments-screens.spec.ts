@@ -179,7 +179,7 @@ async function setup(page: Page, w: World, opts: { locale: Locale; theme: Theme;
       w.visaEnabled = (request.postDataJSON() as { enabled: boolean }).enabled;
       return json(route, { data: onlineMethod({ key: 'visa', status: w.visaEnabled ? 'enabled' : 'disabled', enabled: w.visaEnabled, customer_visible: w.visaEnabled }) });
     }
-    if (path === '/payment-gateways' && method === 'GET') return json(route, { data: [gateway(), gateway({ id: 'g2', provider: 'custom', name: 'ربط يدوي', name_en: 'Manual', status: 'draft', is_usable: false, verified_at: null, activated_at: null, has_secret_key: false, provider_capabilities: null }), gateway({ id: 'g3', name: 'ميسّر (تجريبي غير مفعّل)', name_en: 'Moyasar (inactive)', status: 'draft', is_usable: false, verified_at: null, activated_at: null, has_secret_key: false })] });
+    if (path === '/payment-gateways' && method === 'GET') return json(route, { data: [gateway(), gateway({ id: 'g2', provider: 'custom', name: 'ربط يدوي', name_en: 'Manual', status: 'draft', is_usable: false, verified_at: null, activated_at: null, has_secret_key: false, provider_capabilities: null }), gateway({ id: 'g3', name: 'ميسّر (تجريبي غير مفعّل)', name_en: 'Moyasar (inactive)', status: 'draft', is_usable: false, verified_at: null, activated_at: null, has_secret_key: false }), gateway({ id: 'g4', provider: 'tap', name: 'تاب', name_en: 'Tap', status: 'draft', is_usable: false, verified_at: null, activated_at: null, has_secret_key: false, provider_capabilities: null })] });
 
     if (path === '/payment-attempts' && method === 'GET') {
       if (q.get('posting_status') === 'blocked_period') return json(route, { data: [attempt({ id: 'a2', invoice: { id: 'inv2', number: 'INV-0002' }, posting_status: 'blocked_period', blocked_reason: { kind: 'period' } })], meta: meta(q.get('per_page') === '1' ? 1 : 1) });
@@ -474,6 +474,8 @@ const SCENARIOS: Scenario[] = [
       await expectLogosLoaded(page.getByTestId('pg-item-g1'), ['moyasar']);
       await expect(page.getByTestId('pg-item-g1').locator('img:visible')).toHaveAttribute('src', c.theme === 'dark' ? '/payment-brands/moyasar-dark.svg' : '/payment-brands/moyasar.svg');
       await expectLogosLoaded(page.getByTestId('pg-item-g3'), ['moyasar']);   // اتصال غير مفعَّل: الشعار يظهر وحالته الصحيحة تبقى
+      await expectLogosLoaded(page.getByTestId('pg-item-g4'), ['tap']);   // Tap: شعار الناشر؛ في الداكن على سطح أبيض بلا تلوين
+      if (c.theme === 'dark') await expect(page.getByTestId('pg-item-g4').locator('img:visible')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
       await expect(page.getByTestId('pg-item-g2').locator('img')).toHaveCount(0);
       expect(await ltrIslands(page)).toBeGreaterThanOrEqual(0);
       await tablesUsable(page);

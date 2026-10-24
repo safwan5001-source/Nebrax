@@ -259,7 +259,7 @@ describe.each(TEST_LOCALES)('PaymentGatewaysPage (%s)', (locale) => {
     expect(put?.[1].body).not.toHaveProperty('environment');
   });
 
-  it('shows the Moyasar brand mark only on a Moyasar connection, never a lookalike on other providers', async () => {
+  it('shows the registered Moyasar logo only on a Moyasar connection, never a lookalike on other providers', async () => {
     perms.current = ['payments.view'];
     listReturns([
       conn({ id: 'm1', provider: 'moyasar', name: 'ميسّر الرئيسي', name_en: 'Moyasar main' }),
@@ -270,7 +270,8 @@ describe.each(TEST_LOCALES)('PaymentGatewaysPage (%s)', (locale) => {
     const moyasar = await screen.findByTestId('pg-item-m1');
     const mark = within(moyasar).getByTestId('payment-brand-mark');
     expect(mark.getAttribute('data-brand')).toBe('moyasar');
-    expect(moyasar.querySelector('img')).toBeNull();
+    expect(moyasar.querySelector('img[data-mark="logo"]')?.getAttribute('src')).toBe('/payment-brands/moyasar.svg');
+    expect(within(screen.getByTestId('pg-item-s1')).queryByRole('img')).toBeNull();
     expect(within(screen.getByTestId('pg-item-s1')).queryByTestId('payment-brand-mark')).toBeNull();
   });
 

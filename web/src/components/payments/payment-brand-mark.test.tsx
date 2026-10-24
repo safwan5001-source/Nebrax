@@ -42,7 +42,7 @@ describe.each(TEST_LOCALES)('PaymentBrandMark (%s)', (locale) => {
     const tap = renderIntl(<PaymentBrandMark brand={paymentBrandPresentation('tap')!} />, locale);
     const img = tap.container.querySelector('img[data-mark="logo"]') as HTMLImageElement;
     expect(img.getAttribute('src')).toBe('/payment-brands/tap.svg');
-    expect(img.className).toMatch(/dark:bg-white/);
+    expect(img.className).toMatch(/awj-brand-on-light/);
     expect(tap.container.querySelector('img[data-mark="logo-dark"]')).toBeNull();
   });
 

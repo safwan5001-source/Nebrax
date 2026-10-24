@@ -62,6 +62,14 @@
 /* ERP-UX-H1-6A: the document preview is white paper in every app mode. Its sections read the
    app tokens (--text, --muted, --border…), which in dark mode became light-on-white (1.1:1).
    Pin the light palette on the paper root in dark mode only; light mode is untouched. */
+/* شعار علامة دفع داكن الألوان بلا نسخة داكنة رسمية: سطح أبيض خلفه في الوضع الداكن بدل تلوين الأصل (لا تعديل للشعار). */
+.dark .awj-brand-on-light {
+  box-sizing: content-box;
+  border-radius: 2px;
+  background-color: #fff;
+  padding: 2px;
+}
+
 .dark [data-doc-paper] {
   color-scheme: light;
   --background: #f6f7f9;

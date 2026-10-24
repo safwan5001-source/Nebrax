@@ -44,7 +44,7 @@ export function PaymentBrandMark({
             data-mark="logo"
             onError={() => setBroken(true)}
             className={`h-6 w-auto shrink-0 object-contain ${
-              logo.dark ? 'dark:hidden' : logo.needsLightSurface ? 'dark:box-content dark:rounded-sm dark:bg-white dark:p-0.5' : ''
+              logo.dark ? 'dark:hidden' : logo.needsLightSurface ? 'awj-brand-on-light' : ''
             }`}
           />
           {logo.dark ? (
