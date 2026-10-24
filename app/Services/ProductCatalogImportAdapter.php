@@ -90,7 +90,7 @@ class ProductCatalogImportAdapter extends SpreadsheetImportAdapter implements Im
      * إعادة حساب `row_count` بتعريف صفوف البيانات دون الفيزيائي مرّة واحدة عند أول ترحيل — تصحيحٌ ذاتيٌّ لتشغيلات
      * `ready` أُنشئت بالحساب الفيزيائي القديم (قبل تصحيح المراجعة) قبل أن يعتمد عليها الاكتمال، بلا نقل بيانات منفصل.
      */
-    public function recountOnFirstApply(string $tmpPath, string $extension): ?int
+    public function recountOnFirstApply(string $tmpPath, string $extension, array $frozenOptions = []): ?int
     {
         $rows = SpreadsheetReader::read($tmpPath, $extension, ProductImportService::DURABLE_MAX_ROWS, self::MAX_COLUMNS);
 

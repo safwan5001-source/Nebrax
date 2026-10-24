@@ -14,6 +14,7 @@ use App\Support\PartnerImportFields;
 use App\Support\PriceListItemImportFields;
 use App\Support\ProductTaxonomyImportFields;
 use App\Support\ExpenseImportFields;
+use App\Support\PurchaseImportFields;
 use App\Support\StocktakeCountImportFields;
 use App\Support\UnitTemplateImportFields;
 use App\Support\ProductImportFields;
@@ -81,6 +82,7 @@ class ApplyImportJobRequest extends FormRequest
                 UnitTemplateImportFields::keys(),
                 StocktakeCountImportFields::keys(),
                 ExpenseImportFields::keys(),
+                PurchaseImportFields::keys(),
                 ['ignore']
             ))],
             // IMP-H3-S2 — خياراتا `partner_master`: النوع (عميل/مورّد) وسياسة إشارات التكرار.
@@ -100,6 +102,11 @@ class ApplyImportJobRequest extends FormRequest
             'default_tax_rate' => ['sometimes', 'integer', 'min:0', 'max:100'],
             'confirmed_repeat_rows' => ['sometimes', 'array', 'max:'.ExpenseImportService::MAX_ROWS],
             'confirmed_repeat_rows.*' => ['integer', 'min:2'],
+            // IMP-H5-S4a — سياسات `purchase_import` (مجمَّدة مع المعاينة؛ هنا للمقارنة القانونية لا للتغيير).
+            'default_supplier_id' => ['sometimes', 'nullable', 'uuid'],
+            'default_payment_type' => ['sometimes', 'nullable', Rule::in(PurchaseImportFields::PAYMENT_TYPES)],
+            'tax_inclusive' => ['sometimes', 'nullable', 'boolean'],
+            'warehouse_id' => ['sometimes', 'nullable', 'uuid'],
             'batch_size' => ['sometimes', 'integer', 'min:1', 'max:'.ProductImportService::APPLY_BATCH_SIZE],
             'price_list_id' => ['sometimes', 'nullable', 'uuid'],
             'opening_date' => ['sometimes', 'date_format:Y-m-d'],
@@ -131,10 +138,14 @@ class ApplyImportJobRequest extends FormRequest
     public function explicitOptions(): array
     {
         $options = [];
-        foreach (['mode', 'blank_policy', 'master_data_policy', 'opening_date', 'type', 'duplicate_signal_policy', 'kind', 'parent_policy', 'existing_policy', 'stocktake_id', 'existing_count_policy', 'reference_policy', 'default_account_id', 'default_payment_method', 'default_tax_rate'] as $key) {
+        foreach (['mode', 'blank_policy', 'master_data_policy', 'opening_date', 'type', 'duplicate_signal_policy', 'kind', 'parent_policy', 'existing_policy', 'stocktake_id', 'existing_count_policy', 'reference_policy', 'default_account_id', 'default_payment_method', 'default_tax_rate', 'default_supplier_id', 'default_payment_type', 'warehouse_id'] as $key) {
             if ($this->has($key)) {
                 $options[$key] = $this->string($key)->toString();
             }
+        }
+        // منطقي لا نصّي: false المُرسَلة نصّاً تصير '' فتُقرأ «غائبة» وتختلف عن المجمَّد false.
+        if ($this->has('tax_inclusive')) {
+            $options['tax_inclusive'] = $this->input('tax_inclusive') === null ? null : $this->boolean('tax_inclusive');
         }
         // مطابقة فارغة = لا مطابقة مُرسَلة (المعاينة multipart لا تستطيع إرسال مصفوفة فارغة أصلاً): لا تُعدّ تغييراً للمجمَّد.
         if ($this->has('mapping') && (array) $this->input('mapping', []) !== []) {
@@ -191,10 +202,14 @@ class ApplyImportJobRequest extends FormRequest
         if ($this->has('opening_date')) {
             $options['opening_date'] = (string) $this->input('opening_date');
         }
-        foreach (['type', 'duplicate_signal_policy', 'kind', 'parent_policy', 'existing_policy', 'stocktake_id', 'existing_count_policy', 'reference_policy', 'default_account_id', 'default_payment_method', 'default_tax_rate'] as $key) {
+        foreach (['type', 'duplicate_signal_policy', 'kind', 'parent_policy', 'existing_policy', 'stocktake_id', 'existing_count_policy', 'reference_policy', 'default_account_id', 'default_payment_method', 'default_tax_rate', 'default_supplier_id', 'default_payment_type', 'warehouse_id'] as $key) {
             if ($this->has($key)) {
                 $options[$key] = $this->string($key)->toString();
             }
+        }
+        // منطقي لا نصّي: false المُرسَلة نصّاً تصير '' فتُقرأ «غائبة» وتختلف عن المجمَّد false.
+        if ($this->has('tax_inclusive')) {
+            $options['tax_inclusive'] = $this->input('tax_inclusive') === null ? null : $this->boolean('tax_inclusive');
         }
         if ($this->has('allow_zero_cost')) {
             $options['allow_zero_cost'] = $this->boolean('allow_zero_cost');

@@ -25,8 +25,9 @@ class ImportDomainRegistry
         UnitTemplateImportAdapter $unitTemplates,
         StocktakeCountImportAdapter $stocktakeCounts,
         ExpenseImportAdapter $expenses,
+        PurchaseImportAdapter $purchases,
     ) {
-        foreach ([$catalog, $workbook, $opening, $partners, $taxonomy, $priceListItems, $unitTemplates, $stocktakeCounts, $expenses] as $adapter) {
+        foreach ([$catalog, $workbook, $opening, $partners, $taxonomy, $priceListItems, $unitTemplates, $stocktakeCounts, $expenses, $purchases] as $adapter) {
             $this->adapters[$adapter->domain()] = $adapter;
         }
     }

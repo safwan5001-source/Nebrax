@@ -23,7 +23,7 @@ abstract class SpreadsheetImportAdapter implements ImportDomainAdapter
         return [$this->countDataRows($rows), $rows === [] ? 0 : count($rows[0])];
     }
 
-    public function recountOnFirstApply(string $tmpPath, string $extension): ?int
+    public function recountOnFirstApply(string $tmpPath, string $extension, array $frozenOptions = []): ?int
     {
         return null;
     }

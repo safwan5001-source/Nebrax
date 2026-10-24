@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Services\ExpenseImportService;
+use App\Services\PurchaseImportService;
 use App\Services\ImportJobAccess;
 use App\Services\ProductImportService;
 use App\Services\PartnerImportService;
@@ -11,6 +12,7 @@ use App\Services\ProductTaxonomyImportService;
 use App\Services\StocktakeCountImportService;
 use App\Services\UnitTemplateImportService;
 use App\Support\ExpenseImportFields;
+use App\Support\PurchaseImportFields;
 use App\Support\InventoryOpeningFields;
 use App\Support\PartnerImportFields;
 use App\Support\PriceListItemImportFields;
@@ -69,7 +71,7 @@ class StoreImportJobRequest extends FormRequest
             'options.blank_policy' => ['sometimes', Rule::in([ProductImportService::BLANK_IGNORE, ProductImportService::BLANK_CLEAR])],
             'options.master_data_policy' => ['sometimes', Rule::in([ProductImportService::MASTER_DATA_ERROR, ProductImportService::MASTER_DATA_TEXT, ProductImportService::MASTER_DATA_CREATE])],
             'options.mapping' => ['sometimes', 'array', 'max:'.ProductImportService::MAX_COLUMNS],
-            'options.mapping.*' => ['nullable', 'string', Rule::in(array_merge(ProductImportFields::keys(), InventoryOpeningFields::keys(), PartnerImportFields::keys(), ProductTaxonomyImportFields::allKeys(), PriceListItemImportFields::keys(), UnitTemplateImportFields::keys(), StocktakeCountImportFields::keys(), ExpenseImportFields::keys(), ['ignore']))],
+            'options.mapping.*' => ['nullable', 'string', Rule::in(array_merge(ProductImportFields::keys(), InventoryOpeningFields::keys(), PartnerImportFields::keys(), ProductTaxonomyImportFields::allKeys(), PriceListItemImportFields::keys(), UnitTemplateImportFields::keys(), StocktakeCountImportFields::keys(), ExpenseImportFields::keys(), PurchaseImportFields::keys(), ['ignore']))],
             // IMP-H3-S2: النوع إلزامي لمجال الأطراف (يحدّد عميلاً أم مورّداً ولا يُستنتج من الملف) ويُرفض لغيره؛ فشلُ غيابه بعد الإنشاء كان سيظهر وقت التطبيق.
             'options.type' => [Rule::requiredIf(fn () => $this->input('domain') === ImportJobDomain::PARTNER_MASTER), Rule::in(PartnerImportService::TYPES)],
             'options.duplicate_signal_policy' => ['sometimes', Rule::in([PartnerImportService::SIGNAL_ERROR, PartnerImportService::SIGNAL_SKIP, PartnerImportService::SIGNAL_WARN])],
@@ -88,6 +90,11 @@ class StoreImportJobRequest extends FormRequest
             'options.default_tax_rate' => ['sometimes', 'integer', 'min:0', 'max:100'],
             'options.confirmed_repeat_rows' => ['sometimes', 'array', 'max:'.ExpenseImportService::MAX_ROWS],
             'options.confirmed_repeat_rows.*' => ['integer', 'min:2'],
+            // IMP-H5-S4a: سياسات مسودات المشتريات (تُجمَّد مع المعاينة)؛ المورّد الافتراضي والمستودع يُتحقَّق منهما وقت المعاينة/التنفيذ.
+            'options.default_supplier_id' => ['sometimes', 'nullable', 'uuid'],
+            'options.default_payment_type' => ['sometimes', 'nullable', Rule::in(PurchaseImportFields::PAYMENT_TYPES)],
+            'options.tax_inclusive' => ['sometimes', 'nullable', 'boolean'],
+            'options.warehouse_id' => ['sometimes', 'nullable', 'uuid'],
             'options.opening_date' => ['sometimes', 'date_format:Y-m-d'],
             'options.allow_zero_cost' => ['sometimes', 'boolean'],
             'options.notes' => ['sometimes', 'nullable', 'string', 'max:500'],

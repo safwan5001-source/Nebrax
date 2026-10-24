@@ -38,6 +38,8 @@ final class ImportJobDomain
         self::STOCKTAKE_COUNT => ['view' => 'products.view', 'manage' => 'products.manage', 'app' => 'inventory.core'],
         // IMP-H5-S2: `POST expenses` المباشرة محروسة بـ`expenses.manage` + `finance.operations` (القراءة `expenses.view`) — البوابات نفسها لا أضعف.
         self::EXPENSE_IMPORT => ['view' => 'expenses.view', 'manage' => 'expenses.manage', 'app' => 'finance.operations'],
+        // IMP-H5-S4a: `POST purchases` المباشرة محروسة بـ`purchases.manage` + `purchases.cycle` (القراءة `purchases.view`) — البوابات نفسها لا أضعف؛ ويُفحص المستودع على الفاعل في الخدمة.
+        self::PURCHASE_IMPORT => ['view' => 'purchases.view', 'manage' => 'purchases.manage', 'app' => 'purchases.cycle'],
     ];
 
     public const PRODUCT_CATALOG = 'product_catalog';
@@ -64,6 +66,9 @@ final class ImportJobDomain
     /** مسودات مصروفات (IMP-H5-S2): صفٌّ = مسودة، بلا ترحيل ولا قيد؛ منع التكرار بحجز الهوية، وتكرارٌ مؤكَّد صريح فقط يُستثنى. */
     public const EXPENSE_IMPORT = 'expense_import';
 
+    /** مسودات فواتير مشتريات (IMP-H5-S4a): وحدتها الفاتورة كلها (مجموعة صفوف بـ مورّد ‖ رقم فاتورته)، بلا ترحيل ولا قيد ولا حركة مخزون؛ منع التكرار بحجز الهوية. */
+    public const PURCHASE_IMPORT = 'purchase_import';
+
     /** @return list<string> */
     /**
      * مجالات لا تُنشأ لها تشغيلة إلا مربوطةً بمعاينتها: خياراتها الدلالية الإلزامية (النوع/التصنيف·العلامة/قائمة السعر) وسياساتها تُجمَّد من المعاينة،
@@ -72,7 +77,7 @@ final class ImportJobDomain
      *
      * @var list<string>
      */
-    public const PREVIEW_BOUND_ONLY = [self::PARTNER_MASTER, self::PRODUCT_TAXONOMY, self::PRICE_LIST_ITEMS, self::UNIT_TEMPLATES, self::STOCKTAKE_COUNT, self::EXPENSE_IMPORT];
+    public const PREVIEW_BOUND_ONLY = [self::PARTNER_MASTER, self::PRODUCT_TAXONOMY, self::PRICE_LIST_ITEMS, self::UNIT_TEMPLATES, self::STOCKTAKE_COUNT, self::EXPENSE_IMPORT, self::PURCHASE_IMPORT];
 
     public static function values(): array
     {
@@ -86,6 +91,7 @@ final class ImportJobDomain
             self::UNIT_TEMPLATES,
             self::STOCKTAKE_COUNT,
             self::EXPENSE_IMPORT,
+            self::PURCHASE_IMPORT,
         ];
     }
 

@@ -81,7 +81,7 @@ class ProductWorkbookImportAdapter implements ImportDomainAdapter
         return $this->withMapping($options, $raw);
     }
 
-    public function recountOnFirstApply(string $tmpPath, string $extension): ?int
+    public function recountOnFirstApply(string $tmpPath, string $extension, array $frozenOptions = []): ?int
     {
         return null;
     }
