@@ -361,6 +361,14 @@ php artisan serve
 - **الرفض:** فترة/سنة مقفلة ⇒ تراجع كامل و`blocked_period` (التاريخ الأصلي لا يتغير؛ إعادة صريحة `repost` بعد الفتح). رفض عمل (معدل ضريبة غير 15%، مبلغ لا يطابق، طرف معطَّل، لا مخزن تنفيذ، فشل ترحيل الفاتورة) ⇒ `not_postable` برمز في `posting_blocked_reason` والدفع يبقى مثبَّتاً والحجز قائماً للمراجعة البشرية. نية ملغاة + التقاط متأخر ⇒ لا ترحيل (D-15).
 - **خارج النطاق:** استرداد بوابة لطلب متجر (`PaymentRefundService::partnerIdOf` يردّ `not_refundable` كما كان)، تصنيف ضريبي غير 15% (EXT-05/REM-12)، `/commerce/v1`، رسوم البوابة. المرجع: `docs/plans/payments/horizon/AWJ-PAY-H4-03-IMPLEMENTATION-REPORT.md`.
 
+
+## واجهة الدفع الإلكتروني في المتجر — PAY-H4-05 (`storefront/`، مُتحكَّم بها بالخادم)
+
+لا تظهر وسيلة دفع إلكتروني في Checkout المتجر إلا إذا علّمها الـAPI `online: true` (بوابة H4-04a مفتوحة)؛ مغلقاً يبقى كل شيء كما كان. `PAYMENT_CAPABILITY = gated`.
+- **الإتمام:** نية `requires_action` + `order_reference` ⇒ يُحفظ (id + المرجع الموقَّع + الرقم + الوقت فقط، `localStorage`، TTL 25 ساعة > أقصى حجز 24 ساعة) ويُحوَّل إلى `/checkout/payment-return?start=1`؛ تخزين محجوب ⇒ يبدأ الدفع مباشرةً من الإتمام. COD/الاستلام/البوابة المغلقة = التأكيد القديم حرفياً.
+- **صفحة العودة (`PaymentReturn`):** الحقيقة الوحيدة هي `GET payment-status` من الخادم؛ **لا يُقرأ شيء من عنوان المتصفح** سوى `?start=1` (يبدأ الدفع مرة واحدة ويُزال). التحويل لعنوان https يعيده الخادم فقط. حالات: paid · pending (استطلاع ثم «تحقّق مجدداً») · under_review · awaiting/failed/expired (إعادة محاولة إن `can_retry`) · cancelled · غير معروف · انقطاع (محدود). `not_payable` عند البدء يعيد قراءة الحالة الحقيقية. بلا اسم مزوّد/شعار/حقل بطاقة (حارس معماري). ست لغات (سوق AWJ يعرض ar/en فقط؛ de/es/fr/pl مُتحقَّق منها بالاختبار الوحدوي بملفات الرسائل الحقيقية).
+- المرجع: `docs/plans/payments/horizon/AWJ-PAY-H4-IMPLEMENTATION-REPORT.md`.
+
 ## أدوار ضريبة القيمة المضافة (REM-05 / ACC-01)
 
 `App\Services\Accounting\VatRoleIntegrityService` هو مصدر قواعد دورَي `tax_input`/`tax_output` وسياق تقرير الضريبة. لا يكتب شيئاً.
