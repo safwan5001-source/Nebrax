@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { CreditCard } from 'lucide-react';
 import {
@@ -68,7 +68,17 @@ export function PaymentBrandRow({
   label: string;
   className?: string;
 }) {
-  const brands = enabledMethodBrands(enabled);
+  // إرشادات Apple: رسالة Apple Pay تُعرض على الأجهزة المدعومة فقط (canMakePayments) — لا تُعرض قبل التحقق على العميل.
+  const [applePayDevice, setApplePayDevice] = useState(false);
+  useEffect(() => {
+    try {
+      const session = (window as unknown as { ApplePaySession?: { canMakePayments?: () => boolean } }).ApplePaySession;
+      setApplePayDevice(Boolean(session?.canMakePayments?.()));
+    } catch {
+      setApplePayDevice(false);
+    }
+  }, []);
+  const brands = enabledMethodBrands(enabled).filter((brand) => brand.key !== 'apple_pay' || applePayDevice);
   if (brands.length === 0) return null;
   return (
     <ul role="list" aria-label={label} className={`flex flex-wrap items-center gap-x-3 gap-y-1 ${className}`} data-testid="payment-brand-row">

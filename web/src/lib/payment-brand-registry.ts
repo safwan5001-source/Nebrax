@@ -16,6 +16,8 @@ export interface PaymentBrandProvenance {
   source: string;
   /** تاريخ التحقق (ISO). */
   verifiedAt: string;
+  /** شروط الاستعمال المنشورة لدى الناشر (ملخص حرفي لما يقيّد العرض)، لا اجتهاد. */
+  terms?: string;
 }
 
 export type PaymentBrandLogo =
@@ -35,19 +37,36 @@ export const PAYMENT_BRAND_LOGO_POLICY =
   'Only an official asset with recorded provenance is rendered as a logo. Otherwise the brand is shown by name as text. No redrawn, recolored, cropped, or substitute artwork.';
 
 const PENDING = {
-  moyasar: 'No public official brand kit located. Request the logo pack and usage terms from Moyasar (merchant/partner channel) before adopting.',
-  mada: 'No public official mark located for web use. Request the mada logo pack and usage terms (Saudi Payments / acquiring partner) before adopting.',
-  visa: 'Visa Brand Center requires a request form and accepting its terms. Obtain the mark through the form; do not source it elsewhere.',
-  mastercard: 'Mastercard brand resources could not be verified from this environment. Obtain the mark and guidelines from the Mastercard Brand Center before adopting.',
-  apple_pay: 'Apple publishes the Apple Pay mark under its marketing guidelines only for a supported, enabled Apple Pay flow. Adopt after Apple Pay is enabled and the guidelines are confirmed.',
-} as const satisfies Record<PaymentBrandKey, string>;
+  moyasar: 'BLOCKED: moyasar.com/press and docs.moyasar.com publish no logo pack or reuse terms (only their own site header logo). Request the official logo pack and usage terms via help.moyasar.com / the partner channel before adopting.',
+  mada: 'BLOCKED: mada.com.sa (Saudi Payments) was unreachable from the build environment and no official download page was verified; third-party copies are not official. Obtain the mada brand pack and e-commerce merchant guideline from Saudi Payments or the acquiring partner.',
+  visa: 'BLOCKED (owner action): the Visa Brand Center (globalclient.visa.com/brand-mark) releases files only after a named business submits a form and accepts the Terms of Use. Submit it as the AWJ business and register the files here.',
+  mastercard: 'BLOCKED (owner action): the Mastercard Brand Center (mastercard.com/brandcenter) was not reachable from the build environment (HTTP 403) and also releases artwork under its terms. Obtain it as the AWJ business and register the files here.',
+} as const satisfies Record<Exclude<PaymentBrandKey, 'apple_pay'>, string>;
 
 const BRANDS: Readonly<Record<PaymentBrandKey, PaymentBrandPresentation>> = {
   moyasar: { key: 'moyasar', nameAr: 'ميسّر', nameEn: 'Moyasar', kind: 'gateway_provider', logo: { kind: 'pending', requirement: PENDING.moyasar } },
   mada: { key: 'mada', nameAr: 'مدى', nameEn: 'mada', kind: 'method', logo: { kind: 'pending', requirement: PENDING.mada } },
   visa: { key: 'visa', nameAr: 'فيزا', nameEn: 'Visa', kind: 'method', logo: { kind: 'pending', requirement: PENDING.visa } },
   mastercard: { key: 'mastercard', nameAr: 'ماستركارد', nameEn: 'Mastercard', kind: 'method', logo: { kind: 'pending', requirement: PENDING.mastercard } },
-  apple_pay: { key: 'apple_pay', nameAr: 'Apple Pay', nameEn: 'Apple Pay', kind: 'method', logo: { kind: 'pending', requirement: PENDING.apple_pay } },
+  apple_pay: {
+    key: 'apple_pay',
+    nameAr: 'Apple Pay',
+    nameEn: 'Apple Pay',
+    kind: 'method',
+    logo: {
+      kind: 'official',
+      src: '/payment-brands/apple-pay.svg',
+      width: 166,
+      height: 106,
+      provenance: {
+        publisher: 'Apple Inc.',
+        source: 'https://developer.apple.com/apple-pay/marketing/',
+        verifiedAt: '2026-10-24',
+        terms:
+          'Apple-provided artwork only; no recreation, recolor, stretch, corner-radius change, shadow/glow, flip/rotate/animation; clear space = 1/4 of mark height; not smaller than other payment marks; show Apple Pay messaging only on supported devices.',
+      },
+    },
+  },
 };
 
 export function isPaymentBrandKey(value: unknown): value is PaymentBrandKey {
