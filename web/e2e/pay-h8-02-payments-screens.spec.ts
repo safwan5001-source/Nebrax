@@ -128,6 +128,7 @@ const newWorld = (over: Partial<World> = {}): World => ({ previewMode: 'postable
 const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 
 const PAY_LINKS: Record<string, { view: unknown; status: unknown } | 404> = {
+  tok_open_apple: { view: { status: 'open', merchant: 'شركة نبراس الطموح', invoice_number: 'INV-0043', currency: 'SAR', amount_due_minor: 115000, allow_partial: false, expires_at: '2026-11-30T12:00:00Z', payment_methods: ['mada', 'visa', 'apple_pay'] }, status: { request_status: 'open', payment: 'none' } },
   tok_open: { view: { status: 'open', merchant: 'شركة نبراس الطموح', invoice_number: 'INV-0042', currency: 'SAR', amount_due_minor: 115000, allow_partial: false, expires_at: '2026-11-30T12:00:00Z', payment_methods: ['mada', 'visa'] }, status: { request_status: 'open', payment: 'none' } },
   tok_partial: { view: { status: 'open', merchant: 'شركة نبراس الطموح', invoice_number: 'INV-0043', currency: 'SAR', amount_due_minor: 230000, allow_partial: true, expires_at: null }, status: { request_status: 'open', payment: 'partially_paid' } },
   // الخادم لا يعيد التفاصيل إلا لرابط مفتوح؛ المسدَّد/المتعذَّر يعيد الحالة وحدها (PublicPaymentLinkController::show).
@@ -517,6 +518,14 @@ const SCENARIOS: Scenario[] = [
         await expect(page.getByTestId(`pm-item-${key}`).getByRole('switch')).toBeDisabled();
       }
       await expect(page.getByTestId('pm-reason-visa')).toHaveText(c.t('onlinePaymentMethods', 'blocked.no_permission'));
+      // الشعارات: الأصل الرسمي الموثّق فقط (Apple Pay)؛ الباقي نصٌّ إلى أن تُستلم أصوله — وحالتها الصحيحة تبقى ظاهرة
+      const appleLogo = page.getByTestId('pm-item-apple_pay').locator('img[data-mark="logo"]');
+      await expect(appleLogo).toHaveAttribute('src', '/payment-brands/apple-pay.svg');
+      await expect.poll(() => appleLogo.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+      await expect(page.getByTestId('pm-status-apple_pay')).toHaveText(c.t('onlinePaymentMethods', 'status.needs_setup'));
+      for (const key of ['mada', 'visa', 'mastercard']) {
+        await expect(page.getByTestId(`pm-item-${key}`).locator('img')).toHaveCount(0);
+      }
     },
   },
   {
@@ -754,6 +763,29 @@ const SCENARIOS: Scenario[] = [
       expect(await a11yBasics(page)).toEqual([]);
       await keyboardReachesButton(page);
       await shot(page, `paylink-open-${c.locale}-${c.vw}-${c.theme}`);
+    },
+  },
+  {
+    id: 'paylink-apple-pay-device', full: true,
+    run: async (page, c) => {
+      await page.addInitScript(() => { (window as unknown as { ApplePaySession: unknown }).ApplePaySession = { canMakePayments: () => true }; });
+      await page.goto(`${baseUrl}/pay/tok_open_apple`, { waitUntil: 'domcontentloaded' });
+      const accepted = page.getByTestId('payment-brand-row');
+      await expect(accepted.locator('li')).toHaveCount(3);
+      const logo = accepted.locator('img[src="/payment-brands/apple-pay.svg"]');
+      await expect(logo).toHaveCount(1);
+      await expect.poll(() => logo.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+      expect(await a11yBasics(page)).toEqual([]);
+      await shot(page, `paylink-apple-pay-${c.locale}-${c.vw}-${c.theme}`);
+    },
+  },
+  {
+    id: 'paylink-apple-pay-unsupported-device',
+    run: async (page) => {
+      await page.goto(`${baseUrl}/pay/tok_open_apple`, { waitUntil: 'domcontentloaded' });
+      const accepted = page.getByTestId('payment-brand-row');
+      await expect(accepted.locator('li')).toHaveCount(2);
+      await expect(accepted.locator('img')).toHaveCount(0);
     },
   },
   {
