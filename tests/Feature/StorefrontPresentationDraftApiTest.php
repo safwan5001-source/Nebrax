@@ -269,16 +269,34 @@ class StorefrontPresentationDraftApiTest extends TestCase
 
         $this->withToken($auth['token'])
             ->putJson($this->path($one['storefront']->id), [
-                'config' => ['homepage' => ['heroHeadline' => 'فقط للمتجر واحد']],
+                'config' => [
+                    'homepage' => ['heroHeadline' => 'فقط للمتجر واحد'],
+                    'footer' => ['paymentLogos' => [
+                        'enabled' => true,
+                        'brands' => ['visa', 'mada'],
+                        'style' => 'strip',
+                        'size' => 'lg',
+                        'showTitle' => false,
+                    ]],
+                ],
                 'draft_revision' => 0,
             ])
             ->assertOk();
+
+        $resOne = $this->withToken($auth['token'])
+            ->getJson($this->path($one['storefront']->id))
+            ->assertOk();
+        $this->assertSame(
+            ['enabled' => true, 'brands' => ['visa', 'mada'], 'style' => 'strip', 'size' => 'lg', 'showTitle' => false],
+            $resOne->json('data.draft.footer.paymentLogos'),
+        );
 
         $resTwo = $this->withToken($auth['token'])
             ->getJson($this->path($two['storefront']->id))
             ->assertOk();
 
         $this->assertNotSame('فقط للمتجر واحد', $resTwo->json('data.draft.homepage.heroHeadline'));
+        $this->assertNull($resTwo->json('data.draft.footer.paymentLogos'));
         $this->assertSame(0, $resTwo->json('data.draft_revision'));
     }
 

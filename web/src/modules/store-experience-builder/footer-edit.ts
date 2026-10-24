@@ -14,19 +14,21 @@ import {
   type FooterLayout,
   normalizeFooterExtras,
 } from "./presentation/footer-design";
+import type { FooterPaymentLogos } from "./presentation/payment-logos";
 import type { StorefrontPresentationConfig } from "./presentation/config";
 import { MAX_NAV_ITEMS, type NavItem, type NavMenu, type NavTarget } from "./presentation/navigation";
 import { MAX_NAV_PRODUCT_TARGETS, moveItem, newNavId, removeItem, setTarget, updateItem } from "./navigation-edit";
 
 type Footer = StorefrontPresentationConfig["footer"];
 
-/** Re-composes the footer: the legacy fields untouched, the three optional keys re-normalised from `next`. */
+/** Re-composes the footer: legacy fields untouched, optional settings re-normalised from `next`. */
 export function withFooterExtras(footer: Footer, next: Partial<Record<keyof FooterExtras, unknown>>): Footer {
   const { tagline, showLogo, copyright } = footer;
   const merged = {
     layout: footer.layout,
     groups: footer.groups,
     design: footer.design,
+    paymentLogos: footer.paymentLogos,
     ...next,
   };
   return { tagline, showLogo, copyright, ...normalizeFooterExtras(merged) };
@@ -42,6 +44,10 @@ export function setDesign(footer: Footer, design: FooterDesign | undefined): Foo
 
 export function setGroups(footer: Footer, groups: FooterGroup[] | undefined): Footer {
   return withFooterExtras(footer, { groups: groups && groups.length > 0 ? groups : undefined });
+}
+
+export function setPaymentLogos(footer: Footer, paymentLogos: FooterPaymentLogos): Footer {
+  return withFooterExtras(footer, { paymentLogos });
 }
 
 export function canAddGroup(groups: readonly FooterGroup[] | undefined): boolean {
