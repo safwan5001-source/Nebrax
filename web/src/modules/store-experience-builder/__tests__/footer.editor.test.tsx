@@ -57,6 +57,33 @@ describe("footer editor — layout (V7e-3)", () => {
   });
 });
 
+describe("footer editor — payment logos", () => {
+  it("enables with safe defaults, selects, reorders and configures the display live", async () => {
+    const user = userEvent.setup();
+    const { last } = mount();
+    expect("paymentLogos" in DEFAULT_PRESENTATION_CONFIG.footer).toBe(false);
+
+    await user.click(screen.getByRole("checkbox", { name: "Show payment method logos" }));
+    expect(last().footer.paymentLogos).toEqual({
+      enabled: true,
+      brands: ["mada", "visa", "mastercard", "apple_pay"],
+      style: "cards",
+      size: "md",
+      showTitle: true,
+    });
+
+    await user.click(screen.getByRole("checkbox", { name: "Select Visa" }));
+    expect(last().footer.paymentLogos?.brands).toEqual(["mada", "mastercard", "apple_pay"]);
+    await user.click(screen.getByRole("button", { name: "Up Apple Pay" }));
+    expect(last().footer.paymentLogos?.brands).toEqual(["mada", "apple_pay", "mastercard"]);
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Display style" }), "strip");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Size" }), "lg");
+    await user.click(screen.getByRole("checkbox", { name: "Show the “Payment methods” title" }));
+    expect(last().footer.paymentLogos).toMatchObject({ style: "strip", size: "lg", showTitle: false });
+  });
+});
+
 describe("footer editor — groups (V7e-3)", () => {
   it("adds a group, names it, adds links through the picker (never raw paths), moves and removes", async () => {
     const user = userEvent.setup();

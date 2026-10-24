@@ -2,7 +2,7 @@
  * CUST-HV V7e-1 — footer layout, link groups and design (contract: docs/plans/store/CUST-HV-V0-DECISIONS-AND-
  * ARCHITECTURE-CONTRACT.md §10).
  *
- * Three optional, additive keys inside `footer` — `layout`, `groups`, `design` — typed and enumerated, never a style bag.
+ * Optional, additive keys inside `footer` — `layout`, `groups`, `design`, `paymentLogos` — typed and enumerated, never a style bag.
  * An invalid value is dropped on its own, an empty group is omitted, and **an absent key ⇒ the storefront renders
  * byte-identically to before** (§2.2). `PRESENTATION_CONFIG_VERSION` stays 3.
  *
@@ -25,6 +25,10 @@ import {
 } from "./contrast-engine";
 import { type NavItem, normalizeNavFlatItems } from "./navigation";
 import { type PresentationPalette, resolveRoleHex } from "./palette";
+import {
+  type FooterPaymentLogos,
+  normalizeFooterPaymentLogos,
+} from "./payment-logos";
 import { type ColorRef, normalizeColorRef } from "./section-design";
 import { mixHex } from "./tokens";
 
@@ -71,11 +75,12 @@ export interface FooterDesign {
   align?: FooterAlign;
 }
 
-/** What the three optional keys carry; each is present only when it survived normalisation. */
+/** Optional footer settings; each is present only when it survived normalisation. */
 export interface FooterExtras {
   layout?: FooterLayout;
   groups?: FooterGroup[];
   design?: FooterDesign;
+  paymentLogos?: FooterPaymentLogos;
 }
 
 const ID = /^[a-zA-Z0-9_-]{1,64}$/;
@@ -167,7 +172,7 @@ export function normalizeFooterDesign(raw: unknown): FooterDesign | undefined {
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
-/** The valid `layout` / `groups` / `design` of a raw `footer` object, in canonical order; `{}` when none survive. */
+/** Valid optional settings of a raw `footer` object, in canonical order; `{}` when none survive. */
 export function normalizeFooterExtras(raw: unknown): FooterExtras {
   if (!isObject(raw)) return {};
   const out: FooterExtras = {};
@@ -177,6 +182,8 @@ export function normalizeFooterExtras(raw: unknown): FooterExtras {
   if (groups.length > 0) out.groups = groups;
   const design = normalizeFooterDesign(raw.design);
   if (design) out.design = design;
+  const paymentLogos = normalizeFooterPaymentLogos(raw.paymentLogos);
+  if (paymentLogos) out.paymentLogos = paymentLogos;
   return out;
 }
 

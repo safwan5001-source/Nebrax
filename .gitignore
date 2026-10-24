@@ -14,6 +14,9 @@ package-lock.json
 lefthook.yml
 .claude/worktrees/
 
+# Generated from the canonical assets in web/public/payment-brands at Storefront build/dev time.
+/storefront/public/payment-brands/
+
 # Python bytecode (scripts/ci-gate)
 __pycache__/
 *.pyc

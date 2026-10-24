@@ -345,6 +345,7 @@ export default async function StorefrontLayout({
         layout={presentation?.footer.layout}
         groups={footerGroups}
         design={footerDesign}
+        paymentLogos={presentation?.footer.paymentLogos}
         categoryLinks={
           <Suspense fallback={<FooterCategoryLinksFallback />}>
             <StorefrontFooterCategoryLinks

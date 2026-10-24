@@ -26,7 +26,7 @@ class StorefrontFooterDesignTest extends TestCase
         $this->assertNotEmpty($fixture['cases']);
         foreach ($fixture['cases'] as $case) {
             $footer = $this->normalize(['footer' => $case['input']])['footer'];
-            $extras = array_intersect_key($footer, array_flip(['layout', 'groups', 'design']));
+            $extras = array_intersect_key($footer, array_flip(['layout', 'groups', 'design', 'paymentLogos']));
             if ($case['expected'] === null) {
                 $this->assertSame([], $extras, $case['name']);
             } else {

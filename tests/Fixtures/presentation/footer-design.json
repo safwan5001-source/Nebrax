@@ -1,5 +1,5 @@
 {
-  "_note": "CUST-HV V7e-1 — footer layout / groups / design. Shared by PHP StorefrontFooterNormalizer and both TS twins (normalizeFooterExtras). `input` is the raw `footer` value; `expected` is the object of the keys that survive (layout, groups, design — in that order), or null when none does (the keys are then absent from the document). Legacy fields (tagline, showLogo, copyright) are not part of it.",
+  "_note": "Footer layout / groups / design / display-only payment logos. Shared by PHP StorefrontFooterNormalizer and both TS twins (normalizeFooterExtras). `input` is the raw `footer` value; `expected` is the object of optional keys that survive in canonical order, or null when none does. Legacy fields (tagline, showLogo, copyright) are not part of it.",
   "cases": [
     {"name":"absent","input":null,"expected":null},
     {"name":"non-object","input":"columns","expected":null},
@@ -30,6 +30,10 @@
     {"name":"design: align and logo size are enumerated","input":{"design":{"align":"left","logo":{"size":"xl"}}},"expected":null},
     {"name":"design: deferred keys drop fail-closed","input":{"design":{"surface":{"background":{"media":{"mediaId":"x"}},"alpha":50},"border":{"width":"medium"},"linkHover":{"hex":"#ffffff"},"divider":{"kind":"wave","height":"lg"},"logo":{"treatment":"mono-light"}}},"expected":null},
     {"name":"design: empty drops","input":{"design":[]},"expected":null},
-    {"name":"all three together, canonical order","input":{"design":{"align":"end"},"groups":[{"id":"g1","title":"G"}],"layout":"editorial","tagline":"x"},"expected":{"layout":"editorial","groups":[{"id":"g1","title":"G"}],"design":{"align":"end"}}}
+    {"name":"payment logos: defaults, order, duplicates and unknown brands","input":{"paymentLogos":{"enabled":true,"brands":["visa","unknown","visa","mada"],"style":"unknown","size":"lg","showTitle":false}},"expected":{"paymentLogos":{"enabled":true,"brands":["visa","mada"],"style":"cards","size":"lg","showTitle":false}}},
+    {"name":"payment logos: an empty selected list is preserved","input":{"paymentLogos":{"enabled":false,"brands":[],"style":"strip","size":"sm","showTitle":true}},"expected":{"paymentLogos":{"enabled":false,"brands":[],"style":"strip","size":"sm","showTitle":true}}},
+    {"name":"payment logos: an object with missing fields receives safe defaults","input":{"paymentLogos":{}},"expected":{"paymentLogos":{"enabled":false,"brands":["mada","visa","mastercard","apple_pay"],"style":"cards","size":"md","showTitle":true}}},
+    {"name":"payment logos: non-object drops","input":{"paymentLogos":"yes"},"expected":null},
+    {"name":"all four together, canonical order","input":{"paymentLogos":{"enabled":true},"design":{"align":"end"},"groups":[{"id":"g1","title":"G"}],"layout":"editorial","tagline":"x"},"expected":{"layout":"editorial","groups":[{"id":"g1","title":"G"}],"design":{"align":"end"},"paymentLogos":{"enabled":true,"brands":["mada","visa","mastercard","apple_pay"],"style":"cards","size":"md","showTitle":true}}}
   ]
 }
