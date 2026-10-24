@@ -127,6 +127,34 @@ class PurchaseDuplicateReservationConcurrencyPostgresTest extends TestCase
     }
 
     /** @test */
+    public function document_center_and_the_other_import_sources_racing_for_one_invoice_yield_exactly_one_purchase(): void
+    {
+        [$tenant, $supplier, $items] = $this->tenantWithSupplier();
+
+        // IMP-H5-S6: مركز المستندات والاستيراد القياسي وإجراء الذكاء الاصطناعي يتسابقون على فاتورة المورّد نفسها (برقم مكتوب بصيغٍ مختلفة)
+        $sources = [Dup::SOURCE_DOCUMENT_CENTER, Dup::SOURCE_STANDARD, Dup::SOURCE_AI_ACTION, Dup::SOURCE_DOCUMENT_CENTER, Dup::SOURCE_STANDARD, Dup::SOURCE_DOCUMENT_CENTER];
+        $jobs = [];
+        foreach ($sources as $i => $source) {
+            $jobs[] = function () use ($tenant, $supplier, $items, $i, $source) {
+                app(TenantContext::class)->set($tenant);
+
+                return app(PurchaseService::class)->create(['partner_id' => $supplier, 'payment_type' => 'credit', 'supplier_invoice_no' => $i % 2 === 0 ? 'XS-1' : ' xs 1 ', 'number' => "BILL-X-{$i}"], $items, ['source' => $source])->id;
+            };
+        }
+        $results = $this->runConcurrently($jobs);
+
+        app(TenantContext::class)->set($tenant);
+        $this->assertSame(1, Purchase::query()->count(), json_encode($results, JSON_UNESCAPED_UNICODE));
+        $this->assertSame(1, ImportDocumentReservation::query()->count());
+        $this->assertCount(1, array_filter($results, fn ($r) => ($r['ok'] ?? false) === true));
+        foreach ($results as $r) {
+            if (($r['ok'] ?? false) !== true) {
+                $this->assertSame(DuplicateDocumentException::class, $r['error_class'] ?? null, json_encode($r, JSON_UNESCAPED_UNICODE));
+            }
+        }
+    }
+
+    /** @test */
     public function importers_and_direct_creators_over_overlapping_invoices_end_with_one_purchase_per_identity_and_no_unexpected_error(): void
     {
         [$tenant, $supplier, $items] = $this->tenantWithSupplier();

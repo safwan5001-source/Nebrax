@@ -18,6 +18,7 @@ use App\Models\ExpenseCategory;
 use App\Models\Partner;
 use App\Models\User;
 use App\Services\Accounting\ExpenseService;
+use App\Services\DocumentDuplicateReservationService;
 use App\Support\BranchSettings;
 use App\Support\DocumentWorkflowStatus;
 use Illuminate\Support\Facades\DB;
@@ -87,7 +88,12 @@ final class ExpenseDocumentDraftBuilder implements TransactionDraftBuilder
                 $reason,
                 ['transaction_type' => 'expense'],
             );
-            $expense = $this->expenses->create($data);
+            // IMP-H5-S6: مصدر `document_center` يدخل بروتوكول الهوية المشترك (مورّد ‖ تاريخ ‖ مبلغ، والمرجع رقم المستند المراجَع إن وُجد). لا معرّف تمييز هنا:
+            // مصروفٌ مطابق لقائم يُرفض (`duplicate_document`). الخدمة وحدها تكتب الحجز.
+            $expense = $this->expenses->create($data, [
+                'source' => DocumentDuplicateReservationService::SOURCE_DOCUMENT_CENTER,
+                'reference' => $this->text($reviewed['fields']['document_number'] ?? null),
+            ]);
             $this->assertTotals($expense, $reviewed);
 
             $link = DocumentTransactionLink::create([

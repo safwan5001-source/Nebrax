@@ -15,8 +15,10 @@ use App\Models\DocumentMatchResult;
 use App\Models\DocumentProcessingRun;
 use App\Models\DocumentProviderAttempt;
 use App\Models\DocumentTransactionLink;
+use App\Models\ImportDocumentReservation;
 use App\Models\Partner;
 use App\Models\Product;
+use App\Models\Role;
 use App\Models\Purchase;
 use App\Models\Tenant;
 use App\Models\UnitTemplate;
@@ -27,7 +29,10 @@ use App\Services\DocumentCenter\DocumentReviewMutationGate;
 use App\Services\DocumentCenter\DocumentWorkflowService;
 use App\Services\DocumentCenter\PurchaseDocumentDraftBuilder;
 use App\Services\DocumentCenter\PurchaseDraftBuildOptions;
+use App\Services\DocumentDuplicateReservationService;
 use App\Services\EntitlementGrantService;
+use App\Services\TenantApplicationService;
+use App\Support\DuplicateDocumentException;
 use App\Support\BranchSettings;
 use App\Support\DocumentProcessingStatus;
 use App\Support\DocumentScanStatus;
@@ -671,6 +676,155 @@ class DocumentPurchaseDraftBuilderTest extends TestCase
     }
 
     /** @return array{batch:DocumentBatch,actor:User,partner:Partner,product:Product,warehouse:Warehouse,result:DocumentExtractionResult,token:string,tenant_id:string} */
+    /** @test */
+    public function purchase_draft_endpoint_also_requires_the_direct_purchase_gates(): void
+    {
+        $fixture = $this->readyFixture();
+        app(TenantContext::class)->set($fixture['tenant_id']);
+        Role::create(['slug' => 'doc-only', 'name' => 'doc-only', 'is_system' => false, 'permissions' => ['documents.center.view', 'documents.center.review', 'documents.center.build_draft']]);
+        $docOnly = $this->tokenForRole($fixture['tenant_id'], 'doc-only', 'doc-only@purchase-draft-builder.test');
+        Role::create(['slug' => 'doc-buyer', 'name' => 'doc-buyer', 'is_system' => false, 'permissions' => ['documents.center.view', 'documents.center.review', 'documents.center.build_draft', 'purchases.view', 'purchases.manage']]);
+        $docBuyer = $this->tokenForRole($fixture['tenant_id'], 'doc-buyer', 'doc-buyer@purchase-draft-builder.test');
+
+        // صلاحية مركز المستندات وحدها لا تكفي: الفاتورة تنتهي بـ`PurchaseService::create`.
+        $this->createDraftThroughApi($fixture, token: $docOnly)->assertForbidden();
+        $this->assertNoDraftState($fixture);
+
+        // التطبيق التجاري `purchases.cycle` المعطَّل يحجب حتى من يملك الصلاحيتين.
+        app(TenantApplicationService::class)->disable('purchases.cycle', $fixture['actor']);
+        $this->createDraftThroughApi($fixture, token: $docBuyer)->assertForbidden();
+        $this->assertNoDraftState($fixture);
+    }
+
+    /** @test */
+    public function purchase_draft_endpoint_accepts_a_role_holding_both_the_document_and_purchase_permissions(): void
+    {
+        $fixture = $this->readyFixture();
+        app(TenantContext::class)->set($fixture['tenant_id']);
+        Role::create(['slug' => 'doc-buyer', 'name' => 'doc-buyer', 'is_system' => false, 'permissions' => ['documents.center.view', 'documents.center.review', 'documents.center.build_draft', 'purchases.view', 'purchases.manage']]);
+        $token = $this->tokenForRole($fixture['tenant_id'], 'doc-buyer', 'doc-buyer@purchase-draft-builder.test');
+
+        $this->createDraftThroughApi($fixture, token: $token)->assertCreated();
+        $this->assertDatabaseCount('purchases', 1);
+    }
+
+    /** @test */
+    public function the_draft_reserves_the_supplier_invoice_identity_with_the_document_center_source(): void
+    {
+        $fixture = $this->readyFixture();
+
+        $created = $this->buildDraft($fixture, 'إنشاء مسودة تحجز هوية فاتورة المورّد.');
+
+        $reservation = ImportDocumentReservation::query()->where('document_id', $created->transactionId)->firstOrFail();
+        $this->assertSame('purchase', $reservation->domain);
+        $this->assertSame(DocumentDuplicateReservationService::SOURCE_DOCUMENT_CENTER, $reservation->source);
+        $this->assertSame($fixture['partner']->id, $reservation->counterparty_id);
+        $this->assertDatabaseCount('journal_entries', 0);
+    }
+
+    /** @test */
+    public function a_second_batch_for_the_same_supplier_invoice_is_refused_as_a_duplicate_without_any_partial_state(): void
+    {
+        $fixture = $this->readyFixture();
+        $first = $this->buildDraft($fixture, 'الدفعة الأولى للفاتورة نفسها.');
+        $second = $this->secondReadyBatch($fixture, ' sup 100 ');   // الرقم نفسه SUP-100 بصيغة مختلفة
+
+        $response = $this->withToken($fixture['token'])->postJson("/api/document-batches/{$second->id}/create-purchase-draft", [
+            'expected_version' => $second->version,
+            'reason' => 'الدفعة الثانية لفاتورة قائمة.',
+            'warehouse_id' => $fixture['warehouse']->id,
+        ]);
+
+        $response->assertUnprocessable()->assertJsonPath('reason', 'duplicate_document');
+        $this->assertDatabaseCount('purchases', 1);
+        $this->assertDatabaseCount('document_transaction_links', 1);
+        $this->assertDatabaseCount('import_document_reservations', 1);
+        $this->assertDatabaseHas('document_batches', ['id' => $second->id, 'status' => 'ready_for_draft']);
+        $this->assertSame($first->transactionId, Purchase::query()->firstOrFail()->id);
+    }
+
+    /** @test */
+    public function a_different_supplier_invoice_number_is_not_a_duplicate(): void
+    {
+        $fixture = $this->readyFixture();
+        $this->buildDraft($fixture, 'الدفعة الأولى.');
+        $second = $this->secondReadyBatch($fixture, 'SUP-200');
+
+        $this->withToken($fixture['token'])->postJson("/api/document-batches/{$second->id}/create-purchase-draft", [
+            'expected_version' => $second->version,
+            'reason' => 'فاتورة مختلفة لنفس المورّد.',
+            'warehouse_id' => $fixture['warehouse']->id,
+        ])->assertCreated();
+        $this->assertDatabaseCount('purchases', 2);
+        $this->assertDatabaseCount('import_document_reservations', 2);
+    }
+
+    /** @test */
+    public function a_spreadsheet_style_import_of_the_same_invoice_and_the_document_center_collide_in_both_orders(): void
+    {
+        // (أ) استيراد قياسي أولاً ثم مركز المستندات
+        $fixture = $this->readyFixture();
+        app(PurchaseService::class)->create(
+            ['partner_id' => $fixture['partner']->id, 'payment_type' => 'credit', 'supplier_invoice_no' => 'sup-100', 'warehouse_id' => $fixture['warehouse']->id],
+            [['product_id' => $fixture['product']->id, 'quantity' => 1, 'unit_price' => 10000, 'tax_rate' => 15]],
+            ['source' => DocumentDuplicateReservationService::SOURCE_STANDARD],
+        );
+
+        $this->createDraftThroughApi($fixture)->assertUnprocessable()->assertJsonPath('reason', 'duplicate_document');
+        $this->assertDatabaseCount('purchases', 1);
+        $this->assertDatabaseCount('document_transaction_links', 0);
+        $this->assertDatabaseHas('document_batches', ['id' => $fixture['batch']->id, 'status' => 'ready_for_draft']);
+    }
+
+    /** @test */
+    public function an_import_after_a_document_center_draft_of_the_same_invoice_is_refused(): void
+    {
+        $fixture = $this->readyFixture();
+        $this->buildDraft($fixture, 'مركز المستندات أولاً.');
+
+        try {
+            app(PurchaseService::class)->create(
+                ['partner_id' => $fixture['partner']->id, 'payment_type' => 'credit', 'supplier_invoice_no' => 'SUP-100'],
+                [['product_id' => $fixture['product']->id, 'quantity' => 1, 'unit_price' => 10000, 'tax_rate' => 15]],
+                ['source' => DocumentDuplicateReservationService::SOURCE_STANDARD],
+            );
+            $this->fail('كان يجب رفض الاستيراد لفاتورة محجوزة من مركز المستندات.');
+        } catch (DuplicateDocumentException $e) {
+            $this->assertSame('purchase', $e->domain);
+        }
+        $this->assertDatabaseCount('purchases', 1);
+    }
+
+    /** يُنشئ دفعة ثانية جاهزة للمسودة في المستأجر نفسه بالدليل المراجع نفسه ورقم مستند مختلف. */
+    private function secondReadyBatch(array $fixture, string $documentNumber): DocumentBatch
+    {
+        $actor = $fixture['actor'];
+        $workflow = app(DocumentWorkflowService::class);
+        $batch = DocumentBatch::create(['document_type' => 'purchase_invoice', 'source_type' => 'manual', 'created_by' => $actor->id]);
+        foreach ([[DocumentWorkflowStatus::RECEIVING, 'fixture_receiving'], [DocumentWorkflowStatus::RECEIVED, 'fixture_received'], [DocumentWorkflowStatus::NEEDS_REVIEW, 'fixture_review']] as [$status, $action]) {
+            $batch = $workflow->transition($batch, $status, $action, 'user', $actor->id, 'تهيئة الدليل.');
+        }
+        $file = DocumentFile::create([
+            'document_batch_id' => $batch->id, 'original_name' => 'purchase-2.pdf', 'object_key' => 'fixtures/second/'.md5($documentNumber).'.pdf',
+            'declared_mime' => 'application/pdf', 'detected_mime' => 'application/pdf', 'size_bytes' => 128, 'page_count' => 1,
+            'sha256' => hash('sha256', 'second'.$documentNumber), 'scan_status' => DocumentScanStatus::CLEAN, 'scanned_at' => now('UTC'),
+        ]);
+        $run = DocumentProcessingRun::create(['document_batch_id' => $batch->id, 'document_file_id' => $file->id, 'stage' => 'extraction', 'status' => DocumentProcessingStatus::SUCCEEDED, 'attempt_count' => 1, 'queued_at' => now('UTC'), 'started_at' => now('UTC'), 'finished_at' => now('UTC')]);
+        $attempt = DocumentProviderAttempt::create(['document_batch_id' => $batch->id, 'document_file_id' => $file->id, 'document_processing_run_id' => $run->id, 'sequence' => 1, 'provider_key' => 'fixture', 'model' => 'local', 'status' => 'succeeded', 'page_count' => 1, 'started_at' => now('UTC'), 'finished_at' => now('UTC')]);
+        $payload = $fixture['result']->normalized_payload;
+        $payload['fields']['document_number'] = $documentNumber;
+        $result = DocumentExtractionResult::create([
+            'document_batch_id' => $batch->id, 'document_file_id' => $file->id, 'document_processing_run_id' => $run->id, 'document_provider_attempt_id' => $attempt->id,
+            'provider_key' => 'fixture', 'model' => 'local', 'schema_version' => 1, 'detected_document_type' => 'purchase_invoice', 'detected_language' => 'ar',
+            'confidence_basis_points' => 9900, 'normalized_payload' => $payload, 'extracted_at' => now('UTC'),
+        ]);
+        $this->confirmedMatch($batch, $result, 'header', 'header.counterparty', 'partner', $fixture['partner']->id);
+        $this->confirmedMatch($batch, $result, 'product', 'lines.0.product', 'product', $fixture['product']->id);
+        $this->confirmedMatch($batch, $result, 'unit', 'lines.0.unit', 'product_unit', $fixture['product']->id);
+
+        return $workflow->transition($batch, DocumentWorkflowStatus::READY_FOR_DRAFT, 'fixture_ready', 'user', $actor->id, 'المراجعة مكتملة.');
+    }
+
     private function readyFixture(string $quantity = '1', string $tenantSlug = 'purchase-draft-builder', bool $taxInclusive = false, string $currency = 'SAR', bool $markReady = true, string $documentType = 'purchase_invoice', array $payloadOverrides = []): array
     {
         $email = "owner@{$tenantSlug}.test";

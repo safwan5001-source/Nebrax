@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\Accounting\PurchaseService;
 use App\Services\Accounting\UnitConversion;
+use App\Services\DocumentDuplicateReservationService;
 use App\Support\DocumentWorkflowStatus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -83,7 +84,9 @@ final class PurchaseDocumentDraftBuilder implements TransactionDraftBuilder
                 $reason,
                 ['transaction_type' => 'purchase'],
             );
-            $purchase = $this->purchases->create($data, $items);
+            // IMP-H5-S6: الإنشاء بمصدر `document_center` يدخل بروتوكول الهوية المشترك (مورّد ‖ رقم فاتورته): دفعتان لفاتورة واحدة، أو جدول بيانات ومركز
+            // المستندات لها، لا ينتجان مسودتين — الخدمة وحدها تكتب الحجز (البانيَ لا يكتب حجزاً مباشرة)، وتكرارٌ يُرمى `DuplicateDocumentException` فتتراجع المعاملة كلها.
+            $purchase = $this->purchases->create($data, $items, ['source' => DocumentDuplicateReservationService::SOURCE_DOCUMENT_CENTER]);
             $this->assertTotals($purchase, $reviewed);
 
             $link = DocumentTransactionLink::create([
