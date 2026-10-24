@@ -39,6 +39,7 @@ import { AwjOrderConfirmation } from "@/components/checkout/awj/Confirmation";
 import { ContactStage } from "@/components/checkout/awj/ContactStage";
 import { DeliveryStage } from "@/components/checkout/awj/DeliveryStage";
 import { GiftStage } from "@/components/checkout/awj/GiftStage";
+import { PAYMENT_RETURN_PATH } from "@/components/checkout/awj/PaymentReturn";
 import { PaymentStage } from "@/components/checkout/awj/PaymentStage";
 import { ReviewStage } from "@/components/checkout/awj/ReviewStage";
 import {
@@ -74,6 +75,7 @@ import {
   type StorefrontCheckout,
   type StorefrontOrder,
 } from "@/lib/commerce/checkout-types";
+import { savePendingOnlinePayment } from "@/lib/commerce/pending-online-payment";
 import {
   completeAwjCheckoutAction,
   getAwjCheckoutIdentity,
@@ -87,10 +89,18 @@ import {
   updateAwjPayment,
   updateAwjSchedule,
 } from "@/lib/data/awj-checkout";
+import { startOnlinePaymentAction } from "@/lib/data/awj-online-payment";
 import { extractBasePath } from "@/lib/utils/path";
 
 /** The states the flow can be in that are not one of the six stages. */
-type FlowState = "loading" | "empty" | "unavailable" | "stage" | "done";
+type FlowState =
+  | "loading"
+  | "empty"
+  | "unavailable"
+  | "stage"
+  | "done"
+  /** PAY-H4-05 — an online-payment order was placed; the shopper is being sent to the payment page. */
+  | "redirecting";
 
 function toContactForm(checkout: StorefrontCheckout): ContactForm {
   return {
@@ -433,6 +443,38 @@ export function AwjCheckoutFlow() {
           clearPersistedIdempotencyKey(checkoutIdentityRef.current);
         }
         setOrder(result.order);
+        // PAY-H4-05 — an order that awaits an online payment is not "done": the
+        // shopper is handed to the payment-return page, which starts (or
+        // resumes) the payment and then reports what the *server* knows. The
+        // order id and its signed reference are the only things carried over.
+        // Anything else (cash on delivery/pickup, or the gate closed) is
+        // exactly the confirmation it has always been.
+        if (result.orderReference && result.order.payment.requires_action) {
+          const saved = savePendingOnlinePayment({
+            orderId: result.order.id,
+            orderReference: result.orderReference,
+            orderNumber: result.order.number,
+          });
+          if (saved) {
+            setFlowState("redirecting");
+            window.location.assign(`${basePath}${PAYMENT_RETURN_PATH}?start=1`);
+            return;
+          }
+          // Storage is blocked (private mode, policy): the return page could not
+          // identify the order, so start the payment right here instead of
+          // stranding a placed order. If that cannot start either, fall through
+          // to the plain confirmation (the order exists; the store follows up).
+          const started = await startOnlinePaymentAction(
+            result.order.id,
+            result.orderReference,
+          );
+          const url = started.success ? started.payment.checkout_url : null;
+          if (url?.startsWith("https://")) {
+            setFlowState("redirecting");
+            window.location.assign(url);
+            return;
+          }
+        }
         setStage("confirmation");
         setFlowState("done");
         return;
@@ -486,7 +528,7 @@ export function AwjCheckoutFlow() {
     } finally {
       setCompleting(false);
     }
-  }, [goTo]);
+  }, [goTo, basePath]);
 
   const reviewIssueMessages = useMemo(
     () =>
@@ -554,6 +596,15 @@ export function AwjCheckoutFlow() {
         body={t("unavailableDescription")}
         actionHref={`${basePath}/cart`}
         actionLabel={t("returnToCart")}
+      />
+    );
+  }
+
+  if (flowState === "redirecting") {
+    return (
+      <CheckoutNotice
+        title={t("payment.redirectingTitle")}
+        body={t("payment.redirectingBody")}
       />
     );
   }
@@ -860,20 +911,25 @@ function CheckoutNotice({
 }: {
   title: string;
   body: string;
-  actionHref: string;
-  actionLabel: string;
+  actionHref?: string;
+  actionLabel?: string;
 }) {
   return (
-    <div className="mx-auto w-full max-w-lg px-4 py-20 text-center sm:px-6">
+    <div
+      role={actionHref ? undefined : "status"}
+      className="mx-auto w-full max-w-lg px-4 py-20 text-center sm:px-6"
+    >
       <h1 className="text-xl font-bold text-store-foreground sm:text-2xl">
         {title}
       </h1>
       <p className="mt-2 text-sm leading-relaxed text-store-muted-foreground">
         {body}
       </p>
-      <Button asChild size="lg" className="mt-6">
-        <Link href={actionHref}>{actionLabel}</Link>
-      </Button>
+      {actionHref && actionLabel ? (
+        <Button asChild size="lg" className="mt-6">
+          <Link href={actionHref}>{actionLabel}</Link>
+        </Button>
+      ) : null}
     </div>
   );
 }

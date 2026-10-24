@@ -1,6 +1,6 @@
 "use client";
 
-import { Banknote, Info, Lock } from "lucide-react";
+import { Banknote, CreditCard, Info, Lock, ShieldCheck } from "lucide-react";
 import type { useTranslations } from "next-intl";
 import { StageShell } from "@/components/checkout/awj/StageShell";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -13,9 +13,9 @@ import type {
  * Stage 4 — payment.
  *
  * **Two things are true at once here, per `PAYMENT_CAPABILITY`'s own doc:**
- * online/card payment (`PAYMENT_CAPABILITY`) is still `design_only` — no
- * provider, no brand mark, no card field anywhere in this component, ever.
- * But COM-MOBILE-PAYMENTS-1 (ADR-09) made a narrower thing real: the
+ * online/card payment (`PAYMENT_CAPABILITY`) is `gated` — and in every state
+ * there is no provider name, no brand mark, no card field anywhere in this
+ * component, ever. COM-MOBILE-PAYMENTS-1 (ADR-09) made a narrower thing real: the
  * checkout now has a genuine `PATCH checkout/payment` contract for the
  * store's own enabled cash-settlement methods (`GET checkout/payment-
  * methods`, gated by `PaymentMethodChannelAvailabilityService`). This stage
@@ -28,9 +28,18 @@ import type {
  * loading state or an error.
  *
  * **This never decides how much is charged or when.** The amount is the
- * order total the review stage already shows; timing is COD-style (settled
- * on delivery or on pickup, never at order placement — ADR-04 §5). The
- * choice here is only which of the store's enabled methods collects it.
+ * order total the review stage already shows. For a cash method, timing is
+ * COD-style (settled on delivery or on pickup — ADR-04 §5). The choice here is
+ * only which of the store's enabled methods collects it.
+ *
+ * **PAY-H4-05 — online methods.** When the API marks a method `online: true`
+ * (the platform gate is open and the method is linked to a ready gateway), it
+ * is shown with a card icon and the note that payment happens on the
+ * provider's secure page after the order is placed. Still no provider name, no
+ * brand mark and no card field: card data is typed on the provider's hosted
+ * page, never here, and the note states that rather than implying otherwise.
+ * The amount, gateway and return address are decided by the server; this
+ * component only reports which method was picked.
  */
 
 export function PaymentStage({
@@ -47,6 +56,10 @@ export function PaymentStage({
   t: ReturnType<typeof useTranslations>;
 }) {
   const hasEnabledMethods = paymentMethods.length > 0;
+  const selectedMethod = paymentMethods.find(
+    (method) => method.id === selectedPaymentMethodId,
+  );
+  const selectedIsOnline = selectedMethod?.online === true;
 
   return (
     <StageShell
@@ -73,25 +86,50 @@ export function PaymentStage({
                   value={method.id}
                   className="mt-0.5"
                 />
-                <Banknote
-                  className="mt-0.5 w-5 h-5 shrink-0 text-store-muted-foreground"
-                  aria-hidden="true"
-                />
+                {method.online === true ? (
+                  <CreditCard
+                    className="mt-0.5 w-5 h-5 shrink-0 text-store-muted-foreground"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <Banknote
+                    className="mt-0.5 w-5 h-5 shrink-0 text-store-muted-foreground"
+                    aria-hidden="true"
+                  />
+                )}
                 <span className="flex-1 text-sm font-bold text-store-foreground">
                   {method.name}
+                  {method.online === true ? (
+                    <span className="mt-1 block text-xs font-normal text-store-muted-foreground">
+                      {t("payment.onlineMethodHint")}
+                    </span>
+                  ) : null}
                 </span>
               </label>
             ))}
           </RadioGroup>
 
-          <p className="mt-4 flex items-start gap-2 text-xs leading-relaxed text-store-muted-foreground">
-            <Info className="mt-px w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-            <span>
-              {deliveryMethod === "pickup"
-                ? t("payment.settledOnPickup")
-                : t("payment.settledOnDelivery")}
-            </span>
-          </p>
+          {selectedIsOnline ? (
+            <p
+              data-testid="awj-payment-online-note"
+              className="mt-4 flex items-start gap-2 text-xs leading-relaxed text-store-muted-foreground"
+            >
+              <ShieldCheck
+                className="mt-px w-3.5 h-3.5 shrink-0"
+                aria-hidden="true"
+              />
+              <span>{t("payment.onlineRedirectNote")}</span>
+            </p>
+          ) : (
+            <p className="mt-4 flex items-start gap-2 text-xs leading-relaxed text-store-muted-foreground">
+              <Info className="mt-px w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+              <span>
+                {deliveryMethod === "pickup"
+                  ? t("payment.settledOnPickup")
+                  : t("payment.settledOnDelivery")}
+              </span>
+            </p>
+          )}
         </>
       ) : (
         <div

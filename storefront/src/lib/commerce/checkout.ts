@@ -197,6 +197,13 @@ export async function fetchAwjDeliverySchedule(
 export interface AwjCompletionResult {
   order: StorefrontOrder;
   replayed: boolean;
+  /**
+   * PAY-H4-04a — the signed proof of ownership of this order, sent **only**
+   * when the online-payment gate is open. It is the credential for the
+   * order's payment endpoints (`online-payment.ts`); `null` on an older API
+   * or while the gate is closed, in which case the order is cash-settled.
+   */
+  orderReference: string | null;
 }
 
 /**
@@ -219,10 +226,18 @@ export async function completeAwjCheckout(
   idempotencyKey: string,
 ): Promise<AwjCompletionResult> {
   const response = await storefrontCartRequest<
-    AwjResourceResponse<{ order: AwjOrder; replayed: boolean }>
+    AwjResourceResponse<{
+      order: AwjOrder;
+      replayed: boolean;
+      order_reference?: string;
+    }>
   >("POST", "checkout/complete", {}, { "Idempotency-Key": idempotencyKey });
   return {
     order: mapAwjOrderToViewModel(response.data.order),
     replayed: response.data.replayed,
+    orderReference:
+      typeof response.data.order_reference === "string"
+        ? response.data.order_reference
+        : null,
   };
 }

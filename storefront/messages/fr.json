@@ -960,7 +960,11 @@
       "selectMethod": "Select how you'll pay",
       "noMethodsEnabled": "This store hasn't enabled a specific payment method yet.",
       "settledOnDelivery": "Settled in cash when your order is delivered.",
-      "settledOnPickup": "Settled in cash when you pick up your order."
+      "settledOnPickup": "Settled in cash when you pick up your order.",
+      "onlineMethodHint": "Payez en ligne en toute sécurité",
+      "onlineRedirectNote": "Après la commande, vous serez redirigé vers la page de paiement sécurisée du prestataire pour payer. Les données de carte sont saisies là-bas, jamais dans cette boutique.",
+      "redirectingTitle": "Redirection vers le paiement sécurisé…",
+      "redirectingBody": "Votre commande a été passée. Gardez cette page ouverte pendant la redirection."
     },
     "continueToAddress": "Continue to address",
     "continueToDelivery": "Continue to delivery",
@@ -1002,6 +1006,39 @@
       "message": "Message cadeau",
       "messageHint": "Imprimé sur la carte. Texte brut uniquement.",
       "messageCount": "{count} / {max}"
+    },
+    "paymentReturn": {
+      "loadingTitle": "Vérification de votre paiement…",
+      "loadingBody": "Un instant, nous confirmons l'état du paiement auprès de la boutique.",
+      "startingTitle": "Redirection vers le paiement sécurisé…",
+      "startingBody": "Veuillez patienter — ne fermez pas et n’actualisez pas cette page.",
+      "unknownTitle": "Nous ne trouvons pas votre commande sur cet appareil",
+      "unknownBody": "Si vous venez de payer, votre commande est en sécurité. Contactez la boutique avec les détails de votre commande pour la confirmer.",
+      "unavailableTitle": "Le paiement en ligne est indisponible",
+      "unavailableBody": "Cette commande ne peut plus être payée en ligne pour le moment. Rien n'a été débité via cette page. Veuillez contacter la boutique.",
+      "errorTitle": "Impossible de vérifier votre paiement",
+      "errorBody": "Un problème est survenu lors de la connexion à la boutique. Votre commande est en sécurité — veuillez réessayer.",
+      "paidTitle": "Paiement reçu",
+      "paidBody": "Merci. Nous avons confirmé votre paiement de {amount} et préparons votre commande.",
+      "reviewTitle": "Votre paiement est en cours de vérification",
+      "reviewBody": "Nous avons reçu votre paiement, mais la boutique doit le vérifier avant de le confirmer. Vous n'avez pas à payer à nouveau — la boutique vous contactera.",
+      "pendingTitle": "Confirmation de votre paiement…",
+      "pendingBody": "Cela ne prend généralement que quelques secondes. Gardez cette page ouverte.",
+      "slowTitle": "Toujours en attente de confirmation",
+      "slowBody": "Nous n'avons pas encore reçu la confirmation du paiement. Si vous avez payé, cela peut prendre un peu plus de temps — revérifiez dans un instant. Ne payez pas deux fois.",
+      "awaitingTitle": "Finalisez votre paiement",
+      "awaitingBody": "Votre commande est passée et attend le paiement. Montant dû : {amount}",
+      "failedTitle": "Le paiement n'a pas abouti",
+      "failedBody": "Rien n'a été débité pour cette tentative. Vous pouvez réessayer. Montant dû : {amount}",
+      "expiredTitle": "La page de paiement a expiré",
+      "expiredBody": "La page de paiement a expiré avant la fin du paiement. Vous pouvez recommencer. Montant dû : {amount}",
+      "cancelledTitle": "Le paiement a été annulé",
+      "cancelledBody": "Vous pouvez recommencer pour payer votre commande. Montant dû : {amount}",
+      "payNow": "Payer maintenant",
+      "tryAgain": "Réessayer",
+      "checkAgain": "Vérifier à nouveau",
+      "reopenPayment": "Rouvrir la page de paiement",
+      "continueShopping": "Continuer vos achats"
     }
   }
 }

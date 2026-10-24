@@ -79,12 +79,20 @@ export const COUPON_CAPABILITY = "design_only" as CapabilityState;
 /**
  * Online/card payment.
  *
- * `design_only` for online/card payment specifically — still true: no PSP is
- * integrated, no `client secret`/redirect flow exists, and `POST checkout/
- * complete` still confirms the order on its own rather than requiring a
- * settled/authorised provider intent first. ADR-04 ("Payment Intent /
- * Authorization / Capture / Refund") remains **Accepted — Architecture
- * Direction**, provider selection unmade.
+ * `gated` (PAY-H4-05): the online journey is **built** — a payment method the
+ * API marks `online: true` is selectable at checkout, the order is placed, the
+ * shopper is sent to the provider's hosted page (`POST checkout/payment-intent`
+ * returns its address), and `/checkout/payment-return` reports the outcome the
+ * *server* confirms (`GET orders/{order}/payment-status`). It is withheld, not
+ * absent: the backend gate (`payments.commerce_online_checkout.enabled`) is
+ * closed by default and the API simply never marks a method `online` while it
+ * is, so with the gate closed this storefront behaves exactly as before. Still
+ * no provider name, no brand mark and no card field anywhere in this storefront
+ * — card data is typed on the provider's page only.
+ *
+ * Older note kept for the record: before PAY-H4-04a no PSP was integrated and
+ * `POST checkout/complete` confirmed the order on its own. ADR-04 ("Payment
+ * Intent / Authorization / Capture / Refund") remains the architecture direction.
  *
  * **COM-MOBILE-PAYMENTS-1 (ADR-09) made a narrower thing real underneath**:
  * `CommerceCheckoutService::complete()` now creates a real `CommercePaymentIntent`
@@ -107,7 +115,7 @@ export const COUPON_CAPABILITY = "design_only" as CapabilityState;
  * inside a trusted tenant context (ADR-04 §1), and the provider/vendor
  * selection itself (ADR-09's own open decision).
  */
-export const PAYMENT_CAPABILITY = "design_only" as CapabilityState;
+export const PAYMENT_CAPABILITY = "gated" as CapabilityState;
 
 /**
  * Shipping/delivery pricing.

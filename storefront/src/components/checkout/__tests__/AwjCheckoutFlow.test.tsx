@@ -46,6 +46,12 @@ const mockActions = vi.hoisted(() => ({
 
 vi.mock("@/lib/data/awj-checkout", () => mockActions);
 
+const mockStartPayment = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/data/awj-online-payment", () => ({
+  startOnlinePaymentAction: (...args: unknown[]) => mockStartPayment(...args),
+  getOnlinePaymentStatusAction: vi.fn(),
+}));
+
 function emptyCart() {
   return {
     kind: "awj" as const,
@@ -391,6 +397,148 @@ describe("AwjCheckoutFlow", () => {
     expect(
       screen.getByText("awjCheckout.success.notPaidNote"),
     ).toBeInTheDocument();
+  });
+
+  it("PAY-H4-05: an order awaiting online payment is handed to the payment-return page with only its id and signed reference saved — never shown as confirmed", async () => {
+    const user = userEvent.setup();
+    const assign = vi.fn();
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...window.location, assign },
+    });
+    mockActions.startOrResumeAwjCheckout.mockResolvedValue({
+      success: true,
+      checkout: checkoutWith(),
+    });
+    mockActions.updateAwjContact.mockResolvedValue({
+      success: true,
+      checkout: checkoutWith({ contact: sampleOrder.contact }),
+    });
+    mockActions.updateAwjAddress.mockResolvedValue({
+      success: true,
+      checkout: checkoutWith({ contact: sampleOrder.contact }),
+    });
+    mockActions.updateAwjDelivery.mockResolvedValue({
+      success: true,
+      checkout: checkoutWith({
+        contact: sampleOrder.contact,
+        delivery: {
+          amount: { amount_minor: 0, currency: "SAR" },
+          method: "pickup",
+          address: checkoutWith().delivery.address,
+        },
+      }),
+    });
+    mockActions.completeAwjCheckoutAction.mockResolvedValue({
+      success: true,
+      order: {
+        ...sampleOrder,
+        payment: { ...sampleOrder.payment, requires_action: true },
+      },
+      replayed: false,
+      orderReference: "signed-ref-1",
+    });
+
+    render(<AwjCheckoutFlow />);
+    await fillDetailsAndContinue(user);
+    await screen.findByText("awjCheckout.review.heading");
+    await user.click(
+      screen.getByRole("button", { name: "awjCheckout.completeOrder" }),
+    );
+
+    await waitFor(() => expect(assign).toHaveBeenCalledTimes(1));
+    expect(assign.mock.calls[0][0]).toMatch(
+      /\/checkout\/payment-return\?start=1$/,
+    );
+    expect(screen.queryByText("awjCheckout.success.heading")).toBeNull();
+    expect(
+      await screen.findByText("awjCheckout.payment.redirectingTitle"),
+    ).toBeInTheDocument();
+    const saved = JSON.parse(
+      localStorage.getItem("awj.pendingOnlinePayment.v1") ?? "{}",
+    );
+    expect(saved.orderId).toBe(sampleOrder.id);
+    expect(saved.orderReference).toBe("signed-ref-1");
+    expect(Object.keys(saved).sort()).toEqual([
+      "orderId",
+      "orderNumber",
+      "orderReference",
+      "savedAt",
+    ]);
+  });
+
+  it("PAY-H4-05: when browser storage is blocked the payment starts inline — the placed order is never stranded", async () => {
+    const user = userEvent.setup();
+    const assign = vi.fn();
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...window.location, assign },
+    });
+    const spy = vi
+      .spyOn(Storage.prototype, "setItem")
+      .mockImplementation((key: string) => {
+        if (key.startsWith("awj.pendingOnlinePayment"))
+          throw new Error("blocked");
+      });
+    mockActions.startOrResumeAwjCheckout.mockResolvedValue({
+      success: true,
+      checkout: checkoutWith(),
+    });
+    mockActions.updateAwjContact.mockResolvedValue({
+      success: true,
+      checkout: checkoutWith({ contact: sampleOrder.contact }),
+    });
+    mockActions.updateAwjAddress.mockResolvedValue({
+      success: true,
+      checkout: checkoutWith({ contact: sampleOrder.contact }),
+    });
+    mockActions.updateAwjDelivery.mockResolvedValue({
+      success: true,
+      checkout: checkoutWith({
+        contact: sampleOrder.contact,
+        delivery: {
+          amount: { amount_minor: 0, currency: "SAR" },
+          method: "pickup",
+          address: checkoutWith().delivery.address,
+        },
+      }),
+    });
+    mockActions.completeAwjCheckoutAction.mockResolvedValue({
+      success: true,
+      order: {
+        ...sampleOrder,
+        payment: { ...sampleOrder.payment, requires_action: true },
+      },
+      replayed: false,
+      orderReference: "signed-ref-2",
+    });
+    mockStartPayment.mockResolvedValue({
+      success: true,
+      payment: {
+        status: "pending",
+        can_retry: false,
+        amount: { amount_minor: 5000, currency: "SAR" },
+        paid_at: null,
+        expires_at: null,
+        checkout_url: "https://pay.example/inline/1",
+      },
+    });
+
+    render(<AwjCheckoutFlow />);
+    await fillDetailsAndContinue(user);
+    await screen.findByText("awjCheckout.review.heading");
+    await user.click(
+      screen.getByRole("button", { name: "awjCheckout.completeOrder" }),
+    );
+
+    await waitFor(() =>
+      expect(assign).toHaveBeenCalledWith("https://pay.example/inline/1"),
+    );
+    expect(mockStartPayment).toHaveBeenCalledWith(
+      sampleOrder.id,
+      "signed-ref-2",
+    );
+    spy.mockRestore();
   });
 
   it("on review_required, shows the issue instead of a generic error and updates the UI from the authoritative refreshed checkout", async () => {

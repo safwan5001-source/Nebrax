@@ -960,7 +960,11 @@
       "selectMethod": "Select how you'll pay",
       "noMethodsEnabled": "This store hasn't enabled a specific payment method yet.",
       "settledOnDelivery": "Settled in cash when your order is delivered.",
-      "settledOnPickup": "Settled in cash when you pick up your order."
+      "settledOnPickup": "Settled in cash when you pick up your order.",
+      "onlineMethodHint": "Pay securely online",
+      "onlineRedirectNote": "After you place the order you'll be taken to the payment provider's secure page to pay. Card details are entered there, never on this store.",
+      "redirectingTitle": "Taking you to secure payment…",
+      "redirectingBody": "Your order has been placed. Please keep this page open while we redirect you."
     },
     "continueToAddress": "Continue to address",
     "continueToDelivery": "Continue to delivery",
@@ -1002,6 +1006,39 @@
       "message": "Gift message",
       "messageHint": "Printed on the card. Plain text only.",
       "messageCount": "{count} / {max}"
+    },
+    "paymentReturn": {
+      "loadingTitle": "Checking your payment…",
+      "loadingBody": "One moment while we confirm the payment status with the store.",
+      "startingTitle": "Taking you to secure payment…",
+      "startingBody": "Please wait — do not close or refresh this page.",
+      "unknownTitle": "We can't find your order on this device",
+      "unknownBody": "If you have just paid, your order is safe. Please contact the store with your order details to confirm it.",
+      "unavailableTitle": "Online payment is unavailable",
+      "unavailableBody": "This order can no longer be paid online right now. Nothing has been charged by this page. Please contact the store.",
+      "errorTitle": "We couldn't check your payment",
+      "errorBody": "Something went wrong while contacting the store. Your order is safe — please try again.",
+      "paidTitle": "Payment received",
+      "paidBody": "Thank you. We confirmed your payment of {amount} and your order is being prepared.",
+      "reviewTitle": "Your payment is being reviewed",
+      "reviewBody": "We received your payment but the store needs to review it before confirming. You do not need to pay again — the store will contact you.",
+      "pendingTitle": "Confirming your payment…",
+      "pendingBody": "This usually takes a few seconds. Please keep this page open.",
+      "slowTitle": "Still waiting for confirmation",
+      "slowBody": "We haven't received the payment confirmation yet. If you completed the payment, it may take a little longer — check again in a moment. Please don't pay twice.",
+      "awaitingTitle": "Complete your payment",
+      "awaitingBody": "Your order is placed and is waiting for payment. Amount due: {amount}",
+      "failedTitle": "The payment didn't go through",
+      "failedBody": "Nothing was charged for this attempt. You can try again. Amount due: {amount}",
+      "expiredTitle": "The payment page expired",
+      "expiredBody": "The payment page timed out before it was completed. You can start again. Amount due: {amount}",
+      "cancelledTitle": "The payment was cancelled",
+      "cancelledBody": "You can start again to pay for your order. Amount due: {amount}",
+      "payNow": "Pay now",
+      "tryAgain": "Try again",
+      "checkAgain": "Check again",
+      "reopenPayment": "Open the payment page again",
+      "continueShopping": "Continue shopping"
     }
   }
 }

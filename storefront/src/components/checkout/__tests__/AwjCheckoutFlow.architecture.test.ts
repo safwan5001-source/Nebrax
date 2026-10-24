@@ -15,8 +15,9 @@ import { describe, expect, it } from "vitest";
  *    RTL (Arabic, the default locale) and LTR without a per-direction fork,
  *    matching every other AWJ Store surface's logical-property convention.
  * 3. No payment-provider name or brand mark anywhere in the checkout. The
- *    payment stage is DESIGN_ONLY (`PAYMENT_CAPABILITY`), and naming a provider
- *    would assert a commercial capability the platform does not have. STORE-UI-4
+ *    payment stage is GATED (`PAYMENT_CAPABILITY`) behind the server's own gate,
+ *    and naming a provider would assert a commercial capability the platform
+ *    may not have enabled for this store. STORE-UI-4
  *    added the stage, so it added the guard with it.
  *
  * STORE-UI-4 split the flow into per-stage components, so these guards cover

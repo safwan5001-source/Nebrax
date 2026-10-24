@@ -960,7 +960,11 @@
       "selectMethod": "Select how you'll pay",
       "noMethodsEnabled": "This store hasn't enabled a specific payment method yet.",
       "settledOnDelivery": "Settled in cash when your order is delivered.",
-      "settledOnPickup": "Settled in cash when you pick up your order."
+      "settledOnPickup": "Settled in cash when you pick up your order.",
+      "onlineMethodHint": "Paga online de forma segura",
+      "onlineRedirectNote": "Al realizar el pedido te llevaremos a la página segura del proveedor de pagos para pagar. Los datos de la tarjeta se introducen allí, nunca en esta tienda.",
+      "redirectingTitle": "Te llevamos al pago seguro…",
+      "redirectingBody": "Tu pedido se ha realizado. Mantén esta página abierta mientras te redirigimos."
     },
     "continueToAddress": "Continue to address",
     "continueToDelivery": "Continue to delivery",
@@ -1002,6 +1006,39 @@
       "message": "Mensaje del regalo",
       "messageHint": "Se imprime en la tarjeta. Solo texto.",
       "messageCount": "{count} / {max}"
+    },
+    "paymentReturn": {
+      "loadingTitle": "Comprobando tu pago…",
+      "loadingBody": "Un momento mientras confirmamos el estado del pago con la tienda.",
+      "startingTitle": "Te llevamos al pago seguro…",
+      "startingBody": "Espera, no cierres ni actualices esta página.",
+      "unknownTitle": "No encontramos tu pedido en este dispositivo",
+      "unknownBody": "Si acabas de pagar, tu pedido está a salvo. Ponte en contacto con la tienda con los datos de tu pedido para confirmarlo.",
+      "unavailableTitle": "El pago online no está disponible",
+      "unavailableBody": "Este pedido no se puede pagar online ahora. No se ha cobrado nada desde esta página. Ponte en contacto con la tienda.",
+      "errorTitle": "No pudimos comprobar tu pago",
+      "errorBody": "Algo salió mal al contactar con la tienda. Tu pedido está a salvo; inténtalo de nuevo.",
+      "paidTitle": "Pago recibido",
+      "paidBody": "Gracias. Hemos confirmado tu pago de {amount} y estamos preparando tu pedido.",
+      "reviewTitle": "Tu pago está en revisión",
+      "reviewBody": "Hemos recibido tu pago, pero la tienda debe revisarlo antes de confirmarlo. No necesitas pagar de nuevo; la tienda se pondrá en contacto contigo.",
+      "pendingTitle": "Confirmando tu pago…",
+      "pendingBody": "Suele tardar unos segundos. Mantén esta página abierta.",
+      "slowTitle": "Seguimos esperando la confirmación",
+      "slowBody": "Aún no hemos recibido la confirmación del pago. Si ya pagaste, puede tardar un poco más; vuelve a comprobar en un momento. No pagues dos veces.",
+      "awaitingTitle": "Completa tu pago",
+      "awaitingBody": "Tu pedido está realizado y espera el pago. Importe a pagar: {amount}",
+      "failedTitle": "El pago no se completó",
+      "failedBody": "No se cobró nada en este intento. Puedes volver a intentarlo. Importe a pagar: {amount}",
+      "expiredTitle": "La página de pago ha caducado",
+      "expiredBody": "La página de pago caducó antes de completarse. Puedes empezar de nuevo. Importe a pagar: {amount}",
+      "cancelledTitle": "El pago se canceló",
+      "cancelledBody": "Puedes empezar de nuevo para pagar tu pedido. Importe a pagar: {amount}",
+      "payNow": "Pagar ahora",
+      "tryAgain": "Reintentar",
+      "checkAgain": "Comprobar de nuevo",
+      "reopenPayment": "Abrir de nuevo la página de pago",
+      "continueShopping": "Seguir comprando"
     }
   }
 }
