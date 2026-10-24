@@ -636,7 +636,7 @@ final class CommerceCheckoutService
     {
         try {
             $this->orderReservations->reserve($order, CommercePaymentHold::expiresAt());
-        } catch (OrderLineUnavailableException $e) {
+        } catch (InsufficientAvailabilityException $e) {
             $item = $items->first(fn (CommerceCartItem $i): bool => $i->product_id === $e->productId && ($i->product_variant_id ?? null) === $e->variantId);
             throw new CheckoutReviewRequiredException(
                 'بعض عناصر السلة تغيّرت — راجع السلة قبل الإتمام.',

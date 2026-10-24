@@ -7,7 +7,7 @@
 |---|---|
 | الحجز عند الإتمام | `CommerceCheckoutService::holdStockForPayment` للنية الإلكترونية فقط؛ نقص ⇒ `insufficient_stock` (السطر المعني) وتراجع كامل |
 | `acquire` | يقبل `variantId` و`expiresAt`؛ يقفل صف مخزون المتغيّر؛ إصلاح: كان يتجاهل المتغيّر |
-| `reserve` | يمرّر المتغيّر والموعد؛ المخزن يُحسم عند أول سطر متتبَّع (طلب خدمات بلا سياسة تنفيذ لا يفشل)؛ `OrderLineUnavailableException` تسمّي السطر |
+| `reserve` | يمرّر المتغيّر والموعد؛ المخزن يُحسم عند أول سطر متتبَّع (طلب خدمات بلا سياسة تنفيذ لا يفشل)؛ `InsufficientAvailabilityException` تحمل `productId`/`variantId` للسطر |
 | الإعداد | `sales.commerce_payment_hold_minutes` (60؛ 15..1440؛ تحقق في `UpdateSalesSettingsRequest`) |
 | المكنسة | `CommerceUnpaidOrderSweeper` + `commerce:expire-unpaid-orders` كل 5 دقائق (`withoutOverlapping`, `onOneServer`) |
 | دفع ناجح | `completeCaptured` يجعل الحجز دائماً (`expires_at=null`) |

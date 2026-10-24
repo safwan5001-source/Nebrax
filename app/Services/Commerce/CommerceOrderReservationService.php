@@ -91,7 +91,7 @@ final class CommerceOrderReservationService
      * @throws RuntimeException الطلب غير موجود لمستأجر السياق الحالي، أو
      *                          ليس بحالة `confirmed`.
      * @throws FulfillmentPolicyNotConfiguredException لا مخزن تنفيذ صالحاً لقناة الطلب.
-     * @throws OrderLineUnavailableException الكمية المتاحة للبيع أقل من كمية سطرٍ ما (يرث InsufficientAvailabilityException).
+     * @throws InsufficientAvailabilityException الكمية المتاحة للبيع أقل من كمية سطرٍ ما (تحمل `productId`/`variantId` للسطر).
      * @throws InventoryReservationIdempotencyConflictException إعادة محاولة بحمولة مختلفة.
      */
     public function reserve(CommerceOrder $order, ?\DateTimeInterface $expiresAt = null): Collection
@@ -148,7 +148,10 @@ final class CommerceOrderReservationService
                     ));
                 } catch (InsufficientAvailabilityException $e) {
                     // H4-02: السطر الذي نقص مخزونه يُسمّى ليُعاد إلى مراجعة السلة بدل رسالة عامة.
-                    throw new OrderLineUnavailableException($line->product_id, $line->product_variant_id, $e->getMessage(), $e);
+                    $e->productId = $line->product_id;
+                    $e->variantId = $line->product_variant_id;
+
+                    throw $e;
                 }
             }
 
