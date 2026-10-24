@@ -14,6 +14,18 @@ Web wizard for the registered `stocktake_count` domain (H7-S1b). Route `/stockta
 
 `web/src/modules/stocktaking/import/{contract.ts,StocktakeCountImportWizard.tsx}` · `web/src/app/(app)/stocktaking/[id]/import/page.tsx` · `web/src/app/(app)/stocktaking/[id]/page.tsx` (entry button, draft only) · `web/src/messages/{ar,en}.json` (`stocktakeImport.*`, `stocktaking.import_counts`). Depends on #1702 (`import-jobs/client.ts` domain typing).
 
+## Independent review dispositions (subagent; Codex not claimed)
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | A job resumed from `?job=` was applied without checking domain/target: `/stocktaking/B/import?job=<ready job frozen to stocktake A>` would write counts to A while the page says B | **Fixed** — `ImportJobResource` exposes the frozen `target_id` for the `stocktake_count` domain only (asserted in `H7ImportEndpointsTest`); the wizard refuses to apply unless `domain === 'stocktake_count'` and `target_id === route id` (3-case test) |
+| 2 | Going back / changing a rule while apply was in flight reset the engine and showed a state different from what is being written | **Fixed** — stepper navigation and job dropping are blocked while `applying`/`uploading` (mutation-controlled test) |
+| 3 | «Counts to write» next to «Overwrites» read as additive | **Fixed** — labels say overwrites are a subset («منها استبدال»); result labels likewise |
+| 4 | Job upload without an idempotency key | **Fixed** — key derived from the single-use preview (`stocktake-count-<binding id>`), asserted |
+| 5 | Missing tests (resume, busy navigation, key) | **Added** |
+
+The same resume-domain/busy-navigation gaps exist in the expense and Partner wizards (pre-existing/H5-S2b) → follow-up **IMP-WIZARD-STATE-01** (not pushed into #1702 again to avoid restarting its CI a third time).
+
 ## Accounting impact
 
 None — the UI drives the counts-only endpoints from #1692; no stock movement, no journal entry.

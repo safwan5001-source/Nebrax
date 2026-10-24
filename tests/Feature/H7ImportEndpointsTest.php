@@ -139,6 +139,8 @@ class H7ImportEndpointsTest extends TestCase
             'domain' => 'stocktake_count', 'file' => $this->file($rows), 'options' => ['stocktake_id' => $stocktake->id], 'preview_id' => $binding['id'], 'preview_hash' => $binding['hash'],
         ])->assertCreated()->json('data');
 
+        // الهدف المجمَّد ظاهر لمجال الجرد وحده (تتحقق منه الواجهة عند الاستئناف)
+        $this->assertSame($stocktake->id, $job['target_id']);
         $this->assertSame('completed', $this->runJob($auth['token'], $job['id']));
         $lines = $stocktake->fresh('lines')->lines;
         $this->assertSame([9, 12], [$lines->firstWhere('product_id', $p['a']->id)->counted_quantity, $lines->firstWhere('product_id', $p['b']->id)->counted_quantity]);

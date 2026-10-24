@@ -83,6 +83,8 @@ export function StocktakeCountImportWizard({ stocktakeId }: { stocktakeId: strin
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine.job?.id]);
 
+  // تشغيلةٌ مستأنفةٌ من الرابط تُطبَّق فقط إن كانت من مجال الجرد ومجمَّدةَ الهدف على هذا الجرد نفسه (الخادم يكشف الهدف لهذا المجال).
+  const resumeMismatch = Boolean(resumedWithoutFile && engine.job && (engine.job.domain !== 'stocktake_count' || engine.job.target_id !== stocktakeId));
   const fields = inspection?.fields ?? [];
   const gaps = useMemo(() => stocktakeMappingGaps(mapping), [mapping]);
   const activeMapping = inspection && inspection.columns.length > 0 ? mapping : undefined;
@@ -96,7 +98,8 @@ export function StocktakeCountImportWizard({ stocktakeId }: { stocktakeId: strin
 
   /** تشغيلةٌ سابقة مجمَّدة الملف والخيارات: أي تغيير في الملف/السياسة/المطابقة أو معاينةٌ جديدة يُسقطها كي لا يُنفَّذ ما لم يُعايَن (تبقى على الخادم وتُستأنف برابطها). */
   function dropJob() {
-    if (!engine.job) return;
+    // أثناء الرفع/التنفيذ لا تُسقَط التشغيلة: حلقة التنفيذ ستعيدها وتتناقض الشاشة مع ما يُكتب فعلاً.
+    if (!engine.job || engine.busy === 'applying' || engine.busy === 'uploading') return;
     engine.reset();
     setParam(null);
     setResumedWithoutFile(false);
@@ -205,7 +208,8 @@ export function StocktakeCountImportWizard({ stocktakeId }: { stocktakeId: strin
     setError(null);
     if (!engine.job) {
       if (!file) return;
-      const job = await engine.upload(file, undefined, null, preview?.binding ? { binding: preview.binding, options: applyOptionsPayload() } : null);
+      // مفتاح ثباتٍ مشتق من المعاينة أحادية الاستعمال: إعادة المحاولة بعد انقطاع الشبكة تعيد التشغيلة نفسها بدل أن ترفضها المعاينة المستهلكة.
+      const job = await engine.upload(file, preview?.binding ? `stocktake-count-${preview.binding.id}` : undefined, null, preview?.binding ? { binding: preview.binding, options: applyOptionsPayload() } : null);
       if (!job) {
         // فشل الإنشاء (معاينة منتهية/خيار مرفوض/شبكة): لا صفحة فارغة — نعود إلى المعاينة والخطأ ظاهر.
         setStep(1);
@@ -263,7 +267,7 @@ export function StocktakeCountImportWizard({ stocktakeId }: { stocktakeId: strin
         </Button>
       </header>
 
-      <Stepper steps={steps} current={step} onSelect={(index) => index <= step && setStep(index)} label={t('step_label')} />
+      <Stepper steps={steps} current={step} onSelect={(index) => index <= step && engine.busy !== 'applying' && engine.busy !== 'uploading' && setStep(index)} label={t('step_label')} />
 
       {error || engine.error ? (
         <p role="alert" className="rounded-md border border-negative/30 bg-negative/10 px-3 py-2 text-sm text-negative">
@@ -280,9 +284,10 @@ export function StocktakeCountImportWizard({ stocktakeId }: { stocktakeId: strin
             <CardContent className="space-y-4">
               <p className="text-sm leading-relaxed text-muted">{t('resumed_hint', { name: engine.job.original_filename })}</p>
               {engine.job.preview_bound ? null : <p role="alert" className="text-sm text-negative">{t('resumed_unbound')}</p>}
+              {resumeMismatch ? <p role="alert" className="text-sm text-negative">{t('resumed_other_target')}</p> : null}
               <FormActions
                 primary={
-                  <Button disabled={!engine.job.preview_bound} onClick={() => void confirmAndApply()}>
+                  <Button disabled={!engine.job.preview_bound || resumeMismatch} onClick={() => void confirmAndApply()}>
                     <Upload className="h-4 w-4" strokeWidth={1.7} />
                     {t('apply')}
                   </Button>

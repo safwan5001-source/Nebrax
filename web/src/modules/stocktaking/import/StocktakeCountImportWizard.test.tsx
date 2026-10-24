@@ -129,6 +129,8 @@ describe('StocktakeCountImportWizard (IMP-H7-S1c)', () => {
     const create = api.mock.calls.find((call) => call[0] === '/import-jobs')?.[1]?.body as FormData;
     expect([create.get('domain'), create.get('preview_id'), create.get('options[stocktake_id]'), create.get('options[existing_count_policy]'), create.get('options[mapping][2]')]).toEqual(['stocktake_count', 'pv-1', 'st-1', 'error', 'ignore']);
     expect(api.mock.calls.find((call) => call[0] === '/import-jobs/job-1/apply')?.[1]?.body).toEqual({});
+    // مفتاح ثباتٍ مشتق من المعاينة أحادية الاستعمال كي لا تتحول إعادة المحاولة بعد انقطاعٍ إلى تشغيلةٍ ثانية
+    expect(create.get('idempotency_key')).toBe('stocktake-count-pv-1');
   });
 
   it('refuses to apply a preview with errors and offers the error report', async () => {
@@ -183,5 +185,44 @@ describe('StocktakeCountImportWizard (IMP-H7-S1c)', () => {
     await waitFor(() => expect(creates).toBe(2));
     const second = api.mock.calls.filter((call) => call[0] === '/import-jobs' && call[1]?.method === 'POST').at(-1)?.[1]?.body as FormData;
     expect(second.get('options[existing_count_policy]')).toBe('skip');
+  });
+
+  it('applies a resumed job only when it is a stocktake_count job frozen to THIS stocktake', async () => {
+    for (const [target, domain, enabled] of [['st-2', 'stocktake_count', false], ['st-1', 'expense_import', false], ['st-1', 'stocktake_count', true]] as const) {
+      cleanup();
+      window.history.replaceState({}, '', '/stocktaking/st-1/import?job=job-9');
+      api.mockImplementation((path: string) => {
+        if (path === '/import-jobs/job-9') return Promise.resolve({ data: jobFixture({ id: 'job-9', domain, target_id: target }) });
+        return Promise.resolve({ data: {} });
+      });
+      render(<StocktakeCountImportWizard stocktakeId="st-1" />);
+
+      await waitFor(() => expect(screen.getByText('resumed_title')).toBeTruthy());
+      expect((screen.getByRole('button', { name: 'apply' }) as HTMLButtonElement).disabled, `${domain}/${target}`).toBe(!enabled);
+      expect(Boolean(screen.queryByText('resumed_other_target'))).toBe(!enabled);
+    }
+  });
+
+  it('cannot navigate back while the job is being applied', async () => {
+    const user = userEvent.setup();
+    render(<StocktakeCountImportWizard stocktakeId="st-1" />);
+    await user.upload(screen.getByLabelText('step_file'), csv());
+    await waitFor(() => expect(screen.getByLabelText('رمز الصنف')).toBeTruthy());
+    await user.click(screen.getByRole('button', { name: 'run_preview' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'apply' })).toBeTruthy());
+
+    let release: (value: unknown) => void = () => {};
+    api.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path === '/import-jobs' && options?.method === 'POST') return Promise.resolve({ data: jobFixture() });
+      if (path === '/import-jobs/job-1/apply') return new Promise((resolve) => { release = resolve; });
+      return Promise.resolve({ data: {} });
+    });
+    await user.click(screen.getByRole('button', { name: 'apply' }));
+    await waitFor(() => expect(screen.getByText('step_apply', { selector: '[class*="font"]' })).toBeTruthy());
+
+    await user.click(screen.getByRole('button', { name: 'step_setup' }));
+    expect(screen.queryByLabelText('existing_policy')).toBeNull();
+    expect(screen.getByText('step_apply', { selector: '[class*="font"]' })).toBeTruthy();
+    release({ data: jobFixture({ status: 'completed', apply_result: { written: 2 } }) });
   });
 });
