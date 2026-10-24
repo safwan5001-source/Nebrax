@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, Plus, Save, Tags, Trash2 } from 'lucide-react';
+import { ArrowRight, Plus, Save, Tags, Trash2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Combobox, type ComboOption } from '@/components/ui/combobox';
@@ -189,7 +189,10 @@ export default function PriceListsPage() {
           <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-muted">{t('description')}</p>
         </div>
-        <Button className="ms-auto" onClick={createList}><Plus className="h-4 w-4" strokeWidth={1.7} />{t('new')}</Button>
+        <div className="ms-auto flex flex-wrap gap-2">
+          <Button asChild variant="outline"><Link href={selected ? `/sales-settings/pricelists/import?price_list_id=${selected.id}` : '/sales-settings/pricelists/import'}><Upload className="h-4 w-4" strokeWidth={1.7} />{t('import_from_file')}</Link></Button>
+          <Button onClick={createList}><Plus className="h-4 w-4" strokeWidth={1.7} />{t('new')}</Button>
+        </div>
       </div>
 
       {error && <p className="rounded-md border border-negative/25 bg-negative/10 px-3 py-2 text-sm text-negative" role="alert">{error}</p>}
