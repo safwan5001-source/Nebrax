@@ -286,6 +286,42 @@ final class PaymentGatewayService
         });
     }
 
+    /**
+     * سياسة ضريبة عمولة المزوّد لهذا الاتصال (ADR-0008 D-04 ب). الافتراضي `reject`؛ `input_vat` **لا يُضبط** ما لم يُسجَّل مرجع الرأي الضريبي (EXT-05)
+     * في `config('payments.fee_tax_opinion_ref')`. السبب إلزامي وللتغيير حدث تدقيق ثابت. العودة إلى `reject` مسموحة دائماً.
+     */
+    public function setFeeTaxPolicy(PaymentGateway $gateway, string $policy, ?User $actor, ?string $reason): PaymentGateway
+    {
+        $tenantId = $this->requireTenant();
+        $this->assertSameTenant($tenantId, $gateway);
+        if (! in_array($policy, [PaymentGateway::FEE_TAX_REJECT, PaymentGateway::FEE_TAX_INPUT_VAT], true)) {
+            throw new PaymentGatewayException('gateway.invalid_fee_tax_policy', 'سياسة ضريبة الرسوم غير معروفة.');
+        }
+        $reason = $this->nullableString($reason);
+        if ($reason === null || mb_strlen($reason) < 5) {
+            throw new PaymentGatewayException('gateway.reason_required', 'سبب تغيير السياسة إلزامي (٥ أحرف على الأقل).');
+        }
+        if ($policy === PaymentGateway::FEE_TAX_INPUT_VAT && trim((string) config('payments.fee_tax_opinion_ref')) === '') {
+            throw new PaymentGatewayException('gateway.fee_tax_opinion_required', 'لا يُفعَّل احتساب ضريبة الرسوم كمدخلات قبل تسجيل الرأي الضريبي (EXT-05).');
+        }
+
+        return DB::transaction(function () use ($gateway, $policy, $actor, $reason): PaymentGateway {
+            $locked = $this->lock($gateway);
+            // العودة إلى reject مسموحة دائماً (حتى على اتصال ملغى): بوابة الترحيل لا تغلقها الإلغاء.
+            if ($policy !== PaymentGateway::FEE_TAX_REJECT) {
+                $this->assertNotRevoked($locked);
+            }
+            $from = (string) $locked->fee_tax_policy;
+            if ($from === $policy) {
+                return $locked;
+            }
+            $locked->forceFill(['fee_tax_policy' => $policy])->save();
+            $this->record($locked, 'fee_tax_policy_changed', $from, $policy, $actor, $reason, ['fee_tax_policy']);
+
+            return $locked;
+        });
+    }
+
     /** @return Collection<int, PaymentConnectionEvent> */
     public function events(PaymentGateway $gateway): Collection
     {

@@ -30,6 +30,7 @@ class PaymentGatewaySettlement extends BaseModel implements CompanyWide
         'provider_credits',
         'refunds_total',
         'unreconciled_minor',
+        'fee_tax_invoice_ref',
         'currency',
         'gateway_provider',
         'gateway_name',
@@ -82,7 +83,7 @@ class PaymentGatewaySettlement extends BaseModel implements CompanyWide
             if ($settlement->exists && $settlement->getOriginal('status') === self::STATUS_POSTED) {
                 $watched = [
                     'gross_amount', 'net_bank_amount', 'provider_fee_ex_tax', 'provider_fee_tax',
-                    'provider_deductions', 'provider_credits', 'refunds_total',
+                    'provider_deductions', 'provider_credits', 'refunds_total', 'fee_tax_invoice_ref',
                     'payment_gateway_id', 'cash_bank_account_id', 'provider_settlement_ref',
                     'settlement_date', 'clearing_account_id', 'fee_expense_account_id', 'bank_account_id',
                 ];

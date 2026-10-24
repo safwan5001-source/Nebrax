@@ -1140,6 +1140,7 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('payment-gateways/{id}/activate', [PaymentGatewayController::class, 'activate'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));
         Route::post('payment-gateways/{id}/suspend', [PaymentGatewayController::class, 'suspend'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));
         Route::post('payment-gateways/{id}/revoke', [PaymentGatewayController::class, 'revoke'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));
+        Route::put('payment-gateways/{id}/fee-tax-policy', [PaymentGatewayController::class, 'setFeeTaxPolicy'])->whereUuid('id')->middleware([$perm('payment_gateways.manage'), 'throttle:10,1']);
         Route::delete('payment-gateways/{id}', [PaymentGatewayController::class, 'destroy'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));
 
         // COM-MOBILE-PAYMENTS-1 (ADR-04/ADR-09): إدارة داخلية لالتزامات دفع
