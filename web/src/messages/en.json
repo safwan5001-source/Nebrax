@@ -2121,6 +2121,8 @@
       "resolve_blocked": "Resolve blocked",
       "request": "Request",
       "resolve_unknown": "Resolve unknown",
+      "adjust": "Request adjustment",
+      "approve_adjustment": "Approve adjustment",
       "view": "View",
       "manage": "Manage",
       "create": "Create",

@@ -194,14 +194,75 @@ class PaymentGatewaySettlementPostgresTest extends TestCase
         $this->assertSame(1, DB::table('payment_gateway_settlements')->where('status', 'posted')->count());
     }
 
+    /** @test */
+    public function two_settlements_cannot_both_consume_the_same_approved_adjustment(): void
+    {
+        [, $paymentA] = $this->capturedAttempt();
+        [, $paymentB] = $this->capturedAttempt();
+        $adjustmentId = $this->approvedAdjustment('reserve_hold', 10000);
+
+        $extra = ['adjustments' => [['adjustment_id' => $adjustmentId]]];
+        $results = $this->runConcurrently([
+            $this->settler($paymentA, 115000, [], 103400, 1600, 'PG-ADJ-A', $extra),
+            $this->settler($paymentB, 115000, [], 103400, 1600, 'PG-ADJ-B', $extra),
+        ]);
+
+        $this->assertAllOk($results);
+        $outcomes = array_column(array_column($results, 'value'), 'outcome');
+        sort($outcomes);
+        $this->assertSame(['posted', 'rejected'], $outcomes);
+        $this->assertSame(1, DB::table('payment_gateway_settlement_lines')->where('adjustment_id', $adjustmentId)->count());
+        $this->assertSame('consumed', DB::table('payment_gateway_adjustments')->where('id', $adjustmentId)->value('status'));
+        $this->assertSame(1, DB::table('payment_gateway_adjustment_events')->where('adjustment_id', $adjustmentId)->where('action', 'consumed')->count());
+    }
+
+    /** @test */
+    public function concurrent_approvals_of_one_adjustment_record_a_single_approval_and_never_by_the_requester(): void
+    {
+        app(TenantContext::class)->set($this->tenantId);
+        $adj = app(\App\Services\PaymentGatewayAdjustmentService::class)->request(
+            PaymentGateway::query()->findOrFail($this->gatewayId), 'adjustment_debit', 500, 'تعديل موثّق من الكشف', 'STMT-PG-1', null, User::query()->findOrFail($this->ownerId),
+        );
+        $tenant = $this->tenantId;
+        $approver = function (string $userId) use ($adj, $tenant) {
+            return function () use ($adj, $tenant, $userId) {
+                app(TenantContext::class)->set($tenant);
+                try {
+                    app(\App\Services\PaymentGatewayAdjustmentService::class)->approve(\App\Models\PaymentGatewayAdjustment::query()->findOrFail($adj->id), User::query()->findOrFail($userId));
+
+                    return ['outcome' => 'approved'];
+                } catch (\App\Support\GatewayAdjustmentException $e) {
+                    return ['outcome' => $e->reason];
+                }
+            };
+        };
+
+        $results = $this->runConcurrently([$approver($this->adminId), $approver($this->adminId), $approver($this->ownerId)]);
+
+        $this->assertAllOk($results);
+        $outcomes = array_column(array_column($results, 'value'), 'outcome');
+        $this->assertSame(1, count(array_filter($outcomes, fn ($o) => $o === 'approved')));
+        $this->assertContains('self_approval', $outcomes);
+        $this->assertSame($this->adminId, DB::table('payment_gateway_adjustments')->where('id', $adj->id)->value('approved_by'));
+    }
+
+    private function approvedAdjustment(string $kind, int $amount): string
+    {
+        app(TenantContext::class)->set($this->tenantId);
+        $svc = app(\App\Services\PaymentGatewayAdjustmentService::class);
+        $adj = $svc->request(PaymentGateway::query()->findOrFail($this->gatewayId), $kind, $amount, 'تعديل موثّق من الكشف', 'STMT-'.Str::random(6), null, User::query()->findOrFail($this->ownerId));
+
+        return $svc->approve($adj, User::query()->findOrFail($this->adminId))->id;
+    }
+
     // ═══════════════ أدوات ═══════════════
 
-    private function settler(string $paymentId, int $gross, array $refunds, int $net, int $fee, string $ref): callable
+    private function settler(string $paymentId, int $gross, array $refunds, int $net, int $fee, string $ref, array $extra = []): callable
     {
         $tenant = $this->tenantId;
         $gateway = $this->gatewayId;
 
-        return function () use ($paymentId, $gross, $refunds, $net, $fee, $ref, $tenant, $gateway) {
+        return function () use ($paymentId, $gross, $refunds, $net, $fee, $ref, $extra, $tenant, $gateway) {
             app(TenantContext::class)->set($tenant);
             $bank = \App\Models\CashBankAccount::query()->where('type', 'bank')->where('is_main', true)->firstOrFail();
             try {
@@ -210,7 +271,7 @@ class PaymentGatewaySettlementPostgresTest extends TestCase
                     'net_bank_amount' => $net, 'provider_fee_ex_tax' => $fee,
                     'items' => [['payment_id' => $paymentId, 'gross_amount' => $gross]],
                     'refunds' => collect($refunds)->map(fn ($amount, $id) => ['payment_refund_id' => $id, 'amount_minor' => $amount])->values()->all(),
-                ], User::query()->where('role', 'owner')->where('tenant_id', $tenant)->firstOrFail());
+                ] + $extra, User::query()->where('role', 'owner')->where('tenant_id', $tenant)->firstOrFail());
 
                 return ['outcome' => $settlement->status];
             } catch (\DomainException $e) {

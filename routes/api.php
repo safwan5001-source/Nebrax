@@ -103,6 +103,7 @@ use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\InvoicePaymentRequestController;
 use App\Http\Controllers\Api\PaymentAttemptLogController;
 use App\Http\Controllers\Api\PaymentAttemptPostingController;
+use App\Http\Controllers\Api\PaymentGatewayAdjustmentController;
 use App\Http\Controllers\Api\PaymentGatewaySettlementController;
 use App\Http\Controllers\Api\PaymentRefundController;
 use App\Http\Controllers\Api\PublicPaymentLinkController;
@@ -1106,6 +1107,14 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('payment-gateway-settlements/{id}', [PaymentGatewaySettlementController::class, 'show'])->whereUuid('id')->middleware($perm('payments.view'));
         Route::post('payment-gateway-settlements', [PaymentGatewaySettlementController::class, 'store'])->middleware([$perm('payment_settlements.manage'), 'throttle:30,1']);
         Route::post('payment-gateway-settlements/preview', [PaymentGatewaySettlementController::class, 'preview'])->middleware([$perm('payments.view'), 'throttle:60,1']);
+        // PAY-H3-02c (ADR-0008 D-22): تعديلات المزوّد — الطلب `payment_settlements.adjust`، والاعتماد/الرفض المستقل `payment_settlements.approve_adjustment`.
+        Route::get('payment-gateway-adjustments', [PaymentGatewayAdjustmentController::class, 'index'])->middleware($perm('payments.view'));
+        Route::get('payment-gateway-adjustments/{id}', [PaymentGatewayAdjustmentController::class, 'show'])->whereUuid('id')->middleware($perm('payments.view'));
+        Route::post('payment-gateway-adjustments', [PaymentGatewayAdjustmentController::class, 'store'])->middleware([$perm('payment_settlements.adjust'), 'throttle:30,1']);
+        Route::post('payment-gateway-adjustments/{id}/approve', [PaymentGatewayAdjustmentController::class, 'approve'])->whereUuid('id')->middleware([$perm('payment_settlements.approve_adjustment'), 'throttle:30,1']);
+        Route::post('payment-gateway-adjustments/{id}/reject', [PaymentGatewayAdjustmentController::class, 'reject'])->whereUuid('id')->middleware([$perm('payment_settlements.approve_adjustment'), 'throttle:30,1']);
+        Route::post('payment-gateway-adjustments/{id}/cancel', [PaymentGatewayAdjustmentController::class, 'cancel'])->whereUuid('id')->middleware([$perm('payments.view'), 'throttle:30,1']);
+        Route::get('payment-gateways/{gatewayId}/reserve-balance', [PaymentGatewayAdjustmentController::class, 'reserve'])->whereUuid('gatewayId')->middleware($perm('payments.view'));
         Route::get('payment-gateways/{gatewayId}/unsettled-refunds', [PaymentGatewaySettlementController::class, 'unsettledRefunds'])->whereUuid('gatewayId')->middleware($perm('payment_refunds.view'));
         Route::get('payment-gateways/{gatewayId}/unsettled-payments', [PaymentGatewaySettlementController::class, 'unsettled'])->whereUuid('gatewayId')->middleware($perm('payments.view'));
 

@@ -15,8 +15,14 @@ class PaymentGatewaySettlementLine extends BaseModel implements CompanyWide
 {
     public const TYPE_REFUND = 'refund';
 
+    /** أنواع D-22 (تطابق `PaymentGatewayAdjustment::KINDS`): مصدرها مستند تعديل معتمد. */
+    public const ADJUSTMENT_TYPES = [
+        PaymentGatewayAdjustment::KIND_RESERVE_HOLD, PaymentGatewayAdjustment::KIND_RESERVE_RELEASE,
+        PaymentGatewayAdjustment::KIND_DEBIT, PaymentGatewayAdjustment::KIND_CREDIT,
+    ];
+
     protected $fillable = [
-        'tenant_id', 'settlement_id', 'line_type', 'payment_refund_id', 'amount_minor', 'provider_event_ref', 'evidence_ref', 'reason',
+        'tenant_id', 'settlement_id', 'line_type', 'payment_refund_id', 'adjustment_id', 'amount_minor', 'provider_event_ref', 'evidence_ref', 'reason',
     ];
 
     protected $casts = ['amount_minor' => 'integer'];
@@ -49,6 +55,11 @@ class PaymentGatewaySettlementLine extends BaseModel implements CompanyWide
     public function settlement(): BelongsTo
     {
         return $this->belongsTo(PaymentGatewaySettlement::class, 'settlement_id');
+    }
+
+    public function adjustment(): BelongsTo
+    {
+        return $this->belongsTo(PaymentGatewayAdjustment::class, 'adjustment_id');
     }
 
     public function refund(): BelongsTo

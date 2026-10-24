@@ -33,6 +33,9 @@ export const PERMISSION_RISK: Readonly<Record<string, RiskKind>> = {
   'payment_refunds.resolve_unknown': 'financial',
   // PAY-H3-02b: تسجيل/ترحيل تسوية البوابة — قيد مالي ينقل رصيد المقاصة إلى البنك.
   'payment_settlements.manage': 'financial',
+  // PAY-H3-02c: طلب واعتماد تعديلات المزوّد (احتياطي/غرامة/اعتماد) — تغيّر صافي التسوية وتولّد قيداً.
+  'payment_settlements.adjust': 'financial',
+  'payment_settlements.approve_adjustment': 'financial',
   'accounts.manage': 'financial',
   'accounting_settings.manage': 'financial',
   'hr.manage': 'financial',

@@ -2121,6 +2121,8 @@
       "resolve_blocked": "معالجة المحجوبة",
       "request": "طلب",
       "resolve_unknown": "حسم غير المعروف",
+      "adjust": "طلب تعديل",
+      "approve_adjustment": "اعتماد تعديل",
       "view": "عرض",
       "manage": "إدارة",
       "create": "إنشاء",
