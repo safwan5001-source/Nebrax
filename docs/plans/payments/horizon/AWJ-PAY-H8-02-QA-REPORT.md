@@ -35,3 +35,8 @@
 
 ## اللقطات
 مجلد خارج المستودع (`PAY_QA_SHOTS`، الذي استُعمل: `/tmp/claude-0/pay-qa-shots`، 196 ملفاً بصيغة `‏<الحالة>-<ar|en>-<عرض>-<light|dark>.png`). أمثلة: `record-unreconciled-ar-390-dark.png` · `recon-difference-ar-390-dark.png` · `aging-ar-390-dark.png` · `settlements-list-en-390-light.png` · `adjustments-list-reserve-request-ar-390-dark.png` · `gateways-list-ar-768-dark.png` · `paylink-open-ar-390-dark.png` · `record-postable-en-1440-light.png`. لا تُرفع إلى المستودع (حجم)؛ تُعاد بالأمر أعلاه.
+
+
+## تحديث بعد المراجعة
+- **P2 (شريط الواجهة عند 768px بالإنجليزية) — مُصلَح:** `min-w-0` على حقل البحث في `components/layout/topbar.tsx`؛ أُعيد تشغيل حالات 768·en (12) وزال التنبيه `known-shell-defect` (0 تنبيه)، واختبارات `components/layout` (69) خضراء.
+- يبقى: تلميح تمرير شريط تبويبات الأقسام على الجوال (P3)، وتحذير next-intl التطويري خارج المدفوعات (P3).
