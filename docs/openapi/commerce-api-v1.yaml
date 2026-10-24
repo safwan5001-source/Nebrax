@@ -1373,7 +1373,7 @@ components:
           properties:
             code:
               type: string
-              enum: [internal_error, bad_request, not_found, method_not_allowed, validation_failed, unauthenticated, forbidden, tenant_context_required, client_inactive, insufficient_scope, rate_limited, idempotency_key_required, invalid_idempotency_key, idempotency_conflict, idempotency_in_progress, review_required, cart_merged]
+              enum: [internal_error, bad_request, not_found, method_not_allowed, validation_failed, unauthenticated, forbidden, tenant_context_required, client_inactive, insufficient_scope, rate_limited, idempotency_key_required, invalid_idempotency_key, idempotency_conflict, idempotency_in_progress, review_required, cart_merged, payment_unavailable, payment_not_payable, payment_provider_unavailable]
             message: { type: string }
             details: {}
         meta:

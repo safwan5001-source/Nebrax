@@ -133,6 +133,11 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
                 $payload[$key] = $config[$key];
             }
         }
+        // عنوان عودة خاص بالمحاولة (يبنيه الخادم من نطاق المتجر الموثَّق) يتقدّم على الإعداد العام؛ العودة لا تُثبت دفعاً.
+        if ($context->returnUrl !== null && $context->returnUrl !== '') {
+            $payload['success_url'] = $context->returnUrl;
+            $payload['back_url'] = $context->returnUrl;
+        }
 
         $created = $this->client->createInvoice($context->gateway, $payload);
         // الاستجابة نفسها تُفحص قبل عرض الرابط: فاتورة بمبلغ/عملة غير ما طلبناه لا يُرسَل إليها العميل (يُكتشف الفرق بعد الدفع فقط).

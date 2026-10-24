@@ -26,7 +26,7 @@ final class FakePaymentGatewayAdapter implements GatewayAdapter, RefundsPayments
 {
     public const PROVIDER = 'fake';
 
-    /** @var list<array{attempt_id: string, amount_minor: int, currency: string, payable_key: string}> */
+    /** @var list<array{attempt_id: string, amount_minor: int, currency: string, payable_key: string, return_url: ?string}> */
     public array $checkoutCalls = [];
 
     /** @var array<string, array{amount_minor: int, currency: string}> */
@@ -71,6 +71,7 @@ final class FakePaymentGatewayAdapter implements GatewayAdapter, RefundsPayments
             'amount_minor' => $context->amountMinor,
             'currency' => $context->currency,
             'payable_key' => $context->payableKey,
+            'return_url' => $context->returnUrl,
         ];
 
         if ($this->failCheckouts > 0) {

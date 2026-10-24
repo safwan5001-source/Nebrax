@@ -925,6 +925,9 @@ components:
             - idempotency_in_progress
             - review_required
             - cart_merged
+            - payment_unavailable
+            - payment_not_payable
+            - payment_provider_unavailable
         message: { type: string }
         details:
           type: object

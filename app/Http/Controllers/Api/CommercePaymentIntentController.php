@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\CommercePaymentIntent;
+use App\Models\PaymentAttempt;
 use App\Services\Commerce\CommercePaymentIntentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 /**
  * COM-MOBILE-PAYMENTS-1 (ADR-04/ADR-09) — إدارة داخلية بحتة لالتزامات
@@ -22,12 +24,21 @@ class CommercePaymentIntentController extends ApiController
 {
     public function index(): JsonResponse
     {
+        $intents = CommercePaymentIntent::query()
+            ->with('order:id,number')
+            ->orderByDesc('created_at')
+            ->get();
+
+        // PAY-H4-04a: محاولات الدفع الإلكتروني (قراءة فقط) لعرض المراجعة اليدوية (التقاط متأخر/عدم تطابق مبلغ) دون واجهة موازية.
+        $attempts = PaymentAttempt::query()
+            ->whereIn('payable_key', $intents->filter->isOnline()->map->payableKey()->values()->all() ?: ['-'])
+            ->orderByDesc('created_at')
+            ->get()
+            ->groupBy('payable_key');
+
         return response()->json([
-            'data' => CommercePaymentIntent::query()
-                ->with('order:id,number')
-                ->orderByDesc('created_at')
-                ->get()
-                ->map(fn (CommercePaymentIntent $intent) => $this->serialize($intent))
+            'data' => $intents
+                ->map(fn (CommercePaymentIntent $intent) => $this->serialize($intent, $attempts->get($intent->payableKey())))
                 ->all(),
         ]);
     }
@@ -51,8 +62,11 @@ class CommercePaymentIntentController extends ApiController
         return response()->json(['data' => $this->serialize($intent)]);
     }
 
-    /** @return array<string, mixed> */
-    private function serialize(CommercePaymentIntent $intent): array
+    /**
+     * @param  Collection<int, PaymentAttempt>|null  $attempts  محاولات النية الإلكترونية (الأحدث أولاً)
+     * @return array<string, mixed>
+     */
+    private function serialize(CommercePaymentIntent $intent, ?Collection $attempts = null): array
     {
         return [
             'id' => $intent->id,
@@ -64,8 +78,21 @@ class CommercePaymentIntentController extends ApiController
             'amount_minor' => $intent->amount_minor,
             'currency' => $intent->currency,
             'collected_at' => $intent->collected_at?->toIso8601String(),
+            'paid_at' => $intent->paid_at?->toIso8601String(),
             'cancelled_at' => $intent->cancelled_at?->toIso8601String(),
             'created_at' => $intent->created_at?->toIso8601String(),
+            'attempts' => $intent->isOnline()
+                ? ($attempts ?? collect())->map(fn (PaymentAttempt $a) => [
+                    'id' => $a->id,
+                    'capture_status' => $a->capture_status,
+                    'amount_minor' => (int) $a->amount_minor,
+                    'captured_minor' => (int) $a->captured_minor,
+                    'currency' => $a->currency,
+                    'review_reasons' => $a->review_reasons ?? [],
+                    'captured_at' => $a->captured_at?->toIso8601String(),
+                    'created_at' => $a->created_at?->toIso8601String(),
+                ])->values()->all()
+                : [],
         ];
     }
 }

@@ -11,7 +11,9 @@ use App\Services\Commerce\CheckoutNotFoundException;
 use App\Services\Commerce\CheckoutReviewRequiredException;
 use App\Services\Commerce\CommerceCartService;
 use App\Services\Commerce\CommerceCheckoutService;
+use App\Services\Commerce\CommerceOnlinePaymentService;
 use App\Services\PaymentMethodChannelAvailabilityService;
+use App\Support\CommerceOrderReference;
 use App\Support\CommerceOrderSerializer;
 use App\Support\PublicApiErrorCode;
 use App\Support\PublicApiIdempotency;
@@ -212,6 +214,10 @@ final class StorefrontCheckoutController extends PublicApiController
                 'name' => $method->name,
                 'name_en' => $method->name_en,
                 'settlement_type' => $method->settlement_type,
+                // PAY-H4-04a: يظهر فقط حين الدفع الإلكتروني مفتوحاً؛ true ⇒ اختيارها يجعل الطلب دفعاً إلكترونياً عبر بوابة جاهزة. مغلقاً: المفتاح غائب (الشكل كما كان).
+                ...(CommerceOnlinePaymentService::enabled()
+                    ? ['online' => app(CommerceOnlinePaymentService::class)->usableGatewayFor($method) !== null]
+                    : []),
             ])->all(),
         ]);
     }
@@ -298,7 +304,13 @@ final class StorefrontCheckoutController extends PublicApiController
 
         return PublicApiResponse::success(
             $request,
-            ['order' => $this->serializeOrder($result['order']), 'replayed' => $result['replayed']],
+            [
+                'order' => $this->serializeOrder($result['order']),
+                // PAY-H4-04a: مرجع ضيف موقَّع (نظير `/commerce/v1`) لقراءة حالة دفع الطلب لاحقاً؛ deterministic. يُضاف فقط حين يكون الدفع الإلكتروني مفتوحاً،
+                // فيبقى شكل الاستجابة حرفياً كما كان (عقد الرحلة المشترك مع الواجهة) والبوابة مغلقة.
+                ...(CommerceOnlinePaymentService::enabled() ? ['order_reference' => CommerceOrderReference::issue($result['order'])] : []),
+                'replayed' => $result['replayed'],
+            ],
             $result['replayed'] ? 200 : 201,
         );
     }
@@ -344,6 +356,10 @@ final class StorefrontCheckoutController extends PublicApiController
                 'method' => $order->paymentIntent?->method,
                 'status' => $order->paymentIntent?->status,
                 'payment_method_name' => $order->paymentIntent?->payment_method_name,
+                // PAY-H4-04a: للطلب الإلكتروني فقط (المفتاح غائب لـCOD/الاستلام فيبقى الشكل كما كان): true ⇒ بانتظار خطوة دفع (`POST checkout/payment-intent`).
+                ...($order->paymentIntent?->isOnline() === true
+                    ? ['requires_action' => $order->paymentIntent->status === \App\Models\CommercePaymentIntent::STATUS_PENDING]
+                    : []),
             ],
             'items' => CommerceOrderSerializer::serializeLines($order->lines, $currency),
             'created_at' => $order->created_at?->toIso8601String(),

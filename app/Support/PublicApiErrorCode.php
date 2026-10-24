@@ -44,6 +44,13 @@ enum PublicApiErrorCode: string
     // (سطرٌ جديد أو كميةٌ مجموعة في سطرٍ آخر) — لا 404 مضلِّل، ولا تخمين.
     case CART_MERGED = 'cart_merged';
 
+    // ── PAY-H4-04a — الدفع الإلكتروني لطلب المتجر. رموز إضافية فقط؛ لا تغيّر المستقر أعلاه.
+    // payment_unavailable: الدفع الإلكتروني غير متاح الآن (مغلق/لا بوابة جاهزة/إيقاف منصة) · payment_not_payable: الطلب مدفوع/ملغى/لا يستخدم الدفع الإلكتروني
+    // · payment_provider_unavailable: تعذّر الوصول إلى مزوّد الدفع (أعد المحاولة؛ لا تحصيل حدث).
+    case PAYMENT_UNAVAILABLE = 'payment_unavailable';
+    case PAYMENT_NOT_PAYABLE = 'payment_not_payable';
+    case PAYMENT_PROVIDER_UNAVAILABLE = 'payment_provider_unavailable';
+
     /** رمز HTTP الافتراضي لكل رمز خطأ — مرجع واحد يمنع التضارب بين المسارات. */
     public function defaultHttpStatus(): int
     {
@@ -61,10 +68,13 @@ enum PublicApiErrorCode: string
             self::IDEMPOTENCY_CONFLICT,
             self::IDEMPOTENCY_IN_PROGRESS,
             self::REVIEW_REQUIRED,
-            self::CART_MERGED => 409,
+            self::CART_MERGED,
+            self::PAYMENT_NOT_PAYABLE => 409,
             self::VALIDATION_FAILED => 422,
             self::RATE_LIMITED => 429,
             self::INTERNAL_ERROR => 500,
+            self::PAYMENT_UNAVAILABLE,
+            self::PAYMENT_PROVIDER_UNAVAILABLE => 503,
         };
     }
 }

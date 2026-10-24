@@ -324,6 +324,16 @@ php artisan serve
 - إصلاح مرافق: `TreasurySelectionException` لم يكن يمرّر الرسالة للأب فكانت كل رفوض الخزينة تعود 422 برسالة فارغة؛ الآن مملوءة.
 - **خارج النطاق:** إشعارات مدين/مرتجعات المشتريات (T5b، إيداع)، مخارج 1110 المرمَّزة في الأصول/الرواتب/المصروفات، معاينة الرفض في `quote`، حلقة قفل التعطيل↔الترحيل في المسارات الأخرى. المرجع: `docs/audits/treasury/TREASURY-T6-IMPLEMENTATION-REPORT.md`.
 
+## الدفع الإلكتروني لطلبات المتجر — PAY-H4-04a (مغلق افتراضياً، بلا أثر محاسبي)
+
+يعيد استعمال `CommercePaymentIntent` و`PaymentOrchestrator` و`MoyasarAdapter` ولا ينشئ نظام دفع أو Checkout موازياً. **الشرط:** `config('payments.commerce_online_checkout.enabled')` (env `PAYMENTS_COMMERCE_ONLINE_CHECKOUT_ENABLED`، الافتراضي `false`) + تفعيل المدفوعات للمستأجر؛ مغلقاً يبقى الإتمام COD/الاستلام حرفياً ومسارا `payment-intent`/`payment-status` يردّان 404. **لا يُفتح لمستأجر حي قبل إغلاق G3 (D-05/D-13/D-14) وEXT-05** — الالتقاط يُثبَّت على النية فقط (`pending → paid`) ولا يُرحَّل (لا سند ولا فاتورة ولا حجز ولا حركة مخزون؛ `posting_status` فارغ).
+- **النية:** وسيلة دفع **مرتبطة ببوابة جاهزة** (`payment_gateways.payment_method_id`) مختارة في Checkout متجر ويب ⇒ `method=online`/`status=pending` في معاملة الإتمام؛ ارتباط ببوابة غير جاهزة ⇒ 422 (لا سقوط إلى COD). `CommercePaymentIntent::METHODS` (عقد OpenAPI) لم يتغيّر؛ الجديد في `ALL_METHODS`.
+- **شكل الاستجابات:** الحقول الجديدة (`order_reference`، `payment.requires_action`، `payment_methods[].online`) تظهر **فقط** حين البوابة مفتوحة/النية إلكترونية؛ مغلقة تبقى الاستجابات حرفياً كما كانت (يحرسه `FlowersEndToEndJourneyTest`).
+- **المحاولات:** `payment_attempts.payable_key = commerce_payment_intent:<id>` عبر `CommercePayable`؛ مفتاح idempotency خادمي من (النية، ترتيب المحاولة). المبلغ/العملة/البوابة/عنوان العودة كلها من الخادم؛ عنوان العودة = نطاق المتجر **الموثَّق والنشط** + مسار ثابت (`CommerceReturnUrlResolver`).
+- **الحقيقة من الخادم:** `GET store/v1/orders/{order}/payment-status` يستعلم المزوّد؛ عودة المتصفح لا تُصدَّق. الملكية بـ`X-Order-Reference` الموقَّع (404 موحَّد).
+- **تثبيت الدفع مرة واحدة:** `CommerceOnlinePaymentService::completeCaptured` تحت قفل صف النية؛ مبلغ/عملة غير مطابقين ⇒ `under_review` بلا تثبيت؛ التقاط متأخر ⇒ `late_capture` للمراجعة البشرية (لا استرداد آلي، D-15 المحافظ). شبكة الأمان: `payments:complete-commerce-captures`.
+- المرجع: `docs/plans/payments/horizon/AWJ-PAY-H4-04a-IMPLEMENTATION-REPORT.md` و`AWJ-PAY-H4-G3-DECISION-PROPOSAL.md` (الخيارات والتوصيات بانتظار القرار).
+
 ## أدوار ضريبة القيمة المضافة (REM-05 / ACC-01)
 
 `App\Services\Accounting\VatRoleIntegrityService` هو مصدر قواعد دورَي `tax_input`/`tax_output` وسياق تقرير الضريبة. لا يكتب شيئاً.

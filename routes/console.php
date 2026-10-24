@@ -135,6 +135,12 @@ Schedule::command('payments:post-captured')
     ->withoutOverlapping(10)
     ->onOneServer();
 
+// PAY-H4-04a: شبكة أمان لتثبيت نوايا طلبات المتجر المدفوعة بعد الالتقاط المؤكَّد (فشل المستمع/انهيار). idempotent: تثبيت واحد تحت قفل النية. لا أثر محاسبي.
+Schedule::command('payments:complete-commerce-captures')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(10)
+    ->onOneServer();
+
 // PAY-H3-01c: شبكة أمان لترحيل A5 لاستردادات البوابة المؤكَّدة المعلّقة (فشل المستمع/انهيار). idempotent: لا قيد ثانٍ أبداً (قفل + مفتاح فريد).
 Schedule::command('payments:post-refunds')
     ->everyFiveMinutes()
