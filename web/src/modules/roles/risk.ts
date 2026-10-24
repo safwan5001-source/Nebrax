@@ -31,6 +31,8 @@ export const PERMISSION_RISK: Readonly<Record<string, RiskKind>> = {
   // PAY-H3-01b: اعتماد استرداد البوابة وحسم الاسترداد غير المعروف/الخارجي — قرارات تُخرج مالاً أو تغيّر سجلاً مالياً.
   'payment_refunds.approve': 'financial',
   'payment_refunds.resolve_unknown': 'financial',
+  // PAY-H3-02b: تسجيل/ترحيل تسوية البوابة — قيد مالي ينقل رصيد المقاصة إلى البنك.
+  'payment_settlements.manage': 'financial',
   'accounts.manage': 'financial',
   'accounting_settings.manage': 'financial',
   'hr.manage': 'financial',

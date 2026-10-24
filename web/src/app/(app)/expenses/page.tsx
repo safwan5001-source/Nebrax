@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { type ColumnDef } from '@tanstack/react-table';
-import { Copy, Eye, Pencil, Plus, Settings2, Trash2 } from 'lucide-react';
+import { Copy, Eye, Pencil, Plus, Settings2, Trash2, Upload } from 'lucide-react';
 import { AdvancedFilterDialog } from '@/components/data-explorer/advanced-filter-dialog';
 import { DataTable } from '@/components/data-table';
 import { ListToolbar, PageHeader, Pagination, type PageAction, type SortOption } from '@/components/nebrax';
@@ -284,6 +284,7 @@ export default function ExpensesPage() {
 
   const headerActions: PageAction[] = [
     { key: 'categories', label: t('manage_categories'), icon: Settings2, href: '/expenses/categories', variant: 'outline', emphasis: 'secondary' },
+    { key: 'import', label: t('import_from_file'), icon: Upload, href: '/expenses/import', variant: 'outline', emphasis: 'secondary' },
     { key: 'create', label: t('create'), icon: Plus, href: '/expenses/new', variant: 'primary' },
   ];
 
