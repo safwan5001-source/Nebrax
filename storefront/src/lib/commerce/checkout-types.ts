@@ -59,6 +59,13 @@ export interface AwjPaymentMethod {
   name: string;
   name_en: string | null;
   settlement_type: string;
+  /**
+   * PAY-H4-04a — present **only** when the platform's online-checkout gate is
+   * open: `true` means this method is linked to a ready payment gateway, so
+   * choosing it makes the order an online-payment order. Absent/`false` is
+   * the cash-settlement method it has always been (an older API never sends it).
+   */
+  online?: boolean;
 }
 
 /** Raw `GET/POST /checkout`, `PATCH /checkout/{contact,address,delivery,payment}` response shape. */
@@ -161,6 +168,8 @@ export interface AwjOrder {
     method: string | null;
     status: string | null;
     payment_method_name: string | null;
+    /** PAY-H4-04a — present only when the online gate is open: `true` while an online order still awaits payment. */
+    requires_action?: boolean;
   };
   items: Array<{
     product_id: string | null;

@@ -163,7 +163,13 @@ export async function updateAwjPayment(paymentMethodId: string) {
 }
 
 export type CompleteAwjCheckoutResult =
-  | { success: true; order: StorefrontOrder; replayed: boolean }
+  | {
+      success: true;
+      order: StorefrontOrder;
+      replayed: boolean;
+      /** PAY-H4-04a — signed ownership proof for the order's payment endpoints; `null` unless online payment is on. */
+      orderReference: string | null;
+    }
   | {
       success: false;
       kind: "review_required";
@@ -204,8 +210,9 @@ export async function completeAwjCheckoutAction(
   idempotencyKey: string,
 ): Promise<CompleteAwjCheckoutResult> {
   try {
-    const { order, replayed } = await completeAwjCheckout(idempotencyKey);
-    return { success: true, order, replayed };
+    const { order, replayed, orderReference } =
+      await completeAwjCheckout(idempotencyKey);
+    return { success: true, order, replayed, orderReference };
   } catch (error) {
     if (error instanceof StorefrontApiError) {
       if (

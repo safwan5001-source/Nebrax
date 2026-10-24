@@ -960,7 +960,11 @@
       "selectMethod": "Select how you'll pay",
       "noMethodsEnabled": "This store hasn't enabled a specific payment method yet.",
       "settledOnDelivery": "Settled in cash when your order is delivered.",
-      "settledOnPickup": "Settled in cash when you pick up your order."
+      "settledOnPickup": "Settled in cash when you pick up your order.",
+      "onlineMethodHint": "Zapłać bezpiecznie online",
+      "onlineRedirectNote": "Po złożeniu zamówienia przekierujemy Cię na bezpieczną stronę płatności operatora. Dane karty wpisujesz tylko tam, nigdy w tym sklepie.",
+      "redirectingTitle": "Przekierowanie do bezpiecznej płatności…",
+      "redirectingBody": "Zamówienie zostało złożone. Nie zamykaj tej strony podczas przekierowania."
     },
     "continueToAddress": "Continue to address",
     "continueToDelivery": "Continue to delivery",
@@ -1002,6 +1006,39 @@
       "message": "Wiadomość do prezentu",
       "messageHint": "Zostanie wydrukowana na karcie. Tylko zwykły tekst.",
       "messageCount": "{count} / {max}"
+    },
+    "paymentReturn": {
+      "loadingTitle": "Sprawdzamy Twoją płatność…",
+      "loadingBody": "Chwileczkę, potwierdzamy status płatności ze sklepem.",
+      "startingTitle": "Przekierowanie do bezpiecznej płatności…",
+      "startingBody": "Proszę czekać — nie zamykaj ani nie odświeżaj tej strony.",
+      "unknownTitle": "Nie znajdujemy Twojego zamówienia na tym urządzeniu",
+      "unknownBody": "Jeśli właśnie zapłacono, zamówienie jest bezpieczne. Skontaktuj się ze sklepem, podając dane zamówienia, aby je potwierdzić.",
+      "unavailableTitle": "Płatność online jest niedostępna",
+      "unavailableBody": "To zamówienie nie może teraz zostać opłacone online. Za pośrednictwem tej strony nic nie pobrano. Skontaktuj się ze sklepem.",
+      "errorTitle": "Nie udało się sprawdzić płatności",
+      "errorBody": "Wystąpił problem z połączeniem ze sklepem. Zamówienie jest bezpieczne — spróbuj ponownie.",
+      "paidTitle": "Płatność otrzymana",
+      "paidBody": "Dziękujemy. Potwierdziliśmy Twoją płatność na kwotę {amount}, a zamówienie jest przygotowywane.",
+      "reviewTitle": "Twoja płatność jest weryfikowana",
+      "reviewBody": "Otrzymaliśmy płatność, ale sklep musi ją sprawdzić przed potwierdzeniem. Nie musisz płacić ponownie — sklep skontaktuje się z Tobą.",
+      "pendingTitle": "Potwierdzamy płatność…",
+      "pendingBody": "Zwykle trwa to kilka sekund. Nie zamykaj tej strony.",
+      "slowTitle": "Wciąż czekamy na potwierdzenie",
+      "slowBody": "Nie otrzymaliśmy jeszcze potwierdzenia płatności. Jeśli zapłacono, może to potrwać dłużej — sprawdź ponownie za chwilę. Nie płać dwa razy.",
+      "awaitingTitle": "Dokończ płatność",
+      "awaitingBody": "Zamówienie zostało złożone i czeka na płatność {amount}.",
+      "failedTitle": "Płatność nie powiodła się",
+      "failedBody": "Przy tej próbie nic nie pobrano. Możesz spróbować zapłacić {amount} ponownie.",
+      "expiredTitle": "Strona płatności wygasła",
+      "expiredBody": "Strona płatności wygasła przed zakończeniem. Możesz zacząć od nowa, aby zapłacić {amount}.",
+      "cancelledTitle": "Płatność została anulowana",
+      "cancelledBody": "Możesz zacząć od nowa, aby zapłacić {amount} za zamówienie.",
+      "payNow": "Zapłać teraz",
+      "tryAgain": "Spróbuj ponownie",
+      "checkAgain": "Sprawdź ponownie",
+      "reopenPayment": "Otwórz stronę płatności ponownie",
+      "continueShopping": "Kontynuuj zakupy"
     }
   }
 }
