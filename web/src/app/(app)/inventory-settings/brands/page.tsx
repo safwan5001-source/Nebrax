@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { Plus, Pencil, Trash2, Check, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, X, Upload } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -80,7 +81,16 @@ export default function BrandsPage() {
 
   return (
     <div className="space-y-5">
-      <SettingsHeader title={t('c_brands_t')} subtitle={t('c_brands_d')} />
+      <SettingsHeader title={t('c_brands_t')} subtitle={t('c_brands_d')}
+        action={
+          <Button asChild variant="outline">
+            <Link href="/inventory-settings/brands/import">
+              <Upload className="h-4 w-4" strokeWidth={1.7} />
+              {t('import_from_file')}
+            </Link>
+          </Button>
+        }
+      />
 
       <Card className="max-w-3xl">
         <CardHeader>
