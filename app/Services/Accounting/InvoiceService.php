@@ -888,14 +888,16 @@ class InvoiceService
      *                        حدّ تخويل الخزينة في `settle()`. غيابه (استدعاءات
      *                        POS/Fuel الداخلية) لا يغيّر سلوكها: فواتيرها تُنشأ
      *                        دوماً بـ`is_paid=false` فيتخطّى `settle()` نفسه.
+     * @param  bool  $settledInSameTransaction  H4-03: فاتورة طلب متجر يُسدّدها سند البوابة (1170/1130) في المعاملة نفسها فأثرها الصافي على 1130 صفر؛
+     *                        يتخطى الحد الائتماني كما يتخطاه «مدفوع بالفعل». لا يستعمله إلا جسر `CommerceOrderPostingService`.
      */
-    public function post(Invoice $invoice, ?callable $cogsResolver = null, ?User $actor = null): Invoice
+    public function post(Invoice $invoice, ?callable $cogsResolver = null, ?User $actor = null, bool $settledInSameTransaction = false): Invoice
     {
         if (! $invoice->isDraft()) {
             throw new RuntimeException('لا يمكن ترحيل فاتورة غير مسوّدة (draft).');
         }
 
-        return DB::transaction(function () use ($invoice, $cogsResolver, $actor) {
+        return DB::transaction(function () use ($invoice, $cogsResolver, $actor, $settledInSameTransaction) {
             // قفل الصف وإعادة فحص الحالة داخل المعاملة — يمنع الترحيل المزدوج المتزامن
             // (طلبان متوازيان يريان draft معاً ⇒ قيدان وخصم مخزون مرتان).
             $invoice = Invoice::lockForUpdate()->findOrFail($invoice->id);
@@ -928,7 +930,9 @@ class InvoiceService
             }
 
             // حراسة الحد الائتماني: فاتورة آجلة لا يجوز أن تدفع رصيد العميل فوق حدّه.
-            $this->assertWithinCreditLimit($invoice, $total);
+            if (! $settledInSameTransaction) {
+                $this->assertWithinCreditLimit($invoice, $total);
+            }
 
             $debitAccountId = $invoice->payment_type === 'cash'
                 ? $this->cashSaleDebitAccountId($invoice, $actor)

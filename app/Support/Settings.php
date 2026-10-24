@@ -159,6 +159,10 @@ class Settings
             'commerce_partner_policy' => 'link_verified_else_create',
             // H4-02 / D-14: مدة حجز مخزون الطلب الإلكتروني بانتظار الدفع (دقائق). سياسة عمل قابلة للضبط (CLAUDE.md قاعدة 6)؛ الافتراضي 60.
             'commerce_payment_hold_minutes' => 60,
+            // H4-03 / D-13: توقيت فاتورة الطلب الإلكتروني (`none` | `on_payment_confirmed`) ونمط أسعار المتجر (غير محدد = مغلق | `inclusive`).
+            // الأثر مشروط ببوابة النشر + مرجع EXT-05 (`CommerceInvoiceOnPayment`).
+            'commerce_invoice_trigger' => 'none',
+            'commerce_price_tax_mode' => null,
         ],
         /**
          * إعدادات المخزون والمنتجات.

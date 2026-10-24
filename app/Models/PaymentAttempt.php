@@ -81,7 +81,8 @@ class PaymentAttempt extends BaseModel implements CompanyWide
         self::POSTING_PENDING => [self::POSTING_POSTED, self::POSTING_BLOCKED_PERIOD, self::POSTING_NOT_POSTABLE],
         self::POSTING_BLOCKED_PERIOD => [self::POSTING_POSTED],
         self::POSTING_POSTED => [],
-        self::POSTING_NOT_POSTABLE => [],
+        // H4-03: إعادة ترحيل صريحة مخوَّلة لالتقاط طلب متجر رُفض بسبب قابل للمعالجة (الخدمة تقصرها على kind=commerce)؛ غيره يبقى نهائياً.
+        self::POSTING_NOT_POSTABLE => [self::POSTING_POSTED],
     ];
 
     /** @var array<string, list<string>> */

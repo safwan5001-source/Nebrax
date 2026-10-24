@@ -204,6 +204,25 @@ final class CommerceOrderReservationService
         });
     }
 
+    /**
+     * H4-03: يستهلك حجوزات الطلب النشطة (ACTIVE → CONSUMED) عند إصدار الفاتورة. لا حركة مخزون هنا: الإخراج من `InvoiceService::post`. idempotent.
+     *
+     * @return int عدد الحجوزات المستهلَكة فعلاً
+     */
+    public function consumeActive(string $orderId): int
+    {
+        return DB::transaction(function () use ($orderId): int {
+            $consumed = 0;
+            foreach (InventoryReservation::query()->where('source_type', CommerceOrder::class)->where('source_id', $orderId)
+                ->where('status', InventoryReservation::STATUS_ACTIVE)->orderBy('id')->get() as $reservation) {
+                $this->reservations->consume($reservation->id);
+                $consumed++;
+            }
+
+            return $consumed;
+        });
+    }
+
     /** H4-02: يؤجّل موعد حجوزات الطلب النشطة (تراجع بعد تخطٍّ/فشل المكنسة كي لا تسدّ الدفعة الأقدم الأحدث). لا يمسّ الحجز الدائم (`expires_at` فارغ). */
     public function deferExpiry(string $orderId, int $minutes): void
     {
