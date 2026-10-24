@@ -102,7 +102,7 @@ final class PaymentGatewaySettlementService
             }
 
             // D-04 (ب): ضريبة رسوم > 0 لا تُرحَّل إلا بسياسة `input_vat` على الاتصال **و**مرجع الرأي الضريبي (EXT-05) مسجَّلاً **و**مرجع فاتورة المزوّد الضريبية.
-            $this->assertFeeTaxAllowed($gateway, $feeTax, $feeTaxInvoiceRef);
+            $this->assertFeeTaxAllowed($gateway, $feeTax, $feeTaxInvoiceRef, $ref);
 
             // تفعيل المدفوعات الإلكترونية لهذه المؤسسة شرط للتسجيل الجديد (record)؛ الإيقاف الطارئ للمنصة لا يمنع تسوية مال وصل فعلاً (كترحيل A5)،
             // والتكرار الآمن لمرحَّلة قائمة يُعاد دائماً (idempotent) ولو عُطّلت المؤسسة بعدها.
@@ -513,7 +513,7 @@ final class PaymentGatewaySettlementService
         }
 
         if ($feeTax > 0 && ! $replay && $gateway !== null) {
-            $taxBlocker = $this->feeTaxBlocker($gateway, trim((string) ($input['fee_tax_invoice_ref'] ?? '')));
+            $taxBlocker = $this->feeTaxBlocker($gateway, trim((string) ($input['fee_tax_invoice_ref'] ?? '')), trim((string) ($input['provider_settlement_ref'] ?? '')));
             if ($taxBlocker !== null) {
                 $block($taxBlocker['code'], $taxBlocker['message']);
             } else {
@@ -653,24 +653,35 @@ final class PaymentGatewaySettlementService
      * D-04: ضريبة الرسوم تُرفض ما لم تتحقق الشروط الثلاثة معاً — سياسة `input_vat` على اتصال البوابة، ومرجع الرأي الضريبي EXT-05 مسجَّل في الإعداد
      * (يُفحص وقت الترحيل فيعود الإغلاق بإزالته)، ومرجع فاتورة المزوّد الضريبية. الرسالة الأولى تبقى كما كانت (السلوك القائم).
      */
-    private function assertFeeTaxAllowed(PaymentGateway $gateway, int $feeTax, string $invoiceRef): void
+    private function assertFeeTaxAllowed(PaymentGateway $gateway, int $feeTax, string $invoiceRef, string $settlementRef): void
     {
         if ($feeTax <= 0) {
             return;
         }
-        if ($this->feeTaxBlocker($gateway, $invoiceRef) !== null) {
-            throw new DomainException($this->feeTaxBlocker($gateway, $invoiceRef)['message']);
+        $blocker = $this->feeTaxBlocker($gateway, $invoiceRef, $settlementRef);
+        if ($blocker !== null) {
+            throw new DomainException($blocker['message']);
         }
     }
 
     /** @return array{code: string, message: string}|null */
-    private function feeTaxBlocker(PaymentGateway $gateway, string $invoiceRef): ?array
+    private function feeTaxBlocker(PaymentGateway $gateway, string $invoiceRef, string $settlementRef): ?array
     {
         if ($gateway->fee_tax_policy !== PaymentGateway::FEE_TAX_INPUT_VAT || trim((string) config('payments.fee_tax_opinion_ref')) === '') {
             return ['code' => 'fee_tax_not_authorized', 'message' => 'Provider fee tax posting is not authorized until an approved input-tax routing policy exists. Pass provider_fee_tax=0 or stop for a tax decision.'];
         }
         if (mb_strlen(trim($invoiceRef)) < 3) {
             return ['code' => 'fee_tax_invoice_required', 'message' => 'fee_tax_invoice_required: provider fee tax needs the provider tax invoice reference.'];
+        }
+        // فاتورة المزوّد الضريبية الواحدة تُسترد مرة واحدة: مرجعها لا يتكرر في تسوية أخرى لنفس الاتصال (السجل محروس بقفل صف البوابة).
+        $reused = PaymentGatewaySettlement::query()
+            ->where('payment_gateway_id', $gateway->id)
+            ->where('provider_settlement_ref', '!=', $settlementRef)
+            ->where('provider_fee_tax', '>', 0)
+            ->whereRaw('lower(fee_tax_invoice_ref) = ?', [mb_strtolower(trim($invoiceRef))])
+            ->exists();
+        if ($reused) {
+            return ['code' => 'fee_tax_invoice_reused', 'message' => 'fee_tax_invoice_reused: this provider tax invoice reference is already recorded on another settlement for this connection.'];
         }
 
         return null;

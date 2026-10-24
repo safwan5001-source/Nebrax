@@ -231,6 +231,27 @@ class PaymentGatewayFeeTaxPolicyTest extends TestCase
         $this->withToken($other['token'])->putJson("/api/payment-gateways/{$this->gateway->id}/fee-tax-policy", ['policy' => 'reject', 'reason' => 'محاولة من مستأجر آخر'])->assertNotFound();
     }
 
+    #[Test]
+    public function a_provider_tax_invoice_cannot_be_recovered_twice_and_a_revoked_gateway_can_return_to_reject(): void
+    {
+        $this->enableTaxPolicy();
+        [, $first] = $this->capture();
+        [, $second] = $this->capture();
+        $this->settlements->record($this->taxed($first, 'TAX-ONE'));
+        $entries = JournalEntry::query()->count();
+
+        $e = $this->thrown(fn () => $this->settlements->record($this->taxed($second, 'TAX-TWO')), 'reused invoice', DomainException::class);
+        $this->assertStringStartsWith('fee_tax_invoice_reused', $e->getMessage());
+        $this->assertSame($entries, JournalEntry::query()->count());
+        $other = ['fee_tax_invoice_ref' => 'prov-tax-inv-77'] + $this->taxed($second, 'TAX-TWO');
+        $this->thrown(fn () => $this->settlements->record($other), 'case-insensitive reuse', DomainException::class);
+        $this->assertTrue($this->settlements->record(['fee_tax_invoice_ref' => 'PROV-TAX-INV-78'] + $this->taxed($second, 'TAX-TWO'))->isPosted());
+
+        DB::table('payment_gateways')->where('id', $this->gateway->id)->update(['status' => PaymentGateway::STATUS_REVOKED, 'is_active' => false]);
+        $svc = app(PaymentGatewayService::class);
+        $this->assertSame('reject', $svc->setFeeTaxPolicy($this->gateway->fresh(), 'reject', $this->owner, 'إيقاف الاحتساب بعد الإلغاء')->fee_tax_policy);
+    }
+
     private function enableTaxPolicy(): void
     {
         config(['payments.fee_tax_opinion_ref' => 'EXT-05-OPINION']);

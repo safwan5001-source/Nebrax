@@ -286,7 +286,6 @@ final class PaymentGatewayService
         });
     }
 
-    /** @return Collection<int, PaymentConnectionEvent> */
     /**
      * سياسة ضريبة عمولة المزوّد لهذا الاتصال (ADR-0008 D-04 ب). الافتراضي `reject`؛ `input_vat` **لا يُضبط** ما لم يُسجَّل مرجع الرأي الضريبي (EXT-05)
      * في `config('payments.fee_tax_opinion_ref')`. السبب إلزامي وللتغيير حدث تدقيق ثابت. العودة إلى `reject` مسموحة دائماً.
@@ -308,7 +307,10 @@ final class PaymentGatewayService
 
         return DB::transaction(function () use ($gateway, $policy, $actor, $reason): PaymentGateway {
             $locked = $this->lock($gateway);
-            $this->assertNotRevoked($locked);
+            // العودة إلى reject مسموحة دائماً (حتى على اتصال ملغى): بوابة الترحيل لا تغلقها الإلغاء.
+            if ($policy !== PaymentGateway::FEE_TAX_REJECT) {
+                $this->assertNotRevoked($locked);
+            }
             $from = (string) $locked->fee_tax_policy;
             if ($from === $policy) {
                 return $locked;
@@ -320,6 +322,7 @@ final class PaymentGatewayService
         });
     }
 
+    /** @return Collection<int, PaymentConnectionEvent> */
     public function events(PaymentGateway $gateway): Collection
     {
         $tenantId = $this->requireTenant();
