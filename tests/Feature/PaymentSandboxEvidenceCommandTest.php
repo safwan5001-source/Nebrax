@@ -86,6 +86,11 @@ class PaymentSandboxEvidenceCommandTest extends TestCase
         $this->assertStringNotContainsString('body_hash', $output);
         $this->assertArrayNotHasKey('credentials', $evidence['gateway']);
 
+        // استرداد لدى المزوّد لم يُعترف به محلياً ⇒ الاستعلام لا يطابق (لا يشهد على حالة مالية متباينة)
+        app(FakePaymentGatewayAdapter::class)->scriptRefunded($this->attempt->provider_payment_id, 20000);
+        Artisan::call('payments:sandbox-evidence', ['attempt' => $this->attempt->id, '--tenant' => 'sandbox-evidence', '--fetch' => true]);
+        $this->assertFalse(json_decode(Artisan::output(), true)['checks']['fetch_matches_local']);
+
         // بلا --fetch لا استعلام حي
         Artisan::call('payments:sandbox-evidence', ['attempt' => $this->attempt->id, '--tenant' => 'sandbox-evidence']);
         $this->assertNull(json_decode(Artisan::output(), true)['fetch']);

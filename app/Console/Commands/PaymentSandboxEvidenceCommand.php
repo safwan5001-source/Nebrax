@@ -53,6 +53,7 @@ class PaymentSandboxEvidenceCommand extends Command
         }
 
         $events = PaymentProviderEvent::query()
+            ->where('payment_gateway_id', $gateway->id)   // معرّف دفعة المزوّد فريد لكل اتصال لا لكل مستأجر
             ->where(fn ($q) => $q->where('payment_attempt_id', $attempt->id)->when($attempt->provider_payment_id, fn ($inner, $id) => $inner->orWhere('provider_payment_id', $id)))
             ->orderBy('received_at')->get()
             ->map(fn (PaymentProviderEvent $e) => [
@@ -119,7 +120,8 @@ class PaymentSandboxEvidenceCommand extends Command
             'provider_status' => $snapshot->status, 'amount_minor' => $snapshot->amountMinor, 'captured_minor' => $snapshot->capturedMinor,
             'refunded_minor' => $snapshot->refundedMinor, 'currency' => $snapshot->currency,
             'matches' => $snapshot->status === $attempt->capture_status && $snapshot->amountMinor === (int) $attempt->amount_minor
-                && $snapshot->capturedMinor === (int) $attempt->captured_minor && $snapshot->currency === $attempt->currency,
+                && $snapshot->capturedMinor === (int) $attempt->captured_minor && $snapshot->refundedMinor === (int) $attempt->refunded_minor
+                && $snapshot->currency === $attempt->currency,
         ];
     }
 }
