@@ -2109,6 +2109,7 @@
       "fuel_stations": "Fuel stations",
       "payment_gateways": "Payment gateways",
       "payment_refunds": "Gateway refunds",
+      "payment_settlements": "Gateway settlements",
       "pos": "Point of sale",
       "sales": "Sales",
       "self_service": "Employee self-service",

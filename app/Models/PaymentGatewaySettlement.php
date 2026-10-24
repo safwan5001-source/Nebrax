@@ -12,6 +12,9 @@ class PaymentGatewaySettlement extends BaseModel implements CompanyWide
 {
     public const STATUS_POSTED = 'posted';
 
+    /** فرق غير مفسَّر (D-21): محفوظة بلا قيد، ولا تستهلك بنودها شيئاً حتى تُرحَّل بفرق صفري. */
+    public const STATUS_UNRECONCILED = 'unreconciled';
+
     protected $fillable = [
         'tenant_id',
         'payment_gateway_id',
@@ -25,6 +28,8 @@ class PaymentGatewaySettlement extends BaseModel implements CompanyWide
         'provider_fee_tax',
         'provider_deductions',
         'provider_credits',
+        'refunds_total',
+        'unreconciled_minor',
         'currency',
         'gateway_provider',
         'gateway_name',
@@ -45,6 +50,8 @@ class PaymentGatewaySettlement extends BaseModel implements CompanyWide
         'provider_fee_tax' => 'integer',
         'provider_deductions' => 'integer',
         'provider_credits' => 'integer',
+        'refunds_total' => 'integer',
+        'unreconciled_minor' => 'integer',
     ];
 
     protected $attributes = [
@@ -54,6 +61,7 @@ class PaymentGatewaySettlement extends BaseModel implements CompanyWide
         'provider_fee_tax' => 0,
         'provider_deductions' => 0,
         'provider_credits' => 0,
+        'refunds_total' => 0,
     ];
 
     protected static function booted(): void
@@ -74,7 +82,7 @@ class PaymentGatewaySettlement extends BaseModel implements CompanyWide
             if ($settlement->exists && $settlement->getOriginal('status') === self::STATUS_POSTED) {
                 $watched = [
                     'gross_amount', 'net_bank_amount', 'provider_fee_ex_tax', 'provider_fee_tax',
-                    'provider_deductions', 'provider_credits',
+                    'provider_deductions', 'provider_credits', 'refunds_total',
                     'payment_gateway_id', 'cash_bank_account_id', 'provider_settlement_ref',
                     'settlement_date', 'clearing_account_id', 'fee_expense_account_id', 'bank_account_id',
                 ];
@@ -109,6 +117,16 @@ class PaymentGatewaySettlement extends BaseModel implements CompanyWide
     public function items(): HasMany
     {
         return $this->hasMany(PaymentGatewaySettlementItem::class, 'settlement_id');
+    }
+
+    public function lines(): HasMany
+    {
+        return $this->hasMany(PaymentGatewaySettlementLine::class, 'settlement_id');
+    }
+
+    public function isUnreconciled(): bool
+    {
+        return $this->status === self::STATUS_UNRECONCILED;
     }
 
     public function isPosted(): bool

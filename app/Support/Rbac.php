@@ -92,6 +92,9 @@ class Rbac
         // PAY-H3-01b (ADR-0007، D-28): استرداد البوابة — أربع سلطات مستقلة: العرض، الطلب، الاعتماد المستقل (≠ الطالب، يُفرض في الخدمة والقاعدة)،
         // وحسم الاسترداد غير المعروف/الخارجي. owner/admin عبر `*` فقط؛ لا تُضاف لـ`MATRIX` ولا تُمنح لأي دور مخزَّن بهجرة (لا منح ضمني).
         'payment_refunds.view', 'payment_refunds.request', 'payment_refunds.approve', 'payment_refunds.resolve_unknown',
+        // PAY-H3-02b (ADR-0008): تسجيل/ترحيل تسوية البوابة (A6) وحفظ الفرق غير المفسَّر؛ القراءة والمعاينة `payments.view`. owner/admin عبر `*` فقط؛
+        // لا تُضاف لـ`MATRIX` ولا تُمنح لأي دور مخزَّن بهجرة (لا منح ضمني).
+        'payment_settlements.manage',
         'purchases.view', 'purchases.manage',
         'returns.view', 'returns.manage',
         'hr.view', 'hr.manage',

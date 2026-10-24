@@ -2109,6 +2109,7 @@
       "fuel_stations": "محطات الوقود",
       "payment_gateways": "بوابات الدفع",
       "payment_refunds": "استردادات البوابة",
+      "payment_settlements": "تسويات البوابة",
       "pos": "نقطة البيع",
       "sales": "المبيعات",
       "self_service": "الخدمة الذاتية للموظفين",
