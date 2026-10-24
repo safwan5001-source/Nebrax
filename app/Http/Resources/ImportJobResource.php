@@ -14,6 +14,8 @@ class ImportJobResource extends JsonResource
             'domain' => $this->domain,
             'branch_id' => $this->branch_id,
             'preview_bound' => $this->preview_id !== null,
+            // IMP-H7-S1c: الجرد المستهدف المجمَّد لمجال أعداد الجرد وحده، كي لا تُستأنف تشغيلة جردٍ آخر من صفحة جردٍ مختلف فتُكتب الأعداد حيث لا يظن المستخدم.
+            'target_id' => $this->when($this->domain === \App\Support\ImportJobDomain::STOCKTAKE_COUNT, fn () => ((array) $this->apply_options)['stocktake_id'] ?? null),
             'parent_job_id' => $this->parent_job_id,
             'status' => $this->status,
             'original_filename' => $this->original_filename,
