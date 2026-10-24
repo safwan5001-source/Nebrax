@@ -143,7 +143,7 @@ class ApplyImportJobRequest extends FormRequest
     public function explicitOptions(): array
     {
         $options = [];
-        foreach (['mode', 'blank_policy', 'master_data_policy', 'opening_date', 'type', 'duplicate_signal_policy', 'kind', 'parent_policy', 'existing_policy', 'stocktake_id', 'existing_count_policy', 'reference_policy', 'default_account_id', 'default_payment_method', 'default_tax_rate', 'default_supplier_id', 'default_payment_type', 'warehouse_id'] as $key) {
+        foreach (['mode', 'blank_policy', 'master_data_policy', 'opening_date', 'type', 'duplicate_signal_policy', 'kind', 'parent_policy', 'existing_policy', 'stocktake_id', 'existing_count_policy', 'reference_policy', 'default_account_id', 'default_payment_method', 'default_tax_rate', 'default_supplier_id', 'default_payment_type', 'warehouse_id', 'permit_type', 'permit_date'] as $key) {
             // قيمة null الصريحة لنسبة الضريبة = غياب (تفضيل المؤسسة)، لا نصّاً فارغاً يخالف المجمَّد.
             if ($this->has($key) && ! ($key === 'default_tax_rate' && $this->input($key) === null)) {
                 $options[$key] = $this->string($key)->toString();
@@ -165,6 +165,13 @@ class ApplyImportJobRequest extends FormRequest
         }
         if ($this->has('notes')) {
             $options['notes'] = $this->input('notes');
+        }
+        // IMP-H7-S3 — رأس إذن المخزون: الفارغ = غياب (null) كي يقارَن بالمجمَّد قانونياً لا نصّياً.
+        if ($this->has('target_warehouse_id')) {
+            $options['target_warehouse_id'] = $this->string('target_warehouse_id')->toString() ?: null;
+        }
+        if ($this->has('reason')) {
+            $options['reason'] = $this->input('reason');
         }
         foreach (['allow_zero_cost', 'apply_product_images', 'approve_existing_media_updates'] as $key) {
             if ($this->has($key)) {

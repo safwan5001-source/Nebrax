@@ -292,6 +292,17 @@ class StockPermitImportTest extends TestCase
     }
 
     /** @test */
+    public function a_percentage_in_the_quantity_column_is_a_row_error_not_a_quantity(): void
+    {
+        foreach (['25%', '25 %', '٢٥٪'] as $cell) {
+            $preview = $this->service()->preview($this->file([['sku' => 'SKU-A', 'quantity' => $cell, 'unit_cost' => '1']]), $this->opts(), null);
+            $this->assertSame([0, 1], [$preview['line_rows'], $preview['error_rows']], "«{$cell}» يجب أن تُرفض");
+        }
+        $ok = $this->service()->preview($this->file([['sku' => 'SKU-A', 'quantity' => '25', 'unit_cost' => '1']]), $this->opts(), null);
+        $this->assertSame(1, $ok['line_rows']);
+    }
+
+    /** @test */
     public function an_empty_data_set_and_a_missing_identifier_or_quantity_column_are_setup_errors(): void
     {
         $this->thrown(fn () => $this->service()->preview($this->file([['quantity' => '1', 'unit_cost' => '1']]), $this->opts(['mapping' => [0 => 'quantity', 1 => 'unit_cost']]), null), 'تعريف', RuntimeException::class);

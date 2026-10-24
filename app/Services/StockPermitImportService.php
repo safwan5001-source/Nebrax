@@ -498,7 +498,10 @@ class StockPermitImportService
 
             return;
         }
-        [$value, $error] = Normalizer::integer($text, 1, Fields::MAX_QUANTITY);
+        // Normalizer::integer يقبل صيغة النسبة (25% ← 25)؛ الكمية ليست نسبة، فتُرفض قبل التطبيع لا تُحوَّل صامتةً.
+        [$value, $error] = preg_match('/[%٪]/u', $text) === 1
+            ? [null, 'percent']
+            : Normalizer::integer($text, 1, Fields::MAX_QUANTITY);
         if ($error !== null) {
             $entry['messages'][] = 'الكمية يجب أن تكون عدداً صحيحاً بين 1 و'.number_format(Fields::MAX_QUANTITY).' بلا كسور.';
 

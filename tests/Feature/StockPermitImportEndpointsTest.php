@@ -183,6 +183,32 @@ class StockPermitImportEndpointsTest extends TestCase
     }
 
     /** @test */
+    public function apply_requests_that_change_any_frozen_header_field_are_refused_as_options_frozen(): void
+    {
+        foreach ([
+            ['permit_type' => 'issue'],
+            ['permit_date' => '2026-04-01'],
+            ['reason' => 'سبب مختلف'],
+            ['target_warehouse_id' => (string) \Illuminate\Support\Str::uuid()],
+            ['warehouse_id' => (string) \Illuminate\Support\Str::uuid()],
+        ] as $change) {
+            $job = $this->createJob($this->auth['token'], $this->rows(), $this->hdr(['reason' => 'جرد أولي']))->assertCreated()->json('data');
+            $res = $this->withToken($this->auth['token'])->postJson("/api/import-jobs/{$job['id']}/apply", $change);
+            $this->assertSame(422, $res->status(), 'يجب رفض تغيير '.array_key_first($change));
+            $this->assertSame('options_frozen', $res->json('code'), array_key_first($change));
+        }
+        $this->assertSame(0, StockPermit::query()->count());
+    }
+
+    /** @test */
+    public function apply_requests_repeating_the_frozen_header_are_accepted(): void
+    {
+        $job = $this->createJob($this->auth['token'], $this->rows(), $this->hdr(['reason' => 'جرد أولي']))->assertCreated()->json('data');
+        $this->withToken($this->auth['token'])->postJson("/api/import-jobs/{$job['id']}/apply", $this->hdr(['reason' => 'جرد أولي']))->assertOk();
+        $this->assertSame(1, StockPermit::query()->count());
+    }
+
+    /** @test */
     public function a_failing_file_leaves_the_job_failed_and_writes_no_permit(): void
     {
         $rows = [['sku' => 'CEM-50', 'quantity' => '5', 'unit_cost' => '25.00'], ['sku' => 'CEM-50', 'quantity' => '5', 'unit_cost' => '25.00']];
