@@ -230,4 +230,87 @@ describe('useImportJobEngine', () => {
     expect(result.current.job?.failed_units).toBe(3);
     expect(result.current.error).toBe('فشلت النافذة');
   });
+
+  describe('IMP-WIZARD-STATE-01', () => {
+    it('flags a resumed job of another domain as foreign and never applies it', async () => {
+      getImportJob.mockResolvedValue(job({ id: 'job-x', domain: 'partner_master', status: 'processing' }));
+      const { result } = renderHook(() => useImportJobEngine('product_taxonomy'));
+
+      await act(async () => {
+        await result.current.resume('job-x');
+      });
+      expect(result.current.job?.id).toBe('job-x');
+      expect(result.current.foreignJob).toBe(true);
+
+      await act(async () => {
+        await result.current.applyLoop('job-x', {});
+      });
+      expect(applyImportJobChunk).not.toHaveBeenCalled();
+      expect(result.current.error).toContain('مجالاً آخر');
+      expect(result.current.busy).toBeNull();
+    });
+
+    it('does not flag a job of its own domain, and still applies an id it has never seen', async () => {
+      getImportJob.mockResolvedValue(job({ id: 'job-own', domain: 'product_taxonomy', status: 'ready' }));
+      applyImportJobChunk.mockResolvedValue(job({ id: 'job-own', domain: 'product_taxonomy', status: 'completed', processed_rows: 3 }));
+      const { result } = renderHook(() => useImportJobEngine('product_taxonomy'));
+
+      await act(async () => {
+        await result.current.resume('job-own');
+      });
+      expect(result.current.foreignJob).toBe(false);
+      await act(async () => {
+        await result.current.applyLoop('job-own', {});
+        await result.current.applyLoop('never-seen', {});
+      });
+      expect(applyImportJobChunk).toHaveBeenCalledTimes(2);
+    });
+
+    it('stops a running apply loop at reset: no further chunk and the dropped job is not resurrected', async () => {
+      let release: (value: unknown) => void = () => undefined;
+      applyImportJobChunk.mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }));
+      const { result } = renderHook(() => useImportJobEngine('product_catalog'));
+
+      let loop: Promise<void> = Promise.resolve();
+      act(() => {
+        loop = result.current.applyLoop('job-1', {});
+      });
+      await waitFor(() => expect(result.current.busy).toBe('applying'));
+
+      act(() => result.current.reset());
+      await act(async () => {
+        release(job({ status: 'processing', processed_rows: 1, row_count: 3 }));
+        await loop;
+      });
+
+      expect(applyImportJobChunk).toHaveBeenCalledTimes(1);
+      expect(result.current.job).toBeNull();
+      expect(result.current.busy).toBeNull();
+    });
+
+    it('releases the lock at reset so the new screen can upload at once, and ignores a late upload from before the reset', async () => {
+      let releaseOld: (value: unknown) => void = () => undefined;
+      createImportJob.mockImplementationOnce(() => new Promise((resolve) => { releaseOld = resolve; }));
+      const { result } = renderHook(() => useImportJobEngine('product_catalog'));
+
+      let oldUpload: Promise<unknown> = Promise.resolve();
+      act(() => {
+        oldUpload = result.current.upload(new File(['x'], 'old.csv'));
+      });
+      await waitFor(() => expect(result.current.busy).toBe('uploading'));
+
+      act(() => result.current.reset());
+      createImportJob.mockResolvedValueOnce(job({ id: 'job-new' }));
+      await act(async () => {
+        await result.current.upload(new File(['x'], 'new.csv'));
+      });
+      expect(result.current.job?.id).toBe('job-new');
+
+      await act(async () => {
+        releaseOld(job({ id: 'job-old' }));
+        await oldUpload;
+      });
+      expect(result.current.job?.id).toBe('job-new');
+    });
+  });
 });
