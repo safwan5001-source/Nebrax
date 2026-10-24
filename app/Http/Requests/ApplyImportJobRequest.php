@@ -99,7 +99,7 @@ class ApplyImportJobRequest extends FormRequest
             'reference_policy' => ['sometimes', Rule::in([ExpenseImportService::REFERENCE_OPTIONAL, ExpenseImportService::REFERENCE_REQUIRED])],
             'default_account_id' => ['sometimes', 'nullable', 'uuid'],
             'default_payment_method' => ['sometimes', Rule::in(ExpenseImportFields::PAYMENT_METHODS)],
-            'default_tax_rate' => ['sometimes', 'integer', 'min:0', 'max:100'],
+            'default_tax_rate' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:100'],
             'confirmed_repeat_rows' => ['sometimes', 'array', 'max:'.ExpenseImportService::MAX_ROWS],
             'confirmed_repeat_rows.*' => ['integer', 'min:2'],
             // IMP-H5-S4a — سياسات `purchase_import` (مجمَّدة مع المعاينة؛ هنا للمقارنة القانونية لا للتغيير).
@@ -139,7 +139,8 @@ class ApplyImportJobRequest extends FormRequest
     {
         $options = [];
         foreach (['mode', 'blank_policy', 'master_data_policy', 'opening_date', 'type', 'duplicate_signal_policy', 'kind', 'parent_policy', 'existing_policy', 'stocktake_id', 'existing_count_policy', 'reference_policy', 'default_account_id', 'default_payment_method', 'default_tax_rate', 'default_supplier_id', 'default_payment_type', 'warehouse_id'] as $key) {
-            if ($this->has($key)) {
+            // قيمة null الصريحة لنسبة الضريبة = غياب (تفضيل المؤسسة)، لا نصّاً فارغاً يخالف المجمَّد.
+            if ($this->has($key) && ! ($key === 'default_tax_rate' && $this->input($key) === null)) {
                 $options[$key] = $this->string($key)->toString();
             }
         }
@@ -203,7 +204,8 @@ class ApplyImportJobRequest extends FormRequest
             $options['opening_date'] = (string) $this->input('opening_date');
         }
         foreach (['type', 'duplicate_signal_policy', 'kind', 'parent_policy', 'existing_policy', 'stocktake_id', 'existing_count_policy', 'reference_policy', 'default_account_id', 'default_payment_method', 'default_tax_rate', 'default_supplier_id', 'default_payment_type', 'warehouse_id'] as $key) {
-            if ($this->has($key)) {
+            // قيمة null الصريحة لنسبة الضريبة = غياب (تفضيل المؤسسة)، لا نصّاً فارغاً يخالف المجمَّد.
+            if ($this->has($key) && ! ($key === 'default_tax_rate' && $this->input($key) === null)) {
                 $options[$key] = $this->string($key)->toString();
             }
         }
