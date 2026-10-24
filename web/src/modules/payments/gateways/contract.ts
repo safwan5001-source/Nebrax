@@ -39,6 +39,10 @@ export interface GatewayConnection {
   activated_at: string | null;
   deactivated_at: string | null;
   created_at: string | null;
+  /** سياسة ضريبة عمولة المزوّد (PAY-H3-02c2، D-04): `reject` افتراضياً. الحقلان اختياريان حتى يصل الخادم بهما؛ الغياب = `reject`. عرض فقط. */
+  fee_tax_policy?: 'reject' | 'input_vat';
+  /** مرجع الرأي الضريبي (EXT-05) مسجَّل في الإعداد؟ منطقي فقط، لا المرجع نفسه. */
+  fee_tax_opinion_recorded?: boolean;
 }
 
 export interface GatewayEvent {

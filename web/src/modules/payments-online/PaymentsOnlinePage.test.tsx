@@ -57,6 +57,23 @@ describe.each(TEST_LOCALES)('PaymentsOnlinePage (%s)', (locale) => {
     expect(apiMock).not.toHaveBeenCalled();
   });
 
+  it('offers the settlements and adjustments sections with payments.view, and the refunds section only with its own permission', async () => {
+    route({
+      'GET /payment-attempts': () => ({ data: [row()], meta: meta(1) }),
+      'GET /payment-gateways': () => ({ data: [] }),
+      'GET /payment-gateway-settlements': () => ({ data: [], meta: { total: 0, page: 1, per_page: 25, last_page: 1 } }),
+      'GET /payment-gateway-adjustments': () => ({ data: [], meta: { total: 0, page: 1, per_page: 25, last_page: 1 } }),
+    });
+    ui();
+    await screen.findAllByText('INV-0001');
+    const tabs = screen.getAllByRole('tab').map((t) => t.textContent ?? '');
+    expect(tabs.some((t) => /التسويات|^Settlements/.test(t))).toBe(true);
+    expect(tabs.some((t) => /تعديلات المزوّد|Provider adjustments/.test(t))).toBe(true);
+    expect(tabs.some((t) => /الاستردادات|^Refunds/.test(t))).toBe(false);
+    fireEvent.click(screen.getAllByRole('tab').find((t) => /التسويات|^Settlements/.test(t.textContent ?? ''))!);
+    await waitFor(() => expect(apiMock.mock.calls.some((c) => String(c[0]).startsWith('/payment-gateway-settlements'))).toBe(true));
+  });
+
   it('lists attempts with status, amount and a review flag; no repost button without the resolve permission', async () => {
     route({
       'GET /payment-attempts': () => ({ data: [row(), row({ id: 'a2', posting_status: 'blocked_period', blocked_reason: { kind: 'period' }, review_reasons: ['overpayment'] })], meta: meta(2) }),
