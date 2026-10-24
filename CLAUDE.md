@@ -342,6 +342,15 @@ php artisan serve
 - **التزامن:** `pg_advisory_xact_lock` حول البحث+الإنشاء داخل المعاملة (لا تلتقط خطأ تفرّد داخل معاملة PG). يرفض المحلِّل العمل خارج معاملة. لا هجرة ولا أثر محاسبي ولا صلاحية جديدة.
 - المرجع: `docs/plans/payments/horizon/AWJ-PAY-H4-01-IMPLEMENTATION-REPORT.md`.
 
+
+## حجز مخزون الطلب الإلكتروني — PAY-H4-02 (D-14 المعتمد)
+
+الطلب الإلكتروني (نية `online`) يحجز مخزونه **عند إتمام الطلب** داخل معاملة `CommerceCheckoutService::complete` عبر `CommerceOrderReservationService::reserve($order, $expiresAt)`؛ COD/الاستلام بلا حجز. المدة `sales.commerce_payment_hold_minutes` (الافتراضي 60، 15..1440، `CommercePaymentHold`). نقص المخزون ⇒ `review_required: insufficient_stock` وتراجع كامل (لا طلب ولا حجز جزئي).
+- **الحجز وعدٌ لا حركة مخزون** (لا `StockMovement`، لا قيد). `InventoryReservationService::acquire` صار يقبل `variantId` (المتغيّر مستقل عن شقيقه؛ البصمة تتضمنه حين وُجد فقط) و`expiresAt`. `expires_at` **لا يُحتسب في ATS**: الحجز المنتهي يبقى حاجزاً حتى تحرّره المكنسة (الاتجاه الآمن: لا يُباع مخزون طلب قد يكون مدفوعاً).
+- **المكنسة** `CommerceUnpaidOrderSweeper` / `commerce:expire-unpaid-orders` (كل 5 دقائق): للحجز المنتهي تُجري `reconcile` لكل محاولة نشطة (تعذّر المزوّد ⇒ تتخطى وتُعيد لاحقاً، لا تحرير)، التقاط ⇒ `completeCaptured` (النية مدفوعة والحجز **دائم** `expires_at=null`)، وإلا `CommercePaymentIntentService::cancel` ثم `releaseActive`. الطلب يبقى سجلاً (بلا حالة طلب جديدة). التقاط متأخر بعد الإلغاء ⇒ `late_capture` للمراجعة البشرية (D-15) ولا يُحيي الحجز. إلغاء الإدارة لنية إلكترونية غير ملتقَطة يحرّر الحجز أيضاً.
+- **استهلاك الحجز عند الدفع الناجح = H4-03** (داخل معاملة الإصدار)، لا هنا.
+- المرجع: `docs/plans/payments/horizon/AWJ-PAY-H4-02-IMPLEMENTATION-REPORT.md`.
+
 ## أدوار ضريبة القيمة المضافة (REM-05 / ACC-01)
 
 `App\Services\Accounting\VatRoleIntegrityService` هو مصدر قواعد دورَي `tax_input`/`tax_output` وسياق تقرير الضريبة. لا يكتب شيئاً.

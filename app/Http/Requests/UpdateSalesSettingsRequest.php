@@ -31,6 +31,7 @@ class UpdateSalesSettingsRequest extends FormRequest
                 Rule::in(CashSaleTreasuryPolicy::activationOpen() ? CashSaleTreasuryPolicy::VALUES : [CashSaleTreasuryPolicy::LEGACY]),
             ],
             // H4-01 / D-05: سياسة ربط مشتري المتجر بطرف (تُقرأ عند إنشاء نية دفع إلكتروني فقط).
+            'commerce_payment_hold_minutes' => ['nullable', 'integer', 'min:'.\App\Support\CommercePaymentHold::MIN_MINUTES, 'max:'.\App\Support\CommercePaymentHold::MAX_MINUTES],
             'commerce_partner_policy' => ['nullable', Rule::in(CommercePartnerPolicy::VALUES)],
         ];
     }

@@ -62,6 +62,8 @@ final class InventoryReservationService
         string $idempotencyKey,
         ?string $sourceType = null,
         ?string $sourceId = null,
+        ?string $variantId = null,
+        ?\DateTimeInterface $expiresAt = null,
     ): InventoryReservation {
         if ($baseQuantity <= 0) {
             throw new RuntimeException('كمية الحجز يجب أن تكون أكبر من صفر.');
@@ -72,11 +74,11 @@ final class InventoryReservationService
             throw new RuntimeException('لا سياق مستأجر نشط لإجراء الحجز.');
         }
 
-        $checksum = self::checksum($productId, $warehouseId, $baseQuantity, $sourceType, $sourceId);
+        $checksum = self::checksum($productId, $warehouseId, $baseQuantity, $sourceType, $sourceId, $variantId);
 
         try {
             return DB::transaction(function () use (
-                $productId, $warehouseId, $baseQuantity, $idempotencyKey, $sourceType, $sourceId, $tenantId, $checksum,
+                $productId, $warehouseId, $baseQuantity, $idempotencyKey, $sourceType, $sourceId, $tenantId, $checksum, $variantId, $expiresAt,
             ) {
                 $existing = InventoryReservation::query()->where('idempotency_key', $idempotencyKey)->first();
                 if ($existing !== null) {
@@ -96,11 +98,12 @@ final class InventoryReservationService
                 $stockRow = ProductWarehouseStock::query()
                     ->where('product_id', $productId)
                     ->where('warehouse_id', $warehouseId)
+                    ->where('product_variant_id', $variantId)
                     ->lockForUpdate()
                     ->first();
                 $onHand = (int) ($stockRow->quantity ?? 0);
 
-                $activeReserved = $this->activeReservedQuantity($productId, $warehouseId);
+                $activeReserved = $this->activeReservedQuantity($productId, $warehouseId, $variantId);
                 $available = max(0, $onHand - $activeReserved);
 
                 if ($available < $baseQuantity) {
@@ -115,7 +118,9 @@ final class InventoryReservationService
                     'tenant_id' => $tenantId,
                     'warehouse_id' => $warehouseId,
                     'product_id' => $productId,
+                    'product_variant_id' => $variantId,
                     'base_quantity' => $baseQuantity,
+                    'expires_at' => $expiresAt,
                     'status' => InventoryReservation::STATUS_ACTIVE,
                     'source_type' => $sourceType,
                     'source_id' => $sourceId,
@@ -252,10 +257,13 @@ final class InventoryReservationService
         int $baseQuantity,
         ?string $sourceType,
         ?string $sourceId,
+        ?string $variantId = null,
     ): string {
-        return hash('sha256', implode('|', [
+        // المتغيّر يدخل البصمة حين وُجد فقط: بصمات الحجوزات القائمة (منتج بسيط) تبقى كما حُسبت.
+        return hash('sha256', implode('|', array_filter([
             $productId, $warehouseId, (string) $baseQuantity, (string) $sourceType, (string) $sourceId,
-        ]));
+            $variantId !== null ? 'v:'.$variantId : null,
+        ], fn ($v) => $v !== null)));
     }
 
     private function isUniqueConstraintViolation(QueryException $e): bool

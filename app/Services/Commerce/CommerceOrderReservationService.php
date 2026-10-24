@@ -84,22 +84,24 @@ final class CommerceOrderReservationService
     /**
      * يحجز كل سطور طلبٍ مؤكَّد ذرّياً عبر مخزن التنفيذ المحسوم لقناته.
      *
+     * `$expiresAt` (H4-02): حجز دفع إلكتروني مؤقّت؛ **لا يُحرَّر تلقائياً** عند بلوغه — المكنسة وحدها تحرّره بعد التحقق من حالة الدفع.
+     *
      * @return Collection<int, InventoryReservation>
      *
      * @throws RuntimeException الطلب غير موجود لمستأجر السياق الحالي، أو
      *                          ليس بحالة `confirmed`.
      * @throws FulfillmentPolicyNotConfiguredException لا مخزن تنفيذ صالحاً لقناة الطلب.
-     * @throws InsufficientAvailabilityException الكمية المتاحة للبيع أقل من كمية سطرٍ ما.
+     * @throws OrderLineUnavailableException الكمية المتاحة للبيع أقل من كمية سطرٍ ما (يرث InsufficientAvailabilityException).
      * @throws InventoryReservationIdempotencyConflictException إعادة محاولة بحمولة مختلفة.
      */
-    public function reserve(CommerceOrder $order): Collection
+    public function reserve(CommerceOrder $order, ?\DateTimeInterface $expiresAt = null): Collection
     {
         $tenantId = app(TenantContext::class)->id();
         if ($tenantId === null) {
             throw new RuntimeException('لا سياق مستأجر نشط.');
         }
 
-        return DB::transaction(function () use ($order) {
+        return DB::transaction(function () use ($order, $expiresAt) {
             // إعادة تحميل مقفولة تحت TenantScope الحالي — لا ثقة بحالة
             // الكائن الممرَّر: مصدر الحقيقة الوحيد هو ما يراه السياق الموثوق.
             $order = CommerceOrder::query()->with('lines')->lockForUpdate()->find($order->id);
@@ -113,7 +115,8 @@ final class CommerceOrderReservationService
 
             // مخزنٌ واحد صريح لكل الطلب (ADR-03: V1 = fixed location) — لا
             // تقسيم بين مخازن متعددة، ولا استنتاج من فرع.
-            $warehouse = $this->fulfillment->resolveWarehouseFor($order->sales_channel_id);
+            // H4-02: يُحسم عند أول سطر متتبَّع فقط — طلب خدمات/غير متتبَّع بلا سياسة تنفيذ لا يحتاج مخزناً (نفس منطق إعادة تحقق الإتمام).
+            $warehouse = null;
 
             // ترتيب حتمي بهوية المورد (product_id) — يمنع تقافل PostgreSQL
             // بين طلبين متنافسين بترتيب سطور معكوس (انظر توثيق الصنف، P1-2).
@@ -131,14 +134,22 @@ final class CommerceOrderReservationService
                     continue;
                 }
 
-                $reservations->push($this->reservations->acquire(
-                    productId: $line->product_id,
-                    warehouseId: $warehouse->id,
-                    baseQuantity: $line->baseQuantity(),
-                    idempotencyKey: $this->idempotencyKeyFor($order, $line),
-                    sourceType: CommerceOrder::class,
-                    sourceId: $order->id,
-                ));
+                $warehouse ??= $this->fulfillment->resolveWarehouseFor($order->sales_channel_id);
+                try {
+                    $reservations->push($this->reservations->acquire(
+                        productId: $line->product_id,
+                        warehouseId: $warehouse->id,
+                        baseQuantity: $line->baseQuantity(),
+                        idempotencyKey: $this->idempotencyKeyFor($order, $line),
+                        sourceType: CommerceOrder::class,
+                        sourceId: $order->id,
+                        variantId: $line->product_variant_id,
+                        expiresAt: $expiresAt,
+                    ));
+                } catch (InsufficientAvailabilityException $e) {
+                    // H4-02: السطر الذي نقص مخزونه يُسمّى ليُعاد إلى مراجعة السلة بدل رسالة عامة.
+                    throw new OrderLineUnavailableException($line->product_id, $line->product_variant_id, $e->getMessage(), $e);
+                }
             }
 
             return $reservations;
@@ -169,6 +180,32 @@ final class CommerceOrderReservationService
             ->where('source_type', CommerceOrder::class)
             ->where('source_id', $order->id)
             ->get();
+    }
+
+    /**
+     * H4-02: يحرّر كل حجوزات الطلب النشطة (idempotent). يُستدعى بعد التحقق من حالة الدفع/إلغاء النية فقط (المكنسة، إلغاء الإدارة).
+     *
+     * @return int عدد الحجوزات التي حُرِّرت فعلاً
+     */
+    public function releaseActive(string $orderId): int
+    {
+        return DB::transaction(function () use ($orderId): int {
+            $released = 0;
+            foreach (InventoryReservation::query()->where('source_type', CommerceOrder::class)->where('source_id', $orderId)
+                ->where('status', InventoryReservation::STATUS_ACTIVE)->orderBy('id')->get() as $reservation) {
+                $this->reservations->release($reservation->id);
+                $released++;
+            }
+
+            return $released;
+        });
+    }
+
+    /** H4-02: الطلب دُفع ⇒ الحجز يصير دائماً (بلا موعد) حتى يستهلكه الإصدار المحاسبي (H4-03)؛ المكنسة لا تلمسه. */
+    public function makePermanent(string $orderId): void
+    {
+        InventoryReservation::query()->where('source_type', CommerceOrder::class)->where('source_id', $orderId)
+            ->where('status', InventoryReservation::STATUS_ACTIVE)->update(['expires_at' => null]);
     }
 
     private function idempotencyKeyFor(CommerceOrder $order, CommerceOrderLine $line): string

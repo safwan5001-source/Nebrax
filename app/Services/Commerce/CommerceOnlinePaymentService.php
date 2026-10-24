@@ -242,6 +242,8 @@ final class CommerceOnlinePaymentService
                 'status' => CommercePaymentIntent::STATUS_PAID,
                 'paid_at' => $fresh->captured_at ?? now('UTC'),
             ])->save();
+            // H4-02: طلب مدفوع ⇒ حجزه لا ينتهي بالموعد (يبقى حتى الإصدار المحاسبي).
+            app(CommerceOrderReservationService::class)->makePermanent((string) $intent->commerce_order_id);
 
             return 'paid';
         });
