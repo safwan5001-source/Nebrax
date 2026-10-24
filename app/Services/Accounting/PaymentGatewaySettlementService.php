@@ -455,6 +455,9 @@ final class PaymentGatewaySettlementService
             $block('items_required', 'Gateway settlement requires at least one matched payment.');
         } elseif ($replay) {
             // تكرار آمن بالمبالغ والبنود نفسها أو تعارض؛ تُتجاوز أهلية البنود الجديدة كما في post().
+            // الاستقطاعات/الاعتمادات المشتقّة من التعديلات تُقرأ من الترويسة المخزَّنة (ثابتة بعد الترحيل) فتتطابق المعادلة.
+            $adjDeductions = (int) $existing->provider_deductions;
+            $adjCredits = (int) $existing->provider_credits;
             try {
                 foreach ($itemsList as $raw) {
                     $gross += $this->money($raw['gross_amount'] ?? null, 'item gross');
@@ -520,6 +523,9 @@ final class PaymentGatewaySettlementService
         $difference = $known ? $expectedNet - $net : null;
         if ($known && $expectedNet < 0) {
             $block('negative_net_unsupported', 'Refunds and deductions exceed collections; the refund stays open until a later settlement covers it.');
+        } elseif ($known && ! $replay && $gross <= 0 && $net <= 0 && $difference === 0 && $hasAdjustments) {
+            // نفس رفض الكتابة: تسوية بلا تحصيل يجب أن تنقل مالاً إلى البنك (لا قيد بتعديلات متقابلة بصافٍ صفري).
+            $block('empty_settlement', 'A settlement without collections must move money to the bank.');
         } elseif ($difference !== null && $hasBasis && $difference !== 0 && ! $replay) {
             $block('unreconciled_difference', "Settlement does not reconcile: difference {$difference}.");
         }

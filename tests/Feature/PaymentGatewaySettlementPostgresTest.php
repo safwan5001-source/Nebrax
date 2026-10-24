@@ -242,7 +242,8 @@ class PaymentGatewaySettlementPostgresTest extends TestCase
         $this->assertAllOk($results);
         $outcomes = array_column(array_column($results, 'value'), 'outcome');
         $this->assertSame(1, count(array_filter($outcomes, fn ($o) => $o === 'approved')));
-        $this->assertContains('self_approval', $outcomes);
+        // الطالب لا يعتمد أبداً: يخسر السباق إما بـself_approval أو بـinvalid_state إن سبقه معتمِد (كلاهما رفض صحيح؛ الاعتماد الذاتي المحدد يُختبر حتمياً في PaymentGatewayAdjustmentTest)
+        $this->assertSame(2, count(array_filter($outcomes, fn ($o) => in_array($o, ['self_approval', 'invalid_state'], true))));
         $this->assertSame($this->adminId, DB::table('payment_gateway_adjustments')->where('id', $adj->id)->value('approved_by'));
     }
 

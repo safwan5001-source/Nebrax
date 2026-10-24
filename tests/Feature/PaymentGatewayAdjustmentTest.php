@@ -337,6 +337,27 @@ class PaymentGatewayAdjustmentTest extends TestCase
     }
 
     #[Test]
+    public function preview_mirrors_replay_totals_and_the_empty_settlement_rule(): void
+    {
+        [, $paymentId] = $this->capture();
+        $adj = $this->approved('reserve_hold', 10000, 'STMT-PV1');
+        $payload = $this->input($paymentId, 115000, [], net: 103400, fee: 1600, ref: 'PV-REPLAY') + ['adjustments' => [['adjustment_id' => $adj->id]]];
+        $this->settlements->record($payload);
+
+        // تكرار مطابق لتسوية فيها تعديل: متوازن وقابل للترحيل (idempotent) لا فرق 10000
+        $res = $this->withToken($this->ownerToken)->postJson('/api/payment-gateway-settlements/preview', $payload)->assertOk();
+        $res->assertJsonPath('data.replay', true)->assertJsonPath('data.difference', 0)->assertJsonPath('data.reconciled', true)->assertJsonPath('data.postable', true);
+
+        // صافٍ صفري بتعديلات متقابلة بلا تحصيل: المعاينة ترفض كما ترفض الكتابة
+        $debit = $this->approved('adjustment_debit', 500, 'STMT-PV2');
+        $credit = $this->approved('adjustment_credit', 500, 'STMT-PV3');
+        $zero = ['items' => []] + $this->input($paymentId, 1, [], net: 0, fee: 0, ref: 'PV-ZERO') + ['adjustments' => [['adjustment_id' => $debit->id], ['adjustment_id' => $credit->id]]];
+        $res = $this->withToken($this->ownerToken)->postJson('/api/payment-gateway-settlements/preview', $zero)->assertOk();
+        $this->assertContains('empty_settlement', collect($res->json('data.blockers'))->pluck('code')->all());
+        $res->assertJsonPath('data.postable', false);
+    }
+
+    #[Test]
     public function the_settlement_endpoints_report_field_level_errors_for_an_empty_body(): void
     {
         $this->withToken($this->ownerToken)->postJson('/api/payment-gateway-settlements', [])->assertUnprocessable()->assertJsonValidationErrors(['items', 'adjustments']);
