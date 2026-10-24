@@ -322,4 +322,21 @@ describe('ProductTaxonomyImportWizard (IMP-H4-S6a)', () => {
     await waitFor(() => expect(screen.getByText('resumed_unbound')).toBeTruthy());
     expect((screen.getByRole('button', { name: 'apply' }) as HTMLButtonElement).disabled).toBe(true);
   });
+
+  it('lets a repair child inherit its frozen options on resume: Apply and Continue stay available without a preview binding', async () => {
+    for (const status of ['ready', 'processing']) {
+      window.history.replaceState({}, '', '/inventory-settings/categories/import?job=job-r');
+      api.mockReset();
+      api.mockImplementation((path: string) => {
+        if (path === '/import-jobs/job-r') return Promise.resolve({ data: jobFixture({ id: 'job-r', status, preview_bound: false, parent_job_id: 'job-0' }) });
+        return Promise.resolve({ data: [] });
+      });
+      const { unmount } = render(<ProductTaxonomyImportWizard kind="category" />);
+
+      await waitFor(() => expect(screen.getByRole('button', { name: status === 'ready' ? 'apply' : 'continue_apply' })).toBeTruthy());
+      expect(screen.queryByText('resumed_unbound')).toBeNull();
+      if (status === 'ready') expect((screen.getByRole('button', { name: 'apply' }) as HTMLButtonElement).disabled).toBe(false);
+      unmount();
+    }
+  });
 });
