@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, CheckCircle2, Save } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Save, Upload } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -125,6 +125,12 @@ export default function StocktakeDetailPage() {
 
         {isDraft && (
           <div className="ms-auto flex flex-wrap gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/stocktaking/${id}/import`}>
+                <Upload className="h-4 w-4" strokeWidth={1.7} />
+                {t('import_counts')}
+              </Link>
+            </Button>
             <Button variant="outline" size="sm" disabled={busy} onClick={saveCounts}>
               <Save className="h-4 w-4" strokeWidth={1.7} />
               {t('save_counts')}
