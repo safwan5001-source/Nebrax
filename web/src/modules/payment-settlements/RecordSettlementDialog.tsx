@@ -341,8 +341,9 @@ function PreviewSummary({ preview, currency, money, t }: { preview: SettlementPr
       </div>
       {preview.blockers.length > 0 && (
         <ul className="space-y-1 text-xs leading-5 text-warning" aria-label={t('preview_blockers')}>
-          {preview.blockers.map((b) => (
-            <li key={b.code}>{t.has(`error_${b.code}` as 'error_unknown') ? t(`error_${b.code}` as 'error_unknown') : b.message}</li>
+          {preview.blockers.map((b, i) => (
+            // رموز قابلة للتكرار (role_unmapped لكل دور) ⇒ مفتاح بالترتيب، ورسالة الخادم تسمّي الدور فتُعرض بدل النص العام.
+            <li key={`${b.code}-${i}`}>{b.code !== 'role_unmapped' && t.has(`error_${b.code}` as 'error_unknown') ? t(`error_${b.code}` as 'error_unknown') : b.message}</li>
           ))}
         </ul>
       )}
