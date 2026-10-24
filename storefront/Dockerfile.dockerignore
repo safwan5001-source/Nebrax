@@ -1,0 +1,29 @@
+# The storefront image is built from the repository root. Keep its context
+# limited to the app plus the four canonical payment-brand assets it syncs.
+**
+
+!storefront/
+!storefront/**
+
+!web/
+web/*
+!web/public/
+web/public/*
+!web/public/payment-brands/
+!web/public/payment-brands/mada.svg
+!web/public/payment-brands/visa.svg
+!web/public/payment-brands/mastercard.svg
+!web/public/payment-brands/apple-pay.svg
+
+storefront/node_modules/
+storefront/.next/
+storefront/out/
+storefront/build/
+storefront/dist/
+storefront/.env
+storefront/.env.local
+storefront/.env.*.local
+storefront/coverage/
+storefront/test-results/
+storefront/playwright-report/
+storefront/*.tsbuildinfo
