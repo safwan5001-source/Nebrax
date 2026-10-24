@@ -31,6 +31,7 @@ import {
   expenseImportFormData,
   expenseJobOptions,
   expenseMappingGaps,
+  parseTaxRate,
   spreadsheetSafe,
   suggestedExpenseMapping,
   toggleRepeatRow,
@@ -107,8 +108,9 @@ export function ExpenseImportWizard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine.job?.id]);
 
-  const taxRate = Number(defaultTax);
-  const taxValid = defaultTax.trim() !== '' && Number.isInteger(taxRate) && taxRate >= 0 && taxRate <= 100;
+  const parsedTax = parseTaxRate(defaultTax);
+  const taxValid = parsedTax !== null;
+  const taxRate = parsedTax ?? 0;
   const fields = inspection?.fields ?? [];
   const gaps = useMemo(
     () => expenseMappingGaps(mapping, fields, { defaultAccountId, referencePolicy }),
@@ -123,7 +125,16 @@ export function ExpenseImportWizard() {
     return { referencePolicy, defaultAccountId, defaultPaymentMethod: defaultPayment, defaultTaxRate: taxRate, confirmedRepeatRows: rows, mapping: activeMapping };
   }
 
+  /** تشغيلةٌ سابقة مجمَّدة الملف والخيارات: أي تغيير في الملف/القواعد/المطابقة/التأكيد يُسقطها كي لا يُنفَّذ ما لم يُعايَن (تبقى على الخادم وتُستأنف برابطها). */
+  function dropJob() {
+    if (!engine.job) return;
+    engine.reset();
+    setParam(null);
+    setResumedWithoutFile(false);
+  }
+
   function invalidatePreview(resetConfirmed = true) {
+    dropJob();
     previewSeq.current += 1;
     setPreviewing(false);
     setPreview(null);
@@ -194,8 +205,9 @@ export function ExpenseImportWizard() {
     invalidatePreview();
   }
 
-  async function runPreview(rows: number[] = confirmedRows) {
-    if (!file) return;
+  async function runPreview(rows: number[] = confirmedRows, keepOnError = false): Promise<boolean> {
+    if (!file) return false;
+    dropJob();
     const seq = ++previewSeq.current;
     setPreviewing(true);
     setError(null);
@@ -204,13 +216,16 @@ export function ExpenseImportWizard() {
         method: 'POST',
         body: expenseImportFormData(file, currentOptions(rows)),
       });
-      if (seq !== previewSeq.current) return;
+      if (seq !== previewSeq.current) return false;
       setPreview(response.data);
       setStep(1);
+      return true;
     } catch (err) {
-      if (seq !== previewSeq.current) return;
-      setPreview(null);
+      if (seq !== previewSeq.current) return false;
+      // إعادة معاينة بعد تبديل تأكيدٍ تُبقي المعاينة السابقة سليمةً ويُلغى التبديل، بدل صفحةٍ فارغة.
+      if (!keepOnError) setPreview(null);
       setError(err instanceof ApiError ? err.message : tc('saveFailed'));
+      return false;
     } finally {
       if (seq === previewSeq.current) setPreviewing(false);
     }
@@ -218,9 +233,12 @@ export function ExpenseImportWizard() {
 
   /** تأكيد/إلغاء تأكيد صفٍّ كتكرار حقيقي ثم إعادة المعاينة فوراً: الخادم يعيد الحكم ويصدر ربطاً جديداً بالقائمة المجمَّدة. */
   function toggleConfirmed(row: number, confirmed: boolean) {
+    const previous = confirmedRows;
     const next = toggleRepeatRow(confirmedRows, row, confirmed);
     setConfirmedRows(next);
-    void runPreview(next);
+    void runPreview(next, true).then((ok) => {
+      if (!ok) setConfirmedRows(previous);
+    });
   }
 
   function applyOptionsPayload(): ApplyOptions {
@@ -233,7 +251,11 @@ export function ExpenseImportWizard() {
     if (!engine.job) {
       if (!file) return;
       const job = await engine.upload(file, undefined, null, preview?.binding ? { binding: preview.binding, options: applyOptionsPayload() } : null);
-      if (!job) return;
+      if (!job) {
+        // فشل الإنشاء (معاينة منتهية/خيار مرفوض/شبكة): لا صفحة فارغة — نعود إلى المعاينة والخطأ ظاهر.
+        setStep(1);
+        return;
+      }
       // تشغيلةٌ مربوطةٌ بمعاينة تنفّذ خياراتها المجمَّدة عند الإنشاء: لا خيارات دلالية في طلب التطبيق.
       await engine.applyLoop(job.id, job.preview_bound ? {} : applyOptionsPayload());
       return;
@@ -284,7 +306,7 @@ export function ExpenseImportWizard() {
   }, [engine.job?.status]);
 
   const applyResult = engine.job?.apply_result as { created?: number } | null | undefined;
-  const repeatRows = preview?.rows.filter((row) => row.repeat_candidate || row.confirmed_repeat) ?? [];
+  const repeatRows = preview?.repeat_candidates ?? [];
 
   return (
     <div className="space-y-4 pb-24 lg:pb-0">
@@ -306,9 +328,9 @@ export function ExpenseImportWizard() {
 
       <Stepper steps={steps} current={step} onSelect={(index) => index <= step && setStep(index)} label={t('step_label')} />
 
-      {error ? (
+      {error || engine.error ? (
         <p role="alert" className="rounded-md border border-negative/30 bg-negative/10 px-3 py-2 text-sm text-negative">
-          {error}
+          {error ?? engine.error}
         </p>
       ) : null}
 
@@ -320,9 +342,10 @@ export function ExpenseImportWizard() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm leading-relaxed text-muted">{t('resumed_hint', { name: engine.job.original_filename })}</p>
+              {engine.job.preview_bound ? null : <p role="alert" className="text-sm text-negative">{t('resumed_unbound')}</p>}
               <FormActions
                 primary={
-                  <Button onClick={() => void confirmAndApply()}>
+                  <Button disabled={!engine.job.preview_bound} onClick={() => void confirmAndApply()}>
                     <Upload className="h-4 w-4" strokeWidth={1.7} />
                     {t('apply')}
                   </Button>
@@ -478,7 +501,7 @@ export function ExpenseImportWizard() {
                                 <span className="block truncate text-xs text-muted" title={column.samples.join(' · ')}>{column.samples.slice(0, 2).join(' · ') || '—'}</span>
                               </td>
                               <td className="px-3 py-2">
-                                <Label htmlFor={`ei-map-${column.index}`} className="sr-only">{column.header}</Label>
+                                <Label htmlFor={`ei-map-${column.index}`} className="sr-only">{column.header || t('mapping_column', { n: column.index + 1 })}</Label>
                                 <Select id={`ei-map-${column.index}`} value={selected} onChange={(event) => updateMapping(column.index, event.target.value)} className="min-w-44">
                                   <option value="">{t('mapping_ignore')}</option>
                                   {fields.map((item) => (
@@ -544,6 +567,7 @@ export function ExpenseImportWizard() {
                   {t('repeats_title')}
                 </h3>
                 <p className="text-xs leading-relaxed text-muted">{t('repeats_hint')}</p>
+                <p role="status" aria-live="polite" className="text-xs text-muted">{previewing ? t('repreviewing') : ''}</p>
                 <ul className="space-y-1.5">
                   {repeatRows.map((row) => (
                     <li key={row.row} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
@@ -556,7 +580,7 @@ export function ExpenseImportWizard() {
                         />
                         <span>{t('repeat_confirm', { row: row.row })}</span>
                       </label>
-                      <span className="num text-xs text-muted" dir="ltr">
+                      <span className="num text-xs text-muted" dir="auto">
                         {[row.date, row.amount_minor === null ? null : formatMinorRiyal(row.amount_minor), row.vendor, row.reference].filter(Boolean).join(' · ')}
                       </span>
                     </li>

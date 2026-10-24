@@ -46,7 +46,7 @@ const inspection = {
 const binding = { id: 'pv-1', hash: 'h'.repeat(64), expires_at: '2026-01-01T00:00:00Z' };
 const cleanPreview = {
   total_rows: 2, create_rows: 2, warning_rows: 0, error_rows: 0, create_amount_minor: 20000, confirmed_repeat_rows: [],
-  rows: [], rows_shown: 0, rows_truncated: false, errors: [], binding,
+  rows: [], repeat_candidates: [], rows_shown: 0, rows_truncated: false, errors: [], binding,
 };
 const repeatRow = { row: 3, action: 'error', status: 'error', valid: false, date: '2026-10-01', amount_minor: 10000, account_code: '5130', vendor: 'شركة', reference: null, confirmed_repeat: false, repeat_candidate: true, messages: ['dup'], warnings: [] };
 
@@ -110,10 +110,15 @@ describe('ExpenseImportWizard (IMP-H5-S2b)', () => {
     await user.selectOptions(screen.getByLabelText('default_account'), 'acc-exp');
     expect((screen.getByRole('button', { name: 'run_preview' }) as HTMLButtonElement).disabled).toBe(false);
 
-    await user.clear(screen.getByLabelText('default_tax'));
-    await user.type(screen.getByLabelText('default_tax'), '150');
+    for (const bad of ['150', '1e1', '5.0', ' 5', '0x10', '']) {
+      await user.clear(screen.getByLabelText('default_tax'));
+      if (bad) await user.type(screen.getByLabelText('default_tax'), bad);
+      expect((screen.getByRole('button', { name: 'run_preview' }) as HTMLButtonElement).disabled, `tax "${bad}"`).toBe(true);
+    }
     expect(screen.getByText('default_tax_invalid')).toBeTruthy();
-    expect((screen.getByRole('button', { name: 'run_preview' }) as HTMLButtonElement).disabled).toBe(true);
+    await user.clear(screen.getByLabelText('default_tax'));
+    await user.type(screen.getByLabelText('default_tax'), '0');
+    expect((screen.getByRole('button', { name: 'run_preview' }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it('applies through a preview-bound durable job freezing the policies and sends no semantic options on apply', async () => {
@@ -148,8 +153,8 @@ describe('ExpenseImportWizard (IMP-H5-S2b)', () => {
         previews += 1;
         const confirmed = options?.body?.getAll('confirmed_repeat_rows[]') ?? [];
         return Promise.resolve({ data: confirmed.length === 0
-          ? { ...cleanPreview, create_rows: 1, error_rows: 1, errors: [{ row: 3, messages: ['dup'] }], rows: [repeatRow], rows_shown: 1 }
-          : { ...cleanPreview, confirmed_repeat_rows: [3], rows: [{ ...repeatRow, action: 'create', status: 'warning', valid: true, confirmed_repeat: true, repeat_candidate: false, messages: [] }], rows_shown: 1 } });
+          ? { ...cleanPreview, create_rows: 1, error_rows: 1, errors: [{ row: 3, messages: ['dup'] }], rows: [repeatRow], repeat_candidates: [repeatRow], rows_shown: 1 }
+          : { ...cleanPreview, confirmed_repeat_rows: [3], rows: [], repeat_candidates: [{ ...repeatRow, action: 'create', status: 'warning', valid: true, confirmed_repeat: true, repeat_candidate: false, messages: [] }], rows_shown: 0 } });
       }
       if (path === '/import-jobs' && options?.method === 'POST') return Promise.resolve({ data: jobFixture() });
       if (path === '/import-jobs/job-1/apply') return Promise.resolve({ data: jobFixture({ status: 'completed', apply_result: { created: 2 } }) });
@@ -181,8 +186,8 @@ describe('ExpenseImportWizard (IMP-H5-S2b)', () => {
       if (path === '/expenses/import/inspect') return Promise.resolve({ data: inspection });
       if (path === '/expenses/import/preview') {
         return Promise.resolve({ data: options?.body?.getAll('confirmed_repeat_rows[]').length
-          ? { ...cleanPreview, confirmed_repeat_rows: [3], rows: [{ ...repeatRow, confirmed_repeat: true, repeat_candidate: false }], rows_shown: 1 }
-          : { ...cleanPreview, error_rows: 1, errors: [{ row: 3, messages: ['dup'] }], rows: [repeatRow], rows_shown: 1 } });
+          ? { ...cleanPreview, confirmed_repeat_rows: [3], repeat_candidates: [{ ...repeatRow, confirmed_repeat: true, repeat_candidate: false }] }
+          : { ...cleanPreview, error_rows: 1, errors: [{ row: 3, messages: ['dup'] }], repeat_candidates: [repeatRow] } });
       }
       return Promise.resolve({ data: {} });
     });
@@ -202,5 +207,99 @@ describe('ExpenseImportWizard (IMP-H5-S2b)', () => {
     await waitFor(() => expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(false));
     const last = api.mock.calls.filter((call) => call[0] === '/expenses/import/preview').at(-1)?.[1]?.body as FormData;
     expect(last.getAll('confirmed_repeat_rows[]')).toEqual([]);
+  });
+
+  it('shows a job-creation failure and returns to the preview instead of an empty page', async () => {
+    const { ApiError } = await import('@/lib/api');
+    const user = userEvent.setup();
+    render(<ExpenseImportWizard />);
+    await user.upload(screen.getByLabelText('step_file'), csv());
+    await waitFor(() => expect(screen.getByLabelText('كود الحساب')).toBeTruthy());
+    await user.click(screen.getByRole('button', { name: 'run_preview' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'apply' })).toBeTruthy());
+
+    api.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path === '/import-jobs' && options?.method === 'POST') return Promise.reject(new ApiError(422, 'المعاينة منتهية', null));
+      return Promise.resolve({ data: {} });
+    });
+    await user.click(screen.getByRole('button', { name: 'apply' }));
+
+    await waitFor(() => expect(screen.getAllByRole('alert').map((node) => node.textContent).join(' ')).toContain('المعاينة منتهية'));
+    expect(screen.getByRole('button', { name: 'apply' })).toBeTruthy();
+  });
+
+  it('never re-applies a stale job after the file or a rule changes: a new preview creates a new job', async () => {
+    const { ApiError } = await import('@/lib/api');
+    const user = userEvent.setup();
+    render(<ExpenseImportWizard />);
+    await user.upload(screen.getByLabelText('step_file'), csv());
+    await waitFor(() => expect(screen.getByLabelText('كود الحساب')).toBeTruthy());
+    await user.click(screen.getByRole('button', { name: 'run_preview' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'apply' })).toBeTruthy());
+
+    let creates = 0;
+    api.mockImplementation((path: string, options?: { method?: string; body?: FormData }) => {
+      if (path === '/expenses/import/preview') return Promise.resolve({ data: cleanPreview });
+      if (path === '/import-jobs' && options?.method === 'POST') { creates += 1; return Promise.resolve({ data: jobFixture({ id: `job-${creates}` }) }); }
+      if (path.startsWith('/import-jobs/job-')) return Promise.reject(new ApiError(500, 'تعذّر', null));
+      return Promise.resolve({ data: {} });
+    });
+    await user.click(screen.getByRole('button', { name: 'apply' }));
+    await waitFor(() => expect(creates).toBe(1));
+
+    await user.click(screen.getByRole('button', { name: 'step_setup' }));
+    await user.selectOptions(screen.getByLabelText('default_payment'), 'bank');
+    await user.click(screen.getByRole('button', { name: 'run_preview' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'apply' })).toBeTruthy());
+    await user.click(screen.getByRole('button', { name: 'apply' }));
+
+    await waitFor(() => expect(creates).toBe(2));
+    const second = api.mock.calls.filter((call) => call[0] === '/import-jobs' && call[1]?.method === 'POST').at(-1)?.[1]?.body as FormData;
+    expect(second.get('options[default_payment_method]')).toBe('bank');
+  });
+
+  it('lists a repeat candidate that the truncated preview rows do not contain', async () => {
+    api.mockImplementation((path: string) => {
+      if (path === '/accounts') return Promise.resolve({ data: [] });
+      if (path === '/expenses/import/inspect') return Promise.resolve({ data: inspection });
+      if (path === '/expenses/import/preview') {
+        return Promise.resolve({ data: { ...cleanPreview, error_rows: 1, errors: [{ row: 500, messages: ['dup'] }], rows: [], rows_truncated: true, rows_shown: 200, total_rows: 600, repeat_candidates: [{ ...repeatRow, row: 500 }] } });
+      }
+      return Promise.resolve({ data: {} });
+    });
+    const user = userEvent.setup();
+    render(<ExpenseImportWizard />);
+    await user.upload(screen.getByLabelText('step_file'), csv());
+    await waitFor(() => expect(screen.getByLabelText('كود الحساب')).toBeTruthy());
+    await user.click(screen.getByRole('button', { name: 'run_preview' }));
+
+    await waitFor(() => expect(screen.getByText('repeat_confirm:500')).toBeTruthy());
+  });
+
+  it('keeps the previous preview and reverts the checkbox when a confirmation re-preview fails', async () => {
+    const { ApiError } = await import('@/lib/api');
+    let calls = 0;
+    api.mockImplementation((path: string) => {
+      if (path === '/accounts') return Promise.resolve({ data: [] });
+      if (path === '/expenses/import/inspect') return Promise.resolve({ data: inspection });
+      if (path === '/expenses/import/preview') {
+        calls += 1;
+        if (calls > 1) return Promise.reject(new ApiError(500, 'تعذّرت المعاينة', null));
+        return Promise.resolve({ data: { ...cleanPreview, error_rows: 1, errors: [{ row: 3, messages: ['dup'] }], repeat_candidates: [repeatRow] } });
+      }
+      return Promise.resolve({ data: {} });
+    });
+    const user = userEvent.setup();
+    render(<ExpenseImportWizard />);
+    await user.upload(screen.getByLabelText('step_file'), csv());
+    await waitFor(() => expect(screen.getByLabelText('كود الحساب')).toBeTruthy());
+    await user.click(screen.getByRole('button', { name: 'run_preview' }));
+    await waitFor(() => expect(screen.getByRole('checkbox')).toBeTruthy());
+
+    await user.click(screen.getByRole('checkbox'));
+
+    await waitFor(() => expect(screen.getAllByRole('alert').map((node) => node.textContent).join(' ')).toContain('تعذّرت المعاينة'));
+    expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(false);
+    expect(screen.getByText('repeats_title')).toBeTruthy();
   });
 });

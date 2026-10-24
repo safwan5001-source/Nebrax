@@ -150,6 +150,10 @@ class ExpenseImportService
             'create_amount_minor' => $parsed['create_amount_minor'],
             'rows' => array_map(fn (array $row): array => $this->rowSummary($row), $rows),
             'rows_shown' => count($rows), 'rows_truncated' => count($parsed['rows']) > count($rows),
+            // كل صفٍّ مكرَّر المرشَّح أو المؤكَّد (مقيَّد بالسقف) مهما كان موضعه: قائمة المعاينة مقتطعة عند 200 صف فلا يجوز أن يغيب خيار التأكيد عن صفٍّ بعده.
+            'repeat_candidates' => array_map(fn (array $row): array => $this->rowSummary($row), array_slice(array_values(array_filter(
+                $parsed['rows'], static fn (array $row): bool => $row['confirmed'] || array_intersect(['duplicate_in_file', 'existing_expense_matches'], $row['codes'] ?? []) !== [],
+            )), 0, self::PREVIEW_ROW_LIMIT)),
             'errors' => $parsed['errors'],
         ];
 

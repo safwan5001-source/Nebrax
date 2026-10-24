@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  parseTaxRate,
   expenseImportFormData,
   expenseJobOptions,
   expenseMappingGaps,
@@ -52,5 +53,10 @@ describe('expense import contract (IMP-H5-S2b)', () => {
     expect(suggestedExpenseMapping([{ index: 0, header: 'h', samples: [], suggested_field: 'amount' }, { index: 1, header: 'x', samples: [], suggested_field: null }])).toEqual({ 0: 'amount', 1: null });
     expect(spreadsheetSafe('=SUM(A1)')).toBe("'=SUM(A1)");
     expect(spreadsheetSafe('عادي')).toBe('عادي');
+  });
+
+  it('accepts only whole Latin-digit tax rates between 0 and 100', () => {
+    for (const ok of ['0', '5', '15', '100']) expect(parseTaxRate(ok)).toBe(Number(ok));
+    for (const bad of ['', '101', '1e1', '0x10', '5.0', '5.', ' 5', '-1', '١٥', '1000']) expect(parseTaxRate(bad), bad).toBeNull();
   });
 });

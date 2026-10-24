@@ -60,6 +60,8 @@ export interface ExpenseImportPreview {
   create_amount_minor: number;
   confirmed_repeat_rows: number[];
   rows: ExpensePreviewRow[];
+  /** كل صفٍّ مكرَّر المرشَّح أو المؤكَّد مهما كان موضعه (قائمة `rows` مقتطعة). */
+  repeat_candidates: ExpensePreviewRow[];
   rows_shown: number;
   rows_truncated: boolean;
   errors: { row: number; messages: string[] }[];
@@ -144,6 +146,14 @@ export function expenseMappingGaps(
     missingReference: options.referencePolicy === 'required' && !counts.has('reference'),
     duplicate: [...counts.values()].some((count) => count > 1),
   };
+}
+
+/** نسبة الضريبة كعدد صحيح 0–100 بأرقام لاتينية فقط (لا `1e1` ولا `0x10` ولا مسافات)، كما يقبلها الخادم. */
+export function parseTaxRate(text: string): number | null {
+  if (!/^\d{1,3}$/.test(text)) return null;
+  const value = Number(text);
+
+  return value <= 100 ? value : null;
 }
 
 export function expenseFieldLabel(field: ExpenseImportField, locale: string): string {

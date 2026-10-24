@@ -1341,6 +1341,9 @@
     "result_drafts_hint": "The drafts are in the expenses list; review them, then post each one.",
     "start_another": "Import another file",
     "back_to_expenses": "Back to expenses",
+    "resumed_unbound": "This job is not bound to a preview and cannot be continued. Start the import again.",
+    "repreviewing": "Re-previewing…",
+    "mapping_column": "Column {n}",
     "demo_unavailable": "Not available in the demo.",
     "repair_download_failed": "Could not download the failed rows."
   },

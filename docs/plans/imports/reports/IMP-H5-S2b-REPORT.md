@@ -19,10 +19,25 @@ None — the UI only drives the already-merged drafts-only endpoints. No journal
 
 ## Verification
 
-- Web: new `ExpenseImportWizard.test.tsx` (5), `contract.test.ts` (5), `client.test.ts` (+1); **full web suite 700 files / 8397 tests passed**. `tsc` is clean for the touched files (pre-existing errors exist only in other test files).
+- Web: new `ExpenseImportWizard.test.tsx` (9), `contract.test.ts` (6), `client.test.ts` (+1); **full web suite 700 files / 8397 tests passed**. `tsc` is clean for the touched files (pre-existing errors exist only in other test files).
 - Backend: `ExpenseImportTest` + `H5ImportEndpointsTest` 56 passed (SQLite).
 - Local `next build` cannot run here (Google Fonts fetch is blocked in the sandbox — unrelated to this change); the Web CI build is the authority.
 - No screenshots were taken (no browser session against a seeded tenant in this environment); the UI is verified by component tests only. This is a disclosed limit, not a claim of visual verification.
+
+## Independent review dispositions (subagent; Codex not claimed)
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | Job-creation failure (expired binding, rejected option, network) left an empty page | **Fixed** — the error is shown and the wizard returns to the preview; test added |
+| 2 | A stale `engine.job` survived a file/rule change and was re-applied instead of the new preview | **Fixed** — any change of file, rule, mapping or a new preview drops the job (it stays on the server, resumable by URL); test with mutation control |
+| 3 | Repeat candidates beyond the 200 truncated preview rows could not be confirmed | **Fixed** — server returns `repeat_candidates` independent of truncation (cap 200, PHP test with 207 rows); UI lists from it |
+| 4 | Resumed job that is not preview-bound would freeze page defaults | **Fixed** — apply blocked with a message (unreachable for this PREVIEW_BOUND_ONLY domain, kept as a guard) |
+| 5 | Tax input accepted `1e1`, `0x10`, `5.` | **Fixed** — `parseTaxRate` (`^\d{1,3}$`, ≤100) |
+| 6 | Failed confirmation re-preview left a blank step | **Fixed** — previous preview kept, checkbox reverted, error shown; aria-live status while re-previewing |
+| 7 | a11y: unnamed select for an empty header; `dir="ltr"` around Arabic vendor text | **Fixed** — fallback label «Column n»; `dir="auto"` |
+| 8 | Inspect failure leaves auto-mapping | Accepted (server auto-maps; the server still validates) |
+
+The Partner wizard shares findings 1–2; they are logged as follow-up **IMP-WIZARD-STATE-01** (not widened here).
 
 ## Not in scope / next
 

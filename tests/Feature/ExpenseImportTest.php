@@ -360,6 +360,7 @@ class ExpenseImportTest extends TestCase
         $preview = $this->preview([$this->row(['reference' => 'A']), $this->row(['reference' => 'B'])]);
         $this->assertSame(1, $preview['error_rows']);
         $this->assertSame([false, true], array_column($preview['rows'], 'repeat_candidate'), 'الواجهة تعرض خيار التأكيد للصف المكرَّر وحده.');
+        $this->assertSame([3], array_column($preview['repeat_candidates'], 'row'));
     }
 
     /** @test */
@@ -519,6 +520,25 @@ class ExpenseImportTest extends TestCase
         $preview = $this->service()->preview(UploadedFile::fake()->createWithContent('w.csv', $csv), []);
 
         $this->assertSame(1, $preview['error_rows']);
+    }
+
+    /** @test */
+    public function repeat_candidates_are_listed_even_beyond_the_truncated_preview_rows(): void
+    {
+        $rows = [];
+        for ($i = 1; $i <= 205; $i++) {
+            $rows[] = $this->row(['amount' => (string) $i, 'vendor_name' => 'مورد '.$i]);
+        }
+        $rows[] = $this->row(['amount' => '7', 'vendor_name' => 'مورد 7']);   // الصف 207: تكرار للصف 8
+
+        $preview = $this->preview($rows);
+
+        $this->assertTrue($preview['rows_truncated']);
+        $this->assertSame([207], array_column($preview['repeat_candidates'], 'row'));
+        $this->assertNotContains(207, array_column($preview['rows'], 'row'));
+        $confirmed = $this->preview($rows, ['confirmed_repeat_rows' => [207]]);
+        $this->assertSame([207], array_column($confirmed['repeat_candidates'], 'row'));
+        $this->assertTrue($confirmed['repeat_candidates'][0]['confirmed_repeat']);
     }
 
     /** @test */
