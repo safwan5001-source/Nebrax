@@ -14,6 +14,9 @@ use App\Services\Accounting\AccountingDateGuard;
 use App\Services\Accounting\AccountingPeriodLockedException;
 use App\Services\Accounting\FiscalYearClosedException;
 use App\Services\Accounting\PaymentService;
+use App\Services\Commerce\CommerceOrderPostingService;
+use App\Support\CommerceInvoiceOnPayment;
+use App\Models\CommercePaymentIntent;
 use App\Support\PaymentOrchestrationException;
 use App\Support\Rbac;
 use App\Tenancy\TenantContext;
@@ -44,6 +47,8 @@ final class PaymentAttemptPostingService
 
     public const OUTCOME_SKIPPED = 'skipped';
 
+    public const OUTCOME_NOT_POSTABLE = 'not_postable';
+
     private const ACCOUNTING_TIMEZONE = 'Asia/Riyadh';
 
     /** أسباب مراجعة تمنع الترحيل التلقائي (M6 + تعارض الحالة). */
@@ -57,12 +62,14 @@ final class PaymentAttemptPostingService
         private readonly PaymentService $payments,
         private readonly AccountingDateGuard $dateGuard,
         private readonly TenantContext $tenant,
+        private readonly CommerceOrderPostingService $commerce,
     ) {}
 
     /** يعالج الـPayable هذه الخدمة؟ */
     public static function handles(string $payableKey): bool
     {
-        return str_starts_with($payableKey, InvoicePaymentRequest::PAYABLE_TYPE.':');
+        return str_starts_with($payableKey, InvoicePaymentRequest::PAYABLE_TYPE.':')
+            || CommerceOrderPostingService::handles($payableKey);
     }
 
     /**
@@ -134,7 +141,18 @@ final class PaymentAttemptPostingService
         $query = PaymentAttempt::query()->withoutGlobalScopes()
             ->where('capture_status', PaymentAttempt::STATUS_CAPTURED)
             ->where('posting_status', PaymentAttempt::POSTING_PENDING)
-            ->where('payable_key', 'like', InvoicePaymentRequest::PAYABLE_TYPE.':%');
+            ->where(function ($q): void {
+                $q->where('payable_key', 'like', InvoicePaymentRequest::PAYABLE_TYPE.':%');
+                // H4-03: التقاط طلب متجر يدخل الدفعة فقط حين البوابة مفتوحة ونيته مدفوعة وطلبه بطرف (وإلا لا يسدّ الدفعة الأقدم الأحدث).
+                if (CommerceInvoiceOnPayment::gateOpen()) {
+                    $q->orWhere(fn ($c) => $c->where('payable_key', 'like', CommercePaymentIntent::PAYABLE_TYPE.':%')
+                        ->whereExists(fn ($e) => $e->selectRaw('1')->from('commerce_payment_intents as i')
+                            ->join('commerce_orders as o', 'o.id', '=', 'i.commerce_order_id')
+                            ->whereRaw("payment_attempts.payable_key = 'commerce_payment_intent:' || i.id")
+                            ->where('i.status', CommercePaymentIntent::STATUS_PAID)
+                            ->whereNotNull('o.partner_id')));
+                }
+            });
         foreach (self::HOLDING_REASONS as $reason) {
             $query->where(fn ($q) => $q->whereNull('review_reasons')
                 ->orWhereRaw('CAST(review_reasons AS TEXT) NOT LIKE ?', ['%"'.$reason.'"%']));
@@ -182,6 +200,10 @@ final class PaymentAttemptPostingService
         }
         if (array_intersect(self::HOLDING_REASONS, $locked->review_reasons ?? []) !== []) {
             return self::OUTCOME_HELD;
+        }
+
+        if (CommerceOrderPostingService::handles((string) $locked->payable_key)) {
+            return $this->postCommerce($locked);
         }
 
         $requestId = substr((string) $locked->payable_key, strlen(InvoicePaymentRequest::PAYABLE_TYPE) + 1);
@@ -243,6 +265,48 @@ final class PaymentAttemptPostingService
         }
 
         return self::OUTCOME_POSTED;
+    }
+
+    /**
+     * H4-03 / D-13: التقاط طلب متجر ⇒ فاتورة + سند A1 عبر جسر منفصل (`CommerceOrderPostingService`). الفترة المقفلة تخرج كاستثناء فيتراجع كل شيء
+     * ويُسجَّل الحجب في `process()`؛ رفض العمل يُسجَّل `not_postable` برمز ثابت (مراجعة بشرية) دون إعادة محاولة تلقائية.
+     *
+     * @return self::OUTCOME_*
+     */
+    private function postCommerce(PaymentAttempt $locked): string
+    {
+        $date = $locked->accounting_date?->toDateString()
+            ?? $locked->captured_at->copy()->setTimezone(self::ACCOUNTING_TIMEZONE)->toDateString();
+        $this->dateGuard->assertOpen($date, 'ترحيل التقاط طلب متجر إلكتروني');
+
+        [$outcome, $reason] = $this->commerce->post($locked, $date);
+
+        if ($outcome === CommerceOrderPostingService::OUTCOME_POSTED) {
+            $locked->forceFill(array_filter([
+                'posting_status' => PaymentAttempt::POSTING_POSTED,
+                'posting_blocked_reason' => null,
+                'accounting_date' => $locked->accounting_date === null ? $date : null,
+                'posted_at' => $locked->posted_at === null ? now('UTC') : null,
+            ], fn ($v, $k) => $v !== null || $k === 'posting_blocked_reason', ARRAY_FILTER_USE_BOTH))->save();
+
+            return self::OUTCOME_POSTED;
+        }
+        if ($outcome === CommerceOrderPostingService::OUTCOME_ALREADY_POSTED) {
+            $locked->forceFill(['posting_status' => PaymentAttempt::POSTING_POSTED])->save();
+
+            return self::OUTCOME_ALREADY_POSTED;
+        }
+        if ($outcome === CommerceOrderPostingService::OUTCOME_NOT_POSTABLE) {
+            $locked->forceFill([
+                'posting_status' => PaymentAttempt::POSTING_NOT_POSTABLE,
+                'posting_blocked_reason' => ['kind' => 'commerce', 'reason' => $reason],
+                'accounting_date' => $locked->accounting_date ?? $date,
+            ])->save();
+
+            return self::OUTCOME_NOT_POSTABLE;
+        }
+
+        return self::OUTCOME_SKIPPED;
     }
 
     /** سند قبض مرتبط ببوابة (قيد: مدين 1170 / دائن 1130 + الطرف) — مخصّص بالفاتورة أو غير مخصص. */

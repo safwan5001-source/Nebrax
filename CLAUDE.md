@@ -351,6 +351,16 @@ php artisan serve
 - **استهلاك الحجز عند الدفع الناجح = H4-03** (داخل معاملة الإصدار)، لا هنا.
 - المرجع: `docs/plans/payments/horizon/AWJ-PAY-H4-02-IMPLEMENTATION-REPORT.md`.
 
+
+## فاتورة وقيود طلب المتجر عند الدفع — PAY-H4-03 (D-13 المعتمد، مغلق خلف EXT-05)
+
+التقاط مؤكَّد لنية `online` ⇒ فاتورة مبيعات + سند قبض بوابة، **فقط حين تتحقق الشروط الثلاثة معاً** (`CommerceInvoiceOnPayment::active()`): (1) بوابة النشر `payments.commerce_invoice_on_payment.enabled` **مع مرجع الرأي الضريبي** `tax_opinion_ref` (EXT-05) غير فارغ — إزالته تعيد الإغلاق؛ (2) سياسة المستأجر `sales.commerce_invoice_trigger = on_payment_confirmed` (الافتراضي `none`؛ يرفضها `PUT /sales-settings` بـ422 ما دامت البوابة مغلقة)؛ (3) `sales.commerce_price_tax_mode = inclusive` (غير المحدد مغلق؛ النمط الحصري غير مدعوم لأن المحصَّل = إجمالي الطلب بلا ضريبة). **لا ترحيل رجعي** لالتقاط حدث قبل فتحها.
+- **المنسّق:** `PaymentAttemptPostingService` (نفس آلية الحجب بالفترة/`repost`/`runPending`/الأحداث) يفوّض الالتقاط ذا `payable_key = commerce_payment_intent:*` إلى `CommerceOrderPostingService` (ملف منفصل؛ المنسّق ممنوع أن يذكر `InvoiceService` — يحرسه `PaymentAttemptPostingTest`). الترحيل **بعد** تثبيت النية مدفوعة: المستمع `CompleteCommerceOnlinePayment` ثم شبكة الأمان `payments:post-captured`؛ لا يدخل الدفعة إلا التقاط نيته مدفوعة وطلبه بطرف (لا انسداد).
+- **القيود الناتجة (كلها عبر الخدمات القائمة):** فاتورة `InvoiceService::create/post` (آجلة غير مسدَّدة، `tax_inclusive`، ZATCA مبسّطة، التاريخ = يوم الالتقاط بتوقيت الرياض): **مدين 1130 العملاء = الإجمالي / دائن 4110 الإيراد (صافي) + دائن 2120 ضريبة المخرجات (15%)**، ومعها **مدين 5110 تكلفة البضاعة / دائن 1140 المخزون** وحركة مخزون خارجة للمنتج المتتبَّع؛ ثم سند `PaymentService` **مدين 1170 تسوية البوابة / دائن 1130 العملاء** مخصَّص للفاتورة بكامل الالتقاط (الفاتورة تصير مسدَّدة). الشحن: صافٍ = round(D/1.15) + ضريبة 15% والفرق التقريبي بالهللة في `adjustment`، فإجمالي الفاتورة = المدفوع حرفياً وإلا `invoice_total_mismatch` ⇒ لا ترحيل.
+- **الاستهلاك:** الحجز (H4-02) يُستهلك (`consume`) في المعاملة نفسها؛ **الإخراج والـCOGS هنا فقط لا عند الحجز**. مِرساة `commerce_order_postings` (طلب ↔ فاتورة ↔ سند ↔ محاولة، كلٌّ فريد في القاعدة) + صف `payment_attempt_postings`.
+- **الرفض:** فترة/سنة مقفلة ⇒ تراجع كامل و`blocked_period` (التاريخ الأصلي لا يتغير؛ إعادة صريحة `repost` بعد الفتح). رفض عمل (معدل ضريبة غير 15%، مبلغ لا يطابق، طرف معطَّل، لا مخزن تنفيذ، فشل ترحيل الفاتورة) ⇒ `not_postable` برمز في `posting_blocked_reason` والدفع يبقى مثبَّتاً والحجز قائماً للمراجعة البشرية. نية ملغاة + التقاط متأخر ⇒ لا ترحيل (D-15).
+- **خارج النطاق:** استرداد بوابة لطلب متجر (`PaymentRefundService::partnerIdOf` يردّ `not_refundable` كما كان)، تصنيف ضريبي غير 15% (EXT-05/REM-12)، `/commerce/v1`، رسوم البوابة. المرجع: `docs/plans/payments/horizon/AWJ-PAY-H4-03-IMPLEMENTATION-REPORT.md`.
+
 ## أدوار ضريبة القيمة المضافة (REM-05 / ACC-01)
 
 `App\Services\Accounting\VatRoleIntegrityService` هو مصدر قواعد دورَي `tax_input`/`tax_output` وسياق تقرير الضريبة. لا يكتب شيئاً.

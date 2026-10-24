@@ -161,13 +161,19 @@ final class PaymentOrchestrator
                 if (str_starts_with((string) $locked->payable_key, InvoicePaymentRequest::PAYABLE_TYPE.':')) {
                     $updates['posting_status'] = PaymentAttempt::POSTING_PENDING;
                 }
+                // PAY-H4-03: التقاط طلب متجر ينتظر الترحيل **فقط** حين بوابة الفاتورة عند الدفع + سياسة المستأجر مفعَّلتان (وإلا فارغ كما في 04a).
+                // الترحيل يبدأ بعد تثبيت النية مدفوعة (المستمع `CompleteCommerceOnlinePayment`) أو بالمطابِق الدوري.
+                if (str_starts_with((string) $locked->payable_key, CommercePaymentIntent::PAYABLE_TYPE.':') && \App\Support\CommerceInvoiceOnPayment::active()) {
+                    $updates['posting_status'] = PaymentAttempt::POSTING_PENDING;
+                }
                 if ($reasons !== []) {
                     $updates['review_reasons'] = $this->withReasons($locked, $reasons);
                 }
             }
             $locked->forceFill($updates)->save();
 
-            if (($updates['posting_status'] ?? null) === PaymentAttempt::POSTING_PENDING) {
+            if (($updates['posting_status'] ?? null) === PaymentAttempt::POSTING_PENDING
+                && ! str_starts_with((string) $locked->payable_key, CommercePaymentIntent::PAYABLE_TYPE.':')) {
                 $tenantId = (string) $locked->tenant_id;
                 $attemptId = (string) $locked->getKey();
                 DB::afterCommit(fn () => event(new PaymentAttemptCaptured($tenantId, $attemptId)));
