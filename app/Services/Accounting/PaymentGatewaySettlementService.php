@@ -10,6 +10,8 @@ use App\Models\PaymentGatewaySettlementItem;
 use App\Models\PaymentGatewaySettlementLine;
 use App\Models\PaymentRefund;
 use App\Models\User;
+use App\Models\PaymentGatewayAdjustment;
+use App\Services\PaymentGatewayAdjustmentService;
 use App\Services\PaymentsRolloutControlService;
 use App\Tenancy\TenantContext;
 use DomainException;
@@ -24,6 +26,7 @@ final class PaymentGatewaySettlementService
         private readonly AccountRoleResolver $accountRoles,
         private readonly CashBankAccountService $cashBankAccounts,
         private readonly PaymentsRolloutControlService $rollout,
+        private readonly PaymentGatewayAdjustmentService $adjustments,
     ) {
     }
 
@@ -52,11 +55,16 @@ final class PaymentGatewaySettlementService
         $date = (string) ($input['settlement_date'] ?? now()->toDateString());
         $itemsInput = $input['items'] ?? [];
         $refundsInput = $input['refunds'] ?? [];
+        $adjustmentsInput = $input['adjustments'] ?? [];
 
         if ($gatewayId === '' || $cashBankId === '' || $ref === '') {
             throw new DomainException('Gateway settlement requires a gateway, bank destination, and provider reference.');
         }
-        if (! is_array($itemsInput) || $itemsInput === []) {
+        if (! is_array($itemsInput) || ! is_array($adjustmentsInput)) {
+            throw new DomainException('Settlement items and adjustments must be lists.');
+        }
+        // تسوية بلا تحصيل (gross = 0) مسموحة **فقط** بتعديل معتمد بدليل (إفراج احتياطي/تعديل دائن، ADR-0008 §9)؛ غير ذلك لا بد من تحصيل واحد على الأقل.
+        if ($itemsInput === [] && $adjustmentsInput === []) {
             throw new DomainException('Gateway settlement requires at least one matched payment.');
         }
         if (! is_array($refundsInput)) {
@@ -69,16 +77,11 @@ final class PaymentGatewaySettlementService
         $deductions = $this->money($input['provider_deductions'] ?? 0, 'provider deductions');
         $credits = $this->money($input['provider_credits'] ?? 0, 'provider credits');
 
-        if ($feeTax > 0) {
-            throw new DomainException(
-                'Provider fee tax posting is not authorized until an approved input-tax routing policy exists. Pass provider_fee_tax=0 or stop for a tax decision.'
-            );
-        }
-
+        $feeTaxInvoiceRef = trim((string) ($input['fee_tax_invoice_ref'] ?? ''));
         $this->assertUnsupportedAdjustmentsAreZero($deductions, $credits);
 
         return DB::transaction(function () use (
-            $tenantId, $gatewayId, $cashBankId, $ref, $date, $itemsInput, $refundsInput,
+            $tenantId, $gatewayId, $cashBankId, $ref, $date, $itemsInput, $refundsInput, $adjustmentsInput, $feeTaxInvoiceRef,
             $net, $feeExTax, $feeTax, $deductions, $credits, $input, $actor, $allowUnreconciled
         ) {
             // ترتيب الأقفال: البوابة ← صفوف السندات ← صفوف الاستردادات ← مِرساة المستأجر (داخل LedgerService).
@@ -95,8 +98,11 @@ final class PaymentGatewaySettlementService
                 ->first();
 
             if ($existing !== null && $existing->isPosted()) {
-                return $this->replayOrReject($existing, $net, $feeExTax, $feeTax, $deductions, $credits, $itemsInput, $refundsInput);
+                return $this->replayOrReject($existing, $net, $feeExTax, $feeTax, $deductions, $credits, $itemsInput, $refundsInput, $adjustmentsInput, $feeTaxInvoiceRef);
             }
+
+            // D-04 (ب): ضريبة رسوم > 0 لا تُرحَّل إلا بسياسة `input_vat` على الاتصال **و**مرجع الرأي الضريبي (EXT-05) مسجَّلاً **و**مرجع فاتورة المزوّد الضريبية.
+            $this->assertFeeTaxAllowed($gateway, $feeTax, $feeTaxInvoiceRef, $ref);
 
             // تفعيل المدفوعات الإلكترونية لهذه المؤسسة شرط للتسجيل الجديد (record)؛ الإيقاف الطارئ للمنصة لا يمنع تسوية مال وصل فعلاً (كترحيل A5)،
             // والتكرار الآمن لمرحَّلة قائمة يُعاد دائماً (idempotent) ولو عُطّلت المؤسسة بعدها.
@@ -136,8 +142,18 @@ final class PaymentGatewaySettlementService
             foreach ($normalizedRefunds as $line) {
                 $refundsTotal += $line['amount'];
             }
+            $normalizedAdjustments = $this->normalizeAdjustments($tenantId, (string) $gateway->id, $currency, $adjustmentsInput);
+            [$adjDeductions, $adjCredits] = $this->adjustmentTotals($normalizedAdjustments);
+            $reserveAccount = $this->resolveAdjustmentRole($normalizedAdjustments, ['reserve_hold', 'reserve_release'], 'gateway_reserve', $tenantId);
+            $adjustmentAccount = $this->resolveAdjustmentRole($normalizedAdjustments, ['adjustment_debit', 'adjustment_credit'], 'provider_adjustment', $tenantId);
 
-            $difference = $this->assertReconcilable($gross, $refundsTotal, $net, $feeExTax, $feeTax, $deductions, $credits, $allowUnreconciled);
+            $feeTaxAccount = null;
+            if ($feeTax > 0) {
+                $feeTaxAccount = $this->accountRoles->resolve('tax_input');
+                $this->assertSameTenant($tenantId, (string) $feeTaxAccount->tenant_id, 'Input VAT account');
+            }
+
+            $difference = $this->assertReconcilable($gross, $refundsTotal, $net, $feeExTax, $feeTax, $adjDeductions, $adjCredits, $allowUnreconciled, $normalizedAdjustments !== []);
 
             $header = [
                 'payment_gateway_id' => $gateway->id,
@@ -148,9 +164,10 @@ final class PaymentGatewaySettlementService
                 'net_bank_amount' => $net,
                 'provider_fee_ex_tax' => $feeExTax,
                 'provider_fee_tax' => $feeTax,
-                'provider_deductions' => $deductions,
-                'provider_credits' => $credits,
+                'provider_deductions' => $adjDeductions,   // مشتقّة من مستندات التعديل المعتمدة لا مُدخَلة
+                'provider_credits' => $adjCredits,
                 'refunds_total' => $refundsTotal,
+                'fee_tax_invoice_ref' => $feeTax > 0 ? $feeTaxInvoiceRef : null,
                 'currency' => $currency,
                 'gateway_provider' => $gateway->provider,
                 'gateway_name' => $gateway->name,
@@ -162,12 +179,12 @@ final class PaymentGatewaySettlementService
             if ($difference !== 0) {
                 // D-21: تُحفظ بفرقها وبلا قيد؛ لا تستهلك بنودها (الاستهلاك للمرحَّلة فقط).
                 $settlement = $this->persistDraft($existing, $header + ['unreconciled_minor' => $difference, 'created_by' => $input['created_by'] ?? $actor?->id], $tenantId);
-                $this->replaceChildren($settlement, $tenantId, $normalizedItems, $normalizedRefunds);
+                $this->replaceChildren($settlement, $tenantId, $normalizedItems, $normalizedRefunds, $normalizedAdjustments);
 
                 return $settlement->fresh(['items', 'lines']);
             }
 
-            $lines = $this->settlementLines($cashEntity->account_id, $feeAccount->id, $clearing->id, $net, $feeExTax, $gross, $normalizedRefunds);
+            $lines = $this->settlementLines($cashEntity->account_id, $feeAccount->id, $clearing->id, $net, $feeExTax, $gross, $normalizedRefunds, $normalizedAdjustments, $reserveAccount?->id, $adjustmentAccount?->id, $feeTax, $feeTaxAccount?->id);
 
             if ($existing !== null) {
                 // مسودة `unreconciled`: تُحفظ الترويسة المصحَّحة أولاً (تعتمد عليها مُشغّلات البنود، كالعملة) بلا مساس بالحالة
@@ -181,7 +198,7 @@ final class PaymentGatewaySettlementService
                     'created_by' => $input['created_by'] ?? $actor?->id,
                 ]);
             }
-            $this->replaceChildren($settlement, $tenantId, $normalizedItems, $normalizedRefunds);
+            $this->replaceChildren($settlement, $tenantId, $normalizedItems, $normalizedRefunds, $normalizedAdjustments);
 
             $entry = $this->ledger->post($lines, [
                 'entry_date' => $date,
@@ -197,6 +214,11 @@ final class PaymentGatewaySettlementService
                 'journal_entry_id' => $entry->id,
                 'posted_at' => now(),
             ])->save();
+
+            // التعديلات المعتمدة تُستهلك مرة واحدة بهذه التسوية المرحَّلة (حدث تدقيق لكلٍّ منها)؛ القاعدة تمنع الترحيل لو لم يعد أحدها معتمداً.
+            foreach ($normalizedAdjustments as $adjustment) {
+                $this->adjustments->consume($adjustment['model'], $settlement, $actor);
+            }
 
             return $settlement->fresh(['items', 'lines', 'journalEntry.lines']);
         });
@@ -215,7 +237,7 @@ final class PaymentGatewaySettlementService
     }
 
     /** يستبدل بنود التحصيل والاسترداد (آمن: التسوية غير مرحَّلة بعد، ولا قيد). */
-    private function replaceChildren(PaymentGatewaySettlement $settlement, string $tenantId, array $items, array $refunds): void
+    private function replaceChildren(PaymentGatewaySettlement $settlement, string $tenantId, array $items, array $refunds, array $adjustments = []): void
     {
         PaymentGatewaySettlementItem::query()->where('settlement_id', $settlement->id)->delete();
         PaymentGatewaySettlementLine::query()->where('settlement_id', $settlement->id)->delete();
@@ -239,6 +261,100 @@ final class PaymentGatewaySettlementService
                 'provider_event_ref' => $line['provider_event_ref'],
             ]);
         }
+        foreach ($adjustments as $adjustment) {
+            PaymentGatewaySettlementLine::create([
+                'tenant_id' => $tenantId,
+                'settlement_id' => $settlement->id,
+                'line_type' => $adjustment['kind'],
+                'adjustment_id' => $adjustment['id'],
+                'amount_minor' => $adjustment['amount'],
+                'provider_event_ref' => $adjustment['provider_event_ref'],
+                'evidence_ref' => $adjustment['evidence_ref'],
+                'reason' => $adjustment['reason'],
+            ]);
+        }
+    }
+
+    /**
+     * مستندات التعديل (D-22): معتمدة وغير مستهلَكة، لنفس المستأجر والبوابة والعملة؛ المبلغ والنوع من المستند لا من الطلب.
+     * إفراج الاحتياطي في هذه التسوية لا يتجاوز الاحتياطي المحتجز فعلاً (بنود مرحَّلة).
+     *
+     * @return list<array{id: string, model: PaymentGatewayAdjustment, kind: string, amount: int, provider_event_ref: ?string, evidence_ref: string, reason: string}>
+     */
+    private function normalizeAdjustments(string $tenantId, string $gatewayId, string $currency, array $adjustmentsInput, bool $lock = true): array
+    {
+        $normalized = [];
+        $seen = [];
+        $releases = 0;
+
+        foreach ($adjustmentsInput as $raw) {
+            $id = strtolower((string) ($raw['adjustment_id'] ?? ''));
+            if ($id === '') {
+                throw new DomainException('Each settlement adjustment line requires an adjustment document.');
+            }
+            if (isset($seen[$id])) {
+                throw new DomainException('An adjustment cannot appear twice in the same settlement.');
+            }
+            $seen[$id] = true;
+
+            $query = PaymentGatewayAdjustment::query()->whereKey($id);
+            $model = ($lock ? $query->lockForUpdate() : $query)->first();
+            if ($model === null) {
+                throw new DomainException('Settlement adjustment must belong to the active tenant.');
+            }
+            $this->assertSameTenant($tenantId, (string) $model->tenant_id, 'Adjustment');
+            if ((string) $model->payment_gateway_id !== $gatewayId) {
+                throw new DomainException('Settlement adjustment must reference the same gateway.');
+            }
+            if ($model->status !== PaymentGatewayAdjustment::APPROVED) {
+                throw new DomainException("adjustment_not_approved: only approved, unconsumed adjustments can be settled (status {$model->status}).");
+            }
+            if ((string) $model->currency !== $currency) {
+                throw new DomainException('Settlement adjustment currency must match the settlement currency.');
+            }
+            if ($model->kind === PaymentGatewayAdjustment::KIND_RESERVE_RELEASE) {
+                $releases += (int) $model->amount_minor;
+            }
+
+            $normalized[] = [
+                'id' => (string) $model->id, 'model' => $model, 'kind' => (string) $model->kind, 'amount' => (int) $model->amount_minor,
+                'provider_event_ref' => $model->provider_event_ref, 'evidence_ref' => (string) $model->evidence_ref, 'reason' => (string) $model->reason,
+            ];
+        }
+
+        if ($releases > 0 && $releases > $this->adjustments->reserveBalance($gatewayId)) {
+            throw new DomainException('reserve_insufficient: reserve release exceeds the reserve held by this gateway.');
+        }
+
+        return $normalized;
+    }
+
+    /** @return array{0: int, 1: int} [Σ ما يخصمه المزوّد من الصرف، Σ ما يضيفه] */
+    private function adjustmentTotals(array $adjustments): array
+    {
+        $deductions = 0;
+        $credits = 0;
+        foreach ($adjustments as $adjustment) {
+            if (PaymentGatewayAdjustment::BANK_SIGN[$adjustment['kind']] < 0) {
+                $deductions += $adjustment['amount'];
+            } else {
+                $credits += $adjustment['amount'];
+            }
+        }
+
+        return [$deductions, $credits];
+    }
+
+    /** يحلّ دور حساب التعديل **فقط** إن وُجد بند من نوعه (فشل مغلق عند غياب التعيين)؛ غير ذلك لا يلزم. */
+    private function resolveAdjustmentRole(array $adjustments, array $kinds, string $roleKey, string $tenantId): ?\App\Models\Account
+    {
+        if (! collect($adjustments)->contains(fn ($a) => in_array($a['kind'], $kinds, true))) {
+            return null;
+        }
+        $account = $this->accountRoles->resolve($roleKey);
+        $this->assertSameTenant($tenantId, (string) $account->tenant_id, $roleKey.' account');
+
+        return $account;
     }
 
     /**
@@ -326,6 +442,10 @@ final class PaymentGatewaySettlementService
         $refundsTotal = 0;
         $itemsInput = $input['items'] ?? [];
         $refundsInput = $input['refunds'] ?? [];
+        $adjustmentsInput = is_array($input['adjustments'] ?? []) ? ($input['adjustments'] ?? []) : [];
+        $adjDeductions = 0;
+        $adjCredits = 0;
+        $hasAdjustments = $adjustmentsInput !== [];
         $tenantCurrency = (string) (\App\Models\Tenant::query()->whereKey($tenantId)->value('currency') ?: 'SAR');
         $currency = (string) ($input['currency'] ?? $tenantCurrency);
         if (! $replay && $currency !== $tenantCurrency) {
@@ -335,18 +455,22 @@ final class PaymentGatewaySettlementService
             $block('rollout_disabled', 'Online payments are not enabled for this tenant.');
         }
 
-        if (! is_array($itemsInput) || $itemsInput === []) {
+        $itemsList = is_array($itemsInput) ? $itemsInput : [];
+        if ($itemsList === [] && ! $hasAdjustments) {
             $block('items_required', 'Gateway settlement requires at least one matched payment.');
         } elseif ($replay) {
             // تكرار آمن بالمبالغ والبنود نفسها أو تعارض؛ تُتجاوز أهلية البنود الجديدة كما في post().
+            // الاستقطاعات/الاعتمادات المشتقّة من التعديلات تُقرأ من الترويسة المخزَّنة (ثابتة بعد الترحيل) فتتطابق المعادلة.
+            $adjDeductions = (int) $existing->provider_deductions;
+            $adjCredits = (int) $existing->provider_credits;
             try {
-                foreach ($itemsInput as $raw) {
+                foreach ($itemsList as $raw) {
                     $gross += $this->money($raw['gross_amount'] ?? null, 'item gross');
                 }
                 foreach ((is_array($refundsInput) ? $refundsInput : []) as $raw) {
                     $refundsTotal += $this->money($raw['amount_minor'] ?? null, 'refund amount');
                 }
-                if (! $this->replayMatches($existing, $net, $feeExTax, $feeTax, $deductions, $credits, $itemsInput, is_array($refundsInput) ? $refundsInput : [])) {
+                if (! $this->replayMatches($existing, $net, $feeExTax, $feeTax, $deductions, $credits, $itemsList, is_array($refundsInput) ? $refundsInput : [], $adjustmentsInput, trim((string) ($input['fee_tax_invoice_ref'] ?? '')))) {
                     $block('reference_conflict', 'Provider settlement reference already posted with different amounts.');
                 }
             } catch (DomainException $e) {
@@ -354,11 +478,26 @@ final class PaymentGatewaySettlementService
             }
         } elseif ($gateway !== null) {
             try {
-                foreach ($this->normalizeItems($tenantId, (string) $gateway->id, $itemsInput, false) as $item) {
+                foreach ($itemsList === [] ? [] : $this->normalizeItems($tenantId, (string) $gateway->id, $itemsList, false) as $item) {
                     $gross += $item['gross_amount'];
                 }
             } catch (DomainException $e) {
                 $block('invalid_items', $e->getMessage());
+            }
+            try {
+                $normalizedAdjustments = $this->normalizeAdjustments($tenantId, (string) $gateway->id, $currency, $adjustmentsInput, false);
+                [$adjDeductions, $adjCredits] = $this->adjustmentTotals($normalizedAdjustments);
+                foreach ([['reserve_hold', 'reserve_release', 'gateway_reserve'], ['adjustment_debit', 'adjustment_credit', 'provider_adjustment']] as [$k1, $k2, $role]) {
+                    if (collect($normalizedAdjustments)->contains(fn ($a) => in_array($a['kind'], [$k1, $k2], true))) {
+                        try {
+                            $this->accountRoles->resolve($role);
+                        } catch (RuntimeException $e) {
+                            $block('role_unmapped', $e->getMessage());
+                        }
+                    }
+                }
+            } catch (DomainException $e) {
+                $block('invalid_adjustments', $e->getMessage());
             }
             if (! is_array($refundsInput)) {
                 $block('invalid_refunds', 'Settlement refunds must be a list.');
@@ -373,7 +512,18 @@ final class PaymentGatewaySettlementService
             }
         }
 
-        if ($feeTax > 0) {
+        if ($feeTax > 0 && ! $replay && $gateway !== null) {
+            $taxBlocker = $this->feeTaxBlocker($gateway, trim((string) ($input['fee_tax_invoice_ref'] ?? '')), trim((string) ($input['provider_settlement_ref'] ?? '')));
+            if ($taxBlocker !== null) {
+                $block($taxBlocker['code'], $taxBlocker['message']);
+            } else {
+                try {
+                    $this->accountRoles->resolve('tax_input');
+                } catch (RuntimeException $e) {
+                    $block('role_unmapped', $e->getMessage());
+                }
+            }
+        } elseif ($feeTax > 0 && $gateway === null) {
             $block('fee_tax_not_authorized', 'Provider fee tax posting is not authorized until an approved input-tax routing policy exists.');
         }
         if ($deductions > 0) {
@@ -383,16 +533,20 @@ final class PaymentGatewaySettlementService
             $block('credits_unsupported', 'Unsupported provider credits cannot be posted.');
         }
 
-        $known = ! in_array(true, array_map(fn ($b) => in_array($b['code'], ['invalid_items', 'invalid_refunds', 'items_required', 'gateway_not_found', 'invalid_amount'], true), $blockers), true);
-        $expectedNet = $gross - $refundsTotal - $feeExTax - $feeTax - $deductions + $credits;
+        $known = ! in_array(true, array_map(fn ($b) => in_array($b['code'], ['invalid_items', 'invalid_refunds', 'invalid_adjustments', 'items_required', 'gateway_not_found', 'invalid_amount'], true), $blockers), true);
+        $expectedNet = $gross - $refundsTotal - $feeExTax - $feeTax - $adjDeductions + $adjCredits;
+        $hasBasis = $gross > 0 || $hasAdjustments;
         $difference = $known ? $expectedNet - $net : null;
         if ($known && $expectedNet < 0) {
             $block('negative_net_unsupported', 'Refunds and deductions exceed collections; the refund stays open until a later settlement covers it.');
-        } elseif ($difference !== null && $gross > 0 && $difference !== 0 && ! $replay) {
+        } elseif ($known && ! $replay && $gross <= 0 && $net <= 0 && $difference === 0 && $hasAdjustments) {
+            // نفس رفض الكتابة: تسوية بلا تحصيل يجب أن تنقل مالاً إلى البنك (لا قيد بتعديلات متقابلة بصافٍ صفري).
+            $block('empty_settlement', 'A settlement without collections must move money to the bank.');
+        } elseif ($difference !== null && $hasBasis && $difference !== 0 && ! $replay) {
             $block('unreconciled_difference', "Settlement does not reconcile: difference {$difference}.");
         }
 
-        $reconciled = $difference !== null && $gross > 0 && $difference === 0;
+        $reconciled = $difference !== null && $hasBasis && $difference === 0;
         $codes = array_column($blockers, 'code');
 
         return [
@@ -403,10 +557,12 @@ final class PaymentGatewaySettlementService
             'provider_fee_tax' => $feeTax,
             'provider_deductions' => $deductions,
             'provider_credits' => $credits,
+            'adjustments_deductions' => $known ? $adjDeductions : null,
+            'adjustments_credits' => $known ? $adjCredits : null,
             'difference' => $difference,
             'reconciled' => $reconciled,
             'postable' => $reconciled && $blockers === [],
-            'saveable_as_unreconciled' => $known && $gross > 0 && $difference !== null && $difference !== 0 && $expectedNet >= 0 && array_diff($codes, ['unreconciled_difference']) === [],
+            'saveable_as_unreconciled' => $known && $hasBasis && $difference !== null && $difference !== 0 && $expectedNet >= 0 && array_diff($codes, ['unreconciled_difference']) === [],
             'replay' => $replay,
             'existing_status' => $existing?->status,
             'blockers' => $blockers,
@@ -493,6 +649,44 @@ final class PaymentGatewaySettlementService
         ])->all();
     }
 
+    /**
+     * D-04: ضريبة الرسوم تُرفض ما لم تتحقق الشروط الثلاثة معاً — سياسة `input_vat` على اتصال البوابة، ومرجع الرأي الضريبي EXT-05 مسجَّل في الإعداد
+     * (يُفحص وقت الترحيل فيعود الإغلاق بإزالته)، ومرجع فاتورة المزوّد الضريبية. الرسالة الأولى تبقى كما كانت (السلوك القائم).
+     */
+    private function assertFeeTaxAllowed(PaymentGateway $gateway, int $feeTax, string $invoiceRef, string $settlementRef): void
+    {
+        if ($feeTax <= 0) {
+            return;
+        }
+        $blocker = $this->feeTaxBlocker($gateway, $invoiceRef, $settlementRef);
+        if ($blocker !== null) {
+            throw new DomainException($blocker['message']);
+        }
+    }
+
+    /** @return array{code: string, message: string}|null */
+    private function feeTaxBlocker(PaymentGateway $gateway, string $invoiceRef, string $settlementRef): ?array
+    {
+        if ($gateway->fee_tax_policy !== PaymentGateway::FEE_TAX_INPUT_VAT || trim((string) config('payments.fee_tax_opinion_ref')) === '') {
+            return ['code' => 'fee_tax_not_authorized', 'message' => 'Provider fee tax posting is not authorized until an approved input-tax routing policy exists. Pass provider_fee_tax=0 or stop for a tax decision.'];
+        }
+        if (mb_strlen(trim($invoiceRef)) < 3) {
+            return ['code' => 'fee_tax_invoice_required', 'message' => 'fee_tax_invoice_required: provider fee tax needs the provider tax invoice reference.'];
+        }
+        // فاتورة المزوّد الضريبية الواحدة تُسترد مرة واحدة: مرجعها لا يتكرر في تسوية أخرى لنفس الاتصال (السجل محروس بقفل صف البوابة).
+        $reused = PaymentGatewaySettlement::query()
+            ->where('payment_gateway_id', $gateway->id)
+            ->where('provider_settlement_ref', '!=', $settlementRef)
+            ->where('provider_fee_tax', '>', 0)
+            ->whereRaw('lower(fee_tax_invoice_ref) = ?', [mb_strtolower(trim($invoiceRef))])
+            ->exists();
+        if ($reused) {
+            return ['code' => 'fee_tax_invoice_reused', 'message' => 'fee_tax_invoice_reused: this provider tax invoice reference is already recorded on another settlement for this connection.'];
+        }
+
+        return null;
+    }
+
     private function assertUnsupportedAdjustmentsAreZero(int $deductions, int $credits): void
     {
         if ($deductions > 0) {
@@ -517,8 +711,10 @@ final class PaymentGatewaySettlementService
         int $credits,
         array $itemsInput,
         array $refundsInput = [],
+        array $adjustmentsInput = [],
+        string $feeTaxInvoiceRef = '',
     ): PaymentGatewaySettlement {
-        if (! $this->replayMatches($existing, $net, $feeExTax, $feeTax, $deductions, $credits, $itemsInput, $refundsInput)) {
+        if (! $this->replayMatches($existing, $net, $feeExTax, $feeTax, $deductions, $credits, $itemsInput, $refundsInput, $adjustmentsInput, $feeTaxInvoiceRef)) {
             throw new DomainException('Provider settlement reference already posted with different amounts.');
         }
 
@@ -535,6 +731,8 @@ final class PaymentGatewaySettlementService
         int $credits,
         array $itemsInput,
         array $refundsInput = [],
+        array $adjustmentsInput = [],
+        string $feeTaxInvoiceRef = '',
     ): bool {
         $gross = 0;
         foreach ($itemsInput as $item) {
@@ -551,14 +749,21 @@ final class PaymentGatewaySettlementService
             ->map(fn ($v) => (int) $v)->all();
         ksort($refunds);
         ksort($stored);
+        // التعديلات: المرجع المخزَّن (adjustment_id) يطابق المُرسَل؛ مبالغها من المستندات الثابتة فالاستقطاعات/الاعتمادات في الترويسة مشتقّة منها.
+        $adjIds = collect($adjustmentsInput)->map(fn ($a) => strtolower((string) ($a['adjustment_id'] ?? '')))->sort()->values()->all();
+        $adjStored = $existing->lines()->whereNotNull('adjustment_id')->pluck('adjustment_id')->map(fn ($v) => strtolower((string) $v))->sort()->values()->all();
+        if (count(array_unique($adjIds)) !== count($adjIds)) {
+            return false;
+        }
 
         return $existing->isPosted()
             && (int) $existing->gross_amount === $gross
             && (int) $existing->net_bank_amount === $net
             && (int) $existing->provider_fee_ex_tax === $feeExTax
             && (int) $existing->provider_fee_tax === $feeTax
-            && (int) $existing->provider_deductions === $deductions
-            && (int) $existing->provider_credits === $credits
+            && (string) $existing->fee_tax_invoice_ref === ($feeTax > 0 ? $feeTaxInvoiceRef : '')
+            && $deductions === 0 && $credits === 0   // مُدخَلات الاستقطاع/الاعتماد الحرّة ممنوعة؛ المخزَّن مشتقّ من التعديلات
+            && $adjIds === $adjStored
             && $stored === $refunds
             && (bool) $existing->journal_entry_id;
     }
@@ -725,6 +930,11 @@ final class PaymentGatewaySettlementService
         int $feeExTax,
         int $gross,
         array $refunds = [],
+        array $adjustments = [],
+        ?string $reserveAccountId = null,
+        ?string $adjustmentAccountId = null,
+        int $feeTax = 0,
+        ?string $feeTaxAccountId = null,
     ): array {
         $lines = [];
 
@@ -736,12 +946,27 @@ final class PaymentGatewaySettlementService
             $lines[] = ['account_id' => $feeAccountId, 'debit' => $feeExTax, 'description' => 'عمولة بوابة الدفع'];
         }
 
+        // D-04 (ب): ضريبة رسوم المزوّد مدخلات قابلة للاسترداد بفاتورة ضريبية صالحة (سياسة الاتصال + EXT-05)؛ لا تُدخَل كعمولة أبداً.
+        if ($feeTax > 0) {
+            $lines[] = ['account_id' => $feeTaxAccountId, 'debit' => $feeTax, 'description' => 'ضريبة قيمة مضافة على عمولة البوابة (مدخلات)'];
+        }
+
         // A6: الاسترداد المخصوم من الصرف سطر مدين مستقل على 1170 (يستهلك دائن A5) للتتبّع بالرقم.
         foreach ($refunds as $refund) {
             $lines[] = ['account_id' => $clearingAccountId, 'debit' => $refund['amount'], 'description' => 'استرداد مخصوم من الصرف '.($refund['number'] ?? '')];
         }
 
-        $lines[] = ['account_id' => $clearingAccountId, 'credit' => $gross, 'description' => 'إقفال مقاصة البوابة'];
+        // D-22: احتجاز/تعديل مدين ⇒ مدين حساب الدور؛ إفراج/تعديل دائن ⇒ دائن حساب الدور. بلا حساب فروقات عام.
+        foreach ($adjustments as $adjustment) {
+            $isReserve = in_array($adjustment['kind'], [PaymentGatewayAdjustment::KIND_RESERVE_HOLD, PaymentGatewayAdjustment::KIND_RESERVE_RELEASE], true);
+            $accountId = $isReserve ? $reserveAccountId : $adjustmentAccountId;
+            $isDebit = PaymentGatewayAdjustment::BANK_SIGN[$adjustment['kind']] < 0;
+            $lines[] = ['account_id' => $accountId, ($isDebit ? 'debit' : 'credit') => $adjustment['amount'], 'description' => 'تعديل مزوّد معتمد: '.$adjustment['kind']];
+        }
+
+        if ($gross > 0) {
+            $lines[] = ['account_id' => $clearingAccountId, 'credit' => $gross, 'description' => 'إقفال مقاصة البوابة'];
+        }
 
         return $lines;
     }
@@ -750,7 +975,7 @@ final class PaymentGatewaySettlementService
      * المعادلة الموسّعة: التحصيلات − الاستردادات = الصافي + الرسوم (+ ضريبتها) + الاستقطاعات − الاعتمادات.
      * يعيد الفرق الموقَّع (المتوقَّع − المُدخَل)؛ الصفر وحده يُرحَّل (D-21). الصافي السالب غير مدعوم (v1، ADR-0008 A6-4).
      */
-    private function assertReconcilable(int $gross, int $refundsTotal, int $net, int $feeExTax, int $feeTax, int $deductions, int $credits, bool $allowUnreconciled): int
+    private function assertReconcilable(int $gross, int $refundsTotal, int $net, int $feeExTax, int $feeTax, int $deductions, int $credits, bool $allowUnreconciled, bool $hasAdjustments = false): int
     {
         $expectedNet = $gross - $refundsTotal - $feeExTax - $feeTax - $deductions + $credits;
         if ($expectedNet < 0) {
@@ -764,8 +989,12 @@ final class PaymentGatewaySettlementService
                 "Gateway settlement does not reconcile: gross {$gross} != net {$net} + fee {$feeExTax} + fee_tax {$feeTax} + deductions {$deductions} - credits {$credits} + refunds {$refundsTotal}."
             );
         }
-        if ($gross <= 0) {
+        if ($gross <= 0 && ! $hasAdjustments) {
             throw new DomainException('Gateway settlement gross must be positive.');
+        }
+        // تسوية بلا تحصيل تنقل مالاً فعلاً (إفراج/تعديل دائن)؛ صافٍ صفري بتعديلات متقابلة قيدٌ بلا حركة بنكية ولا يستحق استهلاك المستندات.
+        if ($gross <= 0 && $net <= 0 && $difference === 0) {
+            throw new DomainException('empty_settlement: a settlement without collections must move money to the bank.');
         }
 
         return $difference;

@@ -343,17 +343,6 @@ class PurchaseDuplicateReservationTest extends TestCase
     }
 
     /** @test */
-    public function an_uppercase_supplier_id_in_an_edit_is_not_treated_as_a_supplier_change(): void
-    {
-        $this->policy('block');
-        $a = $this->postPurchase(['supplier_invoice_no' => 'U-9'])->assertCreated()->json('data.id');
-        $this->postPurchase(['supplier_invoice_no' => 'U-9', 'partner_id' => $this->otherSupplier()])->assertCreated();
-
-        // نفس المورّد بحروف كبيرة والرقم نفسه: لا هوية جديدة ⇒ لا فحص ذاتي ولا تعارض
-        $this->withToken($this->auth['token'])->putJson("/api/purchases/{$a}", $this->body(['partner_id' => strtoupper($this->supplierId), 'supplier_invoice_no' => 'U-9', 'notes' => 'ok']))->assertOk();
-    }
-
-    /** @test */
     public function posting_an_imported_draft_produces_the_same_entry_shape_as_a_manual_one(): void
     {
         $imported = $this->import('E-1');

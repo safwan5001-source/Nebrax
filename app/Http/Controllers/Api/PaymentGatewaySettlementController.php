@@ -61,6 +61,8 @@ class PaymentGatewaySettlementController extends ApiController
             ])->values(),
             'lines' => $settlement->lines->map(fn ($l) => [
                 'line_type' => $l->line_type,
+                'adjustment_id' => $l->adjustment_id,
+                'evidence_ref' => $l->evidence_ref,
                 'payment_refund_id' => $seesRefunds ? $l->payment_refund_id : null,
                 'refund_number' => $seesRefunds ? $l->refund?->number : null,
                 'amount_minor' => (int) $l->amount_minor,
@@ -153,7 +155,7 @@ class PaymentGatewaySettlementController extends ApiController
             'provider_fee_tax' => ['nullable', 'integer', 'min:0', 'max:999999999999'],
             'provider_deductions' => ['nullable', 'integer', 'min:0', 'max:999999999999'],
             'provider_credits' => ['nullable', 'integer', 'min:0', 'max:999999999999'],
-            'items' => ['required', 'array', 'min:1', 'max:200'],
+            'items' => ['nullable', 'array', 'max:200', 'required_without:adjustments'],   // بلا تحصيل: فقط مع تعديل معتمد (تتحقق الخدمة)
             'items.*.payment_id' => ['required', 'uuid'],
             'items.*.gross_amount' => ['required', 'integer', 'min:1', 'max:999999999999'],
             'items.*.provider_event_ref' => ['nullable', 'string', 'max:191'],
@@ -161,6 +163,9 @@ class PaymentGatewaySettlementController extends ApiController
             'refunds.*.payment_refund_id' => ['required', 'uuid'],
             'refunds.*.amount_minor' => ['required', 'integer', 'min:1', 'max:999999999999'],
             'refunds.*.provider_event_ref' => ['nullable', 'string', 'max:191'],
+            'fee_tax_invoice_ref' => ['nullable', 'string', 'max:191'],
+            'adjustments' => ['nullable', 'array', 'max:50', 'required_without:items'],
+            'adjustments.*.adjustment_id' => ['required', 'uuid'],
             'currency' => ['nullable', 'string', 'size:3'],
         ];
     }
@@ -196,6 +201,7 @@ class PaymentGatewaySettlementController extends ApiController
             'net_bank_amount' => (int) $s->net_bank_amount,
             'provider_fee_ex_tax' => (int) $s->provider_fee_ex_tax,
             'provider_fee_tax' => (int) $s->provider_fee_tax,
+            'fee_tax_invoice_ref' => $s->fee_tax_invoice_ref,
             'provider_deductions' => (int) $s->provider_deductions,
             'provider_credits' => (int) $s->provider_credits,
             'refunds_total' => (int) $s->refunds_total,

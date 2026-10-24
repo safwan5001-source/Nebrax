@@ -290,7 +290,9 @@ class PaymentsRolloutControlTest extends TestCase
             // PAY-H3-01b: يتحقق من التفعيل قبل طلب/اعتماد/إرسال استرداد البوابة — قراءة فعّالة فقط، ولا يكتب الضوابط.
             'PaymentRefundService.php',
             // PAY-H3-02b: يتحقق من تفعيل المؤسسة قبل تسجيل تسوية البوابة (الإيقاف الطارئ لا يمنعها) — قراءة فعّالة فقط، ولا يكتب الضوابط.
-            'PaymentGatewaySettlementService.php'];
+            'PaymentGatewaySettlementService.php',
+            // PAY-H3-02c: يتحقق من تفعيل المؤسسة قبل طلب/اعتماد تعديل مزوّد — قراءة فعّالة فقط، ولا يكتب الضوابط.
+            'PaymentGatewayAdjustmentService.php'];
         $hits = [];
         $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(base_path('app'), \FilesystemIterator::SKIP_DOTS));
         foreach ($files as $file) {

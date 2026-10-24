@@ -168,6 +168,25 @@ final class AccountingRoles
             'domain' => 'payments',
             'configurable' => true,
         ],
+        // PAY-H3-02c (ADR-0008 D-22): استقطاعات/اعتمادات المزوّد غير العمولة — لا تُصنَّف أبداً كعمولة. تُرحَّل فقط من مستند تعديل معتمد بدليل وموافقة مستقلة.
+        'gateway_reserve' => [
+            'label_ar' => 'احتياطي لدى بوابات الدفع',
+            'label_en' => 'Payment Gateway Reserve',
+            'description_ar' => 'أصل: مبالغ يحتجزها مزوّد بوابة الدفع احتياطياً من الصرف وتُسترد لاحقاً (احتجاز/إفراج).',
+            'description_en' => 'Asset: funds a payment gateway holds back as a reserve from payouts, released later.',
+            'legacy_code' => '1171',
+            'domain' => 'payments',
+            'configurable' => true,
+        ],
+        'provider_adjustment' => [
+            'label_ar' => 'تعديلات مزوّد الدفع',
+            'label_en' => 'Payment Provider Adjustments',
+            'description_ar' => 'حساب واحد يقبل الطرفين: مدين لتعديل مدين (غرامة/خصم موثّق) ودائن لتعديل دائن (اعتماد موثّق) من مزوّد البوابة، بخلاف العمولة.',
+            'description_en' => 'One two-sided account: debited for documented provider debit adjustments and credited for documented credit adjustments, distinct from fees.',
+            'legacy_code' => '5520',
+            'domain' => 'payments',
+            'configurable' => true,
+        ],
         'platform_receivable_clearing' => [
             'label_ar' => 'مستحقات منصات التوصيل',
             'label_en' => 'Delivery Platform Receivable Clearing',
