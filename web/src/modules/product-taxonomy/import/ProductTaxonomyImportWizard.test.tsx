@@ -244,16 +244,33 @@ describe('ProductTaxonomyImportWizard (IMP-H4-S6a)', () => {
     expect((screen.getByRole('button', { name: 'run_preview' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it('refuses to continue an unbound job or one of another domain opened from the URL', async () => {
-    window.history.replaceState({}, '', '/inventory-settings/categories/import?job=job-7');
+  it('never shows or continues a job of another domain opened from the URL, in any status', async () => {
+    for (const status of ['ready', 'processing']) {
+      window.history.replaceState({}, '', '/inventory-settings/categories/import?job=job-7');
+      api.mockReset();
+      api.mockImplementation((path: string) => {
+        if (path === '/import-jobs/job-7') return Promise.resolve({ data: jobFixture({ id: 'job-7', domain: 'partner_master', status, preview_bound: true }) });
+        return Promise.resolve({ data: [] });
+      });
+      const { unmount } = render(<ProductTaxonomyImportWizard kind="category" />);
+
+      await waitFor(() => expect(screen.getByText('resumed_wrong_domain')).toBeTruthy());
+      expect(screen.queryByRole('button', { name: 'apply' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'continue_apply' })).toBeNull();
+      expect(api.mock.calls.some((call) => String(call[0]).endsWith('/apply'))).toBe(false);
+      unmount();
+    }
+  });
+
+  it('refuses to continue an unbound job of this domain opened from the URL', async () => {
+    window.history.replaceState({}, '', '/inventory-settings/categories/import?job=job-8');
     api.mockImplementation((path: string) => {
-      if (path === '/import-jobs/job-7') return Promise.resolve({ data: jobFixture({ id: 'job-7', domain: 'partner_master', status: 'ready', preview_bound: false }) });
+      if (path === '/import-jobs/job-8') return Promise.resolve({ data: jobFixture({ id: 'job-8', status: 'ready', preview_bound: false }) });
       return Promise.resolve({ data: [] });
     });
     render(<ProductTaxonomyImportWizard kind="category" />);
 
-    await waitFor(() => expect(screen.getByText('resumed_wrong_domain')).toBeTruthy());
-    expect(screen.getByText('resumed_unbound')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('resumed_unbound')).toBeTruthy());
     expect((screen.getByRole('button', { name: 'apply' }) as HTMLButtonElement).disabled).toBe(true);
   });
 });

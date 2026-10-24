@@ -102,7 +102,9 @@ export function ProductTaxonomyImportWizard({ kind }: { kind: TaxonomyKind }) {
   const steps = STEP_KEYS.map((key) => ({ key, label: t(`step_${key}`) }));
   // معاينةٌ استُهلك ربطها (تشغيلة انتهت): لا تنفيذ ثانٍ منها — تُعاد المعاينة لتشغيلة جديدة.
   const jobTerminal = engine.job !== null && ['failed', 'completed', 'cancelled'].includes(engine.job.status);
-  const wrongDomainJob = resumedWithoutFile && engine.job !== null && engine.job.domain !== 'product_taxonomy';
+  // تشغيلة من مجالٍ آخر (رابط ?job= يدوي) لا تُعرَض ولا تُنفَّذ من هذه الشاشة في أي خطوة: المحرّك المشترك ينفّذ المعرّف الممرَّر دون فحص مجاله.
+  const wrongDomainJob = engine.job !== null && engine.job.domain !== 'product_taxonomy';
+  const view = wrongDomainJob ? -1 : step;
 
   function currentOptions(): TaxonomyImportOptions {
     return { kind, mode, blankPolicy, parentPolicy, mapping: activeMapping };
@@ -217,6 +219,7 @@ export function ProductTaxonomyImportWizard({ kind }: { kind: TaxonomyKind }) {
   }
 
   async function confirmAndApply() {
+    if (wrongDomainJob) return;
     setStep(2);
     setError(null);
     if (!engine.job) {
@@ -308,7 +311,19 @@ export function ProductTaxonomyImportWizard({ kind }: { kind: TaxonomyKind }) {
         </p>
       ) : null}
 
-      {step === 0 ? (
+      {wrongDomainJob ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('resumed_title')}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p role="alert" className="text-sm text-negative">{t('resumed_wrong_domain')}</p>
+            <FormActions primary={<Button variant="outline" onClick={reset}>{t('start_another')}</Button>} />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {view === 0 ? (
         resumedWithoutFile && engine.job ? (
           <Card>
             <CardHeader>
@@ -317,10 +332,9 @@ export function ProductTaxonomyImportWizard({ kind }: { kind: TaxonomyKind }) {
             <CardContent className="space-y-4">
               <p className="text-sm leading-relaxed text-muted">{t('resumed_hint', { name: engine.job.original_filename })}</p>
               {engine.job.preview_bound ? null : <p role="alert" className="text-sm text-negative">{t('resumed_unbound')}</p>}
-              {wrongDomainJob ? <p role="alert" className="text-sm text-negative">{t('resumed_wrong_domain')}</p> : null}
               <FormActions
                 primary={
-                  <Button disabled={!engine.job.preview_bound || wrongDomainJob} onClick={() => void confirmAndApply()}>
+                  <Button disabled={!engine.job.preview_bound} onClick={() => void confirmAndApply()}>
                     <Upload className="h-4 w-4" strokeWidth={1.7} />
                     {t('apply')}
                   </Button>
@@ -497,7 +511,7 @@ export function ProductTaxonomyImportWizard({ kind }: { kind: TaxonomyKind }) {
         )
       ) : null}
 
-      {step === 1 && preview ? (
+      {view === 1 && preview ? (
         <Card>
           <CardHeader>
             <CardTitle>{t('step_preview')}</CardTitle>
@@ -612,7 +626,7 @@ export function ProductTaxonomyImportWizard({ kind }: { kind: TaxonomyKind }) {
         </Card>
       ) : null}
 
-      {step === 2 && engine.job ? (
+      {view === 2 && engine.job ? (
         <Card>
           <CardHeader>
             <CardTitle>{t('step_apply')}</CardTitle>
@@ -645,7 +659,7 @@ export function ProductTaxonomyImportWizard({ kind }: { kind: TaxonomyKind }) {
         </Card>
       ) : null}
 
-      {step === 3 && engine.job?.status === 'completed' ? (
+      {view === 3 && engine.job?.status === 'completed' ? (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
