@@ -124,7 +124,14 @@ class StocktakeCountImportTest extends TestCase
         foreach (['SKU-A', 'SKU-B', 'SKU-C', 'صنف a'] as $needle) {
             $this->assertStringContainsString($needle, $csv);
         }
-        $this->assertStringNotContainsString('100', $csv, 'الرصيد النظامي لا يظهر في ورقة العدّ الأعمى.');
+        // الفحص على الخلايا لا على النص الخام: معرّفات UUID العشوائية قد تحوي «100» صدفةً (فشل متقطع سابق).
+        $cells = collect(preg_split('/\r?\n/', trim(ltrim($csv, "\xEF\xBB\xBF"))))->flatMap(fn (string $line) => str_getcsv($line, ',', '"', ''))->all();
+        foreach (['100', '50', '10'] as $systemQuantity) {
+            $this->assertNotContains($systemQuantity, $cells, 'الرصيد النظامي لا يظهر في ورقة العدّ الأعمى.');
+        }
+        foreach (array_slice(preg_split('/\r?\n/', trim($csv)), 1) as $line) {
+            $this->assertSame('', (string) (str_getcsv($line, ',', '"', '')[4] ?? ''), 'عمود الكمية المعدودة فارغ في الورقة العمياء.');
+        }
         // والقالب نفسه قابل للاستيراد كما هو بعد ملء الكميات
         $insp = $this->service()->inspect(UploadedFile::fake()->createWithContent('t.csv', $csv));
         $this->assertSame(3, $insp['total_rows']);
