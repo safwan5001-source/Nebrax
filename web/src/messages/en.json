@@ -8565,8 +8565,8 @@
     "activeHint": "Only active types will appear when adding an employee custody settlement after the settlement workflow is available.",
     "backToFinanceSettings": "Back to Finance Settings",
     "cancel": "Cancel",
-    "c_paymentGateways_t": "Payment gateways",
-    "c_paymentGateways_d": "Payment provider connections: add, activate, suspend, rotate secrets and review the change history."
+    "c_paymentGateways_t": "Payments",
+    "c_paymentGateways_d": "Online payment methods customers see and the payment gateways: connections, activation, verification, secret rotation and change history."
   },
   "paymentMethods": {
     "title": "Payment Methods",
@@ -11990,7 +11990,118 @@
       "document_basis": "Based on this document: {fields} fields, {lines} lines sent; {redacted} hidden values were not sent."
     }
   },
+  "paymentSettings": {
+    "title": "Payments",
+    "subtitle": "The online payment methods customers see and the gateways that process them. Secrets are stored only in the Gateways tab and are never shown after saving.",
+    "tabMethods": "Payment methods",
+    "tabGateways": "Payment gateways"
+  },
+  "onlinePaymentMethods": {
+    "list": "Online payment methods",
+    "loading": "Loading payment methods",
+    "loadFailed": "Could not load payment methods.",
+    "retry": "Retry",
+    "empty": "No online payment methods are defined.",
+    "scope": "These are the online payment methods customers see when paying an invoice through the payment link. “Show to customer” lists a method as accepted only while it is actually ready; what the hosted provider page accepts is set in the provider dashboard.",
+    "scopeSeparate": "Completely separate from cash/bank collection methods and POS, which are managed from",
+    "scopeLink": "Payment methods",
+    "showToCustomer": "Show to customer",
+    "status": {
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "needs_setup": "Needs setup",
+      "unsupported": "Unsupported"
+    },
+    "reasonEnabled": "Shown to the customer as an accepted method on the invoice payment link.",
+    "reasonDisabled": "Ready but hidden from customers. Turn the switch on to show it.",
+    "blocked": {
+      "no_permission": "You need the manage-payment-gateways permission to change this method.",
+      "needs_setup": "It cannot be shown to customers until the setup below is complete.",
+      "unsupported": "No supported gateway exists for this method, so it cannot be shown."
+    },
+    "step": {
+      "add_gateway": "Add a connection to a gateway that supports this method (such as Moyasar) and activate it.",
+      "activate_gateway": "The supporting gateway connection is not active. Verify its credentials and activate it from the Payment gateways tab.",
+      "provider_setup": "Requires provider-side setup (domain registration with Apple/the provider) that Nebrax cannot verify, so it cannot be enabled here."
+    },
+    "openGateways": "Open payment gateways",
+    "defaultGateway": "Default gateway",
+    "autoGateway": "Automatic: {name}",
+    "noGateway": "No ready gateway",
+    "multiGateway": "More than one gateway is eligible and the first is used. Choosing a different gateway per method is not available yet, and there is no automatic failover between gateways, to avoid double charging.",
+    "usage": "Where it is used",
+    "usageInvoices": "Invoice payment link",
+    "usageStoreUnavailable": "Online store: not available yet",
+    "connections": "Connections linked to this method",
+    "eligible": "Eligible",
+    "providerSetup": "Needs provider setup",
+    "notReady": "Not ready",
+    "done": {
+      "enabled": "The method is now visible to customers.",
+      "disabled": "The method is hidden from customers."
+    },
+    "errors": {
+      "unsupported": "No gateway connection supports this method. Add a supported connection first.",
+      "needs_setup": "The method is not ready: activate a gateway connection that supports it and complete the required provider setup.",
+      "unknown_method": "Unknown payment method.",
+      "reason_too_long": "The reason is longer than allowed.",
+      "generic": "Could not save the change. Try again."
+    }
+  },
   "paymentGateways": {
+    "close": "Close",
+    "detail": {
+      "description": "Advanced technical settings for this connection. Read-only unless you can manage gateways.",
+      "general": {
+        "title": "General and connection status",
+        "usable": "Ready to use",
+        "notUsable": "Not ready to use",
+        "provider": "Provider",
+        "activatedAt": "Last activated",
+        "never": "Not activated yet",
+        "createdAt": "Added on"
+      },
+      "keys": {
+        "title": "Keys, environment and verification",
+        "environment": "Environment",
+        "publishable": "Publishable key",
+        "note": "Secrets are never shown after saving. Use “Edit” to change keys or environment and “Rotate secrets” to replace secrets. Verification is a safe read at the provider with no financial effect."
+      },
+      "methods": {
+        "title": "Actual payment-method support",
+        "declared": "Declared by the adapter",
+        "providerSetup": "Requires provider-side setup",
+        "note": "This is only what Nebrax’s provider adapter declares; it does not mean your provider account is enabled for them. Methods accepted on the hosted payment page are set in the provider dashboard and Nebrax cannot restrict them.",
+        "noAdapter": "No adapter is enabled for this provider, so no online payment methods are offered through it."
+      },
+      "webhooks": {
+        "title": "Webhooks, events and sync",
+        "url": "Event receiving URL (register it in the provider dashboard)",
+        "copy": "Copy",
+        "copied": "Copied",
+        "managerOnly": "The receiving URL is visible only to users who can manage gateways.",
+        "noAdapter": "There is no event receiving for this connection because no adapter is enabled.",
+        "syncUnavailable": "Manual sync and event replay are not available yet. “History” in the Security section shows the connection’s own events."
+      },
+      "money": {
+        "title": "Capture, refunds and settlements",
+        "capture": "Capture",
+        "hosted": "Through the provider’s hosted payment page",
+        "notHosted": "Not supported",
+        "refunds": "Refunds",
+        "refundsYes": "Supported through the provider",
+        "refundsNo": "Not supported",
+        "currencies": "Currencies",
+        "minAmount": "Minimum amount",
+        "noAdapter": "No capabilities are declared because no adapter is enabled.",
+        "policyUnavailable": "Capture, settlement and clearing policies follow fixed accounting rules in Nebrax; there is no editable setting here.",
+        "openOps": "Open settlements, refunds and reports"
+      },
+      "security": {
+        "title": "Security, secret rotation and audit log",
+        "note": "Every change to the connection is recorded in the log with no secret value. Rotation replaces the secrets and keeps the previous one for a short grace window."
+      }
+    },
     "title": "Payment gateways",
     "subtitle": "The payment provider connections you add yourself. A draft stays idle until you activate it, and secrets are never shown after saving.",
     "back": "Back to finance settings",
@@ -12037,6 +12148,7 @@
       "graceUntil": "Previous secret valid until"
     },
     "actions": {
+      "details": "Details",
       "cancel": "Cancel",
       "edit": "Edit",
       "rotate": "Rotate secrets",

@@ -37,7 +37,13 @@ const meta = (total: number) => ({ total, page: 1, per_page: 25, last_page: 1 })
 const gateway = (over: Record<string, unknown> = {}) => ({
   id: 'g1', provider: 'moyasar', name: 'ميسّر', name_en: 'Moyasar', environment: 'sandbox', status: 'active', is_usable: true, merchant_reference: 'MER-1', publishable_key: 'pk_test_x',
   has_secret_key: true, has_webhook_secret: true, has_extra_credentials: false, credential_version: 2, previous_secret_valid_until: null, verified_at: '2026-10-22T09:00:00Z',
-  activated_at: '2026-10-22T09:05:00Z', deactivated_at: null, created_at: '2026-10-21T09:00:00Z', fee_tax_policy: 'reject', fee_tax_opinion_recorded: false, webhook_key: 'wk_1', ...over,
+  activated_at: '2026-10-22T09:05:00Z', deactivated_at: null, created_at: '2026-10-21T09:00:00Z', fee_tax_policy: 'reject', fee_tax_opinion_recorded: false, webhook_key: 'w'.repeat(40),
+  provider_capabilities: { hosted_checkout: true, refunds: true, currencies: ['SAR'], min_amount_minor: 100, methods: ['mada', 'visa', 'mastercard', 'apple_pay'], methods_requiring_provider_setup: ['apple_pay'] }, ...over,
+});
+const onlineMethod = (over: Record<string, unknown> = {}) => ({
+  key: 'mada', status: 'enabled', reason: null, enabled: true, customer_visible: true,
+  connections: [{ gateway_id: 'g1', gateway_name: 'ميسّر', provider: 'moyasar', environment: 'sandbox', usable: true, requires_provider_setup: false, eligible: true }],
+  effective_gateway: { id: 'g1', name: 'ميسّر' }, multiple_eligible_gateways: false, default_gateway_selectable: false, usage: { invoices: true, store: false }, ...over,
 });
 const attempt = (over: Record<string, unknown> = {}) => ({
   id: 'a1', request_id: 'r1', invoice: { id: 'inv1', number: 'INV-0001' }, gateway: { id: 'g1', name: 'ميسّر', provider: 'moyasar', environment: 'sandbox' },
@@ -110,16 +116,19 @@ const aging = () => ({
 interface World {
   previewMode: 'postable' | 'unreconciled';
   reconMode: 'reconciled' | 'difference' | 'forbidden';
+  /** حالة وسيلة «فيزا» المخزَّنة (يغيّرها PUT /online-payment-methods/visa). */
+  visaEnabled: boolean;
+  methodsMode: 'normal' | 'failing';
   /** رمز رابط الدفع ⇒ استجابة. */
   requests: string[];
   unrouted: string[];
 }
-const newWorld = (over: Partial<World> = {}): World => ({ previewMode: 'postable', reconMode: 'reconciled', requests: [], unrouted: [], ...over });
+const newWorld = (over: Partial<World> = {}): World => ({ previewMode: 'postable', reconMode: 'reconciled', visaEnabled: false, methodsMode: 'normal', requests: [], unrouted: [], ...over });
 
 const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 
 const PAY_LINKS: Record<string, { view: unknown; status: unknown } | 404> = {
-  tok_open: { view: { status: 'open', merchant: 'شركة نبراس الطموح', invoice_number: 'INV-0042', currency: 'SAR', amount_due_minor: 115000, allow_partial: false, expires_at: '2026-11-30T12:00:00Z' }, status: { request_status: 'open', payment: 'none' } },
+  tok_open: { view: { status: 'open', merchant: 'شركة نبراس الطموح', invoice_number: 'INV-0042', currency: 'SAR', amount_due_minor: 115000, allow_partial: false, expires_at: '2026-11-30T12:00:00Z', payment_methods: ['mada', 'visa'] }, status: { request_status: 'open', payment: 'none' } },
   tok_partial: { view: { status: 'open', merchant: 'شركة نبراس الطموح', invoice_number: 'INV-0043', currency: 'SAR', amount_due_minor: 230000, allow_partial: true, expires_at: null }, status: { request_status: 'open', payment: 'partially_paid' } },
   // الخادم لا يعيد التفاصيل إلا لرابط مفتوح؛ المسدَّد/المتعذَّر يعيد الحالة وحدها (PublicPaymentLinkController::show).
   tok_completed: { view: { status: 'completed' }, status: { request_status: 'completed', payment: 'paid' } },
@@ -155,7 +164,21 @@ async function setup(page: Page, w: World, opts: { locale: Locale; theme: Theme;
     if (path === '/branches') return json(route, { data: [{ id: 'b1', code: '1', name: 'الرئيسي', is_main: true, is_active: true }, { id: 'b2', code: '2', name: 'فرع الشرق', is_main: false, is_active: true }] });
     if (path === '/cash-bank-accounts') return json(route, { data: [{ id: 'bk1', name: 'الراجحي', type: 'bank', is_active: true, is_main: true }, { id: 'c1', name: 'الصندوق', type: 'cash', is_active: true, is_main: true }] });
 
-    if (path === '/payment-gateways' && method === 'GET') return json(route, { data: [gateway(), gateway({ id: 'g2', provider: 'custom', name: 'ربط يدوي', name_en: 'Manual', status: 'draft', is_usable: false, verified_at: null, activated_at: null, has_secret_key: false })] });
+    if (path === '/online-payment-methods' && method === 'GET') {
+      if (w.methodsMode === 'failing') return json(route, { error: { message: 'down' } }, 500);
+      return json(route, { data: [
+        onlineMethod({ key: 'mada' }),
+        onlineMethod({ key: 'visa', status: w.visaEnabled ? 'enabled' : 'disabled', enabled: w.visaEnabled, customer_visible: w.visaEnabled }),
+        onlineMethod({ key: 'mastercard', status: 'unsupported', enabled: false, customer_visible: false, connections: [], effective_gateway: null }),
+        onlineMethod({ key: 'apple_pay', status: 'needs_setup', reason: 'provider_setup_required', enabled: false, customer_visible: false,
+          connections: [{ gateway_id: 'g1', gateway_name: 'ميسّر', provider: 'moyasar', environment: 'sandbox', usable: true, requires_provider_setup: true, eligible: false }], effective_gateway: null }),
+      ] });
+    }
+    if (path === '/online-payment-methods/visa' && method === 'PUT') {
+      w.visaEnabled = (request.postDataJSON() as { enabled: boolean }).enabled;
+      return json(route, { data: onlineMethod({ key: 'visa', status: w.visaEnabled ? 'enabled' : 'disabled', enabled: w.visaEnabled, customer_visible: w.visaEnabled }) });
+    }
+    if (path === '/payment-gateways' && method === 'GET') return json(route, { data: [gateway(), gateway({ id: 'g2', provider: 'custom', name: 'ربط يدوي', name_en: 'Manual', status: 'draft', is_usable: false, verified_at: null, activated_at: null, has_secret_key: false, provider_capabilities: null })] });
 
     if (path === '/payment-attempts' && method === 'GET') {
       if (q.get('posting_status') === 'blocked_period') return json(route, { data: [attempt({ id: 'a2', invoice: { id: 'inv2', number: 'INV-0002' }, posting_status: 'blocked_period', blocked_reason: { kind: 'period' } })], meta: meta(q.get('per_page') === '1' ? 1 : 1) });
@@ -226,7 +249,7 @@ function watchErrors(page: Page, tolerateHttpError = false): string[] {
     // تحذير next-intl (تطوير فقط) عن مفاتيح تحوي «.» في appBuilder/developer.events: عيب سابق خارج المدفوعات (مسجَّل في تقرير QA كـP3 مفتوح).
     if (/INVALID_KEY: Namespace keys can not contain/.test(text) && /appBuilder\.|developer\.events/.test(text)) return;
     // طلب مُعترَض يعيد 404/403 عمداً في حالة الاختبار (رابط دفع غير موجود، تقرير محجوب بنطاق الفرع).
-    if (tolerateHttpError && /Failed to load resource: the server responded with a status of (403|404)/.test(text)) return;
+    if (tolerateHttpError && /Failed to load resource: the server responded with a status of (403|404|500)/.test(text)) return;
     errors.push(`console: ${text}`);
   });
   return errors;
@@ -397,6 +420,8 @@ interface Scenario {
   /** المصفوفة الكاملة 4×2×2 بدل 390/1440 × ar/en. */
   full?: boolean;
   world?: Partial<World>;
+  /** صلاحيات المستخدم المُعترَض (الافتراضي كل شيء). */
+  permissions?: string[];
   run: (page: Page, ctx: Ctx) => Promise<void>;
 }
 
@@ -429,8 +454,8 @@ const SCENARIOS: Scenario[] = [
   {
     id: 'gateways-list', full: true,
     run: async (page, c) => {
-      await page.goto(`${baseUrl}/finance-settings/payments`, { waitUntil: 'domcontentloaded' });
-      await expect(page.getByRole('heading', { name: c.t('paymentGateways', 'title') }).first()).toBeVisible();
+      await page.goto(`${baseUrl}/finance-settings/payments?tab=gateways`, { waitUntil: 'domcontentloaded' });
+      await expect(page.getByRole('heading', { name: c.t('paymentSettings', 'title') }).first()).toBeVisible();
       await expect(shown(page, c.locale === 'ar' ? 'ميسّر' : 'Moyasar')).toBeVisible();
       await expect(shown(page, c.t('paymentGateways', 'fields.feeTaxReject'))).toBeVisible();   // سياسة ضريبة الرسوم: مرفوضة افتراضياً
       expect(await ltrIslands(page)).toBeGreaterThanOrEqual(0);
@@ -439,9 +464,104 @@ const SCENARIOS: Scenario[] = [
     },
   },
   {
-    id: 'gateways-wizard',
+    id: 'payment-methods-tab', full: true,
     run: async (page, c) => {
       await page.goto(`${baseUrl}/finance-settings/payments`, { waitUntil: 'domcontentloaded' });
+      await expect(page.getByRole('heading', { name: c.t('paymentSettings', 'title') }).first()).toBeVisible();
+      await expect(page.getByRole('tab', { name: c.t('paymentSettings', 'tabMethods') })).toHaveAttribute('aria-selected', 'true');
+      const list = page.getByTestId('pm-list');
+      await expect(list).toBeVisible();
+      // الحالات الأربع كما حسبها الخادم، بلا شعارات غير رسمية (نص فقط) ولا قائمة اختيار بوابة وهمية
+      await expect(page.getByTestId('pm-status-mada')).toHaveText(c.t('onlinePaymentMethods', 'status.enabled'));
+      await expect(page.getByTestId('pm-status-visa')).toHaveText(c.t('onlinePaymentMethods', 'status.disabled'));
+      await expect(page.getByTestId('pm-status-apple_pay')).toHaveText(c.t('onlinePaymentMethods', 'status.needs_setup'));
+      await expect(page.getByTestId('pm-status-mastercard')).toHaveText(c.t('onlinePaymentMethods', 'status.unsupported'));
+      await expect(list.locator('img')).toHaveCount(0);
+      await expect(list.getByRole('combobox')).toHaveCount(0);
+      await expect(page.getByTestId('pm-item-apple_pay').getByRole('switch')).toBeDisabled();
+      await expect(page.getByTestId('pm-item-mastercard').getByRole('switch')).toBeDisabled();
+      await expect(page.getByTestId('pm-store-mada')).toHaveText(c.t('onlinePaymentMethods', 'usageStoreUnavailable'));
+      await expect(page.getByTestId('pm-scope-note')).toBeVisible();
+      await tablesUsable(page);
+      await keyboardReachesButton(page);
+    },
+  },
+  {
+    id: 'payment-methods-toggle',
+    run: async (page, c) => {
+      await page.goto(`${baseUrl}/finance-settings/payments`, { waitUntil: 'domcontentloaded' });
+      const visa = page.getByTestId('pm-item-visa').getByRole('switch');
+      await expect(visa).toHaveAttribute('aria-checked', 'false');
+      await visa.click();
+      await expect(page.getByTestId('pm-status-visa')).toHaveText(c.t('onlinePaymentMethods', 'status.enabled'));
+      await expect(visa).toHaveAttribute('aria-checked', 'true');
+      expect(c.w.requests).toContain('PUT /online-payment-methods/visa');
+      await visa.click();
+      await expect(page.getByTestId('pm-status-visa')).toHaveText(c.t('onlinePaymentMethods', 'status.disabled'));
+    },
+  },
+  {
+    id: 'payment-methods-load-failure', world: { methodsMode: 'failing' },
+    run: async (page, c) => {
+      await page.goto(`${baseUrl}/finance-settings/payments`, { waitUntil: 'domcontentloaded' });
+      await expect(page.locator('[role=alert]:not(#__next-route-announcer__)')).toContainText(c.t('onlinePaymentMethods', 'loadFailed'));
+      await expect(page.getByRole('button', { name: c.t('onlinePaymentMethods', 'retry') })).toBeVisible();
+    },
+  },
+  {
+    id: 'payment-methods-viewer', permissions: ['payments.view'],
+    run: async (page, c) => {
+      await page.goto(`${baseUrl}/finance-settings/payments`, { waitUntil: 'domcontentloaded' });
+      await expect(page.getByTestId('pm-list')).toBeVisible();
+      for (const key of ['mada', 'visa', 'mastercard', 'apple_pay']) {
+        await expect(page.getByTestId(`pm-item-${key}`).getByRole('switch')).toBeDisabled();
+      }
+      await expect(page.getByTestId('pm-reason-visa')).toHaveText(c.t('onlinePaymentMethods', 'blocked.no_permission'));
+    },
+  },
+  {
+    id: 'gateway-detail-sheet', full: true,
+    run: async (page, c) => {
+      await page.goto(`${baseUrl}/finance-settings/payments?tab=gateways`, { waitUntil: 'domcontentloaded' });
+      await page.getByTestId('pg-details-g1').click();
+      const sheet = page.getByTestId('pg-detail');
+      await expect(sheet).toBeVisible();
+      await expect(sheet.getByRole('heading', { level: 3 })).toHaveCount(6);
+      await expect(sheet.getByTestId('pg-webhook-url')).toContainText('payment-webhooks/moyasar/');
+      await expect(sheet.getByTestId('pg-detail-methods').locator('li')).toHaveCount(4);
+      await expect(sheet.getByText(c.t('paymentGateways', 'detail.money.policyUnavailable'))).toBeVisible();
+      expect(await ltrIslands(page, sheet)).toBeGreaterThan(0);
+      await fitsViewport(sheet);
+      await shot(page, `gateway-detail-sheet-open-${c.locale}-${c.vw}-${c.theme}`);
+      await closeByEscape(page, sheet);
+    },
+  },
+  {
+    id: 'gateway-detail-no-adapter',
+    run: async (page, c) => {
+      await page.goto(`${baseUrl}/finance-settings/payments?tab=gateways`, { waitUntil: 'domcontentloaded' });
+      await page.getByTestId('pg-details-g2').click();
+      const sheet = page.getByTestId('pg-detail');
+      await expect(sheet.getByText(c.t('paymentGateways', 'detail.methods.noAdapter'))).toBeVisible();
+      await expect(sheet.getByTestId('pg-detail-methods')).toHaveCount(0);
+      await fitsViewport(sheet);
+    },
+  },
+  {
+    id: 'tab-switch-and-url',
+    run: async (page, c) => {
+      await page.goto(`${baseUrl}/finance-settings/payments`, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('tab', { name: c.t('paymentSettings', 'tabGateways') }).click();
+      await expect(page.getByTestId('pg-list')).toBeVisible();
+      await expect(page).toHaveURL(/tab=gateways/);
+      await page.getByRole('tab', { name: c.t('paymentSettings', 'tabGateways') }).press(c.locale === 'ar' ? 'ArrowRight' : 'ArrowLeft');
+      await expect(page.getByTestId('pm-list')).toBeVisible();
+    },
+  },
+  {
+    id: 'gateways-wizard',
+    run: async (page, c) => {
+      await page.goto(`${baseUrl}/finance-settings/payments?tab=gateways`, { waitUntil: 'domcontentloaded' });
       await page.getByRole('button', { name: c.t('paymentGateways', 'add') }).first().click();
       const dialog = page.getByRole('dialog');
       await expect(dialog).toBeVisible();
@@ -625,6 +745,10 @@ const SCENARIOS: Scenario[] = [
       await page.goto(`${baseUrl}/pay/tok_open`, { waitUntil: 'domcontentloaded' });
       await expect(page.getByRole('heading', { name: 'شركة نبراس الطموح' })).toBeVisible();
       await expect(page.getByTestId('pay-amount-due')).toBeVisible();
+      // وسائل الدفع المقبولة: ما أعلنه الخادم فقط (مدى وفيزا)، نصاً بلا شعار غير رسمي
+      const accepted = page.getByTestId('payment-brand-row');
+      await expect(accepted.locator('li')).toHaveCount(2);
+      await expect(accepted.locator('img')).toHaveCount(0);
       await expect(page.getByRole('button', { name: payButtonName(c) }).first()).toBeVisible();
       expect(await ltrIslands(page)).toBeGreaterThanOrEqual(0);
       expect(await a11yBasics(page)).toEqual([]);
@@ -677,9 +801,9 @@ test.describe('PAY-H8-02 payments screens', () => {
     for (const { vw, locale, theme } of combos) {
       test(`${scenario.id} · ${vw} · ${locale} · ${theme}`, async ({ page }) => {
         const w = newWorld(scenario.world);
-        const errors = watchErrors(page, ['paylink-not-found', 'reports-branch-scope-forbidden'].includes(scenario.id));
+        const errors = watchErrors(page, ['paylink-not-found', 'reports-branch-scope-forbidden', 'payment-methods-load-failure'].includes(scenario.id));
         const ctx: Ctx = { locale, theme, vw, w, t: (ns, key) => msg(locale, ns, key) };
-        await setup(page, w, { locale, theme, vw });
+        await setup(page, w, { locale, theme, vw, permissions: scenario.permissions });
         await scenario.run(page, ctx);
         await baseChecks(page, ctx);
         await shot(page, `${scenario.id}-${locale}-${vw}-${theme}`);

@@ -43,6 +43,19 @@ export interface GatewayConnection {
   fee_tax_policy?: 'reject' | 'input_vat';
   /** مرجع الرأي الضريبي (EXT-05) مسجَّل في الإعداد؟ منطقي فقط، لا المرجع نفسه. */
   fee_tax_opinion_recorded?: boolean;
+  /** ما يعلنه محوّل المزوّد في الكود (PAY-SETTINGS-UX)، أو `null` إن لم يكن له محوّل مفعَّل. الغياب = لم يصل الخادم به بعد. */
+  provider_capabilities?: ProviderCapabilities | null;
+  /** معرّف مسار استقبال webhook — لحامل `payment_gateways.manage` فقط (الخادم يحجبه عن غيره). */
+  webhook_key?: string;
+}
+
+export interface ProviderCapabilities {
+  hosted_checkout: boolean;
+  refunds: boolean;
+  currencies: string[];
+  min_amount_minor: number;
+  methods: string[];
+  methods_requiring_provider_setup: string[];
 }
 
 export interface GatewayEvent {

@@ -19,6 +19,8 @@ export interface PayLinkView {
   amount_due_minor?: number;
   allow_partial?: boolean;
   expires_at?: string | null;
+  /** وسائل الدفع الإلكتروني الظاهرة للعميل (مفاتيح): مدعومة ومفعَّلة وجاهزة فعلاً؛ الغياب/الفارغ = لا عرض (لا افتراض). */
+  payment_methods?: string[];
 }
 
 export type PayLinkPayment = 'none' | 'pending' | 'partially_paid' | 'paid' | 'not_completed';
