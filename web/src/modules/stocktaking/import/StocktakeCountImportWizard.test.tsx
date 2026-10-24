@@ -225,4 +225,34 @@ describe('StocktakeCountImportWizard (IMP-H7-S1c)', () => {
     expect(screen.getByText('step_apply', { selector: '[class*="font"]' })).toBeTruthy();
     release({ data: jobFixture({ status: 'completed', apply_result: { written: 2 } }) });
   });
+
+  it('offers a continue action for a resumed processing job of this stocktake', async () => {
+    window.history.replaceState({}, '', '/stocktaking/st-1/import?job=job-7');
+    let applied = 0;
+    api.mockImplementation((path: string) => {
+      if (path === '/import-jobs/job-7') return Promise.resolve({ data: jobFixture({ id: 'job-7', status: 'processing', target_id: 'st-1' }) });
+      if (path === '/import-jobs/job-7/apply') { applied += 1; return Promise.resolve({ data: jobFixture({ id: 'job-7', status: 'completed', target_id: 'st-1', apply_result: { written: 2 } }) }); }
+      return Promise.resolve({ data: {} });
+    });
+    const user = userEvent.setup();
+    render(<StocktakeCountImportWizard stocktakeId="st-1" />);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'continue_apply' })).toBeTruthy());
+    expect(applied).toBe(0);
+    await user.click(screen.getByRole('button', { name: 'continue_apply' }));
+    await waitFor(() => expect(screen.getByText('result_written')).toBeTruthy());
+    expect(applied).toBe(1);
+  });
+
+  it('offers no continue action for a processing job that belongs to another stocktake', async () => {
+    window.history.replaceState({}, '', '/stocktaking/st-1/import?job=job-8');
+    api.mockImplementation((path: string) => {
+      if (path === '/import-jobs/job-8') return Promise.resolve({ data: jobFixture({ id: 'job-8', status: 'processing', target_id: 'st-2' }) });
+      return Promise.resolve({ data: {} });
+    });
+    render(<StocktakeCountImportWizard stocktakeId="st-1" />);
+
+    await waitFor(() => expect(screen.getByText('step_apply', { selector: '[class*="font"]' })).toBeTruthy());
+    expect(screen.queryByRole('button', { name: 'continue_apply' })).toBeNull();
+  });
 });

@@ -519,6 +519,15 @@ export function StocktakeCountImportWizard({ stocktakeId }: { stocktakeId: strin
             <CardTitle>{t('step_apply')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {engine.job.status === 'processing' && engine.busy === null && engine.job.preview_bound && !resumeMismatch ? (
+              <div className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-background px-3 py-2">
+                <p className="text-sm text-muted">{t('continue_hint')}</p>
+                <Button type="button" onClick={() => void engine.applyLoop(engine.job!.id, {})}>
+                  <Upload className="h-4 w-4" strokeWidth={1.7} />
+                  {t('continue_apply')}
+                </Button>
+              </div>
+            ) : null}
             <ImportJobStatusPanel
               job={engine.job}
               atomic

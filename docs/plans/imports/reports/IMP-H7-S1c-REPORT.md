@@ -24,6 +24,8 @@ Web wizard for the registered `stocktake_count` domain (H7-S1b). Route `/stockta
 | 4 | Job upload without an idempotency key | **Fixed** — key derived from the single-use preview (`stocktake-count-<binding id>`), asserted |
 | 5 | Missing tests (resume, busy navigation, key) | **Added** |
 
+Also carried over from Codex's second pass on the expense wizard (#1702): a job resumed mid-`processing` now offers an explicit **Continue** (preview-bound, idle, and only when the job targets this stocktake), tested for both the matching and the foreign-target case.
+
 The same resume-domain/busy-navigation gaps exist in the expense and Partner wizards (pre-existing/H5-S2b) → follow-up **IMP-WIZARD-STATE-01** (not pushed into #1702 again to avoid restarting its CI a third time).
 
 ## Accounting impact

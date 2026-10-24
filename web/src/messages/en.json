@@ -1336,7 +1336,9 @@
     "start_another": "Import another file",
     "back_to_stocktake": "Back to the stocktake",
     "demo_unavailable": "Not available in the demo.",
-    "resumed_other_target": "This job belongs to another stocktake or domain and cannot be applied from this page."
+    "resumed_other_target": "This job belongs to another stocktake or domain and cannot be applied from this page.",
+    "continue_hint": "The job is paused midway (a disconnect or page refresh). Continue applying what was previewed.",
+    "continue_apply": "Continue"
   },
   "partnerImport": {
       "title_customer": "Import customers",
