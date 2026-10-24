@@ -22,10 +22,15 @@ class PaymentClearingReportController extends ApiController
         try {
             return response()->json(['data' => $this->reports->reconcile()]);
         } catch (DomainException $e) {
-            $forbidden = str_starts_with($e->getMessage(), 'branch_scope_forbidden');
-
-            return response()->json(['error' => ['code' => $forbidden ? 'branch_scope_forbidden' : 'operation_rejected', 'message' => $e->getMessage()]], $forbidden ? 403 : 422);
+            return $this->rejected($e);
         }
+    }
+
+    private function rejected(DomainException $e): JsonResponse
+    {
+        $forbidden = str_starts_with($e->getMessage(), 'branch_scope_forbidden');
+
+        return response()->json(['error' => ['code' => $forbidden ? 'branch_scope_forbidden' : 'operation_rejected', 'message' => $e->getMessage()]], $forbidden ? 403 : 422);
     }
 
     public function differences(Request $request): JsonResponse
@@ -35,7 +40,11 @@ class PaymentClearingReportController extends ApiController
             PaymentGateway::query()->findOrFail($data['payment_gateway_id']);   // مستأجر آخر ⇒ 404
         }
 
-        return response()->json(['data' => $this->reports->differences($data['payment_gateway_id'] ?? null, (int) ($data['limit'] ?? 200))]);
+        try {
+            return response()->json(['data' => $this->reports->differences($data['payment_gateway_id'] ?? null, (int) ($data['limit'] ?? 200))]);
+        } catch (DomainException $e) {
+            return $this->rejected($e);
+        }
     }
 
     public function aging(Request $request): JsonResponse

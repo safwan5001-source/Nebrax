@@ -12,6 +12,7 @@ use App\Models\Tenant;
 use App\Services\PaymentGatewayAdapterRegistry;
 use App\Tenancy\TenantContext;
 use Illuminate\Console\Command;
+use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -37,7 +38,8 @@ class PaymentSandboxEvidenceCommand extends Command
         }
         $tenants->set($tenant->id);
 
-        $attempt = PaymentAttempt::query()->find((string) $this->argument('attempt'));
+        $attemptId = (string) $this->argument('attempt');
+        $attempt = Str::isUuid($attemptId) ? PaymentAttempt::query()->find($attemptId) : null;
         if ($attempt === null) {
             $this->error('attempt_not_found');
 

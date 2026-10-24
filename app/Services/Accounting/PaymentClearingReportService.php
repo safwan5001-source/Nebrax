@@ -62,10 +62,14 @@ class PaymentClearingReportService
     public function reconcile(): array
     {
         $tenantId = $this->tenantId();
-        if (auth()->user()?->allowedBranchIds() !== null) {
-            throw new DomainException('branch_scope_forbidden: clearing reconciliation is company-wide and unavailable to branch-restricted users.');
-        }
+        $this->assertCompanyWideScope('clearing reconciliation');
 
+        return $this->atSnapshot(fn () => $this->buildReconciliation($tenantId));
+    }
+
+    /** @return array<string, mixed> */
+    private function buildReconciliation(string $tenantId): array
+    {
         $accounts = $this->clearingAccounts();
         $bySource = $this->ledgerBySource(array_keys($accounts));
         foreach ($accounts as $id => &$account) {
@@ -110,6 +114,7 @@ class PaymentClearingReportService
     /** @return array<string, mixed> */
     public function differences(?string $gatewayId = null, int $limit = 200): array
     {
+        $this->assertCompanyWideScope('settlement differences');
         $limit = max(1, min(500, $limit));
         $query = PaymentGatewaySettlement::query()
             ->where('status', PaymentGatewaySettlement::STATUS_UNRECONCILED)
@@ -194,6 +199,28 @@ class PaymentClearingReportService
 
     // ───────────────────────── الداخل ─────────────────────────
 
+    private function assertCompanyWideScope(string $what): void
+    {
+        if (auth()->user()?->allowedBranchIds() !== null) {
+            throw new DomainException("branch_scope_forbidden: {$what} is company-wide and unavailable to branch-restricted users.");
+        }
+    }
+
+    /** قراءات المطابقة (دفتر + مستندات) تُقرأ من لقطة واحدة على PostgreSQL فلا يظهر فرق وهمي من سند يُرحَّل بينها. */
+    private function atSnapshot(callable $read): array
+    {
+        // داخل معاملة قائمة للمستدعي (اختبارات/استدعاء مركّب) تحكمها عزلة المستدعي؛ ومستقلاً نفتح لقطة REPEATABLE READ قبل أول استعلام.
+        $nested = DB::transactionLevel() > 0;
+
+        return DB::transaction(function () use ($read, $nested): array {
+            if (! $nested && DB::connection()->getDriverName() === 'pgsql') {
+                DB::statement('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+            }
+
+            return $read();
+        });
+    }
+
     private function tenantId(): string
     {
         $id = app(TenantContext::class)->id();
@@ -255,6 +282,7 @@ class PaymentClearingReportService
             ->groupByRaw('COALESCE(e.source_type, o.source_type)')
             ->get();
 
+        $other = [];
         $map = [Payment::class => self::SOURCE_CAPTURES, PaymentRefund::class => self::SOURCE_REFUNDS, PaymentGatewaySettlement::class => self::SOURCE_SETTLEMENTS];
         foreach ($rows as $row) {
             $source = $map[(string) $row->src] ?? self::SOURCE_OTHER;
@@ -270,9 +298,17 @@ class PaymentClearingReportService
                 'credit' => ($result['totals'][$source]['credit'] ?? 0) + $credit,
             ];
             if ($source === self::SOURCE_OTHER) {
-                $result['other_labels'][] = ['source_type' => $row->src === null ? null : (string) $row->src, 'debit' => $debit, 'credit' => $credit];
+                $key = (string) $row->src;
+                $other[$key] = [
+                    'source_type' => $row->src === null ? null : (string) $row->src,
+                    'debit' => ($other[$key]['debit'] ?? 0) + $debit,
+                    'credit' => ($other[$key]['credit'] ?? 0) + $credit,
+                ];
             }
         }
+
+        // حركة «أخرى» صافيها صفر (قيد يدوي وعكسه) لا تُعرض تحذيراً: لا أثر لها على المقاصة.
+        $result['other_labels'] = array_values(array_filter($other, fn (array $o) => $o['debit'] !== $o['credit']));
 
         return $result;
     }

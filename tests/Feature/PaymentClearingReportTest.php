@@ -169,6 +169,7 @@ class PaymentClearingReportTest extends TestCase
         $r = app(PaymentClearingReportService::class)->reconcile();
         $this->assertSame('reconciled', $r['status'], 'العكس ينسب إلى أصله فيتعادل');
         $this->assertSame(0, $r['difference']);
+        $this->assertSame([], $r['other_sources'], 'قيد يدوي وعكسه صافيهما صفر ⇒ لا تحذير');
     }
 
     #[Test]
@@ -259,6 +260,7 @@ class PaymentClearingReportTest extends TestCase
         $accountant = $this->tokenForRole($this->tenant->id, 'accountant', 'acc@pay-h3-03.test');
         User::query()->where('email', 'acc@pay-h3-03.test')->firstOrFail()->branches()->sync([$east->id]);
         $this->withToken($accountant)->getJson('/api/payment-reports/clearing-reconciliation')->assertForbidden()->assertJsonPath('error.code', 'branch_scope_forbidden');
+        $this->withToken($accountant)->getJson('/api/payment-reports/settlement-differences')->assertForbidden()->assertJsonPath('error.code', 'branch_scope_forbidden');
         $this->withToken($accountant)->getJson('/api/payment-reports/clearing-aging')->assertOk()->assertJsonPath('data.totals.captures.total', 0)->assertJsonCount(0, 'data.rows');
         $this->withToken($accountant)->getJson('/api/payment-reports/clearing-aging?branch_id[]='.$main->id)->assertOk()->assertJsonPath('data.totals.captures.total', 0);
 

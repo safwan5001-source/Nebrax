@@ -99,6 +99,8 @@ class PaymentSandboxEvidenceCommandTest extends TestCase
         $this->artisan('payments:sandbox-evidence', ['attempt' => $this->attempt->id])->expectsOutputToContain('tenant_required')->assertExitCode(2);
         $this->artisan('payments:sandbox-evidence', ['attempt' => (string) \Illuminate\Support\Str::uuid(), '--tenant' => 'sandbox-evidence'])->expectsOutputToContain('attempt_not_found')->assertFailed();
 
+        $this->artisan('payments:sandbox-evidence', ['attempt' => 'not-a-uuid', '--tenant' => 'sandbox-evidence'])->expectsOutputToContain('attempt_not_found')->assertFailed();
+
         DB::table('payment_gateways')->where('id', $this->gateway->id)->update(['environment' => 'live']);
         $this->artisan('payments:sandbox-evidence', ['attempt' => $this->attempt->id, '--tenant' => 'sandbox-evidence', '--fetch' => true])
             ->expectsOutputToContain('sandbox_only')->assertFailed();
