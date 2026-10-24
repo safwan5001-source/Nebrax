@@ -82,6 +82,13 @@
   }
 }
 
+/* Payment artwork stays unchanged on a light neutral canvas in every storefront mode. */
+.awj-payment-brand-surface {
+  background-color: #fff;
+  border-color: rgb(0 0 0 / 10%);
+  color-scheme: light;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

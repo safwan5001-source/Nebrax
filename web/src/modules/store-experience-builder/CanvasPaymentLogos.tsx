@@ -49,7 +49,7 @@ export function CanvasPaymentLogos({
           className={cn(
             "flex shrink-0 items-center justify-center",
             settings.style === "cards" &&
-              `rounded-store border border-black/10 bg-white ${CARD_PADDING[settings.size]}`,
+              `awj-payment-brand-surface rounded-store border ${CARD_PADDING[settings.size]}`,
           )}
         >
           <img
@@ -80,7 +80,12 @@ export function CanvasPaymentLogos({
         <h2 className="mb-3 text-sm font-bold text-store-footer-foreground">{title}</h2>
       ) : null}
       {settings.style === "strip" ? (
-        <div className={cn("max-w-full overflow-x-auto rounded-store bg-white", CARD_PADDING[settings.size])}>
+        <div
+          className={cn(
+            "awj-payment-brand-surface max-w-full overflow-x-auto rounded-store",
+            CARD_PADDING[settings.size],
+          )}
+        >
           {list}
         </div>
       ) : list}

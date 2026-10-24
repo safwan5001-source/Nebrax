@@ -242,7 +242,7 @@ export function FooterEditor({
           </select>
         </Field>
         <div className="space-y-2">
-          <p className="text-[12px] font-medium text-neutral-600">{t("footerPaymentBrands")}</p>
+          <p className="text-[12px] font-medium text-muted">{t("footerPaymentBrands")}</p>
           <ul className="divide-y divide-border border border-border">
             {paymentRows.map((brandKey) => {
               const brand = paymentBrandPresentation(brandKey);
@@ -251,7 +251,7 @@ export function FooterEditor({
               const selected = selectedAt >= 0;
               return (
                 <li key={brandKey} data-payment-brand={brandKey} className="flex min-h-12 items-center gap-2 px-2">
-                  <label className="flex min-w-0 flex-1 items-center gap-2 text-[12px] text-neutral-800">
+                  <label className="flex min-w-0 flex-1 items-center gap-2 text-[12px] text-text">
                     <input
                       type="checkbox"
                       checked={selected}
