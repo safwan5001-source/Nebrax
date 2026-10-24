@@ -321,16 +321,23 @@ describe('PurchaseImportWizard (IMP-H5-S4b)', () => {
     expect(screen.getByText('preview_used')).toBeTruthy();
   });
 
-  it('refuses to continue a job of another domain opened from the URL', async () => {
-    window.history.replaceState({}, '', '/purchases/import?job=job-7');
-    api.mockImplementation((path: string) => {
-      if (path === '/import-jobs/job-7') return Promise.resolve({ data: jobFixture({ id: 'job-7', domain: 'expense_import', status: 'ready', preview_bound: true }) });
-      return Promise.resolve({ data: [] });
-    });
-    render(<PurchaseImportWizard />);
+  it('never shows or continues a job of another domain opened from the URL, in any status', async () => {
+    for (const status of ['ready', 'processing']) {
+      window.history.replaceState({}, '', '/purchases/import?job=job-7');
+      api.mockReset();
+      api.mockImplementation((path: string) => {
+        if (path === '/import-jobs/job-7') return Promise.resolve({ data: jobFixture({ id: 'job-7', domain: 'expense_import', status, preview_bound: true }) });
+        return Promise.resolve({ data: [] });
+      });
+      const { unmount } = render(<PurchaseImportWizard />);
 
-    await waitFor(() => expect(screen.getByText('resumed_wrong_domain')).toBeTruthy());
-    expect((screen.getByRole('button', { name: 'apply' }) as HTMLButtonElement).disabled).toBe(true);
+      await waitFor(() => expect(screen.getByText('resumed_wrong_domain')).toBeTruthy());
+      // لا زر تنفيذ ولا متابعة ولا خطوة تنفيذ: المحرّك المشترك كان سينفّذ المعرّف الممرَّر بلا فحص مجاله
+      expect(screen.queryByRole('button', { name: 'apply' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'continue_apply' })).toBeNull();
+      expect(api.mock.calls.some((call) => String(call[0]).endsWith('/apply'))).toBe(false);
+      unmount();
+    }
   });
 
   it('resumes a bound job from the URL without a file and refuses an unbound one', async () => {
