@@ -49,6 +49,11 @@
 .awj-store-preview .border-store-border { border-color: var(--store-border); }
 .awj-store-preview .border-store-border-strong { border-color: var(--store-border-strong); }
 .awj-store-preview .border-store-footer-border { border-color: var(--store-footer-border); }
+.awj-store-preview .awj-payment-brand-surface {
+  background-color: #fff;
+  border-color: rgb(0 0 0 / 10%);
+  color-scheme: light;
+}
 .awj-store-preview .rounded-store { border-radius: var(--store-radius); }
 .awj-store-preview .max-w-store { max-width: var(--store-content-max); }
 .awj-store-preview .from-primary-700 { --tw-gradient-from: var(--store-primary-700, #0f2e23); }

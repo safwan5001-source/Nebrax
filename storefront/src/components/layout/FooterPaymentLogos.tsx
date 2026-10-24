@@ -76,7 +76,7 @@ export function FooterPaymentLogos({
             className={cn(
               "flex shrink-0 items-center justify-center",
               settings.style === "cards" &&
-                `rounded-store border border-black/10 bg-white ${CARD_PADDING[settings.size]}`,
+                `awj-payment-brand-surface rounded-store border ${CARD_PADDING[settings.size]}`,
             )}
           >
             <Image
@@ -116,7 +116,7 @@ export function FooterPaymentLogos({
       {settings.style === "strip" ? (
         <div
           className={cn(
-            "max-w-full overflow-x-auto rounded-store bg-white",
+            "awj-payment-brand-surface max-w-full overflow-x-auto rounded-store",
             CARD_PADDING[settings.size],
           )}
         >
