@@ -78,11 +78,12 @@ class CommercePaymentIntentController extends ApiController
             'amount_minor' => $intent->amount_minor,
             'currency' => $intent->currency,
             'collected_at' => $intent->collected_at?->toIso8601String(),
-            'paid_at' => $intent->paid_at?->toIso8601String(),
             'cancelled_at' => $intent->cancelled_at?->toIso8601String(),
             'created_at' => $intent->created_at?->toIso8601String(),
-            'attempts' => $intent->isOnline()
-                ? ($attempts ?? collect())->map(fn (PaymentAttempt $a) => [
+            // PAY-H4-04a: للنية الإلكترونية فقط (غائبان لـCOD/الاستلام فيبقى شكل الاستجابة كما كان).
+            ...($intent->isOnline() ? [
+                'paid_at' => $intent->paid_at?->toIso8601String(),
+                'attempts' => ($attempts ?? collect())->map(fn (PaymentAttempt $a) => [
                     'id' => $a->id,
                     'capture_status' => $a->capture_status,
                     'amount_minor' => (int) $a->amount_minor,
@@ -91,8 +92,8 @@ class CommercePaymentIntentController extends ApiController
                     'review_reasons' => $a->review_reasons ?? [],
                     'captured_at' => $a->captured_at?->toIso8601String(),
                     'created_at' => $a->created_at?->toIso8601String(),
-                ])->values()->all()
-                : [],
+                ])->values()->all(),
+            ] : []),
         ];
     }
 }

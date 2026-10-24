@@ -203,6 +203,15 @@ final class CommerceOnlinePaymentService
                 return 'missing';
             }
             if ($intent->isPaid()) {
+                // نية مدفوعة والتُقطت محاولة أخرى لها (دفعة مزدوجة، ولو بلا مرور بحالة «ملغاة» كمحاولة مفوَّضة): تُوسم للمراجعة البشرية.
+                $dup = PaymentAttempt::query()->find($attempt->getKey());
+                if ($dup !== null && $dup->capture_status === PaymentAttempt::STATUS_CAPTURED
+                    && ! in_array(PaymentAttempt::REVIEW_LATE_CAPTURE, $dup->review_reasons ?? [], true)
+                    && PaymentAttempt::query()->where('payable_key', $dup->payable_key)->where('id', '!=', $dup->getKey())
+                        ->where('capture_status', PaymentAttempt::STATUS_CAPTURED)->exists()) {
+                    $dup->forceFill(['review_reasons' => array_values(array_unique([...($dup->review_reasons ?? []), PaymentAttempt::REVIEW_LATE_CAPTURE]))])->save();
+                }
+
                 return 'paid';
             }
             $fresh = PaymentAttempt::query()->find($attempt->getKey());
@@ -377,6 +386,8 @@ final class CommerceOnlinePaymentService
             $intent->isCancelled() => 'cancelled',
             $held => 'under_review',
             $attempt === null => 'awaiting_payment',
+            // محاولة بدأت ولم تبلغ المزوّد (انقطاع عند البدء): لا صفحة للعميل بعد؛ إعادة `payment-intent` تستأنفها بمفتاحها الثابت.
+            $attempt->capture_status === PaymentAttempt::STATUS_CREATED && $attempt->provider_payment_id === null => 'awaiting_payment',
             in_array($attempt->capture_status, [PaymentAttempt::STATUS_CREATED, PaymentAttempt::STATUS_PENDING_CUSTOMER, PaymentAttempt::STATUS_AUTHORIZED], true) => 'pending',
             $attempt->capture_status === PaymentAttempt::STATUS_EXPIRED => 'expired',
             $attempt->capture_status === PaymentAttempt::STATUS_CANCELLED => 'cancelled',

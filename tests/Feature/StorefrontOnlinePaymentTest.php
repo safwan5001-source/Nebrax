@@ -440,6 +440,8 @@ class StorefrontOnlinePaymentTest extends TestCase
         $this->fake->failNextCheckouts();
 
         $this->startPayment($order)->assertStatus(503)->assertJsonPath('error.code', 'payment_provider_unavailable');
+        // الحالة العامة بعد الانقطاع ليست طريقاً مسدوداً: لا صفحة بعد، والتكرار متاح (إعادة payment-intent تستأنف)
+        $this->paymentStatus($order)->assertOk()->assertJsonPath('data.payment.status', 'awaiting_payment')->assertJsonPath('data.payment.can_retry', true);
         $this->assertCount(1, $this->attempts($order['order_id']));
         $this->assertSame('created', $this->attempts($order['order_id'])->first()->capture_status);
 
@@ -626,6 +628,50 @@ class StorefrontOnlinePaymentTest extends TestCase
         app(PaymentOrchestrator::class)->sync($second->fresh());
         $this->assertContains(PaymentAttempt::REVIEW_LATE_CAPTURE, $second->fresh()->review_reasons);
         $this->assertSame(1, CommercePaymentIntent::query()->where('status', CommercePaymentIntent::STATUS_PAID)->count());
+    }
+
+    #[Test]
+    public function a_second_capture_on_an_already_paid_intent_is_flagged_even_when_its_attempt_was_authorized_and_could_not_be_cancelled(): void
+    {
+        $order = $this->onlineOrder();
+        $this->startPayment($order)->assertCreated();
+        $first = $this->attempts($order['order_id'])->first();
+        DB::table('payment_attempts')->where('id', $first->id)->update(['capture_status' => 'expired']);
+        $this->startPayment($order)->assertCreated();
+        $second = $this->attempts($order['order_id'])->last();
+        // الثانية «مفوَّضة» لدى المزوّد فلا تُلغى محلياً
+        $this->fake->script((string) $second->provider_payment_id, 'authorized');
+        app(PaymentOrchestrator::class)->sync($second->fresh());
+        $this->assertSame('authorized', $second->fresh()->capture_status);
+
+        $this->capture($first->fresh());
+        app(PaymentOrchestrator::class)->sync($first->fresh());
+        $this->assertSame(CommercePaymentIntent::STATUS_PAID, $this->intent($order['order_id'])->status);
+
+        $this->capture($second->fresh());
+        app(PaymentOrchestrator::class)->sync($second->fresh());
+
+        $this->assertSame('captured', $second->fresh()->capture_status);
+        $this->assertContains(PaymentAttempt::REVIEW_LATE_CAPTURE, $second->fresh()->review_reasons ?? [], 'دفعة مزدوجة بلا علامة مراجعة');
+        $this->assertSame(1, CommercePaymentIntent::query()->where('status', CommercePaymentIntent::STATUS_PAID)->count());
+    }
+
+    #[Test]
+    public function the_staff_listing_adds_online_only_fields_just_for_online_intents(): void
+    {
+        $online = $this->onlineOrder();
+        $product = $this->product($this->tenant, $this->channel);
+        config(['payments.commerce_online_checkout.enabled' => false]);
+        $cod = $this->complete($this->readyCheckout($product, null), 'idem-cod-001')->assertCreated();
+        config(['payments.commerce_online_checkout.enabled' => true]);
+
+        $rows = collect($this->withToken($this->token('accountant'))->getJson('/api/commerce/payment-intents')->assertOk()->json('data'));
+        $onlineRow = $rows->firstWhere('commerce_order_id', $online['order_id']);
+        $codRow = $rows->firstWhere('commerce_order_id', $cod->json('data.order.id'));
+        $this->assertArrayHasKey('attempts', $onlineRow);
+        $this->assertArrayHasKey('paid_at', $onlineRow);
+        $this->assertArrayNotHasKey('attempts', $codRow, 'شكل COD كما كان');
+        $this->assertArrayNotHasKey('paid_at', $codRow);
     }
 
     // ═══════════════ الملكية والعزل ═══════════════
