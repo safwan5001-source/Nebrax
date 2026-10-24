@@ -47,6 +47,22 @@ export interface AwjOnlinePayment {
   checkout_url: string | null;
 }
 
+/** A 200 without a well-formed `payment` is an API fault, never a verdict — it must not reach the UI as one. */
+function asPayment(value: unknown): AwjOnlinePayment {
+  const payment = value as Partial<AwjOnlinePayment> | null | undefined;
+  if (
+    !payment ||
+    typeof payment !== "object" ||
+    !(AWJ_ONLINE_PAYMENT_STATUSES as readonly string[]).includes(
+      payment.status as string,
+    ) ||
+    typeof payment.amount?.amount_minor !== "number"
+  ) {
+    throw new Error("Malformed payment response");
+  }
+  return payment as AwjOnlinePayment;
+}
+
 function withReference(reference: string): Record<string, string> {
   return { [ORDER_REFERENCE_HEADER]: reference };
 }
@@ -68,7 +84,7 @@ export async function startAwjOnlinePayment(
     { order_id: orderId },
     withReference(orderReference),
   );
-  return response.data.payment;
+  return asPayment(response.data.payment);
 }
 
 /** The server's current verdict on the order's payment (it asks the provider when needed). */
@@ -84,5 +100,5 @@ export async function fetchAwjOnlinePaymentStatus(
     undefined,
     withReference(orderReference),
   );
-  return response.data.payment;
+  return asPayment(response.data.payment);
 }

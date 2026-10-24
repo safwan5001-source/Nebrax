@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearPendingOnlinePayment,
   PENDING_PAYMENT_TTL_MS,
@@ -58,5 +58,25 @@ describe("pending online payment storage", () => {
     });
     clearPendingOnlinePayment();
     expect(readPendingOnlinePayment()).toBeNull();
+  });
+
+  it("reports failure when storage is blocked so the checkout can start the payment inline instead of stranding the order", () => {
+    const spy = vi
+      .spyOn(Storage.prototype, "setItem")
+      .mockImplementation(() => {
+        throw new Error("blocked");
+      });
+    expect(
+      savePendingOnlinePayment({
+        orderId: "o",
+        orderReference: "r",
+        orderNumber: null,
+      }),
+    ).toBe(false);
+    spy.mockRestore();
+  });
+
+  it("outlives the longest payment hold the API allows (24h)", () => {
+    expect(PENDING_PAYMENT_TTL_MS).toBeGreaterThan(24 * 60 * 60 * 1000);
   });
 });

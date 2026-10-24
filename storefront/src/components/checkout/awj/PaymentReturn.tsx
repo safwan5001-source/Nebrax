@@ -58,6 +58,8 @@ export const PAYMENT_RETURN_PATH = "/checkout/payment-return";
 const POLL_INTERVAL_MS = 3000;
 /** ~2 minutes, then stop hammering and let the shopper re-check by hand. */
 const MAX_POLLS = 40;
+/** Transient errors (provider down, 429/5xx) are retried only briefly before saying so. */
+const MAX_TRANSIENT_RETRIES = 8;
 
 type View =
   | { kind: "loading" }
@@ -81,6 +83,9 @@ export function PaymentReturn({ basePath }: { basePath: string }) {
   const [view, setView] = useState<View>({ kind: "loading" });
   const recordRef = useRef<PendingOnlinePayment | null>(null);
   const pollsRef = useRef(0);
+  const transientRef = useRef(0);
+  const startingRef = useRef(false);
+  const bootedRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoStartedRef = useRef(false);
   const mountedRef = useRef(true);
@@ -119,15 +124,13 @@ export function PaymentReturn({ basePath }: { basePath: string }) {
           return;
         }
         // Transient (provider/network): keep trying a few times, then say so.
+        // The current view stays put meanwhile (no flicker of the live region).
         if (
           (result.reason === "provider_unavailable" ||
             result.reason === "error") &&
-          pollsRef.current < MAX_POLLS
+          transientRef.current < MAX_TRANSIENT_RETRIES
         ) {
-          pollsRef.current += 1;
-          setView((current) =>
-            current.kind === "loading" ? current : { kind: "loading" },
-          );
+          transientRef.current += 1;
           timerRef.current = setTimeout(
             () => void refresh({ autoStart: opts.autoStart }),
             POLL_INTERVAL_MS,
@@ -138,10 +141,11 @@ export function PaymentReturn({ basePath }: { basePath: string }) {
         return;
       }
 
+      transientRef.current = 0;
       const { payment } = result;
 
       if (payment.status === "paid") {
-        clearPendingOnlinePayment();
+        // The record stays (it expires on its own): a reload or a revisit must keep showing "paid", not "unknown".
         stopPolling();
         setView({ kind: "payment", payment, slow: false });
         return;
@@ -184,35 +188,47 @@ export function PaymentReturn({ basePath }: { basePath: string }) {
 
   const startPayment = useCallback(async () => {
     const record = recordRef.current;
-    if (!record) return;
-    stopPolling();
-    setView({ kind: "starting" });
-    const result = await startOnlinePaymentAction(
-      record.orderId,
-      record.orderReference,
-    );
-    if (!mountedRef.current) return;
-    if (!result.success) {
-      if (result.reason === "not_found") {
-        clearPendingOnlinePayment();
-        recordRef.current = null;
-        setView({ kind: "unknown" });
+    if (!record || startingRef.current) return;
+    startingRef.current = true;
+    try {
+      stopPolling();
+      setView({ kind: "starting" });
+      const result = await startOnlinePaymentAction(
+        record.orderId,
+        record.orderReference,
+      );
+      if (!mountedRef.current) return;
+      if (!result.success) {
+        if (result.reason === "not_found") {
+          clearPendingOnlinePayment();
+          recordRef.current = null;
+          setView({ kind: "unknown" });
+          return;
+        }
+        if (result.reason === "not_payable") {
+          // Already paid (another tab), or an attempt is in progress: the server's current verdict is the truth to show, not a dead end.
+          pollsRef.current = 0;
+          transientRef.current = 0;
+          await refresh({ autoStart: false });
+          return;
+        }
+        setView({ kind: "failure", reason: result.reason });
         return;
       }
-      setView({ kind: "failure", reason: result.reason });
-      return;
+      if (result.payment.status === "paid") {
+        setView({ kind: "payment", payment: result.payment, slow: false });
+        return;
+      }
+      if (goToProvider(result.payment)) {
+        return; // leaving the page; keep the "starting" notice until the browser navigates
+      }
+      // No usable payment page (provider hiccup): fall back to the server's verdict.
+      pollsRef.current = 0;
+      transientRef.current = 0;
+      await refresh({ autoStart: false });
+    } finally {
+      startingRef.current = false;
     }
-    if (result.payment.status === "paid") {
-      clearPendingOnlinePayment();
-      setView({ kind: "payment", payment: result.payment, slow: false });
-      return;
-    }
-    if (goToProvider(result.payment)) {
-      return; // leaving the page; keep the "starting" notice until the browser navigates
-    }
-    // No usable payment page (provider hiccup): fall back to the server's verdict.
-    pollsRef.current = 0;
-    await refresh({ autoStart: false });
   }, [goToProvider, refresh, stopPolling]);
 
   useEffect(() => {
@@ -221,6 +237,15 @@ export function PaymentReturn({ basePath }: { basePath: string }) {
 
   useEffect(() => {
     mountedRef.current = true;
+    // React StrictMode re-runs effects in development: boot (read storage, strip `?start=1`, first refresh) exactly once,
+    // so there is one poll chain and `?start=1` is never consumed by a run whose result is thrown away.
+    if (bootedRef.current) {
+      return () => {
+        mountedRef.current = false;
+        stopPolling();
+      };
+    }
+    bootedRef.current = true;
     const record = readPendingOnlinePayment();
     recordRef.current = record;
     if (!record) {

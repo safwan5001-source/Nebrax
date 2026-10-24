@@ -89,6 +89,7 @@ import {
   updateAwjPayment,
   updateAwjSchedule,
 } from "@/lib/data/awj-checkout";
+import { startOnlinePaymentAction } from "@/lib/data/awj-online-payment";
 import { extractBasePath } from "@/lib/utils/path";
 
 /** The states the flow can be in that are not one of the six stages. */
@@ -449,14 +450,30 @@ export function AwjCheckoutFlow() {
         // Anything else (cash on delivery/pickup, or the gate closed) is
         // exactly the confirmation it has always been.
         if (result.orderReference && result.order.payment.requires_action) {
-          savePendingOnlinePayment({
+          const saved = savePendingOnlinePayment({
             orderId: result.order.id,
             orderReference: result.orderReference,
             orderNumber: result.order.number,
           });
-          setFlowState("redirecting");
-          window.location.assign(`${basePath}${PAYMENT_RETURN_PATH}?start=1`);
-          return;
+          if (saved) {
+            setFlowState("redirecting");
+            window.location.assign(`${basePath}${PAYMENT_RETURN_PATH}?start=1`);
+            return;
+          }
+          // Storage is blocked (private mode, policy): the return page could not
+          // identify the order, so start the payment right here instead of
+          // stranding a placed order. If that cannot start either, fall through
+          // to the plain confirmation (the order exists; the store follows up).
+          const started = await startOnlinePaymentAction(
+            result.order.id,
+            result.orderReference,
+          );
+          const url = started.success ? started.payment.checkout_url : null;
+          if (url?.startsWith("https://")) {
+            setFlowState("redirecting");
+            window.location.assign(url);
+            return;
+          }
         }
         setStage("confirmation");
         setFlowState("done");

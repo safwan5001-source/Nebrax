@@ -82,7 +82,10 @@ describe("PaymentReturn in every shipped language", () => {
           messages.awjCheckout.paymentReturn as Record<string, string>
         )[titleKey];
         render(
-          <NextIntlClientProvider locale={locale} messages={messages}>
+          <NextIntlClientProvider
+            locale={locale as keyof typeof LOCALES}
+            messages={messages}
+          >
             <PaymentReturn basePath={`/sa/${locale}`} />
           </NextIntlClientProvider>,
         );

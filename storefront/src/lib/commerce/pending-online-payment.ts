@@ -17,8 +17,12 @@
 
 const STORAGE_KEY = "awj.pendingOnlinePayment.v1";
 
-/** A reference older than this is dropped — long enough to finish paying, short enough for a shared device. */
-export const PENDING_PAYMENT_TTL_MS = 6 * 60 * 60 * 1000;
+/**
+ * A reference older than this is dropped. It must outlive the longest payment hold the API allows (24h,
+ * `sales.commerce_payment_hold_minutes`), otherwise a shopper returning to a still-payable or already-paid order would
+ * see "unknown"; it is also the only thing that removes the record — a paid order's page keeps working on reload.
+ */
+export const PENDING_PAYMENT_TTL_MS = 25 * 60 * 60 * 1000;
 
 export interface PendingOnlinePayment {
   orderId: string;
@@ -35,17 +39,21 @@ function storage(): Storage | null {
   }
 }
 
+/** `true` only when the record was really written — the caller must not rely on the return page otherwise. */
 export function savePendingOnlinePayment(
   value: Omit<PendingOnlinePayment, "savedAt">,
   now: number = Date.now(),
-): void {
+): boolean {
+  const store = storage();
+  if (!store) return false;
   try {
-    storage()?.setItem(
+    store.setItem(
       STORAGE_KEY,
       JSON.stringify({ ...value, savedAt: now } satisfies PendingOnlinePayment),
     );
+    return store.getItem(STORAGE_KEY) !== null;
   } catch {
-    // Storage full/blocked: the redirect still happens; only the return page's lookup is affected.
+    return false; // storage full/blocked
   }
 }
 

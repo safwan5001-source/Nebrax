@@ -5,6 +5,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PaymentReturn } from "@/components/checkout/awj/PaymentReturn";
 import type { AwjOnlinePayment } from "@/lib/commerce/online-payment";
@@ -70,14 +71,14 @@ describe("PaymentReturn", () => {
     expect(status).not.toHaveBeenCalled();
   });
 
-  it("shows paid only when the server says paid, and forgets the order reference afterwards", async () => {
+  it("shows paid only when the server says paid, and keeps the record so a reload still says paid (it expires on its own)", async () => {
     status.mockResolvedValue(
       ok(payment({ status: "paid", paid_at: "2026-10-24T10:00:00Z" })),
     );
     render(<PaymentReturn basePath="/sa/ar" />);
     expect(await screen.findByText("paidTitle")).toBeInTheDocument();
     expect(status).toHaveBeenCalledWith("o-1", "ref-1");
-    expect(readPendingOnlinePayment()).toBeNull();
+    expect(readPendingOnlinePayment()?.orderId).toBe("o-1");
   });
 
   it("never trusts the address bar: a ?status=paid from the provider changes nothing", async () => {
@@ -205,5 +206,61 @@ describe("PaymentReturn", () => {
     render(<PaymentReturn basePath="/sa/ar" />);
     expect(await screen.findByText("unavailableTitle")).toBeInTheDocument();
     expect(screen.queryByText("checkAgain")).toBeNull();
+  });
+
+  it("starting a payment that the server says is no longer payable re-checks the real status instead of a dead end", async () => {
+    status
+      .mockResolvedValueOnce(ok(payment({ status: "failed", can_retry: true })))
+      .mockResolvedValueOnce(ok(payment({ status: "paid" })));
+    start.mockResolvedValue({ success: false, reason: "not_payable" });
+    render(<PaymentReturn basePath="/sa/ar" />);
+    fireEvent.click(await screen.findByText("tryAgain"));
+    expect(await screen.findByText("paidTitle")).toBeInTheDocument();
+    expect(screen.queryByText("unavailableTitle")).toBeNull();
+  });
+
+  it("under React StrictMode the first refresh and the ?start=1 auto-start each happen once", async () => {
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: {
+        ...window.location,
+        assign,
+        search: "?start=1",
+        pathname: "/sa/ar/checkout/payment-return",
+      },
+    });
+    status.mockResolvedValue(
+      ok(payment({ status: "awaiting_payment", can_retry: true })),
+    );
+    start.mockResolvedValue(
+      ok(
+        payment({ status: "pending", checkout_url: "https://pay.example/p/9" }),
+      ),
+    );
+    render(
+      <StrictMode>
+        <PaymentReturn basePath="/sa/ar" />
+      </StrictMode>,
+    );
+    await waitFor(() =>
+      expect(assign).toHaveBeenCalledWith("https://pay.example/p/9"),
+    );
+    expect(status).toHaveBeenCalledTimes(1);
+    expect(start).toHaveBeenCalledTimes(1);
+  });
+
+  it("a malformed or unknown server answer never becomes a verdict", async () => {
+    status.mockResolvedValue({ success: false, reason: "error" });
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    render(<PaymentReturn basePath="/sa/ar" />);
+    // transient errors keep the loading notice (no flicker) and stop after a bounded number of retries
+    for (let i = 0; i < 9; i += 1) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3100);
+      });
+    }
+    expect(await screen.findByText("errorTitle")).toBeInTheDocument();
+    expect(screen.queryByText("paidTitle")).toBeNull();
+    expect(status.mock.calls.length).toBeLessThanOrEqual(9);
   });
 });
