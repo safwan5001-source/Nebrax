@@ -141,6 +141,12 @@ Schedule::command('payments:complete-commerce-captures')
     ->withoutOverlapping(10)
     ->onOneServer();
 
+// PAY-H4-02: مكنسة الطلبات الإلكترونية غير المدفوعة — تتحقق من المزوّد ثم تلغي النية وتحرّر الحجز. الحجز لا يُحرَّر بغيرها (idempotent).
+Schedule::command('commerce:expire-unpaid-orders')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(10)
+    ->onOneServer();
+
 // PAY-H3-01c: شبكة أمان لترحيل A5 لاستردادات البوابة المؤكَّدة المعلّقة (فشل المستمع/انهيار). idempotent: لا قيد ثانٍ أبداً (قفل + مفتاح فريد).
 Schedule::command('payments:post-refunds')
     ->everyFiveMinutes()

@@ -7,6 +7,7 @@ use App\Models\CommerceCartItem;
 use App\Models\CommerceCheckout;
 use App\Models\CommerceListing;
 use App\Models\CommerceOrder;
+use App\Support\CommercePaymentHold;
 use App\Models\CommercePaymentIntent;
 use App\Models\PaymentMethod;
 use App\Models\Product;
@@ -80,6 +81,7 @@ final class CommerceCheckoutService
         private readonly ShippingRateService $shipping,
         private readonly PaymentMethodChannelAvailabilityService $paymentAvailability,
         private readonly CommercePaymentIntentService $paymentIntents,
+        private readonly CommerceOrderReservationService $orderReservations,
     ) {}
 
     /**
@@ -602,7 +604,12 @@ final class CommerceCheckoutService
             // COM-MOBILE-PAYMENTS-1 (ADR-04/ADR-09) — نفس معاملة إنشاء
             // الطلب: لا طلبٌ بلا Payment Intent مطابق. فشلٌ هنا يُلغي إنشاء
             // الطلب كله (savepoint متداخلة ضمن معاملة complete() الخارجية).
-            $this->paymentIntents->createForOrder($order, $checkout->payment_method_id, $checkout->delivery_method);
+            $intent = $this->paymentIntents->createForOrder($order, $checkout->payment_method_id, $checkout->delivery_method);
+
+            // H4-02 / D-14: الطلب الإلكتروني يحجز مخزونه مؤقتاً حتى الدفع (COD/الاستلام بلا حجز كما كان). النقص يُرجع الإتمام كله لمراجعة السلة.
+            if ($intent->isOnline()) {
+                $this->holdStockForPayment($order, $items);
+            }
 
             $checkout->update([
                 'status' => CommerceCheckout::STATUS_COMPLETED,
@@ -618,6 +625,29 @@ final class CommerceCheckoutService
 
             return ['order' => $order, 'replayed' => false];
         }, 3);
+    }
+
+    /**
+     * @param  Collection<int, CommerceCartItem>  $items
+     *
+     * @throws CheckoutReviewRequiredException المخزون لم يعد كافياً أو لا مخزن تنفيذ.
+     */
+    private function holdStockForPayment(CommerceOrder $order, Collection $items): void
+    {
+        try {
+            $this->orderReservations->reserve($order, CommercePaymentHold::expiresAt());
+        } catch (InsufficientAvailabilityException $e) {
+            $item = $items->first(fn (CommerceCartItem $i): bool => $i->product_id === $e->productId && ($i->product_variant_id ?? null) === $e->variantId);
+            throw new CheckoutReviewRequiredException(
+                'بعض عناصر السلة تغيّرت — راجع السلة قبل الإتمام.',
+                [['item_id' => $item?->id ?? 'cart', 'reason' => 'insufficient_stock']],
+            );
+        } catch (FulfillmentPolicyNotConfiguredException) {
+            throw new CheckoutReviewRequiredException(
+                'بعض عناصر السلة تغيّرت — راجع السلة قبل الإتمام.',
+                [['item_id' => 'cart', 'reason' => 'fulfillment_not_configured']],
+            );
+        }
     }
 
     /**

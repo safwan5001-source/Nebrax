@@ -160,6 +160,12 @@ final class CommercePaymentIntentService
 
         if ($cancelled->isOnline()) {
             $this->online->closeActiveAttempts($cancelled); // best-effort؛ التقاط لاحق على صفحة بقيت حيّة يُوسم late_capture للمراجعة
+            // H4-02: نية إلكترونية ملغاة (لم يُلتقط شيء — فُحص تحت القفل) ⇒ يُحرَّر حجز مخزون الطلب. فشل التحرير تعالجه المكنسة لاحقاً.
+            try {
+                app(CommerceOrderReservationService::class)->releaseActive((string) $cancelled->commerce_order_id);
+            } catch (\Throwable $e) {
+                report($e);
+            }
         }
 
         return $cancelled;

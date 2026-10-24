@@ -10,4 +10,8 @@ use RuntimeException;
  */
 class InsufficientAvailabilityException extends RuntimeException
 {
+    /** H4-02: سطر الطلب الذي نقص مخزونه (يعبّئه `CommerceOrderReservationService`) ليُعاد إلى مراجعة السلة؛ الصنف نفسه لا يتغيّر فيبقى عقد الاستثناء كما هو. */
+    public ?string $productId = null;
+
+    public ?string $variantId = null;
 }
