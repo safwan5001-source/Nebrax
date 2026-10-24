@@ -561,6 +561,48 @@ class StorefrontOnlinePaymentTest extends TestCase
     }
 
     #[Test]
+    public function a_start_racing_an_admin_cancel_never_hands_out_a_live_page_for_a_cancelled_intent(): void
+    {
+        $order = $this->onlineOrder();
+        // الإلغاء يلتزم أثناء استدعاء المزوّد لإنشاء الصفحة (بعد فحص الصلاحية وقبل عودة البدء)
+        $this->fake->onCheckout = function () use ($order): void {
+            DB::table('commerce_payment_intents')->where('commerce_order_id', $order['order_id'])->update(['status' => 'cancelled', 'cancelled_at' => now('UTC')]);
+        };
+
+        $this->startPayment($order)->assertStatus(409)->assertJsonPath('error.code', 'payment_not_payable');
+
+        $attempts = $this->attempts($order['order_id']);
+        $this->assertCount(1, $attempts);
+        $this->assertSame('cancelled', $attempts->first()->capture_status, 'لا صفحة دفع حيّة لنية ملغاة');
+        $this->fake->onCheckout = null;
+        $this->startPayment($order)->assertStatus(409)->assertJsonPath('error.code', 'payment_not_payable');
+        $this->assertCount(1, $this->attempts($order['order_id']));
+    }
+
+    #[Test]
+    public function the_safety_net_skips_held_captures_before_applying_its_batch_limit(): void
+    {
+        Event::fake([CommercePaymentAttemptCaptured::class]);
+        $held = $this->onlineOrder();
+        $this->startPayment($held)->assertCreated();
+        $heldAttempt = $this->attempts($held['order_id'])->first();
+        $this->fake->script((string) $heldAttempt->provider_payment_id, 'captured', 4000, 5000); // مبلغ غير مطابق ⇒ محجوزة للمراجعة
+        app(PaymentOrchestrator::class)->sync($heldAttempt);
+
+        $good = $this->onlineOrder(null, null, null, 'idem-online-002');
+        $this->startPayment($good)->assertCreated();
+        $goodAttempt = $this->attempts($good['order_id'])->first();
+        $this->capture($goodAttempt);
+        app(PaymentOrchestrator::class)->sync($goodAttempt);
+
+        // الدفعة بحدّ 1: الأقدم محجوزة ولا يجوز أن تسدّ الطريق أمام الصالحة
+        $this->artisan('payments:complete-commerce-captures', ['--limit' => 1])->assertSuccessful();
+
+        $this->assertSame(CommercePaymentIntent::STATUS_PAID, $this->intent($good['order_id'])->status);
+        $this->assertSame(CommercePaymentIntent::STATUS_PENDING, $this->intent($held['order_id'])->status);
+    }
+
+    #[Test]
     public function a_second_open_attempt_is_cancelled_once_the_order_is_paid_and_a_double_payment_is_flagged(): void
     {
         $order = $this->onlineOrder();

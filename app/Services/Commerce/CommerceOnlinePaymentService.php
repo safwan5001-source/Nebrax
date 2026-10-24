@@ -131,6 +131,13 @@ final class CommerceOnlinePaymentService
             throw $this->map($e);
         }
 
+        // سباق مع إلغاء الإدارة: النية قد أُلغيت بين فحص الصلاحية وولادة المحاولة ⇒ تُغلق المحاولة الجديدة ولا تُسلَّم صفحة دفع لنية ملغاة.
+        $current = CommercePaymentIntent::query()->find($intent->getKey());
+        if ($current === null || $current->status !== CommercePaymentIntent::STATUS_PENDING) {
+            $this->closeActiveAttempts($intent);
+            throw new CommerceOnlinePaymentException('not_payable', 'الطلب لم يعد قابلاً للدفع.');
+        }
+
         return ['attempt' => $attempt, 'created' => $active === null || $active->getKey() !== $attempt->getKey()];
     }
 
@@ -229,19 +236,24 @@ final class CommerceOnlinePaymentService
         return $result === 'paid';
     }
 
-    /** يلغي (محلياً) كل محاولة نشطة للنية قبل إلغائها؛ يرمي إن وُجد التقاط. يُستدعى خارج أي معاملة. */
-    public function cancelActiveAttempts(CommercePaymentIntent $intent): void
+    /** هل التُقط مبلغ لهذه النية (محاولة `captured`)؟ يُستعمل تحت قفل صف النية قبل إلغائها. */
+    public function hasCapture(CommercePaymentIntent $intent): bool
     {
-        $captured = PaymentAttempt::query()->where('payable_key', $intent->payableKey())
+        return PaymentAttempt::query()->where('payable_key', $intent->payableKey())
             ->where('capture_status', PaymentAttempt::STATUS_CAPTURED)->exists();
-        if ($captured) {
-            throw new CommerceOnlinePaymentException('already_paid', 'سبق التقاط دفعة لهذا الطلب؛ لا يُلغى التزام الدفع.');
-        }
+    }
+
+    /**
+     * يغلق (محلياً) كل محاولة نشطة لنية أُلغيت. best-effort وخارج أي معاملة: فشل إغلاق واحدة لا يُرجع الإلغاء (النية الملغاة ترفض أي بدء جديد،
+     * والتقاط لاحق على صفحة بقيت حيّة يُوسم `late_capture` للمراجعة).
+     */
+    public function closeActiveAttempts(CommercePaymentIntent $intent): void
+    {
         foreach (PaymentAttempt::query()->where('payable_key', $intent->payableKey())->whereIn('capture_status', PaymentAttempt::ACTIVE_STATUSES)->get() as $active) {
             try {
                 $this->orchestrator->cancel($active);
-            } catch (PaymentOrchestrationException $e) {
-                throw new CommerceOnlinePaymentException('cancel_failed', 'تعذّر إغلاق محاولة الدفع الجارية.', $e);
+            } catch (PaymentOrchestrationException) {
+                // يعالجه المطابِق الدوري
             }
         }
     }
@@ -260,7 +272,13 @@ final class CommerceOnlinePaymentService
             ->whereExists(fn ($q) => $q->selectRaw('1')->from('commerce_payment_intents as i')
                 ->whereRaw("payment_attempts.payable_key = 'commerce_payment_intent:' || i.id")
                 ->where('i.status', CommercePaymentIntent::STATUS_PENDING))
-            ->orderBy('captured_at')->limit($limit)->get();
+            ->orderBy('captured_at');
+        // المحجوزة للمراجعة (مبلغ/عملة/تعارض) لا تُحتسب في الدفعة: وإلا سدّت الأقدم منها (وعبر المستأجرين) باب استرداد ما فاتته المستمعات.
+        foreach (self::HOLDING_REASONS as $reason) {
+            $rows->where(fn ($q) => $q->whereNull('review_reasons')
+                ->orWhereRaw('CAST(review_reasons AS TEXT) NOT LIKE ?', ['%"'.$reason.'"%']));
+        }
+        $rows = $rows->limit($limit)->get();
 
         $previous = $this->tenant->id();
         foreach ($rows as $row) {

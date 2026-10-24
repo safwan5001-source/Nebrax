@@ -123,16 +123,10 @@ final class CommercePaymentIntentService
      */
     public function cancel(CommercePaymentIntent $intent): CommercePaymentIntent
     {
-        // إلكترونية: تُغلق محاولاتها الجارية أولاً (خارج المعاملة)، ويُرفض الإلغاء إن التُقط مبلغ (يُسترد ولا يُلغى، ADR-04 §14).
-        if ($intent->isOnline() && ! $intent->isCancelled()) {
-            try {
-                $this->online->cancelActiveAttempts($intent);
-            } catch (CommerceOnlinePaymentException $e) {
-                throw new RuntimeException($e->getMessage(), 0, $e);
-            }
-        }
-
-        return DB::transaction(function () use ($intent): CommercePaymentIntent {
+        // الترتيب (PAY-H4-04a): تُقفَل النية وتُلغى **أولاً** (التزام)، ثم تُغلق محاولاتها الجارية خارج المعاملة. بدء دفع يسابق الإلغاء إما يُرفض عند
+        // `assertStillPayable` (نية ملغاة) أو يُتراجع عنه بعد ولادة محاولته (يعيد `start` فحص النية)؛ فلا تبقى صفحة دفع حيّة لنية ملغاة. مبلغ ملتقَط
+        // يُرفض إلغاؤه تحت القفل نفسه (يُسترد ولا يُلغى، ADR-04 §14).
+        $cancelled = DB::transaction(function () use ($intent): CommercePaymentIntent {
             $locked = CommercePaymentIntent::query()->whereKey($intent->id)->lockForUpdate()->firstOrFail();
 
             if ($locked->isCollected() || $locked->isPaid()) {
@@ -140,6 +134,9 @@ final class CommercePaymentIntentService
             }
             if ($locked->isCancelled()) {
                 throw new RuntimeException('التزام الدفع مُلغىً بالفعل.');
+            }
+            if ($locked->isOnline() && $this->online->hasCapture($locked)) {
+                throw new RuntimeException('سبق التقاط دفعة لهذا الطلب؛ لا يُلغى التزام الدفع.');
             }
 
             $locked->update([
@@ -149,6 +146,12 @@ final class CommercePaymentIntentService
 
             return $locked->fresh();
         });
+
+        if ($cancelled->isOnline()) {
+            $this->online->closeActiveAttempts($cancelled); // best-effort؛ التقاط لاحق على صفحة بقيت حيّة يُوسم late_capture للمراجعة
+        }
+
+        return $cancelled;
     }
 
     /**
