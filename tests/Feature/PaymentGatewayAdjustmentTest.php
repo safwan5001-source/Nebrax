@@ -296,6 +296,14 @@ class PaymentGatewayAdjustmentTest extends TestCase
         $this->thrown(fn () => $update(['status' => 'requested']), 'regress', QueryException::class);
         $this->thrown(fn () => $update(['status' => 'consumed']), 'consumed without settlement', QueryException::class);
 
+        // قرار الاعتماد ثابت: لا إعادة كتابة للمعتمِد، ولا استهلاك بلا تسوية مرحَّلة، ولا نصوص فارغة
+        $this->thrown(fn () => $update(['approved_by' => $this->owner->id]), 'approver rewrite', QueryException::class);
+        $this->thrown(fn () => $update(['approved_at' => now()->addDay()]), 'approval time rewrite', QueryException::class);
+        $this->thrown(fn () => DB::transaction(fn () => DB::table('payment_gateway_adjustments')->insert([
+            'id' => (string) Str::uuid(), 'tenant_id' => $this->tenant->id, 'payment_gateway_id' => $this->gateway->id, 'kind' => 'adjustment_debit', 'amount_minor' => 5,
+            'currency' => 'SAR', 'reason' => '   ', 'evidence_ref' => 'EV-1', 'status' => 'requested', 'requested_by' => $this->owner->id, 'created_at' => now(), 'updated_at' => now(),
+        ])), 'empty reason', QueryException::class);
+
         // سجل التدقيق append-only
         $event = PaymentGatewayAdjustmentEvent::query()->firstOrFail();
         $this->thrown(fn () => DB::transaction(fn () => DB::table('payment_gateway_adjustment_events')->where('id', $event->id)->update(['reason' => 'x'])), 'event update', QueryException::class);
@@ -313,6 +321,26 @@ class PaymentGatewayAdjustmentTest extends TestCase
         $this->thrown(fn () => $insert(['line_type' => 'reserve_hold', 'amount_minor' => 10000]), 'adjustment required', QueryException::class);
         $this->thrown(fn () => $insert(['line_type' => 'bogus', 'adjustment_id' => $adj->id, 'amount_minor' => 10000]), 'type', QueryException::class);
         $this->assertSame(0, PaymentGatewaySettlementLine::query()->where('settlement_id', $draft->id)->count());
+    }
+
+    #[Test]
+    public function an_offsetting_zero_net_settlement_without_collections_is_rejected_and_nothing_is_consumed(): void
+    {
+        $debit = $this->approved('adjustment_debit', 500, 'STMT-Z1');
+        $credit = $this->approved('adjustment_credit', 500, 'STMT-Z2');
+        [, $paymentId] = $this->capture();
+
+        $e = $this->thrown(fn () => $this->settlements->record(['items' => []] + $this->input($paymentId, 1, [], net: 0, fee: 0, ref: 'ZERO') + ['adjustments' => [['adjustment_id' => $debit->id], ['adjustment_id' => $credit->id]]]), 'zero', DomainException::class);
+        $this->assertStringStartsWith('empty_settlement', $e->getMessage());
+        $this->assertSame(PaymentGatewayAdjustment::APPROVED, $debit->fresh()->status);
+        $this->assertSame(PaymentGatewayAdjustment::APPROVED, $credit->fresh()->status);
+    }
+
+    #[Test]
+    public function the_settlement_endpoints_report_field_level_errors_for_an_empty_body(): void
+    {
+        $this->withToken($this->ownerToken)->postJson('/api/payment-gateway-settlements', [])->assertUnprocessable()->assertJsonValidationErrors(['items', 'adjustments']);
+        $this->withToken($this->ownerToken)->postJson('/api/payment-gateway-settlements/preview', [])->assertUnprocessable()->assertJsonValidationErrors(['items', 'adjustments']);
     }
 
     // ───────────────────────── المستأجرون القائمون ─────────────────────────
@@ -335,11 +363,12 @@ class PaymentGatewayAdjustmentTest extends TestCase
             $this->assertSame($code, \App\Models\Account::query()->findOrFail($mapped->account_id)->code);
         }
 
-        // حساب مستأجر خاص بنفس الكود (غير نظامي) ⇒ فشل صريح لا انتحال
+        // حساب مستأجر خاص بنفس الكود (غير نظامي) ⇒ لا انتحال ولا إفشال للنشر: يُترك تعيين الدور غائباً لذلك المستأجر (فشل مغلق عند أول تعديل)
         DB::table('account_role_mappings')->where('role_key', 'gateway_reserve')->delete();
         DB::table('accounts')->where('tenant_id', $this->tenant->id)->where('code', '1171')->update(['is_system' => false]);
-        $this->thrown(fn () => $migration->up(), 'foreign account', RuntimeException::class);
+        $migration->up();
         $this->assertSame(0, AccountRoleMapping::query()->where('role_key', 'gateway_reserve')->count());
+        $this->assertSame(1, AccountRoleMapping::query()->where('role_key', 'provider_adjustment')->count(), 'الدور الآخر لا يتأثر');
     }
 
     // ───────────────────────── API ─────────────────────────

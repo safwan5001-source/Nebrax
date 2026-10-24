@@ -155,7 +155,7 @@ class PaymentGatewaySettlementController extends ApiController
             'provider_fee_tax' => ['nullable', 'integer', 'min:0', 'max:999999999999'],
             'provider_deductions' => ['nullable', 'integer', 'min:0', 'max:999999999999'],
             'provider_credits' => ['nullable', 'integer', 'min:0', 'max:999999999999'],
-            'items' => ['nullable', 'array', 'max:200'],   // تسوية بلا تحصيل مسموحة فقط مع تعديل معتمد (تتحقق الخدمة)
+            'items' => ['nullable', 'array', 'max:200', 'required_without:adjustments'],   // بلا تحصيل: فقط مع تعديل معتمد (تتحقق الخدمة)
             'items.*.payment_id' => ['required', 'uuid'],
             'items.*.gross_amount' => ['required', 'integer', 'min:1', 'max:999999999999'],
             'items.*.provider_event_ref' => ['nullable', 'string', 'max:191'],
@@ -163,7 +163,7 @@ class PaymentGatewaySettlementController extends ApiController
             'refunds.*.payment_refund_id' => ['required', 'uuid'],
             'refunds.*.amount_minor' => ['required', 'integer', 'min:1', 'max:999999999999'],
             'refunds.*.provider_event_ref' => ['nullable', 'string', 'max:191'],
-            'adjustments' => ['nullable', 'array', 'max:50'],
+            'adjustments' => ['nullable', 'array', 'max:50', 'required_without:items'],
             'adjustments.*.adjustment_id' => ['required', 'uuid'],
             'currency' => ['nullable', 'string', 'size:3'],
         ];

@@ -922,6 +922,10 @@ final class PaymentGatewaySettlementService
         if ($gross <= 0 && ! $hasAdjustments) {
             throw new DomainException('Gateway settlement gross must be positive.');
         }
+        // تسوية بلا تحصيل تنقل مالاً فعلاً (إفراج/تعديل دائن)؛ صافٍ صفري بتعديلات متقابلة قيدٌ بلا حركة بنكية ولا يستحق استهلاك المستندات.
+        if ($gross <= 0 && $net <= 0 && $difference === 0) {
+            throw new DomainException('empty_settlement: a settlement without collections must move money to the bank.');
+        }
 
         return $difference;
     }

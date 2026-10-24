@@ -10,8 +10,9 @@ use Illuminate\Support\Facades\Schema;
  *
  * - `payment_gateway_adjustments`: مستند بسبب ومرجع دليل ومبلغ، **موافقة مستقلة** (المعتمِد ≠ الطالب، يُفرض في القاعدة)، تُستهلك مرة واحدة بتسوية مرحَّلة.
  * - `payment_gateway_adjustment_events`: سجل تدقيق append-only (الفاعل والحالتان والسبب).
- * - بنود التسوية تقبل الأنواع الأربعة عبر `adjustment_id`؛ مُشغّلات الإدراج تشترط مستنداً معتمداً من المستأجر والبوابة والعملة والنوع والمبلغ نفسها،
- *   والانتقال إلى `posted` يشترط بقاءه معتمداً (فلا استهلاك مزدوج).
+ * - بنود التسوية تقبل الأنواع الأربعة عبر `adjustment_id`؛ مُشغّلات الإدراج تشترط مستنداً معتمداً من المستأجر والبوابة والعملة والنوع والمبلغ نفسها
+ *   (وهذا هو الحارس الأساسي للمسار العادي مع أقفال الصفوف)، وانتقال مسودة `unreconciled` إلى `posted` يشترط بقاءه معتمداً. الاستهلاك `consumed`
+ *   يشترط تسوية مرحَّلة بقيد لنفس المستأجر والبوابة، وقرارات الاعتماد/الرفض/الإلغاء/الاستهلاك ثابتة بعد تسجيلها.
  * `down()` يرفض متى وُجدت مستندات أو بنود تعديل (إصلاح إلى الأمام فقط) ثم يعيد مُشغّلات 02b.
  */
 return new class extends Migration
@@ -132,7 +133,8 @@ return new class extends Migration
 
         return [
             ['table' => 'payment_gateway_adjustments', 'when' => 'BEFORE INSERT', 'name' => 'pga_insert_guard', 'returns' => 'NEW', 'rules' => [
-                'pga_insert_shape' => "NEW.status <> 'requested' OR NEW.kind NOT IN (".self::KINDS.') OR NEW.amount_minor <= 0 OR NEW.requested_by IS NULL OR NEW.approved_by IS NOT NULL OR NEW.settlement_id IS NOT NULL',
+                'pga_insert_shape' => "NEW.status <> 'requested' OR NEW.kind NOT IN (".self::KINDS.') OR NEW.amount_minor <= 0 OR NEW.requested_by IS NULL OR NEW.approved_by IS NOT NULL OR NEW.settlement_id IS NOT NULL '
+                ."OR length(trim(NEW.reason)) < 5 OR length(trim(NEW.evidence_ref)) < 3",
             ]],
             ['table' => 'payment_gateway_adjustments', 'when' => 'BEFORE UPDATE', 'name' => 'pga_update_guard', 'returns' => 'NEW', 'rules' => [
                 'pga_identity_immutable' => $immutable,
@@ -141,6 +143,11 @@ return new class extends Migration
                 'pga_self_reject' => "NEW.status = 'rejected' AND (NEW.rejected_by IS NULL OR NEW.rejected_by = NEW.requested_by)",
                 'pga_cancel_actor' => "NEW.status = 'cancelled' AND NEW.cancelled_by IS NULL",
                 'pga_consumed_shape' => "(NEW.status = 'consumed') <> (NEW.settlement_id IS NOT NULL)",
+                // قرار اعتماد/رفض/إلغاء/استهلاك مسجَّل لا يُعاد كتابته (فاعل المعتمِد ومرجع التسوية ثابتان بعد تسجيلهما).
+                'pga_decision_frozen' => '('.collect(['approved_by', 'approved_at', 'rejected_by', 'rejected_at', 'cancelled_by', 'cancelled_at', 'settlement_id'])
+                    ->map(fn ($c) => "(OLD.{$c} IS NOT NULL AND ".$this->changed("NEW.{$c}", "OLD.{$c}").')')->implode(' OR ').')',
+                'pga_consumed_by_posted' => "NEW.status = 'consumed' AND NOT EXISTS (SELECT 1 FROM payment_gateway_settlements s WHERE s.id = NEW.settlement_id "
+                    ."AND s.tenant_id = NEW.tenant_id AND s.payment_gateway_id = NEW.payment_gateway_id AND s.status = 'posted' AND s.journal_entry_id IS NOT NULL)",
             ]],
             ['table' => 'payment_gateway_adjustment_events', 'when' => 'BEFORE UPDATE', 'name' => 'pgae_no_update', 'returns' => 'NEW', 'rules' => ['pgae_append_only' => '1 = 1']],
             ['table' => 'payment_gateway_adjustment_events', 'when' => 'BEFORE DELETE', 'name' => 'pgae_no_delete', 'returns' => 'OLD', 'rules' => ['pgae_append_only' => $tenantAlive]],
