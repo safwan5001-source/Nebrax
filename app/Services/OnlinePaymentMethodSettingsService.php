@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\OnlinePaymentMethodSetting;
 use App\Models\OnlinePaymentMethodSettingEvent;
 use App\Models\PaymentGateway;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Support\OnlinePaymentMethodCatalog;
 use App\Support\PaymentGatewayException;
@@ -74,6 +75,8 @@ class OnlinePaymentMethodSettingsService
         }
 
         DB::transaction(function () use ($key, $enabled, $actor, $reason, $tenantId): void {
+            // مرساة المستأجر أولاً: تسلسل أول تفعيل متزامن لنفس الوسيلة (قفل صف غير موجود لا يحمي) فلا انتهاك فريد 500.
+            Tenant::query()->whereKey($tenantId)->lockForUpdate()->first();
             // قفل الاتصالات المرشَّحة قبل الحكم بالجاهزية: لا تفعيل على اتصال يُعلَّق/يُلغى بالتوازي.
             PaymentGateway::query()->where('status', '!=', PaymentGateway::STATUS_REVOKED)->orderBy('id')->lockForUpdate()->get();
             $gateways = PaymentGateway::query()->where('status', '!=', PaymentGateway::STATUS_REVOKED)->orderBy('name')->orderBy('id')->get()->all();

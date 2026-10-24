@@ -65,8 +65,14 @@ export function nextStep(method: Pick<OnlineMethod, 'status' | 'reason'>): Metho
  * يظهر المفتاح قابلاً للتشغيل فقط حين تكون الوسيلة جاهزة (`enabled`/`disabled`) والمستخدم مُدير للبوابات.
  * `needs_setup` و`unsupported` (ومنها Apple Pay ما دام إعداد المزوّد غير قابل للتحقق) لا تُفعَّل من أَوْج.
  */
-export function canToggle(method: Pick<OnlineMethod, 'status'>, canManage: boolean): boolean {
-  return canManage && (method.status === 'enabled' || method.status === 'disabled');
+export function canToggle(method: Pick<OnlineMethod, 'status'> & { enabled?: boolean }, canManage: boolean): boolean {
+  // الجاهزة تُشغَّل/تُطفأ؛ ومحفوظة «مفعّلة» لكنها لم تعد جاهزة تُطفأ فقط (لا تظهر لعميل لاحقاً دون إجراء صريح).
+  return canManage && (method.status === 'enabled' || method.status === 'disabled' || method.enabled === true);
+}
+
+/** محفوظة «مفعّلة» لكنها غير جاهزة الآن: غير ظاهرة للعميل، وستظهر تلقائياً متى عادت الجاهزية ما لم تُطفأ. */
+export function isStoredButNotReady(method: Pick<OnlineMethod, 'status' | 'enabled'>): boolean {
+  return method.enabled && method.status !== 'enabled';
 }
 
 /** سبب تعطيل المفتاح للشرح المرئي (null ⇒ قابل للتشغيل). */

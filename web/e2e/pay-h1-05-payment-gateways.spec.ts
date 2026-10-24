@@ -40,7 +40,7 @@ async function open(page: Page, opts: { locale: 'ar' | 'en'; theme?: 'light' | '
     localStorage.setItem('user', userJson);
     localStorage.setItem('theme', theme);
   }, [JSON.stringify(user), opts.theme ?? 'light'] as const);
-  await page.goto(`${baseUrl}/finance-settings/payments`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${baseUrl}/finance-settings/payments?tab=gateways`, { waitUntil: 'domcontentloaded' });
   await page.addStyleTag({ content: 'nextjs-portal{display:none!important}' });
 }
 
@@ -92,7 +92,8 @@ for (const locale of ['ar', 'en'] as const) {
   test(`PAY-H1-05 read-only viewer has no actions and an empty state is calm (${locale})`, async ({ page }, info) => {
     await open(page, { locale, permissions: ['payments.view'] });
     await expect(page.getByTestId('pg-item-g1')).toBeVisible();
-    await expect(page.getByTestId('pg-list').getByRole('button')).toHaveCount(0);
+    // لا إجراء إدارة لقارئ فقط؛ زر «تفاصيل» (قراءة) مسموح.
+    await expect(page.getByTestId('pg-list').getByRole('button', { name: /^(?!.*(تفاصيل|Details)).*$/ })).toHaveCount(0);
     await expect(page.getByRole('button', { name: locale === 'ar' ? 'إضافة اتصال' : 'Add connection' })).toHaveCount(0);
     await noHorizontalOverflow(page);
     await shot(page, `${info.project.name}-${locale}-readonly`);

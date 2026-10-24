@@ -82,6 +82,27 @@ describe.each(TEST_LOCALES)('OnlineMethodsPanel (%s)', (locale) => {
     expect(screen.getByTestId('pm-store-mada').textContent).toBe(m.usageStoreUnavailable);
   });
 
+  it('a method saved as enabled but no longer ready can still be switched off and explains why it is hidden', async () => {
+    overview([
+      method({ key: 'visa', status: 'needs_setup', reason: 'no_usable_gateway', enabled: true, connections: [{ ...ready, usable: false, eligible: false }] }),
+    ]);
+    api.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path === '/online-payment-methods') return Promise.resolve({ data: [method({ key: 'visa', status: 'needs_setup', reason: 'no_usable_gateway', enabled: true })] });
+      if (path === '/online-payment-methods/visa' && options?.method === 'PUT') {
+        return Promise.resolve({ data: method({ key: 'visa', status: 'needs_setup', reason: 'no_usable_gateway', enabled: false }) });
+      }
+      return Promise.reject(new Error(`unexpected ${options?.method ?? 'GET'} ${path}`));
+    });
+    mount(true);
+    expect(await screen.findByTestId('pm-list')).toBeTruthy();
+    const sw = within(screen.getByTestId('pm-item-visa')).getByRole('switch') as HTMLButtonElement;
+    expect(sw.getAttribute('aria-checked')).toBe('true');
+    expect(sw.disabled).toBe(false);
+    expect(screen.getByTestId('pm-reason-visa').textContent).toBe(m.storedNotReady);
+    await userEvent.click(sw);
+    await waitFor(() => expect(api).toHaveBeenCalledWith('/online-payment-methods/visa', expect.objectContaining({ method: 'PUT' })));
+  });
+
   it('a viewer without payment_gateways.manage sees every switch disabled with the permission reason', async () => {
     overview([method({ key: 'mada', status: 'enabled', enabled: true, connections: [ready] })]);
     mount(false);

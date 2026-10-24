@@ -15,6 +15,7 @@ import { PaymentBrandMark } from '@/components/payments/payment-brand-mark';
 import { paymentBrandPresentation } from '@/lib/payment-brand-registry';
 import {
   canToggle,
+  isStoredButNotReady,
   methodErrorKey,
   methodTone,
   nextStep,
@@ -107,7 +108,8 @@ export function OnlineMethodsPanel({
             <ul className="space-y-3" data-testid="pm-list">
               {methods.map((method) => {
                 const brand = paymentBrandPresentation(method.key);
-                const block = toggleBlockReason(method, canManage);
+                const stale = isStoredButNotReady(method);
+                const block = stale && canManage ? null : toggleBlockReason(method, canManage);
                 const step = stepText(method);
                 const switchId = `pm-switch-${method.key}`;
                 const reasonId = `pm-reason-${method.key}`;
@@ -122,7 +124,7 @@ export function OnlineMethodsPanel({
                         <label htmlFor={switchId} className="text-xs text-muted">{t('showToCustomer')}</label>
                         <Switch
                           id={switchId}
-                          checked={method.enabled && method.status === 'enabled'}
+                          checked={method.enabled}
                           disabled={!canToggle(method, canManage) || busy === method.key}
                           aria-describedby={reasonId}
                           onCheckedChange={(next) => void toggle(method, next)}
@@ -131,7 +133,7 @@ export function OnlineMethodsPanel({
                     </div>
 
                     <p id={reasonId} className="mt-3 text-xs leading-relaxed text-muted" data-testid={`pm-reason-${method.key}`}>
-                      {block ? t(`blocked.${block}`) : method.status === 'enabled' ? t('reasonEnabled') : t('reasonDisabled')}
+                      {stale ? t('storedNotReady') : block ? t(`blocked.${block}`) : method.status === 'enabled' ? t('reasonEnabled') : t('reasonDisabled')}
                     </p>
                     {step && (
                       <div className="mt-2 flex flex-wrap items-center gap-2 rounded bg-warning/10 px-3 py-2 text-xs leading-relaxed text-warning">

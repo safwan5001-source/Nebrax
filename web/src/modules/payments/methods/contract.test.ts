@@ -32,6 +32,9 @@ describe('online payment methods contract', () => {
     expect(canToggle({ status: 'disabled' }, false)).toBe(false);
     expect(canToggle({ status: 'needs_setup' }, true)).toBe(false);
     expect(canToggle({ status: 'unsupported' }, true)).toBe(false);
+    // محفوظة «مفعّلة» وغير جاهزة ⇒ تُطفأ فقط
+    expect(canToggle({ status: 'needs_setup', enabled: true }, true)).toBe(true);
+    expect(canToggle({ status: 'unsupported', enabled: true }, false)).toBe(false);
   });
 
   it('explains why a toggle is blocked', () => {
