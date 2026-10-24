@@ -334,6 +334,14 @@ php artisan serve
 - **تثبيت الدفع مرة واحدة:** `CommerceOnlinePaymentService::completeCaptured` تحت قفل صف النية؛ مبلغ/عملة غير مطابقين ⇒ `under_review` بلا تثبيت؛ التقاط متأخر ⇒ `late_capture` للمراجعة البشرية (لا استرداد آلي، D-15 المحافظ). شبكة الأمان: `payments:complete-commerce-captures`.
 - المرجع: `docs/plans/payments/horizon/AWJ-PAY-H4-04a-IMPLEMENTATION-REPORT.md` و`AWJ-PAY-H4-G3-DECISION-PROPOSAL.md` (الخيارات والتوصيات بانتظار القرار).
 
+
+## ربط مشتري المتجر بطرف — PAY-H4-01 (D-05 المعتمد، يعمل فقط مع الدفع الإلكتروني)
+
+`App\Services\Commerce\CustomerPartnerResolver` يحسم `commerce_orders.partner_id` **عند إنشاء نية الدفع الإلكتروني فقط** (داخل معاملة الإتمام؛ COD/الاستلام والطلبات القائمة بلا أي تغيير). السياسة `sales.commerce_partner_policy` (`CommercePartnerPolicy`): `link_verified_else_create` (الافتراضي) · `generic_cash_customer` · `manual_link` (لا طرف آلي).
+- **لا مطابقة ولا دمج مع أطراف الموظفين:** بيانات الضيف غير موثَّقة. الطرف الآلي مفتاحه الحتمي `partners.code = WEB-<16 خانة SHA-256(tenant|key)>`؛ المفتاح: هوية موثَّقة ← هاتف مطبَّع (`ContactKey::phone`) ← بريد مطبَّع ← معرّف الطلب. ربط موظف قائم لهوية موثَّقة يتقدّم. طرف ويب محذوف ناعماً يُستعاد؛ معطَّل ⇒ يُرفض الإتمام.
+- **التزامن:** `pg_advisory_xact_lock` حول البحث+الإنشاء داخل المعاملة (لا تلتقط خطأ تفرّد داخل معاملة PG). يرفض المحلِّل العمل خارج معاملة. لا هجرة ولا أثر محاسبي ولا صلاحية جديدة.
+- المرجع: `docs/plans/payments/horizon/AWJ-PAY-H4-01-IMPLEMENTATION-REPORT.md`.
+
 ## أدوار ضريبة القيمة المضافة (REM-05 / ACC-01)
 
 `App\Services\Accounting\VatRoleIntegrityService` هو مصدر قواعد دورَي `tax_input`/`tax_output` وسياق تقرير الضريبة. لا يكتب شيئاً.

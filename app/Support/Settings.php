@@ -152,6 +152,11 @@ class Settings
              * بقرار تفعيل منسَّق (انظر `App\Support\CashSaleTreasuryPolicy`).
              */
             'cash_sale_treasury_policy' => 'legacy',
+            /**
+             * H4-01 / D-05 — سياسة ربط مشتري المتجر الإلكتروني بطرف محاسبي عند الدفع الإلكتروني:
+             * `link_verified_else_create` (الافتراضي) · `generic_cash_customer` · `manual_link`. راجع `App\Support\CommercePartnerPolicy`.
+             */
+            'commerce_partner_policy' => 'link_verified_else_create',
         ],
         /**
          * إعدادات المخزون والمنتجات.
