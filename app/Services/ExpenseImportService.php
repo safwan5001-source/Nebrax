@@ -776,6 +776,8 @@ class ExpenseImportService
             'date' => $row['values']['expense_date'] ?? null, 'amount_minor' => $row['values']['amount'] ?? null,
             'account_code' => $row['values']['account_code'] ?? null, 'vendor' => $row['values']['vendor_name'] ?? null,
             'reference' => $row['values']['reference'] ?? null, 'confirmed_repeat' => $row['confirmed'],
+            // صفٌّ رُفض لأنه يطابق مصروفاً آخر (داخل الملف أو قائماً): الواجهة تعرض له «تكرار حقيقي؟» ليؤكّده المستخدم صراحةً.
+            'repeat_candidate' => array_intersect(['duplicate_in_file', 'existing_expense_matches'], $row['codes'] ?? []) !== [],
             'messages' => $row['messages'], 'warnings' => $row['warnings'],
         ];
     }

@@ -357,7 +357,9 @@ class ExpenseImportTest extends TestCase
     /** @test */
     public function the_same_vendor_date_and_amount_with_different_references_is_still_a_duplicate_like_the_service_guard(): void
     {
-        $this->assertSame(1, $this->preview([$this->row(['reference' => 'A']), $this->row(['reference' => 'B'])])['error_rows']);
+        $preview = $this->preview([$this->row(['reference' => 'A']), $this->row(['reference' => 'B'])]);
+        $this->assertSame(1, $preview['error_rows']);
+        $this->assertSame([false, true], array_column($preview['rows'], 'repeat_candidate'), 'الواجهة تعرض خيار التأكيد للصف المكرَّر وحده.');
     }
 
     /** @test */

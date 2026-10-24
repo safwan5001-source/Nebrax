@@ -47,6 +47,22 @@ describe('createImportJob (IMP-H1-S3b)', () => {
     expect(form.get('options[approve_existing_media_updates]')).toBe('1');
     expect(form.has('options[notes]')).toBe(false);
   });
+  it('sends a list option as repeated options[key][] fields and skips an empty one (IMP-H5-S2b)', async () => {
+    await createImportJob('expense_import', new File(['a'], 'a.csv'), undefined, null, {
+      binding: { id: 'prev-1', hash: 'h'.repeat(64), expires_at: '2026-01-01T00:00:00Z' },
+      options: { confirmed_repeat_rows: [3, 5], default_tax_rate: 15 },
+    });
+    const form = sentForm();
+    expect(form.getAll('options[confirmed_repeat_rows][]')).toEqual(['3', '5']);
+    expect(form.get('options[default_tax_rate]')).toBe('15');
+
+    await createImportJob('expense_import', new File(['a'], 'a.csv'), undefined, null, {
+      binding: { id: 'prev-1', hash: 'h'.repeat(64), expires_at: '2026-01-01T00:00:00Z' },
+      options: { confirmed_repeat_rows: [] },
+    });
+    expect(sentForm().has('options[confirmed_repeat_rows][]')).toBe(false);
+  });
+
   it('omits an empty mapping so the frozen options match the preview, which cannot send one', async () => {
     await createImportJob('product_catalog', new File(['a'], 'a.csv'), undefined, null, {
       binding: { id: 'prev-1', hash: 'h'.repeat(64), expires_at: '2026-01-01T00:00:00Z' },
