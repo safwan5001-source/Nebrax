@@ -47,6 +47,8 @@ class PurchaseImportService
     private const PREVIEW_UNIT_LIMIT = 200;
     private const LOOKUP_CHUNK = 400;
     private const MAX_MINOR = 100000000000;
+    /** سقف إجمالي الفاتورة المشتق: ضريبة الخدمة تضرب (ضريبة × أساس) في int64، فتجاوزه يفيض (~7.8 مليار هللة)؛ 5 مليارات هللة (50 مليون ريال) هامش آمن. */
+    private const MAX_INVOICE_MINOR = 5000000000;
 
     /** رموز خطأ الخلية → رسالتها. */
     private const CELL_ERRORS = [
@@ -207,6 +209,8 @@ class PurchaseImportService
                     $created++;
                 } catch (DuplicateDocumentException) {
                     $failures[] = ['ordinal' => (int) $unit['ordinal'], 'code' => 'duplicate_document', 'message' => 'فاتورة المورّد بهذا الرقم أُنشئت للتو من مسار آخر.'];
+                } catch (\Illuminate\Database\QueryException $e) {
+                    throw $e;   // خطأ قاعدة بيانات: لا نصّه (SQL/قيم) في رسالة وحدة؛ تفشل القطعة كلها وتتراجع.
                 } catch (RuntimeException $e) {
                     $failures[] = ['ordinal' => (int) $unit['ordinal'], 'code' => 'purchase_create_failed', 'message' => $e->getMessage()];
                 }
@@ -563,8 +567,24 @@ class PurchaseImportService
             }
         }
 
+        // سطور المتابعة في تصديرات بنود الفواتير تترك المورّد فارغاً: صفٌّ بلا كود يرث مورّد صفوف الرقم نفسه إن كان في الملف مورّدٌ واحد صريح لهذا الرقم،
+        // وإلا فالافتراضي — كي لا تنشطر فاتورة واحدة إلى مورّدين صامتاً.
+        $explicit = [];
+        foreach ($entries as $entry) {
+            $reference = DocumentDuplicateReservationService::normalizeReference($entry['values']['supplier_invoice_ref'] ?? null);
+            if ($reference !== null && isset($entry['values']['supplier_code'])) {
+                $explicit[$reference][(string) $entry['values']['supplier_code']] = true;
+            }
+        }
+
         foreach ($entries as &$entry) {
             $v = $entry['values'];
+            if (! isset($v['supplier_code'])) {
+                $reference = DocumentDuplicateReservationService::normalizeReference($v['supplier_invoice_ref'] ?? null);
+                if ($reference !== null && count($explicit[$reference] ?? []) === 1) {
+                    $v['supplier_code'] = (string) array_key_first($explicit[$reference]);
+                }
+            }
 
             if (isset($v['supplier_code'])) {
                 $partner = $suppliers[$v['supplier_code']] ?? null;
@@ -758,6 +778,9 @@ class PurchaseImportService
         }
         unset($entry);
 
+        if ($total > self::MAX_INVOICE_MINOR) {
+            $this->addIssue($unit['entries'][0], 'invoice_out_of_range', 'إجمالي الفاتورة المشتق يتجاوز الحد الآمن للاستيراد (50 مليون ريال). قسّمها أو أنشئها من الشاشة.');
+        }
         if (isset($header['invoice_total']) && (int) $header['invoice_total'] !== $total && $this->unitRowsClean($unit)) {
             $this->addIssue($unit['entries'][0], 'file_total_mismatch', 'إجمالي الفاتورة في الملف ('.number_format($header['invoice_total'] / 100, 2, '.', '').') يخالف المشتق من السطور ('.number_format($total / 100, 2, '.', '').'). الإجمالي لا يُكتب من الملف؛ صحّح الأسعار أو الكميات أو احذف العمود.');
         }

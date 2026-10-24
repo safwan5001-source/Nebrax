@@ -79,7 +79,7 @@ final class PurchaseImportFields
             ],
             'invoice_total' => [
                 'type' => self::TYPE_MONEY, 'required' => false, 'label_ar' => 'إجمالي الفاتورة (للمطابقة)', 'label_en' => 'Invoice total (check only)',
-                'aliases' => ['invoicetotal', 'total', 'grandtotal', 'إجماليالفاتورة', 'الإجمالي', 'الاجمالي', 'اجماليالفاتورة'],
+                'aliases' => ['invoicetotal', 'grandtotal', 'إجماليالفاتورة', 'اجماليالفاتورة'],   // «Total» وحدها غامضة (إجمالي السطر؟) فلا تُطابَق تلقائياً
             ],
         ];
     }

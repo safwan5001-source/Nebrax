@@ -405,6 +405,128 @@ class PurchaseImportTest extends TestCase
         $this->assertSame(1, Purchase::query()->count(), 'لا كتابة قبل الانجراف');
     }
 
+    /** @test */
+    public function a_blank_supplier_cell_inherits_the_single_explicit_supplier_of_the_same_invoice(): void
+    {
+        $other = Partner::create(['name' => 'مورّد ثانٍ', 'type' => 'supplier', 'code' => 'S-002']);
+        $rows = [
+            $this->row(['supplier_code' => 'S-002', 'supplier_invoice_ref' => 'CONT-1']),
+            $this->row(['supplier_code' => '', 'supplier_invoice_ref' => 'CONT-1', 'sku' => 'SAND-1', 'purchase_date' => '2026-10-01']),
+        ];
+
+        // بلا مورّد افتراضي: يرث بدل خطأ «المورّد مطلوب»
+        $plain = $this->preview($rows);
+        $this->assertSame(1, $plain['total_units']);
+        $this->assertSame(1, $plain['create_units']);
+
+        // ومع مورّد افتراضي مختلف: سطر المتابعة لا يشطر الفاتورة إلى مورّد الافتراضي
+        $this->apply($rows, ['default_supplier_id' => $this->supplier->id]);
+        $p = Purchase::query()->where('supplier_invoice_no', 'CONT-1')->firstOrFail();
+        $this->assertSame($other->id, $p->partner_id);
+        $this->assertCount(2, $p->lines);
+        $this->assertSame(1, Purchase::query()->count());
+    }
+
+    /** @test */
+    public function an_ambiguous_blank_supplier_is_never_guessed(): void
+    {
+        Partner::create(['name' => 'مورّد ثانٍ', 'type' => 'supplier', 'code' => 'S-002']);
+        $rows = [
+            $this->row(['supplier_code' => 'S-001', 'supplier_invoice_ref' => 'AMB-1']),
+            $this->row(['supplier_code' => 'S-002', 'supplier_invoice_ref' => 'AMB-1']),
+            $this->row(['supplier_code' => '', 'supplier_invoice_ref' => 'AMB-1', 'sku' => 'SAND-1']),
+        ];
+
+        // الرقم نفسه عند مورّدين صريحين ⇒ لا وراثة: بلا افتراضي خطأ «مطلوب»
+        $plain = $this->preview($rows);
+        $this->assertSame(3, $plain['total_units']);
+        $this->assertSame(1, $plain['error_units']);
+        $this->assertStringContainsString('«كود المورّد» مطلوب', $this->messages($plain, 2));
+    }
+
+    /** @test */
+    public function an_invoice_total_beyond_the_safe_limit_is_a_row_error_not_a_server_error(): void
+    {
+        // كل سطر ضمن حدّ السطر لكن مجموع الفاتورة يفوق 50 مليون ريال (كانت تفيض ضريبة الخدمة int64 فتُرمى TypeError لا رسالة)
+        $rows = array_map(fn (int $i) => $this->row(['quantity' => '1000', 'unit_price' => '500000.00', 'tax_rate' => '15']), range(1, 3));
+        $preview = $this->preview($rows);
+        $this->assertSame(1, $preview['error_units']);
+        $this->assertStringContainsString('الحد الآمن', $this->messages($preview));
+        $this->thrown(fn () => $this->apply($rows), '', ImportUnitFailureException::class);
+        $this->assertSame(0, Purchase::query()->count());
+    }
+
+    /** @test */
+    public function a_bare_total_column_is_not_auto_mapped_to_the_invoice_total(): void
+    {
+        $mapping = PurchaseImportFields::autoMap(['Total', 'Invoice Total', 'الإجمالي']);
+        $this->assertNull($mapping[0] ?? null);
+        $this->assertSame('invoice_total', $mapping[1] ?? null);
+        $this->assertNull($mapping[2] ?? null);
+    }
+
+    /** @test */
+    public function the_tenant_preferences_drive_the_derived_total_exactly_as_the_service_does(): void
+    {
+        \App\Support\Settings::put('purchases', ['default_tax_rate' => 5, 'default_tax_inclusive' => true]);
+        $row = $this->row(['supplier_invoice_ref' => 'PREF-1', 'tax_rate' => '', 'quantity' => '3', 'unit_price' => '33.33']);
+        $this->apply([$row]);   // لا خيارات تشغيلة: التفضيلان من المؤسسة
+
+        $manual = app(PurchaseService::class)->create(
+            ['partner_id' => $this->supplier->id, 'number' => 'BILL-PREF'],   // لا tax_inclusive ولا tax_rate: الخدمة تقرأ التفضيلين
+            [['product_id' => $this->cement->id, 'quantity' => 3, 'unit_price' => 3333]],
+        );
+        $imported = Purchase::query()->where('supplier_invoice_no', 'PREF-1')->firstOrFail();
+        $this->assertSame([(int) $manual->subtotal, (int) $manual->tax_amount, (int) $manual->total], [(int) $imported->subtotal, (int) $imported->tax_amount, (int) $imported->total]);
+    }
+
+    /** @test */
+    public function supplier_sku_and_warehouse_never_resolve_across_tenants(): void
+    {
+        $other = $this->registerTenant('other-co', 'owner@other.test');
+        app(TenantContext::class)->set($other['tenant_id']);
+        $theirWarehouse = Warehouse::query()->where('is_active', true)->firstOrFail();
+        Partner::create(['name' => 'مورّدهم', 'type' => 'supplier', 'code' => 'S-THEIRS']);
+        $this->product('صنفهم', 'THEIRS-1');
+        app(TenantContext::class)->set($this->tenantId);
+
+        $preview = $this->preview([$this->row(['supplier_code' => 'S-THEIRS', 'sku' => 'THEIRS-1'])]);
+        $this->assertStringContainsString('غير موجود', $this->messages($preview));
+        $this->assertStringContainsString('THEIRS-1', $this->messages($preview));
+        $this->thrown(fn () => $this->preview([$this->row()], ['warehouse_id' => $theirWarehouse->id]), 'المستودع', RuntimeException::class);
+    }
+
+    /** @test */
+    public function an_inactive_warehouse_a_wide_row_and_an_oversized_line_are_refused(): void
+    {
+        $warehouse = Warehouse::query()->where('is_active', true)->firstOrFail();
+        $warehouse->forceFill(['is_active' => false])->save();
+        $this->thrown(fn () => $this->preview([$this->row()], ['warehouse_id' => $warehouse->id]), 'المستودع', RuntimeException::class);
+
+        $csv = "supplier_code,supplier_invoice_ref,purchase_date,sku,quantity,unit_price\nS-001,W-1,2026-10-01,CEM-50,1,10.00,EXTRA\n";
+        $wide = $this->service()->preview(UploadedFile::fake()->createWithContent('w.csv', $csv), []);
+        $this->assertStringContainsString('يتجاوز صف العناوين', $this->messages($wide));
+
+        $big = $this->preview([$this->row(['quantity' => '1000000', 'unit_price' => '999999999.00'])]);
+        $this->assertStringContainsString('النطاق المالي', $this->messages($big));
+    }
+
+    /** @test */
+    public function a_file_total_mismatch_is_detected_on_a_multi_line_invoice_and_excel_serial_dates_parse(): void
+    {
+        // 10×25.00 + 4×28.00 = 362.00 + 15% = 416.30
+        $rows = [
+            $this->row(['invoice_total' => '416.30']),
+            $this->row(['sku' => 'SAND-1', 'quantity' => '4', 'unit_price' => '28.00', 'purchase_date' => '', 'invoice_total' => '']),
+        ];
+        $this->assertSame(1, $this->preview($rows)['create_units']);
+        $rows[1]['invoice_total'] = '999.00';
+        $this->assertSame(1, $this->preview($rows)['error_units']);
+
+        // 46296 = 2026-10-01 (أصل 1899-12-30)
+        $this->assertSame('2026-10-01', $this->preview([$this->row(['purchase_date' => '46296'])])['units'][0]['date']);
+    }
+
     // ═══════════════════════════════ الأثر ═══════════════════════════════
 
     /** @test */
