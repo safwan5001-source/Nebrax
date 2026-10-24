@@ -48,3 +48,5 @@ None — the UI only drives drafts-only endpoints.
 | Finding | Disposition |
 |---|---|
 | A `?job=` of another domain that is already `processing` skipped the setup card's domain check (the job-id effect jumps to Apply) and its **Continue** button would call the shared engine, which applies whatever job id it is given | **Fixed (valid):** a job of another domain is now rejected on **every** path — the wizard renders only an error card (no Apply, no Continue, no apply step) and `confirmAndApply` refuses. Test covers `ready` and `processing`, asserts no `/apply` request, and is mutation-verified. The server still enforces each domain's own permissions on apply, so this was a UX/consistency hole, not a privilege one. The same hole exists in the older wizards (expenses, stocktake, customers/suppliers, products) and is logged as an extension of **IMP-WIZARD-STATE-01**; a one-place engine-level guard (`resume` rejecting a foreign domain) is the better long-term fix |
+
+**Also (from the sibling taxonomy wizard's review):** the stepper no longer jumps to the Preview step when no preview exists (a resumed job would show a blank card).
