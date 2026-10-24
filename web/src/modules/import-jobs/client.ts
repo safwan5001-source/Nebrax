@@ -9,7 +9,16 @@
 
 import { api, downloadFile, type DownloadOutcome } from '@/lib/api';
 
-export type ImportJobDomain = 'product_catalog' | 'product_workbook' | 'inventory_opening' | 'partner_master';
+export type ImportJobDomain =
+  | 'product_catalog'
+  | 'product_workbook'
+  | 'inventory_opening'
+  | 'partner_master'
+  | 'product_taxonomy'
+  | 'price_list_items'
+  | 'unit_templates'
+  | 'stocktake_count'
+  | 'expense_import';
 
 /** مطابقٌ حرفياً لـ`App\Support\ImportJobStatus`. `queued` مفردة مُقرَّرة سلفاً بلا مسار كودٍ يبلغها اليوم. */
 export type ImportJobStatus =
@@ -68,7 +77,7 @@ export interface ImportJob {
 }
 
 /** خيارات `/apply` — حقلٌ فضفاض عمداً، يفهم كل مجالٍ حقوله وحدها (انظر `ApplyImportJobRequest`). */
-export type ApplyOptions = Record<string, string | number | boolean | Record<number, string | null> | undefined>;
+export type ApplyOptions = Record<string, string | number | boolean | Record<number, string | null> | number[] | undefined>;
 
 /**
  * خيارات الإنشاء كحقول multipart متداخلة `options[...]` — مطابقة الأعمدة تُرسَل كما في المعاينة والتطبيق تماماً (العمود المتجاهَل
@@ -82,6 +91,11 @@ function appendOptions(form: FormData, options: ApplyOptions) {
       for (const [index, field] of Object.entries(value as Record<number, string | null>)) {
         form.append(`options[mapping][${index}]`, field ?? 'ignore');
       }
+      continue;
+    }
+    if (Array.isArray(value)) {
+      // قائمة أعداد (مثل صفوف التكرار المؤكَّد): عناصر `options[key][]`؛ القائمة الفارغة لا تُرسَل (كالمعاينة: multipart لا يحمل مصفوفةً فارغة).
+      value.forEach((item) => form.append(`options[${key}][]`, String(item)));
       continue;
     }
     form.append(`options[${key}]`, typeof value === 'boolean' ? (value ? '1' : '0') : String(value));
