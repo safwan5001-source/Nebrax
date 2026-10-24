@@ -119,6 +119,8 @@ class PaymentsRollbackDrillTest extends TestCase
         $this->assertSame('platform_stop', $e->reason);
         $this->assertSame($ledgerBefore, [JournalEntry::query()->count(), $this->balance('1170'), $this->balance('1130')]);
         $this->assertSame('captured', $attempt->fresh()->capture_status);
+        // المطابقة المحاسبية تبقى متاحة أثناء الإيقاف (قراءة): المقاصة تساوي المستندات
+        $this->assertSame('reconciled', app(\App\Services\Accounting\PaymentClearingReportService::class)->reconcile()['status']);
 
         // 2) رفع الإيقاف ثم إطفاء ضابط المستأجر ⇒ rollout_disabled
         app(PaymentsRolloutControlService::class)->setPlatformState($this->platform, true, 'تدريب التراجع: رفع الإيقاف');
