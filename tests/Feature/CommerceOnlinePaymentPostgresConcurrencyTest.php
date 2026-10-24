@@ -182,6 +182,37 @@ class CommerceOnlinePaymentPostgresConcurrencyTest extends TestCase
         }
     }
 
+    #[Test]
+    public function concurrent_resolves_for_one_phone_create_exactly_one_web_partner(): void
+    {
+        app(TenantContext::class)->set($this->tenantId);
+        $channelId = $this->order()->sales_channel_id;
+        $orderIds = [];
+        foreach (range(1, 6) as $i) {
+            $order = CommerceOrder::create(['sales_channel_id' => $channelId, 'number' => 'CORD-PR-'.uniqid().$i, 'status' => CommerceOrder::STATUS_CONFIRMED, 'total' => 5000, 'confirmed_at' => now()]);
+            DB::table('commerce_order_snapshots')->insert([
+                'id' => (string) Str::uuid(), 'tenant_id' => $this->tenantId, 'commerce_order_id' => $order->id,
+                'customer_name' => 'سالم الأحمدي', 'phone' => $i % 2 === 0 ? '0501234567' : '+966 50 123 4567',
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+            $orderIds[] = $order->id;
+        }
+        $tenant = $this->tenantId;
+        $jobs = array_map(fn (string $orderId) => function () use ($tenant, $orderId) {
+            app(TenantContext::class)->set($tenant);
+
+            return ['partner' => DB::transaction(
+                fn () => app(\App\Services\Commerce\CustomerPartnerResolver::class)->resolveForOrder(CommerceOrder::query()->findOrFail($orderId))->id
+            )];
+        }, $orderIds);
+
+        $results = $this->runConcurrently($jobs);
+
+        $this->assertAllOk($results);
+        $this->assertCount(1, array_unique(array_column(array_column($results, 'value'), 'partner')), 'كل الطلبات تتقارب على طرف واحد');
+        $this->assertSame(1, DB::table('partners')->where('tenant_id', $this->tenantId)->where('code', 'like', 'WEB-%')->count(), 'طرف ويب واحد فقط');
+    }
+
     // ───────────────────────── مساعدات ─────────────────────────
 
     private function order(): CommerceOrder

@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Support\CashSaleTreasuryPolicy;
+use App\Support\CommercePartnerPolicy;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -29,6 +30,8 @@ class UpdateSalesSettingsRequest extends FormRequest
                 'nullable',
                 Rule::in(CashSaleTreasuryPolicy::activationOpen() ? CashSaleTreasuryPolicy::VALUES : [CashSaleTreasuryPolicy::LEGACY]),
             ],
+            // H4-01 / D-05: سياسة ربط مشتري المتجر بطرف (تُقرأ عند إنشاء نية دفع إلكتروني فقط).
+            'commerce_partner_policy' => ['nullable', Rule::in(CommercePartnerPolicy::VALUES)],
         ];
     }
 
