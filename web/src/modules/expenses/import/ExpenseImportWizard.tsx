@@ -127,7 +127,8 @@ export function ExpenseImportWizard() {
 
   /** تشغيلةٌ سابقة مجمَّدة الملف والخيارات: أي تغيير في الملف/القواعد/المطابقة/التأكيد يُسقطها كي لا يُنفَّذ ما لم يُعايَن (تبقى على الخادم وتُستأنف برابطها). */
   function dropJob() {
-    if (!engine.job) return;
+    // أثناء الرفع/التنفيذ لا تُسقَط التشغيلة: `engine.reset()` لا يوقف حلقة التنفيذ الجارية، فتعيد التشغيلة المُسقَطة وتتناقض الشاشة مع ما يُكتب فعلاً.
+    if (!engine.job || engine.busy === 'applying' || engine.busy === 'uploading') return;
     engine.reset();
     setParam(null);
     setResumedWithoutFile(false);
@@ -328,7 +329,7 @@ export function ExpenseImportWizard() {
         </Button>
       </header>
 
-      <Stepper steps={steps} current={step} onSelect={(index) => index <= step && setStep(index)} label={t('step_label')} />
+      <Stepper steps={steps} current={step} onSelect={(index) => index <= step && engine.busy !== 'applying' && engine.busy !== 'uploading' && setStep(index)} label={t('step_label')} />
 
       {error || engine.error ? (
         <p role="alert" className="rounded-md border border-negative/30 bg-negative/10 px-3 py-2 text-sm text-negative">

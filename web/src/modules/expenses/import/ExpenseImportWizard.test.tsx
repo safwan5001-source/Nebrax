@@ -363,4 +363,27 @@ describe('ExpenseImportWizard (IMP-H5-S2b)', () => {
     const last = api.mock.calls.filter((call) => call[0] === '/expenses/import/preview').at(-1)?.[1]?.body as FormData;
     expect(last.getAll('confirmed_repeat_rows[]')).toEqual([]);
   });
+
+  it('cannot navigate back to setup while the job is being applied', async () => {
+    const user = userEvent.setup();
+    render(<ExpenseImportWizard />);
+    await user.upload(screen.getByLabelText('step_file'), csv());
+    await waitFor(() => expect(screen.getByLabelText('كود الحساب')).toBeTruthy());
+    await user.click(screen.getByRole('button', { name: 'run_preview' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'apply' })).toBeTruthy());
+
+    let release: (value: unknown) => void = () => {};
+    api.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path === '/import-jobs' && options?.method === 'POST') return Promise.resolve({ data: jobFixture() });
+      if (path === '/import-jobs/job-1/apply') return new Promise((resolve) => { release = resolve; });
+      return Promise.resolve({ data: {} });
+    });
+    await user.click(screen.getByRole('button', { name: 'apply' }));
+    await waitFor(() => expect(screen.getByText('step_apply', { selector: '[class*="font"]' })).toBeTruthy());
+
+    await user.click(screen.getByRole('button', { name: 'step_setup' }));
+    expect(screen.queryByLabelText('default_payment')).toBeNull();
+    expect(screen.getByText('step_apply', { selector: '[class*="font"]' })).toBeTruthy();
+    release({ data: jobFixture({ status: 'completed', processed_rows: 2, apply_result: { created: 2 } }) });
+  });
 });

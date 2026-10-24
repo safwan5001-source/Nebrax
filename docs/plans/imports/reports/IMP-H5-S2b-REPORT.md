@@ -41,6 +41,8 @@ None — the UI only drives the already-merged drafts-only endpoints. No journal
 
 **Codex, second pass (2 × P2, both valid, fixed):** (c) a job resumed after a refresh while `processing` showed only progress and a cancel button — nothing continued the chunk loop; the apply card now offers an explicit **Continue** (only for a preview-bound job that is `processing` and idle), which calls `applyLoop` with the frozen options (test); (d) the rollback of a failed confirmation toggle ran even when the request had been **superseded** by a file/rule change, restoring confirmations that belonged to the old input — `runPreview` now reports `ok | failed | stale` and only `failed` reverts (test with two candidates and a pending toggle; mutation-controlled).
 
+**Codex, third pass (1 × P2, valid, fixed):** stepper navigation back to setup was still possible while the apply loop ran; changes there called `engine.reset()`, which does not stop the loop, so the next response resurrected the discarded job. Navigation and job dropping are now blocked while `applying`/`uploading` (test; mutation-controlled). This was also finding 2 of the stocktake wizard's independent review.
+
 The Partner wizard shares findings 1–2 (and the last-chunk result count); they are logged as follow-up **IMP-WIZARD-STATE-01** (also: last-chunk result counts in the Partner wizard) (not widened here).
 
 ## Not in scope / next
