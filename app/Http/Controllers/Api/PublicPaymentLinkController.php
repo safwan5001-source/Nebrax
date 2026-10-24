@@ -7,6 +7,7 @@ use App\Models\InvoicePaymentRequest;
 use App\Models\PaymentAttempt;
 use App\Models\Tenant;
 use App\Services\InvoicePaymentRequestService;
+use App\Services\OnlinePaymentMethodSettingsService;
 use App\Support\PaymentOrchestrationException;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
@@ -36,6 +37,8 @@ class PublicPaymentLinkController extends ApiController
                 'amount_due_minor' => $invoice->remaining(),
                 'allow_partial' => (bool) $paymentRequest->allow_partial,
                 'expires_at' => $paymentRequest->expires_at?->toISOString(),
+                // وسائل الدفع المعروضة للعميل: مدعومة وجاهزة ومُظهَرة من المؤسسة وتدعمها بوابة هذا الطلب فقط (قد تكون فارغة).
+                'payment_methods' => app(OnlinePaymentMethodSettingsService::class)->customerVisibleKeys((string) $paymentRequest->payment_gateway_id),
             ];
         }
 

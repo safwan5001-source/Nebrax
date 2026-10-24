@@ -115,6 +115,21 @@ class PublicPaymentLinkTest extends TestCase
     // ═══════════════ الواجهة العامة ═══════════════
 
     #[Test]
+    public function the_public_page_lists_only_methods_that_are_supported_ready_and_enabled_for_the_request_gateway(): void
+    {
+        $token = $this->link($this->invoice());
+        app(\App\Services\OnlinePaymentMethodSettingsService::class)->setEnabled('mada', true, $this->owner);
+        app(\App\Services\OnlinePaymentMethodSettingsService::class)->setEnabled('visa', true, $this->owner);
+
+        $this->getJson("/api/pay/v1/{$token}")->assertOk()->assertJsonPath('data.payment_methods', ['mada', 'visa']);
+
+        // الاتصال لم يعد جاهزاً ⇒ لا تُعرض وسيلة (المخزَّن باقٍ)
+        DB::table('payment_gateways')->where('id', $this->gateway->id)->update(['status' => PaymentGateway::STATUS_SUSPENDED, 'is_active' => false]);
+        app(TenantContext::class)->set($this->tenant->id);
+        $this->getJson("/api/pay/v1/{$token}")->assertOk()->assertJsonPath('data.payment_methods', []);
+    }
+
+    #[Test]
     public function the_public_page_shows_minimum_data_with_hardened_headers_and_no_authentication(): void
     {
         $invoice = $this->invoice();
@@ -123,7 +138,8 @@ class PublicPaymentLinkTest extends TestCase
         $response = $this->getJson("/api/pay/v1/{$token}")->assertOk()
             ->assertJsonPath('data.status', 'open')->assertJsonPath('data.merchant', 'شركة الرابط العام')
             ->assertJsonPath('data.invoice_number', $invoice->number)->assertJsonPath('data.currency', 'SAR')
-            ->assertJsonPath('data.amount_due_minor', 115000)->assertJsonPath('data.allow_partial', false);
+            ->assertJsonPath('data.amount_due_minor', 115000)->assertJsonPath('data.allow_partial', false)
+            ->assertJsonPath('data.payment_methods', []);   // لا وسيلة مُظهَرة ⇒ لا شيء للعميل (الافتراضي)
         $this->assertSame('no-store, private', $response->headers->get('Cache-Control'));
         $this->assertSame('no-referrer', $response->headers->get('Referrer-Policy'));
         $this->assertStringContainsString('noindex', (string) $response->headers->get('X-Robots-Tag'));

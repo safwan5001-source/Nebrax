@@ -26,12 +26,14 @@ const { api, perms, confirm, toast, ApiErrorMock, verifyOutcome } = vi.hoisted((
   };
 });
 
-vi.mock('@/lib/api', () => ({ api, ApiError: ApiErrorMock }));
+vi.mock('@/lib/api', () => ({ api, ApiError: ApiErrorMock, resolveApiUrl: (path: string) => `https://api.test/api/${path}` }));
 vi.mock('@/lib/use-can', () => ({
   useCan: () => ({ hydrated: true, can: (p: string) => perms.current.includes('*') || perms.current.includes(p) }),
 }));
 vi.mock('@/components/ui/confirm-dialog', () => ({ useConfirm: () => confirm }));
 vi.mock('@/components/ui/toast', () => ({ useToast: () => toast }));
+const { search } = vi.hoisted(() => ({ search: { tab: 'gateways' as string | null } }));
+vi.mock('next/navigation', () => ({ useSearchParams: () => ({ get: (k: string) => (k === 'tab' ? search.tab : null) }) }));
 const { demo } = vi.hoisted(() => ({ demo: { on: false } }));
 vi.mock('@/lib/demo', () => ({ isDemo: () => demo.on }));
 
@@ -81,7 +83,8 @@ describe.each(TEST_LOCALES)('PaymentGatewaysPage (%s)', (locale) => {
     const item = await screen.findByTestId('pg-item-g1');
     expect(within(item).getByText(m.status.active)).toBeTruthy();
     expect(within(item).getAllByText(m.fields.saved).length).toBe(2);
-    expect(within(item).queryAllByRole('button')).toHaveLength(0);
+    // الزر الوحيد للقارئ هو «تفاصيل» (قراءة)؛ لا إجراء تعديلي.
+    expect(within(item).getAllByRole('button').map((b) => b.textContent)).toEqual([m.actions.details]);
     expect(screen.queryByRole('button', { name: m.add })).toBeNull();
     expect(document.body.textContent).not.toMatch(/sk_|whsec_/);
     expect(api).toHaveBeenCalledTimes(1); // السجل (events) يتطلب الإدارة: لا طلب
@@ -312,5 +315,49 @@ describe.each(TEST_LOCALES)('PaymentGatewaysPage (%s)', (locale) => {
     expect(await screen.findByTestId('pg-demo')).toBeTruthy();
     expect(screen.queryByRole('button', { name: m.add })).toBeNull();
     expect(within(await screen.findByTestId('pg-empty')).queryByRole('button')).toBeNull();
+  });
+  it('the details sheet is read-only for a viewer: six sections, no mutation, no webhook URL, no secret', async () => {
+    perms.current = ['payments.view'];
+    listReturns([conn({ provider: 'moyasar', status: 'active', verified_at: '2026-01-01T00:00:00Z', has_webhook_secret: true,
+      provider_capabilities: { hosted_checkout: true, refunds: true, currencies: ['SAR'], min_amount_minor: 100, methods: ['mada', 'apple_pay'], methods_requiring_provider_setup: ['apple_pay'] } })]);
+    renderIntl(<PaymentGatewaysPage />, locale);
+
+    await userEvent.click(await screen.findByTestId('pg-details-g1'));
+    const sheet = await screen.findByTestId('pg-detail');
+    expect(within(sheet).getAllByRole('heading', { level: 3 })).toHaveLength(6);
+    expect(within(sheet).getByText(m.detail.methods.providerSetup)).toBeTruthy();
+    expect(within(sheet).queryByTestId('pg-webhook-url')).toBeNull();
+    expect(within(sheet).getByText(m.detail.webhooks.managerOnly)).toBeTruthy();
+    expect(within(sheet).queryByRole('button', { name: m.actions.rotate })).toBeNull();
+    expect(within(sheet).queryByRole('button', { name: m.actions.edit })).toBeNull();
+    expect(document.body.textContent).not.toMatch(/sk_|whsec_/);
+  });
+
+  it('a manager sees the webhook URL (built from the key) and the sheet hands actions back to the page', async () => {
+    perms.current = ['payments.view', 'payment_gateways.manage'];
+    listReturns([conn({ provider: 'moyasar', status: 'suspended', verified_at: '2026-01-01T00:00:00Z', webhook_key: 'k'.repeat(40),
+      provider_capabilities: { hosted_checkout: true, refunds: false, currencies: ['SAR'], min_amount_minor: 100, methods: ['mada'], methods_requiring_provider_setup: [] } })]);
+    renderIntl(<PaymentGatewaysPage />, locale);
+
+    await userEvent.click(await screen.findByTestId('pg-details-g1'));
+    const sheet = await screen.findByTestId('pg-detail');
+    expect(within(sheet).getByTestId('pg-webhook-url').textContent).toContain(`payment-webhooks/moyasar/${'k'.repeat(40)}`);
+    expect(within(sheet).getByText(m.detail.money.refundsNo)).toBeTruthy();
+    // لا إعداد التقاط/تسوية مزيّف: ملاحظة «غير قابل للتعديل» فقط
+    expect(within(sheet).getByText(m.detail.money.policyUnavailable)).toBeTruthy();
+
+    await userEvent.click(within(sheet).getByRole('button', { name: m.actions.events }));
+    await waitFor(() => expect(screen.queryByTestId('pg-detail')).toBeNull());
+  });
+
+  it('a provider without an adapter is shown as having no method support (nothing is invented)', async () => {
+    perms.current = ['payments.view'];
+    listReturns([conn({ provider: 'custom', provider_capabilities: null })]);
+    renderIntl(<PaymentGatewaysPage />, locale);
+
+    await userEvent.click(await screen.findByTestId('pg-details-g1'));
+    const sheet = await screen.findByTestId('pg-detail');
+    expect(within(sheet).getByText(m.detail.methods.noAdapter)).toBeTruthy();
+    expect(within(sheet).queryByTestId('pg-detail-methods')).toBeNull();
   });
 });

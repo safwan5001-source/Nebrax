@@ -61,7 +61,7 @@ final class FakePaymentGatewayAdapter implements GatewayAdapter, RefundsPayments
 
     public function capabilities(): PaymentGatewayCapabilities
     {
-        return new PaymentGatewayCapabilities(true, ['SAR'], 1, true);
+        return new PaymentGatewayCapabilities(true, ['SAR'], 1, true, ['mada', 'visa', 'mastercard', 'apple_pay'], ['apple_pay']);
     }
 
     public function createCheckout(PaymentAttemptContext $context): PaymentHostedCheckout

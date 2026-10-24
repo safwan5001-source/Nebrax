@@ -256,7 +256,7 @@ function CreateDialog({
       <div className="space-y-4">
         {gateways.length === 0 ? (
           <p className="text-sm text-muted">
-            {t('no_gateway')} <Link href="/finance-settings/payments" className="text-primary hover:underline">{t('go_settings')}</Link>
+            {t('no_gateway')} <Link href="/finance-settings/payments?tab=gateways" className="text-primary hover:underline">{t('go_settings')}</Link>
           </p>
         ) : (
           <>

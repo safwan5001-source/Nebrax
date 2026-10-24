@@ -54,6 +54,28 @@ describe.each(TEST_LOCALES)('PayLinkPage (%s)', (locale) => {
     await waitFor(() => expect(assign).toHaveBeenCalledWith('https://pay.provider.test/i/1'));
   });
 
+  it('shows accepted payment methods only from the server list, as text without unofficial logos, and nothing when absent or empty', async () => {
+    route({ 'GET /': ok(openView({ payment_methods: ['mada', 'visa', 'unknown_method'] })), 'GET /status': noPayment });
+    renderIntl(<PayLinkPage token={TOKEN} navigate={assign} />, locale);
+
+    const row = await screen.findByTestId('payment-brand-row');
+    expect(row.querySelectorAll('li')).toHaveLength(2); // مفتاح مجهول لا يُعرض
+    expect(row.querySelector('img')).toBeNull(); // لا شعار غير رسمي
+    expect(row.textContent).not.toMatch(/Apple|مايكروسوفت/);
+    cleanup();
+
+    route({ 'GET /': ok(openView({ payment_methods: [] })), 'GET /status': noPayment });
+    renderIntl(<PayLinkPage token={TOKEN} navigate={assign} />, locale);
+    await screen.findByText('شركة الاختبار');
+    expect(screen.queryByTestId('payment-brand-row')).toBeNull();
+    cleanup();
+
+    route({ 'GET /': ok(openView()), 'GET /status': noPayment });
+    renderIntl(<PayLinkPage token={TOKEN} navigate={assign} />, locale);
+    await screen.findByText('شركة الاختبار');
+    expect(screen.queryByTestId('payment-brand-row')).toBeNull();
+  });
+
   it('never redirects to a non-https checkout url', async () => {
     route({
       'GET /': ok(openView()), 'GET /status': noPayment,

@@ -103,6 +103,7 @@ use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\InvoicePaymentRequestController;
 use App\Http\Controllers\Api\PaymentAttemptLogController;
 use App\Http\Controllers\Api\PaymentAttemptPostingController;
+use App\Http\Controllers\Api\OnlinePaymentMethodController;
 use App\Http\Controllers\Api\PaymentClearingReportController;
 use App\Http\Controllers\Api\PaymentGatewayAdjustmentController;
 use App\Http\Controllers\Api\PaymentGatewaySettlementController;
@@ -1138,6 +1139,9 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('payment-refunds/{id}/repost', [PaymentRefundController::class, 'repost'])->whereUuid('id')->middleware([$perm('payments.resolve_blocked'), 'throttle:20,1']);
         Route::post('payment-attempts/{id}/resolve-external-refund', [PaymentRefundController::class, 'resolveExternal'])->whereUuid('id')->middleware([$perm('payment_refunds.resolve_unknown'), 'throttle:20,1']);
         Route::post('payment-attempts/{id}/sync', [PaymentAttemptController::class, 'sync'])->whereUuid('id')->middleware($perm('payments.manage'));
+        // PAY-SETTINGS-UX: وسائل الدفع الإلكتروني (إظهار للعميل بجاهزية محسوبة) — منفصلة عن payment-methods (النقد/البنك).
+        Route::get('online-payment-methods', [OnlinePaymentMethodController::class, 'index'])->middleware($perm('payments.view'));
+        Route::put('online-payment-methods/{key}', [OnlinePaymentMethodController::class, 'update'])->where('key', '[a-z_]+')->middleware([$perm('payment_gateways.manage'), 'throttle:30,1']);
         Route::get('payment-gateways', [PaymentGatewayController::class, 'index'])->middleware($perm('payments.view'));
         Route::get('payment-gateways/{id}', [PaymentGatewayController::class, 'show'])->whereUuid('id')->middleware($perm('payments.view'));
         Route::get('payment-gateways/{id}/events', [PaymentGatewayController::class, 'events'])->whereUuid('id')->middleware($perm('payment_gateways.manage'));

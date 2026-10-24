@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LtrNumber } from '@/components/ui/ltr-number';
+import { PaymentBrandRow } from '@/components/payments/payment-brand-mark';
 import {
   PayLinkError,
   fetchPayLink,
@@ -226,6 +227,13 @@ export function PayLinkPage({
                   t('pay_button_amount', { amount: formatPayAmount(requestedMinor ?? due, currency) })
                 )}
               </Button>
+
+              {view.payment_methods && view.payment_methods.length > 0 && (
+                <div className="mt-4 space-y-1.5">
+                  <p className="text-xs text-muted">{t('accepted')}</p>
+                  <PaymentBrandRow enabled={view.payment_methods} label={t('accepted')} />
+                </div>
+              )}
 
               <p className="mt-4 flex items-start gap-2 text-xs leading-5 text-muted">
                 <LockKeyhole className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
