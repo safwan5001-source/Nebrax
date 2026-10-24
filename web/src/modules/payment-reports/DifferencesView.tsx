@@ -31,11 +31,11 @@ export function DifferencesView() {
     { id: 'gateway', header: t('col_gateway'), cell: ({ row }) => row.original.gateway_name ?? '—' },
     { id: 'date', header: t('col_date'), cell: ({ row }) => <bdi>{row.original.settlement_date ?? '—'}</bdi> },
     { id: 'age', header: t('col_age'), cell: ({ row }) => (row.original.age_days === null ? '—' : t('age_days', { n: row.original.age_days })) },
-    { id: 'gross', header: t('col_gross'), cell: ({ row }) => <bdi dir="ltr">{formatPayAmount(row.original.gross_amount, row.original.currency)}</bdi> },
-    { id: 'net', header: t('col_net_bank'), cell: ({ row }) => <bdi dir="ltr">{formatPayAmount(row.original.net_bank_amount, row.original.currency)}</bdi> },
+    { id: 'gross', header: t('col_gross'), cell: ({ row }) => <bdi dir="ltr" className="whitespace-nowrap">{formatPayAmount(row.original.gross_amount, row.original.currency)}</bdi> },
+    { id: 'net', header: t('col_net_bank'), cell: ({ row }) => <bdi dir="ltr" className="whitespace-nowrap">{formatPayAmount(row.original.net_bank_amount, row.original.currency)}</bdi> },
     {
       id: 'diff', header: t('col_difference'),
-      cell: ({ row }) => <Badge tone={signedTone(row.original.unreconciled_minor)}><bdi dir="ltr">{formatSigned(row.original.unreconciled_minor, row.original.currency)}</bdi></Badge>,
+      cell: ({ row }) => <Badge tone={signedTone(row.original.unreconciled_minor)}><bdi dir="ltr" className="whitespace-nowrap">{formatSigned(row.original.unreconciled_minor, row.original.currency)}</bdi></Badge>,
     },
   ], [t]);
 
@@ -54,9 +54,9 @@ export function DifferencesView() {
           <div className="space-y-4">
             <dl className="grid grid-cols-2 gap-3 sm:grid-cols-5">
               <Stat label={t('diff_count')}>{data.totals.count}</Stat>
-              <Stat label={t('diff_net')}><bdi dir="ltr">{formatSigned(data.totals.net_minor, data.currency)}</bdi></Stat>
-              <Stat label={t('diff_positive')}><bdi dir="ltr">{formatSigned(data.totals.positive_minor, data.currency)}</bdi></Stat>
-              <Stat label={t('diff_negative')}><bdi dir="ltr">{formatSigned(data.totals.negative_minor, data.currency)}</bdi></Stat>
+              <Stat label={t('diff_net')}><bdi dir="ltr" className="whitespace-nowrap">{formatSigned(data.totals.net_minor, data.currency)}</bdi></Stat>
+              <Stat label={t('diff_positive')}><bdi dir="ltr" className="whitespace-nowrap">{formatSigned(data.totals.positive_minor, data.currency)}</bdi></Stat>
+              <Stat label={t('diff_negative')}><bdi dir="ltr" className="whitespace-nowrap">{formatSigned(data.totals.negative_minor, data.currency)}</bdi></Stat>
               <Stat label={t('diff_oldest')}>{data.totals.oldest_settlement_date ? <bdi>{data.totals.oldest_settlement_date}</bdi> : '—'}</Stat>
             </dl>
             <DataTable columns={columns} data={data.rows} loading={loading} showToolbar={false} emptyLabel={t('differences_empty')} />

@@ -29,8 +29,8 @@ export function AgingView() {
 
   const toggle = (id: string) => setSelected((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
   const currency = data?.currency ?? 'SAR';
-  const money = (minor: number) => <bdi dir="ltr">{formatPayAmount(minor, currency)}</bdi>;
-  const signed = (minor: number) => <bdi dir="ltr">{formatSigned(minor, currency)}</bdi>;
+  const money = (minor: number) => <bdi dir="ltr" className="whitespace-nowrap">{formatPayAmount(minor, currency)}</bdi>;
+  const signed = (minor: number) => <bdi dir="ltr" className="whitespace-nowrap">{formatSigned(minor, currency)}</bdi>;
 
   return (
     <div className="space-y-4">

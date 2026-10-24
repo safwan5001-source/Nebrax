@@ -67,13 +67,13 @@ export function Topbar({
 
       <div
         data-awj-shell-field=""
-        className="hidden h-12 items-center gap-2 rounded border border-border px-3 focus-within:ring-2 focus-within:ring-primary/40 sm:flex"
+        className="hidden h-12 min-w-0 items-center gap-2 rounded border border-border px-3 focus-within:ring-2 focus-within:ring-primary/40 md:flex"
       >
         <Search className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.6} />
         <input
           aria-label={t('search')}
           placeholder={t('search')}
-          className="h-full w-40 bg-transparent text-sm text-text placeholder:text-muted focus:outline-none"
+          className="h-full w-40 min-w-0 bg-transparent text-sm text-text placeholder:text-muted focus:outline-none"
         />
       </div>
 

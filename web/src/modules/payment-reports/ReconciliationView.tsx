@@ -17,8 +17,8 @@ export function ReconciliationView() {
   const t = useTranslations('paymentReports');
   const { data, loading, error, reload } = useReport<ReconciliationReport>('/payment-reports/clearing-reconciliation');
   const currency = data?.currency ?? 'SAR';
-  const money = (minor: number) => <bdi dir="ltr">{formatPayAmount(minor, currency)}</bdi>;
-  const signed = (minor: number) => <bdi dir="ltr">{formatSigned(minor, currency)}</bdi>;
+  const money = (minor: number) => <bdi dir="ltr" className="whitespace-nowrap">{formatPayAmount(minor, currency)}</bdi>;
+  const signed = (minor: number) => <bdi dir="ltr" className="whitespace-nowrap">{formatSigned(minor, currency)}</bdi>;
 
   return (
     <ReportShell loading={loading} error={error} onRetry={reload} hasData={data !== null}>
