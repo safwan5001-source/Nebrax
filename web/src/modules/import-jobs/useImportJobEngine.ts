@@ -52,7 +52,20 @@ export function useImportJobEngine(domain: ImportJobDomain) {
   // متزامنين لنفس التشغيلة قبل أن يُعاد رسم الزر معطَّلاً.
   const inFlight = useRef(false);
 
+  // «جيل» الشاشة: `reset()` يرفعه فتتوقف أي عملية بدأت قبله عن الكتابة في الحالة. بدونه كانت حلقة `applyLoop` الجارية تعيد التشغيلة المُسقَطة بعد
+  // `reset()`، وكان ردٌّ متأخر لـ`upload`/`resume`/`repair` يستبدل شاشةً بدأت من جديد (IMP-WIZARD-STATE-01). الطلب الجاري على الخادم لا يُلغى — يُكمل
+  // أثره هناك؛ ما يتوقف هو عرضه واستمرار الحلقة.
+  const epoch = useRef(0);
+
+  // مجال كل تشغيلة استلمها المحرّك من الخادم: يمنع `applyLoop` من تنفيذ معرّفٍ يعود لمجالٍ آخر (رابط `?job=` يدوي) — الخادم ينفّذ المجال المخزَّن في التشغيلة
+  // أيّاً كانت الشاشة، فلا يكفي الاعتماد على حذر كل معالج. معرّفٌ لم يمرّ بالمحرّك (اختبار أو استدعاء مباشر) لا يُرفض: القاعدة تمنع المعلوم مخالفته فقط.
+  const seenDomains = useRef(new Map<string, ImportJobDomain>());
+  const remember = useCallback((job: ImportJob) => {
+    seenDomains.current.set(job.id, job.domain);
+  }, []);
+
   const setJob = useCallback((job: ImportJob) => {
+    remember(job);
     setState((current) => {
       // حالةٌ نهائية سابقة لا يجوز أن تُستبدَل بحالة عميل قديمة متأخرة —
       // لكن هذا التحديث نفسه دائماً من استجابة خادمٍ جديدة فلا تعارض هنا؛
@@ -60,23 +73,26 @@ export function useImportJobEngine(domain: ImportJobDomain) {
       void current;
       return { job, busy: null, error: null, networkUncertain: false };
     });
-  }, []);
+  }, [remember]);
 
   const resume = useCallback(async (jobId: string) => {
     if (inFlight.current) return;
     inFlight.current = true;
+    const myEpoch = epoch.current;
     setState((current) => ({ ...current, busy: 'resuming', error: null }));
     try {
       const job = await getImportJob(jobId);
+      if (epoch.current !== myEpoch) return;
       setJob(job);
     } catch (err) {
+      if (epoch.current !== myEpoch) return;
       setState((current) => ({
         ...current,
         busy: null,
         error: err instanceof ApiError ? err.message : null,
       }));
     } finally {
-      inFlight.current = false;
+      if (epoch.current === myEpoch) inFlight.current = false;
     }
   }, [setJob]);
 
@@ -88,12 +104,15 @@ export function useImportJobEngine(domain: ImportJobDomain) {
   ) => {
     if (inFlight.current) return;
     inFlight.current = true;
+    const myEpoch = epoch.current;
     setState({ job: null, busy: 'uploading', error: null, networkUncertain: false });
     try {
       const job = await createImportJob(domain, file, idempotencyKey, mediaArchive, bound);
+      if (epoch.current !== myEpoch) return null;
       setJob(job);
       return job;
     } catch (err) {
+      if (epoch.current !== myEpoch) return null;
       setState({
         job: null,
         busy: null,
@@ -102,7 +121,7 @@ export function useImportJobEngine(domain: ImportJobDomain) {
       });
       return null;
     } finally {
-      inFlight.current = false;
+      if (epoch.current === myEpoch) inFlight.current = false;
     }
   }, [domain, setJob]);
 
@@ -113,12 +132,15 @@ export function useImportJobEngine(domain: ImportJobDomain) {
   const repair = useCallback(async (parentJobId: string, file: File, idempotencyKey?: string) => {
     if (inFlight.current) return null;
     inFlight.current = true;
+    const myEpoch = epoch.current;
     setState((current) => ({ ...current, busy: 'uploading', error: null, networkUncertain: false }));
     try {
       const child = await createRepairJob(parentJobId, file, idempotencyKey);
+      if (epoch.current !== myEpoch) return null;
       setJob(child);
       return child;
     } catch (err) {
+      if (epoch.current !== myEpoch) return null;
       setState((current) => ({
         ...current,
         busy: null,
@@ -126,7 +148,7 @@ export function useImportJobEngine(domain: ImportJobDomain) {
       }));
       return null;
     } finally {
-      inFlight.current = false;
+      if (epoch.current === myEpoch) inFlight.current = false;
     }
   }, [setJob]);
 
@@ -135,10 +157,18 @@ export function useImportJobEngine(domain: ImportJobDomain) {
    * `completed`/`failed`. المصنّف والرصيد الافتتاحي ذرّيان: أول استدعاء
    * يُنجز التشغيلة أو يفشلها، فلا حلقة فعلية تُنفَّذ لهما (نفس الشيفرة، دورة
    * واحدة فقط لأن `status` يصبح نهائياً من أول استجابة).
+   *
+   * **لا تنفّذ تشغيلةً معلومٌ أنها من مجالٍ آخر**، ولا تكتب في الحالة بعد `reset()` (انظر `epoch`).
    */
   const applyLoop = useCallback(async (jobId: string, options: ApplyOptions) => {
     if (inFlight.current) return;
+    const knownDomain = seenDomains.current.get(jobId);
+    if (knownDomain !== undefined && knownDomain !== domain) {
+      setState((current) => ({ ...current, error: 'هذه التشغيلة تخص مجالاً آخر ولا يمكن تنفيذها من هذه الشاشة.' }));
+      return;
+    }
     inFlight.current = true;
+    const myEpoch = epoch.current;
     setState((current) => ({ ...current, busy: 'applying', error: null, networkUncertain: false }));
 
     let currentId = jobId;
@@ -165,11 +195,13 @@ export function useImportJobEngine(domain: ImportJobDomain) {
         try {
           job = await applyImportJobChunk(currentId, options);
         } catch (err) {
+          if (epoch.current !== myEpoch) return;
           if (isNetworkFailure(err)) {
             // انقطاعٌ غير محسوم: لا نفترض فشل التطبيق — نعيد قراءة التشغيلة
             // من الخادم لنعرف ما حدث فعلاً قبل أي قرار.
             setState((current) => ({ ...current, networkUncertain: true }));
             const reFetched = await getImportJob(currentId);
+            if (epoch.current !== myEpoch) return;
             if (TERMINAL_STATUSES.has(reFetched.status)) {
               setJob(reFetched);
               return;
@@ -186,6 +218,8 @@ export function useImportJobEngine(domain: ImportJobDomain) {
           // غالباً — أعِد جلبها كي تُعرَض حالتها النهائية الحقيقية لا تخميناً.
           try {
             const reFetched = await getImportJob(currentId);
+            if (epoch.current !== myEpoch) return;
+            remember(reFetched);
             setState((current) => ({ ...current, job: reFetched }));
           } catch {
             /* تجاهل: الخطأ الأصلي أهمّ من فشل إعادة الجلب. */
@@ -193,6 +227,9 @@ export function useImportJobEngine(domain: ImportJobDomain) {
           return;
         }
 
+        // `reset()` أثناء القطعة: الأثر على الخادم قائم، أما الشاشة فبدأت من جديد فلا تُعاد إليها تشغيلة مُسقَطة ولا تستمر الحلقة.
+        if (epoch.current !== myEpoch) return;
+        remember(job);
         setState((current) => ({ ...current, job }));
 
         if (TERMINAL_STATUSES.has(job.status)) {
@@ -209,34 +246,42 @@ export function useImportJobEngine(domain: ImportJobDomain) {
         }
       }
     } finally {
-      inFlight.current = false;
+      if (epoch.current === myEpoch) inFlight.current = false;
     }
-  }, [setJob]);
+  }, [domain, remember, setJob]);
 
   const cancel = useCallback(async (jobId: string) => {
     if (inFlight.current) return;
     inFlight.current = true;
+    const myEpoch = epoch.current;
     setState((current) => ({ ...current, busy: 'cancelling', error: null }));
     try {
       const job = await cancelImportJob(jobId);
+      if (epoch.current !== myEpoch) return;
       setJob(job);
     } catch (err) {
+      if (epoch.current !== myEpoch) return;
       setState((current) => ({
         ...current,
         busy: null,
         error: err instanceof ApiError ? err.message : null,
       }));
     } finally {
-      inFlight.current = false;
+      if (epoch.current === myEpoch) inFlight.current = false;
     }
   }, [setJob]);
 
   const reset = useCallback(() => {
+    // يُبطل كل عملية جارية (انظر `epoch`) ويحرّر القفل كي تبدأ الشاشة الجديدة فوراً؛ العملية القديمة تنتهي بصمت دون كتابة في الحالة.
+    epoch.current += 1;
+    inFlight.current = false;
     setState({ job: null, busy: null, error: null, networkUncertain: false });
   }, []);
 
   return {
     ...state,
+    /** تشغيلة الشاشة تعود لمجالٍ غير مجال هذا المحرّك (رابط `?job=` يدوي): يجب ألّا تُعرَض كتشغيلة هذه الشاشة ولا تُنفَّذ منها. */
+    foreignJob: state.job !== null && state.job.domain !== domain,
     canApply: state.job !== null && APPLICABLE_STATUSES.has(state.job.status) && state.job.status !== 'completed',
     isTerminal: state.job !== null && TERMINAL_STATUSES.has(state.job.status),
     upload,
