@@ -86,7 +86,7 @@ class PurchaseImportService
         $example = static fn (array $values): array => array_map(static fn (string $key): string => $values[$key] ?? '', Fields::keys());
 
         return SpreadsheetWriter::csv(Fields::templateHeaders(), [
-            $example(['supplier_code' => 'S-001', 'supplier_invoice_ref' => 'INV-2041', 'purchase_date' => '2026-10-01', 'due_date' => '2026-10-31', 'payment_type' => 'credit', 'sku' => 'CEM-50', 'quantity' => '10', 'unit_price' => '25.00', 'tax_rate' => '15', 'invoice_total' => '362.50']),
+            $example(['supplier_code' => 'S-001', 'supplier_invoice_ref' => 'INV-2041', 'purchase_date' => '2026-10-01', 'due_date' => '2026-10-31', 'payment_type' => 'credit', 'sku' => 'CEM-50', 'quantity' => '10', 'unit_price' => '25.00', 'tax_rate' => '15']),
             $example(['supplier_code' => 'S-001', 'supplier_invoice_ref' => 'INV-2041', 'sku' => 'SAND-1', 'description' => 'رمل ناعم', 'quantity' => '4', 'unit_price' => '28.00', 'tax_rate' => '15']),
             $example(['supplier_code' => 'S-002', 'supplier_invoice_ref' => 'B-77', 'purchase_date' => '2026-10-03', 'payment_type' => 'cash', 'barcode' => '6281000000011', 'quantity' => '2', 'unit_price' => '100.00']),
         ]);
