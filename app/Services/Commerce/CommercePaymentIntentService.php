@@ -32,6 +32,7 @@ final class CommercePaymentIntentService
     public function __construct(
         private readonly PaymentMethodChannelAvailabilityService $paymentAvailability,
         private readonly CommerceOnlinePaymentService $online,
+        private readonly CustomerPartnerResolver $partners,
     ) {}
 
     /**
@@ -74,6 +75,11 @@ final class CommercePaymentIntentService
             // المزوّد لا يقبل هذا المبلغ/العملة (حدّ أدنى أو عملة غير مدعومة): يُرفض الإتمام قبل الالتزام فيُصحَّح الاختيار بدل طلب لا يُدفع أبداً.
             if (! $this->online->gatewaySupports($gateway, (int) $order->total, (string) $currency)) {
                 throw new RuntimeException('الدفع الإلكتروني بهذه الطريقة لا يدعم مبلغ الطلب أو عملته؛ اختر طريقة أخرى.');
+            }
+            // H4-01 / D-05: الدفع الإلكتروني يُرحَّل بسند قبض يتطلب طرفاً؛ يُحسم الطرف وفق السياسة داخل معاملة الإتمام (COD/الاستلام بلا تغيير).
+            $partner = $this->partners->resolveForOrder($order);
+            if ($partner !== null && $order->partner_id !== $partner->id) {
+                $order->update(['partner_id' => $partner->id]);
             }
             $method = CommercePaymentIntent::METHOD_ONLINE;
             $status = CommercePaymentIntent::STATUS_PENDING;
