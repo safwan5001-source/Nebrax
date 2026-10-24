@@ -147,6 +147,7 @@ use App\Http\Controllers\Api\PrintTemplateController;
 use App\Http\Controllers\Api\ProcurementController;
 use App\Http\Controllers\Api\PurchaseSettingsController;
 use App\Http\Controllers\Api\PurchaseController;
+use App\Http\Controllers\Api\PurchaseImportController;
 use App\Http\Controllers\Api\PurchaseReportController;
 use App\Http\Controllers\Api\QuoteController;
 use App\Http\Controllers\Api\RecurringInvoiceController;
@@ -1615,6 +1616,12 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('employee-custodies/{id}/post', [EmployeeCustodyController::class, 'post'])->middleware([$perm('payments.manage'), $app('finance.operations')]);
 
         // المشتريات
+        // IMP-H5-S4a: استيراد فواتير المشتريات مسوداتٍ — قالب/حقول/فحص/معاينة فقط (لا apply متزامن؛ التنفيذ عبر import-jobs المربوط بالمعاينة). البوابات = `POST purchases`.
+        // ثابتة قبل `purchases/{id}` كي لا يلتقطها المعرّف.
+        Route::get('purchases/import/template', [PurchaseImportController::class, 'template'])->middleware([$perm('purchases.manage'), $app('purchases.cycle')]);
+        Route::get('purchases/import/fields', [PurchaseImportController::class, 'fields'])->middleware([$perm('purchases.manage'), $app('purchases.cycle')]);
+        Route::post('purchases/import/inspect', [PurchaseImportController::class, 'inspect'])->middleware([$perm('purchases.manage'), $app('purchases.cycle'), EnsureImportFilesScanned::class]);
+        Route::post('purchases/import/preview', [PurchaseImportController::class, 'preview'])->middleware([$perm('purchases.manage'), $app('purchases.cycle'), EnsureImportFilesScanned::class]);
         Route::get('purchases', [PurchaseController::class, 'index'])->middleware([$perm('purchases.view'), $app('purchases.cycle')]);
         Route::get('purchases/{id}', [PurchaseController::class, 'show'])->middleware([$perm('purchases.view'), $app('purchases.cycle')]);
         Route::get('purchases/{id}/attachments', [PurchaseController::class, 'indexAttachments'])->middleware([$perm('purchases.view'), $app('purchases.cycle')]);

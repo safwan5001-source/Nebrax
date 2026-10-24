@@ -173,6 +173,7 @@ class PurchaseImportService
     public function apply(UploadedFile $file, array $options, ?string $userId = null, int $maxRows = self::MAX_ROWS): array
     {
         $resolved = $this->options($options);
+        $this->assertWarehouseAccess($resolved['warehouse_id'], $userId);
 
         return DB::transaction(function () use ($file, $resolved, $userId, $maxRows): array {
             $parsed = $this->parse($file, $resolved, $maxRows);
@@ -191,7 +192,8 @@ class PurchaseImportService
             }
 
             if ($parsed['counters']['error'] > 0) {
-                throw new ImportUnitFailureException('لا يمكن تطبيق الاستيراد قبل معالجة الأخطاء الظاهرة في المعاينة.', $this->unitFailures($parsed['units']));
+                $failures = $this->unitFailures($parsed['units']);
+                throw new ImportUnitFailureException($this->failureSummary('لا يمكن تطبيق الاستيراد قبل معالجة الأخطاء الظاهرة في المعاينة.', $failures), $failures);
             }
 
             $purchases = app(PurchaseService::class);
@@ -208,16 +210,16 @@ class PurchaseImportService
                     ));
                     $created++;
                 } catch (DuplicateDocumentException) {
-                    $failures[] = ['ordinal' => (int) $unit['ordinal'], 'code' => 'duplicate_document', 'message' => 'فاتورة المورّد بهذا الرقم أُنشئت للتو من مسار آخر.'];
+                    $failures[] = ['ordinal' => (int) $unit['ordinal'], 'code' => 'duplicate_document', 'message' => $this->unitLabel($unit).'فاتورة المورّد بهذا الرقم أُنشئت للتو من مسار آخر.'];
                 } catch (\Illuminate\Database\QueryException $e) {
                     throw $e;   // خطأ قاعدة بيانات: لا نصّه (SQL/قيم) في رسالة وحدة؛ تفشل القطعة كلها وتتراجع.
                 } catch (RuntimeException $e) {
-                    $failures[] = ['ordinal' => (int) $unit['ordinal'], 'code' => 'purchase_create_failed', 'message' => $e->getMessage()];
+                    $failures[] = ['ordinal' => (int) $unit['ordinal'], 'code' => 'purchase_create_failed', 'message' => $this->unitLabel($unit).$e->getMessage()];
                 }
                 $results[] = $this->unitSummary($unit);
             }
             if ($failures !== []) {
-                throw new ImportUnitFailureException('تعذّر إنشاء بعض الفواتير.', $failures);
+                throw new ImportUnitFailureException($this->failureSummary('تعذّر إنشاء بعض الفواتير.', $failures), $failures);
             }
 
             return [
@@ -320,34 +322,7 @@ class PurchaseImportService
      */
     private function parse(UploadedFile $file, array $options, int $maxRows): array
     {
-        $raw = $this->readFile($file, $maxRows);
-        if ($raw === []) {
-            throw new RuntimeException('الملف فارغ.');
-        }
-        $headers = array_map('strval', $raw[0]);
-        $mapping = $options['mapping'] ?? Fields::autoMap($headers);
-        $this->assertMapping($mapping, $options);
-
-        // 1) كل الصفوف الفعلية: تطبيعٌ بلا قاعدة بيانات.
-        $entries = [];
-        foreach (array_slice($raw, 1, null, true) as $sheetIndex => $values) {
-            if (ProductImportService::isBlankRow($values)) {
-                continue;
-            }
-            $entry = $this->normalizeRow($values, $mapping);
-            $entry['row'] = $sheetIndex + 1;
-            $entry['codes'] = $entry['errors'];
-            $entry['messages'] = array_map(fn (string $code): string => $this->message($code), $entry['errors']);
-            // صفٌّ أعرض من صف العناوين تسقط قيمةٌ منه صامتةً — أخطر من خطأ صريح.
-            if (count($values) > count($headers)) {
-                $this->addIssue($entry, 'row_wider_than_header', 'عدد الأعمدة في هذا الصف يتجاوز صف العناوين، فبعض القيم ستسقط. صحّح الملف.');
-            }
-            $entries[] = $entry;
-        }
-
-        // 2) المراجع (مورّد/منتج) لكل الملف بدفعات + مستودع التشغيلة.
-        $this->assertWarehouse($options);
-        $this->resolveReferences($entries, $options);
+        ['entries' => $entries, 'mapping' => $mapping] = $this->loadEntries($file, $options, $maxRows);
 
         // 3) التجميع في وحدات (فواتير) بترتيب الظهور الأول.
         $units = $this->group($entries, $options);
@@ -386,6 +361,58 @@ class PurchaseImportService
         return ['units' => $window, 'total_rows' => count($entries), 'total_units' => $total, 'mapping' => $mapping, 'counters' => $counters, 'errors' => $errors, 'create_total_minor' => $createTotal];
     }
 
+    /**
+     * قراءة الملف وتطبيع كل صفوفه وحلّ مراجعه (مورّد/منتج/مستودع). مشتركة بين التحليل الكامل وعدّ الوحدات.
+     *
+     * @param  array<string, mixed>  $options
+     * @return array{entries: list<array<string, mixed>>, mapping: array<int, string|null>}
+     */
+    private function loadEntries(UploadedFile $file, array $options, int $maxRows): array
+    {
+        $raw = $this->readFile($file, $maxRows);
+        if ($raw === []) {
+            throw new RuntimeException('الملف فارغ.');
+        }
+        $headers = array_map('strval', $raw[0]);
+        $mapping = $options['mapping'] ?? Fields::autoMap($headers);
+        $this->assertMapping($mapping, $options);
+
+        // 1) كل الصفوف الفعلية: تطبيعٌ بلا قاعدة بيانات.
+        $entries = [];
+        foreach (array_slice($raw, 1, null, true) as $sheetIndex => $values) {
+            if (ProductImportService::isBlankRow($values)) {
+                continue;
+            }
+            $entry = $this->normalizeRow($values, $mapping);
+            $entry['row'] = $sheetIndex + 1;
+            $entry['codes'] = $entry['errors'];
+            $entry['messages'] = array_map(fn (string $code): string => $this->message($code), $entry['errors']);
+            // صفٌّ أعرض من صف العناوين تسقط قيمةٌ منه صامتةً — أخطر من خطأ صريح.
+            if (count($values) > count($headers)) {
+                $this->addIssue($entry, 'row_wider_than_header', 'عدد الأعمدة في هذا الصف يتجاوز صف العناوين، فبعض القيم ستسقط. صحّح الملف.');
+            }
+            $entries[] = $entry;
+        }
+
+        // 2) المراجع (مورّد/منتج) لكل الملف بدفعات + مستودع التشغيلة.
+        $this->assertWarehouse($options);
+        $this->resolveReferences($entries, $options);
+
+        return ['entries' => $entries, 'mapping' => $mapping];
+    }
+
+    /**
+     * عدد وحدات (فواتير) الملف بالخيارات المجمَّدة نفسها — يعيد المحوّل الدائم حسابه عند أول ترحيل لأن `row_count` وقت الفحص يُعدّ صفوفاً بلا مطابقة أعمدة ولا مورّد افتراضي.
+     *
+     * @param  array<string, mixed>  $options
+     */
+    public function unitCount(UploadedFile $file, array $options, int $maxRows = self::DURABLE_MAX_ROWS): int
+    {
+        ['entries' => $entries] = $this->loadEntries($file, $this->options($options), $maxRows);
+
+        return count($this->group($entries, $this->options($options), false));
+    }
+
     /** @param array<int, string|null> $mapping @param array<string, mixed> $options */
     private function assertMapping(array $mapping, array $options): void
     {
@@ -403,6 +430,24 @@ class PurchaseImportService
         }
         if (! in_array('supplier_code', $chosen, true) && $options['default_supplier_id'] === null) {
             throw new RuntimeException('حدّد عمود «كود المورّد» أو اختر مورّداً افتراضياً للتشغيلة.');
+        }
+    }
+
+    /**
+     * المستودع المحدَّد يجب أن يكون ضمن صلاحيات من ينفّذ (مخزن وفرعه) — مثل `ApiController::assertWarehouseAllowed` في `POST /purchases`. بلا فاعل (مسار نظامي) لا فحص،
+     * وبفاعل مجهول (حُذف) يُرفض مغلقاً. تُستدعى من المعاينة (المتحكّم) ومن كل قطعة تنفيذ.
+     */
+    public function assertWarehouseAccess(?string $warehouseId, ?string $userId): void
+    {
+        if ($warehouseId === null || $userId === null) {
+            return;
+        }
+        $user = \App\Models\User::query()->find($userId);
+        $warehouse = Warehouse::query()->whereKey($warehouseId)->first();
+        if ($user === null || $warehouse === null
+            || ! $user->canAccessWarehouse($warehouse->id)
+            || ($warehouse->branch_id !== null && ! $user->canAccessBranch($warehouse->branch_id))) {
+            throw new RuntimeException('هذا المستودع خارج نطاق صلاحياتك.');
         }
     }
 
@@ -692,9 +737,10 @@ class PurchaseImportService
      *
      * @param  list<array<string, mixed>>  $entries
      * @param  array<string, mixed>  $options
+     * @param  bool  $finalize  false = الحدود فقط (عدّ الوحدات) بلا اشتقاق رأس/سطور/إجماليات
      * @return list<array<string, mixed>>
      */
-    private function group(array $entries, array $options): array
+    private function group(array $entries, array $options, bool $finalize = true): array
     {
         $units = [];
         $index = [];
@@ -714,10 +760,12 @@ class PurchaseImportService
             $units[$index[$key]]['positions'][] = $position;
         }
 
-        foreach ($units as &$unit) {
-            $this->finalizeUnit($unit, $options);
+        if ($finalize) {
+            foreach ($units as &$unit) {
+                $this->finalizeUnit($unit, $options);
+            }
+            unset($unit);
         }
-        unset($unit);
 
         return $units;
     }
@@ -886,10 +934,24 @@ class PurchaseImportService
             if ($unit['valid'] === true) {
                 continue;
             }
-            $failures[] = ['ordinal' => (int) $unit['ordinal'], 'code' => 'unit_invalid', 'message' => implode(' · ', array_map('strval', $unit['messages']))];
+            $failures[] = ['ordinal' => (int) $unit['ordinal'], 'code' => 'unit_invalid', 'message' => $this->unitLabel($unit).implode(' · ', array_map('strval', $unit['messages']))];
         }
 
         return $failures;
+    }
+
+    /** بادئة تعرّف الفاتورة في رسالة الفشل (الصف/الرقم): الوحدات الفاشلة لا تُسجَّل في جدول الوحدات لمجال المستند، فرسالة التشغيلة هي ما يراه المستخدم. */
+    private function unitLabel(array $unit): string
+    {
+        return 'الصف '.$unit['first_row'].($unit['reference'] !== null ? " (فاتورة «{$unit['reference']}»)" : '').': ';
+    }
+
+    /** @param list<array{ordinal: int, code: string, message: string}> $failures */
+    private function failureSummary(string $head, array $failures): string
+    {
+        $shown = array_slice(array_column($failures, 'message'), 0, 3);
+
+        return $head.' '.implode(' | ', $shown).(count($failures) > 3 ? ' … (+'.(count($failures) - 3).')' : '');
     }
 
     /** @param array<string, mixed> $unit @return array<string, mixed> */

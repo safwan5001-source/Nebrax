@@ -48,9 +48,12 @@ interface ImportDomainAdapter
 
     /**
      * إعادة حساب `row_count` عند أول ترحيل إن اختلف تعريفه عن وقت الفحص (تصحيح ذاتي لتشغيلات قديمة)؛ `null` = أبقِ
-     * العدد المخزَّن. الأصل: لا إعادة حساب.
+     * العدد المخزَّن. الأصل: لا إعادة حساب. `$frozenOptions` الخيارات المجمَّدة للتشغيلة (IMP-H5-S4a): مجالٌ وحدته مستند (مجموعة صفوف) لا يعرف عدد وحداته
+     * من الملف وحده بل من مطابقة أعمدته وخياراته، فيعيد عدّها هنا ليبلغ `processed_rows` (وحدات) `row_count` بالضبط.
+     *
+     * @param  array<string, mixed>  $frozenOptions
      */
-    public function recountOnFirstApply(string $tmpPath, string $extension): ?int;
+    public function recountOnFirstApply(string $tmpPath, string $extension, array $frozenOptions = []): ?int;
 
     /**
      * الخيارات **القانونية** لهذا المجال (IMP-H1-S3b): مفاتيح مغلقة، قيم مُطبَّعة بأنواعها وافتراضاتها، مطابقة الأعمدة مرتّبة.
