@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils';
 import { Stepper } from '@/modules/products/import/stepper';
 import { ImportJobStatusPanel } from '@/modules/import-jobs/ImportJobStatusPanel';
 import { ImportRepairPanel } from '@/modules/import-jobs/ImportRepairPanel';
-import { downloadImportFailures, type ApplyOptions } from '@/modules/import-jobs/client';
+import { downloadImportFailures, hasFrozenOptions, type ApplyOptions } from '@/modules/import-jobs/client';
 import { useImportJobEngine, useImportJobUrlParam, useResumeFromUrl } from '@/modules/import-jobs/useImportJobEngine';
 import {
   ACCEPTED_EXPENSE_IMPORT_TYPES,
@@ -119,6 +119,9 @@ export function ExpenseImportWizard() {
   const activeMapping = inspection && inspection.columns.length > 0 ? mapping : undefined;
   const mappingReady = !activeMapping || (gaps.missingRequired.length === 0 && !gaps.missingAccount && !gaps.missingReference && !gaps.duplicate);
   const canPreview = Boolean(file) && !inspecting && !previewing && mappingReady && taxValid;
+  // تشغيلة من مجالٍ آخر (رابط ?job= يدوي) لا تُعرَض ولا تُنفَّذ من هذه الشاشة في أي خطوة (والمحرّك يرفض تنفيذها أيضاً).
+  const wrongDomainJob = engine.foreignJob;
+  const view = wrongDomainJob ? -1 : step;
   const steps = STEP_KEYS.map((key) => ({ key, label: t(`step_${key}`) }));
 
   function currentOptions(rows: number[] = confirmedRows): ExpenseImportOptions {
@@ -248,6 +251,7 @@ export function ExpenseImportWizard() {
   }
 
   async function confirmAndApply() {
+    if (wrongDomainJob) return;
     setStep(2);
     setError(null);
     if (!engine.job) {
@@ -259,10 +263,10 @@ export function ExpenseImportWizard() {
         return;
       }
       // تشغيلةٌ مربوطةٌ بمعاينة تنفّذ خياراتها المجمَّدة عند الإنشاء: لا خيارات دلالية في طلب التطبيق.
-      await engine.applyLoop(job.id, job.preview_bound ? {} : applyOptionsPayload());
+      await engine.applyLoop(job.id, hasFrozenOptions(job) ? {} : applyOptionsPayload());
       return;
     }
-    await engine.applyLoop(engine.job.id, engine.job.preview_bound ? {} : applyOptionsPayload());
+    await engine.applyLoop(engine.job.id, hasFrozenOptions(engine.job) ? {} : applyOptionsPayload());
   }
 
   async function repairFailedRows(repairFile: File) {
@@ -337,7 +341,19 @@ export function ExpenseImportWizard() {
         </p>
       ) : null}
 
-      {step === 0 ? (
+      {wrongDomainJob ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('resumed_title')}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p role="alert" className="text-sm text-negative">{t('resumed_wrong_domain')}</p>
+            <FormActions primary={<Button variant="outline" onClick={reset}>{t('start_another')}</Button>} />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {view === 0 ? (
         resumedWithoutFile && engine.job ? (
           <Card>
             <CardHeader>
@@ -345,10 +361,10 @@ export function ExpenseImportWizard() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm leading-relaxed text-muted">{t('resumed_hint', { name: engine.job.original_filename })}</p>
-              {engine.job.preview_bound ? null : <p role="alert" className="text-sm text-negative">{t('resumed_unbound')}</p>}
+              {hasFrozenOptions(engine.job) ? null : <p role="alert" className="text-sm text-negative">{t('resumed_unbound')}</p>}
               <FormActions
                 primary={
-                  <Button disabled={!engine.job.preview_bound} onClick={() => void confirmAndApply()}>
+                  <Button disabled={!hasFrozenOptions(engine.job)} onClick={() => void confirmAndApply()}>
                     <Upload className="h-4 w-4" strokeWidth={1.7} />
                     {t('apply')}
                   </Button>
@@ -540,7 +556,7 @@ export function ExpenseImportWizard() {
         )
       ) : null}
 
-      {step === 1 && preview ? (
+      {view === 1 && preview ? (
         <Card>
           <CardHeader>
             <CardTitle>{t('step_preview')}</CardTitle>
@@ -638,13 +654,13 @@ export function ExpenseImportWizard() {
         </Card>
       ) : null}
 
-      {step === 2 && engine.job ? (
+      {view === 2 && engine.job ? (
         <Card>
           <CardHeader>
             <CardTitle>{t('step_apply')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {engine.job.status === 'processing' && engine.busy === null && engine.job.preview_bound ? (
+            {engine.job.status === 'processing' && engine.busy === null && hasFrozenOptions(engine.job) ? (
               <div className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-background px-3 py-2">
                 <p className="text-sm text-muted">{t('continue_hint')}</p>
                 <Button type="button" onClick={() => void engine.applyLoop(engine.job!.id, {})}>
@@ -671,7 +687,7 @@ export function ExpenseImportWizard() {
         </Card>
       ) : null}
 
-      {step === 3 && engine.job?.status === 'completed' ? (
+      {view === 3 && engine.job?.status === 'completed' ? (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

@@ -18,7 +18,7 @@ import { formatMinorRiyal } from '@/lib/money';
 import { cn } from '@/lib/utils';
 import { Stepper } from '@/modules/products/import/stepper';
 import { ImportJobStatusPanel } from '@/modules/import-jobs/ImportJobStatusPanel';
-import type { ApplyOptions } from '@/modules/import-jobs/client';
+import { hasFrozenOptions, type ApplyOptions } from '@/modules/import-jobs/client';
 import { useImportJobEngine, useImportJobUrlParam, useResumeFromUrl } from '@/modules/import-jobs/useImportJobEngine';
 import {
   ACCEPTED_PURCHASE_IMPORT_TYPES,
@@ -39,11 +39,6 @@ import {
   type PurchasePaymentType,
   type TriState,
 } from './contract';
-
-/** خياراتها مجمَّدة منذ الإنشاء: مربوطةٌ بمعاينة، أو تشغيلة إصلاح فرعية ترث خيارات أمّها (لا خيارات دلالية في طلب التطبيق). */
-function frozenJob(job: { preview_bound?: boolean; parent_job_id?: string | null }): boolean {
-  return Boolean(job.preview_bound) || Boolean(job.parent_job_id);
-}
 
 const STEP_KEYS = ['setup', 'preview', 'apply', 'result'] as const;
 const ERRORS_COLLAPSED = 5;
@@ -255,10 +250,10 @@ export function PurchaseImportWizard() {
         return;
       }
       // تشغيلةٌ مربوطةٌ بمعاينة تنفّذ خياراتها المجمَّدة عند الإنشاء: لا خيارات دلالية في طلب التطبيق.
-      await engine.applyLoop(job.id, frozenJob(job) ? {} : applyOptionsPayload());
+      await engine.applyLoop(job.id, hasFrozenOptions(job) ? {} : applyOptionsPayload());
       return;
     }
-    await engine.applyLoop(engine.job.id, frozenJob(engine.job) ? {} : applyOptionsPayload());
+    await engine.applyLoop(engine.job.id, hasFrozenOptions(engine.job) ? {} : applyOptionsPayload());
   }
 
   async function downloadTemplate() {
@@ -342,10 +337,10 @@ export function PurchaseImportWizard() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm leading-relaxed text-muted">{t('resumed_hint', { name: engine.job.original_filename })}</p>
-              {frozenJob(engine.job) ? null : <p role="alert" className="text-sm text-negative">{t('resumed_unbound')}</p>}
+              {hasFrozenOptions(engine.job) ? null : <p role="alert" className="text-sm text-negative">{t('resumed_unbound')}</p>}
               <FormActions
                 primary={
-                  <Button disabled={!frozenJob(engine.job)} onClick={() => void confirmAndApply()}>
+                  <Button disabled={!hasFrozenOptions(engine.job)} onClick={() => void confirmAndApply()}>
                     <Upload className="h-4 w-4" strokeWidth={1.7} />
                     {t('apply')}
                   </Button>
@@ -665,7 +660,7 @@ export function PurchaseImportWizard() {
             <CardTitle>{t('step_apply')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {engine.job.status === 'processing' && engine.busy === null && frozenJob(engine.job) ? (
+            {engine.job.status === 'processing' && engine.busy === null && hasFrozenOptions(engine.job) ? (
               <div className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-background px-3 py-2">
                 <p className="text-sm text-muted">{t('continue_hint')}</p>
                 <Button type="button" onClick={() => void engine.applyLoop(engine.job!.id, {})}>

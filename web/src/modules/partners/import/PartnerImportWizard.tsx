@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
 import { Stepper } from '@/modules/products/import/stepper';
 import { ImportJobStatusPanel } from '@/modules/import-jobs/ImportJobStatusPanel';
 import { ImportRepairPanel } from '@/modules/import-jobs/ImportRepairPanel';
-import { downloadImportFailures, type ApplyOptions } from '@/modules/import-jobs/client';
+import { downloadImportFailures, hasFrozenOptions, type ApplyOptions } from '@/modules/import-jobs/client';
 import { useImportJobEngine, useImportJobUrlParam, useResumeFromUrl } from '@/modules/import-jobs/useImportJobEngine';
 import {
   ACCEPTED_PARTNER_IMPORT_TYPES,
@@ -100,7 +100,23 @@ export function PartnerImportWizard({ type }: { type: PartnerImportType }) {
     return { type, mode, blankPolicy, duplicateSignalPolicy: signalPolicy, mapping: activeMapping };
   }
 
+  // معاينةٌ استُهلك ربطها (تشغيلة انتهت): لا تنفيذ ثانٍ منها — تُعاد المعاينة لتشغيلة جديدة.
+  const jobTerminal = engine.job !== null && ['failed', 'completed', 'cancelled'].includes(engine.job.status);
+  // تشغيلة من مجالٍ آخر (رابط ?job= يدوي) لا تُعرَض ولا تُنفَّذ من هذه الشاشة في أي خطوة (والمحرّك يرفض تنفيذها أيضاً).
+  const wrongDomainJob = engine.foreignJob;
+  const view = wrongDomainJob ? -1 : step;
+
+  /** تشغيلةٌ سابقة مجمَّدة الملف والخيارات: أي تغيير يُسقطها كي لا يُنفَّذ ما لم يُعايَن (تبقى على الخادم وتُستأنف برابطها). */
+  function dropJob() {
+    // أثناء الرفع/التنفيذ لا تُسقَط التشغيلة، فتبقى الشاشة متّسقة مع ما يُكتب فعلاً.
+    if (!engine.job || engine.busy === 'applying' || engine.busy === 'uploading') return;
+    engine.reset();
+    setParam(null);
+    setResumedWithoutFile(false);
+  }
+
   function invalidatePreview() {
+    dropJob();
     previewSeq.current += 1;
     setPreviewing(false);
     setPreview(null);
@@ -198,21 +214,27 @@ export function PartnerImportWizard({ type }: { type: PartnerImportType }) {
   }
 
   async function confirmAndApply() {
+    if (wrongDomainJob) return;
     setStep(2);
     setError(null);
     if (!engine.job) {
       if (!file) return;
       const job = await engine.upload(file, undefined, null, preview?.binding ? { binding: preview.binding, options: applyOptionsPayload() } : null);
-      if (!job) return;
+      if (!job) {
+        // فشل الإنشاء (معاينة منتهية/خيار مرفوض/شبكة): لا صفحة فارغة — نعود إلى المعاينة والخطأ ظاهر.
+        setStep(1);
+        return;
+      }
       // تشغيلةٌ مربوطةٌ بمعاينة تنفّذ خياراتها المجمَّدة عند الإنشاء: لا خيارات دلالية في طلب التطبيق.
-      await engine.applyLoop(job.id, job.preview_bound ? {} : applyOptionsPayload());
+      await engine.applyLoop(job.id, hasFrozenOptions(job) ? {} : applyOptionsPayload());
       return;
     }
-    await engine.applyLoop(engine.job.id, engine.job.preview_bound ? {} : applyOptionsPayload());
+    await engine.applyLoop(engine.job.id, hasFrozenOptions(engine.job) ? {} : applyOptionsPayload());
   }
 
   async function repairFailedRows(repairFile: File) {
     if (!engine.job) return;
+    setError(null);
     const key = `repair-${engine.job.id}-${repairFile.name}-${repairFile.size}-${repairFile.lastModified}`;
     const child = await engine.repair(engine.job.id, repairFile, key);
     if (!child) return;
@@ -253,7 +275,10 @@ export function PartnerImportWizard({ type }: { type: PartnerImportType }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine.job?.status]);
 
+  // `apply_result` يحمل قطعة التنفيذ الأخيرة وحدها؛ الإجمالي التراكمي للصفوف المنجزة هو `processed_rows`.
   const applyResult = engine.job?.apply_result as { created?: number; updated?: number; skipped?: number } | null | undefined;
+  const processedTotal = engine.job?.processed_rows ?? 0;
+  const failedAfterPartial = engine.job?.status === 'failed' && processedTotal > 0;
   const modes: PartnerImportMode[] = ['create', 'update', 'upsert'];
 
   return (
@@ -274,15 +299,27 @@ export function PartnerImportWizard({ type }: { type: PartnerImportType }) {
         </Button>
       </header>
 
-      <Stepper steps={steps} current={step} onSelect={(index) => index <= step && setStep(index)} label={t('step_label')} />
+      <Stepper steps={steps} current={step} onSelect={(index) => index <= step && (index !== 1 || preview !== null) && engine.busy !== 'applying' && engine.busy !== 'uploading' && setStep(index)} label={t('step_label')} />
 
-      {error ? (
+      {error || engine.error ? (
         <p role="alert" className="rounded-md border border-negative/30 bg-negative/10 px-3 py-2 text-sm text-negative">
-          {error}
+          {error ?? engine.error}
         </p>
       ) : null}
 
-      {step === 0 ? (
+      {wrongDomainJob ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('resumed_title')}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p role="alert" className="text-sm text-negative">{t('resumed_wrong_domain')}</p>
+            <FormActions primary={<Button variant="outline" onClick={reset}>{t('start_another')}</Button>} />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {view === 0 ? (
         resumedWithoutFile && engine.job ? (
           <Card>
             <CardHeader>
@@ -290,9 +327,11 @@ export function PartnerImportWizard({ type }: { type: PartnerImportType }) {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm leading-relaxed text-muted">{t('resumed_hint', { name: engine.job.original_filename })}</p>
+              {hasFrozenOptions(engine.job) ? null : <p role="alert" className="text-sm text-negative">{t('resumed_unbound')}</p>}
               <FormActions
+                secondary={<Button type="button" variant="outline" onClick={reset}>{t('start_another')}</Button>}
                 primary={
-                  <Button onClick={() => void confirmAndApply()}>
+                  <Button disabled={!hasFrozenOptions(engine.job)} onClick={() => void confirmAndApply()}>
                     <Upload className="h-4 w-4" strokeWidth={1.7} />
                     {t('apply')}
                   </Button>
@@ -466,7 +505,7 @@ export function PartnerImportWizard({ type }: { type: PartnerImportType }) {
         )
       ) : null}
 
-      {step === 1 && preview ? (
+      {view === 1 && preview ? (
         <Card>
           <CardHeader>
             <CardTitle>{t('step_preview')}</CardTitle>
@@ -522,10 +561,12 @@ export function PartnerImportWizard({ type }: { type: PartnerImportType }) {
               <p role="alert" className="rounded-md border border-negative/30 bg-negative/10 px-3 py-2 text-sm text-negative">{t('fix_errors')}</p>
             ) : null}
 
+            {jobTerminal ? <p role="status" className="text-xs leading-relaxed text-muted">{t('preview_used')}</p> : null}
+
             <FormActions
               secondary={<Button type="button" variant="outline" onClick={() => setStep(0)}>{t('back_to_setup')}</Button>}
               primary={
-                <Button disabled={preview.error_rows > 0 || !preview.binding} onClick={() => void confirmAndApply()}>
+                <Button disabled={preview.error_rows > 0 || !preview.binding || previewing || jobTerminal} onClick={() => void confirmAndApply()}>
                   <Upload className="h-4 w-4" strokeWidth={1.7} />
                   {t('apply')}
                 </Button>
@@ -535,12 +576,21 @@ export function PartnerImportWizard({ type }: { type: PartnerImportType }) {
         </Card>
       ) : null}
 
-      {step === 2 && engine.job ? (
+      {view === 2 && engine.job ? (
         <Card>
           <CardHeader>
             <CardTitle>{t('step_apply')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {engine.job.status === 'processing' && engine.busy === null && hasFrozenOptions(engine.job) ? (
+              <div className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-background px-3 py-2">
+                <p className="text-sm text-muted">{t('continue_hint')}</p>
+                <Button type="button" onClick={() => void engine.applyLoop(engine.job!.id, {})}>
+                  <Upload className="h-4 w-4" strokeWidth={1.7} />
+                  {t('continue_apply')}
+                </Button>
+              </div>
+            ) : null}
             <ImportJobStatusPanel
               job={engine.job}
               atomic={false}
@@ -549,17 +599,25 @@ export function PartnerImportWizard({ type }: { type: PartnerImportType }) {
               onCancel={engine.job ? () => void engine.cancel(engine.job!.id) : undefined}
               onOpenParent={(parentId) => void engine.resume(parentId)}
             />
+            {failedAfterPartial ? (
+              <p role="status" className="rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-xs leading-relaxed text-text">
+                {t('partial_failure_note', { count: processedTotal })}
+              </p>
+            ) : null}
             <ImportRepairPanel
               job={engine.job}
               busy={engine.busy !== null}
               onDownload={() => void downloadFailedRows(engine.job!.id)}
               onRepair={(repairFile) => void repairFailedRows(repairFile)}
             />
+            {engine.job.status === 'failed' ? (
+              <FormActions primary={<Button variant="outline" onClick={reset}>{t('start_another')}</Button>} />
+            ) : null}
           </CardContent>
         </Card>
       ) : null}
 
-      {step === 3 && engine.job?.status === 'completed' ? (
+      {view === 3 && engine.job?.status === 'completed' ? (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -568,7 +626,11 @@ export function PartnerImportWizard({ type }: { type: PartnerImportType }) {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <dl className="grid grid-cols-3 gap-2">
+            <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="rounded-md border border-border bg-background px-3 py-2">
+                <dt className="text-xs text-muted">{t('result_processed')}</dt>
+                <dd className="num mt-0.5 text-lg font-semibold text-text">{processedTotal}</dd>
+              </div>
               {(['created', 'updated', 'skipped'] as const).map((key) => (
                 <div key={key} className="rounded-md border border-border bg-background px-3 py-2">
                   <dt className="text-xs text-muted">{t(`result_${key}`)}</dt>
