@@ -111,6 +111,11 @@ class ApplyImportJobRequest extends FormRequest
             'price_list_id' => ['sometimes', 'nullable', 'uuid'],
             'opening_date' => ['sometimes', 'date_format:Y-m-d'],
             'allow_zero_cost' => ['sometimes', 'boolean'],
+            // IMP-H7-S3 — رأس `stock_permit_import` (مجمَّد مع المعاينة؛ هنا للمقارنة القانونية لا للتغيير).
+            'permit_type' => ['sometimes', Rule::in(\App\Models\StockPermit::TYPES)],
+            'target_warehouse_id' => ['sometimes', 'nullable', 'uuid'],
+            'permit_date' => ['sometimes', 'date_format:Y-m-d'],
+            'reason' => ['sometimes', 'nullable', 'string', 'max:255'],
             'notes' => ['sometimes', 'nullable', 'string', 'max:500'],
             'apply_product_images' => ['sometimes', 'boolean'],
             'approve_existing_media_updates' => ['sometimes', 'boolean'],
