@@ -90,6 +90,31 @@ class OnlinePaymentMethodSettingsTest extends TestCase
     }
 
     #[Test]
+    public function a_real_provider_connection_is_ready_only_while_its_credentials_are_verified(): void
+    {
+        $auth = $this->registerTenant('opm-verify', 'owner@opm-verify.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $gateway = PaymentGateway::query()->create(['provider' => 'moyasar', 'name' => 'Moyasar', 'environment' => 'sandbox']);
+        DB::table('payment_gateways')->where('id', $gateway->id)->update(['status' => 'active', 'is_active' => true, 'verified_at' => null]);
+
+        // مفعَّل لكن غير متحقَّق منه (مثلاً بعد تدوير الأسرار) ⇒ لا جاهزية ولا تفعيل ولا عرض للعميل
+        $this->assertSame('needs_setup', $this->methodRow($auth['token'], 'mada')['status']);
+        $this->assertSame('no_usable_gateway', $this->methodRow($auth['token'], 'mada')['reason']);
+        $this->withToken($auth['token'])->putJson('/api/online-payment-methods/mada', ['enabled' => true])->assertStatus(422)->assertJsonPath('error.code', 'method.needs_setup');
+
+        DB::table('payment_gateways')->where('id', $gateway->id)->update(['verified_at' => now()]);
+        $this->withToken($auth['token'])->putJson('/api/online-payment-methods/mada', ['enabled' => true])->assertOk()->assertJsonPath('data.customer_visible', true);
+
+        // التحقق صُفّر بعد التفعيل ⇒ تختفي للعميل فوراً (المخزَّن باقٍ)
+        DB::table('payment_gateways')->where('id', $gateway->id)->update(['verified_at' => null]);
+        $row = $this->methodRow($auth['token'], 'mada');
+        $this->assertTrue($row['enabled']);
+        $this->assertFalse($row['customer_visible']);
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->assertSame([], app(OnlinePaymentMethodSettingsService::class)->customerVisibleKeys($gateway->id));
+    }
+
+    #[Test]
     public function changes_are_audited_once_and_a_no_op_writes_nothing(): void
     {
         $auth = $this->registerTenant('opm-audit', 'owner@opm-audit.test');

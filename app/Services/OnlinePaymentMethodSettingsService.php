@@ -129,7 +129,8 @@ class OnlinePaymentMethodSettingsService
                 continue;
             }
             $needsProviderSetup = in_array($key, $caps->methodsRequiringProviderSetup, true);
-            $usable = $gateway->isUsable();
+            // جاهز = مفعَّل **ومتحقَّق منه** لمزوّد حقيقي (تدوير الأسرار يصفّر التحقق فيرفض المنسّق كل محاولة جديدة `gateway_unverified`).
+            $usable = $gateway->isUsable() && ! ($gateway->requiresVerification() && $gateway->verified_at === null);
             $connections[] = [
                 'gateway_id' => (string) $gateway->id,
                 'gateway_name' => $gateway->name,
