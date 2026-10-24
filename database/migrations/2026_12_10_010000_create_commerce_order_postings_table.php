@@ -33,12 +33,10 @@ return new class extends Migration
             $table->unique('payment_id', 'commerce_order_postings_payment_unique');
         });
 
+        // PostgreSQL فقط: قيد CHECK في القاعدة. SQLite (اختبار) بلا مُشغّل — اختبارات سلامة هجرات أخرى تحصي مُشغّلات SQLite الكاملة؛ يحرس النموذج
+        // (`CommerceOrderPosting::creating`) المبلغ الموجب في كل المحرّكين.
         if (DB::connection()->getDriverName() === 'pgsql') {
             DB::statement('ALTER TABLE commerce_order_postings ADD CONSTRAINT commerce_order_postings_amount_chk CHECK (amount_minor > 0)');
-        } else {
-            foreach (['INSERT', 'UPDATE'] as $event) {
-                DB::unprepared("CREATE TRIGGER commerce_order_postings_amount_".strtolower($event)." BEFORE {$event} ON commerce_order_postings WHEN NOT (NEW.amount_minor > 0) BEGIN SELECT RAISE(ABORT, 'commerce_order_postings: invalid amount'); END");
-            }
         }
     }
 
