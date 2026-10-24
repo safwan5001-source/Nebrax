@@ -1345,7 +1345,9 @@
     "repreviewing": "جارٍ إعادة المعاينة…",
     "mapping_column": "العمود {n}",
     "demo_unavailable": "غير متاح في العرض التجريبي.",
-    "repair_download_failed": "تعذّر تنزيل الصفوف الفاشلة."
+    "repair_download_failed": "تعذّر تنزيل الصفوف الفاشلة.",
+    "continue_hint": "التشغيلة متوقفة في منتصفها (انقطاع أو تحديث للصفحة). تابع تنفيذ ما عُوين سابقاً.",
+    "continue_apply": "متابعة التنفيذ"
   },
   "partnerImport": {
       "title_customer": "استيراد العملاء",

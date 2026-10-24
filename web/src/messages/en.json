@@ -1345,7 +1345,9 @@
     "repreviewing": "Re-previewing…",
     "mapping_column": "Column {n}",
     "demo_unavailable": "Not available in the demo.",
-    "repair_download_failed": "Could not download the failed rows."
+    "repair_download_failed": "Could not download the failed rows.",
+    "continue_hint": "The job is paused midway (a disconnect or page refresh). Continue applying what was previewed.",
+    "continue_apply": "Continue"
   },
   "partnerImport": {
       "title_customer": "Import customers",

@@ -304,4 +304,63 @@ describe('ExpenseImportWizard (IMP-H5-S2b)', () => {
     expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(false);
     expect(screen.getByText('repeats_title')).toBeTruthy();
   });
+
+  it('offers a continue action for a job resumed mid-processing and continues it with an empty body', async () => {
+    window.history.replaceState({}, '', '/expenses/import?job=job-7');
+    let applied = 0;
+    api.mockImplementation((path: string) => {
+      if (path === '/accounts') return Promise.resolve({ data: [] });
+      if (path === '/import-jobs/job-7') return Promise.resolve({ data: jobFixture({ id: 'job-7', status: 'processing', processed_rows: 100, row_count: 250 }) });
+      if (path === '/import-jobs/job-7/apply') { applied += 1; return Promise.resolve({ data: jobFixture({ id: 'job-7', status: 'completed', processed_rows: 250, apply_result: { created: 50 } }) }); }
+      return Promise.resolve({ data: {} });
+    });
+    const user = userEvent.setup();
+    render(<ExpenseImportWizard />);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'continue_apply' })).toBeTruthy());
+    expect(applied).toBe(0);
+    await user.click(screen.getByRole('button', { name: 'continue_apply' }));
+
+    await waitFor(() => expect(screen.getByText('result_created')).toBeTruthy());
+    expect(applied).toBe(1);
+    expect(api.mock.calls.find((call) => call[0] === '/import-jobs/job-7/apply')?.[1]?.body).toEqual({});
+  });
+
+  it('does not restore stale confirmations when a rule changes while a confirmation re-preview is pending', async () => {
+    const second = { ...repeatRow, row: 5 };
+    let release: (value: unknown) => void = () => {};
+    let previews = 0;
+    api.mockImplementation((path: string, options?: { body?: FormData }) => {
+      if (path === '/accounts') return Promise.resolve({ data: [] });
+      if (path === '/expenses/import/inspect') return Promise.resolve({ data: inspection });
+      if (path === '/expenses/import/preview') {
+        previews += 1;
+        const confirmed = (options?.body?.getAll('confirmed_repeat_rows[]') ?? []).map(String);
+        if (previews === 3) return new Promise((resolve) => { release = resolve; });   // تبديل الصف 5: معلّق
+        return Promise.resolve({ data: { ...cleanPreview, error_rows: 1, errors: [{ row: 3, messages: ['dup'] }], repeat_candidates: [
+          { ...repeatRow, confirmed_repeat: confirmed.includes('3'), repeat_candidate: !confirmed.includes('3') },
+          { ...second, confirmed_repeat: confirmed.includes('5'), repeat_candidate: !confirmed.includes('5') },
+        ] } });
+      }
+      return Promise.resolve({ data: {} });
+    });
+    const user = userEvent.setup();
+    render(<ExpenseImportWizard />);
+    await user.upload(screen.getByLabelText('step_file'), csv());
+    await waitFor(() => expect(screen.getByLabelText('كود الحساب')).toBeTruthy());
+    await user.click(screen.getByRole('button', { name: 'run_preview' }));
+    await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(2));
+
+    await user.click(screen.getAllByRole('checkbox')[0]);                 // تأكيد الصف 3 ينجح
+    await waitFor(() => expect((screen.getAllByRole('checkbox')[0] as HTMLInputElement).checked).toBe(true));
+    await user.click(screen.getAllByRole('checkbox')[1]);                 // تبديل الصف 5 معلّق
+    await user.click(screen.getByRole('button', { name: 'back_to_setup' }));
+    await user.selectOptions(screen.getByLabelText('default_payment'), 'bank');   // يُسقط التأكيدات ويتجاوز الطلب المعلّق
+    release({ data: cleanPreview });
+    await user.click(screen.getByRole('button', { name: 'run_preview' }));
+
+    await waitFor(() => expect(previews).toBe(4));
+    const last = api.mock.calls.filter((call) => call[0] === '/expenses/import/preview').at(-1)?.[1]?.body as FormData;
+    expect(last.getAll('confirmed_repeat_rows[]')).toEqual([]);
+  });
 });

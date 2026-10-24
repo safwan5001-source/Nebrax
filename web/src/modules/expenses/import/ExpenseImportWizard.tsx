@@ -205,8 +205,8 @@ export function ExpenseImportWizard() {
     invalidatePreview();
   }
 
-  async function runPreview(rows: number[] = confirmedRows, keepOnError = false): Promise<boolean> {
-    if (!file) return false;
+  async function runPreview(rows: number[] = confirmedRows, keepOnError = false): Promise<'ok' | 'failed' | 'stale'> {
+    if (!file) return 'stale';
     dropJob();
     const seq = ++previewSeq.current;
     setPreviewing(true);
@@ -216,16 +216,16 @@ export function ExpenseImportWizard() {
         method: 'POST',
         body: expenseImportFormData(file, currentOptions(rows)),
       });
-      if (seq !== previewSeq.current) return false;
+      if (seq !== previewSeq.current) return 'stale';
       setPreview(response.data);
       setStep(1);
-      return true;
+      return 'ok';
     } catch (err) {
-      if (seq !== previewSeq.current) return false;
+      if (seq !== previewSeq.current) return 'stale';
       // إعادة معاينة بعد تبديل تأكيدٍ تُبقي المعاينة السابقة سليمةً ويُلغى التبديل، بدل صفحةٍ فارغة.
       if (!keepOnError) setPreview(null);
       setError(err instanceof ApiError ? err.message : tc('saveFailed'));
-      return false;
+      return 'failed';
     } finally {
       if (seq === previewSeq.current) setPreviewing(false);
     }
@@ -236,8 +236,9 @@ export function ExpenseImportWizard() {
     const previous = confirmedRows;
     const next = toggleRepeatRow(confirmedRows, row, confirmed);
     setConfirmedRows(next);
-    void runPreview(next, true).then((ok) => {
-      if (!ok) setConfirmedRows(previous);
+    void runPreview(next, true).then((outcome) => {
+      // التراجع عن التبديل لفشلٍ حقيقي فقط: طلبٌ سبقه تغيير ملف/قاعدة (stale) أسقط التأكيدات عمداً فلا تُعاد قيمٌ تخص مدخلاتٍ سابقة.
+      if (outcome === 'failed') setConfirmedRows(previous);
     });
   }
 
@@ -642,6 +643,15 @@ export function ExpenseImportWizard() {
             <CardTitle>{t('step_apply')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {engine.job.status === 'processing' && engine.busy === null && engine.job.preview_bound ? (
+              <div className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-background px-3 py-2">
+                <p className="text-sm text-muted">{t('continue_hint')}</p>
+                <Button type="button" onClick={() => void engine.applyLoop(engine.job!.id, {})}>
+                  <Upload className="h-4 w-4" strokeWidth={1.7} />
+                  {t('continue_apply')}
+                </Button>
+              </div>
+            ) : null}
             <ImportJobStatusPanel
               job={engine.job}
               atomic={false}
