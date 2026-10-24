@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Schema;
  *
  * - `payment_gateway_settlement_lines`: بنود استرداد مخصومة من الصرف (`line_type=refund` في 02b؛ أنواع D-22 تُضاف في 02c).
  * - ترويسة التسوية: `refunds_total` و`unreconciled_minor` (الفرق الموقَّع للتسوية غير المفسَّرة) وقيمة الحالة `unreconciled`.
- * - مُشغّلات القاعدة (PostgreSQL وSQLite): بند الاسترداد يشترط استرداداً مرحَّلاً (A5) لنفس المستأجر والبوابة والعملة ولا يتجاوز مجموع المستهلَك
+ * - مُشغّلات القاعدة (PostgreSQL وSQLite): حذف التسوية المرحَّلة وبنودها (تحصيل/استرداد) مرفوض ما دام المستأجر موجوداً؛ بند الاسترداد يشترط استرداداً مرحَّلاً (A5) لنفس المستأجر والبوابة والعملة ولا يتجاوز مجموع المستهلَك
  *   مبلغه؛ البنود ثابتة بعد الترحيل؛ `posted` نهائية و`unreconciled` لا تحمل قيداً ولا فرقاً صفرياً (الفرق الصفري يُرحَّل).
  * `down()` يرفض متى وُجدت بنود أو تسوية `unreconciled` (إصلاح إلى الأمام فقط).
  */
@@ -23,6 +23,12 @@ return new class extends Migration
     private const SET_INS_FN = 'pgs_status_insert_guard';
 
     private const SET_UPD_FN = 'pgs_status_update_guard';
+
+    private const LINE_DEL_FN = 'pgsl_line_delete_guard';
+
+    private const ITEM_DEL_FN = 'pgsi_item_delete_guard';
+
+    private const SET_DEL_FN = 'pgs_settlement_delete_guard';
 
     public function up(): void
     {
@@ -114,6 +120,21 @@ return new class extends Migration
         ];
     }
 
+    /**
+     * حذف مرحَّل مرفوض ما دام المستأجر موجوداً (حذف المستأجر النهائي يزيل سلاسله بالتتالي كسائر الجداول). استبدال أبناء المسودة مسموح.
+     *
+     * @return array<string, string>
+     */
+    private function deleteRules(string $table): array
+    {
+        $tenantAlive = 'EXISTS (SELECT 1 FROM tenants t WHERE t.id = OLD.tenant_id)';
+
+        return match ($table) {
+            'payment_gateway_settlements' => ['pgs_posted_no_delete' => "OLD.status = 'posted' AND {$tenantAlive}"],
+            default => ['pgs_child_posted_no_delete' => "EXISTS (SELECT 1 FROM payment_gateway_settlements s WHERE s.id = OLD.settlement_id AND s.status = 'posted' AND s.journal_entry_id IS NOT NULL) AND {$tenantAlive}"],
+        };
+    }
+
     private function createTriggers(): void
     {
         $pg = DB::connection()->getDriverName() === 'pgsql';
@@ -121,17 +142,20 @@ return new class extends Migration
         $this->createTrigger($pg, 'payment_gateway_settlement_lines', 'BEFORE UPDATE', self::LINE_UPD_FN, $this->lineUpdateRules());
         $this->createTrigger($pg, 'payment_gateway_settlements', 'BEFORE INSERT', self::SET_INS_FN, $this->settlementInsertRules());
         $this->createTrigger($pg, 'payment_gateway_settlements', 'BEFORE UPDATE', self::SET_UPD_FN, $this->settlementUpdateRules());
+        $this->createTrigger($pg, 'payment_gateway_settlement_lines', 'BEFORE DELETE', self::LINE_DEL_FN, $this->deleteRules('payment_gateway_settlement_lines'), 'OLD');
+        $this->createTrigger($pg, 'payment_gateway_settlement_items', 'BEFORE DELETE', self::ITEM_DEL_FN, $this->deleteRules('payment_gateway_settlement_items'), 'OLD');
+        $this->createTrigger($pg, 'payment_gateway_settlements', 'BEFORE DELETE', self::SET_DEL_FN, $this->deleteRules('payment_gateway_settlements'), 'OLD');
     }
 
     /** @param  array<string, string>  $rules */
-    private function createTrigger(bool $pg, string $table, string $when, string $name, array $rules): void
+    private function createTrigger(bool $pg, string $table, string $when, string $name, array $rules, string $returns = 'NEW'): void
     {
         if ($pg) {
             $body = '';
             foreach ($rules as $code => $expr) {
                 $body .= "    IF {$expr} THEN RAISE EXCEPTION '{$code}'; END IF;\n";
             }
-            DB::unprepared("CREATE OR REPLACE FUNCTION {$name}() RETURNS trigger AS \$\$\nBEGIN\n{$body}    RETURN NEW;\nEND;\n\$\$ LANGUAGE plpgsql");
+            DB::unprepared("CREATE OR REPLACE FUNCTION {$name}() RETURNS trigger AS \$\$\nBEGIN\n{$body}    RETURN {$returns};\nEND;\n\$\$ LANGUAGE plpgsql");
             DB::unprepared("CREATE TRIGGER {$name} {$when} ON {$table} FOR EACH ROW EXECUTE FUNCTION {$name}()");
 
             return;
@@ -152,6 +176,9 @@ return new class extends Migration
             self::LINE_UPD_FN => 'payment_gateway_settlement_lines',
             self::SET_INS_FN => 'payment_gateway_settlements',
             self::SET_UPD_FN => 'payment_gateway_settlements',
+            self::LINE_DEL_FN => 'payment_gateway_settlement_lines',
+            self::ITEM_DEL_FN => 'payment_gateway_settlement_items',
+            self::SET_DEL_FN => 'payment_gateway_settlements',
         ];
         foreach ($map as $name => $table) {
             if ($pg) {

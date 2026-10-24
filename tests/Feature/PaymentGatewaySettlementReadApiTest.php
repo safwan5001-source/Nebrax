@@ -7,6 +7,8 @@ use App\Models\Invoice;
 use App\Models\JournalEntry;
 use App\Models\AccountRoleMapping;
 use App\Models\Partner;
+use App\Models\PlatformAdministrator;
+use App\Services\PaymentsRolloutControlService;
 use App\Models\Payment;
 use App\Models\PaymentGateway;
 use App\Models\PaymentGatewaySettlement;
@@ -51,6 +53,9 @@ class PaymentGatewaySettlementReadApiTest extends TestCase
         $this->gateway = PaymentGateway::create(['provider' => PaymentGateway::PROVIDER_STRIPE, 'name' => 'Stripe', 'secret_key' => 'sk_test_must_not_leak']);
         $owner = User::create(['tenant_id' => $this->tenant->id, 'name' => 'المالك', 'email' => 'o@pay-h3-02a.test', 'password' => 'password123', 'role' => 'owner']);
         $this->ownerToken = $owner->createToken('t')->plainTextToken;
+        $platform = PlatformAdministrator::create(['name' => 'مشغّل', 'email' => 'ops@pay-h3-02a.test', 'password' => 'platform-password-123']);
+        \App\Support\SchedulerHeartbeat::record();
+        app(PaymentsRolloutControlService::class)->setTenantState($platform, $this->tenant->id, true, 'تفعيل للاختبار');
     }
 
     #[Test]

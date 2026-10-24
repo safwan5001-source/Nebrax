@@ -37,6 +37,13 @@ class PaymentGatewaySettlementLine extends BaseModel implements CompanyWide
                 throw new DomainException('Gateway settlement lines are immutable.');
             }
         });
+
+        // حذف بند مرحَّل يعيد مبلغه متاحاً للخصم مجدداً؛ تستبدل المسودة أبناءها عبر استعلام (القاعدة تحرس المرحَّل أيضاً).
+        static::deleting(function (self $line): void {
+            if (PaymentGatewaySettlement::query()->whereKey($line->settlement_id)->where('status', PaymentGatewaySettlement::STATUS_POSTED)->exists()) {
+                throw new DomainException('Posted gateway settlement lines cannot be deleted.');
+            }
+        });
     }
 
     public function settlement(): BelongsTo

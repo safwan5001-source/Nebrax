@@ -39,11 +39,6 @@ final class PaymentGatewaySettlementService
      */
     public function record(array $input, ?User $actor = null): PaymentGatewaySettlement
     {
-        // تفعيل المدفوعات الإلكترونية لهذه المؤسسة شرط؛ الإيقاف الطارئ للمنصة لا يمنع تسوية مال وصل فعلاً (كترحيل A5).
-        if (! $this->rollout->effectiveForCurrentTenant()->tenantEnabled) {
-            throw new DomainException('rollout_disabled: online payments are not enabled for this tenant.');
-        }
-
         return $this->process($input, $actor, true);
     }
 
@@ -103,6 +98,12 @@ final class PaymentGatewaySettlementService
                 return $this->replayOrReject($existing, $net, $feeExTax, $feeTax, $deductions, $credits, $itemsInput, $refundsInput);
             }
 
+            // تفعيل المدفوعات الإلكترونية لهذه المؤسسة شرط للتسجيل الجديد (record)؛ الإيقاف الطارئ للمنصة لا يمنع تسوية مال وصل فعلاً (كترحيل A5)،
+            // والتكرار الآمن لمرحَّلة قائمة يُعاد دائماً (idempotent) ولو عُطّلت المؤسسة بعدها.
+            if ($allowUnreconciled && ! $this->rollout->effectiveForCurrentTenant()->tenantEnabled) {
+                throw new DomainException('rollout_disabled: online payments are not enabled for this tenant.');
+            }
+
             $cashEntity = CashBankAccount::query()->whereKey($cashBankId)->first();
             if ($cashEntity === null) {
                 throw new DomainException('Cash bank account must belong to the active tenant.');
@@ -120,13 +121,17 @@ final class PaymentGatewaySettlementService
             $this->assertSameTenant($tenantId, (string) $feeAccount->tenant_id, 'Provider fee account');
             $this->assertSameTenant($tenantId, (string) $bankLedger->tenant_id, 'Bank ledger account');
 
-            $currency = (string) ($input['currency'] ?? 'SAR');
+            $tenantCurrency = (string) (\App\Models\Tenant::query()->whereKey($tenantId)->value('currency') ?: 'SAR');
+            $currency = (string) ($input['currency'] ?? $tenantCurrency);
+            if ($currency !== $tenantCurrency) {
+                throw new DomainException("currency_mismatch: settlement currency {$currency} must equal the tenant currency {$tenantCurrency}.");
+            }
             $normalizedItems = $this->normalizeItems($tenantId, $gateway->id, $itemsInput);
             $gross = 0;
             foreach ($normalizedItems as $item) {
                 $gross += $item['gross_amount'];
             }
-            $normalizedRefunds = $this->normalizeRefunds($tenantId, $gateway->id, $currency, $refundsInput);
+            $normalizedRefunds = $this->normalizeRefunds($tenantId, $gateway->id, $currency, $refundsInput, true, $date);
             $refundsTotal = 0;
             foreach ($normalizedRefunds as $line) {
                 $refundsTotal += $line['amount'];
@@ -165,7 +170,10 @@ final class PaymentGatewaySettlementService
             $lines = $this->settlementLines($cashEntity->account_id, $feeAccount->id, $clearing->id, $net, $feeExTax, $gross, $normalizedRefunds);
 
             if ($existing !== null) {
-                $settlement = $existing;   // مسودة `unreconciled`: تُحدَّث ترويستها مع الترحيل في تحديث واحد أدناه
+                // مسودة `unreconciled`: تُحفظ الترويسة المصحَّحة أولاً (تعتمد عليها مُشغّلات البنود، كالعملة) بلا مساس بالحالة
+                // ولا بالفرق غير الصفري؛ والانتقال إلى `posted` مع القيد يبقى تحديثاً واحداً أدناه.
+                $settlement = $existing;
+                $settlement->fill($header)->save();
             } else {
                 $settlement = PaymentGatewaySettlement::create($header + [
                     'tenant_id' => $tenantId,
@@ -318,7 +326,14 @@ final class PaymentGatewaySettlementService
         $refundsTotal = 0;
         $itemsInput = $input['items'] ?? [];
         $refundsInput = $input['refunds'] ?? [];
-        $currency = (string) ($input['currency'] ?? 'SAR');
+        $tenantCurrency = (string) (\App\Models\Tenant::query()->whereKey($tenantId)->value('currency') ?: 'SAR');
+        $currency = (string) ($input['currency'] ?? $tenantCurrency);
+        if (! $replay && $currency !== $tenantCurrency) {
+            $block('currency_mismatch', "Settlement currency {$currency} must equal the tenant currency {$tenantCurrency}.");
+        }
+        if (! $replay && ! $this->rollout->effectiveForCurrentTenant()->tenantEnabled) {
+            $block('rollout_disabled', 'Online payments are not enabled for this tenant.');
+        }
 
         if (! is_array($itemsInput) || $itemsInput === []) {
             $block('items_required', 'Gateway settlement requires at least one matched payment.');
@@ -349,7 +364,7 @@ final class PaymentGatewaySettlementService
                 $block('invalid_refunds', 'Settlement refunds must be a list.');
             } else {
                 try {
-                    foreach ($this->normalizeRefunds($tenantId, (string) $gateway->id, $currency, $refundsInput, false) as $line) {
+                    foreach ($this->normalizeRefunds($tenantId, (string) $gateway->id, $currency, $refundsInput, false, (string) ($input['settlement_date'] ?? now()->toDateString())) as $line) {
                         $refundsTotal += $line['amount'];
                     }
                 } catch (DomainException $e) {
@@ -527,7 +542,10 @@ final class PaymentGatewaySettlementService
         }
         $refunds = [];
         foreach ($refundsInput as $raw) {
-            $refunds[(string) ($raw['payment_refund_id'] ?? '')] = $this->money($raw['amount_minor'] ?? null, 'refund amount');
+            $refunds[strtolower((string) ($raw['payment_refund_id'] ?? ''))] = $this->money($raw['amount_minor'] ?? null, 'refund amount');
+        }
+        if (count($refunds) !== count($refundsInput)) {
+            return false;   // مكرَّر في الحمولة ⇒ ليس تكراراً مطابقاً
         }
         $stored = $existing->lines()->where('line_type', PaymentGatewaySettlementLine::TYPE_REFUND)->pluck('amount_minor', 'payment_refund_id')
             ->map(fn ($v) => (int) $v)->all();
@@ -550,14 +568,14 @@ final class PaymentGatewaySettlementService
      *
      * @return list<array{refund_id: string, amount: int, provider_event_ref: ?string, number: ?string}>
      */
-    private function normalizeRefunds(string $tenantId, string $gatewayId, string $currency, array $refundsInput, bool $lock = true): array
+    private function normalizeRefunds(string $tenantId, string $gatewayId, string $currency, array $refundsInput, bool $lock = true, ?string $settlementDate = null): array
     {
         $normalized = [];
         $seen = [];
         $seenEvents = [];
 
         foreach ($refundsInput as $raw) {
-            $refundId = (string) ($raw['payment_refund_id'] ?? '');
+            $refundId = strtolower((string) ($raw['payment_refund_id'] ?? ''));
             $amount = $this->money($raw['amount_minor'] ?? null, 'refund amount');
             $eventRef = isset($raw['provider_event_ref']) ? trim((string) $raw['provider_event_ref']) : '';
             $eventRef = $eventRef === '' ? null : $eventRef;
@@ -603,6 +621,11 @@ final class PaymentGatewaySettlementService
                 throw new DomainException('Settlement refund currency must match the settlement currency.');
             }
 
+            // تسوية مؤرَّخة قبل ترحيل الاسترداد لا تخصمه (لا استهلاك لقيد لم يوجد بعد في تاريخها).
+            if ($settlementDate !== null && $refund->accounting_date !== null && $settlementDate < $refund->accounting_date->toDateString()) {
+                throw new DomainException('refund_after_settlement_date: the refund was posted after the settlement date.');
+            }
+
             $consumed = (int) PaymentGatewaySettlementLine::query()
                 ->where('payment_refund_id', $refund->id)
                 ->whereHas('settlement', fn ($q) => $q->where('status', PaymentGatewaySettlement::STATUS_POSTED))
@@ -625,7 +648,7 @@ final class PaymentGatewaySettlementService
         $seenEvents = [];
 
         foreach ($itemsInput as $raw) {
-            $paymentId = (string) ($raw['payment_id'] ?? '');
+            $paymentId = strtolower((string) ($raw['payment_id'] ?? ''));
             $gross = $this->money($raw['gross_amount'] ?? null, 'item gross');
             $eventRef = isset($raw['provider_event_ref']) ? trim((string) $raw['provider_event_ref']) : '';
             $eventRef = $eventRef === '' ? null : $eventRef;

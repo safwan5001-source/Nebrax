@@ -280,6 +280,98 @@ class PaymentGatewaySettlementRefundTest extends TestCase
         $this->thrown(fn () => DB::transaction(fn () => DB::table('payment_gateway_settlements')->where('id', $draft->id)->update(['status' => 'posted'])), 'post needs entry', QueryException::class);
     }
 
+    #[Test]
+    public function posted_settlements_and_their_children_cannot_be_deleted_so_consumption_cannot_be_released(): void
+    {
+        [$attempt, $paymentId] = $this->capture();
+        $refund = $this->postedRefund($attempt, 46000);
+        $s = $this->settlements->record($this->input($paymentId, 115000, [$refund->id => 46000], net: 67400, fee: 1600, ref: 'NODEL'));
+        $line = PaymentGatewaySettlementLine::query()->where('settlement_id', $s->id)->firstOrFail();
+
+        $this->thrown(fn () => $line->delete(), 'model delete', DomainException::class);
+        $this->thrown(fn () => DB::transaction(fn () => DB::table('payment_gateway_settlement_lines')->where('id', $line->id)->delete()), 'db line delete', QueryException::class);
+        $this->thrown(fn () => DB::transaction(fn () => DB::table('payment_gateway_settlement_items')->where('settlement_id', $s->id)->delete()), 'db item delete', QueryException::class);
+        $this->thrown(fn () => DB::transaction(fn () => DB::table('payment_gateway_settlements')->where('id', $s->id)->delete()), 'db settlement delete', QueryException::class);
+        $this->assertSame(0, $this->unsettledRefundRemaining($refund), 'الاستهلاك باقٍ: الاسترداد مخصوم كاملاً ولم يُحرَّر');
+        $this->assertSame(1, PaymentGatewaySettlementLine::query()->where('settlement_id', $s->id)->count());
+    }
+
+    #[Test]
+    public function the_settlement_currency_must_equal_the_tenant_currency(): void
+    {
+        [, $paymentId] = $this->capture();
+
+        $e = $this->thrown(fn () => $this->settlements->record(['currency' => 'USD'] + $this->input($paymentId, 115000, [], net: 113400, fee: 1600, ref: 'CUR')), 'currency', DomainException::class);
+        $this->assertStringStartsWith('currency_mismatch', $e->getMessage());
+        $this->assertSame(0, PaymentGatewaySettlement::query()->count());
+    }
+
+    #[Test]
+    public function uppercase_uuid_duplicates_are_rejected_as_domain_errors_and_replay_counts_every_line(): void
+    {
+        [$attempt, $paymentId] = $this->capture();
+        $refund = $this->postedRefund($attempt, 46000);
+        $input = $this->input($paymentId, 115000, [], net: 67400, fee: 1600, ref: 'UUID');
+        $input['refunds'] = [
+            ['payment_refund_id' => strtolower($refund->id), 'amount_minor' => 20000],
+            ['payment_refund_id' => strtoupper($refund->id), 'amount_minor' => 26000],
+        ];
+
+        $e = $this->thrown(fn () => $this->settlements->record($input), 'dup', DomainException::class);
+        $this->assertStringContainsString('cannot appear twice', $e->getMessage());
+        $this->assertSame(0, PaymentGatewaySettlement::query()->count());
+
+        $ok = $this->settlements->record($this->input($paymentId, 115000, [$refund->id => 46000], net: 67400, fee: 1600, ref: 'UUID'));
+        $replay = $this->input($paymentId, 115000, [$refund->id => 46000], net: 67400, fee: 1600, ref: 'UUID');
+        $replay['refunds'][] = ['payment_refund_id' => $refund->id, 'amount_minor' => 46000];   // الحمولة المكرَّرة ليست تكراراً مطابقاً
+        $this->thrown(fn () => $this->settlements->record($replay), 'dup replay', DomainException::class);
+        $this->assertSame($ok->id, $this->settlements->record($this->input($paymentId, 115000, [$refund->id => 46000], net: 67400, fee: 1600, ref: 'UUID'))->id);
+    }
+
+    #[Test]
+    public function a_settlement_dated_before_the_refund_was_posted_cannot_deduct_it(): void
+    {
+        [$attempt, $paymentId] = $this->capture();
+        $refund = $this->postedRefund($attempt, 46000);   // تاريخه المحاسبي 2026-10-23
+        $input = ['settlement_date' => '2026-10-22'] + $this->input($paymentId, 115000, [$refund->id => 46000], net: 67400, fee: 1600, ref: 'DATE');
+
+        $e = $this->thrown(fn () => $this->settlements->record($input), 'date', DomainException::class);
+        $this->assertStringStartsWith('refund_after_settlement_date', $e->getMessage());
+    }
+
+    #[Test]
+    public function an_identical_replay_of_a_posted_settlement_still_returns_after_the_tenant_is_disabled(): void
+    {
+        [$attempt, $paymentId] = $this->capture();
+        $input = $this->input($paymentId, 115000, [], net: 113400, fee: 1600, ref: 'OFF');
+        $first = $this->settlements->record($input);
+
+        app(PaymentsRolloutControlService::class)->setTenantState($this->platform, $this->tenant->id, false, 'تعطيل');
+
+        $this->assertSame($first->id, $this->settlements->record($input)->id, 'التكرار الآمن يُعاد ولو عُطّلت المؤسسة');
+        $res = $this->withToken($this->ownerToken)->postJson('/api/payment-gateway-settlements/preview', $input)->assertOk();
+        $res->assertJsonPath('data.replay', true)->assertJsonPath('data.postable', true);
+    }
+
+    #[Test]
+    public function refund_identity_is_only_visible_to_holders_of_the_refund_view_permission(): void
+    {
+        [$attempt, $paymentId] = $this->capture();
+        $refund = $this->postedRefund($attempt, 46000);
+        $s = $this->settlements->record($this->input($paymentId, 115000, [$refund->id => 46000], net: 67400, fee: 1600, ref: 'PERM'));
+        $accountant = $this->tokenForRole($this->tenant->id, 'accountant', 'acc2@pay-h3-02b.test');
+
+        // المحاسب يرى التسوية وبند الاسترداد (نوعه ومبلغه) دون هوية الاسترداد
+        $show = $this->withToken($accountant)->getJson("/api/payment-gateway-settlements/{$s->id}")->assertOk();
+        $show->assertJsonPath('data.lines.0.amount_minor', 46000)->assertJsonPath('data.lines.0.payment_refund_id', null)->assertJsonPath('data.lines.0.refund_number', null);
+        $owner = $this->withToken($this->ownerToken)->getJson("/api/payment-gateway-settlements/{$s->id}")->assertOk();
+        $owner->assertJsonPath('data.lines.0.payment_refund_id', $refund->id);
+
+        $this->withToken($accountant)->getJson("/api/payment-gateways/{$this->gateway->id}/unsettled-refunds")->assertForbidden();
+        $payload = $this->payload($paymentId, 115000, [$refund->id => 46000], 67400, 1600, 'PERM-2');
+        $this->withToken($accountant)->postJson('/api/payment-gateway-settlements/preview', $payload)->assertForbidden();
+    }
+
     // ───────────────────────── API: الصلاحيات والتفعيل والعزل ─────────────────────────
 
     #[Test]
@@ -293,7 +385,8 @@ class PaymentGatewaySettlementRefundTest extends TestCase
         $this->postJson('/api/payment-gateway-settlements', $payload)->assertUnauthorized();
         $accountant = $this->tokenForRole($this->tenant->id, 'accountant', 'acc@pay-h3-02b.test');
         $this->withToken($accountant)->postJson('/api/payment-gateway-settlements', $payload)->assertForbidden();
-        $this->withToken($accountant)->postJson('/api/payment-gateway-settlements/preview', $payload)->assertOk();   // المعاينة payments.view
+        $this->withToken($accountant)->postJson('/api/payment-gateway-settlements/preview', $payload)->assertForbidden();   // بنود الاسترداد تتطلب payment_refunds.view
+        $this->withToken($accountant)->postJson('/api/payment-gateway-settlements/preview', $this->payload($secondPayment, 1000, [], 900, 100, 'API-0'))->assertOk();   // المعاينة بلا استرداد payments.view
 
         // الإيقاف الطارئ للمنصة لا يمنع التسجيل، أما تعطيل المؤسسة فيمنعه
         app(PaymentsRolloutControlService::class)->setPlatformState($this->platform, false, 'إيقاف طارئ للاختبار');

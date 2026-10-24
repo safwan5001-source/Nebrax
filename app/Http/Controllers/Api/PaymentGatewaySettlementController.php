@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Models\PaymentGateway;
 use App\Models\PaymentGatewaySettlement;
 use App\Services\Accounting\PaymentGatewaySettlementService;
+use App\Support\Rbac;
 use DomainException;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -40,15 +41,17 @@ class PaymentGatewaySettlementController extends ApiController
         ]);
     }
 
-    public function show(string $id): JsonResponse
+    public function show(Request $request, string $id): JsonResponse
     {
-        return response()->json(['data' => $this->detail(PaymentGatewaySettlement::query()->findOrFail($id))]);
+        return response()->json(['data' => $this->detail(PaymentGatewaySettlement::query()->findOrFail($id), $request)]);
     }
 
     /** @return array<string, mixed> */
-    private function detail(PaymentGatewaySettlement $settlement): array
+    private function detail(PaymentGatewaySettlement $settlement, Request $request): array
     {
         $settlement->loadMissing(['items', 'lines.refund']);
+        // هوية الاسترداد (رقمه ومعرّفه) بيانات `payment_refunds.view` (فصل الصلاحيات D-28)؛ بند الاسترداد نفسه (النوع والمبلغ) يخصّ التسوية.
+        $seesRefunds = $this->canViewRefunds($request);
 
         return $this->row($settlement) + [
             'items' => $settlement->items->map(fn ($i) => [
@@ -58,8 +61,8 @@ class PaymentGatewaySettlementController extends ApiController
             ])->values(),
             'lines' => $settlement->lines->map(fn ($l) => [
                 'line_type' => $l->line_type,
-                'payment_refund_id' => $l->payment_refund_id,
-                'refund_number' => $l->refund?->number,
+                'payment_refund_id' => $seesRefunds ? $l->payment_refund_id : null,
+                'refund_number' => $seesRefunds ? $l->refund?->number : null,
                 'amount_minor' => (int) $l->amount_minor,
                 'provider_event_ref' => $l->provider_event_ref,
             ])->values(),
@@ -85,6 +88,9 @@ class PaymentGatewaySettlementController extends ApiController
     {
         $data = $request->validate($this->rules());
         PaymentGateway::query()->findOrFail($data['payment_gateway_id']);
+        if (! empty($data['refunds']) && ! $this->canViewRefunds($request)) {
+            return response()->json(['error' => ['code' => 'forbidden', 'message' => 'بنود الاسترداد تتطلب صلاحية عرض استردادات البوابة.']], 403);
+        }
 
         try {
             return response()->json(['data' => $this->settlements->preview($data, $request->user())]);
@@ -100,6 +106,9 @@ class PaymentGatewaySettlementController extends ApiController
         PaymentGateway::query()->findOrFail($data['payment_gateway_id']);
         // الفاعل من المصادقة لا من الطلب؛ التواريخ الافتراضية من الخادم.
         unset($data['created_by']);
+        if (! empty($data['refunds']) && ! $this->canViewRefunds($request)) {
+            return response()->json(['error' => ['code' => 'forbidden', 'message' => 'بنود الاسترداد تتطلب صلاحية عرض استردادات البوابة.']], 403);
+        }
 
         try {
             $settlement = $this->settlements->record($data, $request->user());
@@ -113,7 +122,7 @@ class PaymentGatewaySettlementController extends ApiController
             return response()->json(['error' => ['code' => 'operation_rejected', 'message' => $e->getMessage()]], 422);
         }
 
-        return response()->json(['data' => $this->detail($settlement)]);
+        return response()->json(['data' => $this->detail($settlement, $request)]);
     }
 
     public function unsettledRefunds(Request $request, string $gatewayId): JsonResponse
@@ -154,6 +163,13 @@ class PaymentGatewaySettlementController extends ApiController
             'refunds.*.provider_event_ref' => ['nullable', 'string', 'max:191'],
             'currency' => ['nullable', 'string', 'size:3'],
         ];
+    }
+
+    private function canViewRefunds(Request $request): bool
+    {
+        $user = $request->user();
+
+        return $user !== null && Rbac::allows($user->role, 'payment_refunds.view');
     }
 
     private function rejected(DomainException $e): JsonResponse

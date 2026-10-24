@@ -1106,7 +1106,7 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('payment-gateway-settlements/{id}', [PaymentGatewaySettlementController::class, 'show'])->whereUuid('id')->middleware($perm('payments.view'));
         Route::post('payment-gateway-settlements', [PaymentGatewaySettlementController::class, 'store'])->middleware([$perm('payment_settlements.manage'), 'throttle:30,1']);
         Route::post('payment-gateway-settlements/preview', [PaymentGatewaySettlementController::class, 'preview'])->middleware([$perm('payments.view'), 'throttle:60,1']);
-        Route::get('payment-gateways/{gatewayId}/unsettled-refunds', [PaymentGatewaySettlementController::class, 'unsettledRefunds'])->whereUuid('gatewayId')->middleware($perm('payments.view'));
+        Route::get('payment-gateways/{gatewayId}/unsettled-refunds', [PaymentGatewaySettlementController::class, 'unsettledRefunds'])->whereUuid('gatewayId')->middleware($perm('payment_refunds.view'));
         Route::get('payment-gateways/{gatewayId}/unsettled-payments', [PaymentGatewaySettlementController::class, 'unsettled'])->whereUuid('gatewayId')->middleware($perm('payments.view'));
 
         Route::get('payment-refunds', [PaymentRefundController::class, 'index'])->middleware($perm('payment_refunds.view'));
