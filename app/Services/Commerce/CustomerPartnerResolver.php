@@ -62,7 +62,12 @@ final class CustomerPartnerResolver
         // ربط موظف قائم لهوية موثَّقة يتقدّم (طرف نشط من نوع عميل).
         if ($identityId !== null && $context->linkedPartnerId() !== null) {
             $linked = Partner::query()->withoutGlobalScope(BranchScope::class)->find($context->linkedPartnerId());
-            if ($linked !== null && $linked->is_active && $linked->isCustomer()) {
+            if ($linked !== null) {
+                // ربط موظف قائم لكنه معطَّل/ليس عميلاً: حجب التاجر يُحترم (لا التفاف بطرف ويب جديد).
+                if (! $linked->is_active || ! $linked->isCustomer()) {
+                    throw new RuntimeException('حساب العميل غير نشط؛ لا يمكن إتمام الطلب.');
+                }
+
                 return $linked;
             }
         }
@@ -81,7 +86,8 @@ final class CustomerPartnerResolver
             'name' => $snapshot?->customer_name ?: 'عميل المتجر الإلكتروني',
             'phone' => $snapshot?->phone,
             'email' => $email,
-            'country' => $snapshot?->shipping_country,
+            // عمود `partners.country` رمز ISO؛ النص الحر لا يُنسخ إليه.
+            'country' => preg_match('/^[A-Za-z]{2}$/', (string) $snapshot?->shipping_country) === 1 ? strtoupper((string) $snapshot->shipping_country) : null,
             'city' => $snapshot?->shipping_city,
             'district' => $snapshot?->shipping_district,
             'street' => $snapshot?->shipping_street,

@@ -244,11 +244,28 @@ class CustomerPartnerResolverTest extends TestCase
         $p3 = DB::transaction(fn () => $resolver->resolveForOrder($orderA));
         $this->assertSame($linked->id, $p3->id);
 
-        // 3) الربط بطرف معطَّل يسقط إلى طرف الهوية الآلي
+        // 3) الربط بطرف معطَّل: حجب التاجر يُحترم (رفض، لا التفاف بطرف ويب)
         DB::table('partners')->where('id', $linked->id)->update(['is_active' => false]);
-        $p4 = DB::transaction(fn () => $resolver->resolveForOrder($orderA));
-        $this->assertSame($p1->id, $p4->id);
-        app(CustomerContext::class)->forget();
+        try {
+            DB::transaction(fn () => $resolver->resolveForOrder($orderA));
+            $this->fail('كان يجب رفض طرف مربوط معطَّل');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('غير نشط', $e->getMessage());
+        } finally {
+            app(CustomerContext::class)->forget();
+        }
+    }
+
+    #[Test]
+    public function contact_keys_normalize_digits_and_reject_unsafe_phones(): void
+    {
+        $this->assertSame('966501234567', ContactKey::phone('٠٥٠١٢٣٤٥٦٧'));
+        $this->assertSame('966501234567', ContactKey::phone('+966 0501234567'));
+        $this->assertSame('966501234567', ContactKey::phone('0501234567'));
+        $this->assertNull(ContactKey::phone('0000000000'));
+        $this->assertNull(ContactKey::phone('1111111111'));
+        $this->assertNull(ContactKey::phone('0501234567 / 0551234567 / 0561234567'));
+        $this->assertNull(ContactKey::phone('123'));
     }
 
     #[Test]
