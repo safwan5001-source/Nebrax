@@ -65,6 +65,12 @@ class OnlineOrderStockHoldTest extends TestCase
         DB::table('inventory_reservations')->where('source_id', $orderId)->update(['expires_at' => now('UTC')->subMinute()]);
     }
 
+    /** المزوّد يعلن أن صفحة الدفع انتهت دون دفع (الحالة الوحيدة التي تسمح بالتحرير). */
+    private function endPageAtProvider(array $order): void
+    {
+        $this->fake->script((string) $this->attempts($order['order_id'])->first()->provider_payment_id, 'expired');
+    }
+
     private function sweep(): array
     {
         return app(CommerceUnpaidOrderSweeper::class)->run();
@@ -138,12 +144,13 @@ class OnlineOrderStockHoldTest extends TestCase
         $this->assertSame(['processed' => 0, 'released' => 0, 'paid' => 0, 'skipped' => 0, 'failed' => 0], $this->sweep(), 'الحجز لم يحن موعده');
 
         $this->expireHolds($order['order_id']);
+        $this->endPageAtProvider($order);
         $summary = $this->sweep();
 
         $this->assertSame(1, $summary['released']);
         $this->assertSame('released', $this->holds($order['order_id'])[0]->status);
         $this->assertSame('cancelled', $this->intent($order['order_id'])->status);
-        $this->assertSame('cancelled', $this->attempts($order['order_id'])->first()->capture_status);
+        $this->assertSame('expired', $this->attempts($order['order_id'])->first()->capture_status);
         $this->assertNotNull(CommerceOrder::query()->withoutGlobalScopes()->find($order['order_id']), 'الطلب يبقى سجلاً');
         $this->assertSame(0, DB::table('journal_entries')->count());
 
@@ -169,7 +176,52 @@ class OnlineOrderStockHoldTest extends TestCase
         $this->assertSame('active', $this->holds($order['order_id'])[0]->status);
         $this->assertSame('pending', $this->intent($order['order_id'])->status);
 
+        $this->endPageAtProvider($order);
+        $this->expireHolds($order['order_id']);
         $this->assertSame(1, $this->sweep()['released'], 'بعد عودة المزوّد يكتمل التحرير');
+    }
+
+    #[Test]
+    public function a_live_payment_page_at_hold_expiry_keeps_the_hold_and_defers_it(): void
+    {
+        $order = $this->onlineOrder(product: $this->tracked(3));
+        $this->startPayment($order)->assertCreated();
+        $this->expireHolds($order['order_id']);
+
+        $summary = $this->sweep();
+
+        $this->assertSame(1, $summary['skipped']);
+        $this->assertSame(0, $summary['released']);
+        $hold = $this->holds($order['order_id'])[0];
+        $this->assertSame('active', $hold->status);
+        $this->assertTrue($hold->expires_at->isFuture(), 'مؤجَّل: لا يعود رأس الدفعة');
+        $this->assertSame('pending', $this->intent($order['order_id'])->status);
+        $this->assertSame(0, $this->sweep()['processed'], 'لم يحن موعده بعد التأجيل');
+
+        // انتهت صفحة المحاولة محلياً ⇒ المطابقة تُنهيها ويكتمل التحرير.
+        DB::table('payment_attempts')->update(['expires_at' => now('UTC')->subMinute()]);
+        $this->expireHolds($order['order_id']);
+        $this->fake->script((string) $this->attempts($order['order_id'])->first()->provider_payment_id, 'expired');
+        $this->assertSame(1, $this->sweep()['released']);
+    }
+
+    #[Test]
+    public function skipped_orders_do_not_starve_newer_ones(): void
+    {
+        $stuck = $this->onlineOrder(product: $this->tracked(3), key: 'idem-h-s1');
+        $this->startPayment($stuck)->assertCreated();
+        $this->expireHolds($stuck['order_id']);
+        $this->fake->failFetchWith(new \RuntimeException('provider down'));
+        $this->sweep();
+        $this->fake->failFetchWith(null);
+        $fresh = $this->onlineOrder(product: $this->tracked(3), key: 'idem-h-s2');
+        $this->expireHolds($fresh['order_id']);
+
+        $summary = app(CommerceUnpaidOrderSweeper::class)->run(1);
+
+        $this->assertSame(1, $summary['released'], 'الطلب الأحدث يُكنَس رغم وجود عالقٍ أقدم');
+        $this->assertSame('released', $this->holds($fresh['order_id'])[0]->status);
+        $this->assertSame('active', $this->holds($stuck['order_id'])[0]->status);
     }
 
     #[Test]
@@ -210,6 +262,7 @@ class OnlineOrderStockHoldTest extends TestCase
         $this->startPayment($order)->assertCreated();
         $attempt = $this->attempts($order['order_id'])->first();
         $this->expireHolds($order['order_id']);
+        $this->endPageAtProvider($order);
         $this->sweep();
 
         $this->capture($attempt, 5000);

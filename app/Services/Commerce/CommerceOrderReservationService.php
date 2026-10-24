@@ -121,7 +121,7 @@ final class CommerceOrderReservationService
             // ترتيب حتمي بهوية المورد (product_id) — يمنع تقافل PostgreSQL
             // بين طلبين متنافسين بترتيب سطور معكوس (انظر توثيق الصنف، P1-2).
             $lines = $order->lines
-                ->sortBy(fn (CommerceOrderLine $line) => $line->product_id, SORT_STRING)
+                ->sortBy(fn (CommerceOrderLine $line) => $line->product_id.'|'.($line->product_variant_id ?? ''), SORT_STRING)
                 ->values();
 
             $reservations = collect();
@@ -199,6 +199,14 @@ final class CommerceOrderReservationService
 
             return $released;
         });
+    }
+
+    /** H4-02: يؤجّل موعد حجوزات الطلب النشطة (تراجع بعد تخطٍّ/فشل المكنسة كي لا تسدّ الدفعة الأقدم الأحدث). لا يمسّ الحجز الدائم (`expires_at` فارغ). */
+    public function deferExpiry(string $orderId, int $minutes): void
+    {
+        InventoryReservation::query()->where('source_type', CommerceOrder::class)->where('source_id', $orderId)
+            ->where('status', InventoryReservation::STATUS_ACTIVE)->whereNotNull('expires_at')
+            ->update(['expires_at' => now('UTC')->addMinutes($minutes)]);
     }
 
     /** H4-02: الطلب دُفع ⇒ الحجز يصير دائماً (بلا موعد) حتى يستهلكه الإصدار المحاسبي (H4-03)؛ المكنسة لا تلمسه. */

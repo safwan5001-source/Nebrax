@@ -20,12 +20,16 @@ use RuntimeException;
  *   1) لكل محاولة دفع نشطة: `reconcile` (يسأل المزوّد ثم يُنهي المنتهية). تعذّر الوصول إلى المزوّد ⇒ يُترك الطلب كما هو ويُعاد في التشغيل التالي
  *      (الاتجاه الآمن: يبقى المخزون محجوزاً ولا يُباع طلب قد يكون مدفوعاً).
  *   2) إن التُقط مبلغ ⇒ `completeCaptured` (النية مدفوعة والحجز يصير دائماً) — لا إلغاء ولا تحرير.
- *   3) وإلا ⇒ إلغاء النية (`CommercePaymentIntentService::cancel`، يغلق المحاولات محلياً ويرفض إن ظهر التقاط تحت القفل) ثم تحرير الحجز.
+ *   3) محاولة ما زالت نشطة بعد المطابقة (صفحة حيّة/مفوَّضة) ⇒ يُترك الطلب ويُؤجَّل موعده (لا تحرير تحت صفحة قد تُدفع).
+ *   4) وإلا ⇒ إلغاء النية (`CommercePaymentIntentService::cancel`، يغلق المحاولات محلياً ويرفض إن ظهر التقاط تحت القفل) ثم تحرير الحجز.
  *      التقاط متأخر بعد ذلك يُوسَم `late_capture` للمراجعة البشرية (D-15)؛ الطلب يبقى سجلاً (بلا حالة طلب جديدة).
  *  لا أثر محاسبي ولا حركة مخزون. كل طلب معزول (فشل واحد لا يوقف الباقي) وبسياق مستأجره.
  */
 final class CommerceUnpaidOrderSweeper
 {
+    /** تراجع (دقائق) بعد تخطٍّ أو فشل: يمنع إعادة الطلب نفسه في رأس كل دفعة فيحجب الأحدث. */
+    private const BACKOFF_MINUTES = 10;
+
     public function __construct(
         private readonly TenantContext $tenant,
         private readonly PaymentOrchestrator $orchestrator,
@@ -55,10 +59,19 @@ final class CommerceUnpaidOrderSweeper
             $summary['processed']++;
             $this->tenant->set((string) $row->tenant_id);
             try {
-                $summary[$this->sweepOrder((string) $row->source_id)]++;
+                $outcome = $this->sweepOrder((string) $row->source_id);
+                $summary[$outcome]++;
+                if ($outcome === 'skipped') {
+                    $this->reservations->deferExpiry((string) $row->source_id, self::BACKOFF_MINUTES);
+                }
             } catch (\Throwable $e) {
                 $summary['failed']++;
                 report($e);
+                try {
+                    $this->reservations->deferExpiry((string) $row->source_id, self::BACKOFF_MINUTES);
+                } catch (\Throwable) {
+                    // لا نخفي الخطأ الأصلي؛ يعاد الطلب في التشغيل التالي
+                }
             } finally {
                 $previous === null ? $this->tenant->forget() : $this->tenant->set($previous);
             }
@@ -100,6 +113,12 @@ final class CommerceUnpaidOrderSweeper
         }
         $captured = PaymentAttempt::query()->where('payable_key', $intent->payableKey())
             ->where('capture_status', PaymentAttempt::STATUS_CAPTURED)->get();
+        // «لم يُلتقط بعد» ≠ «ميّت»: بعد `reconcile` أي محاولة ما زالت نشطة (صفحة حيّة لم تنتهِ، أو مفوَّضة) قد تُدفع بعد قليل ⇒ لا إلغاء ولا تحرير؛
+        // تنتهي صفحتها بحدّ TTL المزوّد فيحسم التشغيل التالي. (الحجز يمتد إذن إلى انتهاء آخر صفحة حيّة.)
+        if ($captured->isEmpty() && PaymentAttempt::query()->where('payable_key', $intent->payableKey())
+            ->whereIn('capture_status', PaymentAttempt::ACTIVE_STATUSES)->exists()) {
+            return 'skipped';
+        }
         foreach ($captured as $attempt) {
             if ($this->online->completeCaptured($attempt)) {
                 return 'paid';
