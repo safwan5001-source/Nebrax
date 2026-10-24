@@ -420,7 +420,7 @@ class PurchaseService
 
     /**
      * يعيد اشتقاق حجز مسودةٍ عند تعديل مورّدها/رقم فاتورته (داخل معاملة التعديل، والمشترى مقفل).
-     *  - محجوزة (مستوردة أو أُنشئت تحت block): الرقم يُمحى ⇒ يُحرَّر الحجز؛ الهوية تغيّرت ⇒ قفل + فحص القائم (يستثني نفسها) + `rekey`.
+     *  - محجوزة (مستوردة أو أُنشئت تحت block، ويبقى حجزها لو عادت السياسة إلى allow — هوية المستند المحجوز تُحمى ما دام المستند):  الرقم يُمحى ⇒ يُحرَّر الحجز؛ الهوية تغيّرت ⇒ قفل + فحص القائم (يستثني نفسها) + `rekey`.
      *  - غير محجوزة: لا شيء إلا تحت `block` وتغيّرت الهوية فعلاً (مورّد أو رقم مطبَّع) — فمسودة قديمة مكرَّرة سلفاً لا تُحجب بتعديل ملاحظة.
      */
     private function reconcileReservation(Purchase $purchase, string $supplierId, ?string $supplierInvoiceNo): void
@@ -445,7 +445,7 @@ class PurchaseService
             return;
         }
 
-        $unchanged = $purchase->partner_id === $supplierId
+        $unchanged = mb_strtolower((string) $purchase->partner_id, 'UTF-8') === mb_strtolower($supplierId, 'UTF-8')
             && DocumentDuplicateReservationService::normalizeReference($purchase->supplier_invoice_no) === $reference;
         if ($unchanged) {
             return;

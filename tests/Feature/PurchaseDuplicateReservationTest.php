@@ -221,13 +221,13 @@ class PurchaseDuplicateReservationTest extends TestCase
     /** @test */
     public function editing_a_reserved_draft_into_the_reference_of_an_unreserved_legacy_purchase_is_refused(): void
     {
-        $legacy = $this->postPurchase(['supplier_invoice_no' => 'LEG-1'])->assertCreated()->json('data.id');
+        $this->postPurchase(['supplier_invoice_no' => 'LEG-1'])->assertCreated();
         $b = $this->import('B-2');
 
         $this->withToken($this->auth['token'])->putJson("/api/purchases/{$b->id}", $this->body(['supplier_invoice_no' => 'LEG-1']))->assertUnprocessable();
 
         $this->assertSame('B-2', $b->fresh()->supplier_invoice_no);
-        $this->assertNotNull($legacy);
+        $this->assertSame('b2', ImportDocumentReservation::query()->where('document_id', $b->id)->firstOrFail()->predicate['reference']);
     }
 
     /** @test */
@@ -260,7 +260,7 @@ class PurchaseDuplicateReservationTest extends TestCase
     /** @test */
     public function under_block_editing_an_unreserved_draft_into_a_taken_identity_is_refused_but_an_unchanged_legacy_duplicate_can_still_be_edited(): void
     {
-        $x = $this->postPurchase(['supplier_invoice_no' => 'D-1'])->assertCreated()->json('data.id');
+        $this->postPurchase(['supplier_invoice_no' => 'D-1'])->assertCreated();
         $y = $this->postPurchase(['supplier_invoice_no' => 'D-1'])->assertCreated()->json('data.id');   // مكرَّر قديم تحت allow
         $z = $this->postPurchase(['supplier_invoice_no' => 'D-2'])->assertCreated()->json('data.id');
         $this->policy('block');
@@ -273,7 +273,6 @@ class PurchaseDuplicateReservationTest extends TestCase
         $this->withToken($this->auth['token'])->putJson("/api/purchases/{$z}", $this->body(['supplier_invoice_no' => 'D-1']))->assertUnprocessable();
         $this->withToken($this->auth['token'])->putJson("/api/purchases/{$z}", $this->body(['supplier_invoice_no' => 'D-3']))->assertOk();
         $this->assertSame(1, $this->reservations());
-        $this->assertNotNull($x);
     }
 
     /** @test */
@@ -301,14 +300,57 @@ class PurchaseDuplicateReservationTest extends TestCase
     }
 
     /** @test */
-    public function the_duplicate_copy_action_is_unchanged(): void
+    public function the_copy_action_never_inherits_the_supplier_number_so_it_never_collides_or_reserves(): void
     {
-        $id = $this->postPurchase(['supplier_invoice_no' => 'CP-1'])->assertCreated()->json('data.id');
         $this->policy('block');
-        $this->withToken($this->auth['token'])->postJson("/api/purchases/{$id}/duplicate")->assertCreated();
-        // الأصل أُنشئ تحت allow (بلا حجز) والنسخة بلا رقم مورّد (لا هوية): لا حجز في أيّ منهما
-        $this->assertSame(0, $this->reservations());
+        $a = $this->import('CP-1');   // محجوزة
+        $res = $this->withToken($this->auth['token'])->postJson("/api/purchases/{$a->id}/duplicate")->assertCreated();
+
+        $this->assertNull($res->json('data.supplier_invoice_no'));
+        $this->assertSame(1, $this->reservations());
         $this->assertSame(2, Purchase::query()->count());
+    }
+
+    /** @test */
+    public function a_held_draft_keeps_its_identity_protection_after_the_policy_returns_to_allow(): void
+    {
+        $this->policy('block');
+        $a = $this->postPurchase(['supplier_invoice_no' => 'H-1'])->assertCreated()->json('data.id');
+        $this->postPurchase(['supplier_invoice_no' => 'H-2'])->assertCreated();
+        $this->policy('allow');
+
+        // المستند المحجوز يحتفظ بحجزه؛ تعديله إلى هوية قائمة مرفوض حتى تحت allow (السلوك المعلن لا يُسقط الحجز بتبدّل السياسة)
+        $this->withToken($this->auth['token'])->putJson("/api/purchases/{$a}", $this->body(['supplier_invoice_no' => 'H-2']))->assertUnprocessable();
+        // ومستند غير محجوز تحت allow يتصرف كالقديم تماماً
+        $free = $this->postPurchase(['supplier_invoice_no' => 'H-3'])->assertCreated()->json('data.id');
+        $this->withToken($this->auth['token'])->putJson("/api/purchases/{$free}", $this->body(['supplier_invoice_no' => 'H-2']))->assertOk();
+    }
+
+    /** @test */
+    public function the_same_supplier_number_in_another_tenant_is_not_a_duplicate(): void
+    {
+        $this->policy('block');
+        $this->postPurchase(['supplier_invoice_no' => 'T-1'])->assertCreated();
+
+        $other = $this->registerTenant('beta-co', 'owner@beta.test');
+        $supplier = $this->withToken($other['token'])->postJson('/api/partners', ['name' => 'مورّد', 'type' => 'supplier'])->assertCreated()['data']['id'];
+        $product = $this->withToken($other['token'])->postJson('/api/products', ['name' => 'س', 'sku' => 'B-'.uniqid(), 'type' => 'good', 'sale_price' => 2000, 'purchase_price' => 1000, 'track_inventory' => true])->assertCreated()['data']['id'];
+        $this->withToken($other['token'])->putJson('/api/purchase-settings', ['duplicate_reference_policy' => 'block'])->assertOk();
+        $body = ['partner_id' => $supplier, 'payment_type' => 'credit', 'supplier_invoice_no' => 'T-1', 'items' => [['product_id' => $product, 'quantity' => 1, 'unit_price' => 1000, 'tax_rate' => 0]]];
+
+        $this->withToken($other['token'])->postJson('/api/purchases', $body)->assertCreated();
+        $this->withToken($other['token'])->postJson('/api/purchases', $body)->assertUnprocessable();
+    }
+
+    /** @test */
+    public function an_uppercase_supplier_id_in_an_edit_is_not_treated_as_a_supplier_change(): void
+    {
+        $this->policy('block');
+        $a = $this->postPurchase(['supplier_invoice_no' => 'U-9'])->assertCreated()->json('data.id');
+        $this->postPurchase(['supplier_invoice_no' => 'U-9', 'partner_id' => $this->otherSupplier()])->assertCreated();
+
+        // نفس المورّد بحروف كبيرة والرقم نفسه: لا هوية جديدة ⇒ لا فحص ذاتي ولا تعارض
+        $this->withToken($this->auth['token'])->putJson("/api/purchases/{$a}", $this->body(['partner_id' => strtoupper($this->supplierId), 'supplier_invoice_no' => 'U-9', 'notes' => 'ok']))->assertOk();
     }
 
     /** @test */
