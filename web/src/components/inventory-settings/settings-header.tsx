@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import type { ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 /** ترويسة قسم داخل «إعدادات المخزون والمنتجات» — عنوان ووصف وزرّ رجوع للمحور. */
-export function SettingsHeader({ title, subtitle }: { title: string; subtitle: string }) {
+export function SettingsHeader({ title, subtitle, action }: { title: string; subtitle: string; action?: ReactNode }) {
   const t = useTranslations('inventorySettings');
   const router = useRouter();
 
@@ -21,10 +22,11 @@ export function SettingsHeader({ title, subtitle }: { title: string; subtitle: s
         {/* السهم يشير إلى «الخلف» في RTL — أي إلى اليمين. */}
         <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
       </Link></Button>
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <h1 className="text-xl font-semibold text-text">{title}</h1>
         <p className="mt-1 text-sm text-muted">{subtitle}</p>
       </div>
+      {action ? <div className="shrink-0">{action}</div> : null}
     </div>
   );
 }

@@ -1,8 +1,9 @@
 'use client';
 
 import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
-import { Plus, Pencil, Trash2, Check, X, ImagePlus } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, X, ImagePlus, Upload } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -233,7 +234,16 @@ export default function ProductCategoriesPage() {
 
   return (
     <div className="space-y-5">
-      <SettingsHeader title={t('c_categories_t')} subtitle={t('c_categories_d')} />
+      <SettingsHeader title={t('c_categories_t')} subtitle={t('c_categories_d')}
+        action={
+          <Button asChild variant="outline">
+            <Link href="/inventory-settings/categories/import">
+              <Upload className="h-4 w-4" strokeWidth={1.7} />
+              {t('import_from_file')}
+            </Link>
+          </Button>
+        }
+      />
 
       <Card className="max-w-4xl">
         <CardHeader>
