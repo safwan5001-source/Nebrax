@@ -58,6 +58,11 @@ export interface PurchasePreviewUnit {
 
 export interface PurchaseImportPreview {
   binding?: ImportBinding;
+  /** القيم **الفعلية** التي ستُجمَّد على التشغيلة (تفضيلات المؤسسة محسومة) — تُعرض قبل التأكيد. */
+  default_payment_type?: PurchasePaymentType | null;
+  default_tax_rate?: number | null;
+  tax_inclusive?: boolean | null;
+  warehouse_id?: string | null;
   total_rows: number;
   total_units: number;
   create_units: number;

@@ -1382,7 +1382,7 @@
     "default_tax_hint": "Used for rows that carry no tax rate. Blank uses the company setting, frozen with this preview.",
     "tax_inclusive": "File prices",
     "inclusive_no": "Before tax",
-    "inclusive_yes": "Include tax",
+    "inclusive_yes": "Tax-inclusive",
     "tax_inclusive_hint": "Blank uses the company setting, frozen with this preview.",
     "data_rows": "{rows} data rows",
     "mapping_reset": "Reset to suggested mapping",
@@ -1435,10 +1435,13 @@
     "result_drafts_hint": "The drafts are in the purchases list; review them, then post each one.",
     "start_another": "Import another file",
     "back_to_purchases": "Back to purchases",
-    "partial_failure_note": "{count} invoices were already created as drafts before the failure. Re-uploading the corrected file will refuse those as existing invoices, so remove their rows first.",
+    "partial_failure_note": "{count, plural, one {# invoice was} other {# invoices were}} already created as drafts before the failure. Re-uploading the corrected file will refuse those as existing invoices, so remove their rows first.",
     "demo_unavailable": "Not available in the demo.",
     "continue_hint": "The job is paused midway (a disconnect or page refresh). Continue applying what was previewed.",
-    "continue_apply": "Continue"
+    "continue_apply": "Continue",
+    "applied_settings": "Applied to this run (frozen with the preview): tax rate {tax}%, file prices: {prices}, payment: {payment}",
+    "preview_used": "This preview was already used by a job. Go back to setup and preview again to create a new job.",
+    "resumed_wrong_domain": "This job is not a purchase import and cannot be continued here."
   },
   "stocktakeImport": {
     "title": "Import stocktake counts",

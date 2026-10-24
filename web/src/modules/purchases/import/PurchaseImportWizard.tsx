@@ -122,7 +122,8 @@ export function PurchaseImportWizard() {
   const gaps = useMemo(() => purchaseMappingGaps(mapping, fields, { defaultSupplierId }), [mapping, fields, defaultSupplierId]);
   const activeMapping = inspection && inspection.columns.length > 0 ? mapping : undefined;
   const mappingReady = !activeMapping || (gaps.missingRequired.length === 0 && !gaps.missingSupplier && !gaps.missingProduct && !gaps.duplicate);
-  const canPreview = Boolean(file) && !inspecting && !previewing && mappingReady && taxValid;
+  // بلا فحص ناجح لا مطابقة ولا حقول: المعاينة ستفشل بالسبب نفسه، فلا تُتاح.
+  const canPreview = Boolean(file) && inspection !== null && !inspecting && !previewing && mappingReady && taxValid;
   const steps = STEP_KEYS.map((key) => ({ key, label: t(`step_${key}`) }));
 
   function currentOptions(): PurchaseImportOptions {
@@ -281,6 +282,9 @@ export function PurchaseImportWizard() {
 
   // الوحدة فاتورة: `processed_rows` بعد الاكتمال = الفواتير المنجزة تراكمياً (`apply_result` يحمل قطعة التنفيذ الأخيرة وحدها).
   const createdCount = engine.job?.processed_rows ?? (engine.job?.apply_result as { created?: number } | null | undefined)?.created ?? 0;
+  // معاينةٌ استُهلك ربطها (تشغيلة انتهت): لا تنفيذ ثانٍ منها — تُعاد المعاينة لتشغيلة جديدة.
+  const jobTerminal = engine.job !== null && ['failed', 'completed', 'cancelled'].includes(engine.job.status);
+  const wrongDomainJob = resumedWithoutFile && engine.job !== null && engine.job.domain !== 'purchase_import';
   const failedAfterPartial = engine.job?.status === 'failed' && (engine.job.processed_rows ?? 0) > 0;
   const visibleUnits = preview ? (unitsExpanded ? preview.units : preview.units.slice(0, UNITS_COLLAPSED)) : [];
 
@@ -319,9 +323,10 @@ export function PurchaseImportWizard() {
             <CardContent className="space-y-4">
               <p className="text-sm leading-relaxed text-muted">{t('resumed_hint', { name: engine.job.original_filename })}</p>
               {engine.job.preview_bound ? null : <p role="alert" className="text-sm text-negative">{t('resumed_unbound')}</p>}
+              {wrongDomainJob ? <p role="alert" className="text-sm text-negative">{t('resumed_wrong_domain')}</p> : null}
               <FormActions
                 primary={
-                  <Button disabled={!engine.job.preview_bound} onClick={() => void confirmAndApply()}>
+                  <Button disabled={!engine.job.preview_bound || wrongDomainJob} onClick={() => void confirmAndApply()}>
                     <Upload className="h-4 w-4" strokeWidth={1.7} />
                     {t('apply')}
                   </Button>
@@ -416,10 +421,11 @@ export function PurchaseImportWizard() {
                       value={defaultTax}
                       placeholder={t('tenant_default')}
                       aria-invalid={!taxValid}
+                      aria-describedby={taxValid ? undefined : 'pi-tax-error'}
                       onChange={(event: ChangeEvent<HTMLInputElement>) => { setDefaultTax(event.target.value); invalidatePreview(); }}
                       className="num"
                     />
-                    {!taxValid ? <p role="alert" className="text-xs text-negative">{t('default_tax_invalid')}</p> : <p className="text-xs leading-relaxed text-muted">{t('default_tax_hint')}</p>}
+                    {!taxValid ? <p id="pi-tax-error" role="alert" className="text-xs text-negative">{t('default_tax_invalid')}</p> : <p className="text-xs leading-relaxed text-muted">{t('default_tax_hint')}</p>}
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="pi-inclusive">{t('tax_inclusive')}</Label>
@@ -454,7 +460,7 @@ export function PurchaseImportWizard() {
                 <CardContent className="space-y-3">
                   {gaps.missingRequired.length > 0 ? (
                     <p role="alert" className="rounded-md border border-negative/30 bg-negative/10 px-3 py-2 text-sm text-negative">
-                      {t('mapping_missing_required', { fields: gaps.missingRequired.map((field) => purchaseFieldLabel(field, locale)).join('، ') })}
+                      {t('mapping_missing_required', { fields: gaps.missingRequired.map((field) => purchaseFieldLabel(field, locale)).join(locale.startsWith('ar') ? '، ' : ', ') })}
                     </p>
                   ) : null}
                   {gaps.missingSupplier ? (
@@ -471,10 +477,10 @@ export function PurchaseImportWizard() {
                     <table className="w-full min-w-[40rem] text-sm">
                       <thead className="bg-background text-muted">
                         <tr>
-                          <th className="px-3 py-2 text-start font-medium">{t('mapping_source')}</th>
-                          <th className="px-3 py-2 text-start font-medium">{t('mapping_sample')}</th>
-                          <th className="px-3 py-2 text-start font-medium">{t('mapping_target')}</th>
-                          <th className="px-3 py-2 text-start font-medium">{t('mapping_state')}</th>
+                          <th scope="col" className="px-3 py-2 text-start font-medium">{t('mapping_source')}</th>
+                          <th scope="col" className="px-3 py-2 text-start font-medium">{t('mapping_sample')}</th>
+                          <th scope="col" className="px-3 py-2 text-start font-medium">{t('mapping_target')}</th>
+                          <th scope="col" className="px-3 py-2 text-start font-medium">{t('mapping_state')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -548,17 +554,26 @@ export function PurchaseImportWizard() {
               ))}
             </dl>
             <p className="text-xs leading-relaxed text-muted">{t('preview_drafts_note', { rows: preview.total_rows, invoices: preview.total_units })}</p>
+            {preview.default_tax_rate != null || preview.tax_inclusive != null || preview.default_payment_type ? (
+              <p className="rounded-md border border-border bg-background px-3 py-2 text-xs leading-relaxed text-text" data-testid="applied-settings">
+                {t('applied_settings', {
+                  tax: preview.default_tax_rate ?? '—',
+                  prices: preview.tax_inclusive == null ? '—' : t(preview.tax_inclusive ? 'inclusive_yes' : 'inclusive_no'),
+                  payment: preview.default_payment_type ? t(`payment_${preview.default_payment_type}`) : '—',
+                })}
+              </p>
+            ) : null}
 
             <div className="overflow-x-auto rounded-md border border-border">
               <table className="w-full min-w-[40rem] text-sm">
                 <thead className="bg-background text-muted">
                   <tr>
-                    <th className="px-3 py-2 text-start font-medium">{t('col_invoice')}</th>
-                    <th className="px-3 py-2 text-start font-medium">{t('col_supplier')}</th>
-                    <th className="px-3 py-2 text-start font-medium">{t('col_date')}</th>
-                    <th className="px-3 py-2 text-start font-medium">{t('col_lines')}</th>
-                    <th className="px-3 py-2 text-start font-medium">{t('col_total')}</th>
-                    <th className="px-3 py-2 text-start font-medium">{t('col_status')}</th>
+                    <th scope="col" className="px-3 py-2 text-start font-medium">{t('col_invoice')}</th>
+                    <th scope="col" className="px-3 py-2 text-start font-medium">{t('col_supplier')}</th>
+                    <th scope="col" className="px-3 py-2 text-start font-medium">{t('col_date')}</th>
+                    <th scope="col" className="px-3 py-2 text-start font-medium">{t('col_lines')}</th>
+                    <th scope="col" className="px-3 py-2 text-start font-medium">{t('col_total')}</th>
+                    <th scope="col" className="px-3 py-2 text-start font-medium">{t('col_status')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -610,11 +625,12 @@ export function PurchaseImportWizard() {
             {preview.error_units > 0 ? (
               <p role="alert" className="rounded-md border border-negative/30 bg-negative/10 px-3 py-2 text-sm text-negative">{t('fix_errors')}</p>
             ) : null}
+            {jobTerminal ? <p role="status" className="text-xs leading-relaxed text-muted">{t('preview_used')}</p> : null}
 
             <FormActions
               secondary={<Button type="button" variant="outline" onClick={() => setStep(0)}>{t('back_to_setup')}</Button>}
               primary={
-                <Button disabled={preview.error_units > 0 || !preview.binding || previewing} onClick={() => void confirmAndApply()}>
+                <Button disabled={preview.error_units > 0 || !preview.binding || previewing || jobTerminal} onClick={() => void confirmAndApply()}>
                   <Upload className="h-4 w-4" strokeWidth={1.7} />
                   {t('apply')}
                 </Button>

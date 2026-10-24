@@ -275,6 +275,64 @@ describe('PurchaseImportWizard (IMP-H5-S4b)', () => {
     expect(screen.getByRole('button', { name: 'start_another' })).toBeTruthy();
   });
 
+  it('shows the resolved company defaults that will be frozen before the user confirms', async () => {
+    api.mockImplementation((path: string) => {
+      if (path === '/purchases/import/inspect') return Promise.resolve({ data: inspection });
+      if (path === '/purchases/import/preview') return Promise.resolve({ data: { ...cleanPreview, default_tax_rate: 5, tax_inclusive: true, default_payment_type: 'credit' } });
+      return Promise.resolve({ data: [] });
+    });
+    const user = userEvent.setup();
+    render(<PurchaseImportWizard />);
+    await previewReady(user);
+
+    expect(screen.getByTestId('applied-settings').textContent).toBe('applied_settings:5,inclusive_yes,payment_credit');
+  });
+
+  it('does not offer a preview when the inspection failed', async () => {
+    const { ApiError } = await import('@/lib/api');
+    api.mockImplementation((path: string) => {
+      if (path === '/purchases/import/inspect') return Promise.reject(new ApiError(422, 'ملف تالف', null));
+      return Promise.resolve({ data: [] });
+    });
+    const user = userEvent.setup();
+    render(<PurchaseImportWizard />);
+    await user.upload(screen.getByLabelText('step_file'), csv());
+
+    await waitFor(() => expect(screen.getAllByRole('alert').map((node) => node.textContent).join(' ')).toContain('ملف تالف'));
+    expect((screen.getByRole('button', { name: 'run_preview' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('disables Apply once the job from this preview has ended, because its single-use binding is spent', async () => {
+    const user = userEvent.setup();
+    render(<PurchaseImportWizard />);
+    await previewReady(user);
+
+    api.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path === '/import-jobs' && options?.method === 'POST') return Promise.resolve({ data: jobFixture() });
+      if (path.startsWith('/import-jobs/job-1')) return Promise.resolve({ data: jobFixture({ status: 'failed', processed_rows: 0, error_message: 'تعذّر' }) });
+      return Promise.resolve({ data: {} });
+    });
+    await user.click(screen.getByRole('button', { name: 'apply' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'start_another' })).toBeTruthy());
+    expect(screen.queryByText(/partial_failure_note/)).toBeNull();   // لا فواتير أُنشئت قبل الفشل
+
+    await user.click(screen.getByRole('button', { name: 'step_preview' }));
+    expect((screen.getByRole('button', { name: 'apply' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText('preview_used')).toBeTruthy();
+  });
+
+  it('refuses to continue a job of another domain opened from the URL', async () => {
+    window.history.replaceState({}, '', '/purchases/import?job=job-7');
+    api.mockImplementation((path: string) => {
+      if (path === '/import-jobs/job-7') return Promise.resolve({ data: jobFixture({ id: 'job-7', domain: 'expense_import', status: 'ready', preview_bound: true }) });
+      return Promise.resolve({ data: [] });
+    });
+    render(<PurchaseImportWizard />);
+
+    await waitFor(() => expect(screen.getByText('resumed_wrong_domain')).toBeTruthy());
+    expect((screen.getByRole('button', { name: 'apply' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it('resumes a bound job from the URL without a file and refuses an unbound one', async () => {
     window.history.replaceState({}, '', '/purchases/import?job=job-9');
     api.mockImplementation((path: string) => {
