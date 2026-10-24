@@ -1,8 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Plus, Pencil, Trash2, Check, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, X, Upload } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -117,7 +118,15 @@ export default function UnitTemplatesPage() {
 
   return (
     <div className="space-y-5">
-      <SettingsHeader title={t('c_units_t')} subtitle={t('c_units_d')} />
+      <SettingsHeader title={t('c_units_t')} subtitle={t('c_units_d')}
+        action={
+          <Button asChild variant="outline">
+            <Link href="/inventory-settings/units/import">
+              <Upload className="h-4 w-4" strokeWidth={1.7} />
+              {t('import_from_file')}
+            </Link>
+          </Button>
+        } />
 
       <Card className="max-w-3xl">
         <CardHeader>
