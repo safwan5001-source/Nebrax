@@ -95,6 +95,8 @@ class Rbac
         // PAY-H3-02b (ADR-0008): تسجيل/ترحيل تسوية البوابة (A6) وحفظ الفرق غير المفسَّر؛ القراءة والمعاينة `payments.view`. owner/admin عبر `*` فقط؛
         // لا تُضاف لـ`MATRIX` ولا تُمنح لأي دور مخزَّن بهجرة (لا منح ضمني).
         'payment_settlements.manage',
+        // PAY-H3-02c (ADR-0008 D-22): تعديلات المزوّد غير العمولة — طلب التعديل، والاعتماد المستقل (≠ الطالب، يُفرض في الخدمة والقاعدة). owner/admin عبر `*` فقط.
+        'payment_settlements.adjust', 'payment_settlements.approve_adjustment',
         'purchases.view', 'purchases.manage',
         'returns.view', 'returns.manage',
         'hr.view', 'hr.manage',
