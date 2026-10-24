@@ -26,6 +26,8 @@ class PaymentGatewayResource extends JsonResource
             'environment' => $this->environment,
             'connection_mode' => $this->connection_mode,
             'status' => $this->status,
+            'fee_tax_policy' => $this->fee_tax_policy,
+            'fee_tax_opinion_recorded' => trim((string) config('payments.fee_tax_opinion_ref')) !== '',
             'is_active' => (bool) $this->is_active,
             'is_usable' => $this->isUsable(),
             'merchant_reference' => $this->merchant_reference,

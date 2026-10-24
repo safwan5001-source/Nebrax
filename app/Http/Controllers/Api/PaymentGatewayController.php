@@ -113,6 +113,18 @@ class PaymentGatewayController extends ApiController
         ))->response());
     }
 
+    public function setFeeTaxPolicy(Request $request, string $id): JsonResponse
+    {
+        $data = $request->validate([
+            'policy' => ['required', 'string', 'in:reject,input_vat'],
+            'reason' => ['required', 'string', 'min:5', 'max:500'],
+        ]);
+
+        return $this->guarded(fn () => (new PaymentGatewayResource(
+            $this->gateways->setFeeTaxPolicy($this->gateways->find($id), $data['policy'], $request->user(), $data['reason'])
+        ))->response());
+    }
+
     public function destroy(string $id): JsonResponse
     {
         return $this->guarded(function () use ($id) {

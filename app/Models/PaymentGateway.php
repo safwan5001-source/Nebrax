@@ -23,6 +23,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class PaymentGateway extends BaseModel implements CompanyWide
 {
+    /** سياسة ضريبة عمولة المزوّد (ADR-0008 D-04): الافتراضي رفض؛ `input_vat` محجوب بـEXT-05 (config payments.fee_tax_opinion_ref). */
+    public const FEE_TAX_REJECT = 'reject';
+
+    public const FEE_TAX_INPUT_VAT = 'input_vat';
+
     public const PROVIDER_STRIPE = 'stripe';
 
     public const PROVIDER_TAP = 'tap';
@@ -100,6 +105,7 @@ class PaymentGateway extends BaseModel implements CompanyWide
         'status' => self::STATUS_DRAFT,
         'connection_mode' => self::MODE_BYOG,
         'credential_version' => 1,
+        'fee_tax_policy' => self::FEE_TAX_REJECT,
     ];
 
     protected function casts(): array
