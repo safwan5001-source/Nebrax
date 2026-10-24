@@ -52,7 +52,10 @@ export const OPENAPI_MODEL: OpenApiModel = {
     "idempotency_conflict",
     "idempotency_in_progress",
     "review_required",
-    "cart_merged"
+    "cart_merged",
+    "payment_unavailable",
+    "payment_not_payable",
+    "payment_provider_unavailable"
   ],
   "notableHeaders": [
     {
