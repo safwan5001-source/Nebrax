@@ -43,7 +43,10 @@ class PurchaseImportController extends ApiController
             $options = $request->importOptions();
             $warehouse = (string) ($options['warehouse_id'] ?? '');
             $this->imports->assertWarehouseAccess($warehouse !== '' ? mb_strtolower($warehouse, 'UTF-8') : null, $request->user()?->id);
-            ['preview' => $preview, 'plan' => $plan] = $this->imports->previewWithPlan($request->file('file'), $options, PurchaseImportService::DURABLE_MAX_ROWS);
+            // المعاينة تُحسب بالخيارات **القانونية** (تفضيلات المؤسسة محسومة) نفسها التي تدخل بصمة الربط وتُجمَّد على التشغيلة، فتُعرَض القيم الفعلية للمستخدم قبل التنفيذ.
+            ['preview' => $preview, 'plan' => $plan] = $this->imports->previewWithPlan(
+                $request->file('file'), app(\App\Services\PurchaseImportAdapter::class)->canonicalOptions($options), PurchaseImportService::DURABLE_MAX_ROWS,
+            );
             $preview['binding'] = app(ImportPreviewService::class)->issue(
                 ImportJobDomain::PURCHASE_IMPORT, $request->file('file'), null, $options, $request->user()?->id, $plan,
             );

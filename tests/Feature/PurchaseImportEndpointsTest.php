@@ -342,6 +342,18 @@ class PurchaseImportEndpointsTest extends TestCase
     }
 
     /** @test */
+    public function the_preview_echoes_the_resolved_company_defaults_that_will_be_frozen(): void
+    {
+        \App\Support\Settings::put('purchases', ['default_tax_rate' => 5, 'default_tax_inclusive' => true, 'default_payment_type' => 'cash']);
+
+        $blank = $this->upload($this->auth['token'], '/api/purchases/import/preview', ['file' => $this->file([$this->row(['tax_rate' => ''])])])->assertOk()->json('data');
+        $this->assertSame([5, true, 'cash'], [$blank['default_tax_rate'], $blank['tax_inclusive'], $blank['default_payment_type']]);
+
+        $explicit = $this->upload($this->auth['token'], '/api/purchases/import/preview', ['file' => $this->file([$this->row()]), 'default_tax_rate' => 0, 'tax_inclusive' => false, 'default_payment_type' => 'credit'])->assertOk()->json('data');
+        $this->assertSame([0, false, 'credit'], [$explicit['default_tax_rate'], $explicit['tax_inclusive'], $explicit['default_payment_type']]);
+    }
+
+    /** @test */
     public function a_null_tax_rate_means_the_company_default_and_round_trips_from_preview_to_job_to_apply(): void
     {
         \App\Support\Settings::put('purchases', ['default_tax_rate' => 5]);
