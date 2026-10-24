@@ -14,7 +14,9 @@ export default defineConfig({
     launchOptions: {
       args: ["--no-sandbox"],
       // Sandboxes pre-install a browser build the project's pinned Playwright does not know: PW_CHROMIUM_PATH points at it.
-      ...(process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {}),
+      ...(process.env.PW_CHROMIUM_PATH
+        ? { executablePath: process.env.PW_CHROMIUM_PATH }
+        : {}),
     },
   },
   projects: [{ name: "chromium", use: { browserName: "chromium" } }],
