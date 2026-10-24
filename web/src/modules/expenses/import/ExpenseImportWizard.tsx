@@ -305,7 +305,8 @@ export function ExpenseImportWizard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine.job?.status]);
 
-  const applyResult = engine.job?.apply_result as { created?: number } | null | undefined;
+  // `apply_result` يحمل قطعة التنفيذ الأخيرة وحدها؛ المجال إنشاءٌ فقط (صفٌّ = مسودة) فالعدد الكلي هو الصفوف المنجزة التراكمية للتشغيلة.
+  const createdCount = engine.job?.processed_rows ?? (engine.job?.apply_result as { created?: number } | null | undefined)?.created ?? 0;
   const repeatRows = preview?.repeat_candidates ?? [];
 
   return (
@@ -671,7 +672,7 @@ export function ExpenseImportWizard() {
             <dl className="grid grid-cols-2 gap-2">
               <div className="rounded-md border border-border bg-background px-3 py-2">
                 <dt className="text-xs text-muted">{t('result_created')}</dt>
-                <dd className="num mt-0.5 text-lg font-semibold text-text">{applyResult?.created ?? 0}</dd>
+                <dd className="num mt-0.5 text-lg font-semibold text-text">{createdCount}</dd>
               </div>
             </dl>
             <p className="text-xs leading-relaxed text-muted">{t('result_drafts_hint')}</p>

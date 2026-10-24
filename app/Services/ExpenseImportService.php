@@ -151,9 +151,7 @@ class ExpenseImportService
             'rows' => array_map(fn (array $row): array => $this->rowSummary($row), $rows),
             'rows_shown' => count($rows), 'rows_truncated' => count($parsed['rows']) > count($rows),
             // كل صفٍّ مكرَّر المرشَّح أو المؤكَّد (مقيَّد بالسقف) مهما كان موضعه: قائمة المعاينة مقتطعة عند 200 صف فلا يجوز أن يغيب خيار التأكيد عن صفٍّ بعده.
-            'repeat_candidates' => array_map(fn (array $row): array => $this->rowSummary($row), array_slice(array_values(array_filter(
-                $parsed['rows'], static fn (array $row): bool => $row['confirmed'] || array_intersect(['duplicate_in_file', 'existing_expense_matches'], $row['codes'] ?? []) !== [],
-            )), 0, self::PREVIEW_ROW_LIMIT)),
+            'repeat_candidates' => $this->repeatCandidates($parsed['rows']),
             'errors' => $parsed['errors'],
         ];
 
@@ -770,6 +768,23 @@ class ExpenseImportService
         }
 
         return $failures;
+    }
+
+    /**
+     * الصفوف المكرَّرة المرشَّحة والمؤكَّدة للواجهة، **غير المؤكَّدة أولاً** ثم المؤكَّدة، بالسقف: ملفٌّ بأكثر من 200 مرشَّح لا يجوز أن تحجب المؤكَّدةُ منها
+     * (وهي تُملأ أولاً بحكم ترتيب الورقة) ما بعدها فيستحيل تأكيده؛ كل تأكيدٍ يُظهر الدفعة التالية في المعاينة اللاحقة.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<array<string, mixed>>
+     */
+    private function repeatCandidates(array $rows): array
+    {
+        $candidates = array_values(array_filter(
+            $rows, static fn (array $row): bool => $row['confirmed'] || array_intersect(['duplicate_in_file', 'existing_expense_matches'], $row['codes'] ?? []) !== [],
+        ));
+        usort($candidates, static fn (array $a, array $b): int => [(int) $a['confirmed'], $a['row']] <=> [(int) $b['confirmed'], $b['row']]);
+
+        return array_map(fn (array $row): array => $this->rowSummary($row), array_slice($candidates, 0, self::PREVIEW_ROW_LIMIT));
     }
 
     /** @param array<string, mixed> $row @return array<string, mixed> */

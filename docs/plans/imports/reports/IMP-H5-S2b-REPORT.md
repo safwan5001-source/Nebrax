@@ -37,7 +37,9 @@ None — the UI only drives the already-merged drafts-only endpoints. No journal
 | 7 | a11y: unnamed select for an empty header; `dir="ltr"` around Arabic vendor text | **Fixed** — fallback label «Column n»; `dir="auto"` |
 | 8 | Inspect failure leaves auto-mapping | Accepted (server auto-maps; the server still validates) |
 
-The Partner wizard shares findings 1–2; they are logged as follow-up **IMP-WIZARD-STATE-01** (not widened here).
+**Codex review (2 × P2, both valid, fixed):** (a) the result screen showed only the *last chunk's* `created` (`apply_result` is overwritten per chunk) — it now shows the cumulative `processed_rows` (create-only domain; test with a 250-row job whose last chunk created 50); (b) with more than 200 candidates the confirmed ones (filled first by sheet order) hid the later unconfirmed ones — `repeat_candidates` now lists **unconfirmed first**, so every confirmation exposes the next batch (PHP test with 205 candidates).
+
+The Partner wizard shares findings 1–2 (and the last-chunk result count); they are logged as follow-up **IMP-WIZARD-STATE-01** (also: last-chunk result counts in the Partner wizard) (not widened here).
 
 ## Not in scope / next
 

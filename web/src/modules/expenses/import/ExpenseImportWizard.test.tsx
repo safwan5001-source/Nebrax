@@ -131,13 +131,15 @@ describe('ExpenseImportWizard (IMP-H5-S2b)', () => {
 
     api.mockImplementation((path: string, options?: { method?: string }) => {
       if (path === '/import-jobs' && options?.method === 'POST') return Promise.resolve({ data: jobFixture() });
-      if (path === '/import-jobs/job-1/apply') return Promise.resolve({ data: jobFixture({ status: 'completed', processed_rows: 2, apply_result: { created: 2 } }) });
+      if (path === '/import-jobs/job-1/apply') return Promise.resolve({ data: jobFixture({ status: 'completed', processed_rows: 250, apply_result: { created: 50 } }) });
       return Promise.resolve({ data: {} });
     });
     await user.click(screen.getByRole('button', { name: 'apply' }));
 
     await waitFor(() => expect(screen.getByText('result_created')).toBeTruthy());
     expect(toastSuccess).toHaveBeenCalled();
+    // العدد الكلي هو processed_rows التراكمي لا created الخاص بآخر قطعة
+    expect(screen.getByText('result_created').parentElement?.textContent).toContain('250');
     const create = api.mock.calls.find((call) => call[0] === '/import-jobs')?.[1]?.body as FormData;
     expect([create.get('domain'), create.get('preview_id'), create.get('options[reference_policy]'), create.get('options[default_tax_rate]'), create.get('options[mapping][3]')]).toEqual(['expense_import', 'pv-1', 'optional', '15', 'ignore']);
     expect(create.has('options[confirmed_repeat_rows][]')).toBe(false);

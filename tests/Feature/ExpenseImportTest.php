@@ -542,6 +542,27 @@ class ExpenseImportTest extends TestCase
     }
 
     /** @test */
+    public function confirmed_candidates_never_hide_unconfirmed_ones_beyond_the_cap(): void
+    {
+        $rows = [];
+        for ($i = 1; $i <= 210; $i++) {
+            $rows[] = $this->row(['amount' => (string) $i, 'vendor_name' => 'مورد '.$i]);
+        }
+        for ($i = 1; $i <= 205; $i++) {   // 205 تكراراً للصفوف 2..206 ⇒ مرشّحة في الصفوف 212..416
+            $rows[] = $this->row(['amount' => (string) $i, 'vendor_name' => 'مورد '.$i]);
+        }
+        $firstBatch = range(212, 411);
+
+        $preview = $this->preview($rows);
+        $this->assertSame($firstBatch, array_column($preview['repeat_candidates'], 'row'), 'الدفعة الأولى: أول 200 مرشَّح.');
+
+        $next = $this->preview($rows, ['confirmed_repeat_rows' => $firstBatch]);
+        $unconfirmed = array_values(array_filter($next['repeat_candidates'], fn ($r) => ! $r['confirmed_repeat']));
+        $this->assertSame(range(412, 416), array_column($unconfirmed, 'row'), 'المؤكَّد لا يحجب الباقي: يظهر الخمسة المتبقية أولاً.');
+        $this->assertSame(range(412, 416), array_slice(array_column($next['repeat_candidates'], 'row'), 0, 5));
+    }
+
+    /** @test */
     public function the_preview_totals_the_creatable_amount_in_minor_units(): void
     {
         $preview = $this->preview([$this->row(['amount' => '10.50', 'vendor_name' => 'أ']), $this->row(['amount' => '1', 'vendor_name' => 'ب']), $this->row(['account_code' => '9999', 'amount' => '500', 'vendor_name' => 'ج'])]);
