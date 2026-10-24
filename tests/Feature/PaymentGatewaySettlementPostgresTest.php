@@ -268,7 +268,7 @@ class PaymentGatewaySettlementPostgresTest extends TestCase
             $bank = \App\Models\CashBankAccount::query()->where('type', 'bank')->where('is_main', true)->firstOrFail();
             try {
                 $settlement = app(PaymentGatewaySettlementService::class)->record([
-                    'payment_gateway_id' => $gateway, 'cash_bank_account_id' => $bank->id, 'provider_settlement_ref' => $ref, 'settlement_date' => now()->toDateString(),
+                    'payment_gateway_id' => $gateway, 'cash_bank_account_id' => $bank->id, 'provider_settlement_ref' => $ref, 'settlement_date' => now('Asia/Riyadh')->toDateString(),
                     'net_bank_amount' => $net, 'provider_fee_ex_tax' => $fee,
                     'items' => [['payment_id' => $paymentId, 'gross_amount' => $gross]],
                     'refunds' => collect($refunds)->map(fn ($amount, $id) => ['payment_refund_id' => $id, 'amount_minor' => $amount])->values()->all(),
