@@ -151,4 +151,140 @@ describe('PartnerImportWizard (IMP-H3-S3)', () => {
     expect((screen.getByRole('button', { name: 'apply' }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByRole('button', { name: 'download_errors' })).toBeTruthy();
   });
+
+  describe('IMP-WIZARD-STATE-01b', () => {
+    async function previewReady(user: ReturnType<typeof userEvent.setup>) {
+      render(<PartnerImportWizard type="supplier" />);
+      await user.upload(screen.getByLabelText('step_file'), csv());
+      await waitFor(() => expect(screen.getByLabelText('الاسم')).toBeTruthy());
+      await user.click(screen.getByRole('button', { name: 'run_preview' }));
+      await waitFor(() => expect(screen.getByRole('button', { name: 'apply' })).toBeTruthy());
+    }
+
+    it('never shows or continues a job of another domain opened from the URL, in any status', async () => {
+      for (const status of ['ready', 'processing']) {
+        window.history.replaceState({}, '', '/suppliers/import?job=job-7');
+        api.mockReset();
+        api.mockImplementation((path: string) => {
+          if (path === '/import-jobs/job-7') return Promise.resolve({ data: jobFixture({ id: 'job-7', domain: 'product_taxonomy', status, preview_bound: true }) });
+          return Promise.resolve({ data: [] });
+        });
+        const { unmount } = render(<PartnerImportWizard type="supplier" />);
+
+        await waitFor(() => expect(screen.getByText('resumed_wrong_domain')).toBeTruthy());
+        expect(screen.queryByRole('button', { name: 'apply' })).toBeNull();
+        expect(screen.queryByRole('button', { name: 'continue_apply' })).toBeNull();
+        expect(api.mock.calls.some((call) => String(call[0]).endsWith('/apply'))).toBe(false);
+        unmount();
+      }
+    });
+
+    it('refuses an unbound job but lets a repair child inherit its frozen options on resume', async () => {
+      window.history.replaceState({}, '', '/suppliers/import?job=job-8');
+      api.mockImplementation((path: string) => {
+        if (path === '/import-jobs/job-8') return Promise.resolve({ data: jobFixture({ id: 'job-8', status: 'ready', preview_bound: false }) });
+        return Promise.resolve({ data: [] });
+      });
+      const unbound = render(<PartnerImportWizard type="supplier" />);
+      await waitFor(() => expect(screen.getByText('resumed_unbound')).toBeTruthy());
+      expect((screen.getByRole('button', { name: 'apply' }) as HTMLButtonElement).disabled).toBe(true);
+      unbound.unmount();
+
+      for (const status of ['ready', 'processing']) {
+        window.history.replaceState({}, '', '/suppliers/import?job=job-r');
+        api.mockReset();
+        api.mockImplementation((path: string) => {
+          if (path === '/import-jobs/job-r') return Promise.resolve({ data: jobFixture({ id: 'job-r', status, preview_bound: false, parent_job_id: 'job-0' }) });
+          return Promise.resolve({ data: [] });
+        });
+        const { unmount } = render(<PartnerImportWizard type="supplier" />);
+        await waitFor(() => expect(screen.getByRole('button', { name: status === 'ready' ? 'apply' : 'continue_apply' })).toBeTruthy());
+        expect(screen.queryByText('resumed_unbound')).toBeNull();
+        unmount();
+      }
+    });
+
+    it('shows a job-creation failure and returns to the preview instead of an empty page', async () => {
+      const { ApiError } = await import('@/lib/api');
+      const user = userEvent.setup();
+      await previewReady(user);
+
+      api.mockImplementation((path: string, options?: { method?: string }) => {
+        if (path === '/import-jobs' && options?.method === 'POST') return Promise.reject(new ApiError(422, 'المعاينة منتهية', null));
+        return Promise.resolve({ data: {} });
+      });
+      await user.click(screen.getByRole('button', { name: 'apply' }));
+
+      await waitFor(() => expect(screen.getAllByRole('alert').map((node) => node.textContent).join(' ')).toContain('المعاينة منتهية'));
+      expect(screen.getByRole('button', { name: 'apply' })).toBeTruthy();
+    });
+
+    it('disables Apply once the job from this preview has ended, and explains a failure after earlier chunks applied rows', async () => {
+      const user = userEvent.setup();
+      await previewReady(user);
+
+      api.mockImplementation((path: string, options?: { method?: string }) => {
+        if (path === '/import-jobs' && options?.method === 'POST') return Promise.resolve({ data: jobFixture() });
+        if (path.startsWith('/import-jobs/job-1')) return Promise.resolve({ data: jobFixture({ status: 'failed', processed_rows: 3, error_message: 'تعذّر' }) });
+        return Promise.resolve({ data: {} });
+      });
+      await user.click(screen.getByRole('button', { name: 'apply' }));
+      await waitFor(() => expect(screen.getByText('partial_failure_note:3')).toBeTruthy());
+      expect(screen.getByRole('button', { name: 'start_another' })).toBeTruthy();
+
+      await user.click(screen.getByRole('button', { name: 'step_preview' }));
+      expect((screen.getByRole('button', { name: 'apply' }) as HTMLButtonElement).disabled).toBe(true);
+      expect(screen.getByText('preview_used')).toBeTruthy();
+    });
+
+    it('drops a stale job when a rule changes, so the next apply creates a new job with the new rule', async () => {
+      const { ApiError } = await import('@/lib/api');
+      const user = userEvent.setup();
+      await previewReady(user);
+
+      let creates = 0;
+      api.mockImplementation((path: string, options?: { method?: string }) => {
+        if (path === '/partners/import/preview') return Promise.resolve({ data: cleanPreview });
+        if (path === '/import-jobs' && options?.method === 'POST') { creates += 1; return Promise.resolve({ data: jobFixture({ id: `job-${creates}` }) }); }
+        if (path.startsWith('/import-jobs/job-')) return Promise.reject(new ApiError(500, 'تعذّر', null));
+        return Promise.resolve({ data: {} });
+      });
+      await user.click(screen.getByRole('button', { name: 'apply' }));
+      await waitFor(() => expect(creates).toBe(1));
+
+      await user.click(screen.getByRole('button', { name: 'step_setup' }));
+      await user.selectOptions(screen.getByLabelText('mode'), 'upsert');
+      await user.click(screen.getByRole('button', { name: 'run_preview' }));
+      await waitFor(() => expect(screen.getByRole('button', { name: 'apply' })).toBeTruthy());
+      await user.click(screen.getByRole('button', { name: 'apply' }));
+
+      await waitFor(() => expect(creates).toBe(2));
+      const second = api.mock.calls.filter((call) => call[0] === '/import-jobs' && call[1]?.method === 'POST').at(-1)?.[1]?.body as FormData;
+      expect(second.get('options[mode]')).toBe('upsert');
+    });
+
+    it('does not let the stepper jump to a preview that does not exist, and shows the cumulative total on the result', async () => {
+      window.history.replaceState({}, '', '/suppliers/import?job=job-9');
+      api.mockImplementation((path: string) => {
+        if (path === '/import-jobs/job-9') return Promise.resolve({ data: jobFixture({ id: 'job-9', status: 'failed', processed_rows: 1, error_message: 'تعذّر' }) });
+        return Promise.resolve({ data: [] });
+      });
+      const user = userEvent.setup();
+      const failed = render(<PartnerImportWizard type="supplier" />);
+      await waitFor(() => expect(screen.getByRole('button', { name: 'start_another' })).toBeTruthy());
+      await user.click(screen.getByRole('button', { name: 'step_preview' }));
+      expect(screen.queryByRole('button', { name: 'apply' })).toBeNull();
+      expect(screen.getByRole('button', { name: 'start_another' })).toBeTruthy();   // بقيت شاشة التنفيذ؛ لا بطاقة فارغة
+      failed.unmount();
+
+      window.history.replaceState({}, '', '/suppliers/import?job=job-10');
+      api.mockImplementation((path: string) => {
+        if (path === '/import-jobs/job-10') return Promise.resolve({ data: jobFixture({ id: 'job-10', status: 'completed', processed_rows: 250, apply_result: { created: 50, updated: 0, skipped: 0 } }) });
+        return Promise.resolve({ data: [] });
+      });
+      render(<PartnerImportWizard type="supplier" />);
+      await waitFor(() => expect(screen.getByText('result_processed')).toBeTruthy());
+      expect(screen.getByText('result_processed').parentElement?.textContent).toContain('250');
+    });
+  });
 });

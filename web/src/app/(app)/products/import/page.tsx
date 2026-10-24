@@ -43,7 +43,7 @@ import {
 } from '@/modules/products/import/contract';
 import { ImportJobStatusPanel } from '@/modules/import-jobs/ImportJobStatusPanel';
 import { ImportRepairPanel } from '@/modules/import-jobs/ImportRepairPanel';
-import { downloadImportFailures } from '@/modules/import-jobs/client';
+import { downloadImportFailures, hasFrozenOptions } from '@/modules/import-jobs/client';
 import { useImportJobEngine, useImportJobUrlParam, useResumeFromUrl } from '@/modules/import-jobs/useImportJobEngine';
 import type { ApplyOptions } from '@/modules/import-jobs/client';
 import { cn } from '@/lib/utils';
@@ -215,10 +215,10 @@ export default function ProductImportPage() {
       );
       if (!job) return;
       // تشغيلةٌ مربوطةٌ بمعاينة تنفّذ خياراتها المجمَّدة عند الإنشاء: لا نرسل خيارات دلالية (الواجهة المستأنَفة لا تملك الأصلية).
-      await engine.applyLoop(job.id, job.preview_bound ? {} : applyOptionsPayload());
+      await engine.applyLoop(job.id, hasFrozenOptions(job) ? {} : applyOptionsPayload());
       return;
     }
-    await engine.applyLoop(engine.job.id, engine.job.preview_bound ? {} : applyOptionsPayload());
+    await engine.applyLoop(engine.job.id, hasFrozenOptions(engine.job) ? {} : applyOptionsPayload());
   }
 
   // IMP-H1-S8c: تشغيلةٌ فاشلة لها وحداتٌ قابلة للإصلاح ⇒ ملفٌّ مصحَّح يُنشئ تشغيلة فرعية ثم يُرحَّل كأي تشغيلة (الخادم يطالب بالوحدات).

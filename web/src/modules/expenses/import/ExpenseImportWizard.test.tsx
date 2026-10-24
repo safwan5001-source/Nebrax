@@ -386,4 +386,38 @@ describe('ExpenseImportWizard (IMP-H5-S2b)', () => {
     expect(screen.getByText('step_apply', { selector: '[class*="font"]' })).toBeTruthy();
     release({ data: jobFixture({ status: 'completed', processed_rows: 2, apply_result: { created: 2 } }) });
   });
+
+  it('never shows or continues a job of another domain opened from the URL, in any status (IMP-WIZARD-STATE-01b)', async () => {
+    for (const status of ['ready', 'processing']) {
+      window.history.replaceState({}, '', '/expenses/import?job=job-x');
+      api.mockReset();
+      api.mockImplementation((path: string) => {
+        if (path === '/import-jobs/job-x') return Promise.resolve({ data: jobFixture({ id: 'job-x', domain: 'partner_master', status, preview_bound: true }) });
+        return Promise.resolve({ data: [] });
+      });
+      const { unmount } = render(<ExpenseImportWizard />);
+
+      await waitFor(() => expect(screen.getByText('resumed_wrong_domain')).toBeTruthy());
+      expect(screen.queryByRole('button', { name: 'apply' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'continue_apply' })).toBeNull();
+      expect(api.mock.calls.some((call) => String(call[0]).endsWith('/apply'))).toBe(false);
+      unmount();
+    }
+  });
+
+  it('lets a repair child inherit its frozen options on resume: Apply and Continue stay available without a preview binding (IMP-WIZARD-STATE-01b)', async () => {
+    for (const status of ['ready', 'processing']) {
+      window.history.replaceState({}, '', '/expenses/import?job=job-r');
+      api.mockReset();
+      api.mockImplementation((path: string) => {
+        if (path === '/import-jobs/job-r') return Promise.resolve({ data: jobFixture({ id: 'job-r', status, preview_bound: false, parent_job_id: 'job-0' }) });
+        return Promise.resolve({ data: [] });
+      });
+      const { unmount } = render(<ExpenseImportWizard />);
+
+      await waitFor(() => expect(screen.getByRole('button', { name: status === 'ready' ? 'apply' : 'continue_apply' })).toBeTruthy());
+      expect(screen.queryByText('resumed_unbound')).toBeNull();
+      unmount();
+    }
+  });
 });

@@ -39,7 +39,7 @@ import {
 } from '@/modules/products/workbook/contract';
 import { ImportJobStatusPanel } from '@/modules/import-jobs/ImportJobStatusPanel';
 import { useImportJobEngine, useImportJobUrlParam, useResumeFromUrl } from '@/modules/import-jobs/useImportJobEngine';
-import type { ApplyOptions } from '@/modules/import-jobs/client';
+import { hasFrozenOptions, type ApplyOptions } from '@/modules/import-jobs/client';
 
 interface PriceListOption {
   id: string;
@@ -252,10 +252,10 @@ export default function ProductWorkbookImportPage() {
       );
       if (!job) return;
       // تشغيلةٌ مربوطةٌ بمعاينة تنفّذ خياراتها المجمَّدة عند الإنشاء: لا نرسل خيارات دلالية (الواجهة المستأنَفة لا تملك الأصلية).
-      await engine.applyLoop(job.id, job.preview_bound ? {} : applyOptionsPayload());
+      await engine.applyLoop(job.id, hasFrozenOptions(job) ? {} : applyOptionsPayload());
       return;
     }
-    await engine.applyLoop(engine.job.id, engine.job.preview_bound ? {} : applyOptionsPayload());
+    await engine.applyLoop(engine.job.id, hasFrozenOptions(engine.job) ? {} : applyOptionsPayload());
   }
 
   useEffect(() => {

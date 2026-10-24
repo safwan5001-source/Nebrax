@@ -105,6 +105,14 @@ function appendOptions(form: FormData, options: ApplyOptions) {
   }
 }
 
+/**
+ * خياراتها مجمَّدة منذ الإنشاء: مربوطةٌ بمعاينة، أو تشغيلة إصلاح فرعية ترث خيارات أمّها. تنفيذ مثل هذه التشغيلة لا يحمل خياراتٍ دلالية (`{}`)؛ وإرسال خيارات
+ * الصفحة الحالية لها يُرفض أو يُقرأ خطأً، وتشغيلةٌ لا تنطبق عليها لا تُستأنف من رابط (IMP-WIZARD-STATE-01).
+ */
+export function hasFrozenOptions(job: { preview_bound?: boolean; parent_job_id?: string | null }): boolean {
+  return Boolean(job.preview_bound) || Boolean(job.parent_job_id);
+}
+
 export async function createImportJob(
   domain: ImportJobDomain,
   file: File,

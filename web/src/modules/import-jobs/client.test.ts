@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const { api, downloadFile } = vi.hoisted(() => ({ api: vi.fn(), downloadFile: vi.fn() }));
 vi.mock('@/lib/api', () => ({ api, downloadFile, ApiError: class ApiError extends Error {} }));
 
-import { applyImportJobChunk, createImportJob, createRepairJob, downloadImportFailures } from './client';
+import { applyImportJobChunk, createImportJob, createRepairJob, downloadImportFailures, hasFrozenOptions } from './client';
 
 function sentForm(): FormData {
   const call = api.mock.calls.at(-1);
@@ -105,5 +105,14 @@ describe('repair client (IMP-H1-S8b/c)', () => {
     await downloadImportFailures('job-9');
 
     expect(downloadFile).toHaveBeenCalledWith('/import-jobs/job-9/failures?format=xlsx', 'failures.xlsx');
+  });
+});
+
+describe('hasFrozenOptions (IMP-WIZARD-STATE-01b)', () => {
+  it('treats a preview-bound job and a repair child as frozen, and a plain legacy job as not', () => {
+    expect(hasFrozenOptions({ preview_bound: true })).toBe(true);
+    expect(hasFrozenOptions({ preview_bound: false, parent_job_id: 'job-0' })).toBe(true);
+    expect(hasFrozenOptions({ preview_bound: false, parent_job_id: null })).toBe(false);
+    expect(hasFrozenOptions({})).toBe(false);
   });
 });
