@@ -19,6 +19,9 @@ class RotatePaymentGatewayCredentialsRequest extends FormRequest
             'webhook_secret' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'extra_credentials' => ['sometimes', 'nullable', 'array', 'max:20'],
             'grace_minutes' => ['sometimes', 'integer', 'min:0', 'max:10080'],
+            // تدوير طارئ (R-42): يتجاوز حظر المحاولات القابلة للمطابقة؛ مغلق افتراضياً ولمالك المؤسسة وحده والاتصال موقوف.
+            'emergency' => ['sometimes', 'boolean'],
+            'reason' => ['required_if_accepted:emergency', 'nullable', 'string', 'max:500'],
         ];
     }
 }

@@ -142,7 +142,7 @@ final class PaymentGatewayService
      *
      * @param array<string, mixed> $input
      */
-    public function rotateCredentials(PaymentGateway $gateway, array $input, int $graceMinutes = 60, ?User $actor = null): PaymentGateway
+    public function rotateCredentials(PaymentGateway $gateway, array $input, int $graceMinutes = 60, ?User $actor = null, bool $emergency = false, ?string $emergencyReason = null): PaymentGateway
     {
         $tenantId = $this->requireTenant();
         $this->assertSameTenant($tenantId, $gateway);
@@ -155,11 +155,28 @@ final class PaymentGatewayService
             throw new PaymentGatewayException('gateway.invalid_grace', 'مدة السماح بين 0 و10080 دقيقة.');
         }
 
-        return DB::transaction(function () use ($gateway, $credentialInput, $graceMinutes, $actor): PaymentGateway {
+        $emergencyReason = $emergency ? $this->nullableString($emergencyReason) : null;
+        if ($emergency) {
+            if (! (bool) config('payments.emergency_rotation.enabled')) {
+                throw new PaymentGatewayException('gateway.emergency_rotation_disabled', 'التدوير الطارئ غير مفعّل لهذه البيئة؛ يفعّله التشغيل بعد التحقق من أن مفاتيح المزوّد على مستوى الحساب (EXT-01).');
+            }
+            if ($actor === null || $actor->role !== 'owner') {
+                throw new PaymentGatewayException('gateway.emergency_rotation_forbidden', 'التدوير الطارئ لمالك المؤسسة وحده.');
+            }
+            if ($emergencyReason === null || mb_strlen($emergencyReason) < 10) {
+                throw new PaymentGatewayException('gateway.reason_required', 'سبب التدوير الطارئ إلزامي (١٠ أحرف على الأقل).');
+            }
+        }
+
+        return DB::transaction(function () use ($gateway, $credentialInput, $graceMinutes, $actor, $emergency, $emergencyReason): PaymentGateway {
             $locked = $this->lock($gateway);
             $this->assertNotRevoked($locked);
+            if ($emergency && $locked->status !== PaymentGateway::STATUS_SUSPENDED) {
+                // الإيقاف المسبق شرط: لا محاولات جديدة بالمفتاح المسرَّب أثناء الاستبدال.
+                throw new PaymentGatewayException('gateway.emergency_requires_suspension', 'أوقف الاتصال مؤقتاً (suspend) قبل التدوير الطارئ.');
+            }
 
-            if ($this->applyCredentials($locked, $credentialInput, $graceMinutes, $actor) === []) {
+            if ($this->applyCredentials($locked, $credentialInput, $graceMinutes, $actor, $emergencyReason) === []) {
                 throw new PaymentGatewayException('gateway.nothing_to_rotate', 'القيم المرسلة مطابقة للمحفوظة؛ لا شيء للتدوير.');
             }
 
@@ -446,7 +463,7 @@ final class PaymentGatewayService
      * @param  array<string, mixed>  $input
      * @return list<string>
      */
-    private function applyCredentials(PaymentGateway $gateway, array $input, int $graceMinutes, ?User $actor): array
+    private function applyCredentials(PaymentGateway $gateway, array $input, int $graceMinutes, ?User $actor, ?string $emergencyReason = null): array
     {
         $rotated = [];
 
@@ -459,6 +476,7 @@ final class PaymentGatewayService
         if ((array_key_exists('secret_key', $input) || array_key_exists('extra_credentials', $input))
             && ($this->nullableString($input['secret_key'] ?? $gateway->secret_key) !== $gateway->secret_key
                 || (array_key_exists('extra_credentials', $input) && $this->normalizeExtra($input['extra_credentials']) !== $gateway->extra_credentials))
+            && $emergencyReason === null
             && $gateway->hasReconcilableAttempts()) {
             throw new PaymentGatewayException(
                 'gateway.rotation_blocked',
@@ -507,7 +525,8 @@ final class PaymentGatewayService
         }
         $gateway->save();
 
-        $this->record($gateway, 'credentials_rotated', $gateway->status, $gateway->status, $actor, null, $rotated);
+        // الطارئ: المفتاح السابق (المسرَّب) **لا يُحتفظ به** ولا يُقرأ به؛ المحاولات القائمة تُطابَق بالمفتاح الجديد (مفاتيح الحساب على مستوى المزوّد).
+        $this->record($gateway, $emergencyReason === null ? 'credentials_rotated' : 'credentials_emergency_rotated', $gateway->status, $gateway->status, $actor, $emergencyReason, $rotated);
 
         return $rotated;
     }
