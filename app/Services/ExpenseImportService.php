@@ -235,6 +235,11 @@ class ExpenseImportService
      */
     public function options(array $options): array
     {
+        foreach (['reference_policy', 'default_account_id', 'default_payment_method', 'occurrence_scope'] as $scalar) {
+            if (isset($options[$scalar]) && ! is_scalar($options[$scalar])) {
+                throw new RuntimeException('خيار استيراد المصروفات غير صالح.');
+            }
+        }
         $reference = (string) ($options['reference_policy'] ?? self::REFERENCE_OPTIONAL);
         if (! in_array($reference, [self::REFERENCE_OPTIONAL, self::REFERENCE_REQUIRED], true)) {
             throw new RuntimeException('سياسة رقم المرجع غير صالحة.');

@@ -36,6 +36,8 @@ final class ImportJobDomain
         self::UNIT_TEMPLATES => ['view' => 'products.view', 'manage' => 'products.manage', 'app' => null],
         // IMP-H7-S1b: `stocktakes/{id}/count` المباشرة محروسة بـ`products.manage` + `inventory.core` (routes/api.php) — البوابات نفسها لا أضعف.
         self::STOCKTAKE_COUNT => ['view' => 'products.view', 'manage' => 'products.manage', 'app' => 'inventory.core'],
+        // IMP-H5-S2: `POST expenses` المباشرة محروسة بـ`expenses.manage` + `finance.operations` (القراءة `expenses.view`) — البوابات نفسها لا أضعف.
+        self::EXPENSE_IMPORT => ['view' => 'expenses.view', 'manage' => 'expenses.manage', 'app' => 'finance.operations'],
     ];
 
     public const PRODUCT_CATALOG = 'product_catalog';
@@ -59,6 +61,9 @@ final class ImportJobDomain
     /** أعداد ورقة جردٍ مفتوح (IMP-H7-S1b) — وحدته الورقة كلها ذرّياً؛ الجرد المستهدف خيارٌ مجمَّد، والترحيل فعلٌ منفصل لا يمرّ من هنا. */
     public const STOCKTAKE_COUNT = 'stocktake_count';
 
+    /** مسودات مصروفات (IMP-H5-S2): صفٌّ = مسودة، بلا ترحيل ولا قيد؛ منع التكرار بحجز الهوية، وتكرارٌ مؤكَّد صريح فقط يُستثنى. */
+    public const EXPENSE_IMPORT = 'expense_import';
+
     /** @return list<string> */
     /**
      * مجالات لا تُنشأ لها تشغيلة إلا مربوطةً بمعاينتها: خياراتها الدلالية الإلزامية (النوع/التصنيف·العلامة/قائمة السعر) وسياساتها تُجمَّد من المعاينة،
@@ -67,7 +72,7 @@ final class ImportJobDomain
      *
      * @var list<string>
      */
-    public const PREVIEW_BOUND_ONLY = [self::PARTNER_MASTER, self::PRODUCT_TAXONOMY, self::PRICE_LIST_ITEMS, self::UNIT_TEMPLATES, self::STOCKTAKE_COUNT];
+    public const PREVIEW_BOUND_ONLY = [self::PARTNER_MASTER, self::PRODUCT_TAXONOMY, self::PRICE_LIST_ITEMS, self::UNIT_TEMPLATES, self::STOCKTAKE_COUNT, self::EXPENSE_IMPORT];
 
     public static function values(): array
     {
@@ -80,6 +85,7 @@ final class ImportJobDomain
             self::PRICE_LIST_ITEMS,
             self::UNIT_TEMPLATES,
             self::STOCKTAKE_COUNT,
+            self::EXPENSE_IMPORT,
         ];
     }
 
