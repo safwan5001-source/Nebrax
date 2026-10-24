@@ -10,6 +10,7 @@ use App\Models\PaymentAttempt;
 use App\Models\PaymentGateway;
 use App\Support\InvalidPaymentWebhookException;
 use App\Support\PaymentAttemptContext;
+use App\Support\OnlinePaymentMethodCatalog;
 use App\Support\PaymentGatewayCapabilities;
 use App\Support\PaymentGatewayException;
 use App\Support\PaymentHostedCheckout;
@@ -59,7 +60,13 @@ final class MoyasarAdapter implements GatewayAdapter, RedactsStoredWebhookBody, 
     public function capabilities(): PaymentGatewayCapabilities
     {
         // `refunds`: مدعوم بالعقد وFixtures؛ استرداد Sandbox الحقيقي PENDING(EXT-01) فلا يُفعَّل مسار مستخدم قبل شريحته وضابطه.
-        return new PaymentGatewayCapabilities(true, ['SAR'], self::MIN_AMOUNT_MINOR, true);
+        // الوسائل: ما توثّقه وثائق Moyasar كمصادر دفع (بطاقات mada/Visa/Mastercard وApple Pay). Apple Pay يحتاج تسجيل النطاق لدى المزوّد (EXT-10) فلا يُعدّ جاهزاً.
+        // ما تعرضه صفحة الفاتورة المستضافة فعلاً يُضبط في لوحة Moyasar، والتحقق في Sandbox PENDING(EXT-01).
+        return new PaymentGatewayCapabilities(
+            true, ['SAR'], self::MIN_AMOUNT_MINOR, true,
+            [OnlinePaymentMethodCatalog::MADA, OnlinePaymentMethodCatalog::VISA, OnlinePaymentMethodCatalog::MASTERCARD, OnlinePaymentMethodCatalog::APPLE_PAY],
+            [OnlinePaymentMethodCatalog::APPLE_PAY],
+        );
     }
 
     public function createCheckout(PaymentAttemptContext $context): PaymentHostedCheckout

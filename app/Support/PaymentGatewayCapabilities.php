@@ -15,7 +15,25 @@ final class PaymentGatewayCapabilities
         public readonly int $minAmountMinor = 1,
         /** يدعم المحوّل استرداد دفعة ملتقَطة (`RefundsPayments`). الافتراضي لا: لا قدرة تُعلَن بلا تنفيذ (PAY-H3-01a). */
         public readonly bool $refunds = false,
+        /**
+         * وسائل الدفع الإلكتروني (`OnlinePaymentMethodCatalog`) التي **توثّق** وثائق المزوّد دعمها لحسابه. لا يعني أن صفحة الدفع المستضافة تقبلها: ذلك يُضبط في لوحة المزوّد
+         * (واجهة الفواتير لدى Moyasar بلا معامل لتقييد الوسائل) ويُتحقق منه في Sandbox. الافتراضي لا شيء: لا قدرة تُعلَن بلا توثيق.
+         *
+         * @var list<string>
+         */
+        public readonly array $methods = [],
+        /**
+         * جزء من `methods` يحتاج إعداداً لدى المزوّد لا يستطيع أَوْج التحقق منه (مثل تسجيل نطاق Apple Pay، EXT-10) فلا يُعدّ جاهزاً تلقائياً.
+         *
+         * @var list<string>
+         */
+        public readonly array $methodsRequiringProviderSetup = [],
     ) {}
+
+    public function supportsMethod(string $method): bool
+    {
+        return in_array($method, $this->methods, true);
+    }
 
     public function supportsAmount(int $amountMinor): bool
     {

@@ -41,12 +41,37 @@ class PaymentGatewayResource extends JsonResource
                 ? $this->previous_secret_expires_at->toISOString()
                 : null,
             'capabilities' => $this->capabilities,
+            'provider_capabilities' => $this->providerCapabilities(),
             'verified_at' => $this->verified_at?->toISOString(),
             'activated_at' => $this->activated_at?->toISOString(),
             'deactivated_at' => $this->deactivated_at?->toISOString(),
             'webhook_key' => $this->when($canManage, $this->webhook_key),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
+        ];
+    }
+
+    /**
+     * ما يعلنه **محوّل المزوّد** في الكود (لا ما يعلنه التاجر): الدفع المستضاف، الاسترداد، العملات، أدنى مبلغ، ووسائل الدفع الموثَّقة وما يحتاج منها إعداداً لدى المزوّد.
+     * `null` إن لم يكن للمزوّد محوّل مفعَّل في هذه البيئة (العرض «غير متاح»).
+     *
+     * @return array<string, mixed>|null
+     */
+    private function providerCapabilities(): ?array
+    {
+        $registry = app(\App\Services\PaymentGatewayAdapterRegistry::class);
+        if (! $registry->has((string) $this->provider)) {
+            return null;
+        }
+        $caps = $registry->for((string) $this->provider)->capabilities();
+
+        return [
+            'hosted_checkout' => $caps->hostedCheckout,
+            'refunds' => $caps->refunds,
+            'currencies' => $caps->currencies,
+            'min_amount_minor' => $caps->minAmountMinor,
+            'methods' => $caps->methods,
+            'methods_requiring_provider_setup' => $caps->methodsRequiringProviderSetup,
         ];
     }
 }
