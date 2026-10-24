@@ -8,7 +8,7 @@ import { api } from '@/lib/api';
 import { formatPayAmount } from '@/lib/pay-link';
 import { formatSigned } from '@/modules/payment-settlements/format';
 import { bucketRanges, bucketTone, buildAgingQuery, type AgingReport, type BranchOption } from './contract';
-import { REPORT_CURRENCY, ReportShell } from './ReportShell';
+import { ReportShell } from './ReportShell';
 import { useReport } from './useReport';
 
 /**
@@ -28,7 +28,9 @@ export function AgingView() {
   }, []);
 
   const toggle = (id: string) => setSelected((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
-  const money = (minor: number) => <bdi dir="ltr">{formatPayAmount(minor, REPORT_CURRENCY)}</bdi>;
+  const currency = data?.currency ?? 'SAR';
+  const money = (minor: number) => <bdi dir="ltr">{formatPayAmount(minor, currency)}</bdi>;
+  const signed = (minor: number) => <bdi dir="ltr">{formatSigned(minor, currency)}</bdi>;
 
   return (
     <div className="space-y-4">
@@ -50,7 +52,7 @@ export function AgingView() {
         {data && (data.rows.length === 0 ? (
           <EmptyState title={t('aging_empty')} />
         ) : (
-          <AgingTable data={data} money={money} />
+          <AgingTable data={data} money={money} signed={signed} />
         ))}
       </ReportShell>
     </div>
@@ -59,7 +61,7 @@ export function AgingView() {
 
 type Side = { total: number; buckets: number[] };
 
-function AgingTable({ data, money }: { data: AgingReport; money: (minor: number) => React.ReactNode }) {
+function AgingTable({ data, money, signed }: { data: AgingReport; money: (minor: number) => React.ReactNode; signed: (minor: number) => React.ReactNode }) {
   const t = useTranslations('paymentReports');
   const ranges = bucketRanges(data.bucket_days);
   const last = ranges.length - 1;
@@ -92,14 +94,14 @@ function AgingTable({ data, money }: { data: AgingReport; money: (minor: number)
             {data.rows.map((row) => (
               <tr key={row.branch_id ?? 'unassigned'} className="border-t border-border">
                 <td className="p-1.5 font-medium">{row.branch_name ?? (row.branch_id === null ? t('branch_unassigned') : '—')}</td>
-                {sections.flatMap((s) => cells(row[s.key] as Side, s.key, ranges.length, last, money))}
+                {sections.flatMap((s) => cells(row[s.key] as Side, s.key, ranges.length, last, money, signed))}
               </tr>
             ))}
           </tbody>
           <tfoot>
             <tr className="border-t-2 border-border font-semibold" data-testid="aging-totals">
               <td className="p-1.5">{t('totals_row')}</td>
-              {sections.flatMap((s) => cells(data.totals[s.key], s.key, ranges.length, last, money))}
+              {sections.flatMap((s) => cells(data.totals[s.key], s.key, ranges.length, last, money, signed))}
             </tr>
           </tfoot>
         </table>
@@ -108,8 +110,8 @@ function AgingTable({ data, money }: { data: AgingReport; money: (minor: number)
   );
 }
 
-function cells(side: Side, key: string, count: number, last: number, money: (minor: number) => React.ReactNode) {
-  const show = (minor: number) => (key === 'net' ? <bdi dir="ltr">{formatSigned(minor, REPORT_CURRENCY)}</bdi> : money(minor));
+function cells(side: Side, key: string, count: number, last: number, money: (minor: number) => React.ReactNode, signed: (minor: number) => React.ReactNode) {
+  const show = (minor: number) => (key === 'net' ? signed(minor) : money(minor));
   return [
     ...Array.from({ length: count }, (_, i) => {
       const value = side.buckets[i];

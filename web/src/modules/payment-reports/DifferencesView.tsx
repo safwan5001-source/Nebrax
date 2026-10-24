@@ -12,7 +12,7 @@ import { formatSigned } from '@/modules/payment-settlements/format';
 import { useGateways } from '@/modules/payment-settlements/useGateways';
 import { gatewayDisplayName } from '@/modules/payments/gateways/contract';
 import { buildDifferencesQuery, signedTone, type DifferenceRow, type DifferencesReport } from './contract';
-import { REPORT_CURRENCY, ReportShell, Stat } from './ReportShell';
+import { ReportShell, Stat } from './ReportShell';
 import { useReport } from './useReport';
 
 /**
@@ -54,9 +54,9 @@ export function DifferencesView() {
           <div className="space-y-4">
             <dl className="grid grid-cols-2 gap-3 sm:grid-cols-5">
               <Stat label={t('diff_count')}>{data.totals.count}</Stat>
-              <Stat label={t('diff_net')}><bdi dir="ltr">{formatSigned(data.totals.net_minor, REPORT_CURRENCY)}</bdi></Stat>
-              <Stat label={t('diff_positive')}><bdi dir="ltr">{formatSigned(data.totals.positive_minor, REPORT_CURRENCY)}</bdi></Stat>
-              <Stat label={t('diff_negative')}><bdi dir="ltr">{formatSigned(data.totals.negative_minor, REPORT_CURRENCY)}</bdi></Stat>
+              <Stat label={t('diff_net')}><bdi dir="ltr">{formatSigned(data.totals.net_minor, data.currency)}</bdi></Stat>
+              <Stat label={t('diff_positive')}><bdi dir="ltr">{formatSigned(data.totals.positive_minor, data.currency)}</bdi></Stat>
+              <Stat label={t('diff_negative')}><bdi dir="ltr">{formatSigned(data.totals.negative_minor, data.currency)}</bdi></Stat>
               <Stat label={t('diff_oldest')}>{data.totals.oldest_settlement_date ? <bdi>{data.totals.oldest_settlement_date}</bdi> : '—'}</Stat>
             </dl>
             <DataTable columns={columns} data={data.rows} loading={loading} showToolbar={false} emptyLabel={t('differences_empty')} />

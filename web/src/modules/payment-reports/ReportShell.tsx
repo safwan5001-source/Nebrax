@@ -6,9 +6,6 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/nebrax';
 import type { ReportError } from './useReport';
 
-/** عملة العرض الافتراضية: ردود التقارير المجمَّعة لا تحمل عملة (مؤسسة ذات عملة واحدة)؛ الصفوف التي تحملها تستعملها. */
-export const REPORT_CURRENCY = 'SAR';
-
 /** حالات التحميل والخطأ الموحَّدة لكل تقرير؛ `children` تُعرض فقط عند وجود بيانات. */
 export function ReportShell({ loading, error, onRetry, hasData, children }: { loading: boolean; error: ReportError | null; onRetry: () => void; hasData: boolean; children: ReactNode }) {
   const t = useTranslations('paymentReports');

@@ -10,7 +10,7 @@ const apiMock = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/api', async (orig) => ({ ...(await orig<typeof import('@/lib/api')>()), api: apiMock }));
 
 const recon = (over: Record<string, unknown> = {}) => ({
-  status: 'reconciled', mapping_state: 'mapped', ledger_balance: 95000, expected_balance: 95000, difference: 0,
+  currency: 'SAR', status: 'reconciled', mapping_state: 'mapped', ledger_balance: 95000, expected_balance: 95000, difference: 0,
   accounts: [{ account_id: 'a1', code: '1170', name: 'مستحقات بوابات الدفع', is_active: true, sources: ['current', 'system_default'], balance: 95000 }],
   documents: { captures: 115000, settled_gross: 0, refunds: 20000, deducted_refunds: 0, capture_count: 1, refund_count: 1, unsettled_captures: 115000, unsettled_refunds: 20000 },
   checks: [
@@ -23,6 +23,7 @@ const recon = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 const diffs = (over: Record<string, unknown> = {}) => ({
+  currency: 'SAR',
   rows: [
     { id: 's1', payment_gateway_id: 'g1', gateway_name: 'ميسّر', provider_settlement_ref: 'DIFF-A', settlement_date: '2026-10-13', age_days: 10, currency: 'SAR', gross_amount: 115000, net_bank_amount: 110500, unreconciled_minor: -500 },
     { id: 's2', payment_gateway_id: 'g1', gateway_name: 'ميسّر', provider_settlement_ref: 'DIFF-B', settlement_date: '2026-10-23', age_days: 0, currency: 'SAR', gross_amount: 115000, net_bank_amount: 111300, unreconciled_minor: 300 },
@@ -32,7 +33,7 @@ const diffs = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 const aging = (over: Record<string, unknown> = {}) => ({
-  as_of: '2026-10-23', bucket_days: [7, 30, 60], scope: 'company',
+  currency: 'SAR', as_of: '2026-10-23', bucket_days: [7, 30, 60], scope: 'company',
   rows: [
     { branch_id: 'b1', branch_name: 'الرئيسي', captures: { count: 2, total: 230000, buckets: [115000, 115000, 0, 0] }, refunds: { count: 1, total: 15000, buckets: [0, 0, 15000, 0] }, net: { total: 215000, buckets: [115000, 115000, -15000, 0] } },
     { branch_id: null, branch_name: null, captures: { count: 1, total: 115000, buckets: [0, 0, 0, 115000] }, refunds: { count: 0, total: 0, buckets: [0, 0, 0, 0] }, net: { total: 115000, buckets: [0, 0, 0, 115000] } },

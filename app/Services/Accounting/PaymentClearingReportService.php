@@ -12,6 +12,7 @@ use App\Models\PaymentGateway;
 use App\Models\PaymentGatewaySettlement;
 use App\Models\PaymentGatewaySettlementLine;
 use App\Models\PaymentRefund;
+use App\Models\Tenant;
 use App\Services\Reporting\ReportService;
 use App\Support\AccountingRoles;
 use App\Tenancy\BranchScope;
@@ -95,6 +96,7 @@ class PaymentClearingReportService
         $anyCheckOff = collect($checks)->contains(fn (array $c) => $c['difference'] !== 0);
 
         return [
+            'currency' => $this->currency(),
             'status' => $accounts === [] ? 'unresolved' : ($difference === 0 && ! $anyCheckOff ? 'reconciled' : 'difference'),
             'mapping_state' => $mapped ? 'mapped' : 'unmapped',
             'ledger_balance' => $ledgerBalance,
@@ -125,6 +127,7 @@ class PaymentClearingReportService
         $today = Carbon::today();
 
         return [
+            'currency' => $this->currency(),
             'rows' => $rows->take($limit)->map(fn (PaymentGatewaySettlement $s) => [
                 'id' => $s->id,
                 'payment_gateway_id' => $s->payment_gateway_id,
@@ -185,6 +188,7 @@ class PaymentClearingReportService
         $sum = fn (string $side, ?int $i = null) => (int) array_sum(array_map(fn (array $row) => $i === null ? $row[$side]['total'] : $row[$side]['buckets'][$i], $rows));
 
         return [
+            'currency' => $this->currency(),
             'as_of' => $today->toDateString(),
             'bucket_days' => self::BUCKET_DAYS,
             'rows' => $rows,
@@ -219,6 +223,12 @@ class PaymentClearingReportService
 
             return $read();
         });
+    }
+
+    /** عملة المؤسسة (تُسجَّل بها التسويات)؛ الأرقام المجمَّعة لا تحمل عملة بذاتها. */
+    private function currency(): string
+    {
+        return (string) (Tenant::query()->whereKey($this->tenantId())->value('currency') ?: 'SAR');
     }
 
     private function tenantId(): string

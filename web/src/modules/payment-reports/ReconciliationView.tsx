@@ -6,7 +6,7 @@ import { EmptyState } from '@/components/nebrax';
 import { formatPayAmount } from '@/lib/pay-link';
 import { formatSigned } from '@/modules/payment-settlements/format';
 import { differenceTone, knownAccountSource, knownCheckKey, knownNotChecked, statusTone, type ReconciliationReport } from './contract';
-import { REPORT_CURRENCY, ReportShell, Stat } from './ReportShell';
+import { ReportShell, Stat } from './ReportShell';
 import { useReport } from './useReport';
 
 /**
@@ -16,8 +16,9 @@ import { useReport } from './useReport';
 export function ReconciliationView() {
   const t = useTranslations('paymentReports');
   const { data, loading, error, reload } = useReport<ReconciliationReport>('/payment-reports/clearing-reconciliation');
-  const money = (minor: number) => <bdi dir="ltr">{formatPayAmount(minor, REPORT_CURRENCY)}</bdi>;
-  const signed = (minor: number) => <bdi dir="ltr">{formatSigned(minor, REPORT_CURRENCY)}</bdi>;
+  const currency = data?.currency ?? 'SAR';
+  const money = (minor: number) => <bdi dir="ltr">{formatPayAmount(minor, currency)}</bdi>;
+  const signed = (minor: number) => <bdi dir="ltr">{formatSigned(minor, currency)}</bdi>;
 
   return (
     <ReportShell loading={loading} error={error} onRetry={reload} hasData={data !== null}>

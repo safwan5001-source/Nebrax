@@ -24,6 +24,7 @@ export interface ReconciliationGateway { payment_gateway_id: string; gateway_nam
 export interface OtherSource { source_type: string | null; debit: number; credit: number }
 
 export interface ReconciliationReport {
+  currency: string;
   status: ReconciliationStatus;
   mapping_state: 'mapped' | 'unmapped';
   ledger_balance: number;
@@ -76,6 +77,7 @@ export interface DifferenceRow {
 }
 
 export interface DifferencesReport {
+  currency: string;
   rows: DifferenceRow[];
   has_more: boolean;
   totals: { count: number; net_minor: number; positive_minor: number; negative_minor: number; oldest_settlement_date: string | null };
@@ -102,6 +104,7 @@ export interface AgingRow {
   net: { total: number; buckets: number[] };
 }
 export interface AgingReport {
+  currency: string;
   as_of: string;
   bucket_days: number[];
   rows: AgingRow[];
