@@ -27,7 +27,7 @@ class InventoryReservation extends BaseModel implements CompanyWide
     public const STATUS_EXPIRED = 'expired';
 
     protected $fillable = [
-        'tenant_id', 'warehouse_id', 'product_id', 'base_quantity', 'status',
+        'tenant_id', 'warehouse_id', 'product_id', 'product_variant_id', 'base_quantity', 'status',
         'source_type', 'source_id', 'idempotency_key', 'request_checksum',
         'expires_at', 'released_at', 'consumed_at', 'expired_at',
     ];

@@ -182,6 +182,84 @@ class CommerceOnlinePaymentPostgresConcurrencyTest extends TestCase
         }
     }
 
+    #[Test]
+    public function the_unpaid_sweeper_racing_a_capture_never_pays_an_order_whose_hold_was_released(): void
+    {
+        app(TenantContext::class)->set($this->tenantId);
+        $product = \App\Models\Product::create(['name' => 'منتج مكنسة', 'sku' => 'SW-'.uniqid(), 'unit' => 'piece', 'sale_price' => 5000, 'is_active' => true, 'track_inventory' => true]);
+        $warehouse = \App\Models\Warehouse::create(['name' => 'مخزن مكنسة', 'code' => 'SW-'.uniqid(), 'is_default' => true]);
+
+        foreach (range(1, 4) as $round) {
+            $this->resetOrderForRound();
+            DB::table('inventory_reservations')->where('tenant_id', $this->tenantId)->delete();
+            \App\Models\InventoryReservation::create([
+                'tenant_id' => $this->tenantId, 'warehouse_id' => $warehouse->id, 'product_id' => $product->id, 'base_quantity' => 1,
+                'status' => 'active', 'source_type' => CommerceOrder::class, 'source_id' => $this->orderId,
+                'idempotency_key' => 'sweep-race-'.$round.'-'.uniqid(), 'request_checksum' => str_repeat('a', 64), 'expires_at' => now('UTC')->subMinute(),
+            ]);
+            $attempt = app(CommerceOnlinePaymentService::class)->start($this->order())['attempt'];
+            $tenant = $this->tenantId;
+
+            $capturer = function () use ($tenant, $attempt) {
+                app(TenantContext::class)->set($tenant);
+                $fresh = PaymentAttempt::query()->findOrFail($attempt->id);
+                app(PaymentOrchestrator::class)->applySnapshot($fresh, new PaymentProviderSnapshot((string) $fresh->provider_payment_id, 'captured', 5000, 'SAR', 5000));
+
+                return ['paid' => app(CommerceOnlinePaymentService::class)->completeCaptured(PaymentAttempt::query()->findOrFail($fresh->id))];
+            };
+            $sweeper = function () {
+                app()->singleton(FakePaymentGatewayAdapter::class);
+
+                return app(\App\Services\Commerce\CommerceUnpaidOrderSweeper::class)->run();
+            };
+            $results = $this->runConcurrently([$capturer, $sweeper]);
+
+            $this->assertAllOk($results);
+            $intent = DB::table('commerce_payment_intents')->where('id', $this->intentId)->first();
+            $hold = DB::table('inventory_reservations')->where('tenant_id', $this->tenantId)->first();
+            if ($intent->status === 'paid') {
+                $this->assertSame('active', $hold->status, "الجولة {$round}: مدفوع بحجز محرَّر");
+                $this->assertNull($hold->expires_at, "الجولة {$round}: الحجز المدفوع دائم");
+            } else {
+                $this->assertSame('cancelled', $intent->status, "الجولة {$round}");
+                $this->assertSame('released', $hold->status, "الجولة {$round}");
+                $row = DB::table('payment_attempts')->where('id', $attempt->id)->first();
+                $this->assertContains(PaymentAttempt::REVIEW_LATE_CAPTURE, json_decode((string) $row->review_reasons, true) ?: [], "الجولة {$round}: التقاط على نية ملغاة");
+            }
+        }
+    }
+
+    #[Test]
+    public function concurrent_resolves_for_one_phone_create_exactly_one_web_partner(): void
+    {
+        app(TenantContext::class)->set($this->tenantId);
+        $channelId = $this->order()->sales_channel_id;
+        $orderIds = [];
+        foreach (range(1, 6) as $i) {
+            $order = CommerceOrder::create(['sales_channel_id' => $channelId, 'number' => 'CORD-PR-'.uniqid().$i, 'status' => CommerceOrder::STATUS_CONFIRMED, 'total' => 5000, 'confirmed_at' => now()]);
+            DB::table('commerce_order_snapshots')->insert([
+                'id' => (string) Str::uuid(), 'tenant_id' => $this->tenantId, 'commerce_order_id' => $order->id,
+                'customer_name' => 'سالم الأحمدي', 'phone' => $i % 2 === 0 ? '0501234567' : '+966 50 123 4567',
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+            $orderIds[] = $order->id;
+        }
+        $tenant = $this->tenantId;
+        $jobs = array_map(fn (string $orderId) => function () use ($tenant, $orderId) {
+            app(TenantContext::class)->set($tenant);
+
+            return ['partner' => DB::transaction(
+                fn () => app(\App\Services\Commerce\CustomerPartnerResolver::class)->resolveForOrder(CommerceOrder::query()->findOrFail($orderId))->id
+            )];
+        }, $orderIds);
+
+        $results = $this->runConcurrently($jobs);
+
+        $this->assertAllOk($results);
+        $this->assertCount(1, array_unique(array_column(array_column($results, 'value'), 'partner')), 'كل الطلبات تتقارب على طرف واحد');
+        $this->assertSame(1, DB::table('partners')->where('tenant_id', $this->tenantId)->where('code', 'like', 'WEB-%')->count(), 'طرف ويب واحد فقط');
+    }
+
     // ───────────────────────── مساعدات ─────────────────────────
 
     private function order(): CommerceOrder
