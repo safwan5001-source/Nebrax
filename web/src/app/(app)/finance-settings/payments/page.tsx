@@ -185,6 +185,12 @@ export default function PaymentGatewaysPage() {
         <dd className="text-text">{connection.has_webhook_secret ? t('fields.saved') : t('fields.missing')}</dd>
         <dt className="text-muted">{t('fields.credentialVersion')}</dt>
         <dd className="num text-text">{connection.credential_version}</dd>
+        <dt className="text-muted">{t('fields.feeTaxPolicy')}</dt>
+        <dd className="text-text" data-testid={`pg-fee-tax-${connection.id}`}>
+          {connection.fee_tax_policy === 'input_vat'
+            ? t(connection.fee_tax_opinion_recorded ? 'fields.feeTaxInputVat' : 'fields.feeTaxInputVatNoOpinion')
+            : t('fields.feeTaxReject')}
+        </dd>
         <dt className="text-muted">{t('fields.verified')}</dt>
         <dd className="text-text">{connection.verified_at ? formatDateTime(connection.verified_at, locale) : t('fields.notVerified')}</dd>
         {connection.previous_secret_valid_until && (

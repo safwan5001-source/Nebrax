@@ -87,6 +87,20 @@ describe.each(TEST_LOCALES)('PaymentGatewaysPage (%s)', (locale) => {
     expect(api).toHaveBeenCalledTimes(1); // السجل (events) يتطلب الإدارة: لا طلب
   });
 
+  it('displays the fee-tax policy read-only: reject by default, input_vat only counts as active with the recorded opinion', async () => {
+    perms.current = ['payments.view'];
+    listReturns([
+      conn({ id: 'g1' }),
+      conn({ id: 'g2', fee_tax_policy: 'input_vat', fee_tax_opinion_recorded: false }),
+      conn({ id: 'g3', fee_tax_policy: 'input_vat', fee_tax_opinion_recorded: true }),
+    ]);
+    renderIntl(<PaymentGatewaysPage />, locale);
+
+    expect(within(await screen.findByTestId('pg-fee-tax-g1')).getByText(m.fields.feeTaxReject)).toBeTruthy();
+    expect(within(screen.getByTestId('pg-fee-tax-g2')).getByText(m.fields.feeTaxInputVatNoOpinion)).toBeTruthy();
+    expect(within(screen.getByTestId('pg-fee-tax-g3')).getByText(m.fields.feeTaxInputVat)).toBeTruthy();
+  });
+
   it('shows the empty state with an add action for a manager and without one for a viewer', async () => {
     perms.current = ['payments.view', 'payment_gateways.manage'];
     listReturns([]);

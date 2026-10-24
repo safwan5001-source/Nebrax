@@ -21,6 +21,8 @@ import { formatDateTime } from '@/lib/formatting';
 import { formatPayAmount } from '@/lib/pay-link';
 import { useCan } from '@/lib/use-can';
 import { apiErrorCode } from '@/modules/payments/gateways/contract';
+import { AdjustmentsPanel } from '@/modules/payment-settlements/AdjustmentsPanel';
+import { SettlementsPanel } from '@/modules/payment-settlements/SettlementsPanel';
 import { RefundsPanel } from '@/modules/payment-refunds/RefundsPanel';
 import { RequestRefundDialog } from '@/modules/payment-refunds/RequestRefundDialog';
 import { ResolveExternalDialog } from '@/modules/payment-refunds/ResolveExternalDialog';
@@ -47,6 +49,7 @@ export function PaymentsOnlinePage() {
   const canRequest = can(REQUEST_PERMISSION);
   const canResolveExternal = can(RESOLVE_UNKNOWN_PERMISSION);
   const tr = useTranslations('paymentRefunds');
+  const ts = useTranslations('paymentSettlements');
 
   const [tab, setTab] = useState<TabKey>('all');
   const [captureStatus, setCaptureStatus] = useState('');
@@ -59,7 +62,8 @@ export function PaymentsOnlinePage() {
   const [error, setError] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [repostFor, setRepostFor] = useState<AttemptRow | null>(null);
-  const [section, setSection] = useState<'payments' | 'refunds'>('payments');
+  const [section, setSection] = useState<'payments' | 'refunds' | 'settlements' | 'adjustments'>('payments');
+  const [settlementsKey, setSettlementsKey] = useState(0);
   const [requestFor, setRequestFor] = useState<string | null>(null);
   const [resolveFor, setResolveFor] = useState<string | null>(null);
   const [refundsKey, setRefundsKey] = useState(0);
@@ -164,14 +168,21 @@ export function PaymentsOnlinePage() {
   return (
     <div className="space-y-4">
       <PageHeader title={t('title')} description={t('description')} />
-      {canViewRefunds && (
-        <Tabs
-          tabs={[{ id: 'payments', label: tr('section_payments') }, { id: 'refunds', label: tr('section_refunds') }]}
-          value={section}
-          onChange={(id) => setSection(id as 'payments' | 'refunds')}
-        />
-      )}
-      {canViewRefunds && section === 'refunds' ? (
+      <Tabs
+        tabs={[
+          { id: 'payments', label: tr('section_payments') },
+          ...(canViewRefunds ? [{ id: 'refunds', label: tr('section_refunds') }] : []),
+          { id: 'settlements', label: ts('section_settlements') },
+          { id: 'adjustments', label: ts('section_adjustments') },
+        ]}
+        value={section}
+        onChange={(id) => setSection(id as typeof section)}
+      />
+      {section === 'settlements' ? (
+        <SettlementsPanel refreshKey={settlementsKey} onChanged={() => { setSettlementsKey((k) => k + 1); setRefundsKey((k) => k + 1); void load(); }} />
+      ) : section === 'adjustments' ? (
+        <AdjustmentsPanel refreshKey={settlementsKey} onChanged={() => setSettlementsKey((k) => k + 1)} />
+      ) : canViewRefunds && section === 'refunds' ? (
         <RefundsPanel refreshKey={refundsKey} onChanged={() => void load()} />
       ) : (
       <>
