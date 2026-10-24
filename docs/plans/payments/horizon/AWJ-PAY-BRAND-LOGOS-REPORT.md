@@ -1,26 +1,30 @@
-# AWJ Payments — الشعارات الرسمية (تقرير)
+# AWJ Payments — الشعارات (تقرير الاستكمال)
 
-**التاريخ:** 2026-10-24 · **الفرع:** `claude/awj-payments-brand-logos`
+**التاريخ:** 2026-10-24 · **الفرع:** `claude/awj-payments-brand-logos-complete`
 
-المبدأ (دون تغيير): لا يُعرض شعار إلا أصلٌ **رسمي منشور من صاحب العلامة** بمصدر موثَّق في `web/src/lib/payment-brand-registry.ts`؛ وإلا يظهر الاسم نصاً مع حالة الاتصال الصحيحة. لا إعادة رسم ولا مصادر طرف ثالث ولا قبول شروط نيابةً عن المالك.
-المكوّنان `PaymentBrandMark` / `PaymentBrandRow` هما الطريق الوحيد؛ مربوطان أصلاً بتبويبي «وسائل الدفع» و«بوابات الدفع» وتفاصيل البوابة ورابط الدفع العام — لا مكوّن جديد ولا تغيير تصميم ولا منطق مدفوعات/محاسبة.
+المبدأ: الشعار يدخل `web/src/lib/payment-brand-registry.ts` **فقط** بمصدر موثَّق + أصل الملف + حالة الحقوق + بصمة SHA-256؛ لا رسم يدوي ولا تلوين ولا تغيير نسبة. أصلٌ ثبت منعُ استعماله لا يُسجَّل (لم يُكتشف أيٌّ منها). الأصول فُحصت قبل الإدخال (لا `<script>`/`<foreignObject>`/`<image>`/`<use>`/DOCTYPE/ENTITY/مراجع خارجية/معالجات أحداث) ويحرس ذلك اختبار آلي على كل ملف في `public/payment-brands/`.
+المكوّنان `PaymentBrandMark`/`PaymentBrandRow` هما الطريق الوحيد (الإعدادات، تفاصيل البوابة، رابط الدفع العام).
 
-## الحالة لكل علامة
+## الأصول (`web/public/payment-brands/`)
 
-| العلامة | الحالة | المصدر / العائق |
-|---|---|---|
-| **Apple Pay** | ✅ أُضيف: `web/public/payment-brands/apple-pay.svg` | [Apple Pay Marketing Guidelines](https://developer.apple.com/apple-pay/marketing/) ← `Apple-Pay-Mark.zip` (تحميل مباشر بلا نموذج قبول؛ الملف `SVG/Apple_Pay_Mark_RGB_041619.svg` **حرفياً دون تعديل**، SHA-256 `66baf110…803c` يحرسه اختبار). |
-| **Moyasar** | ⛔ معلّق | [moyasar.com/press](https://moyasar.com/press) = 404، و[docs.moyasar.com](https://docs.moyasar.com) لا يوفّر حزمة شعار ولا شروط إعادة استعمال (شعار الترويسة لموقعهم فقط). **المطلوب:** طلب الحزمة والشروط عبر help.moyasar.com / قناة الشريك. |
-| **mada** | ⛔ معلّق | موقع مدى/المدفوعات السعودية (`mada.com.sa`) غير قابل للوصول من بيئة البناء (DNS)، ولم يُتحقق من صفحة تنزيل رسمية؛ النسخ المتاحة (Brands of the World / ملف PDF على نطاق ثالث) **ليست رسمية فلا تُستعمل**. **المطلوب:** الحزمة + دليل التجار من مدفوعات السعودية أو شريك التحصيل (إلزام تنظيمي لـSAMA). |
-| **Visa** | ⛔ معلّق — إجراء المالك | [Visa Brand Mark](https://globalclient.visa.com/brand-mark): لا تحميل مباشر؛ نموذج باسم نشاط ويشترط قبول Terms of Use. لا يجوز قبوله نيابةً عن المنشأة. **المطلوب:** تعبئة النموذج باسم أَوْج وإيداع SVG في `public/payment-brands/` وتسجيله. |
-| **Mastercard** | ⛔ معلّق — إجراء المالك | [Mastercard Brand Center](https://www.mastercard.com/brandcenter/en/download-artwork) أعاد 403 من البيئة، والأصول تُصرف بشروطه. **المطلوب:** التنزيل باسم أَوْج وتسجيله. |
-| **Tap وغيرها** | غير منطبق | `tap` (و`stripe`/`paytabs`/`checkout`) مفاتيح مزوّد معرَّفة لكن **بلا محوّل** (`PaymentGatewayAdapterRegistry`: Moyasar فقط) فلا بوابة مدعومة فعلياً؛ ولا أصل رسمي موثَّق (المتاح نسخ [CDNLogo](https://cdnlogo.com/logo/tap-payments_226305.html) غير رسمية). تُضاف مع محوّلها (H2-04). |
+| العلامة | الملف | المصدر | الأصل | حالة الحقوق |
+|---|---|---|---|---|
+| Apple Pay | `apple-pay.svg` (محفوظ) | [Apple Pay Marketing Guidelines](https://developer.apple.com/apple-pay/marketing/) — `Apple-Pay-Mark.zip` | حزمة رسمية | **granted** بشروط Apple المسجَّلة (بلا تعديل؛ يُعرض للعميل على جهاز يدعمه فقط) |
+| Moyasar | `moyasar.svg` + `moyasar-dark.svg` | [docs.moyasar.com/img/logo.svg](https://docs.moyasar.com/img/logo.svg) و`logo-dark.svg` | شعار منشور على موقع الناشر (نسختان رسميتان فاتحة/داكنة) | **unverified**: لا حزمة علامة ولا شروط إعادة استعمال منشورة ولا ما يمنع التعريف بالمزوّد؛ المطلوب تأكيد كتابي عبر help.moyasar.com |
+| Tap | `tap.svg` | [websiteimages.b-cdn.net/Logo_7de102aab6.svg](https://websiteimages.b-cdn.net/Logo_7de102aab6.svg) (شعار ترويسة tap.company) | شعار منشور على موقع الناشر | **unverified** (لا حزمة/شروط). لا محوّل لـTap في AWJ بعد (H2-04): يظهر فقط لاتصال `tap` قائم |
+| mada | `mada.svg` | [activemerchant/payment_icons › mada.svg](https://github.com/activemerchant/payment_icons/blob/master/app/assets/images/payment_icons/mada.svg) | نسخة مجتمعية موثوقة (Shopify) | ملف الأرتورك **MIT** ([MIT-LICENSE](https://github.com/activemerchant/payment_icons/blob/master/MIT-LICENSE)) والعلامة لصاحبها؛ **unverified** حتى نحصل على الحزمة الرسمية |
+| Visa | `visa.svg` | [… › visa.svg](https://github.com/activemerchant/payment_icons/blob/master/app/assets/images/payment_icons/visa.svg) | نسخة مجتمعية (Shopify) | كما mada (MIT للملف، **unverified** للعلامة) |
+| Mastercard | `mastercard.svg` | [… › master.svg](https://github.com/activemerchant/payment_icons/blob/master/app/assets/images/payment_icons/master.svg) | نسخة مجتمعية (Shopify) | كما mada |
 
-## قرارات AWJ
-1. **Apple Pay:** تُعرض العلامة في تبويب الإعدادات تعريفاً بالوسيلة (حالتها الفعلية «تحتاج إعداداً» ظاهرة بجانبها ومفتاحها معطّل)، وفي رابط الدفع العام **فقط** حين تكون الوسيلة مدعومة ومفعَّلة وجاهزة من الخادم **و**جهاز المتسوّق يدعمها (`ApplePaySession.canMakePayments()`) — بحسب إرشادات Apple؛ وتبقى غير جاهزة تلقائياً حتى EXT-10 (تسجيل النطاق). الشروط المنشورة مسجَّلة حرفياً في `provenance.terms`.
-2. **إظهار شعار البوابة مع اتصال غير مفعَّل:** المسار قائم (`GatewaysPanel` يستعمل `gatewayProviderBrand` بصرف النظر عن الحالة)؛ سيظهر شعار Moyasar تلقائياً حين يُسجَّل أصله، والحالة تبقى من الخادم.
-3. العلامات المعلّقة تحمل متطلباً بصيغة `BLOCKED: …` (يحرسها اختبار) وتُدرج في `pendingPaymentBrandRequirements()`.
+محاولات المصادر الرسمية (موثَّقة في التقرير السابق): موقع مدى غير قابل للوصول من البيئة؛ Visa Brand Center يشترط نموذجاً وقبول شروط باسم المنشأة؛ Mastercard Brand Center أعاد 403؛ Moyasar/Tap بلا صفحة علامة. استُبدلت بأقرب مصدر عام موثوق لا يخالف شروطاً معلنة. **عند توفر الحزمة الرسمية** تُستبدل الملفات وتُحدَّث `provenance` (الاختبار يفرض تطابق البصمة).
+
+## العرض
+- **وسائل الدفع:** شعار لكل وسيلة بجانب حالتها الفعلية (مفعّلة/معطّلة/تحتاج إعداداً/غير مدعومة) — الشعار هوية الوسيلة لا ادّعاء قبول.
+- **بوابات الدفع:** شعار المزوّد في بطاقة الاتصال **مهما كانت حالته** (اختُبر اتصال Moyasar مسودة/غير مفعَّل)، والاتصال اليدوي بلا علامة مسجَّلة بلا شعار.
+- **رابط الدفع العام:** لا تُعرض وسيلة إلا إذا أعلنها الخادم مدعومة ∧ مفعَّلة ∧ جاهزة (دون تغيير)، وApple Pay زيادةً على جهاز يدعمها.
+- **الوضع الداكن:** Moyasar بنسخته الداكنة الرسمية؛ Tap (داكن بلا نسخة داكنة) على سطح أبيض صغير بلا تلوين؛ بطاقات mada/Visa/Mastercard/Apple Pay بأسطحها الأصلية.
+- لا تغيير في منطق المدفوعات أو المحاسبة أو الخلفية.
 
 ## الاختبارات
-- vitest: السجل (8) + `PaymentBrandMark`/`PaymentBrandRow` (20 مع اللغتين)، منها بصمة الأصل الرسمي، حجب Apple Pay على جهاز غير مدعوم، وتصحيح اختبار فشل تحميل الصورة (كان يفشل على `main`).
-- Playwright (`pay-h8-02`): `payment-methods-viewer` (شعار Apple Pay محمَّل + بقية الوسائل نص + الحالة الصحيحة)، `paylink-apple-pay-device` (390/768/1280/1440 × ar/en × فاتح/داكن)، `paylink-apple-pay-unsupported-device`، `paylink-open`، `gateway-detail-sheet` — 60 اختباراً أخضر؛ فُحصت اللقطات بصرياً.
+- vitest: السجل (9) + المكوّنات (12×… بلغتين)، منها: تطابق البصمات، تسجيل كل ملف على القرص، فحص المحتوى النشط/الخارجي، حالة الحقوق، النسخة الداكنة، عدم التلوين.
+- Playwright (`pay-h8-02`): الشعارات محمَّلة فعلاً (`naturalWidth>0`) في تبويب الوسائل وقائمة البوابات (بما فيها اتصال غير مفعَّل) ورابط الدفع (بجهاز يدعم/لا يدعم Apple Pay)، على 390/768/1280/1440 × ar/en × فاتح/داكن؛ فُحصت اللقطات بصرياً.

@@ -7,27 +7,49 @@ import { renderIntl, TEST_LOCALES } from '@/test-utils/intl';
 
 afterEach(cleanup);
 
-const NAMES = { ar: { moyasar: 'ميسّر', mada: 'مدى', visa: 'فيزا' }, en: { moyasar: 'Moyasar', mada: 'mada', visa: 'Visa' } } as const;
+const NAMES = {
+  ar: { moyasar: 'ميسّر', mada: 'مدى', visa: 'فيزا', mastercard: 'ماستركارد' },
+  en: { moyasar: 'Moyasar', mada: 'mada', visa: 'Visa', mastercard: 'Mastercard' },
+} as const;
 
 describe.each(TEST_LOCALES)('PaymentBrandMark (%s)', (locale) => {
-  it('shows the brand by visible text with no image while the official asset is pending', () => {
-    const brand = paymentBrandPresentation('moyasar')!;
-    const { container } = renderIntl(<PaymentBrandMark brand={brand} />, locale);
-    expect(screen.getByText(NAMES[locale].moyasar)).toBeTruthy();
-    expect(container.querySelector('img')).toBeNull();
+  it('renders each registered logo undistorted next to the visible name (decorative image)', () => {
+    for (const key of ['moyasar', 'mada', 'visa', 'mastercard'] as const) {
+      const brand = paymentBrandPresentation(key)!;
+      const { container, unmount } = renderIntl(<PaymentBrandMark brand={brand} withIcon />, locale);
+      const img = container.querySelector('img[data-mark="logo"]') as HTMLImageElement;
+      expect(img.getAttribute('src')).toBe(brand.logo.src);
+      expect(img.getAttribute('alt')).toBe('');
+      expect(img.className).toMatch(/object-contain/);
+      expect(img.className).not.toMatch(/\bgrayscale|\binvert|\bhue-rotate|\bsepia|\brotate|\bscale-/);
+      expect(container.querySelector('[data-mark="generic"]')).toBeNull();
+      expect(screen.getAllByText(NAMES[locale][key]).length).toBeGreaterThan(0);
+      unmount();
+    }
   });
 
-  it('uses a generic card icon (never a brand lookalike) when asked and no asset exists', () => {
-    const brand = paymentBrandPresentation('moyasar')!;
-    const { container } = renderIntl(<PaymentBrandMark brand={brand} withIcon />, locale);
-    expect(container.querySelector('[data-mark="generic"]')).toBeTruthy();
-    expect(container.querySelector('img')).toBeNull();
+  it('uses the publisher dark variant for Moyasar and a light surface (no recolor) for Tap', () => {
+    const moyasar = renderIntl(<PaymentBrandMark brand={paymentBrandPresentation('moyasar')!} />, locale);
+    const light = moyasar.container.querySelector('img[data-mark="logo"]') as HTMLImageElement;
+    const dark = moyasar.container.querySelector('img[data-mark="logo-dark"]') as HTMLImageElement;
+    expect(light.getAttribute('src')).toBe('/payment-brands/moyasar.svg');
+    expect(light.className).toMatch(/dark:hidden/);
+    expect(dark.getAttribute('src')).toBe('/payment-brands/moyasar-dark.svg');
+    expect(dark.className).toMatch(/hidden/);
+    expect(dark.className).toMatch(/dark:block/);
+    moyasar.unmount();
+
+    const tap = renderIntl(<PaymentBrandMark brand={paymentBrandPresentation('tap')!} />, locale);
+    const img = tap.container.querySelector('img[data-mark="logo"]') as HTMLImageElement;
+    expect(img.getAttribute('src')).toBe('/payment-brands/tap.svg');
+    expect(img.className).toMatch(/awj-brand-on-light/);
+    expect(tap.container.querySelector('img[data-mark="logo-dark"]')).toBeNull();
   });
 
   it('renders an official logo undistorted next to the name and falls back to text if it fails to load', async () => {
     const brand: PaymentBrandPresentation = {
       ...paymentBrandPresentation('visa')!,
-      logo: { kind: 'official', src: '/payment-brands/visa.svg', width: 64, height: 20, provenance: { publisher: 'Visa', source: 'https://example.com/brand', verifiedAt: '2026-10-23' } },
+      logo: { ...paymentBrandPresentation('visa')!.logo, width: 64, height: 20 },
     };
     const { container } = renderIntl(<PaymentBrandMark brand={brand} />, locale);
     const img = container.querySelector('img')!;

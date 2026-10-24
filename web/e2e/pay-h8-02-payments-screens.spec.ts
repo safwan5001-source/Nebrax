@@ -179,7 +179,7 @@ async function setup(page: Page, w: World, opts: { locale: Locale; theme: Theme;
       w.visaEnabled = (request.postDataJSON() as { enabled: boolean }).enabled;
       return json(route, { data: onlineMethod({ key: 'visa', status: w.visaEnabled ? 'enabled' : 'disabled', enabled: w.visaEnabled, customer_visible: w.visaEnabled }) });
     }
-    if (path === '/payment-gateways' && method === 'GET') return json(route, { data: [gateway(), gateway({ id: 'g2', provider: 'custom', name: 'ربط يدوي', name_en: 'Manual', status: 'draft', is_usable: false, verified_at: null, activated_at: null, has_secret_key: false, provider_capabilities: null })] });
+    if (path === '/payment-gateways' && method === 'GET') return json(route, { data: [gateway(), gateway({ id: 'g2', provider: 'custom', name: 'ربط يدوي', name_en: 'Manual', status: 'draft', is_usable: false, verified_at: null, activated_at: null, has_secret_key: false, provider_capabilities: null }), gateway({ id: 'g3', name: 'ميسّر (تجريبي غير مفعّل)', name_en: 'Moyasar (inactive)', status: 'draft', is_usable: false, verified_at: null, activated_at: null, has_secret_key: false }), gateway({ id: 'g4', provider: 'tap', name: 'تاب', name_en: 'Tap', status: 'draft', is_usable: false, verified_at: null, activated_at: null, has_secret_key: false, provider_capabilities: null })] });
 
     if (path === '/payment-attempts' && method === 'GET') {
       if (q.get('posting_status') === 'blocked_period') return json(route, { data: [attempt({ id: 'a2', invoice: { id: 'inv2', number: 'INV-0002' }, posting_status: 'blocked_period', blocked_reason: { kind: 'period' } })], meta: meta(q.get('per_page') === '1' ? 1 : 1) });
@@ -326,6 +326,17 @@ async function a11yBasics(page: Page): Promise<string[]> {
   });
 }
 
+/** كل شعار ظاهر فعلاً حُمِّل (ملف SVG سليم) ولم يسقط إلى النص. */
+async function expectLogosLoaded(scope: Locator, expectedSrcs: string[]): Promise<void> {
+  const logos = scope.locator('img:visible');
+  await expect(logos).toHaveCount(expectedSrcs.length);
+  for (let i = 0; i < expectedSrcs.length; i += 1) {
+    const img = logos.nth(i);
+    await expect(img).toHaveAttribute('src', new RegExp(`^/payment-brands/${expectedSrcs[i]}(-dark)?\\.svg$`));
+    await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
+  }
+}
+
 /** كل رقم/مرجع داخل `<bdi dir="ltr">` يُعرض LTR فعلاً (لا يتأثر باتجاه RTL المحيط). */
 async function ltrIslands(page: Page, scope: Locator | Page = page): Promise<number> {
   const handles = await scope.locator('bdi[dir="ltr"]').locator('visible=true').elementHandles();
@@ -459,6 +470,13 @@ const SCENARIOS: Scenario[] = [
       await expect(page.getByRole('heading', { name: c.t('paymentSettings', 'title') }).first()).toBeVisible();
       await expect(shown(page, c.locale === 'ar' ? 'ميسّر' : 'Moyasar')).toBeVisible();
       await expect(shown(page, c.t('paymentGateways', 'fields.feeTaxReject'))).toBeVisible();   // سياسة ضريبة الرسوم: مرفوضة افتراضياً
+      // شعار المزوّد يظهر في بطاقة الاتصال (ميسّر) بنسخته المناسبة للثيم؛ الاتصال اليدوي بلا علامة مسجَّلة ⇒ بلا شعار
+      await expectLogosLoaded(page.getByTestId('pg-item-g1'), ['moyasar']);
+      await expect(page.getByTestId('pg-item-g1').locator('img:visible')).toHaveAttribute('src', c.theme === 'dark' ? '/payment-brands/moyasar-dark.svg' : '/payment-brands/moyasar.svg');
+      await expectLogosLoaded(page.getByTestId('pg-item-g3'), ['moyasar']);   // اتصال غير مفعَّل: الشعار يظهر وحالته الصحيحة تبقى
+      await expectLogosLoaded(page.getByTestId('pg-item-g4'), ['tap']);   // Tap: شعار الناشر؛ في الداكن على سطح أبيض بلا تلوين
+      if (c.theme === 'dark') await expect(page.getByTestId('pg-item-g4').locator('img:visible')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+      await expect(page.getByTestId('pg-item-g2').locator('img')).toHaveCount(0);
       expect(await ltrIslands(page)).toBeGreaterThanOrEqual(0);
       await tablesUsable(page);
       await keyboardReachesButton(page);
@@ -472,12 +490,14 @@ const SCENARIOS: Scenario[] = [
       await expect(page.getByRole('tab', { name: c.t('paymentSettings', 'tabMethods') })).toHaveAttribute('aria-selected', 'true');
       const list = page.getByTestId('pm-list');
       await expect(list).toBeVisible();
-      // الحالات الأربع كما حسبها الخادم، بلا شعارات غير رسمية (نص فقط) ولا قائمة اختيار بوابة وهمية
+      // الحالات الأربع كما حسبها الخادم، مع الشعار المسجَّل لكل وسيلة (محمَّل فعلاً) ولا قائمة اختيار بوابة وهمية
       await expect(page.getByTestId('pm-status-mada')).toHaveText(c.t('onlinePaymentMethods', 'status.enabled'));
       await expect(page.getByTestId('pm-status-visa')).toHaveText(c.t('onlinePaymentMethods', 'status.disabled'));
       await expect(page.getByTestId('pm-status-apple_pay')).toHaveText(c.t('onlinePaymentMethods', 'status.needs_setup'));
       await expect(page.getByTestId('pm-status-mastercard')).toHaveText(c.t('onlinePaymentMethods', 'status.unsupported'));
-      await expect(list.locator('img')).toHaveCount(0);
+      for (const [key, file] of [['mada', 'mada'], ['visa', 'visa'], ['mastercard', 'mastercard'], ['apple_pay', 'apple-pay']]) {
+        await expectLogosLoaded(page.getByTestId(`pm-item-${key}`), [file]);
+      }
       await expect(list.getByRole('combobox')).toHaveCount(0);
       await expect(page.getByTestId('pm-item-apple_pay').getByRole('switch')).toBeDisabled();
       await expect(page.getByTestId('pm-item-mastercard').getByRole('switch')).toBeDisabled();
@@ -518,14 +538,12 @@ const SCENARIOS: Scenario[] = [
         await expect(page.getByTestId(`pm-item-${key}`).getByRole('switch')).toBeDisabled();
       }
       await expect(page.getByTestId('pm-reason-visa')).toHaveText(c.t('onlinePaymentMethods', 'blocked.no_permission'));
-      // الشعارات: الأصل الرسمي الموثّق فقط (Apple Pay)؛ الباقي نصٌّ إلى أن تُستلم أصوله — وحالتها الصحيحة تبقى ظاهرة
-      const appleLogo = page.getByTestId('pm-item-apple_pay').locator('img[data-mark="logo"]');
-      await expect(appleLogo).toHaveAttribute('src', '/payment-brands/apple-pay.svg');
-      await expect.poll(() => appleLogo.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
-      await expect(page.getByTestId('pm-status-apple_pay')).toHaveText(c.t('onlinePaymentMethods', 'status.needs_setup'));
-      for (const key of ['mada', 'visa', 'mastercard']) {
-        await expect(page.getByTestId(`pm-item-${key}`).locator('img')).toHaveCount(0);
+      // الشعارات المسجَّلة تظهر لكل وسيلة مهما كانت حالتها، وحالتها الصحيحة تبقى ظاهرة بجانبها
+      for (const [key, file] of [['mada', 'mada'], ['visa', 'visa'], ['mastercard', 'mastercard'], ['apple_pay', 'apple-pay']]) {
+        await expectLogosLoaded(page.getByTestId(`pm-item-${key}`), [file]);
       }
+      await expect(page.getByTestId('pm-status-apple_pay')).toHaveText(c.t('onlinePaymentMethods', 'status.needs_setup'));
+      await expect(page.getByTestId('pm-status-mastercard')).toHaveText(c.t('onlinePaymentMethods', 'status.unsupported'));
     },
   },
   {
@@ -757,7 +775,7 @@ const SCENARIOS: Scenario[] = [
       // وسائل الدفع المقبولة: ما أعلنه الخادم فقط (مدى وفيزا)، نصاً بلا شعار غير رسمي
       const accepted = page.getByTestId('payment-brand-row');
       await expect(accepted.locator('li')).toHaveCount(2);
-      await expect(accepted.locator('img')).toHaveCount(0);
+      await expectLogosLoaded(accepted, ['mada', 'visa']);
       await expect(page.getByRole('button', { name: payButtonName(c) }).first()).toBeVisible();
       expect(await ltrIslands(page)).toBeGreaterThanOrEqual(0);
       expect(await a11yBasics(page)).toEqual([]);
@@ -772,9 +790,7 @@ const SCENARIOS: Scenario[] = [
       await page.goto(`${baseUrl}/pay/tok_open_apple`, { waitUntil: 'domcontentloaded' });
       const accepted = page.getByTestId('payment-brand-row');
       await expect(accepted.locator('li')).toHaveCount(3);
-      const logo = accepted.locator('img[src="/payment-brands/apple-pay.svg"]');
-      await expect(logo).toHaveCount(1);
-      await expect.poll(() => logo.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+      await expectLogosLoaded(accepted, ['mada', 'visa', 'apple-pay']);
       expect(await a11yBasics(page)).toEqual([]);
       await shot(page, `paylink-apple-pay-${c.locale}-${c.vw}-${c.theme}`);
     },
@@ -785,7 +801,8 @@ const SCENARIOS: Scenario[] = [
       await page.goto(`${baseUrl}/pay/tok_open_apple`, { waitUntil: 'domcontentloaded' });
       const accepted = page.getByTestId('payment-brand-row');
       await expect(accepted.locator('li')).toHaveCount(2);
-      await expect(accepted.locator('img')).toHaveCount(0);
+      await expectLogosLoaded(accepted, ['mada', 'visa']);
+      await expect(accepted.locator('img[src="/payment-brands/apple-pay.svg"]')).toHaveCount(0);
     },
   },
   {

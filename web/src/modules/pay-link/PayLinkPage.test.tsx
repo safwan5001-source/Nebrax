@@ -54,13 +54,13 @@ describe.each(TEST_LOCALES)('PayLinkPage (%s)', (locale) => {
     await waitFor(() => expect(assign).toHaveBeenCalledWith('https://pay.provider.test/i/1'));
   });
 
-  it('shows accepted payment methods only from the server list, as text without unofficial logos, and nothing when absent or empty', async () => {
+  it('shows accepted payment methods only from the server list, with their registered logos, and nothing when absent or empty', async () => {
     route({ 'GET /': ok(openView({ payment_methods: ['mada', 'visa', 'unknown_method'] })), 'GET /status': noPayment });
     renderIntl(<PayLinkPage token={TOKEN} navigate={assign} />, locale);
 
     const row = await screen.findByTestId('payment-brand-row');
     expect(row.querySelectorAll('li')).toHaveLength(2); // مفتاح مجهول لا يُعرض
-    expect(row.querySelector('img')).toBeNull(); // لا شعار غير رسمي
+    expect([...row.querySelectorAll('img')].map((img) => img.getAttribute('src'))).toEqual(['/payment-brands/mada.svg', '/payment-brands/visa.svg']);
     expect(row.textContent).not.toMatch(/Apple|مايكروسوفت/);
     cleanup();
 

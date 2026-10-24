@@ -13,8 +13,8 @@ function brandName(brand: PaymentBrandPresentation, locale: string): string {
 }
 
 /**
- * علامة دفع واحدة. الشعار الرسمي الموثّق فقط (`logo.kind === 'official'`) بلا تلوين ولا قصّ ولا تغيير نسبة؛
- * وإلا (أو عند فشل تحميل الأصل) يظهر الاسم نصاً فقط — لا شعار بديل ولا حرف مرسوم.
+ * علامة دفع واحدة. الأصل المسجَّل (بمصدره وحالة حقوقه في السجل) بلا تلوين ولا قصّ ولا تغيير نسبة؛ للوضع الداكن
+ * نسخة الناشر الداكنة إن وُجدت، وإلا سطح أبيض خلف الشعار الداكن. عند فشل تحميل الأصل يظهر الاسم نصاً فقط — لا شعار بديل ولا حرف مرسوم.
  * الاسم نصٌّ ظاهر دائماً، فالصورة زخرفة (`alt=""`).
  */
 export function PaymentBrandMark({
@@ -35,15 +35,30 @@ export function PaymentBrandMark({
   return (
     <span className={`inline-flex min-w-0 items-center gap-2 ${className}`} data-testid="payment-brand-mark" data-brand={brand.key}>
       {logo ? (
-        <img
-          src={logo.src}
-          alt=""
-          width={logo.width}
-          height={logo.height}
-          data-mark="logo"
-          onError={() => setBroken(true)}
-          className="h-6 w-auto shrink-0 object-contain"
-        />
+        <>
+          <img
+            src={logo.src}
+            alt=""
+            width={logo.width}
+            height={logo.height}
+            data-mark="logo"
+            onError={() => setBroken(true)}
+            className={`h-6 w-auto shrink-0 object-contain ${
+              logo.dark ? 'dark:hidden' : logo.needsLightSurface ? 'awj-brand-on-light' : ''
+            }`}
+          />
+          {logo.dark ? (
+            <img
+              src={logo.dark.src}
+              alt=""
+              width={logo.dark.width}
+              height={logo.dark.height}
+              data-mark="logo-dark"
+              onError={() => setBroken(true)}
+              className="hidden h-6 w-auto shrink-0 object-contain dark:block"
+            />
+          ) : null}
+        </>
       ) : withIcon ? (
         <span aria-hidden data-mark="generic" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-surface text-muted">
           <CreditCard className="h-4 w-4" strokeWidth={1.7} />
