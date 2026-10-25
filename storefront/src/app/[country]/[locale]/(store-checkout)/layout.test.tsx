@@ -1,4 +1,9 @@
-import { Children, type ReactElement } from "react";
+import {
+  Children,
+  type CSSProperties,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_PRESENTATION_CONFIG } from "@/lib/presentation/config";
 
@@ -14,11 +19,22 @@ import { PublishedThemeMarkerProvider } from "@/components/layout/PublishedTheme
 import { fetchStorefrontConfig } from "@/lib/commerce/storefront";
 import StoreCheckoutLayout from "./layout";
 
+interface TestElementProps {
+  children?: ReactNode;
+  className?: string;
+  dir?: string;
+  logoUrl?: string | null;
+  name?: string;
+  style?: CSSProperties;
+  themePreset?: string;
+  [key: string]: unknown;
+}
+
 async function checkout(locale: string) {
   return (await StoreCheckoutLayout({
     children: <section>Checkout content</section>,
     params: Promise.resolve({ country: "us", locale }),
-  })) as ReactElement<Record<string, unknown>>;
+  })) as ReactElement<TestElementProps>;
 }
 
 describe("StoreCheckoutLayout published theme", () => {
@@ -46,18 +62,28 @@ describe("StoreCheckoutLayout published theme", () => {
       "--store-primary": "#123456",
       backgroundColor: "#abcdef",
     });
-    const [header, main] = Children.toArray(root.props.children) as ReactElement[];
-    const headerRow = Children.only(header.props.children) as ReactElement;
-    const brand = Children.toArray(headerRow.props.children)[0] as ReactElement;
+    const [header, main] = Children.toArray(
+      root.props.children,
+    ) as ReactElement<TestElementProps>[];
+    const headerRow = Children.only(
+      header.props.children,
+    ) as ReactElement<TestElementProps>;
+    const brand = Children.toArray(
+      headerRow.props.children,
+    )[0] as ReactElement<TestElementProps>;
     expect(brand.type).toBe(StoreBrand);
     expect(brand.props).toMatchObject({
       name: "Published shop",
       logoUrl: "https://assets.example/store-logo.png",
     });
     expect(main.props.className).toBe("flex-1");
-    const themed = Children.only(main.props.children) as ReactElement;
+    const themed = Children.only(
+      main.props.children,
+    ) as ReactElement<TestElementProps>;
     expect(themed.type).toBe(PublishedThemeMarkerProvider);
-    expect(themed.props.themePreset).toBe(DEFAULT_PRESENTATION_CONFIG.themePreset);
+    expect(themed.props.themePreset).toBe(
+      DEFAULT_PRESENTATION_CONFIG.themePreset,
+    );
   });
 
   it("uses safe default branding and RTL when presentation data is unavailable", async () => {
@@ -72,10 +98,16 @@ describe("StoreCheckoutLayout published theme", () => {
     const root = await checkout("ar");
     expect(root.props.dir).toBe("rtl");
     expect(root.props.style).toEqual({});
-    const [header, main] = Children.toArray(root.props.children) as ReactElement[];
+    const [header, main] = Children.toArray(
+      root.props.children,
+    ) as ReactElement<TestElementProps>[];
     expect(main.props.className).toBe("flex-1 bg-store-background");
-    const headerRow = Children.only(header.props.children) as ReactElement;
-    const brand = Children.toArray(headerRow.props.children)[0] as ReactElement;
+    const headerRow = Children.only(
+      header.props.children,
+    ) as ReactElement<TestElementProps>;
+    const brand = Children.toArray(
+      headerRow.props.children,
+    )[0] as ReactElement<TestElementProps>;
     expect(brand.props).toMatchObject({ name: "Live shop", logoUrl: null });
   });
 });
