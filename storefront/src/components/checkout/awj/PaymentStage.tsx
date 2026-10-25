@@ -32,6 +32,11 @@ import type {
  * COD-style (settled on delivery or on pickup — ADR-04 §5). The choice here is
  * only which of the store's enabled methods collects it.
  *
+ * **Beta — merchant-enabled online methods.** The API lists the online methods the merchant switched on (`online_methods`, folded into `paymentMethods`
+ * as options with an `onlineKey`). They show whether or not a gateway is ready; the label comes from the message catalogue by the server-sent key, so no
+ * scheme name is written in this source. Choosing one that is not ready is refused by the server when the shopper continues, with a plain "unavailable,
+ * nothing was charged" notice (see the flow) — nothing is created. Still no provider name and no card field.
+ *
  * **PAY-H4-05 — online methods.** When the API marks a method `online: true`
  * (the platform gate is open and the method is linked to a ready gateway), it
  * is shown with a card icon and the note that payment happens on the
@@ -98,7 +103,9 @@ export function PaymentStage({
                   />
                 )}
                 <span className="flex-1 text-sm font-bold text-store-foreground">
-                  {method.name}
+                  {method.onlineKey
+                    ? t(`payment.onlineBrand.${method.onlineKey}`)
+                    : method.name}
                   {method.online === true ? (
                     <span className="mt-1 block text-xs font-normal text-store-muted-foreground">
                       {t("payment.onlineMethodHint")}

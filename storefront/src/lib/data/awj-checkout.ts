@@ -155,11 +155,38 @@ export async function getAwjPaymentMethods(): Promise<AwjPaymentMethod[]> {
   }
 }
 
-export async function updateAwjPayment(paymentMethodId: string) {
-  return actionResult(async () => {
-    const checkout = await updateAwjCheckoutPayment(paymentMethodId);
-    return { checkout };
-  }, "Could not save your payment method. Please try again.");
+export type UpdateAwjPaymentResult =
+  | { success: true; checkout: StorefrontCheckout }
+  /** Beta — the chosen online method is enabled but not collectable right now; nothing was saved or charged. */
+  | { success: false; kind: "online_unavailable"; error: string }
+  | { success: false; kind?: undefined; error: string };
+
+export async function updateAwjPayment(
+  paymentMethodId: string,
+  onlineKey?: string,
+): Promise<UpdateAwjPaymentResult> {
+  try {
+    const checkout = await updateAwjCheckoutPayment(paymentMethodId, onlineKey);
+    return { success: true, checkout };
+  } catch (error) {
+    if (
+      error instanceof StorefrontApiError &&
+      error.code === "payment_unavailable"
+    ) {
+      return {
+        success: false,
+        kind: "online_unavailable",
+        error: error.message,
+      };
+    }
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Could not save your payment method. Please try again.",
+    };
+  }
 }
 
 export type CompleteAwjCheckoutResult =

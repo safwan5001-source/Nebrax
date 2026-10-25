@@ -12,6 +12,8 @@ const {
   completeAwjCheckout,
   createOrResumeAwjCheckout,
   fetchAwjCheckout,
+  fetchAwjPaymentMethods,
+  updateAwjCheckoutPayment,
   updateAwjCheckoutAddress,
   updateAwjCheckoutContact,
   updateAwjCheckoutDelivery,
@@ -166,5 +168,100 @@ describe("commerce/checkout — AWJ Checkout V1 client", () => {
     const calls = mocks.storefrontCartRequest.mock.calls;
     expect(calls[0][3]).toEqual({ "Idempotency-Key": "retry-key" });
     expect(calls[1][3]).toEqual({ "Idempotency-Key": "retry-key" });
+  });
+
+  describe("Beta — merchant-enabled online payment methods", () => {
+    const cash = {
+      id: "pm-cash",
+      name: "نقدي",
+      name_en: "Cash",
+      settlement_type: "cash",
+    };
+    const card = {
+      id: "pm-card",
+      name: "بطاقة",
+      name_en: "Card",
+      settlement_type: "bank",
+      online: true,
+    };
+
+    it("an older API (no online_methods) returns the list unchanged — byte for byte", async () => {
+      mocks.storefrontCartRequest.mockResolvedValue({
+        data: { payment_methods: [cash, card] },
+        meta: {},
+      });
+
+      expect(await fetchAwjPaymentMethods()).toEqual([cash, card]);
+    });
+
+    it("lists every enabled online method; a ready one absorbs the cash/bank method it resolves to, an unready one stays visible", async () => {
+      mocks.storefrontCartRequest.mockResolvedValue({
+        data: {
+          payment_methods: [cash, card],
+          online_methods: [
+            { key: "mada", ready: true, payment_method_id: "pm-card" },
+            { key: "visa", ready: false, payment_method_id: null },
+          ],
+        },
+        meta: {},
+      });
+
+      const list = await fetchAwjPaymentMethods();
+
+      expect(list.map((m) => m.id)).toEqual([
+        "pm-cash",
+        "online:mada",
+        "online:visa",
+      ]);
+      expect(list[1]).toMatchObject({
+        onlineKey: "mada",
+        ready: true,
+        linkedMethodId: "pm-card",
+        online: true,
+      });
+      expect(list[2]).toMatchObject({
+        onlineKey: "visa",
+        ready: false,
+        linkedMethodId: null,
+      });
+    });
+
+    it("with only unready online methods the linked online cash/bank method is NOT hidden (nothing resolves to it)", async () => {
+      mocks.storefrontCartRequest.mockResolvedValue({
+        data: {
+          payment_methods: [cash, card],
+          online_methods: [
+            { key: "mada", ready: false, payment_method_id: null },
+          ],
+        },
+        meta: {},
+      });
+
+      expect((await fetchAwjPaymentMethods()).map((m) => m.id)).toEqual([
+        "pm-cash",
+        "pm-card",
+        "online:mada",
+      ]);
+    });
+
+    it("selecting an online method PATCHes { online_method } only — never an id, amount or provider", async () => {
+      await updateAwjCheckoutPayment("online:mada", "mada");
+
+      expect(mocks.storefrontCartRequest).toHaveBeenCalledWith(
+        "PATCH",
+        "checkout/payment",
+        { online_method: "mada" },
+      );
+    });
+
+    it("a plain method still PATCHes { payment_method_id } exactly as before", async () => {
+      await updateAwjCheckoutPayment("pm-cash");
+
+      expect(mocks.storefrontCartRequest).toHaveBeenCalledWith(
+        "PATCH",
+        "checkout/payment",
+        { payment_method_id: "pm-cash" },
+      );
+    });
   });
 });

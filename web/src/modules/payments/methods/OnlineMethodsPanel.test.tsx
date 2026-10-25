@@ -24,13 +24,14 @@ vi.mock('@/components/ui/toast', () => ({ useToast: () => toast }));
 
 function method(overrides: Partial<OnlineMethod> & Pick<OnlineMethod, 'key'>): OnlineMethod {
   return {
-    status: 'disabled', reason: null, enabled: false, customer_visible: false, connections: [], effective_gateway: null,
-    multiple_eligible_gateways: false, default_gateway_selectable: false, usage: { invoices: true, store: false },
+    status: 'disabled', reason: null, enabled: false, ready: false, customer_visible: false, connections: [], effective_gateway: null,
+    multiple_eligible_gateways: false, default_gateway_selectable: false, usage: { invoices: true, store: true },
     ...overrides,
   };
 }
 
 const ready = { gateway_id: 'g1', gateway_name: 'ميسّر', provider: 'moyasar', environment: 'sandbox' as const, usable: true, requires_provider_setup: false, eligible: true };
+const gw = { id: 'g1', name: 'ميسّر' };
 
 function overview(rows: OnlineMethod[]) {
   api.mockImplementation((path: string, options?: { method?: string }) => {
@@ -50,13 +51,14 @@ describe.each(TEST_LOCALES)('OnlineMethodsPanel (%s)', (locale) => {
   const m = TEST_MESSAGES[locale].onlinePaymentMethods;
   const mount = (canManage: boolean, onOpenGateways = vi.fn()) =>
     renderIntl(<OnlineMethodsPanel canManage={canManage} refreshKey={0} onOpenGateways={onOpenGateways} />, locale);
+  const sw = (key: string) => within(screen.getByTestId(`pm-item-${key}`)).getByRole('switch') as HTMLButtonElement;
 
-  it('shows each method with its server-computed status and never offers a switch for needs_setup/unsupported', async () => {
+  it('shows each method with its server-computed status, and every switch works for a manager whether or not the gateway is ready (Beta)', async () => {
     overview([
-      method({ key: 'mada', status: 'enabled', enabled: true, customer_visible: true, connections: [ready], effective_gateway: { id: 'g1', name: 'ميسّر' } }),
-      method({ key: 'visa', status: 'disabled', connections: [ready], effective_gateway: { id: 'g1', name: 'ميسّر' } }),
+      method({ key: 'mada', status: 'enabled', enabled: true, ready: true, customer_visible: true, connections: [ready], effective_gateway: gw }),
+      method({ key: 'visa', status: 'disabled', ready: true, connections: [ready], effective_gateway: gw }),
       method({ key: 'apple_pay', status: 'needs_setup', reason: 'provider_setup_required', connections: [{ ...ready, requires_provider_setup: true, eligible: false }] }),
-      method({ key: 'mastercard', status: 'unsupported' }),
+      method({ key: 'mastercard', status: 'unsupported', reason: 'no_gateway' }),
     ]);
     mount(true);
 
@@ -66,28 +68,26 @@ describe.each(TEST_LOCALES)('OnlineMethodsPanel (%s)', (locale) => {
     expect(screen.getByTestId('pm-status-apple_pay').textContent).toBe(m.status.needs_setup);
     expect(screen.getByTestId('pm-status-mastercard').textContent).toBe(m.status.unsupported);
 
-    const sw = (key: string) => within(screen.getByTestId(`pm-item-${key}`)).getByRole('switch') as HTMLButtonElement;
     expect(sw('mada').getAttribute('aria-checked')).toBe('true');
-    expect(sw('mada').disabled).toBe(false);
-    expect(sw('visa').disabled).toBe(false);
-    expect(sw('apple_pay').disabled).toBe(true);
-    expect(sw('mastercard').disabled).toBe(true);
-    expect(screen.getByTestId('pm-reason-apple_pay').textContent).toBe(m.blocked.needs_setup);
-    expect(screen.getByTestId('pm-reason-mastercard').textContent).toBe(m.blocked.unsupported);
+    for (const key of ['mada', 'visa', 'apple_pay', 'mastercard']) expect(sw(key).disabled).toBe(false);
+    // غير الجاهزة تشرح ما يلزم للتحصيل بدل منع التفعيل
     expect(within(screen.getByTestId('pm-item-apple_pay')).getByText(m.step.provider_setup)).toBeTruthy();
-    // لا يوجد قائمة اختيار بوابة: العرض قراءة فقط
+    expect(within(screen.getByTestId('pm-item-mastercard')).getByText(m.step.add_gateway)).toBeTruthy();
+    expect(screen.getByTestId('pm-reason-mastercard').textContent).toBe(m.reasonDisabled);
+    // لا قائمة اختيار بوابة: العرض قراءة فقط
     expect(screen.queryByRole('combobox')).toBeNull();
     expect(screen.getByTestId('pm-gateway-mada').textContent).toBe(m.autoGateway.replace('{name}', 'ميسّر'));
     expect(screen.getByTestId('pm-gateway-mastercard').textContent).toBe(m.noGateway);
-    expect(screen.getByTestId('pm-store-mada').textContent).toBe(m.usageStoreUnavailable);
+    expect(screen.getByTestId('pm-store-mada').textContent).toBe(m.usageStoreCollectable);
+    expect(screen.getByTestId('pm-store-visa').textContent).toBe(m.usageStoreOff);
   });
 
-  it('a method saved as enabled but no longer ready can still be switched off and explains why it is hidden', async () => {
+  it('an enabled method whose gateway is not ready is shown as enabled-but-not-collectable and explains that nothing is charged', async () => {
     overview([
-      method({ key: 'visa', status: 'needs_setup', reason: 'no_usable_gateway', enabled: true, connections: [{ ...ready, usable: false, eligible: false }] }),
+      method({ key: 'visa', status: 'enabled_not_ready', reason: 'no_usable_gateway', enabled: true, customer_visible: true, connections: [{ ...ready, usable: false, eligible: false }] }),
     ]);
     api.mockImplementation((path: string, options?: { method?: string }) => {
-      if (path === '/online-payment-methods') return Promise.resolve({ data: [method({ key: 'visa', status: 'needs_setup', reason: 'no_usable_gateway', enabled: true })] });
+      if (path === '/online-payment-methods') return Promise.resolve({ data: [method({ key: 'visa', status: 'enabled_not_ready', reason: 'no_usable_gateway', enabled: true, customer_visible: true })] });
       if (path === '/online-payment-methods/visa' && options?.method === 'PUT') {
         return Promise.resolve({ data: method({ key: 'visa', status: 'needs_setup', reason: 'no_usable_gateway', enabled: false }) });
       }
@@ -95,25 +95,44 @@ describe.each(TEST_LOCALES)('OnlineMethodsPanel (%s)', (locale) => {
     });
     mount(true);
     expect(await screen.findByTestId('pm-list')).toBeTruthy();
-    const sw = within(screen.getByTestId('pm-item-visa')).getByRole('switch') as HTMLButtonElement;
-    expect(sw.getAttribute('aria-checked')).toBe('true');
-    expect(sw.disabled).toBe(false);
-    expect(screen.getByTestId('pm-reason-visa').textContent).toBe(m.storedNotReady);
-    await userEvent.click(sw);
+    expect(screen.getByTestId('pm-status-visa').textContent).toBe(m.status.enabled_not_ready);
+    expect(sw('visa').getAttribute('aria-checked')).toBe('true');
+    expect(sw('visa').disabled).toBe(false);
+    expect(screen.getByTestId('pm-reason-visa').textContent).toBe(m.reasonEnabledNotReady);
+    expect(screen.getByTestId('pm-store-visa').textContent).toBe(m.usageStoreNotCollectable);
+    expect(within(screen.getByTestId('pm-item-visa')).getByText(m.step.activate_gateway)).toBeTruthy();
+    await userEvent.click(sw('visa'));
     await waitFor(() => expect(api).toHaveBeenCalledWith('/online-payment-methods/visa', expect.objectContaining({ method: 'PUT' })));
   });
 
   it('a viewer without payment_gateways.manage sees every switch disabled with the permission reason', async () => {
-    overview([method({ key: 'mada', status: 'enabled', enabled: true, connections: [ready] })]);
+    overview([method({ key: 'mada', status: 'enabled', enabled: true, ready: true, connections: [ready] })]);
     mount(false);
 
     await screen.findByTestId('pm-list');
-    expect((within(screen.getByTestId('pm-item-mada')).getByRole('switch') as HTMLButtonElement).disabled).toBe(true);
+    expect(sw('mada').disabled).toBe(true);
     expect(screen.getByTestId('pm-reason-mada').textContent).toBe(m.blocked.no_permission);
   });
 
-  it('toggling PUTs the new value, updates from the server response, and reports success', async () => {
-    const rows = [method({ key: 'visa', status: 'disabled', connections: [ready], effective_gateway: { id: 'g1', name: 'ميسّر' } })];
+  it('enabling a method with no gateway at all is allowed: PUT enabled=true, then the row shows enabled-not-ready from the server response', async () => {
+    const rows = [method({ key: 'mada', status: 'unsupported', reason: 'no_gateway' })];
+    api.mockImplementation((path: string, options?: { method?: string; body?: unknown }) => {
+      if (path === '/online-payment-methods') return Promise.resolve({ data: rows });
+      if (path === '/online-payment-methods/mada' && options?.method === 'PUT') {
+        return Promise.resolve({ data: { ...rows[0], status: 'enabled_not_ready', enabled: true, customer_visible: true } });
+      }
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
+    mount(true);
+
+    await userEvent.click(await screen.findByRole('switch'));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith(m.done.enabled));
+    expect(api).toHaveBeenCalledWith('/online-payment-methods/mada', { method: 'PUT', body: { enabled: true } });
+    expect(screen.getByTestId('pm-status-mada').textContent).toBe(m.status.enabled_not_ready);
+  });
+
+  it('toggling a ready method PUTs the new value, updates from the server response, and reports success', async () => {
+    const rows = [method({ key: 'visa', status: 'disabled', ready: true, connections: [ready], effective_gateway: gw })];
     api.mockImplementation((path: string, options?: { method?: string; body?: unknown }) => {
       if (path === '/online-payment-methods') return Promise.resolve({ data: rows });
       if (path === '/online-payment-methods/visa' && options?.method === 'PUT') {
@@ -134,22 +153,22 @@ describe.each(TEST_LOCALES)('OnlineMethodsPanel (%s)', (locale) => {
     api.mockImplementation((path: string, options?: { method?: string }) => {
       if (path === '/online-payment-methods' && !options?.method) {
         reads += 1;
-        return Promise.resolve({ data: [method({ key: 'visa', status: reads === 1 ? 'disabled' : 'needs_setup', reason: 'no_usable_gateway', connections: [ready] })] });
+        return Promise.resolve({ data: [method({ key: 'visa', status: reads === 1 ? 'disabled' : 'enabled', enabled: reads !== 1, ready: true, connections: [ready] })] });
       }
-      return Promise.reject(new ApiErrorMock(422, 'x', { error: { code: 'method.needs_setup', message: 'raw server text' } }));
+      return Promise.reject(new ApiErrorMock(422, 'x', { error: { code: 'method.reason_too_long', message: 'raw server text' } }));
     });
     mount(true);
 
     await userEvent.click(within(await screen.findByTestId('pm-item-visa')).getByRole('switch'));
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(m.errors.needs_setup));
-    await waitFor(() => expect(screen.getByTestId('pm-status-visa').textContent).toBe(m.status.needs_setup));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(m.errors.reason_too_long));
+    await waitFor(() => expect(screen.getByTestId('pm-status-visa').textContent).toBe(m.status.enabled));
     expect(toast.success).not.toHaveBeenCalled();
   });
 
-  it('explains the multi-gateway limit and offers a path to the gateways tab for incomplete methods', async () => {
+  it('explains the multi-gateway limit and offers a path to the gateways tab for methods that cannot collect yet', async () => {
     const onOpen = vi.fn();
     overview([
-      method({ key: 'mada', status: 'enabled', enabled: true, connections: [ready, { ...ready, gateway_id: 'g2', gateway_name: 'ثانية' }], effective_gateway: { id: 'g1', name: 'ميسّر' }, multiple_eligible_gateways: true }),
+      method({ key: 'mada', status: 'enabled', enabled: true, ready: true, connections: [ready, { ...ready, gateway_id: 'g2', gateway_name: 'ثانية' }], effective_gateway: gw, multiple_eligible_gateways: true }),
       method({ key: 'visa', status: 'needs_setup', reason: 'no_usable_gateway', connections: [{ ...ready, usable: false, eligible: false }] }),
     ]);
     mount(true, onOpen);
@@ -169,7 +188,7 @@ describe.each(TEST_LOCALES)('OnlineMethodsPanel (%s)', (locale) => {
     expect(screen.getByTestId('pm-scope-note').textContent).toContain(m.scopeSeparate);
     expect(screen.getByRole('link', { name: m.scopeLink }).getAttribute('href')).toBe('/payment-methods');
 
-    overview([method({ key: 'mada', status: 'enabled', enabled: true, connections: [ready] })]);
+    overview([method({ key: 'mada', status: 'enabled', enabled: true, ready: true, connections: [ready] })]);
     await userEvent.click(screen.getByRole('button', { name: m.retry }));
     expect(await screen.findByTestId('pm-list')).toBeTruthy();
   });

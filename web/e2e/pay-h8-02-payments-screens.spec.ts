@@ -41,7 +41,7 @@ const gateway = (over: Record<string, unknown> = {}) => ({
   provider_capabilities: { hosted_checkout: true, refunds: true, currencies: ['SAR'], min_amount_minor: 100, methods: ['mada', 'visa', 'mastercard', 'apple_pay'], methods_requiring_provider_setup: ['apple_pay'] }, ...over,
 });
 const onlineMethod = (over: Record<string, unknown> = {}) => ({
-  key: 'mada', status: 'enabled', reason: null, enabled: true, customer_visible: true,
+  key: 'mada', status: 'enabled', reason: null, enabled: true, ready: true, customer_visible: true,
   connections: [{ gateway_id: 'g1', gateway_name: 'ميسّر', provider: 'moyasar', environment: 'sandbox', usable: true, requires_provider_setup: false, eligible: true }],
   effective_gateway: { id: 'g1', name: 'ميسّر' }, multiple_eligible_gateways: false, default_gateway_selectable: false, usage: { invoices: true, store: false }, ...over,
 });
@@ -169,15 +169,15 @@ async function setup(page: Page, w: World, opts: { locale: Locale; theme: Theme;
       if (w.methodsMode === 'failing') return json(route, { error: { message: 'down' } }, 500);
       return json(route, { data: [
         onlineMethod({ key: 'mada' }),
-        onlineMethod({ key: 'visa', status: w.visaEnabled ? 'enabled' : 'disabled', enabled: w.visaEnabled, customer_visible: w.visaEnabled }),
-        onlineMethod({ key: 'mastercard', status: 'unsupported', enabled: false, customer_visible: false, connections: [], effective_gateway: null }),
-        onlineMethod({ key: 'apple_pay', status: 'needs_setup', reason: 'provider_setup_required', enabled: false, customer_visible: false,
+        onlineMethod({ key: 'visa', status: w.visaEnabled ? 'enabled' : 'disabled', enabled: w.visaEnabled, ready: true, customer_visible: w.visaEnabled }),
+        onlineMethod({ key: 'mastercard', status: 'unsupported', reason: 'no_gateway', enabled: false, ready: false, customer_visible: false, connections: [], effective_gateway: null }),
+        onlineMethod({ key: 'apple_pay', status: 'needs_setup', reason: 'provider_setup_required', enabled: false, ready: false, customer_visible: false,
           connections: [{ gateway_id: 'g1', gateway_name: 'ميسّر', provider: 'moyasar', environment: 'sandbox', usable: true, requires_provider_setup: true, eligible: false }], effective_gateway: null }),
       ] });
     }
     if (path === '/online-payment-methods/visa' && method === 'PUT') {
       w.visaEnabled = (request.postDataJSON() as { enabled: boolean }).enabled;
-      return json(route, { data: onlineMethod({ key: 'visa', status: w.visaEnabled ? 'enabled' : 'disabled', enabled: w.visaEnabled, customer_visible: w.visaEnabled }) });
+      return json(route, { data: onlineMethod({ key: 'visa', status: w.visaEnabled ? 'enabled' : 'disabled', enabled: w.visaEnabled, ready: true, customer_visible: w.visaEnabled }) });
     }
     if (path === '/payment-gateways' && method === 'GET') return json(route, { data: [gateway(), gateway({ id: 'g2', provider: 'custom', name: 'ربط يدوي', name_en: 'Manual', status: 'draft', is_usable: false, verified_at: null, activated_at: null, has_secret_key: false, provider_capabilities: null }), gateway({ id: 'g3', name: 'ميسّر (تجريبي غير مفعّل)', name_en: 'Moyasar (inactive)', status: 'draft', is_usable: false, verified_at: null, activated_at: null, has_secret_key: false }), gateway({ id: 'g4', provider: 'tap', name: 'تاب', name_en: 'Tap', status: 'draft', is_usable: false, verified_at: null, activated_at: null, has_secret_key: false, provider_capabilities: null })] });
 

@@ -12002,37 +12002,34 @@
     "loadFailed": "Could not load payment methods.",
     "retry": "Retry",
     "empty": "No online payment methods are defined.",
-    "scope": "These are the online payment methods customers see when paying an invoice through the payment link. “Show to customer” lists a method as accepted only while it is actually ready; what the hosted provider page accepts is set in the provider dashboard.",
+    "scope": "These are the online payment methods customers see in your store and on invoice payment links. “Show to customer” is your choice and may be turned on before a gateway is ready; actual collection only happens once the method is ready (an active, verified gateway). What the provider's hosted page accepts is set in the provider's dashboard.",
     "scopeSeparate": "Completely separate from cash/bank collection methods and POS, which are managed from",
     "scopeLink": "Payment methods",
     "showToCustomer": "Show to customer",
     "status": {
-      "enabled": "Enabled",
+      "enabled": "Enabled · ready",
+      "enabled_not_ready": "Enabled · not ready to collect",
       "disabled": "Disabled",
-      "needs_setup": "Needs setup",
-      "unsupported": "Unsupported"
+      "needs_setup": "Disabled · needs setup",
+      "unsupported": "Disabled · no gateway"
     },
-    "reasonEnabled": "Shown to the customer as an accepted method on the invoice payment link.",
-    "reasonDisabled": "Ready but hidden from customers. Turn the switch on to show it.",
+    "reasonEnabled": "Shown to customers, who can pay with it.",
+    "reasonDisabled": "Hidden from customers. Turn it on to show it (you can do this before a gateway is ready).",
     "blocked": {
-      "no_permission": "You need the manage-payment-gateways permission to change this method.",
-      "needs_setup": "It cannot be shown to customers until the setup below is complete.",
-      "unsupported": "No supported gateway exists for this method, so it cannot be shown."
+      "no_permission": "You need the manage payment gateways permission to change this method."
     },
     "step": {
-      "add_gateway": "Add a connection to a gateway that supports this method (such as Moyasar) and activate it.",
-      "activate_gateway": "The supporting gateway connection is not active. Verify its credentials and activate it from the Payment gateways tab.",
-      "provider_setup": "Requires provider-side setup (domain registration with Apple/the provider) that Nebrax cannot verify, so it cannot be enabled here."
+      "add_gateway": "This method cannot collect until you add and activate a connection to a gateway that supports it (e.g. Moyasar).",
+      "activate_gateway": "The supported gateway connection is inactive or unverified. Check its credentials and activate it from the Payment gateways tab.",
+      "provider_setup": "Requires setup at the provider (e.g. Apple/provider domain registration) that Nebrax cannot verify, so it stays not ready to collect."
     },
     "openGateways": "Open payment gateways",
     "defaultGateway": "Default gateway",
     "autoGateway": "Eligible: {name}",
     "noGateway": "No ready gateway",
-    "storedNotReady": "Saved as enabled but not ready now, so it is hidden from customers. It will show again automatically once a supported gateway is ready — turn the switch off if you do not want that.",
     "multiGateway": "More than one gateway is eligible; you pick the gateway for each payment link when you create it. A default gateway per method and automatic failover between gateways are not available (to avoid double charging).",
     "usage": "Where it is used",
     "usageInvoices": "Invoice payment link",
-    "usageStoreUnavailable": "Online store: not available yet",
     "connections": "Connections linked to this method",
     "eligible": "Eligible",
     "providerSetup": "Needs provider setup",
@@ -12042,12 +12039,14 @@
       "disabled": "The method is hidden from customers."
     },
     "errors": {
-      "unsupported": "No gateway connection supports this method. Add a supported connection first.",
-      "needs_setup": "The method is not ready: activate a gateway connection that supports it and complete the required provider setup.",
       "unknown_method": "Unknown payment method.",
       "reason_too_long": "The reason is longer than allowed.",
       "generic": "Could not save the change. Try again."
-    }
+    },
+    "reasonEnabledNotReady": "Shown to customers in the store, but collection is paused until a gateway is ready. If a customer tries to pay with it they see that payment is unavailable, nothing is charged and no payment attempt is created.",
+    "usageStoreCollectable": "Online store: ready to collect",
+    "usageStoreNotCollectable": "Online store: shown · collection paused",
+    "usageStoreOff": "Online store: hidden"
   },
   "paymentGateways": {
     "close": "Close",

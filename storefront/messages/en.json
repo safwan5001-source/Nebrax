@@ -963,6 +963,13 @@
       "settledOnDelivery": "Settled in cash when your order is delivered.",
       "settledOnPickup": "Settled in cash when you pick up your order.",
       "onlineMethodHint": "Pay securely online",
+      "onlineBrand": {
+        "mada": "mada",
+        "visa": "Visa",
+        "mastercard": "Mastercard",
+        "apple_pay": "Apple Pay"
+      },
+      "onlineUnavailable": "Online payment is currently unavailable. You have not been charged.",
       "onlineRedirectNote": "After you place the order you'll be taken to the payment provider's secure page to pay. Card details are entered there, never on this store.",
       "redirectingTitle": "Taking you to secure payment…",
       "redirectingBody": "Your order has been placed. Please keep this page open while we redirect you."

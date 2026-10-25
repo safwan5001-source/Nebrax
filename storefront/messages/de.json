@@ -963,6 +963,13 @@
       "settledOnDelivery": "Settled in cash when your order is delivered.",
       "settledOnPickup": "Settled in cash when you pick up your order.",
       "onlineMethodHint": "Sicher online bezahlen",
+      "onlineBrand": {
+        "mada": "mada",
+        "visa": "Visa",
+        "mastercard": "Mastercard",
+        "apple_pay": "Apple Pay"
+      },
+      "onlineUnavailable": "Die Online-Zahlung ist derzeit nicht verfügbar. Es wurde nichts abgebucht.",
       "onlineRedirectNote": "Nach der Bestellung leiten wir Sie zur sicheren Zahlungsseite des Zahlungsanbieters weiter. Kartendaten geben Sie nur dort ein, niemals in diesem Shop.",
       "redirectingTitle": "Weiterleitung zur sicheren Zahlung …",
       "redirectingBody": "Ihre Bestellung wurde aufgegeben. Bitte lassen Sie diese Seite während der Weiterleitung geöffnet."
