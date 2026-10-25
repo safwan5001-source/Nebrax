@@ -56,9 +56,12 @@ Two race conditions found in review, both fixed:
 ### Tests (new: `web/src/lib/auth-session-race.test.ts`, 9 cases)
 Stale 401 after token replacement / after logout (no clear, no redirect); current-token 401 clears + redirects once; no redirect on `/login`; `fetchPrivateFileUrl` both directions; `/me` success after replacement / logout / demo start (no persist, `superseded`); old-token 401 after replacement; unchanged-token valid / network error (token kept) / 401.
 
-Results: affected suites (`src/lib`, `src/app/login`) 815 passed; **full web suite 721 files / 8660 tests passed**; `npm run build` succeeded; backend auth suites (`AuthRememberMeTest`, `ApiAuthTest`, `AuthRecoveryTest`, `TenantSubdomainAuthTest`) 79 passed (backend code unchanged in this round).
+Results: affected suites (`src/lib`, `src/app/login`) 815 passed; **full web suite 721 files / 8660 tests passed**; `npm run build` succeeded; backend auth suites (`AuthRememberMeTest`, `ApiAuthTest`, `AuthRecoveryTest`, `TenantSubdomainAuthTest`) 67 passed (backend code unchanged in this round).
 
 ### Remaining risks
 - Cross-tab: a token replaced in another tab during `/me` yields `superseded` → form shown rather than auto-redirect (safe; next navigation restores). 
 - `platform-api.ts` has its own 401 path (separate platform session) — out of scope, not reviewed here.
 - Real-browser/Safari verification and production confirmation still outstanding. Full backend suite not run locally (bcmath missing → Fuel tests).
+
+### CI status (at report time)
+Only `web build (Next.js)` is registered for the PR and was `queued` (not yet completed) — no PHP CI run was triggered for this diff. Result not yet known; re-check before merge.
