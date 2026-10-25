@@ -277,6 +277,33 @@ const m = import.meta.env.NEXT_PUBLIC_SPREE_X;`,
     expect(c.spree_env_reads).toBe(3);
   });
 
+  it("does not count type-only references to helpers (review: type queries)", () => {
+    const c = scanSource(
+      `import { getClient } from "@/lib/spree";
+import type { getClientForSurface } from "@/lib/spree";
+type C = ReturnType<typeof getClient>;
+type D = typeof getClientForSurface;
+const x: typeof getClient = getClient;`,
+      "src/lib/data/a.ts",
+    );
+    // only the runtime `= getClient` value reference
+    expect(c.spree_client_access).toBe(1);
+  });
+
+  it('recognises literal bracket access to the environment object (review: process["env"])', () => {
+    const c = scanSource(
+      `const a = process["env"].SPREE_API_URL;
+const b = process["env"]["SPREE_KEY"];
+const env = process["env"];
+const d = env.SPREE_X;
+const { SPREE_Y } = process["env"];
+const e = import.meta["env"].NEXT_PUBLIC_SPREE_Z;
+const f = other["env"].SPREE_NOPE;`,
+      "src/lib/data/a.ts",
+    );
+    expect(c.spree_env_reads).toBe(5); // a, b, alias read, destructure, import.meta; not other["env"]
+  });
+
   it("counts wrapper imports by alias and relative path, but not from inside the wrapper", () => {
     expect(
       scanSource(

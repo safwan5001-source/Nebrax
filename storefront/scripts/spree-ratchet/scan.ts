@@ -316,17 +316,31 @@ function isEnvObject(
     const sym = checker.getSymbolAtLocation(e);
     return !!sym && aliases.has(sym);
   }
-  if (ts.isPropertyAccessExpression(e)) {
-    // process.env
-    if (
-      ts.isIdentifier(e.expression) &&
-      e.expression.text === "process" &&
-      e.name.text === "env"
-    )
-      return true;
-    // import.meta.env
-    if (ts.isMetaProperty(e.expression) && e.name.text === "env") return true;
+  // process.env / process["env"] / import.meta.env / import.meta["env"]
+  const base =
+    ts.isPropertyAccessExpression(e) || ts.isElementAccessExpression(e)
+      ? e.expression
+      : undefined;
+  const member = ts.isPropertyAccessExpression(e)
+    ? e.name.text
+    : ts.isElementAccessExpression(e)
+      ? stringLiteral(e.argumentExpression)
+      : undefined;
+  if (base && member === "env") {
+    if (ts.isIdentifier(base) && base.text === "process") return true;
+    if (ts.isMetaProperty(base)) return true;
   }
+  return false;
+}
+
+/** `typeof getClient` in a type position erases at build time: not an operational access. */
+function isInTypeQuery(id: ts.Identifier): boolean {
+  for (
+    let n: ts.Node | undefined = id.parent;
+    n && !ts.isStatement(n);
+    n = n.parent
+  )
+    if (ts.isTypeQueryNode(n)) return true;
   return false;
 }
 
@@ -444,7 +458,11 @@ export function scanSource(text: string, rel: string): FileCounts {
     }
 
     // Client helper uses: calls, aliases and bare references (not declarations).
-    if (ts.isIdentifier(node) && !isDeclarationName(node)) {
+    if (
+      ts.isIdentifier(node) &&
+      !isDeclarationName(node) &&
+      !isInTypeQuery(node)
+    ) {
       const p = node.parent;
       // `obj.getClient` is a use of the property (name-based); plain identifiers resolve by binding.
       const isPropName = ts.isPropertyAccessExpression(p) && p.name === node;
