@@ -106,6 +106,13 @@ class StorefrontBetaOnlineMethodsTest extends TestCase
         [$token, $response] = $this->pickOnline('mada');
         $response->assertStatus(503)->assertJsonPath('error.code', 'payment_unavailable')->assertJsonPath('error.message', self::NOTICE);
 
+        // الرفض نفسه لا ينشئ طلباً ولا نية ولا محاولة ولا سنداً ولا قيداً (قبل أي إتمام)
+        $this->assertSame(0, CommerceOrder::query()->withoutGlobalScopes()->count());
+        $this->assertSame(0, CommercePaymentIntent::query()->withoutGlobalScopes()->where('method', CommercePaymentIntent::METHOD_ONLINE)->count());
+        $this->assertSame(0, PaymentAttempt::query()->withoutGlobalScopes()->count());
+        $this->assertSame(0, Payment::query()->withoutGlobalScopes()->count());
+        $this->assertSame(0, JournalEntry::query()->withoutGlobalScopes()->count());
+
         // الـCheckout لم يتغيّر، وإتمامه (بلا وسيلة) يبقى COD/استلام؛ لا نية إلكترونية ولا محاولة ولا سند ولا قيد في أي لحظة
         $this->complete($token)->assertCreated()->assertJsonPath('data.order.payment.method', CommercePaymentIntent::METHOD_PAY_ON_PICKUP);
         $this->assertSame(0, PaymentAttempt::query()->withoutGlobalScopes()->count());
