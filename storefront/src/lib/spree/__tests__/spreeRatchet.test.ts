@@ -166,6 +166,61 @@ f({});
     expect(c.spree_client_access).toBe(6);
   });
 
+  it("counts literal bracket access and aliases derived from it (review: bracket notation)", () => {
+    const c = scanSource(
+      `import * as spree from "@/lib/spree";
+spree["getClient"]();
+spree["getClient"]();
+const f = spree["getClientForSurface"];
+f("dtc");
+const { "getWholesaleClient": w } = spree;
+w();
+import * as sdk from "@spree/sdk";
+sdk["createClient"]({});
+const { "createClient": mk } = require("@spree/sdk");
+mk({});`,
+      "src/lib/data/a.ts",
+    );
+    // 2 bracket calls, bracket alias + call, destructured alias call, sdk bracket, mk()
+    expect(c.spree_client_access).toBe(7);
+    expect(
+      scanSource(`const o = {};\no["other"]();`, "src/a.ts")
+        .spree_client_access,
+    ).toBeUndefined();
+  });
+
+  it("scopes aliases by lexical binding, not file-wide names (review: shadowing)", () => {
+    const c = scanSource(
+      `import { getClient as gc } from "@/lib/spree";
+function a() { const run = gc; run(); }
+function b(run: () => void) { run(); }
+const other = () => { const run = () => 1; run(); };`,
+      "src/lib/data/a.ts",
+    );
+    // `= gc` and a()'s run() only
+    expect(c.spree_client_access).toBe(2);
+  });
+
+  it("does not count a parameter or local that shadows a helper name", () => {
+    const c = scanSource(
+      `function f(getClient: () => void) { getClient(); }
+function g() { const withAuthRefresh = () => 1; return withAuthRefresh(); }`,
+      "src/lib/data/a.ts",
+    );
+    expect(c.spree_client_access).toBeUndefined();
+  });
+
+  it("still counts an alias used in a nested scope and an unresolved helper reference", () => {
+    const c = scanSource(
+      `import { getClient as gc } from "@/lib/spree";
+const run = gc;
+function inner() { return run(); }
+getClientForSurface("dtc");`,
+      "src/lib/data/a.ts",
+    );
+    expect(c.spree_client_access).toBe(3);
+  });
+
   it("does not treat createClient from other modules as a Spree factory", () => {
     const c = scanSource(
       `const { createClient } = require("@supabase/supabase-js");\ncreateClient();`,
