@@ -12,7 +12,9 @@ import {
   type StorefrontDeliverySchedule,
 } from "./checkout-gifting";
 import {
+  AWJ_ONLINE_OPTION_PREFIX,
   type AwjCheckout,
+  type AwjOnlineMethodRow,
   type AwjOrder,
   type AwjPaymentMethod,
   mapAwjCheckoutToViewModel,
@@ -110,9 +112,43 @@ export async function updateAwjCheckoutDelivery(
  */
 export async function fetchAwjPaymentMethods(): Promise<AwjPaymentMethod[]> {
   const response = await storefrontCartRequest<
-    AwjResourceResponse<{ payment_methods: AwjPaymentMethod[] }>
+    AwjResourceResponse<{
+      payment_methods: AwjPaymentMethod[];
+      online_methods?: AwjOnlineMethodRow[];
+    }>
   >("GET", "checkout/payment-methods");
-  return response.data.payment_methods;
+  return mergeAwjOnlineMethods(
+    response.data.payment_methods,
+    response.data.online_methods ?? [],
+  );
+}
+
+/**
+ * Beta — folds the merchant's enabled online methods into the one option list the payment stage renders. A cash/bank method that a *ready* online
+ * method resolves to is shown through that online method instead of twice; an unready online method stays visible (selecting it is refused by the
+ * server with the notice — nothing is created). An older API without `online_methods` yields the list unchanged.
+ */
+export function mergeAwjOnlineMethods(
+  methods: AwjPaymentMethod[],
+  online: AwjOnlineMethodRow[],
+): AwjPaymentMethod[] {
+  if (online.length === 0) return methods;
+  const covered = new Set(
+    online
+      .filter((row) => row.ready && row.payment_method_id)
+      .map((row) => row.payment_method_id as string),
+  );
+  const options: AwjPaymentMethod[] = online.map((row) => ({
+    id: `${AWJ_ONLINE_OPTION_PREFIX}${row.key}`,
+    name: row.key,
+    name_en: null,
+    settlement_type: "online",
+    online: true,
+    onlineKey: row.key,
+    ready: row.ready,
+    linkedMethodId: row.payment_method_id,
+  }));
+  return [...methods.filter((m) => !covered.has(m.id)), ...options];
 }
 
 /**
@@ -125,10 +161,18 @@ export async function fetchAwjPaymentMethods(): Promise<AwjPaymentMethod[]> {
  */
 export async function updateAwjCheckoutPayment(
   paymentMethodId: string,
+  onlineKey?: string,
 ): Promise<StorefrontCheckout> {
+  // Beta: an online method is chosen by its key and resolved server-side (a not-ready one is refused with `payment_unavailable` before any write).
   const response = await storefrontCartRequest<
     AwjResourceResponse<AwjCheckout>
-  >("PATCH", "checkout/payment", { payment_method_id: paymentMethodId });
+  >(
+    "PATCH",
+    "checkout/payment",
+    onlineKey
+      ? { online_method: onlineKey }
+      : { payment_method_id: paymentMethodId },
+  );
   return mapAwjCheckoutToViewModel(response.data);
 }
 

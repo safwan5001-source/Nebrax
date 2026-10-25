@@ -18,14 +18,19 @@ use Illuminate\Support\Facades\DB;
  * ═══════════════════════════════════════════════════════════════
  *  مصدر الحقيقة الواحد لحالة كل وسيلة؛ **لا يخلق مفاتيح ولا اتصالات**: يقرأ اتصالات `PaymentGateway` وقدرات محوّلها.
  *
- *  الحالة المحسوبة (لا تُخزَّن):
- *   • `unsupported`: لا اتصال لدى المؤسسة يعلن محوّله هذه الوسيلة.
- *   • `needs_setup`: يوجد اتصال يعلنها لكن لا اتصال **جاهز** (مفعَّل) أو أنها تحتاج إعداداً لدى المزوّد لا يستطيع أَوْج التحقق منه (Apple Pay، EXT-10).
- *   • `disabled`: مدعومة وجاهزة لكن المؤسسة لم تُظهرها للعميل (الافتراضي).
- *   • `enabled`: مدعومة وجاهزة وأظهرتها المؤسسة ⇒ **وحدها** تُعرض للعميل.
+ *  **مفهومان منفصلان (Beta):**
+ *   • `enabled` = اختيار التاجر (مخزَّن): هل تُعرض الوسيلة للعميل؟ يجوز تفعيلها قبل جاهزية أي بوابة.
+ *   • `ready` = جاهزية التحصيل (محسوبة، لا تُخزَّن): يوجد اتصال يعلن محوّله الوسيلة وهو نشط ومتحقَّق منه ولا يحتاج إعداداً غير قابل للتحقق (Apple Pay، EXT-10).
+ *  التفعيل لا يجعل الوسيلة قابلة للتحصيل؛ والتحصيل لا يجري إلا بـ`ready` (يفرضه مسار الدفع نفسه، لا هذه الخدمة).
  *
- *  ما يعنيه «التفعيل» هنا بصدق: **إظهار** للعميل + بوابة جاهزية. لا يقيّد ما تقبله صفحة المزوّد المستضافة (واجهة الفواتير لدى Moyasar بلا معامل لتقييد الوسائل؛
- *  الوسائل تُضبط في لوحة المزوّد) ولا يغيّر أي قيد أو سند. والبوابة «الفعلية» تُحسب (أول اتصال جاهز بالاسم) ولا تُخزَّن: لا توجيه متعدد البوابات قبل H2-04.
+ *  الحالة المحسوبة (`status`):
+ *   • `enabled`: مفعَّلة وجاهزة ⇒ تُعرض وتُحصَّل.
+ *   • `enabled_not_ready`: مفعَّلة لكن غير جاهزة ⇒ تُعرض للعميل، وأي محاولة دفع بها تُرفض قبل أي محاولة تحصيل (`reason` يشرح السبب).
+ *   • `disabled`: غير مفعَّلة وجاهزة (الافتراضي).
+ *   • `needs_setup` / `unsupported`: غير مفعَّلة وغير جاهزة (يوجد اتصال يعلنها لكنه غير جاهز / لا اتصال يعلنها).
+ *
+ *  «التفعيل» لا يقيّد ما تقبله صفحة المزوّد المستضافة (واجهة الفواتير لدى Moyasar بلا معامل لتقييد الوسائل؛ الوسائل تُضبط في لوحة المزوّد) ولا يغيّر أي قيد أو سند.
+ *  والبوابة «الفعلية» تُحسب (أول اتصال جاهز بالاسم) ولا تُخزَّن: لا توجيه متعدد البوابات قبل H2-04.
  */
 class OnlinePaymentMethodSettingsService
 {
@@ -42,7 +47,8 @@ class OnlinePaymentMethodSettingsService
     }
 
     /**
-     * الوسائل التي يجوز عرضها للعميل الآن (حالتها `enabled`)، ومقيَّدة بالاتصال المستعمل إن عُيّن (لا تُعرض وسيلة لا يدعمها اتصال الطلب).
+     * الوسائل **القابلة للتحصيل** الآن (مفعَّلة **وجاهزة**، حالتها `enabled`)، ومقيَّدة بالاتصال المستعمل إن عُيّن (لا تُعرض وسيلة لا يدعمها اتصال الطلب).
+     * هذا مسار رابط الدفع: له اتصال محدَّد فلا معنى لعرض وسيلة غير جاهزة. أما المتجر فيعرض المفعَّلة وإن لم تجهز (انظر `enabledKeys`).
      *
      * @return list<string>
      */
@@ -62,6 +68,16 @@ class OnlinePaymentMethodSettingsService
         return $visible;
     }
 
+    /**
+     * كل الوسائل التي اختار التاجر إظهارها (`enabled`) بصرف النظر عن الجاهزية، بترتيب الكتالوج. الجاهزية في `overview()` (`ready`).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function enabledRows(): array
+    {
+        return array_values(array_filter($this->overview(), fn (array $row): bool => $row['enabled'] === true));
+    }
+
     /** @return array<string, mixed> */
     public function setEnabled(string $key, bool $enabled, ?User $actor, ?string $reason = null): array
     {
@@ -77,21 +93,10 @@ class OnlinePaymentMethodSettingsService
         DB::transaction(function () use ($key, $enabled, $actor, $reason, $tenantId): void {
             // مرساة المستأجر أولاً: تسلسل أول تفعيل متزامن لنفس الوسيلة (قفل صف غير موجود لا يحمي) فلا انتهاك فريد 500.
             Tenant::query()->whereKey($tenantId)->lockForUpdate()->first();
-            // قفل الاتصالات المرشَّحة قبل الحكم بالجاهزية: لا تفعيل على اتصال يُعلَّق/يُلغى بالتوازي.
-            PaymentGateway::query()->where('status', '!=', PaymentGateway::STATUS_REVOKED)->orderBy('id')->lockForUpdate()->get();
-            $gateways = PaymentGateway::query()->where('status', '!=', PaymentGateway::STATUS_REVOKED)->orderBy('name')->orderBy('id')->get()->all();
             $row = OnlinePaymentMethodSetting::query()->where('method_key', $key)->lockForUpdate()->first();
             $from = $row === null ? null : (bool) $row->enabled;
 
-            if ($enabled) {
-                $status = $this->describe($key, $gateways, $from ?? false)['status'];
-                if ($status === 'unsupported') {
-                    throw new PaymentGatewayException('method.unsupported', 'لا يوجد اتصال بوابة يدعم هذه الوسيلة؛ أضف اتصالاً مدعوماً أولاً.');
-                }
-                if ($status === 'needs_setup') {
-                    throw new PaymentGatewayException('method.needs_setup', 'الوسيلة غير جاهزة: فعّل اتصال بوابة يدعمها وأكمل إعداد المزوّد المطلوب.');
-                }
-            }
+            // Beta: التفعيل اختيار تاجر لا يشترط جاهزية بوابة (الجاهزية تُفرض عند التحصيل لا هنا).
             if (($from ?? false) === $enabled) {
                 return;   // لا تغيير (الغياب = معطّلة) ⇒ لا صف ولا حدث
             }
@@ -146,28 +151,37 @@ class OnlinePaymentMethodSettingsService
         }
 
         $eligible = array_values(array_filter($connections, fn (array $c) => $c['eligible']));
+        $ready = $eligible !== [];
         $reason = null;
-        if ($connections === []) {
-            $status = 'unsupported';
-        } elseif ($eligible === []) {
-            $status = 'needs_setup';
-            $reason = collect($connections)->every(fn (array $c) => $c['requires_provider_setup']) ? 'provider_setup_required' : 'no_usable_gateway';
-        } else {
-            $status = $enabled ? 'enabled' : 'disabled';
+        if (! $ready) {
+            $reason = match (true) {
+                $connections === [] => 'no_gateway',
+                collect($connections)->every(fn (array $c) => $c['requires_provider_setup']) => 'provider_setup_required',
+                default => 'no_usable_gateway',
+            };
         }
+        $status = match (true) {
+            $enabled && $ready => 'enabled',
+            $enabled => 'enabled_not_ready',
+            $ready => 'disabled',
+            $connections === [] => 'unsupported',
+            default => 'needs_setup',
+        };
 
         return [
             'key' => $key,
             'status' => $status,
             'reason' => $reason,
             'enabled' => $enabled,
-            'customer_visible' => $status === 'enabled',
+            'ready' => $ready,
+            // المفعَّلة تُعرض للعميل (المتجر) وإن لم تجهز؛ التحصيل مشروط بـ`ready` فقط.
+            'customer_visible' => $enabled,
             'connections' => $connections,
             // البوابة الفعلية محسوبة (أول اتصال جاهز) لا مخزَّنة؛ اختيار الافتراضية غير متاح قبل التوجيه متعدد البوابات (H2-04).
             'effective_gateway' => $eligible === [] ? null : ['id' => $eligible[0]['gateway_id'], 'name' => $eligible[0]['gateway_name']],
             'multiple_eligible_gateways' => count($eligible) > 1,
             'default_gateway_selectable' => false,
-            'usage' => ['invoices' => true, 'store' => false],   // الفواتير: رابط الدفع مبنيّ؛ المتجر: H4 غير مبنيّ ⇒ لا يُعرض فيه شيء
+            'usage' => ['invoices' => true, 'store' => true],   // الفواتير: رابط الدفع؛ المتجر: تُعرض المفعَّلة في Checkout (التحصيل مشروط بالجاهزية)
         ];
     }
 

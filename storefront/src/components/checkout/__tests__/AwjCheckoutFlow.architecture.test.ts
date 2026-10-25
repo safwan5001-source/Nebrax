@@ -18,7 +18,10 @@ import { describe, expect, it } from "vitest";
  *    payment stage is GATED (`PAYMENT_CAPABILITY`) behind the server's own gate,
  *    and naming a provider would assert a commercial capability the platform
  *    may not have enabled for this store. STORE-UI-4
- *    added the stage, so it added the guard with it.
+ *    added the stage, so it added the guard with it. The Beta online methods
+ *    (merchant-enabled card schemes) do NOT relax it: their labels come from
+ *    the message catalogue by the key the API sends, so no scheme or provider
+ *    name is ever written in these sources.
  *
  * STORE-UI-4 split the flow into per-stage components, so these guards cover
  * the whole `awj/` directory rather than one file — a rule that only held for

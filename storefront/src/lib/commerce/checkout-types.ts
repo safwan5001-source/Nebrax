@@ -66,7 +66,26 @@ export interface AwjPaymentMethod {
    * the cash-settlement method it has always been (an older API never sends it).
    */
   online?: boolean;
+  /**
+   * Beta — set only on an *online-method option* (mada/Visa/Mastercard/Apple Pay) the merchant enabled, built from the API's `online_methods`
+   * (never typed in the UI). `id` is then `online:<key>`; the label comes from the message catalogue under `payment.onlineBrand.<key>`.
+   */
+  onlineKey?: string;
+  /** Beta — server-decided: `false` means choosing it is refused with the "unavailable, nothing was charged" notice. */
+  ready?: boolean;
+  /** Beta — the checkout payment-method id a ready option resolves to (for pre-selecting a saved choice). */
+  linkedMethodId?: string | null;
 }
+
+/** Raw `online_methods[]` row of `GET checkout/payment-methods` (present only when the merchant enabled at least one). */
+export interface AwjOnlineMethodRow {
+  key: string;
+  ready: boolean;
+  payment_method_id: string | null;
+}
+
+/** The id an online-method option carries in the shopper-facing list. */
+export const AWJ_ONLINE_OPTION_PREFIX = "online:";
 
 /** Raw `GET/POST /checkout`, `PATCH /checkout/{contact,address,delivery,payment}` response shape. */
 export interface AwjCheckout {

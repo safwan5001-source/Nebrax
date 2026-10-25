@@ -15,7 +15,7 @@ import { PaymentBrandMark } from '@/components/payments/payment-brand-mark';
 import { paymentBrandPresentation } from '@/lib/payment-brand-registry';
 import {
   canToggle,
-  isStoredButNotReady,
+  isEnabledNotReady,
   methodErrorKey,
   methodTone,
   nextStep,
@@ -25,8 +25,8 @@ import {
 
 /**
  * تبويب «وسائل الدفع» (PAY-SETTINGS-UX): وسائل الدفع **الإلكتروني للعميل** (مدى/فيزا/ماستركارد/Apple Pay) وحالتها المحسوبة في الخادم.
- * مفتاح «إظهار للعميل» هو السلوك الوحيد القابل للضبط وهو مشروط بجاهزية محسوبة؛ البوابة الافتراضية معروضة قراءةً فقط لأن التوجيه متعدد البوابات غير مبنيّ
- * (H2-04) ولا تحويل تلقائي بين البوابات. الصفحة لا تخزّن مفاتيح ولا اعتمادات — تلك في تبويب البوابات وحده.
+ * مفتاح «إظهار للعميل» اختيار التاجر (يجوز قبل جاهزية البوابة)، والجاهزية للتحصيل حالة محسوبة منفصلة؛ المفعَّلة غير الجاهزة تظهر في المتجر لكن أي محاولة دفع بها
+ * تُرفض بإشعار قبل أي تحصيل. البوابة الافتراضية معروضة قراءةً فقط لأن التوجيه متعدد البوابات غير مبنيّ (H2-04). الصفحة لا تخزّن مفاتيح ولا اعتمادات — تلك في تبويب البوابات وحده.
  */
 export function OnlineMethodsPanel({
   canManage,
@@ -108,8 +108,8 @@ export function OnlineMethodsPanel({
             <ul className="space-y-3" data-testid="pm-list">
               {methods.map((method) => {
                 const brand = paymentBrandPresentation(method.key);
-                const stale = isStoredButNotReady(method);
-                const block = stale && canManage ? null : toggleBlockReason(method, canManage);
+                const notReady = isEnabledNotReady(method);
+                const block = toggleBlockReason(canManage);
                 const step = stepText(method);
                 const switchId = `pm-switch-${method.key}`;
                 const reasonId = `pm-reason-${method.key}`;
@@ -125,7 +125,7 @@ export function OnlineMethodsPanel({
                         <Switch
                           id={switchId}
                           checked={method.enabled}
-                          disabled={!canToggle(method, canManage) || busy === method.key}
+                          disabled={!canToggle(canManage) || busy === method.key}
                           aria-describedby={reasonId}
                           onCheckedChange={(next) => void toggle(method, next)}
                         />
@@ -133,7 +133,7 @@ export function OnlineMethodsPanel({
                     </div>
 
                     <p id={reasonId} className="mt-3 text-xs leading-relaxed text-muted" data-testid={`pm-reason-${method.key}`}>
-                      {stale ? t('storedNotReady') : block ? t(`blocked.${block}`) : method.status === 'enabled' ? t('reasonEnabled') : t('reasonDisabled')}
+                      {block ? t(`blocked.${block}`) : notReady ? t('reasonEnabledNotReady') : method.enabled ? t('reasonEnabled') : t('reasonDisabled')}
                     </p>
                     {step && (
                       <div className="mt-2 flex flex-wrap items-center gap-2 rounded bg-warning/10 px-3 py-2 text-xs leading-relaxed text-warning">
@@ -150,7 +150,9 @@ export function OnlineMethodsPanel({
                       <dt className="text-muted">{t('usage')}</dt>
                       <dd className="flex flex-wrap gap-1.5">
                         <Badge tone={method.usage.invoices && method.status === 'enabled' ? 'positive' : 'muted'}>{t('usageInvoices')}</Badge>
-                        <Badge tone="muted" data-testid={`pm-store-${method.key}`}>{t('usageStoreUnavailable')}</Badge>
+                        <Badge tone={method.usage.store && method.enabled ? (method.ready ? 'positive' : 'warning') : 'muted'} data-testid={`pm-store-${method.key}`}>
+                          {t(method.enabled ? (method.ready ? 'usageStoreCollectable' : 'usageStoreNotCollectable') : 'usageStoreOff')}
+                        </Badge>
                       </dd>
                     </dl>
                     {method.multiple_eligible_gateways && (

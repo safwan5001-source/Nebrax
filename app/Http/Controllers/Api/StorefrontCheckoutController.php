@@ -12,9 +12,11 @@ use App\Services\Commerce\CheckoutReviewRequiredException;
 use App\Services\Commerce\CommerceCartService;
 use App\Services\Commerce\CommerceCheckoutService;
 use App\Services\Commerce\CommerceOnlinePaymentService;
+use App\Services\Commerce\StorefrontOnlineMethodResolver;
 use App\Services\PaymentMethodChannelAvailabilityService;
 use App\Support\CommerceOrderReference;
 use App\Support\CommerceOrderSerializer;
+use App\Support\OnlinePaymentMethodCatalog;
 use App\Support\PublicApiErrorCode;
 use App\Support\PublicApiIdempotency;
 use App\Support\PublicApiResponse;
@@ -203,10 +205,13 @@ final class StorefrontCheckoutController extends PublicApiController
      * القناة، عبر `PaymentMethodChannelAvailabilityService::availableFor()`
      * حرفياً — لا منطق إتاحة موازٍ. حقول عامة آمنة فقط.
      */
-    public function paymentMethods(Request $request, PaymentMethodChannelAvailabilityService $availability): JsonResponse
+    public function paymentMethods(Request $request, PaymentMethodChannelAvailabilityService $availability, StorefrontOnlineMethodResolver $onlineMethods): JsonResponse
     {
         $channel = SalesChannel::query()->find(app(StorefrontContext::class)->salesChannelId());
         $methods = $channel === null ? collect() : $availability->availableFor($channel);
+        // Beta: وسائل الدفع الإلكتروني التي فعّلها التاجر (مدى/Visa/Mastercard/Apple Pay) تظهر وإن لم تجهز بوابة؛ `ready` يحكم قابلية التحصيل.
+        // لا مفعَّلة ⇒ المفتاح غائب فيبقى شكل الاستجابة كما كان حرفياً.
+        $online = $channel === null ? [] : $onlineMethods->forChannel($channel);
 
         return PublicApiResponse::success($request, [
             'payment_methods' => $methods->map(fn ($method) => [
@@ -219,6 +224,7 @@ final class StorefrontCheckoutController extends PublicApiController
                     ? ['online' => app(CommerceOnlinePaymentService::class)->usableGatewayFor($method) !== null]
                     : []),
             ])->all(),
+            ...($online === [] ? [] : ['online_methods' => $online]),
         ]);
     }
 
@@ -227,17 +233,32 @@ final class StorefrontCheckoutController extends PublicApiController
      * الدفع المتاحة فعلياً لهذه القناة (`GET store/v1/checkout/payment-methods`).
      * لا حقل مبلغ ولا مزوّد في هذا الطلب مطلقاً — سلطة خادم صرفة.
      */
-    public function updatePayment(Request $request, CommerceCheckoutService $checkouts): JsonResponse
+    public function updatePayment(Request $request, CommerceCheckoutService $checkouts, StorefrontOnlineMethodResolver $onlineMethods): JsonResponse
     {
-        $this->rejectUnknown($request, ['payment_method_id']);
+        $this->rejectUnknown($request, ['payment_method_id', 'online_method']);
         $data = $request->validate([
-            'payment_method_id' => ['required', 'uuid'],
+            'payment_method_id' => ['required_without:online_method', 'prohibits:online_method', 'uuid'],
+            'online_method' => ['required_without:payment_method_id', 'prohibits:payment_method_id', 'string', Rule::in(OnlinePaymentMethodCatalog::KEYS)],
         ]);
+
+        $paymentMethodId = $data['payment_method_id'] ?? null;
+        if (isset($data['online_method'])) {
+            // Beta: وسيلة إلكترونية مفعَّلة لكن غير جاهزة ⇒ رفض قبل أي كتابة (لا تغيير في الـCheckout، ولا نية ولا محاولة ولا أثر محاسبي).
+            $channel = SalesChannel::query()->find(app(StorefrontContext::class)->salesChannelId());
+            $method = $channel === null ? null : $onlineMethods->resolveReady($data['online_method'], $channel);
+            if ($method === null) {
+                return PublicApiResponse::error(
+                    $request, PublicApiErrorCode::PAYMENT_UNAVAILABLE,
+                    'الدفع الإلكتروني غير متاح حاليًا. لم يتم خصم أي مبلغ.',
+                );
+            }
+            $paymentMethodId = (string) $method->id;
+        }
 
         return $this->withCurrentCheckout(
             $request,
             $checkouts,
-            fn (CommerceCheckout $checkout) => $checkouts->updatePayment($checkout, $data['payment_method_id']),
+            fn (CommerceCheckout $checkout) => $checkouts->updatePayment($checkout, (string) $paymentMethodId),
         );
     }
 

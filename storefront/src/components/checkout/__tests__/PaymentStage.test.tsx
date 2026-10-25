@@ -139,4 +139,52 @@ describe("PaymentStage", () => {
     );
     expect(screen.queryByText("payment.settledOnDelivery")).toBeNull();
   });
+
+  it("Beta: lists merchant-enabled online methods through the message catalogue, ready or not, with the redirect note once chosen", () => {
+    const ready: AwjPaymentMethod = {
+      id: "online:mada",
+      name: "mada",
+      name_en: null,
+      settlement_type: "online",
+      online: true,
+      onlineKey: "mada",
+      ready: true,
+      linkedMethodId: "pm-9",
+    };
+    const notReady: AwjPaymentMethod = {
+      ...ready,
+      id: "online:visa",
+      name: "visa",
+      onlineKey: "visa",
+      ready: false,
+      linkedMethodId: null,
+    };
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <PaymentStage
+        paymentMethods={[cashMethod, ready, notReady]}
+        selectedPaymentMethodId={cashMethod.id}
+        onChange={onChange}
+        deliveryMethod="standard"
+        t={t}
+      />,
+    );
+
+    // الاسم من الكتالوج بمفتاح الخادم، لا من نص مكتوب في المكوّن؛ وغير الجاهزة تُعرض طبيعياً (الرفض عند المتابعة لا بملصق مسبق)
+    expect(screen.getByText("payment.onlineBrand.mada")).toBeInTheDocument();
+    expect(screen.getByText("payment.onlineBrand.visa")).toBeInTheDocument();
+    expect(screen.getAllByRole("radio")).toHaveLength(3);
+    expect(screen.queryByTestId("awj-payment-online-note")).toBeNull();
+
+    rerender(
+      <PaymentStage
+        paymentMethods={[cashMethod, ready, notReady]}
+        selectedPaymentMethodId="online:visa"
+        onChange={onChange}
+        deliveryMethod="standard"
+        t={t}
+      />,
+    );
+    expect(screen.getByTestId("awj-payment-online-note")).toBeInTheDocument();
+  });
 });

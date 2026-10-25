@@ -369,6 +369,14 @@ php artisan serve
 - **صفحة العودة (`PaymentReturn`):** الحقيقة الوحيدة هي `GET payment-status` من الخادم؛ **لا يُقرأ شيء من عنوان المتصفح** سوى `?start=1` (يبدأ الدفع مرة واحدة ويُزال). التحويل لعنوان https يعيده الخادم فقط. حالات: paid · pending (استطلاع ثم «تحقّق مجدداً») · under_review · awaiting/failed/expired (إعادة محاولة إن `can_retry`) · cancelled · غير معروف · انقطاع (محدود). `not_payable` عند البدء يعيد قراءة الحالة الحقيقية. بلا اسم مزوّد/شعار/حقل بطاقة (حارس معماري). ست لغات (سوق AWJ يعرض ar/en فقط؛ de/es/fr/pl مُتحقَّق منها بالاختبار الوحدوي بملفات الرسائل الحقيقية).
 - المرجع: `docs/plans/payments/horizon/AWJ-PAY-H4-IMPLEMENTATION-REPORT.md`.
 
+## تفعيل وسائل الدفع الإلكتروني في Beta — PAY-BETA-METHODS (فصل `enabled` عن `ready`)
+
+`OnlinePaymentMethodSettingsService` (مدى/Visa/Mastercard/Apple Pay): **`enabled`** اختيار التاجر المخزَّن (يجوز قبل أي بوابة)، و**`ready`** جاهزية التحصيل المحسوبة (اتصال نشط متحقَّق منه يعلن المحوّل الوسيلة ولا يحتاج إعداد مزوّد غير قابل للتحقق كـApple Pay). `setEnabled` لم يعد يرفض غير الجاهزة؛ الحالات: `enabled` · `enabled_not_ready` · `disabled` · `needs_setup` · `unsupported`. `customer_visible = enabled`.
+- **Checkout المتجر:** `GET store/v1/checkout/payment-methods` يضيف `online_methods:[{key,ready,payment_method_id}]` **فقط حين يفعّل التاجر وسيلة** (وإلا الشكل حرفياً كما كان). `StorefrontOnlineMethodResolver` يحكم `ready` = مفعَّلة + اتصال جاهز + بوابة المنصة مفتوحة + اتصال مرتبط بطريقة دفع نشطة متاحة للقناة + `usableGatewayFor`. `PATCH checkout/payment` يقبل `online_method` (بديلاً عن `payment_method_id`، لا الاثنين): غير الجاهزة ⇒ `503 payment_unavailable` برسالة «الدفع الإلكتروني غير متاح حاليًا. لم يتم خصم أي مبلغ.» **قبل أي كتابة** (لا نية ولا محاولة ولا سند ولا قيد). الجاهزة تكمل المسار القائم نفسه (`payment_method_id` ← `complete` ← `payment-intent`) بكل فحوصه؛ **لا مسار دفع موازٍ ولا تجاوز لجاهزية البوابة**.
+- **رابط دفع الفاتورة** (`customerVisibleKeys`) يبقى على المفعَّلة **والجاهزة** فقط (له اتصال محدَّد).
+- **واجهة المتجر:** تظهر الوسائل المفعَّلة طبيعياً في مرحلة الدفع (الاسم من كتالوج الرسائل بمفتاح الخادم — حارس `AwjCheckoutFlow.architecture` باقٍ: لا اسم مزوّد/نظام بطاقة في المصدر)؛ اختيار غير جاهزة ثم «متابعة» يعرض الإشعار ولا يتقدّم. **شعارات التذييل عرض فقط ولا تدخل في الحكم على الجاهزية.**
+- المرجع: `docs/plans/payments/horizon/AWJ-PAY-BETA-METHODS-IMPLEMENTATION-REPORT.md`.
+
 ## أدوار ضريبة القيمة المضافة (REM-05 / ACC-01)
 
 `App\Services\Accounting\VatRoleIntegrityService` هو مصدر قواعد دورَي `tax_input`/`tax_output` وسياق تقرير الضريبة. لا يكتب شيئاً.

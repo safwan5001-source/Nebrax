@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '@/lib/api';
-import { METHOD_KEYS, canToggle, isMethodKey, methodErrorKey, methodTone, nextStep, toggleBlockReason } from './contract';
+import { METHOD_KEYS, canToggle, isEnabledNotReady, isMethodKey, methodErrorKey, methodTone, nextStep, toggleBlockReason } from './contract';
 
 const err = (code: string) => new ApiError(422, 'x', { error: { code, message: 'x' } });
 
@@ -13,42 +13,37 @@ describe('online payment methods contract', () => {
 
   it('maps the computed status to a badge tone', () => {
     expect(methodTone('enabled')).toBe('positive');
+    expect(methodTone('enabled_not_ready')).toBe('warning');
     expect(methodTone('needs_setup')).toBe('warning');
     expect(methodTone('disabled')).toBe('muted');
     expect(methodTone('unsupported')).toBe('muted');
   });
 
-  it('derives the required next step only for the not-ready statuses', () => {
-    expect(nextStep({ status: 'unsupported', reason: null })).toBe('add_gateway');
-    expect(nextStep({ status: 'needs_setup', reason: 'no_usable_gateway' })).toBe('activate_gateway');
-    expect(nextStep({ status: 'needs_setup', reason: 'provider_setup_required' })).toBe('provider_setup');
-    expect(nextStep({ status: 'enabled', reason: null })).toBeNull();
-    expect(nextStep({ status: 'disabled', reason: null })).toBeNull();
+  it('derives the required next step only for methods that cannot collect yet', () => {
+    expect(nextStep({ ready: false, reason: 'no_gateway' })).toBe('add_gateway');
+    expect(nextStep({ ready: false, reason: 'no_usable_gateway' })).toBe('activate_gateway');
+    expect(nextStep({ ready: false, reason: 'provider_setup_required' })).toBe('provider_setup');
+    expect(nextStep({ ready: true, reason: null })).toBeNull();
   });
 
-  it('allows toggling only a ready method for a manager', () => {
-    expect(canToggle({ status: 'disabled' }, true)).toBe(true);
-    expect(canToggle({ status: 'enabled' }, true)).toBe(true);
-    expect(canToggle({ status: 'disabled' }, false)).toBe(false);
-    expect(canToggle({ status: 'needs_setup' }, true)).toBe(false);
-    expect(canToggle({ status: 'unsupported' }, true)).toBe(false);
-    // محفوظة «مفعّلة» وغير جاهزة ⇒ تُطفأ فقط
-    expect(canToggle({ status: 'needs_setup', enabled: true }, true)).toBe(true);
-    expect(canToggle({ status: 'unsupported', enabled: true }, false)).toBe(false);
+  it('Beta: readiness never blocks the switch — only the manage permission does', () => {
+    expect(canToggle(true)).toBe(true);
+    expect(canToggle(false)).toBe(false);
+    expect(toggleBlockReason(true)).toBeNull();
+    expect(toggleBlockReason(false)).toBe('no_permission');
   });
 
-  it('explains why a toggle is blocked', () => {
-    expect(toggleBlockReason({ status: 'unsupported' }, true)).toBe('unsupported');
-    expect(toggleBlockReason({ status: 'needs_setup' }, true)).toBe('needs_setup');
-    expect(toggleBlockReason({ status: 'disabled' }, false)).toBe('no_permission');
-    expect(toggleBlockReason({ status: 'disabled' }, true)).toBeNull();
+  it('flags a method that is shown to customers but cannot collect', () => {
+    expect(isEnabledNotReady({ enabled: true, ready: false })).toBe(true);
+    expect(isEnabledNotReady({ enabled: true, ready: true })).toBe(false);
+    expect(isEnabledNotReady({ enabled: false, ready: false })).toBe(false);
   });
 
   it('translates stable server codes and falls back to generic', () => {
-    expect(methodErrorKey(err('method.unsupported'))).toBe('unsupported');
-    expect(methodErrorKey(err('method.needs_setup'))).toBe('needs_setup');
     expect(methodErrorKey(err('method.unknown'))).toBe('unknown_method');
     expect(methodErrorKey(err('method.reason_too_long'))).toBe('reason_too_long');
+    // رموز الرفض القديمة لم تعد تصدر؛ إن ظهرت فهي عامة
+    expect(methodErrorKey(err('method.needs_setup'))).toBe('generic');
     expect(methodErrorKey(err('something.else'))).toBe('generic');
     expect(methodErrorKey(new Error('network'))).toBe('generic');
   });

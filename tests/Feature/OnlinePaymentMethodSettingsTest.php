@@ -37,7 +37,7 @@ class OnlinePaymentMethodSettingsTest extends TestCase
     }
 
     #[Test]
-    public function without_any_connection_every_method_is_unsupported_and_cannot_be_enabled(): void
+    public function without_any_connection_every_method_is_unsupported_yet_the_merchant_can_still_enable_it_in_beta(): void
     {
         $auth = $this->registerTenant('opm-empty', 'owner@opm-empty.test');
         $rows = $this->withToken($auth['token'])->getJson('/api/online-payment-methods')->assertOk()->json('data');
@@ -45,14 +45,20 @@ class OnlinePaymentMethodSettingsTest extends TestCase
         $this->assertSame(OnlinePaymentMethodCatalog::KEYS, array_column($rows, 'key'));
         foreach ($rows as $row) {
             $this->assertSame('unsupported', $row['status']);
+            $this->assertFalse($row['enabled']);
+            $this->assertFalse($row['ready']);
+            $this->assertSame('no_gateway', $row['reason']);
             $this->assertFalse($row['customer_visible']);
             $this->assertNull($row['effective_gateway']);
             $this->assertFalse($row['default_gateway_selectable']);
         }
+        // Beta: التفعيل اختيار تاجر؛ يُحفظ ويُدقَّق حتى بلا أي بوابة، لكنه لا يجعل الوسيلة جاهزة للتحصيل.
         $this->withToken($auth['token'])->putJson('/api/online-payment-methods/mada', ['enabled' => true])
-            ->assertStatus(422)->assertJsonPath('error.code', 'method.unsupported');
+            ->assertOk()->assertJsonPath('data.status', 'enabled_not_ready')->assertJsonPath('data.enabled', true)
+            ->assertJsonPath('data.ready', false)->assertJsonPath('data.customer_visible', true)->assertJsonPath('data.reason', 'no_gateway');
+        $this->withToken($auth['token'])->putJson('/api/online-payment-methods/mada', ['enabled' => false])->assertOk()->assertJsonPath('data.status', 'unsupported');
         $this->withToken($auth['token'])->putJson('/api/online-payment-methods/bitcoin', ['enabled' => true])->assertNotFound();
-        $this->assertSame(0, OnlinePaymentMethodSettingEvent::withoutGlobalScopes()->count());
+        $this->assertSame(2, OnlinePaymentMethodSettingEvent::withoutGlobalScopes()->count());
     }
 
     #[Test]
@@ -65,28 +71,32 @@ class OnlinePaymentMethodSettingsTest extends TestCase
         $mada = $this->methodRow($auth['token'], 'mada');
         $this->assertSame('needs_setup', $mada['status']);
         $this->assertSame('no_usable_gateway', $mada['reason']);
-        $this->withToken($auth['token'])->putJson('/api/online-payment-methods/mada', ['enabled' => true])->assertStatus(422)->assertJsonPath('error.code', 'method.needs_setup');
+        $this->assertFalse($mada['ready']);
 
         DB::table('payment_gateways')->where('id', $gateway->id)->update(['status' => 'active', 'is_active' => true]);
+        $this->assertTrue($this->methodRow($auth['token'], 'mada')['ready']);
         $this->assertSame('disabled', $this->methodRow($auth['token'], 'mada')['status']);
         $this->assertSame($gateway->id, $this->methodRow($auth['token'], 'mada')['effective_gateway']['id']);
 
-        // Apple Pay موثَّقة لدى المزوّد لكنها تحتاج إعداداً لديه لا يتحقق منه أَوْج ⇒ لا تُفعَّل
+        // Apple Pay موثَّقة لدى المزوّد لكنها تحتاج إعداداً لديه لا يتحقق منه أَوْج ⇒ لا تكون جاهزة أبداً من تلقاء نفسها، ويجوز مع ذلك تفعيلها (Beta)
         $apple = $this->methodRow($auth['token'], 'apple_pay');
         $this->assertSame('needs_setup', $apple['status']);
         $this->assertSame('provider_setup_required', $apple['reason']);
+        $this->assertFalse($apple['ready']);
         $this->assertNull($apple['effective_gateway']);
-        $this->withToken($auth['token'])->putJson('/api/online-payment-methods/apple_pay', ['enabled' => true])->assertStatus(422)->assertJsonPath('error.code', 'method.needs_setup');
+        $this->withToken($auth['token'])->putJson('/api/online-payment-methods/apple_pay', ['enabled' => true])
+            ->assertOk()->assertJsonPath('data.status', 'enabled_not_ready')->assertJsonPath('data.ready', false)->assertJsonPath('data.reason', 'provider_setup_required');
 
-        // تفعيل ثم تعليق الاتصال ⇒ تختفي للعميل (المخزَّن باقٍ) وتعود بإعادة التفعيل
-        $this->withToken($auth['token'])->putJson('/api/online-payment-methods/mada', ['enabled' => true, 'reason' => 'إظهار للعملاء'])->assertOk()->assertJsonPath('data.status', 'enabled')->assertJsonPath('data.customer_visible', true);
+        // تفعيل ثم تعليق الاتصال ⇒ تبقى مفعَّلة ومعروضة لكنها غير جاهزة، وتعود جاهزة بعودة الاتصال
+        $this->withToken($auth['token'])->putJson('/api/online-payment-methods/mada', ['enabled' => true, 'reason' => 'إظهار للعملاء'])->assertOk()->assertJsonPath('data.status', 'enabled')->assertJsonPath('data.ready', true)->assertJsonPath('data.customer_visible', true);
         DB::table('payment_gateways')->where('id', $gateway->id)->update(['status' => 'suspended', 'is_active' => false]);
         $suspended = $this->methodRow($auth['token'], 'mada');
-        $this->assertSame('needs_setup', $suspended['status']);
+        $this->assertSame('enabled_not_ready', $suspended['status']);
         $this->assertTrue($suspended['enabled']);
-        $this->assertFalse($suspended['customer_visible']);
+        $this->assertFalse($suspended['ready']);
+        $this->assertTrue($suspended['customer_visible']);
         DB::table('payment_gateways')->where('id', $gateway->id)->update(['status' => 'active', 'is_active' => true]);
-        $this->assertTrue($this->methodRow($auth['token'], 'mada')['customer_visible']);
+        $this->assertSame('enabled', $this->methodRow($auth['token'], 'mada')['status']);
     }
 
     #[Test]
@@ -97,19 +107,19 @@ class OnlinePaymentMethodSettingsTest extends TestCase
         $gateway = PaymentGateway::query()->create(['provider' => 'moyasar', 'name' => 'Moyasar', 'environment' => 'sandbox']);
         DB::table('payment_gateways')->where('id', $gateway->id)->update(['status' => 'active', 'is_active' => true, 'verified_at' => null]);
 
-        // مفعَّل لكن غير متحقَّق منه (مثلاً بعد تدوير الأسرار) ⇒ لا جاهزية ولا تفعيل ولا عرض للعميل
+        // مفعَّل لكن غير متحقَّق منه (مثلاً بعد تدوير الأسرار) ⇒ لا جاهزية للتحصيل
         $this->assertSame('needs_setup', $this->methodRow($auth['token'], 'mada')['status']);
         $this->assertSame('no_usable_gateway', $this->methodRow($auth['token'], 'mada')['reason']);
-        $this->withToken($auth['token'])->putJson('/api/online-payment-methods/mada', ['enabled' => true])->assertStatus(422)->assertJsonPath('error.code', 'method.needs_setup');
 
         DB::table('payment_gateways')->where('id', $gateway->id)->update(['verified_at' => now()]);
-        $this->withToken($auth['token'])->putJson('/api/online-payment-methods/mada', ['enabled' => true])->assertOk()->assertJsonPath('data.customer_visible', true);
+        $this->withToken($auth['token'])->putJson('/api/online-payment-methods/mada', ['enabled' => true])->assertOk()->assertJsonPath('data.status', 'enabled')->assertJsonPath('data.customer_visible', true);
 
-        // التحقق صُفّر بعد التفعيل ⇒ تختفي للعميل فوراً (المخزَّن باقٍ)
+        // التحقق صُفّر بعد التفعيل ⇒ تبقى معروضة لكنها غير جاهزة؛ ورابط الدفع (له اتصال محدَّد) لا يعرضها
         DB::table('payment_gateways')->where('id', $gateway->id)->update(['verified_at' => null]);
         $row = $this->methodRow($auth['token'], 'mada');
         $this->assertTrue($row['enabled']);
-        $this->assertFalse($row['customer_visible']);
+        $this->assertFalse($row['ready']);
+        $this->assertSame('enabled_not_ready', $row['status']);
         app(TenantContext::class)->set($auth['tenant_id']);
         $this->assertSame([], app(OnlinePaymentMethodSettingsService::class)->customerVisibleKeys($gateway->id));
     }

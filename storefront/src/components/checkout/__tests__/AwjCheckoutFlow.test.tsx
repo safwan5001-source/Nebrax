@@ -954,6 +954,159 @@ describe("AwjCheckoutFlow", () => {
       expect(mockActions.completeAwjCheckoutAction).not.toHaveBeenCalled();
     });
 
+    describe("Beta online payment methods", () => {
+      const brand = (key: string, ready: boolean) => ({
+        id: `online:${key}`,
+        name: key,
+        name_en: null,
+        settlement_type: "online",
+        online: true,
+        onlineKey: key,
+        ready,
+        linkedMethodId: ready ? "pm-card" : null,
+      });
+
+      async function reachPayment(user: ReturnType<typeof userEvent.setup>) {
+        mockActions.startOrResumeAwjCheckout.mockResolvedValue({
+          success: true,
+          checkout: checkoutWith(),
+        });
+        const ok = { success: true, checkout: checkoutWith() };
+        mockActions.updateAwjContact.mockResolvedValue(ok);
+        mockActions.updateAwjAddress.mockResolvedValue(ok);
+        mockActions.updateAwjDelivery.mockResolvedValue(ok);
+        render(<AwjCheckoutFlow />);
+        await screen.findByLabelText("awjCheckout.contact.name");
+        await user.type(
+          screen.getByLabelText("awjCheckout.contact.name"),
+          "سالم الأحمدي",
+        );
+        await user.type(
+          screen.getByLabelText("awjCheckout.contact.phone"),
+          "0501234567",
+        );
+        await user.click(
+          screen.getByRole("button", { name: "awjCheckout.continueToAddress" }),
+        );
+        await screen.findByLabelText("awjCheckout.address.country");
+        await user.type(
+          screen.getByLabelText("awjCheckout.address.country"),
+          "SA",
+        );
+        await user.type(
+          screen.getByLabelText("awjCheckout.address.city"),
+          "الدمام",
+        );
+        await user.type(
+          screen.getByLabelText("awjCheckout.address.street"),
+          "شارع الملك فهد",
+        );
+        await user.click(
+          screen.getByRole("button", {
+            name: "awjCheckout.continueToDelivery",
+          }),
+        );
+        await screen.findByText("awjCheckout.delivery.heading");
+        await user.click(
+          screen.getByLabelText(/awjCheckout\.delivery\.methods\.pickup/),
+        );
+        await user.click(
+          screen.getByRole("button", { name: "awjCheckout.continueToPayment" }),
+        );
+        await screen.findByText("awjCheckout.payment.heading");
+      }
+
+      it("an enabled but not-ready method is refused with the plain notice: the shopper stays on payment and nothing is saved", async () => {
+        const user = userEvent.setup();
+        mockActions.getAwjPaymentMethods.mockResolvedValue([
+          brand("mada", false),
+        ]);
+        mockActions.updateAwjPayment.mockResolvedValue({
+          success: false,
+          kind: "online_unavailable",
+          error: "x",
+        });
+        await reachPayment(user);
+
+        await user.click(screen.getByRole("radio"));
+        await user.click(
+          screen.getByRole("button", { name: "awjCheckout.continueToReview" }),
+        );
+
+        expect(await screen.findByRole("alert")).toHaveTextContent(
+          "awjCheckout.payment.onlineUnavailable",
+        );
+        expect(mockActions.updateAwjPayment).toHaveBeenCalledWith(
+          "online:mada",
+          "mada",
+        );
+        expect(screen.queryByText("awjCheckout.review.heading")).toBeNull();
+        expect(mockActions.completeAwjCheckoutAction).not.toHaveBeenCalled();
+      });
+
+      it("a ready method is saved by its key and the shopper moves on to review", async () => {
+        const user = userEvent.setup();
+        mockActions.getAwjPaymentMethods.mockResolvedValue([
+          brand("mada", true),
+          brand("visa", true),
+        ]);
+        mockActions.updateAwjPayment.mockResolvedValue({
+          success: true,
+          checkout: checkoutWith(),
+        });
+        await reachPayment(user);
+
+        await user.click(screen.getAllByRole("radio")[1]);
+        await user.click(
+          screen.getByRole("button", { name: "awjCheckout.continueToReview" }),
+        );
+
+        await screen.findByText("awjCheckout.review.heading");
+        expect(mockActions.updateAwjPayment).toHaveBeenCalledTimes(1);
+        expect(mockActions.updateAwjPayment).toHaveBeenCalledWith(
+          "online:visa",
+          "visa",
+        );
+      });
+
+      it("switching from a refused online method to a cash method proceeds normally", async () => {
+        const user = userEvent.setup();
+        const cash = {
+          id: "pm-cash",
+          name: "نقدي",
+          name_en: null,
+          settlement_type: "cash",
+        };
+        mockActions.getAwjPaymentMethods.mockResolvedValue([
+          cash,
+          brand("mada", false),
+        ]);
+        mockActions.updateAwjPayment
+          .mockResolvedValueOnce({
+            success: false,
+            kind: "online_unavailable",
+            error: "x",
+          })
+          .mockResolvedValueOnce({ success: true, checkout: checkoutWith() });
+        await reachPayment(user);
+
+        await user.click(screen.getAllByRole("radio")[1]);
+        await user.click(
+          screen.getByRole("button", { name: "awjCheckout.continueToReview" }),
+        );
+        await screen.findByRole("alert");
+
+        await user.click(screen.getAllByRole("radio")[0]);
+        await user.click(
+          screen.getByRole("button", { name: "awjCheckout.continueToReview" }),
+        );
+        await screen.findByText("awjCheckout.review.heading");
+        expect(mockActions.updateAwjPayment).toHaveBeenLastCalledWith(
+          "pm-cash",
+        );
+      });
+    });
+
     it("lets the shopper step back without re-saving the stage they left", async () => {
       const user = userEvent.setup();
       render(<AwjCheckoutFlow />);

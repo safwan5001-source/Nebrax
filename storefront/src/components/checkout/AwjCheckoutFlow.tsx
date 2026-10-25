@@ -237,9 +237,15 @@ export function AwjCheckoutFlow() {
     // draft so the shopper doesn't tap through an option list of one. Still
     // only saved when `saveAndAdvance` actually PATCHes it, same as any
     // other draft field here.
+    const saved = nextCheckout.payment.payment_method_id;
     setPaymentMethodId(
-      nextCheckout.payment.payment_method_id ??
-        (methods.length === 1 ? methods[0].id : null),
+      // A saved choice that a ready online method now stands for re-selects that option (its cash/bank twin is folded away).
+      (saved
+        ? (
+            methods.find((m) => m.id === saved) ??
+            methods.find((m) => m.onlineKey && m.linkedMethodId === saved)
+          )?.id
+        : undefined) ?? (methods.length === 1 ? methods[0].id : null),
     );
     setStage("contact");
     setFlowState("stage");
@@ -399,7 +405,20 @@ export function AwjCheckoutFlow() {
           // is something to save and it differs from what is already saved,
           // so re-visiting this stage without changing anything never fires
           // a redundant write.
-          if (
+          const chosen = paymentMethods.find((m) => m.id === paymentMethodId);
+          if (chosen?.onlineKey) {
+            // Beta: an online method is always resolved by the server (a not-ready one is refused before anything is written or charged).
+            const result = await updateAwjPayment(chosen.id, chosen.onlineKey);
+            if (!result.success) {
+              setFormError(
+                result.kind === "online_unavailable"
+                  ? t("payment.onlineUnavailable")
+                  : result.error,
+              );
+              return;
+            }
+            setCheckout(result.checkout);
+          } else if (
             paymentMethodId &&
             paymentMethodId !== checkout?.payment.payment_method_id
           ) {
@@ -421,6 +440,8 @@ export function AwjCheckoutFlow() {
       address,
       deliveryMethod,
       paymentMethodId,
+      paymentMethods,
+      t,
       checkout,
       scheduleDraft,
       gift,
