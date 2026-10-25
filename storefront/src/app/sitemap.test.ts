@@ -705,13 +705,23 @@ describe("AWJ API failure", () => {
     expect(JSON.stringify(errorLog.mock.calls)).not.toMatch(/SECRET_TOKEN/);
   });
 
-  it("the index degrades to one file, so robots.txt never depends on the API being up", async () => {
+  it("the index throws (retryable) instead of declaring a partial file list", async () => {
     useBackend(failing);
     const { generateSitemaps } = await loadRoute();
 
-    await expect(generateSitemaps()).resolves.toEqual([{ id: 0 }]);
+    await expect(generateSitemaps()).rejects.toThrow(
+      "Sitemap is temporarily unavailable.",
+    );
     expect(errorLog).toHaveBeenCalled();
     expect(JSON.stringify(errorLog.mock.calls)).not.toMatch(LEAK);
+  });
+
+  it("only during `next build` does the index fall back to one file", async () => {
+    useBackend(failing);
+    vi.stubEnv("NEXT_PHASE", "phase-production-build");
+    const { generateSitemaps } = await loadRoute();
+
+    await expect(generateSitemaps()).resolves.toEqual([{ id: 0 }]);
   });
 
   it("reports a missing API configuration without leaking it in the thrown error", async () => {

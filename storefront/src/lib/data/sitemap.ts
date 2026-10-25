@@ -33,6 +33,22 @@ import { getStoreUrl } from "@/lib/store";
 const SITEMAP_PRODUCTS_PAGE_SIZE_MAX = 100;
 
 /**
+ * Sitemap layout — shaped by the upstream request budget, not by URL count.
+ * A file covers a FIXED number of product API pages, so its cost is known
+ * before it starts:
+ *   file 0   = static pages + every category + product pages 1..N
+ *   file k>0 = product pages kN+1..(k+1)N
+ */
+export const PRODUCT_PAGES_PER_SITEMAP = 5;
+export const ITEMS_PER_PAGE = 100;
+export const MAX_PAGES = 1000;
+/** Maximum products we can actually list, given pagination limits. */
+export const MAX_FETCHABLE_ITEMS = ITEMS_PER_PAGE * MAX_PAGES;
+export const MAX_SITEMAPS = Math.ceil(MAX_PAGES / PRODUCT_PAGES_PER_SITEMAP);
+/** The index reads one product row for the total; the locale lookup is not needed. */
+export const SITEMAP_INDEX_REQUESTS = 1;
+
+/**
  * Upstream request budget.
  *
  * `store/v1` catalog routes sit behind `EnforcePublicApiRateLimit:unauth`:
@@ -307,4 +323,52 @@ export function describeSitemapFailure(error: unknown): string {
     return `${error.name}: ${error.message}`.slice(0, 300);
   }
   return "unknown error";
+}
+
+export function announceTruncation(total: number): number {
+  if (total > MAX_FETCHABLE_ITEMS) {
+    // Announced, never silent: these products cannot be listed by this route.
+    console.warn(
+      `Sitemap: ${total} published products exceed the ` +
+        `${MAX_FETCHABLE_ITEMS} this route can list; the rest are omitted.`,
+    );
+  }
+  return total;
+}
+
+/**
+ * The sitemap files that exist for the current host. Throws when the catalog
+ * total cannot be read (API down, rate limit, exhausted request budget): a list
+ * that is "probably right" is wrong — Next's metadata loader answers 404 for
+ * any id missing from it, and a temporary failure must stay a retryable 5xx.
+ */
+export async function listSitemapIds(): Promise<Array<{ id: number }>> {
+  reserveSitemapRequests(SITEMAP_INDEX_REQUESTS);
+  const total = Math.min(
+    announceTruncation((await getSitemapProductPage(1, 1)).total),
+    MAX_FETCHABLE_ITEMS,
+  );
+  const count = Math.max(
+    1,
+    Math.ceil(total / (PRODUCT_PAGES_PER_SITEMAP * ITEMS_PER_PAGE)),
+  );
+  return Array.from({ length: count }, (_, id) => ({ id }));
+}
+
+/**
+ * robots.txt discovery only: advertise what we can verify, else the first file.
+ * Never used for chunk validation — a wrong answer here costs a crawl hint, a
+ * wrong answer there is a false 404.
+ */
+export async function listSitemapIdsForRobots(): Promise<
+  Array<{ id: number }>
+> {
+  try {
+    return await listSitemapIds();
+  } catch (error) {
+    console.error(
+      `robots.txt lists a single sitemap file: ${describeSitemapFailure(error)}`,
+    );
+    return [{ id: 0 }];
+  }
 }

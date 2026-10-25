@@ -5,10 +5,16 @@ import {
   type MarketLocaleTarget,
 } from "@/i18n/markets";
 import {
+  announceTruncation,
   describeSitemapFailure,
   getSitemapCategories,
   getSitemapMarkets,
   getSitemapProductPage,
+  ITEMS_PER_PAGE,
+  listSitemapIds,
+  MAX_PAGES,
+  MAX_SITEMAPS,
+  PRODUCT_PAGES_PER_SITEMAP,
   reserveSitemapRequests,
   resolveSitemapBaseUrl,
   type SitemapCategory,
@@ -21,26 +27,8 @@ export const dynamic = "force-dynamic";
 
 type CountryLocale = MarketLocaleTarget;
 
-/**
- * Sitemap layout — shaped by the upstream request budget, not by URL count.
- *
- * `store/v1` allows 30 requests / 60 s per server IP, shared with all live
- * storefront traffic (see `lib/data/sitemap.ts`). A file therefore covers a
- * FIXED number of product API pages, so its cost is known before it starts:
- *   file 0   = static pages + every category + product pages 1..N
- *   file k>0 = product pages kN+1..(k+1)N
- * Each product page holds 100 products and every product is listed once per
- * locale. Files are small on purpose; a large catalog means many files that the
- * crawler fetches over time, never one request that tries to walk everything.
- */
-const PRODUCT_PAGES_PER_SITEMAP = 5;
-const ITEMS_PER_PAGE = 100;
-const MAX_PAGES = 1000;
-/** Maximum products we can actually list, given pagination limits. */
-const MAX_FETCHABLE_ITEMS = ITEMS_PER_PAGE * MAX_PAGES;
 /** Protocol ceiling per file (Google: 50,000); only file 0 can approach it. */
 const MAX_URLS_PER_SITEMAP = 50_000;
-const MAX_SITEMAPS = Math.ceil(MAX_PAGES / PRODUCT_PAGES_PER_SITEMAP);
 
 const UNAVAILABLE_MESSAGE = "Sitemap is temporarily unavailable.";
 
@@ -56,33 +44,27 @@ function requestsForSitemap(id: number): number {
   return 1 + (id === 0 ? 1 : 0) + pages;
 }
 
-/** Cost of the index: the locale lookup and one product row for the total. */
-const INDEX_REQUESTS = 2;
-
 /**
- * Lists the sitemap files. Reads only the product total (one row). A failure,
- * including an exhausted request budget, degrades to a single file — it must
- * never take robots.txt down with it.
+ * Next's metadata loader calls this on EVERY file request and answers 404 for
+ * an id that is not in the list, before `sitemap()` runs. So it must be the
+ * truth or an error: a temporary failure (API down, rate limit, exhausted
+ * budget) throws, which the loader turns into a retryable 5xx. robots.txt has
+ * its own tolerant discovery (`listSitemapIdsForRobots`).
+ *
+ * The one exception is `next build`, where there is no request, no Host and no
+ * API: prerendering has nothing to validate, so a single file is declared.
  */
 export async function generateSitemaps(): Promise<Array<{ id: number }>> {
   try {
-    reserveSitemapRequests(INDEX_REQUESTS);
-    await resolveCountryLocales();
-    const total = Math.min(
-      announceTruncation((await getSitemapProductPage(1, 1)).total),
-      MAX_FETCHABLE_ITEMS,
-    );
-    const pagesPerFile = PRODUCT_PAGES_PER_SITEMAP * ITEMS_PER_PAGE;
-    const count = Math.max(1, Math.ceil(total / pagesPerFile));
-
-    return Array.from({ length: count }, (_, id) => ({ id }));
+    return await listSitemapIds();
   } catch (error) {
-    // API may be unavailable (build time, outage, rate limit). Return a single
-    // sitemap file; it is populated on demand when the API recovers.
     console.error(
-      `Sitemap index fell back to a single file: ${describeSitemapFailure(error)}`,
+      `Sitemap index unavailable: ${describeSitemapFailure(error)}`,
     );
-    return [{ id: 0 }];
+    if (process.env.NEXT_PHASE === "phase-production-build") {
+      return [{ id: 0 }];
+    }
+    throw new Error(UNAVAILABLE_MESSAGE);
   }
 }
 
@@ -161,17 +143,6 @@ async function buildSitemapChunk(id: number): Promise<MetadataRoute.Sitemap> {
     return entries.slice(0, MAX_URLS_PER_SITEMAP);
   }
   return entries;
-}
-
-function announceTruncation(total: number): number {
-  if (total > MAX_FETCHABLE_ITEMS) {
-    // Announced, never silent: these products cannot be listed by this route.
-    console.warn(
-      `Sitemap: ${total} published products exceed the ` +
-        `${MAX_FETCHABLE_ITEMS} this route can list; the rest are omitted.`,
-    );
-  }
-  return total;
 }
 
 function appendStaticEntries(

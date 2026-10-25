@@ -430,7 +430,9 @@ describe("sitemap and robots work without Spree", () => {
     expect((failure as Error).message).toBe(
       "Sitemap is temporarily unavailable.",
     );
-    expect(await generateSitemaps()).toEqual([{ id: 0 }]);
+    await expect(generateSitemaps()).rejects.toThrow(
+      "Sitemap is temporarily unavailable.",
+    );
     expect(errorLog).toHaveBeenCalled();
     expect(JSON.stringify(errorLog.mock.calls)).not.toMatch(/db-internal/);
     expect((failure as Error).message).not.toMatch(LEAK);

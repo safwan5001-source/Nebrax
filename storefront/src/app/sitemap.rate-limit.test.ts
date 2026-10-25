@@ -121,7 +121,7 @@ describe("request cost of a sitemap file", () => {
     }
   });
 
-  it("an index costs 2 requests regardless of catalog size", async () => {
+  it("an index costs 1 request regardless of catalog size", async () => {
     const fake = createFakeAwj({
       [HOST_A]: { products: manyProducts(100_000), categories: [] },
     });
@@ -129,7 +129,7 @@ describe("request cost of a sitemap file", () => {
     const { generateSitemaps } = await loadRoute();
 
     expect(await generateSitemaps()).toHaveLength(200);
-    expect(fake.calls).toHaveLength(2);
+    expect(fake.calls).toHaveLength(1);
   });
 });
 
@@ -230,19 +230,22 @@ describe("budget guard", () => {
     );
   });
 
-  it("the index falls back to one file rather than spend budget it does not have", async () => {
+  it("an exhausted budget makes the index THROW (retryable) but robots discovery falls back", async () => {
     const fake = createFakeAwj(
       { [HOST_A]: { products: manyProducts(5000), categories: [] } },
       AWJ_LIMIT,
     );
     vi.stubGlobal("fetch", fake.fetchMock);
     const { default: sitemap, generateSitemaps } = await loadRoute();
+    const { listSitemapIdsForRobots } = await import("@/lib/data/sitemap");
     await sitemap({ id: Promise.resolve("0") });
-    await sitemap({ id: Promise.resolve("0") }); // 14 of 15 used; index needs 2
+    await sitemap({ id: Promise.resolve("0") }); // 14 of 15 used
+    expect(await generateSitemaps()).toHaveLength(10); // 15th request
     const used = fake.calls.length;
 
-    expect(await generateSitemaps()).toEqual([{ id: 0 }]);
-    expect(fake.calls).toHaveLength(used);
+    await expect(generateSitemaps()).rejects.toThrow(GENERIC);
+    expect(await listSitemapIdsForRobots()).toEqual([{ id: 0 }]);
+    expect(fake.calls).toHaveLength(used); // neither touched the API
   });
 
   it("honours SITEMAP_UPSTREAM_BUDGET_PER_MINUTE", async () => {
