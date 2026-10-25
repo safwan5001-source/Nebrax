@@ -322,6 +322,17 @@ function g(env: Record<string, string>) { return env.SPREE_NOPE; }`,
     expect(c.spree_env_reads).toBe(5);
   });
 
+  it("counts nested destructuring of process.env (review: nested process destructuring)", () => {
+    const c = scanSource(
+      `const { env: { SPREE_API_URL, SPREE_KEY: key, OTHER } } = process;
+import proc from "node:process";
+const { env: { "SPREE_Q": q } } = proc;
+const { env: { SPREE_NOT: n } } = notProcess;`,
+      "src/lib/data/a.ts",
+    );
+    expect(c.spree_env_reads).toBe(3);
+  });
+
   it("counts wrapper imports by alias and relative path, but not from inside the wrapper", () => {
     expect(
       scanSource(

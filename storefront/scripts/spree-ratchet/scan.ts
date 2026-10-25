@@ -461,6 +461,14 @@ export function scanSource(text: string, rel: string): FileCounts {
     else if (isWrapper(spec, rel)) bump(counts, "spree_wrapper_imports", n);
   };
 
+  const countEnvPattern = (pattern: ts.ObjectBindingPattern) => {
+    for (const el of pattern.elements) {
+      const key = el.propertyName ?? el.name;
+      const k = ts.isIdentifier(key) ? key.text : stringLiteral(key);
+      if (k && SPREE_ENV.test(k)) bump(counts, "spree_env_reads");
+    }
+  };
+
   const visit = (node: ts.Node) => {
     // import ... from "x"
     if (ts.isImportDeclaration(node)) {
@@ -569,10 +577,24 @@ export function scanSource(text: string, rel: string): FileCounts {
       isEnvObject(unwrap(node.initializer), envAliases, checker)
     ) {
       // const { SPREE_API_URL } = process.env
+      countEnvPattern(node.name);
+    } else if (
+      ts.isVariableDeclaration(node) &&
+      ts.isObjectBindingPattern(node.name) &&
+      node.initializer &&
+      isProcessExpr(unwrap(node.initializer), envAliases, checker)
+    ) {
+      // const { env: { SPREE_API_URL, SPREE_KEY: key } } = process
       for (const el of node.name.elements) {
-        const key = el.propertyName ?? el.name;
-        const k = ts.isIdentifier(key) ? key.text : stringLiteral(key);
-        if (k && SPREE_ENV.test(k)) bump(counts, "spree_env_reads");
+        const key = el.propertyName
+          ? ts.isIdentifier(el.propertyName)
+            ? el.propertyName.text
+            : stringLiteral(el.propertyName)
+          : ts.isIdentifier(el.name)
+            ? el.name.text
+            : undefined;
+        if (key === "env" && ts.isObjectBindingPattern(el.name))
+          countEnvPattern(el.name);
       }
     }
 
