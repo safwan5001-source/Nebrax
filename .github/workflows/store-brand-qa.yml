@@ -33,7 +33,7 @@ on:
 jobs:
   merchant-preview:
     name: merchant preview visual QA
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # Playwright has no browser build for ubuntu-26.04 (current ubuntu-latest); keep pinned until the pinned Playwright supports it
     defaults:
       run:
         working-directory: web
@@ -60,7 +60,7 @@ jobs:
 
   published-footer:
     name: published footer visual QA
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # Playwright has no browser build for ubuntu-26.04 (current ubuntu-latest); keep pinned until the pinned Playwright supports it
     defaults:
       run:
         working-directory: storefront
