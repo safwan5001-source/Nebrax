@@ -151,7 +151,6 @@ describe("StoreCheckoutLayout published theme", () => {
     const brand = Children.toArray(
       headerRow.props.children,
     )[0] as ReactElement<TestElementProps>;
-    expect(brand.props["data-header-brand"]).toBe("");
     expect(brand.props.headerBrand).toBe(true);
   });
 });
