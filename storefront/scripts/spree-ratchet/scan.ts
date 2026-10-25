@@ -278,24 +278,69 @@ function collectHelperAliases(
 }
 
 /** Local names bound to `process.env` / `import.meta.env`. */
+/** Bindings (by symbol) that hold the environment object, or the `process` object itself. */
+interface EnvScope {
+  envs: Set<ts.Symbol>;
+  procs: Set<ts.Symbol>;
+}
+
+const PROCESS_MODULES: ReadonlySet<string> = new Set([
+  "process",
+  "node:process",
+]);
+
 function collectEnvAliases(
   sf: ts.SourceFile,
   checker: ts.TypeChecker,
-): Set<ts.Symbol> {
-  const aliases = new Set<ts.Symbol>();
+): EnvScope {
+  const scope: EnvScope = { envs: new Set(), procs: new Set() };
   let changed = true;
+  // Bound by symbol: a same-named parameter/local elsewhere is a different binding.
+  const mark = (set: Set<ts.Symbol>, name: ts.Identifier) => {
+    const sym = checker.getSymbolAtLocation(name);
+    if (sym && !set.has(sym)) {
+      set.add(sym);
+      changed = true;
+    }
+  };
   const visit = (node: ts.Node) => {
-    if (
-      ts.isVariableDeclaration(node) &&
-      ts.isIdentifier(node.name) &&
-      node.initializer &&
-      isEnvObject(unwrap(node.initializer), aliases, checker)
-    ) {
-      // Bound by symbol: a same-named parameter/local elsewhere is a different binding.
-      const sym = checker.getSymbolAtLocation(node.name);
-      if (sym && !aliases.has(sym)) {
-        aliases.add(sym);
-        changed = true;
+    if (ts.isVariableDeclaration(node) && node.initializer) {
+      const init = unwrap(node.initializer);
+      if (ts.isIdentifier(node.name)) {
+        if (isEnvObject(init, scope, checker)) mark(scope.envs, node.name);
+        else if (isProcessExpr(init, scope, checker))
+          mark(scope.procs, node.name);
+      } else if (
+        ts.isObjectBindingPattern(node.name) &&
+        isProcessExpr(init, scope, checker)
+      ) {
+        // const { env } = process;  const { env: e } = process;
+        for (const el of node.name.elements) {
+          const key = el.propertyName
+            ? ts.isIdentifier(el.propertyName)
+              ? el.propertyName.text
+              : stringLiteral(el.propertyName)
+            : ts.isIdentifier(el.name)
+              ? el.name.text
+              : undefined;
+          if (key === "env" && ts.isIdentifier(el.name))
+            mark(scope.envs, el.name);
+        }
+      }
+    } else if (ts.isImportDeclaration(node) && node.importClause) {
+      // import { env } from "node:process";  import process from "node:process";  import * as p from "process"
+      const spec = stringLiteral(node.moduleSpecifier);
+      if (spec && PROCESS_MODULES.has(spec)) {
+        const clause = node.importClause;
+        if (clause.name) mark(scope.procs, clause.name);
+        const nb = clause.namedBindings;
+        if (nb && ts.isNamespaceImport(nb)) mark(scope.procs, nb.name);
+        else if (nb && ts.isNamedImports(nb))
+          for (const el of nb.elements) {
+            const imported = (el.propertyName ?? el.name).text;
+            if (imported === "env") mark(scope.envs, el.name);
+            else if (imported === "default") mark(scope.procs, el.name);
+          }
       }
     }
     ts.forEachChild(node, visit);
@@ -304,17 +349,32 @@ function collectEnvAliases(
     changed = false;
     visit(sf);
   }
-  return aliases;
+  return scope;
+}
+
+/** `process`, a binding of it, or `require("node:process")`. */
+function isProcessExpr(
+  e: ts.Expression,
+  scope: EnvScope,
+  checker: ts.TypeChecker,
+): boolean {
+  if (ts.isIdentifier(e)) {
+    if (e.text === "process") return true;
+    const sym = checker.getSymbolAtLocation(e);
+    return !!sym && scope.procs.has(sym);
+  }
+  const spec = dynamicSpecifier(e);
+  return spec !== undefined && PROCESS_MODULES.has(spec);
 }
 
 function isEnvObject(
   e: ts.Expression,
-  aliases: ReadonlySet<ts.Symbol>,
+  scope: EnvScope,
   checker: ts.TypeChecker,
 ): boolean {
   if (ts.isIdentifier(e)) {
     const sym = checker.getSymbolAtLocation(e);
-    return !!sym && aliases.has(sym);
+    return !!sym && scope.envs.has(sym);
   }
   // process.env / process["env"] / import.meta.env / import.meta["env"]
   const base =
@@ -327,7 +387,7 @@ function isEnvObject(
       ? stringLiteral(e.argumentExpression)
       : undefined;
   if (base && member === "env") {
-    if (ts.isIdentifier(base) && base.text === "process") return true;
+    if (isProcessExpr(unwrap(base), scope, checker)) return true;
     if (ts.isMetaProperty(base)) return true;
   }
   return false;

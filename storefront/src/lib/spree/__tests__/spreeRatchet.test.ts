@@ -304,6 +304,24 @@ const f = other["env"].SPREE_NOPE;`,
     expect(c.spree_env_reads).toBe(5); // a, b, alias read, destructure, import.meta; not other["env"]
   });
 
+  it("tracks env bindings extracted from process or imported from node:process (review)", () => {
+    const c = scanSource(
+      `const { env } = process;
+export const a = env.SPREE_API_URL;
+const { env: e2 } = process;
+export const b = e2["SPREE_KEY"];
+import { env as e3 } from "node:process";
+export const c = e3.SPREE_X;
+import proc from "node:process";
+export const d = proc.env.SPREE_Y;
+const p2 = require("process");
+export const f = p2.env.SPREE_Z;
+function g(env: Record<string, string>) { return env.SPREE_NOPE; }`,
+      "src/lib/data/a.ts",
+    );
+    expect(c.spree_env_reads).toBe(5);
+  });
+
   it("counts wrapper imports by alias and relative path, but not from inside the wrapper", () => {
     expect(
       scanSource(
