@@ -32,7 +32,7 @@ interface AuthContextType {
   login: (
     email: string,
     password: string,
-  ) => Promise<{ success: boolean; error?: string; code?: string }>;
+  ) => Promise<{ success: boolean; code?: string }>;
   register: (params: {
     email: string;
     password: string;
@@ -41,7 +41,7 @@ interface AuthContextType {
     last_name?: string;
     phone?: string;
     metadata?: Record<string, unknown>;
-  }) => Promise<{ success: boolean; error?: string; code?: string }>;
+  }) => Promise<{ success: boolean; code?: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   isAuthenticated: boolean;

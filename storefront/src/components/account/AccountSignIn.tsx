@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
+import { accountErrorMessage } from "@/lib/commerce/account-error-message";
 import { ACCOUNT_AUTH_CAPABILITY } from "@/lib/commerce/capabilities";
 import { resolveAccountRedirect } from "@/lib/utils/account-redirect";
 import { extractBasePath } from "@/lib/utils/path";
@@ -29,6 +30,7 @@ function AccountSignInForm() {
   const searchParams = useSearchParams();
   const basePath = extractBasePath(pathname);
   const t = useTranslations("account");
+  const te = useTranslations("accountErrors");
   const { login } = useAuth();
 
   const redirectUrl = resolveAccountRedirect(
@@ -50,7 +52,13 @@ function AccountSignInForm() {
     if (result.success) {
       if (redirectUrl) router.push(redirectUrl);
     } else {
-      setError(result.error || t("invalidCredentials"));
+      setError(
+        accountErrorMessage(
+          result.code,
+          (code) => te(code),
+          t("invalidCredentials"),
+        ),
+      );
     }
     setLoading(false);
   };

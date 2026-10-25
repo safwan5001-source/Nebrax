@@ -363,15 +363,17 @@ describe("customer server actions", () => {
 
     it("returns error on failure", async () => {
       mockClient.customer.update.mockRejectedValue(
-        Object.assign(new Error("Email taken"), { status: 422 }),
+        Object.assign(new Error("Email taken"), {
+          status: 422,
+          code: "validation_error",
+        }),
       );
 
       const result = await updateCustomer({ email: "taken@example.com" });
 
       expect(result).toEqual({
         success: false,
-        code: "request_failed",
-        error: "Email taken",
+        code: "validation_failed",
       });
     });
 
@@ -379,6 +381,7 @@ describe("customer server actions", () => {
       mockClient.customer.update.mockRejectedValue(
         Object.assign(new Error("Current password is invalid or missing"), {
           status: 422,
+          code: "current_password_invalid",
         }),
       );
 
@@ -389,8 +392,7 @@ describe("customer server actions", () => {
 
       expect(result).toEqual({
         success: false,
-        code: "request_failed",
-        error: "Current password is invalid or missing",
+        code: "current_password_invalid",
       });
     });
 
@@ -402,28 +404,61 @@ describe("customer server actions", () => {
       expect(result).toEqual({
         success: false,
         code: "request_failed",
-        error: undefined,
       });
     });
   });
 });
 
-describe("failure messages (live)", () => {
-  it("never forwards a non-backend (configuration/network) error message", async () => {
+describe("failure handling (live) — upstream text never reaches the buyer", () => {
+  const HOSTILE =
+    "SQLSTATE[HY000] at /var/www/api/v3/store/auth/login token=eyJhbGciOi SPREE_API_URL=http://10.0.0.5";
+
+  it("drops the message of a non-backend (configuration/network) error", async () => {
     mockClient.auth.login.mockRejectedValueOnce(
       new Error("Spree client is not configured. Set SPREE_API_URL"),
     );
     const result = await login("a@b.sa", "pw");
-    expect(result.success).toBe(false);
-    expect(result.error).toBeUndefined();
-    expect(result.code).toBe("request_failed");
+    expect(result).toEqual({ success: false, code: "request_failed" });
   });
 
-  it("forwards a deliberate 4xx backend message", async () => {
+  it("drops the message of an unknown 4xx and returns a safe code only", async () => {
+    mockClient.customers.create.mockRejectedValueOnce(
+      Object.assign(new Error(HOSTILE), {
+        status: 422,
+        code: "weird_internal",
+      }),
+    );
+    const result = await register({
+      email: "a@b.sa",
+      password: "secret1",
+      password_confirmation: "secret1",
+    });
+    expect(result).toEqual({ success: false, code: "request_failed" });
+    expect(JSON.stringify(result)).not.toMatch(/SQLSTATE|eyJ|SPREE_|10\.0/);
+  });
+
+  it("maps a refused sign-in to invalid_credentials without reading the text", async () => {
     mockClient.auth.login.mockRejectedValueOnce(
-      Object.assign(new Error("Invalid email or password"), { status: 401 }),
+      Object.assign(new Error(HOSTILE), { status: 401 }),
     );
     const result = await login("a@b.sa", "pw");
-    expect(result.error).toBe("Invalid email or password");
+    expect(result).toEqual({ success: false, code: "invalid_credentials" });
+  });
+
+  it("keeps a legitimate validation code as a safe code", async () => {
+    mockClient.customer.update.mockRejectedValueOnce(
+      Object.assign(new Error(HOSTILE), {
+        status: 422,
+        code: "current_password_invalid",
+      }),
+    );
+    const result = await updateCustomer({
+      email: "n@b.sa",
+      current_password: "x",
+    });
+    expect(result).toEqual({
+      success: false,
+      code: "current_password_invalid",
+    });
   });
 });

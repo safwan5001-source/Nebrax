@@ -18,6 +18,7 @@ import {
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
+import { accountErrorMessage } from "@/lib/commerce/account-error-message";
 import { safeRedirectPath } from "@/lib/utils/path";
 
 interface WholesaleSignInWallProps {
@@ -37,6 +38,7 @@ export function WholesaleSignInWall({
 }: WholesaleSignInWallProps) {
   const t = useTranslations("wholesale");
   const ta = useTranslations("account");
+  const te = useTranslations("accountErrors");
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
@@ -62,7 +64,13 @@ export function WholesaleSignInWall({
       router.push(redirectUrl);
       router.refresh();
     } else {
-      setError(result.error ?? ta("invalidCredentials"));
+      setError(
+        accountErrorMessage(
+          result.code,
+          (code) => te(code),
+          ta("invalidCredentials"),
+        ),
+      );
       setLoading(false);
     }
   };

@@ -48,3 +48,50 @@
 
 ## الخطوة التالية
 مراجعة PR هذا ثم قرارات D-1…D-14. لا تبدأ AN1/X3/هوية الخلفية قبل موافقتك.
+
+
+---
+
+# تحديث — مراجعة أمنية نهائية لـPR #1744
+
+## النتائج الأمنية والتصحيحات
+| ID | الخطورة | النتيجة | التصحيح |
+|---|---|---|---|
+| SEC-1 | متوسطة | `buyerSafeMessage()` كان يمرّر `error.message` لأي استجابة 4xx؛ رمز الحالة لا يضمن سلامة النص (قد يحمل أثر استثناء/مسار/رمز/تهيئة) | **حذفت الدالة بالكامل.** لا يُقرأ أي نص من الخطأ إطلاقاً. حلّت محلها `classifyAccountError()` (`lib/commerce/account-errors.ts`) تقرأ فقط `status` الرقمي و`code` بشكل رمز (`^[a-z0-9_]{1,64}$`) وتطابقه بقائمة سماح مغلقة؛ كل ما عداه ⇒ `request_failed`. |
+| SEC-2 | متوسطة | حقل `error: string` في نتائج الـactions قابل لحمل نص خارجي | أُزيل من كل الأنواع؛ تُعيد الـactions `{ success:false, code }` فقط. |
+| SEC-3 | منخفضة | الواجهة كانت تعرض `result.error` (أربعة مواضع + بوابة الجملة موضعان) | الواجهة تحوّل الرمز إلى نص محلي عبر `accountErrorMessage()` ومساحة `accountErrors` (9 رموز × 6 لغات)؛ الرمز غير المعروف أو `request_failed` يستعمل النص المحلي الاحتياطي لكل شاشة. تغطية: sign-in، register، reset-password، profile، wholesale sign-in/apply. |
+| — | — | `ACCOUNT_AUTH_CAPABILITY = "gated"` وسلوك الإغلاق | **دون تغيير** (الاختبارات البنيوية تثبّته). |
+
+قرارات تصميم: أرجأتُ عمداً كشف «البريد مأخوذ» (`email_taken`) تفادياً لتعداد الحسابات (يتسق مع ردّ التسجيل الموحّد 202 المخطّط له)؛ يظهر كـ`request_failed`/`validation_failed` العام. 401/403 تعني `invalid_credentials` في الدخول فقط. 429 ⇒ `rate_limited`.
+
+## الملفات المتغيرة في هذا التحديث
+جديد: `lib/commerce/account-errors.ts`, `lib/commerce/account-error-message.ts`, `lib/commerce/__tests__/account-errors.test.ts`.
+معدّل: `lib/data/customer.ts`, `contexts/AuthContext.tsx`, `AccountSignIn.tsx`, `AccountProfileForm.tsx`, صفحات `register` و`reset-password`, `wholesale/_components/WholesaleSignInWall.tsx`, `wholesale/apply/page.tsx`, `messages/*.json` (مساحة `accountErrors`)، اختبارات `customer.test.ts` و`AccountAuthGate.architecture.test.ts`.
+لم يُلمس: Laravel، قواعد البيانات، المحاسبة/المخزون/الطلبات/الدفع، سلة AWJ وCheckout.
+
+## اختبارات الانحدار الأمنية
+- نصوص معادية (SQLSTATE، أثر استثناء، رابط داخلي، JWT، `SPREE_*`) × كل الإجراءات × حالات 400–503 ⇒ النتيجة دائماً رمز من القائمة، لا شظية من النص.
+- 4xx بكود مجهول ⇒ `request_failed`؛ 5xx/خطأ شبكة/قيم غير كائنية ⇒ `request_failed`؛ رمز بصيغة غير آمنة أو بحروف كبيرة مرفوض.
+- ملاحظات تحقق مشروعة محفوظة كرموز (`weak_password`, `current_password_invalid`, `invalid_token`, `validation_failed`, `rate_limited`, `invalid_credentials`).
+- `customer.gated.test.ts`: لا استدعاء لعميل Spree أثناء الإغلاق (يرمي إن لُمس)؛ `AccountAuthUnavailable.test.tsx`: كل شاشات التسجيل/الدخول/الاستعادة/الملف بلا نموذج؛ حارس بنيوي: لا `error: string` ولا `error.message` في `customer.ts`.
+- السلة وCheckout AWJ: غير متأثرتين (مجموعاتهما ضمن التشغيل الكامل).
+
+## الاختبارات والـBuild
+| الفحص | النتيجة |
+|---|---|
+| CI على الـHead السابق `05fdc69` (8 فحوص: CI Gate، php sqlite، php pgsql، storefront lint+typecheck+test ×2، docker-context، visual QA ×2) | **كلها success** — لا فشل يُصلَح |
+| `vitest run` كامل (بعد التصحيح) | **225 ملف نجح / 16 تخطّي، 3185 اختباراً نجح، 0 فشل** |
+| `tsc --noEmit` | نظيف |
+| `biome check .` | بلا أخطاء (4 تحذيرات و3 infos سابقة) |
+| `check:locales` | 6 لغات متطابقة (مع `accountErrors`) |
+| `next build` مع `SPREE_*` غير مضبوطة | نجح |
+| CI على الـHead الجديد | يُراجَع في PR بعد الدفع (لم يُنتظر هنا) |
+
+## المخاطر المتبقية
+- نصوص الأخطاء العامة تفقد تفصيل الحقل (مثلاً أي حقل فشل)؛ يُعاد تصميمها مع عقد AWJ الفعلي (B2/B4) بقائمة رموز موسّعة.
+- قائمة السماح تخمينية لرموز Spree؛ ستُستبدل برموز عقد AWJ عند بنائه (لا أثر الآن لأن البوابة مغلقة).
+- بقية ما ورد في «المخاطر والمتبقي» أعلاه كما هو (policies/sitemap/Checkout القديم/الويبهوك/كوكيز `_spree_*`).
+
+## التوصية
+**Ready for Merge** (من جهة هذا النطاق): لا ثغرة معروفة متبقية في X1/X2، البوابة `gated` دون تغيير، السلة وCheckout وAWJ غير مَمسوسَين، والاختبارات والبناء والـCI السابق خضراء. شرط وحيد: خضرة CI على الـHead الجديد. القرار والـMerge لك.
+

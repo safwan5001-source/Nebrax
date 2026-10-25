@@ -448,6 +448,17 @@
     "addFirstAddress": "Agrega tu primera direccion",
     "addAddress": "Agregar direccion"
   },
+  "accountErrors": {
+    "invalid_credentials": "Correo electrónico o contraseña incorrectos.",
+    "weak_password": "La contraseña no cumple los requisitos.",
+    "password_mismatch": "Las contraseñas no coinciden.",
+    "current_password_invalid": "La contraseña actual es incorrecta.",
+    "invalid_token": "Este enlace no es válido o ha caducado.",
+    "validation_failed": "Revisa los datos introducidos e inténtalo de nuevo.",
+    "rate_limited": "Demasiados intentos. Espera un momento e inténtalo de nuevo.",
+    "capability_unavailable": "Las cuentas de cliente aún no están disponibles.",
+    "request_failed": "Algo salió mal. Inténtalo de nuevo."
+  },
   "accountGate": {
     "title": "Las cuentas de cliente aún no están disponibles",
     "body": "Crear una cuenta e iniciar sesión no está disponible en esta tienda por ahora. Puedes seguir explorando, añadir productos al carrito y pagar como invitado.",

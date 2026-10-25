@@ -2,6 +2,10 @@
 
 import type { Customer } from "@spree/sdk";
 import { updateTag } from "next/cache";
+import {
+  type AccountAuthFailureCode,
+  classifyAccountError,
+} from "@/lib/commerce/account-errors";
 import { ACCOUNT_AUTH_CAPABILITY } from "@/lib/commerce/capabilities";
 import {
   cacheTagSuffix,
@@ -32,9 +36,7 @@ import {
  * environment — so the actions refuse with a typed code and never construct the
  * client (no `SPREE_*` environment is needed, read or leaked).
  */
-export type AccountAuthFailureCode =
-  | "capability_unavailable"
-  | "request_failed";
+export type { AccountAuthFailureCode } from "@/lib/commerce/account-errors";
 
 const accountAuthLive = () => ACCOUNT_AUTH_CAPABILITY === "live";
 
@@ -42,21 +44,6 @@ const UNAVAILABLE = {
   success: false as const,
   code: "capability_unavailable" as const,
 };
-
-/**
- * Only a 4xx the backend deliberately answered with is shown to the buyer
- * (e.g. "Invalid email or password"). Anything else — a thrown configuration
- * error, a network failure, a 5xx — is internal detail and never leaves the
- * server: the caller falls back to its own localized copy.
- */
-function buyerSafeMessage(error: unknown): string | undefined {
-  if (!(error instanceof Error)) return undefined;
-  const status = (error as { status?: unknown }).status;
-  if (typeof status === "number" && status >= 400 && status < 500) {
-    return error.message;
-  }
-  return undefined;
-}
 
 /**
  * Fetch the current customer with automatic token refresh. Throws on any
@@ -168,7 +155,6 @@ export async function login(
     first_name?: string | null;
     last_name?: string | null;
   };
-  error?: string;
   code?: AccountAuthFailureCode;
 }> {
   if (!accountAuthLive()) return UNAVAILABLE;
@@ -180,8 +166,7 @@ export async function login(
   } catch (error) {
     return {
       success: false,
-      code: "request_failed",
-      error: buyerSafeMessage(error),
+      code: classifyAccountError(error, "login"),
     };
   }
 }
@@ -207,7 +192,6 @@ export async function register(params: {
     first_name?: string | null;
     last_name?: string | null;
   };
-  error?: string;
   code?: AccountAuthFailureCode;
 }> {
   if (!accountAuthLive()) return UNAVAILABLE;
@@ -219,8 +203,7 @@ export async function register(params: {
   } catch (error) {
     return {
       success: false,
-      code: "request_failed",
-      error: buyerSafeMessage(error),
+      code: classifyAccountError(error, "register"),
     };
   }
 }
@@ -273,8 +256,11 @@ export async function requestPasswordReset(
       ...(redirectUrl && { redirect_url: redirectUrl }),
     });
     return { success: true, message: result?.message };
-  } catch {
-    return { success: false, code: "request_failed" };
+  } catch (error) {
+    return {
+      success: false,
+      code: classifyAccountError(error, "password_reset_request"),
+    };
   }
 }
 
@@ -288,7 +274,6 @@ export async function resetPassword(
   passwordConfirmation: string,
 ): Promise<{
   success: boolean;
-  error?: string;
   code?: AccountAuthFailureCode;
 }> {
   if (!accountAuthLive()) return UNAVAILABLE;
@@ -303,8 +288,7 @@ export async function resetPassword(
   } catch (error) {
     return {
       success: false,
-      code: "request_failed",
-      error: buyerSafeMessage(error),
+      code: classifyAccountError(error, "password_reset"),
     };
   }
 }
@@ -317,7 +301,6 @@ export async function updateCustomer(data: {
 }): Promise<{
   success: boolean;
   customer?: Customer;
-  error?: string;
   code?: AccountAuthFailureCode;
 }> {
   if (!accountAuthLive()) return UNAVAILABLE;
@@ -339,8 +322,7 @@ export async function updateCustomer(data: {
   } catch (error) {
     return {
       success: false,
-      code: "request_failed",
-      error: buyerSafeMessage(error),
+      code: classifyAccountError(error, "profile_update"),
     };
   }
 }

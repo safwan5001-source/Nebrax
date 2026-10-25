@@ -448,6 +448,17 @@
     "addFirstAddress": "Erste Adresse hinzufügen",
     "addAddress": "Adresse hinzufügen"
   },
+  "accountErrors": {
+    "invalid_credentials": "E-Mail oder Passwort ist falsch.",
+    "weak_password": "Das Passwort erfüllt die Anforderungen nicht.",
+    "password_mismatch": "Die Passwörter stimmen nicht überein.",
+    "current_password_invalid": "Das aktuelle Passwort ist falsch.",
+    "invalid_token": "Dieser Link ist ungültig oder abgelaufen.",
+    "validation_failed": "Bitte überprüfen Sie Ihre Angaben und versuchen Sie es erneut.",
+    "rate_limited": "Zu viele Versuche. Bitte warten Sie einen Moment und versuchen Sie es erneut.",
+    "capability_unavailable": "Kundenkonten sind noch nicht verfügbar.",
+    "request_failed": "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut."
+  },
   "accountGate": {
     "title": "Kundenkonten sind noch nicht verfügbar",
     "body": "Kontoerstellung und Anmeldung sind in diesem Shop derzeit nicht verfügbar. Sie können weiterhin stöbern, Artikel in den Warenkorb legen und als Gast bestellen.",

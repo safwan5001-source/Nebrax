@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
+import { accountErrorMessage } from "@/lib/commerce/account-error-message";
 import { ACCOUNT_AUTH_CAPABILITY } from "@/lib/commerce/capabilities";
 import { extractBasePath } from "@/lib/utils/path";
 
@@ -29,6 +30,7 @@ function RegisterForm() {
   const basePath = extractBasePath(pathname);
   const t = useTranslations("register");
   const ta = useTranslations("account");
+  const te = useTranslations("accountErrors");
   const { register, isAuthenticated, loading: authLoading } = useAuth();
 
   const [firstName, setFirstName] = useState("");
@@ -87,7 +89,13 @@ function RegisterForm() {
       if (result.success) {
         router.push(`${basePath}/account`);
       } else {
-        setError(result.error || t("registrationFailed"));
+        setError(
+          accountErrorMessage(
+            result.code,
+            (code) => te(code),
+            t("registrationFailed"),
+          ),
+        );
       }
     } catch {
       setError(t("unexpectedError"));

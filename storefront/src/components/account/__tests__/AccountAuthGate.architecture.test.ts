@@ -101,14 +101,25 @@ describe("buyer authentication gate (SPREE-X1)", () => {
     }
   });
 
+  it("no action returns an upstream message (no `error:` text field)", () => {
+    const src = read("lib/data/customer.ts");
+    expect(src).not.toMatch(/error\??:\s*string/);
+    expect(src).not.toMatch(/error\.message/);
+    expect(src).not.toContain("buyerSafeMessage");
+  });
+
   it("the shopper-facing copy never mentions Spree or its environment", () => {
     for (const locale of ["ar", "en", "de", "es", "fr", "pl"]) {
       const messages = JSON.parse(
         readFileSync(join(SRC, "..", "messages", `${locale}.json`), "utf8"),
-      ) as { accountGate: Record<string, string> };
-      expect(JSON.stringify(messages.accountGate), locale).not.toMatch(
-        /spree|SPREE_|environment|configured/i,
-      );
+      ) as {
+        accountGate: Record<string, string>;
+        accountErrors: Record<string, string>;
+      };
+      expect(
+        JSON.stringify([messages.accountGate, messages.accountErrors]),
+        locale,
+      ).not.toMatch(/spree|SPREE_|environment|configured/i);
     }
     const notice = read("components/account/AccountAuthUnavailable.tsx");
     expect(notice).not.toMatch(/SPREE_|process\.env/);
