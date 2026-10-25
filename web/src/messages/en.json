@@ -12002,9 +12002,9 @@
     "loadFailed": "Could not load payment methods.",
     "retry": "Retry",
     "empty": "No online payment methods are defined.",
-    "scope": "These are the online payment methods customers see in your store and on invoice payment links. “Show to customer” is your choice and may be turned on before a gateway is ready; actual collection only happens once the method is ready (an active, verified gateway). What the provider's hosted page accepts is set in the provider's dashboard.",
+    "scope": "Choose payment methods and where they appear. Actual collection requires a ready gateway.",
     "scopeSeparate": "Completely separate from cash/bank collection methods and POS, which are managed from",
-    "scopeLink": "Payment methods",
+    "scopeLink": "Cash & bank methods →",
     "showToCustomer": "Show to customer",
     "status": {
       "enabled": "Enabled · ready",
@@ -12013,15 +12013,15 @@
       "needs_setup": "Disabled · needs setup",
       "unsupported": "Disabled · no gateway"
     },
-    "reasonEnabled": "Shown to customers, who can pay with it.",
-    "reasonDisabled": "Hidden from customers. Turn it on to show it (you can do this before a gateway is ready).",
+    "reasonEnabled": "Visible to customers, who can pay with it.",
+    "reasonDisabled": "Hidden from customers. Turn on “Show” to display it (allowed before a gateway is ready).",
     "blocked": {
       "no_permission": "You need the manage payment gateways permission to change this method."
     },
     "step": {
-      "add_gateway": "This method cannot collect until you add and activate a connection to a gateway that supports it (e.g. Moyasar).",
+      "add_gateway": "Add and activate a connection to a gateway that supports this method (e.g. Moyasar) to start collecting.",
       "activate_gateway": "The supported gateway connection is inactive or unverified. Check its credentials and activate it from the Payment gateways tab.",
-      "provider_setup": "Requires setup at the provider (e.g. Apple/provider domain registration) that Nebrax cannot verify, so it stays not ready to collect."
+      "provider_setup": "Needs setup at the provider that Nebrax cannot verify, so it stays not ready to collect."
     },
     "openGateways": "Open payment gateways",
     "defaultGateway": "Default gateway",
@@ -12045,7 +12045,7 @@
       "generic": "Could not save the change. Try again.",
       "default_gateway_invalid": "The selected gateway does not exist or does not support this method."
     },
-    "reasonEnabledNotReady": "Shown to customers in the store, but collection is paused until a gateway is ready. If a customer tries to pay with it they see that payment is unavailable, nothing is charged and no payment attempt is created.",
+    "reasonEnabledNotReady": "Visible to customers, but collection is paused until a gateway is ready. If they try to pay they see it is unavailable and nothing is charged.",
     "usageStoreCollectable": "Online store: ready to collect",
     "usageStoreNotCollectable": "Online store: shown · collection paused",
     "usageStoreOff": "Online store: hidden",
@@ -12060,7 +12060,7 @@
       "cancel": "Cancel",
       "save": "Save settings",
       "saving": "Saving…",
-      "description": "Saved method settings: default gateway and where it is used. Credentials and keys are managed from the gateway's own Manage panel.",
+      "description": "Default gateway and where it is used. Credentials and keys are managed from the gateway’s Manage panel.",
       "readiness": {
         "title": "Status & readiness"
       },
@@ -12068,19 +12068,19 @@
         "title": "Default gateway",
         "label": "Gateway used for this method",
         "auto": "Automatic (first ready gateway)",
-        "autoNote": "The first ready gateway that supports the method is used. Payments are never switched between gateways automatically, to avoid double charging.",
-        "fixedNote": "Only this gateway is used; if it is not ready the method stops collecting and the payment is not moved to another gateway.",
+        "autoNote": "The first ready gateway that supports the method is used. Payments are never switched between gateways automatically (to avoid double charging).",
+        "fixedNote": "Only this gateway is used; if it is not ready, collection stops and is not moved to another gateway.",
         "effective": "Effective gateway now",
         "none": "No gateway supports this method yet. Add a connection from the Payment gateways tab."
       },
       "usage": {
         "title": "Where it is used",
         "invoices": "Invoices & payment links",
-        "invoicesHint": "Shown to the customer on the invoice payment link.",
+        "invoicesHint": "Shown on the invoice payment link.",
         "store": "Online store",
-        "storeHint": "Shown on the store checkout; collection only happens while the method is ready.",
+        "storeHint": "Shown at store checkout; collects once the method is ready.",
         "pos": "Point of sale",
-        "posUnavailable": "There is no online-payment integration with POS yet.",
+        "posUnavailable": "No online-payment integration with POS yet.",
         "notSupported": "Unavailable"
       }
     }
@@ -12088,9 +12088,10 @@
   "paymentGateways": {
     "close": "Close",
     "detail": {
-      "description": "Advanced technical settings for this connection. Read-only unless you can manage gateways.",
+      "description": "Technical settings for this connection.",
+      "readOnly": "Read-only — you do not have permission to manage gateways.",
       "general": {
-        "title": "General and connection status",
+        "title": "Status & connection",
         "usable": "Ready to use",
         "notUsable": "Not ready to use",
         "provider": "Provider",
@@ -12099,29 +12100,29 @@
         "createdAt": "Added on"
       },
       "keys": {
-        "title": "Keys, environment and verification",
+        "title": "Keys & verification",
         "environment": "Environment",
         "publishable": "Publishable key",
-        "note": "Secrets are never shown after saving. Use “Edit” to change keys or environment and “Rotate secrets” to replace secrets. Verification is a safe read at the provider with no financial effect."
+        "note": "Secrets are never shown after saving. Use “Edit” to change keys or environment and “Rotate secrets” to replace them. Verification is a safe read with no financial effect."
       },
       "methods": {
-        "title": "Actual payment-method support",
+        "title": "Supported payment methods",
         "declared": "Declared by the adapter",
         "providerSetup": "Requires provider-side setup",
-        "note": "This is only what Nebrax’s provider adapter declares; it does not mean your provider account is enabled for them. Methods accepted on the hosted payment page are set in the provider dashboard and Nebrax cannot restrict them.",
-        "noAdapter": "No adapter is enabled for this provider, so no online payment methods are offered through it."
+        "note": "Only what Nebrax’s provider adapter declares; it does not mean your provider account has them enabled. Hosted-page methods are set in the provider dashboard.",
+        "noAdapter": "No adapter is enabled for this provider, so no online methods are offered through it."
       },
       "webhooks": {
-        "title": "Webhooks, events and sync",
+        "title": "Webhooks & sync",
         "url": "Event receiving URL (register it in the provider dashboard)",
         "copy": "Copy",
         "copied": "Copied",
         "managerOnly": "The receiving URL is visible only to users who can manage gateways.",
-        "noAdapter": "There is no event receiving for this connection because no adapter is enabled.",
-        "syncUnavailable": "Manual sync and event replay are not available yet. “History” in the Security section shows the connection’s own events."
+        "noAdapter": "No event receiving because no adapter is enabled.",
+        "syncUnavailable": "Manual sync and event replay are not available yet; “History” in the Security section shows the connection’s events."
       },
       "money": {
-        "title": "Capture, refunds and settlements",
+        "title": "Financial operations",
         "capture": "Capture",
         "hosted": "Through the provider’s hosted payment page",
         "notHosted": "Not supported",
@@ -12130,13 +12131,13 @@
         "refundsNo": "Not supported",
         "currencies": "Currencies",
         "minAmount": "Minimum amount",
-        "noAdapter": "No capabilities are declared because no adapter is enabled.",
-        "policyUnavailable": "Capture, settlement and clearing policies follow fixed accounting rules in Nebrax; there is no editable setting here.",
+        "noAdapter": "No capabilities declared because no adapter is enabled.",
+        "policyUnavailable": "Capture, settlement and clearing follow fixed accounting rules; nothing is editable here.",
         "openOps": "Open settlements, refunds and reports"
       },
       "security": {
-        "title": "Security, secret rotation and audit log",
-        "note": "Every change to the connection is recorded in the log with no secret value. Rotation replaces the secrets and keeps the previous one for a short grace window."
+        "title": "Security & log",
+        "note": "Every change is logged with no secret value. Rotation replaces secrets and keeps the previous one for a short grace window."
       }
     },
     "title": "Payment gateways",

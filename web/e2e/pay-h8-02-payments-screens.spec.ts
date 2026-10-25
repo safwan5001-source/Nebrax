@@ -550,7 +550,8 @@ const SCENARIOS: Scenario[] = [
       for (const key of ['mada', 'visa', 'mastercard', 'apple_pay']) {
         await expect(page.getByTestId(`pm-manage-${key}`)).toHaveText(c.t('onlinePaymentMethods', 'manage.open'));
       }
-      await expect(page.getByTestId('pm-scope-note')).toBeVisible();
+      await expect(page.getByTestId('pm-scope-note')).toContainText(c.t('onlinePaymentMethods', 'scope'));
+      await expect(page.locator('[data-testid^=pm-hint-]')).toHaveCount(0);
       await tablesUsable(page);
       await keyboardReachesButton(page);
     },
@@ -634,6 +635,16 @@ const SCENARIOS: Scenario[] = [
       const sheet = page.getByTestId('pg-detail');
       await expect(sheet).toBeVisible();
       await expect(sheet.getByRole('heading', { level: 3 })).toHaveCount(6);
+      // ستة أقسام قابلة للطي: الأول وحده مفتوح، ولا نص «للقراءة فقط» لمن يملك الصلاحية
+      await expect(sheet.locator('h3 button[aria-expanded=true]')).toHaveCount(1);
+      await expect(sheet.getByTestId('pg-detail-readonly')).toHaveCount(0);
+      await shot(page, `gateway-detail-sheet-collapsed-${c.locale}-${c.vw}-${c.theme}`);
+      for (const header of await sheet.locator('h3 button[aria-expanded=false]').all()) await header.click();
+      await expect(sheet.locator('h3 button[aria-expanded=true]')).toHaveCount(6);
+      // عنوان Webhook يلتفّ داخل اللوحة بلا تمرير أفقي
+      const url = sheet.getByTestId('pg-webhook-url');
+      await expect(url).toBeVisible();
+      expect(await url.evaluate((el) => el.scrollWidth <= el.clientWidth + 1), 'webhook URL wraps inside its box').toBe(true);
       await expect(sheet.getByTestId('pg-webhook-url')).toContainText('payment-webhooks/moyasar/');
       await expect(sheet.getByTestId('pg-detail-methods').locator('li')).toHaveCount(4);
       await expect(sheet.getByText(c.t('paymentGateways', 'detail.money.policyUnavailable'))).toBeVisible();
@@ -649,8 +660,23 @@ const SCENARIOS: Scenario[] = [
       await page.goto(`${baseUrl}/finance-settings/payments?tab=gateways`, { waitUntil: 'domcontentloaded' });
       await page.getByTestId('pg-details-g2').click();
       const sheet = page.getByTestId('pg-detail');
+      await sheet.getByRole('button', { name: c.t('paymentGateways', 'detail.methods.title') }).click();
       await expect(sheet.getByText(c.t('paymentGateways', 'detail.methods.noAdapter'))).toBeVisible();
       await expect(sheet.getByTestId('pg-detail-methods')).toHaveCount(0);
+      await fitsViewport(sheet);
+    },
+  },
+  {
+    id: 'gateway-detail-viewer', permissions: ['payments.view'],
+    run: async (page, c) => {
+      await page.goto(`${baseUrl}/finance-settings/payments?tab=gateways`, { waitUntil: 'domcontentloaded' });
+      await page.getByTestId('pg-details-g1').click();
+      const sheet = page.getByTestId('pg-detail');
+      // «للقراءة فقط» تظهر لمن لا يملك الصلاحية وحده، ولا زر إجراء يغيّر الاتصال
+      await expect(sheet.getByTestId('pg-detail-readonly')).toHaveText(c.t('paymentGateways', 'detail.readOnly'));
+      for (const header of await sheet.locator('h3 button[aria-expanded=false]').all()) await header.click();
+      await expect(sheet.getByTestId('pg-webhook-url')).toHaveCount(0);
+      await expect(sheet.getByRole('button').filter({ hasNot: page.locator('svg.lucide-chevron-down') })).toHaveCount(1);   // «إغلاق» الورقة وحده
       await fitsViewport(sheet);
     },
   },

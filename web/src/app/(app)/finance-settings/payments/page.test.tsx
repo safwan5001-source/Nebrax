@@ -62,12 +62,19 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+/** أقسام لوحة البوابة مطويّة عدا الأول: تُفتح كلها بالنقر على رؤوسها (أزرار aria-expanded=false). */
+async function expandAll(sheet: HTMLElement) {
+  for (const header of within(sheet).getAllByRole('button', { expanded: false })) await userEvent.click(header);
+}
+
 describe.each(TEST_LOCALES)('PaymentGatewaysPage (%s)', (locale) => {
   const m = TEST_MESSAGES[locale].paymentGateways;
   /** يفتح لوحة «إدارة» الاتصال (كل الإعدادات والإجراءات فيها) ويعيدها. */
   const openManage = async (id = 'g1') => {
     await userEvent.click(await screen.findByTestId(`pg-details-${id}`));
-    return screen.findByTestId('pg-detail');
+    const sheet = await screen.findByTestId('pg-detail');
+    await expandAll(sheet);
+    return sheet;
   };
 
   it('without payments.view it shows the denial and never calls the API', async () => {
@@ -344,6 +351,8 @@ describe.each(TEST_LOCALES)('PaymentGatewaysPage (%s)', (locale) => {
     await userEvent.click(await screen.findByTestId('pg-details-g1'));
     const sheet = await screen.findByTestId('pg-detail');
     expect(within(sheet).getAllByRole('heading', { level: 3 })).toHaveLength(6);
+    expect(within(sheet).getByTestId('pg-detail-readonly').textContent).toBe(m.detail.readOnly);
+    await expandAll(sheet);
     expect(within(sheet).getByText(m.detail.methods.providerSetup)).toBeTruthy();
     expect(within(sheet).queryByTestId('pg-webhook-url')).toBeNull();
     expect(within(sheet).getByText(m.detail.webhooks.managerOnly)).toBeTruthy();
@@ -360,6 +369,8 @@ describe.each(TEST_LOCALES)('PaymentGatewaysPage (%s)', (locale) => {
 
     await userEvent.click(await screen.findByTestId('pg-details-g1'));
     const sheet = await screen.findByTestId('pg-detail');
+    expect(within(sheet).queryByTestId('pg-detail-readonly')).toBeNull();
+    await expandAll(sheet);
     expect(within(sheet).getByTestId('pg-webhook-url').textContent).toContain(`payment-webhooks/moyasar/${'k'.repeat(40)}`);
     expect(within(sheet).getByText(m.detail.money.refundsNo)).toBeTruthy();
     // لا إعداد التقاط/تسوية مزيّف: ملاحظة «غير قابل للتعديل» فقط
@@ -376,7 +387,33 @@ describe.each(TEST_LOCALES)('PaymentGatewaysPage (%s)', (locale) => {
 
     await userEvent.click(await screen.findByTestId('pg-details-g1'));
     const sheet = await screen.findByTestId('pg-detail');
+    await expandAll(sheet);
     expect(within(sheet).getByText(m.detail.methods.noAdapter)).toBeTruthy();
     expect(within(sheet).queryByTestId('pg-detail-methods')).toBeNull();
+  });
+
+  it('the details sheet groups settings in six collapsible sections: only the first is open, the rest mount on demand', async () => {
+    perms.current = ['payments.view', 'payment_gateways.manage'];
+    listReturns([conn({ provider: 'moyasar', status: 'active', verified_at: '2026-01-01T00:00:00Z', webhook_key: 'k'.repeat(40),
+      provider_capabilities: { hosted_checkout: true, refunds: true, currencies: ['SAR'], min_amount_minor: 100, methods: ['mada'], methods_requiring_provider_setup: [] } })]);
+    renderIntl(<PaymentGatewaysPage />, locale);
+
+    await userEvent.click(await screen.findByTestId('pg-details-g1'));
+    const sheet = await screen.findByTestId('pg-detail');
+    const titles = [m.detail.general.title, m.detail.keys.title, m.detail.methods.title, m.detail.webhooks.title, m.detail.money.title, m.detail.security.title];
+    const headers = titles.map((title) => within(sheet).getByRole('button', { name: title }));
+    expect(headers.map((h) => h.getAttribute('aria-expanded'))).toEqual(['true', 'false', 'false', 'false', 'false', 'false']);
+    expect(within(sheet).queryByTestId('pg-webhook-url')).toBeNull();
+    expect(within(sheet).queryByRole('button', { name: m.actions.rotate })).toBeNull();
+    expect(within(sheet).queryByTestId('pg-detail-readonly')).toBeNull();
+
+    await userEvent.click(headers[3]);
+    expect(within(sheet).getByTestId('pg-webhook-url').getAttribute('dir')).toBe('ltr');
+    await userEvent.click(headers[5]);
+    for (const action of [m.actions.rotate, m.actions.events, m.actions.revoke]) {
+      expect(within(sheet).getByRole('button', { name: action })).toBeTruthy();
+    }
+    await userEvent.click(headers[3]);
+    expect(within(sheet).queryByTestId('pg-webhook-url')).toBeNull();
   });
 });

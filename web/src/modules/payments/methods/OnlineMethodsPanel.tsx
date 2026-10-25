@@ -16,7 +16,6 @@ import { paymentBrandPresentation } from '@/lib/payment-brand-registry';
 import { MethodManageSheet } from '@/modules/payments/methods/MethodManageSheet';
 import {
   canToggle,
-  isEnabledNotReady,
   methodErrorKey,
   methodTone,
   type ManageDraft,
@@ -83,13 +82,10 @@ export function OnlineMethodsPanel({
     <div className="space-y-4">
       <div role="note" className="flex items-start gap-2 rounded-md border border-border bg-primary-soft/40 px-3 py-2.5 text-xs leading-relaxed text-text" data-testid="pm-scope-note">
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" strokeWidth={1.7} aria-hidden="true" />
-        <div className="min-w-0 space-y-1">
-          <p>{t('scope')}</p>
-          <p>
-            {t('scopeSeparate')}{' '}
-            <Link href="/payment-methods" className="text-primary underline-offset-2 hover:underline">{t('scopeLink')}</Link>
-          </p>
-        </div>
+        <p className="min-w-0">
+          {t('scope')}{' '}
+          <Link href="/payment-methods" className="whitespace-nowrap text-primary underline-offset-2 hover:underline">{t('scopeLink')}</Link>
+        </p>
       </div>
 
       <Card>
@@ -141,9 +137,6 @@ export function OnlineMethodsPanel({
                         </Button>
                       </div>
                     </div>
-                    {isEnabledNotReady(method) && (
-                      <p className="mt-2 text-xs leading-relaxed text-warning" data-testid={`pm-hint-${method.key}`}>{t('hintNotReady')}</p>
-                    )}
                   </li>
                 );
               })}
