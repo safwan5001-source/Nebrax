@@ -6,7 +6,7 @@ import type {
 } from "@/lib/presentation/payment-logos";
 import { cn } from "@/lib/utils";
 
-const ASSETS: Record<
+export const PAYMENT_BRAND_ASSETS: Record<
   FooterPaymentLogoKey,
   { src: string; width: number; height: number; name: string }
 > = {
@@ -69,7 +69,7 @@ export function FooterPaymentLogos({
       )}
     >
       {settings.brands.map((key) => {
-        const asset = ASSETS[key];
+        const asset = PAYMENT_BRAND_ASSETS[key];
         return (
           <li
             key={key}
