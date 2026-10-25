@@ -28,7 +28,10 @@ const msg = (locale: Locale, ns: string, key: string): string => {
   return value;
 };
 
-const VIEWPORTS = { 390: { width: 390, height: 844 }, 768: { width: 768, height: 1024 }, 1280: { width: 1280, height: 800 }, 1440: { width: 1440, height: 900 } } as const;
+const VIEWPORTS = {
+  320: { width: 320, height: 640 }, 375: { width: 375, height: 667 }, 390: { width: 390, height: 844 }, 768: { width: 768, height: 1024 },
+  1024: { width: 1024, height: 768 }, 1280: { width: 1280, height: 800 }, 1440: { width: 1440, height: 900 },
+} as const;
 type Vw = keyof typeof VIEWPORTS;
 
 // ───────────────────────── بيانات مُعترَضة (تطابق عقود الواجهة) ─────────────────────────
@@ -43,7 +46,8 @@ const gateway = (over: Record<string, unknown> = {}) => ({
 const onlineMethod = (over: Record<string, unknown> = {}) => ({
   key: 'mada', status: 'enabled', reason: null, enabled: true, ready: true, customer_visible: true,
   connections: [{ gateway_id: 'g1', gateway_name: 'ميسّر', provider: 'moyasar', environment: 'sandbox', usable: true, requires_provider_setup: false, eligible: true }],
-  effective_gateway: { id: 'g1', name: 'ميسّر' }, multiple_eligible_gateways: false, default_gateway_selectable: false, usage: { invoices: true, store: false }, ...over,
+  effective_gateway: { id: 'g1', name: 'ميسّر' }, default_gateway_id: null, multiple_eligible_gateways: false, default_gateway_selectable: true,
+  usage: { invoices: true, store: true, pos: false }, usage_supported: { invoices: true, store: true, pos: false }, ...over,
 });
 const attempt = (over: Record<string, unknown> = {}) => ({
   id: 'a1', request_id: 'r1', invoice: { id: 'inv1', number: 'INV-0001' }, gateway: { id: 'g1', name: 'ميسّر', provider: 'moyasar', environment: 'sandbox' },
@@ -119,11 +123,13 @@ interface World {
   /** حالة وسيلة «فيزا» المخزَّنة (يغيّرها PUT /online-payment-methods/visa). */
   visaEnabled: boolean;
   methodsMode: 'normal' | 'failing';
+  /** إعدادات «إدارة» المحفوظة لكل وسيلة (تغيّرها PUT /online-payment-methods/{key}). */
+  manage: Record<string, { default_gateway_id: string | null; invoices: boolean; store: boolean }>;
   /** رمز رابط الدفع ⇒ استجابة. */
   requests: string[];
   unrouted: string[];
 }
-const newWorld = (over: Partial<World> = {}): World => ({ previewMode: 'postable', reconMode: 'reconciled', visaEnabled: false, methodsMode: 'normal', requests: [], unrouted: [], ...over });
+const newWorld = (over: Partial<World> = {}): World => ({ previewMode: 'postable', reconMode: 'reconciled', visaEnabled: false, methodsMode: 'normal', manage: {}, requests: [], unrouted: [], ...over });
 
 const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 
@@ -142,6 +148,14 @@ const PAY_LINKS: Record<string, { view: unknown; status: unknown } | 404> = {
 async function setup(page: Page, w: World, opts: { locale: Locale; theme: Theme; vw: Vw; permissions?: string[] }) {
   await page.setViewportSize(VIEWPORTS[opts.vw]);
   await page.emulateMedia({ colorScheme: opts.theme });
+  // شارة مشاكل Next في وضع التطوير تتراكب على أسفل الشاشة وتعترض نقرات الأزرار؛ ليست جزءاً من المنتج.
+  await page.addInitScript(() => {
+    document.addEventListener('DOMContentLoaded', () => {
+      const style = document.createElement('style');
+      style.textContent = 'nextjs-portal{display:none!important}';
+      document.head.appendChild(style);
+    });
+  });
   await page.context().addCookies([{ name: 'locale', value: opts.locale, url: baseUrl }]);
 
   await page.route('**/api/**', async (route) => {
@@ -165,19 +179,43 @@ async function setup(page: Page, w: World, opts: { locale: Locale; theme: Theme;
     if (path === '/branches') return json(route, { data: [{ id: 'b1', code: '1', name: 'الرئيسي', is_main: true, is_active: true }, { id: 'b2', code: '2', name: 'فرع الشرق', is_main: false, is_active: true }] });
     if (path === '/cash-bank-accounts') return json(route, { data: [{ id: 'bk1', name: 'الراجحي', type: 'bank', is_active: true, is_main: true }, { id: 'c1', name: 'الصندوق', type: 'cash', is_active: true, is_main: true }] });
 
+    const manageOf = (key: string) => w.manage[key] ?? { default_gateway_id: null, invoices: true, store: true };
+    const withManage = (key: string, row: Record<string, unknown>) => {
+      const m = manageOf(key);
+      const g2 = { gateway_id: 'g2', gateway_name: 'تاب', provider: 'moyasar', environment: 'live', usable: true, requires_provider_setup: false, eligible: true };
+      const hasConnections = Array.isArray(row.connections) && (row.connections as unknown[]).length > 0;
+      return {
+        ...row,
+        ...(key === 'mada' ? { connections: [...(row.connections as unknown[]), g2] } : {}),
+        default_gateway_id: m.default_gateway_id,
+        effective_gateway: m.default_gateway_id === 'g2' ? { id: 'g2', name: 'تاب' } : row.effective_gateway,
+        default_gateway_selectable: hasConnections,
+        usage: { invoices: m.invoices, store: m.store, pos: false },
+      };
+    };
+    const visaRow = () => withManage('visa', onlineMethod({ key: 'visa', status: w.visaEnabled ? 'enabled' : 'disabled', enabled: w.visaEnabled, ready: true, customer_visible: w.visaEnabled }));
     if (path === '/online-payment-methods' && method === 'GET') {
       if (w.methodsMode === 'failing') return json(route, { error: { message: 'down' } }, 500);
       return json(route, { data: [
-        onlineMethod({ key: 'mada' }),
-        onlineMethod({ key: 'visa', status: w.visaEnabled ? 'enabled' : 'disabled', enabled: w.visaEnabled, ready: true, customer_visible: w.visaEnabled }),
-        onlineMethod({ key: 'mastercard', status: 'unsupported', reason: 'no_gateway', enabled: false, ready: false, customer_visible: false, connections: [], effective_gateway: null }),
+        withManage('mada', onlineMethod({ key: 'mada' })),
+        visaRow(),
+        onlineMethod({ key: 'mastercard', status: 'unsupported', reason: 'no_gateway', enabled: false, ready: false, customer_visible: false, connections: [], effective_gateway: null, default_gateway_selectable: false }),
         onlineMethod({ key: 'apple_pay', status: 'needs_setup', reason: 'provider_setup_required', enabled: false, ready: false, customer_visible: false,
           connections: [{ gateway_id: 'g1', gateway_name: 'ميسّر', provider: 'moyasar', environment: 'sandbox', usable: true, requires_provider_setup: true, eligible: false }], effective_gateway: null }),
       ] });
     }
-    if (path === '/online-payment-methods/visa' && method === 'PUT') {
-      w.visaEnabled = (request.postDataJSON() as { enabled: boolean }).enabled;
-      return json(route, { data: onlineMethod({ key: 'visa', status: w.visaEnabled ? 'enabled' : 'disabled', enabled: w.visaEnabled, ready: true, customer_visible: w.visaEnabled }) });
+    const put = /^\/online-payment-methods\/(mada|visa)$/.exec(path);
+    if (put && method === 'PUT') {
+      const key = put[1];
+      const body = request.postDataJSON() as { enabled?: boolean; default_gateway_id?: string | null; use_in_invoices?: boolean; use_in_store?: boolean };
+      if (key === 'visa' && body.enabled !== undefined) w.visaEnabled = body.enabled;
+      const cur = manageOf(key);
+      w.manage[key] = {
+        default_gateway_id: body.default_gateway_id !== undefined ? body.default_gateway_id : cur.default_gateway_id,
+        invoices: body.use_in_invoices ?? cur.invoices,
+        store: body.use_in_store ?? cur.store,
+      };
+      return json(route, { data: key === 'visa' ? visaRow() : withManage('mada', onlineMethod({ key: 'mada' })) });
     }
     if (path === '/payment-gateways' && method === 'GET') return json(route, { data: [gateway(), gateway({ id: 'g2', provider: 'custom', name: 'ربط يدوي', name_en: 'Manual', status: 'draft', is_usable: false, verified_at: null, activated_at: null, has_secret_key: false, provider_capabilities: null }), gateway({ id: 'g3', name: 'ميسّر (تجريبي غير مفعّل)', name_en: 'Moyasar (inactive)', status: 'draft', is_usable: false, verified_at: null, activated_at: null, has_secret_key: false }), gateway({ id: 'g4', provider: 'tap', name: 'تاب', name_en: 'Tap', status: 'draft', is_usable: false, verified_at: null, activated_at: null, has_secret_key: false, provider_capabilities: null })] });
 
@@ -469,7 +507,13 @@ const SCENARIOS: Scenario[] = [
       await page.goto(`${baseUrl}/finance-settings/payments?tab=gateways`, { waitUntil: 'domcontentloaded' });
       await expect(page.getByRole('heading', { name: c.t('paymentSettings', 'title') }).first()).toBeVisible();
       await expect(shown(page, c.locale === 'ar' ? 'ميسّر' : 'Moyasar')).toBeVisible();
-      await expect(shown(page, c.t('paymentGateways', 'fields.feeTaxReject'))).toBeVisible();   // سياسة ضريبة الرسوم: مرفوضة افتراضياً
+      // بطاقة مختصرة: زر «إدارة» واحد لكل اتصال وبلا أزرار إجراءات مضمّنة (كلها داخل لوحة الإدارة)
+      for (const id of ['g1', 'g2', 'g3', 'g4']) {
+        await expect(page.getByTestId(`pg-item-${id}`).getByRole('button')).toHaveCount(1);
+        await expect(page.getByTestId(`pg-details-${id}`)).toHaveText(c.t('paymentGateways', 'actions.manage'));
+      }
+      await expect(page.getByTestId('pg-badges-g1')).toContainText(c.t('paymentGateways', 'status.active'));
+      await expect(page.getByTestId('pg-badges-g1')).toContainText(c.t('paymentGateways', 'environments.sandbox'));
       // شعار المزوّد يظهر في بطاقة الاتصال (ميسّر) بنسخته المناسبة للثيم؛ الاتصال اليدوي بلا علامة مسجَّلة ⇒ بلا شعار
       await expectLogosLoaded(page.getByTestId('pg-item-g1'), ['moyasar']);
       await expect(page.getByTestId('pg-item-g1').locator('img:visible')).toHaveAttribute('src', c.theme === 'dark' ? '/payment-brands/moyasar-dark.svg' : '/payment-brands/moyasar.svg');
@@ -499,9 +543,13 @@ const SCENARIOS: Scenario[] = [
         await expectLogosLoaded(page.getByTestId(`pm-item-${key}`), [file]);
       }
       await expect(list.getByRole('combobox')).toHaveCount(0);
-      await expect(page.getByTestId('pm-item-apple_pay').getByRole('switch')).toBeDisabled();
-      await expect(page.getByTestId('pm-item-mastercard').getByRole('switch')).toBeDisabled();
-      await expect(page.getByTestId('pm-store-mada')).toHaveText(c.t('onlinePaymentMethods', 'usageStoreUnavailable'));
+      // Beta: التفعيل لا يتوقف على الجاهزية
+      await expect(page.getByTestId('pm-item-apple_pay').getByRole('switch')).toBeEnabled();
+      await expect(page.getByTestId('pm-item-mastercard').getByRole('switch')).toBeEnabled();
+      // صف مختصر: زر «إدارة» لكل وسيلة، ولا تفاصيل (بوابات/استعمال) مضمّنة
+      for (const key of ['mada', 'visa', 'mastercard', 'apple_pay']) {
+        await expect(page.getByTestId(`pm-manage-${key}`)).toHaveText(c.t('onlinePaymentMethods', 'manage.open'));
+      }
       await expect(page.getByTestId('pm-scope-note')).toBeVisible();
       await tablesUsable(page);
       await keyboardReachesButton(page);
@@ -537,13 +585,45 @@ const SCENARIOS: Scenario[] = [
       for (const key of ['mada', 'visa', 'mastercard', 'apple_pay']) {
         await expect(page.getByTestId(`pm-item-${key}`).getByRole('switch')).toBeDisabled();
       }
-      await expect(page.getByTestId('pm-reason-visa')).toHaveText(c.t('onlinePaymentMethods', 'blocked.no_permission'));
+      await page.getByTestId('pm-manage-visa').click();
+      const manage = page.getByTestId('pm-manage');
+      await expect(manage.getByTestId('pm-manage-readonly')).toHaveText(c.t('onlinePaymentMethods', 'blocked.no_permission'));
+      await expect(manage.getByTestId('pm-manage-save')).toHaveCount(0);
+      await closeByEscape(page, manage);
       // الشعارات المسجَّلة تظهر لكل وسيلة مهما كانت حالتها، وحالتها الصحيحة تبقى ظاهرة بجانبها
       for (const [key, file] of [['mada', 'mada'], ['visa', 'visa'], ['mastercard', 'mastercard'], ['apple_pay', 'apple-pay']]) {
         await expectLogosLoaded(page.getByTestId(`pm-item-${key}`), [file]);
       }
       await expect(page.getByTestId('pm-status-apple_pay')).toHaveText(c.t('onlinePaymentMethods', 'status.needs_setup'));
       await expect(page.getByTestId('pm-status-mastercard')).toHaveText(c.t('onlinePaymentMethods', 'status.unsupported'));
+    },
+  },
+  {
+    id: 'payment-methods-manage', full: true,
+    run: async (page, c) => {
+      await page.goto(`${baseUrl}/finance-settings/payments`, { waitUntil: 'domcontentloaded' });
+      await page.getByTestId('pm-manage-mada').click();
+      const sheet = page.getByTestId('pm-manage');
+      await expect(sheet).toBeVisible();
+      await expect(sheet.getByRole('heading', { level: 3 })).toHaveCount(4);
+      await expect(sheet.getByTestId('pm-manage-save')).toBeDisabled();
+      await expect(sheet.getByTestId('pm-use-pos')).toContainText(c.t('onlinePaymentMethods', 'manage.usage.posUnavailable'));
+      await expect(sheet.getByTestId('pm-use-pos').getByRole('switch')).toHaveCount(0);
+      await fitsViewport(sheet);
+      await shot(page, `payment-methods-manage-open-${c.locale}-${c.vw}-${c.theme}`);
+      // حفظ فعلي: بوابة افتراضية + إيقاف المتجر ⇒ PUT واحد بالمتغيّر فقط ثم يظهر المحفوظ عند إعادة الفتح
+      await sheet.getByRole('combobox').selectOption('g2');
+      await sheet.getByTestId('pm-use-store').getByRole('switch').click();
+      await sheet.getByTestId('pm-manage-save').click();
+      await expect(sheet).toHaveCount(0);
+      expect(c.w.requests).toContain('PUT /online-payment-methods/mada');
+      expect(c.w.manage.mada).toEqual({ default_gateway_id: 'g2', invoices: true, store: false });
+      await page.getByTestId('pm-manage-mada').click();
+      const again = page.getByTestId('pm-manage');
+      await expect(again.getByRole('combobox')).toHaveValue('g2');
+      await expect(again.getByTestId('pm-use-store').getByRole('switch')).toHaveAttribute('aria-checked', 'false');
+      await expect(again.getByTestId('pm-effective')).toContainText('تاب');
+      await closeByEscape(page, again);
     },
   },
   {
@@ -838,13 +918,16 @@ const SCENARIOS: Scenario[] = [
 // ───────────────────────── المصفوفة ─────────────────────────
 
 const ALL_VW: Vw[] = [390, 768, 1280, 1440];
+/** شاشات إعدادات المدفوعات (وسائل/بوابات): 320/375/390/768/1024/1440. */
+const SETTINGS_VW: Vw[] = [320, 375, 390, 768, 1024, 1440];
+const SETTINGS_SCENARIOS = ['gateways-list', 'payment-methods-tab', 'payment-methods-manage', 'gateway-detail-sheet'];
 const LOCALES: Locale[] = ['ar', 'en'];
 const THEMES: Theme[] = ['light', 'dark'];
 
 test.describe('PAY-H8-02 payments screens', () => {
   for (const scenario of SCENARIOS) {
     const combos: { vw: Vw; locale: Locale; theme: Theme }[] = scenario.full
-      ? ALL_VW.flatMap((vw) => LOCALES.flatMap((locale) => THEMES.map((theme) => ({ vw, locale, theme }))))
+      ? (SETTINGS_SCENARIOS.includes(scenario.id) ? SETTINGS_VW : ALL_VW).flatMap((vw) => LOCALES.flatMap((locale) => THEMES.map((theme) => ({ vw, locale, theme }))))
       : ([390, 1440] as Vw[]).flatMap((vw) => LOCALES.map((locale) => ({ vw, locale, theme: (locale === 'ar' ? 'dark' : 'light') as Theme })));
 
     for (const { vw, locale, theme } of combos) {

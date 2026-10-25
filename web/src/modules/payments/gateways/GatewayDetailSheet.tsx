@@ -180,11 +180,18 @@ export function GatewayDetailSheet({
                 <Row label={d('money.refunds')}>{caps.refunds ? d('money.refundsYes') : d('money.refundsNo')}</Row>
                 <Row label={d('money.currencies')}><bdi dir="ltr">{caps.currencies.join(', ') || '—'}</bdi></Row>
                 <Row label={d('money.minAmount')}><bdi dir="ltr">{formatRiyal(minorToRiyal(caps.min_amount_minor))}</bdi></Row>
-                <Row label={t('fields.feeTaxPolicy')}>{c.fee_tax_policy === 'input_vat' ? t(c.fee_tax_opinion_recorded ? 'fields.feeTaxInputVat' : 'fields.feeTaxInputVatNoOpinion') : t('fields.feeTaxReject')}</Row>
               </Rows>
             ) : (
               <Note>{d('money.noAdapter')}</Note>
             )}
+            {/* سياسة ضريبة الرسوم إعداد للاتصال نفسه لا للمحوّل: تُعرض دائماً (كانت على البطاقة قبل تبسيطها). */}
+            <Rows>
+              <Row label={t('fields.feeTaxPolicy')}>
+                <span data-testid="pg-fee-tax">
+                  {c.fee_tax_policy === 'input_vat' ? t(c.fee_tax_opinion_recorded ? 'fields.feeTaxInputVat' : 'fields.feeTaxInputVatNoOpinion') : t('fields.feeTaxReject')}
+                </span>
+              </Row>
+            </Rows>
             <Note>{d('money.policyUnavailable')}</Note>
             <p className="text-xs">
               <Link href="/payments/online" className="text-primary underline-offset-2 hover:underline">{d('money.openOps')}</Link>

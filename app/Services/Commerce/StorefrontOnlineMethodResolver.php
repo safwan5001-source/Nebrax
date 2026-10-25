@@ -15,7 +15,7 @@ use App\Services\PaymentMethodChannelAvailabilityService;
  *  يجسّر بين إعداد التاجر (`OnlinePaymentMethodSettingsService`: `enabled`/`ready`) ومسار الدفع القائم (`PaymentMethod` المرتبطة ببوابة)؛ **لا يخلق مساراً موازياً**:
  *  الوسيلة الجاهزة تُحلّ إلى `PaymentMethod` موجودة ثم يكمل `PATCH checkout/payment` → `complete` → `payment-intent` كما هي، بكل فحوصها.
  *
- *  • **المعروضة** = ما فعّله التاجر (`enabled`) حتى لو لم تجهز بوابة؛ بلا مفعَّلة ⇒ لا مفتاح في الاستجابة ويبقى شكلها حرفياً كما كان.
+ *  • **المعروضة** = ما فعّله التاجر (`enabled` و`use_in_store`) حتى لو لم تجهز بوابة؛ بلا مفعَّلة ⇒ لا مفتاح في الاستجابة ويبقى شكلها حرفياً كما كان.
  *  • **الجاهزة (`ready`)** = كل ما يلي معاً: مفعَّلة؛ اتصال بوابة جاهز يعلنها (نشط، متحقَّق، لا إعداد مزوّد غير قابل للتحقق)؛ بوابة المنصة للدفع الإلكتروني مفتوحة؛
  *    ذلك الاتصال مرتبط بطريقة دفع نشطة متاحة لهذه القناة، ويقبل المنسّق بدء محاولة عليه (`usableGatewayFor`). غياب أي شرط ⇒ غير جاهزة.
  *  • **غير الجاهزة لا تُنشئ شيئاً:** `resolveReady()` يعيد null فيرفض المتحكّم الاختيار قبل أي كتابة؛ لا طلب، لا نية، لا محاولة، لا سند، لا قيد.
@@ -35,7 +35,7 @@ final class StorefrontOnlineMethodResolver
     public function forChannel(SalesChannel $channel): array
     {
         $out = [];
-        foreach ($this->settings->enabledRows() as $row) {
+        foreach ($this->settings->storeRows() as $row) {
             $method = $this->readyMethod($row, $channel);
             $out[] = [
                 'key' => (string) $row['key'],
@@ -50,7 +50,7 @@ final class StorefrontOnlineMethodResolver
     /** طريقة الدفع القابلة للتحصيل الآن للوسيلة؛ null ⇒ غير مفعَّلة أو غير جاهزة. */
     public function resolveReady(string $key, SalesChannel $channel): ?PaymentMethod
     {
-        foreach ($this->settings->enabledRows() as $row) {
+        foreach ($this->settings->storeRows() as $row) {
             if ($row['key'] === $key) {
                 return $this->readyMethod($row, $channel);
             }
@@ -65,23 +65,17 @@ final class StorefrontOnlineMethodResolver
         if ($row['ready'] !== true || ! CommerceOnlinePaymentService::enabled()) {
             return null;
         }
-        foreach ($row['connections'] as $connection) {
-            if ($connection['eligible'] !== true) {
-                continue;
-            }
-            $gateway = PaymentGateway::query()->find($connection['gateway_id']);
-            if ($gateway === null || $gateway->payment_method_id === null) {
-                continue;
-            }
-            $method = PaymentMethod::query()->where('is_active', true)->find($gateway->payment_method_id);
-            if ($method === null || ! $this->availability->isAvailable($method, $channel)) {
-                continue;
-            }
-            if ($this->online->usableGatewayFor($method)?->getKey() === $gateway->getKey()) {
-                return $method;
-            }
+        // البوابة الفعلية وحدها (الافتراضية المختارة أو أول جاهزة): لا بحث في غيرها ولا تحويل تلقائي.
+        $effectiveId = $row['effective_gateway']['id'] ?? null;
+        $gateway = $effectiveId === null ? null : PaymentGateway::query()->find($effectiveId);
+        if ($gateway === null || $gateway->payment_method_id === null) {
+            return null;
+        }
+        $method = PaymentMethod::query()->where('is_active', true)->find($gateway->payment_method_id);
+        if ($method === null || ! $this->availability->isAvailable($method, $channel)) {
+            return null;
         }
 
-        return null;
+        return $this->online->usableGatewayFor($method)?->getKey() === $gateway->getKey() ? $method : null;
     }
 }

@@ -12036,17 +12036,54 @@
     "notReady": "Not ready",
     "done": {
       "enabled": "The method is now visible to customers.",
-      "disabled": "The method is hidden from customers."
+      "disabled": "The method is hidden from customers.",
+      "saved": "Method settings saved."
     },
     "errors": {
       "unknown_method": "Unknown payment method.",
       "reason_too_long": "The reason is longer than allowed.",
-      "generic": "Could not save the change. Try again."
+      "generic": "Could not save the change. Try again.",
+      "default_gateway_invalid": "The selected gateway does not exist or does not support this method."
     },
     "reasonEnabledNotReady": "Shown to customers in the store, but collection is paused until a gateway is ready. If a customer tries to pay with it they see that payment is unavailable, nothing is charged and no payment attempt is created.",
     "usageStoreCollectable": "Online store: ready to collect",
     "usageStoreNotCollectable": "Online store: shown · collection paused",
-    "usageStoreOff": "Online store: hidden"
+    "usageStoreOff": "Online store: hidden",
+    "hintNotReady": "Shown to customers but collection is paused until a gateway is ready; nothing is charged.",
+    "environment": {
+      "sandbox": "Sandbox",
+      "live": "Live"
+    },
+    "manage": {
+      "open": "Manage",
+      "close": "Close",
+      "cancel": "Cancel",
+      "save": "Save settings",
+      "saving": "Saving…",
+      "description": "Saved method settings: default gateway and where it is used. Credentials and keys are managed from the gateway's own Manage panel.",
+      "readiness": {
+        "title": "Status & readiness"
+      },
+      "gateway": {
+        "title": "Default gateway",
+        "label": "Gateway used for this method",
+        "auto": "Automatic (first ready gateway)",
+        "autoNote": "The first ready gateway that supports the method is used. Payments are never switched between gateways automatically, to avoid double charging.",
+        "fixedNote": "Only this gateway is used; if it is not ready the method stops collecting and the payment is not moved to another gateway.",
+        "effective": "Effective gateway now",
+        "none": "No gateway supports this method yet. Add a connection from the Payment gateways tab."
+      },
+      "usage": {
+        "title": "Where it is used",
+        "invoices": "Invoices & payment links",
+        "invoicesHint": "Shown to the customer on the invoice payment link.",
+        "store": "Online store",
+        "storeHint": "Shown on the store checkout; collection only happens while the method is ready.",
+        "pos": "Point of sale",
+        "posUnavailable": "There is no online-payment integration with POS yet.",
+        "notSupported": "Unavailable"
+      }
+    }
   },
   "paymentGateways": {
     "close": "Close",
@@ -12157,7 +12194,8 @@
       "suspend": "Suspend",
       "revoke": "Revoke",
       "delete": "Delete",
-      "events": "History"
+      "events": "History",
+      "manage": "Manage"
     },
     "confirm": {
       "activate": "Activate the connection “{name}”?",
@@ -12275,6 +12313,10 @@
       "submit": "Revoke",
       "saving": "Revoking…",
       "failed": "Could not revoke the connection."
+    },
+    "card": {
+      "verified": "Credentials verified",
+      "notVerified": "Not verified"
     }
   },
   "posTerminals": {
