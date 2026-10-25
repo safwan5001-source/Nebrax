@@ -71,7 +71,7 @@ class Expectation(unittest.TestCase):
 
     def test_unknown_diff_requires_everything_blocking(self):
         exp = g.expected_checks(M, DOCS, None)
-        self.assertEqual(len(exp), 10)  # 8 before AWJ-HORIZON-V2-1D; +1 = the path-scoped Horizon check; +1 = preview-host (MOBILE-PREVIEW-10B-2A)
+        self.assertEqual(len(exp), 11)  # 10 previously; +1 = path-scoped storefront Docker build context check
         self.assertIn(HORIZON, exp)
 
     def test_advisory_never_expected(self):

@@ -1,0 +1,33 @@
+name: Storefront Docker build context
+
+on:
+  pull_request:
+    paths:
+      - 'storefront/**'
+      - 'web/public/payment-brands/**'
+      - '.github/workflows/storefront-docker-context.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'storefront/**'
+      - 'web/public/payment-brands/**'
+      - '.github/workflows/storefront-docker-context.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docker-context:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify required files exist relative to repository root
+        run: |
+          test -f storefront/Dockerfile
+          test -f storefront/package.json
+          test -f storefront/pnpm-lock.yaml
+          test -d web/public/payment-brands
+      - name: Build the same Docker context expected by Railway
+        run: docker build --file storefront/Dockerfile --tag awj-storefront:ci .

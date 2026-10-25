@@ -66,6 +66,13 @@ vi.mock("next/cache", () => ({
   updateTag: vi.fn(),
 }));
 
+// These tests pin the LIVE (backend-ready) behaviour of the actions. The
+// shipped default is `gated` — see customer.gated.test.ts for that contract.
+vi.mock("@/lib/commerce/capabilities", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/commerce/capabilities")>()),
+  ACCOUNT_AUTH_CAPABILITY: "live",
+}));
+
 import {
   getCustomer,
   login,
@@ -355,19 +362,27 @@ describe("customer server actions", () => {
     });
 
     it("returns error on failure", async () => {
-      mockClient.customer.update.mockRejectedValue(new Error("Email taken"));
+      mockClient.customer.update.mockRejectedValue(
+        Object.assign(new Error("Email taken"), {
+          status: 422,
+          code: "validation_error",
+        }),
+      );
 
       const result = await updateCustomer({ email: "taken@example.com" });
 
       expect(result).toEqual({
         success: false,
-        error: "Email taken",
+        code: "validation_failed",
       });
     });
 
     it("surfaces invalid current password error", async () => {
       mockClient.customer.update.mockRejectedValue(
-        new Error("Current password is invalid or missing"),
+        Object.assign(new Error("Current password is invalid or missing"), {
+          status: 422,
+          code: "current_password_invalid",
+        }),
       );
 
       const result = await updateCustomer({
@@ -377,19 +392,73 @@ describe("customer server actions", () => {
 
       expect(result).toEqual({
         success: false,
-        error: "Current password is invalid or missing",
+        code: "current_password_invalid",
       });
     });
 
-    it("returns fallback message for non-Error throws", async () => {
+    it("returns no message for non-Error throws (caller shows localized copy)", async () => {
       mockClient.customer.update.mockRejectedValue("unexpected");
 
       const result = await updateCustomer({ first_name: "Test" });
 
       expect(result).toEqual({
         success: false,
-        error: "Update failed",
+        code: "request_failed",
       });
+    });
+  });
+});
+
+describe("failure handling (live) — upstream text never reaches the buyer", () => {
+  const HOSTILE =
+    "SQLSTATE[HY000] at /var/www/api/v3/store/auth/login token=eyJhbGciOi SPREE_API_URL=http://10.0.0.5";
+
+  it("drops the message of a non-backend (configuration/network) error", async () => {
+    mockClient.auth.login.mockRejectedValueOnce(
+      new Error("Spree client is not configured. Set SPREE_API_URL"),
+    );
+    const result = await login("a@b.sa", "pw");
+    expect(result).toEqual({ success: false, code: "request_failed" });
+  });
+
+  it("drops the message of an unknown 4xx and returns a safe code only", async () => {
+    mockClient.customers.create.mockRejectedValueOnce(
+      Object.assign(new Error(HOSTILE), {
+        status: 422,
+        code: "weird_internal",
+      }),
+    );
+    const result = await register({
+      email: "a@b.sa",
+      password: "secret1",
+      password_confirmation: "secret1",
+    });
+    expect(result).toEqual({ success: false, code: "request_failed" });
+    expect(JSON.stringify(result)).not.toMatch(/SQLSTATE|eyJ|SPREE_|10\.0/);
+  });
+
+  it("maps a refused sign-in to invalid_credentials without reading the text", async () => {
+    mockClient.auth.login.mockRejectedValueOnce(
+      Object.assign(new Error(HOSTILE), { status: 401 }),
+    );
+    const result = await login("a@b.sa", "pw");
+    expect(result).toEqual({ success: false, code: "invalid_credentials" });
+  });
+
+  it("keeps a legitimate validation code as a safe code", async () => {
+    mockClient.customer.update.mockRejectedValueOnce(
+      Object.assign(new Error(HOSTILE), {
+        status: 422,
+        code: "current_password_invalid",
+      }),
+    );
+    const result = await updateCustomer({
+      email: "n@b.sa",
+      current_password: "x",
+    });
+    expect(result).toEqual({
+      success: false,
+      code: "current_password_invalid",
     });
   });
 });

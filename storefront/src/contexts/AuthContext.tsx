@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { ACCOUNT_AUTH_CAPABILITY } from "@/lib/commerce/capabilities";
 import {
   login as loginAction,
   logout as logoutAction,
@@ -31,7 +32,7 @@ interface AuthContextType {
   login: (
     email: string,
     password: string,
-  ) => Promise<{ success: boolean; error?: string }>;
+  ) => Promise<{ success: boolean; code?: string }>;
   register: (params: {
     email: string;
     password: string;
@@ -40,7 +41,7 @@ interface AuthContextType {
     last_name?: string;
     phone?: string;
     metadata?: Record<string, unknown>;
-  }) => Promise<{ success: boolean; error?: string }>;
+  }) => Promise<{ success: boolean; code?: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   isAuthenticated: boolean;
@@ -70,6 +71,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // server components afterwards to replace any data they fetched with the
   // stale session.
   const refreshUser = useCallback(async () => {
+    // SPREE-X1: while buyer authentication is gated there is no session to
+    // reconcile — do not call the server (and so never reach Spree) at all.
+    if (ACCOUNT_AUTH_CAPABILITY !== "live") return;
     try {
       const { customer, refreshed, stale } = await syncSession();
       // A transparent token rotation may have happened even when the follow-up

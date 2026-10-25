@@ -6,15 +6,25 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { AccountAuthCard } from "@/components/account/AccountAuthCard";
+import { AccountAuthUnavailable } from "@/components/account/AccountAuthUnavailable";
 import { AccountPasswordField } from "@/components/account/AccountPasswordField";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { accountErrorMessage } from "@/lib/commerce/account-error-message";
+import { ACCOUNT_AUTH_CAPABILITY } from "@/lib/commerce/capabilities";
 import { resetPassword } from "@/lib/data/customer";
 import { extractBasePath } from "@/lib/utils/path";
 
 export default function ResetPasswordPage() {
+  // SPREE-X1: no form while buyer authentication has no backend.
+  if (ACCOUNT_AUTH_CAPABILITY !== "live") return <AccountAuthUnavailable />;
+  return <ResetPasswordForm />;
+}
+
+function ResetPasswordForm() {
   const t = useTranslations("resetPassword");
   const ta = useTranslations("account");
+  const te = useTranslations("accountErrors");
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -65,7 +75,13 @@ export default function ResetPasswordPage() {
       if (result.success) {
         setSuccess(true);
       } else {
-        setError(result.error || t("linkExpired"));
+        setError(
+          accountErrorMessage(
+            result.code,
+            (code) => te(code),
+            t("linkExpired"),
+          ),
+        );
       }
     } catch {
       setError(t("genericError"));

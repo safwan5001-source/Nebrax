@@ -6,14 +6,22 @@ import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { AccountAuthCard } from "@/components/account/AccountAuthCard";
+import { AccountAuthUnavailable } from "@/components/account/AccountAuthUnavailable";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { ACCOUNT_AUTH_CAPABILITY } from "@/lib/commerce/capabilities";
 import { requestPasswordReset } from "@/lib/data/customer";
 import { extractBasePath } from "@/lib/utils/path";
 
 export default function ForgotPasswordPage() {
+  // SPREE-X1: no form while buyer authentication has no backend.
+  if (ACCOUNT_AUTH_CAPABILITY !== "live") return <AccountAuthUnavailable />;
+  return <ForgotPasswordForm />;
+}
+
+function ForgotPasswordForm() {
   const t = useTranslations("forgotPassword");
   const pathname = usePathname();
   const basePath = extractBasePath(pathname);
@@ -32,7 +40,7 @@ export default function ForgotPasswordPage() {
       const origin = window.location.origin;
       const redirectUrl = `${origin}${basePath}/account/reset-password`;
       const result = await requestPasswordReset(email, redirectUrl);
-      if (result?.message) {
+      if (result.success) {
         setSubmitted(true);
       } else {
         setError(t("genericError"));

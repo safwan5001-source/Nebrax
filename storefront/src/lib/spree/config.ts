@@ -9,7 +9,11 @@ let _wholesaleClient: Client | null = null;
 /**
  * Initialize the Spree Next.js integration.
  * Call this once in your app (e.g., in `lib/storefront.ts`).
- * If not called, the client will auto-initialize from SPREE_API_URL and SPREE_PUBLISHABLE_KEY env vars.
+ * If not called, the client auto-initializes from SPREE_API_URL and SPREE_PUBLISHABLE_KEY.
+ *
+ * AWJ NOTE (SPREE-X2): those variables are NOT a fix for an AWJ code path. No
+ * Spree backend exists in any AWJ environment, and a placeholder host would
+ * receive shopper credentials. Leave them unset; migrate or gate the caller.
  */
 export function initSpreeNext(config: SpreeNextConfig): void {
   _config = config;
@@ -30,7 +34,7 @@ export function getClient(): Client {
       initSpreeNext({ baseUrl, publishableKey });
     } else {
       throw new Error(
-        "Spree client is not configured. Either call initSpreeNext() or set SPREE_API_URL and SPREE_PUBLISHABLE_KEY environment variables.",
+        "Spree client is not available: this storefront is served by the AWJ Commerce API and no Spree backend exists. A code path that reaches this has not been migrated to AWJ — gate or migrate it; do not set SPREE_API_URL / SPREE_PUBLISHABLE_KEY to work around it.",
       );
     }
   }
