@@ -448,6 +448,12 @@
     "addFirstAddress": "Add Your First Address",
     "addAddress": "Add Address"
   },
+  "accountGate": {
+    "title": "Customer accounts are not available yet",
+    "body": "Creating an account and signing in are not available on this store right now. You can still browse, add items to your cart and check out as a guest.",
+    "continueShopping": "Continue shopping",
+    "viewCart": "View cart"
+  },
   "account": {
     "myAccount": "My Account",
     "signInDescription": "Sign in to access your account.",

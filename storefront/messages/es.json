@@ -448,6 +448,12 @@
     "addFirstAddress": "Agrega tu primera direccion",
     "addAddress": "Agregar direccion"
   },
+  "accountGate": {
+    "title": "Las cuentas de cliente aún no están disponibles",
+    "body": "Crear una cuenta e iniciar sesión no está disponible en esta tienda por ahora. Puedes seguir explorando, añadir productos al carrito y pagar como invitado.",
+    "continueShopping": "Seguir comprando",
+    "viewCart": "Ver carrito"
+  },
   "account": {
     "myAccount": "Mi cuenta",
     "signInDescription": "Inicia sesión para acceder a tu cuenta.",

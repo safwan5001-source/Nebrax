@@ -448,6 +448,12 @@
     "addFirstAddress": "Erste Adresse hinzufügen",
     "addAddress": "Adresse hinzufügen"
   },
+  "accountGate": {
+    "title": "Kundenkonten sind noch nicht verfügbar",
+    "body": "Kontoerstellung und Anmeldung sind in diesem Shop derzeit nicht verfügbar. Sie können weiterhin stöbern, Artikel in den Warenkorb legen und als Gast bestellen.",
+    "continueShopping": "Weiter einkaufen",
+    "viewCart": "Warenkorb ansehen"
+  },
   "account": {
     "myAccount": "Mein Konto",
     "signInDescription": "Melden Sie sich an, um auf Ihr Konto zuzugreifen.",

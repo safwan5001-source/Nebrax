@@ -53,7 +53,7 @@ No other files were changed. No `.env`, no seed data, no migrations, no accounti
 | `NEXT_PUBLIC_DEFAULT_COUNTRY` | `sa` |
 | `NEXT_PUBLIC_DEFAULT_LOCALE` | `ar` |
 | `NEXT_PUBLIC_SITE_URL` | Leave as the Vercel-assigned preview URL once known, or omit for first deploy |
-| `SPREE_API_URL`, `SPREE_PUBLISHABLE_KEY` | Placeholder values are fine — cart/checkout is out of scope for this Preview |
+| `SPREE_API_URL`, `SPREE_PUBLISHABLE_KEY` | **Do not set** (superseded by SPREE-X2). The original advice here — "placeholder values are fine" — is withdrawn: a placeholder host would receive shopper credentials and only hides the gap. Leave both unset; Spree-dependent paths are gated or migrated instead. |
 | `AWJ_STOREFRONT_DEV_HOST` | **Leave unset.** Setting this would be a security regression (non-production hostname override). |
 
 Confirmed by code inspection (unchanged from P2B): `STOREFRONT_GATEWAY_SECRET` is read only in `storefront/src/lib/commerce/config.ts`, used solely as an outbound request header from the Next.js **server** to Laravel — never serialized into any page, script, or client bundle.

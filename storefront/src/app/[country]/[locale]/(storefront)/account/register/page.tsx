@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { AccountAuthCard } from "@/components/account/AccountAuthCard";
+import { AccountAuthUnavailable } from "@/components/account/AccountAuthUnavailable";
 import { AccountPasswordField } from "@/components/account/AccountPasswordField";
 import { PolicyConsent } from "@/components/policy/PolicyConsent";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -13,9 +14,16 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
+import { ACCOUNT_AUTH_CAPABILITY } from "@/lib/commerce/capabilities";
 import { extractBasePath } from "@/lib/utils/path";
 
 export default function RegisterPage() {
+  // SPREE-X1: no form while buyer authentication has no backend.
+  if (ACCOUNT_AUTH_CAPABILITY !== "live") return <AccountAuthUnavailable />;
+  return <RegisterForm />;
+}
+
+function RegisterForm() {
   const router = useRouter();
   const pathname = usePathname();
   const basePath = extractBasePath(pathname);

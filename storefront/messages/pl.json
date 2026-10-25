@@ -448,6 +448,12 @@
     "addFirstAddress": "Dodaj swój pierwszy adres",
     "addAddress": "Dodaj adres"
   },
+  "accountGate": {
+    "title": "Konta klientów nie są jeszcze dostępne",
+    "body": "Zakładanie konta i logowanie nie są obecnie dostępne w tym sklepie. Nadal możesz przeglądać ofertę, dodawać produkty do koszyka i złożyć zamówienie jako gość.",
+    "continueShopping": "Kontynuuj zakupy",
+    "viewCart": "Zobacz koszyk"
+  },
   "account": {
     "myAccount": "Moje konto",
     "signInDescription": "Zaloguj się, aby uzyskać dostęp do konta.",

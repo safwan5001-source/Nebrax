@@ -2,6 +2,7 @@
 
 import type { Customer } from "@spree/sdk";
 import { updateTag } from "next/cache";
+import { ACCOUNT_AUTH_CAPABILITY } from "@/lib/commerce/capabilities";
 import {
   cacheTagSuffix,
   clearAccessToken,
@@ -21,7 +22,41 @@ import {
   setRefreshToken,
   withAuthRefresh,
 } from "@/lib/spree";
-import { actionResult } from "./utils";
+
+/**
+ * SPREE-X1 — buyer account capability gate.
+ *
+ * Every action below checks this FIRST, before anything reaches `@/lib/spree`.
+ * While `ACCOUNT_AUTH_CAPABILITY` is not `live` there is no AWJ buyer-identity
+ * service behind these actions, and the Spree client has no backend in any AWJ
+ * environment — so the actions refuse with a typed code and never construct the
+ * client (no `SPREE_*` environment is needed, read or leaked).
+ */
+export type AccountAuthFailureCode =
+  | "capability_unavailable"
+  | "request_failed";
+
+const accountAuthLive = () => ACCOUNT_AUTH_CAPABILITY === "live";
+
+const UNAVAILABLE = {
+  success: false as const,
+  code: "capability_unavailable" as const,
+};
+
+/**
+ * Only a 4xx the backend deliberately answered with is shown to the buyer
+ * (e.g. "Invalid email or password"). Anything else — a thrown configuration
+ * error, a network failure, a 5xx — is internal detail and never leaves the
+ * server: the caller falls back to its own localized copy.
+ */
+function buyerSafeMessage(error: unknown): string | undefined {
+  if (!(error instanceof Error)) return undefined;
+  const status = (error as { status?: unknown }).status;
+  if (typeof status === "number" && status >= 400 && status < 500) {
+    return error.message;
+  }
+  return undefined;
+}
 
 /**
  * Fetch the current customer with automatic token refresh. Throws on any
@@ -62,6 +97,8 @@ async function finalizeAuth(token: string, refreshToken: string) {
  * Get the currently authenticated customer. Returns null if not logged in.
  */
 export async function getCustomer(): Promise<Customer | null> {
+  if (!accountAuthLive()) return null;
+
   const token = await getAccessToken();
   if (!token) return null;
 
@@ -90,6 +127,8 @@ export async function syncSession(): Promise<{
   refreshed: boolean;
   stale?: boolean;
 }> {
+  if (!accountAuthLive()) return { customer: null, refreshed: false };
+
   const state = await ensureFreshSession();
   if (state === "anonymous" || state === "expired") {
     return { customer: null, refreshed: false };
@@ -130,7 +169,10 @@ export async function login(
     last_name?: string | null;
   };
   error?: string;
+  code?: AccountAuthFailureCode;
 }> {
+  if (!accountAuthLive()) return UNAVAILABLE;
+
   try {
     const result = await getClient().auth.login({ email, password });
     await finalizeAuth(result.token, result.refresh_token);
@@ -138,8 +180,8 @@ export async function login(
   } catch (error) {
     return {
       success: false,
-      error:
-        error instanceof Error ? error.message : "Invalid email or password",
+      code: "request_failed",
+      error: buyerSafeMessage(error),
     };
   }
 }
@@ -166,7 +208,10 @@ export async function register(params: {
     last_name?: string | null;
   };
   error?: string;
+  code?: AccountAuthFailureCode;
 }> {
+  if (!accountAuthLive()) return UNAVAILABLE;
+
   try {
     const result = await getClient().customers.create(params);
     await finalizeAuth(result.token, result.refresh_token);
@@ -174,7 +219,8 @@ export async function register(params: {
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Registration failed",
+      code: "request_failed",
+      error: buyerSafeMessage(error),
     };
   }
 }
@@ -184,7 +230,9 @@ export async function register(params: {
  */
 export async function logout(): Promise<void> {
   const refreshToken = await getRefreshToken();
-  if (refreshToken) {
+  // Gated: there is no server session to revoke, so the Spree client is never
+  // built — the local (legacy) cookies below are still cleared.
+  if (refreshToken && accountAuthLive()) {
     try {
       await getClient().auth.logout({ refresh_token: refreshToken });
     } catch {
@@ -213,11 +261,21 @@ export async function logout(): Promise<void> {
 export async function requestPasswordReset(
   email: string,
   redirectUrl?: string,
-) {
-  return getClient().passwordResets.create({
-    email,
-    ...(redirectUrl && { redirect_url: redirectUrl }),
-  });
+): Promise<
+  | { success: true; message?: string }
+  | { success: false; code: AccountAuthFailureCode }
+> {
+  if (!accountAuthLive()) return UNAVAILABLE;
+
+  try {
+    const result = await getClient().passwordResets.create({
+      email,
+      ...(redirectUrl && { redirect_url: redirectUrl }),
+    });
+    return { success: true, message: result?.message };
+  } catch {
+    return { success: false, code: "request_failed" };
+  }
 }
 
 /**
@@ -228,7 +286,13 @@ export async function resetPassword(
   token: string,
   password: string,
   passwordConfirmation: string,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{
+  success: boolean;
+  error?: string;
+  code?: AccountAuthFailureCode;
+}> {
+  if (!accountAuthLive()) return UNAVAILABLE;
+
   try {
     const result = await getClient().passwordResets.update(token, {
       password,
@@ -239,7 +303,8 @@ export async function resetPassword(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Password reset failed",
+      code: "request_failed",
+      error: buyerSafeMessage(error),
     };
   }
 }
@@ -249,9 +314,16 @@ export async function updateCustomer(data: {
   last_name?: string;
   email?: string;
   current_password?: string;
-}) {
-  return actionResult(async () => {
-    let customer;
+}): Promise<{
+  success: boolean;
+  customer?: Customer;
+  error?: string;
+  code?: AccountAuthFailureCode;
+}> {
+  if (!accountAuthLive()) return UNAVAILABLE;
+
+  try {
+    let customer: Customer;
     try {
       customer = await withAuthRefresh(async (options) => {
         return getClient().customer.update(data, options);
@@ -263,6 +335,12 @@ export async function updateCustomer(data: {
       throw error;
     }
     updateTag("customer");
-    return { customer };
-  }, "Update failed");
+    return { success: true, customer };
+  } catch (error) {
+    return {
+      success: false,
+      code: "request_failed",
+      error: buyerSafeMessage(error),
+    };
+  }
 }

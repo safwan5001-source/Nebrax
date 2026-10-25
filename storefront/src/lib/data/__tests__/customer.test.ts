@@ -66,6 +66,13 @@ vi.mock("next/cache", () => ({
   updateTag: vi.fn(),
 }));
 
+// These tests pin the LIVE (backend-ready) behaviour of the actions. The
+// shipped default is `gated` — see customer.gated.test.ts for that contract.
+vi.mock("@/lib/commerce/capabilities", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/commerce/capabilities")>()),
+  ACCOUNT_AUTH_CAPABILITY: "live",
+}));
+
 import {
   getCustomer,
   login,
@@ -355,19 +362,24 @@ describe("customer server actions", () => {
     });
 
     it("returns error on failure", async () => {
-      mockClient.customer.update.mockRejectedValue(new Error("Email taken"));
+      mockClient.customer.update.mockRejectedValue(
+        Object.assign(new Error("Email taken"), { status: 422 }),
+      );
 
       const result = await updateCustomer({ email: "taken@example.com" });
 
       expect(result).toEqual({
         success: false,
+        code: "request_failed",
         error: "Email taken",
       });
     });
 
     it("surfaces invalid current password error", async () => {
       mockClient.customer.update.mockRejectedValue(
-        new Error("Current password is invalid or missing"),
+        Object.assign(new Error("Current password is invalid or missing"), {
+          status: 422,
+        }),
       );
 
       const result = await updateCustomer({
@@ -377,19 +389,41 @@ describe("customer server actions", () => {
 
       expect(result).toEqual({
         success: false,
+        code: "request_failed",
         error: "Current password is invalid or missing",
       });
     });
 
-    it("returns fallback message for non-Error throws", async () => {
+    it("returns no message for non-Error throws (caller shows localized copy)", async () => {
       mockClient.customer.update.mockRejectedValue("unexpected");
 
       const result = await updateCustomer({ first_name: "Test" });
 
       expect(result).toEqual({
         success: false,
-        error: "Update failed",
+        code: "request_failed",
+        error: undefined,
       });
     });
+  });
+});
+
+describe("failure messages (live)", () => {
+  it("never forwards a non-backend (configuration/network) error message", async () => {
+    mockClient.auth.login.mockRejectedValueOnce(
+      new Error("Spree client is not configured. Set SPREE_API_URL"),
+    );
+    const result = await login("a@b.sa", "pw");
+    expect(result.success).toBe(false);
+    expect(result.error).toBeUndefined();
+    expect(result.code).toBe("request_failed");
+  });
+
+  it("forwards a deliberate 4xx backend message", async () => {
+    mockClient.auth.login.mockRejectedValueOnce(
+      Object.assign(new Error("Invalid email or password"), { status: 401 }),
+    );
+    const result = await login("a@b.sa", "pw");
+    expect(result.error).toBe("Invalid email or password");
   });
 });

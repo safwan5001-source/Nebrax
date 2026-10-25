@@ -17,6 +17,13 @@ vi.mock("next/navigation", () => ({
   useRouter: () => mockRouter,
 }));
 
+// These tests pin the LIVE session-sync behaviour. The shipped default is
+// `gated` — see AuthContext.gated.test.tsx for that contract.
+vi.mock("@/lib/commerce/capabilities", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/commerce/capabilities")>()),
+  ACCOUNT_AUTH_CAPABILITY: "live",
+}));
+
 vi.mock("@/lib/data/customer", () => ({
   syncSession: vi.fn(),
   login: vi.fn(),
