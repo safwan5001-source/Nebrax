@@ -104,7 +104,10 @@ export default async function StoreCheckoutLayout({
         </div>
       </header>
 
-      <main id="main-content" className="flex-1">
+      <main
+        id="main-content"
+        className={presentation ? "flex-1" : "flex-1 bg-store-background"}
+      >
         <PublishedThemeMarkerProvider
           themePreset={presentation?.themePreset ?? "awj-modern"}
         >

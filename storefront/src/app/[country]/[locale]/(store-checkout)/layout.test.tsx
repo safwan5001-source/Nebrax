@@ -72,7 +72,8 @@ describe("StoreCheckoutLayout published theme", () => {
     const root = await checkout("ar");
     expect(root.props.dir).toBe("rtl");
     expect(root.props.style).toEqual({});
-    const [header] = Children.toArray(root.props.children) as ReactElement[];
+    const [header, main] = Children.toArray(root.props.children) as ReactElement[];
+    expect(main.props.className).toBe("flex-1 bg-store-background");
     const headerRow = Children.only(header.props.children) as ReactElement;
     const brand = Children.toArray(headerRow.props.children)[0] as ReactElement;
     expect(brand.props).toMatchObject({ name: "Live shop", logoUrl: null });
