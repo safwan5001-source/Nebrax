@@ -1,9 +1,18 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { CurrentYear } from "@/components/layout/CurrentYear";
+import { PublishedThemeMarkerProvider } from "@/components/layout/PublishedThemeMarker";
 import { StoreBrand } from "@/components/layout/StoreBrand";
 import { DEFAULT_LOCALE, resolveSupportedLocale } from "@/i18n/locales";
-import { fetchStorefrontName } from "@/lib/commerce/storefront";
+import { fetchStorefrontConfig } from "@/lib/commerce/storefront";
+import {
+  publishedLogoUrl,
+  publishedStoreName,
+  publishedThemeAttrs,
+  publishedThemeStyle,
+} from "@/lib/presentation/public";
+import { publishedLogoMedia } from "@/lib/presentation/resolved-media";
+import { resolveStorefrontBackgroundStyle } from "@/lib/presentation/storefront-background-render";
 
 /**
  * STORE-UI-4 — the AWJ checkout shell.
@@ -45,20 +54,47 @@ export default async function StoreCheckoutLayout({
   // (Arabic) rather than the segment's locale, which showed up as an Arabic
   // "back to cart" link on the English checkout during visual QA.
   const messageLocale = resolveSupportedLocale(locale) ?? DEFAULT_LOCALE;
-  const [storeName, t, footer] = await Promise.all([
-    fetchStorefrontName(),
+  const [identity, t, footer] = await Promise.all([
+    fetchStorefrontConfig().catch(() => null),
     getTranslations({ locale: messageLocale, namespace: "awjCheckout" }),
     getTranslations({ locale: messageLocale, namespace: "footer" }),
   ]);
-  // Same fallback the storefront header uses, so the two shells never disagree
-  // about what this store is called.
-  const displayName = storeName?.trim() || footer("shop");
+  const presentation = identity?.presentation ?? null;
+  const displayName = publishedStoreName(
+    presentation,
+    identity?.name ?? null,
+    footer("shop"),
+  );
+  const themeStyle = publishedThemeStyle(presentation);
+  const backgroundStyle = presentation
+    ? resolveStorefrontBackgroundStyle(
+        presentation,
+        messageLocale === "ar" ? "rtl" : "ltr",
+      )
+    : undefined;
+  const themeAttrs = publishedThemeAttrs(presentation);
 
   return (
-    <>
+    <div
+      data-published-theme=""
+      {...themeAttrs}
+      dir={messageLocale === "ar" ? "rtl" : "ltr"}
+      className="relative isolate flex min-h-screen flex-1 flex-col"
+      style={{ ...themeStyle, ...backgroundStyle }}
+    >
       <header className="border-b border-store-border bg-store-surface">
         <div className="mx-auto flex h-store-header max-w-store items-center justify-between gap-4 px-4 sm:px-6 lg:h-store-header-lg lg:px-8">
-          <StoreBrand href={basePath} name={displayName} size="md" />
+          <StoreBrand
+            href={basePath}
+            name={displayName}
+            size="md"
+            locale={messageLocale}
+            logoUrl={publishedLogoUrl(presentation)}
+            logoMedia={publishedLogoMedia(
+              presentation,
+              identity?.presentationMedia ?? {},
+            )}
+          />
           <Link
             href={`${basePath}/cart`}
             className="rounded-md text-sm font-medium text-store-muted-foreground underline-offset-4 outline-none transition-colors hover:text-store-foreground hover:underline focus-visible:ring-2 focus-visible:ring-store-primary"
@@ -68,8 +104,12 @@ export default async function StoreCheckoutLayout({
         </div>
       </header>
 
-      <main id="main-content" className="flex-1 bg-store-background">
-        {children}
+      <main id="main-content" className="flex-1">
+        <PublishedThemeMarkerProvider
+          themePreset={presentation?.themePreset ?? "awj-modern"}
+        >
+          {children}
+        </PublishedThemeMarkerProvider>
       </main>
 
       <footer className="border-t border-store-border bg-store-surface">
@@ -79,6 +119,6 @@ export default async function StoreCheckoutLayout({
           </p>
         </div>
       </footer>
-    </>
+    </div>
   );
 }
