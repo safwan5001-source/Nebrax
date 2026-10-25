@@ -34,6 +34,9 @@ class AuthController extends ApiController
     /** مدة صلاحية التوكن (أيام). */
     private const TOKEN_TTL_DAYS = 7;
 
+    /** مدة صلاحية التوكن عند «تذكرني» (أيام) — سقف صلب مفروض خادمياً، لا توكن دائم أبداً. */
+    private const REMEMBER_TOKEN_TTL_DAYS = 30;
+
     /** مدة التجربة المجانية عند التسجيل (أيام). */
     private const TRIAL_DAYS = 14;
 
@@ -202,7 +205,7 @@ class AuthController extends ApiController
         }
 
         return response()->json([
-            'token' => $this->issueToken($user),
+            'token' => $this->issueToken($user, (bool) ($data['remember'] ?? false)),
             'user'  => $this->userPayload($user),
         ]);
     }
@@ -316,9 +319,11 @@ class AuthController extends ApiController
         ];
     }
 
-    private function issueToken(User $user): string
+    private function issueToken(User $user, bool $remember = false): string
     {
-        return $user->createToken('api', ['*'], now()->addDays(self::TOKEN_TTL_DAYS))->plainTextToken;
+        $days = $remember ? self::REMEMBER_TOKEN_TTL_DAYS : self::TOKEN_TTL_DAYS;
+
+        return $user->createToken('api', ['*'], now()->addDays($days))->plainTextToken;
     }
 
     private function userPayload(User $user): array

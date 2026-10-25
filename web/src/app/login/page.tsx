@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -12,13 +12,15 @@ import { AuthShell } from '@/components/auth/auth-shell';
 import { DemoLoginButton } from '@/components/auth/demo-login-button';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { login } from '@/lib/auth';
+import { checkStoredSession, landingPathFor, login } from '@/lib/auth';
+import { isDemo } from '@/lib/demo';
 import { ApiError } from '@/lib/api';
 import { startDemoSession } from '@/lib/demo-session';
 
 const schema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
+  remember: z.boolean().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -37,16 +39,35 @@ export default function LoginPage() {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({ resolver: zodResolver(schema) });
 
+  // جلسة محفوظة صالحة: لا نعرض نموذج الدخول — نتحقق عبر /me ثم نحوّل. التسابق: أي تفاعل (دخول/معاينة) يُبطل النتيجة.
+  const interactedRef = useRef(false);
+  const [restoring, setRestoring] = useState(false);
+  const routerRef = useRef(router);
+  routerRef.current = router;
+  useEffect(() => {
+    if (isDemo() || !localStorage.getItem('token')) return;
+    let cancelled = false;
+    setRestoring(true);
+    checkStoredSession().then((result) => {
+      if (cancelled || interactedRef.current) return;
+      if (result.status === 'valid') routerRef.current.replace(landingPathFor(result.user.role));
+      else setRestoring(false);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
   function onDemoStart() {
+    interactedRef.current = true;
     demoStartedRef.current = true;
     setDemoStarted(true);
   }
 
   async function onSubmit(values: FormValues) {
+    interactedRef.current = true;
     if (demoStartedRef.current) return; // اختار المستخدم المعاينة: لا تسجيل دخول حقيقي بعدها
     setServerError(null);
     try {
-      const user = await login(values.email, values.password);
+      const user = await login(values.email, values.password, values.remember === true);
       if (demoStartedRef.current) {
         // بدأت المعاينة أثناء الطلب المعلّق (الواجهة تمنعه، وهذا شبكة أمان للتسابق): `login()` كتب للتوّ توكن
         // الحساب الحقيقي ومستخدمه، فتُمسح وتُعاد المعاينة نظيفة بدل أن تنتهي الجلسة على المستأجر الحقيقي.
@@ -54,11 +75,22 @@ export default function LoginPage() {
         return;
       }
       // دور الخدمة الذاتية بلا صلاحياتٍ على شاشات الإدارة — بوابته المخصَّصة.
-      router.replace(user.role === 'self_service' ? '/me' : '/dashboard');
+      router.replace(landingPathFor(user.role));
     } catch (error) {
       if (demoStartedRef.current) return; // فشل طلب متأخر لا يُظهر خطأً فوق المعاينة
       setServerError(error instanceof ApiError ? error.message : t('error'));
     }
+  }
+
+  if (restoring) {
+    return (
+      <AuthShell>
+        <div role="status" aria-live="polite" className="flex items-center justify-center gap-2 py-16 text-sm text-muted">
+          <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+          {t('restoring')}
+        </div>
+      </AuthShell>
+    );
   }
 
   return (
@@ -117,6 +149,11 @@ export default function LoginPage() {
             </div>
             {errors.password && <p id="login-password-error" className="mt-1.5 text-xs text-negative" role="alert">{t('password_invalid')}</p>}
           </div>
+
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-text">
+            <input type="checkbox" className="h-4 w-4 accent-primary" {...register('remember')} />
+            {t('remember')}
+          </label>
 
           {serverError && <p className="border border-negative/20 bg-negative/10 px-3 py-2 text-xs text-negative" role="alert">{serverError}</p>}
 
