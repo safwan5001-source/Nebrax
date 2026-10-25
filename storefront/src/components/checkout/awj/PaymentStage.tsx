@@ -3,6 +3,10 @@
 import { Banknote, CreditCard, Info, Lock, ShieldCheck } from "lucide-react";
 import type { useTranslations } from "next-intl";
 import { StageShell } from "@/components/checkout/awj/StageShell";
+import {
+  isPaymentBrandKey,
+  PaymentBrandMark,
+} from "@/components/checkout/PaymentBrandMark";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import type {
   AwjDeliveryMethod,
@@ -37,6 +41,10 @@ import type {
  * scheme name is written in this source. Choosing one that is not ready is refused by the server when the shopper continues, with a plain "unavailable,
  * nothing was charged" notice (see the flow) — nothing is created. Still no provider name and no card field.
  *
+ * **Polish — marks and readiness.** An online option whose server key is a known scheme shows its approved mark (`PaymentBrandMark`, reusing the footer's
+ * assets) instead of the generic card icon. The "taken to the provider's secure page" note (and the "pay securely online" hint) appear only when the
+ * selected method is ready; a not-ready selection shows the plain "unavailable, nothing charged" notice instead, and the server still refuses it on continue.
+ *
  * **PAY-H4-05 — online methods.** When the API marks a method `online: true`
  * (the platform gate is open and the method is linked to a ready gateway), it
  * is shown with a card icon and the note that payment happens on the
@@ -65,6 +73,10 @@ export function PaymentStage({
     (method) => method.id === selectedPaymentMethodId,
   );
   const selectedIsOnline = selectedMethod?.online === true;
+  // `ready` is sent only for merchant-enabled online options; a PAY-H4-05
+  // method (`online: true`, no `ready`) is ready by construction.
+  const selectedIsNotReady =
+    selectedIsOnline && selectedMethod?.ready === false;
 
   return (
     <StageShell
@@ -91,7 +103,9 @@ export function PaymentStage({
                   value={method.id}
                   className="mt-0.5"
                 />
-                {method.online === true ? (
+                {isPaymentBrandKey(method.onlineKey) ? (
+                  <PaymentBrandMark brand={method.onlineKey} />
+                ) : method.online === true ? (
                   <CreditCard
                     className="mt-0.5 w-5 h-5 shrink-0 text-store-muted-foreground"
                     aria-hidden="true"
@@ -106,7 +120,7 @@ export function PaymentStage({
                   {method.onlineKey
                     ? t(`payment.onlineBrand.${method.onlineKey}`)
                     : method.name}
-                  {method.online === true ? (
+                  {method.online === true && method.ready !== false ? (
                     <span className="mt-1 block text-xs font-normal text-store-muted-foreground">
                       {t("payment.onlineMethodHint")}
                     </span>
@@ -116,7 +130,16 @@ export function PaymentStage({
             ))}
           </RadioGroup>
 
-          {selectedIsOnline ? (
+          {selectedIsNotReady ? (
+            <p
+              role="status"
+              data-testid="awj-payment-unavailable-note"
+              className="mt-4 flex items-start gap-2 text-xs leading-relaxed text-store-muted-foreground"
+            >
+              <Info className="mt-px w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+              <span>{t("payment.onlineUnavailable")}</span>
+            </p>
+          ) : selectedIsOnline ? (
             <p
               data-testid="awj-payment-online-note"
               className="mt-4 flex items-start gap-2 text-xs leading-relaxed text-store-muted-foreground"

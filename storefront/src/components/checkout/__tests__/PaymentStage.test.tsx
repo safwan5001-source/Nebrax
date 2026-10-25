@@ -185,6 +185,93 @@ describe("PaymentStage", () => {
         t={t}
       />,
     );
+    // غير جاهزة: لا رسالة تحويل لصفحة المزوّد، بل إشعار «غير متاح»
+    expect(screen.queryByTestId("awj-payment-online-note")).toBeNull();
+    expect(
+      screen.getByTestId("awj-payment-unavailable-note"),
+    ).toBeInTheDocument();
+
+    rerender(
+      <PaymentStage
+        paymentMethods={[cashMethod, ready, notReady]}
+        selectedPaymentMethodId="online:mada"
+        onChange={onChange}
+        deliveryMethod="standard"
+        t={t}
+      />,
+    );
     expect(screen.getByTestId("awj-payment-online-note")).toBeInTheDocument();
+  });
+
+  it("shows the approved brand mark for known online keys, the generic icon otherwise, and no mark for cash", () => {
+    const mk = (key: string, ready = true): AwjPaymentMethod => ({
+      id: `online:${key}`,
+      name: key,
+      name_en: null,
+      settlement_type: "online",
+      online: true,
+      onlineKey: key,
+      ready,
+      linkedMethodId: ready ? "pm-9" : null,
+    });
+    const { container } = render(
+      <PaymentStage
+        paymentMethods={[
+          cashMethod,
+          mk("mada"),
+          mk("visa"),
+          mk("mastercard"),
+          mk("apple_pay", false),
+          mk("unknown_scheme"),
+        ]}
+        selectedPaymentMethodId={cashMethod.id}
+        onChange={vi.fn()}
+        deliveryMethod="standard"
+        t={t}
+      />,
+    );
+    const marks = [...container.querySelectorAll("[data-payment-brand]")];
+    expect(marks.map((m) => m.getAttribute("data-payment-brand"))).toEqual([
+      "mada",
+      "visa",
+      "mastercard",
+      "apple_pay",
+    ]);
+    for (const img of container.querySelectorAll("[data-payment-brand] img")) {
+      expect(img.getAttribute("alt")).toBe("");
+      expect(img.getAttribute("src")).toMatch(/^\/payment-brands\/.+\.svg$/);
+    }
+    expect(container.querySelectorAll("svg.lucide-credit-card")).toHaveLength(
+      1,
+    );
+  });
+
+  it("does not show the provider-redirect note or hint for a not-ready method; shows the unavailable notice instead", () => {
+    const notReady: AwjPaymentMethod = {
+      id: "online:apple_pay",
+      name: "apple_pay",
+      name_en: null,
+      settlement_type: "online",
+      online: true,
+      onlineKey: "apple_pay",
+      ready: false,
+      linkedMethodId: null,
+    };
+    render(
+      <PaymentStage
+        paymentMethods={[cashMethod, notReady]}
+        selectedPaymentMethodId={notReady.id}
+        onChange={vi.fn()}
+        deliveryMethod="standard"
+        t={t}
+      />,
+    );
+    expect(screen.queryByTestId("awj-payment-online-note")).toBeNull();
+    expect(screen.queryByText("payment.onlineRedirectNote")).toBeNull();
+    expect(screen.queryByText("payment.onlineMethodHint")).toBeNull();
+    expect(screen.queryByText("payment.settledOnDelivery")).toBeNull();
+    expect(
+      screen.getByTestId("awj-payment-unavailable-note"),
+    ).toHaveTextContent("payment.onlineUnavailable");
   });
 });
