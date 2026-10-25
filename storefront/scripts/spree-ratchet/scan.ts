@@ -124,6 +124,10 @@ function unwrap(node: ts.Expression): ts.Expression {
 }
 
 const SDK_FACTORY = "createClient";
+const RELEVANT = new RegExp(
+  `spree|${[...CLIENT_HELPERS, SDK_FACTORY].join("|")}`,
+  "i",
+);
 
 /** Single-file program (no libs, no module resolution) so the binder gives real lexical scopes. */
 function createChecker(sf: ts.SourceFile): ts.TypeChecker {
@@ -274,24 +278,44 @@ function collectHelperAliases(
 }
 
 /** Local names bound to `process.env` / `import.meta.env`. */
-function collectEnvAliases(sf: ts.SourceFile): Set<string> {
-  const aliases = new Set<string>();
+function collectEnvAliases(
+  sf: ts.SourceFile,
+  checker: ts.TypeChecker,
+): Set<ts.Symbol> {
+  const aliases = new Set<ts.Symbol>();
+  let changed = true;
   const visit = (node: ts.Node) => {
     if (
       ts.isVariableDeclaration(node) &&
       ts.isIdentifier(node.name) &&
       node.initializer &&
-      isEnvObject(unwrap(node.initializer), aliases)
-    )
-      aliases.add(node.name.text);
+      isEnvObject(unwrap(node.initializer), aliases, checker)
+    ) {
+      // Bound by symbol: a same-named parameter/local elsewhere is a different binding.
+      const sym = checker.getSymbolAtLocation(node.name);
+      if (sym && !aliases.has(sym)) {
+        aliases.add(sym);
+        changed = true;
+      }
+    }
     ts.forEachChild(node, visit);
   };
-  visit(sf);
+  while (changed) {
+    changed = false;
+    visit(sf);
+  }
   return aliases;
 }
 
-function isEnvObject(e: ts.Expression, aliases: ReadonlySet<string>): boolean {
-  if (ts.isIdentifier(e)) return aliases.has(e.text);
+function isEnvObject(
+  e: ts.Expression,
+  aliases: ReadonlySet<ts.Symbol>,
+  checker: ts.TypeChecker,
+): boolean {
+  if (ts.isIdentifier(e)) {
+    const sym = checker.getSymbolAtLocation(e);
+    return !!sym && aliases.has(sym);
+  }
   if (ts.isPropertyAccessExpression(e)) {
     // process.env
     if (
@@ -346,9 +370,12 @@ export function scanSource(text: string, rel: string): FileCounts {
     scriptKind(rel),
   );
   const counts: FileCounts = {};
+  // Every counted construct names Spree, a client helper/factory or SPREE_*; skip the
+  // (comparatively costly) binder for the vast majority of files that mention none.
+  if (!RELEVANT.test(text)) return counts;
   const checker = createChecker(sf);
   const { isTracked, isSdkModuleExpr } = collectHelperAliases(sf, checker);
-  const envAliases = collectEnvAliases(sf);
+  const envAliases = collectEnvAliases(sf, checker);
 
   const countModule = (spec: string, kind: "value" | "type", n = 1) => {
     if (isSdk(spec))
@@ -448,12 +475,12 @@ export function scanSource(text: string, rel: string): FileCounts {
     if (
       ts.isPropertyAccessExpression(node) &&
       SPREE_ENV.test(node.name.text) &&
-      isEnvObject(unwrap(node.expression), envAliases)
+      isEnvObject(unwrap(node.expression), envAliases, checker)
     )
       bump(counts, "spree_env_reads");
     else if (
       ts.isElementAccessExpression(node) &&
-      isEnvObject(unwrap(node.expression), envAliases)
+      isEnvObject(unwrap(node.expression), envAliases, checker)
     ) {
       const key = stringLiteral(node.argumentExpression);
       if (key && SPREE_ENV.test(key)) bump(counts, "spree_env_reads");
@@ -461,7 +488,7 @@ export function scanSource(text: string, rel: string): FileCounts {
       ts.isVariableDeclaration(node) &&
       ts.isObjectBindingPattern(node.name) &&
       node.initializer &&
-      isEnvObject(unwrap(node.initializer), envAliases)
+      isEnvObject(unwrap(node.initializer), envAliases, checker)
     ) {
       // const { SPREE_API_URL } = process.env
       for (const el of node.name.elements) {

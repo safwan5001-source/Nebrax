@@ -13,6 +13,9 @@ import {
   toBaseline,
 } from "../../../../scripts/spree-ratchet/scan";
 
+// Whole-tree scan (~700 files) parses every source file; on a loaded CI runner running
+// alongside the full suite it can exceed the 5s default. Scoped to this one test only.
+const FULL_TREE_SCAN_TIMEOUT_MS = 30_000;
 const STOREFRONT_ROOT = path.resolve(__dirname, "../../../..");
 const tmpDirs: string[] = [];
 
@@ -250,6 +253,30 @@ const other = process.env.NODE_ENV;`,
     expect(c.spree_env_reads).toBe(4);
   });
 
+  it("resolves process.env aliases by lexical binding (review: env alias scoping)", () => {
+    const c = scanSource(
+      `function a() { const env = process.env; return env.SPREE_API_URL; }
+function b(env: Record<string, string>) { return env.SPREE_API_URL; }
+function c() { const env = { SPREE_API_URL: "x" }; return env.SPREE_API_URL; }
+const e2 = (env: { SPREE_X?: string }) => env["SPREE_X"];`,
+      "src/lib/data/a.ts",
+    );
+    // only a()'s read is a real process.env read
+    expect(c.spree_env_reads).toBe(1);
+  });
+
+  it("still follows env alias chains and nested-scope reads", () => {
+    const c = scanSource(
+      `const env = process.env;
+const again = env;
+function f() { return again.SPREE_API_URL; }
+const { SPREE_WEBHOOK_SECRET } = again;
+const m = import.meta.env.NEXT_PUBLIC_SPREE_X;`,
+      "src/lib/data/a.ts",
+    );
+    expect(c.spree_env_reads).toBe(3);
+  });
+
   it("counts wrapper imports by alias and relative path, but not from inside the wrapper", () => {
     expect(
       scanSource(
@@ -425,16 +452,20 @@ describe("ratchet behaviour", () => {
 });
 
 describe("committed baseline", () => {
-  it("matches the repository exactly (or the baseline change is deliberate)", () => {
-    const baseline = JSON.parse(
-      fs.readFileSync(
-        path.join(STOREFRONT_ROOT, "scripts/spree-ratchet/baseline.json"),
-        "utf8",
-      ),
-    ) as Baseline;
-    const cmp = compare(baseline, scanProject(STOREFRONT_ROOT));
-    expect(cmp.violations).toEqual([]);
-  });
+  it(
+    "matches the repository exactly (or the baseline change is deliberate)",
+    () => {
+      const baseline = JSON.parse(
+        fs.readFileSync(
+          path.join(STOREFRONT_ROOT, "scripts/spree-ratchet/baseline.json"),
+          "utf8",
+        ),
+      ) as Baseline;
+      const cmp = compare(baseline, scanProject(STOREFRONT_ROOT));
+      expect(cmp.violations).toEqual([]);
+    },
+    FULL_TREE_SCAN_TIMEOUT_MS,
+  );
 
   it("is serialised canonically (sorted, trailing newline)", () => {
     const raw = fs.readFileSync(
