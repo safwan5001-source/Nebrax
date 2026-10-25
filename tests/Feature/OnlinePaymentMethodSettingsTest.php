@@ -194,6 +194,110 @@ class OnlinePaymentMethodSettingsTest extends TestCase
     }
 
     #[Test]
+    public function manage_settings_persist_default_gateway_and_usage_and_are_audited_once(): void
+    {
+        $auth = $this->registerTenant('opm-manage', 'owner@opm-manage.test');
+        $first = $this->fakeGateway($auth['tenant_id'], 'A-First');
+        $second = $this->fakeGateway($auth['tenant_id'], 'B-Second');
+        $token = $auth['token'];
+
+        // الافتراضي: تلقائي (أول جاهز بالاسم)، والاستعمال فواتير+متجر، وPOS غير مدعوم
+        $row = $this->methodRow($token, 'mada');
+        $this->assertNull($row['default_gateway_id']);
+        $this->assertSame($first->id, $row['effective_gateway']['id']);
+        $this->assertTrue($row['default_gateway_selectable']);
+        $this->assertSame(['invoices' => true, 'store' => true, 'pos' => false], $row['usage']);
+        $this->assertSame(['invoices' => true, 'store' => true, 'pos' => false], $row['usage_supported']);
+
+        $this->withToken($token)->putJson('/api/online-payment-methods/mada', ['default_gateway_id' => $second->id, 'use_in_store' => false, 'reason' => 'اختيار البوابة'])
+            ->assertOk()->assertJsonPath('data.default_gateway_id', $second->id)->assertJsonPath('data.effective_gateway.id', $second->id)
+            ->assertJsonPath('data.usage.store', false)->assertJsonPath('data.usage.invoices', true)->assertJsonPath('data.enabled', false);
+        // تكرار نفس القيم ⇒ لا حدث ثانٍ
+        $this->withToken($token)->putJson('/api/online-payment-methods/mada', ['default_gateway_id' => $second->id, 'use_in_store' => false])->assertOk();
+        // العودة للتلقائي
+        $this->withToken($token)->putJson('/api/online-payment-methods/mada', ['default_gateway_id' => null])->assertOk()->assertJsonPath('data.default_gateway_id', null);
+        // POS ليس إعداداً مقبولاً
+        $this->withToken($token)->putJson('/api/online-payment-methods/mada', ['use_in_pos' => true])->assertStatus(422)->assertJsonPath('error.code', 'method.nothing_to_update');
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $events = OnlinePaymentMethodSettingEvent::query()->where('method_key', 'mada')->orderBy('created_at')->orderBy('id')->get();
+        $this->assertCount(2, $events);
+        $this->assertSame('اختيار البوابة', $events[0]->reason);
+        $this->assertSame(
+            ['default_gateway_id' => ['from' => null, 'to' => $second->id], 'use_in_store' => ['from' => true, 'to' => false]],
+            json_decode((string) $events[0]->changes, true),
+        );
+        $this->assertSame(['default_gateway_id' => ['from' => $second->id, 'to' => null]], json_decode((string) $events[1]->changes, true));
+        $this->assertFalse($events[1]->enabled_to);
+    }
+
+    #[Test]
+    public function the_default_gateway_must_be_an_own_non_revoked_connection_that_declares_the_method(): void
+    {
+        $a = $this->registerTenant('opm-dg-a', 'owner@opm-dg-a.test');
+        $b = $this->registerTenant('opm-dg-b', 'owner@opm-dg-b.test');
+        $mine = $this->fakeGateway($a['tenant_id'], 'Mine');
+        $foreign = $this->fakeGateway($b['tenant_id'], 'Foreign');
+        $revoked = $this->fakeGateway($a['tenant_id'], 'Revoked', PaymentGateway::STATUS_REVOKED);
+        app(TenantContext::class)->set($a['tenant_id']);
+        $custom = PaymentGateway::query()->create(['provider' => 'custom', 'name' => 'Custom', 'environment' => 'sandbox']);
+
+        foreach ([$foreign->id, $revoked->id, $custom->id, (string) \Illuminate\Support\Str::uuid()] as $bad) {
+            $this->withToken($a['token'])->putJson('/api/online-payment-methods/mada', ['default_gateway_id' => $bad])
+                ->assertStatus(422)->assertJsonPath('error.code', 'method.default_gateway_invalid');
+        }
+        $this->withToken($a['token'])->putJson('/api/online-payment-methods/mada', ['default_gateway_id' => 'not-a-uuid'])->assertStatus(422);
+        $this->assertNull($this->methodRow($a['token'], 'mada')['default_gateway_id']);
+        $this->withToken($a['token'])->putJson('/api/online-payment-methods/mada', ['default_gateway_id' => $mine->id])->assertOk();
+        // الإعداد لا يتسرب بين المستأجرين
+        $this->assertNull($this->methodRow($b['token'], 'mada')['default_gateway_id']);
+    }
+
+    #[Test]
+    public function an_unready_default_gateway_makes_the_method_not_ready_and_never_fails_over_to_another_gateway(): void
+    {
+        $auth = $this->registerTenant('opm-nofailover', 'owner@opm-nofailover.test');
+        $primary = $this->fakeGateway($auth['tenant_id'], 'A-Primary');
+        $this->fakeGateway($auth['tenant_id'], 'B-Other');
+        $token = $auth['token'];
+        $this->withToken($token)->putJson('/api/online-payment-methods/mada', ['enabled' => true, 'default_gateway_id' => $primary->id])->assertOk()->assertJsonPath('data.status', 'enabled');
+
+        DB::table('payment_gateways')->where('id', $primary->id)->update(['status' => 'suspended', 'is_active' => false]);
+        $row = $this->methodRow($token, 'mada');
+        $this->assertFalse($row['ready']);
+        $this->assertSame('enabled_not_ready', $row['status']);
+        $this->assertNull($row['effective_gateway'], 'لا تحويل تلقائي إلى البوابة الأخرى الجاهزة');
+        $this->assertSame('no_usable_gateway', $row['reason']);
+    }
+
+    #[Test]
+    public function the_invoice_usage_switch_controls_the_public_pay_link_methods(): void
+    {
+        $auth = $this->registerTenant('opm-usage', 'owner@opm-usage.test');
+        $gateway = $this->fakeGateway($auth['tenant_id'], 'Fake');
+        $this->withToken($auth['token'])->putJson('/api/online-payment-methods/mada', ['enabled' => true])->assertOk();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $service = app(OnlinePaymentMethodSettingsService::class);
+        $this->assertSame(['mada'], $service->customerVisibleKeys($gateway->id));
+
+        $this->withToken($auth['token'])->putJson('/api/online-payment-methods/mada', ['use_in_invoices' => false])->assertOk();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->assertSame([], $service->customerVisibleKeys($gateway->id));
+        $this->assertSame([], $service->customerVisibleKeys());
+    }
+
+    #[Test]
+    public function viewers_cannot_change_manage_settings(): void
+    {
+        $auth = $this->registerTenant('opm-rbac2', 'owner@opm-rbac2.test');
+        $gateway = $this->fakeGateway($auth['tenant_id'], 'Fake');
+        $accountant = $this->tokenForRole($auth['tenant_id'], 'accountant', 'acc@opm-rbac2.test');
+        $this->withToken($accountant)->putJson('/api/online-payment-methods/mada', ['default_gateway_id' => $gateway->id])->assertForbidden();
+        $this->withToken($accountant)->putJson('/api/online-payment-methods/mada', ['use_in_store' => false])->assertForbidden();
+        $this->assertNull($this->methodRow($auth['token'], 'mada')['default_gateway_id']);
+    }
+
+    #[Test]
     public function gateway_resources_expose_adapter_capabilities_without_secrets_and_moyasar_declares_documented_methods(): void
     {
         $auth = $this->registerTenant('opm-caps', 'owner@opm-caps.test');

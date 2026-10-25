@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '@/lib/api';
-import { METHOD_KEYS, canToggle, isEnabledNotReady, isMethodKey, methodErrorKey, methodTone, nextStep, toggleBlockReason } from './contract';
+import { METHOD_KEYS, canToggle, changesOf, draftOf, isEnabledNotReady, isMethodKey, methodErrorKey, methodTone, nextStep, toggleBlockReason } from './contract';
 
 const err = (code: string) => new ApiError(422, 'x', { error: { code, message: 'x' } });
 
@@ -46,5 +46,17 @@ describe('online payment methods contract', () => {
     expect(methodErrorKey(err('method.needs_setup'))).toBe('generic');
     expect(methodErrorKey(err('something.else'))).toBe('generic');
     expect(methodErrorKey(new Error('network'))).toBe('generic');
+  });
+
+  it('Manage drafts mirror what is stored and only changed fields are sent', () => {
+    const stored = { default_gateway_id: null, usage: { invoices: true, store: true, pos: false } };
+    expect(draftOf(stored)).toEqual({ default_gateway_id: null, use_in_invoices: true, use_in_store: true });
+    expect(changesOf(stored, draftOf(stored))).toEqual({});
+    expect(changesOf(stored, { default_gateway_id: 'g2', use_in_invoices: true, use_in_store: false })).toEqual({ default_gateway_id: 'g2', use_in_store: false });
+    expect(changesOf({ ...stored, default_gateway_id: 'g2' }, { default_gateway_id: null, use_in_invoices: true, use_in_store: true })).toEqual({ default_gateway_id: null });
+  });
+
+  it('maps the default-gateway rejection', () => {
+    expect(methodErrorKey(err('method.default_gateway_invalid'))).toBe('default_gateway_invalid');
   });
 });

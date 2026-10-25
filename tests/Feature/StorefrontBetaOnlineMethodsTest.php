@@ -193,4 +193,44 @@ class StorefrontBetaOnlineMethodsTest extends TestCase
         $patch(['online_method' => 'mada', 'amount' => 1])->assertStatus(422);
         $patch(['payment_method_id' => $this->method->id])->assertOk();   // المسار القديم كما كان
     }
+
+    #[Test]
+    public function turning_off_store_usage_hides_the_method_and_refuses_its_selection(): void
+    {
+        $this->enable('mada');
+        app(TenantContext::class)->set($this->tenant->id);
+        app(OnlinePaymentMethodSettingsService::class)->updateSettings('mada', ['use_in_store' => false], null);
+        app(TenantContext::class)->forget();
+
+        $this->assertArrayNotHasKey('online_methods', $this->methods());
+        [, $response] = $this->pickOnline('mada');
+        $response->assertStatus(503)->assertJsonPath('error.code', 'payment_unavailable');
+        $this->assertNoCollectionFootprint();
+    }
+
+    #[Test]
+    public function the_chosen_default_gateway_decides_which_payment_method_the_order_uses(): void
+    {
+        // اتصال ثانٍ جاهز مرتبط بطريقة دفع أخرى متاحة للقناة
+        app(TenantContext::class)->set($this->tenant->id);
+        $second = \App\Models\PaymentMethod::create(['name' => 'بطاقة ثانية', 'name_en' => 'Second card', 'settlement_type' => 'bank', 'available_online' => true]);
+        app(\App\Services\PaymentMethodChannelAvailabilityService::class)->setAvailability($second, $this->channel, true);
+        $gateway2 = \App\Models\PaymentGateway::query()->create(['provider' => 'fake', 'name' => 'Zeta', 'environment' => 'sandbox', 'payment_method_id' => $second->id]);
+        DB::table('payment_gateways')->where('id', $gateway2->id)->update(['status' => 'active', 'is_active' => true]);
+        app(TenantContext::class)->forget();
+
+        $this->enable('mada');
+        $this->assertSame($this->method->id, collect($this->methods()['online_methods'])->firstWhere('key', 'mada')['payment_method_id']);   // تلقائي: الأول بالاسم
+
+        app(TenantContext::class)->set($this->tenant->id);
+        app(OnlinePaymentMethodSettingsService::class)->updateSettings('mada', ['default_gateway_id' => $gateway2->id], null);
+        app(TenantContext::class)->forget();
+        $row = collect($this->methods()['online_methods'])->firstWhere('key', 'mada');
+        $this->assertTrue($row['ready']);
+        $this->assertSame($second->id, $row['payment_method_id']);
+
+        [$token, $response] = $this->pickOnline('mada');
+        $response->assertOk()->assertJsonPath('data.payment.payment_method_id', $second->id);
+        $this->complete($token)->assertCreated()->assertJsonPath('data.order.payment.method', CommercePaymentIntent::METHOD_ONLINE);
+    }
 }

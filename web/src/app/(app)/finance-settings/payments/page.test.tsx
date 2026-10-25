@@ -64,6 +64,11 @@ afterEach(cleanup);
 
 describe.each(TEST_LOCALES)('PaymentGatewaysPage (%s)', (locale) => {
   const m = TEST_MESSAGES[locale].paymentGateways;
+  /** يفتح لوحة «إدارة» الاتصال (كل الإعدادات والإجراءات فيها) ويعيدها. */
+  const openManage = async (id = 'g1') => {
+    await userEvent.click(await screen.findByTestId(`pg-details-${id}`));
+    return screen.findByTestId('pg-detail');
+  };
 
   it('without payments.view it shows the denial and never calls the API', async () => {
     perms.current = [];
@@ -82,9 +87,13 @@ describe.each(TEST_LOCALES)('PaymentGatewaysPage (%s)', (locale) => {
 
     const item = await screen.findByTestId('pg-item-g1');
     expect(within(item).getByText(m.status.active)).toBeTruthy();
-    expect(within(item).getAllByText(m.fields.saved).length).toBe(2);
-    // الزر الوحيد للقارئ هو «تفاصيل» (قراءة)؛ لا إجراء تعديلي.
-    expect(within(item).getAllByRole('button').map((b) => b.textContent)).toEqual([m.actions.details]);
+    expect(within(item).getByText(m.environments.sandbox)).toBeTruthy();
+    expect(within(item).getByText(m.card.notVerified)).toBeTruthy();
+    // البطاقة مختصرة: الزر الوحيد «إدارة» (قراءة لغير المدير)؛ لا إجراء تعديلي ولا مؤشرات أسرار.
+    expect(within(item).getAllByRole('button').map((b) => b.textContent)).toEqual([m.actions.manage]);
+    const sheet = await openManage();
+    expect(within(sheet).getAllByText(m.fields.saved).length).toBeGreaterThanOrEqual(2);
+    expect(within(sheet).queryByRole('button', { name: m.actions.edit })).toBeNull();
     expect(screen.queryByRole('button', { name: m.add })).toBeNull();
     expect(document.body.textContent).not.toMatch(/sk_|whsec_/);
     expect(api).toHaveBeenCalledTimes(1); // السجل (events) يتطلب الإدارة: لا طلب
@@ -99,9 +108,12 @@ describe.each(TEST_LOCALES)('PaymentGatewaysPage (%s)', (locale) => {
     ]);
     renderIntl(<PaymentGatewaysPage />, locale);
 
-    expect(within(await screen.findByTestId('pg-fee-tax-g1')).getByText(m.fields.feeTaxReject)).toBeTruthy();
-    expect(within(screen.getByTestId('pg-fee-tax-g2')).getByText(m.fields.feeTaxInputVatNoOpinion)).toBeTruthy();
-    expect(within(screen.getByTestId('pg-fee-tax-g3')).getByText(m.fields.feeTaxInputVat)).toBeTruthy();
+    for (const [id, text] of [['g1', m.fields.feeTaxReject], ['g2', m.fields.feeTaxInputVatNoOpinion], ['g3', m.fields.feeTaxInputVat]] as const) {
+      const sheet = await openManage(id);
+      expect(within(sheet).getByText(text)).toBeTruthy();
+      await userEvent.keyboard('{Escape}');
+      await waitFor(() => expect(screen.queryByTestId('pg-detail')).toBeNull());
+    }
   });
 
   it('shows the empty state with an add action for a manager and without one for a viewer', async () => {
@@ -134,10 +146,12 @@ describe.each(TEST_LOCALES)('PaymentGatewaysPage (%s)', (locale) => {
     listReturns([conn({ id: 'real', provider: 'stripe', name: 'Stripe' }), conn({ id: 'manual', provider: 'custom', name: 'يدوي' })]);
     renderIntl(<PaymentGatewaysPage />, locale);
 
-    const real = await screen.findByTestId('pg-item-real');
+    const real = await openManage('real');
     expect((within(real).getByRole('button', { name: m.actions.activate }) as HTMLButtonElement).disabled).toBe(true);
-    expect(within(real).getByText(m.activationBlocked)).toBeTruthy();
-    const manual = screen.getByTestId('pg-item-manual');
+    expect(within(real).getByText(m.activationBlocked, { selector: '[role="note"]' })).toBeTruthy();
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByTestId('pg-detail')).toBeNull());
+    const manual = await openManage('manual');
     expect((within(manual).getByRole('button', { name: m.actions.activate }) as HTMLButtonElement).disabled).toBe(false);
     expect(within(manual).queryByText(m.activationBlocked)).toBeNull();
   });
@@ -152,7 +166,7 @@ describe.each(TEST_LOCALES)('PaymentGatewaysPage (%s)', (locale) => {
     renderIntl(<PaymentGatewaysPage />, locale);
 
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: m.actions.activate }));
+    await user.click(within(await openManage()).getByRole('button', { name: m.actions.activate }));
     await waitFor(() => expect(within(screen.getByTestId('pg-item-g1')).getByText(m.status.active)).toBeTruthy());
     expect(confirm).toHaveBeenCalledTimes(1);
     expect(toast.success).toHaveBeenCalledWith(m.done.activate);
@@ -165,7 +179,8 @@ describe.each(TEST_LOCALES)('PaymentGatewaysPage (%s)', (locale) => {
     renderIntl(<PaymentGatewaysPage />, locale);
 
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: m.actions.suspend }));
+    await user.click(within(await openManage()).getByRole('button', { name: m.actions.suspend }));
+    await waitFor(() => expect(confirm).toHaveBeenCalledTimes(1));
     expect(api).toHaveBeenCalledTimes(1);
   });
 
@@ -180,7 +195,7 @@ describe.each(TEST_LOCALES)('PaymentGatewaysPage (%s)', (locale) => {
     renderIntl(<PaymentGatewaysPage />, locale);
 
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: m.actions.delete }));
+    await user.click(within(await openManage()).getByRole('button', { name: m.actions.delete }));
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(m.errors.gateway_has_references));
     expect(screen.getByTestId('pg-item-g1')).toBeTruthy();
   });
@@ -226,7 +241,7 @@ describe.each(TEST_LOCALES)('PaymentGatewaysPage (%s)', (locale) => {
     renderIntl(<PaymentGatewaysPage />, locale);
 
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: m.actions.revoke }));
+    await user.click(within(await openManage()).getByRole('button', { name: m.actions.revoke }));
     const dialog = await screen.findByRole('dialog');
     await user.click(within(dialog).getByRole('button', { name: m.revoke.submit }));
     expect(within(dialog).getByRole('alert').textContent).toBe(m.revoke.reasonRequired);
@@ -249,7 +264,7 @@ describe.each(TEST_LOCALES)('PaymentGatewaysPage (%s)', (locale) => {
     renderIntl(<PaymentGatewaysPage />, locale);
 
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: m.actions.edit }));
+    await user.click(within(await openManage()).getByRole('button', { name: m.actions.edit }));
     const env = screen.getByLabelText(m.form.environment) as HTMLSelectElement;
     expect(env.disabled).toBe(true);
     expect(screen.getByText(m.form.environmentLocked)).toBeTruthy();
@@ -289,10 +304,10 @@ describe.each(TEST_LOCALES)('PaymentGatewaysPage (%s)', (locale) => {
     });
     renderIntl(<PaymentGatewaysPage />, locale);
 
-    const row = await screen.findByTestId('pg-item-m2');
-    const verifyButton = within(row).getByRole('button', { name: m.actions.verify });
+    let sheet = await openManage('m2');
+    const verifyButton = within(sheet).getByRole('button', { name: m.actions.verify });
     // قبل التحقق لا تفعيل
-    expect((within(row).getByRole('button', { name: m.actions.activate }) as HTMLButtonElement).disabled).toBe(true);
+    expect((within(sheet).getByRole('button', { name: m.actions.activate }) as HTMLButtonElement).disabled).toBe(true);
 
     verifyOutcome.next = 'fail';
     await userEvent.click(verifyButton);
@@ -300,9 +315,12 @@ describe.each(TEST_LOCALES)('PaymentGatewaysPage (%s)', (locale) => {
     expect(toast.success).not.toHaveBeenCalled();
 
     verifyOutcome.next = 'ok';
-    await userEvent.click(within(row).getByRole('button', { name: m.actions.verify }));
+    sheet = await openManage('m2');
+    await userEvent.click(within(sheet).getByRole('button', { name: m.actions.verify }));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith(m.done.verify));
-    await waitFor(() => expect((within(screen.getByTestId('pg-item-m2')).getByRole('button', { name: m.actions.activate }) as HTMLButtonElement).disabled).toBe(false));
+    await waitFor(() => expect(within(screen.getByTestId('pg-item-m2')).getByText(m.card.verified)).toBeTruthy());
+    sheet = await openManage('m2');
+    expect((within(sheet).getByRole('button', { name: m.actions.activate }) as HTMLButtonElement).disabled).toBe(false);
     // لا تأكيد مسبق لقراءة آمنة، ولا زر تحقق لمزوّد بلا محوّل
     expect(confirm).not.toHaveBeenCalled();
   });

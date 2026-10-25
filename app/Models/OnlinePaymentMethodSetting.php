@@ -8,7 +8,7 @@ use App\Tenancy\TenantContext;
 use DomainException;
 
 /**
- * إعداد إظهار وسيلة دفع إلكتروني للعميل (PAY-SETTINGS-UX): لا يقيّد ما تقبله صفحة المزوّد المستضافة، ولا يُفعَّل لعميل ما لم تكن الوسيلة مدعومة وجاهزة (تحسبها الخدمة).
+ * إعداد وسيلة دفع إلكتروني (PAY-SETTINGS-UX): إظهار للعميل + بوابة افتراضية + أماكن الاستخدام (فواتير/متجر): لا يقيّد ما تقبله صفحة المزوّد المستضافة، ولا يُفعَّل لعميل ما لم تكن الوسيلة مدعومة وجاهزة (تحسبها الخدمة).
  * يُكتب عبر `OnlinePaymentMethodSettingsService` وحده (خارج `$fillable` عمداً).
  */
 class OnlinePaymentMethodSetting extends BaseModel implements CompanyWide
@@ -17,7 +17,7 @@ class OnlinePaymentMethodSetting extends BaseModel implements CompanyWide
 
     protected function casts(): array
     {
-        return ['enabled' => 'boolean'];
+        return ['enabled' => 'boolean', 'use_in_invoices' => 'boolean', 'use_in_store' => 'boolean'];
     }
 
     protected static function booted(): void

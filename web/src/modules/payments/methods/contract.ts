@@ -39,12 +39,44 @@ export interface OnlineMethod {
   ready: boolean;
   customer_visible: boolean;
   connections: MethodConnection[];
-  /** البوابة الفعلية محسوبة (أول اتصال جاهز) لا مخزَّنة. */
+  /** البوابة الفعلية: الافتراضية المختارة إن جهزت، وإلا (حين لا اختيار) أول اتصال جاهز. لا تحويل تلقائي بين البوابات. */
   effective_gateway: { id: string; name: string } | null;
+  /** اتصال اختاره التاجر للوسيلة؛ null ⇒ تلقائي. */
+  default_gateway_id: string | null;
   multiple_eligible_gateways: boolean;
-  /** دائماً `false` اليوم: لا توجيه متعدد البوابات (H2-04). */
+  /** يوجد اتصال يعلن الوسيلة فيمكن اختياره افتراضياً. */
   default_gateway_selectable: boolean;
-  usage: { invoices: boolean; store: boolean };
+  /** أماكن الاستخدام المحفوظة فعلاً. */
+  usage: MethodUsage;
+  /** أي أماكن لها تكامل حقيقي (POS لا تكامل له بعد ⇒ لا مفتاح). */
+  usage_supported: MethodUsage;
+}
+
+export interface MethodUsage {
+  invoices: boolean;
+  store: boolean;
+  pos: boolean;
+}
+
+/** مسودة نافذة «إدارة»: ما يُحفظ فعلاً فقط. */
+export interface ManageDraft {
+  default_gateway_id: string | null;
+  use_in_invoices: boolean;
+  use_in_store: boolean;
+}
+
+export function draftOf(method: Pick<OnlineMethod, 'default_gateway_id' | 'usage'>): ManageDraft {
+  return { default_gateway_id: method.default_gateway_id, use_in_invoices: method.usage.invoices, use_in_store: method.usage.store };
+}
+
+/** الحقول المتغيّرة فقط (تُرسل إلى PUT)؛ فارغ ⇒ لا شيء للحفظ. */
+export function changesOf(method: Pick<OnlineMethod, 'default_gateway_id' | 'usage'>, draft: ManageDraft): Partial<ManageDraft> {
+  const base = draftOf(method);
+  const out: Partial<ManageDraft> = {};
+  if (draft.default_gateway_id !== base.default_gateway_id) out.default_gateway_id = draft.default_gateway_id;
+  if (draft.use_in_invoices !== base.use_in_invoices) out.use_in_invoices = draft.use_in_invoices;
+  if (draft.use_in_store !== base.use_in_store) out.use_in_store = draft.use_in_store;
+  return out;
 }
 
 export function methodTone(status: MethodStatus): BadgeTone {
@@ -81,12 +113,13 @@ export function isEnabledNotReady(method: Pick<OnlineMethod, 'enabled' | 'ready'
 }
 
 /** رموز رفض الخادم المعروفة (تُترجم)؛ غيرها يسقط إلى رسالة عامة. */
-export const KNOWN_ERRORS = ['method.unknown', 'method.reason_too_long'] as const;
+export const KNOWN_ERRORS = ['method.unknown', 'method.reason_too_long', 'method.default_gateway_invalid'] as const;
 
-export function methodErrorKey(err: unknown): 'unknown_method' | 'reason_too_long' | 'generic' {
+export function methodErrorKey(err: unknown): 'unknown_method' | 'reason_too_long' | 'default_gateway_invalid' | 'generic' {
   switch (apiErrorCode(err)) {
     case 'method.unknown': return 'unknown_method';
     case 'method.reason_too_long': return 'reason_too_long';
+    case 'method.default_gateway_invalid': return 'default_gateway_invalid';
     default: return 'generic';
   }
 }

@@ -30,7 +30,8 @@ use Illuminate\Support\Facades\DB;
  *   • `needs_setup` / `unsupported`: غير مفعَّلة وغير جاهزة (يوجد اتصال يعلنها لكنه غير جاهز / لا اتصال يعلنها).
  *
  *  «التفعيل» لا يقيّد ما تقبله صفحة المزوّد المستضافة (واجهة الفواتير لدى Moyasar بلا معامل لتقييد الوسائل؛ الوسائل تُضبط في لوحة المزوّد) ولا يغيّر أي قيد أو سند.
- *  والبوابة «الفعلية» تُحسب (أول اتصال جاهز بالاسم) ولا تُخزَّن: لا توجيه متعدد البوابات قبل H2-04.
+ *  البوابة «الفعلية»: الافتراضية التي اختارها التاجر (`default_gateway_id`) إن جهزت، وإلا — حين لا اختيار — أول اتصال جاهز بالاسم. لا توجيه متعدد البوابات ولا تحويل تلقائي (H2-04).
+ *  أماكن الاستخدام (`use_in_invoices`/`use_in_store`) مخزَّنة وتُفرض فعلاً؛ POS لا تكامل له فلا إعداد.
  */
 class OnlinePaymentMethodSettingsService
 {
@@ -43,7 +44,7 @@ class OnlinePaymentMethodSettingsService
         $gateways = PaymentGateway::query()->where('status', '!=', PaymentGateway::STATUS_REVOKED)->orderBy('name')->orderBy('id')->get();
         $stored = OnlinePaymentMethodSetting::query()->get()->keyBy('method_key');
 
-        return array_map(fn (string $key) => $this->describe($key, $gateways->all(), (bool) ($stored[$key]->enabled ?? false)), OnlinePaymentMethodCatalog::KEYS);
+        return array_map(fn (string $key) => $this->describe($key, $gateways->all(), $stored[$key] ?? null), OnlinePaymentMethodCatalog::KEYS);
     }
 
     /**
@@ -56,30 +57,46 @@ class OnlinePaymentMethodSettingsService
     {
         $visible = [];
         foreach ($this->overview() as $row) {
-            if ($row['status'] !== 'enabled') {
+            if (! $row['enabled'] || ! $row['usage']['invoices']) {
                 continue;
             }
-            if ($gatewayId !== null && ! collect($row['connections'])->contains(fn (array $c) => $c['gateway_id'] === $gatewayId && $c['eligible'])) {
-                continue;
+            // مع اتصال محدَّد (رابط الدفع) يكفي أن يكون هو مؤهلاً للوسيلة؛ بدونه نشترط جاهزية الوسيلة.
+            $eligible = $gatewayId === null
+                ? $row['ready']
+                : collect($row['connections'])->contains(fn (array $c) => $c['gateway_id'] === $gatewayId && $c['eligible']);
+            if ($eligible) {
+                $visible[] = $row['key'];
             }
-            $visible[] = $row['key'];
         }
 
         return $visible;
     }
 
     /**
-     * كل الوسائل التي اختار التاجر إظهارها (`enabled`) بصرف النظر عن الجاهزية، بترتيب الكتالوج. الجاهزية في `overview()` (`ready`).
+     * الوسائل التي اختار التاجر إظهارها **في المتجر** (`enabled` و`use_in_store`) بصرف النظر عن الجاهزية، بترتيب الكتالوج. الجاهزية في `ready`.
      *
      * @return list<array<string, mixed>>
      */
-    public function enabledRows(): array
+    public function storeRows(): array
     {
-        return array_values(array_filter($this->overview(), fn (array $row): bool => $row['enabled'] === true));
+        return array_values(array_filter($this->overview(), fn (array $row): bool => $row['enabled'] === true && $row['usage']['store'] === true));
     }
 
     /** @return array<string, mixed> */
     public function setEnabled(string $key, bool $enabled, ?User $actor, ?string $reason = null): array
+    {
+        return $this->updateSettings($key, ['enabled' => $enabled], $actor, $reason);
+    }
+
+    /**
+     * يحفظ إعدادات «إدارة» الوسيلة فعلياً: `enabled` · `default_gateway_id` (null ⇒ تلقائي) · `use_in_invoices` · `use_in_store`. المفاتيح الغائبة لا تتغيّر.
+     * لا إعداد وهمي: POS غير مدعوم بالتكامل فلا مفتاح له. البوابة الافتراضية يجب أن تكون اتصالاً غير ملغى **يعلن** الوسيلة؛ لا يشترط جاهزيته (Beta)،
+     * لكنها إن لم تجهز فالوسيلة غير جاهزة ولا يُحوَّل التحصيل تلقائياً إلى بوابة أخرى. التغيير الفعلي وحده يُدقَّق (مرة واحدة).
+     *
+     * @param  array{enabled?: bool, default_gateway_id?: string|null, use_in_invoices?: bool, use_in_store?: bool}  $changes
+     * @return array<string, mixed>
+     */
+    public function updateSettings(string $key, array $changes, ?User $actor, ?string $reason = null): array
     {
         $tenantId = $this->requireTenant();
         if (! OnlinePaymentMethodCatalog::isKnown($key)) {
@@ -90,43 +107,82 @@ class OnlinePaymentMethodSettingsService
             throw new PaymentGatewayException('method.reason_too_long', 'السبب أطول من 500 حرف.');
         }
 
-        DB::transaction(function () use ($key, $enabled, $actor, $reason, $tenantId): void {
+        DB::transaction(function () use ($key, $changes, $actor, $reason, $tenantId): void {
             // مرساة المستأجر أولاً: تسلسل أول تفعيل متزامن لنفس الوسيلة (قفل صف غير موجود لا يحمي) فلا انتهاك فريد 500.
             Tenant::query()->whereKey($tenantId)->lockForUpdate()->first();
             $row = OnlinePaymentMethodSetting::query()->where('method_key', $key)->lockForUpdate()->first();
-            $from = $row === null ? null : (bool) $row->enabled;
+            $existed = $row !== null;
 
-            // Beta: التفعيل اختيار تاجر لا يشترط جاهزية بوابة (الجاهزية تُفرض عند التحصيل لا هنا).
-            if (($from ?? false) === $enabled) {
-                return;   // لا تغيير (الغياب = معطّلة) ⇒ لا صف ولا حدث
+            $current = [
+                'enabled' => $row === null ? false : (bool) $row->enabled,
+                'default_gateway_id' => $row?->default_gateway_id,
+                'use_in_invoices' => $row === null ? true : (bool) $row->use_in_invoices,
+                'use_in_store' => $row === null ? true : (bool) $row->use_in_store,
+            ];
+            $next = $current;
+            foreach (array_keys($current) as $field) {
+                if (array_key_exists($field, $changes)) {
+                    $next[$field] = $changes[$field];
+                }
+            }
+
+            if ($next['default_gateway_id'] !== null && $next['default_gateway_id'] !== $current['default_gateway_id']) {
+                $this->assertSupportingConnection($key, (string) $next['default_gateway_id']);
+            }
+
+            $diff = array_filter(
+                array_diff_key($next, ['enabled' => true]),
+                fn ($value, $field) => $value !== $current[$field],
+                ARRAY_FILTER_USE_BOTH,
+            );
+            if ($next['enabled'] === $current['enabled'] && $diff === []) {
+                return;   // لا تغيير (الغياب = القيم الافتراضية) ⇒ لا صف ولا حدث
             }
 
             if ($row === null) {
                 $row = new OnlinePaymentMethodSetting();
                 $row->method_key = $key;
             }
-            $row->enabled = $enabled;
+            $row->enabled = $next['enabled'];
+            $row->default_gateway_id = $next['default_gateway_id'];
+            $row->use_in_invoices = $next['use_in_invoices'];
+            $row->use_in_store = $next['use_in_store'];
             $row->updated_by = $actor?->id;
             $row->save();
 
             $event = new OnlinePaymentMethodSettingEvent();
             $event->method_key = $key;
-            $event->enabled_from = $from;
-            $event->enabled_to = $enabled;
+            $event->enabled_from = $existed ? $current['enabled'] : null;
+            $event->enabled_to = $next['enabled'];
             $event->actor_id = $actor?->id;
             $event->reason = $reason;
+            $event->changes = $diff === [] ? null : json_encode(
+                collect(array_keys($diff))->mapWithKeys(fn (string $field) => [$field => ['from' => $current[$field], 'to' => $next[$field]]])->all(),
+                JSON_UNESCAPED_UNICODE,
+            );
             $event->save();
         });
 
         return collect($this->overview())->firstWhere('key', $key);
     }
 
+    /** الاتصال المختار غير ملغى ويعلن محوّله الوسيلة (من مستأجرنا حصراً: الاستعلام تحت نطاق المستأجر). */
+    private function assertSupportingConnection(string $key, string $gatewayId): void
+    {
+        $gateway = PaymentGateway::query()->where('status', '!=', PaymentGateway::STATUS_REVOKED)->whereKey($gatewayId)->lockForUpdate()->first();
+        if ($gateway === null || ! $this->adapters->has((string) $gateway->provider)
+            || ! $this->adapters->for((string) $gateway->provider)->capabilities()->supportsMethod($key)) {
+            throw new PaymentGatewayException('method.default_gateway_invalid', 'البوابة المختارة غير موجودة أو لا تدعم هذه الوسيلة.');
+        }
+    }
+
     /**
      * @param  list<PaymentGateway>  $gateways
      * @return array<string, mixed>
      */
-    private function describe(string $key, array $gateways, bool $enabled): array
+    private function describe(string $key, array $gateways, ?OnlinePaymentMethodSetting $setting): array
     {
+        $enabled = $setting !== null && (bool) $setting->enabled;
         $connections = [];
         foreach ($gateways as $gateway) {
             if (! $this->adapters->has((string) $gateway->provider)) {
@@ -150,13 +206,17 @@ class OnlinePaymentMethodSettingsService
             ];
         }
 
-        $eligible = array_values(array_filter($connections, fn (array $c) => $c['eligible']));
+        // البوابة الافتراضية المخزَّنة تُحترم فقط إن بقي اتصالها قائماً ويعلن الوسيلة؛ وإن لم تجهز فالوسيلة غير جاهزة (لا تحويل تلقائي إلى بوابة أخرى).
+        $storedDefault = $setting?->default_gateway_id;
+        $default = $storedDefault === null ? null : collect($connections)->firstWhere('gateway_id', (string) $storedDefault);
+        $candidates = $default !== null ? [$default] : $connections;
+        $eligible = array_values(array_filter($candidates, fn (array $c) => $c['eligible']));
         $ready = $eligible !== [];
         $reason = null;
         if (! $ready) {
             $reason = match (true) {
                 $connections === [] => 'no_gateway',
-                collect($connections)->every(fn (array $c) => $c['requires_provider_setup']) => 'provider_setup_required',
+                collect($candidates)->every(fn (array $c) => $c['requires_provider_setup']) => 'provider_setup_required',
                 default => 'no_usable_gateway',
             };
         }
@@ -177,11 +237,18 @@ class OnlinePaymentMethodSettingsService
             // المفعَّلة تُعرض للعميل (المتجر) وإن لم تجهز؛ التحصيل مشروط بـ`ready` فقط.
             'customer_visible' => $enabled,
             'connections' => $connections,
-            // البوابة الفعلية محسوبة (أول اتصال جاهز) لا مخزَّنة؛ اختيار الافتراضية غير متاح قبل التوجيه متعدد البوابات (H2-04).
+            // البوابة الفعلية: الافتراضية المختارة إن جهزت، وإلا (حين لا اختيار) أول اتصال جاهز بالاسم. لا توجيه متعدد البوابات قبل H2-04.
             'effective_gateway' => $eligible === [] ? null : ['id' => $eligible[0]['gateway_id'], 'name' => $eligible[0]['gateway_name']],
-            'multiple_eligible_gateways' => count($eligible) > 1,
-            'default_gateway_selectable' => false,
-            'usage' => ['invoices' => true, 'store' => true],   // الفواتير: رابط الدفع؛ المتجر: تُعرض المفعَّلة في Checkout (التحصيل مشروط بالجاهزية)
+            'default_gateway_id' => $default['gateway_id'] ?? null,
+            'multiple_eligible_gateways' => $default === null && count($eligible) > 1,
+            'default_gateway_selectable' => $connections !== [],
+            // أماكن الاستخدام المحفوظة فعلاً؛ `supported` ما يملك تكاملاً حقيقياً (POS لا تكامل له بعد فلا مفتاح).
+            'usage' => [
+                'invoices' => $setting === null ? true : (bool) $setting->use_in_invoices,
+                'store' => $setting === null ? true : (bool) $setting->use_in_store,
+                'pos' => false,
+            ],
+            'usage_supported' => ['invoices' => true, 'store' => true, 'pos' => false],
         ];
     }
 
