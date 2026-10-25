@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { getStoreUrl } from "@/lib/store";
+import { resolveSitemapBaseUrl } from "@/lib/data/sitemap";
 import { generateSitemaps } from "./sitemap";
 
 // Keep the sitemap index in sync with catalog growth instead of freezing the
@@ -7,7 +7,7 @@ import { generateSitemaps } from "./sitemap";
 export const dynamic = "force-dynamic";
 
 export default async function robots(): Promise<MetadataRoute.Robots> {
-  const baseUrl = (getStoreUrl() || "").replace(/\/$/, "") || undefined;
+  const baseUrl = await resolveSitemapBaseUrl();
   const sitemaps = await generateSitemaps();
 
   return {
