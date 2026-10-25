@@ -53,8 +53,24 @@ export function manyProducts(count: number, prefix = "p"): FakeProduct[] {
   }));
 }
 
-export function createFakeAwj(backend: FakeBackend) {
+export interface FakeRateLimit {
+  /** Requests allowed per window (AWJ `unauth`: 30). */
+  limit: number;
+  /** Fixed window in ms (AWJ: 60_000). */
+  windowMs: number;
+}
+
+/**
+ * `rateLimit` models `EnforcePublicApiRateLimit:unauth`: ONE fixed window per
+ * client IP — the Next.js server's — so every host and every kind of storefront
+ * read draws on the same budget. A request over the limit is a 429 with
+ * `Retry-After`, and (as in Laravel) does not extend the window. Time is
+ * `Date.now()`, so tests drive it with fake timers.
+ */
+export function createFakeAwj(backend: FakeBackend, rateLimit?: FakeRateLimit) {
   const calls: RecordedCall[] = [];
+  const window = { start: 0, hits: 0 };
+  let rateLimited = 0;
 
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
     const url = new URL(String(input));
@@ -62,6 +78,33 @@ export function createFakeAwj(backend: FakeBackend) {
     const host = headers["X-Storefront-Forwarded-Host"];
     const path = url.pathname.replace(/^\/store\/v1\//, "");
     calls.push({ path, host, query: url.searchParams });
+
+    if (rateLimit) {
+      const now = Date.now();
+      if (now - window.start >= rateLimit.windowMs) {
+        window.start = now;
+        window.hits = 0;
+      }
+      if (window.hits >= rateLimit.limit) {
+        rateLimited += 1;
+        const retryAfter = Math.ceil(
+          (window.start + rateLimit.windowMs - now) / 1000,
+        );
+        return new Response(
+          JSON.stringify({
+            error: { code: "rate_limited", message: "Too many requests." },
+          }),
+          {
+            status: 429,
+            headers: {
+              "content-type": "application/json",
+              "retry-after": String(retryAfter),
+            },
+          },
+        );
+      }
+      window.hits += 1;
+    }
 
     const tenant = host ? backend[host] : undefined;
     if (!tenant) {
@@ -124,5 +167,6 @@ export function createFakeAwj(backend: FakeBackend) {
     calls,
     api: API,
     callsTo: (path: string) => calls.filter((call) => call.path === path),
+    rateLimitedCount: () => rateLimited,
   };
 }

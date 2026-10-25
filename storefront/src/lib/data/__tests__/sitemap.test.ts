@@ -168,6 +168,39 @@ describe("getSitemapProductPage", () => {
   });
 });
 
+describe("rate limiting", () => {
+  it("keeps the 429's Retry-After on the error, and never in a visitor-facing field", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: { code: "rate_limited", message: "slow down" },
+        }),
+        { status: 429, headers: { "retry-after": "37" } },
+      ),
+    );
+
+    const failure = await getSitemapProductPage(1, 100).catch(
+      (e: unknown) => e,
+    );
+
+    expect(failure).toBeInstanceOf(StorefrontApiError);
+    expect((failure as StorefrontApiError).retryAfterSeconds).toBe(37);
+    expect(describeSitemapFailure(failure)).toBe(
+      "AWJ API 429 (rate_limited), retry after 37s",
+    );
+  });
+
+  it("does not retry a 429 itself", async () => {
+    fetchMock.mockResolvedValue(
+      new Response("{}", { status: 429, headers: { "retry-after": "1" } }),
+    );
+
+    await getSitemapProductPage(1, 100).catch(() => undefined);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("getSitemapCategories", () => {
   it("flattens the tree parents-first, keeps top-level categories and de-duplicates", async () => {
     fetchMock.mockResolvedValue(

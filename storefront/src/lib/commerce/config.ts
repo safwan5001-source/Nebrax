@@ -112,6 +112,8 @@ export class StorefrontApiError extends Error {
      * checkout shapes); callers narrow it themselves.
      */
     public readonly details?: unknown,
+    /** `Retry-After` of a 429, in whole seconds, when the API sent one. */
+    public readonly retryAfterSeconds?: number,
   ) {
     super(message);
     this.name = "StorefrontApiError";
@@ -145,7 +147,16 @@ async function raiseForErrorResponse(response: Response): Promise<never> {
   } catch {
     // Non-JSON error body — keep the generic message.
   }
-  throw new StorefrontApiError(response.status, code, message, details);
+  const retryAfter = Number(response.headers?.get?.("retry-after"));
+  throw new StorefrontApiError(
+    response.status,
+    code,
+    message,
+    details,
+    Number.isFinite(retryAfter) && retryAfter > 0
+      ? Math.ceil(retryAfter)
+      : undefined,
+  );
 }
 
 /**

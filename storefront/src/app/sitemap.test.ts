@@ -140,6 +140,8 @@ beforeEach(() => {
   }
   vi.stubEnv("AWJ_COMMERCE_API_URL", API);
   vi.stubEnv("AWJ_STOREFRONT_DEV_HOST", "");
+  // Functional tests are not about the rate budget (see "upstream rate budget").
+  vi.stubEnv("SITEMAP_UPSTREAM_BUDGET_PER_MINUTE", "1000000");
   vi.stubEnv("NEXT_PUBLIC_DEFAULT_COUNTRY", "sa");
   vi.stubEnv("NEXT_PUBLIC_SITE_URL", "");
   vi.stubEnv("NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL", "");
@@ -201,19 +203,19 @@ describe("URLs and tenant isolation", () => {
     expect(urls).toEqual([
       `https://${HOST_A}/sa/ar`,
       `https://${HOST_A}/sa/ar/products`,
-      `https://${HOST_A}/sa/ar/products/prod-1`,
       `https://${HOST_A}/sa/ar/c/cat-1`,
       `https://${HOST_A}/sa/ar/c/cat-2`,
+      `https://${HOST_A}/sa/ar/products/prod-1`,
       `https://${HOST_A}/sa/en`,
       `https://${HOST_A}/sa/en/products`,
-      `https://${HOST_A}/sa/en/products/prod-1`,
       `https://${HOST_A}/sa/en/c/cat-1`,
       `https://${HOST_A}/sa/en/c/cat-2`,
+      `https://${HOST_A}/sa/en/products/prod-1`,
     ]);
-    expect(entries[2]?.lastModified).toEqual(
+    expect(entries[4]?.lastModified).toEqual(
       new Date("2026-03-04T05:06:07+00:00"),
     );
-    expect(entries[2]).toMatchObject({
+    expect(entries[4]).toMatchObject({
       changeFrequency: "weekly",
       priority: 0.6,
     });
@@ -417,7 +419,7 @@ describe("published catalog only", () => {
 });
 
 describe("pagination", () => {
-  it("never omits or duplicates a published item across chunks", async () => {
+  it("never omits or duplicates a published item across files", async () => {
     const products = manyProducts(10_500);
     useBackend({
       [HOST_A]: { products, categories: tree(["c1", ["c2", "c3"]]) },
@@ -425,8 +427,8 @@ describe("pagination", () => {
 
     const urls = await allUrls();
 
-    // 2 locales × (home + products + 10,500 products + 3 categories)
-    expect(urls).toHaveLength(2 * (2 + 10_500 + 3));
+    // 2 locales × (home + products + 3 categories + 10,500 products)
+    expect(urls).toHaveLength(2 * (2 + 3 + 10_500));
     expect(new Set(urls).size).toBe(urls.length);
     for (const locale of ["ar", "en"]) {
       for (const product of [products[0], products[5000], products[10_499]]) {
@@ -438,16 +440,25 @@ describe("pagination", () => {
     }
   });
 
-  it("splits the index by URL count", async () => {
+  it("splits the index into fixed 5-page files", async () => {
     useBackend({
       [HOST_A]: { products: manyProducts(30_000), categories: [] },
     });
     const { generateSitemaps } = await loadRoute();
 
-    // 2 locales × 30,002 URLs = 60,004 → 7 files of ≤ 10,000
-    await expect(generateSitemaps()).resolves.toEqual(
-      Array.from({ length: 7 }, (_, id) => ({ id })),
-    );
+    // 30,000 products / (5 pages × 100) = 60 files
+    const files = await generateSitemaps();
+    expect(files).toHaveLength(60);
+    expect(files.at(-1)).toEqual({ id: 59 });
+  });
+
+  it("an index for exactly one page boundary has no empty trailing file", async () => {
+    useBackend({
+      [HOST_A]: { products: manyProducts(500), categories: [] },
+    });
+    const { generateSitemaps } = await loadRoute();
+
+    await expect(generateSitemaps()).resolves.toEqual([{ id: 0 }]);
   });
 
   it("reads only a single product row to count, and no catalog page, for the index", async () => {
@@ -461,35 +472,72 @@ describe("pagination", () => {
     const productCalls = fake.callsTo("products");
     expect(productCalls).toHaveLength(1);
     expect(productCalls[0].query.get("per_page")).toBe("1");
+    expect(fake.callsTo("categories")).toHaveLength(0);
   });
 
-  it("loads only the API pages that intersect the requested chunk (plus page 1 for the total)", async () => {
+  it("file k lists exactly product pages 5k+1..5k+5, and nothing else", async () => {
     const fake = useBackend({
       [HOST_A]: { products: manyProducts(30_000), categories: [] },
     });
     const { default: sitemap } = await loadRoute();
 
-    const entries = await sitemap({ id: Promise.resolve("1") });
+    const entries = await sitemap({ id: Promise.resolve("2") });
     const pages = fake
       .callsTo("products")
       .map((call) => Number(call.query.get("page")));
 
-    expect(entries).toHaveLength(10_000);
-    expect(entries[0]?.url).toBe(`https://${HOST_A}/sa/ar/products/p-9998`);
-    expect(entries.at(-1)?.url).toBe(
-      `https://${HOST_A}/sa/ar/products/p-19997`,
-    );
-    expect(new Set(pages)).toEqual(
-      new Set([1, ...Array.from({ length: 101 }, (_, i) => 100 + i)]),
-    );
-    // Each page is requested once even though both locales share the catalog.
-    expect(pages).toHaveLength(new Set(pages).size);
+    // 500 products × 2 locales; file 2 starts at product index 1000
+    expect(entries).toHaveLength(1000);
+    expect(entries[0]?.url).toBe(`https://${HOST_A}/sa/ar/products/p-1000`);
+    expect(entries.at(-1)?.url).toBe(`https://${HOST_A}/sa/en/products/p-1499`);
+    expect(new Set(pages)).toEqual(new Set([11, 12, 13, 14, 15]));
+    expect(pages).toHaveLength(5);
+    expect(fake.callsTo("categories")).toHaveLength(0);
     for (const call of fake.callsTo("products")) {
       expect(call.query.get("per_page")).toBe("100");
     }
   });
 
-  it("shares one catalog read between locales and reads the category tree once per request", async () => {
+  it("file 0 carries the statics and categories; later files do not", async () => {
+    useBackend({
+      [HOST_A]: { products: manyProducts(600), categories: tree(["c1", []]) },
+    });
+    const { default: sitemap } = await loadRoute();
+
+    const first = (await sitemap({ id: Promise.resolve("0") })).map(
+      (e) => e.url,
+    );
+    const second = (await sitemap({ id: Promise.resolve("1") })).map(
+      (e) => e.url,
+    );
+
+    expect(first).toContain(`https://${HOST_A}/sa/ar`);
+    expect(first).toContain(`https://${HOST_A}/sa/ar/c/c1`);
+    expect(second).toHaveLength(200);
+    expect(second[0]).toBe(`https://${HOST_A}/sa/ar/products/p-500`);
+    expect(second.every((url) => url.includes("/products/p-"))).toBe(true);
+  });
+
+  it("answers an id past the last addressable file without asking the API", async () => {
+    const fake = useBackend({
+      [HOST_A]: { products: manyProducts(10), categories: [] },
+    });
+    const { default: sitemap } = await loadRoute();
+
+    await expect(sitemap({ id: Promise.resolve("200") })).resolves.toEqual([]);
+    expect(fake.fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("returns an empty file when the catalog shrank below the requested files", async () => {
+    useBackend({
+      [HOST_A]: { products: manyProducts(10), categories: [] },
+    });
+    const { default: sitemap } = await loadRoute();
+
+    await expect(sitemap({ id: Promise.resolve("7") })).resolves.toEqual([]);
+  });
+
+  it("reads the catalog once per request, shared by both locales, and the category tree once", async () => {
     const fake = useBackend({
       [HOST_A]: { products: manyProducts(250), categories: tree(["c1", []]) },
     });
@@ -499,10 +547,8 @@ describe("pagination", () => {
 
     expect(fake.callsTo("categories")).toHaveLength(1);
     expect(fake.callsTo("storefront")).toHaveLength(1);
-    expect(fake.callsTo("products").map((c) => c.query.get("page"))).toEqual(
-      expect.arrayContaining(["1", "2", "3"]),
-    );
-    expect(fake.callsTo("products")).toHaveLength(3);
+    // pages 1..5 are requested (a fixed, pre-reserved cost); 3 hold data
+    expect(fake.callsTo("products")).toHaveLength(5);
   });
 
   it("does not retain catalog pages between requests", async () => {
@@ -514,7 +560,7 @@ describe("pagination", () => {
     await sitemap({ id: Promise.resolve("0") });
     await sitemap({ id: Promise.resolve("0") });
 
-    expect(fake.callsTo("products")).toHaveLength(2);
+    expect(fake.callsTo("products")).toHaveLength(10);
   });
 
   it("announces — never silently drops — products beyond what this route can list", async () => {
@@ -536,8 +582,8 @@ describe("pagination", () => {
     );
     const { generateSitemaps } = await loadRoute();
 
-    // 2 × (2 + 100,000) = 200,004 → 21 files
-    expect((await generateSitemaps()).length).toBe(21);
+    // 100,000 listable products / 500 per file = 200 files
+    expect((await generateSitemaps()).length).toBe(200);
     expect(warnLog).toHaveBeenCalledWith(
       expect.stringMatching(/150000.*omitted/),
     );

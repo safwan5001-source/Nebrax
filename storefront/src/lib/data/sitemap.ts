@@ -32,6 +32,83 @@ import { getStoreUrl } from "@/lib/store";
 
 const SITEMAP_PRODUCTS_PAGE_SIZE_MAX = 100;
 
+/**
+ * Upstream request budget.
+ *
+ * `store/v1` catalog routes sit behind `EnforcePublicApiRateLimit:unauth`:
+ * 30 requests per fixed 60 s window, keyed by `sha1(client IP)` — here the
+ * Next.js server's IP, so the budget is SHARED by every tenant this server
+ * fronts and by every live storefront read. A sitemap that spends it starves
+ * shoppers. Batching or concurrency does not help: each request counts.
+ *
+ * The sitemap therefore (a) plans its request count up front and (b) may spend
+ * at most `DEFAULT_BUDGET_PER_MINUTE` of the 30 in any 60 s window per server
+ * process (override: `SITEMAP_UPSTREAM_BUDGET_PER_MINUTE`). Over budget it
+ * fails closed WITHOUT calling the API. A 429 from the API starts a cool-down
+ * for its `Retry-After` (capped at one window). There are no retries; the
+ * crawler is the retry loop. Only counters live here — never catalog data —
+ * so nothing crosses tenants.
+ */
+const BUDGET_WINDOW_MS = 60_000;
+const DEFAULT_BUDGET_PER_MINUTE = 15;
+
+const budget = { windowStart: 0, used: 0, cooldownUntil: 0 };
+
+/** The sitemap may not call the API right now; carries the wait in seconds. */
+export class SitemapBudgetError extends Error {
+  constructor(
+    readonly reason: "budget" | "cooldown",
+    readonly retryAfterSeconds: number,
+  ) {
+    super(`Sitemap upstream ${reason} exhausted.`);
+    this.name = "SitemapBudgetError";
+  }
+}
+
+function readBudgetPerMinute(): number {
+  const configured = Number(process.env.SITEMAP_UPSTREAM_BUDGET_PER_MINUTE);
+  return Number.isInteger(configured) && configured > 0
+    ? configured
+    : DEFAULT_BUDGET_PER_MINUTE;
+}
+
+/** Reserve `count` upstream requests for one sitemap invocation, or throw. */
+export function reserveSitemapRequests(count: number): void {
+  const now = Date.now();
+  if (now < budget.cooldownUntil) {
+    throw new SitemapBudgetError(
+      "cooldown",
+      Math.ceil((budget.cooldownUntil - now) / 1000),
+    );
+  }
+  if (now - budget.windowStart >= BUDGET_WINDOW_MS) {
+    budget.windowStart = now;
+    budget.used = 0;
+  }
+  if (budget.used + count > readBudgetPerMinute()) {
+    throw new SitemapBudgetError(
+      "budget",
+      Math.max(
+        1,
+        Math.ceil((budget.windowStart + BUDGET_WINDOW_MS - now) / 1000),
+      ),
+    );
+  }
+  budget.used += count;
+}
+
+async function guardRateLimit<T>(read: () => Promise<T>): Promise<T> {
+  try {
+    return await read();
+  } catch (error) {
+    if (error instanceof StorefrontApiError && error.status === 429) {
+      const wait = Math.min(error.retryAfterSeconds ?? 60, 60);
+      budget.cooldownUntil = Date.now() + wait * 1000;
+    }
+    throw error;
+  }
+}
+
 export interface SitemapProduct {
   id: string;
   /** ISO-8601 timestamp from the API, when present and valid. */
@@ -97,12 +174,11 @@ export async function getSitemapProductPage(
   page: number,
   perPage: number,
 ): Promise<SitemapProductPage> {
-  const response = await storefrontFetch<AwjListResponse<AwjProduct>>(
-    "products",
-    {
+  const response = await guardRateLimit(() =>
+    storefrontFetch<AwjListResponse<AwjProduct>>("products", {
       page,
       per_page: Math.min(Math.max(1, perPage), SITEMAP_PRODUCTS_PAGE_SIZE_MAX),
-    },
+    }),
   );
   if (!Array.isArray(response?.data)) {
     throw new SitemapSourceError("Catalog response has no product list.");
@@ -142,8 +218,9 @@ function flattenCategories(
  * categories (`/c/{id}` resolves them) — they are NOT a synthetic root to skip.
  */
 export async function getSitemapCategories(): Promise<SitemapCategory[]> {
-  const response =
-    await storefrontFetch<AwjListResponse<AwjCategory>>("categories");
+  const response = await guardRateLimit(() =>
+    storefrontFetch<AwjListResponse<AwjCategory>>("categories"),
+  );
   if (!Array.isArray(response?.data)) {
     throw new SitemapSourceError("Category response has no category list.");
   }
@@ -219,7 +296,12 @@ export async function resolveSitemapBaseUrl(): Promise<string | undefined> {
 /** Server-log description of a failure; never sent to a visitor. */
 export function describeSitemapFailure(error: unknown): string {
   if (error instanceof StorefrontApiError) {
-    return `AWJ API ${error.status} (${error.code})`;
+    return error.retryAfterSeconds
+      ? `AWJ API ${error.status} (${error.code}), retry after ${error.retryAfterSeconds}s`
+      : `AWJ API ${error.status} (${error.code})`;
+  }
+  if (error instanceof SitemapBudgetError) {
+    return `upstream ${error.reason} exhausted, retry after ${error.retryAfterSeconds}s`;
   }
   if (error instanceof Error) {
     return `${error.name}: ${error.message}`.slice(0, 300);

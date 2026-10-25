@@ -44,6 +44,7 @@ function useBackend(backend: FakeBackend) {
 beforeEach(() => {
   vi.stubEnv("AWJ_COMMERCE_API_URL", "https://api.awj.test");
   vi.stubEnv("AWJ_STOREFRONT_DEV_HOST", "");
+  vi.stubEnv("SITEMAP_UPSTREAM_BUDGET_PER_MINUTE", "1000000");
   vi.stubEnv("NEXT_PUBLIC_DEFAULT_COUNTRY", "sa");
   vi.stubEnv("NEXT_PUBLIC_SITE_URL", "");
   vi.stubEnv("NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL", "");
@@ -73,7 +74,7 @@ describe("robots.txt", () => {
 
     expect(result.sitemap).toEqual(
       Array.from(
-        { length: 7 },
+        { length: 60 },
         (_, id) => `https://${HOST_A}/sitemap/${id}.xml`,
       ),
     );

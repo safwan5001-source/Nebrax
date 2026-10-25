@@ -9,6 +9,7 @@ import {
   getSitemapCategories,
   getSitemapMarkets,
   getSitemapProductPage,
+  reserveSitemapRequests,
   resolveSitemapBaseUrl,
   type SitemapCategory,
   type SitemapProduct,
@@ -21,51 +22,65 @@ export const dynamic = "force-dynamic";
 type CountryLocale = MarketLocaleTarget;
 
 /**
- * The published catalog behind a storefront host. AWJ serves one catalog per
- * host whatever the locale (ids are language-neutral), so it is read once and
- * shared by every country/locale target.
+ * Sitemap layout — shaped by the upstream request budget, not by URL count.
+ *
+ * `store/v1` allows 30 requests / 60 s per server IP, shared with all live
+ * storefront traffic (see `lib/data/sitemap.ts`). A file therefore covers a
+ * FIXED number of product API pages, so its cost is known before it starts:
+ *   file 0   = static pages + every category + product pages 1..N
+ *   file k>0 = product pages kN+1..(k+1)N
+ * Each product page holds 100 products and every product is listed once per
+ * locale. Files are small on purpose; a large catalog means many files that the
+ * crawler fetches over time, never one request that tries to walk everything.
  */
-interface Catalog {
-  productCount: number;
-  categories: SitemapCategory[];
-}
-
-/** Per-request memo of product pages; never shared across requests or hosts. */
-type ProductPages = Map<number, Promise<SitemapProductPage>>;
-
-/**
- * Google permits 50,000 URLs, but 10,000 keeps each request below roughly 100
- * Store API pages and avoids long-running sitemap responses on large catalogs.
- */
-const URLS_PER_SITEMAP = 10_000;
-/** Home and the product listing. `/c` has no page of its own, so it is not listed. */
-const STATIC_PAGES_PER_LOCALE = 2;
+const PRODUCT_PAGES_PER_SITEMAP = 5;
 const ITEMS_PER_PAGE = 100;
 const MAX_PAGES = 1000;
-const MAX_CONCURRENT_PAGE_REQUESTS = 8;
-/** Maximum items we can actually fetch, given pagination limits. */
+/** Maximum products we can actually list, given pagination limits. */
 const MAX_FETCHABLE_ITEMS = ITEMS_PER_PAGE * MAX_PAGES;
+/** Protocol ceiling per file (Google: 50,000); only file 0 can approach it. */
+const MAX_URLS_PER_SITEMAP = 50_000;
+const MAX_SITEMAPS = Math.ceil(MAX_PAGES / PRODUCT_PAGES_PER_SITEMAP);
 
 const UNAVAILABLE_MESSAGE = "Sitemap is temporarily unavailable.";
 
 /**
- * Splits the sitemap into bounded files. Only counts are read here (a single
- * product row and the category tree); no catalog page is loaded. A failure
- * degrades to one chunk — it must never take robots.txt down with it.
+ * Upstream requests a file costs, reserved before any is made: the default
+ * locale lookup, the category tree (file 0) and its product pages.
+ */
+function requestsForSitemap(id: number): number {
+  const pages = Math.min(
+    PRODUCT_PAGES_PER_SITEMAP,
+    Math.max(0, MAX_PAGES - id * PRODUCT_PAGES_PER_SITEMAP),
+  );
+  return 1 + (id === 0 ? 1 : 0) + pages;
+}
+
+/** Cost of the index: the locale lookup and one product row for the total. */
+const INDEX_REQUESTS = 2;
+
+/**
+ * Lists the sitemap files. Reads only the product total (one row). A failure,
+ * including an exhausted request budget, degrades to a single file — it must
+ * never take robots.txt down with it.
  */
 export async function generateSitemaps(): Promise<Array<{ id: number }>> {
   try {
-    const countryLocales = await resolveCountryLocales();
-    const catalog = await loadCatalog(async () => getSitemapProductPage(1, 1));
-    const totalUrls = countryLocales.length * catalogSize(catalog);
-    const sitemapCount = Math.max(1, Math.ceil(totalUrls / URLS_PER_SITEMAP));
+    reserveSitemapRequests(INDEX_REQUESTS);
+    await resolveCountryLocales();
+    const total = Math.min(
+      announceTruncation((await getSitemapProductPage(1, 1)).total),
+      MAX_FETCHABLE_ITEMS,
+    );
+    const pagesPerFile = PRODUCT_PAGES_PER_SITEMAP * ITEMS_PER_PAGE;
+    const count = Math.max(1, Math.ceil(total / pagesPerFile));
 
-    return Array.from({ length: sitemapCount }, (_, id) => ({ id }));
+    return Array.from({ length: count }, (_, id) => ({ id }));
   } catch (error) {
-    // API may be unavailable (build time, outage). Return a single sitemap
-    // chunk; it is populated on demand when the API recovers.
+    // API may be unavailable (build time, outage, rate limit). Return a single
+    // sitemap file; it is populated on demand when the API recovers.
     console.error(
-      `Sitemap index fell back to a single chunk: ${describeSitemapFailure(error)}`,
+      `Sitemap index fell back to a single file: ${describeSitemapFailure(error)}`,
     );
     return [{ id: 0 }];
   }
@@ -76,6 +91,8 @@ export default async function sitemap(props: {
 }): Promise<MetadataRoute.Sitemap> {
   const id = Number(await props.id);
   if (!Number.isSafeInteger(id) || id < 0) return [];
+  // Beyond the last addressable file there is nothing to list and nothing to ask.
+  if (id >= MAX_SITEMAPS) return [];
 
   try {
     return await buildSitemapChunk(id);
@@ -84,7 +101,7 @@ export default async function sitemap(props: {
     // silently lacks products. Log the detail server-side and answer with a
     // generic 5xx so crawlers retry and monitoring sees it.
     console.error(
-      `Sitemap chunk ${id} failed: ${describeSitemapFailure(error)}`,
+      `Sitemap file ${id} failed: ${describeSitemapFailure(error)}`,
     );
     throw new Error(UNAVAILABLE_MESSAGE);
   }
@@ -99,133 +116,72 @@ async function buildSitemapChunk(id: number): Promise<MetadataRoute.Sitemap> {
     );
   }
 
+  reserveSitemapRequests(requestsForSitemap(id));
+
   const countryLocales = await resolveCountryLocales();
-  const pages: ProductPages = new Map();
-  const catalog = await loadCatalog(() => getProductPage(pages, 1));
+  const firstPage = id * PRODUCT_PAGES_PER_SITEMAP + 1;
+  const lastPage = Math.min(
+    MAX_PAGES,
+    firstPage + PRODUCT_PAGES_PER_SITEMAP - 1,
+  );
+  const pageNumbers = Array.from(
+    { length: lastPage - firstPage + 1 },
+    (_, index) => firstPage + index,
+  );
 
-  const chunkStart = id * URLS_PER_SITEMAP;
-  const chunkEnd = chunkStart + URLS_PER_SITEMAP;
+  const [categories, pages] = await Promise.all([
+    id === 0 ? getSitemapCategories() : Promise.resolve([]),
+    Promise.all(
+      pageNumbers.map((page) => getSitemapProductPage(page, ITEMS_PER_PAGE)),
+    ),
+  ]);
+
+  const products: SitemapProduct[] = [];
+  for (const [index, page] of pages.entries()) {
+    warnOnShortPage(pageNumbers[index], page);
+    products.push(...page.items);
+  }
+  if (id === 0 && pages[0]) announceTruncation(pages[0].total);
+
   const entries: MetadataRoute.Sitemap = [];
-  let targetStart = 0;
-
   for (const target of countryLocales) {
-    const targetEnd = targetStart + catalogSize(catalog);
-    if (targetEnd <= chunkStart) {
-      targetStart = targetEnd;
-      continue;
-    }
-    if (targetStart >= chunkEnd) break;
-
     const basePath = `${baseUrl}/${target.country}/${target.locale}`;
-    appendStaticEntries(entries, basePath, targetStart, chunkStart, chunkEnd);
-
-    const productStart = targetStart + STATIC_PAGES_PER_LOCALE;
-    const productEnd = productStart + catalog.productCount;
-    const categoryStart = productEnd;
-    const categoryEnd = categoryStart + catalog.categories.length;
-
-    const productRange = intersectRange(
-      productStart,
-      productEnd,
-      chunkStart,
-      chunkEnd,
-    );
-    const categoryRange = intersectRange(
-      categoryStart,
-      categoryEnd,
-      chunkStart,
-      chunkEnd,
-    );
-
-    if (productRange) {
-      const products = await fetchProductRange(
-        pages,
-        productRange.start - productStart,
-        productRange.end - productStart,
-      );
-      appendProductEntries(entries, baseUrl, basePath, products);
+    if (id === 0) {
+      appendStaticEntries(entries, basePath);
+      appendCategoryEntries(entries, basePath, categories);
     }
-    if (categoryRange) {
-      appendCategoryEntries(
-        entries,
-        basePath,
-        catalog.categories.slice(
-          categoryRange.start - categoryStart,
-          categoryRange.end - categoryStart,
-        ),
-      );
-    }
-
-    targetStart = targetEnd;
+    appendProductEntries(entries, baseUrl, basePath, products);
   }
 
+  if (entries.length > MAX_URLS_PER_SITEMAP) {
+    console.warn(
+      `Sitemap file ${id} has ${entries.length} URLs; only the first ` +
+        `${MAX_URLS_PER_SITEMAP} are served (protocol limit).`,
+    );
+    return entries.slice(0, MAX_URLS_PER_SITEMAP);
+  }
   return entries;
 }
 
-/**
- * Reads the catalog totals. `readFirstProductPage` decides how much of the
- * first product page is loaded: the index asks for one row, a chunk loads (and
- * memoises) the full first page so it is not fetched twice.
- */
-async function loadCatalog(
-  readFirstProductPage: () => Promise<SitemapProductPage>,
-): Promise<Catalog> {
-  const [firstPage, categories] = await Promise.all([
-    readFirstProductPage(),
-    getSitemapCategories(),
-  ]);
-
-  if (firstPage.total > MAX_FETCHABLE_ITEMS) {
+function announceTruncation(total: number): number {
+  if (total > MAX_FETCHABLE_ITEMS) {
     // Announced, never silent: these products cannot be listed by this route.
     console.warn(
-      `Sitemap: ${firstPage.total} published products exceed the ` +
+      `Sitemap: ${total} published products exceed the ` +
         `${MAX_FETCHABLE_ITEMS} this route can list; the rest are omitted.`,
     );
   }
-
-  return {
-    productCount: Math.min(firstPage.total, MAX_FETCHABLE_ITEMS),
-    categories,
-  };
-}
-
-function catalogSize(catalog: Catalog): number {
-  return (
-    STATIC_PAGES_PER_LOCALE + catalog.productCount + catalog.categories.length
-  );
-}
-
-function intersectRange(
-  rangeStart: number,
-  rangeEnd: number,
-  chunkStart: number,
-  chunkEnd: number,
-): { start: number; end: number } | undefined {
-  const start = Math.max(rangeStart, chunkStart);
-  const end = Math.min(rangeEnd, chunkEnd);
-  return start < end ? { start, end } : undefined;
+  return total;
 }
 
 function appendStaticEntries(
   entries: MetadataRoute.Sitemap,
   basePath: string,
-  targetStart: number,
-  chunkStart: number,
-  chunkEnd: number,
 ): void {
-  const staticEntries: MetadataRoute.Sitemap = [
+  entries.push(
     { url: basePath, changeFrequency: "daily", priority: 1 },
-    {
-      url: `${basePath}/products`,
-      changeFrequency: "daily",
-      priority: 0.8,
-    },
-  ];
-
-  for (const [offset, entry] of staticEntries.entries()) {
-    const position = targetStart + offset;
-    if (position >= chunkStart && position < chunkEnd) entries.push(entry);
-  }
+    { url: `${basePath}/products`, changeFrequency: "daily", priority: 0.8 },
+  );
 }
 
 /** Same-origin image paths become absolute; anything else absolute is kept. */
@@ -288,58 +244,6 @@ async function resolveCountryLocales(): Promise<CountryLocale[]> {
           locale: resolveSupportedLocale(getDefaultLocale()) ?? DEFAULT_LOCALE,
         },
       ];
-}
-
-function getProductPage(
-  pages: ProductPages,
-  page: number,
-): Promise<SitemapProductPage> {
-  let cached = pages.get(page);
-  if (!cached) {
-    cached = getSitemapProductPage(page, ITEMS_PER_PAGE).catch((error) => {
-      pages.delete(page);
-      throw error;
-    });
-    pages.set(page, cached);
-  }
-  return cached;
-}
-
-async function fetchProductRange(
-  pages: ProductPages,
-  start: number,
-  end: number,
-): Promise<SitemapProduct[]> {
-  if (start >= end) return [];
-
-  const firstPage = Math.floor(start / ITEMS_PER_PAGE) + 1;
-  const lastPage = Math.ceil(end / ITEMS_PER_PAGE);
-  const pageNumbers = Array.from(
-    { length: lastPage - firstPage + 1 },
-    (_, index) => firstPage + index,
-  );
-  const items: SitemapProduct[] = [];
-
-  for (
-    let offset = 0;
-    offset < pageNumbers.length;
-    offset += MAX_CONCURRENT_PAGE_REQUESTS
-  ) {
-    const batch = pageNumbers.slice(
-      offset,
-      offset + MAX_CONCURRENT_PAGE_REQUESTS,
-    );
-    const results = await Promise.all(
-      batch.map((page) => getProductPage(pages, page)),
-    );
-    for (const [index, result] of results.entries()) {
-      warnOnShortPage(batch[index], result);
-      items.push(...result.items);
-    }
-  }
-
-  const loadedRangeStart = (firstPage - 1) * ITEMS_PER_PAGE;
-  return items.slice(start - loadedRangeStart, end - loadedRangeStart);
 }
 
 /**
