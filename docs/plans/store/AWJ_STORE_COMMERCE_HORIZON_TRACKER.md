@@ -11,7 +11,7 @@
 
 | الأفق | الاسم | شرائح | Planned | Blocked | In PR | Merged | Env-Verified | Closed | حالة الأفق |
 |---|---|---|---|---|---|---|---|---|---|
-| H0 | Stability, Security & Checkout Theme Parity | 8 | 4 | 3 | 0 | 1 | 0 | 0 | Open |
+| H0 | Stability, Security & Checkout Theme Parity | 8 | 3 | 3 | 1 | 1 | 0 | 0 | Open |
 | H1 | Buyer Identity & Sessions | 9 | 0 | 9 | 0 | 0 | 0 | 0 | Open |
 | H2 | Orders, Cart & Checkout Completion | 17 | 3 | 14 | 0 | 0 | 0 | 0 | Open |
 | H3 | Payments, COD, Accounting & ZATCA | 4 | 0 | 4 | 0 | 0 | 0 | 0 | Open |
@@ -19,7 +19,7 @@
 | H5 | Store Experience, Promotions, Policies & Analytics | 7 | 2 | 5 | 0 | 0 | 0 | 0 | Open |
 | H6 | Final Spree Dependency Removal | 9 | 2 | 7 | 0 | 0 | 0 | 0 | Open |
 
-> لا أفق Closed. H0 هو الأقرب: X0/X1/X2/CTP1 مدموجة لكنها غير منشورة/مُتحقَّق منها بيئياً، وX6 (ratchet مدموج #1749، واختبارات «بلا بيئة Spree» في PR) وX3/X5/ENV0 لم تبدأ، والقرارات مفتوحة.
+> لا أفق Closed. H0 هو الأقرب: X0/X1/X2/CTP1 مدموجة لكنها غير منشورة/مُتحقَّق منها بيئياً، وX6 (ratchet مدموج #1749، واختبارات «بلا بيئة Spree» في PR) وX3 في PR (#1753) وX5/ENV0 لم تبدأ، والقرارات مفتوحة.
 
 ## 2. Master Tracker — الشرائح
 
@@ -30,9 +30,9 @@
 | X0 | تثبيت القرارات وADR + خطة الخروج | E | P0 | — | D-1…D-14 | #1743 (merged) · #1747 (Horizon) | Safwan (قرار) | Merged | ✓ (#1743 · 6384ef6) | ؟ (غير معروف) | — لم يُتحقَّق | الوثائق مدموجة؛ القرارات D-1…D-14 ما زالت مفتوحة — حسمها يغلق X0 |
 | X1 | بوابة حساب المشتري (gated) + منع تسريب الأخطاء | E | P0 | — | — | #1744 (merged) | Claude Code | Merged | ✓ (#1744 · cc9ebf2) | ؟ (غير معروف) | — لم يُتحقَّق | تحقق بيئي: إشعار الإغلاق يظهر على نطاق مستأجر، ولا SPREE_* مضبوطة |
 | X2 | تنظيف البيئة والوثائق (إزالة قيم Spree الوهمية) | E | P0 | — | — | #1744 (merged) | Claude Code | Merged | ✓ (#1744 · cc9ebf2) | ؟ (غير معروف) | — لم يُتحقَّق | تحقق بيئي للقراءة فقط: إزالة أي SPREE_* في Railway/Vercel (يدوياً بواسطة المالك) |
-| X3 | Sitemap من AWJ (بدل Spree) + فشل غير صامت | E | P0 | — | — | — | غير مُسنَد (مقترح: Claude Code) | Planned | — | — | — | التحقق من ترقيم store/v1 ثم PR صغير |
+| X3 | Sitemap من AWJ (بدل Spree) + فشل غير صامت | E | P0 | — | — | #1753 (open) | Claude Code | In PR | — | — | — | الترقيم مُتحقَّق (`per_page` ≤ 100، `total`، ترتيب مستقر)؛ sitemap/robots من `store/v1` بمضيف الطلب، فشل الجلب يُسجَّل ويرمي خطأ عاماً، بلا ذاكرة مؤقتة عابرة للمستأجرين. التقرير: `docs/audits/AWJ_SPREE_X3_IMPLEMENTATION_REPORT.md`. بانتظار مراجعة/دمج المالك ثم تحقق ENV0 (`/sitemap/0.xml`، `/robots.txt`) |
 | X5 | إغلاق مسارات Checkout Spree غير المربوطة (404) | E | P1 | — | — | — | غير مُسنَد (مقترح: Claude Code) | Planned | — | — | — | قابلة للبدء (#1745 مدموج؛ أعد التأسيس على main) |
-| X6 | حارس ratchet للاعتماد التشغيلي على Spree + اختبار «بلا بيئة Spree» (جديد) | E | P1 | X1 | — | — | غير مُسنَد (مقترح: Claude Code) | In PR | ratchet ✓ (#1749 · 91bb82d)؛ اختبارات «بلا بيئة Spree» — | — | — | الـratchet مدموج (#1749). اختبارات «بلا بيئة Spree» (§6.1 قاعدة 5) في PR مستقل: الحساب (gated) والسلة/الإتمام الضيف AWJ تعمل بلا SPREE_*. **فجوات موثَّقة (لا تمريرٌ مُصطنع):** السياسات (`data/policies.ts`) وsitemap (`data/sitemap.ts`) ما زالتا تقرآن عبر `getClient()` ⇒ ترفضان بلا بيئة Spree (الـsitemap يتدهور إلى قائمة فارغة، وصفحة السياسة تُسرّب الخطأ إلى حدّ الخطأ). المعالجة: X3 للـsitemap، ومصدر AWJ للسياسات غير موجود بعد. لا يُغلق X6 قبل دمج هذا الـPR |
+| X6 | حارس ratchet للاعتماد التشغيلي على Spree + اختبار «بلا بيئة Spree» (جديد) | E | P1 | X1 | — | — | غير مُسنَد (مقترح: Claude Code) | In PR | ratchet ✓ (#1749 · 91bb82d)؛ اختبارات «بلا بيئة Spree» — | — | — | الـratchet مدموج (#1749). اختبارات «بلا بيئة Spree» (§6.1 قاعدة 5) في PR مستقل: الحساب (gated) والسلة/الإتمام الضيف AWJ تعمل بلا SPREE_*. **فجوات موثَّقة (لا تمريرٌ مُصطنع):** السياسات (`data/policies.ts`) ما زالت تقرأ عبر `getClient()` ⇒ ترفض بلا بيئة Spree (وصفحة السياسة تُسرّب الخطأ إلى حدّ الخطأ)؛ أما الـsitemap فقد صار أصلياً في X3 (#1753) والاختبار صار إيجابياً. المعالجة: ومصدر AWJ للسياسات غير موجود بعد. لا يُغلق X6 قبل دمج هذا الـPR |
 | CTP1 | Checkout Theme Parity — تطبيق الثيم المنشور على Checkout AWJ | X | P0 | — | — | #1745 (merged) — Codex | Codex | Merged | ✓ (#1745 · f5687dc) | ؟ (غير معروف) | — لم يُتحقَّق | لا عمل منا؛ تحقق بيئي (الثيم المنشور على Checkout) يملكه المالك/Codex |
 | ENV0 | خط أساس التحقق البيئي: أسماء المتغيرات، المراجعة المنشورة، المضيف الحيّ | X | P0 | — | — | — | Safwan (وصول بيئة) | Planned | — | — | — | تسجيل المضيف (Railway/Vercel) والمراجعة المنشورة وأسماء المتغيرات (بلا قيم) |
 
@@ -180,7 +180,7 @@
 | F06 | بحث متقدم (Meilisearch/ملاءمة) | Partially Implemented | H5 | P4c | — | — |
 | F07 | التقييمات والمراجعات | Missing | H5 | P3c | — | — |
 | F08 | المفضلة (Wishlist) | Missing | H5 | P3c | — | — |
-| F09 | Sitemap/robots | Spree-dependent | H0 | X3 | — | — |
+| F09 | Sitemap/robots | Spree-dependent (X3 في PR #1753) | H0 | X3 | — | — |
 | F10 | JSON-LD/OG/SEO | Implemented | H6 | T1 | — | — |
 | F11 | إضافة/تعديل/حذف بند (ضيف) | Implemented | H2 | — | — | — |
 | F12 | إجماليات السلة (خصم/شحن/ضريبة/إجمالي) | Partially Implemented | H2 | CK5 · P1c | D-13 | — |
@@ -264,7 +264,7 @@
 |---|---|---|---|
 | R-02 | تعليمات/متغيرات Spree بقيم بديلة في بيئات منشورة (غير معروف) | H0 | ENV0 + إزالة يدوية |
 | R-03 | `/policies/*` تفشل (500) | H0/H5 | X4 أو قبول مكتوب |
-| R-04 | sitemap فارغ بصمت | H0 | X3 |
+| R-04 | sitemap فارغ بصمت | H0 | X3 (#1753 في PR: الفشل يُسجَّل ويرمي خطأ عاماً) |
 | N-01 | COD بلا مستند مالي ولا حجز | H2/H3 | INV1 + CK4 |
 | N-02 | لا واجهة موظف لطلبات الويب | H2 | O1 |
 | N-03 | حالات الطلب `draft/confirmed` فقط ولا إلغاء | H2 | O3 |
