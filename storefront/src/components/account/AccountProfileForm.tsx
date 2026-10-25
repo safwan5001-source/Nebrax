@@ -10,6 +10,7 @@ import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import type { User } from "@/contexts/AuthContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { accountErrorMessage } from "@/lib/commerce/account-error-message";
 import { updateCustomer } from "@/lib/data/customer";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +21,7 @@ const desktopSettingsField =
 export function AccountProfileForm({ user }: { user: User }) {
   const t = useTranslations("profile");
   const ta = useTranslations("account");
+  const te = useTranslations("accountErrors");
   const { refreshUser } = useAuth();
 
   const [formData, setFormData] = useState({
@@ -61,8 +63,12 @@ export function AccountProfileForm({ user }: { user: User }) {
       setCurrentPassword("");
       await refreshUser();
     } else {
-      const message = result.error || t("failedToUpdate");
-      if (emailChanged && /current password/i.test(message)) {
+      const message = accountErrorMessage(
+        result.code,
+        (code) => te(code),
+        t("failedToUpdate"),
+      );
+      if (result.code === "current_password_invalid") {
         setPasswordError(message);
       } else {
         setError(message);

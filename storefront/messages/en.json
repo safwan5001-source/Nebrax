@@ -448,6 +448,23 @@
     "addFirstAddress": "Add Your First Address",
     "addAddress": "Add Address"
   },
+  "accountErrors": {
+    "invalid_credentials": "Incorrect email or password.",
+    "weak_password": "The password does not meet the requirements.",
+    "password_mismatch": "The passwords do not match.",
+    "current_password_invalid": "The current password is incorrect.",
+    "invalid_token": "This link is invalid or has expired.",
+    "validation_failed": "Please check the details you entered and try again.",
+    "rate_limited": "Too many attempts. Please wait a moment and try again.",
+    "capability_unavailable": "Customer accounts are not available yet.",
+    "request_failed": "Something went wrong. Please try again."
+  },
+  "accountGate": {
+    "title": "Customer accounts are not available yet",
+    "body": "Creating an account and signing in are not available on this store right now. You can still browse, add items to your cart and check out as a guest.",
+    "continueShopping": "Continue shopping",
+    "viewCart": "View cart"
+  },
   "account": {
     "myAccount": "My Account",
     "signInDescription": "Sign in to access your account.",

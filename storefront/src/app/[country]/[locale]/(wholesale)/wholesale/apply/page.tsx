@@ -24,6 +24,7 @@ import {
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
+import { accountErrorMessage } from "@/lib/commerce/account-error-message";
 import { extractBasePath } from "@/lib/utils/path";
 import { wholesaleSignInHref } from "@/lib/wholesale";
 
@@ -39,6 +40,7 @@ export default function WholesaleApplyPage() {
   const t = useTranslations("wholesale");
   const ta = useTranslations("account");
   const tr = useTranslations("register");
+  const te = useTranslations("accountErrors");
   const pathname = usePathname();
   const storeBase = extractBasePath(pathname);
   const wholesaleBase = `${storeBase}/wholesale`;
@@ -80,7 +82,13 @@ export default function WholesaleApplyPage() {
       if (result.success) {
         setSubmitted(true);
       } else {
-        setError(result.error ?? tr("registrationFailed"));
+        setError(
+          accountErrorMessage(
+            result.code,
+            (code) => te(code),
+            tr("registrationFailed"),
+          ),
+        );
       }
     } catch {
       setError(tr("unexpectedError"));

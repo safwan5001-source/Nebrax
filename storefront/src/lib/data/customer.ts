@@ -3,6 +3,11 @@
 import type { Customer } from "@spree/sdk";
 import { updateTag } from "next/cache";
 import {
+  type AccountAuthFailureCode,
+  classifyAccountError,
+} from "@/lib/commerce/account-errors";
+import { ACCOUNT_AUTH_CAPABILITY } from "@/lib/commerce/capabilities";
+import {
   cacheTagSuffix,
   clearAccessToken,
   clearAllCartCookies,
@@ -21,7 +26,24 @@ import {
   setRefreshToken,
   withAuthRefresh,
 } from "@/lib/spree";
-import { actionResult } from "./utils";
+
+/**
+ * SPREE-X1 — buyer account capability gate.
+ *
+ * Every action below checks this FIRST, before anything reaches `@/lib/spree`.
+ * While `ACCOUNT_AUTH_CAPABILITY` is not `live` there is no AWJ buyer-identity
+ * service behind these actions, and the Spree client has no backend in any AWJ
+ * environment — so the actions refuse with a typed code and never construct the
+ * client (no `SPREE_*` environment is needed, read or leaked).
+ */
+export type { AccountAuthFailureCode } from "@/lib/commerce/account-errors";
+
+const accountAuthLive = () => ACCOUNT_AUTH_CAPABILITY === "live";
+
+const UNAVAILABLE = {
+  success: false as const,
+  code: "capability_unavailable" as const,
+};
 
 /**
  * Fetch the current customer with automatic token refresh. Throws on any
@@ -62,6 +84,8 @@ async function finalizeAuth(token: string, refreshToken: string) {
  * Get the currently authenticated customer. Returns null if not logged in.
  */
 export async function getCustomer(): Promise<Customer | null> {
+  if (!accountAuthLive()) return null;
+
   const token = await getAccessToken();
   if (!token) return null;
 
@@ -90,6 +114,8 @@ export async function syncSession(): Promise<{
   refreshed: boolean;
   stale?: boolean;
 }> {
+  if (!accountAuthLive()) return { customer: null, refreshed: false };
+
   const state = await ensureFreshSession();
   if (state === "anonymous" || state === "expired") {
     return { customer: null, refreshed: false };
@@ -129,8 +155,10 @@ export async function login(
     first_name?: string | null;
     last_name?: string | null;
   };
-  error?: string;
+  code?: AccountAuthFailureCode;
 }> {
+  if (!accountAuthLive()) return UNAVAILABLE;
+
   try {
     const result = await getClient().auth.login({ email, password });
     await finalizeAuth(result.token, result.refresh_token);
@@ -138,8 +166,7 @@ export async function login(
   } catch (error) {
     return {
       success: false,
-      error:
-        error instanceof Error ? error.message : "Invalid email or password",
+      code: classifyAccountError(error, "login"),
     };
   }
 }
@@ -165,8 +192,10 @@ export async function register(params: {
     first_name?: string | null;
     last_name?: string | null;
   };
-  error?: string;
+  code?: AccountAuthFailureCode;
 }> {
+  if (!accountAuthLive()) return UNAVAILABLE;
+
   try {
     const result = await getClient().customers.create(params);
     await finalizeAuth(result.token, result.refresh_token);
@@ -174,7 +203,7 @@ export async function register(params: {
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Registration failed",
+      code: classifyAccountError(error, "register"),
     };
   }
 }
@@ -184,7 +213,9 @@ export async function register(params: {
  */
 export async function logout(): Promise<void> {
   const refreshToken = await getRefreshToken();
-  if (refreshToken) {
+  // Gated: there is no server session to revoke, so the Spree client is never
+  // built — the local (legacy) cookies below are still cleared.
+  if (refreshToken && accountAuthLive()) {
     try {
       await getClient().auth.logout({ refresh_token: refreshToken });
     } catch {
@@ -213,11 +244,24 @@ export async function logout(): Promise<void> {
 export async function requestPasswordReset(
   email: string,
   redirectUrl?: string,
-) {
-  return getClient().passwordResets.create({
-    email,
-    ...(redirectUrl && { redirect_url: redirectUrl }),
-  });
+): Promise<
+  | { success: true; message?: string }
+  | { success: false; code: AccountAuthFailureCode }
+> {
+  if (!accountAuthLive()) return UNAVAILABLE;
+
+  try {
+    const result = await getClient().passwordResets.create({
+      email,
+      ...(redirectUrl && { redirect_url: redirectUrl }),
+    });
+    return { success: true, message: result?.message };
+  } catch (error) {
+    return {
+      success: false,
+      code: classifyAccountError(error, "password_reset_request"),
+    };
+  }
 }
 
 /**
@@ -228,7 +272,12 @@ export async function resetPassword(
   token: string,
   password: string,
   passwordConfirmation: string,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{
+  success: boolean;
+  code?: AccountAuthFailureCode;
+}> {
+  if (!accountAuthLive()) return UNAVAILABLE;
+
   try {
     const result = await getClient().passwordResets.update(token, {
       password,
@@ -239,7 +288,7 @@ export async function resetPassword(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Password reset failed",
+      code: classifyAccountError(error, "password_reset"),
     };
   }
 }
@@ -249,9 +298,15 @@ export async function updateCustomer(data: {
   last_name?: string;
   email?: string;
   current_password?: string;
-}) {
-  return actionResult(async () => {
-    let customer;
+}): Promise<{
+  success: boolean;
+  customer?: Customer;
+  code?: AccountAuthFailureCode;
+}> {
+  if (!accountAuthLive()) return UNAVAILABLE;
+
+  try {
+    let customer: Customer;
     try {
       customer = await withAuthRefresh(async (options) => {
         return getClient().customer.update(data, options);
@@ -263,6 +318,11 @@ export async function updateCustomer(data: {
       throw error;
     }
     updateTag("customer");
-    return { customer };
-  }, "Update failed");
+    return { success: true, customer };
+  } catch (error) {
+    return {
+      success: false,
+      code: classifyAccountError(error, "profile_update"),
+    };
+  }
 }

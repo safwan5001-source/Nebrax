@@ -4,6 +4,8 @@
 
 # Spree Storefront
 
+> **AWJ NOTICE (SPREE-X2).** This directory is AWJ Store's storefront, forked from Spree Storefront (MIT — see `LICENSE` and `NOTICE`). The text below is the **upstream** README and is not AWJ's setup guide. In AWJ **no Spree backend exists**, and `SPREE_API_URL` / `SPREE_PUBLISHABLE_KEY` must **not** be set — not even to a placeholder (it would hide gaps and send shopper credentials to a host AWJ does not control). Configure the storefront from `.env.example` (`AWJ_COMMERCE_API_URL`, `STOREFRONT_GATEWAY_SECRET`) and see `docs/plans/store/AWJ_SPREE_EXIT_MIGRATION_PLAN.md`. Buyer sign-in and registration are gated until the AWJ buyer-identity contract exists.
+
 A production-ready, headless ecommerce storefront for [Spree Commerce](https://spreecommerce.org), built with Next.js 16, React 19, and the [Spree REST API](https://spreecommerce.org/docs/api-reference). Open source (MIT) and free to customize.
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/spree/storefront)
@@ -115,7 +117,7 @@ The storefront lands in `apps/storefront/`.
     cp .env.local.example .env.local
     ```
 
-3. Update `.env.local` with your Spree API credentials:
+3. *(Upstream instruction — **do not follow in AWJ**; see the notice above.)* Update `.env.local` with your Spree API credentials:
 
     ```env
     SPREE_API_URL=http://localhost:3000

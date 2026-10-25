@@ -448,6 +448,23 @@
     "addFirstAddress": "Dodaj swój pierwszy adres",
     "addAddress": "Dodaj adres"
   },
+  "accountErrors": {
+    "invalid_credentials": "Nieprawidłowy e-mail lub hasło.",
+    "weak_password": "Hasło nie spełnia wymagań.",
+    "password_mismatch": "Hasła nie są takie same.",
+    "current_password_invalid": "Obecne hasło jest nieprawidłowe.",
+    "invalid_token": "Ten link jest nieprawidłowy lub wygasł.",
+    "validation_failed": "Sprawdź wprowadzone dane i spróbuj ponownie.",
+    "rate_limited": "Zbyt wiele prób. Odczekaj chwilę i spróbuj ponownie.",
+    "capability_unavailable": "Konta klientów nie są jeszcze dostępne.",
+    "request_failed": "Coś poszło nie tak. Spróbuj ponownie."
+  },
+  "accountGate": {
+    "title": "Konta klientów nie są jeszcze dostępne",
+    "body": "Zakładanie konta i logowanie nie są obecnie dostępne w tym sklepie. Nadal możesz przeglądać ofertę, dodawać produkty do koszyka i złożyć zamówienie jako gość.",
+    "continueShopping": "Kontynuuj zakupy",
+    "viewCart": "Zobacz koszyk"
+  },
   "account": {
     "myAccount": "Moje konto",
     "signInDescription": "Zaloguj się, aby uzyskać dostęp do konta.",

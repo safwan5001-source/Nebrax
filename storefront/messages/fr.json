@@ -448,6 +448,23 @@
     "addFirstAddress": "Ajoutez votre premiere adresse",
     "addAddress": "Ajouter une adresse"
   },
+  "accountErrors": {
+    "invalid_credentials": "E-mail ou mot de passe incorrect.",
+    "weak_password": "Le mot de passe ne respecte pas les exigences.",
+    "password_mismatch": "Les mots de passe ne correspondent pas.",
+    "current_password_invalid": "Le mot de passe actuel est incorrect.",
+    "invalid_token": "Ce lien est invalide ou a expiré.",
+    "validation_failed": "Veuillez vérifier les informations saisies et réessayer.",
+    "rate_limited": "Trop de tentatives. Patientez un instant puis réessayez.",
+    "capability_unavailable": "Les comptes clients ne sont pas encore disponibles.",
+    "request_failed": "Une erreur s'est produite. Veuillez réessayer."
+  },
+  "accountGate": {
+    "title": "Les comptes clients ne sont pas encore disponibles",
+    "body": "La création de compte et la connexion ne sont pas disponibles sur cette boutique pour le moment. Vous pouvez continuer à parcourir, ajouter des articles au panier et commander en tant qu'invité.",
+    "continueShopping": "Continuer vos achats",
+    "viewCart": "Voir le panier"
+  },
   "account": {
     "myAccount": "Mon compte",
     "signInDescription": "Connectez-vous pour accéder à votre compte.",
