@@ -30,6 +30,7 @@
     },
     {"name": "web build (Next.js)", "workflow": ".github/workflows/web-ci.yml", "job": "build", "tier": "paths", "covers": ["web"]},
     {"name": "storefront (lint + typecheck + test)", "workflow": ".github/workflows/storefront-ci.yml", "job": "check", "tier": "paths", "covers": ["storefront"]},
+    {"name": "docker-context", "workflow": ".github/workflows/storefront-docker-context.yml", "job": "docker-context", "tier": "paths", "covers": ["storefront", "deploy"]},
     {"name": "preview-host (test + image smoke)", "workflow": ".github/workflows/preview-host-ci.yml", "job": "check", "tier": "paths", "covers": ["preview-host", "mobile-preview"]},
     {"name": "mobile (analyze + test)", "workflow": ".github/workflows/mobile-ci.yml", "job": "check", "tier": "paths", "covers": ["mobile"]},
     {"name": "mobile (Android release build proof)", "workflow": ".github/workflows/mobile-ci.yml", "job": "android-release-build", "tier": "paths", "covers": ["mobile"]},
