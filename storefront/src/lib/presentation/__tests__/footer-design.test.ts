@@ -44,7 +44,12 @@ describe("footer layout / groups / design — shared fixture (V7e-1)", () => {
         expect(Object.keys(extras)).toEqual(Object.keys(c.expected as object));
       }
       const config = normalizePresentationConfig({ footer: c.input });
-      for (const key of ["layout", "groups", "design"] as const) {
+      for (const key of [
+        "layout",
+        "groups",
+        "design",
+        "paymentLogos",
+      ] as const) {
         if (c.expected && key in (c.expected as object)) {
           expect(config.footer[key]).toEqual(
             (c.expected as Record<string, unknown>)[key],

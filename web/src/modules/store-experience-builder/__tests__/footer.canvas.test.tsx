@@ -46,6 +46,45 @@ describe("Canvas footer — backward compatibility (V7e-3)", () => {
   });
 });
 
+describe("Canvas footer — payment logos", () => {
+  const paymentLogos = {
+    enabled: true,
+    brands: ["apple_pay", "mada", "visa", "mastercard"],
+    style: "cards",
+    size: "md",
+    showTitle: true,
+  };
+
+  it("is absent for old stores and mirrors the selected order and title", () => {
+    expect(mount(cfg({})).querySelector("[data-footer-payment-logos]")).toBeNull();
+    const footer = mount(cfg({ paymentLogos }));
+    const block = footer.querySelector("[data-footer-payment-logos]") as HTMLElement;
+    expect(block.textContent).toContain("Payment methods");
+    expect(Array.from(block.querySelectorAll("img")).map((img) => img.getAttribute("src"))).toEqual([
+      "/payment-brands/apple-pay.svg",
+      "/payment-brands/mada.svg",
+      "/payment-brands/visa.svg",
+      "/payment-brands/mastercard.svg",
+    ]);
+  });
+
+  it("renders every style and size; the mobile strip stays one scrollable row", () => {
+    for (const style of ["inline", "cards", "strip"] as const) {
+      for (const size of ["sm", "md", "lg"] as const) {
+        const footer = mount(cfg({ paymentLogos: { ...paymentLogos, style, size } }), "mobile");
+        const block = footer.querySelector("[data-footer-payment-logos]") as HTMLElement;
+        expect(block.dataset.paymentLogoStyle).toBe(style);
+        expect(block.dataset.paymentLogoSize).toBe(size);
+        if (style === "strip") {
+          expect(block.querySelector(".overflow-x-auto")).not.toBeNull();
+          expect(block.querySelector(".flex-nowrap")).not.toBeNull();
+        }
+        cleanup();
+      }
+    }
+  });
+});
+
 describe("Canvas footer — groups (V7e-3)", () => {
   it("drop disabled, unserved-content and title-less entries exactly as the storefront does", () => {
     const footer = mount(cfg({ groups }));

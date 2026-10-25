@@ -13,6 +13,7 @@ import { type FooterColourContext, type FooterLayout, resolveFooterDesign } from
 import type { StorefrontPresentationConfig } from "./presentation/config";
 import { SbcSeal } from "./SbcSeal";
 import { StoreBrand, storeContainerClassName } from "./StoreBrand";
+import { CanvasPaymentLogos } from "./CanvasPaymentLogos";
 
 type Chrome = "branding" | "social" | "whatsapp" | "footer";
 
@@ -479,7 +480,15 @@ export function CanvasFooter(props: CanvasFooterProps) {
           {t("footer")}
         </button>
       ) : null}
-      <div className={cn(storeContainerClassName, designed ? pad : "py-10 md:py-12")}>{body}</div>
+      <div className={cn(storeContainerClassName, designed ? pad : "py-10 md:py-12")}>
+        {body}
+        <CanvasPaymentLogos
+          settings={footer.paymentLogos}
+          title={t("footerPaymentLogosTitle")}
+          locale={locale}
+          align={design.align}
+        />
+      </div>
       {kind === "minimal" ? null : bottomBar}
     </footer>
   );

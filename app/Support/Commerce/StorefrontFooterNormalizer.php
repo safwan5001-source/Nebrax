@@ -3,10 +3,11 @@
 namespace App\Support\Commerce;
 
 /**
- * CUST-HV V7e-1 — تذييل المتجر: `footer.layout` و`footer.groups` و`footer.design` (V0 §10، D-26). السلطة (PHP) لتوأمَي TS
+ * CUST-HV V7e-1 + payment logos — تذييل المتجر: `footer.layout` و`footer.groups` و`footer.design` و`footer.paymentLogos`.
+ * السلطة (PHP) لتوأمَي TS
  * (`footer-design.ts` في web وstorefront، متطابقان حرفياً)، وثلاثتها على `tests/Fixtures/presentation/footer-design.json`.
  *
- * ثلاثة مفاتيح اختيارية إضافية بحتة داخل `footer`. الغياب = لا مفتاح، فيبقى مخرج الوثيقة القديمة **بلا أي تغيير** (V0 §2.2) و
+ * مفاتيح اختيارية إضافية بحتة داخل `footer`. الغياب = لا مفتاح، فيبقى مخرج الوثيقة القديمة **بلا أي تغيير** (V0 §2.2) و
  * `PRESENTATION_CONFIG_VERSION` = 3، ويظل التذييل الحالي (روابط ثابتة + أعمدة الثقة) يُرسم كما هو حين لا `layout` ولا `groups`.
  * قيمة خارج المجموعة المعدودة تُسقط وحدها، والمجموعات الفارغة تُحذف، والترتيب قانوني ثابت.
  *
@@ -15,6 +16,7 @@ namespace App\Support\Commerce;
  *    غيابه) و`links?` (عناصر التنقّل المُصنَّفة الهدف، بلا أبناء) و`span?` ∈ 1|2. روابط المجموعة تعيد استعمال نموذج التنقّل ومنتقياته (§10.3).
  *  - `design` : `surface.background` (ColorRef) · `text` · `heading` · `link` (ColorRef) · `divider.color` · `spacing.top|bottom` ∈ sm|md|lg ·
  *    `logo.size` ∈ sm|md|lg · `align` ∈ start|center|end. تباين الصريح منها يحرسه `FooterDesignContrast` عند النشر.
+ *  - `paymentLogos`: عرض بصري Beta فقط، مستقل عن Checkout: تشغيل، ترتيب العلامات الأربع، النمط، الحجم، وإظهار العنوان.
  *
  * مؤجَّل صراحةً (يُسقط fail-closed): خلفية وسائط/تدرّج/`alpha`، `divider.kind/height`، `border`، `logo.treatment`، `linkHover` — يرث الحومُ لون العنوان.
  */
@@ -36,9 +38,15 @@ final class StorefrontFooterNormalizer
 
     public const ALIGNS = ['start', 'center', 'end'];
 
+    public const PAYMENT_LOGO_KEYS = ['mada', 'visa', 'mastercard', 'apple_pay'];
+
+    public const PAYMENT_LOGO_STYLES = ['inline', 'cards', 'strip'];
+
+    public const PAYMENT_LOGO_SIZES = ['sm', 'md', 'lg'];
+
     /**
      * @param  callable(string):?string  $sanitizeExternalUrl
-     * @return array<string,mixed> المفاتيح الصالحة فقط (layout, groups, design) بهذا الترتيب؛ فارغ عند الغياب
+     * @return array<string,mixed> المفاتيح الصالحة فقط (layout, groups, design, paymentLogos) بهذا الترتيب؛ فارغ عند الغياب
      */
     public static function normalize(mixed $footerRaw, callable $sanitizeExternalUrl): array
     {
@@ -62,7 +70,45 @@ final class StorefrontFooterNormalizer
             $out['design'] = $design;
         }
 
+        $paymentLogos = self::paymentLogos($footerRaw['paymentLogos'] ?? null);
+        if ($paymentLogos !== null) {
+            $out['paymentLogos'] = $paymentLogos;
+        }
+
         return $out;
+    }
+
+    /** @return array{enabled:bool,brands:list<string>,style:string,size:string,showTitle:bool}|null */
+    private static function paymentLogos(mixed $raw): ?array
+    {
+        if (! self::isObject($raw)) {
+            return null;
+        }
+
+        $brands = self::PAYMENT_LOGO_KEYS;
+        if (is_array($raw['brands'] ?? null) && array_is_list($raw['brands'])) {
+            $brands = [];
+            foreach ($raw['brands'] as $brand) {
+                if (
+                    is_string($brand)
+                    && in_array($brand, self::PAYMENT_LOGO_KEYS, true)
+                    && ! in_array($brand, $brands, true)
+                ) {
+                    $brands[] = $brand;
+                }
+            }
+        }
+
+        $style = $raw['style'] ?? null;
+        $size = $raw['size'] ?? null;
+
+        return [
+            'enabled' => is_bool($raw['enabled'] ?? null) ? $raw['enabled'] : false,
+            'brands' => $brands,
+            'style' => is_string($style) && in_array($style, self::PAYMENT_LOGO_STYLES, true) ? $style : 'cards',
+            'size' => is_string($size) && in_array($size, self::PAYMENT_LOGO_SIZES, true) ? $size : 'md',
+            'showTitle' => is_bool($raw['showTitle'] ?? null) ? $raw['showTitle'] : true,
+        ];
     }
 
     /** @return list<array<string,mixed>> */

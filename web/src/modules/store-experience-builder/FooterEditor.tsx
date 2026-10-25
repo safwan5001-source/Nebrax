@@ -17,8 +17,10 @@ import {
   setDesign,
   setGroups,
   setLayout,
+  setPaymentLogos,
   updateGroup,
 } from "./footer-edit";
+import { paymentBrandPresentation } from "@/lib/payment-brand-registry";
 import type { CustomizerMessageKey } from "./messages";
 import { NavTargetPicker, type PickedTarget } from "./NavTargetPicker";
 import type { StorefrontPresentationConfig } from "./presentation/config";
@@ -39,6 +41,16 @@ import { NAV_LABEL_MAX, type NavTarget } from "./presentation/navigation";
 import type { ColorRef } from "./presentation/section-design";
 import type { DesignContext } from "./presentation/section-design-resolve";
 import { StoreIcon } from "./StoreIcon";
+import {
+  FOOTER_PAYMENT_LOGO_KEYS,
+  FOOTER_PAYMENT_LOGO_SIZES,
+  FOOTER_PAYMENT_LOGO_STYLES,
+  normalizeFooterPaymentLogos,
+  resolvedFooterPaymentLogos,
+  type FooterPaymentLogoKey,
+  type FooterPaymentLogoSize,
+  type FooterPaymentLogoStyle,
+} from "./presentation/payment-logos";
 
 const LAYOUT_LABEL: Record<FooterLayout, CustomizerMessageKey> = {
   compact: "footerLayoutCompact",
@@ -57,6 +69,16 @@ const KIND_LABEL: Record<NavTarget["kind"], CustomizerMessageKey> = {
   product: "navTargetProduct",
   content: "navTargetContent",
   external: "navTargetExternal",
+};
+const PAYMENT_STYLE_LABEL: Record<FooterPaymentLogoStyle, CustomizerMessageKey> = {
+  inline: "footerPaymentStyleInline",
+  cards: "footerPaymentStyleCards",
+  strip: "footerPaymentStyleStrip",
+};
+const PAYMENT_SIZE_LABEL: Record<FooterPaymentLogoSize, CustomizerMessageKey> = {
+  sm: "footerPaymentSizeSm",
+  md: "footerPaymentSizeMd",
+  lg: "footerPaymentSizeLg",
 };
 
 type Picking = { groupId: string; linkId?: string } | null;
@@ -82,6 +104,7 @@ export function FooterEditor({
   const footer = config.footer;
   const groups = footer.groups;
   const design = footer.design;
+  const paymentLogos = resolvedFooterPaymentLogos(footer.paymentLogos);
   const [picking, setPicking] = useState<Picking>(null);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const menus = config.navigation?.menus ?? [];
@@ -94,6 +117,22 @@ export function FooterEditor({
   };
   const commitGroups = (next: FooterGroup[]) => patch({ footer: setGroups(footer, next) });
   const commitDesign = (next: FooterDesign | undefined) => patch({ footer: setDesign(footer, next) });
+  const commitPaymentLogos = (next: typeof paymentLogos) => {
+    const normalized = normalizeFooterPaymentLogos(next);
+    if (normalized) patch({ footer: setPaymentLogos(footer, normalized) });
+  };
+  const paymentRows = [
+    ...paymentLogos.brands,
+    ...FOOTER_PAYMENT_LOGO_KEYS.filter((brand) => !paymentLogos.brands.includes(brand)),
+  ];
+  const movePaymentLogo = (brand: FooterPaymentLogoKey, delta: -1 | 1) => {
+    const at = paymentLogos.brands.indexOf(brand);
+    const to = at + delta;
+    if (at < 0 || to < 0 || to >= paymentLogos.brands.length) return;
+    const brands = [...paymentLogos.brands];
+    [brands[at], brands[to]] = [brands[to] as FooterPaymentLogoKey, brands[at] as FooterPaymentLogoKey];
+    commitPaymentLogos({ ...paymentLogos, brands });
+  };
 
   const issues = footerContrastIssues(design, ctx);
   const resolved = resolveFooterDesign(design, ctx);
@@ -158,6 +197,96 @@ export function FooterEditor({
             </option>
           ))}
         </select>
+      </div>
+
+      {/* ── display-only payment marks ── */}
+      <div className="space-y-4 border-y border-border py-5" data-footer-payment-logos-editor="">
+        <div>
+          <h3 className="text-[12px] font-semibold tracking-wide text-muted">{t("footerPaymentLogosTitle")}</h3>
+          <p className="mt-1 text-[12px] leading-5 text-muted">{t("footerPaymentLogosHint")}</p>
+        </div>
+        <Toggle
+          label={t("footerPaymentLogosEnabled")}
+          checked={paymentLogos.enabled}
+          onChange={(enabled) => commitPaymentLogos({ ...paymentLogos, enabled })}
+        />
+        <Toggle
+          label={t("footerPaymentShowTitle")}
+          checked={paymentLogos.showTitle}
+          onChange={(showTitle) => commitPaymentLogos({ ...paymentLogos, showTitle })}
+        />
+        <Field label={t("footerPaymentStyle")}>
+          <select
+            className={selectClass}
+            value={paymentLogos.style}
+            onChange={(event) =>
+              commitPaymentLogos({ ...paymentLogos, style: event.target.value as FooterPaymentLogoStyle })
+            }
+          >
+            {FOOTER_PAYMENT_LOGO_STYLES.map((style) => (
+              <option key={style} value={style}>{t(PAYMENT_STYLE_LABEL[style])}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label={t("footerPaymentSize")}>
+          <select
+            className={selectClass}
+            value={paymentLogos.size}
+            onChange={(event) =>
+              commitPaymentLogos({ ...paymentLogos, size: event.target.value as FooterPaymentLogoSize })
+            }
+          >
+            {FOOTER_PAYMENT_LOGO_SIZES.map((size) => (
+              <option key={size} value={size}>{t(PAYMENT_SIZE_LABEL[size])}</option>
+            ))}
+          </select>
+        </Field>
+        <div className="space-y-2">
+          <p className="text-[12px] font-medium text-muted">{t("footerPaymentBrands")}</p>
+          <ul className="divide-y divide-border border border-border">
+            {paymentRows.map((brandKey) => {
+              const brand = paymentBrandPresentation(brandKey);
+              if (!brand) return null;
+              const selectedAt = paymentLogos.brands.indexOf(brandKey);
+              const selected = selectedAt >= 0;
+              return (
+                <li key={brandKey} data-payment-brand={brandKey} className="flex min-h-12 items-center gap-2 px-2">
+                  <label className="flex min-w-0 flex-1 items-center gap-2 text-[12px] text-text">
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={(event) => {
+                        const brands = event.target.checked
+                          ? [...paymentLogos.brands, brandKey]
+                          : paymentLogos.brands.filter((item) => item !== brandKey);
+                        commitPaymentLogos({ ...paymentLogos, brands });
+                      }}
+                      aria-label={`${t("footerPaymentSelectBrand")} ${locale === "ar" ? brand.nameAr : brand.nameEn}`}
+                    />
+                    <img src={brand.logo.src} alt="" width={brand.logo.width} height={brand.logo.height} className="h-6 w-auto shrink-0 object-contain" />
+                    <span className="truncate">{locale === "ar" ? brand.nameAr : brand.nameEn}</span>
+                  </label>
+                  <span className="flex shrink-0">
+                    <button
+                      type="button"
+                      className={iconBtnClass}
+                      aria-label={`${t("moveUp")} ${locale === "ar" ? brand.nameAr : brand.nameEn}`}
+                      disabled={!selected || selectedAt === 0}
+                      onClick={() => movePaymentLogo(brandKey, -1)}
+                    >↑</button>
+                    <button
+                      type="button"
+                      className={iconBtnClass}
+                      aria-label={`${t("moveDown")} ${locale === "ar" ? brand.nameAr : brand.nameEn}`}
+                      disabled={!selected || selectedAt === paymentLogos.brands.length - 1}
+                      onClick={() => movePaymentLogo(brandKey, 1)}
+                    >↓</button>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       </div>
 
       {/* ── groups ── */}
