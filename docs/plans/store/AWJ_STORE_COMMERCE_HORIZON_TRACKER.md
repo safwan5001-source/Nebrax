@@ -11,7 +11,7 @@
 
 | الأفق | الاسم | شرائح | Planned | Blocked | In PR | Merged | Env-Verified | Closed | حالة الأفق |
 |---|---|---|---|---|---|---|---|---|---|
-| H0 | Stability, Security & Checkout Theme Parity | 8 | 4 | 0 | 0 | 4 | 0 | 0 | Open |
+| H0 | Stability, Security & Checkout Theme Parity | 8 | 4 | 3 | 0 | 1 | 0 | 0 | Open |
 | H1 | Buyer Identity & Sessions | 9 | 0 | 9 | 0 | 0 | 0 | 0 | Open |
 | H2 | Orders, Cart & Checkout Completion | 17 | 3 | 14 | 0 | 0 | 0 | 0 | Open |
 | H3 | Payments, COD, Accounting & ZATCA | 4 | 0 | 4 | 0 | 0 | 0 | 0 | Open |
@@ -32,7 +32,7 @@
 | X2 | تنظيف البيئة والوثائق (إزالة قيم Spree الوهمية) | E | P0 | — | — | #1744 (merged) | Claude Code | Merged | ✓ (#1744 · cc9ebf2) | ؟ (غير معروف) | — لم يُتحقَّق | تحقق بيئي للقراءة فقط: إزالة أي SPREE_* في Railway/Vercel (يدوياً بواسطة المالك) |
 | X3 | Sitemap من AWJ (بدل Spree) + فشل غير صامت | E | P0 | — | — | — | غير مُسنَد (مقترح: Claude Code) | Planned | — | — | — | التحقق من ترقيم store/v1 ثم PR صغير |
 | X5 | إغلاق مسارات Checkout Spree غير المربوطة (404) | E | P1 | — | — | — | غير مُسنَد (مقترح: Claude Code) | Planned | — | — | — | قابلة للبدء (#1745 مدموج؛ أعد التأسيس على main) |
-| X6 | حارس ratchet للاعتماد التشغيلي على Spree + اختبار «بلا بيئة Spree» (جديد) | E | P1 | X1 | — | — | غير مُسنَد (مقترح: Claude Code) | Planned | — | — | — | PR صغير بحسب مواصفة X6 (العقد §6.1): يعدّ الاعتماد التشغيلي فقط ويستثني الوثائق والاختبارات والتعليقات |
+| X6 | حارس ratchet للاعتماد التشغيلي على Spree + اختبار «بلا بيئة Spree» (جديد) | E | P1 | X1 | — | — | غير مُسنَد (مقترح: Claude Code) | In PR | — | — | — | ratchet عدّ بـAST (5 فئات) + baseline.json + خطوة في storefront-ci؛ PR مفتوح، لم يُدمج. «اختبار بلا بيئة Spree» (§6.1 قاعدة 5) خارج هذه الشريحة |
 | CTP1 | Checkout Theme Parity — تطبيق الثيم المنشور على Checkout AWJ | X | P0 | — | — | #1745 (merged) — Codex | Codex | Merged | ✓ (#1745 · f5687dc) | ؟ (غير معروف) | — لم يُتحقَّق | لا عمل منا؛ تحقق بيئي (الثيم المنشور على Checkout) يملكه المالك/Codex |
 | ENV0 | خط أساس التحقق البيئي: أسماء المتغيرات، المراجعة المنشورة، المضيف الحيّ | X | P0 | — | — | — | Safwan (وصول بيئة) | Planned | — | — | — | تسجيل المضيف (Railway/Vercel) والمراجعة المنشورة وأسماء المتغيرات (بلا قيم) |
 
