@@ -118,4 +118,40 @@ describe("StoreCheckoutLayout published theme", () => {
     )[0] as ReactElement<TestElementProps>;
     expect(brand.props).toMatchObject({ name: "Live shop", logoUrl: null });
   });
+
+  it("applies published dark header foreground colors to the row and wordmark", async () => {
+    vi.mocked(fetchStorefrontConfig).mockResolvedValueOnce({
+      name: "Live shop",
+      default_locale: "en",
+      business_identity: {
+        legal_name: null,
+        cr_number: null,
+        vat_number: null,
+      },
+      presentation: {
+        ...DEFAULT_PRESENTATION_CONFIG,
+        header: {
+          ...DEFAULT_PRESENTATION_CONFIG.header,
+          design: { surface: { background: { hex: "#12372a" } } },
+        },
+      },
+      presentationMedia: {},
+    });
+
+    const root = await checkout("en");
+    expect(root.props["data-hd"]).toBe("hbg htx");
+    expect(root.props.style).toMatchObject({ "--hd-fg": "#ffffff" });
+    const [header] = Children.toArray(
+      root.props.children,
+    ) as ReactElement<TestElementProps>[];
+    const headerRow = Children.only(
+      header.props.children,
+    ) as ReactElement<TestElementProps>;
+    expect(headerRow.props["data-header-row"]).toBe("");
+    const brand = Children.toArray(
+      headerRow.props.children,
+    )[0] as ReactElement<TestElementProps>;
+    expect(brand.props["data-header-brand"]).toBe("");
+    expect(brand.props.headerBrand).toBe(true);
+  });
 });

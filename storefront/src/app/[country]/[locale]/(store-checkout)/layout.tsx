@@ -83,12 +83,16 @@ export default async function StoreCheckoutLayout({
       style={{ ...themeStyle, ...backgroundStyle }}
     >
       <header className="border-b border-store-border bg-store-surface">
-        <div className="mx-auto flex h-store-header max-w-store items-center justify-between gap-4 px-4 sm:px-6 lg:h-store-header-lg lg:px-8">
+        <div
+          {...(presentation?.header.design ? { "data-header-row": "" } : {})}
+          className="mx-auto flex h-store-header max-w-store items-center justify-between gap-4 px-4 sm:px-6 lg:h-store-header-lg lg:px-8"
+        >
           <StoreBrand
             href={basePath}
             name={displayName}
             size="md"
             locale={messageLocale}
+            headerBrand={presentation?.header.design !== undefined}
             logoUrl={publishedLogoUrl(presentation)}
             logoMedia={publishedLogoMedia(
               presentation,
