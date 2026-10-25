@@ -639,7 +639,7 @@ const SCENARIOS: Scenario[] = [
       await expect(sheet.locator('h3 button[aria-expanded=true]')).toHaveCount(1);
       await expect(sheet.getByTestId('pg-detail-readonly')).toHaveCount(0);
       await shot(page, `gateway-detail-sheet-collapsed-${c.locale}-${c.vw}-${c.theme}`);
-      for (const header of await sheet.locator('h3 button[aria-expanded=false]').all()) await header.click();
+      while (await sheet.locator('h3 button[aria-expanded=false]').count()) await sheet.locator('h3 button[aria-expanded=false]').first().click();
       await expect(sheet.locator('h3 button[aria-expanded=true]')).toHaveCount(6);
       // عنوان Webhook يلتفّ داخل اللوحة بلا تمرير أفقي
       const url = sheet.getByTestId('pg-webhook-url');
@@ -674,9 +674,10 @@ const SCENARIOS: Scenario[] = [
       const sheet = page.getByTestId('pg-detail');
       // «للقراءة فقط» تظهر لمن لا يملك الصلاحية وحده، ولا زر إجراء يغيّر الاتصال
       await expect(sheet.getByTestId('pg-detail-readonly')).toHaveText(c.t('paymentGateways', 'detail.readOnly'));
-      for (const header of await sheet.locator('h3 button[aria-expanded=false]').all()) await header.click();
-      await expect(sheet.getByTestId('pg-webhook-url')).toHaveCount(0);
-      await expect(sheet.getByRole('button').filter({ hasNot: page.locator('svg.lucide-chevron-down') })).toHaveCount(1);   // «إغلاق» الورقة وحده
+      while (await sheet.locator('h3 button[aria-expanded=false]').count()) await sheet.locator('h3 button[aria-expanded=false]').first().click();
+      for (const action of ['edit', 'rotate', 'verify', 'activate', 'suspend', 'revoke', 'delete', 'events']) {
+        await expect(sheet.getByRole('button', { name: c.t('paymentGateways', `actions.${action}`), exact: true })).toHaveCount(0);
+      }
       await fitsViewport(sheet);
     },
   },
