@@ -109,6 +109,71 @@ alias("dtc");`,
     ).toBeUndefined();
   });
 
+  it("follows alias chains regardless of declaration order (review: chained helper aliases)", () => {
+    const c = scanSource(
+      `import { getClient as gc } from "@/lib/spree";
+const clientFactory = gc;
+const again = clientFactory;
+clientFactory();
+again();
+clientFactory();`,
+      "src/lib/data/a.ts",
+    );
+    // `= gc`, `= clientFactory`, then three calls
+    expect(c.spree_client_access).toBe(5);
+    const reordered = scanSource(
+      `const b = a;\nconst a = getClient;\nb();`,
+      "src/lib/data/a.ts",
+    );
+    expect(reordered.spree_client_access).toBe(3);
+  });
+
+  it("counts SDK factory calls through namespace imports (review: namespace access)", () => {
+    const c = scanSource(
+      `import * as sdk from "@spree/sdk";\nsdk.createClient({});\nsdk.createClient({});`,
+      "src/a.ts",
+    );
+    expect(c).toMatchObject({ spree_value_imports: 1, spree_client_access: 2 });
+    expect(
+      scanSource(
+        `import sdk from "@spree/sdk";\nsdk.createClient({});`,
+        "src/a.ts",
+      ).spree_client_access,
+    ).toBe(1);
+    expect(
+      scanSource(
+        `import * as other from "other";\nother.createClient({});`,
+        "src/a.ts",
+      ).spree_client_access,
+    ).toBeUndefined();
+  });
+
+  it("counts SDK factory calls through destructuring, require and import() (review: destructured factory)", () => {
+    const c = scanSource(
+      `const { createClient: make } = require("@spree/sdk");
+make({});
+const { createClient } = await import("@spree/sdk");
+createClient({});
+const sdk = require("@spree/sdk");
+const { createClient: viaNs } = sdk;
+viaNs({});
+const f = sdk.createClient;
+f({});
+(await import("@spree/sdk")).createClient({});`,
+      "src/a.ts",
+    );
+    // make(), createClient(), viaNs(), `sdk.createClient` + f(), inline import().createClient
+    expect(c.spree_client_access).toBe(6);
+  });
+
+  it("does not treat createClient from other modules as a Spree factory", () => {
+    const c = scanSource(
+      `const { createClient } = require("@supabase/supabase-js");\ncreateClient();`,
+      "src/a.ts",
+    );
+    expect(c.spree_client_access).toBeUndefined();
+  });
+
   it("does not count the helper's own declaration", () => {
     const c = scanSource(
       `export function getClient() { return 1; }`,

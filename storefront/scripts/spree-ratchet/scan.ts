@@ -123,42 +123,122 @@ function unwrap(node: ts.Expression): ts.Expression {
   return n;
 }
 
-/** Import/destructure/alias names that resolve to a tracked client helper. */
-function collectHelperAliases(sf: ts.SourceFile): Set<string> {
+const SDK_FACTORY = "createClient";
+
+interface HelperScope {
+  /** Local names that resolve to a client helper or SDK factory (counted on use). */
+  tracked: Set<string>;
+  /** Local names bound to a whole @spree/* module (namespace/default import, require, import()). */
+  sdkModules: Set<string>;
+}
+
+/** Is `e` the @spree/* module itself: `require("@spree/x")`, `import("@spree/x")` or a tracked module binding? */
+function isSdkModuleExpr(
+  e: ts.Expression,
+  sdkModules: ReadonlySet<string>,
+): boolean {
+  const u = unwrap(e);
+  if (ts.isIdentifier(u)) return sdkModules.has(u.text);
+  const spec = dynamicSpecifier(u);
+  return spec !== undefined && isSdk(spec);
+}
+
+/**
+ * Import/destructure/alias names that resolve to a tracked client helper or the
+ * SDK factory. Iterated to a fixpoint so alias chains (`gc` → `factory` → …) and
+ * namespace→destructure chains resolve regardless of declaration order.
+ */
+function collectHelperAliases(sf: ts.SourceFile): HelperScope {
   const tracked = new Set<string>(CLIENT_HELPERS);
+  const sdkModules = new Set<string>();
+  const add = (set: Set<string>, name: string): boolean => {
+    if (set.has(name)) return false;
+    set.add(name);
+    return true;
+  };
+  let changed = true;
   const visit = (node: ts.Node) => {
     if (ts.isImportSpecifier(node)) {
       const imported = (node.propertyName ?? node.name).text;
-      const from = node.parent.parent.parent.moduleSpecifier;
-      const spec = stringLiteral(from);
-      if (CLIENT_HELPERS.has(imported)) tracked.add(node.name.text);
+      const spec = stringLiteral(node.parent.parent.parent.moduleSpecifier);
+      if (CLIENT_HELPERS.has(imported) && add(tracked, node.name.text))
+        changed = true;
       // `createClient` is only a Spree client factory when it comes from the SDK.
-      else if (imported === "createClient" && spec && isSdk(spec))
-        tracked.add(node.name.text);
+      else if (
+        imported === SDK_FACTORY &&
+        spec &&
+        isSdk(spec) &&
+        add(tracked, node.name.text)
+      )
+        changed = true;
+    } else if (ts.isImportClause(node)) {
+      // import sdk from "@spree/sdk" / import * as sdk from "@spree/sdk"
+      const spec = stringLiteral(node.parent.moduleSpecifier);
+      if (spec && isSdk(spec)) {
+        if (node.name && add(sdkModules, node.name.text)) changed = true;
+        if (
+          node.namedBindings &&
+          ts.isNamespaceImport(node.namedBindings) &&
+          add(sdkModules, node.namedBindings.name.text)
+        )
+          changed = true;
+      }
     } else if (ts.isBindingElement(node) && ts.isIdentifier(node.name)) {
       const key =
         node.propertyName && ts.isIdentifier(node.propertyName)
           ? node.propertyName.text
           : node.name.text;
-      if (CLIENT_HELPERS.has(key)) tracked.add(node.name.text);
+      if (CLIENT_HELPERS.has(key) && add(tracked, node.name.text))
+        changed = true;
+      else if (key === SDK_FACTORY) {
+        // const { createClient: make } = require("@spree/sdk") | await import(...) | sdkNamespace
+        const decl = node.parent.parent;
+        if (
+          ts.isVariableDeclaration(decl) &&
+          decl.initializer &&
+          isSdkModuleExpr(decl.initializer, sdkModules) &&
+          add(tracked, node.name.text)
+        )
+          changed = true;
+      }
     } else if (
       ts.isVariableDeclaration(node) &&
       ts.isIdentifier(node.name) &&
       node.initializer
     ) {
-      // const alias = getClient;   const alias = ns.getClient;
       const init = unwrap(node.initializer);
+      // const alias = getClient;  const alias = ns.getClient;  const chained = alias;
       const name = ts.isIdentifier(init)
         ? init.text
         : ts.isPropertyAccessExpression(init)
           ? init.name.text
           : undefined;
-      if (name && CLIENT_HELPERS.has(name)) tracked.add(node.name.text);
+      if (
+        name &&
+        (CLIENT_HELPERS.has(name) ||
+          (ts.isIdentifier(init) && tracked.has(name))) &&
+        add(tracked, node.name.text)
+      )
+        changed = true;
+      // const sdk = require("@spree/sdk");  const sdk2 = sdk;
+      if (isSdkModuleExpr(init, sdkModules) && add(sdkModules, node.name.text))
+        changed = true;
+      // const make = sdk.createClient;  const make = (await import("@spree/sdk")).createClient;
+      if (
+        ts.isPropertyAccessExpression(init) &&
+        init.name.text === SDK_FACTORY &&
+        isSdkModuleExpr(init.expression, sdkModules) &&
+        add(tracked, node.name.text)
+      )
+        changed = true;
     }
     ts.forEachChild(node, visit);
   };
-  visit(sf);
-  return tracked;
+  while (changed) {
+    changed = false;
+    visit(sf);
+  }
+  return { tracked, sdkModules };
 }
 
 /** Local names bound to `process.env` / `import.meta.env`. */
@@ -234,7 +314,7 @@ export function scanSource(text: string, rel: string): FileCounts {
     scriptKind(rel),
   );
   const counts: FileCounts = {};
-  const helpers = collectHelperAliases(sf);
+  const { tracked: helpers, sdkModules } = collectHelperAliases(sf);
   const envAliases = collectEnvAliases(sf);
 
   const countModule = (spec: string, kind: "value" | "type", n = 1) => {
@@ -315,6 +395,14 @@ export function scanSource(text: string, rel: string): FileCounts {
       if (!isPropName || CLIENT_HELPERS.has(node.text))
         bump(counts, "spree_client_access");
     }
+
+    // SDK factory through a module object: sdk.createClient(...), (await import("@spree/sdk")).createClient(...)
+    if (
+      ts.isPropertyAccessExpression(node) &&
+      node.name.text === SDK_FACTORY &&
+      isSdkModuleExpr(node.expression, sdkModules)
+    )
+      bump(counts, "spree_client_access");
 
     // Env reads
     if (
