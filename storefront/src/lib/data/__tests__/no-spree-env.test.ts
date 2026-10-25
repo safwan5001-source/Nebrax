@@ -23,8 +23,9 @@ import {
  * It deliberately does not duplicate the X6 scanner (static): this is the
  * runtime counterpart.
  *
- * Policies and sitemap are NOT AWJ-native yet — see the "known gaps" block; those
- * tests assert today's dependency honestly rather than passing by mocking Spree.
+ * The sitemap is AWJ-native since X3 and is asserted positively below. Policies are NOT
+ * AWJ-native yet — see the "known gap" block; that test asserts today's dependency
+ * honestly rather than passing by mocking Spree.
  */
 const spree = vi.hoisted(() => ({
   getClient: vi.fn(),
@@ -116,7 +117,6 @@ import {
   updateCustomer,
 } from "@/lib/data/customer";
 import { cachedGetPolicy, getPolicy } from "@/lib/data/policies";
-import { getSitemapMarkets } from "@/lib/data/sitemap";
 import { getClient } from "@/lib/spree";
 
 const AWJ_API = "https://api.awj.test";
@@ -163,6 +163,30 @@ function awjRoutes(url: string, init?: RequestInit) {
       status: 200,
       headers: { "content-type": "application/json" },
     });
+  if (pathname.endsWith("/store/v1/storefront")) {
+    return ok({ name: "Shop", default_locale: "ar" });
+  }
+  if (pathname.endsWith("/store/v1/products")) {
+    return new Response(
+      JSON.stringify({
+        data: [{ id: "prod-1", updated_at: null, thumbnail_url: null }],
+        meta: {
+          request_id: "req-1",
+          pagination: {
+            page: 1,
+            per_page: 100,
+            total: 1,
+            last_page: 1,
+            has_more: false,
+          },
+        },
+      }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+  }
+  if (pathname.endsWith("/store/v1/categories")) {
+    return ok([{ id: "cat-1", parent_id: null, children: [] }]);
+  }
   if (pathname.endsWith("/checkout/payment-methods")) {
     return ok({ payment_methods: [], online_methods: [] });
   }
@@ -348,15 +372,95 @@ describe("AWJ-native guest checkout works without Spree configuration", () => {
 });
 
 /**
- * KNOWN GAPS — these assert TODAY'S behaviour, not the desired one.
- *
- * Policies and the sitemap still read through the Spree client (`getClient()`), so with
- * no Spree environment they cannot return data. They are not migrated here (X3 owns the
- * sitemap; policies have no AWJ source yet). If a future slice migrates them, these
- * tests must be rewritten into positive "works without Spree" tests — a failure here
- * after such a migration is the intended signal.
+ * X3 — the sitemap and robots.txt are AWJ-native: they read `store/v1` only, keyed by the
+ * visitor's Host, and never build a Spree client. (Full behavioural coverage lives in
+ * `src/app/sitemap.test.ts`, `robots.test.ts` and `lib/data/__tests__/sitemap.test.ts`.)
  */
-describe("KNOWN GAP — policies and sitemap still depend on Spree", () => {
+describe("sitemap and robots work without Spree", () => {
+  it("sitemap chunk is built from store/v1 with the visitor host and never touches Spree", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://shop.example.sa");
+    vi.stubEnv("NEXT_PUBLIC_DEFAULT_COUNTRY", "sa");
+    const { default: sitemap, generateSitemaps } = await import(
+      "@/app/sitemap"
+    );
+
+    const entries = await sitemap({ id: Promise.resolve("0") });
+    const urls = entries.map((entry) => entry.url);
+
+    expect(await generateSitemaps()).toEqual([{ id: 0 }]);
+    expect(urls).toContain("https://shop.example.sa/sa/ar/products/prod-1");
+    expect(urls).toContain("https://shop.example.sa/sa/ar/c/cat-1");
+    expect(urls).toContain("https://shop.example.sa/sa/en/products/prod-1");
+    expect(JSON.stringify(entries)).not.toMatch(LEAK);
+
+    for (const u of awjUrls()) {
+      expect(u.startsWith(`${AWJ_API}/store/v1/`)).toBe(true);
+    }
+    for (const call of fetchMock.mock.calls) {
+      const headers = (call[1] as RequestInit).headers as Record<
+        string,
+        string
+      >;
+      expect(headers["X-Storefront-Forwarded-Host"]).toBe("shop.example.sa");
+      expect(JSON.stringify(headers)).not.toMatch(/spree|publishable/i);
+    }
+    expectSpreeUntouched();
+  });
+
+  it("an AWJ API failure yields a generic error and a server-side log only — no Spree/config detail", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://shop.example.sa");
+    fetchMock.mockImplementation(
+      async () =>
+        new Response(
+          JSON.stringify({
+            error: { code: "unavailable", message: "db-internal is down" },
+          }),
+          { status: 503, headers: { "content-type": "application/json" } },
+        ),
+    );
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { default: sitemap, generateSitemaps } = await import(
+      "@/app/sitemap"
+    );
+
+    const failure = await sitemap({ id: Promise.resolve("0") }).catch(
+      (error: unknown) => error,
+    );
+
+    expect((failure as Error).message).toBe(
+      "Sitemap is temporarily unavailable.",
+    );
+    await expect(generateSitemaps()).rejects.toThrow(
+      "Sitemap is temporarily unavailable.",
+    );
+    expect(errorLog).toHaveBeenCalled();
+    expect(JSON.stringify(errorLog.mock.calls)).not.toMatch(/db-internal/);
+    expect((failure as Error).message).not.toMatch(LEAK);
+    expectSpreeUntouched();
+    errorLog.mockRestore();
+  });
+
+  it("robots.txt references the sitemap on the visitor host without Spree", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://shop.example.sa");
+    const { default: robots } = await import("@/app/robots");
+
+    const result = await robots();
+
+    expect(result.sitemap).toEqual(["https://shop.example.sa/sitemap/0.xml"]);
+    expectSpreeUntouched();
+  });
+});
+
+/**
+ * KNOWN GAP — these assert TODAY'S behaviour, not the desired one.
+ *
+ * Policies still read through the Spree client (`getClient()`), so with no Spree
+ * environment they cannot return data. They are not migrated here (policies have no AWJ
+ * source yet). If a future slice migrates them, these tests must be rewritten into
+ * positive "works without Spree" tests — a failure here after such a migration is the
+ * intended signal.
+ */
+describe("KNOWN GAP — policies still depend on Spree", () => {
   it("policies: cachedGetPolicy/getPolicy reject because the Spree client is unavailable", async () => {
     await expect(
       cachedGetPolicy("privacy", { country: "sa", locale: "ar" }),
@@ -366,29 +470,6 @@ describe("KNOWN GAP — policies and sitemap still depend on Spree", () => {
     ).rejects.toThrow(/Spree client is not available/);
     expect(spree.getClient).toHaveBeenCalled();
     expect(spree.createClient).not.toHaveBeenCalled();
-  });
-
-  it("sitemap: data layer rejects because the Spree client is unavailable", async () => {
-    await expect(
-      getSitemapMarkets({ country: "sa", locale: "ar" }),
-    ).rejects.toThrow(/Spree client is not available/);
-    expect(spree.getClient).toHaveBeenCalled();
-  });
-
-  it("sitemap route degrades to an empty sitemap and logs server-side only (no detail in the response)", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://shop.example.sa");
-    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
-    const { default: sitemap, generateSitemaps } = await import(
-      "@/app/sitemap"
-    );
-
-    const entries = await sitemap({ id: Promise.resolve("0") });
-    expect(entries).toEqual([]);
-    expect(await generateSitemaps()).toEqual([{ id: 0 }]);
-    expect(JSON.stringify(entries)).not.toMatch(LEAK);
-    // Detail goes to the server log only.
-    expect(errorLog).toHaveBeenCalled();
-    errorLog.mockRestore();
   });
 
   it("policy page: the configuration error is NOT converted to a shopper-safe result", async () => {
