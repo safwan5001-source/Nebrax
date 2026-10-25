@@ -84,7 +84,7 @@ describe.each(TEST_LOCALES)('OnlineMethodsPanel (%s)', (locale) => {
     expect(screen.queryByText(m.step.provider_setup)).toBeNull();
   });
 
-  it('an enabled method whose gateway is not ready shows a one-line hint and can still be switched off', async () => {
+  it('an enabled method whose gateway is not ready has no repeated warning under the row (status badge only) and can still be switched off', async () => {
     api.mockImplementation((path: string, options?: { method?: string }) => {
       if (path === '/online-payment-methods') return Promise.resolve({ data: [method({ key: 'visa', status: 'enabled_not_ready', reason: 'no_usable_gateway', enabled: true, customer_visible: true })] });
       if (path === '/online-payment-methods/visa' && options?.method === 'PUT') return Promise.resolve({ data: method({ key: 'visa', status: 'needs_setup', reason: 'no_usable_gateway', enabled: false }) });
@@ -93,7 +93,8 @@ describe.each(TEST_LOCALES)('OnlineMethodsPanel (%s)', (locale) => {
     mount(true);
     expect(await screen.findByTestId('pm-list')).toBeTruthy();
     expect(screen.getByTestId('pm-status-visa').textContent).toBe(m.status.enabled_not_ready);
-    expect(screen.getByTestId('pm-hint-visa').textContent).toBe(m.hintNotReady);
+    expect(screen.queryByTestId('pm-hint-visa')).toBeNull();
+    expect(screen.getByTestId('pm-item-visa').textContent).not.toContain(m.hintNotReady);
     expect(sw('visa').getAttribute('aria-checked')).toBe('true');
     await userEvent.click(sw('visa'));
     await waitFor(() => expect(api).toHaveBeenCalledWith('/online-payment-methods/visa', { method: 'PUT', body: { enabled: false } }));
@@ -220,12 +221,13 @@ describe.each(TEST_LOCALES)('OnlineMethodsPanel (%s)', (locale) => {
     expect(within(sheet).getByText(m.step.add_gateway)).toBeTruthy();
   });
 
-  it('shows an error with retry when loading fails, and the scope note separates it from cash/bank methods', async () => {
+  it('shows an error with retry when loading fails, and the one-line scope note links to cash/bank methods', async () => {
     api.mockRejectedValueOnce(new Error('down'));
     mount(true);
 
     expect(await screen.findByRole('alert')).toBeTruthy();
-    expect(screen.getByTestId('pm-scope-note').textContent).toContain(m.scopeSeparate);
+    expect(screen.getByTestId('pm-scope-note').textContent).toContain(m.scope);
+    expect(screen.getByTestId('pm-scope-note').querySelectorAll('p')).toHaveLength(1);
     expect(screen.getByRole('link', { name: m.scopeLink }).getAttribute('href')).toBe('/payment-methods');
 
     overview([method({ key: 'mada', status: 'enabled', enabled: true, ready: true, connections: [ready] })]);
