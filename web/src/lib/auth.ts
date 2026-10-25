@@ -1,6 +1,6 @@
 'use client';
 
-import { api, setToken, clearToken, getToken } from './api';
+import { api, setToken, clearToken, getToken, hasApiStatus } from './api';
 import { isDemo } from './demo';
 import { applyAwjTheme, isAwjTheme, writeAwjThemePreference, type AwjTheme } from './awj-theme';
 import { AUTH_SESSION_CHANGED_EVENT, USER_CHANGED_EVENT } from './user-events';
@@ -46,10 +46,11 @@ export function clearSessionPreferences(): void {
 }
 
 // الدخول بالبريد وكلمة المرور فقط — البريد فريد عالمياً فيُستنتَج منه المستأجر.
-export async function login(email: string, password: string): Promise<AuthUser> {
+// `remember` يطلب توكن 30 يوماً بدل 7؛ المدة يفرضها الخادم (لا توكن دائم). كلمة المرور لا تُخزَّن أبداً.
+export async function login(email: string, password: string, remember = false): Promise<AuthUser> {
   const res = await api<{ token: string; user: AuthUser }>('/login', {
     method: 'POST',
-    body: { email, password },
+    body: remember ? { email, password, remember: true } : { email, password },
   });
   clearSessionPreferences(); // لا يرث الحسابُ الجديد فرعَ الحساب السابق
   setToken(res.token);
@@ -102,6 +103,32 @@ export async function register(payload: RegisterPayload): Promise<RegisterResult
   persistUser(res.user);
   notifyAuthSessionChanged();
   return { user: res.user, tenant: res.tenant, handoffCode: res.handoff?.code ?? null };
+}
+
+/** وجهة الهبوط بعد دخول موثَّق: الخدمة الذاتية بلا صلاحيات على شاشات الإدارة — بوابتها المخصَّصة. */
+export function landingPathFor(role: string | undefined): string {
+  return role === 'self_service' ? '/me' : '/dashboard';
+}
+
+export type SessionCheck =
+  | { status: 'valid'; user: AuthUser }
+  | { status: 'invalid' } // 401: رفضه الخادم (انتهاء/إبطال) — مسحته طبقة `api`
+  | { status: 'unavailable' }; // شبكة/5xx/403 سياقي: لا حكم، ولا يُمسّ التوكن
+
+/**
+ * يتحقق من التوكن المحفوظ عبر `/me` (الخادم هو السلطة؛ المستخدم المخزَّن لا يُصدَّق وحده).
+ * فشل مؤقت (انقطاع شبكة، 5xx، سياق مستأجر مختلف) لا يمسح بيانات الاعتماد الصالحة.
+ */
+export async function checkStoredSession(): Promise<SessionCheck> {
+  if (getToken() === null || isDemo()) return { status: 'invalid' };
+  try {
+    const res = await api<{ user?: AuthUser }>('/me');
+    if (!res?.user || typeof res.user.role !== 'string') return { status: 'unavailable' };
+    persistUser(res.user, { applyDisplayPreferences: false });
+    return { status: 'valid', user: res.user };
+  } catch (error) {
+    return hasApiStatus(error, 401) ? { status: 'invalid' } : { status: 'unavailable' };
+  }
 }
 
 export async function logout(): Promise<void> {
