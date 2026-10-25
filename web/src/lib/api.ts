@@ -71,6 +71,19 @@ export function clearToken(): void {
   localStorage.removeItem('demo');
 }
 
+/**
+ * ردّ 401 يخصّ التوكن الذي أُرسل مع ذلك الطلب. لا يمسح ولا يحوّل إلا إن كان هذا ما زال التوكن الحالي:
+ * دخول جديد أو استبدال جلسة أثناء الطلب المعلّق يجعل الردّ المتأخر لتوكن قديم بلا أثر (لا مسح ولا إعادة توجيه).
+ * جلسة حالية منتهية فعلاً (التوكن لم يتغيّر) تُمسح وتُحوَّل إلى الدخول كما كان.
+ */
+function handleUnauthorized(sentToken: string | null): void {
+  if (typeof window === 'undefined') return;
+  if (getToken() !== sentToken) return;
+  clearToken();
+  // جلسة منتهية: نعيد المستخدم لشاشة الدخول بدل واجهة «مصادَقة» كل نداء فيها يفشل
+  if (!window.location.pathname.startsWith('/login')) window.location.assign('/login');
+}
+
 type Options = Omit<RequestInit, 'body'> & { body?: unknown };
 
 export async function api<T = unknown>(path: string, options: Options = {}): Promise<T> {
@@ -99,14 +112,7 @@ export async function api<T = unknown>(path: string, options: Options = {}): Pro
       : undefined,
   });
 
-  if (res.status === 401 && typeof window !== 'undefined') {
-    // لا نمسح إلا التوكن الذي أُرسل فعلاً: تسجيل دخول جديد تمّ أثناء الطلب المعلّق لا يُلغى برد 401 متأخر لتوكن قديم.
-    if (getToken() === token) clearToken();
-    // جلسة منتهية: نعيد المستخدم لشاشة الدخول بدل واجهة «مصادَقة» كل نداء فيها يفشل
-    if (!window.location.pathname.startsWith('/login')) {
-      window.location.assign('/login');
-    }
-  }
+  if (res.status === 401) handleUnauthorized(token);
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -159,10 +165,7 @@ export async function fetchPrivateFileUrl(pathOrUrl: string, expectedMime?: stri
     },
   });
 
-  if (res.status === 401 && typeof window !== 'undefined') {
-    clearToken();
-    if (!window.location.pathname.startsWith('/login')) window.location.assign('/login');
-  }
+  if (res.status === 401) handleUnauthorized(token);
 
   const contentType = (res.headers.get('Content-Type') ?? '').split(';', 1)[0].trim().toLowerCase();
   if (!res.ok) {

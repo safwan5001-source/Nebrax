@@ -113,6 +113,7 @@ export function landingPathFor(role: string | undefined): string {
 export type SessionCheck =
   | { status: 'valid'; user: AuthUser }
   | { status: 'invalid' } // 401: رفضه الخادم (انتهاء/إبطال) — مسحته طبقة `api`
+  | { status: 'superseded' } // تغيّر التوكن/الوضع أثناء الطلب (دخول/خروج/استبدال): النتيجة قديمة، لا تُستعمل ولا تُحفظ
   | { status: 'unavailable' }; // شبكة/5xx/403 سياقي: لا حكم، ولا يُمسّ التوكن
 
 /**
@@ -120,13 +121,20 @@ export type SessionCheck =
  * فشل مؤقت (انقطاع شبكة، 5xx، سياق مستأجر مختلف) لا يمسح بيانات الاعتماد الصالحة.
  */
 export async function checkStoredSession(): Promise<SessionCheck> {
-  if (getToken() === null || isDemo()) return { status: 'invalid' };
+  const sentToken = getToken();
+  if (sentToken === null || isDemo()) return { status: 'invalid' };
+  // الجلسة التي بدأ بها الفحص ما زالت هي الحالية؟ (دخول/خروج/استبدال أو بدء معاينة أثناء الانتظار يُبطلها)
+  const stillCurrent = () => getToken() === sentToken && !isDemo();
   try {
     const res = await api<{ user?: AuthUser }>('/me');
+    if (!stillCurrent()) return { status: 'superseded' };
     if (!res?.user || typeof res.user.role !== 'string') return { status: 'unavailable' };
     persistUser(res.user, { applyDisplayPreferences: false });
     return { status: 'valid', user: res.user };
   } catch (error) {
+    // 401 للتوكن الحالي تمسحه طبقة `api` نفسها (التوكن صار null): ذلك «غير صالح» لا «استُبدل». استبدال بتوكن آخر أو معاينة = superseded.
+    const clearedByThis401 = hasApiStatus(error, 401) && getToken() === null && !isDemo();
+    if (!stillCurrent() && !clearedByThis401) return { status: 'superseded' };
     return hasApiStatus(error, 401) ? { status: 'invalid' } : { status: 'unavailable' };
   }
 }

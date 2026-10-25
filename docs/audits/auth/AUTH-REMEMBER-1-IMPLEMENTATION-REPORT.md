@@ -44,3 +44,21 @@ Differential for the reported symptom:
 
 ## Next
 Review PR, let CI run, then deploy with owner approval and verify in real browsers (Chrome + Safari/iOS): login → close browser → reopen `/login` and `/dashboard`.
+
+
+## Hardening round (PR review)
+
+Two race conditions found in review, both fixed:
+
+1. **`api.ts` — stale 401 redirected the browser.** The first revision only guarded `clearToken()`; the redirect to `/login` still fired for a 401 belonging to an old token. A shared `handleUnauthorized(sentToken)` now does *both* the clear and the redirect only if `getToken() === sentToken`. The same flaw existed in `fetchPrivateFileUrl` (unconditional clear + redirect) and is fixed through the same helper. A 401 for the current token still clears it and redirects once (not when already on `/login`).
+2. **`checkStoredSession()` — stale `/me` could persist a user.** It now captures the token before the request and, after it settles, returns the new `superseded` status (no `persistUser`, no redirect) if the token changed, was removed (logout), or Demo Mode started meanwhile (so the demo user is never overwritten). A 401 for the unchanged current token (which `api` itself clears) is still reported `invalid`. The login page treats `superseded` as "show the form" (no navigation).
+
+### Tests (new: `web/src/lib/auth-session-race.test.ts`, 9 cases)
+Stale 401 after token replacement / after logout (no clear, no redirect); current-token 401 clears + redirects once; no redirect on `/login`; `fetchPrivateFileUrl` both directions; `/me` success after replacement / logout / demo start (no persist, `superseded`); old-token 401 after replacement; unchanged-token valid / network error (token kept) / 401.
+
+Results: affected suites (`src/lib`, `src/app/login`) 815 passed; **full web suite 721 files / 8660 tests passed**; `npm run build` succeeded; backend auth suites (`AuthRememberMeTest`, `ApiAuthTest`, `AuthRecoveryTest`, `TenantSubdomainAuthTest`) 79 passed (backend code unchanged in this round).
+
+### Remaining risks
+- Cross-tab: a token replaced in another tab during `/me` yields `superseded` → form shown rather than auto-redirect (safe; next navigation restores). 
+- `platform-api.ts` has its own 401 path (separate platform session) — out of scope, not reviewed here.
+- Real-browser/Safari verification and production confirmation still outstanding. Full backend suite not run locally (bcmath missing → Fuel tests).
