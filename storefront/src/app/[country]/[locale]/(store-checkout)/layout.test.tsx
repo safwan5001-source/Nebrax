@@ -14,8 +14,8 @@ vi.mock("@/lib/commerce/storefront", () => ({
   fetchStorefrontConfig: vi.fn(),
 }));
 
-import { StoreBrand } from "@/components/layout/StoreBrand";
 import { PublishedThemeMarkerProvider } from "@/components/layout/PublishedThemeMarker";
+import { StoreBrand } from "@/components/layout/StoreBrand";
 import { fetchStorefrontConfig } from "@/lib/commerce/storefront";
 import StoreCheckoutLayout from "./layout";
 
@@ -42,7 +42,11 @@ describe("StoreCheckoutLayout published theme", () => {
     vi.mocked(fetchStorefrontConfig).mockResolvedValueOnce({
       name: "Live name",
       default_locale: "en",
-      business_identity: { legal_name: null, cr_number: null, vat_number: null },
+      business_identity: {
+        legal_name: null,
+        cr_number: null,
+        vat_number: null,
+      },
       presentation: {
         ...DEFAULT_PRESENTATION_CONFIG,
         primaryColor: "#123456",
@@ -90,7 +94,11 @@ describe("StoreCheckoutLayout published theme", () => {
     vi.mocked(fetchStorefrontConfig).mockResolvedValueOnce({
       name: "Live shop",
       default_locale: "ar",
-      business_identity: { legal_name: null, cr_number: null, vat_number: null },
+      business_identity: {
+        legal_name: null,
+        cr_number: null,
+        vat_number: null,
+      },
       presentation: null,
       presentationMedia: {},
     });
