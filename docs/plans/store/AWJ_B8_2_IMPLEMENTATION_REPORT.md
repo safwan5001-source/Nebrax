@@ -24,14 +24,14 @@
 | `app/Support/Commerce/PolicyMarkdownRenderer.php` | جديد: منقّي Markdown→HTML |
 | `app/Http/Controllers/Api/StorefrontPolicyController.php` | جديد |
 | `routes/api_storefront.php` | مسار `policies/{slug}` |
-| `tests/Feature/StorefrontPublicPolicyApiTest.php` | جديد: 36 اختباراً |
+| `tests/Feature/StorefrontPublicPolicyApiTest.php` | جديد: 37 اختباراً |
 | `docs/plans/store/AWJ_STORE_COMMERCE_HORIZON_TRACKER.md` | B8-2 → In PR |
 | `docs/plans/store/AWJ_B8_2_IMPLEMENTATION_REPORT.md` | هذا التقرير |
 
 لا هجرة، لا تغيير في B8-1 (`StorefrontPresentationNormalizer` وfixtures الذهبية وسياسة النسخ)، لا مسار إدارة ولا محرر، لا تغيير في واجهة X4، لا أثر مالي/محاسبي.
 
 ## 4) الاختبارات (محلياً؛ CI في الـPR)
-- `StorefrontPublicPolicyApiTest`: عقد 200/404 وشكل الاستجابة؛ منشور مقابل مسودة؛ معطَّل/مفقود/فارغ؛ لغات والبديل؛ سرّية الاستجابة العامة؛ العزل وانتحال الـHost؛ **28 حالة XSS** (script, img onerror, svg, iframe/srcdoc, javascript:/data:/vbscript:/file: بأشكال مموَّهة: حالة أحرف، كيانات عشرية/سداسية، tab/newline، روابط مرجعية/تلقائية، صور، تعليقات، CDATA، ترميز مزدوج…) على الطبقتين.
+- `StorefrontPublicPolicyApiTest` (37، منها متن بلا محتوى مرئي بعد التنقية ⇒ لغة تالية ثم 404، بعد ملاحظة Codex P2): عقد 200/404 وشكل الاستجابة؛ منشور مقابل مسودة؛ معطَّل/مفقود/فارغ؛ لغات والبديل؛ سرّية الاستجابة العامة؛ العزل وانتحال الـHost؛ **28 حالة XSS** (script, img onerror, svg, iframe/srcdoc, javascript:/data:/vbscript:/file: بأشكال مموَّهة: حالة أحرف، كيانات عشرية/سداسية، tab/newline، روابط مرجعية/تلقائية، صور، تعليقات، CDATA، ترميز مزدوج…) على الطبقتين.
 - PHP sqlite: مجموعات presentation/config/domain/golden/B8-1/PublicApi → **662 ناجحاً، 1 متخطى**.
 - **PostgreSQL 16 حقيقي:** `StorefrontPublicPolicyApiTest` + `StorefrontPolicyContentTest` → 45 ناجحاً؛ presentation/config/domain-resolution → 364 ناجحاً.
 - لا تراجع في اختبارات توافق B8-1.

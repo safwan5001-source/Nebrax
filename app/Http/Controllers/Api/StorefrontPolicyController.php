@@ -64,7 +64,8 @@ class StorefrontPolicyController extends PublicApiController
                 continue;
             }
             $html = PolicyMarkdownRenderer::render($entry['body']);
-            if ($html === '') {
+            // لا متن مرئي بعد التنقية (مثل صورة وحدها أو وسوم فارغة) ⇒ كأنها فارغة: جرّب اللغة التالية ثم 404.
+            if ($html === '' || trim(html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8'), " \t\n\r\0\x0B\xC2\xA0\u{200B}") === '') {
                 continue;
             }
             $title = is_string($entry['title'] ?? null) && trim($entry['title']) !== '' ? $entry['title'] : $pageTitle;

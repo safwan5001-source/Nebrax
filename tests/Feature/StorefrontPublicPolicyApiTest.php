@@ -147,6 +147,24 @@ class StorefrontPublicPolicyApiTest extends TestCase
     }
 
     /** @test */
+    public function bodies_with_no_visible_content_after_sanitizing_are_treated_as_empty(): void
+    {
+        $a = $this->registerTenant('pp-vis', 'owner@pp-vis.test');
+        $s = $this->seedStore($a['tenant_id'], 'pp-vis.example.com');
+        $this->save($a, $s['storefront'], [
+            $this->page('privacy-policy', ['ar' => ['title' => 'ع', 'body' => '![x](https://example.com/p.png)'], 'en' => ['title' => 'E', 'body' => 'Visible']]),
+            $this->page('returns-policy', ['ar' => ['title' => 'ع', 'body' => '![x](https://example.com/p.png)'], 'en' => ['title' => 'E', 'body' => '<script>alert(1)</script>']]),
+        ]);
+        $u = 'http://pp-vis.example.com/store/v1/policies/';
+
+        // الصورة وحدها لا تُعدّ متناً: ينتقل إلى اللغة التالية.
+        $r = $this->getJson($u.'privacy-policy?locale=ar')->assertOk();
+        $this->assertSame(['en', true], [$r->json('data.locale'), $r->json('data.fallback')]);
+        // لا لغة بمتن مرئي ⇒ 404 موحَّد.
+        $this->getJson($u.'returns-policy')->assertNotFound()->assertJsonPath('error.code', 'not_found');
+    }
+
+    /** @test */
     public function general_storefront_response_never_carries_policy_bodies(): void
     {
         $a = $this->registerTenant('pp-conf', 'owner@pp-conf.test');
