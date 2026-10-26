@@ -14,6 +14,7 @@ import {
   type ResolvedNavItem,
   resolveNavMenu,
 } from "./navigation-resolve";
+import { publishedPolicySlugs } from "./public";
 
 function flattenCategories(
   categories: readonly Category[],
@@ -53,6 +54,11 @@ export async function publishedMainNav(
       .catch(() => undefined);
   }
 
-  const ctx: NavResolveContext = { basePath, categories, products };
+  const ctx: NavResolveContext = {
+    basePath,
+    categories,
+    products,
+    policySlugs: new Set(publishedPolicySlugs(presentation)),
+  };
   return resolveNavMenu(menu, ctx);
 }

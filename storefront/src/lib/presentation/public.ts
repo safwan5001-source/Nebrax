@@ -3,6 +3,7 @@
  * public storefront. Draft is unreachable here.
  */
 
+import { isPolicySlug, type PolicySlug } from "@/lib/policy/slugs";
 import type {
   PresentationNavLink,
   StorefrontPresentationConfig,
@@ -164,4 +165,21 @@ export function publishedExtraNav(
     const href = resolvePresentationHref(link, basePath);
     return href ? [{ id: link.id, label: link.label.trim(), href }] : [];
   });
+}
+
+/**
+ * X4 — policy pages the merchant has switched on in the PUBLISHED document (`pages[].enabled`). This is the
+ * link-visibility signal: it costs no API call. A listed page can still be empty (the page then 404s and the
+ * editor warns about it); a page that is off is never linked. No published document ⇒ nothing is linked.
+ */
+export function publishedPolicySlugs(
+  presentation: StorefrontPresentationConfig | null,
+): PolicySlug[] {
+  const slugs: PolicySlug[] = [];
+  for (const page of presentation?.pages ?? []) {
+    if (page.enabled && isPolicySlug(page.slug) && !slugs.includes(page.slug)) {
+      slugs.push(page.slug);
+    }
+  }
+  return slugs;
 }

@@ -23,9 +23,7 @@ import {
  * It deliberately does not duplicate the X6 scanner (static): this is the
  * runtime counterpart.
  *
- * The sitemap is AWJ-native since X3 and is asserted positively below. Policies are NOT
- * AWJ-native yet — see the "known gap" block; that test asserts today's dependency
- * honestly rather than passing by mocking Spree.
+ * The sitemap (X3) and the policy pages (X4) are AWJ-native and asserted positively below.
  */
 const spree = vi.hoisted(() => ({
   getClient: vi.fn(),
@@ -85,6 +83,19 @@ vi.mock("next/headers", () => ({
   }),
 }));
 
+vi.mock("next/navigation", () => ({
+  // Mirrors the framework: `notFound()` throws an error carrying the 404 fallback digest.
+  notFound: () => {
+    throw Object.assign(new Error("NEXT_HTTP_ERROR_FALLBACK;404"), {
+      digest: "NEXT_HTTP_ERROR_FALLBACK;404",
+    });
+  },
+}));
+
+vi.mock("next-intl/server", () => ({
+  getTranslations: async () => (key: string) => key,
+}));
+
 vi.mock("next/cache", () => ({
   updateTag: vi.fn(),
   revalidateTag: vi.fn(),
@@ -116,7 +127,7 @@ import {
   syncSession,
   updateCustomer,
 } from "@/lib/data/customer";
-import { cachedGetPolicy, getPolicy } from "@/lib/data/policies";
+import { getPolicy, PolicyUnavailableError } from "@/lib/data/policies";
 import { getClient } from "@/lib/spree";
 
 const AWJ_API = "https://api.awj.test";
@@ -186,6 +197,26 @@ function awjRoutes(url: string, init?: RequestInit) {
   }
   if (pathname.endsWith("/store/v1/categories")) {
     return ok([{ id: "cat-1", parent_id: null, children: [] }]);
+  }
+  if (pathname.includes("/store/v1/policies/")) {
+    const slug = decodeURIComponent(pathname.split("/").pop() ?? "");
+    if (slug !== "privacy-policy") {
+      return new Response(
+        JSON.stringify({
+          error: { code: "not_found", message: "الصفحة غير موجودة." },
+        }),
+        { status: 404, headers: { "content-type": "application/json" } },
+      );
+    }
+    const locale =
+      new URL(url).searchParams.get("locale") === "en" ? "en" : "ar";
+    return ok({
+      slug,
+      locale,
+      fallback: false,
+      title: locale === "en" ? "Privacy" : "الخصوصية",
+      html: "<p>نحمي بياناتك</p>",
+    });
   }
   if (pathname.endsWith("/checkout/payment-methods")) {
     return ok({ payment_methods: [], online_methods: [] });
@@ -452,41 +483,111 @@ describe("sitemap and robots work without Spree", () => {
 });
 
 /**
- * KNOWN GAP — these assert TODAY'S behaviour, not the desired one.
- *
- * Policies still read through the Spree client (`getClient()`), so with no Spree
- * environment they cannot return data. They are not migrated here (policies have no AWJ
- * source yet). If a future slice migrates them, these tests must be rewritten into
- * positive "works without Spree" tests — a failure here after such a migration is the
- * intended signal.
+ * X4 — the public policy pages are AWJ-native: `GET store/v1/policies/{slug}` keyed by the visitor's
+ * Host. No Spree client is ever built, and AWJ failures never leak configuration/Spree detail.
+ * (Full behavioural coverage: `src/lib/data/__tests__/policies.test.ts` and the page's own test.)
  */
-describe("KNOWN GAP — policies still depend on Spree", () => {
-  it("policies: cachedGetPolicy/getPolicy reject because the Spree client is unavailable", async () => {
-    await expect(
-      cachedGetPolicy("privacy", { country: "sa", locale: "ar" }),
-    ).rejects.toThrow(/Spree client is not available/);
-    await expect(
-      getPolicy("privacy", { country: "sa", locale: "ar" }),
-    ).rejects.toThrow(/Spree client is not available/);
-    expect(spree.getClient).toHaveBeenCalled();
-    expect(spree.createClient).not.toHaveBeenCalled();
+describe("policy pages work without Spree", () => {
+  const params = (slug: string, locale = "ar") =>
+    Promise.resolve({ country: "sa", locale, slug });
+
+  it("getPolicy reads store/v1/policies/{slug} with the visitor host and never touches Spree", async () => {
+    const policy = await getPolicy("privacy-policy", { locale: "ar" });
+
+    expect(policy).toMatchObject({
+      slug: "privacy-policy",
+      locale: "ar",
+      title: "الخصوصية",
+      html: "<p>نحمي بياناتك</p>",
+    });
+    expect(awjUrls()).toEqual([
+      `${AWJ_API}/store/v1/policies/privacy-policy?locale=ar`,
+    ]);
+    const headers = (fetchMock.mock.calls[0][1] as RequestInit)
+      .headers as Record<string, string>;
+    expect(headers["X-Storefront-Forwarded-Host"]).toBe("shop.example.sa");
+    expect(JSON.stringify(headers)).not.toMatch(/spree|publishable/i);
+    expectSpreeUntouched();
   });
 
-  it("policy page: the configuration error is NOT converted to a shopper-safe result", async () => {
-    // Documented gap: generateMetadata awaits getPolicy without a guard, so the raw
-    // configuration error propagates to Next's error boundary (production hides the
-    // message behind a digest, but the code path is not shopper-safe by construction).
-    const { generateMetadata } = await import(
+  it("a missing policy is a genuine 404 (null), not a configuration error", async () => {
+    await expect(
+      getPolicy("returns-policy", { locale: "ar" }),
+    ).resolves.toBeNull();
+    expectSpreeUntouched();
+  });
+
+  it("the page renders the published policy and its metadata is built without Spree", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://shop.example.sa");
+    const { default: PolicyPage, generateMetadata } = await import(
       "@/app/[country]/[locale]/(storefront)/policies/[slug]/page"
     );
+    const { renderToStaticMarkup } = await import("react-dom/server");
+
+    const metadata = await generateMetadata({
+      params: params("privacy-policy"),
+    });
+    const markup = renderToStaticMarkup(
+      await PolicyPage({ params: params("privacy-policy") }),
+    );
+
+    expect(metadata.title).toBe("الخصوصية");
+    expect(metadata.alternates?.canonical).toBe(
+      "https://shop.example.sa/sa/ar/policies/privacy-policy",
+    );
+    expect(markup).toContain("<p>نحمي بياناتك</p>");
+    expect(markup).toContain('dir="rtl"');
+    expectSpreeUntouched();
+  });
+
+  it("a missing policy page is a real 404 and its metadata does not throw", async () => {
+    const { default: PolicyPage, generateMetadata } = await import(
+      "@/app/[country]/[locale]/(storefront)/policies/[slug]/page"
+    );
+
     await expect(
-      generateMetadata({
-        params: Promise.resolve({
-          country: "sa",
-          locale: "ar",
-          slug: "privacy",
-        }),
-      }),
-    ).rejects.toThrow(/Spree client is not available/);
+      generateMetadata({ params: params("returns-policy") }),
+    ).resolves.toMatchObject({ title: "policyNotFound" });
+    await expect(
+      PolicyPage({ params: params("returns-policy") }),
+    ).rejects.toMatchObject({ digest: expect.stringContaining("404") });
+    expectSpreeUntouched();
+  });
+
+  it("an AWJ outage is distinct from a 404 and leaks no Spree/config/internal detail", async () => {
+    fetchMock.mockImplementation(
+      async () =>
+        new Response(
+          JSON.stringify({
+            error: { code: "unavailable", message: "db-internal is down" },
+          }),
+          { status: 503, headers: { "content-type": "application/json" } },
+        ),
+    );
+    const { default: PolicyPage, generateMetadata } = await import(
+      "@/app/[country]/[locale]/(storefront)/policies/[slug]/page"
+    );
+
+    await expect(
+      getPolicy("privacy-policy", { locale: "ar" }),
+    ).rejects.toBeInstanceOf(PolicyUnavailableError);
+    const metadata = await generateMetadata({
+      params: params("privacy-policy"),
+    });
+    const failure = await PolicyPage({
+      params: params("privacy-policy"),
+    }).catch((error: unknown) => error as Error);
+
+    expect(metadata.title).toBe("policyUnavailable");
+    expect((failure as Error).message).toBe(
+      "Policy page is temporarily unavailable.",
+    );
+    expect(JSON.stringify([metadata, (failure as Error).message])).not.toMatch(
+      LEAK,
+    );
+    expect(JSON.stringify([metadata, (failure as Error).message])).not.toMatch(
+      /db-internal/,
+    );
+    expectSpreeUntouched();
   });
 });

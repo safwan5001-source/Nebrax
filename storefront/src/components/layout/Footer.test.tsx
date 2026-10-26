@@ -400,3 +400,44 @@ describe("Footer SBC presentation", () => {
     expect(screen.queryByRole("link", { name: "a@awj.dev" })).toBeNull();
   });
 });
+
+describe("Footer policy links (X4)", () => {
+  const hrefs = (container: HTMLElement) =>
+    Array.from(container.querySelectorAll("a"))
+      .map((a) => a.getAttribute("href"))
+      .filter((href): href is string => Boolean(href?.includes("/policies/")));
+
+  it("links all four policies when the caller does not restrict them (unchanged default)", async () => {
+    const { container } = render(
+      await Footer({ ...baseProps, basePath: "/sa/ar" }),
+    );
+    expect(hrefs(container)).toEqual([
+      "/sa/ar/policies/shipping-policy",
+      "/sa/ar/policies/privacy-policy",
+      "/sa/ar/policies/returns-policy",
+      "/sa/ar/policies/terms-of-service",
+    ]);
+  });
+
+  it("links only the policies the merchant has enabled — no per-link API call", async () => {
+    const { container } = render(
+      await Footer({
+        ...baseProps,
+        basePath: "/sa/ar",
+        policySlugs: ["privacy-policy", "terms-of-service"],
+      }),
+    );
+    expect(hrefs(container)).toEqual([
+      "/sa/ar/policies/privacy-policy",
+      "/sa/ar/policies/terms-of-service",
+    ]);
+  });
+
+  it("draws no Policies column at all when none is enabled", async () => {
+    const { container } = render(
+      await Footer({ ...baseProps, basePath: "/sa/ar", policySlugs: [] }),
+    );
+    expect(hrefs(container)).toEqual([]);
+    expect(container.querySelector("#footer-policies")).toBeNull();
+  });
+});

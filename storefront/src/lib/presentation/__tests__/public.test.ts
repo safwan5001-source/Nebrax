@@ -4,6 +4,7 @@ import { fontFamilyStack } from "../font-catalogue";
 import {
   publishedExtraNav,
   publishedFaviconUrl,
+  publishedPolicySlugs,
   publishedStoreName,
   publishedThemeStyle,
   publishedWhatsAppHref,
@@ -224,6 +225,59 @@ describe("published presentation runtime helpers", () => {
     );
     expect(links).toEqual([
       { id: "nav-about", label: "About", href: "/sa/en/about" },
+    ]);
+  });
+});
+
+describe("publishedPolicySlugs (X4 link visibility)", () => {
+  const page = (slug: string, enabled: boolean) => ({
+    id: `p-${slug}`,
+    slug,
+    title: "",
+    enabled,
+  });
+
+  it("lists only the policy pages the merchant enabled in the published document", () => {
+    const published = readPublishedPresentation({
+      pages: [
+        page("about", true),
+        page("shipping-policy", false),
+        page("privacy-policy", true),
+        page("returns-policy", true),
+        page("terms-of-service", false),
+      ],
+    });
+    expect(publishedPolicySlugs(published)).toEqual([
+      "privacy-policy",
+      "returns-policy",
+    ]);
+  });
+
+  it("links nothing when nothing is published or every policy is switched off, and never duplicates a slug", () => {
+    expect(publishedPolicySlugs(null)).toEqual([]);
+    const allOff = readPublishedPresentation({
+      pages: [
+        page("shipping-policy", false),
+        page("privacy-policy", false),
+        page("returns-policy", false),
+        page("terms-of-service", false),
+      ],
+    });
+    expect(publishedPolicySlugs(allOff)).toEqual([]);
+    const doubled = readPublishedPresentation({
+      pages: [page("privacy-policy", true), page("privacy-policy", true)],
+    });
+    expect(publishedPolicySlugs(doubled)).toEqual(["privacy-policy"]);
+  });
+
+  it("documents the default: a published document with no explicit page settings enables the four policies", () => {
+    // `enabled` is the only public signal (the snapshot never carries policy text), so a policy that is on but
+    // was never written is still linked and answers 404 — the editor warns merchants about exactly that state.
+    expect(publishedPolicySlugs(readPublishedPresentation({}))).toEqual([
+      "shipping-policy",
+      "privacy-policy",
+      "returns-policy",
+      "terms-of-service",
     ]);
   });
 });

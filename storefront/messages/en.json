@@ -772,7 +772,8 @@
     "shippingPolicy": "Shipping Policy",
     "privacyPolicy": "Privacy Policy",
     "returnsPolicy": "Returns Policy",
-    "termsOfService": "Terms of Service"
+    "termsOfService": "Terms of Service",
+    "policyUnavailable": "Policy temporarily unavailable"
   },
   "expressCheckout": {
     "shipping": "Shipping",
