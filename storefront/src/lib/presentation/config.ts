@@ -109,6 +109,87 @@ export interface PresentationContentPage {
   slug: ContentPageSlug;
   title: string;
   enabled: boolean;
+  /** B8-1 — optional localized policy text; only on policy slugs, absent when empty. */
+  content?: PresentationPolicyContent;
+}
+
+export interface PresentationPolicyLocaleContent {
+  title: string;
+  body: string;
+}
+
+export type PresentationPolicyContent = Partial<
+  Record<"ar" | "en", PresentationPolicyLocaleContent>
+>;
+
+export const POLICY_PAGE_SLUGS: readonly string[] = [
+  "shipping-policy",
+  "privacy-policy",
+  "returns-policy",
+  "terms-of-service",
+];
+const POLICY_TITLE_MAX = 80;
+const POLICY_BODY_MAX = 20000;
+
+export interface PolicyContentIssue {
+  path: string;
+  code: "policy_title_too_long" | "policy_body_too_long";
+}
+
+/** B8-1 — over-limit policy text the server rejects on save (mirror of PHP; no silent truncation). */
+export function policyContentIssues(raw: unknown): PolicyContentIssue[] {
+  const issues: PolicyContentIssue[] = [];
+  const pages = (raw as { pages?: unknown } | null)?.pages;
+  if (!Array.isArray(pages)) return issues;
+  pages.forEach((page, i) => {
+    if (!page || typeof page !== "object" || Array.isArray(page)) return;
+    const p = page as Record<string, unknown>;
+    if (typeof p.slug !== "string" || !POLICY_PAGE_SLUGS.includes(p.slug))
+      return;
+    const content = p.content;
+    if (!content || typeof content !== "object" || Array.isArray(content))
+      return;
+    for (const locale of ["ar", "en"] as const) {
+      const entry = (content as Record<string, unknown>)[locale];
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+      const e = entry as Record<string, unknown>;
+      if (
+        typeof e.title === "string" &&
+        Array.from(e.title).length > POLICY_TITLE_MAX
+      ) {
+        issues.push({
+          path: `pages.${i}.content.${locale}.title`,
+          code: "policy_title_too_long",
+        });
+      }
+      if (
+        typeof e.body === "string" &&
+        Array.from(e.body).length > POLICY_BODY_MAX
+      ) {
+        issues.push({
+          path: `pages.${i}.content.${locale}.body`,
+          code: "policy_body_too_long",
+        });
+      }
+    }
+  });
+  return issues;
+}
+
+function normalizePolicyContent(raw: unknown): PresentationPolicyContent {
+  const out: PresentationPolicyContent = {};
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
+  const value = raw as Record<string, unknown>;
+  for (const locale of ["ar", "en"] as const) {
+    const entry = value[locale];
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+    const e = entry as Record<string, unknown>;
+    const title = asString(e.title).slice(0, POLICY_TITLE_MAX);
+    const body = asString(e.body).slice(0, POLICY_BODY_MAX);
+    if (title.trim() === "" && body.trim() === "") continue;
+    out[locale] = { title, body };
+  }
+  return out;
 }
 
 export const DEFAULT_STORE_BACKGROUND_COLOR = "#f8f9fa";
@@ -476,12 +557,17 @@ function normalizePage(
   if (!raw || typeof raw !== "object") return null;
   const value = raw as Record<string, unknown>;
   const slug = inList(value.slug, CONTENT_PAGE_SLUGS, "about");
-  return {
+  const page: PresentationContentPage = {
     id: safeId(value.id, `page-${index}`),
     slug,
     title: asString(value.title).slice(0, 80),
     enabled: asBoolean(value.enabled, false),
   };
+  if (POLICY_PAGE_SLUGS.includes(slug)) {
+    const content = normalizePolicyContent(value.content);
+    if (Object.keys(content).length > 0) page.content = content;
+  }
+  return page;
 }
 
 /**
