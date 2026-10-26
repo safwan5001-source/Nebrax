@@ -1,7 +1,7 @@
 # META-BRAND-1 — Storefront metadata branding audit & fix
 
-- **Base SHA:** `2f4de9c01ba5f1a7e5280c741aa7c4628114da2b` (origin/main)
-- **Head SHA:** `2a0688fd0da92492718716af0e295bc7a1923d73` (code commit; a docs-only follow-up may sit above it)
+- **Base SHA:** `1bc15a7` (origin/main at finalization; original base `2f4de9c01ba5f1a7e5280c741aa7c4628114da2b`)
+- **Head SHA:** see final PR head (report-only commit above the verified code; code identical to the verified tree)
 - **Status:** In PR — no merge, no deploy. **H1 (Buyer Identity & Sessions) is not touched and remains Open.**
 
 ## Root cause
@@ -48,3 +48,11 @@ See PR checks (storefront-ci: biome, locales, ratchet, tsc, vitest).
 
 ## Next steps
 Review/merge decision by owner; then server-side titles for cart/account when H1 routes land; retire `getStoreName()` consumers with X5/H6.
+
+## Finalization (PR #1767)
+- Merged latest `origin/main` (`1bc15a7`) into the branch: **no conflicts**. Main brought backend/docs only (commerce staff orders O1a, orders audit); no storefront files changed upstream. The tracker diff vs main is exactly one added `META-BRAND-1` row — no newer Horizon entry was touched, H1 still Open.
+- `StorefrontConfigController.php`: diff vs main is a docblock-comment change only; response shape (`name`, `default_locale`, `business_vertical`, `business_identity`, `presentation`, `policy_availability`, `presentation_media`) and data exposure are unchanged — backward compatible, no new private data.
+- Tenant isolation: page metadata reads only `fetchStorefrontConfig()` (per-request `cache()`, `no-store`, resolved by request host); no module-level cache, no env name. Verified by sequential Store A/B tests.
+- AR/EN: tests cover title/template/`og:siteName`/`og:locale` for `ar` and `en`, fallback labels, and ar/en listing titles from the message catalog.
+- Final verification on merged tree: `pnpm check` (0 errors; 5 warnings/3 infos pre-existing), `check:locales` ✔, `check:spree-ratchet` ✔ (value 4, type 147, client 68, wrapper 76, env 9 — unchanged), `tsc --noEmit` ✔, `pnpm test` 236 files / 3406 tests ✔ (16 skipped pre-existing), `pnpm build` ✔, `php -l` ✔.
+- Remaining risks: unchanged from above (cart/account have no page title; legacy getStoreName() consumers; neutral fallback when identity API is down).
