@@ -8,6 +8,7 @@ use App\Models\Tenant;
 use App\Services\Commerce\StorefrontPresentationService;
 use App\Services\Commerce\StorefrontPublishedMediaResolver;
 use App\Support\Commerce\BusinessVertical;
+use App\Support\Commerce\StorefrontPresentationNormalizer;
 use App\Support\PublicApiResponse;
 use App\Tenancy\StorefrontContext;
 use Illuminate\Http\JsonResponse;
@@ -74,6 +75,11 @@ class StorefrontConfigController extends PublicApiController
                     },
                     $presentation['homepage']['sections'],
                 );
+            }
+
+            // B8-1 — متون السياسات لا تخرج من اللقطة العامة (تُخدَم من مسار مخصّص لاحقاً، B8-2).
+            if (is_array($presentation)) {
+                $presentation = StorefrontPresentationNormalizer::withoutPolicyContent($presentation);
             }
 
             $tenant = $row
