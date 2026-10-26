@@ -397,7 +397,7 @@ html:has(.lp) {
 
 /* The first section after the hero starts close under it, so the hero's foot and the next heading read as one screen. */
 #flow.lp-section--tall {
-  padding-block-start: var(--space-xl);
+  padding-block-start: var(--space-lg);
 }
 
 .lp-section--band {
