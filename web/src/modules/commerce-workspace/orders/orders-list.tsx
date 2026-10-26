@@ -95,7 +95,39 @@ export function OrdersList() {
 
   useEffect(() => setSearchInput(state.q), [state.q]);
 
-  const query = useMemo(() => buildOrdersQuery(state, storefrontId).toString(), [state, storefrontId]);
+  /**
+   * تغيّر المتجر المحسوم من **أي** مصدر (محدِّد القائمة أو محدِّد الغلاف العلوي أو سياق آخر) يعيد الترقيم إلى 1.
+   * وإلا طلبنا صفحة المتجر القديم من المتجر الجديد: قد يعيد الخادم قائمة فارغة (متجر بصفحة واحدة) و`Pagination` يقصّ
+   * العرض إلى 1 ويعطّل الأزرار، فيبدو أن لا طلبات. الاستعلام يستعمل الصفحة 1 فوراً (لا طلب بصفحة قديمة أبداً)،
+   * ثم يُصحَّح الرابط. الانتقال من «لا متجر محسوم» إلى متجر (اكتمال تحميل الكتالوج) ليس تغييراً: يحفظ الروابط العميقة والتحديث.
+   */
+  const [handledStore, setHandledStore] = useState<string | null>(storefrontId);
+  const pendingReset = handledStore !== null && storefrontId !== null && handledStore !== storefrontId;
+  const resetIssuedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (handledStore === storefrontId) return;
+    if (!pendingReset) {
+      setHandledStore(storefrontId);
+      return;
+    }
+    if (state.page <= 1) {
+      resetIssuedFor.current = null;
+      setHandledStore(storefrontId);
+      return;
+    }
+    // المزوّد يكتب `?store=` بـ`history.replaceState` في effect الأب (بعد effect الابن). تصحيحنا قبل ذلك كان يُمحى:
+    // ننتظر حتى يطابق الرابط المتجر المحسوم، ثم نزيل الصفحة. الاستعلام يستعمل الصفحة 1 في الأثناء.
+    if (searchParams.get(ACTIVE_STORE_QUERY_PARAM) !== storefrontId) return;
+    if (resetIssuedFor.current !== storefrontId) {
+      resetIssuedFor.current = storefrontId;
+      update({}, { resetPage: true });
+    }
+  }, [handledStore, pendingReset, searchParams, state.page, storefrontId, update]);
+
+  const query = useMemo(
+    () => buildOrdersQuery(pendingReset ? { ...state, page: 1 } : state, storefrontId).toString(),
+    [pendingReset, state, storefrontId],
+  );
 
   const load = useCallback(() => {
     const id = ++requestId.current;

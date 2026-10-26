@@ -29,7 +29,7 @@ const detail = {
   accounting: { posted: false },
 };
 
-async function open(page: Page, path: string, opts: { locale?: 'ar' | 'en'; theme?: 'light' | 'dark'; permissions?: string[]; ordersStatus?: number } = {}) {
+async function open(page: Page, path: string, opts: { locale?: 'ar' | 'en'; theme?: 'light' | 'dark'; permissions?: string[]; ordersStatus?: number; paged?: boolean } = {}) {
   const locale = opts.locale ?? 'ar';
   await page.context().addCookies([{ name: 'locale', value: locale, url: baseUrl }]);
   const requests: string[] = [];
@@ -46,6 +46,15 @@ async function open(page: Page, path: string, opts: { locale?: 'ar' | 'en'; them
     ] } });
     if (p === '/commerce/orders') {
       if (opts.ordersStatus) return json(route, { message: 'forbidden' }, opts.ordersStatus);
+      if (opts.paged) {
+        // s1: ثلاث صفحات؛ s2: صفحة واحدة بطلب واحد (أي صفحة > 1 فارغة كما يفعل الخادم).
+        const sf = url.searchParams.get('storefront_id');
+        const pg = Number(url.searchParams.get('page') ?? '1');
+        if (sf === 's2') {
+          return json(route, { data: pg === 1 ? [summary({ number: 'CORD-S2-1' })] : [], meta: { current_page: pg, per_page: 20, total: 1, last_page: 1 } });
+        }
+        return json(route, { data: [summary({ number: `CORD-S1-P${pg}` })], meta: { current_page: pg, per_page: 20, total: 55, last_page: 3 } });
+      }
       return json(route, { data: [summary(), summary({ id: '22222222-2222-4222-8222-222222222222', number: 'CORD-101', payment: { ...payment, method: 'online', status: 'paid', payment_method_name: 'مدى' }, total: sar(32000) })], meta: { current_page: 1, per_page: 20, total: 2, last_page: 1 } });
     }
     if (p === `/commerce/orders/${ORDER_ID}`) return json(route, { data: detail });
@@ -152,6 +161,32 @@ test.describe('O1b staff orders UI', () => {
     expect(new URL(page.url()).searchParams.get('store')).toBe('s2');
     await page.goForward();
     await expect(page.getByRole('heading', { name: 'CORD-100' })).toBeVisible({ timeout: 20_000 }); // أول تصريف لصفحة التفاصيل في dev
+    expect(new URL(page.url()).searchParams.get('store')).toBe('s2');
+  });
+
+  test('header store switch from page 2 to a one-page store resets the page and shows that store\'s orders', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'محدِّد المتجر العلوي يظهر من md فصاعداً');
+    const requests = await open(page, '/commerce/orders?store=s1&page=2', { paged: true });
+    await expect(shown(page, 'CORD-S1-P2')).toBeVisible();
+
+    await page.getByRole('button', { name: 'المتجر الحالي' }).click();
+    await page.getByRole('menuitem', { name: 'زهور الرشد' }).click();
+
+    await expect(shown(page, 'CORD-S2-1')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('لا توجد طلبات')).toHaveCount(0);
+    await expect.poll(() => new URL(page.url()).searchParams.has('page')).toBe(false);
+    expect(new URL(page.url()).searchParams.get('store')).toBe('s2');
+    // لم يُطلب المتجر الجديد بصفحة قديمة أبداً.
+    expect(requests.filter((r) => r.includes('storefront_id=s2') && /[?&]page=2(&|$)/.test(r))).toEqual([]);
+    await expect(storeSelect(page)).toHaveValue('s2');
+
+    // Refresh ثم Back/Forward عبر التفاصيل: يبقى المتجر B والصفحة 1.
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(shown(page, 'CORD-S2-1')).toBeVisible({ timeout: 20_000 });
+    await shown(page, 'CORD-S2-1').click();
+    await expect(page.getByRole('heading', { name: 'CORD-100' })).toBeVisible({ timeout: 20_000 });
+    await page.goBack();
+    await expect(shown(page, 'CORD-S2-1')).toBeVisible();
     expect(new URL(page.url()).searchParams.get('store')).toBe('s2');
   });
 });

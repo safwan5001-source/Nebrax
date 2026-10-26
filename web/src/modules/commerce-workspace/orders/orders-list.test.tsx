@@ -362,4 +362,125 @@ describe('OrdersList', () => {
       expect(lastUrl().searchParams.get('store')).toBe('bad-store');
     });
   });
+
+  describe('page reset when the resolved store changes from any source (review P2: header selector kept page 3)', () => {
+    /** خادم وهمي: s1 ثلاث صفحات، s2 صفحة واحدة بطلب واحد (أي صفحة > 1 فارغة). */
+    function serverByStore() {
+      fetchOrdersMock.mockImplementation(async (q: URLSearchParams) => {
+        const sf = q.get('storefront_id');
+        const pg = Number(q.get('page') ?? '1');
+        if (sf === 's2') {
+          return pg === 1
+            ? page([summaryFixture({ number: 'CORD-S2-1' })], { current_page: 1, per_page: 20, total: 1, last_page: 1 })
+            : page([], { current_page: pg, per_page: 20, total: 1, last_page: 1 });
+        }
+        return page([summaryFixture({ number: `CORD-S1-P${pg}` })], { current_page: pg, per_page: 20, total: 55, last_page: 3 });
+      });
+    }
+    const calls = () => fetchOrdersMock.mock.calls.map((c) => (c[0] as URLSearchParams).toString());
+
+    it('header store switch from page 3 (many pages) to a one-page store shows that store\'s orders, never an empty list or page 3', async () => {
+      serverByStore();
+      nav.search = 'store=s1&page=3';
+      const view = render(<OrdersList />);
+      await waitFor(() => expect(screen.getAllByText('CORD-S1-P3').length).toBeGreaterThan(0));
+
+      // محدِّد الغلاف العلوي يستدعي setSelectedStoreId مباشرةً: السياق يصير s2 والرابط ما زال page=3.
+      fetchOrdersMock.mockClear();
+      nav.replace.mockClear();
+      setStore('s2');
+      view.rerender(<OrdersList />);
+      await waitFor(() => expect(screen.getAllByText('CORD-S2-1').length).toBeGreaterThan(0));
+      // قبل مزامنة المزوّد للرابط لا نكتب شيئاً (كانت الكتابة المبكرة تُمحى)، ثم يكتب المزوّد ?store=s2.
+      expect(nav.replace).not.toHaveBeenCalled();
+      nav.search = 'store=s2&page=3';
+      view.rerender(<OrdersList />);
+      await waitFor(() => expect(nav.replace).toHaveBeenCalled());
+      // لا طلب واحد بالمتجر الجديد وصفحة قديمة.
+      expect(calls().filter((q) => q.includes('storefront_id=s2') && q.includes('page=3'))).toEqual([]);
+      expect(calls().every((q) => !q.includes('storefront_id=s2') || q.includes('page=1'))).toBe(true);
+      expect(screen.queryByText('لا توجد طلبات')).toBeNull();
+      // الرابط صُحِّح: المتجر الجديد والصفحة الأولى.
+      const url = lastUrl();
+      expect(url.searchParams.get('store')).toBe('s2');
+      expect(url.searchParams.has('page')).toBe(false);
+    });
+
+    it('keeps filters and sort while resetting the page, and does not loop on router.replace', async () => {
+      serverByStore();
+      nav.search = 'store=s1&page=3&payment_status=paid&sort=-total&delivery_method=pickup';
+      const view = render(<OrdersList />);
+      await waitFor(() => expect(fetchOrdersMock).toHaveBeenCalled());
+      nav.replace.mockClear();
+      setStore('s2');
+      view.rerender(<OrdersList />);
+      nav.search = 'store=s2&page=3&payment_status=paid&sort=-total&delivery_method=pickup'; // مزامنة المزوّد
+      view.rerender(<OrdersList />);
+      await waitFor(() => expect(nav.replace).toHaveBeenCalled());
+      const url = lastUrl();
+      expect(url.searchParams.get('payment_status')).toBe('paid');
+      expect(url.searchParams.get('sort')).toBe('-total');
+      expect(url.searchParams.get('delivery_method')).toBe('pickup');
+      expect(url.searchParams.has('page')).toBe(false);
+      // إعادة تصيير بلا تغيير في الرابط (الصفحة ما زالت 3 في searchParams): لا استدعاء إضافي.
+      const before = nav.replace.mock.calls.length;
+      view.rerender(<OrdersList />);
+      view.rerender(<OrdersList />);
+      expect(nav.replace.mock.calls.length).toBe(before);
+      // بعد وصول الرابط المصحَّح يستقر كل شيء.
+      nav.search = url.searchParams.toString();
+      view.rerender(<OrdersList />);
+      await waitFor(() => expect(calls().at(-1)).toContain('page=1'));
+      expect(calls().at(-1)).toContain('storefront_id=s2');
+      expect(calls().at(-1)).toContain('payment_status=paid');
+    });
+
+    it('a deep link to page 3 survives the catalog finishing loading (no store → store is not a change)', async () => {
+      serverByStore();
+      setStore(null);
+      nav.search = 'store=s1&page=3';
+      const view = render(<OrdersList />);
+      await waitFor(() => expect(fetchOrdersMock).toHaveBeenCalled());
+      fetchOrdersMock.mockClear();
+      setStore('s1');
+      view.rerender(<OrdersList />);
+      await waitFor(() => expect(calls().at(-1)).toContain('storefront_id=s1'));
+      expect(calls().at(-1)).toContain('page=3');
+      expect(nav.replace).not.toHaveBeenCalled();
+    });
+
+    it('with scope=all a store change does not touch the page (the data scope did not change)', async () => {
+      serverByStore();
+      nav.search = 'store=s1&scope=all&page=2';
+      const view = render(<OrdersList />);
+      await waitFor(() => expect(fetchOrdersMock).toHaveBeenCalled());
+      nav.replace.mockClear();
+      setStore('s2');
+      view.rerender(<OrdersList />);
+      await waitFor(() => expect(fetchOrdersMock).toHaveBeenCalled());
+      expect(calls().at(-1)).toContain('page=2');
+      expect(calls().at(-1)).not.toContain('storefront_id');
+      expect(nav.replace).not.toHaveBeenCalled();
+    });
+
+    it('a store change from page 1 needs no URL correction; Back/Forward page changes within a store are kept', async () => {
+      serverByStore();
+      nav.search = 'store=s1';
+      const view = render(<OrdersList />);
+      await waitFor(() => expect(screen.getAllByText('CORD-S1-P1').length).toBeGreaterThan(0));
+      nav.replace.mockClear();
+      setStore('s2');
+      view.rerender(<OrdersList />);
+      await waitFor(() => expect(screen.getAllByText('CORD-S2-1').length).toBeGreaterThan(0));
+      expect(nav.replace).not.toHaveBeenCalled();
+
+      // Back/Forward داخل المتجر نفسه: الصفحة من الرابط كما هي.
+      nav.search = 'store=s2&page=2';
+      view.rerender(<OrdersList />);
+      await waitFor(() => expect(calls().at(-1)).toContain('page=2'));
+      nav.search = 'store=s2';
+      view.rerender(<OrdersList />);
+      await waitFor(() => expect(calls().at(-1)).toContain('page=1'));
+    });
+  });
 });
