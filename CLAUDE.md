@@ -378,6 +378,14 @@ php artisan serve
 - **إعدادات «إدارة» الوسيلة (PAY-SETTINGS-UX-2):** `PUT /online-payment-methods/{key}` يحفظ فعلاً `enabled` · `default_gateway_id` (اتصال غير ملغى يعلن الوسيلة، وإلا `method.default_gateway_invalid`؛ null ⇒ تلقائي) · `use_in_invoices` · `use_in_store` (كلها اختيارية، التغيير الفعلي وحده يُدقَّق بـ`changes`). البوابة الافتراضية إن لم تجهز ⇒ الوسيلة غير جاهزة **ولا تحويل تلقائي** إلى بوابة أخرى. المتجر يعرض `enabled && use_in_store` وبالبوابة الفعلية وحدها؛ رابط الفاتورة يحترم `use_in_invoices`. POS بلا تكامل ⇒ `usage.pos=false` ولا مفتاح. الهجرة تضع `use_in_store=false` للصفوف القائمة (لا ظهور صامت في المتجر). واجهة `/finance-settings/payments`: صفوف/بطاقات مختصرة + زر «إدارة» (وسائل: `MethodManageSheet`؛ بوابات: `GatewayDetailSheet` القائم بكل إعداداته).
 - المرجع: `docs/plans/payments/horizon/AWJ-PAY-BETA-METHODS-IMPLEMENTATION-REPORT.md` و`AWJ-PAY-SETTINGS-UX-2-IMPLEMENTATION-REPORT.md`.
 
+## طلبات المتجر للموظف — COMMERCE-ORDERS-O1a (قراءة فقط)
+
+`GET commerce/orders` و`GET commerce/orders/{id}` (`CommerceStaffOrderController` + `CommerceOrderStaffSerializer`) — قائمة وتفاصيل طلبات `CommerceOrder` للموظف. **قراءة فقط بالكامل:** لا تغيير حالة طلب/دفع/تنفيذ، لا حجز ولا حركة مخزون ولا قيد؛ يحرسه اختبار ساكن يمنع استدعاء خدمات الكتابة.
+- **الصلاحية** `commerce.orders.view` (owner/admin عبر `*` فقط؛ لا تُضاف لـ`MATRIX` ولا تُمنح لأي دور مخزَّن) + `EnsureApplicationActive:commerce.storefront`.
+- **المستخدم المقيَّد بمخازن (`allowedWarehouseIds() !== null`) يُرفض 403** (الطلب `CompanyWide` بلا مخزن فلا نطاق رؤية صحيح)؛ يُرفع في F1 حين تحمل الشحنة المخزن.
+- فلاتر/فرز بقائمة بيضاء (`storefront_id`، `sales_channel_id`، `status`، `payment_status`، `payment_method`، `delivery_method`، `from`/`to`، `q`؛ فرز `created_at|total|number`)، `per_page ≤ 50`، بلا N+1. مسلسل الموظف **منفصل** عن `CommerceOrderSerializer` العام الذي لم يتغيّر.
+- المرجع: `docs/audits/AWJ-COMMERCE-ORDERS-O1a-IMPLEMENTATION-REPORT.md`.
+
 ## أدوار ضريبة القيمة المضافة (REM-05 / ACC-01)
 
 `App\Services\Accounting\VatRoleIntegrityService` هو مصدر قواعد دورَي `tax_input`/`tax_output` وسياق تقرير الضريبة. لا يكتب شيئاً.

@@ -44,6 +44,7 @@ use App\Http\Controllers\Api\CommercePaymentIntentController;
 use App\Http\Controllers\Api\CommerceShippingZoneController;
 use App\Http\Controllers\Api\CommerceDeliveryScheduleController;
 use App\Http\Controllers\Api\CommerceFulfillmentController;
+use App\Http\Controllers\Api\CommerceStaffOrderController;
 use App\Http\Controllers\Api\CommerceGiftSettingsController;
 use App\Http\Controllers\Api\CommerceVerticalSetupController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontsController;
@@ -1166,6 +1167,13 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
             ->whereUuid('id')->middleware($perm('payments.manage'));
         Route::post('commerce/payment-intents/{id}/cancel', [CommercePaymentIntentController::class, 'cancel'])
             ->whereUuid('id')->middleware($perm('payments.manage'));
+
+        // COMMERCE-ORDERS-O1a: طلبات المتجر للموظف — قراءة فقط (قائمة + تفاصيل). صلاحية مستقلة commerce.orders.view
+        // (owner/admin عبر `*`)، وحارس القدرة commerce.storefront. المقيَّد بمخازن مرفوض داخل المتحكّم (fail-closed).
+        Route::get('commerce/orders', [CommerceStaffOrderController::class, 'index'])
+            ->middleware([$perm('commerce.orders.view'), $app('commerce.storefront')]);
+        Route::get('commerce/orders/{id}', [CommerceStaffOrderController::class, 'show'])
+            ->whereUuid('id')->middleware([$perm('commerce.orders.view'), $app('commerce.storefront')]);
 
         // كتالوج التطبيقات مدموجاً بحالة تفعيل المؤسسة — لا إنفاذ على مسارات أخرى بعد.
         Route::get('applications', [TenantApplicationController::class, 'index'])->middleware($perm('apps.view'));
