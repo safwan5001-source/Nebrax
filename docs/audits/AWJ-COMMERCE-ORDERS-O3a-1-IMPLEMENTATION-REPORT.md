@@ -44,7 +44,9 @@
 - 29 اختباراً من `Fuel*` على SQLite: `Call to undefined function bcmul()` — امتداد `bcmath` غير مثبّت محلياً (يحمّله CI).
 - PostgreSQL: `PaymentAttemptPostingPostgresTest` (تزامن عابر، نجح عند الإعادة)، و`StorefrontMediaApiTest › the library lists newest first…` (`PDOException HY093` في `cursorPaginate` بمسار الوسائط — لا صلة له بـ`commerce_orders`؛ يُتحقَّق من أنه يفشل على `main` أيضاً في CI).
 
-**CI على Head `d56c533` (تشغيلة `40384928809`):** `php artisan test (L11, sqlite)` ✅ (≈25 د) · `php artisan test (L11, pgsql)` ✅ (≈16 د) · `CI Gate` ✅. أي: **لا فشل في CI**؛ فشلا PostgreSQL المحليان (`PaymentAttemptPostingPostgresTest` العابر و`StorefrontMediaApiTest`) وفشل `Fuel*` (bcmath) **خاصّة بالبيئة المحلية** ولم تظهر في CI. لم يُعالَج أي إخفاق إضافي لأنه لا يوجد إخفاق مرتبط بالتغيير بعد إصلاح `comm_%`.
+**CI على Head `d56c533` (تشغيلة `40384928809`):** SQLite ✅ · PostgreSQL ✅ · `CI Gate` ✅.
+
+**CI على Head `8d9139a` (تشغيلة `40392156994`، تغيير توثيقي فقط):** SQLite ✅ · PostgreSQL ❌ · `CI Gate` ❌ — فشل اختبار واحد من اختباراتنا: `cancelled_rows_do_not_add_queries_to_the_list` (17 مقابل 18 استعلاماً). الكود الإنتاجي مطابق بين التشغيلتين فالفشل **تذبذب في الاختبار** نفسه (استعلام عابر في أول قياس بعد إنشاء الطلبات، لا استعلام لكل صف مُلغى). **أُصلح الاختبار** بقياس حجمين مختلفين من الصفوف المُلغاة بعد تسخين كافٍ (يبقى كاشفاً لأي استعلام لكل صف)؛ ثبت 3 مرات متتالية على PostgreSQL ومرة على SQLite. لا تغيير في كود الإنتاج. فشلا PostgreSQL المحليان الآخران (`PaymentAttemptPostingPostgresTest`، `StorefrontMediaApiTest`) وفشل `Fuel*` (bcmath) **خاصّة بالبيئة المحلية** ولم تظهر في CI.
 
 **مراجعة تسمية الهجرة وترتيبها:** `2026_12_13_010000_add_cancellation_facts_to_commerce_orders.php` — تتبع آخر هجرة على `main` (`2026_12_12_010000_add_visual_to_payment_methods`) بزيادة يومٍ واحد وبلاحقة `_010000` المعتمدة في المستودع، فلا تُرتَّب قبل أي هجرة مدموجة، ولا تتصادم مع اسم قائم. تسمية الصنف تصف الفعل (`add_… _to_commerce_orders`) كبقية الهجرات الإضافية. قيد: بحث الكود في GitHub يفهرس الفرع الافتراضي فقط، فلم يُستبعد تصادم نظري مع هجرة بتاريخ `2026_12_13` في فرع مفتوح آخر؛ أقرب PR مفتوح للتحقق هو #1774 نفسه (يُعاد الفحص عند الدمج).
 

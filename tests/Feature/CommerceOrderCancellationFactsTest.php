@@ -401,13 +401,20 @@ class CommerceOrderCancellationFactsTest extends TestCase
 
             return $n;
         };
-        $count();
-        $one = $count();
-        for ($i = 0; $i < 5; $i++) {
-            $o = $this->order($tenantId);
-            $this->cancelRaw($o->id);
+        // الأعداد تُقاس بعد إدخال الصفوف المُلغاة وبعد تسخين كافٍ: الاستعلامات العابرة
+        // (مثل تحديث آخر استخدام للرمز) لا تُنسب إلى الإلغاء. المقارنة بين حجمين مختلفين
+        // من الصفوف المُلغاة، وهي التي تكشف أي استعلام لكل صف.
+        for ($i = 0; $i < 2; $i++) {
+            $this->cancelRaw($this->order($tenantId)->id);
         }
-        $this->assertSame($one, $count());
+        $count();
+        $count();
+        $few = $count();
+        for ($i = 0; $i < 5; $i++) {
+            $this->cancelRaw($this->order($tenantId)->id);
+        }
+        $count();
+        $this->assertSame($few, $count());
     }
 
     // ── النطاق: لا مسار إلغاء ولا أثر جانبي ───────────────────────────────
