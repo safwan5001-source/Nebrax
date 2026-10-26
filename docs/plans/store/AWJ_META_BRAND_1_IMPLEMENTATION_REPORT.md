@@ -1,7 +1,7 @@
 # META-BRAND-1 — Storefront metadata branding audit & fix
 
 - **Base SHA:** `2f4de9c01ba5f1a7e5280c741aa7c4628114da2b` (origin/main)
-- **Head SHA:** see PR head (last commit on `claude/storefront-metadata-branding-i6cu95`)
+- **Head SHA:** `2a0688fd0da92492718716af0e295bc7a1923d73` (code commit; a docs-only follow-up may sit above it)
 - **Status:** In PR — no merge, no deploy. **H1 (Buyer Identity & Sessions) is not touched and remains Open.**
 
 ## Root cause
