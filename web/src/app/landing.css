@@ -804,13 +804,6 @@ html.dark .lp img.lp-img.lp-theme-dark:not(.lp-narrow) {
   font-weight: 400;
 }
 
-.lp-sectors {
-  max-width: 60ch;
-  margin-block-start: var(--space-xl);
-  color: var(--lp-ink-2);
-  font-size: var(--text-lead);
-}
-
 @media (max-width: 40rem) {
   .lp-table thead {
     position: absolute;

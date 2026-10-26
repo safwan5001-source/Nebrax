@@ -32,7 +32,7 @@ const STATUS_ROWS: { key: 'sales' | 'stock' | 'books' | 'zatca' | 'hr' | 'ops'; 
   { key: 'stock', state: 'ready' },
   { key: 'books', state: 'ready' },
   { key: 'zatca', state: 'partial' },
-  { key: 'hr', state: 'partial' },
+  { key: 'hr', state: 'ready' },
   { key: 'ops', state: 'building' },
 ];
 
@@ -216,7 +216,6 @@ export default async function LandingPage() {
                 ))}
               </tbody>
             </table>
-            <p className="lp-sectors">{t('status_sectors')}</p>
           </div>
         </section>
 

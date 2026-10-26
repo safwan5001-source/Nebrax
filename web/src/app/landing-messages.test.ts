@@ -51,6 +51,15 @@ describe('landing page messages', () => {
     expect(landingEn.brand_aria).toBeTruthy();
   });
 
+  it('makes none of the claims the product cannot back with evidence', () => {
+    const all = [...Object.values(landingAr), ...Object.values(landingEn)].join('\n');
+    expect(all, 'a sector count').not.toMatch(/\b60\b|٦٠/);
+    expect(all, 'a tested-in-a-real-company claim').not.toMatch(/real company|شركة حقيقية/i);
+    expect(all, 'a ZATCA compliance claim for both phases').not.toMatch(/المرحلتين|both phases|compliant|متوافق/i);
+    expect(all, 'a free-trial or pricing promise').not.toMatch(/free trial|تجربة مجانية|مجاناً|مجاني|per month|شهرياً/i);
+    expect(all, 'an uptime or certification claim').not.toMatch(/uptime|SLA|ISO ?27001|SOC ?2|معتمد من/i);
+  });
+
   it('never prints the legacy currency text or an invented customer claim', () => {
     const all = [...Object.values(landingAr), ...Object.values(landingEn)].join('\n');
     expect(all).not.toMatch(/﷼|ر\.س|\bSAR\b/);
