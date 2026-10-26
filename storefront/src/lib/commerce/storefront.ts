@@ -121,7 +121,7 @@ export async function fetchPublishedPresentation(): Promise<StorefrontPresentati
  *
  * `name` is null only when the resolved context cannot expose a public
  * name — callers must not invent a tenant identity or fall back to
- * `NEXT_PUBLIC_STORE_NAME` / "Spree Store".
+ * `NEXT_PUBLIC_STORE_NAME` or a legacy default.
  */
 export const fetchStorefrontConfig = cache(
   async function fetchStorefrontConfig(): Promise<AwjStorefrontConfig> {

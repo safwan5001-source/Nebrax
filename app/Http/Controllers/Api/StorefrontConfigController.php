@@ -25,7 +25,7 @@ use Illuminate\Http\Request;
  * `Storefront` يُستخدم اسم المستأجر نفسه.
  *
  * واجهة Next.js تستهلك `name` كهوية ظاهرة للمشتري بدل
- * `NEXT_PUBLIC_STORE_NAME` / «Spree Store». اللغة تبقى تفضيلاً للعرض فقط —
+ * `NEXT_PUBLIC_STORE_NAME` (قيمة على مستوى النشر، لا هوية المتجر). اللغة تبقى تفضيلاً للعرض فقط —
  * الحسم يبقى حصراً عبر `StorefrontContext`.
  */
 class StorefrontConfigController extends PublicApiController
