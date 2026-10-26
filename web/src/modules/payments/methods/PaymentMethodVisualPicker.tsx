@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { fetchImageUrl } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { ICON_KEYS, ICON_REGISTRY, LOGO_ACCEPT, LOGO_MAX_BYTES, LOGO_TYPES, isHexColor, logoPath, type IconKey, type VisualMode } from './visual';
+import { ICON_KEYS, ICON_REGISTRY, LOGO_ACCEPT, LOGO_MAX_BYTES, LOGO_TYPES, isHexColor, logoPath, resolveTokenHex, rgbToHex, type IconKey, type VisualMode } from './visual';
 
 /** حالة التخصيص داخل نموذج الطريقة. `iconColor === ''` = اللون الافتراضي. */
 export interface VisualFormState {
@@ -38,6 +38,9 @@ export function PaymentMethodVisualPicker({ value, onChange, saved, disabled = f
   const fileRef = useRef<HTMLInputElement>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // لون العرض المحايد لمنتقي اللون حين لا لون مختاراً: رمز النص الدلالي لا ثابت خام.
+  const [neutralColor, setNeutralColor] = useState(() => rgbToHex(0, 0, 0)); // يطابق الخادم عند الـSSR ثم يُحلّ من الرمز بعد التركيب
+  useEffect(() => { setNeutralColor(resolveTokenHex('--text')); }, [value.mode]);
 
   // معاينة فورية: الملف المنتقى أولاً، وإلا الشعار المحفوظ (يُجلب مصادَقاً).
   useEffect(() => {
@@ -57,7 +60,7 @@ export function PaymentMethodVisualPicker({ value, onChange, saved, disabled = f
 
   const patch = (next: Partial<VisualFormState>) => onChange({ ...value, ...next });
   const colorValid = value.iconColor === '' || isHexColor(value.iconColor);
-  const pickerColor = isHexColor(value.iconColor) ? value.iconColor : '#000000';
+  const pickerColor = isHexColor(value.iconColor) ? value.iconColor : neutralColor;
 
   function pickFile(file: File | undefined) {
     if (!file) return;

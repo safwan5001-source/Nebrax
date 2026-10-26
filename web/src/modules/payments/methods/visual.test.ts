@@ -35,3 +35,11 @@ describe('visual — عقد التخصيص البصري', () => {
     expect(logoPath({ id: 'x' })).toBe('/payment-methods/x/logo');
   });
 });
+
+describe('resolveTokenHex — لون محايد من رمز دلالي', () => {
+  it('rgbToHex يطبّع القنوات ويقصّها', async () => {
+    const { rgbToHex } = await import('./visual');
+    expect(rgbToHex(21, 24, 29)).toBe('#15181D');
+    expect(rgbToHex(-5, 300, 0.4)).toBe('#00FF00');
+  });
+});

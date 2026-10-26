@@ -65,3 +65,23 @@ export function resolveVisual(method: PaymentMethodVisualFields): { kind: 'defau
 export function logoPath(method: Pick<PaymentMethodVisualFields, 'id' | 'updated_at'>): string {
   return `/payment-methods/${method.id}/logo${method.updated_at ? `?v=${encodeURIComponent(method.updated_at)}` : ''}`;
 }
+
+export function rgbToHex(r: number, g: number, b: number): string {
+  return `#${[r, g, b].map((n) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0')).join('').toUpperCase()}`;
+}
+
+/**
+ * قيمة `#RRGGBB` لرمز تصميم دلالي (مثل `--text`) يحتاجها `<input type="color">` للعرض المحايد حين لا لون مختاراً.
+ * تُحلّ من الـDOM في وقت التشغيل فتتبع الوضعين الفاتح/الداكن بدل ثابت خام؛ اختيار المستخدم يبقى #RRGGBB ديناميكياً.
+ */
+export function resolveTokenHex(token: string, root: HTMLElement | null = typeof document === 'undefined' ? null : document.body): string {
+  if (!root) return rgbToHex(0, 0, 0);
+  const probe = document.createElement('span');
+  probe.style.color = `var(${token})`;
+  probe.style.display = 'none';
+  root.appendChild(probe);
+  const resolved = getComputedStyle(probe).color;
+  root.removeChild(probe);
+  const channels = resolved.match(/\d+(?:\.\d+)?/g)?.slice(0, 3).map(Number);
+  return channels?.length === 3 ? rgbToHex(channels[0], channels[1], channels[2]) : rgbToHex(0, 0, 0);
+}
