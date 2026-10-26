@@ -42,3 +42,19 @@ describe('PaymentMethodVisual — العارض المشترك', () => {
     await waitFor(() => expect(screen.getByTestId('payment-method-visual-default')).toBeTruthy());
   });
 });
+
+describe('PaymentMethodVisual — تحرير الـBlob URLs القديمة في الكاش', () => {
+  it('استبدال الشعار (نسخة updated_at جديدة) يحرّر URL النسخة السابقة ولا يحرّر الحالية', async () => {
+    const revoke = vi.fn();
+    (URL as unknown as { revokeObjectURL: unknown }).revokeObjectURL = revoke;
+    fetchImageUrl.mockReset(); clearPaymentMethodLogoCache(); revoke.mockClear();
+    fetchImageUrl.mockResolvedValueOnce('blob:v1').mockResolvedValueOnce('blob:v2');
+    const { rerender } = render(<PaymentMethodVisual method={{ id: 'swap', visual_mode: 'image', has_logo: true, updated_at: 'v1' }} />);
+    await waitFor(() => expect(screen.getByTestId('payment-method-visual-image').querySelector('img')?.getAttribute('src')).toBe('blob:v1'));
+    rerender(<PaymentMethodVisual method={{ id: 'swap', visual_mode: 'image', has_logo: true, updated_at: 'v2' }} />);
+    await waitFor(() => expect(screen.getByTestId('payment-method-visual-image').querySelector('img')?.getAttribute('src')).toBe('blob:v2'));
+    await waitFor(() => expect(revoke).toHaveBeenCalledWith('blob:v1'));
+    expect(revoke).not.toHaveBeenCalledWith('blob:v2');
+    cleanup();
+  });
+});

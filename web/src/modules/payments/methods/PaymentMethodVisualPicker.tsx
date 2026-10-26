@@ -42,20 +42,28 @@ export function PaymentMethodVisualPicker({ value, onChange, saved, disabled = f
   const [neutralColor, setNeutralColor] = useState(() => rgbToHex(0, 0, 0)); // يطابق الخادم عند الـSSR ثم يُحلّ من الرمز بعد التركيب
   useEffect(() => { setNeutralColor(resolveTokenHex('--text')); }, [value.mode]);
 
-  // معاينة فورية: الملف المنتقى أولاً، وإلا الشعار المحفوظ (يُجلب مصادَقاً).
+  // معاينة فورية: الملف المنتقى أولاً، وإلا الشعار المحفوظ (يُجلب مصادَقاً). كل Blob URL ينشئه هذا التأثير يُحرَّر عند التنظيف
+  // (إغلاق الحوار/تغيير الطريقة/استبدال الصورة)، وأي URL يصل بعد الإلغاء يُحرَّر فور وصوله.
   useEffect(() => {
-    let revoke: string | null = null;
+    let owned: string | null = null;
     let cancelled = false;
     if (value.logoFile) {
-      revoke = URL.createObjectURL(value.logoFile);
-      setPreviewUrl(revoke);
+      owned = URL.createObjectURL(value.logoFile);
+      setPreviewUrl(owned);
     } else if (value.hasLogo && saved?.id) {
       setPreviewUrl(null);
-      fetchImageUrl(logoPath({ id: saved.id, updated_at: saved.updated_at })).then((url) => { if (!cancelled) setPreviewUrl(url); }).catch(() => { if (!cancelled) setPreviewUrl(null); });
+      fetchImageUrl(logoPath({ id: saved.id, updated_at: saved.updated_at }))
+        .then((url) => {
+          if (!url) { if (!cancelled) setPreviewUrl(null); return; }
+          if (cancelled) { URL.revokeObjectURL(url); return; }
+          owned = url;
+          setPreviewUrl(url);
+        })
+        .catch(() => { if (!cancelled) setPreviewUrl(null); });
     } else {
       setPreviewUrl(null);
     }
-    return () => { cancelled = true; if (revoke) URL.revokeObjectURL(revoke); };
+    return () => { cancelled = true; if (owned) URL.revokeObjectURL(owned); };
   }, [value.logoFile, value.hasLogo, saved?.id, saved?.updated_at]);
 
   const patch = (next: Partial<VisualFormState>) => onChange({ ...value, ...next });

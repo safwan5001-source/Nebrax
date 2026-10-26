@@ -9,13 +9,26 @@ import { defaultIconFor, logoPath, resolveVisual, type PaymentMethodVisualFields
 /** كاش بالجلسة: مفتاحه المسار مع نسخة `updated_at`، فاستبدال الشعار يُجلب من جديد وبقية الشاشات لا تعيد الجلب. */
 const logoCache = new Map<string, Promise<string | null>>();
 /** للاختبارات فقط: يفرّغ كاش الشعارات بين الحالات. */
-export function clearPaymentMethodLogoCache() { logoCache.clear(); }
+export function clearPaymentMethodLogoCache() {
+  for (const pending of logoCache.values()) pending.then((url) => { if (url) URL.revokeObjectURL(url); });
+  logoCache.clear();
+}
 function loadLogo(path: string): Promise<string | null> {
   let hit = logoCache.get(path);
   if (!hit) {
     hit = fetchImageUrl(path).catch(() => null);
     logoCache.set(path, hit);
-    hit.then((url) => { if (url === null) logoCache.delete(path); });
+    hit.then((url) => {
+      if (url === null) { logoCache.delete(path); return; }
+      // نسخة أحدث لنفس الطريقة (استُبدل الشعار): الـBlob URL القديم لم يعد يُطلب، فيُحرَّر ويُزال من الكاش.
+      const methodKey = path.split('?')[0];
+      for (const [other, pending] of logoCache) {
+        if (other !== path && other.split('?')[0] === methodKey) {
+          logoCache.delete(other);
+          pending.then((old) => { if (old) URL.revokeObjectURL(old); });
+        }
+      }
+    });
   }
   return hit;
 }
