@@ -26,7 +26,10 @@ describe('OrderDetailView', () => {
     fetchOrderMock.mockReset();
     window.sessionStorage.clear();
   });
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    window.sessionStorage.clear(); // الوحدة تحفظ استعلام القائمة؛ لا تُسرَّب لملفات اختبار أخرى في العامل نفسه.
+  });
 
   it('shows number, status and payment status as independent badges, customer, items and total', async () => {
     fetchOrderMock.mockResolvedValue(detailFixture());

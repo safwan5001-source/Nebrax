@@ -58,7 +58,10 @@ describe('OrdersList', () => {
     setStore('s1');
     window.sessionStorage.clear();
   });
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    window.sessionStorage.clear(); // الوحدة تحفظ استعلام القائمة؛ لا تُسرَّب لملفات اختبار أخرى في العامل نفسه.
+  });
 
   it('loads the list for the active store and renders the order columns', async () => {
     render(<OrdersList />);

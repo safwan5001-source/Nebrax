@@ -35,7 +35,10 @@ describe('commerce orders pages', () => {
     fetchOrdersMock.mockResolvedValue({ data: [], meta: { current_page: 1, per_page: 20, total: 0, last_page: 1 } });
     fetchOrderMock.mockRejectedValue({ status: 404 });
   });
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    window.sessionStorage.clear();
+  });
 
   it('the orders workspace is store-agnostic so "all stores" is reachable without picking a store first', () => {
     expect(isStoreAgnosticCommercePath('/commerce/orders')).toBe(true);
