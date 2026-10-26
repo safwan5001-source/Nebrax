@@ -94,7 +94,7 @@ test.describe('O1b staff orders UI', () => {
   test('detail shows the accounting warning and no write actions', async ({ page }, info) => {
     const requests = await open(page, `/commerce/orders/${ORDER_ID}`);
     await expect(page.getByRole('heading', { name: 'CORD-100' })).toBeVisible();
-    await expect(page.getByRole('alert')).toContainText('لم يُرحَّل محاسبياً');
+    await expect(page.getByRole('alert').filter({ hasText: /.{10}/ })).toContainText('لم يُرحَّل محاسبياً');
     await noHorizontalOverflow(page);
     await shot(page, `detail-ar-${info.project.name}`);
     for (const name of ['إلغاء', 'قبول', 'شحن', 'تحصيل الدفعة']) {
@@ -105,7 +105,7 @@ test.describe('O1b staff orders UI', () => {
 
   test('detail in English', async ({ page }, info) => {
     await open(page, `/commerce/orders/${ORDER_ID}`, { locale: 'en' });
-    await expect(page.getByRole('alert')).toContainText('has not been posted to accounting');
+    await expect(page.getByRole('alert').filter({ hasText: /.{10}/ })).toContainText('has not been posted to accounting');
     await shot(page, `detail-en-${info.project.name}`);
   });
 
