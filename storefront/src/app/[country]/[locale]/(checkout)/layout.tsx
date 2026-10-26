@@ -17,6 +17,11 @@ interface CheckoutLayoutProps {
  * before when wholesale is enabled — the same condition `(wholesale)/wholesale/layout.tsx` uses — and are a plain
  * 404 otherwise, instead of building a Spree client for a storefront that has none. The check runs in the layout,
  * before any page or data loader, so no Spree call can happen on a 404.
+ *
+ * X5b — this gate alone cannot set the HTTP status: with `cacheComponents` the shell is streamed, so a `notFound()`
+ * here renders the 404 page under an already-committed 200. The real 404 is issued by the proxy
+ * (`createSpreeMiddleware` → `legacyCheckoutClosed`) before rendering. This layout stays as defence in depth for
+ * requests the proxy matcher skips (e.g. ids containing a dot), where it still renders the 404 page and loads nothing.
  */
 export default function CheckoutLayout({ children }: CheckoutLayoutProps) {
   if (!isWholesaleEnabled()) notFound();
