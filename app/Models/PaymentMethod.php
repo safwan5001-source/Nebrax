@@ -21,6 +21,10 @@ class PaymentMethod extends BaseModel implements CompanyWide
         'is_default',
         'pos_clearing_gateway_id',
         'pos_terminal_required',
+        // تخصيص بصري اختياري. مؤشّر الشعار (logo_path/logo_disk) خارج fillable عمداً: يكتبه المتحكّم وحده بعد رفع مفحوص.
+        'visual_mode',
+        'icon_key',
+        'icon_color',
     ];
 
     protected $casts = [

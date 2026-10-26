@@ -8648,7 +8648,36 @@
       "terminalRequiredHint": "عند التفعيل لا يُؤكَّد بيع بهذه الوسيلة في نقطة البيع إلا بموافقة مؤكدة من جهاز دفع. مطفأ افتراضياً."
     },
     "badgeTerminalRequired": "يشترط جهاز الدفع",
-    "badgeClearing": "مقاصة بطاقات"
+    "badgeClearing": "مقاصة بطاقات",
+    "visual": {
+      "title": "أيقونة أو صورة طريقة الدفع",
+      "modeDefault": "افتراضي",
+      "modeIcon": "أيقونة",
+      "modeImage": "صورة / شعار",
+      "defaultHint": "تُعرض الأيقونة الافتراضية حسب نوع التسوية.",
+      "iconGroup": "اختر أيقونة",
+      "color": "لون الأيقونة",
+      "colorPicker": "منتقي اللون",
+      "resetColor": "اللون الافتراضي",
+      "colorHint": "اللون يخص الأيقونات فقط ولا يُطبَّق على الشعارات المرفوعة.",
+      "errorColor": "أدخل لوناً بصيغة #RRGGBB.",
+      "errorIconRequired": "اختر أيقونة لطريقة الدفع أو غيّر الوضع إلى افتراضي.",
+      "errorImageRequired": "ارفع صورة أو شعاراً، أو غيّر الوضع.",
+      "errorType": "الملف غير مدعوم. استخدم PNG أو JPEG أو WebP.",
+      "errorSize": "حجم الملف أكبر من 1 ميغابايت.",
+      "upload": "رفع صورة",
+      "replace": "استبدال الصورة",
+      "remove": "إزالة",
+      "uploadInput": "اختيار ملف الصورة",
+      "previewAlt": "معاينة شعار طريقة الدفع",
+      "imageHint": "PNG أو JPEG أو WebP، حتى 1 ميغابايت وبأبعاد لا تتجاوز 2000×2000. يُعرض الشعار كما هو دون تلوين. SVG غير مدعوم.",
+      "uploadFailed": "حُفظت الطريقة لكن تعذّر رفع الشعار. حاول مجدداً من التعديل.",
+      "icons": {
+        "banknote": "نقد", "coins": "عملات", "wallet": "محفظة", "credit-card": "بطاقة ائتمان", "landmark": "تحويل بنكي",
+        "receipt": "إيصال", "smartphone": "جوال", "qr-code": "رمز QR", "hand-coins": "دفع يدوي", "piggy-bank": "ادخار",
+        "badge-dollar-sign": "شارة مالية", "building-2": "مؤسسة", "send": "إرسال", "scroll-text": "شيك"
+      }
+    }
   },
   "printTemplateAssignments": {
     "title": "تعيينات القوالب",
