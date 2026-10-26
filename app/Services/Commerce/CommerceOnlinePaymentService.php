@@ -278,6 +278,50 @@ final class CommerceOnlinePaymentService
     }
 
     /**
+     * ADR-28 P-3: نسخة **معزولة** لتنظيف ما بعد الإلغاء — لا ترمي أبداً (كل محاولة في try/catch لـ`Throwable` وتُسجَّل)، وتعيد عدّادات
+     * تسمح بالمطابِق الدوري بإعادة المحاولة. تُستدعى بعد الالتزام النهائي فقط وبلا أقفال معلَّقة (تتصل بالمزوّد وتقفل صف المحاولة).
+     * `cannot_cancel` = المحاولة لم تعد نشطة (سبقها التقاط/انتهاء/إلغاء) فتُحتسب «متخطّاة» لا فشلاً. idempotent.
+     *
+     * @return array{closed: int, skipped: int, failed: int, remaining: int}
+     */
+    public function closeActiveAttemptsIsolated(CommercePaymentIntent $intent): array
+    {
+        $result = ['closed' => 0, 'skipped' => 0, 'failed' => 0, 'remaining' => 0];
+
+        try {
+            $attempts = PaymentAttempt::query()->where('payable_key', $intent->payableKey())->whereIn('capture_status', PaymentAttempt::ACTIVE_STATUSES)->get();
+        } catch (\Throwable $e) {
+            report($e);
+
+            return $result + ['failed' => 1];
+        }
+
+        foreach ($attempts as $active) {
+            try {
+                $this->orchestrator->cancel($active);
+                $result['closed']++;
+            } catch (PaymentOrchestrationException $e) {
+                if ($e->reason === 'cannot_cancel') {
+                    $result['skipped']++;
+                } else {
+                    $result['failed']++;
+                }
+            } catch (\Throwable $e) {
+                $result['failed']++;
+                report($e);
+            }
+        }
+
+        try {
+            $result['remaining'] = PaymentAttempt::query()->where('payable_key', $intent->payableKey())->whereIn('capture_status', PaymentAttempt::ACTIVE_STATUSES)->count();
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        return $result;
+    }
+
+    /**
      * شبكة أمان: التقاطات مؤكَّدة لنوايا ما زالت `pending` (فشل المستمع/انهيار بعد الالتزام). كل محاولة معزولة؛ idempotent.
      *
      * @return array{processed: int, completed: int, failed: int}
