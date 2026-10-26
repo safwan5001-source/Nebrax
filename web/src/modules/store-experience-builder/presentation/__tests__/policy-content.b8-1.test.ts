@@ -35,7 +35,7 @@ describe("B8-1 policy content (compat)", () => {
     expect(normalizePresentationConfig(out).pages).toEqual(out.pages);
   });
 
-  it("caps lengths and drops empty or malformed content", () => {
+  it("keeps over-limit text for the editor (flagged, never truncated) and drops empty or malformed content", () => {
     const out = normalizePresentationConfig({
       pages: [
         page("terms-of-service", {
@@ -48,8 +48,12 @@ describe("B8-1 policy content (compat)", () => {
       ],
     });
     expect(Object.keys(out.pages[0].content ?? {})).toEqual(["ar"]);
-    expect(out.pages[0].content?.ar?.title).toHaveLength(80);
-    expect(out.pages[0].content?.ar?.body).toHaveLength(20000);
+    expect(out.pages[0].content?.ar?.title).toHaveLength(200);
+    expect(out.pages[0].content?.ar?.body).toHaveLength(30000);
+    expect(policyContentIssues(out).map((i) => i.code)).toEqual([
+      "policy_title_too_long",
+      "policy_body_too_long",
+    ]);
     expect("content" in out.pages[1]).toBe(false);
   });
 

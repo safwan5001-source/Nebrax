@@ -27,6 +27,7 @@ import {
   legacyHeroContent,
   isHeroAuthored,
   newHomeSectionId,
+  type PresentationContentPage,
   type PresentationHomeSection,
   presetSelectionPatch,
   PRODUCT_CARD_PRESETS,
@@ -38,6 +39,8 @@ import {
   THEME_PRESETS,
   type ThemePresetId,
 } from "./presentation";
+import { PolicyEditor } from "./PolicyEditor";
+import { isPolicyPage } from "./policy-edit";
 import { HeaderDesignPanel } from "./HeaderDesignPanel";
 import { FooterEditor } from "./FooterEditor";
 import { GlobalBackgroundField } from "./GlobalBackgroundField";
@@ -167,7 +170,7 @@ export const CUSTOMIZER_PANELS = CUSTOMIZER_NAV_GROUPS.flatMap(
   (group) => group.items,
 );
 
-const PAGE_LABEL: Record<
+export const PAGE_LABEL: Record<
   (typeof CONTENT_PAGE_SLUGS)[number],
   CustomizerMessageKey
 > = {
@@ -357,7 +360,7 @@ export function ControlPanels({
     case "apps":
       return <AppsPanel config={config} t={t} patch={patch} />;
     case "pages":
-      return <PagesPanel config={config} t={t} patch={patch} />;
+      return <PagesPanel config={config} t={t} patch={patch} locale={locale} />;
     default:
       return null;
   }
@@ -3216,52 +3219,72 @@ function PagesPanel({
   config,
   t,
   patch,
+  locale,
 }: {
   config: StorefrontPresentationConfig;
   t: (key: CustomizerMessageKey) => string;
   patch: (partial: Partial<StorefrontPresentationConfig>) => void;
+  locale: CustomizerLocale;
 }) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const updatePage = (index: number, next: PresentationContentPage) =>
+    patch({ pages: config.pages.map((item, i) => (i === index ? next : item)) });
   return (
     <div className="space-y-4">
       <p className="text-[12px] leading-5 text-neutral-500">{t("pagesHint")}</p>
+      <p className="text-[12px] leading-5 text-neutral-700">{t("policiesHint")}</p>
       <ul className="border border-neutral-200">
-        {config.pages.map((page, index) => (
-          <li
-            key={page.id}
-            className="space-y-2 border-b border-neutral-200 p-3 last:border-b-0"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-medium text-neutral-900">
-                {t(PAGE_LABEL[page.slug])}
-              </span>
-              <span className="text-[11px] text-neutral-400">
-                {t("gatedBadge")}
-              </span>
-            </div>
-            <input
-              className={inputClass}
-              value={page.title}
-              placeholder={t(PAGE_LABEL[page.slug])}
-              onChange={(event) => {
-                const pages = config.pages.map((item, i) =>
-                  i === index ? { ...item, title: event.target.value } : item,
-                );
-                patch({ pages });
-              }}
-            />
-            <Toggle
-              compact
-              label={t("pageEnabled")}
-              checked={page.enabled}
-              onChange={(enabled) => {
-                const pages = config.pages.map((item, i) =>
-                  i === index ? { ...item, enabled } : item,
-                );
-                patch({ pages });
-              }}
-            />
-          </li>
-        ))}
+        {config.pages.map((page, index) => {
+          const policy = isPolicyPage(page);
+          const open = policy && openId === page.id;
+          return (
+            <li
+              key={page.id}
+              className="space-y-2 border-b border-neutral-200 p-3 last:border-b-0"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium text-neutral-900">
+                  {t(PAGE_LABEL[page.slug])}
+                </span>
+                {policy ? (
+                  <button
+                    type="button"
+                    aria-expanded={open}
+                    onClick={() => setOpenId(open ? null : page.id)}
+                    className="min-h-11 px-2 text-[12px] font-medium text-primary"
+                  >
+                    {open ? t("policyCloseText") : t("policyEditText")}
+                  </button>
+                ) : (
+                  <span className="text-[11px] text-neutral-400">
+                    {t("gatedBadge")}
+                  </span>
+                )}
+              </div>
+              <input
+                className={inputClass}
+                value={page.title}
+                placeholder={t(PAGE_LABEL[page.slug])}
+                onChange={(event) =>
+                  updatePage(index, { ...page, title: event.target.value })
+                }
+              />
+              <Toggle
+                compact
+                label={t("pageEnabled")}
+                checked={page.enabled}
+                onChange={(enabled) => updatePage(index, { ...page, enabled })}
+              />
+              {open ? (
+                <PolicyEditor
+                  page={page}
+                  uiLocale={locale}
+                  onChange={(next) => updatePage(index, next)}
+                />
+              ) : null}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
