@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readPolicyAvailability } from "@/lib/policy/availability";
 import { DEFAULT_PRESENTATION_CONFIG } from "../config";
 import { fontFamilyStack } from "../font-catalogue";
 import {
@@ -229,51 +230,95 @@ describe("published presentation runtime helpers", () => {
   });
 });
 
-describe("publishedPolicySlugs (X4 link visibility)", () => {
+describe("publishedPolicySlugs (X4 / X4-FIX link visibility)", () => {
   const page = (slug: string, enabled: boolean) => ({
     id: `p-${slug}`,
     slug,
     title: "",
     enabled,
   });
+  const available = (...slugs: string[]) =>
+    readPolicyAvailability(Object.fromEntries(slugs.map((s) => [s, true])));
+  const all = available(
+    "shipping-policy",
+    "privacy-policy",
+    "returns-policy",
+    "terms-of-service",
+  );
 
-  it("lists only the policy pages the merchant enabled in the published document", () => {
+  it("links only policies that are enabled in the published document AND vouched for by the backend", () => {
     const published = readPublishedPresentation({
       pages: [
         page("about", true),
         page("shipping-policy", false),
         page("privacy-policy", true),
         page("returns-policy", true),
-        page("terms-of-service", false),
+        page("terms-of-service", true),
       ],
     });
-    expect(publishedPolicySlugs(published)).toEqual([
-      "privacy-policy",
-      "returns-policy",
-    ]);
+    // shipping: off. returns: enabled but the backend says no visible content. terms: enabled, available.
+    expect(
+      publishedPolicySlugs(
+        published,
+        available("shipping-policy", "privacy-policy", "terms-of-service"),
+      ),
+    ).toEqual(["privacy-policy", "terms-of-service"]);
   });
 
-  it("links nothing when nothing is published or every policy is switched off, and never duplicates a slug", () => {
-    expect(publishedPolicySlugs(null)).toEqual([]);
-    const allOff = readPublishedPresentation({
-      pages: [
-        page("shipping-policy", false),
-        page("privacy-policy", false),
-        page("returns-policy", false),
-        page("terms-of-service", false),
-      ],
+  it("an enabled page without available content (empty, image-only, draft-only) is never linked", () => {
+    const published = readPublishedPresentation({
+      pages: [page("privacy-policy", true), page("returns-policy", true)],
     });
-    expect(publishedPolicySlugs(allOff)).toEqual([]);
+    expect(publishedPolicySlugs(published, available())).toEqual([]);
+    expect(
+      publishedPolicySlugs(
+        published,
+        readPolicyAvailability({ "privacy-policy": false }),
+      ),
+    ).toEqual([]);
+  });
+
+  it("available content on a DISABLED page is not linked", () => {
+    const published = readPublishedPresentation({
+      pages: [page("privacy-policy", false)],
+    });
+    expect(publishedPolicySlugs(published, all)).toEqual([]);
+  });
+
+  it("fails closed: a missing or malformed availability signal links nothing", () => {
+    const published = readPublishedPresentation({
+      pages: [page("privacy-policy", true), page("returns-policy", true)],
+    });
+    for (const raw of [
+      undefined,
+      null,
+      "yes",
+      1,
+      [],
+      {},
+      { "privacy-policy": "true" },
+      { "privacy-policy": 1 },
+    ]) {
+      expect(
+        publishedPolicySlugs(published, readPolicyAvailability(raw)),
+        String(raw),
+      ).toEqual([]);
+    }
+  });
+
+  it("links nothing without a published document, and never duplicates a slug", () => {
+    expect(publishedPolicySlugs(null, all)).toEqual([]);
     const doubled = readPublishedPresentation({
       pages: [page("privacy-policy", true), page("privacy-policy", true)],
     });
-    expect(publishedPolicySlugs(doubled)).toEqual(["privacy-policy"]);
+    expect(publishedPolicySlugs(doubled, all)).toEqual(["privacy-policy"]);
   });
 
-  it("documents the default: a published document with no explicit page settings enables the four policies", () => {
-    // `enabled` is the only public signal (the snapshot never carries policy text), so a policy that is on but
-    // was never written is still linked and answers 404 — the editor warns merchants about exactly that state.
-    expect(publishedPolicySlugs(readPublishedPresentation({}))).toEqual([
+  it("the default document (four policies enabled) no longer links unwritten policies", () => {
+    expect(
+      publishedPolicySlugs(readPublishedPresentation({}), available()),
+    ).toEqual([]);
+    expect(publishedPolicySlugs(readPublishedPresentation({}), all)).toEqual([
       "shipping-policy",
       "privacy-policy",
       "returns-policy",

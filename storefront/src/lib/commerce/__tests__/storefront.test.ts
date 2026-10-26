@@ -153,4 +153,40 @@ describe("commerce/storefront identity (COM-7-P3A)", () => {
 
     await expect(fetchStorefrontDefaultLocale()).resolves.toBe("en");
   });
+
+  it("reads policy_availability additively and fails closed when it is absent or malformed (X4-FIX)", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({
+        data: {
+          name: "متجر",
+          policy_availability: {
+            "shipping-policy": false,
+            "privacy-policy": true,
+            "returns-policy": "yes",
+            "terms-of-service": true,
+          },
+        },
+        meta: { request_id: "req-1" },
+      }),
+    );
+    expect((await fetchStorefrontConfig()).policyAvailability).toEqual({
+      "shipping-policy": false,
+      "privacy-policy": true,
+      "returns-policy": false,
+      "terms-of-service": true,
+    });
+  });
+
+  it("an older backend without policy_availability yields every policy unavailable", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({ data: { name: "متجر" }, meta: { request_id: "req-1" } }),
+    );
+    const config = await fetchStorefrontConfig();
+    expect(Object.values(config.policyAvailability ?? {})).toEqual([
+      false,
+      false,
+      false,
+      false,
+    ]);
+  });
 });

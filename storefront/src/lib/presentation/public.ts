@@ -3,6 +3,7 @@
  * public storefront. Draft is unreachable here.
  */
 
+import type { PolicyAvailability } from "@/lib/policy/availability";
 import { isPolicySlug, type PolicySlug } from "@/lib/policy/slugs";
 import type {
   PresentationNavLink,
@@ -168,16 +169,22 @@ export function publishedExtraNav(
 }
 
 /**
- * X4 — policy pages the merchant has switched on in the PUBLISHED document (`pages[].enabled`). This is the
- * link-visibility signal: it costs no API call. A listed page can still be empty (the page then 404s and the
- * editor warns about it); a page that is off is never linked. No published document ⇒ nothing is linked.
+ * X4 / X4-FIX — policy pages worth linking: switched on by the merchant in the PUBLISHED document (`pages[].enabled`)
+ * AND vouched for by the backend (`policy_availability`: published, visible, non-empty — the policy endpoint's own
+ * rules). No API call per link. Fail closed: no published document, or no `true` availability ⇒ not linked.
  */
 export function publishedPolicySlugs(
   presentation: StorefrontPresentationConfig | null,
+  availability: PolicyAvailability,
 ): PolicySlug[] {
   const slugs: PolicySlug[] = [];
   for (const page of presentation?.pages ?? []) {
-    if (page.enabled && isPolicySlug(page.slug) && !slugs.includes(page.slug)) {
+    if (
+      page.enabled &&
+      isPolicySlug(page.slug) &&
+      availability[page.slug] === true &&
+      !slugs.includes(page.slug)
+    ) {
       slugs.push(page.slug);
     }
   }

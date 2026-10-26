@@ -6,6 +6,7 @@
 import type { Category } from "@spree/sdk";
 import { fetchCategories } from "@/lib/commerce/categories";
 import { fetchProductsByIds } from "@/lib/commerce/products";
+import type { PolicyAvailability } from "@/lib/policy/availability";
 import type { StorefrontPresentationConfig } from "./config";
 import type { NavItem, NavMenu } from "./navigation";
 import {
@@ -30,6 +31,7 @@ function flatten(categories: readonly Category[], into: Map<string, string>) {
 export async function publishedFooterGroups(
   presentation: StorefrontPresentationConfig | null,
   basePath: string,
+  policyAvailability: PolicyAvailability,
 ): Promise<ResolvedFooterGroup[] | null> {
   const groups = presentation?.footer.groups;
   if (!groups) return null;
@@ -70,7 +72,9 @@ export async function publishedFooterGroups(
     basePath,
     categories,
     products,
-    policySlugs: new Set(publishedPolicySlugs(presentation)),
+    policySlugs: new Set(
+      publishedPolicySlugs(presentation, policyAvailability),
+    ),
   };
   return resolveFooterGroups(groups, menus, ctx);
 }
