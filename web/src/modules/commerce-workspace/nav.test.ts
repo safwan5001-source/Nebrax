@@ -11,6 +11,7 @@ describe('commerce workspace navigation', () => {
   it('exposes the approved commerce destinations only', () => {
     expect(COMMERCE_WORKSPACE_HREFS).toEqual([
       '/commerce',
+      '/commerce/orders',
       '/commerce/stores',
       '/commerce/published-products',
       '/commerce/merchandising',
@@ -52,6 +53,19 @@ describe('commerce workspace navigation', () => {
     expect(merchandising).toMatchObject({ permission: 'products.view' });
     expect(isNavEntryVisible(merchandising!, new Set(), { role: 'staff', permissions: [] })).toBe(false);
     expect(isNavEntryVisible(merchandising!, new Set(), { role: 'staff', permissions: ['products.view'] })).toBe(true);
+  });
+
+  it('places Orders right after Overview, guarded by permission and the storefront capability', () => {
+    const overview = COMMERCE_WORKSPACE_NAV_GROUPS[0].items;
+    expect(overview.map((item) => item.href)).toEqual(['/commerce', '/commerce/orders']);
+    const orders = overview[1];
+    expect(orders).toMatchObject({ labelKey: 'orders', appKey: 'commerce.storefront', permission: 'commerce.orders.view' });
+    // بلا الصلاحية، أو بقدرة معطّلة، لا يظهر العنصر.
+    expect(isNavEntryVisible(orders, new Set(), { role: 'staff', permissions: [] })).toBe(false);
+    expect(isNavEntryVisible(orders, new Set(), { role: 'accountant', permissions: ['payments.manage', 'commerce.manage'] })).toBe(false);
+    expect(isNavEntryVisible(orders, new Set(['commerce.storefront']), { role: 'admin', permissions: ['*'] })).toBe(false);
+    expect(isNavEntryVisible(orders, new Set(), { role: 'owner', permissions: ['*'] })).toBe(true);
+    expect(isNavEntryVisible(orders, new Set(), { role: 'staff', permissions: ['commerce.orders.view'] })).toBe(true);
   });
 
   it('does not add copies of AWJ core modules', () => {

@@ -18,7 +18,11 @@ export type CommerceWorkspaceNavGroup = {
 export const COMMERCE_WORKSPACE_NAV_GROUPS: CommerceWorkspaceNavGroup[] = [
   {
     labelKey: 'groupOverview',
-    items: [{ href: '/commerce', labelKey: 'overview' }],
+    items: [
+      { href: '/commerce', labelKey: 'overview' },
+      // COMMERCE-ORDERS-O1b — يظهر لمن يملك الصلاحية وحين تكون قدرة المتجر مفعّلة (المسار يردّ 403 بدونهما).
+      { href: '/commerce/orders', labelKey: 'orders', appKey: 'commerce.storefront', permission: 'commerce.orders.view' },
+    ],
   },
   {
     labelKey: 'groupStore',

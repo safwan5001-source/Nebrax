@@ -40,6 +40,8 @@ export const STORE_AGNOSTIC_COMMERCE_PATHS = [
   '/commerce/published-products',
   '/commerce/merchandising',
   '/commerce/integrations',
+  // الطلبات تدعم «كل المتاجر» صراحةً (مرشِّح المتجر داخل الصفحة)، فلا تُحجب بانتظار اختيار متجر.
+  '/commerce/orders',
 ] as const;
 
 export function isStoreAgnosticCommercePath(pathname: string | null | undefined): boolean {
