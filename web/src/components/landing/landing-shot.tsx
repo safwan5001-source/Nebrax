@@ -26,9 +26,9 @@ type ShotSize = readonly [number, number];
 /** أبعاد الملف الأصلي بالبكسل (2x) لحجز المساحة؛ تتطابق عبر السمتين، وتختلف باللغة حيث يختلف ارتفاع الجدول الملتقط. */
 const SHOT_SIZE: Record<LandingShotName, ShotSize | Record<'ar' | 'en', ShotSize>> = {
   'hero-entry': [1652, 808],
-  'mod-sales': [1652, 712],
+  'mod-sales': { ar: [1496, 712], en: [1546, 712] },
   'mod-pos': [2360, 1520],
-  'mod-purchases': [1652, 664],
+  'mod-purchases': { ar: [1496, 604], en: [1546, 604] },
   'mod-books': { ar: [1652, 710], en: [1652, 782] },
   'mod-reports': [1752, 1120],
   'phone-dashboard': [780, 1688],
