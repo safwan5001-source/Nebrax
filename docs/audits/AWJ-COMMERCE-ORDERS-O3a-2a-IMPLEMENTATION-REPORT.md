@@ -45,7 +45,28 @@
 
 **القائمة القائمة بلا تعديل:** `CommercePaymentIntentTest`، `OnlineOrderStockHoldTest`، `CommerceOnlinePaymentTest`، `CommerceInvoiceOnPaymentTest`، `CommerceOrderReservationServiceTest`، `StorefrontOnline*` — **116 ناجحاً** (SQLite) بلا أي تعديل في ملفاتها.
 
-RESULTS_PLACEHOLDER
+**نتائج التشغيل الفعلية (محلياً، مشروع Laravel مولَّد من هذا الفرع، PHP 8.3، PostgreSQL 16):**
+
+| التشغيلة | النتيجة |
+|---|---|
+| SQLite — اختبارات الشريحة (`CommerceIntentCancel*`) | 14 ناجحاً · 5 متخطّاة (PostgreSQL فقط) · 0 فاشل |
+| PostgreSQL — اختبارات الشريحة | **19 ناجحاً** (14 + 5 اختبارات `pcntl_fork` الحقيقية) · 0 فاشل · 1459 assertion |
+| الشريحة ذات الصلة (دفع إلكتروني/حجز/فاتورة الدفع/مكنسة/Checkout/المحاولات/الطلبات/الجدولة) — SQLite | 469 ناجحاً · 25 متخطّاة (PG فقط) · 0 فاشل |
+| الشريحة ذات الصلة — PostgreSQL | 494 ناجحاً · 0 فاشل |
+| **الحزمة كاملة — SQLite** | 9568 ناجحاً · 269 متخطّاة · 26 فاشلاً |
+| **الحزمة كاملة — PostgreSQL** | 9832 ناجحاً · 4 متخطّاة · 27 فاشلاً |
+
+**الفشل المتبقي (كله غير مرتبط بهذه الشريحة):**
+- 26 اختباراً `Fuel*` على المحرّكين: `Call to undefined function App\Services\bcmul()` — امتداد `bcmath` غير مثبّت في بيئتي المحلية ويحمّله CI (`ci.yml` يعلنه). لا مسّ لملفات الوقود في هذه الشريحة.
+- 1 على PostgreSQL فقط: `StorefrontMediaApiTest › the library lists newest first…` — `PDOException SQLSTATE[HY093]` من `cursorPaginate` في مسار الوسائط، لا صلة له بنية الدفع؛ هو الفشل المحلي المعروف نفسه الذي لا يظهر في CI (وظيفة pgsql في CI على `main` وعلى PR #1774 خضراء).
+- لم يظهر أي فشل في اختبارات `afterCommit` أو التزامن أو المطابِق المجدول أو عزل المستأجر، ولا في اختبارات `Communication*` (انحدار O3a-1 المعروف `comm_%` لا يخصّ هذه الشريحة: لا هجرة هنا).
+
+**التحقق المستهدف (ما طُلب):**
+- **afterCommit:** `nested in an outer transaction…` و`a rolled back outer transaction…` و`nested cancellation holds locks…` ✅ على المحرّكين (لا تنظيف قبل الالتزام النهائي، ويُهمَل عند التراجع).
+- **التزامن (PostgreSQL حقيقي):** عدم الجمود في 5 جولات بترتيبي بدء، وإلغاءان متزامنان ⇒ واحد فقط، والتقاط يسابق الإلغاء ⇒ لا حالة هجينة ✅.
+- **المطابِق المجدول:** `the reconciler respects the window the scope and the limit` و`the command is scheduled…` ✅.
+- **عزل المستأجر:** `the reconciler runs each intent under its own tenant and restores the previous context` ✅ على المحرّكين.
+
 
 ## 4. المخاطر والمتبقي
 
@@ -62,7 +83,7 @@ RESULTS_PLACEHOLDER
 
 - **Branch:** `claude/commerce-orders-o3a-2a`
 - **Base SHA:** `a9ba9bd58c7ecb2e9a6464c5714cdf36fbbf5aa6` (`main` بعد ADR-28)
-- **Head SHA / PR:** في وصف الـPR.
+- **Head SHA / PR:** في وصف الـPR (الـPR المستقل لهذه الشريحة).
 
 ## 6. المرحلة التالية — O3a-2b
 
