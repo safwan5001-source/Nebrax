@@ -30,6 +30,7 @@ import {
 } from "@/i18n/routing";
 import { getMarkets } from "@/lib/data/markets";
 import { generateStoreMetadata } from "@/lib/metadata/store";
+import { resolvePublishedStoreName } from "@/lib/metadata/store-identity";
 import { buildOrganizationJsonLd } from "@/lib/seo";
 import { getDefaultCountry, getDefaultLocale } from "@/lib/store";
 
@@ -111,7 +112,10 @@ export async function CountryLocaleLayoutContent({
   const renderStorefront = async (
     availableMarkets: NonNullable<typeof markets>,
   ) => {
-    const messages = await loadMessages(requestedLocale);
+    const [messages, publishedStoreName] = await Promise.all([
+      loadMessages(requestedLocale),
+      resolvePublishedStoreName(),
+    ]);
 
     return (
       <DocumentShell locale={requestedLocale}>
@@ -120,6 +124,7 @@ export async function CountryLocaleLayoutContent({
           locale={requestedLocale}
           markets={availableMarkets}
           messages={messages}
+          publishedStoreName={publishedStoreName}
         >
           {children}
         </CountryLocaleProviders>
@@ -178,6 +183,7 @@ interface CountryLocaleProvidersProps {
   locale: Locale;
   markets: Awaited<ReturnType<typeof getMarkets>>["data"];
   messages: IntlMessages;
+  publishedStoreName: string | null;
 }
 
 function CountryLocaleProviders({
@@ -186,6 +192,7 @@ function CountryLocaleProviders({
   locale,
   markets,
   messages,
+  publishedStoreName,
 }: CountryLocaleProvidersProps) {
   return (
     <NextIntlClientProvider messages={messages} locale={locale}>
@@ -202,7 +209,9 @@ function CountryLocaleProviders({
               wishlist contract yet. See `lib/commerce/capabilities.ts`.
             */}
             <WishlistProvider>
-              <JsonLd data={buildOrganizationJsonLd()} />
+              {publishedStoreName ? (
+                <JsonLd data={buildOrganizationJsonLd(publishedStoreName)} />
+              ) : null}
               {children}
               <CartDrawer />
               <Toaster />

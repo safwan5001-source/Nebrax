@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { buildHreflangLanguages } from "@/lib/metadata/alternates";
 import { buildCanonicalUrl } from "@/lib/seo";
 import { getStoreUrl } from "@/lib/store";
@@ -12,6 +13,12 @@ export async function generateProductsMetadata({
   country,
   locale,
 }: ProductsMetadataParams): Promise<Metadata> {
+  const t = await getTranslations({
+    locale: locale as Locale,
+    namespace: "products",
+  });
+  const title = t("allProducts");
+  const description = t("browseCollection");
   const storeUrl = getStoreUrl();
   const canonicalUrl = storeUrl
     ? buildCanonicalUrl(storeUrl, `/${country}/${locale}/products`)
@@ -26,8 +33,8 @@ export async function generateProductsMetadata({
     : undefined;
 
   return {
-    title: "Products",
-    description: "Browse our full collection of products.",
+    title,
+    description,
     ...(canonicalUrl
       ? {
           alternates: {
@@ -37,8 +44,8 @@ export async function generateProductsMetadata({
         }
       : {}),
     openGraph: {
-      title: "Products",
-      description: "Browse our full collection of products.",
+      title,
+      description,
       ...(canonicalUrl ? { url: canonicalUrl } : {}),
       type: "website",
     },

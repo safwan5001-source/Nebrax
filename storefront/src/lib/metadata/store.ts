@@ -1,11 +1,7 @@
 import type { Metadata } from "next";
+import { resolveStoreTitleName } from "@/lib/metadata/store-identity";
 import { SOCIAL_IMAGE_PATH } from "@/lib/seo";
-import {
-  getStoreMetaDescription,
-  getStoreName,
-  getStoreSeoTitle,
-  getStoreUrl,
-} from "@/lib/store";
+import { getStoreUrl } from "@/lib/store";
 
 function normalizeOpenGraphLocale(locale: string): string {
   const parts = locale.split(/[-_]/);
@@ -20,9 +16,9 @@ interface StoreMetadataParams {
 export async function generateStoreMetadata({
   locale,
 }: StoreMetadataParams): Promise<Metadata> {
-  const storeName = getStoreSeoTitle();
+  const storeName = await resolveStoreTitleName(locale);
   const storeUrl = getStoreUrl();
-  const metaDescription = getStoreMetaDescription();
+  const metaDescription = process.env.STORE_META_DESCRIPTION;
   const metaKeywords = process.env.STORE_META_KEYWORDS;
   const twitter = process.env.STORE_TWITTER;
   let metadataBaseSpread: Partial<{ metadataBase: URL }> = {};
@@ -40,14 +36,14 @@ export async function generateStoreMetadata({
       template: `%s | ${storeName}`,
       default: storeName,
     },
-    description: metaDescription,
+    ...(metaDescription ? { description: metaDescription } : {}),
     icons: {
       icon: "/icon",
       apple: "/icon",
     },
     ...(metaKeywords ? { keywords: metaKeywords } : {}),
     openGraph: {
-      siteName: getStoreName(),
+      siteName: storeName,
       locale: normalizeOpenGraphLocale(locale),
       type: "website",
       images: [SOCIAL_IMAGE_PATH],

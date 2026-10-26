@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { getCachedProduct, PRODUCT_METADATA_EXPAND } from "@/lib/data/cached";
 import { cachedGetProduct } from "@/lib/data/products";
 import {
@@ -24,7 +25,11 @@ export async function generateProductMetadata({
   try {
     product = await getCachedProduct(slug, PRODUCT_METADATA_EXPAND);
   } catch {
-    return { title: "Product Not Found" };
+    const t = await getTranslations({
+      locale: locale as Locale,
+      namespace: "notFound",
+    });
+    return { title: t("title") };
   }
 
   const title = product.meta_title || product.name;
@@ -32,7 +37,7 @@ export async function generateProductMetadata({
     ? product.meta_description
     : product.description
       ? stripHtml(product.description).slice(0, 160)
-      : `Shop ${product.name}`;
+      : product.name;
 
   const storeUrl = getStoreUrl();
   const localizedAlternates = storeUrl

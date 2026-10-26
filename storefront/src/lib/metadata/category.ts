@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { getCachedCategory } from "@/lib/data/cached";
 import { cachedGetCategory } from "@/lib/data/categories";
 import {
@@ -27,14 +28,16 @@ export async function generateCategoryMetadata({
       "children",
     ]);
   } catch {
-    return { title: "Category Not Found" };
+    const t = await getTranslations({
+      locale: locale as Locale,
+      namespace: "notFound",
+    });
+    return { title: t("title") };
   }
 
   const title = category.meta_title || category.name;
   const description =
-    category.meta_description ||
-    category.description ||
-    `Browse ${category.name} products.`;
+    category.meta_description || category.description || category.name;
 
   const storeUrl = getStoreUrl();
   const localizedAlternates = storeUrl

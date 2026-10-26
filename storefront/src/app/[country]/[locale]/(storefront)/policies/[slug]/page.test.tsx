@@ -19,6 +19,10 @@ vi.mock("next/navigation", () => ({
   },
 }));
 
+vi.mock("@/lib/metadata/store-identity", () => ({
+  resolvePublishedStoreName: vi.fn(async () => "Example Store"),
+}));
+
 vi.mock("@/lib/data/policies", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/data/policies")>()),
   getPolicy: vi.fn(),
@@ -44,7 +48,6 @@ const params = (
 
 beforeEach(() => {
   vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://store.example/");
-  vi.stubEnv("NEXT_PUBLIC_STORE_NAME", "Example Store");
   vi.mocked(getPolicy).mockResolvedValue(policy);
 });
 

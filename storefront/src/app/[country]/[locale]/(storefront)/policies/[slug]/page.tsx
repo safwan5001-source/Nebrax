@@ -6,8 +6,9 @@ import {
   getPolicy,
   PolicyUnavailableError,
 } from "@/lib/data/policies";
+import { resolvePublishedStoreName } from "@/lib/metadata/store-identity";
 import { buildCanonicalUrl } from "@/lib/seo";
-import { getStoreName, getStoreUrl } from "@/lib/store";
+import { getStoreUrl } from "@/lib/store";
 
 interface PolicyPageProps {
   params: Promise<{
@@ -52,7 +53,10 @@ export async function generateMetadata({
     };
   }
 
-  const description = `${policy.title} — ${getStoreName()}`;
+  const storeName = await resolvePublishedStoreName();
+  const description = storeName
+    ? `${policy.title} — ${storeName}`
+    : policy.title;
   const storeUrl = getStoreUrl();
   // Slugs are fixed and identical in every language, so the canonical is simply this page's own URL.
   const canonical = storeUrl
