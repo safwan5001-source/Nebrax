@@ -1,4 +1,5 @@
 import type { CustomizerMessageKey } from "./messages";
+import { parsePolicyIssuePath } from "./policy-edit";
 import {
   type Announcement,
   announcementWindowState,
@@ -71,14 +72,32 @@ function mediaSlotLabel(
 export function describePublishIssues(
   issues: Record<string, string>,
   t: (key: CustomizerMessageKey) => string,
+  /** B8-3 — names a policy page by its index in `pages[]` (null when unknown). */
+  policyName?: (index: number) => string | null,
 ): string | null {
   const lines: string[] = [];
+  const policyLines: string[] = [];
   const bannerLines: string[] = [];
   const mediaLines: string[] = [];
   let backgroundBlocked = false;
   let backgroundContrastBlocked: CustomizerMessageKey | null = null;
   let sectionTextBlocked = false;
   for (const [path, code] of Object.entries(issues)) {
+    // B8-3 — over-limit policy text: name the policy, language and field (server paths `pages.N.content.LOC.FIELD`).
+    const policy = parsePolicyIssuePath(path);
+    if (policy) {
+      const detail =
+        code === "policy_title_too_long"
+          ? t("policyIssueTitleLong")
+          : code === "policy_body_too_long"
+            ? t("policyIssueBodyLong")
+            : t("policyIssueLead");
+      const name = policyName?.(policy.index);
+      policyLines.push(
+        `${name ? `${name} ` : ""}(${t(policy.locale === "ar" ? "arabic" : "english")}): ${detail}`,
+      );
+      continue;
+    }
     if (path.startsWith("announcements")) {
       const key = ISSUE_KEY[code];
       const index = /items\[(\d+)\]/.exec(path)?.[1];
@@ -140,6 +159,11 @@ export function describePublishIssues(
     const shown = lines.slice(0, MAX_LISTED_ISSUES).join(" · ");
     const more = lines.length - MAX_LISTED_ISSUES;
     parts.push(`${t("annPublishBlocked")}. ${shown}${more > 0 ? ` (+${more})` : ""}`);
+  }
+  if (policyLines.length > 0) {
+    const shown = policyLines.slice(0, MAX_LISTED_ISSUES).join(" · ");
+    const more = policyLines.length - MAX_LISTED_ISSUES;
+    parts.push(`${t("policyIssueLead")}. ${shown}${more > 0 ? ` (+${more})` : ""}`);
   }
   if (bannerLines.length > 0) {
     const shown = bannerLines.slice(0, MAX_LISTED_ISSUES).join(" · ");

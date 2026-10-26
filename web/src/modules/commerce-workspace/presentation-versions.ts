@@ -304,7 +304,7 @@ export async function savePresentationVersion(
     if (data === null) return { ok: false, reason: 'failed', message: 'invalid_payload' };
     return { ok: true, data };
   } catch (error) {
-    return { ok: false, reason: classifyWriteFailure(error), message: errorMessage(error, 'save_failed') };
+    return { ok: false, reason: classifyWriteFailure(error), message: errorMessage(error, 'save_failed'), ...issuesOf(error) };
   }
 }
 

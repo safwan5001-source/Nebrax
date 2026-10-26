@@ -83,6 +83,7 @@ import {
   CUSTOMIZER_NAV_GROUPS,
   CUSTOMIZER_PANELS,
   type CustomizerPanel,
+  PAGE_LABEL,
 } from "./ControlPanels";
 import {
   type CustomizerLocale,
@@ -534,6 +535,11 @@ export function ExperienceBuilder({
   }
 
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
+  // B8-3 — names the policy a 422 path points at (`pages.N…`) from the draft being edited.
+  const policyNameAt = (index: number): string | null => {
+    const page = draft?.pages?.[index];
+    return page ? t(PAGE_LABEL[page.slug]) : null;
+  };
 
   const dirty = !presentationConfigsEqual(draft, saved);
   // CUST-H5-6 (§3.7) — إعادة التحميل/إغلاق التبويب تُسقط التعديلات غير المحفوظة وسجلّ التراجع المحلي (لا تخزين متصفح كمرجع): الحارس
@@ -1965,7 +1971,11 @@ export function ExperienceBuilder({
       return;
     }
     setNoticeKind("status");
-    setNotice(t("versionSaveFailed"));
+    setNotice(
+      (result.reason === "validation" && result.issues
+        ? describePublishIssues(result.issues, t, policyNameAt)
+        : null) ?? t("versionSaveFailed"),
+    );
   }
 
   function handleRestore() {
@@ -2451,7 +2461,7 @@ export function ExperienceBuilder({
       setNoticeKind("status");
       setNotice(
         (result.reason === "validation" && result.issues
-          ? describePublishIssues(result.issues, t)
+          ? describePublishIssues(result.issues, t, policyNameAt)
           : null) ??
         (result.reason === "scheduled_conflict"
           ? t("versionPublishScheduledConflict")
@@ -2561,7 +2571,7 @@ export function ExperienceBuilder({
       setNoticeKind("status");
       setNotice(
         (result.reason === "validation" && result.issues
-          ? describePublishIssues(result.issues, t)
+          ? describePublishIssues(result.issues, t, policyNameAt)
           : null) ??
         (result.reason === "stale_token"
           ? t("versionScheduleStaleToken")

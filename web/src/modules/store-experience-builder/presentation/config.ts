@@ -177,8 +177,10 @@ function normalizePolicyContent(raw: unknown): PresentationPolicyContent {
     const entry = value[locale];
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
     const e = entry as Record<string, unknown>;
-    const title = asString(e.title).slice(0, POLICY_TITLE_MAX);
-    const body = asString(e.body).slice(0, POLICY_BODY_MAX);
+    // B8-3 — the editor keeps over-limit text as typed (never truncates silently); the limits are
+    // surfaced by `policyContentIssues` and enforced by the server's 422 on save.
+    const title = asString(e.title);
+    const body = asString(e.body);
     if (title.trim() === "" && body.trim() === "") continue;
     out[locale] = { title, body };
   }
