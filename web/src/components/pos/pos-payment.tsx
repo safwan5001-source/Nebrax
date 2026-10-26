@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { ArrowRight, Banknote, CalendarClock, Check, Landmark, Loader2, TriangleAlert, User } from 'lucide-react';
+import { ArrowRight, CalendarClock, Check, Loader2, TriangleAlert, User } from 'lucide-react';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
 import type { PosCheckoutPhase } from '@/lib/pos-checkout-attempt';
 import { PosNumericEditor } from '@/components/pos/pos-numeric-editor';
@@ -10,6 +10,8 @@ import { orderedTenderPayload, simulateTenders, type PosTenderInput } from '@/li
 import { PosDeliveryPlatformPicker, type PosDeliveryPlatformOption } from '@/components/pos/pos-delivery-platform-picker';
 import { PosTerminalPay, amountToMinor, usePosTerminals } from '@/components/pos/pos-terminal-pay';
 import { api } from '@/lib/api';
+import { PaymentMethodVisual } from '@/modules/payments/methods/PaymentMethodVisual';
+import type { VisualMode } from '@/modules/payments/methods/visual';
 import { holdsPayment, isApproved, isPending, needsCompensation, type PosTerminalRequest } from '@/modules/pos-terminals/contract';
 
 export interface PaymentSummaryItem { name: string; qty: number; unitPrice: string; lineTotal: number }
@@ -22,6 +24,12 @@ export interface PosPaymentMethod {
   is_default: boolean;
   /** H6-02: الوسيلة تشترط موافقة مؤكدة من جهاز الدفع (الخادم يفرضه أيضاً). */
   pos_terminal_required?: boolean;
+  /** تخصيص بصري اختياري من `GET /payment-methods`؛ غيابه = أيقونة نقد/بنك كما كانت. */
+  visual_mode?: VisualMode | null;
+  icon_key?: string | null;
+  icon_color?: string | null;
+  has_logo?: boolean;
+  updated_at?: string | null;
 }
 export interface PosTender { payment_method_id: string; amount: number; terminal_request_id?: string }
 
@@ -302,7 +310,6 @@ export function PosPayment({
                   const appliedMinor = riyalToMinor(tenders[method.id] ?? '');
                   const applied = appliedMinor > 0;
                   const invalid = sim.invalidMethodId === method.id;
-                  const Icon = method.settlement_type === 'cash' ? Banknote : Landmark;
                   return (
                     <button
                       key={method.id}
@@ -316,7 +323,7 @@ export function PosPayment({
                       }
                     >
                       <span className="flex w-full items-center justify-between gap-2">
-                        <Icon className={'h-4 w-4 ' + (invalid ? 'text-negative' : selected || applied ? 'text-primary' : 'text-muted')} strokeWidth={1.7} />
+                        <PaymentMethodVisual method={method} className="h-4 w-4" defaultIconClassName={invalid ? 'text-negative' : selected || applied ? 'text-primary' : 'text-muted'} />
                         {invalid ? (
                           <TriangleAlert className="h-4 w-4 text-negative" strokeWidth={1.8} aria-hidden />
                         ) : applied ? (

@@ -8648,7 +8648,36 @@
       "terminalRequiredHint": "When on, a POS sale with this method is only confirmed with a confirmed approval from a payment terminal. Off by default."
     },
     "badgeTerminalRequired": "Terminal required",
-    "badgeClearing": "Card clearing"
+    "badgeClearing": "Card clearing",
+    "visual": {
+      "title": "Payment method icon or image",
+      "modeDefault": "Default",
+      "modeIcon": "Icon",
+      "modeImage": "Image / logo",
+      "defaultHint": "The default icon is shown based on the settlement type.",
+      "iconGroup": "Choose an icon",
+      "color": "Icon color",
+      "colorPicker": "Color picker",
+      "resetColor": "Default color",
+      "colorHint": "Color applies to icons only and is never applied to uploaded logos.",
+      "errorColor": "Enter a color in #RRGGBB format.",
+      "errorIconRequired": "Choose an icon, or switch the mode to Default.",
+      "errorImageRequired": "Upload an image or logo, or change the mode.",
+      "errorType": "Unsupported file. Use PNG, JPEG or WebP.",
+      "errorSize": "The file is larger than 1 MB.",
+      "upload": "Upload image",
+      "replace": "Replace image",
+      "remove": "Remove",
+      "uploadInput": "Choose image file",
+      "previewAlt": "Payment method logo preview",
+      "imageHint": "PNG, JPEG or WebP, up to 1 MB and no larger than 2000×2000. The logo is shown as-is, never tinted. SVG is not supported.",
+      "uploadFailed": "The method was saved but the logo upload failed. Try again from Edit.",
+      "icons": {
+        "banknote": "Cash", "coins": "Coins", "wallet": "Wallet", "credit-card": "Credit card", "landmark": "Bank transfer",
+        "receipt": "Receipt", "smartphone": "Mobile", "qr-code": "QR code", "hand-coins": "Manual payment", "piggy-bank": "Savings",
+        "badge-dollar-sign": "Money badge", "building-2": "Institution", "send": "Send", "scroll-text": "Cheque"
+      }
+    }
   },
   "printTemplateAssignments": {
     "title": "Template assignments",

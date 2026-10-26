@@ -1089,6 +1089,9 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('payment-methods', [PaymentMethodController::class, 'index'])->middleware($perm('payments.view'));
         Route::post('payment-methods', [PaymentMethodController::class, 'store'])->middleware($perm('payments.manage'));
         Route::put('payment-methods/{id}', [PaymentMethodController::class, 'update'])->middleware($perm('payments.manage'));
+        Route::get('payment-methods/{id}/logo', [PaymentMethodController::class, 'showLogo'])->middleware($perm('payments.view'));
+        Route::post('payment-methods/{id}/logo', [PaymentMethodController::class, 'uploadLogo'])->middleware([$perm('payments.manage'), 'throttle:30,1']);
+        Route::delete('payment-methods/{id}/logo', [PaymentMethodController::class, 'removeLogo'])->middleware($perm('payments.manage'));
         Route::post('payment-methods/{id}/make-default', [PaymentMethodController::class, 'makeDefault'])->middleware($perm('payments.manage'));
         Route::delete('payment-methods/{id}', [PaymentMethodController::class, 'destroy'])->middleware($perm('payments.manage'));
 
