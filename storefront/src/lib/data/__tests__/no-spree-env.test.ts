@@ -591,3 +591,23 @@ describe("policy pages work without Spree", () => {
     expectSpreeUntouched();
   });
 });
+
+describe("X5: legacy Spree checkout routes are closed without wholesale configuration", () => {
+  it("the legacy (checkout) layout is a 404 and never touches Spree", async () => {
+    const { default: LegacyCheckoutLayout } = await import(
+      "@/app/[country]/[locale]/(checkout)/layout"
+    );
+    expect(() => LegacyCheckoutLayout({ children: null })).toThrow(
+      expect.objectContaining({ digest: "NEXT_HTTP_ERROR_FALLBACK;404" }),
+    );
+    expectSpreeUntouched();
+  });
+
+  it("the AWJ-native checkout page still loads without Spree", async () => {
+    const mod = await import(
+      "@/app/[country]/[locale]/(store-checkout)/checkout/page"
+    );
+    expect(typeof mod.default).toBe("function");
+    expectSpreeUntouched();
+  });
+});
