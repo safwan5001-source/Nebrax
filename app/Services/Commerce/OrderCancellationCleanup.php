@@ -51,7 +51,9 @@ final class OrderCancellationCleanup
     public function runPending(int $limit = 100): array
     {
         $summary = ['processed' => 0, 'cleaned' => 0, 'still_pending' => 0, 'failed' => 0];
-        $active = "'".implode("','", PaymentAttempt::ACTIVE_STATUSES)."'";
+        // فقط الحالات التي يستطيع `PaymentOrchestrator::cancel` إغلاقها: `authorized` يُرفض دوماً بـ`cannot_cancel` فبقاؤه في الدفعة كان
+        // سيُبقي النية نفسها في كل تشغيلة ويجوّع الأحدث (مراجعة Codex P2). التقاط/استرداد المصرَّح به مسار آخر لا يخصّ هذا المطابِق.
+        $active = "'".implode("','", PaymentAttempt::CLOSABLE_STATUSES)."'";
         $key = CommercePaymentIntent::PAYABLE_TYPE.':';
 
         $due = CommercePaymentIntent::query()->withoutGlobalScopes()
@@ -66,7 +68,9 @@ final class OrderCancellationCleanup
                     ->whereRaw("a.payable_key = ? || CAST(commerce_payment_intents.id AS TEXT)", [$key])
                     ->whereRaw("a.capture_status IN ({$active})");
             })
-            ->orderBy('cancelled_at')
+            // ترتيب عشوائي لا «الأقدم أولاً»: نية لا تُغلَق (مزوّد معطّل مثلاً) لا تحجز مقدّمة الدفعة فتجوّع غيرها؛ كل نية مؤهَّلة
+            // تُبلَغ احتمالاً عبر التشغيلات المتكرّرة دون حالة محفوظة أو جدول جديد.
+            ->inRandomOrder()
             ->limit($limit)
             ->get();
 

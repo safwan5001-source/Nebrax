@@ -293,7 +293,10 @@ final class CommerceOnlinePaymentService
         } catch (\Throwable $e) {
             report($e);
 
-            return $result + ['failed' => 1];
+            // `+` يُبقي قيمة الطرف الأيسر (failed=0)؛ يجب الإسناد صراحةً كي يُحتسب الفشل «معلّقاً» لا نجاحاً (مراجعة Codex P2).
+            $result['failed'] = 1;
+
+            return $result;
         }
 
         foreach ($attempts as $active) {
@@ -313,7 +316,7 @@ final class CommerceOnlinePaymentService
         }
 
         try {
-            $result['remaining'] = PaymentAttempt::query()->where('payable_key', $intent->payableKey())->whereIn('capture_status', PaymentAttempt::ACTIVE_STATUSES)->count();
+            $result['remaining'] = PaymentAttempt::query()->where('payable_key', $intent->payableKey())->whereIn('capture_status', PaymentAttempt::CLOSABLE_STATUSES)->count();
         } catch (\Throwable $e) {
             report($e);
         }

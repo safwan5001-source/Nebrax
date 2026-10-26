@@ -289,6 +289,46 @@ class CommerceIntentCancelSeparationTest extends TestCase
         $this->assertSame('created', $this->attemptStatus($old['order_id']), 'older than the window: never touched');
     }
 
+    /** مراجعة Codex P2: محاولة `authorized` لا يغلقها `cancel()` أبداً فلا يجوز أن تحجز مقدّمة الدفعة وتجوّع النوايا القابلة للإغلاق. */
+    #[Test]
+    public function an_authorized_attempt_never_occupies_the_batch_or_starves_closable_intents(): void
+    {
+        $stuck = $this->createdAttemptOrder('idem-auth-1');
+        $closable = $this->createdAttemptOrder('idem-auth-2');
+        $this->service()->cancelWithinTransaction($this->intent($stuck['order_id']));
+        $this->service()->cancelWithinTransaction($this->intent($closable['order_id']));
+        $this->backdateCancellation($stuck['order_id'], 60 * 24 * 3); // الأقدم: كان سيتصدّر ترتيب «الأقدم أولاً»
+        $this->backdateCancellation($closable['order_id'], 5);
+        DB::table('payment_attempts')->where('id', $this->attempts($stuck['order_id'])->first()->id)->update(['capture_status' => PaymentAttempt::STATUS_AUTHORIZED]);
+
+        $summary = $this->runReconciler(1); // دفعة من واحد: لو دخلت المصرَّح بها لحجزتها
+
+        $this->assertSame(['processed' => 1, 'cleaned' => 1, 'still_pending' => 0, 'failed' => 0], $summary);
+        $this->assertSame('cancelled', $this->attemptStatus($closable['order_id']), 'the closable intent is reached');
+        $this->assertSame('authorized', $this->attemptStatus($stuck['order_id']), 'the authorized attempt is left to its own (capture/review) path');
+        $this->assertSame(0, $this->runReconciler(1)['processed'], 'nothing is left for the reconciler once only the authorized attempt remains');
+    }
+
+    /** مراجعة Codex P2: فشل تحميل المحاولات يجب أن يُحتسب فشلاً (معلّقاً) لا تنظيفاً ناجحاً (`array +` كان يُبقي failed=0). */
+    #[Test]
+    public function a_failure_loading_the_attempts_is_reported_as_failed_not_as_cleaned(): void
+    {
+        $order = $this->createdAttemptOrder();
+        $intent = $this->intent($order['order_id']);
+        PaymentAttempt::addGlobalScope('boom', static function (): void {
+            throw new RuntimeException('simulated attempt query failure');
+        });
+
+        try {
+            $result = app(\App\Services\Commerce\CommerceOnlinePaymentService::class)->closeActiveAttemptsIsolated($intent);
+        } finally {
+            PaymentAttempt::clearBootedModels();
+        }
+
+        $this->assertSame(['closed' => 0, 'skipped' => 0, 'failed' => 1, 'remaining' => 0], $result);
+        $this->assertSame('created', $this->attemptStatus($order['order_id']), 'nothing was closed');
+    }
+
     #[Test]
     public function the_reconciler_runs_each_intent_under_its_own_tenant_and_restores_the_context(): void
     {
