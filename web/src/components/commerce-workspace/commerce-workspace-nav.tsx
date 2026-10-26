@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import {
+  ClipboardList,
   Gift,
   Globe,
   Layers3,
@@ -35,6 +36,7 @@ import {
 
 const ICONS: Record<string, typeof Store> = {
   '/commerce': LayoutDashboard,
+  '/commerce/orders': ClipboardList,
   '/commerce/stores': Store,
   '/commerce/published-products': ShoppingBag,
   '/commerce/merchandising': Tags,
