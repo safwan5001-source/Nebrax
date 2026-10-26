@@ -213,6 +213,10 @@ class Rbac
             // قراءة مساحة عمل. owner/admin يملكانها عبر `*`؛ لا تُضاف لـ
             // accountant/staff تلقائياً — نفس نمط الصلاحيات الحديثة أعلاه.
             'commerce.manage',
+            // COMMERCE-ORDERS-O1a: قراءة طلبات المتجر (قائمة + تفاصيل) للموظف — قراءة فقط، تكشف بيانات
+            // اتصال/عنوان المشتري. مستقلة عن `commerce.manage` و`payments.*`. owner/admin عبر `*` فقط؛
+            // لا تُضاف لـ`MATRIX` ولا تُمنح لأي دور مخزَّن بهجرة (لا منح ضمني).
+            'commerce.orders.view',
             // APP-BUILDER-1: إدارة تطبيقات AWJ App Builder (الهوية والمسودة)
             // سلطة مستقلة عن نشر نسخة تجربة — `apps_builder.publish` أدناه.
             // لا علاقة بـ`apps.view`/`apps.manage` (تفعيل/إيقاف قدرات
