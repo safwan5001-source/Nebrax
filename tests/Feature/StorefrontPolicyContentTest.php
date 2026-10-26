@@ -8,6 +8,7 @@ use App\Models\StorefrontDomain;
 use App\Support\Commerce\StorefrontPresentationNormalizer;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
@@ -220,5 +221,51 @@ class StorefrontPolicyContentTest extends TestCase
         $res = $this->withToken($a['token'])->putJson($p, ['config' => $cfg, 'draft_revision' => 0])->assertOk();
         $this->assertArrayNotHasKey('content', $res->json('data.draft.pages.0'));
         $this->assertSame(80, mb_strlen($res->json('data.draft.pages.1.title')));
+    }
+
+    /** @test */
+    public function over_limit_body_via_version_save_is_422_and_leaves_version_draft_and_revision_untouched(): void
+    {
+        $a = $this->registerTenant('pol-ver', 'owner@pol-ver.test');
+        $b = $this->registerTenant('pol-ver-b', 'owner@pol-ver-b.test');
+        $store = $this->seedStore($a['tenant_id'], 'pol-ver.example.com');
+        $storeB = $this->seedStore($b['tenant_id'], 'pol-ver-b.example.com');
+        $list = $this->path($store['storefront']->id).'/versions';
+
+        $created = $this->withToken($a['token'])->postJson($list, ['name' => 'نسخة'])->assertCreated();
+        $item = $list.'/'.$created->json('data.id');
+
+        // حفظ صالح عند الحدّ بالضبط ⇒ يتقدّم revision.
+        $ok = $this->policyConfig(str_repeat('ب', 20000));
+        $ok['pages'][0]['content']['en']['body'] = 'ok';
+        $saved = $this->withToken($a['token'])
+            ->putJson($item, ['config' => $ok, 'revision' => 1])->assertOk();
+        $this->assertSame(2, $saved->json('data.revision'));
+        $this->assertSame(20000, mb_strlen($saved->json('data.config.pages.0.content.ar.body')));
+
+        $versionsBefore = DB::table('storefront_presentation_versions')->where('id', $created->json('data.id'))->first();
+        $draftBefore = DB::table('storefront_presentations')->where('storefront_id', $store['storefront']->id)->first();
+        $revisionRows = DB::table('storefront_presentation_version_revisions')->count();
+
+        $bad = $this->policyConfig(str_repeat('ب', 20001));
+        $bad['pages'][0]['content']['en']['body'] = 'ok';
+        $bad['homepage'] = ['heroHeadline' => 'لا يُحفظ جزئياً'];
+        $r = $this->withToken($a['token'])->putJson($item, ['config' => $bad, 'revision' => 2])->assertStatus(422);
+        $this->assertSame(['pages.0.content.ar.body' => 'policy_body_too_long'], $r->json('error_codes'));
+
+        $read = $this->withToken($a['token'])->getJson($item)->assertOk();
+        $this->assertSame(2, $read->json('data.revision'));
+        $this->assertSame(20000, mb_strlen($read->json('data.config.pages.0.content.ar.body')));
+        $this->assertNotSame('لا يُحفظ جزئياً', $read->json('data.config.homepage.heroHeadline'));
+
+        $versionsAfter = DB::table('storefront_presentation_versions')->where('id', $created->json('data.id'))->first();
+        $draftAfter = DB::table('storefront_presentations')->where('storefront_id', $store['storefront']->id)->first();
+        $this->assertEquals($versionsBefore, $versionsAfter);
+        $this->assertEquals($draftBefore, $draftAfter);
+        $this->assertSame($revisionRows, DB::table('storefront_presentation_version_revisions')->count());
+
+        // عزل: مستأجر آخر لا يصل لنسخة غيره (404) ولو بنص صالح.
+        $this->withToken($b['token'])->putJson($item, ['config' => $ok, 'revision' => 2])->assertNotFound();
+        $this->assertNotNull($storeB['storefront']->id);
     }
 }
