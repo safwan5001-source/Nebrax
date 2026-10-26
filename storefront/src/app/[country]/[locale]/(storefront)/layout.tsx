@@ -14,6 +14,7 @@ import { PublishedThemeMarkerProvider } from "@/components/layout/PublishedTheme
 import { StoreWhatsApp } from "@/components/layout/StoreWhatsApp";
 import { fetchStorefrontConfig } from "@/lib/commerce/storefront";
 import { getCategories } from "@/lib/data/categories";
+import { readPolicyAvailability } from "@/lib/policy/availability";
 import { resolveFooterDesign } from "@/lib/presentation/footer-design";
 import { headerIsCompact } from "@/lib/presentation/header-design";
 import {
@@ -178,6 +179,9 @@ export default async function StorefrontLayout({
   const basePath = `/${country}/${locale}`;
   const identity = await fetchStorefrontConfig().catch(() => null);
   const presentation = identity?.presentation ?? null;
+  // X4-FIX — fail closed: no identity (fetch failed) ⇒ no policy is vouched for ⇒ no policy links.
+  const policyAvailability =
+    identity?.policyAvailability ?? readPolicyAvailability(null);
   const liveName = identity?.name?.trim() ? identity.name : null;
   const footerMessages = await getTranslations({
     locale: locale as Locale,
@@ -205,10 +209,14 @@ export default async function StorefrontLayout({
   );
   // V7d: a published `main` menu supersedes the legacy flat `header.links` (V0 §11.1).
   const extraLinks =
-    (await publishedMainNav(presentation, basePath)) ??
+    (await publishedMainNav(presentation, basePath, policyAvailability)) ??
     publishedExtraNav(presentation, basePath);
   // V7e: the footer's merchant link groups (resolved against the live catalogue) and its design.
-  const footerGroups = await publishedFooterGroups(presentation, basePath);
+  const footerGroups = await publishedFooterGroups(
+    presentation,
+    basePath,
+    policyAvailability,
+  );
   const footerDesign = presentation?.footer.design
     ? resolveFooterDesign(presentation.footer.design, {
         primaryColor: presentation.primaryColor,
@@ -328,7 +336,7 @@ export default async function StorefrontLayout({
       </main>
       <Footer
         basePath={basePath}
-        policySlugs={publishedPolicySlugs(presentation)}
+        policySlugs={publishedPolicySlugs(presentation, policyAvailability)}
         locale={locale as Locale}
         storeName={displayName}
         businessIdentity={identity?.business_identity}

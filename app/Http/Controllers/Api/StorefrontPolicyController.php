@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Support\PublicApiErrorCode;
 use App\Services\Commerce\StorefrontPresentationService;
-use App\Support\Commerce\PolicyMarkdownRenderer;
+use App\Support\Commerce\PublishedPolicyContent;
 use App\Support\Commerce\StorefrontPresentationNormalizer;
 use App\Support\PublicApiResponse;
 use App\Tenancy\StorefrontContext;
@@ -34,21 +34,12 @@ class StorefrontPolicyController extends PublicApiController
         $snapshot = $presentations->publishedSnapshotForStorefront($context->storefrontId());
         $pages = is_array($snapshot) && is_array($snapshot['pages'] ?? null) ? $snapshot['pages'] : [];
 
-        $content = null;
-        $pageTitle = '';
-        foreach ($pages as $page) {
-            if (! is_array($page) || ($page['slug'] ?? null) !== $slug || ($page['enabled'] ?? false) !== true) {
-                continue;
-            }
-            if (is_array($page['content'] ?? null) && $page['content'] !== []) {
-                $content = $page['content'];
-                $pageTitle = is_string($page['title'] ?? null) ? $page['title'] : '';
-                break;
-            }
-        }
-        if ($content === null) {
+        $found = PublishedPolicyContent::page($pages, $slug);
+        if ($found === null) {
             return $this->notFound($request);
         }
+        $content = $found['content'];
+        $pageTitle = $found['title'];
 
         $requested = $this->requestedLocale($request);
         $candidates = array_values(array_unique(array_filter([
@@ -60,12 +51,9 @@ class StorefrontPolicyController extends PublicApiController
 
         foreach ($candidates as $locale) {
             $entry = $content[$locale] ?? null;
-            if (! is_array($entry) || ! is_string($entry['body'] ?? null) || trim($entry['body']) === '') {
-                continue;
-            }
-            $html = PolicyMarkdownRenderer::render($entry['body']);
             // لا متن مرئي بعد التنقية (مثل صورة وحدها أو وسوم فارغة) ⇒ كأنها فارغة: جرّب اللغة التالية ثم 404.
-            if ($html === '' || trim(html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8'), " \t\n\r\0\x0B\xC2\xA0\u{200B}") === '') {
+            $html = PublishedPolicyContent::visibleHtml($entry);
+            if ($html === null) {
                 continue;
             }
             $title = is_string($entry['title'] ?? null) && trim($entry['title']) !== '' ? $entry['title'] : $pageTitle;

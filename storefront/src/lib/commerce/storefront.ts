@@ -1,4 +1,8 @@
 import { cache } from "react";
+import {
+  type PolicyAvailability,
+  readPolicyAvailability,
+} from "@/lib/policy/availability";
 import type { StorefrontPresentationConfig } from "@/lib/presentation/config";
 import type { ResolvedMediaMap } from "@/lib/presentation/media-ref";
 import { readPublishedPresentation } from "@/lib/presentation/public";
@@ -21,6 +25,11 @@ export interface AwjStorefrontConfig {
    * media. Entries that do not match the contract are dropped on read.
    */
   presentationMedia?: ResolvedMediaMap;
+  /**
+   * X4-FIX — which policy pages the backend would actually serve (booleans, no text). Fail closed: absent or
+   * malformed ⇒ every policy `false`.
+   */
+  policyAvailability?: PolicyAvailability;
 }
 
 export interface AwjBusinessIdentity {
@@ -36,6 +45,7 @@ interface AwjStorefrontConfigResponse {
     business_identity?: unknown;
     presentation?: unknown;
     presentation_media?: unknown;
+    policy_availability?: unknown;
   };
 }
 
@@ -129,6 +139,9 @@ export const fetchStorefrontConfig = cache(
       ),
       presentationMedia: readResolvedMedia(
         response.data.presentation_media ?? null,
+      ),
+      policyAvailability: readPolicyAvailability(
+        response.data.policy_availability,
       ),
     };
   },

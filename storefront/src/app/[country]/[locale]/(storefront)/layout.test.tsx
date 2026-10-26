@@ -118,6 +118,102 @@ describe("StorefrontLayout", () => {
     expect(elements.at(-1)?.type).toBe(MobileBottomNav);
   });
 
+  describe("policy links (X4-FIX): enabled AND available, failing closed", () => {
+    const identity = (extra: Record<string, unknown>) => ({
+      name: "متجر الاختبار",
+      default_locale: "ar",
+      business_identity: {
+        legal_name: null,
+        cr_number: null,
+        vat_number: null,
+      },
+      presentation: DEFAULT_PRESENTATION_CONFIG, // the four policy pages are enabled by default
+      ...extra,
+    });
+    // A populated presentation wraps the chrome in the themed <div>; unwrap it to reach the Footer element.
+    const footerSlugs = async () => {
+      const layout = (await StorefrontLayout({
+        children: <section>Storefront content</section>,
+        params: Promise.resolve({ country: "us", locale: "en" }),
+      })) as ReactElement<LayoutElementProps>;
+      const chromeRoot =
+        layout.type === Fragment
+          ? layout
+          : (layout.props.children as ReactElement<LayoutElementProps>);
+      const chrome = Children.toArray(
+        chromeRoot.props.children,
+      ) as ReactElement<LayoutElementProps>[];
+      const footer = chrome.find((element) => element.type === Footer);
+      return (footer?.props as { policySlugs?: string[] } | undefined)
+        ?.policySlugs;
+    };
+
+    it("links only the enabled policies the backend vouches for", async () => {
+      vi.mocked(fetchStorefrontConfig).mockResolvedValueOnce(
+        identity({
+          policyAvailability: {
+            "shipping-policy": false,
+            "privacy-policy": true,
+            "returns-policy": false,
+            "terms-of-service": true,
+          },
+        }) as never,
+      );
+      expect(await footerSlugs()).toEqual([
+        "privacy-policy",
+        "terms-of-service",
+      ]);
+    });
+
+    it("hides every policy link when none has available content", async () => {
+      vi.mocked(fetchStorefrontConfig).mockResolvedValueOnce(
+        identity({
+          policyAvailability: {
+            "shipping-policy": false,
+            "privacy-policy": false,
+            "returns-policy": false,
+            "terms-of-service": false,
+          },
+        }) as never,
+      );
+      expect(await footerSlugs()).toEqual([]);
+    });
+
+    it("hides available content whose page the merchant switched off", async () => {
+      vi.mocked(fetchStorefrontConfig).mockResolvedValueOnce(
+        identity({
+          presentation: {
+            ...DEFAULT_PRESENTATION_CONFIG,
+            pages: DEFAULT_PRESENTATION_CONFIG.pages.map((page) =>
+              page.slug === "privacy-policy"
+                ? { ...page, enabled: false }
+                : page,
+            ),
+          },
+          policyAvailability: {
+            "shipping-policy": false,
+            "privacy-policy": true,
+            "returns-policy": false,
+            "terms-of-service": false,
+          },
+        }) as never,
+      );
+      expect(await footerSlugs()).toEqual([]);
+    });
+
+    it("a payload without the signal (older backend) or a failed config fetch links nothing", async () => {
+      vi.mocked(fetchStorefrontConfig).mockResolvedValueOnce(
+        identity({}) as never,
+      );
+      expect(await footerSlugs()).toEqual([]);
+
+      vi.mocked(fetchStorefrontConfig).mockRejectedValueOnce(
+        new Error("AWJ down"),
+      );
+      expect(await footerSlugs()).toEqual([]);
+    });
+  });
+
   it("passes canonical Tenant identity to the public Footer", async () => {
     const elements = await renderLayout(<section>Storefront content</section>);
     const footer = elements.find((element) => element.type === Footer);

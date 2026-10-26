@@ -8,6 +8,7 @@ use App\Models\Tenant;
 use App\Services\Commerce\StorefrontPresentationService;
 use App\Services\Commerce\StorefrontPublishedMediaResolver;
 use App\Support\Commerce\BusinessVertical;
+use App\Support\Commerce\PublishedPolicyContent;
 use App\Support\Commerce\StorefrontPresentationNormalizer;
 use App\Support\PublicApiResponse;
 use App\Tenancy\StorefrontContext;
@@ -37,6 +38,8 @@ class StorefrontConfigController extends PublicApiController
         $defaultLocale = null;
         $businessVertical = BusinessVertical::default();
         $presentation = null;
+        // Fail closed: nothing is "available" unless a published, enabled, visibly non-empty policy proves it.
+        $policyAvailability = PublishedPolicyContent::availability(null);
         $businessIdentity = [
             'legal_name' => null,
             'cr_number' => null,
@@ -78,6 +81,9 @@ class StorefrontConfigController extends PublicApiController
             }
 
             // B8-1 — متون السياسات لا تخرج من اللقطة العامة (تُخدَم من مسار مخصّص لاحقاً، B8-2).
+            // X4-FIX — availability is computed from the published snapshot BEFORE the bodies are stripped, with
+            // the same rules as the policy endpoint; only booleans leave this method.
+            $policyAvailability = PublishedPolicyContent::availability(is_array($presentation) ? $presentation : null);
             if (is_array($presentation)) {
                 $presentation = StorefrontPresentationNormalizer::withoutPolicyContent($presentation);
             }
@@ -111,6 +117,7 @@ class StorefrontConfigController extends PublicApiController
                 'business_vertical' => $businessVertical->value,
                 'business_identity' => $businessIdentity,
                 'presentation' => $presentation,
+                'policy_availability' => $policyAvailability,
                 'presentation_media' => (object) $presentationMedia,
             ],
             'meta' => ['request_id' => PublicApiResponse::requestId($request)],

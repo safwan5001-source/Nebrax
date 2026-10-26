@@ -6,6 +6,7 @@
 import type { Category } from "@spree/sdk";
 import { fetchCategories } from "@/lib/commerce/categories";
 import { fetchProductsByIds } from "@/lib/commerce/products";
+import type { PolicyAvailability } from "@/lib/policy/availability";
 import type { StorefrontPresentationConfig } from "./config";
 import { mainMenu } from "./navigation";
 import {
@@ -33,6 +34,7 @@ function flattenCategories(
 export async function publishedMainNav(
   presentation: StorefrontPresentationConfig | null,
   basePath: string,
+  policyAvailability: PolicyAvailability,
 ): Promise<ResolvedNavItem[] | null> {
   const menu = mainMenu(presentation?.navigation);
   if (!menu) return null;
@@ -58,7 +60,9 @@ export async function publishedMainNav(
     basePath,
     categories,
     products,
-    policySlugs: new Set(publishedPolicySlugs(presentation)),
+    policySlugs: new Set(
+      publishedPolicySlugs(presentation, policyAvailability),
+    ),
   };
   return resolveNavMenu(menu, ctx);
 }
