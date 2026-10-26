@@ -31,6 +31,9 @@ final class CommerceOrderStaffSerializer
             'id' => $order->id,
             'number' => $order->number,
             'status' => $order->status,
+            // ADR-28 (O3a-1): حالة دورة الحياة المشتقّة + كتلة الإلغاء؛ `status` الخام يبقى كما كان.
+            'lifecycle_status' => $order->lifecycleStatus(),
+            'cancellation' => self::cancellation($order, false),
             'created_at' => $order->created_at?->toIso8601String(),
             'confirmed_at' => $order->confirmed_at?->toIso8601String(),
             'total' => self::money($order->total, $currency),
@@ -60,6 +63,7 @@ final class CommerceOrderStaffSerializer
         return [
             ...self::summary($order, $currency),
             'partner_id' => $order->partner_id,
+            'cancellation' => self::cancellation($order, true),
             'delivery_amount' => self::money($order->delivery_amount_minor, $currency),
             'contact' => [
                 'name' => $snapshot?->contact_name,
@@ -126,6 +130,28 @@ final class CommerceOrderStaffSerializer
                     'accounting_date' => $posting->accounting_date?->toDateString(),
                     'amount' => self::money((int) $posting->amount_minor, $currency),
                 ],
+        ];
+    }
+
+    /**
+     * كتلة الإلغاء. القائمة: الحقائق الموجزة فقط؛ التفاصيل (الفاعل والملاحظة) في الطلب المفرد. للطلب غير الملغى كلها `null`.
+     *
+     * @return array{cancelled: bool, at: ?string, reason: ?string, by?: ?array{id: string, name: ?string}, note?: ?string}
+     */
+    private static function cancellation(CommerceOrder $order, bool $detailed): array
+    {
+        $block = [
+            'cancelled' => $order->isCancelled(),
+            'at' => $order->cancelled_at?->toIso8601String(),
+            'reason' => $order->cancellation_reason,
+        ];
+        if (! $detailed) {
+            return $block;
+        }
+
+        return $block + [
+            'by' => $order->cancelled_by_user_id === null ? null : ['id' => $order->cancelled_by_user_id, 'name' => $order->cancelledBy?->name],
+            'note' => $order->cancellation_note,
         ];
     }
 

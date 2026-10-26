@@ -70,7 +70,17 @@ class CommerceOrder extends BaseModel implements CompanyWide
         'total' => 'integer',
         'delivery_amount_minor' => 'integer',
         'confirmed_at' => 'datetime',
+        'cancelled_at' => 'datetime',
     ];
+
+    /**
+     * حالة دورة الحياة المشتقّة (ADR-28 D-9): `cancelled` متى وُجد `cancelled_at`، وإلا `status` الحالي.
+     * قراءة مشتقة فقط — `status` يبقى `draft|confirmed` ولا يتغيّر معنى `isConfirmed()` (يحمي جمود اللقطات التاريخية).
+     */
+    public const LIFECYCLE_CANCELLED = 'cancelled';
+
+    /** @var list<string> */
+    public const CANCELLATION_REASONS = ['customer_request', 'out_of_stock', 'payment_issue', 'duplicate_order', 'fraud_suspected', 'other'];
 
     protected $attributes = [
         'status' => self::STATUS_DRAFT,
@@ -157,6 +167,26 @@ class CommerceOrder extends BaseModel implements CompanyWide
     public function paymentIntent(): HasOne
     {
         return $this->hasOne(CommercePaymentIntent::class, 'commerce_order_id');
+    }
+
+    /**
+     * حقائق الإلغاء (`cancelled_at`, `cancelled_by_user_id`, `cancellation_reason`, `cancellation_note`) **ليست** في `$fillable` عمداً:
+     * لا تُكتب بتعيين جماعي؛ تكتبها خدمة الإلغاء (O3a-2b) وحدها، وقاعدة البيانات تحرس شكلها وجمودها (migration 2026_12_13).
+     */
+    public function cancelledBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelled_by_user_id');
+    }
+
+    public function isCancelled(): bool
+    {
+        return $this->cancelled_at !== null;
+    }
+
+    /** `cancelled` | `confirmed` | `draft` — مشتقة، لا تُخزَّن. */
+    public function lifecycleStatus(): string
+    {
+        return $this->isCancelled() ? self::LIFECYCLE_CANCELLED : (string) $this->status;
     }
 
     public function isDraft(): bool
