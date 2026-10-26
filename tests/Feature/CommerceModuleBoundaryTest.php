@@ -55,6 +55,9 @@ class CommerceModuleBoundaryTest extends TestCase
      * @var list<string>
      */
     private const ALLOWED_COMMERCE_API_ROUTES = [
+        // COMMERCE-ORDERS-O1a — طلبات المتجر للموظف (قراءة فقط، commerce.orders.view).
+        'api/commerce/orders',
+        'api/commerce/orders/{id}',
         // COM-MOBILE-PAYMENTS-1 — إدارة داخلية لالتزامات دفع Commerce (ADR-09).
         'api/commerce/payment-intents',
         'api/commerce/payment-intents/{id}/cancel',
