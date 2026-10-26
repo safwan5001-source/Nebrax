@@ -44,6 +44,9 @@ function setStore(selected: string | null) {
 const lastQuery = () => (fetchOrdersMock.mock.calls.at(-1)![0] as URLSearchParams);
 const page = (rows = [summaryFixture()], meta = { current_page: 1, per_page: 20, total: rows.length, last_page: 1 }) => ({ data: rows, meta });
 
+/** آخر رابط كُتب عبر router.replace كمعاملات استعلام. */
+const lastUrl = () => new URL(String(nav.replace.mock.calls.at(-1)![0]), 'http://x');
+
 describe('OrdersList', () => {
   beforeEach(() => {
     locale.current = 'ar';
@@ -257,5 +260,106 @@ describe('OrdersList', () => {
     await waitFor(() => expect(fetchOrdersMock).toHaveBeenCalled());
     const channel = screen.getByLabelText('قناة البيع');
     expect(within(channel).getAllByRole('option').map((o) => o.textContent)).toEqual(['كل القنوات', 'زهور طيبة', 'زهور الرشد']);
+  });
+
+  describe('store ↔ URL ↔ data consistency (review P2: stale store overwrote the new one)', () => {
+    it('A → B writes the NEW store into the replacement URL, never the old one', async () => {
+      nav.search = 'store=s1&payment_status=paid&page=2';
+      render(<OrdersList />);
+      await waitFor(() => expect(fetchOrdersMock).toHaveBeenCalled());
+      fireEvent.change(screen.getByLabelText('المتجر'), { target: { value: 's2' } });
+      expect(store.select).toHaveBeenCalledWith('s2');
+      const url = lastUrl();
+      expect(url.searchParams.get('store')).toBe('s2');
+      expect(url.searchParams.getAll('store')).toEqual(['s2']);
+      // الفلاتر محفوظة والصفحة أُعيدت إلى 1 عند تبديل المتجر.
+      expect(url.searchParams.get('payment_status')).toBe('paid');
+      expect(url.searchParams.has('page')).toBe(false);
+      expect(url.searchParams.has('scope')).toBe(false);
+    });
+
+    it('B → all stores keeps the context store in the URL and adds scope=all', async () => {
+      nav.search = 'store=s1';
+      render(<OrdersList />);
+      await waitFor(() => expect(fetchOrdersMock).toHaveBeenCalled());
+      fireEvent.change(screen.getByLabelText('المتجر'), { target: { value: '' } });
+      const url = lastUrl();
+      expect(url.searchParams.get('scope')).toBe('all');
+      expect(url.searchParams.get('store')).toBe('s1');
+      expect(store.select).not.toHaveBeenCalled();
+    });
+
+    it('any later filter/page change uses the context store even if the search params still hold the previous one', async () => {
+      // المزوّد حدّث السياق إلى s2 لكن searchParams ما زالت s1 (تأخّر مزامنة الرابط).
+      setStore('s2');
+      nav.search = 'store=s1';
+      render(<OrdersList />);
+      await waitFor(() => expect(fetchOrdersMock).toHaveBeenCalled());
+      expect(lastQuery().get('storefront_id')).toBe('s2');
+      fireEvent.change(screen.getByLabelText('حالة الدفع'), { target: { value: 'paid' } });
+      expect(lastUrl().searchParams.get('store')).toBe('s2');
+    });
+
+    it('data, selection and URL agree after A → B', async () => {
+      const view = render(<OrdersList />);
+      await waitFor(() => expect(lastQuery().get('storefront_id')).toBe('s1'));
+      fireEvent.change(screen.getByLabelText('المتجر'), { target: { value: 's2' } });
+      // يحاكي المزوّد: السياق يصير s2 والرابط كما كُتب.
+      setStore('s2');
+      nav.search = lastUrl().searchParams.toString();
+      view.rerender(<OrdersList />);
+      await waitFor(() => expect(lastQuery().get('storefront_id')).toBe('s2'));
+      expect((screen.getByLabelText('المتجر') as HTMLSelectElement).value).toBe('s2');
+      expect(new URLSearchParams(nav.search).get('store')).toBe('s2');
+    });
+
+    it('Refresh after A → B restores B from the URL (no flip back to A)', async () => {
+      nav.search = 'store=s1';
+      const first = render(<OrdersList />);
+      await waitFor(() => expect(fetchOrdersMock).toHaveBeenCalled());
+      fireEvent.change(screen.getByLabelText('المتجر'), { target: { value: 's2' } });
+      const written = lastUrl().searchParams.toString();
+      first.unmount();
+      // «تحديث الصفحة»: المزوّد يقرأ ?store= من الرابط المكتوب ويحسمه متجراً نشطاً.
+      fetchOrdersMock.mockClear();
+      setStore(new URLSearchParams(written).get('store'));
+      nav.search = written;
+      render(<OrdersList />);
+      await waitFor(() => expect(fetchOrdersMock).toHaveBeenCalled());
+      expect(lastQuery().get('storefront_id')).toBe('s2');
+      expect((screen.getByLabelText('المتجر') as HTMLSelectElement).value).toBe('s2');
+    });
+
+    it('Back/Forward (URL changes without remount) refetches from the URL state with the context store', async () => {
+      nav.search = 'store=s2&payment_status=paid&page=3&scope=all';
+      setStore('s2');
+      const view = render(<OrdersList />);
+      await waitFor(() => expect(fetchOrdersMock).toHaveBeenCalled());
+      expect(lastQuery().has('storefront_id')).toBe(false); // scope=all
+      expect(lastQuery().get('payment_status')).toBe('paid');
+      expect(lastQuery().get('page')).toBe('3');
+
+      // «رجوع» إلى مدخل سابق: نطاق متجر محدد وصفحة 1 بلا فلتر.
+      nav.search = 'store=s2';
+      view.rerender(<OrdersList />);
+      await waitFor(() => expect(lastQuery().get('storefront_id')).toBe('s2'));
+      expect(lastQuery().has('payment_status')).toBe(false);
+      expect(lastQuery().get('page')).toBe('1');
+
+      // «تقدّم» إلى المدخل الأول.
+      nav.search = 'store=s2&payment_status=paid&page=3&scope=all';
+      view.rerender(<OrdersList />);
+      await waitFor(() => expect(lastQuery().get('page')).toBe('3'));
+      expect(lastQuery().has('storefront_id')).toBe(false);
+    });
+
+    it('does not invent a store when none is resolved: the existing URL value is left untouched', async () => {
+      setStore(null);
+      nav.search = 'store=bad-store';
+      render(<OrdersList />);
+      await waitFor(() => expect(fetchOrdersMock).toHaveBeenCalled());
+      fireEvent.change(screen.getByLabelText('حالة الدفع'), { target: { value: 'paid' } });
+      expect(lastUrl().searchParams.get('store')).toBe('bad-store');
+    });
   });
 });

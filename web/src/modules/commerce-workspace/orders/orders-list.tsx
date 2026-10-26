@@ -67,17 +67,23 @@ export function OrdersList() {
   const [searchInput, setSearchInput] = useState(state.q);
   const requestId = useRef(0);
 
+  /**
+   * يكتب الحالة في الرابط. `store` في الرابط يجب أن يطابق دائماً المتجر المعروض:
+   *  - `storeId` صريح (اختيار المستخدم الآن) يتقدّم، لأن السياق لا يُحدَّث إلا بعد هذه الدورة؛
+   *  - وإلا المتجر المحسوم من السياق (لا نسخة قديمة من `searchParams`)؛
+   *  - وإلا (متجر غير محسوم/طلب غير صالح) يُترك ما في الرابط كما هو فلا يُمحى ولا يُخترع.
+   */
   const update = useCallback(
-    (patch: Partial<OrdersListState>, resetPage = true) => {
+    (patch: Partial<OrdersListState>, options: { resetPage?: boolean; storeId?: string } = {}) => {
+      const resetPage = options.resetPage ?? true;
       const next: OrdersListState = { ...state, ...patch, page: resetPage ? 1 : (patch.page ?? state.page) };
       const params = serializeOrdersState(next);
-      // `store` يملكه سياق المتجر؛ نحتفظ به كما هو في الرابط.
-      const store = searchParams.get(ACTIVE_STORE_QUERY_PARAM);
+      const store = options.storeId ?? activeStoreId ?? searchParams.get(ACTIVE_STORE_QUERY_PARAM);
       if (store) params.set(ACTIVE_STORE_QUERY_PARAM, store);
       const qs = params.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
-    [pathname, router, searchParams, state],
+    [activeStoreId, pathname, router, searchParams, state],
   );
 
   // بحث مؤجَّل 300ms؛ لا طلب بأقل من الحد الأدنى (يُحسم في buildOrdersQuery).
@@ -243,7 +249,8 @@ export function OrdersList() {
                   update({ scopeAll: true });
                 } else {
                   storeContext?.setSelectedStoreId(id);
-                  update({ scopeAll: false });
+                  // الرابط يحمل المتجر الجديد صراحةً — لا يُعاد كتابة المتجر السابق فوق مزامنة المزوّد.
+                  update({ scopeAll: false }, { storeId: id });
                 }
               }}
             >
@@ -360,7 +367,7 @@ export function OrdersList() {
               perPage={meta.per_page}
               total={meta.total}
               perPageOptions={ORDERS_PER_PAGE_OPTIONS}
-              onPageChange={(page) => update({ page }, false)}
+              onPageChange={(page) => update({ page }, { resetPage: false })}
               onPerPageChange={(perPage) => update({ perPage })}
               disabled={loading}
             />

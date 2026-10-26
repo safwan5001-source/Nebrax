@@ -69,6 +69,8 @@ const noHorizontalOverflow = async (page: Page) => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 };
+/** محدِّد المتجر داخل شريط التصفية (لا محدِّد الغلاف). */
+const storeSelect = (page: Page) => page.getByRole('region', { name: 'تصفية الطلبات' }).getByLabel('المتجر', { exact: true });
 const shown = (page: Page, text: string) => page.getByText(text).locator('visible=true').first();
 
 test.describe('O1b staff orders UI', () => {
@@ -118,5 +120,38 @@ test.describe('O1b staff orders UI', () => {
   test('server 403 shows a clear state', async ({ page }) => {
     await open(page, '/commerce/orders', { ordersStatus: 403 });
     await expect(page.getByText('لا تملك صلاحية عرض طلبات المتجر.').first()).toBeVisible();
+  });
+
+  test('switching store A → B keeps store, data and URL in sync across Refresh and Back/Forward', async ({ page }) => {
+    const requests = await open(page, '/commerce/orders?store=s1');
+    const select = storeSelect(page);
+    await expect(select).toHaveValue('s1');
+    await expect(shown(page, 'CORD-100')).toBeVisible();
+
+    await select.selectOption('s2');
+    await expect(select).toHaveValue('s2');
+    await expect.poll(() => new URL(page.url()).searchParams.getAll('store')).toEqual(['s2']);
+    await expect.poll(() => requests.some((r) => r.includes('/commerce/orders?') && r.includes('storefront_id=s2'))).toBe(true);
+
+    // الرابط يصمد بعد مهلة المزوّد (لا يُعاد s1 فوقه).
+    await page.waitForTimeout(500);
+    expect(new URL(page.url()).searchParams.getAll('store')).toEqual(['s2']);
+
+    // Refresh: يبقى B.
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(storeSelect(page)).toHaveValue('s2');
+    expect(new URL(page.url()).searchParams.get('store')).toBe('s2');
+    expect(requests.at(-1)).toContain('storefront_id=s2');
+
+    // فتح تفاصيل ثم Back/Forward: المتجر نفسه في الرابط والمحدِّد.
+    await shown(page, 'CORD-100').click();
+    await expect(page.getByRole('heading', { name: 'CORD-100' })).toBeVisible({ timeout: 20_000 }); // أول تصريف لصفحة التفاصيل في dev
+    expect(new URL(page.url()).searchParams.get('store')).toBe('s2');
+    await page.goBack();
+    await expect(storeSelect(page)).toHaveValue('s2');
+    expect(new URL(page.url()).searchParams.get('store')).toBe('s2');
+    await page.goForward();
+    await expect(page.getByRole('heading', { name: 'CORD-100' })).toBeVisible({ timeout: 20_000 }); // أول تصريف لصفحة التفاصيل في dev
+    expect(new URL(page.url()).searchParams.get('store')).toBe('s2');
   });
 });
