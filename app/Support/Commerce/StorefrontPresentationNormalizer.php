@@ -244,6 +244,24 @@ final class StorefrontPresentationNormalizer
     ];
 
     /**
+     * B8-1 — صفحات السياسات التي يجوز أن تحمل `content` (نص مترجم). الأربع الأخيرة من
+     * CONTENT_PAGE_SLUGS؛ `about`/`contact`/`faq` لا تحمل متناً. المفتاح اختياري ولا يُكتب
+     * إلا عند وجود نص فعلي، فلا مفتاح افتراضي جديد ولا تغيّر في العقود الذهبية.
+     */
+    public const POLICY_PAGE_SLUGS = [
+        'shipping-policy',
+        'privacy-policy',
+        'returns-policy',
+        'terms-of-service',
+    ];
+
+    public const POLICY_CONTENT_LOCALES = ['ar', 'en'];
+
+    public const POLICY_BODY_MAX_CHARS = 20000;
+
+    public const POLICY_TITLE_MAX_CHARS = 80;
+
+    /**
      * CUST-H2-1 — Page Type Registry. توأم `PageType` في
      * `web/.../presentation/page-regions.ts`.
      */
@@ -1275,15 +1293,77 @@ final class StorefrontPresentationNormalizer
             if (! is_array($item) || array_is_list($item)) {
                 continue;
             }
-            $pages[] = [
+            $page = [
                 'id' => $this->safeId($item['id'] ?? null, 'page-'.$index),
                 'slug' => $this->inList($item['slug'] ?? null, self::CONTENT_PAGE_SLUGS, 'about'),
                 'title' => mb_substr($this->asString($item['title'] ?? null), 0, 80),
                 'enabled' => $this->asBoolean($item['enabled'] ?? null, false),
             ];
+            if (in_array($page['slug'], self::POLICY_PAGE_SLUGS, true)) {
+                $content = $this->normalizePolicyContent($item['content'] ?? null);
+                if ($content !== []) {
+                    $page['content'] = $content;
+                }
+            }
+            $pages[] = $page;
         }
 
         return $pages;
+    }
+
+    /**
+     * B8-1 — `{ar?:{title,body}, en?:{title,body}}`. لغة غير مدعومة أو غير مصفوفة أو بلا نص
+     * تسقط؛ العنوان ≤ 80 والمتن ≤ 20000 حرفاً (اقتطاع، نمط المطبِّع). النص خام: لا تعقيم هنا
+     * (التعقيم عند العرض، B8-2).
+     *
+     * @return array<string, array{title: string, body: string}>
+     */
+    private function normalizePolicyContent(mixed $raw): array
+    {
+        if (! is_array($raw) || array_is_list($raw)) {
+            return [];
+        }
+
+        $out = [];
+        foreach (self::POLICY_CONTENT_LOCALES as $locale) {
+            $entry = $raw[$locale] ?? null;
+            if (! is_array($entry) || array_is_list($entry)) {
+                continue;
+            }
+            $title = mb_substr($this->asString($entry['title'] ?? null), 0, self::POLICY_TITLE_MAX_CHARS);
+            $body = mb_substr($this->asString($entry['body'] ?? null), 0, self::POLICY_BODY_MAX_CHARS);
+            if (trim($title) === '' && trim($body) === '') {
+                continue;
+            }
+            $out[$locale] = ['title' => $title, 'body' => $body];
+        }
+
+        return $out;
+    }
+
+    /**
+     * B8-1 — يحذف `pages[].content` من لقطة عامة: متون السياسات لا تخرج من `store/v1/storefront`
+     * (تُخدَم لاحقاً من مسار مخصّص، B8-2). الباقي كما هو حرفياً.
+     *
+     * @param  array<string, mixed>  $snapshot
+     * @return array<string, mixed>
+     */
+    public static function withoutPolicyContent(array $snapshot): array
+    {
+        if (isset($snapshot['pages']) && is_array($snapshot['pages'])) {
+            $snapshot['pages'] = array_map(
+                static function (mixed $page): mixed {
+                    if (is_array($page)) {
+                        unset($page['content']);
+                    }
+
+                    return $page;
+                },
+                $snapshot['pages'],
+            );
+        }
+
+        return $snapshot;
     }
 
     /**

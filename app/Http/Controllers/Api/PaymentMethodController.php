@@ -3,18 +3,22 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\StorePaymentMethodRequest;
+use App\Http\Requests\UploadPaymentMethodLogoRequest;
 use App\Http\Resources\PaymentMethodResource;
 use App\Models\CashBankAccount;
 use App\Models\PaymentGateway;
 use App\Models\PaymentMethod;
 use App\Services\Accounting\CashBankAccountService;
+use App\Services\AttachmentStorage;
+use App\Support\PaymentMethodVisual;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /** إدارة بيان طرق الدفع المشترك للمؤسسة، بلا رسوم أو قيود محاسبية. */
 class PaymentMethodController extends ApiController
 {
-    public function __construct(private CashBankAccountService $cashBankAccounts) {}
+    public function __construct(private CashBankAccountService $cashBankAccounts, private AttachmentStorage $attachmentStorage) {}
 
     public function index(): JsonResponse
     {
@@ -33,17 +37,18 @@ class PaymentMethodController extends ApiController
     public function store(StorePaymentMethodRequest $request): JsonResponse
     {
         $data = $this->normalize($request->validated());
+        $visual = $this->resolveVisual($request->validated(), null);
         $this->assertNameFree($data['name']);
         $this->assertCashBankAccount($data['cash_bank_account_id'], $data['settlement_type']);
         $this->assertPosClearingGateway($data['pos_clearing_gateway_id'], $data['settlement_type'], null);
         $this->assertTerminalPolicy($data['pos_terminal_required'], $data['settlement_type']);
 
-        $method = DB::transaction(function () use ($data) {
+        $method = DB::transaction(function () use ($data, $visual) {
             if ($data['is_default']) {
                 PaymentMethod::where('is_default', true)->update(['is_default' => false]);
             }
 
-            return PaymentMethod::create($data);
+            return PaymentMethod::create($data + $visual['attributes']);
         });
 
         return (new PaymentMethodResource($method->load(['cashBankAccount.account', 'posClearingGateway'])))
@@ -54,12 +59,13 @@ class PaymentMethodController extends ApiController
     {
         $method = PaymentMethod::findOrFail($id);
         $data = $this->normalize($request->validated(), $method);
+        $visual = $this->resolveVisual($request->validated(), $method);
         $this->assertNameFree($data['name'], $method->id);
         $this->assertCashBankAccount($data['cash_bank_account_id'], $data['settlement_type']);
         $this->assertPosClearingGateway($data['pos_clearing_gateway_id'], $data['settlement_type'], $method);
         $this->assertTerminalPolicy($data['pos_terminal_required'], $data['settlement_type']);
 
-        DB::transaction(function () use ($method, $data) {
+        DB::transaction(function () use ($method, $data, $visual) {
             if (! $data['is_active'] && $data['is_default']) {
                 abort(422, 'لا يمكن أن تكون طريقة دفع معطلة هي الافتراضية. فعّلها أو عيّن بديلاً أولاً.');
             }
@@ -70,8 +76,18 @@ class PaymentMethodController extends ApiController
                 abort(422, 'لا يمكن إزالة الافتراضي من دون وجود طريقة دفع نشطة بديلة.');
             }
 
-            $method->update($data);
+            $method->update($data + $visual['attributes']);
+            if ($visual['dropLogo']) {
+                $method->logo_path = null;
+                $method->logo_disk = null;
+                $method->save();
+            }
         });
+
+        // بعد الالتزام: محو كائن الشعار المستبدَل بالأيقونة/الافتراضي (فشل المحو يُسجَّل ولا يُفشل الطلب).
+        if ($visual['dropLogo'] && $visual['oldLogo'] !== null) {
+            $this->attachmentStorage->discard([$visual['oldLogo']]);
+        }
 
         return (new PaymentMethodResource($method->fresh()->load(['cashBankAccount.account', 'posClearingGateway'])))->response();
     }
@@ -105,9 +121,121 @@ class PaymentMethodController extends ApiController
             abort(422, 'لا يمكن حذف طريقة الدفع الافتراضية. عيّن بديلاً أولاً.');
         }
 
+        $logo = $this->logoPointer($method);
         $method->delete();
+        if ($logo !== null) {
+            $this->attachmentStorage->discard([$logo]);
+        }
 
         return response()->json(['message' => 'deleted']);
+    }
+
+    /** يستبدل شعار الطريقة (يحوّلها إلى وضع الصورة). الجديد يُكتب أولاً ثم يُثبَّت المؤشّر ثم يُحذف القديم. */
+    public function uploadLogo(UploadPaymentMethodLogoRequest $request, string $id): JsonResponse
+    {
+        $method = PaymentMethod::findOrFail($id);
+        $old = $this->logoPointer($method);
+
+        $new = $this->attachmentStorage->put(
+            AttachmentStorage::DOMAIN_PAYMENT_METHOD_LOGO, (string) $method->id, $request->file('logo'), "payment-methods/{$method->id}",
+        );
+
+        try {
+            $method->logo_path = $new['path'];
+            $method->logo_disk = $new['disk'];
+            $method->visual_mode = PaymentMethodVisual::MODE_IMAGE;
+            $method->icon_key = null;
+            $method->icon_color = null;
+            $method->save();
+        } catch (\Throwable $e) {
+            $this->attachmentStorage->discard([$new]);
+            throw $e;
+        }
+
+        if ($old !== null) {
+            $this->attachmentStorage->discard([$old]);
+        }
+
+        return $this->resource($method);
+    }
+
+    /** يزيل الشعار ويعيد الطريقة إلى الافتراضي. محو الكائن قبل إزالة المؤشّر: الفشل يرمي والمؤشّر باقٍ. */
+    public function removeLogo(string $id): JsonResponse
+    {
+        $method = PaymentMethod::findOrFail($id);
+        $logo = $this->logoPointer($method);
+
+        if ($logo !== null) {
+            $this->attachmentStorage->delete($logo['disk'], $logo['path']);
+            $method->logo_path = null;
+            $method->logo_disk = null;
+            if ($method->visual_mode === PaymentMethodVisual::MODE_IMAGE) {
+                $method->visual_mode = PaymentMethodVisual::MODE_DEFAULT;
+            }
+            $method->save();
+        }
+
+        return $this->resource($method);
+    }
+
+    /** بث الشعار للعرض (مصادَق، بعزل المستأجر عبر findOrFail). */
+    public function showLogo(string $id): StreamedResponse
+    {
+        $method = PaymentMethod::findOrFail($id);
+        $logo = $this->logoPointer($method);
+        if ($logo === null) {
+            abort(404, 'لا شعار لطريقة الدفع هذه.');
+        }
+
+        return $this->attachmentStorage->inlineImage($logo['disk'], $logo['path']);
+    }
+
+    private function resource(PaymentMethod $method): JsonResponse
+    {
+        return (new PaymentMethodResource($method->fresh()->load(['cashBankAccount.account', 'posClearingGateway'])))->response();
+    }
+
+    /** @return array{disk:string,path:string}|null `null`/`local` = القرص المحلي. */
+    private function logoPointer(PaymentMethod $method): ?array
+    {
+        return $method->logo_path ? ['disk' => $method->logo_disk ?: 'local', 'path' => $method->logo_path] : null;
+    }
+
+    /**
+     * يحسم التخصيص البصري. غياب مفاتيحه كلها يُبقي القائم تماماً (توافق العملاء القدامى ومسار التفعيل/التعطيل).
+     * الأوضاع متنافية: أيقونة/افتراضي يُسقطان الشعار، والصورة تشترط شعاراً مرفوعاً سلفاً.
+     *
+     * @return array{attributes:array<string,mixed>,dropLogo:bool,oldLogo:?array{disk:string,path:string}}
+     */
+    private function resolveVisual(array $validated, ?PaymentMethod $current): array
+    {
+        $touched = array_intersect_key($validated, array_flip(['visual_mode', 'icon_key', 'icon_color']));
+        if ($touched === []) {
+            return ['attributes' => [], 'dropLogo' => false, 'oldLogo' => null];
+        }
+
+        $logo = $current ? $this->logoPointer($current) : null;
+        $mode = array_key_exists('visual_mode', $validated)
+            ? ($validated['visual_mode'] ?: PaymentMethodVisual::MODE_DEFAULT)
+            : ($current?->visual_mode ?: PaymentMethodVisual::MODE_DEFAULT);
+        $key = array_key_exists('icon_key', $validated) ? $validated['icon_key'] : $current?->icon_key;
+        $color = array_key_exists('icon_color', $validated) ? $validated['icon_color'] : $current?->icon_color;
+
+        if ($mode === PaymentMethodVisual::MODE_ICON) {
+            if ($key === null) {
+                abort(422, 'اختر أيقونة لطريقة الدفع.');
+            }
+            return ['attributes' => ['visual_mode' => $mode, 'icon_key' => $key, 'icon_color' => $color], 'dropLogo' => $logo !== null, 'oldLogo' => $logo];
+        }
+
+        if ($mode === PaymentMethodVisual::MODE_IMAGE) {
+            if ($logo === null) {
+                abort(422, 'ارفع شعاراً أولاً قبل اختيار وضع الصورة.');
+            }
+            return ['attributes' => ['visual_mode' => $mode, 'icon_key' => null, 'icon_color' => null], 'dropLogo' => false, 'oldLogo' => null];
+        }
+
+        return ['attributes' => ['visual_mode' => $mode, 'icon_key' => null, 'icon_color' => null], 'dropLogo' => $logo !== null, 'oldLogo' => $logo];
     }
 
     private function normalize(array $data, ?PaymentMethod $current = null): array

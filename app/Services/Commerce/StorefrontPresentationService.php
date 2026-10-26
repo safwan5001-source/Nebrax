@@ -117,6 +117,7 @@ final class StorefrontPresentationService
         // `assertIncomingConfigNotForward` في مسار حفظ النسخة الدقيقة.
         $this->assertIncomingConfigNotForward($config);
         $this->publishValidator->assertIncomingBackground($config);
+        $this->publishValidator->assertIncomingPolicyContent($config);
 
         $normalized = $this->normalizer->normalize($config);
         $this->assertStoredSize($normalized);

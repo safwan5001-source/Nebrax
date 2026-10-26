@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use App\Support\PaymentMethodVisual;
 use Illuminate\Validation\Rule;
 
 class StorePaymentMethodRequest extends FormRequest
@@ -27,6 +28,10 @@ class StorePaymentMethodRequest extends FormRequest
             'pos_clearing_gateway_id' => ['sometimes', 'nullable', 'uuid'],
             // H6-02: تشترط موافقة جهاز مؤكدة لكل بيع POS بها (افتراضي false = مطفأ).
             'pos_terminal_required' => ['sometimes', 'boolean'],
+            // تخصيص بصري اختياري؛ الغياب يُبقي القائم. الشعار نفسه يُرفع عبر مسار منفصل.
+            'visual_mode' => ['sometimes', 'nullable', Rule::in(PaymentMethodVisual::MODES)],
+            'icon_key' => ['sometimes', 'nullable', Rule::in(PaymentMethodVisual::ICON_KEYS)],
+            'icon_color' => ['sometimes', 'nullable', 'string', 'regex:'.PaymentMethodVisual::COLOR_PATTERN],
         ];
     }
 }

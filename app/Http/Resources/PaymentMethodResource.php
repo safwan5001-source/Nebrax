@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Support\PaymentMethodVisual;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -26,6 +27,11 @@ class PaymentMethodResource extends JsonResource
             'pos_terminal_required' => (bool) $this->pos_terminal_required,
             'pos_clearing_gateway_name' => $this->whenLoaded('posClearingGateway', fn () => $this->posClearingGateway?->name),
             'pos_clearing_gateway_usable' => $this->whenLoaded('posClearingGateway', fn () => $this->posClearingGateway?->isUsable()),
+            // تخصيص بصري (اختياري): الغياب/NULL = افتراضي. الشعار يُجلب بمسار مصادَق `payment-methods/{id}/logo`.
+            'visual_mode' => $this->visual_mode ?: PaymentMethodVisual::MODE_DEFAULT,
+            'icon_key' => $this->icon_key,
+            'icon_color' => $this->icon_color,
+            'has_logo' => $this->logo_path !== null && $this->logo_path !== '',
             'payments_count' => $this->when(isset($this->payments_count), $this->payments_count),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),

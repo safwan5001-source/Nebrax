@@ -28,10 +28,11 @@ final class AttachmentStorage
     public const DOMAIN_INVOICE_NOTE = 'invoice-note-attachments';
     public const DOMAIN_EMPLOYEE = 'employee-attachments';
     public const DOMAIN_EMPLOYEE_PHOTO = 'employee-photo';
+    public const DOMAIN_PAYMENT_METHOD_LOGO = 'payment-method-logo';
 
     private const DOMAINS = [
         self::DOMAIN_EXPENSE, self::DOMAIN_PAYMENT, self::DOMAIN_PURCHASE,
-        self::DOMAIN_INVOICE_NOTE, self::DOMAIN_EMPLOYEE, self::DOMAIN_EMPLOYEE_PHOTO,
+        self::DOMAIN_INVOICE_NOTE, self::DOMAIN_EMPLOYEE, self::DOMAIN_EMPLOYEE_PHOTO, self::DOMAIN_PAYMENT_METHOD_LOGO,
     ];
 
     private const IMAGE_MIME_BY_EXTENSION = [

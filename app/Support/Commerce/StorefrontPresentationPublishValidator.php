@@ -62,6 +62,59 @@ final class StorefrontPresentationPublishValidator
     }
 
     /**
+     * B8-1 — يرفض نص السياسة الوارد الذي يتجاوز الحدّ **قبل** التطبيع (لا اقتطاع صامت)،
+     * فيفشل الحفظ كاملاً بلا أي كتابة. غير الصالح نوعاً/اللغة يبقى متسامحاً (يسقط في المطبِّع).
+     *
+     * @param  array<string, mixed>  $raw
+     */
+    public function assertIncomingPolicyContent(array $raw): void
+    {
+        $errors = [];
+        foreach (self::policyContentIssues($raw['pages'] ?? null) as $path => $code) {
+            $errors[$path] = [
+                'code' => $code,
+                'message' => $code === 'policy_body_too_long'
+                    ? 'نص السياسة يتجاوز '.StorefrontPresentationNormalizer::POLICY_BODY_MAX_CHARS.' حرفاً؛ اختصره قبل الحفظ.'
+                    : 'عنوان السياسة يتجاوز '.StorefrontPresentationNormalizer::POLICY_TITLE_MAX_CHARS.' حرفاً؛ اختصره قبل الحفظ.',
+            ];
+        }
+        if ($errors !== []) {
+            throw new PresentationPublishValidationException($errors);
+        }
+    }
+
+    /** @return array<string, string> path => code */
+    private static function policyContentIssues(mixed $pages): array
+    {
+        $issues = [];
+        if (! is_array($pages)) {
+            return $issues;
+        }
+        foreach (array_values($pages) as $i => $page) {
+            if (! is_array($page) || array_is_list($page) || ! is_array($page['content'] ?? null)) {
+                continue;
+            }
+            if (! in_array($page['slug'] ?? null, StorefrontPresentationNormalizer::POLICY_PAGE_SLUGS, true)) {
+                continue;
+            }
+            foreach (StorefrontPresentationNormalizer::POLICY_CONTENT_LOCALES as $locale) {
+                $entry = $page['content'][$locale] ?? null;
+                if (! is_array($entry)) {
+                    continue;
+                }
+                if (is_string($entry['title'] ?? null) && mb_strlen($entry['title']) > StorefrontPresentationNormalizer::POLICY_TITLE_MAX_CHARS) {
+                    $issues["pages.$i.content.$locale.title"] = 'policy_title_too_long';
+                }
+                if (is_string($entry['body'] ?? null) && mb_strlen($entry['body']) > StorefrontPresentationNormalizer::POLICY_BODY_MAX_CHARS) {
+                    $issues["pages.$i.content.$locale.body"] = 'policy_body_too_long';
+                }
+            }
+        }
+
+        return $issues;
+    }
+
+    /**
      * @param  array<string, mixed>  $normalized
      * @return array<string, array{code: string, message: string}>
      */
