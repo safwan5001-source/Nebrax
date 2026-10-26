@@ -3232,7 +3232,7 @@ function PagesPanel({
   return (
     <div className="space-y-4">
       <p className="text-[12px] leading-5 text-neutral-500">{t("pagesHint")}</p>
-      <p className="text-[12px] leading-5 text-neutral-700">{t("policiesHint")}</p>
+      <p className="text-[12px] leading-5 text-text">{t("policiesHint")}</p>
       <ul className="border border-neutral-200">
         {config.pages.map((page, index) => {
           const policy = isPolicyPage(page);
