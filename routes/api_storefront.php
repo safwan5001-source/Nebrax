@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\StorefrontCustomizerMediaController;
 use App\Http\Controllers\Api\StorefrontFacetVisualMediaController;
 use App\Http\Controllers\Api\StorefrontMediaController;
 use App\Http\Controllers\Api\StorefrontOfferController;
+use App\Http\Controllers\Api\StorefrontPolicyController;
 use App\Http\Controllers\Api\StorefrontProductController;
 use App\Http\Middleware\EnforcePublicApiRateLimit;
 use App\Http\Middleware\RequireStorefrontMutationGateway;
@@ -74,6 +75,10 @@ Route::middleware([
     Route::get('media/{id}', [StorefrontMediaController::class, 'show'])->whereUuid('id')->name('media.show');
 
     Route::get('storefront', [StorefrontConfigController::class, 'show'])->name('storefront.show');
+
+    // B8-2 — نص سياسة منشور (HTML منقّى) بمضيف الطلب وحده؛ كل slug غير مسموح 404 موحَّد من المتحكّم.
+    Route::get('policies/{slug}', [StorefrontPolicyController::class, 'show'])
+        ->where('slug', '[^/]+')->name('policies.show');
 
     // CUST-H4-6 — العروض الحيّة (خصمٌ حقيقي من CommercePriceResolver). مسار Host
     // فقط: لا معرّف متجر في الرابط ولا يُقبل من أي مدخل، وليس له نظير متوارَث.
