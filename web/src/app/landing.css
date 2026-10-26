@@ -2,6 +2,8 @@
  * paper: oklch(97.6% 0.003 265) · accent: oklch(42.4% 0.181 266) · display: IBM Plex Sans Arabic · body: IBM Plex Sans Arabic · hero: Stage · nav: edge-aligned · footer: colophon · signature: one invoice and the journal entry it posts, captured from the running product
  * axes: cool-paper/plex/brand-blue · posture: restrained, one committed accent block at the close · contrast: pass · fold: pass · job: sign up · imagery: screenshots, preview mode, light and dark, ar and en · copy: reworded · v2.0.0 */
 /* Hallmark · pre-emit critique: P4 H4 E4 S4 R4 V4 · weakest: S, a ledger tool can look like any dashboard, so the page leads with the one proof only a double-entry product has: the invoice and its posted entry side by side */
+/* Hallmark · dropped #industries, #journey, #about, #start, the "شاهد المزايا" link, the skip-link onClick · the industries copy promised fleet, bookings and manufacturing that the application catalog marks coming_soon, the other sections repeated the status table and the origin line, and a skip link to a main[tabindex=-1] already moves focus natively */
+/* Hallmark · reworded "أدر مبيعاتك ومصاريفك ومخزونك من مكان واحد." to "كل فاتورة تصل إلى دفاترك بقيد متوازن." · the owner asked for a headline that states the product's value directly, and 58 names the trust list under the old hero */
 
 :root {
   --space-3xs: 2px;
@@ -420,7 +422,7 @@ html:has(.lp) {
 
 .lp-hero__grid {
   display: grid;
-  grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+  grid-template-columns: minmax(0, 3.4fr) minmax(0, 7fr);
   gap: var(--space-2xl);
   align-items: center;
 }
@@ -463,11 +465,6 @@ html:has(.lp) {
 @media (min-width: 60rem) {
   .lp-hero {
     min-height: calc(100dvh - var(--nav-h));
-  }
-
-  /* Stage posture: the capture runs into the outer gutter so the entry reads at close to its own size. */
-  .lp-hero__shot {
-    margin-inline-end: calc(var(--gutter) * -1);
   }
 }
 
