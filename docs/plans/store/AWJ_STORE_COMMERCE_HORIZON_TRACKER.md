@@ -140,7 +140,7 @@
 | D-6 | عمر الجلسة وتجديدها | منزلقة محدودة (تدوير توكن) إن توفّر؛ وإلا ثابتة مع إعادة دخول | H1 | B2 | Open | Safwan | حسم قبل بدء: B2 |
 | D-7 | الشحنات المتعددة | إسقاط | H2 | CK6 | Open | Safwan | حسم قبل بدء: CK6 |
 | D-8 | الأثر المالي لطلبات COD/الاستلام وتوقيت ZATCA | ADR محاسبي/ضريبي؛ مغلق افتراضياً على نمط PAY-H4-03 | H3 | INV1، INV2، INV3 | Open | Safwan | حسم قبل بدء: INV1 |
-| D-9 | دورة حياة الطلب (حالات، أبعاد الدفع/التنفيذ، الإلغاء) | ADR؛ يحافظ على `CommerceOrder ≠ Invoice` | H2 | O3، O4، F1، RT2 | Open | Safwan | حسم قبل بدء: O3 |
+| D-9 | دورة حياة الطلب (حالات، أبعاد الدفع/التنفيذ، الإلغاء) | ADR؛ يحافظ على `CommerceOrder ≠ Invoice` — **مقترَح في `ADR-28-COMMERCE-ORDER-LIFECYCLE.md`** | H2 | O3، O4، F1، RT2 | Proposed (ADR-28، بانتظار الموافقة) | Safwan | حسم قبل بدء: O3 |
 | D-10 | حجز مخزون COD/الاستلام | سياسة قابلة للضبط: `none` (الافتراضي) أو `reserve_on_confirm` | H2 | CK4 | Open | Safwan | حسم قبل بدء: CK4 |
 | D-11 | تقييم المرتجعات (Return≠Refund≠CreditNote≠Exchange) | ADR أولاً | H4 | RT1، RT2، RT3، RT4 | Open | Safwan | حسم قبل بدء: RT1 |
 | D-12 | قنوات إشعار المشتري والتاجر وملكية القوالب والموافقة | مع D-2؛ المصدر Laravel (outbox) | H2 | N1، N2، N3، N4 | Open | Safwan | حسم قبل بدء: N1 |
