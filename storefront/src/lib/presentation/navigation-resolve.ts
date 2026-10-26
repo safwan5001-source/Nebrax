@@ -7,6 +7,7 @@
  * Storefront-only — the Canvas draws labels, not hrefs, so there is no web twin.
  */
 
+import { isPolicySlug } from "@/lib/policy/slugs";
 import type { FooterGroup } from "./footer-design";
 import type { IconKey } from "./icon-registry";
 import {
@@ -27,6 +28,11 @@ export interface NavResolveContext {
   categories: ReadonlyMap<string, string>;
   /** product ids that exist and are published. */
   products: ReadonlySet<string>;
+  /**
+   * X4 — policy pages the merchant has enabled in the published document. When provided, a policy target
+   * outside it is omitted (never a link to a 404). Absent ⇒ unchanged behaviour.
+   */
+  policySlugs?: ReadonlySet<string>;
 }
 
 export interface ResolvedNavChild {
@@ -62,6 +68,13 @@ export function navTargetHref(
         : null;
     case "content":
       if (!isServedContentSlug(target.slug)) return null;
+      if (
+        ctx.policySlugs &&
+        isPolicySlug(target.slug) &&
+        !ctx.policySlugs.has(target.slug)
+      ) {
+        return null;
+      }
       return target.slug === "contact"
         ? `${base}/#contact`
         : `${base}/policies/${target.slug}`;

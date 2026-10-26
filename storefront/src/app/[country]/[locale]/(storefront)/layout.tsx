@@ -19,6 +19,7 @@ import { headerIsCompact } from "@/lib/presentation/header-design";
 import {
   publishedExtraNav,
   publishedLogoUrl,
+  publishedPolicySlugs,
   publishedSocialLinks,
   publishedStoreName,
   publishedThemeAttrs,
@@ -327,6 +328,7 @@ export default async function StorefrontLayout({
       </main>
       <Footer
         basePath={basePath}
+        policySlugs={publishedPolicySlugs(presentation)}
         locale={locale as Locale}
         storeName={displayName}
         businessIdentity={identity?.business_identity}

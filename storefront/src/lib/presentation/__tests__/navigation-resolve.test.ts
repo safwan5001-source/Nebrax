@@ -305,3 +305,51 @@ describe("collectNavTargetIds across menus (V7e-2)", () => {
     expect(ids.productIds).toHaveLength(MAX_NAV_PRODUCT_TARGETS);
   });
 });
+
+describe("policy targets honour the merchant-enabled pages (X4)", () => {
+  const withPolicies = (slugs: string[]): NavResolveContext => ({
+    ...ctx,
+    policySlugs: new Set(slugs),
+  });
+
+  it("a policy that is not enabled is omitted — never a link to a 404", () => {
+    const target = { kind: "content", slug: "privacy-policy" } as const;
+    expect(navTargetHref(target, withPolicies(["privacy-policy"]))).toBe(
+      "/sa/ar/policies/privacy-policy",
+    );
+    expect(
+      navTargetHref(target, withPolicies(["terms-of-service"])),
+    ).toBeNull();
+    expect(navTargetHref(target, withPolicies([]))).toBeNull();
+  });
+
+  it("without the set the behaviour is unchanged, and the contact anchor is unaffected", () => {
+    expect(
+      navTargetHref({ kind: "content", slug: "privacy-policy" }, ctx),
+    ).toBe("/sa/ar/policies/privacy-policy");
+    expect(
+      navTargetHref({ kind: "content", slug: "contact" }, withPolicies([])),
+    ).toBe("/sa/ar/#contact");
+  });
+
+  it("an item pointing at a disabled policy drops out of the resolved menu", () => {
+    const resolved = resolveNavMenu(
+      menu([
+        {
+          id: "a",
+          label: "Privacy",
+          target: { kind: "content", slug: "privacy-policy" },
+        },
+        {
+          id: "b",
+          label: "Terms",
+          target: { kind: "content", slug: "terms-of-service" },
+        },
+      ]),
+      withPolicies(["terms-of-service"]),
+    );
+    expect(resolved.map((item) => item.href)).toEqual([
+      "/sa/ar/policies/terms-of-service",
+    ]);
+  });
+});

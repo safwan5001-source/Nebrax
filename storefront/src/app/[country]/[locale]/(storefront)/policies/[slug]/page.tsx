@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { cachedGetPolicy, getPolicy } from "@/lib/data/policies";
 import {
-  buildLocalizedAlternates,
-  translationFingerprint,
-} from "@/lib/metadata/alternates";
+  type AwjPolicy,
+  getPolicy,
+  PolicyUnavailableError,
+} from "@/lib/data/policies";
+import { buildCanonicalUrl } from "@/lib/seo";
 import { getStoreName, getStoreUrl } from "@/lib/store";
 
 interface PolicyPageProps {
@@ -16,61 +17,56 @@ interface PolicyPageProps {
   }>;
 }
 
+/** `null` = genuine 404; `"unavailable"` = the AWJ API could not answer (never conflated with 404). */
+async function loadPolicy(
+  slug: string,
+  locale: string,
+): Promise<AwjPolicy | null | "unavailable"> {
+  try {
+    return await getPolicy(slug, { locale });
+  } catch (error) {
+    if (error instanceof PolicyUnavailableError) return "unavailable";
+    throw error;
+  }
+}
+
 export async function generateMetadata({
   params,
 }: PolicyPageProps): Promise<Metadata> {
   const { country, locale, slug } = await params;
-  const policy = await getPolicy(slug, { country, locale });
+  const policy = await loadPolicy(slug, locale);
+  const t = await getTranslations({
+    locale: locale as Locale,
+    namespace: "policies",
+  });
 
-  const storeName = getStoreName();
-
+  // Metadata must never throw (it would surface the raw upstream error) and must not claim a 404 for an outage.
+  if (policy === "unavailable") {
+    return { title: t("policyUnavailable"), robots: { index: false } };
+  }
   if (!policy) {
-    const t = await getTranslations({
-      locale: locale as Locale,
-      namespace: "policies",
-    });
     return {
       title: t("policyNotFound"),
       description: t("noContent"),
+      robots: { index: false },
     };
   }
 
-  const description = `${policy.name} — ${storeName}`;
+  const description = `${policy.title} — ${getStoreName()}`;
   const storeUrl = getStoreUrl();
-  const localizedAlternates = storeUrl
-    ? await buildLocalizedAlternates({
-        storeUrl,
-        country,
-        locale,
-        path: `/policies/${policy.slug}`,
-        currentResourceFingerprint: policyTranslationFingerprint(policy),
-        resolvePath: async (target) => {
-          const localizedPolicy = await cachedGetPolicy(policy.id, target);
-          return localizedPolicy
-            ? {
-                path: `/policies/${localizedPolicy.slug}`,
-                fingerprint: policyTranslationFingerprint(localizedPolicy),
-              }
-            : undefined;
-        },
-      })
+  // Slugs are fixed and identical in every language, so the canonical is simply this page's own URL.
+  const canonical = storeUrl
+    ? buildCanonicalUrl(storeUrl, `/${country}/${locale}/policies/${slug}`)
     : undefined;
 
   return {
-    title: policy.name,
+    title: policy.title,
     description,
-    ...(localizedAlternates
-      ? {
-          alternates: {
-            canonical: localizedAlternates.canonical,
-            languages: localizedAlternates.languages,
-          },
-        }
-      : {}),
+    ...(canonical ? { alternates: { canonical } } : {}),
     openGraph: {
-      title: policy.name,
+      title: policy.title,
       description,
-      ...(localizedAlternates ? { url: localizedAlternates.canonical } : {}),
+      ...(canonical ? { url: canonical } : {}),
     },
   };
 }
@@ -78,45 +74,34 @@ export async function generateMetadata({
 export default async function PolicyPage({
   params,
 }: PolicyPageProps): Promise<React.JSX.Element> {
-  const { country, slug, locale } = await params;
-  const [policy, t] = await Promise.all([
-    getPolicy(slug, { country, locale }),
-    getTranslations({ locale: locale as Locale, namespace: "policies" }),
-  ]);
+  const { slug, locale } = await params;
+  const policy = await loadPolicy(slug, locale);
 
+  if (policy === "unavailable") {
+    // Generic, message-free failure: the framework's error boundary renders it; no upstream detail leaks.
+    throw new PolicyUnavailableError();
+  }
   if (!policy) {
     notFound();
   }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">{policy.name}</h1>
-      {policy.body_html ? (
+      {/* The text is shown in the language the backend actually served (it may be the fallback language). */}
+      <article
+        lang={policy.locale}
+        dir={policy.locale === "ar" ? "rtl" : "ltr"}
+      >
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">
+          {policy.title}
+        </h1>
         <div
           className="prose prose-gray"
-          dangerouslySetInnerHTML={{ __html: policy.body_html }}
+          // Backend-sanitized HTML, re-verified against the same strict allowlist in `getPolicy`.
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: allowlist-verified policy HTML
+          dangerouslySetInnerHTML={{ __html: policy.html }}
         />
-      ) : policy.body ? (
-        <div className="prose prose-gray whitespace-pre-wrap">
-          {policy.body}
-        </div>
-      ) : (
-        <p className="text-gray-500">{t("noContent")}</p>
-      )}
+      </article>
     </div>
-  );
-}
-
-function policyTranslationFingerprint(policy: {
-  name: string;
-  slug: string;
-  body: string | null;
-  body_html: string | null;
-}): string {
-  return translationFingerprint(
-    policy.name,
-    policy.slug,
-    policy.body,
-    policy.body_html,
   );
 }

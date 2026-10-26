@@ -772,7 +772,8 @@
     "shippingPolicy": "سياسة الشحن",
     "privacyPolicy": "سياسة الخصوصية",
     "returnsPolicy": "سياسة الإرجاع",
-    "termsOfService": "شروط الخدمة"
+    "termsOfService": "شروط الخدمة",
+    "policyUnavailable": "الصفحة غير متاحة مؤقتاً"
   },
   "expressCheckout": {
     "shipping": "الشحن",

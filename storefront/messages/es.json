@@ -772,7 +772,8 @@
     "shippingPolicy": "Politica de envio",
     "privacyPolicy": "Politica de privacidad",
     "returnsPolicy": "Politica de devoluciones",
-    "termsOfService": "Terminos de servicio"
+    "termsOfService": "Terminos de servicio",
+    "policyUnavailable": "Policy temporarily unavailable"
   },
   "expressCheckout": {
     "shipping": "Envio",

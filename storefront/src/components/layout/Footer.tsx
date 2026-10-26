@@ -36,6 +36,11 @@ import { isWholesaleEnabled } from "@/lib/spree";
 
 interface FooterProps {
   basePath: string;
+  /**
+   * X4 — policy pages to link (the merchant-enabled ones in the published document). Omitted ⇒ all four, as
+   * before; an empty list ⇒ the Policies column is not drawn. No API call per link.
+   */
+  policySlugs?: readonly string[];
   locale: Locale;
   categoryLinks: ReactNode;
   storeName: string | null;
@@ -228,6 +233,7 @@ interface FooterGroupView {
  */
 export async function Footer({
   basePath,
+  policySlugs,
   locale,
   categoryLinks,
   storeName,
@@ -407,7 +413,9 @@ export async function Footer({
         ]
       : []),
   ];
-  const policyNodes: ReactNode[] = POLICY_LINKS.map((policy) => (
+  const policyNodes: ReactNode[] = POLICY_LINKS.filter(
+    (policy) => !policySlugs || policySlugs.includes(policy.slug),
+  ).map((policy) => (
     <li key={policy.slug}>
       <Link href={`${basePath}/policies/${policy.slug}`} className={linkClass}>
         {tp(policy.nameKey)}
@@ -441,14 +449,16 @@ export async function Footer({
       nodes: accountNodes,
       flat: accountNodes,
     },
-    {
+  );
+  if (policyNodes.length > 0) {
+    defaultGroups.push({
       id: "footer-policies",
       title: t("policies"),
       span: 1,
       nodes: policyNodes,
       flat: policyNodes,
-    },
-  );
+    });
+  }
 
   const groupViews: FooterGroupView[] = groups
     ? groups.map((group) => ({

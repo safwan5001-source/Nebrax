@@ -14,6 +14,7 @@ import {
   type ResolvedFooterGroup,
   resolveFooterGroups,
 } from "./navigation-resolve";
+import { publishedPolicySlugs } from "./public";
 
 function flatten(categories: readonly Category[], into: Map<string, string>) {
   for (const category of categories) {
@@ -65,6 +66,11 @@ export async function publishedFooterGroups(
       .catch(() => undefined);
   }
 
-  const ctx: NavResolveContext = { basePath, categories, products };
+  const ctx: NavResolveContext = {
+    basePath,
+    categories,
+    products,
+    policySlugs: new Set(publishedPolicySlugs(presentation)),
+  };
   return resolveFooterGroups(groups, menus, ctx);
 }

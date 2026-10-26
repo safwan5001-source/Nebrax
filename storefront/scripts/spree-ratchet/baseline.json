@@ -2,17 +2,16 @@
   "version": 1,
   "categories": {
     "spree_value_imports": {
-      "total": 5,
+      "total": 4,
       "files": {
         "src/lib/data/checkout.ts": 1,
-        "src/lib/data/policies.ts": 1,
         "src/lib/spree/auth-helpers.ts": 1,
         "src/lib/spree/config.ts": 1,
         "src/lib/spree/webhooks.ts": 1
       }
     },
     "spree_type_imports": {
-      "total": 148,
+      "total": 147,
       "files": {
         "src/app/[country]/[locale]/(checkout)/checkout/[id]/CheckoutPageContent.tsx": 4,
         "src/app/[country]/[locale]/(checkout)/checkout/[id]/CheckoutSidebar.tsx": 1,
@@ -84,7 +83,6 @@
         "src/lib/data/markets.ts": 1,
         "src/lib/data/orders.ts": 1,
         "src/lib/data/payment.ts": 1,
-        "src/lib/data/policies.ts": 1,
         "src/lib/data/wholesale.ts": 2,
         "src/lib/metadata/alternates.ts": 1,
         "src/lib/presentation/public-footer.ts": 1,
@@ -102,7 +100,7 @@
       }
     },
     "spree_client_access": {
-      "total": 69,
+      "total": 68,
       "files": {
         "src/lib/data/addresses.ts": 10,
         "src/lib/data/cart.ts": 7,
@@ -114,7 +112,6 @@
         "src/lib/data/markets.ts": 2,
         "src/lib/data/orders.ts": 3,
         "src/lib/data/payment.ts": 7,
-        "src/lib/data/policies.ts": 1,
         "src/lib/data/wholesale.ts": 5,
         "src/lib/spree/auth-helpers.ts": 1,
         "src/lib/spree/config.ts": 6,
@@ -122,7 +119,7 @@
       }
     },
     "spree_wrapper_imports": {
-      "total": 78,
+      "total": 76,
       "files": {
         "src/app/[country]/[locale]/(storefront)/account/(authenticated)/layout.tsx": 2,
         "src/app/[country]/[locale]/(wholesale)/wholesale/layout.tsx": 1,
@@ -143,7 +140,6 @@
         "src/lib/data/markets.ts": 2,
         "src/lib/data/orders.ts": 6,
         "src/lib/data/payment.ts": 5,
-        "src/lib/data/policies.ts": 2,
         "src/lib/data/products.ts": 1,
         "src/lib/data/wholesale.ts": 4,
         "src/lib/metadata/product.ts": 1,

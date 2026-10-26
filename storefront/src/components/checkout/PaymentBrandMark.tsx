@@ -17,10 +17,7 @@ import { cn } from "@/lib/utils";
 export function isPaymentBrandKey(
   key: string | undefined,
 ): key is FooterPaymentLogoKey {
-  return (
-    key !== undefined &&
-    Object.prototype.hasOwnProperty.call(PAYMENT_BRAND_ASSETS, key)
-  );
+  return key !== undefined && Object.hasOwn(PAYMENT_BRAND_ASSETS, key);
 }
 
 export function PaymentBrandMark({
