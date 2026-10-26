@@ -3,9 +3,8 @@
 import { useLocale } from 'next-intl';
 import { useParams } from 'next/navigation';
 import { ClipboardList } from 'lucide-react';
-import { EmptyState } from '@/components/nebrax';
-import { currentUser } from '@/lib/auth';
-import { hasPermission } from '@/lib/permissions';
+import { EmptyState, LoadingState } from '@/components/nebrax';
+import { useCan } from '@/lib/use-can';
 import { ordersMessages } from '@/modules/commerce-workspace/orders/messages';
 import { OrderDetailView } from '@/modules/commerce-workspace/orders/order-detail';
 
@@ -15,9 +14,11 @@ export default function CommerceOrderDetailPage() {
   const { t } = ordersMessages(locale);
   const params = useParams<{ id: string }>();
   const id = typeof params?.id === 'string' ? params.id : '';
-  const user = currentUser();
-  const canView = hasPermission(user?.permissions, user?.role, 'commerce.orders.view');
+  const { can, hydrated } = useCan();
+  // قبل الترطيب لا نعرف الجلسة: لا طلب ولا حكم صلاحية (يمنع وميض «ممنوع» ثم تحميل).
+  const canView = can('commerce.orders.view');
 
+  if (!hydrated) return <LoadingState variant="cards" rows={3} />;
   if (!canView) return <EmptyState icon={ClipboardList} title={t('forbidden')} description={t('forbiddenHint')} />;
   if (id === '') return <EmptyState icon={ClipboardList} title={t('detailNotFound')} description={t('detailNotFoundHint')} />;
 

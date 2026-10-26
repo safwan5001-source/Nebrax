@@ -4,8 +4,7 @@ import { Suspense } from 'react';
 import { useLocale } from 'next-intl';
 import { ClipboardList } from 'lucide-react';
 import { EmptyState, LoadingState, PageHeader } from '@/components/nebrax';
-import { currentUser } from '@/lib/auth';
-import { hasPermission } from '@/lib/permissions';
+import { useCan } from '@/lib/use-can';
 import { ordersMessages } from '@/modules/commerce-workspace/orders/messages';
 import { OrdersList } from '@/modules/commerce-workspace/orders/orders-list';
 
@@ -16,13 +15,16 @@ import { OrdersList } from '@/modules/commerce-workspace/orders/orders-list';
 export default function CommerceOrdersPage() {
   const locale = useLocale();
   const { t } = ordersMessages(locale);
-  const user = currentUser();
-  const canView = hasPermission(user?.permissions, user?.role, 'commerce.orders.view');
+  const { can, hydrated } = useCan();
+  // قبل الترطيب لا نعرف الجلسة: لا طلب ولا حكم صلاحية (يمنع وميض «ممنوع» ثم تحميل).
+  const canView = can('commerce.orders.view');
 
   return (
     <div className="space-y-5">
       <PageHeader eyebrow={t('eyebrow')} title={t('title')} description={t('description')} />
-      {canView ? (
+      {!hydrated ? (
+        <LoadingState variant="table" rows={5} />
+      ) : canView ? (
         <Suspense fallback={<LoadingState variant="table" rows={5} />}>
           <OrdersList />
         </Suspense>
