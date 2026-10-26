@@ -75,6 +75,23 @@ describe("policy-edit helpers (B8-3)", () => {
     expect(policyStatus(page())).toBe("empty");
     expect(policyStatus(page({ content: { en: { title: "", body: "x" } } }))).toBe("ready");
     expect(policyStatus(page({ content: { en: { title: "t", body: "  " } } }))).toBe("empty");
+    // no visible text after safe rendering ⇒ empty (the server would 404 it)
+    for (const body of [
+      "![x](https://example.com/p.png)",
+      "<script>alert(1)</script>",
+      "<div></div>\n\n---\n\n***",
+      "## \n\n> \n\n- ",
+      "**  **",
+    ]) {
+      expect(policyStatus(page({ content: { en: { title: "t", body } } })), body).toBe("empty");
+    }
+    // …while real text, link labels and a second language still count
+    for (const body of ["x", "[label](javascript:alert(1))", "## عنوان", "![x](https://e.com/p.png) text"]) {
+      expect(policyStatus(page({ content: { en: { title: "", body } } })), body).toBe("ready");
+    }
+    expect(
+      policyStatus(page({ content: { en: { title: "", body: "![x](https://e.com/p.png)" }, ar: { title: "", body: "نص" } } })),
+    ).toBe("ready");
     expect(parsePolicyIssuePath("pages.4.content.ar.body")).toEqual({ index: 4, locale: "ar", field: "body" });
     expect(parsePolicyIssuePath("pages.4.title")).toBeNull();
     expect(parsePolicyIssuePath("announcements.items[0]")).toBeNull();
@@ -222,6 +239,8 @@ describe("PolicyMarkdownPreview safety", () => {
       expect(out, md).not.toMatch(/<(script|svg|img|iframe)\b/i);
       expect(out, md).not.toMatch(/\son[a-z]+=/i);
       expect(out, md).not.toMatch(/href="(?!https:|mailto:|tel:)/i);
+      // a raw HTML block (e.g. <script>…</script>) disappears entirely, as on the server — its inner text is not shown
+      if (md.startsWith("<script>")) expect(out).not.toContain("alert");
     }
   });
 });

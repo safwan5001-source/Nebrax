@@ -24,6 +24,37 @@ function stripRawHtml(text: string): string {
   return text.replace(/<\/?[a-zA-Z!?][^>]*>?/g, "");
 }
 
+const RAW_HTML_BLOCK_START = /^ {0,3}<(?:[a-zA-Z][\w-]*|\/[a-zA-Z][\w-]*|!|\?)/;
+const RAW_HTML_VERBATIM = /^ {0,3}<(script|style|pre|textarea)\b/i;
+
+/**
+ * CommonMark's `html_input=strip` drops a whole raw-HTML *block* (a line opening with a tag at the start
+ * of a block, through the next blank line — or through the closing tag for script/style/pre/textarea).
+ * Mirrors that so the preview and the readiness check agree with the server; inline tags are handled by
+ * `stripRawHtml`. An approximation of CommonMark's HTML-block rules, not a copy.
+ */
+function dropHtmlBlocks(lines: string[]): string[] {
+  const out: string[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const atBlockStart = i === 0 || lines[i - 1].trim() === "";
+    if (atBlockStart && RAW_HTML_BLOCK_START.test(lines[i])) {
+      const verbatim = RAW_HTML_VERBATIM.exec(lines[i]);
+      if (verbatim) {
+        const close = new RegExp(`</${verbatim[1]}>`, "i");
+        while (i < lines.length && !close.test(lines[i])) i++;
+        i++; // the closing line itself is dropped too
+      } else {
+        while (i < lines.length && lines[i].trim() !== "") i++;
+      }
+      continue;
+    }
+    out.push(lines[i]);
+    i++;
+  }
+  return out;
+}
+
 const INLINE =
   /!\[[^\]]*\]\([^)]*\)|\[([^\]]+)\]\(([^)\s]*)\)|\*\*([^*]+)\*\*|__([^_]+)__|\*([^*\s][^*]*)\*|_([^_\s][^_]*)_/g;
 
@@ -64,9 +95,10 @@ const HEADING = /^(#{1,6})\s+(.*?)\s*#*\s*$/;
 const BULLET = /^\s*[-*+]\s+(.*)$/;
 const ORDERED = /^\s*\d{1,9}[.)]\s+(.*)$/;
 const QUOTE = /^\s*>\s?(.*)$/;
+const HR = /^\s{0,3}([-*_])(?:\s*\1){2,}\s*$/;
 
 export function PolicyMarkdownPreview({ markdown }: { markdown: string }) {
-  const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
+  const lines = dropHtmlBlocks(markdown.replace(/\r\n?/g, "\n").split("\n"));
   const blocks: ReactNode[] = [];
   let i = 0;
   let k = 0;
@@ -74,6 +106,10 @@ export function PolicyMarkdownPreview({ markdown }: { markdown: string }) {
     const line = lines[i];
     if (line.trim() === "") {
       i++;
+      continue;
+    }
+    if (HR.test(line)) {
+      i++; // thematic breaks are not part of the approved subset (the server drops them too)
       continue;
     }
     const key = `b${k++}`;
@@ -112,7 +148,8 @@ export function PolicyMarkdownPreview({ markdown }: { markdown: string }) {
       !HEADING.test(lines[i]) &&
       !BULLET.test(lines[i]) &&
       !ORDERED.test(lines[i]) &&
-      !QUOTE.test(lines[i])
+      !QUOTE.test(lines[i]) &&
+      !HR.test(lines[i])
     ) {
       para.push(lines[i].trim());
       i++;
@@ -121,4 +158,27 @@ export function PolicyMarkdownPreview({ markdown }: { markdown: string }) {
     if (inline.length > 0) blocks.push(<p key={key}>{inline}</p>);
   }
   return <div data-testid="policy-preview">{blocks}</div>;
+}
+
+/**
+ * True when the safe rendering would show any text — the same notion the server uses (B8-2) to decide a
+ * policy is empty: raw HTML, images and thematic breaks contribute nothing, link labels do.
+ */
+export function markdownHasVisibleText(markdown: string): boolean {
+  const text = stripRawHtml(
+    dropHtmlBlocks(markdown.replace(/\r\n?/g, "\n").split("\n")).join("\n"),
+  )
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+    .replace(/\[([^\]]*)\]\([^)\s]*\)/g, "$1")
+    .split("\n")
+    .filter((line) => !HR.test(line))
+    .map((line) =>
+      line
+        .replace(/^\s{0,3}#{1,6}\s+/, "")
+        .replace(/^\s*>\s?/, "")
+        .replace(/^\s*(?:[-*+]|\d{1,9}[.)])\s+/, ""),
+    )
+    .join("")
+    .replace(/[*_\\]/g, "");
+  return text.replace(/[\s\u200B-\u200D\u2028\u2029\uFEFF\u00A0]+/g, "") !== "";
 }

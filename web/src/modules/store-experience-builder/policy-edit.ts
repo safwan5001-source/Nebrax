@@ -4,6 +4,7 @@ import type {
   PresentationPolicyLocaleContent,
 } from "./presentation/config";
 import { POLICY_PAGE_SLUGS } from "./presentation/config";
+import { markdownHasVisibleText } from "./PolicyMarkdownPreview";
 
 /** B8-3 — pure helpers behind the merchant policy editor (mirror of the server's B8-1 limits). */
 export const POLICY_TITLE_MAX = 80;
@@ -31,13 +32,14 @@ export type PolicyStatus = "hidden" | "empty" | "ready";
 
 /**
  * What a visitor would get once this DRAFT is published: `hidden` (page disabled ⇒ 404),
- * `empty` (enabled but no text in any language ⇒ 404), `ready` (enabled + text ⇒ served).
+ * `empty` (enabled but no text in any language ⇒ 404), `ready` (enabled + visible text ⇒ served).
  * It describes the draft only — the live state needs a publish.
  */
 export function policyStatus(page: PresentationContentPage): PolicyStatus {
   if (!page.enabled) return "hidden";
-  const hasText = POLICY_LOCALES.some(
-    (locale) => policyLocaleContent(page, locale).body.trim() !== "",
+  // Visible text after safe rendering, not raw Markdown: an image-only or HTML-only body is empty (404).
+  const hasText = POLICY_LOCALES.some((locale) =>
+    markdownHasVisibleText(policyLocaleContent(page, locale).body),
   );
   return hasText ? "ready" : "empty";
 }
