@@ -15,12 +15,12 @@ export interface ModuleTab {
 interface ModuleTabsProps {
   tabs: ModuleTab[];
   tablistLabel: string;
-  note: string;
+  panHint: string;
   locale: string;
 }
 
 /** مبدّل وحدات: اللوحة الأولى ظاهرة بلا سكربت، وبقية اللوحات `hidden` حتى تُحدَّد. */
-export function ModuleTabs({ tabs, tablistLabel, note, locale }: ModuleTabsProps) {
+export function ModuleTabs({ tabs, tablistLabel, panHint, locale }: ModuleTabsProps) {
   const [active, setActive] = useState(0);
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   // على الجوال تُمرَّر اللقطة أفقياً لتبقى مقروءة، فتصير منطقة قابلة للتركيز بلوحة المفاتيح.
@@ -103,7 +103,7 @@ export function ModuleTabs({ tabs, tablistLabel, note, locale }: ModuleTabsProps
                 sizes="(min-width: 1440px) 864px, (min-width: 960px) 62vw, 760px"
               />
             </div>
-            <figcaption>{note}</figcaption>
+            <figcaption className="lp-pan__hint">{panHint}</figcaption>
           </figure>
         </div>
       ))}

@@ -5,6 +5,8 @@ import { AwjLogo } from '@/components/layout/awj-logo';
 import { LangToggle } from '@/components/layout/lang-toggle';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { LandingNav } from '@/components/landing/landing-nav';
+import { LandingTheme } from '@/components/landing/landing-theme';
+import { LANDING_THEME_PRE_PAINT_SCRIPT } from '@/components/landing/landing-theme-script';
 import { LandingShot, type LandingShotName } from '@/components/landing/landing-shot';
 import { ModuleTabs, type ModuleTab } from '@/components/landing/module-tabs';
 import './landing.css';
@@ -19,9 +21,10 @@ export async function generateMetadata(): Promise<Metadata> {
   return { description: t('meta_description') };
 }
 
+// نقطة البيع أولاً: لقطة المبيعات تكرّر قائمة الفواتير المعروضة في قسم التدفق قبلها مباشرة.
 const MODULES: { id: string; shot: LandingShotName; prefix: string }[] = [
-  { id: 'sales', shot: 'mod-sales', prefix: 'm_sales' },
   { id: 'pos', shot: 'mod-pos', prefix: 'm_pos' },
+  { id: 'sales', shot: 'mod-sales', prefix: 'm_sales' },
   { id: 'purchases', shot: 'mod-purchases', prefix: 'm_purchases' },
   { id: 'books', shot: 'mod-books', prefix: 'm_books' },
   { id: 'reports', shot: 'mod-reports', prefix: 'm_reports' },
@@ -53,6 +56,9 @@ export default async function LandingPage() {
 
   return (
     <div className="lp">
+      {/* AWJ Core on the public page only: the shared theme attributes before first paint (see landing-theme-script.ts). */}
+      <script dangerouslySetInnerHTML={{ __html: LANDING_THEME_PRE_PAINT_SCRIPT }} />
+      <LandingTheme />
       <a href="#main-content" className="lp-skip">
         {t('skip_to_content')}
       </a>
@@ -149,7 +155,6 @@ export default async function LandingPage() {
                   <figcaption>{t('flow_entry_caption')}</figcaption>
                 </figure>
               </div>
-              <p className="lp-note">{t('flow_note')}</p>
             </div>
           </div>
         </section>
@@ -159,7 +164,7 @@ export default async function LandingPage() {
             <div className="lp-head">
               <h2 id="modules-title">{t('modules_title')}</h2>
             </div>
-            <ModuleTabs tabs={tabs} tablistLabel={t('modules_tablist')} note={t('modules_shot_note')} locale={locale} />
+            <ModuleTabs tabs={tabs} tablistLabel={t('modules_tablist')} panHint={t('modules_pan_hint')} locale={locale} />
           </div>
         </section>
 
@@ -192,7 +197,7 @@ export default async function LandingPage() {
 
         <section id="status" className="lp-section--band" aria-labelledby="status-title">
           <div className="lp-container">
-            <div className="lp-head">
+            <div className="lp-head lp-head--stack">
               <h2 id="status-title">{t('status_title')}</h2>
               <div className="lp-head__side">
                 <p>{t('status_lead')}</p>
@@ -216,6 +221,11 @@ export default async function LandingPage() {
                 ))}
               </tbody>
             </table>
+            <div className="lp-status__action">
+              <Link href="/register" className="lp-btn">
+                {t('cta_register')}
+              </Link>
+            </div>
           </div>
         </section>
 
@@ -239,15 +249,20 @@ export default async function LandingPage() {
         <section className="lp-section" aria-labelledby="close-title">
           <div className="lp-container">
             <div className="lp-close bg-primary px-6 py-10 text-primary-foreground sm:px-10 sm:py-14 lg:px-16 lg:py-20">
-              <h2 id="close-title">{t('close_title')}</h2>
-              <p>{t('close_lead')}</p>
-              <div className="lp-close__actions">
-                <Link href="/register" className="lp-btn lp-btn--inverse">
-                  {t('cta_register')}
-                </Link>
-                <Link href="/login" className="lp-link">
-                  {t('cta_login')}
-                </Link>
+              <div className="lp-close__text">
+                <h2 id="close-title">{t('close_title')}</h2>
+                <p>{t('close_lead')}</p>
+                <div className="lp-close__actions">
+                  <Link href="/register" className="lp-btn lp-btn--inverse">
+                    {t('cta_register')}
+                  </Link>
+                  <Link href="/login" className="lp-link">
+                    {t('cta_login')}
+                  </Link>
+                </div>
+              </div>
+              <div className="lp-shot lp-close__proof" aria-hidden="true">
+                <LandingShot name="card-entry" locale={locale} alt="" sizes="(min-width: 960px) 40vw, 100vw" />
               </div>
             </div>
           </div>

@@ -39,6 +39,19 @@
   --lp-ink-2: color-mix(in oklab, var(--text) 78%, var(--background));
   --lp-ink-3: color-mix(in oklab, var(--text) 66%, var(--background));
   --lp-outline: color-mix(in oklab, var(--text) 10%, transparent);
+  /* AWJ Core, read from the shared theme tokens (design-system/tokens/awj.tokens.json, theme.core): the identity-blue block and the ink on it. The fallbacks are existing page tokens, used only if the shared attributes are absent. */
+  /* Marketing surfaces: the cool band tone as the page and paper as the panels in Light, the desk and paper in Dark (shared tokens; the ERP desk tone stays inside the product). */
+  --lp-page: var(--awj-surface-band, var(--background));
+  --lp-panel: var(--awj-surface-paper, var(--surface));
+  --lp-core: var(--awj-shell-bg, var(--primary));
+  --lp-core-fg: var(--awj-shell-fg, var(--primary-foreground));
+  --lp-core-fg-2: var(--awj-shell-fg-muted, var(--primary-foreground));
+  --lp-core-apex: var(--awj-shell-apex, var(--primary-foreground));
+  --lp-core-line: var(--awj-shell-line, var(--border));
+}
+
+html.dark {
+  --lp-page: var(--awj-surface-desk, var(--background));
 }
 
 @media (max-width: 60rem) {
@@ -71,6 +84,8 @@ html:has(.lp) {
 }
 
 .lp {
+  --background: var(--lp-page);
+  --surface: var(--lp-panel);
   min-height: 100dvh;
   background: var(--background);
   color: var(--text);
@@ -212,19 +227,19 @@ html:has(.lp) {
 }
 
 .lp-btn--inverse {
-  border-color: var(--primary-foreground);
-  background: var(--primary-foreground);
-  color: var(--primary);
+  border-color: var(--lp-core-fg);
+  background: var(--lp-core-fg);
+  color: var(--lp-core);
 }
 
 .lp-btn--inverse:hover {
-  border-color: var(--surface);
-  background: var(--surface);
-  color: var(--primary-hover);
+  border-color: var(--lp-core-fg-2);
+  background: var(--lp-core-fg-2);
+  color: var(--lp-core);
 }
 
 .lp-btn--inverse:focus-visible {
-  outline-color: var(--primary-foreground);
+  outline-color: var(--lp-core-fg);
 }
 
 .lp-link {
@@ -397,7 +412,7 @@ html:has(.lp) {
 
 /* The first section after the hero starts close under it, so the hero's foot and the next heading read as one screen. */
 #flow.lp-section--tall {
-  padding-block-start: var(--space-lg);
+  padding-block-start: var(--space-sm);
 }
 
 .lp-section--band {
@@ -416,6 +431,17 @@ html:has(.lp) {
 
 .lp-head h2 {
   max-width: 18ch;
+}
+
+.lp-head--stack {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-md);
+  margin-block-end: var(--space-xl);
+}
+
+.lp-head--stack h2 {
+  max-width: 24ch;
 }
 
 .lp-head__side {
@@ -499,7 +525,26 @@ html:has(.lp) {
   }
 }
 
+/* English runs longer than Arabic at the same size: a wider text column and a smaller head keep it to three lines. */
+.lp-hero__grid:lang(en) {
+  grid-template-columns: minmax(0, 4.4fr) minmax(0, 7fr);
+}
+
+.lp-hero__grid:lang(en) h1 {
+  font-size: clamp(2rem, 2.6vw + 0.75rem, 3.25rem);
+}
+
+.lp-hero__have a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
 @media (max-width: 60rem) {
+  .lp-hero__grid:lang(en) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .lp-hero {
     padding-block: var(--space-xl) var(--space-2xl);
   }
@@ -553,7 +598,15 @@ html.dark .lp img.lp-img.lp-theme-dark:not(.lp-narrow) {
   }
 }
 
+.lp-pan__hint {
+  display: none;
+}
+
 @media (max-width: 40rem) {
+  .lp-pan__hint {
+    display: block;
+  }
+
   .lp-pan {
     overflow-x: auto;
     overscroll-behavior-x: contain;
@@ -686,6 +739,8 @@ html.dark .lp img.lp-img.lp-theme-dark:not(.lp-narrow) {
 
 .lp-facts li {
   padding-block: var(--space-md);
+  font-size: var(--text-lead);
+  line-height: 1.5;
   border-block-start: 1px solid var(--border);
   color: var(--lp-ink-2);
 }
@@ -707,16 +762,17 @@ html.dark .lp img.lp-img.lp-theme-dark:not(.lp-narrow) {
   display: grid;
   grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
   gap: var(--space-2xl);
-  align-items: center;
+  align-items: start;
 }
 
 .lp-mobile__text {
+  padding-block-start: var(--space-lg);
   display: grid;
   gap: var(--space-lg);
 }
 
 .lp-mobile__text p {
-  max-width: 40ch;
+  max-width: 46ch;
   color: var(--lp-ink-2);
   font-size: var(--text-lead);
 }
@@ -725,7 +781,7 @@ html.dark .lp img.lp-img.lp-theme-dark:not(.lp-narrow) {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--gap-columns);
-  align-items: center;
+  align-items: start;
 }
 
 .lp-mobile__stack {
@@ -792,7 +848,13 @@ html.dark .lp img.lp-img.lp-theme-dark:not(.lp-narrow) {
 }
 
 .lp-table td.lp-state--ready {
-  color: var(--primary);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.lp-status__action {
+  display: flex;
+  margin-block-start: var(--space-xl);
 }
 
 .lp-table td.lp-state--partial {
@@ -884,11 +946,39 @@ html.dark .lp img.lp-img.lp-theme-dark:not(.lp-narrow) {
 
 /* Close */
 
-.lp-close {
+.lp .lp-close {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-xl) var(--space-2xl);
+  align-items: center;
+  border-radius: var(--radius-card);
+  background: var(--lp-core);
+  color: var(--lp-core-fg);
+}
+
+.lp-close__text {
   display: grid;
   gap: var(--space-lg);
   justify-items: start;
-  border-radius: var(--radius-card);
+}
+
+/* The entry again, at the point of sign-up: the proof the page opened with, on the identity block. */
+.lp-close__proof {
+  display: none;
+}
+
+@media (min-width: 60rem) {
+  .lp .lp-close {
+    grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+  }
+
+  .lp-close__proof {
+    display: grid;
+  }
+
+  .lp-close__proof img {
+    outline-color: var(--lp-core-line);
+  }
 }
 
 .lp-close h2 {
@@ -896,7 +986,8 @@ html.dark .lp img.lp-img.lp-theme-dark:not(.lp-narrow) {
 }
 
 .lp-close p {
-  max-width: 44ch;
+  max-width: 46ch;
+  color: var(--lp-core-fg-2);
   font-size: var(--text-lead);
 }
 
@@ -909,16 +1000,17 @@ html.dark .lp img.lp-img.lp-theme-dark:not(.lp-narrow) {
 }
 
 .lp-close .lp-link {
-  color: var(--primary-foreground);
+  color: var(--lp-core-fg);
 }
 
 .lp-close .lp-link:hover {
-  color: var(--primary-foreground);
+  color: var(--lp-core-fg);
   text-decoration: underline;
 }
 
-.lp-close .lp-link:focus-visible {
-  outline-color: var(--primary-foreground);
+/* The shared v3 focus ring is the action blue, which is the Core block itself: on the block the ring is the block's ink. */
+.lp .lp-close a[href]:focus-visible {
+  outline-color: var(--lp-core-fg);
 }
 
 /* Footer */
@@ -960,6 +1052,18 @@ html.dark .lp img.lp-img.lp-theme-dark:not(.lp-narrow) {
   flex-basis: 100%;
   color: var(--lp-ink-3);
   font-size: var(--text-sm);
+}
+
+/* One entrance: the hero capture settles in once (transform and opacity only). Visible without it, and the reduced-motion rule below ends it at once. */
+@keyframes lp-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+
+.lp-hero__shot {
+  animation: lp-rise 600ms var(--ease-out) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
