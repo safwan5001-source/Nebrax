@@ -255,6 +255,7 @@ export default async function LandingPage() {
           <nav aria-label={t('footer_nav')}>
             <Link href="/login">{t('cta_login')}</Link>
             <Link href="/register">{t('cta_register')}</Link>
+            <a href="#modules">{t('nav_modules')}</a>
             <a href="#status">{t('nav_status')}</a>
           </nav>
           <p className="lp-footer__line">{t('footer_line')}</p>
