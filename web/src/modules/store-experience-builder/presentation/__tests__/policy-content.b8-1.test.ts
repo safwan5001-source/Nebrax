@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizePresentationConfig } from "../config";
+import { normalizePresentationConfig, policyContentIssues } from "../config";
 
 describe("B8-1 policy content (compat)", () => {
   const page = (slug: string, extra: Record<string, unknown> = {}) => ({
@@ -51,5 +51,22 @@ describe("B8-1 policy content (compat)", () => {
     expect(out.pages[0].content?.ar?.title).toHaveLength(80);
     expect(out.pages[0].content?.ar?.body).toHaveLength(20000);
     expect("content" in out.pages[1]).toBe(false);
+  });
+
+  it("reports over-limit text, accepts the exact boundary", () => {
+    const at = (body: number, title: number) => ({
+      pages: [
+        page("privacy-policy", {
+          content: { ar: { title: "ع".repeat(title), body: "ب".repeat(body) } },
+        }),
+        page("about", { content: { ar: { title: "x", body: "z".repeat(30000) } } }),
+      ],
+    });
+    expect(policyContentIssues(at(20000, 80))).toEqual([]);
+    expect(policyContentIssues(at(20001, 81))).toEqual([
+      { path: "pages.0.content.ar.title", code: "policy_title_too_long" },
+      { path: "pages.0.content.ar.body", code: "policy_body_too_long" },
+    ]);
+    expect(policyContentIssues(null)).toEqual([]);
   });
 });

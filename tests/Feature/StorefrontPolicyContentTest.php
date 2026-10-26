@@ -168,4 +168,57 @@ class StorefrontPolicyContentTest extends TestCase
         $this->withToken($staff)->putJson($p, ['config' => $this->policyConfig('X'), 'draft_revision' => 0])->assertForbidden();
         $this->withToken($staff)->getJson($p)->assertForbidden();
     }
+
+    /** @test */
+    public function over_limit_body_or_title_is_rejected_atomically_and_boundaries_pass(): void
+    {
+        $a = $this->registerTenant('pol-lim', 'owner@pol-lim.test');
+        $store = $this->seedStore($a['tenant_id'], 'pol-lim.example.com');
+        $p = $this->path($store['storefront']->id);
+
+        // الحدود الصحيحة تُقبل حرفياً بلا اقتطاع (عربي متعدد البايت).
+        $ok = $this->policyConfig(str_repeat('ب', 20000));
+        $ok['pages'][0]['content']['en']['body'] = str_repeat('b', 20000);
+        $ok['pages'][0]['content']['ar']['title'] = str_repeat('ع', 80);
+        $res = $this->withToken($a['token'])->putJson($p, ['config' => $ok, 'draft_revision' => 0])->assertOk();
+        $this->assertSame(20000, mb_strlen($res->json('data.draft.pages.0.content.ar.body')));
+        $this->assertSame(80, mb_strlen($res->json('data.draft.pages.0.content.ar.title')));
+        $revision = $res->json('data.draft_revision');
+
+        // 20001 ⇒ 422 مع مسار ورمز، والمسودة المخزَّنة لا تتغيّر (ولا تتقدّم النسخة).
+        $bad = $this->policyConfig(str_repeat('ب', 20001));
+        $bad['pages'][0]['content']['en']['body'] = 'ok';
+        $bad['homepage'] = ['heroHeadline' => 'لا يجوز أن يُحفظ جزئياً'];
+        $r = $this->withToken($a['token'])->putJson($p, ['config' => $bad, 'draft_revision' => $revision])
+            ->assertStatus(422);
+        $this->assertSame(['pages.0.content.ar.body' => 'policy_body_too_long'], $r->json('error_codes'));
+        $this->assertArrayHasKey('pages.0.content.ar.body', $r->json('errors'));
+
+        $bad = $this->policyConfig('x');
+        $bad['pages'][0]['content']['en']['title'] = str_repeat('t', 81);
+        $r = $this->withToken($a['token'])->putJson($p, ['config' => $bad, 'draft_revision' => $revision])
+            ->assertStatus(422);
+        $this->assertSame(['pages.0.content.en.title' => 'policy_title_too_long'], $r->json('error_codes'));
+
+        $after = $this->withToken($a['token'])->getJson($p)->assertOk();
+        $this->assertSame($revision, $after->json('data.draft_revision'));
+        $this->assertSame(20000, mb_strlen($after->json('data.draft.pages.0.content.ar.body')));
+        $this->assertNotSame('لا يجوز أن يُحفظ جزئياً', $after->json('data.draft.homepage.heroHeadline'));
+    }
+
+    /** @test */
+    public function over_limit_content_on_non_policy_pages_stays_lenient_and_legacy_titles_are_unchanged(): void
+    {
+        $a = $this->registerTenant('pol-len', 'owner@pol-len.test');
+        $store = $this->seedStore($a['tenant_id'], 'pol-len.example.com');
+        $p = $this->path($store['storefront']->id);
+        $cfg = ['pages' => [
+            ['id' => 'a', 'slug' => 'about', 'title' => 'من نحن', 'enabled' => true, 'content' => ['ar' => ['title' => 'x', 'body' => str_repeat('z', 30000)]]],
+            ['id' => 'b', 'slug' => 'faq', 'title' => str_repeat('ع', 100), 'enabled' => true],
+        ]];
+
+        $res = $this->withToken($a['token'])->putJson($p, ['config' => $cfg, 'draft_revision' => 0])->assertOk();
+        $this->assertArrayNotHasKey('content', $res->json('data.draft.pages.0'));
+        $this->assertSame(80, mb_strlen($res->json('data.draft.pages.1.title')));
+    }
 }

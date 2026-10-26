@@ -163,6 +163,7 @@ final class StorefrontPresentationVersionService
             $this->assertSupportedSchema((int) $version->schema_version);
             $this->assertIncomingConfigNotForward($config);
             $this->publishValidator->assertIncomingBackground($config);
+            $this->publishValidator->assertIncomingPolicyContent($config);
 
             // يُطبَّع دائماً تحت الإصدار الحالي — لا يُمرَّر وسم النسخة
             // القديم هنا مطلقاً كي لا تُستحضَر دلالات غياب v1 (تراجع

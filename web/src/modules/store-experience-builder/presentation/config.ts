@@ -138,6 +138,37 @@ export const POLICY_PAGE_SLUGS: readonly string[] = [
 const POLICY_TITLE_MAX = 80;
 const POLICY_BODY_MAX = 20000;
 
+export interface PolicyContentIssue {
+  path: string;
+  code: "policy_title_too_long" | "policy_body_too_long";
+}
+
+/** B8-1 — over-limit policy text the server rejects on save (mirror of PHP; no silent truncation). */
+export function policyContentIssues(raw: unknown): PolicyContentIssue[] {
+  const issues: PolicyContentIssue[] = [];
+  const pages = (raw as { pages?: unknown } | null)?.pages;
+  if (!Array.isArray(pages)) return issues;
+  pages.forEach((page, i) => {
+    if (!page || typeof page !== "object" || Array.isArray(page)) return;
+    const p = page as Record<string, unknown>;
+    if (typeof p.slug !== "string" || !POLICY_PAGE_SLUGS.includes(p.slug)) return;
+    const content = p.content;
+    if (!content || typeof content !== "object" || Array.isArray(content)) return;
+    for (const locale of ["ar", "en"] as const) {
+      const entry = (content as Record<string, unknown>)[locale];
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+      const e = entry as Record<string, unknown>;
+      if (typeof e.title === "string" && Array.from(e.title).length > POLICY_TITLE_MAX) {
+        issues.push({ path: `pages.${i}.content.${locale}.title`, code: "policy_title_too_long" });
+      }
+      if (typeof e.body === "string" && Array.from(e.body).length > POLICY_BODY_MAX) {
+        issues.push({ path: `pages.${i}.content.${locale}.body`, code: "policy_body_too_long" });
+      }
+    }
+  });
+  return issues;
+}
+
 function normalizePolicyContent(raw: unknown): PresentationPolicyContent {
   const out: PresentationPolicyContent = {};
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
