@@ -541,18 +541,16 @@ class ImportPreviewBindingTest extends TestCase
         $priceList = $this->withToken($auth['token'])->postJson('/api/price-lists', ['name' => 'قائمة الجملة'])->assertCreated()['data']['id'];
         $otherList = $this->withToken($auth['token'])->postJson('/api/price-lists', ['name' => 'قائمة أخرى'])->assertCreated()['data']['id'];
         $this->withToken($auth['token'])->postJson('/api/products', ['name' => 'قائم', 'sku' => 'SKU-WBP', 'type' => 'good', 'sale_price' => 10000])->assertCreated();
-        $file = function () {
-            $path = tempnam(sys_get_temp_dir(), 'pb-wb-');
-            SpreadsheetWriter::workbookXlsx($path, [
-                ['name' => 'Products', 'headers' => ['sku', 'name', 'type', 'unit', 'sale_price'], 'rows' => []],
-                ['name' => 'Barcodes', 'headers' => ['sku', 'code'], 'rows' => [['SKU-WBP', '6281234500099']]],
-                ['name' => 'Unit Prices', 'headers' => ['sku', 'unit_name', 'price'], 'rows' => [['SKU-WBP', '', '55.00']]],
-            ]);
-            $f = UploadedFile::fake()->createWithContent('wb.xlsx', (string) file_get_contents($path));
-            @unlink($path);
-
-            return $f;
-        };
+        // الـbytes تُبنى مرةً واحدة: ZipArchive يختم المدخلات بوقت التوليد (دقّة ثانيتين) فإعادة البناء قد تغيّر بصمة الملف (CI #10646).
+        $path = tempnam(sys_get_temp_dir(), 'pb-wb-');
+        SpreadsheetWriter::workbookXlsx($path, [
+            ['name' => 'Products', 'headers' => ['sku', 'name', 'type', 'unit', 'sale_price'], 'rows' => []],
+            ['name' => 'Barcodes', 'headers' => ['sku', 'code'], 'rows' => [['SKU-WBP', '6281234500099']]],
+            ['name' => 'Unit Prices', 'headers' => ['sku', 'unit_name', 'price'], 'rows' => [['SKU-WBP', '', '55.00']]],
+        ]);
+        $bytes = (string) file_get_contents($path);
+        @unlink($path);
+        $file = fn () => UploadedFile::fake()->createWithContent('wb.xlsx', $bytes);
         $binding = $this->withToken($auth['token'])
             ->post('/api/products/workbook/preview', ['file' => $file(), 'price_list_id' => $priceList], ['Accept' => 'application/json'])
             ->assertOk()->json('data.binding');

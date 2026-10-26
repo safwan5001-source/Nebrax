@@ -260,18 +260,28 @@ class ImportPlanDriftTest extends TestCase
         ], ['Accept' => 'application/json'])->assertCreated();
     }
 
+    /** @var array<string, string> bytes الملف لكل SKU — يُبنى مرةً واحدة لكل اختبار. */
+    private array $workbookBytes = [];
+
+    /**
+     * كل استدعاء يعيد **الـbytes نفسها**. ZipArchive يختم كل مدخلٍ بوقت التوليد (دقّة ثانيتين)، فإعادة بناء المصنّف بين
+     * المعاينة والتنفيذ تعبر حدّ الثانيتين أحياناً فتتغيّر بصمة الملف ⇒ `preview_mismatch` عشوائياً (CI #10646). المعاينة تربط
+     * بصمة الملف عمداً، فالاختبار يجب أن يرفع الملف نفسه لا نسخةً مُعاد توليدها.
+     */
     private function workbook(string $sku): UploadedFile
     {
-        $path = tempnam(sys_get_temp_dir(), 'pd-wb-');
-        SpreadsheetWriter::workbookXlsx($path, [
-            ['name' => 'Products', 'headers' => ['sku', 'name', 'type', 'unit', 'sale_price'], 'rows' => []],
-            ['name' => 'Barcodes', 'headers' => ['sku', 'code'], 'rows' => [[$sku, '6281234500123']]],
-            ['name' => 'Unit Prices', 'headers' => ['sku', 'unit_name', 'price'], 'rows' => [[$sku, '', '55.00']]],
-        ]);
-        $file = UploadedFile::fake()->createWithContent('wb.xlsx', (string) file_get_contents($path));
-        @unlink($path);
+        if (! isset($this->workbookBytes[$sku])) {
+            $path = tempnam(sys_get_temp_dir(), 'pd-wb-');
+            SpreadsheetWriter::workbookXlsx($path, [
+                ['name' => 'Products', 'headers' => ['sku', 'name', 'type', 'unit', 'sale_price'], 'rows' => []],
+                ['name' => 'Barcodes', 'headers' => ['sku', 'code'], 'rows' => [[$sku, '6281234500123']]],
+                ['name' => 'Unit Prices', 'headers' => ['sku', 'unit_name', 'price'], 'rows' => [[$sku, '', '55.00']]],
+            ]);
+            $this->workbookBytes[$sku] = (string) file_get_contents($path);
+            @unlink($path);
+        }
 
-        return $file;
+        return UploadedFile::fake()->createWithContent('wb.xlsx', $this->workbookBytes[$sku]);
     }
 
     /** @test */
