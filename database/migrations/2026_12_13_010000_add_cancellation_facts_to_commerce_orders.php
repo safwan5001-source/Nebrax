@@ -63,8 +63,8 @@ return new class extends Migration
             DB::unprepared('DROP FUNCTION IF EXISTS commerce_orders_cancellation_guard_delete()');
         } else {
             foreach ([
-                'commerce_orders_cancel_insert', 'commerce_orders_cancel_frozen', 'commerce_orders_cancel_orphan_details',
-                'commerce_orders_cancel_transition', 'commerce_orders_cancel_no_delete',
+                'cmo_cancel_insert', 'cmo_cancel_frozen', 'cmo_cancel_orphan_details',
+                'cmo_cancel_transition', 'cmo_cancel_no_delete',
             ] as $trigger) {
                 DB::unprepared("DROP TRIGGER IF EXISTS {$trigger}");
             }
@@ -153,7 +153,7 @@ return new class extends Migration
         $columns = implode(', ', ['status', ...self::COLUMNS]);
 
         DB::unprepared(<<<'SQL'
-            CREATE TRIGGER commerce_orders_cancel_insert BEFORE INSERT ON commerce_orders
+            CREATE TRIGGER cmo_cancel_insert BEFORE INSERT ON commerce_orders
             WHEN NEW.cancelled_at IS NOT NULL OR NEW.cancelled_by_user_id IS NOT NULL
               OR NEW.cancellation_reason IS NOT NULL OR NEW.cancellation_note IS NOT NULL
             BEGIN
@@ -162,7 +162,7 @@ return new class extends Migration
             SQL);
 
         DB::unprepared(<<<SQL
-            CREATE TRIGGER commerce_orders_cancel_frozen BEFORE UPDATE OF {$columns} ON commerce_orders
+            CREATE TRIGGER cmo_cancel_frozen BEFORE UPDATE OF {$columns} ON commerce_orders
             WHEN OLD.cancelled_at IS NOT NULL AND (
                 NEW.cancelled_at IS NOT OLD.cancelled_at
                 OR NEW.cancellation_reason IS NOT OLD.cancellation_reason
@@ -176,7 +176,7 @@ return new class extends Migration
             SQL);
 
         DB::unprepared(<<<SQL
-            CREATE TRIGGER commerce_orders_cancel_orphan_details BEFORE UPDATE OF {$columns} ON commerce_orders
+            CREATE TRIGGER cmo_cancel_orphan_details BEFORE UPDATE OF {$columns} ON commerce_orders
             WHEN OLD.cancelled_at IS NULL AND NEW.cancelled_at IS NULL
               AND (NEW.cancelled_by_user_id IS NOT NULL OR NEW.cancellation_reason IS NOT NULL OR NEW.cancellation_note IS NOT NULL)
             BEGIN
@@ -185,7 +185,7 @@ return new class extends Migration
             SQL);
 
         DB::unprepared(<<<SQL
-            CREATE TRIGGER commerce_orders_cancel_transition BEFORE UPDATE OF {$columns} ON commerce_orders
+            CREATE TRIGGER cmo_cancel_transition BEFORE UPDATE OF {$columns} ON commerce_orders
             WHEN OLD.cancelled_at IS NULL AND NEW.cancelled_at IS NOT NULL AND (
                 OLD.status IS NOT 'confirmed' OR NEW.status IS NOT 'confirmed'
                 OR NEW.cancellation_reason IS NULL OR NEW.cancellation_reason NOT IN ({$reasons})
@@ -197,7 +197,7 @@ return new class extends Migration
             SQL);
 
         DB::unprepared(<<<'SQL'
-            CREATE TRIGGER commerce_orders_cancel_no_delete BEFORE DELETE ON commerce_orders
+            CREATE TRIGGER cmo_cancel_no_delete BEFORE DELETE ON commerce_orders
             WHEN OLD.cancelled_at IS NOT NULL AND EXISTS (SELECT 1 FROM tenants t WHERE t.id = OLD.tenant_id)
             BEGIN
                 SELECT RAISE(ABORT, 'commerce_orders: a cancelled order cannot be deleted');
