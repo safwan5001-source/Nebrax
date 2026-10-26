@@ -171,6 +171,7 @@ describe("getPolicy — AWJ store/v1/policies/{slug} (X4)", () => {
       "<script>alert(1)</script>",
       '<p onclick="x">t</p>',
       '<a href="javascript:alert(1)">x</a>',
+      '<a href="javascript:alert(1)" href="https://ok.test" rel="noopener nofollow ugc">x</a>',
       '<img src="x" onerror="alert(1)">',
     ]) {
       fetchMock.mockResolvedValueOnce(ok({ ...published, html }));

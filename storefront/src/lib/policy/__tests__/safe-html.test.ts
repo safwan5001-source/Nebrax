@@ -97,3 +97,141 @@ describe("the real backend renderer's output (generated from PolicyMarkdownRende
     expect(hostile).not.toMatch(/<script|<img|<div|onerror|href="javascript/i);
   });
 });
+
+const REL = 'rel="noopener nofollow ugc"';
+
+describe("duplicate and mixed-case attributes (Codex P2)", () => {
+  it("rejects duplicate attribute names regardless of order, case or value — a browser keeps the first one", () => {
+    for (const html of [
+      // malicious value first, safe value second: a last-wins map would validate the safe one
+      `<a href="javascript:alert(1)" href="https://ok.test" ${REL}>x</a>`,
+      `<a href="https://ok.test" href="javascript:alert(1)" ${REL}>x</a>`,
+      `<a href="https://ok.test" HREF="https://ok.test" ${REL}>x</a>`,
+      `<a HREF="javascript:alert(1)" href="https://ok.test" ${REL}>x</a>`,
+      `<a Href="vbscript:x" hReF="https://ok.test" ${REL}>x</a>`,
+      `<a href="https://ok.test" href="https://ok.test" ${REL}>x</a>`,
+      `<a href="https://ok.test" rel="noopener nofollow ugc" rel="noopener nofollow ugc">x</a>`,
+      `<a href="https://ok.test" ${REL} REL="opener">x</a>`,
+      `<a href="https://ok.test" ${REL} rel="noopener nofollow ugc"  href="data:text/html;base64,AAAA">x</a>`,
+      `<a href="&#106;avascript:alert(1)" href="https://ok.test" ${REL}>x</a>`,
+    ]) {
+      reject(html);
+    }
+  });
+
+  it("treats attribute names case-insensitively for the allowlist too", () => {
+    for (const html of [
+      `<a href="https://ok.test" ONCLICK="alert(1)" ${REL}>x</a>`,
+      `<a href="https://ok.test" OnMouseOver="alert(1)" ${REL}>x</a>`,
+      `<a HREF="https://ok.test" TARGET="_blank" ${REL}>x</a>`,
+      `<a href="https://ok.test" STYLE="x:y" ${REL}>x</a>`,
+      `<p CLASS="a">x</p>`,
+    ]) {
+      reject(html);
+    }
+    // a single, safe, differently-cased name is the same attribute and stays valid
+    expect(() =>
+      assertSafePolicyHtml(
+        `<a HREF="https://ok.test" REL="noopener nofollow ugc">x</a>`,
+      ),
+    ).not.toThrow();
+  });
+
+  it("still rejects every unsafe protocol, in any case and encoding, with a single href", () => {
+    for (const href of [
+      "javascript:alert(1)",
+      "JAVASCRIPT:alert(1)",
+      "JaVaScRiPt:alert(1)",
+      "java\tscript:alert(1)",
+      "java&#x09;script:alert(1)",
+      "&#106;avascript:alert(1)",
+      "&#x6A;avascript:alert(1)",
+      "&Tab;javascript:alert(1)",
+      "jav&amp;ascript:alert(1)",
+      "data:text/html;base64,PHNjcmlwdD4=",
+      "vbscript:msgbox(1)",
+      "file:///etc/passwd",
+      "blob:https://ok.test/x",
+      "http://insecure.test",
+      "//proto.test",
+      "/relative",
+    ]) {
+      reject(`<a href="${href}" ${REL}>x</a>`);
+    }
+  });
+
+  it("keeps accepting valid entity use: &amp; in a query string", () => {
+    expect(() =>
+      assertSafePolicyHtml(
+        `<a href="https://ok.test/?a=1&amp;b=2" ${REL}>x</a>`,
+      ),
+    ).not.toThrow();
+    reject(`<a href="https://ok.test/?a=1&b=2" ${REL}>x</a>`);
+    reject(`<a href="https://ok.test/?a=1&lt;b" ${REL}>x</a>`);
+  });
+});
+
+describe("href length is measured on the decoded URL, like Laravel (Codex P2)", () => {
+  const href = (decoded: string) => decoded.replaceAll("&", "&amp;");
+  const anchor = (decoded: string) => `<a href="${href(decoded)}" ${REL}>x</a>`;
+  const withAmpersands = (length: number) => {
+    const base = "https://a.test/?";
+    let url = base;
+    let i = 0;
+    while (url.length < length) url += `${i++ === 0 ? "" : "&"}k${i}=v`;
+    return `${url.slice(0, length - 1)}x`.padEnd(length, "x");
+  };
+
+  it("accepts a 2048-character decoded URL whose serialized form is far longer", () => {
+    const decoded = withAmpersands(2048);
+    expect(Array.from(decoded)).toHaveLength(2048);
+    expect(decoded.split("&").length).toBeGreaterThan(100);
+    expect(href(decoded).length).toBeGreaterThan(2048);
+    expect(() => assertSafePolicyHtml(anchor(decoded))).not.toThrow();
+  });
+
+  it("rejects a decoded URL of 2049 characters, however it is serialized", () => {
+    reject(anchor(withAmpersands(2049)));
+    reject(anchor(`https://a.test/${"x".repeat(2049 - 15)}`));
+    expect(() =>
+      assertSafePolicyHtml(anchor(`https://a.test/${"x".repeat(2048 - 15)}`)),
+    ).not.toThrow();
+  });
+
+  it("counts code points, not UTF-16 units (an astral character is one)", () => {
+    const astral = `https://a.test/${"\u{1F600}".repeat(2048 - 15)}`;
+    expect(Array.from(astral)).toHaveLength(2048);
+    expect(() => assertSafePolicyHtml(anchor(astral))).not.toThrow();
+    reject(anchor(`${astral}\u{1F600}`));
+  });
+});
+
+describe("long URLs rendered by the real PolicyMarkdownRenderer (Laravel contract)", () => {
+  const find = (label: string) => {
+    const fixture = fixtures.find((f) => f.markdown.startsWith(`[${label}]`));
+    if (!fixture) throw new Error(`missing fixture ${label}`);
+    return fixture;
+  };
+
+  it("a 2048-character URL with ~300 ampersands is linked by Laravel and accepted by the storefront", () => {
+    const { html } = find("at limit");
+    const serialized = /href="([^"]*)"/.exec(html)?.[1] ?? "";
+    expect(serialized.replaceAll("&amp;", "&")).toHaveLength(2048);
+    expect(serialized.length).toBeGreaterThan(3000);
+    expect(() => assertSafePolicyHtml(html)).not.toThrow();
+  });
+
+  it("a well-inside URL passes, and a 2049-character URL is not linked by Laravel at all", () => {
+    expect(() => assertSafePolicyHtml(find("well inside").html)).not.toThrow();
+    const over = find("over limit").html;
+    expect(over).not.toContain("<a ");
+    expect(() => assertSafePolicyHtml(over)).not.toThrow();
+  });
+
+  it("the same backend HTML with one character appended to the URL is refused", () => {
+    const { html } = find("at limit");
+    const tampered = html.replace(/(href="[^"]*)"/, '$1x"');
+    expect(tampered).not.toBe(html);
+    reject(tampered);
+  });
+});

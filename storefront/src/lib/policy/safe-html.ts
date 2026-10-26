@@ -41,13 +41,20 @@ const DISGUISED_HREF =
 /** The only entity the backend emits inside an href (CommonMark escapes `&` in link destinations). */
 const BARE_AMPERSAND = /&(?!amp;)/;
 
+/** Laravel's `PolicyMarkdownRenderer::safeHref` limit: the DECODED URL, in code points (`mb_strlen`). */
+const MAX_HREF_CHARS = 2048;
+
 function assertSafeHref(href: string): void {
   if (DISGUISED_HREF.test(href) || BARE_AMPERSAND.test(href)) {
     throw new UnsafePolicyHtmlError("disguised href");
   }
   const scheme = /^([a-z][a-z0-9+.-]*:)/i.exec(href)?.[1].toLowerCase();
-  if (!scheme || !SAFE_SCHEMES.includes(scheme) || href.length > 2048) {
+  if (!scheme || !SAFE_SCHEMES.includes(scheme)) {
     throw new UnsafePolicyHtmlError("href scheme");
+  }
+  // `&amp;` is the serialization of one `&` — measure what the browser (and Laravel) see, not the markup.
+  if (Array.from(href.replaceAll("&amp;", "&")).length > MAX_HREF_CHARS) {
+    throw new UnsafePolicyHtmlError("href length");
   }
 }
 
@@ -79,10 +86,18 @@ export function assertSafePolicyHtml(html: string): void {
     if (attrs === "") throw new UnsafePolicyHtmlError("anchor without href");
 
     const seen = new Map<string, string>();
+    let duplicated: string | null = null;
     const leftover = attrs.replace(ATTR, (_all, key: string, value: string) => {
-      seen.set(key.toLowerCase(), value);
+      const lower = key.toLowerCase();
+      // HTML attribute names are case-insensitive and a browser keeps the FIRST duplicate, while a
+      // last-wins map would validate a different value than the one that executes — so refuse duplicates.
+      if (seen.has(lower)) duplicated = lower;
+      seen.set(lower, value);
       return "";
     });
+    if (duplicated !== null) {
+      throw new UnsafePolicyHtmlError(`duplicate attribute ${duplicated}`);
+    }
     if (leftover.trim() !== "")
       throw new UnsafePolicyHtmlError("malformed attributes");
     for (const key of seen.keys()) {
