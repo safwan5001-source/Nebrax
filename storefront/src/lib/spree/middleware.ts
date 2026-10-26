@@ -112,8 +112,7 @@ function setLocaleCookies(
 function legacyCheckoutClosed(
   request: NextRequest,
   canonicalPrefix: string,
-  country: string,
-  locale: string,
+  cookies: { country: string; locale: string } | null,
 ): NextResponse {
   const url = request.nextUrl.clone();
   url.pathname = `${canonicalPrefix}/awj-legacy-checkout-closed`;
@@ -124,7 +123,7 @@ function legacyCheckoutClosed(
   const response = NextResponse.rewrite(url, {
     request: { headers: requestHeaders },
   });
-  setLocaleCookies(response, country, locale);
+  if (cookies) setLocaleCookies(response, cookies.country, cookies.locale);
   return response;
 }
 
@@ -191,8 +190,19 @@ export function createSpreeMiddleware(
       return NextResponse.next();
     }
 
-    // Skip if pathname contains a file extension (static assets)
+    // Skip if pathname contains a file extension (static assets). A legacy
+    // checkout id may legitimately contain a dot (`/checkout/test.123`), so the
+    // closed-route check runs first; it only matches the exact
+    // `/{country}/{locale}/{checkout|confirm-payment|order-placed}/{id}` shape.
     if (/\.\w+$/.test(pathname)) {
+      const dotted = pathname.match(HAS_COUNTRY_LOCALE);
+      if (dotted && !isWholesaleEnabled()) {
+        const prefix = `/${dotted[1]}/${dotted[2]}`;
+        if (isLegacyCheckoutPath(pathname.slice(prefix.length))) {
+          // No cookies: the locale here is unvalidated, only the status matters.
+          return legacyCheckoutClosed(request, prefix, null);
+        }
+      }
       return NextResponse.next();
     }
 
@@ -247,7 +257,10 @@ export function createSpreeMiddleware(
         !isWholesaleEnabled() &&
         isLegacyCheckoutPath(pathname.slice(canonicalPrefix.length))
       ) {
-        return legacyCheckoutClosed(request, canonicalPrefix, country, locale);
+        return legacyCheckoutClosed(request, canonicalPrefix, {
+          country,
+          locale,
+        });
       }
 
       return nextWithLocaleContext(request, country, locale);

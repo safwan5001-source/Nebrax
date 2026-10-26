@@ -517,4 +517,47 @@ describe("X5b: legacy Spree checkout routes answer a real 404 without wholesale"
       "https://store.example/us/en/checkout/abc",
     );
   });
+
+  it.each([
+    "/us/en/checkout/test.123",
+    "/us/en/confirm-payment/test.123",
+    "/us/en/order-placed/test.123",
+    // Not the static `payment-return` segment, so it resolves to checkout/[id].
+    "/us/en/checkout/payment-return.v2",
+  ])("closes the dotted legacy id %s without cookies or redirect", async (path) => {
+    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "");
+    const response = await middleware(
+      new NextRequest(`https://store.example${path}`),
+    );
+
+    expect(response.headers.get("location")).toBeNull();
+    expect(rewriteOf(response)).toBe(`https://store.example${closedPath}`);
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("keeps dotted ids, static assets and AWJ routes on the plain pass-through", async () => {
+    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "");
+    for (const path of [
+      "/us/en/products/shirt.v2",
+      "/us/en/checkout/test.123/extra",
+      "/logo.png",
+    ]) {
+      const response = await middleware(
+        new NextRequest(`https://store.example${path}`),
+      );
+      expect(rewriteOf(response)).toBeNull();
+      expect(response.headers.get("location")).toBeNull();
+    }
+  });
+
+  it("leaves dotted legacy ids untouched when the wholesale add-on is enabled", async () => {
+    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "wholesale");
+    const response = await middleware(
+      new NextRequest("https://store.example/us/en/checkout/test.123"),
+    );
+
+    expect(rewriteOf(response)).toBeNull();
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
 });
