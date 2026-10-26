@@ -56,3 +56,9 @@ Review/merge decision by owner; then server-side titles for cart/account when H1
 - AR/EN: tests cover title/template/`og:siteName`/`og:locale` for `ar` and `en`, fallback labels, and ar/en listing titles from the message catalog.
 - Final verification on merged tree: `pnpm check` (0 errors; 5 warnings/3 infos pre-existing), `check:locales` ✔, `check:spree-ratchet` ✔ (value 4, type 147, client 68, wrapper 76, env 9 — unchanged), `tsc --noEmit` ✔, `pnpm test` 236 files / 3406 tests ✔ (16 skipped pre-existing), `pnpm build` ✔, `php -l` ✔.
 - Remaining risks: unchanged from above (cart/account have no page title; legacy getStoreName() consumers; neutral fallback when identity API is down).
+
+## Final merge-readiness (second sync with main)
+- PR was one commit behind: merged `origin/main` = `7cc31d3` (X5 — close legacy Spree checkout routes + X4 verification, #1765).
+- **Only conflict:** the Horizon tracker (X4/X4-FIX region). Resolved by taking main's block verbatim (X4 Deployed row, X4-FIX, X4-LINKS, UI-DEF1) and re-inserting the single `META-BRAND-1` row after `X4-LINKS`. Tracker diff vs main is exactly that one row. All X5 source/tracker changes preserved; no checkout logic touched.
+- Spree ratchet: `wrapper_imports=77` is main's new X5 baseline (ratchet script/baseline byte-identical to main; main alone reports the same). META-BRAND-1 adds no Spree imports.
+- Re-verification on merged tree: `pnpm check` 0 errors, `check:locales` ✔, ratchet ✔, `tsc --noEmit` ✔, `pnpm test` 238 files / 3416 tests ✔.
