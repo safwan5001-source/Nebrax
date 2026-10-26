@@ -18,10 +18,12 @@ interface LandingNavProps {
   menuLabel: string;
   loginHref: string;
   loginLabel: string;
+  registerHref: string;
+  registerLabel: string;
 }
 
 /** شريط علوي بحافتين: الشعار عند البداية والأدوات عند النهاية، وقائمة منسدلة تحت 60rem. */
-export function LandingNav({ brand, tools, links, brandLabel, navLabel, menuLabel, loginHref, loginLabel }: LandingNavProps) {
+export function LandingNav({ brand, tools, links, brandLabel, navLabel, menuLabel, loginHref, loginLabel, registerHref, registerLabel }: LandingNavProps) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -63,6 +65,9 @@ export function LandingNav({ brand, tools, links, brandLabel, navLabel, menuLabe
           <Link href={loginHref} className="lp-nav__login lp-link">
             {loginLabel}
           </Link>
+          <Link href={registerHref} className="lp-nav__register">
+            {registerLabel}
+          </Link>
           <button
             ref={buttonRef}
             type="button"
@@ -83,6 +88,9 @@ export function LandingNav({ brand, tools, links, brandLabel, navLabel, menuLabe
                 {link.label}
               </a>
             ))}
+            <Link href={registerHref} onClick={() => setOpen(false)}>
+              {registerLabel}
+            </Link>
             <Link href={loginHref} onClick={() => setOpen(false)}>
               {loginLabel}
             </Link>

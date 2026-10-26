@@ -20,18 +20,19 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 const MODULES: { id: string; shot: LandingShotName; prefix: string }[] = [
-  { id: 'sales', shot: 'desk-invoices', prefix: 'm_sales' },
-  { id: 'pos', shot: 'desk-pos', prefix: 'm_pos' },
-  { id: 'purchases', shot: 'desk-purchases', prefix: 'm_purchases' },
-  { id: 'books', shot: 'desk-journal', prefix: 'm_books' },
-  { id: 'reports', shot: 'desk-reports', prefix: 'm_reports' },
+  { id: 'sales', shot: 'mod-sales', prefix: 'm_sales' },
+  { id: 'pos', shot: 'mod-pos', prefix: 'm_pos' },
+  { id: 'purchases', shot: 'mod-purchases', prefix: 'm_purchases' },
+  { id: 'books', shot: 'mod-books', prefix: 'm_books' },
+  { id: 'reports', shot: 'mod-reports', prefix: 'm_reports' },
 ];
 
-const STATUS_ROWS: { key: 'sales' | 'stock' | 'books' | 'zatca' | 'ops'; state: 'ready' | 'partial' | 'building' }[] = [
+const STATUS_ROWS: { key: 'sales' | 'stock' | 'books' | 'zatca' | 'hr' | 'ops'; state: 'ready' | 'partial' | 'building' }[] = [
   { key: 'sales', state: 'ready' },
   { key: 'stock', state: 'ready' },
   { key: 'books', state: 'ready' },
   { key: 'zatca', state: 'partial' },
+  { key: 'hr', state: 'partial' },
   { key: 'ops', state: 'building' },
 ];
 
@@ -74,6 +75,8 @@ export default async function LandingPage() {
         menuLabel={t('nav_menu')}
         loginHref="/login"
         loginLabel={t('cta_login')}
+        registerHref="/register"
+        registerLabel={t('cta_register')}
       />
 
       <main id="main-content" tabIndex={-1} className="outline-none">
@@ -100,8 +103,7 @@ export default async function LandingPage() {
                 sizes="(min-width: 1440px) 794px, (min-width: 960px) 56vw, 100vw"
                 priority
               />
-              <LandingShot name="card-invoice" view="narrow" eager locale={locale} alt={t('mobile_invoice_alt')} sizes="384px" />
-              <LandingShot name="card-entry" view="narrow" eager locale={locale} alt={t('mobile_entry_alt')} sizes="384px" />
+              <LandingShot name="phone-entry" view="narrow" eager locale={locale} alt={t('hero_mobile_alt')} sizes="384px" />
               <figcaption>{t('hero_caption')}</figcaption>
             </figure>
           </div>
@@ -119,24 +121,30 @@ export default async function LandingPage() {
             <div className="lp-flow">
               <div className="lp-flow__pair">
                 <figure className="lp-shot">
-                  <LandingShot
-                    name="strip-invoice"
-                    view="wide"
-                    locale={locale}
-                    alt={t('flow_invoice_alt')}
-                    sizes="(min-width: 1440px) 1312px, 100vw"
-                  />
+                  <div className="lp-strip">
+                    <LandingShot
+                      name="strip-invoice"
+                      view="wide"
+                      locale={locale}
+                      alt={t('flow_invoice_alt')}
+                      sizes="(min-width: 1440px) 1312px, 100vw"
+                    />
+                    <span className="lp-mark lp-mark--invoice" aria-hidden="true" />
+                  </div>
                   <LandingShot name="card-invoice" view="narrow" locale={locale} alt={t('flow_invoice_alt')} sizes="384px" />
                   <figcaption>{t('flow_invoice_caption')}</figcaption>
                 </figure>
                 <figure className="lp-shot">
-                  <LandingShot
-                    name="strip-entry"
-                    view="wide"
-                    locale={locale}
-                    alt={t('flow_entry_alt')}
-                    sizes="(min-width: 1440px) 1312px, 100vw"
-                  />
+                  <div className="lp-strip">
+                    <LandingShot
+                      name="strip-entry"
+                      view="wide"
+                      locale={locale}
+                      alt={t('flow_entry_alt')}
+                      sizes="(min-width: 1440px) 1312px, 100vw"
+                    />
+                    <span className="lp-mark lp-mark--entry" aria-hidden="true" />
+                  </div>
                   <LandingShot name="card-entry" view="narrow" locale={locale} alt={t('flow_entry_alt')} sizes="384px" />
                   <figcaption>{t('flow_entry_caption')}</figcaption>
                 </figure>
@@ -172,10 +180,10 @@ export default async function LandingPage() {
               </figure>
               <div className="lp-mobile__stack">
                 <figure className="lp-shot">
-                  <LandingShot name="card-invoice" locale={locale} alt={t('mobile_invoice_alt')} sizes="(min-width: 960px) 24vw, 70vw" />
+                  <LandingShot name="card-purchase-a" locale={locale} alt={t('mobile_purchase_a_alt')} sizes="(min-width: 960px) 24vw, 70vw" />
                 </figure>
                 <figure className="lp-shot">
-                  <LandingShot name="card-entry" locale={locale} alt={t('mobile_entry_alt')} sizes="(min-width: 960px) 24vw, 70vw" />
+                  <LandingShot name="card-purchase-b" locale={locale} alt={t('mobile_purchase_b_alt')} sizes="(min-width: 960px) 24vw, 70vw" />
                 </figure>
               </div>
             </div>

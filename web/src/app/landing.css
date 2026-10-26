@@ -37,6 +37,7 @@
   --z-sticky-nav: 300;
   --radius-card: 0.5rem;
   --lp-ink-2: color-mix(in oklab, var(--text) 78%, var(--background));
+  --lp-ink-3: color-mix(in oklab, var(--text) 66%, var(--background));
   --lp-outline: color-mix(in oklab, var(--text) 10%, transparent);
 }
 
@@ -302,6 +303,30 @@ html:has(.lp) {
   text-decoration: none;
 }
 
+.lp-nav__register {
+  display: none;
+  align-items: center;
+  min-height: 44px;
+  margin-inline-start: var(--space-xs);
+  padding-inline: var(--space-md);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-card);
+  color: var(--primary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color var(--dur-micro) linear;
+}
+
+.lp-nav__register:hover {
+  background: var(--primary-soft);
+}
+
+.lp-nav__register:active {
+  transform: translateY(1px);
+}
+
 .lp-nav__menu-btn {
   display: inline-flex;
   align-items: center;
@@ -350,7 +375,8 @@ html:has(.lp) {
 
 @media (min-width: 60rem) {
   .lp-nav__links,
-  .lp-nav__login {
+  .lp-nav__login,
+  .lp-nav__register {
     display: inline-flex;
   }
 
@@ -408,7 +434,7 @@ html:has(.lp) {
 
 .lp-note {
   margin-block-start: var(--space-md);
-  color: var(--muted);
+  color: var(--lp-ink-3);
   font-size: var(--text-sm);
 }
 
@@ -496,7 +522,7 @@ html:has(.lp) {
 }
 
 .lp-shot figcaption {
-  color: var(--muted);
+  color: var(--lp-ink-3);
   font-size: var(--text-sm);
 }
 
@@ -540,6 +566,36 @@ html.dark .lp img.lp-img.lp-theme-dark:not(.lp-narrow) {
 }
 
 /* Flow: one invoice, one entry */
+
+.lp-strip {
+  position: relative;
+}
+
+/* Outlines the invoice row and the entry row that carry the same reference (row positions come from the capture: a 37px head, then 53px rows). */
+.lp-mark {
+  position: absolute;
+  inset-inline: 0;
+  border-radius: var(--space-2xs);
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+  pointer-events: none;
+}
+
+.lp-mark--invoice {
+  inset-block-start: 12.25%;
+  height: 17.55%;
+}
+
+.lp-mark--entry {
+  inset-block-start: 29.9%;
+  height: 17.6%;
+}
+
+@media (max-width: 40rem) {
+  .lp-strip {
+    display: none;
+  }
+}
 
 .lp-flow {
   display: grid;
@@ -697,7 +753,7 @@ html.dark .lp img.lp-img.lp-theme-dark:not(.lp-narrow) {
   padding-block: var(--space-sm);
   padding-inline: var(--space-md);
   border-block-end: 1px solid var(--text);
-  color: var(--muted);
+  color: var(--lp-ink-3);
   font-size: var(--text-sm);
   font-weight: 500;
   text-align: start;
@@ -739,7 +795,7 @@ html.dark .lp img.lp-img.lp-theme-dark:not(.lp-narrow) {
 }
 
 .lp-table td.lp-state--building {
-  color: var(--muted);
+  color: var(--lp-ink-3);
   font-weight: 400;
 }
 
@@ -796,18 +852,16 @@ html.dark .lp img.lp-img.lp-theme-dark:not(.lp-narrow) {
 
 .lp-controls__list {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 var(--gap-columns);
 }
 
 .lp-control {
   display: grid;
-  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-  gap: var(--space-sm) var(--gap-columns);
-  padding-block: var(--space-lg);
-  border-block-start: 1px solid var(--border);
-}
-
-.lp-control:last-child {
-  border-block-end: 1px solid var(--border);
+  align-content: start;
+  gap: var(--space-sm);
+  padding-block: var(--space-xl);
+  border-block-start: 1px solid var(--text);
 }
 
 .lp-control p {
@@ -821,8 +875,12 @@ html.dark .lp img.lp-img.lp-theme-dark:not(.lp-narrow) {
 }
 
 @media (max-width: 40rem) {
-  .lp-control {
+  .lp-controls__list {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lp-control {
+    padding-block: var(--space-lg);
   }
 }
 
@@ -902,7 +960,7 @@ html.dark .lp img.lp-img.lp-theme-dark:not(.lp-narrow) {
 
 .lp-footer__line {
   flex-basis: 100%;
-  color: var(--muted);
+  color: var(--lp-ink-3);
   font-size: var(--text-sm);
 }
 
