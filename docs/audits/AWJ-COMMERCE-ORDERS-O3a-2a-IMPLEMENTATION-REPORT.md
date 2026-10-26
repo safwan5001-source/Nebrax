@@ -45,7 +45,23 @@
 
 **القائمة القائمة بلا تعديل:** `CommercePaymentIntentTest`، `OnlineOrderStockHoldTest`، `CommerceOnlinePaymentTest`، `CommerceInvoiceOnPaymentTest`، `CommerceOrderReservationServiceTest`، `StorefrontOnline*` — **116 ناجحاً** (SQLite) بلا أي تعديل في ملفاتها.
 
-**نتائج التشغيل الفعلية (محلياً، مشروع Laravel مولَّد من هذا الفرع، PHP 8.3، PostgreSQL 16):**
+**نتائج التشغيل المحلي (مشروع Laravel مولَّد، نسخة معزولة، على الفرع نفسه):**
+
+| التشغيلة | النتيجة |
+|---|---|
+| SQLite — الحزمة كاملة | 9565 ناجحاً · 269 تخطّياً · 29 فاشلاً |
+| PostgreSQL — الحزمة كاملة (بما فيها `CommerceIntentCancelPostgresTest`) | 9822 ناجحاً · 4 تخطّي · 37 فاشلاً |
+
+**لا فشل في أي اختبار Commerce/Payments/Storefront ولا في اختباراتنا الـ19 الجديدة على المحرّكين.** الفشل كله من خارج الشريحة:
+- 29 اختباراً `Fuel*` (على المحرّكين): `bcmul()` غير معرّفة — امتداد `bcmath` غير مثبّت محلياً (يحمّله CI).
+- `PostgresTestLockTimeoutTest` (3): `lock_timeout = 0` لأن `PGOPTIONS='-c lock_timeout=60s'` غير مضبوط محلياً (بيئة؛ يضبطه ci.yml).
+- `StorefrontMediaApiTest › the library lists newest first…` على PostgreSQL: `PDOException HY093` في `cursorPaginate` بمسار الوسائط — لا صلة له بالإلغاء.
+- 10 ملفات (`AiAction*`، `Document*`، `ImportJob*`، `GeminiExtraction*`…) فشلت في تشغيلة PostgreSQL الكاملة التي جرت بالتوازي مع تشغيلة SQLite على الجهاز نفسه، **ونجحت كلها عند إعادة تشغيلها منفردة** (144 ناجحاً) — ضغط موارد لا انحدار.
+
+**CI:** نتائج الـPR في وصفه.
+
+
+**تشغيلة مستقلة ثانية (جلسة أخرى، تشغيلات متتابعة لا متوازية — تؤكد نتائج الأعلى؛ PHP 8.3، PostgreSQL 16 بـ`lock_timeout=60s`):**
 
 | التشغيلة | النتيجة |
 |---|---|
@@ -66,7 +82,6 @@
 - **التزامن (PostgreSQL حقيقي):** عدم الجمود في 5 جولات بترتيبي بدء، وإلغاءان متزامنان ⇒ واحد فقط، والتقاط يسابق الإلغاء ⇒ لا حالة هجينة ✅.
 - **المطابِق المجدول:** `the reconciler respects the window the scope and the limit` و`the command is scheduled…` ✅.
 - **عزل المستأجر:** `the reconciler runs each intent under its own tenant and restores the previous context` ✅ على المحرّكين.
-
 
 ## 4. المخاطر والمتبقي
 
