@@ -32,8 +32,26 @@ The Horizon tracker records the X4/X4-FIX merges and Railway Beta deployment (ow
 - `storefront/src/lib/data/__tests__/no-spree-env.test.ts` (X5 block)
 - `storefront/scripts/spree-ratchet/baseline.json`
 
-## ⚠ Ratchet baseline increase — owner approval required
-`spree_wrapper_imports` 76 → 77: the new gate imports `isWholesaleEnabled` from `@/lib/spree`, because wholesale config is defined there. No honest alternative exists (a re-export wrapper would only hide the import). The gate is a *closing* control, but the count rises by exactly one line (`(checkout)/layout.tsx: 1`). It disappears when the legacy group is deleted (ENV0/X-final).
+## Ratchet follow-up — dependency elimination assessed (PR #1765, head reviewed `c10294a`)
+
+**Root cause.** The only definition of the wholesale switch is `isWholesaleEnabled()` in `src/lib/spree/config.ts`: `process.env.SPREE_WHOLESALE_CHANNEL?.trim()` non-empty. There is no Spree-independent configuration helper (`src/lib/wholesale.ts` holds only the group name / minimum quantity; `lib/commerce/*` has no wholesale flag). The X5 gate must evaluate that exact switch, so it must reach it somehow.
+
+**Alternatives evaluated (none reduces the count without a hidden cost):**
+| Option | Result |
+|---|---|
+| Import from `@/lib/spree` (current) | `spree_wrapper_imports` +1 (76→77) |
+| Deep-import a file inside `src/lib/spree/` | Still counted: the scanner counts `@/lib/spree/*` subpaths from outside the wrapper |
+| Re-export through another module | Evasion of the ratchet's intent; the import is still there |
+| Read `SPREE_WHOLESALE_CHANNEL` directly in the layout | Moves the +1 to `spree_env_reads` (9→10) **and** duplicates the wholesale rule (a parallel config) — both prohibited |
+| Gate in the 3 legacy pages instead of the layout | +3 imports; worse |
+| Gate in `proxy.ts` path matching | Broad routing change (country/locale parsing, `checkout/[id]` vs static `/checkout`) — riskier than the problem, outside X5 scope |
+| New shared config module used by both the wrapper and the gate | Touches wrapper/config code used by every wholesale surface (Header, Footer, wholesale layout) — architectural change for a one-line flag, not "safe" |
+
+**Decision:** no code change; the dependency is not forced out. Baseline stays at 77 (`spree_wrapper_imports`; other categories unchanged: value 4, type 147, client access 68, env reads 9).
+
+**Recommended documented temporary exception.** `(checkout)/layout.tsx` is the single, deliberate, *closing* use of the wrapper (it only decides whether the legacy Spree group exists). Expiry: removed with the legacy `(checkout)` group in the ENV0/X-final deletion, which returns the baseline to 76 (and lower as the group's own Spree imports go). If a Spree-independent commerce flag for the wholesale add-on is ever introduced, the gate can switch to it with no behavior change.
+
+Behavior is unchanged and re-verified: wholesale off → legacy routes 404; wholesale on → legacy shell renders as before; AWJ-native checkout untouched.
 
 ## Tests and results
 - Focused: layout gate (disabled → 404, shell never built; enabled → shell; locale independent), structural route guard (legacy pages only in `(checkout)`, gate precedes shell, AWJ routes exist and import nothing from Spree, no checkout-shaped paths elsewhere), No-Spree block (legacy layout 404 with Spree spies untouched; AWJ checkout page loads) — 34 passed.
