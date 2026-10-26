@@ -490,7 +490,7 @@ html:has(.lp) {
 
 @media (min-width: 60rem) {
   .lp-hero {
-    min-height: calc(100dvh - var(--nav-h));
+    min-height: calc(100dvh - var(--nav-h) - var(--space-3xl));
   }
 }
 
