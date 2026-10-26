@@ -44,7 +44,9 @@
 - 29 اختباراً من `Fuel*` على SQLite: `Call to undefined function bcmul()` — امتداد `bcmath` غير مثبّت محلياً (يحمّله CI).
 - PostgreSQL: `PaymentAttemptPostingPostgresTest` (تزامن عابر، نجح عند الإعادة)، و`StorefrontMediaApiTest › the library lists newest first…` (`PDOException HY093` في `cursorPaginate` بمسار الوسائط — لا صلة له بـ`commerce_orders`؛ يُتحقَّق من أنه يفشل على `main` أيضاً في CI).
 
-**CI:** نتائج الـPR في وصفه/تعليقاته بعد الدفع (الإحالة أدناه).
+**CI على Head `d56c533` (تشغيلة `40384928809`):** `php artisan test (L11, sqlite)` ✅ (≈25 د) · `php artisan test (L11, pgsql)` ✅ (≈16 د) · `CI Gate` ✅. أي: **لا فشل في CI**؛ فشلا PostgreSQL المحليان (`PaymentAttemptPostingPostgresTest` العابر و`StorefrontMediaApiTest`) وفشل `Fuel*` (bcmath) **خاصّة بالبيئة المحلية** ولم تظهر في CI. لم يُعالَج أي إخفاق إضافي لأنه لا يوجد إخفاق مرتبط بالتغيير بعد إصلاح `comm_%`.
+
+**مراجعة تسمية الهجرة وترتيبها:** `2026_12_13_010000_add_cancellation_facts_to_commerce_orders.php` — تتبع آخر هجرة على `main` (`2026_12_12_010000_add_visual_to_payment_methods`) بزيادة يومٍ واحد وبلاحقة `_010000` المعتمدة في المستودع، فلا تُرتَّب قبل أي هجرة مدموجة، ولا تتصادم مع اسم قائم. تسمية الصنف تصف الفعل (`add_… _to_commerce_orders`) كبقية الهجرات الإضافية. قيد: بحث الكود في GitHub يفهرس الفرع الافتراضي فقط، فلم يُستبعد تصادم نظري مع هجرة بتاريخ `2026_12_13` في فرع مفتوح آخر؛ أقرب PR مفتوح للتحقق هو #1774 نفسه (يُعاد الفحص عند الدمج).
 
 ## 4. المخاطر والمتبقي
 
@@ -59,7 +61,7 @@
 
 - **Branch:** `claude/commerce-orders-o3a-1`
 - **Base SHA:** `a9ba9bd58c7ecb2e9a6464c5714cdf36fbbf5aa6` (`main` بعد ADR-28)
-- **Head SHA:** `7a578d160ddb02ee8a83dfb3584f041176f1c9ae` (قبل commit هذا التقرير؛ الـHead النهائي في الـPR)
+- **Head SHA (قبل تحديث التقرير):** `d56c53314930fc1f216748df5b0280bd4b2c0c50` — CI أخضر. الـHead النهائي بعد commit هذا التحديث مذكور في الـPR.
 
 ## 6. المرحلة التالية
 
