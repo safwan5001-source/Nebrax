@@ -119,8 +119,9 @@
       }
     },
     "spree_wrapper_imports": {
-      "total": 76,
+      "total": 77,
       "files": {
+        "src/app/[country]/[locale]/(checkout)/layout.tsx": 1,
         "src/app/[country]/[locale]/(storefront)/account/(authenticated)/layout.tsx": 2,
         "src/app/[country]/[locale]/(wholesale)/wholesale/layout.tsx": 1,
         "src/app/api/webhooks/spree/route.ts": 1,
