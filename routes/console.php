@@ -147,6 +147,12 @@ Schedule::command('commerce:expire-unpaid-orders')
     ->withoutOverlapping(10)
     ->onOneServer();
 
+// ADR-28 / O3a-2a: شبكة أمان لتنظيف محاولات الدفع الجارية لنوايا طلبات المتجر الإلكترونية الملغاة (فشل المزوّد/انهيار بعد الالتزام). idempotent.
+Schedule::command('commerce:close-cancelled-order-attempts')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(10)
+    ->onOneServer();
+
 // PAY-H3-01c: شبكة أمان لترحيل A5 لاستردادات البوابة المؤكَّدة المعلّقة (فشل المستمع/انهيار). idempotent: لا قيد ثانٍ أبداً (قفل + مفتاح فريد).
 Schedule::command('payments:post-refunds')
     ->everyFiveMinutes()

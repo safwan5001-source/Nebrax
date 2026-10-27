@@ -130,14 +130,48 @@ final class CommercePaymentIntentService
      * إلغاءٌ صريح — مبلغٌ تحصَّل فعلاً لا يُلغى أبداً (استرجاعٌ منفصل تماماً
      * عن هذا، ADR-04 §14 — Refund != إلغاء التزام دفع لم يُحصَّل).
      *
+     * **سلوك عام محفوظ (ADR-28 P-1):** انتقال الحالة في `cancelWithinTransaction()`، ثم التنظيف (إغلاق المحاولات الجارية عند المزوّد وتحرير
+     * الحجز) عبر `DB::afterCommit` — فيجري فور الالتزام عند الاستدعاء المنفرد (كما كان تماماً)، ويُؤجَّل إلى **الالتزام النهائي للمعاملة
+     * الخارجية** إن عُشِّش الاستدعاء داخل معاملة (لا اتصال بالمزوّد ولا قفل محاولة تحت أقفال تمسكها المعاملة الخارجية، P-2).
+     * الفرق الوحيد عن السابق: فشل التنظيف لأي سبب (لا `PaymentOrchestrationException` وحدها) يُسجَّل ولا يُرمى بعد الالتزام — الحالة
+     * متسقة والمطابِق الدوري (`commerce:close-cancelled-order-attempts`) يعيد المحاولة.
+     *
      * @throws RuntimeException التزام الدفع مُحصَّلٌ بالفعل، أو مُلغىً بالفعل.
      */
     public function cancel(CommercePaymentIntent $intent): CommercePaymentIntent
     {
-        // الترتيب (PAY-H4-04a): تُقفَل النية وتُلغى **أولاً** (التزام)، ثم تُغلق محاولاتها الجارية خارج المعاملة. بدء دفع يسابق الإلغاء إما يُرفض عند
-        // `assertStillPayable` (نية ملغاة) أو يُتراجع عنه بعد ولادة محاولته (يعيد `start` فحص النية)؛ فلا تبقى صفحة دفع حيّة لنية ملغاة. مبلغ ملتقَط
-        // يُرفض إلغاؤه تحت القفل نفسه (يُسترد ولا يُلغى، ADR-04 §14).
-        $cancelled = DB::transaction(function () use ($intent): CommercePaymentIntent {
+        $cancelled = $this->cancelWithinTransaction($intent);
+
+        if ($cancelled->isOnline()) {
+            DB::afterCommit(function () use ($cancelled): void {
+                // best-effort؛ التقاط لاحق على صفحة بقيت حيّة يُوسم late_capture للمراجعة. لا يرمي أبداً.
+                app(OrderCancellationCleanup::class)->run($cancelled);
+                // H4-02: نية إلكترونية ملغاة (لم يُلتقط شيء — فُحص تحت القفل) ⇒ يُحرَّر حجز مخزون الطلب. فشل التحرير تعالجه المكنسة لاحقاً.
+                try {
+                    app(CommerceOrderReservationService::class)->releaseActive((string) $cancelled->commerce_order_id);
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            });
+        }
+
+        return $cancelled;
+    }
+
+    /**
+     * ADR-28 P-1 — انتقال حالة النية إلى `cancelled` **فقط**: قفل صف النية + الفحوص + التحديث. لا اتصال بالمزوّد، لا إغلاق محاولات، لا قفل صف
+     * محاولة، لا تحرير حجز (P-2). يصحّ استدعاؤها داخل معاملة أكبر (خدمة إلغاء الطلب لاحقاً): تبقى الأقفال حتى التزام المعاملة الخارجية
+     * ويجري التنظيف بعده عبر `OrderCancellationCleanup`.
+     *
+     * الترتيب (PAY-H4-04a): تُقفَل النية وتُلغى **أولاً** (التزام)، ثم تُغلق محاولاتها الجارية بعد الالتزام. بدء دفع يسابق الإلغاء إما يُرفض عند
+     * `assertStillPayable` (نية ملغاة) أو يُتراجع عنه بعد ولادة محاولته (يعيد `start` فحص النية)؛ فلا تبقى صفحة دفع حيّة لنية ملغاة. مبلغ ملتقَط
+     * يُرفض إلغاؤه تحت القفل نفسه (يُسترد ولا يُلغى، ADR-04 §14).
+     *
+     * @throws RuntimeException التزام الدفع مُحصَّلٌ بالفعل، أو مُلغىً بالفعل، أو التُقط مبلغ.
+     */
+    public function cancelWithinTransaction(CommercePaymentIntent $intent): CommercePaymentIntent
+    {
+        return DB::transaction(function () use ($intent): CommercePaymentIntent {
             $locked = CommercePaymentIntent::query()->whereKey($intent->id)->lockForUpdate()->firstOrFail();
 
             if ($locked->isCollected() || $locked->isPaid()) {
@@ -157,18 +191,6 @@ final class CommercePaymentIntentService
 
             return $locked->fresh();
         });
-
-        if ($cancelled->isOnline()) {
-            $this->online->closeActiveAttempts($cancelled); // best-effort؛ التقاط لاحق على صفحة بقيت حيّة يُوسم late_capture للمراجعة
-            // H4-02: نية إلكترونية ملغاة (لم يُلتقط شيء — فُحص تحت القفل) ⇒ يُحرَّر حجز مخزون الطلب. فشل التحرير تعالجه المكنسة لاحقاً.
-            try {
-                app(CommerceOrderReservationService::class)->releaseActive((string) $cancelled->commerce_order_id);
-            } catch (\Throwable $e) {
-                report($e);
-            }
-        }
-
-        return $cancelled;
     }
 
     /**

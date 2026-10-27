@@ -45,6 +45,9 @@ class PaymentAttempt extends BaseModel implements CompanyWide
     /** محاولة نشطة = تحجز الـ Payable (واحدة لكل Payable). */
     public const ACTIVE_STATUSES = [self::STATUS_CREATED, self::STATUS_PENDING_CUSTOMER, self::STATUS_AUTHORIZED];
 
+    /** الحالات التي يُغلقها `PaymentOrchestrator::cancel` (`authorized` يُرفض بـ`cannot_cancel`). */
+    public const CLOSABLE_STATUSES = [self::STATUS_CREATED, self::STATUS_PENDING_CUSTOMER];
+
     public const DISPUTE_NONE = 'none';
 
     public const DISPUTE_OPEN = 'open';
