@@ -41,6 +41,7 @@ class CommerceStaffOrderController extends ApiController
             'storefront_id' => ['sometimes', 'uuid'],
             'sales_channel_id' => ['sometimes', 'uuid'],
             'status' => ['sometimes', Rule::in([CommerceOrder::STATUS_DRAFT, CommerceOrder::STATUS_CONFIRMED])],
+            'lifecycle_status' => ['sometimes', Rule::in([CommerceOrder::STATUS_DRAFT, CommerceOrder::STATUS_CONFIRMED, CommerceOrder::LIFECYCLE_CANCELLED])],
             'payment_status' => ['sometimes', Rule::in([
                 CommercePaymentIntent::STATUS_PENDING,
                 CommercePaymentIntent::STATUS_AWAITING_COLLECTION,
@@ -91,7 +92,7 @@ class CommerceStaffOrderController extends ApiController
         $order = CommerceOrder::query()
             ->with([
                 'salesChannel:id,name,type', 'storefront:id,name', 'snapshot', 'gift', 'schedule',
-                'paymentIntent', 'lines.personalizations',
+                'paymentIntent', 'lines.personalizations', 'cancelledBy:id,name',
             ])
             ->withCount('lines')
             ->find($id);
@@ -114,6 +115,14 @@ class CommerceStaffOrderController extends ApiController
         foreach (['storefront_id', 'sales_channel_id', 'status', 'delivery_method'] as $column) {
             if (isset($f[$column])) {
                 $query->where($column, $f[$column]);
+            }
+        }
+        // ADR-28: مرشِّح دورة الحياة المشتقّة. `status` الخام (أعلاه) لا يتغيّر معناه فيشمل `confirmed` الطلبات الملغاة كما كان قبل O3a-1.
+        if (isset($f['lifecycle_status'])) {
+            if ($f['lifecycle_status'] === CommerceOrder::LIFECYCLE_CANCELLED) {
+                $query->whereNotNull('cancelled_at');
+            } else {
+                $query->where('status', $f['lifecycle_status'])->whereNull('cancelled_at');
             }
         }
         if (isset($f['payment_status']) || isset($f['payment_method'])) {

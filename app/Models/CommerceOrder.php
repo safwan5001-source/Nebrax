@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Support\GeneratesDocumentNumbers;
 use App\Tenancy\CompanyWide;
 use App\Tenancy\ResolvesBranchReferences;
+use App\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -70,7 +71,17 @@ class CommerceOrder extends BaseModel implements CompanyWide
         'total' => 'integer',
         'delivery_amount_minor' => 'integer',
         'confirmed_at' => 'datetime',
+        'cancelled_at' => 'datetime',
     ];
+
+    /**
+     * حالة دورة الحياة المشتقّة (ADR-28 D-9): `cancelled` متى وُجد `cancelled_at`، وإلا `status` الحالي.
+     * قراءة مشتقة فقط — `status` يبقى `draft|confirmed` ولا يتغيّر معنى `isConfirmed()` (يحمي جمود اللقطات التاريخية).
+     */
+    public const LIFECYCLE_CANCELLED = 'cancelled';
+
+    /** @var list<string> */
+    public const CANCELLATION_REASONS = ['customer_request', 'out_of_stock', 'payment_issue', 'duplicate_order', 'fraud_suspected', 'other'];
 
     protected $attributes = [
         'status' => self::STATUS_DRAFT,
@@ -157,6 +168,33 @@ class CommerceOrder extends BaseModel implements CompanyWide
     public function paymentIntent(): HasOne
     {
         return $this->hasOne(CommercePaymentIntent::class, 'commerce_order_id');
+    }
+
+    /**
+     * حقائق الإلغاء (`cancelled_at`, `cancelled_by_user_id`, `cancellation_reason`, `cancellation_note`) **ليست** في `$fillable` عمداً:
+     * لا تُكتب بتعيين جماعي؛ تكتبها خدمة الإلغاء (O3a-2b) وحدها، وقاعدة البيانات تحرس شكلها وجمودها (migration 2026_12_13).
+     */
+    /**
+     * الفاعل التاريخي: يشمل المحذوف حذفاً ناعماً (`UserController::destroy` حذفٌ ناعم؛ الصف و`cancelled_by_user_id` باقيان)
+     * فلا يضيع اسم من ألغى بحذف حسابه. و`User` بلا `TenantScope` عالمي، فالعزل صريح هنا: لا يُحلّ إلا مستخدم المستأجر
+     * الحالي (سياق غائب ⇒ لا تطابق ⇒ فشل مغلق)، فلا يتسرّب اسم مستخدم مستأجر آخر حتى لو خُزّن معرّفه بكتابة مباشرة.
+     */
+    public function cancelledBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelled_by_user_id')
+            ->withTrashed()
+            ->where('users.tenant_id', app(TenantContext::class)->id());
+    }
+
+    public function isCancelled(): bool
+    {
+        return $this->cancelled_at !== null;
+    }
+
+    /** `cancelled` | `confirmed` | `draft` — مشتقة، لا تُخزَّن. */
+    public function lifecycleStatus(): string
+    {
+        return $this->isCancelled() ? self::LIFECYCLE_CANCELLED : (string) $this->status;
     }
 
     public function isDraft(): bool
