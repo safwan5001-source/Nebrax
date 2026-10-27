@@ -336,6 +336,89 @@ class CommerceOrderCancellationTest extends TestCase
         $this->assertSame([InventoryReservation::STATUS_RELEASED], $this->holds($order['order_id']), 'releasing is idempotent: no second release');
     }
 
+    /** نية ملغاة سابقاً بالمسار القديم ثم وصل التقاط متأخر (`late_capture`): الحالة الفعلية «مال دخل ونية ملغاة». */
+    private function lateCapturedUnderCancelledIntent(string $key): array
+    {
+        $order = $this->onlineLive($key);
+        app(TenantContext::class)->set($this->tenant->id);
+        app(\App\Services\Commerce\CommercePaymentIntentService::class)->cancel($this->intent($order['order_id']));
+        $attempt = $this->attempts($order['order_id'])->first();
+        // الفجوة: صفحة المزوّد بقيت حيّة ثم وصل التقاط بعد إلغاء النية.
+        DB::table('payment_attempts')->where('id', $attempt->id)->update(['capture_status' => PaymentAttempt::STATUS_PENDING_CUSTOMER]);
+        $this->capture($attempt->fresh());
+        app(PaymentOrchestrator::class)->sync($attempt->fresh());
+        app(CommerceOnlinePaymentService::class)->completeCaptured(PaymentAttempt::query()->findOrFail($attempt->id));
+        $reasons = json_decode((string) DB::table('payment_attempts')->where('id', $attempt->id)->value('review_reasons'), true) ?: [];
+        $this->assertContains(PaymentAttempt::REVIEW_LATE_CAPTURE, $reasons, 'precondition: a late capture under a cancelled intent');
+        $this->assertSame('cancelled', $this->intent($order['order_id'])->fresh()->status);
+        $this->assertNull($this->order($order['order_id'])->cancelled_at);
+
+        return $order + ['attempt_id' => $attempt->id];
+    }
+
+    #[Test]
+    public function row_9_is_refused_when_a_late_capture_already_arrived_under_the_cancelled_intent(): void
+    {
+        $order = $this->lateCapturedUnderCancelledIntent('idem-can-late');
+        $before = $this->world($order['order_id']);
+
+        $this->assertRefused($this->cancel($order['order_id']), 'payment_captured');
+
+        $this->assertEquals($before, $this->world($order['order_id']), 'order, hold, intent, attempts and accounting facts are untouched');
+        $this->assertNull($this->order($order['order_id'])->cancelled_at);
+    }
+
+    #[Test]
+    public function row_9_checks_every_capture_indicator_not_only_the_captured_status(): void
+    {
+        // أثر مبلغ ملتقَط (captured_minor/captured_at) بحالة محاولة لاحقة غير captured.
+        $a = $this->onlinePending('idem-can-ind-1');
+        app(TenantContext::class)->set($this->tenant->id);
+        app(\App\Services\Commerce\CommercePaymentIntentService::class)->cancel($this->intent($a['order_id']));
+        $this->insertAttempt($a['order_id'], ['capture_status' => PaymentAttempt::STATUS_CANCELLED, 'captured_minor' => 5000]);
+        $this->assertRefused($this->cancel($a['order_id']), 'payment_captured');
+
+        $b = $this->onlinePending('idem-can-ind-2');
+        app(\App\Services\Commerce\CommercePaymentIntentService::class)->cancel($this->intent($b['order_id']));
+        $this->insertAttempt($b['order_id'], ['capture_status' => PaymentAttempt::STATUS_CANCELLED, 'captured_at' => now('UTC')]);
+        $this->assertRefused($this->cancel($b['order_id']), 'payment_captured');
+
+        // وسم late_capture وحده.
+        $c = $this->onlinePending('idem-can-ind-3');
+        app(\App\Services\Commerce\CommercePaymentIntentService::class)->cancel($this->intent($c['order_id']));
+        $this->insertAttempt($c['order_id'], ['capture_status' => PaymentAttempt::STATUS_CANCELLED, 'review_reasons' => [PaymentAttempt::REVIEW_LATE_CAPTURE]]);
+        $this->assertRefused($this->cancel($c['order_id']), 'payment_captured');
+
+        foreach ([$a, $b, $c] as $order) {
+            $this->assertNull($this->order($order['order_id'])->cancelled_at);
+        }
+    }
+
+    #[Test]
+    public function row_9_still_allows_the_administrative_closure_when_nothing_was_captured(): void
+    {
+        // نية ألغاها المسار القديم، محاولتها أُغلقت بلا التقاط ⇒ إقفال إداري مسموح (لا تضييق على الصف 9).
+        $order = $this->onlineLive('idem-can-nocap');
+        app(TenantContext::class)->set($this->tenant->id);
+        app(\App\Services\Commerce\CommercePaymentIntentService::class)->cancel($this->intent($order['order_id']));
+        $this->assertSame('cancelled', $this->attemptStatus($order['order_id']));
+
+        $this->cancel($order['order_id'])->assertOk()->assertJsonPath('data.lifecycle_status', 'cancelled');
+    }
+
+    private function insertAttempt(string $orderId, array $overrides): void
+    {
+        $payable = $this->intent($orderId)->payableKey();
+        $attempt = PaymentAttempt::create([
+            'payment_gateway_id' => $this->gateway->id, 'provider' => 'fake', 'environment' => 'sandbox', 'payable_key' => $payable,
+            'idempotency_key' => 'ind-'.Str::random(10), 'amount_minor' => 5000, 'currency' => 'SAR',
+        ]);
+        DB::table('payment_attempts')->where('id', $attempt->id)->update(array_map(
+            fn ($v) => is_array($v) ? json_encode($v) : $v,
+            $overrides,
+        ));
+    }
+
     #[Test]
     public function row_10_cancelling_twice_is_idempotent_and_keeps_the_original_facts(): void
     {

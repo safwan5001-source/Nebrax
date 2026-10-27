@@ -36,7 +36,7 @@
 | `routes/api.php` | `POST commerce/orders/{id}/cancel` |
 | `CLAUDE.md` | قسم O3a-2b |
 | `tests/Feature/CommerceOrderCancellationTest.php` | جديد — 31 اختباراً |
-| `tests/Feature/CommerceOrderCancellationPostgresTest.php` | جديد — 8 اختبارات PostgreSQL (fork) |
+| `tests/Feature/CommerceOrderCancellationPostgresTest.php` | جديد — 9 اختبارات PostgreSQL (fork) |
 | `tests/Feature/CommerceModuleBoundaryTest.php`، `CommerceOrderCancellationFactsTest.php`، `CommerceIntentCancelSeparationTest.php` | تحديث حارسات «لا مسار إلغاء» لتقبل مسار الموظف الوحيد وبوابته المغلقة |
 
 لا `database/`: **لا هجرة** (أعمدة الإلغاء والحراس من O3a-1).
@@ -50,7 +50,7 @@
 
 **إثبات الحساسية (طفرات):** حذف `releaseActive` ⇒ 5 إخفاقات · تنظيف فوري قبل الالتزام ⇒ 3 · تعطيل فحص الترحيل ⇒ `row 8` يفشل · إزالة تحويل رفض الالتقاط ⇒ يفشل سباق PostgreSQL بخطأ عام (حدث فعلاً فأُصلح).
 
-**التشغيل المحلي (مشروع Laravel مولَّد):** الاختبارات الجديدة 32 + 8 خضراء؛ المتأثرة (`CommerceOrderCancellationFactsTest`، `CommerceModuleBoundaryTest`، `CommerceStaffOrderApiTest`، `CommerceIntentCancel*`، `CommerceInvoiceOnPaymentTest`…) خضراء. الحزمة الكاملة: SQLite 9624 ناجحاً / 30 فاشلاً · PostgreSQL 9884 / 44. الفشل المحلي كله خارج الشريحة: `Fuel*` (bcmath غير مثبّت)، `PostgresTestLockTimeoutTest` (PGOPTIONS)، `StorefrontMediaApiTest`/`ProductMediaR2ReadTest`/`CommerceWorkspace*Media*`/`ImportJob*`/`Ai*`/`Document*` (بيئة محلية وتشغيل SQLite وPostgreSQL بالتوازي على الجهاز نفسه) — **ولا تظهر في CI**. فشل واحد كان من الشريحة: حارس O3a-2a (`no_deployment_gate_route…`) يفترض غياب أي مسار إلغاء — حُدِّث ليقبل مسار الموظف الوحيد وبوابته المغلقة.
+**التشغيل المحلي (مشروع Laravel مولَّد):** الاختبارات الجديدة 35 + 9 خضراء؛ المتأثرة (`CommerceOrderCancellationFactsTest`، `CommerceModuleBoundaryTest`، `CommerceStaffOrderApiTest`، `CommerceIntentCancel*`، `CommerceInvoiceOnPaymentTest`…) خضراء. الحزمة الكاملة: SQLite 9624 ناجحاً / 30 فاشلاً · PostgreSQL 9884 / 44. الفشل المحلي كله خارج الشريحة: `Fuel*` (bcmath غير مثبّت)، `PostgresTestLockTimeoutTest` (PGOPTIONS)، `StorefrontMediaApiTest`/`ProductMediaR2ReadTest`/`CommerceWorkspace*Media*`/`ImportJob*`/`Ai*`/`Document*` (بيئة محلية وتشغيل SQLite وPostgreSQL بالتوازي على الجهاز نفسه) — **ولا تظهر في CI**. فشل واحد كان من الشريحة: حارس O3a-2a (`no_deployment_gate_route…`) يفترض غياب أي مسار إلغاء — حُدِّث ليقبل مسار الموظف الوحيد وبوابته المغلقة.
 
 ## 5. CI
 
@@ -61,6 +61,12 @@
 **الملاحظة:** والبوابة مفتوحة و`commerce.storefront` معطّلة/معلّقة، كان `payment-intents/{id}/cancel` (بـ`payments.manage` فقط على مساره) يُلغي الطلب ويكتب الحقائق ويحرر الحجز بينما المسار المخصَّص يردّ 403.
 **المعالجة:** الفرع المفوَّض يستدعي المنطق الوحيد القائم `EnsureApplicationActive::authorize($request, 'commerce.storefront')` (بعد فحص الصلاحيتين) — مدخلان لإلغاء واحد بقيد واحد. **البوابة مغلقة ⇒ السلوك القديم حرفياً** (لا حارس جديد على المسار القديم).
 **الدليل:** اختبار `the_delegated_legacy_route_enforces_the_same_capability_guard_as_the_dedicated_route` — مفتوحة: المدخلان 403 وبلا أي تغيير؛ مغلقة: المسار القديم ينجح كما كان. SQLite وPostgreSQL (32 اختباراً للصنف). الطفرة (حذف الاستدعاء) تُفشله.
+
+## 5.2 مراجعة Codex P2 — فحص الالتقاط قبل قبول نية ملغاة سابقاً
+
+**الملاحظة:** إن ألغت المكنسة/المسار القديم نية إلكترونية ثم وصل التقاط متأخر، يُبقي `completeCaptured` النية ملغاة ويَسِم المحاولة `late_capture`. كان `assertCancellable` يعود مبكراً لأي نية ملغاة (صف 9) دون فحص الالتقاط، فيُسجّل إلغاءً للطلب ويردّ 200 رغم دخول مال فعلاً. ADR-28 §3 يسمح بالإقفال الإداري فقط «لا `captured`».
+**المعالجة (خدمة فقط؛ لا تغيير في العقد العام ولا البوابة ولا قواعد مالية):** النية الملغاة تمرّ الآن بفحص الدفع الإلكتروني نفسه عبر `hasCaptureEvidence`: محاولة `captured` (الحاجز القائم) **أو** أثر مبلغ ملتقَط (`captured_minor > 0` / `captured_at`) أياً كانت حالتها اللاحقة **أو** وسم `late_capture` ⇒ **409 `payment_captured`** بلا أي تغيير. فحص `authorized` يبقى للنية غير الملغاة فقط (لا تضييق على الصف 9 بما يتجاوز ADR). فحوص `paid`/`collected` للنية غير الملغاة كما كانت. طلب بلا نية يبقى قابلاً للإلغاء.
+**الاختبارات (SQLite + PostgreSQL):** `row_9_is_refused_when_a_late_capture_already_arrived_under_the_cancelled_intent` (التسلسل الحقيقي: إلغاء قديم ← صفحة حيّة ← التقاط ← `completeCaptured`؛ الرفض لا يغيّر الطلب/الحجز/النية/المحاولات/الحقائق المحاسبية بلقطة قبل/بعد) · `row_9_checks_every_capture_indicator_not_only_the_captured_status` (`captured_minor`، `captured_at`، `late_capture` وحده) · `row_9_still_allows_the_administrative_closure_when_nothing_was_captured` (لا تضييق). تزامن PostgreSQL: `a_late_capture_racing_the_administrative_closure…` (5 جولات بترتيبي بدء: إما الرفض `payment_captured` وبلا تغيير، أو إقفال سبق الالتقاط فيُوسم `late_capture` ويبقى الطلب ملغى؛ لا نية `paid`). **طفرتان:** إعادة الخروج المبكر للنية الملغاة تُفشل اختباري الرفض؛ الاكتفاء بـ`hasCapture` يُفشل اختبار المؤشرات. النتيجة: 35 اختباراً للصنف على المحرّكين، و9 لصنف PostgreSQL (3 مرات).
 
 ## 6. أثر التغيير على العقود القديمة
 

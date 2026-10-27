@@ -370,6 +370,49 @@ class CommerceOrderCancellationPostgresTest extends TestCase
     }
 
     #[Test]
+    public function a_late_capture_racing_the_administrative_closure_never_leaves_a_captured_order_closed_without_the_marker(): void
+    {
+        foreach (range(1, 5) as $round) {
+            $this->resetRound();
+            DB::table('payment_attempts')->where('tenant_id', $this->tenantId)->delete();
+            $fake = $this->freshFake();
+            $attemptId = $this->liveAttempt($fake);
+            // النية ألغاها المسار القديم/المكنسة مسبقاً؛ الصفحة بقيت حيّة ثم يصل التقاط بالتوازي مع الإقفال الإداري.
+            app(CommercePaymentIntentService::class)->cancel(CommercePaymentIntent::findOrFail($this->intentId));
+            DB::table('payment_attempts')->where('id', $attemptId)->update(['capture_status' => PaymentAttempt::STATUS_PENDING_CUSTOMER]);
+            $tenant = $this->tenantId;
+            $orderId = $this->orderId;
+            $actor = $this->actor();
+
+            $canceller = fn () => $this->lifecycleCancel($tenant, $orderId, $actor);
+            $capturer = function () use ($tenant, $attemptId) {
+                app(TenantContext::class)->set($tenant);
+                $fresh = PaymentAttempt::query()->findOrFail($attemptId);
+                app(PaymentOrchestrator::class)->applySnapshot($fresh, new PaymentProviderSnapshot((string) $fresh->provider_payment_id, 'captured', 5000, 'SAR', 5000));
+
+                return ['paid' => app(CommerceOnlinePaymentService::class)->completeCaptured(PaymentAttempt::query()->findOrFail($fresh->id))];
+            };
+            $results = $round % 2 === 0 ? $this->runConcurrently([$capturer, $canceller]) : $this->runConcurrently([$canceller, $capturer]);
+
+            $this->assertAllOk($results);
+            $cancelResult = collect($results)->pluck('value')->first(fn ($v) => array_key_exists('cancelled', $v ?? []));
+            $attempt = DB::table('payment_attempts')->where('id', $attemptId)->first();
+            $reasons = json_decode((string) $attempt->review_reasons, true) ?: [];
+            $this->assertNotSame('paid', $this->intentRow()->status, "الجولة {$round}: النية الملغاة لا تُحيا");
+            if ($cancelResult['cancelled']) {
+                // الإقفال سبق التقاط الوصول (يُقبل — ADR §3 صف 4/9): الالتقاط اللاحق يُوسم late_capture والطلب يبقى ملغى.
+                $this->assertNotNull($this->orderRow()->cancelled_at);
+                $this->assertTrue($attempt->capture_status !== 'captured' || in_array(PaymentAttempt::REVIEW_LATE_CAPTURE, $reasons, true), "الجولة {$round}");
+            } else {
+                // الالتقاط سبق الفحص: رفض بالرمز الصحيح وبلا أي تغيير للطلب.
+                $this->assertSame('payment_captured', $cancelResult['reason'], "الجولة {$round}");
+                $this->assertNull($this->orderRow()->cancelled_at);
+                $this->assertContains(PaymentAttempt::REVIEW_LATE_CAPTURE, $reasons, "الجولة {$round}");
+            }
+        }
+    }
+
+    #[Test]
     public function two_concurrent_cancellations_are_idempotent_with_one_effect(): void
     {
         foreach (range(1, 4) as $round) {

@@ -108,24 +108,46 @@ final class CommerceOrderLifecycleService
         if (CommerceOrderPosting::query()->where('commerce_order_id', $order->id)->exists()) {
             throw new CommerceOrderCancellationException(CommerceOrderCancellationException::ALREADY_POSTED, 'رُحِّل هذا الطلب محاسبياً؛ يُعالَج بمرتجع/إشعار دائن لا بإلغاء مباشر.');
         }
-        if ($intent === null || $intent->isCancelled()) {
-            return; // صف 9: نية ملغاة سابقاً (إقفال إداري) أو طلب بلا نية.
+        if ($intent === null) {
+            return; // طلب بلا نية: لا دفع يُفحص.
         }
-        if ($intent->isPaid()) {
-            throw new CommerceOrderCancellationException(CommerceOrderCancellationException::PAYMENT_PAID, 'الطلب مدفوع؛ يُعالَج باسترداد لا بإلغاء مباشر.');
-        }
-        if ($intent->isCollected()) {
-            throw new CommerceOrderCancellationException(CommerceOrderCancellationException::PAYMENT_COLLECTED, 'حُصِّل مبلغ هذا الطلب؛ يلزم مسار استرداد/مرتجع لا إلغاء مباشر.');
+        if (! $intent->isCancelled()) {
+            if ($intent->isPaid()) {
+                throw new CommerceOrderCancellationException(CommerceOrderCancellationException::PAYMENT_PAID, 'الطلب مدفوع؛ يُعالَج باسترداد لا بإلغاء مباشر.');
+            }
+            if ($intent->isCollected()) {
+                throw new CommerceOrderCancellationException(CommerceOrderCancellationException::PAYMENT_COLLECTED, 'حُصِّل مبلغ هذا الطلب؛ يلزم مسار استرداد/مرتجع لا إلغاء مباشر.');
+            }
         }
         if ($intent->isOnline()) {
-            if ($this->online->hasCapture($intent)) {
+            // يشمل النية الملغاة سابقاً (صف 9): الإقفال الإداري مسموح فقط حين لا التقاط — التقاط متأخر (`late_capture`) على نية ألغتها
+            // المكنسة/المسار القديم يعني أن مالاً دخل فعلاً، فيُرفض بـ`payment_captured` لا يُغلق الطلب كأنه لم يُدفع شيء.
+            if ($this->hasCaptureEvidence($intent)) {
                 throw new CommerceOrderCancellationException(CommerceOrderCancellationException::PAYMENT_CAPTURED, 'التُقط مبلغ لهذا الطلب؛ لا يُلغى مباشرة.');
             }
-            $authorized = PaymentAttempt::query()->where('payable_key', $intent->payableKey())
-                ->where('capture_status', PaymentAttempt::STATUS_AUTHORIZED)->exists();
-            if ($authorized) {
-                throw new CommerceOrderCancellationException(CommerceOrderCancellationException::PAYMENT_AUTHORIZED, 'يوجد مبلغ مصرَّح به لدى المزوّد؛ أعد المحاولة بعد انتهاء المحاولة أو إغلاقها.');
+            if (! $intent->isCancelled()) {
+                $authorized = PaymentAttempt::query()->where('payable_key', $intent->payableKey())
+                    ->where('capture_status', PaymentAttempt::STATUS_AUTHORIZED)->exists();
+                if ($authorized) {
+                    throw new CommerceOrderCancellationException(CommerceOrderCancellationException::PAYMENT_AUTHORIZED, 'يوجد مبلغ مصرَّح به لدى المزوّد؛ أعد المحاولة بعد انتهاء المحاولة أو إغلاقها.');
+                }
             }
         }
+    }
+
+    /**
+     * كل مؤشرات الالتقاط الفعلي لنية إلكترونية: محاولة `captured` (`hasCapture`، الحاجز نفسه تحت قفل النية)، أو أثر مبلغ ملتقَط
+     * (`captured_minor > 0` / `captured_at`) أياً كانت حالتها اللاحقة، أو وسم `late_capture` للمراجعة. قراءة SELECT عادية بلا قفل محاولة.
+     */
+    private function hasCaptureEvidence(CommercePaymentIntent $intent): bool
+    {
+        if ($this->online->hasCapture($intent)) {
+            return true;
+        }
+        $attempts = PaymentAttempt::query()->where('payable_key', $intent->payableKey())->get(['id', 'captured_minor', 'captured_at', 'review_reasons']);
+
+        return $attempts->contains(fn (PaymentAttempt $a): bool => (int) $a->captured_minor > 0
+            || $a->captured_at !== null
+            || in_array(PaymentAttempt::REVIEW_LATE_CAPTURE, (array) $a->review_reasons, true));
     }
 }
