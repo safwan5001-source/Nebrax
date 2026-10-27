@@ -1,6 +1,6 @@
 "use client";
 
-import type { Media, Product, Variant } from "@spree/sdk";
+import type { Product, Variant } from "@spree/sdk";
 import { CircleCheckBig, CircleX, Loader2, ShoppingBag } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -30,6 +30,7 @@ import {
   type PdpSelections,
   type ProductGifting,
 } from "@/lib/commerce/pdp-gifting";
+import type { StoreMedia } from "@/lib/commerce/types";
 import type {
   PagePresentation,
   ProductPageRegionKey,
@@ -153,7 +154,7 @@ export function ProductDetails({
    * is by list, not by index into a merged gallery. A variant with no media of
    * its own falls back to the product's.
    */
-  const galleryImages = useMemo((): Media[] => {
+  const galleryImages = useMemo((): StoreMedia[] => {
     const variantMedia = selectedVariant?.media ?? [];
     if (variantMedia.length > 0) return variantMedia;
     return product.media || [];

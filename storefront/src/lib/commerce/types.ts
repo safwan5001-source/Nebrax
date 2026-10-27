@@ -100,6 +100,33 @@ export interface AwjProduct {
   updated_at: string | null;
 }
 
+/**
+ * T1 — AWJ-owned presentation type for one image/media item as the storefront
+ * UI renders it (gallery, lightbox, JSON-LD). It is the structural subset of
+ * fields the presentation layer actually reads, so the Spree-shaped `Media`
+ * that `mappers.ts` still produces is assignable to it with no cast, and
+ * removing the SDK later does not touch any consumer.
+ *
+ * AWJ serves a single image size per item (see `mappers.ts`), so every size
+ * field points at the same URL; sizes are kept only so existing "best
+ * available" fallbacks render byte-for-byte as before.
+ */
+export interface StoreMedia {
+  id: string;
+  /** Variants this item belongs to; empty = a product-level image. */
+  variant_ids: string[];
+  position: number;
+  alt: string | null;
+  original_url: string | null;
+  mini_url: string | null;
+  small_url: string | null;
+  medium_url: string | null;
+  large_url: string | null;
+  xlarge_url: string | null;
+  /** Bounded card/thumbnail derivative when the server provides one. */
+  thumbnail_url?: string | null;
+}
+
 export interface AwjCategoryRef {
   id: string;
   name: string;

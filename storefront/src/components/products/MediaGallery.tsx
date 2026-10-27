@@ -1,11 +1,11 @@
 "use client";
 
-import type { Media } from "@spree/sdk";
 import { ZoomIn } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import { useCallback, useRef, useState } from "react";
 import { ProductImage } from "@/components/ui/product-image";
+import type { StoreMedia } from "@/lib/commerce/types";
 
 const SWIPE_THRESHOLD_PX = 50;
 const SWIPE_MAX_VERTICAL_PX = 75;
@@ -30,7 +30,7 @@ const LazyMediaLightbox = dynamic(
   },
 );
 
-type GalleryMedia = Media & { thumbnail_url?: string | null };
+type GalleryMedia = StoreMedia;
 
 interface MediaGalleryProps {
   images: GalleryMedia[];
@@ -45,7 +45,7 @@ interface MediaGalleryProps {
 
 /** Prefer pre-sized Spree media URLs over the full-resolution original,
  * so the Next.js image optimizer doesn't have to fetch the source file. */
-function getMainImageUrl(media: Media | undefined): string | null {
+function getMainImageUrl(media: StoreMedia | undefined): string | null {
   if (!media) return null;
   return media.xlarge_url || media.large_url || media.original_url || null;
 }
