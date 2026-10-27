@@ -17,6 +17,7 @@ use App\Support\Rbac;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -211,26 +212,97 @@ class CommerceStaffOrderApiTest extends TestCase
         }
     }
 
+    /**
+     * استعلام تحديث Sanctum لـ`last_used_at` (يجري حين يتجاوز آخر استخدام للرمز نافذته الزمنية) استعلام زمني لا علاقة له
+     * بعدد الطلبات؛ كان يظهر أحياناً في أحد القياسين فقط فيُنتج 17/18. يُستثنى **هذا الاستعلام تحديداً** (مطابقة تامة)
+     * ولا يُستثنى غيره ولا يوجد أي تسامح عددي.
+     */
+    private const SANCTUM_TOKEN_TOUCH = '/^update "personal_access_tokens" set "last_used_at" = \?, "updated_at" = \? where "id" = \?$/';
+
+    /** @return list<string> استعلامات طلب القائمة كلها (بما فيها تحديث Sanctum إن وقع). */
+    private function listRequestQueries(string $token): array
+    {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->withToken($token)->getJson('/api/commerce/orders?per_page=50')->assertOk();
+        $queries = array_column(DB::getQueryLog(), 'query');
+        DB::disableQueryLog();
+
+        return $queries;
+    }
+
+    /** عدد استعلامات القائمة بعد استثناء تحديث Sanctum وحده. */
+    private function listQueryCount(string $token): int
+    {
+        return count(array_filter(
+            $this->listRequestQueries($token),
+            fn (string $sql): bool => preg_match(self::SANCTUM_TOKEN_TOUCH, $sql) !== 1,
+        ));
+    }
+
+    /** @return array{0:int,1:int} عدد الاستعلامات بطلب واحد ثم بسبعة طلبات (القياس بعد تسخين). */
+    private function listQueryCountsForOneThenSevenOrders(string $tenantId, string $token): array
+    {
+        $this->seedOrder($tenantId);
+        $this->listQueryCount($token); // warm-up: per-process caches (settings/capabilities) must not skew the comparison
+        $one = $this->listQueryCount($token);
+        for ($i = 0; $i < 6; $i++) {
+            $this->seedOrder($tenantId);
+        }
+
+        return [$one, $this->listQueryCount($token)];
+    }
+
     /** @test */
     public function the_list_does_not_n_plus_one(): void
     {
         [$tenantId, $token] = $this->owner();
-        $this->seedOrder($tenantId);
-        $count = function () use ($token): int {
-            DB::flushQueryLog();
-            DB::enableQueryLog();
-            $this->withToken($token)->getJson('/api/commerce/orders?per_page=50')->assertOk();
-            $n = count(DB::getQueryLog());
-            DB::disableQueryLog();
+        [$one, $many] = $this->listQueryCountsForOneThenSevenOrders($tenantId, $token);
 
-            return $n;
-        };
-        $count(); // warm-up: per-process caches (settings/capabilities) must not skew the comparison
-        $one = $count();
-        for ($i = 0; $i < 6; $i++) {
-            $this->seedOrder($tenantId);
+        $this->assertSame($one, $many, 'query count must not grow with the number of orders');
+    }
+
+    /**
+     * إثبات السبب: حين يتجاوز آخر استخدام للرمز نافذته يُحدّث Sanctum `last_used_at` باستعلام إضافي واحد،
+     * وهذا الاستعلام وحده هو ما يستثنيه العدّ (فرق العدّين = 1 بالضبط، ويقع في القياس الخام لا المُرشَّح).
+     */
+    /** @test */
+    public function the_sanctum_last_used_touch_is_the_only_query_excluded_from_the_count(): void
+    {
+        [, $token] = $this->owner();
+        $this->listQueryCount($token); // warm-up
+
+        DB::table('personal_access_tokens')->update(['last_used_at' => now()->subDay()]); // نافذة متجاوزة ⇒ سيحدّث Sanctum
+        $raw = $this->listRequestQueries($token);
+        $touches = array_filter($raw, fn (string $sql): bool => preg_match(self::SANCTUM_TOKEN_TOUCH, $sql) === 1);
+        $this->assertCount(1, $touches, 'Sanctum touches last_used_at exactly once for a stale token');
+
+        DB::table('personal_access_tokens')->update(['last_used_at' => now()->subDay()]);
+        $filtered = $this->listQueryCount($token);
+        $this->assertSame(count($raw) - 1, $filtered, 'only the Sanctum touch is excluded — no other query is ignored');
+    }
+
+    /**
+     * إثبات الحساسية: N+1 اصطناعي (استعلام إضافي لكل طلب مُحمَّل، كتحميل كسول لعلاقة) يجعل العدّ ينمو
+     * مع عدد الطلبات — أي أن المقارنة التي يقوم عليها اختبار N+1 ستفشل — رغم استثناء تحديث Sanctum.
+     */
+    /** @test */
+    public function a_synthetic_n_plus_one_makes_the_count_grow_with_the_number_of_orders(): void
+    {
+        [$tenantId, $token] = $this->owner();
+        $event = 'eloquent.retrieved: '.CommerceOrder::class;
+        Event::listen($event, function (): void {
+            DB::table('tenants')->count(); // استعلام لكل طلب مُحمَّل
+        });
+
+        try {
+            [$one, $many] = $this->listQueryCountsForOneThenSevenOrders($tenantId, $token);
+        } finally {
+            Event::forget($event);
         }
-        $this->assertSame($one, $count(), 'query count must not grow with the number of orders');
+
+        $this->assertGreaterThanOrEqual($one + 6, $many, 'a per-order query must be visible to the count');
+        $this->assertNotSame($one, $many, 'the N+1 assertion would fail');
     }
 
     // ── الشكل ومنع التسريب ───────────────────────────────────────────────
