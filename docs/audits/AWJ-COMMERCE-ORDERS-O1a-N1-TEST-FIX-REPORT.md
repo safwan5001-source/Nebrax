@@ -27,7 +27,7 @@
 ## 4. النتائج
 
 - محلياً، `CommerceStaffOrderApiTest` (15 اختباراً): SQLite ✅ ×2 · PostgreSQL ✅ ×3 (متتاليات).
-- CI: انظر وصف الـPR (يُحدَّث بعد التشغيل).
+- CI على Head `d44a67c`: `php artisan test (L11, sqlite)` ✅ · `php artisan test (L11, pgsql)` ✅ · `CI Gate` ✅.
 
 ## 5. الملفات
 
@@ -42,7 +42,7 @@
 
 - **Branch:** `claude/commerce-orders-o1a-n1-test-fix`
 - **Base SHA:** `43f86fd430c665152bd34a1082d39ec887b4af9d` (`main`)
-- **Head SHA:** في وصف الـPR (يلي commit هذا التقرير).
+- **Head SHA (الكود والاختبارات):** `d44a67ce32098cd085ff7fd5b01f021d0fd77ff0` — CI أخضر. ما بعده commit لتحديث هذا التقرير فقط.
 
 ## 7. ملاحظة
 
