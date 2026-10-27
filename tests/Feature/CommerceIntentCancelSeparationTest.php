@@ -422,12 +422,17 @@ class CommerceIntentCancelSeparationTest extends TestCase
     }
 
     #[Test]
-    public function no_deployment_gate_route_or_ui_is_added_by_this_slice(): void
+    public function this_slice_added_no_order_cancellation_route_and_the_o3a_2b_gate_stays_closed_by_default(): void
     {
+        // O3a-2a لم تضف مساراً ولا بوابة؛ O3a-2b أضافت مسار الموظف الوحيد وبوابته المغلقة افتراضياً (لا مسار إلغاء آخر).
+        $routes = [];
         foreach (\Illuminate\Support\Facades\Route::getRoutes() as $route) {
-            $this->assertDoesNotMatchRegularExpression('#commerce/orders/\{[^}]+\}/cancel#', $route->uri());
+            if (preg_match('#commerce/orders/\{[^}]+\}/cancel#', $route->uri())) {
+                $routes[] = $route->uri();
+            }
         }
-        $this->assertNull(config('commerce.order_cancellation_enabled'));
+        $this->assertSame(['api/commerce/orders/{id}/cancel'], $routes);
+        $this->assertFalse((bool) (require base_path('config/commerce.php'))['order_cancellation_enabled'], 'closed unless explicitly enabled');
     }
 
     // ── مساعدات ───────────────────────────────────────────────────────────
