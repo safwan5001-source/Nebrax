@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Support\GeneratesDocumentNumbers;
 use App\Tenancy\CompanyWide;
 use App\Tenancy\ResolvesBranchReferences;
+use App\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -173,11 +174,16 @@ class CommerceOrder extends BaseModel implements CompanyWide
      * حقائق الإلغاء (`cancelled_at`, `cancelled_by_user_id`, `cancellation_reason`, `cancellation_note`) **ليست** في `$fillable` عمداً:
      * لا تُكتب بتعيين جماعي؛ تكتبها خدمة الإلغاء (O3a-2b) وحدها، وقاعدة البيانات تحرس شكلها وجمودها (migration 2026_12_13).
      */
+    /**
+     * الفاعل التاريخي: يشمل المحذوف حذفاً ناعماً (`UserController::destroy` حذفٌ ناعم؛ الصف و`cancelled_by_user_id` باقيان)
+     * فلا يضيع اسم من ألغى بحذف حسابه. و`User` بلا `TenantScope` عالمي، فالعزل صريح هنا: لا يُحلّ إلا مستخدم المستأجر
+     * الحالي (سياق غائب ⇒ لا تطابق ⇒ فشل مغلق)، فلا يتسرّب اسم مستخدم مستأجر آخر حتى لو خُزّن معرّفه بكتابة مباشرة.
+     */
     public function cancelledBy(): BelongsTo
     {
-        // `withTrashed`: حذف الحساب ناعمٌ (`UserController::destroy` + `SoftDeletes`) فيبقى الصف و`cancelled_by_user_id`؛ بدونه يضيع اسم
-        // الفاعل التاريخي من تفاصيل الموظف (كقرّاء التدقيق في الدفع). لا يوسّع نطاق المستأجر: المفتاح هو الأجنبي المخزَّن على طلبٍ محصور بمستأجره.
-        return $this->belongsTo(User::class, 'cancelled_by_user_id')->withTrashed();
+        return $this->belongsTo(User::class, 'cancelled_by_user_id')
+            ->withTrashed()
+            ->where('users.tenant_id', app(TenantContext::class)->id());
     }
 
     public function isCancelled(): bool

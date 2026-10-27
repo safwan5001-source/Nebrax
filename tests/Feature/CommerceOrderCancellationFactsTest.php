@@ -244,6 +244,48 @@ class CommerceOrderCancellationFactsTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
+    public function a_soft_deleted_actor_still_appears_as_the_historical_actor(): void
+    {
+        [$tenantId, $token] = $this->owner();
+        $actor = $this->userFor($tenantId, 'admin', 'actor@acme.test');
+        $order = $this->order($tenantId);
+        $this->cancelRaw($order->id, 'customer_request', null, $actor);
+
+        $before = $this->withToken($token)->getJson("/api/commerce/orders/{$order->id}")->assertOk()->json('data.cancellation.by');
+        $this->assertSame(['id' => $actor, 'name' => User::withoutGlobalScopes()->find($actor)->name], $before);
+
+        // الحذف الناعم كما يفعله UserController::destroy: الصف و cancelled_by_user_id باقيان.
+        User::withoutGlobalScopes()->findOrFail($actor)->delete();
+        $this->assertNull(User::query()->find($actor), "soft-deleted: hidden from the default scope");
+        $this->assertNotNull(User::withTrashed()->find($actor));
+        $this->assertSame($actor, $order->fresh()->cancelled_by_user_id);
+
+        $after = $this->withToken($token)->getJson("/api/commerce/orders/{$order->id}")->assertOk()->json('data.cancellation.by');
+        $this->assertSame($before, $after, 'deleting the account must not obscure who cancelled');
+
+        // التحميل الكسول عبر النموذج (سياق المستأجر مضبوط) يحلّ المحذوف أيضاً.
+        $ctx = app(TenantContext::class);
+        $ctx->set($tenantId);
+        $this->assertSame($actor, CommerceOrder::query()->findOrFail($order->id)->cancelledBy?->id);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function the_actor_is_resolved_only_within_the_current_tenant(): void
+    {
+        [$tenantA, $tokenA] = $this->owner('acme', 'owner@acme.test');
+        [$tenantB] = $this->owner('globex', 'owner@globex.test');
+        $foreign = $this->userFor($tenantB, 'admin', 'foreign@globex.test');
+        $order = $this->order($tenantA);
+        // معرّف مستخدم من مستأجر آخر مكتوب بكتابة مباشرة (لا مسار تطبيقي يفعلها): لا يتسرّب اسمه.
+        $this->cancelRaw($order->id, 'customer_request', null, $foreign);
+        User::withoutGlobalScopes()->findOrFail($foreign)->delete(); // وحتى لو كان محذوفاً ناعماً
+
+        $by = $this->withToken($tokenA)->getJson("/api/commerce/orders/{$order->id}")->assertOk()->json('data.cancellation.by');
+        $this->assertSame($foreign, $by['id']);
+        $this->assertNull($by['name'], 'a user of another tenant must never be resolved');
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
     public function a_cancelled_order_cannot_be_deleted_but_other_orders_and_tenant_removal_still_work(): void
     {
         [$tenantId] = $this->owner();
@@ -417,7 +459,9 @@ class CommerceOrderCancellationFactsTest extends TestCase
             DB::flushQueryLog();
             DB::enableQueryLog();
             $this->withToken($token)->getJson('/api/commerce/orders?per_page=50')->assertOk();
-            $n = count(DB::getQueryLog());
+            // Sanctum يحدّث `last_used_at` للرمز عند تجاوز نافذته الزمنية — استعلام زمني لا علاقة له بعدد الطلبات
+            // (يظهر أحياناً في القياس الثاني فقط فيُنتج 17/18). نستثنيه بالاسم فيبقى الاختبار كاشفاً لأي استعلام لكل طلب.
+            $n = count(array_filter(DB::getQueryLog(), fn (array $q) => ! str_starts_with($q['query'], 'update "personal_access_tokens"')));
             DB::disableQueryLog();
 
             return $n;
