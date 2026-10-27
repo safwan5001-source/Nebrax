@@ -53,7 +53,7 @@
 
 - **Branch:** `claude/commerce-orders-o1a-n1-test-fix`
 - **Base SHA:** `43f86fd430c665152bd34a1082d39ec887b4af9d` (`main`)
-- **Head SHA (الكود والاختبارات):** `d44a67ce32098cd085ff7fd5b01f021d0fd77ff0` — CI أخضر. ما بعده commit لتحديث هذا التقرير فقط.
+- **Head SHA (الكود والاختبارات):** `1d6e0f974bfe43f62e610d87c7152d3ee3f19e58` (بعد إصلاح P2) — CI أخضر: SQLite ✅ · PostgreSQL ✅ · CI Gate ✅. (`d44a67c` الأسبق أخضر أيضاً.) ما بعده commit لتحديث هذا التقرير فقط.
 
 ## 7. ملاحظة
 
