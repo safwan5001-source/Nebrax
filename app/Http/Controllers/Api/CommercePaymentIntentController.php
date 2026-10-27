@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Models\CommerceOrder;
 use App\Models\CommercePaymentIntent;
 use App\Models\PaymentAttempt;
+use App\Services\Commerce\CommerceOrderCancellationException;
+use App\Services\Commerce\CommerceOrderLifecycleService;
 use App\Services\Commerce\CommercePaymentIntentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 
 /**
  * COM-MOBILE-PAYMENTS-1 (ADR-04/ADR-09) — إدارة داخلية بحتة لالتزامات
@@ -53,9 +57,35 @@ class CommercePaymentIntentController extends ApiController
         return response()->json(['data' => $this->serialize($intent)]);
     }
 
-    public function cancel(string $id, CommercePaymentIntentService $intents): JsonResponse
+    /**
+     * إلغاء التزام دفع. **سلوك قديم محفوظ حرفياً** ما دامت بوابة `commerce.order_cancellation_enabled` مغلقة (الافتراضي).
+     *
+     * ADR-28 D-9-R1 (البوابة مفتوحة): نية تتبع طلب متجر **تُفوَّض إلى خدمة إلغاء الطلب** فتمرّ بالمعاملة والتنظيف بعد الالتزام نفسيهما،
+     * فلا تبقى طريقة تترك «طلباً مؤكَّداً بنية ملغاة». تتطلب صلاحيتين: `payments.manage` (المسار) **و**`commerce.orders.cancel`، وجسماً
+     * `reason` (+`note` عند `other`). لا يتوسّع هذا في صلاحيات بقية المسارات.
+     */
+    public function cancel(Request $request, string $id, CommercePaymentIntentService $intents, CommerceOrderLifecycleService $lifecycle): JsonResponse
     {
         $intent = CommercePaymentIntent::findOrFail($id);
+
+        if ((bool) config('commerce.order_cancellation_enabled') && $intent->commerce_order_id !== null) {
+            abort_unless($request->user()->hasPermission('commerce.orders.cancel'), 403, 'إلغاء التزام دفع مرتبط بطلب يتطلب صلاحية إلغاء الطلبات.');
+            abort_if($request->user()->allowedWarehouseIds() !== null, 403, 'إلغاء الطلبات غير متاح للمستخدم المقيَّد بمخازن محددة.');
+            $data = $request->validate([
+                'reason' => ['required', 'string', Rule::in(CommerceOrder::CANCELLATION_REASONS)],
+                'note' => ['sometimes', 'nullable', 'string', 'max:500', 'required_if:reason,other'],
+            ]);
+            $order = CommerceOrder::query()->find($intent->commerce_order_id);
+            abort_if($order === null, 404);
+
+            try {
+                $lifecycle->cancel($order, $request->user(), $data['reason'], $data['note'] ?? null);
+            } catch (CommerceOrderCancellationException $e) {
+                return response()->json(['message' => $e->getMessage(), 'reason' => $e->reason], $e->status);
+            }
+
+            return response()->json(['data' => $this->serialize($intent->fresh())]);
+        }
 
         $intent = $this->domain(fn () => $intents->cancel($intent));
 

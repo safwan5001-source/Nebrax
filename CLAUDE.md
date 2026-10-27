@@ -386,6 +386,17 @@ php artisan serve
 - فلاتر/فرز بقائمة بيضاء (`storefront_id`، `sales_channel_id`، `status`، `payment_status`، `payment_method`، `delivery_method`، `from`/`to`، `q`؛ فرز `created_at|total|number`)، `per_page ≤ 50`، بلا N+1. مسلسل الموظف **منفصل** عن `CommerceOrderSerializer` العام الذي لم يتغيّر.
 - المرجع: `docs/audits/AWJ-COMMERCE-ORDERS-O1a-IMPLEMENTATION-REPORT.md`.
 
+## إلغاء طلب المتجر بواسطة الموظف — COMMERCE-ORDERS-O3a-2b (مغلق افتراضياً خلف بوابة نشر)
+
+`POST commerce/orders/{id}/cancel` (`CommerceStaffOrderCancellationController` → `CommerceOrderLifecycleService::cancel`)، وفق ADR-28 (`docs/plans/store/ADR-28-COMMERCE-ORDER-LIFECYCLE.md`). **البوابة** `config('commerce.order_cancellation_enabled')` (env `COMMERCE_ORDER_CANCELLATION_ENABLED`، الافتراضي `false`): مغلقة ⇒ المسار 404 ويبقى `payment-intents/{id}/cancel` القديم حرفياً. **لا تُفتح لمستأجر قبل قرار تفعيل منسَّق** (ADR-28 §5.2 / O3c).
+- **الصلاحية** `commerce.orders.cancel` (owner/admin عبر `*` فقط؛ لا `MATRIX` ولا دور مخزَّن) + `EnsureApplicationActive:commerce.storefront` + رفض المقيَّد بمخازن (403) + 404 موحَّد لطلب مستأجر آخر. الجسم: `reason` ∈ القائمة المعتمدة (`reason_code` اسم بديل) و`note` (≤ 500، إلزامي عند `other`). 200 بتفاصيل الموظف (O1a)؛ 409 `{message, reason}` للمصفوفة؛ 422 للمسودة/المدخل.
+- **المعاملة (قاعدة بيانات فقط):** قفل النية ← قفل الطلب ← صفوف الحجز (لا تعكس أي مسار قائم)، ثم الفحوص بالترتيب `already_posted` ← `payment_paid` ← `payment_collected` ← `payment_captured` ← `payment_authorized`، ثم `cancelWithinTransaction` (انتقال النية فقط) + `releaseActive` + حقائق الإلغاء — ذرّياً. **ممنوع** استدعاء `CommercePaymentIntentService::cancel()` العامة أو `PaymentOrchestrator` أو قفل محاولة من الخدمة (يحرسه اختبار ساكن). التقاط محاولة يسابق الفحص يُحوَّل إلى 409 `payment_captured` لا خطأ عام.
+- **بعد الالتزام النهائي فقط** (`DB::afterCommit`): تنظيف المحاولات عبر `OrderCancellationCleanup` (O3a-2a، لا يرمي، ويعيد المطابِق المجدول ما فشل). التقاط لاحق ⇒ `late_capture` والطلب لا يعود.
+- **idempotent بالحالة:** الطلب الملغى يُعاد كما هو بلا أثر ولا تغيير للسبب/الفاعل/الوقت. نية ملغاة سابقاً (مكنسة/مسار قديم) ⇒ إقفال إداري (صف 9).
+- **لا أثر محاسبي أو مخزني:** لا قيد ولا فاتورة ولا سند ولا إشعار دائن ولا `StockMovement` (الحجز وعد). الطلب المرحَّل (`already_posted`) والمدفوع/المحصَّل/الملتقَط لا يُلغى مباشرة — مسار الاسترداد/المرتجع (RT) مستقل.
+- **تفويض المسار القديم (D-9-R1):** والبوابة مفتوحة، `payment-intents/{id}/cancel` لنية تتبع طلباً يتطلب `payments.manage` **و**`commerce.orders.cancel` وجسم `reason`، ويُفوَّض إلى الخدمة نفسها (فلا يبقى «طلب مؤكَّد بنية ملغاة»). مغلقة ⇒ السلوك القديم حرفياً.
+- **لا تغيير في عقد المشتري/الجمهور** (يبقى `status: confirmed` — O3c لاحقاً). المرجع: `docs/audits/AWJ-COMMERCE-ORDERS-O3a-2b-IMPLEMENTATION-REPORT.md`.
+
 ## أدوار ضريبة القيمة المضافة (REM-05 / ACC-01)
 
 `App\Services\Accounting\VatRoleIntegrityService` هو مصدر قواعد دورَي `tax_input`/`tax_output` وسياق تقرير الضريبة. لا يكتب شيئاً.
