@@ -54,7 +54,7 @@
 
 ## 5. CI
 
-التشغيلة الأولى (Head `4d5291b`): فشل **اختبار واحد** على كلا المحرّكين — حارس O3a-2a أعلاه (أُصلح). Head `5918ac7`: SQLite ✅ · PostgreSQL ✅ · CI Gate ✅. Head `6968e12` (بعد إصلاح P2 §5.1): SQLite ✅ · PostgreSQL ✅ · CI Gate ✅.
+التشغيلة الأولى (Head `4d5291b`): فشل **اختبار واحد** على كلا المحرّكين — حارس O3a-2a أعلاه (أُصلح). Head `5918ac7`: SQLite ✅ · PostgreSQL ✅ · CI Gate ✅. Head `6968e12` (بعد إصلاح P2 §5.1): SQLite ✅ · PostgreSQL ✅ · CI Gate ✅. Head `02c23a1` (بعد إصلاح P2 §5.2): SQLite ✅ · PostgreSQL ✅ · CI Gate ✅.
 
 ## 5.1 مراجعة Codex P2 — حارس القدرة على المدخل المفوَّض
 
@@ -94,7 +94,7 @@
 
 - **Branch:** `claude/commerce-orders-o3a-2b`
 - **Base SHA:** `7ce615a311014f43c8f5896ed4e81216bf9cfec4` (`main` بعد #1776)
-- **Head SHA (الكود والاختبارات):** `6968e12b1d1eacc443268bf36e0cd55628f640fd` — CI أخضر. ما بعده commit لهذا التقرير فقط.
+- **Head SHA (الكود والاختبارات):** `02c23a14c53089faa3e52519ba109991bb0bc6d4` — CI أخضر. ما بعده commit لهذا التقرير فقط.
 - **PR:** [#1777](https://github.com/safwan5001-source/Nebrax/pull/1777)
 
 ## 9. الخطوة التالية
