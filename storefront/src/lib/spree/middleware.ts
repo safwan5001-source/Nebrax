@@ -7,12 +7,33 @@ import {
 } from "@/i18n/normalize";
 import { REQUEST_PATHNAME_HEADER, REQUEST_SEARCH_HEADER } from "@/i18n/routing";
 import { buildAccountLoginHref } from "@/lib/utils/account-redirect";
+import { isWholesaleEnabled } from "./config";
 
 const COUNTRY_COOKIE = "spree_country";
 const LOCALE_COOKIE = "spree_locale";
 const ACCESS_TOKEN_COOKIE = "_spree_jwt";
 const REFRESH_TOKEN_COOKIE = "_spree_refresh_token";
 const COOKIE_MAX_AGE = 365 * 24 * 60 * 60;
+
+/**
+ * Legacy Spree-backed checkout pages (`(checkout)/{checkout,confirm-payment,
+ * order-placed}/[id]`). They belong to the opt-in wholesale add-on; without it
+ * they must answer a genuine HTTP 404 (X5b).
+ */
+const LEGACY_CHECKOUT_PATH =
+  /^\/(checkout|confirm-payment|order-placed)\/([^/]+)$/;
+/** AWJ-native static segment under `checkout/` — it wins over `checkout/[id]`. */
+const AWJ_CHECKOUT_STATIC_SEGMENT = "payment-return";
+
+function isLegacyCheckoutPath(localizedPath: string): boolean {
+  const normalized = localizedPath.replace(/\/+$/, "");
+  const match = normalized.match(LEGACY_CHECKOUT_PATH);
+  if (!match) return false;
+  // Raw comparison on purpose: the router matches static segments literally, so
+  // `/checkout/%70ayment-return` or `/checkout/Payment-Return` resolve to the
+  // legacy `[id]` page (and must be closed), not to the AWJ-native route.
+  return !(match[1] === "checkout" && match[2] === AWJ_CHECKOUT_STATIC_SEGMENT);
+}
 
 const HAS_COUNTRY_LOCALE =
   /^\/([a-z]{2})\/([a-z]{2,3}(?:-[a-z0-9]{2,8})*)(\/|$)/i;
@@ -79,6 +100,33 @@ function setLocaleCookies(
   });
 }
 
+/**
+ * A real HTTP 404, decided before rendering starts.
+ *
+ * Why not `notFound()` in the layout: with `cacheComponents` (PPR) the route is
+ * prerendered and its response is streamed, so by the time the layout throws the
+ * 200 status line is already committed (`x-nextjs-postponed`). Rewriting to a
+ * path that matches no route yields the framework's own 404 (same page and
+ * status as any unknown URL) with no redirect and no data fetch.
+ */
+function legacyCheckoutClosed(
+  request: NextRequest,
+  canonicalPrefix: string,
+  cookies: { country: string; locale: string } | null,
+): NextResponse {
+  const url = request.nextUrl.clone();
+  url.pathname = `${canonicalPrefix}/awj-legacy-checkout-closed`;
+  url.search = "";
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set(REQUEST_PATHNAME_HEADER, request.nextUrl.pathname);
+  requestHeaders.set(REQUEST_SEARCH_HEADER, "");
+  const response = NextResponse.rewrite(url, {
+    request: { headers: requestHeaders },
+  });
+  if (cookies) setLocaleCookies(response, cookies.country, cookies.locale);
+  return response;
+}
+
 function nextWithLocaleContext(
   request: NextRequest,
   country: string,
@@ -142,8 +190,19 @@ export function createSpreeMiddleware(
       return NextResponse.next();
     }
 
-    // Skip if pathname contains a file extension (static assets)
+    // Skip if pathname contains a file extension (static assets). A legacy
+    // checkout id may legitimately contain a dot (`/checkout/test.123`), so the
+    // closed-route check runs first; it only matches the exact
+    // `/{country}/{locale}/{checkout|confirm-payment|order-placed}/{id}` shape.
     if (/\.\w+$/.test(pathname)) {
+      const dotted = pathname.match(HAS_COUNTRY_LOCALE);
+      if (dotted && !isWholesaleEnabled()) {
+        const prefix = `/${dotted[1]}/${dotted[2]}`;
+        if (isLegacyCheckoutPath(pathname.slice(prefix.length))) {
+          // No cookies: the locale here is unvalidated, only the status matters.
+          return legacyCheckoutClosed(request, prefix, null);
+        }
+      }
       return NextResponse.next();
     }
 
@@ -192,6 +251,16 @@ export function createSpreeMiddleware(
         );
         setLocaleCookies(response, country, locale);
         return response;
+      }
+
+      if (
+        !isWholesaleEnabled() &&
+        isLegacyCheckoutPath(pathname.slice(canonicalPrefix.length))
+      ) {
+        return legacyCheckoutClosed(request, canonicalPrefix, {
+          country,
+          locale,
+        });
       }
 
       return nextWithLocaleContext(request, country, locale);

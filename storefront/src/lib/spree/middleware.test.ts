@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSpreeMiddleware } from "@/lib/spree/middleware";
 
 const middleware = createSpreeMiddleware({
@@ -419,5 +419,145 @@ describe("dynamic store icon bypass", () => {
     );
 
     expect(response.headers.get("location")).toBeNull();
+  });
+});
+
+describe("X5b: legacy Spree checkout routes answer a real 404 without wholesale", () => {
+  const legacy = [
+    "/us/en/checkout/abc",
+    "/us/en/confirm-payment/abc",
+    "/us/en/order-placed/abc",
+  ];
+  const closedPath = "/us/en/awj-legacy-checkout-closed";
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const rewriteOf = (response: Response) =>
+    response.headers.get("x-middleware-rewrite");
+
+  it.each(
+    legacy,
+  )("rewrites %s to a path that matches no route (no redirect)", async (path) => {
+    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "");
+    const response = await middleware(
+      new NextRequest(`https://store.example${path}?x=1`),
+    );
+
+    expect(response.headers.get("location")).toBeNull();
+    expect(rewriteOf(response)).toBe(`https://store.example${closedPath}`);
+  });
+
+  it("closes the legacy route for every spelling that resolves to checkout/[id]", async () => {
+    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "");
+    for (const path of [
+      "/us/en/checkout/%70ayment-return",
+      "/us/en/checkout/Payment-Return",
+      "/us/en/checkout/abc/",
+    ]) {
+      const response = await middleware(
+        new NextRequest(`https://store.example${path}`),
+      );
+      expect(rewriteOf(response)?.replace(/\/$/, "")).toBe(
+        `https://store.example${closedPath}`,
+      );
+    }
+  });
+
+  it("leaves the AWJ-native checkout routes untouched", async () => {
+    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "");
+    for (const path of [
+      "/us/en/checkout",
+      "/us/en/checkout/",
+      "/us/en/checkout/payment-return",
+      "/us/en/cart",
+    ]) {
+      const response = await middleware(
+        new NextRequest(`https://store.example${path}`),
+      );
+      expect(rewriteOf(response)).toBeNull();
+      expect(response.headers.get("x-middleware-next")).toBe("1");
+    }
+  });
+
+  it("does not touch deeper or unrelated paths", async () => {
+    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "");
+    for (const path of [
+      "/us/en/checkout/abc/extra",
+      "/us/en/products/checkout",
+      "/us/en/wholesale/checkout/abc",
+    ]) {
+      const response = await middleware(
+        new NextRequest(`https://store.example${path}`),
+      );
+      expect(rewriteOf(response)).toBeNull();
+    }
+  });
+
+  it.each(
+    legacy,
+  )("lets %s through when the wholesale add-on is enabled", async (path) => {
+    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "wholesale");
+    const response = await middleware(
+      new NextRequest(`https://store.example${path}`),
+    );
+
+    expect(rewriteOf(response)).toBeNull();
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+  });
+
+  it("still canonicalises the locale prefix before deciding (no gate bypass by prefix spelling)", async () => {
+    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "");
+    const response = await middleware(
+      new NextRequest("https://store.example/US/EN/checkout/abc"),
+    );
+
+    expect(response.headers.get("location")).toBe(
+      "https://store.example/us/en/checkout/abc",
+    );
+  });
+
+  it.each([
+    "/us/en/checkout/test.123",
+    "/us/en/confirm-payment/test.123",
+    "/us/en/order-placed/test.123",
+    // Not the static `payment-return` segment, so it resolves to checkout/[id].
+    "/us/en/checkout/payment-return.v2",
+  ])("closes the dotted legacy id %s without cookies or redirect", async (path) => {
+    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "");
+    const response = await middleware(
+      new NextRequest(`https://store.example${path}`),
+    );
+
+    expect(response.headers.get("location")).toBeNull();
+    expect(rewriteOf(response)).toBe(`https://store.example${closedPath}`);
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("keeps dotted ids, static assets and AWJ routes on the plain pass-through", async () => {
+    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "");
+    for (const path of [
+      "/us/en/products/shirt.v2",
+      "/us/en/checkout/test.123/extra",
+      "/logo.png",
+    ]) {
+      const response = await middleware(
+        new NextRequest(`https://store.example${path}`),
+      );
+      expect(rewriteOf(response)).toBeNull();
+      expect(response.headers.get("location")).toBeNull();
+    }
+  });
+
+  it("leaves dotted legacy ids untouched when the wholesale add-on is enabled", async () => {
+    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "wholesale");
+    const response = await middleware(
+      new NextRequest("https://store.example/us/en/checkout/test.123"),
+    );
+
+    expect(rewriteOf(response)).toBeNull();
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+    expect(response.headers.get("set-cookie")).toBeNull();
   });
 });

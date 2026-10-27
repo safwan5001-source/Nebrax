@@ -16,5 +16,11 @@ export const config = {
   // rewrites `/icon` to `/{country}/{locale}/icon` and the handler never runs.
   matcher: [
     "/((?!api/|_next/static|_next/image|favicon.ico|icon/?$|.*\\..*$).*)",
+    // X5b: the first entry skips any path containing a dot, but a legacy
+    // checkout id may contain one (`/checkout/test.123`). This explicit entry
+    // routes exactly `/{country}/{locale}/{legacy section}/{id}` through the
+    // proxy so it can answer a real 404; the proxy itself passes every other
+    // dotted path (static assets) straight through.
+    "/:country/:locale/:section(checkout|confirm-payment|order-placed)/:id",
   ],
 };
