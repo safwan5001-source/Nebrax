@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Models\Warehouse;
 use App\Support\Rbac;
 use App\Tenancy\TenantContext;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -219,9 +220,22 @@ class CommerceStaffOrderApiTest extends TestCase
      */
     private const SANCTUM_TOKEN_TOUCH = '/^update "personal_access_tokens" set "last_used_at" = \?, "updated_at" = \? where "id" = \?$/';
 
-    /** @return list<string> استعلامات طلب القائمة كلها (بما فيها تحديث Sanctum إن وقع). */
+    /**
+     * يُرجع **التاريخين معاً** (`last_used_at` و`updated_at`) يوماً إلى الخلف قبل كل قياس، فيحدّث Sanctum الرمز دائماً بالصيغة
+     * الكاملة نفسها (`last_used_at` + `updated_at`) أياً كان توقيت التنفيذ: Eloquent لا يكتب إلا الأعمدة المتغيّرة، فلو بقي
+     * `updated_at` مساوياً لثانية الحفظ لانحصر التحديث في عمود واحد (فلا يطابق الاستثناء) ولصار العدّ رهناً بالساعة.
+     * الإرجاع نسبي إلى `now()` فيصحّ سواء نُفّذت الطلبات في الثانية نفسها أو بساعة مجمَّدة.
+     */
+    private function backdateTokenTimestamps(): void
+    {
+        $past = now()->subDay();
+        DB::table('personal_access_tokens')->update(['last_used_at' => $past, 'updated_at' => $past]);
+    }
+
+    /** @return list<string> استعلامات طلب القائمة كلها (بما فيها تحديث Sanctum، الذي يقع دائماً لأن التاريخين مُرجَعان). */
     private function listRequestQueries(string $token): array
     {
+        $this->backdateTokenTimestamps();
         DB::flushQueryLog();
         DB::enableQueryLog();
         $this->withToken($token)->getJson('/api/commerce/orders?per_page=50')->assertOk();
@@ -272,14 +286,38 @@ class CommerceStaffOrderApiTest extends TestCase
         [, $token] = $this->owner();
         $this->listQueryCount($token); // warm-up
 
-        DB::table('personal_access_tokens')->update(['last_used_at' => now()->subDay()]); // نافذة متجاوزة ⇒ سيحدّث Sanctum
-        $raw = $this->listRequestQueries($token);
+        $raw = $this->listRequestQueries($token); // التاريخان مُرجَعان داخل المساعد ⇒ سيحدّث Sanctum
         $touches = array_filter($raw, fn (string $sql): bool => preg_match(self::SANCTUM_TOKEN_TOUCH, $sql) === 1);
         $this->assertCount(1, $touches, 'Sanctum touches last_used_at exactly once for a stale token');
 
-        DB::table('personal_access_tokens')->update(['last_used_at' => now()->subDay()]);
         $filtered = $this->listQueryCount($token);
         $this->assertSame(count($raw) - 1, $filtered, 'only the Sanctum touch is excluded — no other query is ignored');
+    }
+
+    /**
+     * استقلال عن الساعة: بساعة **مجمَّدة** (كل شيء في الثانية نفسها) يبقى التحديث بالصيغة الكاملة نفسها ويبقى العدّ مستقراً،
+     * وهو الوضع الذي كان يُسقط الصيغة السابقة (تحديث عمود واحد حين يساوي `updated_at` ثانية الحفظ).
+     */
+    /** @test */
+    public function the_count_is_independent_of_the_wall_clock_even_when_everything_happens_in_the_same_second(): void
+    {
+        [$tenantId, $token] = $this->owner();
+        Carbon::setTestNow(Carbon::parse('2026-10-27 08:00:00'));
+
+        try {
+            // الرمز نفسه أُنشئ والطلبات تجري كلها عند اللحظة المجمَّدة ذاتها.
+            DB::table('personal_access_tokens')->update(['last_used_at' => now(), 'updated_at' => now()]);
+            $touches = array_filter(
+                $this->listRequestQueries($token),
+                fn (string $sql): bool => preg_match(self::SANCTUM_TOKEN_TOUCH, $sql) === 1,
+            );
+            $this->assertCount(1, $touches, 'the touch keeps the same full form on a frozen clock');
+
+            [$one, $many] = $this->listQueryCountsForOneThenSevenOrders($tenantId, $token);
+            $this->assertSame($one, $many);
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     /**
