@@ -50,11 +50,17 @@
 
 **إثبات الحساسية (طفرات):** حذف `releaseActive` ⇒ 5 إخفاقات · تنظيف فوري قبل الالتزام ⇒ 3 · تعطيل فحص الترحيل ⇒ `row 8` يفشل · إزالة تحويل رفض الالتقاط ⇒ يفشل سباق PostgreSQL بخطأ عام (حدث فعلاً فأُصلح).
 
-**التشغيل المحلي (مشروع Laravel مولَّد):** الاختبارات الجديدة 31 + 8 خضراء؛ المتأثرة (`CommerceOrderCancellationFactsTest`، `CommerceModuleBoundaryTest`، `CommerceStaffOrderApiTest`، `CommerceIntentCancel*`، `CommerceInvoiceOnPaymentTest`…) خضراء. الحزمة الكاملة: SQLite 9624 ناجحاً / 30 فاشلاً · PostgreSQL 9884 / 44. الفشل المحلي كله خارج الشريحة: `Fuel*` (bcmath غير مثبّت)، `PostgresTestLockTimeoutTest` (PGOPTIONS)، `StorefrontMediaApiTest`/`ProductMediaR2ReadTest`/`CommerceWorkspace*Media*`/`ImportJob*`/`Ai*`/`Document*` (بيئة محلية وتشغيل SQLite وPostgreSQL بالتوازي على الجهاز نفسه) — **ولا تظهر في CI**. فشل واحد كان من الشريحة: حارس O3a-2a (`no_deployment_gate_route…`) يفترض غياب أي مسار إلغاء — حُدِّث ليقبل مسار الموظف الوحيد وبوابته المغلقة.
+**التشغيل المحلي (مشروع Laravel مولَّد):** الاختبارات الجديدة 32 + 8 خضراء؛ المتأثرة (`CommerceOrderCancellationFactsTest`، `CommerceModuleBoundaryTest`، `CommerceStaffOrderApiTest`، `CommerceIntentCancel*`، `CommerceInvoiceOnPaymentTest`…) خضراء. الحزمة الكاملة: SQLite 9624 ناجحاً / 30 فاشلاً · PostgreSQL 9884 / 44. الفشل المحلي كله خارج الشريحة: `Fuel*` (bcmath غير مثبّت)، `PostgresTestLockTimeoutTest` (PGOPTIONS)، `StorefrontMediaApiTest`/`ProductMediaR2ReadTest`/`CommerceWorkspace*Media*`/`ImportJob*`/`Ai*`/`Document*` (بيئة محلية وتشغيل SQLite وPostgreSQL بالتوازي على الجهاز نفسه) — **ولا تظهر في CI**. فشل واحد كان من الشريحة: حارس O3a-2a (`no_deployment_gate_route…`) يفترض غياب أي مسار إلغاء — حُدِّث ليقبل مسار الموظف الوحيد وبوابته المغلقة.
 
 ## 5. CI
 
 التشغيلة الأولى (Head `4d5291b`): فشل **اختبار واحد** على كلا المحرّكين — حارس O3a-2a أعلاه. بعد التحديث: انظر قسم Git/وصف الـPR للنتيجة على آخر Head.
+
+## 5.1 مراجعة Codex P2 — حارس القدرة على المدخل المفوَّض
+
+**الملاحظة:** والبوابة مفتوحة و`commerce.storefront` معطّلة/معلّقة، كان `payment-intents/{id}/cancel` (بـ`payments.manage` فقط على مساره) يُلغي الطلب ويكتب الحقائق ويحرر الحجز بينما المسار المخصَّص يردّ 403.
+**المعالجة:** الفرع المفوَّض يستدعي المنطق الوحيد القائم `EnsureApplicationActive::authorize($request, 'commerce.storefront')` (بعد فحص الصلاحيتين) — مدخلان لإلغاء واحد بقيد واحد. **البوابة مغلقة ⇒ السلوك القديم حرفياً** (لا حارس جديد على المسار القديم).
+**الدليل:** اختبار `the_delegated_legacy_route_enforces_the_same_capability_guard_as_the_dedicated_route` — مفتوحة: المدخلان 403 وبلا أي تغيير؛ مغلقة: المسار القديم ينجح كما كان. SQLite وPostgreSQL (32 اختباراً للصنف). الطفرة (حذف الاستدعاء) تُفشله.
 
 ## 6. أثر التغيير على العقود القديمة
 

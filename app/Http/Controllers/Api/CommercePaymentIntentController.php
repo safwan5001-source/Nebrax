@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Middleware\EnsureApplicationActive;
 use App\Models\CommerceOrder;
 use App\Models\CommercePaymentIntent;
 use App\Models\PaymentAttempt;
@@ -71,6 +72,8 @@ class CommercePaymentIntentController extends ApiController
         if ((bool) config('commerce.order_cancellation_enabled') && $intent->commerce_order_id !== null) {
             abort_unless($request->user()->hasPermission('commerce.orders.cancel'), 403, 'إلغاء التزام دفع مرتبط بطلب يتطلب صلاحية إلغاء الطلبات.');
             abort_if($request->user()->allowedWarehouseIds() !== null, 403, 'إلغاء الطلبات غير متاح للمستخدم المقيَّد بمخازن محددة.');
+            // نفس حارس القدرة الذي يطبّقه المسار المخصَّص (commerce.storefront) — مدخلان لإلغاء واحد بقيد واحد. الإنفاذ بالمنطق الوحيد القائم.
+            app(EnsureApplicationActive::class)->authorize($request, 'commerce.storefront');
             $data = $request->validate([
                 'reason' => ['required', 'string', Rule::in(CommerceOrder::CANCELLATION_REASONS)],
                 'note' => ['sometimes', 'nullable', 'string', 'max:500', 'required_if:reason,other'],

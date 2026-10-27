@@ -663,6 +663,28 @@ class CommerceOrderCancellationTest extends TestCase
     }
 
     #[Test]
+    public function the_delegated_legacy_route_enforces_the_same_capability_guard_as_the_dedicated_route(): void
+    {
+        $order = $this->cod();
+        $intent = $this->intent($order->id);
+        app(TenantContext::class)->set($this->tenant->id);
+        app(TenantApplicationService::class)->disable('commerce.storefront', User::query()->first());
+        app(TenantContext::class)->forget();
+        $before = $this->world($order->id);
+        $url = "/api/commerce/payment-intents/{$intent->id}/cancel";
+
+        // البوابة مفتوحة: كلا المدخلين يرفضان 403 والقدرة معطّلة، بلا أي تغيير (Codex P2).
+        $this->cancel($order->id)->assertForbidden();
+        $this->withToken($this->ownerToken)->postJson($url, ['reason' => 'customer_request'])->assertForbidden();
+        $this->assertEquals($before, $this->world($order->id));
+
+        // البوابة مغلقة: السلوك القديم لا يتغيّر (لا حارس قدرة جديداً على المسار القديم).
+        config(['commerce.order_cancellation_enabled' => false]);
+        $this->withToken($this->ownerToken)->postJson($url)->assertOk()->assertJsonPath('data.status', 'cancelled');
+        $this->assertNull($this->order($order->id)->cancelled_at);
+    }
+
+    #[Test]
     public function the_delegated_legacy_route_keeps_the_matrix_refusals(): void
     {
         $order = $this->cod(CommercePaymentIntent::STATUS_COLLECTED);
