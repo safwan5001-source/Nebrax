@@ -175,7 +175,9 @@ class CommerceOrder extends BaseModel implements CompanyWide
      */
     public function cancelledBy(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'cancelled_by_user_id');
+        // `withTrashed`: حذف الحساب ناعمٌ (`UserController::destroy` + `SoftDeletes`) فيبقى الصف و`cancelled_by_user_id`؛ بدونه يضيع اسم
+        // الفاعل التاريخي من تفاصيل الموظف (كقرّاء التدقيق في الدفع). لا يوسّع نطاق المستأجر: المفتاح هو الأجنبي المخزَّن على طلبٍ محصور بمستأجره.
+        return $this->belongsTo(User::class, 'cancelled_by_user_id')->withTrashed();
     }
 
     public function isCancelled(): bool

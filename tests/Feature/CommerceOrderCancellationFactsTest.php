@@ -347,6 +347,27 @@ class CommerceOrderCancellationFactsTest extends TestCase
         $plain->assertJsonPath('data.cancellation.cancelled', false)->assertJsonPath('data.cancellation.by', null)->assertJsonPath('data.cancellation.note', null);
     }
 
+    /** مراجعة Codex P2: حذف حساب الفاعل ناعمٌ (`SoftDeletes`) ويجب ألا يُخفي هويته التاريخية في تفاصيل الإلغاء. */
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function the_cancellation_actor_stays_attributed_after_the_user_is_soft_deleted(): void
+    {
+        [$tenantId, $token] = $this->owner();
+        $actorId = $this->userFor($tenantId, 'admin', 'former@acme.test');
+        $actorName = (string) User::withoutGlobalScopes()->whereKey($actorId)->value('name');
+        $order = $this->order($tenantId, number: 'CORD-HIST');
+        $this->cancelRaw($order->id, 'customer_request', null, $actorId);
+
+        User::withoutGlobalScopes()->findOrFail($actorId)->delete(); // حذف ناعم كما في UserController::destroy
+
+        $this->assertSoftDeleted('users', ['id' => $actorId]);
+        $this->assertSame($actorId, $order->fresh()->cancelled_by_user_id, 'the soft delete keeps the foreign key');
+
+        $detail = $this->withToken($token)->getJson("/api/commerce/orders/{$order->id}")->assertOk();
+        $detail->assertJsonPath('data.cancellation.by.id', $actorId)
+            ->assertJsonPath('data.cancellation.by.name', $actorName);
+        $this->assertNotSame('', $actorName);
+    }
+
     #[\PHPUnit\Framework\Attributes\Test]
     public function the_lifecycle_status_filter_works_and_the_raw_status_filter_keeps_its_meaning(): void
     {
