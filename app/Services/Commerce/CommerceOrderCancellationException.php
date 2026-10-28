@@ -21,6 +21,9 @@ final class CommerceOrderCancellationException extends RuntimeException
 
     public const PAYMENT_AUTHORIZED = 'payment_authorized';
 
+    /** رمز للمعاينة الاسترشادية فقط (`cancelAction`)؛ الإلغاء المتكرر الفعلي idempotent ولا يرمي به. */
+    public const ALREADY_CANCELLED = 'already_cancelled';
+
     public const INVALID_REASON = 'invalid_reason';
 
     public const NOTE_REQUIRED = 'note_required';

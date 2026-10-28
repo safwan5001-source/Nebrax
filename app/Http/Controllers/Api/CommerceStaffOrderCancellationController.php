@@ -44,6 +44,6 @@ class CommerceStaffOrderCancellationController extends ApiController
             return response()->json(['message' => $e->getMessage(), 'reason' => $e->reason], $e->status);
         }
 
-        return response()->json(['data' => $read->detailData($id)]);
+        return response()->json(['data' => $read->detailData($id, $request->user())]);
     }
 }

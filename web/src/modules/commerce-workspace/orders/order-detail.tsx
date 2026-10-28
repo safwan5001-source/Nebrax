@@ -4,13 +4,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
 import { ClipboardList, TriangleAlert } from 'lucide-react';
-import { DetailPage, DetailSummary, EmptyState, ErrorState, LoadingState, type DetailSection } from '@/components/nebrax';
+import { DetailPage, DetailSummary, EmptyState, ErrorState, FormAlert, LoadingState, type DetailSection } from '@/components/nebrax';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatDateTime } from '@/lib/formatting';
+import { useCan } from '@/lib/use-can';
 import { ACTIVE_STORE_QUERY_PARAM, withStoreParam } from '@/modules/commerce-workspace/active-store';
 import { useOptionalCommerceStoreContext } from '@/modules/commerce-workspace/store-context';
-import { classifyOrdersError, type OrderAddress, type OrderDetail } from './contract';
+import { CancelOrderDialog } from './cancel-order-dialog';
+import { classifyOrdersError, lifecycleOf, type OrderAddress, type OrderDetail } from './contract';
 import { ordersMessages, type OrdersMessageKey } from './messages';
 import { OrderStatusBadge, PaymentStatusBadge, formatOrderMoney } from './order-display';
 import { fetchOrder } from './orders-api';
@@ -47,6 +49,9 @@ export function OrderDetailView({ id }: { id: string }) {
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorKind, setErrorKind] = useState<ReturnType<typeof classifyOrdersError> | null>(null);
+  const { can } = useCan();
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [justCancelled, setJustCancelled] = useState(false);
 
   const load = useCallback(() => {
     let cancelled = false;
@@ -66,6 +71,18 @@ export function OrderDetailView({ id }: { id: string }) {
   }, [id]);
 
   useEffect(() => load(), [load]);
+
+  /** تحديث صامت من الخادم (بعد سباق 409/شبكة): لا يعيد شاشة التحميل ولا يمسح البيانات الحالية إن فشل. */
+  const refresh = useCallback(() => {
+    fetchOrder(id)
+      .then((result) => setOrder(result))
+      .catch((error) => {
+        if (classifyOrdersError(error) === 'not_found') {
+          setOrder(null);
+          setErrorKind('not_found');
+        }
+      });
+  }, [id]);
 
   const backHref = useMemo(() => {
     const params = new URLSearchParams(typeof window === 'undefined' ? '' : savedListQuery());
@@ -87,6 +104,12 @@ export function OrderDetailView({ id }: { id: string }) {
   }
 
   const posted = order.accounting.posted;
+  const lifecycle = lifecycleOf(order);
+  const isCancelled = lifecycle === 'cancelled';
+  // العقد استرشادي: غيابه ⇒ لا إجراء (بوابة مغلقة أو بلا صلاحية). الزرّ ليس حماية — الخادم يحكم دائماً.
+  const cancelAction = order.cancel_action;
+  const canCancel = can('commerce.orders.cancel') && cancelAction?.available === true && !isCancelled;
+  const cancelBlocked = !isCancelled && can('commerce.orders.cancel') && cancelAction?.available === false ? cancelAction.blocked_reason : undefined;
   const isPickup = order.delivery_method === 'pickup';
   const money = formatOrderMoney;
 
@@ -266,6 +289,24 @@ export function OrderDetailView({ id }: { id: string }) {
         </div>
       ),
     },
+    ...(isCancelled
+      ? [
+          {
+            id: 'cancellation',
+            title: t('sectionCancellation'),
+            content: (
+              <DefinitionGrid
+                rows={[
+                  [t('cancellationReason'), order.cancellation?.reason ? label('reason', order.cancellation.reason) : null],
+                  [t('cancellationNote'), order.cancellation?.note],
+                  [t('cancellationBy'), order.cancellation?.by?.name],
+                  [t('cancellationAt'), order.cancellation?.at ? formatDateTime(order.cancellation.at, locale) : null, true],
+                ]}
+              />
+            ),
+          } satisfies DetailSection,
+        ]
+      : []),
   ];
 
   return (
@@ -275,25 +316,46 @@ export function OrderDetailView({ id }: { id: string }) {
       title={order.number}
       badges={
         <>
-          <OrderStatusBadge status={order.status} locale={locale} />
+          <OrderStatusBadge status={lifecycle} locale={locale} />
           <PaymentStatusBadge status={order.payment.status} locale={locale} />
         </>
       }
       meta={
         <span>
-          {formatDateTime(order.created_at, locale)} · <bdi>{order.channel.storefront_name ?? order.channel.sales_channel_name ?? '—'}</bdi> · {t('readOnlyNote')}
+          {formatDateTime(order.created_at, locale)} · <bdi>{order.channel.storefront_name ?? order.channel.sales_channel_name ?? '—'}</bdi> · {cancelAction ? t('cancelEnabledNote') : t('readOnlyNote')}
         </span>
       }
-      alert={
-        !posted ? (
-          <div role="alert" className="flex items-start gap-3 rounded border border-warning/40 bg-warning/10 p-3 text-sm">
-            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
-            <div>
-              <p className="font-medium text-text">{t('accountingWarningTitle')}</p>
-              <p className="mt-1 text-muted">{t('accountingWarningBody')}</p>
-            </div>
-          </div>
+      actionsSlot={
+        canCancel ? (
+          <Button type="button" variant="danger" onClick={() => setCancelOpen(true)}>
+            {t('cancelAction')}
+          </Button>
         ) : undefined
+      }
+      alert={
+        <div className="space-y-3">
+          {justCancelled ? (
+            <div role="status">
+              <FormAlert tone="info">{t('cancelSuccess')}</FormAlert>
+            </div>
+          ) : null}
+          {isCancelled ? <FormAlert tone="info">{t('cancelledBanner')}</FormAlert> : null}
+          {cancelBlocked !== undefined ? (
+            <FormAlert tone="warning">
+              <p className="font-medium text-text">{t('cancelBlockedTitle')}</p>
+              {cancelBlocked ? <p className="mt-1 text-muted">{label('blocked', cancelBlocked)}</p> : null}
+            </FormAlert>
+          ) : null}
+          {!posted && !isCancelled ? (
+            <div role="alert" className="flex items-start gap-3 rounded border border-warning/40 bg-warning/10 p-3 text-sm">
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
+              <div>
+                <p className="font-medium text-text">{t('accountingWarningTitle')}</p>
+                <p className="mt-1 text-muted">{t('accountingWarningBody')}</p>
+              </div>
+            </div>
+          ) : null}
+        </div>
       }
       summaryTitle={t('summary')}
       summary={
@@ -305,7 +367,23 @@ export function OrderDetailView({ id }: { id: string }) {
         />
       }
       sections={sections}
-    />
+    >
+      {/* يبقى مركَّباً ما دام مفتوحاً حتى لو اختفى الإجراء بعد تحديث الحالة (سباق 409): رسالة الرفض لا تختفي مع الحوار. */}
+      {canCancel || cancelOpen ? (
+        <CancelOrderDialog
+          open={cancelOpen}
+          orderId={order.id}
+          orderNumber={order.number}
+          onClose={() => setCancelOpen(false)}
+          onCancelled={(updated) => {
+            setOrder(updated);
+            setCancelOpen(false);
+            setJustCancelled(true);
+          }}
+          onStale={refresh}
+        />
+      ) : null}
+    </DetailPage>
   );
 }
 
