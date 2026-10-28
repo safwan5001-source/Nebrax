@@ -630,7 +630,14 @@
       "notTracked": "Non suivi",
       "caption": "Cette boutique ne publie pas encore de suivi d’expédition. Seule une commande confirmée est marquée comme passée."
     },
-    "contact": "Contact"
+    "contact": "Contact",
+    "statusCancelled": "Annulée",
+    "cancelled": {
+      "title": "Cette commande a été annulée",
+      "body": "Cette commande a été annulée et n'est plus traitée. Annulée le {date}.",
+      "bodyNoDate": "Cette commande a été annulée et n'est plus traitée.",
+      "detail": "Les détails de la commande sont conservés pour vos dossiers. Cette page n'affiche aucune information de paiement ou de remboursement."
+    }
   },
   "orderPlaced": {
     "thanksForOrder": "Merci pour votre commande, {name} !",

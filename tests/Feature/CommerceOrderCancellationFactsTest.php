@@ -485,7 +485,7 @@ class CommerceOrderCancellationFactsTest extends TestCase
     // ── النطاق: لا مسار إلغاء ولا أثر جانبي ───────────────────────────────
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function the_public_serializer_is_untouched_and_the_only_cancel_route_is_the_staff_one(): void
+    public function the_only_cancel_route_is_the_staff_one_and_the_public_contract_follows_o3c(): void
     {
         // O3a-2b أضافت مسار الموظف الوحيد؛ لا مسار إلغاء في أي عقد عام (store/v1، commerce/v1).
         $cancelRoutes = [];
@@ -502,10 +502,11 @@ class CommerceOrderCancellationFactsTest extends TestCase
         $public = CommerceOrderSerializer::serialize(CommerceOrder::query()->findOrFail($order->id));
         app(TenantContext::class)->forget();
 
-        // O3c لاحقاً: لا تغيير في عقد الجمهور الآن.
-        $this->assertSame('confirmed', $public['status']);
-        $this->assertArrayNotHasKey('cancellation', $public);
+        // O3c (ADR-28 D-9-P1 الخيار B): الجمهور يرى `cancelled` + `cancellation.cancelled_at` فقط؛ العمود المخزَّن يبقى `confirmed`.
+        $this->assertSame('cancelled', $public['status']);
+        $this->assertSame(['cancelled_at'], array_keys($public['cancellation']));
         $this->assertArrayNotHasKey('lifecycle_status', $public);
+        $this->assertSame('confirmed', DB::table('commerce_orders')->where('id', $order->id)->value('status'));
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

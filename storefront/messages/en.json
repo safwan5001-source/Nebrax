@@ -630,7 +630,14 @@
       "notTracked": "Not tracked",
       "caption": "This store does not publish shipment tracking yet. Only a confirmed order is marked as placed."
     },
-    "contact": "Contact"
+    "contact": "Contact",
+    "statusCancelled": "Cancelled",
+    "cancelled": {
+      "title": "This order was cancelled",
+      "body": "This order has been cancelled and is no longer being processed. Cancelled on {date}.",
+      "bodyNoDate": "This order has been cancelled and is no longer being processed.",
+      "detail": "The order details are kept for your records. This page does not show payment or refund information."
+    }
   },
   "orderPlaced": {
     "thanksForOrder": "Thanks for your order, {name}!",

@@ -42,6 +42,30 @@ use App\Models\Tenant;
  */
 final class CommerceOrderSerializer
 {
+    /**
+     * الحالة العامة للمشتري (ADR-28 D-9-P1 الخيار B): `cancelled` لطلب ملغى، وإلا `status` المخزَّن كما هو.
+     * عمود `status` في القاعدة يبقى `confirmed` — هذه قيمة عرض مشتقّة من حقيقة `cancelled_at` لا مصدر حقيقة ثانٍ.
+     */
+    public static function publicStatus(CommerceOrder $order): string
+    {
+        return $order->lifecycleStatus();
+    }
+
+    /**
+     * كتلة الإلغاء العامة: المفتاح `cancellation` غائب تماماً لطلب غير ملغى (الشكل حرفياً كما كان)،
+     * ولطلب ملغى `{cancelled_at}` فقط. لا سبب ولا ملاحظة ولا هوية موظف — هذه للموظف وحده (CommerceOrderStaffSerializer).
+     *
+     * @return array<string, mixed>
+     */
+    public static function cancellationBlock(CommerceOrder $order): array
+    {
+        if (! $order->isCancelled()) {
+            return [];
+        }
+
+        return ['cancellation' => ['cancelled_at' => $order->cancelled_at?->toIso8601String()]];
+    }
+
     /** @return array<string, mixed> */
     public static function serialize(CommerceOrder $order): array
     {
@@ -50,8 +74,9 @@ final class CommerceOrderSerializer
         return [
             'id' => $order->id,
             'number' => $order->number,
-            'status' => $order->status,
+            'status' => self::publicStatus($order),
             'delivery_method' => $order->delivery_method,
+            ...self::cancellationBlock($order),
             'total' => ['amount_minor' => $order->total, 'currency' => $currency],
             'contact' => [
                 'name' => $order->snapshot?->contact_name,

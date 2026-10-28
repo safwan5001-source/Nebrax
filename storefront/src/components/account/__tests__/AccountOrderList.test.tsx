@@ -53,4 +53,35 @@ describe("AccountOrderList", () => {
       screen.queryByRole("link", { name: /AWJ-/ }),
     ).not.toBeInTheDocument();
   });
+
+  it("labels a cancelled order and keeps its total (O3c)", () => {
+    const cancelled = { ...ACCOUNT_ORDER_PREVIEW, status: "cancelled" };
+    render(<AccountOrderList orders={[cancelled]} basePath="/sa/en" />);
+    expect(screen.getByText("statusCancelled")).toBeInTheDocument();
+    expect(screen.queryByText("statusConfirmed")).not.toBeInTheDocument();
+    expect((document.body.textContent ?? "").replace(/\s/g, "")).toContain(
+      formatMinorAmount(ACCOUNT_ORDER_PREVIEW.total).replace(/\s/g, ""),
+    );
+  });
+
+  it("still labels confirmed and draft orders, and passes an unknown status through", () => {
+    const { rerender } = render(
+      <AccountOrderList orders={[ACCOUNT_ORDER_PREVIEW]} basePath="/sa/en" />,
+    );
+    expect(screen.getByText("statusConfirmed")).toBeInTheDocument();
+    rerender(
+      <AccountOrderList
+        orders={[{ ...ACCOUNT_ORDER_PREVIEW, status: "draft" }]}
+        basePath="/sa/en"
+      />,
+    );
+    expect(screen.getByText("statusDraft")).toBeInTheDocument();
+    rerender(
+      <AccountOrderList
+        orders={[{ ...ACCOUNT_ORDER_PREVIEW, status: "future_status" }]}
+        basePath="/sa/en"
+      />,
+    );
+    expect(screen.getByText("future_status")).toBeInTheDocument();
+  });
 });

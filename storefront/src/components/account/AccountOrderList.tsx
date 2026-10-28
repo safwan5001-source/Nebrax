@@ -28,6 +28,7 @@ function statusLabel(
 ) {
   if (status === "confirmed") return t("statusConfirmed");
   if (status === "draft") return t("statusDraft");
+  if (status === "cancelled") return t("statusCancelled");
   return status;
 }
 

@@ -344,8 +344,9 @@ final class StorefrontCheckoutController extends PublicApiController
         return [
             'id' => $order->id,
             'number' => $order->number,
-            'status' => $order->status,
+            'status' => CommerceOrderSerializer::publicStatus($order),
             'delivery_method' => $order->delivery_method,
+            ...CommerceOrderSerializer::cancellationBlock($order),
             'total' => ['amount_minor' => $order->total, 'currency' => $currency],
             'contact' => [
                 'name' => $order->snapshot?->contact_name,

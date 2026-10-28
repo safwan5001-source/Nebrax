@@ -630,7 +630,14 @@
       "notTracked": "Bez śledzenia",
       "caption": "Ten sklep nie publikuje jeszcze śledzenia przesyłki. Tylko potwierdzone zamówienie jest oznaczone jako złożone."
     },
-    "contact": "Kontakt"
+    "contact": "Kontakt",
+    "statusCancelled": "Anulowane",
+    "cancelled": {
+      "title": "To zamówienie zostało anulowane",
+      "body": "To zamówienie zostało anulowane i nie jest już realizowane. Anulowano: {date}.",
+      "bodyNoDate": "To zamówienie zostało anulowane i nie jest już realizowane.",
+      "detail": "Szczegóły zamówienia są zachowane w Twojej historii. Ta strona nie pokazuje informacji o płatności ani zwrocie."
+    }
   },
   "orderPlaced": {
     "thanksForOrder": "Dziękujemy za zamówienie, {name}!",

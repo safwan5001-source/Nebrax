@@ -33,6 +33,7 @@ function statusLabel(
 ) {
   if (status === "confirmed") return t("statusConfirmed");
   if (status === "draft") return t("statusDraft");
+  if (status === "cancelled") return t("statusCancelled");
   return status;
 }
 
@@ -95,7 +96,10 @@ export function AccountOrderDetail({
       </header>
 
       <div className="mt-6">
-        <AccountOrderStatus status={order.status} />
+        <AccountOrderStatus
+          status={order.status}
+          cancelledDate={formatOrderDate(order.cancelledAt ?? null, locale)}
+        />
       </div>
 
       <section
@@ -142,9 +146,11 @@ export function AccountOrderDetail({
             <bdi>{formatMinorAmount(order.total)}</bdi>
           </span>
         </div>
-        <p className="text-xs leading-relaxed text-store-muted-foreground">
-          {tawj("success.notPaidNote")}
-        </p>
+        {order.status !== "cancelled" && (
+          <p className="text-xs leading-relaxed text-store-muted-foreground">
+            {tawj("success.notPaidNote")}
+          </p>
+        )}
       </section>
 
       {(order.gift || order.schedule) && (

@@ -137,4 +137,49 @@ describe("AccountOrderDetail", () => {
       expect(rows).toEqual([false, true, false]);
     });
   });
+
+  describe("cancelled (O3c)", () => {
+    const cancelled = {
+      ...ACCOUNT_ORDER_PREVIEW,
+      status: "cancelled",
+      cancelledAt: "2026-05-03T10:00:00+00:00",
+    };
+
+    it("shows the cancelled label and notice, keeps items and total", () => {
+      render(<AccountOrderDetail order={cancelled} basePath="/sa/ar" />);
+
+      expect(screen.getByText("statusCancelled")).toBeInTheDocument();
+      expect(screen.getByText("cancelled.title")).toBeInTheDocument();
+      expect(screen.queryByText("timeline.placed")).not.toBeInTheDocument();
+      expect(screen.queryByText("timeline.preparing")).not.toBeInTheDocument();
+      expect((document.body.textContent ?? "").replace(/\s/g, "")).toContain(
+        formatMinorAmount(ACCOUNT_ORDER_PREVIEW.total).replace(/\s/g, ""),
+      );
+      expect(document.querySelectorAll("[data-line]").length).toBe(
+        ACCOUNT_ORDER_PREVIEW.items.length,
+      );
+    });
+
+    it("drops the 'confirmed commitment' payment note for a cancelled order only", () => {
+      const { unmount } = render(
+        <AccountOrderDetail order={cancelled} basePath="/sa/ar" />,
+      );
+      expect(screen.queryByText("success.notPaidNote")).not.toBeInTheDocument();
+      unmount();
+      render(
+        <AccountOrderDetail order={ACCOUNT_ORDER_PREVIEW} basePath="/sa/ar" />,
+      );
+      expect(screen.getByText("success.notPaidNote")).toBeInTheDocument();
+    });
+
+    it("renders a cancelled order with no cancellation timestamp", () => {
+      render(
+        <AccountOrderDetail
+          order={{ ...cancelled, cancelledAt: null }}
+          basePath="/sa/ar"
+        />,
+      );
+      expect(screen.getByText("cancelled.bodyNoDate")).toBeInTheDocument();
+    });
+  });
 });

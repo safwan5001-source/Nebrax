@@ -163,8 +163,14 @@ export interface AwjOrderSchedule {
 export interface AwjOrder {
   id: string;
   number: string;
+  /**
+   * `draft | confirmed`, plus `cancelled` (ADR-28 D-9-P1 option B / O3c): a cancelled order's stored status stays
+   * `confirmed`, the API derives `cancelled`. Kept `string` so an unknown future value never breaks parsing.
+   */
   status: string;
   delivery_method: string | null;
+  /** Present only when `status === "cancelled"`; carries no reason/actor/refund data. */
+  cancellation?: { cancelled_at: string | null };
   total: AwjMoney;
   contact: {
     name: string | null;
@@ -252,6 +258,8 @@ export interface StorefrontOrder {
   number: string;
   status: string;
   deliveryMethod: string | null;
+  /** O3c — set only for a cancelled order; `null` when the API gave no timestamp. Absent otherwise. */
+  cancelledAt?: string | null;
   total: AwjMoney;
   contact: AwjOrder["contact"];
   delivery: AwjOrder["delivery"];
@@ -301,6 +309,9 @@ export function mapAwjOrderToViewModel(order: AwjOrder): StorefrontOrder {
     number: order.number,
     status: order.status,
     deliveryMethod: order.delivery_method,
+    ...(order.status === "cancelled"
+      ? { cancelledAt: order.cancellation?.cancelled_at ?? null }
+      : {}),
     total: order.total,
     contact: order.contact,
     delivery: order.delivery,
