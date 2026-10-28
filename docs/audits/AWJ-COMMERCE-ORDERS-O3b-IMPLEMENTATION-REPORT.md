@@ -42,7 +42,7 @@
 | `web/src/modules/commerce-workspace/orders/cancel-order.ts` | جديد — الكتابة الوحيدة + التحقق + تصنيف الأخطاء |
 | `…/cancel-order-dialog.tsx` | جديد — الحوار |
 | `…/order-detail.tsx`، `order-display.tsx`، `orders-list.tsx`، `contract.ts`، `messages.ts` | دمج الإجراء/الحالة/العقد/الرسائل |
-| `…/cancel-order.test.tsx` | جديد — 29 اختباراً |
+| `…/cancel-order.test.tsx` | جديد — 30 اختباراً |
 | `…/orders-readonly.test.ts` | تحديث الحارس: كتابة وحيدة في `cancel-order.ts`، لا قراءة للبوابة من المتصفح |
 | `tests/Feature/CommerceOrderCancellationTest.php` | +3 اختبارات عقد القراءة |
 | `CLAUDE.md` | سطر O3b |
@@ -64,6 +64,12 @@
 | `npm run build` (Next.js 15، يشمل فحص الأنواع) | ✅ ناجح |
 | `CommerceOrderCancellationTest` (35+3) + `CommerceStaffOrderApiTest` + `CommerceModuleBoundaryTest` | ✅ SQLite (57) وPostgreSQL (38/35) |
 | CI | انظر وصف الـPR / القسم 7 بعد التشغيل |
+
+## 5.1 مراجعة Codex P2 — قفل الحوار بعد خطأ شبكة ثم تحديث يؤكد الأهلية
+
+**الملاحظة:** بعد انقطاع شبكة (إلغاء غير مؤكَّد) يقفل الحوار تأكيده ويحدّث الطلب؛ فإن بقي مؤهلاً وأُعيد فتح الحوار بقي القفل والحقول المعطَّلة لأن الحوار كان يظل مركَّباً ما دام `canCancel` صحيحاً — فلا تُعاد المحاولة إلا بإعادة تحميل الصفحة.
+**المعالجة (واجهة فقط):** `CancelOrderDialog` يُركَّب عند كل فتح ويُفكّ عند الإغلاق (`cancelOpen` وحده)، فتبدأ كل محاولة جديدة بحالة نظيفة (قفل/خطأ/حقول) بعد أن تكون الأهلية حُدِّثت، بينما يبقى القفل لمحاولة الفتح الجارية (يحمي من إعادة الإرسال على حالة قديمة) ويبقى الحوار مركَّباً طوال فتحه حتى لو اختفى الإجراء (سباق 409) فلا تضيع رسالة الرفض.
+**الدليل:** اختبار `reopening after an inconclusive failure starts clean…` (شبكة ← قفل ← تحديث مؤهل ← إغلاق ← فتح: الحقول والتأكيد مفعَّلان والخطأ زال والحقول فارغة، ثم نجاح الإلغاء بطلب ثانٍ). الطفرة (الإبقاء على الإرساء القديم `canCancel || cancelOpen`) تُفشله. 95 اختباراً لوحدة الطلبات خضراء، وTypeScript نظيف.
 
 ## 6. المخاطر والمتبقي
 

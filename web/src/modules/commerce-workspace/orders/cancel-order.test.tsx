@@ -244,6 +244,31 @@ describe('staff order cancellation UI (O3b)', () => {
       expect((screen.getByRole('button', { name: 'تأكيد الإلغاء' }) as HTMLButtonElement).disabled).toBe(locks);
     });
 
+    it('reopening after an inconclusive failure starts clean once a refresh confirms the order is still eligible (Codex P2)', async () => {
+      fetchOrderMock.mockResolvedValue(eligible()); // التحديث بعد انقطاع الشبكة يؤكد أن الطلب ما زال مؤهلاً
+      apiMock.mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValue({ data: cancelled() });
+      render(<OrderDetailView id="o1" />);
+      let dialog = await openDialog();
+      fireEvent.change(within(dialog).getByLabelText('سبب الإلغاء'), { target: { value: 'customer_request' } });
+      fireEvent.click(submit());
+      await within(dialog).findByText(/لم يُؤكَّد الإلغاء/);
+      expect((screen.getByRole('button', { name: 'تأكيد الإلغاء' }) as HTMLButtonElement).disabled).toBe(true); // القفل لمحاولة قديمة
+      await waitFor(() => expect(fetchOrderMock).toHaveBeenCalledTimes(2));
+
+      fireEvent.click(screen.getByRole('button', { name: 'إغلاق' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      dialog = await openDialog();
+
+      expect((within(dialog).getByLabelText('سبب الإلغاء') as HTMLSelectElement).disabled).toBe(false);
+      expect((within(dialog).getByLabelText('سبب الإلغاء') as HTMLSelectElement).value).toBe('');
+      expect((screen.getByRole('button', { name: 'تأكيد الإلغاء' }) as HTMLButtonElement).disabled).toBe(false);
+      expect(within(dialog).queryByText(/لم يُؤكَّد الإلغاء/)).toBeNull();
+      fireEvent.change(within(dialog).getByLabelText('سبب الإلغاء'), { target: { value: 'customer_request' } });
+      fireEvent.click(submit());
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(apiMock).toHaveBeenCalledTimes(2);
+    });
+
     it('allows a retry after a recoverable error and then succeeds', async () => {
       fetchOrderMock.mockResolvedValue(eligible());
       apiMock.mockRejectedValueOnce(apiError(500)).mockResolvedValue({ data: cancelled() });
