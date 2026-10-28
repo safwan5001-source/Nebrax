@@ -63,7 +63,8 @@
 | `npm test` (vitest الكامل) | ✅ **739 ملفاً / 8834 اختباراً** ناجحاً |
 | `npm run build` (Next.js 15، يشمل فحص الأنواع) | ✅ ناجح |
 | `CommerceOrderCancellationTest` (35+3) + `CommerceStaffOrderApiTest` + `CommerceModuleBoundaryTest` | ✅ SQLite (57) وPostgreSQL (38/35) |
-| CI | انظر وصف الـPR / القسم 7 بعد التشغيل |
+| CI على `9621e70` | ✅ SQLite · PostgreSQL · web build · CI Gate |
+| CI على `2eb1a4b` (بعد إصلاح P2 §5.1) | ✅ SQLite · PostgreSQL · web build · CI Gate |
 
 ## 5.1 مراجعة Codex P2 — قفل الحوار بعد خطأ شبكة ثم تحديث يؤكد الأهلية
 
@@ -86,7 +87,8 @@
 
 - **Branch:** `claude/commerce-orders-o3b`
 - **Base SHA:** `799d09e3f97e1f5c0dab968547632ac94a3850a6` (`main` بعد #1777)
-- **Head SHA / PR:** في وصف الـPR.
+- **Head SHA (الكود والاختبارات):** `2eb1a4b75941432085182e404366cd0c184e391f` — CI أخضر. ما بعده commit لهذا التقرير فقط.
+- **PR:** [#1780](https://github.com/safwan5001-source/Nebrax/pull/1780)
 
 ## 8. الخطوة التالية
 
