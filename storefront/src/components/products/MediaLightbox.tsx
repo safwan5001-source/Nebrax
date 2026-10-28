@@ -1,16 +1,16 @@
 "use client";
 
-import type { Media } from "@spree/sdk";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef } from "react";
+import type { StoreMedia } from "@/lib/commerce/types";
 
 const SWIPE_THRESHOLD_PX = 50;
 const SWIPE_MAX_VERTICAL_PX = 75;
 
 interface MediaLightboxProps {
-  images: Media[];
+  images: StoreMedia[];
   activeIndex: number;
   productName: string;
   onClose: () => void;

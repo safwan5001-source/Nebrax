@@ -1,4 +1,5 @@
-import type { Category, Media, Product } from "@spree/sdk";
+import type { Category, Product } from "@spree/sdk";
+import type { StoreMedia } from "@/lib/commerce/types";
 import { ensureProtocol, getStoreUrl } from "@/lib/store";
 
 /**
@@ -47,7 +48,7 @@ export function buildProductJsonLd(
   }
 
   const imageUrls = (product.media || [])
-    .map((img: Media) => img.original_url || img.large_url)
+    .map((img: StoreMedia) => img.original_url || img.large_url)
     .filter(Boolean);
   // Fall back to thumbnail_url if no media from expand
   if (imageUrls.length === 0 && product.thumbnail_url) {
