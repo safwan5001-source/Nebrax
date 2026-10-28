@@ -1,11 +1,12 @@
 "use client";
 
-import type { PaginatedResponse, Product } from "@spree/sdk";
+import type { Product } from "@spree/sdk";
 import { Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { usePublishedThemeMarker } from "@/components/layout/PublishedThemeMarker";
 import { ProductCard } from "@/components/products/ProductCard";
+import type { StoreProductPage } from "@/lib/commerce/types";
 import { cn } from "@/lib/utils";
 import type { StorefrontListParams } from "@/lib/utils/listing-context";
 
@@ -24,7 +25,7 @@ interface InfiniteProductListProps {
    */
   fetchPage: (
     params: StorefrontListParams,
-  ) => Promise<PaginatedResponse<Product>>;
+  ) => Promise<StoreProductPage<Product>>;
   basePath: string;
   categoryId?: string;
   listId?: string;

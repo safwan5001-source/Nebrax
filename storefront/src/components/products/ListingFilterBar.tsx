@@ -1,14 +1,14 @@
 "use client";
 
-import type { ProductFiltersResponse } from "@spree/sdk";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useTransition } from "react";
 import { FilterBar } from "@/components/products/filters";
+import type { StoreProductFilters } from "@/lib/commerce/types";
 import { buildListingSearchParams } from "@/lib/utils/listing-search-params";
 import type { ActiveFilters } from "@/types/filters";
 
 interface ListingFilterBarProps {
-  filtersData: ProductFiltersResponse | null;
+  filtersData: StoreProductFilters | null;
   activeFilters: ActiveFilters;
   totalCount: number;
 }

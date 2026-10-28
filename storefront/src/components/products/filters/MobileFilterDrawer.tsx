@@ -1,16 +1,16 @@
 "use client";
 
-import type {
-  AvailabilityFilter,
-  OptionFilter,
-  ProductFiltersResponse,
-} from "@spree/sdk";
 import { Check, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { localeDirection } from "@/i18n/locales";
+import type {
+  StoreAvailabilityFilter,
+  StoreOptionFilter,
+  StoreProductFilters,
+} from "@/lib/commerce/types";
 import {
   getActiveFilterCount,
   getAvailabilityLabel,
@@ -26,7 +26,7 @@ import {
 interface MobileFilterDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  filtersData: ProductFiltersResponse | null;
+  filtersData: StoreProductFilters | null;
   activeFilters: ActiveFilters;
   priceBuckets: PriceBucket[];
   onApply: (filters: ActiveFilters) => void;
@@ -121,7 +121,7 @@ export function MobileFilterDrawer({
                 return (
                   <MobileOptionSection
                     key={filter.id}
-                    filter={filter as OptionFilter}
+                    filter={filter as StoreOptionFilter}
                     selectedValues={stagedFilters.optionValues}
                     onToggle={handleOptionValueToggle}
                   />
@@ -139,7 +139,7 @@ export function MobileFilterDrawer({
                 return (
                   <MobileAvailabilitySection
                     key={filter.id}
-                    filter={filter as AvailabilityFilter}
+                    filter={filter as StoreAvailabilityFilter}
                     selected={stagedFilters.availability}
                     onChange={handleAvailabilityChange}
                   />
@@ -170,7 +170,7 @@ function MobileOptionSection({
   selectedValues,
   onToggle,
 }: {
-  filter: OptionFilter;
+  filter: StoreOptionFilter;
   selectedValues: string[];
   onToggle: (id: string) => void;
 }) {
@@ -313,7 +313,7 @@ function MobileAvailabilitySection({
   selected,
   onChange,
 }: {
-  filter: AvailabilityFilter;
+  filter: StoreAvailabilityFilter;
   selected?: AvailabilityStatus;
   onChange: (value?: AvailabilityStatus) => void;
 }) {
