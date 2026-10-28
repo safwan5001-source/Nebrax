@@ -7,6 +7,8 @@ use App\Models\CommerceOrderPosting;
 use App\Models\CommercePaymentIntent;
 use App\Models\PaymentAttempt;
 use App\Models\Tenant;
+use App\Models\User;
+use App\Services\Commerce\CommerceOrderLifecycleService;
 use App\Support\CommerceOrderStaffSerializer;
 use App\Tenancy\TenantContext;
 use Carbon\Carbon;
@@ -89,15 +91,15 @@ class CommerceStaffOrderController extends ApiController
     {
         $this->guard($request);
 
-        return response()->json(['data' => $this->detailData($id)]);
+        return response()->json(['data' => $this->detailData($id, $request->user())]);
     }
 
     /**
-     * تفاصيل الموظف لطلب (قراءة فقط) — يعيد استعمالها مسار الإلغاء (O3a-2b) فتخرج الاستجابة بالمسلسل نفسه. 404 لغير الموجود/مستأجر آخر.
+     * تفاصيل الموظف لطلب (قراءة فقط) — يعيد استعمالها مسار الإلغاء (O3a-2b) فتخرج الاستجابة بالمسلسل نفسه. `$actor` يضيف `cancel_action` (O3b). 404 لغير الموجود/مستأجر آخر.
      *
      * @return array<string, mixed>
      */
-    public function detailData(string $id): array
+    public function detailData(string $id, ?User $actor = null): array
     {
         $order = CommerceOrder::query()
             ->with([
@@ -114,7 +116,14 @@ class CommerceStaffOrderController extends ApiController
             : collect();
         $posting = CommerceOrderPosting::query()->where('commerce_order_id', $order->id)->first();
 
-        return CommerceOrderStaffSerializer::detail($order, $this->currency(), $attempts, $posting);
+        $data = CommerceOrderStaffSerializer::detail($order, $this->currency(), $attempts, $posting);
+        // O3b: عقد قراءة لإجراء الإلغاء — يغيب كلياً (لا مفتاح) حين البوابة مغلقة أو لا صلاحية؛ استرشادي والقرار لـAPI الإلغاء.
+        $action = $actor === null ? null : app(CommerceOrderLifecycleService::class)->cancelAction($order, $actor);
+        if ($action !== null) {
+            $data['cancel_action'] = $action;
+        }
+
+        return $data;
     }
 
     /** @param array<string, mixed> $f */

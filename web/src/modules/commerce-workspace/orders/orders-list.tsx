@@ -23,6 +23,7 @@ import {
   PAYMENT_STATUSES,
   buildOrdersQuery,
   classifyOrdersError,
+  lifecycleOf,
   parseOrdersState,
   serializeOrdersState,
   type OrderSummary,
@@ -229,8 +230,8 @@ export function OrdersList() {
         id: 'status',
         header: t('orderStatus'),
         enableSorting: false,
-        accessorFn: (o) => o.status,
-        cell: ({ row }) => <OrderStatusBadge status={row.original.status} locale={locale} />,
+        accessorFn: (o) => lifecycleOf(o),
+        cell: ({ row }) => <OrderStatusBadge status={lifecycleOf(row.original)} locale={locale} />,
       },
       {
         accessorKey: 'total',
@@ -385,7 +386,7 @@ export function OrdersList() {
               amountLabel: t('total'),
               status: (
                 <span className="flex flex-wrap items-center gap-1.5">
-                  <OrderStatusBadge status={order.status} locale={locale} />
+                  <OrderStatusBadge status={lifecycleOf(order)} locale={locale} />
                   <PaymentStatusBadge status={order.payment.status} locale={locale} />
                 </span>
               ),

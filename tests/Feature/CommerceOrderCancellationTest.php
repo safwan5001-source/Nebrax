@@ -463,6 +463,71 @@ class CommerceOrderCancellationTest extends TestCase
         $this->cancel($order->id)->assertOk()->assertJsonPath('data.lifecycle_status', 'cancelled');
     }
 
+    // ───────────────────────── عقد قراءة إجراء الإلغاء للواجهة (O3b) ─────────────────────────
+
+    #[Test]
+    public function the_cancel_action_contract_is_absent_unless_the_gate_is_open_and_the_user_may_cancel(): void
+    {
+        $order = $this->cod();
+        app(TenantContext::class)->set($this->tenant->id);
+        Role::create(['slug' => 'viewer_only', 'name' => 'عرض فقط', 'permissions' => ['commerce.orders.view'], 'is_system' => false]);
+        app(TenantContext::class)->forget();
+        $viewer = $this->tokenFor($this->tenant, 'viewer_only');
+
+        // البوابة مفتوحة: صاحب الصلاحية يرى العقد، والعارض وحده لا مفتاح له.
+        $this->withToken($this->ownerToken)->getJson("/api/commerce/orders/{$order->id}")->assertOk()
+            ->assertJsonPath('data.cancel_action.available', true)->assertJsonPath('data.cancel_action.blocked_reason', null);
+        $noPermission = $this->withToken($viewer)->getJson("/api/commerce/orders/{$order->id}")->assertOk();
+        $this->assertArrayNotHasKey('cancel_action', $noPermission->json('data'));
+
+        // البوابة مغلقة (الافتراضي): لا مفتاح حتى لصاحب الصلاحية — لا تسرّب لوجود بوابة أو حالتها.
+        config(['commerce.order_cancellation_enabled' => false]);
+        $closed = $this->withToken($this->ownerToken)->getJson("/api/commerce/orders/{$order->id}")->assertOk();
+        $this->assertArrayNotHasKey('cancel_action', $closed->json('data'));
+        $this->assertStringNotContainsString('order_cancellation', $closed->getContent());
+    }
+
+    #[Test]
+    public function the_cancel_action_reuses_the_matrix_and_leaks_nothing_else(): void
+    {
+        $open = $this->cod();
+        $collected = $this->cod(CommercePaymentIntent::STATUS_COLLECTED);
+        $paid = $this->onlineLive('idem-can-act');
+        $this->capture($this->attempts($paid['order_id'])->first());
+        $this->paymentStatus($paid)->assertOk();
+        $cancelled = $this->cod();
+        $this->cancel($cancelled->id)->assertOk();
+        $before = $this->counts();
+
+        $expect = [
+            [$open->id, true, null],
+            [$collected->id, false, 'payment_collected'],
+            [$paid['order_id'], false, 'payment_paid'],
+            [$cancelled->id, false, 'already_cancelled'],
+        ];
+        foreach ($expect as [$id, $available, $reason]) {
+            $res = $this->withToken($this->ownerToken)->getJson("/api/commerce/orders/{$id}")->assertOk();
+            $this->assertSame(['available' => $available, 'blocked_reason' => $reason], $res->json('data.cancel_action'), (string) $id);
+        }
+        // القراءة لا تكتب شيئاً؛ والقائمة لا تحمل العقد.
+        $this->assertEquals($before, $this->counts());
+        $list = $this->withToken($this->ownerToken)->getJson('/api/commerce/orders')->assertOk();
+        $this->assertStringNotContainsString('cancel_action', $list->getContent());
+    }
+
+    #[Test]
+    public function a_stale_available_contract_does_not_weaken_the_api_which_stays_the_final_authority(): void
+    {
+        $order = $this->cod();
+        $this->withToken($this->ownerToken)->getJson("/api/commerce/orders/{$order->id}")->assertJsonPath('data.cancel_action.available', true);
+        // الوضع يتغيّر بين القراءة والنقر (تحصيل نقدي) ⇒ الإلغاء يُرفض 409 ويعيد الواجهة إلى حالة صحيحة عند التحديث.
+        DB::table('commerce_payment_intents')->where('commerce_order_id', $order->id)->update(['status' => 'collected', 'collected_at' => now('UTC')]);
+
+        $this->assertRefused($this->cancel($order->id), 'payment_collected');
+        $this->withToken($this->ownerToken)->getJson("/api/commerce/orders/{$order->id}")
+            ->assertJsonPath('data.cancel_action.available', false)->assertJsonPath('data.cancel_action.blocked_reason', 'payment_collected');
+    }
+
     // ───────────────────────── المدخلات ─────────────────────────
 
     #[Test]

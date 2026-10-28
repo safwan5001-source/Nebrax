@@ -102,6 +102,44 @@ final class CommerceOrderLifecycleService
         return $cancelled;
     }
 
+    /**
+     * عقد قراءة واجهة الموظف (O3b): هل يُعرض إجراء «إلغاء الطلب» وهل هو متاح؟ **استرشادي فقط** — قراءة SELECT عادية بلا أقفال تعيد استعمال فحوص
+     * المصفوفة نفسها (`assertCancellable`) دون نسخة ثانية للقواعد؛ القرار النهائي دائماً لـ`cancel()` تحت الأقفال (قد يتغيّر الوضع بين القراءة والنقر).
+     *
+     * `null` ⇒ الإجراء غير معروض أصلاً: البوابة مغلقة أو لا صلاحية `commerce.orders.cancel` — فلا يتسرّب إلى الواجهة أن بوابة نشر موجودة ولا حالتها.
+     * وإلا `{available, blocked_reason}` حيث السبب رمز مصفوفة آمن (`already_cancelled`، `not_confirmed`، `already_posted`، `payment_*`) أو `null`.
+     *
+     * @return array{available: bool, blocked_reason: ?string}|null
+     */
+    public function cancelAction(CommerceOrder $order, User $actor): ?array
+    {
+        if (! (bool) config('commerce.order_cancellation_enabled') || ! $actor->hasPermission('commerce.orders.cancel')) {
+            return null;
+        }
+        $blocker = $this->cancellationBlocker($order);
+
+        return ['available' => $blocker === null, 'blocked_reason' => $blocker];
+    }
+
+    /** رمز المانع الأول للإلغاء أو `null` إن كان مؤهلاً (قراءة بلا أقفال؛ انظر {@see self::cancelAction}). */
+    public function cancellationBlocker(CommerceOrder $order): ?string
+    {
+        if ($order->isCancelled()) {
+            return CommerceOrderCancellationException::ALREADY_CANCELLED;
+        }
+        if (! $order->isConfirmed()) {
+            return CommerceOrderCancellationException::NOT_CONFIRMED;
+        }
+        $intent = CommercePaymentIntent::query()->where('commerce_order_id', $order->id)->first();
+        try {
+            $this->assertCancellable($order, $intent);
+        } catch (CommerceOrderCancellationException $e) {
+            return $e->reason;
+        }
+
+        return null;
+    }
+
     /** مصفوفة ADR-28 §3 (الصفوف 2 و5–8). تُستدعى تحت قفل النية والطلب. */
     private function assertCancellable(CommerceOrder $order, ?CommercePaymentIntent $intent): void
     {

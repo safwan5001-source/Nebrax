@@ -7,7 +7,7 @@ import { ordersMessages } from './messages';
 
 type Tone = 'neutral' | 'muted' | 'positive' | 'warning' | 'negative';
 
-const ORDER_TONE: Record<string, Tone> = { confirmed: 'positive', draft: 'muted' };
+const ORDER_TONE: Record<string, Tone> = { confirmed: 'positive', draft: 'muted', cancelled: 'negative' };
 const PAYMENT_TONE: Record<string, Tone> = {
   paid: 'positive',
   collected: 'positive',

@@ -26,10 +26,33 @@ export type OrderChannel = {
   storefront_name: string | null;
 };
 
+/** أسباب الإلغاء المعتمدة (ADR-28 D-9-R2) — تطابق قائمة الخادم حرفياً. */
+export const CANCELLATION_REASONS = ['customer_request', 'out_of_stock', 'payment_issue', 'duplicate_order', 'fraud_suspected', 'other'] as const;
+export type CancellationReason = (typeof CANCELLATION_REASONS)[number];
+export const CANCELLATION_NOTE_MAX = 500;
+
+/** كتلة الإلغاء (O3a-1): القائمة بالحقائق الموجزة، والتفاصيل بالفاعل والملاحظة. حقول اختيارية: خادم أقدم لا يرسلها. */
+export type OrderCancellation = {
+  cancelled: boolean;
+  at: string | null;
+  reason: string | null;
+  by?: { id: string; name: string | null } | null;
+  note?: string | null;
+};
+
+/**
+ * عقد قراءة إجراء الإلغاء (O3b) — **استرشادي**: غيابه ⇒ لا يُعرض الإجراء (بوابة مغلقة أو بلا صلاحية، ولا تُكشف أيّهما). حضوره ⇒ `available` ومانع
+ * بسبب آمن إن وُجد. القرار النهائي لـAPI الإلغاء دائماً.
+ */
+export type CancelAction = { available: boolean; blocked_reason: string | null };
+
 export type OrderSummary = {
   id: string;
   number: string;
   status: string;
+  /** `draft|confirmed|cancelled` مشتقّة (O3a-1). غائبة من خادم أقدم ⇒ يُستعمل `status`. */
+  lifecycle_status?: string;
+  cancellation?: OrderCancellation;
   created_at: string | null;
   confirmed_at: string | null;
   total: Money;
@@ -67,6 +90,7 @@ export type OrderAttempt = {
 };
 
 export type OrderDetail = OrderSummary & {
+  cancel_action?: CancelAction;
   partner_id: string | null;
   delivery_amount: Money;
   contact: {
@@ -234,4 +258,9 @@ export function moneyParts(money: Money | null | undefined): { minor: number; cu
 /** هل الطلب بلا أثر محاسبي؟ (لتنبيه التفاصيل) — `collected` وحدها ليست قيداً. */
 export function needsAccountingWarning(order: Pick<OrderDetail, 'accounting' | 'payment'>): boolean {
   return order.accounting.posted === false;
+}
+
+/** حالة دورة الحياة المعروضة: المشتقّة من الخادم إن وُجدت وإلا `status` الخام. */
+export function lifecycleOf(order: Pick<OrderSummary, 'status' | 'lifecycle_status'>): string {
+  return order.lifecycle_status ?? order.status;
 }
