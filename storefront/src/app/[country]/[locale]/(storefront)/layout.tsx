@@ -1,4 +1,3 @@
-import type { Category } from "@spree/sdk";
 import { connection } from "next/server";
 import { getTranslations } from "next-intl/server";
 import { cache, Suspense } from "react";
@@ -13,6 +12,7 @@ import { PublishedCardStyleProvider } from "@/components/layout/PublishedCardSty
 import { PublishedThemeMarkerProvider } from "@/components/layout/PublishedThemeMarker";
 import { StoreWhatsApp } from "@/components/layout/StoreWhatsApp";
 import { fetchStorefrontConfig } from "@/lib/commerce/storefront";
+import type { StoreCategoryNode } from "@/lib/commerce/types";
 import { getCategories } from "@/lib/data/categories";
 import { readPolicyAvailability } from "@/lib/policy/availability";
 import { resolveFooterDesign } from "@/lib/presentation/footer-design";
@@ -48,7 +48,7 @@ interface StorefrontNavigationProps {
   locale: string;
 }
 
-const EMPTY_CATEGORIES: Category[] = [];
+const EMPTY_CATEGORIES: StoreCategoryNode[] = [];
 
 function MobileNavigationFallback() {
   return (
@@ -110,7 +110,7 @@ const getRootCategories = cache(async (country: string, locale: string) => {
  * Narrows an authoritative category to the fields the rail renders. The rail is
  * a view over the catalogue, so nothing here may add to or reinterpret it.
  */
-function toNavCategories(categories: Category[]): StoreNavCategory[] {
+function toNavCategories(categories: StoreCategoryNode[]): StoreNavCategory[] {
   return categories.map((category) => ({
     id: String(category.id),
     name: category.name,

@@ -1,6 +1,5 @@
 "use client";
 
-import type { Category } from "@spree/sdk";
 import { ArrowLeft, ChevronRight, X } from "lucide-react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
@@ -18,6 +17,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { localeDirection } from "@/i18n/locales";
+import type { StoreCategoryNode } from "@/lib/commerce/types";
 import type { IconKey } from "@/lib/presentation/icon-registry";
 import type { NavBadge } from "@/lib/presentation/navigation";
 import type { ResolvedNavChild } from "@/lib/presentation/navigation-resolve";
@@ -35,10 +35,12 @@ export interface StoreExtraNavLink {
   children?: ResolvedNavChild[];
 }
 
-type PanelType = { kind: "main" } | { kind: "category"; category: Category };
+type PanelType =
+  | { kind: "main" }
+  | { kind: "category"; category: StoreCategoryNode };
 
 interface MobileMenuProps {
-  rootCategories: Category[];
+  rootCategories: StoreCategoryNode[];
   basePath: string;
   /** Whether the wholesale addon is enabled — gates the trade portal link. */
   wholesaleEnabled: boolean;

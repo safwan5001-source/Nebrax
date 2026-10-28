@@ -1,4 +1,3 @@
-import type { Category } from "@spree/sdk";
 import Link from "next/link";
 import { connection } from "next/server";
 import { getTranslations } from "next-intl/server";
@@ -20,6 +19,7 @@ import {
 } from "@/components/store/ContactDetail";
 import { IdentityDetail } from "@/components/store/IdentityDetail";
 import { OfficialStoreBadge } from "@/components/store/OfficialStoreBadge";
+import type { StoreCategoryNode } from "@/lib/commerce/types";
 import { POLICY_LINKS } from "@/lib/constants/policies";
 import type {
   FooterLayout,
@@ -83,7 +83,7 @@ interface FooterProps {
 }
 
 interface FooterCategoryLinksProps {
-  rootCategories: Category[];
+  rootCategories: StoreCategoryNode[];
   basePath: string;
 }
 

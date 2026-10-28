@@ -133,14 +133,47 @@ export interface AwjCategoryRef {
 }
 
 /**
- * The Spree-shaped category view model plus AWJ's authoritative presentation
- * fields. Category media is optional because existing categories may have no
- * image; the storefront must never invent one.
+ * T1-2 — AWJ-owned presentation type for one category node as navigation,
+ * breadcrumbs, footer and banners render it. It is field-for-field the subset
+ * of the Spree `Category` that the UI reads, so a Spree-shaped value (the
+ * wholesale/Spree surface, tests, dev pages) is still assignable to it with no
+ * cast, and nothing here imports the SDK.
  */
-export type StoreCategory = import("@spree/sdk").Category & {
+export interface StoreCategoryNode {
+  id: string;
+  name: string;
+  permalink: string;
+  position: number;
+  depth: number;
+  meta_title: string | null;
+  meta_description: string | null;
+  meta_keywords: string | null;
+  children_count: number;
+  parent_id: string | null;
+  description: string;
+  description_html: string;
+  image_url: string | null;
+  square_image_url: string | null;
+  is_root: boolean;
+  is_child: boolean;
+  is_leaf: boolean;
+  parent?: StoreCategoryNode;
+  children?: StoreCategoryNode[];
+  ancestors?: StoreCategoryNode[];
+}
+
+/**
+ * The category view model `mappers.ts` produces: the presentation node plus
+ * AWJ's authoritative presentation fields. Category media is optional because
+ * existing categories may have no image; the storefront must never invent one.
+ */
+export interface StoreCategory extends StoreCategoryNode {
   color: string | null;
   image: { url: string; alt: string } | null;
-};
+  parent?: StoreCategory;
+  children?: StoreCategory[];
+  ancestors?: StoreCategory[];
+}
 
 /**
  * The Spree-shaped product view model plus the one AWJ fact that has no Spree

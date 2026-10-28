@@ -1,9 +1,9 @@
-import type { Category } from "@spree/sdk";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/navigation/Breadcrumbs";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { fetchPublishedPresentation } from "@/lib/commerce/storefront";
+import type { StoreCategoryNode } from "@/lib/commerce/types";
 import { getCachedProduct, PRODUCT_PAGE_EXPAND } from "@/lib/data/cached";
 import { generateProductMetadata } from "@/lib/metadata/product";
 import {
@@ -33,9 +33,9 @@ export async function generateMetadata({
 }
 
 function findBreadcrumbCategory(
-  categories: Category[],
+  categories: StoreCategoryNode[],
   categoryId?: string,
-): Category | undefined {
+): StoreCategoryNode | undefined {
   if (categories.length === 0) return undefined;
   if (categoryId) {
     const match = categories.find((c) => c.id === categoryId);

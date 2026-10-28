@@ -3,9 +3,9 @@
  * `public-navigation.ts`). Kept apart from `public.ts` (pure, no I/O) because it reads categories and products.
  */
 
-import type { Category } from "@spree/sdk";
 import { fetchCategories } from "@/lib/commerce/categories";
 import { fetchProductsByIds } from "@/lib/commerce/products";
+import type { StoreCategoryNode } from "@/lib/commerce/types";
 import type { PolicyAvailability } from "@/lib/policy/availability";
 import type { StorefrontPresentationConfig } from "./config";
 import type { NavItem, NavMenu } from "./navigation";
@@ -17,7 +17,10 @@ import {
 } from "./navigation-resolve";
 import { publishedPolicySlugs } from "./public";
 
-function flatten(categories: readonly Category[], into: Map<string, string>) {
+function flatten(
+  categories: readonly StoreCategoryNode[],
+  into: Map<string, string>,
+) {
   for (const category of categories) {
     into.set(category.id, category.permalink);
     if (category.children?.length) flatten(category.children, into);

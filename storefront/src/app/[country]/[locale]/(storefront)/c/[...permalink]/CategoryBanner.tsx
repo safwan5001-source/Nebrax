@@ -1,17 +1,16 @@
-import type { Category } from "@spree/sdk";
 import { cacheLife, cacheTag } from "next/cache";
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { StoreContainer } from "@/components/layout/StoreContainer";
 import { Breadcrumbs } from "@/components/navigation/Breadcrumbs";
-import type { StoreCategory } from "@/lib/commerce/types";
+import type { StoreCategory, StoreCategoryNode } from "@/lib/commerce/types";
 import type { PagePresentation } from "@/lib/presentation/page-regions";
 import { resolvePublicCategoryRegions } from "@/lib/presentation/page-runtime";
 
 interface CategoryBannerProps {
   /** Optional `image`: only the AWJ category read model carries it. */
-  category: Category & { image?: StoreCategory["image"] };
+  category: StoreCategoryNode & { image?: StoreCategory["image"] };
   basePath: string;
   locale: string;
   /**
