@@ -70,3 +70,16 @@ Mutation check: reverting `publicStatus()` to the stored status fails 3 of the n
 ## 5. Beta activation review prerequisites
 
 Met for a *separate* activation review: staff API (O3a-2b), staff UI (O3b), public contract and storefront parity (this slice), tenant isolation/privacy tests. Still outside this slice and to be decided in that review: the coordinated activation decision itself (ADR-28 §5.2/O3c), refund/return handling for paid orders (separate RT track), mobile/App Builder client verification against the new enum value, and a browser E2E smoke in a gate-open staging tenant.
+
+## 6. Follow-up — P2 "Handle cancelled completion replays in the confirmation UI" (PR #1781)
+
+**Finding (valid):** `completeAwjCheckoutAction` replays return the *current* order, so after "completion → lost response → staff cancels → retry with the same Idempotency-Key" the flow rendered `AwjOrderConfirmation` as a success («Order placed» + `success.notPaidNote` commitment copy) and could still start the online-payment redirect on a stale `requires_action`.
+
+**Fix (storefront only, no backend/contract change):**
+- `AwjOrderConfirmation`: for `status === "cancelled"` shows the terminal state (ban icon, `orders.cancelled.title`, dated/dateless body, `orders.cancelled.detail`); the success heading and `success.notPaidNote` are not rendered. Order number, lines and the server total are kept; no refund/payment-reversal claim. Reuses the existing 6-locale `orders.cancelled.*` keys (no new messages).
+- `AwjCheckoutFlow`: the online-payment hand-off now requires `order.status !== "cancelled"`; a cancelled replay never saves pending-payment state, redirects, or calls `startOnlinePaymentAction`.
+- Other surfaces reviewed: `AccountOrderList/Detail/Status` (handled earlier in this PR), `PaymentReturn` (driven by `payment-status`, which already has a `cancelled` state), and the only other consumer of `completeAwjCheckoutAction` is the flow itself. No further surface renders order completion.
+
+**Tests:** `AwjCheckoutFlow` regression for the exact sequence (first attempt lost → cancelled replay with stale `requires_action`: cancelled UI, no success/commitment copy, no redirect/payment start, no pending storage, same Idempotency-Key reused); `Confirmation.cancelled.test.tsx` renders with the **real** message catalogs in ar, en, de, es, fr, pl (terminal copy present, success/commitment copy absent, total kept), en no-refund-claim, dateless fallback, confirmed unchanged. Mutation check: removing the flow guard fails the regression. Backend replay contract is already covered by `a_replayed_completion_of_a_cancelled_order_reports_cancelled…`.
+
+**Results:** storefront vitest 3462 passed / 16 skipped; `tsc`, biome, `pnpm build` clean. Gate unchanged (off); no merge/deploy.
