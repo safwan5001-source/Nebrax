@@ -3,9 +3,9 @@
  * Kept apart from `public.ts` (pure, synchronous, no I/O) because it reads categories and products.
  */
 
-import type { Category } from "@spree/sdk";
 import { fetchCategories } from "@/lib/commerce/categories";
 import { fetchProductsByIds } from "@/lib/commerce/products";
+import type { StoreCategoryNode } from "@/lib/commerce/types";
 import type { PolicyAvailability } from "@/lib/policy/availability";
 import type { StorefrontPresentationConfig } from "./config";
 import { mainMenu } from "./navigation";
@@ -18,7 +18,7 @@ import {
 import { publishedPolicySlugs } from "./public";
 
 function flattenCategories(
-  categories: readonly Category[],
+  categories: readonly StoreCategoryNode[],
   into: Map<string, string>,
 ): void {
   for (const category of categories) {

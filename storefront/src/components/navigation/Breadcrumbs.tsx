@@ -1,10 +1,10 @@
-import type { Category } from "@spree/sdk";
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
+import type { StoreCategoryNode } from "@/lib/commerce/types";
 
 interface BreadcrumbsProps {
-  category: Category;
+  category: StoreCategoryNode;
   basePath: string;
   productName?: string;
   locale: string;

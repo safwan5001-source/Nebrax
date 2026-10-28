@@ -1,5 +1,5 @@
-import type { Category, Product } from "@spree/sdk";
-import type { StoreMedia } from "@/lib/commerce/types";
+import type { Product } from "@spree/sdk";
+import type { StoreCategoryNode, StoreMedia } from "@/lib/commerce/types";
 import { ensureProtocol, getStoreUrl } from "@/lib/store";
 
 /**
@@ -78,7 +78,7 @@ export function buildProductJsonLd(
  * https://schema.org/BreadcrumbList
  */
 export function buildBreadcrumbJsonLd(
-  category: Category,
+  category: StoreCategoryNode,
   basePath: string,
   storeUrl: string,
   product?: { name: string; slug: string },

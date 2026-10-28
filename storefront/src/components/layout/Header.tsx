@@ -1,4 +1,3 @@
-import type { Category } from "@spree/sdk";
 import { User } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -13,6 +12,7 @@ import { StoreBrand } from "@/components/layout/StoreBrand";
 import { StoreContainer } from "@/components/layout/StoreContainer";
 import { StoreSearch } from "@/components/layout/StoreSearch";
 import { Button } from "@/components/ui/button";
+import type { StoreCategoryNode } from "@/lib/commerce/types";
 import {
   type HeaderDesign,
   resolveHeaderDesign,
@@ -120,7 +120,7 @@ function layoutClasses(design: ReturnType<typeof resolveHeaderDesign>) {
 }
 
 interface HeaderMobileMenuProps {
-  rootCategories: Category[];
+  rootCategories: StoreCategoryNode[];
   basePath: string;
   extraLinks?: StoreExtraNavLink[];
 }
