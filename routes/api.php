@@ -44,6 +44,7 @@ use App\Http\Controllers\Api\CommercePaymentIntentController;
 use App\Http\Controllers\Api\CommerceShippingZoneController;
 use App\Http\Controllers\Api\CommerceDeliveryScheduleController;
 use App\Http\Controllers\Api\CommerceFulfillmentController;
+use App\Http\Controllers\Api\CommerceStaffOrderCancellationController;
 use App\Http\Controllers\Api\CommerceStaffOrderController;
 use App\Http\Controllers\Api\CommerceGiftSettingsController;
 use App\Http\Controllers\Api\CommerceVerticalSetupController;
@@ -1174,6 +1175,10 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
             ->middleware([$perm('commerce.orders.view'), $app('commerce.storefront')]);
         Route::get('commerce/orders/{id}', [CommerceStaffOrderController::class, 'show'])
             ->whereUuid('id')->middleware([$perm('commerce.orders.view'), $app('commerce.storefront')]);
+        // COMMERCE-ORDERS-O3a-2b: إلغاء طلب بواسطة موظف مخوّل (ADR-28) — صلاحية commerce.orders.cancel (owner/admin عبر `*` فقط)،
+        // وبوابة نشر commerce.order_cancellation_enabled مغلقة افتراضياً (404). لا تغيير في عقد المشتري.
+        Route::post('commerce/orders/{id}/cancel', [CommerceStaffOrderCancellationController::class, 'cancel'])
+            ->whereUuid('id')->middleware([$perm('commerce.orders.cancel'), $app('commerce.storefront')]);
 
         // كتالوج التطبيقات مدموجاً بحالة تفعيل المؤسسة — لا إنفاذ على مسارات أخرى بعد.
         Route::get('applications', [TenantApplicationController::class, 'index'])->middleware($perm('apps.view'));

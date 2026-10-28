@@ -89,6 +89,16 @@ class CommerceStaffOrderController extends ApiController
     {
         $this->guard($request);
 
+        return response()->json(['data' => $this->detailData($id)]);
+    }
+
+    /**
+     * تفاصيل الموظف لطلب (قراءة فقط) — يعيد استعمالها مسار الإلغاء (O3a-2b) فتخرج الاستجابة بالمسلسل نفسه. 404 لغير الموجود/مستأجر آخر.
+     *
+     * @return array<string, mixed>
+     */
+    public function detailData(string $id): array
+    {
         $order = CommerceOrder::query()
             ->with([
                 'salesChannel:id,name,type', 'storefront:id,name', 'snapshot', 'gift', 'schedule',
@@ -104,9 +114,7 @@ class CommerceStaffOrderController extends ApiController
             : collect();
         $posting = CommerceOrderPosting::query()->where('commerce_order_id', $order->id)->first();
 
-        return response()->json([
-            'data' => CommerceOrderStaffSerializer::detail($order, $this->currency(), $attempts, $posting),
-        ]);
+        return CommerceOrderStaffSerializer::detail($order, $this->currency(), $attempts, $posting);
     }
 
     /** @param array<string, mixed> $f */
@@ -154,7 +162,7 @@ class CommerceStaffOrderController extends ApiController
         }
     }
 
-    private function guard(Request $request): void
+    public function guard(Request $request): void
     {
         if ($request->user()?->allowedWarehouseIds() !== null) {
             abort(403, 'عرض طلبات المتجر غير متاح للمستخدم المقيَّد بمخازن محددة.');

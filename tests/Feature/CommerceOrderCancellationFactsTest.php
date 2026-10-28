@@ -485,11 +485,16 @@ class CommerceOrderCancellationFactsTest extends TestCase
     // ── النطاق: لا مسار إلغاء ولا أثر جانبي ───────────────────────────────
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function there_is_no_cancel_route_and_the_public_serializer_is_untouched(): void
+    public function the_public_serializer_is_untouched_and_the_only_cancel_route_is_the_staff_one(): void
     {
+        // O3a-2b أضافت مسار الموظف الوحيد؛ لا مسار إلغاء في أي عقد عام (store/v1، commerce/v1).
+        $cancelRoutes = [];
         foreach (Route::getRoutes() as $route) {
-            $this->assertDoesNotMatchRegularExpression('#commerce/orders/\{[^}]+\}/cancel#', $route->uri());
+            if (preg_match('#orders/\{[^}]+\}/cancel#', $route->uri())) {
+                $cancelRoutes[] = $route->uri();
+            }
         }
+        $this->assertSame(['api/commerce/orders/{id}/cancel'], $cancelRoutes);
         [$tenantId] = $this->owner();
         $order = $this->order($tenantId);
         $this->cancelRaw($order->id);
