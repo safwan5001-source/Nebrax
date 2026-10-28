@@ -2,7 +2,7 @@
 
 - **Branch:** `claude/commerce-orders-o3c`
 - **Base SHA:** `f3d9f563503cadae17be16baec76c83fad3a7b8d` (main after O3b)
-- **Head SHA / PR:** see PR description (filled at open)
+- **Head SHA:** `5b5f09515158ecc62ea4112e19479b46de3d9bb9` (before this report touch-up) · **PR:** #1781
 - **Scope guard:** no merge, no deploy, no activation of cancellation, no accounting change.
 
 ## 1. What changed (ADR-28 D-9-P1, option B)
