@@ -1,4 +1,4 @@
-import type { ProductListParams } from "@spree/sdk";
+import type { StoreProductListParams } from "@/lib/commerce/types";
 import type { ActiveFilters } from "@/types/filters";
 
 /**
@@ -9,8 +9,8 @@ import type { ActiveFilters } from "@/types/filters";
 export function buildProductQueryParams(
   filters: ActiveFilters,
   searchQuery?: string,
-): ProductListParams {
-  const params: ProductListParams = {};
+): StoreProductListParams {
+  const params: StoreProductListParams = {};
 
   if (searchQuery) {
     params.search = searchQuery;

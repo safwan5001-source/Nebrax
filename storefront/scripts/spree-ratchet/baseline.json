@@ -11,7 +11,7 @@
       }
     },
     "spree_type_imports": {
-      "total": 91,
+      "total": 86,
       "files": {
         "src/app/[country]/[locale]/(checkout)/checkout/[id]/CheckoutPageContent.tsx": 4,
         "src/app/[country]/[locale]/(checkout)/checkout/[id]/CheckoutSidebar.tsx": 1,
@@ -45,7 +45,6 @@
         "src/lib/analytics/gtm.ts": 3,
         "src/lib/data/addresses.ts": 2,
         "src/lib/data/cart.ts": 2,
-        "src/lib/data/categories.ts": 2,
         "src/lib/data/checkout.ts": 2,
         "src/lib/data/credit-cards.ts": 1,
         "src/lib/data/customer.ts": 1,
@@ -54,15 +53,13 @@
         "src/lib/data/markets.ts": 1,
         "src/lib/data/orders.ts": 1,
         "src/lib/data/payment.ts": 1,
-        "src/lib/data/wholesale.ts": 2,
+        "src/lib/data/wholesale.ts": 1,
         "src/lib/metadata/alternates.ts": 1,
         "src/lib/spree/auth-helpers.ts": 1,
         "src/lib/spree/config.ts": 1,
         "src/lib/spree/webhooks.ts": 1,
         "src/lib/utils/address.ts": 1,
         "src/lib/utils/express-checkout.ts": 2,
-        "src/lib/utils/listing-context.ts": 1,
-        "src/lib/utils/product-query.ts": 1,
         "src/lib/webhooks/handlers.ts": 2,
         "src/lib/wholesale.ts": 1
       }

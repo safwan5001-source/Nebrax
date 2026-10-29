@@ -1,4 +1,4 @@
-import type { ProductListParams } from "@spree/sdk";
+import type { StoreProductListParams } from "@/lib/commerce/types";
 
 /**
  * FLOWERS-H9b / ADR-21 — catalog context carried by a listing URL when it is
@@ -24,12 +24,12 @@ export interface ListingContext {
 /**
  * Extra list params understood by the AWJ product list beyond Spree's
  * (`collection`, `brand_id`, `deliver_today`, flat `facet[<key>]` entries —
- * the PHP array-query form). `ProductListParams`' own flat index signature
+ * the PHP array-query form). `StoreProductListParams`' own flat index signature
  * already admits them, so this is an alias, not a new shape.
  */
-export type ListingContextParams = ProductListParams;
+export type ListingContextParams = StoreProductListParams;
 
-export type StorefrontListParams = ProductListParams;
+export type StorefrontListParams = StoreProductListParams;
 
 type RawSearchParams = Record<string, string | string[] | undefined>;
 
