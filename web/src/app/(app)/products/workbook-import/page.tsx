@@ -39,6 +39,7 @@ import {
 } from '@/modules/products/workbook/contract';
 import { ImportJobStatusPanel } from '@/modules/import-jobs/ImportJobStatusPanel';
 import { useImportJobEngine, useImportJobUrlParam, useResumeFromUrl } from '@/modules/import-jobs/useImportJobEngine';
+import { MappingPresetBar } from '@/modules/import-jobs/MappingPresetBar';
 import { hasFrozenOptions, type ApplyOptions } from '@/modules/import-jobs/client';
 
 interface PriceListOption {
@@ -180,6 +181,14 @@ export default function ProductWorkbookImportPage() {
 
   function updateMapping(index: number, value: string) {
     setMapping((current) => ({ ...current, [index]: value === '' ? null : value }));
+    previewSeq.current += 1;
+    setPreviewing(false);
+    setPreview(null);
+  }
+
+  /** تطبيق مطابقةٍ محفوظة (IMP-H8-S2c): تغييرٌ يدوي للمطابقة، فيُسقط المعاينة كما يفعل `updateMapping`. */
+  function applyPresetMapping(next: ColumnMapping) {
+    setMapping(next);
     previewSeq.current += 1;
     setPreviewing(false);
     setPreview(null);
@@ -441,6 +450,7 @@ export default function ProductWorkbookImportPage() {
                       {tp('import_mapping_duplicate')}
                     </p>
                   ) : null}
+                  <MappingPresetBar domain="product_workbook" columns={inspection.sheets.products.columns} mapping={mapping} fieldKeys={fields.map((item) => item.key)} onApply={applyPresetMapping} />
                   <div className="overflow-x-auto rounded-md border border-border">
                     <table className="w-full min-w-[32rem] text-sm">
                       <thead className="bg-background text-muted">

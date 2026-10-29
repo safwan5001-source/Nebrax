@@ -318,7 +318,8 @@ describe('استيراد مصنّف المنتجات — أول واجهة دا�
     release({ data: cleanPreview });
     await new Promise((resolve) => setTimeout(resolve, 20));
 
-    expect(screen.queryByRole('button', { name: 'apply' })).toBeNull();
+    // زرّ «تطبيق» المطابقات المحفوظة (IMP-H8-S2c) يحمل التسمية نفسها لكنه معطَّل بلا مطابقة مختارة؛ المقصود غياب زر تنفيذ الاستيراد الفعّال.
+    expect(screen.queryAllByRole('button', { name: 'apply' }).filter((button) => !(button as HTMLButtonElement).disabled)).toEqual([]);
     expect((screen.getByRole('button', { name: 'run_preview' }) as HTMLButtonElement).disabled).toBe(false);
   });
 });

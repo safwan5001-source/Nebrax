@@ -45,6 +45,7 @@ import { ImportJobStatusPanel } from '@/modules/import-jobs/ImportJobStatusPanel
 import { ImportRepairPanel } from '@/modules/import-jobs/ImportRepairPanel';
 import { downloadImportFailures, hasFrozenOptions } from '@/modules/import-jobs/client';
 import { useImportJobEngine, useImportJobUrlParam, useResumeFromUrl } from '@/modules/import-jobs/useImportJobEngine';
+import { MappingPresetBar } from '@/modules/import-jobs/MappingPresetBar';
 import type { ApplyOptions } from '@/modules/import-jobs/client';
 import { cn } from '@/lib/utils';
 
@@ -276,6 +277,12 @@ export default function ProductImportPage() {
     setPreview(null);
   }
 
+  /** تطبيق مطابقةٍ محفوظة (IMP-H8-S2c): تغييرٌ يدوي للمطابقة، فيُسقط المعاينة كما يفعل `updateMapping`. */
+  function applyPresetMapping(next: ColumnMapping) {
+    setMapping(next);
+    setPreview(null);
+  }
+
   const applyResult = engine.job?.apply_result as
     | { created?: number; updated?: number; skipped?: number; results?: PreviewRow[] }
     | null
@@ -479,6 +486,7 @@ export default function ProductImportPage() {
                     </p>
                   ) : null}
 
+                  <MappingPresetBar domain="product_catalog" columns={inspection.columns} mapping={mapping} fieldKeys={fields.map((item) => item.key)} onApply={applyPresetMapping} />
                   <div className="overflow-x-auto rounded-md border border-border">
                     <table className="w-full min-w-[40rem] text-sm">
                       <thead className="bg-background text-muted">
