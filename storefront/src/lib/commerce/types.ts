@@ -238,6 +238,71 @@ export interface StoreProductSummary {
   categories?: StoreCategoryNode[];
 }
 
+/** T1-5 — an option group (e.g. colour, size) as the variant picker reads it. */
+export interface StoreOptionType {
+  id: string;
+  name: string;
+  label: string;
+  position: number;
+  kind: string;
+}
+
+/** T1-5 — one value of an option group on a variant. */
+export interface StoreOptionValue {
+  id: string;
+  option_type_id: string;
+  name: string;
+  label: string;
+  position: number;
+  color_code: string | null;
+  option_type_name: string;
+  option_type_label: string;
+  image_url: string | null;
+}
+
+/**
+ * T1-5 — a merchant-defined product attribute. Discriminated on `field_type`
+ * so the one field whose value is rendered as HTML (`rich_text`) is typed as a
+ * string, and every other kind stays `unknown` (no `any`).
+ */
+export type StoreCustomField = {
+  id: string;
+  label: string;
+  key: string;
+} & (
+  | { field_type: "rich_text"; value: string | null }
+  | {
+      field_type:
+        | "short_text"
+        | "long_text"
+        | "number"
+        | "boolean"
+        | "json"
+        // Forward-compatible: an unrecognised kind still renders via String().
+        | (string & {});
+      value: unknown;
+    }
+);
+
+/** T1-5 — a purchasable variant as the product detail page reads it. */
+export interface StoreVariant extends StoreVariantSummary {
+  purchasable: boolean;
+  in_stock: boolean;
+  option_values: StoreOptionValue[];
+  media?: StoreMedia[];
+}
+
+/** T1-5 — a product as the product detail page, SEO and JSON-LD read it. */
+export interface StoreProductDetail extends StoreProductSummary {
+  description: string | null;
+  in_stock: boolean;
+  media?: StoreMedia[];
+  variants?: StoreVariant[];
+  default_variant?: StoreVariant;
+  option_types?: StoreOptionType[];
+  custom_fields?: StoreCustomField[];
+}
+
 export interface StorePaginationMeta {
   page: number;
   limit: number;

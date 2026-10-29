@@ -1,5 +1,8 @@
-import type { Product } from "@spree/sdk";
-import type { StoreCategoryNode, StoreMedia } from "@/lib/commerce/types";
+import type {
+  StoreCategoryNode,
+  StoreMedia,
+  StoreProductDetail,
+} from "@/lib/commerce/types";
 import { ensureProtocol, getStoreUrl } from "@/lib/store";
 
 /**
@@ -29,7 +32,7 @@ export function stripHtml(html: string): string {
  * https://schema.org/Product
  */
 export function buildProductJsonLd(
-  product: Product,
+  product: StoreProductDetail,
   canonicalUrl: string,
 ): Record<string, unknown> {
   const schema: Record<string, unknown> = {

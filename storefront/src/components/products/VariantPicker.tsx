@@ -1,15 +1,15 @@
 "use client";
 
-import type { OptionType, Variant } from "@spree/sdk";
 import { useTranslations } from "next-intl";
 import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
+import type { StoreOptionType, StoreVariant } from "@/lib/commerce/types";
 
 interface VariantPickerProps {
-  variants: Variant[];
-  optionTypes: OptionType[];
-  selectedVariant: Variant | null;
-  onVariantChange: (variant: Variant | null) => void;
+  variants: StoreVariant[];
+  optionTypes: StoreOptionType[];
+  selectedVariant: StoreVariant | null;
+  onVariantChange: (variant: StoreVariant | null) => void;
 }
 
 export function VariantPicker({
@@ -70,7 +70,9 @@ export function VariantPicker({
     return { variantOptionMaps: maps, optionValueDetailsMap: detailsMap };
   }, [variants]);
 
-  const findVariant = (newOptions: Record<string, string>): Variant | null => {
+  const findVariant = (
+    newOptions: Record<string, string>,
+  ): StoreVariant | null => {
     const optionCount = Object.keys(newOptions).length;
     return (
       variantOptionMaps.find(
@@ -118,7 +120,7 @@ export function VariantPicker({
   const getOptionValueDetails = (
     optionTypeId: string,
     optionValueName: string,
-  ): Variant["option_values"][0] | null => {
+  ): StoreVariant["option_values"][0] | null => {
     return optionValueDetailsMap[`${optionTypeId}:${optionValueName}`] || null;
   };
 
