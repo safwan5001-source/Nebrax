@@ -17,6 +17,13 @@ const WIZARDS = [
   'partners/import/PartnerImportWizard.tsx',
 ];
 
+/** صفحات الاستيراد (لا معالجات الوحدات): تمرّر `applyPresetMapping` الذي يُسقط المعاينة بنفسه (IMP-H8-S2c). */
+const PAGES = [
+  'app/(app)/products/import/page.tsx',
+  'app/(app)/products/workbook-import/page.tsx',
+  'app/(app)/inventory-openings/import/page.tsx',
+];
+
 describe('saved mapping presets wiring (IMP-H8-S2b)', () => {
   it.each(WIZARDS)('%s mounts the bar with its own engine domain and drops the preview on apply', (file) => {
     const source = readFileSync(join(process.cwd(), 'src/modules', file), 'utf8');
@@ -26,5 +33,17 @@ describe('saved mapping presets wiring (IMP-H8-S2b)', () => {
     expect(bar, 'bar domain').toBe(engine);
     // تطبيق مطابقة محفوظة تغيير يدوي للمطابقة: يُسقط المعاينة كأي تعديل
     expect(source).toMatch(/onApply=\{\(next\) => \{ setMapping\(next\); invalidatePreview\(\); \}\}/);
+  });
+
+  it.each(PAGES)('%s mounts the bar with its own engine domain and drops the preview through applyPresetMapping', (file) => {
+    const source = readFileSync(join(process.cwd(), 'src', file), 'utf8');
+    const engine = /useImportJobEngine\('([a-z_]+)'\)/.exec(source)?.[1];
+    const bar = /<MappingPresetBar domain="([a-z_]+)"/.exec(source)?.[1];
+    expect(engine, 'engine domain').toBeTruthy();
+    expect(bar, 'bar domain').toBe(engine);
+    expect(source).toContain('onApply={applyPresetMapping}');
+    const body = /function applyPresetMapping\(next: ColumnMapping\) \{([\s\S]*?)\n  \}/.exec(source)?.[1] ?? '';
+    expect(body).toContain('setMapping(next)');
+    expect(body).toContain('setPreview(null)');
   });
 });

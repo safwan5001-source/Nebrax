@@ -47,6 +47,7 @@ import {
 } from '@/modules/inventory-openings/contract';
 import { ImportJobStatusPanel } from '@/modules/import-jobs/ImportJobStatusPanel';
 import { useImportJobEngine, useImportJobUrlParam, useResumeFromUrl } from '@/modules/import-jobs/useImportJobEngine';
+import { MappingPresetBar } from '@/modules/import-jobs/MappingPresetBar';
 import { hasFrozenOptions, type ApplyOptions } from '@/modules/import-jobs/client';
 
 // دُمجت خمس خطوات V1 (ملف·مطابقة·معاينة·تأكيد·نتيجة) إلى أربع: الملف
@@ -221,6 +222,12 @@ export default function InventoryOpeningImportPage() {
     setPreview(null);
   }
 
+  /** تطبيق مطابقةٍ محفوظة (IMP-H8-S2c): تغييرٌ يدوي للمطابقة، فيُسقط المعاينة كما يفعل `updateMapping`. */
+  function applyPresetMapping(next: ColumnMapping) {
+    setMapping(next);
+    setPreview(null);
+  }
+
   function onDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
     setDragging(false);
@@ -369,6 +376,7 @@ export default function InventoryOpeningImportPage() {
                 <CardContent className="space-y-3">
                   <p className="text-sm leading-relaxed text-muted">{t('mapping_hint')}</p>
 
+                  <MappingPresetBar domain="inventory_opening" columns={inspection.columns} mapping={mapping} fieldKeys={fields.map((item) => item.key)} onApply={applyPresetMapping} />
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[36rem] border-collapse text-sm">
                       <thead>
