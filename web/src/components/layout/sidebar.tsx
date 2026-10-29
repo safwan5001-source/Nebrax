@@ -73,6 +73,7 @@ import {
   Wrench,
   X,
   Sparkles,
+  FileUp,
 } from 'lucide-react';
 import { CompanyLogoMark } from '@/components/layout/company-logo-mark';
 import { useCompany } from '@/lib/company';
@@ -325,6 +326,8 @@ const GROUPS: NavGroup[] = [
       { href: '/tax-settings', icon: ReceiptText, key: 'taxSettings', built: true },
       { href: '/payment-methods', icon: WalletCards, key: 'paymentMethods', built: true },
       { href: '/applications', icon: LayoutGrid, key: 'applications', built: true },
+      // مركز الاستيراد (IMP-H8-S1): خريطة تنقّل إلى معالجات الاستيراد وسجلّ تشغيلاتها؛ بلا صلاحية خاصة — كل كيان فيه يُخفى بصلاحيته وقدرته.
+      { href: '/imports', icon: FileUp, key: 'imports', built: true },
       // المستخدمون (AC-UX-01): بوابتها صلاحية العرض `users.view` لا اسم الدور — فمن يملكها دوراً مخصَّصاً يراها،
       // ومن جُرِّد منها (حتى لو `admin`) لا يرى رابطاً يردّ مساره 403. الإدارة داخل الشاشة خلف `users.manage`.
       { href: '/users', icon: UserCog, key: 'users', built: true, permission: 'users.view' },
