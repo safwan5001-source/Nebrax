@@ -83,3 +83,7 @@ Met for a *separate* activation review: staff API (O3a-2b), staff UI (O3b), publ
 **Tests:** `AwjCheckoutFlow` regression for the exact sequence (first attempt lost → cancelled replay with stale `requires_action`: cancelled UI, no success/commitment copy, no redirect/payment start, no pending storage, same Idempotency-Key reused); `Confirmation.cancelled.test.tsx` renders with the **real** message catalogs in ar, en, de, es, fr, pl (terminal copy present, success/commitment copy absent, total kept), en no-refund-claim, dateless fallback, confirmed unchanged. Mutation check: removing the flow guard fails the regression. Backend replay contract is already covered by `a_replayed_completion_of_a_cancelled_order_reports_cancelled…`.
 
 **Results:** storefront vitest 3462 passed / 16 skipped; `tsc`, biome, `pnpm build` clean. Gate unchanged (off); no merge/deploy.
+
+## 7. Follow-up — Storefront CI Biome failure on `8818772`
+
+`Storefront CI` failed on `assist/source/organizeImports` in `storefront/src/components/checkout/__tests__/Confirmation.cancelled.test.tsx` (my earlier local run used `biome lint`/`format`, which do not run the import-organizing assist; CI runs `biome check`). Fix: `biome check --write` on that single file (import order only, no logic or test change). Local `biome check .` now reports 0 errors (5 pre-existing warnings, 3 infos); the file's 9 tests still pass. Final head SHA and CI results are in the PR.

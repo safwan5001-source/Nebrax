@@ -1,13 +1,13 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { formatMinorAmount } from "@/lib/commerce/cart-types";
+import type { StorefrontOrder } from "@/lib/commerce/checkout-types";
 import ar from "../../../../messages/ar.json";
 import de from "../../../../messages/de.json";
 import en from "../../../../messages/en.json";
 import es from "../../../../messages/es.json";
 import fr from "../../../../messages/fr.json";
 import pl from "../../../../messages/pl.json";
-import { formatMinorAmount } from "@/lib/commerce/cart-types";
-import type { StorefrontOrder } from "@/lib/commerce/checkout-types";
 import { AwjOrderConfirmation } from "../awj/Confirmation";
 
 const catalogs = { ar, de, en, es, fr, pl } as Record<string, unknown>;
