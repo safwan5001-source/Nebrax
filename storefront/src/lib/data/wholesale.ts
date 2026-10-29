@@ -1,7 +1,9 @@
 "use server";
 
-import type { Channel } from "@spree/sdk";
-import type { StoreProductListParams } from "@/lib/commerce/types";
+import type {
+  StoreChannel,
+  StoreProductListParams,
+} from "@/lib/commerce/types";
 import {
   getAccessToken,
   getWholesaleClient,
@@ -27,7 +29,7 @@ import { withFallback } from "./utils";
  * caller handles, so a DTC-only build degrades to the sign-in wall rather than
  * failing the build.
  */
-export async function getWholesaleChannel(): Promise<Channel | null> {
+export async function getWholesaleChannel(): Promise<StoreChannel | null> {
   if (!isWholesaleEnabled()) return null;
 
   return withFallback(async () => getWholesaleClient().channel.get(), null);

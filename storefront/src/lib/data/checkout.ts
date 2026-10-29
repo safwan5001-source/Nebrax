@@ -1,8 +1,8 @@
 "use server";
 
-import type { AddressParams, Cart } from "@spree/sdk";
 import { SpreeError } from "@spree/sdk";
 import { updateTag } from "next/cache";
+import type { StoreAddressParams, StoreCart } from "@/lib/commerce/types";
 import {
   cacheTagSuffix,
   getCartId,
@@ -85,7 +85,9 @@ function cartTag(surface: Surface): string {
   return `cart${cacheTagSuffix(surface)}`;
 }
 
-export async function getCheckoutOrder(cartId: string): Promise<Cart | null> {
+export async function getCheckoutOrder(
+  cartId: string,
+): Promise<StoreCart | null> {
   const surface = await resolveSurfaceForCart(cartId);
 
   // Try active cart first (order may still be in checkout)
@@ -94,12 +96,15 @@ export async function getCheckoutOrder(cartId: string): Promise<Cart | null> {
 
   // Cart completed — fetch as completed order.
   return withFallback(
-    async () => (await getOrder(cartId, undefined, surface)) as unknown as Cart,
+    async () =>
+      (await getOrder(cartId, undefined, surface)) as unknown as StoreCart,
     null,
   );
 }
 
-export async function getCompletedOrder(cartId: string): Promise<Cart | null> {
+export async function getCompletedOrder(
+  cartId: string,
+): Promise<StoreCart | null> {
   const surface = await resolveSurfaceForCart(cartId);
 
   // Fetch order directly — used by the order-placed page.
@@ -107,7 +112,8 @@ export async function getCompletedOrder(cartId: string): Promise<Cart | null> {
   // the cart token cookie on failure, which breaks getOrder()
   // for guest users.
   return withFallback(
-    async () => (await getOrder(cartId, undefined, surface)) as unknown as Cart,
+    async () =>
+      (await getOrder(cartId, undefined, surface)) as unknown as StoreCart,
     null,
   );
 }
@@ -115,8 +121,8 @@ export async function getCompletedOrder(cartId: string): Promise<Cart | null> {
 export async function updateOrderAddresses(
   cartId: string,
   addresses: {
-    shipping_address?: AddressParams;
-    billing_address?: AddressParams;
+    shipping_address?: StoreAddressParams;
+    billing_address?: StoreAddressParams;
     shipping_address_id?: string;
     billing_address_id?: string;
     use_shipping?: boolean;

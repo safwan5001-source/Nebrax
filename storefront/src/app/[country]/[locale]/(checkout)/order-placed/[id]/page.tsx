@@ -1,6 +1,5 @@
 "use client";
 
-import type { Cart } from "@spree/sdk";
 import { CircleCheckBig, Package } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -13,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { ProductImage } from "@/components/ui/product-image";
 import { useCheckout } from "@/contexts/CheckoutContext";
 import { trackPurchase } from "@/lib/analytics/gtm";
+import type { StoreCart } from "@/lib/commerce/types";
 import { getCompletedOrder } from "@/lib/data/checkout";
 import { getCachedCompletedOrder } from "@/lib/utils/completed-order-cache";
 import { extractBasePath } from "@/lib/utils/path";
@@ -33,7 +33,7 @@ export default function OrderPlacedPage({ params }: OrderPlacedPageProps) {
   const t = useTranslations("orderPlaced");
   const tc = useTranslations("common");
 
-  const [order, setOrder] = useState<Cart | null>(null);
+  const [order, setOrder] = useState<StoreCart | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<"orderNotFound" | "failedToLoad" | null>(
     null,
@@ -56,7 +56,7 @@ export default function OrderPlacedPage({ params }: OrderPlacedPageProps) {
       try {
         // Try cached order first (from the completion response),
         // fall back to API for page refreshes.
-        const cached = getCachedCompletedOrder(cartId) as Cart | null;
+        const cached = getCachedCompletedOrder(cartId) as StoreCart | null;
         const orderData = cached ?? (await getCompletedOrder(cartId));
         if (cancelled) return;
 

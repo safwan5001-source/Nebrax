@@ -1,4 +1,4 @@
-import type { Cart, Fulfillment } from "@spree/sdk";
+import type { StoreCart, StoreCartFulfillment } from "@/lib/commerce/types";
 
 /**
  * Stripe zero-decimal currencies where the amount is already in the smallest unit.
@@ -52,7 +52,7 @@ export function randomSuffix(): string {
  * prices-hidden guest cart) or a zero total has no valid payable amount, so the
  * caller must skip Express Checkout entirely rather than send `amount: 0`.
  */
-export function hasPayableTotal(order: Cart): boolean {
+export function hasPayableTotal(order: StoreCart): boolean {
   const total = order.total ?? order.item_total;
   if (total == null) return false;
   const n = Number(total);
@@ -65,7 +65,7 @@ export function hasPayableTotal(order: Cart): boolean {
  * separately via shippingRates. Including it here would cause the line item
  * total to exceed the Elements amount, triggering an IntegrationError.
  */
-export function buildLineItems(order: Cart) {
+export function buildLineItems(order: StoreCart) {
   const currency = order.currency;
   const items: Array<{ name: string; amount: number }> = [];
 
@@ -147,7 +147,7 @@ interface ShippingRateMapping {
  * to each rate ID to work around its duplicate-ID rejection.
  */
 export function buildShippingRateMap(
-  shipments: Fulfillment[],
+  shipments: StoreCartFulfillment[],
   isGooglePay: boolean,
   currency: string,
 ): ShippingRateMapping {

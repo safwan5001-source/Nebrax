@@ -1,6 +1,5 @@
 "use client";
 
-import type { Address, AddressParams, Cart, Country } from "@spree/sdk";
 import { CircleAlert, Loader2 } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -31,6 +30,12 @@ import {
   trackAddShippingInfo,
   trackBeginCheckout,
 } from "@/lib/analytics/gtm";
+import type {
+  StoreAddress,
+  StoreAddressParams,
+  StoreCart,
+  StoreCountry,
+} from "@/lib/commerce/types";
 import { getAddresses, updateAddress } from "@/lib/data/addresses";
 import {
   applyCode,
@@ -70,7 +75,7 @@ const ExpressCheckoutButton = dynamic(
 // shipping, etc.) that update local `cart` but not `contextCart`, and
 // we don't want those legitimate divergences to trigger an overwrite.
 // Line items don't change from checkout-page mutations.
-function cartItemsFingerprint(cart: Cart | null): string {
+function cartItemsFingerprint(cart: StoreCart | null): string {
   if (!cart) return "";
   return (cart.items ?? []).map((i) => `${i.id}:${i.quantity}`).join(",");
 }
@@ -101,7 +106,7 @@ function CheckoutPageContentInner({
   // instead of matching — this page was already unreachable for an AWJ
   // cart (there is no client-visible AWJ cart id to build its URL from).
   const { cart: rawContextCart } = useCart();
-  const contextCart = rawContextCart as Cart | null;
+  const contextCart = rawContextCart as StoreCart | null;
   const t = useTranslations("checkout");
   const tc = useTranslations("common");
   const { user, loading: authLoading } = useAuth();
@@ -110,11 +115,11 @@ function CheckoutPageContentInner({
   const paymentError = searchParams.get("payment_error");
 
   // Initialize state from server-fetched data — no loading skeleton needed
-  const [cart, setCart] = useState<Cart | null>(initialData?.cart ?? null);
-  const [countries, setCountries] = useState<Country[]>(
+  const [cart, setCart] = useState<StoreCart | null>(initialData?.cart ?? null);
+  const [countries, setCountries] = useState<StoreCountry[]>(
     initialData?.countries ?? [],
   );
-  const [savedAddresses, setSavedAddresses] = useState<Address[]>(
+  const [savedAddresses, setSavedAddresses] = useState<StoreAddress[]>(
     initialData?.savedAddresses ?? [],
   );
   const [isAuthenticated, setIsAuthenticated] = useState(
@@ -218,9 +223,9 @@ function CheckoutPageContentInner({
 
       const countriesData = market
         ? await getMarketCountries(market.id).catch(() => ({
-            data: [] as Country[],
+            data: [] as StoreCountry[],
           }))
-        : { data: [] as Country[] };
+        : { data: [] as StoreCountry[] };
 
       if (!cartData) {
         setError(tRef.current("orderNotFound"));
@@ -335,7 +340,7 @@ function CheckoutPageContentInner({
   const handleAutoSave = useCallback(
     async (addressData: {
       email: string;
-      shipping_address?: AddressParams;
+      shipping_address?: StoreAddressParams;
       shipping_address_id?: string;
     }) => {
       const currentOrder = cartRef.current;
@@ -381,7 +386,7 @@ function CheckoutPageContentInner({
       setProcessing(true);
       setError(null);
 
-      let trackingOrder: Cart | null = null;
+      let trackingOrder: StoreCart | null = null;
       let trackingRateName: string | undefined;
 
       try {
@@ -421,7 +426,7 @@ function CheckoutPageContentInner({
   // Handle billing address update (called by PaymentSection before gateway confirmation)
   const handleUpdateBillingAddress = useCallback(
     async (data: {
-      billing_address?: AddressParams;
+      billing_address?: StoreAddressParams;
       use_shipping?: boolean;
     }): Promise<boolean> => {
       const currentOrder = cartRef.current;
@@ -527,7 +532,7 @@ function CheckoutPageContentInner({
 
   // Update a saved address
   const handleUpdateSavedAddress = useCallback(
-    async (id: string, data: AddressParams): Promise<Address> => {
+    async (id: string, data: StoreAddressParams): Promise<StoreAddress> => {
       const result = await updateAddress(id, data);
 
       if (!result.success) {

@@ -1,6 +1,5 @@
 "use client";
 
-import type { Cart } from "@spree/sdk";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -14,6 +13,7 @@ import { useCountryStates } from "@/hooks/useCountryStates";
 import type {
   StoreAddress,
   StoreAddressParams,
+  StoreCart,
   StoreCountry,
   StoreState,
 } from "@/lib/commerce/types";
@@ -25,7 +25,7 @@ import {
 } from "@/lib/utils/address";
 
 interface AddressSectionProps {
-  cart: Cart;
+  cart: StoreCart;
   countries: StoreCountry[];
   savedAddresses: StoreAddress[];
   isAuthenticated: boolean;

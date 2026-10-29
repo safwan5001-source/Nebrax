@@ -1,6 +1,5 @@
 "use client";
 
-import type { Cart, LineItem } from "@spree/sdk";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
@@ -18,6 +17,7 @@ import type {
   StorefrontCartLine,
 } from "@/lib/commerce/cart-types";
 import type { PdpSelections } from "@/lib/commerce/pdp-gifting";
+import type { StoreCart, StoreCartLine } from "@/lib/commerce/types";
 import {
   addAwjItem,
   addToCart as addToCartAction,
@@ -38,7 +38,7 @@ import type { Surface } from "@/lib/spree/surface";
  * they are provably Spree-only (wholesale-specific views, the pre-existing
  * Spree checkout flow) — see AWJ_CART_WIRING's Spree-boundary notes.
  */
-export type AnyCart = Cart | StorefrontCart;
+export type AnyCart = StoreCart | StorefrontCart;
 
 interface CartContextType {
   cart: AnyCart | null;
@@ -200,7 +200,7 @@ export function CartProvider({
   const itemCount = useMemo<number>(
     () =>
       cart?.items?.reduce(
-        (sum: number, item: LineItem | StorefrontCartLine) =>
+        (sum: number, item: StoreCartLine | StorefrontCartLine) =>
           // An add-on rides on its parent line (ADR-18) and is not counted.
           "addonOf" in item && item.addonOf ? sum : sum + item.quantity,
         0,

@@ -748,6 +748,182 @@ export interface StoreAnalyticsOrder {
   items: StoreAnalyticsLineItem[];
 }
 
+/**
+ * Cart / checkout presentation types (H6 Batch B).
+ *
+ * Structural twins of the SDK cart shapes the storefront reads. They extend
+ * the order-display types above instead of duplicating them, so a Spree-shaped
+ * `Cart` stays assignable with no casts. Type-only.
+ */
+export interface StoreDiscount {
+  id: string;
+  promotion_id: string;
+  name: string;
+  description: string | null;
+  code: string | null;
+  amount: string | null;
+  display_amount: string | null;
+}
+
+export interface StoreDeliveryMethod {
+  id: string;
+  name: string;
+  code: string | null;
+}
+
+export interface StoreDeliveryRate {
+  id: string;
+  delivery_method_id: string;
+  name: string;
+  selected: boolean;
+  cost: string;
+  total: string;
+  additional_tax_total: string;
+  included_tax_total: string;
+  tax_total: string;
+  display_cost: string;
+  display_total: string;
+  display_additional_tax_total: string;
+  display_included_tax_total: string;
+  display_tax_total: string;
+  delivery_method: StoreDeliveryMethod;
+}
+
+export interface StoreStockLocation {
+  id: string;
+  state_abbr: string | null;
+  name: string;
+  address1: string | null;
+  city: string | null;
+  zipcode: string | null;
+  country_iso: string | null;
+  country_name: string | null;
+  state_text: string | null;
+}
+
+export interface StorePaymentMethod {
+  id: string;
+  name: string;
+  description: string | null;
+  type: string;
+  session_required: boolean;
+  source_required: boolean;
+}
+
+export interface StoreCartLine extends StoreOrderLine {
+  variant_id: string;
+  preorder: boolean;
+  preorder_ships_at: string | null;
+  currency: string;
+  price: string | null;
+  total: string | null;
+  adjustment_total: string | null;
+  display_adjustment_total: string | null;
+  additional_tax_total: string | null;
+  display_additional_tax_total: string | null;
+  included_tax_total: string | null;
+  display_included_tax_total: string | null;
+  discount_total: string | null;
+  display_discount_total: string | null;
+  pre_tax_amount: string | null;
+  display_pre_tax_amount: string | null;
+  discounted_amount: string | null;
+  display_discounted_amount: string | null;
+  display_compare_at_amount: string | null;
+  compare_at_amount: string | null;
+}
+
+export interface StoreCartFulfillment extends StoreOrderFulfillment {
+  number: string;
+  cost: string | null;
+  display_cost: string | null;
+  total: string | null;
+  display_total: string | null;
+  fulfillment_type: string;
+  items: Array<{ item_id: string; variant_id: string; quantity: number }>;
+  delivery_method: StoreDeliveryMethod;
+  stock_location: StoreStockLocation;
+  delivery_rates: StoreDeliveryRate[];
+}
+
+export interface StoreCartPayment extends StoreOrderPayment {
+  payment_method_id: string;
+  response_code: string | null;
+  number: string;
+  amount: string | null;
+  source_id: string | null;
+  payment_method: StorePaymentMethod;
+}
+
+/** A completed order as returned by cart completion (the SDK `Order` shape). */
+export interface StoreCompletedOrder
+  extends StoreOrderDetail,
+    StoreOrderTotals {
+  market_id: string | null;
+  channel_id: string | null;
+  email: string;
+  currency: string;
+  locale: string | null;
+  total_quantity: number;
+  item_total: string | null;
+  adjustment_total: string | null;
+  display_adjustment_total: string | null;
+  included_tax_total: string | null;
+  display_included_tax_total: string | null;
+  additional_tax_total: string | null;
+  display_additional_tax_total: string | null;
+  delivery_total: string | null;
+  covered_by_store_credit: boolean;
+  discounts: StoreDiscount[];
+  items: StoreCartLine[];
+  fulfillments: StoreCartFulfillment[];
+  payments: StoreCartPayment[];
+  billing_address: StoreAddress | null;
+  shipping_address: StoreAddress | null;
+  gift_card: StoreGiftCard | null;
+  market: StoreMarket | null;
+}
+
+export interface StoreCart
+  extends Omit<
+    StoreCompletedOrder,
+    "email" | "completed_at" | "payment_status" | "fulfillment_status"
+  > {
+  token: string;
+  email: string | null;
+  warnings: Array<{
+    code: string;
+    message: string;
+    line_item_id?: string;
+    variant_id?: string;
+  }>;
+  current_step: string;
+  completed_steps: string[];
+  requirements: Array<{ step: string; field: string; message: string }>;
+  shipping_eq_billing_address: boolean;
+  payment_methods: StorePaymentMethod[];
+}
+
+export interface StoreCreateCartParams {
+  /** Arbitrary key-value metadata (stored, not returned in responses). */
+  metadata?: Record<string, unknown>;
+  items?: Array<{
+    variant_id: string;
+    quantity?: number;
+    metadata?: Record<string, unknown>;
+  }>;
+}
+
+export interface StoreChannel {
+  id: string;
+  name: string;
+  code: string;
+  active: boolean;
+  default: boolean;
+  storefront_access: string;
+  guest_checkout: boolean;
+}
+
 export interface AwjCategory {
   id: string;
   name: string;

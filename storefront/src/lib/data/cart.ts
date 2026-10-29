@@ -1,6 +1,5 @@
 "use server";
 
-import type { Cart, CreateCartParams } from "@spree/sdk";
 import { updateTag } from "next/cache";
 import {
   addAwjCartItem,
@@ -10,6 +9,7 @@ import {
 } from "@/lib/commerce/cart";
 import type { StorefrontCart } from "@/lib/commerce/cart-types";
 import type { PdpSelections } from "@/lib/commerce/pdp-gifting";
+import type { StoreCart, StoreCreateCartParams } from "@/lib/commerce/types";
 import {
   cacheTagSuffix,
   clearCartCookies,
@@ -112,7 +112,7 @@ function cartTag(surface: Surface): string {
  * a *confirmed* mismatch rejects, so this never hides a legitimate cart.
  */
 async function cartBelongsToSurface(
-  cart: Cart,
+  cart: StoreCart,
   surface: Surface,
 ): Promise<boolean> {
   if (!cart.channel_id) return true; // channel unknown — can't reject
@@ -132,7 +132,7 @@ async function cartBelongsToSurface(
 export async function getCart(
   explicitCartId?: string,
   surface: Surface = DEFAULT_SURFACE,
-): Promise<Cart | null> {
+): Promise<StoreCart | null> {
   const spreeToken = await getCartToken(surface);
   const token = await getAccessToken();
   const cartId = explicitCartId ?? (await getCartId(surface));
@@ -205,9 +205,9 @@ async function dropSurfaceCartCookies(surface: Surface): Promise<void> {
  * channel and inherits its no-guest-checkout rule.
  */
 export async function getOrCreateCart(
-  params?: CreateCartParams,
+  params?: StoreCreateCartParams,
   surface: Surface = DEFAULT_SURFACE,
-): Promise<Cart> {
+): Promise<StoreCart> {
   const existing = await getCart(undefined, surface);
   if (existing) return existing;
 

@@ -1,14 +1,14 @@
 "use client";
 
-import type { Cart } from "@spree/sdk";
 import { X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import type { StoreCart } from "@/lib/commerce/types";
 
 interface CouponCodeProps {
-  cart: Cart;
+  cart: StoreCart;
   onApply: (code: string) => Promise<{ success: boolean; error?: string }>;
   onRemoveDiscount: (
     code: string,
