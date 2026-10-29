@@ -9,10 +9,11 @@
 **Owner-stated context (added after the first review):** AWJ currently has **no real customers or tenants — every existing account is experimental.** The first version of this report returned NO-GO for the shared deployment mainly because the flag is global (one switch for all tenants). With only experimental accounts that is **not a blocker**: the blast radius of a global switch is experimental data only. The mandatory tests (tenant isolation, RBAC, payment refusal, compatibility) are unchanged and all pass.
 
 **GO** for enabling `COMMERCE_ORDER_CANCELLATION_ENABLED=true` on the current (experimental-only) deployment, **subject to**:
-1. **Owner confirms the deployment state** (§1.2) — still BLOCKED from this environment. Block if the cancellation-facts migration is not applied or the backend predates `e9761194`.
+1. **Owner confirms the deployment state** (§1.2) — still BLOCKED from this environment. Block if the cancellation-facts migration is not applied, or if the backend or storefront predates `e9761194`, or the staff web predates `f3d9f5635` (§6 minimum revisions).
 2. **Explicit owner approval of the activation itself** (this review performed no activation).
 3. **Right after activation, run the §5 smoke on the live experimental tenant** — including the storefront confirmation/customer surfaces that could not be browser-tested here (§2), with a sandbox payment gateway.
-4. Re-open this decision (back to NO-GO for that scope) **before** the first real tenant is onboarded if the flag is still global: either pilot per tenant (allowlist PR) or accept the global switch knowingly.
+4. Rollback is **switch-off only** (§6): the flag may be turned off at any time, but no layer may be reverted below its minimum compatible revision.
+5. Re-open this decision (back to NO-GO for that scope) **before** the first real tenant is onboarded if the flag is still global: either pilot per tenant (allowlist PR) or accept the global switch knowingly.
 
 Residual items that remain true but are no longer blocking in this context: the flag is global; deployment state unverified; storefront/customer browser E2E pending; no un-cancel path by design.
 
@@ -119,14 +120,28 @@ Suites run on main `e9761194`:
 6. Only then ask for the shared-production decision (separately authorised).
 
 ## 6. Rollback plan
-1. Set `COMMERCE_ORDER_CANCELLATION_ENABLED=false` (or remove) → restart (config cache). Effect: route 404, `cancel_action` hidden in staff UI, legacy intent-cancel restored.
-2. Orders already cancelled stay cancelled (public status `cancelled`, DB facts + guards intact); this is intended — do **not** roll back the migration (`down()` refuses while cancelled orders exist; fix-forward only).
-3. For a cancelled order wrongly closed: no un-cancel API exists by design (ADR-28); the remedy is a new order — decide before pilot.
-4. Code rollback of storefront/web is independent of the schema and safe (additive fields).
+
+**Principle: roll back by switching the feature off, never by reverting code to a version that cannot read or display cancelled orders.** Cancelled orders are permanent data; every deployed component that reads orders must keep understanding them.
+
+1. **Switch off:** set `COMMERCE_ORDER_CANCELLATION_ENABLED=false` (or remove it) → restart (config cache). Effect: the cancel route returns 404, `cancel_action` is hidden in the staff UI, the legacy intent-cancel route is restored.
+2. **What the switch does NOT do:** it prevents **new** cancellations only. Orders already cancelled **stay cancelled** — `cancelled_at` and the DB guards remain, the public contract keeps reading `status: "cancelled"` (+ `cancellation.cancelled_at`), their payment intents stay cancelled and their reservations stay released. There is no un-cancel (ADR-28); the remedy for a wrongly cancelled order is a new order.
+3. **Do NOT roll back to an older build of any layer (this replaces the earlier "frontend rollback is unconditionally safe" statement — P2 on #1785).** Minimum compatible revisions once any order may have been cancelled:
+
+| Layer | Minimum compatible revision | Why an older build is unsafe |
+|---|---|---|
+| Backend (Render) | `e9761194fd2788bfb40b7c72a025ac475aafb9f2` (O3c, #1781) | Older backends still return `status: "confirmed"` for a cancelled order, so buyers/guests would see it as active. Below O3a-1 (`e46efc8da`) the schema guards make a code rollback impossible once cancelled rows exist (`down()` refuses). |
+| Storefront (Vercel) | `e9761194fd2788bfb40b7c72a025ac475aafb9f2` (O3c, #1781; includes the confirmation-replay fix in `AwjOrderConfirmation`/`AwjCheckoutFlow` and the account list/detail/status handling) | A pre-O3c storefront renders `success.heading` + `success.notPaidNote` unconditionally in `Confirmation.tsx`, so a shopper replaying checkout completion after a lost response would see a **cancelled** order presented as successfully placed (and could be redirected to pay for it). |
+| Staff web (`web/`) | `f3d9f5635` (O3b, #1780) | Older staff UIs don't read `lifecycle_status` and would show a cancelled order as `confirmed`. |
+| #1784 (header note) | optional, cosmetic | Not a compatibility requirement. |
+
+   These are the SHAs of the approved squash merges on `main` (verified with `git log -S` on the introducing symbols). If a rollback of a layer is unavoidable, roll back to a build that **contains** the SHA above (e.g. a revert of unrelated later commits), never to one that predates it.
+4. **Schema:** never roll back migration `2026_12_13_010000_add_cancellation_facts_to_commerce_orders` once a cancelled order exists (`down()` refuses by design; fix forward only).
+5. **Rollback checklist:** (a) flip the flag off and restart; (b) confirm with the §1.2 probe that it now returns 404; (c) confirm the three layers are still at or above the minimums above; (d) spot-check one already-cancelled order on the storefront confirmation/guest read and the staff detail — it must still read "Cancelled".
 
 ## 7. Residual risks
 - Global (not per-tenant) flag → blast radius = whole deployment.
-- Deployment state unverified from here.
+- Deployment state unverified from here (and the three-layer minimum revisions in §6 must be verified there too).
+- Rolling a layer back below its §6 minimum revision would mis-display already-cancelled orders as active/placed — forbidden by the rollback plan.
 - No browser E2E for the storefront/customer surfaces (blocked as above); component + contract tests only.
 - No un-cancel / "wrongly cancelled" recovery path by design.
 - Cancelling a **paid** online order still requires the separate refund/return track (RT) — out of scope; staff are refused with a safe code.
@@ -134,7 +149,7 @@ Suites run on main `e9761194`:
 - `CommercePayable` relies on the intent status (not `cancelled_at`) — LOW defence-in-depth gap.
 
 ## 8. Conditions for GO (see Decision)
-1. Owner confirms deployment state per §1.2 (or authorises a pilot deployment).
+1. Owner confirms deployment state per §1.2, including that backend/storefront ≥ `e9761194` and staff web ≥ `f3d9f5635` (§6).
 2. Explicit owner approval to activate (not performed by this review).
 3. Merge #1784 (cosmetic, optional but recommended).
 4. Run the §5.4 scenarios on the live experimental tenant right after activation with a sandbox gateway and attach results.
