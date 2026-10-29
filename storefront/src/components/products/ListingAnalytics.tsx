@@ -1,11 +1,11 @@
 "use client";
 
-import type { Product } from "@spree/sdk";
 import { useEffect, useRef } from "react";
 import { trackViewItemList, trackViewSearchResults } from "@/lib/analytics/gtm";
+import type { StoreProductSummary } from "@/lib/commerce/types";
 
 interface ListingAnalyticsProps {
-  products: Product[];
+  products: StoreProductSummary[];
   listId: string;
   listName: string;
   currency?: string;

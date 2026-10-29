@@ -2,7 +2,7 @@
 
 import { Heart } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { type ComponentProps, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { AccountEmptyState } from "@/components/account/AccountEmptyState";
 import { AccountGatedNotice } from "@/components/account/AccountGatedNotice";
 import { ProductCard } from "@/components/products/ProductCard";
@@ -10,7 +10,7 @@ import { useWishlist } from "@/contexts/WishlistContext";
 import { WISHLIST_CAPABILITY } from "@/lib/commerce/capabilities";
 import { getProduct } from "@/lib/data/products";
 
-type CatalogProduct = ComponentProps<typeof ProductCard>["product"];
+type CatalogProduct = Awaited<ReturnType<typeof getProduct>>;
 
 const EMPTY_IDS: readonly string[] = [];
 

@@ -198,6 +198,46 @@ export type StoreProduct = import("@spree/sdk").Product & {
  * Spree-shaped values `mappers.ts` / the data layer still produce are assignable
  * with no cast, and nothing here imports the SDK.
  */
+/** T1-4 — a price as the cards, quick view and analytics read it. */
+export interface StorePrice {
+  id: string;
+  amount: string | null;
+  amount_in_cents: number | null;
+  compare_at_amount: string | null;
+  compare_at_amount_in_cents: number | null;
+  currency: string | null;
+  display_amount: string | null;
+  display_compare_at_amount: string | null;
+  price_list_id: string | null;
+}
+
+/** The variant fields analytics reads (id, sku, label, prices). */
+export interface StoreVariantSummary {
+  id: string;
+  sku: string | null;
+  options_text: string;
+  price: StorePrice;
+  original_price: StorePrice | null;
+}
+
+/**
+ * T1-4 — AWJ-owned summary of a product as catalogue cards, carousels, search
+ * suggestions, quick view and analytics read it. A structural subset of the
+ * Spree-shaped `Product` the mappers produce, so those values are assignable
+ * with no cast.
+ */
+export interface StoreProductSummary {
+  id: string;
+  name: string;
+  slug: string;
+  purchasable: boolean;
+  thumbnail_url: string | null;
+  default_variant_id: string;
+  price: StorePrice;
+  original_price: StorePrice | null;
+  categories?: StoreCategoryNode[];
+}
+
 export interface StorePaginationMeta {
   page: number;
   limit: number;

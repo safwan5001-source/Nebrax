@@ -1,5 +1,9 @@
 import { sendGTMEvent } from "@next/third-parties/google";
-import type { Cart, LineItem, Order, Product, Variant } from "@spree/sdk";
+import type { Cart, LineItem, Order } from "@spree/sdk";
+import type {
+  StoreProductSummary,
+  StoreVariantSummary,
+} from "@/lib/commerce/types";
 
 interface GA4Item {
   item_id: string;
@@ -19,7 +23,7 @@ interface ItemMappingOptions {
   index?: number;
   listId?: string;
   listName?: string;
-  variant?: Variant | null;
+  variant?: StoreVariantSummary | null;
 }
 
 function safeParseFloat(value: string | undefined | null): number {
@@ -28,7 +32,7 @@ function safeParseFloat(value: string | undefined | null): number {
 }
 
 export function mapProductToGA4Item(
-  product: Product,
+  product: StoreProductSummary,
   options: ItemMappingOptions = {},
 ): GA4Item {
   const { index, listId, listName, variant } = options;
@@ -129,7 +133,7 @@ function pushEcommerceEvent(
 let lastViewItemListKey: string | null = null;
 
 export function trackViewItemList(
-  products: Product[],
+  products: StoreProductSummary[],
   listId: string,
   listName: string,
   currency: string,
@@ -151,7 +155,7 @@ export function trackViewItemList(
 }
 
 export function trackSelectItem(
-  product: Product,
+  product: StoreProductSummary,
   listId: string,
   listName: string,
   index: number,
@@ -166,9 +170,9 @@ export function trackSelectItem(
 }
 
 export function trackViewItem(
-  product: Product,
+  product: StoreProductSummary,
   currency: string,
-  variant?: Variant | null,
+  variant?: StoreVariantSummary | null,
 ): void {
   const item = mapProductToGA4Item(product, { variant });
   pushEcommerceEvent("view_item", {
@@ -179,8 +183,8 @@ export function trackViewItem(
 }
 
 export function trackAddToCart(
-  product: Product,
-  variant: Variant | null,
+  product: StoreProductSummary,
+  variant: StoreVariantSummary | null,
   quantity: number,
   currency: string,
 ): void {
@@ -289,7 +293,7 @@ export function trackPurchase(order: Cart | Order): void {
 }
 
 export function trackQuickSearch(
-  products: Product[],
+  products: StoreProductSummary[],
   searchTerm: string,
   currency: string,
 ): void {
@@ -309,7 +313,7 @@ export function trackQuickSearch(
 let lastViewSearchResultsKey: string | null = null;
 
 export function trackViewSearchResults(
-  products: Product[],
+  products: StoreProductSummary[],
   searchTerm: string,
   currency: string,
 ): void {
