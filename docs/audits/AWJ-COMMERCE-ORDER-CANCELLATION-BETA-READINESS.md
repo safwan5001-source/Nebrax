@@ -1,0 +1,131 @@
+# AWJ — Commerce Order Cancellation: Beta Readiness Review
+
+- **Reviewed main:** `e9761194fd2788bfb40b7c72a025ac475aafb9f2` (includes O3a-1 #1774, O3a-2a #1775, O3a-2b #1777, O3b #1780, O3c #1781)
+- **Scope guard:** review only. Nothing was merged, deployed or activated on any shared/published environment. The gate was turned on **only** inside a throwaway local process (see §2).
+- **Side PR (separate, unmerged):** #1784 — one-line staff-UI copy fix found in the E2E (§3.2).
+
+## Decision
+
+**NO-GO for flipping `COMMERCE_ORDER_CANCELLATION_ENABLED` on the shared production deployment.**
+**GO for a dedicated pilot/staging deployment** with the flag on, once the conditions in §8 are met.
+
+Reason: behaviour, safety and compatibility are verified (all PASS below), but (a) the flag is **global per deployment, not per tenant** — a "few pilot accounts" rollout is impossible on a shared instance without either a separate deployment or a small code change (per-tenant allowlist); (b) the real deployment state could not be verified from this environment (BLOCKED); (c) a browser E2E against the real storefront confirmation/customer surfaces was not possible (§2).
+
+## Summary table
+
+| # | Condition | Result |
+|---|---|---|
+| 1a | Merged code compatible with the hosting setup (Render Docker + entrypoint migrations) | PASS (by inspection) |
+| 1b | What is actually deployed | **BLOCKED** (no hosting access) |
+| 1c | Flag default closed; activation / rollback mechanism | PASS (with caveat: global flag) |
+| 2 | Browser E2E (staff UI) on isolated stack | PASS (partial scope, see §2) |
+| 2b | Browser E2E of storefront confirmation / account / payment-return | **BLOCKED** (needs gate + seeded storefront stack; account order pages are `design_only`) |
+| 3 | Public `status` consumer audit | PASS — no blocking gap; 1 minor staff-UI copy bug fixed in #1784 |
+| 4 | Safety verification (isolation, RBAC, paid-order refusal, single release, no accounting, no provider call under lock, late_capture, closed default) | PASS |
+
+## 1. Deployment readiness
+
+### 1.1 Compatibility with hosting — PASS (inspection)
+- Backend ships as a Docker image (`render.yaml`, `deploy/DEPLOY.md`); `deploy/entrypoint.sh` runs `php artisan migrate --force` on **every boot** (5 retries, `exit 1` on failure, so the previous healthy version keeps serving), then `config:cache` + `route:cache`.
+- The only schema change in the cancellation chain is `2026_12_13_010000_add_cancellation_facts_to_commerce_orders` (4 nullable columns, an index, and DB guard triggers/functions on PostgreSQL). Additive; `down()` refuses once any cancelled order exists (fix-forward only).
+- Local migration + full cancellation suites pass on SQLite and PostgreSQL 16 (below).
+- Storefront (`storefront/vercel.json`): Vercel deploys `main` automatically (`git.deploymentEnabled.main = true`). The backend Blueprint declares no `autoDeploy` override.
+
+### 1.2 What is actually deployed — BLOCKED
+This environment has no access to Render/Railway/Vercel dashboards or the production database, so "merged" ≠ "deployed" cannot be resolved here. **Do not assume.** Verification commands for the owner:
+- Render → service `nibras-api` → Events: last deploy is *successful* and at/after merge of #1781 (commit `e9761194`).
+- DB: `SELECT migration FROM migrations ORDER BY id DESC LIMIT 5;` must list `2026_12_13_010000_add_cancellation_facts_to_commerce_orders`.
+- Vercel: the storefront and `web/` production deployments reference `e9761194` (or later).
+- `GET /api/commerce/orders/<any uuid>/cancel` (authenticated POST) must return **404** (gate closed) — this also proves the flag state without revealing any secret.
+
+### 1.3 Flag, activation and rollback — PASS with caveat
+- `config/commerce.php`: `'order_cancellation_enabled' => (bool) env('COMMERCE_ORDER_CANCELLATION_ENABLED', false)`. It appears in **no** `render.yaml`, `.env.example` or deploy file ⇒ closed everywhere by default.
+- Read at runtime in exactly 3 places (`CommerceStaffOrderCancellationController` → 404 when closed; `CommerceOrderLifecycleService::cancelAction` → hides the staff `cancel_action`; `CommercePaymentIntentController` → legacy intent-cancel delegation).
+- **Activate:** set `COMMERCE_ORDER_CANCELLATION_ENABLED=true` on the backend service and restart/redeploy (config is `config:cache`d at boot, so a restart is required). **Rollback:** unset/`false` + restart — the route returns to 404, the legacy intent-cancel route is byte-for-byte as before, and **already-cancelled orders stay cancelled** (the public contract keeps reading `cancelled`; the facts and DB guards remain). No data migration is involved either way.
+- **Caveat:** the flag is **global** (all tenants of that deployment). Permission `commerce.orders.cancel` is only held by `owner`/`admin`, so flipping it exposes cancellation to every tenant's owners/admins at once.
+
+## 2. Browser E2E
+
+Environment: throwaway local stack — SQLite file in the session scratchpad, `php artisan serve` with `COMMERCE_ORDER_CANCELLATION_ENABLED=true` set **only in that process**, `next dev` for `web/`, Playwright/Chromium. Not shared, not published, torn down afterwards. Seed: 1 tenant, owner, storefront, 2 COD orders (one awaiting collection, one collected).
+
+| Scenario | Result | Evidence |
+|---|---|---|
+| Cancel an unpaid order from the staff UI (dialog, reason select, confirm) | PASS | order showed «ملغى»; the cancel button disappeared |
+| Cancelled state in staff list and detail (AR) | PASS | list shows cancelled; both orders listed |
+| English + mobile (390 px) of the cancelled detail | PASS | "Cancelled / This order is cancelled. It remains a historical record…"; no horizontal scroll |
+| Rejection after collection | PASS | collected order offers no cancel action; direct API call → **409 `payment_collected`** |
+| Re-submit cancel | PASS | second POST (different reason) → **200**; original reason `customer_request` preserved |
+| No token | PASS | 401 |
+| No accounting/stock side effects | PASS | after cancel: journal_entries 0, stock_movements 0, invoices 0, payments 0, credit_notes 0; intent `cancelled`; order DB status still `confirmed` with `cancelled_at` set |
+| Payment/reservation behaviour (online intent, live attempt, release, late capture) | PASS via feature tests (§4) — not reproducible in a browser without a payment provider |
+| Storefront confirmation replay, customer account list/detail, payment-return in a browser | **BLOCKED** | needs the storefront gateway + domain stack and a lost-response replay; the account order pages are `ACCOUNT_ORDER_LOOKUP_CAPABILITY = design_only` (not wired to live data). Covered instead by component tests (ar/en/de/es/fr/pl) and the backend replay/contract tests. Not bypassed. |
+
+## 3. Compatibility audit
+
+### 3.1 Consumers of the public order `status`
+| Consumer | Finding |
+|---|---|
+| Storefront account list / detail / status | Handles `cancelled` (O3c). The pages themselves are `design_only` (no live lookup yet). |
+| Storefront checkout confirmation + flow | Handles a cancelled replay (O3c follow-up); never starts payment for it. |
+| Payment return | Driven by `payment-status` (has `cancelled`); no order-status assumption. |
+| Staff web (`commerce-workspace/orders`) | Uses `lifecycle_status`; handles `cancelled` (one copy bug, §3.2). |
+| Mobile (`mobile/lib`) | No order `status` handling exists (checkout/orders are only a documented contract). |
+| App Builder (`contracts/app-builder`, `DataResourceRegistry`) | No order status consumption. |
+| Order notifications | None found (`app/Notifications`, `app/Mail` don't reference `CommerceOrder`). |
+| Generated API clients | None (no openapi-generator/orval/openapi-typescript in the repo). |
+| `contracts/flowers-journey/11-order.json` | A confirmed order; unchanged and valid. |
+| Backend payment/posting paths | `CommercePayable::assertStillPayable` checks `status === confirmed` **and** intent `pending` — a cancelled order's intent is `cancelled`, so payment start is refused (defense relies on the intent; the ADR text says it also checks `cancelled_at` — LOW, defence-in-depth only, not a reachable defect because both change in one transaction). |
+
+**Gap statement:** no in-repo consumer breaks on `cancelled`. External strict clients (the owner's own apps/integrations) that enumerate `draft | confirmed` are the residual risk (documented as an intentional enum extension in OpenAPI and the O3c report); unreachable while the gate is closed.
+
+### 3.2 Confirmed small defect → separate PR #1784
+Staff order detail header still said "The order can be cancelled from this screen when eligible" on an already-cancelled order. One-line fix + test, no behaviour change (`claude/commerce-orders-cancelled-header-note`, unmerged).
+
+(Observation, not a defect: the staff detail shows two badges for a cancelled order — lifecycle and payment status — because they are separate dimensions by ADR-28.)
+
+## 4. Safety verification — PASS
+
+Suites run on main `e9761194`:
+- SQLite: `CommerceOrderCancellation*`, `CommerceIntentCancelSeparation`, `OnlineOrderStockHold`, `CommerceOrderPublicCancelled*`, `CommerceStaffOrder*`, `CommerceModuleBoundary`, `CommerceApiOpenApi`, `CommerceCustomerOrder`, `CommerceOrderStatus`, `StorefrontOnlinePayment`, `PaymentAttemptReconciler` → **217 passed, 10 skipped (3306 assertions)**.
+- PostgreSQL 16 (real concurrency, pcntl, no skips): cancellation + concurrency + public contract + stock hold + reconciler + online payment → **176 passed (2165 assertions)**.
+
+| Requirement | Evidence (tests) |
+|---|---|
+| Tenant isolation / IDOR | `another_tenants_user_cannot_cancel_and_the_id_cannot_be_guessed`; public: foreign reference/customer → uniform 404 |
+| RBAC | `only_an_explicitly_authorized_staff_member_can_cancel`; permission held by owner/admin only; warehouse-restricted users refused; disabled capability blocks |
+| No direct cancel of paid orders | rows 2, 5–8: collected / authorized / captured / paid / posted → 409; `cancel_vs_capture`, `cancel_vs_cod_collection` race tests (one winner) |
+| Hold released once | row 3 + `cancel_vs_the_sweeper…one_release`, `two_concurrent_cancellations_are_idempotent_with_one_effect` |
+| No ledger/stock/invoice/payment on cancel | `cancellation_creates_no_entry_invoice_payment_credit_note_or_stock_movement`; E2E counts above |
+| No provider call under DB locks | `the_provider_is_not_contacted_while_an_outer_transaction_is_open…`, PG `the_provider_is_contacted_only_after_commit_with_no_row_lock_held…`; static guard `the_lifecycle_service_never_uses_the_public_cancel_provider_calls_or_accounting_services` |
+| late_capture + retry | `a_capture_arriving_after_the_cancellation_is_a_late_capture…`, row 9 variants, `a_provider_failure_after_the_commit_leaves_a_consistent_cancelled_order_and_the_reconciler_finishes_it` |
+| Closed by default | `the_deployment_gate_is_closed_by_default_and_a_closed_gate_is_a_uniform_404`, `with_the_gate_closed_the_legacy_intent_cancel_route_is_unchanged` |
+
+## 5. Staged rollout plan (pilot accounts)
+
+1. **Verify deployment state** (§1.2). Block here if the migration is not applied or the backend is older than `e9761194`.
+2. **Pilot deployment, not the shared one.** Because the flag is global, use a dedicated pilot/staging backend + storefront (separate DB, or a copy of the pilot tenants), set the flag there only. *Alternative (needs a small, separate code PR + owner approval):* a per-tenant allowlist/setting checked next to the global flag.
+3. **Pre-flight on the pilot:** run the migration; confirm POST cancel is 404 before the flag, 200/409 after; confirm `commerce.orders.cancel` is held only by the intended owner/admin users.
+4. **Pilot scenarios (manual, with a sandbox payment gateway):** COD cancel; online order unpaid with/without a live attempt; attempt authorized/captured (expect 409); repeat cancel; late capture after cancel (expect `late_capture` review, no auto-refund); customer-side read via the guest reference and `me/orders`; storefront confirmation replay after lost response.
+5. **Observe 1–2 weeks:** reconciler/sweeper health, `late_capture` count, any 409 `payment_captured` support tickets, no `journal_entries` created by cancellations.
+6. Only then ask for the shared-production decision (separately authorised).
+
+## 6. Rollback plan
+1. Set `COMMERCE_ORDER_CANCELLATION_ENABLED=false` (or remove) → restart (config cache). Effect: route 404, `cancel_action` hidden in staff UI, legacy intent-cancel restored.
+2. Orders already cancelled stay cancelled (public status `cancelled`, DB facts + guards intact); this is intended — do **not** roll back the migration (`down()` refuses while cancelled orders exist; fix-forward only).
+3. For a cancelled order wrongly closed: no un-cancel API exists by design (ADR-28); the remedy is a new order — decide before pilot.
+4. Code rollback of storefront/web is independent of the schema and safe (additive fields).
+
+## 7. Residual risks
+- Global (not per-tenant) flag → blast radius = whole deployment.
+- Deployment state unverified from here.
+- No browser E2E for the storefront/customer surfaces (blocked as above); component + contract tests only.
+- No un-cancel / "wrongly cancelled" recovery path by design.
+- Cancelling a **paid** online order still requires the separate refund/return track (RT) — out of scope; staff are refused with a safe code.
+- External strict clients of the public `status` enum (owner-controlled apps) — unreachable until the gate opens; coordinate before pilot.
+- `CommercePayable` relies on the intent status (not `cancelled_at`) — LOW defence-in-depth gap.
+
+## 8. Conditions to turn NO-GO into GO (pilot)
+1. Owner confirms deployment state per §1.2 (or authorises a pilot deployment).
+2. Decide pilot topology: dedicated deployment (no code) **or** approve a per-tenant allowlist PR.
+3. Merge #1784 (cosmetic, optional but recommended).
+4. Run the §5.4 scenarios on the pilot with a sandbox gateway and attach results.
