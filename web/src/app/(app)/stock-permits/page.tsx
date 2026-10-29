@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { type ColumnDef } from '@tanstack/react-table';
-import { Plus } from 'lucide-react';
+import { Plus, Upload } from 'lucide-react';
 import { AdvancedFilterDialog } from '@/components/data-explorer/advanced-filter-dialog';
 import { DataTable } from '@/components/data-table';
 import { ListToolbar, PageHeader, Pagination, type PageAction, type SortOption } from '@/components/nebrax';
@@ -54,7 +54,7 @@ export default function StockPermitsPage(){
   {accessorKey:'status',header:t('status'),cell:({row})=><Badge tone={row.original.status==='posted'?'positive':'muted'}>{t(row.original.status)}</Badge>},
  ],[t]);
  const sortOptions:SortOption[]=[{value:'-permit_date',label:`${t('date')} ↓`},{value:'permit_date',label:`${t('date')} ↑`},{value:'number',label:t('number')},{value:'warehouse',label:t('warehouse')},{value:'type',label:t('type')},{value:'-total_cost',label:`${t('total_cost')} ↓`},{value:'total_cost',label:`${t('total_cost')} ↑`},{value:'status',label:t('status')}];
- const actions:PageAction[]=[{key:'create',label:t('create'),icon:Plus,href:'/stock-permits/new',variant:'primary'}];
+ const actions:PageAction[]=[{key:'create',label:t('create'),icon:Plus,href:'/stock-permits/new',variant:'primary'},{key:'import',label:t('import_from_file'),icon:Upload,href:'/stock-permits/import',variant:'outline',emphasis:'secondary'}];
  return <div className="space-y-4">
   <PageHeader title={t('title')} context={<BranchViewToggle value={view} onChange={next=>{setView(next);setExplorer(c=>({...c,page:1}))}}/>} actions={actions}/>
   <ListToolbar search={searchInput} searchPlaceholder={t('search')} searchLabel={t('title')} onSearchChange={setSearchInput} definitions={definitions} filters={labelled} onFilterChange={updateFilter} onRemoveFilter={key=>setExplorer(c=>({...c,page:1,filters:removeFilter(c.filters,key)}))} onClearFilters={()=>setExplorer(c=>({...c,page:1,filters:[]}))} onOpenAdvanced={()=>setAdvancedOpen(true)} sort={{value:explorer.sort??'-permit_date',onChange:value=>setExplorer(c=>({...c,page:1,sort:value})),options:sortOptions}} resultCount={sorted.length} totalCount={data.length}/>
