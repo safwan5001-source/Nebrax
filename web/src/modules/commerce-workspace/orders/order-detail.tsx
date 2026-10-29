@@ -322,7 +322,7 @@ export function OrderDetailView({ id }: { id: string }) {
       }
       meta={
         <span>
-          {formatDateTime(order.created_at, locale)} · <bdi>{order.channel.storefront_name ?? order.channel.sales_channel_name ?? '—'}</bdi> · {cancelAction ? t('cancelEnabledNote') : t('readOnlyNote')}
+          {formatDateTime(order.created_at, locale)} · <bdi>{order.channel.storefront_name ?? order.channel.sales_channel_name ?? '—'}</bdi> · {cancelAction && !isCancelled ? t('cancelEnabledNote') : t('readOnlyNote')}
         </span>
       }
       actionsSlot={

@@ -149,4 +149,24 @@ describe('OrderDetailView', () => {
     for (const word of ['Cancel', 'Accept', 'Collect', 'Ship', 'Invoice']) expect(names.some((n) => n.includes(word))).toBe(false);
     expect(document.querySelector('form')).toBeNull();
   });
+
+  it('the header advertises cancellation only for an order that can still be cancelled (not for a cancelled one)', async () => {
+    locale.current = 'en';
+    fetchOrderMock.mockResolvedValue(detailFixture({ cancel_action: { available: true, blocked_reason: null } }));
+    const { unmount } = render(<OrderDetailView id="o1" />);
+    await screen.findByRole('alert');
+    expect(screen.getAllByText(/can be cancelled from this screen/).length).toBe(1);
+    unmount();
+    fetchOrderMock.mockResolvedValue(
+      detailFixture({
+        status: 'confirmed',
+        lifecycle_status: 'cancelled',
+        cancel_action: { available: false, blocked_reason: 'already_cancelled' },
+      }),
+    );
+    render(<OrderDetailView id="o1" />);
+    await screen.findAllByText('Cancelled');
+    expect(screen.queryAllByText(/can be cancelled from this screen/).length).toBe(0);
+    expect(screen.getAllByText(/Read only/).length).toBe(1);
+  });
 });
