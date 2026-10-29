@@ -1,6 +1,7 @@
 "use server";
 
-import type { Channel, ProductListParams } from "@spree/sdk";
+import type { Channel } from "@spree/sdk";
+import type { StoreProductListParams } from "@/lib/commerce/types";
 import {
   getAccessToken,
   getWholesaleClient,
@@ -39,7 +40,7 @@ export async function getWholesaleChannel(): Promise<Channel | null> {
 // fetcher props expect. The channel 401s guests, so these must run for an
 // authenticated, approved buyer.
 
-export async function getWholesaleProducts(params?: ProductListParams) {
+export async function getWholesaleProducts(params?: StoreProductListParams) {
   return getProductsBySurface(params, "wholesale");
 }
 

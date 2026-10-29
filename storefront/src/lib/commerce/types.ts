@@ -366,6 +366,54 @@ export interface StoreProductFull extends StoreProductDetail {
   prior_price?: StorePriceHistory | null;
 }
 
+/**
+ * T1-7 — AWJ-owned catalogue request parameters. Field-for-field the shape the
+ * listing/query helpers already build (page, limit, sort, expand, fields plus
+ * the catalogue filters and Ransack-style predicates), so existing
+ * request-building code and its serialised query strings are unchanged.
+ */
+export interface StoreListParams {
+  page?: number;
+  limit?: number;
+  /** Sort order. Prefix with `-` for descending; comma-separated for several. */
+  sort?: string;
+  /** Associations to expand (dot notation allowed). */
+  expand?: string[];
+  /** Fields to include in the response. */
+  fields?: string[];
+}
+
+export interface StoreProductListParams extends StoreListParams {
+  /** Full-text search across name and SKU. */
+  search?: string;
+  /** Filter: name contains. */
+  name_cont?: string;
+  /** Filter: price >= value. */
+  price_gte?: number;
+  /** Filter: price <= value. */
+  price_lte?: number;
+  /** Filter by option value ids. */
+  with_option_value_ids?: string[];
+  /** Filter: only in-stock products. */
+  in_stock?: boolean;
+  /** Filter: only out-of-stock products. */
+  out_of_stock?: boolean;
+  /** Filter: products in category (includes descendants). */
+  in_category?: string;
+  /** Filter: products in any of the given categories (OR). */
+  in_categories?: string[];
+  /** Any additional predicate. */
+  [key: string]: string | number | boolean | (string | number)[] | undefined;
+}
+
+export interface StoreCategoryListParams extends StoreListParams {
+  name_cont?: string;
+  parent_id_eq?: string | number;
+  depth_eq?: number;
+  /** Any additional predicate. */
+  [key: string]: string | number | boolean | (string | number)[] | undefined;
+}
+
 export interface StorePaginationMeta {
   page: number;
   limit: number;

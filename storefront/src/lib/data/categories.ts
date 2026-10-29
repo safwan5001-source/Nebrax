@@ -1,8 +1,11 @@
 "use server";
 
-import type { CategoryListParams, ProductListParams } from "@spree/sdk";
 import { fetchCategories, fetchCategory } from "@/lib/commerce/categories";
 import { fetchProducts } from "@/lib/commerce/products";
+import type {
+  StoreCategoryListParams,
+  StoreProductListParams,
+} from "@/lib/commerce/types";
 
 /**
  * COM-7-P1: category data now comes from the AWJ Store catalog adapter
@@ -18,7 +21,7 @@ import { fetchProducts } from "@/lib/commerce/products";
  * resolved tenant/channel (see `StorefrontCategoryController::index()`).
  */
 export async function getCategories(
-  _params?: CategoryListParams,
+  _params?: StoreCategoryListParams,
   _options?: { locale?: string; country?: string },
 ) {
   return fetchCategories();
@@ -41,7 +44,7 @@ export async function cachedGetCategory(
 
 export async function getCategoryProducts(
   categoryId: string,
-  params?: ProductListParams,
+  params?: StoreProductListParams,
 ) {
   return fetchProducts({ ...params, in_category: categoryId });
 }
