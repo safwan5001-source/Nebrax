@@ -1,10 +1,8 @@
-import type { Cart, Order } from "@spree/sdk";
 import { useTranslations } from "next-intl";
-
-type OrderLike = Cart | Order;
+import type { StoreOrderTotals } from "@/lib/commerce/types";
 
 interface OrderTotalsProps {
-  order: OrderLike;
+  order: StoreOrderTotals;
 }
 
 export function OrderTotals({ order }: OrderTotalsProps) {

@@ -1,4 +1,3 @@
-import type { Order } from "@spree/sdk";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
@@ -7,10 +6,11 @@ import { FulfillmentBlock } from "@/components/order/FulfillmentBlock";
 import { LineItemCard } from "@/components/order/LineItemCard";
 import { OrderTotals } from "@/components/order/OrderTotals";
 import { PaymentInfo } from "@/components/order/PaymentInfo";
+import type { StoreOrderDetail } from "@/lib/commerce/types";
 import { formatDateTime } from "@/lib/utils/format";
 
 interface OrderDetailProps {
-  order: Order;
+  order: StoreOrderDetail;
   basePath: string;
   locale: string;
 }

@@ -1,10 +1,14 @@
-import type { CreditCard, Payment, StoreCredit } from "@spree/sdk";
 import { useTranslations } from "next-intl";
 import { PaymentIcon } from "react-svg-credit-card-payment-icons";
+import type {
+  StoreOrderCard,
+  StoreOrderPayment,
+  StoreOrderStoreCredit,
+} from "@/lib/commerce/types";
 import { getCardIconType, getCardLabel } from "@/lib/utils/credit-card";
 
 interface PaymentInfoProps {
-  payment: Payment;
+  payment: StoreOrderPayment;
   /** Label override for store credit payments (e.g. "Gift Card") */
   storeCreditLabel?: string;
 }
@@ -14,7 +18,7 @@ export function PaymentInfo({ payment, storeCreditLabel }: PaymentInfoProps) {
   const source = payment.source;
 
   if (payment.source_type === "credit_card" && source) {
-    const card = source as CreditCard;
+    const card = source as StoreOrderCard;
     return (
       <div className="flex items-center gap-3">
         <PaymentIcon
@@ -41,7 +45,7 @@ export function PaymentInfo({ payment, storeCreditLabel }: PaymentInfoProps) {
   }
 
   if (payment.source_type === "store_credit" && source) {
-    const credit = source as StoreCredit;
+    const credit = source as StoreOrderStoreCredit;
     const label = storeCreditLabel || t("storeCredit");
     return (
       <div>
