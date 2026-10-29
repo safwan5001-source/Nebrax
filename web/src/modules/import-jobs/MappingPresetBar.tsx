@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { BookmarkPlus, Check, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -47,6 +47,21 @@ export function MappingPresetBar({ domain, columns, mapping, fieldKeys, onApply 
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const allowed = useMemo(() => new Set(fieldKeys), [fieldKeys]);
+  // رمز الدورة: أي ردٍّ متأخر لتطبيقٍ/حفظٍ بدأ قبل تغيّر الملف (عناوين أعمدة أخرى) أو قبل إزالة الشريط يُهمَل، فلا يكتب مطابقة ملفٍ قديم فوق ملفٍ جديد.
+  const epoch = useRef(0);
+  const headerKey = columns.map((column) => column.header ?? '').join('\u0001');
+  useEffect(() => {
+    epoch.current += 1;
+  }, [headerKey, domain]);
+  useEffect(
+    () => () => {
+      epoch.current += 1;
+    },
+    []
+  );
+  // المطابقة الحالية وقت وصول الرد لا وقت النقر: تعديلٌ يدوي أثناء الطلب لا يُمحى.
+  const mappingRef = useRef(mapping);
+  mappingRef.current = mapping;
 
   useEffect(() => {
     let cancelled = false;
@@ -72,13 +87,15 @@ export function MappingPresetBar({ domain, columns, mapping, fieldKeys, onApply 
     setBusy(true);
     setError(null);
     setNote(null);
+    const ticket = epoch.current;
     try {
       const match = await matchMappingPreset(current.id, columns.map((column) => column.header ?? ''));
-      const merged = mergePresetMapping(mapping, match, allowed);
+      if (ticket !== epoch.current) return;
+      const merged = mergePresetMapping(mappingRef.current, match, allowed);
       onApply(merged.mapping);
       setNote(t('applied', { applied: merged.applied, unmatched: match.unmatched.length }) + (merged.dropped > 0 ? ` ${t('dropped', { count: merged.dropped })}` : ''));
     } catch (err) {
-      fail(err);
+      if (ticket === epoch.current) fail(err);
     } finally {
       setBusy(false);
     }

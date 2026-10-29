@@ -63,6 +63,64 @@ describe('MappingPresetBar (IMP-H8-S2b)', () => {
     expect(screen.getByText('applied:1,2')).toBeTruthy();
   });
 
+  it('discards a late match response after the file changed or the bar was removed, and merges into the CURRENT mapping', async () => {
+    let release: (value: unknown) => void = () => undefined;
+    const pending = () => new Promise((resolve) => { release = resolve; });
+    api.mockImplementation((path: string) => {
+      if (path.startsWith('/import-mapping-presets?')) return Promise.resolve({ data: [preset()] });
+      if (path.endsWith('/match')) return pending();
+      return Promise.resolve({ data: {} });
+    });
+    const user = userEvent.setup();
+    const onApply = vi.fn();
+    const element = (cols: typeof columns, mapping: Record<number, string | null>) => (
+      <MappingPresetBar domain="stock_permit_import" columns={cols} mapping={mapping} fieldKeys={fieldKeys} onApply={onApply} />
+    );
+    const view = render(element(columns, { 0: 'sku', 1: 'quantity', 2: null }));
+    await waitFor(() => expect(screen.getByRole('option', { name: 'مورد أ' })).toBeTruthy());
+    await user.selectOptions(screen.getByRole('combobox'), 'p1');
+    await user.click(screen.getByRole('button', { name: 'apply' }));
+
+    // 1) الملف تغيّر (عناوين مختلفة) قبل وصول الرد ⇒ يُهمَل
+    view.rerender(element([{ index: 0, header: 'Other' }, { index: 1, header: 'Cols' }], { 0: null, 1: null }));
+    release({ data: { mapping: { 0: 'sku', 1: 'quantity', 2: null }, matched: 2, unmatched: [2] } });
+    await waitFor(() => expect(api.mock.calls.some((call) => String(call[0]).endsWith('/match'))).toBe(true));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(onApply).not.toHaveBeenCalled();
+
+    // 2) إزالة الشريط قبل وصول الرد ⇒ يُهمَل
+    view.rerender(element(columns, { 0: 'sku', 1: 'quantity', 2: null }));
+    await user.selectOptions(screen.getByRole('combobox'), 'p1');
+    await user.click(screen.getByRole('button', { name: 'apply' }));
+    view.unmount();
+    release({ data: { mapping: { 0: 'sku', 1: 'quantity', 2: null }, matched: 2, unmatched: [2] } });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(onApply).not.toHaveBeenCalled();
+  });
+
+  it('merges into the mapping as it is when the response arrives, not as it was when Apply was clicked', async () => {
+    let release: (value: unknown) => void = () => undefined;
+    api.mockImplementation((path: string) => {
+      if (path.startsWith('/import-mapping-presets?')) return Promise.resolve({ data: [preset()] });
+      if (path.endsWith('/match')) return new Promise((resolve) => { release = resolve; });
+      return Promise.resolve({ data: {} });
+    });
+    const user = userEvent.setup();
+    const onApply = vi.fn();
+    const element = (mapping: Record<number, string | null>) => (
+      <MappingPresetBar domain="stock_permit_import" columns={columns} mapping={mapping} fieldKeys={fieldKeys} onApply={onApply} />
+    );
+    const view = render(element({ 0: null, 1: null, 2: null }));
+    await waitFor(() => expect(screen.getByRole('option', { name: 'مورد أ' })).toBeTruthy());
+    await user.selectOptions(screen.getByRole('combobox'), 'p1');
+    await user.click(screen.getByRole('button', { name: 'apply' }));
+
+    // أثناء الطلب عدّل المستخدم العمود 2 يدوياً
+    view.rerender(element({ 0: null, 1: null, 2: 'unit_cost' }));
+    release({ data: { mapping: { 0: 'sku', 1: null, 2: null }, matched: 1, unmatched: [1, 2] } });
+    await waitFor(() => expect(onApply).toHaveBeenCalledWith({ 0: 'sku', 1: null, 2: 'unit_cost' }));
+  });
+
   it('skips a saved field the current file contract does not know and says so', async () => {
     api.mockImplementation((path: string) => {
       if (path.startsWith('/import-mapping-presets?')) return Promise.resolve({ data: [preset()] });
