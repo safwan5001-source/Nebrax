@@ -1,6 +1,5 @@
 "use client";
 
-import type { Product } from "@spree/sdk";
 import { Eye, Loader2, ShoppingBag } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -14,9 +13,10 @@ import {
 } from "@/components/ui/dialog";
 import { ProductImage } from "@/components/ui/product-image";
 import { useCart } from "@/contexts/CartContext";
+import type { StoreProductSummary } from "@/lib/commerce/types";
 
 interface QuickViewProps {
-  product: Product;
+  product: StoreProductSummary;
   basePath: string;
   categoryId?: string;
   isVariantManaged: boolean;

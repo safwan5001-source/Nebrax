@@ -1,6 +1,5 @@
 "use client";
 
-import type { Product } from "@spree/sdk";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { memo, useState } from "react";
@@ -12,11 +11,12 @@ import { WishlistButton } from "@/components/products/WishlistButton";
 import { ProductImage } from "@/components/ui/product-image";
 import { useCart } from "@/contexts/CartContext";
 import { trackSelectItem } from "@/lib/analytics/gtm";
+import type { StoreProductSummary } from "@/lib/commerce/types";
 import { publishedProductCardBodyClass } from "@/lib/presentation/public-rhythm";
 import { cn } from "@/lib/utils";
 
 interface ProductCardProps {
-  product: Product;
+  product: StoreProductSummary;
   basePath?: string;
   categoryId?: string;
   index?: number;
@@ -43,7 +43,7 @@ export const ProductCard = memo(function ProductCard({
   const { addItem, surface } = useCart();
   const [adding, setAdding] = useState(false);
   const imageUrl =
-    (product as Product & { card_url?: string | null }).card_url ??
+    (product as StoreProductSummary & { card_url?: string | null }).card_url ??
     product.thumbnail_url ??
     null;
 

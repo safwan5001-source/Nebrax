@@ -1,6 +1,5 @@
 "use client";
 
-import type { Product } from "@spree/sdk";
 import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -15,6 +14,7 @@ import {
 import { ProductImage } from "@/components/ui/product-image";
 import { useStore } from "@/contexts/StoreContext";
 import { trackQuickSearch, trackSelectItem } from "@/lib/analytics/gtm";
+import type { StoreProductSummary } from "@/lib/commerce/types";
 import { getProducts } from "@/lib/data/products";
 
 interface SearchBarProps {
@@ -45,7 +45,7 @@ export function SearchBar({
   const { currency } = useStore();
   const t = useTranslations("products");
   const [query, setQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<Product[]>([]);
+  const [suggestions, setSuggestions] = useState<StoreProductSummary[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
@@ -122,7 +122,10 @@ export function SearchBar({
   };
 
   // Handle suggestion click
-  const handleSuggestionClick = (product: Product, index: number) => {
+  const handleSuggestionClick = (
+    product: StoreProductSummary,
+    index: number,
+  ) => {
     trackSelectItem(product, "quick-search", "Quick Search", index, currency);
     router.push(`${basePath}/products/${product.slug}`);
     setIsOpen(false);

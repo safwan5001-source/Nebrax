@@ -1,12 +1,12 @@
 "use client";
 
-import type { Product } from "@spree/sdk";
 import { usePublishedThemeMarker } from "@/components/layout/PublishedThemeMarker";
+import type { StoreProductSummary } from "@/lib/commerce/types";
 import { cn } from "@/lib/utils";
 import { ProductCard } from "./ProductCard";
 
 interface ProductGridProps {
-  products: Product[];
+  products: StoreProductSummary[];
   basePath?: string;
   categoryId?: string;
   listId?: string;

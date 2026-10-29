@@ -1,12 +1,12 @@
 "use client";
 
-import type { Product } from "@spree/sdk";
 import type { ReactElement } from "react";
 import { useCallback, useRef, useState } from "react";
 import type Swiper from "swiper";
 import { Navigation } from "swiper/modules";
 import { Swiper as SwiperComponent, SwiperSlide } from "swiper/react";
 import type { SwiperOptions } from "swiper/types";
+import type { StoreProductSummary } from "@/lib/commerce/types";
 import "swiper/css";
 import "swiper/css/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -14,7 +14,7 @@ import { useTranslations } from "next-intl";
 import { ProductCard } from "@/components/products/ProductCard";
 
 interface ProductCarouselProps {
-  products: Product[];
+  products: StoreProductSummary[];
   basePath: string;
   /** Optional currency used for analytics in each ProductCard. */
   currency?: string;
