@@ -192,6 +192,38 @@ class CommerceOrderCancellationTest extends TestCase
         $this->assertEquals($before, $this->world($order->id));
     }
 
+    #[Test]
+    public function the_non_mutating_gate_probe_tells_a_closed_gate_from_an_open_one(): void
+    {
+        // وسيلة التحقق التشغيلية الموثَّقة في تقرير الجاهزية: POST مصرَّح به بمدخل غير صالح عمداً وUUID صالح الشكل غير موجود.
+        // مغلقة ⇒ 404 (البوابة قبل التحقق)، مفتوحة ⇒ 422 (التحقق قبل البحث عن الطلب). لا طلب يُلمس في الحالتين.
+        $nil = '00000000-0000-0000-0000-000000000000';
+        $real = $this->cod();
+        $before = $this->world($real->id);
+        $invalid = ['reason' => '__gate_probe__'];
+
+        config(['commerce.order_cancellation_enabled' => false]);
+        $this->cancel($nil, $invalid)->assertNotFound();
+        $this->cancel($real->id, $invalid)->assertNotFound();
+
+        config(['commerce.order_cancellation_enabled' => true]);
+        $this->cancel($nil, $invalid)->assertStatus(422)->assertJsonValidationErrors('reason');
+        $this->cancel($real->id, $invalid)->assertStatus(422);
+        $this->assertEquals($before, $this->world($real->id), 'the probe never cancels or mutates a real order');
+        $this->assertNull($this->order($real->id)->cancelled_at);
+
+        // شروط التمييز: بلا رمز ⇒ 401، ومستخدم بلا صلاحية ⇒ 403 في الحالتين (الصلاحية/القدرة تسبق البوابة)،
+        // ومعرّف غير UUID ⇒ 404 من التوجيه مهما كانت البوابة (لا يصلح للتحقق).
+        $limited = $this->tokenFor($this->tenant, 'viewer');
+        foreach ([false, true] as $open) {
+            config(['commerce.order_cancellation_enabled' => $open]);
+            $this->flushHeaders(); // withToken() يترك ترويسة Authorization افتراضية بين الطلبات
+            $this->postJson("/api/commerce/orders/{$nil}/cancel", $invalid)->assertUnauthorized();
+            $this->cancel($nil, $invalid, $limited)->assertForbidden();
+            $this->cancel('not-a-uuid', $invalid)->assertNotFound();
+        }
+    }
+
     // ───────────────────────── مصفوفة الحالات §3 ─────────────────────────
 
     #[Test]

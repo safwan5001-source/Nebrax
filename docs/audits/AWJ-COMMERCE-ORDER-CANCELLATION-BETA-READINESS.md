@@ -4,12 +4,17 @@
 - **Scope guard:** review only. Nothing was merged, deployed or activated on any shared/published environment. The gate was turned on **only** inside a throwaway local process (see §2).
 - **Side PR (separate, unmerged):** #1784 — one-line staff-UI copy fix found in the E2E (§3.2).
 
-## Decision
+## Decision (revised for the Beta context)
 
-**NO-GO for flipping `COMMERCE_ORDER_CANCELLATION_ENABLED` on the shared production deployment.**
-**GO for a dedicated pilot/staging deployment** with the flag on, once the conditions in §8 are met.
+**Owner-stated context (added after the first review):** AWJ currently has **no real customers or tenants — every existing account is experimental.** The first version of this report returned NO-GO for the shared deployment mainly because the flag is global (one switch for all tenants). With only experimental accounts that is **not a blocker**: the blast radius of a global switch is experimental data only. The mandatory tests (tenant isolation, RBAC, payment refusal, compatibility) are unchanged and all pass.
 
-Reason: behaviour, safety and compatibility are verified (all PASS below), but (a) the flag is **global per deployment, not per tenant** — a "few pilot accounts" rollout is impossible on a shared instance without either a separate deployment or a small code change (per-tenant allowlist); (b) the real deployment state could not be verified from this environment (BLOCKED); (c) a browser E2E against the real storefront confirmation/customer surfaces was not possible (§2).
+**GO** for enabling `COMMERCE_ORDER_CANCELLATION_ENABLED=true` on the current (experimental-only) deployment, **subject to**:
+1. **Owner confirms the deployment state** (§1.2) — still BLOCKED from this environment. Block if the cancellation-facts migration is not applied or the backend predates `e9761194`.
+2. **Explicit owner approval of the activation itself** (this review performed no activation).
+3. **Right after activation, run the §5 smoke on the live experimental tenant** — including the storefront confirmation/customer surfaces that could not be browser-tested here (§2), with a sandbox payment gateway.
+4. Re-open this decision (back to NO-GO for that scope) **before** the first real tenant is onboarded if the flag is still global: either pilot per tenant (allowlist PR) or accept the global switch knowingly.
+
+Residual items that remain true but are no longer blocking in this context: the flag is global; deployment state unverified; storefront/customer browser E2E pending; no un-cancel path by design.
 
 ## Summary table
 
@@ -17,7 +22,7 @@ Reason: behaviour, safety and compatibility are verified (all PASS below), but (
 |---|---|---|
 | 1a | Merged code compatible with the hosting setup (Render Docker + entrypoint migrations) | PASS (by inspection) |
 | 1b | What is actually deployed | **BLOCKED** (no hosting access) |
-| 1c | Flag default closed; activation / rollback mechanism | PASS (with caveat: global flag) |
+| 1c | Flag default closed; activation / rollback mechanism; non-mutating gate verification | PASS (global flag acceptable in the experimental-only context) |
 | 2 | Browser E2E (staff UI) on isolated stack | PASS (partial scope, see §2) |
 | 2b | Browser E2E of storefront confirmation / account / payment-return | **BLOCKED** (needs gate + seeded storefront stack; account order pages are `design_only`) |
 | 3 | Public `status` consumer audit | PASS — no blocking gap; 1 minor staff-UI copy bug fixed in #1784 |
@@ -36,13 +41,17 @@ This environment has no access to Render/Railway/Vercel dashboards or the produc
 - Render → service `nibras-api` → Events: last deploy is *successful* and at/after merge of #1781 (commit `e9761194`).
 - DB: `SELECT migration FROM migrations ORDER BY id DESC LIMIT 5;` must list `2026_12_13_010000_add_cancellation_facts_to_commerce_orders`.
 - Vercel: the storefront and `web/` production deployments reference `e9761194` (or later).
-- `GET /api/commerce/orders/<any uuid>/cancel` (authenticated POST) must return **404** (gate closed) — this also proves the flag state without revealing any secret.
+- **Gate probe (non-mutating, replaces the earlier GET suggestion — P2 on #1785).** Send an authorized `POST /api/commerce/orders/00000000-0000-0000-0000-000000000000/cancel` with a deliberately **invalid** body, e.g. `{"reason":"__gate_probe__"}`:
+  - gate **closed** → **404** (the controller checks the gate first);
+  - gate **open** → **422** with a validation error on `reason` (validation runs **before** the order lookup, so a nonexistent UUID is fine and no order is ever read for cancellation, let alone cancelled — an invalid reason can never pass validation).
+  - Required conditions for the 404-vs-422 distinction to be meaningful: (a) a valid Sanctum token (else 401); (b) a user holding `commerce.orders.cancel` and a tenant with `commerce.storefront` enabled — otherwise the route middleware answers **403 regardless of the gate**; (c) the id must be UUID-shaped — a non-UUID id gets a routing 404 whatever the gate says; (d) never send a valid `reason` value.
+  - Proven by `CommerceOrderCancellationTest::the_non_mutating_gate_probe_tells_a_closed_gate_from_an_open_one` (closed → 404 / open → 422 for both a nil UUID and a real order id; the real order stays uncancelled and `world()` unchanged; 401 without token, 403 for an unauthorised user in both states, routing 404 for a non-UUID).
 
 ### 1.3 Flag, activation and rollback — PASS with caveat
 - `config/commerce.php`: `'order_cancellation_enabled' => (bool) env('COMMERCE_ORDER_CANCELLATION_ENABLED', false)`. It appears in **no** `render.yaml`, `.env.example` or deploy file ⇒ closed everywhere by default.
 - Read at runtime in exactly 3 places (`CommerceStaffOrderCancellationController` → 404 when closed; `CommerceOrderLifecycleService::cancelAction` → hides the staff `cancel_action`; `CommercePaymentIntentController` → legacy intent-cancel delegation).
 - **Activate:** set `COMMERCE_ORDER_CANCELLATION_ENABLED=true` on the backend service and restart/redeploy (config is `config:cache`d at boot, so a restart is required). **Rollback:** unset/`false` + restart — the route returns to 404, the legacy intent-cancel route is byte-for-byte as before, and **already-cancelled orders stay cancelled** (the public contract keeps reading `cancelled`; the facts and DB guards remain). No data migration is involved either way.
-- **Caveat:** the flag is **global** (all tenants of that deployment). Permission `commerce.orders.cancel` is only held by `owner`/`admin`, so flipping it exposes cancellation to every tenant's owners/admins at once.
+- **Caveat:** the flag is **global** (all tenants of that deployment); `commerce.orders.cancel` is held only by `owner`/`admin`. Acceptable while every tenant is experimental; revisit before onboarding the first real tenant.
 
 ## 2. Browser E2E
 
@@ -103,7 +112,7 @@ Suites run on main `e9761194`:
 ## 5. Staged rollout plan (pilot accounts)
 
 1. **Verify deployment state** (§1.2). Block here if the migration is not applied or the backend is older than `e9761194`.
-2. **Pilot deployment, not the shared one.** Because the flag is global, use a dedicated pilot/staging backend + storefront (separate DB, or a copy of the pilot tenants), set the flag there only. *Alternative (needs a small, separate code PR + owner approval):* a per-tenant allowlist/setting checked next to the global flag.
+2. **Activation scope.** With only experimental tenants, the current deployment can be used directly (global flag). Before the first real tenant: use a dedicated deployment or a per-tenant allowlist (small separate PR).
 3. **Pre-flight on the pilot:** run the migration; confirm POST cancel is 404 before the flag, 200/409 after; confirm `commerce.orders.cancel` is held only by the intended owner/admin users.
 4. **Pilot scenarios (manual, with a sandbox payment gateway):** COD cancel; online order unpaid with/without a live attempt; attempt authorized/captured (expect 409); repeat cancel; late capture after cancel (expect `late_capture` review, no auto-refund); customer-side read via the guest reference and `me/orders`; storefront confirmation replay after lost response.
 5. **Observe 1–2 weeks:** reconciler/sweeper health, `late_capture` count, any 409 `payment_captured` support tickets, no `journal_entries` created by cancellations.
@@ -124,8 +133,8 @@ Suites run on main `e9761194`:
 - External strict clients of the public `status` enum (owner-controlled apps) — unreachable until the gate opens; coordinate before pilot.
 - `CommercePayable` relies on the intent status (not `cancelled_at`) — LOW defence-in-depth gap.
 
-## 8. Conditions to turn NO-GO into GO (pilot)
+## 8. Conditions for GO (see Decision)
 1. Owner confirms deployment state per §1.2 (or authorises a pilot deployment).
-2. Decide pilot topology: dedicated deployment (no code) **or** approve a per-tenant allowlist PR.
+2. Explicit owner approval to activate (not performed by this review).
 3. Merge #1784 (cosmetic, optional but recommended).
-4. Run the §5.4 scenarios on the pilot with a sandbox gateway and attach results.
+4. Run the §5.4 scenarios on the live experimental tenant right after activation with a sandbox gateway and attach results.
