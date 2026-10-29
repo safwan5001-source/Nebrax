@@ -176,6 +176,26 @@ describe('StockPermitImportWizard (IMP-H7-S3b)', () => {
     expect((screen.getByRole('button', { name: 'run_preview' }) as HTMLButtonElement).disabled).toBe(false);
   });
 
+  it('adapts a late inspection response to the CURRENT type (no cost column re-bound after a type change)', async () => {
+    let release: (value: unknown) => void = () => undefined;
+    api.mockImplementation((path: string) => {
+      if (path === '/stock-permits/import/inspect') return new Promise((resolve) => { release = resolve; });
+      return defaultApi(path);
+    });
+    const user = userEvent.setup();
+    render(<StockPermitImportWizard />);
+    await chooseHeader(user);
+    await user.upload(screen.getByLabelText('step_file'), csv());
+    await waitFor(() => expect(api.mock.calls.some((call) => call[0] === '/stock-permits/import/inspect')).toBe(true));
+    await user.selectOptions(screen.getByLabelText('permit_type'), 'issue');
+    release({ data: inspection });
+
+    await waitFor(() => expect(screen.getByLabelText('التكلفة')).toBeTruthy());
+    expect((screen.getByLabelText('التكلفة') as HTMLSelectElement).value).toBe('');
+    expect(screen.queryByText('mapping_cost_receipt_only')).toBeNull();
+    expect((screen.getByRole('button', { name: 'run_preview' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it('refuses to apply a preview with errors and offers the error report', async () => {
     api.mockImplementation((path: string) => {
       if (path === '/stock-permits/import/preview') return Promise.resolve({ data: { ...cleanPreview, error_rows: 1, line_rows: 0, errors: [{ row: 3, messages: ['bad qty'] }], rows: [{ ...previewRow, valid: false, action: 'error', messages: ['bad qty'] }] } });

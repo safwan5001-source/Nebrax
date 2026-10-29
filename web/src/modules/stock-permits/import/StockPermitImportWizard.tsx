@@ -87,6 +87,10 @@ export function StockPermitImportWizard() {
   const inspectSeq = useRef(0);
   const previewSeq = useRef(0);
 
+  // الرأس الحالي وقت وصول ردّ الفحص لا وقت إرساله: تغيير النوع أثناء الفحص لا يعيد ربط عمود التكلفة الذي أُسقط.
+  const headerRef = useRef(header);
+  headerRef.current = header;
+
   const engine = useImportJobEngine('stock_permit_import');
   useResumeFromUrl((jobId) => {
     setResumedWithoutFile(true);
@@ -182,7 +186,7 @@ export function StockPermitImportWizard() {
       const response = await api<{ data: StockPermitInspectResult }>('/stock-permits/import/inspect', { method: 'POST', body: stockPermitInspectFormData(next, header) });
       if (seq !== inspectSeq.current) return;
       setInspection(response.data);
-      setMapping(suggestedStockPermitMapping(response.data.columns, header.permitType));
+      setMapping(suggestedStockPermitMapping(response.data.columns, headerRef.current.permitType));
     } catch (err) {
       if (seq !== inspectSeq.current) return;
       setInspection(null);

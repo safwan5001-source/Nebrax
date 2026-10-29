@@ -14,7 +14,7 @@
 - ar/en `stockPermitImport` block (95 keys, parity scripted: 0 differences) + `stockPermits.import_from_file`.
 
 ## Tests
-`contract.test.ts` 7 + `StockPermitImportWizard.test.tsx` 10 (17 total). Mutation controls — each fails a test when applied: file input not disabled without a header · job options using the empty field instead of the preview date · foreign-domain guard removed · type change not adapting the mapping · resume button not requiring a bound job.
+`contract.test.ts` 7 + `StockPermitImportWizard.test.tsx` 11 (18 total). Mutation controls — each fails a test when applied: file input not disabled without a header · job options using the empty field instead of the preview date · foreign-domain guard removed · type change not adapting the mapping · resume button not requiring a bound job · inspection response mapped with the type captured at send time (Codex P2).
 
 **Disclosed test limit:** removing `invalidatePreview()` from header changes survives the suite. It is unobservable for the reason documented in H4-S6b: after «back to setup» the stepper cannot move forward again and `runPreview()` replaces the preview itself. The call stays as defence in depth; the retained test asserts what is observable (the changed header is what the next preview and job freeze).
 
