@@ -1,8 +1,8 @@
-import type { OptionFilter } from "@spree/sdk";
 import { DropdownMenuCheckboxItem } from "@/components/ui/dropdown-menu";
+import type { StoreOptionFilter } from "@/lib/commerce/types";
 
 interface OptionDropdownContentProps {
-  filter: OptionFilter;
+  filter: StoreOptionFilter;
   selectedValues: string[];
   onToggle: (id: string) => void;
 }

@@ -1,8 +1,4 @@
-import type {
-  PaginatedResponse,
-  Product,
-  ProductFiltersResponse,
-} from "@spree/sdk";
+import type { Product } from "@spree/sdk";
 import { Search } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { type ReactElement, Suspense } from "react";
@@ -15,6 +11,10 @@ import {
   EMPTY_LISTING_FACETS,
   type ListingFacets,
 } from "@/lib/commerce/listing-facets";
+import type {
+  StoreProductFilters,
+  StoreProductPage,
+} from "@/lib/commerce/types";
 import { PRODUCT_CARD_FIELDS } from "@/lib/data/cached";
 import type { StorefrontListParams } from "@/lib/utils/listing-context";
 import {
@@ -45,11 +45,11 @@ interface ProductListingProps {
    */
   fetchProducts: (
     params: StorefrontListParams,
-  ) => Promise<PaginatedResponse<Product>>;
+  ) => Promise<StoreProductPage<Product>>;
   /** Fetcher for the facet data (filters + sort options). Server-only. */
   fetchFilters: (
     params: Record<string, unknown>,
-  ) => Promise<ProductFiltersResponse>;
+  ) => Promise<StoreProductFilters>;
   /** Shown when the fetch returns zero results. */
   emptyMessage?: string;
   /**

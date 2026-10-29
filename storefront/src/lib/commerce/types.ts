@@ -192,6 +192,92 @@ export type StoreProduct = import("@spree/sdk").Product & {
   gifting: import("./pdp-gifting").ProductGifting;
 };
 
+/**
+ * T1-3 — AWJ-owned listing presentation types. Each is the structural subset of
+ * the matching Spree SDK shape that the listing UI actually reads, so the
+ * Spree-shaped values `mappers.ts` / the data layer still produce are assignable
+ * with no cast, and nothing here imports the SDK.
+ */
+export interface StorePaginationMeta {
+  page: number;
+  limit: number;
+  count: number;
+  pages: number;
+  from: number;
+  to: number;
+  in: number;
+  previous: number | null;
+  next: number | null;
+}
+
+/** One page of a paginated listing (`data` + pagination `meta`). */
+export interface StoreProductPage<T> {
+  data: T[];
+  meta: StorePaginationMeta;
+}
+
+export interface StoreFilterOption {
+  id: string;
+  count: number;
+}
+
+export interface StoreOptionFilterOption extends StoreFilterOption {
+  name: string;
+  label: string;
+  position: number;
+  color_code: string | null;
+  image_url: string | null;
+}
+
+export interface StoreCategoryFilterOption {
+  id: string;
+  name: string;
+  permalink: string;
+  count: number;
+}
+
+export interface StorePriceRangeFilter {
+  id: "price";
+  type: "price_range";
+  min: number;
+  max: number;
+  currency: string;
+}
+
+export interface StoreAvailabilityFilter {
+  id: "availability";
+  type: "availability";
+  options: StoreFilterOption[];
+}
+
+export interface StoreOptionFilter {
+  id: string;
+  type: "option";
+  name: string;
+  label: string;
+  kind: string;
+  options: StoreOptionFilterOption[];
+}
+
+export interface StoreCategoryFilter {
+  id: "categories";
+  type: "category";
+  options: StoreCategoryFilterOption[];
+}
+
+export type StoreProductFilter =
+  | StorePriceRangeFilter
+  | StoreAvailabilityFilter
+  | StoreOptionFilter
+  | StoreCategoryFilter;
+
+export interface StoreProductFilters {
+  filters: StoreProductFilter[];
+  sort_options: { id: string }[];
+  default_sort: string;
+  total_count: number;
+}
+
 export interface AwjCategory {
   id: string;
   name: string;

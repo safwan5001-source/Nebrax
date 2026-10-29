@@ -1,16 +1,16 @@
 "use client";
 
-import type { AvailabilityFilter } from "@spree/sdk";
 import { useTranslations } from "next-intl";
 import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
+import type { StoreAvailabilityFilter } from "@/lib/commerce/types";
 import { getAvailabilityLabel } from "@/lib/utils/filters";
 import { type AvailabilityStatus, isAvailabilityStatus } from "@/types/filters";
 
 interface AvailabilityDropdownContentProps {
-  filter: AvailabilityFilter;
+  filter: StoreAvailabilityFilter;
   selected?: AvailabilityStatus;
   onChange: (value?: AvailabilityStatus) => void;
 }

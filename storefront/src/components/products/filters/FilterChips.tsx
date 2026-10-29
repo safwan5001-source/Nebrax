@@ -1,9 +1,12 @@
 "use client";
 
-import type { OptionFilter, ProductFiltersResponse } from "@spree/sdk";
 import { X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
+import type {
+  StoreOptionFilter,
+  StoreProductFilters,
+} from "@/lib/commerce/types";
 import { getAvailabilityLabel } from "@/lib/utils/filters";
 import {
   findMatchingBucket,
@@ -13,7 +16,7 @@ import type { ActiveFilters } from "@/types/filters";
 
 interface FilterChipsProps {
   activeFilters: ActiveFilters;
-  filtersData: ProductFiltersResponse | null;
+  filtersData: StoreProductFilters | null;
   priceBuckets: PriceBucket[];
   onRemoveOptionValue: (optionValueId: string) => void;
   onRemovePrice: () => void;
@@ -38,8 +41,8 @@ export function FilterChips({
       const optionFilter = filtersData.filters.find(
         (f) =>
           f.type === "option" &&
-          (f as OptionFilter).options.some((o) => o.id === optionValueId),
-      ) as OptionFilter | undefined;
+          (f as StoreOptionFilter).options.some((o) => o.id === optionValueId),
+      ) as StoreOptionFilter | undefined;
 
       if (optionFilter) {
         const option = optionFilter.options.find((o) => o.id === optionValueId);

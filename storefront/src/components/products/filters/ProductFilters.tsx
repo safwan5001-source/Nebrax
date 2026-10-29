@@ -1,11 +1,5 @@
 "use client";
 
-import type {
-  AvailabilityFilter,
-  OptionFilter,
-  PriceRangeFilter,
-  ProductFiltersResponse,
-} from "@spree/sdk";
 import { SlidersHorizontal } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { JSX } from "react";
@@ -18,12 +12,18 @@ import { MobileFilterDrawer } from "@/components/products/filters/MobileFilterDr
 import { OptionDropdownContent } from "@/components/products/filters/OptionDropdownContent";
 import { PriceDropdownContent } from "@/components/products/filters/PriceDropdownContent";
 import { SortDropdownContent } from "@/components/products/filters/SortDropdownContent";
+import type {
+  StoreAvailabilityFilter,
+  StoreOptionFilter,
+  StorePriceRangeFilter,
+  StoreProductFilters,
+} from "@/lib/commerce/types";
 import { getActiveFilterCount } from "@/lib/utils/filters";
 import { generatePriceBuckets } from "@/lib/utils/price-buckets";
 import type { ActiveFilters, AvailabilityStatus } from "@/types/filters";
 
 interface FilterBarProps {
-  filtersData: ProductFiltersResponse | null;
+  filtersData: StoreProductFilters | null;
   filtersLoading: boolean;
   activeFilters: ActiveFilters;
   totalCount: number;
@@ -96,7 +96,7 @@ export const FilterBar = memo(function FilterBar({
     if (!filtersData) return [];
     const priceFilter = filtersData.filters.find(
       (f) => f.type === "price_range",
-    ) as PriceRangeFilter | undefined;
+    ) as StorePriceRangeFilter | undefined;
     if (!priceFilter) return [];
     return generatePriceBuckets(
       priceFilter.min,
@@ -110,7 +110,7 @@ export const FilterBar = memo(function FilterBar({
     if (!filtersData) return [];
     return filtersData.filters.filter(
       (f) => f.type === "option",
-    ) as OptionFilter[];
+    ) as StoreOptionFilter[];
   }, [filtersData]);
 
   const badgeCounts = useMemo(() => {
@@ -143,7 +143,7 @@ export const FilterBar = memo(function FilterBar({
 
   const availabilityFilter = filtersData.filters.find(
     (f) => f.type === "availability",
-  ) as AvailabilityFilter | undefined;
+  ) as StoreAvailabilityFilter | undefined;
 
   const hasPriceFilter =
     filtersData.filters.some((f) => f.type === "price_range") &&
