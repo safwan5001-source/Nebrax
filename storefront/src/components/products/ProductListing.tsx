@@ -1,4 +1,3 @@
-import type { Product } from "@spree/sdk";
 import { Search } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { type ReactElement, Suspense } from "react";
@@ -13,6 +12,7 @@ import {
 } from "@/lib/commerce/listing-facets";
 import type {
   StoreProductFilters,
+  StoreProductFull,
   StoreProductPage,
 } from "@/lib/commerce/types";
 import { PRODUCT_CARD_FIELDS } from "@/lib/data/cached";
@@ -45,7 +45,7 @@ interface ProductListingProps {
    */
   fetchProducts: (
     params: StorefrontListParams,
-  ) => Promise<StoreProductPage<Product>>;
+  ) => Promise<StoreProductPage<StoreProductFull>>;
   /** Fetcher for the facet data (filters + sort options). Server-only. */
   fetchFilters: (
     params: Record<string, unknown>,

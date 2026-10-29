@@ -1,10 +1,3 @@
-import type {
-  Media,
-  OptionType,
-  OptionValue,
-  Price,
-  Variant,
-} from "@spree/sdk";
 import { toRenderableCustomizerMediaUrl } from "./customizer-media";
 import { toRenderableFacetVisualMediaUrl } from "./facet-visual-media";
 import { parseProductGifting } from "./pdp-gifting";
@@ -16,7 +9,12 @@ import type {
   AwjProductOption,
   AwjProductVariant,
   StoreCategory,
+  StoreMediaFull,
+  StoreOptionType,
+  StoreOptionValue,
+  StorePrice,
   StoreProduct,
+  StoreVariantFull,
 } from "./types";
 
 /**
@@ -58,7 +56,7 @@ export function formatMoney(amountMinor: number, currency: string): string {
   }
 }
 
-function toPrice(amountMinor: number, currency: string): Price {
+function toPrice(amountMinor: number, currency: string): StorePrice {
   return {
     id: `price-${amountMinor}-${currency}`,
     amount: (amountMinor / 100).toFixed(2),
@@ -77,7 +75,7 @@ function toPrice(amountMinor: number, currency: string): Price {
  * `product.price?.display_amount` is falsy and the UI takes its
  * "no price to show" branch instead of rendering a formatted zero.
  */
-function unpricedPrice(currency: string): Price {
+function unpricedPrice(currency: string): StorePrice {
   return {
     id: `price-unpriced-${currency}`,
     amount: null,
@@ -111,7 +109,7 @@ function optionLabel(
 function toOptionTypes(
   options: AwjProductOption[],
   locale: string | undefined,
-): OptionType[] {
+): StoreOptionType[] {
   return options.map((option, index) => ({
     id: option.id,
     name: option.name,
@@ -124,7 +122,7 @@ function toOptionTypes(
 function toOptionValues(
   options: AwjProductOption[],
   locale: string | undefined,
-): OptionValue[] {
+): StoreOptionValue[] {
   const isEnglish = locale?.toLowerCase().startsWith("en") ?? false;
 
   return options.flatMap((option) =>
@@ -229,8 +227,8 @@ function toRenderableCategoryMediaUrl(url: string | null): string | null {
 function toVariants(
   product: AwjProduct,
   variants: AwjProductVariant[],
-  optionValues: OptionValue[],
-): Variant[] {
+  optionValues: StoreOptionValue[],
+): StoreVariantFull[] {
   const byId = new Map(optionValues.map((value) => [value.id, value]));
 
   return variants.map((variant) => {
@@ -260,12 +258,12 @@ function toVariants(
       media,
       option_values: variant.option_value_ids
         .map((id) => byId.get(id))
-        .filter((value): value is OptionValue => value !== undefined),
+        .filter((value): value is StoreOptionValue => value !== undefined),
     };
   });
 }
 
-export type StorefrontMedia = Media & {
+export type StorefrontMedia = StoreMediaFull & {
   thumbnail_url: string | null;
   card_url: string | null;
 };
@@ -299,9 +297,9 @@ function toMedia(media: AwjProductMedia, productId: string): StorefrontMedia {
 
 function toDefaultVariant(
   product: AwjProduct,
-  price: Price,
+  price: StorePrice,
   thumbnailUrl: string | null,
-): Variant {
+): StoreVariantFull {
   const purchasable = product.in_stock !== false;
 
   return {

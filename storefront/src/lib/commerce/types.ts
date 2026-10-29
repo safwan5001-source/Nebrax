@@ -184,7 +184,7 @@ export interface StoreCategory extends StoreCategoryNode {
  * price of its own. Without this flag the storefront cannot tell that zero
  * apart from a genuinely free product, and it printed "0.00" as a real price.
  */
-export type StoreProduct = import("@spree/sdk").Product & {
+export type StoreProduct = StoreProductFull & {
   isVariantManaged: boolean;
   /** Explicit 800 px card derivative; thumbnail_url remains the original fallback. */
   card_url: string | null;
@@ -301,6 +301,69 @@ export interface StoreProductDetail extends StoreProductSummary {
   default_variant?: StoreVariant;
   option_types?: StoreOptionType[];
   custom_fields?: StoreCustomField[];
+}
+
+/**
+ * T1-6 — the complete Spree-shaped records `mappers.ts` emits. They extend the
+ * presentation subsets above with the remaining fields of each record, so the
+ * mapper output, the data layer and the wholesale surface (which still returns
+ * SDK values) stay mutually assignable, while nothing here imports the SDK.
+ */
+export interface StorePriceHistory {
+  id: string;
+  amount: string;
+  amount_in_cents: number;
+  currency: string;
+  display_amount: string;
+  recorded_at: string;
+}
+
+export interface StoreMediaFull extends StoreMedia {
+  product_id: string | null;
+  media_type: string;
+  focal_point_x: number | null;
+  focal_point_y: number | null;
+  external_video_url: string | null;
+  og_image_url: string | null;
+}
+
+export interface StoreVariantFull extends StoreVariant {
+  product_id: string;
+  track_inventory: boolean;
+  media_count: number;
+  preorder_ships_at: string | null;
+  thumbnail_url: string | null;
+  backorderable: boolean;
+  preorder: boolean;
+  weight: number | null;
+  height: number | null;
+  width: number | null;
+  depth: number | null;
+  primary_media?: StoreMediaFull;
+  media?: StoreMediaFull[];
+  custom_fields?: StoreCustomField[];
+  prior_price?: StorePriceHistory | null;
+}
+
+export interface StoreProductFull extends StoreProductDetail {
+  meta_title: string | null;
+  meta_description: string | null;
+  meta_keywords: string | null;
+  variant_count: number;
+  available_on: string | null;
+  preorder_ships_at: string | null;
+  preorder: boolean;
+  backorderable: boolean;
+  available: boolean;
+  description_html: string | null;
+  tags: string[];
+  primary_media?: StoreMediaFull;
+  media?: StoreMediaFull[];
+  variants?: StoreVariantFull[];
+  default_variant?: StoreVariantFull;
+  option_values?: StoreOptionValue[];
+  categories?: StoreCategoryNode[];
+  prior_price?: StorePriceHistory | null;
 }
 
 export interface StorePaginationMeta {

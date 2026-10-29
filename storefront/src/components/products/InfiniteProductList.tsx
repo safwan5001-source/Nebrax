@@ -1,17 +1,16 @@
 "use client";
 
-import type { Product } from "@spree/sdk";
 import { Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { usePublishedThemeMarker } from "@/components/layout/PublishedThemeMarker";
 import { ProductCard } from "@/components/products/ProductCard";
-import type { StoreProductPage } from "@/lib/commerce/types";
+import type { StoreProductFull, StoreProductPage } from "@/lib/commerce/types";
 import { cn } from "@/lib/utils";
 import type { StorefrontListParams } from "@/lib/utils/listing-context";
 
 interface InfiniteProductListProps {
-  initialProducts: Product[];
+  initialProducts: StoreProductFull[];
   initialPage: number;
   totalPages: number;
   /**
@@ -25,7 +24,7 @@ interface InfiniteProductListProps {
    */
   fetchPage: (
     params: StorefrontListParams,
-  ) => Promise<StoreProductPage<Product>>;
+  ) => Promise<StoreProductPage<StoreProductFull>>;
   basePath: string;
   categoryId?: string;
   listId?: string;
@@ -58,7 +57,7 @@ export function InfiniteProductList({
 }: InfiniteProductListProps) {
   const t = useTranslations("products");
   const isMarket = usePublishedThemeMarker() === "awj-market";
-  const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [products, setProducts] = useState<StoreProductFull[]>(initialProducts);
   const [currentPage, setCurrentPage] = useState(initialPage);
   // knownPages = the total page count observed from the most recent fetch.
   // hasMore / exhausted state is derived from currentPage < knownPages rather
