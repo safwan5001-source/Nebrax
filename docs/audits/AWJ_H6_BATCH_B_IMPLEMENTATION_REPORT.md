@@ -30,7 +30,7 @@ Components: `checkout/{AddressSection,CouponCode,DeliveryMethodSection,ExpressCh
 ## Evidence runtime behaviour is unchanged
 - Every change is an `import type` line, a type annotation, a generic argument, or an `as` type in an existing assertion (erased). No new casts and no new `any`; `tsc --noEmit` is clean with the existing assertions only renamed.
 - **Emit comparison:** each changed file was transpiled (`ts.transpileModule`) at `origin/main` and at HEAD and compared — 20/20 files byte-identical; the one remaining file (`checkout/[id]/page.tsx`) differs only by a removed blank line after the import block (identical once whitespace is normalised).
-- A scripted rename initially altered two string literals in `webhooks/handlers.ts` (`"… Order Confirmation/Canceled …"` email subjects); the emit comparison flagged nothing only after I restored them — the final diff contains no string/template changes. Email subjects are therefore byte-identical.
+- A scripted rename initially altered two string literals in `webhooks/handlers.ts` (`"… Order Confirmation/Canceled …"` email subjects). I caught it in a diff review and restored them *before* the emit comparison above ran; the final diff contains no string/template changes, so email subjects are byte-identical.
 
 ## Verification
 | Check | Result |
