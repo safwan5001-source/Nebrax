@@ -1,15 +1,17 @@
-import type {
-  PaginatedResponse,
-  PaginationMeta,
-  Product,
-  ProductFiltersResponse,
-} from "@spree/sdk";
 import { getLocale } from "next-intl/server";
 import type { StorefrontListParams } from "@/lib/utils/listing-context";
 import { storefrontFetch } from "./config";
 import { type ListingFacets, parseListingFacets } from "./listing-facets";
 import { mapAwjProductToViewModel } from "./mappers";
-import type { AwjListResponse, AwjProduct, AwjResourceResponse } from "./types";
+import type {
+  AwjListResponse,
+  AwjProduct,
+  AwjResourceResponse,
+  StorePaginationMeta,
+  StoreProductFilters,
+  StoreProductFull,
+  StoreProductPage,
+} from "./types";
 
 /**
  * Sort id translation: Spree's UI/components speak Spree's sort ids
@@ -58,7 +60,7 @@ function buildPaginationMeta(
     has_more: boolean;
   },
   itemCount: number,
-): PaginationMeta {
+): StorePaginationMeta {
   const from =
     itemCount > 0 ? (pagination.page - 1) * pagination.per_page + 1 : 0;
   const to = itemCount > 0 ? from + itemCount - 1 : 0;
@@ -79,13 +81,15 @@ function buildPaginationMeta(
 /**
  * Page-1 meta of the listing carries the disjunctive facet / brand counts the
  * gifting filters render (FLOWERS-H10). Extra to Spree's pagination meta, so
- * every other consumer of `PaginatedResponse<Product>` is unaffected.
+ * every other consumer of `StoreProductPage<StoreProductFull>` is unaffected.
  */
-export type ProductListMeta = PaginationMeta & { listingFacets: ListingFacets };
+export type ProductListMeta = StorePaginationMeta & {
+  listingFacets: ListingFacets;
+};
 
 export async function fetchProducts(
   params: StorefrontListParams | undefined,
-): Promise<PaginatedResponse<Product> & { meta: ProductListMeta }> {
+): Promise<StoreProductPage<StoreProductFull> & { meta: ProductListMeta }> {
   const response = await storefrontFetch<AwjListResponse<AwjProduct>>(
     "products",
     {
@@ -121,7 +125,9 @@ export async function fetchProducts(
   };
 }
 
-export async function fetchProduct(idOrSlug: string): Promise<Product> {
+export async function fetchProduct(
+  idOrSlug: string,
+): Promise<StoreProductFull> {
   const response = await storefrontFetch<AwjResourceResponse<AwjProduct>>(
     `products/${idOrSlug}`,
   );
@@ -149,7 +155,7 @@ export async function fetchProduct(idOrSlug: string): Promise<Product> {
  */
 export async function fetchProductsByIds(
   ids: readonly string[],
-): Promise<Product[]> {
+): Promise<StoreProductFull[]> {
   if (ids.length === 0) return [];
   const response = await storefrontFetch<AwjListResponse<AwjProduct>>(
     "products",
@@ -177,7 +183,7 @@ export async function fetchProductsByIds(
  */
 export async function fetchProductFilters(
   _params?: Record<string, unknown>,
-): Promise<ProductFiltersResponse> {
+): Promise<StoreProductFilters> {
   return {
     filters: [],
     /*
