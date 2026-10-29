@@ -1,6 +1,5 @@
 "use client";
 
-import type { Product, Variant } from "@spree/sdk";
 import { CircleCheckBig, CircleX, Loader2, ShoppingBag } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -30,7 +29,11 @@ import {
   type PdpSelections,
   type ProductGifting,
 } from "@/lib/commerce/pdp-gifting";
-import type { StoreMedia } from "@/lib/commerce/types";
+import type {
+  StoreMedia,
+  StoreProductDetail,
+  StoreVariant,
+} from "@/lib/commerce/types";
 import type {
   PagePresentation,
   ProductPageRegionKey,
@@ -43,7 +46,7 @@ import { publishedPageContainerPaddingClass } from "@/lib/presentation/public-rh
 import { cn } from "@/lib/utils";
 
 interface ProductDetailsProps {
-  product: Product;
+  product: StoreProductDetail;
   basePath: string;
   /**
    * CUST-H2-5 — the Published Version's `pagePresentation.product`, or
@@ -104,21 +107,23 @@ export function ProductDetails({
     (product as { isVariantManaged?: boolean }).isVariantManaged === true;
 
   // Initialize with default variant or first available variant
-  const [selectedVariant, setSelectedVariant] = useState<Variant | null>(() => {
-    /*
-     * AWJ flags no default variant, so preselecting one would assert a merchant
-     * choice that was never made. A variant-managed product therefore starts
-     * with nothing selected and nothing purchasable — the shopper picks.
-     */
-    if (isVariantManaged) return null;
-    if (product.default_variant) {
-      return product.default_variant;
-    }
-    if (hasVariants) {
-      return variants.find((v) => v.purchasable) || variants[0];
-    }
-    return product.default_variant || null;
-  });
+  const [selectedVariant, setSelectedVariant] = useState<StoreVariant | null>(
+    () => {
+      /*
+       * AWJ flags no default variant, so preselecting one would assert a merchant
+       * choice that was never made. A variant-managed product therefore starts
+       * with nothing selected and nothing purchasable — the shopper picks.
+       */
+      if (isVariantManaged) return null;
+      if (product.default_variant) {
+        return product.default_variant;
+      }
+      if (hasVariants) {
+        return variants.find((v) => v.purchasable) || variants[0];
+      }
+      return product.default_variant || null;
+    },
+  );
 
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(false);

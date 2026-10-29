@@ -1,8 +1,8 @@
-import type { CustomField } from "@spree/sdk";
 import { useTranslations } from "next-intl";
+import type { StoreCustomField } from "@/lib/commerce/types";
 
 interface ProductCustomFieldsProps {
-  customFields?: Array<CustomField>;
+  customFields?: Array<StoreCustomField>;
 }
 
 function renderBooleanValue(
@@ -13,7 +13,7 @@ function renderBooleanValue(
 }
 
 function renderValue(
-  field: CustomField,
+  field: StoreCustomField,
   t: ReturnType<typeof useTranslations<"products">>,
 ): React.ReactNode {
   switch (field.field_type) {
