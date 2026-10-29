@@ -1,12 +1,12 @@
 "use client";
 
-import type { Order } from "@spree/sdk";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { ProductImage } from "@/components/ui/product-image";
+import type { StoreOrderLine } from "@/lib/commerce/types";
 
 interface LineItemCardProps {
-  item: Order["items"][number];
+  item: StoreOrderLine;
   basePath: string;
 }
 

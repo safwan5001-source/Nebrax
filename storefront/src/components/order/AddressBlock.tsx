@@ -1,7 +1,7 @@
-import type { Address } from "@spree/sdk";
+import type { StoreOrderAddress } from "@/lib/commerce/types";
 
 interface AddressBlockProps {
-  address: Address;
+  address: StoreOrderAddress;
 }
 
 export function AddressBlock({ address }: AddressBlockProps) {

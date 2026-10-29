@@ -494,6 +494,103 @@ export interface StoreProductFilters {
   total_count: number;
 }
 
+/**
+ * Read-only order presentation types (H6/T1-8).
+ *
+ * Structural subsets of what `components/order/*` and the legacy account order
+ * components read. They are not connected to any AWJ buyer-account API; the
+ * legacy Spree-shaped `Order`/`Cart` values stay assignable (no casts).
+ */
+export interface StoreOrderAddress {
+  full_name: string;
+  company: string | null;
+  address1: string | null;
+  address2: string | null;
+  city: string | null;
+  state_text: string | null;
+  postal_code: string | null;
+  country_name: string;
+  phone: string | null;
+}
+
+export interface StoreOrderTotals {
+  display_item_total: string | null;
+  display_delivery_total: string | null;
+  discount_total: string | null;
+  display_discount_total: string | null;
+  tax_total: string | null;
+  display_tax_total: string | null;
+  total: string | null;
+  display_total: string | null;
+  gift_card: unknown;
+  gift_card_total: string | null;
+  display_gift_card_total: string | null;
+  store_credit_total: string | null;
+  display_store_credit_total: string | null;
+  amount_due: string | null;
+  display_amount_due: string | null;
+}
+
+export interface StoreOrderLine {
+  id: string;
+  name: string;
+  slug: string;
+  options_text: string;
+  quantity: number;
+  display_price: string | null;
+  display_total: string | null;
+  thumbnail_url: string | null;
+}
+
+export interface StoreOrderFulfillment {
+  id: string;
+  status: string;
+  tracking: string | null;
+  tracking_url: string | null;
+  fulfilled_at: string | null;
+  items: Array<{ item_id: string }>;
+  delivery_method: { name: string } | null;
+  stock_location: { name: string } | null;
+}
+
+export interface StoreOrderCard {
+  brand: string;
+  last4: string;
+  month: number;
+  year: number;
+}
+
+export interface StoreOrderStoreCredit {
+  display_amount_remaining: string;
+}
+
+export interface StoreOrderPayment {
+  id: string;
+  status: string;
+  display_amount: string | null;
+  source_type: "credit_card" | "store_credit" | "payment_source" | null;
+  source: StoreOrderCard | StoreOrderStoreCredit | { id: string } | null;
+  payment_method: { name: string } | null;
+}
+
+export interface StoreOrderSummary {
+  id: string;
+  number: string;
+  completed_at: string | null;
+  payment_status: string | null;
+  fulfillment_status: string | null;
+  display_total: string | null;
+}
+
+export interface StoreOrderDetail extends StoreOrderSummary, StoreOrderTotals {
+  customer_note: string | null;
+  items: StoreOrderLine[];
+  fulfillments: StoreOrderFulfillment[];
+  payments: StoreOrderPayment[];
+  billing_address: StoreOrderAddress | null;
+  shipping_address: StoreOrderAddress | null;
+}
+
 export interface AwjCategory {
   id: string;
   name: string;

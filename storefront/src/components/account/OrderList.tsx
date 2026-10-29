@@ -1,7 +1,7 @@
-import type { Order } from "@spree/sdk";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Button } from "@/components/ui/button";
+import type { StoreOrderSummary } from "@/lib/commerce/types";
 import {
   formatDate,
   getFulfillmentStatusColor,
@@ -23,7 +23,7 @@ function getStatusLabel(
 }
 
 interface OrderListProps {
-  orders: Order[];
+  orders: StoreOrderSummary[];
   basePath: string;
   locale: string;
 }

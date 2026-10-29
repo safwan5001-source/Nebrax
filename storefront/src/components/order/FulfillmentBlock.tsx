@@ -1,19 +1,23 @@
 "use client";
 
-import type { Address, Fulfillment, Order } from "@spree/sdk";
 import { CircleAlert } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { AddressBlock } from "@/components/order/AddressBlock";
 import { LineItemCard } from "@/components/order/LineItemCard";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import type {
+  StoreOrderAddress,
+  StoreOrderFulfillment,
+  StoreOrderLine,
+} from "@/lib/commerce/types";
 import { getFulfillmentStatusColor } from "@/lib/utils/format";
 
 interface FulfillmentBlockProps {
-  fulfillment: Fulfillment;
-  shipAddress: Address | null;
+  fulfillment: StoreOrderFulfillment;
+  shipAddress: StoreOrderAddress | null;
   basePath: string;
-  lineItems: Order["items"];
+  lineItems: StoreOrderLine[];
 }
 
 export function FulfillmentBlock({
