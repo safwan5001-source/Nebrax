@@ -98,6 +98,7 @@ use App\Http\Controllers\Api\FuelSupplyReceivingController;
 use App\Http\Controllers\Api\FinancialControlAlertController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\ImportJobController;
+use App\Http\Controllers\Api\ImportMappingPresetController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\InventoryReportController;
 use App\Http\Controllers\Api\InventorySettingsController;
@@ -640,6 +641,11 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('import-jobs', [ImportJobController::class, 'store'])->middleware(EnsureImportFilesScanned::class);
         Route::post('import-jobs/{id}/cancel', [ImportJobController::class, 'cancel']);
         Route::post('import-jobs/{id}/apply', [ImportJobController::class, 'apply']);
+        // IMP-H8-S2a: مطابقات أعمدة محفوظة لكل مجال استيراد. الصلاحية والقدرة حسب مجال المطابقة (`ImportJobAccess`) في المتحكّم، بلا `$perm` على المسار.
+        Route::get('import-mapping-presets', [ImportMappingPresetController::class, 'index']);
+        Route::post('import-mapping-presets', [ImportMappingPresetController::class, 'store']);
+        Route::delete('import-mapping-presets/{id}', [ImportMappingPresetController::class, 'destroy']);
+        Route::post('import-mapping-presets/{id}/match', [ImportMappingPresetController::class, 'match']);
         Route::get('products/{id}', [ProductController::class, 'show'])->middleware($perm('products.view'));
         Route::get('products/{id}/activity', [ProductController::class, 'activity'])->middleware($perm('products.view'));
         Route::get('products/{id}/barcodes', [ProductController::class, 'indexBarcodes'])->middleware($perm('products.view'));
