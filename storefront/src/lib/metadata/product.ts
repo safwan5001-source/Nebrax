@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import { DEFAULT_SURFACE } from "@/lib/commerce/surface";
 import { getCachedProduct, PRODUCT_METADATA_EXPAND } from "@/lib/data/cached";
 import { cachedGetProduct } from "@/lib/data/products";
 import {
@@ -7,7 +8,6 @@ import {
   translationFingerprint,
 } from "@/lib/metadata/alternates";
 import { stripHtml } from "@/lib/seo";
-import { DEFAULT_SURFACE } from "@/lib/spree";
 import { getStoreUrl } from "@/lib/store";
 
 interface ProductMetadataParams {

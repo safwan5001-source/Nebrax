@@ -16,24 +16,6 @@ export async function getAddresses() {
   );
 }
 
-export async function getAddress(id: string) {
-  return withFallback(async () => {
-    return withAuthRefresh(async (options) => {
-      return getClient().customer.addresses.get(id, options);
-    });
-  }, null);
-}
-
-export async function createAddress(address: StoreAddressParams) {
-  return actionResult(async () => {
-    const result = await withAuthRefresh(async (options) => {
-      return getClient().customer.addresses.create(address, options);
-    });
-    updateTag("addresses");
-    return { address: result };
-  }, "Failed to create address");
-}
-
 export async function updateAddress(
   id: string,
   address: Partial<StoreAddressParams>,
@@ -45,14 +27,4 @@ export async function updateAddress(
     updateTag("addresses");
     return { address: result };
   }, "Failed to update address");
-}
-
-export async function deleteAddress(id: string) {
-  return actionResult(async () => {
-    await withAuthRefresh(async (options) => {
-      return getClient().customer.addresses.delete(id, options);
-    });
-    updateTag("addresses");
-    return {};
-  }, "Failed to delete address");
 }

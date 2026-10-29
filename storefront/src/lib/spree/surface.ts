@@ -13,13 +13,13 @@
  * The customer session (JWT) is shared across surfaces — it's the same person
  * signing in — so only the cart cookies split, never the auth cookies.
  */
-export type Surface = "dtc" | "wholesale";
+import type { Surface } from "@/lib/commerce/surface";
 
-export const DEFAULT_SURFACE: Surface = "dtc";
-
-/** All storefront surfaces. Iterate this to act on every surface at once
- * (e.g. clearing all carts on logout). */
-export const SURFACES: readonly Surface[] = ["dtc", "wholesale"];
+export {
+  DEFAULT_SURFACE,
+  SURFACES,
+  type Surface,
+} from "@/lib/commerce/surface";
 
 /**
  * Cart cookie base name for a surface. The cart-id cookie is derived by
