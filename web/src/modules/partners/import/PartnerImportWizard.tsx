@@ -20,6 +20,7 @@ import { ImportJobStatusPanel } from '@/modules/import-jobs/ImportJobStatusPanel
 import { ImportRepairPanel } from '@/modules/import-jobs/ImportRepairPanel';
 import { downloadImportFailures, hasFrozenOptions, type ApplyOptions } from '@/modules/import-jobs/client';
 import { useImportJobEngine, useImportJobUrlParam, useResumeFromUrl } from '@/modules/import-jobs/useImportJobEngine';
+import { MappingPresetBar } from '@/modules/import-jobs/MappingPresetBar';
 import {
   ACCEPTED_PARTNER_IMPORT_TYPES,
   MAX_PARTNER_IMPORT_BYTES,
@@ -445,6 +446,7 @@ export function PartnerImportWizard({ type }: { type: PartnerImportType }) {
                     <p role="alert" className="rounded-md border border-negative/30 bg-negative/10 px-3 py-2 text-sm text-negative">{t('mapping_duplicate')}</p>
                   ) : null}
                   <p className="text-xs leading-relaxed text-muted">{t('mapping_no_opening_balance')}</p>
+                  <MappingPresetBar domain="partner_master" columns={inspection.columns} mapping={mapping} fieldKeys={fields.map((item) => item.key)} onApply={(next) => { setMapping(next); invalidatePreview(); }} />
                   <div className="overflow-x-auto rounded-md border border-border">
                     <table className="w-full min-w-[40rem] text-sm">
                       <thead className="bg-background text-muted">

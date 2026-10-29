@@ -1744,6 +1744,23 @@
     "continue_hint": "The job is paused midway (a disconnect or page refresh). Continue applying what was previewed.",
     "continue_apply": "Continue"
   },
+  "mappingPresets": {
+    "title": "Saved mappings",
+    "none_saved": "No saved mappings yet",
+    "choose": "Choose a mapping",
+    "apply": "Apply",
+    "delete": "Delete",
+    "confirm_delete": "Confirm delete",
+    "save_as": "Save the current mapping as",
+    "name_placeholder": "e.g. Supplier A file",
+    "save": "Save",
+    "note": "A saved mapping is applied by column header, not by position, and it does not store run policies (zero cost and the like) — those stay your choice for each run.",
+    "applied": "The mapping was applied to {applied} columns; {unmatched} columns have no saved match.",
+    "dropped": "{count} saved fields that do not belong to this file were skipped.",
+    "saved": "Saved the mapping “{name}”.",
+    "deleted": "Deleted the mapping “{name}”.",
+    "failed": "The operation failed. Try again."
+  },
   "importHub": {
     "title": "Import hub",
     "subtitle": "One entry point for everything imported from files, and the history of your runs. Each entity leads to its own wizard with the same permissions and guards; nothing is written from this page.",
