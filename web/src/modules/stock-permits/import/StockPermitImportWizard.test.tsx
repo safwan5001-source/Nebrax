@@ -196,6 +196,28 @@ describe('StockPermitImportWizard (IMP-H7-S3b)', () => {
     expect((screen.getByRole('button', { name: 'run_preview' }) as HTMLButtonElement).disabled).toBe(false);
   });
 
+  it('offers saved mappings after the file is inspected and applying one rebinds columns by header', async () => {
+    api.mockImplementation((path: string) => {
+      if (path === '/import-mapping-presets?domain=stock_permit_import') return Promise.resolve({ data: [{ id: 'mp1', domain: 'stock_permit_import', name: 'مورد أ', columns: [], created_at: null }] });
+      if (path === '/import-mapping-presets/mp1/match') return Promise.resolve({ data: { mapping: { 0: null, 1: null, 2: 'quantity' }, matched: 1, unmatched: [0, 1] } });
+      return defaultApi(path);
+    });
+    const user = userEvent.setup();
+    render(<StockPermitImportWizard />);
+    await chooseHeader(user);
+    await user.upload(screen.getByLabelText('step_file'), csv());
+    await waitFor(() => expect(screen.getByLabelText('رمز الصنف')).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole('option', { name: 'مورد أ' })).toBeTruthy());
+
+    // الاقتراح التلقائي: 1 = quantity، 2 = unit_cost؛ المحفوظ يربط العمود 2 بـquantity فيُفرَّغ الاقتراح على العمود 1 (لا حقل على عمودين)
+    expect((screen.getByLabelText('الكمية') as HTMLSelectElement).value).toBe('quantity');
+    await user.selectOptions(screen.getAllByRole('combobox').find((node) => (node as HTMLSelectElement).id === 'mp-select') as HTMLSelectElement, 'mp1');
+    await user.click(screen.getByRole('button', { name: 'apply' }));
+
+    await waitFor(() => expect((screen.getByLabelText('التكلفة') as HTMLSelectElement).value).toBe('quantity'));
+    expect((screen.getByLabelText('الكمية') as HTMLSelectElement).value).toBe('');
+  });
+
   it('refuses to apply a preview with errors and offers the error report', async () => {
     api.mockImplementation((path: string) => {
       if (path === '/stock-permits/import/preview') return Promise.resolve({ data: { ...cleanPreview, error_rows: 1, line_rows: 0, errors: [{ row: 3, messages: ['bad qty'] }], rows: [{ ...previewRow, valid: false, action: 'error', messages: ['bad qty'] }] } });

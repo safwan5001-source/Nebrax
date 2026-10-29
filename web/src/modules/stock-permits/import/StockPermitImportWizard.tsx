@@ -21,6 +21,7 @@ import { Stepper } from '@/modules/products/import/stepper';
 import { ImportJobStatusPanel } from '@/modules/import-jobs/ImportJobStatusPanel';
 import { hasFrozenOptions, type ApplyOptions } from '@/modules/import-jobs/client';
 import { useImportJobEngine, useImportJobUrlParam, useResumeFromUrl } from '@/modules/import-jobs/useImportJobEngine';
+import { MappingPresetBar } from '@/modules/import-jobs/MappingPresetBar';
 import { spreadsheetSafe } from '@/modules/stocktaking/import/contract';
 import {
   ACCEPTED_STOCK_PERMIT_IMPORT_TYPES,
@@ -505,6 +506,7 @@ export function StockPermitImportWizard() {
                       <p key={key} role="alert" className="rounded-md border border-negative/30 bg-negative/10 px-3 py-2 text-sm text-negative">{t(key)}</p>
                     ) : null
                   )}
+                  <MappingPresetBar domain="stock_permit_import" columns={inspection.columns} mapping={mapping} fieldKeys={fields.map((item) => item.key)} onApply={(next) => { setMapping(next); invalidatePreview(); }} />
                   <div className="overflow-x-auto rounded-md border border-border">
                     <table className="w-full min-w-[40rem] text-sm">
                       <thead className="bg-background text-muted">
