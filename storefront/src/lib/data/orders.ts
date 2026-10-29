@@ -1,6 +1,6 @@
 "use server";
 
-import type { OrderListParams } from "@spree/sdk";
+import type { StoreOrderListParams } from "@/lib/commerce/types";
 import {
   DEFAULT_SURFACE,
   getCartOptions,
@@ -11,7 +11,7 @@ import {
 } from "@/lib/spree";
 import { withFallback } from "./utils";
 
-export async function getOrders(params?: OrderListParams) {
+export async function getOrders(params?: StoreOrderListParams) {
   return withFallback(
     async () => {
       return withAuthRefresh(async (options) => {

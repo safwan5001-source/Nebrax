@@ -1,18 +1,18 @@
 "use client";
 
-import type { Country, State } from "@spree/sdk";
 import { useTranslations } from "next-intl";
 import { Input } from "@/components/ui/input";
 import {
   NativeSelect,
   NativeSelectOption,
 } from "@/components/ui/native-select";
+import type { StoreCountry, StoreState } from "@/lib/commerce/types";
 import type { AddressFormData } from "@/lib/utils/address";
 
 interface AddressFormFieldsProps {
   address: AddressFormData;
-  countries: Country[];
-  states: State[];
+  countries: StoreCountry[];
+  states: StoreState[];
   loadingStates: boolean;
   onChange: (field: keyof AddressFormData, value: string) => void;
   idPrefix: string;

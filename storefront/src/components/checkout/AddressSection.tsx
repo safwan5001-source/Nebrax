@@ -1,6 +1,6 @@
 "use client";
 
-import type { Address, AddressParams, Cart, Country, State } from "@spree/sdk";
+import type { Cart } from "@spree/sdk";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -11,6 +11,12 @@ import { AddressSelector } from "@/components/checkout/AddressSelector";
 import { Input } from "@/components/ui/input";
 import type { User } from "@/contexts/AuthContext";
 import { useCountryStates } from "@/hooks/useCountryStates";
+import type {
+  StoreAddress,
+  StoreAddressParams,
+  StoreCountry,
+  StoreState,
+} from "@/lib/commerce/types";
 import {
   type AddressFormData,
   addressToFormData,
@@ -20,21 +26,21 @@ import {
 
 interface AddressSectionProps {
   cart: Cart;
-  countries: Country[];
-  savedAddresses: Address[];
+  countries: StoreCountry[];
+  savedAddresses: StoreAddress[];
   isAuthenticated: boolean;
   signInUrl: string;
-  fetchStates: (countryIso: string) => Promise<State[]>;
+  fetchStates: (countryIso: string) => Promise<StoreState[]>;
   onEmailBlur: (email: string) => Promise<void>;
   onAutoSave: (data: {
     email: string;
-    shipping_address?: AddressParams;
+    shipping_address?: StoreAddressParams;
     shipping_address_id?: string;
   }) => Promise<void>;
   onUpdateSavedAddress?: (
     id: string,
-    data: AddressParams,
-  ) => Promise<Address | null>;
+    data: StoreAddressParams,
+  ) => Promise<StoreAddress | null>;
   errors?: string[];
   saving?: boolean;
   processing?: boolean;
@@ -121,7 +127,9 @@ export function AddressSection({
     return formData;
   });
   const [savedAddresses, setSavedAddresses] = useState(initialSavedAddresses);
-  const [editingAddress, setEditingAddress] = useState<Address | null>(null);
+  const [editingAddress, setEditingAddress] = useState<StoreAddress | null>(
+    null,
+  );
   const [selectedSavedAddressId, setSelectedSavedAddressId] = useState<
     string | undefined
   >(initialSavedAddress?.id);
@@ -222,14 +230,17 @@ export function AddressSection({
     }
   };
 
-  const handleSelectSavedAddress = (address: Address) => {
+  const handleSelectSavedAddress = (address: StoreAddress) => {
     setShipAddress(addressToFormData(address));
     setSelectedSavedAddressId(address.id);
     // Saved address has all fields filled, trigger auto-save immediately
     tryAutoSave(email, addressToFormData(address), address.id);
   };
 
-  const handleSaveEditedAddress = async (data: AddressParams, id?: string) => {
+  const handleSaveEditedAddress = async (
+    data: StoreAddressParams,
+    id?: string,
+  ) => {
     if (!id || !onUpdateSavedAddress) {
       throw new Error("Cannot update address");
     }

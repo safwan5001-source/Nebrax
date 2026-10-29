@@ -1,23 +1,27 @@
 "use client";
 
-import type { Address, Country, State } from "@spree/sdk";
 import { MapPin } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useMemo } from "react";
 import { AddressFormFields } from "@/components/checkout/AddressFormFields";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import type { User } from "@/contexts/AuthContext";
+import type {
+  StoreAddress,
+  StoreCountry,
+  StoreState,
+} from "@/lib/commerce/types";
 import type { AddressFormData } from "@/lib/utils/address";
 
 interface AddressSelectorProps {
-  savedAddresses: Address[];
+  savedAddresses: StoreAddress[];
   currentAddress: AddressFormData;
-  countries: Country[];
-  states: State[];
+  countries: StoreCountry[];
+  states: StoreState[];
   loadingStates: boolean;
   onChange: (field: keyof AddressFormData, value: string) => void;
-  onSelectSavedAddress: (address: Address) => void;
-  onEditAddress?: (address: Address) => void;
+  onSelectSavedAddress: (address: StoreAddress) => void;
+  onEditAddress?: (address: StoreAddress) => void;
   onFieldBlur?: () => void;
   idPrefix: string;
   user?: User | null;

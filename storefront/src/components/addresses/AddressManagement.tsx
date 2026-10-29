@@ -1,6 +1,5 @@
 "use client";
 
-import type { Address, AddressParams, Country } from "@spree/sdk";
 import { Plus } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useState } from "react";
@@ -18,6 +17,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import type { User } from "@/contexts/AuthContext";
+import type {
+  StoreAddress,
+  StoreAddressParams,
+  StoreCountry,
+} from "@/lib/commerce/types";
 import {
   createAddress,
   deleteAddress,
@@ -26,7 +30,7 @@ import {
 import { getCountry } from "@/lib/data/countries";
 
 interface AddressCardProps {
-  address: Address;
+  address: StoreAddress;
   onEdit: () => void;
   onDelete: () => void;
 }
@@ -90,8 +94,8 @@ function AddressCard({ address, onEdit, onDelete }: AddressCardProps) {
 }
 
 interface AddressManagementProps {
-  initialAddresses: Address[];
-  countries: Country[];
+  initialAddresses: StoreAddress[];
+  countries: StoreCountry[];
   showAddButton: boolean;
   emptyState: boolean;
   user?: User | null;
@@ -105,9 +109,11 @@ export function AddressManagement({
   user,
 }: AddressManagementProps) {
   const t = useTranslations("address");
-  const [addresses, setAddresses] = useState<Address[]>(initialAddresses);
+  const [addresses, setAddresses] = useState<StoreAddress[]>(initialAddresses);
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingAddress, setEditingAddress] = useState<Address | null>(null);
+  const [editingAddress, setEditingAddress] = useState<StoreAddress | null>(
+    null,
+  );
 
   const fetchStates = useCallback(async (countryIso: string) => {
     try {
@@ -118,7 +124,7 @@ export function AddressManagement({
     }
   }, []);
 
-  const handleEdit = (address: Address) => {
+  const handleEdit = (address: StoreAddress) => {
     setEditingAddress(address);
     setModalOpen(true);
   };
@@ -128,7 +134,7 @@ export function AddressManagement({
     setModalOpen(true);
   };
 
-  const handleSave = async (data: AddressParams, id?: string) => {
+  const handleSave = async (data: StoreAddressParams, id?: string) => {
     if (id) {
       const result = await updateAddress(id, data);
       if (!result.success) {

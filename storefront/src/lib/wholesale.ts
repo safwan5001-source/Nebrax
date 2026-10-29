@@ -1,4 +1,4 @@
-import type { Customer } from "@spree/sdk";
+import type { StoreCustomer } from "@/lib/commerce/types";
 import { INTERNAL_ORIGIN, resolveLocalPath } from "@/lib/utils/path";
 
 /**
@@ -18,7 +18,7 @@ export const WHOLESALE_GROUP_NAME = "Wholesale";
 export const WHOLESALE_MIN_QUANTITY = 10;
 
 /** Whether a customer is an approved wholesale buyer. */
-export function isWholesaleApproved(customer: Customer | null): boolean {
+export function isWholesaleApproved(customer: StoreCustomer | null): boolean {
   return Boolean(
     customer?.customer_groups?.some((g) => g.name === WHOLESALE_GROUP_NAME),
   );

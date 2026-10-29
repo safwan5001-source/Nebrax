@@ -1,9 +1,9 @@
 "use server";
 
-import type { Market } from "@spree/sdk";
 import { cacheLife, cacheTag } from "next/cache";
 import { DEFAULT_LOCALE, resolveSupportedLocale } from "@/i18n/locales";
 import { fetchStorefrontDefaultLocale } from "@/lib/commerce/storefront";
+import type { StoreMarket } from "@/lib/commerce/types";
 import { getClient, getLocaleOptions } from "@/lib/spree";
 import { getDefaultCountry } from "@/lib/store";
 
@@ -34,7 +34,7 @@ async function resolveAwjDefaultLocale() {
   }
 }
 
-async function staticAwjMarket(): Promise<Market> {
+async function staticAwjMarket(): Promise<StoreMarket> {
   return {
     id: "awj-sa",
     name: "AWJ Store — Saudi Arabia",
@@ -79,7 +79,7 @@ async function cachedListMarketCountries(
 export async function getMarkets(_options?: {
   locale?: string;
   country?: string;
-}): Promise<{ data: Market[] }> {
+}): Promise<{ data: StoreMarket[] }> {
   return { data: [await staticAwjMarket()] };
 }
 

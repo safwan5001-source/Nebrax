@@ -1,4 +1,3 @@
-import type { Market } from "@spree/sdk";
 import { resolveSupportedLocale, type SupportedLocale } from "@/i18n/locales";
 import {
   getDefaultMarketLocaleTarget,
@@ -7,6 +6,7 @@ import {
   type MarketLocaleTarget,
 } from "@/i18n/markets";
 import { canonicalizeLocale } from "@/i18n/normalize";
+import type { StoreMarket } from "@/lib/commerce/types";
 import { getMarkets } from "@/lib/data/markets";
 import { buildCanonicalUrl } from "@/lib/seo";
 import { getDefaultCountry, getDefaultLocale } from "@/lib/store";
@@ -54,7 +54,7 @@ export function translationFingerprint(...fields: unknown[]): string {
 }
 
 function getStoreHreflangCluster(
-  markets: Market[],
+  markets: StoreMarket[],
   country: string,
   locale: SupportedLocale,
 ): StoreHreflangCluster | undefined {
