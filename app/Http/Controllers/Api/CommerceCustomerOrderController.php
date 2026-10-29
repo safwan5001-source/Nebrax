@@ -57,8 +57,9 @@ final class CommerceCustomerOrderController extends PublicApiController
         $data = $paginator->getCollection()->map(fn ($order) => [
             'id' => $order->id,
             'number' => $order->number,
-            'status' => $order->status,
+            'status' => CommerceOrderSerializer::publicStatus($order),
             'delivery_method' => $order->delivery_method,
+            ...CommerceOrderSerializer::cancellationBlock($order),
             'total' => ['amount_minor' => $order->total, 'currency' => $currency],
             'created_at' => $order->created_at?->toIso8601String(),
         ])->all();

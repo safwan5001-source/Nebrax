@@ -398,6 +398,10 @@ php artisan serve
 - **لا تغيير في عقد المشتري/الجمهور** (يبقى `status: confirmed` — O3c لاحقاً). المرجع: `docs/audits/AWJ-COMMERCE-ORDERS-O3a-2b-IMPLEMENTATION-REPORT.md`.
 - **واجهة الموظف (O3b، `web/src/modules/commerce-workspace/orders/`):** زرّ «إلغاء الطلب» في `/commerce/orders/[id]` + حوار (الأسباب الستة، ملاحظة ≤ 500 وإلزامية عند `other`) فوق `POST commerce/orders/{id}/cancel`؛ الكتابة معزولة في `cancel-order.ts` (يحرسه `orders-readonly.test.ts`). **حالة البوابة لا تُقرأ من المتصفح:** يعيد `GET commerce/orders/{id}` المفتاح `cancel_action: {available, blocked_reason}` **فقط** حين البوابة مفتوحة **و**للمستخدم `commerce.orders.cancel`؛ غيابه ⇒ لا إجراء (لا يُكشف سبب الغياب). `blocked_reason` رمز المصفوفة الآمن نفسه (`already_cancelled`، `already_posted`، `payment_*`، `not_confirmed`) محسوباً بـ`CommerceOrderLifecycleService::cancellationBlocker` (قراءة بلا أقفال تعيد استعمال `assertCancellable`، لا نسخة ثانية). **استرشادي:** القرار النهائي لـAPI (409 ⇒ تحديث الحالة وقفل التأكيد القديم). المرجع: `docs/audits/AWJ-COMMERCE-ORDERS-O3b-IMPLEMENTATION-REPORT.md`.
 
+## العقد العام للطلب الملغى — COMMERCE-ORDERS-O3c (ADR-28 D-9-P1 الخيار B)
+
+الطلب الملغى يقرؤه المشتري `status: "cancelled"` + `cancellation: {cancelled_at}` في **كل** مسارات القراءة العامة (`/commerce/v1` ضيف/عميل قائمة وتفاصيل، و`/store/v1` الإتمام/الإعادة) عبر `CommerceOrderSerializer::publicStatus()`/`cancellationBlock()`؛ عمود `commerce_orders.status` يبقى `confirmed` (مصدر الحقيقة `cancelled_at`). غير الملغى **حرفياً كما كان** (لا مفتاح `cancellation`). السبب والملاحظة والفاعل للموظف وحده (`CommerceOrderStaffSerializer`). إضافة قيمة `cancelled` إلى enum العميل **تغيير مقصود** يخص العملاء الصارمين (موثَّق في OpenAPI والتقرير). الواجهة: `AccountOrderStatus` يستبدل الرحلة بإشعار الإلغاء (لا ادّعاء استرداد)، وتُخفى ملاحظة «لم يُدفع» للملغى. لا تفعيل للإلغاء (`COMMERCE_ORDER_CANCELLATION_ENABLED` مغلقة). المرجع: `docs/audits/AWJ-COMMERCE-ORDERS-O3c-IMPLEMENTATION-REPORT.md`.
+
 ## أدوار ضريبة القيمة المضافة (REM-05 / ACC-01)
 
 `App\Services\Accounting\VatRoleIntegrityService` هو مصدر قواعد دورَي `tax_input`/`tax_output` وسياق تقرير الضريبة. لا يكتب شيئاً.

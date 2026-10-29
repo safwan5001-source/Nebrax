@@ -467,6 +467,78 @@ describe("AwjCheckoutFlow", () => {
     ]);
   });
 
+  it("O3c: completion → lost response → staff cancels → replay shows the cancelled terminal state, not a success", async () => {
+    const user = userEvent.setup();
+    const assign = vi.fn();
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...window.location, assign },
+    });
+    mockActions.startOrResumeAwjCheckout.mockResolvedValue({
+      success: true,
+      checkout: checkoutWith(),
+    });
+    mockActions.updateAwjContact.mockResolvedValue({
+      success: true,
+      checkout: checkoutWith({ contact: sampleOrder.contact }),
+    });
+    mockActions.updateAwjAddress.mockResolvedValue({
+      success: true,
+      checkout: checkoutWith({ contact: sampleOrder.contact }),
+    });
+    mockActions.updateAwjDelivery.mockResolvedValue({
+      success: true,
+      checkout: checkoutWith({
+        contact: sampleOrder.contact,
+        delivery: {
+          amount: { amount_minor: 0, currency: "SAR" },
+          method: "pickup",
+          address: checkoutWith().delivery.address,
+        },
+      }),
+    });
+    // 1st attempt lands server-side but the response is lost; staff cancels; the
+    // retry with the same key replays the (now cancelled) order. Even a stale
+    // `requires_action` must never start a payment for it.
+    mockActions.completeAwjCheckoutAction
+      .mockResolvedValueOnce({ success: false, kind: "error", message: "lost" })
+      .mockResolvedValueOnce({
+        success: true,
+        order: {
+          ...sampleOrder,
+          status: "cancelled",
+          cancelledAt: "2026-05-03T10:00:00+00:00",
+          payment: { ...sampleOrder.payment, requires_action: true },
+        },
+        replayed: true,
+        orderReference: "signed-ref-1",
+      });
+
+    render(<AwjCheckoutFlow />);
+    await fillDetailsAndContinue(user);
+    await screen.findByText("awjCheckout.review.heading");
+    const complete = () =>
+      screen.getByRole("button", { name: "awjCheckout.completeOrder" });
+    await user.click(complete());
+    await waitFor(() =>
+      expect(mockActions.completeAwjCheckoutAction).toHaveBeenCalledTimes(1),
+    );
+    await user.click(complete());
+
+    expect(
+      await screen.findByText("orders.cancelled.title"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("awjCheckout.success.heading")).toBeNull();
+    expect(screen.queryByText("awjCheckout.success.notPaidNote")).toBeNull();
+    expect(screen.getByText(sampleOrder.number)).toBeInTheDocument();
+    expect(assign).not.toHaveBeenCalled();
+    expect(mockStartPayment).not.toHaveBeenCalled();
+    expect(localStorage.getItem("awj.pendingOnlinePayment.v1")).toBeNull();
+    const [k1] = mockActions.completeAwjCheckoutAction.mock.calls[0];
+    const [k2] = mockActions.completeAwjCheckoutAction.mock.calls[1];
+    expect(k1).toBe(k2);
+  });
+
   it("PAY-H4-05: when browser storage is blocked the payment starts inline — the placed order is never stranded", async () => {
     const user = userEvent.setup();
     const assign = vi.fn();

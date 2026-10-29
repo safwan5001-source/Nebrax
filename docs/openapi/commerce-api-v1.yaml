@@ -2152,6 +2152,25 @@ components:
             payment_methods: { type: array, items: { $ref: '#/components/schemas/PaymentMethod' } }
         meta: { $ref: '#/components/schemas/SuccessMeta' }
 
+    OrderPublicStatus:
+      type: string
+      description: >
+        Buyer-facing order status. `draft` / `confirmed` are the stored values. `cancelled` was added by
+        COMMERCE-ORDERS-O3c (ADR-28 D-9-P1 option B): it is derived from the cancellation fact while the stored
+        order status stays `confirmed`. This is an intentional enum extension - strict clients that only accept
+        `draft | confirmed` must treat unknown values as a terminal, non-active state.
+      examples: [confirmed, cancelled]
+
+    OrderCancellation:
+      type: object
+      description: >
+        Present ONLY when `status` is `cancelled` (absent otherwise). Carries no reason, note, actor or payment/refund
+        information - those are staff-only.
+      additionalProperties: false
+      required: [cancelled_at]
+      properties:
+        cancelled_at: { type: [string, 'null'], format: date-time }
+
     Order:
       type: object
       additionalProperties: false
@@ -2159,8 +2178,9 @@ components:
       properties:
         id: { type: string, format: uuid }
         number: { type: string }
-        status: { type: string }
+        status: { $ref: '#/components/schemas/OrderPublicStatus' }
         delivery_method: { type: [string, 'null'] }
+        cancellation: { $ref: '#/components/schemas/OrderCancellation' }
         total: { $ref: '#/components/schemas/Money' }
         contact:
           type: object
@@ -2232,8 +2252,9 @@ components:
       properties:
         id: { type: string, format: uuid }
         number: { type: string }
-        status: { type: string }
+        status: { $ref: '#/components/schemas/OrderPublicStatus' }
         delivery_method: { type: [string, 'null'] }
+        cancellation: { $ref: '#/components/schemas/OrderCancellation' }
         total: { $ref: '#/components/schemas/Money' }
         created_at: { type: [string, 'null'], format: date-time }
 

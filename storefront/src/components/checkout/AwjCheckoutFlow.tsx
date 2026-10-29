@@ -469,8 +469,13 @@ export function AwjCheckoutFlow() {
         // resumes) the payment and then reports what the *server* knows. The
         // order id and its signed reference are the only things carried over.
         // Anything else (cash on delivery/pickup, or the gate closed) is
-        // exactly the confirmation it has always been.
-        if (result.orderReference && result.order.payment.requires_action) {
+        // exactly the confirmation it has always been. A replay that returns an
+        // order cancelled in the meantime never starts a payment (O3c).
+        if (
+          result.order.status !== "cancelled" &&
+          result.orderReference &&
+          result.order.payment.requires_action
+        ) {
           const saved = savePendingOnlinePayment({
             orderId: result.order.id,
             orderReference: result.orderReference,

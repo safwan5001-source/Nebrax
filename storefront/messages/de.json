@@ -630,7 +630,14 @@
       "notTracked": "Nicht verfolgt",
       "caption": "Dieser Shop veröffentlicht noch keine Sendungsverfolgung. Nur eine bestätigte Bestellung gilt als aufgegeben."
     },
-    "contact": "Kontakt"
+    "contact": "Kontakt",
+    "statusCancelled": "Storniert",
+    "cancelled": {
+      "title": "Diese Bestellung wurde storniert",
+      "body": "Diese Bestellung wurde storniert und wird nicht mehr bearbeitet. Storniert am {date}.",
+      "bodyNoDate": "Diese Bestellung wurde storniert und wird nicht mehr bearbeitet.",
+      "detail": "Die Bestelldetails bleiben für Ihre Unterlagen erhalten. Diese Seite zeigt keine Zahlungs- oder Erstattungsinformationen."
+    }
   },
   "orderPlaced": {
     "thanksForOrder": "Vielen Dank für Ihre Bestellung, {name}!",

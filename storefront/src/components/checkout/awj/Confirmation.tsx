@@ -1,8 +1,8 @@
 "use client";
 
-import { CheckCircle2, Info, Printer } from "lucide-react";
+import { Ban, CheckCircle2, Info, Printer } from "lucide-react";
 import Link from "next/link";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { awjOrderLineView, CartLine } from "@/components/cart/CartLine";
 import { OrderGiftingDetails } from "@/components/orders/OrderGiftingDetails";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,15 @@ export function AwjOrderConfirmation({
   basePath: string;
 }) {
   const t = useTranslations("awjCheckout");
+  const to = useTranslations("orders");
+  const locale = useLocale();
+  // O3c: a replayed completion can return an order the staff cancelled after the
+  // first response was lost. It is a terminal state — never "placed", never a
+  // commercial-commitment note, and no refund/payment-reversal claim.
+  const cancelled = order.status === "cancelled";
+  const cancelledDate = cancelled
+    ? formatCancelledDate(order.cancelledAt ?? null, locale)
+    : null;
   const tc = useTranslations("common");
   const images = useCartLineImages(order.items.map((item) => item.productId));
 
@@ -55,12 +64,20 @@ export function AwjOrderConfirmation({
       <div className="flex flex-col items-center text-center">
         <span
           aria-hidden="true"
-          className="flex size-14 items-center justify-center rounded-full bg-store-success/10 text-store-success"
+          className={
+            cancelled
+              ? "flex size-14 items-center justify-center rounded-full bg-store-surface-muted text-store-muted-foreground"
+              : "flex size-14 items-center justify-center rounded-full bg-store-success/10 text-store-success"
+          }
         >
-          <CheckCircle2 className="w-8 h-8" />
+          {cancelled ? (
+            <Ban className="w-8 h-8" />
+          ) : (
+            <CheckCircle2 className="w-8 h-8" />
+          )}
         </span>
         <h1 className="mt-4 text-2xl font-bold text-store-foreground">
-          {t("success.heading")}
+          {cancelled ? to("cancelled.title") : t("success.heading")}
         </h1>
         <p className="mt-2 text-sm text-store-muted-foreground">
           {t("success.orderNumberLabel")}
@@ -70,17 +87,33 @@ export function AwjOrderConfirmation({
         </p>
       </div>
 
-      {/* Not a footnote. See this module's doc comment. */}
-      <p
-        role="status"
-        className="mt-6 flex items-start gap-2 rounded-store border border-store-warning/40 bg-store-warning/10 p-4 text-sm leading-relaxed text-store-foreground"
-      >
-        <Info
-          className="mt-0.5 w-4 h-4 shrink-0 text-store-warning"
-          aria-hidden="true"
-        />
-        <span>{t("success.notPaidNote")}</span>
-      </p>
+      {cancelled ? (
+        <div
+          role="status"
+          className="mt-6 rounded-store border border-store-border-strong bg-store-surface-muted p-4 text-sm leading-relaxed text-store-foreground"
+        >
+          <p>
+            {cancelledDate
+              ? to("cancelled.body", { date: cancelledDate })
+              : to("cancelled.bodyNoDate")}
+          </p>
+          <p className="mt-2 text-xs text-store-muted-foreground">
+            {to("cancelled.detail")}
+          </p>
+        </div>
+      ) : (
+        /* Not a footnote. See this module's doc comment. */
+        <p
+          role="status"
+          className="mt-6 flex items-start gap-2 rounded-store border border-store-warning/40 bg-store-warning/10 p-4 text-sm leading-relaxed text-store-foreground"
+        >
+          <Info
+            className="mt-0.5 w-4 h-4 shrink-0 text-store-warning"
+            aria-hidden="true"
+          />
+          <span>{t("success.notPaidNote")}</span>
+        </p>
+      )}
 
       <section
         aria-labelledby="awj-confirmation-items"
@@ -179,6 +212,21 @@ export function AwjOrderConfirmation({
       </div>
     </div>
   );
+}
+
+function formatCancelledDate(value: string | null, locale: string) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  try {
+    return new Intl.DateTimeFormat(locale, {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    }).format(date);
+  } catch {
+    return null;
+  }
 }
 
 function DetailCard({

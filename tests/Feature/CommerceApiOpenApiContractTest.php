@@ -334,6 +334,15 @@ class CommerceApiOpenApiContractTest extends TestCase
         $lookup = $this->withHeaders($this->bearer($store['token']) + ['X-Order-Reference' => $data['order_reference']])
             ->getJson("/commerce/v1/orders/{$data['order']['id']}")->assertOk()->json('data');
         $this->assertMatchesSchema('Order', $lookup['order'], 'Order (guest lookup)');
+
+        // O3c: الطلب الملغى — `cancelled` + كتلة `cancellation` الموثَّقتان؛ المفتاح غائب لغير الملغى.
+        $this->assertArrayNotHasKey('cancellation', $lookup['order']);
+        \Illuminate\Support\Facades\DB::table('commerce_orders')->where('id', $data['order']['id'])
+            ->update(['cancelled_at' => '2026-05-03 10:00:00', 'cancellation_reason' => 'customer_request']);
+        $cancelled = $this->withHeaders($this->bearer($store['token']) + ['X-Order-Reference' => $data['order_reference']])
+            ->getJson("/commerce/v1/orders/{$data['order']['id']}")->assertOk()->json('data.order');
+        $this->assertSame('cancelled', $cancelled['status']);
+        $this->assertMatchesSchema('Order', $cancelled, 'Order (cancelled)');
     }
 
     /** @test */

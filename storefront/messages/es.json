@@ -630,7 +630,14 @@
       "notTracked": "Sin seguimiento",
       "caption": "Esta tienda aún no publica seguimiento de envío. Solo un pedido confirmado se marca como realizado."
     },
-    "contact": "Contacto"
+    "contact": "Contacto",
+    "statusCancelled": "Cancelado",
+    "cancelled": {
+      "title": "Este pedido fue cancelado",
+      "body": "Este pedido fue cancelado y ya no se está procesando. Cancelado el {date}.",
+      "bodyNoDate": "Este pedido fue cancelado y ya no se está procesando.",
+      "detail": "Los detalles del pedido se conservan para tu registro. Esta página no muestra información de pago ni de reembolso."
+    }
   },
   "orderPlaced": {
     "thanksForOrder": "¡Gracias por tu pedido, {name}!",

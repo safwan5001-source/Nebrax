@@ -22,9 +22,43 @@ const STEPS = [
  * once, under the journey, never repeated on every step. The connecting
  * line is never filled — that would fake progress.
  */
-export function AccountOrderStatus({ status }: { status: string }) {
+export function AccountOrderStatus({
+  status,
+  cancelledDate = null,
+}: {
+  status: string;
+  /** Pre-formatted (locale-aware) cancellation date; `null` when the API gave none. */
+  cancelledDate?: string | null;
+}) {
   const t = useTranslations("orders");
   const live = ACCOUNT_ORDER_STATUS_CAPABILITY === "live";
+
+  // O3c: a cancelled order is terminal. It must never read as placed / being
+  // prepared / on its way, so the journey is replaced by a notice. The notice
+  // makes no payment or refund claim.
+  if (status === "cancelled") {
+    const date = cancelledDate;
+    return (
+      <section
+        aria-labelledby="account-order-status"
+        role="status"
+        className="rounded-store border border-store-border-strong bg-store-surface-muted p-4"
+      >
+        <h2
+          id="account-order-status"
+          className="text-sm font-semibold text-store-foreground"
+        >
+          {t("cancelled.title")}
+        </h2>
+        <p className="mt-1 text-sm leading-relaxed text-store-foreground">
+          {date ? t("cancelled.body", { date }) : t("cancelled.bodyNoDate")}
+        </p>
+        <p className="mt-2 text-xs leading-relaxed text-store-muted-foreground">
+          {t("cancelled.detail")}
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section aria-labelledby="account-order-status">

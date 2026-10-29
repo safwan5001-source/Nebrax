@@ -498,4 +498,37 @@ class StorefrontCheckoutCompletionApiTest extends TestCase
         $this->assertSame(0, DB::table('invoices')->count());
         $this->assertDatabaseCount('commerce_orders', 1);
     }
+
+    // ── O3c — العقد العام للطلب الملغى (ADR-28 D-9-P1 الخيار B) ──────────────
+
+    /** @test */
+    public function a_replayed_completion_of_a_cancelled_order_reports_cancelled_with_a_safe_cancellation_block(): void
+    {
+        $s = $this->store('o3c-store.test');
+        $product = $this->product($s['tenant'], $s['channel']);
+        $token = $this->fullyReadyCheckout('o3c-store.test', $s['tenant'], $s['channel'], $product);
+        $key = (string) Str::uuid();
+
+        $first = $this->complete('o3c-store.test', $token, $key)->assertCreated();
+        $this->assertSame('confirmed', $first->json('data.order.status'));
+        $this->assertArrayNotHasKey('cancellation', $first->json('data.order'));
+        $orderId = $first->json('data.order.id');
+
+        DB::table('commerce_orders')->where('id', $orderId)->update([
+            'cancelled_at' => '2026-05-03 10:00:00', 'cancellation_reason' => 'fraud_suspected',
+            'cancellation_note' => 'internal-only-note',
+        ]);
+
+        $replay = $this->complete('o3c-store.test', $token, $key)->assertOk();
+        $order = $replay->json('data.order');
+
+        $this->assertSame('cancelled', $order['status']);
+        $this->assertSame(['cancelled_at'], array_keys($order['cancellation']));
+        $this->assertStringStartsWith('2026-05-03T10:00:00', $order['cancellation']['cancelled_at']);
+        $this->assertSame($first->json('data.order.total'), $order['total']);
+        $this->assertSame($first->json('data.order.items'), $order['items']);
+        $this->assertStringNotContainsString('internal-only-note', $replay->getContent());
+        $this->assertStringNotContainsString('fraud_suspected', $replay->getContent());
+        $this->assertDatabaseHas('commerce_orders', ['id' => $orderId, 'status' => 'confirmed']);
+    }
 }
