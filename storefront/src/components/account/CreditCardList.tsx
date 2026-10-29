@@ -1,6 +1,5 @@
 "use client";
 
-import type { CreditCard as SpreeCreditCard } from "@spree/sdk";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { PaymentIcon } from "react-svg-credit-card-payment-icons";
@@ -16,6 +15,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import type { StoreCreditCard } from "@/lib/commerce/types";
 import { deleteCreditCard } from "@/lib/data/credit-cards";
 import { getCardIconType, getCardLabel } from "@/lib/utils/credit-card";
 
@@ -23,7 +23,7 @@ function CreditCardItem({
   card,
   onDelete,
 }: {
-  card: SpreeCreditCard;
+  card: StoreCreditCard;
   onDelete: () => void;
 }) {
   const t = useTranslations("creditCards");
@@ -104,12 +104,12 @@ function CreditCardItem({
 }
 
 interface CreditCardListProps {
-  initialCards: SpreeCreditCard[];
+  initialCards: StoreCreditCard[];
 }
 
 export function CreditCardList({ initialCards }: CreditCardListProps) {
   const t = useTranslations("creditCards");
-  const [cards, setCards] = useState<SpreeCreditCard[]>(initialCards);
+  const [cards, setCards] = useState<StoreCreditCard[]>(initialCards);
 
   const handleDelete = async (id: string) => {
     const result = await deleteCreditCard(id);

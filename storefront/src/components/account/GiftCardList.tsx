@@ -1,10 +1,10 @@
 "use client";
 
-import type { GiftCard } from "@spree/sdk";
 import { Check, ClipboardCopy } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import type { StoreGiftCard } from "@/lib/commerce/types";
 import { formatDate } from "@/lib/utils/format";
 
 function getStateColor(state: string, expired: boolean): string {
@@ -89,7 +89,7 @@ function CopyButton({ code }: { code: string }) {
   );
 }
 
-function GiftCardItem({ card }: { card: GiftCard }) {
+function GiftCardItem({ card }: { card: StoreGiftCard }) {
   const t = useTranslations("giftCards");
   const locale = useLocale();
   const usagePercentage =
@@ -166,7 +166,7 @@ function GiftCardItem({ card }: { card: GiftCard }) {
 }
 
 interface GiftCardListProps {
-  cards: GiftCard[];
+  cards: StoreGiftCard[];
 }
 
 export function GiftCardList({ cards }: GiftCardListProps) {

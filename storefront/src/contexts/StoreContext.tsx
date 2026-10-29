@@ -1,11 +1,11 @@
 "use client";
 
-import type { Country, Market } from "@spree/sdk";
 import { createContext, type ReactNode, useContext, useMemo } from "react";
+import type { StoreCountry, StoreMarket } from "@/lib/commerce/types";
 import { getStoreName } from "@/lib/store";
 
 /** Country enriched with market info (currency, locale, etc.) */
-export interface CountryWithMarket extends Country {
+export interface CountryWithMarket extends StoreCountry {
   currency: string;
   default_locale: string;
   supported_locales: string[];
@@ -29,11 +29,13 @@ interface StoreProviderProps {
   children: ReactNode;
   initialCountry: string;
   initialLocale: string;
-  initialMarkets: Market[];
+  initialMarkets: StoreMarket[];
 }
 
 /** Build a flat country list from markets, enriching each country with market info. */
-function buildCountriesFromMarkets(markets: Market[]): CountryWithMarket[] {
+function buildCountriesFromMarkets(
+  markets: StoreMarket[],
+): CountryWithMarket[] {
   const seen = new Set<string>();
   const result: CountryWithMarket[] = [];
 

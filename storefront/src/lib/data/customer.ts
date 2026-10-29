@@ -1,12 +1,12 @@
 "use server";
 
-import type { Customer } from "@spree/sdk";
 import { updateTag } from "next/cache";
 import {
   type AccountAuthFailureCode,
   classifyAccountError,
 } from "@/lib/commerce/account-errors";
 import { ACCOUNT_AUTH_CAPABILITY } from "@/lib/commerce/capabilities";
+import type { StoreCustomer } from "@/lib/commerce/types";
 import {
   cacheTagSuffix,
   clearAccessToken,
@@ -49,7 +49,7 @@ const UNAVAILABLE = {
  * Fetch the current customer with automatic token refresh. Throws on any
  * failure (auth or transient) so callers can distinguish the two.
  */
-async function fetchCustomer(): Promise<Customer> {
+async function fetchCustomer(): Promise<StoreCustomer> {
   return withAuthRefresh((options) => getClient().customer.get(options));
 }
 
@@ -83,7 +83,7 @@ async function finalizeAuth(token: string, refreshToken: string) {
 /**
  * Get the currently authenticated customer. Returns null if not logged in.
  */
-export async function getCustomer(): Promise<Customer | null> {
+export async function getCustomer(): Promise<StoreCustomer | null> {
   if (!accountAuthLive()) return null;
 
   const token = await getAccessToken();
@@ -110,7 +110,7 @@ export async function getCustomer(): Promise<Customer | null> {
  * current session rather than treat it as logged out.
  */
 export async function syncSession(): Promise<{
-  customer: Customer | null;
+  customer: StoreCustomer | null;
   refreshed: boolean;
   stale?: boolean;
 }> {
@@ -300,13 +300,13 @@ export async function updateCustomer(data: {
   current_password?: string;
 }): Promise<{
   success: boolean;
-  customer?: Customer;
+  customer?: StoreCustomer;
   code?: AccountAuthFailureCode;
 }> {
   if (!accountAuthLive()) return UNAVAILABLE;
 
   try {
-    let customer: Customer;
+    let customer: StoreCustomer;
     try {
       customer = await withAuthRefresh(async (options) => {
         return getClient().customer.update(data, options);

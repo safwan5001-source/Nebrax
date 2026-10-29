@@ -1,5 +1,5 @@
-import type { State } from "@spree/sdk";
 import { useEffect, useState, useTransition } from "react";
+import type { StoreState } from "@/lib/commerce/types";
 
 /**
  * Fetches states for a country ISO code, with cleanup on unmount/change.
@@ -7,10 +7,10 @@ import { useEffect, useState, useTransition } from "react";
  */
 export function useCountryStates(
   countryIso: string,
-  fetchStates: (countryIso: string) => Promise<State[]>,
+  fetchStates: (countryIso: string) => Promise<StoreState[]>,
   enabled = true,
-): [State[], boolean] {
-  const [states, setStates] = useState<State[]>([]);
+): [StoreState[], boolean] {
+  const [states, setStates] = useState<StoreState[]>([]);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {

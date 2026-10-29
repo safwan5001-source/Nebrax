@@ -1,6 +1,5 @@
 "use client";
 
-import type { Country, State } from "@spree/sdk";
 import { CircleAlert } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
@@ -9,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import type { User } from "@/contexts/AuthContext";
 import { useCountryStates } from "@/hooks/useCountryStates";
+import type { StoreCountry, StoreState } from "@/lib/commerce/types";
 import {
   type AddressFormData,
   addressToFormData,
@@ -33,8 +33,8 @@ interface AddressEditModalProps {
     state_abbr: string | null;
     state_name: string | null;
   } | null;
-  countries: Country[];
-  fetchStates: (countryIso: string) => Promise<State[]>;
+  countries: StoreCountry[];
+  fetchStates: (countryIso: string) => Promise<StoreState[]>;
   onSave: (
     data: ReturnType<typeof formDataToAddress>,
     id?: string,

@@ -591,6 +591,163 @@ export interface StoreOrderDetail extends StoreOrderSummary, StoreOrderTotals {
   shipping_address: StoreOrderAddress | null;
 }
 
+/**
+ * Account, address, market and analytics presentation types (H6 Batch A).
+ *
+ * Structural twins of the SDK shapes the storefront reads, so Spree-shaped
+ * values stay assignable without casts. Type-only; nothing here is connected
+ * to a new AWJ API.
+ */
+export interface StoreCreditCard {
+  id: string;
+  brand: string;
+  last4: string;
+  month: number;
+  year: number;
+  name: string | null;
+  default: boolean;
+  gateway_payment_profile_id: string | null;
+}
+
+export interface StoreGiftCard {
+  id: string;
+  code: string;
+  status: string;
+  currency: string;
+  amount: string | null;
+  amount_used: string | null;
+  amount_authorized: string | null;
+  amount_remaining: string | null;
+  display_amount: string | null;
+  display_amount_used: string | null;
+  display_amount_remaining: string | null;
+  expires_at: string | null;
+  redeemed_at: string | null;
+  expired: boolean;
+  active: boolean;
+}
+
+export interface StoreAddress {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  full_name: string;
+  address1: string | null;
+  address2: string | null;
+  postal_code: string | null;
+  city: string | null;
+  phone: string | null;
+  company: string | null;
+  country_name: string;
+  country_iso: string;
+  state_text: string | null;
+  state_abbr: string | null;
+  quick_checkout: boolean;
+  is_default_billing: boolean;
+  is_default_shipping: boolean;
+  state_name: string | null;
+}
+
+export interface StoreAddressParams {
+  first_name: string;
+  last_name: string;
+  address1: string;
+  address2?: string;
+  city: string;
+  postal_code: string;
+  phone?: string;
+  company?: string;
+  /** ISO 3166-1 alpha-2 country code. */
+  country_iso: string;
+  /** ISO 3166-2 subdivision code without the country prefix. */
+  state_abbr?: string;
+  /** State name, for countries without predefined states. */
+  state_name?: string;
+  quick_checkout?: boolean;
+  is_default_billing?: boolean;
+  is_default_shipping?: boolean;
+}
+
+export interface StoreState {
+  abbr: string;
+  name: string;
+}
+
+export interface StoreCountry {
+  iso: string;
+  iso3: string;
+  name: string;
+  states_required: boolean;
+  zipcode_required: boolean;
+  states?: StoreState[];
+  market?: StoreMarket | null;
+}
+
+export interface StoreMarket {
+  id: string;
+  name: string;
+  currency: string;
+  default_locale: string;
+  tax_inclusive: boolean;
+  default: boolean;
+  country_isos: string[];
+  supported_locales: string[];
+  countries?: StoreCountry[];
+}
+
+export interface StoreCustomerGroup {
+  id: string;
+  name: string;
+}
+
+export interface StoreCustomer {
+  id: string;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  accepts_email_marketing: boolean;
+  full_name: string;
+  available_store_credit_total: string;
+  display_available_store_credit_total: string;
+  addresses: StoreAddress[];
+  default_billing_address: StoreAddress | null;
+  default_shipping_address: StoreAddress | null;
+  customer_groups: StoreCustomerGroup[];
+}
+
+export interface StoreOrderListParams extends StoreListParams {
+  sort?: string;
+  search?: string;
+  state_eq?: string;
+  completed_at_gte?: string;
+  completed_at_lte?: string;
+  [key: string]: string | number | boolean | (string | number)[] | undefined;
+}
+
+/** What GTM purchase/checkout events read from a cart or order line. */
+export interface StoreAnalyticsLineItem {
+  id: string;
+  name: string;
+  quantity: number;
+  options_text: string;
+  price: string | null;
+  total: string | null;
+  discount_total: string | null;
+}
+
+/** What GTM purchase/checkout events read from a cart or order. */
+export interface StoreAnalyticsOrder {
+  number: string;
+  currency: string;
+  item_total: string | null;
+  total: string | null;
+  tax_total: string | null;
+  delivery_total: string | null;
+  discounts: Array<{ code?: string | null }>;
+  items: StoreAnalyticsLineItem[];
+}
+
 export interface AwjCategory {
   id: string;
   name: string;

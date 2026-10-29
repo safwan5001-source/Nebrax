@@ -1,5 +1,4 @@
-import type { AddressParams } from "@spree/sdk";
-
+import type { StoreAddressParams } from "@/lib/commerce/types";
 export interface AddressFormData {
   first_name: string;
   last_name: string;
@@ -59,7 +58,7 @@ export function addressToFormData(
   };
 }
 
-export function formDataToAddress(data: AddressFormData): AddressParams {
+export function formDataToAddress(data: AddressFormData): StoreAddressParams {
   return {
     first_name: data.first_name,
     last_name: data.last_name,

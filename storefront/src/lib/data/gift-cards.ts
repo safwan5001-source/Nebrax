@@ -1,6 +1,6 @@
 "use server";
 
-import type { GiftCard } from "@spree/sdk";
+import type { StoreGiftCard } from "@/lib/commerce/types";
 import { getClient, withAuthRefresh } from "@/lib/spree";
 import { withFallback } from "./utils";
 
@@ -11,7 +11,7 @@ export async function getGiftCards() {
         return getClient().customer.giftCards.list(undefined, options);
       });
     },
-    { data: [] } as { data: GiftCard[] },
+    { data: [] } as { data: StoreGiftCard[] },
   );
 }
 

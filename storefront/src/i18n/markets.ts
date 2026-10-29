@@ -1,9 +1,9 @@
-import type { Market } from "@spree/sdk";
 import {
   DEFAULT_LOCALE,
   resolveSupportedLocale,
   type SupportedLocale,
 } from "@/i18n/locales";
+import type { StoreMarket } from "@/lib/commerce/types";
 
 export interface MarketLocaleTarget {
   marketId: string;
@@ -12,9 +12,9 @@ export interface MarketLocaleTarget {
 }
 
 export function findMarketForCountry(
-  markets: Market[],
+  markets: StoreMarket[],
   country: string,
-): Market | undefined {
+): StoreMarket | undefined {
   const normalizedCountry = country.toLowerCase();
   return markets.find((market) =>
     market.countries?.some(
@@ -24,7 +24,7 @@ export function findMarketForCountry(
 }
 
 /** Return only locales that both the Market and this storefront can render. */
-export function getMarketLocales(market: Market): SupportedLocale[] {
+export function getMarketLocales(market: StoreMarket): SupportedLocale[] {
   const locales: SupportedLocale[] = [];
 
   for (const candidate of [
@@ -39,7 +39,7 @@ export function getMarketLocales(market: Market): SupportedLocale[] {
 }
 
 export function isLocaleEnabledForMarket(
-  market: Market,
+  market: StoreMarket,
   locale: string,
 ): boolean {
   const supportedLocale = resolveSupportedLocale(locale);
@@ -50,7 +50,7 @@ export function isLocaleEnabledForMarket(
 
 /** Resolve the Market's default locale only when the storefront can render it. */
 export function getMarketDefaultLocale(
-  market: Market,
+  market: StoreMarket,
 ): SupportedLocale | undefined {
   const locales = getMarketLocales(market);
   return resolveSupportedLocale(market.default_locale) ?? locales[0];
@@ -58,7 +58,7 @@ export function getMarketDefaultLocale(
 
 /** Build every valid country/locale route exposed by the configured Markets. */
 export function getMarketLocaleTargets(
-  markets: Market[],
+  markets: StoreMarket[],
 ): MarketLocaleTarget[] {
   const targets: MarketLocaleTarget[] = [];
   const seen = new Set<string>();
@@ -81,7 +81,7 @@ export function getMarketLocaleTargets(
 
 /** Resolve the configured default storefront route. */
 export function getDefaultMarketLocaleTarget(
-  markets: Market[],
+  markets: StoreMarket[],
 ): MarketLocaleTarget | undefined {
   const defaultMarket = markets.find((market) => market.default) ?? markets[0];
   const country = defaultMarket?.countries?.[0]?.iso.toLowerCase();
