@@ -1,6 +1,5 @@
 "use client";
 
-import type { Cart, LineItem } from "@spree/sdk";
 import { ShoppingBag, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -31,6 +30,7 @@ import {
   isStorefrontCart,
   lineGroups,
 } from "@/lib/commerce/cart-types";
+import type { StoreCart, StoreCartLine } from "@/lib/commerce/types";
 import { extractBasePath } from "@/lib/utils/path";
 
 const ExpressCheckoutButton = dynamic(
@@ -85,7 +85,8 @@ export function CartDrawer() {
   }, [pathname, closeCart]);
 
   const awjCart = isStorefrontCart(cart) ? cart : null;
-  const spreeCart = cart && !isStorefrontCart(cart) ? (cart as Cart) : null;
+  const spreeCart =
+    cart && !isStorefrontCart(cart) ? (cart as StoreCart) : null;
 
   // AWJ carts do not fire GA4 `view_cart` — see the cart page's identical note.
   useEffect(() => {
@@ -315,7 +316,10 @@ export function CartDrawer() {
  * (`display_price`, `display_compare_at_amount`), so nothing is computed here
  * either — the wholesale surface's authority is simply a different one.
  */
-function spreeCartLineView(line: LineItem, basePath: string): CartLineView {
+function spreeCartLineView(
+  line: StoreCartLine,
+  basePath: string,
+): CartLineView {
   const onSale =
     line.compare_at_amount != null &&
     line.price != null &&

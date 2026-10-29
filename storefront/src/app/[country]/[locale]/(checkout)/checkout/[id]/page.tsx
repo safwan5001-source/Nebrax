@@ -1,19 +1,22 @@
-import type { Address, Cart, Country } from "@spree/sdk";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
+import type {
+  StoreAddress,
+  StoreCart,
+  StoreCountry,
+} from "@/lib/commerce/types";
 import { getAddresses } from "@/lib/data/addresses";
 import { getCheckoutOrder } from "@/lib/data/checkout";
 import { isAuthenticated as checkAuth } from "@/lib/data/cookies";
 import { getCountry } from "@/lib/data/countries";
 import { getMarketCountries, resolveMarket } from "@/lib/data/markets";
-
 import { CheckoutPageContent } from "./CheckoutPageContent";
 
 export interface CheckoutInitialData {
-  cart: Cart;
-  countries: Country[];
-  savedAddresses: Address[];
+  cart: StoreCart;
+  countries: StoreCountry[];
+  savedAddresses: StoreAddress[];
   isAuthenticated: boolean;
 }
 
@@ -37,7 +40,9 @@ async function CheckoutDataLoader({ params }: CheckoutPageProps) {
   const [cartData, market, addressesData] = await Promise.all([
     getCheckoutOrder(cartId),
     resolveMarket(urlCountry).catch(() => null),
-    authStatus ? getAddresses() : Promise.resolve({ data: [] as Address[] }),
+    authStatus
+      ? getAddresses()
+      : Promise.resolve({ data: [] as StoreAddress[] }),
   ]);
 
   // Redirect to order-placed if already complete
@@ -48,9 +53,9 @@ async function CheckoutDataLoader({ params }: CheckoutPageProps) {
 
   const countriesData = market
     ? await getMarketCountries(market.id).catch(() => ({
-        data: [] as Country[],
+        data: [] as StoreCountry[],
       }))
-    : { data: [] as Country[] };
+    : { data: [] as StoreCountry[] };
 
   // Prefetch states for the default country (warms the server cache)
   const defaultIso =

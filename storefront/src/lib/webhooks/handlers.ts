@@ -1,6 +1,6 @@
-import type { Order } from "@spree/sdk";
 import type { WebhookEvent } from "@spree/sdk/webhooks";
 import { createElement } from "react";
+import type { StoreCompletedOrder } from "@/lib/commerce/types";
 import { OrderCanceledEmail } from "@/lib/emails/order-canceled";
 import { OrderConfirmationEmail } from "@/lib/emails/order-confirmation";
 import { PasswordResetEmail } from "@/lib/emails/password-reset";
@@ -43,7 +43,9 @@ function markProcessed(eventId: string): void {
 /**
  * Handle order.completed webhook — send order confirmation email.
  */
-export async function handleOrderCompleted(event: WebhookEvent<Order>) {
+export async function handleOrderCompleted(
+  event: WebhookEvent<StoreCompletedOrder>,
+) {
   if (isAlreadyProcessed(event.id)) return;
   const order = event.data;
   if (!order.email) return;
@@ -93,7 +95,9 @@ export async function handleOrderCompleted(event: WebhookEvent<Order>) {
 /**
  * Handle order.canceled webhook — send cancellation email.
  */
-export async function handleOrderCanceled(event: WebhookEvent<Order>) {
+export async function handleOrderCanceled(
+  event: WebhookEvent<StoreCompletedOrder>,
+) {
   if (isAlreadyProcessed(event.id)) return;
   const order = event.data;
   if (!order.email) return;
@@ -128,7 +132,9 @@ export async function handleOrderCanceled(event: WebhookEvent<Order>) {
  * We subscribe to order.shipped (not shipment.shipped) because the order
  * payload includes the email, customer name, and all shipment details.
  */
-export async function handleOrderShipped(event: WebhookEvent<Order>) {
+export async function handleOrderShipped(
+  event: WebhookEvent<StoreCompletedOrder>,
+) {
   if (isAlreadyProcessed(event.id)) return;
   const order = event.data;
   if (!order.email) return;

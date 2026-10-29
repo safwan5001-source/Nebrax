@@ -1,6 +1,5 @@
 "use client";
 
-import type { Cart, LineItem } from "@spree/sdk";
 import { ShoppingBag } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -9,6 +8,7 @@ import { QuantityPickerField } from "@/components/cart/QuantityPickerField";
 import { Button } from "@/components/ui/button";
 import { ProductImage } from "@/components/ui/product-image";
 import { useCart } from "@/contexts/CartContext";
+import type { StoreCart, StoreCartLine } from "@/lib/commerce/types";
 import { extractBasePath } from "@/lib/utils/path";
 import { WHOLESALE_MIN_QUANTITY } from "@/lib/wholesale";
 
@@ -31,7 +31,7 @@ export function WholesaleCartView() {
     updateItem,
     removeItem,
   } = useCart();
-  const cart = rawCart as Cart | null;
+  const cart = rawCart as StoreCart | null;
   const pathname = usePathname();
   // extractBasePath strips to /{country}/{locale}; the shared checkout lives there.
   const storeBase = extractBasePath(pathname);
@@ -40,7 +40,7 @@ export function WholesaleCartView() {
   const tc = useTranslations("common");
   const tw = useTranslations("wholesale");
 
-  const handleRemove = async (item: LineItem) => {
+  const handleRemove = async (item: StoreCartLine) => {
     await removeItem(item.id);
   };
 

@@ -11,31 +11,12 @@
       }
     },
     "spree_type_imports": {
-      "total": 41,
+      "total": 4,
       "files": {
-        "src/app/[country]/[locale]/(checkout)/checkout/[id]/CheckoutPageContent.tsx": 4,
-        "src/app/[country]/[locale]/(checkout)/checkout/[id]/CheckoutSidebar.tsx": 1,
-        "src/app/[country]/[locale]/(checkout)/checkout/[id]/page.tsx": 3,
-        "src/app/[country]/[locale]/(checkout)/order-placed/[id]/page.tsx": 1,
-        "src/app/[country]/[locale]/(wholesale)/wholesale/cart/WholesaleCartView.tsx": 2,
-        "src/components/cart/CartDrawer.tsx": 2,
-        "src/components/checkout/AddressSection.tsx": 1,
-        "src/components/checkout/CouponCode.tsx": 1,
-        "src/components/checkout/DeliveryMethodSection.tsx": 1,
-        "src/components/checkout/ExpressCheckoutButton.tsx": 1,
-        "src/components/checkout/PaymentSection.tsx": 6,
-        "src/components/checkout/Summary.tsx": 1,
-        "src/contexts/CartContext.tsx": 2,
-        "src/lib/data/cart.ts": 2,
-        "src/lib/data/checkout.ts": 2,
-        "src/lib/data/express-checkout-flow.ts": 2,
-        "src/lib/data/payment.ts": 1,
-        "src/lib/data/wholesale.ts": 1,
         "src/lib/spree/auth-helpers.ts": 1,
         "src/lib/spree/config.ts": 1,
         "src/lib/spree/webhooks.ts": 1,
-        "src/lib/utils/express-checkout.ts": 2,
-        "src/lib/webhooks/handlers.ts": 2
+        "src/lib/webhooks/handlers.ts": 1
       }
     },
     "spree_client_access": {

@@ -1,13 +1,5 @@
 "use client";
 
-import type {
-  AddressParams,
-  Cart,
-  Country,
-  PaymentMethod,
-  CreditCard as SpreeCreditCard,
-  State,
-} from "@spree/sdk";
 import { CircleAlert, CreditCard, Info, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import {
@@ -37,6 +29,14 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useCountryStates } from "@/hooks/useCountryStates";
+import type {
+  StoreAddressParams,
+  StoreCart,
+  StoreCountry,
+  StoreCreditCard,
+  StorePaymentMethod,
+  StoreState,
+} from "@/lib/commerce/types";
 import { getCreditCards } from "@/lib/data/credit-cards";
 import {
   createCheckoutPaymentSession,
@@ -63,12 +63,12 @@ export interface PaymentSectionHandle {
 
 interface PaymentSectionProps {
   ref?: Ref<PaymentSectionHandle>;
-  cart: Cart;
-  countries: Country[];
+  cart: StoreCart;
+  countries: StoreCountry[];
   isAuthenticated: boolean;
-  fetchStates: (countryIso: string) => Promise<State[]>;
+  fetchStates: (countryIso: string) => Promise<StoreState[]>;
   onUpdateBillingAddress: (data: {
-    billing_address?: AddressParams;
+    billing_address?: StoreAddressParams;
     use_shipping?: boolean;
   }) => Promise<boolean>;
   onPaymentComplete: (result: PaymentCompleteResult) => Promise<void>;
@@ -102,7 +102,7 @@ export function PaymentSection({
   const [selectedMethodId, setSelectedMethodId] = useState<string>(
     () => paymentMethods[0]?.id ?? "",
   );
-  const selectedMethod: PaymentMethod | undefined =
+  const selectedMethod: StorePaymentMethod | undefined =
     paymentMethods.find((pm) => pm.id === selectedMethodId) ??
     paymentMethods[0];
   const effectiveSelectedMethodId = selectedMethod?.id ?? "";
@@ -149,7 +149,7 @@ export function PaymentSection({
     useState(initialUseShipping);
 
   // ── Saved cards (session-based gateways only) ───────────────────────
-  const [savedCards, setSavedCards] = useState<SpreeCreditCard[]>([]);
+  const [savedCards, setSavedCards] = useState<StoreCreditCard[]>([]);
   // null = "add new payment method", string = gateway_payment_profile_id
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
 
@@ -188,7 +188,7 @@ export function PaymentSection({
 
   // ── Session management ──────────────────────────────────────────────
   const createSession = useCallback(
-    async (cardId: string | null, method: PaymentMethod) => {
+    async (cardId: string | null, method: StorePaymentMethod) => {
       const currentGatewayId = resolveGatewayId(method.type);
       const requestId = ++sessionRequestIdRef.current;
 

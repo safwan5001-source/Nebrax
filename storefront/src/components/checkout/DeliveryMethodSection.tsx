@@ -1,11 +1,11 @@
 "use client";
 
-import type { Fulfillment } from "@spree/sdk";
 import { useTranslations } from "next-intl";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import type { StoreCartFulfillment } from "@/lib/commerce/types";
 
 interface DeliveryMethodSectionProps {
-  fulfillments: Fulfillment[];
+  fulfillments: StoreCartFulfillment[];
   onDeliveryRateSelect: (
     fulfillmentId: string,
     rateId: string,

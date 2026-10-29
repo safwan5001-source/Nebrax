@@ -1,6 +1,5 @@
 "use client";
 
-import type { Cart } from "@spree/sdk";
 import {
   Elements,
   ExpressCheckoutElement,
@@ -17,6 +16,7 @@ import type {
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { StoreCart } from "@/lib/commerce/types";
 import {
   expressCheckoutCreateSession,
   expressCheckoutFinalize,
@@ -34,7 +34,7 @@ import {
 import { isStripeConfigured, stripePromise } from "@/lib/utils/stripe";
 
 export interface ExpressCheckoutButtonProps {
-  cart: Cart;
+  cart: StoreCart;
   basePath: string;
   onComplete: () => void | Promise<void>;
   onProcessingChange?: (processing: boolean) => void;

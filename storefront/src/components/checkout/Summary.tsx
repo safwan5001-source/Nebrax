@@ -1,11 +1,11 @@
 "use client";
 
-import type { Cart } from "@spree/sdk";
 import { useTranslations } from "next-intl";
 import { ProductImage } from "@/components/ui/product-image";
+import type { StoreCart } from "@/lib/commerce/types";
 
 interface SummaryProps {
-  cart: Cart;
+  cart: StoreCart;
 }
 
 export function Summary({ cart }: SummaryProps) {

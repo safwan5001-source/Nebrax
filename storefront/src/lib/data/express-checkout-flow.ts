@@ -1,6 +1,6 @@
 "use server";
 
-import type { AddressParams, Cart } from "@spree/sdk";
+import type { StoreAddressParams, StoreCart } from "@/lib/commerce/types";
 import {
   getCheckoutOrder,
   selectDeliveryRate,
@@ -23,7 +23,9 @@ export interface ExpressCheckoutPartialAddress {
 export async function expressCheckoutResolveShipping(
   cartId: string,
   address: ExpressCheckoutPartialAddress,
-): Promise<{ success: true; cart: Cart } | { success: false; error: string }> {
+): Promise<
+  { success: true; cart: StoreCart } | { success: false; error: string }
+> {
   return actionResult(async () => {
     const result = await updateOrderAddresses(cartId, {
       shipping_address: {
@@ -52,9 +54,11 @@ export async function expressCheckoutResolveShipping(
 export async function expressCheckoutSelectRates(
   cartId: string,
   selections: Array<{ fulfillmentId: string; rateId: string }>,
-): Promise<{ success: true; cart: Cart } | { success: false; error: string }> {
+): Promise<
+  { success: true; cart: StoreCart } | { success: false; error: string }
+> {
   return actionResult(async () => {
-    let cart: Cart | null = null;
+    let cart: StoreCart | null = null;
 
     for (const { fulfillmentId, rateId } of selections) {
       const result = await selectDeliveryRate(cartId, fulfillmentId, rateId);
@@ -76,10 +80,12 @@ export async function expressCheckoutPreparePayment(
   cartId: string,
   params: {
     email: string;
-    shipAddress: AddressParams;
-    billAddress: AddressParams;
+    shipAddress: StoreAddressParams;
+    billAddress: StoreAddressParams;
   },
-): Promise<{ success: true; cart: Cart } | { success: false; error: string }> {
+): Promise<
+  { success: true; cart: StoreCart } | { success: false; error: string }
+> {
   return actionResult(async () => {
     const result = await updateOrderAddresses(cartId, {
       email: params.email,

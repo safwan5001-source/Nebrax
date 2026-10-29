@@ -1,7 +1,7 @@
 "use server";
 
-import type { Order } from "@spree/sdk";
 import { updateTag } from "next/cache";
+import type { StoreCompletedOrder } from "@/lib/commerce/types";
 import {
   cacheTagSuffix,
   getCartOptions,
@@ -125,10 +125,9 @@ export async function completeCheckoutOrder(
   const surface = knownSurface ?? (await resolveSurfaceForCart(cartId));
   try {
     const options = await getCartOptions(surface);
-    const order: Order = await getClientForSurface(surface).carts.complete(
-      cartId,
-      options,
-    );
+    const order: StoreCompletedOrder = await getClientForSurface(
+      surface,
+    ).carts.complete(cartId, options);
     updateTag(checkoutTag(surface));
     updateTag(cartTag(surface));
     return { success: true as const, order };

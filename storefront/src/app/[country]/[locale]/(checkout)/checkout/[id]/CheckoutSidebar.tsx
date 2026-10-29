@@ -1,11 +1,11 @@
 "use client";
 
-import type { Cart } from "@spree/sdk";
 import { CouponCode } from "@/components/checkout/CouponCode";
 import { Summary } from "@/components/checkout/Summary";
+import type { StoreCart } from "@/lib/commerce/types";
 
 interface CheckoutSidebarProps {
-  cart: Cart;
+  cart: StoreCart;
   onApplyCode: (code: string) => Promise<{ success: boolean; error?: string }>;
   onRemoveDiscount: (
     code: string,
