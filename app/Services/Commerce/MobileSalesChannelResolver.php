@@ -92,7 +92,10 @@ final class MobileSalesChannelResolver
             ->where('is_active', true)
             ->first();
 
-        if ($channel === null) {
+        // H6 Batch G — a wholesale-flagged channel is a web channel (model guard + DB CHECK), so a mobile channel
+        // carrying the flag is corrupt or tampered. An API key is machine identity, never wholesale-buyer approval:
+        // fail closed (the same uniform 404), and never fall back to another mobile channel of the tenant.
+        if ($channel === null || $channel->wholesale_membership_enabled) {
             abort(404, 'تعذّر تحديد قناة جوال صالحة.');
         }
 
