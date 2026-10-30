@@ -39,7 +39,7 @@ abstract class PublicApiController extends Controller
      *
      * @param  array<string, string>  $allowed  مفتاح العميل → عمود قاعدة البيانات
      */
-    protected function applySort(Builder $query, ?string $sort, array $allowed, string $default): void
+    protected function applySort(Builder $query, ?string $sort, array $allowed, string $default, ?\Closure $priceSort = null): void
     {
         $sort = trim((string) ($sort ?? ''));
         if ($sort === '') {
@@ -53,6 +53,14 @@ abstract class PublicApiController extends Controller
             throw ValidationException::withMessages([
                 'sort' => "حقل فرز غير مدعوم: «{$field}».",
             ]);
+        }
+
+        // H6 Batch G — `sale_price` is ordered by the displayed (effective) price via the caller's hook, never by the
+        // frozen `products.sale_price` column. Surfaces that don't pass a hook keep the plain column ordering.
+        if ($field === 'sale_price' && $priceSort !== null) {
+            $priceSort($query, $direction);
+
+            return;
         }
 
         $query->orderBy($allowed[$field], $direction)->orderByDesc('id');

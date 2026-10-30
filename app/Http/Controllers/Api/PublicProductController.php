@@ -7,6 +7,7 @@ use App\Http\Resources\PublicProductResource;
 use App\Models\Product;
 use App\Services\ProductService;
 use App\Support\PublicApiResponse;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -58,7 +59,11 @@ class PublicProductController extends PublicApiController
             $query->where('is_active', filter_var($filters['is_active'], FILTER_VALIDATE_BOOLEAN));
         }
 
-        $this->applySort($query, $filters['sort'] ?? null, self::SORTS, 'name');
+        // H6 Batch G — `sale_price` sorts by the base unit price shown as `sale_price_minor` (product_unit_prices),
+        // not the frozen `products.sale_price` column. No channel here ⇒ no price list tier.
+        $this->applySort($query, $filters['sort'] ?? null, self::SORTS, 'name', function (Builder $q, string $direction): void {
+            \App\Support\Commerce\EffectivePriceOrdering::apply($q, null, false, $direction);
+        });
 
         return PublicApiResponse::paginated($request, $query->paginate($this->perPage($request)), PublicProductResource::class);
     }

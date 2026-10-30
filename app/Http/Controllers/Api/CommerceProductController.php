@@ -21,6 +21,7 @@ use App\Support\Commerce\CatalogFacetFilter;
 use App\Support\PublicApiResponse;
 use App\Tenancy\BranchScope;
 use App\Tenancy\StorefrontContext;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -145,7 +146,10 @@ class CommerceProductController extends PublicApiController
             $facetFilter->orderByCollectionPosition($query, $facetSelection);
             $query->orderBy('name');
         } else {
-            $this->applySort($query, $filters['sort'] ?? null, self::SORTS, 'name');
+            // H6 Batch G — price sort follows the displayed (channel-resolved) price, not the frozen column.
+            $this->applySort($query, $filters['sort'] ?? null, self::SORTS, 'name', function (Builder $q, string $direction) use ($prices, $channelId): void {
+                \App\Support\Commerce\EffectivePriceOrdering::apply($q, $prices->activeChannelPriceList($channelId)?->id, true, $direction);
+            });
         }
 
         $paginator = $query->paginate($this->perPage($request));
@@ -159,8 +163,12 @@ class CommerceProductController extends PublicApiController
             $warehouse = null;
         }
 
+        // H6 Batch G — one batched resolution for the page (same tiers as `resolve()` for this anonymous context)
+        // instead of one full resolver round-trip per row.
+        $browsePrices = $prices->browsePrices($paginator->getCollection(), $channelId);
+
         $data = $paginator->getCollection()
-            ->map(fn (Product $product) => $this->toResource($request, $product, $channelId, $currency, $warehouse, $prices, $availability, $gallery, false))
+            ->map(fn (Product $product) => $this->toResource($request, $product, $channelId, $currency, $warehouse, $prices, $availability, $gallery, false, $browsePrices[$product->id] ?? null))
             ->all();
 
         // FLOWERS-H8 / ADR-20 — وعد التسليم المشتق (استعلامات ثابتة لا تتبع عدد الصفوف)؛ المفتاح غائب حين الجدولة معطَّلة.
@@ -273,6 +281,7 @@ class CommerceProductController extends PublicApiController
         AvailableToSellService $availability,
         ProductMediaGalleryService $gallery,
         bool $detailed,
+        ?int $browsePrice = null,
     ): array {
         if ($product->isVariantManaged()) {
             if ($detailed) {
@@ -283,8 +292,12 @@ class CommerceProductController extends PublicApiController
             $price = 0;
             $inStock = null;
         } else {
-            $resolved = $prices->resolve($product->id, $channelId);
-            $price = (int) ($resolved->amount ?? $product->sale_price);
+            if ($browsePrice !== null) {
+                $price = $browsePrice;
+            } else {
+                $resolved = $prices->resolve($product->id, $channelId);
+                $price = (int) ($resolved->amount ?? $product->sale_price);
+            }
 
             $inStock = null;
             if ($warehouse !== null) {
