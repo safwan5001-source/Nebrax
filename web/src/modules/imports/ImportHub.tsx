@@ -11,9 +11,8 @@ import { EmptyState, ErrorState, LoadingState, PageHeader, Pagination } from '@/
 import { hiddenApplicationKeys, isNavEntryVisible } from '@/components/layout/nav-visibility';
 import { api, ApiError } from '@/lib/api';
 import { formatDateTime } from '@/lib/formatting';
-import { useCurrentUser } from '@/lib/use-can';
+import { useCan, useCurrentUser } from '@/lib/use-can';
 import type { ImportJob, ImportJobStatus } from '@/modules/import-jobs/client';
-import { hasPermission } from '@/lib/permissions';
 import { AiActionsHistory } from './AiActionsHistory';
 import { HUB_ENTITIES, HUB_JOB_DOMAINS, HUB_JOB_STATUSES, HUB_SECTIONS, resumeHref } from './catalog';
 
@@ -43,6 +42,7 @@ export function ImportHub() {
   const tj = useTranslations('importJobs');
   const locale = useLocale();
   const user = useCurrentUser();
+  const { can } = useCan();
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [status, setStatus] = useState('');
   const [domain, setDomain] = useState('');
@@ -262,7 +262,7 @@ export function ImportHub() {
       </section>
 
       {/* IMP-H8-S4b: سجلّ إجراءات المساعد لمن يملك صلاحية AI Actions؛ الخادم يقرّر ما يُعرض فعلاً (بوابات النوع والفرع). */}
-      {hasPermission(user?.permissions, user?.role, 'ai.actions.use') ? <AiActionsHistory /> : null}
+      {can('ai.actions.use') ? <AiActionsHistory /> : null}
     </div>
   );
 }

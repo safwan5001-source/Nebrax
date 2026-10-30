@@ -22,7 +22,10 @@ vi.mock('@/lib/api', async () => {
   const actual = await vi.importActual<typeof import('@/lib/api')>('@/lib/api');
   return { ...actual, api };
 });
-vi.mock('@/lib/use-can', () => ({ useCurrentUser: () => user.current }));
+vi.mock('@/lib/use-can', async () => {
+  const { createCapabilities } = await vi.importActual<typeof import('@/lib/capabilities')>('@/lib/capabilities');
+  return { useCurrentUser: () => user.current, useCan: () => ({ ...createCapabilities(user.current), hydrated: true }) };
+});
 vi.mock('lucide-react', () => {
   const iconStub = () => <span />;
   return new Proxy({ __esModule: true } as Record<string | symbol, unknown>, {
