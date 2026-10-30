@@ -45,6 +45,7 @@ use App\Http\Controllers\Api\CommerceShippingZoneController;
 use App\Http\Controllers\Api\CommerceDeliveryScheduleController;
 use App\Http\Controllers\Api\CommerceFulfillmentController;
 use App\Http\Controllers\Api\CommerceStaffOrderCancellationController;
+use App\Http\Controllers\Api\CommerceStaffWholesaleMembershipController;
 use App\Http\Controllers\Api\CommerceStaffOrderController;
 use App\Http\Controllers\Api\CommerceGiftSettingsController;
 use App\Http\Controllers\Api\CommerceVerticalSetupController;
@@ -1186,6 +1187,15 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // وبوابة نشر commerce.order_cancellation_enabled مغلقة افتراضياً (404). لا تغيير في عقد المشتري.
         Route::post('commerce/orders/{id}/cancel', [CommerceStaffOrderCancellationController::class, 'cancel'])
             ->whereUuid('id')->middleware([$perm('commerce.orders.cancel'), $app('commerce.storefront')]);
+
+        // H6 Batch E: مراجعة طلبات عضوية مشتري الجملة (قائمة + اعتماد/رفض/إيقاف/إعادة تفعيل) — صلاحية مستقلة
+        // commerce.wholesale.manage (owner/admin عبر `*` فقط) + حارس القدرة commerce.storefront، وبوابة النشر
+        // commerce.wholesale_buyer_enabled مغلقة افتراضياً (404). لا مسار عام لتغيير الحالة.
+        Route::get('commerce/wholesale/channels/{channelId}/memberships', [CommerceStaffWholesaleMembershipController::class, 'index'])
+            ->whereUuid('channelId')->middleware([$perm('commerce.wholesale.manage'), $app('commerce.storefront')]);
+        Route::post('commerce/wholesale/memberships/{id}/{action}', [CommerceStaffWholesaleMembershipController::class, 'transition'])
+            ->whereUuid('id')->whereIn('action', ['approve', 'reject', 'suspend', 'reinstate'])
+            ->middleware([$perm('commerce.wholesale.manage'), $app('commerce.storefront')]);
 
         // كتالوج التطبيقات مدموجاً بحالة تفعيل المؤسسة — لا إنفاذ على مسارات أخرى بعد.
         Route::get('applications', [TenantApplicationController::class, 'index'])->middleware($perm('apps.view'));

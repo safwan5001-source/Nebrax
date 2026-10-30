@@ -171,6 +171,35 @@ class TenancyServiceProvider extends ServiceProvider
             ];
         });
 
+        // H6 Batch E — store-host buyer auth. Tenant dimension from the Host-resolved TenantContext (never the
+        // payload); IP + identifier dual limit mirrors commerce-customer-register/login.
+        RateLimiter::for('storefront-buyer-register', function (Request $request): array {
+            $tenant = app(TenantContext::class)->has() ? app(TenantContext::class)->id() : 'unresolved';
+            $email = Str::lower(trim((string) $request->input('email')));
+
+            return [
+                Limit::perMinute(10)->by("storefront-buyer-register|{$tenant}|ip|{$request->ip()}"),
+                Limit::perMinute(3)->by("storefront-buyer-register|{$tenant}|email|{$email}"),
+            ];
+        });
+
+        RateLimiter::for('storefront-buyer-login', function (Request $request): array {
+            $tenant = app(TenantContext::class)->has() ? app(TenantContext::class)->id() : 'unresolved';
+            $email = Str::lower(trim((string) $request->input('email')));
+
+            return [
+                Limit::perMinute(20)->by("storefront-buyer-login|{$tenant}|ip|{$request->ip()}"),
+                Limit::perMinute(5)->by("storefront-buyer-login|{$tenant}|email|{$email}"),
+            ];
+        });
+
+        RateLimiter::for('storefront-buyer-apply', function (Request $request): Limit {
+            $tenant = app(TenantContext::class)->has() ? app(TenantContext::class)->id() : 'unresolved';
+            $identity = (string) ($request->user()?->getAuthIdentifier() ?? $request->ip());
+
+            return Limit::perMinute(10)->by("storefront-buyer-apply|{$tenant}|{$identity}");
+        });
+
         // Separate names for request vs. verify: a legitimate customer's
         // own request+retry flow for one phone must not share a single
         // budget across both actions, or its own retries would lock it out.

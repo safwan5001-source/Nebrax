@@ -13,4 +13,16 @@ return [
     */
     'order_cancellation_enabled' => (bool) env('COMMERCE_ORDER_CANCELLATION_ENABLED', false),
 
+    /*
+    |--------------------------------------------------------------------------
+    | هوية مشتري الجملة وعضويته — H6 Batch E (D-1/D-2 المعتمدان)
+    |--------------------------------------------------------------------------
+    |
+    | مغلق افتراضياً: مسارات store/v1 (auth/*, me, wholesale/*) ومسارات اعتماد الموظف commerce/wholesale/*
+    | تردّ 404 موحَّداً. حتى مفتوحاً، لا تعمل إلا على قناة web موسومة `wholesale_membership_enabled`
+    | (لا مسار HTTP يضبطها في هذه الدفعة)، فلا يتأثر أي متجر DTC. لا يُفتح قبل قرار تفعيل منسَّق مستقل.
+    |
+    */
+    'wholesale_buyer_enabled' => (bool) env('COMMERCE_WHOLESALE_BUYER_ENABLED', false),
+
 ];
