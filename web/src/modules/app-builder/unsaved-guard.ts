@@ -65,7 +65,12 @@ export function useUnsavedChangesGuard(dirty: boolean, navigate: (href: string) 
     if (dirty && !guardEntryPushed.current) pushGuardEntry();
 
     function onPopState() {
-      if (!dirtyRef.current || bypassRef.current) return;
+      if (bypassRef.current) return;
+      if (!dirtyRef.current) {
+        // Back وهو نظيف يستهلك إدخال الحارس المكرَّر؛ نُسقط العلم ليُعاد دفعه عند أول تعديل لاحق (وإلا وصل Back التالي إلى المسار السابق مباشرةً).
+        guardEntryPushed.current = false;
+        return;
+      }
       pushGuardEntry();
       setPending({ kind: 'back' });
     }

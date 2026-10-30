@@ -1770,6 +1770,26 @@ describe('AppBuilderWorkspacePage — save safety (AD-01 / S01b)', () => {
     expect(JSON.stringify(JSON.parse(window.localStorage.getItem(BACKUP_KEY)!).schema)).toContain('typed during the save');
   });
 
+  it('when a slow save fails, the local backup keeps the newest edits, not the older request snapshot', async () => {
+    mockApi();
+    let rejectPut: (e: unknown) => void = () => undefined;
+    overrideApi((path, init) => (path === DRAFT_PATH && init?.method === 'PUT'
+      ? new Promise((_resolve, reject) => { rejectPut = reject; })
+      : undefined));
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+    await makeEdit('Bye');
+    await clickSave();
+    await waitFor(() => expect(putCalls().length).toBe(1));
+
+    const [textarea] = screen.getAllByDisplayValue('Bye');
+    fireEvent.change(textarea, { target: { value: 'Bye (newest)' } });
+    rejectPut(new TypeError('Failed to fetch'));
+
+    expect(await screen.findByText('Could not save (offline). Your changes are kept on this device.')).toBeTruthy();
+    expect(JSON.stringify(JSON.parse(window.localStorage.getItem(BACKUP_KEY)!).schema)).toContain('Bye (newest)');
+  });
+
   it('a local backup that differs from the server draft is offered for restore, and restoring keeps its original base revision', async () => {
     const edited = JSON.parse(JSON.stringify(draftData.schema));
     edited.pages.home.children[0].children[0].props.text = 'Recovered text';

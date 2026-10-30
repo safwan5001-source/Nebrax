@@ -307,13 +307,14 @@ export default function AppBuilderWorkspacePage() {
       const info = parseDraftConflict(err);
       if (info) {
         setConflict((previous) => ({ info, stage: 'choose', latest: null, busy: false, changedAgain: previous?.stage === 'confirmOverwrite' }));
-        if (baseRevisionRef.current !== null) writeDraftBackup(backupUserId, params.id, toSave, baseRevisionRef.current);
+        // الأحدث لا لقطة الطلب: قد يكون المستخدم تابع الكتابة أثناء الحفظ البطيء ونسخته المحلية أحدث.
+        if (baseRevisionRef.current !== null) writeDraftBackup(backupUserId, params.id, schemaRef.current ?? toSave, baseRevisionRef.current);
         return 'conflict';
       }
       const kind = classifySaveError(err);
       if (kind === 'network' || kind === 'other') setSaveFailure(kind);
       toast.error(t('saveErrorTitle'), err instanceof ApiError ? err.message : t('saveNetworkHint'));
-      if (baseRevisionRef.current !== null) writeDraftBackup(backupUserId, params.id, toSave, baseRevisionRef.current);
+      if (baseRevisionRef.current !== null) writeDraftBackup(backupUserId, params.id, schemaRef.current ?? toSave, baseRevisionRef.current);
       return 'failed';
     }
   }

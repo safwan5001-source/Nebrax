@@ -107,6 +107,20 @@ describe('useUnsavedChangesGuard', () => {
     expect(pending()).toBe('none');
   });
 
+  it('re-arms the guard entry after Back consumed it while clean, so the next edit is protected again', () => {
+    const push = vi.spyOn(window.history, 'pushState');
+    const { rerender } = render(<Harness dirty />);
+    rerender(<Harness dirty={false} />); // حُفظ
+    const before = push.mock.calls.length;
+
+    act(() => { window.dispatchEvent(new PopStateEvent('popstate')); }); // Back وهو نظيف يستهلك إدخال الحارس
+    expect(pending()).toBe('none');
+
+    rerender(<Harness dirty />); // تعديل جديد
+    expect(push.mock.calls.length).toBe(before + 1); // أُعيد دفع الحارس
+    push.mockRestore();
+  });
+
   it('confirming a back-leave walks history past the guard entry and stops prompting', () => {
     const go = vi.spyOn(window.history, 'go').mockImplementation(() => undefined);
     render(<Harness dirty />);
