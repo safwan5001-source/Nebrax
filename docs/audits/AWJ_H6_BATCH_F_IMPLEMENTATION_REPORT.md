@@ -5,7 +5,7 @@
 | Branch | `claude/commerce-h6-batch-f` |
 | PR | #1809 |
 | Base | `origin/main` @ `7cb5843fff7f9d906e18fbf92de135babd637ccc` (PR #1807, Batch E) |
-| Head | `8a9b48bf0140437ee98813cea9258cf5f341f3fb` (report-only commits may follow) |
+| Head | `1612d485d30180d14e34fb60fab3cf43228334bf` (code); a docs-only commit recording CI results may follow |
 | Status | Ready for review. **Not merged. Not deployed. Wholesale not enabled anywhere.** |
 
 ## 0. Executive summary
@@ -262,7 +262,18 @@ same `19000`. No other existing assertion was changed or removed.
 
 Net: no failing test attributable to this change locally. **The local PostgreSQL full-suite run was not performed**
 (only the new PG test and migrations); the CI `pgsql` matrix job is the authority for that. CI and CI Gate results:
-see the PR.
+see below.
+
+### CI (GitHub Actions, PR #1809, head `1612d485d`)
+
+| Check | Result |
+|---|---|
+| `php artisan test (L11, sqlite)` | success |
+| `php artisan test (L11, pgsql)` — includes `WholesaleMembershipPostgresConcurrencyTest` | success |
+| `CI Gate` | success |
+| Codex review of `1612d48` | completed, no findings (2 findings on the first head, both valid, fixed and resolved) |
+
+The first CI run (head `8a9b48b`) was cancelled by the newer push, not failed.
 
 ## 12. Deferred work and risks
 
