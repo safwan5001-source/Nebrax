@@ -92,6 +92,27 @@ final class DocumentDuplicateReservationService
         ];
     }
 
+    /**
+     * IMP-DOC-DISTINCT-01: هل يوجد حجز مصروف بالمورّد واليوم والمبلغ **والمرجع** نفسها (أيّاً كان معرّف التمييز)؟ مستندٌ بمرجعه المعلوم نفسه هو المستند ذاته
+     * لا تكراراً حقيقياً، فلا يُقبل تأكيد التمييز عليه. بلا مرجع (أو مرجع يفنى بالتطبيع) ⇒ `false`: لا شيء يميّز، فالقرار للمراجع. قراءة فقط.
+     *
+     * @param  array<string, mixed>  $predicate مسند المصروف من {@see expensePredicate()}
+     */
+    public function holdsSameExpenseReference(array $predicate): bool
+    {
+        if (($predicate['reference'] ?? null) === null) {
+            return false;
+        }
+
+        return ImportDocumentReservation::query()
+            ->where('domain', self::DOMAIN_EXPENSE)
+            ->where('predicate->vendor', $predicate['vendor'])
+            ->where('predicate->date', $predicate['date'])
+            ->where('predicate->amount', $predicate['amount'])
+            ->where('predicate->reference', $predicate['reference'])
+            ->exists();
+    }
+
     /** @return array<string, mixed> */
     public static function purchasePredicate(string $supplierId, string $supplierInvoiceNo): array
     {

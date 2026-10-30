@@ -15,6 +15,8 @@ final readonly class ExpenseDraftBuildOptions implements DraftBuildOptions
         public ?string $categoryId,
         public ?string $costCenterId,
         public string $paymentMethod,
+        // IMP-DOC-DISTINCT-01: تأكيد صريح من المراجع بأن هذا مصروف حقيقي ثانٍ (لا المستند نفسه). لا أثر له ما لم يوجد تكرارٌ فعلاً.
+        public bool $confirmDistinctOccurrence = false,
     ) {
     }
 }

@@ -506,6 +506,185 @@ class DocumentExpenseDraftBuilderTest extends TestCase
         app(ExpenseService::class)->create($this->expenseData($fixture), ['source' => DocumentDuplicateReservationService::SOURCE_STANDARD, 'reference' => 'EXP-100']);
     }
 
+    // ═══ IMP-DOC-DISTINCT-01 — تأكيد «مصروف حقيقي ثانٍ» ═══
+
+    private function postDraft(array $fixture, DocumentBatch $batch, array $overrides = [])
+    {
+        return $this->withToken($fixture['token'])
+            ->postJson("/api/document-batches/{$batch->id}/create-expense-draft", $this->payload(['batch' => $batch] + $fixture, $overrides));
+    }
+
+    /** @test */
+    public function a_refused_repeat_tells_the_ui_it_is_confirmable_and_exposes_no_internal_id(): void
+    {
+        $fixture = $this->readyFixture();
+        $first = $this->buildDraft($fixture, 'الدفعة الأولى.');
+        $second = $this->secondReadyBatch($fixture, 'EXP-101', 10000);
+
+        $response = $this->postDraft($fixture, $second)->assertUnprocessable()
+            ->assertJsonPath('reason', 'duplicate_document')->assertJsonPath('distinct_confirmable', true);
+
+        $this->assertStringNotContainsString($first->transactionId, (string) $response->getContent());
+        $this->assertDatabaseCount('expenses', 1);
+        $this->assertDatabaseHas('document_batches', ['id' => $second->id, 'status' => 'ready_for_draft']);
+    }
+
+    /** @test */
+    public function an_explicit_confirmation_creates_the_second_real_expense_once_audited_and_without_accounting_effect(): void
+    {
+        $fixture = $this->readyFixture();
+        $this->buildDraft($fixture, 'الدفعة الأولى.');
+        $second = $this->secondReadyBatch($fixture, 'EXP-101', 10000);
+
+        $created = $this->postDraft($fixture, $second, ['confirm_distinct_occurrence' => true])->assertCreated()
+            ->assertJsonPath('data.idempotent_replay', false);
+
+        $this->assertDatabaseCount('expenses', 2);
+        $this->assertDatabaseCount('import_document_reservations', 2);
+        $reservation = ImportDocumentReservation::query()->where('document_id', $created->json('data.transaction_id'))->firstOrFail();
+        $this->assertSame(DocumentDuplicateReservationService::SOURCE_DOCUMENT_CENTER, $reservation->source);
+        $this->assertSame(32, strlen((string) ($reservation->predicate['occurrence'] ?? '')));
+        $audit = \App\Models\DocumentReviewAction::query()->where('document_batch_id', $second->id)->where('action', 'expense_draft_created')->firstOrFail();
+        $this->assertTrue($audit->after['distinct_occurrence_confirmed'] ?? false);
+        $this->assertDatabaseCount('journal_entries', 0);
+        $this->assertDatabaseCount('journal_lines', 0);
+        $this->assertDatabaseCount('payments', 0);
+    }
+
+    /** @test */
+    public function repeating_the_confirmed_request_is_an_idempotent_replay_not_a_third_expense(): void
+    {
+        $fixture = $this->readyFixture();
+        $this->buildDraft($fixture, 'الدفعة الأولى.');
+        $second = $this->secondReadyBatch($fixture, 'EXP-101', 10000);
+        $version = $second->version;
+
+        $this->postDraft($fixture, $second, ['confirm_distinct_occurrence' => true])->assertCreated();
+        $this->postDraft($fixture, $second->fresh(), ['confirm_distinct_occurrence' => true, 'expected_version' => $version])->assertOk()
+            ->assertJsonPath('data.idempotent_replay', true);
+        // حتى بلا التأكيد: الرابط القائم هو الذي يُعاد.
+        $this->postDraft($fixture, $second->fresh(), ['expected_version' => $version])->assertOk()->assertJsonPath('data.idempotent_replay', true);
+
+        $this->assertDatabaseCount('expenses', 2);
+        $this->assertDatabaseCount('document_transaction_links', 2);
+        $this->assertDatabaseCount('import_document_reservations', 2);
+    }
+
+    /** @test */
+    public function the_same_document_number_is_never_confirmable_it_is_the_same_document(): void
+    {
+        $fixture = $this->readyFixture();
+        $this->buildDraft($fixture, 'الدفعة الأولى.');
+        $second = $this->secondReadyBatch($fixture, 'EXP-100', 10000);
+
+        // أول رفض (بلا تأكيد) يُصنَّف غير قابل للتأكيد فلا تعرض الواجهة خطوة لا تُقبل (Codex #1803 P2).
+        $this->postDraft($fixture, $second)->assertUnprocessable()
+            ->assertJsonPath('reason', 'duplicate_document')->assertJsonPath('distinct_confirmable', false);
+        $this->postDraft($fixture, $second, ['confirm_distinct_occurrence' => true])->assertUnprocessable()
+            ->assertJsonPath('reason', 'duplicate_document')->assertJsonPath('distinct_confirmable', false);
+
+        $this->assertDatabaseCount('expenses', 1);
+        $this->assertDatabaseCount('document_transaction_links', 1);
+        $this->assertDatabaseCount('import_document_reservations', 1);
+        $this->assertDatabaseHas('document_batches', ['id' => $second->id, 'status' => 'ready_for_draft']);
+    }
+
+    /** @test */
+    public function a_confirmed_repeat_does_not_make_the_same_document_confirmable_afterwards(): void
+    {
+        $fixture = $this->readyFixture();
+        $this->buildDraft($fixture, 'الدفعة الأولى.');
+        $second = $this->secondReadyBatch($fixture, 'EXP-101', 10000);
+        $this->postDraft($fixture, $second, ['confirm_distinct_occurrence' => true])->assertCreated();
+
+        // المستند EXP-101 نفسه مرفوعاً مرة ثانية، ولو بتأكيد: مرجعه محجوز بمعرّف التمييز الأول.
+        $again = $this->secondReadyBatch($fixture, 'EXP-101', 10000, 'expense-3.pdf');
+        $this->postDraft($fixture, $again, ['confirm_distinct_occurrence' => true])->assertUnprocessable()
+            ->assertJsonPath('distinct_confirmable', false);
+
+        $this->assertDatabaseCount('expenses', 2);
+    }
+
+    /** @test */
+    public function a_third_identical_expense_is_refused_again_unless_it_is_itself_confirmed(): void
+    {
+        $fixture = $this->readyFixture();
+        $this->buildDraft($fixture, 'الدفعة الأولى.');
+        $second = $this->secondReadyBatch($fixture, 'EXP-101', 10000);
+        $this->postDraft($fixture, $second, ['confirm_distinct_occurrence' => true])->assertCreated();
+
+        $third = $this->secondReadyBatch($fixture, 'EXP-102', 10000, 'expense-3.pdf');
+        $this->postDraft($fixture, $third)->assertUnprocessable()->assertJsonPath('distinct_confirmable', true);
+        $this->assertDatabaseCount('expenses', 2);
+
+        $this->postDraft($fixture, $third, ['confirm_distinct_occurrence' => true])->assertCreated();
+        $this->assertDatabaseCount('expenses', 3);
+    }
+
+    /** @test */
+    public function a_confirmation_without_any_repeat_is_inert_and_leaves_no_latent_bypass(): void
+    {
+        $fixture = $this->readyFixture();
+        $created = $this->withToken($fixture['token'])
+            ->postJson("/api/document-batches/{$fixture['batch']->id}/create-expense-draft", $this->payload($fixture, ['confirm_distinct_occurrence' => true]))
+            ->assertCreated();
+
+        $reservation = ImportDocumentReservation::query()->where('document_id', $created->json('data.transaction_id'))->firstOrFail();
+        $this->assertNull($reservation->predicate['occurrence'] ?? null, 'لا معرّف تمييز كامن حين لا تكرار.');
+        $audit = \App\Models\DocumentReviewAction::query()->where('document_batch_id', $fixture['batch']->id)->where('action', 'expense_draft_created')->firstOrFail();
+        $this->assertArrayNotHasKey('distinct_occurrence_confirmed', $audit->after);
+
+        $second = $this->secondReadyBatch($fixture, 'EXP-103', 10000);
+        $this->postDraft($fixture, $second)->assertUnprocessable()->assertJsonPath('distinct_confirmable', true);
+        $this->assertDatabaseCount('expenses', 1);
+    }
+
+    /** @test */
+    public function the_same_reference_probe_is_false_without_a_reference_and_true_only_for_the_same_identity_and_reference(): void
+    {
+        $fixture = $this->readyFixture();
+        $this->buildDraft($fixture, 'الدفعة الأولى.');
+        $service = app(DocumentDuplicateReservationService::class);
+        $partner = $fixture['partner']->id;
+        $predicate = fn (?string $ref, int $amount = 10000) => DocumentDuplicateReservationService::expensePredicate($partner, null, $ref, '2026-08-25', $amount);
+
+        // المستند في Document Center يحمل رقماً دائماً (الجاهزية تشترطه)، فالمسار بلا مرجع دفاعي: لا شيء يميّز فالقرار للمراجع.
+        $this->assertFalse($service->holdsSameExpenseReference($predicate(null)));
+        $this->assertTrue($service->holdsSameExpenseReference($predicate('EXP-100')));
+        $this->assertTrue($service->holdsSameExpenseReference($predicate('exp 100')), 'التطبيع نفسه.');
+        $this->assertFalse($service->holdsSameExpenseReference($predicate('EXP-101')));
+        $this->assertFalse($service->holdsSameExpenseReference($predicate('EXP-100', 10001)));
+    }
+
+    /** @test */
+    public function the_confirmation_must_be_a_boolean_and_false_means_not_confirmed(): void
+    {
+        $fixture = $this->readyFixture();
+        $this->buildDraft($fixture, 'الدفعة الأولى.');
+        $second = $this->secondReadyBatch($fixture, 'EXP-101', 10000);
+
+        $this->postDraft($fixture, $second, ['confirm_distinct_occurrence' => 'yes please'])->assertUnprocessable()->assertJsonValidationErrors('confirm_distinct_occurrence');
+        $this->postDraft($fixture, $second, ['confirm_distinct_occurrence' => false])->assertUnprocessable()->assertJsonPath('reason', 'duplicate_document');
+        $this->assertDatabaseCount('expenses', 1);
+    }
+
+    /** @test */
+    public function a_confirmation_never_reaches_across_tenants_or_the_purchase_flow(): void
+    {
+        $fixture = $this->readyFixture();
+        $this->buildDraft($fixture, 'الدفعة الأولى.');
+        $second = $this->secondReadyBatch($fixture, 'EXP-101', 10000);
+
+        // مستأجر آخر بمصروف مطابق الحقول لا يمنع ولا يُستهلك: العزل بالمستأجر.
+        $other = $this->readyFixture('expense-draft-other');
+        $this->postDraft($other, $other['batch'])->assertCreated();
+        $this->assertDatabaseCount('expenses', 2);
+
+        // طلب إنشاء مسودة مشتريات لا يقبل مفتاح التأكيد أصلاً (لا يمتد إلى المشتريات).
+        $this->assertArrayNotHasKey('confirm_distinct_occurrence', (new \App\Http\Requests\CreateDocumentPurchaseDraftRequest)->rules());
+        $this->assertSame('ready_for_draft', $second->fresh()->status->value);
+    }
+
     /** @return array<string,mixed> بيانات المصروف المطابقة لدليل الاختبار: المورّد والتاريخ 2026-08-25 والمبلغ 10000 هللة. */
     private function expenseData(array $fixture): array
     {
@@ -513,7 +692,7 @@ class DocumentExpenseDraftBuilderTest extends TestCase
     }
 
     /** يُنشئ دفعة مصروف ثانية جاهزة في المستأجر نفسه بالمورّد نفسه ورقم مستند ومبلغ مختارين. */
-    private function secondReadyBatch(array $fixture, string $documentNumber, int $subtotalMinor): DocumentBatch
+    private function secondReadyBatch(array $fixture, string $documentNumber, int $subtotalMinor, string $fileName = 'expense-2.pdf'): DocumentBatch
     {
         $actor = $fixture['actor'];
         $workflow = app(DocumentWorkflowService::class);
@@ -522,9 +701,9 @@ class DocumentExpenseDraftBuilderTest extends TestCase
             $batch = $workflow->transition($batch, $status, $action, 'user', $actor->id, 'تهيئة دليل المصروف.');
         }
         $file = DocumentFile::create([
-            'document_batch_id' => $batch->id, 'original_name' => 'expense-2.pdf', 'object_key' => 'fixtures/second/'.md5($documentNumber.$subtotalMinor).'.pdf',
+            'document_batch_id' => $batch->id, 'original_name' => $fileName, 'object_key' => 'fixtures/second/'.md5($documentNumber.$subtotalMinor.$fileName).'.pdf',
             'declared_mime' => 'application/pdf', 'detected_mime' => 'application/pdf', 'size_bytes' => 128, 'page_count' => 1,
-            'sha256' => hash('sha256', 'second'.$documentNumber.$subtotalMinor), 'scan_status' => DocumentScanStatus::CLEAN, 'scanned_at' => now('UTC'),
+            'sha256' => hash('sha256', 'second'.$documentNumber.$subtotalMinor.$fileName), 'scan_status' => DocumentScanStatus::CLEAN, 'scanned_at' => now('UTC'),
         ]);
         $run = DocumentProcessingRun::create(['document_batch_id' => $batch->id, 'document_file_id' => $file->id, 'stage' => 'extraction', 'status' => DocumentProcessingStatus::SUCCEEDED, 'attempt_count' => 1, 'queued_at' => now('UTC'), 'started_at' => now('UTC'), 'finished_at' => now('UTC')]);
         $attempt = DocumentProviderAttempt::create(['document_batch_id' => $batch->id, 'document_file_id' => $file->id, 'document_processing_run_id' => $run->id, 'sequence' => 1, 'provider_key' => 'fixture', 'model' => 'local', 'status' => 'succeeded', 'page_count' => 1, 'started_at' => now('UTC'), 'finished_at' => now('UTC')]);

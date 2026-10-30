@@ -33,6 +33,11 @@ type Labels = {
   retry: string;
   failed: string;
   stale: string;
+  // IMP-DOC-DISTINCT-01: رفض التكرار القابل للتأكيد (مصروف مطابق بالمورّد واليوم والمبلغ).
+  repeatTitle: string;
+  repeatBody: string;
+  repeatConfirm: string;
+  repeatSubmit: string;
 };
 
 type Props = {
@@ -56,6 +61,9 @@ export function ExpenseDraftDialog({ open, onClose, endpoint, expectedVersion, o
   const [loading, setLoading] = useState(false);
   const [loadingOptions, setLoadingOptions] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // التأكيد لا يظهر إلا بعد رفض خادمي صريح `distinct_confirmable`، ويُمسح بأي تعديل لمدخلات الحوار.
+  const [repeatRefused, setRepeatRefused] = useState(false);
+  const [repeatConfirmed, setRepeatConfirmed] = useState(false);
   const errorSummary = useRef<HTMLDivElement>(null);
 
   const loadOptions = useCallback(async () => {
@@ -85,9 +93,15 @@ export function ExpenseDraftDialog({ open, onClose, endpoint, expectedVersion, o
     if (error) errorSummary.current?.focus();
   }, [error]);
 
+  function resetRepeat() {
+    setRepeatRefused(false);
+    setRepeatConfirmed(false);
+  }
+
   function close() {
     if (loading) return;
     setError(null);
+    resetRepeat();
     onClose();
   }
 
@@ -97,6 +111,7 @@ export function ExpenseDraftDialog({ open, onClose, endpoint, expectedVersion, o
       setError(labels.required);
       return;
     }
+    if (repeatRefused && !repeatConfirmed) return;
 
     setLoading(true);
     setError(null);
@@ -110,6 +125,7 @@ export function ExpenseDraftDialog({ open, onClose, endpoint, expectedVersion, o
           category_id: categoryId || undefined,
           cost_center_id: costCenterId || undefined,
           payment_method: paymentMethod,
+          ...(repeatRefused && repeatConfirmed ? { confirm_distinct_occurrence: true } : {}),
         },
       });
       setReason('');
@@ -117,9 +133,21 @@ export function ExpenseDraftDialog({ open, onClose, endpoint, expectedVersion, o
       setCategoryId('');
       setCostCenterId('');
       setPaymentMethod('cash');
+      setRepeatRefused(false);
+      setRepeatConfirmed(false);
       onSuccess();
       onClose();
     } catch (exception) {
+      const body = exception instanceof ApiError ? (exception.body as { distinct_confirmable?: unknown } | null) : null;
+      if (hasApiStatus(exception, 422) && body?.distinct_confirmable === true) {
+        // الخادم هو السلطة: تكرار حقيقي قابل للتأكيد؛ يعرض الحوار الخطوة الثانية ولا يرسل التأكيد قبل ذلك.
+        setRepeatRefused(true);
+        setRepeatConfirmed(false);
+        setError(null);
+        return;
+      }
+      setRepeatRefused(false);
+      setRepeatConfirmed(false);
       setError(hasApiStatus(exception, 409) ? labels.stale : exception instanceof ApiError ? exception.message : labels.failed);
     } finally {
       setLoading(false);
@@ -142,12 +170,12 @@ export function ExpenseDraftDialog({ open, onClose, endpoint, expectedVersion, o
           <>
             <div className="space-y-1.5">
               <Label htmlFor="expense-draft-reason">{labels.reason}</Label>
-              <Textarea id="expense-draft-reason" value={reason} onChange={(event) => setReason(event.target.value)} onBlur={() => { if (!reason.trim()) setError(labels.required); }} required />
+              <Textarea id="expense-draft-reason" value={reason} onChange={(event) => { setReason(event.target.value); resetRepeat(); }} onBlur={() => { if (!reason.trim()) setError(labels.required); }} required />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5 sm:col-span-2">
                 <Label htmlFor="expense-draft-account">{labels.account}</Label>
-                <Select id="expense-draft-account" value={accountId} onChange={(event) => setAccountId(event.target.value)} required aria-describedby={error ? 'expense-draft-error' : undefined}>
+                <Select id="expense-draft-account" value={accountId} onChange={(event) => { setAccountId(event.target.value); resetRepeat(); }} required aria-describedby={error ? 'expense-draft-error' : undefined}>
                   <option value="" disabled>{labels.chooseAccount}</option>
                   {accounts.map((account) => <option key={account.id} value={account.id}>{account.code} — {account.name}</option>)}
                 </Select>
@@ -177,9 +205,19 @@ export function ExpenseDraftDialog({ open, onClose, endpoint, expectedVersion, o
             </div>
           </>
         )}
+        {repeatRefused && (
+          <div role="group" aria-labelledby="expense-draft-repeat-title" className="space-y-2 rounded border border-warning/30 bg-warning/10 p-3 text-sm">
+            <p id="expense-draft-repeat-title" className="font-medium text-warning">{labels.repeatTitle}</p>
+            <p className="text-muted">{labels.repeatBody}</p>
+            <label className="flex items-start gap-2">
+              <input type="checkbox" checked={repeatConfirmed} onChange={(event) => setRepeatConfirmed(event.target.checked)} className="mt-1" />
+              <span>{labels.repeatConfirm}</span>
+            </label>
+          </div>
+        )}
         <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
           <Button type="button" variant="outline" onClick={close} disabled={loading}>{labels.cancel}</Button>
-          <Button type="submit" disabled={loading || loadingOptions || accounts.length === 0}>{labels.create}</Button>
+          <Button type="submit" disabled={loading || loadingOptions || accounts.length === 0 || (repeatRefused && !repeatConfirmed)}>{repeatRefused ? labels.repeatSubmit : labels.create}</Button>
         </div>
       </form>
     </Dialog>
