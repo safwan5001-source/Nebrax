@@ -35,11 +35,21 @@ const order = (n: number, over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
+const consoleErrors: string[] = [];
+
 async function open(page: Page, path: string, opts: { locale?: 'ar' | 'en'; theme?: 'light' | 'dark'; scenario?: Scenario; permissions?: string[] } = {}) {
   const locale = opts.locale ?? 'ar';
   const scenario = opts.scenario ?? 'active';
   await page.context().addCookies([{ name: 'locale', value: locale, url: baseUrl }]);
   const requests: string[] = [];
+  page.on('console', (message) => {
+    // Pre-existing dev-only next-intl INVALID_KEY noise from `appBuilder.builder.visibility.*` message keys (present on
+    // every page of the app, unrelated to this workspace) is excluded; every other console error fails the spec.
+    if (message.type() === 'error' && !/INVALID_KEY|appBuilder\.builder\.visibility|Server\s+Error: INVALID_KEY/.test(message.text())) {
+      consoleErrors.push(message.text().slice(0, 300));
+    }
+  });
+  page.on('pageerror', (error) => consoleErrors.push(`pageerror: ${error.message.slice(0, 300)}`));
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
   const user = { id: 'me', name: 'Safwan', email: 'owner@acme.test', tenant_id: 't1', role: 'owner', permissions: opts.permissions ?? ['*'] };
   await page.route('**/api/**', async (route) => {
@@ -80,8 +90,15 @@ const shot = async (page: Page, name: string) => {
   if (shots) await page.screenshot({ path: `${shots}/${name}.png`, fullPage: true });
 };
 const noHorizontalOverflow = async (page: Page) => {
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-  expect(overflow).toBeLessThanOrEqual(0);
+  const { overflow, culprits } = await page.evaluate(() => {
+    const width = document.documentElement.clientWidth;
+    const wide = [...document.querySelectorAll('body *')]
+      .filter((el) => el.getBoundingClientRect().right > width + 1 || el.getBoundingClientRect().left < -1)
+      .slice(0, 5)
+      .map((el) => `${el.tagName.toLowerCase()}.${String(el.className).slice(0, 60)}`);
+    return { overflow: document.documentElement.scrollWidth - width, culprits: wide };
+  });
+  expect(overflow, `overflowing elements: ${culprits.join(' | ')}`).toBeLessThanOrEqual(0);
 };
 
 const SECTIONS = [
@@ -91,6 +108,10 @@ const SECTIONS = [
 ] as const;
 
 test.describe('Wholesale workspace', () => {
+  test.beforeEach(() => {
+    consoleErrors.length = 0;
+  });
+
   for (const locale of ['ar', 'en'] as const) {
     for (const [name, suffix] of SECTIONS) {
       test(`${name} renders active (${locale}) without overflow and without unexpected writes`, async ({ page }, info) => {
@@ -101,6 +122,7 @@ test.describe('Wholesale workspace', () => {
         await shot(page, `${name}-active-${locale}-${info.project.name}`);
         expect(requests.filter((r) => /^(POST|PUT|PATCH|DELETE) /.test(r))).toEqual([]);
         expect(requests.join('\n')).not.toContain('tenant_id');
+        expect(consoleErrors, 'browser console errors').toEqual([]);
       });
     }
   }
@@ -129,9 +151,10 @@ test.describe('Wholesale workspace', () => {
 
   test('buyer decision drawer works with the keyboard', async ({ page }, info) => {
     await open(page, '/commerce/wholesale/buyers');
-    const row = page.getByText('شركة النخبة للتجارة').locator('visible=true').first();
-    await expect(row).toBeVisible();
-    await row.click();
+    await expect(page.getByText('مؤسسة الرياض').filter({ visible: true }).first()).toBeVisible();
+    const details = page.getByRole('button', { name: 'تفاصيل' }).filter({ visible: true }).first();
+    await details.focus();
+    await page.keyboard.press('Enter');
     await expect(page.getByRole('dialog')).toBeVisible();
     await shot(page, `buyers-drawer-ar-${info.project.name}`);
     await page.keyboard.press('Escape');
