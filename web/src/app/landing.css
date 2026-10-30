@@ -145,7 +145,8 @@ html:has(.lp) {
   text-wrap: pretty;
 }
 
-.lp a {
+/* Zero specificity, so component colours (skip link, buttons, nav) always win over the reset. */
+:where(.lp a) {
   color: inherit;
 }
 

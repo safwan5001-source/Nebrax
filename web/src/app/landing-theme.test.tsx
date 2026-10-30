@@ -201,6 +201,12 @@ describe('landing page keeps its marketing language isolated and on-brand', () =
     }
   });
 
+  it('keeps the link colour reset at zero specificity so the skip link and buttons keep their own ink', () => {
+    expect(css).toMatch(/:where\(\.lp a\) \{\s*color: inherit;/);
+    expect(css).not.toMatch(/^\.lp a \{/m);
+    expect(css).toMatch(/\.lp-skip \{[^}]*color: var\(--mk-fixed-ink\)/);
+  });
+
   it('stops every animation under prefers-reduced-motion', () => {
     const reduced = css.slice(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
     expect(reduced).toMatch(/animation: none !important/);
