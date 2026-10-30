@@ -30,7 +30,9 @@ describe('membership transitions offered per status', () => {
 });
 
 describe('membership client', () => {
-  beforeEach(() => apiMock.mockReset());
+  beforeEach(() => {
+    apiMock.mockReset();
+  });
 
   it('builds a whitelisted, bounded query', () => {
     expect(buildMembershipsQuery({ status: 'pending', page: 3, perPage: 50 }).toString()).toBe('status=pending&page=3&per_page=50');

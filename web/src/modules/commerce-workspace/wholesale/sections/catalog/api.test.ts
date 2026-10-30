@@ -8,7 +8,9 @@ import { loadStoreCatalogCounts, loadStoreCatalogPage, setStorePublication } fro
 const list = (total: number) => ({ data: [], meta: { current_page: 1, last_page: 1, per_page: 10, total } });
 
 describe('catalog api', () => {
-  beforeEach(() => apiMock.mockReset());
+  beforeEach(() => {
+    apiMock.mockReset();
+  });
 
   it('scopes the publication list to the store and never sends a tenant', async () => {
     apiMock.mockResolvedValue(list(0));
