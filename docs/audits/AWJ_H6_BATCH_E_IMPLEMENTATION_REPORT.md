@@ -68,8 +68,10 @@ Modified: `SalesChannel`, `CustomerAuthenticationService`, `Rbac`, `config/comme
 | Check | Result |
 |---|---|
 | Focused `WholesaleBuyerFoundationTest` | 32 tests / 209 assertions pass |
-| Full backend suite (sqlite) | see PR |
-| PostgreSQL suite / CI Gate | see PR (CI runs sqlite + pgsql) |
+| Full backend suite (local sqlite, run in 28 class-chunks) | **15 947 passed · 428 skipped · 52 failed** — all 52 failures are 6 `Fuel*` classes (`FuelSaleService/Api`, `FuelReconciliation`, `FuelAviRfidService`, `FuelSupplyReceiving/Api`) failing with `Call to undefined function bcmul()`: this sandbox lacks the PHP `bcmath` extension (`setup.sh` warns about exactly this; CI installs it). None touches this change. |
+| Route allowlist | `CommerceModuleBoundaryTest` (the repo's Commerce-route guard) correctly failed on the two new staff routes; they were added to its allowlist (the guard's purpose) and it passes. |
+| PostgreSQL / CI Gate | not run locally (no PG; `*Postgres*` classes self-skip). CI runs sqlite + pgsql — see PR. |
+| Local-environment note | a stale, untracked `CommerceOrderCancellationApiTest.php` in the sandbox's assembled app dir (not in the repo) kills the PHP process (signal 9); it was excluded and is unrelated. |
 | Storefront suites | not run — no storefront file changed |
 Mandatory negative coverage present: cross-tenant lookup/login, cross-host reuse, cross-channel access, unauthenticated approval, unauthorized staff approval, buyer self-approval (route + payload), pending/rejected/suspended/absent access, revoked account with live session, invalid password + enumeration, rate limiting (login, register), stale/concurrent transition refusal, duplicate-apply convergence, replayed/expired tokens.
 **Coverage gap (honest):** the concurrency tests are *logical* races (stale read → re-validated under `lockForUpdate`) executed serially on sqlite; there is no multi-process PostgreSQL race test for approve-vs-suspend (the repo's pattern for those is a separate pcntl test class). Risk: low — the unique constraint and row lock are the only mechanisms and both are standard; recommended follow-up in Batch F.
