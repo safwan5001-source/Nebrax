@@ -22,7 +22,10 @@ vi.mock('@/lib/api', async () => {
   const actual = await vi.importActual<typeof import('@/lib/api')>('@/lib/api');
   return { ...actual, api };
 });
-vi.mock('@/lib/use-can', () => ({ useCurrentUser: () => user.current }));
+vi.mock('@/lib/use-can', async () => {
+  const { createCapabilities } = await vi.importActual<typeof import('@/lib/capabilities')>('@/lib/capabilities');
+  return { useCurrentUser: () => user.current, useCan: () => ({ ...createCapabilities(user.current), hydrated: true }) };
+});
 vi.mock('lucide-react', () => {
   const iconStub = () => <span />;
   return new Proxy({ __esModule: true } as Record<string | symbol, unknown>, {
@@ -41,6 +44,7 @@ const jobsPage = (data: unknown[], meta = { current_page: 1, last_page: 1, per_p
 function setApi(jobs: unknown = jobsPage([]), navState: Record<string, boolean> = {}) {
   api.mockImplementation((path: string) => {
     if (path === '/applications/nav-state') return Promise.resolve({ data: navState });
+    if (path.startsWith('/ai-actions')) return Promise.resolve(jobsPage([]));
     if (path.startsWith('/import-jobs')) return typeof jobs === 'function' ? (jobs as (p: string) => unknown)(path) : Promise.resolve(jobs);
     return Promise.resolve({ data: {} });
   });
@@ -155,5 +159,20 @@ describe('ImportHub (IMP-H8-S1)', () => {
     fail = false;
     await user$.click(screen.getByRole('button', { name: /retry|nebrax|try/i }));
     await waitFor(() => expect(screen.getByText('a.csv')).toBeTruthy());
+  });
+
+  it('shows the assistant history section only for a user with the AI Actions permission (IMP-H8-S4b)', async () => {
+    render(<ImportHub />);
+    await waitFor(() => expect(api).toHaveBeenCalledWith('/applications/nav-state'));
+    expect(screen.queryByText('ai_history_title')).toBeNull();
+    expect(api.mock.calls.some((call) => String(call[0]).startsWith('/ai-actions'))).toBe(false);
+
+    cleanup();
+    api.mockReset();
+    user.current = { id: 'u1', role: 'accountant', permissions: [...ALL, 'ai.actions.use'] };
+    setApi();
+    render(<ImportHub />);
+    await screen.findByText('ai_history_title');
+    await waitFor(() => expect(api.mock.calls.some((call) => String(call[0]).startsWith('/ai-actions?'))).toBe(true));
   });
 });
