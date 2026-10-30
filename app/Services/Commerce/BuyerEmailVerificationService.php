@@ -127,9 +127,27 @@ class BuyerEmailVerificationService
             return false;
         }
 
-        return DB::transaction(function () use ($plain, $channelId): bool {
+        $hash = hash('sha256', $plain);
+
+        return DB::transaction(function () use ($hash, $channelId): bool {
+            // Lock order is always identity → token, never token → identity (Codex, PR #1819, P2): two outstanding tokens of one
+            // identity (concurrent resends can leave two) are each locked by their own verification; with token-first locking one
+            // would hold token A and wait for the identity while the other holds the identity and waits for token A while
+            // retiring it — a PostgreSQL deadlock surfacing as HTTP 500. So find the owner unlocked, lock the identity, and only
+            // then lock and re-validate the token.
+            $ownerId = CustomerEmailVerificationToken::query()->where('token_hash', $hash)->value('customer_identity_id');
+            if (! is_string($ownerId)) {
+                return false;
+            }
+
+            $identity = CustomerIdentity::query()->whereKey($ownerId)->lockForUpdate()->first();
+            if ($identity === null || ! $identity->is_active) {
+                return false;
+            }
+
             $token = CustomerEmailVerificationToken::query()
-                ->where('token_hash', hash('sha256', $plain))
+                ->where('token_hash', $hash)
+                ->where('customer_identity_id', $identity->id)
                 ->lockForUpdate()
                 ->first();
 
@@ -138,11 +156,6 @@ class BuyerEmailVerificationService
                 || ! $token->expires_at->isFuture()
                 || $token->sales_channel_id !== $channelId
             ) {
-                return false;
-            }
-
-            $identity = CustomerIdentity::query()->whereKey($token->customer_identity_id)->lockForUpdate()->first();
-            if ($identity === null || ! $identity->is_active) {
                 return false;
             }
 

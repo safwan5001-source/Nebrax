@@ -158,6 +158,41 @@ class WholesaleBuyerPostgresConcurrencyTest extends TestCase
         $this->assertSame(1, DB::table('customer_email_verification_tokens')->whereNotNull('used_at')->count());
     }
 
+    #[Test]
+    public function two_outstanding_links_of_one_buyer_verified_at_once_never_deadlock(): void
+    {
+        // Codex, PR #1819, P2: concurrent resends can leave two live tokens for one identity. Verifying them in parallel
+        // must serialize on the identity (identity → token lock order): exactly one wins, the other gets a plain false,
+        // and nobody sees a deadlock (HTTP 500). Repeated rounds because a deadlock needs the two lock sequences to interleave.
+        [$tenant, $channel, $storefront] = [$this->tenantId, $this->channelId, $this->storefrontId];
+
+        for ($round = 0; $round < 6; $round++) {
+            $identity = $this->identity("twin-{$round}", verified: false);
+            $plains = [Str::random(64), Str::random(64)];
+            app(TenantContext::class)->set($this->tenantId);
+            foreach ($plains as $plain) {
+                CustomerEmailVerificationToken::query()->create([
+                    'tenant_id' => $this->tenantId, 'customer_identity_id' => $identity->id, 'sales_channel_id' => $this->channelId,
+                    'token_hash' => hash('sha256', $plain), 'expires_at' => now()->addHour(),
+                ]);
+            }
+
+            $jobs = array_map(fn (string $plain) => function () use ($tenant, $channel, $storefront, $plain): array {
+                app(TenantContext::class)->set($tenant);
+                app(StorefrontContext::class)->set($tenant, $channel, $storefront);
+
+                return ['verified' => app(BuyerEmailVerificationService::class)->verify($plain)];
+            }, $plains);
+
+            $results = $this->runConcurrently($jobs);
+            $this->assertAllOk($results);
+            $this->assertCount(1, array_filter($results, fn ($r) => $r['value']['verified']), "round {$round}: ".json_encode($results));
+            $this->assertNotNull(DB::table('customer_identities')->where('id', $identity->id)->value('email_verified_at'));
+            $this->assertSame(0, DB::table('customer_email_verification_tokens')
+                ->where('customer_identity_id', $identity->id)->whereNull('used_at')->count(), 'every live link is retired');
+        }
+    }
+
     // ───────────────────────── 2 · الطلب مقابل الإيقاف ─────────────────────────
 
     /** @return array{0: array<string,mixed>, 1: array<int,array<string,mixed>>} */

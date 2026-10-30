@@ -62,10 +62,11 @@ Contract and layer table: `docs/audits/AWJ_H6_BATCH_H_B2B_CONTRACTS.md` §1.
 - `CommerceOrderService::createFromCheckout` re-reads the membership **inside the order transaction with a shared row lock**; anything but `approved` ⇒ refusal and a full rollback. A suspension therefore cannot slip between the middleware check and the insert.
 - `CommerceOrder::updating` forbids changing `customer_identity_id`: no rewrite, no later claim of a guest order.
 - **Review fix (Codex P2, verified real, introduced by this PR):** establishing `CustomerContext` on the store cart/checkout routes made identity-based cart recovery reachable there, and `StorefrontCartController` / `StorefrontCheckoutController` discarded the rotated cart token, so a buyer on a second browser would see the cart but `checkout/complete` (no identity fallback) would 404. Both controllers now hand the rotated token back (cookie), mirroring `/commerce/v1`; two regression tests fail without the fix.
+- **Review fix 2 (Codex P2, verified real, introduced by this PR):** `verify()` locked the token and then the identity while retiring all of the identity's live tokens, so two outstanding links (possible after concurrent resends) verified in parallel could deadlock on PostgreSQL (SQLSTATE 40P01 → HTTP 500). Locking is now identity → token with the token re-validated under the identity lock. A new multi-process test reproduces the deadlock on the old code and passes now.
 - Request-supplied `customer_identity_id` / `partner_id` / `tenant_id` are rejected (422).
 - DTC, guest and mobile flows are unchanged: a buyer token on a DTC host attributes nothing. No accounting, VAT, ZATCA, payment or lifecycle code was touched; no historical order was rewritten.
 
-**PostgreSQL concurrency** (`tests/Feature/WholesaleBuyerPostgresConcurrencyTest.php`, real `pcntl_fork`, 4 tests): four processes presenting one token ⇒ exactly one succeeds (removing `lockForUpdate` in `verify` makes it fail); suspension-first vs concurrent order ⇒ no order after suspension; an in-flight order delays a suspension; and an **isolated approval-check lock test** that fails when `sharedLock()` is removed. *Candour:* the end-to-end order variant does **not** discriminate the shared lock, because the order also serializes on the numbering-anchor tenant row lock; that is why the isolated test exists.
+**PostgreSQL concurrency** (`tests/Feature/WholesaleBuyerPostgresConcurrencyTest.php`, real `pcntl_fork`, 5 tests): two outstanding links verified in parallel never deadlock; four processes presenting one token ⇒ exactly one succeeds (removing `lockForUpdate` in `verify` makes it fail); suspension-first vs concurrent order ⇒ no order after suspension; an in-flight order delays a suspension; and an **isolated approval-check lock test** that fails when `sharedLock()` is removed. *Candour:* the end-to-end order variant does **not** discriminate the shared lock, because the order also serializes on the numbering-anchor tenant row lock; that is why the isolated test exists.
 
 ## 5. P1 — Buyer-specific pricing (not implemented)
 
@@ -109,7 +110,7 @@ Matrix in the B2B contracts doc §3 (VAT mode, MOQ, minimum amount, payment term
 |---|---|
 | New/affected backend suites, SQLite | verification, client-IP, foundation, boundary, price-surface: green |
 | Cart / checkout / order / CommerceOrder suites | SQLite 367 passed, 18 skipped; PostgreSQL 385 passed |
-| PostgreSQL concurrency (new) | 4 passed; skipped on SQLite |
+| PostgreSQL concurrency (new) | 5 passed; skipped on SQLite |
 | Mutation checks | channel binding, `lockForUpdate` in `verify`, `sharedLock` in approval check — each fails its test when removed |
 | Full backend suite, SQLite (29 chunks, 844 test classes) | All green except (a) 26 `Fuel*` tests that need `ext-bcmath` (`Call to undefined function App\Services\bcmul()`; absent locally only, installed in CI) and (b) one `AiActionHistoryListTest` query-count assertion that failed once inside its chunk and passed on rerun of the same chunk and in isolation (unrelated to this change; flaky under chunk ordering). |
 | Affected backend suites, PostgreSQL | 456 passed (verification, client-IP, wholesale boundary/foundation/visibility, module boundary, cart/checkout/order) |
