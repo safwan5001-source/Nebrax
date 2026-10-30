@@ -193,8 +193,9 @@ class AiActionHistoryListTest extends TestCase
         $this->assertSame(['success' => 2], $row['execution']['rows']);
         $this->assertArrayNotHasKey('claim_token', $row['execution']);
 
-        // استعلامات ثابتة لا تنمو مع عدد الصفوف: نضيف سجلات أخرى ونقارن العدد.
+        // استعلامات ثابتة لا تنمو مع عدد الصفوف: كل قياس يسبقه نداء تسخين (ذاكرات الأدوار/الإعدادات تتغيّر بحسب ما سبق في المجموعة الكاملة).
         $this->enable($auth['tenant_id']);
+        $this->list($auth['token'])->assertOk();
         \DB::enableQueryLog();
         $this->list($auth['token'])->assertOk();
         $few = count(\DB::getQueryLog());
@@ -203,6 +204,9 @@ class AiActionHistoryListTest extends TestCase
             $this->withToken($auth['token'])->withHeader('Idempotency-Key', 'hist-exe-more-'.$i)
                 ->postJson('/api/ai-actions', ['type' => 'product_import.v1', 'proposal' => ['schema_version' => 1, 'rows' => [$this->good('r', 2, 'X-'.$i)]]])->assertCreated();
         }
+        \DB::disableQueryLog();
+        $this->list($auth['token'])->assertOk();
+        \DB::enableQueryLog();
         \DB::flushQueryLog();
         $this->list($auth['token'])->assertOk()->assertJsonPath('meta.total', 7);
         $many = count(\DB::getQueryLog());
