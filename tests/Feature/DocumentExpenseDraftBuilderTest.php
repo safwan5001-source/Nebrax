@@ -637,15 +637,20 @@ class DocumentExpenseDraftBuilderTest extends TestCase
     }
 
     /** @test */
-    public function a_document_without_a_number_can_be_confirmed_as_a_distinct_repeat(): void
+    public function the_same_reference_probe_is_false_without_a_reference_and_true_only_for_the_same_identity_and_reference(): void
     {
         $fixture = $this->readyFixture();
         $this->buildDraft($fixture, 'الدفعة الأولى.');
-        $second = $this->secondReadyBatch($fixture, '', 10000);
+        $service = app(DocumentDuplicateReservationService::class);
+        $partner = $fixture['partner']->id;
+        $predicate = fn (?string $ref, int $amount = 10000) => DocumentDuplicateReservationService::expensePredicate($partner, null, $ref, '2026-08-25', $amount);
 
-        $this->postDraft($fixture, $second)->assertUnprocessable()->assertJsonPath('distinct_confirmable', true);
-        $this->postDraft($fixture, $second, ['confirm_distinct_occurrence' => true])->assertCreated();
-        $this->assertDatabaseCount('expenses', 2);
+        // المستند في Document Center يحمل رقماً دائماً (الجاهزية تشترطه)، فالمسار بلا مرجع دفاعي: لا شيء يميّز فالقرار للمراجع.
+        $this->assertFalse($service->holdsSameExpenseReference($predicate(null)));
+        $this->assertTrue($service->holdsSameExpenseReference($predicate('EXP-100')));
+        $this->assertTrue($service->holdsSameExpenseReference($predicate('exp 100')), 'التطبيع نفسه.');
+        $this->assertFalse($service->holdsSameExpenseReference($predicate('EXP-101')));
+        $this->assertFalse($service->holdsSameExpenseReference($predicate('EXP-100', 10001)));
     }
 
     /** @test */
@@ -674,7 +679,7 @@ class DocumentExpenseDraftBuilderTest extends TestCase
 
         // طلب إنشاء مسودة مشتريات لا يقبل مفتاح التأكيد أصلاً (لا يمتد إلى المشتريات).
         $this->assertArrayNotHasKey('confirm_distinct_occurrence', (new \App\Http\Requests\CreateDocumentPurchaseDraftRequest)->rules());
-        $this->postDraft($fixture, $second)->assertUnprocessable();
+        $this->assertSame('ready_for_draft', $second->fresh()->status->value);
     }
 
     /** @return array<string,mixed> بيانات المصروف المطابقة لدليل الاختبار: المورّد والتاريخ 2026-08-25 والمبلغ 10000 هللة. */

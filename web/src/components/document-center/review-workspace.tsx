@@ -395,6 +395,10 @@ export function ReviewWorkspace({ batchId }: Props) {
             retry: t('retry'),
             failed: t('saveFailed'),
             stale: t('stale'),
+            repeatTitle: t('expenseRepeatTitle'),
+            repeatBody: t('expenseRepeatBody'),
+            repeatConfirm: t('expenseRepeatConfirm'),
+            repeatSubmit: t('expenseRepeatSubmit'),
           }}
         />
       )}
