@@ -22,6 +22,7 @@ describe('commerce workspace navigation', () => {
       '/commerce/delivery',
       '/commerce/gifting',
       '/commerce/integrations',
+      '/commerce/wholesale',
     ]);
   });
 
@@ -74,7 +75,19 @@ describe('commerce workspace navigation', () => {
     expect(COMMERCE_WORKSPACE_HREFS).not.toContain('/inventory');
     expect(COMMERCE_WORKSPACE_HREFS).not.toContain('/invoices');
     expect(COMMERCE_WORKSPACE_HREFS).not.toContain('/payments');
-    expect(COMMERCE_WORKSPACE_NAV_GROUPS).toHaveLength(3);
+    expect(COMMERCE_WORKSPACE_NAV_GROUPS).toHaveLength(4);
+  });
+
+  it('adds Wholesale as ONE guarded entry — its eleven sections live in the workspace section bar, not here', () => {
+    const group = COMMERCE_WORKSPACE_NAV_GROUPS.find((candidate) => candidate.labelKey === 'groupWholesale');
+    expect(group?.items).toEqual([{ href: '/commerce/wholesale', labelKey: 'wholesale', permission: 'commerce.wholesale.manage' }]);
+    expect(COMMERCE_WORKSPACE_HREFS.filter((href) => href.startsWith('/commerce/wholesale'))).toEqual(['/commerce/wholesale']);
+    const entry = group!.items[0];
+    expect(isNavEntryVisible(entry, new Set(), { role: 'staff', permissions: ['commerce.manage'] })).toBe(false);
+    expect(isNavEntryVisible(entry, new Set(), { role: 'owner', permissions: ['*'] })).toBe(true);
+    // Sub-routes keep the entry highlighted; the Orders entry does not capture /commerce/wholesale/orders.
+    expect(isCommerceNavItemActive('/commerce/wholesale', '/commerce/wholesale/buyers')).toBe(true);
+    expect(isCommerceNavItemActive('/commerce/orders', '/commerce/wholesale/orders')).toBe(false);
   });
 
   it('treats overview as an exact route and nested routes as prefixes', () => {
