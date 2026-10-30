@@ -441,6 +441,50 @@ class WholesalePricePrecedenceTest extends TestCase
         $this->assertSame($variantId, $detail['variants'][0]['id']);
     }
 
+    #[Test]
+    public function variant_availability_ignores_inactive_variants_and_alternative_units_in_list_sort_and_detail_alike(): void
+    {
+        // Codex, PR #1823, P2: the listing/sort used to count ANY variant entry, while the detail page prices only ACTIVE
+        // variants in the product's BASE unit — so a card could advertise a product the buyer could not buy.
+        [$buyer] = $this->buyer();
+        $vm = $this->inCtx(function (): Product {
+            $product = $this->product('VM2');
+            DB::table('products')->where('id', $product->id)->update(['variant_state' => 'variant_managed']);
+            CommerceListing::create(['product_id' => $product->id, 'sales_channel_id' => $this->ws->id, 'is_published' => true]);
+            $inactive = \App\Models\ProductVariant::create(['product_id' => $product->id, 'sku' => 'VM2-i-'.Str::random(4), 'combination_key' => 'i-'.Str::random(6), 'is_active' => false]);
+            $active = \App\Models\ProductVariant::create(['product_id' => $product->id, 'sku' => 'VM2-a-'.Str::random(4), 'combination_key' => 'a-'.Str::random(6), 'is_active' => true]);
+            // (1) an entry for the INACTIVE variant in the base unit, (2) an entry for the ACTIVE variant but in an alternative unit
+            \App\Models\PriceListItem::create(['price_list_id' => $this->channelList->id, 'product_id' => $product->id, 'product_variant_id' => $inactive->id, 'unit_name' => $product->unit, 'price' => 610]);
+            \App\Models\PriceListItem::create(['price_list_id' => $this->channelList->id, 'product_id' => $product->id, 'product_variant_id' => $active->id, 'unit_name' => 'box', 'price' => 6100]);
+
+            return $product;
+        });
+
+        $row = $this->listing(self::WS, $buyer)['VM2'];
+        $this->assertNull($row['price']);
+        $this->assertSame('unavailable_for_wholesale', $row['wholesale_availability']['state'], 'listing agrees with the detail page: nothing purchasable');
+
+        $detail = $this->api('GET', 'products/'.$vm->id, self::WS, $buyer)->assertOk()->json('data');
+        $this->assertSame('unavailable_for_wholesale', $detail['wholesale_availability']['state']);
+        $this->assertNull($detail['price']);
+
+        $asc = $this->order(self::WS, $buyer, '?sort=sale_price');
+        $desc = $this->order(self::WS, $buyer, '?sort=-sale_price');
+        $this->assertSame(['P1', 'P2'], array_slice($asc, 0, 2), 'priced items first');
+        $this->assertEqualsCanonicalizing(['P3', 'VM2'], array_slice($asc, 2), 'both unavailable items sort last');
+        $this->assertSame(['P2', 'P1'], array_slice($desc, 0, 2));
+        $this->assertEqualsCanonicalizing(['P3', 'VM2'], array_slice($desc, 2), 'unavailable items stay last descending too');
+
+        // giving the ACTIVE variant a base-unit entry makes it available everywhere at once
+        $this->inCtx(function () use ($vm): void {
+            $active = \App\Models\ProductVariant::query()->where('product_id', $vm->id)->where('is_active', true)->firstOrFail();
+            \App\Models\PriceListItem::create(['price_list_id' => $this->channelList->id, 'product_id' => $vm->id, 'product_variant_id' => $active->id, 'unit_name' => $vm->unit, 'price' => 620]);
+        });
+        $this->assertSame('available', $this->listing(self::WS, $buyer)['VM2']['wholesale_availability']['state']);
+        $this->assertSame(620, $this->api('GET', 'products/'.$vm->id, self::WS, $buyer)->json('data.variants.0.price.amount_minor') ?? $this->api('GET', 'products/'.$vm->id, self::WS, $buyer)->json('data.variants.1.price.amount_minor'));
+        $this->assertSame('VM2', $this->order(self::WS, $buyer, '?sort=sale_price')[0], 'now sorts as the 0 its row displays');
+    }
+
     // ═══════════════════ 3 · العزل: مستأجر / قناة / عضوية ═══════════════════
 
     #[Test]

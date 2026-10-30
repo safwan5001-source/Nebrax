@@ -81,8 +81,10 @@ final class EffectivePriceOrdering
         $simple = count($parts) === 1 ? $parts[0] : 'COALESCE('.implode(', ', $parts).')';
 
         $placeholders = implode(', ', array_fill(0, count($lists), '?'));
-        $variantAny = "(SELECT 0 WHERE EXISTS (SELECT 1 FROM price_list_items plv WHERE plv.price_list_id IN ({$placeholders}) "
-            .'AND plv.product_id = products.id AND plv.product_variant_id IS NOT NULL))';
+        // Same predicate as the detail page and the listing: an ACTIVE variant of this product priced in its BASE unit.
+        $variantAny = "(SELECT 0 WHERE EXISTS (SELECT 1 FROM price_list_items plv "
+            .'JOIN product_variants pv ON pv.id = plv.product_variant_id AND pv.product_id = products.id AND pv.is_active '
+            ."WHERE plv.price_list_id IN ({$placeholders}) AND plv.product_id = products.id AND plv.unit_name = products.unit))";
 
         $effective = "CASE WHEN products.variant_state = 'variant_managed' THEN {$variantAny} ELSE {$simple} END";
         // placeholder order inside the expression: variant branch first (the IN list), then the simple branch's lists

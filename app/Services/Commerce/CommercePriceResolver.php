@@ -6,6 +6,7 @@ use App\Models\Partner;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
 use App\Models\ProductUnitPrice;
+use App\Models\ProductVariant;
 use App\Models\Product;
 use App\Models\SalesChannel;
 use App\Models\Tenant;
@@ -372,8 +373,17 @@ final class CommercePriceResolver
             }
             $managedIds = $variantManaged->pluck('id')->all();
             if ($managedIds !== []) {
-                foreach (PriceListItem::query()->whereIn('price_list_id', $listIds)->whereIn('product_id', $managedIds)->whereNotNull('product_variant_id')->get(['product_id']) as $item) {
-                    $variantEntries[$item->product_id] = true;
+                // Same predicate as the detail page: an ACTIVE variant of this product, priced in the product's BASE unit.
+                // (Entries for an inactive variant or an alternative unit are not purchasable there, so they must not
+                // advertise availability here.)
+                $activeVariantIds = ProductVariant::query()
+                    ->whereIn('product_id', $managedIds)->where('is_active', true)->pluck('product_id', 'id')->all();
+                $unitByProduct = $variantManaged->pluck('unit', 'id')->all();
+                foreach (PriceListItem::query()->whereIn('price_list_id', $listIds)->whereIn('product_id', $managedIds)->whereNotNull('product_variant_id')->get(['product_id', 'product_variant_id', 'unit_name']) as $item) {
+                    if (($activeVariantIds[$item->product_variant_id] ?? null) === $item->product_id
+                        && $item->unit_name === ($unitByProduct[$item->product_id] ?? null)) {
+                        $variantEntries[$item->product_id] = true;
+                    }
                 }
             }
         }

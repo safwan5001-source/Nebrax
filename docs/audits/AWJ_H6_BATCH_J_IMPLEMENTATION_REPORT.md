@@ -46,8 +46,8 @@ All `store/v1` price-bearing routes already carry `EnsureWholesalePriceAccess` (
 
 ## 4. Evidence
 
-### 4.1 Precedence and fallback, parity (`WholesalePricePrecedenceTest`, 25 tests)
-Partner → channel → unavailable (listing, detail, search, cart agree per product); buyer without a link; no valid list at all; inactive partner list; inactive channel list (partner still prices, the channel-only item becomes unavailable, **never 1000**); revoked link, inactive partner, supplier-only partner; POS toggle independence; price sort asc/desc with unavailable last; sort and pagination exactness; variant-managed product available only with an eligible variant entry.
+### 4.1 Precedence and fallback, parity (`WholesalePricePrecedenceTest`, 26 tests)
+Partner → channel → unavailable (listing, detail, search, cart agree per product); buyer without a link; no valid list at all; inactive partner list; inactive channel list (partner still prices, the channel-only item becomes unavailable, **never 1000**); revoked link, inactive partner, supplier-only partner; POS toggle independence; price sort asc/desc with unavailable last; sort and pagination exactness; variant-managed product available only when an **active** variant has a **base-unit** entry in an eligible list (entries for an inactive variant or an alternative unit advertise nothing, identically in listing, sort and detail).
 
 ### 4.2 Security and isolation
 Foreign-tenant partner list ignored; foreign-tenant channel list reference ⇒ unavailable; approval on one channel prices nothing on another channel; foreign-tenant `CustomerContext` ⇒ ineligible; a caller-supplied partner id ignored; unauthenticated and staff-preview callers get no price; suspended buyer refused (403) and reinstatement restores pricing; revoked session loses prices, cart and checkout (401) with **no order and no payment intent**; browser-supplied `unit_price`, `price`, `amount_minor`, `partner_id`, `price_list_id` rejected (422) and no cart line created.
@@ -64,6 +64,9 @@ DTC listing, detail, cart and search keep the retail price; a DTC channel list s
 ### 4.6 Mutation checks
 Disabling the wholesale branch (letting wholesale fall to the base logic) fails 8 tests of `WholesalePricePrecedenceTest`; removing the locked re-read fails the PostgreSQL race test.
 
+### 4.7 Review fix (Codex P2 on PR #1823, verified real, my own defect)
+The listing and the sort counted *any* variant entry in an eligible list, while the detail page prices only active variants in the product's base unit, so a card could advertise a product the buyer could not buy. The listing query and `EffectivePriceOrdering::applyWholesale()` now apply the detail page's predicate (active variant of this product, product's base unit). A regression test fails on the previous code and passes now; affected suites re-run green on SQLite (779 passed, 41 skipped) and PostgreSQL (820 passed).
+
 ## 5. Financial regression
 No accounting, VAT, ZATCA, payment-capture, order-lifecycle or cancellation code was changed, and no migration was added. A wholesale order still creates no invoice, payment, journal entry or stock movement (Batch I characterization test passes unchanged). Currency comes from the tenant exactly as before; amounts remain integer minor units; order-line price evidence is unchanged and recorded the same way.
 
@@ -71,7 +74,7 @@ No accounting, VAT, ZATCA, payment-capture, order-lifecycle or cancellation code
 
 | Gate | Result |
 |---|---|
-| New `WholesalePricePrecedenceTest` | 25 passed (SQLite and PostgreSQL) |
+| New `WholesalePricePrecedenceTest` | 26 passed (SQLite and PostgreSQL) |
 | New `WholesalePricePrecedencePostgresConcurrencyTest` | 2 passed on PostgreSQL (skipped on SQLite) |
 | Affected suites on PostgreSQL (wholesale, resolver, parity, sort, products, offers, buyer verification, cart, checkout, order, workspace product, flowers journey, module boundary, partner link, price lists) | 846 passed |
 | Full backend suite, SQLite (29 chunks) | 9,923 passed, 301 skipped (PostgreSQL-only), 26 failed — **all 26 are `Fuel*` tests** (`FuelAviRfid`, `FuelReconciliation`, `FuelSaleApi`, `FuelSaleService`, `FuelSupplyReceivingApi`, `FuelSupplyReceiving`) failing with `Call to undefined function bcmul()`: the `ext-bcmath` extension is absent in this environment only (CI installs it). No pricing, wholesale, commerce or storefront test failed. |
