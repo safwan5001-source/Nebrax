@@ -32,6 +32,12 @@ import { DeviceFrame, DEVICE_FRAME_PRESETS, type DeviceFramePreset } from '@/mod
 import { LayersTree } from '@/modules/app-builder/layers-tree';
 import { Inspector } from '@/modules/app-builder/inspector';
 import { PreviewOnPhoneButton } from '@/modules/app-builder/preview-on-phone';
+import {
+  classifySaveError, clearDraftBackup, parseDraftConflict, readDraftBackup, schemasEqual, writeDraftBackup,
+  type DraftBackup,
+} from '@/modules/app-builder/draft-save';
+import { DraftConflictDialog, LeaveGuardDialog, RecoverBackupDialog, type ConflictState } from '@/modules/app-builder/draft-save-dialogs';
+import { useUnsavedChangesGuard } from '@/modules/app-builder/unsaved-guard';
 import { ThemePanel } from '@/modules/app-builder/theme-panel';
 
 type MobilePanel = 'structure' | 'inspector';
@@ -77,6 +83,15 @@ export default function AppBuilderWorkspacePage() {
   const futureRef = useRef<AppSchema[]>([]);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  // AD-01 / S01b — الأساس التفاؤلي للحفظ: `revision` كما قرأه المحرر آخر مرة (من التحميل أو من آخر حفظ ناجح).
+  const [baseRevision, setBaseRevision] = useState<number | null>(null);
+  const baseRevisionRef = useRef<number | null>(null);
+  const schemaRef = useRef<AppSchema | null>(null);
+  const [conflict, setConflict] = useState<ConflictState | null>(null);
+  const [saveFailure, setSaveFailure] = useState<'network' | 'other' | null>(null);
+  const [recovery, setRecovery] = useState<DraftBackup | null>(null);
+  const canManage = hasAppBuilderPermission(currentUser(), 'apps_builder.manage');
+  const backupUserId = currentUser()?.id ?? 'anonymous';
 
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
@@ -144,6 +159,17 @@ export default function AppBuilderWorkspacePage() {
       .then(([appRes, draftRes, registriesRes]) => {
         setApp(appRes.data);
         setSchema(draftRes.data.schema);
+        baseRevisionRef.current = draftRes.data.revision;
+        setBaseRevision(draftRes.data.revision);
+        setConflict(null);
+        setSaveFailure(null);
+        // نسخة محلية احتياطية لتعديلات لم تُحفظ (إغلاق/انهيار/فشل شبكة/تعارض سابق): تُعرض للاستعادة لا تُطبَّق صامتةً.
+        const backup = readDraftBackup(backupUserId, params.id);
+        if (backup && !schemasEqual(backup.schema, draftRes.data.schema)) setRecovery(backup);
+        else {
+          if (backup) clearDraftBackup(backupUserId, params.id);
+          setRecovery(null);
+        }
         pastRef.current = [];
         futureRef.current = [];
         setDirty(false);
@@ -157,71 +183,83 @@ export default function AppBuilderWorkspacePage() {
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : t('loadFailed')))
       .finally(() => setLoading(false));
-  }, [params.id, t]);
+  }, [params.id, t, backupUserId]);
 
   useEffect(() => load(), [load]);
 
+  schemaRef.current = schema;
+  // حارس المغادرة: beforeunload + الروابط الداخلية + زر الرجوع (AD-01 / S01b).
+  const leaveGuard = useUnsavedChangesGuard(dirty);
+
+  // نسخة محلية احتياطية مؤجَّلة لكل تعديل غير محفوظ، وتُكتب فوراً عند إخفاء الصفحة؛ تُمسح عند الحفظ الناجح أو التجاهل الصريح.
   useEffect(() => {
-    function onBeforeUnload(event: BeforeUnloadEvent) {
-      if (!dirty) return;
-      event.preventDefault();
-      event.returnValue = '';
+    if (!schema || !dirty || !params.id || baseRevision === null) return;
+    const handle = window.setTimeout(() => writeDraftBackup(backupUserId, params.id, schema, baseRevision), 400);
+    return () => window.clearTimeout(handle);
+  }, [schema, dirty, baseRevision, params.id, backupUserId]);
+
+  useEffect(() => {
+    function flushBackup() {
+      const current = schemaRef.current;
+      if (current && dirty && params.id && baseRevisionRef.current !== null) {
+        writeDraftBackup(backupUserId, params.id, current, baseRevisionRef.current);
+      }
     }
-    window.addEventListener('beforeunload', onBeforeUnload);
-    return () => window.removeEventListener('beforeunload', onBeforeUnload);
-  }, [dirty]);
+    window.addEventListener('pagehide', flushBackup);
+    return () => window.removeEventListener('pagehide', flushBackup);
+  }, [dirty, params.id, backupUserId]);
 
   const applyPageEdit = useCallback(
     (pageId: string, updater: (pageRoot: AppSchemaComponent) => AppSchemaComponent) => {
-      if (!schema) return;
+      if (!schema || !canManage) return;
       pastRef.current = [...pastRef.current, schema].slice(-HISTORY_LIMIT);
       futureRef.current = [];
       setDirty(true);
       setSchema({ ...schema, pages: { ...schema.pages, [pageId]: updater(schema.pages[pageId]) } });
     },
-    [schema]
+    [schema, canManage]
   );
 
   const applyThemeEdit = useCallback(
     (patch: Record<string, string>) => {
-      if (!schema) return;
+      if (!schema || !canManage) return;
       pastRef.current = [...pastRef.current, schema].slice(-HISTORY_LIMIT);
       futureRef.current = [];
       setDirty(true);
       setSchema(mergeThemeTokens(schema, patch));
     },
-    [schema]
+    [schema, canManage]
   );
 
   /** أساس عمليات صفحات المخطط (إضافة/حذف/تعيين رئيسية) — نفس مسار السجلّ/التعديل. */
   const applyPagesEdit = useCallback(
     (updater: (current: AppSchema) => AppSchema) => {
-      if (!schema) return;
+      if (!schema || !canManage) return;
       pastRef.current = [...pastRef.current, schema].slice(-HISTORY_LIMIT);
       futureRef.current = [];
       setDirty(true);
       setSchema(updater(schema));
     },
-    [schema]
+    [schema, canManage]
   );
 
   const undo = useCallback(() => {
-    if (!schema || pastRef.current.length === 0) return;
+    if (!schema || !canManage || pastRef.current.length === 0) return;
     const previous = pastRef.current[pastRef.current.length - 1];
     pastRef.current = pastRef.current.slice(0, -1);
     futureRef.current = [schema, ...futureRef.current];
     setDirty(true);
     setSchema(previous);
-  }, [schema]);
+  }, [schema, canManage]);
 
   const redo = useCallback(() => {
-    if (!schema || futureRef.current.length === 0) return;
+    if (!schema || !canManage || futureRef.current.length === 0) return;
     const next = futureRef.current[0];
     futureRef.current = futureRef.current.slice(1);
     pastRef.current = [...pastRef.current, schema].slice(-HISTORY_LIMIT);
     setDirty(true);
     setSchema(next);
-  }, [schema]);
+  }, [schema, canManage]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -238,22 +276,129 @@ export default function AppBuilderWorkspacePage() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [undo, redo]);
 
-  async function handleSave() {
-    if (!schema || !params.id) return;
-    setSaving(true);
+  /**
+   * AD-01 — يحفظ المسودة بأساس تفاؤلي `base_revision`. التعارض (409) لا يكتب شيئاً ولا يمسح التعديلات المحلية: يفتح حوار الحل.
+   * فشل الشبكة/الخادم يُبقي `dirty` والنسخة المحلية الاحتياطية ويعرض خطأً دائماً قابلاً لإعادة المحاولة.
+   */
+  async function persistDraft(overrideBase?: number): Promise<'ok' | 'conflict' | 'failed'> {
+    const toSave = schemaRef.current;
+    if (!toSave || !params.id) return 'failed';
+    const base = overrideBase ?? baseRevisionRef.current;
     try {
-      await api<{ data: BuilderDraftExperience }>(`/app-builder/apps/${params.id}/draft`, {
+      const res = await api<{ data: BuilderDraftExperience }>(`/app-builder/apps/${params.id}/draft`, {
         method: 'PUT',
-        body: { schema },
+        body: base === null ? { schema: toSave } : { schema: toSave, base_revision: base },
       });
-      setDirty(false);
+      const saved = res?.data;
+      if (saved && typeof saved.revision === 'number') {
+        baseRevisionRef.current = saved.revision;
+        setBaseRevision(saved.revision);
+      }
+      // تعديلات أُجريت أثناء الطلب لا تُعدّ محفوظة.
+      if (schemaRef.current === toSave) {
+        setDirty(false);
+        clearDraftBackup(backupUserId, params.id);
+      }
+      setSaveFailure(null);
+      setConflict(null);
       toast.success(t('saveSuccessTitle'));
+      return 'ok';
     } catch (err) {
-      toast.error(t('saveErrorTitle'), err instanceof ApiError ? err.message : undefined);
+      const info = parseDraftConflict(err);
+      if (info) {
+        setConflict((previous) => ({ info, stage: 'choose', latest: null, busy: false, changedAgain: previous?.stage === 'confirmOverwrite' }));
+        if (baseRevisionRef.current !== null) writeDraftBackup(backupUserId, params.id, toSave, baseRevisionRef.current);
+        return 'conflict';
+      }
+      const kind = classifySaveError(err);
+      if (kind === 'network' || kind === 'other') setSaveFailure(kind);
+      toast.error(t('saveErrorTitle'), err instanceof ApiError ? err.message : t('saveNetworkHint'));
+      if (baseRevisionRef.current !== null) writeDraftBackup(backupUserId, params.id, toSave, baseRevisionRef.current);
+      return 'failed';
+    }
+  }
+
+  async function handleSave() {
+    if (!schema || !params.id || !canManage || saving) return;
+    setSaving(true);
+    setSaveFailure(null);
+    try {
+      await persistDraft();
     } finally {
       setSaving(false);
     }
   }
+
+  const handleSaveRef = useRef(handleSave);
+  handleSaveRef.current = handleSave;
+
+  /** الكتابة فوق: إعادة جلب أحدث revision أولاً ثم تأكيد المستخدم، ولا يُرسَل شيء قبلهما. */
+  async function startOverwrite() {
+    if (!params.id) return;
+    setConflict((c) => (c ? { ...c, busy: true } : c));
+    try {
+      const res = await api<{ data: BuilderDraftExperience }>(`/app-builder/apps/${params.id}/draft`);
+      setConflict((c) => (c ? { ...c, busy: false, stage: 'confirmOverwrite', latest: { revision: res.data.revision, updatedAt: res.data.updated_at } } : c));
+    } catch (err) {
+      setConflict((c) => (c ? { ...c, busy: false } : c));
+      toast.error(t('conflict.fetchLatestFailed'), err instanceof ApiError ? err.message : undefined);
+    }
+  }
+
+  async function confirmOverwrite() {
+    const latest = conflict?.latest;
+    if (!latest) return;
+    setConflict((c) => (c ? { ...c, busy: true } : c));
+    setSaving(true);
+    try {
+      await persistDraft(latest.revision);
+    } finally {
+      setSaving(false);
+      setConflict((c) => (c ? { ...c, busy: false } : c));
+    }
+  }
+
+  function confirmReloadLatest() {
+    if (params.id) clearDraftBackup(backupUserId, params.id);
+    setConflict(null);
+    load();
+  }
+
+  async function copyMyChanges() {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(schemaRef.current ?? schema, null, 2));
+      toast.success(t('conflict.copied'));
+    } catch {
+      toast.error(t('conflict.copyFailed'));
+    }
+  }
+
+  function restoreLocalBackup() {
+    if (!recovery) return;
+    baseRevisionRef.current = recovery.baseRevision;
+    setBaseRevision(recovery.baseRevision);
+    pastRef.current = [];
+    futureRef.current = [];
+    setSchema(recovery.schema);
+    setDirty(true);
+    setRecovery(null);
+  }
+
+  function discardLocalBackup() {
+    if (params.id) clearDraftBackup(backupUserId, params.id);
+    setRecovery(null);
+  }
+
+  // Ctrl/Cmd+S يحفظ المسودة (ويمنع حوار «حفظ الصفحة» في المتصفح) حتى أثناء الكتابة داخل حقل.
+  useEffect(() => {
+    function onSaveShortcut(event: KeyboardEvent) {
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 's') return;
+      event.preventDefault();
+      if (dirty && canManage && builderMode === 'design' && previewState === 'draft') void handleSaveRef.current();
+    }
+    window.addEventListener('keydown', onSaveShortcut);
+    return () => window.removeEventListener('keydown', onSaveShortcut);
+  }, [dirty, canManage, builderMode, previewState]);
 
   /** يفتح حوار النشر ويشغّل الفحص الصريح فوراً — لا زرّ تأكيد مفعّلاً قبل نجاحه. */
   function openPublishDialog() {
@@ -596,6 +741,7 @@ export default function AppBuilderWorkspacePage() {
   );
 
   const inspectorPanel = (
+    <fieldset disabled={!canManage} className="contents">
     <div className="h-full min-h-0 overflow-y-auto">
       {structureMode === 'theme' ? (
         <ThemePanel tokens={schemaThemeTokens(schema)} onChange={applyThemeEdit} onPreview={setPreviewThemeTokens} />
@@ -611,6 +757,7 @@ export default function AppBuilderWorkspacePage() {
         />
       )}
     </div>
+    </fieldset>
   );
 
   /**
@@ -771,6 +918,39 @@ export default function AppBuilderWorkspacePage() {
   );
   const previewOnPhoneButton = <PreviewOnPhoneButton appId={app.id} />;
 
+  /** AD-01 / S01b — حوارات سلامة الحفظ، تُعرض في كل أوضاع الصفحة. */
+  const safetyDialogs = (
+    <>
+      <DraftConflictDialog
+        state={conflict}
+        locale={locale}
+        onKeepEditing={() => setConflict(null)}
+        onCopy={() => void copyMyChanges()}
+        onAskReload={() => setConflict((c) => (c ? { ...c, stage: 'confirmReload' } : c))}
+        onConfirmReload={confirmReloadLatest}
+        onAskOverwrite={() => void startOverwrite()}
+        onConfirmOverwrite={() => void confirmOverwrite()}
+        onBack={() => setConflict((c) => (c ? { ...c, stage: 'choose', latest: null, changedAgain: false } : c))}
+      />
+      <LeaveGuardDialog open={leaveGuard.pending !== null} onStay={leaveGuard.cancelLeave} onLeave={leaveGuard.confirmLeave} />
+      <RecoverBackupDialog backup={recovery} locale={locale} onRestore={restoreLocalBackup} onDiscard={discardLocalBackup} />
+    </>
+  );
+
+  const notices = (
+    <>
+      {!canManage ? (
+        <p role="status" className="shrink-0 border-b border-border bg-primary-soft px-4 py-2 text-xs text-text">{t('readOnly.notice')}</p>
+      ) : null}
+      {saveFailure ? (
+        <div role="alert" className="flex shrink-0 flex-wrap items-center gap-2 border-b border-negative/30 bg-negative/10 px-4 py-2 text-xs text-text">
+          <span>{saveFailure === 'network' ? t('saveFailure.network') : t('saveFailure.other')}</span>
+          <Button type="button" size="sm" variant="outline" disabled={saving} onClick={() => void handleSave()}>{t('saveFailure.retry')}</Button>
+        </div>
+      ) : null}
+    </>
+  );
+
   if (builderMode === 'preview' && fullPreview) {
     return (
       <div dir={locale === 'ar' ? 'rtl' : 'ltr'} className="fixed inset-0 z-50 flex flex-col bg-background">
@@ -782,6 +962,7 @@ export default function AppBuilderWorkspacePage() {
           </Button>
         </div>
         <div className="flex min-h-0 flex-1 items-stretch justify-center overflow-auto p-0 lg:items-center lg:p-6">{previewCanvasArea}</div>
+        {safetyDialogs}
       </div>
     );
   }
@@ -823,14 +1004,14 @@ export default function AppBuilderWorkspacePage() {
         {builderMode === 'design' ? (
           <>
             <div className="flex shrink-0 items-center gap-0.5">
-              <Button variant="ghost" size="icon" aria-label={t('undoLabel')} disabled={!isDraftView || !canUndo} onClick={undo}>
+              <Button variant="ghost" size="icon" aria-label={t('undoLabel')} disabled={!isDraftView || !canManage || !canUndo} onClick={undo}>
                 <Undo2 className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
               </Button>
-              <Button variant="ghost" size="icon" aria-label={t('redoLabel')} disabled={!isDraftView || !canRedo} onClick={redo}>
+              <Button variant="ghost" size="icon" aria-label={t('redoLabel')} disabled={!isDraftView || !canManage || !canRedo} onClick={redo}>
                 <Redo2 className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
               </Button>
             </div>
-            <Button size="sm" disabled={!isDraftView || !dirty || saving} onClick={handleSave}>
+            <Button size="sm" disabled={!isDraftView || !canManage || !dirty || saving} title={!canManage ? t('readOnly.saveForbidden') : undefined} onClick={handleSave}>
               {saving ? t('savingBadge') : tc('save')}
             </Button>
             <Button
@@ -904,6 +1085,7 @@ export default function AppBuilderWorkspacePage() {
           ) : null}
         </div>
       </header>
+      {notices}
 
       {builderMode === 'preview' ? (
         // MOBILE-PREVIEW-3 — App Preview shell: no structure/inspector asides, no
@@ -1115,6 +1297,7 @@ export default function AppBuilderWorkspacePage() {
           </div>
         </div>
       </Dialog>
+      {safetyDialogs}
     </div>
   );
 }

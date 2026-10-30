@@ -12,7 +12,9 @@ import { Dialog } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/toast';
 import { ErrorState, LoadingState } from '@/components/nebrax';
 import { api, ApiError } from '@/lib/api';
-import { appDisplayName, type BuilderApp, type BuilderPublishedVersion } from '@/lib/app-builder';
+import { appDisplayName, hasAppBuilderPermission, type BuilderApp, type BuilderDraftExperience, type BuilderPublishedVersion } from '@/lib/app-builder';
+import { currentUser } from '@/lib/auth';
+import { clearDraftBackup, parseDraftConflict, readDraftBackup } from '@/modules/app-builder/draft-save';
 import { formatDate } from '@/lib/formatting';
 
 /**
@@ -36,6 +38,8 @@ export default function AppBuilderVersionsPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [restoreTarget, setRestoreTarget] = useState<BuilderPublishedVersion | null>(null);
   const [restoring, setRestoring] = useState(false);
+  const canManage = hasAppBuilderPermission(currentUser(), 'apps_builder.manage');
+  const backupUserId = currentUser()?.id ?? 'anonymous';
 
   const load = useCallback(() => {
     if (!params.id) return;
@@ -61,11 +65,15 @@ export default function AppBuilderVersionsPage() {
     try {
       // النسخة الكاملة (`schema`) غير موجودة في استجابة القائمة — تُجلب صراحة هنا.
       const full = await api<{ data: BuilderPublishedVersion }>(`/app-builder/apps/${params.id}/versions/${restoreTarget.version}`);
-      await api(`/app-builder/apps/${params.id}/draft`, { method: 'PUT', body: { schema: full.data.schema } });
+      // AD-01: لا كتابة فوق المسودة دون إعادة جلب أحدث revision (التأكيد تمّ في الحوار)، والحفظ بأساسه فإن تحرّكت المسودة بينهما ⇒ 409.
+      const latest = await api<{ data: BuilderDraftExperience }>(`/app-builder/apps/${params.id}/draft`);
+      await api(`/app-builder/apps/${params.id}/draft`, { method: 'PUT', body: { schema: full.data.schema, base_revision: latest.data.revision } });
+      // الاستعادة استبدلت المسودة صراحةً (أكّد المستخدم): نسخة محلية قديمة لم تعد أساساً صالحاً فلا تُعرض للاستعادة.
+      clearDraftBackup(backupUserId, params.id);
       toast.success(t('restoreSuccessTitle'));
       router.push(`/app-builder/${params.id}/builder`);
     } catch (err) {
-      toast.error(t('restoreErrorTitle'), err instanceof ApiError ? err.message : undefined);
+      toast.error(parseDraftConflict(err) ? t('restoreConflictTitle') : t('restoreErrorTitle'), parseDraftConflict(err) ? t('restoreConflictBody') : err instanceof ApiError ? err.message : undefined);
       setRestoring(false);
     }
   }
@@ -103,10 +111,12 @@ export default function AppBuilderVersionsPage() {
                 </p>
                 <p className="text-sm text-text">{version.note || <span className="text-muted">{t('noNote')}</span>}</p>
               </div>
-              <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => setRestoreTarget(version)}>
-                <History className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
-                {t('restoreAction')}
-              </Button>
+              {canManage ? (
+                <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => setRestoreTarget(version)}>
+                  <History className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
+                  {t('restoreAction')}
+                </Button>
+              ) : null}
             </div>
           ))}
         </div>
@@ -120,6 +130,9 @@ export default function AppBuilderVersionsPage() {
         <p className="text-sm leading-6 text-text">
           {restoreTarget ? t('restoreConfirmBody', { version: restoreTarget.version }) : null}
         </p>
+        {restoreTarget && params.id && readDraftBackup(backupUserId, params.id) ? (
+          <p role="status" className="mt-2 text-xs text-muted">{t('restoreLocalBackupWarning')}</p>
+        ) : null}
         <div className="mt-5 flex justify-end gap-2">
           <Button variant="outline" disabled={restoring} onClick={() => setRestoreTarget(null)}>{tc('cancel')}</Button>
           <Button disabled={restoring} onClick={confirmRestore}>

@@ -133,7 +133,9 @@ describe('NewAppBuilderPage', () => {
     const seedCall = calls.find((c) => c.path === '/app-builder/apps/app-42/draft');
     expect(seedCall).toBeTruthy();
     expect(seedCall?.options?.method).toBe('PUT');
-    const seededSchema = seedCall?.options?.body as { schema?: { pages?: Record<string, unknown> } };
+    const seededSchema = seedCall?.options?.body as { schema?: { pages?: Record<string, unknown> }; base_revision?: number };
+    // AD-01: بذر المسودة الجديدة بأساس صريح (revision 0).
+    expect(seededSchema.base_revision).toBe(0);
     expect(Object.keys(seededSchema.schema?.pages ?? {})).toEqual(['home', 'cart']);
   });
 
