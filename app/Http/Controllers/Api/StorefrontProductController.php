@@ -26,6 +26,7 @@ use App\Support\Commerce\DeliverTodayFilter;
 use App\Support\PublicApiResponse;
 use App\Tenancy\BranchScope;
 use App\Tenancy\StorefrontContext;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -126,7 +127,7 @@ class StorefrontProductController extends PublicApiController
             $facetFilter->orderByCollectionPosition($query, $facetSelection);
             $query->orderBy('name');
         } else {
-            $this->applySort($query, $filters['sort'] ?? null, self::SORTS, 'name');
+            $this->applyListingSort($query, $filters['sort'] ?? null, $resolver, $channelId);
         }
 
         $paginator = $query->paginate($this->perPage($request));
@@ -189,6 +190,42 @@ class StorefrontProductController extends PublicApiController
                 ],
             ],
         ]);
+    }
+
+    /**
+     * H6 Batch F — on a channel whose active price list re-prices products, a price sort must order by the price
+     * the listing DISPLAYS, or the displayed amounts come out of order and the cheapest listed products can fall
+     * off page 1. Effective price = the channel list item for the product's own unit, else the product's base
+     * unit price — the same tiers as `CommercePriceResolver::browsePrices()`. The base is read from
+     * `product_unit_prices` (the authority behind the `Product::sale_price` accessor), NOT the legacy
+     * `products.sale_price` column. A correlated subquery, no join, so TenantScope's unqualified columns stay
+     * unambiguous.
+     *
+     * Deliberately scoped to channels WITH an active list: every other request keeps the exact historical
+     * `applySort` statement, so DTC ordering is byte-for-byte unchanged. (That historical statement orders by the
+     * legacy column — a pre-existing quirk reported, not altered, here.)
+     */
+    private function applyListingSort(Builder $query, ?string $sort, CommercePriceResolver $resolver, string $channelId): void
+    {
+        $field = ltrim(trim((string) $sort), '-');
+        $list = $field === 'sale_price' ? $resolver->activeChannelPriceList($channelId) : null;
+
+        if ($list === null) {
+            $this->applySort($query, $sort, self::SORTS, 'name');
+
+            return;
+        }
+
+        $direction = str_starts_with(trim((string) $sort), '-') ? 'desc' : 'asc';
+        $query->orderByRaw(
+            'COALESCE('
+            .'(SELECT pli.price FROM price_list_items pli WHERE pli.price_list_id = ? AND pli.product_id = products.id '
+            .'AND pli.product_variant_id IS NULL AND pli.unit_name = products.unit LIMIT 1), '
+            .'(SELECT pup.price FROM product_unit_prices pup WHERE pup.product_id = products.id '
+            .'AND pup.product_variant_id IS NULL AND pup.unit_name = products.unit LIMIT 1), '
+            .'0) '.$direction,
+            [$list->id],
+        )->orderByDesc('products.id');
     }
 
     public function show(

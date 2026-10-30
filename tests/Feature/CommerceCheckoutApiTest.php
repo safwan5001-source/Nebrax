@@ -473,6 +473,31 @@ class CommerceCheckoutApiTest extends TestCase
     }
 
     /** @test */
+    public function completion_with_a_channel_list_lacking_the_product_records_product_default_with_no_list(): void
+    {
+        $store = $this->seedMobileStore('completion-provenance-gap');
+        $product = $this->publishedProduct($store['tenant'], $store['channel'], ['sale_price' => 10000]);
+        $other = $this->publishedProduct($store['tenant'], $store['channel'], ['sale_price' => 7000]);
+
+        app(TenantContext::class)->set($store['tenant']->id);
+        $priceList = PriceList::create(['name' => 'قائمة ناقصة', 'is_active' => true]);
+        PriceListItem::create([
+            'price_list_id' => $priceList->id, 'product_id' => $other->id,
+            'unit_name' => $other->unit, 'price' => 6000,
+        ]);
+        $store['channel']->update(['default_price_list_id' => $priceList->id]);
+        app(TenantContext::class)->forget();
+
+        $cartToken = $this->fullyReadyCheckout($store, $product);
+        $this->complete($store, $cartToken, 'idem-prov-gap')->assertCreated()
+            ->assertJsonPath('data.order.items.0.unit_price.amount_minor', 10000);
+
+        $line = \App\Models\CommerceOrderLine::withoutGlobalScopes()->firstOrFail();
+        $this->assertSame('product_default', $line->price_source);
+        $this->assertNull($line->price_list_id);
+    }
+
+    /** @test */
     public function provenance_never_appears_in_the_buyer_facing_order_payload(): void
     {
         $store = $this->seedMobileStore('completion-provenance-leak');

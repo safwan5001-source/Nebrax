@@ -83,6 +83,14 @@ commerce order    ──►  CommercePriceResolver::resolve(…)                
 * Same fail-closed rule: a `default_price_list_id` that `TenantScope` cannot resolve throws, exactly as `resolve()`
   does — the list endpoint returns the same status as the detail endpoint (tested).
 * No second price source is created; pagination, filters, sort and the response envelope are untouched.
+* **Base price source.** `Product::sale_price` is an accessor over `product_unit_prices` (VAR-PRICE-1); the
+  `products.sale_price` column is legacy. `browsePrices()` therefore loads base prices in one `product_unit_prices`
+  query (same value as the accessor: the product's own unit, `0` if none) instead of one query per row — verified by a
+  test that the query count does not grow from 1 to 12 rows.
+* **Price sort.** On a channel with an active list, `sort=sale_price|-sale_price` orders by the displayed price
+  (list item, else base unit price, else 0) via a correlated subquery before pagination, so page 1 holds the genuinely
+  cheapest displayed products (review finding, tested incl. pagination). Channels without a list keep the exact
+  historical statement (asserted by test).
 * **Caching:** the listing had none and gets none (nothing to invalidate).
 * **Channel scoping:** the channel comes from the Host-derived `StorefrontContext` only; a list on channel A can never
   affect channel B of the same tenant or any other tenant (tested with a second web channel on its own host).
@@ -156,6 +164,9 @@ both creation paths already hold the resolver result, and nothing shared with ac
   `price_list_id` (FK → `price_lists`, **RESTRICT**, like `invoices.price_list_id`). Both nullable. PostgreSQL CHECK
   keeps them mutually consistent. Reversible; `down()` refuses while any line carries provenance. Verified
   up → down(2 steps) → up on PostgreSQL 16 and SQLite.
+* `price_list_id` is persisted only when the list actually **supplied** the price (`ResolvedCommercePrice::provenanceListId()`):
+  an active list with no item for the product falls back to `product_default` with a NULL list (otherwise the PG
+  CHECK would reject the order and SQLite would store misleading evidence — caught in review; tested in both creation paths).
 * Written **only** server-side from `ResolvedCommercePrice` in `CommerceCheckoutService::revalidateAndPrice`
   (store/v1 + commerce/v1 checkout) and `CommerceOrderService::createLine` (commerce/v1 order API). Request items cannot
   supply it (tested: forged `price_source`/`price_list_id`/`unit_price` in an item are ignored).
@@ -224,10 +235,12 @@ same `19000`. No other existing assertion was changed or removed.
 
 | Check | Result |
 |---|---|
-| New: `StorefrontPriceParityTest` | 7/7 (4 failed before the fix) |
+| New: `StorefrontPriceParityTest` | 10/10 (4 failed before the fix; +sort, +base-price N+1 after review) |
 | New: `WholesalePriceVisibilityTest` | 9/9 |
 | New: `StaffChannelPricingSettingsTest` | 15/15 |
-| Added tests in `CommerceCheckoutApiTest` + `CommerceOrderServiceTest` (+ the two existing suites) | 63/63 (incl. 9 new) |
+| Added tests in `CommerceCheckoutApiTest` + `CommerceOrderServiceTest` (+ the two existing suites) | all pass (incl. 10 new) |
+| Re-run after review fixes (parity, order, checkout, offers, wholesale visibility, storefront products, resolver): 232 tests | pass on **SQLite and PostgreSQL 16** |
+| `Storefront*/Flowers*/Catalog*/Facet*/Visual*` classes | 1343 passed, 17 skipped |
 | `CommerceModuleBoundaryTest` (route allow-list) | pass |
 | New: `WholesaleMembershipPostgresConcurrencyTest` on **PostgreSQL 16** | 6/6 (82 assertions); mutation-checked (§9) |
 | Migrations up → rollback(2) → up | pass on PostgreSQL 16 and SQLite |
@@ -261,6 +274,7 @@ see the PR.
 | Wholesale storefront UI, buyer registration UI, SMS/OTP/email | Explicitly out of scope. |
 | Provenance exposure to staff UI / reports | Persisted but not surfaced; add to the staff order serializer when a consumer exists. |
 | `payment-status` / `payment-intent` not behind the gate | Deliberate (see §4). |
+| Pre-existing: `sort=sale_price` on a channel **without** a list orders by the legacy `products.sale_price` column | Since VAR-PRICE-1 that column is not the price authority, so DTC price-sort order is effectively arbitrary (ties → `id desc`). Not changed here (it would alter DTC ordering, outside this batch's approved scope); recommend fixing with owner approval, e.g. in Batch G. |
 | Local gaps | `bcmath` is not installed in the sandbox: bcmath-dependent suites (e.g. fuel) fail locally and pass in CI. The pre-existing stale `CommerceOrderCancellationApiTest.php` copy in the local assembled app is environmental. |
 
 ## 13. Recommended Batch G

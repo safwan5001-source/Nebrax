@@ -205,6 +205,48 @@ class StorefrontPriceParityTest extends TestCase
         $this->assertStringNotContainsString('1000', json_encode($list->json()), 'never a silent retail fallback');
     }
 
+    // ───────────────────────── 6b · الفرز بالسعر المعروض ─────────────────────────
+
+    #[Test]
+    public function a_price_sort_orders_and_paginates_by_the_displayed_channel_price(): void
+    {
+        ['tenant' => $tenant, 'channel' => $channel] = $this->store('sort.parity.test');
+        $cheapBase = $this->product($tenant, $channel, 100, 'base-cheap');   // list makes it the MOST expensive
+        $dearBase = $this->product($tenant, $channel, 200, 'base-dear');     // list makes it the CHEAPEST
+        $noItem = $this->product($tenant, $channel, 120, 'no-item');         // falls back to its base price
+        $this->channelList($tenant, $channel, [$cheapBase->id => 300, $dearBase->id => 50]);
+
+        $asc = array_values($this->listPrices('sort.parity.test', '?sort=sale_price'));
+        $this->assertSame([50, 120, 300], $asc);
+        $desc = array_values($this->listPrices('sort.parity.test', '?sort=-sale_price'));
+        $this->assertSame([300, 120, 50], $desc);
+
+        // page 1 of an ascending sort holds the genuinely cheapest displayed product
+        $page1 = $this->listPrices('sort.parity.test', '?sort=sale_price&per_page=1&page=1');
+        $this->assertSame([$dearBase->id => 50], $page1);
+    }
+
+    #[Test]
+    public function a_price_sort_on_a_channel_without_a_list_keeps_the_historical_statement(): void
+    {
+        ['tenant' => $tenant, 'channel' => $channel] = $this->store('sortdtc.parity.test');
+        $this->product($tenant, $channel, 300, 'a');
+        $this->product($tenant, $channel, 100, 'b');
+
+        $orders = [];
+        DB::listen(function ($q) use (&$orders) {
+            if (str_starts_with($q->sql, 'select * from "products"') && str_contains($q->sql, 'limit')) {
+                $orders[] = $q->sql;
+            }
+        });
+        $this->listPrices('sortdtc.parity.test', '?sort=sale_price');
+
+        $this->assertCount(1, $orders);
+        // DTC ordering is byte-for-byte what it was before Batch F (no list subquery, same legacy ordering).
+        $this->assertStringContainsString('order by "sale_price" asc, "id" desc', $orders[0]);
+        $this->assertStringNotContainsString('price_list_items', $orders[0]);
+    }
+
     // ───────────────────────── 7 · لا N+1 ─────────────────────────
 
     #[Test]
@@ -227,6 +269,33 @@ class StorefrontPriceParityTest extends TestCase
 
         $this->assertCount(12, $prices);
         $this->assertSame(1, $count, 'exactly one price_list_items query for the whole page');
+    }
+
+    #[Test]
+    public function base_price_resolution_does_not_grow_with_page_size(): void
+    {
+        ['tenant' => $tenant, 'channel' => $channel] = $this->store('nplus2.parity.test');
+        $this->product($tenant, $channel, 1000, 'one');
+
+        $count = function (): int {
+            $n = 0;
+            DB::listen(function ($q) use (&$n) {
+                if (str_contains($q->sql, 'product_unit_prices')) {
+                    $n++;
+                }
+            });
+            $this->listPrices('nplus2.parity.test');
+
+            return $n;
+        };
+        $small = $count();
+        foreach (range(1, 11) as $i) {
+            $this->product($tenant, $channel, 1000 + $i, "extra{$i}");
+        }
+        $large = $count();
+
+        $this->assertGreaterThanOrEqual(1, $small);
+        $this->assertSame($small, $large, 'the number of product_unit_prices queries must not grow with the page size (1 row vs 12 rows)');
     }
 
     // ───────────────────────── 8 · الترقيم والشكل ─────────────────────────

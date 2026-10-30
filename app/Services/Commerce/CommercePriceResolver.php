@@ -3,7 +3,9 @@
 namespace App\Services\Commerce;
 
 use App\Models\Partner;
+use App\Models\PriceList;
 use App\Models\PriceListItem;
+use App\Models\ProductUnitPrice;
 use App\Models\Product;
 use App\Models\SalesChannel;
 use App\Models\Tenant;
@@ -211,45 +213,71 @@ final class CommercePriceResolver
             throw new RuntimeException('لا سياق مستأجر نشط.');
         }
 
-        $salesChannel = SalesChannel::query()->whereKey($salesChannelId)->first();
-        if ($salesChannel === null) {
-            throw new RuntimeException('قناة البيع غير موجودة.');
-        }
-
-        $priceList = null;
-        if ($salesChannel->default_price_list_id !== null) {
-            $channelPriceList = $salesChannel->defaultPriceList()->first();
-            if ($channelPriceList === null) {
-                throw new RuntimeException('قائمة أسعار قناة البيع غير متاحة لهذا المستأجر.');
-            }
-            $priceList = $channelPriceList->is_active ? $channelPriceList : null;
-        }
+        $priceList = $this->activeChannelPriceList($salesChannelId);
 
         $simple = $products->reject(fn (Product $p): bool => $p->isVariantManaged());
 
+        $key = static fn (string $productId, ?string $unit): string => $productId."\0".($unit ?? "\0null");
+        $ids = $simple->pluck('id')->all();
+
+        // One query for the base prices too: `Product::sale_price` is an accessor over `product_unit_prices`
+        // and would otherwise cost one query per row. Same value as the accessor (the product's own unit, `0`
+        // when there is none).
+        $basePrices = [];
         $listPrices = [];
-        if ($priceList !== null && $simple->isNotEmpty()) {
-            $key = static fn (string $productId, ?string $unit): string => $productId."\0".($unit ?? "\0null");
-            $items = PriceListItem::query()
-                ->where('price_list_id', $priceList->id)
-                ->whereIn('product_id', $simple->pluck('id')->all())
-                ->whereNull('product_variant_id')
-                ->get(['product_id', 'unit_name', 'price']);
-            foreach ($items as $item) {
-                $listPrices[$key($item->product_id, $item->unit_name)] = (int) $item->price;
+        if ($ids !== []) {
+            foreach (ProductUnitPrice::query()->whereIn('product_id', $ids)->whereNull('product_variant_id')->get(['product_id', 'unit_name', 'price']) as $row) {
+                $basePrices[$key($row->product_id, $row->unit_name)] = (int) $row->price;
             }
-            $lookup = static fn (Product $p): ?int => $listPrices[$key($p->id, $p->unit)] ?? null;
-        } else {
-            $lookup = static fn (Product $p): ?int => null;
+            if ($priceList !== null) {
+                $items = PriceListItem::query()
+                    ->where('price_list_id', $priceList->id)
+                    ->whereIn('product_id', $ids)
+                    ->whereNull('product_variant_id')
+                    ->get(['product_id', 'unit_name', 'price']);
+                foreach ($items as $item) {
+                    $listPrices[$key($item->product_id, $item->unit_name)] = (int) $item->price;
+                }
+            }
         }
 
         $out = [];
         foreach ($products as $product) {
-            $out[$product->id] = $product->isVariantManaged()
-                ? 0
-                : ($lookup($product) ?? (int) $product->sale_price);
+            if ($product->isVariantManaged()) {
+                $out[$product->id] = 0;
+
+                continue;
+            }
+            $k = $key($product->id, $product->unit);
+            $out[$product->id] = $listPrices[$k] ?? $basePrices[$k] ?? 0;
         }
 
         return $out;
+    }
+
+    /**
+     * The channel's default price list when it is set AND active; `null` otherwise (no list, or inactive ⇒
+     * ignored). A configured reference TenantScope cannot resolve is corrupt/deleted/cross-tenant and throws —
+     * never a base-price fallback. Shared by {@see self::browsePrices()} and the listing's price sort so both
+     * agree on which list (if any) prices the channel.
+     *
+     * @throws RuntimeException
+     */
+    public function activeChannelPriceList(string $salesChannelId): ?PriceList
+    {
+        $salesChannel = SalesChannel::query()->whereKey($salesChannelId)->first();
+        if ($salesChannel === null) {
+            throw new RuntimeException('قناة البيع غير موجودة.');
+        }
+        if ($salesChannel->default_price_list_id === null) {
+            return null;
+        }
+
+        $channelPriceList = $salesChannel->defaultPriceList()->first();
+        if ($channelPriceList === null) {
+            throw new RuntimeException('قائمة أسعار قناة البيع غير متاحة لهذا المستأجر.');
+        }
+
+        return $channelPriceList->is_active ? $channelPriceList : null;
     }
 }

@@ -852,7 +852,7 @@ final class CommerceCheckoutService
                 'line_total' => $price->amount * $item->quantity,
                 // H6 Batch F — server-resolved provenance (never from the cart/browser).
                 'price_source' => $price->source,
-                'price_list_id' => $price->priceListId,
+                'price_list_id' => $price->provenanceListId(),
                 'personalization' => $personalizationRows,
                 // مفاتيح داخلية لربط أسطر الإضافات بأبيها عند إنشاء الطلب (تُنزَع هناك).
                 'cart_item_id' => $item->id,

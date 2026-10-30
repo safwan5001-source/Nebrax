@@ -257,6 +257,23 @@ class CommerceOrderServiceTest extends TestCase
     }
 
     /** @test */
+    public function an_active_list_without_an_item_falls_back_to_product_default_and_names_no_list(): void
+    {
+        $priceList = PriceList::create(['name' => 'قائمة بلا عنصر', 'is_active' => true]);
+        $other = Product::create(['name' => 'منتج آخر', 'sale_price' => 500]);
+        app(PriceListService::class)->upsertItem($priceList, $other, ['price' => 400]);
+        $partner = Partner::create(['name' => 'عميل بقائمة', 'type' => 'customer', 'default_price_list_id' => $priceList->id]);
+
+        $line = $this->orders->create([
+            'sales_channel_id' => $this->channel->id, 'partner_id' => $partner->id,
+        ], $this->items(1), trustedPartnerSelection: true)->lines->first()->fresh();
+
+        $this->assertSame(15000, $line->unit_price, 'no item in the list ⇒ the base price');
+        $this->assertSame('product_default', $line->price_source);
+        $this->assertNull($line->price_list_id, 'a list that supplied nothing is not provenance (PG CHECK would reject it)');
+    }
+
+    /** @test */
     public function client_supplied_provenance_in_an_item_is_ignored(): void
     {
         $foreign = PriceList::create(['name' => 'قائمة مزوّرة', 'is_active' => true]);

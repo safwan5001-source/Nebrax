@@ -426,7 +426,7 @@ class CommerceOrderService
             'line_total' => $lineTotal,
             // H6 Batch F — server-resolved provenance (never from the request item).
             'price_source' => $resolved->source,
-            'price_list_id' => $resolved->priceListId,
+            'price_list_id' => $resolved->provenanceListId(),
         ]);
     }
 
