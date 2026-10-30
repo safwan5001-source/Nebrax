@@ -5,8 +5,10 @@
 **التحقق من بقاء المشكلة:** على `origin/main` (= `7cb5843`) فشل اختبارا `catalog.test.ts` (المجال المفقود: `wholesale`).
 
 **التغيير (سطر لكل لغة، لا غير):**
-- `web/src/messages/en.json`: `hr.perm_areas.wholesale = "Wholesale"`
-- `web/src/messages/ar.json`: `hr.perm_areas.wholesale = "الجملة"`
+- `web/src/messages/en.json`: `hr.perm_areas.wholesale = "Wholesale"`, `hr.perm_areas.channel_settings = "Channel settings"`
+- `web/src/messages/ar.json`: `hr.perm_areas.wholesale = "الجملة"`, `hr.perm_areas.channel_settings = "إعدادات القناة"`
+
+**تحديث بعد أول CI:** تقدّم `main` بـ`caba634` (Batch F) فأضاف `commerce.channel_settings.manage` بلا تسمية لمجال `channel_settings`، فأفشل CI merge-ref بالعيب نفسه؛ أضيفت تسميته (rebase على `caba634`). تسمية `wholesale` كانت ناجحة.
 
 لا تغيير في أسماء الصلاحيات أو RBAC أو API أو قاعدة البيانات أو Treasury أو Railway.
 
