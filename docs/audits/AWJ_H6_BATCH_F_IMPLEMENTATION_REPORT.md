@@ -212,7 +212,44 @@ loosened or removed.
 
 ## 11. Tests and CI results
 
-_(see §11 table, filled from the final runs)_
+### One existing test expectation changed (disclosed)
+
+`StorefrontOfferPublicApiTest::existing_product_endpoints_are_unchanged_by_offers` asserted that the **listing** shows
+`25000` (base price) for a product whose channel price list says `19000` — i.e. it pinned the very divergence this
+batch fixes. The test's purpose (offers never alter `GET /products`) is preserved (the before/after equality
+assertion is unchanged); the pinned value is now `19000`, and I added an assertion that the detail endpoint returns the
+same `19000`. No other existing assertion was changed or removed.
+
+### Local results (SQLite unless stated)
+
+| Check | Result |
+|---|---|
+| New: `StorefrontPriceParityTest` | 7/7 (4 failed before the fix) |
+| New: `WholesalePriceVisibilityTest` | 9/9 |
+| New: `StaffChannelPricingSettingsTest` | 15/15 |
+| Added tests in `CommerceCheckoutApiTest` + `CommerceOrderServiceTest` (+ the two existing suites) | 63/63 (incl. 9 new) |
+| `CommerceModuleBoundaryTest` (route allow-list) | pass |
+| New: `WholesaleMembershipPostgresConcurrencyTest` on **PostgreSQL 16** | 6/6 (82 assertions); mutation-checked (§9) |
+| Migrations up → rollback(2) → up | pass on PostgreSQL 16 and SQLite |
+| Full backend suite, SQLite, 838 test classes in 28 chunks (3 parallel lanes) | see below |
+| Spree ratchet (`pnpm check:spree-ratchet`) | OK, counts equal baseline (no storefront code changed) |
+| Storefront typecheck/tests | not run: no response contract changed (explicit serializers, no new/renamed field on any existing payload) |
+
+**Full-suite triage.** First pass had failures in 15 classes; none touch this change:
+
+* `Fuel*` (7 classes, 29 tests): `Call to undefined function bcmul()` — `bcmath` is not installed in the sandbox (CI installs it).
+* `AiActionControlInFlightStopTest`, `AiDocumentExternalQaTest`, `AiPlatformBudgetTest`, `AttachmentDurabilityS1Test`,
+  `H5ImportEndpointsTest`, `ImportJobApplyTest`, `ImportJobFailedUnitsTest`, `ImportJobRepairTest`: caused by my three
+  lanes sharing one `storage/` tree; **all pass (194 passed, 1 skipped) when re-run serially**.
+* `StorefrontOfferPublicApiTest`: the real regression described above (fixed).
+* One chunk was killed by signal 9 because of `CommerceOrderCancellationApiTest`, a stale file in my *local* assembled
+  app that does not exist in the repository (`git ls-tree origin/main`); every other class of that chunk
+  (30 classes incl. `CommerceOrderServiceTest`, `CommercePriceResolverTest`, `CommerceStaffOrderApiTest`, the
+  cancellation/reservation/invoice-on-payment suites) passes individually.
+
+Net: no failing test attributable to this change locally. **The local PostgreSQL full-suite run was not performed**
+(only the new PG test and migrations); the CI `pgsql` matrix job is the authority for that. CI and CI Gate results:
+see the PR.
 
 ## 12. Deferred work and risks
 
