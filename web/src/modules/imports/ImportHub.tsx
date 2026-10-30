@@ -13,6 +13,8 @@ import { api, ApiError } from '@/lib/api';
 import { formatDateTime } from '@/lib/formatting';
 import { useCurrentUser } from '@/lib/use-can';
 import type { ImportJob, ImportJobStatus } from '@/modules/import-jobs/client';
+import { hasPermission } from '@/lib/permissions';
+import { AiActionsHistory } from './AiActionsHistory';
 import { HUB_ENTITIES, HUB_JOB_DOMAINS, HUB_JOB_STATUSES, HUB_SECTIONS, resumeHref } from './catalog';
 
 const STATUS_TONE: Record<ImportJobStatus, 'muted' | 'positive' | 'negative' | 'warning'> = {
@@ -34,7 +36,7 @@ interface JobsPage {
 /**
  * مركز الاستيراد (IMP-H8-S1): نقطة دخول واحدة لكل ما يُستورد، وسجلّ تشغيلاته. **خريطة تنقّل لا أكثر** — لا يرفع ملفاً ولا يكتب شيئاً؛ كل كيان يقود إلى معالجه القائم بحرّاسه.
  * الاستيراد العادي متاح لكل كيان، والاستيراد بمساعد أَوْج لا يظهر إلا لكيان له مسار مساعد فعلاً (المنتجات اليوم) — وغيره يُعلَن «غير متاح بعد» لا رابطاً وهمياً.
- * السجل = تشغيلات الاستيراد الدائمة (`GET /import-jobs`، مصفّاة بالخادم إلى المجالات التي يراها المستخدم)؛ سجلّ إجراءات المساعد لا نقطة قراءة قائمة له بعد.
+ * السجل = تشغيلات الاستيراد الدائمة (`GET /import-jobs`، مصفّاة بالخادم إلى المجالات التي يراها المستخدم)؛ سجلّ إجراءات المساعد قسمٌ مستقل (`AiActionsHistory`، IMP-H8-S4b) فوق `GET /ai-actions`.
  */
 export function ImportHub() {
   const t = useTranslations('importHub');
@@ -258,6 +260,9 @@ export function ImportHub() {
           </>
         )}
       </section>
+
+      {/* IMP-H8-S4b: سجلّ إجراءات المساعد لمن يملك صلاحية AI Actions؛ الخادم يقرّر ما يُعرض فعلاً (بوابات النوع والفرع). */}
+      {hasPermission(user?.permissions, user?.role, 'ai.actions.use') ? <AiActionsHistory /> : null}
     </div>
   );
 }
