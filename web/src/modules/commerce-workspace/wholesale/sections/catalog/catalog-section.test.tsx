@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import * as React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const locale = vi.hoisted(() => ({ current: 'en' }));
@@ -142,6 +142,35 @@ describe('CatalogSection', () => {
     // so the column must say so and never call it the channel price.
     expect(screen.getByRole('columnheader', { name: 'Base price' })).toBeTruthy();
     expect(screen.queryByRole('columnheader', { name: 'Price' })).toBeNull();
+  });
+
+  it('labels the mobile availability rows as base price too, in English and Arabic', async () => {
+    render(<CatalogSection />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Store availability' }));
+    await waitFor(() => screen.getAllByText('In stock'));
+    const mobileRows = document.querySelector('ul.md\\:hidden') as HTMLElement;
+    expect(mobileRows).toBeTruthy();
+    expect(within(mobileRows).getByText('Base price')).toBeTruthy();
+    expect(within(mobileRows).queryByText('Price')).toBeNull();
+    cleanup();
+
+    locale.current = 'ar';
+    render(<CatalogSection />);
+    fireEvent.click(screen.getByRole('tab', { name: 'التوفر في المتجر' }));
+    await waitFor(() => screen.getAllByText('متوفر'));
+    expect(screen.getByRole('columnheader', { name: 'السعر الأساسي' })).toBeTruthy();
+    const arMobileRows = document.querySelector('ul.md\\:hidden') as HTMLElement;
+    expect(within(arMobileRows).getByText('السعر الأساسي')).toBeTruthy();
+    expect(screen.queryByText('السعر في القناة')).toBeNull(); // the channel-price label belongs to the detail drawer only
+  });
+
+  it('reads the availability list for the active store only, with no tenant or channel override', async () => {
+    render(<CatalogSection />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Store availability' }));
+    await waitFor(() => expect(ws.list).toHaveBeenCalled());
+    const [storeId, params] = ws.list.mock.calls[0] as [string, Record<string, unknown>];
+    expect(storeId).toBe('s1');
+    expect(JSON.stringify(params)).not.toMatch(/tenant|channel/i);
   });
 
   it('renders Arabic', async () => {

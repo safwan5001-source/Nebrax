@@ -71,6 +71,7 @@ async function open(page: Page, path: string, opts: { locale?: 'ar' | 'en'; them
     if (p.startsWith('/commerce/orders/')) return json(route, { data: { ...order(1), cancel_action: { available: true, blocked_reason: null }, partner_id: null, delivery_amount: sar(0), contact: { name: 'شركة النخبة للتجارة', company: 'شركة النخبة للتجارة', email: 'buyer@example.test', phone: '0500000001', vat_number: '300000000000003', cr_number: '1010000000' }, shipping_address: null, billing_address: null, gift: null, schedule: null, items: [{ id: 'l1', parent_line_id: null, product_id: 'p1', product_variant_id: null, product_name: 'أرز بسمتي 10 كجم', variant: null, unit_name: 'كرتون', quantity: 20, unit_price: sar(5000), line_total: sar(100000), personalization: [] }], payment: { ...order(1).payment, collection_note: null, attempts: [] }, accounting: { posted: false } } });
     if (p === '/price-lists') return json(route, { data: [{ id: 'pl1', name: 'جملة — فئة أ', description: 'أسعار الجملة للمشترين المعتمدين', is_active: true, items_count: 42 }, { id: 'pl2', name: 'تصفية الموسم', description: null, is_active: false, items_count: 0 }] });
     if (p === '/commerce/workspace/products/publication') return json(route, { data: [{ id: 'p1', sku: 'RICE-10', name: 'أرز بسمتي 10 كجم', name_en: 'Basmati rice 10 kg', is_active: true, is_published: true, stores: [{ id: 's1', name: 'متجر الجملة', is_published: true }] }, { id: 'p2', sku: 'OIL-18', name: 'زيت طبخ 18 لتر', name_en: null, is_active: true, is_published: false, stores: [{ id: 's1', name: 'متجر الجملة', is_published: false }] }], meta: { current_page: 1, last_page: 1, per_page: 10, total: 2 } });
+    if (p === '/commerce/workspace/storefronts/s1/products') return json(route, { data: [{ id: 'p1', name: 'أرز بسمتي 10 كجم', name_en: 'Basmati rice 10 kg', thumbnail_url: null, is_variant_managed: false, price: { amount_minor: 12500, currency: 'SAR' }, in_stock: true }, { id: 'p2', name: 'زيت طبخ 18 لتر', name_en: null, thumbnail_url: null, is_variant_managed: true, price: { amount_minor: null, currency: 'SAR' }, in_stock: false }], meta: { pagination: { page: 1, per_page: 20, total: 2, has_more: false } } });
     if (p === '/quotes') return json(route, { data: [{ id: 'q1', number: 'QT-0001', partner_id: 'pa1', status: 'sent', quote_date: '2026-10-20', valid_until: '2026-11-20', total: '4600.00' }] });
     if (p === '/payment-methods') return json(route, { data: [{ id: 'pm1', name: 'نقدي', settlement_type: 'cash', cash_bank_account_name: 'الخزينة الرئيسية', available_online: false, is_active: true, is_default: true }, { id: 'pm2', name: 'تحويل بنكي', settlement_type: 'bank', cash_bank_account_name: 'الحساب الرئيسي', available_online: false, is_active: true, is_default: false }] });
     if (p === '/partners') return json(route, { data: [{ id: 'pa1', name: 'شركة النخبة للتجارة', code: 'C-001', type: 'customer', credit_limit: '50000.00', credit_period: 30, is_active: true }], meta: { current_page: 1, last_page: 1, per_page: 100, total: 1 } });
@@ -148,6 +149,21 @@ test.describe('Wholesale workspace', () => {
     await page.waitForLoadState('networkidle');
     expect(requests.filter((r) => r.includes('/memberships') || r.includes('/commerce/orders') || r.includes('pricing-settings'))).toEqual([]);
   });
+
+  for (const locale of ['ar', 'en'] as const) {
+    test(`catalog availability labels the list amount as base price, never as channel price (${locale})`, async ({ page }, info) => {
+      const requests = await open(page, '/commerce/wholesale/catalog', { locale });
+      await page.getByRole('tab', { name: locale === 'ar' ? 'التوفر في المتجر' : 'Store availability' }).click();
+      const base = locale === 'ar' ? 'السعر الأساسي' : 'Base price';
+      const channel = locale === 'ar' ? 'السعر في القناة' : 'Channel price';
+      await expect(page.getByText(base).filter({ visible: true }).first()).toBeVisible();
+      await expect(page.getByText(channel, { exact: true })).toHaveCount(0);
+      await noHorizontalOverflow(page);
+      await shot(page, `catalog-availability-${locale}-${info.project.name}`);
+      expect(requests.filter((r) => r.includes('/products') && r.includes('storefronts/s1'))).not.toEqual([]);
+      expect(requests.filter((r) => /^(POST|PUT|PATCH|DELETE) /.test(r))).toEqual([]);
+    });
+  }
 
   test('buyer decision drawer works with the keyboard', async ({ page }, info) => {
     await open(page, '/commerce/wholesale/buyers');
