@@ -5,7 +5,8 @@
 | Branch | `claude/commerce-h6-batch-h` |
 | PR | #1819 |
 | Base SHA (origin/main, #1812 merge) | `89f344b2bb30f77d5f924a8aed0ca0baab4554d3` |
-| Head SHA | `1f8e7064c3399caf5bd78d30dc8bfdb6ed38bc73` (code; CI result recorded below) |
+| Code head SHA (all CI green) | `604d49353416c6d105751cc4df2d3a6675a9aa21` |
+| Report commit | docs-only commit on top of the code head above (changes this file only; its own CI run is listed in the PR checks) |
 
 **Status.** Nothing is merged, deployed or activated. `commerce.wholesale_buyer_enabled` stays off by default; no production setting, no tenant row and no existing order was touched. The Spree exit is **not** complete.
 
@@ -95,11 +96,12 @@ Matrix in the B2B contracts doc §3 (VAT mode, MOQ, minimum amount, payment term
 
 ## 9. Files changed
 
-41 files, +2,699 / −31 (`git diff --stat 89f344b2b..HEAD`).
+Backend + storefront + tests + docs as listed (originally 41 files, +2,699 / −31; later commits add the two review fixes, their regression tests and the one-line generated model) (`git diff --stat 89f344b2b..HEAD`).
 
 - **Backend:** `CustomerEmailVerificationToken` model + migration `2026_12_19_010000`; `BuyerEmailVerificationService`; `BuyerVerificationMail` + `emails/buyer-verification` view; `BuyerRegisterRequest`, `BuyerVerifyEmailRequest`, `BuyerResendVerificationRequest`; `StorefrontBuyerAuthController`; `routes/api_storefront.php`; `TenancyServiceProvider` (limiters); `config/commerce.php`; `EnsureWholesalePriceAccess`; `CommerceOrder` (immutable owner); `CommerceOrderService` (in-transaction re-check).
 - **Storefront:** `lib/commerce/wholesale-buyer.ts`, `lib/data/wholesale-buyer.ts`; `BuyerRegisterForm`, `BuyerVerifyEmail`, `BuyerResendForm`, `BuyerSignInForm`; pages `buyer/{register,verify,resend}`; messages in ar, en, de, es, fr, pl.
 - **Tests:** `BuyerEmailVerificationTest` (new), `StorefrontClientIpBoundaryTest` (new), `WholesaleBuyerPostgresConcurrencyTest` (new), `WholesaleCartCheckoutBoundaryTest` (extended), `WholesalePriceSurfaceBoundaryTest` (two route names added to the reviewed list); storefront vitest suites extended.
+- **Generated (owner-approved scope addition):** `web/src/modules/developer/docs/openapi-model.generated.ts` (one line, produced by `pnpm openapi:generate`, not hand-edited).
 - **Docs:** this report, `AWJ_H6_BATCH_H_TRUSTED_CLIENT_IP_DECISION.md`, `AWJ_H6_BATCH_H_B2B_CONTRACTS.md`.
 
 **Changed existing assertion (disclosed).** Batch G's test asserting that checkout orders are *not* attributed to the buyer was a deliberate blocker pin; it is replaced by positive attribution tests plus negative ones (forged ids, non-approved buyer, immutability, DTC). No other existing assertion was weakened or removed.
@@ -120,7 +122,8 @@ Matrix in the B2B contracts doc §3 (VAT mode, MOQ, minimum amount, payment term
 | Locale parity (`check:locales`) | all six locales in sync |
 | Spree ratchet | OK |
 | `pnpm build` | exit 0; `/buyer/register`, `/buyer/verify`, `/buyer/resend` build |
-| CI / CI Gate | Run on PR #1819 for the code head above; results are on the PR checks (not duplicated here, to avoid a docs-only push restarting CI). |
+| CI / CI Gate (code head `604d49353`) | **All 9 checks green:** `php artisan test` SQLite and PostgreSQL, `web build (Next.js)` (both event runs), `storefront (lint + typecheck + test)`, `docker-context`, `published footer visual QA`, `merchant preview visual QA`, `CI Gate`. Two infrastructure failures on this head were re-run once each and passed: `docker-context` (Docker build could not resolve the Google Fonts `next/font` import) and `published footer visual QA` (storefront dev server answered 404 until its 120 s startup timeout; no test ran). `CI Gate` had failed fast off the first of those and passed on its single re-run. |
+| OpenAPI drift fix | `web build (Next.js)` had been red since #1812 (89f344b2b): that PR reworded the `sort` parameter description in `docs/openapi/public-api-v1.yaml` without regenerating the committed web model, so `openapi-model.drift.test.ts` failed on `main` and on this PR. Fixed here at the owner's request with `pnpm openapi:generate`: exactly one line changed in `web/src/modules/developer/docs/openapi-model.generated.ts` (the `sort` description now includes the `sale_price` ordering sentence), matching the #1812 contract change. No other contract file or generated line changed; drift tests 8/8 and the local production build pass. |
 
 Environment note: `Fuel*` tests need `ext-bcmath`, absent locally, and fail only here (CI installs it).
 
