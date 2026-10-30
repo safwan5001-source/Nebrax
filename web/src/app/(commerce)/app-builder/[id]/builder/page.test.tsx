@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AppBuilderWorkspacePage from './page';
 
 const { api, currentUser, translate } = vi.hoisted(() => {
@@ -259,6 +259,12 @@ vi.mock('lucide-react', () => {
 // seeing exactly one canvas, exactly as before; the dedicated inline-preview tests flip it to
 // `true` before rendering.
 let wideBuilderViewport = false;
+// `window` يُشارَك بين ملفات الاختبار (singleFork في vitest.config)؛ نُعيد matchMedia الأصلي بعد الملف حتى لا يرى
+// الملف التالي (FacetVisualEditor) مجسّماً بـ matches=false يحوّله إلى تخطيط الجوال.
+const originalMatchMedia = window.matchMedia;
+afterAll(() => {
+  window.matchMedia = originalMatchMedia;
+});
 beforeEach(() => {
   wideBuilderViewport = false;
   window.matchMedia = ((query: string) => ({
@@ -1701,11 +1707,18 @@ describe('AppBuilderWorkspacePage — save safety (AD-01 / S01b)', () => {
 
     // userEvent.setup() يركّب مجسّم clipboard خاصاً به؛ نضع مجسّمنا بعده مباشرةً.
     const user = userEvent.setup();
+    // الإعداد يُلغى في finally: `navigator` يُشارَك بين الملفات في singleFork، وتسريب clipboard يكسر اختبارات لاحقة.
+    const original = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
-    await user.click((await conflictDialog()).getByRole('button', { name: 'Copy my changes' }));
-    await waitFor(() => expect(writeText).toHaveBeenCalled());
-    expect(String(writeText.mock.calls[0][0])).toContain('Bye');
-    expect(toastFns.success).toHaveBeenCalledWith('Copied');
+    try {
+      await user.click((await conflictDialog()).getByRole('button', { name: 'Copy my changes' }));
+      await waitFor(() => expect(writeText).toHaveBeenCalled());
+      expect(String(writeText.mock.calls[0][0])).toContain('Bye');
+      expect(toastFns.success).toHaveBeenCalledWith('Copied');
+    } finally {
+      if (original) Object.defineProperty(navigator, 'clipboard', original);
+      else delete (navigator as unknown as Record<string, unknown>).clipboard;
+    }
   });
 
   it('a network failure keeps the edits unsaved and backed up, shows a persistent retry banner, and a retry succeeds', async () => {
