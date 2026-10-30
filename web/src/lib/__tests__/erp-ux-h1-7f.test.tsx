@@ -28,8 +28,10 @@ describe('ERP-UX-H1-7F residual fixes', () => {
     for (const page of ['app/(app)/purchase-settings/page.tsx', 'app/(app)/sales-settings/invoices/page.tsx']) {
       expect(src(page)).not.toMatch(/href="\/numbering-settings" className="text-primary hover:underline"/);
     }
+    // Landing V2 replaced the utility-class band with its own isolated `.lp-close` section (colours from
+    // the landing palette tokens); the guard against a hard-coded translucent-white utility still holds.
     const landing = src('app/page.tsx');
-    expect(landing).toMatch(/bg-primary px-6 py-10 text-primary-foreground/);
+    expect(landing).toMatch(/className="lp-close lp-dark/);
     expect(landing).not.toMatch(/text-white\/75/);
   });
 

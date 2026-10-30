@@ -20,18 +20,24 @@ let reduceMotion = false;
 
 beforeEach(() => {
   reduceMotion = false;
-  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-    matches: query.includes('reduce') ? reduceMotion : false,
-    media: query,
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-  })) as unknown as typeof window.matchMedia;
+  // Stubbed per test and restored after: this suite shares one environment with the rest of the run.
+  vi.stubGlobal(
+    'matchMedia',
+    (query: string) => ({
+      matches: query.includes('reduce') ? reduceMotion : false,
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    })
+  );
   document.documentElement.dir = 'rtl';
 });
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
   document.documentElement.style.overflow = '';
+  document.documentElement.removeAttribute('dir');
 });
 
 function renderNav() {
@@ -167,7 +173,7 @@ describe('LandingMotion', () => {
   }
 
   beforeEach(() => {
-    (window as unknown as { IntersectionObserver: unknown }).IntersectionObserver = Observer;
+    vi.stubGlobal('IntersectionObserver', Observer);
   });
 
   function mount() {
