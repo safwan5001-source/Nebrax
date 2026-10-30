@@ -6,6 +6,11 @@ import Image from 'next/image';
  * وبذلك لا حاجة لانتظار hydration لمعرفة السمة ولا إزاحة في التخطيط.
  */
 export type LandingShotName =
+  | 'app-dashboard'
+  | 'app-pos-audit'
+  | 'app-fuel'
+  | 'phone-pos-audit'
+  | 'phone-fuel'
   | 'hero-entry'
   | 'mod-sales'
   | 'mod-pos'
@@ -25,6 +30,12 @@ type ShotSize = readonly [number, number];
 
 /** أبعاد الملف الأصلي بالبكسل (2x) لحجز المساحة؛ تتطابق عبر السمتين، وتختلف باللغة حيث يختلف ارتفاع الجدول الملتقط. */
 const SHOT_SIZE: Record<LandingShotName, ShotSize | Record<'ar' | 'en', ShotSize>> = {
+  // نوافذ التطبيق كاملة (1440×900 بدقة 2x مصغّرة إلى 2000) ولقطات الجوال (390×844 بدقة 2x) — scripts/capture-landing-v2-shots.mjs
+  'app-dashboard': [2000, 1250],
+  'app-pos-audit': [2000, 1250],
+  'app-fuel': [2000, 1250],
+  'phone-pos-audit': [780, 1688],
+  'phone-fuel': [780, 1688],
   'hero-entry': [1652, 768],
   'mod-sales': { ar: [1496, 712], en: [1546, 712] },
   'mod-pos': [2360, 1520],
