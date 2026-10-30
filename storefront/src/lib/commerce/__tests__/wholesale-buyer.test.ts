@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   accessStateFromMembership,
   buyerErrorKey,
+  buyerFormErrorKey,
   canApply,
   canSeeWholesalePrices,
   catalogGateFromError,
   isMembershipStatus,
+  localePathFrom,
 } from "../wholesale-buyer";
 
 describe("catalogGateFromError — only 401/403 are access gates", () => {
@@ -87,5 +89,33 @@ describe("buyerErrorKey — no internal text, sign-in failures indistinguishable
     expect(buyerErrorKey(404, "not_found")).toBe("unavailable");
     expect(buyerErrorKey(500, "server_error")).toBe("generic");
     expect(buyerErrorKey(undefined, undefined)).toBe("generic");
+  });
+});
+
+describe("registration / verification error keys", () => {
+  it("a 422 is a validation answer here (unlike sign-in), others keep their own key, no server text ever", () => {
+    expect(buyerFormErrorKey(422)).toBe("validation");
+    expect(buyerFormErrorKey(429)).toBe("rateLimited");
+    expect(buyerFormErrorKey(404)).toBe("unavailable");
+    expect(buyerFormErrorKey(500)).toBe("generic");
+    expect(buyerFormErrorKey(undefined)).toBe("generic");
+  });
+});
+
+describe("localePathFrom — only a /xx/yy prefix may travel to the link builder", () => {
+  it("accepts a country/locale base path and drops everything else", () => {
+    expect(localePathFrom("/sa/ar")).toBe("/sa/ar");
+    for (const bad of [
+      "",
+      "/",
+      "/sa",
+      "/sa/ar/buyer",
+      "//evil.example",
+      "https://evil.example",
+      "/SA/AR",
+      "/sa/ar?x=1",
+    ]) {
+      expect(localePathFrom(bad)).toBeUndefined();
+    }
   });
 });

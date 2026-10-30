@@ -55,6 +55,7 @@ class WholesalePriceSurfaceBoundaryTest extends TestCase
      * إضافة مسار جديد هنا قرارٌ مراجَع، لا افتراض.
      */
     private const REVIEWED_NO_CHANNEL_PRICE = [
+        'storefront.v1.buyer.verify_email', 'storefront.v1.buyer.verification.resend',
         'storefront.v1.buyer.login', 'storefront.v1.buyer.logout', 'storefront.v1.buyer.register', 'storefront.v1.buyer.me',
         'storefront.v1.wholesale.access', 'storefront.v1.wholesale.application.store', 'storefront.v1.wholesale.membership.show',
         'storefront.v1.categories.index', 'storefront.v1.categories.show', 'storefront.v1.collections.index',

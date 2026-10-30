@@ -25,4 +25,11 @@ return [
     */
     'wholesale_buyer_enabled' => (bool) env('COMMERCE_WHOLESALE_BUYER_ENABLED', false),
 
+    /*
+    | H6 Batch H — buyer e-mail verification link lifetime (minutes) and the minimum gap between two verification
+    | e-mails to the same identity (seconds; a request inside the gap is silently skipped — mail-bombing guard).
+    */
+    'buyer_verification_ttl_minutes' => (int) env('COMMERCE_BUYER_VERIFICATION_TTL_MINUTES', 1440),
+    'buyer_verification_resend_gap_seconds' => (int) env('COMMERCE_BUYER_VERIFICATION_RESEND_GAP_SECONDS', 60),
+
 ];

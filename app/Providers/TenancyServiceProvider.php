@@ -193,6 +193,24 @@ class TenancyServiceProvider extends ServiceProvider
             ];
         });
 
+        // H6 Batch H — verification link consumption (per tenant+IP) and resend (per tenant+IP and per address:
+        // a third party cannot mail-bomb an address by repeating the request).
+        RateLimiter::for('storefront-buyer-verify', function (Request $request): Limit {
+            $tenant = app(TenantContext::class)->has() ? app(TenantContext::class)->id() : 'unresolved';
+
+            return Limit::perMinute(30)->by("storefront-buyer-verify|{$tenant}|ip|{$request->ip()}");
+        });
+
+        RateLimiter::for('storefront-buyer-resend', function (Request $request): array {
+            $tenant = app(TenantContext::class)->has() ? app(TenantContext::class)->id() : 'unresolved';
+            $email = Str::lower(trim((string) $request->input('email')));
+
+            return [
+                Limit::perMinute(10)->by("storefront-buyer-resend|{$tenant}|ip|{$request->ip()}"),
+                Limit::perHour(3)->by("storefront-buyer-resend|{$tenant}|email|{$email}"),
+            ];
+        });
+
         RateLimiter::for('storefront-buyer-apply', function (Request $request): Limit {
             $tenant = app(TenantContext::class)->has() ? app(TenantContext::class)->id() : 'unresolved';
             $identity = (string) ($request->user()?->getAuthIdentifier() ?? $request->ip());

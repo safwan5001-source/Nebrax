@@ -115,6 +115,12 @@ Route::middleware([
                 ->middleware('throttle:storefront-buyer-register')->name('buyer.register');
             Route::post('auth/login', [StorefrontBuyerAuthController::class, 'login'])
                 ->middleware('throttle:storefront-buyer-login')->name('buyer.login');
+            // H6 Batch H — e-mail verification of the buyer identity: consume the e-mailed token (tenant + channel
+            // bound, single-use, generic failure) and ask for a fresh link (neutral 202, per-address throttled).
+            Route::post('auth/verify-email', [StorefrontBuyerAuthController::class, 'verifyEmail'])
+                ->middleware('throttle:storefront-buyer-verify')->name('buyer.verify_email');
+            Route::post('auth/verification/resend', [StorefrontBuyerAuthController::class, 'resendVerification'])
+                ->middleware('throttle:storefront-buyer-resend')->name('buyer.verification.resend');
         });
 
         Route::middleware([AuthenticateCommerceCustomer::class, BindStorefrontBuyerToChannel::class])->group(function () {
