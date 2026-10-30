@@ -5,6 +5,9 @@ namespace Tests\Feature;
 use App\Models\BuilderDraftExperience;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\AppBuilder\BuilderDraftExperienceService;
+use App\Tenancy\TenantContext;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
@@ -224,6 +227,28 @@ class BuilderDraftOptimisticLockTest extends TestCase
         $this->assertNull($response->json('current_revision'));
         $this->assertNull($response->json('updated_by'));
         $this->assertSame(1, $this->draft($authA['token'], $appId)['revision']);
+    }
+
+    /** @test */
+    public function the_lock_query_itself_is_tenant_scoped_a_foreign_draft_cannot_be_saved_through_the_service(): void
+    {
+        [$authA, $appId] = $this->newApp('ad01-svc-iso-a');
+        $authB = $this->registerTenant('ad01-svc-iso-b', 'owner@ad01-svc-iso-b.test');
+
+        app(TenantContext::class)->set($authA['tenant_id']);
+        $draftOfA = BuilderDraftExperience::query()->where('builder_app_id', $appId)->firstOrFail();
+
+        // سياق المستأجر ب: حتى لو سُلِّم الخدمة نموذجُ مسودة مستأجر آخر، استعلام القفل نفسه يُقيَّد بنطاق المستأجر.
+        app(TenantContext::class)->set($authB['tenant_id']);
+        try {
+            app(BuilderDraftExperienceService::class)->save($draftOfA, $this->schema('تسلل عبر الخدمة'), null, 0);
+            $this->fail('كان يجب ألا يجد استعلام القفل مسودة مستأجر آخر.');
+        } catch (ModelNotFoundException) {
+            // المتوقع
+        }
+
+        app(TenantContext::class)->set($authA['tenant_id']);
+        $this->assertSame(0, (int) BuilderDraftExperience::query()->where('builder_app_id', $appId)->value('revision'));
     }
 
     /** @test */

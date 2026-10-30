@@ -23,7 +23,7 @@
 | `app/Http/Requests/UpdateBuilderDraftExperienceRequest.php` | قاعدة `base_revision`: `nullable`، عدد صحيح ≥ 0، ويرفض المنطقي صراحةً (لأن `integer` في Laravel يقبل `true`) |
 | `app/Http/Controllers/Api/BuilderDraftExperienceController.php` | يمرّر `base_revision` ويحوّل التعارض إلى **409** بجسم منظَّم |
 | `contracts/app-builder/draft-save-conflict.v1.json` (جديد) | عقد مشترك لشكل النجاح/التعارض/التحقق (يستهلكه S01b لاحقاً) |
-| `tests/Feature/BuilderDraftOptimisticLockTest.php` (جديد) | 17 اختبار API (SQLite + PostgreSQL) |
+| `tests/Feature/BuilderDraftOptimisticLockTest.php` (جديد) | 18 اختبار API (SQLite + PostgreSQL)، منها اختبار صريح أن **استعلام القفل نفسه** مقيَّد بنطاق المستأجر |
 | `tests/Feature/BuilderDraftOptimisticLockPostgresTest.php` (جديد) | 6 اختبارات تزامن PostgreSQL بعمليات `pcntl_fork` |
 | `CLAUDE.md` | قسم قصير يوثّق قواعد AD-01/S01a |
 
@@ -56,7 +56,7 @@ PUT /api/app-builder/apps/{id}/draft
 
 | المجموعة | النتيجة |
 |---|---|
-| `BuilderDraftOptimisticLockTest` (SQLite) | **17 ناجحاً** (97 تأكيداً) |
+| `BuilderDraftOptimisticLockTest` (SQLite) | **18 ناجحاً** (100 تأكيد) |
 | `BuilderDraftOptimisticLockPostgresTest` (PostgreSQL، `pcntl_fork`) | **6 ناجحة** (118 تأكيداً) |
 | مجموعة App Builder الأوسع على **SQLite** (`Builder|AppBuilder|PreviewSession|PreviewExchange|CommerceExperience|ApplicationCatalog…`) | **240 ناجحاً، 8 متخطّاة** (1607 تأكيداً) |
 | المجموعة نفسها على **PostgreSQL** | **119 ناجحاً** (832 تأكيداً) |
@@ -73,7 +73,7 @@ PUT /api/app-builder/apps/{id}/draft
 | AD01-5 عزل المستأجرين | `another_tenant_gets_404…` + اختبار مستأجرين متزامنين |
 | AD01-6 الصلاحيات | `staff_and_view_only_roles_cannot_save…` |
 
-**اختبار الطفرات (هل الاختبارات تلتقط الخلل؟):** حذف `lockForUpdate()` أفشل 4 من 6 اختبارات PostgreSQL؛ وتعطيل مقارنة `base_revision` أفشل 8 اختبارات (API وPostgreSQL). أُعيد الكود الأصلي بعدها وتحققتُ بـ`diff`.
+**اختبار الطفرات (هل الاختبارات تلتقط الخلل؟):** حذف `lockForUpdate()` أفشل 4 من 6 اختبارات PostgreSQL؛ وتعطيل مقارنة `base_revision` أفشل 8 اختبارات (API وPostgreSQL)؛ وإزالة نطاق المستأجر من استعلام القفل (`withoutGlobalScopes`) أفشل اختبار العزل الصريح. أُعيد الكود الأصلي بعدها وتحققتُ بـ`diff`.
 
 ## 5) الأمان وعزل المستأجرين والتوافق الرجعي
 
