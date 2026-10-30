@@ -407,6 +407,51 @@ class WholesaleCartCheckoutBoundaryTest extends TestCase
     }
 
     #[Test]
+    public function a_suspension_blocks_every_cart_boundary_and_a_reinstatement_restores_the_same_cart(): void
+    {
+        [$buyer, $membershipId] = $this->approvedBuyer();
+        $cart = $this->cookie($this->addItem(self::WS, $buyer)->assertCreated());
+
+        $this->suspend($membershipId);
+        $this->api('GET', 'cart', self::WS, $buyer, $cart)->assertForbidden();
+        $this->addItem(self::WS, $buyer, $cart)->assertForbidden();
+        $this->api('GET', 'products', self::WS, $buyer, null)->assertForbidden();
+
+        // the stored cart is untouched (held, not destroyed) and returns on reinstatement
+        $this->assertSame(1, CommerceCart::withoutGlobalScopes()->where('status', 'active')->count());
+        app(TenantContext::class)->set($this->tenant->id);
+        $owner = User::query()->where('role', 'owner')->firstOrFail();
+        app(WholesaleMembershipService::class)->transition($membershipId, 'reinstate', $owner);
+        app(TenantContext::class)->forget();
+
+        $items = $this->api('GET', 'cart', self::WS, $buyer, $cart)->assertOk()->json('data.items');
+        $this->assertCount(1, $items);
+        $this->assertSame(2, $items[0]['quantity']);
+        $this->assertSame(700, $items[0]['unit_price']['amount_minor']);
+    }
+
+    #[Test]
+    public function characterization_a_linked_partner_price_list_does_not_change_wholesale_prices_today(): void
+    {
+        // CONTRACT PIN (Batch H §P1): identity ⇢ active CustomerPartnerLink ⇢ Partner.default_price_list exists in the
+        // data model, but NO storefront path passes a partner to the price resolver. Buyer-specific pricing is not
+        // active; this test fails the day it silently becomes so (it must be a reviewed decision with its own tests).
+        [$buyer, , $identityId] = $this->approvedBuyerWithId();
+
+        app(TenantContext::class)->set($this->tenant->id);
+        $partnerList = PriceList::create(['name' => 'Partner '.Str::random(4), 'is_active' => true]);
+        app(PriceListService::class)->upsertItem($partnerList, $this->product, ['price' => 500]);
+        $partner = \App\Models\Partner::create(['name' => 'عميل جملة', 'type' => 'customer', 'default_price_list_id' => $partnerList->id]);
+        $owner = User::query()->where('role', 'owner')->firstOrFail();
+        app(\App\Services\CustomerPartnerLinkService::class)->link(CustomerIdentity::query()->findOrFail($identityId), $partner, $owner);
+        app(TenantContext::class)->forget();
+
+        $this->assertSame(700, $this->api('GET', 'products', self::WS, $buyer, null)->assertOk()->json('data.0.price.amount_minor'));
+        $this->assertSame(700, $this->api('GET', 'products/'.$this->product->id, self::WS, $buyer, null)->assertOk()->json('data.price.amount_minor'));
+        $this->assertSame(700, $this->addItem(self::WS, $buyer)->assertCreated()->json('data.items.0.unit_price.amount_minor'));
+    }
+
+    #[Test]
     public function blocker_the_cart_and_checkout_contracts_carry_no_tax_minimum_or_terms_fields(): void
     {
         [$buyer] = $this->approvedBuyer();
