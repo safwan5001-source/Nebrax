@@ -35,7 +35,7 @@ Why no implementation slice: every backend contract a native wholesale needs for
 - `lib/data/__tests__/wholesale-boundary.test.ts`:
   - `getWholesaleChannel` returns `null` without building a Spree client while wholesale is off, and degrades to `null` (sign-in wall) on lookup failure — **no fallback to another channel/tenant**.
   - Characterizes the **price boundary**: wholesale PLP/PDP/filter fetchers pass no surface/channel/price-list input to the AWJ catalogue adapter (so they cannot show trade prices today).
-  - Architecture guard: nothing under `lib/commerce/` imports `@/lib/spree`, `@spree/*` or `data/wholesale`, and the AWJ cart/checkout adapters mention no wholesale surface in executable code — pinning "a wholesale cart is never mapped onto a DTC cart" (complements the existing `CartContext` "wholesale stays Spree-backed" and `cart.test.ts` surface-poisoning tests).
+  - Architecture guard (parses complete, multi-line import/export/dynamic-import declarations; the parser itself is tested): nothing under `lib/commerce/` imports `@/lib/spree`, `@spree/*` or `data/wholesale`, and the AWJ cart/checkout adapters mention no wholesale surface in executable code — pinning "a wholesale cart is never mapped onto a DTC cart" (complements the existing `CartContext` "wholesale stays Spree-backed" and `cart.test.ts` surface-poisoning tests).
 
 ## 4. Deferred, with concrete blockers
 1. **Buyer authentication on `store/v1` (B1–B2)** — blocked by owner decisions D-1 (session mechanism) / D-2 (verification channel + SMS/email provider).
@@ -58,7 +58,7 @@ Why no implementation slice: every backend contract a native wholesale needs for
 | Focused: `wholesale.test.ts` + `wholesale-boundary.test.ts` | 17 tests pass |
 | Existing wholesale-adjacent suites (`resolve-surface`, `cart`, `CartContext`, `middleware`, `checkout-routes`, `no-spree-env`, `MobileMenu`, `Footer.legacy`) | included in the full run |
 | `tsc --noEmit` | clean |
-| Full storefront vitest | 242 files passed / 16 skipped; 3474 tests passed (+10 new) |
+| Full storefront vitest | 242 files passed / 16 skipped; 3475 tests passed (+11 new) |
 | Biome | clean; repo-wide 5 warnings / 3 infos unchanged |
 | `next build` | compiled successfully |
 | Spree ratchet | OK, unchanged |
