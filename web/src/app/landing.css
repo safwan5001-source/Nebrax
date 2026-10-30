@@ -1192,8 +1192,9 @@ html.dark .lp-beats__n {
 }
 
 .lp-signals__tab[aria-selected='true'] {
-  border-color: transparent;
-  background: var(--mk-brand-500);
+  /* brand-600 keeps white text at 8.7:1 (brand-500 was 3.2:1); the light rim keeps it distinct on the navy panel. */
+  border-color: var(--mk-brand-300);
+  background: var(--mk-brand-600);
   color: var(--mk-white);
 }
 

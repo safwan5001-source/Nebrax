@@ -207,6 +207,14 @@ describe('landing page keeps its marketing language isolated and on-brand', () =
     expect(css).toMatch(/\.lp-skip \{[^}]*color: var\(--mk-fixed-ink\)/);
   });
 
+  it('never sets white text on the light brand-500 fill in a selected state (3.2:1, below WCAG AA for small text)', () => {
+    const selected = [...css.matchAll(/\[aria-selected='true'\]\s*\{([^}]*)\}/g)].map((match) => match[1]);
+    expect(selected.length).toBeGreaterThan(1);
+    for (const rule of selected) {
+      if (/color:\s*var\(--mk-white\)/.test(rule)) expect(rule).not.toMatch(/background:\s*var\(--mk-brand-500\)/);
+    }
+  });
+
   it('stops every animation under prefers-reduced-motion', () => {
     const reduced = css.slice(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
     expect(reduced).toMatch(/animation: none !important/);
