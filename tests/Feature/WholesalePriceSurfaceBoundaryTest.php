@@ -36,6 +36,7 @@ use Tests\TestCase;
 class WholesalePriceSurfaceBoundaryTest extends TestCase
 {
     use RefreshDatabase;
+    use AssertsNoAmountLeak;
 
     private const SECRET = 'surface-boundary-secret';
 
@@ -188,8 +189,7 @@ class WholesalePriceSurfaceBoundaryTest extends TestCase
         foreach ($this->v1Paths($s['product']) as $path) {
             $response = $this->withToken($s['token'])->getJson('/commerce/v1/'.$path);
             $response->assertNotFound();
-            $this->assertStringNotContainsString('700', $response->getContent(), $path);
-            $this->assertStringNotContainsString('1000', $response->getContent(), $path);
+            $this->assertNoAmountLeak($response->getContent(), [700, 1000], $path);
         }
         $this->withToken($s['token'])->postJson('/commerce/v1/cart/items', ['product_id' => $s['product']->id, 'quantity' => 1])->assertNotFound();
         // sorting / filtering / search cannot be used as a side channel either
@@ -232,8 +232,7 @@ class WholesalePriceSurfaceBoundaryTest extends TestCase
                 'X-Sales-Channel' => $other['channel']->id, 'X-Tenant-Id' => $other['tenant']->id,
             ])->getJson('/commerce/v1/products'.$q)->assertOk()->getContent();
             $this->assertStringContainsString('700', $body);
-            $this->assertStringNotContainsString('4000', $body);
-            $this->assertStringNotContainsString('5000', $body);
+            $this->assertNoAmountLeak($body, [4000, 5000]);
         }
         // tenant B's product is not visible to tenant A's key at all
         $this->withToken($s['token'])->getJson('/commerce/v1/products/'.$other['product']->id)->assertNotFound();

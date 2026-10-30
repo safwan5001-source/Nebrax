@@ -35,6 +35,7 @@ use Tests\TestCase;
 class StorefrontPriceParityTest extends TestCase
 {
     use RefreshDatabase;
+    use AssertsNoAmountLeak;
 
     private const SECRET = 'price-parity-secret';
 
@@ -202,7 +203,7 @@ class StorefrontPriceParityTest extends TestCase
 
         $this->assertGreaterThanOrEqual(400, $detail->getStatusCode());
         $this->assertSame($detail->getStatusCode(), $list->getStatusCode(), 'list must fail the same way as detail');
-        $this->assertStringNotContainsString('1000', json_encode($list->json()), 'never a silent retail fallback');
+        $this->assertNoAmountLeak((string) json_encode($list->json()), [1000], 'never a silent retail fallback');
     }
 
     // ───────────────────────── 6b · الفرز بالسعر المعروض ─────────────────────────
