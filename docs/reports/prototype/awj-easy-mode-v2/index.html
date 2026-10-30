@@ -1,0 +1,1106 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>الوضع السهل V2 — صانع تطبيقات أَوْج (تصوّر)</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* رمز الريال السعودي U+20C1 — الخط نفسه في web/public/fonts (OFL)، مضمَّن ليبقى الملف مستقلاً */
+@font-face{font-family:'AWJ Saudi Riyal';src:url(data:font/woff2;base64,d09GMgABAAAAAAHkAAsAAAAAA8gAAAGWAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAABmAANBEICoEUgR4BNgIkAwgLBgAEIAWCMAcgGwsDIJ4Dbmt8FdPWIgWh7r/dphgZD/3vR7sz//0VS3s2m1gXKwkvRSV1vFGaWKRRYdg2YrLZ/UHH8uzI2k5c878pzhP/HqPXQYWRYAPdeXIGjpuGBZb5T24wdVN/UGMJ/Dcst0iWwAQak6JEI+uyaC3D3M77h/08MY9Q1SUeq8m7+Qb3s098MRMphQQvPcDrPuiqkf+iQP0ZBFSNoFsgUaFTJVgpumHxB92fsPu/bAMQEP9JkKAgMYIjABRANvRdq7zyxXtDGLCige+nUAY1IMV7pgLMsDf5PowL6FrPr7ggFp/5fGjAOD+WiIda2sX68Rr+jotmsP3TxaSoBwlhk49gkXRkVScQ8Wb6Pw3WdrSnn1NAILhzbPMFyvm3iTSBn6clAL+/3YFZDeVl+YMmCYKXgWIFmO0Q2s7qCe0fSCMSJEJgGwA0uwmL0oxuVhK6dJPUYZFUxu2TYtB1UksvSYN+r0m79BZ3TOnW7cBkl5lxO0atTKkc4GG+lDqJ/X8+mdGu0riMMjtuVTe4gHsSwCbc0+0rDQAAAA==) format('woff2');unicode-range:U+20C1;font-display:swap}
+
+/* رموز نظام تصميم أَوْج — المصدر: web/src/app/globals.css */
+:root{
+  --background:#f6f7f9;--surface:#ffffff;--text:#15181d;--muted:#6b7280;--border:#eceef1;
+  --primary:#1e40af;--primary-hover:#1e3a8a;--primary-soft:#eef2ff;--primary-fg:#ffffff;
+  --positive:#166534;--negative:#b91c1c;--warning:#92400e;
+  --field:color-mix(in srgb,var(--muted) 38%,var(--border));
+  --font-sans:'IBM Plex Sans Arabic','AWJ Saudi Riyal',system-ui,'Segoe UI',Tahoma,sans-serif;
+  --font-mono:'IBM Plex Mono','AWJ Saudi Riyal',ui-monospace,monospace;
+  --r:8px;--hdr:92px;
+}
+html.dark{
+  --background:#0e1014;--surface:#181b20;--text:#f3f4f6;--muted:#9099a5;--border:#262a31;
+  --primary:#4f8cff;--primary-hover:#6ba0ff;--primary-soft:#1b2740;--primary-fg:#0e1014;
+  --positive:#16a34a;--negative:#f87171;--warning:#d97706;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:var(--font-sans);background:var(--background);color:var(--text);font-size:14px;line-height:1.55;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.mono,.num{font-family:var(--font-mono);direction:ltr;unicode-bidi:embed}
+bdi{unicode-bidi:isolate}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+svg.i{flex:none;display:inline-block;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin{animation:spin .9s linear infinite}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}*{scroll-behavior:auto!important;transition:none!important}}
+
+/* أزرار */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:0 14px;border-radius:var(--r);border:1px solid var(--field);background:var(--surface);font-weight:500;white-space:nowrap}
+.btn:hover{background:var(--primary-soft)}
+.btn[disabled]{opacity:.5;cursor:not-allowed;background:var(--surface)}
+.btn.p{background:var(--primary);border-color:var(--primary);color:var(--primary-fg)}
+.btn.p:hover{background:var(--primary-hover)}
+.btn.p[disabled]{background:var(--primary);opacity:.45}
+.btn.g{border-color:transparent;background:transparent}
+.btn.g:hover{background:var(--primary-soft)}
+.btn.neg{color:var(--negative)}
+.btn.ic{width:36px;padding:0}
+.btn.lg{min-height:44px;padding:0 20px}
+.btn.sm{min-height:32px;padding:0 10px;font-size:13px}
+.link{background:none;border:0;padding:0;color:var(--primary);font-weight:500;text-decoration:underline;text-underline-offset:3px}
+
+/* شارات الحالة: لون + أيقونة + نص */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:500;border:1px solid;line-height:1.7;white-space:nowrap}
+.badge.ready{color:var(--positive);border-color:color-mix(in srgb,var(--positive) 45%,transparent)}
+.badge.limited{color:var(--warning);border-color:color-mix(in srgb,var(--warning) 50%,transparent)}
+.badge.proposed{color:var(--muted);border:1px dashed var(--muted)}
+.badge.decide{color:var(--negative);border-color:color-mix(in srgb,var(--negative) 45%,transparent)}
+.badge.neutral{color:var(--muted);border-color:var(--border)}
+
+.proto-strip{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;padding:5px 12px;background:var(--primary-soft);border-bottom:1px solid var(--border);font-size:12px;text-align:center}
+.top{display:flex;align-items:center;gap:10px;padding:8px 16px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:30;min-height:56px}
+.top .ttl{display:flex;align-items:center;gap:8px;font-weight:600;min-width:0;flex:1 1 0}
+.top .ttl .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.top .grp{display:flex;align-items:center;gap:6px}
+.seg{display:inline-flex;border:1px solid var(--field);border-radius:var(--r);overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:transparent;padding:0 14px;min-height:34px;font-weight:500}
+.seg button[aria-pressed=true]{background:var(--primary);color:var(--primary-fg)}
+.status{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;padding:0 6px;min-height:34px}
+.status.clean{color:var(--positive)}.status.dirty{color:var(--warning)}.status.busy{color:var(--muted)}.status.err{color:var(--negative)}
+.status .short{display:none}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block}
+.modebar{display:none}
+
+
+/* عنوان فرعي مشتق للصف (عرض فقط — لا يُخزَّن في AppSchema) */
+.row .sb{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.ihead .t small.sb2{display:block;color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* الافتراضيات المعلنة */
+.help.dflt{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.help.dflt .badge{font-size:11px;padding:0 6px}
+
+/* اختيار القالب */
+.crt .card.wide{max-width:900px}
+.tpls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.tp{display:flex;flex-direction:column;gap:8px;padding:10px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface);text-align:start;min-height:0}
+.tp:hover{background:var(--primary-soft)}
+.tp[aria-pressed=true]{box-shadow:0 0 0 2px var(--primary);background:var(--primary-soft)}
+.tp .th{height:120px;border-radius:6px;border:1px solid var(--border);background:#fff;overflow:hidden;display:flex;flex-direction:column}
+.tp .th .hb{height:14px;flex:none}
+.tp .th .bd{flex:1;padding:6px;display:flex;flex-direction:column;gap:5px;overflow:hidden}
+.tp .th .x{background:#e5e7eb;border-radius:3px}
+.tp .th .r3{display:flex;gap:4px}.tp .th .r3 .x{flex:1;height:26px}
+.tp .th .pl{height:12px;border-radius:5px;width:55%;align-self:center}
+.tp .tx{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
+.tp .nm{font-weight:600;display:flex;gap:6px;align-items:center;justify-content:space-between}
+.tp .ds{color:var(--muted);font-size:12px}
+@media (max-width:699px){
+  .tpls{grid-template-columns:1fr}
+  .tp{flex-direction:row;align-items:center}.tp .th{width:84px;height:84px;flex:none}.tp .tx{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
+}
+
+/* منطقة العمل */
+.work{display:grid;grid-template-columns:minmax(290px,330px) 1fr minmax(320px,370px);height:calc(100vh - var(--hdr));min-height:520px}
+.navp,.insp{background:var(--surface);overflow:auto;min-width:0;display:flex;flex-direction:column}
+.navp{border-inline-end:1px solid var(--border)}
+.insp{border-inline-start:1px solid var(--border)}
+.stage{overflow:auto;background:var(--background);display:flex;flex-direction:column;align-items:center;gap:12px;padding:16px;min-width:0}
+.ptabs{display:flex;border-bottom:1px solid var(--border);padding:0 8px;gap:2px;position:sticky;top:0;background:var(--surface);z-index:5;flex:none}
+.ptabs button{flex:1;border:0;background:none;padding:12px 6px;font-weight:500;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+.ptabs button[aria-selected=true]{color:var(--primary);border-bottom-color:var(--primary)}
+.pbody{padding:16px;display:flex;flex-direction:column;gap:14px}
+.h2{font-size:15px;font-weight:600;margin:0}
+.sub{color:var(--muted);font-size:13px;margin:0}
+.note{display:flex;gap:8px;align-items:flex-start;padding:10px 12px;border:1px solid var(--border);border-radius:var(--r);font-size:13px}
+.note.warn{border-color:color-mix(in srgb,var(--warning) 50%,transparent)}.note.warn svg{color:var(--warning)}
+.note.prop{border-style:dashed}.note.neg svg{color:var(--negative)}
+.coach{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--border);border-inline-start:3px solid var(--primary);border-radius:var(--r);background:var(--primary-soft);width:100%;max-width:560px}
+.coach p{margin:0;flex:1}
+
+/* قائمة الأقسام */
+.secs{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}
+.row{display:flex;align-items:center;gap:4px;padding:4px 4px 4px 6px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface);min-height:56px}
+.row.sel{background:var(--primary-soft);border-inline-start:3px solid var(--primary)}
+.row.hid .nm{color:var(--muted);text-decoration:line-through}
+.row.drag{box-shadow:0 0 0 2px var(--primary)}
+.grip{width:34px;height:44px;display:flex;align-items:center;justify-content:center;border:0;background:none;color:var(--muted);touch-action:none;cursor:grab;border-radius:6px}
+.grip:hover{background:var(--primary-soft)}
+.row .main{flex:1;min-width:0;display:flex;align-items:center;gap:10px;border:0;background:none;text-align:start;padding:4px 2px;min-height:44px}
+.row .main .t{display:flex;flex-direction:column;min-width:0;gap:2px}
+.row .nm{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .ty{color:var(--muted);font-size:12px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.add{display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px;border:1.5px dashed var(--field);border-radius:var(--r);background:none;color:var(--primary);font-weight:500;width:100%}
+.add:hover{background:var(--primary-soft)}
+.empty{padding:26px 16px;text-align:center;color:var(--muted);border:1px dashed var(--field);border-radius:var(--r)}
+.pgrow{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface);width:100%;text-align:start;min-height:52px}
+.pgrow.sel{background:var(--primary-soft);border-inline-start:3px solid var(--primary)}.pgrow.prop{border-style:dashed}
+.pgrow .t{flex:1;min-width:0;display:flex;flex-direction:column}.pgrow .t small{color:var(--muted)}
+
+/* المفتش */
+.ihead{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:5;flex:none}
+.ihead .t{flex:1;min-width:0}.ihead .t small{display:block;color:var(--muted);font-size:12px}
+.ihead .t b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.iact{display:flex;gap:4px;flex-wrap:wrap}
+.fld{display:flex;flex-direction:column;gap:6px}
+.fld label,.fld .lb{font-weight:500;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.fld .help{color:var(--muted);font-size:12px;margin:0}
+.in,.sel-in,.ta{width:100%;min-height:40px;border:1px solid var(--field);border-radius:var(--r);background:var(--surface);padding:6px 10px}
+.ta{min-height:84px;resize:vertical}
+.in[disabled],.sel-in[disabled],.ta[disabled]{background:var(--background);color:var(--muted);cursor:not-allowed;border-style:dashed}
+.in.ltr{direction:ltr;text-align:left}
+.ro{padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--background);color:var(--muted)}
+.tgl{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--r)}
+.tgl .tx{display:flex;flex-direction:column;gap:2px;min-width:0}
+.sw{position:relative;width:44px;height:26px;flex:none}
+.sw input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer;width:100%;height:100%;z-index:1}
+.sw i{position:absolute;inset:0;border-radius:999px;background:var(--field);transition:background .15s;pointer-events:none}
+.sw i::after{content:"";position:absolute;top:3px;inset-inline-start:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:inset-inline-start .15s}
+.sw input:checked+i{background:var(--primary)}.sw input:checked+i::after{inset-inline-start:21px}
+.sw input:focus-visible+i{outline:2px solid var(--primary);outline-offset:2px}
+.sw input:disabled{cursor:not-allowed}.sw input:disabled+i{opacity:.45}
+.swc{display:flex;gap:8px;flex-wrap:wrap}
+.swc button{width:40px;height:40px;border-radius:50%;border:2px solid var(--surface);box-shadow:0 0 0 1px var(--field);display:flex;align-items:center;justify-content:center;color:#fff}
+.swc button[aria-pressed=true]{box-shadow:0 0 0 2px var(--primary)}
+.kv{display:grid;grid-template-columns:80px minmax(0,1fr);gap:6px 10px;font-size:13px}.kv dt{color:var(--muted)}.kv dd{margin:0;word-break:break-word;min-width:0}.kv dd.mono{display:block;text-align:left}.kv dd pre.json{max-width:100%}
+.tabrow{display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;padding:8px;border:1px solid var(--border);border-radius:var(--r)}
+.tabrow .in,.tabrow .sel-in{min-height:36px}
+
+/* المعاينة */
+.stbar{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center;max-width:100%}
+.chip{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 12px;border-radius:999px;border:1px solid var(--field);background:var(--surface);font-weight:500}
+.chip[aria-pressed=true]{background:var(--primary-soft);border-color:var(--primary);color:var(--primary)}
+.chip.prop{border-style:dashed;color:var(--muted)}.chip.prop[aria-pressed=true]{color:var(--primary)}
+.truth{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);text-align:center;max-width:420px}
+.phone{max-width:100%;border:10px solid #20242b;border-radius:34px;background:#20242b;position:relative;flex:none}
+.phone::before{content:"";position:absolute;top:-6px;left:50%;width:70px;height:6px;margin-left:-35px;border-radius:0 0 6px 6px;background:#20242b}
+.phone.tab{border-radius:20px}.phone.tab::before{display:none}
+.screen{height:min(660px,calc(100vh - 330px));min-height:420px;border-radius:24px;overflow:auto;background:#fff;color:#15181d;position:relative}
+.phone.tab .screen{border-radius:10px}
+.stage.flat .phone{border:0;border-radius:0;background:none;width:100%!important}
+.stage.flat .phone::before{display:none}
+.stage.flat .screen{height:auto;min-height:420px;border:1px solid var(--border);border-radius:var(--r);overflow:visible}
+
+/* التطبيق داخل المعاينة — لون التطبيق من اختيار التاجر لا لون هوية أَوْج */
+.app{--ap:#0f6a5a;--ink:#fff;font-family:var(--font-sans);display:flex;flex-direction:column;min-height:100%;background:#fff;color:#15181d}
+.a-ann{background:#fef3c7;color:#78350f;padding:6px 12px;font-size:12px;display:flex;gap:8px;align-items:center;justify-content:center;border-bottom:1.5px dashed #b45309}
+.a-bar{background:var(--ap);color:var(--ink);padding:14px 16px;font-weight:600;display:flex;align-items:center;justify-content:space-between}
+.a-body{padding:22px 14px 14px;display:flex;flex-direction:column;gap:18px;flex:1}
+.a-sec h3{margin:0 0 8px;font-size:16px}.a-sec p{margin:0;color:#4b5563}
+.a-sec p.title{font-size:18px;font-weight:600;color:#15181d}.a-sec p.caption{font-size:12px}
+.a-note{font-size:11px;color:#6b7280;margin-top:6px}
+.a-prods{display:flex;gap:10px;overflow:hidden;padding-bottom:4px}
+.a-pc{flex:none;width:132px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;background:#fff}
+.a-pc .im{height:92px;background:#f1f3f5;display:flex;align-items:center;justify-content:center;color:#9ca3af}
+.a-pc .tx{padding:8px;font-size:13px}.a-pc .pr{font-family:var(--font-mono);font-size:12px;color:#374151;direction:ltr;text-align:start;margin-top:2px}
+.a-img{aspect-ratio:16/9;border-radius:8px;background:#f1f3f5;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#6b7280;gap:6px;overflow:hidden;font-size:12px}
+.a-img img{width:100%;height:100%;object-fit:cover;display:block}
+.a-btn{display:flex;align-items:center;justify-content:center;min-height:44px;border-radius:8px;font-weight:600;background:var(--ap);color:var(--ink);border:0;width:100%}
+.a-btn.sec{background:#fff;color:var(--ap);border:1.5px solid var(--ap)}
+.a-card{border:1px solid #e5e7eb;border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.a-line{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px}
+.a-q{display:inline-flex;align-items:center;border:1px solid #d1d5db;border-radius:6px;overflow:hidden}.a-q span{padding:2px 10px}
+.a-prop{border:1.5px dashed #9ca3af;border-radius:8px;padding:10px;background:#f9fafb;display:flex;flex-direction:column;gap:6px}
+.a-prop .hd{display:flex;align-items:center;gap:6px;font-size:12px;color:#4b5563;flex-wrap:wrap}
+.a-tabs{display:flex;border-top:1px solid #e5e7eb;background:#fff;position:sticky;bottom:0}
+.a-tabs div{flex:1;text-align:center;padding:8px 2px;font-size:11px;color:#6b7280;display:flex;flex-direction:column;align-items:center;gap:2px}.a-tabs div.on{color:var(--ap)}
+.a-ghost{margin:10px 12px 0;padding:8px 10px;border:1.5px dashed #9ca3af;border-radius:8px;background:#f9fafb;font-size:12px;color:#4b5563}
+.a-rib{font-size:10px;color:#6b7280;text-align:center;padding:2px;border-top:1px dashed #9ca3af;background:#f9fafb}
+.a-addrow{display:flex;justify-content:center}
+.a-add{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 14px;border:1.5px dashed #9ca3af;border-radius:8px;background:#fff;color:#374151;font-weight:500}
+.a-add:hover{background:#f3f4f6}
+
+/* التحديد داخل المعاينة */
+.sx{position:relative;border-radius:6px;cursor:pointer;scroll-margin-top:150px}
+.sx::after{content:"";position:absolute;inset:-5px;border:2px solid transparent;border-radius:9px;pointer-events:none}
+.sx:hover::after{border-color:color-mix(in srgb,var(--primary) 45%,transparent)}
+.sx.on::after{border-color:var(--primary)}
+.sx:focus-visible{outline:none}.sx:focus-visible::after{border-color:var(--primary)}
+.sx .lbl{display:none;position:absolute;top:-17px;inset-inline-start:2px;background:var(--primary);color:var(--primary-fg);font-size:11px;line-height:1.5;padding:0 8px;border-radius:4px;z-index:3;white-space:nowrap;pointer-events:none}
+.sx:hover .lbl,.sx.on .lbl,.sx:focus-visible .lbl{display:inline-block}
+.sx .ftb{position:absolute;top:-21px;inset-inline-end:0;display:flex;gap:1px;background:var(--surface);color:var(--text);border:1px solid var(--primary);border-radius:6px;padding:2px;z-index:4}
+.sx .ftb button{width:32px;height:30px;border:0;background:none;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--text)}
+.sx .ftb button:hover{background:var(--primary-soft)}.sx .ftb button[disabled]{opacity:.35;cursor:not-allowed}
+.sw-in{pointer-events:none}
+
+/* معاينات الكتالوج */
+.mv{height:76px;border-radius:6px;background:var(--background);border:1px solid var(--border);padding:8px;display:flex;gap:6px;align-items:stretch;overflow:hidden}
+.mv .b{background:var(--border);border-radius:3px}.mv .bp{background:color-mix(in srgb,var(--primary) 55%,var(--border));border-radius:3px}
+.mv .c{flex:1;display:flex;flex-direction:column;gap:4px}.mv.col{flex-direction:column}
+.mv .rw{display:flex;gap:4px;align-items:center}.mv .ci{width:22px;height:22px;border-radius:50%;background:var(--border);flex:none}
+
+/* حوارات وأوراق */
+.ov{position:fixed;inset:0;background:rgba(14,16,20,.5);z-index:60;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--surface);color:var(--text);width:100%;max-height:90vh;border-radius:14px 14px 0 0;display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--border)}
+.sheet:focus{outline:none}
+.sheet .sh{display:flex;align-items:center;gap:8px;padding:14px 16px;border-bottom:1px solid var(--border)}.sheet .sh h2{margin:0;font-size:16px;flex:1}
+.sheet .sb{padding:16px;overflow:auto;display:flex;flex-direction:column;gap:12px}
+.sheet .sf{padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.menu{display:flex;flex-direction:column;padding:6px}
+.menu button{display:flex;align-items:center;gap:12px;min-height:48px;padding:0 12px;border:0;background:none;border-radius:6px;text-align:start;font-weight:500}
+.menu button:hover{background:var(--primary-soft)}.menu button.neg{color:var(--negative)}.menu button[disabled]{opacity:.45;cursor:not-allowed}
+.menu hr{border:0;border-top:1px solid var(--border);margin:4px 0;width:100%}
+.cat{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.ct{display:flex;flex-direction:column;gap:8px;padding:10px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface);text-align:start;min-height:150px}
+.ct:hover{background:var(--primary-soft)}.ct.prop{border-style:dashed}.ct.on{box-shadow:0 0 0 2px var(--primary)}
+.ct .nm{font-weight:600;display:flex;justify-content:space-between;gap:6px;align-items:center}.ct .ds{color:var(--muted);font-size:12px}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.toasts{position:fixed;inset-inline:0;bottom:20px;display:flex;flex-direction:column;align-items:center;gap:8px;z-index:70;pointer-events:none;padding:0 12px}
+.toast{pointer-events:auto;display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:var(--r);background:#15181d;color:#f3f4f6;box-shadow:0 4px 14px rgba(0,0,0,.25);max-width:540px}
+html.dark .toast{background:#f3f4f6;color:#15181d}.toast button{background:none;border:0;color:inherit;font-weight:600;text-decoration:underline}
+.tree{display:flex;flex-direction:column;gap:2px;font-family:var(--font-mono);font-size:12px;direction:ltr}
+.tree button{display:flex;align-items:center;gap:6px;border:0;background:none;text-align:left;padding:4px 6px;border-radius:4px;min-height:32px}
+.tree button:hover{background:var(--primary-soft)}.tree button.on{background:var(--primary-soft);outline:1px solid var(--primary)}
+.tree .tid{color:var(--muted)}.tree .tw{color:var(--warning)}
+pre.json{margin:0;padding:12px;border:1px solid var(--border);border-radius:var(--r);background:var(--background);overflow:auto;font-family:var(--font-mono);font-size:12px;direction:ltr;text-align:left;max-height:62vh}
+.crt{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 40px);padding:20px}
+.crt .card{max-width:560px;width:100%;padding:24px;display:flex;flex-direction:column;gap:16px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface)}
+.chk{display:flex;flex-direction:column;gap:10px;margin:0;padding:0;list-style:none}
+.chk li{display:flex;align-items:center;gap:10px}.chk li .st{width:20px;height:20px;display:flex;align-items:center;justify-content:center;color:var(--positive)}
+.bbar,.scrim{display:none}
+
+/* 1000–1099: عمودان، المستكشف والمفتش يتناوبان (آيباد 10.2 الأفقي وما شابه) */
+@media (min-width:1000px) and (max-width:1099px){
+  .work{grid-template-columns:390px 1fr}
+  .navp,.insp{grid-column:1;grid-row:1}
+  .stage{grid-column:2;grid-row:1}
+  .work[data-sel="1"] .navp{display:none}
+  .work[data-sel="0"] .insp{display:none}
+  .insp{border-inline-start:0;border-inline-end:1px solid var(--border)}
+}
+/* 1100 فما فوق: ثلاثة أعمدة (المستكشف + المعاينة + المفتش) — يشمل الآيباد الأفقي 11" و12.9" */
+@media (min-width:1100px) and (max-width:1279px){.work{grid-template-columns:minmax(250px,290px) 1fr minmax(300px,340px)}}
+@media (min-width:1000px){
+  .sheet{width:min(720px,92vw);border-radius:14px;margin:auto;max-height:86vh}
+  .ov{align-items:center}.cat{grid-template-columns:repeat(3,1fr)}
+  .sheet.sm{width:min(420px,92vw)}
+}
+@media (min-width:1100px){.ihead .back{display:none}}
+
+/* جوال وآيباد عمودي: المعاينة + أوراق سفلية */
+@media (max-width:999px){
+  :root{--hdr:0px}
+  .top{padding:8px 12px;gap:6px}.top .ttl .badge,.top .seg-d,.hide-m{display:none!important}
+  .modebar{display:block;padding:8px 12px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:56px;z-index:25}
+  .modebar .seg{display:flex;width:100%}.modebar .seg button{flex:1;min-height:40px}
+  .status .long{display:none}.status .short{display:inline}
+  .work{display:block;height:auto;min-height:calc(100vh - 160px)}
+  .stage{overflow:visible;padding:12px 12px 52vh}
+  .navp,.insp{display:none;position:fixed;inset-inline:0;bottom:56px;z-index:45;border:0;border-top:1px solid var(--border);border-radius:14px 14px 0 0;max-height:62vh}
+  .navp.open,.insp.open{display:flex}
+  .insp{max-height:46vh}
+  .scrim.on{display:block;position:fixed;inset:0;bottom:56px;background:rgba(14,16,20,.35);z-index:40}
+  .bbar{display:flex;position:fixed;bottom:0;inset-inline:0;background:var(--surface);border-top:1px solid var(--border);z-index:50;padding-bottom:env(safe-area-inset-bottom)}
+  .bbar button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border:0;background:none;padding:8px 2px;min-height:56px;color:var(--muted);font-size:12px;font-weight:500}
+  .bbar button[aria-pressed=true]{color:var(--primary)}
+  .ptabs{position:static}.ihead{position:sticky}
+  .toasts{bottom:72px}
+}
+/* آيباد عمودي (≥700 عرضاً و≥700 ارتفاعاً): المعاينة داخل إطار الجهاز وتبقى أدوات الجهاز والتراجع ظاهرة */
+@media (min-width:700px) and (max-width:999px) and (min-height:700px){
+  .top .btn.hide-m{display:inline-flex!important}
+  .proto-strip .hide-m{display:inline!important}
+  .status .long{display:inline}.status .short{display:none}
+  .stage{padding-top:20px}
+}
+
+/* مؤشر المؤسّسة: أهداف لمس ≥ 44px على أجهزة اللمس فقط — سطح المكتب بالمؤشر الدقيق يبقى كثيفاً */
+@media (pointer:coarse){
+  .btn,.btn.sm{min-height:44px}.btn.ic{width:44px}
+  .seg button,.chip{min-height:44px}
+  .grip{width:44px}
+  .in,.sel-in{min-height:44px}.tabrow .in,.tabrow .sel-in{min-height:44px}
+  .sw{height:44px}.sw i{inset:9px 0}
+  .swc button{width:44px;height:44px}
+  .sx .ftb button{width:44px;height:44px}.sx .ftb{top:-30px}
+  .tree button{min-height:44px}
+  .a-add{min-height:44px}
+  .link{padding:13px 6px;margin:-13px -6px}
+  .toast button{min-height:44px;padding:0 8px}
+  .status{min-height:44px}.modebar .seg button{min-height:44px}
+  .tp{min-height:44px}
+}
+</style>
+</head>
+<body>
+<noscript>هذا النموذج يحتاج JavaScript.</noscript>
+<div id="root"></div>
+<div id="ovr"></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<script>
+(function () {
+'use strict';
+
+/* ───────────── أدوات ───────────── */
+var $ = function (s, r) { return (r || document).querySelector(s); };
+var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+/* يعزل الكلمات اللاتينية داخل الجمل العربية (navigate، Flutter…) */
+function escb(s) { return String(s == null ? '' : s).split(/([A-Za-z][A-Za-z0-9_.\-\/#]*)/).map(function (p, i) { return i % 2 ? '<bdi dir="ltr">' + esc(p) + '</bdi>' : esc(p); }).join(''); }
+var RIYAL = '⃁';
+function money(n) { return Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + RIYAL; }
+function isHex(h) { return /^#[0-9a-f]{6}$/i.test(h || ''); }
+function ink(hex) {
+  var m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return '#fff';
+  var n = parseInt(m[1], 16), r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255;
+  var l = [r, g, b].map(function (v) { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); });
+  return (.2126 * l[0] + .7152 * l[1] + .0722 * l[2]) > .5 ? '#15181d' : '#fff';
+}
+var P = {
+  chevL: '<path d="m15 18-6-6 6-6"/>', chevR: '<path d="m9 18 6-6-6-6"/>', plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>', check: '<path d="M20 6 9 17l-5-5"/>',
+  eye: '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+  eyeOff: '<path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><path d="m2 2 20 20"/>',
+  copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
+  grip: '<circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/>',
+  pencil: '<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>',
+  more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+  home: '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
+  bag: '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>',
+  cart: '<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>',
+  user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>',
+  image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+  type: '<path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/>',
+  mega: '<path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>',
+  play: '<path d="m6 3 14 9-14 9z"/>', timer: '<path d="M10 2h4"/><path d="M12 14l3-3"/><circle cx="12" cy="14" r="8"/>',
+  quote: '<path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3z"/>',
+  list: '<path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/>',
+  pkg: '<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
+  book: '<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>',
+  palette: '<circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>',
+  phone: '<rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/>', tablet: '<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M12 18h.01"/>',
+  alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  dashed: '<circle cx="12" cy="12" r="9" stroke-dasharray="3.2 3.2"/>', info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+  undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/>',
+  redo: '<path d="m15 14 5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5v0A5.5 5.5 0 0 0 9.5 20H13"/>',
+  save: '<path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/>',
+  moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+  refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/>',
+  up: '<path d="m18 15-6-6-6 6"/>', down: '<path d="m6 9 6 6 6-6"/>',
+  shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+  loader: '<path d="M21 12a9 9 0 1 1-6.219-8.56"/>', code: '<path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/>',
+  layers: '<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>'
+};
+function ic(n, s) { s = s || 18; return '<svg class="i" width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (P[n] || '') + '</svg>'; }
+
+/* ───────────── الأنواع والصفحات ─────────────
+   ready: مدعوم اليوم · limited: مدعوم بقيد موثّق · proposed: يتطلب Flutter Runtime/API غير مبني · decide: يحتاج قراراً معمارياً */
+var ST = { ready: { t: 'جاهز', i: 'check' }, limited: { t: 'جاهز بقيود', i: 'alert' }, proposed: { t: 'مقترح', i: 'dashed' }, decide: { t: 'يحتاج قراراً', i: 'alert' } };
+function badge(st, extra) { return '<span class="badge ' + st + '">' + ic(ST[st].i, 12) + ST[st].t + (extra || '') + '</span>'; }
+var DEST = [['home', 'الصفحة الرئيسية'], ['cart', 'السلة']];
+var SORTS = [['', 'بلا ترتيب'], ['created_at', 'created_at'], ['-created_at', '-created_at'], ['name', 'name'], ['sale_price', 'sale_price']];
+var TYPES = {
+  text: { label: 'نص', icon: 'type', status: 'ready', cat: 'content', desc: 'عنوان وفقرة قصيرة.', def: function () { return { title: '', text: 'اكتب نصك هنا', style: 'body' }; },
+    fields: [{ k: 'title', label: 'العنوان', kind: 'text', ph: 'اختياري', dflt: 'لا يُعرض عنوان أعلى النص' }, { k: 'text', label: 'النص', kind: 'textarea' }, { k: 'style', label: 'نمط النص', kind: 'select', opts: [['body', 'عادي'], ['title', 'عنوان'], ['caption', 'صغير']] }] },
+  products: { label: 'قائمة منتجات', icon: 'bag', status: 'ready', cat: 'products', desc: 'منتجات المتجر الحيّة بعرض أفقي.', def: function () { return { title: 'منتجاتنا' }; },
+    fields: [{ k: 'title', label: 'عنوان القسم', kind: 'text', ph: 'مثال: وصل حديثاً', dflt: 'لا يُعرض عنوان للقسم' },
+      { k: '_src', label: 'مصدر المنتجات', kind: 'ro', val: 'منتجات متجرك الحيّة', help: 'تُجلب وقت التشغيل. المعاينة هنا ببيانات تجريبية.' },
+      { k: '_sort', label: 'ترتيب المنتجات وعددها', kind: 'prop', help: 'الخادم يتحقق من الترتيب والبحث، لكن تطبيق Flutter الحالي يجلب كل المنتجات بلا ترتيب أو حد.' }] },
+  hero: { label: 'بنر ترويجي', icon: 'image', status: 'limited', cat: 'content', desc: 'صورة مع عنوان ونص وزر.', note: 'الصورة بنسبة 16:9 ثابتة وبرابط https فقط، والعنوان والزر تحتها لا فوقها.',
+    def: function () { return { title: 'عرض خاص', img: '', text: 'اكتشف أحدث منتجاتنا', btn: 'تسوّق الآن', dest: 'cart' }; },
+    fields: [{ k: 'img', label: 'رابط الصورة', kind: 'url', ph: 'https://…', help: 'https فقط.', dflt: 'تظهر صورة بديلة آمنة' }, { k: '_alt', label: 'نص بديل للصورة', kind: 'prop', help: 'غير مدعوم: مكوّن Image لا يحمل خاصية نص بديل.' },
+      { k: 'title', label: 'العنوان', kind: 'text', dflt: 'لا يُعرض عنوان' }, { k: 'text', label: 'النص', kind: 'textarea', dflt: 'لا يُعرض نص' }, { k: 'btn', label: 'نص الزر', kind: 'text', dflt: 'يُخفى الزر' },
+      { k: 'dest', label: 'وجهة الزر', kind: 'select', opts: DEST, help: 'التنقل اليوم إلى الرئيسية والسلة فقط.' }, { k: '_d2', label: 'وجهات أخرى (تصنيف، رابط خارجي)', kind: 'prop', help: 'تحتاج موجّه صفحات عاماً في Runtime.' }] },
+  image: { label: 'صورة', icon: 'image', status: 'limited', cat: 'content', desc: 'صورة للعرض فقط.', note: 'للعرض فقط: مكوّن Image لا يقبل إجراءً. لصورة قابلة للضغط استعمل «بنر ترويجي».',
+    def: function () { return { img: '' }; },
+    fields: [{ k: 'img', label: 'رابط الصورة', kind: 'url', ph: 'https://…', help: 'https فقط، بنسبة 16:9.', dflt: 'تظهر صورة بديلة آمنة' }, { k: '_tap', label: 'الضغط على الصورة', kind: 'prop', help: 'غير مدعوم: Image غير قابل للأفعال.' }] },
+  button: { label: 'زر تنقّل', icon: 'list', status: 'ready', cat: 'nav', desc: 'زر ينقل إلى الرئيسية أو السلة.', def: function () { return { btn: 'عرض السلة', style: 'primary', dest: 'cart' }; },
+    fields: [{ k: 'btn', label: 'نص الزر', kind: 'text' }, { k: 'style', label: 'النمط', kind: 'select', opts: [['primary', 'أساسي'], ['secondary', 'ثانوي']] }, { k: 'dest', label: 'الوجهة', kind: 'select', opts: DEST }] },
+  cartList: { label: 'محتويات السلة', icon: 'cart', status: 'ready', cat: 'cart', desc: 'أسطر السلة الحيّة بالكمية والإزالة.', def: function () { return {}; },
+    fields: [{ k: '_c', label: 'المصدر', kind: 'ro', val: 'سلة العميل الحيّة', help: 'قالب السطر وإجراءاته ثابتة اليوم؛ تعديلها من الوضع المتقدم.' }] },
+  cartSummary: { label: 'ملخص السلة', icon: 'cart', status: 'ready', cat: 'cart', desc: 'عدد العناصر والمجموع الفرعي.', def: function () { return { label: '' }; },
+    fields: [{ k: 'label', label: 'تسمية الملخص', kind: 'text', ph: 'اختياري', dflt: 'تُعرض عبارة افتراضية (عدد العناصر)' }] },
+  slider: { label: 'سلايدر صور', icon: 'image', status: 'proposed', cat: 'content', desc: 'شرائح صور متحركة بمؤشر.', req: 'مكوّن Carousel جديد في Flutter + تسجيله في سجل المكوّنات + معاينة الويب.', def: function () { return {}; }, fields: [{ k: '_a', label: 'الصور والروابط', kind: 'prop' }, { k: '_b', label: 'شكل المؤشر', kind: 'prop' }] },
+  grid: { label: 'شبكة منتجات', icon: 'grid', status: 'proposed', cat: 'products', desc: 'منتجات بعرض شبكي رأسي.', req: 'نمط عرض شبكي في Flutter (ProductList أفقي فقط اليوم).', def: function () { return {}; }, fields: [{ k: '_a', label: 'عدد الأعمدة', kind: 'prop' }] },
+  categories: { label: 'التصنيفات', icon: 'grid', status: 'proposed', cat: 'products', desc: 'عرض تصنيفات المتجر.', req: 'ربط commerce.categories في Flutter (غير معلن مدعوماً) + مكوّن/شاشة تصنيفات.', def: function () { return {}; }, fields: [{ k: '_a', label: 'طريقة العرض', kind: 'prop' }] },
+  countdown: { label: 'عداد عروض', icon: 'timer', status: 'proposed', cat: 'content', desc: 'عدّ تنازلي لانتهاء عرض.', req: 'مكوّن عدّاد جديد في Flutter.', def: function () { return {}; }, fields: [{ k: '_a', label: 'وقت الانتهاء', kind: 'prop' }] },
+  video: { label: 'فيديو', icon: 'play', status: 'proposed', cat: 'content', desc: 'فيديو مضمَّن.', req: 'مكوّن فيديو + اعتماد حزمة تشغيل في Flutter (غير موجودة في pubspec).', def: function () { return {}; }, fields: [{ k: '_a', label: 'رابط الفيديو', kind: 'prop' }] },
+  testimonials: { label: 'آراء العملاء', icon: 'quote', status: 'proposed', cat: 'content', desc: 'اقتباسات وتقييمات.', req: 'مكوّن آراء + إدخال عناصر متعددة في المخطط.', def: function () { return {}; }, fields: [{ k: '_a', label: 'الآراء', kind: 'prop' }] },
+  features: { label: 'مميزات المتجر', icon: 'shield', status: 'proposed', cat: 'content', desc: 'أيقونة وعنوان ووصف لكل ميزة.', req: 'مكوّن أيقونات. نسخة نصية فقط ممكنة اليوم بتركيب Text.', def: function () { return {}; }, fields: [{ k: '_a', label: 'المزايا', kind: 'prop' }] },
+  blog: { label: 'المدونة', icon: 'book', status: 'proposed', cat: 'content', desc: 'أحدث المقالات.', req: 'مصدر بيانات مدونة + مكوّن عرض.', def: function () { return {}; }, fields: [{ k: '_a', label: 'عدد المقالات', kind: 'prop' }] },
+  orders: { label: 'طلباتي السابقة', icon: 'pkg', status: 'proposed', cat: 'account', desc: 'طلبات العميل المسجَّل.', req: 'دخول العميل داخل التطبيق + Orders API + شاشة طلبات (لا شيء منها مبني).', def: function () { return {}; }, fields: [{ k: '_a', label: 'عدد الطلبات', kind: 'prop' }] },
+  account: { label: 'حساب العميل', icon: 'user', status: 'proposed', cat: 'account', desc: 'تسجيل الدخول وبيانات الحساب.', req: 'شاشات دخول/حساب في Flutter (العميل برمجي موجود بلا واجهة) + موجّه صفحات.', def: function () { return {}; }, fields: [{ k: '_a', label: 'عناصر الحساب', kind: 'prop' }] }
+};
+var CAT_ORDER = ['text', 'products', 'hero', 'image', 'button', 'cartList', 'cartSummary', 'slider', 'grid', 'categories', 'countdown', 'video', 'testimonials', 'features', 'blog', 'orders', 'account'];
+var CATS = [['all', 'الكل'], ['content', 'المحتوى'], ['products', 'المنتجات'], ['nav', 'التنقل'], ['cart', 'السلة'], ['account', 'الحساب']];
+var PAGES = {
+  home: { label: 'الرئيسية', icon: 'home', status: 'ready' },
+  cart: { label: 'السلة', icon: 'cart', status: 'ready' },
+  product: { label: 'تفاصيل المنتج', icon: 'bag', status: 'limited', native: true, req: 'شاشة أصلية في Runtime (ProductScreen) وليست مخططية: لا تُحرَّر أقسامها هنا. العرض للتوضيح فقط.' },
+  categories: { label: 'التصنيفات', icon: 'grid', status: 'proposed', req: 'موجّه صفحات عام في Flutter (navigate يقبل home وcart فقط) + ربط التصنيفات وشاشتها.' },
+  account: { label: 'الحساب', icon: 'user', status: 'proposed', req: 'موجّه صفحات عام + شاشات دخول وحساب العميل (غير مبنية).' },
+  orders: { label: 'الطلبات', icon: 'pkg', status: 'proposed', req: 'موجّه صفحات عام + دخول العميل + Orders API وشاشة طلبات (غير مبنية).' }
+};
+var PAGE_ORDER = ['home', 'cart', 'product', 'categories', 'account', 'orders'];
+var SWATCHES = ['#0F6A5A', '#1E40AF', '#7C3AED', '#B45309', '#BE123C', '#15181D'];
+var MAX_TABS = 5; /* حدّ مستلهم من حد موثّق عند سلة؛ اقتراح وليس قاعدة أَوْج */
+
+/* ───────────── الحالة ───────────── */
+var uid = 1; function nid() { return 's' + (uid++); }
+function sec(type, over, name) { var T = TYPES[type]; return { id: nid(), type: type, name: name || T.label, hidden: false, optional: false, adv: {}, props: Object.assign(T.def(), over || {}) }; }
+/* قوالب البداية: أقسام جاهزة من السجل فقط (لا مكوّن مقترح). تصوّر لتجربة الاختيار — استراتيجية القوالب (الملكية والتخزين والتحديث) قرار مفتوح */
+var TPLS = {
+  basic: { name: 'المتجر الأساسي', desc: 'ترحيب ثم منتجات متجرك الحيّة وزر السلة.', tag: 'الأسرع بداية', primary: '#0F6A5A', thumb: ['t', 'p', 'b'],
+    lines: ['الرئيسية: ترحيب، منتجات متجرك الحيّة، وزر السلة', 'صفحة السلة: المحتويات والملخص والمتابعة', 'هوية افتراضية بلون التطبيق', 'معاينة جاهزة تفتح عليها مباشرة'],
+    home: function () { return [sec('text', { title: 'أَوْج', text: 'تسوّق منتجاتك المفضّلة' }, 'ترحيب'), sec('products', { title: 'منتجاتنا' }, 'منتجاتنا'), sec('button', { btn: 'عرض السلة', style: 'secondary', dest: 'cart' }, 'زر السلة')]; } },
+  offers: { name: 'واجهة العروض', desc: 'بنر ترويجي في الأعلى، ثم المنتجات وسطر تعريفي.', tag: 'يحتاج رابط صورة', primary: '#B45309', thumb: ['h', 'p', 't'],
+    lines: ['الرئيسية: بنر ترويجي، منتجات متجرك الحيّة، وسطر تعريفي', 'صفحة السلة: المحتويات والملخص والمتابعة', 'هوية بلون دافئ قابل للتغيير', 'معاينة جاهزة؛ أضف رابط صورة https للبنر'],
+    home: function () { return [sec('hero', { title: 'عروض الموسم', text: 'خصومات على أحدث منتجاتنا', btn: 'تسوّق الآن', dest: 'cart' }, 'بنر العروض'), sec('products', { title: 'منتجاتنا' }, 'منتجاتنا'), sec('text', { title: 'لماذا نحن؟', text: 'شحن سريع وخدمة موثوقة.' }, 'تعريف')]; } },
+  catalog: { name: 'كتالوج مبسّط', desc: 'منتجات متجرك بلا زوائد، مناسب لكتالوج صغير.', tag: 'الأخف', primary: '#1E40AF', thumb: ['t', 'p'],
+    lines: ['الرئيسية: عنوان قصير ثم منتجات متجرك الحيّة', 'صفحة السلة: المحتويات والملخص والمتابعة', 'هوية بلون أَوْج الأزرق قابلة للتغيير', 'معاينة جاهزة تفتح عليها مباشرة'],
+    home: function () { return [sec('text', { title: 'كتالوجنا', text: 'تصفّح كل منتجاتنا' }, 'عنوان'), sec('products', { title: 'كل المنتجات' }, 'المنتجات')]; } }
+};
+var TPL_ORDER = ['basic', 'offers', 'catalog'];
+function defaultDoc(name, tpl) {
+  var T = TPLS[tpl] || TPLS.basic;
+  return {
+    name: name || 'متجري', primary: T.primary,
+    nav: { enabled: false, tabs: [{ id: 't1', label: 'الرئيسية', page: 'home', visible: true }, { id: 't2', label: 'التصنيفات', page: 'categories', visible: true }, { id: 't3', label: 'السلة', page: 'cart', visible: true }, { id: 't4', label: 'حسابي', page: 'account', visible: true }, { id: 't5', label: 'الطلبات', page: 'orders', visible: false }] },
+    ann: { enabled: false, text: 'شحن مجاني للطلبات فوق ٢٠٠' },
+    pages: {
+      home: T.home(),
+      cart: [sec('cartList', {}, 'محتويات السلة'), sec('cartSummary', {}, 'ملخص السلة'), sec('button', { btn: 'متابعة التسوق', style: 'secondary', dest: 'home' }, 'متابعة التسوق')],
+      categories: [sec('categories', {}, 'التصنيفات')], account: [sec('account', {}, 'حساب العميل')], orders: [sec('orders', {}, 'طلباتي السابقة')]
+    }
+  };
+}
+var doc = defaultDoc();
+var ui = { stage: 'create', mode: 'easy', tab: 'sections', page: 'home', sel: null, advNode: null, advTab: 'tree', dark: false, dir: 'rtl', device: 'p390', coach: true, saving: false, saveErr: false, failNext: false, sheet: null, appName: 'متجري', blankStart: false, tpl: 'basic' };
+var past = [], future = [], savedSnap = '', lastKey = null, lastT = 0, savedAt = null;
+function snap() { return JSON.stringify(doc); }
+function isDirty() { return snap() !== savedSnap; }
+function isMobile() { return window.matchMedia('(max-width: 999px)').matches; }
+function isWide() { return window.matchMedia('(min-width: 1100px)').matches; }
+/* «مسطّح» = جوال حقيقي: معاينة بملء الشاشة بلا إطار. الآيباد العمودي (≥700×700) يبقى بإطار جهاز */
+function isFlat() { return isMobile() && !window.matchMedia('(min-width: 700px) and (min-height: 700px)').matches; }
+function list(p) { return doc.pages[p] || []; }
+function findSec(id) { for (var p in doc.pages) { var a = doc.pages[p]; for (var i = 0; i < a.length; i++) if (a[i].id === id) return { s: a[i], page: p, i: i, arr: a }; } return null; }
+function curPage() { return (ui.mode === 'advanced' && ui.page !== 'home' && ui.page !== 'cart') ? 'home' : ui.page; }
+
+function mutate(fn, o) {
+  o = o || {}; var before = snap(); fn(); if (before === snap()) return;
+  var now = Date.now();
+  if (o.key && lastKey === o.key && now - lastT < 1200) { /* ندمج ضربات الكتابة في خطوة واحدة */ } else { past.push(before); if (past.length > 50) past.shift(); }
+  future = []; lastKey = o.key || null; lastT = now;
+  if (o.full) refreshAll(); else afterChange();
+}
+function restore(js) { doc = JSON.parse(js); lastKey = null; if (ui.sel && !findSec(ui.sel)) { ui.sel = null; ui.advNode = null; } refreshAll(); }
+function undo() { if (!past.length) return; future.push(snap()); restore(past.pop()); }
+function redo() { if (!future.length) return; past.push(snap()); restore(future.pop()); }
+function save() {
+  if (ui.saving || !isDirty()) return;
+  ui.saving = true; ui.saveErr = false; renderStatus();
+  setTimeout(function () {
+    ui.saving = false;
+    if (ui.failNext) { ui.failNext = false; ui.saveErr = true; renderStatus(); toast('تعذّر الحفظ (محاكاة). تعديلاتك ما زالت هنا ولم تُفقد.', { label: 'إعادة المحاولة', fn: save }); return; }
+    savedSnap = snap(); savedAt = new Date(); ui.saveErr = false; renderStatus(); syncGuard(); toast('حُفظت المسودة (حفظ تجريبي — لا شيء يُرسل لأي خادم).');
+  }, 700);
+}
+
+/* فحص التوافق: يحاكي المحرك — قسم/ميزة مطلوبة غير مدعومة تمنع النشر، والاختياري يُسقط بأمان (CompatibilityResolver) */
+function compat() {
+  var block = [], warn = [];
+  ['home', 'cart'].forEach(function (p) {
+    list(p).forEach(function (s) {
+      if (s.hidden) return; var T = TYPES[s.type];
+      if (T.status === 'proposed') { if (s.optional) warn.push('القسم «' + s.name + '» اختياري: سيُسقط من التطبيق الحالي عند النشر ولن يظهر للعملاء.'); else block.push('القسم «' + s.name + '» (' + PAGES[p].label + ') يتطلب: ' + T.req); }
+      if ((s.type === 'hero' || s.type === 'image') && !s.props.img) warn.push('«' + s.name + '» بلا رابط صورة: تظهر صورة بديلة.');
+      if ((s.type === 'hero' || s.type === 'image') && s.props.img && !/^https:\/\//i.test(s.props.img)) warn.push('رابط الصورة في «' + s.name + '» ليس https، وسيُعرض بديل آمن.');
+      if (s.type === 'products' && s.adv.sort) warn.push('الترتيب المضبوط في «' + s.name + '» (' + s.adv.sort + ') لن يُطبَّق في التطبيق الحالي: Runtime لا يمرّر query.');
+    });
+  });
+  if (doc.nav.enabled) block.push('شريط التنقل السفلي (مقترح) يتطلب مكوّن تبويبات في Runtime.');
+  if (doc.ann.enabled) block.push('الشريط الإعلاني (مقترح) يتطلب مكوّناً جديداً في Runtime.');
+  return { block: block, warn: warn };
+}
+
+/* ───────────── المخطط الناتج + فهرس العقد ───────────── */
+var IDX = {};
+function reg(id, s, fields, root) { IDX[id] = { s: s, fields: fields || [], root: !!root }; }
+var STYLE_OPTS = [['body', 'body'], ['title', 'title'], ['caption', 'caption']];
+function nodeOf(s) {
+  var p = s.props, id = s.id;
+  function opt(n) { if (s.optional) n.optional = true; return n; }
+  function sectionWith(ch) { var n = { type: 'Section', id: id }; if (s.optional) n.optional = true; if (p.title) n.props = { title: p.title }; n.children = ch; reg(id, s, [{ k: 'title', label: 'props.title', kind: 'text' }], true); return n; }
+  switch (s.type) {
+    case 'text': reg(id + '-t', s, [{ k: 'text', label: 'props.text', kind: 'textarea' }, { k: 'style', label: 'props.style', kind: 'select', opts: STYLE_OPTS }]);
+      return sectionWith([{ type: 'Text', id: id + '-t', props: { text: p.text || '', style: p.style || 'body' } }]);
+    case 'products': { var b = { resource: 'commerce.products' }; if (s.adv.sort) b.query = { sort: s.adv.sort };
+      reg(id + '-list', s, [{ adv: 'sort', label: 'binding.query.sort', kind: 'select', opts: SORTS }]); reg(id + '-card', s, []);
+      return sectionWith([{ type: 'ProductList', id: id + '-list', binding: b, children: [{ type: 'ProductCard', id: id + '-card', optional: true, props: { title: '$item.display_name', amountMinor: '$item.price.amount_minor', imageUrl: '$item.thumbnail_url' }, action: { type: 'openProduct', params: { productId: '$item.id' } } }] }]); }
+    case 'hero': { reg(id + '-img', s, [{ k: 'img', label: 'props.url', kind: 'url' }]); var ch = [{ type: 'Image', id: id + '-img', props: { url: p.img || '' } }];
+      if (p.text) { reg(id + '-t', s, [{ k: 'text', label: 'props.text', kind: 'textarea' }]); ch.push({ type: 'Text', id: id + '-t', props: { text: p.text } }); }
+      if (p.btn) { reg(id + '-b', s, [{ k: 'btn', label: 'props.label', kind: 'text' }, { k: 'dest', label: 'action.params.pageId', kind: 'select', opts: DEST }]); ch.push({ type: 'Button', id: id + '-b', props: { label: p.btn, style: 'primary' }, action: { type: 'navigate', params: { pageId: p.dest || 'cart' } } }); }
+      return sectionWith(ch); }
+    case 'image': reg(id, s, [{ k: 'img', label: 'props.url', kind: 'url' }], true); return opt({ type: 'Image', id: id, props: { url: p.img || '' } });
+    case 'button': { reg(id, s, [{ k: 'btn', label: 'props.label', kind: 'text' }, { k: 'style', label: 'props.style', kind: 'select', opts: [['primary', 'primary'], ['secondary', 'secondary']] }, { k: 'dest', label: 'action.params.pageId', kind: 'select', opts: DEST }], true);
+      var n = { type: 'Button', id: id, props: { label: p.btn || '', style: p.style || 'primary' } }; if (p.dest) n.action = { type: 'navigate', params: { pageId: p.dest } }; return opt(n); }
+    case 'cartList': reg(id, s, [], true); return opt({ type: 'CartList', id: id, binding: { resource: 'commerce.cart', collect: 'items' }, children: [{ type: 'Section', id: id + '-line', optional: true, props: { title: '$item.product_name' }, children: [] }] });
+    case 'cartSummary': { reg(id, s, [{ k: 'label', label: 'props.summaryLabel', kind: 'text' }], true); var c = { type: 'CartSummary', id: id, props: { itemCount: 0, subtotalAmountMinor: 0 } }; if (p.label) c.props.summaryLabel = p.label; return opt(c); }
+    default: reg(id, s, [], true); return opt({ type: 'x-proposed.' + s.type, id: id });
+  }
+}
+function schemaOf() {
+  IDX = {}; var pages = {};
+  ['home', 'cart'].forEach(function (k) { pages[k] = { type: 'Page', id: k + '-root', children: list(k).filter(function (s) { return !s.hidden; }).map(nodeOf) }; });
+  return { schemaVersion: '1.0.0', minRuntimeVersion: '1.0.0', navigation: { initialPageId: 'home' }, theme: { tokens: { colorPrimary: doc.primary } }, pages: pages };
+}
+
+/* ───────────── عرض التطبيق داخل المعاينة ───────────── */
+var SAMPLE = [['منتج تجريبي ١', 99], ['منتج تجريبي ٢', 149], ['منتج تجريبي ٣', 79.5]];
+function imgBlock(u) {
+  if (u && /^https:\/\//i.test(u)) return '<div class="a-img"><img src="' + esc(u) + '" alt="" onerror="this.parentNode.innerHTML=\'' + ic('image', 22).replace(/'/g, "\\'") + '<span>تعذّر تحميل الصورة</span>\'"></div>';
+  return '<div class="a-img">' + ic('image', 22) + '<span>' + (u ? 'الرابط ليس https' : 'أضف رابط صورة') + '</span></div>';
+}
+function mini(type) {
+  var r = '';
+  switch (type) {
+    case 'text': r = '<div class="mv col"><div class="b" style="height:8px;width:40%"></div><div class="b" style="height:6px"></div><div class="b" style="height:6px;width:80%"></div></div>'; break;
+    case 'products': case 'orders': r = '<div class="mv">' + [0, 1, 2].map(function () { return '<div class="c"><div class="b" style="flex:1"></div><div class="b" style="height:5px"></div><div class="bp" style="height:7px"></div></div>'; }).join('') + '</div>'; break;
+    case 'hero': r = '<div class="mv col"><div class="b" style="flex:1"></div><div class="b" style="height:6px;width:55%"></div><div class="bp" style="height:9px;width:30%"></div></div>'; break;
+    case 'image': case 'slider': r = '<div class="mv col"><div class="b" style="flex:1"></div>' + (type === 'slider' ? '<div class="rw" style="justify-content:center"><div class="ci" style="width:6px;height:6px"></div><div class="ci" style="width:6px;height:6px;background:var(--primary)"></div><div class="ci" style="width:6px;height:6px"></div></div>' : '') + '</div>'; break;
+    case 'button': r = '<div class="mv" style="align-items:center;justify-content:center"><div class="bp" style="height:20px;width:60%;border-radius:6px"></div></div>'; break;
+    case 'grid': r = '<div class="mv col"><div class="rw" style="flex:1"><div class="b" style="flex:1;height:100%"></div><div class="b" style="flex:1;height:100%"></div></div><div class="rw" style="flex:1"><div class="b" style="flex:1;height:100%"></div><div class="b" style="flex:1;height:100%"></div></div></div>'; break;
+    case 'categories': r = '<div class="mv" style="align-items:center;justify-content:space-around">' + [0, 1, 2, 3].map(function () { return '<div class="ci"></div>'; }).join('') + '</div>'; break;
+    case 'countdown': r = '<div class="mv" style="align-items:center;justify-content:center">' + [0, 1, 2, 3].map(function () { return '<div class="bp" style="width:26px;height:30px"></div>'; }).join('') + '</div>'; break;
+    case 'video': r = '<div class="mv" style="align-items:center;justify-content:center"><div class="ci" style="width:30px;height:30px;background:var(--primary);display:flex;align-items:center;justify-content:center;color:var(--primary-fg)">' + ic('play', 14) + '</div></div>'; break;
+    case 'testimonials': r = '<div class="mv col"><div class="b" style="height:6px"></div><div class="b" style="height:6px;width:70%"></div><div class="rw"><div class="ci" style="width:16px;height:16px"></div><div class="b" style="height:5px;width:40%"></div></div></div>'; break;
+    case 'features': r = '<div class="mv col">' + [0, 1, 2].map(function () { return '<div class="rw"><div class="ci" style="width:12px;height:12px"></div><div class="b" style="height:6px;flex:1"></div></div>'; }).join('') + '</div>'; break;
+    case 'blog': r = '<div class="mv">' + [0, 1].map(function () { return '<div class="c"><div class="b" style="flex:1"></div><div class="b" style="height:5px"></div></div>'; }).join('') + '</div>'; break;
+    case 'account': r = '<div class="mv" style="align-items:center;gap:10px"><div class="ci" style="width:34px;height:34px"></div><div class="c" style="justify-content:center"><div class="b" style="height:7px;width:70%"></div><div class="b" style="height:5px;width:45%"></div></div></div>'; break;
+    case 'cartList': case 'cartSummary': r = '<div class="mv col">' + [0, 1].map(function () { return '<div class="rw"><div class="b" style="width:28px;height:20px"></div><div class="b" style="height:6px;flex:1"></div><div class="bp" style="height:8px;width:20%"></div></div>'; }).join('') + '</div>'; break;
+    default: r = '<div class="mv"></div>';
+  }
+  return r;
+}
+function view(s) {
+  var T = TYPES[s.type], p = s.props;
+  if (T.status === 'proposed') return '<div class="a-prop"><div class="hd">' + ic('dashed', 14) + '<b>' + esc(s.name) + '</b> — مقترح، ' + (s.optional ? 'اختياري: يُسقط عند النشر' : 'لا يظهر في التطبيق الحالي') + '</div>' + mini(s.type) + '</div>';
+  switch (s.type) {
+    case 'text': return '<div class="a-sec">' + (p.title ? '<h3>' + esc(p.title) + '</h3>' : '') + '<p class="' + esc(p.style) + '">' + esc(p.text) + '</p></div>';
+    case 'products': return '<div class="a-sec">' + (p.title ? '<h3>' + esc(p.title) + '</h3>' : '') + '<div class="a-prods">' + SAMPLE.map(function (x) { return '<div class="a-pc"><div class="im">' + ic('image', 22) + '</div><div class="tx">' + esc(x[0]) + '<div class="pr">' + money(x[1]) + '</div></div></div>'; }).join('') + '</div><div class="a-note">بيانات تجريبية في المعاينة — المنتجات الفعلية تُجلب من متجرك.</div></div>';
+    case 'hero': return '<div class="a-sec">' + imgBlock(p.img) + (p.title ? '<h3 style="margin-top:8px">' + esc(p.title) + '</h3>' : '') + (p.text ? '<p>' + esc(p.text) + '</p>' : '') + (p.btn ? '<button class="a-btn" style="margin-top:8px" tabindex="-1">' + esc(p.btn) + '</button>' : '') + '</div>';
+    case 'image': return '<div class="a-sec">' + imgBlock(p.img) + '</div>';
+    case 'button': return '<button class="a-btn' + (p.style === 'secondary' ? ' sec' : '') + '" tabindex="-1">' + esc(p.btn || 'زر') + '</button>';
+    case 'cartList': return '<div class="a-card">' + [['منتج تجريبي ١', 99, 1], ['منتج تجريبي ٢', 149, 2]].map(function (x) { return '<div class="a-line"><span>' + esc(x[0]) + '</span><span class="a-q"><span>−</span><span class="num">' + x[2] + '</span><span>+</span></span><b class="num">' + money(x[1] * x[2]) + '</b></div>'; }).join('') + '<div class="a-note">أسطر تجريبية — السلة الفعلية تُجلب وقت التشغيل.</div></div>';
+    case 'cartSummary': return '<div class="a-card"><div class="a-line"><span>' + esc(p.label || '٣ عناصر') + '</span><b class="num">' + money(397) + '</b></div></div>';
+  }
+  return '';
+}
+function ftb(s, r) {
+  function b(act, icn, label, dis) { return '<button type="button" data-act="' + act + '" data-id="' + s.id + '" aria-label="' + label + '"' + (dis ? ' disabled' : '') + '>' + ic(icn, 16) + '</button>'; }
+  return '<div class="ftb" role="toolbar" aria-label="إجراءات القسم">' + b('up', 'up', 'نقل لأعلى', r.i === 0) + b('downm', 'down', 'نقل لأسفل', r.i === r.arr.length - 1) + b('vis', 'eyeOff', 'إخفاء القسم') + b('dup', 'copy', 'تكرار القسم') + b('del', 'trash', 'حذف القسم') + '</div>';
+}
+function wrap(s) {
+  var T = TYPES[s.type], on = ui.sel === s.id, r = findSec(s.id);
+  return '<div class="sx' + (on ? ' on' : '') + '" data-sw="' + s.id + '" role="button" tabindex="0" aria-pressed="' + on + '" aria-label="تحرير «' + esc(s.name) + '»"><span class="lbl">' + esc(s.name) + ' · ' + esc(T.label) + '</span>' + (on ? ftb(s, r) : '') + '<div class="sw-in">' + view(s) + '</div></div>';
+}
+function productScreen() {
+  return '<div class="a-body"><div class="a-img">' + ic('image', 26) + '<span>صورة المنتج</span></div><h3 style="margin:0">منتج تجريبي ١</h3><div class="num" style="font-size:18px;font-weight:600">' + money(99) + '</div><div style="display:flex;gap:8px"><span class="a-q"><span>صغير</span></span><span class="a-q"><span>وسط</span></span></div><div class="a-line"><span class="a-q"><span>−</span><span class="num">1</span><span>+</span></span></div><button class="a-btn" tabindex="-1">إضافة للسلة</button></div>';
+}
+function appView(pk) {
+  var pg = PAGES[pk], secs = list(pk).filter(function (s) { return !s.hidden; });
+  var h = '<div class="app" dir="' + ui.dir + '" style="--ap:' + esc(isHex(doc.primary) ? doc.primary : '#0f6a5a') + ';--ink:' + ink(doc.primary) + '">';
+  if (doc.ann.enabled) h += '<div class="a-ann">' + ic('mega', 14) + '<span>' + esc(doc.ann.text) + '</span><span style="font-size:10px">(مقترح)</span></div>';
+  h += '<div class="a-bar"><span>' + esc(doc.name || 'تطبيقي') + '</span></div>';
+  if (pg.native) h += '<div class="a-ghost"><b>شاشة أصلية — عرض فقط.</b> ' + escb(pg.req) + '</div>' + productScreen();
+  else {
+    if (pg.status === 'proposed') h += '<div class="a-ghost"><b>تصوّر صفحة «' + esc(pg.label) + '»</b> — لا يدعمها Runtime الحالي. ' + escb(pg.req) + '</div>';
+    h += '<div class="a-body" data-body="' + pk + '">' + (secs.length ? secs.map(wrap).join('') : '<div class="a-note" style="text-align:center;padding:26px 0">لا أقسام ظاهرة في هذه الصفحة</div>') +
+      '<div class="a-addrow"><button type="button" class="a-add" data-act="add">' + ic('plus', 16) + 'إضافة قسم</button></div></div>';
+  }
+  if (doc.nav.enabled) {
+    var vis = doc.nav.tabs.filter(function (t) { return t.visible; }).slice(0, MAX_TABS);
+    h += '<div class="a-rib">شريط تنقل سفلي — مقترح، غير مدعوم حالياً</div><div class="a-tabs">' + vis.map(function (t, i) { var pi = PAGES[t.page] || PAGES.home; return '<div class="' + (t.page === pk ? 'on' : '') + '">' + ic(pi.icon, 18) + esc(t.label) + '</div>'; }).join('') + '</div>';
+  }
+  return h + '</div>';
+}
+
+/* ───────────── الهيكل والعرض ───────────── */
+var root = function () { return $('#root'); };
+var lastFocus = null;
+function strip() { return '<div class="proto-strip">' + ic('info', 14) + '<span>نموذج تصوّر V2 للمراجعة<span class="hide-m"> — غير متصل بالنظام، ولا يُحفظ فيه شيء حقيقي.</span></span><button class="link" data-act="limits">حدود النموذج</button></div>'; }
+function modeBtns() { return '<button data-act="mode" data-v="easy" aria-pressed="' + (ui.mode === 'easy') + '">سهل</button><button data-act="mode" data-v="advanced" aria-pressed="' + (ui.mode === 'advanced') + '">متقدم</button>'; }
+function renderAll() {
+  document.documentElement.classList.toggle('dark', ui.dark);
+  var h = strip();
+  if (ui.stage === 'create') h += createView(); else if (ui.stage === 'creating') h += creatingView(); else h += shell();
+  root().innerHTML = h;
+  if (ui.stage === 'creating') runCreating();
+  if (ui.stage === 'editor') { renderNav(); renderInsp(); renderStage(); renderStatus(); syncWork(); }
+  syncGuard();
+}
+function refreshAll() { renderNav(); renderInsp(); renderStage(); renderStatus(); syncWork(); syncGuard(); }
+function shell() {
+  return '<header class="top"><div class="ttl">' + ic('phone', 18) + '<span class="n" id="appname">' + esc(doc.name || 'تطبيقي') + '</span><span class="badge neutral">مسودة</span></div>' +
+    '<div class="seg seg-d" role="group" aria-label="وضع التحرير">' + modeBtns() + '</div>' +
+    '<div class="grp"><span id="status" class="status" role="status"></span>' +
+    '<button class="btn ic g hide-m" id="undo" data-act="undo" aria-label="تراجع" title="تراجع (Ctrl+Z)">' + ic('undo') + '</button><button class="btn ic g hide-m" id="redo" data-act="redo" aria-label="إعادة" title="إعادة (Ctrl+Shift+Z)">' + ic('redo') + '</button>' +
+    '<button class="btn p" id="savebtn" data-act="save" title="حفظ (Ctrl+S)">' + ic('save', 16) + 'حفظ</button><button class="btn ic g" data-act="more" aria-label="المزيد">' + ic('more') + '</button></div></header>' +
+    '<div class="modebar"><div class="seg" role="group" aria-label="وضع التحرير (جوال)">' + modeBtns() + '</div></div>' +
+    '<div class="work" id="work" data-sel="0"><aside class="navp" id="navp" aria-label="المستكشف"></aside><main class="stage" id="stage" aria-label="معاينة التطبيق"></main><aside class="insp" id="insp" aria-label="خصائص العنصر"></aside></div>' +
+    '<div class="scrim" id="scrim" data-act="sheetclose"></div>' +
+    '<nav class="bbar" aria-label="أدوات المحرر"><button data-act="bb" data-v="sections" aria-pressed="false">' + ic('layers', 20) + 'الأقسام</button><button data-act="add">' + ic('plus', 20) + 'إضافة</button><button data-act="bb" data-v="pages" aria-pressed="false">' + ic('home', 20) + 'الصفحات</button><button data-act="bb" data-v="identity" aria-pressed="false">' + ic('palette', 20) + 'الهوية</button></nav>';
+}
+function syncWork() {
+  var w = $('#work'); if (!w) return;
+  var has = ui.mode === 'easy' ? !!(ui.sel && findSec(ui.sel)) : !!ui.advNode;
+  w.setAttribute('data-sel', has ? '1' : '0');
+  var m = isMobile(), navp = $('#navp'), insp = $('#insp'), scrim = $('#scrim');
+  if (navp) navp.classList.toggle('open', m && ui.sheet === 'nav');
+  if (insp) insp.classList.toggle('open', m && ui.sheet === 'insp' && has);
+  if (scrim) scrim.classList.toggle('on', m && ui.sheet === 'nav');
+  $$('.bbar [data-act="bb"]').forEach(function (b) { b.setAttribute('aria-pressed', String(m && ui.sheet === 'nav' && ui.tab === b.getAttribute('data-v'))); });
+}
+
+/* ── الإنشاء ── */
+function tplThumb(k) {
+  var T = TPLS[k], bd = T.thumb.map(function (t) {
+    if (t === 'h') return '<div class="x" style="height:34px"></div>';
+    if (t === 'p') return '<div class="r3"><div class="x"></div><div class="x"></div><div class="x"></div></div>';
+    if (t === 'b') return '<div class="pl" style="background:' + T.primary + '"></div>';
+    return '<div class="x" style="height:7px;width:45%"></div><div class="x" style="height:5px"></div>';
+  }).join('');
+  return '<div class="th" aria-hidden="true"><div class="hb" style="background:' + T.primary + '"></div><div class="bd">' + bd + '</div></div>';
+}
+function createView() {
+  var T = TPLS[ui.tpl] || TPLS.basic;
+  return '<div class="crt"><div class="card wide"><div><h1 class="h2" style="font-size:20px">أنشئ تطبيقك</h1><p class="sub" style="margin-top:4px">اختر قالباً جاهزاً لتبدأ منه، ثم تفتح مباشرة على معاينته وتعدّل بالضغط على أي عنصر. القالب نقطة بداية فقط: كل شيء قابل للتغيير لاحقاً.</p></div>' +
+    '<div class="fld"><label for="newname">اسم التطبيق</label><input id="newname" class="in" value="' + esc(ui.appName) + '" maxlength="60" autocomplete="off"></div>' +
+    '<div class="fld"><div class="lb" id="tpllb">القالب</div><div class="tpls" role="group" aria-labelledby="tpllb">' + TPL_ORDER.map(function (k) {
+      var t = TPLS[k]; return '<button type="button" class="tp" data-act="tpl" data-v="' + k + '" aria-pressed="' + (ui.tpl === k) + '">' + tplThumb(k) + '<span class="tx"><span class="nm"><span>' + esc(t.name) + '</span>' + (ui.tpl === k ? '<span class="badge ready">' + ic('check', 12) + 'المحدد</span>' : '') + '</span><span class="ds">' + esc(t.desc) + '</span><span class="ds"><span class="badge neutral">' + esc(t.tag) + '</span></span></span></button>';
+    }).join('') + '</div></div>' +
+    '<ul class="chk" id="tplines">' + T.lines.map(function (t) { return '<li><span class="st">' + ic('check', 16) + '</span><span>' + esc(t) + '</span></li>'; }).join('') + '</ul>' +
+    '<div class="note prop">' + ic('dashed', 18) + '<div><b>القوالب هنا تصوّر لتجربة الاختيار.</b> كلها من أقسام جاهزة اليوم فقط. من يملك القوالب وكيف تُخزَّن وتُحدَّث قرار مفتوح (استراتيجية القوالب).</div></div>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><button class="btn p lg" data-act="create">إنشاء تطبيقي</button><button class="link" data-act="blank">أو ابدأ من الصفر (الوضع المتقدم)</button></div></div></div>';
+}
+function creatingView() {
+  return '<div class="crt"><div class="card" role="status" aria-live="polite"><h1 class="h2" style="font-size:18px">نجهّز تطبيقك…</h1><ul class="chk" id="steps">' + ['إنشاء الصفحة الرئيسية وأقسامها', 'إنشاء صفحة السلة', 'ضبط الهوية الافتراضية', 'تجهيز المعاينة'].map(function (t) { return '<li><span class="st" style="color:var(--muted)">' + ic('loader', 16).replace('class="i"', 'class="i spin"') + '</span><span>' + t + '</span></li>'; }).join('') + '</ul></div></div>';
+}
+function runCreating() {
+  var items = $$('#steps li'), i = 0;
+  (function next() {
+    if (i >= items.length) { setTimeout(enterEditor, 250); return; }
+    var li = items[i++];
+    setTimeout(function () { var st = li.querySelector('.st'); st.style.color = 'var(--positive)'; st.innerHTML = ic('check', 16); next(); }, 320);
+  })();
+}
+function enterEditor() {
+  doc = defaultDoc(ui.appName.trim() || 'متجري', ui.tpl); if (ui.blankStart) doc.pages.home = [];
+  past = []; future = []; savedSnap = snap(); savedAt = new Date(); ui.stage = 'editor'; ui.page = 'home'; ui.sel = null; ui.advNode = null; ui.tab = 'sections'; ui.sheet = null;
+  ui.mode = ui.blankStart ? 'advanced' : 'easy'; ui.coach = !ui.blankStart; ui.saveErr = false; ui.failNext = false;
+  renderAll();
+  toast(ui.blankStart ? 'بدأت من الصفر في الوضع المتقدم — يمكنك العودة للسهل في أي وقت.' : 'تطبيقك جاهز. اضغط أي عنصر في المعاينة لتحريره.');
+}
+
+/* ── المستكشف ── */
+function renderNav() {
+  var n = $('#navp'); if (!n) return;
+  var h = '';
+  if (isMobile()) h += '<div class="ihead"><div class="t"><b>' + (ui.mode === 'easy' ? 'المستكشف' : 'الشجرة') + '</b></div><button class="btn ic g" data-act="sheetclose" aria-label="إغلاق">' + ic('x') + '</button></div>';
+  if (ui.mode === 'easy') {
+    h += '<div class="ptabs" role="tablist">' + [['sections', 'الأقسام'], ['pages', 'الصفحات والتنقل'], ['identity', 'الهوية']].map(function (t) { return '<button role="tab" data-act="tab" data-v="' + t[0] + '" aria-selected="' + (ui.tab === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div>';
+    h += ui.tab === 'pages' ? pagesTab() : ui.tab === 'identity' ? identityTab() : sectionsTab();
+  } else h += advNav();
+  n.innerHTML = h; bindDrag();
+}
+function sectionsTab() {
+  var pk = ui.page, pg = PAGES[pk], arr = list(pk), vis = arr.filter(function (s) { return !s.hidden; }).length;
+  var h = '<div class="pbody"><div class="fld"><label for="pgsel">الصفحة</label><select id="pgsel" class="sel-in" data-pgsel>' + PAGE_ORDER.map(function (k) { return '<option value="' + k + '"' + (k === pk ? ' selected' : '') + '>' + esc(PAGES[k].label) + (PAGES[k].status === 'proposed' ? ' (مقترح)' : '') + '</option>'; }).join('') + '</select></div>';
+  h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><h2 class="h2">أقسام «' + esc(pg.label) + '»</h2>' + badge(pg.status) + '</div>';
+  if (pg.native) return h + '<div class="note prop">' + ic('dashed', 18) + '<div><b>لا أقسام قابلة للتحرير.</b> ' + escb(pg.req) + '</div></div></div>';
+  if (pg.status === 'proposed') h += '<div class="note prop">' + ic('dashed', 18) + '<div><b>تصوّر للمراجعة فقط.</b> ' + escb(pg.req) + '</div></div>';
+  h += '<p class="sub" id="seccount">' + arr.length + ' قسم · ' + vis + ' ظاهر</p><ul class="secs" id="seclist" aria-label="أقسام الصفحة">' + listHtml() + '</ul><button class="add" data-act="add">' + ic('plus', 18) + 'إضافة قسم</button></div>';
+  return h;
+}
+/* عنوان فرعي مشتق من خصائص القسم لتمييز الأقسام المتشابهة — عرض فقط، لا يُخزَّن ولا يمسّ AppSchema */
+function subOf(s) {
+  var p = s.props, T = TYPES[s.type];
+  function cut(x, n) { x = String(x || '').trim().replace(/\s+/g, ' '); return x.length > n ? x.slice(0, n - 1) + '…' : x; }
+  function host(u) { if (!u) return 'بلا رابط صورة'; if (!/^https:\/\//i.test(u)) return 'الرابط ليس https'; try { return new URL(u).host; } catch (e) { return 'رابط غير صالح'; } }
+  function dst(d) { return d === 'home' ? 'الرئيسية' : 'السلة'; }
+  switch (s.type) {
+    case 'text': return cut(p.title, 26) || cut(p.text, 30) || 'نص فارغ';
+    case 'products': return (cut(p.title, 22) || 'بلا عنوان') + ' · منتجات حيّة';
+    case 'hero': return (cut(p.title, 22) || 'بلا عنوان') + (p.btn ? ' · زر ← ' + dst(p.dest) : '');
+    case 'image': return host(p.img);
+    case 'button': return (cut(p.btn, 18) || 'بلا نص') + ' ← ' + dst(p.dest);
+    case 'cartList': return 'أسطر السلة الحيّة';
+    case 'cartSummary': return cut(p.label, 26) || 'التسمية الافتراضية';
+  }
+  return T.status === 'proposed' ? 'تصوّر مقترح' : '';
+}
+function ordOf(s, arr) { var same = arr.filter(function (x) { return x.type === s.type; }); return same.length > 1 ? (same.indexOf(s) + 1) + ' من ' + same.length : ''; }
+function listHtml() {
+  var arr = list(ui.page);
+  if (!arr.length) return '<li class="empty">لا أقسام في هذه الصفحة بعد. أضف أول قسم من الكتالوج.</li>';
+  return arr.map(function (s) {
+    var T = TYPES[s.type];
+    return '<li class="row' + (ui.sel === s.id ? ' sel' : '') + (s.hidden ? ' hid' : '') + '" data-sec="' + s.id + '"><button class="grip" data-grip="' + s.id + '" aria-label="إعادة ترتيب «' + esc(s.name) + '» (الأسهم أعلى/أسفل)">' + ic('grip', 18) + '</button>' +
+      '<button class="main" data-act="sel" data-id="' + s.id + '"><span style="color:var(--muted)">' + ic(T.icon, 20) + '</span><span class="t"><span class="nm">' + esc(s.name || T.label) + '</span><span class="sb">' + esc(subOf(s)) + '</span><span class="ty">' + esc(T.label) + (ordOf(s, arr) ? '<span class="badge neutral" title="ترتيبه بين أقسام النوع نفسه في الصفحة"><bdi dir="ltr" class="num">' + ordOf(s, arr).replace(' من ', '/') + '</bdi></span>' : '') + (T.status !== 'ready' ? badge(T.status) : '') + (s.optional ? '<span class="badge neutral">اختياري</span>' : '') + (s.hidden ? '<span class="badge neutral">' + ic('eyeOff', 12) + 'مخفي</span>' : '') + '</span></span></button>' +
+      '<button class="btn ic g" data-act="vis" data-id="' + s.id + '" aria-label="' + (s.hidden ? 'إظهار' : 'إخفاء') + ' «' + esc(s.name) + '»">' + ic(s.hidden ? 'eyeOff' : 'eye') + '</button><button class="btn ic g" data-act="menu" data-id="' + s.id + '" aria-label="خيارات «' + esc(s.name) + '»">' + ic('more') + '</button></li>';
+  }).join('');
+}
+function pagesTab() {
+  var h = '<div class="pbody"><div><h2 class="h2">صفحات التطبيق</h2><p class="sub">الصفحات منفصلة عن الأقسام: اختر صفحة لعرضها وتحرير أقسامها.</p></div><div style="display:flex;flex-direction:column;gap:8px">' +
+    PAGE_ORDER.map(function (k) { var pg = PAGES[k]; return '<button class="pgrow' + (ui.page === k ? ' sel' : '') + (pg.status === 'proposed' ? ' prop' : '') + '" data-act="page" data-v="' + k + '" data-from="pages"><span style="color:var(--muted)">' + ic(pg.icon, 20) + '</span><span class="t"><b>' + esc(pg.label) + '</b><small>' + (pg.native ? 'شاشة أصلية' : list(k).length + ' قسم') + '</small></span>' + badge(pg.status) + ic('chevL', 16) + '</button>'; }).join('') + '</div>';
+  h += '<div><h2 class="h2">الأشرطة والتنقل</h2></div>';
+  h += '<div class="tgl"><div class="tx"><b>الشريط العلوي</b><span class="sub">يعرض اسم التطبيق. العنوان ثابت في Runtime الحالي.</span></div>' + badge('limited') + '</div>';
+  h += '<div class="tgl"><div class="tx"><b>شريط التنقل السفلي</b>' + badge('proposed') + '<span class="sub">يتطلب مكوّن تبويبات في Runtime. يمنع النشر عند التفعيل.</span></div><span class="sw"><input type="checkbox" data-nv="enabled" aria-label="شريط التنقل السفلي" ' + (doc.nav.enabled ? 'checked' : '') + '><i></i></span></div>';
+  if (doc.nav.enabled) {
+    h += '<p class="sub">حتى ' + MAX_TABS + ' تبويبات ظاهرة (اقتراح مستلهم من حد موثّق عند سلة). الظاهر الآن: ' + doc.nav.tabs.filter(function (t) { return t.visible; }).length + '.</p>';
+    h += doc.nav.tabs.map(function (t, i) {
+      return '<div class="tabrow"><input class="in" data-tab="' + t.id + '" data-tk="label" value="' + esc(t.label) + '" aria-label="اسم التبويب" maxlength="14"><select class="sel-in" data-tab="' + t.id + '" data-tk="page" aria-label="الصفحة المربوطة">' + PAGE_ORDER.filter(function (k) { return !PAGES[k].native; }).map(function (k) { return '<option value="' + k + '"' + (t.page === k ? ' selected' : '') + '>' + esc(PAGES[k].label) + '</option>'; }).join('') + '</select>' +
+        '<span class="sw"><input type="checkbox" data-tab="' + t.id + '" data-tk="visible" aria-label="إظهار التبويب" ' + (t.visible ? 'checked' : '') + '><i></i></span></div>';
+    }).join('');
+  }
+  h += '<div class="tgl"><div class="tx"><b>الشريط الإعلاني</b>' + badge('proposed') + '<span class="sub">يتطلب مكوّناً جديداً. يمنع النشر عند التفعيل.</span></div><span class="sw"><input type="checkbox" data-an="enabled" aria-label="الشريط الإعلاني" ' + (doc.ann.enabled ? 'checked' : '') + '><i></i></span></div>';
+  if (doc.ann.enabled) h += '<div class="fld"><label for="anntxt">نص الإعلان</label><input id="anntxt" class="in" data-an="text" value="' + esc(doc.ann.text) + '" maxlength="60"></div>';
+  return h + '</div>';
+}
+function identityTab() {
+  var h = '<div class="pbody"><div><h2 class="h2">هوية التطبيق</h2><p class="sub">الاسم واللون يظهران في المعاينة فوراً.</p></div>';
+  h += '<div class="fld"><label for="idname">اسم التطبيق</label><input id="idname" class="in" data-id="name" value="' + esc(doc.name) + '" maxlength="60" autocomplete="off" placeholder="تطبيقي"><p class="help">يُخزَّن في سجل التطبيق. ظهوره في شريط التطبيق الحقيقي يحتاج Runtime (العنوان ثابت اليوم).</p>' + dfltLine('يُستعمل الاسم «تطبيقي»') + '</div>';
+  h += '<div class="fld"><div class="lb">لون التطبيق ' + badge('limited') + '</div><div class="swc" role="group" aria-label="ألوان جاهزة">' + SWATCHES.map(function (c) { var on = doc.primary.toLowerCase() === c.toLowerCase(); return '<button data-act="sw" data-v="' + c + '" aria-pressed="' + on + '" aria-label="اللون ' + c + '" style="background:' + c + '">' + (on ? ic('check', 16) : '') + '</button>'; }).join('') + '</div><input class="in ltr mono" data-id="primary" value="' + esc(doc.primary) + '" maxlength="7" aria-label="قيمة اللون" style="max-width:140px" placeholder="#0F6A5A"><p class="help" id="hexerr" style="color:var(--negative)"></p>' + dfltLine('عند إدخال قيمة غير صالحة يبقى اللون الحالي') + '</div>';
+  h += '<div class="note warn">' + ic('alert', 18) + '<div><b>فجوة معروفة (<bdi dir="ltr">P0-1</bdi>):</b> الواجهة تكتب اللون بمفتاح لا يقرؤه التطبيق الحقيقي، ويُقرأ اللون اليوم من المخطط المضمَّن لا من التجربة المنشورة.</div></div>';
+  [['الشعار', 'لا شعار في Runtime الحالي.'], ['شاشة البداية', 'لا شاشة بداية مخططية؛ الـsplash أصلي ثابت.'], ['شاشات الترحيب', 'غير موجودة في Runtime.']].forEach(function (x) { h += '<div class="tgl"><div class="tx"><b>' + x[0] + '</b><span class="sub">' + x[1] + '</span></div>' + badge('proposed') + '</div>'; });
+  h += '<div class="tgl"><div class="tx"><b>الوضع الداكن للتطبيق</b><span class="sub">لا يستهلكه Runtime.</span></div><span class="sw"><input type="checkbox" disabled aria-label="الوضع الداكن للتطبيق"><i></i></span></div>';
+  h += '<div class="fld"><label for="fnt">الخط ' + badge('proposed') + '</label><select id="fnt" class="sel-in" disabled><option>الافتراضي</option></select><p class="help">لا تعريف خطوط في Runtime الحالي.</p></div></div>';
+  return h;
+}
+
+/* ── المفتش ── */
+function field(s, f) {
+  var id = 'f_' + s.id + '_' + f.k, v = s.props[f.k], h = '<div class="fld">', lab = '<label for="' + id + '">' + escb(f.label) + (f.kind === 'prop' ? badge('proposed') : '') + '</label>';
+  if (f.kind === 'prop') return h + lab + '<input id="' + id + '" class="in" disabled value="—" aria-describedby="' + id + 'h"><p class="help" id="' + id + 'h">' + escb(f.help || 'يتطلب تطوير Runtime أو API ولا يعمل في التطبيق الحالي.') + '</p></div>';
+  if (f.kind === 'ro') return h + '<div class="lb">' + escb(f.label) + '</div><div class="ro">' + escb(f.val) + '</div>' + (f.help ? '<p class="help">' + escb(f.help) + '</p>' : '') + '</div>';
+  if (f.kind === 'textarea') h += lab + '<textarea id="' + id + '" class="ta" data-fld="' + f.k + '">' + esc(v) + '</textarea>';
+  else if (f.kind === 'select') h += lab + '<select id="' + id + '" class="sel-in" data-fld="' + f.k + '">' + f.opts.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (String(v) === o[0] ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select>';
+  else h += lab + '<input id="' + id + '" class="in' + (f.kind === 'url' ? ' ltr' : '') + '" data-fld="' + f.k + '" value="' + esc(v) + '" placeholder="' + esc(f.ph || '') + '" autocomplete="off">';
+  if (f.help) h += '<p class="help">' + escb(f.help) + '</p>';
+  if (f.dflt) h += dfltLine(f.dflt);
+  return h + '</div>';
+}
+/* افتراضي معلن: ما الذي يحدث إن تُرك الحقل فارغاً (بدل علامة إلزامي بلا تفسير) */
+function dfltLine(t) { return '<p class="help dflt"><span class="badge neutral">الافتراضي</span><span>إن تُرك فارغاً: ' + escb(t) + '</span></p>'; }
+function renderInsp() {
+  var el = $('#insp'); if (!el) return;
+  el.innerHTML = ui.mode === 'easy' ? easyInsp() : advInsp();
+}
+function easyInsp() {
+  var r = ui.sel && findSec(ui.sel);
+  if (!r) return '<div class="ihead"><div class="t"><b>خصائص العنصر</b></div></div><div class="pbody"><div class="empty">' + ic('pencil', 22) + '<p style="margin:8px 0 0"><b>اضغط أي عنصر في المعاينة لتحريره.</b></p><p class="sub">أو اختر قسماً من القائمة، أو أضف قسماً جديداً.</p></div></div>';
+  var s = r.s, T = TYPES[s.type];
+  var h = '<div class="ihead"><button class="btn ic g back" data-act="back" aria-label="رجوع إلى الأقسام">' + ic('chevR') + '</button><div class="t"><small>تحرير القسم</small><b id="insp-title">' + esc(s.name) + '</b><small class="sb2" id="insp-sub">' + esc(T.label + (subOf(s) && T.status !== 'proposed' ? ' · ' + subOf(s) : '')) + '</small></div>' + badge(T.status) + '<button class="btn ic g" data-act="back" aria-label="إغلاق وإلغاء التحديد">' + ic('x') + '</button></div><div class="pbody">';
+  h += '<div class="iact"><button class="btn sm" data-act="up" data-id="' + s.id + '"' + (r.i === 0 ? ' disabled' : '') + '>' + ic('up', 16) + 'أعلى</button><button class="btn sm" data-act="downm" data-id="' + s.id + '"' + (r.i === r.arr.length - 1 ? ' disabled' : '') + '>' + ic('down', 16) + 'أسفل</button><button class="btn sm" data-act="dup" data-id="' + s.id + '">' + ic('copy', 16) + 'تكرار</button></div>';
+  if (T.status === 'proposed') h += '<div class="note prop">' + ic('dashed', 18) + '<div><b>قسم مقترح — لا يعمل في التطبيق الحالي.</b><br>' + escb(T.req) + '</div></div>';
+  if (T.note) h += '<div class="note warn">' + ic('alert', 18) + '<div>' + escb(T.note) + '</div></div>';
+  h += '<div class="fld"><label for="f_name">اسم القسم (للتنظيم) ' + badge('decide') + '</label><input id="f_name" class="in" data-fld="__name" value="' + esc(s.name) + '" placeholder="' + esc(T.label) + '" maxlength="40" autocomplete="off"><p class="help">لا مكان لاسم القسم في AppSchema اليوم؛ يتطلب مخزناً جانبياً لبيانات المحرر (قرار معماري).</p>' + dfltLine('يعود إلى اسم النوع «' + esc(T.label) + '»') + '</div>';
+  h += T.fields.map(function (f) { return field(s, f); }).join('');
+  if (s.type === 'products' && s.adv.sort) h += '<div class="note warn">' + ic('alert', 18) + '<div><b>مضبوط من الوضع المتقدم:</b> <bdi dir="ltr">sort=' + esc(s.adv.sort) + '</bdi>. القيمة محفوظة ولا تُمسح، لكنها لا تُطبَّق في التطبيق الحالي.</div></div>';
+  h += '<div class="tgl"><div class="tx"><b>إظهار القسم في التطبيق</b><span class="sub">الإخفاء لا يحذف إعدادات القسم. ' + badge('decide') + '</span></div><span class="sw"><input type="checkbox" data-fld="__vis" aria-label="إظهار القسم" ' + (s.hidden ? '' : 'checked') + '><i></i></span></div>';
+  if (T.status === 'proposed') h += '<div class="tgl"><div class="tx"><b>اختياري عند النشر</b><span class="sub">يُسقط القسم من التطبيق الحالي بدل منع النشر (سلوك <bdi dir="ltr">optional</bdi> في المحرك).</span></div><span class="sw"><input type="checkbox" data-fld="__opt" aria-label="اختياري عند النشر" ' + (s.optional ? 'checked' : '') + '><i></i></span></div>';
+  h += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;border-top:1px solid var(--border);padding-top:12px"><button class="link" data-act="adv" data-id="' + s.id + '">إعدادات متقدمة لهذا القسم ←</button><button class="btn neg" data-act="del" data-id="' + s.id + '">' + ic('trash', 16) + 'حذف القسم</button></div></div>';
+  return h;
+}
+/* ── الوضع المتقدم (تحرير جزئي تجريبي على المسودة نفسها) ── */
+function treeNodes(n, d, out) { out.push({ n: n, d: d }); (n.children || []).forEach(function (c) { treeNodes(c, d + 1, out); }); return out; }
+function advNav() {
+  var sc = schemaOf(), pk = (ui.page === 'cart') ? 'cart' : 'home';
+  var h = '<div class="ptabs" role="tablist">' + [['tree', 'الشجرة'], ['json', 'المخطط (JSON)']].map(function (t) { return '<button role="tab" data-act="advtab" data-v="' + t[0] + '" aria-selected="' + (ui.advTab === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div><div class="pbody">';
+  h += '<div class="note">' + ic('info', 18) + '<div><b>الوضع المتقدم — عرض توضيحي.</b> المحرر المتقدم الحقيقي يبقى كما هو بكامل قدراته. هنا تحرير <b>جزئي</b> لإثبات أن الوضعين يعملان على <b>المسودة نفسها وAppSchema نفسه</b> دون فقد بيانات.</div></div>';
+  if (ui.advTab === 'json') return h + '<pre class="json" tabindex="0" id="jsonpre" aria-label="المخطط الناتج">' + esc(JSON.stringify(sc, null, 2)) + '</pre></div>';
+  h += '<div style="display:flex;gap:6px">' + ['home', 'cart'].map(function (k) { return '<button class="chip" data-act="page" data-v="' + k + '" aria-pressed="' + (pk === k) + '">' + PAGES[k].label + '</button>'; }).join('') + '</div>';
+  h += '<div class="tree" role="tree" aria-label="شجرة المكوّنات">' + treeNodes(sc.pages[pk], 0, []).map(function (o) {
+    var n = o.n, w = /^x-proposed/.test(n.type);
+    return '<button role="treeitem" class="' + (ui.advNode === n.id ? 'on' : '') + '" data-act="tnode" data-v="' + esc(n.id) + '" style="padding-left:' + (6 + o.d * 16) + 'px"><span style="font-weight:500" class="' + (w ? 'tw' : '') + '">' + esc(n.type) + '</span><span class="tid">#' + esc(n.id) + '</span>' + (n.optional ? '<span class="tid">optional</span>' : '') + (w ? '<span class="tw">' + ic('alert', 12) + '</span>' : '') + (n.binding ? '<span class="tid">⇄ ' + esc(n.binding.resource) + '</span>' : '') + '</button>';
+  }).join('') + '</div><div><button class="btn" data-act="mode" data-v="easy">العودة إلى الوضع السهل</button></div></div>';
+  return h;
+}
+function findNode(n, id) { if (n.id === id) return n; var c = n.children || []; for (var i = 0; i < c.length; i++) { var f = findNode(c[i], id); if (f) return f; } return null; }
+function advInsp() {
+  if (!ui.advNode) return '<div class="ihead"><div class="t"><b>خصائص العقدة</b></div></div><div class="pbody"><div class="empty">اختر عقدة من الشجرة أو اضغط قسماً في المعاينة.</div></div>';
+  var sc = schemaOf(), node = null; ['home', 'cart'].forEach(function (k) { var f = findNode(sc.pages[k], ui.advNode); if (f) node = f; });
+  if (!node) return '<div class="ihead"><div class="t"><b>خصائص العقدة</b></div></div><div class="pbody"><div class="empty">العقدة غير موجودة (القسم مخفي أو محذوف).</div></div>';
+  var ix = IDX[node.id], h = '<div class="ihead"><button class="btn ic g back" data-act="back" aria-label="رجوع">' + ic('chevR') + '</button><div class="t"><small>عقدة</small><b class="mono" style="text-align:left">' + esc(node.type) + '</b></div><button class="btn ic g" data-act="back" aria-label="إغلاق">' + ic('x') + '</button></div><div class="pbody">';
+  h += '<dl class="kv"><dt>النوع</dt><dd class="mono">' + esc(node.type) + '</dd><dt>المعرّف</dt><dd class="mono">' + esc(node.id) + '</dd>' + (node.props ? '<dt>props</dt><dd><pre class="json" style="max-height:120px">' + esc(JSON.stringify(node.props, null, 2)) + '</pre></dd>' : '') + (node.binding ? '<dt>binding</dt><dd><pre class="json" style="max-height:120px">' + esc(JSON.stringify(node.binding, null, 2)) + '</pre></dd>' : '') + (node.action ? '<dt>action</dt><dd><pre class="json" style="max-height:100px">' + esc(JSON.stringify(node.action, null, 2)) + '</pre></dd>' : '') + '</dl>';
+  if (ix && ix.fields.length) { h += '<div class="h2">حقول قابلة للتحرير</div>'; ix.fields.forEach(function (f) {
+    var isAdv = !!f.adv, key = f.adv || f.k, v = isAdv ? (ix.s.adv[key] || '') : ix.s.props[key], id = 'af_' + node.id + '_' + key;
+    h += '<div class="fld"><label for="' + id + '" class="mono" style="direction:ltr">' + esc(f.label) + '</label>';
+    if (f.kind === 'select') h += '<select id="' + id + '" class="sel-in" dir="ltr" data-afld="' + key + '" data-akind="' + (isAdv ? 'adv' : 'prop') + '" data-asec="' + ix.s.id + '">' + f.opts.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (String(v) === o[0] ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select>';
+    else if (f.kind === 'textarea') h += '<textarea id="' + id + '" class="ta" data-afld="' + key + '" data-akind="prop" data-asec="' + ix.s.id + '">' + esc(v) + '</textarea>';
+    else h += '<input id="' + id + '" class="in' + (f.kind === 'url' ? ' ltr' : '') + '" data-afld="' + key + '" data-akind="prop" data-asec="' + ix.s.id + '" value="' + esc(v) + '" autocomplete="off">';
+    h += '</div>'; }); }
+  if (ix && ix.root) h += '<div class="tgl"><div class="tx"><b class="mono" style="direction:ltr;text-align:start">optional</b><span class="sub">عند عدم دعم Runtime للعقدة تُسقط بأمان بدل فشل النشر.</span></div><span class="sw"><input type="checkbox" data-afld="optional" data-akind="flag" data-asec="' + ix.s.id + '" aria-label="optional" ' + (ix.s.optional ? 'checked' : '') + '><i></i></span></div>';
+  return h + '<button class="link" data-act="easyfor" data-id="' + (ix ? ix.s.id : '') + '">فتح هذا القسم في الوضع السهل ←</button></div>';
+}
+
+/* ── المعاينة ── */
+var DEVS = { p360: { label: 'جوال صغير', w: 360, ic: 'phone' }, p390: { label: 'جوال', w: 390, ic: 'phone' }, t768: { label: 'تابلت', w: 768, ic: 'tablet' } };
+function renderStage() {
+  var st = $('#stage'); if (!st) return; var m = isFlat(), pk = curPage(), dv = DEVS[ui.device];
+  st.classList.toggle('flat', m);
+  var pages = ui.mode === 'advanced' ? ['home', 'cart'] : PAGE_ORDER;
+  var h = '';
+  if (ui.coach && ui.mode === 'easy') h += '<div class="coach" id="coach">' + ic('info', 18) + '<p><b>تطبيقك جاهز.</b> اضغط أي عنصر في المعاينة لتحريره، أو أضف قسماً من «إضافة».</p><button class="btn ic g" data-act="coachx" aria-label="إغلاق التلميح">' + ic('x', 16) + '</button></div>';
+  h += '<div class="stbar" role="group" aria-label="صفحة المعاينة">' + pages.map(function (k) { var pg = PAGES[k]; return '<button class="chip' + (pg.status === 'proposed' ? ' prop' : '') + '" data-act="page" data-v="' + k + '" aria-pressed="' + (pk === k) + '">' + esc(pg.label) + (pg.status === 'proposed' ? ' <span style="font-size:11px">(مقترح)</span>' : '') + '</button>'; }).join('') + '</div>';
+  h += '<div class="stbar">' + (m ? '' : '<div class="seg" role="group" aria-label="الجهاز">' + Object.keys(DEVS).map(function (k) { return '<button data-act="dev" data-v="' + k + '" aria-pressed="' + (ui.device === k) + '">' + DEVS[k].label + '</button>'; }).join('') + '</div>') + '<button class="btn sm" data-act="dir" aria-label="اتجاه المعاينة">' + ic('refresh', 14) + 'اتجاه المعاينة: ' + (ui.dir === 'rtl' ? 'RTL' : 'LTR') + '</button></div>';
+  h += '<div class="phone' + (ui.device === 't768' ? ' tab' : '') + '" style="width:' + (dv.w + 20) + 'px"><div class="screen" id="screen" aria-label="معاينة الصفحة">' + appView(pk) + '</div></div>';
+  h += '<div class="truth">' + ic('info', 14) + '<span>معاينة المتصفح: تقريب فوري للتطبيق وليست عرضه الأصلي' + (ui.device === 't768' ? ' (تخطيط التابلت غير موثّق في Runtime)' : '') + '. <button class="link" data-act="phoneprev">معاينة على الجوال</button> · <button class="link" data-act="diffs">الفروق عن Runtime</button></span></div>';
+  st.innerHTML = h;
+}
+function renderPreview() {
+  var sc = $('#screen'); if (!sc) return; var top = sc.scrollTop, wy = window.scrollY; sc.innerHTML = appView(curPage()); sc.scrollTop = top; if (isMobile()) window.scrollTo(0, wy);
+}
+function afterChange() {
+  renderStatus(); renderPreview(); var l = $('#seclist'); if (l) { l.innerHTML = listHtml(); bindDrag(); }
+  var c = $('#seccount'); if (c) { var a = list(ui.page); c.textContent = a.length + ' قسم · ' + a.filter(function (s) { return !s.hidden; }).length + ' ظاهر'; }
+  var t = $('#insp-title'); if (t && ui.sel) { var r = findSec(ui.sel); if (r) { t.textContent = r.s.name; var sb = $('#insp-sub'); if (sb) sb.textContent = TYPES[r.s.type].label + (subOf(r.s) && TYPES[r.s.type].status !== 'proposed' ? ' · ' + subOf(r.s) : ''); } }
+  var jp = $('#jsonpre'); if (jp) jp.textContent = JSON.stringify(schemaOf(), null, 2);
+  var an = $('#appname'); if (an) an.textContent = doc.name || 'تطبيقي';
+  syncGuard();
+}
+function renderStatus() {
+  var st = $('#status'); if (!st) return; var d = isDirty();
+  if (ui.saving) { st.className = 'status busy'; st.innerHTML = ic('loader', 16).replace('class="i"', 'class="i spin"') + 'جارٍ الحفظ…'; }
+  else if (ui.saveErr && d) { st.className = 'status err'; st.innerHTML = ic('alert', 16) + '<span class="long">فشل الحفظ — تعديلاتك لم تُفقد</span><span class="short">فشل الحفظ</span> <button class="link" data-act="save">إعادة المحاولة</button>'; }
+  else if (d) { st.className = 'status dirty'; st.innerHTML = '<span class="dot" aria-hidden="true"></span>' + ic('alert', 14) + '<span class="long">تغييرات غير محفوظة</span><span class="short">غير محفوظ</span>'; }
+  else { st.className = 'status clean'; st.innerHTML = ic('check', 16) + '<span>محفوظ' + (savedAt ? ' <span class="num" style="font-size:12px;color:var(--muted)">' + savedAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + '</span>' : '') + '</span>'; }
+  var sb = $('#savebtn'); if (sb) sb.disabled = ui.saving || !d;
+  var u = $('#undo'), r = $('#redo'); if (u) u.disabled = !past.length; if (r) r.disabled = !future.length;
+}
+function syncGuard() { window.onbeforeunload = (ui.stage === 'editor' && isDirty()) ? function (e) { e.preventDefault(); e.returnValue = ''; return ''; } : null; }
+
+/* ───────────── السحب لإعادة الترتيب ───────────── */
+function bindDrag() {
+  var lst = $('#seclist'); if (!lst) return;
+  $$('.grip', lst).forEach(function (g) {
+    g.addEventListener('pointerdown', function (e) {
+      if (e.button != null && e.button !== 0) return;
+      var row = g.closest('.row'); row.classList.add('drag'); g.setPointerCapture(e.pointerId);
+      function move(ev) {
+        var t = document.elementFromPoint(ev.clientX, ev.clientY), tr = t && t.closest && t.closest('.row');
+        if (!tr || tr === row || tr.parentNode !== lst) return;
+        var rc = tr.getBoundingClientRect(), mid = rc.top + rc.height / 2, after = !!(row.compareDocumentPosition(tr) & Node.DOCUMENT_POSITION_FOLLOWING);
+        if (after && ev.clientY > mid) lst.insertBefore(tr, row); else if (!after && ev.clientY < mid) lst.insertBefore(tr, row.nextSibling);
+      }
+      function up() {
+        g.removeEventListener('pointermove', move); g.removeEventListener('pointerup', up); g.removeEventListener('pointercancel', up); row.classList.remove('drag');
+        var order = $$('.row', lst).map(function (r) { return r.getAttribute('data-sec'); });
+        mutate(function () { var a = list(ui.page), map = {}; a.forEach(function (s) { map[s.id] = s; }); doc.pages[ui.page] = order.map(function (id) { return map[id]; }); }, { full: true });
+      }
+      g.addEventListener('pointermove', move); g.addEventListener('pointerup', up); g.addEventListener('pointercancel', up);
+    });
+    g.addEventListener('keydown', function (e) {
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return; e.preventDefault();
+      var id = g.getAttribute('data-grip'); moveSec(id, e.key === 'ArrowUp' ? -1 : 1); var ng = $('[data-grip="' + id + '"]'); if (ng) ng.focus();
+    });
+  });
+}
+function moveSec(id, d) { var r = findSec(id); if (!r) return; var j = r.i + d; if (j < 0 || j >= r.arr.length) return; mutate(function () { var a = doc.pages[r.page], t = a[r.i]; a[r.i] = a[j]; a[j] = t; }, { full: true }); }
+
+/* ───────────── الحوارات والإشعارات ───────────── */
+function openSheet(o) {
+  lastFocus = document.activeElement;
+  $('#ovr').innerHTML = '<div class="ov" data-act="ovclose"><div class="sheet ' + (o.cls || '') + '" tabindex="-1" role="dialog" aria-modal="true" aria-label="' + esc(o.title) + '"><div class="sh"><h2>' + esc(o.title) + '</h2><button class="btn ic g" data-act="close" aria-label="إغلاق">' + ic('x') + '</button></div><div class="sb" id="sheetbody">' + o.body + '</div>' + (o.foot ? '<div class="sf">' + o.foot + '</div>' : '') + '</div></div>';
+  var f = $('#ovr .sheet'); if (f) f.focus();
+}
+function closeSheet() { $('#ovr').innerHTML = ''; if (lastFocus && lastFocus.focus && document.contains(lastFocus)) lastFocus.focus(); }
+function toast(msg, action) {
+  $$('#toasts .toast').forEach(function (x) { x.remove(); });
+  var t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status'); t.innerHTML = '<span>' + esc(msg) + '</span>' + (action ? '<button>' + esc(action.label) + '</button>' : '');
+  if (action) t.querySelector('button').addEventListener('click', function () { action.fn(); t.remove(); });
+  $('#toasts').appendChild(t); setTimeout(function () { t.remove(); }, action ? 6000 : 3800);
+}
+var catFilter = 'all', catStatus = 'all', catQ = '', catSel = null;
+function catalogBody() {
+  var q = catQ.trim();
+  var items = CAT_ORDER.filter(function (k) { var T = TYPES[k]; return (catFilter === 'all' || T.cat === catFilter) && (catStatus === 'all' || T.status === catStatus) && (!q || T.label.indexOf(q) > -1 || T.desc.indexOf(q) > -1); });
+  var h = '<div class="fld"><label class="sr" for="catq">بحث في الأقسام</label><input id="catq" class="in" placeholder="ابحث في الأقسام" value="' + esc(catQ) + '" autocomplete="off"></div>';
+  h += '<div class="filters" role="group" aria-label="التصنيف">' + CATS.map(function (f) { return '<button class="chip" data-act="catf" data-v="' + f[0] + '" aria-pressed="' + (catFilter === f[0]) + '">' + f[1] + '</button>'; }).join('') + '</div>';
+  h += '<div class="filters" role="group" aria-label="الحالة">' + [['all', 'كل الحالات'], ['ready', 'جاهز'], ['limited', 'جاهز بقيود'], ['proposed', 'مقترح']].map(function (f) { return '<button class="chip" data-act="cats" data-v="' + f[0] + '" aria-pressed="' + (catStatus === f[0]) + '">' + f[1] + '</button>'; }).join('') + '</div>';
+  var r = ui.sel && findSec(ui.sel); h += '<p class="sub">' + (r ? 'سيُضاف بعد «' + esc(r.s.name) + '».' : 'سيُضاف في نهاية الصفحة.') + '</p>';
+  h += '<div class="cat" id="catgrid">' + (items.length ? items.map(function (k) { var T = TYPES[k]; return '<button class="ct' + (T.status === 'proposed' ? ' prop' : '') + (catSel === k ? ' on' : '') + '" data-act="catpick" data-v="' + k + '">' + mini(k) + '<span class="nm"><span>' + esc(T.label) + '</span>' + badge(T.status) + '</span><span class="ds">' + esc(T.desc) + '</span></button>'; }).join('') : '<div class="empty" style="grid-column:1/-1">لا نتائج مطابقة.</div>') + '</div>';
+  if (catSel && TYPES[catSel].status === 'proposed') h += '<div class="note prop" id="catnote">' + ic('dashed', 18) + '<div><b>«' + esc(TYPES[catSel].label) + '» نوع مقترح.</b> ' + escb(TYPES[catSel].req) + '<br><span style="color:var(--muted)">يمكنك إضافته كتصوّر؛ سيظهر موسوماً ويمنع النشر ما لم تجعله اختيارياً.</span><div style="margin-top:8px"><button class="btn p" data-act="catadd" data-v="' + catSel + '">أضفه كتصوّر</button></div></div></div>';
+  return h;
+}
+function openCatalog() { catFilter = 'all'; catStatus = 'all'; catQ = ''; catSel = null; openSheet({ title: 'إضافة قسم', body: catalogBody() }); }
+function refreshCatalog() { var b = $('#sheetbody'); if (!b) return; var pos = b.scrollTop, hf = document.activeElement && document.activeElement.id === 'catq'; b.innerHTML = catalogBody(); b.scrollTop = pos; if (hf) { var i = $('#catq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
+function addSection(type) {
+  var T = TYPES[type], created;
+  mutate(function () { var s = sec(type); created = s.id; var a = doc.pages[ui.page]; if (!a) a = doc.pages[ui.page] = []; var idx = ui.sel ? a.findIndex(function (x) { return x.id === ui.sel; }) : -1; if (idx > -1) a.splice(idx + 1, 0, s); else a.push(s); }, {});
+  ui.coach = false; closeSheet(); select(created, true);
+  toast('أُضيف «' + T.label + '»' + (T.status === 'proposed' ? ' كتصوّر مقترح' : ''), { label: 'تراجع', fn: undo });
+}
+function sectionMenu(id) {
+  var r = findSec(id), s = r.s;
+  openSheet({ title: s.name, cls: 'sm', body: '<div class="menu">' +
+    '<button data-act="sel" data-id="' + id + '" data-close="1">' + ic('pencil') + 'تحرير الإعدادات</button><button data-act="vis" data-id="' + id + '" data-close="1">' + ic(s.hidden ? 'eye' : 'eyeOff') + (s.hidden ? 'إظهار' : 'إخفاء') + '</button>' +
+    '<button data-act="dup" data-id="' + id + '">' + ic('copy') + 'تكرار</button><button data-act="ren" data-id="' + id + '">' + ic('type') + 'إعادة تسمية</button>' +
+    '<button data-act="up" data-id="' + id + '" data-close="1"' + (r.i === 0 ? ' disabled' : '') + '>' + ic('up') + 'نقل لأعلى</button><button data-act="downm" data-id="' + id + '" data-close="1"' + (r.i === r.arr.length - 1 ? ' disabled' : '') + '>' + ic('down') + 'نقل لأسفل</button><hr>' +
+    '<button class="neg" data-act="del" data-id="' + id + '" data-close="1">' + ic('trash') + 'حذف</button></div>' });
+}
+function moreMenu() {
+  openSheet({ title: 'المزيد', cls: 'sm', body: '<div class="menu">' +
+    '<button data-act="undo" data-close="1"' + (past.length ? '' : ' disabled') + '>' + ic('undo') + 'تراجع</button><button data-act="redo" data-close="1"' + (future.length ? '' : ' disabled') + '>' + ic('redo') + 'إعادة</button><hr>' +
+    '<button data-act="phoneprev">' + ic('phone') + 'معاينة على الجوال</button><button data-act="pubcheck">' + ic('shield') + 'فحص جاهزية النشر</button><button data-act="diffs">' + ic('info') + 'الفروق عن Runtime الحقيقي</button>' +
+    '<button data-act="failnext">' + ic('alert') + (ui.failNext ? '✓ ' : '') + 'محاكاة فشل الحفظ القادم</button><button data-act="theme">' + ic(ui.dark ? 'sun' : 'moon') + (ui.dark ? 'وضع فاتح للمحرر' : 'وضع داكن للمحرر') + '</button><button data-act="limits">' + ic('info') + 'حدود هذا النموذج</button><hr>' +
+    '<button class="neg" data-act="reset">' + ic('refresh') + 'إعادة تعيين النموذج</button></div>' });
+}
+function pubCheck() {
+  var c = compat(), dirty = isDirty(), body = '';
+  if (!c.block.length) body += '<div class="note">' + ic('check', 18) + '<div><b>لا موانع توافق.</b> المخطط الناتج يستعمل مكوّنات مدعومة في Runtime الحالي (أو أقساماً اختيارية تُسقط بأمان).</div></div>';
+  else body += '<div class="h2">موانع النشر (' + c.block.length + ')</div>' + c.block.map(function (b) { return '<div class="note neg">' + ic('alert', 18) + '<div>' + escb(b) + '</div></div>'; }).join('');
+  if (c.warn.length) body += '<div class="h2">تنبيهات (' + c.warn.length + ')</div>' + c.warn.map(function (b) { return '<div class="note warn">' + ic('alert', 18) + '<div>' + escb(b) + '</div></div>'; }).join('');
+  if (dirty) body += '<div class="note">' + ic('info', 18) + '<div>لديك تغييرات غير محفوظة. احفظ المسودة قبل النشر.</div></div>';
+  body += '<p class="sub">يحاكي الفحص المحرك: قسم مطلوب غير مدعوم يُفشل النشر كاملاً، والاختياري يُسقط بأمان. النشر الحقيقي يتطلب صلاحية <bdi dir="ltr">apps_builder.publish</bdi> وينتج نسخة غير قابلة للتعديل.</p>';
+  openSheet({ title: 'جاهزية النشر', body: body, foot: '<button class="btn" data-act="close">إغلاق</button><button class="btn p" data-act="pubfake"' + (c.block.length || dirty ? ' disabled' : '') + '>نشر (تجريبي)</button>' });
+}
+function ul(a) { return '<ul style="margin:0;padding-inline-start:20px;display:flex;flex-direction:column;gap:6px">' + a.map(function (t) { return '<li>' + t + '</li>'; }).join('') + '</ul>'; }
+function limitsDialog() {
+  openSheet({ title: 'حدود هذا النموذج', body: '<p class="sub">تصوّر للمراجعة وليس ميزة مبنية.</p><div class="h2">حقيقي في التصور</div>' + ul(['هيكل التجربة وتدفقاتها وحالاتها: معاينة أولاً، تحرير بالضغط، أقسام وصفحات، كتالوج، حفظ، تراجع، تبديل الوضعين.', 'الأقسام «جاهز/بقيود» مبنية على مكوّنات سجل أَوْج، والمخطط الناتج (الوضع المتقدم ← JSON) يعكس ذلك.', 'قسم مقترح اختياري يُسقط عند النشر ولا يمنعه (سلوك المحرك).', 'القيود المعروضة مستخرجة من الكود لا تخميناً.']) +
+    '<div class="h2">محاكاة</div>' + ul(['الحفظ والنشر وجلب المنتجات والسلة والمعاينة على الجوال.', 'المعاينة تقريب في المتصفح وليست عرض Flutter، وبياناتها تجريبية.', 'الوضع المتقدم هنا تحرير جزئي؛ الحقيقي يبقى كما هو.', 'عرض التابلت تقريب بلا توثيق في Runtime.']) +
+    '<div class="h2">قرارات مفتوحة</div>' + ul(['إخفاء القسم واسمه لا مكان لهما في AppSchema (مخزن جانبي أو قرار آخر).', 'تمرير <bdi dir="ltr">binding.query</bdi> في Flutter (الترتيب/العدد).', 'استراتيجية القوالب: من يملكها وأين تُخزَّن وكيف تُحدَّث (القوالب الثلاثة هنا للتصوّر فقط).', 'عقد الثيم <bdi dir="ltr">P0-1</bdi> والقفل التفاؤلي <bdi dir="ltr">P0-2</bdi> قبل التنفيذ.']), foot: '<button class="btn p" data-act="close">فهمت</button>' });
+}
+function diffsDialog() {
+  openSheet({ title: 'الفروق عن Flutter Runtime الحقيقي', body: '<p class="sub">المعاينة هنا تقريب في المتصفح. تختلف عن التطبيق الحقيقي في:</p>' + ul(['شريط التطبيق: النموذج يعرض اسمك؛ Flutter يعرض عنواناً ثابتاً مضمَّناً.', 'الصور: بنسبة 16:9 مع بديل نصي؛ المنتجات ببيانات تجريبية.', 'ترتيب المنتجات: يقبله الخادم ويتجاهله Runtime.', 'اللون: يُطبَّق هنا فوراً؛ Flutter يقرؤه اليوم من المخطط المضمَّن.', 'الصفحات الإضافية والأشرطة والتبويبات: تصوّر فقط.', 'التنقل: الأزرار هنا غير فعّالة؛ Runtime يدعم الرئيسية والسلة فقط.', 'الأجهزة اللوحية: تقريب بلا توثيق.']), foot: '<button class="btn p" data-act="close">حسناً</button>' });
+}
+function phoneDialog() {
+  openSheet({ title: 'معاينة على الجوال', cls: 'sm', body: '<div class="note prop">' + ic('dashed', 18) + '<div><b>محاكاة.</b> في التنفيذ تفتح هذه الخطوة جلسة معاينة محدودة المدة تعرض مسودتك في تطبيق Flutter الحقيقي، عبر رمز QR بمرجع تبادل لمرة واحدة، دون نشر.</div></div><p class="sub">«المعاينة الفورية» داخل المحرر تقريب في المتصفح، و«المعاينة على الجوال» هي العرض الحقيقي.</p>', foot: '<button class="btn p" data-act="close">حسناً</button>' });
+}
+function confirmDialog(o) { openSheet({ title: o.title, cls: 'sm', body: '<p style="margin:0">' + o.text + '</p>', foot: '<button class="btn" data-act="close">إلغاء</button><button class="btn ' + (o.neg ? 'neg' : 'p') + '" data-act="confirm">' + esc(o.ok) + '</button>' }); confirmDialog.fn = o.fn; }
+
+/* ───────────── التحديد والتحرير ───────────── */
+function select(id, scroll) {
+  ui.sel = id; ui.advNode = id; ui.tab = (ui.mode === 'easy') ? 'sections' : ui.tab;
+  var r = findSec(id); if (r && ui.page !== r.page && PAGES[r.page]) ui.page = r.page;
+  if (isMobile()) ui.sheet = 'insp'; else ui.sheet = null;
+  renderNav(); renderInsp(); renderStage(); syncWork();
+  var el = $('[data-sw="' + id + '"]'); if (!el) return;
+  if (isMobile()) ensureVisible(el);
+  else if (scroll !== false && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
+}
+/* جوال: القسم المحدد يجب أن يبقى ظاهراً فوق ورقة المفتش (وتحت الشريط العلوي) كي يرى التاجر أثر تعديله */
+function ensureVisible(el) {
+  var ins = $('#insp'), top = ins && ins.classList.contains('open') ? ins.getBoundingClientRect().top : window.innerHeight - 56, r = el.getBoundingClientRect();
+  if (r.bottom > top - 8 || r.top < 136) window.scrollBy(0, r.top - 140);
+}
+function deselect() { ui.sel = null; ui.advNode = null; ui.sheet = isMobile() ? null : ui.sheet; renderNav(); renderInsp(); renderStage(); syncWork(); }
+
+/* ───────────── الأحداث ───────────── */
+function doAct(a, el, e) {
+  var id = el.getAttribute('data-id'), v = el.getAttribute('data-v');
+  switch (a) {
+    case 'tpl': ui.tpl = v; renderAll(); { var tb = $('[data-act="tpl"][data-v="' + v + '"]'); if (tb) tb.focus(); } break;
+    case 'create': ui.appName = ($('#newname').value || '').trim() || 'متجري'; ui.blankStart = false; ui.stage = 'creating'; renderAll(); break;
+    case 'blank': ui.appName = ($('#newname') && $('#newname').value.trim()) || 'متجري'; ui.blankStart = true; ui.stage = 'creating'; renderAll(); break;
+    case 'mode': if (ui.mode !== v) { ui.mode = v; ui.sheet = null; closeSheet(); if (v === 'advanced') { ui.advNode = ui.sel; if (ui.page !== 'home' && ui.page !== 'cart') ui.page = 'home'; } else { if (ui.advNode && IDX[ui.advNode]) ui.sel = IDX[ui.advNode].s.id; else if (ui.advNode && findSec(ui.advNode)) ui.sel = ui.advNode; } renderAll(); toast(v === 'advanced' ? 'الوضع المتقدم: المسودة نفسها، والتغييرات غير المحفوظة معك.' : 'عدت إلى الوضع السهل: المسودة نفسها.'); } break;
+    case 'tab': ui.tab = v; ui.sel = null; renderNav(); renderInsp(); syncWork(); break;
+    case 'bb': ui.tab = v; ui.sel = null; ui.advNode = ui.mode === 'advanced' ? ui.advNode : null; ui.sheet = (ui.sheet === 'nav' && ui.tab === v && el.getAttribute('aria-pressed') === 'true') ? null : 'nav'; renderNav(); renderInsp(); syncWork(); break;
+    case 'sheetclose': ui.sheet = null; syncWork(); break;
+    case 'advtab': ui.advTab = v; renderNav(); break;
+    case 'tnode': { ui.advNode = v; var ix = IDX[v]; if (ix) ui.sel = ix.s.id; renderNav(); renderInsp(); renderStage(); if (isMobile()) { ui.sheet = 'insp'; } syncWork(); break; }
+    case 'page': ui.page = v; ui.sel = null; ui.advNode = null; if (el.getAttribute('data-from') === 'pages' && ui.mode === 'easy') { ui.tab = 'sections'; if (isMobile()) ui.sheet = null; } refreshAll(); break;
+    case 'sel': ui.sel = id; if (el.getAttribute('data-close')) closeSheet(); select(id, true); break;
+    case 'back': deselect(); break;
+    case 'add': closeSheet(); openCatalog(); break;
+    case 'catf': catFilter = v; refreshCatalog(); break;
+    case 'cats': catStatus = v; refreshCatalog(); break;
+    case 'catpick': if (TYPES[v].status === 'proposed') { catSel = v; refreshCatalog(); var n = $('#catnote'); if (n) n.scrollIntoView({ block: 'nearest' }); } else addSection(v); break;
+    case 'catadd': addSection(v); break;
+    case 'vis': mutate(function () { var r = findSec(id); r.s.hidden = !r.s.hidden; }, { full: true }); if (el.getAttribute('data-close')) closeSheet(); break;
+    case 'menu': sectionMenu(id); break;
+    case 'dup': { var nidv; mutate(function () { var r = findSec(id), c = JSON.parse(JSON.stringify(r.s)); c.id = nid(); nidv = c.id; c.name = r.s.name + ' (نسخة)'; doc.pages[r.page].splice(r.i + 1, 0, c); }, { full: true }); closeSheet(); if (nidv) select(nidv, true); toast('تم تكرار القسم'); break; }
+    case 'ren': closeSheet(); select(id, true); setTimeout(function () { var i = $('[data-fld="__name"]'); if (i) { i.focus(); i.select(); } }, 40); break;
+    case 'up': moveSec(id, -1); if (el.getAttribute('data-close')) closeSheet(); break;
+    case 'downm': moveSec(id, 1); if (el.getAttribute('data-close')) closeSheet(); break;
+    case 'del': { var rr = findSec(id), nm = rr.s.name; closeSheet(); mutate(function () { var r2 = findSec(id); doc.pages[r2.page].splice(r2.i, 1); }, { full: false }); if (ui.sel === id) { ui.sel = null; ui.advNode = null; ui.sheet = isMobile() ? null : ui.sheet; } refreshAll(); toast('حُذف القسم «' + nm + '»', { label: 'تراجع', fn: undo }); break; }
+    case 'adv': ui.mode = 'advanced'; ui.advTab = 'tree'; ui.advNode = id; ui.sel = id; { var rf = findSec(id); ui.page = rf && rf.page === 'cart' ? 'cart' : 'home'; } ui.sheet = isMobile() ? 'insp' : null; renderAll(); break;
+    case 'easyfor': ui.mode = 'easy'; ui.sel = id; ui.tab = 'sections'; ui.sheet = isMobile() ? 'insp' : null; renderAll(); break;
+    case 'coachx': ui.coach = false; renderStage(); break;
+    case 'sw': mutate(function () { doc.primary = v; }, { full: true }); break;
+    case 'dir': ui.dir = ui.dir === 'rtl' ? 'ltr' : 'rtl'; renderStage(); break;
+    case 'dev': ui.device = v; renderStage(); break;
+    case 'undo': undo(); if (el.getAttribute('data-close')) closeSheet(); break;
+    case 'redo': redo(); if (el.getAttribute('data-close')) closeSheet(); break;
+    case 'save': save(); break;
+    case 'more': moreMenu(); break;
+    case 'phoneprev': closeSheet(); phoneDialog(); break;
+    case 'pubcheck': closeSheet(); pubCheck(); break;
+    case 'diffs': closeSheet(); diffsDialog(); break;
+    case 'pubfake': closeSheet(); toast('نموذج: لا نشر فعلي. في التنفيذ يتطلب النشر صلاحية apps_builder.publish وينتج نسخة غير قابلة للتعديل.'); break;
+    case 'failnext': ui.failNext = !ui.failNext; closeSheet(); toast(ui.failNext ? 'سيفشل الحفظ القادم (محاكاة).' : 'أُلغيت محاكاة الفشل.'); break;
+    case 'theme': ui.dark = !ui.dark; closeSheet(); renderAll(); break;
+    case 'limits': closeSheet(); limitsDialog(); break;
+    case 'reset': closeSheet(); confirmDialog({ title: 'إعادة تعيين النموذج', text: 'سيُمسح كل ما فعلته في هذا النموذج ويعود إلى شاشة الإنشاء.', ok: 'إعادة التعيين', neg: true, fn: function () { doc = defaultDoc(); past = []; future = []; savedSnap = ''; ui.stage = 'create'; ui.sel = null; ui.advNode = null; ui.mode = 'easy'; ui.tab = 'sections'; ui.page = 'home'; ui.sheet = null; ui.saveErr = false; ui.failNext = false; renderAll(); } }); break;
+    case 'confirm': var fn = confirmDialog.fn; closeSheet(); if (fn) fn(); break;
+    case 'close': closeSheet(); break;
+    case 'ovclose': if (e.target === el) closeSheet(); break;
+  }
+}
+document.addEventListener('click', function (e) {
+  var el = e.target.closest('[data-act]');
+  if (el) { if (el.getAttribute('data-act') === 'ovclose' && e.target !== el) { var inner = e.target.closest('[data-act]'); if (inner === el) return; } doAct(el.getAttribute('data-act'), el, e); return; }
+  var scr = e.target.closest('#screen');
+  if (scr && ui.stage === 'editor') { var sw = e.target.closest('[data-sw]'); if (sw) select(sw.getAttribute('data-sw'), false); else if (ui.sel) deselect(); }
+});
+document.addEventListener('keydown', function (e) {
+  var sw = e.target.closest && e.target.closest('[data-sw]');
+  if (sw && (e.key === 'Enter' || e.key === ' ') && e.target === sw) { e.preventDefault(); select(sw.getAttribute('data-sw'), false); return; }
+  if (e.key === 'Escape') { if ($('#ovr').innerHTML) closeSheet(); else if (ui.stage === 'editor' && (ui.sel || ui.sheet)) { ui.sheet = null; deselect(); } return; }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && ui.stage === 'editor') { e.preventDefault(); save(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && ui.stage === 'editor') { var tg = (e.target.tagName || '').toLowerCase(); if (tg === 'input' || tg === 'textarea') return; e.preventDefault(); if (e.shiftKey) redo(); else undo(); }
+});
+document.addEventListener('input', function (e) {
+  var t = e.target;
+  if (t.id === 'newname') { ui.appName = t.value; return; }
+  if (t.id === 'catq') { catQ = t.value; refreshCatalog(); return; }
+  if (t.hasAttribute('data-fld') && ui.sel) {
+    var k = t.getAttribute('data-fld'), id = ui.sel; if (k === '__vis' || k === '__opt') return;
+    mutate(function () { var r = findSec(id); if (!r) return; if (k === '__name') r.s.name = t.value; else r.s.props[k] = t.value; }, { key: 'f:' + id + k });
+  } else if (t.hasAttribute('data-afld')) {
+    var ak = t.getAttribute('data-afld'), kind = t.getAttribute('data-akind'), sid = t.getAttribute('data-asec'); if (kind === 'flag') return;
+    mutate(function () { var r = findSec(sid); if (!r) return; if (kind === 'adv') { if (t.value) r.s.adv[ak] = t.value; else delete r.s.adv[ak]; } else r.s.props[ak] = t.value; }, { key: 'a:' + sid + ak });
+  } else if (t.getAttribute('data-id') === 'name') { mutate(function () { doc.name = t.value; }, { key: 'name' }); }
+  else if (t.getAttribute('data-id') === 'primary') {
+    var val = t.value.trim(); if (val && val[0] !== '#') val = '#' + val; var err = $('#hexerr');
+    if (isHex(val)) { if (err) err.textContent = ''; mutate(function () { doc.primary = val.toUpperCase(); }, { key: 'primary' }); $$('.swc button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-v').toLowerCase() === val.toLowerCase())); }); }
+    else if (err) err.textContent = 'أدخل لوناً بصيغة #RRGGBB';
+  } else if (t.hasAttribute('data-tab') && t.getAttribute('data-tk') === 'label') { var tid = t.getAttribute('data-tab'); mutate(function () { doc.nav.tabs.forEach(function (x) { if (x.id === tid) x.label = t.value; }); }, { key: 'tab:' + tid }); }
+  else if (t.getAttribute('data-an') === 'text') { mutate(function () { doc.ann.text = t.value; }, { key: 'ann' }); }
+});
+document.addEventListener('change', function (e) {
+  var t = e.target, k = t.getAttribute && t.getAttribute('data-fld');
+  if (t.hasAttribute && t.hasAttribute('data-pgsel')) { ui.page = t.value; ui.sel = null; ui.advNode = null; refreshAll(); return; }
+  if (k === '__name' && ui.sel) { var nid0 = ui.sel, r0 = findSec(nid0); if (r0 && !t.value.trim()) { mutate(function () { r0.s.name = TYPES[r0.s.type].label; }, { full: true, key: 'f:' + nid0 + '__name' }); } return; }
+  if (k === '__vis' && ui.sel) { var id = ui.sel; mutate(function () { var r = findSec(id); r.s.hidden = !t.checked; }, { full: false }); renderNav(); return; }
+  if (k === '__opt' && ui.sel) { var id2 = ui.sel; mutate(function () { var r = findSec(id2); r.s.optional = t.checked; }, { full: false }); renderNav(); return; }
+  if (t.hasAttribute && t.hasAttribute('data-afld') && t.getAttribute('data-akind') === 'flag') { var sid = t.getAttribute('data-asec'); mutate(function () { var r = findSec(sid); if (r) r.s.optional = t.checked; }, { full: false }); renderNav(); renderInsp(); return; }
+  if (t.hasAttribute && t.hasAttribute('data-afld') && t.tagName === 'SELECT') return; /* عولج في input */
+  if (k && ui.sel && t.tagName === 'SELECT') { var sid2 = ui.sel; mutate(function () { var r = findSec(sid2); if (r) r.s.props[k] = t.value; }, {}); return; }
+  if (t.getAttribute && t.getAttribute('data-nv') === 'enabled') { mutate(function () { doc.nav.enabled = t.checked; }, { full: true }); if (t.checked) toast('شريط التنقل السفلي مقترح — سيمنع النشر.'); return; }
+  if (t.getAttribute && t.getAttribute('data-an') === 'enabled') { mutate(function () { doc.ann.enabled = t.checked; }, { full: true }); return; }
+  if (t.hasAttribute && t.hasAttribute('data-tab')) {
+    var tid = t.getAttribute('data-tab'), tk = t.getAttribute('data-tk');
+    if (tk === 'visible' && t.checked && doc.nav.tabs.filter(function (x) { return x.visible; }).length >= MAX_TABS) { t.checked = false; toast('حدّ الاقتراح: ' + MAX_TABS + ' تبويبات ظاهرة كحد أقصى.'); return; }
+    mutate(function () { doc.nav.tabs.forEach(function (x) { if (x.id === tid) { if (tk === 'visible') x.visible = t.checked; else if (tk === 'page') x.page = t.value; } }); }, { full: true });
+  }
+});
+var mq = window.matchMedia('(max-width: 999px)'); var mq2 = window.matchMedia('(min-width: 1100px)'); var mq3 = window.matchMedia('(min-width: 700px) and (min-height: 700px)');
+function onBp() { if (ui.stage === 'editor') { if (!isMobile()) ui.sheet = null; refreshAll(); } }
+[mq, mq2, mq3].forEach(function (m) { if (m.addEventListener) m.addEventListener('change', onBp); else m.addListener(onBp); });
+renderAll();
+window.__proto = { get doc() { return doc; }, get ui() { return ui; }, schema: schemaOf, compat: compat, isDirty: isDirty };
+})();
+</script>
+</body>
+</html>
