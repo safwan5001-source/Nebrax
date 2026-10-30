@@ -21,6 +21,7 @@ use App\Services\Accounting\ExpenseService;
 use App\Services\DocumentDuplicateReservationService;
 use App\Support\BranchSettings;
 use App\Support\DocumentWorkflowStatus;
+use App\Support\DuplicateDocumentException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -35,6 +36,7 @@ final class ExpenseDocumentDraftBuilder implements TransactionDraftBuilder
         private readonly DocumentWorkflowService $workflow,
         private readonly ReviewedDocumentProjector $projector,
         private readonly DocumentReviewReadinessPolicy $readiness,
+        private readonly DocumentDuplicateReservationService $reservations,
     ) {}
 
     public function build(DocumentBatch $batch, DraftBuildContext $context): CreatedDraftReference
@@ -88,12 +90,13 @@ final class ExpenseDocumentDraftBuilder implements TransactionDraftBuilder
                 $reason,
                 ['transaction_type' => 'expense'],
             );
-            // IMP-H5-S6: مصدر `document_center` يدخل بروتوكول الهوية المشترك (مورّد ‖ تاريخ ‖ مبلغ، والمرجع رقم المستند المراجَع إن وُجد). لا معرّف تمييز هنا:
-            // مصروفٌ مطابق لقائم يُرفض (`duplicate_document`). الخدمة وحدها تكتب الحجز.
-            $expense = $this->expenses->create($data, [
+            // IMP-H5-S6: مصدر `document_center` يدخل بروتوكول الهوية المشترك (مورّد ‖ تاريخ ‖ مبلغ، والمرجع رقم المستند المراجَع إن وُجد). الخدمة وحدها تكتب الحجز.
+            // IMP-DOC-DISTINCT-01: مصروفٌ مطابق لقائم يُرفض (`duplicate_document`) إلا إذا أكّد المراجع صراحةً أنه مصروف حقيقي ثانٍ.
+            $reservation = [
                 'source' => DocumentDuplicateReservationService::SOURCE_DOCUMENT_CENTER,
                 'reference' => $this->text($reviewed['fields']['document_number'] ?? null),
-            ]);
+            ];
+            [$expense, $distinctConfirmed] = $this->createExpense($data, $reservation, $batch, $context->options->confirmDistinctOccurrence);
             $this->assertTotals($expense, $reviewed);
 
             $link = DocumentTransactionLink::create([
@@ -120,7 +123,8 @@ final class ExpenseDocumentDraftBuilder implements TransactionDraftBuilder
                 'subject_id' => $link->id,
                 'action' => 'expense_draft_created',
                 'before' => ['status' => DocumentWorkflowStatus::READY_FOR_DRAFT->value],
-                'after' => ['status' => $created->status->value, 'transaction_type' => 'expense', 'transaction_id' => $expense->id],
+                'after' => ['status' => $created->status->value, 'transaction_type' => 'expense', 'transaction_id' => $expense->id]
+                    + ($distinctConfirmed ? ['distinct_occurrence_confirmed' => true] : []),
                 'actor_id' => $actor->id,
                 'reason' => $reason,
                 'review_version' => $created->version,
@@ -129,6 +133,38 @@ final class ExpenseDocumentDraftBuilder implements TransactionDraftBuilder
 
             return $this->response($link, $expense, false);
         }, 3);
+    }
+
+    /**
+     * المحاولة الأولى بلا معرّف تمييز دائماً. التأكيد لا يُستهلك إلا إذا رُفضت فعلاً بتكرار مصروف (فتأكيدٌ بلا تكرار لا يترك معرّف تمييز كامناً يتجاوز
+     * فحصاً لاحقاً). المرجع المعلوم نفسه (المستند ذاته) لا يُؤكَّد أبداً. معرّف التمييز حتميّ من الدفعة: إعادة الطلب لا تنتج مصروفاً ثانياً (والرابط يعيد التشغيل أصلاً).
+     * الاستثناء يُلتقط حول `create` فقط: رفض التكرار استثناءٌ تطبيقي قبل أي كتابة في هذه المرحلة، فتبقى معاملة PostgreSQL سليمة (نقطة حفظ `create` تتراجع).
+     *
+     * @param  array<string,mixed>  $data
+     * @param  array<string,mixed>  $reservation
+     * @return array{0:Expense,1:bool}
+     */
+    private function createExpense(array $data, array $reservation, DocumentBatch $batch, bool $confirmDistinct): array
+    {
+        try {
+            return [$this->expenses->create($data, $reservation), false];
+        } catch (DuplicateDocumentException $duplicate) {
+            if (! $confirmDistinct || $duplicate->domain !== DocumentDuplicateReservationService::DOMAIN_EXPENSE) {
+                throw $duplicate;
+            }
+        }
+
+        $predicate = DocumentDuplicateReservationService::expensePredicate(
+            $data['partner_id'] ?? null, $data['vendor_name'] ?? null, $reservation['reference'], $data['expense_date'], (int) $data['amount'],
+        );
+        if ($this->reservations->holdsSameExpenseReference($predicate)) {
+            throw new DuplicateDocumentException(DocumentDuplicateReservationService::DOMAIN_EXPENSE, null, null, 'same_document_reference');
+        }
+
+        return [
+            $this->expenses->create($data, $reservation + ['occurrence_id' => substr(hash('sha256', 'document_center|'.$batch->id), 0, 32)]),
+            true,
+        ];
     }
 
     private function replay(DocumentBatch $batch, DocumentTransactionLink $link): CreatedDraftReference

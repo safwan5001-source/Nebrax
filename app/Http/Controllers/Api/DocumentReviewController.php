@@ -32,6 +32,7 @@ use App\Services\DocumentCenter\DocumentReviewReadinessPolicy;
 use App\Services\DocumentCenter\DocumentReviewService;
 use App\Services\DocumentCenter\ExpenseDocumentDraftBuilder;
 use App\Services\DocumentCenter\ExpenseDraftBuildOptions;
+use App\Support\DuplicateDocumentException;
 use App\Services\DocumentCenter\PurchaseDocumentDraftBuilder;
 use App\Services\DocumentCenter\PurchaseDraftBuildOptions;
 use App\Services\DocumentCenter\ReviewedDocumentProjector;
@@ -289,20 +290,32 @@ class DocumentReviewController extends Controller
 
     public function createExpenseDraft(CreateDocumentExpenseDraftRequest $request, DocumentBatch $batch): JsonResponse
     {
-        $draft = app(ExpenseDocumentDraftBuilder::class)->build(
-            $batch,
-            new DraftBuildContext(
-                expectedVersion: $request->integer('expected_version'),
-                reason: $request->string('reason')->toString(),
-                actorId: $request->user()?->id,
-                options: new ExpenseDraftBuildOptions(
-                    accountId: $request->validated('account_id'),
-                    categoryId: $request->validated('category_id'),
-                    costCenterId: $request->validated('cost_center_id'),
-                    paymentMethod: $request->validated('payment_method'),
+        try {
+            $draft = app(ExpenseDocumentDraftBuilder::class)->build(
+                $batch,
+                new DraftBuildContext(
+                    expectedVersion: $request->integer('expected_version'),
+                    reason: $request->string('reason')->toString(),
+                    actorId: $request->user()?->id,
+                    options: new ExpenseDraftBuildOptions(
+                        accountId: $request->validated('account_id'),
+                        categoryId: $request->validated('category_id'),
+                        costCenterId: $request->validated('cost_center_id'),
+                        paymentMethod: $request->validated('payment_method'),
+                        confirmDistinctOccurrence: $request->boolean('confirm_distinct_occurrence'),
+                    ),
                 ),
-            ),
-        );
+            );
+        } catch (DuplicateDocumentException $duplicate) {
+            // IMP-DOC-DISTINCT-01: نفس 422 الثابت (بلا معرّفات داخلية) + علم يخبر الواجهة هل يُعرَض تأكيد «مصروف حقيقي ثانٍ». المستند ذاته (مرجعه معلوم) لا يُؤكَّد.
+            return response()->json([
+                'message' => $duplicate->reason === 'same_document_reference'
+                    ? 'هذا المستند نفسه (برقمه) مسجَّل بالفعل كمصروف؛ لا يُنشأ مكرراً.'
+                    : $duplicate->getMessage(),
+                'reason' => $duplicate->reason === 'same_document_reference' ? 'duplicate_document' : $duplicate->reason,
+                'distinct_confirmable' => $duplicate->reason !== 'same_document_reference',
+            ], 422);
+        }
 
         return response()->json(['data' => [
             'document_batch_id' => $batch->id,

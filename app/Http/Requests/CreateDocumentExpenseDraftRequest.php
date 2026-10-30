@@ -20,6 +20,8 @@ class CreateDocumentExpenseDraftRequest extends FormRequest
             'category_id' => ['nullable', 'uuid'],
             'cost_center_id' => ['nullable', 'uuid'],
             'payment_method' => ['required', 'string', 'in:cash,bank,credit'],
+            // IMP-DOC-DISTINCT-01: يؤكد المراجع أن تكراراً (مورّد ‖ يوم ‖ مبلغ) مصروفٌ حقيقي ثانٍ. يُقبل `true` فقط؛ غيابه = رفض التكرار كما كان.
+            'confirm_distinct_occurrence' => ['sometimes', 'boolean'],
 
             // حقائق المجال والسياق والدليل المراجع محمية من العميل؛ الباني يستخرجها
             // حصراً من projection المراجع وTenant/Branch الحاليين.
