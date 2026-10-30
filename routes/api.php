@@ -487,6 +487,9 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // no approve/execute/repair endpoint in this foundation slice.
         Route::post('ai-actions', [AiActionController::class, 'store'])
             ->middleware([$perm('ai.actions.use'), EnforceUserIdempotency::class, 'throttle:20,1']);
+        // IMP-H8-S4a: سجلّ AI Actions (قراءة فقط، مقسَّم، مرشّحات بقائمة بيضاء) — يفوّض بوابات كل نوع كما يفعل `show`.
+        Route::get('ai-actions', [AiActionController::class, 'index'])
+            ->middleware([$perm('ai.actions.use'), 'throttle:60,1']);
         Route::get('ai-actions/{action}', [AiActionController::class, 'show'])
             ->middleware([$perm('ai.actions.use'), 'throttle:60,1']);
         Route::post('ai-actions/{action}/versions', [AiActionController::class, 'storeVersion'])
