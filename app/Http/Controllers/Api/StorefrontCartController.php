@@ -19,7 +19,7 @@ final class StorefrontCartController extends PublicApiController
         $lookup = $carts->findByToken($request->cookie(CommerceCartService::COOKIE_NAME));
         $response = PublicApiResponse::success($request, $carts->serialize($lookup['cart']));
 
-        return $lookup['invalid'] ? $this->clearCookie($response) : $response;
+        return $lookup['invalid'] ? $this->clearCookie($response) : $this->persistRebound($response, $lookup['rebound']);
     }
 
     public function store(Request $request, CommerceCartService $carts): JsonResponse
@@ -67,7 +67,7 @@ final class StorefrontCartController extends PublicApiController
         $response = PublicApiResponse::success($request, $result['data'], $result['created'] ? 201 : 200);
         $this->setCookie(
             $response,
-            $result['token'] ?? (string) $request->cookie(CommerceCartService::COOKIE_NAME),
+            $result['token'] ?? $lookup['rebound'] ?? (string) $request->cookie(CommerceCartService::COOKIE_NAME),
         );
 
         return $response;
@@ -97,7 +97,7 @@ final class StorefrontCartController extends PublicApiController
         }
 
         $response = PublicApiResponse::success($request, $data);
-        $this->setCookie($response, (string) $request->cookie(CommerceCartService::COOKIE_NAME));
+        $this->setCookie($response, $lookup['rebound'] ?? (string) $request->cookie(CommerceCartService::COOKIE_NAME));
 
         return $response;
     }
@@ -123,7 +123,7 @@ final class StorefrontCartController extends PublicApiController
         }
 
         $response = PublicApiResponse::success($request, $data);
-        $this->setCookie($response, (string) $request->cookie(CommerceCartService::COOKIE_NAME));
+        $this->setCookie($response, $lookup['rebound'] ?? (string) $request->cookie(CommerceCartService::COOKIE_NAME));
 
         return $response;
     }
@@ -150,6 +150,20 @@ final class StorefrontCartController extends PublicApiController
         $lookup = $carts->findByToken($request->cookie(CommerceCartService::COOKIE_NAME));
 
         return $lookup['invalid'] ? $this->clearCookie($response) : $response;
+    }
+
+    /**
+     * H6 Batch H (Codex, PR #1819, P2): a wholesale buyer's identity-owned cart is recovered by identity when the cookie is
+     * absent or stale, and `findByToken()` then rotates the cart token. The rotated token must reach the browser, or the
+     * next request (and `checkout/complete`, which has no identity fallback) cannot find the cart.
+     */
+    private function persistRebound(JsonResponse $response, ?string $rebound): JsonResponse
+    {
+        if ($rebound !== null) {
+            $this->setCookie($response, $rebound);
+        }
+
+        return $response;
     }
 
     private function clearCookie(JsonResponse $response): JsonResponse

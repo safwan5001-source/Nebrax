@@ -52,7 +52,7 @@ final class StorefrontCheckoutController extends PublicApiController
         $result = $checkouts->current($request->cookie(CommerceCartService::COOKIE_NAME));
         $response = PublicApiResponse::success($request, $checkouts->serialize($result['checkout'], $result['cart']));
 
-        return $result['invalid'] ? $this->clearCartCookie($response) : $response;
+        return $result['invalid'] ? $this->clearCartCookie($response) : $this->persistRebound($response, $result['rebound']);
     }
 
     public function store(Request $request, CommerceCartService $carts, CommerceCheckoutService $checkouts): JsonResponse
@@ -77,11 +77,11 @@ final class StorefrontCheckoutController extends PublicApiController
             abort(422, $e->getMessage());
         }
 
-        return PublicApiResponse::success(
+        return $this->persistRebound(PublicApiResponse::success(
             $request,
             $checkouts->serialize($result['checkout'], $result['cart']),
             $result['created'] ? 201 : 200,
-        );
+        ), $result['rebound'] ?? $lookup['rebound']);
     }
 
     public function updateContact(Request $request, CommerceCheckoutService $checkouts): JsonResponse
@@ -307,7 +307,7 @@ final class StorefrontCheckoutController extends PublicApiController
         } catch (CheckoutReviewRequiredException $e) {
             $current = $checkouts->current($request->cookie(CommerceCartService::COOKIE_NAME));
 
-            return PublicApiResponse::error(
+            return $this->persistRebound(PublicApiResponse::error(
                 $request,
                 PublicApiErrorCode::REVIEW_REQUIRED,
                 $e->getMessage(),
@@ -316,7 +316,7 @@ final class StorefrontCheckoutController extends PublicApiController
                     'items' => $e->details(),
                     'checkout' => $checkouts->serialize($current['checkout'], $current['cart']),
                 ],
-            );
+            ), $current['rebound']);
         } catch (PDOException $e) {
             throw $e;
         } catch (RuntimeException $e) {
@@ -408,7 +408,7 @@ final class StorefrontCheckoutController extends PublicApiController
             abort(422, $e->getMessage());
         }
 
-        return PublicApiResponse::success($request, $data);
+        return $this->persistRebound(PublicApiResponse::success($request, $data), $lookup['rebound']);
     }
 
     /** @param array<int, string> $allowed */
@@ -428,6 +428,29 @@ final class StorefrontCheckoutController extends PublicApiController
     }
 
     /** يشارك كوكي AWJ Cart نفسه — لا كوكي Checkout مستقل (§14). */
+    /**
+     * H6 Batch H (Codex, PR #1819, P2): see StorefrontCartController::persistRebound() — a rotated cart token produced by
+     * identity recovery must be handed back, or `checkout/complete` (no identity fallback) 404s.
+     */
+    private function persistRebound(JsonResponse $response, ?string $rebound): JsonResponse
+    {
+        if ($rebound !== null) {
+            $response->headers->setCookie(cookie(
+                CommerceCartService::COOKIE_NAME,
+                $rebound,
+                CommerceCartService::LIFETIME_DAYS * 24 * 60,
+                '/',
+                null,
+                app()->environment('production'),
+                true,
+                false,
+                'lax',
+            ));
+        }
+
+        return $response;
+    }
+
     private function clearCartCookie(JsonResponse $response): JsonResponse
     {
         $response->headers->setCookie(cookie()->forget(CommerceCartService::COOKIE_NAME, '/', null));

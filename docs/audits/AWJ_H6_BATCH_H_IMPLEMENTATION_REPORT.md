@@ -61,6 +61,7 @@ Contract and layer table: `docs/audits/AWJ_H6_BATCH_H_B2B_CONTRACTS.md` §1.
 - The cart is owned by the identity (existing machinery); a cart token is useless to any other bearer.
 - `CommerceOrderService::createFromCheckout` re-reads the membership **inside the order transaction with a shared row lock**; anything but `approved` ⇒ refusal and a full rollback. A suspension therefore cannot slip between the middleware check and the insert.
 - `CommerceOrder::updating` forbids changing `customer_identity_id`: no rewrite, no later claim of a guest order.
+- **Review fix (Codex P2, verified real, introduced by this PR):** establishing `CustomerContext` on the store cart/checkout routes made identity-based cart recovery reachable there, and `StorefrontCartController` / `StorefrontCheckoutController` discarded the rotated cart token, so a buyer on a second browser would see the cart but `checkout/complete` (no identity fallback) would 404. Both controllers now hand the rotated token back (cookie), mirroring `/commerce/v1`; two regression tests fail without the fix.
 - Request-supplied `customer_identity_id` / `partner_id` / `tenant_id` are rejected (422).
 - DTC, guest and mobile flows are unchanged: a buyer token on a DTC host attributes nothing. No accounting, VAT, ZATCA, payment or lifecycle code was touched; no historical order was rewritten.
 

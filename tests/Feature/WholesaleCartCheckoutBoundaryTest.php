@@ -311,6 +311,42 @@ class WholesaleCartCheckoutBoundaryTest extends TestCase
     }
 
     #[Test]
+    public function a_buyer_on_a_second_browser_recovers_the_cart_and_is_handed_the_rotated_token(): void
+    {
+        // Codex, PR #1819, P2: identity recovery rotates the cart token; the storefront controllers must hand it back,
+        // otherwise checkout/complete (no identity fallback) cannot find the cart on this browser.
+        [$buyer] = $this->approvedBuyer();
+        $this->addItem(self::WS, $buyer)->assertCreated();
+
+        // second browser: signed in, no cart cookie
+        $show = $this->api('GET', 'cart', self::WS, $buyer, null)->assertOk();
+        $this->assertCount(1, $show->json('data.items'), 'the buyer\'s own cart is recovered by identity');
+        $recovered = $this->cookie($show);
+        $this->assertNotSame('', $recovered);
+
+        // the handed-back token carries the whole checkout, including completion
+        $this->readyCheckout(self::WS, $buyer, $recovered);
+        $this->api('POST', 'checkout/complete', self::WS, $buyer, $recovered, [], 'idem-rebound-1')->assertCreated();
+        $this->assertSame(1, CommerceOrder::withoutGlobalScopes()->count());
+    }
+
+    #[Test]
+    public function checkout_steps_on_a_cookieless_browser_hand_back_a_token_that_completes(): void
+    {
+        [$buyer] = $this->approvedBuyer();
+        $this->addItem(self::WS, $buyer)->assertCreated();
+
+        // no cookie at all: POST checkout recovers the cart by identity and must return the new token
+        $created = $this->api('POST', 'checkout', self::WS, $buyer, null)->assertCreated();
+        $token = $this->cookie($created);
+
+        $this->api('PATCH', 'checkout/contact', self::WS, $buyer, $token, ['name' => 'سالم', 'phone' => '0501234567', 'email' => 's@example.com'])->assertOk();
+        $this->api('PATCH', 'checkout/address', self::WS, $buyer, $token, ['country' => 'SA', 'city' => 'الدمام', 'district' => 'الشاطئ', 'street' => 'الملك فهد', 'postal_code' => '31411'])->assertOk();
+        $this->api('PATCH', 'checkout/delivery', self::WS, $buyer, $token, ['method' => 'pickup'])->assertOk();
+        $this->api('POST', 'checkout/complete', self::WS, $buyer, $token, [], 'idem-rebound-2')->assertCreated();
+    }
+
+    #[Test]
     public function a_cart_token_is_useless_to_any_other_bearer_even_another_approved_buyer(): void
     {
         [$buyerA] = $this->approvedBuyer('a@cart.test');
