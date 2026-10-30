@@ -29,4 +29,14 @@ final readonly class ResolvedCommercePrice
         public ?string $unitName,
         public ?int $minSalePrice,
     ) {}
+
+    /**
+     * H6 Batch F — the list that actually SUPPLIED the price. `priceListId` is the list that was consulted;
+     * when it had no item for the product/unit the price falls back to the product default and no list
+     * supplied it, so persisted provenance must not name one.
+     */
+    public function provenanceListId(): ?string
+    {
+        return $this->source === self::SOURCE_PRICE_LIST ? $this->priceListId : null;
+    }
 }

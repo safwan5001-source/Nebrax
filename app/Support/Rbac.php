@@ -224,6 +224,10 @@ class Rbac
             // مستقل عن `commerce.manage` و`commerce.orders.*`. owner/admin عبر `*` فقط؛ لا تُضاف لـ`MATRIX` ولا تُمنح
             // لأي دور مخزَّن بهجرة (لا منح ضمني).
             'commerce.wholesale.manage',
+            // H6 Batch F: إسناد قائمة أسعار القناة ووسم عضوية الجملة — يغيّر الأسعار التي يراها زوّار القناة ومن يراها؛ مستقل
+            // عن `commerce.manage` و`commerce.wholesale.manage`. owner/admin عبر `*` فقط؛ لا يُضاف لـ`MATRIX` ولا يُمنح لأي
+            // دور مخزَّن بهجرة (لا منح ضمني).
+            'commerce.channel_settings.manage',
             // APP-BUILDER-1: إدارة تطبيقات AWJ App Builder (الهوية والمسودة)
             // سلطة مستقلة عن نشر نسخة تجربة — `apps_builder.publish` أدناه.
             // لا علاقة بـ`apps.view`/`apps.manage` (تفعيل/إيقاف قدرات

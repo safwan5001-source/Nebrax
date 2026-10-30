@@ -26,6 +26,7 @@ use App\Support\Commerce\DeliverTodayFilter;
 use App\Support\PublicApiResponse;
 use App\Tenancy\BranchScope;
 use App\Tenancy\StorefrontContext;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -48,7 +49,7 @@ class StorefrontProductController extends PublicApiController
      */
     private const IDS_FILTER_MAX = 8;
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, CommercePriceResolver $resolver): JsonResponse
     {
         $filters = $request->validate([
             'search' => ['sometimes', 'nullable', 'string', 'max:120'],
@@ -126,7 +127,7 @@ class StorefrontProductController extends PublicApiController
             $facetFilter->orderByCollectionPosition($query, $facetSelection);
             $query->orderBy('name');
         } else {
-            $this->applySort($query, $filters['sort'] ?? null, self::SORTS, 'name');
+            $this->applyListingSort($query, $filters['sort'] ?? null, $resolver, $channelId);
         }
 
         $paginator = $query->paginate($this->perPage($request));
@@ -138,14 +139,12 @@ class StorefrontProductController extends PublicApiController
         $tenantSlug = $request->route('tenantSlug');
         $gallery = app(ProductMediaGalleryService::class);
 
-        // السعر لتصفّح مجهول (بلا partnerId) مطابقٌ حتماً لناتج
-        // CommercePriceResolver::resolve() في هذه الحالة لمنتجٍ بسيط: لا قائمة
-        // سعر عميل تُحلّ بلا partnerId، والوحدة غير محدَّدة تعني وحدة الأساس
-        // دائماً — فرعا الحسم الوحيدان الممكنان هما SOURCE_PRODUCT_DEFAULT
-        // (sale_price) فقط. نقرأه مباشرةً هنا لتفادي استدعاء المُحلِّل لكل صفّ
-        // (N+1)؛ `show()` يستدعي المُحلِّل نفسه لأن N=1 هناك. اختبارٌ مخصّص
-        // يثبّت تطابق النتيجتين.
-        //
+        // H6-F — one authoritative path: the same channel-list-then-sale_price
+        // precedence as `CommercePriceResolver::resolve()` (detail/cart), batched
+        // so a page costs one list query instead of one per row. A channel with
+        // no active list yields `sale_price` exactly as before.
+        $prices = $resolver->browsePrices($paginator->getCollection(), $channelId);
+
         // VAR-COM-1 — منتجٌ متعدد الخيارات لا سعر أبٍ ذا معنى له
         // (`resolve()` يرفض `variantId=null` لمنتجٍ كهذا فشلاً مغلَقاً)، ولا
         // نحسب «سعراً ابتدائياً» تخمينياً في القائمة المُرقَّمة (تفادي N+1 عبر
@@ -156,9 +155,9 @@ class StorefrontProductController extends PublicApiController
         $promises = app(CommerceDeliveryPromiseService::class)
             ->forProducts($channelId, $paginator->getCollection(), $filters['city'] ?? null, $filters['region'] ?? null);
 
-        $data = $paginator->getCollection()->map(function (Product $product) use ($request, $currency, $inStockByProduct, $tenantSlug, $gallery, $promises): array {
+        $data = $paginator->getCollection()->map(function (Product $product) use ($request, $currency, $inStockByProduct, $tenantSlug, $gallery, $promises, $prices): array {
             $galleryMedia = StorefrontProductResource::mediaPayload($gallery->resolveGallery($product), $tenantSlug);
-            $price = $product->isVariantManaged() ? 0 : (int) $product->sale_price;
+            $price = $prices[$product->id];
 
             return (new StorefrontProductResource(
                 $product,
@@ -191,6 +190,42 @@ class StorefrontProductController extends PublicApiController
                 ],
             ],
         ]);
+    }
+
+    /**
+     * H6 Batch F — on a channel whose active price list re-prices products, a price sort must order by the price
+     * the listing DISPLAYS, or the displayed amounts come out of order and the cheapest listed products can fall
+     * off page 1. Effective price = the channel list item for the product's own unit, else the product's base
+     * unit price — the same tiers as `CommercePriceResolver::browsePrices()`. The base is read from
+     * `product_unit_prices` (the authority behind the `Product::sale_price` accessor), NOT the legacy
+     * `products.sale_price` column. A correlated subquery, no join, so TenantScope's unqualified columns stay
+     * unambiguous.
+     *
+     * Deliberately scoped to channels WITH an active list: every other request keeps the exact historical
+     * `applySort` statement, so DTC ordering is byte-for-byte unchanged. (That historical statement orders by the
+     * legacy column — a pre-existing quirk reported, not altered, here.)
+     */
+    private function applyListingSort(Builder $query, ?string $sort, CommercePriceResolver $resolver, string $channelId): void
+    {
+        $field = ltrim(trim((string) $sort), '-');
+        $list = $field === 'sale_price' ? $resolver->activeChannelPriceList($channelId) : null;
+
+        if ($list === null) {
+            $this->applySort($query, $sort, self::SORTS, 'name');
+
+            return;
+        }
+
+        $direction = str_starts_with(trim((string) $sort), '-') ? 'desc' : 'asc';
+        $query->orderByRaw(
+            'COALESCE('
+            .'(SELECT pli.price FROM price_list_items pli WHERE pli.price_list_id = ? AND pli.product_id = products.id '
+            .'AND pli.product_variant_id IS NULL AND pli.unit_name = products.unit LIMIT 1), '
+            .'(SELECT pup.price FROM product_unit_prices pup WHERE pup.product_id = products.id '
+            .'AND pup.product_variant_id IS NULL AND pup.unit_name = products.unit LIMIT 1), '
+            .'0) '.$direction,
+            [$list->id],
+        )->orderByDesc('products.id');
     }
 
     public function show(
