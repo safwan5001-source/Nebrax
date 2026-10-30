@@ -92,7 +92,8 @@ export default function NewAppBuilderPage() {
   }
 
   async function seedTemplate(appId: string, schema: AppSchema) {
-    await api(`/app-builder/apps/${appId}/draft`, { method: 'PUT', body: { schema } });
+    // AD-01: المسودة الجديدة عند revision 0؛ نبذرها بأساس صريح.
+    await api(`/app-builder/apps/${appId}/draft`, { method: 'PUT', body: { schema, base_revision: 0 } });
   }
 
   return (

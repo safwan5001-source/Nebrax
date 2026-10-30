@@ -2,10 +2,10 @@
 import * as React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import AppBuilderVersionsPage from './page';
 
-const { api, push, translate } = vi.hoisted(() => {
+const { api, push, translate, currentUser } = vi.hoisted(() => {
   const strings: Record<string, string> = {
     'versions.title': 'Published versions',
     'versions.loadFailed': 'Could not load versions.',
@@ -19,6 +19,9 @@ const { api, push, translate } = vi.hoisted(() => {
     'versions.restoring': 'Restoring…',
     'versions.restoreSuccessTitle': 'Draft restored',
     'versions.restoreErrorTitle': 'Could not restore this version',
+    'versions.restoreConflictTitle': 'The draft changed during the restore',
+    'versions.restoreConflictBody': 'Nothing was written. Try again.',
+    'versions.restoreLocalBackupWarning': 'You have unsaved local changes that the restore will discard.',
     'detail.back': 'Back to apps',
     cancel: 'Cancel',
     loading: 'Loading…',
@@ -39,7 +42,7 @@ const { api, push, translate } = vi.hoisted(() => {
     if (!cache.has(namespace)) cache.set(namespace, buildTranslator(namespace));
     return cache.get(namespace)!;
   };
-  return { api: vi.fn(), push: vi.fn(), translate: translator };
+  return { api: vi.fn(), push: vi.fn(), translate: translator, currentUser: vi.fn() };
 });
 
 vi.mock('next-intl', () => ({ useTranslations: (ns: string) => translate(ns), useLocale: () => 'en' }));
@@ -53,6 +56,7 @@ vi.mock('@/lib/api', async () => {
   const actual = await vi.importActual<typeof import('@/lib/api')>('@/lib/api');
   return { ...actual, api };
 });
+vi.mock('@/lib/auth', () => ({ currentUser }));
 const { toastFns } = vi.hoisted(() => ({ toastFns: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/components/ui/toast', () => ({ useToast: () => toastFns }));
 vi.mock('lucide-react', () => {
@@ -88,14 +92,19 @@ const versionOneSchema = {
   pages: { home: { type: 'Page', id: 'home-root', children: [] } },
 };
 
-function mockApi(options?: { publishedByName?: string | null }) {
+let ApiErrorCtor: typeof import('@/lib/api').ApiError;
+function mockApi(options?: { publishedByName?: string | null; putConflict?: boolean }) {
   api.mockImplementation((path?: string, init?: { method?: string; body?: unknown }) => {
     if (!path) return Promise.resolve({ data: null });
     if (path.endsWith('/versions/1')) {
       return Promise.resolve({ data: { ...versionsData[1], schema: versionOneSchema } });
     }
     if (path.endsWith('/versions')) return Promise.resolve({ data: versionsData });
-    if (path.endsWith('/draft') && init?.method === 'PUT') return Promise.resolve({ data: { id: 'draft-1', schema: versionOneSchema, revision: 1 } });
+    if (path.endsWith('/draft') && init?.method === 'PUT') {
+      if (options?.putConflict) return Promise.reject(new ApiErrorCtor(409, 'conflict', { reason: 'draft_conflict', current_revision: 8, base_revision: 7, updated_by: 'u2', updated_at: '2026-09-23T00:00:00Z' }));
+      return Promise.resolve({ data: { id: 'draft-1', schema: versionOneSchema, revision: 8 } });
+    }
+    if (path.endsWith('/draft')) return Promise.resolve({ data: { id: 'draft-1', builder_app_id: 'app-1', schema: versionOneSchema, revision: 7, updated_at: null } });
     if (path.includes('/app-builder/apps/')) return Promise.resolve({ data: appData });
     return Promise.reject(new Error(`unexpected path: ${path}`));
   });
@@ -108,6 +117,11 @@ describe('AppBuilderVersionsPage', () => {
     push.mockReset();
     toastFns.success.mockReset();
     toastFns.error.mockReset();
+    currentUser.mockReturnValue({ id: 'u1', role: 'owner' });
+    window.localStorage.clear();
+  });
+  beforeAll(async () => {
+    ApiErrorCtor = (await import('@/lib/api')).ApiError;
   });
 
   it('loads and renders every published version with its note and publisher', async () => {
@@ -150,7 +164,48 @@ describe('AppBuilderVersionsPage', () => {
     expect(toastFns.success).toHaveBeenCalledWith('Draft restored');
 
     const putCall = api.mock.calls.find((call) => call[0] === '/app-builder/apps/app-1/draft' && call[1]?.method === 'PUT');
-    expect(putCall?.[1]?.body).toEqual({ schema: versionOneSchema });
+    // AD-01: الاستعادة تجلب أحدث revision أولاً ثم تكتب بأساسه (لا كتابة فوق دون أساس).
+    expect(putCall?.[1]?.body).toEqual({ schema: versionOneSchema, base_revision: 7 });
+    const calls = api.mock.calls.map((call) => `${call[1]?.method ?? 'GET'} ${call[0]}`);
+    expect(calls.indexOf('GET /app-builder/apps/app-1/draft')).toBeLessThan(calls.indexOf('PUT /app-builder/apps/app-1/draft'));
+  });
+
+  it('a restore that races a newer draft save is rejected with a clear error and does not redirect', async () => {
+    mockApi({ putConflict: true });
+    render(<AppBuilderVersionsPage />);
+    await screen.findByText('Version 2');
+
+    await userEvent.setup().click(screen.getAllByText('Restore to draft').slice(-1)[0]);
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.setup().click(within(dialog).getAllByRole('button', { name: 'Restore to draft' })[0]);
+
+    await waitFor(() => expect(toastFns.error).toHaveBeenCalledWith('The draft changed during the restore', 'Nothing was written. Try again.'));
+    expect(push).not.toHaveBeenCalled();
+    expect(toastFns.success).not.toHaveBeenCalled();
+  });
+
+  it('a successful restore discards the local unsaved backup, and the dialog warns about it beforehand', async () => {
+    window.localStorage.setItem('awj.appBuilder.draftBackup.v1.u1.app-1', JSON.stringify({ v: 1, appId: 'app-1', userId: 'u1', schema: versionOneSchema, baseRevision: 3, savedAt: '2026-09-22T00:00:00Z' }));
+    mockApi();
+    render(<AppBuilderVersionsPage />);
+    await screen.findByText('Version 2');
+
+    await userEvent.setup().click(screen.getAllByText('Restore to draft').slice(-1)[0]);
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('You have unsaved local changes that the restore will discard.')).toBeTruthy();
+    await userEvent.setup().click(within(dialog).getAllByRole('button', { name: 'Restore to draft' })[0]);
+
+    await waitFor(() => expect(push).toHaveBeenCalled());
+    expect(window.localStorage.getItem('awj.appBuilder.draftBackup.v1.u1.app-1')).toBeNull();
+  });
+
+  it('a user without the manage permission does not see the restore action', async () => {
+    currentUser.mockReturnValue({ id: 'u9', role: 'staff', permissions: ['apps_builder.view'] });
+    mockApi();
+    render(<AppBuilderVersionsPage />);
+    await screen.findByText('Version 2');
+
+    expect(screen.queryAllByText('Restore to draft').length).toBe(0);
   });
 
   it('shows an error state when the app fails to load', async () => {

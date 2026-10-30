@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AppBuilderWorkspacePage from './page';
 
 const { api, currentUser, translate } = vi.hoisted(() => {
@@ -138,6 +138,41 @@ const { api, currentUser, translate } = vi.hoisted(() => {
     'previewState.loadFailed': 'Could not load the published version',
     'previewState.readOnlyNotice': 'Read-only — switch to the Draft tab to edit',
     'previewState.switchToDraftToPublish': 'Switch to Draft to publish',
+    // AD-01 / S01b — save safety
+    saveNetworkHint: 'Server unreachable',
+    'conflict.title': 'Draft save conflict',
+    'conflict.body': 'Saved elsewhere (version {current}) after you opened version {base}.',
+    'conflict.lastSaved': 'Last saved: {when}',
+    'conflict.safeNote': 'Your changes are kept.',
+    'conflict.changedAgain': 'The draft changed again.',
+    'conflict.keepEditing': 'Keep editing',
+    'conflict.copyMine': 'Copy my changes',
+    'conflict.reload': 'Load the saved draft',
+    'conflict.overwrite': 'Overwrite the saved draft',
+    'conflict.checkingLatest': 'Fetching the latest version…',
+    'conflict.confirmReloadBody': 'Replace with version {current} and discard my changes.',
+    'conflict.confirmReloadAction': 'Load and discard my changes',
+    'conflict.confirmOverwriteBody': 'Replace saved version {latest} with my changes.',
+    'conflict.overwriteWarning': 'Only published versions can restore it.',
+    'conflict.confirmOverwriteAction': 'Yes, overwrite it',
+    'conflict.back': 'Back',
+    'conflict.copied': 'Copied',
+    'conflict.copyFailed': 'Could not copy',
+    'conflict.fetchLatestFailed': 'Could not fetch the latest draft',
+    'leave.title': 'Leave without saving?',
+    'leave.body': 'You have unsaved changes.',
+    'leave.stayAction': 'Stay in the editor',
+    'leave.leaveAction': 'Leave',
+    'recovery.title': 'Restore unsaved local changes?',
+    'recovery.body': 'We found local changes that were not saved to the server.',
+    'recovery.savedAt': 'Kept locally: {when}',
+    'recovery.restore': 'Restore my changes',
+    'recovery.discard': 'Discard them',
+    'readOnly.notice': 'Read-only: you do not have permission to edit the draft.',
+    'readOnly.saveForbidden': 'No permission to save',
+    'saveFailure.network': 'Could not save (offline). Your changes are kept on this device.',
+    'saveFailure.other': 'Could not save. Your changes are kept on this device.',
+    'saveFailure.retry': 'Try saving again',
     'builderMode.design': 'Design',
     'builderMode.preview': 'App Preview',
     'preview.browserTruthBadge': 'Browser Preview — not a real runtime render',
@@ -224,6 +259,12 @@ vi.mock('lucide-react', () => {
 // seeing exactly one canvas, exactly as before; the dedicated inline-preview tests flip it to
 // `true` before rendering.
 let wideBuilderViewport = false;
+// `window` يُشارَك بين ملفات الاختبار (singleFork في vitest.config)؛ نُعيد matchMedia الأصلي بعد الملف حتى لا يرى
+// الملف التالي (FacetVisualEditor) مجسّماً بـ matches=false يحوّله إلى تخطيط الجوال.
+const originalMatchMedia = window.matchMedia;
+afterAll(() => {
+  window.matchMedia = originalMatchMedia;
+});
 beforeEach(() => {
   wideBuilderViewport = false;
   window.matchMedia = ((query: string) => ({
@@ -384,6 +425,7 @@ describe('AppBuilderWorkspacePage', () => {
     toastFns.error.mockReset();
     toastFns.toast.mockReset();
     currentUser.mockReturnValue({ role: 'owner' });
+    window.localStorage.clear();
   });
 
   it('loads the draft and renders the page tree, canvas content, and default selection', async () => {
@@ -1458,5 +1500,469 @@ describe('AppBuilderWorkspacePage', () => {
       expect(screen.getByTestId('inline-mobile-preview')).toBeTruthy();
       expect(screen.getAllByText('Featured').length).toBe(2);
     });
+  });
+});
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  AD-01 / S01b — سلامة الحفظ: قفل تفاؤلي، تعارض، نسخة محلية، حارس مغادرة، صلاحيات
+// ═══════════════════════════════════════════════════════════════════════════
+describe('AppBuilderWorkspacePage — save safety (AD-01 / S01b)', () => {
+  const DRAFT_PATH = '/app-builder/apps/app-1/draft';
+  const BACKUP_KEY = 'awj.appBuilder.draftBackup.v1.u1.app-1';
+  const conflictBody = { message: 'conflict', reason: 'draft_conflict', current_revision: 5, base_revision: 0, updated_by: 'u2', updated_at: '2026-10-30T10:00:00+00:00' };
+
+  afterEach(cleanup);
+  beforeEach(() => {
+    api.mockReset();
+    toastFns.success.mockReset();
+    toastFns.error.mockReset();
+    toastFns.toast.mockReset();
+    currentUser.mockReturnValue({ id: 'u1', role: 'owner' });
+    window.localStorage.clear();
+  });
+
+  const putCalls = () => api.mock.calls.filter((c) => c[0] === DRAFT_PATH && c[1]?.method === 'PUT');
+  const getDraftCalls = () => api.mock.calls.filter((c) => c[0] === DRAFT_PATH && !c[1]?.method);
+  type Override = (path: string, init?: { method?: string; body?: unknown }) => Promise<unknown> | undefined;
+  function overrideApi(custom: Override) {
+    const base = api.getMockImplementation()!;
+    api.mockImplementation((path?: string, init?: { method?: string; body?: unknown }) => custom(path ?? '', init) ?? base(path, init));
+  }
+
+  async function openEditor() {
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+  }
+
+  async function makeEdit(value = 'Bye') {
+    const desktopTree = screen.getAllByRole('tree')[0];
+    await userEvent.setup().click(within(desktopTree).getByText('Text'));
+    const textareas = await screen.findAllByDisplayValue('Welcome');
+    fireEvent.change(textareas[0], { target: { value } });
+  }
+
+  async function clickSave() {
+    await userEvent.setup().click(screen.getAllByText('Save')[0]);
+  }
+
+  async function conflictDialog() {
+    return within(await screen.findByRole('dialog', { name: 'Draft save conflict' }));
+  }
+
+  it('sends the loaded revision as base_revision and rebases on the revision the server returns', async () => {
+    const { ApiError: _unused } = await import('@/lib/api');
+    void _unused;
+    mockApi();
+    let nextRevision = 1;
+    overrideApi((path, init) => (path === DRAFT_PATH && init?.method === 'PUT' ? Promise.resolve({ data: { ...draftData, revision: nextRevision++ } }) : undefined));
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    await makeEdit('Bye');
+    await clickSave();
+    await waitFor(() => expect(putCalls().length).toBe(1));
+    expect((putCalls()[0][1].body as { base_revision: number }).base_revision).toBe(0);
+
+    await waitFor(() => expect(screen.getAllByText('Saved').length).toBeGreaterThan(0));
+    const [textarea] = await screen.findAllByDisplayValue('Bye');
+    fireEvent.change(textarea, { target: { value: 'Bye again' } });
+    await clickSave();
+    await waitFor(() => expect(putCalls().length).toBe(2));
+    expect((putCalls()[1][1].body as { base_revision: number }).base_revision).toBe(1);
+  });
+
+  it('a 409 draft_conflict opens the conflict dialog, keeps the edits unsaved, and keeps a local backup', async () => {
+    const { ApiError } = await import('@/lib/api');
+    mockApi();
+    overrideApi((path, init) => (path === DRAFT_PATH && init?.method === 'PUT' ? Promise.reject(new ApiError(409, 'conflict', conflictBody)) : undefined));
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    await makeEdit('Bye');
+    await clickSave();
+
+    const dialog = await conflictDialog();
+    expect(dialog.getByText('Saved elsewhere (version 5) after you opened version 0.')).toBeTruthy();
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+    expect(screen.queryAllByText('Saved')).toHaveLength(0);
+    expect(toastFns.success).not.toHaveBeenCalled();
+
+    const backup = JSON.parse(window.localStorage.getItem(BACKUP_KEY)!);
+    expect(backup.baseRevision).toBe(0);
+    expect(JSON.stringify(backup.schema)).toContain('Bye');
+  });
+
+  it('"Keep editing" closes the conflict dialog without losing anything', async () => {
+    const { ApiError } = await import('@/lib/api');
+    mockApi();
+    overrideApi((path, init) => (path === DRAFT_PATH && init?.method === 'PUT' ? Promise.reject(new ApiError(409, 'conflict', conflictBody)) : undefined));
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+    await makeEdit('Bye');
+    await clickSave();
+
+    await userEvent.setup().click((await conflictDialog()).getByRole('button', { name: 'Keep editing' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Draft save conflict' })).toBeNull());
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+    expect(screen.getAllByDisplayValue('Bye').length).toBeGreaterThan(0);
+  });
+
+  it('overwrite never sends before re-fetching the latest revision and an explicit confirmation', async () => {
+    const { ApiError } = await import('@/lib/api');
+    mockApi();
+    let putNo = 0;
+    overrideApi((path, init) => {
+      if (path === DRAFT_PATH && init?.method === 'PUT') {
+        putNo++;
+        return putNo === 1 ? Promise.reject(new ApiError(409, 'conflict', conflictBody)) : Promise.resolve({ data: { ...draftData, revision: 6 } });
+      }
+      if (path === DRAFT_PATH && !init?.method) return Promise.resolve({ data: { ...draftData, revision: 5, updated_at: '2026-10-30T10:00:00+00:00' } });
+      return undefined;
+    });
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+    await makeEdit('Bye');
+    await clickSave();
+
+    const user = userEvent.setup();
+    const initialGets = getDraftCalls().length;
+    await user.click((await conflictDialog()).getByRole('button', { name: 'Overwrite the saved draft' }));
+
+    // الخطوة 1: إعادة الجلب فقط — لا PUT ثانٍ بعد، ويُطلب التأكيد.
+    const confirm = await conflictDialog();
+    expect(await confirm.findByText('Replace saved version 5 with my changes.')).toBeTruthy();
+    expect(getDraftCalls().length).toBe(initialGets + 1);
+    expect(putCalls().length).toBe(1);
+
+    // الخطوة 2: بعد التأكيد فقط يُرسَل الحفظ، بأساس الـrevision الأحدث (5) لا القديم (0).
+    await user.click(confirm.getByRole('button', { name: 'Yes, overwrite it' }));
+    await waitFor(() => expect(putCalls().length).toBe(2));
+    expect((putCalls()[1][1].body as { base_revision: number }).base_revision).toBe(5);
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Draft save conflict' })).toBeNull());
+    await waitFor(() => expect(screen.getAllByText('Saved').length).toBeGreaterThan(0));
+    expect(window.localStorage.getItem(BACKUP_KEY)).toBeNull();
+  });
+
+  it('if the draft moves again during an overwrite, the dialog returns to the choice with a notice and nothing is written', async () => {
+    const { ApiError } = await import('@/lib/api');
+    mockApi();
+    overrideApi((path, init) => {
+      if (path === DRAFT_PATH && init?.method === 'PUT') {
+        const second = putCalls().length >= 1;
+        return Promise.reject(new ApiError(409, 'conflict', second ? { ...conflictBody, current_revision: 9, base_revision: 5 } : conflictBody));
+      }
+      if (path === DRAFT_PATH && !init?.method) return Promise.resolve({ data: { ...draftData, revision: 5, updated_at: null } });
+      return undefined;
+    });
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+    await makeEdit('Bye');
+    await clickSave();
+
+    const user = userEvent.setup();
+    await user.click((await conflictDialog()).getByRole('button', { name: 'Overwrite the saved draft' }));
+    await user.click((await conflictDialog()).getByRole('button', { name: 'Yes, overwrite it' }));
+
+    const dialog = await conflictDialog();
+    expect(await dialog.findByText('The draft changed again.')).toBeTruthy();
+    expect(dialog.getByText('Saved elsewhere (version 9) after you opened version 5.')).toBeTruthy();
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+    expect(JSON.stringify(JSON.parse(window.localStorage.getItem(BACKUP_KEY)!).schema)).toContain('Bye');
+  });
+
+  it('"Load the saved draft" needs a second confirmation, then reloads the server draft and drops the local backup', async () => {
+    const { ApiError } = await import('@/lib/api');
+    mockApi();
+    overrideApi((path, init) => (path === DRAFT_PATH && init?.method === 'PUT' ? Promise.reject(new ApiError(409, 'conflict', conflictBody)) : undefined));
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+    await makeEdit('Bye');
+    await clickSave();
+
+    const user = userEvent.setup();
+    const loadsBefore = getDraftCalls().length;
+    await user.click((await conflictDialog()).getByRole('button', { name: 'Load the saved draft' }));
+    expect(getDraftCalls().length).toBe(loadsBefore); // ما زال يسأل
+    await user.click((await conflictDialog()).getByRole('button', { name: 'Load and discard my changes' }));
+
+    await waitFor(() => expect(getDraftCalls().length).toBe(loadsBefore + 1));
+    await screen.findByText('Featured');
+    expect(screen.queryAllByText('Unsaved changes')).toHaveLength(0);
+    expect(window.localStorage.getItem(BACKUP_KEY)).toBeNull();
+    expect(putCalls().length).toBe(1); // لا حفظ إضافي
+  });
+
+  it('"Copy my changes" puts the current schema on the clipboard', async () => {
+    const { ApiError } = await import('@/lib/api');
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    mockApi();
+    overrideApi((path, init) => (path === DRAFT_PATH && init?.method === 'PUT' ? Promise.reject(new ApiError(409, 'conflict', conflictBody)) : undefined));
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+    await makeEdit('Bye');
+    await clickSave();
+
+    // userEvent.setup() يركّب مجسّم clipboard خاصاً به؛ نضع مجسّمنا بعده مباشرةً.
+    const user = userEvent.setup();
+    // الإعداد يُلغى في finally: `navigator` يُشارَك بين الملفات في singleFork، وتسريب clipboard يكسر اختبارات لاحقة.
+    const original = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    try {
+      await user.click((await conflictDialog()).getByRole('button', { name: 'Copy my changes' }));
+      await waitFor(() => expect(writeText).toHaveBeenCalled());
+      expect(String(writeText.mock.calls[0][0])).toContain('Bye');
+      expect(toastFns.success).toHaveBeenCalledWith('Copied');
+    } finally {
+      if (original) Object.defineProperty(navigator, 'clipboard', original);
+      else delete (navigator as unknown as Record<string, unknown>).clipboard;
+    }
+  });
+
+  it('a network failure keeps the edits unsaved and backed up, shows a persistent retry banner, and a retry succeeds', async () => {
+    mockApi();
+    let fail = true;
+    overrideApi((path, init) => {
+      if (path === DRAFT_PATH && init?.method === 'PUT') {
+        return fail ? Promise.reject(new TypeError('Failed to fetch')) : Promise.resolve({ data: { ...draftData, revision: 1 } });
+      }
+      return undefined;
+    });
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+    await makeEdit('Bye');
+    await clickSave();
+
+    expect(await screen.findByText('Could not save (offline). Your changes are kept on this device.')).toBeTruthy();
+    expect(toastFns.error).toHaveBeenCalledWith('Could not save the draft', 'Server unreachable');
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+    expect(JSON.stringify(JSON.parse(window.localStorage.getItem(BACKUP_KEY)!).schema)).toContain('Bye');
+
+    fail = false;
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Try saving again' }));
+    await waitFor(() => expect(screen.queryByText('Could not save (offline). Your changes are kept on this device.')).toBeNull());
+    await waitFor(() => expect(screen.getAllByText('Saved').length).toBeGreaterThan(0));
+    expect(window.localStorage.getItem(BACKUP_KEY)).toBeNull();
+  });
+
+  it('edits made while a save is in flight are not reported as saved', async () => {
+    mockApi();
+    let resolvePut: () => void = () => undefined;
+    overrideApi((path, init) => (path === DRAFT_PATH && init?.method === 'PUT'
+      ? new Promise((resolve) => { resolvePut = () => resolve({ data: { ...draftData, revision: 1 } }); })
+      : undefined));
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+    await makeEdit('Bye');
+    await clickSave();
+    await waitFor(() => expect(putCalls().length).toBe(1));
+
+    const [textarea] = screen.getAllByDisplayValue('Bye');
+    fireEvent.change(textarea, { target: { value: 'Bye (typed during the save)' } });
+    resolvePut();
+
+    await waitFor(() => expect(toastFns.success).toHaveBeenCalled());
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+    // النسخة المحلية مؤجَّلة (400ms) — يُنتظر وصولها ثم يُتحقق من أنها تحمل الكتابة أثناء الحفظ.
+    await waitFor(() => expect(window.localStorage.getItem(BACKUP_KEY)).not.toBeNull());
+    expect(JSON.stringify(JSON.parse(window.localStorage.getItem(BACKUP_KEY)!).schema)).toContain('typed during the save');
+  });
+
+  it('when a slow save fails, the local backup keeps the newest edits, not the older request snapshot', async () => {
+    mockApi();
+    let rejectPut: (e: unknown) => void = () => undefined;
+    overrideApi((path, init) => (path === DRAFT_PATH && init?.method === 'PUT'
+      ? new Promise((_resolve, reject) => { rejectPut = reject; })
+      : undefined));
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+    await makeEdit('Bye');
+    await clickSave();
+    await waitFor(() => expect(putCalls().length).toBe(1));
+
+    const [textarea] = screen.getAllByDisplayValue('Bye');
+    fireEvent.change(textarea, { target: { value: 'Bye (newest)' } });
+    rejectPut(new TypeError('Failed to fetch'));
+
+    expect(await screen.findByText('Could not save (offline). Your changes are kept on this device.')).toBeTruthy();
+    expect(JSON.stringify(JSON.parse(window.localStorage.getItem(BACKUP_KEY)!).schema)).toContain('Bye (newest)');
+  });
+
+  it('confirming the leave dialog flushes the newest edits to the local backup immediately (no 400ms debounce wait)', async () => {
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+    await makeEdit('Bye (just typed)');
+    expect(window.localStorage.getItem(BACKUP_KEY)).toBeNull(); // الـdebounce لم ينتهِ بعد
+
+    // رابط داخلي يفتح حوار المغادرة، ثم «مغادرة» تكتب النسخة فوراً.
+    const link = document.createElement('a');
+    link.href = '/commerce';
+    document.body.appendChild(link);
+    fireEvent.click(link);
+    const leave = within(await screen.findByRole('dialog', { name: 'Leave without saving?' }));
+    await userEvent.setup().click(leave.getByRole('button', { name: 'Leave' }));
+    expect(JSON.stringify(JSON.parse(window.localStorage.getItem(BACKUP_KEY)!).schema)).toContain('Bye (just typed)');
+    link.remove();
+  });
+
+  it('restoring a backup that deleted the server draft\'s selected page re-selects a valid page from the restored schema', async () => {
+    const edited = JSON.parse(JSON.stringify(draftData.schema));
+    const homeId = edited.navigation.initialPageId;
+    edited.pages.second = { ...JSON.parse(JSON.stringify(edited.pages[homeId])), id: 'second-root', children: [{ type: 'Text', id: 'second-text', props: { text: 'Second page text' } }] };
+    delete edited.pages[homeId];
+    edited.navigation.initialPageId = 'second';
+    window.localStorage.setItem(BACKUP_KEY, JSON.stringify({ v: 1, appId: 'app-1', userId: 'u1', schema: edited, baseRevision: 0, savedAt: '2026-10-30T09:00:00+00:00' }));
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+    const recovery = within(await screen.findByRole('dialog', { name: 'Restore unsaved local changes?' }));
+    await userEvent.setup().click(recovery.getByRole('button', { name: 'Restore my changes' }));
+    expect((await screen.findAllByText('Second page text')).length).toBeGreaterThan(0);
+  });
+
+  it("a successful save does not erase another tab's different unsaved backup", async () => {
+    mockApi();
+    overrideApi((path, init) => (path === DRAFT_PATH && init?.method === 'PUT' ? Promise.resolve({ data: { ...draftData, revision: 1 } }) : undefined));
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+    await makeEdit('Bye');
+    await clickSave();
+    await waitFor(() => expect(screen.getAllByText('Saved').length).toBeGreaterThan(0));
+
+    // تبويب آخر كتب نسخته المحلية أثناء الحفظ (محتوى مختلف عمّا حُفظ هنا).
+    const foreign = JSON.parse(JSON.stringify(draftData.schema));
+    foreign.pages.home.children[0].children[0].props.text = 'Other tab edits';
+    window.localStorage.setItem(BACKUP_KEY, JSON.stringify({ v: 1, appId: 'app-1', userId: 'u1', schema: foreign, baseRevision: 0, savedAt: 'x' }));
+    const [textarea] = screen.getAllByDisplayValue('Bye');
+    fireEvent.change(textarea, { target: { value: 'Bye again' } });
+    await clickSave();
+    await waitFor(() => expect(putCalls().length).toBe(2));
+    await waitFor(() => expect(toastFns.success).toHaveBeenCalledTimes(2));
+    expect(JSON.stringify(JSON.parse(window.localStorage.getItem(BACKUP_KEY)!).schema)).toContain('Other tab edits');
+  });
+
+  it('a local backup that differs from the server draft is offered for restore, and restoring keeps its original base revision', async () => {
+    const edited = JSON.parse(JSON.stringify(draftData.schema));
+    edited.pages.home.children[0].children[0].props.text = 'Recovered text';
+    window.localStorage.setItem(BACKUP_KEY, JSON.stringify({ v: 1, appId: 'app-1', userId: 'u1', schema: edited, baseRevision: 0, savedAt: '2026-10-30T09:00:00+00:00' }));
+    const { ApiError } = await import('@/lib/api');
+    mockApi();
+    overrideApi((path, init) => (path === DRAFT_PATH && init?.method === 'PUT'
+      ? Promise.reject(new ApiError(409, 'conflict', { ...conflictBody, current_revision: 3 }))
+      : path === DRAFT_PATH && !init?.method ? Promise.resolve({ data: { ...draftData, revision: 3 } }) : undefined));
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    const recovery = within(await screen.findByRole('dialog', { name: 'Restore unsaved local changes?' }));
+    await userEvent.setup().click(recovery.getByRole('button', { name: 'Restore my changes' }));
+
+    await waitFor(() => expect(screen.getAllByText('Recovered text').length).toBeGreaterThan(0));
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+
+    // الأساس الأصلي (0) محفوظ ⇒ الخادم عند 3 يكتشف التعارض بدل أن تُكتب الاستعادة فوق عمل غيرك.
+    await clickSave();
+    expect((putCalls()[0][1].body as { base_revision: number }).base_revision).toBe(0);
+    await conflictDialog();
+  });
+
+  it('discarding the offered backup clears it and leaves the editor clean', async () => {
+    const edited = JSON.parse(JSON.stringify(draftData.schema));
+    edited.pages.home.children[0].children[0].props.text = 'Recovered text';
+    window.localStorage.setItem(BACKUP_KEY, JSON.stringify({ v: 1, appId: 'app-1', userId: 'u1', schema: edited, baseRevision: 0, savedAt: '2026-10-30T09:00:00+00:00' }));
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    await userEvent.setup().click(within(await screen.findByRole('dialog', { name: 'Restore unsaved local changes?' })).getByRole('button', { name: 'Discard them' }));
+
+    expect(window.localStorage.getItem(BACKUP_KEY)).toBeNull();
+    expect(screen.queryAllByText('Recovered text')).toHaveLength(0);
+    expect(screen.queryAllByText('Unsaved changes')).toHaveLength(0);
+  });
+
+  it('a backup identical to the server draft, or belonging to another user, is never offered', async () => {
+    window.localStorage.setItem(BACKUP_KEY, JSON.stringify({ v: 1, appId: 'app-1', userId: 'u1', schema: draftData.schema, baseRevision: 0, savedAt: 'x' }));
+    const other = JSON.parse(JSON.stringify(draftData.schema));
+    other.pages.home.children[0].children[0].props.text = 'Someone else';
+    window.localStorage.setItem('awj.appBuilder.draftBackup.v1.u2.app-1', JSON.stringify({ v: 1, appId: 'app-1', userId: 'u2', schema: other, baseRevision: 0, savedAt: 'x' }));
+    await openEditor();
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(window.localStorage.getItem(BACKUP_KEY)).toBeNull(); // المطابق للخادم يُنظَّف
+    expect(window.localStorage.getItem('awj.appBuilder.draftBackup.v1.u2.app-1')).not.toBeNull(); // لا نمسّ عمل مستخدم آخر
+  });
+
+  it('while dirty, clicking an internal link asks before leaving; staying keeps the editor and the edits', async () => {
+    await openEditor();
+    await makeEdit('Bye');
+
+    fireEvent.click(screen.getByText('backToCommerce'));
+    const dialog = within(await screen.findByRole('dialog', { name: 'Leave without saving?' }));
+    await userEvent.setup().click(dialog.getByRole('button', { name: 'Stay in the editor' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Leave without saving?' })).toBeNull());
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+  });
+
+  it('while clean, links are not intercepted', async () => {
+    await openEditor();
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 });
+    screen.getByText('backToCommerce').dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('Ctrl+S saves the draft even while typing in a field, and does nothing when clean', async () => {
+    await openEditor();
+
+    const cleanEvent = new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true, cancelable: true });
+    window.dispatchEvent(cleanEvent);
+    expect(putCalls()).toHaveLength(0);
+
+    await makeEdit('Bye');
+    const [textarea] = screen.getAllByDisplayValue('Bye');
+    expect(fireEvent.keyDown(textarea, { key: 's', ctrlKey: true })).toBe(false); // منع حوار حفظ الصفحة
+    await waitFor(() => expect(putCalls().length).toBe(1));
+    await waitFor(() => expect(screen.getAllByText('Saved').length).toBeGreaterThan(0));
+  });
+
+  it('a user without apps_builder.manage gets a read-only draft: notice, disabled save, disabled inspector, edits ignored', async () => {
+    currentUser.mockReturnValue({ id: 'u3', role: 'staff', permissions: ['apps_builder.view'] });
+    await openEditor();
+
+    expect(screen.getByText('Read-only: you do not have permission to edit the draft.')).toBeTruthy();
+    expect((screen.getAllByText('Save')[0].closest('button') as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getAllByLabelText('Undo')[0] as HTMLButtonElement).disabled).toBe(true);
+
+    const desktopTree = screen.getAllByRole('tree')[0];
+    await userEvent.setup().click(within(desktopTree).getByText('Text'));
+    const [textarea] = await screen.findAllByDisplayValue('Welcome');
+    expect(textarea.matches(':disabled')).toBe(true);
+
+    fireEvent.change(textarea, { target: { value: 'Hacked' } });
+    expect(screen.queryAllByText('Unsaved changes')).toHaveLength(0);
+    expect(putCalls()).toHaveLength(0);
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true, cancelable: true }));
+    expect(putCalls()).toHaveLength(0);
+  });
+
+  it('a read-only user cannot add a page: the control is disabled and the selection is left intact', async () => {
+    currentUser.mockReturnValue({ id: 'u3', role: 'staff', permissions: ['apps_builder.view'] });
+    await openEditor();
+
+    const add = screen.getAllByRole('button', { name: /Add page/i })[0] as HTMLButtonElement;
+    expect(add.disabled).toBe(true);
+    fireEvent.click(add);
+    expect(screen.getAllByText('Featured').length).toBeGreaterThan(0); // الكانفاس لم يُستبدل بصفحة غير موجودة
+    expect(screen.queryAllByText('Unsaved changes')).toHaveLength(0);
+  });
+
+  it('an owner is never shown the read-only notice', async () => {
+    await openEditor();
+    expect(screen.queryByText('Read-only: you do not have permission to edit the draft.')).toBeNull();
   });
 });

@@ -8534,7 +8534,10 @@
       "restoreConfirmBody": "This replaces your current draft with version {version}. Any unsaved draft changes will be lost. You'll review it in the builder and must publish again explicitly.",
       "restoring": "Restoring…",
       "restoreSuccessTitle": "Draft restored",
-      "restoreErrorTitle": "Could not restore this version"
+      "restoreErrorTitle": "Could not restore this version",
+      "restoreConflictTitle": "The draft changed during the restore",
+      "restoreConflictBody": "The draft was saved elsewhere before the restore finished, so nothing was written. Try again.",
+      "restoreLocalBackupWarning": "You have unsaved local changes for this app; they will be discarded by the restore."
     },
     "builder": {
       "back": "Back",
@@ -8545,6 +8548,50 @@
       "savingBadge": "Saving…",
       "saveSuccessTitle": "Draft saved",
       "saveErrorTitle": "Could not save the draft",
+      "saveNetworkHint": "Couldn't reach the server. Your changes are kept on this device.",
+      "conflict": {
+        "title": "Draft save conflict",
+        "body": "The draft was saved elsewhere (version {current}) after you opened it (version {base}). Nothing was written to the server.",
+        "lastSaved": "Last saved: {when}",
+        "safeNote": "Your changes are still in the editor and kept on this device — they won't be lost.",
+        "changedAgain": "The draft changed again while you were trying to overwrite it. Review the updated details.",
+        "keepEditing": "Keep editing",
+        "copyMine": "Copy my changes",
+        "reload": "Load the saved draft",
+        "overwrite": "Overwrite the saved draft",
+        "checkingLatest": "Fetching the latest version…",
+        "confirmReloadBody": "The editor will be replaced with the saved draft (version {current}) and your unsaved changes will be discarded. Copy your changes first if you want to keep them.",
+        "confirmReloadAction": "Load and discard my changes",
+        "confirmOverwriteBody": "The currently saved draft (version {latest}) will be replaced with your changes. What was saved there won't appear in the editor afterwards.",
+        "overwriteWarning": "Earlier content can only be recovered from published versions.",
+        "confirmOverwriteAction": "Yes, overwrite it",
+        "back": "Back",
+        "copied": "Your changes were copied as JSON",
+        "copyFailed": "Couldn't copy",
+        "fetchLatestFailed": "Couldn't fetch the latest draft"
+      },
+      "leave": {
+        "title": "Unsaved changes",
+        "body": "You have changes that haven't been saved. Stay and save them, or leave (a local copy stays on this device and you'll be offered to restore it when you return).",
+        "stayAction": "Stay in the editor",
+        "leaveAction": "Leave"
+      },
+      "recovery": {
+        "title": "Unsaved local changes",
+        "body": "We found changes to this draft that weren't saved to the server (the page was closed, the connection dropped, or a conflict occurred). Restore them?",
+        "savedAt": "Kept locally: {when}",
+        "restore": "Restore my changes",
+        "discard": "Discard them"
+      },
+      "readOnly": {
+        "notice": "Read-only: you don't have permission to edit the draft.",
+        "saveForbidden": "You don't have permission to save the draft."
+      },
+      "saveFailure": {
+        "network": "Couldn't save (no connection to the server). Your changes are kept on this device.",
+        "other": "Couldn't save. Your changes are kept on this device.",
+        "retry": "Try again"
+      },
       "undoLabel": "Undo",
       "redoLabel": "Redo",
       "moveUpLabel": "Move up",
