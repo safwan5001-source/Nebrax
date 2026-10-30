@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | Branch | `claude/commerce-h6-batch-f` |
-| PR | _(filled on open)_ |
+| PR | #1809 |
 | Base | `origin/main` @ `7cb5843fff7f9d906e18fbf92de135babd637ccc` (PR #1807, Batch E) |
-| Head | _(filled on final push)_ |
+| Head | `8a9b48bf0140437ee98813cea9258cf5f341f3fb` (report-only commits may follow) |
 | Status | Ready for review. **Not merged. Not deployed. Wholesale not enabled anywhere.** |
 
 ## 0. Executive summary
