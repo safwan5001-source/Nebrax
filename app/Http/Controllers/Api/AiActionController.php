@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\CancelAiActionRequest;
+use App\Http\Requests\ListAiActionsRequest;
 use App\Http\Requests\StoreAiActionRequest;
 use App\Http\Requests\StoreAiActionFileRequest;
 use App\Http\Requests\StoreAiActionImageArchiveRequest;
@@ -13,10 +14,12 @@ use App\Http\Requests\StoreAiActionApprovalRequest;
 use App\Http\Requests\StoreAiActionExecutionRequest;
 use App\Http\Requests\StoreAiActionPreviewRequest;
 use App\Http\Resources\AiActionExtractionResource;
+use App\Http\Resources\AiActionHistoryItemResource;
 use App\Http\Resources\AiActionResource;
 use App\Models\AiAction;
 use App\Models\AiActionFile;
 use App\Services\AiActionGateway;
+use App\Services\AiActionHistoryService;
 use App\Services\AiActionProductFileIntakeService;
 use App\Services\AiActionProductImageStager;
 use App\Services\AiActionProductRepairService;
@@ -39,6 +42,36 @@ class AiActionController extends ApiController
         }
 
         return (new AiActionResource($action))->response()->setStatusCode(201);
+    }
+
+    /** IMP-H8-S4a: سجلّ مقسَّم للقراءة فقط — راجع `AiActionHistoryService`. */
+    public function index(ListAiActionsRequest $request, AiActionHistoryService $history): JsonResponse
+    {
+        try {
+            $result = $history->list(
+                $request->user(),
+                array_merge($request->safe()->only(['type', 'status', 'from', 'to']), ['mine' => $request->boolean('mine')]),
+                (int) $request->integer('per_page', AiActionHistoryService::DEFAULT_PER_PAGE),
+            );
+        } catch (AiActionException $exception) {
+            return $this->error($exception);
+        }
+
+        $page = $result['page'];
+
+        return response()->json([
+            'data' => $page->getCollection()->map(fn (AiAction $action) => (new AiActionHistoryItemResource(
+                $action,
+                $result['versions']->get($action->id),
+                $result['executions']->get($action->id),
+            ))->resolve($request))->values()->all(),
+            'meta' => [
+                'current_page' => $page->currentPage(),
+                'last_page' => $page->lastPage(),
+                'per_page' => $page->perPage(),
+                'total' => $page->total(),
+            ],
+        ]);
     }
 
     public function show(Request $request, AiAction $action, AiActionGateway $gateway): JsonResponse
