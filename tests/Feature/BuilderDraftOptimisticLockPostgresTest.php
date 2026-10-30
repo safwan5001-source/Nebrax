@@ -20,8 +20,7 @@ use Tests\TestCase;
  * ═══════════════════════════════════════════════════════════════
  *  1) N كتّاب من الأساس نفسه (`base_revision`) ⇒ ينجح واحد فقط والباقي تعارض، وrevision = 1 بلا كتابة ضائعة.
  *  2) كتّاب يعيدون المحاولة بعد التعارض ⇒ ينجحون جميعاً وrevision = عددهم (تسلسل محكم، لا كتابة ضائعة).
- *  3) كتّاب **بلا** base_revision (مسار قديم) ⇒ لا يضيع أي تزايد في revision (كان يضيع قبل القفل).
- *  4) خليط قديم/تفاؤلي ⇒ revision النهائي = عدد النجاحات بالضبط.
+ *  3) (S01c) لا مسار بلا `base_revision`: حُذف اختبار الكتّاب القدامى لأن الخدمة تطلبه نوعاً والمتحكّم يرفض غيابه بـ428.
  *  5) موت مفاجئ (SIGKILL) داخل المعاملة بعد قفل الصف ⇒ لا كتابة، والقفل ينفكّ، والحفظ التالي ينجح.
  *  6) مستأجران متزامنان ⇒ كلٌّ يتسلسل على مسودته فقط، بلا أثر متبادل ولا جمود.
  *
@@ -131,44 +130,6 @@ class BuilderDraftOptimisticLockPostgresTest extends TestCase
     }
 
     /** @test */
-    public function writers_without_base_revision_never_lose_a_revision_increment(): void
-    {
-        [$tenant, $draftId] = $this->makeDraft();
-
-        $jobs = [];
-        foreach (range(1, 8) as $i) {
-            $jobs[] = $this->saver($tenant, $draftId, "قديم {$i}", baseRevision: null);
-        }
-        $results = $this->runConcurrently($jobs);
-
-        $this->assertAllCompleted($results);
-        foreach ($results as $r) {
-            $this->assertSame('ok', $r['value']['status'], 'المسار القديم لا يعارض أبداً (توافق رجعي)');
-        }
-        $this->assertSame(8, (int) DB::table('builder_draft_experiences')->where('id', $draftId)->value('revision'),
-            'ثمانية حفظات = ثمانية تزايدات (قبل القفل كانت تضيع)');
-    }
-
-    /** @test */
-    public function mixed_legacy_and_optimistic_writers_end_with_revision_equal_to_the_number_of_successes(): void
-    {
-        [$tenant, $draftId] = $this->makeDraft();
-
-        $jobs = [];
-        foreach (range(1, 4) as $i) {
-            $jobs[] = $this->saver($tenant, $draftId, "قديم {$i}", baseRevision: null);
-            $jobs[] = $this->saver($tenant, $draftId, "تفاؤلي {$i}", baseRevision: 0);
-        }
-        $results = $this->runConcurrently($jobs);
-
-        $this->assertAllCompleted($results);
-        $successes = count(array_filter($results, fn ($r) => $r['value']['status'] === 'ok'));
-        $this->assertGreaterThanOrEqual(4, $successes, 'الكتّاب القدامى الأربعة ينجحون دائماً');
-        $this->assertLessThanOrEqual(5, $successes, 'تفاؤلي واحد على الأكثر ينجح من الأساس 0');
-        $this->assertSame($successes, (int) DB::table('builder_draft_experiences')->where('id', $draftId)->value('revision'));
-    }
-
-    /** @test */
     public function a_writer_killed_while_holding_the_row_lock_leaves_no_write_and_releases_the_lock(): void
     {
         [$tenant, $draftId] = $this->makeDraft();
@@ -209,14 +170,17 @@ class BuilderDraftOptimisticLockPostgresTest extends TestCase
 
         $jobs = [];
         foreach (range(1, 4) as $i) {
-            $jobs[] = $this->saver($tenantA, $draftA, "أ{$i}", baseRevision: null);
-            $jobs[] = $this->saver($tenantB, $draftB, "ب{$i}", baseRevision: null);
+            $jobs[] = $this->retryingSaver($tenantA, $draftA, "أ{$i}");
+            $jobs[] = $this->retryingSaver($tenantB, $draftB, "ب{$i}");
         }
         $results = $this->runConcurrently($jobs);
 
         $this->assertAllCompleted($results);
         $this->assertSame(4, (int) DB::table('builder_draft_experiences')->where('id', $draftA)->value('revision'));
         $this->assertSame(4, (int) DB::table('builder_draft_experiences')->where('id', $draftB)->value('revision'));
+        foreach ($results as $r) {
+            $this->assertSame('ok', $r['value']['status']);
+        }
         $this->assertStringStartsWith('أ', $this->markerOf(DB::table('builder_draft_experiences')->where('id', $draftA)->first()));
         $this->assertStringStartsWith('ب', $this->markerOf(DB::table('builder_draft_experiences')->where('id', $draftB)->first()));
     }
@@ -257,7 +221,28 @@ class BuilderDraftOptimisticLockPostgresTest extends TestCase
         return json_decode($row->schema, true)['pages']['home']['children'][0]['props']['text'];
     }
 
-    private function saver(string $tenant, string $draftId, string $marker, ?int $baseRevision): callable
+    /** كاتب يقرأ revision ثم يحفظ به ويعيد عند التعارض (البروتوكول الصحيح بعد S01c). */
+    private function retryingSaver(string $tenant, string $draftId, string $marker): callable
+    {
+        return function () use ($tenant, $draftId, $marker) {
+            $this->enter($tenant);
+            $service = app(BuilderDraftExperienceService::class);
+            for ($attempt = 1; $attempt <= 60; $attempt++) {
+                $draft = BuilderDraftExperience::findOrFail($draftId);
+                try {
+                    $saved = $service->save($draft, $this->schemaFor($marker), null, (int) $draft->revision);
+
+                    return ['status' => 'ok', 'attempts' => $attempt, 'revision' => (int) $saved->revision];
+                } catch (DraftRevisionConflictException) {
+                    usleep(random_int(500, 4000));
+                }
+            }
+
+            return ['status' => 'gave_up'];
+        };
+    }
+
+    private function saver(string $tenant, string $draftId, string $marker, int $baseRevision): callable
     {
         return function () use ($tenant, $draftId, $marker, $baseRevision) {
             $this->enter($tenant);

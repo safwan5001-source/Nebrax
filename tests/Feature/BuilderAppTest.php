@@ -137,7 +137,7 @@ class BuilderAppTest extends TestCase
         ];
 
         $response = $this->withToken($auth['token'])
-            ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $schema])
+            ->putJson("/api/app-builder/apps/{$appId}/draft", $this->builderDraftBody($appId, $schema))
             ->assertOk();
 
         $response->assertJsonPath('data.revision', 1);
@@ -157,7 +157,7 @@ class BuilderAppTest extends TestCase
         ]);
 
         $this->withToken($auth['token'])
-            ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $schema])
+            ->putJson("/api/app-builder/apps/{$appId}/draft", $this->builderDraftBody($appId, $schema))
             ->assertStatus(422);
     }
 
@@ -173,7 +173,7 @@ class BuilderAppTest extends TestCase
         $schema['navigation']['initialPageId'] = 'does-not-exist';
 
         $this->withToken($auth['token'])
-            ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $schema])
+            ->putJson("/api/app-builder/apps/{$appId}/draft", $this->builderDraftBody($appId, $schema))
             ->assertStatus(422);
     }
 
@@ -189,7 +189,7 @@ class BuilderAppTest extends TestCase
         $schema['pages']['home']['type'] = 'Section';
 
         $this->withToken($auth['token'])
-            ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $schema])
+            ->putJson("/api/app-builder/apps/{$appId}/draft", $this->builderDraftBody($appId, $schema))
             ->assertStatus(422);
     }
 
@@ -205,7 +205,7 @@ class BuilderAppTest extends TestCase
         $schema['schemaVersion'] = '1.0';
 
         $this->withToken($auth['token'])
-            ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $schema])
+            ->putJson("/api/app-builder/apps/{$appId}/draft", $this->builderDraftBody($appId, $schema))
             ->assertStatus(422);
     }
 
@@ -224,7 +224,7 @@ class BuilderAppTest extends TestCase
             ['type' => 'NotARealComponent', 'id' => 'x1'],
         ];
         $this->withToken($auth['token'])
-            ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $schema])
+            ->putJson("/api/app-builder/apps/{$appId}/draft", $this->builderDraftBody($appId, $schema))
             ->assertOk();
 
         $this->withToken($auth['token'])->postJson("/api/app-builder/apps/{$appId}/versions", [])
@@ -244,7 +244,7 @@ class BuilderAppTest extends TestCase
             ['type' => 'NotARealComponent', 'id' => 'x1', 'optional' => true],
         ];
         $this->withToken($auth['token'])
-            ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $schema])
+            ->putJson("/api/app-builder/apps/{$appId}/draft", $this->builderDraftBody($appId, $schema))
             ->assertOk();
 
         $this->withToken($auth['token'])->postJson("/api/app-builder/apps/{$appId}/versions", [])
@@ -263,7 +263,7 @@ class BuilderAppTest extends TestCase
         $schema['schemaVersion'] = '9.0.0';
         $schema['minRuntimeVersion'] = '9.0.0';
         $this->withToken($auth['token'])
-            ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $schema])
+            ->putJson("/api/app-builder/apps/{$appId}/draft", $this->builderDraftBody($appId, $schema))
             ->assertOk();
 
         $this->withToken($auth['token'])->postJson("/api/app-builder/apps/{$appId}/versions", [])
@@ -281,7 +281,7 @@ class BuilderAppTest extends TestCase
         $schema = \App\Models\BuilderDraftExperience::minimalSafeSchema();
         $schema['requiredCapabilities'] = ['addToCart' => 99];
         $this->withToken($auth['token'])
-            ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $schema])
+            ->putJson("/api/app-builder/apps/{$appId}/draft", $this->builderDraftBody($appId, $schema))
             ->assertOk();
 
         $this->withToken($auth['token'])->postJson("/api/app-builder/apps/{$appId}/versions", [])
@@ -318,7 +318,7 @@ class BuilderAppTest extends TestCase
             ['type' => 'NotARealComponent', 'id' => 'x1'],
         ];
         $this->withToken($auth['token'])
-            ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $schema])
+            ->putJson("/api/app-builder/apps/{$appId}/draft", $this->builderDraftBody($appId, $schema))
             ->assertOk();
 
         $this->withToken($auth['token'])->postJson("/api/app-builder/apps/{$appId}/validate")

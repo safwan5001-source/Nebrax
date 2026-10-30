@@ -1,13 +1,13 @@
 {
   "contract": "app-builder.draft-save",
   "version": 1,
-  "decision": "AD-01 (optimistic locking) — slice S01a",
+  "decision": "AD-01 (optimistic locking) — slices S01a, S01c",
   "request": {
     "method": "PUT",
     "path": "/api/app-builder/apps/{id}/draft",
     "body": {
       "schema": "AppSchema object (required)",
-      "base_revision": "integer >= 0 or null; OPTIONAL during the transition (absent = legacy last-write-wins, logged). Will become required (428) only after the save-path inventory (S01-INV) and owner approval."
+      "base_revision": "integer >= 0; REQUIRED since S01c (absent or null => 428 base_revision_required, no write)"
     }
   },
   "success": {
@@ -27,6 +27,18 @@
     "guarantees": [
       "no write happens on conflict (schema and revision unchanged)",
       "the client rebases by re-reading GET draft (revision == current_revision) and re-sending with that base_revision after user confirmation"
+    ]
+  },
+  "precondition_required": {
+    "status": 428,
+    "body": {
+      "message": "string",
+      "reason": "base_revision_required",
+      "current_revision": "integer"
+    },
+    "guarantees": [
+      "no write happens; the client re-reads GET draft and re-sends with base_revision = revision",
+      "checked after authentication, permission, tenant scoping (404 for another tenant) and request-shape validation (schema required => 422)"
     ]
   },
   "validation": {
