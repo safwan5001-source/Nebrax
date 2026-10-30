@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | Branch | `claude/commerce-h6-batch-g` |
-| PR | _(filled on open)_ |
+| PR | #1812 |
 | Base | `origin/main` @ `caba634d93eec9f674c3fe68a04be7b2df3f2419` (PR #1809, Batch F) |
-| Head | _(filled on final push)_ |
+| Head | `639cce2eafc067e069ee70a04b43df0dbdcb997b` (last code/test commit; docs-only commits may follow it) |
 | Status | Ready for review. **Not merged. Not deployed. Wholesale not enabled anywhere.** |
 
 ## 0. Summary
@@ -164,7 +164,19 @@ Consequently the storefront **does not** forward the buyer token to cart/checkou
 
 ### CI (GitHub Actions, PR #1812)
 
-_(see PR checks; results recorded below when final)_
+All on head `639cce2ea` (last code/test change):
+
+| Check | Result |
+|---|---|
+| `php artisan test (L11, sqlite)` | success |
+| `php artisan test (L11, pgsql)` — includes `WholesaleMembershipPostgresConcurrencyTest`, the PG branch of `WholesalePriceSurfaceBoundaryTest`, `PriceSortAuthorityTest` | success |
+| `storefront (lint + typecheck + test)` | success |
+| `docker-context` | success |
+| `merchant preview visual QA`, `published footer visual QA` (advisory) | success |
+| `CI Gate` | success (after one re-run: the first attempt exited on `GitHub API unreachable for pulls/1812: HTTP 503` while polling, with every underlying job already green or finishing — infrastructure, not a check result) |
+| Codex review | no findings on the code; 1 finding on the first head (shared-IP login throttling) answered and intentionally left open for the owner (§5) |
+
+Earlier heads of this PR had two non-product CI events, both documented below (flaky footer QA font fetch; flaky `700`-substring assertion, fixed in this PR).
 
 ### Notes on CI signals seen while working
 * **A flaky assertion of mine, found by CI and fixed in this PR.** `php artisan test (sqlite)` failed once on `WholesalePriceVisibilityTest` (a Batch F test, already on `main`): it asserted that a 401 body does not contain the substring `700`, but every API response carries a random `meta.request_id` whose hex can contain `700` by chance (the failing body's request id began `641c…`). Not a product regression: the responses were correct (401, no price). Fixed by a shared helper (`AssertsNoAmountLeak`: drops `meta`, matches the amount only as a whole token) used by every amount-absence assertion in my three suites (`WholesalePriceVisibilityTest`, `WholesalePriceSurfaceBoundaryTest`, `StorefrontPriceParityTest`), with its own self-test proving it ignores random ids yet always catches a real `amount_minor`/`sale_price_minor` leak. Other work groups' digit-substring assertions were left alone.
