@@ -574,7 +574,7 @@ export default function AppBuilderWorkspacePage() {
 
   /** يضيف صفحة فارغة جديدة ويحدّدها مباشرة. */
   function addNewPage() {
-    if (!schema) return;
+    if (!schema || !canManage) return;
     const pageId = generatePageId();
     applyPagesEdit((current) => addPage(current, pageId));
     setSelectedPageId(pageId);
@@ -583,7 +583,7 @@ export default function AppBuilderWorkspacePage() {
 
   /** يحذف صفحة — لا تأثير على الصفحة الرئيسية أو آخر صفحة متبقية (`removePage` نفسه صامت، والزر معطّل أصلاً في هذه الحالات). إن كانت الصفحة المحذوفة هي المحدَّدة، يعاد التحديد إلى الصفحة الرئيسية الباقية دوماً. */
   function deletePage(pageId: string) {
-    if (!schema) return;
+    if (!schema || !canManage) return;
     applyPagesEdit((current) => removePage(current, pageId));
     if (selectedPageId === pageId) {
       const fallbackId = schema.navigation.initialPageId;
@@ -593,6 +593,7 @@ export default function AppBuilderWorkspacePage() {
   }
 
   function makeInitialPage(pageId: string) {
+    if (!canManage) return;
     applyPagesEdit((current) => setInitialPage(current, pageId));
   }
 
@@ -608,7 +609,7 @@ export default function AppBuilderWorkspacePage() {
   }
 
   function removeSelected() {
-    if (!selectedPageId || !selectedComponentId || !currentPageRoot || selectedComponentId === currentPageRoot.id) return;
+    if (!canManage || !selectedPageId || !selectedComponentId || !currentPageRoot || selectedComponentId === currentPageRoot.id) return;
     const targetId = selectedComponentId;
     const parentId = findParentId(currentPageRoot, targetId) ?? currentPageRoot.id;
     applyPageEdit(selectedPageId, (root) => removeComponentById(root, targetId));
@@ -695,6 +696,7 @@ export default function AppBuilderWorkspacePage() {
                       size="icon"
                       aria-label={t('pages.setHomeLabel')}
                       title={t('pages.setHomeLabel')}
+                      disabled={!canManage}
                       onClick={() => makeInitialPage(pageId)}
                       className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100"
                     >
@@ -706,7 +708,7 @@ export default function AppBuilderWorkspacePage() {
                     variant="ghost"
                     size="icon"
                     aria-label={t('pages.removeLabel')}
-                    disabled={!canRemove}
+                    disabled={!canRemove || !canManage}
                     onClick={() => deletePage(pageId)}
                     className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100"
                   >
@@ -715,7 +717,7 @@ export default function AppBuilderWorkspacePage() {
                 </div>
               );
             })}
-            <Button type="button" variant="outline" size="sm" className="mt-1 h-8 w-full text-xs" onClick={addNewPage}>
+            <Button type="button" variant="outline" size="sm" className="mt-1 h-8 w-full text-xs" disabled={!canManage} onClick={addNewPage}>
               <Plus className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
               {t('pages.addAction')}
             </Button>

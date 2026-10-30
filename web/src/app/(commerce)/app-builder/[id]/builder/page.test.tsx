@@ -1896,6 +1896,17 @@ describe('AppBuilderWorkspacePage — save safety (AD-01 / S01b)', () => {
     expect(putCalls()).toHaveLength(0);
   });
 
+  it('a read-only user cannot add a page: the control is disabled and the selection is left intact', async () => {
+    currentUser.mockReturnValue({ id: 'u3', role: 'staff', permissions: ['apps_builder.view'] });
+    await openEditor();
+
+    const add = screen.getAllByRole('button', { name: /Add page/i })[0] as HTMLButtonElement;
+    expect(add.disabled).toBe(true);
+    fireEvent.click(add);
+    expect(screen.getAllByText('Featured').length).toBeGreaterThan(0); // الكانفاس لم يُستبدل بصفحة غير موجودة
+    expect(screen.queryAllByText('Unsaved changes')).toHaveLength(0);
+  });
+
   it('an owner is never shown the read-only notice', async () => {
     await openEditor();
     expect(screen.queryByText('Read-only: you do not have permission to edit the draft.')).toBeNull();
