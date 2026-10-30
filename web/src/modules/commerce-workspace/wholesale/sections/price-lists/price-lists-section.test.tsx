@@ -15,15 +15,18 @@ vi.mock('@/lib/use-can', () => ({ useCan: () => ({ hydrated: true, can: (p: stri
 
 const channel = vi.hoisted(() => ({
   applySettings: vi.fn(),
+  reloadSettings: vi.fn(),
+  store: { id: 's1', name: 'Wholesale Store', salesChannelId: 'c1' },
   settings: { status: 'ready', data: { default_price_list: { id: 'pl1', name: 'Wholesale A', is_active: true } } } as Record<string, unknown>,
 }));
 vi.mock('../../channel-context', () => ({
   useWholesaleChannel: () => ({
     readiness: 'active',
-    store: { id: 's1', name: 'Wholesale Store', salesChannelId: 'c1' },
+    store: channel.store,
     channelId: 'c1',
     settings: channel.settings,
     applySettings: channel.applySettings,
+    reloadSettings: channel.reloadSettings,
   }),
 }));
 
@@ -67,6 +70,8 @@ beforeEach(() => {
   can.allowed = new Set(['invoices.view', 'company.manage', 'partners.view', 'commerce.channel_settings.manage']);
   channel.settings = { status: 'ready', data: { default_price_list: { id: 'pl1', name: 'Wholesale A', is_active: true } } };
   channel.applySettings.mockReset();
+  channel.reloadSettings.mockReset();
+  channel.store = { id: 's1', name: 'Wholesale Store', salesChannelId: 'c1' };
   Object.values(apiFns).forEach((fn) => fn.mockReset());
   apiFns.fetchPriceLists.mockResolvedValue(lists);
   apiFns.fetchPriceList.mockResolvedValue(detail);
@@ -148,6 +153,36 @@ describe('PriceListsSection', () => {
     expect(apiFns.deletePriceList).not.toHaveBeenCalled();
     fireEvent.click(screen.getAllByRole('button', { name: 'Delete list' })[0]);
     await waitFor(() => expect(apiFns.deletePriceList).toHaveBeenCalled());
+    // The shared channel snapshot is refreshed too, so Settings/Overview never keep describing a deleted list.
+    await waitFor(() => expect(channel.reloadSettings).toHaveBeenCalledTimes(1));
+  });
+
+  it('refreshes the channel settings after editing a list (an assigned list may have been deactivated)', async () => {
+    apiFns.updatePriceList.mockResolvedValue({ ...lists[0], is_active: false });
+    render(<PriceListsSection />);
+    await waitFor(() => screen.getAllByText('Wholesale A'));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Open' })[0]);
+    await waitFor(() => screen.getByText('Rice'));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit list' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(apiFns.updatePriceList).toHaveBeenCalled());
+    await waitFor(() => expect(channel.reloadSettings).toHaveBeenCalledTimes(1));
+    // The drawer returns after the form closes.
+    await waitFor(() => expect(screen.getByText('Rice')).toBeTruthy());
+  });
+
+  it('drops coverage results when the active store changes', async () => {
+    const view = render(<PriceListsSection />);
+    await waitFor(() => screen.getAllByText('Wholesale A'));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Open' })[0]);
+    await waitFor(() => screen.getByText('Rice'));
+    fireEvent.click(screen.getByRole('button', { name: 'Run diagnostics' }));
+    await waitFor(() => screen.getByText('50%'));
+
+    channel.store = { id: 's2', name: 'Other Store', salesChannelId: 'c2' };
+    view.rerender(<PriceListsSection />);
+    await waitFor(() => expect(screen.queryByText('50%')).toBeNull());
+    expect(screen.getByRole('button', { name: 'Run diagnostics' })).toBeTruthy();
   });
 
   it('shows an error state with retry', async () => {

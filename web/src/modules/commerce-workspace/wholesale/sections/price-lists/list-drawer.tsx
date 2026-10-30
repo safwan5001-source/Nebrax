@@ -78,7 +78,7 @@ export function ListDrawer({ list, canWrite, customers, onClose, onChanged, onEd
               />
               {store ? (
                 <CoveragePanel
-                  key={`${list.id}:${detail.state.data.items?.length ?? 0}`}
+                  key={`${store.id}:${list.id}:${detail.state.data.items?.length ?? 0}`}
                   storeId={store.id}
                   itemProductIds={(detail.state.data.items ?? []).map((item) => item.product_id)}
                 />

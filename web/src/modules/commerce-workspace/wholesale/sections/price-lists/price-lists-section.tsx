@@ -37,7 +37,7 @@ function Body() {
   const { can } = useCan();
   const confirm = useConfirm();
   const toast = useToast();
-  const { settings } = useWholesaleChannel();
+  const { settings, reloadSettings } = useWholesaleChannel();
   const canWrite = can('company.manage');
   const canSeeCustomers = can('partners.view');
 
@@ -52,6 +52,13 @@ function Body() {
   const channelListId = settings.status === 'ready' ? (settings.data.default_price_list?.id ?? null) : null;
   const openedList = lists.state.status === 'ready' ? (lists.state.data.find((candidate) => candidate.id === opened) ?? null) : null;
 
+  // The channel's price-list snapshot (active flag, existence) lives in the shared channel settings: any edit or
+  // delete of a list must refresh it too, or Settings/Overview keep reporting a list the resolver no longer uses.
+  const refreshAll = () => {
+    lists.reload();
+    reloadSettings();
+  };
+
   async function remove(list: PriceList) {
     const ok = await confirm({
       title: t('deleteConfirmTitle'),
@@ -64,7 +71,7 @@ function Body() {
       await deletePriceList(list.id);
       toast.success(t('deleted'));
       setOpened(null);
-      lists.reload();
+      refreshAll();
     } catch (failure) {
       toast.error(failure instanceof Error && failure.message ? failure.message : t('err.generic'));
     }
@@ -177,18 +184,25 @@ function Body() {
         canWrite={canWrite}
         customers={customerRows ?? null}
         onClose={() => setOpened(null)}
-        onChanged={lists.reload}
-        onEdit={(list) => setForm({ list })}
+        onChanged={refreshAll}
+        onEdit={(list) => {
+          // One modal at a time (two stacked modals fight over focus): the drawer yields to the form and returns after it.
+          setOpened(null);
+          setForm({ list });
+        }}
       />
       {form ? (
         <ListFormDialog
           list={form.list}
-          onClose={() => setForm(null)}
+          onClose={() => {
+            setForm(null);
+            if (form.list) setOpened(form.list.id);
+          }}
           onSaved={(saved) => {
             toast.success(t('saved'));
             setForm(null);
-            lists.reload();
-            if (!form.list) setOpened(saved.id);
+            refreshAll();
+            setOpened(form.list ? form.list.id : saved.id);
           }}
         />
       ) : null}

@@ -110,8 +110,8 @@ State screens: gated Buyers (deployment off, ar desktop) ![](assets/wholesale-wo
 
 | Check | Result |
 |---|---|
-| Vitest — wholesale + nav | 33 files / **200 tests** pass |
-| Vitest — full web suite | **786 files / 9201 tests pass** (was 750 / 8923 at the last recorded baseline in `AWJ-WEB-RBAC-01`; none removed) |
+| Vitest — wholesale + nav | 33 files / **202 tests** pass |
+| Vitest — full web suite | **786 files / 9201 tests pass** (measured before the review fixes below; +2 tests since, wholesale subset re-run green) (was 750 / 8923 at the last recorded baseline in `AWJ-WEB-RBAC-01`; none removed) |
 | `npm run build` (Next 15) | **exit 0**; all 11 `/commerce/wholesale*` routes compiled |
 | `tsc --noEmit` | 55 errors, **all in pre-existing test files outside this change** (same count recorded before this work); **0 in any wholesale file** |
 | Lint | **Not run — the repo has no ESLint config** (`next lint` prompts to create one). Not introduced here. |
@@ -119,6 +119,8 @@ State screens: gated Buyers (deployment off, ar desktop) ![](assets/wholesale-wo
 | DTC regression | existing `commerce-orders-o1b.spec.ts` **17 / 17** (desktop + mobile); the entire existing unit suite is green; **no existing test was weakened or removed** |
 | Localization | `expectMessageParity` on every dictionary (identical keys, no empty values, matching placeholders); `i18n-keys` guard green |
 | CI / CI Gate | _recorded in the PR after the first run_ |
+
+**Review fixes after the first Codex pass (both verified real, both fixed with regression tests):** (1) editing/deleting a price list now also reloads the shared channel settings, so Settings/Overview no longer report a deactivated/deleted assigned list as active; (2) the price-coverage panel is keyed by store, so its results are dropped when the active store changes. Same change closes a related focus hazard: the list form no longer opens as a second modal on top of the open drawer (drawer yields, then returns).
 
 **One existing assertion updated (disclosed):** `nav.test.ts` asserted `COMMERCE_WORKSPACE_NAV_GROUPS` has length 3 and listed the Commerce hrefs; they now expect 4 groups / the extra `/commerce/wholesale` href, with a new test pinning that Wholesale is a single guarded entry.
 
