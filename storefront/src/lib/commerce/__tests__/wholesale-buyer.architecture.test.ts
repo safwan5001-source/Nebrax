@@ -33,6 +33,12 @@ const NEW_FILES = [
   "components/wholesale-buyer/BuyerSignInForm.tsx",
   "components/wholesale-buyer/BuyerMembershipPanel.tsx",
   "components/wholesale-buyer/CatalogAccessGate.tsx",
+  "components/wholesale-buyer/BuyerRegisterForm.tsx",
+  "components/wholesale-buyer/BuyerResendForm.tsx",
+  "components/wholesale-buyer/BuyerVerifyEmail.tsx",
+  "app/[country]/[locale]/(storefront)/buyer/register/page.tsx",
+  "app/[country]/[locale]/(storefront)/buyer/resend/page.tsx",
+  "app/[country]/[locale]/(storefront)/buyer/verify/page.tsx",
   "app/[country]/[locale]/(storefront)/buyer/sign-in/page.tsx",
   "app/[country]/[locale]/(storefront)/buyer/membership/page.tsx",
 ];
@@ -149,6 +155,18 @@ describe("native wholesale buyer surface — boundaries", () => {
       expect(keys(messages.wholesaleBuyer).sort(), locale).toEqual(expected);
     }
     // every state the UI can show has copy
+    for (const key of [
+      "register.doneBody",
+      "verify.successBody",
+      "verify.failedBody",
+      "verify.missingToken",
+      "resend.doneBody",
+      "errors.validation",
+      "signIn.registerLink",
+      "signIn.resendLink",
+    ]) {
+      expect(expected).toContain(key);
+    }
     for (const state of [
       "signed_out",
       "no_application",
@@ -161,5 +179,16 @@ describe("native wholesale buyer surface — boundaries", () => {
       expect(expected).toContain(`status.${state}.label`);
       expect(expected).toContain(`status.${state}.body`);
     }
+  });
+
+  it("the e-mailed token is never consumed during a server render (only by an explicit client action)", () => {
+    const page = read(
+      "app/[country]/[locale]/(storefront)/buyer/verify/page.tsx",
+    );
+    expect(page).not.toMatch(/verifyBuyerEmail|@\/lib\/data\/wholesale-buyer/);
+    expect(page).toMatch(/\^\[A-Za-z0-9\]\{64\}\$/);
+    expect(read("components/wholesale-buyer/BuyerVerifyEmail.tsx")).toMatch(
+      /onClick=\{confirm\}/,
+    );
   });
 });

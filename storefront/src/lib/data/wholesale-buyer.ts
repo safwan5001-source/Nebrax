@@ -12,7 +12,10 @@ import {
 import {
   accessStateFromMembership,
   type BuyerAccessState,
+  type BuyerErrorKey,
   buyerErrorKey,
+  buyerFormErrorKey,
+  localePathFrom,
 } from "@/lib/commerce/wholesale-buyer";
 
 /**
@@ -26,7 +29,7 @@ import {
 
 export type BuyerActionResult =
   | { success: true }
-  | { success: false; error: ReturnType<typeof buyerErrorKey> };
+  | { success: false; error: BuyerErrorKey };
 
 function failure(error: unknown): BuyerActionResult {
   if (error instanceof StorefrontApiError) {
@@ -51,6 +54,67 @@ export async function signInBuyer(
     return { success: true };
   } catch (error) {
     return failure(error);
+  }
+}
+
+function formFailure(error: unknown): BuyerActionResult {
+  if (error instanceof StorefrontApiError) {
+    return { success: false, error: buyerFormErrorKey(error.status) };
+  }
+  return { success: false, error: "generic" };
+}
+
+/**
+ * Creates the buyer identity (unverified). The API answers an identical 202 for a new and an existing address and sends
+ * the verification e-mail itself; nothing here reveals which one happened.
+ */
+export async function registerBuyer(input: {
+  displayName: string;
+  email: string;
+  password: string;
+  basePath: string;
+}): Promise<BuyerActionResult> {
+  try {
+    await storefrontBuyerRequest("POST", "auth/register", {
+      body: {
+        display_name: input.displayName,
+        email: input.email,
+        password: input.password,
+        locale_path: localePathFrom(input.basePath),
+      },
+    });
+    return { success: true };
+  } catch (error) {
+    return formFailure(error);
+  }
+}
+
+/** Consumes the e-mailed token (the API binds it to this store's tenant + channel). One generic failure. */
+export async function verifyBuyerEmail(
+  token: string,
+): Promise<BuyerActionResult> {
+  try {
+    await storefrontBuyerRequest("POST", "auth/verify-email", {
+      body: { token },
+    });
+    return { success: true };
+  } catch (error) {
+    return formFailure(error);
+  }
+}
+
+/** Neutral by design: success whatever the address is. */
+export async function resendBuyerVerification(input: {
+  email: string;
+  basePath: string;
+}): Promise<BuyerActionResult> {
+  try {
+    await storefrontBuyerRequest("POST", "auth/verification/resend", {
+      body: { email: input.email, locale_path: localePathFrom(input.basePath) },
+    });
+    return { success: true };
+  } catch (error) {
+    return formFailure(error);
   }
 }
 

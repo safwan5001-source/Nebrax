@@ -7,6 +7,7 @@ use App\Models\CommerceOrderLine;
 use App\Models\Partner;
 use App\Models\Product;
 use App\Models\SalesChannel;
+use App\Models\WholesaleMembership;
 use App\Services\Accounting\UnitConversion;
 use App\Support\DocumentLineVariantResolver;
 use App\Tenancy\BranchScope;
@@ -212,6 +213,8 @@ class CommerceOrderService
         $customerIdentityId = $customerContext->isEstablished() ? $customerContext->customerIdentityId() : null;
 
         return DB::transaction(function () use ($header, $lines, $customerIdentityId) {
+            $this->assertWholesaleBuyerStillApproved($header['sales_channel_id'], $customerIdentityId);
+
             $order = CommerceOrder::create([
                 'sales_channel_id' => $header['sales_channel_id'],
                 'storefront_id' => $header['storefront_id'],
@@ -376,6 +379,32 @@ class CommerceOrderService
 
             return $order->fresh('lines');
         });
+    }
+
+    /**
+     * H6 Batch H — last line of defence, INSIDE the order transaction: an order on a wholesale-flagged channel may only
+     * be created for an identity whose membership is `approved` right now. The membership row is read with a shared
+     * row lock, so a concurrent suspension either commits first (we refuse) or waits for this commit (the order was
+     * placed while approved). The request-level gate already checked; this closes the window between that check and
+     * the commit. DTC channels are untouched.
+     */
+    private function assertWholesaleBuyerStillApproved(string $salesChannelId, ?string $customerIdentityId): void
+    {
+        $wholesale = SalesChannel::query()->whereKey($salesChannelId)->where('wholesale_membership_enabled', true)->exists();
+        if (! $wholesale) {
+            return;
+        }
+
+        $approved = $customerIdentityId !== null
+            && WholesaleMembership::query()
+                ->where('customer_identity_id', $customerIdentityId)
+                ->where('sales_channel_id', $salesChannelId)
+                ->sharedLock()
+                ->value('status') === WholesaleMembership::APPROVED;
+
+        if (! $approved) {
+            throw new RuntimeException('طلب الجملة يتطلب مشترياً معتمداً.');
+        }
     }
 
     private function createLine(CommerceOrder $order, string $salesChannelId, ?string $partnerId, array $item): CommerceOrderLine

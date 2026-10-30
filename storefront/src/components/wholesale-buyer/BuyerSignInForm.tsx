@@ -1,7 +1,8 @@
 "use client";
 
 import { CircleAlert } from "lucide-react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
 import { AccountAuthCard } from "@/components/account/AccountAuthCard";
@@ -11,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { signInBuyer } from "@/lib/data/wholesale-buyer";
+import { extractBasePath } from "@/lib/utils/path";
 
 /**
  * Wholesale buyer sign-in (H6 Batch G). Credentials go to a server action that
@@ -21,6 +23,7 @@ import { signInBuyer } from "@/lib/data/wholesale-buyer";
 export function BuyerSignInForm({ nextPath }: { nextPath: string }) {
   const t = useTranslations("wholesaleBuyer");
   const router = useRouter();
+  const basePath = extractBasePath(usePathname());
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +47,25 @@ export function BuyerSignInForm({ nextPath }: { nextPath: string }) {
     <AccountAuthCard
       title={t("signIn.title")}
       description={t("signIn.description")}
-      footer={<p>{t("signIn.footer")}</p>}
+      footer={
+        <div className="space-y-2">
+          <p>{t("signIn.footer")}</p>
+          <p className="flex flex-wrap gap-x-4 gap-y-1">
+            <Link
+              href={`${basePath}/buyer/register`}
+              className="font-medium text-store-primary hover:text-store-primary-hover"
+            >
+              {t("signIn.registerLink")}
+            </Link>
+            <Link
+              href={`${basePath}/buyer/resend`}
+              className="font-medium text-store-primary hover:text-store-primary-hover"
+            >
+              {t("signIn.resendLink")}
+            </Link>
+          </p>
+        </div>
+      }
     >
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
         {error && (

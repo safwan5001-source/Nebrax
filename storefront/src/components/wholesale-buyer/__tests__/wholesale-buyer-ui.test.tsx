@@ -5,6 +5,9 @@ import ar from "../../../../messages/ar.json";
 import en from "../../../../messages/en.json";
 
 const actions = vi.hoisted(() => ({
+  registerBuyer: vi.fn(),
+  verifyBuyerEmail: vi.fn(),
+  resendBuyerVerification: vi.fn(),
   signInBuyer: vi.fn(),
   signOutBuyer: vi.fn(),
   applyForWholesale: vi.fn(),
@@ -34,7 +37,10 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { BuyerMembershipPanel } from "../BuyerMembershipPanel";
+import { BuyerRegisterForm } from "../BuyerRegisterForm";
+import { BuyerResendForm } from "../BuyerResendForm";
 import { BuyerSignInForm } from "../BuyerSignInForm";
+import { BuyerVerifyEmail } from "../BuyerVerifyEmail";
 import { CatalogAccessGate } from "../CatalogAccessGate";
 
 const STATES = [
@@ -256,5 +262,135 @@ describe("CatalogAccessGate", () => {
 
   it("is exported (route wiring imports it)", () => {
     expect(typeof CatalogAccessGate).toBe("function");
+  });
+});
+
+describe("verification journey UI", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("registration shows the same neutral 'check your email' result and never mentions whether the address existed", async () => {
+    actions.registerBuyer.mockResolvedValue({ success: true });
+    const { container } = render(withIntl(<BuyerRegisterForm />));
+
+    fireEvent.change(screen.getByLabelText("Your name or company"), {
+      target: { value: "Acme" },
+    });
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "a@x.test" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "pw-123456" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+
+    await waitFor(() =>
+      expect(
+        container.querySelector('[data-state="registered"]'),
+      ).not.toBeNull(),
+    );
+    expect(actions.registerBuyer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        displayName: "Acme",
+        email: "a@x.test",
+        basePath: "/sa/en",
+      }),
+    );
+    expect(container.textContent).toMatch(/If this address can be registered/);
+    expect(container.textContent).not.toMatch(/already (registered|exists)/i);
+  });
+
+  it("registration failures show a catalogue message only", async () => {
+    actions.registerBuyer.mockResolvedValue({
+      success: false,
+      error: "validation",
+    });
+    render(withIntl(<BuyerRegisterForm />));
+    fireEvent.change(screen.getByLabelText("Your name or company"), {
+      target: { value: "A" },
+    });
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "a@x.test" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "short" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+
+    expect(
+      await screen.findByText(
+        "Please check the details you entered and try again.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("the link is NOT consumed while the page renders — only when the buyer presses the button", async () => {
+    actions.verifyBuyerEmail.mockResolvedValue({ success: true });
+    const token = "a".repeat(64);
+    const { container } = render(withIntl(<BuyerVerifyEmail token={token} />));
+
+    expect(actions.verifyBuyerEmail).not.toHaveBeenCalled();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirm email address" }),
+    );
+
+    await waitFor(() =>
+      expect(container.querySelector('[data-state="verified"]')).not.toBeNull(),
+    );
+    expect(actions.verifyBuyerEmail).toHaveBeenCalledOnce();
+    expect(actions.verifyBuyerEmail).toHaveBeenCalledWith(token);
+    expect(screen.getByRole("link", { name: "Sign in" })).toBeInTheDocument();
+  });
+
+  it("an invalid, expired or replayed link is one generic failure with a way to request a new one", async () => {
+    actions.verifyBuyerEmail.mockResolvedValue({
+      success: false,
+      error: "validation",
+    });
+    const { container } = render(
+      withIntl(<BuyerVerifyEmail token={"b".repeat(64)} />),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirm email address" }),
+    );
+
+    await waitFor(() =>
+      expect(container.querySelector('[data-state="failed"]')).not.toBeNull(),
+    );
+    expect(
+      screen.getByRole("link", { name: "Send a new confirmation email" }),
+    ).toBeInTheDocument();
+  });
+
+  it("no token (or a malformed one filtered out by the page) shows the missing-link state and offers no confirm button", () => {
+    const { container } = render(withIntl(<BuyerVerifyEmail token={null} />));
+
+    expect(container.querySelector('[data-state="failed"]')).not.toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Confirm email address" }),
+    ).toBeNull();
+    expect(actions.verifyBuyerEmail).not.toHaveBeenCalled();
+  });
+
+  it("resend shows the same neutral answer", async () => {
+    actions.resendBuyerVerification.mockResolvedValue({ success: true });
+    const { container } = render(withIntl(<BuyerResendForm />));
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "ghost@x.test" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send email" }));
+
+    await waitFor(() =>
+      expect(container.querySelector('[data-state="resent"]')).not.toBeNull(),
+    );
+    expect(container.textContent).toMatch(
+      /If this address belongs to an account/,
+    );
+  });
+
+  it("every state has copy in Arabic too", () => {
+    render(withIntl(<BuyerVerifyEmail token={null} />, "ar"));
+    expect(
+      screen.getByText(ar.wholesaleBuyer.verify.failedTitle),
+    ).toBeInTheDocument();
   });
 });

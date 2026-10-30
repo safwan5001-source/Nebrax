@@ -82,10 +82,17 @@ const SAFE_ERROR_CODES = new Set([
  * `generic`, so internal error text never reaches a buyer, and sign-in failures
  * stay indistinguishable (unknown / wrong password / unverified email).
  */
+export type BuyerErrorKey =
+  | "invalidCredentials"
+  | "rateLimited"
+  | "unavailable"
+  | "validation"
+  | "generic";
+
 export function buyerErrorKey(
   status: number | undefined,
   code: string | undefined,
-): "invalidCredentials" | "rateLimited" | "unavailable" | "generic" {
+): Exclude<BuyerErrorKey, "validation"> {
   if (status === 429 || code === "rate_limited") return "rateLimited";
   if (status === 404) return "unavailable";
   if (
@@ -96,4 +103,21 @@ export function buyerErrorKey(
     return "invalidCredentials";
   }
   return "generic";
+}
+
+/**
+ * Registration / verification failures. Unlike sign-in (where a 422 means "bad credentials" and must stay
+ * indistinguishable), a 422 here is a form-validation or invalid-link answer, so it is surfaced as such; rate limiting and
+ * an unavailable store keep their own keys and everything else is generic. Never any server text.
+ */
+export function buyerFormErrorKey(status: number | undefined): BuyerErrorKey {
+  if (status === 429) return "rateLimited";
+  if (status === 404) return "unavailable";
+  if (status === 422) return "validation";
+  return "generic";
+}
+
+/** A `/xx/yy` locale prefix the backend accepts for the e-mailed link path; anything else is dropped. */
+export function localePathFrom(basePath: string): string | undefined {
+  return /^\/[a-z]{2}\/[a-z]{2}$/.test(basePath) ? basePath : undefined;
 }
