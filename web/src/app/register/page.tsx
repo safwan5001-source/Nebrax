@@ -233,7 +233,6 @@ export default function RegisterPage() {
             </p>
           )}
 
-          <p className="text-center text-xs leading-5 text-muted lg:text-start">{t('terms')}</p>
           <Button type="submit" className="ax-submit w-full" disabled={isSubmitting} aria-busy={isSubmitting}>
             {isSubmitting ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
             {isSubmitting ? t('submitting') : t('submit')}

@@ -174,6 +174,16 @@ describe('register page inside the experience', () => {
       phone: '+966512345678',
     });
   });
+
+  it('asserts no consent to terms or a privacy policy that are not published yet', () => {
+    for (const locale of ['ar', 'en'] as const) {
+      cleanup();
+      withIntl(<RegisterPage />, locale);
+      expect(document.body.textContent ?? '').not.toMatch(/الشروط والأحكام|سياسة الخصوصية|Terms|Privacy Policy/i);
+    }
+    expect(arMessages.register).not.toHaveProperty('terms');
+    expect(enMessages.register).not.toHaveProperty('terms');
+  });
 });
 
 describe('forgot password inside the experience', () => {
