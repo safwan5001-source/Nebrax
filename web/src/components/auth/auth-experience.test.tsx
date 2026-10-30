@@ -207,6 +207,14 @@ describe('auth experience copy', () => {
     }
   });
 
+  it('promises no specific time on the auth surfaces (login, register, panel)', () => {
+    const copy = [arMessages.login, enMessages.login, arMessages.register, enMessages.register, ar, en]
+      .flatMap((catalog) => Object.values(catalog as Record<string, unknown>))
+      .filter((value): value is string => typeof value === 'string')
+      .join('\n');
+    expect(copy).not.toMatch(/دقائق|دقيقة|ثوانٍ|ثوان|فوراً|فورًا|مباشرةً|in minutes|minutes?\b|seconds?\b|instantly|right away|immediately/i);
+  });
+
   it('makes no claim the product cannot back', () => {
     const all = [...Object.values(ar), ...Object.values(en)].join('\n');
     expect(all).not.toMatch(/free trial|تجربة مجانية|مجاناً|مجاني|per month|شهرياً|no credit card/i);

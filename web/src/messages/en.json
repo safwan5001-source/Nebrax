@@ -3534,7 +3534,7 @@
     "login_point_delivery": "Delivery-app orders in one hub",
     "login_point_store": "A store and an app in your brand",
     "register_title": "Start your business on AWJ",
-    "register_lead": "When you create the account, AWJ sets up right away:",
+    "register_lead": "Creating the account sets up:",
     "register_lead_short": "Your company account, ready with a chart of accounts, branch and warehouse.",
     "register_point_address": "Your company account with its own sign-in address",
     "register_point_ledger": "A Saudi chart of accounts, with a main cash box and bank account",
@@ -6467,7 +6467,7 @@
   },
   "register": {
     "title": "Create a new account",
-    "subtitle": "Set up your account and start accounting in minutes",
+    "subtitle": "A few details to create your company account.",
     "company_name": "Account name",
     "company_name_ph": "e.g. AWJ account",
     "slug": "Login page",
