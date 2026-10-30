@@ -8,10 +8,51 @@ on:
     # fixture `web/src/modules/app-builder/runtime-contract.test.ts` asserts
     # against — see that workflow's own note in `mobile-ci.yml` for why a
     # fixture-only change must re-run both suites, not just one.
-    paths: ['web/**', 'contracts/app-builder/**', 'contracts/flowers-admin-journey/**', '.github/workflows/web-ci.yml']
+    # WEB-CI-02: كل مسار أدناه تقرؤه اختبارات Vitest فعلاً من خارج `web/` (مُتحقَّق منه بتتبّع
+    # ملفات الاختبار الكامل). الحارس `web/src/ci/web-ci-paths.test.ts` يُفشل أي مرجع خارجي جديد
+    # لا يغطيه هذا الفلتر ويشترط تطابق push وpull_request (لا anchors: دعمها غير مضمون في أدوات الـCI).
+    paths:
+      - 'web/**'
+      - 'contracts/app-builder/**'
+      - 'contracts/flowers-admin-journey/**'
+      - 'app/Support/Rbac.php'                            # catalog.test.ts: تسميات الصلاحيات
+      - 'app/Support/ApplicationCatalog.php'
+      - 'app/Support/DocumentNumberingCatalog.php'
+      - 'app/Support/PaymentMethodVisual.php'
+      - 'app/Support/Commerce/IconRegistry.php'
+      - 'app/Http/Controllers/Api/InvoiceController.php'  # workspace/lifecycle.test.ts
+      - 'app/Http/Controllers/Api/PurchaseController.php'
+      - 'app/Models/Invoice.php'
+      - 'app/Models/Purchase.php'
+      - 'tests/Fixtures/presentation/**'
+      - 'storefront/src/**'
+      - 'design-system/governance/baseline.json'
+      - 'design-system/tokens/awj.tokens.json'
+      - 'docs/openapi/public-api-v1.yaml'
+      - 'mobile/lib/app/runtime_schema.dart'
+      - '.github/workflows/web-ci.yml'
   pull_request:
     branches: ['**']
-    paths: ['web/**', 'contracts/app-builder/**', 'contracts/flowers-admin-journey/**', '.github/workflows/web-ci.yml']
+    paths:
+      - 'web/**'
+      - 'contracts/app-builder/**'
+      - 'contracts/flowers-admin-journey/**'
+      - 'app/Support/Rbac.php'                            # catalog.test.ts: تسميات الصلاحيات
+      - 'app/Support/ApplicationCatalog.php'
+      - 'app/Support/DocumentNumberingCatalog.php'
+      - 'app/Support/PaymentMethodVisual.php'
+      - 'app/Support/Commerce/IconRegistry.php'
+      - 'app/Http/Controllers/Api/InvoiceController.php'  # workspace/lifecycle.test.ts
+      - 'app/Http/Controllers/Api/PurchaseController.php'
+      - 'app/Models/Invoice.php'
+      - 'app/Models/Purchase.php'
+      - 'tests/Fixtures/presentation/**'
+      - 'storefront/src/**'
+      - 'design-system/governance/baseline.json'
+      - 'design-system/tokens/awj.tokens.json'
+      - 'docs/openapi/public-api-v1.yaml'
+      - 'mobile/lib/app/runtime_schema.dart'
+      - '.github/workflows/web-ci.yml'
 
 jobs:
   build:
