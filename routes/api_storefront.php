@@ -19,6 +19,7 @@ use App\Http\Middleware\AuthenticateCommerceCustomer;
 use App\Http\Middleware\BindStorefrontBuyerToChannel;
 use App\Http\Middleware\EnsureApprovedWholesaleBuyer;
 use App\Http\Middleware\EnsureWholesaleBuyerEnabled;
+use App\Http\Middleware\EnsureWholesalePriceAccess;
 use App\Http\Middleware\EnforcePublicApiRateLimit;
 use App\Http\Middleware\RequireStorefrontMutationGateway;
 use App\Http\Middleware\ResolveStorefrontDomain;
@@ -59,8 +60,12 @@ Route::middleware([
     // FLOWERS-H7a / ADR-19 — خيارات جدولة التسليم المتاحة فعلاً (قراءة فقط).
     Route::get('delivery-schedule', [StorefrontDeliveryScheduleController::class, 'show'])->name('delivery_schedule.show');
 
-    Route::get('products', [StorefrontProductController::class, 'index'])->name('products.index');
-    Route::get('products/{id}', [StorefrontProductController::class, 'show'])->whereUuid('id')->name('products.show');
+    // H6 Batch F — المسارات الحاملة للأسعار خلف `EnsureWholesalePriceAccess`: قناة موسومة جملة لا تُظهر
+    // أسعارها إلا لمشترٍ معتمد بجلسة مربوطة بهذا الـ Host؛ القناة غير الموسومة (كل متاجر DTC) تمرّ بلا أي تغيير.
+    Route::get('products', [StorefrontProductController::class, 'index'])
+        ->middleware(EnsureWholesalePriceAccess::class)->name('products.index');
+    Route::get('products/{id}', [StorefrontProductController::class, 'show'])->whereUuid('id')
+        ->middleware(EnsureWholesalePriceAccess::class)->name('products.show');
 
     // CUST-HV V2c — وسائط المُخصِّص (بوابة المرجع المنشور؛ الأصل `private, no-store`).
     // مقطعان ثابتان بعد `media/customizer` فلا يتقاطع مع `media/{id}/derivatives/{x}`.
@@ -88,10 +93,12 @@ Route::middleware([
 
     // CUST-H4-6 — العروض الحيّة (خصمٌ حقيقي من CommercePriceResolver). مسار Host
     // فقط: لا معرّف متجر في الرابط ولا يُقبل من أي مدخل، وليس له نظير متوارَث.
-    Route::get('offers', [StorefrontOfferController::class, 'index'])->name('offers.index');
+    Route::get('offers', [StorefrontOfferController::class, 'index'])
+        ->middleware(EnsureWholesalePriceAccess::class)->name('offers.index');
 
-    Route::get('cart', [StorefrontCartController::class, 'show'])->name('cart.show');
-    Route::middleware(RequireStorefrontMutationGateway::class)->group(function () {
+    Route::get('cart', [StorefrontCartController::class, 'show'])
+        ->middleware(EnsureWholesalePriceAccess::class)->name('cart.show');
+    Route::middleware([RequireStorefrontMutationGateway::class, EnsureWholesalePriceAccess::class])->group(function () {
         Route::post('cart/items', [StorefrontCartController::class, 'store'])->name('cart.items.store');
         Route::patch('cart/items/{item}', [StorefrontCartController::class, 'update'])->whereUuid('item')->name('cart.items.update');
         Route::delete('cart/items/{item}', [StorefrontCartController::class, 'destroy'])->whereUuid('item')->name('cart.items.destroy');
@@ -125,10 +132,12 @@ Route::middleware([
 
     // COM-CHECKOUT-1A أساسٌ؛ COM-CHECKOUT-1B يضيف /checkout/complete —
     // idempotency إلزامية + التزامٌ صريح، راجع AWJ_CHECKOUT_V1_ARCHITECTURE.md §9.
-    Route::get('checkout', [StorefrontCheckoutController::class, 'show'])->name('checkout.show');
+    Route::get('checkout', [StorefrontCheckoutController::class, 'show'])
+        ->middleware(EnsureWholesalePriceAccess::class)->name('checkout.show');
     // COM-MOBILE-PAYMENTS-1 — طرق الدفع المتاحة فعلياً للقناة الحالية
     // (ADR-09 §3)، عبر PaymentMethodChannelAvailabilityService. قراءة فقط.
-    Route::get('checkout/payment-methods', [StorefrontCheckoutController::class, 'paymentMethods'])->name('checkout.payment_methods.index');
+    Route::get('checkout/payment-methods', [StorefrontCheckoutController::class, 'paymentMethods'])
+        ->middleware(EnsureWholesalePriceAccess::class)->name('checkout.payment_methods.index');
     // PAY-H4-04a — حالة الدفع الإلكتروني لطلب (حقيقة الخادم، لا عودة المتصفح). الملكية بمرجع الطلب الموقَّع؛ مغلق (404) خلف البوابة المنصّية.
     Route::get('orders/{order}/payment-status', [StorefrontOnlinePaymentController::class, 'status'])
         ->whereUuid('order')->middleware('throttle:30,1')->name('orders.payment_status');
@@ -136,16 +145,18 @@ Route::middleware([
         // PAY-H4-04a — بدء/استئناف محاولة دفع إلكتروني للطلب (يعيد `checkout_url` لصفحة المزوّد المستضافة).
         Route::post('checkout/payment-intent', [StorefrontOnlinePaymentController::class, 'start'])
             ->middleware('throttle:10,1')->name('checkout.payment_intent.store');
-        Route::post('checkout', [StorefrontCheckoutController::class, 'store'])->name('checkout.store');
-        Route::patch('checkout/contact', [StorefrontCheckoutController::class, 'updateContact'])->name('checkout.contact.update');
-        Route::patch('checkout/address', [StorefrontCheckoutController::class, 'updateAddress'])->name('checkout.address.update');
-        // FLOWERS-H3 / ADR-15 — هوية الإهداء ورسالته.
-        Route::patch('checkout/gift', [StorefrontCheckoutController::class, 'updateGift'])->name('checkout.gift.update');
-        // FLOWERS-H7b / ADR-19 — موعد التسليم (تاريخ + نافذة).
-        Route::patch('checkout/schedule', [StorefrontCheckoutController::class, 'updateSchedule'])->name('checkout.schedule.update');
-        Route::patch('checkout/delivery', [StorefrontCheckoutController::class, 'updateDelivery'])->name('checkout.delivery.update');
-        Route::patch('checkout/payment', [StorefrontCheckoutController::class, 'updatePayment'])->name('checkout.payment.update');
-        Route::post('checkout/complete', [StorefrontCheckoutController::class, 'complete'])->name('checkout.complete');
+        Route::middleware(EnsureWholesalePriceAccess::class)->group(function () {
+            Route::post('checkout', [StorefrontCheckoutController::class, 'store'])->name('checkout.store');
+            Route::patch('checkout/contact', [StorefrontCheckoutController::class, 'updateContact'])->name('checkout.contact.update');
+            Route::patch('checkout/address', [StorefrontCheckoutController::class, 'updateAddress'])->name('checkout.address.update');
+            // FLOWERS-H3 / ADR-15 — هوية الإهداء ورسالته.
+            Route::patch('checkout/gift', [StorefrontCheckoutController::class, 'updateGift'])->name('checkout.gift.update');
+            // FLOWERS-H7b / ADR-19 — موعد التسليم (تاريخ + نافذة).
+            Route::patch('checkout/schedule', [StorefrontCheckoutController::class, 'updateSchedule'])->name('checkout.schedule.update');
+            Route::patch('checkout/delivery', [StorefrontCheckoutController::class, 'updateDelivery'])->name('checkout.delivery.update');
+            Route::patch('checkout/payment', [StorefrontCheckoutController::class, 'updatePayment'])->name('checkout.payment.update');
+            Route::post('checkout/complete', [StorefrontCheckoutController::class, 'complete'])->name('checkout.complete');
+        });
     });
 });
 
@@ -174,8 +185,10 @@ if (! app()->environment('production')) {
         Route::get('collections', [StorefrontCollectionController::class, 'index'])->name('legacy.collections.index');
         Route::get('delivery-schedule', [StorefrontDeliveryScheduleController::class, 'show'])->name('legacy.delivery_schedule.show');
 
-        Route::get('products', [StorefrontProductController::class, 'index'])->name('legacy.products.index');
-        Route::get('products/{id}', [StorefrontProductController::class, 'show'])->whereUuid('id')->name('legacy.products.show');
+        Route::get('products', [StorefrontProductController::class, 'index'])
+            ->middleware(EnsureWholesalePriceAccess::class)->name('legacy.products.index');
+        Route::get('products/{id}', [StorefrontProductController::class, 'show'])->whereUuid('id')
+            ->middleware(EnsureWholesalePriceAccess::class)->name('legacy.products.show');
 
         Route::get('media/categories/{id}', [StorefrontMediaController::class, 'showCategory'])->whereUuid('id')->name('legacy.media.category.show');
         Route::get('media/{id}/derivatives/{derivative}', [StorefrontMediaController::class, 'showDerivative'])
