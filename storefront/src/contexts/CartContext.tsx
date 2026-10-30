@@ -17,6 +17,7 @@ import type {
   StorefrontCartLine,
 } from "@/lib/commerce/cart-types";
 import type { PdpSelections } from "@/lib/commerce/pdp-gifting";
+import type { Surface } from "@/lib/commerce/surface";
 import type { StoreCart, StoreCartLine } from "@/lib/commerce/types";
 import {
   addAwjItem,
@@ -28,7 +29,6 @@ import {
   updateAwjItem,
   updateCartItem as updateCartItemAction,
 } from "@/lib/data/cart";
-import type { Surface } from "@/lib/spree/surface";
 
 /**
  * The DTC surface's cart is AWJ-native (`StorefrontCart`); wholesale stays

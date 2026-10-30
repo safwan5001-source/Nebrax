@@ -35,7 +35,7 @@ import { actionResult } from "./utils";
  *
  * The Spree-backed functions in the rest of this file (`getCart`,
  * `getOrCreateCart`, `addToCart`, `updateCartItem`, `removeCartItem`,
- * `clearCart`, `associateCartWithUser`) are UNCHANGED and keep serving the
+ * `clearCart`) are UNCHANGED and keep serving the
  * wholesale surface exactly as before (a distinct sales context with its
  * own Spree channel, not part of this wiring — see AWJ_CART_WIRING §
  * scope) and the shared checkout/payment data layer (`checkout.ts`,
@@ -293,28 +293,4 @@ export async function removeCartItem(
     updateTag(cartTag(surface));
     return { cart };
   }, "Failed to remove cart item");
-}
-
-export async function associateCartWithUser(
-  surface: Surface = DEFAULT_SURFACE,
-) {
-  return actionResult(async () => {
-    const spreeToken = await getCartToken(surface);
-    const token = await getAccessToken();
-    const cartId = await getCartId(surface);
-    if (!cartId || !token) return {};
-
-    try {
-      await getClientForSurface(surface).carts.associate(cartId, {
-        spreeToken,
-        token,
-      });
-      updateTag(cartTag(surface));
-    } catch {
-      // Cart might already belong to another user — clear it
-      await clearCartCookies(surface);
-      updateTag(cartTag(surface));
-    }
-    return {};
-  }, "Failed to associate cart");
 }

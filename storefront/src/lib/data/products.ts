@@ -5,7 +5,7 @@ import {
   fetchProductFilters,
   fetchProducts,
 } from "@/lib/commerce/products";
-import type { Surface } from "@/lib/spree";
+import type { Surface } from "@/lib/commerce/surface";
 import type { StorefrontListParams } from "@/lib/utils/listing-context";
 
 /**

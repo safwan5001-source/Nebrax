@@ -63,7 +63,6 @@ vi.mock("next/cache", () => ({
 import {
   addAwjItem,
   addToCart,
-  associateCartWithUser,
   clearCart,
   getAwjCart,
   getCart,
@@ -303,20 +302,6 @@ describe("cart server actions", () => {
   describe("clearCart", () => {
     it("returns success", async () => {
       const result = await clearCart();
-      expect(result).toEqual({ success: true });
-    });
-  });
-
-  describe("associateCartWithUser", () => {
-    it("returns success", async () => {
-      const { getAccessToken } = await import("@/lib/spree");
-      (getAccessToken as ReturnType<typeof vi.fn>).mockResolvedValue(
-        "jwt-token",
-      );
-      mockClient.carts.associate.mockResolvedValue({});
-
-      const result = await associateCartWithUser();
-
       expect(result).toEqual({ success: true });
     });
   });

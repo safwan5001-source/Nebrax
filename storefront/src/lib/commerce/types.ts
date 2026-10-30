@@ -716,15 +716,6 @@ export interface StoreCustomer {
   customer_groups: StoreCustomerGroup[];
 }
 
-export interface StoreOrderListParams extends StoreListParams {
-  sort?: string;
-  search?: string;
-  state_eq?: string;
-  completed_at_gte?: string;
-  completed_at_lte?: string;
-  [key: string]: string | number | boolean | (string | number)[] | undefined;
-}
-
 /** What GTM purchase/checkout events read from a cart or order line. */
 export interface StoreAnalyticsLineItem {
   id: string;

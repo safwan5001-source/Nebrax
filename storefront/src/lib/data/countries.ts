@@ -3,11 +3,6 @@
 import { cacheLife, cacheTag } from "next/cache";
 import { getClient, getLocaleOptions } from "@/lib/spree";
 
-export async function getCountries() {
-  const options = await getLocaleOptions();
-  return getClient().countries.list(options);
-}
-
 async function cachedGetCountry(
   iso: string,
   options: { locale?: string; country?: string },
