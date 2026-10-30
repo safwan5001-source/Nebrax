@@ -113,6 +113,14 @@ class WholesaleCartCheckoutBoundaryTest extends TestCase
         return [$token, $membership->id];
     }
 
+    /** @return array{0: string, 1: string, 2: string} [token, membership id, identity id] */
+    private function approvedBuyerWithId(string $email = 'buyer@cart.test'): array
+    {
+        [$token, $membershipId] = $this->approvedBuyer($email);
+
+        return [$token, $membershipId, CustomerIdentity::withoutGlobalScopes()->where('email_normalized', $email)->firstOrFail()->id];
+    }
+
     private function suspend(string $membershipId): void
     {
         app(TenantContext::class)->set($this->tenant->id);
@@ -136,6 +144,9 @@ class WholesaleCartCheckoutBoundaryTest extends TestCase
 
     private function api(string $method, string $path, string $host, ?string $buyer, ?string $cart, array $body = [], ?string $idem = null): TestResponse
     {
+        // withHeaders() is cumulative on a TestCase: start clean so a previous call's buyer token can't leak into this one
+        $this->flushHeaders();
+        $this->unencryptedCookies = []; // cookies are cumulative too: a previous call's cart token must not ride along
         $t = $this->withHeaders($this->headers($host, $buyer, null, $idem))->withCredentials();
         if ($cart !== null) {
             $t = $t->withUnencryptedCookie(CommerceCartService::COOKIE_NAME, $cart);
@@ -257,7 +268,12 @@ class WholesaleCartCheckoutBoundaryTest extends TestCase
 
         // the DTC cart token on the wholesale host: not that cart either — and it does not leak DTC retail items
         $onWs = $this->api('GET', 'cart', self::WS, $buyer, $dtcCart)->assertOk();
-        $this->assertSame([], $onWs->json('data.items'));
+        // an authenticated buyer is always served THEIR OWN wholesale cart (never the DTC one the token points to):
+        // every line is a wholesale-priced line (700), none is the DTC retail line (1000)
+        $this->assertNotEmpty($onWs->json('data.items'));
+        foreach ($onWs->json('data.items') as $line) {
+            $this->assertSame(700, $line['unit_price']['amount_minor']);
+        }
 
         // each channel's cart row is bound to its own channel
         $channels = CommerceCart::withoutGlobalScopes()->pluck('sales_channel_id')->sort()->values()->all();
@@ -280,17 +296,114 @@ class WholesaleCartCheckoutBoundaryTest extends TestCase
     // ═══════════════════ B · الفجوات (تمنع تفعيل الإتمام للجملة) ═══════════════════
 
     #[Test]
-    public function blocker_the_order_is_not_attributed_to_the_approved_buyer(): void
+    public function the_order_and_cart_are_attributed_to_the_approved_buyer_from_the_server_side_context(): void
     {
-        [$buyer] = $this->approvedBuyer();
+        [$buyer, , $identityId] = $this->approvedBuyerWithId();
         $cart = $this->cookie($this->addItem(self::WS, $buyer)->assertCreated());
         $this->readyCheckout(self::WS, $buyer, $cart);
-        $this->api('POST', 'checkout/complete', self::WS, $buyer, $cart, [], 'idem-blk-1')->assertCreated();
+        $this->api('POST', 'checkout/complete', self::WS, $buyer, $cart, [], 'idem-attr-1')->assertCreated();
 
         $order = CommerceOrder::withoutGlobalScopes()->firstOrFail();
-        // store/v1 checkout is anonymous by design (ADR-24): approval is proven per request but never recorded on the order.
-        $this->assertNull($order->customer_identity_id, 'BLOCKER: wholesale orders carry no buyer identity');
-        $this->assertNull($order->partner_id, 'BLOCKER: no linked ERP partner / per-buyer price list');
+        $this->assertSame($identityId, $order->customer_identity_id);
+        $this->assertSame($this->wsChannel->id, $order->sales_channel_id);
+        $this->assertNull($order->partner_id, 'no ERP partner is linked or inferred (buyer pricing is a separate contract)');
+        $this->assertSame($identityId, CommerceCart::withoutGlobalScopes()->firstOrFail()->customer_identity_id);
+    }
+
+    #[Test]
+    public function a_cart_token_is_useless_to_any_other_bearer_even_another_approved_buyer(): void
+    {
+        [$buyerA] = $this->approvedBuyer('a@cart.test');
+        [$buyerB] = $this->approvedBuyer('b@cart.test');
+        $cartA = $this->cookie($this->addItem(self::WS, $buyerA)->assertCreated());
+
+        // B presents A's cart token: it resolves to B's own (empty) cart, never A's
+        $this->assertSame([], $this->api('GET', 'cart', self::WS, $buyerB, $cartA)->assertOk()->json('data.items'));
+        // anonymous with A's token: gated before any cart is touched
+        $this->api('GET', 'cart', self::WS, null, $cartA)->assertUnauthorized();
+        $this->assertSame(1, count($this->api('GET', 'cart', self::WS, $buyerA, $cartA)->json('data.items')));
+    }
+
+    #[Test]
+    public function client_supplied_buyer_or_partner_ids_never_become_the_orders_owner(): void
+    {
+        [$buyer, , $identityId] = $this->approvedBuyerWithId();
+        $cart = $this->cookie($this->addItem(self::WS, $buyer)->assertCreated());
+        $this->readyCheckout(self::WS, $buyer, $cart);
+
+        $this->api('POST', 'checkout/complete', self::WS, $buyer, $cart, [
+            'customer_identity_id' => (string) Str::uuid(), 'partner_id' => (string) Str::uuid(), 'tenant_id' => (string) Str::uuid(),
+        ], 'idem-forge')->assertStatus(422);
+
+        $this->api('POST', 'checkout/complete', self::WS, $buyer, $cart, [], 'idem-forge-2')->assertCreated();
+        $this->assertSame($identityId, CommerceOrder::withoutGlobalScopes()->firstOrFail()->customer_identity_id);
+    }
+
+    #[Test]
+    public function the_order_transaction_itself_refuses_a_buyer_who_is_no_longer_approved(): void
+    {
+        [, $membershipId, $identityId] = $this->approvedBuyerWithId();
+        $this->suspend($membershipId);
+
+        app(TenantContext::class)->set($this->tenant->id);
+        app(\App\Tenancy\CustomerContext::class)->set($this->tenant->id, $identityId, null);
+        $header = ['sales_channel_id' => $this->wsChannel->id, 'storefront_id' => null, 'commerce_checkout_id' => null, 'delivery_method' => 'pickup', 'delivery_amount_minor' => 0];
+        $lines = [['product_id' => $this->product->id, 'product_name_snapshot' => 'x', 'quantity' => 1, 'unit_name' => null, 'unit_factor' => 1, 'unit_price' => 700, 'line_total' => 700]];
+
+        try {
+            app(\App\Services\Commerce\CommerceOrderService::class)->createFromCheckout($header, $lines);
+            $this->fail('a suspended buyer must not get an order even if the request-level gate was bypassed');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('مشترياً معتمداً', $e->getMessage());
+        } finally {
+            app(\App\Tenancy\CustomerContext::class)->forget();
+        }
+        $this->assertSame(0, CommerceOrder::withoutGlobalScopes()->count());
+
+        // and a guest (no owner) can never create an order on a wholesale channel
+        $this->expectException(\RuntimeException::class);
+        app(\App\Services\Commerce\CommerceOrderService::class)->createFromCheckout($header, $lines);
+    }
+
+    #[Test]
+    public function an_orders_owner_is_immutable_and_guest_orders_are_never_claimed_later(): void
+    {
+        [$buyer, , $identityId] = $this->approvedBuyerWithId();
+        $cart = $this->cookie($this->addItem(self::WS, $buyer)->assertCreated());
+        $this->readyCheckout(self::WS, $buyer, $cart);
+        $this->api('POST', 'checkout/complete', self::WS, $buyer, $cart, [], 'idem-imm')->assertCreated();
+
+        // a guest order on the DTC host
+        $dtcCart = $this->cookie($this->addItem(self::DTC, null)->assertCreated());
+        $this->readyCheckout(self::DTC, null, $dtcCart);
+        $this->api('POST', 'checkout/complete', self::DTC, null, $dtcCart, [], 'idem-guest')->assertCreated();
+
+        app(TenantContext::class)->set($this->tenant->id);
+        $attributed = CommerceOrder::query()->where('sales_channel_id', $this->wsChannel->id)->firstOrFail();
+        $guest = CommerceOrder::query()->where('sales_channel_id', $this->dtcChannel->id)->firstOrFail();
+        $this->assertNull($guest->customer_identity_id, 'DTC guest orders stay guest orders');
+
+        foreach ([[$attributed, null], [$attributed, (string) Str::uuid()], [$guest, $identityId]] as [$order, $to]) {
+            try {
+                $order->update(['customer_identity_id' => $to]);
+                $this->fail('the owner of an order must not be rewritten or back-filled');
+            } catch (\LogicException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+        app(TenantContext::class)->forget();
+    }
+
+    #[Test]
+    public function a_buyer_token_on_a_dtc_host_does_not_attribute_a_dtc_order(): void
+    {
+        [$buyer] = $this->approvedBuyer();
+        $dtcCart = $this->cookie($this->addItem(self::DTC, $buyer)->assertCreated());
+        $this->readyCheckout(self::DTC, $buyer, $dtcCart);
+        $this->api('POST', 'checkout/complete', self::DTC, $buyer, $dtcCart, [], 'idem-dtc-buyer')->assertCreated();
+
+        $order = CommerceOrder::withoutGlobalScopes()->where('sales_channel_id', $this->dtcChannel->id)->firstOrFail();
+        $this->assertNull($order->customer_identity_id, 'DTC behaviour is unchanged: store/v1 DTC checkout stays anonymous');
     }
 
     #[Test]

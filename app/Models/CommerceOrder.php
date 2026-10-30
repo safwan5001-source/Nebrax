@@ -96,6 +96,14 @@ class CommerceOrder extends BaseModel implements CompanyWide
      */
     protected static function booted(): void
     {
+        // H6 Batch H — the owner of an order is stamped once, at creation, from the server-side CustomerContext.
+        // It is never rewritten, and a historical guest order is never claimed after the fact.
+        static::updating(function (self $order): void {
+            if ($order->isDirty('customer_identity_id')) {
+                throw new LogicException('مالك طلب Commerce (customer_identity_id) ثابتٌ بعد الإنشاء.');
+            }
+        });
+
         static::deleting(function (self $order): void {
             if ($order->status === self::STATUS_CONFIRMED) {
                 throw new LogicException('لا يمكن حذف طلب Commerce مؤكَّد — هو سجلٌّ تاريخي لالتزامٍ تجاري.');
