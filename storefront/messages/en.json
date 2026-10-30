@@ -1084,13 +1084,16 @@
       "showPassword": "Show password",
       "hidePassword": "Hide password",
       "submit": "Sign in",
-      "submitting": "Signing in..."
+      "submitting": "Signing in...",
+      "registerLink": "Create a buyer account",
+      "resendLink": "Resend verification email"
     },
     "errors": {
       "invalidCredentials": "We could not sign you in. Check your email and password, and that your email address is verified.",
       "rateLimited": "Too many attempts. Please wait a moment and try again.",
       "unavailable": "Wholesale is not available on this store.",
-      "generic": "Something went wrong. Please try again."
+      "generic": "Something went wrong. Please try again.",
+      "validation": "Please check the details you entered and try again."
     },
     "gate": {
       "sign_in_required": {
@@ -1141,6 +1144,36 @@
         "label": "Not available",
         "body": "Wholesale is not available on this store right now."
       }
+    },
+    "register": {
+      "title": "Create a wholesale buyer account",
+      "description": "Register with your business email. You must confirm your email before you can sign in, and the store reviews wholesale requests before showing trade prices.",
+      "displayName": "Your name or company",
+      "submit": "Create account",
+      "submitting": "Creating...",
+      "doneTitle": "Check your email",
+      "doneBody": "If this address can be registered, we have sent a confirmation link. Open it to confirm your email, then sign in. The link works once and expires.",
+      "resendLink": "Did not get the email? Send it again",
+      "haveAccount": "Already have an account?"
+    },
+    "verify": {
+      "title": "Confirm your email",
+      "description": "Press the button to confirm your email address for this store.",
+      "confirm": "Confirm email address",
+      "confirming": "Confirming...",
+      "successTitle": "Email confirmed",
+      "successBody": "Your email address is confirmed. You can sign in now; the store reviews wholesale requests before showing trade prices.",
+      "failedTitle": "This link cannot be used",
+      "failedBody": "The confirmation link is invalid, expired, or already used. Request a new one.",
+      "missingToken": "This page needs the link from your confirmation email. Request a new email if you lost it.",
+      "resendCta": "Send a new confirmation email"
+    },
+    "resend": {
+      "title": "Resend confirmation email",
+      "description": "Enter the email you registered with.",
+      "submit": "Send email",
+      "submitting": "Sending...",
+      "doneBody": "If this address belongs to an account that still needs confirmation, a new link has been sent. The previous link stops working once the new email is sent."
     }
   }
 }

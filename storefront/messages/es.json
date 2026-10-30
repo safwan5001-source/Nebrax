@@ -1084,13 +1084,16 @@
       "showPassword": "Mostrar contraseña",
       "hidePassword": "Ocultar contraseña",
       "submit": "Iniciar sesión",
-      "submitting": "Iniciando sesión..."
+      "submitting": "Iniciando sesión...",
+      "registerLink": "Crear una cuenta de comprador",
+      "resendLink": "Reenviar el correo de verificación"
     },
     "errors": {
       "invalidCredentials": "No pudimos iniciar su sesión. Revise su correo y contraseña, y que su correo esté verificado.",
       "rateLimited": "Demasiados intentos. Espere un momento e inténtelo de nuevo.",
       "unavailable": "La venta mayorista no está disponible en esta tienda.",
-      "generic": "Algo salió mal. Inténtelo de nuevo."
+      "generic": "Algo salió mal. Inténtelo de nuevo.",
+      "validation": "Revise los datos introducidos e inténtelo de nuevo."
     },
     "gate": {
       "sign_in_required": {
@@ -1141,6 +1144,36 @@
         "label": "No disponible",
         "body": "La venta mayorista no está disponible en esta tienda por ahora."
       }
+    },
+    "register": {
+      "title": "Crear una cuenta de comprador mayorista",
+      "description": "Regístrese con su correo de empresa. Debe confirmar su correo antes de iniciar sesión, y la tienda revisa las solicitudes mayoristas antes de mostrar precios de mayorista.",
+      "displayName": "Su nombre o empresa",
+      "submit": "Crear cuenta",
+      "submitting": "Creando...",
+      "doneTitle": "Revise su correo",
+      "doneBody": "Si esta dirección puede registrarse, hemos enviado un enlace de confirmación. Ábralo para confirmar su correo y luego inicie sesión. El enlace funciona una vez y caduca.",
+      "resendLink": "¿No recibió el correo? Enviar de nuevo",
+      "haveAccount": "¿Ya tiene una cuenta?"
+    },
+    "verify": {
+      "title": "Confirme su correo",
+      "description": "Pulse el botón para confirmar su dirección de correo en esta tienda.",
+      "confirm": "Confirmar dirección de correo",
+      "confirming": "Confirmando...",
+      "successTitle": "Correo confirmado",
+      "successBody": "Su correo está confirmado. Ya puede iniciar sesión; la tienda revisa las solicitudes mayoristas antes de mostrar precios de mayorista.",
+      "failedTitle": "Este enlace no se puede usar",
+      "failedBody": "El enlace de confirmación no es válido, ha caducado o ya se usó. Solicite uno nuevo.",
+      "missingToken": "Esta página necesita el enlace de su correo de confirmación. Solicite un correo nuevo si lo perdió.",
+      "resendCta": "Enviar un nuevo correo de confirmación"
+    },
+    "resend": {
+      "title": "Reenviar el correo de confirmación",
+      "description": "Introduzca el correo con el que se registró.",
+      "submit": "Enviar correo",
+      "submitting": "Enviando...",
+      "doneBody": "Si la dirección pertenece a una cuenta que aún necesita confirmación, se ha enviado un enlace nuevo. El enlace anterior deja de funcionar cuando se envía el nuevo."
     }
   }
 }

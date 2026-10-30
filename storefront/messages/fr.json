@@ -1084,13 +1084,16 @@
       "showPassword": "Afficher le mot de passe",
       "hidePassword": "Masquer le mot de passe",
       "submit": "Se connecter",
-      "submitting": "Connexion..."
+      "submitting": "Connexion...",
+      "registerLink": "Créer un compte acheteur",
+      "resendLink": "Renvoyer l'e-mail de vérification"
     },
     "errors": {
       "invalidCredentials": "Connexion impossible. Vérifiez votre e-mail et votre mot de passe, et que votre adresse e-mail est vérifiée.",
       "rateLimited": "Trop de tentatives. Patientez un instant puis réessayez.",
       "unavailable": "La vente en gros n'est pas disponible dans cette boutique.",
-      "generic": "Une erreur est survenue. Veuillez réessayer."
+      "generic": "Une erreur est survenue. Veuillez réessayer.",
+      "validation": "Vérifiez les informations saisies et réessayez."
     },
     "gate": {
       "sign_in_required": {
@@ -1141,6 +1144,36 @@
         "label": "Indisponible",
         "body": "La vente en gros n'est pas disponible dans cette boutique pour le moment."
       }
+    },
+    "register": {
+      "title": "Créer un compte acheteur grossiste",
+      "description": "Inscrivez-vous avec votre e-mail professionnel. Vous devez confirmer votre e-mail avant de vous connecter, et la boutique examine les demandes de gros avant d'afficher les tarifs professionnels.",
+      "displayName": "Votre nom ou société",
+      "submit": "Créer le compte",
+      "submitting": "Création...",
+      "doneTitle": "Vérifiez votre boîte mail",
+      "doneBody": "Si cette adresse peut être enregistrée, nous avons envoyé un lien de confirmation. Ouvrez-le pour confirmer votre e-mail, puis connectez-vous. Le lien fonctionne une fois et expire.",
+      "resendLink": "Pas reçu l'e-mail ? Le renvoyer",
+      "haveAccount": "Vous avez déjà un compte ?"
+    },
+    "verify": {
+      "title": "Confirmez votre e-mail",
+      "description": "Appuyez sur le bouton pour confirmer votre adresse e-mail pour cette boutique.",
+      "confirm": "Confirmer l'adresse e-mail",
+      "confirming": "Confirmation...",
+      "successTitle": "E-mail confirmé",
+      "successBody": "Votre adresse e-mail est confirmée. Vous pouvez vous connecter ; la boutique examine les demandes de gros avant d'afficher les tarifs professionnels.",
+      "failedTitle": "Ce lien est inutilisable",
+      "failedBody": "Le lien de confirmation est invalide, expiré ou déjà utilisé. Demandez-en un nouveau.",
+      "missingToken": "Cette page nécessite le lien de votre e-mail de confirmation. Demandez un nouvel e-mail si vous l'avez perdu.",
+      "resendCta": "Envoyer un nouvel e-mail de confirmation"
+    },
+    "resend": {
+      "title": "Renvoyer l'e-mail de confirmation",
+      "description": "Saisissez l'e-mail avec lequel vous vous êtes inscrit.",
+      "submit": "Envoyer l'e-mail",
+      "submitting": "Envoi...",
+      "doneBody": "Si l'adresse correspond à un compte à confirmer, un nouveau lien a été envoyé. Le lien précédent cesse de fonctionner dès l'envoi du nouveau."
     }
   }
 }

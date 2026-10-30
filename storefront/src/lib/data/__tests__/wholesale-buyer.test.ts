@@ -27,8 +27,15 @@ vi.mock("@/lib/commerce/config", async () => {
 });
 
 const { StorefrontApiError } = await import("@/lib/commerce/config");
-const { signInBuyer, signOutBuyer, applyForWholesale, getBuyerAccess } =
-  await import("../wholesale-buyer");
+const {
+  signInBuyer,
+  signOutBuyer,
+  applyForWholesale,
+  getBuyerAccess,
+  registerBuyer,
+  verifyBuyerEmail,
+  resendBuyerVerification,
+} = await import("../wholesale-buyer");
 
 describe("wholesale buyer server actions", () => {
   beforeEach(() => {
@@ -156,5 +163,99 @@ describe("wholesale buyer server actions", () => {
       mocks.request.mockRejectedValue(new Error("boom"));
       expect((await getBuyerAccess()).state).toBe("unavailable");
     });
+  });
+});
+
+describe("registration and verification actions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getBuyerToken.mockResolvedValue(undefined);
+  });
+
+  it("register posts the form with only a validated locale prefix, sets no session and returns no token", async () => {
+    mocks.request.mockResolvedValue({ data: { verification_required: true } });
+
+    const result = await registerBuyer({
+      displayName: "Ann",
+      email: "a@x.test",
+      password: "pw-123456",
+      basePath: "/sa/ar",
+    });
+
+    expect(result).toEqual({ success: true });
+    expect(mocks.request).toHaveBeenCalledWith("POST", "auth/register", {
+      body: {
+        display_name: "Ann",
+        email: "a@x.test",
+        password: "pw-123456",
+        locale_path: "/sa/ar",
+      },
+    });
+    expect(mocks.setBuyerToken).not.toHaveBeenCalled();
+  });
+
+  it("a hostile base path never reaches the API as a link prefix", async () => {
+    mocks.request.mockResolvedValue({ data: {} });
+
+    await registerBuyer({
+      displayName: "A",
+      email: "a@x.test",
+      password: "pw-123456",
+      basePath: "//evil.example",
+    });
+    await resendBuyerVerification({
+      email: "a@x.test",
+      basePath: "https://evil.example",
+    });
+
+    for (const call of mocks.request.mock.calls) {
+      expect(call[2].body.locale_path).toBeUndefined();
+    }
+  });
+
+  it("verify sends only the token and maps every failure to a key, never server text", async () => {
+    mocks.request.mockResolvedValueOnce({ data: { verified: true } });
+    expect(await verifyBuyerEmail("t".repeat(64))).toEqual({ success: true });
+    expect(mocks.request).toHaveBeenCalledWith("POST", "auth/verify-email", {
+      body: { token: "t".repeat(64) },
+    });
+
+    mocks.request.mockRejectedValueOnce(
+      new StorefrontApiError(422, "validation_failed", "internal detail"),
+    );
+    expect(await verifyBuyerEmail("x")).toEqual({
+      success: false,
+      error: "validation",
+    });
+    mocks.request.mockRejectedValueOnce(
+      new StorefrontApiError(429, "rate_limited", "x"),
+    );
+    expect(await verifyBuyerEmail("x")).toEqual({
+      success: false,
+      error: "rateLimited",
+    });
+    mocks.request.mockRejectedValueOnce(new Error("boom"));
+    expect(await verifyBuyerEmail("x")).toEqual({
+      success: false,
+      error: "generic",
+    });
+  });
+
+  it("resend is a plain success for the caller whatever the address (the API answers neutrally)", async () => {
+    mocks.request.mockResolvedValue({ data: { verification_required: true } });
+
+    expect(
+      await resendBuyerVerification({
+        email: "ghost@x.test",
+        basePath: "/sa/en",
+      }),
+    ).toEqual({ success: true });
+    expect(mocks.request).toHaveBeenCalledWith(
+      "POST",
+      "auth/verification/resend",
+      {
+        body: { email: "ghost@x.test", locale_path: "/sa/en" },
+      },
+    );
   });
 });

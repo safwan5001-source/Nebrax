@@ -1084,13 +1084,16 @@
       "showPassword": "Passwort anzeigen",
       "hidePassword": "Passwort verbergen",
       "submit": "Anmelden",
-      "submitting": "Anmeldung läuft..."
+      "submitting": "Anmeldung läuft...",
+      "registerLink": "Käuferkonto erstellen",
+      "resendLink": "Bestätigungs-E-Mail erneut senden"
     },
     "errors": {
       "invalidCredentials": "Anmeldung nicht möglich. Prüfen Sie E-Mail und Passwort sowie, ob Ihre E-Mail-Adresse bestätigt ist.",
       "rateLimited": "Zu viele Versuche. Bitte warten Sie einen Moment und versuchen Sie es erneut.",
       "unavailable": "Großhandel ist in diesem Shop nicht verfügbar.",
-      "generic": "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut."
+      "generic": "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.",
+      "validation": "Bitte prüfen Sie Ihre Eingaben und versuchen Sie es erneut."
     },
     "gate": {
       "sign_in_required": {
@@ -1141,6 +1144,36 @@
         "label": "Nicht verfügbar",
         "body": "Großhandel ist in diesem Shop derzeit nicht verfügbar."
       }
+    },
+    "register": {
+      "title": "Großhandelskonto erstellen",
+      "description": "Registrieren Sie sich mit Ihrer geschäftlichen E-Mail. Sie müssen Ihre E-Mail bestätigen, bevor Sie sich anmelden können; der Shop prüft Großhandelsanfragen, bevor Händlerpreise angezeigt werden.",
+      "displayName": "Ihr Name oder Firmenname",
+      "submit": "Konto erstellen",
+      "submitting": "Wird erstellt...",
+      "doneTitle": "Prüfen Sie Ihr Postfach",
+      "doneBody": "Falls diese Adresse registriert werden kann, haben wir einen Bestätigungslink gesendet. Öffnen Sie ihn zur Bestätigung und melden Sie sich dann an. Der Link gilt einmal und läuft ab.",
+      "resendLink": "Keine E-Mail erhalten? Erneut senden",
+      "haveAccount": "Bereits ein Konto?"
+    },
+    "verify": {
+      "title": "E-Mail bestätigen",
+      "description": "Klicken Sie auf die Schaltfläche, um Ihre E-Mail-Adresse für diesen Shop zu bestätigen.",
+      "confirm": "E-Mail-Adresse bestätigen",
+      "confirming": "Wird bestätigt...",
+      "successTitle": "E-Mail bestätigt",
+      "successBody": "Ihre E-Mail-Adresse ist bestätigt. Sie können sich jetzt anmelden; der Shop prüft Großhandelsanfragen, bevor Händlerpreise angezeigt werden.",
+      "failedTitle": "Dieser Link ist nicht nutzbar",
+      "failedBody": "Der Bestätigungslink ist ungültig, abgelaufen oder bereits verwendet. Fordern Sie einen neuen an.",
+      "missingToken": "Diese Seite benötigt den Link aus Ihrer Bestätigungs-E-Mail. Fordern Sie bei Verlust eine neue E-Mail an.",
+      "resendCta": "Neue Bestätigungs-E-Mail senden"
+    },
+    "resend": {
+      "title": "Bestätigungs-E-Mail erneut senden",
+      "description": "Geben Sie die E-Mail ein, mit der Sie sich registriert haben.",
+      "submit": "E-Mail senden",
+      "submitting": "Wird gesendet...",
+      "doneBody": "Gehört die Adresse zu einem Konto, das noch bestätigt werden muss, wurde ein neuer Link gesendet. Der vorherige Link wird ungültig, sobald die neue E-Mail versendet ist."
     }
   }
 }

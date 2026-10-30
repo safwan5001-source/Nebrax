@@ -1084,13 +1084,16 @@
       "showPassword": "Pokaż hasło",
       "hidePassword": "Ukryj hasło",
       "submit": "Zaloguj się",
-      "submitting": "Logowanie..."
+      "submitting": "Logowanie...",
+      "registerLink": "Utwórz konto kupca",
+      "resendLink": "Wyślij ponownie e-mail weryfikacyjny"
     },
     "errors": {
       "invalidCredentials": "Nie udało się zalogować. Sprawdź e-mail i hasło oraz czy adres e-mail jest zweryfikowany.",
       "rateLimited": "Zbyt wiele prób. Poczekaj chwilę i spróbuj ponownie.",
       "unavailable": "Sprzedaż hurtowa nie jest dostępna w tym sklepie.",
-      "generic": "Coś poszło nie tak. Spróbuj ponownie."
+      "generic": "Coś poszło nie tak. Spróbuj ponownie.",
+      "validation": "Sprawdź wprowadzone dane i spróbuj ponownie."
     },
     "gate": {
       "sign_in_required": {
@@ -1141,6 +1144,36 @@
         "label": "Niedostępne",
         "body": "Sprzedaż hurtowa nie jest teraz dostępna w tym sklepie."
       }
+    },
+    "register": {
+      "title": "Utwórz konto kupca hurtowego",
+      "description": "Zarejestruj się firmowym adresem e-mail. Przed zalogowaniem musisz potwierdzić e-mail, a sklep rozpatruje wnioski hurtowe, zanim pokaże ceny hurtowe.",
+      "displayName": "Twoje imię lub nazwa firmy",
+      "submit": "Utwórz konto",
+      "submitting": "Tworzenie...",
+      "doneTitle": "Sprawdź skrzynkę e-mail",
+      "doneBody": "Jeśli ten adres można zarejestrować, wysłaliśmy link potwierdzający. Otwórz go, aby potwierdzić e-mail, a potem zaloguj się. Link działa jednorazowo i wygasa.",
+      "resendLink": "Nie dostałeś e-maila? Wyślij ponownie",
+      "haveAccount": "Masz już konto?"
+    },
+    "verify": {
+      "title": "Potwierdź e-mail",
+      "description": "Naciśnij przycisk, aby potwierdzić adres e-mail dla tego sklepu.",
+      "confirm": "Potwierdź adres e-mail",
+      "confirming": "Potwierdzanie...",
+      "successTitle": "E-mail potwierdzony",
+      "successBody": "Twój adres e-mail jest potwierdzony. Możesz się zalogować; sklep rozpatruje wnioski hurtowe, zanim pokaże ceny hurtowe.",
+      "failedTitle": "Tego linku nie można użyć",
+      "failedBody": "Link potwierdzający jest nieprawidłowy, wygasł lub został już użyty. Poproś o nowy.",
+      "missingToken": "Ta strona wymaga linku z e-maila potwierdzającego. Jeśli go zgubiłeś, poproś o nowy e-mail.",
+      "resendCta": "Wyślij nowy e-mail potwierdzający"
+    },
+    "resend": {
+      "title": "Wyślij ponownie e-mail potwierdzający",
+      "description": "Podaj e-mail, którym się zarejestrowałeś.",
+      "submit": "Wyślij e-mail",
+      "submitting": "Wysyłanie...",
+      "doneBody": "Jeśli adres należy do konta wymagającego potwierdzenia, wysłano nowy link. Poprzedni link przestaje działać po wysłaniu nowego."
     }
   }
 }
