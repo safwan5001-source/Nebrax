@@ -106,6 +106,39 @@ class ExpenseService
     }
 
     /**
+     * IMP-DOC-DISTINCT-01: إنشاء مصروف **بمعرّف تمييز** بعد أن أكّد مراجعٌ أنه تكرارٌ حقيقي. يجب أن يُستدعى داخل معاملة المستدعي (الخارجية): القفل الاستشاري للهوية
+     * يُؤخذ **قبل** فحص المرجع ويبقى حتى نهاية تلك المعاملة (لا داخل نقطة حفظ `create` التي تتراجع فتُحرّر أقفالها)، فيتسلسل طلبان لمستندٍ بمرجعٍ واحد: الثاني
+     * ينتظر التزام الأول ثم يرى حجزه ويُرفض `same_document_reference`. ترتيب الأقفال كما في `create`: مِرساة الترقيم ثم الاستشاري. (مِرساة الترقيم هي ما يسلسل فعلياً في اختبار التزامن؛ القفل الاستشاري احتياط لحالة ترقيمٍ مُمرَّر `number`.)
+     *
+     * @param  array<string, mixed>  $data  كما في {@see create()}
+     * @param  array<string, mixed>  $reservation  `['source'=>…, 'reference'=>?string]`
+     */
+    public function createDistinctOccurrence(array $data, array $reservation, string $occurrenceId): Expense
+    {
+        if (DB::transactionLevel() < 1) {
+            throw new \LogicException('تأكيد تكرار المصروف يجب أن يجري داخل معاملة المستدعي.');
+        }
+        $amount = (int) ($data['amount'] ?? 0);
+        $date = $data['expense_date'] ?? now()->toDateString();
+
+        try {
+            $predicate = DocumentDuplicateReservationService::expensePredicate(
+                $data['partner_id'] ?? null, $data['vendor_name'] ?? null, $reservation['reference'] ?? null, $date, $amount,
+            );
+        } catch (\LogicException) {
+            throw new RuntimeException('تاريخ المصروف غير صالح.');
+        }
+
+        $this->nextNumber($date);   // مِرساة الترقيم أولاً (ترتيب الأقفال الثابت)
+        $this->lockIdentity($predicate, $amount);
+        if ($this->duplicates->holdsSameExpenseReference($predicate)) {
+            throw new DuplicateDocumentException(DocumentDuplicateReservationService::DOMAIN_EXPENSE, null, null, 'same_document_reference');
+        }
+
+        return $this->create($data, $reservation + ['occurrence_id' => $occurrenceId]);
+    }
+
+    /**
      * تعديل مسودة المصروف فقط. إعادة اشتقاق الضريبة والإجمالي تمنع تعارض شاشة
      * قديمة مع القيم المخزّنة، والمصروف المرحّل لا يُفتح للتعديل أبداً.
      */

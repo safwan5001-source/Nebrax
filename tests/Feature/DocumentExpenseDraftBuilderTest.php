@@ -577,6 +577,9 @@ class DocumentExpenseDraftBuilderTest extends TestCase
         $this->buildDraft($fixture, 'الدفعة الأولى.');
         $second = $this->secondReadyBatch($fixture, 'EXP-100', 10000);
 
+        // أول رفض (بلا تأكيد) يُصنَّف غير قابل للتأكيد فلا تعرض الواجهة خطوة لا تُقبل (Codex #1803 P2).
+        $this->postDraft($fixture, $second)->assertUnprocessable()
+            ->assertJsonPath('reason', 'duplicate_document')->assertJsonPath('distinct_confirmable', false);
         $this->postDraft($fixture, $second, ['confirm_distinct_occurrence' => true])->assertUnprocessable()
             ->assertJsonPath('reason', 'duplicate_document')->assertJsonPath('distinct_confirmable', false);
 

@@ -137,7 +137,9 @@ final class ExpenseDocumentDraftBuilder implements TransactionDraftBuilder
 
     /**
      * المحاولة الأولى بلا معرّف تمييز دائماً. التأكيد لا يُستهلك إلا إذا رُفضت فعلاً بتكرار مصروف (فتأكيدٌ بلا تكرار لا يترك معرّف تمييز كامناً يتجاوز
-     * فحصاً لاحقاً). المرجع المعلوم نفسه (المستند ذاته) لا يُؤكَّد أبداً. معرّف التمييز حتميّ من الدفعة: إعادة الطلب لا تنتج مصروفاً ثانياً (والرابط يعيد التشغيل أصلاً).
+     * فحصاً لاحقاً). المرجع المعلوم نفسه (المستند ذاته) لا يُؤكَّد أبداً، ويُصنَّف الرفض هكذا **من أول رفض** (بتأكيدٍ أو بدونه) كي لا تعرض الواجهة تأكيداً
+     * لا يُقبل. معرّف التمييز حتميّ من الدفعة (إعادة الطلب لا تنتج مصروفاً ثانياً؛ والرابط يعيد التشغيل أصلاً). فحص المرجع وإنشاء المصروف المؤكَّد يجريان في
+     * `ExpenseService::createDistinctOccurrence` تحت قفل الهوية في هذه المعاملة الخارجية (لا يُفلت طلبان متزامنان لمرجعٍ واحد).
      * الاستثناء يُلتقط حول `create` فقط: رفض التكرار استثناءٌ تطبيقي قبل أي كتابة في هذه المرحلة، فتبقى معاملة PostgreSQL سليمة (نقطة حفظ `create` تتراجع).
      *
      * @param  array<string,mixed>  $data
@@ -149,20 +151,22 @@ final class ExpenseDocumentDraftBuilder implements TransactionDraftBuilder
         try {
             return [$this->expenses->create($data, $reservation), false];
         } catch (DuplicateDocumentException $duplicate) {
-            if (! $confirmDistinct || $duplicate->domain !== DocumentDuplicateReservationService::DOMAIN_EXPENSE) {
+            if ($duplicate->domain !== DocumentDuplicateReservationService::DOMAIN_EXPENSE) {
+                throw $duplicate;
+            }
+            $predicate = DocumentDuplicateReservationService::expensePredicate(
+                $data['partner_id'] ?? null, $data['vendor_name'] ?? null, $reservation['reference'], $data['expense_date'], (int) $data['amount'],
+            );
+            if ($this->reservations->holdsSameExpenseReference($predicate)) {
+                throw new DuplicateDocumentException(DocumentDuplicateReservationService::DOMAIN_EXPENSE, null, null, 'same_document_reference');
+            }
+            if (! $confirmDistinct) {
                 throw $duplicate;
             }
         }
 
-        $predicate = DocumentDuplicateReservationService::expensePredicate(
-            $data['partner_id'] ?? null, $data['vendor_name'] ?? null, $reservation['reference'], $data['expense_date'], (int) $data['amount'],
-        );
-        if ($this->reservations->holdsSameExpenseReference($predicate)) {
-            throw new DuplicateDocumentException(DocumentDuplicateReservationService::DOMAIN_EXPENSE, null, null, 'same_document_reference');
-        }
-
         return [
-            $this->expenses->create($data, $reservation + ['occurrence_id' => substr(hash('sha256', 'document_center|'.$batch->id), 0, 32)]),
+            $this->expenses->createDistinctOccurrence($data, $reservation, substr(hash('sha256', 'document_center|'.$batch->id), 0, 32)),
             true,
         ];
     }

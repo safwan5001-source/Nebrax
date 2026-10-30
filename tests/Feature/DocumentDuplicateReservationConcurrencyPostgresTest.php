@@ -164,6 +164,55 @@ class DocumentDuplicateReservationConcurrencyPostgresTest extends TestCase
         $this->assertContains(strtoupper((string) ImportDocumentReservation::query()->first()->predicate['reference']), ['R1', 'R2', 'R3', 'R4'], json_encode($results));
     }
 
+    /**
+     * IMP-DOC-DISTINCT-01 (Codex #1803 P1): دفعتان متزامنتان تؤكّدان مصروفاً ثانياً بالرقم المرجعي نفسه (EXP-101) والمصروف الأول (EXP-100) قائم — يلزم أن يمرّ واحدٌ فقط.
+     * كل متسابق يفعل ما يفعله باني الدفعة داخل معاملته الخارجية: محاولة بلا تمييز (ترفض) ثم `createDistinctOccurrence` بمعرّف تمييز **مختلف** (لكل دفعة معرّفها).
+     *
+     * @test
+     */
+    public function racing_confirmations_of_one_new_document_reference_admit_exactly_one_distinct_expense(): void
+    {
+        $tenant = $this->tenant();
+        app(TenantContext::class)->set($tenant);
+        $account = \App\Models\Account::query()->where('code', '5130')->firstOrFail();
+        $data = ['account_id' => $account->id, 'vendor_name' => 'مورد التزامن', 'payment_method' => 'cash', 'expense_date' => '2026-08-25', 'amount' => 10000, 'tax_rate' => 15];
+        DB::transaction(fn () => app(\App\Services\Accounting\ExpenseService::class)->create($data, ['source' => Svc::SOURCE_DOCUMENT_CENTER, 'reference' => 'EXP-100']));
+
+        $jobs = [];
+        foreach (range(1, 5) as $i) {
+            $jobs[] = function () use ($tenant, $data, $i) {
+                app(TenantContext::class)->set($tenant);
+                $reservation = ['source' => Svc::SOURCE_DOCUMENT_CENTER, 'reference' => 'EXP-101'];
+
+                return DB::transaction(function () use ($data, $reservation, $i) {
+                    $expenses = app(\App\Services\Accounting\ExpenseService::class);
+                    try {
+                        $expenses->create($data, $reservation);
+                        $this->fail('the first attempt must be refused as a repeat');
+                    } catch (DuplicateDocumentException) {
+                        // مرفوض كتكرار: ننتقل إلى التأكيد كما يفعل الباني.
+                    }
+                    usleep(40_000);   // نافذة عريضة: كل المتسابقين تجاوزوا المحاولة الأولى قبل أن يلتزم أحدهم
+                    $expense = $expenses->createDistinctOccurrence($data, $reservation, 'occ-'.$i.'-'.str_repeat('x', 8));
+
+                    return $expense->id;
+                });
+            };
+        }
+
+        $results = $this->runConcurrently($jobs);
+
+        app(TenantContext::class)->set($tenant);
+        $wins = array_values(array_filter($results, fn ($r) => ($r['ok'] ?? false) === true));
+        $this->assertCount(1, $wins, json_encode($results, JSON_UNESCAPED_UNICODE));
+        $this->assertSame(2, \App\Models\Expense::query()->count(), 'EXP-100 الأصلي + مصروف EXP-101 واحد فقط.');
+        foreach ($results as $r) {
+            if (($r['ok'] ?? false) !== true) {
+                $this->assertSame(DuplicateDocumentException::class, $r['error_class'] ?? null, json_encode($r, JSON_UNESCAPED_UNICODE));
+            }
+        }
+    }
+
     /** @test */
     public function it_refuses_to_run_outside_a_transaction(): void
     {
