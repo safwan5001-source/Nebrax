@@ -67,6 +67,9 @@ Disabling the wholesale branch (letting wholesale fall to the base logic) fails 
 ### 4.7 Review fix (Codex P2 on PR #1823, verified real, my own defect)
 The listing and the sort counted *any* variant entry in an eligible list, while the detail page prices only active variants in the product's base unit, so a card could advertise a product the buyer could not buy. The listing query and `EffectivePriceOrdering::applyWholesale()` now apply the detail page's predicate (active variant of this product, product's base unit). A regression test fails on the previous code and passes now; affected suites re-run green on SQLite (779 passed, 41 skipped) and PostgreSQL (820 passed).
 
+### 4.8 Review fix 2 (Codex P2 on PR #1823, verified real, my own defect)
+The staff preview API now returns `price: null` for a wholesale channel, but the ERP web workspace mapper turned null into `0` with a defaulted `SAR` currency and the preview canvas formatted it unconditionally, so a merchant would have seen a zero (and, for non-SAR tenants, wrongly denominated) price. `workspace-products.ts` now preserves `null` for the product and each variant (an ordinary price maps exactly as before) and `StorefrontPreviewCanvas.tsx` renders "غير متاح للجملة / Unavailable for wholesale" for it. Two new mapper tests; web workspace and store-builder suites pass (3,800 tests); the touched files add no type errors (the repo's 55 pre-existing `tsc` errors in unrelated test files are unchanged).
+
 ## 5. Financial regression
 No accounting, VAT, ZATCA, payment-capture, order-lifecycle or cancellation code was changed, and no migration was added. A wholesale order still creates no invoice, payment, journal entry or stock movement (Batch I characterization test passes unchanged). Currency comes from the tenant exactly as before; amounts remain integer minor units; order-line price evidence is unchanged and recorded the same way.
 
@@ -94,6 +97,7 @@ Exactly one assertion block, and by design. `WholesaleCartCheckoutBoundaryTest::
 ## 8. Changed files
 - Backend: `app/Services/Commerce/WholesalePriceAuthority.php` (new), `WholesalePriceContext.php` (new), `CommercePriceResolver.php`, `ResolvedCommercePrice.php`, `StorefrontOfferResolver.php`, `app/Support/Commerce/EffectivePriceOrdering.php`, `app/Http/Controllers/Api/StorefrontProductController.php`, `CommerceWorkspaceStorefrontProductController.php`, `app/Http/Resources/StorefrontProductResource.php`.
 - Storefront: `src/lib/commerce/types.ts`, `mappers.ts`, `__tests__/mappers.test.ts`.
+- ERP web (staff preview): `web/src/modules/commerce-workspace/workspace-products.ts` and its test, `web/src/modules/store-experience-builder/StorefrontPreviewCanvas.tsx`.
 - Tests: `WholesalePricePrecedenceTest` (new), `WholesalePricePrecedencePostgresConcurrencyTest` (new), `WholesaleCartCheckoutBoundaryTest` (one test replaced).
 - Docs: this report.
 

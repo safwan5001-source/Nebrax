@@ -242,4 +242,29 @@ describe('workspace-products client — CUST-H2-3', () => {
     const result = await showWorkspaceProduct('store-1', 'p1');
     expect(result).toEqual({ ok: false, reason: 'failed', message: 'network down' });
   });
+  it('preserves a null price (unavailable for wholesale) instead of showing 0 or a guessed currency (H6 Batch J)', async () => {
+    apiMock.mockResolvedValue({
+      data: detailRow({
+        price: null,
+        wholesale_availability: { state: 'unavailable_for_wholesale' },
+        is_variant_managed: true,
+        variants: [
+          { id: 'v1', sku: null, option_value_ids: [], price: { amount_minor: 640, currency: 'SAR' }, in_stock: true, media: [] },
+          { id: 'v2', sku: null, option_value_ids: [], price: null, in_stock: true, media: [] },
+        ],
+      }),
+    });
+    const result = await showWorkspaceProduct('store-1', 'p1');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.priceAmountMinor).toBeNull();
+    expect(result.data.variants?.[0]?.priceAmountMinor).toBe(640);
+    expect(result.data.variants?.[1]?.priceAmountMinor).toBeNull();
+  });
+
+  it('still maps an ordinary price exactly as before', async () => {
+    apiMock.mockResolvedValue({ data: detailRow() });
+    const result = await showWorkspaceProduct('store-1', 'p1');
+    expect(result.ok && result.data.priceAmountMinor).toBe(12500);
+  });
 });
