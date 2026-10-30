@@ -11,8 +11,8 @@
 | **Branch** | `feat/app-builder-s01a-draft-optimistic-lock` |
 | **Base SHA** | `d73d8811b97a1f3abafb15c20c94d204b99aaf8a` (أحدث `origin/main` وقت البدء: `fix(web): label the wholesale permission area… (#1811)`) |
 | **Code SHA** | `9b1253a6c6651cc1c2f4dffd8bb39f9537f4bd5f` (التنفيذ + الاختبارات + العقد) |
-| **Head SHA** | يُسجَّل في وصف الـPR ورسالة التسليم (هذا التقرير جزء من الـHead فلا يمكن تضمين SHA-ه فيه) |
-| PR | يُرفق بعد الإنشاء (انظر وصف الـPR) |
+| **Head SHA (وقت الاختبار)** | `23b013d7dc39432e3cdea5c92125de47be7427e2` — الـHead الذي أنتج CI الأخضر. هذا التقرير المحدَّث التزام لاحق (توثيق فقط) رأسُه يُذكر في رسالة التسليم |
+| PR | https://github.com/safwan5001-source/Nebrax/pull/1814 |
 
 ## 2) ما تغيّر
 
@@ -61,7 +61,7 @@ PUT /api/app-builder/apps/{id}/draft
 | مجموعة App Builder الأوسع على **SQLite** (`Builder|AppBuilder|PreviewSession|PreviewExchange|CommerceExperience|ApplicationCatalog…`) | **240 ناجحاً، 8 متخطّاة** (1607 تأكيداً) |
 | المجموعة نفسها على **PostgreSQL** | **119 ناجحاً** (832 تأكيداً) |
 | اختبارات App Builder القائمة | **لم تُعدَّل** (كلها خضراء كما كانت) |
-| **المجموعة الكاملة محلياً** (`php artisan test --parallel --processes=4`، 10078 اختباراً، SQLite) | ⏳ قيد التشغيل وقت فتح الـPR — تُحدَّث النتيجة في commit لاحق |
+| **المجموعة الكاملة محلياً** (`php artisan test --parallel --processes=4`، 10078 اختباراً، SQLite) | 9764 ناجحاً، 288 متخطّاة، **26 فاشلاً كلها اختبارات الوقود** (`FuelSale*`، `FuelSupplyReceiving*`، `FuelReconciliation*`، `FuelAviRfid*`) بسبب `Call to undefined function bcmul()`: امتداد `bcmath` غير مثبّت في بيئتي المحلية (يحذّر منه `setup.sh`، ويمرّ في CI). **لا علاقة لأي منها بـApp Builder** |
 
 **ما تثبته الاختبارات (معايير AD-01 المغطاة في S01a):**
 | المعيار | الدليل |
@@ -92,11 +92,23 @@ PUT /api/app-builder/apps/{id}/draft
 | تنافس القفل | صف واحد لكل تطبيق ولحظات قصيرة؛ التحقق البنيوي خارج القفل؛ لا قفل على جداول أخرى |
 | `integer` في Laravel يقبل النصوص الرقمية (`"3"`) | مقبولة وتُحوَّل إلى عدد؛ المنطقي مرفوض صراحةً |
 | إضافة ملف JSON في `contracts/app-builder/` يطلق `mobile-ci` (مساره يشمل هذا المجلد) | متوقع؛ لا تغيير في Flutter. نتيجته مذكورة في §7 |
-| الاختبار الكامل محلياً | انظر §4؛ الـCI يشغّل المجموعة الكاملة على SQLite وPostgreSQL |
+| الاختبار الكامل محلياً | 26 فشلاً بيئياً (`bcmath`) في اختبارات الوقود فقط؛ المجموعة الكاملة خضراء في CI على SQLite وPostgreSQL |
 
 ## 7) CI
 
-⏳ يُحدَّث بنتائج الـPR (`ci.yml` على SQLite وPostgreSQL، `web-ci`، `mobile-ci`) بعد اكتمالها.
+كل الفحوص **خضراء (11/11)** على Head `23b013d7dc39432e3cdea5c92125de47be7427e2`:
+
+| الفحص | النتيجة |
+|---|---|
+| `php artisan test (L11, sqlite)` — المجموعة الكاملة | ✅ نجاح |
+| `php artisan test (L11, pgsql)` — المجموعة الكاملة (بما فيها اختبارات التزامن) | ✅ نجاح |
+| `CI Gate` | ✅ نجاح |
+| `web build (Next.js)` (push وPR) | ✅ نجاح |
+| `mobile (analyze + test)` (push وPR) | ✅ نجاح |
+| `mobile (Android release build proof)` (push وPR) | ✅ نجاح |
+| `mobile (iOS release build proof)` (push وPR) | ✅ نجاح |
+
+روابط التشغيل: `actions/runs/41102578619` (CI) · `41102578705` (CI Gate) · `41102578663` (Web CI) · `41102578734` (Mobile CI). ويثبت `mobile (analyze + test)` الأخضر خط أساس Flutter الذي لم أستطع تشغيله محلياً.
 
 ## 8) ما لم يُنفَّذ عمداً (وفق قرارك)
 
