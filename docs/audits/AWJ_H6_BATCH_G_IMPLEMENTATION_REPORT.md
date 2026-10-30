@@ -143,7 +143,33 @@ Consequently the storefront **does not** forward the buyer token to cart/checkou
 
 ## 8. Tests and CI results
 
-_(filled from the final runs — see below)_
+### Local results
+
+| Check | Result |
+|---|---|
+| New backend suites (SQLite **and** PostgreSQL 16): `WholesalePriceSurfaceBoundaryTest` (8), `PriceSortAuthorityTest` (12), `WholesaleCartCheckoutBoundaryTest` (9), + the Batch F suites (`StorefrontPriceParityTest` 10, `WholesalePriceVisibilityTest` 9, `StaffChannelPricingSettingsTest` 15) | 63/63 on both engines |
+| Mutation check | removing the resolver's flagged-channel refusal fails the flagged-channel and no-fallback tests |
+| OpenAPI / `commerce/v1` / `api/v1` / App Builder resource suites | 140 passed, 1 skipped |
+| **Full backend suite, SQLite** (all test classes, 29 chunks, 2 lanes with separate DB **and** storage) | **9821 passed, 288 skipped, 26 failed** |
+| — the 26 failures | **all `Fuel*` classes** (`FuelAviRfid`, `FuelReconciliation`, `FuelSaleApi`, `FuelSaleService`, `FuelSupplyReceiving(Api)`): `Call to undefined function bcmul()` — `bcmath` is not installed in this sandbox (CI installs it). Same environmental cause as in Batch F. No other failure. |
+| Full backend suite, PostgreSQL | not run locally end-to-end (only the affected suites above); CI `pgsql` job is the authority |
+| Migration `2026_12_18` on PostgreSQL 16 | CHECK present; raw `UPDATE` of a flagged mobile channel rejected (asserted in-test) |
+| Storefront `tsc --noEmit` | clean |
+| Storefront Biome (`biome check .`) | exit 0; 5 warnings / 3 infos — identical to the pre-existing baseline |
+| Storefront vitest (full) | 247 files passed / 16 skipped; **3534 tests passed** (+ new: 32 pure/transport/action tests, 16 UI-state tests across en+ar, 7 architecture guards, 5 gate-wiring tests) |
+| `pnpm check:locales` | all six locales in sync |
+| Spree ratchet | OK, identical to baseline (§6) |
+| `next build` | compiled; `/[country]/[locale]/buyer/sign-in` and `/buyer/membership` present in the route table |
+| Playwright e2e | not run (no browser stack here); CI runs the footer/preview visual QA jobs |
+
+### CI (GitHub Actions, PR #1812)
+
+_(see PR checks; results recorded below when final)_
+
+### Notes on CI signals seen while working
+* `published footer visual QA` failed once on the first head (`1ba2b8c`): the Turbopack dev server could not resolve Google Fonts in the runner (`next/font/google … Module not found`), before any test ran. Not caused by this change; the same job **passed** on the next push.
+* `main` at the Batch F merge (`caba634d`) showed one unrelated sqlite failure — `AiActionHistoryListTest` (a query-count equality, 23 vs 24) from the import/AI work group — while pgsql passed and the same test had passed on the PR. Not touched by this batch; flagged for its owners as a probable flaky assertion.
+
 
 ## 9. Existing assertions changed (disclosed)
 
