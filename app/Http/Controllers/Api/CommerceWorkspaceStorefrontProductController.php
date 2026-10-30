@@ -474,7 +474,8 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
         ProductMediaGalleryService $gallery,
     ): array {
         $resolved = $prices->resolve($product->id, $channelId);
-        $price = (int) ($resolved->amount ?? $product->sale_price);
+        // H6 Batch J — staff preview of a wholesale channel has no buyer: it is "unavailable for wholesale", never the retail price.
+        $price = $resolved->unavailableReason !== null ? null : (int) ($resolved->amount ?? $product->sale_price);
 
         $inStock = null;
         if ($warehouse !== null) {
@@ -516,6 +517,7 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
             if ($variantPrice->amount !== null && ($cheapest === null || $variantPrice->amount < $cheapest)) {
                 $cheapest = $variantPrice->amount;
             }
+            $anyWholesaleUnavailable = ($anyWholesaleUnavailable ?? false) || $variantPrice->unavailableReason !== null;
 
             $variantInStock = null;
             if ($warehouse !== null) {
@@ -531,7 +533,7 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
                 'id' => $variant->id,
                 'sku' => $variant->sku,
                 'option_value_ids' => $optionValueIds,
-                'price' => ['amount_minor' => $variantPrice->amount ?? 0, 'currency' => $currency],
+                'price' => $variantPrice->unavailableReason !== null ? null : ['amount_minor' => $variantPrice->amount ?? 0, 'currency' => $currency],
                 'in_stock' => $variantInStock,
                 'media' => StorefrontProductResource::workspaceMediaPayload($gallery->resolveGallery($product, $variant), $storefrontId),
             ];
@@ -553,7 +555,7 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
 
         return (new StorefrontProductResource(
             $product,
-            $cheapest ?? 0,
+            ($anyWholesaleUnavailable ?? false) && $cheapest === null ? null : ($cheapest ?? 0),
             $currency,
             $anyInStock,
             true,

@@ -234,6 +234,10 @@ function toVariants(
   return variants.map((variant) => {
     const media = variant.media.map((item) => toMedia(item, product.id));
     const purchasable = variant.in_stock !== false;
+    // Wholesale: no eligible price ⇒ not purchasable, shown as "no price" (never 0, never retail).
+    const variantUnavailable =
+      variant.price === null ||
+      variant.wholesale_availability?.state === "unavailable_for_wholesale";
 
     return {
       id: variant.id,
@@ -244,7 +248,7 @@ function toVariants(
       media_count: media.length,
       preorder_ships_at: null,
       thumbnail_url: media[0]?.small_url ?? product.thumbnail_url,
-      purchasable,
+      purchasable: purchasable && !variantUnavailable,
       in_stock: variant.in_stock ?? true,
       backorderable: false,
       preorder: false,
@@ -252,7 +256,10 @@ function toVariants(
       height: null,
       width: null,
       depth: null,
-      price: toPrice(variant.price.amount_minor, variant.price.currency),
+      price:
+        variant.price === null
+          ? unpricedPrice(product.price?.currency ?? "")
+          : toPrice(variant.price.amount_minor, variant.price.currency),
       original_price: null,
       primary_media: media[0],
       media,
@@ -381,13 +388,21 @@ export function mapAwjProductToViewModel(
    * real figure — the cheapest active variant — so the zero is only
    * meaningless when no variant came with it.
    */
+  /*
+   * H6 Batch J — on a wholesale channel the API sends `price: null` and
+   * `wholesale_availability.state = "unavailable_for_wholesale"` when the approved buyer
+   * has no eligible price. That is "no price, not purchasable": never zero, never retail.
+   */
+  const wholesaleUnavailable =
+    product.price === null ||
+    product.wholesale_availability?.state === "unavailable_for_wholesale";
   const price =
-    isVariantManaged && awjVariants.length === 0
-      ? unpricedPrice(product.price.currency)
+    product.price === null || (isVariantManaged && awjVariants.length === 0)
+      ? unpricedPrice(product.price?.currency ?? "")
       : toPrice(product.price.amount_minor, product.price.currency);
 
   const media = (product.media ?? []).map((item) => toMedia(item, product.id));
-  const purchasable = product.in_stock !== false;
+  const purchasable = product.in_stock !== false && !wholesaleUnavailable;
 
   return {
     isVariantManaged,

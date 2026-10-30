@@ -144,7 +144,11 @@ class StorefrontProductController extends PublicApiController
         // precedence as `CommercePriceResolver::resolve()` (detail/cart), batched
         // so a page costs one list query instead of one per row. A channel with
         // no active list yields `sale_price` exactly as before.
-        $prices = $resolver->browsePrices($paginator->getCollection(), $channelId);
+        $wholesale = $resolver->isWholesaleChannel($channelId);
+        // H6 Batch J — wholesale: approved precedence only; `null` = unavailable for wholesale (never the base price).
+        $prices = $wholesale
+            ? $resolver->browseWholesalePrices($paginator->getCollection(), $channelId)
+            : $resolver->browsePrices($paginator->getCollection(), $channelId);
 
         // VAR-COM-1 — منتجٌ متعدد الخيارات لا سعر أبٍ ذا معنى له
         // (`resolve()` يرفض `variantId=null` لمنتجٍ كهذا فشلاً مغلَقاً)، ولا
@@ -156,11 +160,11 @@ class StorefrontProductController extends PublicApiController
         $promises = app(CommerceDeliveryPromiseService::class)
             ->forProducts($channelId, $paginator->getCollection(), $filters['city'] ?? null, $filters['region'] ?? null);
 
-        $data = $paginator->getCollection()->map(function (Product $product) use ($request, $currency, $inStockByProduct, $tenantSlug, $gallery, $promises, $prices): array {
+        $data = $paginator->getCollection()->map(function (Product $product) use ($request, $currency, $inStockByProduct, $tenantSlug, $gallery, $promises, $prices, $wholesale): array {
             $galleryMedia = StorefrontProductResource::mediaPayload($gallery->resolveGallery($product), $tenantSlug);
             $price = $prices[$product->id];
 
-            return (new StorefrontProductResource(
+            $resource = (new StorefrontProductResource(
                 $product,
                 $price,
                 $currency,
@@ -168,7 +172,15 @@ class StorefrontProductController extends PublicApiController
                 false,
                 $tenantSlug,
                 $galleryMedia,
-            ))->withDeliveryPromise($promises[$product->id] ?? null)->resolve($request);
+            ))->withDeliveryPromise($promises[$product->id] ?? null);
+
+            if ($wholesale) {
+                $resource->withWholesaleAvailability($price === null
+                    ? StorefrontProductResource::WHOLESALE_UNAVAILABLE
+                    : StorefrontProductResource::WHOLESALE_AVAILABLE);
+            }
+
+            return $resource->resolve($request);
         })->all();
 
         // AWJ-VD-H1 / VD-1c (D1/D2) — `visual` on facets and values, storefront.v1 only: this controller is not the
@@ -202,6 +214,13 @@ class StorefrontProductController extends PublicApiController
     private function applyListingSort(Builder $query, ?string $sort, CommercePriceResolver $resolver, string $channelId): void
     {
         $this->applySort($query, $sort, self::SORTS, 'name', function (Builder $q, string $direction) use ($resolver, $channelId): void {
+            if ($resolver->isWholesaleChannel($channelId)) {
+                // H6 Batch J — wholesale: order by the approved precedence the listing displays; unavailable items last.
+                [$partnerListId, $channelListId] = $resolver->wholesaleListIds($channelId);
+                EffectivePriceOrdering::applyWholesale($q, $partnerListId, $channelListId, $direction);
+
+                return;
+            }
             EffectivePriceOrdering::apply($q, $resolver->activeChannelPriceList($channelId)?->id, true, $direction);
         });
     }
@@ -247,6 +266,8 @@ class StorefrontProductController extends PublicApiController
         $tenantSlug = $request->route('tenantSlug');
         $galleryService = app(ProductMediaGalleryService::class);
         $currency = Tenant::findOrFail($storefront->tenantId())->currency;
+        $wholesale = $prices->isWholesaleChannel($channelId);
+        $resourceAvailable = true;
 
         $warehouse = null;
         try {
@@ -274,6 +295,7 @@ class StorefrontProductController extends PublicApiController
                 if ($variantPrice->amount !== null && ($cheapest === null || $variantPrice->amount < $cheapest)) {
                     $cheapest = $variantPrice->amount;
                 }
+                $variantUnavailable = $wholesale && $variantPrice->amount === null;
 
                 $variantInStock = null;
                 if ($warehouse !== null) {
@@ -290,7 +312,9 @@ class StorefrontProductController extends PublicApiController
                     'sku' => $variant->sku,
                     'descriptor' => DocumentLineVariantResolver::descriptor($variant),
                     'option_value_ids' => $optionValueIds,
-                    'price' => ['amount_minor' => $variantPrice->amount ?? 0, 'currency' => $currency],
+                    // Wholesale: an unpriced variant is unavailable and carries no price (never 0, never retail).
+                    'price' => $variantUnavailable ? null : ['amount_minor' => $variantPrice->amount ?? 0, 'currency' => $currency],
+                    ...($wholesale ? ['wholesale_availability' => ['state' => $variantUnavailable ? StorefrontProductResource::WHOLESALE_UNAVAILABLE : StorefrontProductResource::WHOLESALE_AVAILABLE]] : []),
                     'in_stock' => $variantInStock,
                     'media' => StorefrontProductResource::mediaPayload($galleryService->resolveGallery($product, $variant), $tenantSlug),
                 ];
@@ -310,9 +334,10 @@ class StorefrontProductController extends PublicApiController
 
             $galleryMedia = StorefrontProductResource::mediaPayload($galleryService->resolveGallery($product), $tenantSlug);
 
+            $resourceAvailable = $cheapest !== null;
             $resource = new StorefrontProductResource(
                 $product,
-                $cheapest ?? 0,
+                $wholesale && $cheapest === null ? null : ($cheapest ?? 0),
                 $currency,
                 $anyInStock,
                 true,
@@ -323,6 +348,7 @@ class StorefrontProductController extends PublicApiController
             );
         } else {
             $price = $prices->resolve($id, $channelId);
+            $resourceAvailable = $price->amount !== null;
 
             $inStock = null;
             if ($warehouse !== null) {
@@ -333,13 +359,20 @@ class StorefrontProductController extends PublicApiController
 
             $resource = new StorefrontProductResource(
                 $product,
-                (int) ($price->amount ?? $product->sale_price),
+                // Wholesale: no eligible entry ⇒ NO price (never the base `sale_price`). Other channels: unchanged.
+                $wholesale && $price->amount === null ? null : (int) ($price->amount ?? $product->sale_price),
                 $price->currency,
                 $inStock,
                 true,
                 $tenantSlug,
                 $galleryMedia,
             );
+        }
+
+        if ($wholesale) {
+            $resource->withWholesaleAvailability($resourceAvailable
+                ? StorefrontProductResource::WHOLESALE_AVAILABLE
+                : StorefrontProductResource::WHOLESALE_UNAVAILABLE);
         }
 
         // FLOWERS-H8 / ADR-20 — وعد التسليم المشتق؛ المفتاح غائب حين الجدولة معطَّلة على القناة.

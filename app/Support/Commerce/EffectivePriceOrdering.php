@@ -48,4 +48,48 @@ final class EffectivePriceOrdering
 
         $query->orderByRaw($effective.' '.$direction, $bindings)->orderByDesc('products.id');
     }
+
+    /**
+     * H6 Batch J — the wholesale twin: orders by the price a wholesale listing DISPLAYS, i.e. the approved precedence
+     * (buyer's partner-list item, else the channel-list item) — never the base price. Products with no eligible entry
+     * are "unavailable for wholesale" and sort LAST in both directions, so a wholesale buyer's `sort=sale_price` never
+     * interleaves unpriced items with priced ones. A variant-managed product shows `0` when any of its variants has an
+     * entry in an eligible list and is unavailable otherwise (mirrors `CommercePriceResolver::browseWholesalePrices`).
+     * Ineligible request (`[null, null]`) ⇒ everything unavailable ⇒ only the `id` tie-break applies.
+     */
+    public static function applyWholesale(Builder $query, ?string $partnerListId, ?string $channelListId, string $direction): void
+    {
+        $direction = strtolower($direction) === 'desc' ? 'desc' : 'asc';
+
+        $lists = array_values(array_filter([$partnerListId, $channelListId]));
+        if ($lists === []) {
+            $query->orderByDesc('products.id');
+
+            return;
+        }
+
+        $item = static fn (): string => '(SELECT pli.price FROM price_list_items pli WHERE pli.price_list_id = ? AND pli.product_id = products.id '
+            .'AND pli.product_variant_id IS NULL AND pli.unit_name = products.unit LIMIT 1)';
+
+        $bindings = [];
+        $parts = [];
+        foreach ($lists as $listId) {
+            $parts[] = $item();
+            $bindings[] = $listId;
+        }
+        // COALESCE needs two or more arguments on SQLite; a single eligible list is just its own lookup.
+        $simple = count($parts) === 1 ? $parts[0] : 'COALESCE('.implode(', ', $parts).')';
+
+        $placeholders = implode(', ', array_fill(0, count($lists), '?'));
+        $variantAny = "(SELECT 0 WHERE EXISTS (SELECT 1 FROM price_list_items plv WHERE plv.price_list_id IN ({$placeholders}) "
+            .'AND plv.product_id = products.id AND plv.product_variant_id IS NOT NULL))';
+
+        $effective = "CASE WHEN products.variant_state = 'variant_managed' THEN {$variantAny} ELSE {$simple} END";
+        // placeholder order inside the expression: variant branch first (the IN list), then the simple branch's lists
+        $allBindings = array_merge($lists, $bindings);
+
+        $query->orderByRaw("(({$effective}) IS NULL) asc", $allBindings)
+            ->orderByRaw("({$effective}) {$direction}", $allBindings)
+            ->orderByDesc('products.id');
+    }
 }

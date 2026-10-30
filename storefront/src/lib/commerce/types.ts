@@ -53,12 +53,19 @@ export interface AwjProductOptionValue {
  * receive. Price, availability and media are all per-variant and all come from
  * the server — none of them is derived here.
  */
+/** H6 Batch J — machine-readable wholesale availability; the key is absent on every non-wholesale channel. */
+export interface AwjWholesaleAvailability {
+  state: "available" | "unavailable_for_wholesale";
+}
+
 export interface AwjProductVariant {
   id: string;
   sku: string | null;
   descriptor: string | null;
   option_value_ids: string[];
-  price: AwjMoney;
+  /** `null` only on a wholesale channel when the buyer has no eligible price for this variant (never a retail substitute). */
+  price: AwjMoney | null;
+  wholesale_availability?: AwjWholesaleAvailability;
   /** null = availability unknown, exactly as on the product. */
   in_stock: boolean | null;
   media: AwjProductMedia[];
@@ -71,7 +78,13 @@ export interface AwjProduct {
   description: string | null;
   sku: string | null;
   category: AwjProductCategoryRef | null;
-  price: AwjMoney;
+  /**
+   * `null` only on a wholesale channel when the approved buyer has no eligible entry in a valid partner or channel
+   * price list ("unavailable for wholesale"). The backend never substitutes the retail price there, and neither may we.
+   */
+  price: AwjMoney | null;
+  /** Present only on wholesale channels. */
+  wholesale_availability?: AwjWholesaleAvailability;
   /** null = availability unknown (channel has no fulfillment policy configured). */
   in_stock: boolean | null;
   thumbnail_url: string | null;

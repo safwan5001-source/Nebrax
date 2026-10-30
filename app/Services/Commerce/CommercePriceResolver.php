@@ -67,6 +67,7 @@ final class CommercePriceResolver
         private readonly PosCustomerPriceListResolver $partnerPriceLists,
         private readonly UnitConversion $units,
         private readonly ProductPricingService $pricing,
+        private readonly WholesalePriceAuthority $wholesale,
     ) {}
 
     /**
@@ -121,6 +122,13 @@ final class CommercePriceResolver
         // يتحقق من الوحدة ويرفض ما هو غير معرَّف — null يعني وحدة الأساس.
         [$resolvedUnitName] = $this->units->resolve($product, $unitName);
         $isAlternativeUnit = $resolvedUnitName !== null;
+
+        // H6 Batch J — a wholesale channel is priced ONLY by the approved precedence (buyer's partner list → channel list →
+        // unavailable). The caller's `$partnerId` is ignored there (the buyer comes from the server session), and the
+        // product/base price is never a substitute. Every other channel falls through to the unchanged logic below.
+        if ($this->wholesale->governs($salesChannel)) {
+            return $this->resolveWholesale($salesChannel, $product, $variant, $unitName, $resolvedUnitName, $lockEligibility);
+        }
 
         $priceList = $partnerId !== null ? $this->partnerPriceLists->forPartner($partnerId) : null;
         if ($priceList === null && $salesChannel->default_price_list_id !== null) {
@@ -279,5 +287,137 @@ final class CommercePriceResolver
         }
 
         return $channelPriceList->is_active ? $channelPriceList : null;
+    }
+
+    private function resolveWholesale(
+        SalesChannel $salesChannel,
+        Product $product,
+        ?\App\Models\ProductVariant $variant,
+        ?string $unitName,
+        ?string $resolvedUnitName,
+        bool $lockEligibility,
+    ): ResolvedCommercePrice {
+        $context = $this->wholesale->context($salesChannel);
+        $hit = $this->wholesale->priceFor($context, $product, $unitName, $variant, $lockEligibility);
+
+        $minSalePrice = null;
+        if (Settings::get('sales', 'enforce_min_sale_price')) {
+            $floor = (int) ($product->min_sale_price ?? 0);
+            $minSalePrice = $floor > 0 ? $floor : null;
+        }
+
+        $currency = Tenant::findOrFail(app(TenantContext::class)->id())->currency;
+
+        if ($hit === null) {
+            return new ResolvedCommercePrice(
+                resolved: false,
+                amount: null,
+                currency: $currency,
+                source: ResolvedCommercePrice::SOURCE_NONE,
+                priceListId: null,
+                unitName: $resolvedUnitName,
+                minSalePrice: $minSalePrice,
+                unavailableReason: ResolvedCommercePrice::UNAVAILABLE_FOR_WHOLESALE,
+            );
+        }
+
+        return new ResolvedCommercePrice(
+            resolved: true,
+            amount: $hit['amount'],
+            currency: $currency,
+            source: ResolvedCommercePrice::SOURCE_PRICE_LIST,
+            priceListId: $hit['priceList']->id,
+            unitName: $resolvedUnitName,
+            minSalePrice: $minSalePrice,
+        );
+    }
+
+    /** Is this channel priced by the wholesale authority (flagged wholesale)? Listings use it to pick the path. */
+    public function isWholesaleChannel(string $salesChannelId): bool
+    {
+        return $this->wholesale->governsId($salesChannelId);
+    }
+
+    /**
+     * Wholesale twin of {@see self::browsePrices()}: one batched resolution per page by the same precedence as
+     * {@see self::resolve()}. `null` = unavailable for wholesale (no eligible entry); never the base price.
+     * A variant-managed product keeps the listing's historical `0` when ANY of its variants has an eligible entry
+     * (its real prices are per variant, shown on detail) and is `null` when none does.
+     *
+     * @param  Collection<int, Product>  $products
+     * @return array<string, ?int> productId => minor units, or null when unavailable
+     */
+    public function browseWholesalePrices(Collection $products, string $salesChannelId): array
+    {
+        $salesChannel = SalesChannel::query()->whereKey($salesChannelId)->first();
+        if ($salesChannel === null) {
+            throw new RuntimeException('قناة البيع غير موجودة.');
+        }
+
+        $context = $this->wholesale->context($salesChannel);
+        $out = [];
+        $listIds = array_map(fn (PriceList $l): string => $l->id, $context->lists());
+
+        $simple = $products->reject(fn (Product $p): bool => $p->isVariantManaged());
+        $variantManaged = $products->filter(fn (Product $p): bool => $p->isVariantManaged());
+
+        $items = [];
+        $variantEntries = [];
+        if ($listIds !== []) {
+            $simpleIds = $simple->pluck('id')->all();
+            if ($simpleIds !== []) {
+                foreach (PriceListItem::query()->whereIn('price_list_id', $listIds)->whereIn('product_id', $simpleIds)->whereNull('product_variant_id')->get(['price_list_id', 'product_id', 'unit_name', 'price']) as $item) {
+                    $items[$item->price_list_id."\0".$item->product_id."\0".$item->unit_name] = (int) $item->price;
+                }
+            }
+            $managedIds = $variantManaged->pluck('id')->all();
+            if ($managedIds !== []) {
+                foreach (PriceListItem::query()->whereIn('price_list_id', $listIds)->whereIn('product_id', $managedIds)->whereNotNull('product_variant_id')->get(['product_id']) as $item) {
+                    $variantEntries[$item->product_id] = true;
+                }
+            }
+        }
+
+        foreach ($products as $product) {
+            if (! $context->eligible) {
+                $out[$product->id] = null;
+
+                continue;
+            }
+            if ($product->isVariantManaged()) {
+                $out[$product->id] = isset($variantEntries[$product->id]) ? 0 : null;
+
+                continue;
+            }
+            $price = null;
+            foreach ($listIds as $listId) {
+                $key = $listId."\0".$product->id."\0".$product->unit;
+                if (array_key_exists($key, $items)) {
+                    $price = $items[$key];
+
+                    break;
+                }
+            }
+            $out[$product->id] = $price;
+        }
+
+        return $out;
+    }
+
+    /**
+     * The (partner list id, channel list id) pair that prices this request on a wholesale channel, for the listing's
+     * price sort — so the order agrees with the amounts shown. `[null, null]` for an ineligible request.
+     *
+     * @return array{0: ?string, 1: ?string}
+     */
+    public function wholesaleListIds(string $salesChannelId): array
+    {
+        $salesChannel = SalesChannel::query()->whereKey($salesChannelId)->first();
+        if ($salesChannel === null) {
+            throw new RuntimeException('قناة البيع غير موجودة.');
+        }
+        $context = $this->wholesale->context($salesChannel);
+
+        return $context->eligible ? [$context->partnerList?->id, $context->channelList?->id] : [null, null];
     }
 }
