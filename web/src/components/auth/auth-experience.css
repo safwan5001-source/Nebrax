@@ -1,0 +1,644 @@
+/* AWJ Auth Experience V2 — the customer sign-in and sign-up surfaces.
+ * A visual continuation of Landing V2, isolated under `.ax` and only rendered when a page opts in
+ * (`<AuthShell experience=…>`), so the internal platform login and every ERP screen are untouched.
+ * Colour: literals live only in the palette blocks, derived from the AWJ brand primitives
+ * (design-system/tokens/awj.tokens.json) and kept identical to the Landing V2 palette (guarded by a test).
+ * Inside `.ax` the app tokens the forms already use (--background, --surface, --text, --muted, --border)
+ * resolve to the marketing paper (light) or graphite (dark); the brand panel and mobile band stay navy.
+ * Motion: one aurora drift, a card rise on load, a focus glow. Everything stops under reduced motion. */
+
+/* palette:start */
+.ax {
+  --mk-night: #050b1c;
+  --mk-navy: #0a1530;
+  --mk-navy-2: #0e1a31;
+  --mk-navy-3: #15244a;
+  --mk-brand-800: #172f73;
+  --mk-brand-700: #1e3a8a;
+  --mk-brand-600: #1e40af;
+  --mk-brand-500: #4f8cff;
+  --mk-brand-300: #7fa8ff;
+  --mk-brand-200: #c2d2f2;
+  --mk-brand-50: #eaf0fe;
+  --mk-ink-900: #0e1a31;
+  --mk-ink-600: #22345a;
+  --mk-ink-500: #4a6091;
+  --mk-white: #ffffff;
+  --mk-paper: #f5f7fc;
+  --mk-paper-2: #eef2fa;
+  --mk-line: #dfe6f3;
+  --mk-amber: #f5b544;
+  --mk-mint: #3dd9a4;
+}
+
+html.dark .ax {
+  --mk-paper: #0b0f19;
+  --mk-paper-2: #0f1420;
+  --mk-line: #232c40;
+  --mk-card: #131a29;
+  --mk-ink-900: #eaf0fe;
+  --mk-ink-600: #c2d0ee;
+  --mk-ink-500: #9db0d8;
+}
+/* palette:end */
+
+.ax {
+  --ax-card: var(--mk-card, var(--mk-white));
+  --ax-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --ax-radius: 14px;
+  /* The app tokens the auth forms read, mapped onto the marketing surfaces. */
+  --background: var(--mk-paper);
+  --surface: var(--ax-card);
+  --text: var(--mk-ink-900);
+  --muted: var(--mk-ink-500);
+  --border: var(--mk-line);
+
+  display: grid;
+  min-block-size: 100dvh;
+  background: var(--mk-paper);
+  color: var(--mk-ink-900);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.ax *,
+.ax *::before,
+.ax *::after {
+  box-sizing: border-box;
+}
+
+.ax :focus-visible {
+  outline: 2px solid var(--mk-brand-500);
+  outline-offset: 2px;
+}
+
+@media (min-width: 64rem) {
+  .ax {
+    grid-template-columns: minmax(28rem, 0.9fr) minmax(0, 1.1fr);
+  }
+}
+
+/* ───────── Form side ───────── */
+
+.ax-main {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+
+.ax-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-block-size: 48px;
+}
+
+.ax-top__brand {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 44px;
+  border-radius: 8px;
+}
+
+.ax-top__tools {
+  display: flex;
+  align-items: center;
+}
+
+.ax-body {
+  inline-size: 100%;
+  max-inline-size: 26.5rem;
+  margin-inline: auto;
+  animation: ax-rise 700ms 80ms var(--ax-ease) both;
+}
+
+.ax-foot {
+  margin-block-start: auto;
+  padding-block-start: 28px;
+  color: var(--mk-ink-500);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+/* Mobile and tablet: a navy band carries the brand and the page's message; the card lifts over it. */
+.ax-band {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: -1;
+  block-size: 300px;
+  background:
+    radial-gradient(70% 90% at 80% 0%, color-mix(in oklab, var(--mk-brand-500) 40%, transparent), transparent 70%),
+    radial-gradient(60% 80% at 10% 20%, color-mix(in oklab, var(--mk-brand-600) 55%, transparent), transparent 70%),
+    linear-gradient(180deg, var(--mk-night), var(--mk-navy));
+  border-end-start-radius: 28px;
+  border-end-end-radius: 28px;
+}
+
+.ax-band ~ .ax-top .ax-logo {
+  color: var(--mk-white);
+}
+
+.ax-band ~ .ax-top .ax-top__tools button {
+  color: color-mix(in oklab, var(--mk-brand-50) 85%, transparent);
+}
+
+.ax-band ~ .ax-top .ax-top__tools button:hover {
+  background: color-mix(in oklab, var(--mk-white) 10%, transparent);
+  color: var(--mk-white);
+}
+
+.ax-intro {
+  padding: 18px 4px 24px;
+  color: var(--mk-white);
+  text-align: center;
+  animation: ax-rise 600ms var(--ax-ease) both;
+}
+
+.ax-intro__title {
+  margin: 0;
+  font-size: clamp(1.5rem, 5.4vw, 1.9rem);
+  font-weight: 700;
+  line-height: 1.3;
+  text-wrap: balance;
+}
+
+.ax-intro__lead {
+  margin: 8px auto 0;
+  max-inline-size: 30ch;
+  color: color-mix(in oklab, var(--mk-brand-50) 78%, transparent);
+  font-size: 0.925rem;
+  line-height: 1.6;
+}
+
+@media (min-width: 64rem) {
+  .ax-main {
+    padding: 28px clamp(28px, 4vw, 64px);
+  }
+
+  .ax-band,
+  .ax-intro {
+    display: none;
+  }
+
+  .ax-band ~ .ax-top .ax-logo {
+    color: var(--primary, var(--mk-brand-600));
+  }
+
+  html.dark .ax-band ~ .ax-top .ax-logo {
+    color: var(--mk-brand-300);
+  }
+
+  .ax-band ~ .ax-top .ax-top__tools button {
+    color: var(--mk-ink-600);
+  }
+
+  .ax-band ~ .ax-top .ax-top__tools button:hover {
+    background: var(--mk-paper-2);
+    color: var(--mk-ink-900);
+  }
+
+  .ax-body {
+    margin-block: auto;
+    padding-block: 32px;
+  }
+}
+
+/* ───────── Card & form controls (classes applied by the auth pages) ───────── */
+
+.ax .ax-card {
+  padding: clamp(22px, 5vw, 32px);
+  border: 1px solid var(--mk-line);
+  border-radius: 22px;
+  background: var(--ax-card);
+  box-shadow:
+    0 1px 0 color-mix(in oklab, var(--mk-white) 70%, transparent) inset,
+    0 24px 60px -32px color-mix(in oklab, var(--mk-night) 55%, transparent);
+}
+
+html.dark .ax .ax-card {
+  box-shadow: 0 24px 60px -30px color-mix(in oklab, var(--mk-night) 95%, transparent);
+}
+
+@media (min-width: 64rem) {
+  .ax .ax-card {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+  }
+}
+
+.ax .ax-card h1 {
+  font-size: clamp(1.6rem, 2vw + 0.9rem, 2rem);
+  letter-spacing: -0.01em;
+}
+
+.ax .ax-input {
+  block-size: 50px;
+  border-radius: 12px;
+  border-color: var(--mk-line);
+  background: var(--ax-card);
+  font-size: 1rem; /* 16px keeps iOS from zooming into focused fields */
+  transition:
+    border-color 160ms var(--ax-ease),
+    box-shadow 160ms var(--ax-ease);
+}
+
+@media (min-width: 64rem) {
+  .ax .ax-input {
+    background: var(--mk-paper-2);
+  }
+
+  html.dark .ax .ax-input {
+    background: var(--ax-card);
+  }
+}
+
+.ax .ax-input:hover {
+  border-color: color-mix(in oklab, var(--mk-brand-500) 45%, var(--mk-line));
+}
+
+.ax .ax-input:focus-visible,
+.ax .ax-affix:focus-within {
+  border-color: var(--mk-brand-500);
+  outline: none;
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--mk-brand-500) 22%, transparent);
+}
+
+.ax .ax-input[aria-invalid='true'],
+.ax .ax-affix[data-invalid='true'] {
+  border-color: var(--negative);
+}
+
+.ax .ax-input[aria-invalid='true']:focus-visible,
+.ax .ax-affix[data-invalid='true']:focus-within {
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--negative) 18%, transparent);
+}
+
+/* Inputs with a fixed prefix or suffix (phone country code, account address). */
+.ax .ax-affix {
+  block-size: 50px;
+  border: 1px solid var(--mk-line);
+  border-radius: 12px;
+  background: var(--ax-card);
+  overflow: hidden;
+  transition:
+    border-color 160ms var(--ax-ease),
+    box-shadow 160ms var(--ax-ease);
+}
+
+@media (min-width: 64rem) {
+  .ax .ax-affix {
+    background: var(--mk-paper-2);
+  }
+
+  html.dark .ax .ax-affix {
+    background: var(--ax-card);
+  }
+}
+
+.ax .ax-affix > span {
+  background: color-mix(in oklab, var(--mk-paper-2) 70%, transparent);
+  border-color: var(--mk-line);
+}
+
+.ax .ax-affix input {
+  font-size: 1rem;
+}
+
+.ax .ax-submit {
+  block-size: 52px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--mk-brand-600), var(--mk-brand-700));
+  box-shadow:
+    0 1px 0 color-mix(in oklab, var(--mk-white) 22%, transparent) inset,
+    0 14px 30px -14px color-mix(in oklab, var(--mk-brand-600) 85%, transparent);
+  color: var(--mk-white);
+  font-size: 1rem;
+  font-weight: 700;
+  transition:
+    transform 160ms var(--ax-ease),
+    box-shadow 160ms var(--ax-ease),
+    filter 160ms var(--ax-ease);
+}
+
+.ax .ax-submit:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.ax .ax-submit:active:not(:disabled) {
+  transform: translateY(0) scale(0.99);
+}
+
+.ax .ax-secondary {
+  block-size: 50px;
+  border-radius: 12px;
+}
+
+.ax .ax-link {
+  color: var(--mk-brand-600);
+  font-weight: 600;
+  text-decoration: none;
+  text-underline-offset: 3px;
+}
+
+html.dark .ax .ax-link {
+  color: var(--mk-brand-300);
+}
+
+.ax .ax-link:hover {
+  text-decoration: underline;
+}
+
+.ax .ax-check {
+  inline-size: 18px;
+  block-size: 18px;
+  accent-color: var(--mk-brand-600);
+}
+
+/* Server feedback: an error, or a success after recovery / verification. */
+.ax .ax-alert,
+.ax .ax-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  animation: ax-shake 360ms var(--ax-ease);
+}
+
+.ax .ax-alert {
+  border: 1px solid color-mix(in oklab, var(--negative) 30%, transparent);
+  background: color-mix(in oklab, var(--negative) 9%, transparent);
+  color: var(--negative);
+}
+
+.ax .ax-status {
+  border: 1px solid color-mix(in oklab, var(--mk-mint) 40%, transparent);
+  background: color-mix(in oklab, var(--mk-mint) 12%, transparent);
+  color: var(--mk-ink-900);
+  animation: ax-rise 400ms var(--ax-ease) both;
+}
+
+.ax .ax-alert svg,
+.ax .ax-status svg {
+  flex: none;
+  margin-block-start: 2px;
+}
+
+.ax .ax-status svg {
+  color: color-mix(in oklab, var(--mk-mint) 70%, var(--mk-ink-900));
+}
+
+/* Register: two labelled groups instead of one long list. */
+.ax .ax-group {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
+}
+
+.ax .ax-group + .ax-group {
+  margin-block-start: 8px;
+  padding-block-start: 20px;
+  border-block-start: 1px dashed var(--mk-line);
+}
+
+.ax .ax-group legend {
+  float: inline-start;
+  inline-size: 100%;
+  margin-block-end: 2px;
+  padding: 0;
+  color: var(--mk-ink-500);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ax .ax-strength i {
+  border-radius: 999px;
+  transition: background-color 200ms var(--ax-ease);
+}
+
+/* ───────── Brand panel (desktop) ───────── */
+
+.ax-panel {
+  display: none;
+}
+
+@media (min-width: 64rem) {
+  .ax-panel {
+    position: sticky;
+    inset-block-start: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    block-size: 100dvh;
+    margin: 12px;
+    margin-inline-start: 0;
+    block-size: calc(100dvh - 24px);
+    overflow: hidden;
+    isolation: isolate;
+    border-radius: 28px;
+    background:
+      radial-gradient(80% 60% at 50% -10%, color-mix(in oklab, var(--mk-brand-600) 60%, transparent), transparent 70%),
+      linear-gradient(180deg, var(--mk-night), var(--mk-navy) 70%, var(--mk-night));
+    color: var(--mk-white);
+  }
+}
+
+.ax-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(color-mix(in oklab, var(--mk-brand-200) 14%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklab, var(--mk-brand-200) 14%, transparent) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(70% 60% at 50% 30%, var(--mk-night), transparent 75%);
+  opacity: 0.4;
+}
+
+.ax-panel__aurora {
+  position: absolute;
+  inset: -20% -15% auto;
+  z-index: -1;
+  block-size: 80%;
+  background:
+    radial-gradient(35% 45% at 25% 35%, color-mix(in oklab, var(--mk-brand-500) 40%, transparent), transparent 70%),
+    radial-gradient(30% 40% at 75% 25%, color-mix(in oklab, var(--mk-brand-300) 22%, transparent), transparent 70%);
+  filter: blur(30px);
+  animation: ax-aurora 22s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.ax-panel__inner {
+  padding: clamp(32px, 4vw, 56px);
+  padding-block-end: 0;
+}
+
+.ax-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 6px 14px;
+  border: 1px solid color-mix(in oklab, var(--mk-brand-200) 20%, transparent);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--mk-white) 5%, transparent);
+  color: color-mix(in oklab, var(--mk-brand-50) 82%, transparent);
+  font-size: 0.825rem;
+  font-weight: 600;
+}
+
+.ax-chip__dot {
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: 50%;
+  background: var(--mk-mint);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--mk-mint) 22%, transparent);
+}
+
+.ax-panel__title {
+  margin: 18px 0 0;
+  max-inline-size: 16ch;
+  font-size: clamp(2.2rem, 2.6vw + 1rem, 3.4rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  background: linear-gradient(100deg, var(--mk-white) 30%, var(--mk-brand-300));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.ax-panel__lead {
+  margin: 16px 0 0;
+  max-inline-size: 46ch;
+  color: color-mix(in oklab, var(--mk-brand-50) 78%, transparent);
+  font-size: 1.05rem;
+  line-height: 1.75;
+}
+
+.ax-points {
+  display: grid;
+  gap: 10px;
+  margin: 26px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ax-points li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: color-mix(in oklab, var(--mk-brand-50) 92%, transparent);
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.ax-points__icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  inline-size: 34px;
+  block-size: 34px;
+  border: 1px solid color-mix(in oklab, var(--mk-brand-200) 18%, transparent);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--mk-navy-3) 70%, transparent);
+  color: var(--mk-brand-300);
+}
+
+.ax-glimpse {
+  margin: 0;
+  padding-inline: clamp(32px, 4vw, 56px);
+  transform: translateY(14%);
+}
+
+.ax-glimpse__frame {
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--mk-brand-200) 22%, transparent);
+  border-radius: 18px;
+  background: var(--mk-navy-2);
+  box-shadow: 0 40px 100px -40px color-mix(in oklab, var(--mk-brand-500) 60%, transparent);
+}
+
+.ax-glimpse__bar {
+  display: flex;
+  gap: 6px;
+  padding: 10px 14px;
+  background: color-mix(in oklab, var(--mk-navy-3) 85%, var(--mk-night));
+}
+
+.ax-glimpse__bar span {
+  inline-size: 9px;
+  block-size: 9px;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--mk-brand-200) 35%, transparent);
+}
+
+/* One capture per theme; the other stays display: none, so a lazy image never downloads. */
+.ax .ax-glimpse__img {
+  display: none;
+  inline-size: 100%;
+  block-size: auto;
+}
+
+html:not(.dark) .ax .ax-glimpse__img.ax-theme-light,
+html.dark .ax .ax-glimpse__img.ax-theme-dark {
+  display: block;
+}
+
+/* Short desktop windows: keep the message, drop the glimpse rather than crowd it. */
+@media (min-width: 64rem) and (max-height: 760px) {
+  .ax-glimpse {
+    display: none;
+  }
+}
+
+/* ───────── Motion ───────── */
+
+@keyframes ax-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+
+@keyframes ax-aurora {
+  to {
+    transform: translate3d(4%, 3%, 0) scale(1.08);
+  }
+}
+
+@keyframes ax-shake {
+  20%,
+  60% {
+    transform: translateX(-3px);
+  }
+  40%,
+  80% {
+    transform: translateX(3px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ax *,
+  .ax *::before,
+  .ax *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

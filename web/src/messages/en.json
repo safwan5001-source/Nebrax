@@ -3523,6 +3523,30 @@
     "deleted": "Invoice deleted",
     "delete_failed": "Delete failed"
   },
+  "authExperience": {
+    "panel_aria": "About AWJ",
+    "eyebrow": "A cloud business platform — Arabic first",
+    "footer": "AWJ | أَوْج",
+    "login_title": "All your business. One system.",
+    "login_lead": "Finance, sales, inventory, point of sale, delivery channels and your store, on one ledger.",
+    "login_lead_short": "Sign in to your business on one ledger.",
+    "login_point_pos": "Point-of-sale control and exception review",
+    "login_point_delivery": "Delivery-app orders in one hub",
+    "login_point_store": "A store and an app in your brand",
+    "register_title": "Start your business on AWJ",
+    "register_lead": "Creating the account sets up:",
+    "register_lead_short": "Your company account, ready with a chart of accounts, branch and warehouse.",
+    "register_point_address": "Your company account with its own sign-in address",
+    "register_point_ledger": "A Saudi chart of accounts, with a main cash box and bank account",
+    "register_point_branch": "A main branch and a main warehouse",
+    "register_point_roles": "Ready roles and permissions for the owner and the team",
+    "recovery_title": "Get back into your account",
+    "recovery_lead": "Recovery and confirmation links go to the email registered on the account.",
+    "recovery_lead_short": "Recovery links go to your registered email.",
+    "recovery_point_email": "We send the instructions to your email if the account exists",
+    "recovery_point_reset": "The link opens a page to set a new password",
+    "recovery_point_session": "After saving, you sign in again with the new password"
+  },
   "landing": {
     "meta_title": "AWJ — All your business. One system.",
     "meta_description": "AWJ is an Arabic-first cloud business platform that connects accounting, sales, purchasing, inventory, point of sale, delivery channels, online store, and HR in one system.",
@@ -6443,7 +6467,7 @@
   },
   "register": {
     "title": "Create a new account",
-    "subtitle": "Set up your account and start accounting in minutes",
+    "subtitle": "A few details to create your company account.",
     "company_name": "Account name",
     "company_name_ph": "e.g. AWJ account",
     "slug": "Login page",
@@ -6465,7 +6489,6 @@
     "back_home": "Back to home",
     "show_pw": "Show password",
     "hide_pw": "Hide password",
-    "terms": "By creating an account you agree to the Terms and Privacy Policy.",
     "phone": "Mobile number",
     "phone_invalid": "Enter a valid Saudi mobile number starting with 5.",
     "phone_country": "Saudi Arabia",
@@ -6476,7 +6499,9 @@
     "strength_weak": "Weak",
     "strength_fair": "Fair",
     "strength_good": "Good",
-    "strength_strong": "Strong"
+    "strength_strong": "Strong",
+    "section_company": "Your business",
+    "section_account": "Sign-in details"
   },
   "reportDoc": {
     "vat_number": "VAT number",

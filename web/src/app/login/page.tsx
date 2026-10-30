@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslations } from 'next-intl';
-import { Eye, EyeOff, LoaderCircle } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, LoaderCircle } from 'lucide-react';
 import { AuthShell } from '@/components/auth/auth-shell';
 import { DemoLoginButton } from '@/components/auth/demo-login-button';
 import { Button } from '@/components/ui/button';
@@ -84,7 +84,7 @@ export default function LoginPage() {
 
   if (restoring) {
     return (
-      <AuthShell>
+      <AuthShell experience="login">
         <div role="status" aria-live="polite" className="flex items-center justify-center gap-2 py-16 text-sm text-muted">
           <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
           {t('restoring')}
@@ -94,10 +94,10 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthShell>
-      <section className="border border-border bg-surface p-5 shadow-sm sm:p-8" aria-labelledby="login-title">
-        <header className="text-center">
-          <h1 id="login-title" className="text-2xl font-bold tracking-tight text-text sm:text-[1.7rem]">
+    <AuthShell experience="login">
+      <section className="ax-card" aria-labelledby="login-title">
+        <header className="text-center lg:text-start">
+          <h1 id="login-title" className="font-bold tracking-tight text-text">
             {t('title')}
           </h1>
           <p className="mt-1.5 text-sm text-muted">{t('subtitle')}</p>
@@ -113,7 +113,7 @@ export default function LoginPage() {
               type="email"
               dir="ltr"
               autoComplete="email"
-              className="h-12 text-base"
+              className="ax-input"
               placeholder="name@company.com"
               aria-invalid={Boolean(errors.email)}
               aria-describedby={errors.email ? 'login-email-error' : undefined}
@@ -132,7 +132,7 @@ export default function LoginPage() {
                 type={showPw ? 'text' : 'password'}
                 dir="auto"
                 autoComplete="current-password"
-                className="h-12 ps-11 text-base"
+                className="ax-input ps-12"
                 placeholder={t('password')}
                 aria-invalid={Boolean(errors.password)}
                 aria-describedby={errors.password ? 'login-password-error' : undefined}
@@ -142,7 +142,7 @@ export default function LoginPage() {
                 type="button"
                 onClick={() => setShowPw((visible) => !visible)}
                 aria-label={showPw ? t('hide_pw') : t('show_pw')}
-                className="absolute start-0 top-0 flex h-12 w-11 items-center justify-center text-muted transition-colors hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                className="absolute start-0 top-0 flex h-[50px] w-12 items-center justify-center rounded-s-xl text-muted transition-colors hover:text-text"
               >
                 {showPw ? <EyeOff className="h-[18px] w-[18px]" strokeWidth={1.7} /> : <Eye className="h-[18px] w-[18px]" strokeWidth={1.7} />}
               </button>
@@ -150,33 +150,40 @@ export default function LoginPage() {
             {errors.password && <p id="login-password-error" className="mt-1.5 text-xs text-negative" role="alert">{t('password_invalid')}</p>}
           </div>
 
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-text">
-            <input type="checkbox" className="h-4 w-4 accent-primary" {...register('remember')} />
-            {t('remember')}
-          </label>
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-text">
+              <input type="checkbox" className="ax-check" {...register('remember')} />
+              {t('remember')}
+            </label>
+            <Link href="/forgot-password" className="ax-link inline-flex min-h-11 items-center text-sm">
+              {t('forgot_link')}
+            </Link>
+          </div>
 
-          {serverError && <p className="border border-negative/20 bg-negative/10 px-3 py-2 text-xs text-negative" role="alert">{serverError}</p>}
+          {serverError && (
+            <p className="ax-alert" role="alert">
+              <AlertCircle className="h-4 w-4" aria-hidden="true" />
+              {serverError}
+            </p>
+          )}
 
-          <Button type="submit" className="h-12 w-full text-base" disabled={isSubmitting || demoStarted} aria-busy={isSubmitting}>
+          <Button type="submit" className="ax-submit w-full" disabled={isSubmitting || demoStarted} aria-busy={isSubmitting}>
             {isSubmitting ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
             {isSubmitting ? t('submitting') : t('submit')}
           </Button>
-          <Link href="/forgot-password" className="block text-center text-sm font-semibold text-primary hover:underline">
-            {t('forgot_link')}
-          </Link>
         </form>
 
         <DemoLoginButton disabled={isSubmitting || demoStarted} onStart={onDemoStart} />
       </section>
 
-      <footer className="pt-5 text-center">
+      <footer className="pt-6 text-center">
         <p className="text-sm text-muted">
           {t('no_account')}{' '}
-          <Link href="/register" className="font-semibold text-primary hover:text-primary-hover hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+          <Link href="/register" className="ax-link">
             {t('register_link')}
           </Link>
         </p>
-        <Link href="/" className="mt-2 inline-block text-xs text-muted hover:text-text hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+        <Link href="/" className="mt-2 inline-flex min-h-11 items-center text-xs text-muted hover:text-text hover:underline">
           {t('back_home')}
         </Link>
       </footer>

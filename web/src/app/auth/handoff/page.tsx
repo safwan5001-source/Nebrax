@@ -52,14 +52,14 @@ export default function AuthHandoffPage() {
   }, [params, router, t]);
 
   return (
-    <AuthShell>
-      <section className="border border-border bg-surface p-5 text-center shadow-sm sm:p-8">
-        <h1 className="text-2xl font-bold text-text">{t('handoff_title')}</h1>
+    <AuthShell experience="register">
+      <section className="ax-card text-center lg:text-start">
+        <h1 className="font-bold text-text">{t('handoff_title')}</h1>
         <p className="mt-4 text-sm text-muted" role="status">
           {message}
         </p>
         {failed ? (
-          <Link href="/login" className="mt-5 inline-block text-sm font-semibold text-primary hover:underline">
+          <Link href="/login" className="ax-link mt-5 inline-flex min-h-11 items-center text-sm">
             {t('back_login')}
           </Link>
         ) : null}
