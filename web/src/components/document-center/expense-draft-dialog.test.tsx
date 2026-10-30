@@ -41,7 +41,9 @@ async function fillAndSubmit(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('ExpenseDraftDialog — distinct-occurrence confirmation (IMP-DOC-DISTINCT-01)', () => {
-  beforeEach(() => api.mockReset());
+  beforeEach(() => {
+    api.mockReset();
+  });
   afterEach(cleanup);
 
   it('never sends the confirmation on the first submit and shows the second step only after a confirmable refusal', async () => {
