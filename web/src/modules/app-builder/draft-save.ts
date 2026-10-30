@@ -92,6 +92,16 @@ export function clearDraftBackup(userId: string, appId: string): void {
   }
 }
 
+/**
+ * يمسح النسخة المحلية بعد حفظٍ ناجح **فقط** إن كانت تخصّ ما حُفظ (أو لا يوجد شيء): تبويبٌ آخر للمستخدم نفسه على
+ * التطبيق نفسه يشارك المفتاح، وقد تحمل نسخته تعديلات لم تُحفظ فلا يجوز محوها.
+ */
+export function clearDraftBackupIfSaved(userId: string, appId: string, savedSchema: AppSchema): void {
+  const stored = readDraftBackup(userId, appId);
+  if (stored && !schemasEqual(stored.schema, savedSchema)) return;
+  clearDraftBackup(userId, appId);
+}
+
 export function schemasEqual(a: AppSchema, b: AppSchema): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }

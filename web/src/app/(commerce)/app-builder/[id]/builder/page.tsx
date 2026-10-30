@@ -33,7 +33,7 @@ import { LayersTree } from '@/modules/app-builder/layers-tree';
 import { Inspector } from '@/modules/app-builder/inspector';
 import { PreviewOnPhoneButton } from '@/modules/app-builder/preview-on-phone';
 import {
-  classifySaveError, clearDraftBackup, parseDraftConflict, readDraftBackup, schemasEqual, writeDraftBackup,
+  classifySaveError, clearDraftBackup, clearDraftBackupIfSaved, parseDraftConflict, readDraftBackup, schemasEqual, writeDraftBackup,
   type DraftBackup,
 } from '@/modules/app-builder/draft-save';
 import { DraftConflictDialog, LeaveGuardDialog, RecoverBackupDialog, type ConflictState } from '@/modules/app-builder/draft-save-dialogs';
@@ -312,7 +312,7 @@ export default function AppBuilderWorkspacePage() {
       // تعديلات أُجريت أثناء الطلب لا تُعدّ محفوظة.
       if (schemaRef.current === toSave) {
         setDirty(false);
-        clearDraftBackup(backupUserId, params.id);
+        clearDraftBackupIfSaved(backupUserId, params.id, toSave);
       }
       setSaveFailure(null);
       setConflict(null);

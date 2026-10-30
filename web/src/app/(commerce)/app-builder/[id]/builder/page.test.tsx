@@ -1823,6 +1823,27 @@ describe('AppBuilderWorkspacePage — save safety (AD-01 / S01b)', () => {
     expect((await screen.findAllByText('Second page text')).length).toBeGreaterThan(0);
   });
 
+  it("a successful save does not erase another tab's different unsaved backup", async () => {
+    mockApi();
+    overrideApi((path, init) => (path === DRAFT_PATH && init?.method === 'PUT' ? Promise.resolve({ data: { ...draftData, revision: 1 } }) : undefined));
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+    await makeEdit('Bye');
+    await clickSave();
+    await waitFor(() => expect(screen.getAllByText('Saved').length).toBeGreaterThan(0));
+
+    // تبويب آخر كتب نسخته المحلية أثناء الحفظ (محتوى مختلف عمّا حُفظ هنا).
+    const foreign = JSON.parse(JSON.stringify(draftData.schema));
+    foreign.pages.home.children[0].children[0].props.text = 'Other tab edits';
+    window.localStorage.setItem(BACKUP_KEY, JSON.stringify({ v: 1, appId: 'app-1', userId: 'u1', schema: foreign, baseRevision: 0, savedAt: 'x' }));
+    const [textarea] = screen.getAllByDisplayValue('Bye');
+    fireEvent.change(textarea, { target: { value: 'Bye again' } });
+    await clickSave();
+    await waitFor(() => expect(putCalls().length).toBe(2));
+    await waitFor(() => expect(toastFns.success).toHaveBeenCalledTimes(2));
+    expect(JSON.stringify(JSON.parse(window.localStorage.getItem(BACKUP_KEY)!).schema)).toContain('Other tab edits');
+  });
+
   it('a local backup that differs from the server draft is offered for restore, and restoring keeps its original base revision', async () => {
     const edited = JSON.parse(JSON.stringify(draftData.schema));
     edited.pages.home.children[0].children[0].props.text = 'Recovered text';

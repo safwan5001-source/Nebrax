@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { ApiError } from '@/lib/api';
 import type { AppSchema } from '@/lib/app-builder';
 import {
-  classifySaveError, clearDraftBackup, parseDraftConflict, readDraftBackup, schemasEqual, writeDraftBackup,
+  classifySaveError, clearDraftBackup, clearDraftBackupIfSaved, parseDraftConflict, readDraftBackup, schemasEqual, writeDraftBackup,
 } from './draft-save';
 
 const schema: AppSchema = {
@@ -81,6 +81,19 @@ describe('local draft backup', () => {
     writeDraftBackup('u1', 'app-1', schema, 1);
     clearDraftBackup('u1', 'app-1');
     expect(readDraftBackup('u1', 'app-1')).toBeNull();
+  });
+
+  it("clearDraftBackupIfSaved removes the backup only when it matches what was saved (another tab's unsaved work survives)", () => {
+    const other = { ...schema, navigation: { initialPageId: 'other' } } as AppSchema;
+    writeDraftBackup('u1', 'app-1', other, 1); // تبويب آخر لم يحفظ
+    clearDraftBackupIfSaved('u1', 'app-1', schema);
+    expect(readDraftBackup('u1', 'app-1')?.schema).toEqual(other);
+
+    writeDraftBackup('u1', 'app-1', schema, 1); // نسخة تخصّ ما حُفظ
+    clearDraftBackupIfSaved('u1', 'app-1', schema);
+    expect(readDraftBackup('u1', 'app-1')).toBeNull();
+
+    clearDraftBackupIfSaved('u1', 'app-1', schema); // لا شيء مخزَّن: لا خطأ
   });
 
   it('never throws when storage is blocked or full', () => {
