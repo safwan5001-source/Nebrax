@@ -53,4 +53,10 @@ class PriceList extends BaseModel implements CompanyWide
     {
         return $this->hasMany(Invoice::class);
     }
+
+    /** H6 Batch F — أسطر طلبات Commerce التي سُعِّرت من هذه القائمة (دليل تسعير ثابت). */
+    public function commerceOrderLines(): HasMany
+    {
+        return $this->hasMany(CommerceOrderLine::class);
+    }
 }

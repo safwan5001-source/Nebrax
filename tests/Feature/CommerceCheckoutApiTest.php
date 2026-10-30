@@ -427,6 +427,89 @@ class CommerceCheckoutApiTest extends TestCase
         $response->assertJsonPath('data.order.items.0.unit_price.amount_minor', 6500);
     }
 
+    // ── 12b. H6 Batch F — immutable price provenance on the new order line ──
+
+    /** @test */
+    public function completion_records_the_channel_price_list_as_immutable_line_provenance(): void
+    {
+        $store = $this->seedMobileStore('completion-provenance');
+        $product = $this->publishedProduct($store['tenant'], $store['channel'], ['sale_price' => 10000]);
+
+        app(TenantContext::class)->set($store['tenant']->id);
+        $priceList = PriceList::create(['name' => 'سعر الجوال', 'is_active' => true]);
+        PriceListItem::create([
+            'price_list_id' => $priceList->id, 'product_id' => $product->id,
+            'unit_name' => $product->unit, 'price' => 6500,
+        ]);
+        $store['channel']->update(['default_price_list_id' => $priceList->id]);
+        app(TenantContext::class)->forget();
+
+        $cartToken = $this->fullyReadyCheckout($store, $product);
+        $this->complete($store, $cartToken, 'idem-prov-001')->assertCreated();
+
+        $line = \App\Models\CommerceOrderLine::withoutGlobalScopes()->firstOrFail();
+        $this->assertSame(6500, $line->unit_price);
+        $this->assertSame('price_list', $line->price_source);
+        $this->assertSame($priceList->id, $line->price_list_id);
+
+        app(TenantContext::class)->set($store['tenant']->id);
+        $this->expectException(\LogicException::class);
+        $line->update(['price_source' => 'product_default', 'price_list_id' => null]);
+    }
+
+    /** @test */
+    public function completion_without_a_channel_list_records_the_product_default_source(): void
+    {
+        $store = $this->seedMobileStore('completion-provenance-dtc');
+        $product = $this->publishedProduct($store['tenant'], $store['channel'], ['sale_price' => 10000]);
+
+        $cartToken = $this->fullyReadyCheckout($store, $product);
+        $this->complete($store, $cartToken, 'idem-prov-002')->assertCreated()
+            ->assertJsonPath('data.order.items.0.unit_price.amount_minor', 10000);
+
+        $line = \App\Models\CommerceOrderLine::withoutGlobalScopes()->firstOrFail();
+        $this->assertSame('product_default', $line->price_source);
+        $this->assertNull($line->price_list_id);
+    }
+
+    /** @test */
+    public function completion_with_a_channel_list_lacking_the_product_records_product_default_with_no_list(): void
+    {
+        $store = $this->seedMobileStore('completion-provenance-gap');
+        $product = $this->publishedProduct($store['tenant'], $store['channel'], ['sale_price' => 10000]);
+        $other = $this->publishedProduct($store['tenant'], $store['channel'], ['sale_price' => 7000]);
+
+        app(TenantContext::class)->set($store['tenant']->id);
+        $priceList = PriceList::create(['name' => 'قائمة ناقصة', 'is_active' => true]);
+        PriceListItem::create([
+            'price_list_id' => $priceList->id, 'product_id' => $other->id,
+            'unit_name' => $other->unit, 'price' => 6000,
+        ]);
+        $store['channel']->update(['default_price_list_id' => $priceList->id]);
+        app(TenantContext::class)->forget();
+
+        $cartToken = $this->fullyReadyCheckout($store, $product);
+        $this->complete($store, $cartToken, 'idem-prov-gap')->assertCreated()
+            ->assertJsonPath('data.order.items.0.unit_price.amount_minor', 10000);
+
+        $line = \App\Models\CommerceOrderLine::withoutGlobalScopes()->firstOrFail();
+        $this->assertSame('product_default', $line->price_source);
+        $this->assertNull($line->price_list_id);
+    }
+
+    /** @test */
+    public function provenance_never_appears_in_the_buyer_facing_order_payload(): void
+    {
+        $store = $this->seedMobileStore('completion-provenance-leak');
+        $product = $this->publishedProduct($store['tenant'], $store['channel'], ['sale_price' => 10000]);
+
+        $cartToken = $this->fullyReadyCheckout($store, $product);
+        $body = $this->complete($store, $cartToken, 'idem-prov-003')->assertCreated()->getContent();
+
+        $this->assertStringNotContainsString('price_source', $body);
+        $this->assertStringNotContainsString('price_list_id', $body);
+    }
+
     // ── 13. client cannot override tenant/channel/storefront ───────────────
 
     /** @test */

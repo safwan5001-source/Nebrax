@@ -801,7 +801,13 @@ class StorefrontOfferPublicApiTest extends TestCase
         $s = $this->discountedStore('regress.example.test');
 
         $before = $this->getJson("http://regress.example.test/store/v1/products")->assertOk()->json('data');
-        $this->assertSame(25000, $before[0]['price']['amount_minor']); // list still shows the base price — untouched here
+        // H6 Batch F: the listing now prices through the channel price list like detail/cart do (it used to
+        // print the 25000 base price here, contradicting the 19000 detail/cart price). Offers still don't alter it.
+        $this->assertSame(19000, $before[0]['price']['amount_minor']);
+        $this->assertSame(
+            19000,
+            $this->getJson("http://regress.example.test/store/v1/products/{$s['product']->id}")->assertOk()->json('data.price.amount_minor'),
+        );
 
         $this->getJson($this->offersUrl($s['host']))->assertOk();
 

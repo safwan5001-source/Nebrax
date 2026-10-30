@@ -424,6 +424,9 @@ class CommerceOrderService
             'unit_factor' => $unitFactor,
             'unit_price' => $resolved->amount,
             'line_total' => $lineTotal,
+            // H6 Batch F — server-resolved provenance (never from the request item).
+            'price_source' => $resolved->source,
+            'price_list_id' => $resolved->provenanceListId(),
         ]);
     }
 
