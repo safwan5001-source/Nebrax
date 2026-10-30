@@ -123,6 +123,55 @@ class StorefrontClientIpBoundaryTest extends TestCase
     }
 
     #[Test]
+    public function direct_requests_without_a_valid_gateway_secret_never_reach_the_buyer_limiter_or_login(): void
+    {
+        // Batch I (P1) — direct API access: a browser or script talking to Laravel itself, with a wrong, an empty or no secret,
+        // gets the same uniform 404 as a non-wholesale host. Nothing is resolved, so no tenant bucket is consumed and an
+        // attacker cannot burn the legitimate gateway's budget from outside.
+        $cases = [
+            'wrong secret' => ['X-Storefront-Forwarded-Host' => self::HOST, 'X-Storefront-Gateway-Secret' => 'not-the-secret'],
+            'empty secret' => ['X-Storefront-Forwarded-Host' => self::HOST, 'X-Storefront-Gateway-Secret' => ''],
+            'no secret' => ['X-Storefront-Forwarded-Host' => self::HOST],
+            'no gateway headers at all (direct)' => [],
+        ];
+
+        foreach ($cases as $label => $headers) {
+            for ($i = 1; $i <= 25; $i++) {
+                // withHeaders() is cumulative on a TestCase: start clean so each case sends ONLY its own headers
+                $this->flushHeaders();
+                $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.9'])
+                    ->withHeaders(array_merge($headers, $this->spoofSet("198.51.100.{$i}")))
+                    ->postJson(self::URL, ['email' => "direct{$i}@ip.test", 'password' => 'wrong-password-1'])
+                    ->assertStatus(404);
+            }
+        }
+
+        // guard against regressing to accumulated headers: after a clean flush nothing from earlier cases remains
+        $this->flushHeaders();
+        $this->assertArrayNotHasKey('X-Storefront-Gateway-Secret', $this->defaultHeaders);
+        $this->assertArrayNotHasKey('X-Storefront-Forwarded-Host', $this->defaultHeaders);
+
+        // the legitimate gateway's bucket from the same address is untouched: a full budget of 20 still passes
+        for ($i = 1; $i <= 20; $i++) {
+            $this->attempt("legit{$i}@ip.test")->assertStatus(422);
+        }
+        $this->attempt('legit21@ip.test')->assertStatus(429);
+    }
+
+    #[Test]
+    public function a_gateway_secret_for_another_deployment_does_not_unlock_the_limiter_identity_either(): void
+    {
+        // The secret authenticates the storefront, never a client address: even a request that presents it plus a forged
+        // visitor header is bucketed by the connection address. A secret mismatch fails closed (404), not open.
+        config(['storefront.gateway_secret' => 'rotated-secret']);
+
+        $this->attempt('rot@ip.test', $this->spoofSet('198.51.100.7'))->assertStatus(404);
+
+        config(['storefront.gateway_secret' => self::SECRET]);
+        $this->attempt('rot@ip.test', $this->spoofSet('198.51.100.7'))->assertStatus(422);
+    }
+
+    #[Test]
     public function other_tenants_buckets_are_independent(): void
     {
         for ($i = 1; $i <= 20; $i++) {
