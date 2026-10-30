@@ -500,4 +500,113 @@ class WholesaleCartCheckoutBoundaryTest extends TestCase
             $this->assertStringNotContainsString($needle, $payload, "BLOCKER: no `{$needle}` contract on cart/checkout");
         }
     }
+
+    // ═══════════════════ C · Batch I — توصيف القواعد التجارية القائمة (لا سياسة جديدة) ═══════════════════
+    //  كل اختبار هنا يثبّت ما يفعله النظام **اليوم** لدى مشترٍ جملة معتمد. لا يعني أنه المطلوب: انظر
+    //  `docs/audits/AWJ_H6_BATCH_I_COMMERCIAL_RULES_CONTRACT.md`. تغيير أيٍّ منها قرارٌ صريح بموافقة المالك.
+
+    /** Drives a full checkout for $quantity units and returns the created order. */
+    private function completeOrder(string $buyer, int $quantity, string $idem): CommerceOrder
+    {
+        $add = $this->api('POST', 'cart/items', self::WS, $buyer, null, ['product_id' => $this->product->id, 'quantity' => $quantity, 'unit_key' => 'base'])->assertCreated();
+        $cart = $this->cookie($add);
+        $this->readyCheckout(self::WS, $buyer, $cart);
+        $this->api('POST', 'checkout/complete', self::WS, $buyer, $cart, [], $idem)->assertCreated();
+
+        return CommerceOrder::withoutGlobalScopes()->latest('created_at')->firstOrFail();
+    }
+
+    #[Test]
+    public function characterization_there_is_no_moq_or_minimum_order_amount_a_single_unit_order_completes(): void
+    {
+        [$buyer] = $this->approvedBuyer();
+
+        $order = $this->completeOrder($buyer, 1, 'idem-moq-1');
+
+        $this->assertSame(700, (int) $order->total, 'one unit at the wholesale price (700) is accepted: no MOQ, no minimum amount');
+        $this->assertSame(1, CommerceOrderLine::withoutGlobalScopes()->where('commerce_order_id', $order->id)->sum('quantity'));
+    }
+
+    #[Test]
+    public function characterization_the_order_total_is_the_sum_of_lines_with_no_tax_added(): void
+    {
+        [$buyer] = $this->approvedBuyer();
+
+        $order = $this->completeOrder($buyer, 3, 'idem-tax-1');
+
+        $this->assertSame(2100, (int) $order->total, '3 × 700, pickup (no delivery fee): nothing added for VAT');
+        foreach (['tax', 'vat', 'tax_amount', 'subtotal', 'tax_mode', 'tax_inclusive'] as $column) {
+            $this->assertFalse(\Illuminate\Support\Facades\Schema::hasColumn('commerce_orders', $column), "commerce_orders.{$column} does not exist: VAT treatment is undecided");
+        }
+    }
+
+    #[Test]
+    public function characterization_a_wholesale_order_creates_no_invoice_payment_or_ledger_entry(): void
+    {
+        [$buyer] = $this->approvedBuyer();
+        $before = [
+            'invoices' => \App\Models\Invoice::withoutGlobalScopes()->count(),
+            'payments' => \App\Models\Payment::withoutGlobalScopes()->count(),
+            'journal' => \App\Models\JournalEntry::withoutGlobalScopes()->count(),
+            'stock' => \App\Models\StockMovement::withoutGlobalScopes()->count(),
+        ];
+
+        $this->completeOrder($buyer, 2, 'idem-fin-1');
+
+        $this->assertSame($before, [
+            'invoices' => \App\Models\Invoice::withoutGlobalScopes()->count(),
+            'payments' => \App\Models\Payment::withoutGlobalScopes()->count(),
+            'journal' => \App\Models\JournalEntry::withoutGlobalScopes()->count(),
+            'stock' => \App\Models\StockMovement::withoutGlobalScopes()->count(),
+        ], 'CommerceOrder is not an Invoice (CLAUDE.md contract 1): ordering touches no accounting, VAT, ZATCA, payment or stock');
+    }
+
+    #[Test]
+    public function characterization_partner_credit_terms_do_not_gate_or_shape_a_wholesale_order(): void
+    {
+        [$buyer, , $identityId] = $this->approvedBuyerWithId();
+        app(TenantContext::class)->set($this->tenant->id);
+        // a linked partner with the tightest possible credit: 1 halala limit, 30-day period
+        $partner = \App\Models\Partner::create(['name' => 'عميل ائتمان', 'type' => 'customer', 'credit_limit' => 1, 'credit_period' => 30]);
+        $owner = User::query()->where('role', 'owner')->firstOrFail();
+        app(\App\Services\CustomerPartnerLinkService::class)->link(CustomerIdentity::query()->findOrFail($identityId), $partner, $owner);
+        app(TenantContext::class)->forget();
+
+        $order = $this->completeOrder($buyer, 5, 'idem-credit-1');
+
+        $this->assertSame(3500, (int) $order->total, 'far above the partner\'s credit limit and still accepted: credit eligibility is not evaluated');
+        $this->assertNull($order->partner_id, 'the order carries no ERP partner, so no credit period / terms attach to it');
+    }
+
+    #[Test]
+    public function characterization_wholesale_and_dtc_hosts_offer_the_same_payment_methods(): void
+    {
+        [$buyer] = $this->approvedBuyer();
+        $dtcCart = $this->cookie($this->api('POST', 'cart/items', self::DTC, null, null, ['product_id' => $this->product->id, 'quantity' => 1, 'unit_key' => 'base'])->assertCreated());
+        $this->api('POST', 'checkout', self::DTC, null, $dtcCart)->assertCreated();
+        $wsCart = $this->cookie($this->addItem(self::WS, $buyer)->assertCreated());
+        $this->api('POST', 'checkout', self::WS, $buyer, $wsCart)->assertCreated();
+
+        $dtc = $this->api('GET', 'checkout/payment-methods', self::DTC, null, $dtcCart)->assertOk()->json('data');
+        $ws = $this->api('GET', 'checkout/payment-methods', self::WS, $buyer, $wsCart)->assertOk()->json('data');
+
+        $this->assertSame($dtc, $ws, 'no wholesale-specific COD / terms policy exists: the channel offers what any web channel offers');
+    }
+
+    #[Test]
+    public function characterization_a_suspended_buyers_cart_is_retained_unchanged_and_checkout_is_blocked(): void
+    {
+        [$buyer, $membershipId] = $this->approvedBuyer();
+        $cart = $this->cookie($this->addItem(self::WS, $buyer)->assertCreated());
+        $this->readyCheckout(self::WS, $buyer, $cart);
+        $linesBefore = CommerceOrderLine::withoutGlobalScopes()->count();
+
+        $this->suspend($membershipId);
+
+        // every boundary refuses; nothing is deleted or expired by the suspension itself
+        $this->api('POST', 'checkout/complete', self::WS, $buyer, $cart, [], 'idem-susp-1')->assertStatus(403);
+        $this->assertSame(1, CommerceCart::withoutGlobalScopes()->where('status', CommerceCart::STATUS_ACTIVE)->count(), 'the cart row is retained');
+        $this->assertSame(0, CommerceOrder::withoutGlobalScopes()->count());
+        $this->assertSame($linesBefore, CommerceOrderLine::withoutGlobalScopes()->count());
+    }
 }
