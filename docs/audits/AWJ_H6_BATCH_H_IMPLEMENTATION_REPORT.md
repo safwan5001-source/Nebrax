@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | Branch | `claude/commerce-h6-batch-h` |
-| PR | __PR__ |
+| PR | #1819 |
 | Base SHA (origin/main, #1812 merge) | `89f344b2bb30f77d5f924a8aed0ca0baab4554d3` |
-| Head SHA | __HEAD__ |
+| Head SHA | `1f8e7064c3399caf5bd78d30dc8bfdb6ed38bc73` (code; CI result recorded below) |
 
 **Status.** Nothing is merged, deployed or activated. `commerce.wholesale_buyer_enabled` stays off by default; no production setting, no tenant row and no existing order was touched. The Spree exit is **not** complete.
 
@@ -118,7 +118,7 @@ Matrix in the B2B contracts doc §3 (VAT mode, MOQ, minimum amount, payment term
 | Locale parity (`check:locales`) | all six locales in sync |
 | Spree ratchet | OK |
 | `pnpm build` | exit 0; `/buyer/register`, `/buyer/verify`, `/buyer/resend` build |
-| CI / CI Gate | __CI__ |
+| CI / CI Gate | Run on PR #1819 for the code head above; results are on the PR checks (not duplicated here, to avoid a docs-only push restarting CI). |
 
 Environment note: `Fuel*` tests need `ext-bcmath`, absent locally, and fail only here (CI installs it).
 
