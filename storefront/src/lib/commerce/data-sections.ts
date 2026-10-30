@@ -4,6 +4,7 @@ import type {
   FacetVisualDefaults,
 } from "@/lib/presentation/facet-visual";
 import type { ShelfSource } from "@/lib/presentation/section-content";
+import { withBuyerToken } from "./buyer-session";
 import { storefrontFetch } from "./config";
 import {
   type ListingFacetImageSource,
@@ -64,7 +65,9 @@ export async function fetchShelfProducts(
   const response = await storefrontFetch<AwjListResponse<AwjProduct>>(
     "products",
     { per_page: shelf.limit, ...shelfListingParams(shelf) },
-    shelf.deliverToday ? { cache: "no-store" } : undefined,
+    await withBuyerToken(
+      shelf.deliverToday ? { cache: "no-store" as const } : undefined,
+    ),
   );
   const locale = await getLocale();
   return response.data.map((product) =>

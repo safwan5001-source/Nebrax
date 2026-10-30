@@ -10,6 +10,7 @@ import { GiftingFilters } from "@/components/products/GiftingFilters";
 import { InfiniteProductList } from "@/components/products/InfiniteProductList";
 import { ListingAnalytics } from "@/components/products/ListingAnalytics";
 import { ProductListing } from "@/components/products/ProductListing";
+import { CatalogAccessGate } from "@/components/wholesale-buyer/CatalogAccessGate";
 import type { StorefrontListParams } from "@/lib/utils/listing-context";
 import { parseListingSearchParams } from "@/lib/utils/listing-search-params";
 
@@ -131,5 +132,42 @@ describe("ProductListing catalog context identity", () => {
         }
       ).deliverTodayAvailable,
     ).toBe(false);
+  });
+});
+
+describe("ProductListing — wholesale access gate (H6 Batch G)", () => {
+  async function renderWith(fetchProducts: () => Promise<never>) {
+    const outer = ProductListing({
+      state: parseListingSearchParams({}),
+      basePath: "/sa/en",
+      currency: "SAR",
+      locale: "en" as never,
+      listId: "all",
+      listName: "All",
+      fetchProducts,
+      fetchFilters: async () => ({}) as never,
+    });
+    const inner = (outer.props as { children: ReactElement }).children;
+    const Fn = inner.type as (p: unknown) => Promise<ReactElement>;
+    return Fn(inner.props);
+  }
+
+  it.each([
+    [401, "sign_in_required"],
+    [403, "approval_required"],
+  ])("a %i from the catalogue renders the access gate, not an error or an empty grid", async (status, gate) => {
+    const result = await renderWith(() => Promise.reject({ status }));
+
+    expect(result.type).toBe(CatalogAccessGate);
+    expect((result.props as { gate: string }).gate).toBe(gate);
+    expect(find(result, InfiniteProductList)).toBeNull();
+  });
+
+  it.each([
+    404, 500,
+  ])("a %i still bubbles to the route error boundary", async (status) => {
+    await expect(
+      renderWith(() => Promise.reject({ status })),
+    ).rejects.toMatchObject({ status });
   });
 });

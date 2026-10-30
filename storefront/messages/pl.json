@@ -1073,5 +1073,74 @@
       "reopenPayment": "Otwórz stronę płatności ponownie",
       "continueShopping": "Kontynuuj zakupy"
     }
+  },
+  "wholesaleBuyer": {
+    "signIn": {
+      "title": "Logowanie kupca hurtowego",
+      "description": "Zaloguj się adresem e-mail i hasłem konta hurtowego, aby zobaczyć ceny hurtowe.",
+      "footer": "Konta hurtowe są weryfikowane i zatwierdzane przez sklep, zanim pokażą się ceny hurtowe.",
+      "email": "E-mail",
+      "password": "Hasło",
+      "showPassword": "Pokaż hasło",
+      "hidePassword": "Ukryj hasło",
+      "submit": "Zaloguj się",
+      "submitting": "Logowanie..."
+    },
+    "errors": {
+      "invalidCredentials": "Nie udało się zalogować. Sprawdź e-mail i hasło oraz czy adres e-mail jest zweryfikowany.",
+      "rateLimited": "Zbyt wiele prób. Poczekaj chwilę i spróbuj ponownie.",
+      "unavailable": "Sprzedaż hurtowa nie jest dostępna w tym sklepie.",
+      "generic": "Coś poszło nie tak. Spróbuj ponownie."
+    },
+    "gate": {
+      "sign_in_required": {
+        "title": "Zaloguj się, aby zobaczyć ceny hurtowe",
+        "body": "To sklep hurtowy. Katalog i ceny widzą tylko zalogowani, zatwierdzeni kupcy.",
+        "cta": "Zaloguj się"
+      },
+      "approval_required": {
+        "title": "Twoje konto hurtowe nie jest zatwierdzone",
+        "body": "Jesteś zalogowany, ale Twoje członkostwo hurtowe nie zostało jeszcze zatwierdzone. Sprawdź jego status, aby kontynuować.",
+        "cta": "Zobacz status członkostwa"
+      }
+    },
+    "membership": {
+      "title": "Członkostwo hurtowe",
+      "signedInAs": "Zalogowano jako {name}",
+      "signOut": "Wyloguj się",
+      "apply": "Złóż wniosek o dostęp hurtowy",
+      "applying": "Wysyłanie...",
+      "browse": "Przeglądaj katalog hurtowy"
+    },
+    "status": {
+      "signed_out": {
+        "label": "Wylogowany",
+        "body": "Zaloguj się, aby zobaczyć członkostwo hurtowe i ceny."
+      },
+      "no_application": {
+        "label": "Brak wniosku",
+        "body": "Jesteś zalogowany, ale nie złożyłeś wniosku o dostęp hurtowy w tym sklepie. Złóż wniosek do rozpatrzenia przez sklep."
+      },
+      "pending": {
+        "label": "W trakcie rozpatrywania",
+        "body": "Twój wniosek został otrzymany i czeka na rozpatrzenie przez sklep. Ceny pozostają ukryte do czasu zatwierdzenia."
+      },
+      "approved": {
+        "label": "Zatwierdzone",
+        "body": "Twoje członkostwo hurtowe jest zatwierdzone, a ceny hurtowe są widoczne. Zamawianie online dla kupców hurtowych nie jest jeszcze dostępne."
+      },
+      "rejected": {
+        "label": "Niezatwierdzone",
+        "body": "Sklep nie zatwierdził Twojego wniosku hurtowego. Skontaktuj się ze sklepem, jeśli uważasz, że to błąd."
+      },
+      "suspended": {
+        "label": "Zawieszone",
+        "body": "Twoje członkostwo hurtowe jest zawieszone, więc ceny hurtowe są ukryte. Skontaktuj się ze sklepem w celu weryfikacji."
+      },
+      "unavailable": {
+        "label": "Niedostępne",
+        "body": "Sprzedaż hurtowa nie jest teraz dostępna w tym sklepie."
+      }
+    }
   }
 }

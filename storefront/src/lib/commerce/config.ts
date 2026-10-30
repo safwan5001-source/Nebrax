@@ -120,12 +120,23 @@ export class StorefrontApiError extends Error {
   }
 }
 
+export const BUYER_TOKEN_HEADER = "X-Customer-Token";
+
 export type StorefrontFetchInit = {
   /**
    * STORE-BACKEND-1: identity/presentation GET must not serve a stale
    * Published snapshot. Catalog/product GETs keep the default fetch cache.
    */
   cache?: RequestCache;
+  /**
+   * H6 Batch G — the signed-in wholesale buyer's session token, for the
+   * price-bearing catalogue reads of a wholesale-flagged channel (the API
+   * answers those with 401/403 without an approved buyer). Setting it ALWAYS
+   * forces `cache: "no-store"` — a buyer-scoped response must never enter a
+   * shared cache keyed only by URL/host. Absent for every DTC visitor, in
+   * which case the request is byte-for-byte what it was.
+   */
+  buyerToken?: string;
 };
 
 export type StorefrontQueryParams = Record<
@@ -196,10 +207,17 @@ export async function storefrontFetch<T>(
   if (secret) {
     requestHeaders[GATEWAY_SECRET_HEADER] = secret;
   }
+  if (init?.buyerToken) {
+    requestHeaders[BUYER_TOKEN_HEADER] = init.buyerToken;
+  }
 
   const response = await fetch(url.toString(), {
     headers: requestHeaders,
-    ...(init?.cache ? { cache: init.cache } : {}),
+    ...(init?.buyerToken
+      ? { cache: "no-store" as RequestCache }
+      : init?.cache
+        ? { cache: init.cache }
+        : {}),
   });
 
   if (!response.ok) {
@@ -268,6 +286,55 @@ export async function storefrontCartRequest<T>(
   });
 
   await applyAwjSetCookie(response);
+
+  if (!response.ok) {
+    await raiseForErrorResponse(response);
+  }
+
+  return (await response.json()) as T;
+}
+
+export type StorefrontBuyerMethod = "GET" | "POST";
+
+/**
+ * H6 Batch G — the wholesale buyer's own calls (`store/v1/auth/*`, `me`,
+ * `wholesale/*`). Same trust boundary as the cart request above: forwarded
+ * host + gateway secret are always attached (mutations are refused without
+ * the secret), nothing here widens what the backend trusts. Differences:
+ * identity is the buyer's `X-Customer-Token` (never the cart cookie), the
+ * response is never cached, and no `Set-Cookie` is mirrored — the session
+ * token is returned in the body and held by `buyer-session.ts` in the
+ * storefront's own HttpOnly cookie, never exposed to browser code.
+ */
+export async function storefrontBuyerRequest<T>(
+  method: StorefrontBuyerMethod,
+  path: string,
+  options?: { token?: string; body?: unknown },
+): Promise<T> {
+  const url = buildStorefrontUrl(path);
+  const hostname = await resolveVisitorHostname();
+  const requestHeaders: Record<string, string> = {
+    Accept: "application/json",
+    [FORWARDED_HOST_HEADER]: hostname,
+  };
+  const secret = getGatewaySecret();
+  if (secret) {
+    requestHeaders[GATEWAY_SECRET_HEADER] = secret;
+  }
+  if (options?.token) {
+    requestHeaders[BUYER_TOKEN_HEADER] = options.token;
+  }
+  if (options?.body !== undefined) {
+    requestHeaders["Content-Type"] = "application/json";
+  }
+
+  const response = await fetch(url.toString(), {
+    method,
+    headers: requestHeaders,
+    body:
+      options?.body !== undefined ? JSON.stringify(options.body) : undefined,
+    cache: "no-store",
+  });
 
   if (!response.ok) {
     await raiseForErrorResponse(response);
