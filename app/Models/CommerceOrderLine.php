@@ -6,6 +6,7 @@ use App\Tenancy\CompanyWide;
 use App\Tenancy\ResolvesBranchReferences;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 
 /**
  * سطر التزام تجاري — لقطة تاريخية لما اتُّفق عليه، لا مرجعاً حياً يُعاد
@@ -24,6 +25,9 @@ class CommerceOrderLine extends BaseModel implements CompanyWide
         'tenant_id', 'commerce_order_id', 'parent_line_id', 'product_id', 'product_variant_id',
         'product_name_snapshot', 'variant_descriptor_snapshot',
         'quantity', 'unit_name', 'unit_factor', 'unit_price', 'line_total',
+        // H6 Batch F — immutable price provenance, written only by the server-side order builders from
+        // CommercePriceResolver's result. Never read from a request.
+        'price_source', 'price_list_id',
     ];
 
     protected $casts = [
@@ -36,6 +40,17 @@ class CommerceOrderLine extends BaseModel implements CompanyWide
     protected $attributes = [
         'unit_factor' => 1,
     ];
+
+    protected static function booted(): void
+    {
+        // H6 Batch F — pricing evidence is written once, at creation. Historical lines (NULL) are never
+        // backfilled, and a recorded source/list can never be rewritten.
+        static::updating(function (self $line): void {
+            if ($line->isDirty(['price_source', 'price_list_id'])) {
+                throw new LogicException('Order line price provenance is immutable.');
+            }
+        });
+    }
 
     /** FLOWERS-H4b / ADR-16 — لقطة التخصيص الثابتة لهذا السطر (صفر أو أكثر). */
     public function personalizations(): HasMany

@@ -228,6 +228,102 @@ class CommerceOrderServiceTest extends TestCase
         $this->assertSame(8000, $line->unit_price, 'تغيير بند القائمة لاحقاً لا يعيد كتابة اللقطة الملتزمة.');
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  H6 Batch F — price provenance (server-resolved, immutable, additive)
+    // ═══════════════════════════════════════════════════════════
+
+    /** @test */
+    public function a_partner_list_price_records_its_list_as_provenance(): void
+    {
+        $priceList = PriceList::create(['name' => 'قائمة مصدر', 'is_active' => true]);
+        app(PriceListService::class)->upsertItem($priceList, $this->product, ['price' => 9900]);
+        $partner = Partner::create(['name' => 'عميل مصدر', 'type' => 'customer', 'default_price_list_id' => $priceList->id]);
+
+        $line = $this->orders->create([
+            'sales_channel_id' => $this->channel->id, 'partner_id' => $partner->id,
+        ], $this->items(1), trustedPartnerSelection: true)->lines->first()->fresh();
+
+        $this->assertSame('price_list', $line->price_source);
+        $this->assertSame($priceList->id, $line->price_list_id);
+    }
+
+    /** @test */
+    public function a_base_price_records_the_product_default_source_with_no_list(): void
+    {
+        $line = $this->orders->create(['sales_channel_id' => $this->channel->id], $this->items(1))->lines->first()->fresh();
+
+        $this->assertSame('product_default', $line->price_source);
+        $this->assertNull($line->price_list_id);
+    }
+
+    /** @test */
+    public function client_supplied_provenance_in_an_item_is_ignored(): void
+    {
+        $foreign = PriceList::create(['name' => 'قائمة مزوّرة', 'is_active' => true]);
+
+        $line = $this->orders->create(['sales_channel_id' => $this->channel->id], [[
+            'product_id' => $this->product->id, 'quantity' => 1,
+            'price_source' => 'price_list', 'price_list_id' => $foreign->id, 'unit_price' => 1,
+        ]])->lines->first()->fresh();
+
+        $this->assertSame(15000, $line->unit_price);
+        $this->assertSame('product_default', $line->price_source);
+        $this->assertNull($line->price_list_id);
+    }
+
+    /** @test */
+    public function recorded_provenance_cannot_be_rewritten_and_historical_nulls_cannot_be_backfilled(): void
+    {
+        $line = $this->orders->create(['sales_channel_id' => $this->channel->id], $this->items(1))->lines->first();
+        $list = PriceList::create(['name' => 'قائمة لاحقة', 'is_active' => true]);
+
+        try {
+            $line->update(['price_source' => 'price_list', 'price_list_id' => $list->id]);
+            $this->fail('rewriting recorded provenance must be refused');
+        } catch (LogicException) {
+            $this->addToAssertionCount(1);
+        }
+
+        // a historical (pre-F) line has NULL provenance and stays NULL — no backfill path
+        $historical = CommerceOrderLine::query()->findOrFail($line->id);
+        \Illuminate\Support\Facades\DB::table('commerce_order_lines')->where('id', $line->id)->update(['price_source' => null, 'price_list_id' => null]);
+        $historical = $historical->fresh();
+        try {
+            $historical->update(['price_source' => 'product_default']);
+            $this->fail('backfilling a historical line must be refused');
+        } catch (LogicException) {
+            $this->addToAssertionCount(1);
+        }
+        $this->assertNull($historical->fresh()->price_source);
+    }
+
+    /** @test */
+    public function provenance_leaves_prices_totals_and_accounting_untouched(): void
+    {
+        $order = $this->orders->create(['sales_channel_id' => $this->channel->id], $this->items(2));
+
+        $this->assertSame(15000, $order->lines->first()->unit_price);
+        $this->assertSame(30000, $order->total);
+        $this->assertSame(0, JournalEntry::query()->count());
+        $this->assertSame(0, Invoice::query()->count());
+        $this->assertSame(0, StockMovement::query()->count());
+    }
+
+    /** @test */
+    public function a_price_list_that_priced_an_order_line_cannot_be_hard_deleted(): void
+    {
+        $priceList = PriceList::create(['name' => 'قائمة مستعملة', 'is_active' => true]);
+        app(PriceListService::class)->upsertItem($priceList, $this->product, ['price' => 9900]);
+        $partner = Partner::create(['name' => 'عميل مستعمل', 'type' => 'customer', 'default_price_list_id' => $priceList->id]);
+        $this->orders->create([
+            'sales_channel_id' => $this->channel->id, 'partner_id' => $partner->id,
+        ], $this->items(1), trustedPartnerSelection: true);
+        $partner->update(['default_price_list_id' => null]);
+
+        $this->expectException(RuntimeException::class);
+        app(PriceListService::class)->delete($priceList);
+    }
+
     /** @test */
     public function a_later_product_name_change_does_not_mutate_the_committed_snapshot(): void
     {
