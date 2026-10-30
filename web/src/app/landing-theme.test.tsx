@@ -152,26 +152,58 @@ describe('client-side navigation between the workspace and the landing page', ()
   });
 });
 
-describe('landing page stays on the shared theme system', () => {
+describe('landing page keeps its marketing language isolated and on-brand', () => {
   const css = read('app/landing.css');
   const page = read('app/page.tsx');
+  const palette = [...css.matchAll(/\/\* palette:start \*\/([\s\S]*?)\/\* palette:end \*\//g)].map((match) => match[1]).join('\n');
+  const tokens = JSON.parse(readFileSync(resolve(src, '../../design-system/tokens/awj.tokens.json'), 'utf8')) as {
+    primitive: { brand: Record<string, string>; ink: Record<string, string> };
+  };
 
-  it('has no literal colours: every colour is a token', () => {
-    const body = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  it('declares literal colours only inside the palette block; every rule reads a token', () => {
+    expect(palette.length).toBeGreaterThan(0);
+    const body = css.replace(/\/\* palette:start \*\/[\s\S]*?\/\* palette:end \*\//g, '').replace(/\/\*[\s\S]*?\*\//g, '');
     expect(body).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
-    expect(body).not.toMatch(/\b(?:rgba?|hsla?|hwb|lab|lch)\(/);
+    expect(body).not.toMatch(/\b(?:rgba?|hsla?|hwb|lab|lch|oklch|oklab)\(/);
   });
 
-  it('reads Core from the shared shell tokens and does not declare a theme of its own', () => {
-    expect(css).toContain('var(--awj-shell-bg');
-    expect(css).toContain('var(--awj-shell-fg');
+  it('derives its blues and inks from the AWJ brand primitives', () => {
+    const lower = palette.toLowerCase();
+    for (const shade of ['500', '600', '700', '800', '300', '200', '50'] as const) {
+      expect(lower, `brand.${shade}`).toContain(tokens.primitive.brand[shade].toLowerCase());
+    }
+    expect(lower).toContain(tokens.primitive.ink['900'].toLowerCase());
+  });
+
+  it('scopes every selector to the landing page so no ERP screen can inherit it', () => {
+    const selectors = css
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/@keyframes[^{]+\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, '')
+      .match(/(^|\})\s*([^{}@]+)\{/g)!
+      .map((rule) => rule.replace(/^\}?\s*/, '').replace(/\{$/, '').trim());
+    for (const selector of selectors) {
+      for (const part of selector.split(',').map((piece) => piece.trim())) {
+        if (/^(from|to|\d+%)/.test(part)) continue;
+        expect(part, part).toMatch(/\.lp\b|\.lp-|:has\(\.lp\)/);
+      }
+    }
+  });
+
+  it('does not touch the shared theme tokens or declare an AWJ theme of its own', () => {
     expect(css).not.toMatch(/data-awj-theme/);
-    expect(css).not.toMatch(/--awj-shell-[a-z-]+\s*:/);
+    expect(css).not.toMatch(/--awj-[a-z-]+\s*:/);
+    expect(css).not.toMatch(/^\s*:root\b/m);
   });
 
-  it('offers no way to pick another theme on the page', () => {
+  it('offers no way to pick another AWJ theme on the page', () => {
     for (const file of [page, read('components/landing/landing-nav.tsx'), read('components/landing/module-tabs.tsx')]) {
       expect(file).not.toMatch(/setAwjTheme|AccountPreferencesCard|useAwjTheme|AWJ_THEMES/);
     }
+  });
+
+  it('stops every animation under prefers-reduced-motion', () => {
+    const reduced = css.slice(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
+    expect(reduced).toMatch(/animation: none !important/);
+    expect(reduced).toMatch(/transition: none !important/);
   });
 });
