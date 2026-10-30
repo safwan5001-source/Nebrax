@@ -1073,5 +1073,74 @@
       "reopenPayment": "Open the payment page again",
       "continueShopping": "Continue shopping"
     }
+  },
+  "wholesaleBuyer": {
+    "signIn": {
+      "title": "Wholesale buyer sign-in",
+      "description": "Sign in with the email and password of your wholesale buyer account to see trade prices.",
+      "footer": "Wholesale accounts are verified and approved by the store before trade prices are shown.",
+      "email": "Email",
+      "password": "Password",
+      "showPassword": "Show password",
+      "hidePassword": "Hide password",
+      "submit": "Sign in",
+      "submitting": "Signing in..."
+    },
+    "errors": {
+      "invalidCredentials": "We could not sign you in. Check your email and password, and that your email address is verified.",
+      "rateLimited": "Too many attempts. Please wait a moment and try again.",
+      "unavailable": "Wholesale is not available on this store.",
+      "generic": "Something went wrong. Please try again."
+    },
+    "gate": {
+      "sign_in_required": {
+        "title": "Sign in to see wholesale prices",
+        "body": "This is a wholesale store. Catalogue and prices are shown to signed-in, approved buyers only.",
+        "cta": "Sign in"
+      },
+      "approval_required": {
+        "title": "Your wholesale account is not approved",
+        "body": "You are signed in, but your wholesale membership has not been approved yet. Check its status to continue.",
+        "cta": "View membership status"
+      }
+    },
+    "membership": {
+      "title": "Wholesale membership",
+      "signedInAs": "Signed in as {name}",
+      "signOut": "Sign out",
+      "apply": "Apply for wholesale access",
+      "applying": "Submitting...",
+      "browse": "Browse wholesale catalogue"
+    },
+    "status": {
+      "signed_out": {
+        "label": "Signed out",
+        "body": "Sign in to see your wholesale membership and trade prices."
+      },
+      "no_application": {
+        "label": "No application",
+        "body": "You are signed in but have not applied for wholesale access on this store. Apply to be reviewed by the store."
+      },
+      "pending": {
+        "label": "Pending review",
+        "body": "Your application has been received and is waiting for the store to review it. Prices stay hidden until it is approved."
+      },
+      "approved": {
+        "label": "Approved",
+        "body": "Your wholesale membership is approved and trade prices are visible. Online ordering for wholesale buyers is not available yet."
+      },
+      "rejected": {
+        "label": "Not approved",
+        "body": "The store did not approve your wholesale application. Contact the store if you think this is a mistake."
+      },
+      "suspended": {
+        "label": "Suspended",
+        "body": "Your wholesale membership is suspended, so trade prices are hidden. Contact the store to have it reviewed."
+      },
+      "unavailable": {
+        "label": "Not available",
+        "body": "Wholesale is not available on this store right now."
+      }
+    }
   }
 }

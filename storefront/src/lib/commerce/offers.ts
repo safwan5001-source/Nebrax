@@ -1,4 +1,5 @@
 import { getLocale } from "next-intl/server";
+import { withBuyerToken } from "./buyer-session";
 import { storefrontFetch } from "./config";
 import { formatMoney, toRenderableMediaUrl } from "./mappers";
 import type { AwjMoney, AwjOffer } from "./types";
@@ -84,7 +85,11 @@ export function mapAwjOffer(raw: unknown, locale?: string): Offer | null {
 }
 
 export async function fetchOffers(): Promise<Offer[]> {
-  const response = await storefrontFetch<{ data?: unknown }>("offers");
+  const response = await storefrontFetch<{ data?: unknown }>(
+    "offers",
+    undefined,
+    await withBuyerToken(undefined),
+  );
   if (!Array.isArray(response.data)) return [];
   const locale = await getLocale();
   const offers: Offer[] = [];

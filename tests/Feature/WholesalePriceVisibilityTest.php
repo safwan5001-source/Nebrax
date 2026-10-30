@@ -29,6 +29,7 @@ use Tests\TestCase;
 class WholesalePriceVisibilityTest extends TestCase
 {
     use RefreshDatabase;
+    use AssertsNoAmountLeak;
 
     private const SECRET = 'price-visibility-secret';
 
@@ -193,8 +194,7 @@ class WholesalePriceVisibilityTest extends TestCase
         foreach ($this->priceSurfaces() as $path) {
             $response = $this->storeGet($path, $this->host, $token);
             $response->assertNotFound();
-            $this->assertStringNotContainsString('700', $response->getContent());
-            $this->assertStringNotContainsString('1000', $response->getContent());
+            $this->assertNoAmountLeak($response->getContent(), [700, 1000], $path);
         }
         $this->addToCart($this->host, $this->product->id, $token)->assertNotFound();
         $this->withHeaders($this->headers($this->host, $token))->postJson(self::BASE.'checkout/complete', [])->assertNotFound();
@@ -208,8 +208,7 @@ class WholesalePriceVisibilityTest extends TestCase
         foreach ($this->priceSurfaces() as $path) {
             $response = $this->storeGet($path, $this->host);
             $response->assertStatus(401);
-            $this->assertStringNotContainsString('700', $response->getContent());
-            $this->assertStringNotContainsString('1000', $response->getContent());
+            $this->assertNoAmountLeak($response->getContent(), [700, 1000], $path);
         }
         $this->addToCart($this->host, $this->product->id)->assertStatus(401);
     }

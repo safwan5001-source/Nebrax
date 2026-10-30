@@ -1,5 +1,6 @@
 import { getLocale } from "next-intl/server";
 import type { StorefrontListParams } from "@/lib/utils/listing-context";
+import { withBuyerToken } from "./buyer-session";
 import { storefrontFetch } from "./config";
 import { type ListingFacets, parseListingFacets } from "./listing-facets";
 import { mapAwjProductToViewModel } from "./mappers";
@@ -105,7 +106,12 @@ export async function fetchProducts(
       ...facetQuery(params),
     },
     // "Deliver today" depends on the clock, stock and capacity: never cached.
-    params?.deliver_today === true ? { cache: "no-store" } : undefined,
+    // H6-G: a signed-in wholesale buyer's token rides along (and forces no-store).
+    await withBuyerToken(
+      params?.deliver_today === true
+        ? { cache: "no-store" as const }
+        : undefined,
+    ),
   );
 
   const locale = await getLocale();
@@ -130,6 +136,8 @@ export async function fetchProduct(
 ): Promise<StoreProductFull> {
   const response = await storefrontFetch<AwjResourceResponse<AwjProduct>>(
     `products/${idOrSlug}`,
+    undefined,
+    await withBuyerToken(undefined),
   );
   const locale = await getLocale();
 
@@ -162,6 +170,7 @@ export async function fetchProductsByIds(
     {
       ids,
     },
+    await withBuyerToken(undefined),
   );
   const locale = await getLocale();
   return response.data.map((product) =>

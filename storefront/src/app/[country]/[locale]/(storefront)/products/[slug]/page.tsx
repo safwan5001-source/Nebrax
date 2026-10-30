@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/navigation/Breadcrumbs";
 import { JsonLd } from "@/components/seo/JsonLd";
+import { CatalogAccessGate } from "@/components/wholesale-buyer/CatalogAccessGate";
 import { fetchPublishedPresentation } from "@/lib/commerce/storefront";
 import type { StoreCategoryNode } from "@/lib/commerce/types";
+import { catalogGateFromError } from "@/lib/commerce/wholesale-buyer";
 import { getCachedProduct, PRODUCT_PAGE_EXPAND } from "@/lib/data/cached";
 import { generateProductMetadata } from "@/lib/metadata/product";
 import {
@@ -55,7 +57,19 @@ export default async function ProductPage({
   let product;
   try {
     product = await getCachedProduct(slug, PRODUCT_PAGE_EXPAND);
-  } catch {
+  } catch (error) {
+    // H6-G: a wholesale-flagged channel answers 401/403 until an approved buyer
+    // is signed in — show the access gate rather than a misleading 404.
+    const gate = catalogGateFromError(error);
+    if (gate !== null) {
+      return (
+        <CatalogAccessGate
+          gate={gate}
+          basePath={basePath}
+          locale={locale as Locale}
+        />
+      );
+    }
     notFound();
   }
 

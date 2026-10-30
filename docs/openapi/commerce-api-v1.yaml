@@ -1290,6 +1290,10 @@ components:
       name: sort
       in: query
       required: false
+      description: >-
+        `sale_price` / `-sale_price` order by the price the listing displays for this channel (the channel's active
+        price-list item for the product's unit, else the base unit price; variant-managed products display 0), with the
+        product id as a deterministic tie-break. The parameter values are unchanged.
       schema: { type: string, enum: [name, '-name', sale_price, '-sale_price', created_at, '-created_at'] }
     OrdersSort:
       name: sort

@@ -1073,5 +1073,74 @@
       "reopenPayment": "Abrir de nuevo la página de pago",
       "continueShopping": "Seguir comprando"
     }
+  },
+  "wholesaleBuyer": {
+    "signIn": {
+      "title": "Acceso de compradores mayoristas",
+      "description": "Inicie sesión con el correo y la contraseña de su cuenta mayorista para ver los precios de mayorista.",
+      "footer": "Las cuentas mayoristas son verificadas y aprobadas por la tienda antes de mostrar precios de mayorista.",
+      "email": "Correo electrónico",
+      "password": "Contraseña",
+      "showPassword": "Mostrar contraseña",
+      "hidePassword": "Ocultar contraseña",
+      "submit": "Iniciar sesión",
+      "submitting": "Iniciando sesión..."
+    },
+    "errors": {
+      "invalidCredentials": "No pudimos iniciar su sesión. Revise su correo y contraseña, y que su correo esté verificado.",
+      "rateLimited": "Demasiados intentos. Espere un momento e inténtelo de nuevo.",
+      "unavailable": "La venta mayorista no está disponible en esta tienda.",
+      "generic": "Algo salió mal. Inténtelo de nuevo."
+    },
+    "gate": {
+      "sign_in_required": {
+        "title": "Inicie sesión para ver precios de mayorista",
+        "body": "Esta es una tienda mayorista. El catálogo y los precios solo se muestran a compradores aprobados con sesión iniciada.",
+        "cta": "Iniciar sesión"
+      },
+      "approval_required": {
+        "title": "Su cuenta mayorista no está aprobada",
+        "body": "Ha iniciado sesión, pero su membresía mayorista aún no ha sido aprobada. Consulte su estado para continuar.",
+        "cta": "Ver estado de la membresía"
+      }
+    },
+    "membership": {
+      "title": "Membresía mayorista",
+      "signedInAs": "Sesión iniciada como {name}",
+      "signOut": "Cerrar sesión",
+      "apply": "Solicitar acceso mayorista",
+      "applying": "Enviando...",
+      "browse": "Ver catálogo mayorista"
+    },
+    "status": {
+      "signed_out": {
+        "label": "Sin sesión",
+        "body": "Inicie sesión para ver su membresía mayorista y los precios."
+      },
+      "no_application": {
+        "label": "Sin solicitud",
+        "body": "Ha iniciado sesión pero no ha solicitado acceso mayorista en esta tienda. Envíe la solicitud para que la tienda la revise."
+      },
+      "pending": {
+        "label": "En revisión",
+        "body": "Su solicitud fue recibida y espera la revisión de la tienda. Los precios siguen ocultos hasta su aprobación."
+      },
+      "approved": {
+        "label": "Aprobada",
+        "body": "Su membresía mayorista está aprobada y los precios son visibles. El pedido en línea para compradores mayoristas aún no está disponible."
+      },
+      "rejected": {
+        "label": "No aprobada",
+        "body": "La tienda no aprobó su solicitud mayorista. Contacte con la tienda si cree que es un error."
+      },
+      "suspended": {
+        "label": "Suspendida",
+        "body": "Su membresía mayorista está suspendida, por lo que los precios están ocultos. Contacte con la tienda para revisarla."
+      },
+      "unavailable": {
+        "label": "No disponible",
+        "body": "La venta mayorista no está disponible en esta tienda por ahora."
+      }
+    }
   }
 }

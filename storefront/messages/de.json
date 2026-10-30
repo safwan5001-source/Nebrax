@@ -1073,5 +1073,74 @@
       "reopenPayment": "Zahlungsseite erneut öffnen",
       "continueShopping": "Weiter einkaufen"
     }
+  },
+  "wholesaleBuyer": {
+    "signIn": {
+      "title": "Anmeldung für Großhandelskunden",
+      "description": "Melden Sie sich mit E-Mail und Passwort Ihres Großhandelskontos an, um Händlerpreise zu sehen.",
+      "footer": "Großhandelskonten werden vom Shop geprüft und freigegeben, bevor Händlerpreise angezeigt werden.",
+      "email": "E-Mail",
+      "password": "Passwort",
+      "showPassword": "Passwort anzeigen",
+      "hidePassword": "Passwort verbergen",
+      "submit": "Anmelden",
+      "submitting": "Anmeldung läuft..."
+    },
+    "errors": {
+      "invalidCredentials": "Anmeldung nicht möglich. Prüfen Sie E-Mail und Passwort sowie, ob Ihre E-Mail-Adresse bestätigt ist.",
+      "rateLimited": "Zu viele Versuche. Bitte warten Sie einen Moment und versuchen Sie es erneut.",
+      "unavailable": "Großhandel ist in diesem Shop nicht verfügbar.",
+      "generic": "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut."
+    },
+    "gate": {
+      "sign_in_required": {
+        "title": "Anmelden, um Großhandelspreise zu sehen",
+        "body": "Dies ist ein Großhandelsshop. Katalog und Preise sehen nur angemeldete, freigegebene Kunden.",
+        "cta": "Anmelden"
+      },
+      "approval_required": {
+        "title": "Ihr Großhandelskonto ist nicht freigegeben",
+        "body": "Sie sind angemeldet, aber Ihre Großhandelsmitgliedschaft wurde noch nicht freigegeben. Prüfen Sie den Status.",
+        "cta": "Mitgliedschaftsstatus ansehen"
+      }
+    },
+    "membership": {
+      "title": "Großhandelsmitgliedschaft",
+      "signedInAs": "Angemeldet als {name}",
+      "signOut": "Abmelden",
+      "apply": "Großhandelszugang beantragen",
+      "applying": "Wird gesendet...",
+      "browse": "Großhandelskatalog ansehen"
+    },
+    "status": {
+      "signed_out": {
+        "label": "Abgemeldet",
+        "body": "Melden Sie sich an, um Ihre Mitgliedschaft und Händlerpreise zu sehen."
+      },
+      "no_application": {
+        "label": "Kein Antrag",
+        "body": "Sie sind angemeldet, haben aber noch keinen Großhandelszugang in diesem Shop beantragt. Stellen Sie den Antrag zur Prüfung."
+      },
+      "pending": {
+        "label": "In Prüfung",
+        "body": "Ihr Antrag ist eingegangen und wird vom Shop geprüft. Preise bleiben bis zur Freigabe verborgen."
+      },
+      "approved": {
+        "label": "Freigegeben",
+        "body": "Ihre Großhandelsmitgliedschaft ist freigegeben und Händlerpreise sind sichtbar. Online-Bestellungen für Großhandelskunden sind noch nicht verfügbar."
+      },
+      "rejected": {
+        "label": "Nicht freigegeben",
+        "body": "Der Shop hat Ihren Großhandelsantrag nicht freigegeben. Kontaktieren Sie den Shop, falls Sie einen Fehler vermuten."
+      },
+      "suspended": {
+        "label": "Gesperrt",
+        "body": "Ihre Großhandelsmitgliedschaft ist gesperrt, daher sind Händlerpreise verborgen. Kontaktieren Sie den Shop zur Prüfung."
+      },
+      "unavailable": {
+        "label": "Nicht verfügbar",
+        "body": "Großhandel ist in diesem Shop derzeit nicht verfügbar."
+      }
+    }
   }
 }

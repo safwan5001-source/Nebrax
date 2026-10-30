@@ -1073,5 +1073,74 @@
       "reopenPayment": "Rouvrir la page de paiement",
       "continueShopping": "Continuer vos achats"
     }
+  },
+  "wholesaleBuyer": {
+    "signIn": {
+      "title": "Connexion acheteur grossiste",
+      "description": "Connectez-vous avec l'e-mail et le mot de passe de votre compte grossiste pour voir les tarifs professionnels.",
+      "footer": "Les comptes grossistes sont vérifiés et approuvés par la boutique avant l'affichage des tarifs professionnels.",
+      "email": "E-mail",
+      "password": "Mot de passe",
+      "showPassword": "Afficher le mot de passe",
+      "hidePassword": "Masquer le mot de passe",
+      "submit": "Se connecter",
+      "submitting": "Connexion..."
+    },
+    "errors": {
+      "invalidCredentials": "Connexion impossible. Vérifiez votre e-mail et votre mot de passe, et que votre adresse e-mail est vérifiée.",
+      "rateLimited": "Trop de tentatives. Patientez un instant puis réessayez.",
+      "unavailable": "La vente en gros n'est pas disponible dans cette boutique.",
+      "generic": "Une erreur est survenue. Veuillez réessayer."
+    },
+    "gate": {
+      "sign_in_required": {
+        "title": "Connectez-vous pour voir les tarifs grossiste",
+        "body": "Ceci est une boutique de gros. Le catalogue et les prix ne sont montrés qu'aux acheteurs approuvés et connectés.",
+        "cta": "Se connecter"
+      },
+      "approval_required": {
+        "title": "Votre compte grossiste n'est pas approuvé",
+        "body": "Vous êtes connecté, mais votre adhésion grossiste n'a pas encore été approuvée. Consultez son statut pour continuer.",
+        "cta": "Voir le statut de l'adhésion"
+      }
+    },
+    "membership": {
+      "title": "Adhésion grossiste",
+      "signedInAs": "Connecté en tant que {name}",
+      "signOut": "Se déconnecter",
+      "apply": "Demander l'accès grossiste",
+      "applying": "Envoi...",
+      "browse": "Parcourir le catalogue grossiste"
+    },
+    "status": {
+      "signed_out": {
+        "label": "Déconnecté",
+        "body": "Connectez-vous pour voir votre adhésion grossiste et les tarifs."
+      },
+      "no_application": {
+        "label": "Aucune demande",
+        "body": "Vous êtes connecté mais n'avez pas demandé l'accès grossiste dans cette boutique. Envoyez la demande pour qu'elle soit examinée."
+      },
+      "pending": {
+        "label": "En cours d'examen",
+        "body": "Votre demande a été reçue et attend l'examen de la boutique. Les prix restent masqués jusqu'à l'approbation."
+      },
+      "approved": {
+        "label": "Approuvée",
+        "body": "Votre adhésion grossiste est approuvée et les tarifs sont visibles. La commande en ligne pour les acheteurs grossistes n'est pas encore disponible."
+      },
+      "rejected": {
+        "label": "Non approuvée",
+        "body": "La boutique n'a pas approuvé votre demande grossiste. Contactez la boutique si vous pensez à une erreur."
+      },
+      "suspended": {
+        "label": "Suspendue",
+        "body": "Votre adhésion grossiste est suspendue, les tarifs sont donc masqués. Contactez la boutique pour la réexaminer."
+      },
+      "unavailable": {
+        "label": "Indisponible",
+        "body": "La vente en gros n'est pas disponible dans cette boutique pour le moment."
+      }
+    }
   }
 }

@@ -6,6 +6,7 @@ import { InfiniteProductList } from "@/components/products/InfiniteProductList";
 import { ListingAnalytics } from "@/components/products/ListingAnalytics";
 import { ListingFilterBar } from "@/components/products/ListingFilterBar";
 import { ProductListingSkeleton } from "@/components/products/ProductListingSkeleton";
+import { CatalogAccessGate } from "@/components/wholesale-buyer/CatalogAccessGate";
 import {
   EMPTY_LISTING_FACETS,
   type ListingFacets,
@@ -15,6 +16,7 @@ import type {
   StoreProductFull,
   StoreProductPage,
 } from "@/lib/commerce/types";
+import { catalogGateFromError } from "@/lib/commerce/wholesale-buyer";
 import { PRODUCT_CARD_FIELDS } from "@/lib/data/cached";
 import type { StorefrontListParams } from "@/lib/utils/listing-context";
 import {
@@ -140,9 +142,19 @@ async function ProductListingInner({
   // error boundary rather than masquerade as a legitimate empty
   // results page. Filters fetch is cosmetic (facet counts) so we fall
   // back to a bare filter bar on failure.
-  const [productsResponse, filtersResponse, deliverTodayAvailable] =
+  const [productsResult, filtersResponse, deliverTodayAvailable] =
     await Promise.all([
-      fetchProducts({ ...listParams, page: 1 }),
+      // H6-G: a wholesale-flagged channel refuses this read with 401/403 until
+      // the visitor is an approved buyer — show the access gate, never an
+      // error page or an empty grid. Any other failure still bubbles.
+      fetchProducts({ ...listParams, page: 1 }).then(
+        (response) => ({ response, gate: null }),
+        (error: unknown) => {
+          const gate = catalogGateFromError(error);
+          if (gate === null) throw error;
+          return { response: null, gate };
+        },
+      ),
       fetchFilters(filterFetchParams).catch((error) => {
         console.error("ProductListing: filters fetch failed", error);
         return null;
@@ -151,6 +163,17 @@ async function ProductListingInner({
         ? fetchDeliverTodayAvailable().catch(() => false)
         : Promise.resolve(false),
     ]);
+
+  if (productsResult.response === null) {
+    return (
+      <CatalogAccessGate
+        gate={productsResult.gate}
+        basePath={basePath}
+        locale={locale}
+      />
+    );
+  }
+  const productsResponse = productsResult.response;
 
   const products = productsResponse.data;
   const totalCount = productsResponse.meta.count;

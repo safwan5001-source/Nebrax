@@ -35,6 +35,7 @@ use Tests\TestCase;
 class StorefrontPriceParityTest extends TestCase
 {
     use RefreshDatabase;
+    use AssertsNoAmountLeak;
 
     private const SECRET = 'price-parity-secret';
 
@@ -202,7 +203,7 @@ class StorefrontPriceParityTest extends TestCase
 
         $this->assertGreaterThanOrEqual(400, $detail->getStatusCode());
         $this->assertSame($detail->getStatusCode(), $list->getStatusCode(), 'list must fail the same way as detail');
-        $this->assertStringNotContainsString('1000', json_encode($list->json()), 'never a silent retail fallback');
+        $this->assertNoAmountLeak((string) json_encode($list->json()), [1000], 'never a silent retail fallback');
     }
 
     // ───────────────────────── 6b · الفرز بالسعر المعروض ─────────────────────────
@@ -227,7 +228,7 @@ class StorefrontPriceParityTest extends TestCase
     }
 
     #[Test]
-    public function a_price_sort_on_a_channel_without_a_list_keeps_the_historical_statement(): void
+    public function a_price_sort_on_a_channel_without_a_list_orders_by_the_base_unit_price_not_the_frozen_column(): void
     {
         ['tenant' => $tenant, 'channel' => $channel] = $this->store('sortdtc.parity.test');
         $this->product($tenant, $channel, 300, 'a');
@@ -239,12 +240,16 @@ class StorefrontPriceParityTest extends TestCase
                 $orders[] = $q->sql;
             }
         });
-        $this->listPrices('sortdtc.parity.test', '?sort=sale_price');
+        $prices = $this->listPrices('sortdtc.parity.test', '?sort=sale_price');
 
+        // Batch G (supersedes the Batch F pin of the legacy `order by "sale_price"` statement, which ordered by a
+        // column frozen since VAR-PRICE-1): ordering now follows the displayed base unit price. Full behaviour:
+        // PriceSortAuthorityTest.
+        $this->assertSame([100, 300], array_values($prices));
         $this->assertCount(1, $orders);
-        // DTC ordering is byte-for-byte what it was before Batch F (no list subquery, same legacy ordering).
-        $this->assertStringContainsString('order by "sale_price" asc, "id" desc', $orders[0]);
-        $this->assertStringNotContainsString('price_list_items', $orders[0]);
+        $this->assertStringContainsString('product_unit_prices', $orders[0]);
+        $this->assertStringNotContainsString('order by "sale_price"', $orders[0]);
+        $this->assertStringNotContainsString('price_list_items', $orders[0], 'no list ⇒ no list tier in the ordering');
     }
 
     // ───────────────────────── 7 · لا N+1 ─────────────────────────
