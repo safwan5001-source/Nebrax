@@ -111,7 +111,7 @@ export function AvailabilityPanel({ storeId }: { storeId: string }) {
             {rows.map((row) => (
               <li key={row.id}>
                 <button type="button" onClick={() => setOpen(row)} className="block w-full text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40">
-                  <MobileRecordItem record={{ title: row.name, amount: money(row.priceAmountMinor, row.currency), status: <StockBadge value={row.inStock} /> }} />
+                  <MobileRecordItem record={{ title: row.name, amount: money(row.priceAmountMinor, row.currency), amountLabel: t('colPrice'), status: <StockBadge value={row.inStock} /> }} />
                 </button>
               </li>
             ))}

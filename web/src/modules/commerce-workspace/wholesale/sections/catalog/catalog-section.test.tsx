@@ -138,6 +138,10 @@ describe('CatalogSection', () => {
     await waitFor(() => expect(ws.list).toHaveBeenCalledWith('s1', expect.objectContaining({ page: 1, perPage: 20 })));
     await waitFor(() => expect(screen.getAllByText('In stock').length).toBeGreaterThan(0));
     expect(screen.getAllByText(/125/).length).toBeGreaterThan(0);
+    // The list endpoint returns the product's BASE price (the channel price list is resolved only in the detail view),
+    // so the column must say so and never call it the channel price.
+    expect(screen.getByRole('columnheader', { name: 'Base price' })).toBeTruthy();
+    expect(screen.queryByRole('columnheader', { name: 'Price' })).toBeNull();
   });
 
   it('renders Arabic', async () => {
