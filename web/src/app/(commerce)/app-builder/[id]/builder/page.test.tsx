@@ -1790,6 +1790,39 @@ describe('AppBuilderWorkspacePage — save safety (AD-01 / S01b)', () => {
     expect(JSON.stringify(JSON.parse(window.localStorage.getItem(BACKUP_KEY)!).schema)).toContain('Bye (newest)');
   });
 
+  it('confirming the leave dialog flushes the newest edits to the local backup immediately (no 400ms debounce wait)', async () => {
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+    await makeEdit('Bye (just typed)');
+    expect(window.localStorage.getItem(BACKUP_KEY)).toBeNull(); // الـdebounce لم ينتهِ بعد
+
+    // رابط داخلي يفتح حوار المغادرة، ثم «مغادرة» تكتب النسخة فوراً.
+    const link = document.createElement('a');
+    link.href = '/commerce';
+    document.body.appendChild(link);
+    fireEvent.click(link);
+    const leave = within(await screen.findByRole('dialog', { name: 'Leave without saving?' }));
+    await userEvent.setup().click(leave.getByRole('button', { name: 'Leave' }));
+    expect(JSON.stringify(JSON.parse(window.localStorage.getItem(BACKUP_KEY)!).schema)).toContain('Bye (just typed)');
+    link.remove();
+  });
+
+  it('restoring a backup that deleted the server draft\'s selected page re-selects a valid page from the restored schema', async () => {
+    const edited = JSON.parse(JSON.stringify(draftData.schema));
+    const homeId = edited.navigation.initialPageId;
+    edited.pages.second = { ...JSON.parse(JSON.stringify(edited.pages[homeId])), id: 'second-root', children: [{ type: 'Text', id: 'second-text', props: { text: 'Second page text' } }] };
+    delete edited.pages[homeId];
+    edited.navigation.initialPageId = 'second';
+    window.localStorage.setItem(BACKUP_KEY, JSON.stringify({ v: 1, appId: 'app-1', userId: 'u1', schema: edited, baseRevision: 0, savedAt: '2026-10-30T09:00:00+00:00' }));
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+    const recovery = within(await screen.findByRole('dialog', { name: 'Restore unsaved local changes?' }));
+    await userEvent.setup().click(recovery.getByRole('button', { name: 'Restore my changes' }));
+    expect((await screen.findAllByText('Second page text')).length).toBeGreaterThan(0);
+  });
+
   it('a local backup that differs from the server draft is offered for restore, and restoring keeps its original base revision', async () => {
     const edited = JSON.parse(JSON.stringify(draftData.schema));
     edited.pages.home.children[0].children[0].props.text = 'Recovered text';

@@ -66,6 +66,12 @@ const HISTORY_LIMIT = 50;
  * الـ Inspector، تراجع/إعادة محدودان، وحفظ صريح عبر `PUT /app-builder/apps/{id}/draft`
  * الموجود أصلاً منذ APP-BUILDER-1. انظر `APP-BUILDER-6-UX-EVIDENCE-PASS.md`.
  */
+/** الصفحة الرئيسية للمخطط إن وُجدت وإلا أول صفحة. */
+function pickInitialPageId(schema: AppSchema): string | null {
+  const initialPageId = schema.navigation?.initialPageId ?? null;
+  return initialPageId && schema.pages[initialPageId] ? initialPageId : Object.keys(schema.pages)[0] ?? null;
+}
+
 export default function AppBuilderWorkspacePage() {
   const t = useTranslations('appBuilder.builder');
   const tc = useTranslations('common');
@@ -87,6 +93,7 @@ export default function AppBuilderWorkspacePage() {
   const [baseRevision, setBaseRevision] = useState<number | null>(null);
   const baseRevisionRef = useRef<number | null>(null);
   const schemaRef = useRef<AppSchema | null>(null);
+  const dirtyRef = useRef(false);
   const [conflict, setConflict] = useState<ConflictState | null>(null);
   const [saveFailure, setSaveFailure] = useState<'network' | 'other' | null>(null);
   const [recovery, setRecovery] = useState<DraftBackup | null>(null);
@@ -176,8 +183,7 @@ export default function AppBuilderWorkspacePage() {
         setStructureMode('pages');
         setPreviewThemeTokens(null);
         setRegistries(registriesRes.data);
-        const initialPageId = draftRes.data.schema.navigation?.initialPageId ?? null;
-        const pageId = initialPageId && draftRes.data.schema.pages[initialPageId] ? initialPageId : Object.keys(draftRes.data.schema.pages)[0] ?? null;
+        const pageId = pickInitialPageId(draftRes.data.schema);
         setSelectedPageId(pageId);
         setSelectedComponentId(pageId ? draftRes.data.schema.pages[pageId].id : null);
       })
@@ -188,6 +194,7 @@ export default function AppBuilderWorkspacePage() {
   useEffect(() => load(), [load]);
 
   schemaRef.current = schema;
+  dirtyRef.current = dirty;
   // حارس المغادرة: beforeunload + الروابط الداخلية + زر الرجوع (AD-01 / S01b).
   const leaveGuard = useUnsavedChangesGuard(dirty);
 
@@ -198,16 +205,24 @@ export default function AppBuilderWorkspacePage() {
     return () => window.clearTimeout(handle);
   }, [schema, dirty, baseRevision, params.id, backupUserId]);
 
-  useEffect(() => {
-    function flushBackup() {
-      const current = schemaRef.current;
-      if (current && dirty && params.id && baseRevisionRef.current !== null) {
-        writeDraftBackup(backupUserId, params.id, current, baseRevisionRef.current);
-      }
+  const flushBackupNow = useCallback(() => {
+    const current = schemaRef.current;
+    if (current && dirtyRef.current && params.id && baseRevisionRef.current !== null) {
+      writeDraftBackup(backupUserId, params.id, current, baseRevisionRef.current);
     }
-    window.addEventListener('pagehide', flushBackup);
-    return () => window.removeEventListener('pagehide', flushBackup);
-  }, [dirty, params.id, backupUserId]);
+  }, [params.id, backupUserId]);
+  const flushBackupRef = useRef(flushBackupNow);
+  flushBackupRef.current = flushBackupNow;
+
+  useEffect(() => {
+    // pagehide لا يُطلَق عند تنقل Next من جهة العميل (Back المؤكَّد)، فنفرّغ أيضاً عند فك التركيب.
+    const onPageHide = () => flushBackupRef.current();
+    window.addEventListener('pagehide', onPageHide);
+    return () => {
+      window.removeEventListener('pagehide', onPageHide);
+      flushBackupRef.current();
+    };
+  }, []);
 
   const applyPageEdit = useCallback(
     (pageId: string, updater: (pageRoot: AppSchemaComponent) => AppSchemaComponent) => {
@@ -381,6 +396,10 @@ export default function AppBuilderWorkspacePage() {
     pastRef.current = [];
     futureRef.current = [];
     setSchema(recovery.schema);
+    // النسخة المستعادة قد تحذف/تغيّر الصفحة المحدَّدة من مسودة الخادم؛ التحديد يُعاد من المخطط المستعاد وإلا ظهر الكانفاس فارغاً.
+    const pageId = pickInitialPageId(recovery.schema);
+    setSelectedPageId(pageId);
+    setSelectedComponentId(pageId ? recovery.schema.pages[pageId].id : null);
     setDirty(true);
     setRecovery(null);
   }
@@ -935,7 +954,7 @@ export default function AppBuilderWorkspacePage() {
         onConfirmOverwrite={() => void confirmOverwrite()}
         onBack={() => setConflict((c) => (c ? { ...c, stage: 'choose', latest: null, changedAgain: false } : c))}
       />
-      <LeaveGuardDialog open={leaveGuard.pending !== null} onStay={leaveGuard.cancelLeave} onLeave={leaveGuard.confirmLeave} />
+      <LeaveGuardDialog open={leaveGuard.pending !== null} onStay={leaveGuard.cancelLeave} onLeave={() => { flushBackupNow(); leaveGuard.confirmLeave(); }} />
       <RecoverBackupDialog backup={recovery} locale={locale} onRestore={restoreLocalBackup} onDiscard={discardLocalBackup} />
     </>
   );
