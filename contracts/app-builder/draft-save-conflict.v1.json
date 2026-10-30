@@ -1,0 +1,36 @@
+{
+  "contract": "app-builder.draft-save",
+  "version": 1,
+  "decision": "AD-01 (optimistic locking) — slice S01a",
+  "request": {
+    "method": "PUT",
+    "path": "/api/app-builder/apps/{id}/draft",
+    "body": {
+      "schema": "AppSchema object (required)",
+      "base_revision": "integer >= 0 or null; OPTIONAL during the transition (absent = legacy last-write-wins, logged). Will become required (428) only after the save-path inventory (S01-INV) and owner approval."
+    }
+  },
+  "success": {
+    "status": 200,
+    "data_keys": ["id", "builder_app_id", "schema", "revision", "updated_at"]
+  },
+  "conflict": {
+    "status": 409,
+    "body": {
+      "message": "string",
+      "reason": "draft_conflict",
+      "current_revision": "integer",
+      "base_revision": "integer",
+      "updated_by": "string|null",
+      "updated_at": "string|null"
+    },
+    "guarantees": [
+      "no write happens on conflict (schema and revision unchanged)",
+      "the client rebases by re-reading GET draft (revision == current_revision) and re-sending with that base_revision after user confirmation"
+    ]
+  },
+  "validation": {
+    "status": 422,
+    "when": "base_revision is not an integer >= 0, or the schema is structurally invalid (checked before the lock)"
+  }
+}
