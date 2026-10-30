@@ -48,7 +48,7 @@ class StorefrontProductController extends PublicApiController
      */
     private const IDS_FILTER_MAX = 8;
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, CommercePriceResolver $resolver): JsonResponse
     {
         $filters = $request->validate([
             'search' => ['sometimes', 'nullable', 'string', 'max:120'],
@@ -138,14 +138,12 @@ class StorefrontProductController extends PublicApiController
         $tenantSlug = $request->route('tenantSlug');
         $gallery = app(ProductMediaGalleryService::class);
 
-        // السعر لتصفّح مجهول (بلا partnerId) مطابقٌ حتماً لناتج
-        // CommercePriceResolver::resolve() في هذه الحالة لمنتجٍ بسيط: لا قائمة
-        // سعر عميل تُحلّ بلا partnerId، والوحدة غير محدَّدة تعني وحدة الأساس
-        // دائماً — فرعا الحسم الوحيدان الممكنان هما SOURCE_PRODUCT_DEFAULT
-        // (sale_price) فقط. نقرأه مباشرةً هنا لتفادي استدعاء المُحلِّل لكل صفّ
-        // (N+1)؛ `show()` يستدعي المُحلِّل نفسه لأن N=1 هناك. اختبارٌ مخصّص
-        // يثبّت تطابق النتيجتين.
-        //
+        // H6-F — one authoritative path: the same channel-list-then-sale_price
+        // precedence as `CommercePriceResolver::resolve()` (detail/cart), batched
+        // so a page costs one list query instead of one per row. A channel with
+        // no active list yields `sale_price` exactly as before.
+        $prices = $resolver->browsePrices($paginator->getCollection(), $channelId);
+
         // VAR-COM-1 — منتجٌ متعدد الخيارات لا سعر أبٍ ذا معنى له
         // (`resolve()` يرفض `variantId=null` لمنتجٍ كهذا فشلاً مغلَقاً)، ولا
         // نحسب «سعراً ابتدائياً» تخمينياً في القائمة المُرقَّمة (تفادي N+1 عبر
@@ -156,9 +154,9 @@ class StorefrontProductController extends PublicApiController
         $promises = app(CommerceDeliveryPromiseService::class)
             ->forProducts($channelId, $paginator->getCollection(), $filters['city'] ?? null, $filters['region'] ?? null);
 
-        $data = $paginator->getCollection()->map(function (Product $product) use ($request, $currency, $inStockByProduct, $tenantSlug, $gallery, $promises): array {
+        $data = $paginator->getCollection()->map(function (Product $product) use ($request, $currency, $inStockByProduct, $tenantSlug, $gallery, $promises, $prices): array {
             $galleryMedia = StorefrontProductResource::mediaPayload($gallery->resolveGallery($product), $tenantSlug);
-            $price = $product->isVariantManaged() ? 0 : (int) $product->sale_price;
+            $price = $prices[$product->id];
 
             return (new StorefrontProductResource(
                 $product,

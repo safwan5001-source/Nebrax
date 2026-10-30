@@ -3,6 +3,7 @@
 namespace App\Services\Commerce;
 
 use App\Models\Partner;
+use App\Models\PriceListItem;
 use App\Models\Product;
 use App\Models\SalesChannel;
 use App\Models\Tenant;
@@ -14,6 +15,7 @@ use App\Support\DocumentLineVariantResolver;
 use App\Support\Settings;
 use App\Tenancy\BranchScope;
 use App\Tenancy\TenantContext;
+use Illuminate\Support\Collection;
 use RuntimeException;
 
 /**
@@ -178,5 +180,76 @@ final class CommercePriceResolver
             unitName: $resolvedUnitName,
             minSalePrice: $minSalePrice,
         );
+    }
+
+    /**
+     * Anonymous-browse price for a whole page of simple products — the batched
+     * twin of `resolve($id, $channelId)` (no partner, no unit, no variant).
+     * H6-F: the listing used to read `Product.sale_price` directly, so a channel
+     * with an active `default_price_list_id` showed the list price on detail/cart
+     * but the retail price in the listing.
+     *
+     * Same precedence as `resolve()` for this context: the channel's default list
+     * (active only) item for the product's own unit, else `Product.sale_price`.
+     * A channel without an active list therefore returns `sale_price` exactly as
+     * the listing always did (DTC output unchanged, no list query at all). With a
+     * list it costs one `price_list_items` query for the whole page. A configured
+     * reference TenantScope cannot resolve is corrupt/cross-tenant and throws —
+     * identical to `resolve()`, never a silent retail fallback.
+     *
+     * Variant-managed products keep the listing's historical `0` (their price is
+     * per variant and resolved in `show()`).
+     *
+     * @param  Collection<int, Product>  $products
+     * @return array<string, int> productId => minor units
+     *
+     * @throws RuntimeException
+     */
+    public function browsePrices(Collection $products, string $salesChannelId): array
+    {
+        if (app(TenantContext::class)->id() === null) {
+            throw new RuntimeException('لا سياق مستأجر نشط.');
+        }
+
+        $salesChannel = SalesChannel::query()->whereKey($salesChannelId)->first();
+        if ($salesChannel === null) {
+            throw new RuntimeException('قناة البيع غير موجودة.');
+        }
+
+        $priceList = null;
+        if ($salesChannel->default_price_list_id !== null) {
+            $channelPriceList = $salesChannel->defaultPriceList()->first();
+            if ($channelPriceList === null) {
+                throw new RuntimeException('قائمة أسعار قناة البيع غير متاحة لهذا المستأجر.');
+            }
+            $priceList = $channelPriceList->is_active ? $channelPriceList : null;
+        }
+
+        $simple = $products->reject(fn (Product $p): bool => $p->isVariantManaged());
+
+        $listPrices = [];
+        if ($priceList !== null && $simple->isNotEmpty()) {
+            $key = static fn (string $productId, ?string $unit): string => $productId."\0".($unit ?? "\0null");
+            $items = PriceListItem::query()
+                ->where('price_list_id', $priceList->id)
+                ->whereIn('product_id', $simple->pluck('id')->all())
+                ->whereNull('product_variant_id')
+                ->get(['product_id', 'unit_name', 'price']);
+            foreach ($items as $item) {
+                $listPrices[$key($item->product_id, $item->unit_name)] = (int) $item->price;
+            }
+            $lookup = static fn (Product $p): ?int => $listPrices[$key($p->id, $p->unit)] ?? null;
+        } else {
+            $lookup = static fn (Product $p): ?int => null;
+        }
+
+        $out = [];
+        foreach ($products as $product) {
+            $out[$product->id] = $product->isVariantManaged()
+                ? 0
+                : ($lookup($product) ?? (int) $product->sale_price);
+        }
+
+        return $out;
     }
 }
