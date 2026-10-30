@@ -64,6 +64,9 @@ class CommerceModuleBoundaryTest extends TestCase
         'api/commerce/payment-intents',
         'api/commerce/payment-intents/{id}/cancel',
         'api/commerce/payment-intents/{id}/collect',
+        // H6 Batch E — مراجعة عضوية مشتري الجملة (commerce.wholesale.manage، بوابة نشر مغلقة افتراضياً).
+        'api/commerce/wholesale/channels/{channelId}/memberships',
+        'api/commerce/wholesale/memberships/{id}/{action}',
         // COM-CATALOG-2 — مساحة عمل نشر التصنيفات (قراءة + استبدال مجموعة النشر).
         'api/commerce/workspace/categories/publication',
         'api/commerce/workspace/categories/{id}/publication',

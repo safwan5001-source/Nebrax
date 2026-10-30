@@ -220,6 +220,10 @@ class Rbac
             // COMMERCE-ORDERS-O3a-2b: إلغاء طلب متجر بواسطة الموظف (ADR-28) — كتابة تُحرّر الحجز وتُلغي نية الدفع؛ مستقلة عن
             // `commerce.orders.view` و`payments.manage`. owner/admin عبر `*` فقط؛ لا تُضاف لـ`MATRIX` ولا تُمنح لأي دور مخزَّن بهجرة.
             'commerce.orders.cancel',
+            // H6 Batch E: اعتماد/رفض/إيقاف عضوية مشتري الجملة — قرار تجاري يمنح الوصول لقدرات الجملة المحمية؛
+            // مستقل عن `commerce.manage` و`commerce.orders.*`. owner/admin عبر `*` فقط؛ لا تُضاف لـ`MATRIX` ولا تُمنح
+            // لأي دور مخزَّن بهجرة (لا منح ضمني).
+            'commerce.wholesale.manage',
             // APP-BUILDER-1: إدارة تطبيقات AWJ App Builder (الهوية والمسودة)
             // سلطة مستقلة عن نشر نسخة تجربة — `apps_builder.publish` أدناه.
             // لا علاقة بـ`apps.view`/`apps.manage` (تفعيل/إيقاف قدرات

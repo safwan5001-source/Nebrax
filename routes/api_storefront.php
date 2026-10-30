@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\StorefrontBuyerAuthController;
 use App\Http\Controllers\Api\StorefrontCartController;
 use App\Http\Controllers\Api\StorefrontCategoryController;
 use App\Http\Controllers\Api\StorefrontCollectionController;
@@ -13,6 +14,11 @@ use App\Http\Controllers\Api\StorefrontMediaController;
 use App\Http\Controllers\Api\StorefrontOfferController;
 use App\Http\Controllers\Api\StorefrontPolicyController;
 use App\Http\Controllers\Api\StorefrontProductController;
+use App\Http\Controllers\Api\StorefrontWholesaleController;
+use App\Http\Middleware\AuthenticateCommerceCustomer;
+use App\Http\Middleware\BindStorefrontBuyerToChannel;
+use App\Http\Middleware\EnsureApprovedWholesaleBuyer;
+use App\Http\Middleware\EnsureWholesaleBuyerEnabled;
 use App\Http\Middleware\EnforcePublicApiRateLimit;
 use App\Http\Middleware\RequireStorefrontMutationGateway;
 use App\Http\Middleware\ResolveStorefrontDomain;
@@ -89,6 +95,32 @@ Route::middleware([
         Route::post('cart/items', [StorefrontCartController::class, 'store'])->name('cart.items.store');
         Route::patch('cart/items/{item}', [StorefrontCartController::class, 'update'])->whereUuid('item')->name('cart.items.update');
         Route::delete('cart/items/{item}', [StorefrontCartController::class, 'destroy'])->whereUuid('item')->name('cart.items.destroy');
+    });
+
+    // H6 Batch E — هوية مشتري الجملة وعضويته (بريد + كلمة مرور؛ OTP لاحقاً عبر Messaging Foundation).
+    // مغلق افتراضياً: بوابة النشر `commerce.wholesale_buyer_enabled` **و** قناة الـ Host موسومة
+    // `wholesale_membership_enabled` وإلا 404 موحَّد (لا أثر على أي متجر DTC). الكتابة خلف بوابة الخادم.
+    // الجلسة: `X-Customer-Token` مربوط بقناة هذا الـ Host (`store-channel:{id}`) فلا يُعاد استعماله عبر مضيف/قناة.
+    // العضوية حالة أهلية مستقلة عن المصادقة؛ `wholesale/access` نموذج بوابة القدرات المحمية القادمة.
+    Route::middleware(EnsureWholesaleBuyerEnabled::class)->group(function () {
+        Route::middleware(RequireStorefrontMutationGateway::class)->group(function () {
+            Route::post('auth/register', [StorefrontBuyerAuthController::class, 'register'])
+                ->middleware('throttle:storefront-buyer-register')->name('buyer.register');
+            Route::post('auth/login', [StorefrontBuyerAuthController::class, 'login'])
+                ->middleware('throttle:storefront-buyer-login')->name('buyer.login');
+        });
+
+        Route::middleware([AuthenticateCommerceCustomer::class, BindStorefrontBuyerToChannel::class])->group(function () {
+            Route::get('me', [StorefrontBuyerAuthController::class, 'me'])->name('buyer.me');
+            Route::get('wholesale/membership', [StorefrontWholesaleController::class, 'membership'])->name('wholesale.membership.show');
+            Route::middleware(RequireStorefrontMutationGateway::class)->group(function () {
+                Route::post('auth/logout', [StorefrontBuyerAuthController::class, 'logout'])->name('buyer.logout');
+                Route::post('wholesale/application', [StorefrontWholesaleController::class, 'apply'])
+                    ->middleware('throttle:storefront-buyer-apply')->name('wholesale.application.store');
+            });
+            Route::get('wholesale/access', [StorefrontWholesaleController::class, 'access'])
+                ->middleware(EnsureApprovedWholesaleBuyer::class)->name('wholesale.access');
+        });
     });
 
     // COM-CHECKOUT-1A أساسٌ؛ COM-CHECKOUT-1B يضيف /checkout/complete —

@@ -16,8 +16,13 @@ class CustomerAuthenticationService
 
     public function __construct(private TenantContext $tenantContext) {}
 
-    /** @return array{identity:CustomerIdentity,token:string} */
-    public function login(string $email, string $password): array
+    /**
+     * @param  list<string>  $extraAbilities  additional token abilities (default none — unchanged behaviour). The
+     *                                        store-host buyer flow passes a channel-binding ability so the token
+     *                                        is only valid on the host/channel it was issued for.
+     * @return array{identity:CustomerIdentity,token:string}
+     */
+    public function login(string $email, string $password, array $extraAbilities = []): array
     {
         if (! $this->tenantContext->has()) {
             throw new LogicException('TenantContext is required before customer credential lookup.');
@@ -45,7 +50,7 @@ class CustomerAuthenticationService
         return [
             'identity' => $identity,
             'token' => $identity
-                ->createToken('customer', ['customer:access'], now()->addDays(self::TOKEN_TTL_DAYS))
+                ->createToken('customer', ['customer:access', ...$extraAbilities], now()->addDays(self::TOKEN_TTL_DAYS))
                 ->plainTextToken,
         ];
     }

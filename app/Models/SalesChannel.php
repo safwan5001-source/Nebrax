@@ -39,6 +39,7 @@ class SalesChannel extends BaseModel implements CompanyWide
 
     protected $casts = [
         'is_active' => 'boolean',
+        'wholesale_membership_enabled' => 'boolean',
     ];
 
     protected $attributes = [
@@ -48,6 +49,12 @@ class SalesChannel extends BaseModel implements CompanyWide
     protected static function booted(): void
     {
         static::saving(function (self $channel): void {
+            // H6 Batch E — only a web channel can require wholesale membership (the host resolver only serves
+            // web channels). Not mass-assignable: set explicitly by a later staff-settings batch.
+            if ($channel->wholesale_membership_enabled && $channel->type !== self::TYPE_WEB) {
+                throw new DomainException('Only a web sales channel can require wholesale membership.');
+            }
+
             if (! $channel->isDirty('default_price_list_id') || $channel->default_price_list_id === null) {
                 return;
             }
