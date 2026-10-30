@@ -1000,7 +1000,7 @@ export const OPENAPI_MODEL: OpenApiModel = {
               "name": "sort",
               "in": "query",
               "required": false,
-              "description": "Sort field with optional leading `-`. Default `name`.",
+              "description": "Sort field with optional leading `-`. Default `name`. `sale_price` orders by the base unit price reported as `sale_price_minor`, with the product id as a deterministic tie-break.",
               "type": "string · enum",
               "constraints": "enum: name · sku · sale_price · created_at · -name · -sku · -sale_price · -created_at"
             }
