@@ -74,7 +74,7 @@ No accounting, VAT, ZATCA, payment-capture, order-lifecycle or cancellation code
 | New `WholesalePricePrecedenceTest` | 25 passed (SQLite and PostgreSQL) |
 | New `WholesalePricePrecedencePostgresConcurrencyTest` | 2 passed on PostgreSQL (skipped on SQLite) |
 | Affected suites on PostgreSQL (wholesale, resolver, parity, sort, products, offers, buyer verification, cart, checkout, order, workspace product, flowers journey, module boundary, partner link, price lists) | 846 passed |
-| Full backend suite, SQLite | __FULLSUITE__ |
+| Full backend suite, SQLite (29 chunks) | 9,923 passed, 301 skipped (PostgreSQL-only), 26 failed — **all 26 are `Fuel*` tests** (`FuelAviRfid`, `FuelReconciliation`, `FuelSaleApi`, `FuelSaleService`, `FuelSupplyReceivingApi`, `FuelSupplyReceiving`) failing with `Call to undefined function bcmul()`: the `ext-bcmath` extension is absent in this environment only (CI installs it). No pricing, wholesale, commerce or storefront test failed. |
 | Storefront `tsc --noEmit` | exit 0 |
 | Biome | exit 0, 5 warnings / 3 infos (unchanged baseline) |
 | Vitest | 247 files, 3,552 passed, 16 skipped (+4 new mapper tests) |
