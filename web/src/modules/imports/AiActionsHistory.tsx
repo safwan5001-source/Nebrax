@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { Badge } from '@/components/ui/badge';
@@ -36,31 +36,36 @@ export function AiActionsHistory() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // آخر طلب يفوز: كل `load()` (من التأثير أو من زر إعادة المحاولة) يأخذ رقماً، وتغيّر المرشّح/الصفحة/التفكيك يُبطل ما سبق، فلا يكتب ردٌّ متأخر فوق نتائج أحدث.
+  const latest = useRef(0);
+
   const load = useCallback(() => {
-    let cancelled = false;
+    const id = ++latest.current;
     setLoading(true);
     setError(null);
     fetchAiActions({ page, perPage, status, mine })
       .then((result) => {
-        if (cancelled) return;
+        if (id !== latest.current) return;
         setUnavailable(result.availability === 'unavailable');
         setData(result.page);
       })
       .catch((err) => {
-        if (cancelled) return;
+        if (id !== latest.current) return;
         setData(null);
         setError(err instanceof ApiError ? err.message : t('ai_history_failed'));
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (id === latest.current) setLoading(false);
       });
-
-    return () => {
-      cancelled = true;
-    };
   }, [page, perPage, status, mine, t]);
 
-  useEffect(() => load(), [load]);
+  useEffect(() => {
+    load();
+
+    return () => {
+      latest.current += 1;
+    };
+  }, [load]);
 
   const rows = Array.isArray(data?.data) ? data.data : [];
 

@@ -98,4 +98,25 @@ describe('AiActionsHistory (IMP-H8-S4b)', () => {
     await screen.findByText('سارة');
     for (const call of api.mock.calls) expect((call[1] as { method?: string } | undefined)?.method ?? 'GET').toBe('GET');
   });
+
+  it('ignores a slow retry that was started before the filters changed (latest request wins)', async () => {
+    const user = userEvent.setup();
+    let resolveRetry: (value: unknown) => void = () => {};
+    api.mockRejectedValueOnce(new ApiError(500, 'boom', null));
+    render(<AiActionsHistory />);
+    await screen.findByText('boom');
+
+    // إعادة المحاولة معلّقة…
+    api.mockImplementationOnce(() => new Promise((resolve) => { resolveRetry = resolve; }));
+    await user.click(screen.getByRole('button', { name: /retry|ai_retry|try/i }));
+    // …ثم يتغيّر المرشّح وتصل نتيجته أولاً.
+    api.mockResolvedValueOnce(page([item({ id: 'f1', created_by_name: 'مفلتر' })]));
+    await user.selectOptions(screen.getByLabelText('filter_status'), 'failed');
+    await screen.findByText('مفلتر');
+
+    // الرد المتأخر للمحاولة القديمة (بلا مرشّح) لا يكتب فوق النتيجة المفلترة.
+    resolveRetry(page([item({ id: 'old', created_by_name: 'قديم' })]));
+    await waitFor(() => expect(screen.queryByText('قديم')).toBeNull());
+    expect(screen.getByText('مفلتر')).toBeTruthy();
+  });
 });
