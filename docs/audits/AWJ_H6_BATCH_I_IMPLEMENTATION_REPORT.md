@@ -45,6 +45,8 @@ Details: `AWJ_H6_BATCH_I_COMMERCIAL_RULES_CONTRACT.md`. Verified today: no MOQ, 
 | Commercial-rules characterization, 6 tests (no MOQ, no minimum amount, no tax added and no tax columns, no accounting side-effects, credit terms inert, same payment methods as DTC, suspended cart retained) | `WholesaleCartCheckoutBoundaryTest::characterization_*` |
 | Three decision documents | trusted-IP addendum, pricing matrix, commercial-rules contract |
 
+*Review fix (Codex P2, verified real, my own defect):* the direct-access test reused accumulated `withHeaders()` state, so its "no secret" and "no gateway headers" cases still sent earlier headers and did not exercise absence. It now flushes headers per case and asserts none remain; with truly absent headers the API still answers the uniform 404 (SQLite and PostgreSQL).
+
 *Assumption corrected by testing:* three of my first-draft expectations were wrong (`priceListId` is set even when the item is missing, an inactive default list cannot be assigned, POS settings live under `sales_config.pos`); the tests were corrected to the real behaviour, never the other way round. No existing test was modified or weakened.
 
 ## 4. Deferred decisions (need the owner)

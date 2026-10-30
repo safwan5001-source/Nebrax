@@ -137,12 +137,19 @@ class StorefrontClientIpBoundaryTest extends TestCase
 
         foreach ($cases as $label => $headers) {
             for ($i = 1; $i <= 25; $i++) {
+                // withHeaders() is cumulative on a TestCase: start clean so each case sends ONLY its own headers
+                $this->flushHeaders();
                 $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.9'])
                     ->withHeaders(array_merge($headers, $this->spoofSet("198.51.100.{$i}")))
                     ->postJson(self::URL, ['email' => "direct{$i}@ip.test", 'password' => 'wrong-password-1'])
                     ->assertStatus(404);
             }
         }
+
+        // guard against regressing to accumulated headers: after a clean flush nothing from earlier cases remains
+        $this->flushHeaders();
+        $this->assertArrayNotHasKey('X-Storefront-Gateway-Secret', $this->defaultHeaders);
+        $this->assertArrayNotHasKey('X-Storefront-Forwarded-Host', $this->defaultHeaders);
 
         // the legitimate gateway's bucket from the same address is untouched: a full budget of 20 still passes
         for ($i = 1; $i <= 20; $i++) {
