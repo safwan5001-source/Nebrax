@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslations } from 'next-intl';
-import { Eye, EyeOff, LoaderCircle } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, LoaderCircle } from 'lucide-react';
 import { AuthShell } from '@/components/auth/auth-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -90,159 +90,165 @@ export default function RegisterPage() {
   }
 
   return (
-    <AuthShell>
-      <section className="border border-border bg-surface p-5 shadow-sm sm:p-8" aria-labelledby="register-title">
-        <header className="text-center">
-          <h1 id="register-title" className="text-2xl font-bold tracking-tight text-text sm:text-[1.7rem]">
+    <AuthShell experience="register">
+      <section className="ax-card" aria-labelledby="register-title">
+        <header className="text-center lg:text-start">
+          <h1 id="register-title" className="font-bold tracking-tight text-text">
             {t('title')}
           </h1>
           <p className="mt-1.5 text-sm text-muted">{t('subtitle')}</p>
         </header>
 
         <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-7 space-y-4">
-          <div>
-            <label htmlFor="register-name" className="mb-1.5 block text-sm font-semibold text-text">
-              {t('company_name')} <span className="text-muted" aria-hidden="true">*</span>
-            </label>
-            <Input
-              id="register-name"
-              autoComplete="organization"
-              className="h-12 text-base"
-              placeholder={t('company_name_ph')}
-              aria-invalid={Boolean(errors.company_name)}
-              aria-describedby={errors.company_name ? 'register-name-error' : undefined}
-              {...register('company_name')}
-            />
-            {errors.company_name && <p id="register-name-error" className="mt-1.5 text-xs text-negative" role="alert">{t('field_required')}</p>}
-          </div>
-
-          <div>
-            <label htmlFor="register-email" className="mb-1.5 block text-sm font-semibold text-text">
-              {t('email')} <span className="text-muted" aria-hidden="true">*</span>
-            </label>
-            <Input
-              id="register-email"
-              type="email"
-              dir="ltr"
-              autoComplete="email"
-              className="h-12 text-base"
-              placeholder="name@company.com"
-              aria-invalid={Boolean(errors.email)}
-              aria-describedby={errors.email ? 'register-email-error' : undefined}
-              {...register('email')}
-            />
-            {errors.email && <p id="register-email-error" className="mt-1.5 text-xs text-negative" role="alert">{t('email_invalid')}</p>}
-          </div>
-
-          <div>
-            <label htmlFor="register-phone" className="mb-1.5 block text-sm font-semibold text-text">
-              {t('phone')} <span className="text-muted" aria-hidden="true">*</span>
-            </label>
-            <div
-              data-invalid={Boolean(errors.phone) || undefined}
-              className="flex h-12 overflow-hidden border border-border bg-surface transition-shadow focus-within:ring-2 focus-within:ring-primary/40 data-[invalid=true]:border-negative data-[invalid=true]:ring-1 data-[invalid=true]:ring-negative/20"
-            >
-              <span className="flex shrink-0 items-center gap-1.5 border-e border-border bg-background px-2.5 text-sm text-muted" dir="ltr" aria-label={`${t('phone_country')} +966`}>
-                <SaudiFlag />
-                <span className="font-semibold text-text" lang="ar" dir="rtl">{t('phone_country')}</span>
-                <span>+966</span>
-              </span>
-              <input
-                id="register-phone"
-                dir="ltr"
-                type="tel"
-                inputMode="numeric"
-                autoComplete="tel-national"
-                maxLength={9}
-                className="num h-full w-full bg-transparent px-3 text-base text-text placeholder:text-muted focus:outline-none"
-                placeholder="5X XXX XXXX"
-                aria-invalid={Boolean(errors.phone)}
-                aria-describedby={errors.phone ? 'register-phone-error' : undefined}
-                {...register('phone')}
-              />
-            </div>
-            {errors.phone && <p id="register-phone-error" className="mt-1.5 text-xs text-negative" role="alert">{t('phone_invalid')}</p>}
-          </div>
-
-          <div>
-            <label htmlFor="register-slug" className="mb-1.5 block text-sm font-semibold text-text">
-              {t('slug')} <span className="text-muted" aria-hidden="true">*</span>
-            </label>
-            <div
-              data-invalid={Boolean(errors.slug) || undefined}
-              className="flex h-12 overflow-hidden border border-border bg-surface transition-shadow focus-within:ring-2 focus-within:ring-primary/40 data-[invalid=true]:border-negative data-[invalid=true]:ring-1 data-[invalid=true]:ring-negative/20"
-              dir="ltr"
-            >
-              <input
-                id="register-slug"
-                className="h-full w-full bg-transparent px-3 text-base text-text placeholder:text-muted focus:outline-none"
-                autoComplete="off"
-                spellCheck="false"
-                placeholder="myaccount"
-                aria-invalid={Boolean(errors.slug)}
-                aria-describedby={errors.slug ? 'register-slug-error' : 'register-slug-hint'}
-                {...register('slug')}
-              />
-              <span className="flex shrink-0 items-center border-s border-border bg-background px-3 text-sm text-muted">{tenantHostSuffix()}</span>
-            </div>
-            {errors.slug ? <p id="register-slug-error" className="mt-1.5 text-xs text-negative" role="alert">{errors.slug.message === 'reserved' ? t('slug_reserved') : t('slug_invalid')}</p> : <p id="register-slug-hint" className="mt-1.5 text-xs text-muted">{t('slug_hint')}</p>}
-          </div>
-
-          <div>
-            <label htmlFor="register-password" className="mb-1.5 block text-sm font-semibold text-text">
-              {t('password')} <span className="text-muted" aria-hidden="true">*</span>
-            </label>
-            <div className="relative">
+          <fieldset className="ax-group">
+            <legend>{t('section_company')}</legend>
+            <div>
+              <label htmlFor="register-name" className="mb-1.5 block text-sm font-semibold text-text">
+                {t('company_name')} <span className="text-muted" aria-hidden="true">*</span>
+              </label>
               <Input
-                id="register-password"
-                type={showPw ? 'text' : 'password'}
-                dir="auto"
-                autoComplete="new-password"
-                className="h-12 ps-11 text-base"
-                placeholder={t('password')}
-                aria-invalid={Boolean(errors.password)}
-                aria-describedby={errors.password ? 'register-password-error' : password ? 'register-password-strength' : undefined}
-                {...register('password')}
+                id="register-name"
+                autoComplete="organization"
+                className="ax-input"
+                placeholder={t('company_name_ph')}
+                aria-invalid={Boolean(errors.company_name)}
+                aria-describedby={errors.company_name ? 'register-name-error' : undefined}
+                {...register('company_name')}
               />
-              <button
-                type="button"
-                onClick={() => setShowPw((visible) => !visible)}
-                aria-label={showPw ? t('hide_pw') : t('show_pw')}
-                className="absolute start-0 top-0 flex h-12 w-11 items-center justify-center text-muted transition-colors hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-              >
-                {showPw ? <EyeOff className="h-[18px] w-[18px]" strokeWidth={1.7} /> : <Eye className="h-[18px] w-[18px]" strokeWidth={1.7} />}
-              </button>
+              {errors.company_name && <p id="register-name-error" className="mt-1.5 text-xs text-negative" role="alert">{t('field_required')}</p>}
             </div>
-            {errors.password ? (
-              <p id="register-password-error" className="mt-1.5 text-xs text-negative" role="alert">{t('password_hint')}</p>
-            ) : password ? (
-              <div id="register-password-strength" className="mt-1.5 flex min-h-4 items-center justify-between gap-3 text-xs text-muted" aria-live="polite">
-                <span className="flex flex-1 gap-1" aria-hidden="true">
-                  {[1, 2, 3, 4].map((segment) => <i key={segment} className={`h-1 flex-1 bg-border ${segment <= passwordScore ? 'bg-primary' : ''}`} />)}
-                </span>
-                <span>{password ? `${t('password_strength')}: ${passwordLabels[Math.max(passwordScore - 1, 0)]}` : ''}</span>
+
+            <div>
+              <label htmlFor="register-slug" className="mb-1.5 block text-sm font-semibold text-text">
+                {t('slug')} <span className="text-muted" aria-hidden="true">*</span>
+              </label>
+              <div data-invalid={Boolean(errors.slug) || undefined} className="ax-affix flex" dir="ltr">
+                <input
+                  id="register-slug"
+                  className="h-full w-full bg-transparent px-3 text-text placeholder:text-muted focus:outline-none"
+                  autoComplete="off"
+                  spellCheck="false"
+                  placeholder="myaccount"
+                  aria-invalid={Boolean(errors.slug)}
+                  aria-describedby={errors.slug ? 'register-slug-error' : 'register-slug-hint'}
+                  {...register('slug')}
+                />
+                <span className="flex shrink-0 items-center border-s px-3 text-sm text-muted">{tenantHostSuffix()}</span>
               </div>
-            ) : null}
-          </div>
+              {errors.slug ? <p id="register-slug-error" className="mt-1.5 text-xs text-negative" role="alert">{errors.slug.message === 'reserved' ? t('slug_reserved') : t('slug_invalid')}</p> : <p id="register-slug-hint" className="mt-1.5 text-xs text-muted">{t('slug_hint')}</p>}
+            </div>
+          </fieldset>
 
-          {serverError && <p className="border border-negative/20 bg-negative/10 px-3 py-2 text-xs text-negative" role="alert">{serverError}</p>}
+          <fieldset className="ax-group">
+            <legend>{t('section_account')}</legend>
+            <div>
+              <label htmlFor="register-email" className="mb-1.5 block text-sm font-semibold text-text">
+                {t('email')} <span className="text-muted" aria-hidden="true">*</span>
+              </label>
+              <Input
+                id="register-email"
+                type="email"
+                dir="ltr"
+                autoComplete="email"
+                className="ax-input"
+                placeholder="name@company.com"
+                aria-invalid={Boolean(errors.email)}
+                aria-describedby={errors.email ? 'register-email-error' : undefined}
+                {...register('email')}
+              />
+              {errors.email && <p id="register-email-error" className="mt-1.5 text-xs text-negative" role="alert">{t('email_invalid')}</p>}
+            </div>
 
-          <p className="text-center text-xs leading-5 text-muted">{t('terms')}</p>
-          <Button type="submit" className="h-12 w-full text-base" disabled={isSubmitting} aria-busy={isSubmitting}>
+            <div>
+              <label htmlFor="register-phone" className="mb-1.5 block text-sm font-semibold text-text">
+                {t('phone')} <span className="text-muted" aria-hidden="true">*</span>
+              </label>
+              <div data-invalid={Boolean(errors.phone) || undefined} className="ax-affix flex">
+                <span className="flex shrink-0 items-center gap-1.5 border-e px-2.5 text-sm text-muted" dir="ltr" aria-label={`${t('phone_country')} +966`}>
+                  <SaudiFlag />
+                  <span className="font-semibold text-text" lang="ar" dir="rtl">{t('phone_country')}</span>
+                  <span>+966</span>
+                </span>
+                <input
+                  id="register-phone"
+                  dir="ltr"
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel-national"
+                  maxLength={9}
+                  className="num h-full w-full bg-transparent px-3 text-text placeholder:text-muted focus:outline-none"
+                  placeholder="5X XXX XXXX"
+                  aria-invalid={Boolean(errors.phone)}
+                  aria-describedby={errors.phone ? 'register-phone-error' : undefined}
+                  {...register('phone')}
+                />
+              </div>
+              {errors.phone && <p id="register-phone-error" className="mt-1.5 text-xs text-negative" role="alert">{t('phone_invalid')}</p>}
+            </div>
+
+            <div>
+              <label htmlFor="register-password" className="mb-1.5 block text-sm font-semibold text-text">
+                {t('password')} <span className="text-muted" aria-hidden="true">*</span>
+              </label>
+              <div className="relative">
+                <Input
+                  id="register-password"
+                  type={showPw ? 'text' : 'password'}
+                  dir="auto"
+                  autoComplete="new-password"
+                  className="ax-input ps-12"
+                  placeholder={t('password')}
+                  aria-invalid={Boolean(errors.password)}
+                  aria-describedby={errors.password ? 'register-password-error' : password ? 'register-password-strength' : undefined}
+                  {...register('password')}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPw((visible) => !visible)}
+                  aria-label={showPw ? t('hide_pw') : t('show_pw')}
+                  className="absolute start-0 top-0 flex h-[50px] w-12 items-center justify-center rounded-s-xl text-muted transition-colors hover:text-text"
+                >
+                  {showPw ? <EyeOff className="h-[18px] w-[18px]" strokeWidth={1.7} /> : <Eye className="h-[18px] w-[18px]" strokeWidth={1.7} />}
+                </button>
+              </div>
+              {errors.password ? (
+                <p id="register-password-error" className="mt-1.5 text-xs text-negative" role="alert">{t('password_hint')}</p>
+              ) : password ? (
+                <div id="register-password-strength" className="ax-strength mt-2 flex min-h-4 items-center justify-between gap-3 text-xs text-muted" aria-live="polite">
+                  <span className="flex flex-1 gap-1" aria-hidden="true">
+                    {[1, 2, 3, 4].map((segment) => <i key={segment} className={`h-1.5 flex-1 bg-border ${segment <= passwordScore ? 'bg-primary' : ''}`} />)}
+                  </span>
+                  <span>{password ? `${t('password_strength')}: ${passwordLabels[Math.max(passwordScore - 1, 0)]}` : ''}</span>
+                </div>
+              ) : (
+                <p className="mt-1.5 text-xs text-muted">{t('password_hint')}</p>
+              )}
+            </div>
+          </fieldset>
+
+          {serverError && (
+            <p className="ax-alert" role="alert">
+              <AlertCircle className="h-4 w-4" aria-hidden="true" />
+              {serverError}
+            </p>
+          )}
+
+          <p className="text-center text-xs leading-5 text-muted lg:text-start">{t('terms')}</p>
+          <Button type="submit" className="ax-submit w-full" disabled={isSubmitting} aria-busy={isSubmitting}>
             {isSubmitting ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
             {isSubmitting ? t('submitting') : t('submit')}
           </Button>
         </form>
       </section>
 
-      <footer className="pt-5 text-center">
+      <footer className="pt-6 text-center">
         <p className="text-sm text-muted">
           {t('have_account')}{' '}
-          <Link href="/login" className="font-semibold text-primary hover:text-primary-hover hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+          <Link href="/login" className="ax-link">
             {t('login_link')}
           </Link>
         </p>
-        <Link href="/" className="mt-2 inline-block text-xs text-muted hover:text-text hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+        <Link href="/" className="mt-2 inline-flex min-h-11 items-center text-xs text-muted hover:text-text hover:underline">
           {t('back_home')}
         </Link>
       </footer>
