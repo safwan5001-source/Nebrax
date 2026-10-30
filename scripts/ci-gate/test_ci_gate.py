@@ -277,9 +277,10 @@ class Validation(unittest.TestCase):
     def test_paths_ignore_unsupported(self):
         d = self._sandbox()
         p = d / ".github" / "workflows" / "web-ci.yml"
-        p.write_text(p.read_text(encoding="utf-8").replace(
-            "    paths: ['web/**', 'contracts/app-builder/**', 'contracts/flowers-admin-journey/**', '.github/workflows/web-ci.yml']\n\njobs",
-            "    paths-ignore: ['docs/**']\n\njobs"), encoding="utf-8")
+        # قائمة pull_request.paths (آخر قائمة قبل jobs) تُستبدل بـ paths-ignore، بصرف النظر عن تنسيقها.
+        text = re.sub(r"(  pull_request:\n    branches: \['\*\*'\]\n)    paths:.*?(?=\n\njobs)",
+                      r"\1    paths-ignore: ['docs/**']", p.read_text(encoding="utf-8"), count=1, flags=re.S)
+        p.write_text(text, encoding="utf-8")
         errs = g.validate(d)[0]
         self.assertTrue(any("paths-ignore" in e for e in errs), errs)
 
@@ -542,7 +543,8 @@ class Baseline(unittest.TestCase):
         b, h = self._pair()
         p = h / ".github/workflows/web-ci.yml"
         t = p.read_text()
-        p.write_text(t.replace("  pull_request:\n    branches: ['**']\n    paths: ['web/**', ", "  pull_request:\n    branches: ['**']\n    paths: [", 1))
+        head, sep, tail = t.partition("  pull_request:\n")
+        p.write_text(head + sep + tail.replace("      - 'web/**'\n", "", 1))
         self.assertTrue(any("paths lost" in e for e in g.compare_baseline(b, h)), t[:0])
 
     def test_adding_checks_or_paths_is_allowed(self):
