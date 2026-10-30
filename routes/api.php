@@ -45,6 +45,7 @@ use App\Http\Controllers\Api\CommerceShippingZoneController;
 use App\Http\Controllers\Api\CommerceDeliveryScheduleController;
 use App\Http\Controllers\Api\CommerceFulfillmentController;
 use App\Http\Controllers\Api\CommerceStaffOrderCancellationController;
+use App\Http\Controllers\Api\CommerceStaffChannelSettingsController;
 use App\Http\Controllers\Api\CommerceStaffWholesaleMembershipController;
 use App\Http\Controllers\Api\CommerceStaffOrderController;
 use App\Http\Controllers\Api\CommerceGiftSettingsController;
@@ -1190,6 +1191,14 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // وبوابة نشر commerce.order_cancellation_enabled مغلقة افتراضياً (404). لا تغيير في عقد المشتري.
         Route::post('commerce/orders/{id}/cancel', [CommerceStaffOrderCancellationController::class, 'cancel'])
             ->whereUuid('id')->middleware([$perm('commerce.orders.cancel'), $app('commerce.storefront')]);
+
+        // H6 Batch F: إعدادات تسعير قناة الويب (إسناد/إلغاء قائمة أسعار القناة + وسم عضوية الجملة) — صلاحية مستقلة
+        // commerce.channel_settings.manage (owner/admin عبر `*` فقط) + حارس القدرة commerce.storefront. إعداد فقط:
+        // لا يفعّل الجملة (بوابة النشر المنصّية منفصلة ومغلقة) ولا يمسّ أسعاراً أو طلبات أو محاسبة؛ كل تغيير فعلي يُدقَّق.
+        Route::get('commerce/channels/{id}/pricing-settings', [CommerceStaffChannelSettingsController::class, 'show'])
+            ->whereUuid('id')->middleware([$perm('commerce.channel_settings.manage'), $app('commerce.storefront')]);
+        Route::put('commerce/channels/{id}/pricing-settings', [CommerceStaffChannelSettingsController::class, 'update'])
+            ->whereUuid('id')->middleware([$perm('commerce.channel_settings.manage'), $app('commerce.storefront')]);
 
         // H6 Batch E: مراجعة طلبات عضوية مشتري الجملة (قائمة + اعتماد/رفض/إيقاف/إعادة تفعيل) — صلاحية مستقلة
         // commerce.wholesale.manage (owner/admin عبر `*` فقط) + حارس القدرة commerce.storefront، وبوابة النشر
