@@ -3,9 +3,10 @@
 | | |
 |---|---|
 | Branch | `claude/commerce-h6-batch-i` |
-| PR | __PR__ |
+| PR | #1821 |
 | Base SHA (origin/main, #1819 merge) | `26fd3c139bcf6aabe839b078f0aa3cb9bd85f7da` |
-| Head SHA | __HEAD__ |
+| Code head SHA (all CI green) | `8776f6bc090ab6e453cbfc1533982343107f428d` |
+| Report commit | docs-only commit on top of the code head (changes this file only; its CI run is on the PR) |
 
 **Status.** No production code changed. Nothing merged, deployed or activated; `commerce.wholesale_buyer_enabled` stays off; Spree is untouched and the Spree exit is **not** complete. This batch converts every open wholesale blocker into either a proven negative test or a precise, owner-approvable specification, because none of the blockers has an approved contract or verifiable provenance yet.
 
@@ -80,7 +81,7 @@ Details: `AWJ_H6_BATCH_I_COMMERCIAL_RULES_CONTRACT.md`. Verified today: no MOQ, 
 | Same suites, PostgreSQL | 628 passed |
 | Tenant isolation / authorization / negative cases | Covered by the above (matrix m8a–d, direct-access, forged headers, cross-tenant) |
 | Storefront / web | **No files changed** under `storefront/` or `web/`; storefront checks and builds are exercised by CI |
-| CI / CI Gate | __CI__ |
+| CI / CI Gate (code head `8776f6bc0`) | **All required checks green:** `php artisan test` SQLite, `php artisan test` PostgreSQL, `CI Gate`. The web/storefront/docker/visual-QA jobs did not run: the PR changes only `tests/` and `docs/`. Codex: one P2 finding (own test weakness), fixed and resolved; no open findings. |
 
 Environment note: `Fuel*` tests need `ext-bcmath`, absent locally only. No production code changed, so a full local backend run was not repeated; CI runs it.
 
