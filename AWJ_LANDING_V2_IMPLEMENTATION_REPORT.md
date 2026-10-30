@@ -6,8 +6,8 @@
 |---|---|
 | الفرع | `claude/focused-lovelace-oyeuyv` |
 | Base SHA (`origin/main`) | `7cb5843fff7f9d906e18fbf92de135babd637ccc` |
-| Head SHA | انظر آخر commit على الفرع في الـPR (هذا التقرير هو آخر commit) |
-| PR | يُضاف رابطه في وصف الـPR |
+| Head SHA | `fbad68003db3beb1fc4f4b09ae9f507ccb3b5510` (آخر commit تنفيذي)؛ يليه commit هذا السطر فقط |
+| PR | https://github.com/safwan5001-source/Nebrax/pull/1810 |
 | الدمج / النشر | **لا دمج · لا نشر** |
 
 ---
