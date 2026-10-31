@@ -8708,13 +8708,24 @@
             "noScreen": "The current mobile app has no screen for this section yet.",
           "pageOnly": "This section only works on page: {pages} (its data is provided by that app screen)."
           },
-            "selectionBar": {
+            "hideSection": "Hide section",
+          "showSection": "Show section",
+          "hidden": "Hidden",
+          "renameSection": "Rename section",
+          "renameSave": "Save name",
+          "renameCancel": "Cancel",
+          "renameInputLabel": "New section name",
+          "pageTitleLabel": "Page title",
+          "pageTitleHint": "Editor only — not shown in the app",
+          "selectionBar": {
             "label": "Tools for section “{name}”",
             "up": "Move section up",
             "down": "Move section down",
             "duplicate": "Duplicate section",
             "hide": "Hide section",
-            "hideReason": "Hiding needs an architecture decision (AD-05) — not available yet",
+            "show": "Show section",
+            "hideReason": "A hidden section stays in the draft but is not in the published app or the preview",
+            "rename": "Rename section",
             "delete": "Delete section"
           },
           "identity": {

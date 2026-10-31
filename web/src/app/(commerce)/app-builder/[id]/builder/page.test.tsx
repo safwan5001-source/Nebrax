@@ -156,7 +156,17 @@ const { api, currentUser, translate } = vi.hoisted(() => {
     'easy.selectionBar.down': 'Bar move down',
     'easy.selectionBar.duplicate': 'Bar duplicate',
     'easy.selectionBar.hide': 'Bar hide',
-    'easy.selectionBar.hideReason': 'Hiding needs AD-05',
+    'easy.selectionBar.show': 'Bar show',
+    'easy.selectionBar.hideReason': 'Hidden sections stay in the draft only',
+    'easy.hidden': 'Hidden',
+    'easy.hideSection': 'Hide section',
+    'easy.showSection': 'Show section',
+    'easy.renameSection': 'Rename section',
+    'easy.renameSave': 'Save name',
+    'easy.renameCancel': 'Cancel rename',
+    'easy.renameInputLabel': 'New section name',
+    'easy.pageTitleLabel': 'Page title',
+    'easy.pageTitleHint': 'Editor only',
     'easy.selectionBar.delete': 'Bar delete',
     'easy.identity.tab': 'Identity',
     'easy.identity.name': 'App name (Arabic)',
@@ -2293,21 +2303,210 @@ describe('AppBuilderWorkspacePage — Easy Mode V2 shell (S21a)', () => {
     await waitFor(() => expect(screen.getAllByText('Visibility condition').length).toBeGreaterThan(0));
   });
 
-  it('selecting an element shows the section toolbar; its actions work and Hide is disabled with its reason (AD-05)', async () => {
+  it('selecting an element shows the section toolbar; its actions work (Hide is a real toggle since AD-05)', async () => {
     await open();
     expect(screen.queryByTestId('easy-selection-bar')).toBeNull();
     await userEvent.setup().click(within(sections().getAllByRole('listitem')[0]).getAllByRole('button')[0]);
 
     const bar = within(await screen.findByTestId('easy-selection-bar'));
     const hide = bar.getByRole('button', { name: 'Bar hide' }) as HTMLButtonElement;
-    expect(hide.disabled).toBe(true);
-    expect(hide.title).toBe('Hiding needs AD-05');
+    expect(hide.disabled).toBe(false);
+    expect(hide.title).toBe('Hidden sections stay in the draft only');
 
     await userEvent.setup().click(bar.getByRole('button', { name: 'Bar duplicate' }));
     expect(screen.getByText('Unsaved changes')).toBeTruthy();
     await userEvent.setup().click(screen.getAllByText('Save')[0]);
     await waitFor(() => expect(putBodies().length).toBe(1));
     expect(putBodies()[0].schema.pages.home.children.length).toBeGreaterThanOrEqual(2);
+  });
+
+  // ── بيانات المحرر (AD-05 / S20b): إخفاء/اسم/عنوان صفحة/Preset — تُحفظ بالقفل نفسه ولا تدخل المخطط ──
+  type MetaBody = { schema: { pages: { home: { children: Array<{ id: string }> } } }; editor_meta?: { v: number; nodes: Record<string, Record<string, { name?: string; hidden?: boolean; preset?: string }>>; pages: Record<string, { title?: string }> } | null };
+  const metaPuts = () => api.mock.calls.filter((c) => c[0] === DRAFT_PATH && c[1]?.method === 'PUT').map((c) => c[1].body as MetaBody);
+  const sectionItem = (index = 0) => within(sections().getAllByRole('listitem')[index]);
+
+  function openWithMeta(editorMeta: unknown) {
+    mockApi();
+    const base = api.getMockImplementation()!;
+    api.mockImplementation((path?: string, init?: { method?: string; body?: unknown }) => {
+      if (path === DRAFT_PATH && !init?.method) return Promise.resolve({ data: { ...draftData, editor_meta: editorMeta } });
+      if (path === DRAFT_PATH && init?.method === 'PUT') return Promise.resolve({ data: { ...draftData, revision: 1, editor_meta: (init.body as MetaBody).editor_meta ?? null } });
+      return base(path, init);
+    });
+    render(<AppBuilderWorkspacePage />);
+  }
+
+  it('hiding a section removes it from the canvas and previews, keeps it in the list and the draft, and saves editor_meta (not the schema)', async () => {
+    await open();
+    expect(screen.getAllByText('Welcome').length).toBeGreaterThan(0);
+
+    await userEvent.setup().click(sectionItem().getByRole('button', { name: 'Hide section' }));
+
+    expect(screen.queryAllByText('Welcome')).toHaveLength(0); // الكانفاس والمعاينة المضمّنة كلاهما يعرضان ما سيُنشر
+    expect(sections().getAllByRole('listitem')).toHaveLength(1); // القسم باقٍ في القائمة
+    expect(sectionItem().getByText('Hidden')).toBeTruthy();
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+
+    await userEvent.setup().click(screen.getAllByText('Save')[0]);
+    await waitFor(() => expect(metaPuts().length).toBe(1));
+    const body = metaPuts()[0];
+    expect(body.editor_meta).toEqual({ v: 1, nodes: { home: { 'sec-1': { hidden: true } } }, pages: {} });
+    expect(body.schema.pages.home.children.map((c) => c.id)).toEqual(['sec-1']); // المخطط لم يتغيّر
+  });
+
+  it('showing a hidden section again returns editor_meta to null and the section to the canvas', async () => {
+    await open();
+    await userEvent.setup().click(sectionItem().getByRole('button', { name: 'Hide section' }));
+    await userEvent.setup().click(sectionItem().getByRole('button', { name: 'Show section' }));
+    expect(screen.getAllByText('Welcome').length).toBeGreaterThan(0);
+
+    await userEvent.setup().click(screen.getAllByText('Save')[0]);
+    await waitFor(() => expect(metaPuts().length).toBe(1));
+    expect(metaPuts()[0].editor_meta).toBeNull();
+  });
+
+  it('a draft loaded with editor_meta restores hidden sections, custom names and page titles', async () => {
+    openWithMeta({ v: 1, nodes: { home: { 'sec-1': { hidden: true, name: 'Hero block' } } }, pages: { home: { title: 'Storefront' } } });
+    await screen.findAllByText('Hero block');
+
+    expect(screen.queryAllByText('Welcome')).toHaveLength(0);
+    expect(sectionItem().getByText('Hidden')).toBeTruthy();
+    expect(sections().getByText('Storefront')).toBeTruthy();
+  });
+
+  it('renames a section (Enter saves, empty falls back to the derived name) and the name round-trips through the save', async () => {
+    await open();
+    const user = userEvent.setup();
+    await user.click(sectionItem().getByRole('button', { name: 'Rename section' }));
+    await user.type(screen.getByLabelText('New section name'), 'Top picks{Enter}');
+    expect(sections().getAllByText('Top picks').length).toBeGreaterThan(0);
+
+    await user.click(screen.getAllByText('Save')[0]);
+    await waitFor(() => expect(metaPuts().length).toBe(1));
+    expect(metaPuts()[0].editor_meta?.nodes.home['sec-1']).toEqual({ name: 'Top picks' });
+
+    // مسح الاسم يعيد المشتق
+    await user.click(sectionItem().getByRole('button', { name: 'Rename section' }));
+    await user.clear(screen.getByLabelText('New section name'));
+    await user.keyboard('{Enter}');
+    expect(sections().queryByText('Top picks')).toBeNull();
+  });
+
+  it('Escape cancels a rename without changing anything', async () => {
+    await open();
+    const user = userEvent.setup();
+    await user.click(sectionItem().getByRole('button', { name: 'Rename section' }));
+    await user.type(screen.getByLabelText('New section name'), 'Nope{Escape}');
+    expect(screen.queryByLabelText('New section name')).toBeNull();
+    expect(screen.queryAllByText('Unsaved changes')).toHaveLength(0);
+  });
+
+  it('renames the page title in the editor only (the schema page id is untouched)', async () => {
+    await open();
+    const user = userEvent.setup();
+    await user.click(sections().getByRole('button', { name: 'Page title' }));
+    await user.type(sections().getByRole('textbox', { name: 'Page title' }), 'Landing{Enter}');
+    await user.click(screen.getAllByText('Save')[0]);
+    await waitFor(() => expect(metaPuts().length).toBe(1));
+    expect(metaPuts()[0].editor_meta?.pages).toEqual({ home: { title: 'Landing' } });
+    expect(Object.keys((metaPuts()[0].schema as unknown as { pages: object }).pages)).toEqual(['home', 'about']);
+  });
+
+  it('"Copy my changes" after a save conflict includes the unsaved editor meta (hide/rename/page title), and stays the plain schema when there is none', async () => {
+    const { ApiError } = await import('@/lib/api');
+    const conflict = { message: 'conflict', reason: 'draft_conflict', current_revision: 5, base_revision: 0, updated_by: 'u2', updated_at: '2026-10-30T10:00:00+00:00' };
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    await open();
+    const base = api.getMockImplementation()!;
+    api.mockImplementation((path?: string, init?: { method?: string; body?: unknown }) =>
+      path === DRAFT_PATH && init?.method === 'PUT' ? Promise.reject(new ApiError(409, 'conflict', conflict)) : base(path, init));
+    const user = userEvent.setup();
+    const original = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    try {
+      await user.click(sectionItem().getByRole('button', { name: 'Hide section' }));
+      await user.click(screen.getAllByText('Save')[0]);
+      const dialog = within(await screen.findByRole('dialog', { name: 'Draft save conflict' }));
+      await user.click(dialog.getByRole('button', { name: 'Copy my changes' }));
+      await waitFor(() => expect(writeText).toHaveBeenCalled());
+
+      const exported = JSON.parse(String(writeText.mock.calls[0][0]));
+      expect(exported.editor_meta).toEqual({ v: 1, nodes: { home: { 'sec-1': { hidden: true } } }, pages: {} });
+      expect(exported.schema.pages.home.children[0].id).toBe('sec-1');
+    } finally {
+      if (original) Object.defineProperty(navigator, 'clipboard', original);
+      else delete (navigator as unknown as Record<string, unknown>).clipboard;
+    }
+  });
+
+  it('a pending rename never follows the user to another page (page title and section name are bound to the page they started on)', async () => {
+    await open();
+    const user = userEvent.setup();
+
+    // عنوان الصفحة: ابدأ على home، انتقل إلى about، ثم احفظ — لا يجوز أن يُكتب على about.
+    await user.click(sections().getByRole('button', { name: 'Page title' }));
+    await user.type(sections().getByRole('textbox', { name: 'Page title' }), 'Draft title');
+    await user.click(screen.getAllByRole('button', { name: 'about' })[0]);
+    expect(sections().queryByRole('textbox', { name: 'Page title' })).toBeNull(); // حقل التحرير لم ينتقل معه
+
+    // اسم القسم: كذلك (قسم home المفتوح للتسمية لا يُكتب على صفحة أخرى).
+    await user.click(screen.getAllByRole('button', { name: /^home/ })[0]);
+    await user.click(sectionItem().getByRole('button', { name: 'Rename section' }));
+    await user.type(screen.getByLabelText('New section name'), 'Half typed');
+    await user.click(screen.getAllByRole('button', { name: 'about' })[0]);
+    expect(screen.queryByLabelText('New section name')).toBeNull();
+
+    // لا تعديل ولا كتابة شيء: لا «غير محفوظ» ولا editor_meta.
+    expect(screen.queryAllByText('Unsaved changes')).toHaveLength(0);
+    await user.click(screen.getAllByRole('button', { name: /^home/ })[0]);
+    expect(sections().getByRole('button', { name: 'Page title' })).toBeTruthy();
+    expect(sections().queryByText('Draft title')).toBeNull();
+  });
+
+  it('a section added from the catalog records its preset; a duplicate carries name and preset but is visible', async () => {
+    await open();
+    const user = userEvent.setup();
+    await addFromCatalog('Text block');
+    await user.click(screen.getAllByText('Save')[0]);
+    await waitFor(() => expect(metaPuts().length).toBe(1));
+    const added = metaPuts()[0].schema.pages.home.children.find((c) => c.id !== 'sec-1')!;
+    expect(metaPuts()[0].editor_meta?.nodes.home[added.id]).toEqual({ preset: 'text' });
+
+    // نسخ قسم مسمّى ومخفي: النسخة تحمل الاسم فقط وتظهر.
+    await user.click(sectionItem(0).getByRole('button', { name: 'Rename section' }));
+    await user.type(screen.getByLabelText('New section name'), 'Featured copy{Enter}');
+    await user.click(sectionItem(0).getByRole('button', { name: 'Hide section' }));
+    await user.click(sectionItem(0).getByRole('button', { name: 'Duplicate section' }));
+    await user.click(screen.getAllByText('Save')[0]);
+    await waitFor(() => expect(metaPuts().length).toBe(2));
+    const second = metaPuts()[1];
+    const copyId = second.schema.pages.home.children.map((c) => c.id).find((id) => id !== 'sec-1' && id !== added.id)!;
+    expect(second.editor_meta?.nodes.home['sec-1']).toEqual({ name: 'Featured copy', hidden: true });
+    expect(second.editor_meta?.nodes.home[copyId]).toEqual({ name: 'Featured copy' });
+  });
+
+  it('hide is one undo step and redo restores it; the selection bar toggles the same state', async () => {
+    await open();
+    const user = userEvent.setup();
+    await user.click(within(sections().getAllByRole('listitem')[0]).getAllByRole('button')[0]);
+    const bar = within(await screen.findByTestId('easy-selection-bar'));
+    await user.click(bar.getByRole('button', { name: 'Bar hide' }));
+    expect(screen.queryAllByText('Welcome')).toHaveLength(0);
+    expect(bar.getByRole('button', { name: 'Bar show' })).toBeTruthy();
+
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true });
+    await waitFor(() => expect(screen.getAllByText('Welcome').length).toBeGreaterThan(0));
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true, shiftKey: true });
+    await waitFor(() => expect(screen.queryAllByText('Welcome')).toHaveLength(0));
+  });
+
+  it('a user without manage permission cannot hide, show or rename', async () => {
+    currentUser.mockReturnValue({ id: 'u3', role: 'staff', permissions: ['apps_builder.view'] });
+    await open();
+    for (const name of ['Hide section', 'Rename section']) {
+      for (const b of sections().getAllByRole('button', { name })) expect((b as HTMLButtonElement).disabled).toBe(true);
+    }
+    expect((sections().getByRole('button', { name: 'Page title' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('the Identity tab renames the app through the app endpoint (not the schema draft) and lists the proposed items as unavailable', async () => {

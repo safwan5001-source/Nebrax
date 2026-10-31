@@ -1,5 +1,5 @@
 import { ApiError } from '@/lib/api';
-import type { AppSchema } from '@/lib/app-builder';
+import type { AppSchema, EditorMeta } from '@/lib/app-builder';
 
 /**
  * AD-01 / S01b — منطق حفظ المسودة بلا واجهة: قراءة تعارض الخادم (409 `draft_conflict`) وتصنيف أسباب فشل الحفظ،
@@ -51,6 +51,8 @@ export interface DraftBackup {
   appId: string;
   userId: string;
   schema: AppSchema;
+  /** AD-05: بيانات المحرر المرافقة للمخطط (غائبة في نسخ ما قبل S20b ⇒ null). */
+  editorMeta?: EditorMeta | null;
   /** الـrevision الذي بُنيت عليه التعديلات — يبقى أساس الحفظ التفاؤلي عند الاستعادة، فيُكتشف أي تعارض لاحق. */
   baseRevision: number;
   savedAt: string;
@@ -61,9 +63,9 @@ function backupKey(userId: string, appId: string): string {
 }
 
 /** المفتاح يضمّ هوية المستخدم كي لا يظهر عمل مستخدم لآخر على المتصفح نفسه. */
-export function writeDraftBackup(userId: string, appId: string, schema: AppSchema, baseRevision: number): boolean {
+export function writeDraftBackup(userId: string, appId: string, schema: AppSchema, baseRevision: number, editorMeta: EditorMeta | null = null): boolean {
   try {
-    const payload: DraftBackup = { v: 1, appId, userId, schema, baseRevision, savedAt: new Date().toISOString() };
+    const payload: DraftBackup = { v: 1, appId, userId, schema, editorMeta, baseRevision, savedAt: new Date().toISOString() };
     window.localStorage.setItem(backupKey(userId, appId), JSON.stringify(payload));
     return true;
   } catch {
@@ -96,12 +98,17 @@ export function clearDraftBackup(userId: string, appId: string): void {
  * يمسح النسخة المحلية بعد حفظٍ ناجح **فقط** إن كانت تخصّ ما حُفظ (أو لا يوجد شيء): تبويبٌ آخر للمستخدم نفسه على
  * التطبيق نفسه يشارك المفتاح، وقد تحمل نسخته تعديلات لم تُحفظ فلا يجوز محوها.
  */
-export function clearDraftBackupIfSaved(userId: string, appId: string, savedSchema: AppSchema): void {
+export function clearDraftBackupIfSaved(userId: string, appId: string, savedSchema: AppSchema, savedMeta: EditorMeta | null = null): void {
   const stored = readDraftBackup(userId, appId);
-  if (stored && !schemasEqual(stored.schema, savedSchema)) return;
+  if (stored && !draftStatesEqual({ schema: stored.schema, editorMeta: stored.editorMeta ?? null }, { schema: savedSchema, editorMeta: savedMeta })) return;
   clearDraftBackup(userId, appId);
 }
 
 export function schemasEqual(a: AppSchema, b: AppSchema): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/** مسودة كاملة = المخطط + بيانات المحرر (تغيّر الاسم/الإخفاء وحده تعديل غير محفوظ). */
+export function draftStatesEqual(a: { schema: AppSchema; editorMeta: EditorMeta | null }, b: { schema: AppSchema; editorMeta: EditorMeta | null }): boolean {
+  return schemasEqual(a.schema, b.schema) && JSON.stringify(a.editorMeta ?? null) === JSON.stringify(b.editorMeta ?? null);
 }

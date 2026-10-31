@@ -14,6 +14,9 @@ import {
   setInitialPage,
   themeTokens,
   updateComponentById,
+  projectPageRoot,
+  updateEditorMetaNode,
+  updateEditorMetaPageTitle,
   canonicalizeThemeTokens,
   readPrimaryColor,
   type AppSchema,
@@ -230,6 +233,56 @@ describe('setInitialPage', () => {
   it('is a no-op for an id that does not reference a declared page', () => {
     const original = twoPageSchema();
     expect(setInitialPage(original, 'missing')).toEqual(original);
+  });
+});
+
+describe('editor meta helpers (AD-05)', () => {
+  const root: AppSchemaComponent = {
+    type: 'Page', id: 'root',
+    children: [
+      { type: 'Section', id: 'a', children: [{ type: 'Text', id: 'a1', props: { text: 'x' } }] },
+      { type: 'Section', id: 'b', children: [] },
+    ],
+  };
+
+  it('projectPageRoot drops hidden nodes and their subtrees, never mutates, and returns the same root when nothing is hidden', () => {
+    const meta = { v: 1 as const, nodes: { home: { a: { hidden: true as const, name: 'A' } } }, pages: {} };
+    const projected = projectPageRoot(root, meta, 'home');
+    expect(projected.children?.map((c) => c.id)).toEqual(['b']);
+    expect(root.children?.map((c) => c.id)).toEqual(['a', 'b']);
+    expect(projectPageRoot(root, null, 'home')).toBe(root);
+    expect(projectPageRoot(root, { v: 1, nodes: { home: { a: { name: 'only a name' } } }, pages: {} }, 'home')).toBe(root);
+    // نظير بالمعرّف نفسه في صفحة أخرى: لا يتأثر (فرادة المعرّف داخل الصفحة وحدها).
+    expect(projectPageRoot(root, meta, 'about')).toBe(root);
+  });
+
+  it('updateEditorMetaNode sets, trims and clears fields; empty entries and empty meta collapse to null', () => {
+    let meta = updateEditorMetaNode(null, 'home', 'a', { name: '  Hero ' });
+    expect(meta?.nodes.home.a).toEqual({ name: 'Hero' });
+    meta = updateEditorMetaNode(meta, 'home', 'a', { hidden: true, preset: 'text' });
+    expect(meta?.nodes.home.a).toEqual({ name: 'Hero', hidden: true, preset: 'text' });
+    meta = updateEditorMetaNode(meta, 'about', 'a', { name: 'Same id elsewhere' });
+    expect(meta?.nodes.about.a).toEqual({ name: 'Same id elsewhere' });
+    expect(meta?.nodes.home.a).toEqual({ name: 'Hero', hidden: true, preset: 'text' }); // مقيَّدة بالصفحة
+    meta = updateEditorMetaNode(meta, 'about', 'a', { name: '' });
+    expect(meta?.nodes.about).toBeUndefined();
+    meta = updateEditorMetaNode(meta, 'home', 'a', { hidden: false, name: '' });
+    expect(meta?.nodes.home.a).toEqual({ preset: 'text' });
+    expect(updateEditorMetaNode(meta, 'home', 'a', { preset: '' })).toBeNull();
+  });
+
+  it('updateEditorMetaNode / PageTitle do not mutate their input', () => {
+    const before = { v: 1 as const, nodes: { home: { a: { name: 'A' } } }, pages: { home: { title: 'H' } } };
+    const snapshot = JSON.stringify(before);
+    updateEditorMetaNode(before, 'home', 'a', { hidden: true });
+    updateEditorMetaPageTitle(before, 'home', '');
+    expect(JSON.stringify(before)).toBe(snapshot);
+  });
+
+  it('updateEditorMetaPageTitle sets and clears a title; clearing the last entry gives null', () => {
+    const meta = updateEditorMetaPageTitle(null, 'home', ' Landing ');
+    expect(meta?.pages.home).toEqual({ title: 'Landing' });
+    expect(updateEditorMetaPageTitle(meta, 'home', '  ')).toBeNull();
   });
 });
 
