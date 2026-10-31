@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { HostContext } from "@/lib/commerce/edge-storefront-locale";
 import { createSpreeMiddleware } from "@/lib/spree/middleware";
 
 const middleware = createSpreeMiddleware({
@@ -559,5 +560,218 @@ describe("X5b: legacy Spree checkout routes answer a real 404 without wholesale"
     expect(rewriteOf(response)).toBeNull();
     expect(response.headers.get("x-middleware-next")).toBe("1");
     expect(response.headers.get("set-cookie")).toBeNull();
+  });
+});
+
+describe("H6 Final Closure: host context, wholesale-only pages, bare country, cookie attributes", () => {
+  const closedPath = "/sa/ar/awj-legacy-checkout-closed";
+  type Ctx = HostContext;
+
+  const retail: Ctx = {
+    state: "known",
+    defaultLocale: "ar",
+    wholesaleBuyer: false,
+  };
+  const wholesale: Ctx = {
+    state: "known",
+    defaultLocale: "ar",
+    wholesaleBuyer: true,
+  };
+
+  function withContext(
+    ctx: Ctx | "reject",
+    extra: { closeUnknownHosts?: boolean } = {},
+  ) {
+    const resolveHostContext = vi.fn(async () => {
+      if (ctx === "reject") throw new Error("boom");
+      return ctx;
+    });
+    const mw = createSpreeMiddleware({
+      defaultCountry: "sa",
+      defaultLocale: "ar",
+      supportedLocales: ["ar", "en"],
+      resolveHostContext,
+      ...extra,
+    });
+    return { mw, resolveHostContext };
+  }
+
+  // A request path that ends in "/" keeps it on the rewritten URL; the router ignores it, so compare without it.
+  const rewriteOf = (response: Response) =>
+    response.headers.get("x-middleware-rewrite")?.replace(/\/$/, "") ?? null;
+  const call = (mw: ReturnType<typeof withContext>["mw"], path: string) =>
+    mw(new NextRequest(`https://store.example${path}`));
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("answers a real 404 (rewrite to no route, no redirect) for a Host the API definitively does not know", async () => {
+    const { mw } = withContext({ state: "unknown" });
+    for (const path of ["/sa/ar", "/sa/ar/products", "/sa/en/cart"]) {
+      const response = await call(mw, path);
+      expect(response.headers.get("location")).toBeNull();
+      expect(rewriteOf(response)).toMatch(/\/awj-legacy-checkout-closed$/);
+    }
+  });
+
+  it("sets no locale cookies on an unknown Host", async () => {
+    const { mw } = withContext({ state: "unknown" });
+    const response = await call(mw, "/sa/ar/products");
+    expect(response.cookies.get("spree_country")).toBeUndefined();
+    expect(response.cookies.get("spree_locale")).toBeUndefined();
+  });
+
+  it("never closes a Host on 'unavailable' or a rejected lookup (fail open for the Host)", async () => {
+    for (const ctx of [{ state: "unavailable" } as Ctx, "reject" as const]) {
+      const { mw } = withContext(ctx);
+      const response = await call(mw, "/sa/ar/products");
+      expect(rewriteOf(response)).toBeNull();
+      expect(response.status).toBe(200);
+    }
+  });
+
+  it("honors the off switch for unknown Hosts", async () => {
+    const { mw } = withContext(
+      { state: "unknown" },
+      { closeUnknownHosts: false },
+    );
+    const response = await call(mw, "/sa/ar/products");
+    expect(rewriteOf(response)).toBeNull();
+  });
+
+  it("closes native buyer pages on a retail Host, on an unavailable lookup and on an unknown Host", async () => {
+    for (const ctx of [retail, { state: "unavailable" } as Ctx]) {
+      const { mw } = withContext(ctx);
+      for (const path of [
+        "/sa/ar/buyer/sign-in",
+        "/sa/ar/buyer/orders",
+        "/sa/ar/buyer/orders/abc",
+        "/sa/ar/buyer/forgot-password",
+        "/sa/ar/buyer/",
+      ]) {
+        const response = await call(mw, path);
+        expect(rewriteOf(response)).toBe(`https://store.example${closedPath}`);
+      }
+    }
+  });
+
+  it("serves native buyer pages on a Host whose API says wholesale is open", async () => {
+    const { mw } = withContext(wholesale);
+    for (const path of ["/sa/ar/buyer/sign-in", "/sa/ar/buyer/orders/abc"]) {
+      const response = await call(mw, path);
+      expect(rewriteOf(response)).toBeNull();
+      expect(response.status).toBe(200);
+    }
+  });
+
+  it("does not mistake look-alike paths for buyer pages", async () => {
+    const { mw } = withContext(retail);
+    for (const path of ["/sa/ar/buyers-guide", "/sa/ar/products/buyer"]) {
+      expect(rewriteOf(await call(mw, path))).toBeNull();
+    }
+  });
+
+  it("closes the Spree-era /wholesale/* URLs with a real 404 on a retail Host", async () => {
+    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "");
+    const { mw } = withContext(retail);
+    for (const path of [
+      "/sa/ar/wholesale",
+      "/sa/ar/wholesale/sign-in",
+      "/sa/ar/wholesale/apply",
+      "/sa/ar/wholesale/cart",
+      "/sa/ar/wholesale/quick-order",
+      "/sa/ar/wholesale/products/abc",
+    ]) {
+      const response = await call(mw, path);
+      expect(response.headers.get("location")).toBeNull();
+      expect(rewriteOf(response)).toBe(`https://store.example${closedPath}`);
+    }
+  });
+
+  it("redirects legacy /wholesale/* to the native equivalent on a native wholesale Host, closing the rest", async () => {
+    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "");
+    const { mw } = withContext(wholesale);
+    const cases: Array<[string, string | null]> = [
+      ["/sa/ar/wholesale", "/sa/ar/buyer/sign-in"],
+      ["/sa/ar/wholesale/sign-in", "/sa/ar/buyer/sign-in"],
+      ["/sa/ar/wholesale/apply", "/sa/ar/buyer/membership"],
+      ["/sa/ar/wholesale/cart", "/sa/ar/cart"],
+      ["/sa/ar/wholesale/products", "/sa/ar/products"],
+      ["/sa/ar/wholesale/products/abc", "/sa/ar/products"],
+      ["/sa/ar/wholesale/whatever", null],
+    ];
+    for (const [from, to] of cases) {
+      const response = await call(mw, `${from}?x=1`);
+      if (to) {
+        expect(response.status).toBe(308);
+        expect(new URL(response.headers.get("location") ?? "").pathname).toBe(
+          to,
+        );
+        expect(new URL(response.headers.get("location") ?? "").search).toBe(
+          "?x=1",
+        );
+      } else {
+        expect(rewriteOf(response)).toBe(`https://store.example${closedPath}`);
+      }
+    }
+  });
+
+  it("leaves the Spree wholesale portal alone when that add-on is enabled", async () => {
+    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "wholesale");
+    const { mw } = withContext(retail);
+    const response = await call(mw, "/sa/ar/wholesale/sign-in");
+    expect(rewriteOf(response)).toBeNull();
+    expect(response.status).toBe(200);
+  });
+
+  it("does not consult the Host context for static or non-localized requests", async () => {
+    const { mw, resolveHostContext } = withContext(retail);
+    await call(mw, "/_next/static/chunk.js");
+    await call(mw, "/logo.png");
+    expect(resolveHostContext).not.toHaveBeenCalled();
+  });
+
+  it("routes a bare country (/sa) to that market's root instead of /sa/ar/sa", async () => {
+    const { mw } = withContext(retail);
+    const response = await call(mw, "/sa");
+    expect(response.headers.get("location")).toBe(
+      "https://store.example/sa/ar",
+    );
+    const trailing = await call(mw, "/sa/");
+    expect(new URL(trailing.headers.get("location") ?? "").pathname).toMatch(
+      /^\/sa\/ar\/?$/,
+    );
+    const other = await call(mw, "/ae");
+    expect(other.headers.get("location")).toBe("https://store.example/ae/ar");
+  });
+
+  it("keeps ordinary bare pages on the old redirect (longer than a country code)", async () => {
+    const { mw } = withContext(retail);
+    const response = await call(mw, "/products");
+    expect(response.headers.get("location")).toBe(
+      "https://store.example/sa/ar/products",
+    );
+  });
+
+  it("sets the locale cookies HttpOnly, SameSite=Lax and (in production) Secure", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    const { mw } = withContext(retail);
+    const response = await call(mw, "/sa/ar/products");
+    for (const name of ["spree_country", "spree_locale"]) {
+      const cookie = response.cookies.get(name);
+      expect(cookie?.httpOnly).toBe(true);
+      expect(cookie?.sameSite).toBe("lax");
+      expect(cookie?.secure).toBe(true);
+      expect(cookie?.path).toBe("/");
+      expect(cookie?.maxAge).toBe(365 * 24 * 60 * 60);
+    }
+  });
+
+  it("keeps the cookie VALUES (names, country, locale) exactly as before", async () => {
+    const { mw } = withContext(retail);
+    const response = await call(mw, "/sa/en/products");
+    expect(response.cookies.get("spree_country")?.value).toBe("sa");
+    expect(response.cookies.get("spree_locale")?.value).toBe("en");
   });
 });

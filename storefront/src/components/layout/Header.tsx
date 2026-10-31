@@ -12,6 +12,7 @@ import { StoreBrand } from "@/components/layout/StoreBrand";
 import { StoreContainer } from "@/components/layout/StoreContainer";
 import { StoreSearch } from "@/components/layout/StoreSearch";
 import { Button } from "@/components/ui/button";
+import { accountHrefs } from "@/lib/commerce/account-links";
 import type { StoreCategoryNode } from "@/lib/commerce/types";
 import {
   type HeaderDesign,
@@ -56,6 +57,8 @@ interface HeaderProps {
   showCart?: boolean;
   compact?: boolean;
   extraLinks?: StoreExtraNavLink[];
+  /** H6 Final Closure — native wholesale is open on this Host: account links go to the native buyer pages. */
+  nativeWholesale?: boolean;
   /** CUST-HV V7a — structural design; absent ⇒ the header renders exactly as before. */
   design?: HeaderDesign;
 }
@@ -123,12 +126,14 @@ interface HeaderMobileMenuProps {
   rootCategories: StoreCategoryNode[];
   basePath: string;
   extraLinks?: StoreExtraNavLink[];
+  nativeWholesale?: boolean;
 }
 
 export function HeaderMobileMenu({
   rootCategories,
   basePath,
   extraLinks = [],
+  nativeWholesale = false,
 }: HeaderMobileMenuProps) {
   return (
     <LazyMobileMenu
@@ -136,6 +141,7 @@ export function HeaderMobileMenu({
       basePath={basePath}
       extraLinks={extraLinks}
       wholesaleEnabled={isWholesaleEnabled()}
+      nativeWholesale={nativeWholesale}
     />
   );
 }
@@ -176,6 +182,7 @@ export async function Header({
   showCart = true,
   compact = false,
   extraLinks = [],
+  nativeWholesale = false,
   design,
 }: HeaderProps) {
   const t = await getTranslations({ locale, namespace: "header" });
@@ -267,7 +274,7 @@ export async function Header({
                 <div className="hidden md:block">
                   <Button variant="ghost" size="icon-lg" asChild>
                     <Link
-                      href={`${basePath}/account`}
+                      href={accountHrefs(basePath, nativeWholesale).account}
                       aria-label={t("account")}
                     >
                       <User className="size-5" />

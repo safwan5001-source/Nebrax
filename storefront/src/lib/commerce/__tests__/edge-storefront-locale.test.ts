@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   __resetStorefrontLocaleCacheForTests,
+  resolveHostContextForRequest,
   resolveStorefrontDefaultLocaleForRequest,
 } from "../edge-storefront-locale";
 
@@ -149,5 +150,185 @@ describe("edge-storefront-locale (STORE-LOCALE-WIRING-1)", () => {
       ),
     ).resolves.toBeNull();
     expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe("resolveHostContextForRequest (H6 Final Closure)", () => {
+  beforeEach(() => {
+    vi.stubEnv("AWJ_COMMERCE_API_URL", "http://awj-api.test");
+    vi.stubGlobal("fetch", vi.fn());
+    __resetStorefrontLocaleCacheForTests();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  const unresolved = () =>
+    jsonResponse(
+      {
+        error: { code: "not_found", message: "تعذّر تحديد متجر صالح." },
+        meta: { request_id: "r" },
+      },
+      false,
+      404,
+    );
+
+  it("reports a known Host with its locale and the wholesale capability", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({
+        data: { default_locale: "ar", capabilities: { wholesale_buyer: true } },
+      }),
+    );
+    await expect(
+      resolveHostContextForRequest(requestFor("ws.example")),
+    ).resolves.toEqual({
+      state: "known",
+      defaultLocale: "ar",
+      wholesaleBuyer: true,
+    });
+  });
+
+  it("treats a missing or non-literal capability as closed", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({
+        data: {
+          default_locale: "en",
+          capabilities: { wholesale_buyer: "yes" },
+        },
+      }),
+    );
+    await expect(
+      resolveHostContextForRequest(requestFor("retail.example")),
+    ).resolves.toMatchObject({ state: "known", wholesaleBuyer: false });
+  });
+
+  it("recognizes only the API's definitive 'no valid store' answer as an unknown Host", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(unresolved());
+    await expect(
+      resolveHostContextForRequest(requestFor("nobody.example")),
+    ).resolves.toEqual({ state: "unknown" });
+  });
+
+  it("does NOT call a Host unknown on any other failure (route 404, wrong service, 5xx, bad body, network, no config)", async () => {
+    const cases: Array<() => void> = [
+      // Laravel's own unmatched-route 404 shares the code but names the route
+      () =>
+        vi.mocked(fetch).mockResolvedValueOnce(
+          jsonResponse(
+            {
+              error: {
+                code: "not_found",
+                message: "The route store/v1/storefront could not be found.",
+              },
+            },
+            false,
+            404,
+          ),
+        ),
+      // a different service answering 404 (HTML / empty / other envelope)
+      () =>
+        vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({}, false, 404)),
+      () =>
+        vi.mocked(fetch).mockResolvedValueOnce({
+          ok: false,
+          status: 404,
+          json: async () => {
+            throw new Error("html");
+          },
+        } as unknown as Response),
+      () =>
+        vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({}, false, 500)),
+      () =>
+        vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({}, false, 403)),
+      () => vi.mocked(fetch).mockRejectedValueOnce(new Error("network down")),
+    ];
+    let i = 0;
+    for (const arrange of cases) {
+      arrange();
+      await expect(
+        resolveHostContextForRequest(requestFor(`case-${i++}.example`)),
+      ).resolves.toEqual({ state: "unavailable" });
+    }
+    vi.unstubAllEnvs();
+    await expect(
+      resolveHostContextForRequest(requestFor("noconfig.example")),
+    ).resolves.toEqual({ state: "unavailable" });
+  });
+
+  it("makes one API call for concurrent requests on a cold Host", async () => {
+    let release: (r: Response) => void = () => {};
+    vi.mocked(fetch).mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        release = resolve;
+      }),
+    );
+    const req = requestFor("burst.example");
+    const all = Promise.all([
+      resolveHostContextForRequest(req),
+      resolveHostContextForRequest(req),
+      resolveHostContextForRequest(req),
+    ]);
+    release(jsonResponse({ data: { default_locale: "ar" } }));
+    const results = await all;
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(new Set(results.map((r) => JSON.stringify(r))).size).toBe(1);
+  });
+
+  it("keeps the last definitive answer through a failed refresh, but not forever", async () => {
+    vi.useFakeTimers();
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({
+        data: { default_locale: "ar", capabilities: { wholesale_buyer: true } },
+      }),
+    );
+    const req = requestFor("blip.example");
+    await expect(resolveHostContextForRequest(req)).resolves.toMatchObject({
+      wholesaleBuyer: true,
+    });
+
+    // the 60 s cache expires, the refresh fails: the Host keeps its capability
+    vi.setSystemTime(Date.now() + 61_000);
+    vi.mocked(fetch).mockRejectedValueOnce(new Error("blip"));
+    await expect(resolveHostContextForRequest(req)).resolves.toMatchObject({
+      state: "known",
+      wholesaleBuyer: true,
+    });
+
+    // …and a later success replaces it
+    vi.setSystemTime(Date.now() + 61_000);
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({
+        data: {
+          default_locale: "ar",
+          capabilities: { wholesale_buyer: false },
+        },
+      }),
+    );
+    await expect(resolveHostContextForRequest(req)).resolves.toMatchObject({
+      wholesaleBuyer: false,
+    });
+
+    // an outage longer than the stale window finally degrades to 'unavailable'
+    vi.setSystemTime(Date.now() + 61_000);
+    vi.mocked(fetch).mockRejectedValue(new Error("down"));
+    vi.setSystemTime(Date.now() + 700_000);
+    await expect(resolveHostContextForRequest(req)).resolves.toEqual({
+      state: "unavailable",
+    });
+  });
+
+  it("does not bleed a context across Hosts", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        jsonResponse({ data: { capabilities: { wholesale_buyer: true } } }),
+      )
+      .mockResolvedValueOnce(jsonResponse({ data: {} }));
+    const a = await resolveHostContextForRequest(requestFor("a.example"));
+    const b = await resolveHostContextForRequest(requestFor("b.example"));
+    expect(a).toMatchObject({ wholesaleBuyer: true });
+    expect(b).toMatchObject({ wholesaleBuyer: false });
   });
 });

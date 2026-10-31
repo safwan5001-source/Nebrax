@@ -123,8 +123,10 @@ async function StorefrontMobileNavigation({
   country,
   locale,
   extraLinks,
+  nativeWholesale = false,
 }: StorefrontNavigationProps & {
   extraLinks: { id: string; label: string; href: string }[];
+  nativeWholesale?: boolean;
 }) {
   const rootCategories = await getRootCategories(country, locale);
 
@@ -133,6 +135,7 @@ async function StorefrontMobileNavigation({
       rootCategories={rootCategories}
       basePath={basePath}
       extraLinks={extraLinks}
+      nativeWholesale={nativeWholesale}
     />
   );
 }
@@ -182,6 +185,7 @@ export default async function StorefrontLayout({
   // X4-FIX — fail closed: no identity (fetch failed) ⇒ no policy is vouched for ⇒ no policy links.
   const policyAvailability =
     identity?.policyAvailability ?? readPolicyAvailability(null);
+  const nativeWholesale = identity?.capabilities?.wholesaleBuyer === true;
   const liveName = identity?.name?.trim() ? identity.name : null;
   const footerMessages = await getTranslations({
     locale: locale as Locale,
@@ -291,6 +295,7 @@ export default async function StorefrontLayout({
         compact={compact}
         design={presentation?.header.design}
         extraLinks={extraLinks}
+        nativeWholesale={nativeWholesale}
         mobileNavigation={
           <Suspense fallback={<MobileNavigationFallback />}>
             <StorefrontMobileNavigation
@@ -298,6 +303,7 @@ export default async function StorefrontLayout({
               country={country}
               locale={locale}
               extraLinks={extraLinks}
+              nativeWholesale={nativeWholesale}
             />
           </Suspense>
         }
@@ -336,6 +342,7 @@ export default async function StorefrontLayout({
       </main>
       <Footer
         basePath={basePath}
+        nativeWholesale={nativeWholesale}
         policySlugs={publishedPolicySlugs(presentation, policyAvailability)}
         locale={locale as Locale}
         storeName={displayName}

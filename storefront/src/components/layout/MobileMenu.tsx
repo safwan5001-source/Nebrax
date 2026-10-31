@@ -17,6 +17,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { localeDirection } from "@/i18n/locales";
+import { accountHrefs } from "@/lib/commerce/account-links";
 import type { StoreCategoryNode } from "@/lib/commerce/types";
 import type { IconKey } from "@/lib/presentation/icon-registry";
 import type { NavBadge } from "@/lib/presentation/navigation";
@@ -44,6 +45,8 @@ interface MobileMenuProps {
   basePath: string;
   /** Whether the wholesale addon is enabled — gates the trade portal link. */
   wholesaleEnabled: boolean;
+  /** H6 Final Closure — native wholesale is open on this Host: "My account" goes to the native buyer page. */
+  nativeWholesale?: boolean;
   /** Merchant-published links, shared with the desktop header. */
   extraLinks?: StoreExtraNavLink[];
 }
@@ -52,6 +55,7 @@ export function MobileMenu({
   rootCategories,
   basePath,
   wholesaleEnabled,
+  nativeWholesale = false,
   extraLinks = [],
 }: MobileMenuProps) {
   const t = useTranslations("header");
@@ -290,7 +294,10 @@ export function MobileMenu({
                   </Link>
                 )}
                 <SheetClose asChild>
-                  <Link href={`${basePath}/account`} className={linkClass}>
+                  <Link
+                    href={accountHrefs(basePath, nativeWholesale).account}
+                    className={linkClass}
+                  >
                     {t("myAccount")}
                   </Link>
                 </SheetClose>

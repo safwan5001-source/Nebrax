@@ -28,8 +28,27 @@ import {
 } from "./config";
 
 interface AwjStorefrontConfigResponse {
-  data?: { default_locale?: string | null };
+  data?: {
+    default_locale?: string | null;
+    capabilities?: { wholesale_buyer?: unknown };
+  };
+  error?: { code?: unknown; message?: unknown };
 }
+
+/**
+ * What the proxy may know about the request's Host (H6 Final Closure).
+ *
+ * - `known`: the API resolved the Host to a live Storefront. `wholesaleBuyer` is the API's own answer to "is native
+ *   wholesale buying open here?" (deployment flag AND a wholesale-flagged channel) — never inferred from the URL.
+ * - `unknown`: the API answered its definitive "no valid store for this Host" 404. Only this state may be turned into a
+ *   real HTTP 404 by the caller.
+ * - `unavailable`: anything else (not configured, network error, timeout, 5xx, a 404 that is not that definitive
+ *   answer, malformed body). Callers must treat it as "no information": never 404 a Host on it.
+ */
+export type HostContext =
+  | { state: "known"; defaultLocale: string | null; wholesaleBuyer: boolean }
+  | { state: "unknown" }
+  | { state: "unavailable" };
 
 /** Fail-closed request budget so a slow/unreachable API never strands a
  * cookie-less first visitor at the Edge — the caller falls through to the
@@ -46,26 +65,41 @@ const REQUEST_TIMEOUT_MS = 1500;
  * seconds, not stuck until a deploy.
  */
 const CACHE_TTL_MS = 60_000;
+/** A failed lookup is remembered only briefly, so an outage neither hammers the API nor outlives itself. */
+const UNAVAILABLE_TTL_MS = 5_000;
 const CACHE_MAX_ENTRIES = 200;
 
+/** How long a previous definitive answer may stand in for a failed refresh (a blip must not flip a Host's state). */
+const STALE_MAX_MS = 600_000;
+
 interface CacheEntry {
-  locale: string | null;
+  context: HostContext;
   expiresAt: number;
+  staleUntil: number;
 }
 
 const cache = new Map<string, CacheEntry>();
+const inflight = new Map<string, Promise<HostContext>>();
 
-function cacheGet(host: string): string | null | undefined {
+function cacheGet(host: string): HostContext | undefined {
   const entry = cache.get(host);
   if (!entry) return undefined;
-  if (entry.expiresAt <= Date.now()) {
+  if (entry.expiresAt <= Date.now()) return undefined;
+  return entry.context;
+}
+
+/** The last definitive (known/unknown) answer, even if expired, while it is still inside the stale window. */
+function cacheGetStale(host: string): HostContext | undefined {
+  const entry = cache.get(host);
+  if (!entry || entry.context.state === "unavailable") return undefined;
+  if (entry.staleUntil <= Date.now()) {
     cache.delete(host);
     return undefined;
   }
-  return entry.locale;
+  return entry.context;
 }
 
-function cacheSet(host: string, locale: string | null): void {
+function cacheSet(host: string, context: HostContext): void {
   if (cache.size >= CACHE_MAX_ENTRIES && !cache.has(host)) {
     // Bounded FIFO eviction — simplicity over strict LRU, since this cache
     // only ever exists to save a redundant fetch, never as a correctness
@@ -73,47 +107,95 @@ function cacheSet(host: string, locale: string | null): void {
     const oldestKey = cache.keys().next().value;
     if (oldestKey !== undefined) cache.delete(oldestKey);
   }
-  cache.set(host, { locale, expiresAt: Date.now() + CACHE_TTL_MS });
+  const ttl =
+    context.state === "unavailable" ? UNAVAILABLE_TTL_MS : CACHE_TTL_MS;
+  const now = Date.now();
+  cache.set(host, {
+    context,
+    expiresAt: now + ttl,
+    staleUntil: now + STALE_MAX_MS,
+  });
 }
 
 /**
- * Resolves the current request's Host's `Storefront.default_locale` from
- * `GET store/v1/storefront`, or `null` on any failure (missing
- * configuration, network error, timeout, non-OK response, malformed body,
- * or an absent/blank field). Never throws — every caller must be able to
- * treat `null` exactly like "no preference" and fall through to the
- * existing Accept-Language → static-default chain.
+ * Resolves the Host's context from `GET store/v1/storefront` (see {@link HostContext}). Never throws.
  *
- * The Host used is the request's own transport-level `Host` header (or, in
- * its absence, `NextRequest`'s parsed `nextUrl.host`) — the same
- * authoritative value `resolveVisitorHostname()` reads server-side. Locale
- * never participates in *which* Storefront is resolved; the backend's own
- * `ResolveStorefrontDomain` does that from this same forwarded Host, same
- * as every other `store/v1` call.
+ * The Host used is the request's own transport-level `Host` header (or, in its absence, `NextRequest`'s parsed
+ * `nextUrl.host`) — the same authoritative value `resolveVisitorHostname()` reads server-side. The backend's own
+ * `ResolveStorefrontDomain` decides which Storefront that is from this same forwarded Host, as for every other
+ * `store/v1` call; nothing here influences it.
  */
-export async function resolveStorefrontDefaultLocaleForRequest(
+export async function resolveHostContextForRequest(
   request: NextRequest,
-): Promise<string | null> {
+): Promise<HostContext> {
   const host = request.headers.get("host") || request.nextUrl.host;
-  if (!host) return null;
+  if (!host) return { state: "unavailable" };
 
   const cached = cacheGet(host);
   if (cached !== undefined) return cached;
 
-  const locale = await fetchStorefrontDefaultLocale(host);
-  cacheSet(host, locale);
-  return locale;
+  // A cold cache under load would otherwise fan out one identical API call per concurrent request.
+  const pending = inflight.get(host);
+  if (pending) return pending;
+
+  const lookup = fetchHostContext(host)
+    .then((fresh) => {
+      // A failed refresh keeps the previous definitive answer (and re-arms it briefly) instead of flipping the Host.
+      const stale =
+        fresh.state === "unavailable" ? cacheGetStale(host) : undefined;
+      const context = stale ?? fresh;
+      if (stale) {
+        const entry = cache.get(host);
+        cache.set(host, {
+          context: stale,
+          expiresAt: Date.now() + UNAVAILABLE_TTL_MS,
+          staleUntil: entry?.staleUntil ?? Date.now() + STALE_MAX_MS,
+        });
+      } else {
+        cacheSet(host, context);
+      }
+      return context;
+    })
+    .finally(() => inflight.delete(host));
+  inflight.set(host, lookup);
+  return lookup;
 }
 
-async function fetchStorefrontDefaultLocale(
-  host: string,
+/**
+ * Resolves the current request's Host's `Storefront.default_locale`, or `null` on any failure or when the
+ * Storefront has none. Never throws — every caller must be able to treat `null` exactly like "no preference" and
+ * fall through to the existing Accept-Language → static-default chain. Shares its lookup and cache with
+ * {@link resolveHostContextForRequest}, so a request that needs both makes one call.
+ */
+export async function resolveStorefrontDefaultLocaleForRequest(
+  request: NextRequest,
 ): Promise<string | null> {
+  const context = await resolveHostContextForRequest(request);
+  return context.state === "known" ? context.defaultLocale : null;
+}
+
+/** The API's definitive "no valid store for this Host" answer, as opposed to any other 404 (e.g. a wrong base URL). */
+function isUnresolvedHostAnswer(
+  status: number,
+  body: AwjStorefrontConfigResponse | null,
+): boolean {
+  if (status !== 404) return false;
+  const error = body?.error;
+  if (!error || error.code !== "not_found") return false;
+  // Laravel's own unmatched-route 404 shares the code; its message names the route. The Host resolver's does not.
+  return !(
+    typeof error.message === "string" &&
+    /could not be found/i.test(error.message)
+  );
+}
+
+async function fetchHostContext(host: string): Promise<HostContext> {
   let url: URL;
   try {
     url = buildStorefrontUrl("storefront");
   } catch {
     // AWJ_COMMERCE_API_URL not configured — nothing to call.
-    return null;
+    return { state: "unavailable" };
   }
 
   const headers: Record<string, string> = {
@@ -133,14 +215,28 @@ async function fetchStorefrontDefaultLocale(
       headers,
       signal: controller.signal,
     });
-    if (!response.ok) return null;
+
+    if (!response.ok) {
+      const body = (await response
+        .json()
+        .catch(() => null)) as AwjStorefrontConfigResponse | null;
+      return isUnresolvedHostAnswer(response.status, body)
+        ? { state: "unknown" }
+        : { state: "unavailable" };
+    }
 
     const body = (await response.json()) as AwjStorefrontConfigResponse;
     const locale = body.data?.default_locale;
-    return typeof locale === "string" && locale.trim() ? locale : null;
+    return {
+      state: "known",
+      defaultLocale:
+        typeof locale === "string" && locale.trim() ? locale : null,
+      // Only a literal `true` opens it: an absent/legacy field is "closed".
+      wholesaleBuyer: body.data?.capabilities?.wholesale_buyer === true,
+    };
   } catch {
-    // Network error, abort/timeout, or malformed JSON — fail closed.
-    return null;
+    // Network error, abort/timeout, or malformed JSON — fail open for the Host, closed for the capability.
+    return { state: "unavailable" };
   } finally {
     clearTimeout(timeout);
   }
@@ -149,4 +245,5 @@ async function fetchStorefrontDefaultLocale(
 /** Test-only: clears the module-level cache between cases. */
 export function __resetStorefrontLocaleCacheForTests(): void {
   cache.clear();
+  inflight.clear();
 }

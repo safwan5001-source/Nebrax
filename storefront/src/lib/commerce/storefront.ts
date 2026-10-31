@@ -30,6 +30,11 @@ export interface AwjStorefrontConfig {
    * malformed ⇒ every policy `false`.
    */
   policyAvailability?: PolicyAvailability;
+  /**
+   * H6 Final Closure — what the API says this Host can do. `wholesaleBuyer` is true only when native wholesale
+   * buying is open here (deployment flag AND a wholesale channel); absent/malformed ⇒ false (fail closed).
+   */
+  capabilities?: { wholesaleBuyer: boolean };
 }
 
 export interface AwjBusinessIdentity {
@@ -46,7 +51,16 @@ interface AwjStorefrontConfigResponse {
     presentation?: unknown;
     presentation_media?: unknown;
     policy_availability?: unknown;
+    capabilities?: unknown;
   };
+}
+
+function readCapabilities(raw: unknown): { wholesaleBuyer: boolean } {
+  const value =
+    raw != null && typeof raw === "object" && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)
+      : {};
+  return { wholesaleBuyer: value.wholesale_buyer === true };
 }
 
 function readBusinessIdentity(raw: unknown): AwjBusinessIdentity {
@@ -143,6 +157,7 @@ export const fetchStorefrontConfig = cache(
       policyAvailability: readPolicyAvailability(
         response.data.policy_availability,
       ),
+      capabilities: readCapabilities(response.data.capabilities),
     };
   },
 );

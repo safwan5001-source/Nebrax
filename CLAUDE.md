@@ -543,6 +543,18 @@ php artisan serve
 - **ربط المشتري بشريك (موظف فقط):** `GET/PUT/DELETE commerce/wholesale/memberships/{id}/partner-link` و`GET commerce/wholesale/partners/eligible` (`CommerceStaffWholesalePartnerLinkController` → `WholesalePartnerLinkAdminService` فوق `CustomerPartnerLinkService` الكاتب الوحيد). صلاحيتان معاً: `commerce.wholesale.manage` + `customer_access.manage`، وبوابة النشر 404 مغلقة. لا يُربط إلا مشترٍ **معتمد**؛ الفك مسموح بأي حالة؛ شريك = عميل نشط من المستأجر نفسه. «العلاقة الفعلية» تأتي من `WholesalePriceAuthority::describeFor()` (القاعدة نفسها التي تحكم الدفع). المشتري لا يرسل ولا يُقبل منه partner/price list (`BuyerApplyRequest` يرفضهما 422). لا مساس بـPOS ولا بقوائم الأسعار.
 - **حساب المشتري:** `GET store/v1/buyer/orders[/{id}]` — سجل الطلبات للمشتري **المعتمد** على قناته فقط (`EnsureWholesalePriceAccess` + `CustomerContext` + `CommerceOrderService::ownedOrders()` + تضييق بالقناة؛ طلب غيره/قناة أخرى = 404 واحد؛ الموقوف/المرفوض 403 مع `details.membership_status` لحالته هو فقط). إعادة تعيين كلمة المرور: `auth/password/forgot|reset` (جدول مستقل `customer_password_reset_tokens` على نمط تأكيد البريد: SHA-256 فقط، ساعة، مرة واحدة، مربوط بالمستأجر والقناة، 202 محايد، لا يُؤكّد البريد، والإتمام يُنهي كل جلسات الهوية). طلب العضوية يقبل `company_name`/`contact_phone` اختياريَّين غير موثَّقين على `wholesale_memberships` (للمراجع فقط، لا يؤثران على سعر ولا أهلية ولا يُكتبان في هوية المشتري).
 
+## إغلاق H6 — مضيفات المتجر، صفحات المشتري، الترويسات (Final Closure)
+
+- **`GET store/v1/storefront` يعلن `data.capabilities.wholesale_buyer`** (منطقي فقط): `WholesaleBuyerGate::isOpen()` = بوابة النشر `commerce.wholesale_buyer_enabled` **و**قناة المضيف الموسومة `wholesale_membership_enabled`. هو المصدر الوحيد لهذا الحكم (يستعمله أيضاً `EnsureWholesaleBuyerEnabled`)، وغياب الحقل = مغلق.
+- **القرار في `storefront/src/proxy.ts` قبل العرض** (لا `notFound()` داخل الصفحة: مع `cacheComponents` يُرسَل سطر الحالة 200 قبل أن تُرمى). `resolveHostContextForRequest` (`edge-storefront-locale.ts`) يقرأ السياق من الـAPI بذاكرة مؤقتة 60ث ودمج الطلبات المتزامنة وبقاء آخر إجابة حاسمة 10 دقائق عند تعذّر التحديث:
+  - مضيف **غير معروف** (404 حاسم برسالة «تعذّر تحديد متجر صالح» فقط) ⇒ 404 حقيقي لكل صفحة محلية؛ أي فشل آخر (شبكة/5xx/404 بلا هذه الرسالة/لا إعداد) ⇒ **يُفتح للمضيف** ولا يُغلق أبداً. مفتاح الإيقاف `STOREFRONT_UNKNOWN_HOST_404=0`.
+  - صفحات `/buyer/**` ⇒ 404 حقيقي ما لم يقل الـAPI إن الجملة مفتوحة (فشل مغلق للقدرة).
+  - روابط `/wholesale/*` القديمة (حين تكون إضافة Spree معطّلة): على مضيف جملة أصلي تُحوَّل 308 إلى المكافئ الأصلي (`/buyer/sign-in`، `/buyer/membership`، `/cart`، `/products`) وما عداها 404؛ على غيره 404. لا حذف لمسارات Spree.
+  - `/sa` وحدها ⇒ `/sa/{locale}` (كان `/sa/ar/sa`). كوكيز `spree_country/spree_locale` صارت HttpOnly وSameSite=Lax وSecure في الإنتاج (الأسماء والقيم كما هي؛ لا تقرؤها واجهة المتصفح).
+  - `next.config.ts` يضيف ترويسات أساسية محايدة: HSTS (بلا includeSubDomains/preload)، nosniff، Referrer-Policy، X-Frame-Options، `frame-ancestors 'none'` وPermissions-Policy. **لا CSP مقيِّد للموارد** قبل جرد الأصول ومرحلة report-only (انظر تقرير الإغلاق).
+  - روابط «حسابي/سجل الطلبات» في الرأس والتذييل والقائمة المحمولة تذهب إلى `/buyer/membership` و`/buyer/orders` على مضيف الجملة الأصلي فقط (`account-links.ts`).
+- **لم يُبنَ بعد (قرار مالك):** الطلب السريع بـSKU (لا بديل أصلي؛ `/wholesale/quick-order` مغلق 404). المرجع: `docs/audits/AWJ_H6_FINAL_CLOSURE_REPORT.md`.
+
 ## وقت إصدار الفاتورة (`invoices.issued_at`) — REM-13a
 
 لحظة الإصدار القانونية للفاتورة تُلتقط **مرة واحدة** في `InvoiceService::post()` (داخل معاملة الترحيل بعد القفلين وقبل `ZatcaService::buildFor`)، وتُخزَّن UTC بدقة ثانية، **ثابتة** (حارس `Invoice::booted`)، ولا تدخل `$fillable`.

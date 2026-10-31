@@ -1752,3 +1752,189 @@ test.describe("@mobile arabic rtl on a phone viewport", () => {
     ev("E03", { forgot_reset_orders_rtl: true, horizontal_overflow_px: 0 });
   });
 });
+
+// ───────────────────────── H6 Final Closure: real 404s, legacy redirects, headers, cookies, nav ─────────────────────────
+// Status codes are asserted on the FIRST navigation response: a Next page that calls notFound() after streaming
+// has begun answers 200 with a "not found" body, which is exactly the defect these tests exist to catch.
+const UNKNOWN = base("no-such-store.e2e.localhost");
+const status = async (page: Page, url: string) => {
+  resetBuckets();
+  const response = await page.goto(url, { waitUntil: "domcontentloaded" });
+  return response?.status() ?? 0;
+};
+
+test.describe
+  .serial("@desktop final closure — status codes, redirects, headers, cookies", () => {
+    test("H01 a retail host answers a REAL 404 for every native buyer page and every Spree-era wholesale URL", async ({
+      page,
+    }) => {
+      const results: Record<string, number> = {};
+      for (const p of [
+        "/sa/en/buyer/sign-in",
+        "/sa/en/buyer/register",
+        "/sa/en/buyer/membership",
+        "/sa/en/buyer/orders",
+        "/sa/en/buyer/forgot-password",
+        "/sa/ar/buyer/reset-password",
+        "/sa/en/wholesale",
+        "/sa/en/wholesale/sign-in",
+        "/sa/en/wholesale/apply",
+        "/sa/en/wholesale/cart",
+        "/sa/en/wholesale/quick-order",
+        "/sa/en/checkout/abc",
+      ]) {
+        results[p] = await status(page, `${DTC}${p}`);
+        expect(results[p], p).toBe(404);
+      }
+      // …while the retail storefront itself is untouched
+      for (const p of [
+        "/sa/en",
+        "/sa/en/products",
+        "/sa/ar/products",
+        "/sa/en/cart",
+      ]) {
+        expect(await status(page, `${DTC}${p}`), p).toBe(200);
+      }
+      ev("H01", { retail_closed_paths: results });
+    });
+
+    test("H02 an unknown tenant host is a real 404 (no empty storefront shell); a known host is unaffected", async ({
+      page,
+    }) => {
+      expect(await status(page, `${UNKNOWN}/sa/en`)).toBe(404);
+      expect(await status(page, `${UNKNOWN}/sa/en/products`)).toBe(404);
+      expect(await status(page, `${base(seed.hosts.other_tenant)}/sa/en`)).toBe(
+        200,
+      );
+      expect(await status(page, `${WS}/sa/en/products`)).toBe(200);
+      ev("H02", { unknown_host_status: 404, known_hosts: 200 });
+    });
+
+    test("H03 a wholesale host serves the native buyer pages and sends legacy /wholesale/* to their native equivalents", async ({
+      page,
+    }) => {
+      expect(await status(page, `${WS}/sa/en/buyer/sign-in`)).toBe(200);
+      const landed: Record<string, string> = {};
+      for (const [from, to] of [
+        ["/sa/en/wholesale", "/sa/en/buyer/sign-in"],
+        ["/sa/en/wholesale/sign-in", "/sa/en/buyer/sign-in"],
+        ["/sa/en/wholesale/apply", "/sa/en/buyer/membership"],
+        ["/sa/en/wholesale/cart", "/sa/en/cart"],
+        ["/sa/en/wholesale/products", "/sa/en/products"],
+      ] as const) {
+        await go(page, `${WS}${from}?src=legacy`);
+        const url = new URL(page.url());
+        expect(url.pathname, from).toBe(to);
+        expect(url.search, from).toBe("?src=legacy");
+        landed[from] = url.pathname;
+      }
+      // no native equivalent ⇒ closed, never redirected somewhere unrelated
+      expect(await status(page, `${WS}/sa/en/wholesale/quick-order`)).toBe(404);
+      ev("H03", { legacy_redirects: landed, quick_order: 404 });
+    });
+
+    test("H04 on a wholesale host the account and order-history links lead to the native buyer pages; on retail they do not change", async ({
+      page,
+    }) => {
+      await go(page, `${WS}/sa/en/products`);
+      const wsHrefs = await page
+        .locator("footer a")
+        .evaluateAll((as) =>
+          as.map((a) => (a as HTMLAnchorElement).getAttribute("href")),
+        );
+      expect(wsHrefs).toContain("/sa/en/buyer/membership");
+      expect(wsHrefs).toContain("/sa/en/buyer/orders");
+      expect(wsHrefs).not.toContain("/sa/en/account");
+      expect(wsHrefs).not.toContain("/sa/en/account/orders");
+
+      await go(page, `${DTC}/sa/en/products`);
+      const dtcHrefs = await page
+        .locator("footer a")
+        .evaluateAll((as) =>
+          as.map((a) => (a as HTMLAnchorElement).getAttribute("href")),
+        );
+      expect(dtcHrefs).toContain("/sa/en/account");
+      expect(dtcHrefs).toContain("/sa/en/account/orders");
+      expect(dtcHrefs).not.toContain("/sa/en/buyer/orders");
+      ev("H04", { ws_account_native: true, dtc_account_unchanged: true });
+    });
+
+    test("H05 baseline security headers are present; no resource-restricting CSP", async ({
+      page,
+    }) => {
+      resetBuckets();
+      const response = await page.goto(`${DTC}/sa/en/products`, {
+        waitUntil: "domcontentloaded",
+      });
+      const h = response?.headers() ?? {};
+      expect(h["x-content-type-options"]).toBe("nosniff");
+      expect(h["referrer-policy"]).toBe("strict-origin-when-cross-origin");
+      expect(h["x-frame-options"]).toBe("DENY");
+      expect(h["strict-transport-security"]).toBe("max-age=31536000");
+      expect(h["permissions-policy"]).toContain("camera=()");
+      expect(h["content-security-policy"]).toBe("frame-ancestors 'none'");
+      // the page still renders and hydrates under those headers (no console errors from blocked resources)
+      const errors: string[] = [];
+      page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+      await go(page, `${DTC}/sa/en/products`);
+      await expect(page.getByText("صنف تجزئة").first()).toBeVisible();
+      expect(
+        errors.filter((e) => /Content Security Policy|Refused to/i.test(e)),
+      ).toEqual([]);
+      ev("H05", {
+        headers: Object.keys(h).filter((k) =>
+          /^(x-|strict|referrer|permissions|content-security)/.test(k),
+        ),
+      });
+    });
+
+    test("H06 the locale cookies are HttpOnly + SameSite=Lax (names and values unchanged) and locale switching still works", async ({
+      page,
+      context,
+    }) => {
+      await go(page, `${DTC}/sa/en/products`);
+      const cookies = await context.cookies();
+      for (const name of ["spree_country", "spree_locale"]) {
+        const c = cookies.find((x) => x.name === name);
+        expect(c, name).toBeTruthy();
+        expect(c?.httpOnly, name).toBe(true);
+        expect(c?.sameSite, name).toBe("Lax");
+      }
+      expect(cookies.find((x) => x.name === "spree_locale")?.value).toBe("en");
+      await go(page, `${DTC}/sa/ar/products`);
+      expect(
+        (await context.cookies()).find((x) => x.name === "spree_locale")?.value,
+      ).toBe("ar");
+      ev("H06", { httpOnly: true, sameSite: "Lax", locale_switch: "en→ar" });
+    });
+
+    test("H07 a bare country path goes to that market's root, not /sa/ar/sa", async ({
+      page,
+    }) => {
+      resetBuckets();
+      await page.goto(`${DTC}/sa`, { waitUntil: "domcontentloaded" });
+      expect(new URL(page.url()).pathname).toMatch(/^\/sa\/(ar|en)\/?$/);
+      expect(await status(page, page.url())).toBe(200);
+      ev("H07", { landed: new URL(page.url()).pathname });
+    });
+  });
+
+test.describe("@mobile final closure on a phone viewport (Arabic)", () => {
+  test("H08 retail 404 for buyer pages and legacy wholesale, and wholesale redirect, on a phone in Arabic", async ({
+    page,
+  }) => {
+    expect(await status(page, `${DTC}/sa/ar/buyer/sign-in`)).toBe(404);
+    expect(await status(page, `${DTC}/sa/ar/wholesale/cart`)).toBe(404);
+    expect(await status(page, `${UNKNOWN}/sa/ar`)).toBe(404);
+    await go(page, `${WS}/sa/ar/wholesale/apply`);
+    expect(new URL(page.url()).pathname).toBe("/sa/ar/buyer/membership");
+    expect(await page.evaluate(() => document.documentElement.dir)).toBe("rtl");
+    const overflow = await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(1);
+    ev("H08", { rtl: true, horizontal_overflow_px: overflow });
+  });
+});
