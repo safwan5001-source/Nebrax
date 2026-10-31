@@ -214,6 +214,8 @@ final class AppSchemaContractChecker
 
         if (! $definition->actionable) {
             $issues[] = new ContractIssue('action_not_supported', ContractIssue::WARNING, $pageId, $id, 'action', "المكوّن \"{$definition->type}\" لا ينفّذ إجراءات؛ سيُتجاهل الإجراء.");
+
+            return; // إجراء لا يُنفَّذ أصلاً: لا تُفحص معاملاته ولا وجهته (يبقى تحذيراً غير حاجب).
         }
         if ($actionDefinition === null) {
             return; // نوع الإجراء المجهول عمل CompatibilityResolver

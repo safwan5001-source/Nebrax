@@ -251,6 +251,11 @@ class AppSchemaContractCheckerTest extends TestCase
 
         $this->assertSame([], $this->codes($schema, ContractIssue::ERROR));
         $this->assertContains('action_not_supported', $this->codes($schema, ContractIssue::WARNING));
+
+        // وإجراء مخالف على مكوّن لا ينفّذه لا يحجب النشر (الـRuntime يتجاهله كلياً).
+        $ignored = $this->schema([['type' => 'Text', 'id' => 't', 'props' => ['text' => 'x'], 'action' => ['type' => 'navigate', 'params' => ['pageId' => 'ghost']]]]);
+        $this->assertSame([], $this->codes($ignored, ContractIssue::ERROR));
+        $this->assertSame(['action_not_supported'], $this->codes($ignored));
     }
 
     /** @test */
