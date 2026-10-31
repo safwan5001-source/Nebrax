@@ -248,11 +248,17 @@ class BuilderDraftOptimisticLockPostgresTest extends TestCase
         $this->assertGreaterThan(0, $published, 'نجح نشر واحد على الأقل (وإلا لا يثبت الاختبار شيئاً)');
         foreach ($versions as $v) {
             $schema = json_decode($v->schema, true);
-            $marker = $schema['pages']['home']['children'][0]['props']['text'];
-            $expectedMarker = (int) $v->source_draft_revision === 0 ? null : 'r'.$v->source_draft_revision;
-            if ($expectedMarker !== null) {
-                $this->assertSame($expectedMarker, $marker, "النسخة {$v->version}: المخطط المنشور يطابق revision المصدر المسجَّل");
+            if ((int) $v->source_draft_revision === 0) {
+                // revision 0 = المخطط الأولي الآمن بلا أبناء (لا علامة): نتحقق أنه فعلاً الأولي.
+                $this->assertSame([], $schema['pages']['home']['children'] ?? [], 'النسخة المصدرها revision 0 هي المخطط الأولي');
+
+                continue;
             }
+            $this->assertSame(
+                'r'.$v->source_draft_revision,
+                $schema['pages']['home']['children'][0]['props']['text'] ?? null,
+                "النسخة {$v->version}: المخطط المنشور يطابق revision المصدر المسجَّل",
+            );
         }
         $numbers = $versions->pluck('version')->map(fn ($n) => (int) $n)->sort()->values()->all();
         $this->assertSame(range(1, count($numbers)), $numbers, 'أرقام النسخ متتالية بلا ثغرة ولا تكرار');
