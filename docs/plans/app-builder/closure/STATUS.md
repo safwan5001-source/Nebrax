@@ -22,7 +22,8 @@
 | **S01d** حماية النشر (G1) | ✅ مدموجة (بموافقة المالك) | #1826 | `9b410e97c0f465a849a24562d2033b47ba62fdfa` | `expected_draft_revision` اختياري + `source_draft_revision` (هجرة إضافية)؛ تقرير: `S01d-IMPLEMENTATION-REPORT.md` |
 | **S02** عقد المكوّنات (AD-12) | ✅ مدموجة (S02a خادم + S02b ويب) | #1827 | `c10fdbc7b56a2cfc57e4ff1e0a8f3b161b6adfad` | فرض مرحلي؛ 3 جولات مراجعة Codex (7 ملاحظات P2 صحيحة كلها أُصلحت باختبارات)؛ تقارير S02a/S02b |
 | **S21a** الوضع السهل V2: القشرة | ✅ مدموجة | #1830 | `5c07d1d37d54cf27ffe4582e7dd95a40037b818a` | قائمة أقسام + كتالوج صادق (صفحات Runtime) + شريط قسم + هوية + مبدّل وضع؛ مراجعة Codex: 4 ملاحظات أُصلحت؛ e2e متصفح حقيقي؛ `S21a-IMPLEMENTATION-REPORT.md` |
-| **S23a** تجاوب/لمس/اتجاه (UX-02/04/07/08/09/10/11) | 🟡 PR مفتوح | — | — | آيباد عمودي وجوال أفقي بعمودين، أهداف لمس 44px على `pointer: coarse` فقط، سهم رجوع حسب الاتجاه؛ e2e 17 اختباراً؛ `S23a-IMPLEMENTATION-REPORT.md` |
+| **S23a** تجاوب/لمس/اتجاه (UX-02/04/07/08/09/10/11) | ✅ مدموجة | #1831 | `5274f640c958006d47b1fa87d07dfc50f896fe9d` | آيباد عمودي وجوال أفقي بعمودين، أهداف لمس 44px على `pointer: coarse`، سهم رجوع حسب الاتجاه؛ e2e متصفح حقيقي 17/17؛ `S23a-IMPLEMENTATION-REPORT.md` |
+| **FIX-SIGNAL-KEYS** مفاتيح تسمية إشارات الظهور | 🟡 PR مفتوح | — | — | يعالج جزء App Builder من UX-I18N-DOT (INVALID_KEY) |
 | S03 … S25 (عدا S21a)، AF01–AF03 | ⏳ لم تبدأ | — | — | انظر الخارطة؛ بعضها يتطلب اعتماد AD المرتبط |
 
 ## 3) الفجوات المتأثرة حتى الآن
@@ -67,4 +68,5 @@
 - بيئة الاختبار المحلية: `pg_ctlcluster 16 main start`؛ مزامنة الملفات المتغيّرة إلى `/home/user/nibras-app` بسكربت المزامنة في الـscratchpad.
 
 ## 6) عيوب مسبقة مكتشفة (لا تنتمي لشريحة مفتوحة)
-- **UX-I18N-DOT:** مفاتيح ترجمة تحوي نقطة (`appBuilder.builder.visibility.signalOption.cart.itemCount` وأخواتها، `developer.events.*`) تُنتج `INVALID_KEY` في next-intl فتفشل تسمية إشارات الظهور/أحداث المطوّر. تحتاج تحويل المفاتيح إلى صيغة بلا نقاط (مع مطابقة الكود) — شريحة صغيرة مقترحة، لا تمسّ المنطق.
+- **UX-I18N-DOT (الجزء المتبقي = `developer.events.*` فقط، خارج App Builder):** مفاتيح ترجمة تحوي نقطة (`appBuilder.builder.visibility.signalOption.cart.itemCount` وأخواتها، `developer.events.*`) تُنتج `INVALID_KEY` في next-intl فتفشل تسمية إشارات الظهور/أحداث المطوّر. تحتاج تحويل المفاتيح إلى صيغة بلا نقاط (مع مطابقة الكود) — شريحة صغيرة مقترحة، لا تمسّ المنطق.
+- **اختبار متقطع مسبق:** `AiActionHistoryListTest::an_executed_action_carries_its_latest_execution_and_row_counts_without_n_plus_one` (عدد الاستعلامات 24 مقابل 23) فشل متقطعاً على sqlite وpgsql في 4 تشغيلات مستقلة لـPRs لا تمسّ PHP؛ ينجح عند إعادة التشغيل. يحتاج مالك وحدة AI-actions لتثبيته (تسخين ذاكرة غير كافٍ).
