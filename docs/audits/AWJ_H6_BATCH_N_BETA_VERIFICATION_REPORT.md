@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | Branch | `claude/commerce-h6-batch-n` (docs only) |
-| PR | __PR__ |
+| PR | https://github.com/safwan5001-source/Nebrax/pull/1836 |
 | Base SHA (origin/main) | `89f4117ca1d6d2d3bbdc6b3e77482305e663f6a2` (#1832, Batch M) |
-| Head SHA | __HEAD__ |
+| Head SHA | `3dcaa1860ddb1c9d81904397979bc3b9a6dd7655` (before this link-up commit) |
 | Evidence window | 2026-10-31 07:51Z – 07:57Z (all times UTC) |
 | Environment under test | Railway-hosted **public shared Beta** (retail tenant `alrshd`), probed from outside only |
 
