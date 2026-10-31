@@ -12,6 +12,8 @@ export const KNOWN_ISSUE_CODES = [
   'duplicate_id_across_pages', 'unknown_prop', 'missing_required_prop', 'action_not_supported', 'unknown_action_param',
 ] as const;
 
+const locationOf = (issue: ContractIssue): string => [issue.page_id, issue.node_id, issue.field].filter(Boolean).join(' › ');
+
 export function issueText(issue: ContractIssue, t: Translate): string {
   return (KNOWN_ISSUE_CODES as readonly string[]).includes(issue.code) ? t(`issues.codes.${issue.code}`) : issue.message;
 }
@@ -23,7 +25,7 @@ export function parseContractIssues(body: unknown): ContractIssue[] | null {
 }
 
 /** قائمة مشكلات العقد (تُستعمل في الشريط وفي حوار النشر). */
-export function ContractIssuesList({ issues, t, limit = 50 }: { issues: ContractIssue[]; t: Translate; limit?: number }) {
+export function ContractIssuesList({ issues, t, limit = 50, onOpen }: { issues: ContractIssue[]; t: Translate; limit?: number; onOpen?: (issue: ContractIssue) => void }) {
   const shown = issues.slice(0, limit);
   return (
     <ul className="max-h-48 space-y-1 overflow-auto text-xs">
@@ -33,7 +35,14 @@ export function ContractIssuesList({ issues, t, limit = 50 }: { issues: Contract
             {issue.blocks_publish ? t('issues.blocking') : t('issues.warning')}
           </span>
           <span className="text-text">{issueText(issue, t)}</span>
-          <code className="text-[11px] text-muted" dir="ltr">{[issue.page_id, issue.node_id, issue.field].filter(Boolean).join(' › ')}</code>
+          {onOpen && issue.node_id ? (
+            // الاسم يضم الموضع (الصفحة › العقدة › الحقل) كي يميّز قارئ الشاشة الوجهات؛ التعليمة المترجمة في الاسم نفسه.
+            <button type="button" className="text-[11px] text-primary underline" dir="ltr" aria-label={`${t('issues.open')}: ${locationOf(issue)}`} title={t('issues.open')} onClick={() => onOpen(issue)}>
+              {locationOf(issue)}
+            </button>
+          ) : (
+            <code className="text-[11px] text-muted" dir="ltr">{locationOf(issue)}</code>
+          )}
         </li>
       ))}
       {issues.length > limit ? <li className="text-muted">{t('issues.more', { count: issues.length - limit })}</li> : null}
@@ -42,7 +51,7 @@ export function ContractIssuesList({ issues, t, limit = 50 }: { issues: Contract
 }
 
 /** شريط مشكلات العقد في المحرر: غائب بلا مشكلات؛ يوضّح ما سيمنع النشر. معلوماتي — لا يمنع الحفظ أبداً. */
-export function ContractIssuesNotice({ issues, t }: { issues: ContractIssue[]; t: Translate }) {
+export function ContractIssuesNotice({ issues, t, onOpen }: { issues: ContractIssue[]; t: Translate; onOpen?: (issue: ContractIssue) => void }) {
   const [open, setOpen] = React.useState(false);
   if (issues.length === 0) return null;
   const blocking = issues.filter((i) => i.blocks_publish).length;
@@ -57,7 +66,7 @@ export function ContractIssuesNotice({ issues, t }: { issues: ContractIssue[]; t
           {open ? t('issues.hide') : t('issues.show')}
         </button>
       </div>
-      {open ? <div className="mt-2"><ContractIssuesList issues={issues} t={t} /></div> : null}
+      {open ? <div className="mt-2"><ContractIssuesList issues={issues} t={t} onOpen={onOpen} /></div> : null}
     </div>
   );
 }

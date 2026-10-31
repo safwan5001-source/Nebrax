@@ -58,3 +58,19 @@ describe('visibility signal labels', () => {
     }
   });
 });
+
+describe('issue markers', () => {
+  it('buildIssueMarkers keeps only the shown page, ignores node-less issues, and lets errors win over warnings', async () => {
+    const { buildIssueMarkers, sectionMarker } = await import('./issue-markers');
+    const mk = (code: string, page: string, node: string | null, blocks: boolean) => ({ code, severity: blocks ? 'error' as const : 'warning' as const, page_id: page, node_id: node, field: null, message: 'x', blocks_publish: blocks });
+    const markers = buildIssueMarkers([mk('a', 'home', 'n1', false), mk('b', 'home', 'n1', true), mk('c', 'home', 'n2', false), mk('d', 'cart', 'n3', true), mk('e', 'home', null, true)], 'home');
+
+    expect([...markers.entries()].sort()).toEqual([['n1', 'error'], ['n2', 'warning']]);
+    expect(buildIssueMarkers([mk('a', 'home', 'n1', true)], null).size).toBe(0);
+
+    const section = { type: 'Section', id: 's', children: [{ type: 'Text', id: 'n2' }, { type: 'Text', id: 'n1' }] };
+    expect(sectionMarker(section, markers)).toBe('error');
+    expect(sectionMarker({ type: 'Section', id: 's2', children: [{ type: 'Text', id: 'n2' }] }, markers)).toBe('warning');
+    expect(sectionMarker({ type: 'Section', id: 's3', children: [] }, markers)).toBeNull();
+  });
+});

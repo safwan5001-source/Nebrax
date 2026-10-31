@@ -32,6 +32,7 @@ import { EasySelectionBar } from '@/modules/app-builder/easy/easy-selection-bar'
 import { EasySectionsPanel } from '@/modules/app-builder/easy/easy-sections-panel';
 import { readEditorMode, sectionContains, writeEditorMode, type EditorMode } from '@/modules/app-builder/easy/editor-mode';
 import { isAddableOnPage, sectionSummary, type EasyCatalogEntry } from '@/modules/app-builder/easy/easy-catalog';
+import { buildIssueMarkers, IssueMarkersProvider } from '@/modules/app-builder/issue-markers';
 import { ContractIssuesList, ContractIssuesNotice, parseContractIssues } from '@/modules/app-builder/contract-issues';
 import { AppBuilderCanvas, PREVIEW_WIDTHS, type PreviewDevice } from '@/modules/app-builder/canvas';
 import { DEFAULT_APP_EXPERIENCE } from '@/modules/app-builder/default-experience';
@@ -578,6 +579,8 @@ export default function AppBuilderWorkspacePage() {
   }
 
   const pageIds = useMemo(() => (schema ? Object.keys(schema.pages) : []), [schema]);
+  // شارات المشكلات للصفحة المعروضة (الشجرة وقائمة الأقسام) — معلوماتية من آخر نسخة محفوظة. (قبل أي return مبكر: قواعد الـhooks.)
+  const issueMarkers = useMemo(() => buildIssueMarkers(contractIssues, selectedPageId), [contractIssues, selectedPageId]);
   const viewedSchema: AppSchema | null =
     previewState === 'published' ? publishedVersion?.schema ?? null : previewState === 'default' ? DEFAULT_APP_EXPERIENCE : null;
   const viewedPageIds = useMemo(() => (viewedSchema ? Object.keys(viewedSchema.pages) : []), [viewedSchema]);
@@ -866,6 +869,7 @@ export default function AppBuilderWorkspacePage() {
                 onUndo={easyUndoDelete}
                 canUndo={canUndo}
                 undoBanner={deleteUndo ? { name: deleteUndo.name } : null}
+                markers={issueMarkers}
               />
             </div>
           ) : (
@@ -1093,6 +1097,16 @@ export default function AppBuilderWorkspacePage() {
     </>
   );
 
+  /** يفتح عقدة مشكلة في المحرر: الصفحة ثم العقدة (إن وُجدت)، ويعود إلى التصميم/المسودة ويغلق حوار النشر. */
+  function openIssue(issue: ContractIssue) {
+    if (!schema || !schema.pages[issue.page_id]) return;
+    setBuilderMode('design');
+    setPreviewState('draft');
+    setPublishOpen(false);
+    selectPage(issue.page_id);
+    if (issue.node_id && findComponentById(schema.pages[issue.page_id], issue.node_id)) setSelectedComponentId(issue.node_id);
+  }
+
   // القسم الحاوي للعنصر المحدد (الوضع السهل): أول ابن مباشر لجذر الصفحة يحتويه؛ يقود شريط التحديد.
   const selectedSectionInfo = (() => {
     const list = currentPageRoot?.children ?? [];
@@ -1109,7 +1123,7 @@ export default function AppBuilderWorkspacePage() {
       {!canManage ? (
         <p role="status" className="shrink-0 border-b border-border bg-primary-soft px-4 py-2 text-xs text-text">{t('readOnly.notice')}</p>
       ) : null}
-      <ContractIssuesNotice issues={contractIssues} t={t} />
+      <ContractIssuesNotice issues={contractIssues} t={t} onOpen={openIssue} />
       {saveFailure ? (
         <div role="alert" className="flex shrink-0 flex-wrap items-center gap-2 border-b border-negative/30 bg-negative/10 px-4 py-2 text-xs text-text">
           <span>{saveFailure === 'network' ? t('saveFailure.network') : t('saveFailure.other')}</span>
@@ -1136,6 +1150,7 @@ export default function AppBuilderWorkspacePage() {
   }
 
   return (
+    <IssueMarkersProvider markers={issueMarkers}>
     <div dir={locale === 'ar' ? 'rtl' : 'ltr'} data-touch-targets className="flex h-full min-h-0 flex-col">
       <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 border-b border-border bg-surface px-3 md:px-4 [@media(max-height:500px)]:min-h-11 [@media(max-height:500px)]:flex-nowrap [@media(max-height:500px)]:overflow-x-auto">
         <Button asChild variant="ghost" size="icon" aria-label={t('back')}>
@@ -1479,7 +1494,7 @@ export default function AppBuilderWorkspacePage() {
           ) : (
             <div className="space-y-2">
               <p className="text-sm text-negative">{validation.message}</p>
-              {validation.issues ? <ContractIssuesList issues={validation.issues} t={t} /> : null}
+              {validation.issues ? <ContractIssuesList issues={validation.issues} t={t} onOpen={openIssue} /> : null}
             </div>
           )}
           <div className="space-y-1">
@@ -1505,5 +1520,6 @@ export default function AppBuilderWorkspacePage() {
       <EasyCatalogDialog open={catalogOpen} onClose={() => setCatalogOpen(false)} onPick={easyAdd} pageId={selectedPageId} t={t} />
       {safetyDialogs}
     </div>
+    </IssueMarkersProvider>
   );
 }

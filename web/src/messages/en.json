@@ -8796,6 +8796,7 @@
           }
         },
       "issues": {
+        "open": "Show in the editor",
         "blocking": "Blocks publishing",
         "warning": "Warning",
         "more": "and {count} more",
