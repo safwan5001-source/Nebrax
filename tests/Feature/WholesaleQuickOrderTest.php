@@ -264,6 +264,22 @@ class WholesaleQuickOrderTest extends TestCase
     }
 
     #[Test]
+    public function an_exact_variant_sku_is_not_crowded_out_by_other_products_that_merely_mention_it(): void
+    {
+        $token = $this->buyer('crowd@qo.test');
+        app(TenantContext::class)->set($this->tenant->id);
+        foreach (['A', 'B', 'C'] as $i => $letter) {
+            $noise = Product::create(['name' => $letter.' mentions shirt-red in passing', 'sku' => 'NOISE-'.$i, 'unit' => 'piece', 'sale_price' => 100, 'is_active' => true]);
+            CommerceListing::create(['product_id' => $noise->id, 'sales_channel_id' => $this->ws->id, 'is_published' => true]);
+        }
+
+        $lines = $this->api('GET', 'buyer/quick-order/lookup?q='.rawurlencode('SHIRT-RED').'&limit=2', self::WS, $token)
+            ->assertOk()->json('data');
+
+        $this->assertContains($this->varRed->id, array_column($lines, 'product_variant_id'), 'the exact variant SKU must survive the product limit');
+    }
+
+    #[Test]
     public function an_unpriced_product_is_unavailable_with_no_price_and_the_sale_price_is_never_exposed(): void
     {
         $token = $this->buyer('u@qo.test');

@@ -109,7 +109,7 @@ The remaining screenshots of the 56-test run were generated locally in `storefro
 
 | Check | Result |
 |---|---|
-| `WholesaleQuickOrderTest` | 25 tests, **SQLite and PostgreSQL green** |
+| `WholesaleQuickOrderTest` | 26 tests, **SQLite and PostgreSQL green** |
 | Related PHP suites (SQLite): Wholesale\*, StorefrontCart\*/Checkout\*, CommerceCart\*/Checkout\*, CommerceModuleBoundary, CommercePrice\*, BranchIsolationGuard, ApplicationCatalog, StorefrontGateway\*, StorefrontClientIp, StorefrontRoutesRegistered, StorefrontPriceParity | **414 passed, 27 skipped, 0 failed** |
 | Related PHP suites (PostgreSQL): WholesaleQuickOrder, WholesalePriceSurfaceBoundary, WholesaleCartCheckoutBoundary, WholesalePricePrecedence, WholesaleBuyer, StorefrontCart/Checkout, CommerceCart, CommerceModuleBoundary, BranchIsolationGuard | 282 passed on the first run + the 2 quick-order failures fixed (§6) and re-run green; boundary test re-run green |
 | Storefront `pnpm test` | **256 files passed, 3675 tests passed**, 16 skipped (pre-existing) |
@@ -144,6 +144,7 @@ No financial or security assertion was weakened.
 1. **PostgreSQL case sensitivity (real bug, would have shipped).** `LIKE` is case-insensitive on SQLite and **case-sensitive on PostgreSQL**, so a buyer typing `cof-100` found nothing in production while the SQLite tests passed. Found by the PostgreSQL run; fixed by comparing `lower(column) like lower(term)`; the existing lowercase-SKU tests now guard it on both engines.
 2. A parent SKU that matched alongside a variant's own SKU returned only one variant (`elseif`); now two independent checks.
 3. UI: the submit button stayed disabled after a pasted import (React transition + server action); replaced by an explicit in-flight flag with `try/finally`.
+5. Codex review of the PR (three P2 findings, all verified as real and fixed with a regression test each): (a) while an add is in flight the submitted rows could still be edited, so those edits were lost when the response cleared the row — the quantity input, remove and pick controls are now disabled while pending; (b) merging a duplicate SKU treated an invalid quantity as 0, silently turning a typo into a smaller valid order — the invalid text is now preserved and keeps blocking; (c) an exact variant SKU could be crowded out by ≥ limit other products that merely mention it, because only the parent SKU was prioritised before the limit — the ordering now ranks an exact active-variant SKU match first.
 4. E2E reliability only (no product change): a shared logged-in browser context broke the sign-in step of two gate tests (they now use a fresh context); cart assertions poll a fixed expected figure; the price-withdrawn test restores state with a park/restore helper instead of deleting a row.
 
 ---

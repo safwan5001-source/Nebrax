@@ -235,6 +235,20 @@ describe("entries", () => {
     expect(apart).toHaveLength(2);
   });
 
+  it("merging never turns an invalid quantity into a valid order: the invalid text stays and keeps blocking", () => {
+    const incomingInvalid = mergeEntry(
+      [entry("a", "2")],
+      entry("b", "1000000"),
+    );
+    expect(incomingInvalid).toHaveLength(1);
+    expect(incomingInvalid[0].quantity).toBe("1000000");
+    expect(quantityError(incomingInvalid[0].quantity)).not.toBeNull();
+
+    const existingInvalid = mergeEntry([entry("a", "abc")], entry("b", "3"));
+    expect(existingInvalid[0].quantity).toBe("abc");
+    expect(quantityError(existingInvalid[0].quantity)).not.toBeNull();
+  });
+
   it("merging never exceeds the ceiling", () => {
     const merged = mergeEntry(
       [entry("a", String(QUICK_ORDER_MAX_QUANTITY))],

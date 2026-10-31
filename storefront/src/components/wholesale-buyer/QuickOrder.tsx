@@ -326,6 +326,7 @@ export function QuickOrder({ basePath }: { basePath: string }) {
                       variant="outline"
                       size="sm"
                       onClick={() => addLine(line)}
+                      disabled={pending}
                       data-testid="qo-pick"
                       data-sku={line.sku ?? ""}
                     >
@@ -462,6 +463,7 @@ export function QuickOrder({ basePath }: { basePath: string }) {
                         variant="ghost"
                         size="icon"
                         onClick={() => remove(entry.id)}
+                        disabled={pending}
                         aria-label={t("list.remove")}
                       >
                         <Trash2 aria-hidden="true" className="size-4" />
@@ -482,7 +484,7 @@ export function QuickOrder({ basePath }: { basePath: string }) {
                           aria-invalid={message ? true : undefined}
                           className="w-24"
                           data-testid="qo-qty"
-                          disabled={blocked}
+                          disabled={blocked || pending}
                         />
                       </label>
                       {entry.line.available && entry.line.price && !message ? (

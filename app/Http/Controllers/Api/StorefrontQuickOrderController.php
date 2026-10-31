@@ -89,7 +89,10 @@ final class StorefrontQuickOrderController extends PublicApiController
                 ->orWhereRaw('lower(sku) like ?', [$like])
                 ->orWhereHas('variants', fn ($v) => $v->where('is_active', true)->whereRaw('lower(sku) like ?', [$like])))
             ->with(['variants' => fn ($v) => $v->where('is_active', true)->with('optionValues.option')])
-            ->orderByRaw('case when lower(sku) = ? then 0 else 1 end', [$exact])
+            ->orderByRaw(
+                'case when lower(sku) = ? or exists (select 1 from product_variants pv where pv.product_id = products.id and pv.is_active = ? and lower(pv.sku) = ?) then 0 else 1 end',
+                [$exact, true, $exact],
+            )
             ->orderBy('name')
             ->limit($limit)
             ->get();

@@ -189,13 +189,21 @@ export function mergeEntry(
   const index = entries.findIndex(same);
   if (index === -1) return [...entries, next];
   const merged = [...entries];
-  const a = quantityError(entries[index].quantity)
-    ? 0
-    : quantityValue(entries[index].quantity);
-  const b = quantityError(next.quantity) ? 0 : quantityValue(next.quantity);
+  // An invalid quantity on either side must stay visible and blocking: summing it as 0 would turn a typo into a
+  // valid (smaller) order with no message. Keep the offending raw text so the row shows its validation error.
+  if (quantityError(entries[index].quantity)) return merged;
+  if (quantityError(next.quantity)) {
+    merged[index] = { ...entries[index], quantity: next.quantity };
+    return merged;
+  }
   merged[index] = {
     ...entries[index],
-    quantity: String(Math.min(a + b, QUICK_ORDER_MAX_QUANTITY)),
+    quantity: String(
+      Math.min(
+        quantityValue(entries[index].quantity) + quantityValue(next.quantity),
+        QUICK_ORDER_MAX_QUANTITY,
+      ),
+    ),
   };
   return merged;
 }

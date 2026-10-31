@@ -265,6 +265,42 @@ describe("quick order UI", () => {
     expect(links).toEqual(["/sa/en/cart", "/sa/en/checkout"]);
   });
 
+  it("while an add is in flight the submitted rows cannot be edited, removed or re-picked", async () => {
+    actions.searchQuickOrder.mockResolvedValue({ kind: "ok", lines: [line()] });
+    let release: (v: { kind: "ok" }) => void = () => {};
+    actions.addQuickOrderLines.mockReturnValue(
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+    );
+    render(wrap());
+    await search("x1");
+    fireEvent.click((await screen.findAllByTestId("qo-pick"))[0]);
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("qo-submit"));
+    });
+
+    expect((screen.getByTestId("qo-qty") as HTMLInputElement).disabled).toBe(
+      true,
+    );
+    expect(
+      (screen.getAllByTestId("qo-pick")[0] as HTMLButtonElement).disabled,
+    ).toBe(true);
+    expect(
+      (
+        screen.getByRole("button", {
+          name: /remove/i,
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+
+    await act(async () => {
+      release({ kind: "ok" });
+    });
+    await waitFor(() => expect(screen.getByTestId("qo-added")).toBeTruthy());
+  });
+
   it("a server rejection keeps every line, marks the failing one and says nothing was added", async () => {
     actions.searchQuickOrder.mockResolvedValue({
       kind: "ok",
