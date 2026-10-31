@@ -3,9 +3,10 @@
 | | |
 |---|---|
 | Branch | `claude/commerce-h6-batch-j` |
-| PR | __PR__ |
+| PR | #1823 |
 | Base SHA (origin/main) | `4f93795d9` (contains the #1821 merge `1dd736d19ac800f9bca15ce590fbab37ba519d8f`) |
-| Head SHA | __HEAD__ |
+| Code head SHA (all CI green) | `f7ffc0f72c3d2ee493ceb29342287d1e2f4786eb` |
+| Report commit | docs-only commit on top of the code head (changes this file only; its own CI run is on the PR) |
 
 **Status.** Wholesale is not activated: `commerce.wholesale_buyer_enabled` stays off and no tenant, deployment or database was touched. Nothing merged, nothing deployed. No MOQ, credit terms or tax policy was added. The Spree wholesale checkout is untouched; the Spree exit is **not** complete.
 
@@ -87,7 +88,7 @@ No accounting, VAT, ZATCA, payment-capture, order-lifecycle or cancellation code
 | `check:locales` | all locales in sync |
 | Spree ratchet | OK, unchanged: 4 / 4 / 52 / 69 / 9 |
 | `pnpm build` | exit 0 |
-| CI / CI Gate | __CI__ |
+| CI / CI Gate (code head `f7ffc0f`) | **All 9 checks green:** `php artisan test` SQLite, `php artisan test` PostgreSQL, `web build (Next.js)` (both event runs), `storefront (lint + typecheck + test)`, `docker-context`, `published footer visual QA`, `merchant preview visual QA`, `CI Gate`. Codex: three review rounds on this PR produced two valid P2 findings (variant availability predicate; staff-preview null price), both my own defects, both fixed with regression tests and resolved; the final round has no findings. |
 
 Environment note: `Fuel*` tests need `ext-bcmath`, absent locally only; CI installs it.
 
