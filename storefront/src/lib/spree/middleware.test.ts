@@ -498,14 +498,14 @@ describe("X5b: legacy Spree checkout routes answer a real 404 without wholesale"
 
   it.each(
     legacy,
-  )("lets %s through when the wholesale add-on is enabled", async (path) => {
+  )("keeps %s closed even when the (dead) Spree add-on env is set: the pages no longer exist", async (path) => {
     vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "wholesale");
     const response = await middleware(
       new NextRequest(`https://store.example${path}`),
     );
 
-    expect(rewriteOf(response)).toBeNull();
-    expect(response.headers.get("x-middleware-next")).toBe("1");
+    expect(response.headers.get("location")).toBeNull();
+    expect(rewriteOf(response)).toBe(`https://store.example${closedPath}`);
   });
 
   it("still canonicalises the locale prefix before deciding (no gate bypass by prefix spelling)", async () => {
@@ -551,14 +551,13 @@ describe("X5b: legacy Spree checkout routes answer a real 404 without wholesale"
     }
   });
 
-  it("leaves dotted legacy ids untouched when the wholesale add-on is enabled", async () => {
+  it("closes dotted legacy ids even when the (dead) Spree add-on env is set", async () => {
     vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "wholesale");
     const response = await middleware(
       new NextRequest("https://store.example/us/en/checkout/test.123"),
     );
 
-    expect(rewriteOf(response)).toBeNull();
-    expect(response.headers.get("x-middleware-next")).toBe("1");
+    expect(rewriteOf(response)).toBe(`https://store.example${closedPath}`);
     expect(response.headers.get("set-cookie")).toBeNull();
   });
 });

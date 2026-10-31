@@ -8,7 +8,6 @@ import {
 import { REQUEST_PATHNAME_HEADER, REQUEST_SEARCH_HEADER } from "@/i18n/routing";
 import type { HostContext } from "@/lib/commerce/edge-storefront-locale";
 import { buildAccountLoginHref } from "@/lib/utils/account-redirect";
-import { isWholesaleEnabled } from "./config";
 
 const COUNTRY_COOKIE = "spree_country";
 const LOCALE_COOKIE = "spree_locale";
@@ -17,9 +16,10 @@ const REFRESH_TOKEN_COOKIE = "_spree_refresh_token";
 const COOKIE_MAX_AGE = 365 * 24 * 60 * 60;
 
 /**
- * Legacy Spree-backed checkout pages (`(checkout)/{checkout,confirm-payment,
- * order-placed}/[id]`). They belong to the opt-in wholesale add-on; without it
- * they must answer a genuine HTTP 404 (X5b).
+ * Legacy Spree-backed checkout URLs (`/{checkout,confirm-payment,order-placed}/[id]`). The pages are gone (they belonged
+ * to the removed Spree wholesale add-on); the proxy keeps answering a genuine HTTP 404 for them (X5b) so old links never
+ * fall through to a page that no longer exists, and `/checkout/{anything but payment-return}` is not mistaken for the
+ * AWJ-native checkout.
  */
 const LEGACY_CHECKOUT_PATH =
   /^\/(checkout|confirm-payment|order-placed)\/([^/]+)$/;
@@ -259,7 +259,7 @@ export function createSpreeMiddleware(
     // `/{country}/{locale}/{checkout|confirm-payment|order-placed}/{id}` shape.
     if (/\.\w+$/.test(pathname)) {
       const dotted = pathname.match(HAS_COUNTRY_LOCALE);
-      if (dotted && !isWholesaleEnabled()) {
+      if (dotted) {
         const prefix = `/${dotted[1]}/${dotted[2]}`;
         if (isLegacyCheckoutPath(pathname.slice(prefix.length))) {
           // No cookies: the locale here is unvalidated, only the status matters.
@@ -318,7 +318,7 @@ export function createSpreeMiddleware(
 
       const localizedPath = pathname.slice(canonicalPrefix.length);
 
-      if (!isWholesaleEnabled() && isLegacyCheckoutPath(localizedPath)) {
+      if (isLegacyCheckoutPath(localizedPath)) {
         return legacyCheckoutClosed(request, canonicalPrefix, {
           country,
           locale,

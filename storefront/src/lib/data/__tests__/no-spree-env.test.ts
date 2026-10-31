@@ -1,4 +1,6 @@
 // @vitest-environment node
+import fs from "node:fs";
+import path from "node:path";
 import {
   afterAll,
   beforeAll,
@@ -592,14 +594,13 @@ describe("policy pages work without Spree", () => {
   });
 });
 
-describe("X5: legacy Spree checkout routes are closed without wholesale configuration", () => {
-  it("the legacy (checkout) layout is a 404 and never touches Spree", async () => {
-    const { default: LegacyCheckoutLayout } = await import(
-      "@/app/[country]/[locale]/(checkout)/layout"
+describe("X5: legacy Spree checkout routes stay closed without wholesale configuration", () => {
+  it("the legacy (checkout) route group no longer exists — the proxy answers 404 for those URLs (see middleware.test.ts)", () => {
+    const dir = path.join(
+      process.cwd(),
+      "src/app/[country]/[locale]/(checkout)",
     );
-    expect(() => LegacyCheckoutLayout({ children: null })).toThrow(
-      expect.objectContaining({ digest: "NEXT_HTTP_ERROR_FALLBACK;404" }),
-    );
+    expect(fs.existsSync(dir)).toBe(false);
     expectSpreeUntouched();
   });
 
