@@ -84,16 +84,19 @@ export function QuickOrder({ basePath }: { basePath: string }) {
   // debounced catalogue search (≥ 2 characters); a stale response never overwrites a newer one
   useEffect(() => {
     const q = term.trim();
+    // exact-resolution candidates handed over by an import win over every search rule (including the 2-character minimum:
+    // a valid one-character parent SKU must keep its variant choices)
+    if (suppressSearchFor.current !== null && suppressSearchFor.current === q) {
+      latestSearch.current += 1;
+      setSearching(false);
+      return;
+    }
     if (q.length < 2) {
       // invalidate any lookup still in flight so its late response cannot repopulate the picker for a query that is gone
       latestSearch.current += 1;
       setResults(null);
       setSearching(false);
-      return;
-    }
-    if (suppressSearchFor.current === q) {
-      latestSearch.current += 1;
-      setSearching(false);
+      suppressSearchFor.current = null;
       return;
     }
     suppressSearchFor.current = null;

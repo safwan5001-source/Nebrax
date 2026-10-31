@@ -305,6 +305,29 @@ describe("quick order UI", () => {
     expect(actions.searchQuickOrder).not.toHaveBeenCalled();
   });
 
+  it("a one-character ambiguous parent SKU keeps its variant choices", async () => {
+    const a1 = { ...variant, sku: "A-1" };
+    const a2 = {
+      ...variant,
+      variantId: "44444444-4444-4444-8444-444444444444",
+      sku: "A-2",
+    };
+    actions.resolveQuickOrderSkus.mockResolvedValue({
+      kind: "ok",
+      rows: [{ sku: "A", lines: [a1, a2] }],
+    });
+    render(wrap());
+    fireEvent.change(screen.getByTestId("qo-paste"), {
+      target: { value: "A 2" },
+    });
+    fireEvent.click(screen.getByTestId("qo-import"));
+    await waitFor(() =>
+      expect(screen.getAllByTestId("qo-pick")).toHaveLength(2),
+    );
+    await new Promise((r) => setTimeout(r, 500));
+    expect(screen.getAllByTestId("qo-pick")).toHaveLength(2);
+  });
+
   it("a partial import keeps only the unresolved rows in the paste box, so a retry cannot apply the good ones twice", async () => {
     actions.resolveQuickOrderSkus.mockResolvedValue({
       kind: "ok",
