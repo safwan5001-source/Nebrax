@@ -162,8 +162,6 @@ class BuilderEditorMetaTest extends TestCase
         return [
             'unknown top key' => [['v' => 1, 'mystery' => 1]],
             'wrong version' => [['v' => 2, 'nodes' => []]],
-            'nodes as a list' => [['v' => 1, 'nodes' => [['name' => 'x']]]],
-            'page entry as a list' => [['v' => 1, 'nodes' => ['home' => [['name' => 'x']]]]],
             'flat (unscoped) node entry' => [['v' => 1, 'nodes' => ['sec-a' => ['name' => 'x']]]],
             'unknown node key' => [['v' => 1, 'nodes' => ['home' => ['sec-a' => ['color' => 'red']]]]],
             'name not a string' => [['v' => 1, 'nodes' => ['home' => ['sec-a' => ['name' => 5]]]]],
@@ -239,6 +237,42 @@ class BuilderEditorMetaTest extends TestCase
         $this->assertSame(['home', 'about'], array_keys($response->json('data.editor_meta.nodes')));
         $this->assertSame(['about-sec'], array_keys($response->json('data.editor_meta.nodes.about')));
         $this->assertTrue($response->json('data.editor_meta.nodes.about.about-sec.hidden'));
+    }
+
+    /** @test */
+    public function numeric_component_and_page_ids_are_valid_keys_even_though_php_reads_them_as_a_list(): void
+    {
+        // JSON {"0": {...}} يُفكّ في PHP إلى [0 => ...] فتبدو قائمة؛ معرّف المكوّن "0" صالح في المخطط (مراجعة Codex P2).
+        [$auth, $appId] = $this->newApp('ad05-numeric');
+        $schema = $this->schema();
+        $schema['pages']['home']['children'][] = ['type' => 'Section', 'id' => '0', 'props' => ['title' => 'صفري'], 'children' => []];
+        $schema['pages']['7'] = ['type' => 'Page', 'id' => '7-root', 'children' => [['type' => 'Section', 'id' => '1', 'props' => ['title' => 'سبعة'], 'children' => []]]];
+
+        $meta = ['v' => 1, 'nodes' => ['home' => ['0' => ['hidden' => true, 'name' => 'مخفي']], '7' => ['1' => ['name' => 'مسمّى']]], 'pages' => ['7' => ['title' => 'صفحة سبعة']]];
+        $response = $this->save($auth['token'], $appId, ['editor_meta' => $meta], $schema)->assertOk();
+
+        // الاستجابة تحفظ المفاتيح الرقمية كما هي (JsonResource كان يعيد فهرستها ⇒ «7» تصير «0»).
+        $body = json_decode($response->getContent(), false);
+        $this->assertTrue($body->data->editor_meta->nodes->home->{'0'}->hidden);
+        $this->assertSame('مسمّى', $body->data->editor_meta->nodes->{'7'}->{'1'}->name);
+        $this->assertSame('صفحة سبعة', $body->data->editor_meta->pages->{'7'}->title);
+        $this->assertSame(['home', 'about', '7'], array_map('strval', array_keys((array) $body->data->schema->pages)), 'معرّفات الصفحات تبقى كما هي');
+
+        $projected = (new EditorMeta())->project($schema, json_decode(json_encode($meta), true));
+        $this->assertNotContains('0', array_map(fn ($c) => (string) $c['id'], $projected['pages']['home']['children']));
+        $this->assertCount(1, $projected['pages']['7']['children'], 'إخفاء "0" في home لا يمسّ "1" في الصفحة 7');
+    }
+
+    /** @test */
+    public function a_list_shaped_map_is_read_as_an_id_keyed_map_never_stored_as_garbage(): void
+    {
+        [$auth, $appId] = $this->newApp('ad05-list');
+
+        // [ [...] ] ≡ {"0": [...]}: معرّف صفحة «0» غير موجود ⇒ يُنظَّف ولا يُخزَّن شيء.
+        $this->save($auth['token'], $appId, ['editor_meta' => ['v' => 1, 'nodes' => [['sec-a' => ['name' => 'x']]]]])->assertOk()
+            ->assertJsonPath('data.editor_meta', null);
+        // وإدخال عقدة ليس كائناً (نصّ) ⇒ 422 كما كان.
+        $this->save($auth['token'], $appId, ['editor_meta' => ['v' => 1, 'nodes' => [['name' => 'x']]]])->assertStatus(422);
     }
 
     /** @test */
