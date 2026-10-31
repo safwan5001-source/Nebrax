@@ -624,6 +624,16 @@ export function Inspector({
     }
   }
 
+  /** CMP-10: «اختياري عند النشر» — المفتاح يُكتب `true` فقط ويُحذف عند الإيقاف (لا `false` مخزَّناً)، فلا يتغيّر مخطط قديم. جذر الصفحة لا يُعلَّم. */
+  function setOptional(next: boolean) {
+    if (next) {
+      onChange({ ...node!, optional: true });
+    } else {
+      const { optional: _dropped, ...rest } = node!;
+      onChange(rest);
+    }
+  }
+
   function handleAddChild() {
     if (!addType || !registries) return;
     const childDefinition = registries.components[addType];
@@ -652,6 +662,21 @@ export function Inspector({
           ))
         )}
       </div>
+
+      {node.type !== 'Page' ? (
+        <div>
+          <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-text">
+            <input
+              type="checkbox"
+              className="h-6 w-6 accent-primary"
+              checked={node.optional === true}
+              onChange={(event) => setOptional(event.target.checked)}
+            />
+            {t('optionalTitle')}
+          </label>
+          <p className="mt-1 text-[11px] leading-relaxed text-muted">{node.optional === true ? t('optionalOn') : t('optionalOff')}</p>
+        </div>
+      ) : null}
 
       {definition.actionable ? (
         <div>

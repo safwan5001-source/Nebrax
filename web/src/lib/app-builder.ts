@@ -159,6 +159,18 @@ export interface BuilderDraftExperience {
   updated_at: string | null;
 }
 
+/** DRF-03 / CMP-10 (S03b): تقرير توافق استشاري لكل جيل Runtime معروف — ما سيُحذف (اختيارياً) يظهر بمعرّفه لا صامتاً. */
+export interface CompatDropped { component_id: string; component_type: string; /** معرّف المكوّن فريد داخل الصفحة وحدها. */ page_id?: string | null }
+export interface CompatGeneration { runtime: string; compatible: boolean; reason: string | null; dropped: CompatDropped[] }
+export interface CompatReport {
+  generations: CompatGeneration[];
+  /** أقدم جيل يعرض التجربة (قد تُحذف منها اختيارية). */
+  min_runtime: string | null;
+  /** أقدم جيل يعرضها كاملةً بلا حذف. */
+  full_runtime: string | null;
+  has_drops: boolean;
+}
+
 export const EMPTY_EDITOR_META: EditorMeta = { v: 1, nodes: {}, pages: {} };
 
 /** يُسقط العقد المخفية وأبناءها من جذر صفحة — مرآة `EditorMeta::project` في الخادم (ما يراه المتجر والمعاينة). لا يحوّر المدخل. */

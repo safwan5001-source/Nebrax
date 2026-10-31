@@ -24,7 +24,7 @@ import {
   themeTokens as schemaThemeTokens, updateComponentById,
   type AppBuilderRegistries, type AppSchema, type AppSchemaActionRef, type AppSchemaComponent, type BuilderApp,
   pageNodeMeta, projectPageRoot, updateEditorMetaNode, updateEditorMetaPageTitle,
-  type BuilderDraftExperience, type BuilderPublishedVersion, type ContractIssue, type EditorMeta,
+  type BuilderDraftExperience, type BuilderPublishedVersion, type CompatReport, type ContractIssue, type EditorMeta,
 } from '@/lib/app-builder';
 import { resolvePreviewActionOutcome } from '@/modules/app-builder/action-semantics';
 import { EasyCatalogDialog } from '@/modules/app-builder/easy/easy-catalog-dialog';
@@ -35,6 +35,7 @@ import { readEditorMode, sectionContains, writeEditorMode, type EditorMode } fro
 import { isAddableOnPage, sectionSummary, type EasyCatalogEntry } from '@/modules/app-builder/easy/easy-catalog';
 import { buildIssueMarkers, IssueMarkersProvider } from '@/modules/app-builder/issue-markers';
 import { ContractIssuesList, ContractIssuesNotice, parseContractIssues } from '@/modules/app-builder/contract-issues';
+import { CompatDisclosure, CompatNotice, compatNeedsAttention } from '@/modules/app-builder/compat-report';
 import { AppBuilderCanvas, PREVIEW_WIDTHS, type PreviewDevice } from '@/modules/app-builder/canvas';
 import { DEFAULT_APP_EXPERIENCE } from '@/modules/app-builder/default-experience';
 import { DeviceFrame, DEVICE_FRAME_PRESETS, type DeviceFramePreset } from '@/modules/app-builder/device-frame';
@@ -131,9 +132,11 @@ export default function AppBuilderWorkspacePage() {
   const [deleteUndo, setDeleteUndo] = useState<{ name: string; schema: AppSchema } | null>(null);
   const [publishOpen, setPublishOpen] = useState(false);
   const [publishNote, setPublishNote] = useState('');
-  const [validation, setValidation] = useState<{ status: 'checking' | 'passed' | 'failed'; message?: string; issues?: ContractIssue[] }>({ status: 'checking' });
+  const [validation, setValidation] = useState<{ status: 'checking' | 'passed' | 'failed'; message?: string; issues?: ContractIssue[]; compat?: CompatReport | null }>({ status: 'checking' });
   // AD-12: مشكلات العقد في آخر نسخة محفوظة (من استجابة GET/PUT للمسودة)؛ معلوماتية ولا تمنع الحفظ.
   const [contractIssues, setContractIssues] = useState<ContractIssue[]>([]);
+  // S03b: تقرير التوافق الاستشاري لآخر نسخة محفوظة (ما سيُحذف على كل جيل Runtime) — لا يمنع شيئاً.
+  const [compat, setCompat] = useState<CompatReport | null>(null);
   const [publishing, setPublishing] = useState(false);
   const canPublish = hasAppBuilderPermission(currentUser(), 'apps_builder.publish');
   const [previewThemeTokens, setPreviewThemeTokens] = useState<Record<string, string> | null>(null);
@@ -185,13 +188,14 @@ export default function AppBuilderWorkspacePage() {
     setLoadError(null);
     Promise.all([
       api<{ data: BuilderApp }>(`/app-builder/apps/${params.id}`),
-      api<{ data: BuilderDraftExperience; issues?: ContractIssue[] }>(`/app-builder/apps/${params.id}/draft`),
+      api<{ data: BuilderDraftExperience; issues?: ContractIssue[]; compat?: CompatReport | null }>(`/app-builder/apps/${params.id}/draft`),
       api<{ data: AppBuilderRegistries }>('/app-builder/registries'),
     ])
       .then(([appRes, draftRes, registriesRes]) => {
         setApp(appRes.data);
         setSchema(withMeta(draftRes.data.schema, draftRes.data.editor_meta ?? null));
         setContractIssues(draftRes.issues ?? []);
+        setCompat(draftRes.compat ?? null);
         baseRevisionRef.current = draftRes.data.revision;
         setBaseRevision(draftRes.data.revision);
         setConflict(null);
@@ -349,12 +353,13 @@ export default function AppBuilderWorkspacePage() {
     const base = overrideBase ?? baseRevisionRef.current;
     const sentMeta = metaOf(toSave); // ما أُرسل فعلاً: به يُقارَن النسخ الاحتياطي (الخادم قد يقصّ معرّفات غير موجودة).
     try {
-      const res = await api<{ data: BuilderDraftExperience; issues?: ContractIssue[] }>(`/app-builder/apps/${params.id}/draft`, {
+      const res = await api<{ data: BuilderDraftExperience; issues?: ContractIssue[]; compat?: CompatReport | null }>(`/app-builder/apps/${params.id}/draft`, {
         method: 'PUT',
         body: base === null ? { schema: toSave, editor_meta: sentMeta } : { schema: toSave, base_revision: base, editor_meta: sentMeta },
       });
       const saved = res?.data;
       setContractIssues(res?.issues ?? []);
+      setCompat(res?.compat ?? null);
       // الخادم ينظّف بيانات المحرر (يقصّ معرّفات لم تعد في المخطط)؛ نسخته هي المرجع لما حُفظ.
       if (saved && 'editor_meta' in saved) metaRegistry.current.set(toSave, saved.editor_meta ?? null);
       if (saved && typeof saved.revision === 'number') {
@@ -486,8 +491,8 @@ export default function AppBuilderWorkspacePage() {
     if (!params.id) return;
     setValidation({ status: 'checking' });
     try {
-      await api(`/app-builder/apps/${params.id}/validate`, { method: 'POST' });
-      setValidation({ status: 'passed' });
+      const checked = await api<{ compat?: CompatReport | null }>(`/app-builder/apps/${params.id}/validate`, { method: 'POST' });
+      setValidation({ status: 'passed', compat: checked?.compat ?? null });
     } catch (err) {
       const issues = err instanceof ApiError ? parseContractIssues(err.body) : null;
       setValidation({ status: 'failed', message: err instanceof ApiError ? err.message : t('publish.validateErrorGeneric'), ...(issues ? { issues } : {}) });
@@ -1170,6 +1175,21 @@ export default function AppBuilderWorkspacePage() {
     </>
   );
 
+  /** يحدّد مكوّناً بمعرّفه (أول صفحة تحويه) كما يفعل `openIssue`: يعيد وضع التصميم/المسودة ويغلق حوار النشر ويعيد لوحة الصفحات (لا تبقى لوحة المظهر أو App Preview تخفي المفتش). */
+  function openComponentById(componentId: string, preferredPageId?: string | null) {
+    if (!schema) return;
+    // معرّف المكوّن فريد داخل الصفحة وحدها: الصفحة التي أبلغ عنها التقرير تتقدّم، وإلا أول صفحة تحويه (خادم أقدم بلا page_id).
+    const pageId = preferredPageId && schema.pages[preferredPageId] && findComponentById(schema.pages[preferredPageId], componentId) !== null
+      ? preferredPageId
+      : Object.keys(schema.pages).find((id) => findComponentById(schema.pages[id], componentId) !== null);
+    if (!pageId) return;
+    setBuilderMode('design');
+    setPreviewState('draft');
+    setPublishOpen(false);
+    selectPage(pageId); // يبدّل لوحة البنية إلى «الصفحات» ويحدّد جذر الصفحة
+    setSelectedComponentId(componentId);
+  }
+
   /** يفتح عقدة مشكلة في المحرر: الصفحة ثم العقدة (إن وُجدت)، ويعود إلى التصميم/المسودة ويغلق حوار النشر. */
   function openIssue(issue: ContractIssue) {
     if (!schema || !schema.pages[issue.page_id]) return;
@@ -1197,6 +1217,7 @@ export default function AppBuilderWorkspacePage() {
         <p role="status" className="shrink-0 border-b border-border bg-primary-soft px-4 py-2 text-xs text-text">{t('readOnly.notice')}</p>
       ) : null}
       <ContractIssuesNotice issues={contractIssues} t={t} onOpen={openIssue} />
+      <CompatNotice report={compat} t={t} onOpen={openComponentById} />
       {saveFailure ? (
         <div role="alert" className="flex shrink-0 flex-wrap items-center gap-2 border-b border-negative/30 bg-negative/10 px-4 py-2 text-xs text-text">
           <span>{saveFailure === 'network' ? t('saveFailure.network') : t('saveFailure.other')}</span>
@@ -1565,7 +1586,10 @@ export default function AppBuilderWorkspacePage() {
           {validation.status === 'checking' ? (
             <p className="text-sm text-muted">{t('publish.validating')}</p>
           ) : validation.status === 'passed' ? (
-            <p className="text-sm text-positive">{t('publish.validationPassed')}</p>
+            <div className="space-y-2">
+              <p className="text-sm text-positive">{t('publish.validationPassed')}</p>
+              {compatNeedsAttention(validation.compat) ? <CompatDisclosure report={validation.compat} t={t} onOpen={openComponentById} /> : null}
+            </div>
           ) : (
             <div className="space-y-2">
               <p className="text-sm text-negative">{validation.message}</p>
