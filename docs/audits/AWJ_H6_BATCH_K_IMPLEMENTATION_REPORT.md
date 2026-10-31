@@ -88,7 +88,7 @@ No accounting, VAT, ZATCA, payment-capture, order-lifecycle or cancellation code
 |---|---|
 | Affected backend suites, SQLite | 810 passed, 41 skipped (PostgreSQL-only) |
 | Same suites, PostgreSQL | 851 passed |
-| Full backend suite, SQLite | __FULLSUITE__ |
+| Full backend suite, SQLite (29 chunks) | 9,930 passed, 299 skipped (PostgreSQL-only), 26 failed — **all 26 are `Fuel*` tests** (`FuelAviRfid`, `FuelReconciliation`, `FuelSaleApi`, `FuelSaleService`, `FuelSupplyReceivingApi`, `FuelSupplyReceiving`) failing with `Call to undefined function bcmul()`: the `ext-bcmath` extension is absent in this environment only (CI installs it). No wholesale, pricing, commerce, cart, checkout or storefront test failed. |
 | Storefront tsc / Biome / vitest / locales / ratchet / build | 0 / baseline / 3,572 passed / OK / OK / exit 0 |
 | CI / CI Gate | __CI__ |
 
