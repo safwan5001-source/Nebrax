@@ -205,6 +205,20 @@ class AppSchemaContractCheckerTest extends TestCase
     }
 
     /** @test */
+    public function an_empty_optional_string_param_is_accepted_but_an_empty_required_one_is_not(): void
+    {
+        $schema = $this->schema([
+            ['type' => 'Button', 'id' => 'a', 'props' => ['label' => 'x'], 'action' => ['type' => 'addToCart', 'params' => ['productId' => 'p1', 'variantId' => '']]],
+            ['type' => 'Button', 'id' => 'b', 'props' => ['label' => 'x'], 'action' => ['type' => 'addToCart', 'params' => ['productId' => '']]],
+        ]);
+
+        $issues = array_values(array_filter($this->checker->check($schema), fn (ContractIssue $i) => $i->blocksPublish()));
+        $this->assertCount(1, $issues);
+        $this->assertSame('b', $issues[0]->nodeId);
+        $this->assertSame('action.params.productId', $issues[0]->field);
+    }
+
+    /** @test */
     public function an_action_on_a_non_actionable_component_is_a_warning(): void
     {
         $schema = $this->schema([['type' => 'Text', 'id' => 't', 'props' => ['text' => 'x'], 'action' => ['type' => 'refresh', 'params' => []]]]);

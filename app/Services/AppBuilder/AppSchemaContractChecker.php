@@ -241,7 +241,8 @@ final class AppSchemaContractChecker
             }
             $ok = match ($param->type) {
                 PropType::INTEGER => $this->isInteger($value) && ($param->minValue === null || (int) $value >= $param->minValue),
-                default => is_string($value) && $value !== '',
+                // المطلوب نصٌّ غير فارغ؛ الاختياري (مثل `variantId` الذي يتركه المحرر "" بعد المسح) يقبله Runtime فارغاً.
+                default => is_string($value) && ($value !== '' || ! $param->required),
             };
             if (! $ok) {
                 $issues[] = new ContractIssue('action_param_invalid', ContractIssue::ERROR, $pageId, $id, "action.params.{$key}", "قيمة المعامل \"{$key}\" للإجراء \"{$actionType}\" غير صالحة.");
