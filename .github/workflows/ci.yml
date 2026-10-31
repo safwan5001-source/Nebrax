@@ -210,6 +210,9 @@ jobs:
           # عقد LIVE-PREVIEW مشترك (LIVE-PREVIEW-2/7) — يقرأه اختبار الإثبات المتكامل عبر
           # base_path('contracts/app-builder/…')؛ نفس الملفات التي تقرأها اختبارات TypeScript/Dart مباشرة.
           cp -r "$CORE/contracts/app-builder/"*.json      contracts/app-builder/
+          # أرشيف النسخ المجمَّد (CPT-05) في مجلد فرعي — يقرؤه PublishedVersionArchiveTest.
+          mkdir -p contracts/app-builder/archive
+          cp -r "$CORE/contracts/app-builder/archive/"*.json contracts/app-builder/archive/
           # عقد رحلة الورود والهدايا (FLOWERS-H16): استجابات store/v1 الحقيقية؛ يقارنها FlowersEndToEndJourneyTest
           # بالواقع، ويقرؤها اختبار واجهة المتجر بمحلّلاته الفعلية.
           cp -r "$CORE/contracts/flowers-journey/"*.json  contracts/flowers-journey/

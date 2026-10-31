@@ -105,6 +105,9 @@ cp "$CORE_DIR/deploy/php/awj-uploads.ini" deploy/php/
 # عقد LIVE-PREVIEW مشترك (LIVE-PREVIEW-2/7) — يقرأه اختبار الإثبات المتكامل عبر
 # base_path('contracts/app-builder/…')؛ نفس الملفات التي تقرأها اختبارات TypeScript/Dart مباشرة.
 cp -r "$CORE_DIR/contracts/app-builder/"*.json   contracts/app-builder/
+# أرشيف النسخ المجمَّد (CPT-05) في مجلد فرعي — يقرؤه PublishedVersionArchiveTest.
+mkdir -p contracts/app-builder/archive
+cp -r "$CORE_DIR/contracts/app-builder/archive/"*.json contracts/app-builder/archive/
 # عقد رحلة الورود والهدايا (FLOWERS-H16) — يقارنه FlowersEndToEndJourneyTest ويقرؤه اختبار واجهة المتجر.
 cp -r "$CORE_DIR/contracts/flowers-journey/"*.json contracts/flowers-journey/
 # عقد رحلة التاجر الإدارية (FLOWERS-H2-15) — يقارنه FlowersMerchantAdminJourneyTest وتقرؤه واجهة الإدارة.
