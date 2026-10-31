@@ -520,6 +520,61 @@ final class CommerceCartService
     }
 
     /**
+     * H6 Quick Order — adds several plain lines (product, optional variant, unit, quantity — no personalization or add-ons) to
+     * the buyer's cart ALL-OR-NOTHING. Every line goes through the very same {@see add()} (so eligibility, wholesale price
+     * precedence, variant/unit consistency, cart ownership and overflow guards are not re-implemented here), each inside its own
+     * savepoint so a bad line is recorded without poisoning the outer transaction. If any line fails, the outer transaction is
+     * rolled back — no cart created, no line added — and {@see CommerceCartBatchRejectedException} lists every failing line.
+     *
+     * @param  list<array{product_id: string, product_variant_id?: ?string, unit_key?: string, quantity: int}>  $lines
+     * @return array{cart: CommerceCart, token: ?string, created: bool, data: array}
+     */
+    public function addMany(?CommerceCart $knownCart, array $lines): array
+    {
+        return DB::transaction(function () use ($knownCart, $lines): array {
+            $cart = $knownCart;
+            $token = null;
+            $created = false;
+            $failures = [];
+
+            foreach ($lines as $index => $line) {
+                try {
+                    $result = DB::transaction(fn (): array => $this->add(
+                        $cart,
+                        $line['product_id'],
+                        $line['unit_key'] ?? 'base',
+                        $line['quantity'],
+                        $line['product_variant_id'] ?? null,
+                    ));
+                } catch (CommerceCartLineNotPurchasableException $e) {
+                    $failures[] = ['index' => $index, 'reason' => $e->reason ?? 'not_purchasable'];
+
+                    continue;
+                } catch (RuntimeException $e) {
+                    $failures[] = ['index' => $index, 'reason' => 'invalid_line'];
+
+                    continue;
+                }
+
+                $cart = $result['cart'];
+                $token ??= $result['token'];
+                $created = $created || $result['created'];
+            }
+
+            if ($failures !== []) {
+                throw new CommerceCartBatchRejectedException($failures);
+            }
+
+            return [
+                'cart' => $cart,
+                'token' => $token,
+                'created' => $created,
+                'data' => $this->serialize($cart),
+            ];
+        }, 3);
+    }
+
+    /**
      * FLOWERS-H6 / ADR-18 — ينشئ/يحدّث أسطر الإضافات لسطر أب: كل إضافة سطر مستقل مفتاحه
      * `a:<parent id>` وكميته = كمية الأب × كمية لكل أب. أهلية البيع (نشر/سعر/وحدة) عبر
      * `purchasable()` نفسه — فإضافة غير قابلة للشراء ترفض الإضافة كلها (معاملة واحدة).
