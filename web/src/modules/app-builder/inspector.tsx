@@ -21,6 +21,9 @@ import {
  * `ComponentRegistry`/`ActionRegistry`. انظر `APP-BUILDER-6-UX-EVIDENCE-PASS.md`.
  */
 
+/** مفتاح الترجمة لإشارة ظهور: النقطة في معرّف الإشارة (`cart.itemCount`) تُقرأ تداخلاً في next-intl (INVALID_KEY)، فتُستبدل بشرطة سفلية. */
+export const signalKey = (signal: string): string => signal.replace(/\./g, '_');
+
 const MULTILINE_PROP_KEYS = new Set(['text', 'description']);
 
 function PropField({
@@ -470,7 +473,7 @@ function VisibilityEditor({
                   >
                     <option value="" disabled>{t('visibility.signalPlaceholder')}</option>
                     {signals.map((signal) => (
-                      <option key={signal} value={signal}>{t(`visibility.signalOption.${signal}`)}</option>
+                      <option key={signal} value={signal}>{t(`visibility.signalOption.${signalKey(signal)}`)}</option>
                     ))}
                   </Select>
                   <button
