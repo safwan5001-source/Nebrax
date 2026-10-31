@@ -105,6 +105,8 @@ Retail host: no gate, retail price 10.00, **no buyer cookie** set; add to cart �
 
 390×844: the gate, sign-in and register pages render `dir=rtl` with 0 px horizontal overflow, **measured only after the real content (gate title, e-mail field, name field) was visible**. For an approved buyer the Arabic listing, a **cart that holds a real line** (5.00) and the **checkout contact form** (step 1 of 6, populated order summary) also overflow by 0 px (`mobile-ar-E01-*.png`, `E02-*.png`). Arabic copy was visually reviewed on the listing, cart and checkout step 1 only; full Arabic wording review is **not tested**. Cosmetic: the store name is truncated in the phone header ("....localhost").
 
+> **Second review pass (`7cf95fc`).** The checkout step now asserts what the buyer actually sees — the *Order placed* heading, an order number of shape `CORD-9999-99999`, and the "No payment has been processed" notice — instead of waiting for a URL change (the success state is a local stage, not a URL); the retail smoke asserts the same heading. The stack runner no longer skips the build when a `.next` directory exists.
+
 > **Correction (review of `955d0ef`).** The first version of the mobile cart/checkout tests measured overflow before the page had rendered and with an empty cart, so those two screenshots were blank and the "0 px" claim for them was not evidence. The tests now add a real line and assert the cart line and checkout form are visible before measuring; the screenshots in this PR are from the corrected run.
 
 ## 4. Order evidence (sanitized; no emails, names or tokens)
@@ -232,7 +234,7 @@ The partner-linked buyer's order (API) shows `unit_price_minor=500`, `price_sour
 
 `storefront/e2e/wholesale-buyer-journey.spec.ts` · `storefront/playwright.wholesale-e2e.config.ts` · `storefront/e2e/support/wholesale-e2e-{seed,evidence,expire-session}.php` · `storefront/scripts/e2e/wholesale-stack.sh` · `storefront/playwright.config.ts` (**one line**: `testIgnore` so the default Spree suite never loads this spec) · `docs/audits/assets/h6-batch-l/*.png` (27 screenshots) · this report. **No existing test or production file was changed or weakened.**
 
-Reproduce: `LARAVEL_ROOT=<setup.sh output> storefront/scripts/e2e/wholesale-stack.sh up`, export the three variables it prints, then `pnpm exec playwright test --config=playwright.wholesale-e2e.config.ts` (set `PW_CHROMIUM_PATH` when the sandbox browser build differs). The suite is **not wired into CI** (it needs the assembled Laravel app).
+Reproduce: `LARAVEL_ROOT=<setup.sh output> storefront/scripts/e2e/wholesale-stack.sh up` (it **always rebuilds the current storefront source**; `E2E_SKIP_BUILD=1` is an explicit, warned opt-out), export the three variables it prints, then `pnpm exec playwright test --config=playwright.wholesale-e2e.config.ts` (set `PW_CHROMIUM_PATH` when the sandbox browser build differs). The suite is **not wired into CI** (it needs the assembled Laravel app).
 
 ## 12. Recommended next batch
 

@@ -651,17 +651,22 @@ test.describe
         complete.click({ timeout: 5000 }),
         complete.click({ timeout: 5000, force: true }),
       ]);
-      await page
-        .waitForURL(/(confirmation|order|thank)/i, { timeout: 30_000 })
-        .catch(() => undefined);
-      await page.waitForTimeout(2000);
+      // the success state is a local stage of the checkout flow (no URL change): assert what the buyer actually sees
+      await expect(
+        page.getByRole("heading", { name: en.awjCheckout.success.heading }),
+      ).toBeVisible({ timeout: 30_000 });
+      await expect(
+        page.getByText(en.awjCheckout.success.notPaidNote),
+      ).toBeVisible();
+      const orderNo = (await bodyText(page)).match(
+        /[A-Z]{2,}-\d{4}-\d{3,}/,
+      )?.[0];
+      expect(orderNo, "order number shown on the confirmation").toBeTruthy();
       await shot(page, "12-confirmation");
       ev("12", {
-        url_after_complete: new URL(page.url()).pathname.replace(
-          /[0-9a-f-]{20,}/g,
-          "{id}",
-        ),
-        confirmation_text_snippet: (await bodyText(page)).slice(0, 160),
+        confirmation_heading_visible: true,
+        not_paid_notice_visible: true,
+        order_number_shape: orderNo?.replace(/\d/g, "9"),
       });
     });
 

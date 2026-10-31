@@ -44,7 +44,13 @@ case "${1:-}" in
     (
       store_env
       cd "$STORE_DIR"
-      [ -d .next ] || pnpm build
+      # always compile the CURRENT source: a leftover .next (or one from `next dev`) says nothing about it.
+      # NEXT_PUBLIC_* values are baked in at build time, so the build uses the same env as the server.
+      if [ "${E2E_SKIP_BUILD:-0}" = "1" ]; then
+        echo "WARNING: E2E_SKIP_BUILD=1 — serving whatever .next already holds; results may not reflect the current source" >&2
+      else
+        pnpm build
+      fi
       nohup pnpm exec next start -p 3001 > "$WORK/next.out" 2>&1 &
       echo $! > "$WORK/next.pid"
     )
