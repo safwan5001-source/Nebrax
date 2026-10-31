@@ -3,10 +3,10 @@
 | | |
 |---|---|
 | Branch | `claude/commerce-h6-batch-m` |
-| PR | __PR__ |
+| PR | https://github.com/safwan5001-source/Nebrax/pull/1832 |
 | Base SHA (origin/main) | `5c07d1d37d54cf27ffe4582e7dd95a40037b818a` (branched from the #1829 merge `2889dd986fb3169a8c8655677ad19c1d15b31aee`; the only commit since is #1830, web app-builder, disjoint) |
-| Head SHA | __HEAD__ |
-| CI | __CI__ |
+| Head SHA | `8aa83d217b4c50b8c536d0746c6983723131d9ac` (before this report update) |
+| CI | pending at push; see PR checks |
 
 **Status.** Nothing was merged, deployed or run against live data. Wholesale stays **disabled by default** (`COMMERCE_WHOLESALE_BUYER_ENABLED=false`; every new route is a uniform 404 while it is off). Spree is **not** removed. Two additive migrations; no change to accounting, POS pricing, price lists, ZATCA or any financial table.
 
