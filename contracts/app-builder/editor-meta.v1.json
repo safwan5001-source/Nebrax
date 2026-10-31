@@ -1,0 +1,20 @@
+{
+  "contract": "app-builder.editor-meta",
+  "version": 1,
+  "decision": "AD-05 (editor data store) — slice S20a",
+  "storage": "builder_draft_experiences.editor_meta (json, nullable); saved by PUT draft under the same optimistic lock and revision",
+  "shape": {
+    "v": 1,
+    "nodes": { "<nodeId>": { "name": "string 1..80 (optional)", "hidden": "true (optional)", "preset": "string ^[a-zA-Z][A-Za-z0-9]{0,39}$ (optional)" } },
+    "pages": { "<pageId>": { "title": "string 1..80 (optional)" } }
+  },
+  "rules": [
+    "the schema stays the single source: editor_meta never carries structure",
+    "hidden nodes (and their children) are removed from published versions, preview sessions and contract issues (EditorMeta::project); they stay in the draft",
+    "names, presets and page titles never leave the draft",
+    "node/page ids that no longer exist in the saved schema are pruned silently; a page root cannot be hidden (422 editor_meta_hidden_root)",
+    "unknown keys, wrong types, over-long text, non-object entries, or more than max_editor_meta_bytes (default 65536) => 422 with no write"
+  ],
+  "request": "PUT /api/app-builder/apps/{id}/draft { schema, base_revision, editor_meta? }",
+  "response": "GET/PUT draft: data.editor_meta (null when empty)"
+}

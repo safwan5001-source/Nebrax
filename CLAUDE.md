@@ -433,6 +433,12 @@ php artisan serve
 - **قواعد التضمين من مصدر واحد:** `ComponentRegistry::allowedChildTypes/allowedParentTypes` (من `ChildrenRule`: `Page` جذر فقط، الورقيات بلا أبناء)، تُعرض في `GET registries` (`allowed_children`/`allowed_parents`) وتستهلكها الفاحصة والويب. `$item.*` مقبول في أي خاصية/معامل (يُحلّ وقت التشغيل).
 - **مؤجَّل صراحةً:** حدود الكمية لكل مستأجر (تطبيقات/نسخ/جلسات معاينة، DRF-07) — سياسة عمل تحتاج قرار المالك (قاعدة 6)؛ تحقق `visibility`/`binding` الدلالي؛ واجهة الويب (S02b).
 
+## بيانات المحرر (AD-05 / S20a) — `editor_meta`
+
+عمود `builder_draft_experiences.editor_meta` (JSON، nullable) يحمل ما لا مكان له في AppSchema: **اسم القسم، إخفاؤه، نوعه الجاهز (preset)، عنوان الصفحة** (`App\Services\AppBuilder\EditorMeta`، عقد `contracts/app-builder/editor-meta.v1.json`).
+- **يُحفظ بالقفل التفاؤلي نفسه** (`PUT draft` + `editor_meta` اختياري: غيابه = بلا تغيير، وجوده = استبدال كامل، null يمسح). `normalize()` يتحقق (شكل/أنواع/أطوال/حجم `config('app_builder.max_editor_meta_bytes')` 65536/جذر الصفحة لا يُخفى ⇒ 422 برمز) **وينظّف** إدخالات عقد/صفحات لم تعد في المخطط.
+- **لا يدخل ما يُنشر أو يُعاين:** كل قراءة للمسودة للنشر/المعاينة/فاحصة العقد تمرّ بـ`BuilderDraftExperience::publishableSchema()` (يُسقط العقد المخفية وأبناءها)؛ الأسماء والعناوين والـpresets لا تغادر المسودة. **لا تقرأ `$draft->schema` الخام في مسار نشر/معاينة جديد.**
+
 ## الواجهة (web/) — قواعد موجزة
 
 - المرجع الإلزامي: **`DESIGN_SYSTEM.md`** (أداة محاسبية نظيفة كثيفة، الجداول هي البطل، لون هوية واحد، خطّان).

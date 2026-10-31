@@ -15,6 +15,7 @@ class BuilderDraftExperienceResource extends JsonResource
             'id' => $this->id,
             'builder_app_id' => $this->builder_app_id,
             'schema' => $this->schema,
+            'editor_meta' => $this->editor_meta,
             'revision' => $this->revision,
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];

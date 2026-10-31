@@ -51,7 +51,7 @@ class PreviewExchangeService
             'tenant_id' => $app->tenant_id,
             'builder_app_id' => $app->id,
             'reference_hash' => hash('sha256', $plain),
-            'schema_snapshot' => $draft->schema,
+            'schema_snapshot' => $draft->publishableSchema(),
             'draft_revision' => $draft->revision,
             'channel' => PreviewSession::CHANNEL_DEVICE,
             'device_label' => $deviceLabel,

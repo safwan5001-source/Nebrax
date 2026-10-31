@@ -46,7 +46,7 @@ class PreviewSessionService
             'tenant_id' => $app->tenant_id,
             'builder_app_id' => $app->id,
             'source' => PreviewSession::SOURCE_DRAFT,
-            'schema_snapshot' => $draft->schema,
+            'schema_snapshot' => $draft->publishableSchema(),
             'draft_revision' => $draft->revision,
             'channel' => $channel,
             'device_label' => $deviceLabel,
