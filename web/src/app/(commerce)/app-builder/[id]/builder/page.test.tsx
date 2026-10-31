@@ -82,7 +82,7 @@ const { api, currentUser, translate } = vi.hoisted(() => {
     cancel: 'Cancel',
     'theme.tabLabel': 'Theme',
     'theme.tabDescription': 'Edit theme tokens.',
-    'theme.runtimeNote': 'Not yet active in the mobile app.',
+    'theme.runtimeNote': 'Color applies to the published mobile app.',
     'theme.presetTitle': 'Presets',
     'theme.preset.awj-modern': 'AWJ Modern',
     'theme.preset.navy': 'Navy',
@@ -679,6 +679,46 @@ describe('AppBuilderWorkspacePage', () => {
     await waitFor(() => expect(screen.getAllByDisplayValue('#1e3a5f').length).toBeGreaterThan(0));
   });
 
+  // ── AD-03 / S04b: الاسم القانوني `colorPrimary`؛ `primaryColor` مرادف مقروء فقط؛ لا حفظ لمتغيرات العرض ──
+  const draftPuts = () => api.mock.calls.filter((c) => String(c[0]).endsWith('/draft') && c[1]?.method === 'PUT').map((c) => c[1].body as { schema: { theme?: { tokens?: Record<string, string> } } });
+
+  it('picking a preset and saving writes the canonical colorPrimary — no legacy primaryColor and no derived --css variables', async () => {
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+    const user = userEvent.setup();
+    await user.click(screen.getAllByText('Theme')[0]);
+    await user.click((await screen.findAllByText('Navy'))[0]);
+    await user.click(screen.getAllByText('Save')[0]);
+    await waitFor(() => expect(draftPuts().length).toBe(1));
+
+    const tokens = draftPuts()[0].schema.theme?.tokens ?? {};
+    expect(tokens.colorPrimary).toBe('#1e3a5f');
+    expect(tokens.themePreset).toBe('navy');
+    expect(Object.keys(tokens)).not.toContain('primaryColor');
+    expect(Object.keys(tokens).filter((key) => key.startsWith('--'))).toEqual([]);
+  });
+
+  it('a legacy draft (primaryColor + --vars) shows its color, and the next theme edit migrates it to colorPrimary without a bulk rewrite', async () => {
+    mockApi();
+    const base = api.getMockImplementation()!;
+    api.mockImplementation((path?: string, init?: { method?: string; body?: unknown }) =>
+      path && path.endsWith('/draft') && !init?.method
+        ? Promise.resolve({ data: { ...draftData, schema: { ...draftData.schema, theme: { tokens: { primaryColor: '#b45309', '--primary': '#b45309', '--store-radius': '8px', radius: 'default' } } } } })
+        : base(path, init));
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+    const user = userEvent.setup();
+    await user.click(screen.getAllByText('Theme')[0]);
+    expect(screen.getAllByDisplayValue('#b45309').length).toBeGreaterThan(0); // المرادف مقروء
+    expect(screen.queryAllByText('Unsaved changes')).toHaveLength(0); // القراءة وحدها لا تعدّل
+
+    await user.click(screen.getAllByText('Sharp')[0]);
+    await user.click(screen.getAllByText('Save')[0]);
+    await waitFor(() => expect(draftPuts().length).toBe(1));
+    expect(draftPuts()[0].schema.theme?.tokens).toEqual({ colorPrimary: '#b45309', radius: 'sharp' });
+  });
+
   it('switching back to Pages after selecting a component shows the component Inspector, not the Theme panel', async () => {
     mockApi();
     render(<AppBuilderWorkspacePage />);
@@ -711,7 +751,7 @@ describe('AppBuilderWorkspacePage', () => {
 
     // The published presentation (burgundy, #7f1d1d) is used over the unpublished draft.
     await waitFor(() => expect(screen.getAllByText('#7f1d1d').length).toBeGreaterThan(0));
-    expect(screen.getAllByText('primaryColor').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('colorPrimary').length).toBeGreaterThan(0);
 
     const [applyButton] = screen.getAllByText('Apply');
     await userEvent.setup().click(applyButton);
@@ -719,7 +759,7 @@ describe('AppBuilderWorkspacePage', () => {
     expect(screen.getByText('Unsaved changes')).toBeTruthy();
     await waitFor(() => expect(screen.getAllByDisplayValue('#7f1d1d').length).toBeGreaterThan(0));
     // Review state clears after Apply — the diff table is gone.
-    expect(screen.queryAllByText('primaryColor').length).toBe(0);
+    expect(screen.queryAllByText('colorPrimary').length).toBe(0);
   });
 
   it('Use My Store Design: shows a store picker when more than one store exists', async () => {

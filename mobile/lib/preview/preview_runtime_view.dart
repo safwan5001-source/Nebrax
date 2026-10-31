@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../actions/actions.dart';
 import '../app/runtime_schema.dart' show currentRuntimePlatform;
 import '../app/runtime_status_views.dart';
+import '../app/theme_tokens.dart' show themeDataFor;
 import '../registry/experience_view.dart';
 import '../schema/schema.dart';
 import 'preview_action_handler.dart';
@@ -106,13 +107,18 @@ class _PreviewRuntimeViewState extends State<PreviewRuntimeView> {
     );
     final dispatcher = AppActionDispatcher(handler);
 
-    return Column(
-      children: [
-        if (ready.draftChanged) const _DraftChangedBanner(),
-        Expanded(
-          child: ExperienceView(experience: ready.experience, pageId: _pageId, dispatcher: dispatcher),
-        ),
-      ],
+    // THM-09 — the preview renders under the snapshot's own theme tokens
+    // (the draft being previewed), not a color hardcoded by the host app.
+    return Theme(
+      data: themeDataFor(ready.experience.schema.theme.tokens),
+      child: Column(
+        children: [
+          if (ready.draftChanged) const _DraftChangedBanner(),
+          Expanded(
+            child: ExperienceView(experience: ready.experience, pageId: _pageId, dispatcher: dispatcher),
+          ),
+        ],
+      ),
     );
   }
 }
