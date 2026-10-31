@@ -515,15 +515,24 @@ export function generatePageId(): string {
 }
 
 /**
- * عدد إجراءات `navigate` التي تستهدف صفحة **من الصفحات الأخرى** — هي التي تبقى مخالفة حاجبة حتى تُصلَح عند حذفها.
- * إحالات الصفحة إلى نفسها تُحذف معها فلا تُعدّ، ولا إجراءات المكوّنات غير القابلة للإجراء (مراجعة Codex).
+ * عدد إجراءات `navigate` التي تستهدف صفحة **من الصفحات الأخرى** وتصير مخالفة حاجبة عند حذفها. مرآة لحدود تجوال
+ * `AppSchemaContractChecker::walk()/checkAction()` (مراجعات Codex المتتابعة؛ نسخة سلوكه لا نسخة ثانية له):
+ *  - إحالات الصفحة إلى نفسها تُحذف معها فلا تُعدّ؛
+ *  - مكوّن نوعه مجهول للسجل أو إجراؤه مجهول: لا يُفحص **ولا أبناؤه** (من عمل `CompatibilityResolver`)؛
+ *  - إجراء على مكوّن غير قابل للإجراء: تحذير فقط، لا هدف يُفحص.
+ * بلا سجل (`registries` غائب) يُعدّ الكل تحفّظاً.
  */
-export function countNavigationTo(schema: AppSchema, pageId: string, isActionable?: (componentType: string) => boolean): number {
+export function countNavigationTo(schema: AppSchema, pageId: string, registries?: Pick<AppBuilderRegistries, 'components' | 'actions'> | null): number {
   let count = 0;
   const walk = (node: AppSchemaComponent) => {
-    // فاحصة العقد تتجاهل إجراءً على مكوّن غير قابل للإجراء (تحذير فقط، لا هدف يُفحص) فلا يصير مخالفة حاجبة؛ بلا سجل نعدّ الكل (تحفّظ).
-    const counts = !isActionable || isActionable(node.type);
-    if (counts && node.action?.type === 'navigate' && node.action.params?.pageId === pageId) count += 1;
+    if (registries) {
+      const definition = registries.components[node.type];
+      const unsupportedAction = node.action !== undefined && !registries.actions[node.action.type];
+      if (!definition || unsupportedAction) return; // الشجرة كلها خارج الفحص
+      if (node.action?.type === 'navigate' && definition.actionable && node.action.params?.pageId === pageId) count += 1;
+    } else if (node.action?.type === 'navigate' && node.action.params?.pageId === pageId) {
+      count += 1;
+    }
     (node.children ?? []).forEach(walk);
   };
   for (const [id, root] of Object.entries(schema.pages)) {
