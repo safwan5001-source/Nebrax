@@ -27,12 +27,17 @@ class SubscriptionController extends ApiController
             'limits' => [
                 'invoices_per_month' => PlanGate::limit($tenant, 'invoices_per_month'),
                 'users'              => PlanGate::limit($tenant, 'users'),
+                // DRF-07 (S02c): حدود صانع التطبيقات (إضافية).
+                'builder_apps'             => PlanGate::limit($tenant, 'builder_apps'),
+                'builder_versions_per_app' => PlanGate::limit($tenant, 'builder_versions_per_app'),
+                'builder_active_previews'  => PlanGate::limit($tenant, 'builder_active_previews'),
             ],
             'usage' => [
                 'invoices_this_month' => Invoice::whereBetween('created_at', [
                     now()->startOfMonth(), now()->endOfMonth(),
                 ])->count(),
                 'users' => User::where('tenant_id', $tenant->id)->count(),
+                'builder_apps' => \App\Models\BuilderApp::query()->count(),
             ],
         ]);
     }
