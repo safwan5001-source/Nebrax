@@ -15,9 +15,8 @@ vi.mock("@/contexts/StoreContext", () => ({
 }));
 
 const mockAddItem = vi.fn();
-const mockSurface = { current: "dtc" as "dtc" | "wholesale" };
 vi.mock("@/contexts/CartContext", () => ({
-  useCart: () => ({ addItem: mockAddItem, surface: mockSurface.current }),
+  useCart: () => ({ addItem: mockAddItem }),
 }));
 
 // Minimal product fixtures — cast to Product for component props
@@ -204,17 +203,6 @@ describe("ProductCard", () => {
     );
     expect(queryByLabelText("quickView")).toBeInTheDocument();
   });
-
-  it("hides quick view on the wholesale surface, matching the card's own inline action", () => {
-    mockSurface.current = "wholesale";
-    const { queryByLabelText } = render(
-      <PublishedThemeMarkerProvider themePreset="awj-market">
-        <ProductCard product={baseProduct} basePath="/us/en" />
-      </PublishedThemeMarkerProvider>,
-    );
-    expect(queryByLabelText("quickView")).not.toBeInTheDocument();
-    mockSurface.current = "dtc";
-  });
 });
 
 describe("ProductCard — purchase action (STORE-UI-3)", () => {
@@ -258,7 +246,6 @@ describe("ProductCard — purchase action (STORE-UI-3)", () => {
   beforeEach(() => {
     mockAddItem.mockReset();
     mockAddItem.mockResolvedValue(undefined);
-    mockSurface.current = "dtc";
   });
 
   it("adds a simple product by its product id, with no variant and no price", async () => {
@@ -323,13 +310,6 @@ describe("ProductCard — purchase action (STORE-UI-3)", () => {
     expect(
       await screen.findByRole("button", { name: "addToCart" }),
     ).toBeEnabled();
-  });
-
-  it("leaves the wholesale surface link-only", () => {
-    mockSurface.current = "wholesale";
-    render(<ProductCard product={simple} basePath="/sa/en" />);
-
-    expect(screen.queryByRole("button", { name: "addToCart" })).toBeNull();
   });
 });
 

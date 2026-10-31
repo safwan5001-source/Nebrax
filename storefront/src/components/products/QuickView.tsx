@@ -39,7 +39,7 @@ export function QuickView({
   isVariantManaged,
 }: QuickViewProps) {
   const t = useTranslations("products");
-  const { addItem, surface } = useCart();
+  const { addItem } = useCart();
   const [open, setOpen] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [adding, setAdding] = useState(false);
@@ -63,8 +63,7 @@ export function QuickView({
     : null;
 
   const productHref = `${basePath}/products/${product.slug}${categoryId ? `?category_id=${categoryId}` : ""}`;
-  const canQuickAdd =
-    surface !== "wholesale" && !isVariantManaged && product.purchasable;
+  const canQuickAdd = !isVariantManaged && product.purchasable;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

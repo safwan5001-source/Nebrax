@@ -72,7 +72,7 @@ export function ProductDetails({
   pagePresentation,
   density,
 }: ProductDetailsProps) {
-  const { addItem, surface } = useCart();
+  const { addItem } = useCart();
   const { currency } = useStore();
   const t = useTranslations("products");
   const tw = useTranslations("wholesale");
@@ -129,15 +129,11 @@ export function ProductDetails({
   const [loading, setLoading] = useState(false);
 
   /*
-   * FLOWERS-H11 — gifting blocks exist on the AWJ (DTC) catalog only; the
-   * wholesale/Spree product has none. Empty for any product without them, so
-   * every existing PDP renders exactly as before.
+   * FLOWERS-H11 — gifting blocks exist on the AWJ catalog. Empty for any
+   * product without them, so every existing PDP renders exactly as before.
    */
   const gifting: ProductGifting =
-    surface === "wholesale"
-      ? EMPTY_PRODUCT_GIFTING
-      : ((product as { gifting?: ProductGifting }).gifting ??
-        EMPTY_PRODUCT_GIFTING);
+    (product as { gifting?: ProductGifting }).gifting ?? EMPTY_PRODUCT_GIFTING;
   const [personalizationValues, setPersonalizationValues] = useState<
     Record<string, string>
   >({});
@@ -176,8 +172,6 @@ export function ProductDetails({
   /*
    * `description_html` is null on the AWJ adapter now: the API's `description`
    * is a plain text column and was being piped into `dangerouslySetInnerHTML`.
-   * The wholesale/Spree surface still supplies real authored HTML, so that
-   * branch is kept for it.
    */
   const descriptionText = product.description;
 
@@ -221,80 +215,60 @@ export function ProductDetails({
 
   const handleAddToCart = async () => {
     /*
-     * The wholesale surface runs on real Spree variants — pass its own variant
-     * id unchanged.
-     *
-     * The DTC surface is AWJ Cart V1, which takes a product id AND an optional
-     * `product_variant_id`. A simple product sends only the product: its
-     * `${product.id}-default` variant is synthetic and would never resolve.
-     * A variant-managed product must send the variant the shopper actually
-     * chose — the parent has no sellable identity, and sending it added the
-     * wrong thing.
+     * AWJ Cart V1 takes a product id AND an optional `product_variant_id`. A
+     * simple product sends only the product: its `${product.id}-default`
+     * variant is synthetic and would never resolve. A variant-managed product
+     * must send the variant the shopper actually chose — the parent has no
+     * sellable identity, and sending it added the wrong thing.
      */
-    if (surface !== "wholesale") {
-      const awjVariantId = isVariantManaged ? selectedVariant?.id : null;
-      // Guarded by the disabled button below; this is the last line of defence
-      // so a mis-wired caller cannot post a parent id for a variant product.
-      if (isVariantManaged && !awjVariantId) return;
+    const awjVariantId = isVariantManaged ? selectedVariant?.id : null;
+    // Guarded by the disabled button below; this is the last line of defence
+    // so a mis-wired caller cannot post a parent id for a variant product.
+    if (isVariantManaged && !awjVariantId) return;
 
-      // Required personalization is checked here only to save a round trip and
-      // point at the first gap; the server re-validates every answer.
-      const missing = missingRequiredFields(
-        gifting.personalization,
-        personalizationValues,
-      );
-      if (missing.length > 0) {
-        setShowPersonalizationErrors(true);
-        document
-          .querySelector<HTMLElement>(
-            `[data-personalization-field="${missing[0]}"] input, [data-personalization-field="${missing[0]}"] textarea, [data-personalization-field="${missing[0]}"] select`,
-          )
-          ?.focus();
-        return;
-      }
-      const selections: PdpSelections = {
-        personalization: Object.fromEntries(
-          gifting.personalization
-            .map((field) => [field.key, personalizationValues[field.key] ?? ""])
-            .filter(([, value]) => value.trim() !== ""),
-        ),
-        addons: gifting.addons
-          .map((addon) => ({
-            productId: addon.productId,
-            variantId: addon.variantId,
-            quantity: addonQuantities[addonKey(addon)] ?? 0,
-          }))
-          .filter((addon) => addon.quantity >= 1),
-      };
-
-      setLoading(true);
-      // Nothing chosen → nothing extra is sent (the request is unchanged for a
-      // product without gifting inputs).
-      const hasSelections =
-        Object.keys(selections.personalization).length > 0 ||
-        selections.addons.length > 0;
-      await addItem(
-        product.id,
-        quantity,
-        "base",
-        awjVariantId,
-        hasSelections ? selections : undefined,
-      );
-      setLoading(false);
-      trackAddToCart(product, selectedVariant, quantity, currency);
+    // Required personalization is checked here only to save a round trip and
+    // point at the first gap; the server re-validates every answer.
+    const missing = missingRequiredFields(
+      gifting.personalization,
+      personalizationValues,
+    );
+    if (missing.length > 0) {
+      setShowPersonalizationErrors(true);
+      document
+        .querySelector<HTMLElement>(
+          `[data-personalization-field="${missing[0]}"] input, [data-personalization-field="${missing[0]}"] textarea, [data-personalization-field="${missing[0]}"] select`,
+        )
+        ?.focus();
       return;
     }
-
-    const variantId =
-      selectedVariant?.id ||
-      product.default_variant?.id ||
-      product.default_variant_id;
-    if (!variantId) {
-      throw new Error("No variant selected");
-    }
+    const selections: PdpSelections = {
+      personalization: Object.fromEntries(
+        gifting.personalization
+          .map((field) => [field.key, personalizationValues[field.key] ?? ""])
+          .filter(([, value]) => value.trim() !== ""),
+      ),
+      addons: gifting.addons
+        .map((addon) => ({
+          productId: addon.productId,
+          variantId: addon.variantId,
+          quantity: addonQuantities[addonKey(addon)] ?? 0,
+        }))
+        .filter((addon) => addon.quantity >= 1),
+    };
 
     setLoading(true);
-    await addItem(variantId, quantity);
+    // Nothing chosen → nothing extra is sent (the request is unchanged for a
+    // product without gifting inputs).
+    const hasSelections =
+      Object.keys(selections.personalization).length > 0 ||
+      selections.addons.length > 0;
+    await addItem(
+      product.id,
+      quantity,
+      "base",
+      awjVariantId,
+      hasSelections ? selections : undefined,
+    );
     setLoading(false);
     trackAddToCart(product, selectedVariant, quantity, currency);
   };

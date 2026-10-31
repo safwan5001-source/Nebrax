@@ -9,9 +9,8 @@ vi.mock("next-intl", () => ({
 }));
 
 const mockAddItem = vi.fn();
-const mockSurface = { current: "dtc" as "dtc" | "wholesale" };
 vi.mock("@/contexts/CartContext", () => ({
-  useCart: () => ({ addItem: mockAddItem, surface: mockSurface.current }),
+  useCart: () => ({ addItem: mockAddItem }),
 }));
 
 const simpleProduct = {
@@ -50,7 +49,6 @@ const outOfStockProduct = {
 describe("QuickView", () => {
   beforeEach(() => {
     mockAddItem.mockClear();
-    mockSurface.current = "dtc";
   });
 
   it("opens on click without a duplicate product-detail fetch — no fetch mock is wired at all", async () => {

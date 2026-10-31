@@ -142,9 +142,7 @@ describe("native wholesale buyer surface — boundaries", () => {
       "lib/commerce/checkout.ts",
       "lib/commerce/online-payment.ts",
       "lib/data/cart.ts",
-      "lib/data/checkout.ts",
-      "lib/data/orders.ts",
-      "lib/data/payment.ts",
+      "lib/data/awj-checkout.ts",
     ]) {
       const source = read(file);
       expect(source, file).not.toMatch(
@@ -162,7 +160,7 @@ describe("native wholesale buyer surface — boundaries", () => {
       "lib/commerce/checkout.ts",
       "lib/data/products.ts",
       "lib/data/cart.ts",
-      "lib/data/checkout.ts",
+      "lib/data/awj-checkout.ts",
       "lib/commerce/buyer-session.ts",
       "lib/data/wholesale-buyer.ts",
     ]) {
