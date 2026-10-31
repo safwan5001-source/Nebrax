@@ -8893,6 +8893,11 @@
       "optionalOn": "If the app version cannot show this component it is dropped instead of failing the whole experience. It will be listed in the compatibility report before you publish.",
       "optionalOff": "Required: if the app version cannot show this component the experience cannot be published.",
       "propsTitle": "Properties",
+      "fieldA11y": {
+        "itemName": "{label} — item {n}",
+        "removeItem": "Remove {label} item {n}",
+        "addItem": "Add item to {label}"
+      },
       "noProps": "This component has no properties.",
       "actionTitle": "Action",
       "noAction": "No action",
@@ -8907,6 +8912,7 @@
         "searchPlaceholder": "Leave empty to show all",
         "sortLabel": "Sort by",
         "sortNoneOption": "Default order",
+        "sortDirectionLabel": "Sort direction",
         "sortDirectionAscending": "Ascending",
         "sortDirectionDescending": "Descending",
         "mappingTitle": "Map fields",
@@ -8922,6 +8928,12 @@
         "signalPlaceholder": "Choose a signal",
         "operatorPlaceholder": "Choose a comparison",
         "valuePlaceholder": "Value",
+        "leaf": {
+          "signal": "Condition {n}: signal",
+          "operator": "Condition {n}: comparison",
+          "value": "Condition {n}: value",
+          "remove": "Remove condition {n}"
+        },
         "valueListPlaceholder": "Comma-separated values",
         "addCondition": "Add condition",
         "unsupportedShape": "This condition was set up in a more advanced way than this editor supports. Reset it to start over.",

@@ -30,15 +30,24 @@ function PropField({
   definition,
   value,
   onChange,
+  id,
+  labelId,
+  labelText,
 }: {
   definition: RegistryPropDefinition;
   value: unknown;
   onChange: (next: unknown) => void;
+  /** يربط `<label htmlFor>` بالتحكم (UX-03). */
+  id: string;
+  labelId: string;
+  /** نص التسمية — يبني منه الاسم المُتاح لعناصر القائمة. */
+  labelText: string;
 }) {
+  const t = useTranslations('appBuilder.builder');
   if (definition.enum_values && definition.enum_values.length > 0) {
     const current = typeof value === 'string' ? value : '';
     return (
-      <Select value={current} onChange={(event) => onChange(event.target.value)} className="h-8 text-xs">
+      <Select id={id} value={current} onChange={(event) => onChange(event.target.value)} className="h-8 text-xs">
         {definition.enum_values.map((option) => (
           <option key={option} value={option}>{option}</option>
         ))}
@@ -51,6 +60,7 @@ function PropField({
       const current = typeof value === 'number' ? value : '';
       return (
         <Input
+          id={id}
           type="number"
           className="h-8 text-xs"
           value={current}
@@ -62,6 +72,7 @@ function PropField({
       const minor = typeof value === 'number' ? value : 0;
       return (
         <Input
+          id={id}
           type="number"
           step="0.01"
           className="h-8 text-xs"
@@ -76,11 +87,12 @@ function PropField({
     case 'stringList': {
       const items = Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
       return (
-        <div className="space-y-1">
+        <div className="space-y-1" role="group" aria-labelledby={labelId}>
           {items.map((item, index) => (
             <div key={index} className="flex items-center gap-1">
               <Input
                 className="h-8 text-xs"
+                aria-label={t('fieldA11y.itemName', { label: labelText, n: index + 1 })}
                 value={item}
                 onChange={(event) => {
                   const next = [...items];
@@ -90,7 +102,7 @@ function PropField({
               />
               <button
                 type="button"
-                aria-label="remove"
+                aria-label={t('fieldA11y.removeItem', { label: labelText, n: index + 1 })}
                 onClick={() => onChange(items.filter((_, i) => i !== index))}
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-muted hover:bg-primary-soft hover:text-primary"
               >
@@ -98,8 +110,15 @@ function PropField({
               </button>
             </div>
           ))}
-          <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onChange([...items, ''])}>
-            +
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs"
+            aria-label={t('fieldA11y.addItem', { label: labelText })}
+            onClick={() => onChange([...items, ''])}
+          >
+            <span aria-hidden="true">+</span>
           </Button>
         </div>
       );
@@ -108,6 +127,7 @@ function PropField({
       const current = typeof value === 'string' ? value : '';
       return (
         <Input
+          id={id}
           type="url"
           dir="ltr"
           className="h-8 text-xs"
@@ -120,9 +140,9 @@ function PropField({
     default: {
       const current = typeof value === 'string' ? value : '';
       if (MULTILINE_PROP_KEYS.has(definition.key)) {
-        return <Textarea className="min-h-16 text-xs" value={current} onChange={(event) => onChange(event.target.value)} />;
+        return <Textarea id={id} className="min-h-16 text-xs" value={current} onChange={(event) => onChange(event.target.value)} />;
       }
-      return <Input className="h-8 text-xs" value={current} onChange={(event) => onChange(event.target.value)} />;
+      return <Input id={id} className="h-8 text-xs" value={current} onChange={(event) => onChange(event.target.value)} />;
     }
   }
 }
@@ -138,13 +158,25 @@ function PropRow({
   onChange: (next: unknown) => void;
   locale: string;
 }) {
+  const id = React.useId();
+  const labelId = `${id}-label`;
+  const labelText = registryLabel(definition.label, locale);
+  // قائمة النصوص تحمل عدة تحكمات فلا يربطها `for` واحد: تسمية عادية + مجموعة `aria-labelledby`.
+  const isList = definition.type === 'stringList' && !(definition.enum_values && definition.enum_values.length > 0);
+  const labelContent = (
+    <>
+      {labelText}
+      {definition.required ? <span className="text-negative"> *</span> : null}
+    </>
+  );
   return (
     <div className="space-y-1 border-b border-border py-2 last:border-0">
-      <label className="block text-xs font-medium text-text" title={definition.key}>
-        {registryLabel(definition.label, locale)}
-        {definition.required ? <span className="text-negative"> *</span> : null}
-      </label>
-      <PropField definition={definition} value={value} onChange={onChange} />
+      {isList ? (
+        <span id={labelId} className="block text-xs font-medium text-text" title={definition.key}>{labelContent}</span>
+      ) : (
+        <label id={labelId} htmlFor={id} className="block text-xs font-medium text-text" title={definition.key}>{labelContent}</label>
+      )}
+      <PropField definition={definition} value={value} onChange={onChange} id={id} labelId={labelId} labelText={labelText} />
     </div>
   );
 }
@@ -155,7 +187,9 @@ function ActionParamField({
   onChange,
   pageIds,
   t,
+  id,
 }: {
+  id: string;
   definition: RegistryActionParamDefinition;
   value: unknown;
   onChange: (next: unknown) => void;
@@ -169,7 +203,7 @@ function ActionParamField({
   if (pageIds) {
     const current = typeof value === 'string' ? value : '';
     return (
-      <Select value={current} onChange={(event) => onChange(event.target.value)} className="h-8 text-xs">
+      <Select id={id} value={current} onChange={(event) => onChange(event.target.value)} className="h-8 text-xs">
         <option value="">{t('pages.pickerPlaceholder')}</option>
         {pageIds.map((pageId) => (
           <option key={pageId} value={pageId}>{pageId}</option>
@@ -181,6 +215,7 @@ function ActionParamField({
     const current = typeof value === 'number' ? value : '';
     return (
       <Input
+        id={id}
         type="number"
         min={definition.min_value ?? undefined}
         className="h-8 text-xs"
@@ -190,7 +225,7 @@ function ActionParamField({
     );
   }
   const current = typeof value === 'string' ? value : '';
-  return <Input className="h-8 text-xs" value={current} onChange={(event) => onChange(event.target.value)} />;
+  return <Input id={id} className="h-8 text-xs" value={current} onChange={(event) => onChange(event.target.value)} />;
 }
 
 function ActionParamRow({
@@ -208,13 +243,14 @@ function ActionParamRow({
   t: ReturnType<typeof useTranslations>;
   locale: string;
 }) {
+  const id = React.useId();
   return (
     <div className="space-y-1 border-b border-border py-2 last:border-0">
-      <label className="block text-xs font-medium text-text" title={definition.key}>
+      <label htmlFor={id} className="block text-xs font-medium text-text" title={definition.key}>
         {registryLabel(definition.label, locale)}
         {definition.required ? <span className="text-negative"> *</span> : null}
       </label>
-      <ActionParamField definition={definition} value={value} onChange={onChange} pageIds={pageIds} t={t} />
+      <ActionParamField id={id} definition={definition} value={value} onChange={onChange} pageIds={pageIds} t={t} />
     </div>
   );
 }
@@ -245,6 +281,9 @@ function BindingEditor({
 }) {
   const resourceId = binding?.resource ?? '';
   const resource = resourceId ? resources[resourceId] : undefined;
+  const fieldId = React.useId();
+  const searchId = `${fieldId}-search`;
+  const sortId = `${fieldId}-sort`;
 
   function setQuery(patch: Record<string, unknown>) {
     if (!binding) return;
@@ -296,8 +335,9 @@ function BindingEditor({
               <p className="text-xs font-medium text-muted">{t('binding.queryTitle')}</p>
               {hasSearchFilter ? (
                 <div>
-                  <label className="mb-1 block text-[11px] text-muted">{t('binding.searchLabel')}</label>
+                  <label htmlFor={searchId} className="mb-1 block text-[11px] text-muted">{t('binding.searchLabel')}</label>
                   <Input
+                    id={searchId}
                     className="h-8 text-xs"
                     placeholder={t('binding.searchPlaceholder')}
                     value={typeof binding?.query?.search === 'string' ? binding.query.search : ''}
@@ -307,9 +347,10 @@ function BindingEditor({
               ) : null}
               {sortParams.length > 0 ? (
                 <div>
-                  <label className="mb-1 block text-[11px] text-muted">{t('binding.sortLabel')}</label>
+                  <label htmlFor={sortId} className="mb-1 block text-[11px] text-muted">{t('binding.sortLabel')}</label>
                   <div className="flex items-center gap-1.5">
                     <Select
+                      id={sortId}
                       className="h-8 flex-1 text-xs"
                       value={currentSortKey}
                       onChange={(event) => {
@@ -324,6 +365,7 @@ function BindingEditor({
                     </Select>
                     {currentSortKey ? (
                       <Select
+                        aria-label={t('binding.sortDirectionLabel')}
                         className="h-8 w-28 shrink-0 text-xs"
                         value={currentSortDesc ? 'desc' : 'asc'}
                         onChange={(event) => setQuery({ sort: event.target.value === 'desc' ? `-${currentSortKey}` : currentSortKey })}
@@ -468,6 +510,7 @@ function VisibilityEditor({
                 <div className="flex items-center gap-1">
                   <Select
                     className="h-8 flex-1 text-xs"
+                    aria-label={t('visibility.leaf.signal', { n: index + 1 })}
                     value={leaf.signal}
                     onChange={(event) => updateLeaf(index, { signal: event.target.value })}
                   >
@@ -478,7 +521,7 @@ function VisibilityEditor({
                   </Select>
                   <button
                     type="button"
-                    aria-label="remove"
+                    aria-label={t('visibility.leaf.remove', { n: index + 1 })}
                     onClick={() => updateLeaves(leaves.filter((_, i) => i !== index))}
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-muted hover:bg-primary-soft hover:text-primary"
                   >
@@ -487,6 +530,7 @@ function VisibilityEditor({
                 </div>
                 <Select
                   className="h-8 text-xs"
+                  aria-label={t('visibility.leaf.operator', { n: index + 1 })}
                   value={leaf.operator}
                   onChange={(event) => {
                     const nextOperator = event.target.value;
@@ -502,6 +546,7 @@ function VisibilityEditor({
                 {arity === 'none' ? null : arity === 'list' ? (
                   <Input
                     className="h-8 text-xs"
+                    aria-label={t('visibility.leaf.value', { n: index + 1 })}
                     placeholder={t('visibility.valueListPlaceholder')}
                     value={Array.isArray(leaf.value) ? leaf.value.join(', ') : ''}
                     onChange={(event) =>
@@ -514,6 +559,7 @@ function VisibilityEditor({
                   <Input
                     className="h-8 text-xs"
                     type={leaf.signal === 'cart.itemCount' ? 'number' : 'text'}
+                    aria-label={t('visibility.leaf.value', { n: index + 1 })}
                     placeholder={t('visibility.valuePlaceholder')}
                     value={typeof leaf.value === 'string' || typeof leaf.value === 'number' ? leaf.value : ''}
                     onChange={(event) => {
