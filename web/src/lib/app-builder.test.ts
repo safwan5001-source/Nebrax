@@ -18,8 +18,10 @@ import {
   updateEditorMetaNode,
   updateEditorMetaPageTitle,
   canonicalizeThemeTokens,
+  countNavigationTo,
   readPrimaryColor,
   type AppSchema,
+  type AppBuilderRegistries,
   type AppSchemaComponent,
   type RegistryComponentDefinition,
 } from './app-builder';
@@ -318,5 +320,70 @@ describe('canonical theme tokens (AD-03 / S04b)', () => {
     expect(legacy.theme?.tokens).toEqual({ primaryColor: '#12372a', '--primary': '#12372a', radius: 'default' });
     // لا تعديل ⇒ لا إعادة كتابة: القراءة وحدها لا تمسّ شيئاً.
     expect(themeTokens(legacy)).toEqual({ primaryColor: '#12372a', '--primary': '#12372a', radius: 'default' });
+  });
+});
+
+describe('countNavigationTo (S21b)', () => {
+  const schema = {
+    schemaVersion: '1.0.0', minRuntimeVersion: '1.0.0', navigation: { initialPageId: 'home' },
+    pages: {
+      home: { type: 'Page', id: 'r', children: [
+        { type: 'Button', id: 'b1', action: { type: 'navigate', params: { pageId: 'cart' } } },
+        { type: 'Section', id: 's', children: [{ type: 'Button', id: 'b2', action: { type: 'navigate', params: { pageId: 'cart' } } }, { type: 'Button', id: 'b3', action: { type: 'openProduct', params: { productId: 'cart' } } }] },
+      ] },
+      cart: { type: 'Page', id: 'c', children: [{ type: 'Button', id: 'b4', action: { type: 'navigate', params: { pageId: 'home' } } }] },
+    },
+  } as AppSchema;
+
+  it('counts only navigate actions to that page, at any depth and from any page', () => {
+    expect(countNavigationTo(schema, 'cart')).toBe(2);
+    expect(countNavigationTo(schema, 'home')).toBe(1);
+    expect(countNavigationTo(schema, 'ghost')).toBe(0);
+  });
+
+  it('counts only navigate actions on actionable components — an action on a Text is ignored by the contract checker and never blocks (review P2)', () => {
+    const withText = {
+      ...schema,
+      pages: {
+        ...schema.pages,
+        home: { type: 'Page', id: 'r', children: [
+          { type: 'Button', id: 'b1', action: { type: 'navigate', params: { pageId: 'cart' } } },
+          { type: 'Text', id: 't1', props: { text: 'x' }, action: { type: 'navigate', params: { pageId: 'cart' } } },
+        ] },
+      },
+    } as AppSchema;
+    const registries = { components: { Page: { actionable: false }, Button: { actionable: true }, Text: { actionable: false } }, actions: { navigate: {} } } as unknown as Pick<AppBuilderRegistries, 'components' | 'actions'>;
+    expect(countNavigationTo(withText, 'cart', registries)).toBe(1);
+    expect(countNavigationTo(withText, 'cart')).toBe(2); // بلا سجل: تحفّظ (يُعدّ الكل)
+  });
+
+  it('does not enter subtrees the contract checker skips: an unknown component or unknown action hides its whole subtree (review P2)', () => {
+    const registries = { components: { Page: { actionable: false }, Section: { actionable: false }, Button: { actionable: true } }, actions: { navigate: {} } } as unknown as Pick<AppBuilderRegistries, 'components' | 'actions'>;
+    const nav = { type: 'navigate', params: { pageId: 'cart' } };
+    const tree = {
+      ...schema,
+      pages: {
+        ...schema.pages,
+        home: { type: 'Page', id: 'r', children: [
+          { type: 'FutureWidget', id: 'unknown', optional: true, children: [{ type: 'Button', id: 'inside-unknown', action: nav }] },
+          { type: 'Section', id: 'unknown-action', action: { type: 'futureAction' }, children: [{ type: 'Button', id: 'inside-action', action: nav }] },
+          { type: 'Button', id: 'counted', action: nav },
+        ] },
+      },
+    } as AppSchema;
+    expect(countNavigationTo(tree, 'cart', registries)).toBe(1); // الزر الظاهر وحده
+    expect(countNavigationTo(tree, 'cart')).toBe(3); // بلا سجل: الكل
+  });
+
+  it('ignores references inside the page itself: they disappear with it and never become dangling (review P2)', () => {
+    const selfRef = {
+      ...schema,
+      pages: {
+        ...schema.pages,
+        cart: { type: 'Page', id: 'c', children: [{ type: 'Button', id: 'self', action: { type: 'navigate', params: { pageId: 'cart' } } }, { type: 'Button', id: 'b4', action: { type: 'navigate', params: { pageId: 'home' } } }] },
+      },
+    } as AppSchema;
+    expect(countNavigationTo(selfRef, 'cart')).toBe(2); // الإحالتان من home فقط، لا الذاتية
+    expect(countNavigationTo(selfRef, 'home')).toBe(1);
   });
 });

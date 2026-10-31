@@ -19,7 +19,7 @@ import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import {
-  addChildComponent, addPage, appDisplayName, cloneWithFreshIds, findComponentById, insertChildAfter, findParentId, generatePageId, hasAppBuilderPermission,
+  addChildComponent, addPage, appDisplayName, cloneWithFreshIds, countNavigationTo, findComponentById, insertChildAfter, findParentId, generatePageId, hasAppBuilderPermission,
   mergeThemeTokens, moveSibling, registryLabel, removeComponentById, removePage, reorderChildren, setInitialPage,
   themeTokens as schemaThemeTokens, updateComponentById,
   type AppBuilderRegistries, type AppSchema, type AppSchemaActionRef, type AppSchemaComponent, type BuilderApp,
@@ -29,6 +29,7 @@ import {
 import { resolvePreviewActionOutcome } from '@/modules/app-builder/action-semantics';
 import { EasyCatalogDialog } from '@/modules/app-builder/easy/easy-catalog-dialog';
 import { EasyIdentityPanel } from '@/modules/app-builder/easy/easy-identity-panel';
+import { EasyPageActions } from '@/modules/app-builder/easy/easy-page-actions';
 import { EasySelectionBar } from '@/modules/app-builder/easy/easy-selection-bar';
 import { EasySectionsPanel } from '@/modules/app-builder/easy/easy-sections-panel';
 import { readEditorMode, sectionContains, writeEditorMode, type EditorMode } from '@/modules/app-builder/easy/editor-mode';
@@ -923,7 +924,21 @@ export default function AppBuilderWorkspacePage() {
           </div>
           )}
           {editorMode === 'easy' ? (
-            <div className="min-h-0 flex-1">
+            <div className="flex min-h-0 flex-1 flex-col">
+              {selectedPageId ? (
+                <EasyPageActions
+                  pageId={selectedPageId}
+                  pageName={editorMeta?.pages[selectedPageId]?.title ?? selectedPageId}
+                  isInitial={selectedPageId === schema.navigation?.initialPageId}
+                  canDelete={pageIds.length > 1}
+                  canManage={canManage}
+                  navigationRefs={countNavigationTo(schema, selectedPageId, registries)}
+                  onSetHome={() => makeInitialPage(selectedPageId)}
+                  onDelete={() => deletePage(selectedPageId)}
+                  t={t}
+                />
+              ) : null}
+              <div className="min-h-0 flex-1">
               <EasySectionsPanel
                 // مربوطة بالصفحة: تغيير الصفحة يعيد تركيب اللوحة فيسقط أي حقل تسمية معلّق (وإلا كُتب نصّه على الصفحة الجديدة).
                 key={selectedPageId ?? 'none'}
@@ -949,6 +964,7 @@ export default function AppBuilderWorkspacePage() {
                 pageTitleCustom={(selectedPageId && editorMeta?.pages[selectedPageId]?.title) || ''}
                 onRenamePage={easyRenamePage}
               />
+              </div>
             </div>
           ) : (
           <>

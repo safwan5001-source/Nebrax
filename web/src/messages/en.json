@@ -8725,6 +8725,23 @@
           "renameInputLabel": "New section name",
           "pageTitleLabel": "Page title",
           "pageTitleHint": "Editor only — not shown in the app",
+          "pageActions": {
+            "setHome": "Make this the home page",
+            "delete": "Delete this page",
+            "homeNote": "This is the home page.",
+            "deleteTitle": "Delete page {name}?",
+            "deleteBody": "All its sections are removed, and {count, plural, one {# action that navigates} other {# actions that navigate}} to it will show a blocking issue until fixed.",
+            "deleteConfirm": "Delete page",
+            "cancel": "Keep page",
+            "proposedTitle": "Proposed pages",
+            "proposedReason": "The current mobile app has no screen for this page yet.",
+            "proposed": {
+              "categories": "Categories",
+              "account": "Account",
+              "orders": "My orders"
+            }
+          },
+          "sectionsVisible": "{visible}/{count} visible",
           "selectionBar": {
             "label": "Tools for section “{name}”",
             "up": "Move section up",
