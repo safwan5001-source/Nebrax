@@ -11,7 +11,7 @@ export function compatNeedsAttention(report: CompatReport | null | undefined): r
 }
 
 /** قائمة ما يُحذف/يفشل لكل جيل — تُستعمل في شريط المحرر وفي حوار النشر (لا حذف صامت). */
-export function CompatDisclosure({ report, t, onOpen }: { report: CompatReport; t: Translate; onOpen?: (componentId: string) => void }) {
+export function CompatDisclosure({ report, t, onOpen }: { report: CompatReport; t: Translate; onOpen?: (componentId: string, pageId?: string | null) => void }) {
   return (
     <div className="space-y-2" data-testid="compat-disclosure">
       {report.generations.map((generation) => (
@@ -24,10 +24,10 @@ export function CompatDisclosure({ report, t, onOpen }: { report: CompatReport; 
           ) : (
             <ul className="mt-1 space-y-1">
               {generation.dropped.map((item) => (
-                <li key={item.component_id} className="flex flex-wrap items-center gap-2">
+                <li key={`${item.page_id ?? ''}:${item.component_id}`} className="flex flex-wrap items-center gap-2">
                   <span className="text-text">{t('compat.dropped', { type: item.component_type, id: item.component_id })}</span>
                   {onOpen ? (
-                    <button type="button" className="text-primary underline" onClick={() => onOpen(item.component_id)}>
+                    <button type="button" className="text-primary underline" onClick={() => onOpen(item.component_id, item.page_id)}>
                       {t('compat.open')}
                     </button>
                   ) : null}
@@ -45,10 +45,10 @@ export function CompatDisclosure({ report, t, onOpen }: { report: CompatReport; 
 }
 
 /** شريط المحرر: غائب بلا ما يستحق؛ يوضّح ما سيُحذف قبل النشر. استشاري — لا يمنع شيئاً. */
-export function CompatNotice({ report, t, onOpen }: { report: CompatReport | null | undefined; t: Translate; onOpen?: (componentId: string) => void }) {
+export function CompatNotice({ report, t, onOpen }: { report: CompatReport | null | undefined; t: Translate; onOpen?: (componentId: string, pageId?: string | null) => void }) {
   const [open, setOpen] = React.useState(false);
   if (!compatNeedsAttention(report)) return null;
-  const dropped = new Set(report.generations.flatMap((g) => g.dropped.map((d) => d.component_id))).size;
+  const dropped = new Set(report.generations.flatMap((g) => g.dropped.map((d) => `${d.page_id ?? ''}:${d.component_id}`))).size;
   const incompatible = report.generations.some((g) => !g.compatible);
   return (
     <div role="status" data-testid="compat-notice" className="shrink-0 border-b border-border bg-primary-soft px-4 py-2 text-xs">

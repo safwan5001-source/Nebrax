@@ -160,7 +160,7 @@ export interface BuilderDraftExperience {
 }
 
 /** DRF-03 / CMP-10 (S03b): تقرير توافق استشاري لكل جيل Runtime معروف — ما سيُحذف (اختيارياً) يظهر بمعرّفه لا صامتاً. */
-export interface CompatDropped { component_id: string; component_type: string }
+export interface CompatDropped { component_id: string; component_type: string; /** معرّف المكوّن فريد داخل الصفحة وحدها. */ page_id?: string | null }
 export interface CompatGeneration { runtime: string; compatible: boolean; reason: string | null; dropped: CompatDropped[] }
 export interface CompatReport {
   generations: CompatGeneration[];

@@ -4,7 +4,7 @@
   "decision": "DRF-03 / CMP-10 (S03b) — advisory per-runtime-generation compatibility disclosure",
   "returned_by": ["GET/PUT app-builder/apps/{id}/draft -> compat", "POST .../validate -> compat", "POST .../versions (201) -> compat"],
   "shape": {
-    "generations": [{ "runtime": "x.y.z", "compatible": "bool", "reason": "null | schemaVersionTooNew | schemaVersionTooOld | runtimeTooOld | missingRequiredCapability", "dropped": [{ "component_id": "string", "component_type": "string" }] }],
+    "generations": [{ "runtime": "x.y.z", "compatible": "bool", "reason": "null | schemaVersionTooNew | schemaVersionTooOld | runtimeTooOld | missingRequiredCapability", "dropped": [{ "component_id": "string", "component_type": "string", "page_id": "string (component ids are unique only within a page)" }] }],
     "min_runtime": "oldest known generation that renders the experience (dropping optional parts) | null",
     "full_runtime": "oldest known generation that renders it with nothing dropped | null",
     "has_drops": "true when any compatible generation drops an optional component"
@@ -12,7 +12,7 @@
   "rules": [
     "advisory only: never blocks saving or publishing (blocking stays in BuilderPublishedExperienceVersionService)",
     "computed from the publishable schema (hidden editor sections excluded)",
-    "dropped lists the root of each omitted optional subtree by id and type only — never schema values",
+    "dropped lists the root of each omitted optional subtree by id, type and page only — never schema values",
     "null when the schema fails structural validation",
     "an optional component unsupported by a generation is dropped there, so it must be disclosed here before publishing (no silent drops)"
   ]

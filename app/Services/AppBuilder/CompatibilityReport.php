@@ -9,7 +9,7 @@ namespace App\Services\AppBuilder;
  *
  * يجيب عن سؤال المحرّر قبل النشر: «على كل جيل Runtime معروف، هل تُعرض هذه التجربة؟ وما الذي **سيُحذف** منها؟». المكوّن الاختياري
  * (`optional`) غير المدعوم يُحذف عمداً على الجيل القديم؛ التقرير يجعل ذلك **معلَناً لا صامتاً**: لكل جيل قائمة المكوّنات المحذوفة
- * (معرّف + نوع، بلا قيم مخطط)، و`min_runtime` = أقدم جيل يعرضها، و`full_runtime` = أقدم جيل يعرضها **كاملةً بلا حذف**.
+ * (معرّف + نوع + صفحة، بلا قيم مخطط)، و`min_runtime` = أقدم جيل يعرضها، و`full_runtime` = أقدم جيل يعرضها **كاملةً بلا حذف**.
  *
  * استشاري بحت: لا يمنع الحفظ ولا النشر (المنع قائم في `BuilderPublishedExperienceVersionService`). دالة قراءة بلا كتابة ولا أقفال.
  * مخطط لا يجتاز المحلل البنيوي ⇒ `null` (لا تقرير؛ المخالفات البنيوية تظهر عبر مساراتها).
@@ -42,7 +42,7 @@ final class CompatibilityReport
             $result = $this->resolver->resolve($schema, $manifest);
             $runtime = (string) $manifest->runtimeVersion;
             $dropped = array_map(
-                fn (array $f) => ['component_id' => $f['componentId'], 'component_type' => $f['componentType']],
+                fn (array $f) => ['component_id' => $f['componentId'], 'component_type' => $f['componentType'], 'page_id' => $f['pageId'] ?? null],
                 $result->fallbacks,
             );
             $rows[] = ['runtime' => $runtime, 'compatible' => $result->compatible, 'reason' => $result->reason, 'dropped' => $dropped];

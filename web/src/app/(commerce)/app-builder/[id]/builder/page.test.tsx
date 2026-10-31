@@ -2614,7 +2614,7 @@ describe('AppBuilderWorkspacePage — Easy Mode V2 shell (S21a)', () => {
 
   // ── S03b: تقرير التوافق الاستشاري + مفتاح «اختياري عند النشر» ──
   const compatDrops = {
-    generations: [{ runtime: '1.0.0', compatible: true, reason: null, dropped: [{ component_id: 'txt-1', component_type: 'Text' }] }, { runtime: '1.1.0', compatible: true, reason: null, dropped: [] }],
+    generations: [{ runtime: '1.0.0', compatible: true, reason: null, dropped: [{ component_id: 'txt-1', component_type: 'Text', page_id: 'home' }] }, { runtime: '1.1.0', compatible: true, reason: null, dropped: [] }],
     min_runtime: '1.0.0', full_runtime: '1.1.0', has_drops: true,
   };
   function openWithCompat(compat: unknown, validateCompat?: unknown) {
@@ -2666,6 +2666,23 @@ describe('AppBuilderWorkspacePage — Easy Mode V2 shell (S21a)', () => {
     if (opener && opener.getAttribute('aria-expanded') !== 'true') await user.click(opener);
     await user.click(within(screen.getByTestId('compat-disclosure')).getByRole('button', { name: 'Open dropped' }));
     await waitFor(() => expect(screen.getAllByDisplayValue('Welcome').length).toBeGreaterThan(0));
+  });
+
+  it('opens the dropped component on the page the report names, even when another page reuses the same component id', async () => {
+    mockApi();
+    const base = api.getMockImplementation()!;
+    const schema = JSON.parse(JSON.stringify(draftData.schema));
+    schema.pages.about.children = [{ type: 'Text', id: 'txt-1', props: { text: 'About page text' } }]; // المعرّف نفسه في صفحة أخرى
+    const report = { generations: [{ runtime: '1.0.0', compatible: true, reason: null, dropped: [{ component_id: 'txt-1', component_type: 'Text', page_id: 'about' }] }], min_runtime: '1.0.0', full_runtime: null, has_drops: true };
+    api.mockImplementation((path?: string, init?: { method?: string; body?: unknown }) =>
+      path === DRAFT_PATH && !init?.method ? Promise.resolve({ data: { ...draftData, schema }, issues: [], compat: report }) : base(path, init));
+    render(<AppBuilderWorkspacePage />);
+    await screen.findAllByText('Featured');
+    const user = userEvent.setup();
+    await user.click(within(screen.getByTestId('compat-notice')).getByRole('button', { name: 'Compat details' }));
+    await user.click(within(screen.getByTestId('compat-disclosure')).getByRole('button', { name: 'Open dropped' }));
+    await waitFor(() => expect(screen.getAllByDisplayValue('About page text').length).toBeGreaterThan(0));
+    expect(screen.queryAllByDisplayValue('Welcome')).toHaveLength(0);
   });
 
   it('shows no compatibility notice for a clean or absent report', async () => {
