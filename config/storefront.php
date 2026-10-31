@@ -43,6 +43,17 @@
 return [
     'gateway_secret' => env('STOREFRONT_GATEWAY_SECRET'),
 
+    /*
+     * H6 Batch M — ميزانية طلبات `store/v1` القادمة من بوابة المتجر الموثَّقة (سرّ البوابة صحيح)، لكل متجر لا لكل IP اتصال.
+     * كل زوار كل المتاجر يصلون من عنوان خادم Next.js، فمفتاح IP واحد كان يستنزف 30/دقيقة للمنصة كلها. هوية الزائر الحقيقية
+     * غير مثبتة (لا نثق بأي ترويسة IP)، لذا الميزانية على مستوى المتجر. `0` = السلوك القديم (سلة IP مشتركة بـ30/دقيقة).
+     * الطلبات المباشرة (بلا سرّ صحيح) ومسارات المصادقة (لها محدِّداتها) لا تتأثر.
+     */
+    'gateway_limits' => [
+        'read_per_minute' => (int) env('STOREFRONT_GATEWAY_READ_LIMIT', 600),
+        'write_per_minute' => (int) env('STOREFRONT_GATEWAY_WRITE_LIMIT', 120),
+    ],
+
     'managed_base_domain' => env('AWJ_STOREFRONT_BASE_DOMAIN', 'store.awj.app'),
 
     /*

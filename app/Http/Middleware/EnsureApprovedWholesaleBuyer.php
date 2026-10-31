@@ -35,8 +35,16 @@ class EnsureApprovedWholesaleBuyer
             || ! $this->context->isEstablished()
             || ! $this->memberships->isApproved($identity->id, $this->context->salesChannelId())
         ) {
+            // H6 Batch M: tell an authenticated buyer THEIR OWN membership state (they can read it at `wholesale/membership`
+            // anyway) so the storefront can word the gate truthfully (pending / rejected / suspended / not applied) instead of
+            // saying "not approved yet" to a suspended buyer. Nothing about other buyers or the channel is added.
+            $status = $identity instanceof CustomerIdentity && $this->context->isEstablished()
+                ? ($this->memberships->find($identity->id, $this->context->salesChannelId())?->status ?? 'none')
+                : null;
+
             return PublicApiResponse::error(
                 $request, PublicApiErrorCode::FORBIDDEN, 'هذه الخاصية متاحة لمشتري الجملة المعتمدين فقط.', 403,
+                $status === null ? [] : ['membership_status' => $status],
             );
         }
 

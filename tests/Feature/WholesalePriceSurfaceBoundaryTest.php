@@ -48,6 +48,8 @@ class WholesalePriceSurfaceBoundaryTest extends TestCase
         'storefront.v1.checkout.contact.update', 'storefront.v1.checkout.address.update', 'storefront.v1.checkout.gift.update',
         'storefront.v1.checkout.schedule.update', 'storefront.v1.checkout.delivery.update', 'storefront.v1.checkout.payment.update',
         'storefront.v1.checkout.complete',
+        // H6 Batch M — the approved buyer's own order history (order lines carry prices): gated by EnsureWholesalePriceAccess
+        'storefront.v1.buyer.orders.index', 'storefront.v1.buyer.orders.show',
     ];
 
     /**
@@ -56,6 +58,8 @@ class WholesalePriceSurfaceBoundaryTest extends TestCase
      */
     private const REVIEWED_NO_CHANNEL_PRICE = [
         'storefront.v1.buyer.verify_email', 'storefront.v1.buyer.verification.resend',
+        // H6 Batch M — password reset reveals no channel price (neutral request; token-bound consumption)
+        'storefront.v1.buyer.password.forgot', 'storefront.v1.buyer.password.reset',
         'storefront.v1.buyer.login', 'storefront.v1.buyer.logout', 'storefront.v1.buyer.register', 'storefront.v1.buyer.me',
         'storefront.v1.wholesale.access', 'storefront.v1.wholesale.application.store', 'storefront.v1.wholesale.membership.show',
         'storefront.v1.categories.index', 'storefront.v1.categories.show', 'storefront.v1.collections.index',

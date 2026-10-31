@@ -193,6 +193,24 @@ class TenancyServiceProvider extends ServiceProvider
             ];
         });
 
+        // H6 Batch M — password reset: requests are throttled per account (an address cannot be mail-bombed) AND per tenant+IP;
+        // consuming a token is throttled per tenant+IP. The per-tenant+IP bucket is shared by all buyers behind the gateway (D-T1),
+        // so it is a tenant-wide brake rather than a per-visitor one; the per-account bucket is the real abuse control.
+        RateLimiter::for('storefront-buyer-reset-request', function (Request $request): array {
+            $tenant = app(TenantContext::class)->has() ? app(TenantContext::class)->id() : 'unresolved';
+            $email = Str::lower(trim((string) $request->input('email')));
+
+            return [
+                Limit::perMinute(20)->by("storefront-buyer-reset-request|{$tenant}|ip|{$request->ip()}"),
+                Limit::perMinute(3)->by("storefront-buyer-reset-request|{$tenant}|email|{$email}"),
+            ];
+        });
+        RateLimiter::for('storefront-buyer-reset', function (Request $request): Limit {
+            $tenant = app(TenantContext::class)->has() ? app(TenantContext::class)->id() : 'unresolved';
+
+            return Limit::perMinute(30)->by("storefront-buyer-reset|{$tenant}|ip|{$request->ip()}");
+        });
+
         // H6 Batch H — verification link consumption (per tenant+IP) and resend (per tenant+IP and per address:
         // a third party cannot mail-bomb an address by repeating the request).
         RateLimiter::for('storefront-buyer-verify', function (Request $request): Limit {

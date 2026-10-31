@@ -37,6 +37,10 @@ export type Membership = {
   decided_by: { id: string; name: string } | null;
   decision_note: string | null;
   customer: { id: string | null; display_name: string | null; email: string | null; phone: string | null };
+  /** Active partner link summary (list only); the drawer loads the full relationship. */
+  partner_link?: { partner_id: string; partner_name: string; partner_code: string | null } | null;
+  /** Unverified context the buyer typed when applying (company / phone) — for the reviewer, never an authority. */
+  application?: { company_name: string | null; contact_phone: string | null };
 };
 
 export type MembershipsMeta = { page: number; per_page: number; total: number; last_page: number };
@@ -77,4 +81,66 @@ export async function transitionMembership(id: string, action: MembershipAction,
   const body = trimmed ? { note: trimmed.slice(0, DECISION_NOTE_MAX) } : {};
   const response = await api<{ data: Membership }>(`/commerce/wholesale/memberships/${encodeURIComponent(id)}/${action}`, { method: 'POST', body });
   return response.data;
+}
+
+// ───────────────────────── H6 Batch M: partner linking (staff) ─────────────────────────
+//   GET    commerce/wholesale/partners/eligible?q&limit
+//   GET    commerce/wholesale/memberships/{id}/partner-link
+//   PUT    commerce/wholesale/memberships/{id}/partner-link   body { partner_id }
+//   DELETE commerce/wholesale/memberships/{id}/partner-link
+// Permissions: `commerce.wholesale.manage` AND `customer_access.manage`. Only a partner id is ever sent — never a tenant,
+// a price list, or an actor; the server derives them and owns eligibility.
+
+export const PARTNER_LINK_PERMISSIONS = ['commerce.wholesale.manage', 'customer_access.manage'] as const;
+
+export type EligiblePartner = { id: string; code: string | null; name: string; name_en: string | null; phone: string | null; email: string | null; has_price_list: boolean };
+export type PriceListRef = { id: string; name: string; is_active: boolean };
+export type PartnerLinkRow = {
+  id: string;
+  status: 'active' | 'revoked' | string;
+  link_method: string | null;
+  partner: { id: string; code: string | null; name: string } | null;
+  linked_at: string | null;
+  linked_by: { id: string; name: string } | null;
+  revoked_at: string | null;
+  revoked_by: { id: string; name: string } | null;
+};
+export type EffectivePriceList = {
+  source: 'partner' | 'channel' | 'none';
+  price_list: PriceListRef | null;
+  partner_list: PriceListRef | null;
+  channel_list: PriceListRef | null;
+};
+export type PartnerLinkState = { active: PartnerLinkRow | null; history: PartnerLinkRow[]; effective_price_list: EffectivePriceList };
+
+const partnerLinkPath = (membershipId: string) => `/commerce/wholesale/memberships/${encodeURIComponent(membershipId)}/partner-link`;
+
+export function buildPartnerSearchQuery(q: string, limit = 20): string {
+  const params = new URLSearchParams();
+  const term = q.trim().slice(0, 100);
+  if (term) params.set('q', term);
+  params.set('limit', String(Math.min(Math.max(limit, 1), 50)));
+  return params.toString();
+}
+
+export async function searchEligiblePartners(q: string): Promise<EligiblePartner[]> {
+  const response = await api<{ data: EligiblePartner[] }>(`/commerce/wholesale/partners/eligible?${buildPartnerSearchQuery(q)}`);
+  return Array.isArray(response.data) ? response.data : [];
+}
+
+function assertLinkState(state: PartnerLinkState | undefined): PartnerLinkState {
+  if (!state || !state.effective_price_list || !Array.isArray(state.history)) throw new Error('Malformed partner-link response');
+  return state;
+}
+
+export async function fetchPartnerLink(membershipId: string): Promise<PartnerLinkState> {
+  return assertLinkState((await api<{ data: PartnerLinkState }>(partnerLinkPath(membershipId))).data);
+}
+
+export async function linkPartner(membershipId: string, partnerId: string): Promise<PartnerLinkState> {
+  return assertLinkState((await api<{ data: PartnerLinkState }>(partnerLinkPath(membershipId), { method: 'PUT', body: { partner_id: partnerId } })).data);
+}
+
+export async function unlinkPartner(membershipId: string): Promise<PartnerLinkState> {
+  return assertLinkState((await api<{ data: PartnerLinkState }>(partnerLinkPath(membershipId), { method: 'DELETE' })).data);
 }

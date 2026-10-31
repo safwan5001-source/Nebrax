@@ -1087,7 +1087,8 @@
       "submit": "Sign in",
       "submitting": "Signing in...",
       "registerLink": "Create a buyer account",
-      "resendLink": "Resend verification email"
+      "resendLink": "Resend verification email",
+      "forgotLink": "Forgot your password?"
     },
     "errors": {
       "invalidCredentials": "We could not sign you in. Check your email and password, and that your email address is verified.",
@@ -1106,6 +1107,24 @@
         "title": "Your wholesale account is not approved",
         "body": "You are signed in, but your wholesale membership has not been approved yet. Check its status to continue.",
         "cta": "View membership status"
+      },
+      "membership": {
+        "none": {
+          "title": "Apply for wholesale access",
+          "body": "You are signed in but have not applied for wholesale access on this store yet. Apply to be reviewed by the store."
+        },
+        "pending": {
+          "title": "Your application is under review",
+          "body": "The store has received your wholesale application and is reviewing it. Prices stay hidden until it is approved."
+        },
+        "rejected": {
+          "title": "Your application was not approved",
+          "body": "The store did not approve your wholesale application. Contact the store if you think this is a mistake."
+        },
+        "suspended": {
+          "title": "Your wholesale account is suspended",
+          "body": "Your wholesale membership is suspended, so prices and ordering are unavailable. Contact the store to have it reviewed."
+        }
       }
     },
     "membership": {
@@ -1114,7 +1133,11 @@
       "signOut": "Sign out",
       "apply": "Apply for wholesale access",
       "applying": "Submitting...",
-      "browse": "Browse wholesale catalogue"
+      "browse": "Browse wholesale catalogue",
+      "company": "Company name (optional)",
+      "phone": "Contact phone (optional)",
+      "applicationHint": "This helps the store review your application. It is not verified and does not change your prices.",
+      "myOrders": "My orders"
     },
     "status": {
       "signed_out": {
@@ -1180,6 +1203,54 @@
       "sign_in_required": "Sign in to your wholesale account to view and order from this cart.",
       "approval_required": "Your wholesale account is not approved for ordering right now. Check your membership status.",
       "unavailable_for_wholesale": "This product is not available for wholesale ordering."
+    },
+    "forgot": {
+      "title": "Reset your password",
+      "description": "Enter the email of your wholesale buyer account and we will send you a link to choose a new password.",
+      "backToSignIn": "Back to sign in",
+      "submit": "Send reset link",
+      "submitting": "Sending...",
+      "doneBody": "If this address belongs to a confirmed account, we have sent a link to choose a new password. The link works once and expires soon."
+    },
+    "reset": {
+      "title": "Choose a new password",
+      "description": "Enter a new password for your wholesale buyer account. You will be signed out everywhere and can sign in with the new password.",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm new password",
+      "submit": "Change password",
+      "submitting": "Saving...",
+      "tooShort": "The password must be at least {min} characters.",
+      "mismatch": "The two passwords do not match.",
+      "successTitle": "Password changed",
+      "successBody": "Your password was changed and all other sessions were signed out. Sign in with the new password.",
+      "failedTitle": "This link cannot be used",
+      "failedBody": "The reset link is invalid, expired, or already used. Request a new one.",
+      "missingToken": "This page needs the link from your reset email. Request a new email if you lost it.",
+      "requestNew": "Send a new reset email"
+    },
+    "orders": {
+      "title": "My orders",
+      "emptyTitle": "No orders yet",
+      "emptyBody": "Orders you place on this store will appear here.",
+      "backToList": "Back to my orders",
+      "detailTitle": "Order",
+      "delivery": "Delivery",
+      "total": "Total",
+      "deliveryAddress": "Delivery address",
+      "payment": "Payment",
+      "notPaidNote": "An order is a commercial commitment; the store confirms the final amount and how to pay. No payment is taken on this page.",
+      "cancelledNote": "This order was cancelled.",
+      "notFoundTitle": "Order not found",
+      "notFoundBody": "We could not find this order in your account.",
+      "unavailableTitle": "Orders are unavailable",
+      "unavailableBody": "We could not load your orders right now. Please try again shortly.",
+      "pagination": "Orders pages",
+      "previous": "Previous",
+      "next": "Next",
+      "status": {
+        "confirmed": "Confirmed",
+        "cancelled": "Cancelled"
+      }
     }
   }
 }

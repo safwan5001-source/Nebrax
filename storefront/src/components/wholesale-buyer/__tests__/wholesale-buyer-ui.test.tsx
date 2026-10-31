@@ -246,7 +246,10 @@ describe("CatalogAccessGate", () => {
     const { container } = render(element);
 
     const gateCopy = (
-      en.wholesaleBuyer.gate as Record<string, { title: string; cta: string }>
+      en.wholesaleBuyer.gate as unknown as Record<
+        string,
+        { title: string; cta: string }
+      >
     )[gate];
     expect(
       screen.getByRole("heading", { name: gateCopy.title }),

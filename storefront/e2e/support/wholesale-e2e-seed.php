@@ -124,6 +124,7 @@ $out['seeded_buyers'] = [
     'approved_unlinked' => $seedBuyer('unlinked', false, null),
     'revoked_target' => $seedBuyer('revoke', true, null),
     'linked' => $seedBuyer('linked', true, null),
+    'resettable' => $seedBuyer('reset', false, null),
 ];
 app(TenantContext::class)->forget();
 
@@ -137,6 +138,7 @@ $out += [
     'hosts' => ['ws' => 'wholesale.e2e.localhost', 'ws2' => 'wholesale2.e2e.localhost', 'dtc' => 'retail.e2e.localhost', 'other_tenant' => 'other.e2e.localhost'],
     'tenant_id' => $a->id,
     'channel_ids' => ['ws' => $ws->id, 'ws2' => $ws2->id, 'dtc' => $dtc->id],
+    'partner_id' => $partner->id,
     'products' => ['p1' => $p1->id, 'p2' => $p2->id, 'p3' => $p3->id, 'retail' => $r1->id],
     'expected_minor' => ['p1_partner' => 500, 'p1_channel' => 700, 'p1_retail' => 1000, 'p2_channel' => 900],
     'staff' => ['email' => $owner->email],

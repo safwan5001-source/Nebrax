@@ -31,5 +31,8 @@ return [
     */
     'buyer_verification_ttl_minutes' => (int) env('COMMERCE_BUYER_VERIFICATION_TTL_MINUTES', 1440),
     'buyer_verification_resend_gap_seconds' => (int) env('COMMERCE_BUYER_VERIFICATION_RESEND_GAP_SECONDS', 60),
+    // H6 Batch M — buyer password reset: link lifetime (shorter than verification: it grants account takeover) and the per-account gap between mails.
+    'buyer_password_reset_ttl_minutes' => (int) env('COMMERCE_BUYER_PASSWORD_RESET_TTL_MINUTES', 60),
+    'buyer_password_reset_resend_gap_seconds' => (int) env('COMMERCE_BUYER_PASSWORD_RESET_RESEND_GAP_SECONDS', 60),
 
 ];

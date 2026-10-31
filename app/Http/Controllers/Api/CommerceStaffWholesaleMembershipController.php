@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Models\CustomerPartnerLink;
 use App\Models\SalesChannel;
 use App\Models\WholesaleMembership;
 use App\Services\Commerce\WholesaleMembershipException;
@@ -46,8 +47,18 @@ class CommerceStaffWholesaleMembershipController extends ApiController
 
         $page = $query->paginate((int) ($data['per_page'] ?? 25));
 
+        // H6 Batch M: one query for the page's active partner links (summary only; the drawer loads the full relationship)
+        $links = CustomerPartnerLink::query()
+            ->whereIn('customer_identity_id', $page->getCollection()->pluck('customer_identity_id')->all())
+            ->where('status', 'active')
+            ->with(['partner' => fn ($q) => $q->withoutGlobalScope(\App\Tenancy\BranchScope::class)->select('id', 'code', 'name')])
+            ->get()->keyBy('customer_identity_id');
+
         return response()->json([
-            'data' => $page->getCollection()->map(fn (WholesaleMembership $m): array => $this->serialize($m))->all(),
+            'data' => $page->getCollection()->map(fn (WholesaleMembership $m): array => $this->serialize($m) + [
+                'partner_link' => ($l = $links->get($m->customer_identity_id)) === null || $l->partner === null ? null
+                    : ['partner_id' => $l->partner->id, 'partner_name' => $l->partner->name, 'partner_code' => $l->partner->code],
+            ])->all(),
             'meta' => ['page' => $page->currentPage(), 'per_page' => $page->perPage(), 'total' => $page->total(), 'last_page' => $page->lastPage()],
         ]);
     }
@@ -78,6 +89,8 @@ class CommerceStaffWholesaleMembershipController extends ApiController
             'decided_at' => $m->decided_at?->toIso8601String(),
             'decided_by' => $m->decidedBy === null ? null : ['id' => $m->decidedBy->id, 'name' => $m->decidedBy->name],
             'decision_note' => $m->decision_note,
+            // unverified context the buyer typed when applying (Batch M) — for the reviewer, never an authority
+            'application' => ['company_name' => $m->company_name, 'contact_phone' => $m->contact_phone],
             'customer' => [
                 'id' => $m->identity?->id,
                 'display_name' => $m->identity?->display_name,

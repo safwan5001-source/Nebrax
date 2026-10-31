@@ -47,6 +47,7 @@ use App\Http\Controllers\Api\CommerceFulfillmentController;
 use App\Http\Controllers\Api\CommerceStaffOrderCancellationController;
 use App\Http\Controllers\Api\CommerceStaffChannelSettingsController;
 use App\Http\Controllers\Api\CommerceStaffWholesaleMembershipController;
+use App\Http\Controllers\Api\CommerceStaffWholesalePartnerLinkController;
 use App\Http\Controllers\Api\CommerceStaffOrderController;
 use App\Http\Controllers\Api\CommerceGiftSettingsController;
 use App\Http\Controllers\Api\CommerceVerticalSetupController;
@@ -1208,6 +1209,17 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('commerce/wholesale/memberships/{id}/{action}', [CommerceStaffWholesaleMembershipController::class, 'transition'])
             ->whereUuid('id')->whereIn('action', ['approve', 'reject', 'suspend', 'reinstate'])
             ->middleware([$perm('commerce.wholesale.manage'), $app('commerce.storefront')]);
+
+        // H6 Batch M: ربط مشترٍ معتمد بطرف (عميل) من الموظف — صلاحيتان (commerce.wholesale.manage + customer_access.manage التي تفرضها
+        // الخدمة الكاتبة نفسها) + حارس القدرة commerce.storefront، وبوابة النشر نفسها (404 ما دامت مغلقة). لا مسار للمشتري.
+        Route::get('commerce/wholesale/partners/eligible', [CommerceStaffWholesalePartnerLinkController::class, 'eligiblePartners'])
+            ->middleware([$perm('commerce.wholesale.manage'), $perm('customer_access.manage'), $app('commerce.storefront')]);
+        Route::get('commerce/wholesale/memberships/{id}/partner-link', [CommerceStaffWholesalePartnerLinkController::class, 'show'])
+            ->whereUuid('id')->middleware([$perm('commerce.wholesale.manage'), $perm('customer_access.manage'), $app('commerce.storefront')]);
+        Route::put('commerce/wholesale/memberships/{id}/partner-link', [CommerceStaffWholesalePartnerLinkController::class, 'link'])
+            ->whereUuid('id')->middleware([$perm('commerce.wholesale.manage'), $perm('customer_access.manage'), $app('commerce.storefront')]);
+        Route::delete('commerce/wholesale/memberships/{id}/partner-link', [CommerceStaffWholesalePartnerLinkController::class, 'unlink'])
+            ->whereUuid('id')->middleware([$perm('commerce.wholesale.manage'), $perm('customer_access.manage'), $app('commerce.storefront')]);
 
         // كتالوج التطبيقات مدموجاً بحالة تفعيل المؤسسة — لا إنفاذ على مسارات أخرى بعد.
         Route::get('applications', [TenantApplicationController::class, 'index'])->middleware($perm('apps.view'));

@@ -5,7 +5,10 @@ import { JsonLd } from "@/components/seo/JsonLd";
 import { CatalogAccessGate } from "@/components/wholesale-buyer/CatalogAccessGate";
 import { fetchPublishedPresentation } from "@/lib/commerce/storefront";
 import type { StoreCategoryNode } from "@/lib/commerce/types";
-import { catalogGateFromError } from "@/lib/commerce/wholesale-buyer";
+import {
+  catalogGateFromError,
+  membershipGateStatusFromError,
+} from "@/lib/commerce/wholesale-buyer";
 import { getCachedProduct, PRODUCT_PAGE_EXPAND } from "@/lib/data/cached";
 import { generateProductMetadata } from "@/lib/metadata/product";
 import {
@@ -65,6 +68,7 @@ export default async function ProductPage({
       return (
         <CatalogAccessGate
           gate={gate}
+          membership={membershipGateStatusFromError(error)}
           basePath={basePath}
           locale={locale as Locale}
         />

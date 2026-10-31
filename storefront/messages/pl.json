@@ -1087,7 +1087,8 @@
       "submit": "Zaloguj się",
       "submitting": "Logowanie...",
       "registerLink": "Utwórz konto kupca",
-      "resendLink": "Wyślij ponownie e-mail weryfikacyjny"
+      "resendLink": "Wyślij ponownie e-mail weryfikacyjny",
+      "forgotLink": "Nie pamiętasz hasła?"
     },
     "errors": {
       "invalidCredentials": "Nie udało się zalogować. Sprawdź e-mail i hasło oraz czy adres e-mail jest zweryfikowany.",
@@ -1106,6 +1107,24 @@
         "title": "Twoje konto hurtowe nie jest zatwierdzone",
         "body": "Jesteś zalogowany, ale Twoje członkostwo hurtowe nie zostało jeszcze zatwierdzone. Sprawdź jego status, aby kontynuować.",
         "cta": "Zobacz status członkostwa"
+      },
+      "membership": {
+        "none": {
+          "title": "Złóż wniosek o dostęp hurtowy",
+          "body": "Jesteś zalogowany, ale nie złożyłeś jeszcze wniosku o dostęp hurtowy w tym sklepie. Złóż wniosek, aby sklep go rozpatrzył."
+        },
+        "pending": {
+          "title": "Twój wniosek jest rozpatrywany",
+          "body": "Sklep otrzymał Twój wniosek hurtowy i go rozpatruje. Ceny pozostają ukryte do czasu zatwierdzenia."
+        },
+        "rejected": {
+          "title": "Twój wniosek nie został zatwierdzony",
+          "body": "Sklep nie zatwierdził Twojego wniosku hurtowego. Skontaktuj się ze sklepem, jeśli uważasz, że to pomyłka."
+        },
+        "suspended": {
+          "title": "Twoje konto hurtowe jest zawieszone",
+          "body": "Twoje członkostwo hurtowe jest zawieszone, więc ceny i zamówienia są niedostępne. Skontaktuj się ze sklepem w celu ponownego rozpatrzenia."
+        }
       }
     },
     "membership": {
@@ -1114,7 +1133,11 @@
       "signOut": "Wyloguj się",
       "apply": "Złóż wniosek o dostęp hurtowy",
       "applying": "Wysyłanie...",
-      "browse": "Przeglądaj katalog hurtowy"
+      "browse": "Przeglądaj katalog hurtowy",
+      "company": "Nazwa firmy (opcjonalnie)",
+      "phone": "Telefon kontaktowy (opcjonalnie)",
+      "applicationHint": "Pomaga to sklepowi rozpatrzyć wniosek. Nie jest weryfikowane i nie zmienia Twoich cen.",
+      "myOrders": "Moje zamówienia"
     },
     "status": {
       "signed_out": {
@@ -1180,6 +1203,54 @@
       "sign_in_required": "Zaloguj się na konto hurtowe, aby zobaczyć ten koszyk i składać zamówienia.",
       "approval_required": "Twoje konto hurtowe nie jest obecnie zatwierdzone do składania zamówień. Sprawdź status członkostwa.",
       "unavailable_for_wholesale": "Ten produkt nie jest dostępny w zamówieniach hurtowych."
+    },
+    "forgot": {
+      "title": "Zresetuj hasło",
+      "description": "Podaj e-mail konta kupującego hurtowego, a wyślemy Ci link do ustawienia nowego hasła.",
+      "backToSignIn": "Wróć do logowania",
+      "submit": "Wyślij link do resetu",
+      "submitting": "Wysyłanie...",
+      "doneBody": "Jeśli ten adres należy do potwierdzonego konta, wysłaliśmy link do ustawienia nowego hasła. Link działa raz i wkrótce wygasa."
+    },
+    "reset": {
+      "title": "Ustaw nowe hasło",
+      "description": "Podaj nowe hasło do konta kupującego hurtowego. Zostaniesz wylogowany wszędzie i zalogujesz się nowym hasłem.",
+      "newPassword": "Nowe hasło",
+      "confirmPassword": "Potwierdź nowe hasło",
+      "submit": "Zmień hasło",
+      "submitting": "Zapisywanie...",
+      "tooShort": "Hasło musi mieć co najmniej {min} znaków.",
+      "mismatch": "Oba hasła nie są zgodne.",
+      "successTitle": "Hasło zmienione",
+      "successBody": "Hasło zostało zmienione, a pozostałe sesje wylogowane. Zaloguj się nowym hasłem.",
+      "failedTitle": "Tego linku nie można użyć",
+      "failedBody": "Link do resetu jest nieprawidłowy, wygasł lub został już użyty. Poproś o nowy.",
+      "missingToken": "Ta strona wymaga linku z e-maila do resetu. Poproś o nowy e-mail, jeśli go zgubiłeś.",
+      "requestNew": "Wyślij nowy e-mail do resetu"
+    },
+    "orders": {
+      "title": "Moje zamówienia",
+      "emptyTitle": "Brak zamówień",
+      "emptyBody": "Zamówienia złożone w tym sklepie pojawią się tutaj.",
+      "backToList": "Wróć do moich zamówień",
+      "detailTitle": "Zamówienie",
+      "delivery": "Dostawa",
+      "total": "Razem",
+      "deliveryAddress": "Adres dostawy",
+      "payment": "Płatność",
+      "notPaidNote": "Zamówienie jest zobowiązaniem handlowym; sklep potwierdza kwotę końcową i sposób płatności. Na tej stronie nie pobiera się płatności.",
+      "cancelledNote": "To zamówienie zostało anulowane.",
+      "notFoundTitle": "Nie znaleziono zamówienia",
+      "notFoundBody": "Nie znaleźliśmy tego zamówienia na Twoim koncie.",
+      "unavailableTitle": "Zamówienia niedostępne",
+      "unavailableBody": "Nie udało się teraz wczytać zamówień. Spróbuj ponownie za chwilę.",
+      "pagination": "Strony zamówień",
+      "previous": "Poprzednia",
+      "next": "Następna",
+      "status": {
+        "confirmed": "Potwierdzone",
+        "cancelled": "Anulowane"
+      }
     }
   }
 }

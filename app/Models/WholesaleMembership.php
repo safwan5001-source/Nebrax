@@ -29,7 +29,7 @@ class WholesaleMembership extends BaseModel implements CompanyWide
 
     public const STATUSES = [self::PENDING, self::APPROVED, self::REJECTED, self::SUSPENDED];
 
-    protected $fillable = ['tenant_id', 'sales_channel_id', 'customer_identity_id', 'applied_at'];
+    protected $fillable = ['tenant_id', 'sales_channel_id', 'customer_identity_id', 'applied_at', 'company_name', 'contact_phone'];
 
     protected $attributes = ['status' => self::PENDING];
 

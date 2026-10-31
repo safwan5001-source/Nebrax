@@ -11,10 +11,9 @@ import { formatDateTime } from '@/lib/formatting';
 import { useCan } from '@/lib/use-can';
 import { useWholesaleChannel } from '../../channel-context';
 import { MEMBERSHIP_STATUS_TONE, StatusBadge, toneFor } from '../../components/status-badge';
-import { UnavailablePanel } from '../../components/unavailable-panel';
 import { ResourceBoundary } from '../../components/resource-boundary';
 import { useResource } from '../../use-resource';
-import { MEMBERSHIP_STATUSES, fetchMembershipCounts, fetchMemberships, type Membership, type MembershipAction, type MembershipStatus } from './api';
+import { MEMBERSHIP_STATUSES, PARTNER_LINK_PERMISSIONS, fetchMembershipCounts, fetchMemberships, type Membership, type MembershipAction, type MembershipStatus } from './api';
 import { DecisionDialog } from './decision-dialog';
 import { MembershipSheet } from './membership-sheet';
 import { buyersMessages } from './messages';
@@ -29,6 +28,7 @@ export function BuyersSection() {
   const { channelId } = useWholesaleChannel();
   const { can } = useCan();
   const canDecide = can('commerce.wholesale.manage');
+  const canLink = PARTNER_LINK_PERMISSIONS.every((permission) => can(permission));
 
   const [filter, setFilter] = useState<Filter>('pending');
   const [page, setPage] = useState(1);
@@ -162,13 +162,12 @@ export function BuyersSection() {
         </TabPanel>
       </section>
 
-      <UnavailablePanel title={t('linkTitle')} description={t('linkDescription')} blocker={t('linkBlocker')} reference={t('linkReference')} />
-
       <MembershipSheet
         // The decision dialog is a separate modal: the drawer steps aside while it is open (two stacked modals would
         // fight over focus) and returns on cancel, because `selected` is kept until the decision is applied.
         membership={pending ? null : selected}
         canDecide={canDecide}
+        canLink={canLink}
         onClose={() => setSelected(null)}
         onAction={(membership, action) => setPending({ membership, action })}
       />

@@ -13,9 +13,15 @@ import {
   accessStateFromMembership,
   type BuyerAccessState,
   type BuyerErrorKey,
+  type BuyerOrderDetail,
+  type BuyerOrderSummary,
   buyerErrorKey,
   buyerFormErrorKey,
+  buyerOrderDetailFromApi,
+  buyerOrderSummaryFromApi,
   localePathFrom,
+  type MembershipGateStatus,
+  membershipGateStatusFromError,
 } from "@/lib/commerce/wholesale-buyer";
 
 /**
@@ -129,14 +135,135 @@ export async function signOutBuyer(): Promise<void> {
   await clearBuyerToken();
 }
 
-export async function applyForWholesale(): Promise<BuyerActionResult> {
+/**
+ * The buyer's own application. `companyName` / `contactPhone` are optional, UNVERIFIED context for the store's reviewer:
+ * they decide nothing (no pricing, no linking, no eligibility). No partner, price list or identity is ever sent — the
+ * backend refuses those outright and derives the buyer from the session.
+ */
+export async function applyForWholesale(details?: {
+  companyName?: string;
+  contactPhone?: string;
+}): Promise<BuyerActionResult> {
   const token = await getBuyerToken();
   if (!token) return { success: false, error: "invalidCredentials" };
+  const body: Record<string, string> = {};
+  const company = details?.companyName?.trim();
+  const phone = details?.contactPhone?.trim();
+  if (company) body.company_name = company;
+  if (phone) body.contact_phone = phone;
   try {
-    await storefrontBuyerRequest("POST", "wholesale/application", { token });
+    await storefrontBuyerRequest("POST", "wholesale/application", {
+      token,
+      ...(Object.keys(body).length > 0 ? { body } : {}),
+    });
     return { success: true };
   } catch (error) {
+    // a 422 here is a field problem (bad phone / too-long company), not bad credentials
+    if (error instanceof StorefrontApiError && error.status === 422) {
+      return { success: false, error: "validation" };
+    }
     return failure(error);
+  }
+}
+
+/** Neutral by design: success whatever the address is (the API answers one 202 and mails only an eligible account). */
+export async function requestBuyerPasswordReset(input: {
+  email: string;
+  basePath: string;
+}): Promise<BuyerActionResult> {
+  try {
+    await storefrontBuyerRequest("POST", "auth/password/forgot", {
+      body: { email: input.email, locale_path: localePathFrom(input.basePath) },
+    });
+    return { success: true };
+  } catch (error) {
+    return formFailure(error);
+  }
+}
+
+/** Consumes the e-mailed token (bound to this store's tenant + channel, single use) and sets the new password. */
+export async function resetBuyerPassword(input: {
+  token: string;
+  password: string;
+}): Promise<BuyerActionResult> {
+  try {
+    await storefrontBuyerRequest("POST", "auth/password/reset", {
+      body: { token: input.token, password: input.password },
+    });
+    // the backend ended every session of this account; drop this browser's cookie too
+    await clearBuyerToken();
+    return { success: true };
+  } catch (error) {
+    return formFailure(error);
+  }
+}
+
+export type BuyerOrdersResult<T> =
+  | { kind: "ok"; data: T }
+  | { kind: "signed_out" }
+  | { kind: "not_approved"; membership: MembershipGateStatus | null }
+  | { kind: "not_found" }
+  | { kind: "unavailable" };
+
+function ordersFailure(error: unknown): BuyerOrdersResult<never> {
+  if (error instanceof StorefrontApiError) {
+    if (error.status === 401) return { kind: "signed_out" };
+    if (error.status === 403) {
+      return {
+        kind: "not_approved",
+        membership: membershipGateStatusFromError(error),
+      };
+    }
+    if (error.status === 404) return { kind: "not_found" };
+  }
+  return { kind: "unavailable" };
+}
+
+/** The approved buyer's own orders on this channel. Ownership is the server's (the verified session), never an id from here. */
+export async function getBuyerOrders(page = 1): Promise<
+  BuyerOrdersResult<{
+    orders: BuyerOrderSummary[];
+    page: number;
+    lastPage: number;
+  }>
+> {
+  const token = await getBuyerToken();
+  if (!token) return { kind: "signed_out" };
+  try {
+    const response = await storefrontBuyerRequest<{
+      data?: unknown[];
+      meta?: { pagination?: { page?: number; last_page?: number } };
+    }>("GET", `buyer/orders?page=${Math.max(1, Math.floor(page))}`, { token });
+    const orders = (Array.isArray(response.data) ? response.data : [])
+      .map(buyerOrderSummaryFromApi)
+      .filter((order): order is BuyerOrderSummary => order !== null);
+    return {
+      kind: "ok",
+      data: {
+        orders,
+        page: response.meta?.pagination?.page ?? 1,
+        lastPage: response.meta?.pagination?.last_page ?? 1,
+      },
+    };
+  } catch (error) {
+    return ordersFailure(error);
+  }
+}
+
+export async function getBuyerOrder(
+  id: string,
+): Promise<BuyerOrdersResult<BuyerOrderDetail>> {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return { kind: "not_found" };
+  const token = await getBuyerToken();
+  if (!token) return { kind: "signed_out" };
+  try {
+    const response = await storefrontBuyerRequest<{
+      data?: { order?: unknown };
+    }>("GET", `buyer/orders/${id}`, { token });
+    const order = buyerOrderDetailFromApi(response.data?.order);
+    return order ? { kind: "ok", data: order } : { kind: "not_found" };
+  } catch (error) {
+    return ordersFailure(error);
   }
 }
 

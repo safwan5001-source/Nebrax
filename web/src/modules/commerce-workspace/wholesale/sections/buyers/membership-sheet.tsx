@@ -8,16 +8,19 @@ import { commonMessages } from '../../messages/common';
 import { StatusBadge, MEMBERSHIP_STATUS_TONE, toneFor } from '../../components/status-badge';
 import { actionsFor, type Membership, type MembershipAction } from './api';
 import { buyersMessages, type BuyersMessageKey } from './messages';
+import { PartnerLinkPanel } from './partner-link-panel';
 
 /** Detail drawer for one membership; decision buttons are exactly the transitions valid for its current status. */
 export function MembershipSheet({
   membership,
   canDecide,
+  canLink,
   onClose,
   onAction,
 }: {
   membership: Membership | null;
   canDecide: boolean;
+  canLink: boolean;
   onClose: () => void;
   onAction: (membership: Membership, action: MembershipAction) => void;
 }) {
@@ -41,6 +44,8 @@ export function MembershipSheet({
             <dl className="flex-1 space-y-3 overflow-y-auto p-4 text-sm">
               <Row label={t('email')}><span className="break-all" dir="ltr">{membership.customer.email ?? '—'}</span></Row>
               <Row label={t('phone')}><span className="num" dir="ltr">{membership.customer.phone ?? '—'}</span></Row>
+              {membership.application?.company_name ? <Row label={t('company')}><bdi>{membership.application.company_name}</bdi></Row> : null}
+              {membership.application?.contact_phone ? <Row label={t('applicationPhone')}><span className="num" dir="ltr">{membership.application.contact_phone}</span></Row> : null}
               <Row label={t('appliedAt')}><span className="num">{formatDateTime(membership.applied_at, locale)}</span></Row>
               {membership.decided_at ? (
                 <>
@@ -51,7 +56,13 @@ export function MembershipSheet({
               ) : (
                 <Row label={t('decidedAt')}><span className="text-muted">{t('noDecisionYet')}</span></Row>
               )}
+              {membership.partner_link ? (
+                <Row label={t('colPartner')}><bdi>{membership.partner_link.partner_name}</bdi></Row>
+              ) : null}
             </dl>
+            {membership.status === 'approved' || membership.partner_link ? (
+              <PartnerLinkPanel membershipId={membership.id} approved={membership.status === 'approved'} canLink={canLink} />
+            ) : null}
             {actions.length > 0 ? (
               <div className="flex flex-col gap-2 border-t border-border p-4 sm:flex-row sm:justify-end">
                 {actions.map((action) => (

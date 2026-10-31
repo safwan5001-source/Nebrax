@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Membership } from './api';
+import type { Membership, PartnerLinkState } from './api';
 
 const locale = vi.hoisted(() => ({ current: 'en' }));
 vi.mock('next-intl', () => {
@@ -37,8 +37,26 @@ const membership = (over: Partial<Membership> = {}): Membership => ({
 
 const totals: Record<string, number> = { pending: 3, approved: 7, rejected: 1, suspended: 2 };
 
-function mockServer(rows: Membership[]) {
+const NOT_LINKED: PartnerLinkState = {
+  active: null,
+  history: [],
+  effective_price_list: { source: 'channel', price_list: { id: 'pl-ch', name: 'Channel list', is_active: true }, partner_list: null, channel_list: { id: 'pl-ch', name: 'Channel list', is_active: true } },
+};
+const LINKED: PartnerLinkState = {
+  active: { id: 'l1', status: 'active', link_method: 'staff_verified_claim', partner: { id: 'p1', code: 'C-100', name: 'Horizon Co' }, linked_at: '2026-10-22T09:00:00+03:00', linked_by: { id: 'u9', name: 'Owner' }, revoked_at: null, revoked_by: null },
+  history: [{ id: 'l1', status: 'active', link_method: 'staff_verified_claim', partner: { id: 'p1', code: 'C-100', name: 'Horizon Co' }, linked_at: '2026-10-22T09:00:00+03:00', linked_by: { id: 'u9', name: 'Owner' }, revoked_at: null, revoked_by: null }],
+  effective_price_list: { source: 'partner', price_list: { id: 'pl-pt', name: 'Horizon list', is_active: true }, partner_list: { id: 'pl-pt', name: 'Horizon list', is_active: true }, channel_list: { id: 'pl-ch', name: 'Channel list', is_active: true } },
+};
+const PARTNERS = [{ id: 'p1', code: 'C-100', name: 'Horizon Co', name_en: null, phone: '0500000001', email: null, has_price_list: true }];
+
+function mockServer(rows: Membership[], link: PartnerLinkState = NOT_LINKED) {
   apiMock.mockImplementation((path: string, options?: { method?: string }) => {
+    if (path.includes('/partners/eligible')) return Promise.resolve({ data: PARTNERS });
+    if (path.endsWith('/partner-link')) {
+      if (options?.method === 'PUT') return Promise.resolve({ data: LINKED });
+      if (options?.method === 'DELETE') return Promise.resolve({ data: NOT_LINKED });
+      return Promise.resolve({ data: link });
+    }
     if (options?.method === 'POST') return Promise.resolve({ data: membership({ status: 'approved', decided_at: '2026-10-21T10:00:00+03:00' }) });
     const params = new URL(path, 'http://x').searchParams;
     const perPage = Number(params.get('per_page'));
@@ -144,12 +162,65 @@ describe('BuyersSection', () => {
     expect(await screen.findByText('No membership applications')).toBeTruthy();
   });
 
-  it('declares partner linking unavailable with the exact blocker and renders no link control', async () => {
-    mockServer([]);
-    render(<BuyersSection />);
-    const panel = await screen.findByTestId('deferred-capability');
-    expect(panel.textContent).toContain('D-B3');
-    expect(panel.querySelector('button, input, select, a')).toBeNull();
+  describe('partner linking (Batch M)', () => {
+    const open = async (rows: Membership[], link?: PartnerLinkState) => {
+      mockServer(rows, link);
+      render(<BuyersSection />);
+      fireEvent.click((await screen.findAllByRole('button', { name: 'Details' }))[0]);
+    };
+    const writes = () => apiMock.mock.calls.filter((c) => (c[1] as { method?: string } | undefined)?.method && (c[1] as { method: string }).method !== 'GET');
+
+    it('shows the effective price list and links a searched customer sending only a partner id', async () => {
+      can.allowed = new Set(['commerce.wholesale.manage', 'customer_access.manage']);
+      await open([membership({ status: 'approved' })]);
+      expect((await screen.findByTestId('effective-price-list')).textContent).toContain('Channel list');
+      fireEvent.change(await screen.findByLabelText('Find a customer'), { target: { value: 'hor' } });
+      fireEvent.click(await screen.findByRole('button', { name: 'Link' }));
+      await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Buyer linked to the customer.'));
+      const put = writes().find((c) => (c[1] as { method: string }).method === 'PUT')!;
+      expect(put[0]).toContain('/memberships/m1/partner-link');
+      expect((put[1] as { body: unknown }).body).toEqual({ partner_id: 'p1' }); // never a tenant, price list or actor
+      expect((await screen.findByTestId('effective-price-list')).textContent).toContain('Horizon list');
+      expect(screen.getAllByText('Horizon Co').length).toBeGreaterThan(0);
+    });
+
+    it('unlinks only after an explicit confirmation and shows the audit trail', async () => {
+      can.allowed = new Set(['commerce.wholesale.manage', 'customer_access.manage']);
+      await open([membership({ status: 'approved', partner_link: { partner_id: 'p1', partner_name: 'Horizon Co', partner_code: 'C-100' } })], LINKED);
+      expect(await screen.findByText('Link history')).toBeTruthy();
+      expect(screen.getAllByText(/by Owner/).length).toBeGreaterThan(0);
+      fireEvent.click(await screen.findByRole('button', { name: 'Unlink' }));
+      expect(writes()).toHaveLength(0);
+      fireEvent.click(await screen.findByRole('button', { name: 'Confirm' }));
+      await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Buyer unlinked.'));
+      expect(writes().map((c) => (c[1] as { method: string }).method)).toEqual(['DELETE']);
+    });
+
+    it('offers no link controls without BOTH permissions and says why', async () => {
+      can.allowed = new Set(['commerce.wholesale.manage']);
+      await open([membership({ status: 'approved' })]);
+      expect(await screen.findByText(/needs both the wholesale-management and customer-access permissions/)).toBeTruthy();
+      expect(screen.queryByLabelText('Find a customer')).toBeNull();
+    });
+
+    it('does not render the panel for a pending buyer', async () => {
+      can.allowed = new Set(['commerce.wholesale.manage', 'customer_access.manage']);
+      await open([membership({ status: 'pending' })]);
+      await screen.findByText('Buyer details').catch(() => undefined);
+      expect(screen.queryByText('Link buyer to an AWJ customer')).toBeNull();
+    });
+
+    it('maps a server refusal to a friendly message and keeps the state', async () => {
+      can.allowed = new Set(['commerce.wholesale.manage', 'customer_access.manage']);
+      await open([membership({ status: 'approved' })]);
+      apiMock.mockImplementationOnce(() => Promise.resolve({ data: PARTNERS })); // search results
+      fireEvent.change(await screen.findByLabelText('Find a customer'), { target: { value: 'hor' } });
+      const button = await screen.findByRole('button', { name: 'Link' });
+      apiMock.mockImplementation(() => Promise.reject(Object.assign(new Error('x'), { status: 409, body: { reason: 'already_linked' } })));
+      fireEvent.click(button);
+      expect(await screen.findByText(/already has an active link to another customer/)).toBeTruthy();
+      expect(toast.error).toHaveBeenCalled();
+    });
   });
 
   it('renders in Arabic', async () => {
