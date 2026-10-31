@@ -1966,10 +1966,6 @@ test.describe("@mobile final closure on a phone viewport (Arabic)", () => {
 
 /** Every money figure on the cart page, sorted: two carts with the same lines and totals have the same signature. */
 const cartMoney = (text: string) => (text.match(/\d+\.\d\d/g) ?? []).sort();
-const bodyTextOf = async (page: Page, url: string) => {
-  await go(page, url);
-  return bodyText(page);
-};
 /** Sign in as an identity that has NO approved membership on this host: success lands on the membership page too. */
 const signInUnapproved = (page: Page, email: string, origin: string) =>
   signIn(page, email, "en", origin);
@@ -2088,10 +2084,9 @@ test.describe
       await expect(q("qo-line")).toHaveAttribute("data-sku", "QO-TEA");
 
       await go(page, `${WS3}/sa/en/cart`);
-      const text = await bodyText(page);
-      expect(text).toMatch(/Quick Coffee|قهوة سريعة/);
-      expect(text).toMatch(/Quick Shirt|قميص سريع/);
-      expect(text).not.toMatch(/Quick Tea|شاي سريع/);
+      await money(page, /Quick Coffee|قهوة سريعة/);
+      await money(page, /Quick Shirt|قميص سريع/);
+      expect(await bodyText(page)).not.toMatch(/Quick Tea|شاي سريع/);
       ev("Q04", {
         added: 2,
         not_added: [
@@ -2120,7 +2115,17 @@ test.describe
     });
 
     test("Q06 if the price disappears between review and submit, the server rejects the WHOLE batch and nothing is added", async () => {
-      const before = cartMoney(await bodyTextOf(page, `${WS3}/sa/en/cart`));
+      // the cart after Q02 (3 coffee) + Q04 (1 coffee, 2 shirt-red): unit and line figures plus the total, as the buyer sees them
+      const EXPECTED_CART = ["25.00", "28.00", "50.00", "7.00", "78.00"];
+      const cartEventually = async () => {
+        await go(page, `${WS3}/sa/en/cart`);
+        await expect
+          .poll(async () => cartMoney(await bodyText(page)), {
+            timeout: 20_000,
+          })
+          .toEqual(EXPECTED_CART);
+      };
+      await cartEventually();
       await go(page, `${WS3}/sa/en/buyer/quick-order`);
       await pasteAndImport("QO-COFFEE 1\nQO-SHIRT-RED 1");
       await expect(q("qo-line")).toHaveCount(2);
@@ -2140,11 +2145,9 @@ test.describe
           page.locator('[data-testid="qo-line"][data-sku="QO-COFFEE"]'),
         ).toHaveAttribute("data-state", "ready");
       } finally {
-        php("wholesale-e2e-price.php", ["QO-SHIRT-RED", "2500"]);
+        php("wholesale-e2e-price.php", ["QO-SHIRT-RED", "restore"]);
       }
-      expect(cartMoney(await bodyTextOf(page, `${WS3}/sa/en/cart`))).toEqual(
-        before,
-      ); // the cart is exactly as it was
+      await cartEventually(); // the cart is exactly as it was
       ev("Q06", { atomic_rejection: true, cart_unchanged: true });
     });
 
@@ -2231,7 +2234,9 @@ test.describe
       });
     });
 
-    test("Q09 a suspended buyer can sign in but gets the approval gate, and the API refuses lookup and add", async () => {
+    test("Q09 a suspended buyer can sign in but gets the approval gate, and the API refuses lookup and add", async ({
+      browser,
+    }) => {
       const susp = seed.seeded_buyers.qo_suspended.email;
       const session = await login(seed.hosts.ws3, susp);
       expect(session.status).toBe(200);
@@ -2253,7 +2258,11 @@ test.describe
       });
       expect(add.status).toBe(403);
 
-      const p = await ctx.newPage();
+      // a FRESH browser context: the shared one still carries the approved buyer's session cookie
+      const fresh = await browser.newContext({
+        viewport: { width: 1280, height: 900 },
+      });
+      const p = await fresh.newPage();
       await signIn(p, susp, "en", WS3);
       await go(p, `${WS3}/sa/en/buyer/quick-order`);
       await expect(
@@ -2261,11 +2270,13 @@ test.describe
       ).toBeVisible();
       await expect(p.getByTestId("quick-order")).toHaveCount(0);
       await shot(p, "Q09-suspended");
-      await p.close();
+      await fresh.close();
       ev("Q09", { api_lookup: 403, api_add: 403, gate: "suspended" });
     });
 
-    test("Q10 cross-channel: a buyer approved only on ANOTHER channel gets the gate here, and its token unlocks nothing on this host", async () => {
+    test("Q10 cross-channel: a buyer approved only on ANOTHER channel gets the gate here, and its token unlocks nothing on this host", async ({
+      browser,
+    }) => {
       const other = seed.seeded_buyers.linked.email; // approved on ws, never on ws3
       const onWs = (await login(seed.hosts.ws, other)).token as string;
       for (const h of [seed.hosts.ws3]) {
@@ -2285,14 +2296,17 @@ test.describe
         expect([401, 403]).toContain(add.status);
       }
       // signing in on ws3 as that identity yields a session without a membership there
-      const p = await ctx.newPage();
+      const fresh = await browser.newContext({
+        viewport: { width: 1280, height: 900 },
+      });
+      const p = await fresh.newPage();
       await signInUnapproved(p, other, WS3);
       await go(p, `${WS3}/sa/en/buyer/quick-order`);
       await expect(p.getByTestId("quick-order")).toHaveCount(0);
       await expect(
         p.getByText(en.wholesaleBuyer.gate.membership.none.title),
       ).toBeVisible();
-      await p.close();
+      await fresh.close();
       ev("Q10", {
         foreign_token_status: "401/403",
         gate: "no application on this channel",
