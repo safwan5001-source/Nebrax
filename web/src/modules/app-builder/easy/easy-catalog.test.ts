@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { AppSchemaComponent } from '@/lib/app-builder';
 import { cloneWithFreshIds, insertChildAfter } from '@/lib/app-builder';
-import { EASY_CATALOG, isAddable, sectionSummary } from './easy-catalog';
+import { EASY_CATALOG, isAddable, isAddableOnPage, sectionSummary } from './easy-catalog';
 import { selectionTargetFor, sectionContains } from './editor-mode';
 
 const fixture = JSON.parse(readFileSync(resolve(process.cwd(), '../contracts/app-builder/registry-identifiers.v1.json'), 'utf8')) as { components: string[]; actions: string[] };
@@ -51,6 +51,20 @@ describe('Easy Mode catalog', () => {
   it('dump for server-side contract calibration (opt-in)', () => {
     if (!process.env.EASY_CATALOG_DUMP) return;
     writeFileSync(process.env.EASY_CATALOG_DUMP, JSON.stringify(Object.fromEntries(addable.map((e) => [e.key, e.build!()]))));
+  });
+});
+
+describe('page-scoped sections', () => {
+  const entry = (key: string) => EASY_CATALOG.find((e) => e.key === key)!;
+
+  it('product list belongs to home, cart sections belong to cart, the rest to any page, proposed to none', () => {
+    expect(isAddableOnPage(entry('productList'), 'home')).toBe(true);
+    expect(isAddableOnPage(entry('productList'), 'cart')).toBe(false);
+    expect(isAddableOnPage(entry('cartList'), 'cart')).toBe(true);
+    expect(isAddableOnPage(entry('cartSummary'), 'home')).toBe(false);
+    expect(isAddableOnPage(entry('text'), 'anything')).toBe(true);
+    expect(isAddableOnPage(entry('productList'), null)).toBe(false);
+    expect(isAddableOnPage(entry('slider'), 'home')).toBe(false);
   });
 });
 

@@ -17,7 +17,7 @@ type Translate = (key: string, values?: Record<string, string | number>) => stri
  * العنوان الفرعي المشتق (نص/تسمية القسم) والترتيب `n/m` للنوع المكرّر **عرض فقط** ولا يُكتب في المخطط.
  */
 export function EasySectionsPanel({
-  sections, selectedId, canManage, registries, locale, t, onSelect, onMove, onDuplicate, onDelete, onAdd, onUndo, canUndo,
+  sections, selectedId, canManage, registries, locale, t, onSelect, onMove, onDuplicate, onDelete, onAdd, onUndo, canUndo, undoBanner,
 }: {
   sections: AppSchemaComponent[];
   selectedId: string | null;
@@ -28,19 +28,13 @@ export function EasySectionsPanel({
   onSelect: (id: string) => void;
   onMove: (id: string, direction: 'up' | 'down') => void;
   onDuplicate: (id: string) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string, name: string) => void;
   onAdd: () => void;
   onUndo: () => void;
   canUndo: boolean;
+  /** يُعرض فقط ما دام الحذف هو آخر تعديل (الصفحة تُبطله عند أي تعديل لاحق، فلا يُعكس تعديل غير الحذف بالخطأ). */
+  undoBanner: { name: string } | null;
 }) {
-  const [justDeleted, setJustDeleted] = React.useState<string | null>(null);
-  // الإشعار يزول عند أي تغيّر في عدد الأقسام غير الحذف نفسه (إضافة/تراجع).
-  const countRef = React.useRef(sections.length);
-  React.useEffect(() => {
-    if (sections.length >= countRef.current) setJustDeleted(null);
-    countRef.current = sections.length;
-  }, [sections.length]);
-
   const typeTotals = new Map<string, number>();
   const typeSeen = new Map<string, number>();
   for (const s of sections) {
@@ -55,10 +49,10 @@ export function EasySectionsPanel({
         <Badge tone="muted">{t('easy.sectionsCount', { count: sections.length })}</Badge>
       </div>
 
-      {justDeleted ? (
+      {undoBanner ? (
         <div role="status" className="flex shrink-0 items-center gap-2 border-b border-border bg-primary-soft px-3 py-1.5 text-xs text-text">
-          <span className="min-w-0 flex-1 truncate">{t('easy.deleted', { name: justDeleted })}</span>
-          <Button type="button" size="sm" variant="outline" className="h-7 text-xs" disabled={!canUndo} onClick={() => { onUndo(); setJustDeleted(null); }}>
+          <span className="min-w-0 flex-1 truncate">{t('easy.deleted', { name: undoBanner.name })}</span>
+          <Button type="button" size="sm" variant="outline" className="h-7 text-xs" disabled={!canUndo} onClick={onUndo}>
             <Undo2 className="h-3 w-3" strokeWidth={1.7} aria-hidden="true" />
             {t('easy.undo')}
           </Button>
@@ -105,7 +99,7 @@ export function EasySectionsPanel({
                       </Button>
                       <Button
                         type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label={t('easy.delete')} disabled={!canManage}
-                        onClick={() => { setJustDeleted(summary.title ?? typeName); onDelete(section.id); }}
+                        onClick={() => onDelete(section.id, summary.title ?? typeName)}
                       >
                         <Trash2 className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
                       </Button>

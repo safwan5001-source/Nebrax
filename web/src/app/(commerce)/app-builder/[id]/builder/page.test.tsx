@@ -177,6 +177,9 @@ const { api, currentUser, translate } = vi.hoisted(() => {
     'easy.catalog.button.name': 'Button block',
     'easy.catalog.slider.name': 'Slider block',
     'easy.reasons.noComponent': 'No component yet.',
+    'easy.reasons.pageOnly': 'Only works on page: {pages}',
+    'easy.catalog.cartList.name': 'Cart items block',
+    'easy.catalog.productList.name': 'Product list block',
     'issues.blocking': 'Blocks publishing',
     'issues.warning': 'Warning',
     'issues.more': 'and {count} more',
@@ -2294,5 +2297,29 @@ describe('AppBuilderWorkspacePage — Easy Mode V2 shell (S21a)', () => {
     const panel = within(screen.getAllByTestId('easy-identity')[0]);
     expect((panel.getByLabelText('App name (Arabic)') as HTMLInputElement).disabled).toBe(true);
     expect((panel.getByRole('button', { name: 'Save name' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('resource sections are only addable on the runtime page that supplies their data (cart sections on home are disabled, product list on home is not)', async () => {
+    await open();
+    await userEvent.setup().click(sections().getByRole('button', { name: 'Add a section' }));
+    const dialog = within(await screen.findByRole('dialog', { name: 'Pick a section' }));
+
+    const cartRow = dialog.getByText('Cart items block').closest('li') as HTMLElement;
+    expect(within(cartRow).getByText('Only works on page: cart')).toBeTruthy();
+    expect((within(cartRow).getByRole('button', { name: 'Unavailable' }) as HTMLButtonElement).disabled).toBe(true);
+
+    const productRow = dialog.getByText('Product list block').closest('li') as HTMLElement;
+    expect((within(productRow).getByRole('button', { name: 'Add to page' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('the delete undo banner disappears after any later edit, so Undo can never revert something else', async () => {
+    await open();
+    await userEvent.setup().click(sections().getAllByRole('button', { name: 'Duplicate section' })[0]);
+    await userEvent.setup().click(sections().getAllByRole('button', { name: 'Delete section' })[0]);
+    expect(sections().getByRole('button', { name: 'Undo delete' })).toBeTruthy();
+
+    // تعديل لاحق (نقل قسم) يُبطل الشريط
+    await userEvent.setup().click(sections().getAllByRole('button', { name: 'Move section down' }).find((b) => !(b as HTMLButtonElement).disabled) ?? sections().getAllByRole('button', { name: 'Duplicate section' })[0]);
+    await waitFor(() => expect(sections().queryByRole('button', { name: 'Undo delete' })).toBeNull());
   });
 });

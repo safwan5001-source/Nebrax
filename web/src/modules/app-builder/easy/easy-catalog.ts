@@ -17,6 +17,8 @@ export interface EasyCatalogEntry {
   status: EasySectionStatus;
   /** مفتاح ترجمة السبب للمقيَّد/المقترح. */
   reasonKey?: string;
+  /** صفحات Runtime التي يوفّر لها بيانات هذا القسم (`home`/`cart`)؛ غائب = أي صفحة. المورد لا يُحلّ خارجها فيظهر فارغاً. */
+  pages?: string[];
   /** يبني شجرة القسم بمعرّفات جديدة؛ غائب للمقترح. */
   build?: () => AppSchemaComponent;
 }
@@ -38,7 +40,7 @@ export const EASY_CATALOG: EasyCatalogEntry[] = [
     build: () => section([{ type: 'Button', id: generateComponentId('Button'), props: { label: 'زر', style: 'primary' } }]),
   },
   {
-    key: 'productList', category: 'products', status: 'ready',
+    key: 'productList', category: 'products', status: 'ready', pages: ['home'],
     // مطابق لبنية `default-experience.ts` (ProductList + قالب ProductCard اختياري بمراجع $item.* وإجراء openProduct).
     build: () => section([{
       type: 'ProductList',
@@ -54,7 +56,7 @@ export const EASY_CATALOG: EasyCatalogEntry[] = [
     }]),
   },
   {
-    key: 'cartList', category: 'cart', status: 'ready',
+    key: 'cartList', category: 'cart', status: 'ready', pages: ['cart'],
     build: () => section([{
       type: 'CartList',
       id: generateComponentId('CartList'),
@@ -82,7 +84,7 @@ export const EASY_CATALOG: EasyCatalogEntry[] = [
     }]),
   },
   {
-    key: 'cartSummary', category: 'cart', status: 'ready',
+    key: 'cartSummary', category: 'cart', status: 'ready', pages: ['cart'],
     build: () => section([{ type: 'CartSummary', id: generateComponentId('CartSummary'), props: { itemCount: 0, subtotalAmountMinor: 0 } }]),
   },
   {
@@ -109,6 +111,11 @@ export const EASY_CATALOG: EasyCatalogEntry[] = [
 /** كل قسم قابل للإضافة بنقرة (جاهز/جاهز بقيود). */
 export function isAddable(entry: EasyCatalogEntry): boolean {
   return entry.status !== 'proposed' && typeof entry.build === 'function';
+}
+
+/** هل يصلح القسم للصفحة `pageId`؟ (أقسام الموارد مرتبطة بشاشة Runtime التي تحلّ مواردها.) */
+export function isAddableOnPage(entry: EasyCatalogEntry, pageId: string | null): boolean {
+  return isAddable(entry) && (!entry.pages || (pageId !== null && entry.pages.includes(pageId)));
 }
 
 /** وصف مختصر مشتق للقسم في القائمة (عرض فقط — لا يُكتب في المخطط). */

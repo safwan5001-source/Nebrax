@@ -31,7 +31,7 @@ import { EasyIdentityPanel } from '@/modules/app-builder/easy/easy-identity-pane
 import { EasySelectionBar } from '@/modules/app-builder/easy/easy-selection-bar';
 import { EasySectionsPanel } from '@/modules/app-builder/easy/easy-sections-panel';
 import { readEditorMode, sectionContains, writeEditorMode, type EditorMode } from '@/modules/app-builder/easy/editor-mode';
-import { sectionSummary, type EasyCatalogEntry } from '@/modules/app-builder/easy/easy-catalog';
+import { isAddableOnPage, sectionSummary, type EasyCatalogEntry } from '@/modules/app-builder/easy/easy-catalog';
 import { ContractIssuesList, ContractIssuesNotice, parseContractIssues } from '@/modules/app-builder/contract-issues';
 import { AppBuilderCanvas, PREVIEW_WIDTHS, type PreviewDevice } from '@/modules/app-builder/canvas';
 import { DEFAULT_APP_EXPERIENCE } from '@/modules/app-builder/default-experience';
@@ -117,6 +117,9 @@ export default function AppBuilderWorkspacePage() {
   const [editorMode, setEditorModeState] = useState<EditorMode>('easy');
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
+  // «تراجع عن الحذف» يُعرض ما دام الحذف آخر تعديل: يُلتقط مخطط ما بعد الحذف، وأي مخطط مختلف لاحقاً يُبطله (مراجعة Codex).
+  const [pendingDeleteName, setPendingDeleteName] = useState<string | null>(null);
+  const [deleteUndo, setDeleteUndo] = useState<{ name: string; schema: AppSchema } | null>(null);
   const [publishOpen, setPublishOpen] = useState(false);
   const [publishNote, setPublishNote] = useState('');
   const [validation, setValidation] = useState<{ status: 'checking' | 'passed' | 'failed'; message?: string; issues?: ContractIssue[] }>({ status: 'checking' });
@@ -210,6 +213,14 @@ export default function AppBuilderWorkspacePage() {
 
   schemaRef.current = schema;
   dirtyRef.current = dirty;
+  useEffect(() => {
+    if (pendingDeleteName !== null && schema) {
+      setDeleteUndo({ name: pendingDeleteName, schema });
+      setPendingDeleteName(null);
+    } else if (deleteUndo && schema !== deleteUndo.schema) {
+      setDeleteUndo(null);
+    }
+  }, [schema, pendingDeleteName, deleteUndo]);
   // حارس المغادرة: beforeunload + الروابط الداخلية + زر الرجوع (AD-01 / S01b).
   const leaveGuard = useUnsavedChangesGuard(dirty);
 
@@ -687,14 +698,20 @@ export default function AppBuilderWorkspacePage() {
     setSelectedComponentId(copy.id);
   }
 
-  function easyDelete(id: string) {
+  function easyDelete(id: string, name: string) {
     if (!canManage || !selectedPageId || !currentPageRoot) return;
     applyPageEdit(selectedPageId, (root) => removeComponentById(root, id));
     setSelectedComponentId(currentPageRoot.id);
+    setPendingDeleteName(name);
+  }
+
+  function easyUndoDelete() {
+    undo();
+    setDeleteUndo(null);
   }
 
   function easyAdd(entry: EasyCatalogEntry) {
-    if (!canManage || !selectedPageId || !currentPageRoot || !entry.build) return;
+    if (!canManage || !selectedPageId || !currentPageRoot || !entry.build || !isAddableOnPage(entry, selectedPageId)) return;
     const created = entry.build();
     // بعد القسم المحدد (أو أحد أبنائه)، وإلا في النهاية.
     const afterId = (currentPageRoot.children ?? []).find((section) => findComponentById(section, selectedComponentId ?? '') !== null)?.id ?? null;
@@ -823,8 +840,9 @@ export default function AppBuilderWorkspacePage() {
                 onDuplicate={easyDuplicate}
                 onDelete={easyDelete}
                 onAdd={() => setCatalogOpen(true)}
-                onUndo={undo}
+                onUndo={easyUndoDelete}
                 canUndo={canUndo}
+                undoBanner={deleteUndo ? { name: deleteUndo.name } : null}
               />
             </div>
           ) : (
@@ -1280,7 +1298,7 @@ export default function AppBuilderWorkspacePage() {
               onMoveUp={() => selectedPageId && moveNode(selectedPageId, selectedSectionInfo.id, 'up')}
               onMoveDown={() => selectedPageId && moveNode(selectedPageId, selectedSectionInfo.id, 'down')}
               onDuplicate={() => easyDuplicate(selectedSectionInfo.id)}
-              onDelete={() => easyDelete(selectedSectionInfo.id)}
+              onDelete={() => easyDelete(selectedSectionInfo.id, selectedSectionInfo.name)}
               t={t}
             />
           ) : null}
@@ -1459,7 +1477,7 @@ export default function AppBuilderWorkspacePage() {
           </div>
         </div>
       </Dialog>
-      <EasyCatalogDialog open={catalogOpen} onClose={() => setCatalogOpen(false)} onPick={easyAdd} t={t} />
+      <EasyCatalogDialog open={catalogOpen} onClose={() => setCatalogOpen(false)} onPick={easyAdd} pageId={selectedPageId} t={t} />
       {safetyDialogs}
     </div>
   );

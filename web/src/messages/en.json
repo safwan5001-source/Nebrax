@@ -8705,7 +8705,8 @@
             "image": "Image is 16:9, https only, with no alt text or action.",
             "banner": "The image has the image limits; the button is separate because images cannot run actions.",
             "noComponent": "The current mobile app has no component for this section yet.",
-            "noScreen": "The current mobile app has no screen for this section yet."
+            "noScreen": "The current mobile app has no screen for this section yet.",
+          "pageOnly": "This section only works on page: {pages} (its data is provided by that app screen)."
           },
             "selectionBar": {
             "label": "Tools for section “{name}”",

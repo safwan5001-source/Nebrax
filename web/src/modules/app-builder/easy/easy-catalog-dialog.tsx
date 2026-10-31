@@ -6,14 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { EASY_CATALOG, isAddable, type EasyCatalogEntry, type EasyCategory } from './easy-catalog';
+import { EASY_CATALOG, isAddable, isAddableOnPage, type EasyCatalogEntry, type EasyCategory } from './easy-catalog';
 
 type Translate = (key: string, values?: Record<string, string | number>) => string;
 const CATEGORIES: Array<EasyCategory | 'all'> = ['all', 'content', 'products', 'navigation', 'cart'];
 const STATUS_TONE: Record<EasyCatalogEntry['status'], 'positive' | 'warning' | 'muted'> = { ready: 'positive', limited: 'warning', proposed: 'muted' };
 
 /** كتالوج الأقسام: بحث + تصنيفات + شارة حالة صادقة؛ المقترح معطّل بسببه ولا يُضاف أبداً. */
-export function EasyCatalogDialog({ open, onClose, onPick, t }: { open: boolean; onClose: () => void; onPick: (entry: EasyCatalogEntry) => void; t: Translate }) {
+export function EasyCatalogDialog({ open, onClose, onPick, pageId, t }: { open: boolean; onClose: () => void; onPick: (entry: EasyCatalogEntry) => void; pageId: string | null; t: Translate }) {
   const [query, setQuery] = React.useState('');
   const [category, setCategory] = React.useState<EasyCategory | 'all'>('all');
 
@@ -47,7 +47,8 @@ export function EasyCatalogDialog({ open, onClose, onPick, t }: { open: boolean;
         ) : (
           <ul className="max-h-[50vh] space-y-1.5 overflow-y-auto">
             {entries.map((entry) => {
-              const addable = isAddable(entry);
+              const addable = isAddableOnPage(entry, pageId);
+              const wrongPage = isAddable(entry) && !addable;
               return (
                 <li key={entry.key} className="flex items-start gap-3 rounded-md border border-border p-2.5">
                   <div className="min-w-0 flex-1">
@@ -57,6 +58,7 @@ export function EasyCatalogDialog({ open, onClose, onPick, t }: { open: boolean;
                     </div>
                     <p className="mt-0.5 text-xs text-muted">{t(`easy.catalog.${entry.key}.desc`)}</p>
                     {entry.reasonKey ? <p className="mt-0.5 text-[11px] text-muted">{t(entry.reasonKey)}</p> : null}
+                    {wrongPage ? <p className="mt-0.5 text-[11px] text-warning">{t('easy.reasons.pageOnly', { pages: (entry.pages ?? []).join('، ') })}</p> : null}
                   </div>
                   <Button type="button" size="sm" className="h-9 shrink-0" disabled={!addable} onClick={() => onPick(entry)}>
                     {addable ? t('easy.catalogAdd') : t('easy.status.unavailable')}
