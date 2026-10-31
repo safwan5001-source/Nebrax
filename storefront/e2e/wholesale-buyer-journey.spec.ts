@@ -644,7 +644,10 @@ test.describe
 
     test("08 listing: channel price shown, unpriced product marked unavailable with no add button", async () => {
       await go(page, `${WS}/sa/en/products`);
-      await expect(page.getByText("صنف جملة أول")).toBeVisible();
+      // by role: while the page streams, a hidden copy of the card can briefly coexist with the visible one (getByText matches both)
+      await expect(
+        page.getByRole("link", { name: "صنف جملة أول" }),
+      ).toBeVisible();
       await pricesOn(page, /7\.00/); // P1 channel list (700 minor) — this buyer is not partner-linked
       await pricesOn(page, /9\.00/); // P2 channel list
       expect(await bodyText(page)).not.toMatch(/10\.00/); // never the retail 1000

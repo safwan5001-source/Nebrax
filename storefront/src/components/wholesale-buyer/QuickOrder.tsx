@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useId, useRef, useState, useTransition } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { StoreContainer } from "@/components/layout/StoreContainer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,7 +68,8 @@ export function QuickOrder({ basePath }: { basePath: string }) {
   const [truncated, setTruncated] = useState(false);
   const [notice, setNotice] = useState<Notice>({ kind: "none" });
   const [rejected, setRejected] = useState<Record<string, string>>({});
-  const [pending, startTransition] = useTransition();
+  // explicit in-flight flag (not a React transition): the buttons must re-enable the moment a server action settles
+  const [pending, setPending] = useState(false);
   const counter = useRef(0);
   const latestSearch = useRef(0);
 
@@ -122,42 +123,51 @@ export function QuickOrder({ basePath }: { basePath: string }) {
     const { rows, truncated: cut } = parsePastedRows(pasted);
     setTruncated(cut);
     setPasteIssues([]);
-    if (rows.length === 0) return;
-    startTransition(async () => {
-      const outcome = await resolveQuickOrderSkus(rows.map((r) => r.sku));
-      if (outcome.kind !== "ok") {
-        setNotice(
-          outcome.kind === "unavailable"
-            ? { kind: "error" }
-            : { kind: "access", access: outcome.kind },
-        );
-        return;
-      }
-      const issues: PasteIssue[] = [];
-      let next = entries;
-      rows.forEach((row, i) => {
-        const lines = outcome.rows[i]?.lines ?? [];
-        if (lines.length === 0) {
-          issues.push({ sku: row.sku, kind: "not_found" });
-        } else if (lines.length > 1) {
-          // a variant-managed parent SKU: the buyer must choose a variant — hand the candidates to the picker
-          issues.push({ sku: row.sku, kind: "ambiguous" });
-          setTerm(row.sku);
-          setResults(lines);
-        } else {
-          next = mergeEntry(next, {
-            id: nextId(),
-            line: lines[0],
-            quantity: row.quantity,
-          });
+    if (rows.length === 0 || pending) return;
+    setPending(true);
+    void (async () => {
+      try {
+        const outcome = await resolveQuickOrderSkus(rows.map((r) => r.sku));
+        if (outcome.kind !== "ok") {
+          setNotice(
+            outcome.kind === "unavailable"
+              ? { kind: "error" }
+              : { kind: "access", access: outcome.kind },
+          );
+          return;
         }
-      });
-      setEntries(next.slice(0, Math.max(QUICK_ORDER_MAX_LINES, 0)));
-      setPasteIssues(issues);
-      setRejected({});
-      setNotice({ kind: "none" });
-      if (issues.length === 0) setPasted("");
-    });
+        const issues: PasteIssue[] = [];
+        const additions: QuickOrderEntry[] = [];
+        rows.forEach((row, i) => {
+          const lines = outcome.rows[i]?.lines ?? [];
+          if (lines.length === 0) {
+            issues.push({ sku: row.sku, kind: "not_found" });
+          } else if (lines.length > 1) {
+            // a variant-managed parent SKU: the buyer must choose a variant — hand the candidates to the picker
+            issues.push({ sku: row.sku, kind: "ambiguous" });
+            setTerm(row.sku);
+            setResults(lines);
+          } else {
+            additions.push({
+              id: nextId(),
+              line: lines[0],
+              quantity: row.quantity,
+            });
+          }
+        });
+        setEntries((prev) =>
+          additions
+            .reduce<QuickOrderEntry[]>(mergeEntry, prev)
+            .slice(0, QUICK_ORDER_MAX_LINES),
+        );
+        setPasteIssues(issues);
+        setRejected({});
+        setNotice({ kind: "none" });
+        if (issues.length === 0) setPasted("");
+      } finally {
+        setPending(false);
+      }
+    })();
   };
 
   const setQuantity = (id: string, quantity: string) => {
@@ -182,33 +192,40 @@ export function QuickOrder({ basePath }: { basePath: string }) {
     if (eligible.length === 0 || pending) return;
     setNotice({ kind: "none" });
     setRejected({});
+    setPending(true);
     const submitted = eligible;
-    startTransition(async () => {
-      const result = await addQuickOrderLines(submitItems(submitted));
-      if (result.kind === "ok") {
-        const ids = new Set(submitted.map((e) => e.id));
-        setEntries((prev) => prev.filter((e) => !ids.has(e.id)));
-        setNotice({ kind: "added", count: submitted.length });
-        await refreshCart();
-        openCart();
-        return;
-      }
-      if (result.kind === "rejected") {
-        const byEntry: Record<string, string> = {};
-        for (const failure of result.failures) {
-          const entry = submitted[failure.index];
-          if (entry) byEntry[entry.id] = failure.reason;
+    void (async () => {
+      try {
+        const result = await addQuickOrderLines(submitItems(submitted));
+        if (result.kind === "ok") {
+          const ids = new Set(submitted.map((e) => e.id));
+          setEntries((prev) => prev.filter((e) => !ids.has(e.id)));
+          setNotice({ kind: "added", count: submitted.length });
+          await refreshCart();
+          openCart();
+          return;
         }
-        setRejected(byEntry);
-        setNotice({ kind: "rejected" });
-        return;
+        if (result.kind === "rejected") {
+          const byEntry: Record<string, string> = {};
+          for (const failure of result.failures) {
+            const entry = submitted[failure.index];
+            if (entry) byEntry[entry.id] = failure.reason;
+          }
+          setRejected(byEntry);
+          setNotice({ kind: "rejected" });
+          return;
+        }
+        setNotice(
+          result.kind === "unavailable"
+            ? { kind: "error" }
+            : { kind: "access", access: result.kind },
+        );
+      } catch {
+        setNotice({ kind: "error" });
+      } finally {
+        setPending(false);
       }
-      setNotice(
-        result.kind === "unavailable"
-          ? { kind: "error" }
-          : { kind: "access", access: result.kind },
-      );
-    });
+    })();
   };
 
   const lineName = (line: QuickOrderLine) =>
