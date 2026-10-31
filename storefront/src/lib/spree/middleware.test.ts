@@ -689,6 +689,24 @@ describe("H6 Final Closure: host context, wholesale-only pages, bare country, co
     }
   });
 
+  it("treats legacy /wholesale/* the same when the dead Spree wholesale add-on env is set: the portal no longer exists", async () => {
+    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "wholesale");
+    const retailMw = withContext(retail).mw;
+    for (const path of ["/sa/ar/wholesale", "/sa/ar/wholesale/cart"]) {
+      const response = await call(retailMw, path);
+      expect(response.headers.get("location")).toBeNull();
+      expect(rewriteOf(response)).toBe(`https://store.example${closedPath}`);
+    }
+    const response = await call(
+      withContext(wholesale).mw,
+      "/sa/ar/wholesale/quick-order",
+    );
+    expect(response.status).toBe(308);
+    expect(new URL(response.headers.get("location") ?? "").pathname).toBe(
+      "/sa/ar/buyer/quick-order",
+    );
+  });
+
   it("redirects legacy /wholesale/* to the native equivalent on a native wholesale Host, closing the rest", async () => {
     vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "");
     const { mw } = withContext(wholesale);
@@ -716,14 +734,6 @@ describe("H6 Final Closure: host context, wholesale-only pages, bare country, co
         expect(rewriteOf(response)).toBe(`https://store.example${closedPath}`);
       }
     }
-  });
-
-  it("leaves the Spree wholesale portal alone when that add-on is enabled", async () => {
-    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "wholesale");
-    const { mw } = withContext(retail);
-    const response = await call(mw, "/sa/ar/wholesale/sign-in");
-    expect(rewriteOf(response)).toBeNull();
-    expect(response.status).toBe(200);
   });
 
   it("does not consult the Host context for static or non-localized requests", async () => {

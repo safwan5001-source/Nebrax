@@ -11,12 +11,12 @@ interface CheckoutLayoutProps {
  * `checkout/[id]`, `confirm-payment/[id]` and `order-placed/[id]`.
  *
  * Ownership (evidence, not assumption): the DTC storefront's cart and checkout are AWJ-native
- * (`(store-checkout)/checkout`, `/checkout/payment-return`); a Spree cart exists only on the opt-in wholesale
- * surface, which links here (`WholesaleCartView` → `/checkout/{cart.id}`) and whose payment return URLs are
- * `/confirm-payment/{id}` and `/order-placed/{id}`. So these routes are the wholesale add-on's: they work exactly as
- * before when wholesale is enabled — the same condition `(wholesale)/wholesale/layout.tsx` uses — and are a plain
- * 404 otherwise, instead of building a Spree client for a storefront that has none. The check runs in the layout,
- * before any page or data loader, so no Spree call can happen on a 404.
+ * (`(store-checkout)/checkout`, `/checkout/payment-return`); a Spree cart existed only on the Spree wholesale portal,
+ * which linked here (`/checkout/{cart.id}`) and whose payment return URLs were `/confirm-payment/{id}` and
+ * `/order-placed/{id}`. That portal's route group has since been removed (H6 W1a), so nothing in the app links here any
+ * more: these routes are a plain 404 unless the (unusable — no Spree backend exists) add-on env is set, instead of
+ * building a Spree client for a storefront that has none. They are the next removal candidate (R1); until then the
+ * check runs in the layout, before any page or data loader, so no Spree call can happen on a 404.
  *
  * X5b — this gate alone cannot set the HTTP status: with `cacheComponents` the shell is streamed, so a `notFound()`
  * here renders the 404 page under an already-committed 200. The real 404 is issued by the proxy

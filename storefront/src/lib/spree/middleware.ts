@@ -41,7 +41,7 @@ function isLegacyCheckoutPath(localizedPath: string): boolean {
  * wholesale; elsewhere they must answer a genuine 404 instead of rendering a wholesale gate on a retail store.
  */
 const BUYER_PATH = /^\/buyer(\/|$)/;
-/** The opt-in Spree wholesale portal group (`(wholesale)/wholesale/**`). */
+/** The removed Spree wholesale portal URLs (`/wholesale/**`): kept only so they redirect or 404 instead of 500ing. */
 const LEGACY_WHOLESALE_PATH = /^\/wholesale(\/|$)/;
 
 /**
@@ -347,12 +347,10 @@ export function createSpreeMiddleware(
           });
         }
 
-        // The Spree-era portal URLs: when that add-on is off they never render (a real 404, or a redirect to the
-        // native equivalent on a native wholesale host); when it is on they are the portal and pass through.
-        if (
-          !isWholesaleEnabled() &&
-          LEGACY_WHOLESALE_PATH.test(normalizedPath)
-        ) {
+        // The Spree-era portal URLs. The portal itself is gone (its route group was removed), so these never render
+        // whatever the Spree add-on env says: a real 404, or a redirect to the native equivalent on a native
+        // wholesale host.
+        if (LEGACY_WHOLESALE_PATH.test(normalizedPath)) {
           const equivalent = nativeWholesaleOpen
             ? nativeWholesaleEquivalent(normalizedPath)
             : null;
