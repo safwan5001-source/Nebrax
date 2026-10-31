@@ -8,10 +8,6 @@ vi.mock("@/lib/data/cart", () => ({
   addAwjItem: vi.fn(),
   updateAwjItem: vi.fn(),
   removeAwjItem: vi.fn(),
-  getCart: vi.fn(),
-  addToCart: vi.fn(),
-  updateCartItem: vi.fn(),
-  removeCartItem: vi.fn(),
 }));
 
 vi.mock("sonner", () => ({
@@ -26,14 +22,10 @@ import { toast } from "sonner";
 import { CartProvider, useCart } from "@/contexts/CartContext";
 import {
   addAwjItem,
-  addToCart,
   type getAwjCart,
   getAwjCartState,
-  getCart,
   removeAwjItem,
-  removeCartItem,
   updateAwjItem,
-  updateCartItem,
 } from "@/lib/data/cart";
 
 const mockGetAwjCartState = vi.mocked(getAwjCartState);
@@ -47,10 +39,6 @@ const mockGetAwjCart = {
 const mockAddAwjItem = vi.mocked(addAwjItem);
 const mockUpdateAwjItem = vi.mocked(updateAwjItem);
 const mockRemoveAwjItem = vi.mocked(removeAwjItem);
-const mockGetCart = vi.mocked(getCart);
-const mockAddToCart = vi.mocked(addToCart);
-const mockUpdateCartItem = vi.mocked(updateCartItem);
-const mockRemoveCartItem = vi.mocked(removeCartItem);
 const mockToastError = vi.mocked(toast.error);
 
 const mockCart = {
@@ -74,20 +62,10 @@ function wrapper({ children }: { children: ReactNode }) {
   return <CartProvider>{children}</CartProvider>;
 }
 
-function wholesaleWrapper({ children }: { children: ReactNode }) {
-  return <CartProvider surface="wholesale">{children}</CartProvider>;
-}
-
-const spreeCart = {
-  id: "cart-1",
-  items: [{ id: "li-1", quantity: 2, name: "Shirt" }],
-} as never;
-
 describe("CartContext", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAwjCart.mockResolvedValue(mockCart);
-    mockGetCart.mockResolvedValue(spreeCart);
   });
 
   it("throws when used outside CartProvider", () => {
@@ -96,7 +74,7 @@ describe("CartContext", () => {
     }).toThrow("useCart must be used within a CartProvider");
   });
 
-  it("loads the AWJ cart on mount for the default (dtc) surface", async () => {
+  it("loads the AWJ cart on mount", async () => {
     const { result } = renderHook(() => useCart(), { wrapper });
 
     await waitFor(() => {
@@ -104,9 +82,7 @@ describe("CartContext", () => {
     });
 
     expect(mockGetAwjCartState).toHaveBeenCalledOnce();
-    expect(mockGetCart).not.toHaveBeenCalled();
     expect(result.current.cart).toBe(mockCart);
-    expect(result.current.surface).toBe("dtc");
   });
 
   it("computes itemCount from cart items", async () => {
@@ -202,7 +178,7 @@ describe("CartContext", () => {
     });
   });
 
-  describe("addItem (dtc/AWJ)", () => {
+  describe("addItem", () => {
     it("sends the AWJ product id, quantity, and unit key; opens the drawer on success", async () => {
       mockAddAwjItem.mockResolvedValue({
         success: true as const,
@@ -226,7 +202,6 @@ describe("CartContext", () => {
         undefined,
         undefined,
       );
-      expect(mockAddToCart).not.toHaveBeenCalled();
       expect(result.current.cart).toBe(updatedCart);
       expect(result.current.isOpen).toBe(true);
       expect(result.current.updating).toBe(false);
@@ -335,7 +310,7 @@ describe("CartContext", () => {
     });
   });
 
-  describe("updateItem (dtc/AWJ)", () => {
+  describe("updateItem", () => {
     it("updates cart on success via the AWJ item id and quantity", async () => {
       mockUpdateAwjItem.mockResolvedValue({
         success: true as const,
@@ -353,13 +328,12 @@ describe("CartContext", () => {
       });
 
       expect(mockUpdateAwjItem).toHaveBeenCalledWith("li-1", 5);
-      expect(mockUpdateCartItem).not.toHaveBeenCalled();
       expect(result.current.cart).toBe(updatedCart);
       expect(result.current.updating).toBe(false);
     });
   });
 
-  describe("removeItem (dtc/AWJ)", () => {
+  describe("removeItem", () => {
     it("updates cart on success via the AWJ item id", async () => {
       const cartAfterRemoval = {
         kind: "awj" as const,
@@ -382,45 +356,8 @@ describe("CartContext", () => {
       });
 
       expect(mockRemoveAwjItem).toHaveBeenCalledWith("li-1");
-      expect(mockRemoveCartItem).not.toHaveBeenCalled();
       expect(result.current.cart).toBe(cartAfterRemoval);
       expect(result.current.itemCount).toBe(1);
-    });
-  });
-
-  describe("wholesale surface stays Spree-backed", () => {
-    it("loads via the Spree getCart, never the AWJ adapter", async () => {
-      const { result } = renderHook(() => useCart(), {
-        wrapper: wholesaleWrapper,
-      });
-
-      await waitFor(() => {
-        expect(result.current.loading).toBe(false);
-      });
-
-      expect(mockGetCart).toHaveBeenCalledWith(undefined, "wholesale");
-      expect(mockGetAwjCartState).not.toHaveBeenCalled();
-      expect(result.current.cart).toBe(spreeCart);
-      expect(result.current.surface).toBe("wholesale");
-    });
-
-    it("addItem calls the Spree addToCart with the variant id and surface, no unit key", async () => {
-      mockAddToCart.mockResolvedValue({
-        success: true as const,
-        cart: spreeCart,
-      });
-
-      const { result } = renderHook(() => useCart(), {
-        wrapper: wholesaleWrapper,
-      });
-      await waitFor(() => expect(result.current.loading).toBe(false));
-
-      await act(async () => {
-        await result.current.addItem("variant-1", 2);
-      });
-
-      expect(mockAddToCart).toHaveBeenCalledWith("variant-1", 2, "wholesale");
-      expect(mockAddAwjItem).not.toHaveBeenCalled();
     });
   });
 

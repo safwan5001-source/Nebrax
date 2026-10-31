@@ -41,13 +41,10 @@ import { actionResult } from "./utils";
  * `actionResult()` convention, same "server does the HTTP, client only ever
  * sees the mapped view model or a structured failure" shape).
  *
- * Named `awj-checkout.ts`, not `checkout.ts`: that filename is already the
- * Spree/wholesale checkout data layer (`resolveSurfaceForCart`,
- * `getCheckoutOrder`, `applyCode`, ...), consumed by the existing
- * `(checkout)` route group and `payment.ts`/`express-checkout-flow.ts`. This
- * file is fully independent of it — no shared exports, no shared surface
- * resolution — matching the Storefront architecture boundary: AWJ DTC
- * Checkout stays AWJ-native, the Spree checkout data layer is untouched.
+ * The Spree/wholesale checkout data layer (`checkout.ts`, `payment.ts`,
+ * `express-checkout-flow.ts`) that used to sit beside this file has been
+ * removed; this is now the storefront's only checkout data layer and stays
+ * AWJ-native.
  */
 
 /** GET the current checkout. Never creates one (see `fetchAwjCheckout`). Null on any failure. */

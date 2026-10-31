@@ -20,10 +20,9 @@ vi.mock("@/components/products/ProductCustomFields", () => ({
 }));
 
 const mockAddItem = vi.fn();
-const mockSurface = { current: "dtc" as "dtc" | "wholesale" };
 
 vi.mock("@/contexts/CartContext", () => ({
-  useCart: () => ({ addItem: mockAddItem, surface: mockSurface.current }),
+  useCart: () => ({ addItem: mockAddItem }),
 }));
 
 vi.mock("@/contexts/HiddenPricingContext", () => ({
@@ -78,7 +77,6 @@ const productWithoutCustomVariants = {
 describe("ProductDetails", () => {
   beforeEach(() => {
     mockAddItem.mockClear();
-    mockSurface.current = "dtc";
   });
 
   it("requests the default variant for the product page", () => {
@@ -123,21 +121,6 @@ describe("ProductDetails", () => {
       expect.anything(),
       expect.anything(),
     );
-  });
-
-  it("on the wholesale surface, add-to-cart still sends the Spree variant id (unchanged behavior)", async () => {
-    mockSurface.current = "wholesale";
-    const user = userEvent.setup();
-    render(
-      <ProductDetails
-        product={productWithoutCustomVariants}
-        basePath="/us/en"
-      />,
-    );
-
-    await user.click(screen.getByText("addToCart"));
-
-    expect(mockAddItem).toHaveBeenCalledWith("variant-master", 1);
   });
 });
 
@@ -237,7 +220,6 @@ describe("ProductDetails — AWJ variant-managed products (STORE-UI-3)", () => {
 
   beforeEach(() => {
     mockAddItem.mockReset();
-    mockSurface.current = "dtc";
   });
 
   it("preselects nothing, because AWJ designates no default variant", () => {
@@ -276,7 +258,6 @@ describe("ProductDetails — AWJ variant-managed products (STORE-UI-3)", () => {
 describe("ProductDetails — AWJ Market mobile purchase bar", () => {
   beforeEach(() => {
     mockAddItem.mockClear();
-    mockSurface.current = "dtc";
   });
 
   it("pins the existing quantity/add-to-cart row to the bottom below the desktop breakpoint", () => {
@@ -335,7 +316,6 @@ describe("ProductDetails — AWJ Market mobile purchase bar", () => {
 describe("ProductDetails — CUST-H2-5 public page presentation parity", () => {
   beforeEach(() => {
     mockAddItem.mockClear();
-    mockSurface.current = "dtc";
   });
 
   const productWithDescriptionAndSku = {
@@ -598,7 +578,6 @@ describe("ProductDetails — CUST-H2-5 public page presentation parity", () => {
 describe("ProductDetails — CUST-H3-3 density container-padding parity", () => {
   beforeEach(() => {
     mockAddItem.mockClear();
-    mockSurface.current = "dtc";
   });
 
   function pageShell(container: HTMLElement): Element {

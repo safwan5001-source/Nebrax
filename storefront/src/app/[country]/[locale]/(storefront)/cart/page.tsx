@@ -4,7 +4,6 @@ import { AlertTriangle, ArrowLeft, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useRef } from "react";
 import { CartEmptyState } from "@/components/cart/CartEmptyState";
 import { awjCartLineView, CartLine } from "@/components/cart/CartLine";
 import { CartSummary } from "@/components/cart/CartSummary";
@@ -12,17 +11,15 @@ import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
 import { useCartLineImages } from "@/hooks/useCartLineImages";
 import { localeDirection } from "@/i18n/locales";
-import { trackViewCart } from "@/lib/analytics/gtm";
-import { isStorefrontCart, lineGroups } from "@/lib/commerce/cart-types";
+import { lineGroups } from "@/lib/commerce/cart-types";
 import { extractBasePath } from "@/lib/utils/path";
 
 /**
  * STORE-UI-4 — the AWJ cart page.
  *
- * This route is the DTC surface's cart and is always AWJ-backed (the Spree
- * wholesale portal and its own cart page have been removed), so nothing
- * Spree-shaped can reach here. The narrowing below is the guard for that, not a
- * second design.
+ * The cart is always AWJ-backed (`StorefrontCart`); the Spree wholesale portal
+ * and its cart page have been removed. AWJ carts do not fire GA4 `view_cart`
+ * (the payload was modelled on Spree's cart shape).
  *
  * **Mobile deliberately has no sticky checkout bar.** `MobileBottomNav` is
  * already fixed to the bottom of every storefront page, and a second fixed bar
@@ -40,34 +37,16 @@ export default function CartPage() {
   const tc = useTranslations("common");
   const rtl = localeDirection(useLocale()) === "rtl";
   const Arrow = rtl ? ArrowLeft : ArrowRight;
-  const viewCartFiredRef = useRef(false);
-  const awjCart = isStorefrontCart(cart) ? cart : null;
-
-  // GA4's `view_cart` payload is modelled on Spree's Cart/Order shape
-  // (item_total, discounts). AWJ carts do not fire it — adapting analytics is a
-  // separate concern from presenting the cart, exactly as before this pass.
-  useEffect(() => {
-    if (
-      !loading &&
-      cart &&
-      !isStorefrontCart(cart) &&
-      cart.total_quantity > 0 &&
-      !viewCartFiredRef.current
-    ) {
-      trackViewCart(cart);
-      viewCartFiredRef.current = true;
-    }
-  }, [cart, loading]);
 
   const images = useCartLineImages(
-    awjCart?.items.map((line) => line.productId) ?? [],
+    cart?.items.map((line) => line.productId) ?? [],
   );
 
   if (loading) {
     return <CartPageSkeleton />;
   }
 
-  if (!awjCart || awjCart.items.length === 0) {
+  if (!cart || cart.items.length === 0) {
     return (
       <div className="mx-auto w-full max-w-store px-4 sm:px-6 lg:px-8">
         <CartEmptyState basePath={basePath} accessIssue={accessIssue} />
@@ -82,11 +61,11 @@ export default function CartPage() {
           {t("shoppingCart")}
         </h1>
         <span className="text-sm text-store-muted-foreground tabular-nums">
-          {t("itemCount", { count: awjCart.itemCount })}
+          {t("itemCount", { count: cart.itemCount })}
         </span>
       </header>
 
-      {awjCart.hasUnavailableItems && (
+      {cart.hasUnavailableItems && (
         <div
           role="status"
           className="mt-5 flex items-start gap-3 rounded-store border border-store-warning/40 bg-store-warning/10 p-4"
@@ -107,7 +86,7 @@ export default function CartPage() {
           className="rounded-store border border-store-border bg-store-surface px-4 sm:px-5"
         >
           <ul className="divide-y divide-store-border">
-            {lineGroups(awjCart.items, {
+            {lineGroups(cart.items, {
               id: (line) => line.id,
               parent: (line) => line.addonOf,
             }).map(({ line, addons }) => (
@@ -134,8 +113,8 @@ export default function CartPage() {
         </section>
 
         <CartSummary
-          subtotal={awjCart.subtotal}
-          itemCount={awjCart.itemCount}
+          subtotal={cart.subtotal}
+          itemCount={cart.itemCount}
           sticky
           actions={
             <div className="space-y-2">

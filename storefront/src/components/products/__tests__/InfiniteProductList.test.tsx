@@ -13,7 +13,7 @@ vi.mock("@/contexts/StoreContext", () => ({
 }));
 
 vi.mock("@/contexts/CartContext", () => ({
-  useCart: () => ({ addItem: vi.fn(), surface: "dtc" }),
+  useCart: () => ({ addItem: vi.fn() }),
 }));
 
 // jsdom has no IntersectionObserver; the component only uses it to trigger

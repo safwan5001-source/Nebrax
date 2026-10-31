@@ -13,7 +13,7 @@ vi.mock("@/contexts/StoreContext", () => ({
 }));
 
 vi.mock("@/contexts/CartContext", () => ({
-  useCart: () => ({ addItem: vi.fn(), surface: "dtc" }),
+  useCart: () => ({ addItem: vi.fn() }),
 }));
 
 const products = [{ id: "p1", name: "منتج" }] as unknown as Product[];

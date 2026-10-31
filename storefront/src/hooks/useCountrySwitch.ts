@@ -4,8 +4,6 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useCart } from "@/contexts/CartContext";
 import type { CountryWithMarket } from "@/contexts/StoreContext";
-import { isStorefrontCart } from "@/lib/commerce/cart-types";
-import { updateCartMarket } from "@/lib/data/checkout";
 import { rebaseAccountRedirectSearch } from "@/lib/utils/account-redirect";
 import { setStoreCookies } from "@/lib/utils/cookies";
 import { getPathWithoutPrefix } from "@/lib/utils/path";
@@ -30,7 +28,7 @@ export function useCountrySwitch({
   currentLocale,
   onBeforeNavigate,
 }: UseCountrySwitchOptions): UseCountrySwitchResult {
-  const { cart, loading: isCartLoading, refreshCart } = useCart();
+  const { loading: isCartLoading } = useCart();
   const pathname = usePathname();
   const [isCountryNavigating, setIsCountryNavigating] = useState(false);
 
@@ -56,34 +54,14 @@ export function useCountrySwitch({
 
     setIsCountryNavigating(true);
 
-    const newCurrency = entry.currency;
     const pathRest = getPathWithoutPrefix(pathname);
     const newPath = `/${nextCountry}/${newLocale}${pathRest}`;
     const currentBasePath = `/${activeCountry}/${currentLocale}`;
     const nextBasePath = `/${nextCountry}/${newLocale}`;
 
     try {
-      // AWJ Cart V1 (the DTC surface) has no market/locale-per-cart concept
-      // yet — no new currency/pricing rules are in scope for the cart
-      // wiring, so this Spree-only market sync simply skips an AWJ cart
-      // rather than persisting anything to it.
-      if (
-        cart &&
-        !isStorefrontCart(cart) &&
-        (cart.currency !== newCurrency || cart.locale !== newLocale)
-      ) {
-        const result = await updateCartMarket(cart.id, {
-          currency: newCurrency,
-          locale: newLocale,
-        });
-
-        if (!result.success) {
-          return false;
-        }
-
-        await refreshCart();
-      }
-
+      // The AWJ cart has no market/locale-per-cart concept, so switching
+      // country only updates the store cookies and navigates.
       setStoreCookies(nextCountry, newLocale);
       onBeforeNavigate?.();
       const nextSearch = rebaseAccountRedirectSearch(

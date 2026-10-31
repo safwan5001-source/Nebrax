@@ -21,9 +21,8 @@ vi.mock("@/components/products/ProductCustomFields", () => ({
 }));
 
 const mockAddItem = vi.fn();
-const mockSurface = { current: "dtc" as "dtc" | "wholesale" };
 vi.mock("@/contexts/CartContext", () => ({
-  useCart: () => ({ addItem: mockAddItem, surface: mockSurface.current }),
+  useCart: () => ({ addItem: mockAddItem }),
 }));
 vi.mock("@/contexts/HiddenPricingContext", () => ({
   useHiddenPricing: () => null,
@@ -128,7 +127,6 @@ const gifting: ProductGifting = {
 describe("ProductDetails — gifting blocks (FLOWERS-H11)", () => {
   beforeEach(() => {
     mockAddItem.mockReset();
-    mockSurface.current = "dtc";
   });
 
   it("renders nothing extra for a product without gifting (existing PDPs unchanged)", () => {
@@ -250,13 +248,5 @@ describe("ProductDetails — gifting blocks (FLOWERS-H11)", () => {
     expect(
       document.querySelector('[data-delivery-promise="unavailable"]'),
     ).not.toBeNull();
-  });
-
-  it("ignores gifting data on the wholesale surface", () => {
-    mockSurface.current = "wholesale";
-    render(<ProductDetails product={product(gifting)} basePath="/sa/en" />);
-    expect(document.querySelector("[data-personalization]")).toBeNull();
-    expect(document.querySelector("[data-addons]")).toBeNull();
-    expect(document.querySelector("[data-delivery-promise]")).toBeNull();
   });
 });

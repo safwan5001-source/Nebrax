@@ -264,7 +264,7 @@ export interface AwjCompletionResult {
  * `details` carries `{ items, checkout }` — see `AwjReviewRequiredDetails`
  * in `checkout-types.ts`. Callers must read that instead of treating this
  * as a generic error (see `completeAwjCheckoutAction` in
- * `@/lib/data/checkout`).
+ * `@/lib/data/awj-checkout`).
  */
 export async function completeAwjCheckout(
   idempotencyKey: string,

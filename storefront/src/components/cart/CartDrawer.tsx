@@ -1,17 +1,12 @@
 "use client";
 
 import { ShoppingBag, X } from "lucide-react";
-import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { CartEmptyState } from "@/components/cart/CartEmptyState";
-import {
-  awjCartLineView,
-  CartLine,
-  type CartLineView,
-} from "@/components/cart/CartLine";
+import { awjCartLineView, CartLine } from "@/components/cart/CartLine";
 import { CouponField } from "@/components/cart/CouponField";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,30 +19,14 @@ import {
 import { useCart } from "@/contexts/CartContext";
 import { useCartLineImages } from "@/hooks/useCartLineImages";
 import { localeDirection } from "@/i18n/locales";
-import { trackRemoveFromCart, trackViewCart } from "@/lib/analytics/gtm";
-import {
-  formatMinorAmount,
-  isStorefrontCart,
-  lineGroups,
-} from "@/lib/commerce/cart-types";
-import type { StoreCart, StoreCartLine } from "@/lib/commerce/types";
+import { formatMinorAmount, lineGroups } from "@/lib/commerce/cart-types";
 import { extractBasePath } from "@/lib/utils/path";
-
-const ExpressCheckoutButton = dynamic(
-  () =>
-    import("@/components/checkout/ExpressCheckoutButton").then((m) => ({
-      default: m.ExpressCheckoutButton,
-    })),
-  { ssr: false },
-);
 
 /**
  * The cart quick-access surface.
  *
- * Two providers mount this: the root layout's DTC `<CartProvider>` (AWJ carts)
- * and `WholesaleGate`'s `<CartProvider surface="wholesale">` (Spree carts). Both
- * render the same `CartLine` through their own adapter, so the drawer is one
- * design over two authorities rather than two drawers.
+ * Mounted under the root layout's `<CartProvider>`, whose cart is the AWJ-native
+ * `StorefrontCart` (DTC and the native wholesale buyer share it).
  *
  * It is a **view of the cart, not a second cart**: it shows the same lines, the
  * same server-sent subtotal and the same honesty about what is not priced yet as
@@ -63,7 +42,6 @@ export function CartDrawer() {
     updateItem,
     removeItem,
     itemCount,
-    refreshCart,
     accessIssue,
   } = useCart();
   const t = useTranslations("cart");
@@ -71,44 +49,21 @@ export function CartDrawer() {
   // The drawer always enters from the "end" edge — left in Arabic, right in
   // English — matching where the header's cart button sits.
   const drawerSide = localeDirection(useLocale()) === "rtl" ? "left" : "right";
-  const [expressProcessing, setExpressProcessing] = useState(false);
   const pathname = usePathname();
   const basePath = extractBasePath(pathname);
-  const viewCartFiredRef = useRef(false);
   const prevPathnameRef = useRef(pathname);
 
   useEffect(() => {
     if (prevPathnameRef.current !== pathname) {
       prevPathnameRef.current = pathname;
       closeCart();
-      setExpressProcessing(false);
     }
   }, [pathname, closeCart]);
-
-  const awjCart = isStorefrontCart(cart) ? cart : null;
-  const spreeCart =
-    cart && !isStorefrontCart(cart) ? (cart as StoreCart) : null;
-
-  // AWJ carts do not fire GA4 `view_cart` — see the cart page's identical note.
-  useEffect(() => {
-    if (
-      isOpen &&
-      spreeCart &&
-      spreeCart.total_quantity > 0 &&
-      !viewCartFiredRef.current
-    ) {
-      trackViewCart(spreeCart);
-      viewCartFiredRef.current = true;
-    }
-    if (!isOpen) {
-      viewCartFiredRef.current = false;
-    }
-  }, [isOpen, spreeCart]);
 
   // Only fetched while the drawer is actually open — a closed drawer requests
   // no imagery.
   const images = useCartLineImages(
-    awjCart?.items.map((line) => line.productId) ?? [],
+    cart?.items.map((line) => line.productId) ?? [],
     isOpen,
   );
 
@@ -118,10 +73,7 @@ export function CartDrawer() {
     <Sheet
       open={isOpen}
       onOpenChange={(open) => {
-        if (!open) {
-          closeCart();
-          setExpressProcessing(false);
-        }
+        if (!open) closeCart();
       }}
     >
       <SheetContent
@@ -178,128 +130,64 @@ export function CartDrawer() {
             />
           ) : (
             <ul className="divide-y divide-store-border bg-store-surface px-4">
-              {awjCart
-                ? lineGroups(awjCart.items, {
-                    id: (line) => line.id,
-                    parent: (line) => line.addonOf,
-                  }).map(({ line, addons }) => (
-                    <li key={line.id}>
-                      {[line, ...addons].map((row) => (
-                        <CartLine
-                          key={row.id}
-                          view={awjCartLineView(
-                            row,
-                            basePath,
-                            row.productId ? images[row.productId] : null,
-                          )}
-                          density="drawer"
-                          disabled={updating}
-                          onNavigate={closeCart}
-                          onQuantityChange={(quantity) =>
-                            updateItem(row.id, quantity)
-                          }
-                          onRemove={() => removeItem(row.id)}
-                        />
-                      ))}
-                    </li>
-                  ))
-                : (spreeCart?.items ?? []).map((line) => (
-                    <li key={line.id}>
-                      <CartLine
-                        view={spreeCartLineView(line, basePath)}
-                        density="drawer"
-                        disabled={updating}
-                        onNavigate={closeCart}
-                        onQuantityChange={(quantity) =>
-                          updateItem(line.id, quantity)
-                        }
-                        onRemove={async () => {
-                          await removeItem(line.id);
-                          if (spreeCart) {
-                            trackRemoveFromCart(line, spreeCart.currency);
-                          }
-                        }}
-                      />
-                    </li>
+              {lineGroups(cart?.items ?? [], {
+                id: (line) => line.id,
+                parent: (line) => line.addonOf,
+              }).map(({ line, addons }) => (
+                <li key={line.id}>
+                  {[line, ...addons].map((row) => (
+                    <CartLine
+                      key={row.id}
+                      view={awjCartLineView(
+                        row,
+                        basePath,
+                        row.productId ? images[row.productId] : null,
+                      )}
+                      density="drawer"
+                      disabled={updating}
+                      onNavigate={closeCart}
+                      onQuantityChange={(quantity) =>
+                        updateItem(row.id, quantity)
+                      }
+                      onRemove={() => removeItem(row.id)}
+                    />
                   ))}
+                </li>
+              ))}
             </ul>
           )}
         </div>
 
         {!isEmpty && !loading && (
           <SheetFooter className="gap-0 border-t border-store-border bg-store-surface p-0">
-            {!expressProcessing && (
-              <div className="space-y-3 border-b border-store-border p-4">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-store-muted-foreground">
-                    {tc("subtotal")}
-                  </span>
-                  <span className="text-base font-bold tabular-nums text-store-foreground">
-                    <bdi>
-                      {awjCart
-                        ? formatMinorAmount(awjCart.subtotal)
-                        : (spreeCart?.display_item_total ?? "")}
-                    </bdi>
-                  </span>
-                </div>
-                {spreeCart?.discount_total &&
-                  parseFloat(spreeCart.discount_total) < 0 && (
-                    <div className="flex items-center justify-between text-sm text-store-success">
-                      <span>{tc("discount")}</span>
-                      <span className="tabular-nums">
-                        <bdi>{spreeCart.display_discount_total}</bdi>
-                      </span>
-                    </div>
-                  )}
-                <div className="flex items-center justify-between text-xs text-store-muted-foreground">
-                  <span>{tc("shipping")}</span>
-                  <span>{t("shippingCalculatedAtCheckout")}</span>
-                </div>
-                {awjCart && <CouponField className="pt-1" />}
+            <div className="space-y-3 border-b border-store-border p-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-store-muted-foreground">
+                  {tc("subtotal")}
+                </span>
+                <span className="text-base font-bold tabular-nums text-store-foreground">
+                  <bdi>{cart ? formatMinorAmount(cart.subtotal) : ""}</bdi>
+                </span>
               </div>
-            )}
+              <div className="flex items-center justify-between text-xs text-store-muted-foreground">
+                <span>{tc("shipping")}</span>
+                <span>{t("shippingCalculatedAtCheckout")}</span>
+              </div>
+              <CouponField className="pt-1" />
+            </div>
 
-            {/* Express checkout must stay mounted while it processes. AWJ carts
-                have no payment integration at all, so it never renders for one
-                rather than being wired to state it cannot use. */}
-            {spreeCart && parseFloat(spreeCart.total ?? "0") > 0 && (
-              <div className="px-4 pt-4">
-                <ExpressCheckoutButton
-                  cart={spreeCart}
-                  basePath={basePath}
-                  onComplete={async () => {
-                    await refreshCart();
-                    closeCart();
-                  }}
-                  onProcessingChange={setExpressProcessing}
-                />
-              </div>
-            )}
-
-            {!expressProcessing && (
-              <div className="space-y-2 p-4">
-                <Button size="lg" className="w-full" asChild>
-                  <Link
-                    href={
-                      awjCart
-                        ? `${basePath}/checkout`
-                        : `${basePath}/checkout/${spreeCart?.id}`
-                    }
-                    onClick={closeCart}
-                  >
-                    {t("checkout")}
-                  </Link>
-                </Button>
-                <Button size="lg" variant="outline" className="w-full" asChild>
-                  {/* Unchanged for both surfaces: the wholesale drawer has
-                      always pointed here, and re-routing it is not this
-                      slice's change to make. */}
-                  <Link href={`${basePath}/cart`} onClick={closeCart}>
-                    {t("viewCart")}
-                  </Link>
-                </Button>
-              </div>
-            )}
+            <div className="space-y-2 p-4">
+              <Button size="lg" className="w-full" asChild>
+                <Link href={`${basePath}/checkout`} onClick={closeCart}>
+                  {t("checkout")}
+                </Link>
+              </Button>
+              <Button size="lg" variant="outline" className="w-full" asChild>
+                <Link href={`${basePath}/cart`} onClick={closeCart}>
+                  {t("viewCart")}
+                </Link>
+              </Button>
+            </div>
           </SheetFooter>
         )}
 
@@ -311,32 +199,4 @@ export function CartDrawer() {
       </SheetContent>
     </Sheet>
   );
-}
-
-/**
- * Spree line → view. Spree serves its money already formatted
- * (`display_price`, `display_compare_at_amount`), so nothing is computed here
- * either — the wholesale surface's authority is simply a different one.
- */
-function spreeCartLineView(
-  line: StoreCartLine,
-  basePath: string,
-): CartLineView {
-  const onSale =
-    line.compare_at_amount != null &&
-    line.price != null &&
-    parseFloat(line.compare_at_amount) > parseFloat(line.price);
-
-  return {
-    id: line.id,
-    name: line.name,
-    href: line.slug ? `${basePath}/products/${line.slug}` : null,
-    imageUrl: line.thumbnail_url ?? null,
-    meta: [line.options_text],
-    quantity: line.quantity,
-    available: true,
-    unitPriceLabel: line.display_price ?? null,
-    lineTotalLabel: line.display_price ?? null,
-    compareAtLabel: onSale ? (line.display_compare_at_amount ?? null) : null,
-  };
 }
