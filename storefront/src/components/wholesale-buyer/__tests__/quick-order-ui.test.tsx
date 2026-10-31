@@ -328,6 +328,33 @@ describe("quick order UI", () => {
     expect(screen.getAllByTestId("qo-pick")).toHaveLength(2);
   });
 
+  it("choosing a variant of an ambiguous pasted SKU keeps the quantity typed in that row", async () => {
+    const blue = {
+      ...variant,
+      variantId: "44444444-4444-4444-8444-444444444444",
+      sku: "SHIRT-BLUE",
+    };
+    actions.resolveQuickOrderSkus.mockResolvedValue({
+      kind: "ok",
+      rows: [{ sku: "SHIRT", lines: [variant, blue] }],
+    });
+    render(wrap());
+    fireEvent.change(screen.getByTestId("qo-paste"), {
+      target: { value: "SHIRT 12" },
+    });
+    fireEvent.click(screen.getByTestId("qo-import"));
+    await waitFor(() =>
+      expect(screen.getAllByTestId("qo-pick")).toHaveLength(2),
+    );
+    fireEvent.click(screen.getAllByTestId("qo-pick")[0]);
+    expect((screen.getByTestId("qo-qty") as HTMLInputElement).value).toBe("12");
+    // the quantity belongs to that one row: a second pick starts at 1
+    fireEvent.click(screen.getAllByTestId("qo-pick")[1]);
+    expect((screen.getAllByTestId("qo-qty")[1] as HTMLInputElement).value).toBe(
+      "1",
+    );
+  });
+
   it("a partial import keeps only the unresolved rows in the paste box, so a retry cannot apply the good ones twice", async () => {
     actions.resolveQuickOrderSkus.mockResolvedValue({
       kind: "ok",

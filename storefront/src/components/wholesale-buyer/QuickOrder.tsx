@@ -65,6 +65,9 @@ export function QuickOrder({ basePath }: { basePath: string }) {
   const [entries, setEntries] = useState<QuickOrderEntry[]>([]);
   const [term, setTerm] = useState("");
   const [results, setResults] = useState<QuickOrderLine[] | null>(null);
+  // the quantity typed in a pasted row whose parent SKU needs a variant choice: applied to the FIRST variant picked from
+  // those candidates (it belongs to that row), then forgotten
+  const [pickQuantity, setPickQuantity] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
   const [pasted, setPasted] = useState("");
   const [pasteIssues, setPasteIssues] = useState<PasteIssue[]>([]);
@@ -97,9 +100,11 @@ export function QuickOrder({ basePath }: { basePath: string }) {
       setResults(null);
       setSearching(false);
       suppressSearchFor.current = null;
+      setPickQuantity(null);
       return;
     }
     suppressSearchFor.current = null;
+    setPickQuantity(null);
     setSearching(true);
     const ticket = ++latestSearch.current;
     const timer = setTimeout(async () => {
@@ -165,6 +170,7 @@ export function QuickOrder({ basePath }: { basePath: string }) {
             suppressSearchFor.current = row.sku.trim();
             setTerm(row.sku);
             setResults(lines);
+            setPickQuantity(row.quantity);
           } else {
             additions.push({
               id: nextId(),
@@ -372,7 +378,10 @@ export function QuickOrder({ basePath }: { basePath: string }) {
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => addLine(line)}
+                      onClick={() => {
+                        addLine(line, pickQuantity ?? "1");
+                        setPickQuantity(null);
+                      }}
                       disabled={pending}
                       data-testid="qo-pick"
                       data-sku={line.sku ?? ""}
