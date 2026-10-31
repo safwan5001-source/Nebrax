@@ -15,6 +15,27 @@ Status vocabulary: **PASSED** = observed and correct · **FAILED** = observed an
 
 ---
 
+## 0. Supplement (2026-10-31 09:44Z) — owner-provided Railway evidence, CI Gate cause, re-probe
+
+**Owner-provided Railway deployment evidence** (not independently verifiable from this session — no Railway access; recorded as reported):
+
+| Service | Deployment status | Commit |
+|---|---|---|
+| Storefront | **SUCCESS** | `89f4117ca` (Batch M merge) |
+| Laravel API | **SUCCESS** | `89f4117ca` |
+| AWJ Web | **FAILED** | `89f4117ca` |
+
+A successful API deployment is **not** treated as proof that the Batch M migrations or the runtime flags are verified: the entrypoint's fail-closed `migrate --force` makes it *likely* the migrations ran, and the flag values remain unread. Both stay **UNKNOWN** until the migrations table and the non-secret variables are read.
+
+**Re-probe of the public storefront at 09:44Z** (read-only): the `wholesaleBuyer` i18n catalogue now contains the Batch M keys (`forgot`, `orders`, `reset`), which matches the reported storefront success at `89f4117ca`. The earlier "Batch M absent at 07:55–07:57Z" result was a build still in progress, not a stuck deploy; §3.2 and §3.3 below describe the earlier state and are superseded by this paragraph. Two new facts from the same probe:
+
+* `/sa/ar/buyer/sign-in`, `/buyer/orders`, `/buyer/forgot-password`, `/buyer/reset-password`, `/buyer/membership` answer **HTTP 200 on the retail tenant** (`x-nextjs-postponed: 1`). They render real wholesale UI ("This is a wholesale store. Catalogue and prices are shown only to approved buyers" on `/buyer/orders`) although that tenant has no wholesale channel. The catalogue and product pages themselves are unaffected (0 gate text). This is a **retail-host exposure of wholesale pages**, same family as the legacy soft-404 defect, and is a launch blocker for B7.
+* `/sa/ar/buyer` (no sub-path) is a real `404`.
+
+**Why `CI Gate` was red on this PR.** The gate waits for the required checks on the head SHA; the `php artisan test (L11, pgsql)` job failed once on `78e0f0cd2`, so the gate failed. The artifact of that run (`test-output-pgsql`) shows exactly one failure out of 10,333 tests: `Tests\Feature\AiActionHistoryListTest::an_executed_action_carries_its_latest_execution_and_row_counts_without_n_plus_one` — `Failed asserting that 24 is identical to 23` (a query-count assertion). This PR changes only this markdown file; the SQLite job passed on the same commit; CI on `main` for `89f4117ca` (identical code) passed; and the pgsql job **passed on one re-run** of the same commit. Classification: **not documentation drift, not a required-check configuration problem, not a regression from this PR** — an order-dependent flake in an AI-actions query-count test that already warms its caches. No code was changed for it here; hardening that test is listed as a follow-up in the closure report. `CI Gate` was re-run after the pgsql job went green.
+
+---
+
 ## 1. Verdict
 
 **Wholesale is NOT launch-ready on the deployed Beta.** The retail storefront is up and serving, the Laravel API is up and already carries the Batch M routes, but (a) the deployed *storefront* does not yet carry Batch M (see the timing caveat in §3.2), (b) no wholesale browser verification is possible on any deployed host without environment changes that need your authorization, and (c) production e-mail, the Railway flags and the Batch M migrations could not be verified at all from here.
@@ -22,7 +43,7 @@ Status vocabulary: **PASSED** = observed and correct · **FAILED** = observed an
 | Area | Result |
 |---|---|
 | Deployed Laravel API SHA | **UNKNOWN** (exposed nowhere); Batch M **code present** — PASSED (route evidence) |
-| Deployed storefront SHA | **UNKNOWN**; content equals Batch K exactly, Batch M **absent at 07:55Z** — see caveat |
+| Deployed storefront SHA | **UNKNOWN** from the public surface; owner reports SUCCESS at `89f4117ca`; catalogue carried Batch M by 09:44Z (§0). AWJ Web deployment reported FAILED |
 | Railway / Vercel build and deployment status | **BLOCKED** (no CLI, no token, no dashboard access in this session) |
 | Runtime feature flags | **BLOCKED** (values); behaviour is *consistent with* wholesale disabled |
 | Batch M migrations applied | **UNKNOWN** (inferred only — §3.4) |
