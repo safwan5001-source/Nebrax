@@ -668,7 +668,7 @@ export function Inspector({
           <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-text">
             <input
               type="checkbox"
-              className="h-4 w-4 accent-primary"
+              className="h-6 w-6 accent-primary"
               checked={node.optional === true}
               onChange={(event) => setOptional(event.target.checked)}
             />

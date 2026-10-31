@@ -2558,6 +2558,27 @@ describe('AppBuilderWorkspacePage — Easy Mode V2 shell (S21a)', () => {
     await waitFor(() => expect(screen.getAllByDisplayValue('Welcome').length).toBeGreaterThan(0));
   });
 
+  it('opening a dropped component from the notice restores design mode and the pages panel even from App Preview or the Theme tab', async () => {
+    openWithCompat(compatDrops);
+    await screen.findAllByText('Featured');
+    const user = userEvent.setup();
+    // من تبويب المظهر (لوحة المظهر تحجب المفتش).
+    await user.click(screen.getAllByText('Theme')[0]);
+    expect(screen.getAllByText('Presets').length).toBeGreaterThan(0);
+    await user.click(within(screen.getByTestId('compat-notice')).getByRole('button', { name: 'Compat details' }));
+    await user.click(within(screen.getByTestId('compat-disclosure')).getByRole('button', { name: 'Open dropped' }));
+    await waitFor(() => expect(screen.getAllByDisplayValue('Welcome').length).toBeGreaterThan(0));
+    expect(screen.queryAllByText('Presets')).toHaveLength(0);
+
+    // من App Preview (محرّر التصميم مخفي).
+    await user.click(screen.getAllByRole('button', { name: 'App Preview' })[0]);
+    expect(screen.queryAllByDisplayValue('Welcome')).toHaveLength(0);
+    const opener = within(screen.getByTestId('compat-notice')).queryByRole('button', { name: /Compat details|Hide compat/ });
+    if (opener && opener.getAttribute('aria-expanded') !== 'true') await user.click(opener);
+    await user.click(within(screen.getByTestId('compat-disclosure')).getByRole('button', { name: 'Open dropped' }));
+    await waitFor(() => expect(screen.getAllByDisplayValue('Welcome').length).toBeGreaterThan(0));
+  });
+
   it('shows no compatibility notice for a clean or absent report', async () => {
     openWithCompat({ generations: [{ runtime: '1.0.0', compatible: true, reason: null, dropped: [] }], min_runtime: '1.0.0', full_runtime: '1.0.0', has_drops: false });
     await screen.findAllByText('Featured');
