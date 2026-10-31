@@ -6,7 +6,10 @@ use App\Models\BuilderApp;
 use App\Models\BuilderDraftExperience;
 use App\Models\Tenant;
 use App\Services\AppBuilder\BuilderAppService;
+use App\Models\BuilderPublishedExperienceVersion;
 use App\Services\AppBuilder\BuilderDraftExperienceService;
+use App\Services\AppBuilder\BuilderPublishedExperienceVersionService;
+use App\Services\AppBuilder\DraftChangedSinceReviewException;
 use App\Services\AppBuilder\DraftRevisionConflictException;
 use App\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
@@ -183,6 +186,76 @@ class BuilderDraftOptimisticLockPostgresTest extends TestCase
         }
         $this->assertStringStartsWith('أ', $this->markerOf(DB::table('builder_draft_experiences')->where('id', $draftA)->first()));
         $this->assertStringStartsWith('ب', $this->markerOf(DB::table('builder_draft_experiences')->where('id', $draftB)->first()));
+    }
+
+    /**
+     * AD-01 / S01d (G1): حفظ ونشر متزامنان. كل حفظ يكتب علامة تحمل رقم revision الناتج (`r{N}`)؛ فكل نسخة منشورة
+     * يجب أن تطابق علامتها `source_draft_revision` بالضبط (لا يُنشر مخطط حُفظ أثناء النشر ولا يُسجَّل revision مختلف)،
+     * وكل نشر بـ`expected_draft_revision` قديم يُرفض بلا نسخة.
+     *
+     * @test
+     */
+    public function concurrent_saves_and_publishes_never_publish_a_schema_that_disagrees_with_its_recorded_revision(): void
+    {
+        [$tenant, $draftId] = $this->makeDraft();
+        $appId = BuilderDraftExperience::query()->whereKey($draftId)->value('builder_app_id');
+
+        $jobs = [];
+        foreach (range(1, 3) as $i) {
+            $jobs[] = function () use ($tenant, $draftId) {
+                $this->enter($tenant);
+                $service = app(BuilderDraftExperienceService::class);
+                $saved = 0;
+                for ($n = 0; $n < 6; $n++) {
+                    $draft = BuilderDraftExperience::findOrFail($draftId);
+                    try {
+                        $service->save($draft, $this->schemaFor('r'.((int) $draft->revision + 1)), null, (int) $draft->revision);
+                        $saved++;
+                    } catch (DraftRevisionConflictException) {
+                        usleep(random_int(200, 2000));
+                    }
+                }
+
+                return ['status' => 'ok', 'saved' => $saved];
+            };
+        }
+        foreach (range(1, 3) as $i) {
+            $jobs[] = function () use ($tenant, $draftId, $appId) {
+                $this->enter($tenant);
+                $service = app(BuilderPublishedExperienceVersionService::class);
+                $published = 0;
+                $rejected = 0;
+                for ($n = 0; $n < 6; $n++) {
+                    $expected = (int) BuilderDraftExperience::findOrFail($draftId)->revision;
+                    try {
+                        $service->publish(BuilderApp::findOrFail($appId), null, null, $expected);
+                        $published++;
+                    } catch (DraftChangedSinceReviewException) {
+                        $rejected++;
+                    }
+                    usleep(random_int(200, 2000));
+                }
+
+                return ['status' => 'ok', 'published' => $published, 'rejected' => $rejected];
+            };
+        }
+        $results = $this->runConcurrently($jobs);
+        $this->assertAllCompleted($results);
+
+        $versions = DB::table('builder_published_experience_versions')->where('builder_app_id', $appId)->get();
+        $published = array_sum(array_map(fn ($r) => $r['value']['published'] ?? 0, $results));
+        $this->assertCount($published, $versions, 'عدد النسخ = عدد النشرات الناجحة');
+        $this->assertGreaterThan(0, $published, 'نجح نشر واحد على الأقل (وإلا لا يثبت الاختبار شيئاً)');
+        foreach ($versions as $v) {
+            $schema = json_decode($v->schema, true);
+            $marker = $schema['pages']['home']['children'][0]['props']['text'];
+            $expectedMarker = (int) $v->source_draft_revision === 0 ? null : 'r'.$v->source_draft_revision;
+            if ($expectedMarker !== null) {
+                $this->assertSame($expectedMarker, $marker, "النسخة {$v->version}: المخطط المنشور يطابق revision المصدر المسجَّل");
+            }
+        }
+        $numbers = $versions->pluck('version')->map(fn ($n) => (int) $n)->sort()->values()->all();
+        $this->assertSame(range(1, count($numbers)), $numbers, 'أرقام النسخ متتالية بلا ثغرة ولا تكرار');
     }
 
     // ───────────────────────── مساعدات ─────────────────────────

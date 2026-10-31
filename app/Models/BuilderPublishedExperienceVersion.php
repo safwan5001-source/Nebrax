@@ -25,13 +25,14 @@ use LogicException;
 class BuilderPublishedExperienceVersion extends BaseModel implements CompanyWide
 {
     protected $fillable = [
-        'tenant_id', 'builder_app_id', 'version', 'schema', 'schema_version',
+        'tenant_id', 'builder_app_id', 'version', 'schema', 'schema_version', 'source_draft_revision',
         'published_by', 'published_at', 'note',
     ];
 
     protected $casts = [
         'schema' => 'array',
         'version' => 'integer',
+        'source_draft_revision' => 'integer',
         'published_at' => 'immutable_datetime',
     ];
 

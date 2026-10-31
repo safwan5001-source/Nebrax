@@ -16,6 +16,7 @@ class BuilderPublishedExperienceVersionResource extends JsonResource
             'builder_app_id' => $this->builder_app_id,
             'version' => $this->version,
             'schema_version' => $this->schema_version,
+            'source_draft_revision' => $this->source_draft_revision,
             'note' => $this->note,
             'schema' => $this->schema,
             'published_by' => $this->published_by,

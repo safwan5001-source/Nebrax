@@ -444,7 +444,8 @@ export default function AppBuilderWorkspacePage() {
     try {
       await api(`/app-builder/apps/${params.id}/versions`, {
         method: 'POST',
-        body: { note: publishNote.trim() || undefined },
+        // AD-01 / S01d: ننشر ما راجعناه فقط — إن تغيّرت المسودة منذ آخر قراءة/حفظ لنا يردّ الخادم 409 ولا تُنشأ نسخة.
+        body: { note: publishNote.trim() || undefined, expected_draft_revision: baseRevisionRef.current ?? undefined },
       });
       setPublishOpen(false);
       toast.success(t('publish.successTitle'));
@@ -453,7 +454,12 @@ export default function AppBuilderWorkspacePage() {
       // «منشورة» بدل الاستمرار بعرض النسخة القديمة المخبّأة.
       setPublishedVersion(null);
     } catch (err) {
-      toast.error(t('publish.errorTitle'), err instanceof ApiError ? err.message : undefined);
+      if (err instanceof ApiError && err.status === 409 && (err.body as { reason?: string } | null)?.reason === 'draft_changed_since_review') {
+        setPublishOpen(false);
+        toast.error(t('publish.draftChangedTitle'), t('publish.draftChangedBody'));
+      } else {
+        toast.error(t('publish.errorTitle'), err instanceof ApiError ? err.message : undefined);
+      }
     } finally {
       setPublishing(false);
     }

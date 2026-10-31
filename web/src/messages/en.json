@@ -8669,6 +8669,8 @@
       },
       "publish": {
         "action": "Publish",
+        "draftChangedTitle": "The draft changed",
+        "draftChangedBody": "Someone saved a newer draft since you last loaded it. Nothing was published. Reload the editor, review the changes, then publish again.",
         "forbidden": "You don't have permission to publish.",
         "saveFirst": "Save your changes before publishing.",
         "dialogTitle": "Publish a new version",

@@ -6,6 +6,7 @@ use App\Http\Requests\StoreBuilderPublishedExperienceVersionRequest;
 use App\Http\Resources\BuilderPublishedExperienceVersionResource;
 use App\Models\BuilderApp;
 use App\Services\AppBuilder\BuilderPublishedExperienceVersionService;
+use App\Services\AppBuilder\DraftChangedSinceReviewException;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -31,11 +32,24 @@ class BuilderPublishedExperienceVersionController extends ApiController
     {
         $app = BuilderApp::findOrFail($appId);
 
-        $version = $this->domain(fn () => $this->service->publish(
-            $app,
-            $request->validated('note'),
-            $request->user()?->id,
-        ));
+        $expected = $request->validated('expected_draft_revision');
+
+        try {
+            $version = $this->domain(fn () => $this->service->publish(
+                $app,
+                $request->validated('note'),
+                $request->user()?->id,
+                $expected === null ? null : (int) $expected,
+            ));
+        } catch (DraftChangedSinceReviewException $e) {
+            // AD-01 / S01d: المسودة تغيّرت بعد مراجعة الناشر — لا نسخة تُنشأ.
+            return response()->json([
+                'message' => 'تغيّرت المسودة منذ آخر مراجعة لك. أعد التحميل وراجع التغييرات قبل النشر.',
+                'reason' => 'draft_changed_since_review',
+                'current_revision' => $e->currentRevision,
+                'expected_revision' => $e->expectedRevision,
+            ], 409);
+        }
 
         return response()->json(['data' => new BuilderPublishedExperienceVersionResource($version)], 201);
     }

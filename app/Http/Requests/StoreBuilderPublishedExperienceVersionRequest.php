@@ -15,6 +15,17 @@ class StoreBuilderPublishedExperienceVersionRequest extends FormRequest
     {
         return [
             'note' => ['nullable', 'string', 'max:1000'],
+            // AD-01 / S01d: اختياري (متوافق مع المستهلكين الحاليين). إن أُرسل فيجب أن يطابق revision المسودة وقت النشر وإلا 409.
+            'expected_draft_revision' => [
+                'nullable',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (is_bool($value)) {
+                        $fail('expected_draft_revision يجب أن يكون عدداً صحيحاً.');
+                    }
+                },
+                'integer',
+                'min:0',
+            ],
         ];
     }
 }
