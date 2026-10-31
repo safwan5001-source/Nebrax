@@ -6,7 +6,7 @@
 | PR | https://github.com/safwan5001-source/Nebrax/pull/1832 |
 | Base SHA (origin/main) | `5c07d1d37d54cf27ffe4582e7dd95a40037b818a` (branched from the #1829 merge `2889dd986fb3169a8c8655677ad19c1d15b31aee`; the only commit since is #1830, web app-builder, disjoint) |
 | Head SHA | `8aa83d217b4c50b8c536d0746c6983723131d9ac` (before this report update) |
-| CI | pending at push; see PR checks |
+| CI | All 8 checks green on `3b7fd9f` (CI Gate, docker-context, backend SQLite + PostgreSQL, storefront lint/typecheck/test, web build, two visual QA). `docker-context` failed once on a Google Fonts fetch (`Cairo`, `module-not-found`) and passed on one re-run; CI Gate was re-run after it. Codex review: no findings. |
 
 **Status.** Nothing was merged, deployed or run against live data. Wholesale stays **disabled by default** (`COMMERCE_WHOLESALE_BUYER_ENABLED=false`; every new route is a uniform 404 while it is off). Spree is **not** removed. Two additive migrations; no change to accounting, POS pricing, price lists, ZATCA or any financial table.
 
