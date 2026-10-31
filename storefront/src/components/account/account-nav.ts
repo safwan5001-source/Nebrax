@@ -2,15 +2,15 @@
  * Destinations the customer-account shell offers.
  *
  * Gift cards are a leftover Spree surface and are not part of the AWJ
- * account. Payment methods and addresses are designed but gated — they
- * stay in the nav so the journey is complete; the pages themselves refuse
- * to persist anything.
+ * account. Addresses are live (B2C-ACCOUNTS). Wishlist and payment methods are
+ * designed but gated — they stay in the nav so the journey is complete; the
+ * pages themselves refuse to persist anything.
  */
 export const ACCOUNT_NAV_ITEMS = [
   { href: "/account", key: "overview", exact: true },
   { href: "/account/orders", key: "orders" },
   { href: "/account/profile", key: "profile" },
-  { href: "/account/addresses", key: "addresses", gated: true },
+  { href: "/account/addresses", key: "addresses" },
   { href: "/account/wishlist", key: "wishlist", gated: true },
   { href: "/account/payment-methods", key: "paymentMethods", gated: true },
 ] as const;

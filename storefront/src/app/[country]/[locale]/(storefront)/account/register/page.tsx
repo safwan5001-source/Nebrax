@@ -6,8 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { AccountAuthCard } from "@/components/account/AccountAuthCard";
-import { AccountAuthUnavailable } from "@/components/account/AccountAuthUnavailable";
 import { AccountPasswordField } from "@/components/account/AccountPasswordField";
+import { AccountsGate } from "@/components/account/AccountsGate";
 import { PolicyConsent } from "@/components/policy/PolicyConsent";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -15,13 +15,15 @@ import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { accountErrorMessage } from "@/lib/commerce/account-error-message";
-import { ACCOUNT_AUTH_CAPABILITY } from "@/lib/commerce/capabilities";
 import { extractBasePath } from "@/lib/utils/path";
 
 export default function RegisterPage() {
-  // SPREE-X1: no form while buyer authentication has no backend.
-  if (ACCOUNT_AUTH_CAPABILITY !== "live") return <AccountAuthUnavailable />;
-  return <RegisterForm />;
+  // B2C-ACCOUNTS: the form exists only where the API says this store has customer accounts.
+  return (
+    <AccountsGate>
+      <RegisterForm />
+    </AccountsGate>
+  );
 }
 
 function RegisterForm() {
@@ -31,6 +33,7 @@ function RegisterForm() {
   const t = useTranslations("register");
   const ta = useTranslations("account");
   const te = useTranslations("accountErrors");
+  const tr = useTranslations("retailAccount");
   const { register, isAuthenticated, loading: authLoading } = useAuth();
 
   const [firstName, setFirstName] = useState("");
@@ -42,6 +45,7 @@ function RegisterForm() {
   const [error, setError] = useState<string | null>(null);
   const [policyConsent, setPolicyConsent] = useState(false);
   const [policyError, setPolicyError] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
@@ -61,7 +65,7 @@ function RegisterForm() {
       return;
     }
 
-    if (password.length < 6) {
+    if (password.length < 8) {
       setError(t("passwordTooShort"));
       return;
     }
@@ -85,9 +89,11 @@ function RegisterForm() {
         password_confirmation: passwordConfirmation,
         ...(firstName && { first_name: firstName }),
         ...(lastName && { last_name: lastName }),
+        basePath,
       });
       if (result.success) {
-        router.push(`${basePath}/account`);
+        // The account exists UNVERIFIED: no session yet. The same screen is shown for a new and an existing address.
+        setVerificationSent(true);
       } else {
         setError(
           accountErrorMessage(
@@ -103,6 +109,35 @@ function RegisterForm() {
       setSubmitting(false);
     }
   };
+
+  if (verificationSent) {
+    return (
+      <AccountAuthCard
+        title={tr("checkYourEmailTitle")}
+        description={tr("checkYourEmailBody", { email })}
+        footer={
+          <Link
+            href={`${basePath}/account`}
+            className="font-medium text-store-primary hover:text-store-primary-hover"
+          >
+            {t("signIn")}
+          </Link>
+        }
+      >
+        <div role="status" data-testid="register-verification-sent">
+          <p className="text-sm text-store-muted-foreground">
+            {tr("verifyThenSignIn")}
+          </p>
+          <Link
+            href={`${basePath}/account/verify`}
+            className="mt-3 inline-flex min-h-11 items-center text-sm font-medium text-store-primary hover:text-store-primary-hover"
+          >
+            {tr("resendVerification")}
+          </Link>
+        </div>
+      </AccountAuthCard>
+    );
+  }
 
   return (
     <AccountAuthCard
@@ -176,7 +211,7 @@ function RegisterForm() {
           autoComplete="new-password"
           showLabel={ta("showPassword")}
           hideLabel={ta("hidePassword")}
-          minLength={6}
+          minLength={8}
         />
 
         <AccountPasswordField
@@ -187,7 +222,7 @@ function RegisterForm() {
           autoComplete="new-password"
           showLabel={ta("showPassword")}
           hideLabel={ta("hidePassword")}
-          minLength={6}
+          minLength={8}
         />
 
         <PolicyConsent

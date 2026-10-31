@@ -6,22 +6,24 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { AccountAuthCard } from "@/components/account/AccountAuthCard";
-import { AccountAuthUnavailable } from "@/components/account/AccountAuthUnavailable";
 import { AccountPasswordField } from "@/components/account/AccountPasswordField";
+import { AccountsGate } from "@/components/account/AccountsGate";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { accountErrorMessage } from "@/lib/commerce/account-error-message";
-import { ACCOUNT_AUTH_CAPABILITY } from "@/lib/commerce/capabilities";
 import { resolveAccountRedirect } from "@/lib/utils/account-redirect";
 import { extractBasePath } from "@/lib/utils/path";
 
 export function AccountSignIn() {
-  // SPREE-X1: no form while buyer authentication has no backend.
-  if (ACCOUNT_AUTH_CAPABILITY !== "live") return <AccountAuthUnavailable />;
-  return <AccountSignInForm />;
+  // B2C-ACCOUNTS: the form exists only where the API says this store has customer accounts.
+  return (
+    <AccountsGate>
+      <AccountSignInForm />
+    </AccountsGate>
+  );
 }
 
 function AccountSignInForm() {
@@ -31,6 +33,7 @@ function AccountSignInForm() {
   const basePath = extractBasePath(pathname);
   const t = useTranslations("account");
   const te = useTranslations("accountErrors");
+  const tr = useTranslations("retailAccount");
   const { login } = useAuth();
 
   const redirectUrl = resolveAccountRedirect(
@@ -40,6 +43,7 @@ function AccountSignInForm() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,7 +52,7 @@ function AccountSignInForm() {
     setError(null);
     setLoading(true);
 
-    const result = await login(email, password);
+    const result = await login(email, password, remember);
     if (result.success) {
       if (redirectUrl) router.push(redirectUrl);
     } else {
@@ -111,7 +115,21 @@ function AccountSignInForm() {
           hideLabel={t("hidePassword")}
         />
 
-        <div className="flex justify-end">
+        <div className="flex items-center justify-between gap-3">
+          <label
+            htmlFor="remember-me"
+            className="flex min-h-11 items-center gap-2 text-sm text-store-foreground"
+          >
+            <input
+              id="remember-me"
+              name="remember"
+              type="checkbox"
+              checked={remember}
+              onChange={(event) => setRemember(event.target.checked)}
+              className="size-4 accent-[var(--store-primary,#000)]"
+            />
+            {tr("rememberMe")}
+          </label>
           <Link
             href={`${basePath}/account/forgot-password`}
             className="text-sm font-medium text-store-primary hover:text-store-primary-hover"
@@ -123,6 +141,16 @@ function AccountSignInForm() {
         <Button type="submit" disabled={loading} size="lg" className="w-full">
           {loading ? t("signingIn") : t("signIn")}
         </Button>
+
+        <p className="text-center text-xs text-store-muted-foreground">
+          {tr("noVerificationEmail")}{" "}
+          <Link
+            href={`${basePath}/account/verify`}
+            className="font-medium text-store-primary hover:text-store-primary-hover"
+          >
+            {tr("resendVerification")}
+          </Link>
+        </p>
       </form>
     </AccountAuthCard>
   );

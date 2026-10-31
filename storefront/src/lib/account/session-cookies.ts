@@ -12,6 +12,14 @@
 export const ACCOUNT_SESSION_COOKIE = "awj_account_session";
 export const ACCOUNT_REFRESH_COOKIE = "awj_account_refresh";
 
+/**
+ * B2C-ACCOUNTS — a NON-secret, JS-readable presence hint written next to the HttpOnly session cookie (same lifetime),
+ * value `1`. It carries no token and grants nothing: it only lets the browser skip the session check on stores/visits
+ * where no account session can exist, so a store without accounts (or a guest) makes no extra request on any page.
+ * The server never trusts it — the HttpOnly cookie and the API decide every request.
+ */
+export const ACCOUNT_HINT_COOKIE = "awj_account_hint";
+
 export const LEGACY_BROWSER_COOKIES: readonly string[] = [
   "_spree_jwt",
   "_spree_refresh_token",

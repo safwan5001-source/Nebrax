@@ -173,6 +173,18 @@ class TenancyServiceProvider extends ServiceProvider
 
         // H6 Batch E — store-host buyer auth. Tenant dimension from the Host-resolved TenantContext (never the
         // payload); IP + identifier dual limit mirrors commerce-customer-register/login.
+        // B2C-ACCOUNTS — retail account writes. Keyed by the authenticated identity (never the shared server IP) and tenant.
+        $accountKey = fn (Request $request): string => (app(TenantContext::class)->has() ? app(TenantContext::class)->id() : 'unresolved')
+            .'|'.($request->user()?->getAuthIdentifier() ?? 'anon');
+        RateLimiter::for('storefront-account-write', fn (Request $request): Limit =>
+            Limit::perMinute(30)->by('storefront-account-write|'.$accountKey($request)));
+        RateLimiter::for('storefront-account-password', fn (Request $request): Limit =>
+            Limit::perMinute(5)->by('storefront-account-password|'.$accountKey($request)));
+        RateLimiter::for('storefront-account-claim', fn (Request $request): array => [
+            Limit::perMinute(10)->by('storefront-account-claim|'.$accountKey($request)),
+            Limit::perHour(60)->by('storefront-account-claim-hourly|'.$accountKey($request)),
+        ]);
+
         RateLimiter::for('storefront-buyer-register', function (Request $request): array {
             $tenant = app(TenantContext::class)->has() ? app(TenantContext::class)->id() : 'unresolved';
             $email = Str::lower(trim((string) $request->input('email')));

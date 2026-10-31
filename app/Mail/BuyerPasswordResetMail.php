@@ -16,6 +16,8 @@ class BuyerPasswordResetMail extends Mailable
         public readonly string $url,
         public readonly string $storeName,
         public readonly int $ttlMinutes,
+        /** B2C-ACCOUNTS — a retail shopper account (neutral wording) rather than a wholesale buyer account. */
+        public readonly bool $retail = false,
     ) {}
 
     public function envelope(): Envelope

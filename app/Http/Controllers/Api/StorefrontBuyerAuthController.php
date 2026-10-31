@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Middleware\BindStorefrontBuyerToChannel;
-use App\Http\Requests\CustomerLoginRequest;
+use App\Http\Requests\BuyerLoginRequest;
 use App\Http\Requests\BuyerRegisterRequest;
 use App\Http\Requests\BuyerForgotPasswordRequest;
 use App\Http\Requests\BuyerResendVerificationRequest;
@@ -13,6 +13,8 @@ use App\Http\Resources\CustomerIdentityResource;
 use App\Models\CustomerIdentity;
 use App\Services\Commerce\BuyerEmailVerificationService;
 use App\Services\Commerce\BuyerPasswordResetService;
+use App\Services\Commerce\RetailAccountGate;
+use App\Services\Commerce\WholesaleBuyerGate;
 use App\Services\CustomerAuthenticationService;
 use App\Services\CustomerIdentityService;
 use App\Support\PublicApiErrorCode;
@@ -151,17 +153,34 @@ class StorefrontBuyerAuthController extends PublicApiController
         });
     }
 
-    public function login(CustomerLoginRequest $request, CustomerAuthenticationService $authentication, StorefrontContext $context): JsonResponse
-    {
+    public function login(
+        BuyerLoginRequest $request,
+        CustomerAuthenticationService $authentication,
+        StorefrontContext $context,
+        WholesaleBuyerGate $wholesale,
+        RetailAccountGate $retail,
+    ): JsonResponse {
+        // B2C-ACCOUNTS — a retail-only host honours "remember me" (persistent vs one-day session). A host where wholesale is
+        // open keeps the unchanged default lifetime: wholesale buyer sessions are not altered by retail accounts.
+        $ttlDays = null;
+        if (! $wholesale->isOpen() && $retail->isOpen()) {
+            $ttlDays = $request->boolean('remember', true)
+                ? max(1, (int) config('commerce.account_session_days'))
+                : max(1, (int) config('commerce.account_session_days_short'));
+        }
+
         $result = $authentication->login(
             $request->validated('email'),
             $request->validated('password'),
             [BindStorefrontBuyerToChannel::ability($context->salesChannelId())],
+            $ttlDays,
         );
 
         return PublicApiResponse::success($request, [
             'token' => $result['token'],
             'customer' => new CustomerIdentityResource($result['identity']),
+            // lets the storefront set a cookie lifetime that matches the token (null = the unchanged default).
+            'session_days' => $ttlDays,
         ]);
     }
 

@@ -34,6 +34,9 @@ class SalesChannelSettingsService
 
     public const KEY_WHOLESALE = 'wholesale_membership_enabled';
 
+    /** B2C-ACCOUNTS — retail shopper accounts on this web channel (deployment flag `commerce.retail_accounts_enabled` stays the master switch). */
+    public const KEY_CUSTOMER_ACCOUNTS = 'customer_accounts_enabled';
+
     public function __construct(private TenantContext $tenantContext) {}
 
     /**
@@ -91,6 +94,21 @@ class SalesChannelSettingsService
                 if ($to !== (bool) $channel->wholesale_membership_enabled) {
                     $diff[self::KEY_WHOLESALE] = ['from' => (bool) $channel->wholesale_membership_enabled, 'to' => $to];
                     $channel->wholesale_membership_enabled = $to;
+                }
+            }
+
+            if (array_key_exists(self::KEY_CUSTOMER_ACCOUNTS, $changes)) {
+                $to = (bool) $changes[self::KEY_CUSTOMER_ACCOUNTS];
+                if ($to && ! $channel->customer_accounts_enabled && ! (bool) config('commerce.retail_accounts_enabled')) {
+                    throw new SalesChannelSettingsException(
+                        'customer_accounts_deployment_disabled',
+                        'Customer accounts are not enabled for this deployment; the channel flag cannot be turned on.',
+                        409,
+                    );
+                }
+                if ($to !== (bool) $channel->customer_accounts_enabled) {
+                    $diff[self::KEY_CUSTOMER_ACCOUNTS] = ['from' => (bool) $channel->customer_accounts_enabled, 'to' => $to];
+                    $channel->customer_accounts_enabled = $to;
                 }
             }
 

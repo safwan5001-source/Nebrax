@@ -1,51 +1,130 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
-import { ACCOUNT_ADDRESSES_CAPABILITY } from "@/lib/commerce/capabilities";
-import { AccountAddresses } from "../AccountAddresses";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next-intl", () => ({
   useLocale: () => "en",
   useTranslations: () => (key: string) => key,
 }));
 
-describe("AccountAddresses — DESIGN_ONLY", () => {
-  it("is declared design_only", () => {
-    expect(ACCOUNT_ADDRESSES_CAPABILITY).toBe("design_only");
-  });
+const actions = vi.hoisted(() => ({
+  listAddresses: vi.fn(),
+  saveAddress: vi.fn(),
+  deleteAddress: vi.fn(),
+}));
+vi.mock("@/lib/data/customer", () => actions);
 
-  it("renders the intended address-book cards", () => {
+import { ACCOUNT_ADDRESSES_CAPABILITY } from "@/lib/commerce/capabilities";
+import { AccountAddresses } from "../AccountAddresses";
+
+const ID = "11111111-2222-3333-4444-555555555555";
+const address = {
+  id: ID,
+  label: "Home",
+  recipientName: "Sara",
+  phone: "+966501234567",
+  country: "SA",
+  region: null,
+  city: "Dammam",
+  district: "Shati",
+  street: "King Fahd Rd",
+  buildingNo: "1234",
+  additionalNumber: "5678",
+  postalCode: "31411",
+  deliveryNotes: null,
+  isDefaultShipping: true,
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  actions.listAddresses.mockResolvedValue({ kind: "ok", data: [address] });
+  actions.saveAddress.mockResolvedValue({ kind: "ok", data: address });
+  actions.deleteAddress.mockResolvedValue({ kind: "ok", data: true });
+});
+
+describe("AccountAddresses — live address book (B2C-ACCOUNTS)", () => {
+  it("is live and shows only what the owner-scoped API returned", async () => {
+    expect(ACCOUNT_ADDRESSES_CAPABILITY).toBe("live");
     render(<AccountAddresses />);
-    expect(screen.getByText("addressFixture.name")).toBeInTheDocument();
-    expect(screen.getByText("addressFixture.line1")).toBeInTheDocument();
-    expect(screen.getByText("addressFixture.cityPostal")).toBeInTheDocument();
-    expect(screen.getByText("addressFixtureAlt.line1")).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "editAddress" })).toHaveLength(
-      2,
-    );
-    expect(
-      screen.getAllByRole("button", { name: "removeAddress" }),
-    ).toHaveLength(2);
+    expect(await screen.findByText("Home")).toBeInTheDocument();
+    expect(screen.getByText(/King Fahd Rd/)).toBeInTheDocument();
+    expect(screen.getByText("defaultAddress")).toBeInTheDocument();
+    expect(actions.listAddresses).toHaveBeenCalledTimes(1);
   });
 
-  it("refuses add/edit/remove without reporting success or writing storage", async () => {
+  it("an empty book is an honest empty state", async () => {
+    actions.listAddresses.mockResolvedValue({ kind: "ok", data: [] });
+    render(<AccountAddresses />);
+    expect(await screen.findByText("noAddresses")).toBeInTheDocument();
+  });
+
+  it("a failed load says so instead of showing a stale or fabricated book", async () => {
+    actions.listAddresses.mockResolvedValue({ kind: "unavailable" });
+    render(<AccountAddresses />);
+    expect(await screen.findByText("addressLoadFailed")).toBeInTheDocument();
+  });
+
+  it("validates the Saudi digit fields locally and sends nothing when they are wrong", async () => {
     const user = userEvent.setup();
-    const setItem = vi.spyOn(Storage.prototype, "setItem");
-    const cookieSpy = vi.spyOn(document, "cookie", "set");
-
     render(<AccountAddresses />);
-
+    await screen.findByText("Home");
     await user.click(screen.getByRole("button", { name: "addNewAddress" }));
-    expect(screen.getByText("addressActionUnavailable")).toBeInTheDocument();
-    expect(screen.queryByText(/saved successfully/i)).not.toBeInTheDocument();
-    expect(setItem).not.toHaveBeenCalled();
-    expect(cookieSpy).not.toHaveBeenCalled();
 
-    await user.click(screen.getAllByRole("button", { name: "editAddress" })[0]);
-    expect(setItem).not.toHaveBeenCalled();
-    expect(cookieSpy).not.toHaveBeenCalled();
+    await user.type(screen.getByLabelText("recipientName"), "Sara");
+    await user.type(screen.getByLabelText("phone"), "+966501234567");
+    await user.type(screen.getByLabelText("city"), "Dammam");
+    await user.type(screen.getByLabelText("district"), "Shati");
+    await user.type(screen.getByLabelText("street"), "King Fahd");
+    await user.type(screen.getByLabelText("buildingNo"), "12");
+    await user.type(screen.getByLabelText("additionalNo"), "5678");
+    await user.type(screen.getByLabelText("postalCode"), "31411");
+    await user.click(screen.getByRole("button", { name: "saveAddress" }));
 
-    setItem.mockRestore();
-    cookieSpy.mockRestore();
+    expect(await screen.findAllByText("addressDigits")).not.toHaveLength(0);
+    expect(actions.saveAddress).not.toHaveBeenCalled();
+  });
+
+  it("normalizes Arabic-Indic digits and saves a Saudi address with no owner field", async () => {
+    const user = userEvent.setup();
+    render(<AccountAddresses />);
+    await screen.findByText("Home");
+    await user.click(screen.getByRole("button", { name: "addNewAddress" }));
+
+    await user.type(screen.getByLabelText("recipientName"), "Sara");
+    await user.type(screen.getByLabelText("phone"), "+966501234567");
+    await user.type(screen.getByLabelText("city"), "Dammam");
+    await user.type(screen.getByLabelText("district"), "Shati");
+    await user.type(screen.getByLabelText("street"), "King Fahd");
+    await user.type(screen.getByLabelText("buildingNo"), "١٢٣٤");
+    await user.type(screen.getByLabelText("additionalNo"), "٥٦٧٨");
+    await user.type(screen.getByLabelText("postalCode"), "٣١٤١١");
+    await user.click(screen.getByRole("button", { name: "saveAddress" }));
+
+    await waitFor(() => expect(actions.saveAddress).toHaveBeenCalledTimes(1));
+    const [input, id] = actions.saveAddress.mock.calls[0];
+    expect(id).toBeUndefined();
+    expect(input).toMatchObject({
+      country: "SA",
+      building_no: "1234",
+      additional_number: "5678",
+      postal_code: "31411",
+    });
+    expect(Object.keys(input)).not.toEqual(
+      expect.arrayContaining(["customer_identity_id"]),
+    );
+    expect(Object.keys(input)).not.toEqual(
+      expect.arrayContaining(["tenant_id"]),
+    );
+  });
+
+  it("deleting needs a confirmation and only then calls the API with the row's own id", async () => {
+    const user = userEvent.setup();
+    render(<AccountAddresses />);
+    await screen.findByText("Home");
+
+    await user.click(screen.getByRole("button", { name: "delete" }));
+    expect(actions.deleteAddress).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "confirmDelete" }));
+    await waitFor(() => expect(actions.deleteAddress).toHaveBeenCalledWith(ID));
   });
 });

@@ -6,19 +6,21 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { AccountAuthCard } from "@/components/account/AccountAuthCard";
-import { AccountAuthUnavailable } from "@/components/account/AccountAuthUnavailable";
 import { AccountPasswordField } from "@/components/account/AccountPasswordField";
+import { AccountsGate } from "@/components/account/AccountsGate";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { accountErrorMessage } from "@/lib/commerce/account-error-message";
-import { ACCOUNT_AUTH_CAPABILITY } from "@/lib/commerce/capabilities";
 import { resetPassword } from "@/lib/data/customer";
 import { extractBasePath } from "@/lib/utils/path";
 
 export default function ResetPasswordPage() {
-  // SPREE-X1: no form while buyer authentication has no backend.
-  if (ACCOUNT_AUTH_CAPABILITY !== "live") return <AccountAuthUnavailable />;
-  return <ResetPasswordForm />;
+  // B2C-ACCOUNTS: the form exists only where the API says this store has customer accounts.
+  return (
+    <AccountsGate>
+      <ResetPasswordForm />
+    </AccountsGate>
+  );
 }
 
 function ResetPasswordForm() {
@@ -63,7 +65,7 @@ function ResetPasswordForm() {
       return;
     }
 
-    if (password.length < 6) {
+    if (password.length < 8) {
       setError(t("passwordTooShort"));
       return;
     }
@@ -141,7 +143,7 @@ function ResetPasswordForm() {
           autoComplete="new-password"
           showLabel={ta("showPassword")}
           hideLabel={ta("hidePassword")}
-          minLength={6}
+          minLength={8}
         />
         <AccountPasswordField
           id="passwordConfirmation"
@@ -151,7 +153,7 @@ function ResetPasswordForm() {
           autoComplete="new-password"
           showLabel={ta("showPassword")}
           hideLabel={ta("hidePassword")}
-          minLength={6}
+          minLength={8}
         />
         <Button
           type="submit"

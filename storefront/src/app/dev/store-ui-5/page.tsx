@@ -108,6 +108,8 @@ function StoreUi5Preview() {
     () => ({
       user: signedIn ? PREVIEW_USER : null,
       loading: false,
+      accountsAvailable: true,
+      checkAccountsAvailable: async () => undefined,
       isAuthenticated: signedIn,
       login: async () => ({ success: true }),
       register: async () => ({ success: true }),

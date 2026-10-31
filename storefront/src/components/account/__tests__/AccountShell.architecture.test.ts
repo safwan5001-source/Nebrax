@@ -63,11 +63,12 @@ const AWJ_ACCOUNT_FILES = [
 ];
 
 describe("AWJ account — architecture boundaries", () => {
-  it("declares the STORE-UI-5 capabilities as design_only", () => {
-    expect(ACCOUNT_ORDER_HISTORY_CAPABILITY).toBe("design_only");
-    expect(ACCOUNT_ORDER_LOOKUP_CAPABILITY).toBe("design_only");
+  it("declares which account capabilities are live (B2C-ACCOUNTS) and which are still design_only", () => {
+    expect(ACCOUNT_ORDER_HISTORY_CAPABILITY).toBe("live");
+    expect(ACCOUNT_ORDER_LOOKUP_CAPABILITY).toBe("live");
+    expect(ACCOUNT_ADDRESSES_CAPABILITY).toBe("live");
+    // there is still no fulfilment lifecycle on the order, so tracking stays visibly untracked
     expect(ACCOUNT_ORDER_STATUS_CAPABILITY).toBe("design_only");
-    expect(ACCOUNT_ADDRESSES_CAPABILITY).toBe("design_only");
     expect(ACCOUNT_SAVED_PAYMENT_METHODS_CAPABILITY).toBe("design_only");
     expect(WISHLIST_CAPABILITY).toBe("design_only");
   });

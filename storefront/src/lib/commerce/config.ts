@@ -11,6 +11,7 @@
  */
 
 import { headers } from "next/headers";
+import { getAccountToken } from "@/lib/account/account-session";
 import { getBuyerToken } from "./buyer-session";
 import {
   AWJ_CART_COOKIE_NAME,
@@ -295,6 +296,17 @@ export async function storefrontCartRequest<T>(
   const buyerToken = await getBuyerToken();
   if (buyerToken) {
     requestHeaders[BUYER_TOKEN_HEADER] = buyerToken;
+  } else {
+    /*
+     * B2C-ACCOUNTS — the retail shopper's account session (HttpOnly `awj_account_session`), sent the same way and ONLY
+     * when there is no wholesale buyer session. The backend uses it solely to own the cart / order of a signed-in shopper
+     * on a host with retail accounts open; a missing, expired or foreign-host token is treated there as a plain guest, so
+     * guest cart and checkout behave exactly as before.
+     */
+    const accountToken = await getAccountToken();
+    if (accountToken) {
+      requestHeaders[BUYER_TOKEN_HEADER] = accountToken;
+    }
   }
   if (body !== undefined) {
     requestHeaders["Content-Type"] = "application/json";
@@ -316,7 +328,7 @@ export async function storefrontCartRequest<T>(
   return (await response.json()) as T;
 }
 
-export type StorefrontBuyerMethod = "GET" | "POST";
+export type StorefrontBuyerMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 
 /**
  * H6 Batch G — the wholesale buyer's own calls (`store/v1/auth/*`, `me`,

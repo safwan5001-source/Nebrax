@@ -32,39 +32,62 @@ const ACCOUNT_PAGES = [
   "app/[country]/[locale]/(storefront)/account/register/page.tsx",
   "app/[country]/[locale]/(storefront)/account/forgot-password/page.tsx",
   "app/[country]/[locale]/(storefront)/account/reset-password/page.tsx",
-  "app/[country]/[locale]/(storefront)/account/(authenticated)/profile/page.tsx",
+  "app/[country]/[locale]/(storefront)/account/verify/page.tsx",
   "components/account/AccountSignIn.tsx",
 ];
 
-describe("buyer authentication gate (SPREE-X1)", () => {
-  it("ships gated — flipping it to live must be a deliberate, reviewed change", () => {
-    expect(ACCOUNT_AUTH_CAPABILITY).toBe("gated");
+describe("customer account host gate (B2C-ACCOUNTS)", () => {
+  it("is built (live) — and live means 'the code exists', not 'every store has accounts'", () => {
+    expect(ACCOUNT_AUTH_CAPABILITY).toBe("live");
   });
 
-  it("every auth screen checks the gate and renders the unavailable notice", () => {
+  it("every public auth screen renders inside AccountsGate (the API's per-host answer), never a bare form", () => {
     for (const page of ACCOUNT_PAGES) {
       const src = read(page);
-      expect(src, page).toContain("ACCOUNT_AUTH_CAPABILITY");
-      expect(src, page).toContain("AccountAuthUnavailable");
+      expect(src, page).toContain("AccountsGate");
+      expect(src, page).not.toContain("ACCOUNT_AUTH_CAPABILITY");
     }
+    const gate = read("components/account/AccountsGate.tsx");
+    expect(gate).toContain("AccountAuthUnavailable");
+    expect(gate).toContain("accountsAvailable");
   });
 
-  it("the session provider never syncs with the server while gated", () => {
+  it("the host answer is fail-closed: only a literal true opens accounts", () => {
+    const src = read("lib/commerce/storefront.ts");
+    expect(src).toContain("value.customer_accounts === true");
+    const action = read("lib/data/customer.ts");
+    expect(action).toContain("customerAccounts === true");
+    expect(action).toContain("return false;"); // an unreachable config is closed, not open
+  });
+
+  it("the session provider makes no request without the presence hint", () => {
     const src = read("contexts/AuthContext.tsx");
-    const gate = src.indexOf('ACCOUNT_AUTH_CAPABILITY !== "live"');
-    const sync = src.indexOf("await syncSession()");
-    expect(gate).toBeGreaterThan(-1);
-    expect(gate).toBeLessThan(sync);
+    const hint = src.indexOf("hasAccountHint()");
+    const sync = src.indexOf("await refreshUser()");
+    expect(hint).toBeGreaterThan(-1);
+    expect(hint).toBeLessThan(sync);
   });
 
-  it("every customer server action is a refusal: no upstream access of any kind", () => {
-    const src = read("lib/data/customer.ts");
-    // No Spree/commerce client, token refresh or session helper can be reached from the file at all.
-    expect(src).not.toMatch(
-      /getClient\(|withAuthRefresh\(|ensureFreshSession\(|finalizeAuth\(|fetch\(|@\/lib\/spree|@spree\//,
-    );
-    const chunks = src.split(/\nexport async function /).slice(1);
-    expect(chunks.length).toBeGreaterThanOrEqual(8);
+  it("the session token only ever lives in an HttpOnly cookie written by a server action", () => {
+    const session = read("lib/account/account-session.ts");
+    expect(session).toMatch(/httpOnly:\s*true/);
+    expect(session).toMatch(/sameSite:\s*"lax"/);
+    // the only non-HttpOnly cookie is the value-`1` presence hint
+    expect(session.match(/httpOnly:\s*false/g)?.length).toBe(1);
+    expect(session).toContain('store.set(ACCOUNT_HINT_COOKIE, "1"');
+    const actions = read("lib/data/customer.ts");
+    expect(actions.startsWith('"use server"')).toBe(true);
+    expect(actions).not.toMatch(/localStorage|sessionStorage|document\.cookie/);
+  });
+
+  it("no client component imports the cookie/session module", () => {
+    for (const file of walk(join(SRC, "components", "account"))) {
+      const src = readFileSync(file, "utf8");
+      if (!/^"use client"/.test(src)) continue;
+      expect(src, relative(SRC, file)).not.toContain(
+        "@/lib/account/account-session",
+      );
+    }
   });
 
   it("buyer-account UI has no runtime Spree import", () => {

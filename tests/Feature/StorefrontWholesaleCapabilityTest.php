@@ -110,6 +110,7 @@ class StorefrontWholesaleCapabilityTest extends TestCase
 
         $capabilities = $this->config('f.cap.test')->assertOk()->json('data.capabilities');
 
-        $this->assertSame(['wholesale_buyer' => true], $capabilities);
+        // additive booleans only (B2C-ACCOUNTS adds `customer_accounts`, closed here: this host has no retail accounts)
+        $this->assertSame(['wholesale_buyer' => true, 'customer_accounts' => false], $capabilities);
     }
 }

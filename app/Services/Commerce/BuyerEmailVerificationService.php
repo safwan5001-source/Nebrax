@@ -94,11 +94,11 @@ class BuyerEmailVerificationService
         ]);
         $tokenId = $token->id;
 
-        $url = 'https://'.$host.self::sanitizeLocalePath($localePath).'/buyer/verify?token='.$plain;
+        $url = 'https://'.$host.self::sanitizeLocalePath($localePath).BuyerPasswordResetService::pagePrefix().'/verify?token='.$plain;
         $storeName = (string) (Tenant::query()->whereKey($tenantId)->value('name') ?? '');
 
         try {
-            Mail::to($identity->email)->send(new BuyerVerificationMail($url, $storeName, $ttl));
+            Mail::to($identity->email)->send(new BuyerVerificationMail($url, $storeName, $ttl, BuyerPasswordResetService::pagePrefix() === '/account'));
         } catch (Throwable $e) {
             // The candidate token was never delivered: retire it, keep the previous link usable, leak nothing.
             CustomerEmailVerificationToken::query()->whereKey($tokenId)->update(['used_at' => now()]);

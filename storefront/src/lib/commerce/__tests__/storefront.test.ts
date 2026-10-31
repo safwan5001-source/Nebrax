@@ -208,6 +208,7 @@ describe("commerce/storefront identity (COM-7-P3A)", () => {
       );
       expect((await fetchStorefrontConfig()).capabilities).toEqual({
         wholesaleBuyer: expected,
+        customerAccounts: false,
       });
     }
   });
@@ -218,6 +219,27 @@ describe("commerce/storefront identity (COM-7-P3A)", () => {
     );
     expect((await fetchStorefrontConfig()).capabilities).toEqual({
       wholesaleBuyer: false,
+      customerAccounts: false,
     });
+  });
+
+  it("reads capabilities.customer_accounts additively: only a literal true opens retail accounts (B2C-ACCOUNTS)", async () => {
+    for (const [raw, expected] of [
+      [{ customer_accounts: true }, true],
+      [{ customer_accounts: false }, false],
+      [{ customer_accounts: "true" }, false],
+      [{ customer_accounts: 1 }, false],
+      [{ wholesale_buyer: true }, false],
+    ] as const) {
+      vi.mocked(fetch).mockResolvedValueOnce(
+        jsonResponse({
+          data: { name: "متجر", capabilities: raw },
+          meta: { request_id: "req-1" },
+        }),
+      );
+      expect(
+        (await fetchStorefrontConfig()).capabilities?.customerAccounts,
+      ).toBe(expected);
+    }
   });
 });

@@ -70,6 +70,14 @@ class WholesalePriceSurfaceBoundaryTest extends TestCase
         'storefront.v1.media.derivative.show',
         // طلب قائم بمرجع موقَّع/نية دفع: لا يكشف سعر قناة، ومنع الدفع بعد إيقاف عضوية يترك مشترياً عالقاً (قرار F §4).
         'storefront.v1.orders.payment_status', 'storefront.v1.checkout.payment_intent.store',
+        // B2C-ACCOUNTS — the signed-in retail shopper's OWN account: profile, addresses, sessions, the owner-scoped order history
+        // (amounts the shopper was already charged — never a channel/price-list price) and the guest-order claim. All sit behind the
+        // retail-accounts gate + a token bound to this host's channel; none reads or returns a price list.
+        'storefront.v1.account.profile.show', 'storefront.v1.account.profile.update', 'storefront.v1.account.password.update',
+        'storefront.v1.account.addresses.index', 'storefront.v1.account.addresses.store', 'storefront.v1.account.addresses.update',
+        'storefront.v1.account.addresses.destroy', 'storefront.v1.account.orders.index', 'storefront.v1.account.orders.show',
+        'storefront.v1.account.orders.claim', 'storefront.v1.account.sessions.index', 'storefront.v1.account.sessions.revoke_others',
+        'storefront.v1.account.sessions.revoke',
     ];
 
     // ═══════════════════════ حارس التصنيف ═══════════════════════

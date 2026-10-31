@@ -34,7 +34,7 @@ export interface AwjStorefrontConfig {
    * H6 Final Closure — what the API says this Host can do. `wholesaleBuyer` is true only when native wholesale
    * buying is open here (deployment flag AND a wholesale channel); absent/malformed ⇒ false (fail closed).
    */
-  capabilities?: { wholesaleBuyer: boolean };
+  capabilities?: { wholesaleBuyer: boolean; customerAccounts?: boolean };
 }
 
 export interface AwjBusinessIdentity {
@@ -55,12 +55,19 @@ interface AwjStorefrontConfigResponse {
   };
 }
 
-function readCapabilities(raw: unknown): { wholesaleBuyer: boolean } {
+function readCapabilities(raw: unknown): {
+  wholesaleBuyer: boolean;
+  customerAccounts: boolean;
+} {
   const value =
     raw != null && typeof raw === "object" && !Array.isArray(raw)
       ? (raw as Record<string, unknown>)
       : {};
-  return { wholesaleBuyer: value.wholesale_buyer === true };
+  return {
+    wholesaleBuyer: value.wholesale_buyer === true,
+    // B2C-ACCOUNTS — only a literal `true` opens retail accounts on this host (fail closed).
+    customerAccounts: value.customer_accounts === true,
+  };
 }
 
 function readBusinessIdentity(raw: unknown): AwjBusinessIdentity {

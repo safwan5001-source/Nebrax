@@ -17,14 +17,8 @@ vi.mock("next/navigation", () => ({
   useRouter: () => mockRouter,
 }));
 
-// These tests pin the LIVE session-sync behaviour. The shipped default is
-// `gated` — see AuthContext.gated.test.tsx for that contract.
-vi.mock("@/lib/commerce/capabilities", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/commerce/capabilities")>()),
-  ACCOUNT_AUTH_CAPABILITY: "live",
-}));
-
 vi.mock("@/lib/data/customer", () => ({
+  getAccountsAvailable: vi.fn(),
   syncSession: vi.fn(),
   login: vi.fn(),
   logout: vi.fn(),
@@ -32,9 +26,18 @@ vi.mock("@/lib/data/customer", () => ({
 }));
 
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { syncSession } from "@/lib/data/customer";
+import { getAccountsAvailable, syncSession } from "@/lib/data/customer";
 
 const mockSyncSession = vi.mocked(syncSession);
+const mockAvailable = vi.mocked(getAccountsAvailable);
+
+/** The JS-readable presence hint the login action writes next to the HttpOnly session cookie. */
+function setHint(on: boolean) {
+  // biome-ignore lint/suspicious/noDocumentCookie: the test sets the JS-readable presence hint
+  document.cookie = on
+    ? "awj_account_hint=1; path=/"
+    : "awj_account_hint=; path=/; max-age=0";
+}
 
 const mockCustomer = {
   id: "user-1",
@@ -59,10 +62,49 @@ async function returnToTab(msAhead: number) {
 describe("AuthContext session sync", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    setHint(true);
     mockSyncSession.mockResolvedValue({
+      available: true,
       customer: mockCustomer,
       refreshed: false,
     });
+  });
+
+  it("makes no request at all for a visitor with no session hint (guests and stores without accounts)", async () => {
+    setHint(false);
+    const { result } = renderHook(() => useAuth(), { wrapper });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(mockSyncSession).not.toHaveBeenCalled();
+    expect(result.current.isAuthenticated).toBe(false);
+    expect(result.current.accountsAvailable).toBeNull();
+
+    await returnToTab(31_000);
+    expect(mockSyncSession).not.toHaveBeenCalled();
+  });
+
+  it("learns whether the host has accounts only when an account screen asks", async () => {
+    setHint(false);
+    mockAvailable.mockResolvedValue(false);
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.checkAccountsAvailable();
+    });
+    expect(result.current.accountsAvailable).toBe(false);
+  });
+
+  it("fails closed when the availability check itself fails", async () => {
+    setHint(false);
+    mockAvailable.mockRejectedValue(new Error("network"));
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.checkAccountsAvailable();
+    });
+    expect(result.current.accountsAvailable).toBe(false);
   });
 
   it("syncs the session on mount and exposes the customer", async () => {
@@ -89,6 +131,7 @@ describe("AuthContext session sync", () => {
 
   it("re-renders server components after a transparent refresh", async () => {
     mockSyncSession.mockResolvedValue({
+      available: true,
       customer: mockCustomer,
       refreshed: true,
     });
@@ -98,7 +141,11 @@ describe("AuthContext session sync", () => {
   });
 
   it("clears the user when the session is gone", async () => {
-    mockSyncSession.mockResolvedValue({ customer: null, refreshed: false });
+    mockSyncSession.mockResolvedValue({
+      available: true,
+      customer: null,
+      refreshed: false,
+    });
 
     const { result } = renderHook(() => useAuth(), { wrapper });
 

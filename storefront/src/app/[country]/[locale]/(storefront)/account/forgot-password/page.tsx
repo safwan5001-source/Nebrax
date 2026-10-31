@@ -6,19 +6,21 @@ import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { AccountAuthCard } from "@/components/account/AccountAuthCard";
-import { AccountAuthUnavailable } from "@/components/account/AccountAuthUnavailable";
+import { AccountsGate } from "@/components/account/AccountsGate";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { ACCOUNT_AUTH_CAPABILITY } from "@/lib/commerce/capabilities";
 import { requestPasswordReset } from "@/lib/data/customer";
 import { extractBasePath } from "@/lib/utils/path";
 
 export default function ForgotPasswordPage() {
-  // SPREE-X1: no form while buyer authentication has no backend.
-  if (ACCOUNT_AUTH_CAPABILITY !== "live") return <AccountAuthUnavailable />;
-  return <ForgotPasswordForm />;
+  // B2C-ACCOUNTS: the form exists only where the API says this store has customer accounts.
+  return (
+    <AccountsGate>
+      <ForgotPasswordForm />
+    </AccountsGate>
+  );
 }
 
 function ForgotPasswordForm() {
@@ -37,9 +39,8 @@ function ForgotPasswordForm() {
     setSubmitting(true);
 
     try {
-      const origin = window.location.origin;
-      const redirectUrl = `${origin}${basePath}/account/reset-password`;
-      const result = await requestPasswordReset(email, redirectUrl);
+      // The link's host is the store's own verified domain, chosen by the API — only the locale path is passed.
+      const result = await requestPasswordReset(email, undefined, basePath);
       if (result.success) {
         setSubmitted(true);
       } else {
