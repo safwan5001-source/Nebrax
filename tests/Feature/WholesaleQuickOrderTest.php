@@ -299,6 +299,16 @@ class WholesaleQuickOrderTest extends TestCase
     }
 
     #[Test]
+    public function resolve_accepts_catalog_length_skus_up_to_255_characters_and_rejects_longer(): void
+    {
+        $token = $this->buyer('long@qo.test');
+        $long = 'L'.str_repeat('x', 254);
+
+        $this->api('GET', 'buyer/quick-order/resolve?skus[]='.$long, self::WS, $token)->assertOk();
+        $this->api('GET', 'buyer/quick-order/resolve?skus[]='.$long.'x', self::WS, $token)->assertStatus(422);
+    }
+
+    #[Test]
     public function an_unpriced_product_is_unavailable_with_no_price_and_the_sale_price_is_never_exposed(): void
     {
         $token = $this->buyer('u@qo.test');
@@ -594,7 +604,7 @@ class WholesaleQuickOrderTest extends TestCase
         $this->resolve([], $token)->assertStatus(422);
         $this->api('GET', 'buyer/quick-order/resolve', self::WS, $token)->assertStatus(422);
         $this->resolve(array_fill(0, 51, 'COF-100'), $token)->assertStatus(422);
-        $this->resolve([str_repeat('a', 121)], $token)->assertStatus(422);
+        $this->resolve([str_repeat('a', 256)], $token)->assertStatus(422);
         $this->api('GET', 'buyer/quick-order/resolve?skus[]=COF-100&price=1', self::WS, $token)->assertStatus(422);
         $this->resolve(['COF-100'], $token, self::DTC)->assertNotFound();
         $this->resolve(['RETAIL-ONLY'], $token)->assertOk()->assertJsonPath('data.0.lines', []);

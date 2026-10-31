@@ -369,39 +369,56 @@ export async function searchQuickOrder(
   }
 }
 
+/** The catalogue's SKU length limit (product and variant requests). */
+const MAX_SKU_LENGTH = 255;
+
 export type QuickOrderResolvedRow = { sku: string; lines: QuickOrderLine[] };
 
 /** Exact-SKU resolution of a pasted list (one request). Order and spelling of the input are preserved. */
 export async function resolveQuickOrderSkus(
   skus: string[],
 ): Promise<{ kind: "ok"; rows: QuickOrderResolvedRow[] } | QuickOrderAccess> {
-  const list = skus
-    .map((s) => s.trim().slice(0, 120))
+  const trimmed = skus
+    .map((s) => s.trim())
     .filter((s) => s !== "")
     .slice(0, QUICK_ORDER_MAX_LINES);
-  if (list.length === 0) return { kind: "ok", rows: [] };
+  if (trimmed.length === 0) return { kind: "ok", rows: [] };
+  // A SKU longer than the catalogue allows (255) cannot exist: report it as "not found" in its own position instead of
+  // truncating it into a different, valid identifier.
+  const resolvable = trimmed.filter((s) => s.length <= MAX_SKU_LENGTH);
   const token = await getBuyerToken();
   if (!token) return { kind: "signed_out" };
   try {
-    const query = list.map((s) => `skus[]=${encodeURIComponent(s)}`).join("&");
-    const response = await storefrontBuyerRequest<{ data?: unknown[] }>(
-      "GET",
-      `buyer/quick-order/resolve?${query}`,
-      { token },
-    );
-    const rows = (Array.isArray(response.data) ? response.data : []).flatMap(
-      (raw) => {
-        const r = raw as { sku?: unknown; lines?: unknown };
-        if (typeof r?.sku !== "string") return [];
-        return [
-          {
-            sku: r.sku,
-            lines: (Array.isArray(r.lines) ? r.lines : [])
-              .map(quickOrderLineFromApi)
-              .filter((l): l is QuickOrderLine => l !== null),
-          },
-        ];
-      },
+    let fetched: QuickOrderResolvedRow[] = [];
+    if (resolvable.length > 0) {
+      const query = resolvable
+        .map((s) => `skus[]=${encodeURIComponent(s)}`)
+        .join("&");
+      const response = await storefrontBuyerRequest<{ data?: unknown[] }>(
+        "GET",
+        `buyer/quick-order/resolve?${query}`,
+        { token },
+      );
+      fetched = (Array.isArray(response.data) ? response.data : []).flatMap(
+        (raw) => {
+          const r = raw as { sku?: unknown; lines?: unknown };
+          if (typeof r?.sku !== "string") return [];
+          return [
+            {
+              sku: r.sku,
+              lines: (Array.isArray(r.lines) ? r.lines : [])
+                .map(quickOrderLineFromApi)
+                .filter((l): l is QuickOrderLine => l !== null),
+            },
+          ];
+        },
+      );
+    }
+    let next = 0;
+    const rows: QuickOrderResolvedRow[] = trimmed.map((sku) =>
+      sku.length > MAX_SKU_LENGTH
+        ? { sku, lines: [] }
+        : (fetched[next++] ?? { sku, lines: [] }),
     );
     return { kind: "ok", rows };
   } catch (error) {

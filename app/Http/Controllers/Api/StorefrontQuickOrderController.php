@@ -134,7 +134,8 @@ final class StorefrontQuickOrderController extends PublicApiController
         $this->rejectUnknown($request, ['skus']);
         $data = $request->validate([
             'skus' => ['required', 'array', 'min:1', 'max:'.self::MAX_LINES],
-            'skus.*' => ['required', 'string', 'min:1', 'max:120'],
+            // catalog SKUs may be up to 255 characters (product and variant requests): never truncate or reject a valid one
+            'skus.*' => ['required', 'string', 'min:1', 'max:255'],
         ]);
 
         $requested = array_values(array_map(fn ($sku) => trim((string) $sku), $data['skus']));

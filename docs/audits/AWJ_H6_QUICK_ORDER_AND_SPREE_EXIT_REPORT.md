@@ -109,7 +109,7 @@ The remaining screenshots of the 56-test run were generated locally in `storefro
 
 | Check | Result |
 |---|---|
-| `WholesaleQuickOrderTest` | 27 tests, **SQLite and PostgreSQL green** |
+| `WholesaleQuickOrderTest` | 28 tests, **SQLite and PostgreSQL green** |
 | Related PHP suites (SQLite): Wholesale\*, StorefrontCart\*/Checkout\*, CommerceCart\*/Checkout\*, CommerceModuleBoundary, CommercePrice\*, BranchIsolationGuard, ApplicationCatalog, StorefrontGateway\*, StorefrontClientIp, StorefrontRoutesRegistered, StorefrontPriceParity | **414 passed, 27 skipped, 0 failed** |
 | Related PHP suites (PostgreSQL): WholesaleQuickOrder, WholesalePriceSurfaceBoundary, WholesaleCartCheckoutBoundary, WholesalePricePrecedence, WholesaleBuyer, StorefrontCart/Checkout, CommerceCart, CommerceModuleBoundary, BranchIsolationGuard | 282 passed on the first run + the 2 quick-order failures fixed (§6) and re-run green; boundary test re-run green |
 | Storefront `pnpm test` | **256 files passed, 3675 tests passed**, 16 skipped (pre-existing) |
@@ -118,7 +118,7 @@ The remaining screenshots of the 56-test run were generated locally in `storefro
 | `pnpm check:locales` | all six locales in sync |
 | `pnpm check:spree-ratchet` | OK at the unchanged baseline (4 / 4 / 52 / 69 / 9) — this PR adds **no** Spree dependency |
 | Production build | the E2E stack serves `next start` of a production build of this source |
-| Playwright wholesale suite (local isolated stack, desktop-en + mobile-ar) | **56 / 56 passed** (12 new Q-tests; the rest are the pre-existing journey, security, retail-regression, rate-limit, closure and Arabic-mobile tests) |
+| Playwright wholesale suite (local isolated stack, desktop-en + mobile-ar) | **56 / 56 passed**, run on a fresh production build of `280acb341`; the review fixes after it (paste-box handling, SKU length) are covered by unit/component/backend tests, not by a browser re-run (12 new Q-tests; the rest are the pre-existing journey, security, retail-regression, rate-limit, closure and Arabic-mobile tests) |
 | CI Gate | running at the time of writing — see §10 |
 
 Not run locally: the full PHP suite (no ParaTest here; `ext-bcmath` is absent so Fuel\* tests fail locally by environment, not by this change) — CI runs it.
@@ -147,6 +147,7 @@ No financial or security assertion was weakened.
 5. Codex review of the PR (three P2 findings, all verified as real and fixed with a regression test each): (a) while an add is in flight the submitted rows could still be edited, so those edits were lost when the response cleared the row — the quantity input, remove and pick controls are now disabled while pending; (b) merging a duplicate SKU treated an invalid quantity as 0, silently turning a typo into a smaller valid order — the invalid text is now preserved and keeps blocking; (c) an exact variant SKU could be crowded out by ≥ limit other products that merely mention it, because only the parent SKU was prioritised before the limit — the ordering now ranks an exact active-variant SKU match first.
 6. Codex re-review of the fix commit (three more P2 findings, verified and fixed with tests): (a) the 50-line limit was checked on the pasted batch alone, so rows beyond the merged capacity were dropped silently — capacity is now checked on the merged list and each row that does not fit is reported (`list_full`, six locales) and kept in the paste box; (b) after a partial import the whole paste text stayed, so correcting a typo and retrying applied the good rows twice — only the unresolved rows now stay in the paste box; (c) the per-product 12-variant cap in `candidateTargets()` could cut off an exact variant SKU when more than 12 variants merely contain the term — exact matches are now ordered first before the cap.
 7. Third Codex pass (two more P2 findings, verified and fixed with tests): (a) pasted-list parsing digit-normalised the whole line, which could rewrite a SKU that itself contains Arabic-Indic or Persian digits — only the quantity token is normalised now and the SKU reaches the server exactly as typed; (b) the paste box stayed editable while an import was resolving, so typed edits could be overwritten by the response — it is disabled while the import is in flight.
+8. Fourth Codex pass (one P2, verified): pasted SKUs were truncated to 120 characters before exact resolution, although catalogue SKUs may be 255 — a longer SKU could resolve to a different product. The endpoint now accepts up to 255; the data layer never truncates, and a SKU longer than 255 (which cannot exist) is reported "not found" in its own row position.
 4. E2E reliability only (no product change): a shared logged-in browser context broke the sign-in step of two gate tests (they now use a fresh context); cart assertions poll a fixed expected figure; the price-withdrawn test restores state with a park/restore helper instead of deleting a row.
 
 ---

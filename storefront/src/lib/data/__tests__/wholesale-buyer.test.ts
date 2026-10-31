@@ -517,6 +517,29 @@ describe("native quick order server actions (H6)", () => {
     expect(result.kind === "ok" && result.rows[0].lines).toHaveLength(1);
   });
 
+  it("a SKU is never truncated: 255 characters go through whole, longer ones are reported not found in their own position", async () => {
+    const long = `L${"x".repeat(254)}`; // exactly 255
+    const tooLong = `T${"y".repeat(255)}`; // 256: cannot exist in the catalogue
+    mocks.getBuyerToken.mockResolvedValue("tok");
+    mocks.request.mockResolvedValue({
+      data: [
+        { sku: long, lines: [] },
+        { sku: "OK-1", lines: [] },
+      ],
+    });
+
+    const result = await resolveQuickOrderSkus([long, tooLong, "OK-1"]);
+
+    const url = mocks.request.mock.calls.at(-1)?.[1] as string;
+    expect(url).toContain(`skus[]=${long}`);
+    expect(url).not.toContain("yyy");
+    expect(result.kind === "ok" && result.rows.map((r) => r.sku)).toEqual([
+      long,
+      tooLong,
+      "OK-1",
+    ]);
+  });
+
   it("add posts ids/units/quantities through the cart transport, refreshes the cart tag and returns success", async () => {
     mocks.cartRequest.mockResolvedValue({ data: {} });
     const items = [
