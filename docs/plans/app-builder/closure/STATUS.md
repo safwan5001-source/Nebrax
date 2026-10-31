@@ -21,7 +21,8 @@
 | **S01c** فرض 428 | ✅ مدموجة (بموافقة المالك) | #1825 | `e88d0b0f0d93871c0008fc9c756a7f0d4338d824` | CI أخضر؛ تقرير: `docs/reports/app-builder/S01c-IMPLEMENTATION-REPORT.md` |
 | **S01d** حماية النشر (G1) | ✅ مدموجة (بموافقة المالك) | #1826 | `9b410e97c0f465a849a24562d2033b47ba62fdfa` | `expected_draft_revision` اختياري + `source_draft_revision` (هجرة إضافية)؛ تقرير: `S01d-IMPLEMENTATION-REPORT.md` |
 | **S02** عقد المكوّنات (AD-12) | ✅ مدموجة (S02a خادم + S02b ويب) | #1827 | `c10fdbc7b56a2cfc57e4ff1e0a8f3b161b6adfad` | فرض مرحلي؛ 3 جولات مراجعة Codex (7 ملاحظات P2 صحيحة كلها أُصلحت باختبارات)؛ تقارير S02a/S02b |
-| **S21a** الوضع السهل V2: القشرة | 🟡 PR #1830 — CI/مراجعة | #1830 | — | قائمة أقسام + كتالوج صادق + شريط قسم + هوية + مبدّل وضع؛ `S21a-IMPLEMENTATION-REPORT.md` |
+| **S21a** الوضع السهل V2: القشرة | ✅ مدموجة | #1830 | `5c07d1d37d54cf27ffe4582e7dd95a40037b818a` | قائمة أقسام + كتالوج صادق (صفحات Runtime) + شريط قسم + هوية + مبدّل وضع؛ مراجعة Codex: 4 ملاحظات أُصلحت؛ e2e متصفح حقيقي؛ `S21a-IMPLEMENTATION-REPORT.md` |
+| **S23a** تجاوب/لمس/اتجاه (UX-02/04/07/08/09/10/11) | 🟡 PR مفتوح | — | — | آيباد عمودي وجوال أفقي بعمودين، أهداف لمس 44px على `pointer: coarse` فقط، سهم رجوع حسب الاتجاه؛ e2e 17 اختباراً؛ `S23a-IMPLEMENTATION-REPORT.md` |
 | S03 … S25 (عدا S21a)، AF01–AF03 | ⏳ لم تبدأ | — | — | انظر الخارطة؛ بعضها يتطلب اعتماد AD المرتبط |
 
 ## 3) الفجوات المتأثرة حتى الآن
@@ -61,6 +62,9 @@
 4. ~~openapi drift~~: أُصلح في #1820.
 
 ## 5) Handoff — الاستئناف
-- الفرع الحالي للعمل: `feat/app-builder-s21a-easy-mode-shell` (PR #1830 على `main`).
+- الفرع الحالي للعمل: `feat/app-builder-s23a-responsive-layouts`. بيئة e2e المتصفح: `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/opt/pw-browsers/chromium-1243/chrome-linux64/chrome npx playwright test e2e/app-builder-easy-mode.spec.ts --project=desktop` (الخادم مُعترَض، `APP_BUILDER_SHOTS=<dir>` للقطات).
 - المتبقي من S21 (الوضع السهل V2): S21b (الصفحات/الهوية/الجهاز واللغة)، S21c (تخطيط الجوال: أوراق سفلية)، تحرير بالضغط على المعاينة مع شريط عائم؛ **الإخفاء/اسم القسم/Preset** مرهونة بـAD-05 (غير معتمد) وتُعرض معطّلة بسببها.
 - بيئة الاختبار المحلية: `pg_ctlcluster 16 main start`؛ مزامنة الملفات المتغيّرة إلى `/home/user/nibras-app` بسكربت المزامنة في الـscratchpad.
+
+## 6) عيوب مسبقة مكتشفة (لا تنتمي لشريحة مفتوحة)
+- **UX-I18N-DOT:** مفاتيح ترجمة تحوي نقطة (`appBuilder.builder.visibility.signalOption.cart.itemCount` وأخواتها، `developer.events.*`) تُنتج `INVALID_KEY` في next-intl فتفشل تسمية إشارات الظهور/أحداث المطوّر. تحتاج تحويل المفاتيح إلى صيغة بلا نقاط (مع مطابقة الكود) — شريحة صغيرة مقترحة، لا تمسّ المنطق.
