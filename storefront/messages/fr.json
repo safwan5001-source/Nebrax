@@ -1292,7 +1292,8 @@
       },
       "reason": {
         "noWholesalePrice": "Aucun prix de gros n'est disponible pour cet article",
-        "notPurchasable": "Cet article ne peut pas être acheté pour le moment"
+        "notPurchasable": "Cet article ne peut pas être acheté pour le moment",
+        "personalizationRequired": "Cet article nécessite une personnalisation — ajoutez-le depuis sa fiche produit"
       },
       "notice": {
         "added": "Ajouté à votre panier : {count}",

@@ -1292,7 +1292,8 @@
       },
       "reason": {
         "noWholesalePrice": "لا يتوفر سعر جملة لهذا الصنف",
-        "notPurchasable": "لا يمكن شراء هذا الصنف حالياً"
+        "notPurchasable": "لا يمكن شراء هذا الصنف حالياً",
+        "personalizationRequired": "هذا الصنف يحتاج إلى تخصيص — أضِفه من صفحة المنتج"
       },
       "notice": {
         "added": "أُضيف إلى سلتك: {count}",

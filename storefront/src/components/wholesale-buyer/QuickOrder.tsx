@@ -264,7 +264,9 @@ export function QuickOrder({ basePath }: { basePath: string }) {
   const reasonText = (reason: string | null) =>
     reason === "no_wholesale_price" || reason === "unavailable_for_wholesale"
       ? t("reason.noWholesalePrice")
-      : t("reason.notPurchasable");
+      : reason === "personalization_required"
+        ? t("reason.personalizationRequired")
+        : t("reason.notPurchasable");
 
   const qtyMessage = (text: string) => {
     const e = quantityError(text);

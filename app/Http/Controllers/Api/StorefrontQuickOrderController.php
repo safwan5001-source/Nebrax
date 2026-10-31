@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\CommerceListing;
+use App\Models\CommerceProductPersonalizationField;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Tenant;
@@ -265,6 +266,18 @@ final class StorefrontQuickOrderController extends PublicApiController
             ->all();
     }
 
+    /** @var array<string, bool> */
+    private array $personalizationMemo = [];
+
+    private function requiresPersonalization(string $productId): bool
+    {
+        return $this->personalizationMemo[$productId] ??= CommerceProductPersonalizationField::query()
+            ->where('product_id', $productId)
+            ->where('is_active', true)
+            ->where('is_required', true)
+            ->exists();
+    }
+
     /** @return array<string, mixed> */
     private function line(
         Product $product,
@@ -291,6 +304,14 @@ final class StorefrontQuickOrderController extends PublicApiController
             }
         } catch (RuntimeException) {
             $reason = 'not_purchasable';
+        }
+
+        // A product with an ACTIVE REQUIRED personalization field cannot be added without that input, which the quick-order
+        // form does not collect: it is shown as not orderable here (add it from its product page) instead of being "ready"
+        // and then failing the whole batch.
+        if ($amount !== null && $this->requiresPersonalization($product->id)) {
+            $amount = null;
+            $reason = 'personalization_required';
         }
 
         $inStock = null;

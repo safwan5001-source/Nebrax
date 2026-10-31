@@ -1292,7 +1292,8 @@
       },
       "reason": {
         "noWholesalePrice": "Brak ceny hurtowej dla tego towaru",
-        "notPurchasable": "Tego towaru nie można teraz kupić"
+        "notPurchasable": "Tego towaru nie można teraz kupić",
+        "personalizationRequired": "Ten produkt wymaga personalizacji — dodaj go ze strony produktu"
       },
       "notice": {
         "added": "Dodano do koszyka: {count}",

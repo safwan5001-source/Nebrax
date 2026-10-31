@@ -200,13 +200,12 @@ export function mergeEntry(
     merged[index] = { ...entries[index], quantity: next.quantity };
     return merged;
   }
+  // The SUM is kept even above the ceiling: the row then shows the "too large" error and blocks submit, instead of the
+  // order being silently reduced to the ceiling.
   merged[index] = {
     ...entries[index],
     quantity: String(
-      Math.min(
-        quantityValue(entries[index].quantity) + quantityValue(next.quantity),
-        QUICK_ORDER_MAX_QUANTITY,
-      ),
+      quantityValue(entries[index].quantity) + quantityValue(next.quantity),
     ),
   };
   return merged;

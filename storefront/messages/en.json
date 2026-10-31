@@ -1292,7 +1292,8 @@
       },
       "reason": {
         "noWholesalePrice": "No wholesale price is available for this item",
-        "notPurchasable": "This item cannot be purchased right now"
+        "notPurchasable": "This item cannot be purchased right now",
+        "personalizationRequired": "This item needs personalisation — add it from its product page"
       },
       "notice": {
         "added": "Added to your cart: {count}",

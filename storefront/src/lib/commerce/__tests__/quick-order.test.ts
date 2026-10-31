@@ -261,12 +261,11 @@ describe("entries", () => {
     expect(quantityError(existingInvalid[0].quantity)).not.toBeNull();
   });
 
-  it("merging never exceeds the ceiling", () => {
-    const merged = mergeEntry(
-      [entry("a", String(QUICK_ORDER_MAX_QUANTITY))],
-      entry("b", "5"),
-    );
-    expect(merged[0].quantity).toBe(String(QUICK_ORDER_MAX_QUANTITY));
+  it("merging keeps the true sum above the ceiling so the row is flagged too_large instead of being silently reduced", () => {
+    const merged = mergeEntry([entry("a", "600000")], entry("b", "600000"));
+    expect(merged[0].quantity).toBe("1200000");
+    expect(quantityError(merged[0].quantity)).toBe("too_large");
+    expect(eligibleEntries(merged)).toHaveLength(0);
   });
 });
 

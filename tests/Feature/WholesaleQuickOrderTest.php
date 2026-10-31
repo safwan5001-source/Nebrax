@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\CommerceCart;
 use App\Models\CommerceCartItem;
 use App\Models\CommerceListing;
+use App\Models\CommerceProductPersonalizationField;
 use App\Models\CustomerIdentity;
 use App\Models\Partner;
 use App\Models\PriceList;
@@ -441,6 +442,25 @@ class WholesaleQuickOrderTest extends TestCase
         $this->assertSame(0, $this->cartLines(), 'nothing was added');
         $this->assertSame(0, CommerceCart::withoutGlobalScopes()->count(), 'no cart was created either');
         $this->assertNull($this->cartIdOf($response));
+    }
+
+    #[Test]
+    public function a_product_with_a_required_personalization_field_is_not_orderable_here_and_never_breaks_a_batch_unindexed(): void
+    {
+        $token = $this->buyer('pers@qo.test');
+        app(TenantContext::class)->set($this->tenant->id);
+        CommerceProductPersonalizationField::create(['product_id' => $this->simple->id, 'key' => 'engraving', 'type' => 'text', 'label' => 'نقش', 'is_required' => true]);
+
+        $line = $this->lookup('cof-100', $token)->assertOk()->json('data.0');
+        $this->assertFalse($line['available']);
+        $this->assertNull($line['price']);
+        $this->assertSame('personalization_required', $line['unavailable_reason']);
+
+        // a client that ignores the lookup still gets an INDEXED rejection, not a bare 422
+        $response = $this->add([['product_id' => $this->simple->id, 'quantity' => 1]], $token)->assertStatus(422);
+        $response->assertJsonPath('error.details.reason', 'quick_order_rejected');
+        $this->assertSame('personalization_required', $response->json('error.details.lines.0.reason'));
+        $this->assertSame(0, $this->cartLines());
     }
 
     #[Test]

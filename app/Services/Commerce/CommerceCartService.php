@@ -550,6 +550,12 @@ final class CommerceCartService
                     $failures[] = ['index' => $index, 'reason' => $e->reason ?? 'not_purchasable'];
 
                     continue;
+                } catch (ValidationException $e) {
+                    // the only input a plain line can lack is a required personalization: report it per line, not as a bare 422
+                    $missing = collect(array_keys($e->errors()))->contains(fn ($key): bool => str_starts_with((string) $key, 'personalization'));
+                    $failures[] = ['index' => $index, 'reason' => $missing ? 'personalization_required' : 'invalid_line'];
+
+                    continue;
                 } catch (RuntimeException $e) {
                     $failures[] = ['index' => $index, 'reason' => 'invalid_line'];
 
