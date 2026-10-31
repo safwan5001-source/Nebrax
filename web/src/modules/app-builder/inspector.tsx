@@ -567,7 +567,10 @@ export function Inspector({
 
   const actionDefinition = node.action ? registries?.actions[node.action.type] : undefined;
   const actionTypeOptions = registries ? Object.keys(registries.actions) : [];
-  const componentTypeOptions = registries ? Object.keys(registries.components) : [];
+  // AD-12: الأنواع المسموح تضمينها تحت هذا المكوّن من السجل (الخادم يفرضها أيضاً)؛ خادم أقدم بلا القاعدة ⇒ كل نوع عدا Page.
+  const componentTypeOptions = registries
+    ? (definition.allowed_children ?? Object.keys(registries.components).filter((type) => type !== 'Page')).filter((type) => registries.components[type])
+    : [];
   const canAddChild = definition.children_rule.kind === 'unboundedAny';
   const injectedParams = new Set(definition.injected_runtime_action_params);
 

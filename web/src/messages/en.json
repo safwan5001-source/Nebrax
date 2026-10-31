@@ -8667,6 +8667,30 @@
         "removeLabel": "Remove page",
         "pickerPlaceholder": "Choose a page"
       },
+      "issues": {
+        "blocking": "Blocks publishing",
+        "warning": "Warning",
+        "more": "and {count} more",
+        "summaryBlocking": "{blocking} issue(s) block publishing and {warnings} warning(s) in the last saved version.",
+        "summaryWarnings": "{warnings} warning(s) in the last saved version (they do not block publishing).",
+        "show": "Show",
+        "hide": "Hide",
+        "codes": {
+          "page_not_root": "A page cannot be nested inside another component.",
+          "child_not_allowed": "This component cannot be placed inside its current parent.",
+          "children_not_allowed": "This component does not accept children.",
+          "prop_type_mismatch": "A property value is not of the expected type.",
+          "prop_enum_invalid": "A property value is outside the allowed values.",
+          "action_param_invalid": "An action parameter is not valid.",
+          "missing_action_param": "A required action parameter is missing.",
+          "navigate_target_missing": "The navigation target page does not exist.",
+          "duplicate_id_across_pages": "The identifier is used on more than one page.",
+          "unknown_prop": "The property is not defined for this component and the app will ignore it.",
+          "missing_required_prop": "A required property is missing.",
+          "action_not_supported": "This component does not run actions; the action will be ignored.",
+          "unknown_action_param": "A parameter is not defined for this action."
+        }
+      },
       "publish": {
         "action": "Publish",
         "draftChangedTitle": "The draft changed",

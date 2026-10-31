@@ -185,6 +185,20 @@ export interface RegistryComponentDefinition {
   injected_runtime_action_params: string[];
   notes: string;
   bindable_resources: string[];
+  /** AD-12: قواعد التضمين من الخادم (غائبة عن خادم أقدم ⇒ يسقط الويب على `children_rule`). */
+  allowed_children?: string[];
+  allowed_parents?: string[];
+}
+
+/** AD-12 (S02): مشكلة عقد من الخادم. `blocks_publish` ⇒ تمنع النشر؛ لا تمنع الحفظ أبداً. */
+export interface ContractIssue {
+  code: string;
+  severity: 'error' | 'warning';
+  page_id: string;
+  node_id: string | null;
+  field: string | null;
+  message: string;
+  blocks_publish: boolean;
 }
 
 export interface RegistryActionParamDefinition {

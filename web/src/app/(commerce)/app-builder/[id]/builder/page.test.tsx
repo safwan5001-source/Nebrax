@@ -128,6 +128,15 @@ const { api, currentUser, translate } = vi.hoisted(() => {
     'publish.publishing': 'Publishing…',
     'publish.successTitle': 'Version published',
     'publish.errorTitle': 'Could not publish',
+    'issues.blocking': 'Blocks publishing',
+    'issues.warning': 'Warning',
+    'issues.more': 'and {count} more',
+    'issues.summaryBlocking': '{blocking} issue(s) block publishing and {warnings} warning(s).',
+    'issues.summaryWarnings': '{warnings} warning(s).',
+    'issues.show': 'Show',
+    'issues.hide': 'Hide',
+    'issues.codes.navigate_target_missing': 'The navigation target page does not exist.',
+    'issues.codes.unknown_prop': 'Unknown property.',
     'publish.draftChangedTitle': 'The draft changed',
     'publish.draftChangedBody': 'Nothing was published. Reload and review.',
     'previewState.draft': 'Draft',
@@ -533,6 +542,19 @@ describe('AppBuilderWorkspacePage', () => {
     expect(screen.getByText('Unsaved changes')).toBeTruthy();
     // The new Text node is selected — its (empty-string default) `text` prop field is now visible.
     await waitFor(() => expect(screen.getAllByDisplayValue('').length).toBeGreaterThan(0));
+  });
+
+  it('the add-item menu never offers Page (a Page is a root only), and follows allowed_children from the registry when present', async () => {
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+    const desktopTree = screen.getAllByRole('tree')[0];
+    await userEvent.setup().click(within(desktopTree).getByText('Section'));
+
+    const [addTypeSelect] = await screen.findAllByDisplayValue('Choose an item type');
+    const optionValues = Array.from((addTypeSelect as HTMLSelectElement).options).map((o) => o.value);
+    expect(optionValues).toContain('Text');
+    expect(optionValues).not.toContain('Page');
   });
 
   it('undo reverts the last edit and redo reapplies it', async () => {
@@ -1877,6 +1899,49 @@ describe('AppBuilderWorkspacePage — save safety (AD-01 / S01b)', () => {
     await waitFor(() => expect(toastFns.error).toHaveBeenCalledWith('The draft changed', 'Nothing was published. Reload and review.'));
     expect(toastFns.success).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  const navIssue = { code: 'navigate_target_missing', severity: 'error', page_id: 'home', node_id: 'go', field: 'action.params.pageId', message: 'x', blocks_publish: true };
+  const warnIssue = { code: 'unknown_prop', severity: 'warning', page_id: 'home', node_id: 't', field: 'mystery', message: 'y', blocks_publish: false };
+
+  it('contract issues from the loaded draft show as a summary that expands to the node-level list', async () => {
+    mockApi();
+    overrideApi((path, init) => (path === DRAFT_PATH && !init?.method ? Promise.resolve({ data: draftData, issues: [navIssue, warnIssue] }) : undefined));
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    const notice = await screen.findByTestId('contract-issues');
+    expect(within(notice).getByText('1 issue(s) block publishing and 1 warning(s).')).toBeTruthy();
+    await userEvent.setup().click(within(notice).getByRole('button', { name: 'Show' }));
+    expect(within(notice).getByText('The navigation target page does not exist.')).toBeTruthy();
+    expect(within(notice).getByText('home › go › action.params.pageId')).toBeTruthy();
+    expect(within(notice).getByText('Unknown property.')).toBeTruthy();
+  });
+
+  it('a clean draft shows no issues notice, and a save refreshes the issues from the PUT response', async () => {
+    mockApi();
+    overrideApi((path, init) => (path === DRAFT_PATH && init?.method === 'PUT' ? Promise.resolve({ data: { ...draftData, revision: 1 }, issues: [warnIssue] }) : undefined));
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+    expect(screen.queryByTestId('contract-issues')).toBeNull();
+
+    await makeEdit('Bye');
+    await clickSave();
+    expect(await screen.findByTestId('contract-issues')).toBeTruthy();
+    expect(screen.getByText('1 warning(s).')).toBeTruthy();
+  });
+
+  it('a 422 contract_violations from the publish check lists the blocking issues in the dialog and keeps Publish disabled', async () => {
+    const { ApiError } = await import('@/lib/api');
+    mockApi({ validateError: new ApiError(422, 'Contract violations', { reason: 'contract_violations', issues: [navIssue] }) });
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    await userEvent.setup().click(screen.getAllByText('Publish')[0]);
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(await dialog.findByText('Contract violations')).toBeTruthy();
+    expect(dialog.getByText('The navigation target page does not exist.')).toBeTruthy();
+    expect((dialog.getByRole('button', { name: 'Publish' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('a local backup that differs from the server draft is offered for restore, and restoring keeps its original base revision', async () => {

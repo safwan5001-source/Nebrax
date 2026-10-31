@@ -8667,6 +8667,30 @@
         "removeLabel": "حذف الصفحة",
         "pickerPlaceholder": "اختر صفحة"
       },
+      "issues": {
+        "blocking": "يمنع النشر",
+        "warning": "تحذير",
+        "more": "و{count} أخرى",
+        "summaryBlocking": "{blocking} مشكلة تمنع النشر و{warnings} تحذير في آخر نسخة محفوظة.",
+        "summaryWarnings": "{warnings} تحذير في آخر نسخة محفوظة (لا تمنع النشر).",
+        "show": "عرض",
+        "hide": "إخفاء",
+        "codes": {
+          "page_not_root": "الصفحة لا تُضمَّن داخل مكوّن آخر.",
+          "child_not_allowed": "هذا المكوّن لا يُضمَّن داخل أبيه الحالي.",
+          "children_not_allowed": "هذا المكوّن لا يقبل أبناء.",
+          "prop_type_mismatch": "قيمة خاصية ليست من النوع المتوقع.",
+          "prop_enum_invalid": "قيمة خاصية خارج القيم المسموحة.",
+          "action_param_invalid": "معامل إجراء غير صالح.",
+          "missing_action_param": "معامل مطلوب غائب عن الإجراء.",
+          "navigate_target_missing": "وجهة الانتقال تشير إلى صفحة غير موجودة.",
+          "duplicate_id_across_pages": "المعرّف مستعمل في أكثر من صفحة.",
+          "unknown_prop": "خاصية غير معرّفة للمكوّن وسيتجاهلها التطبيق.",
+          "missing_required_prop": "خاصية مطلوبة غائبة.",
+          "action_not_supported": "هذا المكوّن لا ينفّذ إجراءات؛ سيُتجاهل الإجراء.",
+          "unknown_action_param": "معامل غير معرّف للإجراء."
+        }
+      },
       "publish": {
         "action": "نشر",
         "draftChangedTitle": "تغيّرت المسودة",

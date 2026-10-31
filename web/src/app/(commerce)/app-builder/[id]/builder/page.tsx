@@ -23,9 +23,10 @@ import {
   mergeThemeTokens, moveSibling, removeComponentById, removePage, reorderChildren, setInitialPage,
   themeTokens as schemaThemeTokens, updateComponentById,
   type AppBuilderRegistries, type AppSchema, type AppSchemaActionRef, type AppSchemaComponent, type BuilderApp,
-  type BuilderDraftExperience, type BuilderPublishedVersion,
+  type BuilderDraftExperience, type BuilderPublishedVersion, type ContractIssue,
 } from '@/lib/app-builder';
 import { resolvePreviewActionOutcome } from '@/modules/app-builder/action-semantics';
+import { ContractIssuesList, ContractIssuesNotice, parseContractIssues } from '@/modules/app-builder/contract-issues';
 import { AppBuilderCanvas, PREVIEW_WIDTHS, type PreviewDevice } from '@/modules/app-builder/canvas';
 import { DEFAULT_APP_EXPERIENCE } from '@/modules/app-builder/default-experience';
 import { DeviceFrame, DEVICE_FRAME_PRESETS, type DeviceFramePreset } from '@/modules/app-builder/device-frame';
@@ -108,7 +109,9 @@ export default function AppBuilderWorkspacePage() {
   const [structureMode, setStructureMode] = useState<StructureMode>('pages');
   const [publishOpen, setPublishOpen] = useState(false);
   const [publishNote, setPublishNote] = useState('');
-  const [validation, setValidation] = useState<{ status: 'checking' | 'passed' | 'failed'; message?: string }>({ status: 'checking' });
+  const [validation, setValidation] = useState<{ status: 'checking' | 'passed' | 'failed'; message?: string; issues?: ContractIssue[] }>({ status: 'checking' });
+  // AD-12: مشكلات العقد في آخر نسخة محفوظة (من استجابة GET/PUT للمسودة)؛ معلوماتية ولا تمنع الحفظ.
+  const [contractIssues, setContractIssues] = useState<ContractIssue[]>([]);
   const [publishing, setPublishing] = useState(false);
   const canPublish = hasAppBuilderPermission(currentUser(), 'apps_builder.publish');
   const [previewThemeTokens, setPreviewThemeTokens] = useState<Record<string, string> | null>(null);
@@ -160,12 +163,13 @@ export default function AppBuilderWorkspacePage() {
     setLoadError(null);
     Promise.all([
       api<{ data: BuilderApp }>(`/app-builder/apps/${params.id}`),
-      api<{ data: BuilderDraftExperience }>(`/app-builder/apps/${params.id}/draft`),
+      api<{ data: BuilderDraftExperience; issues?: ContractIssue[] }>(`/app-builder/apps/${params.id}/draft`),
       api<{ data: AppBuilderRegistries }>('/app-builder/registries'),
     ])
       .then(([appRes, draftRes, registriesRes]) => {
         setApp(appRes.data);
         setSchema(draftRes.data.schema);
+        setContractIssues(draftRes.issues ?? []);
         baseRevisionRef.current = draftRes.data.revision;
         setBaseRevision(draftRes.data.revision);
         setConflict(null);
@@ -300,11 +304,12 @@ export default function AppBuilderWorkspacePage() {
     if (!toSave || !params.id) return 'failed';
     const base = overrideBase ?? baseRevisionRef.current;
     try {
-      const res = await api<{ data: BuilderDraftExperience }>(`/app-builder/apps/${params.id}/draft`, {
+      const res = await api<{ data: BuilderDraftExperience; issues?: ContractIssue[] }>(`/app-builder/apps/${params.id}/draft`, {
         method: 'PUT',
         body: base === null ? { schema: toSave } : { schema: toSave, base_revision: base },
       });
       const saved = res?.data;
+      setContractIssues(res?.issues ?? []);
       if (saved && typeof saved.revision === 'number') {
         baseRevisionRef.current = saved.revision;
         setBaseRevision(saved.revision);
@@ -434,7 +439,8 @@ export default function AppBuilderWorkspacePage() {
       await api(`/app-builder/apps/${params.id}/validate`, { method: 'POST' });
       setValidation({ status: 'passed' });
     } catch (err) {
-      setValidation({ status: 'failed', message: err instanceof ApiError ? err.message : t('publish.validateErrorGeneric') });
+      const issues = err instanceof ApiError ? parseContractIssues(err.body) : null;
+      setValidation({ status: 'failed', message: err instanceof ApiError ? err.message : t('publish.validateErrorGeneric'), ...(issues ? { issues } : {}) });
     }
   }
 
@@ -970,6 +976,7 @@ export default function AppBuilderWorkspacePage() {
       {!canManage ? (
         <p role="status" className="shrink-0 border-b border-border bg-primary-soft px-4 py-2 text-xs text-text">{t('readOnly.notice')}</p>
       ) : null}
+      <ContractIssuesNotice issues={contractIssues} t={t} />
       {saveFailure ? (
         <div role="alert" className="flex shrink-0 flex-wrap items-center gap-2 border-b border-negative/30 bg-negative/10 px-4 py-2 text-xs text-text">
           <span>{saveFailure === 'network' ? t('saveFailure.network') : t('saveFailure.other')}</span>
@@ -1303,7 +1310,10 @@ export default function AppBuilderWorkspacePage() {
           ) : validation.status === 'passed' ? (
             <p className="text-sm text-positive">{t('publish.validationPassed')}</p>
           ) : (
-            <p className="text-sm text-negative">{validation.message}</p>
+            <div className="space-y-2">
+              <p className="text-sm text-negative">{validation.message}</p>
+              {validation.issues ? <ContractIssuesList issues={validation.issues} t={t} /> : null}
+            </div>
           )}
           <div className="space-y-1">
             <label className="block text-xs font-medium text-text">{t('publish.noteLabel')}</label>
