@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Services\Commerce\CartNotFoundException;
+use App\Services\Commerce\CommerceCartLineNotPurchasableException;
 use App\Services\Commerce\CommerceCartService;
 use App\Support\PublicApiErrorCode;
 use App\Support\PublicApiResponse;
@@ -60,6 +61,8 @@ final class StorefrontCartController extends PublicApiController
             return $this->clearCookie($this->notFound($request));
         } catch (PDOException $e) {
             throw $e;
+        } catch (CommerceCartLineNotPurchasableException $e) {
+            return $this->notPurchasable($request, $e);
         } catch (RuntimeException $e) {
             abort(422, $e->getMessage());
         }
@@ -92,6 +95,8 @@ final class StorefrontCartController extends PublicApiController
             return $this->notFoundAfterMutation($request, $carts);
         } catch (PDOException $e) {
             throw $e;
+        } catch (CommerceCartLineNotPurchasableException $e) {
+            return $this->notPurchasable($request, $e);
         } catch (RuntimeException $e) {
             abort(422, $e->getMessage());
         }
@@ -137,6 +142,19 @@ final class StorefrontCartController extends PublicApiController
                 'request' => 'حقول غير مسموحة: '.implode(', ', $unknown),
             ]);
         }
+    }
+
+    /**
+     * 422 as before. Only when the exception carries a machine-readable reason (a wholesale channel with no eligible price) the
+     * envelope also states it in `error.details.reason`; every other case, and every non-wholesale channel, is `abort(422)` exactly as it was.
+     */
+    private function notPurchasable(Request $request, CommerceCartLineNotPurchasableException $e): JsonResponse
+    {
+        if ($e->reason === null) {
+            abort(422, $e->getMessage());
+        }
+
+        return PublicApiResponse::error($request, PublicApiErrorCode::VALIDATION_FAILED, $e->getMessage(), 422, ['reason' => $e->reason]);
     }
 
     private function notFound(Request $request): JsonResponse

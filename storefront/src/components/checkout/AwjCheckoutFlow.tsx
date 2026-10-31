@@ -76,6 +76,7 @@ import {
   type StorefrontOrder,
 } from "@/lib/commerce/checkout-types";
 import { savePendingOnlinePayment } from "@/lib/commerce/pending-online-payment";
+import type { PurchaseIssue } from "@/lib/commerce/wholesale-buyer";
 import {
   completeAwjCheckoutAction,
   getAwjCheckoutIdentity,
@@ -159,6 +160,24 @@ const CONTINUE_LABEL: Record<CheckoutStage, string> = {
 export function AwjCheckoutFlow() {
   const t = useTranslations("awjCheckout");
   const tc = useTranslations("common");
+  const tw = useTranslations("wholesaleBuyer");
+
+  /*
+   * H6 Batch K — a wholesale refusal (signed out / not approved / suspended / no eligible price) is shown as the
+   * store's own localized wording; every other failure keeps the server text exactly as before. The wording never
+   * names a price list, a partner or another buyer's state.
+   */
+  const failureText = useCallback(
+    (failure: {
+      error?: string;
+      message?: string;
+      purchaseIssue?: PurchaseIssue;
+    }): string =>
+      failure.purchaseIssue
+        ? tw(`purchase.${failure.purchaseIssue}`)
+        : (failure.error ?? failure.message ?? ""),
+    [tw],
+  );
   const pathname = usePathname();
   const basePath = extractBasePath(pathname);
 
@@ -308,7 +327,7 @@ export function AwjCheckoutFlow() {
             email: contact.email.trim() ? contact.email.trim() : null,
           });
           if (!result.success) {
-            setFormError(result.error);
+            setFormError(failureText(result));
             return;
           }
           setCheckout(result.checkout);
@@ -325,7 +344,7 @@ export function AwjCheckoutFlow() {
             notes: address.notes.trim() ? address.notes.trim() : null,
           });
           if (!result.success) {
-            setFormError(result.error);
+            setFormError(failureText(result));
             return;
           }
           setCheckout(result.checkout);
@@ -335,7 +354,7 @@ export function AwjCheckoutFlow() {
           // here or in the client — the delivery amount is the server's alone.
           const result = await updateAwjDelivery(deliveryMethod);
           if (!result.success) {
-            setFormError(result.error);
+            setFormError(failureText(result));
             return;
           }
           setCheckout(result.checkout);
@@ -352,7 +371,7 @@ export function AwjCheckoutFlow() {
                 slot_id: scheduleDraft.slotId,
               });
               if (!result.success) {
-                setFormError(result.error);
+                setFormError(failureText(result));
                 return;
               }
               setCheckout(result.checkout);
@@ -364,7 +383,7 @@ export function AwjCheckoutFlow() {
               slot_id: null,
             });
             if (!result.success) {
-              setFormError(result.error);
+              setFormError(failureText(result));
               return;
             }
             setCheckout(result.checkout);
@@ -384,7 +403,7 @@ export function AwjCheckoutFlow() {
               message: gift.message.trim() ? gift.message.trim() : null,
             });
             if (!result.success) {
-              setFormError(result.error);
+              setFormError(failureText(result));
               return;
             }
             setCheckout(result.checkout);
@@ -393,7 +412,7 @@ export function AwjCheckoutFlow() {
             // always clears (the server allows it even if gifting was disabled).
             const result = await updateAwjGift({ is_gift: false });
             if (!result.success) {
-              setFormError(result.error);
+              setFormError(failureText(result));
               return;
             }
             setCheckout(result.checkout);
@@ -413,7 +432,7 @@ export function AwjCheckoutFlow() {
               setFormError(
                 result.kind === "online_unavailable"
                   ? t("payment.onlineUnavailable")
-                  : result.error,
+                  : failureText(result),
               );
               return;
             }
@@ -424,7 +443,7 @@ export function AwjCheckoutFlow() {
           ) {
             const result = await updateAwjPayment(paymentMethodId);
             if (!result.success) {
-              setFormError(result.error);
+              setFormError(failureText(result));
               return;
             }
             setCheckout(result.checkout);
@@ -446,6 +465,7 @@ export function AwjCheckoutFlow() {
       scheduleDraft,
       gift,
       goTo,
+      failureText,
     ],
   );
 
@@ -550,11 +570,11 @@ export function AwjCheckoutFlow() {
 
       // Includes `idempotency_conflict`: the shopper is told, and the key is
       // deliberately kept so a genuine replay still works.
-      setFormError(result.message);
+      setFormError(failureText(result));
     } finally {
       setCompleting(false);
     }
-  }, [goTo, basePath]);
+  }, [goTo, basePath, failureText]);
 
   const reviewIssueMessages = useMemo(
     () =>

@@ -417,6 +417,7 @@ export function mapAwjProductToViewModel(
     available_on: product.created_at,
     preorder_ships_at: null,
     purchasable,
+    ...(wholesaleUnavailable ? { wholesale_unavailable: true } : {}),
     preorder: false,
     in_stock: product.in_stock ?? true,
     backorderable: false,

@@ -80,7 +80,42 @@ describe("native wholesale buyer surface — boundaries", () => {
     expect(source).not.toMatch(/return\s*\{[^}]*token/);
   });
 
-  it("the buyer token rides ONLY on price-bearing catalogue reads — never cart, checkout, payment or orders", () => {
+  it("the buyer token reaches cart, checkout and payment ONLY through the shared server transport (H6 Batch K)", () => {
+    // Batch G forbade forwarding to cart/checkout until the backend contract (approved precedence, membership re-check,
+    // order ownership) existed. Batches H–J delivered it, so Batch K forwards the HttpOnly-cookie token — but through
+    // exactly ONE place: `storefrontCartRequest` in `config.ts`. No feature module touches the token, so no call site
+    // can forget, leak or log it.
+    const importers = walk(join(SRC))
+      .filter((f) => !/\.(test|spec)\.(ts|tsx)$/.test(f))
+      .filter((f) => /getBuyerToken/.test(readFileSync(f, "utf8")))
+      .map((f) => f.slice(SRC.length + 1))
+      .sort();
+    expect(importers).toEqual([
+      "lib/commerce/buyer-session.ts",
+      "lib/commerce/config.ts",
+      "lib/data/wholesale-buyer.ts",
+    ]);
+
+    // …and it is only ever placed in a request HEADER: never a URL, body, log, storage or a returned value
+    const transport = read("lib/commerce/config.ts");
+    expect(transport).toMatch(
+      /requestHeaders\[BUYER_TOKEN_HEADER\]\s*=\s*buyerToken/,
+    );
+    expect(transport).not.toMatch(
+      /console\.(log|info|warn|error)\([^)]*(buyerToken|token)/,
+    );
+    expect(transport).not.toMatch(
+      /searchParams\.(set|append)\([^)]*buyerToken/,
+    );
+    for (const file of walk(SRC)) {
+      const source = readFileSync(file, "utf8");
+      expect(source, file).not.toMatch(
+        /(localStorage|sessionStorage)\.[a-zA-Z]+\([^)]*awj_buyer_session/,
+      );
+    }
+  });
+
+  it("the buyer token rides on catalogue reads only via withBuyerToken, and no feature module references it directly", () => {
     const withToken = walk(join(SRC, "lib")).filter((f) =>
       readFileSync(f, "utf8").includes("withBuyerToken"),
     );

@@ -16,4 +16,15 @@ use RuntimeException;
  * failure has nothing to do with the line being merged and must abort the
  * whole merge, never be silently swallowed as "not purchasable".
  */
-final class CommerceCartLineNotPurchasableException extends RuntimeException {}
+final class CommerceCartLineNotPurchasableException extends RuntimeException
+{
+    /**
+     * H6 Batch K — a stable machine-readable reason, set ONLY when a wholesale channel has no eligible price for the line
+     * (`ResolvedCommercePrice::UNAVAILABLE_FOR_WHOLESALE`). `null` for every other cause and on every non-wholesale channel,
+     * so a DTC response is unchanged. The storefront reads it to show "unavailable for wholesale" instead of a generic error.
+     */
+    public function __construct(string $message = '', public readonly ?string $reason = null)
+    {
+        parent::__construct($message);
+    }
+}

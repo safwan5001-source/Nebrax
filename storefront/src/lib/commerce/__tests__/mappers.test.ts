@@ -409,6 +409,20 @@ describe("mapAwjProductToViewModel — wholesale unavailable (H6 Batch J)", () =
     expect(viewModel.price.amount_in_cents).toBeNull();
     expect(viewModel.purchasable).toBe(false);
     expect(viewModel.available).toBe(false);
+    // so the UI can say "not available for wholesale" rather than a misleading "out of stock"
+    expect(viewModel.wholesale_unavailable).toBe(true);
+  });
+
+  it("never sets the wholesale flag for an ordinary or an available product (view model unchanged)", () => {
+    expect(
+      "wholesale_unavailable" in mapAwjProductToViewModel(baseProduct()),
+    ).toBe(false);
+    expect(
+      "wholesale_unavailable" in
+        mapAwjProductToViewModel(
+          baseProduct({ wholesale_availability: { state: "available" } }),
+        ),
+    ).toBe(false);
   });
 
   it("treats the machine-readable state alone as unavailable even if a price object is present", () => {

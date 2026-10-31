@@ -19,10 +19,11 @@ import type {
 import type { PdpSelections } from "@/lib/commerce/pdp-gifting";
 import type { Surface } from "@/lib/commerce/surface";
 import type { StoreCart, StoreCartLine } from "@/lib/commerce/types";
+import type { PurchaseIssue } from "@/lib/commerce/wholesale-buyer";
 import {
   addAwjItem,
   addToCart as addToCartAction,
-  getAwjCart,
+  getAwjCartState,
   getCart as getCartAction,
   removeAwjItem,
   removeCartItem as removeCartItemAction,
@@ -47,6 +48,11 @@ interface CartContextType {
   loading: boolean;
   updating: boolean;
   itemCount: number;
+  /**
+   * H6 Batch K — set only when the cart cannot be read or changed because of the buyer's wholesale standing
+   * (`sign_in_required`, `approval_required`, `unavailable_for_wholesale`). Always `null` for a DTC visitor.
+   */
+  accessIssue: PurchaseIssue | null;
   isOpen: boolean;
   openCart: () => void;
   closeCart: () => void;
@@ -85,6 +91,8 @@ export function CartProvider({
   const router = useRouter();
   const pathname = usePathname();
   const t = useTranslations("cart");
+  const tw = useTranslations("wholesaleBuyer");
+  const [accessIssue, setAccessIssue] = useState<PurchaseIssue | null>(null);
   const isAwj = surface === "dtc";
 
   const openCart = useCallback(() => setIsOpen(true), []);
@@ -92,10 +100,13 @@ export function CartProvider({
 
   const refreshCart = useCallback(async () => {
     try {
-      const cartData = isAwj
-        ? await getAwjCart()
-        : await getCartAction(undefined, surface);
-      setCart(cartData);
+      if (isAwj) {
+        const state = await getAwjCartState();
+        setCart(state.cart);
+        setAccessIssue(state.purchaseIssue ?? null);
+      } else {
+        setCart(await getCartAction(undefined, surface));
+      }
     } catch {
       setCart(null);
     } finally {
@@ -109,6 +120,7 @@ export function CartProvider({
         success: boolean;
         cart?: AnyCart | null;
         error?: string;
+        purchaseIssue?: PurchaseIssue;
       }>,
       fallbackMessage: string,
       onSuccess?: () => void,
@@ -120,6 +132,10 @@ export function CartProvider({
           setCart(result.cart ?? null);
           onSuccess?.();
           router.refresh();
+        } else if (result.purchaseIssue) {
+          // A wholesale refusal: the store's own localized wording, never the backend's text, and the cart shows why.
+          setAccessIssue(result.purchaseIssue);
+          toast.error(tw(`purchase.${result.purchaseIssue}`));
         } else {
           toast.error(result.error || fallbackMessage);
         }
@@ -129,7 +145,7 @@ export function CartProvider({
         setUpdating(false);
       }
     },
-    [router],
+    [router, tw],
   );
 
   const addItem = useCallback(
@@ -215,6 +231,7 @@ export function CartProvider({
       loading,
       updating,
       itemCount,
+      accessIssue,
       isOpen,
       openCart,
       closeCart,
@@ -229,6 +246,7 @@ export function CartProvider({
       loading,
       updating,
       itemCount,
+      accessIssue,
       isOpen,
       openCart,
       closeCart,

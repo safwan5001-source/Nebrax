@@ -200,7 +200,9 @@ export const ProductCard = memo(function ProductCard({
           */}
           {!product.purchasable && surface === "wholesale" && (
             <span className="text-[0.625rem] font-medium text-store-muted-foreground">
-              {t("outOfStock")}
+              {product.wholesale_unavailable
+                ? t("wholesaleUnavailable")
+                : t("outOfStock")}
             </span>
           )}
         </div>
@@ -218,7 +220,9 @@ export const ProductCard = memo(function ProductCard({
           <div className="relative z-10 mt-2.5">
             {!product.purchasable ? (
               <span className="block rounded-store border border-store-border px-3 py-1.5 text-center text-xs font-medium text-store-muted-foreground">
-                {t("outOfStock")}
+                {product.wholesale_unavailable
+                  ? t("wholesaleUnavailable")
+                  : t("outOfStock")}
               </span>
             ) : isVariantManaged ? (
               /*

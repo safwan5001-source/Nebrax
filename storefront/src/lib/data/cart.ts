@@ -11,6 +11,10 @@ import type { StorefrontCart } from "@/lib/commerce/cart-types";
 import type { PdpSelections } from "@/lib/commerce/pdp-gifting";
 import type { StoreCart, StoreCreateCartParams } from "@/lib/commerce/types";
 import {
+  type PurchaseIssue,
+  purchaseIssueFromError,
+} from "@/lib/commerce/wholesale-buyer";
+import {
   cacheTagSuffix,
   clearCartCookies,
   DEFAULT_SURFACE,
@@ -57,6 +61,22 @@ export async function getAwjCart(): Promise<StorefrontCart | null> {
     return await fetchAwjCart();
   } catch {
     return null;
+  }
+}
+
+/**
+ * H6 Batch K — the same read, plus WHY it came back empty when a wholesale refusal was the reason (signed out, membership not
+ * approved / suspended). `purchaseIssue` is `undefined` for every other outcome, so a DTC visitor's result is exactly `getAwjCart()`'s.
+ */
+export async function getAwjCartState(): Promise<{
+  cart: StorefrontCart | null;
+  purchaseIssue?: PurchaseIssue;
+}> {
+  try {
+    return { cart: await fetchAwjCart() };
+  } catch (error) {
+    const purchaseIssue = purchaseIssueFromError(error);
+    return { cart: null, ...(purchaseIssue ? { purchaseIssue } : {}) };
   }
 }
 

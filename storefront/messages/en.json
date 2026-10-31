@@ -336,7 +336,8 @@
     "contentBlock_allergens": "Allergens",
     "contentBlock_storage": "Storage",
     "contentBlock_preparation_notes": "Preparation notes",
-    "contentBlock_personalization_instructions": "Personalization instructions"
+    "contentBlock_personalization_instructions": "Personalization instructions",
+    "wholesaleUnavailable": "Not available for wholesale"
   },
   "navigation": {
     "home": "Home",
@@ -1130,7 +1131,7 @@
       },
       "approved": {
         "label": "Approved",
-        "body": "Your wholesale membership is approved and trade prices are visible. Online ordering for wholesale buyers is not available yet."
+        "body": "Your wholesale membership is approved. Trade prices are visible and you can add products to your cart and place orders."
       },
       "rejected": {
         "label": "Not approved",
@@ -1174,6 +1175,11 @@
       "submit": "Send email",
       "submitting": "Sending...",
       "doneBody": "If this address belongs to an account that still needs confirmation, a new link has been sent. The previous link stops working once the new email is sent."
+    },
+    "purchase": {
+      "sign_in_required": "Sign in to your wholesale account to view and order from this cart.",
+      "approval_required": "Your wholesale account is not approved for ordering right now. Check your membership status.",
+      "unavailable_for_wholesale": "This product is not available for wholesale ordering."
     }
   }
 }

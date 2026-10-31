@@ -173,7 +173,7 @@ describe("BuyerMembershipPanel — every state, both locales", () => {
     ).toBeInTheDocument();
   });
 
-  it("approved copy is honest that online ordering is not available yet", () => {
+  it("approved copy states that products can be ordered (native ordering, H6 Batch K), not that ordering is unavailable", () => {
     render(
       withIntl(
         <BuyerMembershipPanel
@@ -184,10 +184,9 @@ describe("BuyerMembershipPanel — every state, both locales", () => {
       ),
     );
     expect(
-      screen.getByText(
-        /Online ordering for wholesale buyers is not available yet/,
-      ),
+      screen.getByText(/you can add products to your cart and place orders/),
     ).toBeInTheDocument();
+    expect(screen.queryByText(/not available yet/)).not.toBeInTheDocument();
   });
 });
 

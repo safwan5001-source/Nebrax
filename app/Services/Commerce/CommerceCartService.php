@@ -765,7 +765,7 @@ final class CommerceCartService
             $variant?->id,
         );
         if (! $price->resolved || $price->amount === null) {
-            throw new CommerceCartLineNotPurchasableException('لا يوجد سعر معتمد لهذه الوحدة.');
+            throw new CommerceCartLineNotPurchasableException('لا يوجد سعر معتمد لهذه الوحدة.', $price->unavailableReason);
         }
 
         return [

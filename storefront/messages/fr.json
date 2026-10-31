@@ -336,7 +336,8 @@
     "contentBlock_allergens": "Allergènes",
     "contentBlock_storage": "Conservation",
     "contentBlock_preparation_notes": "Notes de préparation",
-    "contentBlock_personalization_instructions": "Instructions de personnalisation"
+    "contentBlock_personalization_instructions": "Instructions de personnalisation",
+    "wholesaleUnavailable": "Non disponible en gros"
   },
   "navigation": {
     "home": "Accueil",
@@ -1130,7 +1131,7 @@
       },
       "approved": {
         "label": "Approuvée",
-        "body": "Votre adhésion grossiste est approuvée et les tarifs sont visibles. La commande en ligne pour les acheteurs grossistes n'est pas encore disponible."
+        "body": "Votre adhésion grossiste est approuvée. Les prix professionnels sont visibles et vous pouvez ajouter des produits au panier et commander."
       },
       "rejected": {
         "label": "Non approuvée",
@@ -1174,6 +1175,11 @@
       "submit": "Envoyer l'e-mail",
       "submitting": "Envoi...",
       "doneBody": "Si l'adresse correspond à un compte à confirmer, un nouveau lien a été envoyé. Le lien précédent cesse de fonctionner dès l'envoi du nouveau."
+    },
+    "purchase": {
+      "sign_in_required": "Connectez-vous à votre compte grossiste pour voir ce panier et commander.",
+      "approval_required": "Votre compte grossiste n'est pas autorisé à commander pour le moment. Vérifiez le statut de votre adhésion.",
+      "unavailable_for_wholesale": "Ce produit n'est pas disponible à la commande en gros."
     }
   }
 }

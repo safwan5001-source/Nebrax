@@ -123,7 +123,9 @@ export function QuickView({
             </div>
             {!product.purchasable && (
               <p className="mt-1 text-xs font-medium text-store-destructive">
-                {t("outOfStock")}
+                {product.wholesale_unavailable
+                  ? t("wholesaleUnavailable")
+                  : t("outOfStock")}
               </p>
             )}
           </div>

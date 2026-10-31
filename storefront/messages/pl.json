@@ -336,7 +336,8 @@
     "contentBlock_allergens": "Alergeny",
     "contentBlock_storage": "Przechowywanie",
     "contentBlock_preparation_notes": "Uwagi dotyczące przygotowania",
-    "contentBlock_personalization_instructions": "Instrukcje personalizacji"
+    "contentBlock_personalization_instructions": "Instrukcje personalizacji",
+    "wholesaleUnavailable": "Niedostępne w hurcie"
   },
   "navigation": {
     "home": "Strona główna",
@@ -1130,7 +1131,7 @@
       },
       "approved": {
         "label": "Zatwierdzone",
-        "body": "Twoje członkostwo hurtowe jest zatwierdzone, a ceny hurtowe są widoczne. Zamawianie online dla kupców hurtowych nie jest jeszcze dostępne."
+        "body": "Twoje członkostwo hurtowe jest zatwierdzone. Ceny hurtowe są widoczne, możesz dodawać produkty do koszyka i składać zamówienia."
       },
       "rejected": {
         "label": "Niezatwierdzone",
@@ -1174,6 +1175,11 @@
       "submit": "Wyślij e-mail",
       "submitting": "Wysyłanie...",
       "doneBody": "Jeśli adres należy do konta wymagającego potwierdzenia, wysłano nowy link. Poprzedni link przestaje działać po wysłaniu nowego."
+    },
+    "purchase": {
+      "sign_in_required": "Zaloguj się na konto hurtowe, aby zobaczyć ten koszyk i składać zamówienia.",
+      "approval_required": "Twoje konto hurtowe nie jest obecnie zatwierdzone do składania zamówień. Sprawdź status członkostwa.",
+      "unavailable_for_wholesale": "Ten produkt nie jest dostępny w zamówieniach hurtowych."
     }
   }
 }
