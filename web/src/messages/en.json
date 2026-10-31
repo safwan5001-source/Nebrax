@@ -8741,6 +8741,7 @@
               "orders": "My orders"
             }
           },
+          "dragHandle": "Drag to reorder",
           "sectionsVisible": "{visible}/{count} visible",
           "selectionBar": {
             "label": "Tools for section “{name}”",

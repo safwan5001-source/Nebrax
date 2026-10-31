@@ -219,6 +219,20 @@ test.describe('App Builder — Easy Mode V2 (real browser)', () => {
     await expect(list).toBeVisible();
   });
 
+  test('reorder sections with the drag handle by keyboard (and the arrows still work): the new order is what gets saved', async ({ page }) => {
+    const { puts } = await open(page, { locale: 'en', viewport: VIEWPORTS[0] });
+    const list = visibleSections(page);
+    const handle = list.getByRole('button', { name: 'Drag to reorder' }).first();
+    await handle.focus();
+    await page.keyboard.press('Space');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Space');
+
+    await page.getByRole('button', { name: 'Save' }).first().click();
+    await expect.poll(() => puts.length).toBe(1);
+    expect(puts[0].schema.pages.home.children.map((c: { id: string }) => c.id)).toEqual(['sec-products', 'sec-welcome', 'sec-cta']);
+  });
+
   test('selecting an element in the preview shows the section toolbar; Advanced shows the layers tree and switching back keeps the draft', async ({ page }) => {
     await open(page, { locale: 'en', viewport: VIEWPORTS[0] });
     await visibleSections(page).getByRole('listitem').first().getByRole('button').first().click();
