@@ -154,6 +154,7 @@ No financial or security assertion was weakened.
 12. Eighth Codex pass (one P2, a knock-on of fix 11, verified with a failing-before test): the 2-character minimum-search rule ran before the "keep the imported candidates" rule, so a valid one-character ambiguous parent SKU (e.g. `A`) lost its variant choices — the import rule now takes precedence.
 13. Ninth Codex pass (one P2, verified with a failing-before test): choosing a variant from an ambiguous pasted parent SKU dropped the quantity typed in that row (`SHIRT 12` produced one shirt). The pasted quantity is now carried to the first variant picked from those candidates.
 14. Tenth Codex pass (one P2, a knock-on of fix 13, verified with a failing-before test): after a variant was picked for an ambiguous pasted row, that row stayed in the paste box with its warning, so a retry after fixing another typo would add it again. Picking now consumes the originating row (text and warning).
+15. Eleventh Codex pass (one P2, a knock-on of fix 14, verified with a failing-before test): with a full 50-line list, picking a variant silently added nothing yet consumed its pasted row and warning, losing the order. Adding now reports a full list per SKU, and the originating row is consumed only after a successful addition.
 4. E2E reliability only (no product change): a shared logged-in browser context broke the sign-in step of two gate tests (they now use a fresh context); cart assertions poll a fixed expected figure; the price-withdrawn test restores state with a park/restore helper instead of deleting a row.
 
 ---

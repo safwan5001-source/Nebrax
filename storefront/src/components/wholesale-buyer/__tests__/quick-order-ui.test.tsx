@@ -386,6 +386,53 @@ describe("quick order UI", () => {
     expect(issues).not.toContain("SHIRT");
   });
 
+  it("when the review list is full a variant pick is reported and its pasted row is kept, not consumed", async () => {
+    const mk = (i: number) =>
+      line({
+        productId: `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`,
+        sku: `S-${i}`,
+      });
+    const fifty = Array.from({ length: 50 }, (_, i) => mk(i + 1));
+    actions.resolveQuickOrderSkus.mockResolvedValueOnce({
+      kind: "ok",
+      rows: fifty.map((l) => ({ sku: l.sku, lines: [l] })),
+    });
+    render(wrap());
+    fireEvent.change(screen.getByTestId("qo-paste"), {
+      target: { value: fifty.map((l) => `${l.sku} 1`).join("\n") },
+    });
+    fireEvent.click(screen.getByTestId("qo-import"));
+    await waitFor(() =>
+      expect(screen.getAllByTestId("qo-line")).toHaveLength(50),
+    );
+
+    const blue = {
+      ...variant,
+      variantId: "44444444-4444-4444-8444-444444444444",
+      sku: "SHIRT-BLUE",
+    };
+    actions.resolveQuickOrderSkus.mockResolvedValueOnce({
+      kind: "ok",
+      rows: [{ sku: "SHIRT", lines: [variant, blue] }],
+    });
+    fireEvent.change(screen.getByTestId("qo-paste"), {
+      target: { value: "SHIRT 12" },
+    });
+    fireEvent.click(screen.getByTestId("qo-import"));
+    await waitFor(() =>
+      expect(screen.getAllByTestId("qo-pick")).toHaveLength(2),
+    );
+    fireEvent.click(screen.getAllByTestId("qo-pick")[0]);
+
+    expect(screen.getAllByTestId("qo-line")).toHaveLength(50);
+    expect((screen.getByTestId("qo-paste") as HTMLTextAreaElement).value).toBe(
+      "SHIRT 12",
+    );
+    expect(screen.getByTestId("qo-paste-issues").textContent).toContain(
+      "maximum of 50",
+    );
+  });
+
   it("a partial import keeps only the unresolved rows in the paste box, so a retry cannot apply the good ones twice", async () => {
     actions.resolveQuickOrderSkus.mockResolvedValue({
       kind: "ok",

@@ -128,20 +128,27 @@ export function QuickOrder({ basePath }: { basePath: string }) {
     return () => clearTimeout(timer);
   }, [term]);
 
-  const addLine = (line: QuickOrderLine, quantity = "1") => {
+  /** @return whether the line joined the list (false: the list is full and this is a new line — reported, never silent) */
+  const addLine = (line: QuickOrderLine, quantity = "1"): boolean => {
     setNotice({ kind: "none" });
     setRejected({});
-    setEntries((prev) =>
-      prev.length >= QUICK_ORDER_MAX_LINES &&
-      !prev.some(
-        (e) =>
-          e.line.productId === line.productId &&
-          e.line.variantId === line.variantId &&
-          e.line.unitKey === line.unitKey,
-      )
-        ? prev
-        : mergeEntry(prev, { id: nextId(), line, quantity }),
+    const exists = entries.some(
+      (e) =>
+        e.line.productId === line.productId &&
+        e.line.variantId === line.variantId &&
+        e.line.unitKey === line.unitKey,
     );
+    if (entries.length >= QUICK_ORDER_MAX_LINES && !exists) {
+      setPasteIssues((prev) => [
+        ...prev.filter(
+          (i) => !(i.kind === "list_full" && i.sku === (line.sku ?? line.name)),
+        ),
+        { sku: line.sku ?? line.name, kind: "list_full" },
+      ]);
+      return false;
+    }
+    setEntries((prev) => mergeEntry(prev, { id: nextId(), line, quantity }));
+    return true;
   };
 
   /** The picked variant settles its pasted row: drop that line from the paste box and its ambiguity warning. */
@@ -400,9 +407,10 @@ export function QuickOrder({ basePath }: { basePath: string }) {
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        addLine(line, pickRow?.quantity ?? "1");
-                        if (pickRow) consumePastedRow(pickRow);
-                        setPickRow(null);
+                        const added = addLine(line, pickRow?.quantity ?? "1");
+                        // the originating pasted row is settled only by a successful addition
+                        if (added && pickRow) consumePastedRow(pickRow);
+                        if (added) setPickRow(null);
                       }}
                       disabled={pending}
                       data-testid="qo-pick"
