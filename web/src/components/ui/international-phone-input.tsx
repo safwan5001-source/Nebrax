@@ -295,11 +295,24 @@ export function InternationalPhoneInput({
           onChange={(e) => handleNationalChange(e.target.value)}
           onBlur={onBlur}
           onPaste={(e) => {
-            // اللصق يمرّ بالتطبيع نفسه حتى لو حمل أرقاماً عربية أو + أو مسافات.
+            // اللصق يمرّ بالتطبيع نفسه (أرقام عربية، +، مسافات) لكنه يُطبَّق على موضع المؤشر/التحديد لا على الحقل كله.
             const text = e.clipboardData.getData('text');
             if (!text) return;
             e.preventDefault();
-            handleNationalChange(text);
+            const el = e.currentTarget;
+            const pasted = normalizePhoneText(text);
+            if (pasted.startsWith('+')) {
+              // رقم دولي كامل يحلّ محل ما في الحقل (الدولة تُحسم من رمزه).
+              handleNationalChange(pasted);
+              return;
+            }
+            const start = el.selectionStart ?? el.value.length;
+            const end = el.selectionEnd ?? start;
+            handleNationalChange(el.value.slice(0, start) + pasted + el.value.slice(end));
+            const caret = start + pasted.length;
+            requestAnimationFrame(() => {
+              if (document.activeElement === el) el.setSelectionRange(Math.min(caret, el.value.length), Math.min(caret, el.value.length));
+            });
           }}
           placeholder={placeholder}
           aria-invalid={invalid || undefined}

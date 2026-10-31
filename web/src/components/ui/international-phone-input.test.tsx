@@ -332,6 +332,56 @@ describe('typing an international number character by character (Codex P2)', () 
   });
 });
 
+describe('pasting into an existing number (Codex P2)', () => {
+  const paste = (text: string) => fireEvent.paste(input(), { clipboardData: { getData: () => text } });
+
+  it('inserts at the caret instead of replacing the whole field', async () => {
+    const user = userEvent.setup();
+    mount();
+    await user.type(input(), '512');
+    input().setSelectionRange(3, 3);
+    paste('345678');
+    expect(input().value).toBe('512345678');
+    expect(e164()).toBe('+966512345678');
+  });
+
+  it('inserts in the middle of the number', async () => {
+    const user = userEvent.setup();
+    mount();
+    await user.type(input(), '5178');
+    input().setSelectionRange(2, 2);
+    paste('2345 6');
+    expect(input().value).toBe('512345678'); // 51 + 23456 + 78
+  });
+
+  it('replaces only the selected part', async () => {
+    const user = userEvent.setup();
+    mount();
+    await user.type(input(), '599999678');
+    input().setSelectionRange(1, 6);
+    paste('12345');
+    expect(input().value).toBe('512345678'); // 5 + 12345 + 678
+  });
+
+  it('converts pasted Arabic digits and keeps the surrounding digits', async () => {
+    const user = userEvent.setup();
+    mount();
+    await user.type(input(), '51');
+    input().setSelectionRange(2, 2);
+    paste('٢٣٤ ٥٦٧٨');
+    expect(input().value).toBe('512345678');
+  });
+
+  it('a pasted full international number still replaces the field and picks its country', async () => {
+    const user = userEvent.setup();
+    mount();
+    await user.type(input(), '512');
+    paste('+971501234567');
+    expect(flagOf()).toBe('AE');
+    expect(input().value).toBe('501234567');
+  });
+});
+
 describe('shared calling codes and saved values (+1, legacy)', () => {
   function direct(value: string, defaultCountry?: 'US' | 'CA' | 'SA', locale: 'ar' | 'en' = 'en') {
     const onChange = vi.fn();
