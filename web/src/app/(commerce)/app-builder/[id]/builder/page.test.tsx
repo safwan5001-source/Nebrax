@@ -2565,7 +2565,9 @@ describe('AppBuilderWorkspacePage — Easy Mode V2 shell (S21a)', () => {
     api.mockImplementation((path?: string, init?: { method?: string; body?: unknown }) => {
       if (path === DRAFT_PATH && !init?.method) {
         const schema = JSON.parse(JSON.stringify(draftData.schema));
-        schema.pages.home.children.push({ type: 'Button', id: 'go-about', props: { label: 'About' }, action: { type: 'navigate', params: { pageId: 'about' } } });
+        // مكوّن قابل للإجراء (يُعدّ) + نصّ بإجراء (تتجاهله فاحصة العقد فلا يُعدّ — مراجعة Codex).
+        schema.pages.home.children.push({ type: 'ProductCard', id: 'go-about', props: { title: 'About' }, action: { type: 'navigate', params: { pageId: 'about' } } });
+        schema.pages.home.children.push({ type: 'Text', id: 'ignored-nav', props: { text: 'x' }, action: { type: 'navigate', params: { pageId: 'about' } } });
         return Promise.resolve({ data: { ...draftData, schema }, issues: [] });
       }
       return base(path, init);

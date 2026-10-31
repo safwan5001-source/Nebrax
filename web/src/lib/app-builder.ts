@@ -516,12 +516,14 @@ export function generatePageId(): string {
 
 /**
  * عدد إجراءات `navigate` التي تستهدف صفحة **من الصفحات الأخرى** — هي التي تبقى مخالفة حاجبة حتى تُصلَح عند حذفها.
- * إحالات الصفحة إلى نفسها تُحذف معها فلا تُعدّ (مراجعة Codex).
+ * إحالات الصفحة إلى نفسها تُحذف معها فلا تُعدّ، ولا إجراءات المكوّنات غير القابلة للإجراء (مراجعة Codex).
  */
-export function countNavigationTo(schema: AppSchema, pageId: string): number {
+export function countNavigationTo(schema: AppSchema, pageId: string, isActionable?: (componentType: string) => boolean): number {
   let count = 0;
   const walk = (node: AppSchemaComponent) => {
-    if (node.action?.type === 'navigate' && node.action.params?.pageId === pageId) count += 1;
+    // فاحصة العقد تتجاهل إجراءً على مكوّن غير قابل للإجراء (تحذير فقط، لا هدف يُفحص) فلا يصير مخالفة حاجبة؛ بلا سجل نعدّ الكل (تحفّظ).
+    const counts = !isActionable || isActionable(node.type);
+    if (counts && node.action?.type === 'navigate' && node.action.params?.pageId === pageId) count += 1;
     (node.children ?? []).forEach(walk);
   };
   for (const [id, root] of Object.entries(schema.pages)) {
