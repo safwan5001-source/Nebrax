@@ -8741,6 +8741,7 @@
               "orders": "طلباتي"
             }
           },
+          "dragHandle": "اسحب لإعادة الترتيب",
           "sectionsVisible": "{visible}/{count} ظاهر",
           "selectionBar": {
             "label": "أدوات القسم «{name}»",
