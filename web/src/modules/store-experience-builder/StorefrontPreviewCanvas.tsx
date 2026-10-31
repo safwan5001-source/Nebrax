@@ -2217,9 +2217,16 @@ function ProductPagePreview({
                 return wrap(
                   region,
                   <div className="mt-3">
-                    <span className="text-xl font-black text-store-primary md:text-2xl">
-                      <bdi>{formatMinorAmount(product.priceAmountMinor, product.currency, locale)}</bdi>
-                    </span>
+                    {product.priceAmountMinor === null ? (
+                      // Wholesale preview: the API sent no price (unavailable for wholesale). Never 0, never a retail price.
+                      <span className="text-sm font-semibold text-store-muted-foreground">
+                        {locale === "ar" ? "غير متاح للجملة" : "Unavailable for wholesale"}
+                      </span>
+                    ) : (
+                      <span className="text-xl font-black text-store-primary md:text-2xl">
+                        <bdi>{formatMinorAmount(product.priceAmountMinor, product.currency, locale)}</bdi>
+                      </span>
+                    )}
                   </div>,
                 );
               case "availability":

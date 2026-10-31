@@ -55,7 +55,8 @@ export interface WorkspaceProductVariant {
   id: string;
   sku: string | null;
   optionValueIds: string[];
-  priceAmountMinor: number;
+  /** `null` = no price on a wholesale channel (unavailable for wholesale) — never 0 and never a retail price. */
+  priceAmountMinor: number | null;
   currency: string;
   inStock: boolean | null;
   media: WorkspaceProductMedia[];
@@ -68,7 +69,8 @@ export interface WorkspaceProductDetail {
   description: string | null;
   sku: string | null;
   categoryName: string | null;
-  priceAmountMinor: number;
+  /** `null` = unavailable for wholesale (the API sends `price: null`); preserved so the preview never shows 0 or a currency guess. */
+  priceAmountMinor: number | null;
   currency: string;
   inStock: boolean | null;
   media: WorkspaceProductMedia[];
@@ -179,7 +181,7 @@ function mapVariants(raw: unknown): WorkspaceProductVariant[] | null {
       optionValueIds: Array.isArray(row.option_value_ids)
         ? row.option_value_ids.filter((v): v is string => typeof v === 'string')
         : [],
-      priceAmountMinor: typeof price.amount_minor === 'number' ? price.amount_minor : 0,
+      priceAmountMinor: row.price === null ? null : typeof price.amount_minor === 'number' ? price.amount_minor : 0,
       currency: typeof price.currency === 'string' ? price.currency : 'SAR',
       inStock: typeof row.in_stock === 'boolean' ? row.in_stock : null,
       media: asMediaList(row.media),
@@ -205,7 +207,7 @@ function mapDetail(payload: unknown): WorkspaceProductDetail | null {
     description: typeof row.description === 'string' ? row.description : null,
     sku: typeof row.sku === 'string' ? row.sku : null,
     categoryName: category && typeof category.name === 'string' ? category.name : null,
-    priceAmountMinor: typeof price.amount_minor === 'number' ? price.amount_minor : 0,
+    priceAmountMinor: row.price === null ? null : typeof price.amount_minor === 'number' ? price.amount_minor : 0,
     currency: typeof price.currency === 'string' ? price.currency : 'SAR',
     inStock: typeof row.in_stock === 'boolean' ? row.in_stock : null,
     media: asMediaList(row.media),

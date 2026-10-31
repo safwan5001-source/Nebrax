@@ -395,3 +395,78 @@ describe("mapAwjProductToViewModel — options and variants (STORE-UI-3)", () =>
     expect(vm.variant_count).toBe(0);
   });
 });
+
+describe("mapAwjProductToViewModel — wholesale unavailable (H6 Batch J)", () => {
+  it("maps a null price to 'no price' and not purchasable — never zero, never a substitute", () => {
+    const viewModel = mapAwjProductToViewModel(
+      baseProduct({
+        price: null,
+        wholesale_availability: { state: "unavailable_for_wholesale" },
+      }),
+    );
+
+    expect(viewModel.price.display_amount).toBeNull();
+    expect(viewModel.price.amount_in_cents).toBeNull();
+    expect(viewModel.purchasable).toBe(false);
+    expect(viewModel.available).toBe(false);
+  });
+
+  it("treats the machine-readable state alone as unavailable even if a price object is present", () => {
+    const viewModel = mapAwjProductToViewModel(
+      baseProduct({
+        wholesale_availability: { state: "unavailable_for_wholesale" },
+      }),
+    );
+
+    expect(viewModel.purchasable).toBe(false);
+  });
+
+  it("leaves an available wholesale product and every non-wholesale product exactly as before", () => {
+    const wholesale = mapAwjProductToViewModel(
+      baseProduct({ wholesale_availability: { state: "available" } }),
+    );
+    const retail = mapAwjProductToViewModel(baseProduct());
+
+    expect(wholesale.price.amount_in_cents).toBe(12345);
+    expect(wholesale.purchasable).toBe(true);
+    expect(retail.price.amount_in_cents).toBe(12345);
+    expect(retail.purchasable).toBe(true);
+  });
+
+  it("marks an unpriced variant not purchasable and keeps the priced one purchasable", () => {
+    const viewModel = mapAwjProductToViewModel(
+      baseProduct({
+        is_variant_managed: true,
+        options: [],
+        variants: [
+          {
+            id: "v1",
+            sku: null,
+            descriptor: "A",
+            option_value_ids: [],
+            price: { amount_minor: 640, currency: "SAR" },
+            wholesale_availability: { state: "available" },
+            in_stock: true,
+            media: [],
+          },
+          {
+            id: "v2",
+            sku: null,
+            descriptor: "B",
+            option_value_ids: [],
+            price: null,
+            wholesale_availability: { state: "unavailable_for_wholesale" },
+            in_stock: true,
+            media: [],
+          },
+        ],
+      }),
+    );
+
+    const [v1, v2] = viewModel.variants ?? [];
+    expect(v1?.purchasable).toBe(true);
+    expect(v1?.price.amount_in_cents).toBe(640);
+    expect(v2?.purchasable).toBe(false);
+    expect(v2?.price.display_amount).toBeNull();
+  });
+});

@@ -40,7 +40,7 @@ class StorefrontProductResource extends JsonResource
      */
     public function __construct(
         Product $resource,
-        private readonly int $priceAmountMinor,
+        private readonly ?int $priceAmountMinor,
         private readonly string $currency,
         private readonly ?bool $inStock,
         private readonly bool $detailed,
@@ -94,6 +94,20 @@ class StorefrontProductResource extends JsonResource
         return $this;
     }
 
+    /** H6 Batch J — حالة التوفر للجملة؛ null على كل قناة غير جملة (فلا مفتاح ويبقى الشكل حرفياً كما كان). */
+    private ?string $wholesaleAvailability = null;
+
+    public const WHOLESALE_AVAILABLE = 'available';
+
+    public const WHOLESALE_UNAVAILABLE = 'unavailable_for_wholesale';
+
+    public function withWholesaleAvailability(string $state): static
+    {
+        $this->wholesaleAvailability = $state;
+
+        return $this;
+    }
+
     /** @var ?array<string, mixed> FLOWERS-H8 / ADR-20 — وعد التسليم المشتق (قائمة وتفصيل)؛ null = لا مفتاح. */
     private ?array $deliveryPromise = null;
 
@@ -121,10 +135,14 @@ class StorefrontProductResource extends JsonResource
                     'name' => $this->resource->productCategory->name,
                 ]
                 : null,
-            'price' => [
-                'amount_minor' => $this->priceAmountMinor,
-                'currency' => $this->currency,
-            ],
+            // Wholesale only: an unavailable product carries NO price (never a retail substitute) and a machine-readable state.
+            'price' => $this->priceAmountMinor === null
+                ? null
+                : [
+                    'amount_minor' => $this->priceAmountMinor,
+                    'currency' => $this->currency,
+                ],
+            'wholesale_availability' => $this->when($this->wholesaleAvailability !== null, fn () => ['state' => $this->wholesaleAvailability]),
             'in_stock' => $this->inStock,
             'thumbnail_url' => $thumbnail['url'] ?? null,
             // Additive: catalogue cards can prefer this bounded derivative

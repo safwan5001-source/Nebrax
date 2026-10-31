@@ -467,11 +467,13 @@ class WholesaleCartCheckoutBoundaryTest extends TestCase
     }
 
     #[Test]
-    public function characterization_a_linked_partner_price_list_does_not_change_wholesale_prices_today(): void
+    public function a_linked_partner_price_list_now_prices_the_wholesale_buyer_consistently_everywhere(): void
     {
-        // CONTRACT PIN (Batch H §P1): identity ⇢ active CustomerPartnerLink ⇢ Partner.default_price_list exists in the
-        // data model, but NO storefront path passes a partner to the price resolver. Buyer-specific pricing is not
-        // active; this test fails the day it silently becomes so (it must be a reviewed decision with its own tests).
+        // H6 Batch J (owner-approved precedence) SUPERSEDES the Batch H/I pin
+        // `characterization_a_linked_partner_price_list_does_not_change_wholesale_prices_today`, which existed precisely so that
+        // this change could only arrive as a reviewed decision. The full precedence matrix lives in `WholesalePricePrecedenceTest`;
+        // this keeps the original scenario as the minimal parity check: listing, detail and cart agree on the PARTNER price (500),
+        // not the channel price (700).
         [$buyer, , $identityId] = $this->approvedBuyerWithId();
 
         app(TenantContext::class)->set($this->tenant->id);
@@ -482,9 +484,9 @@ class WholesaleCartCheckoutBoundaryTest extends TestCase
         app(\App\Services\CustomerPartnerLinkService::class)->link(CustomerIdentity::query()->findOrFail($identityId), $partner, $owner);
         app(TenantContext::class)->forget();
 
-        $this->assertSame(700, $this->api('GET', 'products', self::WS, $buyer, null)->assertOk()->json('data.0.price.amount_minor'));
-        $this->assertSame(700, $this->api('GET', 'products/'.$this->product->id, self::WS, $buyer, null)->assertOk()->json('data.price.amount_minor'));
-        $this->assertSame(700, $this->addItem(self::WS, $buyer)->assertCreated()->json('data.items.0.unit_price.amount_minor'));
+        $this->assertSame(500, $this->api('GET', 'products', self::WS, $buyer, null)->assertOk()->json('data.0.price.amount_minor'));
+        $this->assertSame(500, $this->api('GET', 'products/'.$this->product->id, self::WS, $buyer, null)->assertOk()->json('data.price.amount_minor'));
+        $this->assertSame(500, $this->addItem(self::WS, $buyer)->assertCreated()->json('data.items.0.unit_price.amount_minor'));
     }
 
     #[Test]

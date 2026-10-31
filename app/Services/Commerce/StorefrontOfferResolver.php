@@ -240,6 +240,18 @@ final class StorefrontOfferResolver
         $notDiscounted = fn () => [self::REASON_NOT_DISCOUNTED, null, null];
 
         $channel = SalesChannel::query()->whereKey($salesChannelId)->first();
+
+        // H6 Batch J — a wholesale channel is priced by the buyer's own precedence (partner list → channel list), and the
+        // offer comparison is against the RETAIL reference price. Showing "retail X, now Y" to a wholesale buyer would both
+        // expose the retail price and misrepresent a contract price as a promotion ⇒ offers never discount there.
+        if ($channel !== null && $channel->wholesale_membership_enabled) {
+            foreach ($priceable as $id => $offer) {
+                $out[$id] = $notDiscounted();
+            }
+
+            return $out;
+        }
+
         $priceListId = $channel?->default_price_list_id;
 
         // (١) بلا قائمة أسعار افتراضية للقناة ⇒ الحسم دائماً السعر الأساسي ⇒ لا خصم.

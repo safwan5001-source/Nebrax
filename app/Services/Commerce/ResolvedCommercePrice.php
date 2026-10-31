@@ -20,6 +20,13 @@ final readonly class ResolvedCommercePrice
 
     public const SOURCE_NONE = 'none';
 
+    /**
+     * H6 Batch J — the ONLY reason a wholesale channel reports an unresolved price: the approved buyer has no eligible entry
+     * in a valid partner list or the channel list (or is not an approved buyer at all — deliberately indistinguishable, so
+     * the state never reveals membership status). Never a retail/base price.
+     */
+    public const UNAVAILABLE_FOR_WHOLESALE = 'unavailable_for_wholesale';
+
     public function __construct(
         public bool $resolved,
         public ?int $amount,
@@ -28,6 +35,7 @@ final readonly class ResolvedCommercePrice
         public ?string $priceListId,
         public ?string $unitName,
         public ?int $minSalePrice,
+        public ?string $unavailableReason = null,
     ) {}
 
     /**
