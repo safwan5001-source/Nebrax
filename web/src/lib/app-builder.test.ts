@@ -14,6 +14,11 @@ import {
   setInitialPage,
   themeTokens,
   updateComponentById,
+  projectPageRoot,
+  updateEditorMetaNode,
+  updateEditorMetaPageTitle,
+  canonicalizeThemeTokens,
+  readPrimaryColor,
   type AppSchema,
   type AppSchemaComponent,
   type RegistryComponentDefinition,
@@ -164,14 +169,14 @@ describe('themeTokens', () => {
 
 describe('mergeThemeTokens', () => {
   it('adds tokens to a schema with no theme yet', () => {
-    const updated = mergeThemeTokens(minimalSchema(), { primaryColor: '#12372a' });
-    expect(updated.theme?.tokens).toEqual({ primaryColor: '#12372a' });
+    const updated = mergeThemeTokens(minimalSchema(), { colorPrimary: '#12372a' });
+    expect(updated.theme?.tokens).toEqual({ colorPrimary: '#12372a' });
   });
   it('merges into existing tokens without dropping untouched keys', () => {
-    const original = minimalSchema({ tokens: { primaryColor: '#12372a', radius: 'default' } });
+    const original = minimalSchema({ tokens: { colorPrimary: '#12372a', radius: 'default' } });
     const updated = mergeThemeTokens(original, { radius: 'sharp' });
-    expect(updated.theme?.tokens).toEqual({ primaryColor: '#12372a', radius: 'sharp' });
-    expect(original.theme?.tokens).toEqual({ primaryColor: '#12372a', radius: 'default' });
+    expect(updated.theme?.tokens).toEqual({ colorPrimary: '#12372a', radius: 'sharp' });
+    expect(original.theme?.tokens).toEqual({ colorPrimary: '#12372a', radius: 'default' });
   });
 });
 
@@ -228,5 +233,90 @@ describe('setInitialPage', () => {
   it('is a no-op for an id that does not reference a declared page', () => {
     const original = twoPageSchema();
     expect(setInitialPage(original, 'missing')).toEqual(original);
+  });
+});
+
+describe('editor meta helpers (AD-05)', () => {
+  const root: AppSchemaComponent = {
+    type: 'Page', id: 'root',
+    children: [
+      { type: 'Section', id: 'a', children: [{ type: 'Text', id: 'a1', props: { text: 'x' } }] },
+      { type: 'Section', id: 'b', children: [] },
+    ],
+  };
+
+  it('projectPageRoot drops hidden nodes and their subtrees, never mutates, and returns the same root when nothing is hidden', () => {
+    const meta = { v: 1 as const, nodes: { home: { a: { hidden: true as const, name: 'A' } } }, pages: {} };
+    const projected = projectPageRoot(root, meta, 'home');
+    expect(projected.children?.map((c) => c.id)).toEqual(['b']);
+    expect(root.children?.map((c) => c.id)).toEqual(['a', 'b']);
+    expect(projectPageRoot(root, null, 'home')).toBe(root);
+    expect(projectPageRoot(root, { v: 1, nodes: { home: { a: { name: 'only a name' } } }, pages: {} }, 'home')).toBe(root);
+    // نظير بالمعرّف نفسه في صفحة أخرى: لا يتأثر (فرادة المعرّف داخل الصفحة وحدها).
+    expect(projectPageRoot(root, meta, 'about')).toBe(root);
+  });
+
+  it('updateEditorMetaNode sets, trims and clears fields; empty entries and empty meta collapse to null', () => {
+    let meta = updateEditorMetaNode(null, 'home', 'a', { name: '  Hero ' });
+    expect(meta?.nodes.home.a).toEqual({ name: 'Hero' });
+    meta = updateEditorMetaNode(meta, 'home', 'a', { hidden: true, preset: 'text' });
+    expect(meta?.nodes.home.a).toEqual({ name: 'Hero', hidden: true, preset: 'text' });
+    meta = updateEditorMetaNode(meta, 'about', 'a', { name: 'Same id elsewhere' });
+    expect(meta?.nodes.about.a).toEqual({ name: 'Same id elsewhere' });
+    expect(meta?.nodes.home.a).toEqual({ name: 'Hero', hidden: true, preset: 'text' }); // مقيَّدة بالصفحة
+    meta = updateEditorMetaNode(meta, 'about', 'a', { name: '' });
+    expect(meta?.nodes.about).toBeUndefined();
+    meta = updateEditorMetaNode(meta, 'home', 'a', { hidden: false, name: '' });
+    expect(meta?.nodes.home.a).toEqual({ preset: 'text' });
+    expect(updateEditorMetaNode(meta, 'home', 'a', { preset: '' })).toBeNull();
+  });
+
+  it('updateEditorMetaNode / PageTitle do not mutate their input', () => {
+    const before = { v: 1 as const, nodes: { home: { a: { name: 'A' } } }, pages: { home: { title: 'H' } } };
+    const snapshot = JSON.stringify(before);
+    updateEditorMetaNode(before, 'home', 'a', { hidden: true });
+    updateEditorMetaPageTitle(before, 'home', '');
+    expect(JSON.stringify(before)).toBe(snapshot);
+  });
+
+  it('updateEditorMetaPageTitle sets and clears a title; clearing the last entry gives null', () => {
+    const meta = updateEditorMetaPageTitle(null, 'home', ' Landing ');
+    expect(meta?.pages.home).toEqual({ title: 'Landing' });
+    expect(updateEditorMetaPageTitle(meta, 'home', '  ')).toBeNull();
+  });
+});
+
+describe('canonical theme tokens (AD-03 / S04b)', () => {
+  it('readPrimaryColor: canonical colorPrimary wins, legacy primaryColor is a read-only synonym, first VALID wins, nothing valid is null', () => {
+    expect(readPrimaryColor({ colorPrimary: '#1E3A5F' })).toBe('#1E3A5F');
+    expect(readPrimaryColor({ primaryColor: '#B45309' })).toBe('#B45309');
+    expect(readPrimaryColor({ colorPrimary: '#1E3A5F', primaryColor: '#B45309' })).toBe('#1E3A5F');
+    expect(readPrimaryColor({ colorPrimary: 'teal', primaryColor: '#B45309' })).toBe('#B45309');
+    const invalid: Array<Record<string, string> | undefined> = [{}, { colorPrimary: '' }, { colorPrimary: '#FFF' }, { colorPrimary: 'red', primaryColor: 'blue' }, undefined];
+    for (const bad of invalid) {
+      expect(readPrimaryColor(bad)).toBeNull();
+    }
+    expect(readPrimaryColor({ colorPrimary: '  #1e3a5f ' })).toBe('#1e3a5f'); // مرآة Dart: يُقصّ
+  });
+
+  it('canonicalizeThemeTokens renames the legacy key, drops derived CSS variables, keeps everything else, and does not mutate', () => {
+    const input = { primaryColor: '#B45309', '--primary': '#B45309', '--store-radius': '8px', radius: 'sharp', themePreset: 'navy' };
+    const snapshot = JSON.stringify(input);
+    expect(canonicalizeThemeTokens(input)).toEqual({ colorPrimary: '#B45309', radius: 'sharp', themePreset: 'navy' });
+    expect(JSON.stringify(input)).toBe(snapshot);
+  });
+
+  it('canonicalizeThemeTokens: an existing valid colorPrimary wins over a stale legacy key, and an invalid legacy value is dropped, not promoted', () => {
+    expect(canonicalizeThemeTokens({ colorPrimary: '#1E3A5F', primaryColor: '#B45309' })).toEqual({ colorPrimary: '#1E3A5F' });
+    expect(canonicalizeThemeTokens({ primaryColor: 'not-a-color', radius: 'sharp' })).toEqual({ radius: 'sharp' });
+  });
+
+  it('mergeThemeTokens canonicalizes on write (legacy drafts migrate on the next theme edit, never in bulk)', () => {
+    const legacy = minimalSchema({ tokens: { primaryColor: '#12372a', '--primary': '#12372a', radius: 'default' } });
+    const updated = mergeThemeTokens(legacy, { radius: 'sharp' });
+    expect(updated.theme?.tokens).toEqual({ colorPrimary: '#12372a', radius: 'sharp' });
+    expect(legacy.theme?.tokens).toEqual({ primaryColor: '#12372a', '--primary': '#12372a', radius: 'default' });
+    // لا تعديل ⇒ لا إعادة كتابة: القراءة وحدها لا تمسّ شيئاً.
+    expect(themeTokens(legacy)).toEqual({ primaryColor: '#12372a', '--primary': '#12372a', radius: 'default' });
   });
 });

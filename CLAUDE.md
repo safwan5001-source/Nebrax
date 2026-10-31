@@ -433,6 +433,12 @@ php artisan serve
 - **قواعد التضمين من مصدر واحد:** `ComponentRegistry::allowedChildTypes/allowedParentTypes` (من `ChildrenRule`: `Page` جذر فقط، الورقيات بلا أبناء)، تُعرض في `GET registries` (`allowed_children`/`allowed_parents`) وتستهلكها الفاحصة والويب. `$item.*` مقبول في أي خاصية/معامل (يُحلّ وقت التشغيل).
 - **مؤجَّل صراحةً:** حدود الكمية لكل مستأجر (تطبيقات/نسخ/جلسات معاينة، DRF-07) — سياسة عمل تحتاج قرار المالك (قاعدة 6)؛ تحقق `visibility`/`binding` الدلالي؛ واجهة الويب (S02b).
 
+## بيانات المحرر (AD-05 / S20a) — `editor_meta`
+
+عمود `builder_draft_experiences.editor_meta` (JSON، nullable) يحمل ما لا مكان له في AppSchema: **اسم القسم، إخفاؤه، نوعه الجاهز (preset)، عنوان الصفحة**. **إدخالات العقد مقيَّدة بصفحتها** (`nodes.<pageId>.<nodeId>`) لأن فرادة `component.id` داخل الصفحة وحدها (`App\Services\AppBuilder\EditorMeta`، عقد `contracts/app-builder/editor-meta.v1.json`).
+- **يُحفظ بالقفل التفاؤلي نفسه** (`PUT draft` + `editor_meta` اختياري: غيابه = بلا تغيير، وجوده = استبدال كامل، null يمسح). `normalize()` يتحقق (شكل/أنواع/أطوال/حجم `config('app_builder.max_editor_meta_bytes')` 65536/جذر الصفحة لا يُخفى ⇒ 422 برمز) **وينظّف** إدخالات عقد/صفحات لم تعد في المخطط.
+- **لا يدخل ما يُنشر أو يُعاين:** كل قراءة للمسودة للنشر/المعاينة/فاحصة العقد تمرّ بـ`BuilderDraftExperience::publishableSchema()` (يُسقط العقد المخفية وأبناءها)؛ الأسماء والعناوين والـpresets لا تغادر المسودة. **لا تقرأ `$draft->schema` الخام في مسار نشر/معاينة جديد.**
+
 ## الواجهة (web/) — قواعد موجزة
 
 - المرجع الإلزامي: **`DESIGN_SYSTEM.md`** (أداة محاسبية نظيفة كثيفة، الجداول هي البطل، لون هوية واحد، خطّان).
@@ -542,6 +548,18 @@ php artisan serve
 - **حدّ `store/v1` (P0):** كل الزوار يصلون من عنوان خادم Next.js، فكانت سلة `unauth` (30/دقيقة لكل IP) واحدة للمنصة (Batch L: الصفحة الرابعة تفشل للجميع). لا يمكن إثبات IP الزائر الحقيقي (لا `trustProxies`، لا ترويسة IP موثوقة — D-T1 مفتوح)، فلا يُوثَق بأي ترويسة. ما يُثبَت فقط: أن المُرسِل خادم المتجر (سرّ البوابة، `ResolveStorefrontDomain` وحده يضع `storefront_gateway_verified`) وأي متجر هو. فطلبات البوابة الموثَّقة تُحسب على **ميزانية لكل متجر** (`storefront.gateway_limits`: قراءة 600 / كتابة 120 في الدقيقة؛ `0` = السلوك القديم حرفياً)، والطلب المباشر (بلا سرّ صحيح) يبقى 30/دقيقة لكل IP. محدِّدات المصادقة (لكل بريد + لكل مستأجر/IP) **لم تُلمس**؛ ومحدِّد المستأجر/IP للدخول (20/دقيقة) يبقى مشتركاً بين كل مشتري المتجر (قيد معلن). يحرسه `StorefrontGatewayRateLimitTest`. لا تُضف ثقةً بترويسة IP قبل الدليل التشغيلي في `AWJ_H6_BATCH_M_IMPLEMENTATION_REPORT.md` §P0.
 - **ربط المشتري بشريك (موظف فقط):** `GET/PUT/DELETE commerce/wholesale/memberships/{id}/partner-link` و`GET commerce/wholesale/partners/eligible` (`CommerceStaffWholesalePartnerLinkController` → `WholesalePartnerLinkAdminService` فوق `CustomerPartnerLinkService` الكاتب الوحيد). صلاحيتان معاً: `commerce.wholesale.manage` + `customer_access.manage`، وبوابة النشر 404 مغلقة. لا يُربط إلا مشترٍ **معتمد**؛ الفك مسموح بأي حالة؛ شريك = عميل نشط من المستأجر نفسه. «العلاقة الفعلية» تأتي من `WholesalePriceAuthority::describeFor()` (القاعدة نفسها التي تحكم الدفع). المشتري لا يرسل ولا يُقبل منه partner/price list (`BuyerApplyRequest` يرفضهما 422). لا مساس بـPOS ولا بقوائم الأسعار.
 - **حساب المشتري:** `GET store/v1/buyer/orders[/{id}]` — سجل الطلبات للمشتري **المعتمد** على قناته فقط (`EnsureWholesalePriceAccess` + `CustomerContext` + `CommerceOrderService::ownedOrders()` + تضييق بالقناة؛ طلب غيره/قناة أخرى = 404 واحد؛ الموقوف/المرفوض 403 مع `details.membership_status` لحالته هو فقط). إعادة تعيين كلمة المرور: `auth/password/forgot|reset` (جدول مستقل `customer_password_reset_tokens` على نمط تأكيد البريد: SHA-256 فقط، ساعة، مرة واحدة، مربوط بالمستأجر والقناة، 202 محايد، لا يُؤكّد البريد، والإتمام يُنهي كل جلسات الهوية). طلب العضوية يقبل `company_name`/`contact_phone` اختياريَّين غير موثَّقين على `wholesale_memberships` (للمراجع فقط، لا يؤثران على سعر ولا أهلية ولا يُكتبان في هوية المشتري).
+
+## إغلاق H6 — مضيفات المتجر، صفحات المشتري، الترويسات (Final Closure)
+
+- **`GET store/v1/storefront` يعلن `data.capabilities.wholesale_buyer`** (منطقي فقط): `WholesaleBuyerGate::isOpen()` = بوابة النشر `commerce.wholesale_buyer_enabled` **و**قناة المضيف الموسومة `wholesale_membership_enabled`. هو المصدر الوحيد لهذا الحكم (يستعمله أيضاً `EnsureWholesaleBuyerEnabled`)، وغياب الحقل = مغلق.
+- **القرار في `storefront/src/proxy.ts` قبل العرض** (لا `notFound()` داخل الصفحة: مع `cacheComponents` يُرسَل سطر الحالة 200 قبل أن تُرمى). `resolveHostContextForRequest` (`edge-storefront-locale.ts`) يقرأ السياق من الـAPI بذاكرة مؤقتة 60ث ودمج الطلبات المتزامنة وبقاء آخر إجابة حاسمة 10 دقائق عند تعذّر التحديث:
+  - مضيف **غير معروف** (404 حاسم برسالة «تعذّر تحديد متجر صالح» فقط) ⇒ 404 حقيقي لكل صفحة محلية؛ أي فشل آخر (شبكة/5xx/404 بلا هذه الرسالة/لا إعداد) ⇒ **يُفتح للمضيف** ولا يُغلق أبداً. مفتاح الإيقاف `STOREFRONT_UNKNOWN_HOST_404=0`.
+  - صفحات `/buyer/**` ⇒ 404 حقيقي ما لم يقل الـAPI إن الجملة مفتوحة (فشل مغلق للقدرة).
+  - روابط `/wholesale/*` القديمة (حين تكون إضافة Spree معطّلة): على مضيف جملة أصلي تُحوَّل 308 إلى المكافئ الأصلي (`/buyer/sign-in`، `/buyer/membership`، `/cart`، `/products`) وما عداها 404؛ على غيره 404. لا حذف لمسارات Spree.
+  - `/sa` وحدها ⇒ `/sa/{locale}` (كان `/sa/ar/sa`). كوكيز `spree_country/spree_locale` صارت HttpOnly وSameSite=Lax وSecure في الإنتاج (الأسماء والقيم كما هي؛ لا تقرؤها واجهة المتصفح).
+  - `next.config.ts` يضيف ترويسات أساسية محايدة: HSTS (بلا includeSubDomains/preload)، nosniff، Referrer-Policy، X-Frame-Options، `frame-ancestors 'none'` وPermissions-Policy. **لا CSP مقيِّد للموارد** قبل جرد الأصول ومرحلة report-only (انظر تقرير الإغلاق).
+  - روابط «حسابي/سجل الطلبات» في الرأس والتذييل والقائمة المحمولة تذهب إلى `/buyer/membership` و`/buyer/orders` على مضيف الجملة الأصلي فقط (`account-links.ts`).
+- **لم يُبنَ بعد (قرار مالك):** الطلب السريع بـSKU (لا بديل أصلي؛ `/wholesale/quick-order` مغلق 404). المرجع: `docs/audits/AWJ_H6_FINAL_CLOSURE_REPORT.md`.
 
 ## وقت إصدار الفاتورة (`invoices.issued_at`) — REM-13a
 

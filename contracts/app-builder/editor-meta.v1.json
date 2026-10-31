@@ -1,0 +1,22 @@
+{
+  "contract": "app-builder.editor-meta",
+  "version": 1,
+  "decision": "AD-05 (editor data store) — slice S20a",
+  "storage": "builder_draft_experiences.editor_meta (json, nullable); saved by PUT draft under the same optimistic lock and revision",
+  "shape": {
+    "v": 1,
+    "nodes": { "<pageId>": { "<nodeId>": { "name": "string 1..80 (optional)", "hidden": "true (optional)", "preset": "string ^[a-zA-Z][A-Za-z0-9]{0,39}$ (optional)" } } },
+    "pages": { "<pageId>": { "title": "string 1..80 (optional)" } }
+  },
+  "rules": [
+    "the schema stays the single source: editor_meta never carries structure",
+    "node entries are scoped by page ('nodes.<pageId>.<nodeId>'): component.id is unique only within a page, so hiding a node on one page never affects a same-id node on another page",
+    "hidden nodes (and their children) are removed from published versions, preview sessions and contract issues (EditorMeta::project); they stay in the draft",
+    "names, presets and page titles never leave the draft",
+    "page/node ids that no longer exist in the saved schema (or sit under the wrong page) are pruned silently; a page root cannot be hidden (422 editor_meta_hidden_root)",
+    "numeric ids are valid keys: GET/PUT responses always serialize nodes / nodes.<pageId> / pages (and schema.pages) as JSON objects, never re-indexed lists (JsonResource would turn all-numeric keys into a list)",
+    "unknown keys, wrong types, over-long text, non-object entries, or more than max_editor_meta_bytes (default 65536) => 422 with no write"
+  ],
+  "request": "PUT /api/app-builder/apps/{id}/draft { schema, base_revision, editor_meta? }",
+  "response": "GET/PUT draft: data.editor_meta (null when empty)"
+}

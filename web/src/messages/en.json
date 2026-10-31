@@ -8708,13 +8708,24 @@
             "noScreen": "The current mobile app has no screen for this section yet.",
           "pageOnly": "This section only works on page: {pages} (its data is provided by that app screen)."
           },
-            "selectionBar": {
+            "hideSection": "Hide section",
+          "showSection": "Show section",
+          "hidden": "Hidden",
+          "renameSection": "Rename section",
+          "renameSave": "Save name",
+          "renameCancel": "Cancel",
+          "renameInputLabel": "New section name",
+          "pageTitleLabel": "Page title",
+          "pageTitleHint": "Editor only — not shown in the app",
+          "selectionBar": {
             "label": "Tools for section “{name}”",
             "up": "Move section up",
             "down": "Move section down",
             "duplicate": "Duplicate section",
             "hide": "Hide section",
-            "hideReason": "Hiding needs an architecture decision (AD-05) — not available yet",
+            "show": "Show section",
+            "hideReason": "A hidden section stays in the draft but is not in the published app or the preview",
+            "rename": "Rename section",
             "delete": "Delete section"
           },
           "identity": {
@@ -8904,7 +8915,7 @@
       "theme": {
         "tabLabel": "Theme",
         "tabDescription": "Edit the app's color, corner radius, density, and product card style. Stored as free-form tokens in the schema — not yet gated by any runtime capability/compatibility check.",
-        "runtimeNote": "Not yet active in the mobile app — a published experience's colors are not applied to the real app's appearance yet. Safe to set up now; it will take effect once published-experience theming is wired into the mobile app.",
+        "runtimeNote": "The primary color is applied to the mobile app once you publish (app builds that include live theming). Corner radius, density and product-card style only affect the editor preview for now.",
         "presetTitle": "Presets",
         "preset": {
           "awj-modern": "AWJ Modern",

@@ -7,12 +7,13 @@
     "path": "/api/app-builder/apps/{id}/draft",
     "body": {
       "schema": "AppSchema object (required)",
+      "editor_meta": "object|null, OPTIONAL (AD-05/S20a): absent = unchanged, present = full replacement (null clears). Validated and pruned against the saved schema; never reaches published versions or previews",
       "base_revision": "integer >= 0; REQUIRED since S01c (absent or null => 428 base_revision_required, no write)"
     }
   },
   "success": {
     "status": 200,
-    "data_keys": ["id", "builder_app_id", "schema", "revision", "updated_at"]
+    "data_keys": ["id", "builder_app_id", "schema", "editor_meta", "revision", "updated_at"]
   },
   "conflict": {
     "status": 409,

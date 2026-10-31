@@ -79,6 +79,43 @@ vi.mock("@vercel/speed-insights/next", () => ({
 }));
 
 describe("DocumentShell", () => {
+  describe("Vercel-only analytics (H6 Final Closure)", () => {
+    function componentNames(node: unknown, found: string[] = []): string[] {
+      if (Array.isArray(node)) {
+        for (const child of node) componentNames(child, found);
+      } else if (node && typeof node === "object" && "type" in node) {
+        const element = node as {
+          type: unknown;
+          props?: { children?: unknown };
+        };
+        if (typeof element.type === "function") found.push(element.type.name);
+        componentNames(element.props?.children, found);
+      }
+      return found;
+    }
+
+    const render = () =>
+      componentNames(
+        DocumentShell({ children: <main>Storefront</main>, locale: "ar" }),
+      );
+
+    it("does not load Vercel Analytics / Speed Insights off Vercel (their script URLs 404 as HTML elsewhere)", () => {
+      vi.stubEnv("VERCEL", "");
+      const names = render();
+      expect(names).not.toContain("Analytics");
+      expect(names).not.toContain("SpeedInsights");
+      vi.unstubAllEnvs();
+    });
+
+    it("still loads them on Vercel", () => {
+      vi.stubEnv("VERCEL", "1");
+      const names = render();
+      expect(names).toContain("Analytics");
+      expect(names).toContain("SpeedInsights");
+      vi.unstubAllEnvs();
+    });
+  });
+
   it("renders the route locale and tolerates extension root mutations", () => {
     const document = DocumentShell({
       children: <main>Storefront</main>,

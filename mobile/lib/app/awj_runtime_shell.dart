@@ -46,12 +46,19 @@ class AwjRuntimeShell extends StatefulWidget {
   /// (`null`), which builds a real [FileExperienceCache].
   final ExperienceCache? experienceCache;
 
+  /// AD-03 — reports the live experience's `theme.tokens` (published or
+  /// last-known-good) once the startup decision is known, `null` when the
+  /// Default AWJ Experience / an unavailable state applies. Optional: the
+  /// shell is usable (and tested) standalone without a theme owner above it.
+  final ValueChanged<Map<String, String>?>? onThemeTokensChanged;
+
   const AwjRuntimeShell({
     super.key,
     this.client,
     required this.locale,
     required this.onLocaleChanged,
     this.experienceCache,
+    this.onThemeTokensChanged,
   });
 
   @override
@@ -181,6 +188,7 @@ class _AwjRuntimeShellState extends State<AwjRuntimeShell> with WidgetsBindingOb
     );
     if (!mounted) return;
     setState(() => _startupDecision = decision);
+    widget.onThemeTokensChanged?.call(_liveExperience?.schema.theme.tokens);
   }
 
   /// The live [RenderableExperience] Home/Cart should render instead of the

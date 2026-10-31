@@ -34,8 +34,23 @@ use RuntimeException;
  */
 class PreviewExchangeService
 {
+    public function __construct(private readonly BuilderQuota $quota) {}
+
     /** يصدر مرجع تبادل عن **المسودة الحالية** فقط — نفس نطاق `PreviewSessionService::issueForDraft()`. */
     public function issueForDraft(BuilderApp $app, ?User $issuer, ?string $deviceLabel = null): array
+    {
+        return DB::transaction(function () use ($app, $issuer, $deviceLabel): array {
+            // DRF-07: يُحسب المرجع غير المستهلَك ضمن الجلسات النشطة (يتحوّل إلى جلسة جهاز) — الحدّ عند الإصدار الموثَّق
+            // لا عند التبادل العام، فلا يفشل الجهاز برفض غامض. على صفّ التطبيق المقفول.
+            $lockedApp = BuilderApp::query()->whereKey($app->id)->lockForUpdate()->firstOrFail();
+            $this->quota->assertCanIssuePreview($lockedApp);
+
+            return $this->createReference($lockedApp, $issuer, $deviceLabel);
+        });
+    }
+
+    /** @return array{reference: PreviewExchangeReference, plain: string, expires_at: \Illuminate\Support\Carbon} */
+    private function createReference(BuilderApp $app, ?User $issuer, ?string $deviceLabel): array
     {
         $draft = $app->draft()->first();
         if ($draft === null) {
@@ -51,7 +66,7 @@ class PreviewExchangeService
             'tenant_id' => $app->tenant_id,
             'builder_app_id' => $app->id,
             'reference_hash' => hash('sha256', $plain),
-            'schema_snapshot' => $draft->schema,
+            'schema_snapshot' => $draft->publishableSchema(),
             'draft_revision' => $draft->revision,
             'channel' => PreviewSession::CHANNEL_DEVICE,
             'device_label' => $deviceLabel,

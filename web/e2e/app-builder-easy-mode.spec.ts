@@ -69,7 +69,8 @@ const registries = {
 interface Opts { locale: 'ar' | 'en'; viewport: (typeof VIEWPORTS)[number]; permissions?: string[] }
 
 async function open(page: Page, opts: Opts) {
-  const puts: Array<{ schema: ReturnType<typeof draftSchema>; base_revision?: number }> = [];
+  const puts: Array<{ schema: ReturnType<typeof draftSchema>; base_revision?: number; editor_meta?: unknown }> = [];
+  let storedMeta: unknown = null; // يحاكي حفظ الخادم لبيانات المحرر (AD-05)
   const consoleErrors: string[] = [];
   page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text()); });
   page.on('pageerror', (e) => consoleErrors.push(e.message));
@@ -89,10 +90,11 @@ async function open(page: Page, opts: Opts) {
       if (method === 'PUT') {
         const body = route.request().postDataJSON();
         puts.push(body);
+        storedMeta = body.editor_meta ?? null;
         revision += 1;
-        return json(route, { data: { id: 'd1', builder_app_id: APP_ID, schema: body.schema, revision, updated_at: new Date().toISOString() }, issues: [] });
+        return json(route, { data: { id: 'd1', builder_app_id: APP_ID, schema: body.schema, editor_meta: storedMeta, revision, updated_at: new Date().toISOString() }, issues: [] });
       }
-      return json(route, { data: { id: 'd1', builder_app_id: APP_ID, schema: draftSchema(), revision, updated_at: new Date().toISOString() }, issues: [] });
+      return json(route, { data: { id: 'd1', builder_app_id: APP_ID, schema: draftSchema(), editor_meta: storedMeta, revision, updated_at: new Date().toISOString() }, issues: [] });
     }
     if (path === `/app-builder/apps/${APP_ID}`) return json(route, { data: { id: APP_ID, name: 'متجر الأفق', name_en: 'Horizon Store', creation_source: 'scratch', latest_published_version: null, created_at: '2026-10-01', updated_at: '2026-10-01' } });
     if (path.startsWith('/commerce/workspace')) return json(route, { data: [] });
@@ -169,6 +171,34 @@ test.describe('App Builder — Easy Mode V2 (real browser)', () => {
     Object.values(puts[0].schema.pages).forEach((root) => walk(root as { id: string; children?: unknown[] }));
     expect(new Set(ids).size).toBe(ids.length);
     expect(puts[0].schema.pages.home.children.length).toBe(4);
+  });
+
+  test('hide + rename a section and a page title: the preview drops the hidden section, save sends editor_meta (schema untouched), and a reload restores it', async ({ page }) => {
+    const { puts } = await open(page, { locale: 'en', viewport: VIEWPORTS[0] });
+    const list = visibleSections(page);
+    await expect(page.getByText('أهلاً بك في متجرنا').first()).toBeVisible();
+
+    await list.getByRole('listitem').first().getByRole('button', { name: 'Rename section' }).click();
+    await page.getByRole('textbox', { name: 'New section name' }).fill('Welcome banner');
+    await page.keyboard.press('Enter');
+    await list.getByRole('listitem').first().getByRole('button', { name: 'Hide section' }).click();
+    await expect(page.getByText('أهلاً بك في متجرنا')).toHaveCount(0);
+    await expect(list.getByRole('listitem').first().getByText('Hidden')).toBeVisible();
+    if (shots) await page.screenshot({ path: `${shots}/easy-en-hidden.png` });
+
+    await list.getByRole('button', { name: 'Page title' }).click();
+    await page.getByRole('textbox', { name: 'Page title' }).fill('Landing');
+    await page.keyboard.press('Enter');
+
+    await page.getByRole('button', { name: 'Save' }).first().click();
+    await expect.poll(() => puts.length).toBe(1);
+    expect(puts[0].editor_meta).toEqual({ v: 1, nodes: { home: { 'sec-welcome': { name: 'Welcome banner', hidden: true } } }, pages: { home: { title: 'Landing' } } });
+    expect(puts[0].schema.pages.home.children.map((c: { id: string }) => c.id)).toEqual(['sec-welcome', 'sec-products', 'sec-cta']);
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(visibleSections(page)).toBeVisible({ timeout: 20_000 });
+    await expect(visibleSections(page).getByText('Welcome banner')).toBeVisible();
+    await expect(page.getByText('أهلاً بك في متجرنا')).toHaveCount(0);
   });
 
   test('selecting an element in the preview shows the section toolbar; Advanced shows the layers tree and switching back keeps the draft', async ({ page }) => {

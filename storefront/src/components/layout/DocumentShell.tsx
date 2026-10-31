@@ -336,8 +336,18 @@ export function DocumentShell({ children, locale }: DocumentShellProps) {
         className={`${geist.variable} ${geistTajawalFallback.variable} ${cairo.variable} ${tajawal.variable} ${CATALOGUE_FONT_VARIABLES} antialiased min-h-screen flex flex-col`}
       >
         <Suspense fallback={null}>{children}</Suspense>
-        <Analytics />
-        <SpeedInsights />
+        {/*
+          Vercel Analytics / Speed Insights only exist on Vercel: their script URLs (`/_vercel/insights/script.js`)
+          are served by the Vercel edge. On any other host (the production storefront runs on Railway) the request
+          falls through to the app and returns an HTML 404, which the browser then refuses to run as a script
+          (`X-Content-Type-Options: nosniff`) — two failing requests and two console errors on every page view.
+        */}
+        {process.env.VERCEL ? (
+          <>
+            <Analytics />
+            <SpeedInsights />
+          </>
+        ) : null}
       </body>
     </html>
   );

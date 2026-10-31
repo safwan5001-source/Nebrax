@@ -19,6 +19,7 @@ import {
 } from "@/components/store/ContactDetail";
 import { IdentityDetail } from "@/components/store/IdentityDetail";
 import { OfficialStoreBadge } from "@/components/store/OfficialStoreBadge";
+import { accountHrefs } from "@/lib/commerce/account-links";
 import type { StoreCategoryNode } from "@/lib/commerce/types";
 import { POLICY_LINKS } from "@/lib/constants/policies";
 import type {
@@ -36,6 +37,8 @@ import { isWholesaleEnabled } from "@/lib/spree";
 
 interface FooterProps {
   basePath: string;
+  /** H6 Final Closure — native wholesale is open on this Host: account links go to the native buyer pages. */
+  nativeWholesale?: boolean;
   /**
    * X4 — policy pages to link (the merchant-enabled ones in the published document). Omitted ⇒ all four, as
    * before; an empty list ⇒ the Policies column is not drawn. No API call per link.
@@ -254,6 +257,7 @@ export async function Footer({
   groups = null,
   design,
   paymentLogos,
+  nativeWholesale = false,
 }: FooterProps) {
   const t = await getTranslations({ locale, namespace: "footer" });
   const tp = await getTranslations({ locale, namespace: "policies" });
@@ -387,14 +391,15 @@ export async function Footer({
   // ── link groups: the merchant's, else the three fixed ones ────────────────────────────────────────────────
   const defaultGroups: FooterGroupView[] = [];
   const linkClass = kind === "legacy" ? footerLinkClassName : rowLinkClassName;
+  const account = accountHrefs(basePath, nativeWholesale);
   const accountNodes: ReactNode[] = [
     <li key="account">
-      <Link href={`${basePath}/account`} className={linkClass}>
+      <Link href={account.account} className={linkClass}>
         {t("myAccount")}
       </Link>
     </li>,
     <li key="orders">
-      <Link href={`${basePath}/account/orders`} className={linkClass}>
+      <Link href={account.orders} className={linkClass}>
         {t("orderHistory")}
       </Link>
     </li>,

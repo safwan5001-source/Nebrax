@@ -140,12 +140,73 @@ export interface AppSchema {
   pages: Record<string, AppSchemaComponent>;
 }
 
+/** AD-05 (S20a): بيانات المحرر المستقلة عن المخطط — `contracts/app-builder/editor-meta.v1.json`. لا تغادر المسودة. */
+export interface EditorMetaNode { name?: string; hidden?: true; preset?: string }
+export interface EditorMeta {
+  v: 1;
+  /** مقيَّدة بالصفحة: `nodes[pageId][nodeId]` (فرادة معرّف المكوّن داخل الصفحة وحدها). */
+  nodes: Record<string, Record<string, EditorMetaNode>>;
+  pages: Record<string, { title?: string }>;
+}
+
 export interface BuilderDraftExperience {
   id: string;
   builder_app_id: string;
   schema: AppSchema;
+  /** null = لا بيانات (كل المسودات القديمة). */
+  editor_meta?: EditorMeta | null;
   revision: number;
   updated_at: string | null;
+}
+
+export const EMPTY_EDITOR_META: EditorMeta = { v: 1, nodes: {}, pages: {} };
+
+/** يُسقط العقد المخفية وأبناءها من جذر صفحة — مرآة `EditorMeta::project` في الخادم (ما يراه المتجر والمعاينة). لا يحوّر المدخل. */
+export function projectPageRoot(root: AppSchemaComponent, meta: EditorMeta | null | undefined, pageId: string): AppSchemaComponent {
+  const hidden = new Set(Object.entries(meta?.nodes[pageId] ?? {}).filter(([, n]) => n.hidden === true).map(([id]) => id));
+  if (hidden.size === 0) return root;
+  const prune = (node: AppSchemaComponent): AppSchemaComponent => {
+    if (!node.children) return node;
+    return { ...node, children: node.children.filter((child) => !hidden.has(child.id)).map(prune) };
+  };
+  return prune(root);
+}
+
+/** إدخالات عقد صفحة واحدة (فارغة إن لم يوجد). */
+const NO_NODES: Record<string, EditorMetaNode> = {};
+export function pageNodeMeta(meta: EditorMeta | null | undefined, pageId: string | null): Record<string, EditorMetaNode> {
+  return (pageId && meta?.nodes[pageId]) || NO_NODES;
+}
+
+/** تحديث غير مغيِّر لإدخال عقدة؛ إدخال فارغ يُحذف، وبيانات فارغة تعود `null`. */
+export function updateEditorMetaNode(meta: EditorMeta | null | undefined, pageId: string, nodeId: string, patch: Partial<Omit<EditorMetaNode, 'hidden'>> & { hidden?: boolean }): EditorMeta | null {
+  const base = meta ?? EMPTY_EDITOR_META;
+  const next: EditorMetaNode = { ...(base.nodes[pageId]?.[nodeId] ?? {}) };
+  for (const [key, value] of Object.entries(patch)) {
+    if (key === 'hidden') {
+      if (value === true) next.hidden = true; else delete next.hidden;
+    } else if (typeof value === 'string' && value.trim() !== '') {
+      (next as Record<string, unknown>)[key] = value.trim();
+    } else {
+      delete (next as Record<string, unknown>)[key];
+    }
+  }
+  const pageNodes = { ...(base.nodes[pageId] ?? {}) };
+  if (Object.keys(next).length === 0) delete pageNodes[nodeId]; else pageNodes[nodeId] = next;
+  const nodes = { ...base.nodes };
+  if (Object.keys(pageNodes).length === 0) delete nodes[pageId]; else nodes[pageId] = pageNodes;
+  return compactEditorMeta({ ...base, nodes });
+}
+
+export function updateEditorMetaPageTitle(meta: EditorMeta | null | undefined, pageId: string, title: string): EditorMeta | null {
+  const base = meta ?? EMPTY_EDITOR_META;
+  const pages = { ...base.pages };
+  if (title.trim() === '') delete pages[pageId]; else pages[pageId] = { title: title.trim() };
+  return compactEditorMeta({ ...base, pages });
+}
+
+function compactEditorMeta(meta: EditorMeta): EditorMeta | null {
+  return Object.keys(meta.nodes).length === 0 && Object.keys(meta.pages).length === 0 ? null : meta;
 }
 
 // ── Component/Action registries (APP-BUILDER-3, serialized by AppBuilderRegistryController) ──
@@ -391,9 +452,39 @@ export function themeTokens(schema: AppSchema): Record<string, string> {
   return schema.theme?.tokens ?? {};
 }
 
-/** يدمج رموزاً جديدة/محدَّثة في `theme.tokens` — لا يحذف مفاتيح غائبة عن `patch`. */
+// ── عقد رموز الثيم القانوني (AD-03 / S04b) ───────────────────────────────────
+// `colorPrimary` هو الاسم القانوني؛ `primaryColor` (الويب القديم) مرادف **مقروء فقط** — مرآة `seedColorFromTokens` في Flutter.
+// الكتابة تُطبِّع (تعيد التسمية وتُسقط متغيرات العرض المشتقّة)؛ القراءة وحدها لا تمسّ شيئاً (لا إعادة كتابة جماعية).
+export const PRIMARY_COLOR_TOKEN = 'colorPrimary';
+export const LEGACY_PRIMARY_COLOR_TOKEN = 'primaryColor';
+const HEX6 = /^#[0-9a-fA-F]{6}$/;
+
+/** أول لون `#RRGGBB` صالح بترتيب (قانوني، مرادف)، أو `null`. يُقصّ الفراغ المحيط كما يفعل Flutter. */
+export function readPrimaryColor(tokens: Record<string, string> | null | undefined): string | null {
+  for (const key of [PRIMARY_COLOR_TOKEN, LEGACY_PRIMARY_COLOR_TOKEN]) {
+    const raw = tokens?.[key]?.trim();
+    if (raw && HEX6.test(raw)) return raw;
+  }
+  return null;
+}
+
+/**
+ * الشكل القانوني لرموز الثيم عند الكتابة: `colorPrimary` بدل المرادف القديم (القانوني الصالح يتقدّم، والمرادف غير الصالح يُسقَط ولا يُرقّى)،
+ * ويُسقَط ما يبدأ بـ`--` (متغيرات CSS مشتقّة كانت اللوحة القديمة تحفظها — العرض يشتقّها ولا تُخزَّن). لا يحوّر المدخل.
+ */
+export function canonicalizeThemeTokens(tokens: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(tokens)) {
+    if (key.startsWith('--') || key === LEGACY_PRIMARY_COLOR_TOKEN || key === PRIMARY_COLOR_TOKEN) continue;
+    out[key] = value;
+  }
+  const primary = readPrimaryColor(tokens);
+  return primary ? { [PRIMARY_COLOR_TOKEN]: primary, ...out } : out;
+}
+
+/** يدمج رموزاً جديدة/محدَّثة في `theme.tokens` ويُطبِّعها (القانوني) — لا يحذف مفاتيح غائبة عن `patch` غير ما تُسقطه التسوية. */
 export function mergeThemeTokens(schema: AppSchema, patch: Record<string, string>): AppSchema {
-  return { ...schema, theme: { ...schema.theme, tokens: { ...themeTokens(schema), ...patch } } };
+  return { ...schema, theme: { ...schema.theme, tokens: canonicalizeThemeTokens({ ...themeTokens(schema), ...patch }) } };
 }
 
 // ── Page-map edit helpers (APP-BUILDER-9) ────────────────────────────────────
