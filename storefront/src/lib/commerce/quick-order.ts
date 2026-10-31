@@ -8,6 +8,7 @@
 
 export type QuickOrderUnavailableReason =
   | "no_wholesale_price"
+  | "personalization_required"
   | "not_purchasable";
 
 export type QuickOrderLine = {
@@ -73,7 +74,9 @@ export function quickOrderLineFromApi(raw: unknown): QuickOrderLine | null {
       ? null
       : reason === "no_wholesale_price"
         ? "no_wholesale_price"
-        : "not_purchasable",
+        : reason === "personalization_required"
+          ? "personalization_required"
+          : "not_purchasable",
     inStock: typeof r.in_stock === "boolean" ? r.in_stock : null,
     exact: r.exact === true,
   };

@@ -82,6 +82,8 @@ export function QuickOrder({ basePath }: { basePath: string }) {
   useEffect(() => {
     const q = term.trim();
     if (q.length < 2) {
+      // invalidate any lookup still in flight so its late response cannot repopulate the picker for a query that is gone
+      latestSearch.current += 1;
       setResults(null);
       setSearching(false);
       return;

@@ -253,6 +253,29 @@ describe("quick order UI", () => {
     );
   });
 
+  it("a lookup still in flight when the search box is cleared never repopulates the picker", async () => {
+    let release: (v: unknown) => void = () => {};
+    actions.searchQuickOrder.mockReturnValue(
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+    );
+    render(wrap());
+    const box = screen.getByRole("textbox", {
+      name: "Search by SKU or product name",
+    });
+    fireEvent.change(box, { target: { value: "cof" } });
+    await waitFor(() => expect(actions.searchQuickOrder).toHaveBeenCalled(), {
+      timeout: 2000,
+    });
+    fireEvent.change(box, { target: { value: "" } });
+    await act(async () => {
+      release({ kind: "ok", lines: [line()] });
+    });
+    expect(screen.queryByTestId("qo-results")).toBeNull();
+    expect(screen.queryAllByTestId("qo-pick")).toHaveLength(0);
+  });
+
   it("a partial import keeps only the unresolved rows in the paste box, so a retry cannot apply the good ones twice", async () => {
     actions.resolveQuickOrderSkus.mockResolvedValue({
       kind: "ok",

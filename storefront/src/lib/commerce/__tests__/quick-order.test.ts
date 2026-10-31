@@ -269,6 +269,27 @@ describe("entries", () => {
   });
 });
 
+describe("quickOrderLineFromApi reasons", () => {
+  const base = {
+    product_id: "11111111-1111-4111-8111-111111111111",
+    name: "x",
+    available: false,
+    price: null,
+  };
+  it("keeps the personalization-required reason so the buyer is told what to do", () => {
+    expect(
+      quickOrderLineFromApi({
+        ...base,
+        unavailable_reason: "personalization_required",
+      })?.unavailableReason,
+    ).toBe("personalization_required");
+    expect(
+      quickOrderLineFromApi({ ...base, unavailable_reason: "whatever" })
+        ?.unavailableReason,
+    ).toBe("not_purchasable");
+  });
+});
+
 describe("failuresFromError", () => {
   it("reads the server's per-line rejection", () => {
     expect(
