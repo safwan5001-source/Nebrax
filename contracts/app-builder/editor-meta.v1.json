@@ -14,6 +14,7 @@
     "hidden nodes (and their children) are removed from published versions, preview sessions and contract issues (EditorMeta::project); they stay in the draft",
     "names, presets and page titles never leave the draft",
     "page/node ids that no longer exist in the saved schema (or sit under the wrong page) are pruned silently; a page root cannot be hidden (422 editor_meta_hidden_root)",
+    "numeric ids are valid keys: GET/PUT responses always serialize nodes / nodes.<pageId> / pages (and schema.pages) as JSON objects, never re-indexed lists (JsonResource would turn all-numeric keys into a list)",
     "unknown keys, wrong types, over-long text, non-object entries, or more than max_editor_meta_bytes (default 65536) => 422 with no write"
   ],
   "request": "PUT /api/app-builder/apps/{id}/draft { schema, base_revision, editor_meta? }",

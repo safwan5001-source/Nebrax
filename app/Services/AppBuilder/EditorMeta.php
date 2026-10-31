@@ -190,7 +190,9 @@ final class EditorMeta
         if ($raw === null || $raw === []) {
             return [];
         }
-        if (! is_array($raw) || array_is_list($raw)) {
+        // لا نرفض «القائمة»: JSON `{"0": {...}}` يُفكّ في PHP إلى `[0 => ...]` فتبدو قائمة، ومعرّف المكوّن/الصفحة "0" صالح في المخطط
+        // (مراجعة Codex P2). `[ {...} ]` و`{"0": {...}}` متطابقان بعد فك الترميز فلا يُمكن التمييز؛ المعرّف غير الموجود يُنظَّف عند الحفظ.
+        if (! is_array($raw)) {
             throw new SchemaFormatException('editor_meta_invalid', "الحقل {$field} في بيانات المحرر يجب أن يكون كائناً.");
         }
         foreach (array_keys($raw) as $id) {
@@ -249,5 +251,27 @@ final class EditorMeta
         }
 
         return $out;
+    }
+
+    /**
+     * شكل الاستجابة: خرائط `nodes`/`nodes.<pageId>`/`pages` **كائنات JSON دائماً**. `JsonResource` يعيد فهرسة أي مصفوفة مفاتيحها
+     * كلها رقمية (`array_values`) فيُفسد معرّفاً رقمياً صالحاً («7» ⇒ «0») — وهو ما التقطته مراجعة Codex على المعرّفات الرقمية.
+     *
+     * @param  array<string, mixed>|null  $meta
+     * @return array<string, mixed>|null
+     */
+    public static function forJson(?array $meta): ?array
+    {
+        if ($meta === null) {
+            return null;
+        }
+        $nodes = [];
+        foreach (($meta['nodes'] ?? []) as $pageId => $perPage) {
+            $nodes[(string) $pageId] = (object) (is_array($perPage) ? $perPage : []);
+        }
+        $meta['nodes'] = (object) $nodes;
+        $meta['pages'] = (object) (is_array($meta['pages'] ?? null) ? $meta['pages'] : []);
+
+        return $meta;
     }
 }
