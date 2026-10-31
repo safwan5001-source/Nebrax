@@ -23,7 +23,8 @@ import {
   mergeThemeTokens, moveSibling, registryLabel, removeComponentById, removePage, reorderChildren, setInitialPage,
   themeTokens as schemaThemeTokens, updateComponentById,
   type AppBuilderRegistries, type AppSchema, type AppSchemaActionRef, type AppSchemaComponent, type BuilderApp,
-  type BuilderDraftExperience, type BuilderPublishedVersion, type ContractIssue,
+  pageNodeMeta, projectPageRoot, updateEditorMetaNode, updateEditorMetaPageTitle,
+  type BuilderDraftExperience, type BuilderPublishedVersion, type ContractIssue, type EditorMeta,
 } from '@/lib/app-builder';
 import { resolvePreviewActionOutcome } from '@/modules/app-builder/action-semantics';
 import { EasyCatalogDialog } from '@/modules/app-builder/easy/easy-catalog-dialog';
@@ -41,7 +42,7 @@ import { LayersTree } from '@/modules/app-builder/layers-tree';
 import { Inspector } from '@/modules/app-builder/inspector';
 import { PreviewOnPhoneButton } from '@/modules/app-builder/preview-on-phone';
 import {
-  classifySaveError, clearDraftBackup, clearDraftBackupIfSaved, parseDraftConflict, readDraftBackup, schemasEqual, writeDraftBackup,
+  classifySaveError, clearDraftBackup, clearDraftBackupIfSaved, draftStatesEqual, parseDraftConflict, readDraftBackup, writeDraftBackup,
   type DraftBackup,
 } from '@/modules/app-builder/draft-save';
 import { DraftConflictDialog, LeaveGuardDialog, RecoverBackupDialog, type ConflictState } from '@/modules/app-builder/draft-save-dialogs';
@@ -101,6 +102,13 @@ export default function AppBuilderWorkspacePage() {
   const [baseRevision, setBaseRevision] = useState<number | null>(null);
   const baseRevisionRef = useRef<number | null>(null);
   const schemaRef = useRef<AppSchema | null>(null);
+  // AD-05: بيانات المحرر مرتبطة بهوية كائن المخطط (WeakMap) فيشملها سجلّ التراجع/الإعادة تلقائياً دون تغيير بنيته.
+  const metaRegistry = useRef(new WeakMap<AppSchema, EditorMeta | null>());
+  const metaOf = (value: AppSchema | null): EditorMeta | null => (value ? metaRegistry.current.get(value) ?? null : null);
+  const withMeta = (next: AppSchema, meta: EditorMeta | null): AppSchema => {
+    metaRegistry.current.set(next, meta);
+    return next;
+  };
   const dirtyRef = useRef(false);
   const [conflict, setConflict] = useState<ConflictState | null>(null);
   const [saveFailure, setSaveFailure] = useState<'network' | 'other' | null>(null);
@@ -182,7 +190,7 @@ export default function AppBuilderWorkspacePage() {
     ])
       .then(([appRes, draftRes, registriesRes]) => {
         setApp(appRes.data);
-        setSchema(draftRes.data.schema);
+        setSchema(withMeta(draftRes.data.schema, draftRes.data.editor_meta ?? null));
         setContractIssues(draftRes.issues ?? []);
         baseRevisionRef.current = draftRes.data.revision;
         setBaseRevision(draftRes.data.revision);
@@ -190,7 +198,7 @@ export default function AppBuilderWorkspacePage() {
         setSaveFailure(null);
         // نسخة محلية احتياطية لتعديلات لم تُحفظ (إغلاق/انهيار/فشل شبكة/تعارض سابق): تُعرض للاستعادة لا تُطبَّق صامتةً.
         const backup = readDraftBackup(backupUserId, params.id);
-        if (backup && !schemasEqual(backup.schema, draftRes.data.schema)) setRecovery(backup);
+        if (backup && !draftStatesEqual({ schema: backup.schema, editorMeta: backup.editorMeta ?? null }, { schema: draftRes.data.schema, editorMeta: draftRes.data.editor_meta ?? null })) setRecovery(backup);
         else {
           if (backup) clearDraftBackup(backupUserId, params.id);
           setRecovery(null);
@@ -228,14 +236,14 @@ export default function AppBuilderWorkspacePage() {
   // نسخة محلية احتياطية مؤجَّلة لكل تعديل غير محفوظ، وتُكتب فوراً عند إخفاء الصفحة؛ تُمسح عند الحفظ الناجح أو التجاهل الصريح.
   useEffect(() => {
     if (!schema || !dirty || !params.id || baseRevision === null) return;
-    const handle = window.setTimeout(() => writeDraftBackup(backupUserId, params.id, schema, baseRevision), 400);
+    const handle = window.setTimeout(() => writeDraftBackup(backupUserId, params.id, schema, baseRevision, metaOf(schema)), 400);
     return () => window.clearTimeout(handle);
   }, [schema, dirty, baseRevision, params.id, backupUserId]);
 
   const flushBackupNow = useCallback(() => {
     const current = schemaRef.current;
     if (current && dirtyRef.current && params.id && baseRevisionRef.current !== null) {
-      writeDraftBackup(backupUserId, params.id, current, baseRevisionRef.current);
+      writeDraftBackup(backupUserId, params.id, current, baseRevisionRef.current, metaOf(current));
     }
   }, [params.id, backupUserId]);
   const flushBackupRef = useRef(flushBackupNow);
@@ -252,12 +260,25 @@ export default function AppBuilderWorkspacePage() {
   }, []);
 
   const applyPageEdit = useCallback(
-    (pageId: string, updater: (pageRoot: AppSchemaComponent) => AppSchemaComponent) => {
+    (pageId: string, updater: (pageRoot: AppSchemaComponent) => AppSchemaComponent, metaUpdater?: (meta: EditorMeta | null) => EditorMeta | null) => {
       if (!schema || !canManage) return;
       pastRef.current = [...pastRef.current, schema].slice(-HISTORY_LIMIT);
       futureRef.current = [];
       setDirty(true);
-      setSchema({ ...schema, pages: { ...schema.pages, [pageId]: updater(schema.pages[pageId]) } });
+      const meta = metaOf(schema);
+      setSchema(withMeta({ ...schema, pages: { ...schema.pages, [pageId]: updater(schema.pages[pageId]) } }, metaUpdater ? metaUpdater(meta) : meta));
+    },
+    [schema, canManage]
+  );
+
+  /** تعديل بيانات المحرر وحدها (إخفاء/اسم/عنوان صفحة) — خطوة تراجع كاملة، والمخطط نفسه لا يتغير (كائن جديد بالمحتوى نفسه). */
+  const applyMetaEdit = useCallback(
+    (metaUpdater: (meta: EditorMeta | null) => EditorMeta | null) => {
+      if (!schema || !canManage) return;
+      pastRef.current = [...pastRef.current, schema].slice(-HISTORY_LIMIT);
+      futureRef.current = [];
+      setDirty(true);
+      setSchema(withMeta({ ...schema }, metaUpdater(metaOf(schema))));
     },
     [schema, canManage]
   );
@@ -268,7 +289,7 @@ export default function AppBuilderWorkspacePage() {
       pastRef.current = [...pastRef.current, schema].slice(-HISTORY_LIMIT);
       futureRef.current = [];
       setDirty(true);
-      setSchema(mergeThemeTokens(schema, patch));
+      setSchema(withMeta(mergeThemeTokens(schema, patch), metaOf(schema)));
     },
     [schema, canManage]
   );
@@ -280,7 +301,7 @@ export default function AppBuilderWorkspacePage() {
       pastRef.current = [...pastRef.current, schema].slice(-HISTORY_LIMIT);
       futureRef.current = [];
       setDirty(true);
-      setSchema(updater(schema));
+      setSchema(withMeta(updater(schema), metaOf(schema)));
     },
     [schema, canManage]
   );
@@ -326,13 +347,16 @@ export default function AppBuilderWorkspacePage() {
     const toSave = schemaRef.current;
     if (!toSave || !params.id) return 'failed';
     const base = overrideBase ?? baseRevisionRef.current;
+    const sentMeta = metaOf(toSave); // ما أُرسل فعلاً: به يُقارَن النسخ الاحتياطي (الخادم قد يقصّ معرّفات غير موجودة).
     try {
       const res = await api<{ data: BuilderDraftExperience; issues?: ContractIssue[] }>(`/app-builder/apps/${params.id}/draft`, {
         method: 'PUT',
-        body: base === null ? { schema: toSave } : { schema: toSave, base_revision: base },
+        body: base === null ? { schema: toSave, editor_meta: sentMeta } : { schema: toSave, base_revision: base, editor_meta: sentMeta },
       });
       const saved = res?.data;
       setContractIssues(res?.issues ?? []);
+      // الخادم ينظّف بيانات المحرر (يقصّ معرّفات لم تعد في المخطط)؛ نسخته هي المرجع لما حُفظ.
+      if (saved && 'editor_meta' in saved) metaRegistry.current.set(toSave, saved.editor_meta ?? null);
       if (saved && typeof saved.revision === 'number') {
         baseRevisionRef.current = saved.revision;
         setBaseRevision(saved.revision);
@@ -340,7 +364,7 @@ export default function AppBuilderWorkspacePage() {
       // تعديلات أُجريت أثناء الطلب لا تُعدّ محفوظة.
       if (schemaRef.current === toSave) {
         setDirty(false);
-        clearDraftBackupIfSaved(backupUserId, params.id, toSave);
+        clearDraftBackupIfSaved(backupUserId, params.id, toSave, sentMeta);
       }
       setSaveFailure(null);
       setConflict(null);
@@ -351,13 +375,13 @@ export default function AppBuilderWorkspacePage() {
       if (info) {
         setConflict((previous) => ({ info, stage: 'choose', latest: null, busy: false, changedAgain: previous?.stage === 'confirmOverwrite' }));
         // الأحدث لا لقطة الطلب: قد يكون المستخدم تابع الكتابة أثناء الحفظ البطيء ونسخته المحلية أحدث.
-        if (baseRevisionRef.current !== null) writeDraftBackup(backupUserId, params.id, schemaRef.current ?? toSave, baseRevisionRef.current);
+        if (baseRevisionRef.current !== null) writeDraftBackup(backupUserId, params.id, schemaRef.current ?? toSave, baseRevisionRef.current, metaOf(schemaRef.current ?? toSave));
         return 'conflict';
       }
       const kind = classifySaveError(err);
       if (kind === 'network' || kind === 'other') setSaveFailure(kind);
       toast.error(t('saveErrorTitle'), err instanceof ApiError ? err.message : t('saveNetworkHint'));
-      if (baseRevisionRef.current !== null) writeDraftBackup(backupUserId, params.id, schemaRef.current ?? toSave, baseRevisionRef.current);
+      if (baseRevisionRef.current !== null) writeDraftBackup(backupUserId, params.id, schemaRef.current ?? toSave, baseRevisionRef.current, metaOf(schemaRef.current ?? toSave));
       return 'failed';
     }
   }
@@ -423,7 +447,7 @@ export default function AppBuilderWorkspacePage() {
     setBaseRevision(recovery.baseRevision);
     pastRef.current = [];
     futureRef.current = [];
-    setSchema(recovery.schema);
+    setSchema(withMeta(recovery.schema, recovery.editorMeta ?? null));
     // النسخة المستعادة قد تحذف/تغيّر الصفحة المحدَّدة من مسودة الخادم؛ التحديد يُعاد من المخطط المستعاد وإلا ظهر الكانفاس فارغاً.
     const pageId = pickInitialPageId(recovery.schema);
     setSelectedPageId(pageId);
@@ -588,6 +612,10 @@ export default function AppBuilderWorkspacePage() {
     viewedPageId && viewedSchema?.pages[viewedPageId] ? viewedPageId : viewedSchema?.navigation.initialPageId ?? null;
   const viewedPageRoot = viewedSchema && effectiveViewedPageId ? viewedSchema.pages[effectiveViewedPageId] ?? null : null;
   const currentPageRoot = schema && selectedPageId ? schema.pages[selectedPageId] ?? null : null;
+  // بيانات المحرر (AD-05) والجذر **المُسقَط**: ما يراه التاجر في الكانفاس والمعاينة هو ما يُنشر (الأقسام المخفية خارجه).
+  const editorMeta = metaOf(schema);
+  const projectedPageRoot = currentPageRoot && selectedPageId ? projectPageRoot(currentPageRoot, editorMeta, selectedPageId) : null;
+  const nodeMeta = pageNodeMeta(editorMeta, selectedPageId);
   const selectedNode = currentPageRoot && selectedComponentId ? findComponentById(currentPageRoot, selectedComponentId) : null;
   const canUndo = pastRef.current.length > 0;
   const canRedo = futureRef.current.length > 0;
@@ -603,7 +631,8 @@ export default function AppBuilderWorkspacePage() {
    * never a crash or a fabricated page.
    */
   const inlineEffectivePageId = inlinePreviewPageId ?? selectedPageId;
-  const inlinePreviewRoot = schema && inlineEffectivePageId ? schema.pages[inlineEffectivePageId] ?? null : null;
+  const inlinePreviewRootRaw = schema && inlineEffectivePageId ? schema.pages[inlineEffectivePageId] ?? null : null;
+  const inlinePreviewRoot = inlinePreviewRootRaw && inlineEffectivePageId ? projectPageRoot(inlinePreviewRootRaw, editorMeta, inlineEffectivePageId) : null;
 
   /** يبدّل وضع لوحة البنية — يلغي أي معاينة مزامنة مظهر معلّقة عند مغادرة تبويب المظهر، فلا تبقى معلَّقة على كانفاس لم يعد يُظهر أدواتها. */
   function switchStructureMode(mode: StructureMode) {
@@ -696,8 +725,16 @@ export default function AppBuilderWorkspacePage() {
     if (!canManage || !selectedPageId || !currentPageRoot) return;
     const source = findComponentById(currentPageRoot, id);
     if (!source) return;
+    const pageId = selectedPageId;
     const copy = cloneWithFreshIds(source);
-    applyPageEdit(selectedPageId, (root) => insertChildAfter(root, root.id, id, copy));
+    // النسخة تحمل اسم القسم ونوعه الجاهز (لا الإخفاء: نسخة جديدة ظاهرة)؛ معرّفها جديد فلا تلتبس ببيانات الأصل.
+    const original = pageNodeMeta(metaOf(schema), selectedPageId)[id];
+    const carry = original && (original.name || original.preset) ? { name: original.name, preset: original.preset } : null;
+    applyPageEdit(
+      selectedPageId,
+      (root) => insertChildAfter(root, root.id, id, copy),
+      carry ? (meta) => updateEditorMetaNode(meta, pageId, copy.id, carry) : undefined,
+    );
     setSelectedComponentId(copy.id);
   }
 
@@ -706,6 +743,25 @@ export default function AppBuilderWorkspacePage() {
     applyPageEdit(selectedPageId, (root) => removeComponentById(root, id));
     setSelectedComponentId(currentPageRoot.id);
     setPendingDeleteName(name);
+  }
+
+  function easyToggleHidden(id: string) {
+    if (!canManage || !selectedPageId) return;
+    const pageId = selectedPageId;
+    const hidden = pageNodeMeta(metaOf(schema), pageId)[id]?.hidden === true;
+    applyMetaEdit((meta) => updateEditorMetaNode(meta, pageId, id, { hidden: !hidden }));
+  }
+
+  function easyRename(id: string, name: string) {
+    if (!canManage || !selectedPageId) return;
+    const pageId = selectedPageId;
+    applyMetaEdit((meta) => updateEditorMetaNode(meta, pageId, id, { name }));
+  }
+
+  function easyRenamePage(title: string) {
+    if (!canManage || !selectedPageId) return;
+    const pageId = selectedPageId;
+    applyMetaEdit((meta) => updateEditorMetaPageTitle(meta, pageId, title));
   }
 
   function easyUndoDelete() {
@@ -718,7 +774,13 @@ export default function AppBuilderWorkspacePage() {
     const created = entry.build();
     // بعد القسم المحدد (أو أحد أبنائه)، وإلا في النهاية.
     const afterId = (currentPageRoot.children ?? []).find((section) => findComponentById(section, selectedComponentId ?? '') !== null)?.id ?? null;
-    applyPageEdit(selectedPageId, (root) => insertChildAfter(root, root.id, afterId, created));
+    // النوع الجاهز (Preset) يُسجَّل في بيانات المحرر لا في المخطط: يميّز القسم الذي بُني من الكتالوج دون مفتاح جديد في AppSchema.
+    const pageId = selectedPageId;
+    applyPageEdit(
+      pageId,
+      (root) => insertChildAfter(root, root.id, afterId, created),
+      (meta) => updateEditorMetaNode(meta, pageId, created.id, { preset: entry.key }),
+    );
     setSelectedComponentId(created.id);
     setCatalogOpen(false);
   }
@@ -740,7 +802,7 @@ export default function AppBuilderWorkspacePage() {
   // `currentPageRoot`/`schema` can be shown safely without a second fetch or a second
   // "viewed" tracking variable — `published`/`default` keep using the existing
   // `viewedPageRoot`/`viewedSchema` exactly as Design's own read-only branch already does.
-  const previewRoot = previewState === 'draft' ? currentPageRoot : viewedPageRoot;
+  const previewRoot = previewState === 'draft' ? projectedPageRoot : viewedPageRoot;
   const previewThemeTokensResolved =
     previewState === 'draft' ? schemaThemeTokens(schema) : viewedSchema ? schemaThemeTokens(viewedSchema) : undefined;
   const previewBannerText =
@@ -792,7 +854,7 @@ export default function AppBuilderWorkspacePage() {
                     pageId === selectedPageId ? 'border-primary bg-primary-soft text-primary' : 'border-border text-text hover:bg-background'
                   )}
                 >
-                  {pageId}{pageId === schema.navigation?.initialPageId ? ' ★' : ''}
+                  {editorMeta?.pages[pageId]?.title ?? pageId}{pageId === schema.navigation?.initialPageId ? ' ★' : ''}
                 </button>
               ))}
               <Button type="button" variant="outline" size="icon" className="h-8 w-8 rounded-full" aria-label={t('pages.addAction')} title={t('pages.addAction')} disabled={!canManage} onClick={addNewPage}>
@@ -870,6 +932,12 @@ export default function AppBuilderWorkspacePage() {
                 canUndo={canUndo}
                 undoBanner={deleteUndo ? { name: deleteUndo.name } : null}
                 markers={issueMarkers}
+                nodeMeta={nodeMeta}
+                onToggleHidden={easyToggleHidden}
+                onRename={easyRename}
+                pageTitle={(selectedPageId && editorMeta?.pages[selectedPageId]?.title) || selectedPageId || ''}
+                pageTitleCustom={(selectedPageId && editorMeta?.pages[selectedPageId]?.title) || ''}
+                onRenamePage={easyRenamePage}
               />
             </div>
           ) : (
@@ -1115,7 +1183,7 @@ export default function AppBuilderWorkspacePage() {
     const section = list[index];
     const summary = sectionSummary(section);
     const definition = registries?.components[summary.primaryType];
-    return { id: section.id, index, count: list.length, name: summary.title ?? (definition ? registryLabel(definition.label, locale) : summary.primaryType) };
+    return { id: section.id, index, count: list.length, name: nodeMeta[section.id]?.name ?? summary.title ?? (definition ? registryLabel(definition.label, locale) : summary.primaryType) };
   })();
 
   const notices = (
@@ -1334,6 +1402,8 @@ export default function AppBuilderWorkspacePage() {
               name={selectedSectionInfo.name}
               position={{ index: selectedSectionInfo.index, count: selectedSectionInfo.count }}
               canManage={canManage}
+              hidden={nodeMeta[selectedSectionInfo.id]?.hidden === true}
+              onToggleHidden={() => easyToggleHidden(selectedSectionInfo.id)}
               onMoveUp={() => selectedPageId && moveNode(selectedPageId, selectedSectionInfo.id, 'up')}
               onMoveDown={() => selectedPageId && moveNode(selectedPageId, selectedSectionInfo.id, 'down')}
               onDuplicate={() => easyDuplicate(selectedSectionInfo.id)}
@@ -1344,7 +1414,7 @@ export default function AppBuilderWorkspacePage() {
           <div className="flex min-h-0 min-w-0 flex-1">
           {isDraftView ? (
             <AppBuilderCanvas
-              root={currentPageRoot}
+              root={projectedPageRoot}
               device={device}
               locale={previewLocale}
               selectedId={selectedComponentId}

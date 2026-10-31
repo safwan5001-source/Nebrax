@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { ApiError } from '@/lib/api';
 import type { AppSchema } from '@/lib/app-builder';
 import {
-  classifySaveError, clearDraftBackup, clearDraftBackupIfSaved, parseDraftConflict, readDraftBackup, schemasEqual, writeDraftBackup,
+  classifySaveError, clearDraftBackup, clearDraftBackupIfSaved, draftStatesEqual, parseDraftConflict, readDraftBackup, schemasEqual, writeDraftBackup,
 } from './draft-save';
 
 const schema: AppSchema = {
@@ -111,5 +111,28 @@ describe('schemasEqual', () => {
   it('compares structurally', () => {
     expect(schemasEqual(schema, JSON.parse(JSON.stringify(schema)))).toBe(true);
     expect(schemasEqual(schema, { ...schema, navigation: { initialPageId: 'other' } })).toBe(false);
+  });
+});
+
+describe('draft state with editor meta (AD-05)', () => {
+  beforeEach(() => window.localStorage.clear());
+  const meta = { v: 1 as const, nodes: { home: { 'sec-1': { hidden: true as const } } }, pages: {} };
+
+  it('round-trips editor meta in the local backup', () => {
+    writeDraftBackup('u1', 'app-1', schema, 2, meta);
+    expect(readDraftBackup('u1', 'app-1')?.editorMeta).toEqual(meta);
+  });
+
+  it('a meta-only change is a real difference; null and undefined meta are equal', () => {
+    expect(draftStatesEqual({ schema, editorMeta: null }, { schema, editorMeta: meta })).toBe(false);
+    expect(draftStatesEqual({ schema, editorMeta: null }, { schema, editorMeta: null })).toBe(true);
+  });
+
+  it('a saved draft clears its backup only when the meta matches too', () => {
+    writeDraftBackup('u1', 'app-1', schema, 2, meta);
+    clearDraftBackupIfSaved('u1', 'app-1', schema, null); // مخطط مطابق لكن بيانات المحرر أحدث محلياً
+    expect(readDraftBackup('u1', 'app-1')).not.toBeNull();
+    clearDraftBackupIfSaved('u1', 'app-1', schema, meta);
+    expect(readDraftBackup('u1', 'app-1')).toBeNull();
   });
 });
