@@ -8,7 +8,7 @@
 | **PR** | __PR_URL__ |
 | **Base** | `origin/main` @ `ddd5e76f2b385f908667e3c94d4482bbfabc8d7c` |
 | **Head SHA (code)** | __HEAD_CODE__ |
-| **Head SHA (PR head, incl. this metadata commit)** | __HEAD_PR__ |
+| **PR head** | the tip of the branch (this metadata commit sits on top of the code SHA above) |
 | **Status** | Built and verified locally. **Closed by default** (deployment flag + per-channel flag). Not merged, not deployed, not activated, no remote migrations run. **Stopped for review.** |
 
 ---
