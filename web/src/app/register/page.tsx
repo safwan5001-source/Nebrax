@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslations } from 'next-intl';
@@ -11,6 +11,8 @@ import { AlertCircle, Eye, EyeOff, LoaderCircle } from 'lucide-react';
 import { AuthShell } from '@/components/auth/auth-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { InternationalPhoneInput } from '@/components/ui/international-phone-input';
+import { isValidE164 } from '@/lib/phone/phone';
 import { register as registerTenant } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
 import { isReservedTenantSlug, isTenantSubdomainHost, tenantHostFor, tenantHostSuffix } from '@/lib/tenant-domain';
@@ -18,22 +20,13 @@ import { isReservedTenantSlug, isTenantSubdomainHost, tenantHostFor, tenantHostS
 const schema = z.object({
   company_name: z.string().min(1),
   email: z.string().email(),
-  phone: z.string().regex(/^5\d{8}$/),
+  // E.164 دولي («+9665XXXXXXXX»)؛ يتحقق من نمط الدولة الفعلي لا من السعودية وحدها.
+  phone: z.string().refine((value) => isValidE164(value)),
   slug: z.string().min(1).regex(/^[a-zA-Z0-9_-]+$/).refine((value) => !isReservedTenantSlug(value), { message: 'reserved' }),
   password: z.string().min(8),
 });
 
 type FormValues = z.infer<typeof schema>;
-
-function SaudiFlag() {
-  return (
-    <svg className="h-4 w-6 shrink-0 rounded-[2px] shadow-[0_0_0_1px_rgb(0_0_0_/_0.1)]" viewBox="0 0 28 18" aria-hidden="true" focusable="false">
-      <rect width="28" height="18" rx="1.5" fill="var(--flag-saudi)" />
-      <path d="M6.2 5.7h15.6M7.4 8.1h13.2M8.3 10.4h11.4" stroke="var(--flag-mark)" strokeWidth="1.25" strokeLinecap="round" />
-      <path d="M7.2 13.5c4.45.76 9.12.76 13.6 0" stroke="var(--flag-mark)" strokeWidth="1.15" strokeLinecap="round" />
-    </svg>
-  );
-}
 
 export default function RegisterPage() {
   const t = useTranslations('register');
@@ -43,9 +36,10 @@ export default function RegisterPage() {
   const {
     register,
     handleSubmit,
+    control,
     watch,
     formState: { errors, isSubmitting },
-  } = useForm<FormValues>({ resolver: zodResolver(schema) });
+  } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { phone: '' } });
   const password = watch('password', '');
   const passwordScore = [password.length >= 8, /[A-Z]/.test(password), /\d/.test(password), /[^A-Za-z0-9]/.test(password)].filter(Boolean).length;
   const passwordLabels = [t('strength_weak'), t('strength_fair'), t('strength_good'), t('strength_strong')];
@@ -58,7 +52,7 @@ export default function RegisterPage() {
         slug: values.slug.toLowerCase(),
         email: values.email,
         password: values.password,
-        phone: '+966' + values.phone.replace(/^0+/, ''),
+        phone: values.phone,
       });
 
       // TENANT-PROVISIONING-E2E-1: التسجيل يصل من نطاق فرعي عام غير محسوم
@@ -163,26 +157,21 @@ export default function RegisterPage() {
               <label htmlFor="register-phone" className="mb-1.5 block text-sm font-semibold text-text">
                 {t('phone')} <span className="text-muted" aria-hidden="true">*</span>
               </label>
-              <div data-invalid={Boolean(errors.phone) || undefined} className="ax-affix flex">
-                <span className="flex shrink-0 items-center gap-1.5 border-e px-2.5 text-sm text-muted" dir="ltr" aria-label={`${t('phone_country')} +966`}>
-                  <SaudiFlag />
-                  <span className="font-semibold text-text" lang="ar" dir="rtl">{t('phone_country')}</span>
-                  <span>+966</span>
-                </span>
-                <input
-                  id="register-phone"
-                  dir="ltr"
-                  type="tel"
-                  inputMode="numeric"
-                  autoComplete="tel-national"
-                  maxLength={9}
-                  className="num h-full w-full bg-transparent px-3 text-text placeholder:text-muted focus:outline-none"
-                  placeholder="5X XXX XXXX"
-                  aria-invalid={Boolean(errors.phone)}
-                  aria-describedby={errors.phone ? 'register-phone-error' : undefined}
-                  {...register('phone')}
-                />
-              </div>
+              <Controller
+                name="phone"
+                control={control}
+                render={({ field }) => (
+                  <InternationalPhoneInput
+                    id="register-phone"
+                    name={field.name}
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    invalid={Boolean(errors.phone)}
+                    aria-describedby={errors.phone ? 'register-phone-error' : undefined}
+                  />
+                )}
+              />
               {errors.phone && <p id="register-phone-error" className="mt-1.5 text-xs text-negative" role="alert">{t('phone_invalid')}</p>}
             </div>
 

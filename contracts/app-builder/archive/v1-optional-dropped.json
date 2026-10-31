@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "1.0.0",
+  "minRuntimeVersion": "1.0.0",
+  "navigation": { "initialPageId": "home" },
+  "theme": { "tokens": { "colorPrimary": "#0f766e" } },
+  "pages": {
+    "home": {
+      "type": "Page",
+      "id": "home-root",
+      "children": [
+        { "type": "Text", "id": "intro", "props": { "text": "متجري" } },
+        {
+          "type": "Section",
+          "id": "categories-strip",
+          "optional": true,
+          "props": { "title": "التصنيفات" },
+          "children": [
+            { "type": "ProductList", "id": "categories-list", "binding": { "resource": "commerce.categories" }, "children": [] }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "1.0.0",
+  "minRuntimeVersion": "1.0.0",
+  "navigation": { "initialPageId": "home" },
+  "theme": {
+    "tokens": {
+      "primaryColor": "#1e3a5f",
+      "themePreset": "navy",
+      "radius": "sharp",
+      "density": "compact",
+      "--primary": "#1e3a5f",
+      "--store-radius": "2px"
+    }
+  },
+  "pages": {
+    "home": {
+      "type": "Page",
+      "id": "home-root",
+      "children": [
+        { "type": "Section", "id": "hero", "props": { "title": "أهلاً" }, "children": [ { "type": "Text", "id": "hello", "props": { "text": "مرحباً بكم", "style": "title" } } ] }
+      ]
+    }
+  }
+}

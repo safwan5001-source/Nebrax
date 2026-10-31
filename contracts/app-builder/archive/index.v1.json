@@ -1,0 +1,17 @@
+{
+  "contract": "app-builder.version-archive",
+  "version": 1,
+  "decision": "AD-02 / CPT-05 — published versions are immutable and must stay valid after every feature",
+  "rules": [
+    "every archived schema must parse (PHP AppSchemaParser and Dart AppSchema.parse) forever",
+    "its compatibility outcome under the runtime generation named in `expect` must never change",
+    "a newer runtime generation may never make an archived version that rendered on an older generation fail to render",
+    "archived documents are frozen: add new files for new shapes, never edit an existing one"
+  ],
+  "versions": [
+    { "file": "v1-minimal.json", "note": "home page only, no components", "expect": { "1.0.0": { "compatible": true, "fallbackIds": [] } } },
+    { "file": "../integrated-proof-schema.v1.json", "note": "products list + cart page with binding.collect (LIVE-PREVIEW-7 proof)", "expect": { "1.0.0": { "compatible": true, "fallbackIds": [] } } },
+    { "file": "v1-legacy-theme.json", "note": "published before S04b: legacy primaryColor + derived --css tokens", "expect": { "1.0.0": { "compatible": true, "fallbackIds": [] } } },
+    { "file": "v1-optional-dropped.json", "note": "optional section bound to a resource this runtime does not enable (commerce.categories) — dropped, never fails", "expect": { "1.0.0": { "compatible": true, "fallbackIds": ["categories-strip"] } } }
+  ]
+}

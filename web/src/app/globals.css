@@ -28,8 +28,6 @@
   --negative: #b91c1c;
   --danger-fg: #ffffff;
   --warning: #92400e;
-  --flag-saudi: #006c35;
-  --flag-mark: #ffffff;
   --font-sans: var(--font-ibm-sans), 'IBM Plex Sans Arabic', 'AWJ Saudi Riyal', system-ui, sans-serif;
   --font-mono: var(--font-ibm-mono), 'IBM Plex Mono', 'AWJ Saudi Riyal', ui-monospace, monospace;
 }
@@ -48,8 +46,6 @@
   --negative: #f87171;
   --danger-fg: #0e1014;
   --warning: #d97706;
-  --flag-saudi: #006c35;
-  --flag-mark: #ffffff;
 }
 
 /* Gate-off dark danger fill. White on #f87171 is 2.77:1; #0e1014 on that fill is 6.88:1.
