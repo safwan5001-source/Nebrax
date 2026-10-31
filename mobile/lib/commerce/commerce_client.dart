@@ -86,8 +86,17 @@ class CommerceClient {
   /// Throws exactly like every other method here ([CommerceApiException] on
   /// a documented error, [CommerceProtocolException] on a malformed body) —
   /// the fetcher, not this client, is where those become a fail-safe outcome.
-  Future<String> getExperienceSchemaJson() async {
-    final envelope = await _send(CommerceHttpMethod.get, const ['experience']);
+  ///
+  /// AD-02 (S05b) — [runtimeVersion] declares this runtime's generation as
+  /// `X-Runtime-Version` so the server serves the highest published version
+  /// *this* runtime can render (not merely the newest). Sent on this call
+  /// only; omitted ⇒ the server treats the device as the oldest generation.
+  Future<String> getExperienceSchemaJson({String? runtimeVersion}) async {
+    final envelope = await _send(
+      CommerceHttpMethod.get,
+      const ['experience'],
+      extraHeaders: runtimeVersion == null ? null : {'X-Runtime-Version': runtimeVersion},
+    );
     final data = envelope['data'];
     if (data is! Map) {
       throw const CommerceProtocolException('experience response missing "data" object');
@@ -335,11 +344,13 @@ class CommerceClient {
     Map<String, String>? query,
     Map<String, Object?>? body,
     _CustomerTokenPolicy customerTokenPolicy = _CustomerTokenPolicy.none,
+    Map<String, String>? extraHeaders,
   }) async {
     final headers = <String, String>{
       'Authorization': 'Bearer ${config.storeBearerToken}',
       'Accept': 'application/json',
       'Accept-Language': _acceptLanguage,
+      ...?extraHeaders,
     };
 
     final cartToken = await sessionStore.readCartToken();

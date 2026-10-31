@@ -27,7 +27,7 @@ Future<StartupDecision> resolveRealStartup({
     cached = null;
   }
 
-  final outcome = await _fetch(client);
+  final outcome = await _fetch(client, runtimeVersion: manifest.runtimeVersion.toString());
 
   final decision = resolveStartup(fetch: outcome, cached: cached, manifest: manifest);
 
@@ -60,9 +60,9 @@ Future<StartupDecision> resolveRealStartup({
 /// raw exception message or URL (its own doc comment's requirement). This is
 /// the one place that draws that line: everywhere else in the runtime, a
 /// 404 on this specific, single-purpose endpoint means exactly one thing.
-Future<ExperienceFetchOutcome> _fetch(CommerceClient client) async {
+Future<ExperienceFetchOutcome> _fetch(CommerceClient client, {required String runtimeVersion}) async {
   try {
-    final rawJson = await client.getExperienceSchemaJson();
+    final rawJson = await client.getExperienceSchemaJson(runtimeVersion: runtimeVersion);
     return ExperienceFetchSucceeded(rawJson);
   } on CommerceApiException catch (e) {
     if (e.statusCode == 404) {

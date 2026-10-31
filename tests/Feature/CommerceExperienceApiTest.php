@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\BuilderApp;
+use App\Models\BuilderDraftExperience;
 use App\Models\BuilderPublishedExperienceVersion;
 use App\Models\SalesChannel;
 use App\Models\Tenant;
@@ -63,14 +64,9 @@ class CommerceExperienceApiTest extends TestCase
             'name' => 'تطبيقي', 'creation_source' => BuilderApp::SOURCE_SCRATCH,
         ]);
 
-        $schema = array_merge([
-            'schemaVersion' => 1,
-            'minRuntimeVersion' => 1,
-            'requiredCapabilities' => [],
-            'theme' => ['tokens' => []],
-            'navigation' => ['initialPage' => 'home'],
-            'pages' => ['home' => ['type' => 'Page', 'children' => []]],
-        ], $schemaOverrides);
+        // مخطط صالح فعلاً (يمرّ المحلل ومحلّل التوافق): الاختيار بحسب جيل Runtime (AD-02/S05b) يتجاوز أي صف لا يُحلَّل،
+        // فلا تصلح مخططات «شكلية». العلامة المميِّزة بين النسخ في `theme.tokens.marker`.
+        $schema = array_merge(BuilderDraftExperience::minimalSafeSchema(), $schemaOverrides);
 
         $row = BuilderPublishedExperienceVersion::create([
             'builder_app_id' => $app->id,
@@ -90,17 +86,17 @@ class CommerceExperienceApiTest extends TestCase
     {
         $store = $this->seedMobileStore('exp');
 
-        $this->publishExperience($store['tenant'], 1, ['navigation' => ['initialPage' => 'old']]);
+        $this->publishExperience($store['tenant'], 1, ['theme' => ['tokens' => ['marker' => 'old']]]);
         // إنشاء ثانٍ متأخر زمنياً بثانية كاملة يضمن ترتيباً حتمياً بلا اعتماد
         // على دقّة الطابع الزمني دون الثانية.
         sleep(1);
-        $latest = $this->publishExperience($store['tenant'], 1, ['navigation' => ['initialPage' => 'new']]);
+        $latest = $this->publishExperience($store['tenant'], 1, ['theme' => ['tokens' => ['marker' => 'new']]]);
 
         $res = $this->getJson('/commerce/v1/experience', $this->bearer($store['token']))->assertOk();
 
         $res->assertJsonPath('data.version', $latest->version);
-        $res->assertJsonPath('data.schema.navigation.initialPage', 'new');
-        $res->assertJsonPath('data.schema_version', '1');
+        $res->assertJsonPath('data.schema.theme.tokens.marker', 'new');
+        $res->assertJsonPath('data.schema_version', '1.0.0');
     }
 
     /** @test */
@@ -109,7 +105,7 @@ class CommerceExperienceApiTest extends TestCase
         $a = $this->seedMobileStore('exp-a');
         $b = $this->seedMobileStore('exp-b');
 
-        $this->publishExperience($b['tenant'], 1, ['navigation' => ['initialPage' => 'b-only']]);
+        $this->publishExperience($b['tenant'], 1, ['theme' => ['tokens' => ['marker' => 'b-only']]]);
 
         $this->getJson('/commerce/v1/experience', $this->bearer($a['token']))
             ->assertStatus(404);
