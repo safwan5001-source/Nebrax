@@ -55,6 +55,8 @@ export const COMMERCE_WORKSPACE_MESSAGES = {
     delivery: 'التوصيل وإعدادات القناة',
     gifting: 'الإهداء',
     integrations: 'التكاملات',
+    groupWholesale: 'الجملة',
+    wholesale: 'مساحة الجملة',
     overviewTitle: 'مركز قيادة التجارة',
     overviewDescription:
       'إدارة ما يخص المتجر الإلكتروني فقط. المنتجات والعملاء والمخزون والفواتير والحسابات تبقى في أَوْج.',
@@ -408,6 +410,8 @@ export const COMMERCE_WORKSPACE_MESSAGES = {
     delivery: 'Delivery and channel settings',
     gifting: 'Gifting',
     integrations: 'Integrations',
+    groupWholesale: 'Wholesale',
+    wholesale: 'Wholesale workspace',
     overviewTitle: 'Commerce command center',
     overviewDescription:
       'Manage commerce-specific concerns only. Products, customers, inventory, invoices, and accounting stay in AWJ.',

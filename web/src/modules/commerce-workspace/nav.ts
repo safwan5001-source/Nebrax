@@ -44,6 +44,12 @@ export const COMMERCE_WORKSPACE_NAV_GROUPS: CommerceWorkspaceNavGroup[] = [
       { href: '/commerce/integrations', labelKey: 'integrations' },
     ],
   },
+  {
+    labelKey: 'groupWholesale',
+    // Single entry: the Wholesale Merchant Workspace owns its own section bar (modules/commerce-workspace/wholesale),
+    // so its eleven sections are not repeated in this navigation.
+    items: [{ href: '/commerce/wholesale', labelKey: 'wholesale', permission: 'commerce.wholesale.manage' }],
+  },
 ];
 
 export const COMMERCE_WORKSPACE_HREFS = COMMERCE_WORKSPACE_NAV_GROUPS.flatMap((group) =>

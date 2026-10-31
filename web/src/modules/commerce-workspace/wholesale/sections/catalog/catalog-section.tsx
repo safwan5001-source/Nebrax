@@ -1,0 +1,98 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocale } from 'next-intl';
+import { Tabs, TabPanel } from '@/components/ui/tabs';
+import { EmptyState } from '@/components/nebrax';
+import { ShieldAlert } from 'lucide-react';
+import { useCan } from '@/lib/use-can';
+import { useWholesaleChannel } from '../../channel-context';
+import { SectionPage } from '../../components/section-page';
+import { StatCard } from '../../components/stat-card';
+import { UnavailablePanel } from '../../components/unavailable-panel';
+import { loadStoreCatalogCounts, type CatalogCounts } from './api';
+import { AvailabilityPanel } from './availability-panel';
+import { catalogMessages } from './messages';
+import { PublicationPanel } from './publication-panel';
+
+export function CatalogSection() {
+  const locale = useLocale();
+  const { t } = catalogMessages.forLocale(locale);
+  return (
+    <SectionPage sectionKey="catalog" description={t('description')}>
+      <CatalogBody />
+    </SectionPage>
+  );
+}
+
+function CatalogBody() {
+  const locale = useLocale();
+  const { t } = catalogMessages.forLocale(locale);
+  const { store } = useWholesaleChannel();
+  const { can } = useCan();
+  const [tab, setTab] = useState<'visibility' | 'availability'>('visibility');
+  const [counts, setCounts] = useState<{ status: 'loading' } | { status: 'error' } | { status: 'ready'; data: CatalogCounts }>({ status: 'loading' });
+  const seq = useRef(0);
+  const storeId = store?.id ?? null;
+  // The active store as of the latest render. A callback captured for another store (e.g. a publication write that
+  // finishes after the merchant switched stores) must neither fetch nor write figures for the store now on screen.
+  const activeStore = useRef(storeId);
+  activeStore.current = storeId;
+
+  const loadCounts = useCallback(() => {
+    if (!storeId || activeStore.current !== storeId) return;
+    const id = ++seq.current;
+    const isCurrent = () => id === seq.current && activeStore.current === storeId;
+    loadStoreCatalogCounts(storeId).then(
+      (data) => isCurrent() && setCounts({ status: 'ready', data }),
+      () => isCurrent() && setCounts({ status: 'error' }),
+    );
+  }, [storeId]);
+  useEffect(() => {
+    // New store: drop the previous store's figures immediately instead of showing them until the new ones arrive.
+    setCounts({ status: 'loading' });
+    loadCounts();
+  }, [loadCounts]);
+
+  if (!store) return null;
+  const stat = (key: keyof CatalogCounts) => ({
+    loading: counts.status === 'loading',
+    unavailable: counts.status === 'error' ? t('statsError') : undefined,
+    value: counts.status === 'ready' ? counts.data[key] : undefined,
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <StatCard label={t('statAll')} {...stat('all')} />
+        <StatCard label={t('statPublished')} {...stat('published')} />
+        <StatCard label={t('statUnpublished')} {...stat('unpublished')} />
+      </div>
+
+      <div className="rounded border border-border bg-surface">
+        <span className="sr-only" id="catalog-tabs-label">{t('tabsAria')}</span>
+        <Tabs
+          tabs={[
+            { id: 'visibility', label: t('tabVisibility') },
+            { id: 'availability', label: t('tabAvailability') },
+          ]}
+          value={tab}
+          onChange={(id) => setTab(id as typeof tab)}
+        />
+        <div className="p-3">
+          <TabPanel id={tab}>
+            {tab === 'visibility' ? (
+              <PublicationPanel key={store.id} storeId={store.id} storeName={store.name} onChanged={loadCounts} />
+            ) : can('commerce.manage') ? (
+              <AvailabilityPanel key={store.id} storeId={store.id} />
+            ) : (
+              <EmptyState icon={ShieldAlert} title={t('availabilityForbidden')} />
+            )}
+          </TabPanel>
+        </div>
+      </div>
+
+      <UnavailablePanel title={t('unitsTitle')} description={t('unitsBody')} blocker={t('unitsBlocker')} reference={t('unitsReference')} />
+    </div>
+  );
+}

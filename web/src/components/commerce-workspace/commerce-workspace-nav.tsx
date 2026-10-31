@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import {
+  Boxes,
   ClipboardList,
   Gift,
   Globe,
@@ -46,6 +47,7 @@ const ICONS: Record<string, typeof Store> = {
   '/commerce/delivery': Truck,
   '/commerce/gifting': Gift,
   '/commerce/integrations': Plug,
+  '/commerce/wholesale': Boxes,
 };
 
 export function CommerceWorkspaceNav({
