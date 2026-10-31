@@ -7,6 +7,7 @@ use App\Http\Resources\BuilderPublishedExperienceVersionResource;
 use App\Models\BuilderApp;
 use App\Services\AppBuilder\BuilderPublishedExperienceVersionService;
 use App\Services\AppBuilder\DraftChangedSinceReviewException;
+use App\Services\AppBuilder\SchemaContractViolationException;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -41,6 +42,8 @@ class BuilderPublishedExperienceVersionController extends ApiController
                 $request->user()?->id,
                 $expected === null ? null : (int) $expected,
             ));
+        } catch (SchemaContractViolationException $e) {
+            return $this->contractViolationResponse($e);
         } catch (DraftChangedSinceReviewException $e) {
             // AD-01 / S01d: المسودة تغيّرت بعد مراجعة الناشر — لا نسخة تُنشأ.
             return response()->json([
@@ -70,8 +73,22 @@ class BuilderPublishedExperienceVersionController extends ApiController
     {
         $app = BuilderApp::findOrFail($appId);
 
-        $this->domain(fn () => $this->service->validate($app));
+        try {
+            $this->domain(fn () => $this->service->validate($app));
+        } catch (SchemaContractViolationException $e) {
+            return $this->contractViolationResponse($e);
+        }
 
         return response()->json(['data' => ['valid' => true]]);
+    }
+
+    /** AD-12 (S02): 422 بجسم منظَّم قابل للإصلاح — المخالفات الحاجبة بمعرّفات الصفحة/العقدة. */
+    private function contractViolationResponse(SchemaContractViolationException $e): JsonResponse
+    {
+        return response()->json([
+            'message' => $e->getMessage(),
+            'reason' => 'contract_violations',
+            'issues' => array_map(fn ($issue) => $issue->toArray(), $e->issues),
+        ], 422);
     }
 }

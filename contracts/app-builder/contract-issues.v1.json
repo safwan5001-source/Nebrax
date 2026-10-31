@@ -1,0 +1,29 @@
+{
+  "contract": "app-builder.contract-issues",
+  "version": 1,
+  "decision": "AD-12 (component contract enforcement) — slice S02a",
+  "surfaces": {
+    "GET /api/app-builder/apps/{id}/draft": "response.issues[] (computed on read)",
+    "PUT /api/app-builder/apps/{id}/draft": "response.issues[] (never blocks the save)",
+    "POST /api/app-builder/apps/{id}/validate": "422 { message, reason: 'contract_violations', issues[] } when any issue blocks publishing",
+    "POST /api/app-builder/apps/{id}/versions": "422 { message, reason: 'contract_violations', issues[] } and no version is created"
+  },
+  "issue": {
+    "code": "stable string for client translation",
+    "severity": "error (blocks publishing) | warning",
+    "page_id": "string",
+    "node_id": "string|null",
+    "field": "string|null  (prop key, 'children', 'action', 'action.params.<key>')",
+    "message": "Arabic default",
+    "blocks_publish": "boolean (== severity == error)"
+  },
+  "codes": {
+    "error": ["page_not_root", "child_not_allowed", "children_not_allowed", "prop_type_mismatch", "prop_enum_invalid", "action_param_invalid", "missing_action_param", "navigate_target_missing"],
+    "warning": ["duplicate_id_across_pages", "unknown_prop", "missing_required_prop", "action_not_supported", "unknown_action_param"]
+  },
+  "hard_limits_at_save": {
+    "status": 422,
+    "codes": ["duplicate_id (within one page)", "schema_too_large (config app_builder.max_schema_bytes, default 262144)"]
+  },
+  "never": "issue messages never echo schema content (merchant text); they carry ids and prop keys only"
+}

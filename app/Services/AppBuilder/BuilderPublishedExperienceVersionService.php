@@ -35,6 +35,7 @@ final class BuilderPublishedExperienceVersionService
     public function __construct(
         private readonly AppSchemaParser $parser,
         private readonly CompatibilityResolver $compatibilityResolver,
+        private readonly AppSchemaContractChecker $contractChecker,
     ) {}
 
     /**
@@ -114,6 +115,13 @@ final class BuilderPublishedExperienceVersionService
         $compatibility = $this->compatibilityResolver->resolve($schema, CapabilityManifest::current());
         if (! $compatibility->compatible) {
             throw new RuntimeException("التجربة غير متوافقة مع تطبيق الجوال الحالي: {$compatibility->message}");
+        }
+
+        // AD-12 (S02): مخالفات العقد الحاجبة تمنع النشر والفحص برسالة قابلة للإصلاح (`issues[]` في المتحكّم).
+        $this->contractChecker->assertHardLimits($schema);
+        $blocking = AppSchemaContractChecker::blocking($this->contractChecker->check($schema));
+        if ($blocking !== []) {
+            throw new SchemaContractViolationException($blocking);
         }
 
         return $schema;

@@ -261,4 +261,38 @@ final class ComponentRegistry
 
         return $byType;
     }
+
+    /**
+     * أنواع الأبناء المسموحة تحت `$parentType` (AD-12). من `ChildrenRule`: `none` ⇒ لا أحد؛ `unboundedAny` ⇒ كل نوع
+     * معروف عدا `Page` (الصفحة جذر فقط). مصدر واحد تستهلكه الفاحصة و`GET registries` والويب.
+     *
+     * @return list<string>
+     */
+    public static function allowedChildTypes(string $parentType): array
+    {
+        $definitions = self::definitions();
+        $parent = $definitions[$parentType] ?? null;
+        if ($parent === null || $parent->childrenRule->kind === ChildrenRule::NONE) {
+            return [];
+        }
+
+        return array_values(array_filter(array_keys($definitions), fn (string $type) => $type !== 'Page'));
+    }
+
+    /**
+     * أنواع الآباء المسموحة لـ`$childType`: كل نوع يسمح أبناؤه به. `Page` بلا آباء (جذر فقط).
+     *
+     * @return list<string>
+     */
+    public static function allowedParentTypes(string $childType): array
+    {
+        $parents = [];
+        foreach (array_keys(self::definitions()) as $type) {
+            if (in_array($childType, self::allowedChildTypes($type), true)) {
+                $parents[] = $type;
+            }
+        }
+
+        return $parents;
+    }
 }

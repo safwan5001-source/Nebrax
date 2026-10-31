@@ -66,6 +66,9 @@ class AppBuilderRegistryController extends ApiController
                 'kind' => $definition->childrenRule->kind,
                 'suggested_child_type' => $definition->childrenRule->suggestedChildType,
             ],
+            // AD-12: قواعد التضمين من مصدر واحد (الفاحصة تفرضها خادمياً والويب يستهلكها).
+            'allowed_children' => ComponentRegistry::allowedChildTypes($definition->type),
+            'allowed_parents' => ComponentRegistry::allowedParentTypes($definition->type),
             'actionable' => $definition->actionable,
             'injected_runtime_action_params' => $definition->injectedRuntimeActionParams,
             'notes' => $definition->notes,
