@@ -917,6 +917,8 @@ export default function AppBuilderWorkspacePage() {
           {editorMode === 'easy' ? (
             <div className="min-h-0 flex-1">
               <EasySectionsPanel
+                // مربوطة بالصفحة: تغيير الصفحة يعيد تركيب اللوحة فيسقط أي حقل تسمية معلّق (وإلا كُتب نصّه على الصفحة الجديدة).
+                key={selectedPageId ?? 'none'}
                 sections={currentPageRoot?.children ?? []}
                 selectedId={selectedComponentId}
                 canManage={canManage}

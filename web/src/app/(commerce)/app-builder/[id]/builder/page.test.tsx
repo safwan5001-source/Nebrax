@@ -2372,6 +2372,30 @@ describe('AppBuilderWorkspacePage — Easy Mode V2 shell (S21a)', () => {
     expect(Object.keys((metaPuts()[0].schema as unknown as { pages: object }).pages)).toEqual(['home', 'about']);
   });
 
+  it('a pending rename never follows the user to another page (page title and section name are bound to the page they started on)', async () => {
+    await open();
+    const user = userEvent.setup();
+
+    // عنوان الصفحة: ابدأ على home، انتقل إلى about، ثم احفظ — لا يجوز أن يُكتب على about.
+    await user.click(sections().getByRole('button', { name: 'Page title' }));
+    await user.type(sections().getByRole('textbox', { name: 'Page title' }), 'Draft title');
+    await user.click(screen.getAllByRole('button', { name: 'about' })[0]);
+    expect(sections().queryByRole('textbox', { name: 'Page title' })).toBeNull(); // حقل التحرير لم ينتقل معه
+
+    // اسم القسم: كذلك (قسم home المفتوح للتسمية لا يُكتب على صفحة أخرى).
+    await user.click(screen.getAllByRole('button', { name: /^home/ })[0]);
+    await user.click(sectionItem().getByRole('button', { name: 'Rename section' }));
+    await user.type(screen.getByLabelText('New section name'), 'Half typed');
+    await user.click(screen.getAllByRole('button', { name: 'about' })[0]);
+    expect(screen.queryByLabelText('New section name')).toBeNull();
+
+    // لا تعديل ولا كتابة شيء: لا «غير محفوظ» ولا editor_meta.
+    expect(screen.queryAllByText('Unsaved changes')).toHaveLength(0);
+    await user.click(screen.getAllByRole('button', { name: /^home/ })[0]);
+    expect(sections().getByRole('button', { name: 'Page title' })).toBeTruthy();
+    expect(sections().queryByText('Draft title')).toBeNull();
+  });
+
   it('a section added from the catalog records its preset; a duplicate carries name and preset but is visible', async () => {
     await open();
     const user = userEvent.setup();
