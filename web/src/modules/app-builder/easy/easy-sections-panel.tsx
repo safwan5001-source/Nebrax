@@ -1,7 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { ArrowDown, ArrowUp, Copy, Eye, EyeOff, Pencil, Plus, Trash2, Undo2 } from 'lucide-react';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { ArrowDown, ArrowUp, Copy, Eye, EyeOff, GripVertical, Pencil, Plus, Trash2, Undo2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -13,6 +16,31 @@ import { InlineRename } from './inline-rename';
 
 type Translate = (key: string, values?: Record<string, string | number>) => string;
 
+type HandleProps = Record<string, unknown>;
+
+/** صف قسم قابل للترتيب: المقبض وحده يحمل مستمعات السحب (لا يتعارض مع النقر للتحديد)، ويعمل بلوحة المفاتيح (Space ثم الأسهم ثم Space). */
+function SortableSection({
+  id, disabled, className, hidden, children,
+}: {
+  id: string;
+  disabled: boolean;
+  className: string;
+  hidden: boolean;
+  children: (handle: { props: HandleProps; setActivator: (node: HTMLElement | null) => void; dragging: boolean }) => React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id, disabled });
+  return (
+    <li
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      data-hidden={hidden ? 'true' : undefined}
+      className={cn(className, isDragging && 'relative z-10 shadow-md')}
+    >
+      {children({ props: { ...attributes, ...listeners }, setActivator: setActivatorNodeRef, dragging: isDragging })}
+    </li>
+  );
+}
+
 /**
  * قائمة أقسام الصفحة المحددة — الوضع السهل V2 (مواصفة §4.2). الأقسام = أبناء جذر الصفحة المباشرون، **مستقلة عن الصفحات**.
  * كل تعديل يمرّ عبر معالجات المحرر نفسها (تراجع/إعادة/حفظ تفاؤلي/صلاحيات)؛ هذا العرض لا يحمل حالة مخطط.
@@ -20,7 +48,7 @@ type Translate = (key: string, values?: Record<string, string | number>) => stri
  */
 export function EasySectionsPanel({
   sections, selectedId, canManage, registries, locale, t, onSelect, onMove, onDuplicate, onDelete, onAdd, onUndo, canUndo, undoBanner, markers,
-  nodeMeta, onToggleHidden, onRename, pageTitle, pageTitleCustom, onRenamePage,
+  nodeMeta, onToggleHidden, onRename, pageTitle, pageTitleCustom, onRenamePage, onReorder,
 }: {
   sections: AppSchemaComponent[];
   selectedId: string | null;
@@ -50,9 +78,25 @@ export function EasySectionsPanel({
   /** العنوان المخصّص فقط ('' = لا يوجد) — قيمة حقل التحرير تبدأ منه لا من المعرّف. */
   pageTitleCustom: string;
   onRenamePage: (title: string) => void;
+  /** الترتيب الجديد لمعرّفات الأقسام بعد السحب. */
+  onReorder: (orderedIds: string[]) => void;
 }) {
   const [renamingId, setRenamingId] = React.useState<string | null>(null);
   const [renamingPage, setRenamingPage] = React.useState(false);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  function onDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const ids = sections.map((section) => section.id);
+    const from = ids.indexOf(String(active.id));
+    const to = ids.indexOf(String(over.id));
+    if (from < 0 || to < 0) return;
+    onReorder(arrayMove(ids, from, to));
+  }
+  const reorderable = canManage && sections.length > 1;
   const hiddenCount = sections.filter((section) => nodeMeta[section.id]?.hidden === true).length;
   const typeTotals = new Map<string, number>();
   const typeSeen = new Map<string, number>();
@@ -97,6 +141,8 @@ export function EasySectionsPanel({
         {sections.length === 0 ? (
           <p className="px-2 py-6 text-center text-xs text-muted">{t('easy.emptyPage')}</p>
         ) : (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+          <SortableContext items={sections.map((section) => section.id)} strategy={verticalListSortingStrategy}>
           <ul className="space-y-1" aria-label={t('easy.sectionsTitle')}>
             {sections.map((section, index) => {
               const summary = sectionSummary(section);
@@ -112,7 +158,8 @@ export function EasySectionsPanel({
               const hidden = metaNode?.hidden === true;
               const shownName = customName ?? typeName;
               return (
-                <li key={section.id} data-hidden={hidden ? 'true' : undefined} className={cn('group rounded-md border', selected ? 'border-primary bg-primary-soft' : 'border-transparent hover:bg-background', hidden && 'opacity-60')}>
+                <SortableSection key={section.id} id={section.id} disabled={!reorderable || renamingId === section.id} hidden={hidden} className={cn('group rounded-md border', selected ? 'border-primary bg-primary-soft' : 'border-transparent hover:bg-background', hidden && 'opacity-60')}>
+                  {(handle) => (<>
                   {renamingId === section.id ? (
                     <InlineRename
                       initial={customName ?? ''}
@@ -139,6 +186,16 @@ export function EasySectionsPanel({
                     </button>
                     {/* الأدوات في سطر ثانٍ: عمود البنية 240px لا يتّسع لاسم القسم وستة أزرار في سطر واحد. */}
                     <div className="flex shrink-0 items-center justify-end">
+                      <button
+                        type="button"
+                        ref={handle.setActivator}
+                        {...handle.props}
+                        disabled={!reorderable}
+                        aria-label={t('easy.dragHandle')}
+                        className={cn('inline-flex h-9 w-8 touch-none items-center justify-center rounded text-muted hover:bg-background disabled:opacity-40', reorderable && 'cursor-grab', handle.dragging && 'cursor-grabbing')}
+                      >
+                        <GripVertical className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
+                      </button>
                       <Button type="button" variant="ghost" size="icon" className="h-9 w-8" aria-label={t('easy.moveUp')} disabled={!canManage || index === 0} onClick={() => onMove(section.id, 'up')}>
                         <ArrowUp className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
                       </Button>
@@ -163,10 +220,13 @@ export function EasySectionsPanel({
                     </div>
                   </div>
                   )}
-                </li>
+                  </>)}
+                </SortableSection>
               );
             })}
           </ul>
+          </SortableContext>
+          </DndContext>
         )}
       </div>
 
