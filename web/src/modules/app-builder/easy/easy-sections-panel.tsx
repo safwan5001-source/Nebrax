@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { registryLabel, type AppBuilderRegistries, type AppSchemaComponent } from '@/lib/app-builder';
+import { IssueDot, sectionMarker, type IssueMarkers } from '../issue-markers';
 import { sectionSummary } from './easy-catalog';
 import { sectionContains, selectionTargetFor } from './editor-mode';
 
@@ -17,7 +18,7 @@ type Translate = (key: string, values?: Record<string, string | number>) => stri
  * العنوان الفرعي المشتق (نص/تسمية القسم) والترتيب `n/m` للنوع المكرّر **عرض فقط** ولا يُكتب في المخطط.
  */
 export function EasySectionsPanel({
-  sections, selectedId, canManage, registries, locale, t, onSelect, onMove, onDuplicate, onDelete, onAdd, onUndo, canUndo, undoBanner,
+  sections, selectedId, canManage, registries, locale, t, onSelect, onMove, onDuplicate, onDelete, onAdd, onUndo, canUndo, undoBanner, markers,
 }: {
   sections: AppSchemaComponent[];
   selectedId: string | null;
@@ -34,6 +35,8 @@ export function EasySectionsPanel({
   canUndo: boolean;
   /** يُعرض فقط ما دام الحذف هو آخر تعديل (الصفحة تُبطله عند أي تعديل لاحق، فلا يُعكس تعديل غير الحذف بالخطأ). */
   undoBanner: { name: string } | null;
+  /** شارات مشكلات العقد للصفحة المعروضة (لكل قسم أشدّ ما فيه). */
+  markers: IssueMarkers;
 }) {
   const typeTotals = new Map<string, number>();
   const typeSeen = new Map<string, number>();
@@ -72,6 +75,7 @@ export function EasySectionsPanel({
               typeSeen.set(summary.primaryType, seen);
               const total = typeTotals.get(summary.primaryType) ?? 1;
               const selected = sectionContains(section, selectedId);
+              const marker = sectionMarker(section, markers);
               return (
                 <li key={section.id} className={cn('group rounded-md border', selected ? 'border-primary bg-primary-soft' : 'border-transparent hover:bg-background')}>
                   <div className="flex items-center gap-1 px-1">
@@ -84,6 +88,7 @@ export function EasySectionsPanel({
                       <span className="flex w-full items-center gap-1.5">
                         <span className="truncate text-sm font-medium text-text" title={typeName}>{typeName}</span>
                         {total > 1 ? <span className="shrink-0 text-[11px] text-muted" dir="ltr">{seen}/{total}</span> : null}
+                        {marker ? <IssueDot severity={marker} label={marker === 'error' ? t('issues.blocking') : t('issues.warning')} /> : null}
                       </span>
                       {summary.title ? <span className="w-full truncate text-xs text-muted">{summary.title}</span> : null}
                     </button>

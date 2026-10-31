@@ -9,6 +9,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { ArrowDown, ArrowUp, GripVertical } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
+import { IssueDot, useIssueMarker } from './issue-markers';
 import { registryLabel, type AppBuilderRegistries, type AppSchemaComponent } from '@/lib/app-builder';
 
 /**
@@ -52,6 +53,7 @@ function TreeRow({
   const t = useTranslations('appBuilder.builder');
   const locale = useLocale();
   const selected = node.id === selectedId;
+  const marker = useIssueMarker(node.id);
   const label = nodeLabel(node);
   const componentDefinition = registries?.components[node.type];
   const typeLabel = componentDefinition ? registryLabel(componentDefinition.label, locale) : node.type;
@@ -114,6 +116,7 @@ function TreeRow({
       >
         <span className="shrink-0 text-xs text-muted" title={node.type}>{typeLabel}</span>
         {label ? <span className="truncate text-xs text-muted">· {label}</span> : null}
+        {marker ? <span className="ms-auto"><IssueDot severity={marker} label={marker === 'error' ? t('issues.blocking') : t('issues.warning')} /></span> : null}
       </div>
     </div>
   );

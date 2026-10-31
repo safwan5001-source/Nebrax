@@ -187,6 +187,7 @@ const { api, currentUser, translate } = vi.hoisted(() => {
     'issues.summaryWarnings': '{warnings} warning(s).',
     'issues.show': 'Show',
     'issues.hide': 'Hide',
+    'issues.open': 'Show in the editor',
     'issues.codes.navigate_target_missing': 'The navigation target page does not exist.',
     'issues.codes.unknown_prop': 'Unknown property.',
     'publish.draftChangedTitle': 'The draft changed',
@@ -2321,5 +2322,31 @@ describe('AppBuilderWorkspacePage — Easy Mode V2 shell (S21a)', () => {
     // تعديل لاحق (نقل قسم) يُبطل الشريط
     await userEvent.setup().click(sections().getAllByRole('button', { name: 'Move section down' }).find((b) => !(b as HTMLButtonElement).disabled) ?? sections().getAllByRole('button', { name: 'Duplicate section' })[0]);
     await waitFor(() => expect(sections().queryByRole('button', { name: 'Undo delete' })).toBeNull());
+  });
+
+  it('clicking an issue location opens its page and node in the editor, and flags the section in the list and the node in the Advanced tree', async () => {
+    mockApi();
+    const issue = { code: 'unknown_prop', severity: 'warning', page_id: 'home', node_id: 'txt-1', field: 'mystery', message: 'x', blocks_publish: false };
+    const blocking = { code: 'navigate_target_missing', severity: 'error', page_id: 'home', node_id: 'pc-1', field: 'action.params.pageId', message: 'x', blocks_publish: true };
+    const base = api.getMockImplementation()!;
+    api.mockImplementation((path?: string, init?: { method?: string; body?: unknown }) =>
+      path === DRAFT_PATH && !init?.method ? Promise.resolve({ data: draftData, issues: [issue, blocking] }) : base(path, init));
+    render(<AppBuilderWorkspacePage />);
+    await screen.findAllByText('Featured');
+
+    // الأشد يغلب: القسم الحاوي لعقدتين (تحذير + خطأ) يحمل شارة «يمنع النشر»
+    expect(sections().getAllByText('Blocks publishing').length).toBe(1);
+    expect(sections().queryByText('Warning')).toBeNull();
+
+    const notice = await screen.findByTestId('contract-issues');
+    await userEvent.setup().click(within(notice).getByRole('button', { name: 'Show' }));
+    await userEvent.setup().click(within(notice).getAllByRole('button', { name: /Show in the editor: home › txt-1 › mystery/ })[0]);
+    // فُتحت عقدة النص txt-1: المفتش يعرض قيمتها
+    expect((await screen.findAllByDisplayValue('Welcome')).length).toBeGreaterThan(0);
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Advanced' }));
+    const tree = within(screen.getAllByRole('tree')[0]);
+    expect(tree.getAllByText('Blocks publishing').length).toBe(1); // pc-1
+    expect(tree.getAllByText('Warning').length).toBe(1); // txt-1
   });
 });
