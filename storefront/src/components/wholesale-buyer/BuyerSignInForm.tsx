@@ -63,6 +63,12 @@ export function BuyerSignInForm({ nextPath }: { nextPath: string }) {
             >
               {t("signIn.resendLink")}
             </Link>
+            <Link
+              href={`${basePath}/buyer/forgot-password`}
+              className="font-medium text-store-primary hover:text-store-primary-hover"
+            >
+              {t("signIn.forgotLink")}
+            </Link>
           </p>
         </div>
       }

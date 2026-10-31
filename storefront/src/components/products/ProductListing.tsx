@@ -16,7 +16,10 @@ import type {
   StoreProductFull,
   StoreProductPage,
 } from "@/lib/commerce/types";
-import { catalogGateFromError } from "@/lib/commerce/wholesale-buyer";
+import {
+  catalogGateFromError,
+  membershipGateStatusFromError,
+} from "@/lib/commerce/wholesale-buyer";
 import { PRODUCT_CARD_FIELDS } from "@/lib/data/cached";
 import type { StorefrontListParams } from "@/lib/utils/listing-context";
 import {
@@ -148,11 +151,15 @@ async function ProductListingInner({
       // the visitor is an approved buyer — show the access gate, never an
       // error page or an empty grid. Any other failure still bubbles.
       fetchProducts({ ...listParams, page: 1 }).then(
-        (response) => ({ response, gate: null }),
+        (response) => ({ response, gate: null, membership: null }),
         (error: unknown) => {
           const gate = catalogGateFromError(error);
           if (gate === null) throw error;
-          return { response: null, gate };
+          return {
+            response: null,
+            gate,
+            membership: membershipGateStatusFromError(error),
+          };
         },
       ),
       fetchFilters(filterFetchParams).catch((error) => {
@@ -168,6 +175,7 @@ async function ProductListingInner({
     return (
       <CatalogAccessGate
         gate={productsResult.gate}
+        membership={productsResult.membership}
         basePath={basePath}
         locale={locale}
       />

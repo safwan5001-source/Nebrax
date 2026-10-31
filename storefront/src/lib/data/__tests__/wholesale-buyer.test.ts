@@ -19,6 +19,7 @@ vi.mock("@/lib/commerce/config", async () => {
       public readonly status: number,
       public readonly code: string,
       message: string,
+      public readonly details?: unknown,
     ) {
       super(message);
     }
@@ -35,6 +36,10 @@ const {
   registerBuyer,
   verifyBuyerEmail,
   resendBuyerVerification,
+  requestBuyerPasswordReset,
+  resetBuyerPassword,
+  getBuyerOrders,
+  getBuyerOrder,
 } = await import("../wholesale-buyer");
 
 describe("wholesale buyer server actions", () => {
@@ -257,5 +262,159 @@ describe("registration and verification actions", () => {
         body: { email: "ghost@x.test", locale_path: "/sa/en" },
       },
     );
+  });
+
+  describe("H6 Batch M — application context, password reset, order history", () => {
+    it("an application sends only the optional company/phone and never a partner, price list or identity", async () => {
+      mocks.getBuyerToken.mockResolvedValue("tok");
+      mocks.request.mockResolvedValue({ data: {} });
+
+      await applyForWholesale({
+        companyName: "  Horizon Co ",
+        contactPhone: " +966501234567 ",
+      });
+
+      expect(mocks.request).toHaveBeenCalledWith(
+        "POST",
+        "wholesale/application",
+        {
+          token: "tok",
+          body: { company_name: "Horizon Co", contact_phone: "+966501234567" },
+        },
+      );
+      const sent = JSON.stringify(mocks.request.mock.calls[0]);
+      for (const forbidden of ["partner", "price_list", "tenant", "identity"]) {
+        expect(sent).not.toContain(forbidden);
+      }
+
+      mocks.request.mockClear();
+      await applyForWholesale({ companyName: "   ", contactPhone: "" });
+      expect(mocks.request).toHaveBeenCalledWith(
+        "POST",
+        "wholesale/application",
+        {
+          token: "tok",
+        },
+      );
+    });
+
+    it("a 422 on apply is a field problem, not bad credentials", async () => {
+      mocks.getBuyerToken.mockResolvedValue("tok");
+      mocks.request.mockRejectedValueOnce(
+        new StorefrontApiError(422, "validation_failed", "x"),
+      );
+      expect(await applyForWholesale({ contactPhone: "<script>" })).toEqual({
+        success: false,
+        error: "validation",
+      });
+    });
+
+    it("the reset request is neutral and carries only the email and a locale path", async () => {
+      mocks.request.mockResolvedValue({ data: { reset_requested: true } });
+      expect(
+        await requestBuyerPasswordReset({
+          email: "b@x.test",
+          basePath: "/sa/ar",
+        }),
+      ).toEqual({ success: true });
+      expect(mocks.request).toHaveBeenCalledWith(
+        "POST",
+        "auth/password/forgot",
+        {
+          body: { email: "b@x.test", locale_path: "/sa/ar" },
+        },
+      );
+    });
+
+    it("a reset spends the token, clears this browser's session cookie and returns no token", async () => {
+      mocks.request.mockResolvedValue({ data: { password_reset: true } });
+      const result = await resetBuyerPassword({
+        token: "t".repeat(64),
+        password: "new-password-1",
+      });
+      expect(result).toEqual({ success: true });
+      expect(mocks.clearBuyerToken).toHaveBeenCalled();
+      expect(mocks.setBuyerToken).not.toHaveBeenCalled();
+    });
+
+    it("a failed reset keeps the cookie and is one generic validation failure", async () => {
+      mocks.request.mockRejectedValueOnce(
+        new StorefrontApiError(422, "validation_failed", "internal"),
+      );
+      const result = await resetBuyerPassword({
+        token: "t".repeat(64),
+        password: "new-password-1",
+      });
+      expect(result).toEqual({ success: false, error: "validation" });
+      expect(mocks.clearBuyerToken).not.toHaveBeenCalled();
+    });
+
+    it("order history uses only the verified session and maps public fields", async () => {
+      mocks.getBuyerToken.mockResolvedValue("tok");
+      mocks.request.mockResolvedValue({
+        data: [
+          {
+            id: "11111111-1111-4111-8111-111111111111",
+            number: "CORD-1",
+            status: "confirmed",
+            total: { amount_minor: 1600, currency: "SAR" },
+            created_at: null,
+          },
+          { id: "broken" },
+        ],
+        meta: { pagination: { page: 1, last_page: 3 } },
+      });
+
+      const result = await getBuyerOrders(2);
+
+      expect(mocks.request).toHaveBeenCalledWith("GET", "buyer/orders?page=2", {
+        token: "tok",
+      });
+      expect(result).toMatchObject({
+        kind: "ok",
+        data: { page: 1, lastPage: 3 },
+      });
+      expect(result.kind === "ok" && result.data.orders).toHaveLength(1);
+    });
+
+    it("order history without a session never calls the API; refusals map to states, not errors", async () => {
+      expect(await getBuyerOrders()).toEqual({ kind: "signed_out" });
+      expect(mocks.request).not.toHaveBeenCalled();
+
+      mocks.getBuyerToken.mockResolvedValue("tok");
+      mocks.request.mockRejectedValueOnce(
+        new StorefrontApiError(401, "unauthenticated", "x"),
+      );
+      expect(await getBuyerOrders()).toEqual({ kind: "signed_out" });
+
+      const suspended = new StorefrontApiError(403, "forbidden", "x", {
+        membership_status: "suspended",
+      });
+      mocks.request.mockRejectedValueOnce(suspended);
+      expect(await getBuyerOrders()).toEqual({
+        kind: "not_approved",
+        membership: "suspended",
+      });
+
+      mocks.request.mockRejectedValueOnce(
+        new StorefrontApiError(500, "server_error", "x"),
+      );
+      expect(await getBuyerOrders()).toEqual({ kind: "unavailable" });
+    });
+
+    it("an order detail validates the id shape locally and treats someone else's order as plainly not found", async () => {
+      mocks.getBuyerToken.mockResolvedValue("tok");
+      expect(await getBuyerOrder("../../etc/passwd")).toEqual({
+        kind: "not_found",
+      });
+      expect(mocks.request).not.toHaveBeenCalled();
+
+      mocks.request.mockRejectedValueOnce(
+        new StorefrontApiError(404, "not_found", "x"),
+      );
+      expect(
+        await getBuyerOrder("11111111-1111-4111-8111-111111111111"),
+      ).toEqual({ kind: "not_found" });
+    });
   });
 });

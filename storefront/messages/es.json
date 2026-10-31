@@ -1087,7 +1087,8 @@
       "submit": "Iniciar sesión",
       "submitting": "Iniciando sesión...",
       "registerLink": "Crear una cuenta de comprador",
-      "resendLink": "Reenviar el correo de verificación"
+      "resendLink": "Reenviar el correo de verificación",
+      "forgotLink": "¿Olvidó su contraseña?"
     },
     "errors": {
       "invalidCredentials": "No pudimos iniciar su sesión. Revise su correo y contraseña, y que su correo esté verificado.",
@@ -1106,6 +1107,24 @@
         "title": "Su cuenta mayorista no está aprobada",
         "body": "Ha iniciado sesión, pero su membresía mayorista aún no ha sido aprobada. Consulte su estado para continuar.",
         "cta": "Ver estado de la membresía"
+      },
+      "membership": {
+        "none": {
+          "title": "Solicite acceso mayorista",
+          "body": "Ha iniciado sesión pero aún no ha solicitado acceso mayorista en esta tienda. Envíe la solicitud para que la tienda la revise."
+        },
+        "pending": {
+          "title": "Su solicitud está en revisión",
+          "body": "La tienda ha recibido su solicitud mayorista y la está revisando. Los precios siguen ocultos hasta que se apruebe."
+        },
+        "rejected": {
+          "title": "Su solicitud no fue aprobada",
+          "body": "La tienda no aprobó su solicitud mayorista. Contacte con la tienda si cree que es un error."
+        },
+        "suspended": {
+          "title": "Su cuenta mayorista está suspendida",
+          "body": "Su membresía mayorista está suspendida, por lo que los precios y los pedidos no están disponibles. Contacte con la tienda para que la revise."
+        }
       }
     },
     "membership": {
@@ -1114,7 +1133,11 @@
       "signOut": "Cerrar sesión",
       "apply": "Solicitar acceso mayorista",
       "applying": "Enviando...",
-      "browse": "Ver catálogo mayorista"
+      "browse": "Ver catálogo mayorista",
+      "company": "Nombre de la empresa (opcional)",
+      "phone": "Teléfono de contacto (opcional)",
+      "applicationHint": "Esto ayuda a la tienda a revisar su solicitud. No se verifica y no cambia sus precios.",
+      "myOrders": "Mis pedidos"
     },
     "status": {
       "signed_out": {
@@ -1180,6 +1203,54 @@
       "sign_in_required": "Inicie sesión en su cuenta mayorista para ver este carrito y hacer pedidos.",
       "approval_required": "Su cuenta mayorista no está aprobada para pedir en este momento. Revise el estado de su membresía.",
       "unavailable_for_wholesale": "Este producto no está disponible para pedidos mayoristas."
+    },
+    "forgot": {
+      "title": "Restablecer su contraseña",
+      "description": "Introduzca el correo de su cuenta de comprador mayorista y le enviaremos un enlace para elegir una nueva contraseña.",
+      "backToSignIn": "Volver a iniciar sesión",
+      "submit": "Enviar enlace de restablecimiento",
+      "submitting": "Enviando...",
+      "doneBody": "Si esta dirección pertenece a una cuenta confirmada, hemos enviado un enlace para elegir una nueva contraseña. El enlace funciona una sola vez y caduca pronto."
+    },
+    "reset": {
+      "title": "Elija una nueva contraseña",
+      "description": "Introduzca una nueva contraseña para su cuenta de comprador mayorista. Se cerrará su sesión en todas partes y podrá iniciarla con la nueva contraseña.",
+      "newPassword": "Nueva contraseña",
+      "confirmPassword": "Confirmar nueva contraseña",
+      "submit": "Cambiar contraseña",
+      "submitting": "Guardando...",
+      "tooShort": "La contraseña debe tener al menos {min} caracteres.",
+      "mismatch": "Las dos contraseñas no coinciden.",
+      "successTitle": "Contraseña cambiada",
+      "successBody": "Su contraseña se ha cambiado y se cerraron las demás sesiones. Inicie sesión con la nueva contraseña.",
+      "failedTitle": "Este enlace no se puede usar",
+      "failedBody": "El enlace de restablecimiento no es válido, ha caducado o ya se usó. Solicite uno nuevo.",
+      "missingToken": "Esta página necesita el enlace de su correo de restablecimiento. Solicite un correo nuevo si lo perdió.",
+      "requestNew": "Enviar un nuevo correo de restablecimiento"
+    },
+    "orders": {
+      "title": "Mis pedidos",
+      "emptyTitle": "Aún no hay pedidos",
+      "emptyBody": "Los pedidos que haga en esta tienda aparecerán aquí.",
+      "backToList": "Volver a mis pedidos",
+      "detailTitle": "Pedido",
+      "delivery": "Entrega",
+      "total": "Total",
+      "deliveryAddress": "Dirección de entrega",
+      "payment": "Pago",
+      "notPaidNote": "Un pedido es un compromiso comercial; la tienda confirma el importe final y la forma de pago. En esta página no se cobra nada.",
+      "cancelledNote": "Este pedido fue cancelado.",
+      "notFoundTitle": "Pedido no encontrado",
+      "notFoundBody": "No pudimos encontrar este pedido en su cuenta.",
+      "unavailableTitle": "Pedidos no disponibles",
+      "unavailableBody": "No pudimos cargar sus pedidos ahora. Inténtelo de nuevo en breve.",
+      "pagination": "Páginas de pedidos",
+      "previous": "Anterior",
+      "next": "Siguiente",
+      "status": {
+        "confirmed": "Confirmado",
+        "cancelled": "Cancelado"
+      }
     }
   }
 }

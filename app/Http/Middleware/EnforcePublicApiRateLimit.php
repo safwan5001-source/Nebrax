@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\ApiClient;
+use App\Tenancy\StorefrontContext;
 use App\Support\PublicApiErrorCode;
 use App\Support\PublicApiRateLimits;
 use App\Support\PublicApiResponse;
@@ -30,8 +31,7 @@ class EnforcePublicApiRateLimit
 {
     public function handle(Request $request, Closure $next, string $rateClass = PublicApiRateLimits::CLASS_READ): Response
     {
-        $limit = PublicApiRateLimits::limitFor($rateClass);
-        $key = self::resolveKey($request, $rateClass);
+        [$limit, $key] = $this->budget($request, $rateClass);
 
         if (RateLimiter::tooManyAttempts($key, $limit)) {
             $retryAfter = RateLimiter::availableIn($key);
@@ -53,6 +53,47 @@ class EnforcePublicApiRateLimit
         $remaining = max(0, RateLimiter::retriesLeft($key, $limit));
 
         return $this->withRateHeaders($response, $limit, $remaining, null);
+    }
+
+    /**
+     * H6 Batch M — الميزانية الفعلية للطلب: [الحدّ، المفتاح].
+     *
+     * طلبات `store/v1` تصل كلها من خادم Next.js، فكان `request->ip()` عنوانه لكل الزوار ومن كل المتاجر: سلة واحدة بـ30/دقيقة
+     * عالمياً (Batch L: الصفحة الرابعة في الدقيقة تفشل للجميع). لا يمكن إثبات هوية الزائر الحقيقية من هنا (راجع تقرير Batch M §P0)،
+     * فلا نثق بأي ترويسة IP. ما يمكن إثباته فقط: **أن المُرسِل هو خادم المتجر** (سرّ البوابة تحقّق في `ResolveStorefrontDomain`)
+     * وأي متجر هو (`StorefrontContext` المحسوم من النطاق الموثَّق). فتُحسب طلبات البوابة الموثَّقة على **ميزانية لكل متجر**
+     * (قراءة/كتابة) بدل IP الاتصال، فلا يستنزف متجرٌ ميزانية متجرٍ آخر ولا ميزانية الطلبات المباشرة.
+     *
+     * - الطلب المباشر (بلا سرّ صحيح، أو IP العميل المباشر): كما كان — `unauth` 30/دقيقة لكل IP.
+     * - ضبط الحدّ `0` (`STOREFRONT_GATEWAY_*_LIMIT`) يعيد السلوك القديم كاملاً (مفتاح تراجع).
+     * - المصادقة (login/register/verify/reset) لها محدِّداتها الخاصة (لكل بريد + لكل مستأجر/IP) ولا تمرّ من هذه الميزانية.
+     * - الحدّ لا يُحذف: متجرٌ يتجاوز ميزانيته يتلقّى 429 كالمعتاد.
+     *
+     * @return array{0: int, 1: string}
+     */
+    private function budget(Request $request, string $rateClass): array
+    {
+        $default = [PublicApiRateLimits::limitFor($rateClass), self::resolveKey($request, $rateClass)];
+
+        if ($rateClass !== PublicApiRateLimits::CLASS_UNAUTH
+            || $request->attributes->get(ResolveStorefrontDomain::GATEWAY_VERIFIED_ATTRIBUTE) !== true
+            || $request->user() instanceof ApiClient
+        ) {
+            return $default;
+        }
+
+        $context = app(StorefrontContext::class);
+        if (! $context->isEstablished() || ! $context->hasStorefront()) {
+            return $default;
+        }
+
+        $isRead = in_array($request->getMethod(), ['GET', 'HEAD', 'OPTIONS'], true);
+        $limit = (int) config($isRead ? 'storefront.gateway_limits.read_per_minute' : 'storefront.gateway_limits.write_per_minute', 0);
+        if ($limit <= 0) {
+            return $default;
+        }
+
+        return [$limit, 'pubapi:gw:'.($isRead ? 'read' : 'write').':'.$context->tenantId().':'.$context->storefrontId()];
     }
 
     /**

@@ -53,6 +53,7 @@ type Seed = {
   seeded_buyers: Record<string, { email: string }>;
   staff: { email: string };
   channel_ids: { ws: string; ws2: string; dtc: string };
+  partner_id: string;
   products: { p1: string; p2: string; p3: string; retail: string };
 };
 const seed: Seed = JSON.parse(fs.readFileSync(ENV.seedJson, "utf8"));
@@ -78,7 +79,10 @@ test.afterAll(() => {
 });
 
 // ───────────────────────── helpers ─────────────────────────
+// `E2E_NO_BUCKET_RESET=1` turns the per-step limiter reset OFF: since H6 Batch M the journey no longer needs it (the
+// anonymous store/v1 budget is per storefront, not one shared per-IP bucket), and the suite is run both ways.
 const resetBuckets = () => {
+  if (process.env.E2E_NO_BUCKET_RESET === "1") return;
   // Laravel may write a cache file mid-removal: retry instead of failing the step.
   for (let i = 0; i < 5; i++) {
     try {
@@ -205,20 +209,35 @@ const cartCookie = (r: { setCookie: string[] }) =>
     .find(Boolean) as string;
 
 async function login(host: string, email: string, password = seed.password) {
-  resetBuckets();
-  const r = await gw(host, "POST", "auth/login", { body: { email, password } });
-  return { status: r.status, token: r.json?.data?.token as string | undefined };
+  // The per-tenant login brake (20/min) is shared by every buyer behind the gateway (D-T1, documented). A test run compresses
+  // minutes of traffic into seconds, so a 429 is honoured like a real client would: wait out Retry-After, then retry.
+  for (let attempt = 0; ; attempt++) {
+    resetBuckets();
+    const r = await gw(host, "POST", "auth/login", {
+      body: { email, password },
+    });
+    if (r.status !== 429 || attempt >= 4) {
+      return {
+        status: r.status,
+        token: r.json?.data?.token as string | undefined,
+      };
+    }
+    await new Promise((resolve) => setTimeout(resolve, 15_000));
+  }
 }
 
-// staff (ERP) API — the operator who approves memberships. Token kept in memory only.
+let cachedStaffToken: string | null = null;
 async function staffToken(): Promise<string> {
+  // one ERP login per run: the staff login endpoint is itself throttled (5/min), which a real operator session never hits
+  if (cachedStaffToken) return cachedStaffToken;
   const r = await fetch(`${ENV.api}/api/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ email: seed.staff.email, password: seed.password }),
   });
   expect(r.status).toBe(200);
-  return (await r.json()).token;
+  cachedStaffToken = (await r.json()).token as string;
+  return cachedStaffToken;
 }
 async function staffTransition(
   email: string,
@@ -251,31 +270,140 @@ async function staffTransition(
   return (await res.json()).data.status as string;
 }
 
-async function signIn(page: Page, email: string, locale = "en") {
-  await go(page, `${WS}/sa/${locale}/buyer/sign-in`);
-  await page
-    .getByLabel(
-      locale === "ar"
-        ? ar.wholesaleBuyer.signIn.email
-        : en.wholesaleBuyer.signIn.email,
+async function staffHeaders() {
+  return {
+    Authorization: `Bearer ${await staffToken()}`,
+    Accept: "application/json",
+    "Content-Type": "application/json",
+  };
+}
+async function membershipIdOf(email: string, channelId = seed.channel_ids.ws) {
+  const list = await (
+    await fetch(
+      `${ENV.api}/api/commerce/wholesale/channels/${channelId}/memberships?per_page=100`,
+      { headers: await staffHeaders() },
     )
-    .fill(email);
-  await page
-    .getByLabel(
-      locale === "ar"
-        ? ar.wholesaleBuyer.signIn.password
-        : en.wholesaleBuyer.signIn.password,
-      { exact: true },
-    )
-    .first()
-    .fill(seed.password);
+  ).json();
+  const m = list.data.find((x: any) => x.customer.email === email);
+  expect(m, "membership visible to staff").toBeTruthy();
+  return {
+    id: m.id as string,
+    application: m.application as {
+      company_name: string | null;
+      contact_phone: string | null;
+    },
+  };
+}
+async function staffPartnerLink(
+  membershipId: string,
+  method: "PUT" | "DELETE",
+) {
+  const res = await fetch(
+    `${ENV.api}/api/commerce/wholesale/memberships/${membershipId}/partner-link`,
+    {
+      method,
+      headers: await staffHeaders(),
+      body:
+        method === "PUT"
+          ? JSON.stringify({ partner_id: seed.partner_id })
+          : undefined,
+    },
+  );
+  expect(res.status).toBe(200);
+  return (await res.json()).data;
+}
+/** One real native order placed through the API (the same calls the storefront server makes). */
+async function placeApiOrder(token: string, key: string): Promise<string> {
   resetBuckets();
-  await page
-    .getByRole("button", {
-      name: locale === "ar" ? ar.wholesaleBuyer.signIn.submit : /^sign in$/i,
-    })
-    .click();
-  await page.waitForURL(/\/buyer\/membership/);
+  const add = await gw(seed.hosts.ws, "POST", "cart/items", {
+    token,
+    body: { product_id: seed.products.p1, quantity: 1, unit_key: "base" },
+  });
+  const cart = cartCookie(add);
+  const steps: Array<[string, string, unknown]> = [
+    ["POST", "checkout", undefined],
+    [
+      "PATCH",
+      "checkout/contact",
+      { name: "سالم", phone: "0501234567", email: "s@example.com" },
+    ],
+    [
+      "PATCH",
+      "checkout/address",
+      {
+        country: "SA",
+        city: "الدمام",
+        district: "الشاطئ",
+        street: "الملك فهد",
+        postal_code: "31411",
+      },
+    ],
+    ["PATCH", "checkout/delivery", { method: "pickup" }],
+  ];
+  for (const [m, p, body] of steps) {
+    resetBuckets();
+    expect([200, 201]).toContain(
+      (await gw(seed.hosts.ws, m, p, { token, cart, body })).status,
+    );
+  }
+  resetBuckets();
+  const done = await gw(seed.hosts.ws, "POST", "checkout/complete", {
+    token,
+    cart,
+    idem: key,
+  });
+  expect(done.status).toBe(201);
+  return done.json.data.order.id as string;
+}
+/** Last password-reset link mailed to `email` (app's own `log` transport). */
+function resetLink(email: string): URL {
+  const log = fs.readFileSync(
+    path.join(ENV.laravelRoot, "storage/logs/laravel.log"),
+    "utf8",
+  );
+  const last =
+    log
+      .split(/\nTo: /)
+      .slice(1)
+      .filter((b) => b.startsWith(email))
+      .at(-1) ?? "";
+  const m = last.match(
+    /https?:\/\/[^"'\s<]+\/buyer\/reset-password\?token=[A-Za-z0-9]+/,
+  );
+  if (!m) throw new Error("no password-reset link was mailed to the buyer");
+  return new URL(m[0]);
+}
+
+async function signIn(page: Page, email: string, locale = "en") {
+  const t = locale === "ar" ? ar.wholesaleBuyer : en.wholesaleBuyer;
+  // Same rule as `login()`: a rate-limited sign-in (the per-tenant login brake shared behind the gateway) is waited out, as a real buyer would.
+  for (let attempt = 0; ; attempt++) {
+    await go(page, `${WS}/sa/${locale}/buyer/sign-in`);
+    await page.getByLabel(t.signIn.email).fill(email);
+    await page
+      .getByLabel(t.signIn.password, { exact: true })
+      .first()
+      .fill(seed.password);
+    resetBuckets();
+    await page
+      .getByRole("button", {
+        name: locale === "ar" ? ar.wholesaleBuyer.signIn.submit : /^sign in$/i,
+      })
+      .click();
+    const outcome = await Promise.race([
+      page
+        .waitForURL(/\/buyer\/membership/, { timeout: 20_000 })
+        .then(() => "ok" as const),
+      page
+        .getByText(t.errors.rateLimited)
+        .waitFor({ timeout: 20_000 })
+        .then(() => "limited" as const),
+    ]).catch(() => "timeout" as const);
+    if (outcome === "ok") return;
+    if (outcome !== "limited" || attempt >= 4)
+      throw new Error(`sign-in did not complete (${outcome})`);
+    await page.waitForTimeout(15_000);
+  }
 }
 
 // ═════════════════════════════════════════════════════════════════
@@ -431,10 +559,17 @@ test.describe
         page.getByText(en.wholesaleBuyer.status.no_application.label),
       ).toBeVisible();
       await go(page, `${WS}/sa/en/products`);
+      // not applied yet: the gate says so, not "not approved"
       await expect(
-        page.getByText(en.wholesaleBuyer.gate.approval_required.title).first(),
+        page.getByText(en.wholesaleBuyer.gate.membership.none.title).first(),
       ).toBeVisible();
       await go(page, `${WS}/sa/en/buyer/membership`);
+      await page
+        .getByLabel(en.wholesaleBuyer.membership.company)
+        .fill("Journey Buyer Trading Co");
+      await page
+        .getByLabel(en.wholesaleBuyer.membership.phone)
+        .fill("+966 50 123 4567");
       const t0 = Date.now();
       await click(
         page,
@@ -455,8 +590,14 @@ test.describe
       applyMs = Date.now() - t0;
       await go(page, `${WS}/sa/en/products`);
       await expect(
-        page.getByText(en.wholesaleBuyer.gate.approval_required.title).first(),
+        page.getByText(en.wholesaleBuyer.gate.membership.pending.title).first(),
       ).toBeVisible();
+      // the optional context reached the reviewer, and only as context
+      const reviewed = await membershipIdOf(email);
+      expect(reviewed.application).toEqual({
+        company_name: "Journey Buyer Trading Co",
+        contact_phone: "+966 50 123 4567",
+      });
       await shot(page, "06-pending-gated");
       ev("06", {
         result:
@@ -713,12 +854,80 @@ test.describe
       });
     });
 
+    test("13b staff links the buyer to a customer: the buyer's price changes in the browser; unlinking restores it", async () => {
+      const { id } = await membershipIdOf(email);
+      await go(page, `${WS}/sa/en/products`);
+      await pricesOn(page, /7\.00/);
+
+      const linked = await staffPartnerLink(id, "PUT");
+      expect(linked.effective_price_list.source).toBe("partner");
+      expect(linked.active.linked_by.name).toBeTruthy();
+      await go(page, `${WS}/sa/en/products`);
+      await pricesOn(page, /5\.00/); // partner list
+      expect(await bodyText(page)).not.toMatch(/7\.00/);
+      await shot(page, "13b-partner-price-after-link");
+
+      const unlinked = await staffPartnerLink(id, "DELETE");
+      expect(unlinked.effective_price_list.source).toBe("channel");
+      expect(unlinked.history[0].revoked_by.name).toBeTruthy();
+      await go(page, `${WS}/sa/en/products`);
+      await pricesOn(page, /7\.00/);
+      ev("13b", {
+        channel_price_before: "7.00",
+        partner_price_after_link: "5.00",
+        channel_price_after_unlink: "7.00",
+        audit: "history keeps who linked and who unlinked, with timestamps",
+      });
+    });
+
+    test("13c order history: the buyer sees their own order and its detail; another buyer's order is one not-found", async () => {
+      const linkedToken = (
+        await login(seed.hosts.ws, seed.seeded_buyers.linked.email)
+      ).token as string;
+      const foreignOrderId = await placeApiOrder(
+        linkedToken,
+        "e2e-foreign-order-1",
+      );
+
+      await go(page, `${WS}/sa/en/buyer/orders`);
+      const row = page.getByRole("link", { name: /CORD-\d{4}-\d+/ });
+      await expect(row).toHaveCount(1); // only this buyer's single order, never the other buyer's
+      await shot(page, "13c-order-history");
+      const number = (await row.innerText()).match(/CORD-\d{4}-\d+/)?.[0];
+      resetBuckets();
+      await row.click();
+      await page.waitForURL(/\/buyer\/orders\/[0-9a-f-]{36}$/);
+      await pricesOn(page, /7\.00/);
+      await pricesOn(page, /9\.00/);
+      await expect(
+        page.getByText(en.wholesaleBuyer.orders.notPaidNote),
+      ).toBeVisible();
+      await shot(page, "13c-order-detail");
+
+      await go(page, `${WS}/sa/en/buyer/orders/${foreignOrderId}`);
+      await expect(
+        page.getByText(en.wholesaleBuyer.orders.notFoundTitle).first(),
+      ).toBeVisible();
+      expect(await bodyText(page)).not.toMatch(/CORD-\d{4}-\d+/);
+      await shot(page, "13c-foreign-order-not-found");
+      ev("13c", {
+        own_orders_listed: 1,
+        own_order_number_shape: number?.replace(/\d/g, "9"),
+        detail_lines_priced: ["7.00", "9.00"],
+        foreign_order_detail: "not-found state, no data",
+      });
+    });
+
     test("14 suspension: gated again, cart/checkout refused; reinstatement restores access", async () => {
       expect(await staffTransition(email, "suspend")).toBe("suspended");
       await go(page, `${WS}/sa/en/products`);
+      // Batch L finding fixed: a suspended buyer is told they are suspended, not that they are "not approved yet"
       await expect(
-        page.getByText(en.wholesaleBuyer.gate.approval_required.title).first(),
+        page
+          .getByText(en.wholesaleBuyer.gate.membership.suspended.title)
+          .first(),
       ).toBeVisible();
+      expect(await bodyText(page)).not.toContain("has not been approved yet");
       await go(page, `${WS}/sa/en/cart`);
       expect(await bodyText(page)).not.toMatch(/\d+\.00/);
       await shot(page, "14-suspended-cart");
@@ -1052,6 +1261,12 @@ test.describe
 
     test("C10 duplicate checkout submission with one idempotency key yields one order; another buyer cannot read it", async () => {
       resetBuckets();
+      // the journey (13c) already placed one order for this buyer: this test must add exactly ONE more, however often it is submitted
+      const ordersBefore = php("wholesale-e2e-evidence.php", [
+        S.linked.email,
+      ]).orders.filter(
+        (o: any) => o.owned_by_expected_identity === true,
+      ).length;
       expect(
         (
           await gw(seed.hosts.ws, "POST", "checkout", {
@@ -1108,9 +1323,10 @@ test.describe
       const mine = out.orders.filter(
         (o: any) => o.owned_by_expected_identity === true,
       );
-      expect(mine).toHaveLength(1);
-      expect(mine[0].lines[0].unit_price_minor).toBe(500);
-      expect(mine[0].lines[0].price_source).toBe("price_list");
+      expect(mine).toHaveLength(ordersBefore + 1);
+      const newest = mine.at(-1);
+      expect(newest.lines[0].unit_price_minor).toBe(500);
+      expect(newest.lines[0].price_source).toBe("price_list");
 
       // buyer B (not the owner) cannot read order A's payment state
       const other = (await login(seed.hosts.ws, S.approved_unlinked.email))
@@ -1119,15 +1335,40 @@ test.describe
       const peek = await gw(
         seed.hosts.ws,
         "GET",
-        `orders/${mine[0].id}/payment-status`,
+        `orders/${newest.id}/payment-status`,
         { token: other },
       );
       expect(peek.status).toBe(404);
+      // and the buyer-account endpoints (Batch M): another buyer's order is one 404, the owner reads it
+      resetBuckets();
+      expect(
+        (
+          await gw(seed.hosts.ws, "GET", `buyer/orders/${newest.id}`, {
+            token: other,
+          })
+        ).status,
+      ).toBe(404);
+      resetBuckets();
+      expect(
+        (
+          await gw(seed.hosts.ws, "GET", `buyer/orders/${newest.id}`, {
+            token: linked,
+          })
+        ).status,
+      ).toBe(200);
+      resetBuckets();
+      const theirs = await gw(seed.hosts.ws, "GET", "buyer/orders", {
+        token: other,
+      });
+      expect(theirs.status).toBe(200);
+      expect(
+        (theirs.json.data as Array<{ id: string }>).map((o) => o.id),
+      ).not.toContain(newest.id);
       ev("C10", {
         first_complete: a.status,
         replay_same_key: b.status,
-        orders_for_buyer: mine.length,
-        line_unit_minor: mine[0].lines[0].unit_price_minor,
+        orders_added_by_this_checkout: mine.length - ordersBefore,
+        line_unit_minor: newest.lines[0].unit_price_minor,
         other_buyer_reads_order_status: peek.status,
       });
     });
@@ -1257,7 +1498,7 @@ test.describe
 //  F. HARNESS-FREE CHARACTERIZATION — what a visitor sees WITHOUT the per-step bucket reset
 // ═════════════════════════════════════════════════════════════════
 test.describe("@desktop shared anonymous rate limit (blocker B1 — characterization, never fails)", () => {
-  test("F01 repeated page loads from the storefront server exhaust the shared per-IP bucket", async ({
+  test("F01 repeated page loads from the storefront server no longer exhaust a shared per-IP bucket", async ({
     page,
   }) => {
     const loop = async (url: string) => {
@@ -1282,7 +1523,7 @@ test.describe("@desktop shared anonymous rate limit (blocker B1 — characteriza
     const first = (o: string[]) => o.indexOf("error") + 1 || null;
     ev("F01", {
       limiter:
-        "unauth class, 30 req/min per connection IP — every visitor of every store shares the storefront server's IP",
+        "gateway-authenticated reads are budgeted per storefront (600/min default), not per connection IP",
       anonymous_retail_12_loads: {
         outcomes: retail,
         first_failed_load: first(retail),
@@ -1292,8 +1533,104 @@ test.describe("@desktop shared anonymous rate limit (blocker B1 — characteriza
         first_failed_load: first(buyer),
       },
     });
+    // Batch L measured the 4th load failing for everyone; with the per-storefront budget all 12 succeed
+    expect(first(retail)).toBeNull();
+    expect(first(buyer)).toBeNull();
   });
 });
+
+// ═════════════════════════════════════════════════════════════════
+//  G. PASSWORD RESET IN THE BROWSER (H6 Batch M)
+// ═════════════════════════════════════════════════════════════════
+test.describe
+  .serial("@desktop buyer password reset", () => {
+    const buyer = seed.seeded_buyers.resettable.email;
+    const newPassword = "E2e-brand-new-pass-1";
+
+    test("G01 forgot-password is neutral; the mailed link sets a new password once; old password and old session die", async ({
+      browser,
+    }) => {
+      const ctx = await browser.newContext({
+        viewport: { width: 1280, height: 900 },
+      });
+      const page = await ctx.newPage();
+      // a live session that the reset must end
+      const sessionBefore = (await login(seed.hosts.ws, buyer)).token as string;
+      expect(
+        (await gw(seed.hosts.ws, "GET", "me", { token: sessionBefore })).status,
+      ).toBe(200);
+
+      // neutral request for a known and an unknown address: identical visible outcome
+      for (const address of [buyer, "nobody-here@e2e.test"]) {
+        await go(page, `${WS}/sa/en/buyer/forgot-password`);
+        await page.getByLabel(en.wholesaleBuyer.signIn.email).fill(address);
+        await click(
+          page,
+          page.getByRole("button", { name: en.wholesaleBuyer.forgot.submit }),
+        );
+        await expect(
+          page.getByText(en.wholesaleBuyer.forgot.doneBody),
+        ).toBeVisible();
+      }
+      await shot(page, "G01-forgot-neutral");
+
+      const link = resetLink(buyer);
+      expect(link.hostname).toBe(seed.hosts.ws);
+      expect(link.pathname).toMatch(/\/buyer\/reset-password$/);
+      const local = `${WS}${link.pathname}${link.search}`;
+
+      await go(page, local);
+      await page
+        .getByLabel(en.wholesaleBuyer.reset.newPassword, { exact: true })
+        .fill(newPassword);
+      await page
+        .getByLabel(en.wholesaleBuyer.reset.confirmPassword, { exact: true })
+        .fill(newPassword);
+      await click(
+        page,
+        page.getByRole("button", { name: en.wholesaleBuyer.reset.submit }),
+      );
+      await expect(
+        page.getByText(en.wholesaleBuyer.reset.successTitle),
+      ).toBeVisible();
+      await shot(page, "G01-reset-done");
+
+      // the link is single-use
+      await go(page, local);
+      await page
+        .getByLabel(en.wholesaleBuyer.reset.newPassword, { exact: true })
+        .fill("Another-pass-22");
+      await page
+        .getByLabel(en.wholesaleBuyer.reset.confirmPassword, { exact: true })
+        .fill("Another-pass-22");
+      await click(
+        page,
+        page.getByRole("button", { name: en.wholesaleBuyer.reset.submit }),
+      );
+      await expect(
+        page.getByText(en.wholesaleBuyer.reset.failedTitle),
+      ).toBeVisible();
+
+      // old password refused, new accepted; the pre-reset session token is dead server-side
+      expect((await login(seed.hosts.ws, buyer, seed.password)).status).toBe(
+        422,
+      );
+      expect((await login(seed.hosts.ws, buyer, newPassword)).status).toBe(200);
+      resetBuckets();
+      expect(
+        (await gw(seed.hosts.ws, "GET", "me", { token: sessionBefore })).status,
+      ).toBe(401);
+      ev("G01", {
+        forgot_known_and_unknown: "same neutral confirmation",
+        mail_link_host_matches_channel: true,
+        new_password_works: true,
+        old_password_refused: true,
+        link_single_use: true,
+        pre_reset_session_after_reset: 401,
+      });
+      await ctx.close();
+    });
+  });
 
 // ═════════════════════════════════════════════════════════════════
 //  E. MOBILE + ARABIC / RTL
@@ -1385,5 +1722,33 @@ test.describe("@mobile arabic rtl on a phone viewport", () => {
       cart_has_real_line: true,
       checkout_form_input_visible: true,
     });
+  });
+  test("E03 forgot-password, reset and order history render RTL on a phone with no overflow", async ({
+    page,
+  }) => {
+    const wb = ar.wholesaleBuyer;
+    await go(page, `${WS}/sa/ar/buyer/forgot-password`);
+    await expect(page.getByLabel(wb.signIn.email)).toBeVisible({
+      timeout: 20_000,
+    });
+    expect(await page.locator("html").getAttribute("dir")).toBe("rtl");
+    expect(await overflow(page)).toBeLessThanOrEqual(1);
+    await shot(page, "E03-forgot");
+
+    await go(page, `${WS}/sa/ar/buyer/reset-password`); // no token: the "request a new link" state
+    await expect(page.getByText(wb.reset.missingToken)).toBeVisible({
+      timeout: 20_000,
+    });
+    expect(await overflow(page)).toBeLessThanOrEqual(1);
+    await shot(page, "E03-reset-missing-token");
+
+    await signIn(page, seed.seeded_buyers.linked.email, "ar");
+    await go(page, `${WS}/sa/ar/buyer/orders`);
+    await expect(
+      page.getByRole("link", { name: /CORD-\d{4}-\d+/ }).first(),
+    ).toBeVisible({ timeout: 20_000 });
+    expect(await overflow(page)).toBeLessThanOrEqual(1);
+    await shot(page, "E03-orders");
+    ev("E03", { forgot_reset_orders_rtl: true, horizontal_overflow_px: 0 });
   });
 });

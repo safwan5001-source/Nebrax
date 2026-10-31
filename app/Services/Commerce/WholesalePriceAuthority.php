@@ -115,6 +115,26 @@ final class WholesalePriceAuthority
         return null;
     }
 
+    /**
+     * H6 Batch M — «العلاقة الفعلية» لعرض الموظف فقط (لا يسعّر شيئاً): أي قائمة ستحكم هذا المشتري على هذه القناة الآن.
+     * يعيد استعمال نفس الدالتين الخاصتين اللتين تبني بهما `context()` الأسبقية، فلا نسخة ثانية من القاعدة: رابط نشط ← شريك عميل نشط ←
+     * قائمة نشطة، وإلا قائمة القناة النشطة، وإلا لا شيء (غير متاح للجملة — لا سعر أساسي بديلاً).
+     *
+     * @return array{source: 'partner'|'channel'|'none', price_list: PriceList|null, partner_list: PriceList|null, channel_list: PriceList|null}
+     */
+    public function describeFor(string $identityId, SalesChannel $channel): array
+    {
+        $partnerList = $this->partnerList($identityId);
+        $channelList = $this->channelList($channel);
+
+        return [
+            'source' => $partnerList !== null ? 'partner' : ($channelList !== null ? 'channel' : 'none'),
+            'price_list' => $partnerList ?? $channelList,
+            'partner_list' => $partnerList,
+            'channel_list' => $channelList,
+        ];
+    }
+
     private function partnerList(string $identityId): ?PriceList
     {
         $link = CustomerPartnerLink::query()

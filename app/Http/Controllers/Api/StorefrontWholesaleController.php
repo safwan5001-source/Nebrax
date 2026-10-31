@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Requests\BuyerApplyRequest;
 use App\Models\CustomerIdentity;
 use App\Models\WholesaleMembership;
 use App\Services\Commerce\WholesaleMembershipService;
@@ -20,12 +21,12 @@ use Illuminate\Http\Request;
  */
 class StorefrontWholesaleController extends PublicApiController
 {
-    public function apply(Request $request, WholesaleMembershipService $memberships, StorefrontContext $context): JsonResponse
+    public function apply(BuyerApplyRequest $request, WholesaleMembershipService $memberships, StorefrontContext $context): JsonResponse
     {
         /** @var CustomerIdentity $identity */
         $identity = $request->user();
 
-        $membership = $memberships->apply($identity, $context->salesChannelId());
+        $membership = $memberships->apply($identity, $context->salesChannelId(), $request->validated());
 
         return PublicApiResponse::success($request, ['membership' => $this->payload($membership)], $membership->wasRecentlyCreated ? 201 : 200);
     }
@@ -46,13 +47,16 @@ class StorefrontWholesaleController extends PublicApiController
         return PublicApiResponse::success($request, ['access' => true]);
     }
 
-    /** @return array{status:string,applied_at:?string,decided_at:?string} */
+    /** @return array{status:string,applied_at:?string,decided_at:?string,company_name:?string,contact_phone:?string} */
     private function payload(WholesaleMembership $membership): array
     {
         return [
             'status' => $membership->status,
             'applied_at' => $membership->applied_at?->toIso8601String(),
             'decided_at' => $membership->decided_at?->toIso8601String(),
+            // the buyer's own submitted context, echoed back to them only
+            'company_name' => $membership->company_name,
+            'contact_phone' => $membership->contact_phone,
         ];
     }
 }

@@ -5,11 +5,14 @@ namespace App\Http\Controllers\Api;
 use App\Http\Middleware\BindStorefrontBuyerToChannel;
 use App\Http\Requests\CustomerLoginRequest;
 use App\Http\Requests\BuyerRegisterRequest;
+use App\Http\Requests\BuyerForgotPasswordRequest;
 use App\Http\Requests\BuyerResendVerificationRequest;
+use App\Http\Requests\BuyerResetPasswordRequest;
 use App\Http\Requests\BuyerVerifyEmailRequest;
 use App\Http\Resources\CustomerIdentityResource;
 use App\Models\CustomerIdentity;
 use App\Services\Commerce\BuyerEmailVerificationService;
+use App\Services\Commerce\BuyerPasswordResetService;
 use App\Services\CustomerAuthenticationService;
 use App\Services\CustomerIdentityService;
 use App\Support\PublicApiErrorCode;
@@ -76,12 +79,47 @@ class StorefrontBuyerAuthController extends PublicApiController
         return PublicApiResponse::success($request, ['verification_required' => true], 202);
     }
 
-    /**
-     * Created and sent after the response (timing never reveals whether the address exists). The terminating phase
-     * runs after the request-scoped contexts are gone, so the TRUSTED tenant/channel/storefront of this request are
-     * captured now and re-established for the call, then removed again.
-     */
+    /** Created and sent after the response (timing never reveals whether the address exists). */
     private function sendVerificationAfterResponse(string $identityId, ?string $localePath): void
+    {
+        $this->afterResponseInStore(fn () => app(BuyerEmailVerificationService::class)->sendFor($identityId, (string) $localePath));
+    }
+
+    /**
+     * H6 Batch M — neutral 202 whatever the address is (unknown, unverified, inactive, cooling down, or eligible). Only a
+     * verified, active identity of THIS tenant receives a link; the mail is created and sent after the response.
+     */
+    public function forgotPassword(BuyerForgotPasswordRequest $request): JsonResponse
+    {
+        $identity = CustomerIdentity::query()
+            ->where('email_normalized', CustomerIdentity::normalizeEmail($request->validated('email')))
+            ->first();
+
+        if ($identity !== null) {
+            $localePath = $request->validated('locale_path');
+            $this->afterResponseInStore(fn () => app(BuyerPasswordResetService::class)->sendFor($identity->id, (string) $localePath));
+        }
+
+        return PublicApiResponse::success($request, ['reset_requested' => true], 202);
+    }
+
+    /** Consume the e-mailed token for THIS host's tenant + channel and set the new password. Every failure is one generic 422. */
+    public function resetPassword(BuyerResetPasswordRequest $request, BuyerPasswordResetService $resets): JsonResponse
+    {
+        if (! $resets->complete($request->validated('token'), $request->validated('password'))) {
+            return PublicApiResponse::error(
+                $request, PublicApiErrorCode::VALIDATION_FAILED, 'رابط إعادة التعيين غير صالح أو منتهي.', 422,
+            );
+        }
+
+        return PublicApiResponse::success($request, ['password_reset' => true]);
+    }
+
+    /**
+     * Runs `$work` after the response with the TRUSTED tenant/channel/storefront of this request re-established (the
+     * terminating phase runs after the request-scoped contexts are gone), then removes them again, exactly once.
+     */
+    private function afterResponseInStore(callable $work): void
     {
         $tenant = app(TenantContext::class);
         $storefront = app(StorefrontContext::class);
@@ -94,7 +132,7 @@ class StorefrontBuyerAuthController extends PublicApiController
         $done = false;
 
         // `terminating` callbacks of a long-lived app instance can run again on a later request: run exactly once.
-        app()->terminating(function () use (&$done, $identityId, $localePath, $tenantId, $channelId, $storefrontId): void {
+        app()->terminating(function () use (&$done, $work, $tenantId, $channelId, $storefrontId): void {
             if ($done) {
                 return;
             }
@@ -105,7 +143,7 @@ class StorefrontBuyerAuthController extends PublicApiController
             $tenantCtx->set($tenantId);
             $storeCtx->set($tenantId, $channelId, $storefrontId);
             try {
-                app(BuyerEmailVerificationService::class)->sendFor($identityId, (string) $localePath);
+                $work();
             } finally {
                 $tenantCtx->forget();
                 $storeCtx->forget();

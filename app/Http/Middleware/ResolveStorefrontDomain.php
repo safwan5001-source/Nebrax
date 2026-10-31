@@ -68,6 +68,9 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class ResolveStorefrontDomain
 {
+    /** Request attribute (server-side only) set when the gateway secret verified; see `incomingHostname()`. */
+    public const GATEWAY_VERIFIED_ATTRIBUTE = 'storefront_gateway_verified';
+
     public function __construct(
         private TenantContext $tenantContext,
         private BranchContext $branchContext,
@@ -147,6 +150,11 @@ class ResolveStorefrontDomain
         $providedSecret = (string) $request->header('X-Storefront-Gateway-Secret', '');
 
         if ($secret !== '' && $forwardedHost !== null && hash_equals($secret, $providedSecret)) {
+            // H6 Batch M: the ONLY place that proves the caller is the storefront server (holder of the gateway secret).
+            // `EnforcePublicApiRateLimit` reads this server-set flag to budget gateway traffic per storefront instead of
+            // per connection IP. It is never derived from a client header; anything else leaves it unset.
+            $request->attributes->set(self::GATEWAY_VERIFIED_ATTRIBUTE, true);
+
             return $forwardedHost;
         }
 

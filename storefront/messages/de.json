@@ -1087,7 +1087,8 @@
       "submit": "Anmelden",
       "submitting": "Anmeldung läuft...",
       "registerLink": "Käuferkonto erstellen",
-      "resendLink": "Bestätigungs-E-Mail erneut senden"
+      "resendLink": "Bestätigungs-E-Mail erneut senden",
+      "forgotLink": "Passwort vergessen?"
     },
     "errors": {
       "invalidCredentials": "Anmeldung nicht möglich. Prüfen Sie E-Mail und Passwort sowie, ob Ihre E-Mail-Adresse bestätigt ist.",
@@ -1106,6 +1107,24 @@
         "title": "Ihr Großhandelskonto ist nicht freigegeben",
         "body": "Sie sind angemeldet, aber Ihre Großhandelsmitgliedschaft wurde noch nicht freigegeben. Prüfen Sie den Status.",
         "cta": "Mitgliedschaftsstatus ansehen"
+      },
+      "membership": {
+        "none": {
+          "title": "Großhandelszugang beantragen",
+          "body": "Sie sind angemeldet, haben aber noch keinen Großhandelszugang in diesem Shop beantragt. Stellen Sie den Antrag, damit der Shop ihn prüft."
+        },
+        "pending": {
+          "title": "Ihr Antrag wird geprüft",
+          "body": "Der Shop hat Ihren Großhandelsantrag erhalten und prüft ihn. Preise bleiben bis zur Freigabe verborgen."
+        },
+        "rejected": {
+          "title": "Ihr Antrag wurde nicht genehmigt",
+          "body": "Der Shop hat Ihren Großhandelsantrag nicht genehmigt. Wenden Sie sich an den Shop, falls Sie einen Irrtum vermuten."
+        },
+        "suspended": {
+          "title": "Ihr Großhandelskonto ist gesperrt",
+          "body": "Ihre Großhandelsmitgliedschaft ist gesperrt, daher sind Preise und Bestellungen nicht verfügbar. Wenden Sie sich zur Prüfung an den Shop."
+        }
       }
     },
     "membership": {
@@ -1114,7 +1133,11 @@
       "signOut": "Abmelden",
       "apply": "Großhandelszugang beantragen",
       "applying": "Wird gesendet...",
-      "browse": "Großhandelskatalog ansehen"
+      "browse": "Großhandelskatalog ansehen",
+      "company": "Firmenname (optional)",
+      "phone": "Kontakttelefon (optional)",
+      "applicationHint": "Das hilft dem Shop bei der Prüfung Ihres Antrags. Es wird nicht verifiziert und ändert Ihre Preise nicht.",
+      "myOrders": "Meine Bestellungen"
     },
     "status": {
       "signed_out": {
@@ -1180,6 +1203,54 @@
       "sign_in_required": "Melden Sie sich bei Ihrem Großhandelskonto an, um diesen Warenkorb zu sehen und zu bestellen.",
       "approval_required": "Ihr Großhandelskonto ist derzeit nicht zum Bestellen freigegeben. Prüfen Sie den Status Ihrer Mitgliedschaft.",
       "unavailable_for_wholesale": "Dieses Produkt kann nicht im Großhandel bestellt werden."
+    },
+    "forgot": {
+      "title": "Passwort zurücksetzen",
+      "description": "Geben Sie die E-Mail-Adresse Ihres Großhandelskontos ein. Wir senden Ihnen einen Link zum Festlegen eines neuen Passworts.",
+      "backToSignIn": "Zurück zur Anmeldung",
+      "submit": "Link zum Zurücksetzen senden",
+      "submitting": "Wird gesendet...",
+      "doneBody": "Gehört diese Adresse zu einem bestätigten Konto, haben wir einen Link zum Festlegen eines neuen Passworts gesendet. Der Link funktioniert einmal und läuft bald ab."
+    },
+    "reset": {
+      "title": "Neues Passwort festlegen",
+      "description": "Geben Sie ein neues Passwort für Ihr Großhandelskonto ein. Sie werden überall abgemeldet und können sich mit dem neuen Passwort anmelden.",
+      "newPassword": "Neues Passwort",
+      "confirmPassword": "Neues Passwort bestätigen",
+      "submit": "Passwort ändern",
+      "submitting": "Wird gespeichert...",
+      "tooShort": "Das Passwort muss mindestens {min} Zeichen lang sein.",
+      "mismatch": "Die beiden Passwörter stimmen nicht überein.",
+      "successTitle": "Passwort geändert",
+      "successBody": "Ihr Passwort wurde geändert und alle anderen Sitzungen wurden abgemeldet. Melden Sie sich mit dem neuen Passwort an.",
+      "failedTitle": "Dieser Link kann nicht verwendet werden",
+      "failedBody": "Der Link zum Zurücksetzen ist ungültig, abgelaufen oder bereits verwendet. Fordern Sie einen neuen an.",
+      "missingToken": "Diese Seite benötigt den Link aus Ihrer E-Mail zum Zurücksetzen. Fordern Sie eine neue E-Mail an, falls Sie ihn verloren haben.",
+      "requestNew": "Neue E-Mail zum Zurücksetzen senden"
+    },
+    "orders": {
+      "title": "Meine Bestellungen",
+      "emptyTitle": "Noch keine Bestellungen",
+      "emptyBody": "Bestellungen, die Sie in diesem Shop aufgeben, erscheinen hier.",
+      "backToList": "Zurück zu meinen Bestellungen",
+      "detailTitle": "Bestellung",
+      "delivery": "Lieferung",
+      "total": "Gesamt",
+      "deliveryAddress": "Lieferadresse",
+      "payment": "Zahlung",
+      "notPaidNote": "Eine Bestellung ist eine geschäftliche Verpflichtung; der Shop bestätigt den Endbetrag und die Zahlungsweise. Auf dieser Seite wird keine Zahlung erhoben.",
+      "cancelledNote": "Diese Bestellung wurde storniert.",
+      "notFoundTitle": "Bestellung nicht gefunden",
+      "notFoundBody": "Wir konnten diese Bestellung in Ihrem Konto nicht finden.",
+      "unavailableTitle": "Bestellungen nicht verfügbar",
+      "unavailableBody": "Ihre Bestellungen konnten gerade nicht geladen werden. Bitte versuchen Sie es gleich erneut.",
+      "pagination": "Seiten der Bestellungen",
+      "previous": "Zurück",
+      "next": "Weiter",
+      "status": {
+        "confirmed": "Bestätigt",
+        "cancelled": "Storniert"
+      }
     }
   }
 }

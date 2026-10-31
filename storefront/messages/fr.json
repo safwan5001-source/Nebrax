@@ -1087,7 +1087,8 @@
       "submit": "Se connecter",
       "submitting": "Connexion...",
       "registerLink": "Créer un compte acheteur",
-      "resendLink": "Renvoyer l'e-mail de vérification"
+      "resendLink": "Renvoyer l'e-mail de vérification",
+      "forgotLink": "Mot de passe oublié ?"
     },
     "errors": {
       "invalidCredentials": "Connexion impossible. Vérifiez votre e-mail et votre mot de passe, et que votre adresse e-mail est vérifiée.",
@@ -1106,6 +1107,24 @@
         "title": "Votre compte grossiste n'est pas approuvé",
         "body": "Vous êtes connecté, mais votre adhésion grossiste n'a pas encore été approuvée. Consultez son statut pour continuer.",
         "cta": "Voir le statut de l'adhésion"
+      },
+      "membership": {
+        "none": {
+          "title": "Demandez l’accès grossiste",
+          "body": "Vous êtes connecté mais vous n’avez pas encore demandé l’accès grossiste sur cette boutique. Envoyez la demande pour qu’elle soit examinée."
+        },
+        "pending": {
+          "title": "Votre demande est en cours d’examen",
+          "body": "La boutique a reçu votre demande grossiste et l’examine. Les prix restent masqués jusqu’à son approbation."
+        },
+        "rejected": {
+          "title": "Votre demande n’a pas été approuvée",
+          "body": "La boutique n’a pas approuvé votre demande grossiste. Contactez la boutique si vous pensez à une erreur."
+        },
+        "suspended": {
+          "title": "Votre compte grossiste est suspendu",
+          "body": "Votre adhésion grossiste est suspendue : les prix et les commandes sont indisponibles. Contactez la boutique pour la faire réexaminer."
+        }
       }
     },
     "membership": {
@@ -1114,7 +1133,11 @@
       "signOut": "Se déconnecter",
       "apply": "Demander l'accès grossiste",
       "applying": "Envoi...",
-      "browse": "Parcourir le catalogue grossiste"
+      "browse": "Parcourir le catalogue grossiste",
+      "company": "Nom de l’entreprise (facultatif)",
+      "phone": "Téléphone de contact (facultatif)",
+      "applicationHint": "Cela aide la boutique à examiner votre demande. Ce n’est pas vérifié et cela ne modifie pas vos prix.",
+      "myOrders": "Mes commandes"
     },
     "status": {
       "signed_out": {
@@ -1180,6 +1203,54 @@
       "sign_in_required": "Connectez-vous à votre compte grossiste pour voir ce panier et commander.",
       "approval_required": "Votre compte grossiste n'est pas autorisé à commander pour le moment. Vérifiez le statut de votre adhésion.",
       "unavailable_for_wholesale": "Ce produit n'est pas disponible à la commande en gros."
+    },
+    "forgot": {
+      "title": "Réinitialiser votre mot de passe",
+      "description": "Saisissez l’e-mail de votre compte acheteur grossiste ; nous vous enverrons un lien pour choisir un nouveau mot de passe.",
+      "backToSignIn": "Retour à la connexion",
+      "submit": "Envoyer le lien de réinitialisation",
+      "submitting": "Envoi...",
+      "doneBody": "Si cette adresse correspond à un compte confirmé, nous avons envoyé un lien pour choisir un nouveau mot de passe. Le lien ne fonctionne qu’une fois et expire bientôt."
+    },
+    "reset": {
+      "title": "Choisir un nouveau mot de passe",
+      "description": "Saisissez un nouveau mot de passe pour votre compte acheteur grossiste. Vous serez déconnecté partout et pourrez vous connecter avec le nouveau mot de passe.",
+      "newPassword": "Nouveau mot de passe",
+      "confirmPassword": "Confirmer le nouveau mot de passe",
+      "submit": "Changer le mot de passe",
+      "submitting": "Enregistrement...",
+      "tooShort": "Le mot de passe doit comporter au moins {min} caractères.",
+      "mismatch": "Les deux mots de passe ne correspondent pas.",
+      "successTitle": "Mot de passe modifié",
+      "successBody": "Votre mot de passe a été modifié et toutes les autres sessions ont été fermées. Connectez-vous avec le nouveau mot de passe.",
+      "failedTitle": "Ce lien est inutilisable",
+      "failedBody": "Le lien de réinitialisation est invalide, expiré ou déjà utilisé. Demandez-en un nouveau.",
+      "missingToken": "Cette page nécessite le lien de votre e-mail de réinitialisation. Demandez un nouvel e-mail si vous l’avez perdu.",
+      "requestNew": "Envoyer un nouvel e-mail de réinitialisation"
+    },
+    "orders": {
+      "title": "Mes commandes",
+      "emptyTitle": "Aucune commande pour l’instant",
+      "emptyBody": "Les commandes passées sur cette boutique apparaîtront ici.",
+      "backToList": "Retour à mes commandes",
+      "detailTitle": "Commande",
+      "delivery": "Livraison",
+      "total": "Total",
+      "deliveryAddress": "Adresse de livraison",
+      "payment": "Paiement",
+      "notPaidNote": "Une commande est un engagement commercial ; la boutique confirme le montant final et le mode de paiement. Aucun paiement n’est prélevé sur cette page.",
+      "cancelledNote": "Cette commande a été annulée.",
+      "notFoundTitle": "Commande introuvable",
+      "notFoundBody": "Nous n’avons pas trouvé cette commande dans votre compte.",
+      "unavailableTitle": "Commandes indisponibles",
+      "unavailableBody": "Impossible de charger vos commandes pour le moment. Réessayez dans un instant.",
+      "pagination": "Pages des commandes",
+      "previous": "Précédent",
+      "next": "Suivant",
+      "status": {
+        "confirmed": "Confirmée",
+        "cancelled": "Annulée"
+      }
     }
   }
 }

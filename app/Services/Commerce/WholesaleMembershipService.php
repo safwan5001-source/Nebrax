@@ -41,7 +41,11 @@ class WholesaleMembershipService
     public function __construct(private TenantContext $tenantContext) {}
 
     /** Idempotent self-application. Returns the existing membership untouched if one already exists. */
-    public function apply(CustomerIdentity $identity, string $salesChannelId): WholesaleMembership
+    /**
+     * @param array{company_name?: ?string, contact_phone?: ?string} $details optional unverified context for the reviewer (Batch M);
+     *        stored on first application only — an existing membership is returned untouched, details included.
+     */
+    public function apply(CustomerIdentity $identity, string $salesChannelId, array $details = []): WholesaleMembership
     {
         $this->requireTenant();
 
@@ -51,12 +55,14 @@ class WholesaleMembershipService
         }
 
         try {
-            return DB::transaction(function () use ($identity, $salesChannelId): WholesaleMembership {
+            return DB::transaction(function () use ($identity, $salesChannelId, $details): WholesaleMembership {
                 $membership = WholesaleMembership::create([
                     'tenant_id' => $this->tenantContext->id(),
                     'sales_channel_id' => $salesChannelId,
                     'customer_identity_id' => $identity->id,
                     'applied_at' => now(),
+                    'company_name' => $this->clean($details['company_name'] ?? null),
+                    'contact_phone' => $this->clean($details['contact_phone'] ?? null),
                 ]);
 
                 WholesaleMembershipEvent::create([
@@ -157,5 +163,12 @@ class WholesaleMembershipService
         if (! $this->tenantContext->has()) {
             throw new LogicException('TenantContext is required for wholesale membership.');
         }
+    }
+
+    private function clean(?string $value): ?string
+    {
+        $value = $value === null ? '' : trim(preg_replace('/\s+/u', ' ', $value) ?? '');
+
+        return $value === '' ? null : $value;
     }
 }

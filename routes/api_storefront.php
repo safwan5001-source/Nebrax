@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\StorefrontBuyerAuthController;
+use App\Http\Controllers\Api\StorefrontBuyerOrderController;
 use App\Http\Controllers\Api\StorefrontCartController;
 use App\Http\Controllers\Api\StorefrontCategoryController;
 use App\Http\Controllers\Api\StorefrontCollectionController;
@@ -121,6 +122,19 @@ Route::middleware([
                 ->middleware('throttle:storefront-buyer-verify')->name('buyer.verify_email');
             Route::post('auth/verification/resend', [StorefrontBuyerAuthController::class, 'resendVerification'])
                 ->middleware('throttle:storefront-buyer-resend')->name('buyer.verification.resend');
+            // H6 Batch M — password reset: neutral 202 request (per-address + per-tenant/IP throttled) and a single-use,
+            // tenant+channel-bound token that sets the new password and ends every session of the identity.
+            Route::post('auth/password/forgot', [StorefrontBuyerAuthController::class, 'forgotPassword'])
+                ->middleware('throttle:storefront-buyer-reset-request')->name('buyer.password.forgot');
+            Route::post('auth/password/reset', [StorefrontBuyerAuthController::class, 'resetPassword'])
+                ->middleware('throttle:storefront-buyer-reset')->name('buyer.password.reset');
+        });
+
+        // H6 Batch M — the approved buyer's own order history on this channel (approval re-checked every request; ownership from the
+        // verified token via CustomerContext, never from input). A suspended/rejected buyer gets 403 like the catalogue.
+        Route::middleware(EnsureWholesalePriceAccess::class)->group(function () {
+            Route::get('buyer/orders', [StorefrontBuyerOrderController::class, 'index'])->name('buyer.orders.index');
+            Route::get('buyer/orders/{order}', [StorefrontBuyerOrderController::class, 'show'])->whereUuid('order')->name('buyer.orders.show');
         });
 
         Route::middleware([AuthenticateCommerceCustomer::class, BindStorefrontBuyerToChannel::class])->group(function () {
