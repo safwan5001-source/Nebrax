@@ -1,0 +1,32 @@
+{
+  "contract": "app-builder.draft-publish",
+  "version": 1,
+  "decision": "AD-01 (optimistic locking) — slice S01d (G1)",
+  "request": {
+    "method": "POST",
+    "path": "/api/app-builder/apps/{id}/versions",
+    "body": {
+      "note": "string <= 1000 (optional)",
+      "expected_draft_revision": "integer >= 0 or null; OPTIONAL (additive, compatible with existing callers). When sent, it must equal the draft revision at publish time (checked inside the row lock) or the publish is rejected."
+    }
+  },
+  "success": {
+    "status": 201,
+    "data_keys_added": ["source_draft_revision"],
+    "notes": "source_draft_revision = the draft revision the immutable version was captured from (null for versions published before S01d)."
+  },
+  "conflict": {
+    "status": 409,
+    "body": {
+      "message": "string",
+      "reason": "draft_changed_since_review",
+      "current_revision": "integer",
+      "expected_revision": "integer"
+    },
+    "guarantees": [
+      "no version is created and the draft is untouched",
+      "the draft row is locked during publish, so a concurrent save cannot slip a schema in between validation and capture; the captured schema always corresponds to source_draft_revision"
+    ]
+  },
+  "validation": { "status": 422, "when": "expected_draft_revision is not an integer >= 0" }
+}

@@ -3,6 +3,7 @@
 namespace App\Services\AppBuilder;
 
 use App\Models\BuilderApp;
+use App\Models\BuilderDraftExperience;
 use App\Models\BuilderPublishedExperienceVersion;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -42,12 +43,25 @@ final class BuilderPublishedExperienceVersionService
      *                          ذرّياً)، أو المسودة غير صالحة بنيوياً، أو غير
      *                          متوافقة مع بناء AWJ Mobile Runtime الحالي.
      */
-    public function publish(BuilderApp $app, ?string $note, ?string $userId): BuilderPublishedExperienceVersion
+    public function publish(BuilderApp $app, ?string $note, ?string $userId, ?int $expectedDraftRevision = null): BuilderPublishedExperienceVersion
     {
-        return DB::transaction(function () use ($app, $note, $userId): BuilderPublishedExperienceVersion {
+        return DB::transaction(function () use ($app, $note, $userId, $expectedDraftRevision): BuilderPublishedExperienceVersion {
             $lockedApp = BuilderApp::query()->whereKey($app->id)->lockForUpdate()->firstOrFail();
 
-            $schema = $this->validatedDraftSchema($lockedApp);
+            // AD-01 / S01d: قفل صفّ المسودة نفسه (ترتيب الأقفال: التطبيق ثم المسودة؛ الحفظ يقفل المسودة وحدها
+            // فلا جمود). الالتقاط والتحقق والمقارنة كلها على الصفّ المقفول، فلا يُنشر مخطط حُفظ أثناء النشر.
+            $draft = BuilderDraftExperience::query()
+                ->where('builder_app_id', $lockedApp->id)
+                ->lockForUpdate()
+                ->first();
+            if ($draft === null) {
+                throw new RuntimeException('لا توجد مسودة تجربة لهذا التطبيق.');
+            }
+            if ($expectedDraftRevision !== null && (int) $draft->revision !== $expectedDraftRevision) {
+                throw new DraftChangedSinceReviewException((int) $draft->revision, $expectedDraftRevision);
+            }
+
+            $schema = $this->validatedSchemaOf($draft);
 
             $nextVersion = (int) (BuilderPublishedExperienceVersion::query()
                 ->where('builder_app_id', $lockedApp->id)
@@ -58,6 +72,7 @@ final class BuilderPublishedExperienceVersionService
                 'version' => $nextVersion,
                 'schema' => $schema,
                 'schema_version' => (string) $schema['schemaVersion'],
+                'source_draft_revision' => (int) $draft->revision,
                 'published_by' => $userId,
                 'published_at' => now(),
                 'note' => $note,
@@ -71,7 +86,7 @@ final class BuilderPublishedExperienceVersionService
      * ═══════════════════════════════════════════════════════════════
      * يُشغِّل تحقّقَي `publish()` نفسيهما (بنيوي ثم توافق) بلا قفل وبلا إنشاء
      * صفّ — فحصٌ صريح لا فعل. لا قاعدة تحقّق جديدة: يعيد استخدام
-     * `validatedDraftSchema()` حرفياً، فنجاح الفحص يعني نجاح نشرٍ فعلي لاحق
+     * `validatedSchemaOf()` حرفياً، فنجاح الفحص يعني نجاح نشرٍ فعلي لاحق
      * بنفس المسودة (ما لم تتغيّر المسودة أو بناء التشغيل الحالي بين الفحص
      * والنشر — سباقٌ نادر، ونشرٌ فاشل بعده يُبلّغ برسالته الحقيقية كأي فشل آخر).
      *
@@ -79,7 +94,11 @@ final class BuilderPublishedExperienceVersionService
      */
     public function validate(BuilderApp $app): void
     {
-        $this->validatedDraftSchema($app);
+        $draft = $app->draft()->first();
+        if ($draft === null) {
+            throw new RuntimeException('لا توجد مسودة تجربة لهذا التطبيق.');
+        }
+        $this->validatedSchemaOf($draft);
     }
 
     /**
@@ -87,13 +106,8 @@ final class BuilderPublishedExperienceVersionService
      *
      * @throws RuntimeException لا توجد مسودة، أو غير صالحة بنيوياً، أو غير متوافقة.
      */
-    private function validatedDraftSchema(BuilderApp $app): array
+    private function validatedSchemaOf(BuilderDraftExperience $draft): array
     {
-        $draft = $app->draft()->first();
-        if ($draft === null) {
-            throw new RuntimeException('لا توجد مسودة تجربة لهذا التطبيق.');
-        }
-
         $schema = $draft->schema;
         $this->parser->validate($schema);
 

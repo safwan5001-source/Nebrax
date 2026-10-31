@@ -128,6 +128,8 @@ const { api, currentUser, translate } = vi.hoisted(() => {
     'publish.publishing': 'Publishing…',
     'publish.successTitle': 'Version published',
     'publish.errorTitle': 'Could not publish',
+    'publish.draftChangedTitle': 'The draft changed',
+    'publish.draftChangedBody': 'Nothing was published. Reload and review.',
     'previewState.draft': 'Draft',
     'previewState.published': 'Published',
     'previewState.default': 'Default',
@@ -1842,6 +1844,39 @@ describe('AppBuilderWorkspacePage — save safety (AD-01 / S01b)', () => {
     await waitFor(() => expect(putCalls().length).toBe(2));
     await waitFor(() => expect(toastFns.success).toHaveBeenCalledTimes(2));
     expect(JSON.stringify(JSON.parse(window.localStorage.getItem(BACKUP_KEY)!).schema)).toContain('Other tab edits');
+  });
+
+  const versionPosts = () => api.mock.calls.filter((c) => typeof c[0] === 'string' && c[0].endsWith('/versions') && c[1]?.method === 'POST');
+  async function openPublishDialog() {
+    await userEvent.setup().click(screen.getAllByText('Publish')[0]);
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByText('Ready to publish.');
+    return dialog;
+  }
+
+  it('publishing sends the revision of the draft the user is looking at as expected_draft_revision', async () => {
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    const dialog = await openPublishDialog();
+    await userEvent.setup().click(within(dialog).getByRole('button', { name: 'Publish' }));
+    await waitFor(() => expect(versionPosts().length).toBe(1));
+    expect((versionPosts()[0][1].body as { expected_draft_revision: number }).expected_draft_revision).toBe(0);
+  });
+
+  it('a 409 draft_changed_since_review closes the dialog, explains that nothing was published, and offers no success', async () => {
+    const { ApiError } = await import('@/lib/api');
+    mockApi({ publishError: new ApiError(409, 'changed', { reason: 'draft_changed_since_review', current_revision: 4, expected_revision: 0 }) });
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    const dialog = await openPublishDialog();
+    await userEvent.setup().click(within(dialog).getByRole('button', { name: 'Publish' }));
+
+    await waitFor(() => expect(toastFns.error).toHaveBeenCalledWith('The draft changed', 'Nothing was published. Reload and review.'));
+    expect(toastFns.success).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 
   it('a local backup that differs from the server draft is offered for restore, and restoring keeps its original base revision', async () => {
