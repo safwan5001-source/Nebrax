@@ -135,19 +135,38 @@ const ADDRESS_KEYS: ReadonlyArray<keyof AddressInput> = [
   "is_default_shipping",
 ];
 
-/** Allow-list the body: only known address keys, blanks dropped (a PATCH never clears with "" by accident). */
+/** Optional on the API (`nullable`): an emptied field is sent as `null` so an edit can really clear it. */
+const CLEARABLE_KEYS: ReadonlySet<keyof AddressInput> = new Set([
+  "label",
+  "region",
+  "district",
+  "building_no",
+  "additional_number",
+  "postal_code",
+  "delivery_notes",
+]);
+
+/**
+ * Allow-list the body: only known address keys. A blank REQUIRED field is dropped; a blank OPTIONAL field becomes `null`
+ * (explicit clear) so obsolete delivery notes / labels are really removed by a partial update.
+ */
 export function addressBody(
   input: Partial<AddressInput>,
-): Partial<AddressInput> {
-  const body: Record<string, unknown> = {};
+): Partial<Record<keyof AddressInput, string | boolean | null>> {
+  const body: Record<string, string | boolean | null> = {};
   for (const key of ADDRESS_KEYS) {
     const value = input[key];
     if (typeof value === "boolean") body[key] = value;
-    else if (typeof value === "string" && value.trim() !== "") {
-      body[key] = key === "country" ? value.trim().toUpperCase() : value.trim();
+    else if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed !== "") {
+        body[key] = key === "country" ? trimmed.toUpperCase() : trimmed;
+      } else if (CLEARABLE_KEYS.has(key)) {
+        body[key] = null;
+      }
     }
   }
-  return body as Partial<AddressInput>;
+  return body;
 }
 
 export interface AccountSession {

@@ -79,14 +79,21 @@ final class StorefrontAccountController extends PublicApiController
             'password' => ['required', 'string', 'min:8', 'max:255', 'different:current_password'],
         ]);
 
-        $identity = $this->identity($request);
+        $subject = $this->identity($request);
+        $currentId = $subject->currentAccessToken()?->getKey();
 
-        if (! Hash::check($data['current_password'], (string) $identity->password)) {
-            throw ValidationException::withMessages(['current_password' => ['كلمة المرور الحالية غير صحيحة.']]);
-        }
+        // Verify against a FRESH, row-locked identity: a concurrent change or an e-mailed reset (which also ends this
+        // session) must not be overwritten by a request that was authenticated with the old password.
+        DB::transaction(function () use ($subject, $data, $currentId): void {
+            $identity = CustomerIdentity::query()->whereKey($subject->id)->lockForUpdate()->firstOrFail();
 
-        $currentId = $identity->currentAccessToken()?->getKey();
-        DB::transaction(function () use ($identity, $data, $currentId): void {
+            if (! Hash::check($data['current_password'], (string) $identity->password)) {
+                throw ValidationException::withMessages(['current_password' => ['كلمة المرور الحالية غير صحيحة.']]);
+            }
+            if ($currentId !== null && ! $identity->tokens()->whereKey($currentId)->exists()) {
+                abort(401); // this session was revoked while the request was in flight
+            }
+
             $identity->forceFill(['password' => $data['password']])->save(); // 'hashed' cast
             $identity->tokens()->when($currentId !== null, fn ($q) => $q->where('id', '!=', $currentId))->delete();
         });

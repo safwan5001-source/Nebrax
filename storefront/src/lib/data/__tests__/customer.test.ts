@@ -411,15 +411,19 @@ describe("authenticated actions", () => {
       city: "c",
       street: "s",
       label: "  ",
+      delivery_notes: "",
       ...({ customer_identity_id: "evil", tenant_id: "evil" } as object),
     } as never);
     const body = request.mock.calls[0][2].body;
+    // owner/tenant keys never travel; blank OPTIONAL fields are explicit nulls so an edit can really clear them
     expect(body).toEqual({
       recipient_name: "A",
       phone: "+966500000000",
       country: "SA",
       city: "c",
       street: "s",
+      label: null,
+      delivery_notes: null,
     });
   });
 

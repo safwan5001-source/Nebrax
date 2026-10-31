@@ -290,6 +290,23 @@ class RetailCustomerAccountsTest extends TestCase
     }
 
     #[Test]
+    public function a_password_change_never_overwrites_a_reset_that_revoked_its_session(): void
+    {
+        $this->identity('race@shop.test');
+        $t = (string) $this->login('race@shop.test');
+
+        // an e-mailed reset lands first and ends every session
+        $this->api('POST', 'auth/password/forgot', self::RA, null, ['email' => 'race@shop.test'])->assertStatus(202);
+        $mail = Mail::sent(BuyerPasswordResetMail::class)->values()->last();
+        parse_str((string) parse_url($mail->url, PHP_URL_QUERY), $q);
+        $this->api('POST', 'auth/password/reset', self::RA, null, ['token' => $q['token'], 'password' => 'reset-by-mail-1'])->assertOk();
+
+        // the stale session is rejected and the reset password survives
+        $this->api('PUT', 'account/password', self::RA, $t, ['current_password' => 'correct-horse-9', 'password' => 'attacker-pass-1'])->assertUnauthorized();
+        $this->assertNotNull($this->api('POST', 'auth/login', self::RA, null, ['email' => 'race@shop.test', 'password' => 'reset-by-mail-1'])->json('data.token'));
+    }
+
+    #[Test]
     public function password_recovery_mails_a_retail_page_link_and_ends_all_sessions(): void
     {
         $this->identity('rec@shop.test');
@@ -358,6 +375,10 @@ class RetailCustomerAccountsTest extends TestCase
         $this->api('POST', 'account/addresses', self::RA, $t1, $this->addressBody(['tenant_id' => (string) Str::uuid()]))->assertStatus(422);
         // a Saudi address needs the national address fields
         $this->api('POST', 'account/addresses', self::RA, $t1, $this->addressBody(['postal_code' => 'abc']))->assertStatus(422);
+
+        // an optional field can be explicitly cleared by a partial update
+        $this->api('PATCH', 'account/addresses/'.$id, self::RA, $t1, ['delivery_notes' => 'ملاحظة'])->assertOk()->assertJsonPath('data.delivery_notes', 'ملاحظة');
+        $this->api('PATCH', 'account/addresses/'.$id, self::RA, $t1, ['delivery_notes' => null])->assertOk()->assertJsonPath('data.delivery_notes', null);
 
         $this->api('PATCH', 'account/addresses/'.$id, self::RA, $t1, ['city' => 'الخبر'])->assertOk()->assertJsonPath('data.city', 'الخبر');
         $this->api('DELETE', 'account/addresses/'.$id, self::RA, $t1)->assertOk();
