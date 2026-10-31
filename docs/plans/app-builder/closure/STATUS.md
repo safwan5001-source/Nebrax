@@ -23,8 +23,9 @@
 | **S02** عقد المكوّنات (AD-12) | ✅ مدموجة (S02a خادم + S02b ويب) | #1827 | `c10fdbc7b56a2cfc57e4ff1e0a8f3b161b6adfad` | فرض مرحلي؛ 3 جولات مراجعة Codex (7 ملاحظات P2 صحيحة كلها أُصلحت باختبارات)؛ تقارير S02a/S02b |
 | **S21a** الوضع السهل V2: القشرة | ✅ مدموجة | #1830 | `5c07d1d37d54cf27ffe4582e7dd95a40037b818a` | قائمة أقسام + كتالوج صادق (صفحات Runtime) + شريط قسم + هوية + مبدّل وضع؛ مراجعة Codex: 4 ملاحظات أُصلحت؛ e2e متصفح حقيقي؛ `S21a-IMPLEMENTATION-REPORT.md` |
 | **S23a** تجاوب/لمس/اتجاه (UX-02/04/07/08/09/10/11) | ✅ مدموجة | #1831 | `5274f640c958006d47b1fa87d07dfc50f896fe9d` | آيباد عمودي وجوال أفقي بعمودين، أهداف لمس 44px على `pointer: coarse`، سهم رجوع حسب الاتجاه؛ e2e متصفح حقيقي 17/17؛ `S23a-IMPLEMENTATION-REPORT.md` |
-| **FIX-SIGNAL-KEYS** مفاتيح تسمية إشارات الظهور | 🟡 PR مفتوح | — | — | يعالج جزء App Builder من UX-I18N-DOT (INVALID_KEY) |
-| S03 … S25 (عدا S21a)، AF01–AF03 | ⏳ لم تبدأ | — | — | انظر الخارطة؛ بعضها يتطلب اعتماد AD المرتبط |
+| **FIX-SIGNAL-KEYS** مفاتيح تسمية إشارات الظهور | ✅ مدموجة | #1833 | `72ff4056fa05356199d9049b9d10d74d124d17d7` | يعالج جزء App Builder من UX-I18N-DOT |
+| **S03a** فتح عقدة المشكلة + شارات الشجرة/الأقسام | ✅ مدموجة | #1834 | `2ff9786cb9d91db9006579a04ee4637ef74cf08b` | `S03a-IMPLEMENTATION-REPORT.md`؛ Codex: ملاحظة وصول أُصلحت |
+| S03 (المتبقي: مفتاح `optional` + تقرير الإسقاط — AD-02)، S04–S20، S21b/c، S22، S24، S25، AF01–AF03 | ⏳ لم تبدأ / محجوبة بـAD | — | — | انظر الخارطة؛ بعضها يتطلب اعتماد AD المرتبط |
 
 ## 3) الفجوات المتأثرة حتى الآن
 | الفجوة | الحالة |
@@ -63,7 +64,7 @@
 4. ~~openapi drift~~: أُصلح في #1820.
 
 ## 5) Handoff — الاستئناف
-- الفرع الحالي للعمل: `feat/app-builder-s23a-responsive-layouts`. بيئة e2e المتصفح: `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/opt/pw-browsers/chromium-1243/chrome-linux64/chrome npx playwright test e2e/app-builder-easy-mode.spec.ts --project=desktop` (الخادم مُعترَض، `APP_BUILDER_SHOTS=<dir>` للقطات).
+- لا فرع عمل مفتوح؛ كل شرائح Horizon المتاحة دُمجت. **الخطوة التالية بانتظار قرارات `OWNER-DECISION-PACK.md`** (ابدأ بـAD-05 + AD-03 + AD-02). بيئة e2e المتصفح: `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/opt/pw-browsers/chromium-1243/chrome-linux64/chrome npx playwright test e2e/app-builder-easy-mode.spec.ts --project=desktop` (الخادم مُعترَض، `APP_BUILDER_SHOTS=<dir>` للقطات).
 - المتبقي من S21 (الوضع السهل V2): S21b (الصفحات/الهوية/الجهاز واللغة)، S21c (تخطيط الجوال: أوراق سفلية)، تحرير بالضغط على المعاينة مع شريط عائم؛ **الإخفاء/اسم القسم/Preset** مرهونة بـAD-05 (غير معتمد) وتُعرض معطّلة بسببها.
 - بيئة الاختبار المحلية: `pg_ctlcluster 16 main start`؛ مزامنة الملفات المتغيّرة إلى `/home/user/nibras-app` بسكربت المزامنة في الـscratchpad.
 
