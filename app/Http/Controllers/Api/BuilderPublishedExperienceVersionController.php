@@ -6,6 +6,7 @@ use App\Http\Requests\StoreBuilderPublishedExperienceVersionRequest;
 use App\Http\Resources\BuilderPublishedExperienceVersionResource;
 use App\Models\BuilderApp;
 use App\Services\AppBuilder\BuilderPublishedExperienceVersionService;
+use App\Services\AppBuilder\CompatibilityReport;
 use App\Services\AppBuilder\DraftChangedSinceReviewException;
 use App\Services\AppBuilder\SchemaContractViolationException;
 use Illuminate\Http\JsonResponse;
@@ -18,7 +19,10 @@ use Illuminate\Http\JsonResponse;
  */
 class BuilderPublishedExperienceVersionController extends ApiController
 {
-    public function __construct(private readonly BuilderPublishedExperienceVersionService $service) {}
+    public function __construct(
+        private readonly BuilderPublishedExperienceVersionService $service,
+        private readonly CompatibilityReport $compatibility,
+    ) {}
 
     public function index(string $appId): JsonResponse
     {
@@ -54,7 +58,11 @@ class BuilderPublishedExperienceVersionController extends ApiController
             ], 409);
         }
 
-        return response()->json(['data' => new BuilderPublishedExperienceVersionResource($version)], 201);
+        // S03b: ما سيُحذف من النسخة المنشورة على كل جيل Runtime معلَنٌ لا صامت (استشاري؛ يطابق ما رآه المحرّر في validate).
+        return response()->json([
+            'data' => new BuilderPublishedExperienceVersionResource($version),
+            'compat' => $this->compatibility->forSchema((array) $version->schema),
+        ], 201);
     }
 
     public function show(string $appId, string $version): JsonResponse
@@ -79,7 +87,12 @@ class BuilderPublishedExperienceVersionController extends ApiController
             return $this->contractViolationResponse($e);
         }
 
-        return response()->json(['data' => ['valid' => true]]);
+        $draft = $app->draft()->first();
+
+        return response()->json([
+            'data' => ['valid' => true],
+            'compat' => $draft === null ? null : $this->compatibility->forSchema($draft->publishableSchema()),
+        ]);
     }
 
     /** AD-12 (S02): 422 بجسم منظَّم قابل للإصلاح — المخالفات الحاجبة بمعرّفات الصفحة/العقدة. */

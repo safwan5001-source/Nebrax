@@ -7,6 +7,7 @@ use App\Http\Resources\BuilderDraftExperienceResource;
 use App\Models\BuilderApp;
 use App\Services\AppBuilder\AppSchemaContractChecker;
 use App\Services\AppBuilder\BuilderDraftExperienceService;
+use App\Services\AppBuilder\CompatibilityReport;
 use App\Services\AppBuilder\DraftRevisionConflictException;
 use Illuminate\Http\JsonResponse;
 
@@ -16,6 +17,7 @@ class BuilderDraftExperienceController extends ApiController
     public function __construct(
         private readonly BuilderDraftExperienceService $service,
         private readonly AppSchemaContractChecker $contractChecker,
+        private readonly CompatibilityReport $compatibility,
     ) {}
 
     public function show(string $appId): JsonResponse
@@ -26,6 +28,7 @@ class BuilderDraftExperienceController extends ApiController
         return response()->json([
             'data' => new BuilderDraftExperienceResource($draft),
             'issues' => $this->issuesOf($draft->publishableSchema()),
+            'compat' => $this->compatibility->forSchema($draft->publishableSchema()),
         ]);
     }
 
@@ -70,6 +73,7 @@ class BuilderDraftExperienceController extends ApiController
         return response()->json([
             'data' => new BuilderDraftExperienceResource($updated),
             'issues' => $this->issuesOf($updated->publishableSchema()),
+            'compat' => $this->compatibility->forSchema($updated->publishableSchema()),
         ]);
     }
 

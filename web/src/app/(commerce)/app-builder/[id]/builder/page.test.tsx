@@ -134,6 +134,20 @@ const { api, currentUser, translate } = vi.hoisted(() => {
     'easy.sectionsTitle': 'Page sections',
     'easy.sectionsCount': '{count} sections',
     'easy.deleted': 'Deleted {name}',
+    'compat.summaryDrops': '{count} optional dropped on older versions',
+    'compat.summaryIncompatible': 'Some versions cannot show this',
+    'compat.show': 'Compat details',
+    'compat.hide': 'Hide compat',
+    'compat.generation': 'App version {runtime}',
+    'compat.incompatible': 'Cannot show this experience.',
+    'compat.nothingDropped': 'Shows everything.',
+    'compat.dropped': 'Dropped: {type} {id}',
+    'compat.open': 'Open dropped',
+    'compat.fullFrom': 'Full from {runtime}',
+    'compat.noFullRuntime': 'No version shows everything yet',
+    'optionalTitle': 'Optional when published',
+    'optionalOn': 'Dropped instead of failing if unsupported.',
+    'optionalOff': 'Required: blocks publishing if unsupported.',
     'easy.undo': 'Undo delete',
     'easy.emptyPage': 'This page is empty.',
     'easy.moveUp': 'Move section up',
@@ -2507,6 +2521,97 @@ describe('AppBuilderWorkspacePage — Easy Mode V2 shell (S21a)', () => {
       for (const b of sections().getAllByRole('button', { name })) expect((b as HTMLButtonElement).disabled).toBe(true);
     }
     expect((sections().getByRole('button', { name: 'Page title' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  // ── S03b: تقرير التوافق الاستشاري + مفتاح «اختياري عند النشر» ──
+  const compatDrops = {
+    generations: [{ runtime: '1.0.0', compatible: true, reason: null, dropped: [{ component_id: 'txt-1', component_type: 'Text' }] }, { runtime: '1.1.0', compatible: true, reason: null, dropped: [] }],
+    min_runtime: '1.0.0', full_runtime: '1.1.0', has_drops: true,
+  };
+  function openWithCompat(compat: unknown, validateCompat?: unknown) {
+    mockApi();
+    const base = api.getMockImplementation()!;
+    api.mockImplementation((path?: string, init?: { method?: string; body?: unknown }) => {
+      if (path === DRAFT_PATH && !init?.method) return Promise.resolve({ data: draftData, issues: [], compat });
+      if (path && path.endsWith('/validate')) return Promise.resolve({ data: { valid: true }, compat: validateCompat ?? compat });
+      return base(path, init);
+    });
+    render(<AppBuilderWorkspacePage />);
+  }
+
+  it('shows the compatibility notice only when something would be dropped, discloses each dropped component per generation and opens it', async () => {
+    openWithCompat(compatDrops);
+    await screen.findAllByText('Featured');
+    const user = userEvent.setup();
+    const notice = within(screen.getByTestId('compat-notice'));
+    expect(notice.getByText('1 optional dropped on older versions')).toBeTruthy();
+
+    await user.click(notice.getByRole('button', { name: 'Compat details' }));
+    const detail = within(screen.getByTestId('compat-disclosure'));
+    expect(detail.getByText('App version 1.0.0')).toBeTruthy();
+    expect(detail.getByText('Dropped: Text txt-1')).toBeTruthy(); // لا حذف صامت: معرّف ونوع
+    expect(detail.getByText('Shows everything.')).toBeTruthy(); // الجيل الأحدث
+    expect(detail.getByText('Full from 1.1.0')).toBeTruthy();
+
+    // «فتح» يحدّد المكوّن (يظهر مفتشه).
+    await user.click(detail.getByRole('button', { name: 'Open dropped' }));
+    await waitFor(() => expect(screen.getAllByDisplayValue('Welcome').length).toBeGreaterThan(0));
+  });
+
+  it('shows no compatibility notice for a clean or absent report', async () => {
+    openWithCompat({ generations: [{ runtime: '1.0.0', compatible: true, reason: null, dropped: [] }], min_runtime: '1.0.0', full_runtime: '1.0.0', has_drops: false });
+    await screen.findAllByText('Featured');
+    expect(screen.queryByTestId('compat-notice')).toBeNull();
+    cleanup();
+    openWithCompat(null);
+    await screen.findAllByText('Featured');
+    expect(screen.queryByTestId('compat-notice')).toBeNull();
+  });
+
+  it('flags a generation that cannot show the experience at all', async () => {
+    openWithCompat({ generations: [{ runtime: '1.0.0', compatible: false, reason: 'missingRequiredCapability', dropped: [] }], min_runtime: null, full_runtime: null, has_drops: false });
+    await screen.findAllByText('Featured');
+    expect(within(screen.getByTestId('compat-notice')).getByText('Some versions cannot show this')).toBeTruthy();
+  });
+
+  it('the publish dialog discloses what will be dropped before the merchant confirms (never silent)', async () => {
+    openWithCompat(null, compatDrops);
+    await screen.findAllByText('Featured');
+    const user = userEvent.setup();
+    await user.click(screen.getAllByRole('button', { name: 'Publish' })[0]);
+    const dialog = within(await screen.findByRole('dialog', { name: 'Publish a new version' }));
+    expect(await dialog.findByText('Dropped: Text txt-1')).toBeTruthy();
+  });
+
+  it('the Optional toggle writes optional:true, removes the key (not false) when turned off, and explains the effect', async () => {
+    await open();
+    const user = userEvent.setup();
+    await user.click(within(sections().getAllByRole('listitem')[0]).getAllByRole('button')[0]);
+
+    const toggle = (await screen.findAllByRole('checkbox', { name: 'Optional when published' }))[0] as HTMLInputElement;
+    expect(toggle.checked).toBe(false);
+    expect(screen.getAllByText('Required: blocks publishing if unsupported.').length).toBeGreaterThan(0);
+
+    await user.click(toggle);
+    await waitFor(() => expect((screen.getAllByRole('checkbox', { name: 'Optional when published' })[0] as HTMLInputElement).checked).toBe(true));
+    expect(screen.getAllByText('Dropped instead of failing if unsupported.').length).toBeGreaterThan(0);
+    await user.click(screen.getAllByText('Save')[0]);
+    await waitFor(() => expect(putBodies().length).toBe(1));
+    const saved = putBodies()[0].schema.pages.home.children[0] as { id: string; optional?: boolean };
+    expect(saved.optional).toBe(true);
+
+    await user.click(screen.getAllByRole('checkbox', { name: 'Optional when published' })[0]);
+    await user.click(screen.getAllByText('Save')[0]);
+    await waitFor(() => expect(putBodies().length).toBe(2));
+    expect('optional' in (putBodies()[1].schema.pages.home.children[0] as object)).toBe(false);
+  });
+
+  it('a user without manage permission cannot toggle Optional', async () => {
+    currentUser.mockReturnValue({ id: 'u3', role: 'staff', permissions: ['apps_builder.view'] });
+    await open();
+    await userEvent.setup().click(within(sections().getAllByRole('listitem')[0]).getAllByRole('button')[0]);
+    const toggle = (await screen.findAllByRole('checkbox', { name: 'Optional when published' }))[0] as HTMLInputElement;
+    expect(toggle.matches(':disabled')).toBe(true);
   });
 
   it('the Identity tab renames the app through the app endpoint (not the schema draft) and lists the proposed items as unavailable', async () => {
