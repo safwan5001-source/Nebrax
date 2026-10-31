@@ -280,6 +280,25 @@ class WholesaleQuickOrderTest extends TestCase
     }
 
     #[Test]
+    public function an_exact_variant_sku_survives_the_per_product_variant_cap(): void
+    {
+        $token = $this->buyer('cap@qo.test');
+        app(TenantContext::class)->set($this->tenant->id);
+        $pants = Product::create(['name' => 'Pants', 'sku' => 'PANTS', 'unit' => 'piece', 'sale_price' => 100, 'is_active' => true]);
+        DB::table('products')->where('id', $pants->id)->update(['variant_state' => 'variant_managed']);
+        CommerceListing::create(['product_id' => $pants->id, 'sales_channel_id' => $this->ws->id, 'is_published' => true]);
+        foreach (range('A', 'N') as $i => $suffix) {
+            ProductVariant::create(['product_id' => $pants->id, 'sku' => 'PNT-1'.$suffix, 'combination_key' => 'k-'.$i, 'is_active' => true]);
+        }
+        $exact = ProductVariant::create(['product_id' => $pants->id, 'sku' => 'PNT-1', 'combination_key' => 'k-exact', 'is_active' => true]);
+
+        $lines = $this->lookup('PNT-1', $token)->assertOk()->json('data');
+
+        $this->assertContains($exact->id, array_column($lines, 'product_variant_id'), 'the exact variant must not be cut off by the 12-variant cap');
+        $this->assertSame('PNT-1', $lines[0]['sku'], 'and it is listed first');
+    }
+
+    #[Test]
     public function an_unpriced_product_is_unavailable_with_no_price_and_the_sale_price_is_never_exposed(): void
     {
         $token = $this->buyer('u@qo.test');

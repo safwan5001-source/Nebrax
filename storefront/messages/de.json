@@ -1271,7 +1271,8 @@
         "truncated": "Es wurden nur die ersten {max} Zeilen verwendet.",
         "issue": {
           "not_found": "nicht im Katalog dieses Shops gefunden",
-          "ambiguous": "passt zu mehreren Varianten – wählen Sie oben in den Suchergebnissen eine aus"
+          "ambiguous": "passt zu mehreren Varianten – wählen Sie oben in den Suchergebnissen eine aus",
+          "list_full": "nicht hinzugefügt — die Liste enthält bereits die maximalen {max} Positionen"
         }
       },
       "list": {

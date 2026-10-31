@@ -44,7 +44,10 @@ type Notice =
   | { kind: "added"; count: number }
   | { kind: "rejected" };
 
-type PasteIssue = { sku: string; kind: "not_found" | "ambiguous" };
+type PasteIssue = {
+  sku: string;
+  kind: "not_found" | "ambiguous" | "list_full";
+};
 
 const SEARCH_DELAY_MS = 300;
 
@@ -155,15 +158,42 @@ export function QuickOrder({ basePath }: { basePath: string }) {
             });
           }
         });
-        setEntries((prev) =>
-          additions
-            .reduce<QuickOrderEntry[]>(mergeEntry, prev)
-            .slice(0, QUICK_ORDER_MAX_LINES),
-        );
+        // Capacity is checked against the MERGED list (existing + pasted), not the pasted batch alone: whatever does not
+        // fit is reported per SKU and stays in the paste box instead of being dropped silently.
+        const merged = additions.reduce<QuickOrderEntry[]>(mergeEntry, entries);
+        const dropped = merged.slice(QUICK_ORDER_MAX_LINES);
+        const kept = merged.slice(0, QUICK_ORDER_MAX_LINES);
+        const droppedIds = new Set(dropped.map((e) => e.id));
+        setEntries(kept);
+        const resolved = new Set<number>();
+        rows.forEach((row, i) => {
+          const lines = outcome.rows[i]?.lines ?? [];
+          if (lines.length !== 1) return;
+          const wasDropped = additions.some(
+            (a) =>
+              droppedIds.has(a.id) &&
+              a.line.productId === lines[0].productId &&
+              a.line.variantId === lines[0].variantId &&
+              a.line.unitKey === lines[0].unitKey,
+          );
+          if (wasDropped) {
+            issues.push({ sku: row.sku, kind: "list_full" });
+          } else {
+            resolved.add(i);
+          }
+        });
         setPasteIssues(issues);
         setRejected({});
         setNotice({ kind: "none" });
-        if (issues.length === 0) setPasted("");
+        // keep only the rows that still need the buyer's attention, so a retry never re-applies the ones that worked
+        setPasted(
+          issues.length === 0
+            ? ""
+            : rows
+                .filter((_, i) => !resolved.has(i))
+                .map((r) => `${r.sku} ${r.quantity}`)
+                .join("\n"),
+        );
       } finally {
         setPending(false);
       }
@@ -392,7 +422,10 @@ export function QuickOrder({ basePath }: { basePath: string }) {
                     className="mt-0.5 size-4 shrink-0"
                   />
                   <span>
-                    <bdi>{issue.sku}</bdi> — {t(`paste.issue.${issue.kind}`)}
+                    <bdi>{issue.sku}</bdi> —{" "}
+                    {t(`paste.issue.${issue.kind}`, {
+                      max: QUICK_ORDER_MAX_LINES,
+                    })}
                   </span>
                 </li>
               ))}

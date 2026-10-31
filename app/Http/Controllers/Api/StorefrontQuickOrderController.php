@@ -255,6 +255,9 @@ final class StorefrontQuickOrderController extends PublicApiController
         $needle = mb_strtolower($term);
         $matching = $product->variants->filter(fn (ProductVariant $v): bool => $v->sku !== null && str_contains(mb_strtolower($v->sku), $needle));
 
+        // an exact variant SKU must survive the per-product cap even when more than the cap merely contain the term
+        $matching = $matching->sortBy(fn (ProductVariant $v): int => mb_strtolower((string) $v->sku) === $needle ? 0 : 1);
+
         return ($matching->isNotEmpty() ? $matching : $product->variants)
             ->take(self::MAX_VARIANTS_PER_PRODUCT)
             ->values()

@@ -1271,7 +1271,8 @@
         "truncated": "Użyto tylko pierwszych {max} wierszy.",
         "issue": {
           "not_found": "nie znaleziono w katalogu tego sklepu",
-          "ambiguous": "pasuje do kilku wariantów – wybierz jeden w wynikach wyszukiwania powyżej"
+          "ambiguous": "pasuje do kilku wariantów – wybierz jeden w wynikach wyszukiwania powyżej",
+          "list_full": "nie dodano — lista ma już maksymalnie {max} pozycji"
         }
       },
       "list": {

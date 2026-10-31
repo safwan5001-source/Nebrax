@@ -1271,7 +1271,8 @@
         "truncated": "Only the first {max} lines were used.",
         "issue": {
           "not_found": "not found in this store's catalogue",
-          "ambiguous": "matches several variants — choose one in the search results above"
+          "ambiguous": "matches several variants — choose one in the search results above",
+          "list_full": "not added — the list already holds the maximum of {max} lines"
         }
       },
       "list": {

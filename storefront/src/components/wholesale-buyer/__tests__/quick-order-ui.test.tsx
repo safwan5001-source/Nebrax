@@ -226,6 +226,77 @@ describe("quick order UI", () => {
     expect(await screen.findByTestId("qo-results")).toBeTruthy();
   });
 
+  it("a partial import keeps only the unresolved rows in the paste box, so a retry cannot apply the good ones twice", async () => {
+    actions.resolveQuickOrderSkus.mockResolvedValue({
+      kind: "ok",
+      rows: [
+        { sku: "COF-100", lines: [line()] },
+        { sku: "TYPO", lines: [] },
+      ],
+    });
+    render(wrap());
+    fireEvent.change(screen.getByTestId("qo-paste"), {
+      target: { value: "COF-100 2\nTYPO 1" },
+    });
+    fireEvent.click(screen.getByTestId("qo-import"));
+    await waitFor(() =>
+      expect(screen.getByTestId("qo-paste-issues")).toBeTruthy(),
+    );
+    expect((screen.getByTestId("qo-paste") as HTMLTextAreaElement).value).toBe(
+      "TYPO 1",
+    );
+    expect((screen.getByTestId("qo-qty") as HTMLInputElement).value).toBe("2");
+  });
+
+  it("rows that do not fit the 50-line list are reported and kept in the paste box, never dropped silently", async () => {
+    const mk = (i: number) =>
+      line({
+        productId: `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`,
+        sku: `S-${i}`,
+      });
+    const first = Array.from({ length: 49 }, (_, i) => mk(i + 1));
+    actions.resolveQuickOrderSkus.mockResolvedValueOnce({
+      kind: "ok",
+      rows: first.map((l) => ({ sku: l.sku, lines: [l] })),
+    });
+    render(wrap());
+    fireEvent.change(screen.getByTestId("qo-paste"), {
+      target: { value: first.map((l) => `${l.sku} 1`).join("\n") },
+    });
+    fireEvent.click(screen.getByTestId("qo-import"));
+    await waitFor(() =>
+      expect(screen.getAllByTestId("qo-line")).toHaveLength(49),
+    );
+
+    const a = mk(100);
+    const b = mk(101);
+    actions.resolveQuickOrderSkus.mockResolvedValueOnce({
+      kind: "ok",
+      rows: [
+        { sku: a.sku, lines: [a] },
+        { sku: b.sku, lines: [b] },
+      ],
+    });
+    fireEvent.change(screen.getByTestId("qo-paste"), {
+      target: { value: `${a.sku} 1\n${b.sku} 1` },
+    });
+    fireEvent.click(screen.getByTestId("qo-import"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("qo-paste-issues")).toBeTruthy(),
+    );
+    expect(screen.getAllByTestId("qo-line")).toHaveLength(50);
+    expect(screen.getByTestId("qo-paste-issues").textContent).toContain(
+      "S-101",
+    );
+    expect(screen.getByTestId("qo-paste-issues").textContent).toContain(
+      "maximum of 50",
+    );
+    expect((screen.getByTestId("qo-paste") as HTMLTextAreaElement).value).toBe(
+      "S-101 1",
+    );
+  });
+
   it("submits only eligible ids, units and quantities — no price — then clears them and offers cart and checkout", async () => {
     actions.searchQuickOrder.mockResolvedValue({
       kind: "ok",

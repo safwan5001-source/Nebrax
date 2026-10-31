@@ -1271,7 +1271,8 @@
         "truncated": "Solo se usaron las primeras {max} líneas.",
         "issue": {
           "not_found": "no se encuentra en el catálogo de esta tienda",
-          "ambiguous": "coincide con varias variantes: elija una en los resultados de búsqueda de arriba"
+          "ambiguous": "coincide con varias variantes: elija una en los resultados de búsqueda de arriba",
+          "list_full": "no añadido: la lista ya tiene el máximo de {max} líneas"
         }
       },
       "list": {
