@@ -4,9 +4,9 @@
 |---|---|
 | Branch | `claude/commerce-h6-batch-l` |
 | Base (origin/main, #1828 merge) | `84e17e52ebd25b5ae2c505301a9655df2c8c0f4b` |
-| PR | __PR__ |
-| Head SHA | __HEAD__ |
-| CI | __CI__ |
+| PR | #1829 |
+| Tested head (tooling + report content) | `955d0efa25ebcc8cc94242a5353bbf65b5ea54f1` (the PR head moves by this docs-only update) |
+| CI | pending at time of writing — see the PR checks |
 
 **Status.** Nothing was merged, deployed, activated globally or removed. Wholesale stays off by default (`COMMERCE_WHOLESALE_BUYER_ENABLED=false`); the only place it was switched on is a throwaway local process. No production or Beta system was written to. **Spree is still not removable** (verdict in §8). This batch adds test tooling only; **no production code changed** (§10).
 
