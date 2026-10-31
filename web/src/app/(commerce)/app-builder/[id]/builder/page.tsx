@@ -775,6 +775,28 @@ export default function AppBuilderWorkspacePage() {
       </div>
       {structureMode === 'pages' ? (
         <>
+          {editorMode === 'easy' ? (
+            // الوضع السهل: الصفحات شرائح مدمجة (اختيار + إضافة) لتبقى المساحة لقائمة الأقسام، خصوصاً على الجوال. تعيين الرئيسية وحذف الصفحة في الوضع المتقدم.
+            <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-border p-2" role="group" aria-label={t('pagesTitle')}>
+              {pageIds.map((pageId) => (
+                <button
+                  key={pageId}
+                  type="button"
+                  onClick={() => selectPage(pageId)}
+                  aria-current={pageId === selectedPageId ? 'page' : undefined}
+                  className={cn(
+                    'h-8 max-w-[9rem] truncate rounded-full border px-3 text-xs font-medium',
+                    pageId === selectedPageId ? 'border-primary bg-primary-soft text-primary' : 'border-border text-text hover:bg-background'
+                  )}
+                >
+                  {pageId}{pageId === schema.navigation?.initialPageId ? ' ★' : ''}
+                </button>
+              ))}
+              <Button type="button" variant="outline" size="icon" className="h-8 w-8 rounded-full" aria-label={t('pages.addAction')} title={t('pages.addAction')} disabled={!canManage} onClick={addNewPage}>
+                <Plus className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
+              </Button>
+            </div>
+          ) : (
           <div className="shrink-0 space-y-0.5 border-b border-border p-2">
             {pageIds.map((pageId) => {
               const isInitial = pageId === schema.navigation?.initialPageId;
@@ -826,6 +848,7 @@ export default function AppBuilderWorkspacePage() {
               {t('pages.addAction')}
             </Button>
           </div>
+          )}
           {editorMode === 'easy' ? (
             <div className="min-h-0 flex-1">
               <EasySectionsPanel

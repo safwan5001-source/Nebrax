@@ -82,23 +82,23 @@ export function EasySectionsPanel({
                       className="flex min-h-11 min-w-0 flex-1 flex-col items-start justify-center rounded px-2 text-start"
                     >
                       <span className="flex w-full items-center gap-1.5">
-                        <span className="truncate text-sm font-medium text-text">{typeName}</span>
+                        <span className="truncate text-sm font-medium text-text" title={typeName}>{typeName}</span>
                         {total > 1 ? <span className="shrink-0 text-[11px] text-muted" dir="ltr">{seen}/{total}</span> : null}
                       </span>
                       {summary.title ? <span className="w-full truncate text-xs text-muted">{summary.title}</span> : null}
                     </button>
                     <div className="flex shrink-0 items-center">
-                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label={t('easy.moveUp')} disabled={!canManage || index === 0} onClick={() => onMove(section.id, 'up')}>
+                      <Button type="button" variant="ghost" size="icon" className="h-9 w-7" aria-label={t('easy.moveUp')} disabled={!canManage || index === 0} onClick={() => onMove(section.id, 'up')}>
                         <ArrowUp className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
                       </Button>
-                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label={t('easy.moveDown')} disabled={!canManage || index === sections.length - 1} onClick={() => onMove(section.id, 'down')}>
+                      <Button type="button" variant="ghost" size="icon" className="h-9 w-7" aria-label={t('easy.moveDown')} disabled={!canManage || index === sections.length - 1} onClick={() => onMove(section.id, 'down')}>
                         <ArrowDown className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
                       </Button>
-                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label={t('easy.duplicate')} disabled={!canManage} onClick={() => onDuplicate(section.id)}>
+                      <Button type="button" variant="ghost" size="icon" className="h-9 w-7" aria-label={t('easy.duplicate')} disabled={!canManage} onClick={() => onDuplicate(section.id)}>
                         <Copy className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
                       </Button>
                       <Button
-                        type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label={t('easy.delete')} disabled={!canManage}
+                        type="button" variant="ghost" size="icon" className="h-9 w-7" aria-label={t('easy.delete')} disabled={!canManage}
                         onClick={() => onDelete(section.id, summary.title ?? typeName)}
                       >
                         <Trash2 className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
