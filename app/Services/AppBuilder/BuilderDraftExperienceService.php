@@ -16,11 +16,15 @@ use Illuminate\Support\Facades\DB;
  * (409) بلا أي كتابة. غيابه يُرفض قبل الوصول إلى هنا بـ428 في المتحكّم
  * (`base_revision_required`) — لا مسار «آخر كتابة تفوز» بعد S01c. الزيادة تُحسب من
  * الصفّ المقفول لا من نموذج قديم في الذاكرة.
+ *
+ * **AD-12 (S02):** بعد التحقق البنيوي تُطبَّق الحدود الصارمة (`AppSchemaContractChecker::assertHardLimits`) ثم يُحفظ؛
+ * مخالفات العقد الأخرى تُحسب للعرض فقط (`issues[]` في المتحكّم) ولا تمنع الحفظ.
  */
 final class BuilderDraftExperienceService
 {
     public function __construct(
         private readonly AppSchemaParser $parser,
+        private readonly AppSchemaContractChecker $contractChecker,
     ) {}
 
     /**
@@ -32,6 +36,9 @@ final class BuilderDraftExperienceService
     public function save(BuilderDraftExperience $draft, array $schema, ?string $userId, int $baseRevision): BuilderDraftExperience
     {
         $this->parser->validate($schema);
+        // AD-12 (S02): حدود صارمة آمنة عند الحفظ — فرادة المعرّف داخل الصفحة وسقف البايتات. بقية مخالفات العقد
+        // تحذيرات تُعاد في `issues[]` ولا تمنع الحفظ (فرض مرحلي لحماية المسودات القائمة).
+        $this->contractChecker->assertHardLimits($schema);
 
         return DB::transaction(function () use ($draft, $schema, $userId, $baseRevision): BuilderDraftExperience {
             // إعادة قراءة الصفّ داخل القفل (يطبّق نطاق المستأجر نفسه): `$draft` قد يكون قديماً.
