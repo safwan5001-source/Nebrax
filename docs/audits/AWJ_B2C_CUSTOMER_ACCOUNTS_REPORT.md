@@ -5,9 +5,9 @@
 | **Task** | Replace the storefront "Customer accounts are currently unavailable" screen with working AWJ-native retail customer accounts |
 | **Repository** | `safwan5001-source/Nebrax` |
 | **Branch** | `feat/b2c-customer-accounts` |
-| **PR** | __PR_URL__ |
+| **PR** | https://github.com/safwan5001-source/Nebrax/pull/1860 |
 | **Base** | `origin/main` @ `ddd5e76f2b385f908667e3c94d4482bbfabc8d7c` |
-| **Head SHA (code)** | __HEAD_CODE__ |
+| **Head SHA (code)** | `d143fe2d3565455598d257540a30f53649a650d0` |
 | **PR head** | the tip of the branch (this metadata commit sits on top of the code SHA above) |
 | **Status** | Built and verified locally. **Closed by default** (deployment flag + per-channel flag). Not merged, not deployed, not activated, no remote migrations run. **Stopped for review.** |
 
@@ -103,7 +103,7 @@ No automatic linking exists anywhere. Orders placed while signed in are owned fr
 | `RetailCustomerAccountsTest` (19 tests, 239 assertions — gates, register/verify/login/logout, remember-me TTLs, channel binding, sessions, password change/reset, profile, address IDOR, order IDOR, claim proofs, signed-in checkout ownership, immutability, rate limits, staff switch) | ✅ | ✅ |
 | `RetailOrderClaimPostgresConcurrencyTest` (6 forked processes, 3 identities, one order ⇒ exactly one owner + one audit row) | skipped by design (needs PG) | ✅ |
 | Wholesale regression: `WholesaleBuyerAccountTest`, `WholesaleBuyerFoundationTest`, `BuyerEmailVerificationTest`, `StorefrontWholesaleCapabilityTest`, `WholesalePriceSurfaceBoundaryTest`, `StaffChannelPricingSettingsTest`, `CommerceCustomerAuthApiTest`, `StorefrontGatewayRateLimitTest` | ✅ | ✅ |
-| Full `php artisan test` | __FULL_SQLITE__ | — (CI matrix) |
+| Full `php artisan test` | ✅ 10133 passed / 304 skipped / 26 failed — all 26 are `Fuel*` tests erroring on missing `bcmath` in this sandbox; no failures elsewhere | — (CI matrix) |
 
 Two **existing guard tests were updated, deliberately** (they exist to force a decision on every new surface): `WholesalePriceSurfaceBoundaryTest` (new `account.*` routes classified *reviewed, no channel price*) and `StorefrontWholesaleCapabilityTest` (capabilities payload is now `{wholesale_buyer, customer_accounts}`).
 
@@ -131,7 +131,7 @@ Screenshots: `docs/audits/assets/b2c-accounts/` (`mobile-ar-*`, `desktop-en-*`).
 
 ### 4.4 CI
 
-__CI__
+GitHub Actions for PR #1860 (php sqlite+pgsql, web-ci) start on push; results are tracked on the PR and this report is amended if CI finds anything.
 
 ---
 
