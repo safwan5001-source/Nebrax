@@ -514,14 +514,19 @@ export function generatePageId(): string {
   return `page-${random}`;
 }
 
-/** عدد الإجراءات `navigate` في كل المخطط التي تستهدف صفحة — يُعلَن عند حذفها (تبقى مخالفة حاجبة حتى تُصلَح). */
+/**
+ * عدد إجراءات `navigate` التي تستهدف صفحة **من الصفحات الأخرى** — هي التي تبقى مخالفة حاجبة حتى تُصلَح عند حذفها.
+ * إحالات الصفحة إلى نفسها تُحذف معها فلا تُعدّ (مراجعة Codex).
+ */
 export function countNavigationTo(schema: AppSchema, pageId: string): number {
   let count = 0;
   const walk = (node: AppSchemaComponent) => {
     if (node.action?.type === 'navigate' && node.action.params?.pageId === pageId) count += 1;
     (node.children ?? []).forEach(walk);
   };
-  Object.values(schema.pages).forEach(walk);
+  for (const [id, root] of Object.entries(schema.pages)) {
+    if (id !== pageId) walk(root);
+  }
   return count;
 }
 

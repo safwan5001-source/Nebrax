@@ -339,4 +339,16 @@ describe('countNavigationTo (S21b)', () => {
     expect(countNavigationTo(schema, 'home')).toBe(1);
     expect(countNavigationTo(schema, 'ghost')).toBe(0);
   });
+
+  it('ignores references inside the page itself: they disappear with it and never become dangling (review P2)', () => {
+    const selfRef = {
+      ...schema,
+      pages: {
+        ...schema.pages,
+        cart: { type: 'Page', id: 'c', children: [{ type: 'Button', id: 'self', action: { type: 'navigate', params: { pageId: 'cart' } } }, { type: 'Button', id: 'b4', action: { type: 'navigate', params: { pageId: 'home' } } }] },
+      },
+    } as AppSchema;
+    expect(countNavigationTo(selfRef, 'cart')).toBe(2); // الإحالتان من home فقط، لا الذاتية
+    expect(countNavigationTo(selfRef, 'home')).toBe(1);
+  });
 });
