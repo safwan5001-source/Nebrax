@@ -21,6 +21,7 @@ import {
   countNavigationTo,
   readPrimaryColor,
   type AppSchema,
+  type AppBuilderRegistries,
   type AppSchemaComponent,
   type RegistryComponentDefinition,
 } from './app-builder';
@@ -351,9 +352,27 @@ describe('countNavigationTo (S21b)', () => {
         ] },
       },
     } as AppSchema;
-    const actionable = (type: string) => type === 'Button';
-    expect(countNavigationTo(withText, 'cart', actionable)).toBe(1);
+    const registries = { components: { Page: { actionable: false }, Button: { actionable: true }, Text: { actionable: false } }, actions: { navigate: {} } } as unknown as Pick<AppBuilderRegistries, 'components' | 'actions'>;
+    expect(countNavigationTo(withText, 'cart', registries)).toBe(1);
     expect(countNavigationTo(withText, 'cart')).toBe(2); // بلا سجل: تحفّظ (يُعدّ الكل)
+  });
+
+  it('does not enter subtrees the contract checker skips: an unknown component or unknown action hides its whole subtree (review P2)', () => {
+    const registries = { components: { Page: { actionable: false }, Section: { actionable: false }, Button: { actionable: true } }, actions: { navigate: {} } } as unknown as Pick<AppBuilderRegistries, 'components' | 'actions'>;
+    const nav = { type: 'navigate', params: { pageId: 'cart' } };
+    const tree = {
+      ...schema,
+      pages: {
+        ...schema.pages,
+        home: { type: 'Page', id: 'r', children: [
+          { type: 'FutureWidget', id: 'unknown', optional: true, children: [{ type: 'Button', id: 'inside-unknown', action: nav }] },
+          { type: 'Section', id: 'unknown-action', action: { type: 'futureAction' }, children: [{ type: 'Button', id: 'inside-action', action: nav }] },
+          { type: 'Button', id: 'counted', action: nav },
+        ] },
+      },
+    } as AppSchema;
+    expect(countNavigationTo(tree, 'cart', registries)).toBe(1); // الزر الظاهر وحده
+    expect(countNavigationTo(tree, 'cart')).toBe(3); // بلا سجل: الكل
   });
 
   it('ignores references inside the page itself: they disappear with it and never become dangling (review P2)', () => {
