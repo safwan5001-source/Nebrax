@@ -34,7 +34,7 @@ Open commercial rules (MOQ, B2B tax, terms) are unchanged and are *not* invented
 * **Classification.** Not report drift (the PR touches one markdown file), not a required-check configuration problem (the gate behaved correctly), not a regression from this work. It is an order-dependent flake in an unrelated AI-actions query-count test; the same commit passed SQLite, `main` at `89f4117ca` (identical code) passed both databases, and the pgsql job **passed on one re-run**. No code was changed for it. *Follow-up (not done here):* harden that test (compare against a second warmed measurement, or pin the cache state) so it stops costing a CI cycle.
 * **Report updated** (`ff3ffced`): owner-provided Railway evidence recorded as reported — Storefront **SUCCESS** and Laravel API **SUCCESS** at `89f4117ca`, AWJ Web **FAILED** at `89f4117ca` — with the explicit statement that a successful API deployment does **not** verify the Batch M migrations or the runtime flags; both stay UNKNOWN until the `migrations` table and the non-secret variables are read.
 * **Independent confirmation of the storefront claim.** At 09:44Z the public storefront's i18n catalogue carries the Batch M keys (`forgot`, `orders`, `reset`); at 07:57Z it did not. That fits a build that finished after the first probes.
-* `CI Gate` on #1836 was re-run after the pgsql job went green: __N_GATE__
+* `CI Gate` on #1836 was re-run after the pgsql job went green: **success** — all three checks green on `ff3ffced` (pgsql passed on the re-run, `CI Gate` passed); Codex review: no findings.
 
 ---
 
@@ -55,6 +55,8 @@ Open commercial rules (MOQ, B2B tax, terms) are unchanged and are *not* invented
 | Header/footer "My account / Order history" → Spree `/account` (L2) | On a native wholesale host they point to `/buyer/membership` and `/buyer/orders` (header, footer, mobile menu); retail unchanged | layout + `account-links.ts` |
 
 **CSP — deliberately not set.** A resource-restricting CSP would need an inventory of every script/style/image/connect origin in use (Sentry, payment redirects, R2 media proxy, store customization) and a report-only soak; none of that can be done safely from here, and a wrong CSP breaks checkout. Only `frame-ancestors` is set, because nothing embeds the live storefront (the customizer previews an in-workspace canvas — ARCH-1 — and payment redirects are top-level). Pinned by `next-config-headers.test.ts`, which also asserts no `default-src`/`script-src`/… appears.
+
+**A defect the new headers exposed (fixed).** E2E H05 failed on its first run: with `nosniff` the browser now *refuses* `/_vercel/insights/script.js` and `/_vercel/speed-insights/script.js`. `DocumentShell` loaded Vercel Analytics and Speed Insights unconditionally, but on Railway those URLs fall through to the app and return an HTML 404 — so every page view already made two failing script requests (a syntax error before, an explicit refusal now). They are now rendered only when `VERCEL` is set (`DocumentShell.test.tsx` pins both branches). No analytics behavior changes on Vercel; on Railway two doomed requests per page view disappear.
 
 **Preserved:** locale redirects and cookie values, the account redirect for protected pages, legacy checkout X5b closure, static assets and `/icon`, tenant isolation (the host context is read per Host from the API; nothing is inferred from the URL), DTC pricing/cart/checkout (E2E D01/D02 green).
 
@@ -125,16 +127,16 @@ Only what the buyer journey needs; no financial policy invented; nothing deleted
 |---|---|
 | Storefront `tsc --noEmit` | clean |
 | Storefront lint (`biome lint`) | no errors (6 warnings, 3 infos — pre-existing) |
-| Storefront unit tests (`vitest run`) | __UNIT__ |
+| Storefront unit tests (`vitest run`) | **3,635 passed**, 16 skipped (254 files) |
 | `pnpm check:locales` | in sync |
 | `pnpm check:spree-ratchet` | **at baseline, no growth**: `value_imports=4 · type_imports=4 · client_access=52 · wrapper_imports=69 · env_reads=9` |
-| Storefront production build | __BUILD__ |
+| Storefront production build | passes (`next build` ran inside the E2E stack from the final source; TypeScript clean) |
 | AWJ Web `npm run build` (local, same tree) | exit 0, peak ≈ 2.8 GB |
 | PHP focused, **SQLite** | 303 passed, 26 skipped (2,756 assertions) — wholesale, storefront config/identity/policy, boundary, gateway/IP, buyer account, partner link, precedence, checkout, cart, domain |
 | PHP focused, **PostgreSQL 16** | **333 passed** (3,198 assertions) — same set + `BranchIsolationGuard` |
 | New PHP tests | `StorefrontWholesaleCapabilityTest` (6) |
 | New/extended storefront tests | `middleware.test.ts` (+17 closure cases), `edge-storefront-locale.test.ts` (+7), `storefront.test.ts` (+2), `account-links.test.ts` (2), `next-config-headers.test.ts` (3) |
-| Browser E2E (existing Batch L/M suite, Chromium, loopback throwaway stack) | __E2E__ |
+| Browser E2E (existing Batch L/M suite, Chromium, loopback throwaway stack) | **44 / 44 passed** on the final source (desktop-en 1280×900 + mobile-ar 390×844, Chromium, real Laravel on a throwaway SQLite, production-mode `next start`, `E2E_NO_BUCKET_RESET=1`): the 36-test Batch L/M suite plus **H01–H08** (retail real 404s, unknown host 404, wholesale redirects, native account links, headers, cookies, bare country, mobile/Arabic). Run history, stated plainly: run 1 was 41/44 with **H05 failing for a real reason** (see below); run 2 (after the fix) was 43/44 with one `sign-in did not complete (timeout)` in the price-precedence block that **passed in isolation** (4.0 s) — the known shared login-brake harness sensitivity, not a product failure; run 3, a fresh seed with no code change, was **44/44**. |
 | `CI Gate` / CI on this PR | __CI_RESULT__ |
 
 **Changed existing tests:** none weakened. `middleware.test.ts`, `edge-storefront-locale.test.ts` and `storefront.test.ts` only gained cases; the E2E spec gained H01–H08. Behaviour covered by the old cases (locale fall-through, fail-closed resolver, cookie values, X5b) still passes unmodified.
@@ -143,7 +145,32 @@ Only what the buyer journey needs; no financial policy invented; nothing deleted
 
 ## 8. Files changed
 
-__FILES__
+- `M` CLAUDE.md
+- `M` app/Http/Controllers/Api/StorefrontConfigController.php
+- `M` app/Http/Middleware/EnsureWholesaleBuyerEnabled.php
+- `A` app/Services/Commerce/WholesaleBuyerGate.php
+- `A` docs/audits/AWJ_H6_FINAL_CLOSURE_REPORT.md
+- `M` storefront/e2e/wholesale-buyer-journey.spec.ts
+- `M` storefront/next.config.ts
+- `M` storefront/src/app/[country]/[locale]/(storefront)/layout.tsx
+- `M` storefront/src/components/layout/DocumentShell.test.tsx
+- `M` storefront/src/components/layout/DocumentShell.tsx
+- `M` storefront/src/components/layout/Footer.tsx
+- `M` storefront/src/components/layout/Header.tsx
+- `M` storefront/src/components/layout/MobileMenu.tsx
+- `A` storefront/src/lib/commerce/__tests__/account-links.test.ts
+- `M` storefront/src/lib/commerce/__tests__/edge-storefront-locale.test.ts
+- `A` storefront/src/lib/commerce/__tests__/next-config-headers.test.ts
+- `M` storefront/src/lib/commerce/__tests__/storefront.test.ts
+- `A` storefront/src/lib/commerce/account-links.ts
+- `M` storefront/src/lib/commerce/edge-storefront-locale.ts
+- `M` storefront/src/lib/commerce/storefront.ts
+- `M` storefront/src/lib/spree/middleware.test.ts
+- `M` storefront/src/lib/spree/middleware.ts
+- `M` storefront/src/proxy.ts
+- `A` tests/Feature/StorefrontWholesaleCapabilityTest.php
+
+(plus this report)
 
 ---
 
