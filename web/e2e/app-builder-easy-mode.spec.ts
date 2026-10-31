@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import { auditPage } from './helpers/a11y-audit';
 
 /**
  * AWJ App Builder — الوضع السهل V2 (S21a/S23) في متصفح حقيقي.
@@ -180,5 +181,51 @@ test.describe('App Builder — Easy Mode V2 (real browser)', () => {
     await expect(page.getByRole('tree').first()).toBeVisible();
     await page.getByRole('button', { name: 'Easy' }).click();
     await expect(visibleSections(page)).toBeVisible();
+  });
+
+  for (const viewport of [VIEWPORTS[0], VIEWPORTS[3]]) {
+    test(`a11y/structure audit (named controls, labels, ids, 24px targets) on Easy mode and on Advanced with a node selected — ${viewport.width}px`, async ({ page }) => {
+      await open(page, { locale: 'en', viewport });
+      const easy = await auditPage(page);
+      await visibleSections(page).getByRole('listitem').first().getByRole('button').first().click();
+      const easySelected = await auditPage(page);
+      await page.getByRole('button', { name: 'Advanced' }).click();
+      const advanced = await auditPage(page);
+      if (process.env.APP_BUILDER_AUDIT_DUMP) console.log(JSON.stringify({ viewport: viewport.width, easy, easySelected, advanced }, null, 1));
+      expect({ easy, easySelected, advanced }).toEqual({ easy: [], easySelected: [], advanced: [] });
+    });
+  }
+
+  // UX-09/10 — جوال أفقي وآيباد عمودي: المعاينة والأدوات معاً دون حجب (لقطات + حدود هندسية للمعاينة).
+  for (const viewport of [{ width: 844, height: 390 }, { width: 834, height: 1194 }, { width: 744, height: 1133 }] as const) {
+    test(`preview stays usable next to the tools — ${viewport.width}x${viewport.height}`, async ({ page }) => {
+      await open(page, { locale: 'en', viewport: viewport as unknown as (typeof VIEWPORTS)[number] });
+      await noHorizontalOverflow(page);
+      if (shots) await page.screenshot({ path: `${shots}/easy-en-${viewport.width}x${viewport.height}.png` });
+      const canvasBox = await page.getByText('Draft — being edited, not a live version in the mobile app').first().boundingBox();
+      expect(canvasBox).not.toBeNull();
+      // المعاينة تبدأ فوق الطيّ ويبقى منها جزء ظاهر فعلي
+      expect(canvasBox!.y).toBeLessThan(viewport.height * 0.6);
+    });
+  }
+
+  test.describe('touch (pointer: coarse)', () => {
+    test.use({ hasTouch: true, isMobile: true });
+
+    // UX-04: على اللمس كل عنصر تفاعلي مرئي ≥ 44×44 (الكثافة على المؤشر الدقيق لا تتغير).
+    for (const viewport of [{ width: 390, height: 844 }, { width: 834, height: 1194 }] as const) {
+      test(`interactive controls are at least 44px on touch — ${viewport.width}px`, async ({ page }) => {
+        await open(page, { locale: 'en', viewport: viewport as unknown as (typeof VIEWPORTS)[number] });
+        const small = await page.evaluate(() => {
+          const visible = (el: Element) => { const r = el.getBoundingClientRect(); const st = getComputedStyle(el); return r.width > 0 && r.height > 0 && st.visibility !== 'hidden' && st.display !== 'none' && !el.closest('[aria-hidden="true"],nextjs-portal,[data-preview-surface]'); };
+          return Array.from(document.querySelectorAll('button, [role=button], a[href], input:not([type=hidden]), select, textarea'))
+            .filter(visible)
+            .map((el) => { const r = el.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), label: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 30) }; })
+            .filter((x) => x.w < 44 || x.h < 44);
+        });
+        if (process.env.APP_BUILDER_AUDIT_DUMP) console.log(JSON.stringify(small));
+        expect(small).toEqual([]);
+      });
+    }
   });
 });

@@ -522,7 +522,7 @@ export function AppBuilderCanvas({
   const showSampleDataBanner = React.useMemo(() => (root ? hasAnyBinding(root) : false), [root]);
 
   return (
-    <div className="flex h-full min-h-0 flex-1 justify-center overflow-auto bg-background p-6">
+    <div data-preview-surface className="flex h-full min-h-0 flex-1 justify-center overflow-auto bg-background p-6">
       <div
         dir={locale.toLowerCase().startsWith('ar') ? 'rtl' : 'ltr'}
         style={{ width: PREVIEW_WIDTHS[device], maxWidth: '100%', ...themeCssVars(themeTokens) }}

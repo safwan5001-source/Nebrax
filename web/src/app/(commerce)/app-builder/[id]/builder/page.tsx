@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import {
-  ArrowRight, Eye, EyeOff, Home, LayoutPanelLeft, Maximize2, Minimize2, Plus, Redo2, RefreshCcw, SlidersHorizontal, Trash2,
+  ArrowLeft, ArrowRight, Eye, EyeOff, Home, LayoutPanelLeft, Maximize2, Minimize2, Plus, Redo2, RefreshCcw, SlidersHorizontal, Trash2,
   Undo2, UploadCloud,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -1136,11 +1136,12 @@ export default function AppBuilderWorkspacePage() {
   }
 
   return (
-    <div dir={locale === 'ar' ? 'rtl' : 'ltr'} className="flex h-full min-h-0 flex-col">
-      <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 border-b border-border bg-surface px-3 md:px-4">
+    <div dir={locale === 'ar' ? 'rtl' : 'ltr'} data-touch-targets className="flex h-full min-h-0 flex-col">
+      <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 border-b border-border bg-surface px-3 md:px-4 [@media(max-height:500px)]:min-h-11 [@media(max-height:500px)]:flex-nowrap [@media(max-height:500px)]:overflow-x-auto">
         <Button asChild variant="ghost" size="icon" aria-label={t('back')}>
           <Link href={`/app-builder/${app.id}`}>
-            <ArrowRight className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
+            {/* UX-07: «رجوع» يتجه حسب اتجاه الصفحة (يمين في RTL، يسار في LTR). */}
+            {locale === 'ar' ? <ArrowRight className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" /> : <ArrowLeft className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />}
           </Link>
         </Button>
         <Button asChild variant="ghost" size="sm" className="shrink-0">
@@ -1213,7 +1214,7 @@ export default function AppBuilderWorkspacePage() {
           </>
         ) : null}
 
-        <div className="ms-auto flex flex-wrap items-center gap-2">
+        <div className="ms-auto flex flex-wrap items-center gap-2 [@media(max-height:500px)]:flex-nowrap">
           <div className="hidden items-center gap-1 rounded-md border border-border p-1 sm:flex">
             {(['draft', 'published', 'default'] as const).map((state) => {
               const disabled = state === 'published' && !app.latest_published_version;
@@ -1307,7 +1308,7 @@ export default function AppBuilderWorkspacePage() {
         </div>
       ) : (
       /* Desktop/tablet: three fixed panes. Below `lg`: canvas + a switchable structure/inspector pane, per the responsive admin baseline in APP-BUILDER-5-UX-EVIDENCE-PASS.md. */
-      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+      <div className="flex min-h-0 flex-1 flex-col min-[744px]:flex-row [@media(max-height:500px)]:flex-row">
         <aside className="hidden w-60 shrink-0 overflow-hidden border-e border-border bg-surface lg:block">
           {isDraftView ? structurePanel : readOnlyPagePanel}
         </aside>
@@ -1428,7 +1429,8 @@ export default function AppBuilderWorkspacePage() {
           </aside>
         ) : null}
 
-        <div className="flex min-h-0 shrink-0 flex-col border-t border-border bg-surface lg:hidden" style={{ height: '38vh' }}>
+        {/* UX-09/10: الجوال العمودي = ورقة سفلية 38vh؛ من 744px عرضاً (آيباد عمودي) أو في الجوال الأفقي القصير = عمود جانبي بجوار المعاينة بدل حجبها. */}
+        <div className="flex h-[38vh] min-h-0 shrink-0 flex-col border-t border-border bg-surface lg:hidden min-[744px]:h-auto min-[744px]:w-80 min-[744px]:border-s min-[744px]:border-t-0 [@media(max-height:500px)]:h-auto [@media(max-height:500px)]:w-80 [@media(max-height:500px)]:border-s [@media(max-height:500px)]:border-t-0">
           {isDraftView ? (
             <>
               <div className="flex shrink-0 border-b border-border">

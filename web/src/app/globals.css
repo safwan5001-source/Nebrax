@@ -1712,3 +1712,14 @@ html[data-awj-ui="3"].dark .bg-negative.text-white {
 html[data-awj-ui="3"].dark .hover\:bg-negative.hover\:text-white:hover {
   color: var(--awj-text-inverse);
 }
+
+/*
+ * UX-04 (App Builder): على اللمس فقط (pointer: coarse) كل عنصر تحكم في المحرر ≥ 44×44؛ كثافة المؤشر الدقيق لا تتغير.
+ * أسطح المعاينة (`data-preview-surface`) مستثناة: هي محاكاة للتطبيق لا تحكماً في المحرر.
+ */
+@media (pointer: coarse) {
+  [data-touch-targets] :is(button, [role='button'], a[href], input:not([type='hidden']), select, textarea):not([data-preview-surface] *) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
