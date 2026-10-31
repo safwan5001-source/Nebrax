@@ -233,7 +233,8 @@ final class AppSchemaContractChecker
                 continue;
             }
             $param = $known[$key];
-            if ($value === null && $param->nullable) {
+            // `null` لمعامل اختياري = غائب (Runtime يطبّق الافتراضي، مثل quantity=1) فلا يُحجب نشر مخطط صالح وقت التشغيل.
+            if ($value === null && ($param->nullable || ! $param->required)) {
                 continue;
             }
             if ($this->isBindingRef($value)) {

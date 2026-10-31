@@ -219,6 +219,19 @@ class AppSchemaContractCheckerTest extends TestCase
     }
 
     /** @test */
+    public function an_explicit_null_for_an_optional_param_means_absent_and_keeps_the_runtime_default(): void
+    {
+        $schema = $this->schema([
+            ['type' => 'Button', 'id' => 'a', 'props' => ['label' => 'x'], 'action' => ['type' => 'addToCart', 'params' => ['productId' => 'p1', 'quantity' => null, 'variantId' => null]]],
+            ['type' => 'Button', 'id' => 'b', 'props' => ['label' => 'x'], 'action' => ['type' => 'addToCart', 'params' => ['productId' => null]]],
+        ]);
+
+        $blocking = array_values(array_filter($this->checker->check($schema), fn (ContractIssue $i) => $i->blocksPublish()));
+        $this->assertCount(1, $blocking, 'الاختياري null مقبول؛ productId (مطلوب) null مرفوض');
+        $this->assertSame('b', $blocking[0]->nodeId);
+    }
+
+    /** @test */
     public function an_action_on_a_non_actionable_component_is_a_warning(): void
     {
         $schema = $this->schema([['type' => 'Text', 'id' => 't', 'props' => ['text' => 'x'], 'action' => ['type' => 'refresh', 'params' => []]]]);
