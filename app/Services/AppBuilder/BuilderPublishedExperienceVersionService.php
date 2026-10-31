@@ -109,7 +109,8 @@ final class BuilderPublishedExperienceVersionService
      */
     private function validatedSchemaOf(BuilderDraftExperience $draft): array
     {
-        $schema = $draft->schema;
+        // AD-05: ما يُنشر هو المخطط بلا العقد المخفية (اسم القسم/الإخفاء لا يغادران المسودة).
+        $schema = $draft->publishableSchema();
         $this->parser->validate($schema);
 
         $compatibility = $this->compatibilityResolver->resolve($schema, CapabilityManifest::current());

@@ -25,22 +25,27 @@ final class BuilderDraftExperienceService
     public function __construct(
         private readonly AppSchemaParser $parser,
         private readonly AppSchemaContractChecker $contractChecker,
+        private readonly EditorMeta $editorMeta,
     ) {}
 
     /**
      * @param  array<string, mixed>  $schema
      * @param  int  $baseRevision  `revision` كما قرأه العميل (إلزامي).
+     * @param  bool  $replaceEditorMeta  true = استبدال `editor_meta` كاملاً بـ`$editorMeta` (null يمسح)؛ false = يبقى ما هو (يُنظَّف مقابل المخطط الجديد).
+     * @param  array<string, mixed>|null  $editorMeta
      *
      * @throws DraftRevisionConflictException
      */
-    public function save(BuilderDraftExperience $draft, array $schema, ?string $userId, int $baseRevision): BuilderDraftExperience
+    public function save(BuilderDraftExperience $draft, array $schema, ?string $userId, int $baseRevision, bool $replaceEditorMeta = false, ?array $editorMeta = null): BuilderDraftExperience
     {
         $this->parser->validate($schema);
         // AD-12 (S02): حدود صارمة آمنة عند الحفظ — فرادة المعرّف داخل الصفحة وسقف البايتات. بقية مخالفات العقد
         // تحذيرات تُعاد في `issues[]` ولا تمنع الحفظ (فرض مرحلي لحماية المسودات القائمة).
         $this->contractChecker->assertHardLimits($schema);
+        // AD-05: التحقق من بيانات المحرر المرسَلة قبل القفل (422 بلا كتابة)؛ المخزَّن يُنظَّف داخل القفل مقابل المخطط الجديد.
+        $newMeta = $replaceEditorMeta ? $this->editorMeta->normalize($editorMeta, $schema) : null;
 
-        return DB::transaction(function () use ($draft, $schema, $userId, $baseRevision): BuilderDraftExperience {
+        return DB::transaction(function () use ($draft, $schema, $userId, $baseRevision, $replaceEditorMeta, $newMeta): BuilderDraftExperience {
             // إعادة قراءة الصفّ داخل القفل (يطبّق نطاق المستأجر نفسه): `$draft` قد يكون قديماً.
             $locked = BuilderDraftExperience::query()
                 ->whereKey($draft->getKey())
@@ -58,6 +63,7 @@ final class BuilderDraftExperienceService
 
             $locked->update([
                 'schema' => $schema,
+                'editor_meta' => $replaceEditorMeta ? $newMeta : $this->editorMeta->normalize($locked->editor_meta, $schema),
                 'revision' => $locked->revision + 1,
                 'updated_by' => $userId,
             ]);

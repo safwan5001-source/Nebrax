@@ -36,13 +36,25 @@ class BuilderDraftExperience extends BaseModel implements CompanyWide
     public const CURRENT_SCHEMA_VERSION = '1.0.0';
 
     protected $fillable = [
-        'tenant_id', 'builder_app_id', 'schema', 'revision', 'updated_by',
+        'tenant_id', 'builder_app_id', 'schema', 'editor_meta', 'revision', 'updated_by',
     ];
 
     protected $casts = [
         'schema' => 'array',
+        'editor_meta' => 'array',
         'revision' => 'integer',
     ];
+
+    /**
+     * المخطط كما يُنشر/يُعاين: بلا العقد المخفية في `editor_meta` (AD-05). كل مسار يقرأ المسودة للنشر أو المعاينة أو الفحص
+     * يجب أن يمرّ من هنا لا من `$schema` الخام.
+     *
+     * @return array<string, mixed>
+     */
+    public function publishableSchema(): array
+    {
+        return app(\App\Services\AppBuilder\EditorMeta::class)->project($this->schema, $this->editor_meta);
+    }
 
     public function app(): BelongsTo
     {

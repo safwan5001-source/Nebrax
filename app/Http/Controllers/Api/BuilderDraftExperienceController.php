@@ -25,7 +25,7 @@ class BuilderDraftExperienceController extends ApiController
 
         return response()->json([
             'data' => new BuilderDraftExperienceResource($draft),
-            'issues' => $this->issuesOf($draft->schema),
+            'issues' => $this->issuesOf($draft->publishableSchema()),
         ]);
     }
 
@@ -51,6 +51,8 @@ class BuilderDraftExperienceController extends ApiController
                 $request->validated('schema'),
                 $request->user()?->id,
                 (int) $baseRevision,
+                $request->has('editor_meta'),
+                $request->validated('editor_meta'),
             ));
         } catch (DraftRevisionConflictException $e) {
             // AD-01: تعارض حفظ — 409 بجسم منظَّم يكفي العميل لعرض حوار الحل وإعادة الأساس.
@@ -67,7 +69,7 @@ class BuilderDraftExperienceController extends ApiController
 
         return response()->json([
             'data' => new BuilderDraftExperienceResource($updated),
-            'issues' => $this->issuesOf($updated->schema),
+            'issues' => $this->issuesOf($updated->publishableSchema()),
         ]);
     }
 
