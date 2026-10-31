@@ -425,6 +425,14 @@ php artisan serve
 - **النشر (S01d / G1):** `POST app-builder/apps/{id}/versions` يقبل `expected_draft_revision` **اختيارياً** (إضافي)؛ يقفل `BuilderPublishedExperienceVersionService::publish` صف التطبيق ثم صف المسودة (الحفظ يقفل المسودة وحدها فلا جمود)، ويقارن ثم يلتقط ويتحقق من الصف المقفول نفسه. عدم تطابقه ⇒ **409** `{reason: "draft_changed_since_review", current_revision, expected_revision}` بلا نسخة. كل نسخة تسجّل `source_draft_revision` (null قبل S01d؛ لا Backfill). العقد: `contracts/app-builder/draft-publish.v1.json`.
 - الواجهة (S01b): لا كتابة فوق إلا بعد إعادة جلب أحدث revision وتأكيد المستخدم، ومسودة محلية تحمي التعديلات عند التعارض أو فشل الشبكة.
 
+## فرض عقد المكوّنات (AD-12 / S02a) — مرحلي
+
+`App\Services\AppBuilder\AppSchemaContractChecker` (دالة نقية) فوق `AppSchemaParser` (المرآة الحرفية لمحلّل Dart — لا يُضاف إليه ما لا يفعله Flutter):
+- **صارم عند الحفظ** (`assertHardLimits` في `BuilderDraftExperienceService::save` والنشر): فرادة `component.id` **داخل الصفحة** (`duplicate_id`) وسقف بايتات المخطط (`schema_too_large`، `config('app_builder.max_schema_bytes')` الافتراضي 262144) ⇒ 422 بلا كتابة. التكرار عبر صفحات = تحذير فقط.
+- **`issues[]` (`ContractIssue`)**: `error` (يمنع النشر: `page_not_root`، `child_not_allowed`، `children_not_allowed`، `prop_type_mismatch`، `prop_enum_invalid`، `action_param_invalid`، `missing_action_param`، `navigate_target_missing`) و`warning` (لا يمنع). تُعاد في `GET/PUT draft` **ولا تمنع الحفظ أبداً** (مسودة قديمة مخالفة تُحفظ وتُصلَح في مكانها)، و`POST validate`/`versions` يردّان 422 `{reason: "contract_violations", issues[]}` عند أي `error` بلا نسخة. الرسائل لا تحمل قيم المخطط (معرّفات ومفاتيح فقط). العقد المشترك: `contracts/app-builder/contract-issues.v1.json` (يحرس تزامن الرموز اختبار).
+- **قواعد التضمين من مصدر واحد:** `ComponentRegistry::allowedChildTypes/allowedParentTypes` (من `ChildrenRule`: `Page` جذر فقط، الورقيات بلا أبناء)، تُعرض في `GET registries` (`allowed_children`/`allowed_parents`) وتستهلكها الفاحصة والويب. `$item.*` مقبول في أي خاصية/معامل (يُحلّ وقت التشغيل).
+- **مؤجَّل صراحةً:** حدود الكمية لكل مستأجر (تطبيقات/نسخ/جلسات معاينة، DRF-07) — سياسة عمل تحتاج قرار المالك (قاعدة 6)؛ تحقق `visibility`/`binding` الدلالي؛ واجهة الويب (S02b).
+
 ## الواجهة (web/) — قواعد موجزة
 
 - المرجع الإلزامي: **`DESIGN_SYSTEM.md`** (أداة محاسبية نظيفة كثيفة، الجداول هي البطل، لون هوية واحد، خطّان).

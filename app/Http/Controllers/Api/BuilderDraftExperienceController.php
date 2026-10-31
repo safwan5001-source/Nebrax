@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Requests\UpdateBuilderDraftExperienceRequest;
 use App\Http\Resources\BuilderDraftExperienceResource;
 use App\Models\BuilderApp;
+use App\Services\AppBuilder\AppSchemaContractChecker;
 use App\Services\AppBuilder\BuilderDraftExperienceService;
 use App\Services\AppBuilder\DraftRevisionConflictException;
 use Illuminate\Http\JsonResponse;
@@ -12,14 +13,20 @@ use Illuminate\Http\JsonResponse;
 /** APP-BUILDER-1 — قراءة/تحديث مسودة تجربة تطبيق واحد. */
 class BuilderDraftExperienceController extends ApiController
 {
-    public function __construct(private readonly BuilderDraftExperienceService $service) {}
+    public function __construct(
+        private readonly BuilderDraftExperienceService $service,
+        private readonly AppSchemaContractChecker $contractChecker,
+    ) {}
 
     public function show(string $appId): JsonResponse
     {
         $app = BuilderApp::findOrFail($appId);
         $draft = $app->draft()->firstOrFail();
 
-        return response()->json(['data' => new BuilderDraftExperienceResource($draft)]);
+        return response()->json([
+            'data' => new BuilderDraftExperienceResource($draft),
+            'issues' => $this->issuesOf($draft->schema),
+        ]);
     }
 
     public function update(UpdateBuilderDraftExperienceRequest $request, string $appId): JsonResponse
@@ -58,6 +65,20 @@ class BuilderDraftExperienceController extends ApiController
             ], 409);
         }
 
-        return response()->json(['data' => new BuilderDraftExperienceResource($updated)]);
+        return response()->json([
+            'data' => new BuilderDraftExperienceResource($updated),
+            'issues' => $this->issuesOf($updated->schema),
+        ]);
+    }
+
+    /**
+     * AD-12 (S02): مخالفات العقد للعرض (`error` = تمنع النشر، `warning` = لا تمنعه). لا تمنع الحفظ أبداً.
+     *
+     * @param  array<string, mixed>  $schema
+     * @return list<array<string, mixed>>
+     */
+    private function issuesOf(array $schema): array
+    {
+        return array_map(fn ($issue) => $issue->toArray(), $this->contractChecker->check($schema));
     }
 }
