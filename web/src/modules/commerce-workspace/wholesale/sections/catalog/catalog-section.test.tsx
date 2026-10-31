@@ -135,6 +135,50 @@ describe('CatalogSection', () => {
     expect(screen.queryByText('Rice 10kg')).toBeNull();
   });
 
+  it('does not reset a page change made right after load when nothing was typed', async () => {
+    apiMocks.page.mockImplementation(async (_store: string, params: { page?: number }) =>
+      (params.page ?? 1) === 1
+        ? { items: [item({ id: 'p1', name: 'Page one rice' })], meta: { currentPage: 1, lastPage: 2, perPage: 25, total: 26 } }
+        : { items: [item({ id: 'p26', name: 'Last rice' })], meta: { currentPage: 2, lastPage: 2, perPage: 25, total: 26 } },
+    );
+    render(<CatalogSection />);
+    await waitFor(() => screen.getAllByText('Page one rice'));
+    fireEvent.click(screen.getAllByRole('button', { name: 'nextPage' })[0]);
+    await waitFor(() => screen.getAllByText('Last rice'));
+    await new Promise((resolve) => setTimeout(resolve, 450)); // longer than the 300ms search debounce
+    expect(screen.getAllByText('Last rice').length).toBeGreaterThan(0); // still page 2: the idle debounce did not reset it
+    expect((apiMocks.page.mock.calls.at(-1)![1] as { page?: number }).page).toBe(2);
+  });
+
+  it('recovers to the last real page when a write empties the final page', async () => {
+    const calls: number[] = [];
+    let page2Emptied = false;
+    apiMocks.page.mockImplementation(async (_store: string, params: { page?: number }) => {
+      const requested = params.page ?? 1;
+      calls.push(requested);
+      if (requested === 1) return { items: [item({ id: 'p1', name: 'Page one rice' })], meta: { currentPage: 1, lastPage: page2Emptied ? 1 : 2, perPage: 25, total: page2Emptied ? 25 : 26 } };
+      if (!page2Emptied) return { items: [item({ id: 'p26', name: 'Last rice', isPublished: true, stores: [{ id: 's1', name: 'x', isPublished: true }] })], meta: { currentPage: 2, lastPage: 2, perPage: 25, total: 26 } };
+      return { items: [], meta: { currentPage: 2, lastPage: 1, perPage: 25, total: 25 } }; // page 2 no longer exists
+    });
+    apiMocks.set.mockImplementation(async () => {
+      page2Emptied = true; // the sole product of page 2 was unpublished under a "published" filter
+      return [];
+    });
+
+    render(<CatalogSection />);
+    await waitFor(() => screen.getAllByText('Page one rice'));
+    fireEvent.click(screen.getAllByRole('button', { name: 'nextPage' })[0]);
+    await waitFor(() => screen.getAllByText('Last rice'));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Unpublish' })[0]);
+    await waitFor(() => expect(apiMocks.set).toHaveBeenCalledWith('p26', 's1', false));
+
+    await waitFor(() => screen.getAllByText('Page one rice')); // recovered to page 1, not a false empty catalog
+    expect(screen.queryByText('No products')).toBeNull();
+    expect(screen.queryByText('No matching results')).toBeNull();
+    expect(calls.at(-1)).toBe(1);
+    expect(screen.getAllByRole('button', { name: 'nextPage' }).length).toBeGreaterThan(0); // pagination still present
+  });
+
   it('does not write when the confirmation is declined', async () => {
     confirmMock.mockResolvedValue(false);
     render(<CatalogSection />);

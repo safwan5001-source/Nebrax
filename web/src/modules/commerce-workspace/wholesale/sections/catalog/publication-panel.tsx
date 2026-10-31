@@ -41,12 +41,15 @@ export function PublicationPanel({ storeId, storeName, onChanged }: { storeId: s
   const seq = useRef(0);
 
   useEffect(() => {
+    // Nothing typed (or typed back to the applied value): no debounce, so a page change made right after load is not
+    // reset to page 1 by a timer that was only armed by mounting.
+    if (searchInput.trim() === search) return;
     const timer = window.setTimeout(() => {
       setSearch(searchInput.trim());
       setPage(1);
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [searchInput]);
+  }, [searchInput, search]);
 
   const load = useCallback(() => {
     const id = ++seq.current;
@@ -54,6 +57,13 @@ export function PublicationPanel({ storeId, storeName, onChanged }: { storeId: s
     loadStoreCatalogPage(storeId, { search, status, page, perPage }).then(
       (next) => {
         if (id !== seq.current) return;
+        // The requested page no longer exists (e.g. unpublishing the last product of the final page under a status
+        // filter) while matches remain on earlier pages: move to the real last page instead of showing a false empty
+        // catalog with no pagination. Staying in the loading state until the re-request (triggered by `page`) lands.
+        if (next.items.length === 0 && page > 1 && next.meta.total > 0) {
+          setPage(Math.max(1, Math.min(page - 1, next.meta.lastPage)));
+          return;
+        }
         setResult(next);
         setState('ready');
       },
