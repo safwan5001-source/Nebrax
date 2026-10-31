@@ -228,4 +228,22 @@ class AppSchemaContractCheckerTest extends TestCase
             $this->assertContains($code, $m[1], "الرمز {$code} في العقد ولا تُصدره الفاحصة");
         }
     }
+
+    /** @test */
+    public function the_server_registries_match_the_shared_identifier_fixture_so_a_new_component_cannot_skip_the_contract(): void
+    {
+        $fixture = json_decode((string) file_get_contents(base_path('contracts/app-builder/registry-identifiers.v1.json')), true);
+
+        $components = $fixture['components'];
+        $actions = $fixture['actions'];
+        sort($components);
+        sort($actions);
+        $serverComponents = array_keys(ComponentRegistry::definitions());
+        $serverActions = array_keys(\App\Services\AppBuilder\ActionRegistry::definitions());
+        sort($serverComponents);
+        sort($serverActions);
+
+        $this->assertSame($components, $serverComponents, 'أضف المكوّن إلى fixture العقد المشترك (Dart + الويب + الخادم) في الـPR نفسه');
+        $this->assertSame($actions, $serverActions);
+    }
 }
