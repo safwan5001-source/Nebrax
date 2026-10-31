@@ -1137,7 +1137,8 @@
       "company": "Nombre de la empresa (opcional)",
       "phone": "Teléfono de contacto (opcional)",
       "applicationHint": "Esto ayuda a la tienda a revisar su solicitud. No se verifica y no cambia sus precios.",
-      "myOrders": "Mis pedidos"
+      "myOrders": "Mis pedidos",
+      "quickOrder": "Pedido rápido"
     },
     "status": {
       "signed_out": {
@@ -1250,6 +1251,59 @@
       "status": {
         "confirmed": "Confirmado",
         "cancelled": "Cancelado"
+      }
+    },
+    "quickOrder": {
+      "title": "Pedido rápido",
+      "subtitle": "Busque artículos por SKU o nombre, indique cantidades y añádalos todos al carrito a la vez. Se aplican sus precios mayoristas aprobados.",
+      "search": {
+        "title": "Buscar por SKU o nombre del producto",
+        "placeholder": "SKU o nombre del producto…",
+        "searching": "Buscando…",
+        "none": "Ninguna coincidencia.",
+        "addToList": "Añadir a la lista"
+      },
+      "paste": {
+        "title": "Pegar una lista de SKU",
+        "hint": "Un artículo por línea: SKU y cantidad, separados por espacio, coma o tabulador (p. ej. ABC-100 12). Solo el SKU significa cantidad 1.",
+        "placeholder": "ABC-100 12\nSHIRT-RED, 4\nCOF-100",
+        "cta": "Añadir lo pegado a la lista",
+        "truncated": "Solo se usaron las primeras {max} líneas.",
+        "issue": {
+          "not_found": "no se encuentra en el catálogo de esta tienda",
+          "ambiguous": "coincide con varias variantes: elija una en los resultados de búsqueda de arriba"
+        }
+      },
+      "list": {
+        "title": "Lista del pedido ({count})",
+        "empty": "Su lista está vacía. Busque arriba o pegue una lista de SKU.",
+        "remove": "Quitar línea",
+        "quantity": "Cantidad",
+        "excluded": "esta línea no se añadirá",
+        "eligible": "Listas para añadir: {eligible} de {total}",
+        "estimate": "Total estimado",
+        "priceNote": "La tienda confirma los precios al añadir al carrito y de nuevo al finalizar la compra.",
+        "submit": "Añadir al carrito ({count})"
+      },
+      "qty": {
+        "invalid": "Introduzca un número entero de 1 o más.",
+        "tooLarge": "La cantidad no puede superar {max}."
+      },
+      "reason": {
+        "noWholesalePrice": "No hay precio mayorista disponible para este artículo",
+        "notPurchasable": "Este artículo no se puede comprar ahora"
+      },
+      "notice": {
+        "added": "Añadido a su carrito: {count}",
+        "viewCart": "Ver carrito",
+        "checkout": "Finalizar compra",
+        "rejected": "No se añadió nada: algunas líneas ya no se pueden comprar. Corrija o quite las líneas marcadas e inténtelo de nuevo.",
+        "error": "Algo salió mal. No se añadió nada; inténtelo de nuevo.",
+        "access": {
+          "signed_out": "Inicie sesión de nuevo para continuar.",
+          "not_approved": "Su cuenta mayorista no está aprobada para pedir."
+        },
+        "accessCta": "Continuar"
       }
     }
   }

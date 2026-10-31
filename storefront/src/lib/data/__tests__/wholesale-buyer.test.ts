@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   request: vi.fn(),
+  cartRequest: vi.fn(),
+  updateTag: vi.fn(),
   getBuyerToken: vi.fn(),
   setBuyerToken: vi.fn(),
   clearBuyerToken: vi.fn(),
@@ -24,8 +26,14 @@ vi.mock("@/lib/commerce/config", async () => {
       super(message);
     }
   }
-  return { StorefrontApiError, storefrontBuyerRequest: mocks.request };
+  return {
+    StorefrontApiError,
+    storefrontBuyerRequest: mocks.request,
+    storefrontCartRequest: mocks.cartRequest,
+  };
 });
+
+vi.mock("next/cache", () => ({ updateTag: mocks.updateTag }));
 
 const { StorefrontApiError } = await import("@/lib/commerce/config");
 const {
@@ -40,6 +48,9 @@ const {
   resetBuyerPassword,
   getBuyerOrders,
   getBuyerOrder,
+  searchQuickOrder,
+  resolveQuickOrderSkus,
+  addQuickOrderLines,
 } = await import("../wholesale-buyer");
 
 describe("wholesale buyer server actions", () => {
@@ -416,5 +427,145 @@ describe("registration and verification actions", () => {
         await getBuyerOrder("11111111-1111-4111-8111-111111111111"),
       ).toEqual({ kind: "not_found" });
     });
+  });
+});
+
+describe("native quick order server actions (H6)", () => {
+  const P = "11111111-1111-4111-8111-111111111111";
+  const apiLine = {
+    product_id: P,
+    product_variant_id: null,
+    unit_key: "base",
+    unit_name: "piece",
+    sku: "COF-100",
+    name: "قهوة",
+    name_en: "Coffee",
+    descriptor: null,
+    price: { amount_minor: 700, currency: "SAR" },
+    available: true,
+    unavailable_reason: null,
+    in_stock: null,
+    exact: true,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getBuyerToken.mockResolvedValue("tok");
+  });
+
+  it("search sends the term and the server-held token only, and maps well-formed lines", async () => {
+    mocks.request.mockResolvedValue({ data: [apiLine, { broken: true }] });
+
+    const result = await searchQuickOrder("  coffee & tea  ");
+
+    expect(mocks.request).toHaveBeenCalledWith(
+      "GET",
+      "buyer/quick-order/lookup?q=coffee%20%26%20tea&limit=10",
+      { token: "tok" },
+    );
+    expect(result.kind === "ok" && result.lines).toHaveLength(1);
+  });
+
+  it("an empty term and a missing session never call the API", async () => {
+    expect(await searchQuickOrder("   ")).toEqual({ kind: "ok", lines: [] });
+    mocks.getBuyerToken.mockResolvedValue(undefined);
+    expect(await searchQuickOrder("abc")).toEqual({ kind: "signed_out" });
+    expect(await resolveQuickOrderSkus(["A"])).toEqual({ kind: "signed_out" });
+    expect(
+      await addQuickOrderLines([
+        { product_id: P, unit_key: "base", quantity: 1 },
+      ]),
+    ).toEqual({ kind: "signed_out" });
+    expect(mocks.request).not.toHaveBeenCalled();
+    expect(mocks.cartRequest).not.toHaveBeenCalled();
+  });
+
+  it("refusals map to access states, not errors", async () => {
+    mocks.request.mockRejectedValueOnce(new StorefrontApiError(401, "x", "x"));
+    expect(await searchQuickOrder("abc")).toEqual({ kind: "signed_out" });
+    mocks.request.mockRejectedValueOnce(
+      new StorefrontApiError(403, "x", "x", { membership_status: "suspended" }),
+    );
+    expect(await searchQuickOrder("abc")).toEqual({
+      kind: "not_approved",
+      membership: "suspended",
+    });
+    mocks.request.mockRejectedValueOnce(new StorefrontApiError(500, "x", "x"));
+    expect(await searchQuickOrder("abc")).toEqual({ kind: "unavailable" });
+  });
+
+  it("resolve sends every SKU as skus[] in order and keeps the answer's order and spelling", async () => {
+    mocks.request.mockResolvedValue({
+      data: [
+        { sku: "cof-100", lines: [apiLine] },
+        { sku: "NOPE", lines: [] },
+        "garbage",
+      ],
+    });
+
+    const result = await resolveQuickOrderSkus(["cof-100", " NOPE "]);
+
+    expect(mocks.request).toHaveBeenCalledWith(
+      "GET",
+      "buyer/quick-order/resolve?skus[]=cof-100&skus[]=NOPE",
+      { token: "tok" },
+    );
+    expect(result.kind === "ok" && result.rows.map((r) => r.sku)).toEqual([
+      "cof-100",
+      "NOPE",
+    ]);
+    expect(result.kind === "ok" && result.rows[0].lines).toHaveLength(1);
+  });
+
+  it("add posts ids/units/quantities through the cart transport, refreshes the cart tag and returns success", async () => {
+    mocks.cartRequest.mockResolvedValue({ data: {} });
+    const items = [
+      { product_id: P, unit_key: "base", quantity: 3 },
+      {
+        product_id: P,
+        product_variant_id: "22222222-2222-4222-8222-222222222222",
+        unit_key: "base",
+        quantity: 1,
+      },
+    ];
+
+    expect(await addQuickOrderLines(items)).toEqual({ kind: "ok" });
+    expect(mocks.cartRequest).toHaveBeenCalledWith(
+      "POST",
+      "buyer/quick-order/add",
+      { items },
+    );
+    expect(mocks.updateTag).toHaveBeenCalledWith("cart");
+  });
+
+  it("a server rejection reports the failing lines and leaves the cart tag alone", async () => {
+    mocks.cartRequest.mockRejectedValue(
+      new StorefrontApiError(422, "validation_failed", "x", {
+        reason: "quick_order_rejected",
+        lines: [{ index: 1, reason: "unavailable_for_wholesale" }],
+      }),
+    );
+
+    expect(
+      await addQuickOrderLines([
+        { product_id: P, unit_key: "base", quantity: 1 },
+        { product_id: P, unit_key: "base", quantity: 1 },
+      ]),
+    ).toEqual({
+      kind: "rejected",
+      failures: [{ index: 1, reason: "unavailable_for_wholesale" }],
+    });
+    expect(mocks.updateTag).not.toHaveBeenCalled();
+  });
+
+  it("an empty or oversized batch is refused before any request", async () => {
+    expect(await addQuickOrderLines([])).toEqual({ kind: "unavailable" });
+    const many = Array.from({ length: 51 }, () => ({
+      product_id: P,
+      unit_key: "base",
+      quantity: 1,
+    }));
+    expect(await addQuickOrderLines(many)).toEqual({ kind: "unavailable" });
+    expect(mocks.cartRequest).not.toHaveBeenCalled();
   });
 });

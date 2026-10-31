@@ -1,5 +1,6 @@
 "use server";
 
+import { updateTag } from "next/cache";
 import {
   clearBuyerToken,
   getBuyerToken,
@@ -8,7 +9,16 @@ import {
 import {
   StorefrontApiError,
   storefrontBuyerRequest,
+  storefrontCartRequest,
 } from "@/lib/commerce/config";
+import {
+  failuresFromError,
+  QUICK_ORDER_MAX_LINES,
+  type QuickOrderFailure,
+  type QuickOrderLine,
+  type QuickOrderSubmitItem,
+  quickOrderLineFromApi,
+} from "@/lib/commerce/quick-order";
 import {
   accessStateFromMembership,
   type BuyerAccessState,
@@ -308,5 +318,122 @@ export async function getBuyerAccess(): Promise<{
         return { state: "unavailable", displayName: null };
     }
     return { state: "unavailable", displayName: null };
+  }
+}
+
+// ───────────────────────── native Quick Order (H6) ─────────────────────────
+
+export type QuickOrderAccess =
+  | { kind: "signed_out" }
+  | { kind: "not_approved"; membership: MembershipGateStatus | null }
+  | { kind: "unavailable" };
+
+function quickOrderAccess(error: unknown): QuickOrderAccess {
+  if (error instanceof StorefrontApiError) {
+    if (error.status === 401) return { kind: "signed_out" };
+    if (error.status === 403) {
+      return {
+        kind: "not_approved",
+        membership: membershipGateStatusFromError(error),
+      };
+    }
+  }
+  return { kind: "unavailable" };
+}
+
+/**
+ * Free-text search (SKU or name, including variant SKUs) for the quick-order picker. Resolved and priced by the server for the
+ * signed-in buyer on this channel; a line with no approved wholesale price comes back unavailable with no price.
+ */
+export async function searchQuickOrder(
+  term: string,
+): Promise<{ kind: "ok"; lines: QuickOrderLine[] } | QuickOrderAccess> {
+  const q = term.trim().slice(0, 120);
+  if (q === "") return { kind: "ok", lines: [] };
+  const token = await getBuyerToken();
+  if (!token) return { kind: "signed_out" };
+  try {
+    const response = await storefrontBuyerRequest<{ data?: unknown[] }>(
+      "GET",
+      `buyer/quick-order/lookup?q=${encodeURIComponent(q)}&limit=10`,
+      { token },
+    );
+    return {
+      kind: "ok",
+      lines: (Array.isArray(response.data) ? response.data : [])
+        .map(quickOrderLineFromApi)
+        .filter((l): l is QuickOrderLine => l !== null),
+    };
+  } catch (error) {
+    return quickOrderAccess(error);
+  }
+}
+
+export type QuickOrderResolvedRow = { sku: string; lines: QuickOrderLine[] };
+
+/** Exact-SKU resolution of a pasted list (one request). Order and spelling of the input are preserved. */
+export async function resolveQuickOrderSkus(
+  skus: string[],
+): Promise<{ kind: "ok"; rows: QuickOrderResolvedRow[] } | QuickOrderAccess> {
+  const list = skus
+    .map((s) => s.trim().slice(0, 120))
+    .filter((s) => s !== "")
+    .slice(0, QUICK_ORDER_MAX_LINES);
+  if (list.length === 0) return { kind: "ok", rows: [] };
+  const token = await getBuyerToken();
+  if (!token) return { kind: "signed_out" };
+  try {
+    const query = list.map((s) => `skus[]=${encodeURIComponent(s)}`).join("&");
+    const response = await storefrontBuyerRequest<{ data?: unknown[] }>(
+      "GET",
+      `buyer/quick-order/resolve?${query}`,
+      { token },
+    );
+    const rows = (Array.isArray(response.data) ? response.data : []).flatMap(
+      (raw) => {
+        const r = raw as { sku?: unknown; lines?: unknown };
+        if (typeof r?.sku !== "string") return [];
+        return [
+          {
+            sku: r.sku,
+            lines: (Array.isArray(r.lines) ? r.lines : [])
+              .map(quickOrderLineFromApi)
+              .filter((l): l is QuickOrderLine => l !== null),
+          },
+        ];
+      },
+    );
+    return { kind: "ok", rows };
+  } catch (error) {
+    return quickOrderAccess(error);
+  }
+}
+
+export type QuickOrderAddResult =
+  | { kind: "ok" }
+  | { kind: "rejected"; failures: QuickOrderFailure[] }
+  | QuickOrderAccess;
+
+/**
+ * All-or-nothing: the server adds every line to the buyer's cart or none. Only ids, unit and quantity leave the browser —
+ * the price is the server's, resolved again for every line, and again at checkout. Re-submitting adds the quantities again
+ * (the cart merges identical lines), so the caller disables the button while a request is in flight.
+ */
+export async function addQuickOrderLines(
+  items: QuickOrderSubmitItem[],
+): Promise<QuickOrderAddResult> {
+  if (items.length === 0 || items.length > QUICK_ORDER_MAX_LINES) {
+    return { kind: "unavailable" };
+  }
+  const token = await getBuyerToken();
+  if (!token) return { kind: "signed_out" };
+  try {
+    await storefrontCartRequest("POST", "buyer/quick-order/add", { items });
+    updateTag("cart");
+    return { kind: "ok" };
+  } catch (error) {
+    const failures = failuresFromError(error);
+    if (failures !== null) return { kind: "rejected", failures };
+    return quickOrderAccess(error);
   }
 }

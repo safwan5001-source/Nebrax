@@ -1137,7 +1137,8 @@
       "company": "Company name (optional)",
       "phone": "Contact phone (optional)",
       "applicationHint": "This helps the store review your application. It is not verified and does not change your prices.",
-      "myOrders": "My orders"
+      "myOrders": "My orders",
+      "quickOrder": "Quick order"
     },
     "status": {
       "signed_out": {
@@ -1250,6 +1251,59 @@
       "status": {
         "confirmed": "Confirmed",
         "cancelled": "Cancelled"
+      }
+    },
+    "quickOrder": {
+      "title": "Quick order",
+      "subtitle": "Find items by SKU or name, set quantities and add them all to your cart at once. Prices are your approved wholesale prices.",
+      "search": {
+        "title": "Search by SKU or product name",
+        "placeholder": "SKU or product name…",
+        "searching": "Searching…",
+        "none": "Nothing matches that search.",
+        "addToList": "Add to list"
+      },
+      "paste": {
+        "title": "Paste a list of SKUs",
+        "hint": "One item per line: SKU and quantity, separated by a space, comma or tab (for example: ABC-100 12). A line with only a SKU means quantity 1.",
+        "placeholder": "ABC-100 12\nSHIRT-RED, 4\nCOF-100",
+        "cta": "Add pasted items to the list",
+        "truncated": "Only the first {max} lines were used.",
+        "issue": {
+          "not_found": "not found in this store's catalogue",
+          "ambiguous": "matches several variants — choose one in the search results above"
+        }
+      },
+      "list": {
+        "title": "Order list ({count})",
+        "empty": "Your list is empty. Search above or paste a list of SKUs.",
+        "remove": "Remove line",
+        "quantity": "Quantity",
+        "excluded": "this line will not be added",
+        "eligible": "Ready to add: {eligible} of {total}",
+        "estimate": "Estimated total",
+        "priceNote": "Prices are confirmed by the store when you add to the cart and again at checkout.",
+        "submit": "Add to cart ({count})"
+      },
+      "qty": {
+        "invalid": "Enter a whole number of 1 or more.",
+        "tooLarge": "The quantity cannot exceed {max}."
+      },
+      "reason": {
+        "noWholesalePrice": "No wholesale price is available for this item",
+        "notPurchasable": "This item cannot be purchased right now"
+      },
+      "notice": {
+        "added": "Added to your cart: {count}",
+        "viewCart": "View cart",
+        "checkout": "Checkout",
+        "rejected": "Nothing was added: some lines can no longer be purchased. Fix or remove the marked lines and try again.",
+        "error": "Something went wrong. Nothing was added — please try again.",
+        "access": {
+          "signed_out": "Please sign in again to continue.",
+          "not_approved": "Your wholesale account is not approved for ordering."
+        },
+        "accessCta": "Continue"
       }
     }
   }

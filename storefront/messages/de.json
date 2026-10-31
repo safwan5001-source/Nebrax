@@ -1137,7 +1137,8 @@
       "company": "Firmenname (optional)",
       "phone": "Kontakttelefon (optional)",
       "applicationHint": "Das hilft dem Shop bei der Prüfung Ihres Antrags. Es wird nicht verifiziert und ändert Ihre Preise nicht.",
-      "myOrders": "Meine Bestellungen"
+      "myOrders": "Meine Bestellungen",
+      "quickOrder": "Schnellbestellung"
     },
     "status": {
       "signed_out": {
@@ -1250,6 +1251,59 @@
       "status": {
         "confirmed": "Bestätigt",
         "cancelled": "Storniert"
+      }
+    },
+    "quickOrder": {
+      "title": "Schnellbestellung",
+      "subtitle": "Artikel per SKU oder Name finden, Mengen festlegen und alle auf einmal in den Warenkorb legen. Es gelten Ihre freigegebenen Großhandelspreise.",
+      "search": {
+        "title": "Nach SKU oder Produktnamen suchen",
+        "placeholder": "SKU oder Produktname…",
+        "searching": "Suche läuft…",
+        "none": "Keine Treffer.",
+        "addToList": "Zur Liste hinzufügen"
+      },
+      "paste": {
+        "title": "SKU-Liste einfügen",
+        "hint": "Ein Artikel pro Zeile: SKU und Menge, getrennt durch Leerzeichen, Komma oder Tab (z. B. ABC-100 12). Nur eine SKU bedeutet Menge 1.",
+        "placeholder": "ABC-100 12\nSHIRT-RED, 4\nCOF-100",
+        "cta": "Eingefügte Artikel zur Liste hinzufügen",
+        "truncated": "Es wurden nur die ersten {max} Zeilen verwendet.",
+        "issue": {
+          "not_found": "nicht im Katalog dieses Shops gefunden",
+          "ambiguous": "passt zu mehreren Varianten – wählen Sie oben in den Suchergebnissen eine aus"
+        }
+      },
+      "list": {
+        "title": "Bestellliste ({count})",
+        "empty": "Ihre Liste ist leer. Suchen Sie oben oder fügen Sie eine SKU-Liste ein.",
+        "remove": "Zeile entfernen",
+        "quantity": "Menge",
+        "excluded": "diese Zeile wird nicht hinzugefügt",
+        "eligible": "Bereit zum Hinzufügen: {eligible} von {total}",
+        "estimate": "Geschätzte Summe",
+        "priceNote": "Die Preise werden beim Hinzufügen zum Warenkorb und erneut an der Kasse vom Shop bestätigt.",
+        "submit": "In den Warenkorb ({count})"
+      },
+      "qty": {
+        "invalid": "Geben Sie eine ganze Zahl ab 1 ein.",
+        "tooLarge": "Die Menge darf {max} nicht überschreiten."
+      },
+      "reason": {
+        "noWholesalePrice": "Für diesen Artikel ist kein Großhandelspreis verfügbar",
+        "notPurchasable": "Dieser Artikel kann derzeit nicht gekauft werden"
+      },
+      "notice": {
+        "added": "Zum Warenkorb hinzugefügt: {count}",
+        "viewCart": "Warenkorb ansehen",
+        "checkout": "Zur Kasse",
+        "rejected": "Es wurde nichts hinzugefügt: Einige Zeilen sind nicht mehr kaufbar. Korrigieren oder entfernen Sie die markierten Zeilen und versuchen Sie es erneut.",
+        "error": "Etwas ist schiefgelaufen. Es wurde nichts hinzugefügt – bitte erneut versuchen.",
+        "access": {
+          "signed_out": "Bitte melden Sie sich erneut an, um fortzufahren.",
+          "not_approved": "Ihr Großhandelskonto ist nicht zum Bestellen freigegeben."
+        },
+        "accessCta": "Weiter"
       }
     }
   }
