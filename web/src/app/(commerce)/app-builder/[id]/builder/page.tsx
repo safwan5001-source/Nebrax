@@ -932,7 +932,7 @@ export default function AppBuilderWorkspacePage() {
                   isInitial={selectedPageId === schema.navigation?.initialPageId}
                   canDelete={pageIds.length > 1}
                   canManage={canManage}
-                  navigationRefs={countNavigationTo(schema, selectedPageId)}
+                  navigationRefs={countNavigationTo(schema, selectedPageId, registries ? (type) => registries.components[type]?.actionable === true : undefined)}
                   onSetHome={() => makeInitialPage(selectedPageId)}
                   onDelete={() => deletePage(selectedPageId)}
                   t={t}

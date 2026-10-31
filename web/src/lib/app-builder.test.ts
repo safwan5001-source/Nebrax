@@ -340,6 +340,22 @@ describe('countNavigationTo (S21b)', () => {
     expect(countNavigationTo(schema, 'ghost')).toBe(0);
   });
 
+  it('counts only navigate actions on actionable components — an action on a Text is ignored by the contract checker and never blocks (review P2)', () => {
+    const withText = {
+      ...schema,
+      pages: {
+        ...schema.pages,
+        home: { type: 'Page', id: 'r', children: [
+          { type: 'Button', id: 'b1', action: { type: 'navigate', params: { pageId: 'cart' } } },
+          { type: 'Text', id: 't1', props: { text: 'x' }, action: { type: 'navigate', params: { pageId: 'cart' } } },
+        ] },
+      },
+    } as AppSchema;
+    const actionable = (type: string) => type === 'Button';
+    expect(countNavigationTo(withText, 'cart', actionable)).toBe(1);
+    expect(countNavigationTo(withText, 'cart')).toBe(2); // بلا سجل: تحفّظ (يُعدّ الكل)
+  });
+
   it('ignores references inside the page itself: they disappear with it and never become dangling (review P2)', () => {
     const selfRef = {
       ...schema,
