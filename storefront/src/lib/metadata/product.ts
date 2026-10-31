@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-import { DEFAULT_SURFACE } from "@/lib/commerce/surface";
 import { getCachedProduct, PRODUCT_METADATA_EXPAND } from "@/lib/data/cached";
 import { cachedGetProduct } from "@/lib/data/products";
 import {
@@ -48,12 +47,10 @@ export async function generateProductMetadata({
         path: `/products/${product.slug}`,
         currentResourceFingerprint: productTranslationFingerprint(product),
         resolvePath: async (target) => {
-          const localizedProduct = await cachedGetProduct(
-            product.id,
-            [],
-            { country: target.country, locale: target.locale },
-            DEFAULT_SURFACE,
-          );
+          const localizedProduct = await cachedGetProduct(product.id, [], {
+            country: target.country,
+            locale: target.locale,
+          });
           return {
             path: `/products/${localizedProduct.slug}`,
             fingerprint: productTranslationFingerprint(localizedProduct),

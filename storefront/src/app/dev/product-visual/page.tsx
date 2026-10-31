@@ -1,7 +1,7 @@
-import type { Product } from "@spree/sdk";
 import { notFound } from "next/navigation";
 import { NextIntlClientProvider } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
+import type { StoreProduct as Product } from "@/lib/commerce/types";
 import type { PagePresentation } from "@/lib/presentation/page-regions";
 import ar from "../../../../messages/ar.json";
 import en from "../../../../messages/en.json";

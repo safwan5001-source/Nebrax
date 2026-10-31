@@ -1,6 +1,9 @@
-import type { Country, Market } from "@spree/sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { REQUEST_PATHNAME_HEADER, REQUEST_SEARCH_HEADER } from "@/i18n/routing";
+import type {
+  StoreCountry as Country,
+  StoreMarket as Market,
+} from "@/lib/commerce/types";
 
 const mocks = vi.hoisted(() => ({
   getMarkets: vi.fn(),

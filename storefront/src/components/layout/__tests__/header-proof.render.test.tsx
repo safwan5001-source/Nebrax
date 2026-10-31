@@ -35,7 +35,6 @@ vi.mock("next-intl/server", () => ({
   },
 }));
 vi.mock("next/dynamic", () => ({ default: () => () => null }));
-vi.mock("@/lib/spree", () => ({ isWholesaleEnabled: () => false }));
 vi.mock("@/components/layout/StoreSearch", () => ({
   StoreSearch: ({ className }: { className?: string }) => (
     <div

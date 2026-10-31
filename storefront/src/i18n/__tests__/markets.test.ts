@@ -1,4 +1,3 @@
-import type { Country, Market } from "@spree/sdk";
 import { describe, expect, it } from "vitest";
 import {
   findMarketForCountry,
@@ -7,6 +6,10 @@ import {
   getMarketLocaleTargets,
   isLocaleEnabledForMarket,
 } from "@/i18n/markets";
+import type {
+  StoreCountry as Country,
+  StoreMarket as Market,
+} from "@/lib/commerce/types";
 
 function market(overrides: Partial<Market> = {}): Market {
   return {

@@ -14,64 +14,17 @@ import {
 /**
  * H0 / X6 follow-up — AWJ-native storefront behaviour with NO Spree environment.
  *
- * Unlike `customer.gated.test.ts` (which mocks `@/lib/spree` away), this suite runs
- * the REAL `@/lib/spree` configuration and the real data layer with every
- * `SPREE_*` / `NEXT_PUBLIC_SPREE_*` variable removed. The only seams are the
- * framework (`next/*`) and the network (`fetch`). The Spree entry points are
- * wrapped in spies that call through, so any code path that tries to build or
- * fetch a Spree client either fires a spy or hits the real "not available" error
- * — both fail these tests.
+ * This suite runs the real data layer with every `SPREE_*` / `NEXT_PUBLIC_SPREE_*`
+ * variable removed. The only seams are the framework (`next/*`) and the network
+ * (`fetch`); every request is checked against the AWJ API route table. (The Spree
+ * client no longer exists in the codebase; this suite proves the storefront needs
+ * no Spree environment and never sends a Spree credential.)
  *
  * It deliberately does not duplicate the X6 scanner (static): this is the
  * runtime counterpart.
  *
  * The sitemap (X3) and the policy pages (X4) are AWJ-native and asserted positively below.
  */
-const spree = vi.hoisted(() => ({
-  getClient: vi.fn(),
-  getClientForSurface: vi.fn(),
-  getWholesaleClient: vi.fn(),
-  initSpreeNext: vi.fn(),
-  createClient: vi.fn(),
-}));
-
-vi.mock("@/lib/spree", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/spree")>();
-  const wrap =
-    <A extends unknown[], R>(
-      spy: (...args: A) => void,
-      fn: (...args: A) => R,
-    ) =>
-    (...args: A): R => {
-      spy(...args);
-      return fn(...args);
-    };
-  return {
-    ...actual,
-    getClient: wrap(spree.getClient, actual.getClient),
-    getClientForSurface: wrap(
-      spree.getClientForSurface,
-      actual.getClientForSurface,
-    ),
-    getWholesaleClient: wrap(
-      spree.getWholesaleClient,
-      actual.getWholesaleClient,
-    ),
-    initSpreeNext: wrap(spree.initSpreeNext, actual.initSpreeNext),
-  };
-});
-
-vi.mock("@spree/sdk", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@spree/sdk")>();
-  return {
-    ...actual,
-    createClient: (...args: Parameters<typeof actual.createClient>) => {
-      spree.createClient(...args);
-      return actual.createClient(...args);
-    },
-  };
-});
-
 const cookieJar = new Map<string, string>();
 vi.mock("next/headers", () => ({
   headers: async () => new Headers({ host: "shop.example.sa" }),
@@ -130,7 +83,6 @@ import {
   updateCustomer,
 } from "@/lib/data/customer";
 import { getPolicy, PolicyUnavailableError } from "@/lib/data/policies";
-import { getClient } from "@/lib/spree";
 
 const AWJ_API = "https://api.awj.test";
 const LEAK = /spree|SPREE_|publishable|not configured|AWJ_COMMERCE_API_URL/i;
@@ -253,24 +205,11 @@ beforeEach(() => {
   vi.stubGlobal("fetch", fetchMock);
 });
 
-const expectSpreeUntouched = () => {
-  expect(spree.getClient).not.toHaveBeenCalled();
-  expect(spree.getClientForSurface).not.toHaveBeenCalled();
-  expect(spree.getWholesaleClient).not.toHaveBeenCalled();
-  expect(spree.initSpreeNext).not.toHaveBeenCalled();
-  expect(spree.createClient).not.toHaveBeenCalled();
-};
-
 const awjUrls = () => fetchMock.mock.calls.map((c) => String(c[0]));
 
 describe("test environment precondition", () => {
   it("has no SPREE_* / NEXT_PUBLIC_SPREE_* variable set", () => {
     expect(spreeEnvKeys()).toEqual([]);
-  });
-
-  it("the real Spree client really is unavailable here (so the spies below are meaningful)", () => {
-    expect(() => getClient()).toThrow(/Spree client is not available/);
-    expect(spree.getClient).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -298,7 +237,6 @@ describe("buyer account actions stay gated and never initialise Spree", () => {
     expect(await syncSession()).toEqual({ customer: null, refreshed: false });
     await expect(logout()).resolves.toBeUndefined();
 
-    expectSpreeUntouched();
     expect(fetchMock).not.toHaveBeenCalled();
     expect(JSON.stringify(results)).not.toMatch(LEAK);
   });
@@ -321,7 +259,6 @@ describe("AWJ-native guest cart works without Spree configuration", () => {
     for (const u of urls) {
       expect(u.startsWith(`${AWJ_API}/store/v1/cart`)).toBe(true);
     }
-    expectSpreeUntouched();
   });
 
   it("an AWJ API failure surfaces AWJ's own message, never Spree/config detail", async () => {
@@ -345,7 +282,6 @@ describe("AWJ-native guest cart works without Spree configuration", () => {
       error: "Cart is temporarily unavailable.",
     });
     expect(JSON.stringify(failed)).not.toMatch(LEAK);
-    expectSpreeUntouched();
   });
 });
 
@@ -369,7 +305,6 @@ describe("AWJ-native guest checkout works without Spree configuration", () => {
     for (const u of awjUrls()) {
       expect(u.startsWith(`${AWJ_API}/store/v1/checkout`)).toBe(true);
     }
-    expectSpreeUntouched();
   });
 
   it("forwards the visitor host and never sends a Spree credential", async () => {
@@ -400,7 +335,6 @@ describe("AWJ-native guest checkout works without Spree configuration", () => {
     });
     expect(await getAwjCheckout()).toBeNull();
     expect(JSON.stringify(started)).not.toMatch(LEAK);
-    expectSpreeUntouched();
   });
 });
 
@@ -437,7 +371,6 @@ describe("sitemap and robots work without Spree", () => {
       expect(headers["X-Storefront-Forwarded-Host"]).toBe("shop.example.sa");
       expect(JSON.stringify(headers)).not.toMatch(/spree|publishable/i);
     }
-    expectSpreeUntouched();
   });
 
   it("an AWJ API failure yields a generic error and a server-side log only — no Spree/config detail", async () => {
@@ -469,7 +402,6 @@ describe("sitemap and robots work without Spree", () => {
     expect(errorLog).toHaveBeenCalled();
     expect(JSON.stringify(errorLog.mock.calls)).not.toMatch(/db-internal/);
     expect((failure as Error).message).not.toMatch(LEAK);
-    expectSpreeUntouched();
     errorLog.mockRestore();
   });
 
@@ -480,7 +412,6 @@ describe("sitemap and robots work without Spree", () => {
     const result = await robots();
 
     expect(result.sitemap).toEqual(["https://shop.example.sa/sitemap/0.xml"]);
-    expectSpreeUntouched();
   });
 });
 
@@ -509,14 +440,12 @@ describe("policy pages work without Spree", () => {
       .headers as Record<string, string>;
     expect(headers["X-Storefront-Forwarded-Host"]).toBe("shop.example.sa");
     expect(JSON.stringify(headers)).not.toMatch(/spree|publishable/i);
-    expectSpreeUntouched();
   });
 
   it("a missing policy is a genuine 404 (null), not a configuration error", async () => {
     await expect(
       getPolicy("returns-policy", { locale: "ar" }),
     ).resolves.toBeNull();
-    expectSpreeUntouched();
   });
 
   it("the page renders the published policy and its metadata is built without Spree", async () => {
@@ -539,7 +468,6 @@ describe("policy pages work without Spree", () => {
     );
     expect(markup).toContain("<p>نحمي بياناتك</p>");
     expect(markup).toContain('dir="rtl"');
-    expectSpreeUntouched();
   });
 
   it("a missing policy page is a real 404 and its metadata does not throw", async () => {
@@ -553,7 +481,6 @@ describe("policy pages work without Spree", () => {
     await expect(
       PolicyPage({ params: params("returns-policy") }),
     ).rejects.toMatchObject({ digest: expect.stringContaining("404") });
-    expectSpreeUntouched();
   });
 
   it("an AWJ outage is distinct from a 404 and leaks no Spree/config/internal detail", async () => {
@@ -590,7 +517,6 @@ describe("policy pages work without Spree", () => {
     expect(JSON.stringify([metadata, (failure as Error).message])).not.toMatch(
       /db-internal/,
     );
-    expectSpreeUntouched();
   });
 });
 
@@ -601,7 +527,6 @@ describe("X5: legacy Spree checkout routes stay closed without wholesale configu
       "src/app/[country]/[locale]/(checkout)",
     );
     expect(fs.existsSync(dir)).toBe(false);
-    expectSpreeUntouched();
   });
 
   it("the AWJ-native checkout page still loads without Spree", async () => {
@@ -609,6 +534,5 @@ describe("X5: legacy Spree checkout routes stay closed without wholesale configu
       "@/app/[country]/[locale]/(store-checkout)/checkout/page"
     );
     expect(typeof mod.default).toBe("function");
-    expectSpreeUntouched();
   });
 });

@@ -1,4 +1,3 @@
-import type { Product } from "@spree/sdk";
 import { notFound } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
 import { CartLine, type CartLineView } from "@/components/cart/CartLine";
@@ -9,7 +8,10 @@ import { PublishedThemeMarkerProvider } from "@/components/layout/PublishedTheme
 import { StoreContainer } from "@/components/layout/StoreContainer";
 import { ProductCarousel } from "@/components/products/ProductCarousel";
 import { ProductGrid } from "@/components/products/ProductGrid";
-import type { StoreCategory } from "@/lib/commerce/types";
+import type {
+  StoreProduct as Product,
+  StoreCategory,
+} from "@/lib/commerce/types";
 import { publishedHomeStackClass } from "@/lib/presentation/public-rhythm";
 import type { ThemePresetId } from "@/lib/presentation/tokens";
 import ar from "../../../../messages/ar.json";

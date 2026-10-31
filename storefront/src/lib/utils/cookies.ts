@@ -1,3 +1,5 @@
+import { COUNTRY_COOKIE, LOCALE_COOKIE } from "@/lib/proxy/locale-cookies";
+
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
 function setCookie(name: string, value: string): void {
@@ -23,6 +25,6 @@ function setCookie(name: string, value: string): void {
  * Persist the selected country and locale in client-side cookies.
  */
 export function setStoreCookies(country: string, locale: string): void {
-  setCookie("spree_country", country);
-  setCookie("spree_locale", locale);
+  setCookie(COUNTRY_COOKIE, country);
+  setCookie(LOCALE_COOKIE, locale);
 }

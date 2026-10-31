@@ -57,22 +57,14 @@ describe("buyer authentication gate (SPREE-X1)", () => {
     expect(gate).toBeLessThan(sync);
   });
 
-  it("every customer server action checks the gate before touching Spree", () => {
+  it("every customer server action is a refusal: no upstream access of any kind", () => {
     const src = read("lib/data/customer.ts");
-    const spreeAccess =
-      /getClient\(|withAuthRefresh\(|ensureFreshSession\(|fetchCustomer\(|finalizeAuth\(/;
+    // No Spree/commerce client, token refresh or session helper can be reached from the file at all.
+    expect(src).not.toMatch(
+      /getClient\(|withAuthRefresh\(|ensureFreshSession\(|finalizeAuth\(|fetch\(|@\/lib\/spree|@spree\//,
+    );
     const chunks = src.split(/\nexport async function /).slice(1);
     expect(chunks.length).toBeGreaterThanOrEqual(8);
-    for (const chunk of chunks) {
-      const name = chunk.slice(0, chunk.indexOf("("));
-      const access = chunk.search(spreeAccess);
-      if (access === -1) continue;
-      const gate = chunk.indexOf("accountAuthLive()");
-      expect(gate, `${name} must check accountAuthLive()`).toBeGreaterThan(-1);
-      expect(gate, `${name}: gate must precede Spree access`).toBeLessThan(
-        access,
-      );
-    }
   });
 
   it("buyer-account UI has no runtime Spree import", () => {

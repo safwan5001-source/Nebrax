@@ -68,7 +68,6 @@ createRoot(document.getElementById("mount")!).render(
       <MobileMenu
         rootCategories={categories as never}
         basePath={basePath}
-        wholesaleEnabled={tenant === "a"}
         extraLinks={
           [
             {

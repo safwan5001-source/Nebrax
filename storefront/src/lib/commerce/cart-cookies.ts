@@ -78,7 +78,7 @@ function parseSetCookie(header: string): ParsedSetCookie | null {
  * (GET on an already-valid cart never rotates the token), and best-effort
  * (swallowed) when called during a Server Component render, where Next.js
  * forbids writing cookies at all — mirroring the same guard
- * `@/lib/spree/cookies`'s `clearCartCookies` callers already rely on.
+ * the former Spree `clearCartCookies` callers already rely on.
  */
 export async function applyAwjSetCookie(response: Response): Promise<void> {
   const rawValues =

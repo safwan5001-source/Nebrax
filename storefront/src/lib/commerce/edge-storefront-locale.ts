@@ -6,7 +6,7 @@
  * visitor's Host with `next/headers`'s `headers()` — a Server
  * Component/Route Handler API backed by Next's request-scoped
  * `AsyncLocalStorage`. Edge Middleware (`src/proxy.ts` /
- * `src/lib/spree/middleware.ts`) runs *before* that machinery exists for the
+ * `src/lib/proxy/storefront-proxy.ts`) runs *before* that machinery exists for the
  * request and receives the Host directly on the `NextRequest` it is handed
  * instead. The two are a compatible request/response shape but a distinct
  * API surface, so this module reads the Host from `NextRequest` and never

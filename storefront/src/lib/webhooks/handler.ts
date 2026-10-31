@@ -1,6 +1,5 @@
-import type { WebhookEvent } from "@spree/sdk/webhooks";
-import { verifyWebhookSignature } from "@spree/sdk/webhooks";
 import { NextResponse } from "next/server";
+import { verifyWebhookSignature, type WebhookEvent } from "./signature";
 
 export type { WebhookEvent };
 
@@ -8,8 +7,8 @@ export type WebhookHandler<T = any> = (event: WebhookEvent<T>) => Promise<void>;
 
 export interface CreateWebhookHandlerOptions {
   /**
-   * The webhook endpoint secret key (from Spree Admin → Webhooks).
-   * Usually: `process.env.SPREE_WEBHOOK_SECRET`
+   * The webhook endpoint secret key.
+   * Usually: `process.env.SPREE_WEBHOOK_SECRET` (the endpoint answers 503 while it is unset).
    */
   secret: string;
 

@@ -11,12 +11,12 @@ import {
   scanSource,
   serializeBaseline,
   toBaseline,
-} from "../../../../scripts/spree-ratchet/scan";
+} from "../../scripts/spree-ratchet/scan";
 
 // Whole-tree scan (~700 files) parses every source file; on a loaded CI runner running
 // alongside the full suite it can exceed the 5s default. Scoped to this one test only.
 const FULL_TREE_SCAN_TIMEOUT_MS = 30_000;
-const STOREFRONT_ROOT = path.resolve(__dirname, "../../../..");
+const STOREFRONT_ROOT = path.resolve(__dirname, "../..");
 const tmpDirs: string[] = [];
 
 function fixture(files: Record<string, string>): string {

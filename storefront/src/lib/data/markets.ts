@@ -1,10 +1,8 @@
 "use server";
 
-import { cacheLife, cacheTag } from "next/cache";
 import { DEFAULT_LOCALE, resolveSupportedLocale } from "@/i18n/locales";
 import { fetchStorefrontDefaultLocale } from "@/lib/commerce/storefront";
 import type { StoreMarket } from "@/lib/commerce/types";
-import { getClient, getLocaleOptions } from "@/lib/spree";
 import { getDefaultCountry } from "@/lib/store";
 
 /**
@@ -17,10 +15,9 @@ import { getDefaultCountry } from "@/lib/store";
  * decision, not a COM-7 concern — see AWJ_SPREE_ADMIN_SANDBOX_GAP_MAP.md
  * "الأسواق/الدول"). `supported_locales` reflects what is actually
  * registered in `src/i18n/locales.ts` (`ar`/`en` — the two AWJ_STORE_
- * LANGUAGE_DECISION.md §1-2 requires). This still only backs
+ * LANGUAGE_DECISION.md §1-2 requires). This backs
  * `getMarkets()`/`resolveCurrency()` (root layout + catalog pricing
- * display); `resolveMarket()`/`getMarketCountries()` below remain
- * Spree-backed and unused by any AWJ catalog page.
+ * display).
  */
 async function resolveAwjDefaultLocale() {
   try {
@@ -56,41 +53,11 @@ async function staticAwjMarket(): Promise<StoreMarket> {
   };
 }
 
-async function cachedResolveMarket(
-  country: string,
-  options: { locale?: string; country?: string },
-) {
-  "use cache: remote";
-  cacheLife("hours");
-  cacheTag("resolved-market");
-  return getClient().markets.resolve(country, options);
-}
-
-async function cachedListMarketCountries(
-  marketId: string,
-  options: { locale?: string; country?: string },
-) {
-  "use cache: remote";
-  cacheLife("hours");
-  cacheTag("market-countries");
-  return getClient().markets.countries.list(marketId, options);
-}
-
 export async function getMarkets(_options?: {
   locale?: string;
   country?: string;
 }): Promise<{ data: StoreMarket[] }> {
   return { data: [await staticAwjMarket()] };
-}
-
-export async function resolveMarket(country: string) {
-  const options = await getLocaleOptions();
-  return cachedResolveMarket(country, options);
-}
-
-export async function getMarketCountries(marketId: string) {
-  const options = await getLocaleOptions();
-  return cachedListMarketCountries(marketId, options);
 }
 
 /**

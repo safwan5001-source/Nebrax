@@ -2,52 +2,25 @@
   "version": 1,
   "categories": {
     "spree_value_imports": {
-      "total": 3,
-      "files": {
-        "src/lib/spree/auth-helpers.ts": 1,
-        "src/lib/spree/config.ts": 1,
-        "src/lib/spree/webhooks.ts": 1
-      }
+      "total": 0,
+      "files": {}
     },
     "spree_type_imports": {
-      "total": 4,
-      "files": {
-        "src/lib/spree/auth-helpers.ts": 1,
-        "src/lib/spree/config.ts": 1,
-        "src/lib/spree/webhooks.ts": 1,
-        "src/lib/webhooks/handlers.ts": 1
-      }
+      "total": 0,
+      "files": {}
     },
     "spree_client_access": {
-      "total": 20,
-      "files": {
-        "src/lib/data/customer.ts": 10,
-        "src/lib/data/markets.ts": 2,
-        "src/lib/spree/auth-helpers.ts": 1,
-        "src/lib/spree/config.ts": 6,
-        "src/lib/spree/cookies.ts": 1
-      }
+      "total": 0,
+      "files": {}
     },
     "spree_wrapper_imports": {
-      "total": 26,
-      "files": {
-        "src/app/[country]/[locale]/(storefront)/account/(authenticated)/layout.tsx": 2,
-        "src/app/api/webhooks/spree/route.ts": 1,
-        "src/components/home/WholesaleSection.tsx": 1,
-        "src/components/layout/Footer.tsx": 1,
-        "src/components/layout/Header.tsx": 1,
-        "src/lib/data/customer.ts": 17,
-        "src/lib/data/markets.ts": 2,
-        "src/proxy.ts": 1
-      }
+      "total": 0,
+      "files": {}
     },
     "spree_env_reads": {
-      "total": 9,
+      "total": 1,
       "files": {
-        "next.config.ts": 2,
-        "src/app/api/webhooks/spree/route.ts": 1,
-        "src/components/layout/DocumentShell.tsx": 2,
-        "src/lib/spree/config.ts": 4
+        "src/app/api/webhooks/spree/route.ts": 1
       }
     }
   }

@@ -11,12 +11,22 @@ const mocks = vi.hoisted(() => ({
   }),
 }));
 
-vi.mock("next/headers", () => ({ headers: mocks.headers }));
-vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
-vi.mock("@/lib/spree", () => ({
-  getAccessToken: () => Promise.resolve(mocks.accessToken),
-  getRefreshToken: () => Promise.resolve(mocks.refreshToken),
+vi.mock("next/headers", () => ({
+  headers: mocks.headers,
+  cookies: () =>
+    Promise.resolve({
+      get: (name: string) => {
+        const value =
+          name === "awj_account_session"
+            ? mocks.accessToken
+            : name === "awj_account_refresh"
+              ? mocks.refreshToken
+              : undefined;
+        return value === undefined ? undefined : { name, value };
+      },
+    }),
 }));
+vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 vi.mock("@/components/account/AuthenticatedAccountShell", () => ({
   AuthenticatedAccountShell: ({
     children,

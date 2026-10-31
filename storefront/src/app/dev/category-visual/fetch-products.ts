@@ -1,6 +1,10 @@
 "use server";
 
-import type { PaginatedResponse, Product, ProductListParams } from "@spree/sdk";
+import type {
+  StoreProductPage as PaginatedResponse,
+  StoreProduct as Product,
+  StoreProductListParams as ProductListParams,
+} from "@/lib/commerce/types";
 
 /**
  * CUST-H2-5 dev fixture — must be a genuine Server Action (not an inline

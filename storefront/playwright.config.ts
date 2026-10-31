@@ -1,25 +1,16 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Playwright config for the storefront E2E suite.
+ * Playwright config for the storefront's fixture-route E2E specs (`e2e/*.spec.ts` that open the `/dev/*` fixture pages).
  *
- * Prerequisites (run once before `pnpm run test:e2e`):
- *   pnpm run e2e:up     # boots Docker + bootstraps Spree via @spree/cli
- *
- * That seeds Spree with sample data and writes `.env.e2e` with the
- * publishable key the storefront needs.
- *
- * The `webServer` block boots `next dev` against `.env.e2e` and waits for it
- * to respond before running tests.
+ * The `webServer` block boots `next dev` (loading `.env.e2e` if one exists) and waits for it to respond. The Laravel-backed
+ * wholesale journey has its own config (`playwright.wholesale-e2e.config.ts`), as do the visual-QA suites.
  */
 export default defineConfig({
   testDir: "./e2e",
   // Needs the throwaway Laravel stack (scripts/e2e/wholesale-stack.sh) — runs under playwright.wholesale-e2e.config.ts only.
   testIgnore: /wholesale-buyer-journey\.spec\.ts/,
-  // The guest checkout walks home → PDP → cart → checkout → Stripe against
-  // dev-mode Next.js + dockerized Spree, which blows well past Playwright's
-  // 30s default on CI runners — each retry was dying mid-flow wherever it
-  // happened to be standing.
+  // Dev-mode Next.js compiles each route on first hit, which blows past Playwright's 30s default on CI runners.
   timeout: 120_000,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,

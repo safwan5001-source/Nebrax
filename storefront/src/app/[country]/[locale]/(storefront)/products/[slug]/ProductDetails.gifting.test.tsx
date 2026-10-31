@@ -1,4 +1,3 @@
-import type { Product } from "@spree/sdk";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -6,6 +5,7 @@ import {
   EMPTY_PRODUCT_GIFTING,
   type ProductGifting,
 } from "@/lib/commerce/pdp-gifting";
+import type { StoreProduct as Product } from "@/lib/commerce/types";
 import { ProductDetails } from "./ProductDetails";
 
 vi.mock("next-intl", () => ({

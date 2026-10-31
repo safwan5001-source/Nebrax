@@ -44,7 +44,6 @@ vi.mock("@/components/layout/HeaderNavLinks", () => ({
     />
   ),
 }));
-vi.mock("@/lib/spree", () => ({ isWholesaleEnabled: () => false }));
 vi.mock("@/components/layout/StoreSearch", () => ({
   StoreSearch: ({ className }: { className?: string }) => (
     <div

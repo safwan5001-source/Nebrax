@@ -23,15 +23,6 @@ import { Suspense } from "react";
 import { localeDirection } from "@/i18n/locales";
 
 const gtmId = process.env.GTM_ID;
-const spreeApiOrigin = (() => {
-  try {
-    return process.env.SPREE_API_URL
-      ? new URL(process.env.SPREE_API_URL).origin
-      : undefined;
-  } catch {
-    return undefined;
-  }
-})();
 
 /**
  * `fallback` is what makes the Arabic face reachable, and it is load-bearing.
@@ -323,14 +314,7 @@ export function DocumentShell({ children, locale }: DocumentShellProps) {
   return (
     <html lang={locale} dir={localeDirection(locale)} suppressHydrationWarning>
       {/* biome-ignore lint/style/noHeadElement: this shell is used only by Next.js root layouts */}
-      <head>
-        {spreeApiOrigin && (
-          <>
-            <link rel="preconnect" href={spreeApiOrigin} />
-            <link rel="dns-prefetch" href={spreeApiOrigin} />
-          </>
-        )}
-      </head>
+      <head />
       {gtmId && <GoogleTagManager gtmId={gtmId} />}
       <body
         className={`${geist.variable} ${geistTajawalFallback.variable} ${cairo.variable} ${tajawal.variable} ${CATALOGUE_FONT_VARIABLES} antialiased min-h-screen flex flex-col`}

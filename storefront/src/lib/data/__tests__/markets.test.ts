@@ -7,10 +7,6 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/commerce/storefront", () => ({
   fetchStorefrontDefaultLocale: mocks.fetchStorefrontDefaultLocale,
 }));
-vi.mock("@/lib/spree", () => ({
-  getClient: () => ({}),
-  getLocaleOptions: vi.fn(),
-}));
 
 const { getMarkets } = await import("../markets");
 
