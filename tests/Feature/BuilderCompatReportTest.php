@@ -110,9 +110,27 @@ class BuilderCompatReportTest extends TestCase
 
         $this->assertTrue($compat['has_drops']);
         $this->assertTrue($compat['generations'][0]['compatible']);
-        $this->assertSame([['component_id' => 'cat-strip', 'component_type' => 'Section']], $compat['generations'][0]['dropped']);
+        $this->assertSame([['component_id' => 'cat-strip', 'component_type' => 'Section', 'page_id' => 'home']], $compat['generations'][0]['dropped']);
         $this->assertSame('1.0.0', $compat['min_runtime']);
         $this->assertNull($compat['full_runtime'], 'لا جيل معروف يعرض كل شيء بعد');
+    }
+
+    /** @test */
+    public function a_dropped_entry_carries_its_page_so_a_same_id_component_on_another_page_is_never_confused_with_it(): void
+    {
+        // فرادة component.id داخل الصفحة وحدها: «shared» في home مدعوم، و«shared» في about اختياري يُحذف (مراجعة Codex P2).
+        [$auth, $appId] = $this->newApp('compat-page');
+        $schema = BuilderDraftExperience::minimalSafeSchema();
+        $schema['pages']['home']['children'] = [['type' => 'Section', 'id' => 'shared', 'props' => ['title' => 'مدعوم'], 'children' => []]];
+        $schema['pages']['about'] = ['type' => 'Page', 'id' => 'about-root', 'children' => [
+            ['type' => 'Section', 'id' => 'shared', 'optional' => true, 'props' => ['title' => 'محذوف'], 'children' => [
+                ['type' => 'ProductList', 'id' => 'shared-list', 'binding' => ['resource' => 'commerce.categories'], 'children' => []],
+            ]],
+        ]];
+
+        $compat = $this->save($auth['token'], $appId, $schema)->assertOk()->json('compat');
+
+        $this->assertSame([['component_id' => 'shared', 'component_type' => 'Section', 'page_id' => 'about']], $compat['generations'][0]['dropped']);
     }
 
     /** @test */
@@ -124,7 +142,7 @@ class BuilderCompatReportTest extends TestCase
         $compat = $this->save($auth['token'], $appId, $this->schemaWithOptionalImage())->assertOk()->json('compat');
 
         $this->assertSame(['1.0.0', '1.1.0'], array_column($compat['generations'], 'runtime'));
-        $this->assertSame([['component_id' => 'pic', 'component_type' => 'Image']], $compat['generations'][0]['dropped']);
+        $this->assertSame([['component_id' => 'pic', 'component_type' => 'Image', 'page_id' => 'home']], $compat['generations'][0]['dropped']);
         $this->assertSame([], $compat['generations'][1]['dropped']);
         $this->assertSame('1.0.0', $compat['min_runtime']);
         $this->assertSame('1.1.0', $compat['full_runtime']);

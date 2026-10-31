@@ -1193,9 +1193,12 @@ export default function AppBuilderWorkspacePage() {
   );
 
   /** يحدّد مكوّناً بمعرّفه (أول صفحة تحويه) كما يفعل `openIssue`: يعيد وضع التصميم/المسودة ويغلق حوار النشر ويعيد لوحة الصفحات (لا تبقى لوحة المظهر أو App Preview تخفي المفتش). */
-  function openComponentById(componentId: string) {
+  function openComponentById(componentId: string, preferredPageId?: string | null) {
     if (!schema) return;
-    const pageId = Object.keys(schema.pages).find((id) => findComponentById(schema.pages[id], componentId) !== null);
+    // معرّف المكوّن فريد داخل الصفحة وحدها: الصفحة التي أبلغ عنها التقرير تتقدّم، وإلا أول صفحة تحويه (خادم أقدم بلا page_id).
+    const pageId = preferredPageId && schema.pages[preferredPageId] && findComponentById(schema.pages[preferredPageId], componentId) !== null
+      ? preferredPageId
+      : Object.keys(schema.pages).find((id) => findComponentById(schema.pages[id], componentId) !== null);
     if (!pageId) return;
     setBuilderMode('design');
     setPreviewState('draft');
