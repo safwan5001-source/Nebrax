@@ -66,6 +66,10 @@ export function PublicationPanel({ storeId, storeName, onChanged }: { storeId: s
   }, [storeId, search, status, page, perPage]);
 
   useEffect(() => load(), [load]);
+  // A write resolves long after the click: `toggle` must refresh with the filters/page on screen NOW, not the ones its
+  // closure captured when the click happened (a stale loader would fetch old filters and win the sequence race).
+  const latestLoad = useRef(load);
+  latestLoad.current = load;
 
   async function toggle(item: ProductPublicationListPage['items'][number], publish: boolean) {
     if (busyId) return;
@@ -81,7 +85,7 @@ export function PublicationPanel({ storeId, storeName, onChanged }: { storeId: s
     try {
       await setStorePublication(item.id, storeId, publish);
       toast.success(t(publish ? 'publishDone' : 'unpublishDone'));
-      load();
+      latestLoad.current();
       onChanged();
     } catch {
       toast.error(t('writeFailed'));

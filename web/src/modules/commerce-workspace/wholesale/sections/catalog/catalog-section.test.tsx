@@ -108,6 +108,33 @@ describe('CatalogSection', () => {
     expect(apiMocks.counts.mock.calls.slice(callsBefore).filter(([id]) => id === 's1')).toEqual([]);
   });
 
+  it('refreshes the rows with the filters on screen when a write finishes after they changed', async () => {
+    // Rows depend on the status filter the request carries; a refresh with stale filters would show the wrong set.
+    apiMocks.page.mockImplementation(async (_store: string, params: { status?: string }) =>
+      page([item({ id: params.status === 'published' ? 'p-pub' : 'p1', name: params.status === 'published' ? 'Published rice' : 'Rice 10kg' })]),
+    );
+    let finishWrite: (value: unknown) => void = () => undefined;
+    apiMocks.set.mockReturnValue(new Promise((resolve) => (finishWrite = resolve)));
+
+    render(<CatalogSection />);
+    await waitFor(() => screen.getAllByText('Rice 10kg'));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Publish' })[0]);
+    await waitFor(() => expect(apiMocks.set).toHaveBeenCalledWith('p1', 's1', true)); // write pending under filter "all"
+
+    fireEvent.change(screen.getByLabelText('Publication status'), { target: { value: 'published' } });
+    await waitFor(() => screen.getAllByText('Published rice'));
+    const callsBefore = apiMocks.page.mock.calls.length;
+
+    finishWrite([]); // completes after the filter changed
+    await waitFor(() => expect(apiMocks.page.mock.calls.length).toBeGreaterThan(callsBefore));
+
+    // The refresh used the CURRENT filter, so the visible rows still match "published".
+    const lastParams = apiMocks.page.mock.calls.at(-1)![1] as { status?: string };
+    expect(lastParams.status).toBe('published');
+    expect(screen.getAllByText('Published rice').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Rice 10kg')).toBeNull();
+  });
+
   it('does not write when the confirmation is declined', async () => {
     confirmMock.mockResolvedValue(false);
     render(<CatalogSection />);
