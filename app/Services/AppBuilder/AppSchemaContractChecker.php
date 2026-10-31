@@ -241,7 +241,8 @@ final class AppSchemaContractChecker
                 continue;
             }
             $ok = match ($param->type) {
-                PropType::INTEGER => $this->isInteger($value) && ($param->minValue === null || (int) $value >= $param->minValue),
+                // مطابق لـ`decodeAction` في Dart: `is int` صارم (2.0 مرفوض هناك فيُسقط الإجراء كله).
+                PropType::INTEGER => is_int($value) && ($param->minValue === null || $value >= $param->minValue),
                 // المطلوب نصٌّ غير فارغ؛ الاختياري (مثل `variantId` الذي يتركه المحرر "" بعد المسح) يقبله Runtime فارغاً.
                 default => is_string($value) && ($value !== '' || ! $param->required),
             };

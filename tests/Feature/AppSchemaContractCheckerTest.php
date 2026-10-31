@@ -219,6 +219,19 @@ class AppSchemaContractCheckerTest extends TestCase
     }
 
     /** @test */
+    public function an_action_integer_param_must_be_a_real_integer_like_the_dart_decoder(): void
+    {
+        $schema = $this->schema([
+            ['type' => 'Button', 'id' => 'a', 'props' => ['label' => 'x'], 'action' => ['type' => 'addToCart', 'params' => ['productId' => 'p1', 'quantity' => 2.0]]],
+            ['type' => 'Button', 'id' => 'b', 'props' => ['label' => 'x'], 'action' => ['type' => 'addToCart', 'params' => ['productId' => 'p1', 'quantity' => '2']]],
+            ['type' => 'Button', 'id' => 'c', 'props' => ['label' => 'x'], 'action' => ['type' => 'addToCart', 'params' => ['productId' => 'p1', 'quantity' => 2]]],
+        ]);
+
+        $bad = array_map(fn (ContractIssue $i) => $i->nodeId, array_values(array_filter($this->checker->check($schema), fn (ContractIssue $i) => $i->blocksPublish())));
+        $this->assertSame(['a', 'b'], $bad);
+    }
+
+    /** @test */
     public function an_explicit_null_for_an_optional_param_means_absent_and_keeps_the_runtime_default(): void
     {
         $schema = $this->schema([
