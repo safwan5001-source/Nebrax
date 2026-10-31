@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Branch | `claude/h6-final-spree-exit` |
-| PR | _linked on the PR page_ |
+| PR | https://github.com/safwan5001-source/Nebrax/pull/1859 |
 | Base SHA (origin/main) | `7c7ccddb0ae25a15f1ef17fde261941d44b2d65e` (#1857) |
 | Head SHA | code head `578fb9f17229f7a2ce7a6b14f3b2f3aa86719836`; any later commit on the branch changes this report only |
 | CI | see the PR's checks (the PR page is the source of truth) |
