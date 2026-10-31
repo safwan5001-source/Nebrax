@@ -97,7 +97,7 @@ A GitHub-Actions alternative needs no remote resource (Laravel + a Postgres serv
 
 ### 3.1 What was verified, where, and what it does **not** prove
 
-All of the following ran **locally** on a throwaway SQLite stack, loopback only, against a fresh production build of this branch: **{{E2E}}** (desktop-EN and mobile-AR). **This is not deployed acceptance and must not be cited as such.**
+All of the following ran **locally** on a throwaway SQLite stack, loopback only, against a fresh production build of this branch: **56 of 56 passed** (desktop-EN and mobile-AR). **This is not deployed acceptance and must not be cited as such.**
 
 | Required journey item | Local browser evidence | Deployed? |
 |---|---|---|
@@ -183,7 +183,7 @@ Ratchet after this PR: `spree_value_imports=4, spree_type_imports=4, spree_clien
 - Comments in `(checkout)/layout.tsx` and `(storefront)/cart/page.tsx` updated to stop referring to the deleted group.
 - `scripts/spree-ratchet/baseline.json`: `spree_wrapper_imports` 69 → 68.
 
-**Files changed:** see `git diff origin/main...HEAD --stat` ({{FILES}}). **Not touched:** any Laravel file, any API contract, `data/*`, `CartContext`, Header/Footer, messages, packages.
+**Files changed:** see `git diff origin/main...HEAD --stat` (23 files: 17 deleted, 5 modified, 1 added (this report); +255 / −1963 lines). **Not touched:** any Laravel file, any API contract, `data/*`, `CartContext`, Header/Footer, messages, packages.
 
 Explicitly **not** removed although mostly dead: everything in the §4.3 rows marked R1/W1b/R2/R3/R4 — each still has a caller, a test dependency or an owner decision.
 
@@ -193,13 +193,13 @@ Explicitly **not** removed although mostly dead: everything in the §4.3 rows ma
 
 | Check | Result |
 |---|---|
-| Storefront `pnpm test` | {{UNIT}} |
+| Storefront `pnpm test` | **255 files / 3677 tests passed**, 16 skipped (pre-existing); the removed `lib/wholesale` test and the superseded middleware test are gone, one middleware test added |
 | `tsc --noEmit`, Biome lint, `check:locales` | clean (lint: 0 errors; 6 warnings/3 infos pre-existing) |
 | `pnpm build` (production build of the E2E stack) | succeeded |
 | Spree dependency ratchet | OK; baseline tightened (`spree_wrapper_imports` 68) |
 | Backend SQLite — wholesale, DTC cart/checkout, commerce boundary/price, branch isolation, API tenant isolation, RBAC, storefront gateway/IP/security, payment-gateway tenant guard (451 passed, 27 skipped = PostgreSQL-only) | green |
 | Backend PostgreSQL — same filter, `lock_timeout=60s` (478 passed) | green |
-| Browser E2E | {{E2E}} |
+| Browser E2E | 56 / 56 passed on a fresh production build of this branch (no payment captured); the build printed a `Sitemap index unavailable … headers() inside generateStaticParams` notice from sitemap code this PR does not touch — not compared against a pre-change build, so not claimed as pre-existing |
 | CI Gate | {{CI}} |
 
 Backend code is unchanged by this PR (storefront-only); the backend runs confirm main's state, not new code. The full PHP suite is CI's job (no ParaTest locally; `ext-bcmath` missing locally).
