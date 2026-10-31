@@ -201,6 +201,24 @@ test.describe('App Builder — Easy Mode V2 (real browser)', () => {
     await expect(page.getByText('أهلاً بك في متجرنا')).toHaveCount(0);
   });
 
+  test('Easy mode page management: delete asks first and names the actions that point to it; making a page home is what is saved', async ({ page }) => {
+    const { puts } = await open(page, { locale: 'en', viewport: VIEWPORTS[0] });
+    const list = visibleSections(page);
+    await page.getByRole('button', { name: /^cart/ }).first().click();
+
+    await page.getByRole('button', { name: 'Delete this page' }).first().click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toContainText('1 action that navigates');
+    await dialog.getByRole('button', { name: 'Keep page' }).click();
+    await expect(page.getByText('Unsaved changes')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Make this the home page' }).first().click();
+    await page.getByRole('button', { name: 'Save' }).first().click();
+    await expect.poll(() => puts.length).toBe(1);
+    expect((puts[0].schema as unknown as { navigation: { initialPageId: string } }).navigation.initialPageId).toBe('cart');
+    await expect(list).toBeVisible();
+  });
+
   test('selecting an element in the preview shows the section toolbar; Advanced shows the layers tree and switching back keeps the draft', async ({ page }) => {
     await open(page, { locale: 'en', viewport: VIEWPORTS[0] });
     await visibleSections(page).getByRole('listitem').first().getByRole('button').first().click();

@@ -8725,6 +8725,23 @@
           "renameInputLabel": "الاسم الجديد للقسم",
           "pageTitleLabel": "عنوان الصفحة",
           "pageTitleHint": "للمحرر فقط — لا يظهر في التطبيق",
+          "pageActions": {
+            "setHome": "اجعلها الصفحة الرئيسية",
+            "delete": "حذف هذه الصفحة",
+            "homeNote": "هذه هي الصفحة الرئيسية.",
+            "deleteTitle": "حذف الصفحة {name}؟",
+            "deleteBody": "تُحذف كل أقسامها، و{count, plural, one {إجراء تنقّل واحد إليها سيظهر} two {إجراءا تنقّل إليها سيظهران} few {# إجراءات تنقّل إليها ستظهر} other {# إجراء تنقّل إليها سيظهر}} كمخالفة حاجبة حتى تُصلَح.",
+            "deleteConfirm": "حذف الصفحة",
+            "cancel": "إبقاء الصفحة",
+            "proposedTitle": "صفحات مقترحة",
+            "proposedReason": "لا شاشة لهذه الصفحة في تطبيق الجوال الحالي بعد.",
+            "proposed": {
+              "categories": "التصنيفات",
+              "account": "الحساب",
+              "orders": "طلباتي"
+            }
+          },
+          "sectionsVisible": "{visible}/{count} ظاهر",
           "selectionBar": {
             "label": "أدوات القسم «{name}»",
             "up": "نقل القسم للأعلى",

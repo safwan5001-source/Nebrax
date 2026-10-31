@@ -53,6 +53,7 @@ export function EasySectionsPanel({
 }) {
   const [renamingId, setRenamingId] = React.useState<string | null>(null);
   const [renamingPage, setRenamingPage] = React.useState(false);
+  const hiddenCount = sections.filter((section) => nodeMeta[section.id]?.hidden === true).length;
   const typeTotals = new Map<string, number>();
   const typeSeen = new Map<string, number>();
   for (const s of sections) {
@@ -64,7 +65,7 @@ export function EasySectionsPanel({
     <div className="flex h-full min-h-0 flex-col" data-testid="easy-sections">
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-2">
         <p className="text-xs font-semibold text-muted">{t('easy.sectionsTitle')}</p>
-        <Badge tone="muted">{t('easy.sectionsCount', { count: sections.length })}</Badge>
+        <Badge tone="muted">{hiddenCount > 0 ? t('easy.sectionsVisible', { visible: sections.length - hiddenCount, count: sections.length }) : t('easy.sectionsCount', { count: sections.length })}</Badge>
       </div>
 
       <div className="shrink-0 border-b border-border px-3 py-1.5">

@@ -514,6 +514,17 @@ export function generatePageId(): string {
   return `page-${random}`;
 }
 
+/** عدد الإجراءات `navigate` في كل المخطط التي تستهدف صفحة — يُعلَن عند حذفها (تبقى مخالفة حاجبة حتى تُصلَح). */
+export function countNavigationTo(schema: AppSchema, pageId: string): number {
+  let count = 0;
+  const walk = (node: AppSchemaComponent) => {
+    if (node.action?.type === 'navigate' && node.action.params?.pageId === pageId) count += 1;
+    (node.children ?? []).forEach(walk);
+  };
+  Object.values(schema.pages).forEach(walk);
+  return count;
+}
+
 /** يضيف صفحة فارغة جديدة بمعرّف `pageId` المعطى (استدعِ `generatePageId` أولاً). */
 export function addPage(schema: AppSchema, pageId: string): AppSchema {
   return { ...schema, pages: { ...schema.pages, [pageId]: { type: 'Page', id: `${pageId}-root`, children: [] } } };

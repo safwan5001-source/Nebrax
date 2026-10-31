@@ -18,6 +18,7 @@ import {
   updateEditorMetaNode,
   updateEditorMetaPageTitle,
   canonicalizeThemeTokens,
+  countNavigationTo,
   readPrimaryColor,
   type AppSchema,
   type AppSchemaComponent,
@@ -318,5 +319,24 @@ describe('canonical theme tokens (AD-03 / S04b)', () => {
     expect(legacy.theme?.tokens).toEqual({ primaryColor: '#12372a', '--primary': '#12372a', radius: 'default' });
     // لا تعديل ⇒ لا إعادة كتابة: القراءة وحدها لا تمسّ شيئاً.
     expect(themeTokens(legacy)).toEqual({ primaryColor: '#12372a', '--primary': '#12372a', radius: 'default' });
+  });
+});
+
+describe('countNavigationTo (S21b)', () => {
+  const schema = {
+    schemaVersion: '1.0.0', minRuntimeVersion: '1.0.0', navigation: { initialPageId: 'home' },
+    pages: {
+      home: { type: 'Page', id: 'r', children: [
+        { type: 'Button', id: 'b1', action: { type: 'navigate', params: { pageId: 'cart' } } },
+        { type: 'Section', id: 's', children: [{ type: 'Button', id: 'b2', action: { type: 'navigate', params: { pageId: 'cart' } } }, { type: 'Button', id: 'b3', action: { type: 'openProduct', params: { productId: 'cart' } } }] },
+      ] },
+      cart: { type: 'Page', id: 'c', children: [{ type: 'Button', id: 'b4', action: { type: 'navigate', params: { pageId: 'home' } } }] },
+    },
+  } as AppSchema;
+
+  it('counts only navigate actions to that page, at any depth and from any page', () => {
+    expect(countNavigationTo(schema, 'cart')).toBe(2);
+    expect(countNavigationTo(schema, 'home')).toBe(1);
+    expect(countNavigationTo(schema, 'ghost')).toBe(0);
   });
 });

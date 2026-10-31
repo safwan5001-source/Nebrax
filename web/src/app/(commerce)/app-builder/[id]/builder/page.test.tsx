@@ -134,6 +134,19 @@ const { api, currentUser, translate } = vi.hoisted(() => {
     'easy.sectionsTitle': 'Page sections',
     'easy.sectionsCount': '{count} sections',
     'easy.deleted': 'Deleted {name}',
+    'easy.pageActions.setHome': 'Make this the home page',
+    'easy.pageActions.delete': 'Delete this page',
+    'easy.pageActions.homeNote': 'This is the home page.',
+    'easy.pageActions.deleteTitle': 'Delete page {name}?',
+    'easy.pageActions.deleteBody': 'All its sections are removed. {count} action(s) navigating to it will show a blocking issue until fixed.',
+    'easy.pageActions.deleteConfirm': 'Delete page',
+    'easy.pageActions.cancel': 'Keep page',
+    'easy.pageActions.proposedTitle': 'Proposed pages',
+    'easy.pageActions.proposedReason': 'No app screen for this page yet.',
+    'easy.pageActions.proposed.categories': 'Categories',
+    'easy.pageActions.proposed.account': 'Account',
+    'easy.pageActions.proposed.orders': 'My orders',
+    'easy.sectionsVisible': '{visible}/{count} visible',
     'compat.summaryDrops': '{count} optional dropped on older versions',
     'compat.summaryIncompatible': 'Some versions cannot show this',
     'compat.show': 'Compat details',
@@ -2521,6 +2534,82 @@ describe('AppBuilderWorkspacePage — Easy Mode V2 shell (S21a)', () => {
       for (const b of sections().getAllByRole('button', { name })) expect((b as HTMLButtonElement).disabled).toBe(true);
     }
     expect((sections().getByRole('button', { name: 'Page title' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  // ── S21b: إدارة الصفحات في الوضع السهل ──
+  const chip = (name: RegExp | string) => screen.getAllByRole('button', { name })[0];
+
+  it('makes another page the home page from Easy mode, and the change is what gets saved', async () => {
+    await open();
+    const user = userEvent.setup();
+    await user.click(chip('about'));
+    expect(screen.queryAllByText('This is the home page.')).toHaveLength(0);
+    await user.click(screen.getAllByRole('button', { name: 'Make this the home page' })[0]);
+    await user.click(screen.getAllByText('Save')[0]);
+    await waitFor(() => expect(putBodies().length).toBe(1));
+    expect((putBodies()[0].schema as unknown as { navigation: { initialPageId: string } }).navigation.initialPageId).toBe('about');
+    await waitFor(() => expect(screen.getAllByText('This is the home page.').length).toBeGreaterThan(0));
+  });
+
+  it('the home page cannot be deleted or re-homed from the page actions', async () => {
+    await open();
+    expect(screen.queryAllByRole('button', { name: 'Delete this page' })).toHaveLength(0);
+    expect(screen.queryAllByRole('button', { name: 'Make this the home page' })).toHaveLength(0);
+    expect(screen.getAllByText('This is the home page.').length).toBeGreaterThan(0);
+  });
+
+  it('deleting a page asks first, names the actions that point to it, removes it on confirm and falls back to the home page', async () => {
+    await open();
+    const base = api.getMockImplementation()!;
+    // زرّ في home يتنقّل إلى about: الحذف يجب أن يعلن أثره.
+    api.mockImplementation((path?: string, init?: { method?: string; body?: unknown }) => {
+      if (path === DRAFT_PATH && !init?.method) {
+        const schema = JSON.parse(JSON.stringify(draftData.schema));
+        schema.pages.home.children.push({ type: 'Button', id: 'go-about', props: { label: 'About' }, action: { type: 'navigate', params: { pageId: 'about' } } });
+        return Promise.resolve({ data: { ...draftData, schema }, issues: [] });
+      }
+      return base(path, init);
+    });
+    cleanup();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findAllByText('Featured');
+    const user = userEvent.setup();
+    await user.click(chip('about'));
+    await user.click(screen.getAllByRole('button', { name: 'Delete this page' })[0]);
+
+    const dialog = within(await screen.findByRole('dialog', { name: 'Delete page about?' }));
+    expect(dialog.getByText(/1 action\(s\) navigating to it/)).toBeTruthy();
+    await user.click(dialog.getByRole('button', { name: 'Keep page' }));
+    expect(screen.queryAllByText('Unsaved changes')).toHaveLength(0); // الإلغاء لا يمسّ شيئاً
+
+    await user.click(screen.getAllByRole('button', { name: 'Delete this page' })[0]);
+    await user.click(within(await screen.findByRole('dialog', { name: 'Delete page about?' })).getByRole('button', { name: 'Delete page' }));
+    await user.click(screen.getAllByText('Save')[0]);
+    await waitFor(() => expect(putBodies().length).toBe(1));
+    expect(Object.keys((putBodies()[0].schema as unknown as { pages: object }).pages)).toEqual(['home']);
+    expect(sections().getAllByRole('listitem').length).toBeGreaterThan(0); // عاد التحديد إلى الرئيسية
+  });
+
+  it('proposed pages are listed with their reason and can never be added; page actions are disabled without manage', async () => {
+    currentUser.mockReturnValue({ id: 'u3', role: 'staff', permissions: ['apps_builder.view'] });
+    await open();
+    const user = userEvent.setup();
+    await user.click(chip('about'));
+    expect((screen.getAllByRole('button', { name: 'Make this the home page' })[0] as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getAllByRole('button', { name: 'Delete this page' })[0] as HTMLButtonElement).disabled).toBe(true);
+    await user.click(screen.getAllByText('Proposed pages')[0]);
+    for (const name of ['Categories', 'Account', 'My orders']) {
+      const row = screen.getAllByText(name)[0].closest('li') as HTMLElement;
+      expect(within(row).getByText('No app screen for this page yet.')).toBeTruthy();
+      expect(within(row).queryByRole('button')).toBeNull();
+    }
+  });
+
+  it('the sections counter shows visible/total once a section is hidden', async () => {
+    await open();
+    expect(screen.queryAllByText('0/1 visible')).toHaveLength(0);
+    await userEvent.setup().click(sectionItem().getByRole('button', { name: 'Hide section' }));
+    expect(screen.getAllByText('0/1 visible').length).toBeGreaterThan(0);
   });
 
   // ── S03b: تقرير التوافق الاستشاري + مفتاح «اختياري عند النشر» ──
