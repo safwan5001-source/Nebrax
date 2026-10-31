@@ -6,6 +6,7 @@ import {
   negotiateLocale,
 } from "@/i18n/normalize";
 import { REQUEST_PATHNAME_HEADER, REQUEST_SEARCH_HEADER } from "@/i18n/routing";
+import type { HostContext } from "@/lib/commerce/edge-storefront-locale";
 import { buildAccountLoginHref } from "@/lib/utils/account-redirect";
 import { isWholesaleEnabled } from "./config";
 
@@ -35,6 +36,37 @@ function isLegacyCheckoutPath(localizedPath: string): boolean {
   return !(match[1] === "checkout" && match[2] === AWJ_CHECKOUT_STATIC_SEGMENT);
 }
 
+/**
+ * Native wholesale buyer pages (`(storefront)/buyer/**`). They are only meaningful on a Host whose channel is
+ * wholesale; elsewhere they must answer a genuine 404 instead of rendering a wholesale gate on a retail store.
+ */
+const BUYER_PATH = /^\/buyer(\/|$)/;
+/** The opt-in Spree wholesale portal group (`(wholesale)/wholesale/**`). */
+const LEGACY_WHOLESALE_PATH = /^\/wholesale(\/|$)/;
+
+/**
+ * Where a legacy `/wholesale/*` URL lands on a host that runs the NATIVE wholesale journey. `null` means "no native
+ * equivalent" (the URL is then closed with a real 404, never redirected to something unrelated).
+ */
+function nativeWholesaleEquivalent(legacyPath: string): string | null {
+  const path = legacyPath.replace(/\/+$/, "") || "/wholesale";
+  if (path === "/wholesale" || path === "/wholesale/sign-in") {
+    return "/buyer/sign-in";
+  }
+  if (path === "/wholesale/apply") return "/buyer/membership";
+  if (path === "/wholesale/cart") return "/cart";
+  if (
+    path === "/wholesale/products" ||
+    path.startsWith("/wholesale/products/")
+  ) {
+    return "/products";
+  }
+  return null;
+}
+
+/** A country-only bare path (`/sa`): the market without a locale, not a page. */
+const BARE_COUNTRY = /^\/([a-z]{2})\/?$/i;
+
 const HAS_COUNTRY_LOCALE =
   /^\/([a-z]{2})\/([a-z]{2,3}(?:-[a-z0-9]{2,8})*)(\/|$)/i;
 
@@ -62,6 +94,18 @@ export interface SpreeMiddlewareConfig {
   resolveStorefrontLocale?: (
     request: NextRequest,
   ) => Promise<string | null | undefined>;
+  /**
+   * Resolves what the API knows about the request's Host (H6 Final Closure): whether it is a real Storefront at all
+   * and whether native wholesale buying is open there. Consulted only for localized page requests. An `unavailable`
+   * answer never closes anything except the wholesale-only pages (fail closed for the capability, fail open for the
+   * Host). Omit to keep the previous behavior exactly.
+   */
+  resolveHostContext?: (request: NextRequest) => Promise<HostContext>;
+  /**
+   * When true, a Host that the API definitively reports as unknown answers a real 404 for every localized page. Off
+   * switch for deployments whose default domain intentionally serves a generic shell.
+   */
+  closeUnknownHosts?: boolean;
 }
 
 const PUBLIC_ACCOUNT_PATHS = new Set([
@@ -90,14 +134,17 @@ function setLocaleCookies(
   country: string,
   locale: string,
 ): void {
-  response.cookies.set(COUNTRY_COOKIE, country, {
+  // Only the server (this proxy and `getLocaleOptions()`) ever reads these, so they are HttpOnly; the rest of the
+  // storefront's cookies (cart, session) already carry the same Secure/SameSite attributes.
+  const attributes = {
     path: "/",
     maxAge: COOKIE_MAX_AGE,
-  });
-  response.cookies.set(LOCALE_COOKIE, locale, {
-    path: "/",
-    maxAge: COOKIE_MAX_AGE,
-  });
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax" as const,
+  };
+  response.cookies.set(COUNTRY_COOKIE, country, attributes);
+  response.cookies.set(LOCALE_COOKIE, locale, attributes);
 }
 
 /**
@@ -124,6 +171,19 @@ function legacyCheckoutClosed(
     request: { headers: requestHeaders },
   });
   if (cookies) setLocaleCookies(response, cookies.country, cookies.locale);
+  return response;
+}
+
+/** Redirects to `target` (same origin, same query) without altering the visitor's locale choice. */
+function redirectTo(
+  request: NextRequest,
+  target: string,
+  cookies: { country: string; locale: string },
+): NextResponse {
+  const url = request.nextUrl.clone();
+  url.pathname = target;
+  const response = NextResponse.redirect(url, 308);
+  setLocaleCookies(response, cookies.country, cookies.locale);
   return response;
 }
 
@@ -174,6 +234,8 @@ export function createSpreeMiddleware(
   const refreshTokenCookieName =
     config.refreshTokenCookieName ?? REFRESH_TOKEN_COOKIE;
   const resolveStorefrontLocale = config.resolveStorefrontLocale;
+  const resolveHostContext = config.resolveHostContext;
+  const closeUnknownHosts = config.closeUnknownHosts ?? true;
 
   return async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
@@ -253,21 +315,68 @@ export function createSpreeMiddleware(
         return response;
       }
 
-      if (
-        !isWholesaleEnabled() &&
-        isLegacyCheckoutPath(pathname.slice(canonicalPrefix.length))
-      ) {
+      const localizedPath = pathname.slice(canonicalPrefix.length);
+
+      if (!isWholesaleEnabled() && isLegacyCheckoutPath(localizedPath)) {
         return legacyCheckoutClosed(request, canonicalPrefix, {
           country,
           locale,
         });
       }
 
+      if (resolveHostContext) {
+        const normalizedPath = localizedPath.replace(/\/+$/, "") || "/";
+        const hostContext: HostContext = await resolveHostContext(
+          request,
+        ).catch((): HostContext => ({ state: "unavailable" }));
+
+        // A Host the API definitively does not know is not a store: answer 404 instead of an empty shell.
+        if (closeUnknownHosts && hostContext.state === "unknown") {
+          return legacyCheckoutClosed(request, canonicalPrefix, null);
+        }
+
+        const nativeWholesaleOpen =
+          hostContext.state === "known" && hostContext.wholesaleBuyer;
+
+        // Native buyer pages exist only where the API says wholesale is open (unknown = closed: fail closed).
+        if (BUYER_PATH.test(normalizedPath) && !nativeWholesaleOpen) {
+          return legacyCheckoutClosed(request, canonicalPrefix, {
+            country,
+            locale,
+          });
+        }
+
+        // The Spree-era portal URLs: when that add-on is off they never render (a real 404, or a redirect to the
+        // native equivalent on a native wholesale host); when it is on they are the portal and pass through.
+        if (
+          !isWholesaleEnabled() &&
+          LEGACY_WHOLESALE_PATH.test(normalizedPath)
+        ) {
+          const equivalent = nativeWholesaleOpen
+            ? nativeWholesaleEquivalent(normalizedPath)
+            : null;
+          return equivalent
+            ? redirectTo(request, `${canonicalPrefix}${equivalent}`, {
+                country,
+                locale,
+              })
+            : legacyCheckoutClosed(request, canonicalPrefix, {
+                country,
+                locale,
+              });
+        }
+      }
+
       return nextWithLocaleContext(request, country, locale);
     }
 
+    // `/sa` alone is a market with no locale. It used to fall through as a page called "sa" and land on
+    // `/sa/ar/sa` (a 404); send it to that market's root with the usual locale negotiation instead.
+    const bareCountry = pathname.match(BARE_COUNTRY);
+
     // Detect country: cookie → geo headers → default
     const country =
+      bareCountry?.[1].toLowerCase() ??
       request.cookies.get(COUNTRY_COOKIE)?.value ??
       request.headers.get("x-vercel-ip-country")?.toLowerCase() ??
       request.headers.get("cf-ipcountry")?.toLowerCase() ??
@@ -303,7 +412,9 @@ export function createSpreeMiddleware(
       cookieLocale ?? storefrontLocale ?? acceptedLocale ?? defaultLocale;
 
     const url = request.nextUrl.clone();
-    url.pathname = `/${country}/${locale}${pathname === "/" ? "" : pathname}`;
+    url.pathname = `/${country}/${locale}${
+      pathname === "/" || bareCountry ? "" : pathname
+    }`;
 
     const response = NextResponse.redirect(url);
     setLocaleCookies(response, country, locale);

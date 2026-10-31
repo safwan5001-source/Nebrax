@@ -189,4 +189,35 @@ describe("commerce/storefront identity (COM-7-P3A)", () => {
       false,
     ]);
   });
+  it("reads capabilities.wholesale_buyer additively: only a literal true opens it (H6 Final Closure)", async () => {
+    for (const [raw, expected] of [
+      [{ wholesale_buyer: true }, true],
+      [{ wholesale_buyer: false }, false],
+      [{ wholesale_buyer: "true" }, false],
+      [{ wholesale_buyer: 1 }, false],
+      [{}, false],
+      [null, false],
+      ["open", false],
+      [[true], false],
+    ] as const) {
+      vi.mocked(fetch).mockResolvedValueOnce(
+        jsonResponse({
+          data: { name: "متجر", capabilities: raw },
+          meta: { request_id: "req-1" },
+        }),
+      );
+      expect((await fetchStorefrontConfig()).capabilities).toEqual({
+        wholesaleBuyer: expected,
+      });
+    }
+  });
+
+  it("an older backend without capabilities is a closed wholesale capability", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({ data: { name: "متجر" }, meta: { request_id: "req-1" } }),
+    );
+    expect((await fetchStorefrontConfig()).capabilities).toEqual({
+      wholesaleBuyer: false,
+    });
+  });
 });

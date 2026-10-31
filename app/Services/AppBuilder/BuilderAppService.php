@@ -21,6 +21,7 @@ final class BuilderAppService
 {
     public function __construct(
         private readonly AppSchemaParser $parser,
+        private readonly BuilderQuota $quota,
     ) {}
 
     /**
@@ -39,6 +40,10 @@ final class BuilderAppService
         $this->parser->validate($schema);
 
         return DB::transaction(function () use ($name, $nameEn, $creationSource, $userId, $schema): BuilderApp {
+            // DRF-07: حدّ عدد التطبيقات (PlanGate) — بعد قفل صفّ المستأجر فلا يتجاوزه طلبان متزامنان.
+            $this->quota->lockTenantRow();
+            $this->quota->assertCanCreateApp();
+
             $app = BuilderApp::create([
                 'name' => $name,
                 'name_en' => $nameEn,

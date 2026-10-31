@@ -37,6 +37,7 @@ final class BuilderPublishedExperienceVersionService
         private readonly CompatibilityResolver $compatibilityResolver,
         private readonly RuntimeGenerations $generations,
         private readonly AppSchemaContractChecker $contractChecker,
+        private readonly BuilderQuota $quota,
     ) {}
 
     /**
@@ -49,6 +50,9 @@ final class BuilderPublishedExperienceVersionService
     {
         return DB::transaction(function () use ($app, $note, $userId, $expectedDraftRevision): BuilderPublishedExperienceVersion {
             $lockedApp = BuilderApp::query()->whereKey($app->id)->lockForUpdate()->firstOrFail();
+
+            // DRF-07: حدّ النسخ المنشورة لكل تطبيق (PlanGate) على الصف المقفول.
+            $this->quota->assertCanPublish($lockedApp);
 
             // AD-01 / S01d: قفل صفّ المسودة نفسه (ترتيب الأقفال: التطبيق ثم المسودة؛ الحفظ يقفل المسودة وحدها
             // فلا جمود). الالتقاط والتحقق والمقارنة كلها على الصفّ المقفول، فلا يُنشر مخطط حُفظ أثناء النشر.
@@ -110,7 +114,8 @@ final class BuilderPublishedExperienceVersionService
      */
     private function validatedSchemaOf(BuilderDraftExperience $draft): array
     {
-        $schema = $draft->schema;
+        // AD-05: ما يُنشر هو المخطط بلا العقد المخفية (اسم القسم/الإخفاء لا يغادران المسودة).
+        $schema = $draft->publishableSchema();
         $this->parser->validate($schema);
 
         // AD-02: تُنشر إن رندرها **أي** جيل Runtime معروف (والجهاز يتلقّى أعلى نسخة متوافقة مع جيله)، وتُرفض إن لم يرندرها أحد.

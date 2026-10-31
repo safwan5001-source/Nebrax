@@ -5,7 +5,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { EyeOff, FlaskConical, ImageOff, ShoppingCart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatRiyal } from '@/lib/money';
-import { registryLabel, type AppBuilderRegistries, type AppSchemaActionRef, type AppSchemaComponent } from '@/lib/app-builder';
+import { readPrimaryColor, registryLabel, type AppBuilderRegistries, type AppSchemaActionRef, type AppSchemaComponent } from '@/lib/app-builder';
 import { presentationCssVars, radiusToken, RADIUS_PRESETS, type RadiusId } from '@/modules/store-experience-builder/presentation/tokens';
 import { resolveNodeBindings } from './runtime-contract';
 import { SAMPLE_RESOURCE_DATA } from './sample-resource-data';
@@ -461,7 +461,7 @@ function CanvasComponentNode({
  * الواجهة خارج الـBuilder)، فأُضيف نطاقٌ منفصل `canvas` بدل تعديله.
  */
 function themeCssVars(tokens: Record<string, string> | undefined): React.CSSProperties {
-  const primary = tokens?.primaryColor;
+  const primary = readPrimaryColor(tokens);
   const radiusId = (RADIUS_PRESETS.some((preset) => preset.id === tokens?.radius) ? tokens!.radius : 'default') as RadiusId;
   const vars: Record<string, string> = { '--canvas-radius': radiusToken(radiusId) };
   if (primary && /^#([0-9a-fA-F]{6})$/.test(primary)) {

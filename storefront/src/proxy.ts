@@ -1,5 +1,8 @@
 import { SUPPORTED_LOCALES } from "@/i18n/locales";
-import { resolveStorefrontDefaultLocaleForRequest } from "@/lib/commerce/edge-storefront-locale";
+import {
+  resolveHostContextForRequest,
+  resolveStorefrontDefaultLocaleForRequest,
+} from "@/lib/commerce/edge-storefront-locale";
 import { createSpreeMiddleware } from "@/lib/spree/middleware";
 import { getDefaultCountry, getDefaultLocale } from "@/lib/store";
 
@@ -8,6 +11,11 @@ export const proxy = createSpreeMiddleware({
   defaultLocale: getDefaultLocale(),
   supportedLocales: SUPPORTED_LOCALES,
   resolveStorefrontLocale: resolveStorefrontDefaultLocaleForRequest,
+  // H6 Final Closure: real 404s for unknown Hosts and for wholesale-only pages on non-wholesale Hosts.
+  resolveHostContext: resolveHostContextForRequest,
+  // Set STOREFRONT_UNKNOWN_HOST_404=0 to restore the old generic-shell behavior for unknown Hosts (e.g. while a
+  // default platform domain is still used for demos). Any other value keeps the real 404.
+  closeUnknownHosts: process.env.STOREFRONT_UNKNOWN_HOST_404 !== "0",
 });
 
 export const config = {

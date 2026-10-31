@@ -35,8 +35,37 @@ function spreeImagePatterns(): RemotePattern[] {
   ];
 }
 
+/**
+ * Response headers for every storefront response (H6 Final Closure). Deliberately conservative: each one is
+ * behavior-neutral for the storefront as shipped.
+ *
+ * - HSTS: the app is only ever served over HTTPS (Railway edge redirects HTTP). No `includeSubDomains`/`preload`:
+ *   tenants bring their own custom domains and their sibling subdomains are not ours to pin.
+ * - Framing: nothing embeds the live storefront (the store customizer previews an in-workspace canvas, and payment
+ *   redirects are top-level navigations), so framing is denied. `frame-ancestors` is the only CSP directive set.
+ * - Permissions-Policy only turns off capabilities the storefront does not use.
+ *
+ * NOT set on purpose: a resource-restricting Content-Security-Policy. Doing that safely needs an inventory of every
+ * script/style/image/connect origin in use (Sentry, payment redirects, R2 media, store customization) and a
+ * report-only soak first; see docs/audits/AWJ_H6_FINAL_CLOSURE_REPORT.md.
+ */
+const SECURITY_HEADERS = [
+  { key: "Strict-Transport-Security", value: "max-age=31536000" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+  {
+    key: "Permissions-Policy",
+    value: "camera=(), microphone=(), geolocation=()",
+  },
+];
+
 const nextConfig: NextConfig = {
   output: "standalone",
+  async headers() {
+    return [{ source: "/:path*", headers: SECURITY_HEADERS }];
+  },
   allowedDevOrigins: ["shop.lvh.me", "*.trycloudflare.com", "192.168.33.13"],
   env: {
     NEXT_PUBLIC_SENTRY_DSN: process.env.SENTRY_DSN || "",

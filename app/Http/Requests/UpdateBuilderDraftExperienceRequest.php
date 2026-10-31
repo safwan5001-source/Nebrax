@@ -25,6 +25,8 @@ class UpdateBuilderDraftExperienceRequest extends FormRequest
     {
         return [
             'schema' => ['required', 'array'],
+            // AD-05 (S20a): غيابه = بلا تغيير، وجوده = استبدال كامل (null يمسح). التحقق والتنظيف في `EditorMeta::normalize`.
+            'editor_meta' => ['sometimes', 'nullable', 'array'],
             // `integer` في Laravel يقبل `true` (يتحوّل إلى 1): نرفض المنطقي صراحةً كي لا يصير أساساً صالحاً.
             'base_revision' => [
                 'nullable',

@@ -62,6 +62,35 @@ void main() {
     expect(find.textContaining('تغيّرت المسودة'), findsNothing);
   });
 
+  testWidgets('the preview renders under the DRAFT\'s theme, not a hardcoded color (THM-09)', (tester) async {
+    const marker = 'THEME_MARKER';
+    Future<Color> primaryFor(Map<String, String> tokens) async {
+      final json = baseSchemaJson(
+        pageOverride: componentNode(
+          type: 'Page',
+          id: 'home-root',
+          children: [componentNode(type: 'Text', id: 'marker', props: {'text': marker})],
+        ),
+      );
+      json['theme'] = {'tokens': tokens};
+      final client = _client((request) async => jsonResponse(200, _successBody(encodeSchema(json))));
+      await tester.pumpWidget(_app(client));
+      await tester.pump();
+      await tester.pump();
+      return Theme.of(tester.element(find.text(marker))).colorScheme.primary;
+    }
+
+    Color seeded(Color seed) => ThemeData(colorSchemeSeed: seed, useMaterial3: true).colorScheme.primary;
+
+    expect(await primaryFor({'colorPrimary': '#1E3A5F'}), seeded(const Color(0xFF1E3A5F)));
+    // الاسم القديم يُقرأ مرادفاً (CPT-04).
+    await tester.pumpWidget(const SizedBox());
+    expect(await primaryFor({'primaryColor': '#B45309'}), seeded(const Color(0xFFB45309)));
+    // بلا رمز لون ⇒ لون العلامة الافتراضي.
+    await tester.pumpWidget(const SizedBox());
+    expect(await primaryFor({}), seeded(const Color(0xFF0F6A5A)));
+  });
+
   testWidgets('draft_changed shows the advisory banner without blocking the render', (tester) async {
     final schemaJson = encodeSchema(baseSchemaJson());
     final client = _client(

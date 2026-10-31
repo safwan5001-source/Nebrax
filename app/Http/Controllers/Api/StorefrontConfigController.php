@@ -7,6 +7,7 @@ use App\Models\StorefrontBusinessProfile;
 use App\Models\Tenant;
 use App\Services\Commerce\StorefrontPresentationService;
 use App\Services\Commerce\StorefrontPublishedMediaResolver;
+use App\Services\Commerce\WholesaleBuyerGate;
 use App\Support\Commerce\BusinessVertical;
 use App\Support\Commerce\PublishedPolicyContent;
 use App\Support\Commerce\StorefrontPresentationNormalizer;
@@ -30,7 +31,7 @@ use Illuminate\Http\Request;
  */
 class StorefrontConfigController extends PublicApiController
 {
-    public function show(Request $request, StorefrontPresentationService $presentations, StorefrontPublishedMediaResolver $mediaResolver): JsonResponse
+    public function show(Request $request, StorefrontPresentationService $presentations, StorefrontPublishedMediaResolver $mediaResolver, WholesaleBuyerGate $wholesaleGate): JsonResponse
     {
         $context = app(StorefrontContext::class);
 
@@ -119,6 +120,9 @@ class StorefrontConfigController extends PublicApiController
                 'presentation' => $presentation,
                 'policy_availability' => $policyAvailability,
                 'presentation_media' => (object) $presentationMedia,
+                // H6 Final Closure — additive, boolean only. Lets the storefront answer a real 404 for the native
+                // buyer pages on a host where wholesale is closed (deployment flag off or channel not wholesale).
+                'capabilities' => ['wholesale_buyer' => $wholesaleGate->isOpen()],
             ],
             'meta' => ['request_id' => PublicApiResponse::requestId($request)],
         ]);

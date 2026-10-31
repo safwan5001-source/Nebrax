@@ -6,6 +6,7 @@ use App\Models\BuilderApp;
 use App\Models\PreviewSession;
 use App\Models\PreviewSessionEvent;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /**
@@ -24,6 +25,8 @@ use RuntimeException;
  */
 class PreviewSessionService
 {
+    public function __construct(private readonly BuilderQuota $quota) {}
+
     /** يصدر جلسة معاينة للمسودة الحالية لتطبيق. يرمي عند غياب مسودة (لا يُفترَض أن يحدث). */
     public function issueForDraft(
         BuilderApp $app,
@@ -35,6 +38,18 @@ class PreviewSessionService
             throw new RuntimeException('قناة معاينة غير معروفة.');
         }
 
+        return DB::transaction(function () use ($app, $issuer, $channel, $deviceLabel): array {
+            // DRF-07: حدّ الجلسات النشطة لكل تطبيق (PlanGate) على صفّ التطبيق المقفول.
+            $lockedApp = BuilderApp::query()->whereKey($app->id)->lockForUpdate()->firstOrFail();
+            $this->quota->assertCanIssuePreview($lockedApp);
+
+            return $this->createSession($lockedApp, $issuer, $channel, $deviceLabel);
+        });
+    }
+
+    /** @return array{session: PreviewSession, token: \Laravel\Sanctum\NewAccessToken} */
+    private function createSession(BuilderApp $app, ?User $issuer, string $channel, ?string $deviceLabel): array
+    {
         $draft = $app->draft()->first();
         if ($draft === null) {
             throw new RuntimeException('لا توجد مسودة لهذا التطبيق.');
@@ -46,7 +61,7 @@ class PreviewSessionService
             'tenant_id' => $app->tenant_id,
             'builder_app_id' => $app->id,
             'source' => PreviewSession::SOURCE_DRAFT,
-            'schema_snapshot' => $draft->schema,
+            'schema_snapshot' => $draft->publishableSchema(),
             'draft_revision' => $draft->revision,
             'channel' => $channel,
             'device_label' => $deviceLabel,
