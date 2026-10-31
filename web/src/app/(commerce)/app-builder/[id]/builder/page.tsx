@@ -19,13 +19,19 @@ import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import {
-  addChildComponent, addPage, appDisplayName, findComponentById, findParentId, generatePageId, hasAppBuilderPermission,
-  mergeThemeTokens, moveSibling, removeComponentById, removePage, reorderChildren, setInitialPage,
+  addChildComponent, addPage, appDisplayName, cloneWithFreshIds, findComponentById, insertChildAfter, findParentId, generatePageId, hasAppBuilderPermission,
+  mergeThemeTokens, moveSibling, registryLabel, removeComponentById, removePage, reorderChildren, setInitialPage,
   themeTokens as schemaThemeTokens, updateComponentById,
   type AppBuilderRegistries, type AppSchema, type AppSchemaActionRef, type AppSchemaComponent, type BuilderApp,
   type BuilderDraftExperience, type BuilderPublishedVersion, type ContractIssue,
 } from '@/lib/app-builder';
 import { resolvePreviewActionOutcome } from '@/modules/app-builder/action-semantics';
+import { EasyCatalogDialog } from '@/modules/app-builder/easy/easy-catalog-dialog';
+import { EasyIdentityPanel } from '@/modules/app-builder/easy/easy-identity-panel';
+import { EasySelectionBar } from '@/modules/app-builder/easy/easy-selection-bar';
+import { EasySectionsPanel } from '@/modules/app-builder/easy/easy-sections-panel';
+import { readEditorMode, sectionContains, writeEditorMode, type EditorMode } from '@/modules/app-builder/easy/editor-mode';
+import { isAddableOnPage, sectionSummary, type EasyCatalogEntry } from '@/modules/app-builder/easy/easy-catalog';
 import { ContractIssuesList, ContractIssuesNotice, parseContractIssues } from '@/modules/app-builder/contract-issues';
 import { AppBuilderCanvas, PREVIEW_WIDTHS, type PreviewDevice } from '@/modules/app-builder/canvas';
 import { DEFAULT_APP_EXPERIENCE } from '@/modules/app-builder/default-experience';
@@ -42,7 +48,7 @@ import { useUnsavedChangesGuard } from '@/modules/app-builder/unsaved-guard';
 import { ThemePanel } from '@/modules/app-builder/theme-panel';
 
 type MobilePanel = 'structure' | 'inspector';
-type StructureMode = 'pages' | 'theme';
+type StructureMode = 'pages' | 'theme' | 'identity';
 /**
  * MOBILE-PREVIEW-3 — المحور العلوي الجديد المستقل عن `PreviewState` أدناه: `design` هو
  * سطح التحرير الحالي بلا أي تغيير (`AWJ_APP_BUILDER_REAL_MOBILE_PREVIEW_HORIZON.md` §2/6).
@@ -107,6 +113,13 @@ export default function AppBuilderWorkspacePage() {
   const [device, setDevice] = useState<PreviewDevice>('desktop');
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>('structure');
   const [structureMode, setStructureMode] = useState<StructureMode>('pages');
+  // الوضع السهل/المتقدم (V2): تفضيل عرض لكل مستخدم/تطبيق، لا يمسّ المسودة. القراءة بعد التركيب (تجنّب اختلاف الـhydration).
+  const [editorMode, setEditorModeState] = useState<EditorMode>('easy');
+  const [catalogOpen, setCatalogOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  // «تراجع عن الحذف» يُعرض ما دام الحذف آخر تعديل: يُلتقط مخطط ما بعد الحذف، وأي مخطط مختلف لاحقاً يُبطله (مراجعة Codex).
+  const [pendingDeleteName, setPendingDeleteName] = useState<string | null>(null);
+  const [deleteUndo, setDeleteUndo] = useState<{ name: string; schema: AppSchema } | null>(null);
   const [publishOpen, setPublishOpen] = useState(false);
   const [publishNote, setPublishNote] = useState('');
   const [validation, setValidation] = useState<{ status: 'checking' | 'passed' | 'failed'; message?: string; issues?: ContractIssue[] }>({ status: 'checking' });
@@ -184,6 +197,7 @@ export default function AppBuilderWorkspacePage() {
         pastRef.current = [];
         futureRef.current = [];
         setDirty(false);
+        setEditorModeState(readEditorMode(backupUserId, params.id));
         setStructureMode('pages');
         setPreviewThemeTokens(null);
         setRegistries(registriesRes.data);
@@ -199,6 +213,14 @@ export default function AppBuilderWorkspacePage() {
 
   schemaRef.current = schema;
   dirtyRef.current = dirty;
+  useEffect(() => {
+    if (pendingDeleteName !== null && schema) {
+      setDeleteUndo({ name: pendingDeleteName, schema });
+      setPendingDeleteName(null);
+    } else if (deleteUndo && schema !== deleteUndo.schema) {
+      setDeleteUndo(null);
+    }
+  }, [schema, pendingDeleteName, deleteUndo]);
   // حارس المغادرة: beforeunload + الروابط الداخلية + زر الرجوع (AD-01 / S01b).
   const leaveGuard = useUnsavedChangesGuard(dirty);
 
@@ -647,6 +669,57 @@ export default function AppBuilderWorkspacePage() {
     setSelectedComponentId(parentId);
   }
 
+  function setEditorMode(mode: EditorMode) {
+    setEditorModeState(mode);
+    if (params.id) writeEditorMode(backupUserId, params.id, mode);
+  }
+
+  async function renameApp(name: string, nameEn: string | null) {
+    if (!canManage || !params.id || renaming) return;
+    setRenaming(true);
+    try {
+      const res = await api<{ data: BuilderApp }>(`/app-builder/apps/${params.id}`, { method: 'PATCH', body: { name, name_en: nameEn } });
+      if (res?.data) setApp(res.data);
+      toast.success(t('easy.identity.saved'));
+    } catch (err) {
+      toast.error(t('easy.identity.saveFailed'), err instanceof ApiError ? err.message : undefined);
+    } finally {
+      setRenaming(false);
+    }
+  }
+
+  /** الأقسام = أبناء جذر الصفحة المباشرون (الوضع السهل). كل تعديل عبر applyPageEdit نفسه (تراجع/حفظ تفاؤلي/صلاحيات). */
+  function easyDuplicate(id: string) {
+    if (!canManage || !selectedPageId || !currentPageRoot) return;
+    const source = findComponentById(currentPageRoot, id);
+    if (!source) return;
+    const copy = cloneWithFreshIds(source);
+    applyPageEdit(selectedPageId, (root) => insertChildAfter(root, root.id, id, copy));
+    setSelectedComponentId(copy.id);
+  }
+
+  function easyDelete(id: string, name: string) {
+    if (!canManage || !selectedPageId || !currentPageRoot) return;
+    applyPageEdit(selectedPageId, (root) => removeComponentById(root, id));
+    setSelectedComponentId(currentPageRoot.id);
+    setPendingDeleteName(name);
+  }
+
+  function easyUndoDelete() {
+    undo();
+    setDeleteUndo(null);
+  }
+
+  function easyAdd(entry: EasyCatalogEntry) {
+    if (!canManage || !selectedPageId || !currentPageRoot || !entry.build || !isAddableOnPage(entry, selectedPageId)) return;
+    const created = entry.build();
+    // بعد القسم المحدد (أو أحد أبنائه)، وإلا في النهاية.
+    const afterId = (currentPageRoot.children ?? []).find((section) => findComponentById(section, selectedComponentId ?? '') !== null)?.id ?? null;
+    applyPageEdit(selectedPageId, (root) => insertChildAfter(root, root.id, afterId, created));
+    setSelectedComponentId(created.id);
+    setCatalogOpen(false);
+  }
+
   function reorderSiblings(pageId: string, parentId: string, orderedIds: string[]) {
     applyPageEdit(pageId, (root) => reorderChildren(root, parentId, orderedIds));
   }
@@ -685,7 +758,7 @@ export default function AppBuilderWorkspacePage() {
   const structurePanel = (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center gap-1 border-b border-border p-2">
-        {(['pages', 'theme'] as const).map((mode) => (
+        {((editorMode === 'easy' ? ['pages', 'theme', 'identity'] : ['pages', 'theme']) as StructureMode[]).map((mode) => (
           <button
             key={mode}
             type="button"
@@ -696,12 +769,34 @@ export default function AppBuilderWorkspacePage() {
               structureMode === mode ? 'bg-primary text-primary-foreground' : 'text-muted hover:bg-primary-soft hover:text-primary'
             )}
           >
-            {mode === 'pages' ? t('pagesTitle') : t('theme.tabLabel')}
+            {mode === 'pages' ? t('pagesTitle') : mode === 'theme' ? t('theme.tabLabel') : t('easy.identity.tab')}
           </button>
         ))}
       </div>
       {structureMode === 'pages' ? (
         <>
+          {editorMode === 'easy' ? (
+            // الوضع السهل: الصفحات شرائح مدمجة (اختيار + إضافة) لتبقى المساحة لقائمة الأقسام، خصوصاً على الجوال. تعيين الرئيسية وحذف الصفحة في الوضع المتقدم.
+            <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-border p-2" role="group" aria-label={t('pagesTitle')}>
+              {pageIds.map((pageId) => (
+                <button
+                  key={pageId}
+                  type="button"
+                  onClick={() => selectPage(pageId)}
+                  aria-current={pageId === selectedPageId ? 'page' : undefined}
+                  className={cn(
+                    'h-8 max-w-[9rem] truncate rounded-full border px-3 text-xs font-medium',
+                    pageId === selectedPageId ? 'border-primary bg-primary-soft text-primary' : 'border-border text-text hover:bg-background'
+                  )}
+                >
+                  {pageId}{pageId === schema.navigation?.initialPageId ? ' ★' : ''}
+                </button>
+              ))}
+              <Button type="button" variant="outline" size="icon" className="h-8 w-8 rounded-full" aria-label={t('pages.addAction')} title={t('pages.addAction')} disabled={!canManage} onClick={addNewPage}>
+                <Plus className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
+              </Button>
+            </div>
+          ) : (
           <div className="shrink-0 space-y-0.5 border-b border-border p-2">
             {pageIds.map((pageId) => {
               const isInitial = pageId === schema.navigation?.initialPageId;
@@ -753,6 +848,28 @@ export default function AppBuilderWorkspacePage() {
               {t('pages.addAction')}
             </Button>
           </div>
+          )}
+          {editorMode === 'easy' ? (
+            <div className="min-h-0 flex-1">
+              <EasySectionsPanel
+                sections={currentPageRoot?.children ?? []}
+                selectedId={selectedComponentId}
+                canManage={canManage}
+                registries={registries}
+                locale={locale}
+                t={t}
+                onSelect={selectComponent}
+                onMove={(id, direction) => selectedPageId && moveNode(selectedPageId, id, direction)}
+                onDuplicate={easyDuplicate}
+                onDelete={easyDelete}
+                onAdd={() => setCatalogOpen(true)}
+                onUndo={easyUndoDelete}
+                canUndo={canUndo}
+                undoBanner={deleteUndo ? { name: deleteUndo.name } : null}
+              />
+            </div>
+          ) : (
+          <>
           <div className="shrink-0 px-3 py-2">
             <p className="text-xs font-semibold text-muted">{t('layersTitle')}</p>
           </div>
@@ -767,7 +884,11 @@ export default function AppBuilderWorkspacePage() {
               registries={registries}
             />
           </div>
+          </>
+          )}
         </>
+      ) : structureMode === 'identity' ? (
+        <EasyIdentityPanel name={app.name} nameEn={app.name_en} canManage={canManage} saving={renaming} onSave={renameApp} t={t} />
       ) : (
         <p className="px-3 py-4 text-xs leading-relaxed text-muted">{t('theme.tabDescription')}</p>
       )}
@@ -788,6 +909,7 @@ export default function AppBuilderWorkspacePage() {
           onAddChild={addChildToSelected}
           onRemove={removeSelected}
           canRemove={Boolean(selectedNode && currentPageRoot && selectedNode.id !== currentPageRoot.id)}
+          mode={editorMode}
         />
       )}
     </div>
@@ -971,6 +1093,17 @@ export default function AppBuilderWorkspacePage() {
     </>
   );
 
+  // القسم الحاوي للعنصر المحدد (الوضع السهل): أول ابن مباشر لجذر الصفحة يحتويه؛ يقود شريط التحديد.
+  const selectedSectionInfo = (() => {
+    const list = currentPageRoot?.children ?? [];
+    const index = list.findIndex((section) => sectionContains(section, selectedComponentId));
+    if (index < 0) return null;
+    const section = list[index];
+    const summary = sectionSummary(section);
+    const definition = registries?.components[summary.primaryType];
+    return { id: section.id, index, count: list.length, name: summary.title ?? (definition ? registryLabel(definition.label, locale) : summary.primaryType) };
+  })();
+
   const notices = (
     <>
       {!canManage ? (
@@ -1015,6 +1148,24 @@ export default function AppBuilderWorkspacePage() {
         </Button>
         <p className="min-w-0 truncate text-sm font-semibold text-text">{appDisplayName(app, previewLocale)}</p>
         {statusBadge}
+
+        {/* V2 — الوضع السهل/المتقدم: يبدّل العرض فقط؛ المسودة واحدة ولا شيء يُمسح عند التبديل. */}
+        <div className="flex shrink-0 items-center gap-1 rounded-md border border-border p-1" role="group" aria-label={t('easy.modeLabel')}>
+          {(['easy', 'advanced'] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              aria-pressed={editorMode === mode}
+              onClick={() => setEditorMode(mode)}
+              className={cn(
+                'h-7 rounded px-2.5 text-xs font-medium',
+                editorMode === mode ? 'bg-primary text-primary-foreground' : 'text-muted hover:bg-primary-soft hover:text-primary'
+              )}
+            >
+              {t(`easy.mode.${mode}`)}
+            </button>
+          ))}
+        </div>
 
         {/* MOBILE-PREVIEW-3 — top-level Design / App Preview switch. Deliberately not
             `hidden ... sm:flex` like the other toggle groups below: this is the primary
@@ -1161,7 +1312,20 @@ export default function AppBuilderWorkspacePage() {
           {isDraftView ? structurePanel : readOnlyPagePanel}
         </aside>
 
-        <div className="flex min-h-0 min-w-0 flex-1">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {isDraftView && editorMode === 'easy' && selectedSectionInfo ? (
+            <EasySelectionBar
+              name={selectedSectionInfo.name}
+              position={{ index: selectedSectionInfo.index, count: selectedSectionInfo.count }}
+              canManage={canManage}
+              onMoveUp={() => selectedPageId && moveNode(selectedPageId, selectedSectionInfo.id, 'up')}
+              onMoveDown={() => selectedPageId && moveNode(selectedPageId, selectedSectionInfo.id, 'down')}
+              onDuplicate={() => easyDuplicate(selectedSectionInfo.id)}
+              onDelete={() => easyDelete(selectedSectionInfo.id, selectedSectionInfo.name)}
+              t={t}
+            />
+          ) : null}
+          <div className="flex min-h-0 min-w-0 flex-1">
           {isDraftView ? (
             <AppBuilderCanvas
               root={currentPageRoot}
@@ -1195,6 +1359,7 @@ export default function AppBuilderWorkspacePage() {
               }
             />
           )}
+          </div>
         </div>
 
         <aside className="hidden w-72 shrink-0 overflow-hidden border-s border-border bg-surface lg:block">
@@ -1335,6 +1500,7 @@ export default function AppBuilderWorkspacePage() {
           </div>
         </div>
       </Dialog>
+      <EasyCatalogDialog open={catalogOpen} onClose={() => setCatalogOpen(false)} onPick={easyAdd} pageId={selectedPageId} t={t} />
       {safetyDialogs}
     </div>
   );
