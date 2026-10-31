@@ -3,11 +3,11 @@
 | | |
 |---|---|
 | Branch | `claude/h6-final-closure` |
-| PR | __PR__ |
+| PR | https://github.com/safwan5001-source/Nebrax/pull/1841 |
 | Base SHA (origin/main) | `89f4117ca1d6d2d3bbdc6b3e77482305e663f6a2` (#1832, Batch M) |
-| Head SHA | __HEAD__ |
+| Head SHA | `227f6ba563537857e1c7a32b126e028d807eb7ef` (before this link-up commit) |
 | Related open PR | #1836 (Batch N verification report) — see §1 |
-| CI | __CI__ |
+| CI | see PR checks; result recorded in §7 |
 
 Nothing was merged, deployed, restarted or migrated against a deployed environment; no environment variable was changed; wholesale stays disabled by default; no Spree code or route was deleted. The E2E seed ran only against a throwaway local SQLite file.
 
@@ -137,7 +137,7 @@ Only what the buyer journey needs; no financial policy invented; nothing deleted
 | New PHP tests | `StorefrontWholesaleCapabilityTest` (6) |
 | New/extended storefront tests | `middleware.test.ts` (+17 closure cases), `edge-storefront-locale.test.ts` (+7), `storefront.test.ts` (+2), `account-links.test.ts` (2), `next-config-headers.test.ts` (3) |
 | Browser E2E (existing Batch L/M suite, Chromium, loopback throwaway stack) | **44 / 44 passed** on the final source (desktop-en 1280×900 + mobile-ar 390×844, Chromium, real Laravel on a throwaway SQLite, production-mode `next start`, `E2E_NO_BUCKET_RESET=1`): the 36-test Batch L/M suite plus **H01–H08** (retail real 404s, unknown host 404, wholesale redirects, native account links, headers, cookies, bare country, mobile/Arabic). Run history, stated plainly: run 1 was 41/44 with **H05 failing for a real reason** (see below); run 2 (after the fix) was 43/44 with one `sign-in did not complete (timeout)` in the price-precedence block that **passed in isolation** (4.0 s) — the known shared login-brake harness sensitivity, not a product failure; run 3, a fresh seed with no code change, was **44/44**. |
-| `CI Gate` / CI on this PR | __CI_RESULT__ |
+| `CI Gate` / CI on this PR | pending at time of writing — see the PR checks |
 
 **Changed existing tests:** none weakened. `middleware.test.ts`, `edge-storefront-locale.test.ts` and `storefront.test.ts` only gained cases; the E2E spec gained H01–H08. Behaviour covered by the old cases (locale fall-through, fail-closed resolver, cookie values, X5b) still passes unmodified.
 
