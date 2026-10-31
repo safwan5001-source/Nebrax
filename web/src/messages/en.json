@@ -8873,9 +8873,9 @@
         "unsupportedShape": "This condition was set up in a more advanced way than this editor supports. Reset it to start over.",
         "reset": "Reset to \"Always visible\"",
         "signalOption": {
-          "cart.itemCount": "Cart item count",
-          "customer.isAuthenticated": "Customer is signed in",
-          "product.inStock": "Product is in stock"
+          "cart_itemCount": "Cart item count",
+          "customer_isAuthenticated": "Customer is signed in",
+          "product_inStock": "Product is in stock"
         },
         "operatorOption": {
           "equals": "equals",

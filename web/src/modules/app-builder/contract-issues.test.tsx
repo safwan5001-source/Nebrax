@@ -46,3 +46,15 @@ describe('contract issue codes', () => {
     expect(screen.getByTestId('contract-issues')).toBeTruthy();
   });
 });
+
+describe('visibility signal labels', () => {
+  it('every dotted signal id has a dot-free message key in both languages (next-intl reads dots as nesting)', async () => {
+    const { signalKey } = await import('./inspector');
+    expect(signalKey('cart.itemCount')).toBe('cart_itemCount');
+    for (const messages of [arMessages, enMessages]) {
+      const options = (messages as unknown as { appBuilder: { builder: { visibility: { signalOption: Record<string, string> } } } }).appBuilder.builder.visibility.signalOption;
+      for (const key of Object.keys(options)) expect(key.includes('.'), key).toBe(false);
+      for (const signal of ['cart.itemCount', 'customer.isAuthenticated', 'product.inStock']) expect(options[signalKey(signal)], signal).toBeTruthy();
+    }
+  });
+});
