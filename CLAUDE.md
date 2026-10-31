@@ -688,6 +688,13 @@ ZATCA فيها NULL) صالحة بلا مدخل سلسلة. أعمدة ZATCA ي�
 - **النشر:** الكود أولاً ثم الهجرة. نسخة أقدم من الخدمة أثناء إيقاف قائم تُرفض بخطأ قاعدة (500) بدل 422 (فشل مغلق). D-B5 (أثر محاسبي/ضريبي لتأخر الاستردادات ومهل الإصدار) **غير معتمد** لتفعيل إنتاجي.
 - المرجع: `docs/audits/horizon/REM-18b-3d-IMPLEMENTATION-REPORT.md` و`REM-18b-3c-EMERGENCY-STOP-POLICY-B-CONTRACT-PROPOSAL.md`.
 
+## حقل الهاتف الدولي — INTL-PHONE-V1
+
+`web/src/components/ui/international-phone-input.tsx` (`InternationalPhoneInput`) هو حقل الهاتف المشترك؛ يستعمله `/register` أولاً ويصلح للعملاء والموردين والموظفين لاحقاً. المنطق في `web/src/lib/phone/` (`digits.ts` تطبيع الأرقام، `phone.ts` فوق libphonenumber-js `max`، `countries.ts` القائمة والبحث).
+- **قاعدة صلبة:** أرقام الهاتف ومفاتيح الاتصال تُعرض وتُعالج وتُحفظ **0–9 إنجليزية فقط** مهما كانت لغة الواجهة؛ التحويل فعلي على القيمة (كتابة/لصق/بحث) لا CSS، والعرض `dir="ltr"`. القيمة المُرسلة E.164 (`+9665XXXXXXXX`).
+- التحقق حسب الدولة (`isValidE164`، جوال فقط افتراضياً)، والبادئة الوطنية تُزال ولا يتكرر رمز الدولة. الخادم (`RegisterRequest`) يطبّع الأرقام العربية/الفارسية ويشترط E.164 شكلاً فقط (لا libphonenumber في PHP)؛ الحقل اختياري كما كان.
+- الأعلام SVG حقيقية منسوخة من `country-flag-icons` (MIT) إلى `web/public/flags/` (انظر `LICENSE.txt` هناك).
+
 ## الترقيم التسلسلي
 
 كل أرقام المستندات تُولَّد من مصدر واحد: `App\Support\GeneratesDocumentNumbers` (trait على النموذج).

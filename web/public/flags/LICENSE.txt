@@ -1,0 +1,3 @@
+Flag artwork in this directory is copied unmodified from the npm package
+"country-flag-icons" (3x2 set), https://gitlab.com/catamphetamine/country-flag-icons
+Licensed under the MIT License. Copyright (c) 2020 catamphetamine <purecatamphetamine@gmail.com>
