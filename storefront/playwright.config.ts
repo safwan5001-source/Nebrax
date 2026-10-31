@@ -14,6 +14,8 @@ import { defineConfig, devices } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./e2e",
+  // Needs the throwaway Laravel stack (scripts/e2e/wholesale-stack.sh) — runs under playwright.wholesale-e2e.config.ts only.
+  testIgnore: /wholesale-buyer-journey\.spec\.ts/,
   // The guest checkout walks home → PDP → cart → checkout → Stripe against
   // dev-mode Next.js + dockerized Spree, which blows well past Playwright's
   // 30s default on CI runners — each retry was dying mid-flow wherever it
