@@ -8893,6 +8893,11 @@
       "optionalOn": "إن لم يدعم إصدار التطبيق هذا المكوّن يُحذف بدل أن تفشل التجربة كلها، ويظهر في تقرير التوافق قبل النشر.",
       "optionalOff": "مطلوب: إن لم يدعم إصدار التطبيق هذا المكوّن فلن تُنشر التجربة.",
       "propsTitle": "الخصائص",
+      "fieldA11y": {
+        "itemName": "{label} — العنصر {n}",
+        "removeItem": "حذف العنصر {n} من {label}",
+        "addItem": "إضافة عنصر إلى {label}"
+      },
       "noProps": "لا خصائص لهذا المكوّن.",
       "actionTitle": "الإجراء",
       "noAction": "بلا إجراء",
@@ -8907,6 +8912,7 @@
         "searchPlaceholder": "اتركه فارغاً لعرض الكل",
         "sortLabel": "الترتيب حسب",
         "sortNoneOption": "الترتيب الافتراضي",
+        "sortDirectionLabel": "اتجاه الترتيب",
         "sortDirectionAscending": "تصاعدي",
         "sortDirectionDescending": "تنازلي",
         "mappingTitle": "ربط الحقول",
@@ -8922,6 +8928,12 @@
         "signalPlaceholder": "اختر إشارة",
         "operatorPlaceholder": "اختر مقارنة",
         "valuePlaceholder": "القيمة",
+        "leaf": {
+          "signal": "الشرط {n}: الإشارة",
+          "operator": "الشرط {n}: المقارنة",
+          "value": "الشرط {n}: القيمة",
+          "remove": "حذف الشرط {n}"
+        },
         "valueListPlaceholder": "قيَم مفصولة بفواصل",
         "addCondition": "إضافة شرط",
         "unsupportedShape": "أُعِدّ هذا الشرط بطريقة أكثر تقدماً مما يدعمه هذا المحرِّر. أعِد ضبطه للبدء من جديد.",
