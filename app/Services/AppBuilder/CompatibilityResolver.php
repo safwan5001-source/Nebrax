@@ -73,7 +73,12 @@ final class CompatibilityResolver
         $fallbacks = [];
         foreach (($schema['pages'] ?? []) as $pageId => $root) {
             $requiredFailure = null;
+            $before = count($fallbacks);
             $resolvedRoot = $this->resolveComponent($root, $manifest, $fallbacks, $requiredFailure);
+            // S03b: الصفحة التي أُسقط منها كل تجاوز (معرّف المكوّن يتكرر عبر الصفحات؛ فرادته داخل الصفحة وحدها).
+            for ($i = $before; $i < count($fallbacks); $i++) {
+                $fallbacks[$i]['pageId'] = (string) $pageId;
+            }
             if ($resolvedRoot === false) {
                 // LIVE-PREVIEW-5: names the actual unsupported node, not just the page,
                 // whenever `resolveComponent` identified one — see that method's own
@@ -107,7 +112,7 @@ final class CompatibilityResolver
      * آمن لعقدة اختيارية (`$fallbacks`)، فلا يظهر خطأ فرعٍ آمنٍ مُسقَط في
      * رسالة فشلٍ فعلية غير ذات صلة لاحقاً.
      *
-     * @param  array<int, array{componentId: string, componentType: string, reason: string}>  &$fallbacks
+     * @param  array<int, array{componentId: string, componentType: string, reason: string, pageId?: string}>  &$fallbacks
      * @param  array{componentId: string, componentType: string}|null  &$requiredFailure
      */
     private function resolveComponent(array $node, CapabilityManifest $manifest, array &$fallbacks, ?array &$requiredFailure): bool

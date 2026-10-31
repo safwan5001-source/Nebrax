@@ -21,7 +21,7 @@ final class CompatibilityResult
     public const REASON_MISSING_REQUIRED_CAPABILITY = 'missingRequiredCapability';
 
     /**
-     * @param  array<int, array{componentId: string, componentType: string, reason: string}>  $fallbacks
+     * @param  array<int, array{componentId: string, componentType: string, reason: string, pageId?: string}>  $fallbacks
      */
     private function __construct(
         public readonly bool $compatible,
@@ -31,7 +31,7 @@ final class CompatibilityResult
     ) {}
 
     /**
-     * @param  array<int, array{componentId: string, componentType: string, reason: string}>  $fallbacks
+     * @param  array<int, array{componentId: string, componentType: string, reason: string, pageId?: string}>  $fallbacks
      */
     public static function compatible(array $fallbacks = []): self
     {
