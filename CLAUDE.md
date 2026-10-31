@@ -435,7 +435,7 @@ php artisan serve
 
 ## بيانات المحرر (AD-05 / S20a) — `editor_meta`
 
-عمود `builder_draft_experiences.editor_meta` (JSON، nullable) يحمل ما لا مكان له في AppSchema: **اسم القسم، إخفاؤه، نوعه الجاهز (preset)، عنوان الصفحة** (`App\Services\AppBuilder\EditorMeta`، عقد `contracts/app-builder/editor-meta.v1.json`).
+عمود `builder_draft_experiences.editor_meta` (JSON، nullable) يحمل ما لا مكان له في AppSchema: **اسم القسم، إخفاؤه، نوعه الجاهز (preset)، عنوان الصفحة**. **إدخالات العقد مقيَّدة بصفحتها** (`nodes.<pageId>.<nodeId>`) لأن فرادة `component.id` داخل الصفحة وحدها (`App\Services\AppBuilder\EditorMeta`، عقد `contracts/app-builder/editor-meta.v1.json`).
 - **يُحفظ بالقفل التفاؤلي نفسه** (`PUT draft` + `editor_meta` اختياري: غيابه = بلا تغيير، وجوده = استبدال كامل، null يمسح). `normalize()` يتحقق (شكل/أنواع/أطوال/حجم `config('app_builder.max_editor_meta_bytes')` 65536/جذر الصفحة لا يُخفى ⇒ 422 برمز) **وينظّف** إدخالات عقد/صفحات لم تعد في المخطط.
 - **لا يدخل ما يُنشر أو يُعاين:** كل قراءة للمسودة للنشر/المعاينة/فاحصة العقد تمرّ بـ`BuilderDraftExperience::publishableSchema()` (يُسقط العقد المخفية وأبناءها)؛ الأسماء والعناوين والـpresets لا تغادر المسودة. **لا تقرأ `$draft->schema` الخام في مسار نشر/معاينة جديد.**
 

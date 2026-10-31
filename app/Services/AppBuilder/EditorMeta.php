@@ -10,9 +10,12 @@ namespace App\Services\AppBuilder;
  * شكل v1 (JSON، `builder_draft_experiences.editor_meta`):
  *
  *   { "v": 1,
- *     "nodes": { "<nodeId>": { "name"?: string 1..80, "hidden"?: true, "preset"?: string },
+ *     "nodes": { "<pageId>": { "<nodeId>": { "name"?: string 1..80, "hidden"?: true, "preset"?: string } } },
  *     "pages": { "<pageId>": { "title"?: string 1..80 } } }
  *
+ * - **العقد مقيَّدة بصفحتها:** فرادة `component.id` مفروضة داخل الصفحة وحدها (تكرارها عبر صفحات مسموح)، فمفتاح الإخفاء
+ *   `(pageId, nodeId)` لا `nodeId` وحده — وإلا أخفى إخفاءُ عقدة في صفحة عقدةً تحمل معرّفها في صفحة أخرى.
+
  * - **لا يدخل ما يُنشر أو يُعاين:** `project()` يُسقط العقد المخفية من المخطط، فالنسخة المنشورة وجلسات المعاينة وفاحصة العقد
  *   كلها ترى الناتج بلا المخفي؛ المخفي يبقى في المسودة وحدها ويُظهره المحرر. أسماء الأقسام وعناوين الصفحات لا تغادر المسودة.
  * - **`normalize()` يتحقق ثم ينظّف:** الشكل والأنواع والأطوال والحجم صارمة (ترفض 422 برمز)، وإدخالات العقد/الصفحات التي لم تعد
@@ -63,25 +66,38 @@ final class EditorMeta
         $nodeIds = [];
         foreach ($pages as $pageId => $root) {
             if (is_array($root)) {
-                $roots[(string) ($root['id'] ?? '')] = true;
-                $this->collectIds($root, $nodeIds);
+                $roots[(string) $pageId] = (string) ($root['id'] ?? '');
+                $ids = [];
+                $this->collectIds($root, $ids);
+                $nodeIds[(string) $pageId] = $ids;
             }
         }
 
-        $nodes = $this->entries($meta['nodes'] ?? [], 'nodes');
+        $nodesByPage = $this->entries($meta['nodes'] ?? [], 'nodes');
         $pagesMeta = $this->entries($meta['pages'] ?? [], 'pages');
-        if (count($nodes) + count($pagesMeta) > self::MAX_ENTRIES) {
+        $total = count($pagesMeta);
+        foreach ($nodesByPage as $pageId => $perPage) {
+            $total += count($this->entries($perPage, "nodes.{$pageId}"));
+        }
+        if ($total > self::MAX_ENTRIES) {
             throw new SchemaFormatException('editor_meta_too_large', 'عدد إدخالات بيانات المحرر يتجاوز الحد.');
         }
 
         $outNodes = [];
-        foreach ($nodes as $id => $entry) {
-            $clean = $this->cleanEntry($entry, self::NODE_KEYS, "nodes.{$id}");
-            if (($clean['hidden'] ?? false) === true && isset($roots[$id])) {
-                throw new SchemaFormatException('editor_meta_hidden_root', 'لا يمكن إخفاء جذر الصفحة.');
+        foreach ($nodesByPage as $pageId => $perPage) {
+            $pageId = (string) $pageId;
+            $kept = [];
+            foreach ($this->entries($perPage, "nodes.{$pageId}") as $id => $entry) {
+                $clean = $this->cleanEntry($entry, self::NODE_KEYS, "nodes.{$pageId}.{$id}");
+                if (($clean['hidden'] ?? false) === true && ($roots[$pageId] ?? null) === (string) $id) {
+                    throw new SchemaFormatException('editor_meta_hidden_root', 'لا يمكن إخفاء جذر الصفحة.');
+                }
+                if ($clean !== [] && isset($nodeIds[$pageId][(string) $id])) {
+                    $kept[(string) $id] = $clean;
+                }
             }
-            if ($clean !== [] && isset($nodeIds[$id])) {
-                $outNodes[$id] = $clean;
+            if ($kept !== []) {
+                $outNodes[$pageId] = $kept;
             }
         }
         $outPages = [];
@@ -108,19 +124,21 @@ final class EditorMeta
      */
     public function project(array $schema, ?array $meta): array
     {
-        $hidden = [];
-        foreach (($meta['nodes'] ?? []) as $id => $entry) {
-            if (is_array($entry) && ($entry['hidden'] ?? false) === true) {
-                $hidden[(string) $id] = true;
+        $hiddenByPage = [];
+        foreach (($meta['nodes'] ?? []) as $pageId => $perPage) {
+            foreach ((is_array($perPage) ? $perPage : []) as $id => $entry) {
+                if (is_array($entry) && ($entry['hidden'] ?? false) === true) {
+                    $hiddenByPage[(string) $pageId][(string) $id] = true;
+                }
             }
         }
-        if ($hidden === [] || ! is_array($schema['pages'] ?? null)) {
+        if ($hiddenByPage === [] || ! is_array($schema['pages'] ?? null)) {
             return $schema;
         }
 
         foreach ($schema['pages'] as $pageId => $root) {
-            if (is_array($root)) {
-                $schema['pages'][$pageId] = $this->prune($root, $hidden);
+            if (is_array($root) && isset($hiddenByPage[(string) $pageId])) {
+                $schema['pages'][$pageId] = $this->prune($root, $hiddenByPage[(string) $pageId]);
             }
         }
 

@@ -48,9 +48,12 @@ class BuilderEditorMetaTest extends TestCase
         return $this->withToken($token)->putJson("/api/app-builder/apps/{$appId}/draft", $this->builderDraftBody($appId, $schema ?? $this->schema()) + $extra);
     }
 
-    private function meta(array $nodes = [], array $pages = []): array
+    /** @param array<string, array<string, mixed>> $nodes عقد صفحة `home` (الصفحات الأخرى عبر $otherPages: ['about' => [...]]) */
+    private function meta(array $nodes = [], array $pages = [], array $otherPages = []): array
     {
-        return ['v' => 1, 'nodes' => $nodes, 'pages' => $pages];
+        $byPage = array_filter(['home' => $nodes] + $otherPages, fn ($n) => $n !== []);
+
+        return ['v' => 1, 'nodes' => $byPage, 'pages' => $pages];
     }
 
     /** @test */
@@ -61,12 +64,12 @@ class BuilderEditorMetaTest extends TestCase
 
         $this->save($auth['token'], $appId, ['editor_meta' => $meta])->assertOk()
             ->assertJsonPath('data.revision', 1)
-            ->assertJsonPath('data.editor_meta.nodes.sec-a.name', 'الترحيب')
-            ->assertJsonPath('data.editor_meta.nodes.sec-b.hidden', true)
+            ->assertJsonPath('data.editor_meta.nodes.home.sec-a.name', 'الترحيب')
+            ->assertJsonPath('data.editor_meta.nodes.home.sec-b.hidden', true)
             ->assertJsonPath('data.editor_meta.pages.about.title', 'من نحن');
 
         $this->withToken($auth['token'])->getJson("/api/app-builder/apps/{$appId}/draft")->assertOk()
-            ->assertJsonPath('data.editor_meta.nodes.sec-a.preset', 'text');
+            ->assertJsonPath('data.editor_meta.nodes.home.sec-a.preset', 'text');
     }
 
     /** @test */
@@ -75,7 +78,7 @@ class BuilderEditorMetaTest extends TestCase
         [$auth, $appId] = $this->newApp('ad05-absent');
         $this->save($auth['token'], $appId, ['editor_meta' => $this->meta(['sec-a' => ['name' => 'س']])])->assertOk();
 
-        $this->save($auth['token'], $appId)->assertOk()->assertJsonPath('data.editor_meta.nodes.sec-a.name', 'س');
+        $this->save($auth['token'], $appId)->assertOk()->assertJsonPath('data.editor_meta.nodes.home.sec-a.name', 'س');
         $this->save($auth['token'], $appId, ['editor_meta' => null])->assertOk()->assertJsonPath('data.editor_meta', null);
     }
 
@@ -127,7 +130,7 @@ class BuilderEditorMetaTest extends TestCase
         array_pop($smaller['pages']['home']['children']); // حُذف sec-b
         $response = $this->save($auth['token'], $appId, [], $smaller)->assertOk();
 
-        $this->assertSame(['sec-a'], array_keys($response->json('data.editor_meta.nodes')));
+        $this->assertSame(['sec-a'], array_keys($response->json('data.editor_meta.nodes.home')));
     }
 
     /** @test */
@@ -160,13 +163,15 @@ class BuilderEditorMetaTest extends TestCase
             'unknown top key' => [['v' => 1, 'mystery' => 1]],
             'wrong version' => [['v' => 2, 'nodes' => []]],
             'nodes as a list' => [['v' => 1, 'nodes' => [['name' => 'x']]]],
-            'unknown node key' => [['v' => 1, 'nodes' => ['sec-a' => ['color' => 'red']]]],
-            'name not a string' => [['v' => 1, 'nodes' => ['sec-a' => ['name' => 5]]]],
-            'name too long' => [['v' => 1, 'nodes' => ['sec-a' => ['name' => $long]]]],
-            'hidden not bool' => [['v' => 1, 'nodes' => ['sec-a' => ['hidden' => 'yes']]]],
-            'bad preset' => [['v' => 1, 'nodes' => ['sec-a' => ['preset' => 'bad preset!']]]],
+            'page entry as a list' => [['v' => 1, 'nodes' => ['home' => [['name' => 'x']]]]],
+            'flat (unscoped) node entry' => [['v' => 1, 'nodes' => ['sec-a' => ['name' => 'x']]]],
+            'unknown node key' => [['v' => 1, 'nodes' => ['home' => ['sec-a' => ['color' => 'red']]]]],
+            'name not a string' => [['v' => 1, 'nodes' => ['home' => ['sec-a' => ['name' => 5]]]]],
+            'name too long' => [['v' => 1, 'nodes' => ['home' => ['sec-a' => ['name' => $long]]]]],
+            'hidden not bool' => [['v' => 1, 'nodes' => ['home' => ['sec-a' => ['hidden' => 'yes']]]]],
+            'bad preset' => [['v' => 1, 'nodes' => ['home' => ['sec-a' => ['preset' => 'bad preset!']]]]],
             'page title too long' => [['v' => 1, 'pages' => ['home' => ['title' => $long]]]],
-            'hiding a page root' => [['v' => 1, 'nodes' => ['home-root' => ['hidden' => true]]]],
+            'hiding a page root' => [['v' => 1, 'nodes' => ['home' => ['home-root' => ['hidden' => true]]]]],
         ];
     }
 
@@ -188,7 +193,7 @@ class BuilderEditorMetaTest extends TestCase
         $this->withToken($auth['token'])->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $this->schema(), 'base_revision' => 0, 'editor_meta' => $this->meta(['sec-a' => ['name' => 'جديد']])])
             ->assertStatus(409);
 
-        $this->withToken($auth['token'])->getJson("/api/app-builder/apps/{$appId}/draft")->assertJsonPath('data.editor_meta.nodes.sec-a.name', 'قديم');
+        $this->withToken($auth['token'])->getJson("/api/app-builder/apps/{$appId}/draft")->assertJsonPath('data.editor_meta.nodes.home.sec-a.name', 'قديم');
     }
 
     /** @test */
@@ -204,6 +209,39 @@ class BuilderEditorMetaTest extends TestCase
     }
 
     /** @test */
+    public function hiding_a_node_on_one_page_never_hides_a_same_id_node_on_another_page(): void
+    {
+        // فرادة component.id داخل الصفحة وحدها (تكرارها عبر صفحات تحذير فقط) — مفتاح الإخفاء (الصفحة، العقدة).
+        $schema = $this->schema();
+        $schema['pages']['home']['children'][] = ['type' => 'Section', 'id' => 'shared', 'props' => ['title' => 'في home'], 'children' => []];
+        $schema['pages']['about']['children'] = [['type' => 'Section', 'id' => 'shared', 'props' => ['title' => 'في about'], 'children' => []]];
+
+        $projected = (new EditorMeta())->project($schema, $this->meta([], [], ['about' => ['shared' => ['hidden' => true]]]));
+        $this->assertSame([], $projected['pages']['about']['children'], 'المخفي في about');
+        $this->assertContains('shared', array_map(fn ($c) => $c['id'], $projected['pages']['home']['children']), 'النظير في home يبقى');
+
+        $projected = (new EditorMeta())->project($schema, $this->meta(['shared' => ['hidden' => true]]));
+        $this->assertNotSame([], $projected['pages']['about']['children'], 'إخفاء home لا يمسّ about');
+        $this->assertNotContains('shared', array_map(fn ($c) => $c['id'], $projected['pages']['home']['children']));
+    }
+
+    /** @test */
+    public function entries_are_kept_per_page_and_an_entry_under_the_wrong_page_is_pruned(): void
+    {
+        [$auth, $appId] = $this->newApp('ad05-scope');
+        $schema = $this->schema();
+        $schema['pages']['about']['children'] = [['type' => 'Section', 'id' => 'about-sec', 'props' => ['title' => 'ع'], 'children' => []]];
+
+        // sec-a ينتمي إلى home لا about؛ about-sec ينتمي إلى about.
+        $meta = $this->meta(['sec-a' => ['name' => 'صحيح']], [], ['about' => ['sec-a' => ['name' => 'خاطئ'], 'about-sec' => ['hidden' => true]], 'ghost' => ['x' => ['name' => 'y']]]);
+        $response = $this->save($auth['token'], $appId, ['editor_meta' => $meta], $schema)->assertOk();
+
+        $this->assertSame(['home', 'about'], array_keys($response->json('data.editor_meta.nodes')));
+        $this->assertSame(['about-sec'], array_keys($response->json('data.editor_meta.nodes.about')));
+        $this->assertTrue($response->json('data.editor_meta.nodes.about.about-sec.hidden'));
+    }
+
+    /** @test */
     public function the_projection_is_pure_and_handles_nested_and_absent_meta(): void
     {
         $meta = new EditorMeta();
@@ -212,7 +250,7 @@ class BuilderEditorMetaTest extends TestCase
 
         $same = $meta->project($schema, null);
         $this->assertSame($schema, $same);
-        $projected = $meta->project($schema, ['v' => 1, 'nodes' => ['deep' => ['hidden' => true], 'sec-b' => ['hidden' => true]]]);
+        $projected = $meta->project($schema, ['v' => 1, 'nodes' => ['home' => ['deep' => ['hidden' => true], 'sec-b' => ['hidden' => true]]]]);
         $this->assertSame(['txt-a'], array_map(fn ($c) => $c['id'], $projected['pages']['home']['children'][0]['children']));
         $this->assertCount(1, $projected['pages']['home']['children']);
         $this->assertCount(2, $schema['pages']['home']['children'], 'المدخل لا يُحوَّر');
@@ -222,7 +260,7 @@ class BuilderEditorMetaTest extends TestCase
     public function normalize_throws_a_coded_exception(): void
     {
         try {
-            (new EditorMeta())->normalize(['v' => 1, 'nodes' => ['home-root' => ['hidden' => true]]], $this->schema());
+            (new EditorMeta())->normalize(['v' => 1, 'nodes' => ['home' => ['home-root' => ['hidden' => true]]]], $this->schema());
             $this->fail('كان يجب رفض إخفاء الجذر.');
         } catch (SchemaFormatException $e) {
             $this->assertSame('editor_meta_hidden_root', $e->errorCode);
