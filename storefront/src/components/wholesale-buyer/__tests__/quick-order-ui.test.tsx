@@ -226,6 +226,33 @@ describe("quick order UI", () => {
     expect(await screen.findByTestId("qo-results")).toBeTruthy();
   });
 
+  it("the paste box is locked while an import is resolving, so typed edits cannot be overwritten", async () => {
+    let release: (v: unknown) => void = () => {};
+    actions.resolveQuickOrderSkus.mockReturnValue(
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+    );
+    render(wrap());
+    fireEvent.change(screen.getByTestId("qo-paste"), {
+      target: { value: "COF-100 2" },
+    });
+    fireEvent.click(screen.getByTestId("qo-import"));
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("qo-paste") as HTMLTextAreaElement).disabled,
+      ).toBe(true),
+    );
+    await act(async () => {
+      release({ kind: "ok", rows: [{ sku: "COF-100", lines: [line()] }] });
+    });
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("qo-paste") as HTMLTextAreaElement).disabled,
+      ).toBe(false),
+    );
+  });
+
   it("a partial import keeps only the unresolved rows in the paste box, so a retry cannot apply the good ones twice", async () => {
     actions.resolveQuickOrderSkus.mockResolvedValue({
       kind: "ok",

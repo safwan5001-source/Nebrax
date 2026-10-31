@@ -235,6 +235,18 @@ describe("entries", () => {
     expect(apart).toHaveLength(2);
   });
 
+  it("parsing normalises only the quantity digits and leaves a SKU's own non-Latin digits untouched", () => {
+    expect(parsePastedRows("ITEM-١٢ ٣").rows).toEqual([
+      { sku: "ITEM-١٢", quantity: "3" },
+    ]);
+    expect(parsePastedRows("ABC-۱۲\t۴").rows).toEqual([
+      { sku: "ABC-۱۲", quantity: "4" },
+    ]);
+    expect(parsePastedRows("ITEM-١٢").rows).toEqual([
+      { sku: "ITEM-١٢", quantity: "1" },
+    ]);
+  });
+
   it("merging never turns an invalid quantity into a valid order: the invalid text stays and keeps blocking", () => {
     const incomingInvalid = mergeEntry(
       [entry("a", "2")],

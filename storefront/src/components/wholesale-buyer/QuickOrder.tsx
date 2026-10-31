@@ -390,6 +390,7 @@ export function QuickOrder({ basePath }: { basePath: string }) {
             className="font-mono text-sm"
             placeholder={t("paste.placeholder")}
             aria-label={t("paste.title")}
+            disabled={pending}
             data-testid="qo-paste"
           />
           <Button

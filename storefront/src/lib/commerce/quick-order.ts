@@ -123,7 +123,7 @@ export function parsePastedRows(
 ): { rows: PastedRow[]; truncated: boolean } {
   const rows: PastedRow[] = [];
   let truncated = false;
-  for (const rawLine of normalizeDigits(text).split(/\r?\n/)) {
+  for (const rawLine of text.split(/\r?\n/)) {
     const line = rawLine.trim();
     if (line === "") continue;
     if (rows.length >= max) {
@@ -131,9 +131,13 @@ export function parsePastedRows(
       break;
     }
     // The multiplication sign is unambiguous; a latin "x" only counts with spaces around it ("SHIRTX5" is a SKU, not 5 × SHIRT).
-    const match = line.match(/^(.*?)(?:[\s,;:]+|\s+[xX]\s+|\s*×\s*)(\d+)$/u);
+    // Only the QUANTITY token is digit-normalised (Arabic-Indic / Persian → Latin): a SKU is an identifier and must reach
+    // the server exactly as typed, including any non-Latin digits it contains.
+    const match = line.match(
+      /^(.*?)(?:[\s,;:]+|\s+[xX]\s+|\s*×\s*)([0-9٠-٩۰-۹]+)$/u,
+    );
     if (match && match[1].trim() !== "") {
-      rows.push({ sku: match[1].trim(), quantity: match[2] });
+      rows.push({ sku: match[1].trim(), quantity: normalizeDigits(match[2]) });
     } else {
       rows.push({ sku: line, quantity: "1" });
     }
