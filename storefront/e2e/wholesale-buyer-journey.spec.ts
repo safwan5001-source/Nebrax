@@ -49,11 +49,25 @@ if (!ENV.dbPath.includes("e2e")) {
 
 type Seed = {
   password: string;
-  hosts: { ws: string; ws2: string; dtc: string; other_tenant: string };
+  hosts: {
+    ws: string;
+    ws2: string;
+    ws3: string;
+    dtc: string;
+    other_tenant: string;
+  };
+  quick_order: {
+    coffee: string;
+    tea: string;
+    shirt: string;
+    red: string;
+    blue: string;
+  };
   seeded_buyers: Record<string, { email: string }>;
   staff: { email: string };
-  channel_ids: { ws: string; ws2: string; dtc: string };
+  channel_ids: { ws: string; ws2: string; ws3: string; dtc: string };
   partner_id: string;
+  tenant_id: string;
   products: { p1: string; p2: string; p3: string; retail: string };
 };
 const seed: Seed = JSON.parse(fs.readFileSync(ENV.seedJson, "utf8"));
@@ -64,6 +78,7 @@ const ar = msg("ar");
 
 const base = (host: string) => `http://${host}:${ENV.store}`;
 const WS = base(seed.hosts.ws);
+const WS3 = base(seed.hosts.ws3);
 const DTC = base(seed.hosts.dtc);
 
 // ───────────────────────── evidence (sanitized: no tokens, emails, secrets) ─────────────────────────
@@ -374,11 +389,16 @@ function resetLink(email: string): URL {
   return new URL(m[0]);
 }
 
-async function signIn(page: Page, email: string, locale = "en") {
+async function signIn(
+  page: Page,
+  email: string,
+  locale = "en",
+  origin: string = WS,
+) {
   const t = locale === "ar" ? ar.wholesaleBuyer : en.wholesaleBuyer;
   // Same rule as `login()`: a rate-limited sign-in (the per-tenant login brake shared behind the gateway) is waited out, as a real buyer would.
   for (let attempt = 0; ; attempt++) {
-    await go(page, `${WS}/sa/${locale}/buyer/sign-in`);
+    await go(page, `${origin}/sa/${locale}/buyer/sign-in`);
     await page.getByLabel(t.signIn.email).fill(email);
     await page
       .getByLabel(t.signIn.password, { exact: true })
@@ -1775,6 +1795,7 @@ test.describe
         "/sa/en/buyer/membership",
         "/sa/en/buyer/orders",
         "/sa/en/buyer/forgot-password",
+        "/sa/en/buyer/quick-order",
         "/sa/ar/buyer/reset-password",
         "/sa/en/wholesale",
         "/sa/en/wholesale/sign-in",
@@ -1821,6 +1842,7 @@ test.describe
         ["/sa/en/wholesale/apply", "/sa/en/buyer/membership"],
         ["/sa/en/wholesale/cart", "/sa/en/cart"],
         ["/sa/en/wholesale/products", "/sa/en/products"],
+        ["/sa/en/wholesale/quick-order", "/sa/en/buyer/quick-order"],
       ] as const) {
         await go(page, `${WS}${from}?src=legacy`);
         const url = new URL(page.url());
@@ -1829,8 +1851,8 @@ test.describe
         landed[from] = url.pathname;
       }
       // no native equivalent ⇒ closed, never redirected somewhere unrelated
-      expect(await status(page, `${WS}/sa/en/wholesale/quick-order`)).toBe(404);
-      ev("H03", { legacy_redirects: landed, quick_order: 404 });
+      expect(await status(page, `${WS}/sa/en/wholesale/whatever`)).toBe(404);
+      ev("H03", { legacy_redirects: landed, unknown_legacy_path: 404 });
     });
 
     test("H04 on a wholesale host the account and order-history links lead to the native buyer pages; on retail they do not change", async ({
@@ -1936,5 +1958,433 @@ test.describe("@mobile final closure on a phone viewport (Arabic)", () => {
     );
     expect(overflow).toBeLessThanOrEqual(1);
     ev("H08", { rtl: true, horizontal_overflow_px: overflow });
+  });
+});
+
+/** Every money figure on the cart page, sorted: two carts with the same lines and totals have the same signature. */
+const cartMoney = (text: string) => (text.match(/\d+\.\d\d/g) ?? []).sort();
+const bodyTextOf = async (page: Page, url: string) => {
+  await go(page, url);
+  return bodyText(page);
+};
+/** Sign in as an identity that has NO approved membership on this host: success lands on the membership page too. */
+const signInUnapproved = (page: Page, email: string, origin: string) =>
+  signIn(page, email, "en", origin);
+
+// ───────────────────────── H6 Quick Order (native replacement for the Spree quick-order page) ─────────────────────────
+const QO = seed.quick_order;
+const qoBuyer = seed.seeded_buyers.qo.email;
+const money = (page: Page, re: RegExp) =>
+  expect.poll(() => bodyText(page), { timeout: 20_000 }).toMatch(re);
+
+test.describe
+  .serial("@desktop quick order by SKU", () => {
+    let ctx: BrowserContext;
+    let page: Page;
+
+    test.beforeAll(async ({ browser }) => {
+      ctx = await browser.newContext({
+        viewport: { width: 1280, height: 900 },
+      });
+      page = await ctx.newPage();
+    });
+    test.afterAll(async () => ctx.close());
+
+    const q = (id: string) => page.getByTestId(id);
+    const pasteAndImport = async (text: string) => {
+      resetBuckets();
+      await q("qo-paste").fill(text);
+      await q("qo-import").click();
+    };
+
+    test("Q01 a signed-out visitor gets the sign-in gate, not the form", async () => {
+      await go(page, `${WS3}/sa/en/buyer/quick-order`);
+      await expect(
+        page.getByText(en.wholesaleBuyer.gate.sign_in_required.title),
+      ).toBeVisible();
+      await expect(q("quick-order")).toHaveCount(0);
+      ev("Q01", { signed_out_gate: true });
+    });
+
+    test("Q02 an approved buyer resolves an exact SKU and adds it; the cart shows the server price and total", async () => {
+      await signIn(page, qoBuyer, "en", WS3);
+      await go(page, `${WS3}/sa/en/buyer/quick-order`);
+      await expect(q("quick-order")).toBeVisible();
+
+      await pasteAndImport("QO-COFFEE 3");
+      await expect(q("qo-line")).toHaveCount(1);
+      await expect(q("qo-line")).toHaveAttribute("data-sku", "QO-COFFEE");
+      await money(page, /7\.00/); // channel list price, not the 10.00 sale price
+      await expect(q("qo-total")).toContainText("21.00");
+      expect(await bodyText(page)).not.toMatch(/10\.00/);
+      await shot(page, "Q02-exact-sku-ready");
+
+      resetBuckets();
+      await q("qo-submit").click();
+      await expect(q("qo-added")).toBeVisible({ timeout: 20_000 });
+      await expect(q("qo-empty")).toBeVisible();
+
+      await go(page, `${WS3}/sa/en/cart`);
+      await money(page, /Quick Coffee|قهوة سريعة/);
+      await money(page, /21\.00/);
+      await shot(page, "Q02-cart-after-add");
+      ev("Q02", { sku: "QO-COFFEE", qty: 3, unit: "7.00", total: "21.00" });
+    });
+
+    test("Q03 a variant is found by its OWN sku and priced per variant", async () => {
+      await go(page, `${WS3}/sa/en/buyer/quick-order`);
+      resetBuckets();
+      await page
+        .getByRole("textbox", {
+          name: en.wholesaleBuyer.quickOrder.search.title,
+        })
+        .fill("QO-SHIRT-RED");
+      await expect(q("qo-results")).toBeVisible({ timeout: 20_000 });
+      await q("qo-pick").first().click();
+      await expect(q("qo-line")).toHaveAttribute("data-sku", "QO-SHIRT-RED");
+      await expect(q("qo-line")).toContainText("25.00");
+      await q("qo-qty").fill("2");
+      await expect(q("qo-total")).toContainText("50.00");
+      await shot(page, "Q03-variant-sku");
+      ev("Q03", {
+        variant_sku: "QO-SHIRT-RED",
+        unit: "25.00",
+        qty: 2,
+        total: "50.00",
+      });
+    });
+
+    test("Q04 multiple lines with an invalid SKU, an ambiguous parent SKU and an unavailable item: review, then add only what is eligible", async () => {
+      await go(page, `${WS3}/sa/en/buyer/quick-order`);
+      await pasteAndImport(
+        "QO-COFFEE 1\nQO-SHIRT-RED 2\nNOPE-404 5\nQO-TEA 1\nQO-SHIRT 1",
+      );
+
+      await expect(q("qo-paste-issues")).toContainText("NOPE-404");
+      await expect(q("qo-paste-issues")).toContainText("not found");
+      await expect(q("qo-paste-issues")).toContainText("several variants");
+      // the ambiguous parent hands its variants to the picker
+      await expect(q("qo-results")).toBeVisible();
+
+      const lines = q("qo-line");
+      await expect(lines).toHaveCount(3); // coffee, shirt-red, tea
+      const tea = page.locator('[data-testid="qo-line"][data-sku="QO-TEA"]');
+      await expect(tea).toHaveAttribute("data-state", "unavailable");
+      await expect(tea).toContainText(
+        en.wholesaleBuyer.quickOrder.reason.noWholesalePrice,
+      );
+      expect(await tea.innerText()).not.toMatch(/\d+\.\d\d/);
+      await expect(q("qo-submit")).toContainText("(2)");
+      await shot(page, "Q04-review-mixed");
+
+      resetBuckets();
+      await q("qo-submit").click();
+      await expect(q("qo-added")).toBeVisible({ timeout: 20_000 });
+      // the unavailable line stays in the list for the buyer to see and remove
+      await expect(q("qo-line")).toHaveCount(1);
+      await expect(q("qo-line")).toHaveAttribute("data-sku", "QO-TEA");
+
+      await go(page, `${WS3}/sa/en/cart`);
+      const text = await bodyText(page);
+      expect(text).toMatch(/Quick Coffee|قهوة سريعة/);
+      expect(text).toMatch(/Quick Shirt|قميص سريع/);
+      expect(text).not.toMatch(/Quick Tea|شاي سريع/);
+      ev("Q04", {
+        added: 2,
+        not_added: [
+          "NOPE-404 (unknown)",
+          "QO-TEA (no wholesale price)",
+          "QO-SHIRT (ambiguous)",
+        ],
+      });
+    });
+
+    test("Q05 quantity errors are caught in the form before anything is sent", async () => {
+      await go(page, `${WS3}/sa/en/buyer/quick-order`);
+      await pasteAndImport("QO-COFFEE 1");
+      for (const bad of ["0", "-2", "1.5", "abc", ""]) {
+        await q("qo-qty").fill(bad);
+        await expect(q("qo-line")).toHaveAttribute("data-state", "invalid");
+        await expect(q("qo-submit")).toBeDisabled();
+      }
+      await q("qo-qty").fill("1000000");
+      await expect(q("qo-line")).toContainText("cannot exceed");
+      await expect(q("qo-submit")).toBeDisabled();
+      await q("qo-qty").fill("2");
+      await expect(q("qo-submit")).toBeEnabled();
+      await shot(page, "Q05-quantity-errors");
+      ev("Q05", { rejected: ["0", "-2", "1.5", "abc", "", "1000000"] });
+    });
+
+    test("Q06 if the price disappears between review and submit, the server rejects the WHOLE batch and nothing is added", async () => {
+      const before = cartMoney(await bodyTextOf(page, `${WS3}/sa/en/cart`));
+      await go(page, `${WS3}/sa/en/buyer/quick-order`);
+      await pasteAndImport("QO-COFFEE 1\nQO-SHIRT-RED 1");
+      await expect(q("qo-line")).toHaveCount(2);
+
+      // approved price of the shirt variant is withdrawn after the review
+      php("wholesale-e2e-price.php", ["QO-SHIRT-RED", "none"]);
+      try {
+        resetBuckets();
+        await q("qo-submit").click();
+        await expect(q("qo-rejected")).toBeVisible({ timeout: 20_000 });
+        await expect(q("qo-rejected")).toContainText("Nothing was added");
+        await expect(q("qo-line")).toHaveCount(2); // nothing was removed from the list
+        await expect(
+          page.locator('[data-testid="qo-line"][data-sku="QO-SHIRT-RED"]'),
+        ).toHaveAttribute("data-state", "rejected");
+        await expect(
+          page.locator('[data-testid="qo-line"][data-sku="QO-COFFEE"]'),
+        ).toHaveAttribute("data-state", "ready");
+      } finally {
+        php("wholesale-e2e-price.php", ["QO-SHIRT-RED", "2500"]);
+      }
+      expect(cartMoney(await bodyTextOf(page, `${WS3}/sa/en/cart`))).toEqual(
+        before,
+      ); // the cart is exactly as it was
+      ev("Q06", { atomic_rejection: true, cart_unchanged: true });
+    });
+
+    test("Q07 checkout completes natively with the quick-ordered lines; no payment is captured", async () => {
+      await go(page, `${WS3}/sa/en/checkout`);
+      await page.getByLabel("Full name").fill("Quick Buyer");
+      await page.getByLabel("Phone number").fill("0501234567");
+      await click(
+        page,
+        page.getByRole("button", { name: /continue to address/i }),
+      );
+      await page.getByLabel("Region").waitFor();
+      for (const [l, v] of [
+        ["Country", "SA"],
+        ["Region", "Eastern"],
+        ["City", "الدمام"],
+        ["District", "الشاطئ"],
+        ["Street", "الملك فهد"],
+        ["Postal code", "31411"],
+      ] as const) {
+        await page.getByLabel(l).first().fill(v);
+      }
+      await click(
+        page,
+        page.getByRole("button", { name: /continue to delivery/i }),
+      );
+      await page.getByText("Pickup", { exact: true }).click();
+      await click(
+        page,
+        page.getByRole("button", { name: /continue to payment/i }),
+      );
+      await click(
+        page,
+        page.getByRole("button", { name: /continue to review/i }),
+      );
+      const complete = page.getByRole("button", { name: /complete order/i });
+      await expect(complete).toBeVisible();
+      await shot(page, "Q07-review");
+      resetBuckets();
+      await Promise.allSettled([
+        complete.click({ timeout: 5000 }),
+        complete.click({ timeout: 5000, force: true }),
+      ]);
+      await expect(
+        page.getByRole("heading", { name: en.awjCheckout.success.heading }),
+      ).toBeVisible({ timeout: 30_000 });
+      await shot(page, "Q07-confirmation");
+      ev("Q07", { confirmation_heading_visible: true });
+    });
+
+    test("Q08 exactly one order from the quick-ordered lines, owned by this buyer on the quick-order channel, priced by the server; nothing financial was touched", async () => {
+      const out = php("wholesale-e2e-evidence.php", [qoBuyer]);
+      const mine = out.orders.filter(
+        (o: any) => o.owned_by_expected_identity === true,
+      );
+      expect(mine).toHaveLength(1);
+      const o = mine[0];
+      expect(o.channel_id).toBe(seed.channel_ids.ws3);
+      expect(
+        o.lines.map((l: any) => [l.quantity, l.unit_price_minor]).sort(),
+      ).toEqual([
+        [2, 2500],
+        [4, 700],
+      ]);
+      expect(
+        o.lines.every(
+          (l: any) => l.price_source === "price_list" && l.price_list_id,
+        ),
+      ).toBe(true);
+      expect(o.total_minor).toBe(4 * 700 + 2 * 2500);
+      const { commerce_payment_intents: intents, ...financial } =
+        out.untouched as Record<string, number>;
+      for (const [k, v] of Object.entries(financial))
+        expect(v, `untouched.${k}`).toBe(0);
+      expect(intents).toBe(out.order_count);
+      ev("Q08", {
+        lines: o.lines.map((l: any) => ({
+          qty: l.quantity,
+          unit_minor: l.unit_price_minor,
+          price_source: l.price_source,
+        })),
+        total_minor: o.total_minor,
+        untouched_financial_tables: financial,
+      });
+    });
+
+    test("Q09 a suspended buyer can sign in but gets the approval gate, and the API refuses lookup and add", async () => {
+      const susp = seed.seeded_buyers.qo_suspended.email;
+      const session = await login(seed.hosts.ws3, susp);
+      expect(session.status).toBe(200);
+      expect(
+        (
+          await gw(
+            seed.hosts.ws3,
+            "GET",
+            "buyer/quick-order/lookup?q=QO-COFFEE",
+            { token: session.token },
+          )
+        ).status,
+      ).toBe(403);
+      const add = await gw(seed.hosts.ws3, "POST", "buyer/quick-order/add", {
+        token: session.token,
+        body: {
+          items: [{ product_id: QO.coffee, quantity: 1, unit_key: "base" }],
+        },
+      });
+      expect(add.status).toBe(403);
+
+      const p = await ctx.newPage();
+      await signIn(p, susp, "en", WS3);
+      await go(p, `${WS3}/sa/en/buyer/quick-order`);
+      await expect(
+        p.getByText(en.wholesaleBuyer.gate.membership.suspended.title),
+      ).toBeVisible();
+      await expect(p.getByTestId("quick-order")).toHaveCount(0);
+      await shot(p, "Q09-suspended");
+      await p.close();
+      ev("Q09", { api_lookup: 403, api_add: 403, gate: "suspended" });
+    });
+
+    test("Q10 cross-channel: a buyer approved only on ANOTHER channel gets the gate here, and its token unlocks nothing on this host", async () => {
+      const other = seed.seeded_buyers.linked.email; // approved on ws, never on ws3
+      const onWs = (await login(seed.hosts.ws, other)).token as string;
+      for (const h of [seed.hosts.ws3]) {
+        const lookup = await gw(
+          h,
+          "GET",
+          "buyer/quick-order/lookup?q=QO-COFFEE",
+          { token: onWs },
+        );
+        expect([401, 403]).toContain(lookup.status);
+        const add = await gw(h, "POST", "buyer/quick-order/add", {
+          token: onWs,
+          body: {
+            items: [{ product_id: QO.coffee, quantity: 1, unit_key: "base" }],
+          },
+        });
+        expect([401, 403]).toContain(add.status);
+      }
+      // signing in on ws3 as that identity yields a session without a membership there
+      const p = await ctx.newPage();
+      await signInUnapproved(p, other, WS3);
+      await go(p, `${WS3}/sa/en/buyer/quick-order`);
+      await expect(p.getByTestId("quick-order")).toHaveCount(0);
+      await expect(
+        p.getByText(en.wholesaleBuyer.gate.membership.none.title),
+      ).toBeVisible();
+      await p.close();
+      ev("Q10", {
+        foreign_token_status: "401/403",
+        gate: "no application on this channel",
+      });
+    });
+
+    test("Q11 the API never trusts the browser: prices, identities and unknown fields are refused; the gateway secret is required", async () => {
+      const session = (
+        await login(seed.hosts.ws3, seed.seeded_buyers.qo_other.email)
+      ).token as string;
+      for (const extra of [
+        { price: 1 },
+        { unit_price: 1 },
+        { partner_id: seed.partner_id },
+        { sales_channel_id: seed.channel_ids.ws },
+        { tenant_id: seed.tenant_id },
+      ]) {
+        const r = await gw(seed.hosts.ws3, "POST", "buyer/quick-order/add", {
+          token: session,
+          body: {
+            items: [
+              {
+                product_id: QO.coffee,
+                quantity: 1,
+                unit_key: "base",
+                ...extra,
+              },
+            ],
+          },
+        });
+        expect(r.status, JSON.stringify(extra)).toBe(422);
+      }
+      const noSecret = await gw(
+        seed.hosts.ws3,
+        "POST",
+        "buyer/quick-order/add",
+        {
+          token: session,
+          secret: null,
+          body: {
+            items: [{ product_id: QO.coffee, quantity: 1, unit_key: "base" }],
+          },
+        },
+      );
+      expect([401, 403, 404]).toContain(noSecret.status);
+      ev("Q11", { forbidden_fields_refused: 5, no_secret: noSecret.status });
+    });
+  });
+
+test.describe("@mobile quick order in Arabic on a phone viewport", () => {
+  test("Q12 RTL layout fits the phone: search, paste, review and the full-width submit are reachable without horizontal scroll", async ({
+    page,
+  }) => {
+    const overflow = () =>
+      page.evaluate(
+        () =>
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth,
+      );
+    await signIn(page, seed.seeded_buyers.qo_other.email, "ar", WS3);
+    await go(page, `${WS3}/sa/ar/buyer/quick-order`);
+    await expect(page.getByTestId("quick-order")).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.dir)).toBe("rtl");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+      ar.wholesaleBuyer.quickOrder.title,
+    );
+    expect(await overflow()).toBeLessThanOrEqual(1);
+
+    resetBuckets();
+    await page
+      .getByTestId("qo-paste")
+      .fill("QO-COFFEE 2\nQO-SHIRT-RED 1\nQO-TEA 1\nNOPE-1");
+    await page.getByTestId("qo-import").click();
+    await expect(page.getByTestId("qo-line")).toHaveCount(3);
+    await expect(page.getByTestId("qo-paste-issues")).toContainText("NOPE-1");
+    await expect(page.getByTestId("qo-line").nth(0)).toContainText(
+      "قهوة سريعة",
+    );
+    expect(await overflow()).toBeLessThanOrEqual(1);
+    const submit = page.getByTestId("qo-submit");
+    await submit.scrollIntoViewIfNeeded();
+    const box = await submit.boundingBox();
+    const viewport = page.viewportSize();
+    expect(box && viewport && box.width > viewport.width * 0.8).toBe(true);
+    await shot(page, "Q12-mobile-arabic-review");
+
+    resetBuckets();
+    await submit.click();
+    await expect(page.getByTestId("qo-added")).toBeVisible({ timeout: 20_000 });
+    expect(await overflow()).toBeLessThanOrEqual(1);
+    await shot(page, "Q12-mobile-arabic-added");
+    ev("Q12", {
+      rtl: true,
+      horizontal_overflow_px: 0,
+      submit_full_width: true,
+    });
   });
 });

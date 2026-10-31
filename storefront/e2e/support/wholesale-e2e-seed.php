@@ -20,7 +20,9 @@ use App\Models\CommerceListing;
 use App\Models\CustomerIdentity;
 use App\Models\Partner;
 use App\Models\PriceList;
+use App\Models\PriceListItem;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\SalesChannel;
 use App\Models\Storefront;
 use App\Models\StorefrontDomain;
@@ -79,6 +81,8 @@ app(TenantContext::class)->set($a->id);
 $ws = $web('ws', 'wholesale.e2e.localhost', true);
 $ws2 = $web('ws2', 'wholesale2.e2e.localhost', true);
 $dtc = $web('dtc', 'retail.e2e.localhost', false);
+// H6 Quick Order: a third wholesale channel with its own small catalogue, so the browse/listing journeys on `ws` are untouched.
+$ws3 = $web('ws3', 'wholesale3.e2e.localhost', true);
 
 $p1 = $product('Wholesale Item One', 'صنف جملة أول');
 $p2 = $product('Wholesale Item Two', 'صنف جملة ثانٍ');
@@ -97,18 +101,34 @@ $ws->update(['default_price_list_id' => $channelList->id]);
 $partnerList = $list('e2e-partner', [[$p1, 500]]);
 $partner = Partner::create(['name' => 'عميل جملة E2E', 'type' => 'customer', 'default_price_list_id' => $partnerList->id]);
 
+// ───────── quick-order catalogue (channel ws3 only) ─────────
+$qoCoffee = Product::create(['name' => 'قهوة سريعة', 'name_en' => 'Quick Coffee', 'sku' => 'QO-COFFEE', 'unit' => 'piece', 'sale_price' => 1000, 'is_active' => true]);
+$qoTea = Product::create(['name' => 'شاي سريع', 'name_en' => 'Quick Tea', 'sku' => 'QO-TEA', 'unit' => 'piece', 'sale_price' => 888, 'is_active' => true]);
+$qoShirt = Product::create(['name' => 'قميص سريع', 'name_en' => 'Quick Shirt', 'sku' => 'QO-SHIRT', 'unit' => 'piece', 'sale_price' => 777, 'is_active' => true]);
+DB::table('products')->where('id', $qoShirt->id)->update(['variant_state' => 'variant_managed']);
+$qoRed = ProductVariant::create(['product_id' => $qoShirt->id, 'sku' => 'QO-SHIRT-RED', 'combination_key' => 'k-red', 'is_active' => true]);
+$qoBlue = ProductVariant::create(['product_id' => $qoShirt->id, 'sku' => 'QO-SHIRT-BLUE', 'combination_key' => 'k-blue', 'is_active' => true]);
+foreach ([$qoCoffee, $qoTea, $qoShirt] as $p) {
+    CommerceListing::create(['product_id' => $p->id, 'sales_channel_id' => $ws3->id, 'is_published' => true]);
+}
+$ws3List = $list('e2e-ws3', [[$qoCoffee, 700]]);
+PriceListItem::create(['price_list_id' => $ws3List->id, 'product_id' => $qoShirt->id, 'product_variant_id' => $qoRed->id, 'unit_name' => 'piece', 'price' => 2500]);
+// QO-TEA and QO-SHIRT-BLUE deliberately carry NO entry: unavailable for wholesale
+$ws3->update(['default_price_list_id' => $ws3List->id]);
+
 $owner = User::create(['tenant_id' => $a->id, 'name' => 'e2e-owner', 'email' => 'owner-'.Str::random(5).'@e2e.test', 'password' => $password, 'role' => 'owner']);
 
 // the operator step that makes the staff membership-review API reachable at all (EnsureApplicationActive:commerce.storefront)
 app(TenantApplicationService::class)->enable('commerce.storefront', $owner, 'e2e seed');
 
-$seedBuyer = function (string $tag, bool $link, ?string $finalAction) use ($a, $ws, $partner, $owner, $password): array {
+$seedBuyer = function (string $tag, bool $link, ?string $finalAction, ?SalesChannel $channel = null) use ($a, $ws, $partner, $owner, $password): array {
+    $channel ??= $ws;
     $identity = CustomerIdentity::create([
         'tenant_id' => $a->id, 'display_name' => 'E2E '.$tag, 'email' => $tag.'-'.Str::random(4).'@e2e.test', 'password' => $password,
         'email_verified_at' => now(), 'is_active' => true,
     ]);
     $svc = app(WholesaleMembershipService::class);
-    $membership = $svc->apply($identity, $ws->id);
+    $membership = $svc->apply($identity, $channel->id);
     $svc->transition($membership->id, 'approve', $owner);
     if ($link) {
         app(CustomerPartnerLinkService::class)->link($identity, $partner, $owner);
@@ -125,6 +145,10 @@ $out['seeded_buyers'] = [
     'revoked_target' => $seedBuyer('revoke', true, null),
     'linked' => $seedBuyer('linked', true, null),
     'resettable' => $seedBuyer('reset', false, null),
+    // quick-order buyers, approved on the dedicated channel only
+    'qo' => $seedBuyer('qo', false, null, $ws3),
+    'qo_other' => $seedBuyer('qo-other', false, null, $ws3),
+    'qo_suspended' => $seedBuyer('qo-susp', false, 'suspend', $ws3),
 ];
 app(TenantContext::class)->forget();
 
@@ -135,9 +159,10 @@ $wsB = $web('ws-b', 'other.e2e.localhost', true);
 app(TenantContext::class)->forget();
 
 $out += [
-    'hosts' => ['ws' => 'wholesale.e2e.localhost', 'ws2' => 'wholesale2.e2e.localhost', 'dtc' => 'retail.e2e.localhost', 'other_tenant' => 'other.e2e.localhost'],
+    'hosts' => ['ws' => 'wholesale.e2e.localhost', 'ws2' => 'wholesale2.e2e.localhost', 'ws3' => 'wholesale3.e2e.localhost', 'dtc' => 'retail.e2e.localhost', 'other_tenant' => 'other.e2e.localhost'],
     'tenant_id' => $a->id,
-    'channel_ids' => ['ws' => $ws->id, 'ws2' => $ws2->id, 'dtc' => $dtc->id],
+    'channel_ids' => ['ws' => $ws->id, 'ws2' => $ws2->id, 'ws3' => $ws3->id, 'dtc' => $dtc->id],
+    'quick_order' => ['coffee' => $qoCoffee->id, 'tea' => $qoTea->id, 'shirt' => $qoShirt->id, 'red' => $qoRed->id, 'blue' => $qoBlue->id],
     'partner_id' => $partner->id,
     'products' => ['p1' => $p1->id, 'p2' => $p2->id, 'p3' => $p3->id, 'retail' => $r1->id],
     'expected_minor' => ['p1_partner' => 500, 'p1_channel' => 700, 'p1_retail' => 1000, 'p2_channel' => 900],
