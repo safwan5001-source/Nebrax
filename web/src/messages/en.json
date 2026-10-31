@@ -8707,7 +8707,35 @@
             "noComponent": "The current mobile app has no component for this section yet.",
             "noScreen": "The current mobile app has no screen for this section yet."
           },
-          "catalog": {
+            "selectionBar": {
+            "label": "Tools for section “{name}”",
+            "up": "Move section up",
+            "down": "Move section down",
+            "duplicate": "Duplicate section",
+            "hide": "Hide section",
+            "hideReason": "Hiding needs an architecture decision (AD-05) — not available yet",
+            "delete": "Delete section"
+          },
+          "identity": {
+            "tab": "Identity",
+            "name": "App name (Arabic)",
+            "nameEn": "App name (English)",
+            "save": "Save name",
+            "saving": "Saving…",
+            "saved": "App name saved",
+            "saveFailed": "Could not save the name",
+            "nameNote": "The name saves immediately and does not go through the schema draft. The app color is in the Theme tab.",
+            "proposedTitle": "Proposed identity items",
+            "proposedReason": "Not supported by the current mobile app yet.",
+            "items": {
+              "logo": "Logo",
+              "font": "Font",
+              "darkMode": "Dark mode",
+              "splash": "Splash screen",
+              "onboarding": "Onboarding screens"
+            }
+          },
+        "catalog": {
             "text": {
               "name": "Text",
               "desc": "A heading or paragraph."

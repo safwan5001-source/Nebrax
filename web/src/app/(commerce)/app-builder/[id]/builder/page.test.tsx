@@ -151,6 +151,28 @@ const { api, currentUser, translate } = vi.hoisted(() => {
     'easy.status.limited': 'Ready with limits',
     'easy.status.proposed': 'Proposed',
     'easy.status.unavailable': 'Unavailable',
+    'easy.selectionBar.label': 'Tools for {name}',
+    'easy.selectionBar.up': 'Bar move up',
+    'easy.selectionBar.down': 'Bar move down',
+    'easy.selectionBar.duplicate': 'Bar duplicate',
+    'easy.selectionBar.hide': 'Bar hide',
+    'easy.selectionBar.hideReason': 'Hiding needs AD-05',
+    'easy.selectionBar.delete': 'Bar delete',
+    'easy.identity.tab': 'Identity',
+    'easy.identity.name': 'App name (Arabic)',
+    'easy.identity.nameEn': 'App name (English)',
+    'easy.identity.save': 'Save name',
+    'easy.identity.saving': 'Saving name…',
+    'easy.identity.saved': 'App name saved',
+    'easy.identity.saveFailed': 'Could not save the name',
+    'easy.identity.nameNote': 'Name note.',
+    'easy.identity.proposedTitle': 'Proposed identity items',
+    'easy.identity.proposedReason': 'Not supported yet.',
+    'easy.identity.items.logo': 'Logo',
+    'easy.identity.items.font': 'Font',
+    'easy.identity.items.darkMode': 'Dark mode',
+    'easy.identity.items.splash': 'Splash screen',
+    'easy.identity.items.onboarding': 'Onboarding screens',
     'easy.catalog.text.name': 'Text block',
     'easy.catalog.button.name': 'Button block',
     'easy.catalog.slider.name': 'Slider block',
@@ -2117,6 +2139,14 @@ describe('AppBuilderWorkspacePage — Easy Mode V2 shell (S21a)', () => {
   const sections = () => within(screen.getAllByTestId('easy-sections')[0]);
   const putBodies = () => api.mock.calls.filter((c) => c[0] === DRAFT_PATH && c[1]?.method === 'PUT').map((c) => c[1].body as { schema: { pages: { home: { children: Array<{ id: string; type: string; children?: unknown[] }> } } } });
 
+  function overrideAppPatch() {
+    const base = api.getMockImplementation()!;
+    api.mockImplementation((path?: string, init?: { method?: string; body?: unknown }) =>
+      path === '/app-builder/apps/app-1' && init?.method === 'PATCH'
+        ? Promise.resolve({ data: { ...appData, name: (init.body as { name: string }).name } })
+        : base(path, init));
+  }
+
   async function open() {
     mockApi();
     render(<AppBuilderWorkspacePage />);
@@ -2217,5 +2247,52 @@ describe('AppBuilderWorkspacePage — Easy Mode V2 shell (S21a)', () => {
 
     await userEvent.setup().click(screen.getByRole('button', { name: 'Advanced' }));
     await waitFor(() => expect(screen.getAllByText('Visibility condition').length).toBeGreaterThan(0));
+  });
+
+  it('selecting an element shows the section toolbar; its actions work and Hide is disabled with its reason (AD-05)', async () => {
+    await open();
+    expect(screen.queryByTestId('easy-selection-bar')).toBeNull();
+    await userEvent.setup().click(within(sections().getAllByRole('listitem')[0]).getAllByRole('button')[0]);
+
+    const bar = within(await screen.findByTestId('easy-selection-bar'));
+    const hide = bar.getByRole('button', { name: 'Bar hide' }) as HTMLButtonElement;
+    expect(hide.disabled).toBe(true);
+    expect(hide.title).toBe('Hiding needs AD-05');
+
+    await userEvent.setup().click(bar.getByRole('button', { name: 'Bar duplicate' }));
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+    await userEvent.setup().click(screen.getAllByText('Save')[0]);
+    await waitFor(() => expect(putBodies().length).toBe(1));
+    expect(putBodies()[0].schema.pages.home.children.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('the Identity tab renames the app through the app endpoint (not the schema draft) and lists the proposed items as unavailable', async () => {
+    mockApi();
+    overrideAppPatch();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findAllByText('Featured');
+
+    await userEvent.setup().click(screen.getAllByRole('button', { name: 'Identity' })[0]);
+    const panel = within(screen.getAllByTestId('easy-identity')[0]);
+    for (const item of ['Logo', 'Font', 'Dark mode', 'Splash screen', 'Onboarding screens']) expect(panel.getByText(item)).toBeTruthy();
+
+    const input = panel.getByLabelText('App name (Arabic)') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'متجري الجديد' } });
+    await userEvent.setup().click(panel.getByRole('button', { name: 'Save name' }));
+
+    await waitFor(() => expect(api.mock.calls.some((c) => c[0] === '/app-builder/apps/app-1' && c[1]?.method === 'PATCH')).toBe(true));
+    const patch = api.mock.calls.find((c) => c[0] === '/app-builder/apps/app-1' && c[1]?.method === 'PATCH')!;
+    expect(patch[1].body).toEqual({ name: 'متجري الجديد', name_en: expect.anything() });
+    expect(putBodies()).toHaveLength(0); // لا حفظ للمسودة
+    await waitFor(() => expect(toastFns.success).toHaveBeenCalledWith('App name saved'));
+  });
+
+  it('a user without manage permission cannot rename the app', async () => {
+    currentUser.mockReturnValue({ id: 'u3', role: 'staff', permissions: ['apps_builder.view'] });
+    await open();
+    await userEvent.setup().click(screen.getAllByRole('button', { name: 'Identity' })[0]);
+    const panel = within(screen.getAllByTestId('easy-identity')[0]);
+    expect((panel.getByLabelText('App name (Arabic)') as HTMLInputElement).disabled).toBe(true);
+    expect((panel.getByRole('button', { name: 'Save name' }) as HTMLButtonElement).disabled).toBe(true);
   });
 });
