@@ -391,9 +391,39 @@ export function themeTokens(schema: AppSchema): Record<string, string> {
   return schema.theme?.tokens ?? {};
 }
 
-/** يدمج رموزاً جديدة/محدَّثة في `theme.tokens` — لا يحذف مفاتيح غائبة عن `patch`. */
+// ── عقد رموز الثيم القانوني (AD-03 / S04b) ───────────────────────────────────
+// `colorPrimary` هو الاسم القانوني؛ `primaryColor` (الويب القديم) مرادف **مقروء فقط** — مرآة `seedColorFromTokens` في Flutter.
+// الكتابة تُطبِّع (تعيد التسمية وتُسقط متغيرات العرض المشتقّة)؛ القراءة وحدها لا تمسّ شيئاً (لا إعادة كتابة جماعية).
+export const PRIMARY_COLOR_TOKEN = 'colorPrimary';
+export const LEGACY_PRIMARY_COLOR_TOKEN = 'primaryColor';
+const HEX6 = /^#[0-9a-fA-F]{6}$/;
+
+/** أول لون `#RRGGBB` صالح بترتيب (قانوني، مرادف)، أو `null`. يُقصّ الفراغ المحيط كما يفعل Flutter. */
+export function readPrimaryColor(tokens: Record<string, string> | null | undefined): string | null {
+  for (const key of [PRIMARY_COLOR_TOKEN, LEGACY_PRIMARY_COLOR_TOKEN]) {
+    const raw = tokens?.[key]?.trim();
+    if (raw && HEX6.test(raw)) return raw;
+  }
+  return null;
+}
+
+/**
+ * الشكل القانوني لرموز الثيم عند الكتابة: `colorPrimary` بدل المرادف القديم (القانوني الصالح يتقدّم، والمرادف غير الصالح يُسقَط ولا يُرقّى)،
+ * ويُسقَط ما يبدأ بـ`--` (متغيرات CSS مشتقّة كانت اللوحة القديمة تحفظها — العرض يشتقّها ولا تُخزَّن). لا يحوّر المدخل.
+ */
+export function canonicalizeThemeTokens(tokens: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(tokens)) {
+    if (key.startsWith('--') || key === LEGACY_PRIMARY_COLOR_TOKEN || key === PRIMARY_COLOR_TOKEN) continue;
+    out[key] = value;
+  }
+  const primary = readPrimaryColor(tokens);
+  return primary ? { [PRIMARY_COLOR_TOKEN]: primary, ...out } : out;
+}
+
+/** يدمج رموزاً جديدة/محدَّثة في `theme.tokens` ويُطبِّعها (القانوني) — لا يحذف مفاتيح غائبة عن `patch` غير ما تُسقطه التسوية. */
 export function mergeThemeTokens(schema: AppSchema, patch: Record<string, string>): AppSchema {
-  return { ...schema, theme: { ...schema.theme, tokens: { ...themeTokens(schema), ...patch } } };
+  return { ...schema, theme: { ...schema.theme, tokens: canonicalizeThemeTokens({ ...themeTokens(schema), ...patch }) } };
 }
 
 // ── Page-map edit helpers (APP-BUILDER-9) ────────────────────────────────────

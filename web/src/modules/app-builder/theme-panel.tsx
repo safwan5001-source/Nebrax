@@ -8,9 +8,10 @@ import { Select } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import {
   THEME_PRESETS, RADIUS_PRESETS, DENSITY_PRESETS, PRODUCT_CARD_PRESETS,
-  presentationCssVars, isSafeHexColor, presetPrimary,
+  isSafeHexColor, presetPrimary,
   type ThemePresetId, type RadiusId, type DensityId, type ProductCardStyleId,
 } from '@/modules/store-experience-builder/presentation/tokens';
+import { PRIMARY_COLOR_TOKEN, readPrimaryColor } from '@/lib/app-builder';
 import { loadCommerceStoreCatalog, type CommerceStoreOption } from '@/modules/commerce-workspace/stores';
 import { loadStorefrontPresentation, type StorefrontPresentationRecord } from '@/modules/commerce-workspace/presentation';
 
@@ -26,7 +27,7 @@ import { loadStorefrontPresentation, type StorefrontPresentationRecord } from '@
 const DEFAULT_PRIMARY = presetPrimary('awj-modern');
 
 export const THEME_TOKEN_KEYS = [
-  'primaryColor', 'accentColor', 'radius', 'density', 'productCardStyle', 'themePreset', 'fontPreset', 'displayName',
+  PRIMARY_COLOR_TOKEN, 'accentColor', 'radius', 'density', 'productCardStyle', 'themePreset', 'fontPreset', 'displayName',
 ] as const;
 
 function matchPreset(hex: string): ThemePresetId | null {
@@ -37,7 +38,7 @@ function matchPreset(hex: string): ThemePresetId | null {
 /** يشتقّ من إعدادات مخصِّص المتجر مجموعة رموز `theme.tokens` المقترَحة — ألوان/نصف قطر/كثافة/بطاقة منتج فقط، لا شعارات (انظر وثيقة الأدلّة). */
 export function tokensFromPresentation(config: StorefrontPresentationRecord['draft']): Record<string, string> {
   const tokens: Record<string, string> = {
-    primaryColor: config.primaryColor,
+    [PRIMARY_COLOR_TOKEN]: config.primaryColor,
     radius: config.radius,
     density: config.density,
     productCardStyle: config.productCard,
@@ -98,7 +99,8 @@ export function ThemePanel({
   const t = useTranslations('appBuilder.builder.theme');
   const [sync, setSync] = React.useState<SyncState>({ phase: 'idle' });
 
-  const primaryColor = isSafeHexColor(tokens.primaryColor) ? tokens.primaryColor : DEFAULT_PRIMARY;
+  const storedPrimary = readPrimaryColor(tokens);
+  const primaryColor = storedPrimary && isSafeHexColor(storedPrimary) ? storedPrimary : DEFAULT_PRIMARY;
   const radius = (RADIUS_PRESETS.some((p) => p.id === tokens.radius) ? tokens.radius : 'default') as RadiusId;
   const density = (DENSITY_PRESETS.includes(tokens.density as DensityId) ? tokens.density : 'comfortable') as DensityId;
   const productCardStyle = (
@@ -145,8 +147,10 @@ export function ThemePanel({
     onPreview(null);
   }
 
+  // اللون يُقرأ بالمرادف القديم أيضاً: مسودة قديمة بـprimaryColor لا تُظهر فرقاً كاذباً مع اللون نفسه.
+  const currentToken = (key: string) => (key === PRIMARY_COLOR_TOKEN ? readPrimaryColor(tokens) ?? undefined : tokens[key]);
   const diffRows = sync.phase === 'reviewing'
-    ? Object.entries(sync.proposed).filter(([key, value]) => tokens[key] !== value)
+    ? Object.entries(sync.proposed).filter(([key, value]) => currentToken(key) !== value)
     : [];
 
   return (
@@ -167,7 +171,7 @@ export function ThemePanel({
                 key={preset.id}
                 type="button"
                 aria-pressed={selected}
-                onClick={() => onChange({ ...presentationCssVars(preset.primary, radius), primaryColor: preset.primary, themePreset: preset.id })}
+                onClick={() => onChange({ [PRIMARY_COLOR_TOKEN]: preset.primary, themePreset: preset.id })}
                 className={cn(
                   'flex h-12 items-center justify-center rounded border text-xs font-medium',
                   selected ? 'border-primary ring-2 ring-primary' : 'border-border hover:border-primary/50'
@@ -192,7 +196,7 @@ export function ThemePanel({
               value={primaryColor}
               onChange={(event) => {
                 const hex = event.target.value;
-                onChange({ ...presentationCssVars(hex, radius), primaryColor: hex, themePreset: matchPreset(hex) ?? '' });
+                onChange({ [PRIMARY_COLOR_TOKEN]: hex, themePreset: matchPreset(hex) ?? '' });
               }}
               className="absolute inset-0 cursor-pointer opacity-0"
             />
@@ -205,7 +209,7 @@ export function ThemePanel({
             onChange={(event) => {
               const hex = event.target.value;
               if (!isSafeHexColor(hex)) return;
-              onChange({ ...presentationCssVars(hex, radius), primaryColor: hex, themePreset: matchPreset(hex) ?? '' });
+              onChange({ [PRIMARY_COLOR_TOKEN]: hex, themePreset: matchPreset(hex) ?? '' });
             }}
           />
         </div>
@@ -215,7 +219,7 @@ export function ThemePanel({
         <label className="block text-xs font-medium text-text">{t('radius')}</label>
         <SegmentedField
           value={radius}
-          onChange={(next) => onChange({ ...presentationCssVars(primaryColor, next), radius: next })}
+          onChange={(next) => onChange({ radius: next })}
           options={RADIUS_PRESETS.map((preset) => ({ id: preset.id, label: t(`radiusOption.${preset.id}`) }))}
         />
       </div>
@@ -278,7 +282,7 @@ export function ThemePanel({
                   <div key={key} className="flex items-center justify-between gap-2 text-[11px]">
                     <span className="text-muted">{key}</span>
                     <span className="flex items-center gap-1">
-                      <span className="text-muted line-through">{tokens[key] ?? '—'}</span>
+                      <span className="text-muted line-through">{currentToken(key) ?? '—'}</span>
                       <span className="text-text">→</span>
                       <span className="font-medium text-text">{value}</span>
                     </span>
