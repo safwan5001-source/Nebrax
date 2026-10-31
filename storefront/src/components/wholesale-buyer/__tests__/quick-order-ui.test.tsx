@@ -276,6 +276,35 @@ describe("quick order UI", () => {
     expect(screen.queryAllByTestId("qo-pick")).toHaveLength(0);
   });
 
+  it("the variant choices handed over by an ambiguous parent SKU are not replaced by a substring search", async () => {
+    const blue = {
+      ...variant,
+      variantId: "44444444-4444-4444-8444-444444444444",
+      sku: "BLUE-001",
+    };
+    actions.resolveQuickOrderSkus.mockResolvedValue({
+      kind: "ok",
+      rows: [{ sku: "SHIRT", lines: [variant, blue] }],
+    });
+    // what a substring lookup for "SHIRT" would (wrongly) shrink the picker to
+    actions.searchQuickOrder.mockResolvedValue({
+      kind: "ok",
+      lines: [variant],
+    });
+    render(wrap());
+    fireEvent.change(screen.getByTestId("qo-paste"), {
+      target: { value: "SHIRT 1" },
+    });
+    fireEvent.click(screen.getByTestId("qo-import"));
+    await waitFor(() =>
+      expect(screen.getAllByTestId("qo-pick")).toHaveLength(2),
+    );
+    // wait past the debounce window: the picker must keep both choices and no search may have been issued
+    await new Promise((r) => setTimeout(r, 700));
+    expect(screen.getAllByTestId("qo-pick")).toHaveLength(2);
+    expect(actions.searchQuickOrder).not.toHaveBeenCalled();
+  });
+
   it("a partial import keeps only the unresolved rows in the paste box, so a retry cannot apply the good ones twice", async () => {
     actions.resolveQuickOrderSkus.mockResolvedValue({
       kind: "ok",

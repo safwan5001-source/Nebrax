@@ -75,6 +75,9 @@ export function QuickOrder({ basePath }: { basePath: string }) {
   const [pending, setPending] = useState(false);
   const counter = useRef(0);
   const latestSearch = useRef(0);
+  // set when an import hands exact-resolution candidates to the picker: the term change that follows must not trigger a
+  // substring search that would replace them
+  const suppressSearchFor = useRef<string | null>(null);
 
   const nextId = () => `${seq}-${counter.current++}`;
 
@@ -88,6 +91,12 @@ export function QuickOrder({ basePath }: { basePath: string }) {
       setSearching(false);
       return;
     }
+    if (suppressSearchFor.current === q) {
+      latestSearch.current += 1;
+      setSearching(false);
+      return;
+    }
+    suppressSearchFor.current = null;
     setSearching(true);
     const ticket = ++latestSearch.current;
     const timer = setTimeout(async () => {
@@ -150,6 +159,7 @@ export function QuickOrder({ basePath }: { basePath: string }) {
           } else if (lines.length > 1) {
             // a variant-managed parent SKU: the buyer must choose a variant — hand the candidates to the picker
             issues.push({ sku: row.sku, kind: "ambiguous" });
+            suppressSearchFor.current = row.sku.trim();
             setTerm(row.sku);
             setResults(lines);
           } else {
