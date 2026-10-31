@@ -355,6 +355,37 @@ describe("quick order UI", () => {
     );
   });
 
+  it("picking a variant settles its pasted row: the text and the ambiguity warning go, so a retry cannot apply it twice", async () => {
+    const blue = {
+      ...variant,
+      variantId: "44444444-4444-4444-8444-444444444444",
+      sku: "SHIRT-BLUE",
+    };
+    actions.resolveQuickOrderSkus.mockResolvedValue({
+      kind: "ok",
+      rows: [
+        { sku: "SHIRT", lines: [variant, blue] },
+        { sku: "TYPO", lines: [] },
+      ],
+    });
+    render(wrap());
+    fireEvent.change(screen.getByTestId("qo-paste"), {
+      target: { value: "SHIRT 12\nTYPO 1" },
+    });
+    fireEvent.click(screen.getByTestId("qo-import"));
+    await waitFor(() =>
+      expect(screen.getAllByTestId("qo-pick")).toHaveLength(2),
+    );
+    fireEvent.click(screen.getAllByTestId("qo-pick")[0]);
+
+    expect((screen.getByTestId("qo-paste") as HTMLTextAreaElement).value).toBe(
+      "TYPO 1",
+    );
+    const issues = screen.getByTestId("qo-paste-issues").textContent ?? "";
+    expect(issues).toContain("TYPO");
+    expect(issues).not.toContain("SHIRT");
+  });
+
   it("a partial import keeps only the unresolved rows in the paste box, so a retry cannot apply the good ones twice", async () => {
     actions.resolveQuickOrderSkus.mockResolvedValue({
       kind: "ok",

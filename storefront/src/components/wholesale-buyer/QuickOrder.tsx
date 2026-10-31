@@ -65,9 +65,12 @@ export function QuickOrder({ basePath }: { basePath: string }) {
   const [entries, setEntries] = useState<QuickOrderEntry[]>([]);
   const [term, setTerm] = useState("");
   const [results, setResults] = useState<QuickOrderLine[] | null>(null);
-  // the quantity typed in a pasted row whose parent SKU needs a variant choice: applied to the FIRST variant picked from
-  // those candidates (it belongs to that row), then forgotten
-  const [pickQuantity, setPickQuantity] = useState<string | null>(null);
+  // the pasted row whose parent SKU needs a variant choice: its quantity is applied to the FIRST variant picked from the
+  // candidates and the row (text + warning) is consumed by that pick, so a later retry cannot apply it twice
+  const [pickRow, setPickRow] = useState<{
+    sku: string;
+    quantity: string;
+  } | null>(null);
   const [searching, setSearching] = useState(false);
   const [pasted, setPasted] = useState("");
   const [pasteIssues, setPasteIssues] = useState<PasteIssue[]>([]);
@@ -100,11 +103,11 @@ export function QuickOrder({ basePath }: { basePath: string }) {
       setResults(null);
       setSearching(false);
       suppressSearchFor.current = null;
-      setPickQuantity(null);
+      setPickRow(null);
       return;
     }
     suppressSearchFor.current = null;
-    setPickQuantity(null);
+    setPickRow(null);
     setSearching(true);
     const ticket = ++latestSearch.current;
     const timer = setTimeout(async () => {
@@ -141,6 +144,24 @@ export function QuickOrder({ basePath }: { basePath: string }) {
     );
   };
 
+  /** The picked variant settles its pasted row: drop that line from the paste box and its ambiguity warning. */
+  const consumePastedRow = (row: { sku: string; quantity: string }) => {
+    setPasteIssues((prev) =>
+      prev.filter((i) => !(i.kind === "ambiguous" && i.sku === row.sku)),
+    );
+    setPasted((prev) => {
+      const rows = parsePastedRows(prev).rows;
+      const at = rows.findIndex(
+        (r) => r.sku === row.sku && r.quantity === row.quantity,
+      );
+      if (at === -1) return prev;
+      return rows
+        .filter((_, i) => i !== at)
+        .map((r) => `${r.sku} ${r.quantity}`)
+        .join("\n");
+    });
+  };
+
   const importPasted = () => {
     const { rows, truncated: cut } = parsePastedRows(pasted);
     setTruncated(cut);
@@ -170,7 +191,7 @@ export function QuickOrder({ basePath }: { basePath: string }) {
             suppressSearchFor.current = row.sku.trim();
             setTerm(row.sku);
             setResults(lines);
-            setPickQuantity(row.quantity);
+            setPickRow({ sku: row.sku, quantity: row.quantity });
           } else {
             additions.push({
               id: nextId(),
@@ -379,8 +400,9 @@ export function QuickOrder({ basePath }: { basePath: string }) {
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        addLine(line, pickQuantity ?? "1");
-                        setPickQuantity(null);
+                        addLine(line, pickRow?.quantity ?? "1");
+                        if (pickRow) consumePastedRow(pickRow);
+                        setPickRow(null);
                       }}
                       disabled={pending}
                       data-testid="qo-pick"
