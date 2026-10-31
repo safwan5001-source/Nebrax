@@ -1137,7 +1137,8 @@
       "company": "Nom de l’entreprise (facultatif)",
       "phone": "Téléphone de contact (facultatif)",
       "applicationHint": "Cela aide la boutique à examiner votre demande. Ce n’est pas vérifié et cela ne modifie pas vos prix.",
-      "myOrders": "Mes commandes"
+      "myOrders": "Mes commandes",
+      "quickOrder": "Commande rapide"
     },
     "status": {
       "signed_out": {
@@ -1250,6 +1251,61 @@
       "status": {
         "confirmed": "Confirmée",
         "cancelled": "Annulée"
+      }
+    },
+    "quickOrder": {
+      "title": "Commande rapide",
+      "subtitle": "Trouvez des articles par SKU ou par nom, saisissez les quantités et ajoutez-les tous au panier d'un coup. Vos prix de gros approuvés s'appliquent.",
+      "search": {
+        "title": "Rechercher par SKU ou nom de produit",
+        "placeholder": "SKU ou nom du produit…",
+        "searching": "Recherche…",
+        "none": "Aucun résultat.",
+        "addToList": "Ajouter à la liste"
+      },
+      "paste": {
+        "title": "Coller une liste de SKU",
+        "hint": "Un article par ligne : SKU et quantité, séparés par un espace, une virgule ou une tabulation (ex. ABC-100 12). Un SKU seul signifie quantité 1.",
+        "placeholder": "ABC-100 12\nSHIRT-RED, 4\nCOF-100",
+        "cta": "Ajouter les articles collés à la liste",
+        "truncated": "Seules les {max} premières lignes ont été utilisées.",
+        "issue": {
+          "not_found": "introuvable dans le catalogue de cette boutique",
+          "ambiguous": "correspond à plusieurs variantes : choisissez-en une dans les résultats de recherche ci-dessus",
+          "list_full": "non ajouté — la liste contient déjà le maximum de {max} lignes"
+        }
+      },
+      "list": {
+        "title": "Liste de commande ({count})",
+        "empty": "Votre liste est vide. Recherchez ci-dessus ou collez une liste de SKU.",
+        "remove": "Supprimer la ligne",
+        "quantity": "Quantité",
+        "excluded": "cette ligne ne sera pas ajoutée",
+        "eligible": "Prêtes à ajouter : {eligible} sur {total}",
+        "estimate": "Total estimé",
+        "priceNote": "La boutique confirme les prix à l'ajout au panier puis de nouveau au paiement.",
+        "submit": "Ajouter au panier ({count})"
+      },
+      "qty": {
+        "invalid": "Saisissez un nombre entier supérieur ou égal à 1.",
+        "tooLarge": "La quantité ne peut pas dépasser {max}."
+      },
+      "reason": {
+        "noWholesalePrice": "Aucun prix de gros n'est disponible pour cet article",
+        "notPurchasable": "Cet article ne peut pas être acheté pour le moment",
+        "personalizationRequired": "Cet article nécessite une personnalisation — ajoutez-le depuis sa fiche produit"
+      },
+      "notice": {
+        "added": "Ajouté à votre panier : {count}",
+        "viewCart": "Voir le panier",
+        "checkout": "Paiement",
+        "rejected": "Rien n'a été ajouté : certaines lignes ne peuvent plus être achetées. Corrigez ou supprimez les lignes signalées puis réessayez.",
+        "error": "Une erreur s'est produite. Rien n'a été ajouté ; veuillez réessayer.",
+        "access": {
+          "signed_out": "Veuillez vous reconnecter pour continuer.",
+          "not_approved": "Votre compte de gros n'est pas approuvé pour commander."
+        },
+        "accessCta": "Continuer"
       }
     }
   }

@@ -54,6 +54,7 @@ function nativeWholesaleEquivalent(legacyPath: string): string | null {
     return "/buyer/sign-in";
   }
   if (path === "/wholesale/apply") return "/buyer/membership";
+  if (path === "/wholesale/quick-order") return "/buyer/quick-order";
   if (path === "/wholesale/cart") return "/cart";
   if (
     path === "/wholesale/products" ||
