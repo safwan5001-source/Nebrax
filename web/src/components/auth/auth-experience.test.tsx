@@ -175,6 +175,44 @@ describe('register page inside the experience', () => {
     });
   });
 
+  async function fillRegisterAndSubmit(user: ReturnType<typeof userEvent.setup>, phone: string) {
+    const r = arMessages.register;
+    await user.type(field(r.company_name), 'Acme');
+    await user.type(field(r.slug), 'acme');
+    await user.type(field(r.email), 'owner@acme.sa');
+    await user.type(field(r.phone), phone);
+    await user.type(field(r.password), 'Str0ng!pass');
+    await user.click(screen.getByRole('button', { name: r.submit }));
+  }
+
+  it('INTL-PHONE: sends an international number typed key by key as E.164 (the country follows the typed code)', async () => {
+    registerMock.mockResolvedValue({ tenant: { slug: 'acme' }, handoffCode: null });
+    withIntl(<RegisterPage />);
+    const user = userEvent.setup();
+    await fillRegisterAndSubmit(user, '+971501234567');
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/dashboard'));
+    expect(registerMock).toHaveBeenCalledWith(expect.objectContaining({ phone: '+971501234567' }));
+  });
+
+  it('INTL-PHONE: Arabic digits typed in the phone field are sent as English E.164 digits', async () => {
+    registerMock.mockResolvedValue({ tenant: { slug: 'acme' }, handoffCode: null });
+    withIntl(<RegisterPage />);
+    const user = userEvent.setup();
+    await fillRegisterAndSubmit(user, '٠٥١٢٣٤٥٦٧٨');
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/dashboard'));
+    expect(registerMock).toHaveBeenCalledWith(expect.objectContaining({ phone: '+966512345678' }));
+    expect((field(arMessages.register.phone) as HTMLInputElement).value).not.toMatch(/[\u0660-\u0669\u06f0-\u06f9]/);
+  });
+
+  it('INTL-PHONE: a number invalid for the chosen country (or a landline) blocks the submit with the phone error', async () => {
+    withIntl(<RegisterPage />);
+    const user = userEvent.setup();
+    await fillRegisterAndSubmit(user, '112345678'); // خط ثابت سعودي
+    expect(await screen.findByText(arMessages.register.phone_invalid)).toBeTruthy();
+    expect(registerMock).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(new RegExp(`^${arMessages.register.phone}`), { selector: 'input' }).getAttribute('aria-invalid')).toBe('true');
+  });
+
   it('asserts no consent to terms or a privacy policy that are not published yet', () => {
     for (const locale of ['ar', 'en'] as const) {
       cleanup();

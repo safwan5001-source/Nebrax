@@ -2196,7 +2196,7 @@
     "required": "Required",
     "available": "Available blocks",
     "search": "Search blocks",
-    "search_placeholder": "Block name",
+    "search_placeholder": "Search by name or code",
     "search_empty": "No block matches the search.",
     "add": "Add {section}",
     "show": "Show {section}",
@@ -6465,6 +6465,15 @@
     "tax_total": "Total tax",
     "save": "Save template"
   },
+  "phoneInput": {
+    "country_label": "Country and calling code",
+    "search_label": "Search for a country",
+    "search_placeholder": "Search by name or code, e.g. Egypt or 20",
+    "empty": "No matching country",
+    "kept_note": "We kept the number you entered. Make sure it belongs to the selected country.",
+    "legacy_note": "The saved number is in a local format without a country code. Choose its country and check the number.",
+    "results": "{count} results"
+  },
   "register": {
     "title": "Create a new account",
     "subtitle": "A few details to create your company account.",
@@ -6490,8 +6499,7 @@
     "show_pw": "Show password",
     "hide_pw": "Hide password",
     "phone": "Mobile number",
-    "phone_invalid": "Enter a valid Saudi mobile number starting with 5.",
-    "phone_country": "Saudi Arabia",
+    "phone_invalid": "Enter a valid mobile number for the selected country.",
     "email_invalid": "Enter a valid email address.",
     "submitting": "Creating account…",
     "field_required": "This field is required.",
