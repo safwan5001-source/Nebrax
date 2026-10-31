@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "1.0.0",
+  "minRuntimeVersion": "1.0.0",
+  "navigation": { "initialPageId": "home" },
+  "theme": { "tokens": {} },
+  "pages": {
+    "home": { "type": "Page", "id": "home-root", "children": [] }
+  }
+}
