@@ -70,7 +70,9 @@ final class StorefrontQuickOrderController extends PublicApiController
 
         $storefront = app(StorefrontContext::class);
         $channelId = $storefront->salesChannelId();
-        $like = $this->likeTerm($term);
+        // SQL LIKE is case-insensitive on SQLite but case-sensitive on PostgreSQL: compare lower(column) to a lowered term
+        // so a buyer typing "cof-100" finds COF-100 on the production database too.
+        $like = mb_strtolower($this->likeTerm($term));
         $exact = mb_strtolower($term);
         $limit = (int) ($filters['limit'] ?? 10);
 
@@ -82,10 +84,10 @@ final class StorefrontQuickOrderController extends PublicApiController
                 ->where('is_published', true)
                 ->select('product_id'))
             ->where(fn ($q) => $q
-                ->where('name', 'like', $like)
-                ->orWhere('name_en', 'like', $like)
-                ->orWhere('sku', 'like', $like)
-                ->orWhereHas('variants', fn ($v) => $v->where('is_active', true)->where('sku', 'like', $like)))
+                ->whereRaw('lower(name) like ?', [$like])
+                ->orWhereRaw('lower(name_en) like ?', [$like])
+                ->orWhereRaw('lower(sku) like ?', [$like])
+                ->orWhereHas('variants', fn ($v) => $v->where('is_active', true)->whereRaw('lower(sku) like ?', [$like])))
             ->with(['variants' => fn ($v) => $v->where('is_active', true)->with('optionValues.option')])
             ->orderByRaw('case when lower(sku) = ? then 0 else 1 end', [$exact])
             ->orderBy('name')
