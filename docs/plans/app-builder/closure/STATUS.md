@@ -27,8 +27,13 @@
 | **S02** عقد المكوّنات (AD-12) | ✅ مدموجة (S02a خادم + S02b ويب) | #1827 | `c10fdbc7b56a2cfc57e4ff1e0a8f3b161b6adfad` | فرض مرحلي؛ 3 جولات مراجعة Codex (7 ملاحظات P2 صحيحة كلها أُصلحت باختبارات)؛ تقارير S02a/S02b |
 | **S21a** الوضع السهل V2: القشرة | ✅ مدموجة | #1830 | `5c07d1d37d54cf27ffe4582e7dd95a40037b818a` | قائمة أقسام + كتالوج صادق (صفحات Runtime) + شريط قسم + هوية + مبدّل وضع؛ مراجعة Codex: 4 ملاحظات أُصلحت؛ e2e متصفح حقيقي؛ `S21a-IMPLEMENTATION-REPORT.md` |
 | **S23a** تجاوب/لمس/اتجاه (UX-02/04/07/08/09/10/11) | ✅ مدموجة | #1831 | `5274f640c958006d47b1fa87d07dfc50f896fe9d` | آيباد عمودي وجوال أفقي بعمودين، أهداف لمس 44px على `pointer: coarse`، سهم رجوع حسب الاتجاه؛ e2e متصفح حقيقي 17/17؛ `S23a-IMPLEMENTATION-REPORT.md` |
-| **S20a** `editor_meta` (AD-05، خادم) | 🟡 PR مفتوح | — | — | هجرة nullable + `EditorMeta` + إسقاط المخفي عند النشر/المعاينة؛ `S20a-IMPLEMENTATION-REPORT.md` |
-| **S20b** `editor_meta` (AD-05، واجهة) | 🟡 PR مفتوح | — | — | إخفاء/اسم قسم/عنوان صفحة/Preset في الوضع السهل؛ `WeakMap` فوق سجل التراجع؛ `S20b-IMPLEMENTATION-REPORT.md`؛ يغلق CMP-16/PAG-05/DRF-09/UX-01 |
+| **S20a** `editor_meta` (AD-05، خادم) | ✅ مدموجة | #1837 | `26ce08198e38ba2e4cd025fdcbeea7ce2692c657` | هجرة nullable؛ Codex: ملاحظتان P2 (تقييد بالصفحة، معرّفات رقمية + إفساد JsonResource للمفاتيح الرقمية) أُصلحتا؛ `S20a-IMPLEMENTATION-REPORT.md` |
+| **S20b** `editor_meta` (AD-05، واجهة) | ✅ مدموجة | #1838 | `50e6d42fd6f54b37a2e2ebda2e8f880a98d5f911` | إخفاء/اسم قسم/عنوان صفحة/Preset؛ Codex: ملاحظتان P2 (تسمية معلّقة عبر الصفحات، تصدير التعارض) أُصلحتا؛ e2e متصفح 18/18؛ يغلق CMP-16/PAG-05/DRF-09/UX-01 |
+| **S04a** الثيم الحيّ في Flutter (AD-03) | ✅ مدموجة | #1839 | `8c383b6b30769cb1c55561aa6a30bd0b3477b454` | اختبارات Dart حمراء أولاً؛ يقرأ `primaryColor` مرادفاً؛ المعاينة تتبع المسودة (THM-09) |
+| **S04b** الثيم القانوني في الويب (AD-03) | ✅ مدموجة | #1840 | `89fb6fe5bd99e4df5ba8849bf90165480bfcfe36` | `colorPrimary` + لا حفظ لمتغيرات `--*` + هجرة عند أول تعديل (THM-01/02، QA-03، CPT-04) |
+| **S05b** أجيال Runtime (AD-02) | ✅ مدموجة | #1842 | `ef163cf295099f93b3a44d06dfbc8b043d6c52b5` | `X-Runtime-Version` + أعلى نسخة متوافقة + حارس نشر؛ جيل واحد اليوم |
+| **S02c** حدود الكمية عبر PlanGate (DRF-07) | ✅ مدموجة | #1843 | `4a480cabefac9eaccf50a8f7236cd0a3eef64a5c` | افتراضات سخية + تجاوز لكل مستأجر؛ تزامن PostgreSQL وطفرتان |
+| **CPT-05** أرشيف نسخ مجمَّد | ✅ مدموجة | #1844 | `c4746754741050087cc8c9c3928f9e2d75569fb9` | مشترك PHP/Dart؛ Codex P1 (نسخ `archive/` في تجميع CI) أُصلح؛ طفرة متحقَّقة |
 | **FIX-SIGNAL-KEYS** مفاتيح تسمية إشارات الظهور | ✅ مدموجة | #1833 | `72ff4056fa05356199d9049b9d10d74d124d17d7` | يعالج جزء App Builder من UX-I18N-DOT |
 | **S03a** فتح عقدة المشكلة + شارات الشجرة/الأقسام | ✅ مدموجة | #1834 | `2ff9786cb9d91db9006579a04ee4637ef74cf08b` | `S03a-IMPLEMENTATION-REPORT.md`؛ Codex: ملاحظة وصول أُصلحت |
 | S03 (المتبقي: مفتاح `optional` + تقرير الإسقاط — AD-02)، S04–S20، S21b/c، S22، S24، S25، AF01–AF03 | ⏳ لم تبدأ / محجوبة بـAD | — | — | انظر الخارطة؛ بعضها يتطلب اعتماد AD المرتبط |
@@ -70,7 +75,7 @@
 4. ~~openapi drift~~: أُصلح في #1820.
 
 ## 5) Handoff — الاستئناف
-- **قرارات المالك الأخيرة:** AD-05 وAD-03 وAD-02 وDRF-07 معتمدة. الترتيب: S20a→S20b (الوضع السهل: إخفاء/اسم) → S04 (ثيم) → S05-A (أجيال Runtime، اختبارات Dart أولاً) → S02c (حدود PlanGate). سجل الفجوات المُولَّد: `GAP-LEDGER.md` (`python3 gap-ledger.py`). Flutter محلياً: SDK 3.47.5 في الـscratchpad (`flutter test` يعمل). بيئة e2e المتصفح: `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/opt/pw-browsers/chromium-1243/chrome-linux64/chrome npx playwright test e2e/app-builder-easy-mode.spec.ts --project=desktop` (الخادم مُعترَض، `APP_BUILDER_SHOTS=<dir>` للقطات).
+- **قرارات المالك الأخيرة:** AD-05 وAD-03 وAD-02 (A) وDRF-07 معتمدة ونُفِّذت (S20a/b، S04a/b، S05b، S02c). AD-04 وAD-06…AD-13 معلّقة. **التالي:** S03b (تقرير توافق استشاري عند الحفظ DRF-03 + مفتاح `optional` في المحرر CMP-10 باستعمال `RuntimeGenerations`)، S21b/c، أول جيل Runtime حقيقي ثانٍ عند أول مفتاح مخطط جديد (يتطلب اعتماد AD المرتبط). سجل الفجوات: `GAP-LEDGER.md` (`python3 gap-ledger.py`). ملاحظة بيئية: Codex يراجع كل دفعة خلال دقائق؛ الاختبار المتقطع `AiActionHistoryListTest` (24 مقابل 23) يُعاد تشغيله بـrerun-failed-jobs.
 - المتبقي من S21 (الوضع السهل V2): S21b (الصفحات/الهوية/الجهاز واللغة)، S21c (تخطيط الجوال: أوراق سفلية)، تحرير بالضغط على المعاينة مع شريط عائم؛ **الإخفاء/اسم القسم/Preset/عنوان الصفحة**: مبنية (S20a خادم + S20b واجهة).
 - بيئة الاختبار المحلية: `pg_ctlcluster 16 main start`؛ مزامنة الملفات المتغيّرة إلى `/home/user/nibras-app` بسكربت المزامنة في الـscratchpad.
 
