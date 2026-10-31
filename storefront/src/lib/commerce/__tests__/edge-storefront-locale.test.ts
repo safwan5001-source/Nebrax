@@ -331,4 +331,34 @@ describe("resolveHostContextForRequest (H6 Final Closure)", () => {
     expect(a).toMatchObject({ wholesaleBuyer: true });
     expect(b).toMatchObject({ wholesaleBuyer: false });
   });
+
+  it("honors AWJ_STOREFRONT_DEV_HOST outside production, exactly like the server-side resolver", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("AWJ_STOREFRONT_DEV_HOST", "dev-store.example");
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({ data: { default_locale: "ar" } }),
+    );
+
+    await resolveHostContextForRequest(requestFor("localhost:3001"));
+
+    const [, init] = vi.mocked(fetch).mock.calls[0];
+    expect(
+      (init?.headers as Record<string, string>)["X-Storefront-Forwarded-Host"],
+    ).toBe("dev-store.example");
+  });
+
+  it("never reads AWJ_STOREFRONT_DEV_HOST in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("AWJ_STOREFRONT_DEV_HOST", "dev-store.example");
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({ data: { default_locale: "ar" } }),
+    );
+
+    await resolveHostContextForRequest(requestFor("real-store.example"));
+
+    const [, init] = vi.mocked(fetch).mock.calls[0];
+    expect(
+      (init?.headers as Record<string, string>)["X-Storefront-Forwarded-Host"],
+    ).toBe("real-store.example");
+  });
 });

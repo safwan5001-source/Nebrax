@@ -118,6 +118,22 @@ function cacheSet(host: string, context: HostContext): void {
 }
 
 /**
+ * The Host the API must be asked about. Mirrors `resolveVisitorHostname()` in `./config.ts` exactly — including its
+ * non-production-only `AWJ_STOREFRONT_DEV_HOST` escape hatch (never read in production) — so the proxy and the
+ * server components always identify the same Storefront. Without this, local development against a registered
+ * Storefront would be told "unknown Host" and every page would 404.
+ */
+function hostForRequest(request: NextRequest): string {
+  if (
+    process.env.NODE_ENV !== "production" &&
+    process.env.AWJ_STOREFRONT_DEV_HOST
+  ) {
+    return process.env.AWJ_STOREFRONT_DEV_HOST;
+  }
+  return request.headers.get("host") || request.nextUrl.host;
+}
+
+/**
  * Resolves the Host's context from `GET store/v1/storefront` (see {@link HostContext}). Never throws.
  *
  * The Host used is the request's own transport-level `Host` header (or, in its absence, `NextRequest`'s parsed
@@ -128,7 +144,7 @@ function cacheSet(host: string, context: HostContext): void {
 export async function resolveHostContextForRequest(
   request: NextRequest,
 ): Promise<HostContext> {
-  const host = request.headers.get("host") || request.nextUrl.host;
+  const host = hostForRequest(request);
   if (!host) return { state: "unavailable" };
 
   const cached = cacheGet(host);
