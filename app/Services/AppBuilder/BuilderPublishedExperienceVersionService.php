@@ -26,7 +26,7 @@ use RuntimeException;
  *
  * **APP-BUILDER-2**: إضافةً للتحقق البنيوي، النشر يستدعي
  * `CompatibilityResolver` مقابل بناء AWJ Mobile Runtime **الحالي**
- * (`CapabilityManifest::current()`) — قدرة مطلوبة غير مدعومة تمنع النشر
+ * (سجل أجيال Runtime `RuntimeGenerations`، AD-02: يُنشر ما يرندره أي جيل معروف) — قدرة مطلوبة غير مدعومة تمنع النشر
  * كاملاً («compatibility failure cannot silently publish»، Quality Gate E)؛
  * تجاوزات اختيارية آمنة (`fallbacks`) لا تمنعه.
  */
@@ -35,6 +35,7 @@ final class BuilderPublishedExperienceVersionService
     public function __construct(
         private readonly AppSchemaParser $parser,
         private readonly CompatibilityResolver $compatibilityResolver,
+        private readonly RuntimeGenerations $generations,
         private readonly AppSchemaContractChecker $contractChecker,
     ) {}
 
@@ -112,8 +113,11 @@ final class BuilderPublishedExperienceVersionService
         $schema = $draft->schema;
         $this->parser->validate($schema);
 
-        $compatibility = $this->compatibilityResolver->resolve($schema, CapabilityManifest::current());
-        if (! $compatibility->compatible) {
+        // AD-02: تُنشر إن رندرها **أي** جيل Runtime معروف (والجهاز يتلقّى أعلى نسخة متوافقة مع جيله)، وتُرفض إن لم يرندرها أحد.
+        // الرسالة من أحدث جيل (الأقرب إلى ما يتوقّعه المحرّر). مع جيل واحد السلوك كما كان.
+        if ($this->generations->lowestRendering($schema, $this->compatibilityResolver) === null) {
+            $newest = $this->generations->all()[count($this->generations->all()) - 1];
+            $compatibility = $this->compatibilityResolver->resolve($schema, $newest);
             throw new RuntimeException("التجربة غير متوافقة مع تطبيق الجوال الحالي: {$compatibility->message}");
         }
 

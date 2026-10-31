@@ -45,6 +45,30 @@ void main() {
   final compatibleSchema = baseSchemaJson(schemaVersion: '1.0.0');
   final compatibleJson = encodeSchema(compatibleSchema);
 
+  group('resolveRealStartup — declares its runtime generation (AD-02 / S05b)', () {
+    test('the experience request carries X-Runtime-Version = the manifest\'s runtime version', () async {
+      final transport = FakeCommerceTransport.always(
+        jsonResponse(200, {
+          'data': {'version': 1, 'schema_version': '1.0.0', 'published_at': '2026-09-25T00:00:00Z', 'schema': compatibleSchema},
+          'meta': successMeta(),
+        }),
+      );
+      final client = CommerceClient(config: _config(), sessionStore: InMemorySecureSessionStore(), transport: transport);
+      final manifest = CapabilityManifest(
+        platform: RuntimePlatform.android,
+        runtimeVersion: SchemaVersion.parse('1.4.2'),
+        minSupportedSchemaVersion: SchemaVersion.parse('1.0.0'),
+        maxSupportedSchemaVersion: SchemaVersion.parse('1.4.0'),
+        components: RuntimeCapabilities.components,
+        actions: RuntimeCapabilities.actions,
+      );
+
+      await resolveRealStartup(client: client, cache: InMemoryExperienceCache(), manifest: manifest);
+
+      expect(transport.requests.single.headers['X-Runtime-Version'], '1.4.2');
+    });
+  });
+
   group('resolveRealStartup — fresh fetch succeeds', () {
     test('fetch succeeds and is compatible -> UseFreshExperience, and the cache is written', () async {
       final client = _clientWithSchema(compatibleSchema);

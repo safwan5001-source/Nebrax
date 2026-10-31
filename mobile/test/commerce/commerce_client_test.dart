@@ -309,6 +309,22 @@ void main() {
       expect(sent.headers.containsKey('X-Customer-Token'), isFalse);
     });
 
+    test('getExperienceSchemaJson sends X-Runtime-Version only when a runtime version is given, and no other call ever does', () async {
+      final transport = FakeCommerceTransport.always(
+        jsonResponse(200, {
+          'data': {'schema': {'schemaVersion': '1.0.0'}},
+          'meta': successMeta(),
+        }),
+      );
+      final client = CommerceClient(config: _config(), sessionStore: InMemorySecureSessionStore(), transport: transport);
+
+      await client.getExperienceSchemaJson();
+      await client.getExperienceSchemaJson(runtimeVersion: '1.2.3');
+
+      expect(transport.requests[0].headers.containsKey('X-Runtime-Version'), isFalse);
+      expect(transport.requests[1].headers['X-Runtime-Version'], '1.2.3');
+    });
+
     test('getExperienceSchemaJson throws CommerceApiException on a documented 404', () async {
       final transport = FakeCommerceTransport.always(
         jsonResponse(404, errorEnvelope('not_found', 'لا توجد تجربة منشورة لهذا المستأجر.')),

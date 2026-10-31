@@ -3,6 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\BuilderPublishedExperienceVersion;
+use App\Services\AppBuilder\AppSchemaParser;
+use App\Services\AppBuilder\CompatibilityResolver;
+use App\Services\AppBuilder\RuntimeGenerations;
+use App\Services\AppBuilder\SchemaFormatException;
 use App\Support\PublicApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -38,12 +42,44 @@ use Illuminate\Http\Request;
  */
 class CommerceExperienceController extends PublicApiController
 {
+    /** أقصى عدد نسخ حديثة تُفحَص بحثاً عن الأعلى المتوافقة مع جيل الجهاز (حدّ للكلفة؛ يُضبط من `config/app_builder.php`). */
+    private const DEFAULT_SCAN_LIMIT = 100;
+
+    public function __construct(
+        private readonly RuntimeGenerations $generations,
+        private readonly AppSchemaParser $parser,
+        private readonly CompatibilityResolver $resolver,
+    ) {}
+
+    /**
+     * AD-02 (S05b): **أعلى نسخة منشورة متوافقة مع جيل الجهاز** (`X-Runtime-Version`)، لا «الأحدث» أيّاً كانت.
+     * الترويسة الغائبة/التالفة ⇒ أقدم جيل معروف. لا نسخة متوافقة ⇒ 404 (يعود الجهاز إلى التجربة الافتراضية المضمَّنة)
+     * بدل وثيقة لا يستطيع عرضها. صف تالف لا يخفي صفاً أقدم سليماً.
+     */
     public function show(Request $request): JsonResponse
     {
-        $version = BuilderPublishedExperienceVersion::query()
+        $manifest = $this->generations->forRuntime($request->header('X-Runtime-Version'));
+        $limit = max(1, (int) config('app_builder.runtime_selection_scan_limit', self::DEFAULT_SCAN_LIMIT));
+
+        $candidates = BuilderPublishedExperienceVersion::query()
             ->orderByDesc('published_at')
             ->orderByDesc('created_at')
-            ->first();
+            ->limit($limit)
+            ->get();
+
+        $version = $candidates->first(function (BuilderPublishedExperienceVersion $candidate) use ($manifest): bool {
+            $schema = $candidate->schema;
+            if (! is_array($schema)) {
+                return false;
+            }
+            try {
+                $this->parser->validate($schema);
+            } catch (SchemaFormatException) {
+                return false;
+            }
+
+            return $this->resolver->resolve($schema, $manifest)->compatible;
+        });
 
         if ($version === null) {
             abort(404, 'لا توجد تجربة منشورة لهذا المستأجر.');
@@ -54,6 +90,6 @@ class CommerceExperienceController extends PublicApiController
             'schema_version' => $version->schema_version,
             'published_at' => $version->published_at?->toIso8601String(),
             'schema' => $version->schema,
-        ]);
+        ])->header('Vary', 'X-Runtime-Version');
     }
 }

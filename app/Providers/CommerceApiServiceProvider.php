@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Http\Middleware\ForceJsonResponse;
 use App\Http\Middleware\PublicApiRequestContext;
 use App\Http\Middleware\ResolveCommerceLocale;
+use App\Services\AppBuilder\RuntimeGenerations;
 use App\Services\Commerce\Otp\FakeOtpProvider;
 use App\Services\Commerce\Otp\OtpProvider;
 use App\Support\PublicApiExceptionRenderer;
@@ -50,6 +51,9 @@ class CommerceApiServiceProvider extends ServiceProvider
         // until a vendor-selection Decision/Owner Gate is resolved; swapping
         // it later touches only this one line.
         $this->app->bind(OtpProvider::class, FakeOtpProvider::class);
+
+        // AD-02 (S05b) — أجيال Runtime المعروفة (جيل واحد 1.0.0 اليوم)؛ تُستبدل في الاختبارات بسجلّ متعدد الأجيال.
+        $this->app->singleton(RuntimeGenerations::class, fn () => RuntimeGenerations::current());
     }
 
     public function boot(): void

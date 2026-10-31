@@ -150,16 +150,23 @@ paths:
   /experience:
     parameters:
       - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/RuntimeVersion'
     get:
       operationId: getExperience
       tags: [AppBuilder]
-      summary: The tenant's most recently published App Builder experience
+      summary: The tenant's latest published App Builder experience that the calling runtime can render
       description: >-
         APP-BUILDER-19 — backs the mobile runtime's live publish → fetch →
-        on-device-cache loop. Returns the latest `BuilderPublishedExperienceVersion`
-        across all of the tenant's BuilderApp records (there is no separate
-        "active app" flag today — publishing is what makes a version live).
-        404 when the tenant has never published any App Builder experience.
+        on-device-cache loop. Returns the most recently published
+        `BuilderPublishedExperienceVersion` across all of the tenant's BuilderApp
+        records (there is no separate "active app" flag today — publishing is what
+        makes a version live) **that the calling runtime generation can render**
+        (AD-02): the device declares its generation with `X-Runtime-Version`; a
+        missing or malformed header is treated as the oldest known generation,
+        never the newest. The response therefore varies by that header
+        (`Vary: X-Runtime-Version`). 404 when the tenant has never published, or
+        when no published version is renderable by the declared generation (the
+        runtime then uses its bundled Default Experience).
       x-auth-tier: read
       responses:
         '200':
@@ -1175,6 +1182,14 @@ components:
       required: false
       description: Optional client-supplied correlation id, echoed back if valid; otherwise server-generated.
       schema: { type: string }
+    RuntimeVersion:
+      name: X-Runtime-Version
+      in: header
+      required: false
+      description: >-
+        The calling runtime's generation as `major.minor.patch` (AD-02). Selects the highest published
+        experience that generation can render. Missing or malformed ⇒ treated as the oldest known generation.
+      schema: { type: string, pattern: '^\d{1,6}\.\d{1,6}\.\d{1,6}$' }
     CartToken:
       name: X-Cart-Token
       in: header
