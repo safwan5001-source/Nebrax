@@ -543,7 +543,9 @@ export function Inspector({
   onAddChild,
   onRemove,
   canRemove,
+  mode = 'advanced',
 }: {
+  mode?: 'easy' | 'advanced';
   node: AppSchemaComponent | null;
   registries: AppBuilderRegistries | null;
   pageIds: string[];
@@ -571,7 +573,9 @@ export function Inspector({
   const componentTypeOptions = registries
     ? (definition.allowed_children ?? Object.keys(registries.components).filter((type) => type !== 'Page')).filter((type) => registries.components[type])
     : [];
-  const canAddChild = definition.children_rule.kind === 'unboundedAny';
+  // الوضع السهل يخفي الربط وشرط الظهور وإضافة الأبناء (تبقى قيمها في المسودة كما هي ويعرضها المتقدم) — مواصفة V2 §8.
+  const advancedOnly = mode === 'advanced';
+  const canAddChild = advancedOnly && definition.children_rule.kind === 'unboundedAny';
   const injectedParams = new Set(definition.injected_runtime_action_params);
 
   function setProp(key: string, value: unknown) {
@@ -681,7 +685,7 @@ export function Inspector({
         </div>
       ) : null}
 
-      {definition.bindable_resources.length > 0 ? (
+      {advancedOnly && definition.bindable_resources.length > 0 ? (
         <BindingEditor
           binding={node.binding}
           bindableResourceIds={definition.bindable_resources}
@@ -692,13 +696,13 @@ export function Inspector({
         />
       ) : null}
 
-      <VisibilityEditor
+      {advancedOnly ? <VisibilityEditor
         visibility={node.visibility}
         signals={registries?.visibility_signals ?? []}
         operators={registries?.visibility_operators ?? []}
         onChange={setVisibility}
         t={t}
-      />
+      /> : null}
 
       {canAddChild ? (
         <div className="border-t border-border pt-3">

@@ -128,6 +128,33 @@ const { api, currentUser, translate } = vi.hoisted(() => {
     'publish.publishing': 'Publishing…',
     'publish.successTitle': 'Version published',
     'publish.errorTitle': 'Could not publish',
+    'easy.modeLabel': 'Editor mode',
+    'easy.mode.easy': 'Easy',
+    'easy.mode.advanced': 'Advanced',
+    'easy.sectionsTitle': 'Page sections',
+    'easy.sectionsCount': '{count} sections',
+    'easy.deleted': 'Deleted {name}',
+    'easy.undo': 'Undo delete',
+    'easy.emptyPage': 'This page is empty.',
+    'easy.moveUp': 'Move section up',
+    'easy.moveDown': 'Move section down',
+    'easy.duplicate': 'Duplicate section',
+    'easy.delete': 'Delete section',
+    'easy.addSection': 'Add a section',
+    'easy.catalogTitle': 'Pick a section',
+    'easy.catalogSearch': 'Search sections',
+    'easy.catalogCategories': 'Categories',
+    'easy.catalogNoResults': 'No matching sections.',
+    'easy.catalogAdd': 'Add to page',
+    'easy.categories.all': 'All',
+    'easy.status.ready': 'Ready',
+    'easy.status.limited': 'Ready with limits',
+    'easy.status.proposed': 'Proposed',
+    'easy.status.unavailable': 'Unavailable',
+    'easy.catalog.text.name': 'Text block',
+    'easy.catalog.button.name': 'Button block',
+    'easy.catalog.slider.name': 'Slider block',
+    'easy.reasons.noComponent': 'No component yet.',
     'issues.blocking': 'Blocks publishing',
     'issues.warning': 'Warning',
     'issues.more': 'and {count} more',
@@ -276,6 +303,10 @@ const originalMatchMedia = window.matchMedia;
 afterAll(() => {
   window.matchMedia = originalMatchMedia;
 });
+/** V2: الافتراضي «سهل»؛ الاختبارات القديمة تُحرّر عبر الشجرة والمفتش فتُثبَّت على «متقدم» صراحةً (مفاتيح كل مستخدمي الاختبار). */
+function seedAdvancedMode() {
+  for (const user of ['anonymous', 'u1', 'u3']) window.localStorage.setItem(`awj.appBuilder.editorMode.v1.${user}.app-1`, 'advanced');
+}
 beforeEach(() => {
   wideBuilderViewport = false;
   window.matchMedia = ((query: string) => ({
@@ -437,6 +468,7 @@ describe('AppBuilderWorkspacePage', () => {
     toastFns.toast.mockReset();
     currentUser.mockReturnValue({ role: 'owner' });
     window.localStorage.clear();
+    seedAdvancedMode();
   });
 
   it('loads the draft and renders the page tree, canvas content, and default selection', async () => {
@@ -1544,6 +1576,7 @@ describe('AppBuilderWorkspacePage — save safety (AD-01 / S01b)', () => {
     toastFns.toast.mockReset();
     currentUser.mockReturnValue({ id: 'u1', role: 'owner' });
     window.localStorage.clear();
+    seedAdvancedMode();
   });
 
   const putCalls = () => api.mock.calls.filter((c) => c[0] === DRAFT_PATH && c[1]?.method === 'PUT');
@@ -2064,5 +2097,125 @@ describe('AppBuilderWorkspacePage — save safety (AD-01 / S01b)', () => {
   it('an owner is never shown the read-only notice', async () => {
     await openEditor();
     expect(screen.queryByText('Read-only: you do not have permission to edit the draft.')).toBeNull();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  الوضع السهل V2 (S21a) — الافتراضي سهل؛ كل تعديل عبر معالجات المحرر نفسها
+// ═══════════════════════════════════════════════════════════════════════════
+describe('AppBuilderWorkspacePage — Easy Mode V2 shell (S21a)', () => {
+  const DRAFT_PATH = '/app-builder/apps/app-1/draft';
+  afterEach(cleanup);
+  beforeEach(() => {
+    api.mockReset();
+    toastFns.success.mockReset();
+    toastFns.error.mockReset();
+    currentUser.mockReturnValue({ id: 'u1', role: 'owner' });
+    window.localStorage.clear(); // لا تثبيت «متقدم»: الافتراضي سهل
+  });
+
+  const sections = () => within(screen.getAllByTestId('easy-sections')[0]);
+  const putBodies = () => api.mock.calls.filter((c) => c[0] === DRAFT_PATH && c[1]?.method === 'PUT').map((c) => c[1].body as { schema: { pages: { home: { children: Array<{ id: string; type: string; children?: unknown[] }> } } } });
+
+  async function open() {
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findAllByText('Featured'); // عنوان القسم يظهر في الكانفاس وكعنوان فرعي في قائمة الأقسام
+  }
+
+  async function addFromCatalog(name: string) {
+    await userEvent.setup().click(sections().getByRole('button', { name: 'Add a section' }));
+    const dialog = within(await screen.findByRole('dialog', { name: 'Pick a section' }));
+    const row = dialog.getByText(name).closest('li') as HTMLElement;
+    await userEvent.setup().click(within(row).getByRole('button', { name: 'Add to page' }));
+  }
+
+  it('opens in Easy mode by default: a sections list instead of the layers tree, and the mode switch is visible', async () => {
+    await open();
+
+    expect(screen.getAllByTestId('easy-sections').length).toBeGreaterThan(0);
+    expect(screen.queryAllByRole('tree')).toHaveLength(0);
+    expect((screen.getByRole('button', { name: 'Easy' }) as HTMLButtonElement).getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('adds a ready section from the catalog after the selected one, selects it, and marks the draft unsaved', async () => {
+    await open();
+    await addFromCatalog('Text block');
+
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+    await userEvent.setup().click(screen.getAllByText('Save')[0]);
+    await waitFor(() => expect(putBodies().length).toBe(1));
+    const types = putBodies()[0].schema.pages.home.children.map((c) => c.type);
+    expect(types.length).toBeGreaterThanOrEqual(2);
+    expect(types).toContain('Section');
+  });
+
+  it('proposed sections are listed with a clear status but can never be added', async () => {
+    await open();
+    await userEvent.setup().click(sections().getByRole('button', { name: 'Add a section' }));
+    const dialog = within(await screen.findByRole('dialog', { name: 'Pick a section' }));
+
+    const row = dialog.getByText('Slider block').closest('li') as HTMLElement;
+    expect(within(row).getByText('Proposed')).toBeTruthy();
+    const action = within(row).getByRole('button', { name: 'Unavailable' }) as HTMLButtonElement;
+    expect(action.disabled).toBe(true);
+  });
+
+  it('duplicating a section never produces a duplicate id, and saving keeps every id unique', async () => {
+    await open();
+    await userEvent.setup().click(sections().getAllByRole('button', { name: 'Duplicate section' })[0]);
+    await userEvent.setup().click(screen.getAllByText('Save')[0]);
+    await waitFor(() => expect(putBodies().length).toBe(1));
+
+    const ids: string[] = [];
+    const walk = (n: { id: string; children?: unknown[] }) => { ids.push(n.id); (n.children as typeof n[] | undefined)?.forEach(walk); };
+    putBodies()[0].schema.pages.home.children.forEach(walk);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(putBodies()[0].schema.pages.home.children.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('deleting a section offers an inline undo that restores it', async () => {
+    await open();
+    const before = sections().getAllByRole('button', { name: 'Delete section' }).length;
+    await userEvent.setup().click(sections().getAllByRole('button', { name: 'Delete section' })[0]);
+
+    expect(sections().queryAllByRole('button', { name: 'Delete section' }).length).toBe(before - 1);
+    await userEvent.setup().click(sections().getByRole('button', { name: 'Undo delete' }));
+    await waitFor(() => expect(sections().getAllByRole('button', { name: 'Delete section' }).length).toBe(before));
+  });
+
+  it('switching to Advanced and back keeps the draft and the unsaved state (nothing is lost), and the choice is remembered', async () => {
+    await open();
+    await userEvent.setup().click(sections().getAllByRole('button', { name: 'Duplicate section' })[0]);
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Advanced' }));
+    expect(screen.getAllByRole('tree').length).toBeGreaterThan(0);
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+    expect(window.localStorage.getItem('awj.appBuilder.editorMode.v1.u1.app-1')).toBe('advanced');
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Easy' }));
+    expect(screen.getAllByTestId('easy-sections').length).toBeGreaterThan(0);
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+  });
+
+  it('a user without manage permission cannot add, move, duplicate or delete', async () => {
+    currentUser.mockReturnValue({ id: 'u3', role: 'staff', permissions: ['apps_builder.view'] });
+    await open();
+
+    expect((sections().getByRole('button', { name: 'Add a section' }) as HTMLButtonElement).disabled).toBe(true);
+    for (const name of ['Duplicate section', 'Delete section']) {
+      for (const b of sections().getAllByRole('button', { name })) expect((b as HTMLButtonElement).disabled).toBe(true);
+    }
+  });
+
+  it('the Easy inspector hides binding, visibility and add-child controls that Advanced shows', async () => {
+    await open();
+    await userEvent.setup().click(within(sections().getAllByRole('listitem')[0]).getAllByRole('button')[0]);
+    expect(screen.queryByText('Visibility condition')).toBeNull();
+    expect(screen.queryByText('Add item')).toBeNull();
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Advanced' }));
+    await waitFor(() => expect(screen.getAllByText('Visibility condition').length).toBeGreaterThan(0));
   });
 });

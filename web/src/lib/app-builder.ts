@@ -341,6 +341,33 @@ export function generateComponentId(type: string): string {
   return `${type.toLowerCase()}-${random}`;
 }
 
+/** يُدرج عقدة بعد أخٍ محدد داخل `parentId` (أو في النهاية إن لم يوجد/كان `afterId` null) — AD-12: المعرّفات تبقى فريدة بتوليد جديد من المستدعي. */
+export function insertChildAfter(
+  root: AppSchemaComponent,
+  parentId: string,
+  afterId: string | null,
+  newNode: AppSchemaComponent
+): AppSchemaComponent {
+  return updateComponentById(root, parentId, (node) => {
+    const children = node.children ?? [];
+    const index = afterId ? children.findIndex((child) => child.id === afterId) : -1;
+    const next = [...children];
+    next.splice(index < 0 ? next.length : index + 1, 0, newNode);
+    return { ...node, children: next };
+  });
+}
+
+/** نسخة عميقة من شجرة عقدة بمعرّفات جديدة لكل عقدة (التكرار لا يُنتج معرّفاً مكرراً أبداً — AD-12/CMP-14). */
+export function cloneWithFreshIds(node: AppSchemaComponent): AppSchemaComponent {
+  const copy = JSON.parse(JSON.stringify(node)) as AppSchemaComponent;
+  const reId = (n: AppSchemaComponent): AppSchemaComponent => ({
+    ...n,
+    id: generateComponentId(n.type),
+    ...(n.children ? { children: n.children.map(reId) } : {}),
+  });
+  return reId(copy);
+}
+
 /** ينشئ عقدة جديدة بقيَم `props` الافتراضية من تعريف السجلّ (يترك ما لا افتراضي له لعرض المكوّن الدفاعي). */
 export function createComponentFromDefinition(type: string, definition: RegistryComponentDefinition): AppSchemaComponent {
   const props: Record<string, unknown> = {};
