@@ -1,6 +1,9 @@
-import type { Country, Market } from "@spree/sdk";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MarketLocaleTarget } from "@/i18n/markets";
+import type {
+  StoreCountry as Country,
+  StoreMarket as Market,
+} from "@/lib/commerce/types";
 import { getMarkets } from "@/lib/data/markets";
 import {
   buildHreflangLanguages,

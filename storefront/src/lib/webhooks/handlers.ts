@@ -1,4 +1,3 @@
-import type { WebhookEvent } from "@spree/sdk/webhooks";
 import { createElement } from "react";
 import type { StoreCompletedOrder } from "@/lib/commerce/types";
 import { OrderCanceledEmail } from "@/lib/emails/order-canceled";
@@ -7,6 +6,7 @@ import { PasswordResetEmail } from "@/lib/emails/password-reset";
 import { sendEmail } from "@/lib/emails/send";
 import { ShipmentShippedEmail } from "@/lib/emails/shipment-shipped";
 import { getStoreName, getStoreUrl } from "@/lib/store";
+import type { WebhookEvent } from "./signature";
 
 const STORE_NAME = getStoreName();
 const SITE_URL = getStoreUrl();

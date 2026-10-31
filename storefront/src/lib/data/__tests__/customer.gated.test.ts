@@ -1,50 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * SPREE-X1 — with buyer authentication gated (the shipped default), no buyer
- * account action may reach the Spree client or leak internal detail.
- *
- * `getClient` / `getClientForSurface` / `withAuthRefresh` throw if touched, and
- * SPREE_* are explicitly unset: any regression that routes an account action
- * back through Spree fails here.
+ * With buyer authentication gated (the shipped default and the only implemented state — there is no buyer-identity
+ * backend yet), every buyer account action refuses with a typed code, reaches no upstream client and leaks no
+ * internal detail. The module itself must not import any Spree code, so a regression that wires an account action
+ * back to a commerce SDK fails here.
  */
-const spreeTouched = vi.fn();
+const cookieSet = vi.fn();
 
-vi.mock("@/lib/spree", () => {
-  const boom = () => {
-    spreeTouched();
-    throw new Error(
-      "Spree client is not available (SPREE_API_URL leaked internal detail)",
-    );
-  };
-  return {
-    getClient: boom,
-    getClientForSurface: boom,
-    withAuthRefresh: boom,
-    ensureFreshSession: vi.fn(async () => {
-      spreeTouched();
-      return "valid";
-    }),
-    isAuthError: () => false,
-    getAccessToken: vi.fn().mockResolvedValue(undefined),
-    setAccessToken: vi.fn(),
-    clearAccessToken: vi.fn(),
-    clearAuthCookies: vi.fn(),
-    getRefreshToken: vi.fn().mockResolvedValue("legacy-refresh"),
-    setRefreshToken: vi.fn(),
-    clearRefreshToken: vi.fn(),
-    getCartToken: vi.fn().mockResolvedValue(undefined),
-    getCartId: vi.fn().mockResolvedValue(undefined),
-    clearCartCookies: vi.fn(),
-    clearAllCartCookies: vi.fn(),
-    cacheTagSuffix: (surface: string) =>
-      surface === "wholesale" ? "-wholesale" : "",
-    SURFACES: ["dtc", "wholesale"] as const,
-  };
-});
+vi.mock("next/headers", () => ({
+  cookies: async () => ({ set: cookieSet }),
+}));
 
 vi.mock("next/cache", () => ({ updateTag: vi.fn() }));
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { ACCOUNT_AUTH_CAPABILITY } from "@/lib/commerce/capabilities";
 import {
   getCustomer,
@@ -56,13 +27,10 @@ import {
   syncSession,
   updateCustomer,
 } from "@/lib/data/customer";
-import * as spree from "@/lib/spree";
 
 describe("buyer account actions while ACCOUNT_AUTH_CAPABILITY is gated", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubEnv("SPREE_API_URL", "");
-    vi.stubEnv("SPREE_PUBLISHABLE_KEY", "");
   });
 
   it("ships as gated", () => {
@@ -105,26 +73,29 @@ describe("buyer account actions while ACCOUNT_AUTH_CAPABILITY is gated", () => {
     expect(await syncSession()).toEqual({ customer: null, refreshed: false });
   });
 
-  it("logout clears local cookies without building the Spree client", async () => {
+  it("logout expires the account-session cookies and any leftover legacy cookie", async () => {
     await expect(logout()).resolves.toBeUndefined();
-    expect(spree.clearAccessToken).toHaveBeenCalled();
-    expect(spree.clearRefreshToken).toHaveBeenCalled();
-    expect(spree.clearAllCartCookies).toHaveBeenCalled();
+    const expired = cookieSet.mock.calls.map((c) => c[0]);
+    expect(expired).toEqual(
+      expect.arrayContaining([
+        "awj_account_session",
+        "awj_account_refresh",
+        "_spree_jwt",
+        "_spree_refresh_token",
+        "_spree_cart_token",
+        "_spree_cart_token_id",
+        "_spree_wholesale_cart_token",
+        "_spree_wholesale_cart_token_id",
+      ]),
+    );
+    for (const call of cookieSet.mock.calls) {
+      expect(call[1]).toMatchObject({ path: "/", maxAge: 0 });
+      expect(call[0]).toBeTypeOf("string");
+    }
   });
 
-  it("never touches the Spree client or session helpers", async () => {
-    await login("a@b.sa", "x");
-    await register({
-      email: "a@b.sa",
-      password: "x",
-      password_confirmation: "x",
-    });
-    await requestPasswordReset("a@b.sa");
-    await resetPassword("t", "x", "x");
-    await updateCustomer({});
-    await getCustomer();
-    await syncSession();
-    await logout();
-    expect(spreeTouched).not.toHaveBeenCalled();
+  it("the module imports no Spree wrapper or SDK", () => {
+    const source = readFileSync(join(__dirname, "../customer.ts"), "utf-8");
+    expect(source).not.toMatch(/@\/lib\/spree|@spree\//);
   });
 });

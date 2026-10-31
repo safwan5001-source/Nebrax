@@ -1,9 +1,12 @@
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AuthenticatedAccountShell } from "@/components/account/AuthenticatedAccountShell";
 import { REQUEST_PATHNAME_HEADER, REQUEST_SEARCH_HEADER } from "@/i18n/routing";
-import { getAccessToken, getRefreshToken } from "@/lib/spree";
+import {
+  ACCOUNT_REFRESH_COOKIE,
+  ACCOUNT_SESSION_COOKIE,
+} from "@/lib/account/session-cookies";
 import {
   buildAccountLoginHref,
   resolveAccountRedirect,
@@ -28,8 +31,13 @@ export async function AuthenticatedAccountLayoutContent({
   children,
   params,
 }: AuthenticatedAccountLayoutProps) {
-  const [{ country, locale }, requestHeaders, accessToken, refreshToken] =
-    await Promise.all([params, headers(), getAccessToken(), getRefreshToken()]);
+  const [{ country, locale }, requestHeaders, cookieStore] = await Promise.all([
+    params,
+    headers(),
+    cookies(),
+  ]);
+  const accessToken = cookieStore.get(ACCOUNT_SESSION_COOKIE)?.value;
+  const refreshToken = cookieStore.get(ACCOUNT_REFRESH_COOKIE)?.value;
 
   const basePath = `/${country}/${locale}`;
   const pathname = requestHeaders.get(REQUEST_PATHNAME_HEADER);

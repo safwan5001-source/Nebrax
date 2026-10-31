@@ -15,7 +15,6 @@ vi.mock("next-intl", () => ({
       allProducts: "All Products",
       contact: "Contact",
       myAccount: "My Account",
-      wholesale: "Wholesale",
     })[key] ?? key,
   useLocale: () => localeMock.value,
 }));
@@ -40,13 +39,7 @@ describe("MobileMenu", () => {
   ])("opens %s from the reading-start edge with explicit direction", async (locale, direction, side) => {
     localeMock.value = locale;
     const user = userEvent.setup();
-    render(
-      <MobileMenu
-        rootCategories={[]}
-        basePath={`/sa/${locale}`}
-        wholesaleEnabled={false}
-      />,
-    );
+    render(<MobileMenu rootCategories={[]} basePath={`/sa/${locale}`} />);
     const trigger = screen.getByRole("button", { name: "Open menu" });
     expect(trigger).toHaveAttribute("aria-expanded", "false");
     await user.click(trigger);
@@ -65,13 +58,7 @@ describe("MobileMenu", () => {
 
   it("closes via its named close control and restores trigger focus", async () => {
     const user = userEvent.setup();
-    render(
-      <MobileMenu
-        rootCategories={[]}
-        basePath="/sa/ar"
-        wholesaleEnabled={false}
-      />,
-    );
+    render(<MobileMenu rootCategories={[]} basePath="/sa/ar" />);
     const trigger = screen.getByRole("button", { name: "Open menu" });
     await user.click(trigger);
     await user.click(
@@ -85,13 +72,7 @@ describe("MobileMenu", () => {
 
   it("closes via Escape and releases the page scroll lock", async () => {
     const user = userEvent.setup();
-    render(
-      <MobileMenu
-        rootCategories={[]}
-        basePath="/sa/ar"
-        wholesaleEnabled={false}
-      />,
-    );
+    render(<MobileMenu rootCategories={[]} basePath="/sa/ar" />);
     await user.click(screen.getByRole("button", { name: "Open menu" }));
     expect(document.body).toHaveAttribute("data-scroll-locked");
     await user.keyboard("{Escape}");
@@ -101,13 +82,7 @@ describe("MobileMenu", () => {
 
   it("closes by clicking the outside overlay", async () => {
     const user = userEvent.setup();
-    render(
-      <MobileMenu
-        rootCategories={[]}
-        basePath="/sa/ar"
-        wholesaleEnabled={false}
-      />,
-    );
+    render(<MobileMenu rootCategories={[]} basePath="/sa/ar" />);
     await user.click(screen.getByRole("button", { name: "Open menu" }));
     await user.click(document.querySelector('[data-slot="sheet-overlay"]')!);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -136,7 +111,6 @@ describe("MobileMenu", () => {
           ] as never
         }
         basePath="/sa/ar"
-        wholesaleEnabled={false}
       />,
     );
     await user.click(screen.getByRole("button", { name: "Open menu" }));
@@ -202,7 +176,6 @@ describe("MobileMenu", () => {
           ] as never
         }
         basePath={`/sa/${locale}`}
-        wholesaleEnabled={false}
       />,
     );
     await user.click(screen.getByRole("button", { name: "Open menu" }));
@@ -252,7 +225,7 @@ describe("MobileMenu", () => {
 
   it("keeps tenant categories, links and feature flags local when IDs collide", async () => {
     const user = userEvent.setup();
-    const menu = (tenant: string, wholesale: boolean) => (
+    const menu = (tenant: string) => (
       <MobileMenu
         key={tenant}
         rootCategories={
@@ -266,7 +239,6 @@ describe("MobileMenu", () => {
           ] as never
         }
         basePath={`/${tenant}/en`}
-        wholesaleEnabled={wholesale}
         extraLinks={[
           {
             id: "shared",
@@ -276,14 +248,14 @@ describe("MobileMenu", () => {
         ]}
       />
     );
-    const view = render(menu("a", true));
+    const view = render(menu("a"));
     await user.click(screen.getByRole("button", { name: "Open menu" }));
     expect(screen.getByRole("link", { name: "About a" })).toHaveAttribute(
       "href",
       "/a/en/about",
     );
     await user.keyboard("{Escape}");
-    view.rerender(menu("b", false));
+    view.rerender(menu("b"));
     await user.click(screen.getByRole("button", { name: "Open menu" }));
     expect(screen.getByRole("link", { name: "About b" })).toHaveAttribute(
       "href",
@@ -299,21 +271,15 @@ describe("MobileMenu", () => {
     expect(
       screen.queryByRole("link", { name: "Category a" }),
     ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("link", { name: "Wholesale" }),
-    ).not.toBeInTheDocument();
   });
 
-  it("places My Account below Wholesale and centers Region and language", async () => {
+  it("centers Region and language in the footer, below My Account", async () => {
     const user = userEvent.setup();
 
-    render(
-      <MobileMenu rootCategories={[]} basePath="/us/en" wholesaleEnabled />,
-    );
+    render(<MobileMenu rootCategories={[]} basePath="/us/en" />);
     await user.click(screen.getByRole("button", { name: "Open menu" }));
 
     const menu = screen.getByRole("dialog", { name: "Menu" });
-    const wholesale = within(menu).getByRole("link", { name: "Wholesale" });
     const myAccount = within(menu).getByRole("link", { name: "My Account" });
     const regionPreferences = within(menu).getByRole("button", {
       name: "Region and language",
@@ -321,28 +287,23 @@ describe("MobileMenu", () => {
     const footer = regionPreferences.closest('[data-slot="sheet-footer"]');
 
     expect(
-      wholesale.compareDocumentPosition(myAccount) &
+      myAccount.compareDocumentPosition(regionPreferences) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(footer).toHaveClass("items-center");
   });
 
-  it("keeps the wholesale entry hidden when the addon is disabled", async () => {
+  it("never renders a legacy /wholesale entry", async () => {
     const user = userEvent.setup();
 
-    render(
-      <MobileMenu
-        rootCategories={[]}
-        basePath="/us/en"
-        wholesaleEnabled={false}
-      />,
-    );
+    render(<MobileMenu rootCategories={[]} basePath="/us/en" />);
     await user.click(screen.getByRole("button", { name: "Open menu" }));
 
     const menu = screen.getByRole("dialog", { name: "Menu" });
     expect(
       within(menu).queryByRole("link", { name: "Wholesale" }),
     ).not.toBeInTheDocument();
+    expect(menu.querySelector('a[href$="/wholesale"]')).toBeNull();
     expect(
       within(menu).getByRole("link", { name: "My Account" }),
     ).toHaveAttribute("href", "/us/en/account");
@@ -362,7 +323,6 @@ describe("MobileMenu", () => {
         <MobileMenu
           rootCategories={[]}
           basePath="/us/en"
-          wholesaleEnabled={false}
           extraLinks={extraLinks}
         />,
       );
@@ -388,7 +348,6 @@ describe("MobileMenu", () => {
         <MobileMenu
           rootCategories={[]}
           basePath="/us/en"
-          wholesaleEnabled
           extraLinks={extraLinks}
         />,
       );
@@ -403,9 +362,6 @@ describe("MobileMenu", () => {
       );
       expect(order.indexOf("About us")).toBeLessThan(order.indexOf("Contact"));
       expect(order.indexOf("Instagram")).toBeLessThan(
-        order.indexOf("Wholesale"),
-      );
-      expect(order.indexOf("Instagram")).toBeLessThan(
         order.indexOf("My Account"),
       );
     });
@@ -416,7 +372,6 @@ describe("MobileMenu", () => {
         <MobileMenu
           rootCategories={[]}
           basePath="/us/en"
-          wholesaleEnabled={false}
           extraLinks={extraLinks}
         />,
       );
@@ -430,13 +385,7 @@ describe("MobileMenu", () => {
 
     it("renders nothing extra when the merchant published no links", async () => {
       const user = userEvent.setup();
-      render(
-        <MobileMenu
-          rootCategories={[]}
-          basePath="/us/en"
-          wholesaleEnabled={false}
-        />,
-      );
+      render(<MobileMenu rootCategories={[]} basePath="/us/en" />);
       await user.click(screen.getByRole("button", { name: "Open menu" }));
 
       const menu = screen.getByRole("dialog", { name: "Menu" });

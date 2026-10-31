@@ -48,7 +48,6 @@
     "contact": "تواصل معنا",
     "viewAllCategory": "عرض الكل في {category}",
     "myAccount": "حسابي",
-    "wholesale": "الجملة",
     "shop": "المنتجات",
     "cart": "السلة",
     "primaryNavigation": "التنقل الرئيسي",
@@ -92,7 +91,6 @@
     "policies": "السياسات",
     "poweredBy": "مشغَّل بواسطة",
     "copyright": "© {year} {storeName}. مشغَّل بواسطة Spree Commerce.",
-    "wholesale": "التجارة والجملة",
     "whatsapp": "واتساب",
     "whatsappAria": "التواصل عبر واتساب",
     "businessInformation": "معلومات المنشأة",
@@ -127,17 +125,6 @@
     "shippingDescription": "توصيل سريع وموثوق إلى باب منزلك.",
     "support": "دعم على مدار الساعة",
     "supportDescription": "فريقنا جاهز لمساعدتك في أي وقت.",
-    "wholesaleBadge": "التجارة والجملة",
-    "wholesaleTitle": "تشتري لنشاطك التجاري؟",
-    "wholesaleDescription": "يحصل مشترو الجملة المعتمَدون على أسعار خاصة على كامل الكتالوج، وطلب سريع بالجملة عبر رمز الصنف (SKU)، وسجل طلبات خاص بهم. قدّم طلبك مرة واحدة — سنراجعه وننشّط حسابك.",
-    "wholesaleCtaPrimary": "الدخول إلى بوابة الجملة",
-    "wholesaleCtaSecondary": "تقديم طلب حساب",
-    "wholesaleBenefitPricingTitle": "أسعار الجملة",
-    "wholesaleBenefitPricingDescription": "أسعارك المتفَق عليها تُطبَّق تلقائياً على كامل الكتالوج.",
-    "wholesaleBenefitQuickOrderTitle": "طلب سريع بالجملة",
-    "wholesaleBenefitQuickOrderDescription": "أدخل رموز الأصناف والكميات لإنشاء طلب كبير خلال ثوانٍ.",
-    "wholesaleBenefitOrdersTitle": "سجل الطلبات",
-    "wholesaleBenefitOrdersDescription": "راجع طلباتك السابقة وأعد طلب أصنافك المعتادة خلال نقرتين.",
     "browseCategories": "تسوّق حسب القسم",
     "newArrivals": "أحدث المنتجات",
     "benefits": "مزايا المتجر",
@@ -783,89 +770,7 @@
     "termsOfService": "شروط الخدمة",
     "policyUnavailable": "الصفحة غير متاحة مؤقتاً"
   },
-  "expressCheckout": {
-    "shipping": "الشحن",
-    "finalizingPayment": "جارٍ إتمام الدفع...",
-    "or": "أو"
-  },
   "wholesale": {
-    "portalTitle": "بوابة الجملة",
-    "portalName": "بوابة الجملة",
-    "badge": "الجملة",
-    "nav": {
-      "catalog": "الكتالوج",
-      "quickOrder": "طلب سريع",
-      "cart": "السلة",
-      "backToStore": "العودة إلى المتجر",
-      "signOut": "تسجيل الخروج",
-      "signIn": "تسجيل الدخول"
-    },
-    "signInWall": {
-      "title": "أسعار جملة للمشترين المعتمَدين",
-      "description": "سجّل الدخول إلى حساب الجملة الخاص بك لتصفّح الكتالوج الكامل بأسعارك التجارية المتفَق عليها، وتقديم طلبات بالجملة.",
-      "gatedNotice": "هذه البوابة متاحة لمشتري الجملة المعتمَدين فقط. تظهر الأسعار والمنتجات بعد تسجيل الدخول.",
-      "noAccount": "ليس لديك حساب جملة؟",
-      "applyLink": "تقديم طلب وصول",
-      "formTitle": "تسجيل الدخول",
-      "formDescription": "استخدم البريد الإلكتروني وكلمة المرور الخاصين بحساب الجملة.",
-      "submit": "تسجيل الدخول"
-    },
-    "pending": {
-      "title": "طلبك قيد المراجعة",
-      "description": "شكراً لتقديمك الطلب. تم إعداد حسابك، لكن الوصول إلى الجملة ما زال بانتظار الموافقة.",
-      "nameLabel": "الاسم",
-      "emailLabel": "البريد الإلكتروني",
-      "whatNext": "يراجع فريقنا طلبات الجملة الجديدة ويفعّل أسعار الجملة فور الموافقة عليها. ستتمكن من تسجيل الدخول هنا فور تفعيل حسابك.",
-      "support": "لديك استفسار؟ تواصل معنا عبر wholesale@example.com"
-    },
-    "plp": {
-      "title": "كتالوج الجملة",
-      "subtitle": "تُطبَّق أسعار الجملة الخاصة بك تلقائياً عند الدفع.",
-      "empty": "لا توجد منتجات متاحة في كتالوج الجملة بعد.",
-      "noMatchingProducts": "لا توجد منتجات مطابقة لـ \"{query}\".",
-      "tradePriceNote": "جميع الأسعار المعروضة في الكتالوج هي أسعار جملة، وتُطبَّق على الطلبات من {min}+ لكل قطعة."
-    },
-    "pdp": {
-      "tradePriceHint": "يُطبَّق سعر الجملة على الطلبات من {min}+"
-    },
-    "cart": {
-      "title": "سلة الجملة",
-      "emptyDescription": "أضف منتجات من الكتالوج أو استخدم الطلب السريع للبدء.",
-      "browseCatalog": "تصفّح الكتالوج",
-      "unlockNudge": "أضف {count} أكثر لتفعيل سعر الجملة",
-      "tradePriceApplied": "تم تطبيق سعر الجملة"
-    },
-    "quickOrder": {
-      "title": "طلب سريع",
-      "subtitle": "أدخل رموز الأصناف والكميات لإضافة عدة منتجات إلى سلتك دفعة واحدة.",
-      "skuHeader": "رمز الصنف",
-      "qtyHeader": "الكمية",
-      "actionsHeader": "الإجراءات",
-      "skuPlaceholder": "أدخل رمز الصنف",
-      "addRow": "إضافة صف",
-      "removeRow": "إزالة الصف",
-      "addAll": "إضافة الكل إلى السلة",
-      "adding": "جارٍ الإضافة...",
-      "added": "تمت إضافة {name}",
-      "skuNotFound": "لم يُعثَر على منتج بهذا الرمز.",
-      "notPurchasable": "هذا العنصر غير متاح للشراء.",
-      "addFailed": "تعذّرت إضافة هذا العنصر. حاول مرة أخرى.",
-      "searching": "جارٍ البحث...",
-      "noResults": "لا توجد منتجات"
-    },
-    "apply": {
-      "title": "تقديم طلب وصول للجملة",
-      "description": "أخبرنا عن نشاطك التجاري. سنراجع طلبك ونفعّل أسعار الجملة فور الموافقة.",
-      "companyLabel": "اسم الشركة",
-      "companyPlaceholder": "شركة المثال التجارية",
-      "phoneLabel": "الهاتف",
-      "phonePlaceholder": "+966 5X XXX XXXX",
-      "submit": "إرسال الطلب",
-      "alreadyMember": "لديك حساب جملة بالفعل؟",
-      "receivedTitle": "تم استلام الطلب",
-      "receivedDescription": "شكراً لتقديمك الطلب. سنراجع حسابك ونفعّل الوصول إلى الجملة قريباً.",
-      "goToPortal": "الذهاب إلى البوابة"
-    },
     "hiddenPrice": {
       "signInForPricing": "سجّل الدخول لعرض السعر",
       "signInToOrder": "سجّل الدخول للطلب"

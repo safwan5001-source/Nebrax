@@ -5,7 +5,6 @@ import {
   fetchProductFilters,
   fetchProducts,
 } from "@/lib/commerce/products";
-import type { Surface } from "@/lib/commerce/surface";
 import type { StorefrontListParams } from "@/lib/utils/listing-context";
 
 /**
@@ -14,12 +13,6 @@ import type { StorefrontListParams } from "@/lib/utils/listing-context";
  * are kept identical to the pre-P1 Spree-backed implementation so every
  * existing call site (ProductsPage, CategoryPage, SearchBar,
  * FeaturedProducts, ...) keeps working unmodified.
- *
- * `surface` (DTC vs wholesale) is accepted for signature compatibility
- * only and has no effect: AWJ has no wholesale/channel-pricing concept
- * yet (wholesale is explicitly out of scope — see
- * AWJ_COM_7_SPREE_INTEGRATION_GATE.md §11/§9, "LATER"). Every call reads
- * the same AWJ storefront catalog regardless of the value passed.
  *
  * No "use cache: remote" here (unlike the Spree-backed version this
  * replaces): the AWJ tenant/channel this deployment serves is a fixed,
@@ -34,24 +27,19 @@ import type { StorefrontListParams } from "@/lib/utils/listing-context";
 export async function cachedListProducts(
   params: StorefrontListParams | undefined,
   _options?: { locale?: string; country?: string },
-  _surface?: Surface,
   _userToken?: string,
 ) {
   return fetchProducts(params);
 }
 
-export async function getProducts(
-  params?: StorefrontListParams,
-  surface: Surface = "dtc",
-) {
-  return cachedListProducts(params, undefined, surface, undefined);
+export async function getProducts(params?: StorefrontListParams) {
+  return cachedListProducts(params, undefined, undefined);
 }
 
 export async function cachedGetProduct(
   slugOrId: string,
   _expand?: string[],
   _options?: { locale?: string; country?: string },
-  _surface?: Surface,
   _userToken?: string,
 ) {
   return fetchProduct(slugOrId);
@@ -60,29 +48,18 @@ export async function cachedGetProduct(
 export async function getProduct(
   slugOrId: string,
   params?: { expand?: string[] },
-  surface: Surface = "dtc",
 ) {
-  return cachedGetProduct(
-    slugOrId,
-    params?.expand,
-    undefined,
-    surface,
-    undefined,
-  );
+  return cachedGetProduct(slugOrId, params?.expand, undefined, undefined);
 }
 
 async function cachedGetProductFilters(
   params: Record<string, unknown> | undefined,
   _options?: { locale?: string; country?: string },
-  _surface?: Surface,
   _userToken?: string,
 ) {
   return fetchProductFilters(params);
 }
 
-export async function getProductFilters(
-  params?: Record<string, unknown>,
-  surface: Surface = "dtc",
-) {
-  return cachedGetProductFilters(params, undefined, surface, undefined);
+export async function getProductFilters(params?: Record<string, unknown>) {
+  return cachedGetProductFilters(params, undefined, undefined);
 }

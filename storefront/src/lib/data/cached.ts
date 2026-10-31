@@ -1,5 +1,4 @@
 import { cache } from "react";
-import type { Surface } from "@/lib/commerce/surface";
 import { getCategory } from "./categories";
 import { getProduct } from "./products";
 
@@ -37,9 +36,8 @@ export const PRODUCT_CARD_FIELDS = [
   "categories",
 ];
 
-export const getCachedProduct = cache(
-  (slugOrId: string, expand: string[], surface: Surface = "dtc") =>
-    getProduct(slugOrId, { expand }, surface),
+export const getCachedProduct = cache((slugOrId: string, expand: string[]) =>
+  getProduct(slugOrId, { expand }),
 );
 
 export const getCachedCategory = cache(

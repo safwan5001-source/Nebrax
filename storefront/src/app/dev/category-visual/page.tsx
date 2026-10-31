@@ -1,9 +1,12 @@
-import type { Category, ProductFiltersResponse } from "@spree/sdk";
 import { notFound } from "next/navigation";
 import { NextIntlClientProvider } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
 import { StoreContainer } from "@/components/layout/StoreContainer";
 import { ProductListing } from "@/components/products/ProductListing";
+import type {
+  StoreCategory as Category,
+  StoreProductFilters as ProductFiltersResponse,
+} from "@/lib/commerce/types";
 import type { PagePresentation } from "@/lib/presentation/page-regions";
 import ar from "../../../../messages/ar.json";
 import en from "../../../../messages/en.json";

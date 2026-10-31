@@ -3,10 +3,10 @@ import {
   resolveHostContextForRequest,
   resolveStorefrontDefaultLocaleForRequest,
 } from "@/lib/commerce/edge-storefront-locale";
-import { createSpreeMiddleware } from "@/lib/spree/middleware";
+import { createStorefrontProxy } from "@/lib/proxy/storefront-proxy";
 import { getDefaultCountry, getDefaultLocale } from "@/lib/store";
 
-export const proxy = createSpreeMiddleware({
+export const proxy = createStorefrontProxy({
   defaultCountry: getDefaultCountry(),
   defaultLocale: getDefaultLocale(),
   supportedLocales: SUPPORTED_LOCALES,

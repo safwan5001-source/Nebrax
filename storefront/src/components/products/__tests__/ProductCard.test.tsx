@@ -1,10 +1,10 @@
-import type { Product } from "@spree/sdk";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PublishedCardStyleProvider } from "@/components/layout/PublishedCardStyle";
 import { PublishedThemeMarkerProvider } from "@/components/layout/PublishedThemeMarker";
 import { ProductCard } from "@/components/products/ProductCard";
+import type { StoreProduct as Product } from "@/lib/commerce/types";
 
 vi.mock("next-intl", () => ({
   useTranslations: () => (key: string) => key,

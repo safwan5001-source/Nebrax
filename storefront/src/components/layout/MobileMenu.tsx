@@ -43,8 +43,6 @@ type PanelType =
 interface MobileMenuProps {
   rootCategories: StoreCategoryNode[];
   basePath: string;
-  /** Whether the wholesale addon is enabled — gates the trade portal link. */
-  wholesaleEnabled: boolean;
   /** H6 Final Closure — native wholesale is open on this Host: "My account" goes to the native buyer page. */
   nativeWholesale?: boolean;
   /** Merchant-published links, shared with the desktop header. */
@@ -54,7 +52,6 @@ interface MobileMenuProps {
 export function MobileMenu({
   rootCategories,
   basePath,
-  wholesaleEnabled,
   nativeWholesale = false,
   extraLinks = [],
 }: MobileMenuProps) {
@@ -284,15 +281,6 @@ export function MobileMenu({
                 {t("contact")}
               </Link>
               <div className="mt-2 shrink-0 border-t border-store-border pt-2">
-                {wholesaleEnabled && (
-                  <Link
-                    href={`${basePath}/wholesale`}
-                    onClick={() => handleOpenChange(false)}
-                    className={linkClass}
-                  >
-                    {t("wholesale")}
-                  </Link>
-                )}
                 <SheetClose asChild>
                   <Link
                     href={accountHrefs(basePath, nativeWholesale).account}

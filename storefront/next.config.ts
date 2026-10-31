@@ -1,39 +1,8 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
-import type { RemotePattern } from "next/dist/shared/lib/image-config";
 import createNextIntlPlugin from "next-intl/plugin";
 
 const withNextIntl = createNextIntlPlugin();
-
-/**
- * Allow product/asset images served by the configured Spree backend. Spree
- * returns Active Storage URLs on its own host (which may differ from
- * SPREE_API_URL's — e.g. store URL vs API URL, http vs https, with or without a
- * port), so we allow the SPREE_API_URL hostname over both protocols and any
- * port rather than hardcoding specific hosts. Set SPREE_IMAGES_URL when images
- * are served from a different host than the API — e.g. spree.sh puts images
- * behind a CDN (console.spree.sh) — and it takes precedence over SPREE_API_URL.
- * The pathname stays scoped to Active Storage. Falls back to `localhost` when
- * neither variable is set (dev).
- */
-function spreeImagePatterns(): RemotePattern[] {
-  const raw = (
-    process.env.SPREE_IMAGES_URL || process.env.SPREE_API_URL
-  )?.trim();
-  let hostname = "localhost";
-  if (raw) {
-    try {
-      hostname = new URL(raw).hostname;
-    } catch {
-      // Malformed URL — keep the localhost fallback.
-    }
-  }
-  const pathname = "/rails/active_storage/**";
-  return [
-    { protocol: "http", hostname, pathname },
-    { protocol: "https", hostname, pathname },
-  ];
-}
 
 /**
  * Response headers for every storefront response (H6 Final Closure). Deliberately conservative: each one is
@@ -70,7 +39,6 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_SENTRY_DSN: process.env.SENTRY_DSN || "",
   },
-  transpilePackages: ["@spree/sdk"],
   reactCompiler: true,
   experimental: {
     optimizePackageImports: [
@@ -95,11 +63,8 @@ const nextConfig: NextConfig = {
     dangerouslyAllowLocalIP: true, // Allow localhost images in development
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
-    remotePatterns: [
-      // Derived from SPREE_IMAGES_URL (if set) or SPREE_API_URL.
-      ...spreeImagePatterns(),
-      // Hosted demo / tunnel backends whose image host differs from SPREE_API_URL.
-    ],
+    // Catalogue imagery is served by the AWJ API / media proxy; no remote image host is allow-listed.
+    remotePatterns: [],
   },
 };
 

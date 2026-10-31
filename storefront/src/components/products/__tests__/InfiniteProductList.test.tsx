@@ -1,8 +1,8 @@
-import type { Product } from "@spree/sdk";
 import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { PublishedThemeMarkerProvider } from "@/components/layout/PublishedThemeMarker";
 import { InfiniteProductList } from "@/components/products/InfiniteProductList";
+import type { StoreProduct as Product } from "@/lib/commerce/types";
 
 vi.mock("next-intl", () => ({
   useTranslations: () => (key: string) => key,

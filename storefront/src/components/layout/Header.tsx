@@ -19,7 +19,6 @@ import {
   resolveHeaderDesign,
 } from "@/lib/presentation/header-design";
 import type { MediaRef, ResolvedMedia } from "@/lib/presentation/media-ref";
-import { isWholesaleEnabled } from "@/lib/spree";
 
 const LazyMobileMenu = dynamic(
   () =>
@@ -140,7 +139,6 @@ export function HeaderMobileMenu({
       rootCategories={rootCategories}
       basePath={basePath}
       extraLinks={extraLinks}
-      wholesaleEnabled={isWholesaleEnabled()}
       nativeWholesale={nativeWholesale}
     />
   );
@@ -187,7 +185,6 @@ export async function Header({
 }: HeaderProps) {
   const t = await getTranslations({ locale, namespace: "header" });
   const footer = await getTranslations({ locale, namespace: "footer" });
-  const wholesaleEnabled = isWholesaleEnabled();
   const displayName = storeName?.trim() || footer("shop");
   const homeHref = basePath || "/";
   const resolved = resolveHeaderDesign(design);
@@ -261,14 +258,6 @@ export async function Header({
             )}
 
             <div className={classes.actions}>
-              {wholesaleEnabled && (
-                <Link
-                  href={`${basePath}/wholesale`}
-                  className="hidden whitespace-nowrap px-2 py-1.5 text-sm text-store-muted-foreground transition-colors hover:text-store-foreground lg:block"
-                >
-                  {t("wholesale")}
-                </Link>
-              )}
               <HeaderNavLinks items={extraLinks} />
               {showAccount ? (
                 <div className="hidden md:block">

@@ -20,55 +20,11 @@ import {
 /**
  * X3 — the sitemap is produced from AWJ `store/v1` only.
  *
- * The real data layer runs against a fake AWJ backend (fetch is the only seam),
- * with the REAL `@/lib/spree` wrapped in spies: any attempt to build a Spree
- * client fails these tests. Tenant selection is by the request Host alone, as in
- * production.
+ * The real data layer runs against a fake AWJ backend (fetch is the only seam).
+ * There is no Spree client left in the codebase to reach; the sitemap must still
+ * build with every SPREE_* variable unset. Tenant selection is by the request
+ * Host alone, as in production.
  */
-const spree = vi.hoisted(() => ({
-  getClient: vi.fn(),
-  getClientForSurface: vi.fn(),
-  getWholesaleClient: vi.fn(),
-  initSpreeNext: vi.fn(),
-  createClient: vi.fn(),
-}));
-
-vi.mock("@/lib/spree", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/spree")>();
-  return {
-    ...actual,
-    getClient: (...args: []) => {
-      spree.getClient(...args);
-      return actual.getClient(...args);
-    },
-    getClientForSurface: (
-      ...args: Parameters<typeof actual.getClientForSurface>
-    ) => {
-      spree.getClientForSurface(...args);
-      return actual.getClientForSurface(...args);
-    },
-    getWholesaleClient: (...args: []) => {
-      spree.getWholesaleClient(...args);
-      return actual.getWholesaleClient(...args);
-    },
-    initSpreeNext: (...args: Parameters<typeof actual.initSpreeNext>) => {
-      spree.initSpreeNext(...args);
-      return actual.initSpreeNext(...args);
-    },
-  };
-});
-
-vi.mock("@spree/sdk", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@spree/sdk")>();
-  return {
-    ...actual,
-    createClient: (...args: Parameters<typeof actual.createClient>) => {
-      spree.createClient(...args);
-      return actual.createClient(...args);
-    },
-  };
-});
-
 const request = vi.hoisted(() => ({
   host: undefined as string | undefined,
   proto: undefined as string | undefined,
@@ -158,14 +114,6 @@ afterEach(() => {
   warnLog.mockRestore();
 });
 
-const expectSpreeUntouched = () => {
-  expect(spree.getClient).not.toHaveBeenCalled();
-  expect(spree.getClientForSurface).not.toHaveBeenCalled();
-  expect(spree.getWholesaleClient).not.toHaveBeenCalled();
-  expect(spree.initSpreeNext).not.toHaveBeenCalled();
-  expect(spree.createClient).not.toHaveBeenCalled();
-};
-
 describe("no Spree dependency", () => {
   it("builds the sitemap with every SPREE_* variable unset and never touches a Spree client", async () => {
     const fake = useBackend({
@@ -177,7 +125,6 @@ describe("no Spree dependency", () => {
     const entries = await sitemap({ id: Promise.resolve("0") });
 
     expect(entries.length).toBeGreaterThan(0);
-    expectSpreeUntouched();
     for (const call of fake.calls) {
       expect(["storefront", "products", "categories"]).toContain(call.path);
     }
@@ -263,7 +210,6 @@ describe("URLs and tenant isolation", () => {
     // Every backend call carried the host of the request that caused it.
     const hosts = fake.calls.map((call) => call.host);
     expect(new Set(hosts)).toEqual(new Set([HOST_A, HOST_B]));
-    expectSpreeUntouched();
   });
 
   it("an unknown host gets no catalog and no URLs", async () => {
@@ -652,7 +598,6 @@ describe("AWJ API failure", () => {
       expect.stringContaining("AWJ API 503 (internal)"),
     );
     expect(JSON.stringify(errorLog.mock.calls)).not.toMatch(LEAK);
-    expectSpreeUntouched();
   });
 
   it("does not turn a failed product read into a 200 sitemap without products", async () => {

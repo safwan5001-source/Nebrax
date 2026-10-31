@@ -7,7 +7,6 @@ import {
   hasVisibleHero,
   publishedNodes,
 } from "@/components/home/published-nodes";
-import { WholesaleSection } from "@/components/home/WholesaleSection";
 import { StoreContainer } from "@/components/layout/StoreContainer";
 import { localeDirection } from "@/i18n/locales";
 import { fetchStorefrontConfig } from "@/lib/commerce/storefront";
@@ -82,7 +81,8 @@ export default async function HomePage({ params }: HomePageProps) {
         themePreset={presentation?.themePreset}
       />
     ),
-    wholesale: <WholesaleSection basePath={basePath} locale={locale} />,
+    // The Spree-era trade-portal pitch is gone; a published `wholesale` section renders nothing.
+    wholesale: null,
   };
 
   // No presentation keeps the default implemented stack. A published v2

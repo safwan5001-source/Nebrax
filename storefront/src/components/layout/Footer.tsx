@@ -33,7 +33,6 @@ import type {
 } from "@/lib/presentation/navigation-resolve";
 import type { FooterPaymentLogos as FooterPaymentLogosConfig } from "@/lib/presentation/payment-logos";
 import { isSafeAppStoreUrl, isSafePlayStoreUrl } from "@/lib/presentation/urls";
-import { isWholesaleEnabled } from "@/lib/spree";
 
 interface FooterProps {
   basePath: string;
@@ -261,7 +260,6 @@ export async function Footer({
 }: FooterProps) {
   const t = await getTranslations({ locale, namespace: "footer" });
   const tp = await getTranslations({ locale, namespace: "policies" });
-  const wholesaleEnabled = isWholesaleEnabled();
   const displayName = storeName?.trim() || t("shop");
   await connection();
   const year = new Date().getFullYear();
@@ -408,15 +406,6 @@ export async function Footer({
         {t("cart")}
       </Link>
     </li>,
-    ...(wholesaleEnabled
-      ? [
-          <li key="wholesale">
-            <Link href={`${basePath}/wholesale`} className={linkClass}>
-              {t("wholesale")}
-            </Link>
-          </li>,
-        ]
-      : []),
   ];
   const policyNodes: ReactNode[] = POLICY_LINKS.filter(
     (policy) => !policySlugs || policySlugs.includes(policy.slug),

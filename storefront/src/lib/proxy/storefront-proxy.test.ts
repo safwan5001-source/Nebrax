@@ -1,15 +1,15 @@
 import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HostContext } from "@/lib/commerce/edge-storefront-locale";
-import { createSpreeMiddleware } from "@/lib/spree/middleware";
+import { createStorefrontProxy } from "@/lib/proxy/storefront-proxy";
 
-const middleware = createSpreeMiddleware({
+const middleware = createStorefrontProxy({
   defaultCountry: "us",
   defaultLocale: "en",
   supportedLocales: ["en", "de", "zh-CN"],
 });
 
-describe("Spree locale middleware", () => {
+describe("Storefront proxy", () => {
   it("canonicalizes an existing country and locale prefix", async () => {
     const response = await middleware(
       new NextRequest("https://store.example/US/ZH-cn/products?sort=name"),
@@ -28,12 +28,12 @@ describe("Spree locale middleware", () => {
     expect(response.headers.get("location")).toBe(
       "https://store.example/us/en/products/coffee",
     );
-    expect(response.cookies.get("spree_country")?.value).toBe("us");
-    expect(response.cookies.get("spree_locale")?.value).toBe("en");
+    expect(response.cookies.get("awj_country")?.value).toBe("us");
+    expect(response.cookies.get("awj_locale")?.value).toBe("en");
   });
 
   it("falls back to a supported locale when the configured default is unavailable", async () => {
-    const invalidDefaultMiddleware = createSpreeMiddleware({
+    const invalidDefaultMiddleware = createStorefrontProxy({
       defaultCountry: "us",
       defaultLocale: "it",
       supportedLocales: ["en", "de"],
@@ -78,10 +78,10 @@ describe("Spree locale middleware", () => {
     );
 
     expect(
-      response.headers.get("x-middleware-request-x-spree-request-pathname"),
+      response.headers.get("x-middleware-request-x-awj-request-pathname"),
     ).toBe("/ar/en/products/coffee");
     expect(
-      response.headers.get("x-middleware-request-x-spree-request-search"),
+      response.headers.get("x-middleware-request-x-awj-request-search"),
     ).toBe("?sort=price");
   });
 
@@ -112,8 +112,8 @@ describe("Spree locale middleware", () => {
   });
 
   it.each([
-    "_spree_jwt",
-    "_spree_refresh_token",
+    "awj_account_session",
+    "awj_account_refresh",
   ])("allows a protected account request with a %s session cookie", async (cookieName) => {
     const request = new NextRequest(
       "https://store.example/us/en/account/orders",
@@ -129,7 +129,7 @@ describe("Spree locale middleware", () => {
     const request = new NextRequest(
       "https://store.example/us/en/account/orders",
     );
-    request.cookies.set("_spree_jwt", "");
+    request.cookies.set("awj_account_session", "");
 
     const response = await middleware(request);
 
@@ -138,13 +138,13 @@ describe("Spree locale middleware", () => {
   });
 });
 
-describe("Spree locale middleware — Storefront default locale (STORE-LOCALE-WIRING-1)", () => {
+describe("Storefront proxy — Storefront default locale (STORE-LOCALE-WIRING-1)", () => {
   function middlewareWithResolver(
     resolveStorefrontLocale: (
       request: NextRequest,
     ) => Promise<string | null | undefined>,
   ) {
-    return createSpreeMiddleware({
+    return createStorefrontProxy({
       defaultCountry: "sa",
       defaultLocale: "ar",
       supportedLocales: ["ar", "en"],
@@ -179,12 +179,12 @@ describe("Spree locale middleware — Storefront default locale (STORE-LOCALE-WI
     );
   });
 
-  it("lets an existing spree_locale cookie override the Storefront's default locale", async () => {
+  it("lets an existing awj_locale cookie override the Storefront's default locale", async () => {
     const resolver = vi.fn().mockResolvedValue("en");
     const middleware = middlewareWithResolver(resolver);
 
     const request = new NextRequest("https://alrshd.store.example/");
-    request.cookies.set("spree_locale", "ar");
+    request.cookies.set("awj_locale", "ar");
 
     const response = await middleware(request);
 
@@ -200,7 +200,7 @@ describe("Spree locale middleware — Storefront default locale (STORE-LOCALE-WI
     const middleware = middlewareWithResolver(resolver);
 
     const request = new NextRequest("https://alrshd.store.example/");
-    request.cookies.set("spree_locale", "en");
+    request.cookies.set("awj_locale", "en");
 
     const response = await middleware(request);
 
@@ -350,7 +350,7 @@ describe("Spree locale middleware — Storefront default locale (STORE-LOCALE-WI
 });
 
 describe("dynamic store icon bypass", () => {
-  const localeMiddleware = createSpreeMiddleware({
+  const localeMiddleware = createStorefrontProxy({
     defaultCountry: "sa",
     defaultLocale: "ar",
     supportedLocales: ["ar", "en"],
@@ -370,8 +370,8 @@ describe("dynamic store icon bypass", () => {
 
   it("does not rewrite /icon to /sa/ar/icon when locale cookies are already set", async () => {
     const request = new NextRequest("https://alrshd.store.example/icon");
-    request.cookies.set("spree_country", "sa");
-    request.cookies.set("spree_locale", "ar");
+    request.cookies.set("awj_country", "sa");
+    request.cookies.set("awj_locale", "ar");
 
     const response = await localeMiddleware(request);
 
@@ -423,7 +423,7 @@ describe("dynamic store icon bypass", () => {
   });
 });
 
-describe("X5b: legacy Spree checkout routes answer a real 404 without wholesale", () => {
+describe("X5b: legacy checkout routes answer a real 404", () => {
   const legacy = [
     "/us/en/checkout/abc",
     "/us/en/confirm-payment/abc",
@@ -441,7 +441,6 @@ describe("X5b: legacy Spree checkout routes answer a real 404 without wholesale"
   it.each(
     legacy,
   )("rewrites %s to a path that matches no route (no redirect)", async (path) => {
-    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "");
     const response = await middleware(
       new NextRequest(`https://store.example${path}?x=1`),
     );
@@ -451,7 +450,6 @@ describe("X5b: legacy Spree checkout routes answer a real 404 without wholesale"
   });
 
   it("closes the legacy route for every spelling that resolves to checkout/[id]", async () => {
-    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "");
     for (const path of [
       "/us/en/checkout/%70ayment-return",
       "/us/en/checkout/Payment-Return",
@@ -467,7 +465,6 @@ describe("X5b: legacy Spree checkout routes answer a real 404 without wholesale"
   });
 
   it("leaves the AWJ-native checkout routes untouched", async () => {
-    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "");
     for (const path of [
       "/us/en/checkout",
       "/us/en/checkout/",
@@ -483,7 +480,6 @@ describe("X5b: legacy Spree checkout routes answer a real 404 without wholesale"
   });
 
   it("does not touch deeper or unrelated paths", async () => {
-    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "");
     for (const path of [
       "/us/en/checkout/abc/extra",
       "/us/en/products/checkout",
@@ -496,20 +492,7 @@ describe("X5b: legacy Spree checkout routes answer a real 404 without wholesale"
     }
   });
 
-  it.each(
-    legacy,
-  )("keeps %s closed even when the (dead) Spree add-on env is set: the pages no longer exist", async (path) => {
-    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "wholesale");
-    const response = await middleware(
-      new NextRequest(`https://store.example${path}`),
-    );
-
-    expect(response.headers.get("location")).toBeNull();
-    expect(rewriteOf(response)).toBe(`https://store.example${closedPath}`);
-  });
-
   it("still canonicalises the locale prefix before deciding (no gate bypass by prefix spelling)", async () => {
-    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "");
     const response = await middleware(
       new NextRequest("https://store.example/US/EN/checkout/abc"),
     );
@@ -526,7 +509,6 @@ describe("X5b: legacy Spree checkout routes answer a real 404 without wholesale"
     // Not the static `payment-return` segment, so it resolves to checkout/[id].
     "/us/en/checkout/payment-return.v2",
   ])("closes the dotted legacy id %s without cookies or redirect", async (path) => {
-    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "");
     const response = await middleware(
       new NextRequest(`https://store.example${path}`),
     );
@@ -537,7 +519,6 @@ describe("X5b: legacy Spree checkout routes answer a real 404 without wholesale"
   });
 
   it("keeps dotted ids, static assets and AWJ routes on the plain pass-through", async () => {
-    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "");
     for (const path of [
       "/us/en/products/shirt.v2",
       "/us/en/checkout/test.123/extra",
@@ -549,16 +530,6 @@ describe("X5b: legacy Spree checkout routes answer a real 404 without wholesale"
       expect(rewriteOf(response)).toBeNull();
       expect(response.headers.get("location")).toBeNull();
     }
-  });
-
-  it("closes dotted legacy ids even when the (dead) Spree add-on env is set", async () => {
-    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "wholesale");
-    const response = await middleware(
-      new NextRequest("https://store.example/us/en/checkout/test.123"),
-    );
-
-    expect(rewriteOf(response)).toBe(`https://store.example${closedPath}`);
-    expect(response.headers.get("set-cookie")).toBeNull();
   });
 });
 
@@ -585,7 +556,7 @@ describe("H6 Final Closure: host context, wholesale-only pages, bare country, co
       if (ctx === "reject") throw new Error("boom");
       return ctx;
     });
-    const mw = createSpreeMiddleware({
+    const mw = createStorefrontProxy({
       defaultCountry: "sa",
       defaultLocale: "ar",
       supportedLocales: ["ar", "en"],
@@ -617,8 +588,8 @@ describe("H6 Final Closure: host context, wholesale-only pages, bare country, co
   it("sets no locale cookies on an unknown Host", async () => {
     const { mw } = withContext({ state: "unknown" });
     const response = await call(mw, "/sa/ar/products");
-    expect(response.cookies.get("spree_country")).toBeUndefined();
-    expect(response.cookies.get("spree_locale")).toBeUndefined();
+    expect(response.cookies.get("awj_country")).toBeUndefined();
+    expect(response.cookies.get("awj_locale")).toBeUndefined();
   });
 
   it("never closes a Host on 'unavailable' or a rejected lookup (fail open for the Host)", async () => {
@@ -671,8 +642,7 @@ describe("H6 Final Closure: host context, wholesale-only pages, bare country, co
     }
   });
 
-  it("closes the Spree-era /wholesale/* URLs with a real 404 on a retail Host", async () => {
-    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "");
+  it("closes the legacy /wholesale/* URLs with a real 404 on a retail Host", async () => {
     const { mw } = withContext(retail);
     for (const path of [
       "/sa/ar/wholesale",
@@ -688,26 +658,7 @@ describe("H6 Final Closure: host context, wholesale-only pages, bare country, co
     }
   });
 
-  it("treats legacy /wholesale/* the same when the dead Spree wholesale add-on env is set: the portal no longer exists", async () => {
-    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "wholesale");
-    const retailMw = withContext(retail).mw;
-    for (const path of ["/sa/ar/wholesale", "/sa/ar/wholesale/cart"]) {
-      const response = await call(retailMw, path);
-      expect(response.headers.get("location")).toBeNull();
-      expect(rewriteOf(response)).toBe(`https://store.example${closedPath}`);
-    }
-    const response = await call(
-      withContext(wholesale).mw,
-      "/sa/ar/wholesale/quick-order",
-    );
-    expect(response.status).toBe(308);
-    expect(new URL(response.headers.get("location") ?? "").pathname).toBe(
-      "/sa/ar/buyer/quick-order",
-    );
-  });
-
   it("redirects legacy /wholesale/* to the native equivalent on a native wholesale Host, closing the rest", async () => {
-    vi.stubEnv("SPREE_WHOLESALE_CHANNEL", "");
     const { mw } = withContext(wholesale);
     const cases: Array<[string, string | null]> = [
       ["/sa/ar/wholesale", "/sa/ar/buyer/sign-in"],
@@ -768,7 +719,7 @@ describe("H6 Final Closure: host context, wholesale-only pages, bare country, co
     vi.stubEnv("NODE_ENV", "production");
     const { mw } = withContext(retail);
     const response = await call(mw, "/sa/ar/products");
-    for (const name of ["spree_country", "spree_locale"]) {
+    for (const name of ["awj_country", "awj_locale"]) {
       const cookie = response.cookies.get(name);
       expect(cookie?.httpOnly).toBe(true);
       expect(cookie?.sameSite).toBe("lax");
@@ -781,7 +732,91 @@ describe("H6 Final Closure: host context, wholesale-only pages, bare country, co
   it("keeps the cookie VALUES (names, country, locale) exactly as before", async () => {
     const { mw } = withContext(retail);
     const response = await call(mw, "/sa/en/products");
-    expect(response.cookies.get("spree_country")?.value).toBe("sa");
-    expect(response.cookies.get("spree_locale")?.value).toBe("en");
+    expect(response.cookies.get("awj_country")?.value).toBe("sa");
+    expect(response.cookies.get("awj_locale")?.value).toBe("en");
+  });
+});
+
+describe("legacy cookie-name migration (spree_country / spree_locale → awj_country / awj_locale)", () => {
+  const proxy = createStorefrontProxy({
+    defaultCountry: "sa",
+    defaultLocale: "ar",
+    supportedLocales: ["ar", "en"],
+  });
+
+  function withCookies(url: string, cookies: Record<string, string>) {
+    const request = new NextRequest(url);
+    for (const [name, value] of Object.entries(cookies)) {
+      request.cookies.set(name, value);
+    }
+    return request;
+  }
+
+  it("still reads the legacy pair on a bare path, so a returning visitor keeps their market and language", async () => {
+    const response = await proxy(
+      withCookies("https://store.example/products", {
+        spree_country: "sa",
+        spree_locale: "en",
+      }),
+    );
+    expect(new URL(response.headers.get("location") ?? "").pathname).toBe(
+      "/sa/en/products",
+    );
+  });
+
+  it("writes the new pair and expires the legacy pair in the same response", async () => {
+    const response = await proxy(
+      withCookies("https://store.example/sa/en/products", {
+        spree_country: "sa",
+        spree_locale: "en",
+      }),
+    );
+    expect(response.cookies.get("awj_country")?.value).toBe("sa");
+    expect(response.cookies.get("awj_locale")?.value).toBe("en");
+    const setCookie = response.headers.getSetCookie().join("\n");
+    expect(setCookie).toMatch(/spree_country=;[^\n]*Max-Age=0/i);
+    expect(setCookie).toMatch(/spree_locale=;[^\n]*Max-Age=0/i);
+  });
+
+  it("prefers the new pair over a stale legacy pair", async () => {
+    const response = await proxy(
+      withCookies("https://store.example/products", {
+        awj_country: "sa",
+        awj_locale: "ar",
+        spree_country: "ae",
+        spree_locale: "en",
+      }),
+    );
+    expect(new URL(response.headers.get("location") ?? "").pathname).toBe(
+      "/sa/ar/products",
+    );
+  });
+
+  it("sets no legacy cookie header when the browser never had one", async () => {
+    const response = await proxy(
+      new NextRequest("https://store.example/sa/ar/products"),
+    );
+    expect(response.headers.getSetCookie().join("\n")).not.toMatch(/spree_/);
+  });
+
+  it("sends a protected account page to sign-in unless an account-session cookie is present (and a stale _spree_jwt does not count)", async () => {
+    const anonymous = await proxy(
+      new NextRequest("https://store.example/sa/ar/account/orders"),
+    );
+    expect(anonymous.headers.get("location")).toContain("/sa/ar/account");
+
+    const staleLegacy = await proxy(
+      withCookies("https://store.example/sa/ar/account/orders", {
+        _spree_jwt: "x",
+      }),
+    );
+    expect(staleLegacy.headers.get("location")).toContain("/sa/ar/account");
+
+    const signedIn = await proxy(
+      withCookies("https://store.example/sa/ar/account/orders", {
+        awj_account_session: "x",
+      }),
+    );
+    expect(signedIn.headers.get("location")).toBeNull();
   });
 });

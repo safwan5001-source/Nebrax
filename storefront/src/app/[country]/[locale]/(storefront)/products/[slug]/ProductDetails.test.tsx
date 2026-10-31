@@ -1,8 +1,8 @@
-import type { Product } from "@spree/sdk";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PublishedThemeMarkerProvider } from "@/components/layout/PublishedThemeMarker";
+import type { StoreProduct as Product } from "@/lib/commerce/types";
 import { PRODUCT_PAGE_EXPAND } from "@/lib/data/cached";
 import type { PagePresentation } from "@/lib/presentation/page-regions";
 import { ProductDetails } from "./ProductDetails";

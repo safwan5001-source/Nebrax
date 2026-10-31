@@ -6,13 +6,19 @@ import {
   negotiateLocale,
 } from "@/i18n/normalize";
 import { REQUEST_PATHNAME_HEADER, REQUEST_SEARCH_HEADER } from "@/i18n/routing";
+import {
+  ACCOUNT_REFRESH_COOKIE,
+  ACCOUNT_SESSION_COOKIE,
+} from "@/lib/account/session-cookies";
 import type { HostContext } from "@/lib/commerce/edge-storefront-locale";
+import {
+  COUNTRY_COOKIE,
+  LEGACY_COUNTRY_COOKIE,
+  LEGACY_LOCALE_COOKIE,
+  LOCALE_COOKIE,
+} from "@/lib/proxy/locale-cookies";
 import { buildAccountLoginHref } from "@/lib/utils/account-redirect";
 
-const COUNTRY_COOKIE = "spree_country";
-const LOCALE_COOKIE = "spree_locale";
-const ACCESS_TOKEN_COOKIE = "_spree_jwt";
-const REFRESH_TOKEN_COOKIE = "_spree_refresh_token";
 const COOKIE_MAX_AGE = 365 * 24 * 60 * 60;
 
 /**
@@ -71,7 +77,7 @@ const BARE_COUNTRY = /^\/([a-z]{2})\/?$/i;
 const HAS_COUNTRY_LOCALE =
   /^\/([a-z]{2})\/([a-z]{2,3}(?:-[a-z0-9]{2,8})*)(\/|$)/i;
 
-export interface SpreeMiddlewareConfig {
+export interface StorefrontProxyConfig {
   /** Default country ISO code (default: 'us') */
   defaultCountry?: string;
   /** Default locale code (default: 'en') */
@@ -80,9 +86,9 @@ export interface SpreeMiddlewareConfig {
   supportedLocales?: readonly string[];
   /** Routes to skip — prefixes matched with startsWith (default: ['/_next', '/api', '/favicon.ico']) */
   staticRoutes?: string[];
-  /** JWT cookie used to identify a potentially authenticated account request. */
+  /** Session cookie used to identify a potentially authenticated account request. */
   accessTokenCookieName?: string;
-  /** Refresh-token cookie used to preserve recoverable account sessions. */
+  /** Refresh cookie used to preserve recoverable account sessions. */
   refreshTokenCookieName?: string;
   /**
    * Resolves the current request's Storefront-configured default locale
@@ -127,16 +133,15 @@ function isProtectedAccountPath(pathname: string, localizedPrefix: string) {
 }
 
 /**
- * Set spree_country / spree_locale cookies on a response so that
- * `getLocaleOptions()` reads values matching the URL during SSR.
+ * Set the country / locale cookies on a response so that they match the URL.
  */
 function setLocaleCookies(
   response: NextResponse,
   country: string,
   locale: string,
 ): void {
-  // Only the server (this proxy and `getLocaleOptions()`) ever reads these, so they are HttpOnly; the rest of the
-  // storefront's cookies (cart, session) already carry the same Secure/SameSite attributes.
+  // Only the server (this proxy) ever reads these, so they are HttpOnly; the rest of the storefront's cookies (cart,
+  // session) already carry the same Secure/SameSite attributes.
   const attributes = {
     path: "/",
     maxAge: COOKIE_MAX_AGE,
@@ -205,15 +210,16 @@ function nextWithLocaleContext(
 }
 
 /**
- * Creates a Next.js middleware that handles:
+ * Creates the storefront proxy (Next.js middleware) that handles:
  * - Redirecting bare paths to /{country}/{locale}/...
  * - Detecting country from cookies → geo headers → default
- * - Detecting locale from cookies → accept-language → default
- * - Syncing spree_country / spree_locale cookies with URL segments so
- *   server-side data fetching (via `getLocaleOptions()`) uses the correct market
+ * - Detecting locale from cookies → Storefront default → accept-language → default
+ * - Syncing the country / locale cookies with the URL segments
+ * - Real 404s for closed legacy URLs, unknown Hosts and wholesale-only pages on non-wholesale Hosts
+ * - Sending protected `/account/*` pages to sign-in when there is no account session cookie
  */
-export function createSpreeMiddleware(
-  config: SpreeMiddlewareConfig = {},
+export function createStorefrontProxy(
+  config: StorefrontProxyConfig = {},
 ): (request: NextRequest) => Promise<NextResponse> {
   const defaultCountry = config.defaultCountry ?? "us";
   const supportedLocales = config.supportedLocales ?? [];
@@ -231,14 +237,14 @@ export function createSpreeMiddleware(
     "/favicon.ico",
   ];
   const accessTokenCookieName =
-    config.accessTokenCookieName ?? ACCESS_TOKEN_COOKIE;
+    config.accessTokenCookieName ?? ACCOUNT_SESSION_COOKIE;
   const refreshTokenCookieName =
-    config.refreshTokenCookieName ?? REFRESH_TOKEN_COOKIE;
+    config.refreshTokenCookieName ?? ACCOUNT_REFRESH_COOKIE;
   const resolveStorefrontLocale = config.resolveStorefrontLocale;
   const resolveHostContext = config.resolveHostContext;
   const closeUnknownHosts = config.closeUnknownHosts ?? true;
 
-  return async function middleware(request: NextRequest) {
+  const handle = async (request: NextRequest): Promise<NextResponse> => {
     const { pathname } = request.nextUrl;
 
     // `/icon` is the dynamic store icon. Locale-prefixing it 404s before
@@ -377,6 +383,7 @@ export function createSpreeMiddleware(
     const country =
       bareCountry?.[1].toLowerCase() ??
       request.cookies.get(COUNTRY_COOKIE)?.value ??
+      request.cookies.get(LEGACY_COUNTRY_COOKIE)?.value ??
       request.headers.get("x-vercel-ip-country")?.toLowerCase() ??
       request.headers.get("cf-ipcountry")?.toLowerCase() ??
       defaultCountry;
@@ -384,7 +391,9 @@ export function createSpreeMiddleware(
     // Detect locale: cookie → Storefront.default_locale → accept-language → default
     // (STORE-LOCALE-WIRING-1 — see storefront/src/lib/commerce/edge-storefront-locale.ts
     // for the resolver's own fail-closed/caching behavior.)
-    const cookieValue = request.cookies.get(LOCALE_COOKIE)?.value;
+    const cookieValue =
+      request.cookies.get(LOCALE_COOKIE)?.value ??
+      request.cookies.get(LEGACY_LOCALE_COOKIE)?.value;
     const cookieLocale =
       supportedLocales.length > 0
         ? negotiateLocale(cookieValue, supportedLocales)
@@ -417,6 +426,20 @@ export function createSpreeMiddleware(
 
     const response = NextResponse.redirect(url);
     setLocaleCookies(response, country, locale);
+    return response;
+  };
+
+  return async function proxy(request: NextRequest) {
+    const response = await handle(request);
+    // Migration from the legacy cookie names: once the current pair is on the response, expire any legacy pair the
+    // browser still holds (read above as a fallback, so the visitor's market and language are not lost).
+    if (response.cookies.get(COUNTRY_COOKIE)) {
+      for (const legacy of [LEGACY_COUNTRY_COOKIE, LEGACY_LOCALE_COOKIE]) {
+        if (request.cookies.has(legacy)) {
+          response.cookies.set(legacy, "", { path: "/", maxAge: 0 });
+        }
+      }
+    }
     return response;
   };
 }
