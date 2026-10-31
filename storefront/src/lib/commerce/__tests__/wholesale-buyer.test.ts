@@ -8,6 +8,7 @@ import {
   catalogGateFromError,
   isMembershipStatus,
   localePathFrom,
+  purchaseIssueFromError,
 } from "../wholesale-buyer";
 
 describe("catalogGateFromError — only 401/403 are access gates", () => {
@@ -117,5 +118,33 @@ describe("localePathFrom — only a /xx/yy prefix may travel to the link builder
     ]) {
       expect(localePathFrom(bad)).toBeUndefined();
     }
+  });
+});
+
+describe("purchaseIssueFromError (H6 Batch K)", () => {
+  it("maps a signed-out refusal, a not-approved refusal and an unavailable line to stable keys", () => {
+    expect(purchaseIssueFromError({ status: 401 })).toBe("sign_in_required");
+    expect(purchaseIssueFromError({ status: 403 })).toBe("approval_required");
+    expect(
+      purchaseIssueFromError({
+        status: 422,
+        details: { reason: "unavailable_for_wholesale" },
+      }),
+    ).toBe("unavailable_for_wholesale");
+  });
+
+  it("leaves every other failure alone so DTC handling is unchanged", () => {
+    expect(purchaseIssueFromError({ status: 422 })).toBeNull();
+    expect(
+      purchaseIssueFromError({ status: 422, details: { reason: "other" } }),
+    ).toBeNull();
+    expect(purchaseIssueFromError({ status: 404 })).toBeNull();
+    expect(
+      purchaseIssueFromError({ status: 409, code: "review_required" }),
+    ).toBeNull();
+    expect(purchaseIssueFromError({ status: 500 })).toBeNull();
+    expect(purchaseIssueFromError(new Error("boom"))).toBeNull();
+    expect(purchaseIssueFromError(null)).toBeNull();
+    expect(purchaseIssueFromError(undefined)).toBeNull();
   });
 });

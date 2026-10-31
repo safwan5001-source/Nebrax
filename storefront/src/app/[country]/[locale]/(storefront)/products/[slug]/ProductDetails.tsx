@@ -394,7 +394,12 @@ export function ProductDetails({
              * regardless of the region's own visibility flag.
              */
             <p className="mt-2 text-xs font-medium">
-              {inStock ? (
+              {product.wholesale_unavailable ? (
+                <span className="inline-flex items-center gap-1.5 text-store-muted-foreground">
+                  <CircleX className="size-4" aria-hidden="true" />
+                  {t("wholesaleUnavailable")}
+                </span>
+              ) : inStock ? (
                 <span className="inline-flex items-center gap-1.5 text-store-success">
                   <CircleCheckBig className="size-4" aria-hidden="true" />
                   {t("inStock")}
@@ -507,6 +512,8 @@ export function ProductDetails({
                     <ShoppingBag className="size-5" />
                     {t("addToCart")}
                   </>
+                ) : product.wholesale_unavailable ? (
+                  t("wholesaleUnavailable")
                 ) : (
                   t("outOfStock")
                 )}

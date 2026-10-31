@@ -64,6 +64,7 @@ export function CartDrawer() {
     removeItem,
     itemCount,
     refreshCart,
+    accessIssue,
   } = useCart();
   const t = useTranslations("cart");
   const tc = useTranslations("common");
@@ -173,6 +174,7 @@ export function CartDrawer() {
               basePath={basePath}
               density="drawer"
               onNavigate={closeCart}
+              accessIssue={accessIssue}
             />
           ) : (
             <ul className="divide-y divide-store-border bg-store-surface px-4">

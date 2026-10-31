@@ -683,6 +683,93 @@ class WholesalePricePrecedenceTest extends TestCase
         $this->assertSame(0, CommerceOrderLine::withoutGlobalScopes()->where('price_source', 'product_default')->count(), 'no wholesale line is ever priced from the product default');
     }
 
+    // ═══════════════════ 4b · Batch K — الرحلة الأصلية للمشتري ═══════════════════
+
+    #[Test]
+    public function an_unavailable_wholesale_line_is_refused_with_a_machine_readable_reason_and_dtc_errors_are_unchanged(): void
+    {
+        [$buyer] = $this->buyer();
+
+        // add
+        $add = $this->add(self::WS, $buyer, $this->p3)->assertStatus(422);
+        $this->assertSame('validation_failed', $add->json('error.code'));
+        $this->assertSame('unavailable_for_wholesale', $add->json('error.details.reason'));
+
+        // update (the price disappears after the line was added)
+        $cart = $this->add(self::WS, $buyer, $this->p1)->assertCreated();
+        $line = $cart->json('data.items.0.id');
+        $this->deactivate($this->partnerList);
+        $this->deactivate($this->channelList);
+        $upd = $this->api('PATCH', 'cart/items/'.$line, self::WS, $buyer, $this->cookie($cart), ['quantity' => 2])->assertStatus(422);
+        $this->assertSame('unavailable_for_wholesale', $upd->json('error.details.reason'));
+
+        // DTC: the same endpoint's refusals carry no wholesale reason (response shape unchanged)
+        $unlisted = $this->inCtx(fn () => $this->product('UNLISTED'));
+        $dtc = $this->add(self::DTC, null, $unlisted)->assertStatus(422);
+        $this->assertNull($dtc->json('error.details.reason'), 'no wholesale reason on a DTC refusal');
+    }
+
+    #[Test]
+    public function the_full_native_journey_creates_one_order_owned_and_priced_by_the_buyer_and_replays_idempotently(): void
+    {
+        [$buyer, , $identityId] = $this->buyer();
+        $cart = $this->cookie($this->add(self::WS, $buyer, $this->p1, quantity: 2)->assertCreated());
+        $this->add(self::WS, $buyer, $this->p2, $cart)->assertSuccessful();
+        $this->readyCheckout(self::WS, $buyer, $cart);
+        $this->api('GET', 'checkout/payment-methods', self::WS, $buyer, $cart)->assertOk();
+
+        $first = $this->api('POST', 'checkout/complete', self::WS, $buyer, $cart, [], 'idem-journey')->assertCreated();
+        $replay = $this->api('POST', 'checkout/complete', self::WS, $buyer, $cart, [], 'idem-journey');
+
+        $this->assertTrue($replay->json('data.replayed'), 'the same key replays instead of creating a second order');
+        $this->assertSame(1, CommerceOrder::withoutGlobalScopes()->count());
+        $order = CommerceOrder::withoutGlobalScopes()->firstOrFail();
+        $this->assertSame($identityId, $order->customer_identity_id, 'owned by the authenticated buyer, never by input');
+        $this->assertSame($this->ws->id, $order->sales_channel_id);
+        $this->assertNull($order->partner_id);
+        $this->assertSame(500 * 2 + 900, (int) $order->total, 'partner price for P1, channel-list fallback for P2');
+        $this->assertSame($first->json('data.order.number'), $replay->json('data.order.number'));
+        $this->assertSame(0, \App\Models\Invoice::withoutGlobalScopes()->count() + \App\Models\Payment::withoutGlobalScopes()->count(), 'ordering posts nothing to accounting and captures no payment');
+    }
+
+    #[Test]
+    public function a_suspended_buyer_keeps_the_cart_but_cannot_modify_or_purchase_and_resumes_on_reinstatement(): void
+    {
+        [$buyer, $membershipId] = $this->buyer();
+        $cart = $this->cookie($this->add(self::WS, $buyer, $this->p1, quantity: 2)->assertCreated());
+        $this->readyCheckout(self::WS, $buyer, $cart);
+        $owner = fn () => User::query()->where('role', 'owner')->firstOrFail();
+
+        $this->inCtx(fn () => app(WholesaleMembershipService::class)->transition($membershipId, 'suspend', $owner()));
+
+        $this->api('GET', 'cart', self::WS, $buyer, $cart)->assertStatus(403);
+        $this->add(self::WS, $buyer, $this->p2, $cart)->assertStatus(403);
+        $this->api('PATCH', 'cart/items/'.CommerceCart::withoutGlobalScopes()->firstOrFail()->items()->firstOrFail()->id, self::WS, $buyer, $cart, ['quantity' => 5])->assertStatus(403);
+        $this->api('POST', 'checkout/complete', self::WS, $buyer, $cart, [], 'idem-susp')->assertStatus(403);
+        $this->assertSame(0, CommerceOrder::withoutGlobalScopes()->count());
+        $this->assertSame(2, (int) CommerceCart::withoutGlobalScopes()->firstOrFail()->items()->firstOrFail()->quantity, 'the cart row is retained untouched');
+
+        $this->inCtx(fn () => app(WholesaleMembershipService::class)->transition($membershipId, 'reinstate', $owner()));
+
+        $this->assertSame(1000, $this->api('GET', 'cart', self::WS, $buyer, $cart)->assertOk()->json('data.subtotal.amount_minor'), 'the same cart resumes: 2 × 500');
+        $this->api('POST', 'checkout/complete', self::WS, $buyer, $cart, [], 'idem-susp-2')->assertCreated();
+    }
+
+    #[Test]
+    public function a_cart_cookie_from_one_wholesale_channel_never_resolves_on_another_channel(): void
+    {
+        [$buyerA] = $this->buyer('a@prec.test');
+        [$buyerB] = $this->buyer('b@prec.test', linked: false, channel: $this->ws2, host: self::WS2);
+        $cartA = $this->cookie($this->add(self::WS, $buyerA, $this->p1)->assertCreated());
+
+        // B (approved only on WS2) presenting A's cart cookie on WS2: the cart is not visible there
+        $this->assertSame([], $this->api('GET', 'cart', self::WS2, $buyerB, $cartA)->assertOk()->json('data.items'));
+        // A's own token is bound to WS and is refused on WS2
+        $this->api('GET', 'cart', self::WS2, $buyerA, $cartA)->assertStatus(401);
+        $this->api('POST', 'checkout/complete', self::WS2, $buyerB, $cartA, [], 'idem-cross')->assertStatus(404);
+        $this->assertSame(0, CommerceOrder::withoutGlobalScopes()->count());
+    }
+
     // ═══════════════════ 5 · توافق DTC ═══════════════════
 
     #[Test]

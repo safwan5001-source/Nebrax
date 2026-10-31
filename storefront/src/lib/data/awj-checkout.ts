@@ -28,6 +28,10 @@ import {
   type StorefrontOrder,
 } from "@/lib/commerce/checkout-types";
 import { StorefrontApiError } from "@/lib/commerce/config";
+import {
+  type PurchaseIssue,
+  purchaseIssueFromError,
+} from "@/lib/commerce/wholesale-buyer";
 import { actionResult } from "./utils";
 
 /**
@@ -159,7 +163,12 @@ export type UpdateAwjPaymentResult =
   | { success: true; checkout: StorefrontCheckout }
   /** Beta — the chosen online method is enabled but not collectable right now; nothing was saved or charged. */
   | { success: false; kind: "online_unavailable"; error: string }
-  | { success: false; kind?: undefined; error: string };
+  | {
+      success: false;
+      kind?: undefined;
+      error: string;
+      purchaseIssue?: PurchaseIssue;
+    };
 
 export async function updateAwjPayment(
   paymentMethodId: string,
@@ -179,12 +188,14 @@ export async function updateAwjPayment(
         error: error.message,
       };
     }
+    const purchaseIssue = purchaseIssueFromError(error);
     return {
       success: false,
       error:
         error instanceof Error
           ? error.message
           : "Could not save your payment method. Please try again.",
+      ...(purchaseIssue ? { purchaseIssue } : {}),
     };
   }
 }
@@ -206,7 +217,12 @@ export type CompleteAwjCheckoutResult =
     }
   | { success: false; kind: "idempotency_conflict"; message: string }
   | { success: false; kind: "not_found"; message: string }
-  | { success: false; kind: "error"; message: string };
+  | {
+      success: false;
+      kind: "error";
+      message: string;
+      purchaseIssue?: PurchaseIssue;
+    };
 
 function isReviewRequiredDetails(
   value: unknown,
@@ -264,7 +280,13 @@ export async function completeAwjCheckoutAction(
       if (error.code === "not_found") {
         return { success: false, kind: "not_found", message: error.message };
       }
-      return { success: false, kind: "error", message: error.message };
+      const purchaseIssue = purchaseIssueFromError(error);
+      return {
+        success: false,
+        kind: "error",
+        message: error.message,
+        ...(purchaseIssue ? { purchaseIssue } : {}),
+      };
     }
     return {
       success: false,

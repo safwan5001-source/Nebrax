@@ -121,3 +121,34 @@ export function buyerFormErrorKey(status: number | undefined): BuyerErrorKey {
 export function localePathFrom(basePath: string): string | undefined {
   return /^\/[a-z]{2}\/[a-z]{2}$/.test(basePath) ? basePath : undefined;
 }
+
+/**
+ * H6 Batch K — why a cart or checkout call was refused for a wholesale buyer, as a stable key the storefront can localize
+ * (never the backend's own text). `sign_in_required`: no valid buyer session for this host (401). `approval_required`: signed in
+ * but the membership is not approved / is suspended (403). `unavailable_for_wholesale`: the line has no eligible price for this
+ * buyer (422 with `details.reason`). Anything else is `null` and keeps its existing handling, so DTC behaviour is unchanged.
+ */
+export type PurchaseIssue =
+  | "sign_in_required"
+  | "approval_required"
+  | "unavailable_for_wholesale";
+
+export function purchaseIssueFromError(error: unknown): PurchaseIssue | null {
+  const e = error as {
+    status?: unknown;
+    code?: unknown;
+    details?: unknown;
+  } | null;
+  if (e === null || typeof e !== "object") return null;
+  if (e.status === 401) return "sign_in_required";
+  if (e.status === 403) return "approval_required";
+  if (
+    e.status === 422 &&
+    typeof e.details === "object" &&
+    e.details !== null &&
+    (e.details as { reason?: unknown }).reason === "unavailable_for_wholesale"
+  ) {
+    return "unavailable_for_wholesale";
+  }
+  return null;
+}

@@ -336,7 +336,8 @@
     "contentBlock_allergens": "مسببات الحساسية",
     "contentBlock_storage": "التخزين",
     "contentBlock_preparation_notes": "ملاحظات التجهيز",
-    "contentBlock_personalization_instructions": "تعليمات التخصيص"
+    "contentBlock_personalization_instructions": "تعليمات التخصيص",
+    "wholesaleUnavailable": "غير متاح للجملة"
   },
   "navigation": {
     "home": "الرئيسية",
@@ -1130,7 +1131,7 @@
       },
       "approved": {
         "label": "معتمد",
-        "body": "عضوية الجملة معتمدة وأسعار الجملة ظاهرة. الطلب عبر الإنترنت لمشتري الجملة غير متاح بعد."
+        "body": "تم اعتماد عضويتك في الجملة. أسعار الجملة ظاهرة ويمكنك إضافة المنتجات إلى السلة وإرسال الطلبات."
       },
       "rejected": {
         "label": "غير معتمد",
@@ -1174,6 +1175,11 @@
       "submit": "إرسال",
       "submitting": "جارٍ الإرسال...",
       "doneBody": "إن كان العنوان يخص حساباً ينتظر التأكيد فقد أُرسل رابط جديد. يتوقف الرابط السابق عن العمل عند إرسال الجديد."
+    },
+    "purchase": {
+      "sign_in_required": "سجّل الدخول إلى حساب الجملة لعرض السلة والطلب منها.",
+      "approval_required": "حساب الجملة الخاص بك غير معتمد للطلب حاليًا. راجع حالة عضويتك.",
+      "unavailable_for_wholesale": "هذا المنتج غير متاح للطلب بالجملة."
     }
   }
 }

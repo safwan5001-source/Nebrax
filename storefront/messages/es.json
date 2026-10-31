@@ -336,7 +336,8 @@
     "contentBlock_allergens": "Alérgenos",
     "contentBlock_storage": "Conservación",
     "contentBlock_preparation_notes": "Notas de preparación",
-    "contentBlock_personalization_instructions": "Instrucciones de personalización"
+    "contentBlock_personalization_instructions": "Instrucciones de personalización",
+    "wholesaleUnavailable": "No disponible para mayoristas"
   },
   "navigation": {
     "home": "Inicio",
@@ -1130,7 +1131,7 @@
       },
       "approved": {
         "label": "Aprobada",
-        "body": "Su membresía mayorista está aprobada y los precios son visibles. El pedido en línea para compradores mayoristas aún no está disponible."
+        "body": "Su membresía mayorista está aprobada. Los precios mayoristas son visibles y puede añadir productos al carrito y hacer pedidos."
       },
       "rejected": {
         "label": "No aprobada",
@@ -1174,6 +1175,11 @@
       "submit": "Enviar correo",
       "submitting": "Enviando...",
       "doneBody": "Si la dirección pertenece a una cuenta que aún necesita confirmación, se ha enviado un enlace nuevo. El enlace anterior deja de funcionar cuando se envía el nuevo."
+    },
+    "purchase": {
+      "sign_in_required": "Inicie sesión en su cuenta mayorista para ver este carrito y hacer pedidos.",
+      "approval_required": "Su cuenta mayorista no está aprobada para pedir en este momento. Revise el estado de su membresía.",
+      "unavailable_for_wholesale": "Este producto no está disponible para pedidos mayoristas."
     }
   }
 }

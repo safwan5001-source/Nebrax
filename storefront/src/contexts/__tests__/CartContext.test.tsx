@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/data/cart", () => ({
   getAwjCart: vi.fn(),
+  getAwjCartState: vi.fn(),
   addAwjItem: vi.fn(),
   updateAwjItem: vi.fn(),
   removeAwjItem: vi.fn(),
@@ -26,7 +27,8 @@ import { CartProvider, useCart } from "@/contexts/CartContext";
 import {
   addAwjItem,
   addToCart,
-  getAwjCart,
+  type getAwjCart,
+  getAwjCartState,
   getCart,
   removeAwjItem,
   removeCartItem,
@@ -34,7 +36,14 @@ import {
   updateCartItem,
 } from "@/lib/data/cart";
 
-const mockGetAwjCart = vi.mocked(getAwjCart);
+const mockGetAwjCartState = vi.mocked(getAwjCartState);
+// The provider reads `getAwjCartState()` ({ cart, purchaseIssue? }) since H6 Batch K; this keeps the existing cases readable.
+const mockGetAwjCart = {
+  mockResolvedValue: (cart: Awaited<ReturnType<typeof getAwjCart>>) =>
+    mockGetAwjCartState.mockResolvedValue({ cart }),
+  mockRejectedValue: (error: Error) =>
+    mockGetAwjCartState.mockRejectedValue(error),
+};
 const mockAddAwjItem = vi.mocked(addAwjItem);
 const mockUpdateAwjItem = vi.mocked(updateAwjItem);
 const mockRemoveAwjItem = vi.mocked(removeAwjItem);
@@ -94,7 +103,7 @@ describe("CartContext", () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(mockGetAwjCart).toHaveBeenCalledOnce();
+    expect(mockGetAwjCartState).toHaveBeenCalledOnce();
     expect(mockGetCart).not.toHaveBeenCalled();
     expect(result.current.cart).toBe(mockCart);
     expect(result.current.surface).toBe("dtc");
@@ -134,6 +143,63 @@ describe("CartContext", () => {
 
     expect(result.current.cart).toBeNull();
     expect(result.current.itemCount).toBe(0);
+  });
+
+  describe("wholesale standing (H6 Batch K)", () => {
+    it("a DTC visitor never has an access issue", async () => {
+      const { result } = renderHook(() => useCart(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.accessIssue).toBeNull();
+    });
+
+    it("a read refused for the buyer's standing leaves the cart empty and says why", async () => {
+      mockGetAwjCartState.mockResolvedValue({
+        cart: null,
+        purchaseIssue: "approval_required",
+      });
+      const { result } = renderHook(() => useCart(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.cart).toBeNull();
+      expect(result.current.accessIssue).toBe("approval_required");
+    });
+
+    it("a refused add shows the store's localized wording, never the backend text, and records the issue", async () => {
+      mockAddAwjItem.mockResolvedValue({
+        success: false,
+        error: "backend text that must not be shown",
+        purchaseIssue: "unavailable_for_wholesale",
+      } as never);
+      const { result } = renderHook(() => useCart(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.addItem("p1", 1);
+      });
+
+      expect(mockToastError).toHaveBeenCalledWith(
+        "purchase.unavailable_for_wholesale",
+      );
+      expect(mockToastError).not.toHaveBeenCalledWith(
+        "backend text that must not be shown",
+      );
+      expect(result.current.accessIssue).toBe("unavailable_for_wholesale");
+    });
+
+    it("an ordinary failed add keeps its existing message and sets no issue", async () => {
+      mockAddAwjItem.mockResolvedValue({
+        success: false,
+        error: "Out of stock",
+      } as never);
+      const { result } = renderHook(() => useCart(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.addItem("p1", 1);
+      });
+
+      expect(mockToastError).toHaveBeenCalledWith("Out of stock");
+      expect(result.current.accessIssue).toBeNull();
+    });
   });
 
   describe("addItem (dtc/AWJ)", () => {
@@ -333,7 +399,7 @@ describe("CartContext", () => {
       });
 
       expect(mockGetCart).toHaveBeenCalledWith(undefined, "wholesale");
-      expect(mockGetAwjCart).not.toHaveBeenCalled();
+      expect(mockGetAwjCartState).not.toHaveBeenCalled();
       expect(result.current.cart).toBe(spreeCart);
       expect(result.current.surface).toBe("wholesale");
     });

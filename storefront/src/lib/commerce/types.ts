@@ -244,6 +244,11 @@ export interface StoreProductSummary {
   name: string;
   slug: string;
   purchasable: boolean;
+  /**
+   * H6 Batch K — true only on a wholesale store when the approved buyer has no eligible price for this product ("unavailable for
+   * wholesale"). Absent everywhere else, so non-wholesale view models are unchanged. It is not "out of stock": the UI says so.
+   */
+  wholesale_unavailable?: boolean;
   thumbnail_url: string | null;
   default_variant_id: string;
   price: StorePrice;

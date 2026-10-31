@@ -32,7 +32,8 @@ import { extractBasePath } from "@/lib/utils/path";
  * action just as fast without fighting the shell.
  */
 export default function CartPage() {
-  const { cart, loading, updating, updateItem, removeItem } = useCart();
+  const { cart, loading, updating, updateItem, removeItem, accessIssue } =
+    useCart();
   const pathname = usePathname();
   const basePath = extractBasePath(pathname);
   const t = useTranslations("cart");
@@ -69,7 +70,7 @@ export default function CartPage() {
   if (!awjCart || awjCart.items.length === 0) {
     return (
       <div className="mx-auto w-full max-w-store px-4 sm:px-6 lg:px-8">
-        <CartEmptyState basePath={basePath} />
+        <CartEmptyState basePath={basePath} accessIssue={accessIssue} />
       </div>
     );
   }

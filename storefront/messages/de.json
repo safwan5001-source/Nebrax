@@ -336,7 +336,8 @@
     "contentBlock_allergens": "Allergene",
     "contentBlock_storage": "Lagerung",
     "contentBlock_preparation_notes": "Hinweise zur Zubereitung",
-    "contentBlock_personalization_instructions": "Hinweise zur Personalisierung"
+    "contentBlock_personalization_instructions": "Hinweise zur Personalisierung",
+    "wholesaleUnavailable": "Nicht im Großhandel erhältlich"
   },
   "navigation": {
     "home": "Startseite",
@@ -1130,7 +1131,7 @@
       },
       "approved": {
         "label": "Freigegeben",
-        "body": "Ihre Großhandelsmitgliedschaft ist freigegeben und Händlerpreise sind sichtbar. Online-Bestellungen für Großhandelskunden sind noch nicht verfügbar."
+        "body": "Ihre Großhandelsmitgliedschaft ist freigegeben. Händlerpreise sind sichtbar, und Sie können Produkte in den Warenkorb legen und bestellen."
       },
       "rejected": {
         "label": "Nicht freigegeben",
@@ -1174,6 +1175,11 @@
       "submit": "E-Mail senden",
       "submitting": "Wird gesendet...",
       "doneBody": "Gehört die Adresse zu einem Konto, das noch bestätigt werden muss, wurde ein neuer Link gesendet. Der vorherige Link wird ungültig, sobald die neue E-Mail versendet ist."
+    },
+    "purchase": {
+      "sign_in_required": "Melden Sie sich bei Ihrem Großhandelskonto an, um diesen Warenkorb zu sehen und zu bestellen.",
+      "approval_required": "Ihr Großhandelskonto ist derzeit nicht zum Bestellen freigegeben. Prüfen Sie den Status Ihrer Mitgliedschaft.",
+      "unavailable_for_wholesale": "Dieses Produkt kann nicht im Großhandel bestellt werden."
     }
   }
 }

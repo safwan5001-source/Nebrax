@@ -11,6 +11,7 @@
  */
 
 import { headers } from "next/headers";
+import { getBuyerToken } from "./buyer-session";
 import {
   AWJ_CART_COOKIE_NAME,
   applyAwjSetCookie,
@@ -266,6 +267,12 @@ export async function storefrontCartRequest<T>(
     Accept: "application/json",
     [FORWARDED_HOST_HEADER]: hostname,
   };
+  // The buyer identity comes ONLY from the server-held session below — a caller-supplied header of that name is discarded.
+  for (const key of Object.keys(requestHeaders)) {
+    if (key.toLowerCase() === BUYER_TOKEN_HEADER.toLowerCase()) {
+      delete requestHeaders[key];
+    }
+  }
   const secret = getGatewaySecret();
   if (secret) {
     requestHeaders[GATEWAY_SECRET_HEADER] = secret;
@@ -273,6 +280,21 @@ export async function storefrontCartRequest<T>(
   const cartToken = await getAwjCartToken();
   if (cartToken) {
     requestHeaders.Cookie = `${AWJ_CART_COOKIE_NAME}=${cartToken}`;
+  }
+  /*
+   * H6 Batch K — the native wholesale buyer's session. Read server-side from the
+   * HttpOnly `awj_buyer_session` cookie (host-only, so a DTC host never has one) and sent
+   * ONLY as the `X-Customer-Token` header on this server-to-server call: never in a URL, a
+   * body, a log line or any browser-visible value. The backend binds the token to the sales
+   * channel and tenant of the forwarded host, re-checks the approved membership on every
+   * request, and derives the buyer, partner and price list itself — nothing the client submits
+   * can name a buyer. Set after the trust-boundary headers, and `extraHeaders` cannot override
+   * it (it is spread first). A visitor without a buyer cookie (every DTC visitor) sends exactly
+   * the request this function sent before.
+   */
+  const buyerToken = await getBuyerToken();
+  if (buyerToken) {
+    requestHeaders[BUYER_TOKEN_HEADER] = buyerToken;
   }
   if (body !== undefined) {
     requestHeaders["Content-Type"] = "application/json";
