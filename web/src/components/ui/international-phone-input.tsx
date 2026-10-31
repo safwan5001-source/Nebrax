@@ -8,12 +8,12 @@ import { digitsOnly, normalizePhoneText } from '@/lib/phone/digits';
 import { phoneCountries, searchCountries, type PhoneCountry } from '@/lib/phone/countries';
 import {
   DEFAULT_COUNTRY,
-  E164_MAX_DIGITS,
+  MAX_INPUT_DIGITS,
   callingCodeOf,
   displayNational,
   exampleNational,
-  fromE164,
   splitInternational,
+  stateFromValue,
   toE164,
   type CountryCode,
 } from '@/lib/phone/phone';
@@ -87,13 +87,15 @@ export function InternationalPhoneInput({
   const locale = useLocale() === 'en' ? 'en' : 'ar';
   const countries = React.useMemo(() => phoneCountries(locale), [locale]);
 
-  const initial = React.useMemo(() => fromE164(value), []);
-  const [country, setCountry] = React.useState<CountryCode>(initial?.country ?? defaultCountry);
-  const [national, setNational] = React.useState(initial?.national ?? '');
-  const [keptNote, setKeptNote] = React.useState(false);
+  const initial = React.useMemo(() => stateFromValue(value, defaultCountry), []);
+  const [country, setCountry] = React.useState<CountryCode>(initial.country);
+  const [national, setNational] = React.useState(initial.national);
+  /** تنبيه غير مانع: `kept` الرقم بقي بعد تغيير الدولة · `legacy` قيمة محفوظة بصيغة محلية. */
+  const [note, setNote] = React.useState<'kept' | 'legacy' | null>(initial.legacy && value ? 'legacy' : null);
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
   const [active, setActive] = React.useState(0);
+  const focusSearchOnOpen = React.useRef(false);
 
   const lastEmitted = React.useRef(value);
   const rootRef = React.useRef<HTMLDivElement>(null);
@@ -101,19 +103,23 @@ export function InternationalPhoneInput({
   const searchRef = React.useRef<HTMLInputElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const listRef = React.useRef<HTMLUListElement>(null);
+  const panelRef = React.useRef<HTMLDivElement>(null);
   const listId = `${id}-countries`;
 
   // قيمة خارجية جديدة (إعادة ضبط النموذج أو تحميل بيانات) تُعاد إلى الحالة الداخلية.
+  // الدولة الحالية تُفضَّل عند مفتاح مشترك (+1…) فلا تنقلب كندا إلى أمريكا لمجرد إعادة قراءة القيمة.
   React.useEffect(() => {
     if (value === lastEmitted.current) return;
     lastEmitted.current = value;
-    const next = fromE164(value);
-    if (next) {
-      setCountry(next.country);
-      setNational(next.national);
-    } else if (!value) {
+    if (!value) {
       setNational('');
+      setNote(null);
+      return;
     }
+    const next = stateFromValue(value, country);
+    setCountry(next.country);
+    setNational(next.national);
+    setNote(next.legacy ? 'legacy' : null);
   }, [value]);
 
   const emit = React.useCallback(
@@ -126,15 +132,14 @@ export function InternationalPhoneInput({
   );
 
   const cc = callingCodeOf(country);
-  const maxNational = E164_MAX_DIGITS - cc.length;
   const selected = countries.find((c) => c.code === country);
   const placeholder = React.useMemo(() => exampleNational(country), [country]);
 
   function handleNationalChange(raw: string) {
-    setKeptNote(false);
+    setNote(null);
     const text = normalizePhoneText(raw);
     if (text.startsWith('+')) {
-      // لصق/كتابة رقم دولي: تُحدَّد الدولة من رمزه ويبقى الحقل رقماً وطنياً بلا تكرار للمفتاح.
+      // رقم دولي (لصق أو كتابة): الدولة من رمزه، والحقل رقم وطني بلا تكرار للمفتاح.
       const split = splitInternational(text, country);
       if (split) {
         setCountry(split.country);
@@ -142,17 +147,14 @@ export function InternationalPhoneInput({
         emit(split.country, split.national);
         return;
       }
-      // «+» وحدها أو رمز غير معروف: لا تغيير في الحقل.
-      if (text.length <= 1) {
-        setNational('');
-        emit(country, '');
-      }
+      // رمز الدولة لم يكتمل بعد («+» أو «+9» أو «+97»): يبقى النص ظاهراً كما كُتب، وتُحدَّد الدولة عند اكتماله.
+      const pending = text.slice(0, MAX_INPUT_DIGITS + 1);
+      setNational(pending);
+      lastEmitted.current = pending;
+      onChange(pending);
       return;
     }
-    const allDigits = digitsOnly(text);
-    // الصفر البادئ بادئة وطنية (05…) لا يُحتسب من طول E.164.
-    const digits = allDigits.slice(0, allDigits.startsWith('0') ? maxNational + 1 : maxNational);
-    const shown = displayNational(digits, country);
+    const shown = displayNational(digitsOnly(text).slice(0, MAX_INPUT_DIGITS), country);
     setNational(shown);
     emit(country, shown);
   }
@@ -162,19 +164,20 @@ export function InternationalPhoneInput({
     setQuery('');
     if (next.code !== country) {
       setCountry(next.code);
-      const kept = digitsOnly(national);
-      const trimmed = kept.slice(0, E164_MAX_DIGITS - next.dial.length + (kept.startsWith('0') ? 1 : 0));
-      setNational(trimmed);
-      emit(next.code, trimmed);
-      setKeptNote(trimmed.length > 0);
+      // رمز دولي قيد الكتابة يبقى كما هو (لا يُحوَّل إلى رقم وطني بصمت)؛ وغير ذلك يبقى الرقم المكتوب كاملاً بلا اقتطاع.
+      if (!national.startsWith('+')) {
+        emit(next.code, national);
+        setNote(national && next.dial !== cc ? 'kept' : null);
+      }
     }
     inputRef.current?.focus();
   }
 
   const filtered = React.useMemo(() => searchCountries(countries, query), [countries, query]);
 
-  function openList() {
+  function openList(viaKeyboard = false) {
     if (disabled) return;
+    focusSearchOnOpen.current = viaKeyboard;
     setQuery('');
     const idx = countries.findIndex((c) => c.code === country);
     setActive(Math.max(idx, 0));
@@ -191,7 +194,10 @@ export function InternationalPhoneInput({
   React.useEffect(() => {
     if (!open) return;
     const finePointer = typeof window !== 'undefined' && window.matchMedia?.('(pointer: fine)').matches;
-    if (finePointer) searchRef.current?.focus();
+    // الفتح بلوحة المفاتيح (Enter/Space/↓) يُركّز البحث دائماً كي تعمل الأسهم؛ باللمس لا تغطي لوحة المفاتيح القائمة.
+    if (finePointer || focusSearchOnOpen.current) searchRef.current?.focus({ preventScroll: true });
+    // اللوحة تظهر كاملة في الشاشة (الجوال: الحقل قرب أسفل الصفحة فتبقى القائمة مقطوعة تحت الحافة).
+    panelRef.current?.scrollIntoView?.({ block: 'nearest' });
   }, [open]);
 
   // الصف النشط يبقى ظاهراً.
@@ -258,11 +264,11 @@ export function InternationalPhoneInput({
           ref={triggerRef}
           type="button"
           disabled={disabled}
-          onClick={() => (open ? closeList(false) : openList())}
+          onClick={(e) => (open ? closeList(false) : openList(e.detail === 0))}
           onKeyDown={(e) => {
             if (e.key === 'ArrowDown' && !open) {
               e.preventDefault();
-              openList();
+              openList(true);
             }
           }}
           aria-haspopup="listbox"
@@ -302,21 +308,20 @@ export function InternationalPhoneInput({
         />
       </div>
 
-      {keptNote ? (
-        <p className="mt-1.5 text-xs text-muted" role="status" data-testid="phone-kept-note">
-          {t('kept_note')}
+      {note ? (
+        <p className="mt-1.5 text-xs text-muted" role="status" data-testid={note === 'kept' ? 'phone-kept-note' : 'phone-legacy-note'}>
+          {note === 'kept' ? t('kept_note') : t('legacy_note')}
         </p>
       ) : null}
 
       {open ? (
-        <div className="absolute inset-x-0 top-full z-50 mt-1.5 overflow-hidden rounded-xl border border-border bg-surface shadow-lg" data-testid="phone-country-panel">
+        <div ref={panelRef} className="absolute inset-x-0 top-full z-50 mt-1.5 overflow-hidden rounded-xl border border-border bg-surface shadow-lg" data-testid="phone-country-panel">
           <div className="relative border-b border-border p-2">
             <Search className="pointer-events-none absolute start-5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true" />
             <input
               ref={searchRef}
               type="text"
               role="combobox"
-              dir="auto"
               inputMode="search"
               enterKeyHint="search"
               autoComplete="off"
@@ -337,9 +342,12 @@ export function InternationalPhoneInput({
               className="h-11 w-full rounded-lg border border-border bg-background ps-9 pe-3 text-base text-text placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             />
           </div>
+          <p className="sr-only" role="status" aria-live="polite" data-testid="phone-results-status">
+            {filtered.length === 0 ? t('empty') : t('results', { count: String(filtered.length) })}
+          </p>
           <ul ref={listRef} id={listId} role="listbox" aria-label={t('country_label')} className="max-h-64 overflow-y-auto overscroll-contain py-1">
             {filtered.length === 0 ? (
-              <li role="presentation" className="px-3 py-6 text-center text-sm text-muted">
+              <li role="presentation" aria-hidden="true" className="px-3 py-6 text-center text-sm text-muted">
                 {t('empty')}
               </li>
             ) : (

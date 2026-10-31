@@ -1,4 +1,4 @@
-import { allCountries, callingCodeOf, type CountryCode } from './phone';
+import { allCountries, callingCodeOf, mainCountryFor, type CountryCode } from './phone';
 import { toEnglishDigits } from './digits';
 
 export interface PhoneCountry {
@@ -72,7 +72,9 @@ export function searchCountries(list: PhoneCountry[], query: string): PhoneCount
   const dialQuery = q.replace(/^(\+|00)/, '');
   if (/^\d+$/.test(dialQuery) && dialQuery.length > 0) {
     const byDial = list.filter((c) => c.dial.startsWith(dialQuery));
-    const exact = byDial.filter((c) => c.dial === dialQuery);
+    // مفتاح مشترك (+1 …): الدولة الرئيسية للمفتاح أولاً ثم بقية أصحابه بالترتيب الأبجدي.
+    const main = mainCountryFor(dialQuery);
+    const exact = byDial.filter((c) => c.dial === dialQuery).sort((a, b) => Number(b.code === main) - Number(a.code === main));
     return [...exact, ...byDial.filter((c) => c.dial !== dialQuery)];
   }
   const scored: Array<{ c: PhoneCountry; score: number }> = [];

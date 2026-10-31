@@ -1,7 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import { digitsOnly, normalizePhoneText, toEnglishDigits } from '../digits';
 import { phoneCountries, searchCountries } from '../countries';
-import { displayNational, fromE164, isValidE164, splitInternational, toE164, exampleNational } from '../phone';
+import { getExampleNumber } from 'libphonenumber-js/core';
+import metadata from 'libphonenumber-js/metadata.max.json';
+import examples from 'libphonenumber-js/examples.mobile.json';
+import {
+  displayNational,
+  exampleNational,
+  fromE164,
+  isPendingInternational,
+  isValidE164,
+  mainCountryFor,
+  splitInternational,
+  stateFromValue,
+  toE164,
+  type CountryCode,
+} from '../phone';
+
+const exampleE164 = (code: string): string | null => {
+  try {
+    return getExampleNumber(code as CountryCode, examples, metadata as never)?.number ?? null;
+  } catch {
+    return null;
+  }
+};
 
 describe('digit normalisation (English 0-9 only)', () => {
   it('converts Arabic-Indic, Persian and full-width digits', () => {
@@ -127,5 +149,103 @@ describe('country list and search', () => {
   it('gives a mobile example placeholder in English digits', () => {
     expect(exampleNational('SA')).toMatch(/^[0-9 ()\-]+$/);
     expect(exampleNational('SA').length).toBeGreaterThan(5);
+  });
+});
+
+describe('shared calling codes (+1, +7, +44, …)', () => {
+  const byCode = new Map<string, string[]>();
+  for (const c of phoneCountries('en')) byCode.set(c.dial, [...(byCode.get(c.dial) ?? []), c.code]);
+  const shared = [...byCode.entries()].filter(([, list]) => list.length > 1);
+
+  it('finds a real set of shared codes, including NANP', () => {
+    expect(shared.length).toBeGreaterThan(8);
+    const nanp = byCode.get('1')!;
+    expect(nanp).toEqual(expect.arrayContaining(['US', 'CA']));
+  });
+
+  it.each(shared.map(([code, list]) => [code, list] as const))('+%s: a partial code keeps the selected country and the main one is the fallback', (code, list) => {
+    expect(mainCountryFor(code)).not.toBeNull();
+    expect(list).toContain(mainCountryFor(code));
+    for (const c of list) {
+      expect(splitInternational(`+${code}`, c as CountryCode)?.country, `${c} preferred for +${code}`).toBe(c);
+    }
+    expect(splitInternational(`+${code}`)?.country).toBe(mainCountryFor(code));
+  });
+
+  it('every selectable country with a mobile example survives paste → split → rebuild with the SAME E.164 (no silent change)', () => {
+    let checked = 0;
+    for (const c of phoneCountries('en')) {
+      const example = exampleE164(c.code);
+      if (!example) continue;
+      const split = splitInternational(example, c.code);
+      expect(split, c.code).not.toBeNull();
+      expect(toE164(split!.national, split!.country), `${c.code} ${example}`).toBe(example);
+      expect(isValidE164(example), `${c.code} example is a valid mobile`).toBe(true);
+      checked += 1;
+    }
+    expect(checked).toBeGreaterThan(200);
+  });
+
+  it('a pasted valid number resolves to the country it truly belongs to, not the previously selected sibling', () => {
+    // كندا (416) تُلصق وأمريكا مختارة ← كندا؛ وأمريكا (202) وكندا مختارة ← أمريكا؛ الرقم نفسه لا يتغيّر.
+    expect(splitInternational('+14162345678', 'US')).toEqual({ country: 'CA', national: '4162345678' });
+    expect(splitInternational('+12025550123', 'CA')).toEqual({ country: 'US', national: '2025550123' });
+    // أرقام +44: النطاقات تتداخل بين المملكة المتحدة والجزر التابعة في بيانات libphonenumber نفسها (مثلاً مثال جزيرة مان يُحسم GB)،
+    // فالضمان المطلوب: الدولة ضمن أصحاب المفتاح والرقم E.164 لا يتغيّر مهما كانت الدولة المختارة سابقاً.
+    const siblings: CountryCode[] = ['GB', 'JE', 'GG', 'IM'];
+    for (const own of siblings) {
+      const number = exampleE164(own)!;
+      for (const selected of siblings) {
+        const split = splitInternational(number, selected)!;
+        expect(siblings, `${number} pasted while ${selected} is selected`).toContain(split.country);
+        expect(toE164(split.national, split.country)).toBe(number);
+      }
+    }
+    for (const own of ['JE', 'GG'] as CountryCode[]) {
+      expect(splitInternational(exampleE164(own)!, 'GB')?.country).toBe(own);
+    }
+  });
+
+  it('an invalid or partial number never flips the user-selected sibling', () => {
+    expect(splitInternational('+1416', 'CA')?.country).toBe('CA');
+    expect(splitInternational('+1555', 'CA')?.country).toBe('CA');
+    expect(splitInternational('+7', 'KZ')?.country).toBe('KZ');
+    expect(splitInternational('+7', 'SA')?.country).toBe('RU');
+  });
+
+  it('restoring a saved value keeps the sibling the caller prefers when the number alone cannot tell', () => {
+    expect(stateFromValue('+1416', 'CA')).toEqual({ country: 'CA', national: '416', legacy: false });
+    expect(stateFromValue('+14162345678', 'US').country).toBe('CA');
+  });
+
+  it('searching a shared code lists the main country first, then the siblings alphabetically', () => {
+    const list = phoneCountries('en');
+    const hits = searchCountries(list, '+1');
+    expect(hits[0].code).toBe('US');
+    expect(hits.slice(0, byCode.get('1')!.length).map((c) => c.code).sort()).toEqual([...byCode.get('1')!].sort());
+    expect(searchCountries(list, '+7')[0].code).toBe('RU');
+    expect(searchCountries(list, '+44')[0].code).toBe('GB');
+  });
+});
+
+describe('saved values and in-progress input', () => {
+  it('a legacy local value is shown as typed and flagged, never re-interpreted as a country', () => {
+    expect(stateFromValue('0500000000', 'SA')).toEqual({ country: 'SA', national: '0500000000', legacy: true });
+    expect(stateFromValue('٠٥٠٠٠٠٠٠٠٠', 'SA').national).toBe('0500000000');
+    expect(stateFromValue('', 'SA')).toEqual({ country: 'SA', national: '', legacy: false });
+  });
+
+  it('an incomplete calling code is pending, a complete one is not', () => {
+    expect(isPendingInternational('+')).toBe(true);
+    expect(isPendingInternational('+9')).toBe(true);
+    expect(isPendingInternational('+97')).toBe(true);
+    expect(isPendingInternational('+971')).toBe(false);
+    expect(isPendingInternational('0501234567')).toBe(false);
+  });
+
+  it('does not truncate an over-long pasted number silently', () => {
+    const split = splitInternational('+9665123456789012345678');
+    expect(split?.national).toBe('5123456789012345678');
+    expect(isValidE164(toE164(split!.national, split!.country))).toBe(false);
   });
 });

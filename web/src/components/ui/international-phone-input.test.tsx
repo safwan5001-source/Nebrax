@@ -8,6 +8,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import arMessages from '@/messages/ar.json';
 import enMessages from '@/messages/en.json';
+import { isValidE164 } from '@/lib/phone/phone';
 import { InternationalPhoneInput } from './international-phone-input';
 
 afterEach(() => cleanup());
@@ -110,7 +111,7 @@ describe('InternationalPhoneInput', () => {
     expect((search as HTMLInputElement).value).toBe('+٩٦٧'); // ما كتبه المستخدم؛ التطبيع للمطابقة فقط
     await user.clear(search);
     await user.type(search, 'zzzz');
-    expect(screen.getByText(arMessages.phoneInput.empty)).toBeTruthy();
+    expect(screen.getAllByText(arMessages.phoneInput.empty).length).toBeGreaterThan(0);
   });
 
   it('converts Arabic and Persian digits typed into the field to English', async () => {
@@ -230,11 +231,12 @@ describe('InternationalPhoneInput', () => {
     expect(rerender).toBeTypeOf('function');
   });
 
-  it('caps the length at the E.164 maximum', async () => {
+  it('never silently truncates an over-long number: it stays visible and is simply invalid', async () => {
     const user = userEvent.setup();
     mount();
     await user.type(input(), '5'.repeat(30));
-    expect(e164()!.replace('+', '').length).toBeLessThanOrEqual(15);
+    expect(input().value).toBe('5'.repeat(20)); // سقف أمان للإدخال، لا اقتطاعاً إلى رقم يبدو صالحاً
+    expect(isValidE164(e164()!)).toBe(false);
   });
 
   it('is LTR in both RTL and LTR UIs, and uses English digits in both', () => {
@@ -252,6 +254,231 @@ describe('InternationalPhoneInput', () => {
     fireEvent.error(trigger().querySelector('img')!);
     expect(trigger().querySelector('img')).toBeNull();
     expect(dial()).toBe('+966');
+  });
+});
+
+describe('typing an international number character by character (Codex P2)', () => {
+  it('+971501234567 typed key by key switches Saudi → UAE and produces the right E.164', async () => {
+    const user = userEvent.setup();
+    mount();
+    await user.type(input(), '+971501234567');
+    expect(flagOf()).toBe('AE');
+    expect(dial()).toBe('+971');
+    expect(input().value).toBe('501234567');
+    expect(e164()).toBe('+971501234567');
+  });
+
+  it('keeps the incomplete prefix visible until the calling code is known', async () => {
+    const user = userEvent.setup();
+    mount();
+    await user.type(input(), '+97');
+    expect(input().value).toBe('+97');
+    expect(flagOf()).toBe('SA'); // لم يُحسم بعد
+    expect(e164()).toBe('+97');
+    await user.type(input(), '1');
+    expect(input().value).toBe('');
+    expect(flagOf()).toBe('AE');
+    expect(e164()).toBe(''); // رمز الدولة وحده ليس رقماً بعد
+  });
+
+  it('a lone + stays visible instead of vanishing', async () => {
+    const user = userEvent.setup();
+    mount();
+    await user.type(input(), '+');
+    expect(input().value).toBe('+');
+    await user.type(input(), '2');
+    expect(input().value).toBe('+2');
+    await user.type(input(), '0');
+    expect(flagOf()).toBe('EG');
+    expect(input().value).toBe('');
+  });
+
+  it('the 00 prefix works key by key too', async () => {
+    const user = userEvent.setup();
+    mount();
+    await user.type(input(), '00971501234567');
+    expect(flagOf()).toBe('AE');
+    expect(input().value).toBe('501234567');
+    expect(e164()).toBe('+971501234567');
+  });
+
+  it('Arabic digits typed after + are converted and still resolve the country', async () => {
+    const user = userEvent.setup();
+    mount();
+    await user.type(input(), '+٩٦٧٧١٢٣٤٥٦٧٨');
+    expect(flagOf()).toBe('YE');
+    expect(input().value).toBe('712345678');
+    expect(e164()).toBe('+967712345678');
+    expect(document.body.textContent).not.toMatch(/[\u0660-\u0669\u06f0-\u06f9]/);
+  });
+
+  it('changing the country while a prefix is still pending does not rewrite what was typed', async () => {
+    const user = userEvent.setup();
+    mount('ar');
+    await user.type(input(), '+97');
+    await pick(user, 'مصر', 'EG');
+    expect(input().value).toBe('+97');
+    expect(e164()).toBe('+97');
+  });
+
+  it('a country change never truncates the typed digits', async () => {
+    const user = userEvent.setup();
+    mount('ar');
+    await pick(user, 'الولايات المتحدة', 'US');
+    await user.type(input(), '2345678901234'); // 13 رقماً: أطول من أي رقم وطني، تبقى كاملة
+    expect(input().value).toBe('2345678901234');
+    await pick(user, 'السعودية', 'SA');
+    expect(input().value).toBe('2345678901234');
+  });
+});
+
+describe('shared calling codes and saved values (+1, legacy)', () => {
+  function direct(value: string, defaultCountry?: 'US' | 'CA' | 'SA', locale: 'ar' | 'en' = 'en') {
+    const onChange = vi.fn();
+    const messages = locale === 'ar' ? arMessages : enMessages;
+    const ui = (v: string) => (
+      <NextIntlClientProvider locale={locale} messages={messages as never}>
+        <label htmlFor="ph">Phone</label>
+        <InternationalPhoneInput id="ph" value={v} onChange={onChange} defaultCountry={defaultCountry} />
+      </NextIntlClientProvider>
+    );
+    const view = render(ui(value));
+    return { onChange, rerender: (v: string) => view.rerender(ui(v)) };
+  }
+
+  it('US ↔ CA: switching keeps the very same E.164 and shows no "kept" note', async () => {
+    const user = userEvent.setup();
+    mount('en');
+    await pick(user, 'united states', 'US');
+    await user.type(input(), '2025550123');
+    expect(e164()).toBe('+12025550123');
+    await pick(user, 'canada', 'CA');
+    expect(flagOf()).toBe('CA');
+    expect(dial()).toBe('+1');
+    expect(input().value).toBe('2025550123');
+    expect(e164()).toBe('+12025550123');
+    expect(screen.queryByTestId('phone-kept-note')).toBeNull();
+  });
+
+  it('searching +1 lists the United States first and Canada among its siblings', async () => {
+    const user = userEvent.setup();
+    mount('en');
+    await user.click(trigger());
+    await user.type(screen.getByRole('combobox'), '+1');
+    const codes = [...document.querySelectorAll('[role="option"]')].map((o) => o.getAttribute('data-country'));
+    expect(codes[0]).toBe('US');
+    expect(codes).toContain('CA');
+  });
+
+  it('pasting a Canadian number while the United States is selected selects Canada without changing the number', async () => {
+    const user = userEvent.setup();
+    mount('en');
+    await pick(user, 'united states', 'US');
+    input().focus();
+    await user.paste('+1 416 234 5678');
+    expect(flagOf()).toBe('CA');
+    expect(e164()).toBe('+14162345678');
+    expect(input().value).toBe('4162345678');
+  });
+
+  it('typing just +1 while Canada is selected keeps Canada', async () => {
+    const user = userEvent.setup();
+    mount('en');
+    await pick(user, 'canada', 'CA');
+    await user.type(input(), '+1');
+    expect(flagOf()).toBe('CA');
+    expect(input().value).toBe('');
+  });
+
+  it('restores a saved +1 number to the country it belongs to, and a partial one to the caller default', () => {
+    direct('+14162345678', 'US');
+    expect(flagOf()).toBe('CA');
+    cleanup();
+    direct('+1416', 'CA');
+    expect(flagOf()).toBe('CA');
+    expect(input().value).toBe('416');
+  });
+
+  it('an external re-set of the same shared-code number does not flip the selected sibling', () => {
+    const { rerender } = direct('+1416', 'CA');
+    rerender('+14165');
+    expect(flagOf()).toBe('CA');
+    expect(input().value).toBe('4165');
+  });
+
+  it('restoring a legacy local value shows it unchanged with a note, guesses no country and emits nothing', async () => {
+    const user = userEvent.setup();
+    const { onChange } = direct('0500000000', 'SA', 'ar');
+    expect(input().value).toBe('0500000000');
+    expect(screen.getByTestId('phone-legacy-note').textContent).toBe(arMessages.phoneInput.legacy_note);
+    expect(onChange).not.toHaveBeenCalled();
+    // التعديل الصريح فقط يحوّله إلى E.164 تحت الدولة المختارة.
+    await user.type(input(), '1');
+    expect(onChange).toHaveBeenLastCalledWith('+96650000000' + '01');
+    expect(screen.queryByTestId('phone-legacy-note')).toBeNull();
+  });
+
+  it('a legacy value written with Arabic digits is shown with English digits', () => {
+    direct('٠٥٠٠٠٠٠٠٠٠', 'SA', 'ar');
+    expect(input().value).toBe('0500000000');
+  });
+});
+
+describe('keyboard and accessibility', () => {
+  it('opening with the keyboard focuses the search so the arrows work, then Enter picks and returns focus to the number', async () => {
+    const user = userEvent.setup();
+    mount('en');
+    trigger().focus();
+    await user.keyboard('{ArrowDown}');
+    expect(document.activeElement).toBe(screen.getByRole('combobox'));
+    await user.keyboard('egypt');
+    expect(screen.getByRole('combobox').getAttribute('aria-activedescendant')).toBe('ph-opt-EG');
+    await user.keyboard('{Enter}');
+    expect(flagOf()).toBe('EG');
+    expect(document.activeElement).toBe(input());
+  });
+
+  it('ArrowDown/ArrowUp/Home/End move the active option', async () => {
+    const user = userEvent.setup();
+    mount('en');
+    trigger().focus();
+    await user.keyboard('{ArrowDown}');
+    const search = screen.getByRole('combobox');
+    const options = () => [...document.querySelectorAll('[role="option"]')];
+    await user.keyboard('{Home}');
+    expect(search.getAttribute('aria-activedescendant')).toBe(options()[0].id);
+    await user.keyboard('{End}');
+    expect(search.getAttribute('aria-activedescendant')).toBe(options().at(-1)!.id);
+    await user.keyboard('{ArrowUp}');
+    expect(search.getAttribute('aria-activedescendant')).toBe(options().at(-2)!.id);
+  });
+
+  it('announces the result count politely, in English digits in both languages', async () => {
+    for (const locale of ['ar', 'en'] as const) {
+      cleanup();
+      const user = userEvent.setup();
+      mount(locale);
+      await user.click(trigger());
+      const status = screen.getByTestId('phone-results-status');
+      expect(status.getAttribute('aria-live')).toBe('polite');
+      expect(status.textContent).toMatch(/^[0-9]+ /);
+      expect(status.textContent).not.toMatch(/[\u0660-\u0669\u06f0-\u06f9]/);
+      await user.type(screen.getByRole('combobox'), 'zzzz');
+      expect(screen.getByTestId('phone-results-status').textContent).toBe(
+        locale === 'ar' ? arMessages.phoneInput.empty : enMessages.phoneInput.empty,
+      );
+    }
+  });
+
+  it('exposes a listbox with named options and a labelled search field', async () => {
+    const user = userEvent.setup();
+    mount('en');
+    await user.click(trigger());
+    expect(screen.getByRole('combobox').getAttribute('aria-label')).toBe(enMessages.phoneInput.search_label);
+    expect(screen.getByRole('listbox').getAttribute('aria-label')).toBe(enMessages.phoneInput.country_label);
+    for (const option of [...document.querySelectorAll('[role="option"]')].slice(0, 5)) {
+      expect(option.textContent!.trim().length).toBeGreaterThan(0);
+    }
   });
 });
 

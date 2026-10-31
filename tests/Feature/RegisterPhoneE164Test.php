@@ -8,8 +8,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * INTL-PHONE-V1 — جوال التسجيل يُحفظ بصيغة E.164 بأرقام إنجليزية فقط.
- * الواجهة ترسل E.164؛ الخادم يطبّع الأرقام العربية/الفارسية والمسافات ويرفض ما ليس E.164.
+ * INTL-PHONE-V1 — جوال التسجيل: الواجهة ترسل E.164؛ الخادم يطبّع الأرقام العربية/الفارسية ويفحص شكل E.164
+ * للقيم الدولية (`+…`) فقط، ويُبقي الأرقام المحلية القديمة كما كانت (توافق رجعي، بلا تخمين دولة).
  */
 class RegisterPhoneE164Test extends TestCase
 {
@@ -55,19 +55,41 @@ class RegisterPhoneE164Test extends TestCase
     }
 
     /** @test */
-    public function it_normalises_arabic_and_persian_digits_spaces_and_double_zero(): void
+    public function it_normalises_arabic_and_persian_digits_and_separators_of_international_numbers(): void
     {
         $this->postJson('/api/register', $this->payload('phone-ar', '+٩٦٦ ٥١ ٢٣٤ ٥٦٧٨'))->assertCreated();
-        $this->assertSame('+966512345678', User::withoutGlobalScopes()->where('email', 'owner@phone-ar.test')->value('phone'));
+        $this->assertSame('+966512345678', $this->storedPhone('phone-ar'));
 
-        $this->postJson('/api/register', $this->payload('phone-fa', '۰۰۹۷۱ ۵۰ ۱۲۳ ۴۵۶۷'))->assertCreated();
-        $this->assertSame('+971501234567', User::withoutGlobalScopes()->where('email', 'owner@phone-fa.test')->value('phone'));
+        $this->postJson('/api/register', $this->payload('phone-fa', "\u{200E}＋۹۷۱ (۵۰) ۱۲۳-۴۵۶۷"))->assertCreated();
+        $this->assertSame('+971501234567', $this->storedPhone('phone-fa'));
+    }
+
+    /**
+     * Regression (PlatformTenantManagementTest): الرقم المحلي القديم كان مقبولاً ويُخزَّن حرفياً.
+     * الخادم لا يعرف دولة الرقم المحلي فلا يخمّنها ولا يضيف +966 ولا يرفضه.
+     *
+     * @test
+     */
+    public function a_legacy_local_number_is_still_accepted_and_stored_verbatim(): void
+    {
+        foreach (['0500000000' => '0500000000', '500000000' => '500000000', '00971501234567' => '00971501234567'] as $sent => $expected) {
+            $slug = 'legacy-' . $sent;
+            $this->postJson('/api/register', $this->payload($slug, $sent))->assertCreated();
+            $this->assertSame($expected, $this->storedPhone($slug), "legacy value {$sent} must not be re-interpreted");
+        }
     }
 
     /** @test */
-    public function it_rejects_numbers_that_are_not_e164(): void
+    public function a_legacy_local_number_still_gets_english_digits_only(): void
     {
-        foreach (['0512345678', '512345678', '+0123456789', '+966', '+96651234567890123', 'abc', '+966 5x'] as $i => $phone) {
+        $this->postJson('/api/register', $this->payload('legacy-ar', '٠٥٠٠٠٠٠٠٠٠'))->assertCreated();
+        $this->assertSame('0500000000', $this->storedPhone('legacy-ar'));
+    }
+
+    /** @test */
+    public function it_rejects_malformed_international_numbers(): void
+    {
+        foreach (['+0123456789', '+966', '+123456', '+96651234567890123', '+966 5x', '+abc'] as $i => $phone) {
             $this->postJson('/api/register', $this->payload("bad-{$i}", $phone))
                 ->assertStatus(422)->assertJsonValidationErrors(['phone']);
         }
@@ -78,12 +100,20 @@ class RegisterPhoneE164Test extends TestCase
     {
         $this->postJson('/api/register', $this->payload('nophone', null, false))->assertCreated();
         $this->postJson('/api/register', $this->payload('blankphone', '  '))->assertCreated();
+        $this->assertNull($this->storedPhone('blankphone'));
     }
 
     /** @test */
-    public function normalize_helper_is_deterministic(): void
+    public function normalize_helper_is_deterministic_and_never_guesses_a_country(): void
     {
         $this->assertSame('+966512345678', RegisterRequest::normalizePhone("\u{200E}+966 512-345-678"));
+        $this->assertSame('0512345678', RegisterRequest::normalizePhone('0512345678'));
+        $this->assertSame('00966512345678', RegisterRequest::normalizePhone('00966512345678'));
         $this->assertNull(RegisterRequest::normalizePhone('   '));
+    }
+
+    private function storedPhone(string $slug): ?string
+    {
+        return User::withoutGlobalScopes()->where('email', "owner@{$slug}.test")->value('phone');
     }
 }

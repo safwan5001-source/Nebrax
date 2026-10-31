@@ -20,6 +20,8 @@ export type { CountryCode };
 export const DEFAULT_COUNTRY: CountryCode = 'SA';
 /** أقصى طول للرقم الدولي (رمز الدولة + الرقم الوطني) بحسب E.164. */
 export const E164_MAX_DIGITS = 15;
+/** سقف أمان لما يُقبل كتابةً/لصقاً في الحقل (أعلى من E.164 عمداً فلا يُقتطع رقم طويل بصمت؛ التحقق يرفضه). */
+export const MAX_INPUT_DIGITS = 20;
 
 const meta = metadata as unknown as Parameters<typeof getCountries>[0];
 const callingCodeTable = (metadata as unknown as { country_calling_codes: Record<string, CountryCode[]> }).country_calling_codes;
@@ -101,7 +103,8 @@ export function splitInternational(
   const sharedWithPreferred = preferred && callingCodeOf(preferred) === code;
   const country = parsed?.country ?? (sharedWithPreferred ? preferred! : mainCountryFor(code));
   if (!country) return null;
-  return { country, national: digits.slice(code.length).slice(0, E164_MAX_DIGITS - code.length) };
+  // لا اقتطاع صامت: رقم أطول من E.164 يبقى كما أُدخل ويُرفض بالتحقق.
+  return { country, national: digits.slice(code.length) };
 }
 
 /**
@@ -116,13 +119,36 @@ export function displayNational(digits: string, country: CountryCode): string {
   return digits;
 }
 
-/** يفكّ قيمة E.164 مخزَّنة إلى حالة المكوّن. قيمة غير معروفة ⇒ null. */
-export function fromE164(value: string): { country: CountryCode; national: string } | null {
+/** يفكّ قيمة E.164 مخزَّنة إلى حالة المكوّن. قيمة غير دولية/غير معروفة ⇒ null (لا تخمين دولة). */
+export function fromE164(value: string, preferred?: CountryCode): { country: CountryCode; national: string } | null {
   if (!value) return null;
-  const parsed = parse(value.startsWith('+') ? value : `+${digitsOnly(value)}`);
-  if (!parsed) return splitInternational(value.startsWith('+') ? value : `+${value}`);
-  const country = parsed.country ?? mainCountryFor(parsed.countryCallingCode);
-  return country ? { country, national: parsed.nationalNumber } : null;
+  return splitInternational(value.trim().startsWith('+') ? value : `+${digitsOnly(value)}`, preferred);
+}
+
+export interface PhoneFieldState {
+  country: CountryCode;
+  national: string;
+  /** قيمة محفوظة ليست E.164 مفهوماً (رقم محلي قديم): تُعرض كما هي ولا يُخمَّن لها بلد ولا تُرسَل قبل تعديل المستخدم. */
+  legacy: boolean;
+}
+
+/**
+ * حالة الحقل من قيمة مُسلَّمة من الخارج (استرجاع محفوظ/إعادة ضبط).
+ * E.164 مفهوم ⇒ دولته ورقمه الوطني؛ وإلا يبقى النص كما هو (أرقام إنجليزية) تحت `preferred` بوسم `legacy`.
+ */
+export function stateFromValue(value: string, preferred: CountryCode): PhoneFieldState {
+  const text = normalizePhoneText(value);
+  if (!text) return { country: preferred, national: '', legacy: false };
+  if (text.startsWith('+')) {
+    const split = splitInternational(text, preferred);
+    if (split) return { ...split, legacy: false };
+  }
+  return { country: preferred, national: text, legacy: true };
+}
+
+/** هل النص «دولي قيد الكتابة» لم يكتمل رمز دولته بعد (+ ثم أرقام لا تطابق رمزاً)؟ */
+export function isPendingInternational(text: string): boolean {
+  return text.startsWith('+') && splitInternational(text) === null;
 }
 
 /** مثال رقم جوال محلي للدولة (أرقام إنجليزية) لاستعماله placeholder، أو ''. */

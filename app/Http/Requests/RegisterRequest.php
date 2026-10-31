@@ -26,9 +26,12 @@ class RegisterRequest extends FormRequest
     }
 
     /**
-     * يطبّع الجوال إلى أرقام إنجليزية 0–9 بلا مسافات/فواصل/علامات اتجاه، مع تحويل `00` البادئة إلى `+`.
-     * الواجهة ترسل E.164 أصلاً؛ هذا يحمي من عملاء API يرسلون أرقاماً عربية/فارسية أو مسافات.
-     * فارغ ⇒ null (الحقل اختياري كما كان).
+     * يطبّع الجوال دون تخمين دولة:
+     *  - كل رقم عربي/فارسي يُحوَّل إلى 0–9 (قاعدة «أرقام إنجليزية فقط» تسري على كل ما يُحفظ)، وتُزال علامات الاتجاه غير المرئية.
+     *  - إن بدأ بـ`+` فهو دولي: تُزال المسافات والفواصل والأقواس ليُفحص E.164 (انظر `phoneRule`).
+     *  - غير ذلك (رقم محلي قديم مثل 0500000000) يبقى حرفياً كما أُرسل — **لا يُضاف له رمز دولة ولا يُعاد تفسيره**؛
+     *    كان مقبولاً قبل INTL-PHONE-V1 ويعتمد عليه مستهلكو API القائمون (PlatformTenantManagementTest).
+     *  فارغ ⇒ null (الحقل اختياري كما كان).
      */
     public static function normalizePhone(string $phone): ?string
     {
@@ -37,12 +40,29 @@ class RegisterRequest extends FormRequest
             '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4', '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
             '＋' => '+',
         ]);
-        $phone = preg_replace('/[\x{200B}\x{200E}\x{200F}\x{061C}\x{202A}-\x{202E}\x{2066}-\x{2069}\x{FEFF}\s\-().]+/u', '', $phone) ?? '';
-        if (str_starts_with($phone, '00')) {
-            $phone = '+' . substr($phone, 2);
+        $phone = trim(preg_replace('/[\x{200B}\x{200E}\x{200F}\x{061C}\x{202A}-\x{202E}\x{2066}-\x{2069}\x{FEFF}]+/u', '', $phone) ?? '');
+        if ($phone === '') {
+            return null;
+        }
+        if (str_starts_with($phone, '+')) {
+            return '+' . (preg_replace('/[\s\-().]+/u', '', substr($phone, 1)) ?? '');
         }
 
-        return $phone === '' ? null : $phone;
+        return $phone;
+    }
+
+    /**
+     * عقد الخادم للجوال: شكل E.164 فقط للقيم الدولية (`+` ثم 7–15 رقماً أولها 1–9). **ليس تحققاً بنمط الدولة**
+     * (لا libphonenumber في PHP ولا composer.json في المستودع)؛ التحقق بنمط الدولة في الواجهة، والجوال هنا بيانات
+     * تواصل اختيارية غير موثَّقة (لا دخول ولا OTP ولا فريدة). القيم المحلية القديمة تمرّ كما كانت (max:255).
+     */
+    private function phoneRule(): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail): void {
+            if (is_string($value) && str_starts_with($value, '+') && preg_match('/^\+[1-9]\d{6,14}$/', $value) !== 1) {
+                $fail('رقم الجوال الدولي يجب أن يكون بالصيغة +966512345678 (رمز الدولة ثم الرقم).');
+            }
+        };
     }
 
     public function rules(): array
@@ -52,7 +72,7 @@ class RegisterRequest extends FormRequest
             'slug'         => ['required', 'string', 'alpha_dash', 'max:255', 'unique:tenants,slug', Rule::notIn(ReservedTenantSlugs::all()), $this->slugNotUsedByManagedStorefrontHost()],
             'vat_number'   => ['nullable', 'string', 'size:15'],
             'name'         => ['nullable', 'string', 'max:255'], // اسم المالك — يُشتق من الاسم التجاري إن غاب
-            'phone'        => ['nullable', 'string', 'regex:/^\+[1-9]\d{6,14}$/'], // رقم الجوال بصيغة E.164 (+9665XXXXXXXX)
+            'phone'        => ['nullable', 'string', 'max:255', $this->phoneRule()], // رقم الجوال: E.164 إن بدأ بـ+ وإلا كما كان (توافق)
             'email'        => ['required', 'email', 'max:255', 'unique:users,email'], // فريد عالمياً (الدخول بالبريد)
             'password'     => ['required', 'string', 'min:8'],
         ];
@@ -70,12 +90,5 @@ class RegisterRequest extends FormRequest
                 $fail('هذا المعرّف غير متاح.');
             }
         };
-    }
-
-    public function messages(): array
-    {
-        return [
-            'phone.regex' => 'رقم الجوال يجب أن يكون بالصيغة الدولية مثل +966512345678.',
-        ];
     }
 }
