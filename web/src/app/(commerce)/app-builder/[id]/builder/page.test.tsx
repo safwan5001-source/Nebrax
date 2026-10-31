@@ -2412,6 +2412,33 @@ describe('AppBuilderWorkspacePage — Easy Mode V2 shell (S21a)', () => {
     expect(Object.keys((metaPuts()[0].schema as unknown as { pages: object }).pages)).toEqual(['home', 'about']);
   });
 
+  it('"Copy my changes" after a save conflict includes the unsaved editor meta (hide/rename/page title), and stays the plain schema when there is none', async () => {
+    const { ApiError } = await import('@/lib/api');
+    const conflict = { message: 'conflict', reason: 'draft_conflict', current_revision: 5, base_revision: 0, updated_by: 'u2', updated_at: '2026-10-30T10:00:00+00:00' };
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    await open();
+    const base = api.getMockImplementation()!;
+    api.mockImplementation((path?: string, init?: { method?: string; body?: unknown }) =>
+      path === DRAFT_PATH && init?.method === 'PUT' ? Promise.reject(new ApiError(409, 'conflict', conflict)) : base(path, init));
+    const user = userEvent.setup();
+    const original = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    try {
+      await user.click(sectionItem().getByRole('button', { name: 'Hide section' }));
+      await user.click(screen.getAllByText('Save')[0]);
+      const dialog = within(await screen.findByRole('dialog', { name: 'Draft save conflict' }));
+      await user.click(dialog.getByRole('button', { name: 'Copy my changes' }));
+      await waitFor(() => expect(writeText).toHaveBeenCalled());
+
+      const exported = JSON.parse(String(writeText.mock.calls[0][0]));
+      expect(exported.editor_meta).toEqual({ v: 1, nodes: { home: { 'sec-1': { hidden: true } } }, pages: {} });
+      expect(exported.schema.pages.home.children[0].id).toBe('sec-1');
+    } finally {
+      if (original) Object.defineProperty(navigator, 'clipboard', original);
+      else delete (navigator as unknown as Record<string, unknown>).clipboard;
+    }
+  });
+
   it('a pending rename never follows the user to another page (page title and section name are bound to the page they started on)', async () => {
     await open();
     const user = userEvent.setup();

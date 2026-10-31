@@ -434,7 +434,10 @@ export default function AppBuilderWorkspacePage() {
 
   async function copyMyChanges() {
     try {
-      await navigator.clipboard.writeText(JSON.stringify(schemaRef.current ?? schema, null, 2));
+      // بيانات المحرر (إخفاء/اسم/عنوان صفحة) جزء من «تعديلاتي»: تُصدَّر معها حين توجد، وإلا يبقى المخطط وحده كما كان.
+      const current = schemaRef.current ?? schema;
+      const meta = metaOf(current);
+      await navigator.clipboard.writeText(JSON.stringify(meta ? { schema: current, editor_meta: meta } : current, null, 2));
       toast.success(t('conflict.copied'));
     } catch {
       toast.error(t('conflict.copyFailed'));
