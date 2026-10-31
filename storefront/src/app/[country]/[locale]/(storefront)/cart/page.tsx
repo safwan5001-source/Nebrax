@@ -19,10 +19,10 @@ import { extractBasePath } from "@/lib/utils/path";
 /**
  * STORE-UI-4 — the AWJ cart page.
  *
- * This route is the DTC surface's cart and is always AWJ-backed: the wholesale
- * surface has its own page (`(wholesale)/wholesale/cart`) bound to a Spree
- * provider, so nothing Spree-shaped can reach here. The narrowing below is the
- * guard for that, not a second design.
+ * This route is the DTC surface's cart and is always AWJ-backed (the Spree
+ * wholesale portal and its own cart page have been removed), so nothing
+ * Spree-shaped can reach here. The narrowing below is the guard for that, not a
+ * second design.
  *
  * **Mobile deliberately has no sticky checkout bar.** `MobileBottomNav` is
  * already fixed to the bottom of every storefront page, and a second fixed bar
