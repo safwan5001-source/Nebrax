@@ -3,10 +3,10 @@
 | | |
 |---|---|
 | Branch | `claude/h6-quick-order` |
-| PR | _see §10 (filled after the PR is opened)_ |
+| PR | https://github.com/safwan5001-source/Nebrax/pull/1846 |
 | Base SHA | `c945a1dc6505882b7de70efb172a872de440f1e6` (#1841, H6 final closure) |
-| Head SHA | _see §10_ |
-| CI | _see §10_ |
+| Head SHA | code head `5bdfb21a3` (this report's later edits are docs-only on top of it) |
+| CI | running at the time of writing — see §10 |
 
 Nothing was merged, deployed, restarted or migrated against a deployed environment. No environment variable was changed. Wholesale stays disabled by default (`commerce.wholesale_buyer_enabled`). **No Spree code, route, dependency or file was removed.** There is no migration in this PR. The browser suite ran only against a throwaway local SQLite file on loopback, and no payment was captured.
 
@@ -119,7 +119,7 @@ The remaining screenshots of the 56-test run were generated locally in `storefro
 | `pnpm check:spree-ratchet` | OK at the unchanged baseline (4 / 4 / 52 / 69 / 9) — this PR adds **no** Spree dependency |
 | Production build | the E2E stack serves `next start` of a production build of this source |
 | Playwright wholesale suite (local isolated stack, desktop-en + mobile-ar) | **56 / 56 passed** (12 new Q-tests; the rest are the pre-existing journey, security, retail-regression, rate-limit, closure and Arabic-mobile tests) |
-| CI Gate | _see §10_ |
+| CI Gate | running at the time of writing — see §10 |
 
 Not run locally: the full PHP suite (no ParaTest here; `ext-bcmath` is absent so Fuel\* tests fail locally by environment, not by this change) — CI runs it.
 
@@ -201,7 +201,9 @@ Final gate (unchanged from the exit plan §G): zero runtime Spree calls, no `SPR
 
 ## 10. PR, SHAs and CI
 
-_Filled in after the PR is opened._
+- PR: #1846, branch `claude/h6-quick-order`, base `c945a1dc6505882b7de70efb172a872de440f1e6`.
+- Head SHA (code): `5bdfb21a3`.
+- CI: pending when this report was written; the PR page is the source of truth. If the PostgreSQL job fails only in `AiActionHistoryListTest` (a known intermittent count flake unrelated to this change), it is re-run once and noted on the PR.
 
 ## 11. Recommended final action
 
