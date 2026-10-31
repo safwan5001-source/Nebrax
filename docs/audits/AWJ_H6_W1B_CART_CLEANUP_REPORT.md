@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Branch | `claude/h6-w1b-cart-cleanup` |
-| PR | _filled in when opened (see the PR page)_ |
+| PR | https://github.com/safwan5001-source/Nebrax/pull/1857 |
 | Base SHA (origin/main) | `ec79c16eff43bdee26a6b0273bdb402e5d2e328b` (#1856) |
 | Head SHA | code head `2ee7a350c5f1dee620e106d656d31f396a6dd964`; any later commit on the branch changes this report only |
 | CI | see the PR's checks (the PR page is the source of truth) |
