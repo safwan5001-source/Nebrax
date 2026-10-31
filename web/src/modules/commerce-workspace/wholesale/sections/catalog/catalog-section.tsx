@@ -34,16 +34,25 @@ function CatalogBody() {
   const [counts, setCounts] = useState<{ status: 'loading' } | { status: 'error' } | { status: 'ready'; data: CatalogCounts }>({ status: 'loading' });
   const seq = useRef(0);
   const storeId = store?.id ?? null;
+  // The active store as of the latest render. A callback captured for another store (e.g. a publication write that
+  // finishes after the merchant switched stores) must neither fetch nor write figures for the store now on screen.
+  const activeStore = useRef(storeId);
+  activeStore.current = storeId;
 
   const loadCounts = useCallback(() => {
-    if (!storeId) return;
+    if (!storeId || activeStore.current !== storeId) return;
     const id = ++seq.current;
+    const isCurrent = () => id === seq.current && activeStore.current === storeId;
     loadStoreCatalogCounts(storeId).then(
-      (data) => id === seq.current && setCounts({ status: 'ready', data }),
-      () => id === seq.current && setCounts({ status: 'error' }),
+      (data) => isCurrent() && setCounts({ status: 'ready', data }),
+      () => isCurrent() && setCounts({ status: 'error' }),
     );
   }, [storeId]);
-  useEffect(() => loadCounts(), [loadCounts]);
+  useEffect(() => {
+    // New store: drop the previous store's figures immediately instead of showing them until the new ones arrive.
+    setCounts({ status: 'loading' });
+    loadCounts();
+  }, [loadCounts]);
 
   if (!store) return null;
   const stat = (key: keyof CatalogCounts) => ({

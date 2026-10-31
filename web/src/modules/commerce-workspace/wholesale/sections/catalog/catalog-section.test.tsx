@@ -12,8 +12,9 @@ vi.mock('next/link', () => ({ default: ({ href, children, ...rest }: { href: str
 
 const can = vi.hoisted(() => ({ allowed: new Set<string>() }));
 vi.mock('@/lib/use-can', () => ({ useCan: () => ({ hydrated: true, can: (p: string) => can.allowed.has(p) }) }));
+const channel = vi.hoisted(() => ({ store: { id: 's1', name: 'Wholesale Store', salesChannelId: 'c1' } }));
 vi.mock('../../channel-context', () => ({
-  useWholesaleChannel: () => ({ readiness: 'active', store: { id: 's1', name: 'Wholesale Store', salesChannelId: 'c1' } }),
+  useWholesaleChannel: () => ({ readiness: 'active', store: channel.store }),
 }));
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
@@ -43,6 +44,7 @@ const page = (items = [item()]) => ({ items, meta: { currentPage: 1, lastPage: 1
 
 beforeEach(() => {
   locale.current = 'en';
+  channel.store = { id: 's1', name: 'Wholesale Store', salesChannelId: 'c1' };
   can.allowed = new Set(['products.view', 'products.manage', 'commerce.manage']);
   apiMocks.page.mockReset().mockResolvedValue(page());
   apiMocks.counts.mockReset().mockResolvedValue({ all: 12, published: 7, unpublished: 5 });
@@ -75,6 +77,35 @@ describe('CatalogSection', () => {
     expect(confirmMock).toHaveBeenCalledOnce();
     expect(toast.success).toHaveBeenCalledWith('Product published');
     expect(apiMocks.counts.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it('ignores a publication write that finishes after the store was switched (no cross-store counts)', async () => {
+    apiMocks.counts.mockImplementation(async (storeId: string) =>
+      storeId === 's1' ? { all: 11, published: 1, unpublished: 10 } : { all: 99, published: 9, unpublished: 90 },
+    );
+    let finishWrite: (value: unknown) => void = () => undefined;
+    apiMocks.set.mockReturnValue(new Promise((resolve) => (finishWrite = resolve)));
+
+    const view = render(<CatalogSection />);
+    await waitFor(() => screen.getAllByText('Rice 10kg'));
+    await waitFor(() => screen.getByText('11'));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Publish' })[0]);
+    await waitFor(() => expect(apiMocks.set).toHaveBeenCalledWith('p1', 's1', true)); // write for store A now pending
+
+    channel.store = { id: 's2', name: 'Other Store', salesChannelId: 'c2' };
+    view.rerender(<CatalogSection />);
+    await waitFor(() => screen.getByText('99')); // store B's own figures
+    expect(screen.queryByText('11')).toBeNull(); // A's figures were dropped on the switch
+    const callsBefore = apiMocks.counts.mock.calls.length;
+
+    finishWrite([]); // A's write completes after the switch → its onChanged callback fires
+    await new Promise((resolve) => setTimeout(resolve, 30));
+
+    expect(screen.getByText('99')).toBeTruthy();
+    expect(screen.queryByText('11')).toBeNull();
+    // The stale callback neither fetched A's counts again nor disturbed B's request sequence.
+    expect(apiMocks.counts.mock.calls.length).toBe(callsBefore);
+    expect(apiMocks.counts.mock.calls.slice(callsBefore).filter(([id]) => id === 's1')).toEqual([]);
   });
 
   it('does not write when the confirmation is declined', async () => {
