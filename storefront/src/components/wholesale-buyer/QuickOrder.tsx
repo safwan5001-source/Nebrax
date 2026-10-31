@@ -230,8 +230,8 @@ export function QuickOrder({ basePath }: { basePath: string }) {
   };
 
   return (
-    <StoreContainer className="py-8 sm:py-12" data-testid="quick-order">
-      <div className="mx-auto max-w-3xl space-y-6">
+    <StoreContainer className="py-8 sm:py-12">
+      <div className="mx-auto max-w-3xl space-y-6" data-testid="quick-order">
         <header className="space-y-1">
           <h1 className="text-2xl font-bold text-store-foreground sm:text-3xl">
             {t("title")}
