@@ -5,9 +5,9 @@
 | | |
 |---|---|
 | Branch | `claude/wholesale-merchant-workspace-ui-3hx9wy` |
-| PR | _filled after opening (see PR description)_ |
-| Base SHA | `310f1400a2ee05890b55e517e4a10fd77a7f810a` (`origin/main`) |
-| Head SHA | _recorded in the PR description (the head moves when this report is amended)_ |
+| PR | [#1824](https://github.com/safwan5001-source/Nebrax/pull/1824) |
+| Base SHA | `310f1400a2ee05890b55e517e4a10fd77a7f810a` (branch point on `origin/main`). `main` has since advanced to `258d392dac6c2a45a6e356d2259b88d42459ba38`; GitHub reports the PR **mergeable (clean)**, no conflict. |
+| Head SHA (verified) | `694d56ec14195a61773a86915c6499f335b4122f` — the last commit that changes code/tests; every result below was produced on it. This report is amended by one docs-only commit afterwards (a report cannot contain its own commit SHA); that final head is recorded in the PR description. |
 | Status | Ready for review. Not merged, not deployed, not enabled. |
 
 ## 1. Architecture (what was reused, what was added)
@@ -110,15 +110,15 @@ State screens: gated Buyers (deployment off, ar desktop) ![](assets/wholesale-wo
 
 | Check | Result |
 |---|---|
-| Vitest — wholesale + nav | 33 files / **202 tests** pass |
-| Vitest — full web suite | **786 files / 9201 tests pass** (measured before the review fixes below; +2 tests since, wholesale subset re-run green) (was 750 / 8923 at the last recorded baseline in `AWJ-WEB-RBAC-01`; none removed) |
+| Vitest — wholesale + nav | 33 files / **206 tests** pass (incl. new base-price regression tests) |
+| Vitest — full web suite | **786 files / 9207 tests pass** on `694d56e` (re-run after all review fixes) (was 750 / 8923 at the last recorded baseline in `AWJ-WEB-RBAC-01`; none removed) |
 | `npm run build` (Next 15) | **exit 0**; all 11 `/commerce/wholesale*` routes compiled |
 | `tsc --noEmit` | 55 errors, **all in pre-existing test files outside this change** (same count recorded before this work); **0 in any wholesale file** |
 | Lint | **Not run — the repo has no ESLint config** (`next lint` prompts to create one). Not introduced here. |
-| Playwright `wholesale-workspace.spec.ts` | **52 / 52** (desktop + mobile × ar/en × 11 sections active; gated state; dark theme; no-permission sends no request; keyboard open/Esc of the buyer drawer). Each section: no horizontal overflow, no unexpected write request, no `tenant_id`, no console errors |
+| Playwright `wholesale-workspace.spec.ts` | **56 / 56** (52 original + 4 base-price availability checks: ar/en × desktop/mobile) (desktop + mobile × ar/en × 11 sections active; gated state; dark theme; no-permission sends no request; keyboard open/Esc of the buyer drawer). Each section: no horizontal overflow, no unexpected write request, no `tenant_id`, no console errors |
 | DTC regression | existing `commerce-orders-o1b.spec.ts` **17 / 17** (desktop + mobile); the entire existing unit suite is green; **no existing test was weakened or removed** |
 | Localization | `expectMessageParity` on every dictionary (identical keys, no empty values, matching placeholders); `i18n-keys` guard green |
-| CI / CI Gate | _recorded in the PR after the first run_ |
+| CI / CI Gate (GitHub Actions, head `694d56e`) | **all green**: `php artisan test (L11, sqlite)` ✅ · `php artisan test (L11, pgsql)` ✅ · `CI Gate` ✅ · `web build (Next.js)` ✅ ×2 (push + pull_request). Codex automated review of `694d56e`: **no findings**; all three earlier P2 threads resolved with evidence. |
 
 **Review fixes after Codex review (all verified real; fixed with regression tests / copy corrections):** (1) editing/deleting a price list now also reloads the shared channel settings, so Settings/Overview no longer report a deactivated/deleted assigned list as active; (2) the price-coverage panel is keyed by store, so its results are dropped when the active store changes. (3) the Catalog availability list is labelled **Base price** (the backend list endpoint returns the product's base price; the channel price-list price is resolved only in the product detail view, which keeps the "Channel price" label) — the earlier copy overstated it. Same change closes a related focus hazard: the list form no longer opens as a second modal on top of the open drawer (drawer yields, then returns).
 
