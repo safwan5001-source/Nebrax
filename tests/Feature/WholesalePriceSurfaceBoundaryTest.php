@@ -50,6 +50,7 @@ class WholesalePriceSurfaceBoundaryTest extends TestCase
         'storefront.v1.checkout.complete',
         // H6 Batch M — the approved buyer's own order history (order lines carry prices): gated by EnsureWholesalePriceAccess
         'storefront.v1.buyer.orders.index', 'storefront.v1.buyer.orders.show',
+        'storefront.v1.buyer.quick_order.lookup', 'storefront.v1.buyer.quick_order.resolve', 'storefront.v1.buyer.quick_order.add',
     ];
 
     /**

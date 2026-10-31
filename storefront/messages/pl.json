@@ -1137,7 +1137,8 @@
       "company": "Nazwa firmy (opcjonalnie)",
       "phone": "Telefon kontaktowy (opcjonalnie)",
       "applicationHint": "Pomaga to sklepowi rozpatrzyć wniosek. Nie jest weryfikowane i nie zmienia Twoich cen.",
-      "myOrders": "Moje zamówienia"
+      "myOrders": "Moje zamówienia",
+      "quickOrder": "Szybkie zamówienie"
     },
     "status": {
       "signed_out": {
@@ -1250,6 +1251,61 @@
       "status": {
         "confirmed": "Potwierdzone",
         "cancelled": "Anulowane"
+      }
+    },
+    "quickOrder": {
+      "title": "Szybkie zamówienie",
+      "subtitle": "Znajdź towary po SKU lub nazwie, ustaw ilości i dodaj wszystkie naraz do koszyka. Obowiązują Twoje zatwierdzone ceny hurtowe.",
+      "search": {
+        "title": "Szukaj po SKU lub nazwie produktu",
+        "placeholder": "SKU lub nazwa produktu…",
+        "searching": "Szukanie…",
+        "none": "Brak wyników.",
+        "addToList": "Dodaj do listy"
+      },
+      "paste": {
+        "title": "Wklej listę SKU",
+        "hint": "Jeden towar w wierszu: SKU i ilość oddzielone spacją, przecinkiem lub tabulatorem (np. ABC-100 12). Samo SKU oznacza ilość 1.",
+        "placeholder": "ABC-100 12\nSHIRT-RED, 4\nCOF-100",
+        "cta": "Dodaj wklejone towary do listy",
+        "truncated": "Użyto tylko pierwszych {max} wierszy.",
+        "issue": {
+          "not_found": "nie znaleziono w katalogu tego sklepu",
+          "ambiguous": "pasuje do kilku wariantów – wybierz jeden w wynikach wyszukiwania powyżej",
+          "list_full": "nie dodano — lista ma już maksymalnie {max} pozycji"
+        }
+      },
+      "list": {
+        "title": "Lista zamówienia ({count})",
+        "empty": "Twoja lista jest pusta. Wyszukaj powyżej lub wklej listę SKU.",
+        "remove": "Usuń wiersz",
+        "quantity": "Ilość",
+        "excluded": "ten wiersz nie zostanie dodany",
+        "eligible": "Gotowe do dodania: {eligible} z {total}",
+        "estimate": "Szacunkowa suma",
+        "priceNote": "Sklep potwierdza ceny przy dodawaniu do koszyka i ponownie przy kasie.",
+        "submit": "Dodaj do koszyka ({count})"
+      },
+      "qty": {
+        "invalid": "Wpisz liczbę całkowitą równą co najmniej 1.",
+        "tooLarge": "Ilość nie może przekraczać {max}."
+      },
+      "reason": {
+        "noWholesalePrice": "Brak ceny hurtowej dla tego towaru",
+        "notPurchasable": "Tego towaru nie można teraz kupić",
+        "personalizationRequired": "Ten produkt wymaga personalizacji — dodaj go ze strony produktu"
+      },
+      "notice": {
+        "added": "Dodano do koszyka: {count}",
+        "viewCart": "Zobacz koszyk",
+        "checkout": "Do kasy",
+        "rejected": "Nic nie dodano: niektórych wierszy nie można już kupić. Popraw lub usuń oznaczone wiersze i spróbuj ponownie.",
+        "error": "Coś poszło nie tak. Nic nie dodano – spróbuj ponownie.",
+        "access": {
+          "signed_out": "Zaloguj się ponownie, aby kontynuować.",
+          "not_approved": "Twoje konto hurtowe nie jest zatwierdzone do zamawiania."
+        },
+        "accessCta": "Dalej"
       }
     }
   }

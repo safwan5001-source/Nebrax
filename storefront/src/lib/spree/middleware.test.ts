@@ -697,6 +697,7 @@ describe("H6 Final Closure: host context, wholesale-only pages, bare country, co
       ["/sa/ar/wholesale/sign-in", "/sa/ar/buyer/sign-in"],
       ["/sa/ar/wholesale/apply", "/sa/ar/buyer/membership"],
       ["/sa/ar/wholesale/cart", "/sa/ar/cart"],
+      ["/sa/ar/wholesale/quick-order", "/sa/ar/buyer/quick-order"],
       ["/sa/ar/wholesale/products", "/sa/ar/products"],
       ["/sa/ar/wholesale/products/abc", "/sa/ar/products"],
       ["/sa/ar/wholesale/whatever", null],

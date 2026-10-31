@@ -153,6 +153,11 @@ export function BuyerMembershipPanel({
               </Link>
             </Button>
             <Button asChild variant="outline" className="w-full">
+              <Link href={`${basePath}/buyer/quick-order`}>
+                {t("membership.quickOrder")}
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="w-full">
               <Link href={`${basePath}/buyer/orders`}>
                 {t("membership.myOrders")}
               </Link>

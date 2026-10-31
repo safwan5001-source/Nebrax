@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\StorefrontBuyerAuthController;
 use App\Http\Controllers\Api\StorefrontBuyerOrderController;
+use App\Http\Controllers\Api\StorefrontQuickOrderController;
 use App\Http\Controllers\Api\StorefrontCartController;
 use App\Http\Controllers\Api\StorefrontCategoryController;
 use App\Http\Controllers\Api\StorefrontCollectionController;
@@ -135,6 +136,16 @@ Route::middleware([
         Route::middleware(EnsureWholesalePriceAccess::class)->group(function () {
             Route::get('buyer/orders', [StorefrontBuyerOrderController::class, 'index'])->name('buyer.orders.index');
             Route::get('buyer/orders/{order}', [StorefrontBuyerOrderController::class, 'show'])->whereUuid('order')->name('buyer.orders.show');
+        });
+
+        // H6 Quick Order — the native replacement for the Spree quick-order page. Same approval gate as the catalogue (re-checked on
+        // every request). `lookup` resolves a typed SKU/name to purchasable lines with the approved wholesale price (or none);
+        // `add` puts several lines in the buyer's cart ALL-OR-NOTHING. Nothing here accepts a price, buyer, partner or channel.
+        Route::middleware(EnsureWholesalePriceAccess::class)->group(function () {
+            Route::get('buyer/quick-order/lookup', [StorefrontQuickOrderController::class, 'lookup'])->name('buyer.quick_order.lookup');
+            Route::get('buyer/quick-order/resolve', [StorefrontQuickOrderController::class, 'resolve'])->name('buyer.quick_order.resolve');
+            Route::post('buyer/quick-order/add', [StorefrontQuickOrderController::class, 'add'])
+                ->middleware(RequireStorefrontMutationGateway::class)->name('buyer.quick_order.add');
         });
 
         Route::middleware([AuthenticateCommerceCustomer::class, BindStorefrontBuyerToChannel::class])->group(function () {
