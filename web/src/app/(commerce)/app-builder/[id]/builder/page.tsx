@@ -1191,14 +1191,15 @@ export default function AppBuilderWorkspacePage() {
     </>
   );
 
-  /** يحدّد مكوّناً بمعرّفه (أول صفحة تحويه) ويعود إلى التصميم/المسودة ويغلق حوار النشر — لفتح ما يُحذف من تقرير التوافق. */
+  /** يحدّد مكوّناً بمعرّفه (أول صفحة تحويه) كما يفعل `openIssue`: يعيد وضع التصميم/المسودة ويغلق حوار النشر ويعيد لوحة الصفحات (لا تبقى لوحة المظهر أو App Preview تخفي المفتش). */
   function openComponentById(componentId: string) {
     if (!schema) return;
     const pageId = Object.keys(schema.pages).find((id) => findComponentById(schema.pages[id], componentId) !== null);
     if (!pageId) return;
-    setPublishOpen(false);
+    setBuilderMode('design');
     setPreviewState('draft');
-    setSelectedPageId(pageId);
+    setPublishOpen(false);
+    selectPage(pageId); // يبدّل لوحة البنية إلى «الصفحات» ويحدّد جذر الصفحة
     setSelectedComponentId(componentId);
   }
 
