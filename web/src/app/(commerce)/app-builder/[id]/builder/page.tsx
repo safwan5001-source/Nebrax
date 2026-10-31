@@ -963,6 +963,7 @@ export default function AppBuilderWorkspacePage() {
                 pageTitle={(selectedPageId && editorMeta?.pages[selectedPageId]?.title) || selectedPageId || ''}
                 pageTitleCustom={(selectedPageId && editorMeta?.pages[selectedPageId]?.title) || ''}
                 onRenamePage={easyRenamePage}
+                onReorder={(ids) => selectedPageId && reorderSiblings(selectedPageId, currentPageRoot?.id ?? '', ids)}
               />
               </div>
             </div>

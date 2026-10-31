@@ -147,6 +147,7 @@ const { api, currentUser, translate } = vi.hoisted(() => {
     'easy.pageActions.proposed.account': 'Account',
     'easy.pageActions.proposed.orders': 'My orders',
     'easy.sectionsVisible': '{visible}/{count} visible',
+    'easy.dragHandle': 'Drag to reorder',
     'compat.summaryDrops': '{count} optional dropped on older versions',
     'compat.summaryIncompatible': 'Some versions cannot show this',
     'compat.show': 'Compat details',
@@ -2534,6 +2535,21 @@ describe('AppBuilderWorkspacePage — Easy Mode V2 shell (S21a)', () => {
       for (const b of sections().getAllByRole('button', { name })) expect((b as HTMLButtonElement).disabled).toBe(true);
     }
     expect((sections().getByRole('button', { name: 'Page title' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  // ── S21c: ترتيب الأقسام بمقبض سحب (الترتيب الفعلي بلوحة المفاتيح في e2e المتصفح) ──
+  it('each section has a keyboard-reachable drag handle, disabled for a single section and without manage', async () => {
+    await open();
+    // قسم واحد ⇒ لا ترتيب.
+    expect((sectionItem().getByRole('button', { name: 'Drag to reorder' }) as HTMLButtonElement).disabled).toBe(true);
+    await addFromCatalog('Text block'); // قسمان ⇒ المقبض فعّال
+    for (const handle of sections().getAllByRole('button', { name: 'Drag to reorder' })) expect((handle as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('without manage permission the drag handles are disabled', async () => {
+    currentUser.mockReturnValue({ id: 'u3', role: 'staff', permissions: ['apps_builder.view'] });
+    await open();
+    for (const handle of sections().getAllByRole('button', { name: 'Drag to reorder' })) expect((handle as HTMLButtonElement).disabled).toBe(true);
   });
 
   // ── S21b: إدارة الصفحات في الوضع السهل ──
