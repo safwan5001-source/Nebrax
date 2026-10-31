@@ -3,10 +3,10 @@
 | | |
 |---|---|
 | Branch | `claude/h6-spree-exit-acceptance` |
-| PR | {{PR}} |
+| PR | https://github.com/safwan5001-source/Nebrax/pull/1853 |
 | Base SHA (origin/main) | `2ee50f220ac8fd1d954990e95b0ccd4d6e2a08a9` (#1851; contains #1846, merge SHA `b3556eef0`) |
-| Head SHA | {{HEAD}} |
-| CI | {{CI}} |
+| Head SHA | code head `e7ad23213`; every later commit on the branch changes this report only |
+| CI | see the PR's checks — running when this report was written (the PR page is the source of truth) |
 
 **Verdict: BLOCKED** for *wholesale activation* and for the *final Spree exit*; **READY for review** for the one small removal in this PR (§5). The reasons are in §0; none of them is a defect in the code that was built.
 
@@ -19,7 +19,7 @@ Nothing was merged, deployed, restarted or migrated; no Railway variable or serv
 | # | Blocker | Evidence | Who |
 |---|---|---|---|
 | B1 | **No isolated environment exists.** The Railway project has exactly one environment, `production`, with one Postgres (`nibras-db`). Deployed wholesale acceptance cannot be run without either touching production data or creating a second environment. | `list-services` → one environment; §2 | owner authorisation to create one (§2) |
-| B2 | **The storefront running in production does not yet contain Quick Order.** The Laravel API does (`2ee50f220`); the storefront's two newer deployments are *Waiting for CI* and the live one is `3a3c60291`. This clears by itself when CI on main goes green — re-check before relying on it (§1). | Railway status snapshot §1 | nobody (time) |
+| ~~B2~~ | **Cleared during this work:** the storefront deployment for the Quick Order merge (`b3556eef0`) reached SUCCESS at 15:58Z and is now live; the deployment for `2ee50f220` is still Waiting for CI (§1). Quick Order is therefore live in both the API and the storefront, behind the off wholesale flag. | Railway `list-deployments` | — |
 | B3 | **Mail delivery and trusted-proxy behaviour are not verified on the deployed stack.** Mail/Resend variables exist; whether a real inbox receives the verification mail has never been exercised. No proxy-trust configuration exists (deliberate, `EdgeScheme.php`; open decision D-T1). | §3.3 | owner (isolated-env test inbox; D-T1) |
 | B4 | **Most of the Spree runtime is still in the codebase and unmigrated** (checkout/payment/orders data layer, retail account pages, `lib/spree` proxy, webhook route, SDK packages). Only the proven-dead wholesale portal is removed here. | §4 | later PRs, each needing its own proof |
 
@@ -27,7 +27,7 @@ Not a blocker (resolved): the **AWJ Web** deployment failures. AWJ Web is live a
 
 ---
 
-## 1. Exact deployed SHAs (Railway, read-only, snapshot ~16:00 UTC 2026-10-31)
+## 1. Exact deployed SHAs (Railway, read-only, snapshot ~16:00 UTC 2026-10-31; storefront re-read ~16:05)
 
 Source: Railway MCP `describe-environment` / `environment-status` / `list-deployments` / `describe-service`. Project «أَوْج AWJ», environment `production`. Nothing was deployed or changed by this work.
 
@@ -39,13 +39,13 @@ Source: Railway MCP `describe-environment` / `environment-status` / `list-deploy
 | `awj-scheduler` | Laravel cron (`*/5`) | SUCCESS `6482e801…`, last run succeeded 15:55Z | `2ee50f220` | n/a (same code as API) |
 | `awj-preview-host` | preview host | SUCCESS | `2ee50f220` | n/a |
 | `Nebrax` (AWJ Web, `web/`) | staff web app | SUCCESS `1870b5b9…` (`b3556eef0`); `2ee50f220` BUILDING at snapshot | `b3556eef0` → `2ee50f220` | n/a (`web/` unchanged by #1846) |
-| `storefront` | Next.js storefront | **live: SUCCESS `1cce6f18…` = `3a3c60291`**; `b3556eef0` and `2ee50f220` both **WAITING — "Waiting for CI"** | `3a3c60291` live | **No — not yet** |
+| `storefront` | Next.js storefront | **live: SUCCESS `7eee4749…` = `b3556eef0`** (15:58Z; the previous live `3a3c60291` deployment became REMOVED); `2ee50f220` (`fbb117d0…`) is still **WAITING — "Waiting for CI"** | `b3556eef0` live | **Yes (as of 15:58Z)** |
 | `nibras-db` | PostgreSQL 18, 500 MB volume | online since 2026-09-02 | — | — |
 | `awj-clamav` | AV scanner | online | — | — |
 
 ### 1.2 Reading the table
 
-- **Quick Order is live in the API only.** The storefront service has `checkSuites: true`: it deploys only after CI on the commit is green. The previous storefront deployment waited ~26 minutes (15:09→15:35), so the two queued ones should go live shortly. **Re-check `storefront` live SHA before treating Quick Order as deployed**; the report states the snapshot, not a promise.
+- **Quick Order is live in the API (since 15:38Z) and in the storefront (since 15:58Z).** The storefront service has `checkSuites: true`: it deploys only after CI on the commit is green, which took ~22 minutes after the merge (a first look at ~16:00Z had shown it still waiting; the later check showed SUCCESS). A GitHub merge was therefore *not* an immediate storefront deploy — the very reason the live SHA is read from Railway.
 - The API and AWJ Web have `checkSuites: false` and deploy on push. A GitHub merge is therefore *not* evidence of a storefront deploy — exactly the point of the instruction.
 - **Wholesale is off in production.** `nibras-api` has no `COMMERCE_WHOLESALE_BUYER_ENABLED` variable (names listed; values were not read), and the config default is `false`. So the new routes exist but answer 404.
 - Deployment/runtime config facts that matter: storefront variables are `AWJ_COMMERCE_API_URL`, `NEXT_PUBLIC_DEFAULT_COUNTRY`, `NEXT_PUBLIC_DEFAULT_LOCALE`, `STOREFRONT_GATEWAY_SECRET` — **no `SPREE_*` variable** (this is the proof used in §4 that the Spree portal cannot render in production).
@@ -106,7 +106,7 @@ All of the following ran **locally** on a throwaway SQLite stack, loopback only,
 | Membership approval | 06, 07 | Not verified |
 | Partner linking & price precedence | 13b (link → partner price; unlink restores), B1 partner-list 5.00 vs channel fallback 9.00 | Not verified |
 | Catalogue & variants | 08, 09, Q03 (variant by its own SKU) | Not verified |
-| Native Quick Order by SKU | Q01–Q12 | Not verified (storefront not yet live, §1) |
+| Native Quick Order by SKU | Q01–Q12 | Not verified (now deployed, but wholesale is off in production and there is no isolated environment) |
 | Atomic multi-line add | Q04 (only eligible lines), Q06 (price withdrawn → whole batch rejected, nothing added) | Not verified |
 | Cart recovery | 10 (refresh recovery), 11 (cart follows the buyer to a new browser context) | Not verified |
 | Checkout & order without payment capture | 12 (double submit → ONE order), 13, Q07, Q08 (financial tables untouched) | Not verified |
@@ -200,7 +200,7 @@ Explicitly **not** removed although mostly dead: everything in the §4.3 rows ma
 | Backend SQLite — wholesale, DTC cart/checkout, commerce boundary/price, branch isolation, API tenant isolation, RBAC, storefront gateway/IP/security, payment-gateway tenant guard (451 passed, 27 skipped = PostgreSQL-only) | green |
 | Backend PostgreSQL — same filter, `lock_timeout=60s` (478 passed) | green |
 | Browser E2E | 56 / 56 passed on a fresh production build of this branch (no payment captured); the build printed a `Sitemap index unavailable … headers() inside generateStaticParams` notice from sitemap code this PR does not touch — not compared against a pre-change build, so not claimed as pre-existing |
-| CI Gate | {{CI}} |
+| CI Gate | see the PR's checks (running when written) |
 
 Backend code is unchanged by this PR (storefront-only); the backend runs confirm main's state, not new code. The full PHP suite is CI's job (no ParaTest locally; `ext-bcmath` missing locally).
 
@@ -208,7 +208,7 @@ Backend code is unchanged by this PR (storefront-only); the backend runs confirm
 
 ## 7. Remaining blockers and exact next actions
 
-1. **Wait for / confirm the storefront deployment** of `2ee50f220` (Railway shows it waiting for CI) and record the live SHA. Owner: nobody; me on request.
+1. ~~Confirm the storefront deployment~~ — done: live at `b3556eef0` (Quick Order included); `2ee50f220` is queued behind CI.
 2. **Authorise an isolated acceptance environment** (§2.1) — or choose the CI-runner alternative. Without it, wholesale cannot be activated or accepted deployed.
 3. **Review and approve the safeguard-aware remote-isolated test mode** (§2.2 step 3) as its own PR.
 4. **Decide D-T1** (client-IP trust) and **D-14** (webhook) — or accept the documented limits.
@@ -218,4 +218,4 @@ Backend code is unchanged by this PR (storefront-only); the backend runs confirm
 
 ## 8. Explicit verdict
 
-**BLOCKED** — wholesale must not be activated and the Spree exit is not final until B1–B4 clear. The removal PR itself is **READY for review**.
+**BLOCKED** — wholesale must not be activated and the Spree exit is not final until B1, B3 and B4 clear (B2 cleared). The removal PR itself is **READY for review**.
