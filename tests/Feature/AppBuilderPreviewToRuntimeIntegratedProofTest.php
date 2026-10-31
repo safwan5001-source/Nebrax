@@ -61,7 +61,7 @@ class AppBuilderPreviewToRuntimeIntegratedProofTest extends TestCase
         ])->assertCreated()->json('data.id');
 
         $draft = $this->withToken($auth['token'])
-            ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $fixture])
+            ->putJson("/api/app-builder/apps/{$appId}/draft", $this->builderDraftBody($appId, $fixture))
             ->assertOk();
         $this->assertSame($fixture, $draft->json('data.schema'), 'Draft save must not mutate the authored fixture.');
 

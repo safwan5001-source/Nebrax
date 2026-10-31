@@ -29,12 +29,21 @@ class BuilderDraftExperienceController extends ApiController
 
         $baseRevision = $request->validated('base_revision');
 
+        if ($baseRevision === null) {
+            // AD-01 / S01c: لا كتابة بلا أساس. `current_revision` من مسودة المستأجر نفسه (محمّلة بنطاقه) يكفي العميل ليعيد القراءة.
+            return response()->json([
+                'message' => 'يلزم إرسال base_revision (رقم نسخة المسودة كما قرأتها) مع كل حفظ.',
+                'reason' => 'base_revision_required',
+                'current_revision' => (int) $draft->revision,
+            ], 428);
+        }
+
         try {
             $updated = $this->domain(fn () => $this->service->save(
                 $draft,
                 $request->validated('schema'),
                 $request->user()?->id,
-                $baseRevision === null ? null : (int) $baseRevision,
+                (int) $baseRevision,
             ));
         } catch (DraftRevisionConflictException $e) {
             // AD-01: تعارض حفظ — 409 بجسم منظَّم يكفي العميل لعرض حوار الحل وإعادة الأساس.

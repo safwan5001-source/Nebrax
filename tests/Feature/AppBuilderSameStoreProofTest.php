@@ -130,7 +130,7 @@ class AppBuilderSameStoreProofTest extends TestCase
             ]],
         ];
         $this->withToken($auth['token'])
-            ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $schema])
+            ->putJson("/api/app-builder/apps/{$appId}/draft", $this->builderDraftBody($appId, $schema))
             ->assertOk();
         $this->withToken($auth['token'])
             ->postJson("/api/app-builder/apps/{$appId}/validate")

@@ -5,8 +5,9 @@ namespace App\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * AD-01 (S01a): `base_revision` اختياري انتقالياً (عدد صحيح ≥ 0، `null` = غائب) —
- * القفل التفاؤلي في `BuilderDraftExperienceService`؛ لا يُفرض 428 قبل حصر مسارات الحفظ.
+ * AD-01 (S01a/S01c): `base_revision` عدد صحيح ≥ 0. غيابه (أو `null`) لا يُرفض هنا بـ422 بل
+ * بـ428 `base_revision_required` في المتحكّم (شرط مسبق مفقود لا خطأ تحقق)؛ القفل التفاؤلي
+ * في `BuilderDraftExperienceService`.
  *
  * تحقق شكل الطلب فقط (`schema` كائن موجود) — التحقق البنيوي العميق (مطابقة
  * حرفية لعقد `AppSchema` في `mobile/lib/schema/app_schema.dart`) في

@@ -122,4 +122,20 @@ trait InteractsWithApi
             ...$extra,
         ];
     }
+
+    /**
+     * جسم حفظ مسودة صانع التطبيقات الصحيح (AD-01 / S01c): المخطط + `base_revision` = revision الحالي.
+     * يقرأ الصف مباشرةً (بلا نطاق مستأجر ولا صلاحيات) ليبقى المساعد صالحاً لكل الأدوار في الاختبار.
+     *
+     * @param  array<string, mixed>  $schema
+     * @return array{schema: array<string, mixed>, base_revision: int}
+     */
+    protected function builderDraftBody(string $appId, array $schema): array
+    {
+        return [
+            'schema' => $schema,
+            'base_revision' => (int) \Illuminate\Support\Facades\DB::table('builder_draft_experiences')
+                ->where('builder_app_id', $appId)->value('revision'),
+        ];
+    }
 }

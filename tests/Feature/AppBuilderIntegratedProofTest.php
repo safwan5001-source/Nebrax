@@ -116,7 +116,7 @@ class AppBuilderIntegratedProofTest extends TestCase
 
         // 2) تحرير — تطبيق مخطط القالب الحقيقي (صفحتان + إجراء navigate حقيقي).
         $draft = $this->withToken($auth['token'])
-            ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $this->catalogTemplateSchema()])
+            ->putJson("/api/app-builder/apps/{$appId}/draft", $this->builderDraftBody($appId, $this->catalogTemplateSchema()))
             ->assertOk();
         $draft->assertJsonPath('data.revision', 1);
         $draft->assertJsonPath('data.schema.pages.cart.type', 'Page');
@@ -138,7 +138,7 @@ class AppBuilderIntegratedProofTest extends TestCase
             'themePreset' => $presentation->json('data.draft.themePreset'),
         ];
         $draft = $this->withToken($auth['token'])
-            ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $schemaWithTheme])
+            ->putJson("/api/app-builder/apps/{$appId}/draft", $this->builderDraftBody($appId, $schemaWithTheme))
             ->assertOk();
         $draft->assertJsonPath('data.revision', 2);
         $draft->assertJsonPath('data.schema.theme.tokens.primaryColor', '#12372a');
@@ -152,14 +152,14 @@ class AppBuilderIntegratedProofTest extends TestCase
         ];
         $schemaWithThirdPage['navigation']['initialPageId'] = 'about';
         $this->withToken($auth['token'])
-            ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $schemaWithThirdPage])
+            ->putJson("/api/app-builder/apps/{$appId}/draft", $this->builderDraftBody($appId, $schemaWithThirdPage))
             ->assertOk()
             ->assertJsonPath('data.schema.navigation.initialPageId', 'about');
 
         $schemaBackToHome = $schemaWithThirdPage;
         $schemaBackToHome['navigation']['initialPageId'] = 'home';
         $draft = $this->withToken($auth['token'])
-            ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $schemaBackToHome])
+            ->putJson("/api/app-builder/apps/{$appId}/draft", $this->builderDraftBody($appId, $schemaBackToHome))
             ->assertOk();
         $draft->assertJsonPath('data.revision', 4);
         $draft->assertJsonPath('data.schema.navigation.initialPageId', 'home');
@@ -182,7 +182,7 @@ class AppBuilderIntegratedProofTest extends TestCase
         $schemaEdited = $schemaBackToHome;
         $schemaEdited['pages']['home']['children'][1]['props']['label'] = 'عرض السلة';
         $this->withToken($auth['token'])
-            ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $schemaEdited])
+            ->putJson("/api/app-builder/apps/{$appId}/draft", $this->builderDraftBody($appId, $schemaEdited))
             ->assertOk();
 
         $v2 = $this->withToken($auth['token'])->postJson("/api/app-builder/apps/{$appId}/versions", [])
@@ -196,7 +196,7 @@ class AppBuilderIntegratedProofTest extends TestCase
 
         // 8) استرجاع (Rollback) — كتابة مخطط النسخة الأولى التاريخي إلى المسودة، بلا نشر تلقائي.
         $restoreResponse = $this->withToken($auth['token'])
-            ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $v1Schema])
+            ->putJson("/api/app-builder/apps/{$appId}/draft", $this->builderDraftBody($appId, $v1Schema))
             ->assertOk();
         $restoreResponse->assertJsonPath('data.schema.pages.home.children.1.props.label', 'View cart');
         // الاسترجاع كتابةٌ على المسودة فقط — لا يُنشئ نسخة جديدة من تلقاء نفسه.
@@ -231,7 +231,7 @@ class AppBuilderIntegratedProofTest extends TestCase
         $this->withToken($bToken)->getJson("/api/app-builder/apps/{$appId}")->assertStatus(404);
         $this->withToken($bToken)->getJson("/api/app-builder/apps/{$appId}/draft")->assertStatus(404);
         $this->withToken($bToken)->putJson("/api/app-builder/apps/{$appId}/draft", [
-            'schema' => \App\Models\BuilderDraftExperience::minimalSafeSchema(),
+            'schema' => \App\Models\BuilderDraftExperience::minimalSafeSchema(), 'base_revision' => 0,
         ])->assertStatus(404);
         $this->withToken($bToken)->postJson("/api/app-builder/apps/{$appId}/validate")->assertStatus(404);
         $this->withToken($bToken)->postJson("/api/app-builder/apps/{$appId}/versions", [])->assertStatus(404);
@@ -253,7 +253,7 @@ class AppBuilderIntegratedProofTest extends TestCase
         $this->withToken($staffToken)->postJson('/api/app-builder/apps', ['name' => 'x', 'creation_source' => 'scratch'])
             ->assertForbidden();
         $this->withToken($staffToken)->putJson("/api/app-builder/apps/{$appId}/draft", [
-            'schema' => \App\Models\BuilderDraftExperience::minimalSafeSchema(),
+            'schema' => \App\Models\BuilderDraftExperience::minimalSafeSchema(), 'base_revision' => 0,
         ])->assertForbidden();
         $this->withToken($staffToken)->postJson("/api/app-builder/apps/{$appId}/validate")->assertForbidden();
         $this->withToken($staffToken)->postJson("/api/app-builder/apps/{$appId}/versions", [])->assertForbidden();
@@ -301,7 +301,7 @@ class AppBuilderIntegratedProofTest extends TestCase
             ['type' => 'Text', 'id' => 'bound-text', 'bindings' => ['text' => 'commerce.products.0.title']],
         ];
         $this->withToken($auth['token'])
-            ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $misspelledSchema])
+            ->putJson("/api/app-builder/apps/{$appId}/draft", $this->builderDraftBody($appId, $misspelledSchema))
             ->assertStatus(422);
 
         // مفتاح `binding` (بالإفراد) الصحيح على مكوّن قابل للربط (`ProductList`)
@@ -315,7 +315,7 @@ class AppBuilderIntegratedProofTest extends TestCase
             ]],
         ];
         $this->withToken($auth['token'])
-            ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $boundSchema])
+            ->putJson("/api/app-builder/apps/{$appId}/draft", $this->builderDraftBody($appId, $boundSchema))
             ->assertOk();
         $this->withToken($auth['token'])
             ->postJson("/api/app-builder/apps/{$appId}/validate")

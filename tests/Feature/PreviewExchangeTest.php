@@ -34,7 +34,7 @@ class PreviewExchangeTest extends TestCase
 
     private function saveDraft(string $token, string $appId, array $schema): void
     {
-        $this->withToken($token)->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $schema])
+        $this->withToken($token)->putJson("/api/app-builder/apps/{$appId}/draft", $this->builderDraftBody($appId, $schema))
             ->assertOk();
     }
 

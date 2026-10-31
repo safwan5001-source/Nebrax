@@ -9,7 +9,6 @@ use App\Services\AppBuilder\BuilderDraftExperienceService;
 use App\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 /**
@@ -134,36 +133,57 @@ class BuilderDraftOptimisticLockTest extends TestCase
         $this->assertSame($snapshot, $this->withToken($auth['token'])->getJson("/api/app-builder/apps/{$appId}/versions/{$versionNo}")->json('data.schema'));
     }
 
-    // ── التوافق الرجعي ───────────────────────────────────────────────
+    // ── S01c: base_revision إلزامي (428) ─────────────────────────────
 
     /** @test */
-    public function a_save_without_base_revision_still_works_as_before_and_is_counted(): void
+    public function a_save_without_base_revision_is_428_with_a_structured_body_and_writes_nothing(): void
     {
-        [$auth, $appId] = $this->newApp('ad01-legacy');
-        Log::spy();
+        [$auth, $appId] = $this->newApp('ad01-428');
+        $this->saveDraft($auth['token'], $appId, ['schema' => $this->schema('أ'), 'base_revision' => 0])->assertOk();
 
-        $this->saveDraft($auth['token'], $appId, ['schema' => $this->schema('قديم')])
-            ->assertOk()->assertJsonPath('data.revision', 1);
-        // آخر كتابة تفوز كما كان (لا قفل تفاؤلي بلا base_revision)
-        $this->saveDraft($auth['token'], $appId, ['schema' => $this->schema('قديم 2')])
-            ->assertOk()->assertJsonPath('data.revision', 2);
+        $before = $this->draft($auth['token'], $appId);
+        $response = $this->saveDraft($auth['token'], $appId, ['schema' => $this->schema('بلا أساس')]);
 
-        Log::shouldHaveReceived('info')
-            ->with('app_builder.draft_save_without_base_revision', \Mockery::on(fn ($ctx) => is_array($ctx)
-                && array_key_exists('tenant_id', $ctx) && array_key_exists('builder_app_id', $ctx) && ($ctx['revision'] ?? null) === 1))
-            ->once();
+        $response->assertStatus(428)
+            ->assertJsonPath('reason', 'base_revision_required')
+            ->assertJsonPath('current_revision', $before['revision'])
+            ->assertJsonStructure(['message', 'reason', 'current_revision']);
+        $after = $this->draft($auth['token'], $appId);
+        $this->assertSame($before['revision'], $after['revision']);
+        $this->assertSame($before['schema'], $after['schema']);
     }
 
     /** @test */
-    public function a_null_base_revision_is_treated_as_absent_and_a_versioned_save_is_not_counted_as_legacy(): void
+    public function a_null_base_revision_is_428_exactly_like_an_absent_one(): void
     {
-        [$auth, $appId] = $this->newApp('ad01-null');
-        Log::spy();
+        [$auth, $appId] = $this->newApp('ad01-428-null');
 
-        $this->saveDraft($auth['token'], $appId, ['schema' => $this->schema('n'), 'base_revision' => null])->assertOk();
-        $this->saveDraft($auth['token'], $appId, ['schema' => $this->schema('m'), 'base_revision' => 1])->assertOk();
+        $this->saveDraft($auth['token'], $appId, ['schema' => $this->schema('n'), 'base_revision' => null])
+            ->assertStatus(428)->assertJsonPath('reason', 'base_revision_required')->assertJsonPath('current_revision', 0);
+        $this->assertSame(0, $this->draft($auth['token'], $appId)['revision']);
+    }
 
-        Log::shouldHaveReceived('info')->with('app_builder.draft_save_without_base_revision', \Mockery::any())->once();
+    /** @test */
+    public function the_service_refuses_a_missing_base_revision_by_type_so_no_caller_can_bypass_the_lock(): void
+    {
+        [$auth, $appId] = $this->newApp('ad01-428-svc');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $draft = BuilderDraftExperience::query()->where('builder_app_id', $appId)->firstOrFail();
+
+        $this->expectException(\ArgumentCountError::class);
+        app(BuilderDraftExperienceService::class)->save($draft, $this->schema('تجاوز'), null);
+    }
+
+    /** @test */
+    public function the_428_precondition_is_checked_after_authorization_and_tenant_scope(): void
+    {
+        [$authA, $appId] = $this->newApp('ad01-428-a');
+        $authB = $this->registerTenant('ad01-428-b', 'owner@ad01-428-b.test');
+
+        // مستأجر آخر: 404 لا 428 (لا يعرف شيئاً عن revision التطبيق).
+        $response = $this->saveDraft($authB['token'], $appId, ['schema' => $this->schema('x')]);
+        $response->assertStatus(404);
+        $this->assertNull($response->json('current_revision'));
     }
 
     /** @test */
