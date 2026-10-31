@@ -5,7 +5,7 @@
 | Branch | `claude/commerce-h6-batch-l` |
 | Base (origin/main, #1828 merge) | `84e17e52ebd25b5ae2c505301a9655df2c8c0f4b` |
 | PR | #1829 |
-| Tested head (tooling + report content) | `955d0efa25ebcc8cc94242a5353bbf65b5ea54f1` (the PR head moves by this docs-only update) |
+| Tested head (tooling + report content) | superseded by the review-fix commit; see the PR head (first reviewed: `955d0efa25ebcc8cc94242a5353bbf65b5ea54f1`) (the PR head moves by this docs-only update) |
 | CI | pending at time of writing — see the PR checks |
 
 **Status.** Nothing was merged, deployed, activated globally or removed. Wholesale stays off by default (`COMMERCE_WHOLESALE_BUYER_ENABLED=false`); the only place it was switched on is a throwaway local process. No production or Beta system was written to. **Spree is still not removable** (verdict in §8). This batch adds test tooling only; **no production code changed** (§10).
@@ -52,9 +52,9 @@
 1. `resetBuckets()` deletes the file cache before each user action — required because of B1 (§9). The harness-free behaviour is recorded separately (F01).
 2. Session *expiry* is simulated by back-dating the Sanctum token in the throwaway DB (a browser test cannot wait out the TTL); the backend's `expires_at->isPast()` check is what then refuses it.
 
-## 3. Test matrix (32 browser tests: 30 desktop, 2 mobile — **32 passed**)
+## 3. Test matrix (32 browser tests: 30 desktop, 2 mobile — **32 passed in each of two consecutive fresh-stack runs**)
 
-Run: `playwright test --config=playwright.wholesale-e2e.config.ts` → `32 passed (2.0m)`. Trace for every test: `storefront/test-results/wholesale-e2e/artifacts/*/trace.zip` (≈30 MB, **not committed**); sanitized evidence JSON: `evidence-desktop-en.json`, `evidence-mobile-ar.json`; screenshots committed under `docs/audits/assets/h6-batch-l/`.
+Run: `playwright test --config=playwright.wholesale-e2e.config.ts` → `32 passed` twice in a row on freshly seeded stacks (≈2 min each). Trace for every test: `storefront/test-results/wholesale-e2e/artifacts/*/trace.zip` (≈30 MB, **not committed**); sanitized evidence JSON: `evidence-desktop-en.json`, `evidence-mobile-ar.json`; screenshots committed under `docs/audits/assets/h6-batch-l/`.
 
 ### 3.1 Buyer journey (your items 1–14)
 
@@ -63,7 +63,7 @@ Run: `playwright test --config=playwright.wholesale-e2e.config.ts` → `32 passe
 | 1 | Registration | Neutral "check your email" state | **Browser ✅** | `02-register-done.png` |
 | 2 | E-mail verification via configured test transport | Mail addressed to the channel host; link confirms once; **replay refused** with the generic state; sign-in **before** confirmation refused with the indistinguishable message and no cookie | **Browser ✅** | `04-verified.png` |
 | 3 | Sign-in + secure session cookie | `awj_buyer_session`: **HttpOnly, Secure, SameSite=Lax, host-only**; token absent from `document.cookie`, web storage, every requested URL and the DOM | **Browser ✅** | `05-membership-after-signin.png` |
-| 4 | Pending membership | no application → apply → *Pending review* in 1.2 s; catalogue stays gated | **Browser ✅** | `06-pending-gated.png` |
+| 4 | Pending membership | no application → apply → *Pending review* (1.2 s when it works); catalogue stays gated. **Intermittent defect: in 1 of the 2 final runs (and 2 earlier runs) the button stayed on "Submitting…" although the application was recorded; a reload showed Pending** (see B1 consequence, §9) | **Browser ✅** | `06-pending-gated.png` |
 | 5 | Staff approval | Via staff API `POST commerce/wholesale/memberships/{id}/approve`; buyer's next load shows *Approved* | **Browser ✅ (buyer side)** · staff side **API only** | `07-approved.png` |
 | 6 | Listing and detail | P1 **7.00**, P2 **9.00**, never the retail 10.00; detail pages priced | **Browser ✅** | `08-listing.png`, `09-detail-p1.png` |
 | 7 | Buyer-specific price precedence | Partner-linked buyer sees P1 **5.00** (partner list) and P2 **9.00** (channel fallback) | **Browser ✅** | `B1-linked-buyer-prices.png` |
@@ -103,7 +103,9 @@ Retail host: no gate, retail price 10.00, **no buyer cookie** set; add to cart �
 
 ### 3.4 Mobile Arabic/RTL — **Browser ✅**
 
-390×844: gate, sign-in and register render `dir=rtl` with **0 px** horizontal overflow; for an approved buyer the Arabic listing, cart and checkout also overflow by 0 px (`mobile-ar-E01-*.png`, `E02-*.png`). Arabic copy was visually reviewed on the listing only; full Arabic wording review is **not tested**.
+390×844: the gate, sign-in and register pages render `dir=rtl` with 0 px horizontal overflow, **measured only after the real content (gate title, e-mail field, name field) was visible**. For an approved buyer the Arabic listing, a **cart that holds a real line** (5.00) and the **checkout contact form** (step 1 of 6, populated order summary) also overflow by 0 px (`mobile-ar-E01-*.png`, `E02-*.png`). Arabic copy was visually reviewed on the listing, cart and checkout step 1 only; full Arabic wording review is **not tested**. Cosmetic: the store name is truncated in the phone header ("....localhost").
+
+> **Correction (review of `955d0ef`).** The first version of the mobile cart/checkout tests measured overflow before the page had rendered and with an empty cart, so those two screenshots were blank and the "0 px" claim for them was not evidence. The tests now add a real line and assert the cart line and checkout form are visible before measuring; the screenshots in this PR are from the corrected run.
 
 ## 4. Order evidence (sanitized; no emails, names or tokens)
 
@@ -207,6 +209,8 @@ The partner-linked buyer's order (API) shows `unit_price_minor=500`, `price_sour
 | **B1** | **Shared anonymous limiter.** `store/v1` read/write routes use `EnforcePublicApiRateLimit:unauth` = **30 req/min keyed on `request->ip()`**; every visitor arrives from the storefront server, so the whole platform shares one bucket. A page costs ≈7–11 API calls. Measured with no harness reset: **loads 1–3 succeed, load 4 and every later load in that minute render "Something went wrong"** — for an anonymous retail visitor *and* for a signed-in wholesale buyer (`F01`, `F01-signed-in-buyer-after-repeated-loads.png`). Buyer reads are `no-store`, so wholesale cannot hide behind caching. Earlier batches documented the shared bucket; this is its first real-browser severity measure. The choice of fix (trusted forwarded IP vs. gateway-keyed bucket vs. raising the class) is a decision, not applied here. | spec F01 |
 | **B2** | **No deployed evidence.** Revision of API and storefront unknown; no staging wholesale host known. This suite must be re-run against an authorized Beta stack. | §1 |
 | **B3** | **Operators cannot link a buyer to a partner price list** — partner-specific pricing (proven correct) is unusable without code/SQL. | `CustomerPartnerLinkService` |
+
+**B1 consequence seen in the journey:** the *Apply for wholesale access* button intermittently stays on "Submitting…" (observed ≥ 45 s) while the membership **is** recorded server-side; the log shows the post-action page refresh hitting the throttled limiter. There is no error state and no timeout, so a real buyer would be stuck and might re-submit. The suite records this (`apply_ui_stuck_on_submitting_until_reload`) and confirms the state by reloading.
 
 **Other findings (non-blocking, ranked):**
 
