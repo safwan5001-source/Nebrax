@@ -5,7 +5,7 @@
 | Branch | `claude/h6-quick-order` |
 | PR | https://github.com/safwan5001-source/Nebrax/pull/1846 |
 | Base SHA | `c945a1dc6505882b7de70efb172a872de440f1e6` (#1841, H6 final closure) |
-| Head SHA | code head `5bdfb21a3` (this report's later edits are docs-only on top of it) |
+| Head SHA | code head `3d95105f4` (this report's later edits are docs-only on top of it) |
 | CI | running at the time of writing — see §10 |
 
 Nothing was merged, deployed, restarted or migrated against a deployed environment. No environment variable was changed. Wholesale stays disabled by default (`commerce.wholesale_buyer_enabled`). **No Spree code, route, dependency or file was removed.** There is no migration in this PR. The browser suite ran only against a throwaway local SQLite file on loopback, and no payment was captured.
@@ -112,13 +112,13 @@ The remaining screenshots of the 56-test run were generated locally in `storefro
 | `WholesaleQuickOrderTest` | 29 tests, **SQLite and PostgreSQL green** |
 | Related PHP suites (SQLite): Wholesale\*, StorefrontCart\*/Checkout\*, CommerceCart\*/Checkout\*, CommerceModuleBoundary, CommercePrice\*, BranchIsolationGuard, ApplicationCatalog, StorefrontGateway\*, StorefrontClientIp, StorefrontRoutesRegistered, StorefrontPriceParity | **414 passed, 27 skipped, 0 failed** |
 | Related PHP suites (PostgreSQL): WholesaleQuickOrder, WholesalePriceSurfaceBoundary, WholesaleCartCheckoutBoundary, WholesalePricePrecedence, WholesaleBuyer, StorefrontCart/Checkout, CommerceCart, CommerceModuleBoundary, BranchIsolationGuard | 282 passed on the first run + the 2 quick-order failures fixed (§6) and re-run green; boundary test re-run green |
-| Storefront `pnpm test` | **256 files passed, 3675 tests passed**, 16 skipped (pre-existing) |
+| Storefront `pnpm test` | **256 files passed, 3689 tests passed**, 16 skipped (pre-existing) — run on `3d95105f4` |
 | `tsc --noEmit` | clean |
 | `pnpm lint` (Biome) | 0 errors (6 warnings / 3 infos are pre-existing) |
 | `pnpm check:locales` | all six locales in sync |
 | `pnpm check:spree-ratchet` | OK at the unchanged baseline (4 / 4 / 52 / 69 / 9) — this PR adds **no** Spree dependency |
 | Production build | the E2E stack serves `next start` of a production build of this source |
-| Playwright wholesale suite (local isolated stack, desktop-en + mobile-ar) | **56 / 56 passed**, run on a fresh production build of `280acb341`; the review fixes after it (paste-box handling, SKU length) are covered by unit/component/backend tests, not by a browser re-run (12 new Q-tests; the rest are the pre-existing journey, security, retail-regression, rate-limit, closure and Arabic-mobile tests) |
+| Playwright wholesale suite (local isolated stack, desktop-en + mobile-ar) | **56 / 56 passed**, run on a fresh production build of the final code head `3d95105f4` |
 | CI Gate | running at the time of writing — see §10 |
 
 Not run locally: the full PHP suite (no ParaTest here; `ext-bcmath` is absent so Fuel\* tests fail locally by environment, not by this change) — CI runs it.
@@ -213,7 +213,7 @@ Final gate (unchanged from the exit plan §G): zero runtime Spree calls, no `SPR
 ## 10. PR, SHAs and CI
 
 - PR: #1846, branch `claude/h6-quick-order`, base `c945a1dc6505882b7de70efb172a872de440f1e6`.
-- Head SHA (code): `5bdfb21a3`.
+- Head SHA (code): `3d95105f4` (after eleven Codex review rounds, §6 items 5–15).
 - CI: pending when this report was written; the PR page is the source of truth. If the PostgreSQL job fails only in `AiActionHistoryListTest` (a known intermittent count flake unrelated to this change), it is re-run once and noted on the PR.
 
 ## 11. Recommended final action
