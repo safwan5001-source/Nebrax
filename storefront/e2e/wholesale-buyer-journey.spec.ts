@@ -223,6 +223,7 @@ async function staffToken(): Promise<string> {
 async function staffTransition(
   email: string,
   action: "approve" | "suspend" | "reinstate",
+  channelId: string = seed.channel_ids.ws,
 ) {
   const t = await staffToken();
   const h = {
@@ -232,7 +233,7 @@ async function staffTransition(
   };
   const list = await (
     await fetch(
-      `${ENV.api}/api/commerce/wholesale/channels/${seed.channel_ids.ws}/memberships?per_page=100`,
+      `${ENV.api}/api/commerce/wholesale/channels/${channelId}/memberships?per_page=100`,
       { headers: h },
     )
   ).json();
@@ -1003,20 +1004,48 @@ test.describe
       });
     });
 
-    test("C09 a cart cookie from one channel is useless on another channel", async () => {
+    test("C09 a WS cart cookie replayed on another channel, by a buyer who IS approved there, reveals and resolves nothing", async () => {
+      // Give the same buyer a genuine approved membership on WS2 so the request passes the token/membership
+      // gates and actually reaches cart resolution (otherwise this would only repeat C01's token-binding check).
+      const t2 = (await login(seed.hosts.ws2, S.linked.email)).token as string;
       resetBuckets();
-      const other = await gw(seed.hosts.ws2, "GET", "cart", {
-        token: linked,
+      const apply = await gw(seed.hosts.ws2, "POST", "wholesale/application", {
+        token: t2,
+      });
+      expect([200, 201]).toContain(apply.status);
+      expect(
+        await staffTransition(S.linked.email, "approve", seed.channel_ids.ws2),
+      ).toBe("approved");
+      resetBuckets();
+      const reaches = await gw(seed.hosts.ws2, "GET", "products", {
+        token: t2,
+      });
+      expect(reaches.status).toBe(200); // proves the destination-channel session is valid and approved
+
+      resetBuckets();
+      const replay = await gw(seed.hosts.ws2, "GET", "cart", {
+        token: t2,
         cart: p1CartCookie,
       });
-      expect(other.status).toBeGreaterThanOrEqual(400);
+      expect(replay.status).toBeLessThan(500);
+      const leaked = JSON.stringify(replay.json ?? {});
+      expect(leaked).not.toContain(seed.products.p1);
+      expect(replay.json?.data?.items ?? []).toHaveLength(0);
+
+      // the other direction: the same WS cart cookie with no buyer identity on the retail channel
+      resetBuckets();
       const dtc = await gw(seed.hosts.dtc, "GET", "cart", {
         cart: p1CartCookie,
       });
       expect(JSON.stringify(dtc.json ?? {})).not.toContain(seed.products.p1);
+      expect(dtc.json?.data?.items ?? []).toHaveLength(0);
       ev("C09", {
-        wholesale_cart_on_other_wholesale_channel: other.status,
-        wholesale_cart_on_retail_channel: dtc.status,
+        buyer_approved_on_destination_channel: true,
+        destination_channel_catalogue: reaches.status,
+        ws_cart_cookie_on_ws2_status: replay.status,
+        ws_cart_cookie_on_ws2_items: (replay.json?.data?.items ?? []).length,
+        ws_cart_cookie_on_retail_status: dtc.status,
+        ws_cart_cookie_on_retail_items: (dtc.json?.data?.items ?? []).length,
         cart_contents_leaked: false,
       });
     });
@@ -1195,7 +1224,17 @@ test.describe
         page.getByRole("button", { name: /continue to review/i }),
       );
       await click(page, page.getByRole("button", { name: /complete order/i }));
-      await page.waitForTimeout(3000);
+      // assert what the shopper sees, not just that rows exist
+      await expect(
+        page.getByRole("heading", { name: en.awjCheckout.success.heading }),
+      ).toBeVisible({ timeout: 30_000 });
+      await expect(
+        page.getByText(en.awjCheckout.success.notPaidNote),
+      ).toBeVisible();
+      expect(
+        (await bodyText(page)).match(/[A-Z]{2,}-\d{4}-\d{3,}/)?.[0],
+        "order number shown on the retail confirmation",
+      ).toBeTruthy();
       await shot(page, "D02-retail-confirmation");
       const out = php("wholesale-e2e-evidence.php");
       const retail = out.orders.filter(
