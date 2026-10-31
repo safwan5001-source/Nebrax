@@ -89,7 +89,7 @@ describe("buyer account actions while ACCOUNT_AUTH_CAPABILITY is gated", () => {
       ]),
     );
     for (const call of cookieSet.mock.calls) {
-      expect(call[1]).toMatchObject({ path: "/", maxAge: 0 });
+      expect(call[2]).toMatchObject({ path: "/", maxAge: 0 });
       expect(call[0]).toBeTypeOf("string");
     }
   });

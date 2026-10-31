@@ -37,7 +37,6 @@ vi.mock("next-intl/server", () => ({
     return (key: string) => table[key] ?? key;
   },
 }));
-vi.mock("@/lib/spree", () => ({ isWholesaleEnabled: () => false }));
 vi.mock("@/components/layout/FooterGroupDisclosure", () => ({
   FooterGroupDisclosure: ({
     id,

@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
  * X5 — route-tree inventory. Checkout URLs have exactly ONE owner:
  *   - AWJ-native, Spree-free:  (store-checkout)/checkout and (store-checkout)/checkout/payment-return
  * The legacy Spree pages (`checkout/[id]`, `confirm-payment/[id]`, `order-placed/[id]`) and their gated `(checkout)` group
- * were removed (H6); the proxy keeps answering a real 404 for those URLs (see `lib/spree/middleware.test.ts`). This test
+ * were removed (H6); the proxy keeps answering a real 404 for those URLs (see `lib/proxy/storefront-proxy.test.ts`). This test
  * makes sure none of them can reappear, ungated, anywhere in the route tree.
  */
 const ROOT = path.join(process.cwd(), "src/app/[country]/[locale]");

@@ -1445,6 +1445,27 @@ test.describe
       });
     });
 
+    test("D03 retail account: a protected page sends an anonymous visitor to sign-in, which says accounts are unavailable (no form, no Spree wording)", async ({
+      page,
+    }) => {
+      const response = await page.goto(`${DTC}/sa/en/account/orders`, {
+        waitUntil: "domcontentloaded",
+      });
+      expect(response?.status()).toBe(200);
+      expect(new URL(page.url()).pathname).toBe("/sa/en/account");
+      await expect(page.getByText(en.accountGate.title).first()).toBeVisible();
+      expect(await page.locator("form input[type=password]").count()).toBe(0);
+      expect(await bodyText(page)).not.toMatch(/spree|SPREE_/i);
+      for (const path of ["register", "forgot-password", "reset-password"]) {
+        await go(page, `${DTC}/sa/en/account/${path}`);
+        await expect(
+          page.getByText(en.accountGate.title).first(),
+        ).toBeVisible();
+        expect(await page.locator("input[type=password]").count()).toBe(0);
+      }
+      ev("D03", { redirect_to_signin: true, notice: true, form: false });
+    });
+
     test("D02 retail cart and checkout to a confirmed order, unchanged behaviour", async ({
       page,
     }) => {
@@ -1913,24 +1934,43 @@ test.describe
       });
     });
 
-    test("H06 the locale cookies are HttpOnly + SameSite=Lax (names and values unchanged) and locale switching still works", async ({
+    test("H06 the locale cookies (awj_country / awj_locale) are HttpOnly + SameSite=Lax, locale switching works, and a legacy spree_* pair is read once then expired", async ({
       page,
       context,
     }) => {
       await go(page, `${DTC}/sa/en/products`);
       const cookies = await context.cookies();
-      for (const name of ["spree_country", "spree_locale"]) {
+      for (const name of ["awj_country", "awj_locale"]) {
         const c = cookies.find((x) => x.name === name);
         expect(c, name).toBeTruthy();
         expect(c?.httpOnly, name).toBe(true);
         expect(c?.sameSite, name).toBe("Lax");
       }
-      expect(cookies.find((x) => x.name === "spree_locale")?.value).toBe("en");
+      expect(cookies.find((x) => x.name === "awj_locale")?.value).toBe("en");
+      expect(cookies.some((x) => x.name.startsWith("spree_"))).toBe(false);
       await go(page, `${DTC}/sa/ar/products`);
       expect(
-        (await context.cookies()).find((x) => x.name === "spree_locale")?.value,
+        (await context.cookies()).find((x) => x.name === "awj_locale")?.value,
       ).toBe("ar");
-      ev("H06", { httpOnly: true, sameSite: "Lax", locale_switch: "en→ar" });
+
+      // A returning browser that still holds the legacy pair keeps its market/language and sheds the old names.
+      await context.clearCookies();
+      const origin = new URL(DTC).origin;
+      await context.addCookies([
+        { name: "spree_country", value: "sa", url: origin },
+        { name: "spree_locale", value: "ar", url: origin },
+      ]);
+      await page.goto(`${DTC}/products`, { waitUntil: "domcontentloaded" });
+      expect(new URL(page.url()).pathname).toMatch(/^\/sa\/ar\/products/);
+      const migrated = await context.cookies();
+      expect(migrated.find((x) => x.name === "awj_locale")?.value).toBe("ar");
+      expect(migrated.some((x) => x.name.startsWith("spree_"))).toBe(false);
+      ev("H06", {
+        httpOnly: true,
+        sameSite: "Lax",
+        locale_switch: "en→ar",
+        legacy_migrated: true,
+      });
     });
 
     test("H07 a bare country path goes to that market's root, not /sa/ar/sa", async ({

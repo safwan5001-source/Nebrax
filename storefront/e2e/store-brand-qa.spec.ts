@@ -200,12 +200,12 @@ for (const locale of locales) {
       await page.setViewportSize({ width, height: 1000 });
       await page.context().addCookies([
         {
-          name: "spree_country",
+          name: "awj_country",
           value: "sa",
           url: "http://127.0.0.1:3001",
         },
         {
-          name: "spree_locale",
+          name: "awj_locale",
           value: locale,
           url: "http://127.0.0.1:3001",
         },
@@ -391,12 +391,12 @@ test("published icon targets are usable and keyboard focus is visible", async ({
   await page.setViewportSize({ width: 390, height: 1000 });
   await page.context().addCookies([
     {
-      name: "spree_country",
+      name: "awj_country",
       value: "sa",
       url: "http://127.0.0.1:3001",
     },
     {
-      name: "spree_locale",
+      name: "awj_locale",
       value: "en",
       url: "http://127.0.0.1:3001",
     },

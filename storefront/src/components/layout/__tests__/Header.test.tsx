@@ -18,8 +18,6 @@ vi.mock("next-intl/server", () => ({
   },
 }));
 
-vi.mock("@/lib/spree", () => ({ isWholesaleEnabled: () => false }));
-
 vi.mock("@/components/layout/StoreSearch", () => ({
   StoreSearch: () => <div data-testid="store-search" />,
 }));

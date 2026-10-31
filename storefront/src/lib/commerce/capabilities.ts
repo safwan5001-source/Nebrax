@@ -84,16 +84,16 @@ export const COUPON_CAPABILITY = "design_only" as CapabilityState;
  * `store/v1` is anonymous by design (ADR-24) and carries no shopper identity;
  * `commerce/v1` and `customer/v1` are not reachable from this storefront
  * server; and no customer verification / recovery delivery exists yet. The
- * only code behind these screens was the leftover Spree SDK client, which has
- * no backend in any AWJ environment.
+ * only code that was behind these screens was a Spree SDK client, which had no
+ * backend in any AWJ environment and has been removed (final Spree exit).
  *
- * While this is not `live`: no server action under `@/lib/data/customer`
- * reaches `@/lib/spree`, the auth screens render an honest notice instead of a
- * form, the session provider never calls the server, and no internal error
+ * While this is not `live`: every server action under `@/lib/data/customer`
+ * refuses (`capability_unavailable`) and reaches no upstream client, the auth
+ * screens render an honest notice instead of a form, the session provider never calls the server, and no internal error
  * text reaches the buyer. Guest cart, checkout and payment are unaffected.
  *
- * Do NOT "fix" this by setting `SPREE_API_URL` / `SPREE_PUBLISHABLE_KEY`: a
- * placeholder host would receive the shopper's email and password.
+ * Flipping this constant to `live` does nothing by itself: the actions have no
+ * implementation to switch to until the contract below exists.
  *
  * Missing backend contract (tracked in AWJ_SPREE_EXIT_MIGRATION_PLAN.md, B1-B4):
  * a `store/v1` customer session (register / login / logout / me), verification

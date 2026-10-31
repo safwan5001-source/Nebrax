@@ -12,7 +12,6 @@ vi.mock("next/server", () => ({ connection: vi.fn() }));
 vi.mock("next-intl/server", () => ({
   getTranslations: vi.fn(async () => (key: string) => key),
 }));
-vi.mock("@/lib/spree", () => ({ isWholesaleEnabled: () => false }));
 
 import { Footer } from "./Footer";
 
