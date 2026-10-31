@@ -3,10 +3,10 @@
 | | |
 |---|---|
 | Branch | `claude/h6-spree-runtime-cleanup` |
-| PR | {{PR}} |
+| PR | https://github.com/safwan5001-source/Nebrax/pull/1856 |
 | Base SHA (origin/main) | `86867089d8b655e8f70d21648b1976eedd69dd4e` (#1853) |
-| Head SHA | {{HEAD}} |
-| CI | {{CI}} |
+| Head SHA | code head `5e0f4ab3c`; any later commit on the branch changes this report only |
+| CI | see the PR's checks (running when this report was written; the PR page is the source of truth) |
 
 Storefront-only. No Laravel file, API contract, schema, accounting/VAT/ZATCA rule, payment/refund/cancellation path, tenant/channel isolation, buyer authentication, wholesale price precedence, or DTC cart/checkout behaviour was touched. Nothing was merged, deployed, migrated or activated.
 
@@ -80,7 +80,7 @@ Baseline tightened in this PR. Packages with Spree/payment SDKs: 5 → 2 payment
 | Spree ratchet | OK at the new, lower baseline |
 | Backend SQLite / PostgreSQL | not run — no backend change |
 | Browser suite | not run — routing/auth/cart/checkout behaviour is unchanged for every URL that existed in production before (the removed routes were already 404 there) |
-| CI Gate | {{CI}} |
+| CI Gate | see the PR's checks (running when written) |
 
 ## 7. Remaining blockers and exact next action
 
