@@ -51,7 +51,9 @@ A mistake caught by the post-delete recheck, recorded for transparency: `src/com
 
 - `/{checkout,confirm-payment,order-placed}/{id}` (and dotted ids, `/checkout/Payment-Return` spellings) keep answering a **real 404** from the proxy. The proxy guard no longer depends on the Spree add-on env (the pages are gone, so the env can no longer open them); four middleware tests that asserted "lets it through when the add-on is enabled" were **changed to assert the closed behaviour** (a disclosed, intended behaviour change).
 - The native checkout (`/checkout`, `/checkout/payment-return`) is unchanged and still tested (`AwjCheckoutFlow*`, `PaymentReturn*`, `PaymentStage`, no-Spree-env guard).
-- `no-spree-env.test.ts`: its X5 case imported the deleted layout; it now asserts the route group no longer exists (the closure itself is covered by the middleware tests). No other guard was weakened.
+- `no-spree-env.test.ts`: its X5 case imported the deleted layout; it now asserts the route group no longer exists (the closure itself is covered by the middleware tests).
+- `app/__tests__/checkout-routes.test.ts` (X5 route-tree inventory): three cases asserted the legacy group's pages/layout *exist*. They were replaced by two **stricter** cases — no legacy checkout-shaped page may exist anywhere, and the `(checkout)` group must be gone — and the "no stray checkout-shaped route" case lost its exemption for `(checkout)/`. The AWJ-native-checkout-is-Spree-free cases are unchanged.
+- No other guard was weakened; no financial or security assertion was touched.
 - Legacy `/wholesale/*` redirects (from #1853) untouched.
 
 ## 5. Spree counters (`pnpm check:spree-ratchet`)
@@ -72,9 +74,9 @@ Baseline tightened in this PR. Packages with Spree/payment SDKs: 5 → 2 payment
 |---|---|
 | Import-graph recheck after deletion | no live module depends on a deleted one; only generic UI primitives, `i18n/request.ts` and one test-only util remain unreachable |
 | `tsc --noEmit`, Biome lint | clean (6 warnings / 3 infos pre-existing) |
-| Affected suites (`lib/data`, `lib/spree`, `components/checkout`, `components/cart`, `contexts`) | 524 tests; the 4 changed middleware tests pass in their new form |
-| Full storefront `pnpm test` | {{UNIT}} |
-| Production build (`pnpm build`) | {{BUILD}} |
+| Affected suites (`lib/data`, `lib/spree`, `components/checkout`, `components/cart`, `contexts`, route inventory) | pass; the 4 changed middleware tests, the rewritten route-inventory guard and the `no-spree-env` X5 case pass in their new form |
+| Full storefront `pnpm test` | **253 files / 3666 tests passed**, 16 skipped (pre-existing), run with a clean environment (`AWJ_*`/gateway variables unset — a first run that inherited them from the build shell failed two env-sensitive tests, `config.test.ts` and `edge-storefront-locale.test.ts`, which pass once the variables are unset; that was my shell, not the code) |
+| Production build (`pnpm build`) | `pnpm build` compiled successfully (exit 0); the build prints a `Sitemap index unavailable … headers() inside generateStaticParams` notice from sitemap code this PR does not touch |
 | Spree ratchet | OK at the new, lower baseline |
 | Backend SQLite / PostgreSQL | not run — no backend change |
 | Browser suite | not run — routing/auth/cart/checkout behaviour is unchanged for every URL that existed in production before (the removed routes were already 404 there) |

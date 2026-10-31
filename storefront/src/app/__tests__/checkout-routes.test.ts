@@ -4,10 +4,11 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * X5 — route-tree inventory. Checkout URLs must have exactly two owners:
+ * X5 — route-tree inventory. Checkout URLs have exactly ONE owner:
  *   - AWJ-native, Spree-free:  (store-checkout)/checkout and (store-checkout)/checkout/payment-return
- *   - legacy Spree/wholesale:  (checkout)/{checkout/[id], confirm-payment/[id], order-placed/[id]}, gated in one layout
- * so a new checkout-shaped route cannot appear elsewhere (ungated) without this test failing.
+ * The legacy Spree pages (`checkout/[id]`, `confirm-payment/[id]`, `order-placed/[id]`) and their gated `(checkout)` group
+ * were removed (H6); the proxy keeps answering a real 404 for those URLs (see `lib/spree/middleware.test.ts`). This test
+ * makes sure none of them can reappear, ungated, anywhere in the route tree.
  */
 const ROOT = path.join(process.cwd(), "src/app/[country]/[locale]");
 
@@ -27,34 +28,15 @@ const routes = files.filter((f) => /(^|\/)(page|route)\.tsx?$/.test(f));
 const read = (file: string) => readFileSync(path.join(ROOT, file), "utf8");
 
 describe("checkout route ownership (X5)", () => {
-  it("the legacy Spree checkout pages live only in the gated (checkout) group", () => {
+  it("no legacy Spree checkout page exists anywhere in the route tree", () => {
     const legacy = routes.filter((r) =>
       /(^|\/)(checkout\/\[[^\]]+\]|confirm-payment|order-placed)(\/|$)/.test(r),
     );
-    expect(legacy.sort()).toEqual([
-      "(checkout)/checkout/[id]/page.tsx",
-      "(checkout)/confirm-payment/[id]/page.tsx",
-      "(checkout)/order-placed/[id]/page.tsx",
-    ]);
+    expect(legacy).toEqual([]);
   });
 
-  it("the (checkout) group's layout is a server component that 404s unless wholesale is enabled, before any page runs", () => {
-    const layout = read("(checkout)/layout.tsx");
-    expect(layout).not.toMatch(/^\s*["']use client["']/m);
-    expect(layout).toMatch(/isWholesaleEnabled\(\)/);
-    expect(layout).toMatch(/if \(!isWholesaleEnabled\(\)\) notFound\(\)/);
-    // the gate precedes the shell/provider in the file's only exported component
-    expect(layout.indexOf("notFound()")).toBeLessThan(
-      layout.indexOf("<CheckoutShell>"),
-    );
-  });
-
-  it("every page of the group sits under that layout (no nested route group escapes it)", () => {
-    const pages = routes.filter((r) => r.startsWith("(checkout)/"));
-    expect(pages).toHaveLength(3);
-    for (const page of pages) {
-      expect(page).not.toMatch(/\(.+\)\/.*\(.+\)/); // no second route group inside → same layout chain
-    }
+  it("the gated (checkout) route group is gone", () => {
+    expect(files.filter((f) => f.startsWith("(checkout)/"))).toEqual([]);
   });
 
   it("the AWJ-native checkout routes exist, are outside the gated group, and import nothing from Spree", () => {
@@ -78,7 +60,6 @@ describe("checkout route ownership (X5)", () => {
   it("no other route group contains a checkout-shaped legacy path", () => {
     const strays = routes.filter(
       (r) =>
-        !r.startsWith("(checkout)/") &&
         !r.startsWith("(store-checkout)/") &&
         /(^|\/)(checkout|confirm-payment|order-placed)(\/|$)/.test(r),
     );
