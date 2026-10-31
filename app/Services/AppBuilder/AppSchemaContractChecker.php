@@ -118,19 +118,20 @@ final class AppSchemaContractChecker
             $idPages[$id][] = $pageId;
         }
 
+        // نوع/إجراء مجهول: العقدة (وشجرتها كلها) من عمل `CompatibilityResolver` — إن كانت اختيارية فهي وحدة إسقاط آمنة
+        // يتجاوزها التطبيق، فلا تُحجب بها مسودة كانت قابلة للنشر (مراجعة Codex). الفحص هنا لما سيُعرض فعلاً.
+        $action = is_array($node['action'] ?? null) ? $node['action'] : null;
+        $unsupportedAction = $action !== null && ! isset(ActionRegistry::definitions()[(string) ($action['type'] ?? '')]);
+        if ($definition === null || $unsupportedAction) {
+            return;
+        }
+
         if ($parentType !== null) {
             if ($type === 'Page') {
                 $issues[] = new ContractIssue('page_not_root', ContractIssue::ERROR, $pageId, $id, null, 'الصفحة لا تُضمَّن داخل مكوّن آخر؛ هي جذر الصفحة فقط.');
             } elseif ($definition !== null && ! in_array($parentType, ComponentRegistry::allowedParentTypes($type), true)) {
                 $issues[] = new ContractIssue('child_not_allowed', ContractIssue::ERROR, $pageId, $id, null, "المكوّن \"{$type}\" لا يُضمَّن داخل \"{$parentType}\".");
             }
-        }
-
-        if ($definition === null) {
-            // نوع مجهول: فحص الهوية والتوافق عمل `CompatibilityResolver`.
-            $this->walkChildren($node, $type, $pageId, $pageIds, $idPages, $issues);
-
-            return;
         }
 
         $children = $node['children'] ?? [];

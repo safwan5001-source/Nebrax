@@ -136,6 +136,17 @@ class BuilderContractEnforcementApiTest extends TestCase
     }
 
     /** @test */
+    public function a_draft_with_an_unsupported_optional_subtree_still_publishes_through_the_compatibility_fallback(): void
+    {
+        [$auth, $appId] = $this->newApp('ad12-optional');
+        $this->save($auth['token'], $appId, $this->schemaWith([
+            ['type' => 'FutureLayout', 'id' => 'f', 'optional' => true, 'children' => [['type' => 'Text', 'id' => 'inner', 'props' => ['text' => 'x']]]],
+        ]))->assertOk()->assertJsonPath('issues', []);
+
+        $this->withToken($auth['token'])->postJson("/api/app-builder/apps/{$appId}/versions", [])->assertCreated();
+    }
+
+    /** @test */
     public function registries_expose_allowed_parents_and_children(): void
     {
         $auth = $this->registerTenant('ad12-reg', 'owner@ad12-reg.test');

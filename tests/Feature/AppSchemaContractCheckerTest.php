@@ -109,6 +109,17 @@ class AppSchemaContractCheckerTest extends TestCase
     }
 
     /** @test */
+    public function an_unsupported_optional_subtree_is_not_checked_so_its_compatibility_fallback_still_publishes(): void
+    {
+        $schema = $this->schema([
+            ['type' => 'FutureLayout', 'id' => 'f', 'optional' => true, 'children' => [['type' => 'Text', 'id' => 'inner', 'props' => ['text' => 'x']]]],
+            ['type' => 'Button', 'id' => 'b', 'optional' => true, 'props' => ['label' => 'x', 'style' => 'wild'], 'action' => ['type' => 'futureAction', 'params' => []]],
+        ]);
+
+        $this->assertSame([], $this->checker->check($schema));
+    }
+
+    /** @test */
     public function a_page_nested_inside_a_section_is_a_blocking_error(): void
     {
         $schema = $this->schema([['type' => 'Section', 'id' => 's', 'children' => [['type' => 'Page', 'id' => 'p2']]]]);
